@@ -560,6 +560,9 @@ fn shadowing_original() -> bool {
 
 fn bench(n: u32) -> anyhow::Result<()> {
     use std::time::Instant;
+    if n == 0 {
+        anyhow::bail!("--n must be >= 1");
+    }
     let me = std::env::current_exe()?;
     let mut mine = vec![];
     for _ in 0..n {

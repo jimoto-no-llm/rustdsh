@@ -124,7 +124,10 @@ pub fn cmd_compact(file: &str, max_tokens: usize) -> anyhow::Result<()> {
     body.push_str(&summary);
     body.push('\n');
     for l in &kept {
-        if *l == first {
+        // Skip only the head line itself (already emitted above). A content
+        // match (`*l == first`) would also drop a body line that happens to
+        // repeat the first line verbatim, e.g. a re-sent system prompt.
+        if std::ptr::eq(*l, first) {
             continue;
         }
         body.push_str(l);
