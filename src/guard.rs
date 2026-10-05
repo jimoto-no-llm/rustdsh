@@ -99,7 +99,7 @@ pub fn cmd_guard(deny: Vec<String>, reason: Option<String>, json_out: bool) -> a
                 );
                 Ok(())
             } else {
-                eprintln!("{}", msg);
+                eprintln!("{msg}");
                 std::process::exit(2);
             }
         }
