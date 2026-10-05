@@ -4,7 +4,7 @@
 // it does not know, so these hints cannot break boot.
 // NOTE: upstream dsh (0.2.0) does not read any RDSH_* key; they only tune
 // rdsh-side behavior. The one env below that the Node runtime itself reads
-// is NODE_COMPILE_CACHE (Node >= 22.1).
+// is NODE_COMPILE_CACHE (effective on Node >= 22.1; ignored on older).
 pub fn slim_env() -> Vec<(String, String)> {
     vec![
         ("RDSH_SLIM".into(), "1".into()),
@@ -17,7 +17,7 @@ pub fn slim_env() -> Vec<(String, String)> {
 }
 
 pub fn describe() -> String {
-    "RDSH_SLIM=1 RDSH_LAZY_PLUGINS=1 RDSH_DISABLE_VOICE=1 RDSH_DISABLE_AUTO_REVIEW=1 NODE_COMPILE_CACHE=<cache-dir, Node>=22.1 only, RDSH_NODE_COMPILE_CACHE=0 to disable>".to_string()
+    "RDSH_SLIM=1 RDSH_LAZY_PLUGINS=1 RDSH_DISABLE_VOICE=1 RDSH_DISABLE_AUTO_REVIEW=1 NODE_COMPILE_CACHE=<cache-dir, effective on Node>=22.1, RDSH_NODE_COMPILE_CACHE=0 to disable>".to_string()
 }
 
 // Default on-disk dir for the Node compile cache (V8 code cache for the
