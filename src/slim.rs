@@ -28,13 +28,7 @@ pub fn default_cache_dir_for(home: &str) -> String {
 
 // Process-home version of default_cache_dir_for.
 pub fn default_compile_cache_dir() -> Option<String> {
-    let home = std::env::var("HOME")
-        .or_else(|_| std::env::var("USERPROFILE"))
-        .ok()?;
-    if home.is_empty() {
-        return None;
-    }
-    Some(default_cache_dir_for(&home))
+    crate::inspect::home_dir().map(|h| default_cache_dir_for(&h))
 }
 
 // Pure decision for NODE_COMPILE_CACHE: returns the dir to set, or None

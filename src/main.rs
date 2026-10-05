@@ -374,10 +374,7 @@ fn print_help() {
 }
 
 fn dump_config_native(profile: &str, patches: &[String]) -> anyhow::Result<()> {
-    let home = std::env::var("DSH_HOME").unwrap_or_else(|_| {
-        let h = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-        format!("{h}/.dsh")
-    });
+    let home = crate::inspect::dsh_home();
     println!("{{\"profile\": \"{profile}\", \"dsh_home\": \"{home}\", \"patches\": {patches:?}}}");
     let root = format!("{home}/profiles/{profile}");
     match std::fs::read_dir(&root) {
@@ -413,10 +410,7 @@ fn doctor() -> anyhow::Result<()> {
         "[rdsh] original dsh: {}",
         orig.as_deref().unwrap_or("<not found in PATH>")
     ));
-    let home = std::env::var("DSH_HOME").unwrap_or_else(|_| {
-        let h = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-        format!("{h}/.dsh")
-    });
+    let home = crate::inspect::dsh_home();
     say(format!("[rdsh] DSH_HOME: {home}"));
     match std::fs::read_dir(format!("{home}/profiles")) {
         Ok(d) => say(format!("[rdsh] profiles: {} local profile(s)", d.count())),
@@ -498,10 +492,9 @@ fn smart_dsh_status(home: &str) -> String {
 /// the native binary (Node tries to parse the ELF as JS). Scan the local bin
 /// dir for text files mentioning both and point at the offending wrappers.
 fn node_wrapper_warnings() -> Vec<String> {
-    let home = std::env::var("HOME").unwrap_or_default();
-    if home.is_empty() {
+    let Some(home) = crate::inspect::home_dir() else {
         return vec![];
-    }
+    };
     let dir = format!("{home}/.local/bin");
     let entries = std::fs::read_dir(&dir).ok();
     let mut hits: Vec<String> = vec![];

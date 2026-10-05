@@ -10,9 +10,7 @@ pub fn env_dry() -> bool {
 
 fn origin_file() -> Option<String> {
     // install.ps1 records the backup here on native Windows (USERPROFILE).
-    let home = std::env::var("HOME")
-        .or_else(|_| std::env::var("USERPROFILE"))
-        .ok()?;
+    let home = crate::inspect::home_dir()?;
     let p = format!("{home}/.config/rdsh/origin");
     let s = std::fs::read_to_string(p).ok()?;
     let s = s.trim().to_string();
@@ -74,7 +72,7 @@ pub fn find_original_dsh() -> Option<String> {
             }
         }
     }
-    if let Ok(home) = std::env::var("HOME") {
+    if let Some(home) = crate::inspect::home_dir() {
         for cand in [
             format!("{home}/.local/bin/dsh.orig"),
             format!("{home}/.local/bin/dsh-orig"),
@@ -176,7 +174,7 @@ pub fn latest_node_tree_for(opt_dir: &str) -> Option<String> {
 
 // Newest matching tree under ~/.local/opt.
 pub fn latest_node_tree() -> Option<String> {
-    let home = std::env::var("HOME").ok()?;
+    let home = crate::inspect::home_dir()?;
     latest_node_tree_for(&format!("{home}/.local/opt"))
 }
 

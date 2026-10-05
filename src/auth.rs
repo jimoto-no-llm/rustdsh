@@ -20,22 +20,7 @@ use std::collections::HashMap;
 const RECORD_SCOPE: &str = "llm-pi-ai";
 
 fn home() -> Option<String> {
-    // Windows has no HOME; USERPROFILE (or HOMEDRIVE+HOMEPATH) is the equivalent.
-    for k in ["HOME", "USERPROFILE"] {
-        if let Ok(h) = std::env::var(k) {
-            if !h.is_empty() {
-                return Some(h);
-            }
-        }
-    }
-    #[cfg(target_os = "windows")]
-    {
-        match (std::env::var("HOMEDRIVE"), std::env::var("HOMEPATH")) {
-            (Ok(d), Ok(p)) if !d.is_empty() && !p.is_empty() => return Some(format!("{d}{p}")),
-            _ => {}
-        }
-    }
-    None
+    crate::inspect::home_dir()
 }
 
 pub fn creds_path() -> String {

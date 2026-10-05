@@ -1,12 +1,31 @@
 //! Read-only inspection of $DSH_HOME without Node: sessions, logs, skills, profiles.
 //! Never writes; missing dirs are reported, not errors (exit 0 with a note).
 
+/// User home directory without a dirs/home crate: HOME, USERPROFILE, then
+/// HOMEDRIVE+HOMEPATH (native Windows). One resolver for the whole binary so
+/// no call site drifts back to a HOME-only fallback (which yields "./" on
+/// Windows and diverges from every other feature).
+pub fn home_dir() -> Option<String> {
+    for k in ["HOME", "USERPROFILE"] {
+        if let Ok(h) = std::env::var(k) {
+            if !h.is_empty() {
+                return Some(h);
+            }
+        }
+    }
+    #[cfg(target_os = "windows")]
+    {
+        match (std::env::var("HOMEDRIVE"), std::env::var("HOMEPATH")) {
+            (Ok(d), Ok(p)) if !d.is_empty() && !p.is_empty() => return Some(format!("{d}{p}")),
+            _ => {}
+        }
+    }
+    None
+}
+
 pub fn dsh_home() -> String {
     std::env::var("DSH_HOME").unwrap_or_else(|_| {
-        // USERPROFILE is the Windows equivalent of HOME.
-        let h = std::env::var("HOME")
-            .or_else(|_| std::env::var("USERPROFILE"))
-            .unwrap_or_else(|_| ".".to_string());
+        let h = home_dir().unwrap_or_else(|| ".".to_string());
         format!("{h}/.dsh")
     })
 }
