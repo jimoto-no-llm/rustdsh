@@ -54,8 +54,7 @@ fn constant_time_eq(a: &str, b: &str) -> bool {
 
 pub fn random_token() -> anyhow::Result<String> {
     let mut bytes = [0u8; 32];
-    getrandom::fill(&mut bytes)
-        .map_err(|e| anyhow::anyhow!("OS random source failed: {e}"))?;
+    getrandom::fill(&mut bytes).map_err(|e| anyhow::anyhow!("OS random source failed: {e}"))?;
     Ok(bytes.iter().map(|b| format!("{b:02x}")).collect())
 }
 
