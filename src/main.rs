@@ -543,7 +543,7 @@ fn print_help() {
     println!("  rdsh tokens ./AGENTS.md         estimate input tokens natively");
     println!("  rdsh auth --import              mirror codex/opencode OAuth into dsh credentials");
     println!("  rdsh setup                      first-run connect: import, login flow, next steps");
-    println!("  rdsh search TODO --dir .        fast file search without Node");
+    println!("  rdsh search hello --dir .       fast file search without Node");
     println!("  rdsh search-web \"rust async\"      web search via SearXNG (no API key)");
     println!("  rdsh --passthrough tui          byte-identical delegation, no slim env");
     println!("  rdsh --dry-run tui -- --resume abc   show what would exec");
