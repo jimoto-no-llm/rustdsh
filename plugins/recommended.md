@@ -7,7 +7,7 @@ All entries below were verified present in the shipped dsh distribution and
 absent from the `dsh-base` bundle, so each one adds real capability.
 
 | Package | Why |
-|---|---|
+| --- | --- |
 | `@deepseek-ai/dsh-tool-present` | Final deliverables as file cards (spreadsheets, decks, images) |
 | `@deepseek-ai/dsh-tool-ask-user` | Ask the user for confirmation, choices, or missing info mid-run |
 | `@deepseek-ai/dsh-tool-str-replace-editor` | Claude-Code-style `view`/`create`/`str_replace` editor tool |
@@ -27,7 +27,7 @@ DRY_RUN=1 ./plugins/install.sh         # print the pnpm commands only
 Install with `./plugins/install-skills.sh` (defaults to `~/.dsh/skills`).
 
 | Skill | Source | Notes |
-|---|---|---|
+| --- | --- | --- |
 | ponytail + 5 companions | `DietrichGebert/ponytail@main` | shallow clone, `FORCE=1` refreshes with timestamped backup |
 | rtk | local `rtk` binary (want 0.46.0+) | verified by the script; its `SKILL.md` is kept as-is |
 
