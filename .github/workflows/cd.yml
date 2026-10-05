@@ -43,11 +43,15 @@ jobs:
       - if: matrix.target == 'x86_64-unknown-linux-musl'
         run: sudo apt-get update && sudo apt-get install -y musl-tools
       - run: cargo build --release --target ${{ matrix.target }}
-      - if: runner.os != 'Windows'
         run: tar -czf ${{ matrix.pkg }} -C target/${{ matrix.target }}/release ${{ matrix.bin }}
+        run: Compress-Archive -Path "target/${{ matrix.target }}/release/${{ matrix.bin }}" -DestinationPath ${{ matrix.pkg }}
+      # Sidecar checksum per asset (distinct names, no matrix race).
+      # install.sh verifies it and refuses mismatches.
+      - if: runner.os != 'Windows'
+        run: sha256sum ${{ matrix.pkg }} > ${{ matrix.pkg }}.sha256
       - if: runner.os == 'Windows'
         shell: pwsh
-        run: Compress-Archive -Path "target/${{ matrix.target }}/release/${{ matrix.bin }}" -DestinationPath ${{ matrix.pkg }}
+        run: (Get-FileHash -Algorithm SHA256 ${{ matrix.pkg }}).Hash.ToLower() | Out-File -NoNewline -Encoding ascii ${{ matrix.pkg }}.sha256
       # Ship the installers alongside the binaries so releases are one-liners:
       #   curl -fsSL .../releases/latest/download/install.sh | bash -s -- --from-release
       # Installers go up from the gnu Linux job only: same filenames from every
@@ -57,12 +61,15 @@ jobs:
         with:
           files: |
             ${{ matrix.pkg }}
+            ${{ matrix.pkg }}.sha256
             install.sh
             install.ps1
           generate_release_notes: true
       - if: runner.os != 'Linux' || matrix.target != 'x86_64-unknown-linux-gnu'
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ matrix.pkg }}
+          files: |
+            ${{ matrix.pkg }}
+            ${{ matrix.pkg }}.sha256
           generate_release_notes: true
 

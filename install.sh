@@ -70,6 +70,34 @@ want_musl() {
   fi
   return 1
 }
+verify_sha256() {
+  file="$1"
+  sidecar="$2"
+  line="$(cat "$sidecar" 2>/dev/null)"
+  want="${line%% *}"
+  if [ -z "$want" ]; then
+    echo "empty checksum sidecar" >&2
+    return 1
+  fi
+  if command -v sha256sum >/dev/null 2>&1; then
+    out="$(sha256sum "$file")"
+  elif command -v shasum >/dev/null 2>&1; then
+    out="$(shasum -a 256 "$file")"
+  else
+    echo "no sha256sum or shasum available" >&2
+    return 1
+  fi
+  got="${out%% *}"
+  lwant="$(printf %s "$want" | tr A-F a-f)"
+  lgot="$(printf %s "$got" | tr A-F a-f)"
+  if [ -n "$lgot" ] && [ "$lwant" = "$lgot" ]; then
+    echo "checksum ok" >&2
+    return 0
+  fi
+  echo "CHECKSUM MISMATCH" >&2
+  return 1
+}
+
 fetch_release() {
   # Print the path of the extracted prebuilt rdsh binary.
   # Overridable for tests: RDSH_RELEASE_BASE=file:///path/to/dir.
@@ -91,7 +119,15 @@ fetch_release() {
   if [ "$VER" = "latest" ]; then url="$base/latest/download/$asset"; else url="$base/download/$VER/$asset"; fi
   FETCH_TMPD="$(mktemp -d)"
   echo "fetching $url" >&2
-  curl -fsSL -o "$FETCH_TMPD/pkg.tgz" "$url"
+  curl -fsSL -o "$FETCH_TMPD/pkg.tgz" "$url" || { echo "download failed: $url" >&2; exit 1; }
+  if [ "${RDSH_NO_CHECKSUM:-0}" = 1 ]; then
+    echo "checksum verification skipped (RDSH_NO_CHECKSUM=1)" >&2
+  elif curl -fsSL -o "$FETCH_TMPD/pkg.tgz.sha256" "$url.sha256" 2>/dev/null; then
+    verify_sha256 "$FETCH_TMPD/pkg.tgz" "$FETCH_TMPD/pkg.tgz.sha256" || exit 1
+  else
+    echo "no checksum sidecar: refusing release install (set RDSH_NO_CHECKSUM=1 to override)" >&2
+    exit 1
+  fi
   tar -xzf "$FETCH_TMPD/pkg.tgz" -C "$FETCH_TMPD"
   if [ ! -x "$FETCH_TMPD/rdsh" ]; then echo "release archive has no rdsh binary" >&2; exit 1; fi
   echo "$FETCH_TMPD/rdsh"
