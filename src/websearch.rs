@@ -98,14 +98,12 @@ fn strip_tags(s: &str) -> String {
     out.trim().to_string()
 }
 
-const DQ: char = 34 as char;
-
 fn decode_entities(s: &str) -> String {
     let mut out = s
         .replace("&amp;", "&")
         .replace("&lt;", "<")
         .replace("&gt;", ">")
-        .replace("&quot;", &DQ.to_string())
+        .replace("&quot;", "\"")
         .replace("&#39;", "'")
         .replace("&#x27;", "'");
     let mut search = 0;
