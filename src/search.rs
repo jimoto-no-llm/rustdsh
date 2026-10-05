@@ -95,15 +95,6 @@ fn entry_kind(e: &std::fs::DirEntry, p: &std::path::Path, name: &str) -> EntryKi
     }
 }
 
-/// Shared worker cap (issue #85-4): cores clamped to 1..=8 so a 2-core
-/// host stays responsive while bigger machines still parallelize.
-fn parallelism() -> usize {
-    std::thread::available_parallelism()
-        .map(|n| n.get())
-        .unwrap_or(4)
-        .clamp(1, 8)
-}
-
 /// Walk subdirectories in parallel while preserving exact sequential order:
 /// root entries keep their listing order and each subtree is joined in place.
 /// Falls back to the plain sequential walk for narrow trees.
@@ -155,13 +146,16 @@ fn collect_parallel(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
         .collect();
     let mut resolved: Vec<Vec<std::path::PathBuf>> = vec![];
     resolved.resize_with(sub_idx.len(), Vec::new);
-    for batch in sub_idx.chunks(parallelism().max(1)) {
+    let width = crate::inspect::parallelism().max(1);
+    for (batch_no, batch) in sub_idx.chunks(width).enumerate() {
         std::thread::scope(|s| {
             let mut handles = vec![];
             for (k, seg_i) in batch.iter().enumerate() {
                 if let Seg::Sub(p) = &segs[*seg_i] {
+                    // slot in `resolved` = global index into sub_idx.
+                    let pos = batch_no * width + k;
                     handles.push((
-                        k,
+                        pos,
                         s.spawn(move || {
                             let mut v = vec![];
                             collect_files(p, &mut v);
@@ -170,9 +164,7 @@ fn collect_parallel(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
                     ));
                 }
             }
-            for (k, h) in handles {
-                let slot = batch[k];
-                let pos = sub_idx.iter().position(|x| *x == slot).unwrap_or(0);
+            for (pos, h) in handles {
                 resolved[pos] = h.join().unwrap_or_default();
             }
         });
@@ -230,7 +222,7 @@ fn grep_one(pattern: &str, path: &std::path::Path) -> Vec<String> {
 }
 
 fn grep_parallel(pattern: &str, files: &[std::path::PathBuf]) -> Vec<Vec<String>> {
-    let threads = parallelism();
+    let threads = crate::inspect::parallelism();
     if threads <= 1 {
         return files.iter().map(|p| grep_one(pattern, p)).collect();
     }
@@ -269,7 +261,7 @@ mod tests {
     #[test]
     fn worker_cap() {
         // Issue #85-4: walker/grep threads follow cores, clamped 1..=8.
-        assert!((1..=8).contains(&parallelism()));
+        assert!((1..=8).contains(&crate::inspect::parallelism()));
     }
 
     #[test]

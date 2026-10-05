@@ -60,19 +60,11 @@ pub fn cmd_skills() -> anyhow::Result<()> {
 }
 
 fn list_dir(dir: &str, kind: &str) -> anyhow::Result<()> {
-    let entries = match std::fs::read_dir(dir) {
-        Ok(e) => e,
-        Err(_) => {
-            println!("# no {kind} dir at {dir}");
-            return Ok(());
-        }
-    };
-    let mut names: Vec<String> = entries
-        .filter_map(|e| e.ok())
-        .filter(|e| e.metadata().map(|m| m.is_dir()).unwrap_or(false))
-        .map(|e| e.file_name().to_string_lossy().into_owned())
-        .collect();
-    names.sort();
+    if std::fs::read_dir(dir).is_err() {
+        println!("# no {kind} dir at {dir}");
+        return Ok(());
+    }
+    let names = dir_names(dir);
     use std::io::Write;
     let stdout = std::io::stdout();
     let mut out = std::io::BufWriter::new(stdout.lock());
@@ -92,20 +84,19 @@ struct Session {
     mtime_s: String,
 }
 
-pub fn cmd_sessions(project: Option<String>, limit: usize, tokens: bool) -> anyhow::Result<()> {
-    let root = format!("{}/sessions", dsh_home());
-    let projs: Vec<String> = match &project {
-        Some(p) => vec![p.clone()],
-        None => match std::fs::read_dir(&root) {
+/// All sessions under `root` (or one project), newest first. Shared by the
+/// CLI table and the serve JSON view so the walk/stats live in one place.
+/// Missing root yields an empty vec.
+fn scan_sessions(root: &str, project: Option<&str>) -> Vec<Session> {
+    let projs: Vec<String> = match project {
+        Some(p) => vec![p.to_string()],
+        None => match std::fs::read_dir(root) {
             Ok(e) => e
                 .filter_map(|e| e.ok())
                 .filter(|e| e.metadata().map(|m| m.is_dir()).unwrap_or(false))
                 .map(|e| e.file_name().to_string_lossy().into_owned())
                 .collect(),
-            Err(_) => {
-                println!("# no sessions dir at {root}");
-                return Ok(());
-            }
+            Err(_) => return vec![],
         },
     };
     let mut out: Vec<Session> = vec![];
@@ -132,6 +123,16 @@ pub fn cmd_sessions(project: Option<String>, limit: usize, tokens: bool) -> anyh
         }
     }
     out.sort_by_key(|a| std::cmp::Reverse(a.mtime));
+    out
+}
+
+pub fn cmd_sessions(project: Option<String>, limit: usize, tokens: bool) -> anyhow::Result<()> {
+    let root = format!("{}/sessions", dsh_home());
+    if project.is_none() && std::fs::read_dir(&root).is_err() {
+        println!("# no sessions dir at {root}");
+        return Ok(());
+    }
+    let out = scan_sessions(&root, project.as_deref());
     let total = out.len();
     // Frame headers give exact sizes with std only (no subprocess); the CLI
     // is probed only when tokens are requested, and only used as a fallback
@@ -239,7 +240,8 @@ fn dir_size_mtime(dir: &std::path::Path) -> (u64, u64, String) {
 
 /// Shared worker cap (issues #85-3, #85-4): cores clamped to 1..=8 so a
 /// 2-core host stays responsive while bigger machines still parallelize.
-fn parallelism() -> usize {
+/// Crate-wide: `search` uses the same cap.
+pub(crate) fn parallelism() -> usize {
     std::thread::available_parallelism()
         .map(|n| n.get())
         .unwrap_or(4)
@@ -560,10 +562,6 @@ fn latest_file(dir: &str) -> Option<std::path::PathBuf> {
     best.map(|(_, p)| p)
 }
 
-fn mtime_of(v: &serde_json::Value) -> &str {
-    v.get("mtime").and_then(|m| m.as_str()).unwrap_or("")
-}
-
 fn dir_names(dir: &str) -> Vec<String> {
     let mut names: Vec<String> = std::fs::read_dir(dir)
         .map(|e| {
@@ -584,35 +582,23 @@ pub fn names_json(kind: &str) -> String {
 
 pub fn sessions_json(limit: usize) -> String {
     let root = format!("{}/sessions", dsh_home());
-    let mut out: Vec<serde_json::Value> = vec![];
-    let projs: Vec<String> = std::fs::read_dir(&root)
-        .map(|e| {
-            e.filter_map(|e| e.ok())
-                .filter(|e| e.metadata().map(|m| m.is_dir()).unwrap_or(false))
-                .map(|e| e.file_name().to_string_lossy().into_owned())
-                .collect()
+    let projects = dir_names(&root).len();
+    // Same walk the CLI uses (newest first by numeric mtime); the old code
+    // re-implemented it and sorted by the minute-precision display string.
+    let sessions = scan_sessions(&root, None);
+    let out: Vec<serde_json::Value> = sessions
+        .iter()
+        .take(limit.clamp(1, 100))
+        .map(|s| {
+            serde_json::json!({
+                "project": s.project,
+                "id": s.id,
+                "bytes": s.bytes,
+                "mtime": s.mtime_s,
+            })
         })
-        .unwrap_or_default();
-    for proj in &projs {
-        let pdir = std::path::Path::new(&root).join(proj);
-        if let Ok(entries) = std::fs::read_dir(&pdir) {
-            for e in entries.filter_map(|e| e.ok()) {
-                if !e.metadata().map(|m| m.is_dir()).unwrap_or(false) {
-                    continue;
-                }
-                let (bytes, _m, mtime_s) = dir_size_mtime(&e.path());
-                out.push(serde_json::json!({
-                    "project": proj,
-                    "id": e.file_name().to_string_lossy(),
-                    "bytes": bytes,
-                    "mtime": mtime_s,
-                }));
-            }
-        }
-    }
-    out.sort_by(|a, b| mtime_of(b).cmp(mtime_of(a)));
-    out.truncate(limit.clamp(1, 100));
-    serde_json::json!({"sessions": out, "projects": projs.len()}).to_string()
+        .collect();
+    serde_json::json!({"sessions": out, "projects": projects}).to_string()
 }
 
 #[cfg(test)]
