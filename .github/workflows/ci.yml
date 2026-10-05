@@ -42,6 +42,8 @@ jobs:
         run: |
           printf '#!/bin/sh\necho stub-dsh $@' > /tmp/stub-dsh && chmod +x /tmp/stub-dsh
           BIN=./target/debug/rdsh DSH_ORIG_BIN=/tmp/stub-dsh sh tests/regress.sh
+          sh tests/sync-node-select.sh
+          sh tests/sync-regress-sandbox.sh
       - if: '! matrix.regress'
         shell: pwsh
         run: |
