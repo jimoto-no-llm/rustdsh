@@ -38,7 +38,7 @@
 手元環境（Linux x86_64）での測定値です。条件をそろえた前後比較も含みます。
 
 | 項目 | rdsh | 比較対象 | 倍率 |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `--version` 起動（中央値、n=5） | 約0.90ms | 本家dsh 約88ms | 約98倍 |
 | `--version` メモリ（最大RSS） | 約2.9MB | 本家 約66MB | 約1/23 |
 | フック相当処理のメモリ | 約2.7MB | node同等 約45MB | 約1/16 |
@@ -87,7 +87,7 @@ cd rustdsh
 ```
 
 | OS | スクリプト | 備考 |
-|---|---|---|
+| --- | --- | --- |
 | Linux / macOS | `./install.sh` | cargoかcurlが必要（rustup自動導入） |
 | WSL | ディストロ内で `./install.sh` | 自動検出。ネイティブ併用は `install.ps1 -Wsl` |
 | Windows（ネイティブ） | `.\install.ps1` | Rustが必要。コンパイルにMSVCビルドツールが必要 |
@@ -207,7 +207,7 @@ rdsh serve
 ```
 
 | API | 内容 |
-|---|---|
+| --- | --- |
 | `GET /api/version` | バージョン |
 | `GET /api/doctor` | 状態確認 |
 | `POST /api/tokens` | トークン推定（`{"text"}`） |

@@ -43,7 +43,7 @@ to Rust and delegates everything else to the original `dsh` binary** — so you 
 Measured on Linux x86_64, including before/after comparisons for the optimizations.
 
 | Case | rdsh | Baseline | Factor |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `--version` startup (median, n=5) | ~0.90ms | original `dsh` ~88ms | ~98x |
 | `--version` peak RSS | ~2.9MB | original ~66MB | ~1/23 |
 | Hook-equivalent peak RSS | ~2.7MB | equivalent Node script ~45MB | ~1/16 |
@@ -94,7 +94,7 @@ cd rustdsh
 ```
 
 | OS | script | notes |
-|---|---|---|
+| --- | --- | --- |
 | Linux / macOS | `./install.sh` | needs `cargo` or `curl` (rustup auto-install) |
 | WSL | `./install.sh` inside the distro | detected automatically; alongside native via `install.ps1 -Wsl` |
 | Windows (native) | `.\install.ps1` | needs Rust (`winget install Rustlang.Rustup`); MSVC build tools required to compile |
@@ -244,7 +244,7 @@ rdsh serve
 ```
 
 | API | Purpose |
-|---|---|
+| --- | --- |
 | `GET /api/version` | version |
 | `GET /api/doctor` | health check |
 | `POST /api/tokens` | token estimate for `{"text"}` |
