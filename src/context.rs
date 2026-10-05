@@ -441,7 +441,7 @@ pub fn cmd_build(
     let packed = if cfg.enable_packer {
         crate::tokens::prune_to_budget(&full, budget)
     } else {
-        full.clone()
+        full
     };
     let after = estimate(&packed);
     if as_json {
