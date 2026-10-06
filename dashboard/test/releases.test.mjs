@@ -459,6 +459,7 @@ test("stale selection plans never start native work, while exclusive registry ow
   const source = path.join((await releases.plan(alpha)).slot, "dsh/bin.mjs");
   if (process.platform !== "win32") {
     const sourceBytes = await fs.readFile(source);
+    const sourceMode = (await fs.stat(source)).mode & 0o777;
     await fs.unlink(source);
     await fs.symlink(path.join(rootFor(alpha), "outside.mjs"), source);
     await assert.rejects(
@@ -466,7 +467,7 @@ test("stale selection plans never start native work, while exclusive registry ow
       code("artifact_changed_wait_restore_pinned_bytes"),
     );
     await fs.unlink(source);
-    await fs.writeFile(source, sourceBytes, { mode: 0o555 });
+    await fs.writeFile(source, sourceBytes, { mode: sourceMode });
     const codeDirectory = path.dirname(source);
     const copiedDirectory = path.join(rootFor(alpha), "linked-code");
     const heldDirectory = path.join(rootFor(alpha), "held-code");
