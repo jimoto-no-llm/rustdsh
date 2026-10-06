@@ -149,6 +149,21 @@ Codex/opencode側でログインするだけで使えます。
 `RDSH_AUTH_AUTOSYNC=0` で無効化できます。dsh側で更新された新しい
 トークンは上書きせず、非grant記録（APIキー）にも触れません。
 
+### 追加機能（既定OFF）
+
+サーバー型の機能は有効化するまで動きません。素のままでは高速なdshです。
+セットアップUI（`rdsh setup --web` の追加機能欄）かCLIで有効にします：
+
+```sh
+rdsh settings set extras.enable serve,search-web
+rdsh settings get extras.enable
+```
+
+| 機能 | コマンド |
+| --- | --- |
+| `serve` | `rdsh serve` 状態ページ |
+| `search-web` | `rdsh search-web` Web検索 |
+
 ### hooks.json での使い方（`rdsh guard`）
 
 標準入力（フックJSONまたは生テキスト）を走査し、拒否パターンに一致したらexit 2＋理由出力でブロック、それ以外はexit 0で通過します。`--json` で `{"decision":"block"/"approve"}` を返します。パターンの `*` は任意文字列に一致します。

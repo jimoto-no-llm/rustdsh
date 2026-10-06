@@ -34,6 +34,24 @@ pub struct RdshSettings {
     pub setup: SetupSection,
     pub beta: BetaSection,
     pub context: ContextSection,
+    pub extras: ExtrasSection,
+}
+
+/// Optional server-type features, off by default. Known ids are listed in
+/// KNOWN_EXTRAS; unknown entries are ignored by the gate.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ExtrasSection {
+    pub enable: Vec<String>,
+}
+
+/// Extra feature ids that can be enabled via `extras.enable`.
+/// `serve` = `rdsh serve` dashboard, `search-web` = `rdsh search-web`.
+/// Setup itself (`rdsh setup --web`) always runs: it hosts the switches.
+pub const KNOWN_EXTRAS: &[&str] = &["serve", "search-web"];
+
+/// True when the named extra is enabled in settings (unknown ids never match).
+pub fn extra_enabled(cfg: &RdshSettings, id: &str) -> bool {
+    KNOWN_EXTRAS.contains(&id) && cfg.extras.enable.iter().any(|e| e == id)
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -214,6 +232,7 @@ impl Default for RdshSettings {
             setup: SetupSection::default(),
             beta: BetaSection::default(),
             context: ContextSection::default(),
+            extras: ExtrasSection::default(),
         }
     }
 }
@@ -400,6 +419,12 @@ impl RdshSettings {
                 max_sessions: clamp_u64(num(&cx, "max_sessions"), 10, 0, 100) as usize,
                 include_git_diff: flag(&cx, "include_git_diff", true),
             },
+            extras: ExtrasSection {
+                enable: list(&sec("extras"), "enable", TEXT_CHARS)
+                    .into_iter()
+                    .filter(|e| KNOWN_EXTRAS.contains(&e.as_str()))
+                    .collect(),
+            },
         };
         out.sanitize();
         out
@@ -462,6 +487,11 @@ impl RdshSettings {
         };
         let be = v.get("beta").cloned().unwrap_or(serde_json::Value::Null);
         out.beta.context_engine = flag(&be, "context_engine", false);
+        let ex = v.get("extras").cloned().unwrap_or(serde_json::Value::Null);
+        out.extras.enable = list(&ex, "enable", TEXT_CHARS)
+            .into_iter()
+            .filter(|e| KNOWN_EXTRAS.contains(&e.as_str()))
+            .collect();
         let cx = v.get("context").cloned().unwrap_or(serde_json::Value::Null);
         out.context.token_budget = clamp_u64(num(&cx, "token_budget"), 4000, 500, 200000) as usize;
         out.context.enable_retriever = flag(&cx, "enable_retriever", true);
@@ -509,6 +539,7 @@ impl RdshSettings {
             "bench": { "n": self.bench.n },
             "setup": { "web_port": self.setup.web_port },
             "beta": { "context_engine": self.beta.context_engine },
+            "extras": { "enable": self.extras.enable },
             "context": {
                 "token_budget": self.context.token_budget,
                 "enable_retriever": self.context.enable_retriever,
@@ -575,6 +606,7 @@ impl RdshSettings {
             "bench.n" => self.bench.n = parse_usize(raw, 5)? as u32,
             "setup.web_port" => self.setup.web_port = parse_usize(raw, 0)? as u16,
             "beta.context_engine" => self.beta.context_engine = parse_bool(raw)?,
+            "extras.enable" => self.extras.enable = parse_list(raw, TEXT_CHARS),
             "context.token_budget" => self.context.token_budget = parse_usize(raw, 4000)? as usize,
             "context.enable_retriever" => self.context.enable_retriever = parse_bool(raw)?,
             "context.enable_packer" => self.context.enable_packer = parse_bool(raw)?,
@@ -612,6 +644,7 @@ impl RdshSettings {
                 | "bench"
                 | "setup"
                 | "beta"
+                | "extras"
                 | "context"
                 | "all"
                 | ""
@@ -634,6 +667,7 @@ impl RdshSettings {
             "bench" => self.bench = d.bench,
             "setup" => self.setup = d.setup,
             "beta" => self.beta = d.beta,
+            "extras" => self.extras = d.extras,
             "context" => self.context = d.context,
             "all" | "" => *self = d,
             _ => {
@@ -681,6 +715,7 @@ impl RdshSettings {
             "bench.n(1-20)",
             "setup.web_port(0-65535, 0=random)",
             "beta.context_engine(bool, default OFF)",
+            "extras.enable(list: serve,search-web; default OFF)",
             "context.token_budget(500-200000)",
             "context.enable_retriever(bool)",
             "context.enable_packer(bool)",

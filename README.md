@@ -158,6 +158,22 @@ rdsh setup --web     # floating glass setup UI on localhost (browser auto-opens)
 この鍵が必要です。接続状態の読み取りにも同じ鍵が必要です。
 端末に表示された URL を他人と共有しないでください。
 
+### Optional extras (off by default)
+
+Server-type features stay off until you enable them, so a plain install
+remains a fast dsh. Enable them from the setup UI (`rdsh setup --web`,
+Extras section) or the CLI:
+
+```sh
+rdsh settings set extras.enable serve,search-web
+rdsh settings get extras.enable
+```
+
+| Extra | Command |
+| --- | --- |
+| `serve` | `rdsh serve` local dashboard |
+| `search-web` | `rdsh search-web` web search |
+
 Booting (`rdsh tui`, `dump-config`, `plugin`) auto-syncs first, so logging
 in with Codex/opencode is enough. `RDSH_AUTH_AUTOSYNC=0` disables it.
 A dsh-side token that is newer is never overwritten, and non-grant

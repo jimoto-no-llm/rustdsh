@@ -315,7 +315,11 @@ fn main() {
             search::cmd_search(&pattern, &dir, max.unwrap_or(cfg.search.max))
         }
         Some(Commands::SearchWeb { query, limit, json }) => {
-            websearch::cmd_search_web(&query, limit.unwrap_or(cfg.search.web_limit), json)
+            if !crate::rdsh_config::extra_enabled(&cfg, "search-web") {
+                extra_disabled("search-web")
+            } else {
+                websearch::cmd_search_web(&query, limit.unwrap_or(cfg.search.web_limit), json)
+            }
         }
         Some(Commands::Compact { file, max_tokens }) => {
             compact::cmd_compact(&file, max_tokens.unwrap_or(cfg.compact.max_tokens))
@@ -337,7 +341,13 @@ fn main() {
         Some(Commands::Logs { tail, grep, file }) => {
             inspect::cmd_logs(tail.unwrap_or(cfg.logs.tail), grep, file)
         }
-        Some(Commands::Serve { port }) => serve::cmd_serve(port.unwrap_or(cfg.serve.port)),
+        Some(Commands::Serve { port }) => {
+            if !crate::rdsh_config::extra_enabled(&cfg, "serve") {
+                extra_disabled("serve")
+            } else {
+                serve::cmd_serve(port.unwrap_or(cfg.serve.port))
+            }
+        }
         Some(Commands::Bench { n }) => bench(n.unwrap_or(cfg.bench.n)),
         Some(Commands::Guard { deny, reason, json }) => {
             let mut merged = cfg.guard.deny.clone();
@@ -669,6 +679,14 @@ fn dump_config_native(profile: &str, patches: &[String]) -> anyhow::Result<()> {
         }
     }
     Ok(())
+}
+
+/// Server-type extras are off by default: refuse with enable guidance.
+/// Setup itself is never gated (it hosts the switches).
+fn extra_disabled(id: &str) -> anyhow::Result<()> {
+    Err(anyhow::anyhow!(
+        "extra '{id}' is disabled by default; enable with: rdsh settings set extras.enable {id}"
+    ))
 }
 
 fn doctor() -> anyhow::Result<()> {

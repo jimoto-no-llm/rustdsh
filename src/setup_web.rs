@@ -127,6 +127,36 @@ fn handle(
                     Cow::Owned(serde_json::json!({"error": e.to_string()}).to_string()),
                 ),
             },
+            ("GET", "/api/extras") if !req.authorized(token) => (
+                401,
+                "application/json",
+                Cow::Borrowed("{\"error\":\"unauthorized\"}"),
+            ),
+            ("GET", "/api/extras") => {
+                let cfg = crate::rdsh_config::load();
+                (
+                    200,
+                    "application/json",
+                    Cow::Owned(serde_json::json!({"enable": cfg.extras.enable}).to_string()),
+                )
+            }
+            ("POST", "/api/extras") if !req.authorized(token) => (
+                401,
+                "application/json",
+                Cow::Borrowed("{\"error\":\"unauthorized\"}"),
+            ),
+            ("POST", "/api/extras") => match store_extras_body(&req.body) {
+                Ok(enable) => (
+                    200,
+                    "application/json",
+                    Cow::Owned(serde_json::json!({"enable": enable}).to_string()),
+                ),
+                Err(e) => (
+                    400,
+                    "application/json",
+                    Cow::Owned(serde_json::json!({"error": e.to_string()}).to_string()),
+                ),
+            },
             ("POST", "/api/done") if !req.authorized(token) => (
                 401,
                 "application/json",
@@ -144,6 +174,26 @@ fn handle(
         };
     crate::local_http::respond(&mut s, status, ctype, &payload)?;
     Ok(())
+}
+
+fn store_extras_body(body: &str) -> anyhow::Result<Vec<String>> {
+    let v: serde_json::Value = serde_json::from_str(body)?;
+    let arr = v.get("enable").and_then(|x| x.as_array());
+    let mut cfg = crate::rdsh_config::load();
+    let mut enable = Vec::new();
+    if let Some(items) = arr {
+        for x in items {
+            if let Some(s) = x.as_str() {
+                let s = s.trim().to_string();
+                if crate::rdsh_config::KNOWN_EXTRAS.contains(&s.as_str()) && !enable.contains(&s) {
+                    enable.push(s);
+                }
+            }
+        }
+    }
+    cfg.extras.enable = enable.clone();
+    cfg.save()?;
+    Ok(enable)
 }
 
 fn store_key_body(body: &str) -> anyhow::Result<bool> {

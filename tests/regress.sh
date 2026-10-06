@@ -130,6 +130,8 @@ http.server.HTTPServer(("127.0.0.1", int(sys.argv[2])), H).serve_forever()
 PYEOF
 HTTPSRV=$!
 sleep 1
+if $BIN search-web "hello world" 2>&1 | grep -q "disabled by default"; then ok "search-web refused while extra off"; else echo "FAIL(output): extras gate"; kill $HTTPSRV 2>/dev/null; exit 1; fi
+$BIN settings set extras.enable search-web >/dev/null 2>&1
 if SEARXNG_URL="http://127.0.0.1:38083" $BIN search-web "hello world" --limit 5 2>/dev/null | grep -q "Alpha result"; then ok "search-web via fixture"; else echo "FAIL(output): search-web via fixture"; kill $HTTPSRV 2>/dev/null; exit 1; fi
 kill $HTTPSRV 2>/dev/null
 wait $HTTPSRV 2>/dev/null || true
