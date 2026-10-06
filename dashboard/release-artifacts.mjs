@@ -82,7 +82,9 @@ export function compatible(manifest) {
 }
 export async function readReleaseManifest(home, id) {
   if (!releaseId(id)) throw new ReleaseError("exact_release_id_required");
-  const slot = path.join(home, "slots", id);
+  // The configured state root can use Windows case/short-name aliases. Resolve
+  // that root once; slots and their contents must still be canonical, unlinked.
+  const slot = path.join(await fs.realpath(home), "slots", id);
   if (
     !(await fs.lstat(slot)).isDirectory() ||
     (await fs.realpath(slot)) !== slot

@@ -5,9 +5,9 @@
   "baseline_qualification": {
     "qualification": {
       "status": "passed",
-      "release_id": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
-      "project_id": "ac069e46a192a391",
-      "checked_at": "2026-10-06T14:39:35.248Z",
+      "release_id": "rel_40d1d9bdf598c1eae64b0e65bf6ea69b7b3cab25e5ffc12ca3824dfe231ea55a",
+      "project_id": "379e9d754be05937",
+      "checked_at": "2026-10-06T15:11:28.349Z",
       "checks": {
         "start": "acknowledged",
         "plugin_start": "native_injection_observed",
@@ -15,7 +15,7 @@
         "resume": "same_native_id_acknowledged",
         "plugin_resume": "native_injection_observed"
       },
-      "native_session_id": "a136eb28-081b-4d43-8919-79da28631020",
+      "native_session_id": "7eadd9b9-c117-4024-98e8-587accfa4d28",
       "authentication": "not_verified",
       "model_request": "not_exercised",
       "production_adoption": "not_requested",
@@ -23,15 +23,15 @@
       "cleanup": "owned_exits_confirmed"
     },
     "selection": {
-      "project_id": "ac069e46a192a391",
+      "project_id": "379e9d754be05937",
       "revision": 1,
-      "default_release": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
+      "default_release": "rel_40d1d9bdf598c1eae64b0e65bf6ea69b7b3cab25e5ffc12ca3824dfe231ea55a",
       "history": [
         {
           "from": null,
-          "to": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
+          "to": "rel_40d1d9bdf598c1eae64b0e65bf6ea69b7b3cab25e5ffc12ca3824dfe231ea55a",
           "reason": "canary_qualified",
-          "at": "2026-10-06T14:39:37.155Z"
+          "at": "2026-10-06T15:11:30.174Z"
         }
       ]
     },
@@ -40,9 +40,9 @@
   "candidate_qualification": {
     "qualification": {
       "status": "passed",
-      "release_id": "rel_707b2e4004ee3d8cac7c81b23058c209e10cdca059753b2e4d1001eea6aa94fd",
-      "project_id": "ac069e46a192a391",
-      "checked_at": "2026-10-06T14:40:51.974Z",
+      "release_id": "rel_25956dfabd68810e41b18a85aaf85a6123ccfb515970dfdafb621e89c80bb798",
+      "project_id": "379e9d754be05937",
+      "checked_at": "2026-10-06T15:12:43.411Z",
       "checks": {
         "start": "acknowledged",
         "plugin_start": "native_injection_observed",
@@ -50,7 +50,7 @@
         "resume": "same_native_id_acknowledged",
         "plugin_resume": "native_injection_observed"
       },
-      "native_session_id": "a69e575e-a6a7-4f4c-bb4f-9631870a9430",
+      "native_session_id": "ca1d793a-8058-46a2-84fb-740481a2bf71",
       "authentication": "not_verified",
       "model_request": "not_exercised",
       "production_adoption": "not_requested",
@@ -58,21 +58,21 @@
       "cleanup": "owned_exits_confirmed"
     },
     "selection": {
-      "project_id": "ac069e46a192a391",
+      "project_id": "379e9d754be05937",
       "revision": 2,
-      "default_release": "rel_707b2e4004ee3d8cac7c81b23058c209e10cdca059753b2e4d1001eea6aa94fd",
+      "default_release": "rel_25956dfabd68810e41b18a85aaf85a6123ccfb515970dfdafb621e89c80bb798",
       "history": [
         {
           "from": null,
-          "to": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
+          "to": "rel_40d1d9bdf598c1eae64b0e65bf6ea69b7b3cab25e5ffc12ca3824dfe231ea55a",
           "reason": "canary_qualified",
-          "at": "2026-10-06T14:39:37.155Z"
+          "at": "2026-10-06T15:11:30.174Z"
         },
         {
-          "from": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
-          "to": "rel_707b2e4004ee3d8cac7c81b23058c209e10cdca059753b2e4d1001eea6aa94fd",
+          "from": "rel_40d1d9bdf598c1eae64b0e65bf6ea69b7b3cab25e5ffc12ca3824dfe231ea55a",
+          "to": "rel_25956dfabd68810e41b18a85aaf85a6123ccfb515970dfdafb621e89c80bb798",
           "reason": "canary_qualified",
-          "at": "2026-10-06T14:40:55.968Z"
+          "at": "2026-10-06T15:12:45.793Z"
         }
       ]
     },
@@ -81,9 +81,9 @@
   "rollback": {
     "qualification": {
       "status": "passed",
-      "release_id": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
-      "project_id": "ac069e46a192a391",
-      "checked_at": "2026-10-06T14:41:52.827Z",
+      "release_id": "rel_40d1d9bdf598c1eae64b0e65bf6ea69b7b3cab25e5ffc12ca3824dfe231ea55a",
+      "project_id": "379e9d754be05937",
+      "checked_at": "2026-10-06T15:13:46.305Z",
       "checks": {
         "start": "acknowledged",
         "plugin_start": "native_injection_observed",
@@ -91,7 +91,7 @@
         "resume": "same_native_id_acknowledged",
         "plugin_resume": "native_injection_observed"
       },
-      "native_session_id": "83a87cf0-66b1-4295-a927-f5126a5fa23c",
+      "native_session_id": "8b7ff0f4-ca4f-4491-ba34-6c06f385abb7",
       "authentication": "not_verified",
       "model_request": "not_exercised",
       "production_adoption": "not_requested",
@@ -99,66 +99,66 @@
       "cleanup": "owned_exits_confirmed"
     },
     "selection": {
-      "project_id": "ac069e46a192a391",
+      "project_id": "379e9d754be05937",
       "revision": 3,
-      "default_release": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
+      "default_release": "rel_40d1d9bdf598c1eae64b0e65bf6ea69b7b3cab25e5ffc12ca3824dfe231ea55a",
       "history": [
         {
           "from": null,
-          "to": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
+          "to": "rel_40d1d9bdf598c1eae64b0e65bf6ea69b7b3cab25e5ffc12ca3824dfe231ea55a",
           "reason": "canary_qualified",
-          "at": "2026-10-06T14:39:37.155Z"
+          "at": "2026-10-06T15:11:30.174Z"
         },
         {
-          "from": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
-          "to": "rel_707b2e4004ee3d8cac7c81b23058c209e10cdca059753b2e4d1001eea6aa94fd",
+          "from": "rel_40d1d9bdf598c1eae64b0e65bf6ea69b7b3cab25e5ffc12ca3824dfe231ea55a",
+          "to": "rel_25956dfabd68810e41b18a85aaf85a6123ccfb515970dfdafb621e89c80bb798",
           "reason": "canary_qualified",
-          "at": "2026-10-06T14:40:55.968Z"
+          "at": "2026-10-06T15:12:45.793Z"
         },
         {
-          "from": "rel_707b2e4004ee3d8cac7c81b23058c209e10cdca059753b2e4d1001eea6aa94fd",
-          "to": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
+          "from": "rel_25956dfabd68810e41b18a85aaf85a6123ccfb515970dfdafb621e89c80bb798",
+          "to": "rel_40d1d9bdf598c1eae64b0e65bf6ea69b7b3cab25e5ffc12ca3824dfe231ea55a",
           "reason": "rollback_requalified",
-          "at": "2026-10-06T14:41:54.953Z"
+          "at": "2026-10-06T15:13:48.345Z"
         }
       ]
     },
     "changed": true
   },
   "beta_before": {
-    "project_id": "4fccaee83c5c8dcb",
+    "project_id": "49f9b0f95ba7c5ff",
     "revision": 1,
-    "default_release": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
+    "default_release": "rel_40d1d9bdf598c1eae64b0e65bf6ea69b7b3cab25e5ffc12ca3824dfe231ea55a",
     "history": [
       {
         "from": null,
-        "to": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
+        "to": "rel_40d1d9bdf598c1eae64b0e65bf6ea69b7b3cab25e5ffc12ca3824dfe231ea55a",
         "reason": "explicit_promotion",
-        "at": "2026-10-06T14:39:43.503Z"
+        "at": "2026-10-06T15:11:36.243Z"
       }
     ]
   },
   "beta_after": {
-    "project_id": "4fccaee83c5c8dcb",
+    "project_id": "49f9b0f95ba7c5ff",
     "revision": 1,
-    "default_release": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
+    "default_release": "rel_40d1d9bdf598c1eae64b0e65bf6ea69b7b3cab25e5ffc12ca3824dfe231ea55a",
     "history": [
       {
         "from": null,
-        "to": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
+        "to": "rel_40d1d9bdf598c1eae64b0e65bf6ea69b7b3cab25e5ffc12ca3824dfe231ea55a",
         "reason": "explicit_promotion",
-        "at": "2026-10-06T14:39:43.503Z"
+        "at": "2026-10-06T15:11:36.243Z"
       }
     ]
   },
   "old_run": {
     "run": {
-      "run_id": "run_fe3a44a6-144c-4e27-8e47-ba5fc16feb49",
-      "project_id": "ac069e46a192a391",
+      "run_id": "run_30b97932-fde3-4594-8749-6ca8688736f3",
+      "project_id": "379e9d754be05937",
       "task_id": null,
       "label": null,
       "cli": "dsh",
-      "cli_session_id": "2c0ba4b4-53b2-45bb-9282-1242a6d44dd8",
+      "cli_session_id": "a063d8db-16cf-46ba-8a12-1b88a37722d3",
       "binding": "confirmed",
       "cwd": "<qa>/alpha",
       "branch": null,
@@ -169,8 +169,8 @@
       },
       "launch": {
         "method": "acp-stdio-v1",
-        "executable": "<qa>/state/managed-releases/slots/rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21/runtime/node",
-        "entrypoint": "<qa>/state/managed-releases/slots/rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21/dsh/lib/bin.js",
+        "executable": "<qa>/state/managed-releases/slots/rel_40d1d9bdf598c1eae64b0e65bf6ea69b7b3cab25e5ffc12ca3824dfe231ea55a/runtime/node",
+        "entrypoint": "<qa>/state/managed-releases/slots/rel_40d1d9bdf598c1eae64b0e65bf6ea69b7b3cab25e5ffc12ca3824dfe231ea55a/dsh/lib/bin.js",
         "profile": "acp"
       },
       "scope": {
@@ -185,17 +185,17 @@
       },
       "provider": null,
       "cli_version": "0.2.0-rc.2",
-      "created_at": "2026-10-06T14:40:00.786Z",
-      "last_attached_at": "2026-10-06T14:40:02.052Z",
+      "created_at": "2026-10-06T15:11:51.218Z",
+      "last_attached_at": "2026-10-06T15:11:52.268Z",
       "unknown_fields": [
         "task_id",
         "branch",
         "provider"
       ],
-      "cli_session_display": "2c0ba4b4-53b2-45bb-9282-1242a6d44dd8"
+      "cli_session_display": "a063d8db-16cf-46ba-8a12-1b88a37722d3"
     },
     "release": {
-      "release_id": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
+      "release_id": "rel_40d1d9bdf598c1eae64b0e65bf6ea69b7b3cab25e5ffc12ca3824dfe231ea55a",
       "tuple": {
         "dashboard": "0.1.0",
         "adapter_contract": "acp-stdio-v1",
@@ -210,18 +210,18 @@
     },
     "process": {
       "status": "exit_confirmed",
-      "pid": 4475,
+      "pid": 4680,
       "scope": "owned_root_process_only; descendants_unverified"
     }
   },
   "new_run": {
     "run": {
-      "run_id": "run_e3d47b76-05c4-48c6-aa05-381e4c271b22",
-      "project_id": "ac069e46a192a391",
+      "run_id": "run_58de81f4-8e98-4b80-af5d-334d0c962fe8",
+      "project_id": "379e9d754be05937",
       "task_id": null,
       "label": null,
       "cli": "dsh",
-      "cli_session_id": "8af06271-f3cc-421f-9993-29bb321c6f5b",
+      "cli_session_id": "6ad7e6cb-f07a-4264-b331-2ed9604c873d",
       "binding": "confirmed",
       "cwd": "<qa>/alpha",
       "branch": null,
@@ -232,8 +232,8 @@
       },
       "launch": {
         "method": "acp-stdio-v1",
-        "executable": "<qa>/state/managed-releases/slots/rel_707b2e4004ee3d8cac7c81b23058c209e10cdca059753b2e4d1001eea6aa94fd/runtime/node",
-        "entrypoint": "<qa>/state/managed-releases/slots/rel_707b2e4004ee3d8cac7c81b23058c209e10cdca059753b2e4d1001eea6aa94fd/dsh/lib/bin.js",
+        "executable": "<qa>/state/managed-releases/slots/rel_25956dfabd68810e41b18a85aaf85a6123ccfb515970dfdafb621e89c80bb798/runtime/node",
+        "entrypoint": "<qa>/state/managed-releases/slots/rel_25956dfabd68810e41b18a85aaf85a6123ccfb515970dfdafb621e89c80bb798/dsh/lib/bin.js",
         "profile": "acp"
       },
       "scope": {
@@ -248,17 +248,17 @@
       },
       "provider": null,
       "cli_version": "0.2.0-rc.2",
-      "created_at": "2026-10-06T14:41:10.459Z",
-      "last_attached_at": "2026-10-06T14:41:11.604Z",
+      "created_at": "2026-10-06T15:13:02.621Z",
+      "last_attached_at": "2026-10-06T15:13:03.831Z",
       "unknown_fields": [
         "task_id",
         "branch",
         "provider"
       ],
-      "cli_session_display": "8af06271-f3cc-421f-9993-29bb321c6f5b"
+      "cli_session_display": "6ad7e6cb-f07a-4264-b331-2ed9604c873d"
     },
     "release": {
-      "release_id": "rel_707b2e4004ee3d8cac7c81b23058c209e10cdca059753b2e4d1001eea6aa94fd",
+      "release_id": "rel_25956dfabd68810e41b18a85aaf85a6123ccfb515970dfdafb621e89c80bb798",
       "tuple": {
         "dashboard": "0.1.0",
         "adapter_contract": "acp-stdio-v1",
@@ -273,18 +273,18 @@
     },
     "process": {
       "status": "exit_confirmed",
-      "pid": 5736,
+      "pid": 5860,
       "scope": "owned_root_process_only; descendants_unverified"
     }
   },
   "resumed_old_after_update": {
     "run": {
-      "run_id": "run_fe3a44a6-144c-4e27-8e47-ba5fc16feb49",
-      "project_id": "ac069e46a192a391",
+      "run_id": "run_30b97932-fde3-4594-8749-6ca8688736f3",
+      "project_id": "379e9d754be05937",
       "task_id": null,
       "label": null,
       "cli": "dsh",
-      "cli_session_id": "2c0ba4b4-53b2-45bb-9282-1242a6d44dd8",
+      "cli_session_id": "a063d8db-16cf-46ba-8a12-1b88a37722d3",
       "binding": "confirmed",
       "cwd": "<qa>/alpha",
       "branch": null,
@@ -295,8 +295,8 @@
       },
       "launch": {
         "method": "acp-stdio-v1",
-        "executable": "<qa>/state/managed-releases/slots/rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21/runtime/node",
-        "entrypoint": "<qa>/state/managed-releases/slots/rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21/dsh/lib/bin.js",
+        "executable": "<qa>/state/managed-releases/slots/rel_40d1d9bdf598c1eae64b0e65bf6ea69b7b3cab25e5ffc12ca3824dfe231ea55a/runtime/node",
+        "entrypoint": "<qa>/state/managed-releases/slots/rel_40d1d9bdf598c1eae64b0e65bf6ea69b7b3cab25e5ffc12ca3824dfe231ea55a/dsh/lib/bin.js",
         "profile": "acp"
       },
       "scope": {
@@ -311,17 +311,17 @@
       },
       "provider": null,
       "cli_version": "0.2.0-rc.2",
-      "created_at": "2026-10-06T14:40:00.786Z",
-      "last_attached_at": "2026-10-06T14:41:27.599Z",
+      "created_at": "2026-10-06T15:11:51.218Z",
+      "last_attached_at": "2026-10-06T15:13:19.561Z",
       "unknown_fields": [
         "task_id",
         "branch",
         "provider"
       ],
-      "cli_session_display": "2c0ba4b4-53b2-45bb-9282-1242a6d44dd8"
+      "cli_session_display": "a063d8db-16cf-46ba-8a12-1b88a37722d3"
     },
     "release": {
-      "release_id": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
+      "release_id": "rel_40d1d9bdf598c1eae64b0e65bf6ea69b7b3cab25e5ffc12ca3824dfe231ea55a",
       "tuple": {
         "dashboard": "0.1.0",
         "adapter_contract": "acp-stdio-v1",
@@ -336,18 +336,18 @@
     },
     "process": {
       "status": "exit_confirmed",
-      "pid": 5950,
+      "pid": 5998,
       "scope": "owned_root_process_only; descendants_unverified"
     }
   },
   "resumed_new_after_rollback": {
     "run": {
-      "run_id": "run_e3d47b76-05c4-48c6-aa05-381e4c271b22",
-      "project_id": "ac069e46a192a391",
+      "run_id": "run_58de81f4-8e98-4b80-af5d-334d0c962fe8",
+      "project_id": "379e9d754be05937",
       "task_id": null,
       "label": null,
       "cli": "dsh",
-      "cli_session_id": "8af06271-f3cc-421f-9993-29bb321c6f5b",
+      "cli_session_id": "6ad7e6cb-f07a-4264-b331-2ed9604c873d",
       "binding": "confirmed",
       "cwd": "<qa>/alpha",
       "branch": null,
@@ -358,8 +358,8 @@
       },
       "launch": {
         "method": "acp-stdio-v1",
-        "executable": "<qa>/state/managed-releases/slots/rel_707b2e4004ee3d8cac7c81b23058c209e10cdca059753b2e4d1001eea6aa94fd/runtime/node",
-        "entrypoint": "<qa>/state/managed-releases/slots/rel_707b2e4004ee3d8cac7c81b23058c209e10cdca059753b2e4d1001eea6aa94fd/dsh/lib/bin.js",
+        "executable": "<qa>/state/managed-releases/slots/rel_25956dfabd68810e41b18a85aaf85a6123ccfb515970dfdafb621e89c80bb798/runtime/node",
+        "entrypoint": "<qa>/state/managed-releases/slots/rel_25956dfabd68810e41b18a85aaf85a6123ccfb515970dfdafb621e89c80bb798/dsh/lib/bin.js",
         "profile": "acp"
       },
       "scope": {
@@ -374,17 +374,17 @@
       },
       "provider": null,
       "cli_version": "0.2.0-rc.2",
-      "created_at": "2026-10-06T14:41:10.459Z",
-      "last_attached_at": "2026-10-06T14:42:11.863Z",
+      "created_at": "2026-10-06T15:13:02.621Z",
+      "last_attached_at": "2026-10-06T15:14:02.610Z",
       "unknown_fields": [
         "task_id",
         "branch",
         "provider"
       ],
-      "cli_session_display": "8af06271-f3cc-421f-9993-29bb321c6f5b"
+      "cli_session_display": "6ad7e6cb-f07a-4264-b331-2ed9604c873d"
     },
     "release": {
-      "release_id": "rel_707b2e4004ee3d8cac7c81b23058c209e10cdca059753b2e4d1001eea6aa94fd",
+      "release_id": "rel_25956dfabd68810e41b18a85aaf85a6123ccfb515970dfdafb621e89c80bb798",
       "tuple": {
         "dashboard": "0.1.0",
         "adapter_contract": "acp-stdio-v1",
@@ -399,18 +399,18 @@
     },
     "process": {
       "status": "exit_confirmed",
-      "pid": 6880,
+      "pid": 6929,
       "scope": "owned_root_process_only; descendants_unverified"
     }
   },
   "new_run_after_rollback": {
     "run": {
-      "run_id": "run_c399faaa-9367-4814-b68d-1bcd0f8d6c9b",
-      "project_id": "ac069e46a192a391",
+      "run_id": "run_9582e8d2-9a32-4a96-9994-f92d6c461fff",
+      "project_id": "379e9d754be05937",
       "task_id": null,
       "label": null,
       "cli": "dsh",
-      "cli_session_id": "aba273df-6baf-4ff0-a2b8-aeff7066a898",
+      "cli_session_id": "6418d2c2-87d3-44ba-93d4-22f2e4c2f537",
       "binding": "confirmed",
       "cwd": "<qa>/alpha",
       "branch": null,
@@ -421,8 +421,8 @@
       },
       "launch": {
         "method": "acp-stdio-v1",
-        "executable": "<qa>/state/managed-releases/slots/rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21/runtime/node",
-        "entrypoint": "<qa>/state/managed-releases/slots/rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21/dsh/lib/bin.js",
+        "executable": "<qa>/state/managed-releases/slots/rel_40d1d9bdf598c1eae64b0e65bf6ea69b7b3cab25e5ffc12ca3824dfe231ea55a/runtime/node",
+        "entrypoint": "<qa>/state/managed-releases/slots/rel_40d1d9bdf598c1eae64b0e65bf6ea69b7b3cab25e5ffc12ca3824dfe231ea55a/dsh/lib/bin.js",
         "profile": "acp"
       },
       "scope": {
@@ -437,17 +437,17 @@
       },
       "provider": null,
       "cli_version": "0.2.0-rc.2",
-      "created_at": "2026-10-06T14:42:25.528Z",
-      "last_attached_at": "2026-10-06T14:42:26.594Z",
+      "created_at": "2026-10-06T15:14:17.929Z",
+      "last_attached_at": "2026-10-06T15:14:19.041Z",
       "unknown_fields": [
         "task_id",
         "branch",
         "provider"
       ],
-      "cli_session_display": "aba273df-6baf-4ff0-a2b8-aeff7066a898"
+      "cli_session_display": "6418d2c2-87d3-44ba-93d4-22f2e4c2f537"
     },
     "release": {
-      "release_id": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
+      "release_id": "rel_40d1d9bdf598c1eae64b0e65bf6ea69b7b3cab25e5ffc12ca3824dfe231ea55a",
       "tuple": {
         "dashboard": "0.1.0",
         "adapter_contract": "acp-stdio-v1",
@@ -462,7 +462,7 @@
     },
     "process": {
       "status": "exit_confirmed",
-      "pid": 7011,
+      "pid": 7059,
       "scope": "owned_root_process_only; descendants_unverified"
     }
   },

@@ -60,6 +60,8 @@ A slot is limited to 1 GiB and 50,000 files (a 16 MiB manifest); the registry ho
 releases, 5,000 project selections and 10,000 run pins. Slots are kept in
 `RDSH_DASHBOARD_HOME/managed-releases/slots/rel_<sha256>` (or the existing default
 state home). Files are read-only, copied rather than linked to mutable installs.
+The configured state root is resolved canonically, including Windows case and
+short-name aliases; links inside its slot hierarchy remain refused.
 Managed launch/selection verifies every recorded byte and refuses extra files,
 missing files, links and incompatible tuples. These checks establish bytes at
 attachment/selection time; they are not protection against a privileged operator

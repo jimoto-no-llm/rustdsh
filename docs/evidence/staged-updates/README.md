@@ -64,8 +64,8 @@ measurements, including runtime/dependency copy and checksum verification:
 
 | Artifact  | Files  | Bytes       | Staging time |
 | --------- | ------ | ----------- | ------------ |
-| First     | 30,432 | 611,801,005 | 24.468 s     |
-| Candidate | 30,432 | 611,801,077 | 23.221 s     |
+| First     | 30,432 | 611,801,185 | 24.120 s     |
+| Candidate | 30,432 | 611,801,257 | 22.492 s     |
 
 These are two samples from this machine, not a throughput or latency guarantee.
 The manifest covers the captured Node, original DSH and packaged dependencies,
@@ -84,6 +84,7 @@ fixtures in [releases.test.mjs](../../../dashboard/test/releases.test.mjs) cover
   rollback, and missing/tampered/unsupported artifacts without silent fallback.
 - Public CLI runtime re-execution, stale selection/override refusal and refusal
   of `NODE_OPTIONS`/`NODE_PATH` injection before managed dispatch.
+- Windows state-root case aliases resolve to the same fully verified artifact.
 - Locked concurrent registry writes, corrupt registry preservation, legacy
   unpinned records and incompatible host Node versions.
 - Refused symlinked files and, on Linux, linked parent directories even when

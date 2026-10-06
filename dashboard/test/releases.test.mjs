@@ -266,6 +266,13 @@ test("public CLI re-execs the captured runtime and refuses overrides or changed 
     "0",
   );
   assert.equal(selected.changed, true);
+  if (process.platform === "win32") {
+    const aliasedRoot = new Releases(releases.home.toUpperCase());
+    assert.equal(
+      (await aliasedRoot.plan(alpha)).manifest.release_id,
+      release.release_id,
+    );
+  }
   const started = await invoke(
     "session-ledger",
     "start",

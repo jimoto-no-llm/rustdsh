@@ -2,10 +2,10 @@
   "kind": "actual_code_snapshot_including_native_dependencies",
   "samples": [
     {
-      "release_id": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
-      "elapsed_ms": 24467.675374,
+      "release_id": "rel_40d1d9bdf598c1eae64b0e65bf6ea69b7b3cab25e5ffc12ca3824dfe231ea55a",
+      "elapsed_ms": 24119.848514999998,
       "files": 30432,
-      "bytes": 611801005,
+      "bytes": 611801185,
       "tuple": {
         "dashboard": "0.1.0",
         "adapter_contract": "acp-stdio-v1",
@@ -17,10 +17,10 @@
       }
     },
     {
-      "release_id": "rel_707b2e4004ee3d8cac7c81b23058c209e10cdca059753b2e4d1001eea6aa94fd",
-      "elapsed_ms": 23221.018016999995,
+      "release_id": "rel_25956dfabd68810e41b18a85aaf85a6123ccfb515970dfdafb621e89c80bb798",
+      "elapsed_ms": 22491.937319999997,
       "files": 30432,
-      "bytes": 611801077,
+      "bytes": 611801257,
       "tuple": {
         "dashboard": "0.1.0",
         "adapter_contract": "acp-stdio-v1",
