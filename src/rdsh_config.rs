@@ -84,6 +84,8 @@ pub struct CompactSection {
 pub struct SessionsSection {
     pub limit: usize,
     pub with_tokens: bool,
+    /// Stale-estimate window for growing session files (0 disables).
+    pub stale_secs: u64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -175,6 +177,7 @@ impl Default for SessionsSection {
         Self {
             limit: 20,
             with_tokens: false,
+            stale_secs: 60,
         }
     }
 }
@@ -374,6 +377,7 @@ impl RdshSettings {
             sessions: SessionsSection {
                 limit: clamp_u64(num(&ss, "limit"), 20, 1, 100) as usize,
                 with_tokens: flag(&ss, "with_tokens", false),
+                stale_secs: clamp_u64(num(&ss, "stale_secs"), 60, 0, 3600),
             },
             logs: LogsSection {
                 tail: clamp_u64(num(&l, "tail"), 50, 1, 500) as usize,
@@ -470,6 +474,7 @@ impl RdshSettings {
             .unwrap_or(serde_json::Value::Null);
         out.sessions.limit = clamp_u64(num(&ss, "limit"), 20, 1, 100) as usize;
         out.sessions.with_tokens = flag(&ss, "with_tokens", false);
+        out.sessions.stale_secs = clamp_u64(num(&ss, "stale_secs"), 60, 0, 3600);
         let l = v.get("logs").cloned().unwrap_or(serde_json::Value::Null);
         out.logs.tail = clamp_u64(num(&l, "tail"), 50, 1, 500) as usize;
         let sv = v.get("serve").cloned().unwrap_or(serde_json::Value::Null);
@@ -532,7 +537,7 @@ impl RdshSettings {
                 "searxng_url": self.search.searxng_url,
             },
             "compact": { "max_tokens": self.compact.max_tokens },
-            "sessions": { "limit": self.sessions.limit, "with_tokens": self.sessions.with_tokens },
+            "sessions": { "limit": self.sessions.limit, "with_tokens": self.sessions.with_tokens, "stale_secs": self.sessions.stale_secs },
             "logs": { "tail": self.logs.tail },
             "serve": { "port": self.serve.port },
             "guard": { "deny": self.guard.deny, "reason": self.guard.reason },
@@ -599,6 +604,7 @@ impl RdshSettings {
             "compact.max_tokens" => self.compact.max_tokens = parse_usize(raw, 8000)? as usize,
             "sessions.limit" => self.sessions.limit = parse_usize(raw, 20)? as usize,
             "sessions.with_tokens" => self.sessions.with_tokens = parse_bool(raw)?,
+            "sessions.stale_secs" => self.sessions.stale_secs = parse_usize(raw, 60)? as u64,
             "logs.tail" => self.logs.tail = parse_usize(raw, 50)? as usize,
             "serve.port" => self.serve.port = parse_usize(raw, 38080)? as u16,
             "guard.deny" => self.guard.deny = parse_list(raw, TEXT_CHARS),
@@ -708,6 +714,7 @@ impl RdshSettings {
             "compact.max_tokens(500-200000)",
             "sessions.limit(1-100)",
             "sessions.with_tokens(bool)",
+            "sessions.stale_secs(0-3600, 0=off)",
             "logs.tail(1-500)",
             "serve.port(1-65535)",
             "guard.deny(list)",

@@ -335,6 +335,7 @@ fn main() {
             limit.unwrap_or(cfg.sessions.limit),
             tokens || cfg.sessions.with_tokens,
             json,
+            cfg.sessions.stale_secs,
         ),
         Some(Commands::Profiles) => inspect::cmd_profiles(),
         Some(Commands::Skills) => inspect::cmd_skills(),

@@ -151,6 +151,7 @@ pub fn cmd_sessions(
     limit: usize,
     tokens: bool,
     json: bool,
+    stale_secs: u64,
 ) -> anyhow::Result<()> {
     let root = format!("{}/sessions", dsh_home());
     if project.is_none() && std::fs::read_dir(&root).is_err() {
@@ -174,11 +175,11 @@ pub fn cmd_sessions(
         // Content-keyed cache: repeat views skip re-decompression.
         let mut cache = TokensCache::load();
         let out = if shown.len() >= 2 {
-            batch_decompressed(&root, &shown, zstd_cli, &mut cache)
+            batch_decompressed(&root, &shown, zstd_cli, stale_secs, &mut cache)
         } else {
             shown
                 .iter()
-                .map(|s| session_decompressed_bytes(&root, s, zstd_cli, &mut cache))
+                .map(|s| session_decompressed_bytes(&root, s, zstd_cli, stale_secs, &mut cache))
                 .collect()
         };
         cache.save();
@@ -468,6 +469,7 @@ fn batch_decompressed(
     root: &str,
     shown: &[&Session],
     zstd_cli: bool,
+    stale_secs: u64,
     cache: &mut TokensCache,
 ) -> Vec<(Option<u64>, bool)> {
     let mut out: Vec<(Option<u64>, bool)> = vec![(None, false); shown.len()];
@@ -494,7 +496,9 @@ fn batch_decompressed(
                 handles.push((
                     *i,
                     s.spawn(move || {
-                        let r = session_decompressed_bytes(&root, &sess, zstd_cli, &mut local);
+                        let r = session_decompressed_bytes(
+                            &root, &sess, zstd_cli, stale_secs, &mut local,
+                        );
                         (r, local)
                     }),
                 ));
@@ -534,14 +538,21 @@ fn session_decompressed_bytes(
     root: &str,
     sess: &Session,
     zstd_cli: bool,
+    stale_secs: u64,
     cache: &mut TokensCache,
 ) -> (Option<u64>, bool) {
     let key = TokensCache::key(root, &sess.project, &sess.id);
     if let Some(hit) = cache.get(&key, sess.mtime, sess.bytes) {
         return (hit, true);
     }
-    let (r, exact) =
-        session_decompressed_bytes_uncached(root, &sess.project, &sess.id, zstd_cli, cache);
+    let (r, exact) = session_decompressed_bytes_uncached(
+        root,
+        &sess.project,
+        &sess.id,
+        zstd_cli,
+        stale_secs,
+        cache,
+    );
     cache.put(&key, sess.mtime, sess.bytes, r);
     (r, exact)
 }
@@ -551,6 +562,7 @@ fn session_decompressed_bytes_uncached(
     project: &str,
     id: &str,
     zstd_cli: bool,
+    stale_secs: u64,
     cache: &mut TokensCache,
 ) -> (Option<u64>, bool) {
     let dir = std::path::Path::new(root).join(project).join(id);
@@ -604,14 +616,17 @@ fn session_decompressed_bytes_uncached(
         }
         // Stale reuse: grown files with a recent exact value skip expansion
         // (marked inexact by the caller via the returned flag).
-        const STALE_SECS: u64 = 60;
+        let stale_window = stale_secs;
         let mut todo2: Vec<std::path::PathBuf> = vec![];
         for p in &todo {
             let stale_hit = p
                 .file_name()
                 .map(|s| s.to_string_lossy().into_owned())
                 .and_then(|name| {
-                    cache.stale(&TokensCache::file_key(root, project, id, &name), STALE_SECS)
+                    cache.stale(
+                        &TokensCache::file_key(root, project, id, &name),
+                        stale_window,
+                    )
                 });
             match stale_hit {
                 Some(n) => {
