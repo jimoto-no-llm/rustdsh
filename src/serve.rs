@@ -11,7 +11,7 @@ pub fn cmd_serve(port: u16) -> anyhow::Result<()> {
     let addr = format!("127.0.0.1:{port}");
     let listener = std::net::TcpListener::bind(&addr).map_err(|e| {
         anyhow::anyhow!(
-            "cannot listen on {addr}: {e} (dsh web GUI also uses 3080; try --port 38080)"
+            "cannot listen on {addr}: {e} (dsh web GUI uses 3080; rdsh serve defaults to 38080, or try --port 0)"
         )
     })?;
     let port = listener.local_addr()?.port();

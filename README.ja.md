@@ -124,7 +124,7 @@ rdsh logs --tail 50 --grep ERROR   # 起動ログの参照
 rdsh profiles / rdsh skills        # プロファイル・スキル一覧
 rdsh doctor                        # 本家dsh・DSH_HOME・slim設定の確認
 rdsh bench --n 5                   # rdsh/dsh の起動比較
-rdsh serve                         # Webダッシュボード（:3080）
+rdsh serve                         # Webダッシュボード（:38080）
 ```
 
 ### OAuth自動認識（`rdsh auth`：入れるだけで認識）
@@ -194,8 +194,8 @@ rdsh --profile web                             # slim env付きで起動（プ�
 
 併用時の注意点：
 
-- ポート：dsh web GUIと`rdsh serve`は既定3080です。dsh webを3080のまま使い、
-  `rdsh serve --port 38080` に分けます
+- ポート：dsh web GUIは3080、`rdsh serve`は既定38080です。競合しません。
+  `--port 0` で空きポートの自動選択もできます
 - 置換時：`install.sh --as-dsh`後はSmart-DSHの補助スクリプトがPATH上の`dsh`を
   Rust製と誤認します。`dsh-orig`を使うか`DSH_PACKAGE_DIR`を指定します
 - 対応バージョン：Smart-DSHはDSH `0.1.2-rc.1`基準です。`rdsh doctor`の版表示で差異を確認します
@@ -204,8 +204,8 @@ rdsh --profile web                             # slim env付きで起動（プ�
 
 ```sh
 rdsh serve
-# → http://127.0.0.1:3080/ を開く（localhost のみ、読取専用API）
-# ※ dsh web GUIと同ポートのため競合時は `rdsh serve --port 38080` 等を使ってください
+# → http://127.0.0.1:38080/ を開く（localhost のみ、読取専用API）
+# ※ dsh web GUI（:3080）と競合しません。`--port 0` で自動選択もできます
 ```
 
 | API | 内容 |
@@ -226,7 +226,7 @@ rdsh serve
 
 - 手元の状態確認（バージョン・doctor・tokens・sessions）だけなら `rdsh serve` を使います。`rdsh` バイナリだけで動きます。
 - プロジェクトの指標・タスク・質問と回答・スマホ接続には `dashboard/` を使います。Node.js 22+ が必要です。詳しくは[Node.jsダッシュボードの案内](dashboard/README.md)を見てください。
-- dsh web GUIと同ポート（3080）で競合したら、dsh webを3080のままにして `rdsh serve --port 38080` で分けます。
+- `rdsh serve` は既定38080です（dsh webは3080のまま）。スクリプト用途では `--port 0` で空きポートを使います。
 
 ### プロジェクト専用ダッシュボードとスマホ接続
 
@@ -290,7 +290,7 @@ Node.js 22+が必要です。導入・MCP設定・Secure MCP TunnelによるDots
 
 ## よくある質問
 
-- **3080が使用中と言われる**：dsh web GUIと同ポートです。`rdsh serve --port 38080` を使ってください
+- **ポートが使用中と言われる**：dsh web GUIは3080、`rdsh serve`は既定38080です。`--port 0` で空きポートを使えます
 - **プロファイル名がサブコマンドと被る**：`dsh --profile <name>` 形式で起動してください
 - **元に戻したい**：`./install.sh --restore`（退避した本家を復元）
 - **`--tokens` の `?` 付き表示**：zstd CLIが無い環境では圧縮サイズからの概算である印です

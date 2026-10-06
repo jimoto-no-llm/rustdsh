@@ -133,7 +133,7 @@ rdsh logs --tail 50 --grep ERROR     # inspect startup logs
 rdsh profiles / rdsh skills          # list profiles and skills
 rdsh doctor                          # check original dsh, DSH_HOME, slim setup
 rdsh bench --n 5                     # compare rdsh vs dsh startup
-rdsh serve                           # local web dashboard (:3080)
+rdsh serve                           # local web dashboard (:38080)
 ```
 
 ### `rdsh auth`: OAuth auto-recognition (drop it in and it works)
@@ -228,8 +228,8 @@ rdsh --profile web                             # boot web with slim env (plugins
 
 Co-use notes:
 
-- Ports: the dsh web GUI and `rdsh serve` both default to 3080. Keep 3080 for
-  dsh web (push/remote access) and run `rdsh serve --port 38080`.
+- Ports: the dsh web GUI uses 3080; `rdsh serve` defaults to 38080, so they no
+  longer collide. `--port 0` picks a free port and prints the actual URL.
 - `dsh`-shadowing: with `install.sh --as-dsh`, Smart-DSH helper scripts that
   locate DSH via `dsh` on PATH resolve to the Rust binary and fail. Run those
   scripts against the original (`dsh-orig ...`) or export `DSH_PACKAGE_DIR`
@@ -242,7 +242,7 @@ Co-use notes:
 ```sh
 rdsh serve
 # open the URL containing #key=... printed by rdsh (localhost only)
-# if the port is taken (the dsh web GUI also uses 3080), try --port 38080
+# default :38080 keeps clear of the dsh web GUI (:3080); --port 0 auto-picks
 ```
 
 | API | Purpose |
@@ -270,8 +270,8 @@ machine. For project metrics, human Q&A, and phone access, use the optional
 - Use `dashboard/` for project work: metrics, tasks, human Q&A,
   and phone access via Tailscale QR. It needs Node.js 22+.
   See the [Node.js dashboard guide](dashboard/README.md).
-- If port 3080 is taken by the dsh web GUI, keep 3080 for dsh web
-  and run `rdsh serve --port 38080`.
+- `rdsh serve` defaults to :38080 (dsh web keeps 3080). Use `--port 0` for
+  a free port when scripting.
 
 ### Private project dashboards and phone access
 
@@ -362,7 +362,7 @@ workflow.
 
 ## FAQ
 
-- **Port 3080 is busy?** The dsh web GUI uses it too — run `rdsh serve --port 38080`.
+- **Port is busy?** The dsh web GUI uses 3080; `rdsh serve` defaults to 38080. Use `--port 0` for a free port.
 - **A profile collides with a subcommand name?** Boot it explicitly:
   `dsh --profile <name>`.
 - **Revert the replacement?** `./install.sh --restore` brings the original back.

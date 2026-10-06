@@ -167,7 +167,7 @@ impl Default for LogsSection {
 
 impl Default for ServeSection {
     fn default() -> Self {
-        Self { port: 3080 }
+        Self { port: 38080 }
     }
 }
 
@@ -322,7 +322,7 @@ impl RdshSettings {
                 tail: clamp_u64(num(&l, "tail"), 50, 1, 500) as usize,
             },
             serve: ServeSection {
-                port: clamp_u64(num(&sv, "port"), 3080, 1, 65535) as u16,
+                port: clamp_u64(num(&sv, "port"), 38080, 1, 65535) as u16,
             },
             guard: GuardSection {
                 deny: list(&gd, "deny", TEXT_CHARS),
@@ -410,7 +410,7 @@ impl RdshSettings {
         let l = v.get("logs").cloned().unwrap_or(serde_json::Value::Null);
         out.logs.tail = clamp_u64(num(&l, "tail"), 50, 1, 500) as usize;
         let sv = v.get("serve").cloned().unwrap_or(serde_json::Value::Null);
-        out.serve.port = clamp_u64(num(&sv, "port"), 3080, 1, 65535) as u16;
+        out.serve.port = clamp_u64(num(&sv, "port"), 38080, 1, 65535) as u16;
         let gd = v.get("guard").cloned().unwrap_or(serde_json::Value::Null);
         out.guard.deny = list(&gd, "deny", TEXT_CHARS);
         out.guard.reason = text(&gd, "reason", TEXT_CHARS);
@@ -531,7 +531,7 @@ impl RdshSettings {
             "sessions.limit" => self.sessions.limit = parse_usize(raw, 20)? as usize,
             "sessions.with_tokens" => self.sessions.with_tokens = parse_bool(raw)?,
             "logs.tail" => self.logs.tail = parse_usize(raw, 50)? as usize,
-            "serve.port" => self.serve.port = parse_usize(raw, 3080)? as u16,
+            "serve.port" => self.serve.port = parse_usize(raw, 38080)? as u16,
             "guard.deny" => self.guard.deny = parse_list(raw, TEXT_CHARS),
             "guard.reason" => self.guard.reason = parse_string(raw, TEXT_CHARS),
             "bench.n" => self.bench.n = parse_usize(raw, 5)? as u32,
@@ -894,7 +894,7 @@ mod rdsh_config_tests {
         assert_eq!(d.compact.max_tokens, 8000);
         assert_eq!((d.sessions.limit, d.sessions.with_tokens), (20, false));
         assert_eq!(d.logs.tail, 50);
-        assert_eq!(d.serve.port, 3080);
+        assert_eq!(d.serve.port, 38080);
         assert!(d.guard.deny.is_empty() && d.guard.reason.is_empty());
         assert_eq!(d.bench.n, 5);
         assert_eq!(d.setup.web_port, 0);
