@@ -415,7 +415,7 @@ fn code_hits(query: &str, max: usize) -> Vec<String> {
         }
     }
     // 重複除去して点数順
-    scored.sort_by(|a, b| b.0.cmp(&a.0));
+    scored.sort_by_key(|a| std::cmp::Reverse(a.0));
     scored.dedup_by(|a, b| a.1 == b.1);
     scored.into_iter().take(max).map(|(_, s)| s).collect()
 }

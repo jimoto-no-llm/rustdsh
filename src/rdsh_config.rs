@@ -93,7 +93,7 @@ pub struct SetupSection {
     pub web_port: u16,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct BetaSection {
     pub context_engine: bool,
 }
@@ -174,14 +174,6 @@ impl Default for ServeSection {
 impl Default for BenchSection {
     fn default() -> Self {
         Self { n: 5 }
-    }
-}
-
-impl Default for BetaSection {
-    fn default() -> Self {
-        Self {
-            context_engine: false,
-        }
     }
 }
 
@@ -845,7 +837,7 @@ fn parse_list(raw: &str, max_chars: usize) -> Vec<String> {
 fn split_list(s: &str, max_chars: usize) -> Vec<String> {
     // 改行・カンマ区切りを許容し、JSON配列でなくても1行1件で入る
     let mut out = vec![];
-    for part in s.split(|c| c == '\n' || c == ',').map(str::trim) {
+    for part in s.split(['\n', ',']).map(str::trim) {
         if part.is_empty() {
             continue;
         }
