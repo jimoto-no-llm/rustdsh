@@ -67,7 +67,9 @@ curl -fsSL https://github.com/sahenjp/rustdsh/releases/latest/download/install.s
 
 ```powershell
 # Windows (PowerShell)
-& ([scriptblock]::Create((Invoke-WebRequest -Uri https://github.com/sahenjp/rustdsh/releases/latest/download/install.ps1).Content)) -FromRelease
+$f = Join-Path $env:TEMP 'rdsh-install.ps1'
+Invoke-WebRequest -Uri https://github.com/sahenjp/rustdsh/releases/latest/download/install.ps1 -OutFile $f -UseBasicParsing
+& $f -FromRelease
 ```
 
 From source:
