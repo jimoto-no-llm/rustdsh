@@ -31,6 +31,8 @@ import { allInputCommands } from "./instruction-queue.mjs";
 import { ProjectStore, publicState } from "./state.mjs";
 import { setTimeout as delay } from "node:timers/promises";
 import { randomUUID } from "node:crypto";
+import { fileURLToPath } from "node:url";
+import { Releases } from "./releases.mjs";
 import {
   loopbackBase,
   recordTunnel,
@@ -66,6 +68,10 @@ rdsh-dashboard backup inspect --archive-file <json>
 rdsh-dashboard backup restore --project <directory> --archive-file <json> --expected-revision <n>
 rdsh-dashboard backup history --project <directory>
 rdsh-dashboard backup export --project <directory> --archive-id <backup_id> --output-file <new-json>
+rdsh-dashboard release stage --input-file <trusted-code-roots-json>
+rdsh-dashboard release inspect --project <directory>
+rdsh-dashboard release canary|promote|rollback --project <directory> --release-id <rel_sha256> --selection-revision <n>
+rdsh-dashboard session-ledger start|resume --project <directory> [--run-id <id>] # selected/pinned managed release
 rdsh-dashboard session-ledger start|resume --budget-guard --worker-id <id> --project <directory> --executable <original-dsh> [--entrypoint <bin.js>] [--run-id <id>]
 rdsh-dashboard reply-consumer once|serve --budget-guard --worker-id <id> --project <directory> --run-id <id> --executable <original-dsh> [--entrypoint <bin.js>]
 
@@ -127,6 +133,10 @@ const { values, positionals } = parseArgs({
     "output-file": { type: "string" },
     "expected-revision": { type: "string" },
     "archive-id": { type: "string" },
+    "release-id": { type: "string" },
+    "selection-revision": { type: "string" },
+    "managed-release-id": { type: "string" },
+    "managed-revision": { type: "string" },
     help: { type: "boolean", short: "h" },
   },
 });
@@ -172,8 +182,105 @@ async function localJson(file) {
     await handle.close();
   }
 }
+async function inPinnedCli(artifact, selectionRevision) {
+  if (process.env.NODE_OPTIONS || process.env.NODE_PATH)
+    throw new Error(
+      "Managed Node injection is unsupported; resolve NODE_OPTIONS/NODE_PATH before using the pinned runtime",
+    );
+  const pinnedCli = path.join(artifact.slot, "adapter/dashboard/cli.mjs");
+  const supplied = values["managed-release-id"];
+  if (
+    supplied !== undefined &&
+    (supplied !== artifact.manifest.release_id ||
+      Number(values["managed-revision"]) !== selectionRevision)
+  )
+    throw new Error(
+      "Managed selection changed before pinned CLI dispatch; refresh the selection",
+    );
+  if (
+    path.resolve(fileURLToPath(import.meta.url)) === path.resolve(pinnedCli) &&
+    path.resolve(process.execPath) === path.resolve(artifact.command[0])
+  )
+    return true;
+  if (supplied !== undefined)
+    throw new Error(
+      "Pinned CLI/runtime path changed; restore the captured release",
+    );
+  const args = [
+    pinnedCli,
+    ...process.argv.slice(2),
+    "--managed-release-id",
+    artifact.manifest.release_id,
+    "--managed-revision",
+    String(selectionRevision),
+  ];
+  const child = spawn(artifact.command[0], args, {
+    shell: false,
+    windowsHide: true,
+    stdio: "inherit",
+    env: process.env,
+  });
+  const interrupt = () => child.kill("SIGINT");
+  const terminate = () => child.kill("SIGTERM");
+  process.on("SIGINT", interrupt);
+  process.on("SIGTERM", terminate);
+  try {
+    process.exitCode = await new Promise((resolve, reject) => {
+      child.once("error", reject);
+      child.once("exit", (code) => resolve(code ?? 1));
+    });
+  } finally {
+    process.off("SIGINT", interrupt);
+    process.off("SIGTERM", terminate);
+  }
+  return false;
+}
+async function pinnedAttachment(project, options) {
+  const releases = new Releases();
+  const plan = await releases.plan(project, options.run_id || null);
+  if (plan === null) {
+    if (values["managed-release-id"] !== undefined)
+      throw new Error("Managed run/default no longer exists");
+    if (!options.command)
+      throw new Error("Specify the original DSH executable with --executable");
+    return { attached: await attachRecordedSession(options) };
+  }
+  if (values.executable || values.entrypoint)
+    throw new Error(
+      "This run/project pins a managed release; omit executable/entrypoint to use its captured command",
+    );
+  if (!(await inPinnedCli(plan, plan.selection_revision)))
+    return { delegated: true };
+  return { attached: await releases.attach(project, plan, options) };
+}
 try {
   const command = positionals[0];
+  if (
+    command !== "release" &&
+    ["release-id", "selection-revision"].some((k) => values[k] !== undefined)
+  )
+    throw new Error("Release selection options require release");
+  if (
+    ["managed-release-id", "managed-revision"].some(
+      (k) => values[k] !== undefined,
+    ) &&
+    (!values["managed-release-id"] ||
+      values["managed-revision"] === undefined ||
+      (!(
+        command === "release" && ["canary", "rollback"].includes(positionals[1])
+      ) &&
+        !(
+          command === "session-ledger" &&
+          ["start", "resume"].includes(positionals[1])
+        ) &&
+        !(
+          command === "reply-consumer" &&
+          ["once", "serve"].includes(positionals[1])
+        )))
+  )
+    throw new Error(
+      "Managed dispatch requires a captured CLI attachment or native qualification",
+    );
   if (
     command !== "backup" &&
     [
@@ -243,6 +350,78 @@ try {
     throw new Error("Model route options require routing");
   if (values.help || !command) {
     console.log(help);
+  } else if (command === "release") {
+    const action = positionals[1];
+    const allowed = new Set([
+      "project",
+      "release-id",
+      "selection-revision",
+      "input-file",
+      "help",
+      "managed-release-id",
+      "managed-revision",
+    ]);
+    if (
+      positionals.length !== 2 ||
+      !["stage", "inspect", "canary", "promote", "rollback"].includes(action) ||
+      Object.keys(values).some((key) => !allowed.has(key))
+    )
+      throw new Error(
+        "Specify release stage, inspect, canary, promote or rollback",
+      );
+    const releases = new Releases();
+    let result;
+    if (action === "stage") {
+      if (
+        !values["input-file"] ||
+        values["release-id"] ||
+        values["selection-revision"] ||
+        values.project
+      )
+        throw new Error(
+          "Stage requires only an explicit trusted code input file",
+        );
+      result = await releases.stage(await localJson(values["input-file"]));
+    } else {
+      if (values["input-file"])
+        throw new Error("Code capture input is for release stage only");
+      const project = await identity(values.project || process.cwd());
+      if (action === "inspect") {
+        if (values["release-id"] || values["selection-revision"])
+          throw new Error("Inspect uses the project registry");
+        result = await releases.inspect(project);
+      } else {
+        const rev = Number(values["selection-revision"]);
+        if (
+          !values["release-id"] ||
+          values["selection-revision"] === undefined ||
+          !Number.isSafeInteger(rev) ||
+          rev < 0
+        )
+          throw new Error(
+            "Select an exact release ID and current project selection revision",
+          );
+        if (action === "promote")
+          result = await releases.promote(project, values["release-id"], rev);
+        else {
+          let artifact;
+          try {
+            artifact = await releases.verify(values["release-id"]);
+          } catch {
+            // No captured code can run when its bytes are unavailable. The
+            // controller still retains the failed verification below.
+          }
+          if (artifact && !(await inPinnedCli(artifact, rev)))
+            process.exit(process.exitCode || 0);
+          result = await releases.check(project, values["release-id"], rev, {
+            rollback: action === "rollback",
+          });
+          if (result.qualification.status !== "passed" || !result.changed)
+            process.exitCode = 1;
+        }
+      }
+    }
+    console.log(JSON.stringify(result, null, 2));
   } else if (command === "backup") {
     const action = positionals[1];
     const optionSets = {
@@ -402,6 +581,8 @@ try {
       "help",
       "budget-guard",
       "worker-id",
+      "managed-release-id",
+      "managed-revision",
     ]);
     if (
       positionals.length !== 2 ||
@@ -436,7 +617,7 @@ try {
           "Reply consumption requires an exact --run-id; individual command IDs are for inspection only",
         );
       const ledger = await SessionLedger.open(project);
-      const attached = await attachRecordedSession({
+      const managed = await pinnedAttachment(project, {
         ledger,
         run_id: values["run-id"],
         budget: values["budget-guard"]
@@ -449,6 +630,8 @@ try {
             ]
           : undefined,
       });
+      if (managed.delegated) process.exit(process.exitCode || 0);
+      const attached = managed.attached;
       const controller = new AbortController();
       const stop = () => {
         controller.abort();
@@ -799,10 +982,6 @@ try {
         cli_session_id: values["session-id"] || null,
       });
     } else {
-      if (!argv)
-        throw new Error(
-          "Specify the original DSH executable with --executable",
-        );
       if (values.cli && values.cli !== "dsh")
         throw new Error("Only DSH ACP can be attached");
       if (values["session-id"])
@@ -820,7 +999,7 @@ try {
         )
       )
         throw new Error("resume uses the recorded cwd, task and provider");
-      const attached = await attachRecordedSession({
+      const managed = await pinnedAttachment(ledger.project, {
         ...options,
         run_id: action === "resume" ? values["run-id"] : null,
         budget: values["budget-guard"]
@@ -831,6 +1010,8 @@ try {
           : null,
         verifyAuth: values["verify-auth"] || false,
       });
+      if (managed.delegated) process.exit(process.exitCode || 0);
+      const attached = managed.attached;
       const stopped = await attached.adapter.stop();
       result = {
         run: attached.record,
@@ -838,6 +1019,7 @@ try {
         history: await attached.history.inspect(attached.record.run_id),
         lifecycle: "attachment_verified_process_stopped",
         process: stopped,
+        ...(attached.release ? { release: attached.release } : {}),
       };
     }
     console.log(JSON.stringify(result, null, 2));

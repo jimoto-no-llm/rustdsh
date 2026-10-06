@@ -1,0 +1,36 @@
+{
+  "kind": "actual_code_snapshot_including_native_dependencies",
+  "samples": [
+    {
+      "release_id": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
+      "elapsed_ms": 24467.675374,
+      "files": 30432,
+      "bytes": 611801005,
+      "tuple": {
+        "dashboard": "0.1.0",
+        "adapter_contract": "acp-stdio-v1",
+        "dsh": "0.2.0-rc.2",
+        "node": "v24.21.0",
+        "platform": "linux",
+        "arch": "x64",
+        "probe_contract": 1
+      }
+    },
+    {
+      "release_id": "rel_707b2e4004ee3d8cac7c81b23058c209e10cdca059753b2e4d1001eea6aa94fd",
+      "elapsed_ms": 23221.018016999995,
+      "files": 30432,
+      "bytes": 611801077,
+      "tuple": {
+        "dashboard": "0.1.0",
+        "adapter_contract": "acp-stdio-v1",
+        "dsh": "0.2.0-rc.2",
+        "node": "v24.21.0",
+        "platform": "linux",
+        "arch": "x64",
+        "probe_contract": 1
+      }
+    }
+  ],
+  "note": "Staging time includes code copy and checksum verification; two local samples, no throughput guarantee"
+}

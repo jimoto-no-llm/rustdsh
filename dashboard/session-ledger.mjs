@@ -457,6 +457,7 @@ export async function attachRecordedSession({
   requirements = null,
   verifyAuth = false,
   budget = null,
+  onRecord = null,
 } = {}) {
   env = { ...env };
   if (Array.isArray(command)) command = [...command];
@@ -492,6 +493,8 @@ export async function attachRecordedSession({
   }
   if (record.git.status === "unavailable")
     throw new LedgerError("repository_context_unknown");
+  // Managed releases persist their immutable pin before budget/native dispatch.
+  if (onRecord !== null) await onRecord(record);
   const history = await RunHistory.open(ledger.project);
   if (run_id !== null) {
     let previous;

@@ -297,6 +297,18 @@ subscriptions are never transported. See the
 collision handling. `backup history` exposes imported records through the local
 control CLI; the existing state resource also includes `history_backups`.
 
+## Project-scoped pinned updates
+
+`release stage|inspect|canary|promote|rollback` captures a compatible original DSH,
+Node and adapter snapshot, qualifies it in one project and widens only explicitly.
+Managed `session-ledger start|resume` and `reply-consumer once|serve` omit executable
+overrides and dispatch through the captured CLI. Project defaults apply to new
+runs; existing runs retain their own artifact and native ID through rollback.
+See the [pinned update contract](../docs/STAGED-UPDATES.md) for trusted code roots,
+selection revisions, native qualification and recovery. This controls local
+managed runs; global updates, external user plugins and provider/billing adoption
+are separate.
+
 ## Validation
 
 ```sh

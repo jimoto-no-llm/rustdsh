@@ -1,0 +1,473 @@
+{
+  "kind": "actual_original_dsh_acp_and_cordis_injection",
+  "node": "v24.21.0",
+  "platform": "linux",
+  "baseline_qualification": {
+    "qualification": {
+      "status": "passed",
+      "release_id": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
+      "project_id": "ac069e46a192a391",
+      "checked_at": "2026-10-06T14:39:35.248Z",
+      "checks": {
+        "start": "acknowledged",
+        "plugin_start": "native_injection_observed",
+        "stop": "both_owned_exits_confirmed",
+        "resume": "same_native_id_acknowledged",
+        "plugin_resume": "native_injection_observed"
+      },
+      "native_session_id": "a136eb28-081b-4d43-8919-79da28631020",
+      "authentication": "not_verified",
+      "model_request": "not_exercised",
+      "production_adoption": "not_requested",
+      "error": null,
+      "cleanup": "owned_exits_confirmed"
+    },
+    "selection": {
+      "project_id": "ac069e46a192a391",
+      "revision": 1,
+      "default_release": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
+      "history": [
+        {
+          "from": null,
+          "to": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
+          "reason": "canary_qualified",
+          "at": "2026-10-06T14:39:37.155Z"
+        }
+      ]
+    },
+    "changed": true
+  },
+  "candidate_qualification": {
+    "qualification": {
+      "status": "passed",
+      "release_id": "rel_707b2e4004ee3d8cac7c81b23058c209e10cdca059753b2e4d1001eea6aa94fd",
+      "project_id": "ac069e46a192a391",
+      "checked_at": "2026-10-06T14:40:51.974Z",
+      "checks": {
+        "start": "acknowledged",
+        "plugin_start": "native_injection_observed",
+        "stop": "both_owned_exits_confirmed",
+        "resume": "same_native_id_acknowledged",
+        "plugin_resume": "native_injection_observed"
+      },
+      "native_session_id": "a69e575e-a6a7-4f4c-bb4f-9631870a9430",
+      "authentication": "not_verified",
+      "model_request": "not_exercised",
+      "production_adoption": "not_requested",
+      "error": null,
+      "cleanup": "owned_exits_confirmed"
+    },
+    "selection": {
+      "project_id": "ac069e46a192a391",
+      "revision": 2,
+      "default_release": "rel_707b2e4004ee3d8cac7c81b23058c209e10cdca059753b2e4d1001eea6aa94fd",
+      "history": [
+        {
+          "from": null,
+          "to": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
+          "reason": "canary_qualified",
+          "at": "2026-10-06T14:39:37.155Z"
+        },
+        {
+          "from": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
+          "to": "rel_707b2e4004ee3d8cac7c81b23058c209e10cdca059753b2e4d1001eea6aa94fd",
+          "reason": "canary_qualified",
+          "at": "2026-10-06T14:40:55.968Z"
+        }
+      ]
+    },
+    "changed": true
+  },
+  "rollback": {
+    "qualification": {
+      "status": "passed",
+      "release_id": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
+      "project_id": "ac069e46a192a391",
+      "checked_at": "2026-10-06T14:41:52.827Z",
+      "checks": {
+        "start": "acknowledged",
+        "plugin_start": "native_injection_observed",
+        "stop": "both_owned_exits_confirmed",
+        "resume": "same_native_id_acknowledged",
+        "plugin_resume": "native_injection_observed"
+      },
+      "native_session_id": "83a87cf0-66b1-4295-a927-f5126a5fa23c",
+      "authentication": "not_verified",
+      "model_request": "not_exercised",
+      "production_adoption": "not_requested",
+      "error": null,
+      "cleanup": "owned_exits_confirmed"
+    },
+    "selection": {
+      "project_id": "ac069e46a192a391",
+      "revision": 3,
+      "default_release": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
+      "history": [
+        {
+          "from": null,
+          "to": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
+          "reason": "canary_qualified",
+          "at": "2026-10-06T14:39:37.155Z"
+        },
+        {
+          "from": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
+          "to": "rel_707b2e4004ee3d8cac7c81b23058c209e10cdca059753b2e4d1001eea6aa94fd",
+          "reason": "canary_qualified",
+          "at": "2026-10-06T14:40:55.968Z"
+        },
+        {
+          "from": "rel_707b2e4004ee3d8cac7c81b23058c209e10cdca059753b2e4d1001eea6aa94fd",
+          "to": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
+          "reason": "rollback_requalified",
+          "at": "2026-10-06T14:41:54.953Z"
+        }
+      ]
+    },
+    "changed": true
+  },
+  "beta_before": {
+    "project_id": "4fccaee83c5c8dcb",
+    "revision": 1,
+    "default_release": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
+    "history": [
+      {
+        "from": null,
+        "to": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
+        "reason": "explicit_promotion",
+        "at": "2026-10-06T14:39:43.503Z"
+      }
+    ]
+  },
+  "beta_after": {
+    "project_id": "4fccaee83c5c8dcb",
+    "revision": 1,
+    "default_release": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
+    "history": [
+      {
+        "from": null,
+        "to": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
+        "reason": "explicit_promotion",
+        "at": "2026-10-06T14:39:43.503Z"
+      }
+    ]
+  },
+  "old_run": {
+    "run": {
+      "run_id": "run_fe3a44a6-144c-4e27-8e47-ba5fc16feb49",
+      "project_id": "ac069e46a192a391",
+      "task_id": null,
+      "label": null,
+      "cli": "dsh",
+      "cli_session_id": "2c0ba4b4-53b2-45bb-9282-1242a6d44dd8",
+      "binding": "confirmed",
+      "cwd": "<qa>/alpha",
+      "branch": null,
+      "git": {
+        "status": "not_a_repository",
+        "root": null,
+        "head": null
+      },
+      "launch": {
+        "method": "acp-stdio-v1",
+        "executable": "<qa>/state/managed-releases/slots/rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21/runtime/node",
+        "entrypoint": "<qa>/state/managed-releases/slots/rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21/dsh/lib/bin.js",
+        "profile": "acp"
+      },
+      "scope": {
+        "effective_home": "<qa>",
+        "HOME": "<qa>",
+        "USERPROFILE": "<qa>",
+        "DSH_HOME": "<qa>/native-home",
+        "XDG_CONFIG_HOME": "<qa>/config",
+        "XDG_DATA_HOME": "<qa>/data",
+        "APPDATA": "<qa>/data",
+        "LOCALAPPDATA": "<qa>/local"
+      },
+      "provider": null,
+      "cli_version": "0.2.0-rc.2",
+      "created_at": "2026-10-06T14:40:00.786Z",
+      "last_attached_at": "2026-10-06T14:40:02.052Z",
+      "unknown_fields": [
+        "task_id",
+        "branch",
+        "provider"
+      ],
+      "cli_session_display": "2c0ba4b4-53b2-45bb-9282-1242a6d44dd8"
+    },
+    "release": {
+      "release_id": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
+      "tuple": {
+        "dashboard": "0.1.0",
+        "adapter_contract": "acp-stdio-v1",
+        "dsh": "0.2.0-rc.2",
+        "node": "v24.21.0",
+        "platform": "linux",
+        "arch": "x64",
+        "probe_contract": 1
+      },
+      "selection_revision": 1,
+      "use": "new_run_project_default"
+    },
+    "process": {
+      "status": "exit_confirmed",
+      "pid": 4475,
+      "scope": "owned_root_process_only; descendants_unverified"
+    }
+  },
+  "new_run": {
+    "run": {
+      "run_id": "run_e3d47b76-05c4-48c6-aa05-381e4c271b22",
+      "project_id": "ac069e46a192a391",
+      "task_id": null,
+      "label": null,
+      "cli": "dsh",
+      "cli_session_id": "8af06271-f3cc-421f-9993-29bb321c6f5b",
+      "binding": "confirmed",
+      "cwd": "<qa>/alpha",
+      "branch": null,
+      "git": {
+        "status": "not_a_repository",
+        "root": null,
+        "head": null
+      },
+      "launch": {
+        "method": "acp-stdio-v1",
+        "executable": "<qa>/state/managed-releases/slots/rel_707b2e4004ee3d8cac7c81b23058c209e10cdca059753b2e4d1001eea6aa94fd/runtime/node",
+        "entrypoint": "<qa>/state/managed-releases/slots/rel_707b2e4004ee3d8cac7c81b23058c209e10cdca059753b2e4d1001eea6aa94fd/dsh/lib/bin.js",
+        "profile": "acp"
+      },
+      "scope": {
+        "effective_home": "<qa>",
+        "HOME": "<qa>",
+        "USERPROFILE": "<qa>",
+        "DSH_HOME": "<qa>/native-home",
+        "XDG_CONFIG_HOME": "<qa>/config",
+        "XDG_DATA_HOME": "<qa>/data",
+        "APPDATA": "<qa>/data",
+        "LOCALAPPDATA": "<qa>/local"
+      },
+      "provider": null,
+      "cli_version": "0.2.0-rc.2",
+      "created_at": "2026-10-06T14:41:10.459Z",
+      "last_attached_at": "2026-10-06T14:41:11.604Z",
+      "unknown_fields": [
+        "task_id",
+        "branch",
+        "provider"
+      ],
+      "cli_session_display": "8af06271-f3cc-421f-9993-29bb321c6f5b"
+    },
+    "release": {
+      "release_id": "rel_707b2e4004ee3d8cac7c81b23058c209e10cdca059753b2e4d1001eea6aa94fd",
+      "tuple": {
+        "dashboard": "0.1.0",
+        "adapter_contract": "acp-stdio-v1",
+        "dsh": "0.2.0-rc.2",
+        "node": "v24.21.0",
+        "platform": "linux",
+        "arch": "x64",
+        "probe_contract": 1
+      },
+      "selection_revision": 2,
+      "use": "new_run_project_default"
+    },
+    "process": {
+      "status": "exit_confirmed",
+      "pid": 5736,
+      "scope": "owned_root_process_only; descendants_unverified"
+    }
+  },
+  "resumed_old_after_update": {
+    "run": {
+      "run_id": "run_fe3a44a6-144c-4e27-8e47-ba5fc16feb49",
+      "project_id": "ac069e46a192a391",
+      "task_id": null,
+      "label": null,
+      "cli": "dsh",
+      "cli_session_id": "2c0ba4b4-53b2-45bb-9282-1242a6d44dd8",
+      "binding": "confirmed",
+      "cwd": "<qa>/alpha",
+      "branch": null,
+      "git": {
+        "status": "not_a_repository",
+        "root": null,
+        "head": null
+      },
+      "launch": {
+        "method": "acp-stdio-v1",
+        "executable": "<qa>/state/managed-releases/slots/rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21/runtime/node",
+        "entrypoint": "<qa>/state/managed-releases/slots/rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21/dsh/lib/bin.js",
+        "profile": "acp"
+      },
+      "scope": {
+        "effective_home": "<qa>",
+        "HOME": "<qa>",
+        "USERPROFILE": "<qa>",
+        "DSH_HOME": "<qa>/native-home",
+        "XDG_CONFIG_HOME": "<qa>/config",
+        "XDG_DATA_HOME": "<qa>/data",
+        "APPDATA": "<qa>/data",
+        "LOCALAPPDATA": "<qa>/local"
+      },
+      "provider": null,
+      "cli_version": "0.2.0-rc.2",
+      "created_at": "2026-10-06T14:40:00.786Z",
+      "last_attached_at": "2026-10-06T14:41:27.599Z",
+      "unknown_fields": [
+        "task_id",
+        "branch",
+        "provider"
+      ],
+      "cli_session_display": "2c0ba4b4-53b2-45bb-9282-1242a6d44dd8"
+    },
+    "release": {
+      "release_id": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
+      "tuple": {
+        "dashboard": "0.1.0",
+        "adapter_contract": "acp-stdio-v1",
+        "dsh": "0.2.0-rc.2",
+        "node": "v24.21.0",
+        "platform": "linux",
+        "arch": "x64",
+        "probe_contract": 1
+      },
+      "selection_revision": 1,
+      "use": "existing_run_pin"
+    },
+    "process": {
+      "status": "exit_confirmed",
+      "pid": 5950,
+      "scope": "owned_root_process_only; descendants_unverified"
+    }
+  },
+  "resumed_new_after_rollback": {
+    "run": {
+      "run_id": "run_e3d47b76-05c4-48c6-aa05-381e4c271b22",
+      "project_id": "ac069e46a192a391",
+      "task_id": null,
+      "label": null,
+      "cli": "dsh",
+      "cli_session_id": "8af06271-f3cc-421f-9993-29bb321c6f5b",
+      "binding": "confirmed",
+      "cwd": "<qa>/alpha",
+      "branch": null,
+      "git": {
+        "status": "not_a_repository",
+        "root": null,
+        "head": null
+      },
+      "launch": {
+        "method": "acp-stdio-v1",
+        "executable": "<qa>/state/managed-releases/slots/rel_707b2e4004ee3d8cac7c81b23058c209e10cdca059753b2e4d1001eea6aa94fd/runtime/node",
+        "entrypoint": "<qa>/state/managed-releases/slots/rel_707b2e4004ee3d8cac7c81b23058c209e10cdca059753b2e4d1001eea6aa94fd/dsh/lib/bin.js",
+        "profile": "acp"
+      },
+      "scope": {
+        "effective_home": "<qa>",
+        "HOME": "<qa>",
+        "USERPROFILE": "<qa>",
+        "DSH_HOME": "<qa>/native-home",
+        "XDG_CONFIG_HOME": "<qa>/config",
+        "XDG_DATA_HOME": "<qa>/data",
+        "APPDATA": "<qa>/data",
+        "LOCALAPPDATA": "<qa>/local"
+      },
+      "provider": null,
+      "cli_version": "0.2.0-rc.2",
+      "created_at": "2026-10-06T14:41:10.459Z",
+      "last_attached_at": "2026-10-06T14:42:11.863Z",
+      "unknown_fields": [
+        "task_id",
+        "branch",
+        "provider"
+      ],
+      "cli_session_display": "8af06271-f3cc-421f-9993-29bb321c6f5b"
+    },
+    "release": {
+      "release_id": "rel_707b2e4004ee3d8cac7c81b23058c209e10cdca059753b2e4d1001eea6aa94fd",
+      "tuple": {
+        "dashboard": "0.1.0",
+        "adapter_contract": "acp-stdio-v1",
+        "dsh": "0.2.0-rc.2",
+        "node": "v24.21.0",
+        "platform": "linux",
+        "arch": "x64",
+        "probe_contract": 1
+      },
+      "selection_revision": 2,
+      "use": "existing_run_pin"
+    },
+    "process": {
+      "status": "exit_confirmed",
+      "pid": 6880,
+      "scope": "owned_root_process_only; descendants_unverified"
+    }
+  },
+  "new_run_after_rollback": {
+    "run": {
+      "run_id": "run_c399faaa-9367-4814-b68d-1bcd0f8d6c9b",
+      "project_id": "ac069e46a192a391",
+      "task_id": null,
+      "label": null,
+      "cli": "dsh",
+      "cli_session_id": "aba273df-6baf-4ff0-a2b8-aeff7066a898",
+      "binding": "confirmed",
+      "cwd": "<qa>/alpha",
+      "branch": null,
+      "git": {
+        "status": "not_a_repository",
+        "root": null,
+        "head": null
+      },
+      "launch": {
+        "method": "acp-stdio-v1",
+        "executable": "<qa>/state/managed-releases/slots/rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21/runtime/node",
+        "entrypoint": "<qa>/state/managed-releases/slots/rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21/dsh/lib/bin.js",
+        "profile": "acp"
+      },
+      "scope": {
+        "effective_home": "<qa>",
+        "HOME": "<qa>",
+        "USERPROFILE": "<qa>",
+        "DSH_HOME": "<qa>/native-home",
+        "XDG_CONFIG_HOME": "<qa>/config",
+        "XDG_DATA_HOME": "<qa>/data",
+        "APPDATA": "<qa>/data",
+        "LOCALAPPDATA": "<qa>/local"
+      },
+      "provider": null,
+      "cli_version": "0.2.0-rc.2",
+      "created_at": "2026-10-06T14:42:25.528Z",
+      "last_attached_at": "2026-10-06T14:42:26.594Z",
+      "unknown_fields": [
+        "task_id",
+        "branch",
+        "provider"
+      ],
+      "cli_session_display": "aba273df-6baf-4ff0-a2b8-aeff7066a898"
+    },
+    "release": {
+      "release_id": "rel_086c25797a6fb547c4bf6027f47ecfba8a8faffe09c4765223db29cca22d7b21",
+      "tuple": {
+        "dashboard": "0.1.0",
+        "adapter_contract": "acp-stdio-v1",
+        "dsh": "0.2.0-rc.2",
+        "node": "v24.21.0",
+        "platform": "linux",
+        "arch": "x64",
+        "probe_contract": 1
+      },
+      "selection_revision": 3,
+      "use": "new_run_project_default"
+    },
+    "process": {
+      "status": "exit_confirmed",
+      "pid": 7011,
+      "scope": "owned_root_process_only; descendants_unverified"
+    }
+  },
+  "authentication": "not_verified",
+  "model_requests": 0,
+  "billing": "not_verified",
+  "production_adoption": "not_requested"
+}
