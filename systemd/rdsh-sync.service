@@ -11,7 +11,7 @@ CPUWeight=10
 ExecStart=%h/File/Prog/rustdsh/sync-dsh.sh
 # Default: rdsh follows GitHub release tags (prebuilt binary, no cargo build;
 # untagged commits on main are NOT picked up). To follow the main branch with
-# a local source build + regress run instead, uncomment:
+# a local source build instead, uncomment:
 #Environment=RDSH_SYNC_FROM_SOURCE=1
 # Stay out of the way on weak hosts (2-core Celeron etc.): the update only
 # runs when nothing else needs the CPU.

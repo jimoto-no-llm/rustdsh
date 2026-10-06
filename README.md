@@ -25,9 +25,9 @@ to Rust and delegates everything else to the original `dsh` binary** — so you 
 
 - [Benchmarks](#benchmarks)
 - [Install](#install)
-- [Low-end hosts](#low-end-hosts)
 - [Usage](#usage)
 - [Replacement mode (run as `dsh`)](#replacement-mode-run-as-dsh)
+- [Low-end hosts](#low-end-hosts)
 - [Using with Smart-DSH](#using-with-smart-dsh)
 - [Web dashboard](#web-dashboard)
 - [Safety design](#safety-design)
@@ -63,8 +63,10 @@ curl -fsSL https://github.com/sahenjp/rustdsh/releases/latest/download/install.s
 ```
 
 On Linux/x86_64 the installer picks the glibc build (`rdsh-linux-x64.tar.gz`,
-needs glibc >= 2.34) or, when glibc is older than 2.34 or missing (Alpine), the
-fully static `rdsh-linux-x64-musl.tar.gz`. Force the static one with `--musl`.
+needs glibc >= 2.34), or the fully static `rdsh-linux-x64-musl.tar.gz` when it
+detects an older glibc. Force the static build with `--musl` (or `RDSH_MUSL=1`);
+on musl-only systems such as Alpine, where glibc cannot be detected, pass
+`--musl` yourself. Each download is checked against its `.sha256` file.
 
 ```powershell
 # Windows (PowerShell)
@@ -120,21 +122,15 @@ rdsh --passthrough web           # byte-identical delegation, no slim env
 rdsh --dry-run web -- --resume abc  # print what would be executed
 ```
 
-Any profile name is passed to dsh verbatim, including `rdsh tui` and
-`--profile tui`. Note that dsh >= 0.2.0 no longer ships a `tui` profile: it
-only works if you have a local one (`$DSH_HOME/profiles/tui`). The profiles dsh
-0.2.0 creates on first use are `web`, `headless`, `acp`, `sdk` and `sdk-minimal`.
+Any profile name is passed to dsh verbatim. dsh >= 0.2.0 no longer ships a
+`tui` profile (it creates `web`, `headless`, `acp`, `sdk` and `sdk-minimal`),
+so `rdsh tui` only works if you have a local `$DSH_HOME/profiles/tui`.
 
-#### Default profile
-
-`rdsh boot` and `rdsh dump-config` without a profile pick one in this order:
-
-1. `RDSH_DEFAULT_PROFILE`, if set and non-empty (e.g. `RDSH_DEFAULT_PROFILE=web`)
-2. `tui`, only if `$DSH_HOME/profiles/tui` exists (older installs keep working)
-3. otherwise exit 2 with a message listing your local profiles and the
-   shipped templates; there is no hardcoded fallback
-
-`--dry-run` resolves the same way. A bare `rdsh` still prints the help.
+Without a profile, `rdsh boot` and `rdsh dump-config` use
+`RDSH_DEFAULT_PROFILE`, then `general.default_profile` from the rdsh settings
+(`rdsh settings set general.default_profile web`), then a local `tui` profile
+if there is one. If none applies, rdsh exits with an error that tells you to
+pass `--profile <name>` or set `RDSH_DEFAULT_PROFILE`.
 
 ### Native fast commands (no Node startup)
 
@@ -240,61 +236,33 @@ Full discovery order and naming rules: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.
 rdsh is meant to stay useful on weak machines (2-core Celeron/Pentium class,
 no AVX, older distros, no Node at all).
 
-- **Slim mode, honestly.** Slim (on by default for booting) sets `RDSH_*` hint
-  variables, but upstream dsh (0.2.0-rc.x and its core packages) does not read
-  any of them; they only matter to third-party plugins that opt in. What really
-  shortens Node boot is the on-disk compile cache (`NODE_COMPILE_CACHE`, Node >=
-  22.1, works for ESM): slim mode points it at
-  `$XDG_CACHE_HOME/rdsh/node-compile-cache` (else `~/.cache/rdsh/node-compile-cache`;
-  `%LOCALAPPDATA%\rdsh\node-compile-cache` on Windows) and creates the directory
-  best-effort. A `NODE_COMPILE_CACHE` you already export always wins;
-  `RDSH_NODE_COMPILE_CACHE=0` opts out; `--passthrough`, `--no-slim` and
-  `RDSH_PASSTHROUGH=1` add nothing; `--dry-run` shows what would be set and
-  never creates the directory. Older Node ignores the variable.
-- **Prebuilt binaries** are baseline x86-64 (no `target-cpu`, no AVX/BMI), so
-  they run on Celeron/Pentium parts; the static musl asset covers old glibc.
-  Release builds must stay that way.
-- **`sessions --tokens`** reads the decompressed size from each zstd frame
-  header (exact; no decompression, no `zstd` CLI, no processes). Only a frame
-  that records no size falls back to `zstd -dc`, streamed into a byte counter
-  (never buffered) with at most one process per core. `?` marks sessions where
+- **Faster Node boot.** When rdsh boots dsh it sets `NODE_COMPILE_CACHE` to
+  `~/.cache/rdsh-node-compile-cache`, so Node reuses compiled code between
+  launches (Node >= 22.1; older Node ignores it). A `NODE_COMPILE_CACHE` you
+  already export is left untouched. `RDSH_NODE_COMPILE_CACHE=0`, `--passthrough`
+  and `RDSH_PASSTHROUGH=1` turn it off. The other slim variables (`RDSH_*`)
+  are hints that upstream dsh itself does not read.
+- **Prebuilt binaries** are plain x86-64 (no AVX/BMI), so they run on
+  Celeron/Pentium parts; the static musl build covers old glibc.
+- **`sessions --tokens`** reads each session's decompressed size from the zstd
+  frame header (no decompression, no `zstd` CLI needed). Only a frame that
+  records no size falls back to the `zstd` CLI; `?` marks sessions where
   neither worked.
-- **Thread counts** for `search` and the `sessions` scans follow the core
-  count instead of fixed fan-outs.
-- **No Node on the host?** `rdsh doctor` says so (with the node path/version
-  when present, and a warning when Node < 22.1) and the native commands keep
-  working; set `RDSH_ORIG_BIN` or install `@deepseek-ai/dsh` to boot dsh.
-- **Gentle auto-update.** `sync-dsh.sh` updates rdsh from the release
-  prebuilt binary (compare tag with `rdsh --version`, verify it runs, atomic
-  replace, restore on failure); building from source is opt-in with
-  `RDSH_SYNC_FROM_SOURCE=1` and runs under `nice -n 19` / `ionice -c3`
-  (`CARGO_BUILD_JOBS` is honored). The systemd unit runs at idle CPU/IO
-  priority; point its `ExecStart` at your checkout.
-
-### Change: auto-update now follows release tags, not `main`
-
-`sync-dsh.sh` used to update rdsh by fast-forwarding `origin/main`, building
-with cargo and running `tests/regress.sh`. **By default it now installs the
-latest GitHub release binary instead**, so commits on `main` that have not
-been tagged yet are *not* picked up.
-
-- To restore the old behavior (follow `main`, build from source, run
-  `tests/regress.sh` before installing), set `RDSH_SYNC_FROM_SOURCE=1`, e.g.
-  `RDSH_SYNC_FROM_SOURCE=1 ./sync-dsh.sh`, or add
-  `Environment=RDSH_SYNC_FROM_SOURCE=1` to `systemd/rdsh-sync.service`.
-- Trade-offs: by default there is no local cargo build (gentle on weak hosts,
-  no toolchain needed, the git checkout is untouched) and the downloaded
-  binary only has to answer `--version` before it replaces the old one (the
-  old one is restored on failure; tests are left to the tag's CI). A fix that
-  lands on `main` reaches default hosts only with the next release tag.
-- Each run logs which mode is active (`rdsh update mode: ...` in
-  `~/.local/share/rdsh/sync.log`).
-- `tests/regress.sh` only runs in source mode (release mode logs
-  `post-update regress: skipped`), and always sandboxed: a throwaway `HOME` and
-  `DSH_HOME` with `RDSH_AUTH_AUTOSYNC=0`, so it can never write your real
-  `~/.dsh`. The original dsh is resolved first (`dsh-orig`) and handed to the
-  tests as `DSH_ORIG_BIN`; without one a stub is used. `tests/regress.sh`
-  itself also disables auth autosync and defaults `DSH_HOME` to a temp dir.
+- **Threads.** `search` and the `sessions` scan use as many threads as the
+  host has cores (at most 8).
+- **No Node on the host?** The native commands (`tokens`, `search`,
+  `sessions`, ...) keep working. `rdsh doctor` reports the missing original
+  dsh and exits with 1; set `DSH_ORIG_BIN` (or `RDSH_ORIG_BIN`) or install
+  `@deepseek-ai/dsh` to boot dsh.
+- **Gentle auto-update.** `sync-dsh.sh` updates the original dsh (with
+  verification and rollback) and rdsh itself. By default rdsh comes from the
+  latest GitHub release as a prebuilt binary, so there is no cargo build and
+  commits on `main` reach you only once they are tagged; the new binary
+  replaces the old one only after it runs and passes `tests/regress.sh` in a
+  throwaway `HOME`. To follow `main` with a source build instead, set
+  `RDSH_SYNC_FROM_SOURCE=1` (it runs under `nice -n 19`, and `ionice -c3` when
+  available). `systemd/rdsh-sync.service` runs it at idle priority; point its
+  `ExecStart` at your checkout.
 
 ## Using with Smart-DSH
 
@@ -351,8 +319,8 @@ QR access: `rdsh-dashboard project --project <directory>` for a project,
 
 1. The agent loop and profile boot are never reimplemented — delegation only.
 2. Slim mode only *adds* environment variables (`RDSH_*` hints plus
-`NODE_COMPILE_CACHE`); unknown keys are ignored upstream and your own
-`NODE_COMPILE_CACHE` is never overridden.
+   `NODE_COMPILE_CACHE`); unknown keys are ignored upstream and your own
+   `NODE_COMPILE_CACHE` is never overridden.
 3. Launcher error cases from the original (`desktop` profile, mutually exclusive
 dumps, missing `--profile`) are reproduced in Rust.
 4. Read paths never write: tokens/search/compact/dump/native APIs touch nothing.
@@ -375,16 +343,15 @@ Verified with `cargo test` (26 unit tests) and `tests/regress.sh`
 ## FAQ
 
 - **Port is busy?** The dsh web GUI uses 3080; `rdsh serve` defaults to 38080. Use `--port 0` for a free port.
-- **`profile "tui" does not exist`?** dsh 0.2.0 no longer ships `tui`. Use
-  `rdsh web` / `rdsh --profile headless`, or set `RDSH_DEFAULT_PROFILE=web` for
-  the profile-less `rdsh boot`.
+- **`rdsh tui`, or a bare `rdsh boot`, fails?** dsh 0.2.0 no longer ships
+  `tui`. Use `rdsh web` / `rdsh --profile headless`, or set
+  `RDSH_DEFAULT_PROFILE=web` for the profile-less `rdsh boot`.
 - **A profile collides with a subcommand name?** Boot it explicitly:
   `dsh --profile <name>`.
 - **Revert the replacement?** `./install.sh --restore` brings the original back.
-- **What does `~123tok?` mean?** The session's size could not be determined:
-  `sessions --tokens` normally reads the exact decompressed size from the zstd
-  frame headers, falls back to the `zstd` CLI when a frame records no size, and
-  only if that is missing too shows compressed-bytes/4; the `?` marks that.
+- **What does `~123tok?` mean?** The decompressed size could not be read from
+  the zstd frame header or via the `zstd` CLI, so the number is a rough
+  stored-bytes/4 estimate.
 - **No NODE_COMPILE_CACHE wanted?** `RDSH_NODE_COMPILE_CACHE=0` (or `--passthrough`).
   An exported `NODE_COMPILE_CACHE` of your own is always respected.
 

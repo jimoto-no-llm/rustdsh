@@ -21,9 +21,9 @@
 
 - [実測](#実測)
 - [インストール](#インストール)
-- [低スペック環境向け](#低スペック環境向け)
 - [使い方](#使い方)
 - [置換モード（dsh として使う）](#置換モードdsh-として使う)
+- [低スペック環境向け](#低スペック環境向け)
 - [Smart-DSH との併用](#smart-dsh-との併用)
 - [Web UI（ダッシュボード）](#web-uiダッシュボード)
 - [安全設計](#安全設計)
@@ -58,8 +58,9 @@ curl -fsSL https://github.com/sahenjp/rustdsh/releases/latest/download/install.s
 ```
 
 Linux/x86_64 では、glibc版（`rdsh-linux-x64.tar.gz`、glibc 2.34以上が必要）を選びます。
-glibcが2.34未満、または無い環境（Alpine等）では、完全静的な
-`rdsh-linux-x64-musl.tar.gz` を自動で選びます。`--musl` で静的版を強制できます。
+2.34未満のglibcを検出したときは、完全静的な `rdsh-linux-x64-musl.tar.gz` を選びます。
+`--musl`（または `RDSH_MUSL=1`）で静的版を強制できます。glibcを検出できないmusl専用環境
+（Alpine等）では、自分で `--musl` を付けてください。ダウンロードは `.sha256` ファイルで検証します。
 
 ```powershell
 # Windows（PowerShell）
@@ -114,21 +115,14 @@ rdsh --passthrough web            # slim 無しの完全委譲（非常口）
 rdsh --dry-run web -- --resume abc  # 実行内容だけ表示
 ```
 
-プロファイル名はそのまま本家dshへ渡します（`rdsh tui`・`--profile tui` も同様）。
-ただしdsh 0.2.0以降は `tui` プロファイルが同梱されないため、ローカルに
-`$DSH_HOME/profiles/tui` がある場合だけ使えます。dsh 0.2.0が初回利用時に作るのは
-`web`・`headless`・`acp`・`sdk`・`sdk-minimal` です。
+プロファイル名はそのまま本家dshへ渡します。dsh 0.2.0以降は `tui` プロファイルが同梱されない
+（作られるのは `web`・`headless`・`acp`・`sdk`・`sdk-minimal`）ため、`rdsh tui` は
+ローカルに `$DSH_HOME/profiles/tui` がある場合だけ使えます。
 
-#### 既定プロファイル
-
-プロファイル無指定の `rdsh boot`・`rdsh dump-config` は次の順で決めます：
-
-1. `RDSH_DEFAULT_PROFILE`（設定済みで空でなければ。例：`RDSH_DEFAULT_PROFILE=web`）
-2. `$DSH_HOME/profiles/tui` がある場合だけ `tui`（旧環境の後方互換）
-3. どちらでもなければexit 2で終了し、ローカルのプロファイルと同梱テンプレートを案内します
-   （決め打ちのフォールバックはありません）
-
-`--dry-run` も同じ解決をします。引数なしの `rdsh` は従来どおりヘルプを表示します。
+プロファイル無指定の `rdsh boot`・`rdsh dump-config` は、`RDSH_DEFAULT_PROFILE`、
+rdsh設定の `general.default_profile`（`rdsh settings set general.default_profile web`）、
+ローカルに `tui` があればそれ、の順で決めます。どれも無ければ、`--profile <name>` を付けるか
+`RDSH_DEFAULT_PROFILE` を設定するよう案内するエラーで終了します。
 
 ### 高速ネイティブコマンド（Nodeを起動しない）
 
@@ -216,54 +210,28 @@ rdsh固有の先頭サブコマンド（`tokens`/`guard`/`serve`/`sessions`等�
 
 2コアのCeleron/Pentium級、AVXなし、古いディストロ、Nodeなしでも使えることを目標にしています。
 
-- **slimの実態**：起動時のslim（既定ON）は `RDSH_*` のヒント変数を付けますが、本家dsh
-  （0.2.0-rc.x とそのコアパッケージ）はどれも読みません。効くのはオプトインした
-  サードパーティのプラグインだけです。Nodeの起動を実際に短くするのはディスク上の
-  コンパイルキャッシュ（`NODE_COMPILE_CACHE`、Node 22.1以上、ESM対応）です。
-  slimは `$XDG_CACHE_HOME/rdsh/node-compile-cache`（無ければ
-  `~/.cache/rdsh/node-compile-cache`、Windowsは `%LOCALAPPDATA%\rdsh\node-compile-cache`）を
-  指し、ディレクトリは可能な範囲で作成します。既に `NODE_COMPILE_CACHE` を設定していれば
-  常にそちらを優先します。`RDSH_NODE_COMPILE_CACHE=0` で無効化、`--passthrough`・
-  `--no-slim`・`RDSH_PASSTHROUGH=1` では何も付けません。`--dry-run` は設定内容を表示するだけで
-  ディレクトリは作りません。古いNodeはこの変数を無視します
-- **ビルド済みバイナリ**はベースラインのx86-64（`target-cpu`・AVX/BMIなし）なので、
-  Celeron/Pentiumでも動きます。古いglibcには静的musl版が対応します。
-  リリースビルドはこの条件を保ってください
-- **`sessions --tokens`** はzstdフレームヘッダーから展開後サイズを読みます
-  （正確・展開なし・`zstd` CLI不要・プロセス起動なし）。サイズを記録していない
-  フレームだけ `zstd -dc` にフォールバックし、出力はバイト数のカウンターへ流します
-  （全文は保持しません。プロセス数はコア数まで）。どちらも使えない場合だけ `?` を付けます
-- **スレッド数**：`search` と `sessions` の走査は固定値ではなくコア数に合わせます
-- **ホストにNodeが無い場合**：`rdsh doctor` が明示します（Nodeがあればパス・版、22.1未満なら警告）。
-  ネイティブコマンドはそのまま使えます。dshを起動するには `RDSH_ORIG_BIN` を指定するか
+- **Nodeの起動を速く**：rdshがdshを起動するとき `NODE_COMPILE_CACHE` を
+  `~/.cache/rdsh-node-compile-cache` に設定し、Nodeが起動間でコンパイル結果を再利用します
+  （Node 22.1以上。古いNodeは無視します）。自分で `NODE_COMPILE_CACHE` を設定していれば
+  そのまま尊重します。`RDSH_NODE_COMPILE_CACHE=0`・`--passthrough`・`RDSH_PASSTHROUGH=1` で
+  無効になります。slimのその他の変数（`RDSH_*`）は本家dshが読まないヒントです
+- **ビルド済みバイナリ**は素のx86-64（AVX/BMIなし）なので、Celeron/Pentiumでも動きます。
+  古いglibcには静的musl版が対応します
+- **`sessions --tokens`** はzstdフレームヘッダーから展開後サイズを読みます（展開なし、
+  `zstd` CLI不要）。サイズを記録していないフレームだけ `zstd` CLIにフォールバックし、
+  どちらも使えない場合だけ `?` を付けます
+- **スレッド数**：`search` と `sessions` の走査はホストのコア数に合わせます（最大8）
+- **ホストにNodeが無い場合**：ネイティブコマンド（`tokens`・`search`・`sessions` など）は
+  そのまま使えます。`rdsh doctor` は本家dshが見つからないことを報告してexit 1で終わります。
+  dshを起動するには `DSH_ORIG_BIN`（または `RDSH_ORIG_BIN`）を指定するか
   `@deepseek-ai/dsh` を導入してください
-- **穏やかな自動更新**：`sync-dsh.sh` はrdshをリリースのビルド済みバイナリで更新します
-  （タグと `rdsh --version` を比較→実行確認→アトミック置換→失敗時は復元）。
-  ソースビルドは `RDSH_SYNC_FROM_SOURCE=1` の明示指定時のみで、`nice -n 19`／`ionice -c3` 下で
-  実行します（`CARGO_BUILD_JOBS` を尊重）。systemdユニットはCPU・IOともidle優先度で動きます。
-  `ExecStart` は各自のcheckoutの場所に合わせてください
-
-### 変更点: 自動更新はmainブランチ追従からリリースタグ追従に変わりました
-
-`sync-dsh.sh` は従来、`origin/main` をfast-forwardしてcargoでビルドし、`tests/regress.sh` を
-実行してからrdshを更新していました。**既定ではGitHubの最新リリースのバイナリを導入する方式に
-変わった**ため、タグが付く前の `main` のコミットは取り込まれません。
-
-- 従来の挙動（`main` 追従・ソースビルド・インストール前に `tests/regress.sh`）に戻すには
-  `RDSH_SYNC_FROM_SOURCE=1` を指定します（例：`RDSH_SYNC_FROM_SOURCE=1 ./sync-dsh.sh`、または
-  `systemd/rdsh-sync.service` に `Environment=RDSH_SYNC_FROM_SOURCE=1` を追加）
-- トレードオフ：既定ではローカルでcargoビルドを行わず（低スペック環境に優しく、ツールチェーン不要、
-  gitのcheckoutにも触れません）、ダウンロードしたバイナリは `--version` に応答することだけを
-  確認してから置換します（失敗時は元に戻します。テストはタグ側のCIに任せます）。
-  `main` に入った修正は、次のリリースタグが付くまで既定設定のホストには届きません
-- 実行のたびに有効なモードをログに記録します（`~/.local/share/rdsh/sync.log` の
-  `rdsh update mode: ...`）
-- `tests/regress.sh` はソースモードでのみ実行します（リリースモードは
-  `post-update regress: skipped` をログに残します）。実行は常にサンドボックス内で、
-  使い捨ての `HOME`／`DSH_HOME` と `RDSH_AUTH_AUTOSYNC=0` を使うため、本物の `~/.dsh` には
-  書き込みません。本家dsh（`dsh-orig`）は先に解決して `DSH_ORIG_BIN` で渡し、見つからなければ
-  スタブを使います。`tests/regress.sh` 自体もauth自動同期を無効化し、`DSH_HOME` 未設定なら
-  一時ディレクトリを使います
+- **穏やかな自動更新**：`sync-dsh.sh` は本家dshを（検証・失敗時ロールバック付きで）更新し、
+  rdsh自体も更新します。既定ではGitHubの最新リリースのビルド済みバイナリを使うため、
+  cargoビルドは走らず、`main` のコミットはタグが付いてから届きます。新しいバイナリは、
+  起動確認と、使い捨ての `HOME` での `tests/regress.sh` に通ったときだけ置き換えます。
+  `main` に追従してソースからビルドしたい場合は `RDSH_SYNC_FROM_SOURCE=1` を指定します
+  （`nice -n 19`、あれば `ionice -c3` 下で実行）。`systemd/rdsh-sync.service` はidle優先度で
+  動かすので、`ExecStart` は各自のcheckoutに合わせてください
 
 ## Smart-DSH との併用
 
@@ -330,12 +298,12 @@ rdsh serve
 ## よくある質問
 
 - **ポートが使用中と言われる**：dsh web GUIは3080、`rdsh serve`は既定38080です。`--port 0` で空きポートを使えます
-- **`profile "tui" does not exist` と出る**：dsh 0.2.0は `tui` を同梱しません。
+- **`rdsh tui` や無指定の `rdsh boot` が失敗する**：dsh 0.2.0は `tui` を同梱しません。
   `rdsh web` や `rdsh --profile headless` を使うか、無指定の `rdsh boot` 用に
   `RDSH_DEFAULT_PROFILE=web` を設定してください
 - **プロファイル名がサブコマンドと被る**：`dsh --profile <name>` 形式で起動してください
 - **元に戻したい**：`./install.sh --restore`（退避した本家を復元）
-- **`--tokens` の `?` 付き表示**：セッションのサイズを確定できなかった印です。`sessions --tokens` は通常zstdフレームヘッダーから展開後サイズを正確に読み、サイズ未記録のフレームがあれば `zstd` CLIにフォールバックし、それも無い場合だけ圧縮サイズ/4の概算を表示します
+- **`--tokens` の `?` 付き表示**：zstdフレームヘッダーからも `zstd` CLIからも展開後サイズを読めなかったため、保存サイズ/4の概算を表示している印です
 - **NODE_COMPILE_CACHEを使いたくない**：`RDSH_NODE_COMPILE_CACHE=0`（または `--passthrough`）。自分で設定した `NODE_COMPILE_CACHE` は常に尊重します
 
 ## クレジット

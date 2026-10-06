@@ -73,42 +73,43 @@ if RDSH_AUTH_AUTOSYNC=0 PATH="$SB/bin:$SB/orig:$PATH" DSH_ORIG_BIN="$SB/orig/dsh
 if RDSH_AUTH_AUTOSYNC=0 PATH="$SB/bin:$SB/orig:$PATH" RDSH_ORIG_BIN="$SB/orig/dsh" $SB/bin/dsh --version | grep -q FAKE-ORIG; then ok "RDSH_ORIG_BIN primary"; else echo "FAIL: RDSH_ORIG_BIN primary"; exit 1; fi
 # --- default profile: dsh >= 0.2.0 no longer ships `tui` ---
 DP=$RG_TMP/dp
-mkdir -p "$DP/empty" "$DP/withtui/profiles/tui" "$DP/local/profiles/mine"
+mkdir -p "$DP/empty" "$DP/withtui/profiles/tui"
 dp_dry() { env -u RDSH_DEFAULT_PROFILE DSH_ORIG_BIN="$SB/orig/dsh" "$@"; }
 dp_dry DSH_HOME="$DP/empty" $BIN --dry-run boot >"$DP/out" 2>"$DP/err"; code=$?
-if [ "$code" = 2 ] && grep -q "no default profile" "$DP/err" && grep -q "headless" "$DP/err" && grep -q "RDSH_DEFAULT_PROFILE=web" "$DP/err"; then ok "no profile + no tui dir: exit 2 with guidance"; else echo "FAIL(exit $code want 2): no default profile guidance"; cat "$DP/err"; exit 1; fi
-dp_dry DSH_HOME="$DP/local" $BIN --dry-run boot >"$DP/out" 2>"$DP/err"; code=$?
-if [ "$code" = 2 ] && grep -q "mine" "$DP/err"; then ok "guidance lists local profiles"; else echo "FAIL(exit $code): guidance lists local profiles"; cat "$DP/err"; exit 1; fi
+if [ "$code" = 1 ] && grep -q "no profile specified" "$DP/err" && grep -q "headless" "$DP/err" && grep -q "RDSH_DEFAULT_PROFILE=" "$DP/err"; then ok "no profile + no tui dir: guided error"; else echo "FAIL(exit $code want 1): no default profile guidance"; cat "$DP/err"; exit 1; fi
 dp_dry DSH_HOME="$DP/empty" $BIN dump-config --native >"$DP/out" 2>"$DP/err"; code=$?
-if [ "$code" = 2 ] && grep -q "no default profile" "$DP/err"; then ok "dump-config without profile: exit 2"; else echo "FAIL(exit $code want 2): dump-config default"; exit 1; fi
+if [ "$code" = 1 ] && grep -q "no profile specified" "$DP/err"; then ok "dump-config without profile: guided error"; else echo "FAIL(exit $code want 1): dump-config default"; cat "$DP/err"; exit 1; fi
 if dp_dry DSH_HOME="$DP/empty" RDSH_DEFAULT_PROFILE=web $BIN --dry-run boot 2>/dev/null | grep -q '"--profile" "web"'; then ok "RDSH_DEFAULT_PROFILE=web dry-run shows --profile web"; else echo "FAIL(output): RDSH_DEFAULT_PROFILE"; exit 1; fi
 if dp_dry DSH_HOME="$DP/withtui" $BIN --dry-run boot 2>/dev/null | grep -q '"--profile" "tui"'; then ok "local tui profile dir keeps tui as default"; else echo "FAIL(output): tui dir default"; exit 1; fi
 if dp_dry DSH_HOME="$DP/withtui" RDSH_DEFAULT_PROFILE=headless $BIN --dry-run boot 2>/dev/null | grep -q '"--profile" "headless"'; then ok "RDSH_DEFAULT_PROFILE beats local tui dir"; else echo "FAIL(output): env beats tui dir"; exit 1; fi
 if dp_dry DSH_HOME="$DP/empty" $BIN --dry-run --profile tui 2>/dev/null | grep -q '"--profile" "tui"' && dp_dry DSH_HOME="$DP/empty" $BIN --dry-run tui 2>/dev/null | grep -q '"--profile" "tui"'; then ok "explicit tui passes through verbatim"; else echo "FAIL(output): explicit tui passthrough"; exit 1; fi
 # --- slim: Node compile cache (the part of slim that really speeds up Node boot) ---
+# Default dir is $HOME/.cache/rdsh-node-compile-cache (XDG_CACHE_HOME is not consulted).
 CC=/tmp/rdsh-cc-$$
-mkdir -p "$CC/xdg" "$CC/home" "$CC/dsh"
+mkdir -p "$CC/home" "$CC/dsh" "$CC/home-pt"
 cat > "$CC/envdsh" << 'ENVEOF'
 #!/bin/sh
 echo "CACHE=${NODE_COMPILE_CACHE:-unset} HINT=${RDSH_SLIM:-unset}"
 ENVEOF
 chmod +x "$CC/envdsh"
-CCDEF="$CC/xdg/rdsh/node-compile-cache"
-if env -u NODE_COMPILE_CACHE -u RDSH_NODE_COMPILE_CACHE XDG_CACHE_HOME="$CC/xdg" DSH_ORIG_BIN="$SB/orig/dsh" $BIN --dry-run tui 2>/dev/null | grep -q "NODE_COMPILE_CACHE=\"$CCDEF\""; then ok "slim dry-run shows NODE_COMPILE_CACHE"; else echo "FAIL(output): slim dry-run shows NODE_COMPILE_CACHE"; exit 1; fi
-if [ ! -e "$CC/xdg/rdsh" ]; then ok "dry-run does not create the cache dir"; else echo "FAIL: dry-run created the cache dir"; exit 1; fi
-if env -u NODE_COMPILE_CACHE XDG_CACHE_HOME="$CC/xdg" DSH_ORIG_BIN="$SB/orig/dsh" $BIN --dry-run --passthrough tui 2>/dev/null | grep -q "NODE_COMPILE_CACHE\|RDSH_SLIM"; then echo "FAIL: --passthrough must add no env"; exit 1; else ok "passthrough adds no env"; fi
-if env -u NODE_COMPILE_CACHE XDG_CACHE_HOME="$CC/xdg" RDSH_PASSTHROUGH=1 DSH_ORIG_BIN="$SB/orig/dsh" $BIN --dry-run tui 2>/dev/null | grep -q "NODE_COMPILE_CACHE"; then echo "FAIL: RDSH_PASSTHROUGH=1 must add no env"; exit 1; else ok "RDSH_PASSTHROUGH=1 adds no cache env"; fi
-if env -u NODE_COMPILE_CACHE XDG_CACHE_HOME="$CC/xdg" RDSH_NODE_COMPILE_CACHE=0 DSH_ORIG_BIN="$SB/orig/dsh" $BIN --dry-run tui 2>/dev/null | grep -q 'NODE_COMPILE_CACHE="'; then echo "FAIL: RDSH_NODE_COMPILE_CACHE=0 opt-out ignored"; exit 1; else ok "RDSH_NODE_COMPILE_CACHE=0 opts out"; fi
-if NODE_COMPILE_CACHE=/tmp/rdsh-mine XDG_CACHE_HOME="$CC/xdg" DSH_ORIG_BIN="$SB/orig/dsh" $BIN --dry-run tui 2>/dev/null | grep -q 'NODE_COMPILE_CACHE=/tmp/rdsh-mine (yours, respected)'; then ok "user NODE_COMPILE_CACHE respected"; else echo "FAIL(output): user NODE_COMPILE_CACHE respected"; exit 1; fi
-# Real exec (not dry-run): the child sees the variable and the directory exists.
-if env -u NODE_COMPILE_CACHE XDG_CACHE_HOME="$CC/xdg" HOME="$CC/home" DSH_HOME="$CC/dsh" DSH_ORIG_BIN="$CC/envdsh" $BIN tui 2>/dev/null | grep -q "CACHE=$CCDEF " && [ -d "$CCDEF" ]; then ok "boot exports NODE_COMPILE_CACHE and creates the dir"; else echo "FAIL(output): boot exports NODE_COMPILE_CACHE"; exit 1; fi
+CCDEF="$CC/home/.cache/rdsh-node-compile-cache"
+if env -u NODE_COMPILE_CACHE -u RDSH_NODE_COMPILE_CACHE HOME="$CC/home" DSH_ORIG_BIN="$SB/orig/dsh" $BIN --dry-run tui 2>/dev/null | grep -q "NODE_COMPILE_CACHE=\"$CCDEF\""; then ok "slim dry-run shows NODE_COMPILE_CACHE"; else echo "FAIL(output): slim dry-run shows NODE_COMPILE_CACHE"; exit 1; fi
+if env -u NODE_COMPILE_CACHE HOME="$CC/home-pt" DSH_ORIG_BIN="$SB/orig/dsh" $BIN --dry-run --passthrough tui 2>/dev/null | grep -q "NODE_COMPILE_CACHE\|RDSH_SLIM"; then echo "FAIL: --passthrough must add no env"; exit 1; else ok "passthrough adds no env"; fi
+if [ ! -e "$CC/home-pt/.cache" ]; then ok "passthrough does not create the cache dir"; else echo "FAIL: passthrough created the cache dir"; exit 1; fi
+if env -u NODE_COMPILE_CACHE HOME="$CC/home" RDSH_PASSTHROUGH=1 DSH_ORIG_BIN="$SB/orig/dsh" $BIN --dry-run tui 2>/dev/null | grep -q "NODE_COMPILE_CACHE"; then echo "FAIL: RDSH_PASSTHROUGH=1 must add no env"; exit 1; else ok "RDSH_PASSTHROUGH=1 adds no cache env"; fi
+if env -u NODE_COMPILE_CACHE HOME="$CC/home" RDSH_NODE_COMPILE_CACHE=0 DSH_ORIG_BIN="$SB/orig/dsh" $BIN --dry-run tui 2>/dev/null | grep -q 'NODE_COMPILE_CACHE="'; then echo "FAIL: RDSH_NODE_COMPILE_CACHE=0 opt-out ignored"; exit 1; else ok "RDSH_NODE_COMPILE_CACHE=0 opts out"; fi
+# A value the user already exports is left alone: rdsh adds nothing to the exec line.
+if NODE_COMPILE_CACHE=/tmp/rdsh-mine HOME="$CC/home" DSH_ORIG_BIN="$SB/orig/dsh" $BIN --dry-run tui 2>/dev/null | grep "would exec" | grep -q 'NODE_COMPILE_CACHE='; then echo "FAIL: user NODE_COMPILE_CACHE must not be overridden (dry-run)"; exit 1; else ok "user NODE_COMPILE_CACHE respected (dry-run)"; fi
+if NODE_COMPILE_CACHE=/tmp/rdsh-mine HOME="$CC/home" DSH_HOME="$CC/dsh" DSH_ORIG_BIN="$CC/envdsh" $BIN tui 2>/dev/null | grep -q "CACHE=/tmp/rdsh-mine "; then ok "boot passes the user's NODE_COMPILE_CACHE through"; else echo "FAIL(output): boot must keep the user's NODE_COMPILE_CACHE"; exit 1; fi
+# Real exec (not dry-run): the child sees the default value and the directory exists.
+if env -u NODE_COMPILE_CACHE HOME="$CC/home" DSH_HOME="$CC/dsh" DSH_ORIG_BIN="$CC/envdsh" $BIN tui 2>/dev/null | grep -q "CACHE=$CCDEF " && [ -d "$CCDEF" ]; then ok "boot exports NODE_COMPILE_CACHE and creates the dir"; else echo "FAIL(output): boot exports NODE_COMPILE_CACHE"; exit 1; fi
 rm -rf "$CC"
-# --- doctor on a host with no Node/dsh: clear hint, non-zero exit ---
+# --- doctor on a host with no Node/dsh: fails with a clear error ---
 ND=/tmp/rdsh-nodsh-$$
 mkdir -p "$ND/home"
-env -u RDSH_ORIG_BIN -u DSH_ORIG_BIN HOME="$ND/home" PATH="/nonexistent" $BIN doctor > "$ND/out" 2>/dev/null
+env -u RDSH_ORIG_BIN -u DSH_ORIG_BIN HOME="$ND/home" PATH="/nonexistent" $BIN doctor > "$ND/out" 2> "$ND/err"
 code=$?
-if [ "$code" = 1 ] && grep -q "hint: no Node/dsh" "$ND/out" && grep -q "node: <not found>" "$ND/out"; then ok "doctor hints when node/dsh are missing"; else echo "FAIL(output): doctor missing-node hint (exit $code)"; cat "$ND/out"; exit 1; fi
+if [ "$code" = 1 ] && grep -q "original 'dsh' not found" "$ND/err"; then ok "doctor exits 1 when original dsh is missing"; else echo "FAIL(output): doctor missing-dsh error (exit $code)"; cat "$ND/err"; exit 1; fi
 rm -rf "$ND"
 # --- sessions --tokens: exact size from zstd frame headers, no zstd process ---
 ZS=/tmp/rdsh-zst-$$
@@ -171,6 +172,8 @@ printf '#!/bin/sh\necho fake-musl\n' > $MS/musl/rdsh
 chmod +x $MS/gnu/rdsh $MS/musl/rdsh
 tar -czf $MS/rel/latest/download/rdsh-linux-x64.tar.gz -C $MS/gnu rdsh
 tar -czf $MS/rel/latest/download/rdsh-linux-x64-musl.tar.gz -C $MS/musl rdsh
+# install.sh refuses a release asset without its .sha256 sidecar.
+for a in rdsh-linux-x64 rdsh-linux-x64-musl; do (cd "$MS/rel/latest/download" && $SUM "$a.tar.gz" > "$a.tar.gz.sha256"); done
 printf '#!/bin/sh\ncase "$1" in -s) echo Linux ;; -m) echo x86_64 ;; *) exec /usr/bin/uname "$@" ;; esac\n' > $MS/shim/uname
 chmod +x $MS/shim/uname
 # pick NAME GETCONF_BODY LDD_BODY [install flags...] -> which fake binary got installed
@@ -188,8 +191,6 @@ r="$(pick x 'echo "glibc 2.41"' 'exit 1')"
 if [ "$r" = fake-gnu ]; then ok "install: glibc 2.41 picks gnu"; else echo "FAIL: glibc 2.41 picked $r"; exit 1; fi
 r="$(pick x 'echo "glibc 2.31"' 'exit 1')"
 if [ "$r" = fake-musl ]; then ok "install: glibc 2.31 picks musl"; else echo "FAIL: glibc 2.31 picked $r"; exit 1; fi
-r="$(pick x 'exit 1' 'echo "musl libc (x86_64)" >&2; echo "Version 1.2.4" >&2; exit 1')"
-if [ "$r" = fake-musl ]; then ok "install: musl libc picks musl"; else echo "FAIL: musl libc picked $r"; exit 1; fi
 r="$(pick x 'exit 1' 'echo "ldd (Debian GLIBC 2.36-9) 2.36"')"
 if [ "$r" = fake-gnu ]; then ok "install: ldd fallback glibc 2.36 picks gnu"; else echo "FAIL: ldd 2.36 picked $r"; exit 1; fi
 r="$(pick x 'echo "glibc 2.41"' 'exit 1' --musl)"
