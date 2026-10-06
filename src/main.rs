@@ -729,8 +729,7 @@ fn doctor() -> anyhow::Result<()> {
     for w in node_wrapper_warnings(shadowed) {
         say(w);
     }
-    say("[rdsh] note: dsh web GUI and `rdsh serve` both default to 3080; co-use with".to_string());
-    say("[rdsh] note: `rdsh serve --port 38080` while dsh web keeps 3080".to_string());
+    say("[rdsh] note: dsh web GUI uses 3080; `rdsh serve` defaults to 38080 (`--port 0` auto-picks)".to_string());
     if orig.is_none() {
         anyhow::bail!("original 'dsh' not found; set DSH_ORIG_BIN or install @deepseek-ai/dsh");
     }

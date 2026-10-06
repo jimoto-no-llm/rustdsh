@@ -51,7 +51,7 @@ pub fn cmd_setup_web(port: u16) -> anyhow::Result<()> {
                 });
             }
             Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                std::thread::sleep(std::time::Duration::from_millis(100));
+                std::thread::sleep(std::time::Duration::from_millis(10));
             }
             Err(e) => {
                 eprintln!("[rdsh setup] accept: {e:#}");
