@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
 mod auth;
 mod compact;
 mod context;
@@ -19,7 +19,8 @@ mod websearch;
 #[command(
     name = "rdsh",
     version,
-    about = "Rust fast launcher for dsh (safe: native fast-paths + passthrough)"
+    about = "Rust fast launcher for dsh (safe: native fast-paths + passthrough)",
+    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|dump-config|boot)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import              mirror codex/opencode OAuth into dsh credentials\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh --passthrough tui          byte-identical delegation, no slim env\n  rdsh --dry-run tui -- --resume abc   show what would exec"
 )]
 struct Cli {
     #[arg(long = "passthrough", global = true)]
@@ -363,16 +364,31 @@ fn main() {
                         Err(e) => Err(anyhow::anyhow!(e)),
                     }
                 } else {
+                    // Effective values per editable key with their source:
+                    // `config` = explicitly present in rdsh.json,
+                    // `default` = built-in fallback. `settings keys` remains
+                    // the editable-key list.
                     println!("config: {}", rdsh_config::settings_path());
-                    match v.as_object() {
-                        Some(map) => {
-                            for k in map.keys() {
-                                println!("- {k}");
-                            }
-                            Ok(())
-                        }
-                        None => Err(anyhow::anyhow!("settings did not render as an object")),
+                    let raw: serde_json::Value =
+                        std::fs::read_to_string(rdsh_config::settings_path())
+                            .ok()
+                            .and_then(|text| serde_json::from_str(&text).ok())
+                            .unwrap_or(serde_json::Value::Null);
+                    for annotated in rdsh_config::RdshSettings::keys() {
+                        let key = annotated.split('(').next().unwrap_or(annotated);
+                        let value = cfg.get_dotted(key).unwrap_or(serde_json::Value::Null);
+                        let rendered = match &value {
+                            serde_json::Value::String(s) => s.clone(),
+                            _ => serde_json::to_string(&value).unwrap_or_else(|_| "-".to_string()),
+                        };
+                        let source = if settings_key_in_file(&raw, key) {
+                            "config"
+                        } else {
+                            "default"
+                        };
+                        println!("{key}  {rendered}  {source}");
                     }
+                    Ok(())
                 }
             }
             SettingsAction::Init { force } => {
@@ -522,20 +538,14 @@ fn main() {
             )
         }),
         None => {
-            let wants_help = cli.extra.iter().any(|a| a == "-h" || a == "--help");
             let parsed = dsh_args::split_launcher_args(cli.profile, cli.extra);
             match parsed {
                 dsh_args::Launcher::Help => {
-                    if wants_help {
-                        print_help();
-                        Ok(())
-                    } else {
-                        // Bare `rdsh` (no profile, no help flag): boot the
-                        // resolved default instead of showing help.
-                        resolve_default_profile().and_then(|p| {
-                            passthrough::exec_boot(&p, None, &cli.patch, &[], dry, slim)
-                        })
-                    }
+                    // Single source of truth: clap-generated help (see the
+                    // #[command] attributes on Cli). Bare `rdsh` and
+                    // `-h`/`--help` launcher args land here.
+                    let _ = Cli::command().print_help();
+                    Ok(())
                 }
                 dsh_args::Launcher::Plugin { profile, pnpm_args } => {
                     passthrough::exec_plugin(&profile, &pnpm_args, dry, slim)
@@ -614,24 +624,18 @@ fn resolve_default_profile() -> anyhow::Result<String> {
     pick_default_profile(env.as_deref(), local_tui).map_err(|m| anyhow::anyhow!(m))
 }
 
-fn print_help() {
-    println!("rdsh: fast Rust launcher for dsh (safe shim)");
-    println!();
-    println!("USAGE:");
-    println!("  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]");
-    println!("  rdsh <native-subcommand> ...   (tokens|prune|search|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|dump-config|boot)");
-    println!();
-    println!("EXAMPLES:");
-    println!("  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)");
-    println!("  rdsh --profile web --patch x.yml boot web with overlay");
-    println!("  rdsh dump-config --profile tui  delegate exact dump to dsh");
-    println!("  rdsh tokens ./AGENTS.md         estimate input tokens natively");
-    println!("  rdsh auth --import              mirror codex/opencode OAuth into dsh credentials");
-    println!("  rdsh setup                      first-run connect: import, login flow, next steps");
-    println!("  rdsh search hello --dir .       fast file search without Node");
-    println!("  rdsh search-web \"rust async\"      web search via SearXNG (no API key)");
-    println!("  rdsh --passthrough tui          byte-identical delegation, no slim env");
-    println!("  rdsh --dry-run tui -- --resume abc   show what would exec");
+/// True when `dotted` (e.g. `search.max`) is explicitly present (non-null)
+/// in the raw rdsh.json text. Used by `settings show` to label each
+/// effective value `config` vs `default`.
+fn settings_key_in_file(raw: &serde_json::Value, dotted: &str) -> bool {
+    let mut node = raw;
+    for part in dotted.split('.') {
+        match node.get(part) {
+            Some(next) if !next.is_null() => node = next,
+            _ => return false,
+        }
+    }
+    true
 }
 
 fn dump_config_native(profile: &str, patches: &[String]) -> anyhow::Result<()> {
