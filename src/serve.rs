@@ -125,9 +125,9 @@ fn handle(mut s: std::net::TcpStream, token: &str, port: u16) -> anyhow::Result<
         ("GET", "/api/bench") => (200, "application/json", Cow::Owned(bench_json(query))),
         ("GET", "/api/sessions") => {
             let n: usize = query
-                .split("&")
+                .split('&')
                 .find_map(|kv| {
-                    let mut it = kv.splitn(2, "=");
+                    let mut it = kv.splitn(2, '=');
                     match (it.next(), it.next()) {
                         (Some("limit"), Some(v)) => v.parse().ok(),
                         _ => None,
