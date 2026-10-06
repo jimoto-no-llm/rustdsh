@@ -1,7 +1,9 @@
 //! Unified settings backed by `$DSH_HOME/rdsh.json` (schema v1).
 //!
 //! `serde_json` + `anyhow` + `std` のみを使います。
-//! ファイル欠落・壊れ JSON は既定値にフォールバックし、不正値は clamp/切詰めで吸収します。
+//! ファイル欠落は既定値にフォールバックし、不正値は clamp/切詰めで吸収します。
+//! 存在するのに壊れた JSON は既定値に置き換えず hard error にします
+//!（guard.deny 空での fail-open 起動と `settings set` による上書き消去を防ぐため）。
 //! 旧 `rdsh-context.json` は読み取り専用で context 節の補完に使います（書き込みません）。
 
 /// rdsh.json のスキーマ版。
@@ -223,11 +225,47 @@ pub fn settings_path() -> String {
     format!("{}/rdsh.json", crate::inspect::dsh_home())
 }
 
-/// 設定を読み込む。欠落・壊れ JSON は既定値、不正値は clamp/切詰めで吸収する。
+/// 設定を読み込む。ファイル欠落は既定値、不正値は clamp/切詰めで吸収する。
 /// context 節が空なら旧 rdsh-context.json で補完する（読み取り専用）。
+///
+/// 存在するのに壊れた JSON は fail-open しない: エラーを出して exit(1) で
+/// 終了する（guard.deny 空での起動を防ぐため）。表示形式は main の cmd
+/// エラー処理 (`[rdsh] error: ...` + exit(1)) に合わせている。
+/// テストや Result が欲しい呼び出し側は [`try_load`] を使う。
 pub fn load() -> RdshSettings {
-    let raw = std::fs::read_to_string(settings_path()).unwrap_or_default();
-    let parsed: serde_json::Value = serde_json::from_str(&raw).unwrap_or(serde_json::Value::Null);
+    match try_load() {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            eprintln!("[rdsh] error: {e:#}");
+            std::process::exit(1);
+        }
+    }
+}
+
+/// `load` の実体。ファイル欠落は既定値 (Ok) を返し、有効な設定の
+/// 読み込み結果は従来と同一。存在するのに壊れた JSON はファイルパス・
+/// 行/列・復旧手順つきの Err を返す（guard 系設定の fail-open 禁止）。
+pub fn try_load() -> anyhow::Result<RdshSettings> {
+    let path = settings_path();
+    let (raw, existed) = match std::fs::read_to_string(&path) {
+        Ok(raw) => (raw, true),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => (String::new(), false),
+        Err(e) => {
+            return Err(anyhow::anyhow!("cannot read settings file at {path}: {e}"));
+        }
+    };
+    let parsed: serde_json::Value = match serde_json::from_str(&raw) {
+        Ok(v) => v,
+        // 欠落ファイルは従来どおり Null 扱い（既定値 + legacy 補完）。
+        Err(_) if !existed => serde_json::Value::Null,
+        Err(e) => {
+            return Err(anyhow::anyhow!(
+                "invalid settings file at {path}: {e} (line {}, column {}); run `rdsh settings init --force` (rdsh settings reset) to restore defaults",
+                e.line(),
+                e.column()
+            ));
+        }
+    };
     let has_context = parsed.get("context").is_some_and(|c| !c.is_null());
     let mut cfg = if parsed.is_null() {
         RdshSettings::default()
@@ -235,7 +273,7 @@ pub fn load() -> RdshSettings {
         RdshSettings::from_value(&parsed)
     };
     complement_from_legacy(&mut cfg, has_context);
-    cfg
+    Ok(cfg)
 }
 
 impl RdshSettings {
@@ -913,16 +951,58 @@ mod rdsh_config_tests {
         with_home("missing", |_| {
             assert!(!std::path::Path::new(&settings_path()).exists());
             assert_eq!(load(), RdshSettings::default());
+            assert_eq!(try_load().unwrap(), RdshSettings::default());
         });
     }
 
     #[test]
-    fn broken_json_returns_default() {
-        with_home("broken", |_| {
+    fn corrupt_json_is_hard_error_with_location() {
+        with_home("corrupt", |_| {
             let p = settings_path();
             std::fs::create_dir_all(std::path::Path::new(&p).parent().unwrap()).unwrap();
-            std::fs::write(&p, "{oops,,,").unwrap();
-            assert_eq!(load(), RdshSettings::default());
+            std::fs::write(&p, "{\n  \"search\": {\n    oops\n").unwrap();
+            let err = try_load().unwrap_err().to_string();
+            assert!(err.contains(&p), "path missing: {err}");
+            assert!(err.contains("line"), "line missing: {err}");
+            assert!(err.contains("column"), "column missing: {err}");
+            assert!(
+                err.contains("settings reset"),
+                "recovery hint missing: {err}"
+            );
+            // 壊れファイルは既定値に置き換えない（fail-open 禁止）。
+            assert_eq!(
+                std::fs::read_to_string(&p).unwrap(),
+                "{\n  \"search\": {\n    oops\n"
+            );
+        });
+    }
+
+    #[test]
+    fn empty_file_is_hard_error() {
+        with_home("empty", |_| {
+            let p = settings_path();
+            std::fs::create_dir_all(std::path::Path::new(&p).parent().unwrap()).unwrap();
+            std::fs::write(&p, "").unwrap();
+            let err = try_load().unwrap_err().to_string();
+            assert!(err.contains(&p), "path missing: {err}");
+            assert!(
+                err.contains("settings reset"),
+                "recovery hint missing: {err}"
+            );
+        });
+    }
+
+    #[test]
+    fn guard_deny_list_survives_reload() {
+        with_home("guard", |_| {
+            let mut cfg = RdshSettings::default();
+            cfg.guard.deny = vec!["rm -rf *".to_string(), "shutdown*".to_string()];
+            cfg.guard.reason = "safety".to_string();
+            cfg.save().unwrap();
+            let back = try_load().unwrap();
+            assert_eq!(back.guard.deny, cfg.guard.deny);
+            assert_eq!(back.guard.reason, "safety");
+            assert_eq!(load(), cfg);
         });
     }
 
