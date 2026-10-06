@@ -96,7 +96,9 @@ fn query_terms(query: &str) -> Vec<String> {
         .to_lowercase()
         .split(|c: char| !(c.is_alphanumeric() || c == '_' || c == '-' || c == '/'))
     {
-        let t = raw.trim().trim_matches(|c| c == '_' || c == '-' || c == '/');
+        let t = raw
+            .trim()
+            .trim_matches(|c| c == '_' || c == '-' || c == '/');
         if t.len() < 2 && t.chars().count() < 1 {
             continue;
         }
@@ -310,11 +312,7 @@ fn recent_sessions(query: &str, limit: usize) -> Vec<String> {
         scored.push((score, mtime, label));
     }
     scored.sort_by(|a, b| b.0.cmp(&a.0).then(b.1.cmp(&a.1)));
-    scored
-        .into_iter()
-        .take(limit)
-        .map(|(_, _, s)| s)
-        .collect()
+    scored.into_iter().take(limit).map(|(_, _, s)| s).collect()
 }
 
 fn short_session(p: &std::path::Path) -> String {
@@ -403,7 +401,10 @@ fn code_hits(query: &str, max: usize) -> Vec<String> {
                 }
             }
             for (s, i, snippet) in best {
-                scored.push((s + file_bonus, format!("{}:{}:{}", p.display(), i + 1, snippet)));
+                scored.push((
+                    s + file_bonus,
+                    format!("{}:{}:{}", p.display(), i + 1, snippet),
+                ));
             }
             if scored.len() >= max * 6 {
                 break;
@@ -446,7 +447,10 @@ fn assemble(query: &str, cfg: &ContextConfig) -> Vec<Section> {
     } else {
         cfg.goal.clone()
     };
-    secs.push(Section { name: "goal", body: goal });
+    secs.push(Section {
+        name: "goal",
+        body: goal,
+    });
     if !cfg.constraints.is_empty() {
         secs.push(Section {
             name: "constraints",
@@ -465,7 +469,9 @@ fn assemble(query: &str, cfg: &ContextConfig) -> Vec<Section> {
                         t.chars().take(3000).collect::<String>()
                     ));
                 }
-                None => parts.push(format!("## {f}\n(missing or binary — verify before trusting)")),
+                None => parts.push(format!(
+                    "## {f}\n(missing or binary — verify before trusting)"
+                )),
             }
         }
         secs.push(Section {
@@ -533,7 +539,11 @@ fn pack_by_priority(sections: Vec<Section>, budget: usize) -> String {
                 let keep = ((lines.len() as f64) * frac) as usize;
                 trial.push(Section {
                     name: s.name,
-                    body: lines.into_iter().take(keep.max(1)).collect::<Vec<_>>().join("\n"),
+                    body: lines
+                        .into_iter()
+                        .take(keep.max(1))
+                        .collect::<Vec<_>>()
+                        .join("\n"),
                 });
             } else {
                 trial.push(Section {
@@ -636,7 +646,10 @@ pub fn cmd_status(json: bool) -> anyhow::Result<()> {
     )?;
     writeln!(out, "working memory: {} (~{} tokens)", wm, wm_tokens)?;
     if cfg.goal.trim().is_empty() {
-        writeln!(out, "goal: (unset — rdsh settings set context.goal \"...\")")?;
+        writeln!(
+            out,
+            "goal: (unset — rdsh settings set context.goal \"...\")"
+        )?;
     } else {
         writeln!(out, "goal: {}", cfg.goal)?;
     }
@@ -718,7 +731,10 @@ pub fn cmd_search(query: String, max: usize) -> anyhow::Result<()> {
         writeln!(out, "{s}")?;
     }
     out.flush()?;
-    eprintln!("[rdsh context search] query={query:?} terms={:?}", query_terms(&query));
+    eprintln!(
+        "[rdsh context search] query={query:?} terms={:?}",
+        query_terms(&query)
+    );
     Ok(())
 }
 

@@ -518,13 +518,19 @@ impl RdshSettings {
             "general.slim" => self.general.slim = parse_bool(raw)?,
             "general.passthrough" => self.general.passthrough = parse_bool(raw)?,
             "general.dry_run" => self.general.dry_run = parse_bool(raw)?,
-            "general.default_profile" => self.general.default_profile = parse_string(raw, PROFILE_CHARS),
+            "general.default_profile" => {
+                self.general.default_profile = parse_string(raw, PROFILE_CHARS)
+            }
             "tokens.default_budget" => {
                 self.tokens.default_budget = parse_usize(raw, 4000)? as usize
             }
             "search.dir" => {
                 let d = parse_string(raw, PATH_CHARS);
-                self.search.dir = if d.trim().is_empty() { ".".to_string() } else { d };
+                self.search.dir = if d.trim().is_empty() {
+                    ".".to_string()
+                } else {
+                    d
+                };
             }
             "search.max" => self.search.max = parse_usize(raw, 100)? as usize,
             "search.web_limit" => self.search.web_limit = parse_usize(raw, 10)? as usize,
@@ -539,9 +545,7 @@ impl RdshSettings {
             "bench.n" => self.bench.n = parse_usize(raw, 5)? as u32,
             "setup.web_port" => self.setup.web_port = parse_usize(raw, 0)? as u16,
             "beta.context_engine" => self.beta.context_engine = parse_bool(raw)?,
-            "context.token_budget" => {
-                self.context.token_budget = parse_usize(raw, 4000)? as usize
-            }
+            "context.token_budget" => self.context.token_budget = parse_usize(raw, 4000)? as usize,
             "context.enable_retriever" => self.context.enable_retriever = parse_bool(raw)?,
             "context.enable_packer" => self.context.enable_packer = parse_bool(raw)?,
             "context.enable_verifier" => self.context.enable_verifier = parse_bool(raw)?,
@@ -552,12 +556,8 @@ impl RdshSettings {
                 self.context.working_files = parse_list(raw, PATH_CHARS)
             }
             "context.open_tasks" => self.context.open_tasks = parse_list(raw, TEXT_CHARS),
-            "context.max_code_hits" => {
-                self.context.max_code_hits = parse_usize(raw, 20)? as usize
-            }
-            "context.max_sessions" => {
-                self.context.max_sessions = parse_usize(raw, 10)? as usize
-            }
+            "context.max_code_hits" => self.context.max_code_hits = parse_usize(raw, 20)? as usize,
+            "context.max_sessions" => self.context.max_sessions = parse_usize(raw, 10)? as usize,
             "context.include_git_diff" => self.context.include_git_diff = parse_bool(raw)?,
             _ => return Err(bad()),
         }
@@ -587,7 +587,9 @@ impl RdshSettings {
                 | ""
         );
         if !known_section && RdshSettings::default().get_dotted(&key).is_none() {
-            return Err(anyhow::anyhow!("unknown settings key: {key} (try: rdsh settings keys)"));
+            return Err(anyhow::anyhow!(
+                "unknown settings key: {key} (try: rdsh settings keys)"
+            ));
         }
         let d = RdshSettings::default();
         match key.as_str() {
@@ -1062,10 +1064,7 @@ mod rdsh_config_tests {
     fn dotted_get_set_unset_cover_all_sections() {
         let mut c = RdshSettings::default();
         // get
-        assert_eq!(
-            c.get_dotted("search.max").unwrap(),
-            serde_json::json!(100)
-        );
+        assert_eq!(c.get_dotted("search.max").unwrap(), serde_json::json!(100));
         assert!(c.get_dotted("beta.context_engine").unwrap().as_bool() == Some(false));
         // set: 数値・真偽・文字・配列
         c.set_dotted("search.max", "42").unwrap();
@@ -1076,7 +1075,8 @@ mod rdsh_config_tests {
         assert_eq!(c.context.goal, "v2-goal");
         c.set_dotted("guard.deny", r#"["a*","b"]"#).unwrap();
         assert_eq!(c.guard.deny, vec!["a*".to_string(), "b".to_string()]);
-        c.set_dotted("context.working_files", "src/a.rs, src/b.rs").unwrap();
+        c.set_dotted("context.working_files", "src/a.rs, src/b.rs")
+            .unwrap();
         assert_eq!(c.context.working_files.len(), 2);
         c.set_dotted("serve.port", "38080").unwrap();
         assert_eq!(c.serve.port, 38080);

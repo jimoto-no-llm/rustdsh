@@ -231,14 +231,9 @@ enum SettingsAction {
         json: bool,
     },
     /// Set one value: rdsh settings set search.max 50 / guard.deny '["a*"]' / context.goal "方針"
-    Set {
-        key: String,
-        value: String,
-    },
+    Set { key: String, value: String },
     /// Reset to defaults: rdsh settings unset search.max (or a whole section like context)
-    Unset {
-        key: String,
-    },
+    Unset { key: String },
     /// List editable keys
     Keys,
 }
@@ -427,23 +422,23 @@ fn main() {
                 } else if let Err(e) = cfg.save() {
                     Err(e)
                 } else {
-                match cfg.get_dotted(&key) {
-                    Some(v) => {
-                        if v.is_string() {
-                            println!("{}={}", key.trim(), v.as_str().unwrap_or_default());
-                            Ok(())
-                        } else {
-                            match serde_json::to_string(&v) {
-                                Ok(text) => {
-                                    println!("{}={}", key.trim(), text);
-                                    Ok(())
+                    match cfg.get_dotted(&key) {
+                        Some(v) => {
+                            if v.is_string() {
+                                println!("{}={}", key.trim(), v.as_str().unwrap_or_default());
+                                Ok(())
+                            } else {
+                                match serde_json::to_string(&v) {
+                                    Ok(text) => {
+                                        println!("{}={}", key.trim(), text);
+                                        Ok(())
+                                    }
+                                    Err(e) => Err(anyhow::anyhow!(e)),
                                 }
-                                Err(e) => Err(anyhow::anyhow!(e)),
                             }
                         }
+                        None => Err(anyhow::anyhow!("set failed: {key}")),
                     }
-                    None => Err(anyhow::anyhow!("set failed: {key}")),
-                }
                 }
             }
             SettingsAction::Unset { key } => {
@@ -453,8 +448,12 @@ fn main() {
                 } else if let Err(e) = cfg.save() {
                     Err(e)
                 } else {
-                println!("reset {} (saved to {})", key.trim(), rdsh_config::settings_path());
-                Ok(())
+                    println!(
+                        "reset {} (saved to {})",
+                        key.trim(),
+                        rdsh_config::settings_path()
+                    );
+                    Ok(())
                 }
             }
             SettingsAction::Keys => {
