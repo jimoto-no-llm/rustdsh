@@ -41,7 +41,7 @@ footer { padding: 0 24px 24px; color: var(--mut); font-size: 12px; }
 <section class="card"><h2>prune（切り詰め）</h2><p>head+tailを残して予算内に収める</p>
 <textarea id="ptext" placeholder="長いツール出力を貼り付け"></textarea>
 <div class="row"><label>予算</label><input id="pmax" type="number" value="4000" min="100"></div>
-<button onclick="prune()">prune実行</button><pre id="pout">-</pre></section>
+<button onclick="prune()">prune実行</button> <button class="ghost" id="pcopy" onclick="copyPrune()">コピー</button><pre id="pout">-</pre></section>
 <section class="card"><h2>セッション</h2><p>最新のセッション一覧（Nodeなし）</p>
 <button class="ghost" onclick="sessions()">更新</button><pre id="sess">未取得</pre></section>
 <section class="card"><h2>スキル</h2><p>導入済みスキル一覧</p>
@@ -54,15 +54,85 @@ footer { padding: 0 24px 24px; color: var(--mut); font-size: 12px; }
 const dashboardToken = new URLSearchParams(location.hash.slice(1)).get("key") || sessionStorage.getItem("rdsh_dashboard_token") || "";
 if (dashboardToken) sessionStorage.setItem("rdsh_dashboard_token", dashboardToken);
 history.replaceState(null, "", location.pathname);
-async function jget(p){ const r = await fetch(p, {headers:{"X-RDSH-Token":dashboardToken}}); return r.json(); }
-async function jpost(p, b){ const r = await fetch(p, {method:"POST", headers:{"Content-Type":"application/json","X-RDSH-Token":dashboardToken}, body: JSON.stringify(b)}); return r.json(); }
-(async () => { try { const v = await jget("/api/version"); document.getElementById("ver").textContent = v.name + " " + v.version; } catch(e){} })();
-async function doctor(){ const d = await jget("/api/doctor"); document.getElementById("doctor").textContent = JSON.stringify(d, null, 2); }
-async function tokens(){ const t = document.getElementById("ttext").value; const r = await jpost("/api/tokens", {text: t}); document.getElementById("tout").textContent = "tokens: " + r.tokens + " / chars: " + r.chars; }
-async function prune(){ const t = document.getElementById("ptext").value; const m = +document.getElementById("pmax").value || 4000; const r = await jpost("/api/prune", {text: t, max_tokens: m}); document.getElementById("pout").textContent = "[before " + r.before + " -> after " + r.after + "]\n" + r.pruned.slice(0, 2000); }
-async function bench(){ document.getElementById("bench").textContent = "計測中…"; const r = await jget("/api/bench?n=3"); document.getElementById("bench").textContent = JSON.stringify(r, null, 2); }
-async function sessions(){ const r = await jget("/api/sessions?limit=10"); document.getElementById("sess").textContent = r.sessions.map(s => s.mtime + " " + s.project + "/" + s.id).join("\n") + "\n(" + r.projects + " projects)"; }
-async function skills(){ const r = await jget("/api/skills"); document.getElementById("sk").textContent = r.names.join("\n"); }
+function statusMessage(status, path){
+  switch (status){
+    case 400: return "不正なリクエスト (400): " + path + " への送信内容を確認してください。";
+    case 401: return "認証エラー (401): トークンが無効か期限切れです。起動時に表示された URL（http://127.0.0.1:<ポート>/#key=...）を開き直してください。";
+    case 403: return "アクセス拒否 (403): 信頼できないホスト/オリジンです。127.0.0.1 のダッシュボードURLから直接開いてください。";
+    case 404: return "見つかりません (404): " + path + " は存在しません。";
+    case 413: return "送信データが大きすぎます (413): テキストを短くして再試行してください。";
+    case 429: return "混雑しています (429): しばらく待って再試行してください。";
+    case 500: return "サーバー内部エラー (500): 再試行してください。直らない場合は serve を再起動してください。";
+    case 503: return "サーバーが混み合っています (503): しばらく待って再試行してください。";
+    default: return "リクエスト失敗 (" + status + "): " + path + "。再試行してください。";
+  }
+}
+async function checkRes(r, path){
+  if (r.ok){
+    try { return await r.json(); }
+    catch(e){ throw new Error("応答の解析に失敗: サーバーから不正な応答が返されました。再試行してください。"); }
+  }
+  let detail = "";
+  try { const b = await r.json(); if (b && b.error) detail = "（" + b.error + "）"; } catch(e){}
+  throw new Error(statusMessage(r.status, path) + detail);
+}
+async function jget(p){
+  let r;
+  try { r = await fetch(p, {headers:{"X-RDSH-Token":dashboardToken}}); }
+  catch(e){ throw new Error("接続できません: rdsh serve が起動しているか確認し、再試行してください。"); }
+  return checkRes(r, p);
+}
+async function jpost(p, b){
+  let r;
+  try { r = await fetch(p, {method:"POST", headers:{"Content-Type":"application/json","X-RDSH-Token":dashboardToken}, body: JSON.stringify(b)}); }
+  catch(e){ throw new Error("接続できません: rdsh serve が起動しているか確認し、再試行してください。"); }
+  return checkRes(r, p);
+}
+function fail(outId, message, retry){
+  const out = document.getElementById(outId);
+  out.textContent = "エラー: " + message;
+  let btn = document.getElementById(outId + "-retry");
+  if (!btn){
+    btn = document.createElement("button");
+    btn.id = outId + "-retry";
+    btn.className = "ghost";
+    btn.textContent = "再試行";
+    out.after(btn);
+  }
+  btn.onclick = retry;
+  btn.hidden = false;
+}
+function clearRetry(outId){
+  const btn = document.getElementById(outId + "-retry");
+  if (btn) btn.hidden = true;
+}
+(async () => { try { const v = await jget("/api/version"); document.getElementById("ver").textContent = v.name + " " + v.version; } catch(e){ document.getElementById("ver").textContent = "エラー: " + e.message; } })();
+async function doctor(){ try { clearRetry("doctor"); const d = await jget("/api/doctor"); document.getElementById("doctor").textContent = JSON.stringify(d, null, 2); } catch(e){ fail("doctor", e.message, doctor); } }
+async function tokens(){ try { clearRetry("tout"); const t = document.getElementById("ttext").value; const r = await jpost("/api/tokens", {text: t}); document.getElementById("tout").textContent = "tokens: " + r.tokens + " / chars: " + r.chars; } catch(e){ fail("tout", e.message, tokens); } }
+let lastPruned = "";
+async function prune(){
+  try {
+    clearRetry("pout");
+    const t = document.getElementById("ptext").value;
+    const m = +document.getElementById("pmax").value || 4000;
+    const r = await jpost("/api/prune", {text: t, max_tokens: m});
+    lastPruned = r.pruned;
+    document.getElementById("pout").textContent = "[before " + r.before + " -> after " + r.after + "] (" + r.pruned.length + " chars)\n" + r.pruned;
+  } catch(e){ fail("pout", e.message, prune); }
+}
+async function copyPrune(){
+  const btn = document.getElementById("pcopy");
+  try {
+    if (!lastPruned) throw new Error("コピー対象がありません。先にprune実行してください。");
+    await navigator.clipboard.writeText(lastPruned);
+    const old = btn.textContent;
+    btn.textContent = "コピー済み";
+    setTimeout(() => { btn.textContent = old; }, 1500);
+  } catch(e){ fail("pout", e.message, prune); }
+}
+async function bench(){ try { clearRetry("bench"); document.getElementById("bench").textContent = "計測中…"; const r = await jget("/api/bench?n=3"); document.getElementById("bench").textContent = JSON.stringify(r, null, 2); } catch(e){ fail("bench", e.message, bench); } }
+async function sessions(){ try { clearRetry("sess"); const r = await jget("/api/sessions?limit=10"); document.getElementById("sess").textContent = r.sessions.map(s => s.mtime + " " + s.project + "/" + s.id).join("\n") + "\n(" + r.projects + " projects)"; } catch(e){ fail("sess", e.message, sessions); } }
+async function skills(){ try { clearRetry("sk"); const r = await jget("/api/skills"); document.getElementById("sk").textContent = r.names.join("\n"); } catch(e){ fail("sk", e.message, skills); } }
 doctor(); sessions(); skills();
 </script>
 </body>
