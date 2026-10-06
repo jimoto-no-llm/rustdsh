@@ -112,7 +112,7 @@ fn scan_sessions(root: &str, project: Option<&str>) -> Vec<Session> {
         None => match std::fs::read_dir(root) {
             Ok(e) => e
                 .filter_map(|e| e.ok())
-                .filter(|e| e.metadata().map(|m| m.is_dir()).unwrap_or(false))
+                .filter(|e| e.metadata().is_ok_and(|m| m.is_dir()))
                 .map(|e| e.file_name().to_string_lossy().into_owned())
                 .collect(),
             Err(_) => return vec![],
@@ -585,7 +585,7 @@ fn dir_names(dir: &str) -> Vec<String> {
     let mut names: Vec<String> = std::fs::read_dir(dir)
         .map(|e| {
             e.filter_map(|e| e.ok())
-                .filter(|e| e.metadata().map(|m| m.is_dir()).unwrap_or(false))
+                .filter(|e| e.metadata().is_ok_and(|m| m.is_dir()))
                 .map(|e| e.file_name().to_string_lossy().into_owned())
                 .collect()
         })
