@@ -164,7 +164,7 @@ pub fn latest_node_tree_for(opt_dir: &str) -> Option<String> {
     let mut names: Vec<String> = vec![];
     for e in entries.flatten() {
         if e.metadata().map(|m| m.is_dir()).unwrap_or(false) {
-            if let Some(n) = e.file_name().to_str().map(|s| s.to_string()) {
+            if let Some(n) = e.file_name().to_str().map(str::to_owned) {
                 names.push(n);
             }
         }
