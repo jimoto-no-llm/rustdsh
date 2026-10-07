@@ -18,6 +18,11 @@ DSH設定サイドバーに rdsh セクションを追加するテスト用プ�
 
 ## 試す
 
+APIにはDSHのGUIセッション認証とHost/Origin検証を適用します。
+`connection.requestRejection` を提供するDSHが必要です（0.2.0-rc.2で検証済み）。
+認証機能を利用できない場合、APIは操作を拒否します。
+設定画面が扱わない既存キー（`extras.enable`など）は、保存時にも保持します。
+
 ```sh
 dsh plugin --profile web add ./plugins/rdsh-settings
 ```

@@ -2,7 +2,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
 
-export const inject = ['webServer'];
+export const inject = ['webServer', 'connection'];
 
 function dshHome() {
   return process.env.DSH_HOME || join(homedir(), '.dsh');
@@ -43,10 +43,33 @@ async function loadCfg() {
 
 async function loadSettings() {
   try {
-    const raw = await readFile(settingsPath(), 'utf8');
-    const j = JSON.parse(raw);
-    return sanitizeSettings(j && typeof j === 'object' ? j : {});
+    return mergeSettings(await readSettingsDocument(), {});
   } catch (e) { return settingsDefaults(); }
+}
+
+async function readSettingsDocument() {
+  try {
+    const value = JSON.parse(await readFile(settingsPath(), 'utf8'));
+    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('invalid settings');
+    return value;
+  } catch (e) {
+    if (e.code === 'ENOENT') return {};
+    throw e;
+  }
+}
+
+function mergeSettings(current, input) {
+  input = obj(input);
+  const source = { ...current, ...input };
+  for (const [key, value] of Object.entries(settingsDefaults())) {
+    if (typeof value === 'object') source[key] = { ...obj(current[key]), ...obj(input[key]) };
+  }
+  const normalized = sanitizeSettings(source);
+  const result = { ...current, ...normalized };
+  for (const [key, value] of Object.entries(normalized)) {
+    if (typeof value === 'object') result[key] = { ...obj(current[key]), ...value };
+  }
+  return result;
 }
 
 function strList(v, maxN, maxC) {
@@ -175,6 +198,14 @@ function json(res, code, body) {
   res.end(s);
 }
 
+function authorize(ctx, req, res) {
+  const status = typeof ctx.connection?.requestRejection === 'function'
+    ? ctx.connection.requestRejection(req) : 503;
+  if (status === undefined) return true;
+  json(res, status, { ok: false, error: status === 401 ? 'unauthorized' : status === 403 ? 'forbidden' : 'authentication-unavailable' });
+  return false;
+}
+
 export function apply(ctx, config) {
   return ctx.effect(() => {
     if (!ctx.webServer) return;
@@ -182,6 +213,7 @@ export function apply(ctx, config) {
       kind: 'exact',
       path: '/api/rdsh-context',
       handler: async (req, res) => {
+        if (!authorize(ctx, req, res)) return;
         if (req.method !== 'GET' && req.method !== 'HEAD') {
           res.writeHead(405, { 'content-type': 'application/json' });
           res.end(JSON.stringify({ error: 'method-not-allowed' }));
@@ -197,6 +229,7 @@ export function apply(ctx, config) {
       kind: 'exact',
       path: '/api/rdsh-context/save',
       handler: async (req, res) => {
+        if (!authorize(ctx, req, res)) return;
         if (req.method !== 'POST') {
           res.writeHead(405, { 'content-type': 'application/json' });
           res.end(JSON.stringify({ error: 'method-not-allowed' }));
@@ -220,6 +253,7 @@ export function apply(ctx, config) {
       kind: 'exact',
       path: '/api/rdsh-settings',
       handler: async (req, res) => {
+        if (!authorize(ctx, req, res)) return;
         if (req.method !== 'GET' && req.method !== 'HEAD') {
           res.writeHead(405, { 'content-type': 'application/json' });
           res.end(JSON.stringify({ error: 'method-not-allowed' }));
@@ -235,6 +269,7 @@ export function apply(ctx, config) {
       kind: 'exact',
       path: '/api/rdsh-settings/save',
       handler: async (req, res) => {
+        if (!authorize(ctx, req, res)) return;
         if (req.method !== 'POST') {
           res.writeHead(405, { 'content-type': 'application/json' });
           res.end(JSON.stringify({ error: 'method-not-allowed' }));
@@ -242,7 +277,7 @@ export function apply(ctx, config) {
         }
         try {
           const input = await readBody(req);
-          const cfg = sanitizeSettings(input.config ?? input);
+          const cfg = mergeSettings(await readSettingsDocument(), input.config ?? input);
           await mkdir(dshHome(), { recursive: true });
           await writeFile(settingsPath(), JSON.stringify(cfg, null, 2) + '\n', { mode: 0o600 });
           json(res, 200, { ok: true, config: cfg });
