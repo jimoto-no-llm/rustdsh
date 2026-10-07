@@ -36,14 +36,33 @@ top-level section, and an unknown nested search key while applying the edited
 `search.max`. The plugin merges only fields it models into the current disk
 document. Unknown fields supplied by a client cannot change those disk values.
 Malformed existing settings refuse a save without replacing the file.
+GET and save responses contain only fields supported by the form, so large
+unmodeled sections stay on disk instead of entering the next POST body.
 
 Clearing Working Files was verified through an authenticated settings save
 followed by `rdsh settings get context.working_files`. It returns `[]` even
-when the saved document retains an older `context.files` list, or a separate
-`rdsh-context.json` contains old files. The Rust reader uses the `files` alias
+when the original document has an older `context.files` list, or a separate
+`rdsh-context.json` contains old files. The save migrates `context.files` into
+`working_files` and removes the alias. The Rust reader uses the `files` alias
 only when `working_files` is missing or null, and reads the separate legacy
 file only when the canonical context section is absent or null. Explicit
 empty/default context settings remain authoritative.
+
+Review regression checks reproduced two oversized round-trip failures at
+`5e16a77`: 50 Japanese paths of 300 characters produced a 91,074-byte POST,
+and a 1 MiB unmodeled section produced a 1,049,376-byte POST. Both returned
+400. After restricting responses to form fields, real authenticated DSH
+round-trips returned 200 with 45,814-byte and 676-byte bodies respectively;
+the disk retained the unmodeled data. Fixtures differed between the handler
+regression and real DSH runs, so these sizes are examples rather than exact
+before/after size deltas.
+
+The canonical settings save has a bounded 1 MiB request limit, sufficient
+for all supported fields at their current maximum lengths and list sizes,
+including JSON escaping. The real DSH API accepted the 654,200-byte maximum
+escaped form and rejected a body over 1 MiB with 400 without writing the
+settings file. Regression checks cover both cases. The legacy context save
+retains its 64 KiB limit.
 
 ## Regression check
 
@@ -55,8 +74,10 @@ The dependency-free check covers all six handlers, GET/HEAD/POST rejection,
 missing/incompatible authentication, refusal before body consumption and
 file/subprocess effects, authorized operations, settings round-trips, partial
 saves, clamping, unknown-field injection, explicit empty Working Files with
-legacy aliases, and malformed disk documents. Rust regression checks cover
-alias precedence and clearing context while the separate legacy file exists.
+legacy aliases, oversized disk metadata, the maximum supported form body,
+oversized request rejection, and malformed disk documents. Rust regression
+checks cover alias precedence and clearing context while the separate
+legacy file exists.
 CI runs it on Node 22.
 
 ## Impact and limits

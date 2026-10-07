@@ -42,7 +42,7 @@ async function loadCfg() {
 
 async function loadSettings() {
   try {
-    return mergeSettings(await readSettingsDocument(), {});
+    return sanitizeSettings(await readSettingsDocument());
   } catch (e) { return settingsDefaults(); }
 }
 
@@ -68,6 +68,8 @@ function mergeSettings(current, input) {
   for (const [key, value] of Object.entries(normalized)) {
     if (typeof value === 'object') result[key] = { ...obj(current[key]), ...value };
   }
+  // The legacy alias has been migrated into working_files, including empty lists.
+  delete result.context.files;
   return result;
 }
 
@@ -185,9 +187,9 @@ function sanitizeSettings(j) {
   };
 }
 
-async function readBody(req) {
+async function readBody(req, limit = 65536) {
   let size = 0; const chunks = [];
-  for await (const chunk of req) { size += chunk.length; if (size > 65536) throw new Error('too large'); chunks.push(chunk); }
+  for await (const chunk of req) { size += chunk.length; if (size > limit) throw new Error('too large'); chunks.push(chunk); }
   return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
 }
 
@@ -275,11 +277,12 @@ export function apply(ctx, config) {
           return;
         }
         try {
-          const input = await readBody(req);
+          // Covers every supported form field at its limit, including JSON escapes.
+          const input = await readBody(req, 1024 * 1024);
           const cfg = mergeSettings(await readSettingsDocument(), input.config ?? input);
           await mkdir(dshHome(), { recursive: true });
           await writeFile(settingsPath(), JSON.stringify(cfg, null, 2) + '\n', { mode: 0o600 });
-          json(res, 200, { ok: true, config: cfg });
+          json(res, 200, { ok: true, config: sanitizeSettings(cfg) });
         } catch (e) {
           res.writeHead(400, { 'content-type': 'application/json' });
           res.end(JSON.stringify({ ok: false, error: 'bad-request' }));

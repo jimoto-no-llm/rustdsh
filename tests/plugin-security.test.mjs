@@ -101,10 +101,10 @@ test('plugin security boundary and settings preservation', async (t) => {
 
   await t.test('round-trip and partial saves preserve keys outside the form', async () => {
     const loaded = (await request('/api/rdsh-settings')).body.config;
-    assert.deepEqual(loaded.extras, original.extras);
+    assert.equal(loaded.extras, undefined);
     loaded.search.max = 42;
-    loaded.extras.enable = [];
-    loaded.future_section.flag = false;
+    loaded.extras = { enable: [] };
+    loaded.future_section = { flag: false };
     loaded.search.future_key = 'client must not overwrite';
     loaded.injected_section = { flag: true };
     const saved = await request('/api/rdsh-settings/save', { method: 'POST', body: JSON.stringify({ config: loaded }) });
@@ -120,7 +120,8 @@ test('plugin security boundary and settings preservation', async (t) => {
     assert.equal(partial.body.config.search.max, 100);
     assert.deepEqual(partial.body.config.guard, original.guard);
     assert.equal(partial.body.config.context.goal, original.context.goal);
-    assert.equal(partial.body.config.context.future_key, 'keep nested');
+    assert.equal(partial.body.config.context.future_key, undefined);
+    assert.equal(JSON.parse(await readFile(settingsFile, 'utf8')).context.future_key, 'keep nested');
   });
 
   await t.test('cleared working files stay empty alongside legacy aliases', async () => {
@@ -131,7 +132,7 @@ test('plugin security boundary and settings preservation', async (t) => {
     assert.equal((await request('/api/rdsh-settings/save', { method: 'POST', body: JSON.stringify(loaded) })).status, 200);
     const stored = JSON.parse(await readFile(settingsFile, 'utf8'));
     assert.deepEqual(stored.context.working_files, []);
-    assert.deepEqual(stored.context.files, ['stale.rs']);
+    assert.equal(stored.context.files, undefined);
     assert.equal(stored.context.future_key, 'keep nested');
     assert.deepEqual(stored.extras, original.extras);
     assert.deepEqual((await request('/api/rdsh-settings')).body.config.context.working_files, []);
@@ -139,6 +140,59 @@ test('plugin security boundary and settings preservation', async (t) => {
       await writeFile(contextFile, JSON.stringify(legacy));
       assert.deepEqual((await request('/api/rdsh-context')).body.config.working_files, legacy.working_files ?? legacy.files);
     }
+  });
+
+  for (const [name, extra] of [
+    ['long legacy paths', { context: { files: Array(50).fill('あ'.repeat(300)) } }],
+    ['large unmodeled section', { future_section: { value: 'x'.repeat(1024 * 1024) } }],
+  ]) {
+    await t.test(`form round-trip remains saveable with ${name}`, async () => {
+      const document = { ...original, ...extra };
+      await writeFile(settingsFile, JSON.stringify(document));
+      const loaded = (await request('/api/rdsh-settings')).body.config;
+      loaded.search.max = 42;
+      const body = JSON.stringify({ config: loaded });
+      const saved = await request('/api/rdsh-settings/save', { method: 'POST', body });
+      assert.equal(saved.status, 200, `form request has ${Buffer.byteLength(body)} bytes`);
+      assert.ok(Buffer.byteLength(body) < 65536);
+      for (const config of [loaded, saved.body.config]) {
+        assert.equal(config.extras, undefined);
+        assert.equal(config.future_section, undefined);
+        assert.equal(config.search.future_key, undefined);
+        assert.equal(config.context.files, undefined);
+      }
+      const stored = JSON.parse(await readFile(settingsFile, 'utf8'));
+      assert.equal(stored.search.max, 42);
+      assert.deepEqual(stored.extras, original.extras);
+      assert.equal(stored.search.future_key, original.search.future_key);
+      if (extra.future_section) assert.deepEqual(stored.future_section, extra.future_section);
+      if (extra.context) assert.deepEqual(stored.context.working_files, extra.context.files);
+    });
+  }
+
+  await t.test('all supported form fields fit within the bounded save body', async () => {
+    // JSON escapes cost six bytes per character, exceeding multibyte UTF-8 paths.
+    const text = (n) => '\u0001'.repeat(n);
+    const rows = (n) => Array(50).fill(text(n));
+    const document = {
+      ...original,
+      general: { default_profile: text(500) },
+      search: { dir: text(300), searxng_url: text(500) },
+      guard: { deny: rows(300), reason: text(500) },
+      context: { goal: text(2000), decisions: rows(500), constraints: rows(500), working_files: rows(300), open_tasks: rows(500) },
+    };
+    await writeFile(settingsFile, JSON.stringify(document));
+    const loaded = (await request('/api/rdsh-settings')).body.config;
+    const body = JSON.stringify({ config: loaded });
+    assert.ok(Buffer.byteLength(body) > 65536);
+    assert.ok(Buffer.byteLength(body) < 1024 * 1024);
+    const saved = await request('/api/rdsh-settings/save', { method: 'POST', body });
+    assert.equal(saved.status, 200);
+    assert.deepEqual(saved.body.config, loaded);
+    const stored = await readFile(settingsFile, 'utf8');
+    const oversized = JSON.stringify({ config: loaded, padding: 'x'.repeat(1024 * 1024) });
+    assert.equal((await request('/api/rdsh-settings/save', { method: 'POST', body: oversized })).status, 400);
+    assert.equal(await readFile(settingsFile, 'utf8'), stored);
   });
 
   await t.test('unreadable settings are never replaced with defaults', async () => {
