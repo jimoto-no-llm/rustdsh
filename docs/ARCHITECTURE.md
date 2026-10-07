@@ -5,14 +5,26 @@ Design rule: **port only the hot paths, delegate everything else**.
 
 ## Big picture
 
-```text
-user -> rdsh (argv) -> decision
-                          |- native fast path (no Node startup)
-                          |    tokens / compact / inspect / serve / guard / search
-                          |    auth / setup / doctor / profiles / skills / logs / sessions
-                          `- passthrough: verbatim exec of dsh-orig
-                               (agent loop and profile boot are never reimplemented)
-```
+![Runtime ownership](diagrams/runtime.svg)
+
+[Editable Mermaid source](diagrams/runtime.mmd). Native commands run in Rust;
+conversation and model execution remain in the original DSH runtime.
+The Node dashboard is a separate optional entry point. Its Harness launcher
+currently targets Windows/WSL; project mode is portable.
+
+For the end-user sequence, see [installation, setup, usage, and recovery](USER-FLOW.md).
+Open PRs for additional orchestration features are not part of this diagram.
+
+## Settings and authentication boundaries
+
+![Settings ownership](diagrams/settings.svg)
+
+[Editable Mermaid source](diagrams/settings.mmd). `$DSH_HOME/rdsh.json` is the
+settings source of truth. The old context file only supplies missing context.
+The setup server validates its per-launch key, Host, and Origin; the settings
+plugin delegates authentication to the DSH connection service.
+Ordinary commands fail on corrupt JSON. `settings init --force` is the explicit
+operation that replaces the document with defaults.
 
 - Delegation is a verbatim `exec`: zero behavior change by construction.
 - Optimizations must be output-identical (see `tests/regress.sh`).
@@ -34,7 +46,10 @@ user -> rdsh (argv) -> decision
 | `auth.rs` | OAuth state detection (`provider_needs()`), credential import |
 | `setup_web.rs` + `setup.html` | First-run setup flow |
 | `websearch.rs` | SearXNG-backed web search |
-| `ui.html` | Floating setup UI |
+| `ui.html` | Native status dashboard UI |
+| `rdsh_config.rs` | Unified settings, defaults, validation, legacy fallback |
+| `local_http.rs` | Local HTTP framing, trust checks, and per-launch token |
+| `context.rs` | Experimental context engine, disabled by default |
 
 ## Optional Node dashboard (`dashboard/`)
 
@@ -50,7 +65,6 @@ See `dashboard/README.md`.
 
 - `install.sh` (Linux/macOS/WSL), `install.ps1` (Windows, incl. `-Wsl`).
 - `sync-dsh.sh` + `systemd/rdsh-sync.*`: keep the upstream Harness in sync.
-- `audit-rdsh.sh` + `systemd/rdsh-audit.*`: periodic audit hooks.
 - `plugins/`: Smart-DSH compat bundle, update banner, skill installer.
 
 ## Original-binary discovery (`dsh` name)
@@ -80,3 +94,10 @@ value wins, `RDSH_NODE_COMPILE_CACHE=0` opts out).
 2. Delegation stays byte-identical (`--passthrough` is the reference).
 3. Every optimization ships with a before/after output diff.
 4. `doctor` must stay truthful: wrappers, shadowing, and auth state.
+
+## Maintaining the diagrams
+
+Each `.mmd` source declares its purpose, source paths, update triggers, and
+verification date. Update the SVG beside it when its sources or boundaries change.
+Runtime ownership, settings persistence, and the user journey are separate figures
+so each can be reviewed against the relevant code.

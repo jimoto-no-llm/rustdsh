@@ -17,7 +17,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-      - run: node --test tests/plugin-security.test.mjs
+      - run: node --test tests/plugin-security.test.mjs tests/settings-client.test.mjs
 
   lint:
     runs-on: ubuntu-latest
@@ -67,4 +67,3 @@ jobs:
           $setup = ./target/debug/rdsh.exe setup --json | Out-String
           if ($setup -notmatch '"needed":true') { throw 'setup should report needed on first run' }
           ./target/debug/rdsh.exe doctor
-

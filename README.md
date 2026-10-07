@@ -13,16 +13,19 @@
 
 `rdsh` is a drop-in fast path for [dsh](https://github.com/deepseek-ai/deepseek-harness)
 (the DeepSeek Harness CLI). Instead of a full rewrite, it **ports only the hot paths
-to Rust and delegates everything else to the original `dsh` binary** — so you get
-~98x faster startup and ~1/23rd the memory with zero behavior change.
+to Rust and delegates conversation and model execution to the original `dsh` binary**.
+The Linux `--version` benchmark measured ~98x faster startup and ~1/23rd peak RSS.
+Those numbers describe a short CLI invocation, not the resident Desktop app or
+delegated model calls.
 
-- Startup median **~0.90ms** (original `dsh`: ~88ms)
-- Resident memory **~2.9MB** (original: ~66MB), single ~806KB binary, no runtime tree
+- `--version` startup median **~0.90ms** (original `dsh`: ~88ms, Linux)
+- `--version` peak RSS **~2.9MB** (original: ~66MB, Linux)
 - Safe by construction: agent loop and profile boot are never reimplemented,
   delegation is a verbatim `exec`, and every optimization is output-identical
 
 ## Contents
 
+- [Getting started](#getting-started)
 - [Benchmarks](#benchmarks)
 - [Install](#install)
 - [Usage](#usage)
@@ -34,6 +37,19 @@ to Rust and delegates everything else to the original `dsh` binary** — so you 
 - [FAQ](#faq)
 - [Credits](#credits)
 - [License](#license)
+
+## Getting started
+
+1. Install using the commands below, then run `rdsh --version` and `rdsh doctor`.
+2. Open `rdsh setup --web` using the complete URL printed by the launcher.
+3. For conversations, use `rdsh tui` and confirm a response from the selected model.
+4. For the local status page, enable `serve` first: `rdsh settings set extras.enable serve`.
+5. If settings are corrupt, preserve the file before explicitly resetting with
+   `rdsh settings init --force`; then review the restored settings.
+
+See the [usage and recovery flow](docs/USER-FLOW.md),
+[settings](docs/RDSH-SETTINGS.md), and [architecture diagrams](docs/ARCHITECTURE.md).
+The original DSH runtime is required for delegated conversations.
 
 ## Benchmarks
 
@@ -121,14 +137,14 @@ rdsh --dry-run tui -- --resume abc  # print what would be executed
 rdsh tokens ./AGENTS.md               # estimate input tokens (~4 chars = 1, CJK = 1 each)
 echo ... | rdsh prune --max-tokens 4000  # keep head+tail within a token budget
 rdsh search TODO --dir . --max 100   # recursive grep (parallel, same order as sequential)
-rdsh search-web "rust async" --limit 5  # web search via SearXNG (default http://127.0.0.1:8888, $SEARXNG_URL wins)
+rdsh search-web "rust async" --limit 5  # requires search-web extra and SearXNG
 rdsh compact ./s.jsonl --max-tokens 8000 # compact a session transcript (source untouched)
 rdsh sessions --limit 20 --tokens    # list sessions with decompressed token estimates
 rdsh logs --tail 50 --grep ERROR     # inspect startup logs
 rdsh profiles / rdsh skills          # list profiles and skills
 rdsh doctor                          # check original dsh, DSH_HOME, slim setup
 rdsh bench --n 5                     # compare rdsh vs dsh startup
-rdsh serve                           # local web dashboard (:38080)
+rdsh serve                           # requires serve extra; local dashboard (:38080)
 ```
 
 ### `rdsh auth`: OAuth auto-recognition (drop it in and it works)
@@ -238,6 +254,7 @@ Co-use notes:
 ## Web dashboard
 
 ```sh
+rdsh settings set extras.enable serve  # replaces the enabled-extra list
 rdsh serve
 # open the URL containing #key=... printed by rdsh (localhost only)
 # default :38080 keeps clear of the dsh web GUI (:3080); --port 0 auto-picks
@@ -257,8 +274,8 @@ APIs other than `/api/version` require the per-launch key in the
 `X-RDSH-Token` header (the browser UI uses the key from its URL).
 No CDN is used; the page works offline.
 
-Which one? `rdsh serve` is the quick local status page (no setup beyond
-the binary). For project metrics, human Q&A, and phone access, use the
+`rdsh serve` is the quick local status page after enabling its extra.
+For project metrics, human Q&A, and phone access, use the
 optional [Node.js dashboard](dashboard/README.md) (needs Node.js 22+).
 
 The Node.js dashboard adds project metrics, tasks, human Q&A, and Tailscale
@@ -274,8 +291,9 @@ dumps, missing `--profile`) are reproduced in Rust.
 4. Read paths never write: tokens/search/compact/dump/native APIs touch nothing.
 5. Instant retreats: `--passthrough`, `RDSH_PASSTHROUGH=1`, `./install.sh --restore`.
 
-Verified with `cargo test` (26 unit tests) and `tests/regress.sh`
-(35 CLI checks), plus byte-for-byte output equality on optimizations.
+Verify the current checkout with `cargo test`, `tests/regress.sh`, and the
+[required checks](CONTRIBUTING.md). Reproducible synthetic performance tests and
+before/after output checks are described in [BENCHMARKS.md](docs/BENCHMARKS.md).
 
 ## Community
 

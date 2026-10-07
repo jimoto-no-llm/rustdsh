@@ -23,7 +23,7 @@ function settingsDefaults() {
     compact: { max_tokens: 8000 },
     sessions: { limit: 20, with_tokens: false },
     logs: { tail: 50 },
-    serve: { port: 3080 },
+    serve: { port: 38080 },
     guard: { deny: [], reason: '' },
     bench: { n: 5 },
     setup: { web_port: 0 },
@@ -47,9 +47,7 @@ async function settingsForForm(current) {
 }
 
 async function loadSettings() {
-  try {
-    return await settingsForForm(await readSettingsDocument());
-  } catch (e) { return settingsDefaults(); }
+  return await settingsForForm(await readSettingsDocument());
 }
 
 async function readSettingsDocument() {
@@ -276,7 +274,13 @@ export function apply(ctx, config) {
           res.end(JSON.stringify({ error: 'method-not-allowed' }));
           return;
         }
-        const cfg = await loadSettings();
+        let cfg;
+        try {
+          cfg = await loadSettings();
+        } catch (e) {
+          json(res, 400, { ok: false, error: 'invalid-settings' });
+          return;
+        }
         let legacyPresent = false;
         try { await access(cfgPath()); legacyPresent = true; } catch (e) {}
         json(res, 200, { ok: true, config: cfg, legacy_present: legacyPresent });

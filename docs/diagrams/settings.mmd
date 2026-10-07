@@ -1,0 +1,24 @@
+%% purpose: Show the settings source of truth and read-only legacy fallback
+%% owner: rustdsh maintainers
+%% sources: src/rdsh_config.rs, src/setup_web.rs, plugins/rdsh-settings/index.js
+%% update_triggers: Settings schema, authentication, persistence, or legacy fallback change
+%% last_verified: 2026-10-08
+flowchart LR
+    CLI["settings CLI / 明示的な編集"]
+    Setup["setup画面 / Extras変更"]
+    SetupAuth["起動ごとの鍵・Host・Origin確認"]
+    Form["DSH内のrdsh設定画面"]
+    Auth["DSH connectionによる認証"]
+    Store["rdsh.json / 設定の正典"]
+    Reader["CLIの実効設定"]
+    Legacy["旧rdsh-context.json"]
+    API["設定API / 未表示キーを保持"]
+    CLI --> Store
+    Setup --> SetupAuth
+    SetupAuth --> Store
+    Form --> Auth
+    Auth --> API
+    API --> Store
+    Store --> Reader
+    Legacy --> Reader
+    Legacy --> API

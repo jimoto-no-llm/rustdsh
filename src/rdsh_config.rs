@@ -282,12 +282,17 @@ pub fn try_load() -> anyhow::Result<RdshSettings> {
         Err(_) if !existed => serde_json::Value::Null,
         Err(e) => {
             return Err(anyhow::anyhow!(
-                "invalid settings file at {path}: {e} (line {}, column {}); run `rdsh settings init --force` (rdsh settings reset) to restore defaults",
+                "invalid settings file at {path}: {e} (line {}, column {}); run `rdsh settings init --force` to restore defaults",
                 e.line(),
                 e.column()
             ));
         }
     };
+    if existed && !parsed.is_object() {
+        return Err(anyhow::anyhow!(
+            "invalid settings file at {path}: expected a JSON object; run `rdsh settings init --force` to restore defaults"
+        ));
+    }
     let has_context = parsed.get("context").is_some_and(|c| !c.is_null());
     let mut cfg = if parsed.is_null() {
         RdshSettings::default()
@@ -999,7 +1004,7 @@ mod rdsh_config_tests {
             assert!(err.contains("line"), "line missing: {err}");
             assert!(err.contains("column"), "column missing: {err}");
             assert!(
-                err.contains("settings reset"),
+                err.contains("settings init --force"),
                 "recovery hint missing: {err}"
             );
             // 壊れファイルは既定値に置き換えない（fail-open 禁止）。
@@ -1019,7 +1024,7 @@ mod rdsh_config_tests {
             let err = try_load().unwrap_err().to_string();
             assert!(err.contains(&p), "path missing: {err}");
             assert!(
-                err.contains("settings reset"),
+                err.contains("settings init --force"),
                 "recovery hint missing: {err}"
             );
         });
