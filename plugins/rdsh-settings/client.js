@@ -72,7 +72,7 @@ window.__ModuleLoader__.load({
           h('p', { style: title }, 'rdsh context engine（実験的、既定OFF）'),
           h('p', { style: desc }, '毎ターン必要な文脈だけ再構成します。全文履歴は渡しません。使うときだけONにします。設定は rdsh.json に保存され、`rdsh context` コマンドと共有されます。'),
           h('div', { style: row }, h('label', { style: row }, h('input', { type: 'checkbox', checked: !!bt.context_engine, onChange: (e) => setPath('beta', 'context_engine', e.target.checked) }), 'context engine を有効化する')),
-          legacy && cxActive ? h('p', { style: warn }, '旧 rdsh-context.json がありますが、rdsh.json に context があるため無視されます。旧ファイルは削除してかまいません。') : null
+          legacy && cxActive ? h('p', { style: warn }, '旧 rdsh-context.json があります。削除する前に、この画面で設定を保存し、rdsh.json に文脈が保存されたことを確認してください。') : null
         ),
         h('div', { style: card },
           h('p', { style: title }, 'Working Memory'),

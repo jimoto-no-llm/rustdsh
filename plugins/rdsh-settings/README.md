@@ -13,7 +13,9 @@ DSH設定サイドバーに rdsh セクションを追加するテスト用プ�
 
 - DSH_HOME/rdsh.json（単一設定源。context・beta・全体設定すべて）
 - 旧 DSH_HOME/rdsh-context.json は読み替え専用。rdsh.json に context が
-  ある場合は無視されるので、移行後は削除してかまいません。
+  ない場合（nullを含む）は画面に旧文脈を読み込み、全体保存で移行します。
+  contextを含まない部分保存では、未設定のcontextを新規作成しません。
+  旧ファイルを削除する前に、rdsh.jsonへの文脈の保存を確認してください。
 - Rust側 `rdsh context build/search/status/explain` と同じファイルを読み書きします
 
 ## 試す

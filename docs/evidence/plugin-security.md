@@ -48,6 +48,26 @@ only when `working_files` is missing or null, and reads the separate legacy
 file only when the canonical context section is absent or null. Explicit
 empty/default context settings remain authoritative.
 
+When canonical context is absent or null, the GUI loads the active legacy
+values and migrates them on a full save. An unrelated partial save leaves
+context absent/null rather than generating a default context that shadows
+the legacy file. A partial context edit starts from the active legacy values;
+an explicit empty Working Files list clears only that selection.
+
+Authenticated real DSH saves followed by Rust CLI reloads verified the
+missing-context partial save, null-context partial save, GUI-shaped full
+round-trip, and explicit Working Files clear. All retained the previously
+effective context except for the requested clear; the legacy file stayed
+unchanged. These paths failed regression checks at `d5bf393` before repair.
+
+The actual production React component was also rendered on an isolated
+component host with real DSH APIs and synthetic settings. Changing only
+`search.max` to 42 and clicking Save retained/migrated the legacy goal, files,
+and decisions. This is component verification, not a full DSH shell capture.
+The warning now requires confirming migration before deleting the old file.
+Both warning captures use the repaired API and the same synthetic fixture.
+Screenshots belong in the PR conversation rather than the source tree.
+
 Review regression checks reproduced two oversized round-trip failures at
 `5e16a77`: 50 Japanese paths of 300 characters produced a 91,074-byte POST,
 and a 1 MiB unmodeled section produced a 1,049,376-byte POST. Both returned
@@ -75,7 +95,8 @@ missing/incompatible authentication, refusal before body consumption and
 file/subprocess effects, authorized operations, settings round-trips, partial
 saves, clamping, unknown-field injection, explicit empty Working Files with
 legacy aliases, oversized disk metadata, the maximum supported form body,
-oversized request rejection, and malformed disk documents. Rust regression
+oversized request rejection, active legacy context migration, unrelated partial
+saves with absent/null context, and malformed disk documents. Rust regression
 checks cover alias precedence and clearing context while the separate
 legacy file exists.
 CI runs it on Node 22.

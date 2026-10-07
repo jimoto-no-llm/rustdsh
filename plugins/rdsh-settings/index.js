@@ -32,17 +32,23 @@ function settingsDefaults() {
   };
 }
 
-async function loadCfg() {
+async function readLegacyContext() {
   try {
-    const raw = await readFile(cfgPath(), 'utf8');
-    const j = JSON.parse(raw);
-    return sanitize(j);
-  } catch (e) { return defaults(); }
+    return obj(JSON.parse(await readFile(cfgPath(), 'utf8')));
+  } catch (e) { return {}; }
+}
+
+async function loadCfg() {
+  return sanitize(await readLegacyContext());
+}
+
+async function settingsForForm(current) {
+  return sanitizeSettings({ ...current, context: current.context ?? await readLegacyContext() });
 }
 
 async function loadSettings() {
   try {
-    return sanitizeSettings(await readSettingsDocument());
+    return await settingsForForm(await readSettingsDocument());
   } catch (e) { return settingsDefaults(); }
 }
 
@@ -57,8 +63,12 @@ async function readSettingsDocument() {
   }
 }
 
-function mergeSettings(current, input) {
+async function mergeSettings(current, input) {
   input = obj(input);
+  const hasContext = current.context != null || input.context != null;
+  if (current.context == null && input.context != null) {
+    current = { ...current, context: (await settingsForForm(current)).context };
+  }
   const source = { ...current, ...input };
   for (const [key, value] of Object.entries(settingsDefaults())) {
     if (typeof value === 'object') source[key] = { ...obj(current[key]), ...obj(input[key]) };
@@ -68,8 +78,14 @@ function mergeSettings(current, input) {
   for (const [key, value] of Object.entries(normalized)) {
     if (typeof value === 'object') result[key] = { ...obj(current[key]), ...value };
   }
-  // The legacy alias has been migrated into working_files, including empty lists.
-  delete result.context.files;
+  if (hasContext) {
+    // The legacy alias has been migrated into working_files, including empty lists.
+    delete result.context.files;
+  } else {
+    // An unrelated partial save must not shadow the active legacy context.
+    if (Object.hasOwn(current, 'context')) result.context = current.context;
+    else delete result.context;
+  }
   return result;
 }
 
@@ -279,10 +295,10 @@ export function apply(ctx, config) {
         try {
           // Covers every supported form field at its limit, including JSON escapes.
           const input = await readBody(req, 1024 * 1024);
-          const cfg = mergeSettings(await readSettingsDocument(), input.config ?? input);
+          const cfg = await mergeSettings(await readSettingsDocument(), input.config ?? input);
           await mkdir(dshHome(), { recursive: true });
           await writeFile(settingsPath(), JSON.stringify(cfg, null, 2) + '\n', { mode: 0o600 });
-          json(res, 200, { ok: true, config: sanitizeSettings(cfg) });
+          json(res, 200, { ok: true, config: await settingsForForm(cfg) });
         } catch (e) {
           res.writeHead(400, { 'content-type': 'application/json' });
           res.end(JSON.stringify({ ok: false, error: 'bad-request' }));

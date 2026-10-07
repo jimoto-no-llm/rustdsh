@@ -248,7 +248,7 @@ pub fn settings_path() -> String {
 }
 
 /// 設定を読み込む。ファイル欠落は既定値、不正値は clamp/切詰めで吸収する。
-/// context 節が空なら旧 rdsh-context.json で補完する（読み取り専用）。
+/// context 節が未設定/nullなら旧 rdsh-context.json で補完する（読み取り専用）。
 ///
 /// 存在するのに壊れた JSON は fail-open しない: エラーを出して exit(1) で
 /// 終了する（guard.deny 空での起動を防ぐため）。表示形式は main の cmd

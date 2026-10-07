@@ -142,6 +142,59 @@ test('plugin security boundary and settings preservation', async (t) => {
     }
   });
 
+  for (const context of [undefined, null]) {
+    await t.test(`unrelated partial saves leave ${context === null ? 'null' : 'missing'} context unset`, async () => {
+      const document = { search: { max: 10 }, extras: original.extras };
+      if (context === null) document.context = null;
+      await writeFile(settingsFile, JSON.stringify(document));
+      const legacy = { goal: 'keep legacy goal', working_files: ['legacy.rs'], max_code_hits: 35, max_sessions: 4 };
+      await writeFile(contextFile, JSON.stringify(legacy));
+      const saved = await request('/api/rdsh-settings/save', { method: 'POST', body: JSON.stringify({ search: { max: 42 } }) });
+      assert.equal(saved.status, 200);
+      const stored = JSON.parse(await readFile(settingsFile, 'utf8'));
+      assert.equal(stored.search.max, 42);
+      assert.equal(stored.context, context);
+      assert.deepEqual(stored.extras, original.extras);
+      assert.equal(saved.body.config.context.goal, legacy.goal);
+      assert.deepEqual(saved.body.config.context.working_files, legacy.working_files);
+      assert.deepEqual(JSON.parse(await readFile(contextFile, 'utf8')), legacy);
+    });
+  }
+
+  await t.test('form round-trip migrates active legacy context before unrelated edits', async () => {
+    await writeFile(settingsFile, JSON.stringify({ search: { max: 10 }, extras: original.extras }));
+    const legacy = { goal: 'keep legacy goal', files: ['legacy.rs'], enable_packer: false, decisions: ['keep decision'], max_code_hits: 35, max_sessions: 4 };
+    await writeFile(contextFile, JSON.stringify(legacy));
+    const loaded = (await request('/api/rdsh-settings')).body.config;
+    assert.equal(loaded.context.goal, legacy.goal);
+    assert.deepEqual(loaded.context.working_files, legacy.files);
+    assert.equal(loaded.context.max_code_hits, 35);
+    assert.equal(loaded.context.max_sessions, 4);
+    loaded.search.max = 42;
+    assert.equal((await request('/api/rdsh-settings/save', { method: 'POST', body: JSON.stringify({ config: loaded }) })).status, 200);
+    const stored = JSON.parse(await readFile(settingsFile, 'utf8'));
+    assert.equal(stored.context.goal, legacy.goal);
+    assert.deepEqual(stored.context.working_files, legacy.files);
+    assert.equal(stored.context.enable_packer, false);
+    assert.deepEqual(stored.context.decisions, legacy.decisions);
+    assert.equal(stored.context.files, undefined);
+    assert.deepEqual(stored.extras, original.extras);
+    assert.deepEqual(JSON.parse(await readFile(contextFile, 'utf8')), legacy);
+  });
+
+  await t.test('a context edit preserves other legacy values while honoring explicit clears', async () => {
+    await writeFile(settingsFile, JSON.stringify({ search: { max: 10 } }));
+    const legacy = { goal: 'keep legacy goal', files: ['legacy.rs'], constraints: ['keep constraint'] };
+    await writeFile(contextFile, JSON.stringify(legacy));
+    const saved = await request('/api/rdsh-settings/save', { method: 'POST', body: JSON.stringify({ context: { working_files: [] } }) });
+    assert.equal(saved.status, 200);
+    assert.equal(saved.body.config.context.goal, legacy.goal);
+    assert.deepEqual(saved.body.config.context.constraints, legacy.constraints);
+    assert.deepEqual(saved.body.config.context.working_files, []);
+    assert.deepEqual((await request('/api/rdsh-settings')).body.config.context.working_files, []);
+    assert.deepEqual(JSON.parse(await readFile(contextFile, 'utf8')), legacy);
+  });
+
   for (const [name, extra] of [
     ['long legacy paths', { context: { files: Array(50).fill('あ'.repeat(300)) } }],
     ['large unmodeled section', { future_section: { value: 'x'.repeat(1024 * 1024) } }],
