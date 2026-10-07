@@ -36,8 +36,7 @@ async function loadCfg() {
   try {
     const raw = await readFile(cfgPath(), 'utf8');
     const j = JSON.parse(raw);
-    const d = defaults();
-    return sanitize({ ...d, ...j });
+    return sanitize(j);
   } catch (e) { return defaults(); }
 }
 

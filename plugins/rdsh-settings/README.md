@@ -22,6 +22,8 @@ APIにはDSHのGUIセッション認証とHost/Origin検証を適用します。
 `connection.requestRejection` を提供するDSHが必要です（0.2.0-rc.2で検証済み）。
 認証機能を利用できない場合、APIは操作を拒否します。
 設定画面が扱わない既存キー（`extras.enable`など）は、保存時にも保持します。
+Working Filesの空リストは明示的な指定として扱い、旧形式のファイル一覧には戻りません。
+この読込動作を反映するには、Rustランチャーも更新してください。
 
 ```sh
 dsh plugin --profile web add ./plugins/rdsh-settings

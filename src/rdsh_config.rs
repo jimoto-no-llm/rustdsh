@@ -410,14 +410,7 @@ impl RdshSettings {
                 goal: text(&cx, "goal", GOAL_CHARS),
                 decisions: list(&cx, "decisions", TEXT_CHARS),
                 constraints: list(&cx, "constraints", TEXT_CHARS),
-                working_files: {
-                    let w = list(&cx, "working_files", PATH_CHARS);
-                    if w.is_empty() {
-                        list(&cx, "files", PATH_CHARS)
-                    } else {
-                        w
-                    }
-                },
+                working_files: working_file_list(&cx),
                 open_tasks: list(&cx, "open_tasks", TEXT_CHARS),
                 max_code_hits: clamp_u64(num(&cx, "max_code_hits"), 20, 1, 100) as usize,
                 max_sessions: clamp_u64(num(&cx, "max_sessions"), 10, 0, 100) as usize,
@@ -505,14 +498,7 @@ impl RdshSettings {
         out.context.goal = text(&cx, "goal", GOAL_CHARS);
         out.context.decisions = list(&cx, "decisions", TEXT_CHARS);
         out.context.constraints = list(&cx, "constraints", TEXT_CHARS);
-        out.context.working_files = {
-            let w = list(&cx, "working_files", PATH_CHARS);
-            if w.is_empty() {
-                list(&cx, "files", PATH_CHARS)
-            } else {
-                w
-            }
-        };
+        out.context.working_files = working_file_list(&cx);
         out.context.open_tasks = list(&cx, "open_tasks", TEXT_CHARS);
         out.context.max_code_hits = clamp_u64(num(&cx, "max_code_hits"), 20, 1, 100) as usize;
         out.context.max_sessions = clamp_u64(num(&cx, "max_sessions"), 10, 0, 100) as usize;
@@ -745,10 +731,10 @@ fn legacy_context_path() -> String {
     format!("{}/rdsh-context.json", crate::inspect::dsh_home())
 }
 
-/// context 節が空（未設定または既定値のまま）なら旧ファイルで項目ごとに補完する。
+/// context 節が未設定なら旧ファイルで項目ごとに補完する。
 /// 旧ファイルへの書き込みはしない。
 fn complement_from_legacy(cfg: &mut RdshSettings, has_context: bool) {
-    if has_context && cfg.context != ContextSection::default() {
+    if has_context {
         return;
     }
     let raw = std::fs::read_to_string(legacy_context_path()).unwrap_or_default();
@@ -786,12 +772,7 @@ fn complement_from_legacy(cfg: &mut RdshSettings, has_context: bool) {
         c.constraints = list(&v, "constraints", TEXT_CHARS);
     }
     if c.working_files.is_empty() {
-        let w = list(&v, "working_files", PATH_CHARS);
-        c.working_files = if w.is_empty() {
-            list(&v, "files", PATH_CHARS)
-        } else {
-            w
-        };
+        c.working_files = working_file_list(&v);
     }
     if c.open_tasks.is_empty() {
         c.open_tasks = list(&v, "open_tasks", TEXT_CHARS);
@@ -836,6 +817,16 @@ fn list(v: &serde_json::Value, key: &str, max_chars: usize) -> Vec<String> {
             .collect(),
         None => vec![],
     }
+}
+
+fn working_file_list(v: &serde_json::Value) -> Vec<String> {
+    // An explicit empty list clears the selection; only missing/null uses the alias.
+    let key = if v.get("working_files").is_some_and(|value| !value.is_null()) {
+        "working_files"
+    } else {
+        "files"
+    };
+    list(v, key, PATH_CHARS)
 }
 
 fn truncate(s: &str, max_chars: usize) -> String {
@@ -1146,6 +1137,38 @@ mod rdsh_config_tests {
     }
 
     #[test]
+    fn explicit_working_files_override_legacy_alias() {
+        for (context, expected) in [
+            (
+                serde_json::json!({"working_files": [], "files": ["stale.rs"]}),
+                vec![],
+            ),
+            (
+                serde_json::json!({"working_files": ["current.rs"], "files": ["stale.rs"]}),
+                vec!["current.rs"],
+            ),
+            (
+                serde_json::json!({"files": ["legacy.rs"]}),
+                vec!["legacy.rs"],
+            ),
+            (
+                serde_json::json!({"working_files": null, "files": ["legacy.rs"]}),
+                vec!["legacy.rs"],
+            ),
+        ] {
+            let value = serde_json::json!({"context": context});
+            assert_eq!(
+                RdshSettings::from_value(&value).context.working_files,
+                expected
+            );
+            assert_eq!(
+                RdshSettings::from_value_raw(&value).context.working_files,
+                expected
+            );
+        }
+    }
+
+    #[test]
     fn legacy_file_completes_empty_context_without_writing() {
         with_home("legacy", |_| {
             let legacy = legacy_context_path();
@@ -1171,6 +1194,21 @@ mod rdsh_config_tests {
             assert_eq!(c.context.working_files, vec!["src/tokens.rs".to_string()]);
             assert_eq!(c.context.open_tasks, vec!["packing評価".to_string()]);
             assert!(!std::path::Path::new(&settings_path()).exists());
+
+            std::fs::write(
+                settings_path(),
+                serde_json::json!({"context": {"working_files": []}}).to_string(),
+            )
+            .unwrap();
+            assert_eq!(load().context, ContextSection::default());
+
+            std::fs::remove_file(settings_path()).unwrap();
+            std::fs::write(
+                &legacy,
+                serde_json::json!({"working_files": [], "files": ["stale.rs"]}).to_string(),
+            )
+            .unwrap();
+            assert!(load().context.working_files.is_empty());
         });
     }
 

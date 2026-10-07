@@ -37,6 +37,14 @@ top-level section, and an unknown nested search key while applying the edited
 document. Unknown fields supplied by a client cannot change those disk values.
 Malformed existing settings refuse a save without replacing the file.
 
+Clearing Working Files was verified through an authenticated settings save
+followed by `rdsh settings get context.working_files`. It returns `[]` even
+when the saved document retains an older `context.files` list, or a separate
+`rdsh-context.json` contains old files. The Rust reader uses the `files` alias
+only when `working_files` is missing or null, and reads the separate legacy
+file only when the canonical context section is absent or null. Explicit
+empty/default context settings remain authoritative.
+
 ## Regression check
 
 ```sh
@@ -46,7 +54,9 @@ node --test tests/plugin-security.test.mjs
 The dependency-free check covers all six handlers, GET/HEAD/POST rejection,
 missing/incompatible authentication, refusal before body consumption and
 file/subprocess effects, authorized operations, settings round-trips, partial
-saves, clamping, unknown-field injection, and malformed disk documents.
+saves, clamping, unknown-field injection, explicit empty Working Files with
+legacy aliases, and malformed disk documents. Rust regression checks cover
+alias precedence and clearing context while the separate legacy file exists.
 CI runs it on Node 22.
 
 ## Impact and limits
@@ -63,6 +73,7 @@ timestamp alone does not prove updater execution. The subprocess counter
 confirms the unauthenticated trigger without running the updater.
 
 Until the patched bundles are loaded, disable these two plugins in the web
-profile and restart the GUI. Applying the source change requires reloading
-the installed bundles; it does not repair already overwritten settings or
-legacy context. Restore those from a known-good backup if needed.
+profile and restart the GUI. Applying the source change requires updating
+the Rust launcher and reloading the installed bundles; it does not repair
+already overwritten settings or legacy context. Restore those from a
+known-good backup if needed.

@@ -123,6 +123,24 @@ test('plugin security boundary and settings preservation', async (t) => {
     assert.equal(partial.body.config.context.future_key, 'keep nested');
   });
 
+  await t.test('cleared working files stay empty alongside legacy aliases', async () => {
+    await writeFile(settingsFile, JSON.stringify({ ...original, context: { files: ['stale.rs'], future_key: 'keep nested' } }));
+    const loaded = (await request('/api/rdsh-settings')).body.config;
+    assert.deepEqual(loaded.context.working_files, ['stale.rs']);
+    loaded.context.working_files = [];
+    assert.equal((await request('/api/rdsh-settings/save', { method: 'POST', body: JSON.stringify(loaded) })).status, 200);
+    const stored = JSON.parse(await readFile(settingsFile, 'utf8'));
+    assert.deepEqual(stored.context.working_files, []);
+    assert.deepEqual(stored.context.files, ['stale.rs']);
+    assert.equal(stored.context.future_key, 'keep nested');
+    assert.deepEqual(stored.extras, original.extras);
+    assert.deepEqual((await request('/api/rdsh-settings')).body.config.context.working_files, []);
+    for (const legacy of [{ files: ['legacy.rs'] }, { working_files: [], files: ['legacy.rs'] }]) {
+      await writeFile(contextFile, JSON.stringify(legacy));
+      assert.deepEqual((await request('/api/rdsh-context')).body.config.working_files, legacy.working_files ?? legacy.files);
+    }
+  });
+
   await t.test('unreadable settings are never replaced with defaults', async () => {
     for (const raw of ['{broken', 'null', '[]']) {
       await writeFile(settingsFile, raw);
