@@ -995,7 +995,7 @@ pub fn cmd_logs(tail: usize, grep: Option<String>, file: Option<String>) -> anyh
     let mut kept: std::collections::VecDeque<&str> =
         std::collections::VecDeque::with_capacity(tail.min(512));
     for line in text.lines() {
-        if pat.map(|p| line.contains(p)).unwrap_or(true) {
+        if pat.is_none_or(|p| line.contains(p)) {
             n += 1;
             if tail > 0 {
                 if kept.len() == tail {
