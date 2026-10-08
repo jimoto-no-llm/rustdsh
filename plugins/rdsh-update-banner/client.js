@@ -8,6 +8,45 @@ window.__ModuleLoader__.load({
     const useCallback = React.useCallback;
     const useRef = React.useRef;
     const ENDPOINT = "/api/rdsh-update";
+    const DISMISS_KEY = "rdsh-update-dismissed";
+    const DISMISS_PREFIX = DISMISS_KEY + ":v2:";
+    // Shared across overlay remounts even when browser storage is unavailable.
+    const dismissedUpdates = new Set();
+    const updateKey = (j) => JSON.stringify([j.kind || "update", j.to || ""]);
+    function acknowledge(j) {
+      return fetch(ENDPOINT + "/dismiss", {
+        method: "POST", cache: "no-store",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ to: j.to, kind: j.kind || "update" }),
+      }).catch(() => {});
+    }
+    function remember(j) {
+      const key = updateKey(j);
+      dismissedUpdates.add(key);
+      try { localStorage.setItem(DISMISS_PREFIX + key, "1"); } catch (e) {}
+    }
+    function isDismissed(j) {
+      if (!j) return false;
+      const key = updateKey(j);
+      if (j.dismissed || dismissedUpdates.has(key)) return true;
+      try {
+        if (localStorage.getItem(DISMISS_PREFIX + key) === "1") {
+          dismissedUpdates.add(key);
+          return true;
+        }
+        // Migrate the previous timestamp-based record, including expired ones.
+        const old = JSON.parse(localStorage.getItem(DISMISS_KEY) || "null");
+        const separator = typeof old?.key === "string" ? old.key.lastIndexOf("@") : -1;
+        if (separator > 0 && old.key.slice(0, separator) === j.to) {
+          remember(j);
+          // Once assigned to this component, the legacy wildcard must not hide
+          // a future update of a different component with the same version.
+          try { localStorage.removeItem(DISMISS_KEY); } catch (e) {}
+          return true;
+        }
+      } catch (e) {}
+      return false;
+    }
     const CSS = ".rub-wrap{position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:900;" +
       "width:min(400px,calc(100vw - 24px));box-sizing:border-box;" +
       "background:rgba(20,20,24,.55);-webkit-backdrop-filter:blur(28px) saturate(200%);backdrop-filter:blur(28px) saturate(200%);" +
@@ -58,43 +97,45 @@ window.__ModuleLoader__.load({
       const resPair = useState("");
       const result = resPair[0];
       const setResult = resPair[1];
-      // Dismissed update key (to + at), persisted so reloads stay quiet.
-      // Reappears only for a newer update or after 2 hours.
-      const DISMISS_KEY = "rdsh-update-dismissed";
-      const DISMISS_TTL = 2 * 60 * 60 * 1000;
-      const dismissedRef = useRef(null);
-      try {
-        const raw = localStorage.getItem(DISMISS_KEY);
-        if (raw) dismissedRef.current = JSON.parse(raw);
-      } catch (e) {}
-      const updateKey = (j) => ((j && j.to) || "") + "@" + ((j && j.at) || "");
-      const dismissedRecently = (key) => {
-        const d = dismissedRef.current;
-        return !!d && d.key === key && (Date.now() - d.at) < DISMISS_TTL;
-      };
+      const loadGeneration = useRef(0);
       const load = useCallback(async () => {
+        const generation = ++loadGeneration.current;
         try {
           const r = await fetch(ENDPOINT, { cache: "no-store" });
           if (!r.ok) return;
           const j = await r.json();
-          if (!j || !j.ok) return;
-          if (j.updated && dismissedRecently(updateKey(j))) return;
-          setData(j);
+          if (!j || !j.ok || generation !== loadGeneration.current) return;
+          // Clear a visible banner too, including a response arriving after close.
+          const hidden = j.updated && isDismissed(j);
+          if (hidden && !j.dismissed) acknowledge(j);
+          setData(hidden ? null : j);
         } catch (e) {}
       }, []);
       useEffect(() => {
         load();
         const t = setInterval(load, 60000);
-        return () => clearInterval(t);
+        const onStorage = (event) => {
+          if (event.key?.startsWith(DISMISS_PREFIX) && event.newValue === "1") {
+            dismissedUpdates.add(event.key.slice(DISMISS_PREFIX.length));
+          }
+          if (event.key === DISMISS_KEY || event.key?.startsWith(DISMISS_PREFIX)) {
+            setData((current) => isDismissed(current) ? null : current);
+          }
+        };
+        window.addEventListener("storage", onStorage);
+        return () => {
+          clearInterval(t);
+          window.removeEventListener("storage", onStorage);
+          ++loadGeneration.current;
+        };
       }, [load]);
       const dismiss = () => {
         if (data) {
-          dismissedRef.current = { key: updateKey(data), at: Date.now() };
-          try {
-            localStorage.setItem(DISMISS_KEY, JSON.stringify(dismissedRef.current));
-          } catch (e) {}
+          remember(data);
+          // Account-wide acknowledgement also spans GUI ports and browsers.
+          acknowledge(data);
         }
-        setData({ ok: true, updated: false });
+        setData(null);
       };
       const runUpdate = useCallback(async () => {
         if (running !== "idle") return;

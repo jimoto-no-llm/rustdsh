@@ -7,6 +7,27 @@ When `sync-dsh.sh` (shipped with rdsh) records an update in
 top of the web GUI. From the card you can run the update check, see details,
 minimize it, or dismiss it (dismissed versions stay dismissed).
 
+Both **dismiss** and **x** remember the update's component (`kind`) and target
+version/commit (`to`), without a time limit. Rewriting an update's timestamp,
+reloading, or changing projects cannot make the same target appear again.
+Different target versions still appear; minimizing keeps the notification.
+
+Dismissals are shared by all projects and profiles running as the same OS user.
+The authenticated `POST /api/rdsh-update/dismiss` route creates a private marker
+under `~/.local/share/rdsh/update-dismissals/`, separate from `update-state.json`.
+Each target gets its own marker, so simultaneous acknowledgements do not erase
+older ones. Same-origin browser tabs close immediately through storage events;
+other GUI ports or browsers observe the acknowledgement on their next poll
+(within 60 seconds) or page load. Separate OS accounts keep separate records.
+
+The previous browser dismissal record is migrated, including records whose old
+two-hour timeout expired. If browser storage is disabled, in-memory suppression
+lasts across project remounts and server acknowledgement lasts across reloads.
+If the server cannot save and browser storage is also disabled, persistence
+across a full browser reload is unavailable. Demo dismissals are browser-local
+and never write account state. New server/client code takes effect after the
+normal GUI restart/reload; no running user session is restarted automatically.
+
 ## Install
 
 ```sh
