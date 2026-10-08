@@ -31,7 +31,7 @@ network and model work. p50/p95 use nearest rank on accepted model runs only;
 failed attempts remain in the full JSON. This is not first-token latency.
 
 | Model | Task | Launcher | Model pass | Runtime pass | p50 seconds | p95 seconds |
-|---|---|---|---:|---:|---:|---:|
+| --- | --- | --- | ---: | ---: | ---: | ---: |
 | GPT 6.1 Sol | Short response | Original DSH | 3/3 | 0/3 | 4.825 | 5.021 |
 | GPT 6.1 Sol | Short response | rdsh | 3/3 | 0/3 | 3.645 | 4.475 |
 | GPT 6.1 Sol | Read JSON fixture | rdsh | 3/3 | 0/3 | 4.742 | 6.623 |

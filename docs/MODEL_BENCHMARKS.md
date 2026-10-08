@@ -52,7 +52,7 @@ bounded follow-up. Follow-up results remain separate from the original benchmark
 ## Conditions and acceptance
 
 | Condition | Launcher | Independent acceptance |
-|---|---|---|
+| --- | --- | --- |
 | Short arithmetic answer | Original DSH and rdsh | Exact nonce and sum, completed turn, exit 0 |
 | Read synthetic JSON | rdsh | A successful file tool, hidden nonce and sum, unchanged fixture |
 | Repair Rust range boundary | rdsh | Successful file tools, failed tests before repair, passed tests after repair for 1,001 inputs |
