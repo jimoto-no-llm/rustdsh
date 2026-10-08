@@ -73,7 +73,7 @@ reservation after confirmed controller absence, or a bound reservation after a
 matching checksummed run-history kernel-empty receipt plus actual root absence.
 An unbound launch intent, remaining descendants, unknown PID/host observations,
 missing/mismatched receipts or lost monitor keep the reservation. Re-run reconcile
-for remaining expired entries; inspect reports retained reasons. There is no
+for remaining expired entries; reconcile reports retained reasons. There is no
 force-release command that treats a heartbeat or missing driver PID as proof.
 
 `gpu inspect` is read-only and separately exposes `driver_used_mib`,

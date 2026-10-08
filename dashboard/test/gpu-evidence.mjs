@@ -73,6 +73,8 @@ const timings = {
   leased: { attach_ms: [], send_ms: [], stop_ms: [] },
 };
 const sourceFiles = [
+  "package.json",
+  "package-lock.json",
   "gpu-telemetry.mjs",
   "gpu-lock.mjs",
   "gpu-leases.mjs",
