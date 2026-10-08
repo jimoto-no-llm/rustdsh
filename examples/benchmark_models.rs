@@ -32,6 +32,10 @@ struct Args {
     samples: usize,
     #[arg(long, default_value_t = 120)]
     timeout_seconds: u64,
+    #[arg(long, value_parser = ["response", "read", "rust_fix"])]
+    only_case: Option<String>,
+    #[arg(long, value_parser = ["openai-codex", "anthropic"])]
+    only_provider: Option<String>,
 }
 
 fn accepted(events: &[Value], expected: &str, needs_tool: bool, exit_ok: bool) -> bool {
@@ -208,7 +212,7 @@ struct SessionFacts {
     retry_attempts: usize,
     provider_attempts: usize,
 }
-fn session_facts(root: &Path) -> Result<SessionFacts> {
+fn session_facts(root: &Path, needs_tool: bool) -> Result<SessionFacts> {
     let mut facts = SessionFacts {
         effort_ok: true,
         catalog_ok: true,
@@ -217,7 +221,7 @@ fn session_facts(root: &Path) -> Result<SessionFacts> {
     for entry in fs::read_dir(root)? {
         let path = entry?.path();
         if path.is_dir() {
-            let sub = session_facts(&path)?;
+            let sub = session_facts(&path, needs_tool)?;
             facts.routes.extend(sub.routes);
             facts.headers += sub.headers;
             facts.effort_ok &= sub.effort_ok;
@@ -246,9 +250,12 @@ fn session_facts(root: &Path) -> Result<SessionFacts> {
                         facts.effort_ok &=
                             v["data"]["header"]["config"]["reasoningEffort"] == "high";
                         if let Some(tools) = v["data"]["header"]["tools"].as_array() {
+                            facts.catalog_ok &= !needs_tool || !tools.is_empty();
                             facts.catalog_ok &= tools.iter().all(|tool| {
                                 matches!(tool["name"].as_str(), Some("read" | "edit" | "write"))
                             });
+                        } else {
+                            facts.catalog_ok &= !needs_tool;
                         }
                     }
                     if v["type"] == "assistant/attempt" {
@@ -472,7 +479,7 @@ fn run_one(
         }
         events.push(event);
     }
-    let facts = session_facts(&run.join("sessions")).unwrap_or_default();
+    let facts = session_facts(&run.join("sessions"), case != "response").unwrap_or_default();
     let route_ok = !facts.routes.is_empty()
         && facts
             .routes
@@ -490,10 +497,21 @@ fn run_one(
         case != "response",
         exit.success() && !timed_out,
     );
+    let generated_source_allowed = if case == "rust_fix" {
+        Some(safe_arithmetic(&fs::read_to_string(
+            cwd.join("src/lib.rs"),
+        )?))
+    } else {
+        None
+    };
+    let cargo_oracle_passed = if generated_source_allowed == Some(true) {
+        Some(cargo_oracle(&cwd, &home, &run)?)
+    } else {
+        None
+    };
     let oracle_ok = if case == "rust_fix" {
         fs::read_to_string(cwd.join("tests/oracle.rs"))? == ORACLE
-            && safe_arithmetic(&fs::read_to_string(cwd.join("src/lib.rs"))?)
-            && cargo_oracle(&cwd, &home, &run)?
+            && cargo_oracle_passed == Some(true)
     } else {
         fs::read(cwd.join("fixture.json"))?
             == serde_json::to_vec(&json!({"nonce":nonce,"numbers":[3,7,11,28]}))?
@@ -528,10 +546,13 @@ fn run_one(
         "passed":passed,"answer_ok":answer_ok,"session_request_routes":facts.routes,"route_ok":route_ok,"oracle_ok":oracle_ok,
         "model_passed":model_passed,"response_elapsed_seconds":response_elapsed,"shutdown_timeout":shutdown_timeout,
         "final_event_count":events.iter().filter(|e|e["type"]=="final").count(),
+        "generated_source_allowed":generated_source_allowed,"cargo_oracle_passed":cargo_oracle_passed,
         "exit_code":exit.code(),"timed_out":timed_out,"tool_call_count":tool_call_count,"step_usage":usage,
         "step_count":step_count,"recorded_provider_attempts":facts.provider_attempts,"retry_attempt_events":facts.retry_attempts,
         "tool_catalog_ok":facts.catalog_ok,"configured_retry_limit":0,"max_model_requests":if case == "response" {1} else if case == "read" {2} else {4},
-        "failure_class":if passed {None} else if shutdown_timeout {Some("shutdown_timeout")} else {Some(classify(&events,timed_out))}});
+        "failure_class":if generated_source_allowed == Some(false) {Some("unreviewed_generated_source")}
+        else if cargo_oracle_passed == Some(false) {Some("cargo_oracle_failed")}
+        else if passed {None} else if shutdown_timeout {Some("shutdown_timeout")} else {Some(classify(&events,timed_out))}});
     fs::write(run.join("result.json"), serde_json::to_vec_pretty(&result)?)?;
     cleanup.clean().context("raw model run cleanup failed")?;
     println!(
@@ -617,17 +638,32 @@ fn main() -> Result<()> {
         "measurement":"response from spawn to committed turn_end; process lifetime and normal exit tracked separately; first text is not first token",
         "ordering":"sequential; alternate provider and launcher order every sample; no automatic retries",
         "authentication":"existing official credential provider; normal OAuth refresh permitted; no credential export",
+        "only_case":args.only_case,"only_provider":args.only_provider,
         "runs":[]});
     for sample in 1..=args.samples {
         let order = if sample % 2 == 1 { [0, 1] } else { [1, 0] };
         for p in order {
             let (provider, model) = selections[p];
+            if args
+                .only_provider
+                .as_deref()
+                .is_some_and(|filter| filter != provider)
+            {
+                continue;
+            }
             let launchers = if sample % 2 == 1 {
                 ["original", "rdsh"]
             } else {
                 ["rdsh", "original"]
             };
             for launcher in launchers {
+                if args
+                    .only_case
+                    .as_deref()
+                    .is_some_and(|filter| filter != "response")
+                {
+                    continue;
+                }
                 let index = report["runs"].as_array().unwrap().len() + 1;
                 let result = run_one(
                     &args,
@@ -645,6 +681,13 @@ fn main() -> Result<()> {
                 )?;
             }
             for case in ["read", "rust_fix"] {
+                if args
+                    .only_case
+                    .as_deref()
+                    .is_some_and(|filter| filter != case)
+                {
+                    continue;
+                }
                 let index = report["runs"].as_array().unwrap().len() + 1;
                 let result = run_one(
                     &args,
