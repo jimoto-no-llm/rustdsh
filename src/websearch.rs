@@ -458,6 +458,8 @@ mod tests {
                     Err(e) => panic!("fixture accept: {e}"),
                 }
             };
+            // Accepted sockets inherit O_NONBLOCK from the listener on BSD.
+            stream.set_nonblocking(false).unwrap();
             stream
                 .set_read_timeout(Some(std::time::Duration::from_secs(3)))
                 .unwrap();
