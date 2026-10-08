@@ -56,6 +56,12 @@ def validate(root, tag):
         if (not any(asset == "sh" for _, asset in installers)
                 or any(channel != f"download/{tag}" for channel, _ in installers)):
             raise ValueError("prerelease installer URLs must use this exact tag URL")
+        instructions = re.sub(r"<!--.*?-->", "", authored, flags=re.S)
+        unix_versions = [value.strip("'\"") for value in re.findall(r"--version=([^\s`]+)", instructions)]
+        windows_versions = [value.strip("'\"") for value in re.findall(r"(?i:-Version)[ \t]+([^\s`]+)", instructions)]
+        if (not unix_versions or not windows_versions
+                or any(value != tag for value in (*unix_versions, *windows_versions))):
+            raise ValueError("prerelease installers require --version=TAG and -Version TAG matching this tag")
     if previous_tag(authored) == tag:
         raise ValueError("previous-tag must differ from the release tag")
     return authored

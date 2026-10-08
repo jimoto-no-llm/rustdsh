@@ -26,8 +26,8 @@ class ReleaseMetadataTests(unittest.TestCase):
         (self.root / "Cargo.lock").write_text(f'[[package]]\nname = "rdsh"\nversion = "{version}"\n', encoding="utf-8")
         (self.root / "CHANGELOG.md").write_text(f"## [{version}] - 2026-10-08\n", encoding="utf-8")
         notes = (f"## {version} — Example\n\n- Fixed an issue.\n\n## 更新前に確認\n\n"
-                 f"- Restart processes.\n\nInstall/update:\n\n```sh\ncurl https://github.com/org/repo/releases/download/v{version}/install.sh\n```\n\n"
-                 "Windows: `install.ps1 -FromRelease`.\n")
+                 f"- Restart processes.\n\nInstall/update:\n\n```sh\ncurl https://github.com/org/repo/releases/download/v{version}/install.sh | bash -s -- --from-release --version=v{version}\n```\n\n"
+                 f"Windows: `install.ps1 -FromRelease -Version v{version}`.\n")
         path = self.root / "docs" / "releases" / f"v{version}.md"
         path.write_text(notes, encoding="utf-8")
         return path
@@ -122,6 +122,36 @@ class ReleaseMetadataTests(unittest.TestCase):
         notes.write_text(notes.read_text(encoding="utf-8") + "<!-- previous-tag: v1.2.3 -->\n", encoding="utf-8")
         with self.assertRaisesRegex(ValueError, "must differ"):
             release.validate(self.root, "v1.2.3")
+
+    def test_candidate_installer_download_alone_does_not_select_candidate_binaries(self):
+        for option in ("--version=v1.2.3-rc.1", "-Version v1.2.3-rc.1"):
+            for replacement in ("", option.replace("v1.2.3-rc.1", "latest"),
+                                option.replace("v1.2.3-rc.1", "v1.2.3-rc.0"),
+                                option + " " + option.replace("v1.2.3-rc.1", "v1.2.2")):
+                notes = self.fixture("1.2.3-rc.1")
+                notes.write_text(notes.read_text(encoding="utf-8").replace(option, replacement), encoding="utf-8")
+                with self.subTest(option=option, replacement=replacement), self.assertRaisesRegex(ValueError, "matching this tag"):
+                    release.validate(self.root, "v1.2.3-rc.1")
+
+    def test_candidate_installer_versions_can_be_quoted(self):
+        for quote in ("'", '"'):
+            notes = self.fixture("1.2.3-rc.1")
+            text = notes.read_text(encoding="utf-8")
+            text = text.replace("--version=v1.2.3-rc.1", f"--version={quote}v1.2.3-rc.1{quote}")
+            text = text.replace("-Version v1.2.3-rc.1", f"-Version {quote}v1.2.3-rc.1{quote}")
+            notes.write_text(text, encoding="utf-8")
+            release.validate(self.root, "v1.2.3-rc.1")
+
+    def test_candidate_version_hints_in_comments_do_not_replace_instructions(self):
+        notes = self.fixture("1.2.3-rc.1")
+        text = notes.read_text(encoding="utf-8")
+        hint = "<!-- --version=vX.Y.Z-rc.N and -Version vX.Y.Z-rc.N -->\n"
+        notes.write_text(text + hint, encoding="utf-8")
+        release.validate(self.root, "v1.2.3-rc.1")
+        text = text.replace("--version=v1.2.3-rc.1", "")
+        notes.write_text(text + "<!-- --version=v1.2.3-rc.1 -->\n", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "matching this tag"):
+            release.validate(self.root, "v1.2.3-rc.1")
 
     def test_publication_reads_the_persisted_previous_tag_without_cli_override(self):
         notes = self.fixture()

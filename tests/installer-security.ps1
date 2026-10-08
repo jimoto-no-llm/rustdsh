@@ -1,13 +1,17 @@
-param([string]$InstallerPath = (Join-Path $PSScriptRoot '../install.ps1'))
+param(
+  [string]$InstallerPath = (Join-Path $PSScriptRoot '../install.ps1'),
+  [string]$Version = 'latest'
+)
 $ErrorActionPreference = 'Stop'
 if (!(Test-Path -LiteralPath $InstallerPath -PathType Leaf)) { throw 'Installer source is missing' }
 $taskRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('rdsh-installer-security-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $taskRoot | Out-Null
 $priorBase = $env:RDSH_RELEASE_BASE
 $env:RDSH_RELEASE_BASE = 'https://fixture.invalid/releases'
-$global:RdshInstallerSecurityFixture = @{ extractions = 0; checksum = $null }
+$global:RdshInstallerSecurityFixture = @{ extractions = 0; checksum = $null; requests = @() }
 function Invoke-WebRequest {
   param([string]$Uri, [string]$OutFile)
+  $global:RdshInstallerSecurityFixture.requests += $Uri
   if ($Uri.EndsWith('.sha256')) {
     if ($null -eq $global:RdshInstallerSecurityFixture.checksum) { throw 'fixture checksum unavailable' }
     [System.IO.File]::WriteAllText($OutFile, $global:RdshInstallerSecurityFixture.checksum)
@@ -32,9 +36,15 @@ try {
       }
     }
     $before = $global:RdshInstallerSecurityFixture.extractions
+    $global:RdshInstallerSecurityFixture.requests = @()
     $caught = $null
-    try { & $installer -FromRelease -Prefix (Join-Path $taskRoot 'bin') }
+    try { & $installer -FromRelease -Version $Version -Prefix (Join-Path $taskRoot 'bin') }
     catch { $caught = $_.Exception.Message }
+    $channel = if ($Version -eq 'latest') { 'latest/download' } else { "download/$Version" }
+    if (!$global:RdshInstallerSecurityFixture.requests.Count -or
+        ($global:RdshInstallerSecurityFixture.requests | Where-Object { !$_.StartsWith("https://fixture.invalid/releases/$channel/") })) {
+      throw 'Installer did not select the requested release channel'
+    }
     if ($checksumCase -eq 'valid') {
       if ($global:RdshInstallerSecurityFixture.extractions -ne ($before + 1) -or $caught -ne 'fixture reached extraction') { throw "valid checksum rejected: $caught" }
     } else {
