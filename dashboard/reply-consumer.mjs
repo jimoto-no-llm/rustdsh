@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
 import {
   replyCheck,
   finalReplyPhases,
@@ -51,6 +52,7 @@ export class ReplyConsumer {
     this.url = url;
     this.fetch = fetchImpl;
     this.cursor = 0;
+    this.controlIntervalMs = 500;
   }
   async request(route, input, headers) {
     const response = await this.fetch(`${this.url}api/replies/${route}`, {
@@ -83,6 +85,61 @@ export class ReplyConsumer {
       ...extra,
     });
   }
+  control(commandId, phase, extra = {}) {
+    return this.request("control", {
+      consumer_id: this.consumer.consumer_id,
+      command_id: commandId,
+      phase,
+      ...extra,
+    });
+  }
+  async watchInterrupt(commandId, nativeId, signal) {
+    while (!signal.aborted) {
+      await delay(this.controlIntervalMs, undefined, { signal }).catch(
+        () => {},
+      );
+      if (signal.aborted) break;
+      try {
+        const read = await this.read();
+        for (const control of read.controls || []) {
+          if (signal.aborted) break;
+          if (
+            control.target_command_id !== commandId ||
+            control.target_native_command_id !== nativeId ||
+            control.phase !== "pending"
+          )
+            continue;
+          // This monitor only controls its own awaited prompt. A stale target
+          // cannot cancel a subsequent prompt after the current one returns.
+          if (!this.attached.adapter.prompts.has(this.consumer.session_id))
+            continue;
+          const cancelId = "cmd_" + randomUUID();
+          const claim = await this.control(control.command_id, "begin", {
+            native_command_id: cancelId,
+          });
+          if (!claim.claimed) continue;
+          if (
+            signal.aborted ||
+            !this.attached.adapter.prompts.has(this.consumer.session_id)
+          ) {
+            await this.control(control.command_id, "unknown");
+            continue;
+          }
+          try {
+            await this.attached.adapter.interrupt(this.consumer.session_id, {
+              command_id: cancelId,
+            });
+            await this.control(control.command_id, "reconcile");
+          } catch {
+            await this.control(control.command_id, "unknown").catch(() => {});
+          }
+        }
+      } catch {
+        // Losing the control response never grants a second cancel effect.
+        // The durable claim remains pending/unknown for exact reconciliation.
+      }
+    }
+  }
   async apply(message) {
     replyCheck(
       message.consumer_id === this.consumer.consumer_id &&
@@ -91,6 +148,11 @@ export class ReplyConsumer {
       "Answer targets a different native session",
     );
     const id = message.reply_command_id;
+    if (
+      message.source_kind === "instruction" &&
+      message.effective_mode === "interrupt"
+    )
+      await this.control(id, "reconcile");
     if (message.contract_validity !== "current") {
       if (["started", "unknown"].includes(message.application.phase)) {
         const result = await this.ack(id, "reconcile");
@@ -151,6 +213,8 @@ export class ReplyConsumer {
       };
     }
     const prompt = replyPrompt(message, this.consumer);
+    const controller = new AbortController();
+    const monitor = this.watchInterrupt(id, nativeId, controller.signal);
     try {
       await this.attached.adapter.send(this.consumer.session_id, prompt, {
         command_id: nativeId,
@@ -162,6 +226,9 @@ export class ReplyConsumer {
         phase: "unknown",
         result_reason: "native_result_missing",
       };
+    } finally {
+      controller.abort();
+      await monitor;
     }
     try {
       return (await this.ack(id, "reconcile")).command;

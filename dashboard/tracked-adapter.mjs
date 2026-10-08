@@ -63,9 +63,20 @@ export function trackAdapter(
       throw error;
     }
   };
-  adapter.interrupt = async (sessionId) => {
+  adapter.interrupt = async (sessionId, options = {}) => {
+    if (
+      !options ||
+      typeof options !== "object" ||
+      Array.isArray(options) ||
+      Object.keys(options).some((key) => key !== "command_id")
+    )
+      throw new HistoryError("invalid_command");
     adapter.requireOperation("interrupt", sessionId);
-    const id = await history.recordCommand(runId, "interrupt");
+    const id = await history.recordCommand(
+      runId,
+      "interrupt",
+      options.command_id,
+    );
     await history.commandPhase(id, "dispatched");
     try {
       const result = await interrupt(sessionId);

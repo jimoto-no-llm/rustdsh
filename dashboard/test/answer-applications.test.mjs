@@ -16,6 +16,9 @@ import { feedbackSince } from "../mcp.mjs";
 import { EventsHub } from "../webhooks.mjs";
 import { Webhook } from "standardwebhooks";
 import { replyPrompt } from "../answer-applications.mjs";
+import { instructionRequest } from "../instruction-client.mjs";
+import { validateInstructions } from "../instruction-queue.mjs";
+import { setTimeout as delay } from "node:timers/promises";
 
 const exec = promisify(execFile);
 const fixture = fileURLToPath(
@@ -216,6 +219,517 @@ async function setup(t, webhook = false) {
 }
 const command = (state, message) =>
   state.answer_applications.commands[message.reply_command_id];
+async function instruction(f, client, extra = {}) {
+  return {
+    command_id: "input_" + randomUUID(),
+    consumer_id: client.consumer.consumer_id,
+    run_id: client.consumer.run_id,
+    session_id: client.consumer.session_id,
+    text: "まずテストを修正する",
+    mode: "next_turn",
+    expected_queue_revision: (await f.state()).input_queue_revision,
+    ...extra,
+  };
+}
+async function posted(f, input, actor = "human") {
+  const response = await f.post("instructions/submit", input, actor),
+    result = await response.json();
+  assert.equal(response.status, 200, JSON.stringify(result));
+  return result;
+}
+test(
+  "general inputs and human replies share exact-session order and immutable IDs, including unsupported steer",
+  options,
+  async (t) => {
+    const f = await setup(t),
+      attached = await f.attach(),
+      client = await f.client(attached);
+    const first = await instruction(f, client);
+    const saved = await posted(f, first);
+    assert.equal(saved.request.actor, "human");
+    assert.equal(saved.command.phase, "saved");
+    assert.equal(
+      (
+        await f.post("instructions/submit", {
+          ...first,
+          command_id: "input_" + randomUUID(),
+          run_id: "run_" + randomUUID(),
+        })
+      ).status,
+      400,
+    );
+    assert.equal(
+      (
+        await f.post("instructions/submit", {
+          ...first,
+          command_id: "input_" + randomUUID(),
+          mode: "interrupt",
+          active_command_id: first.command_id,
+          expected_queue_revision: (await f.state()).input_queue_revision,
+        })
+      ).status,
+      409,
+    );
+    const reordered = Object.fromEntries(Object.entries(first).reverse());
+    assert.equal((await posted(f, reordered)).duplicate, true);
+    assert.equal(
+      (
+        await f.post("instructions/submit", {
+          ...first,
+          text: "同じIDで別の指示",
+        })
+      ).status,
+      409,
+    );
+    assert.equal(
+      (await f.post("instructions/submit", { ...first, actor: "human" }, "mcp"))
+        .status,
+      400,
+    );
+    await f.ask("after-instruction", client);
+    const reply = await f.answer("after-instruction");
+    const third = await instruction(f, client, {
+      text: "次はUIを修正する",
+      mode: "steer",
+    });
+    const steer = await posted(f, third, "mcp");
+    assert.equal(steer.request.actor, "management_agent");
+    assert.equal(steer.request.effective_mode, "next_turn");
+    assert.equal(steer.request.timing_reason, "dsh_acp_no_verified_steer");
+    const read = await client.read();
+    assert.deepEqual(
+      read.messages.map((m) => m.reply_command_id),
+      [first.command_id, reply.reply_command_id, third.command_id],
+    );
+    assert.deepEqual(
+      read.messages.map((m) => m.sequence),
+      [1, 2, 3],
+    );
+    assert.equal(read.messages[1].application.feedback_sequence, 1);
+    assert.equal(
+      (await f.state()).instructions.commands[first.command_id].read_at,
+      null,
+    );
+    const result = await client.poll();
+    assert.deepEqual(
+      result.processed.map((c) => c.phase),
+      ["succeeded", "succeeded", "succeeded"],
+    );
+    await client.poll();
+    await posted(f, first);
+    assert.equal(await f.effects(), 3);
+    const prompts = (await f.trace()).filter(
+      (e) => e.method === "session/prompt",
+    );
+    assert.equal(prompts.length, 3);
+    assert.ok(
+      prompts.every(
+        (p) => p.params.sessionId === attached.record.cli_session_id,
+      ),
+    );
+    assert.ok(prompts[0].params.prompt[0].text.startsWith("追指示"));
+    assert.ok(prompts[1].params.prompt[0].text.startsWith("人間からの返答"));
+    assert.ok(
+      prompts.every((p) =>
+        p.params.prompt[0].text.includes('"execution_authorized":false'),
+      ),
+    );
+    assert.equal(
+      (await f.trace()).filter((e) => e.method === "session/new").length,
+      1,
+    );
+    await ProjectStore.open(f.project);
+  },
+);
+test(
+  "legacy unbound feedback cannot advance a consumer cursor past a newly submitted instruction",
+  options,
+  async (t) => {
+    const f = await setup(t),
+      client = await f.client(await f.attach());
+    const first = await instruction(f, client);
+    await posted(f, first);
+    await client.poll();
+    for (let i = 0; i < 4; i++) {
+      const id = `unbound-${i}`;
+      assert.equal(
+        (
+          await f.post(
+            "update/question",
+            { id, question: "配送対象を持たない従来の質問" },
+            "mcp",
+          )
+        ).status,
+        200,
+      );
+      assert.equal(
+        (await f.post("update/answer", { id, answer: "従来の回答" })).status,
+        200,
+      );
+    }
+    await client.poll();
+    assert.equal(client.cursor, 4);
+    const next = await instruction(f, client);
+    const saved = await posted(f, next);
+    assert.equal(saved.command.queue_sequence, 5);
+    assert.equal(
+      (await client.poll()).processed[0].command_id,
+      next.command_id,
+    );
+    assert.equal(await f.effects(), 2);
+    await ProjectStore.open(f.project);
+  },
+);
+test(
+  "concurrent contradictory inputs retain both texts, require human comparison, and reject stale review decisions",
+  options,
+  async (t) => {
+    const f = await setup(t),
+      client = await f.client(await f.attach());
+    const first = await instruction(f, client, { text: "元のAPIを維持する" }),
+      other = {
+        ...first,
+        command_id: "input_" + randomUUID(),
+        text: "元のAPIを削除する",
+      };
+    const pair = await Promise.all([posted(f, first), posted(f, other, "mcp")]);
+    const accepted = pair.find((r) => r.request.status === "accepted"),
+      conflict = pair.find((r) => r.request.status === "review_required");
+    assert.ok(accepted && conflict);
+    assert.equal(conflict.command, null);
+    assert.equal(conflict.request.comparison[0].text, accepted.request.text);
+    assert.equal((await client.read()).messages.length, 1);
+    const decision = {
+      command_id: conflict.request.command_id,
+      expected_queue_revision: (await f.state()).input_queue_revision,
+      decision: "append_next_turn",
+    };
+    assert.ok(
+      [401, 403].includes(
+        (await f.post("instructions/resolve", decision, "mcp")).status,
+      ),
+    );
+    const extra = await instruction(f, client, {
+      text: "READMEの文言を整える",
+    });
+    await posted(f, extra);
+    assert.equal((await f.post("instructions/resolve", decision)).status, 409);
+    const response = await f.post("instructions/resolve", {
+      ...decision,
+      expected_queue_revision: (await f.state()).input_queue_revision,
+    });
+    assert.equal(response.status, 200, JSON.stringify(await response.json()));
+    assert.equal((await client.poll()).processed.length, 3);
+    assert.equal(await f.effects(), 3);
+    const originals = [first, other];
+    assert.deepEqual(
+      originals.map(
+        (r) => f.server.store.value.instructions.requests[r.command_id].text,
+      ),
+      originals.map((r) => r.text),
+    );
+    assert.equal(
+      (
+        await posted(
+          f,
+          originals.find((r) => r.command_id === conflict.request.command_id),
+          conflict.request.actor === "management_agent" ? "mcp" : "human",
+        )
+      ).duplicate,
+      true,
+    );
+    await ProjectStore.open(f.project);
+  },
+);
+test(
+  "human-approved interruption cancels only the currently awaited native prompt and confirms its correlated result before the follow-up",
+  options,
+  async (t) => {
+    const f = await setup(t),
+      client = await f.client(await f.attach("reply_interrupt"));
+    client.controlIntervalMs = 40;
+    const parent = await instruction(f, client, { text: "中断前の入力" });
+    await posted(f, parent);
+    const running = client.poll();
+    for (let i = 0; i < 150 && !(await f.effects()); i++) await delay(20);
+    assert.equal(await f.effects(), 1);
+    const follow = await instruction(f, client, {
+      text: "中断を確認して次の修正をする",
+      mode: "interrupt",
+      active_command_id: parent.command_id,
+    });
+    const pending = await posted(f, follow, "mcp");
+    assert.equal(pending.request.status, "review_required");
+    assert.equal(pending.request.control, null);
+    assert.equal(
+      (await f.trace()).filter((e) => e.method === "session/cancel").length,
+      0,
+    );
+    assert.equal(
+      (
+        await f.post(
+          "replies/control",
+          {
+            consumer_id: client.consumer.consumer_id,
+            command_id: follow.command_id,
+            phase: "begin",
+            native_command_id: "cmd_" + randomUUID(),
+          },
+          { "x-rdsh-consumer-token": client.token },
+        )
+      ).status,
+      409,
+    );
+    const approval = await f.post("instructions/resolve", {
+      command_id: follow.command_id,
+      expected_queue_revision: (await f.state()).input_queue_revision,
+      decision: "approve_interrupt",
+    });
+    assert.equal(approval.status, 200, JSON.stringify(await approval.json()));
+    const first = await running;
+    assert.equal(first.processed[0].phase, "failed");
+    const result = await client.poll();
+    assert.equal(result.processed.at(-1).phase, "succeeded");
+    const state = await f.state(),
+      ctl = state.instructions.requests[follow.command_id].control;
+    assert.equal(ctl.phase, "confirmed");
+    assert.equal(ctl.reason, "correlated_cancelled_prompt_result");
+    assert.equal(
+      state.instructions.commands[parent.command_id].result_reason,
+      "native_prompt_cancelled",
+    );
+    assert.equal(
+      (
+        await client.control(follow.command_id, "begin", {
+          native_command_id: "cmd_" + randomUUID(),
+        })
+      ).claimed,
+      false,
+    );
+    await client.poll();
+    assert.equal(await f.effects(), 2);
+    const trace = await f.trace(),
+      cancel = trace.findIndex((e) => e.method === "session/cancel"),
+      sends = trace
+        .map((e, i) => (e.method === "session/prompt" ? i : -1))
+        .filter((i) => i >= 0);
+    assert.ok(sends[0] < cancel && cancel < sends[1]);
+    assert.equal(trace.filter((e) => e.method === "session/cancel").length, 1);
+    await ProjectStore.open(f.project);
+  },
+);
+test(
+  "a cancel notification without a correlated prompt result cannot release the follow-up or be replayed after reconnect",
+  options,
+  async (t) => {
+    const f = await setup(t),
+      attached = await f.attach("reply_interrupt_lost"),
+      client = await f.client(attached);
+    client.controlIntervalMs = 40;
+    const parent = await instruction(f, client);
+    await posted(f, parent);
+    const running = client.poll();
+    for (let i = 0; i < 150 && !(await f.effects()); i++) await delay(20);
+    assert.equal(await f.effects(), 1);
+    const follow = await instruction(f, client, {
+      mode: "interrupt",
+      active_command_id: parent.command_id,
+    });
+    await posted(f, follow);
+    assert.equal((await running).blocked, true);
+    await client.control(follow.command_id, "reconcile");
+    assert.ok(
+      ["notification_sent", "unknown"].includes(
+        f.server.store.value.instructions.requests[follow.command_id].control
+          .phase,
+      ),
+    );
+    assert.equal(
+      (
+        await client.control(follow.command_id, "begin", {
+          native_command_id: "cmd_" + randomUUID(),
+        })
+      ).claimed,
+      false,
+    );
+    await attached.adapter.stop();
+    const resumed = await f.client(
+      await f.attach("reply_effect", attached.record.run_id),
+    );
+    assert.equal((await resumed.poll()).blocked, true);
+    assert.equal(await f.effects(), 1);
+    assert.equal(
+      (await f.trace()).filter((e) => e.method === "session/cancel").length,
+      1,
+    );
+    assert.equal(
+      f.server.store.value.instructions.commands[follow.command_id].phase,
+      "saved",
+    );
+    await ProjectStore.open(f.project);
+  },
+);
+test(
+  "a lost cancel claim response performs zero cancels and does not gain replay permission",
+  options,
+  async (t) => {
+    const f = await setup(t),
+      attached = await f.attach("reply_interrupt"),
+      client = await f.client(attached);
+    client.controlIntervalMs = 40;
+    const parent = await instruction(f, client);
+    await posted(f, parent);
+    const original = client.fetch;
+    let lost = false;
+    client.fetch = async (url, options) => {
+      const response = await original(url, options);
+      if (
+        !lost &&
+        url.endsWith("/control") &&
+        JSON.parse(options.body).phase === "begin"
+      ) {
+        lost = true;
+        await response.json();
+        throw new Error("fixture lost cancel claim");
+      }
+      return response;
+    };
+    const running = client.poll();
+    for (let i = 0; i < 150 && !(await f.effects()); i++) await delay(20);
+    const follow = await instruction(f, client, {
+      mode: "interrupt",
+      active_command_id: parent.command_id,
+    });
+    await posted(f, follow);
+    for (let i = 0; i < 150 && !lost; i++) await delay(20);
+    assert.equal(lost, true);
+    await delay(160);
+    assert.equal(
+      f.server.store.value.instructions.requests[follow.command_id].control
+        .phase,
+      "claimed",
+    );
+    assert.equal(
+      (await f.trace()).filter((e) => e.method === "session/cancel").length,
+      0,
+    );
+    await attached.adapter.stop();
+    await running;
+    await client.control(follow.command_id, "reconcile");
+    assert.equal(
+      f.server.store.value.instructions.requests[follow.command_id].control
+        .phase,
+      "unknown",
+    );
+  },
+);
+test(
+  "general-input result loss remains an ordered unknown barrier after explicit exact-session reconnection",
+  options,
+  async (t) => {
+    const f = await setup(t),
+      attached = await f.attach("reply_effect_lost"),
+      first = await f.client(attached);
+    const input = await instruction(f, first);
+    await posted(f, input);
+    assert.equal((await first.poll()).blocked, true);
+    const later = await instruction(f, first, {
+      text: "この入力は先の結果確認まで保留",
+    });
+    await posted(f, later);
+    await attached.adapter.stop();
+    const resumed = await f.attach("reply_effect", attached.record.run_id),
+      next = await f.client(resumed);
+    assert.equal((await next.poll()).processed[0].phase, "unknown");
+    const read = await next.read(),
+      late = read.messages.find((m) => m.reply_command_id === later.command_id);
+    assert.equal((await next.apply(late)).phase, "queued");
+    assert.equal(await f.effects(), 1);
+    assert.equal(
+      (await f.state()).instructions.commands[later.command_id].phase,
+      "read",
+    );
+    assert.deepEqual(
+      (await f.state()).instructions.commands[later.command_id].queue_blocker,
+      { command_id: input.command_id, phase: "unknown" },
+    );
+    await ProjectStore.open(f.project);
+  },
+);
+test(
+  "public instruction CLI and lost HTTP submission responses reuse an immutable ID without launching native sessions",
+  options,
+  async (t) => {
+    const f = await setup(t),
+      client = await f.client(await f.attach());
+    const context = await instructionRequest(f.project, "context", {
+      consumer_id: client.consumer.consumer_id,
+    });
+    assert.equal(context.steer.supported, false);
+    const input = await instruction(f, client);
+    await assert.rejects(
+      instructionRequest(f.project, "submit", input, async (...args) => {
+        const result = await fetch(...args);
+        await result.json();
+        throw new Error("fixture lost response");
+      }),
+      /lost response/,
+    );
+    const file = path.join(f.root, "input.json");
+    await fs.writeFile(file, JSON.stringify(input));
+    const output = await exec(
+      process.execPath,
+      [
+        cli,
+        "instruction",
+        "submit",
+        "--project",
+        f.project.root,
+        "--input-file",
+        file,
+      ],
+      { env: f.env, windowsHide: true, timeout: 15000 },
+    );
+    assert.equal(JSON.parse(output.stdout).duplicate, true);
+    assert.equal(JSON.parse(output.stdout).request.actor, "management_agent");
+    assert.equal(
+      (await f.trace()).filter((e) => e.method === "session/new").length,
+      1,
+    );
+    assert.equal(await f.effects(), 0);
+    await client.poll();
+    assert.equal(await f.effects(), 1);
+    const inspect = await exec(
+      process.execPath,
+      [
+        cli,
+        "reply-consumer",
+        "inspect",
+        "--project",
+        f.project.root,
+        "--command-id",
+        input.command_id,
+      ],
+      { env: f.env, windowsHide: true, timeout: 15000 },
+    );
+    assert.equal(JSON.parse(inspect.stdout).commands[0].phase, "succeeded");
+    const baseline = f.server.store.value;
+    for (const change of [
+      (s) => (s.instructions.requests[input.command_id].text = "corrupt"),
+      (s) => (s.instructions.commands[input.command_id].queue_sequence = 0),
+      (s) =>
+        (s.instructions.commands[input.command_id].attempt_owner_id = null),
+      (s) => (s.instructions.requests[input.command_id].actor = "forged"),
+      (s) =>
+        (s.instructions.commands.orphan =
+          s.instructions.commands[input.command_id]),
+    ]) {
+      const corrupt = structuredClone(baseline);
+      change(corrupt);
+      assert.throws(() => validateInstructions(corrupt));
+    }
+  },
+);
 const begin = () => ({
   attempt_id: "attempt_" + randomUUID(),
   native_command_id: "cmd_" + randomUUID(),

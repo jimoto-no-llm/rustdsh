@@ -383,6 +383,27 @@
         padding: 10px;
         font: inherit;
       }
+      #instruction-panel form {
+        margin-bottom: 20px;
+      }
+      #instruction-panel label {
+        display: block;
+        margin: 12px 0 6px;
+      }
+      #instruction-panel select {
+        width: 100%;
+        min-width: 0;
+        font: inherit;
+        padding: 8px;
+      }
+      #instruction-panel button {
+        margin: 8px 8px 8px 0;
+      }
+      .instruction-text {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        font: inherit;
+      }
       .error {
         color: var(--red);
         font-size: 13px;
@@ -757,6 +778,17 @@
               <tbody id="tasks"></tbody>
             </table>
           </div>
+        </details>
+        <details class="fold" id="instruction-detail">
+          <summary>同じsessionへ追指示を送る</summary>
+          <h2>追指示と適用タイミング</h2>
+          <p class="sub">
+            下書きはこの端末で保持します。入力は順番に配送し、結果不明の入力がある場合は保留します。指示の保存で新しい実行権限は発行されません。
+          </p>
+          <section
+            id="instruction-panel"
+            aria-label="追指示の投稿と確認"
+          ></section>
         </details>
         <details class="fold" id="reply-detail">
           <summary>回答の保存・適用を確認</summary>

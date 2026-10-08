@@ -5,8 +5,19 @@ import {
   matchProcessIdentity,
   readProcessIdentity,
 } from "./process-identity.mjs";
-import { replyCheck, replyKeys, replyCommand } from "./answer-applications.mjs";
+import {
+  replyCheck,
+  replyKeys,
+  replyCommand,
+  replyMessage,
+} from "./answer-applications.mjs";
 import { feedbackValidity } from "./question-contracts.mjs";
+import {
+  allInputCommands,
+  inputSequence,
+  queueSequence,
+  instructionContext,
+} from "./instruction-queue.mjs";
 
 const equal = (a, b) =>
   typeof a === "string" &&
@@ -155,19 +166,31 @@ export class AnswerApplicationServer {
     const { consumer, credential } = this.authenticate(id, token);
     const state = this.getState(),
       loaded = await this.history();
-    const messages = state.feedback
+    const messages = allInputCommands(state)
       .filter(
-        (message) => message.sequence > after && message.consumer_id === id,
+        (command) =>
+          inputSequence(command) > after && command.consumer_id === id,
       )
-      .map((message) => ({
-        ...feedbackValidity(state, message),
-        application: structuredClone(
-          replyCommand(state, message.reply_command_id, consumer),
-        ),
-      }));
+      .sort((a, b) => inputSequence(a) - inputSequence(b))
+      .map((command) => {
+        const message = replyMessage(state, command);
+        return {
+          ...(command.source_kind === "instruction"
+            ? message
+            : feedbackValidity(state, message)),
+          sequence: inputSequence(command),
+          application: structuredClone(command),
+        };
+      });
     return {
       messages,
-      next_cursor: state.feedback.at(-1)?.sequence || after,
+      next_cursor: Math.max(queueSequence(state), after),
+      controls: Object.values(state.instructions?.requests || {})
+        .filter((r) => r.consumer_id === id && r.control)
+        .map((r) => ({
+          command_id: r.command_id,
+          ...structuredClone(r.control),
+        })),
       target_observation: await this.observe(consumer, loaded, credential),
     };
   }
@@ -207,6 +230,107 @@ export class AnswerApplicationServer {
     )
       return null;
     return { phase: result[0], reason: result[1], at: native.updated_at };
+  }
+  async instructionContext(id) {
+    const result = instructionContext(this.getState(), id);
+    return {
+      ...result,
+      target_observation: await this.observe(
+        result.consumer,
+        await this.history(),
+      ),
+    };
+  }
+  async instruction(input, actor, resolve = false) {
+    const state = this.getState();
+    const id = resolve
+      ? state.instructions?.requests[input.command_id]?.consumer_id
+      : input.consumer_id;
+    const consumer = state.answer_applications?.consumers[id];
+    replyCheck(consumer, "Unknown exact instruction recipient", 400);
+    const observed = await this.observe(consumer, await this.history());
+    return this.mutate(
+      resolve ? "instruction_resolve" : "instruction_submit",
+      input,
+      {
+        actor,
+        available: observed.status === "available",
+        owner_id: observed.owner_id,
+      },
+    );
+  }
+  cancelProof(control, consumer, loaded) {
+    const native = loaded.commands.get(control.native_command_id);
+    if (
+      !native ||
+      native.run_id !== consumer.run_id ||
+      native.operation !== "interrupt" ||
+      native.phase !== "notification_sent" ||
+      Date.parse(native.recorded_at) < Date.parse(control.started_at) ||
+      loaded.tail_bytes ||
+      loaded.runs.get(consumer.run_id)?.native_session_id !==
+        consumer.session_id
+    )
+      return false;
+    const index = loaded.events.findIndex(
+      (e) =>
+        e.type === "command" &&
+        e.data.command_id === control.native_command_id &&
+        e.data.phase === "recorded",
+    );
+    const bound = loaded.events
+      .slice(0, index)
+      .findLast(
+        (e) => e.run_id === consumer.run_id && e.type === "scope_bound",
+      );
+    return index >= 0 && bound?.data.owner_id === control.owner_id;
+  }
+  async control(input, token) {
+    const { consumer, credential } = this.authenticate(
+      input.consumer_id,
+      token,
+    );
+    const request = this.getState().instructions?.requests[input.command_id];
+    replyCheck(
+      request?.consumer_id === consumer.consumer_id && request.control,
+      "Exact interrupt recipient required",
+    );
+    const parent = replyCommand(
+        this.getState(),
+        request.control.target_command_id,
+        consumer,
+      ),
+      loaded = await this.history();
+    const observed = await this.observe(consumer, loaded, credential);
+    const parentProof = this.proof(parent, loaded);
+    if (
+      input.phase === "begin" &&
+      request.control.phase === "pending" &&
+      !parentProof
+    ) {
+      replyCheck(
+        !loaded.commands.has(input.native_command_id),
+        "Native cancel command already exists",
+      );
+      const native = loaded.commands.get(
+        request.control.target_native_command_id,
+      );
+      const last = [...loaded.commands.values()].findLast(
+        (c) => c.run_id === consumer.run_id && c.operation === "send",
+      );
+      replyCheck(
+        native?.phase === "dispatched" &&
+          last?.command_id === native.command_id,
+        "Exact target prompt is not the dispatched native input",
+      );
+    }
+    return this.mutate("control", input, {
+      consumer,
+      owner_id: credential.owner_id,
+      available: observed.status === "available",
+      parent_proof: parentProof,
+      cancel_proof: this.cancelProof(request.control, consumer, loaded),
+    });
   }
   async ack(input, token) {
     replyKeys(input, [

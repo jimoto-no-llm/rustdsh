@@ -192,7 +192,13 @@ if (process.argv.includes("--version")) {
         });
     } else if (msg.method === "session/prompt") {
       if (
-        ["reply_effect", "reply_effect_lost", "reply_refusal"].includes(mode)
+        [
+          "reply_effect",
+          "reply_effect_lost",
+          "reply_refusal",
+          "reply_interrupt",
+          "reply_interrupt_lost",
+        ].includes(mode)
       ) {
         fs.appendFileSync(
           process.env.RDSH_ADAPTER_FIXTURE_REPLY_COUNTER,
@@ -238,7 +244,19 @@ if (process.argv.includes("--version")) {
         });
         return;
       }
-      if (mode === "busy" || mode === "permission" || mode === "filesystem") {
+      if (
+        mode === "busy" ||
+        mode === "permission" ||
+        mode === "filesystem" ||
+        (["reply_interrupt", "reply_interrupt_lost"].includes(mode) &&
+          fs
+            .readFileSync(
+              process.env.RDSH_ADAPTER_FIXTURE_REPLY_COUNTER,
+              "utf8",
+            )
+            .trim()
+            .split("\n").length === 1)
+      ) {
         prompts.set(msg.id, msg.params.sessionId);
         if (mode === "permission" || mode === "filesystem")
           output({
@@ -268,6 +286,10 @@ if (process.argv.includes("--version")) {
       }
       reply(msg.id, fixture.send);
     } else if (msg.method === "session/cancel") {
+      if (mode === "reply_interrupt_lost") {
+        process.exit(9);
+        return;
+      }
       for (const [id, session] of prompts)
         if (session === msg.params.sessionId) {
           reply(id, fixture.interrupt);

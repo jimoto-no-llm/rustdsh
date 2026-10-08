@@ -2,6 +2,7 @@ import { renderQuestionCards } from "./question-cards-ui.mjs";
 import { renderAnswerApplications } from "./answer-applications-ui.mjs";
 import { renderOverview } from "./project-overview.mjs";
 import { renderConnectionDiagnostics } from "./connection-diagnostics-ui.mjs";
+import { createInstructionPanel } from "./instruction-queue-ui.mjs";
 
 const $ = (id) => document.getElementById(id);
 const base = location.pathname.startsWith("/_rdsh") ? "/_rdsh/" : "/";
@@ -110,7 +111,8 @@ function updateOverview(state) {
   const view = renderOverview($("project-overview"), state, selectedTask, node);
   $("quick-context").textContent = view.context;
   $("quick-context").title = view.context;
-  $("quick-pending").textContent = `判断 ${view.pending.length}件`;
+  $("quick-pending").textContent =
+    `判断 ${view.pending.length}件${view.reviews.length ? ` · 追指示 ${view.reviews.length}件` : ""}`;
 }
 $("overview-task").addEventListener("change", (event) => {
   selectedTask = event.target.value;
@@ -137,7 +139,15 @@ $("overview-pending").addEventListener("click", (event) => {
   navigateTo(decodeURIComponent(link.hash.slice(1)));
 });
 $("quick-overview").onclick = () => navigateTo("overview-heading");
-$("quick-pending").onclick = () => navigateTo("pending-heading");
+$("quick-pending").onclick = () => {
+  const view =
+    latestState &&
+    renderOverview($("project-overview"), latestState, selectedTask, node);
+  if (view?.reviews.length && !view.pending.length) {
+    renderInstructions.selectTarget(view.reviews[0].consumer_id);
+    navigateTo("instruction-panel");
+  } else navigateTo("pending-heading");
+};
 $("quick-details").onclick = () => navigateTo("metrics-heading");
 $("quick-stop").onclick = () => navigateTo("overview-stop");
 $("diagnostics-refresh").onclick = async () => {
@@ -156,10 +166,16 @@ $("diagnostics-refresh").onclick = async () => {
     $("diagnostics-refresh").disabled = false;
   }
 };
+const renderInstructions = createInstructionPanel($("instruction-panel"), {
+  node,
+  api,
+  refreshState,
+});
 function render(state) {
   if (state.revision < renderedRevision) return;
   renderedRevision = state.revision;
   latestState = state;
+  renderInstructions(state);
   updateOverview(state);
   const m = state.metrics,
     done = state.tasks.filter((task) => task.status === "done").length,

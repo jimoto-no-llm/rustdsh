@@ -30,15 +30,23 @@ export function overviewModel(state, taskId = "", now = Date.now()) {
   const unassigned = taskId
     ? pendingAll.filter((question) => !questionTask(state, question.id)).length
     : 0;
-  const commands = Object.values(
-    state.answer_applications?.commands || {},
-  ).filter(
+  const reviews = Object.values(state.instructions?.requests || {}).filter(
+    (request) =>
+      request.status === "review_required" &&
+      (!taskId ||
+        state.answer_applications?.consumers[request.consumer_id]?.task_id ===
+          taskId),
+  );
+  const commands = [
+    ...Object.values(state.answer_applications?.commands || {}),
+    ...Object.values(state.instructions?.commands || {}),
+  ].filter(
     (command) =>
       !taskId ||
       state.answer_applications.consumers[command.consumer_id]?.task_id ===
         taskId,
   );
-  // Only the latest reply for each target supplies its current observation.
+  // Only the latest input for each target supplies its current observation.
   const latestTargets = new Map();
   for (const command of commands.sort(
     (a, b) => times(a.saved_at) - times(b.saved_at),
@@ -55,7 +63,7 @@ export function overviewModel(state, taskId = "", now = Date.now()) {
   )[0];
   let execution = "実行状態は未取得";
   if (targets.length)
-    execution = `回答対象: 接続確認 ${live} · 終了観測 ${ended} · 不明 ${unknown}。作業の完了は未確認`;
+    execution = `${commands.some((c) => c.source_kind === "instruction") ? "入力対象" : "回答対象"}: 接続確認 ${live} · 終了観測 ${ended} · 不明 ${unknown}。作業の完了は未確認`;
   const taskReport = taskId
     ? task
       ? `${task.id}: ${taskLabels[task.status] || "未取得"}`
@@ -71,8 +79,13 @@ export function overviewModel(state, taskId = "", now = Date.now()) {
   const results = commands
     .filter((command) => resultNames[command.display_phase])
     .map((command) => ({
-      title: resultNames[command.display_phase],
-      detail: `${command.question_id} · run ${command.run_id}`,
+      title:
+        command.source_kind === "instruction"
+          ? resultNames[command.display_phase]
+              .replace("回答入力", "追指示入力")
+              .replace("回答は", "追指示は")
+          : resultNames[command.display_phase],
+      detail: `${command.question_id || command.command_id} · run ${command.run_id}`,
       at: command.completed_at || command.started_at || command.saved_at,
     }));
   // Legacy progress/artifact reports have no task binding or acceptance proof.
@@ -95,8 +108,9 @@ export function overviewModel(state, taskId = "", now = Date.now()) {
     reportUpdated: `申告更新: ${at(state.updated_at)}`,
     lastResult,
     pending,
+    reviews,
     unassigned,
-    decision: `${pending.length ? `判断待ち ${pending.length} 件` : "この範囲の判断待ちは0件"}${unassigned ? ` · タスク未指定 ${unassigned} 件は全体で確認` : ""}`,
+    decision: `${pending.length ? `判断待ち ${pending.length} 件` : "この範囲の質問の判断待ちは0件"}${reviews.length ? ` · 追指示の確認待ち ${reviews.length} 件` : ""}${unassigned ? ` · タスク未指定 ${unassigned} 件は全体で確認` : ""}`,
     stop: "この画面からの停止は非対応。元のCLIで対象を確認してください",
   };
 }

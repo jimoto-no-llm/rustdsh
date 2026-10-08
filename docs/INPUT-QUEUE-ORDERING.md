@@ -61,9 +61,9 @@ apply. A second scenario reconciles the already-issued first input without
 replay, then permits the second input once; the revised question stays unanswered.
 
 This change covers existing bound reply inputs for an exact registered target.
-Explicit next-turn/steer/interrupt selection, a general PC/phone/management-agent
-instruction submission interface and human review of conflicting instructions
-are subsequent parts of #19. The current adapter still exposes only its
+Explicit next-turn/steer/interrupt selection, general PC/phone/management-agent
+submission and human review are documented in the subsequent
+[follow-up instruction contract](INPUT-INSTRUCTIONS.md). This foundation only exposes the
 verified operations; this change adds no steer call, interruption request,
 execution permission or cross-run alias assumption. The PR references #19
 without closing the full issue.

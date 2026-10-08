@@ -18,6 +18,8 @@ import { AcceptanceStore } from "./acceptance.mjs";
 import { ModelRouting } from "./model-routing.mjs";
 import { requestedSelection, validSelection } from "./model-selection.mjs";
 import { ReplyConsumer } from "./reply-consumer.mjs";
+import { instructionRequest } from "./instruction-client.mjs";
+import { allInputCommands } from "./instruction-queue.mjs";
 import { ProjectStore, publicState } from "./state.mjs";
 import { setTimeout as delay } from "node:timers/promises";
 import { randomUUID } from "node:crypto";
@@ -45,6 +47,8 @@ rdsh-dashboard acceptance define|run|report|inspect --project <directory> --task
 rdsh-dashboard routing bind|inspect|probe|allow-change --project <directory> --run-id <id> [--route-file <json>] [--authorization-file <json>] [--executable <original-dsh>] [--entrypoint <bin.js>]
 rdsh-dashboard session-ledger list|record|resolve|start|resume --project <directory> [--run-id <run_id>] [--task-id <id>] [--session-id <id>] [--label <name>] [--provider <name>] [--cwd <directory>] [--cli <name>] [--executable <original-dsh>] [--entrypoint <bin.js>]
 rdsh-dashboard reply-consumer inspect|once|serve --project <directory> [--run-id <run_id>] [--command-id <reply_id>] [--executable <original-dsh>] [--entrypoint <bin.js>]
+rdsh-dashboard instruction context --project <directory> --consumer-id <consumer_id>
+rdsh-dashboard instruction submit|resolve --project <directory> --input-file <json>
 
 Project mode: project metrics, tasks, questions, human feedback, and /mcp.
 Harness mode: a separate managed DeepSeek Harness Web UI and QR landing page.
@@ -94,6 +98,8 @@ const { values, positionals } = parseArgs({
     "route-file": { type: "string" },
     "authorization-file": { type: "string" },
     "command-id": { type: "string" },
+    "consumer-id": { type: "string" },
+    "input-file": { type: "string" },
     help: { type: "boolean", short: "h" },
   },
 });
@@ -184,6 +190,28 @@ try {
     throw new Error("Model route options require routing");
   if (values.help || !command) {
     console.log(help);
+  } else if (command === "instruction") {
+    const action = positionals[1],
+      allowed = new Set(["project", "consumer-id", "input-file", "help"]);
+    if (
+      positionals.length !== 2 ||
+      !["context", "submit", "resolve"].includes(action) ||
+      Object.keys(values).some((key) => !allowed.has(key)) ||
+      (action === "context"
+        ? !values["consumer-id"] || values["input-file"]
+        : !values["input-file"] || values["consumer-id"])
+    )
+      throw new Error(
+        "Instruction context requires --consumer-id; submit/resolve requires --input-file",
+      );
+    const project = await identity(values.project || process.cwd());
+    const input =
+      action === "context"
+        ? { consumer_id: values["consumer-id"] }
+        : await localJson(values["input-file"]);
+    console.log(
+      JSON.stringify(await instructionRequest(project, action, input), null, 2),
+    );
   } else if (command === "reply-consumer") {
     const action = positionals[1];
     const allowed = new Set([
@@ -207,9 +235,7 @@ try {
       if (values.executable || values.entrypoint)
         throw new Error("Reply inspection never launches a CLI");
       const state = publicState((await ProjectStore.open(project)).value);
-      const commands = Object.values(
-        state.answer_applications?.commands || {},
-      ).filter(
+      const commands = allInputCommands(state).filter(
         (item) =>
           (!values["run-id"] || item.run_id === values["run-id"]) &&
           (!values["command-id"] || item.command_id === values["command-id"]),

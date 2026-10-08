@@ -12,6 +12,46 @@ const state = () => ({
   questions: [],
   events: [],
 });
+test("follow-up review counts and a newer unknown instruction remain visible in the task overview", () => {
+  const s = state();
+  s.answer_applications = {
+    consumers: { C1: { task_id: "T1" }, C2: { task_id: "T2" } },
+    commands: {
+      R1: {
+        consumer_id: "C1",
+        display_phase: "succeeded",
+        question_id: "Q1",
+        run_id: "run1",
+        saved_at: "2026-10-06T00:00:00Z",
+        completed_at: "2026-10-06T00:01:00Z",
+        target_observation: { status: "available" },
+      },
+    },
+  };
+  s.instructions = {
+    requests: {
+      I1: { consumer_id: "C1", status: "review_required" },
+      I2: { consumer_id: "C2", status: "review_required" },
+    },
+    commands: {
+      I3: {
+        source_kind: "instruction",
+        command_id: "I3",
+        consumer_id: "C1",
+        display_phase: "unknown",
+        run_id: "run1",
+        saved_at: "2026-10-06T00:03:00Z",
+        target_observation: { status: "unknown" },
+      },
+    },
+  };
+  const view = overviewModel(s, "T1");
+  assert.equal(view.reviews.length, 1);
+  assert.match(view.decision, /追指示の確認待ち 1/);
+  assert.match(view.lastResult.title, /追指示入力の結果は不明/);
+  assert.match(view.execution, /入力対象.*不明 1/);
+  assert.equal(overviewModel(s).reviews.length, 2);
+});
 test("task completion reports and saved/delivered answers never become native success or live state", () => {
   const s = state();
   s.answer_applications = {

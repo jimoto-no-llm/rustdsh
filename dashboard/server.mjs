@@ -326,6 +326,8 @@ export async function startDashboard(options) {
       const agentRoute =
         route === "/mcp" ||
         route === "/api/state" ||
+        route === "/api/instructions/context" ||
+        (req.method === "POST" && route === "/api/instructions/submit") ||
         (req.method === "POST" &&
           ["metrics", "task", "question", "event"].some(
             (operation) => route === `/api/update/${operation}`,
@@ -357,7 +359,8 @@ export async function startDashboard(options) {
       const consumerRoute =
         kind === "project" &&
         ((req.method === "GET" && route === "/api/replies/read") ||
-          (req.method === "POST" && route === "/api/replies/ack"));
+          (req.method === "POST" &&
+            ["/api/replies/ack", "/api/replies/control"].includes(route)));
       const consumerToken = req.headers["x-rdsh-consumer-token"];
       const publicAsset =
         kind === "project" &&
@@ -367,7 +370,8 @@ export async function startDashboard(options) {
           route === "/question-cards-ui.mjs" ||
           route === "/project-overview.mjs" ||
           route === "/connection-diagnostics-ui.mjs" ||
-          route === "/answer-applications-ui.mjs");
+          route === "/answer-applications-ui.mjs" ||
+          route === "/instruction-queue-ui.mjs");
       if (
         !publicAsset &&
         !adminAuthorized &&
@@ -439,6 +443,7 @@ export async function startDashboard(options) {
           "/project-overview.mjs",
           "/connection-diagnostics-ui.mjs",
           "/answer-applications-ui.mjs",
+          "/instruction-queue-ui.mjs",
         ].includes(route)
       ) {
         res.writeHead(200, {
@@ -479,6 +484,37 @@ export async function startDashboard(options) {
         return res.end(svg);
       }
       if (kind === "project") {
+        if (req.method === "GET" && route === "/api/instructions/context")
+          return json(
+            res,
+            200,
+            await applications.instructionContext(
+              url.searchParams.get("consumer_id"),
+            ),
+          );
+        if (
+          req.method === "POST" &&
+          ["/api/instructions/submit", "/api/instructions/resolve"].includes(
+            route,
+          )
+        ) {
+          const resolve = route.endsWith("/resolve");
+          if (resolve && !humanAuthorized && !adminAuthorized)
+            return json(res, 403, { error: "Human confirmation required" });
+          return json(
+            res,
+            200,
+            await applications.instruction(
+              await readBody(req),
+              adminAuthorized
+                ? "administrator"
+                : mcpAuthorized
+                  ? "management_agent"
+                  : "human",
+              resolve,
+            ),
+          );
+        }
         if (req.method === "POST" && route === "/api/replies/register") {
           if (!adminAuthorized)
             return json(res, 403, {
@@ -508,7 +544,9 @@ export async function startDashboard(options) {
           return json(
             res,
             200,
-            await applications.ack(await readBody(req), consumerToken),
+            route.endsWith("/control")
+              ? await applications.control(await readBody(req), consumerToken)
+              : await applications.ack(await readBody(req), consumerToken),
           );
         }
         if (req.method === "POST" && route === "/api/decision/cancel") {

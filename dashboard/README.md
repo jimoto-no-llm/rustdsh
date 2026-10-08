@@ -7,6 +7,10 @@ and isolated lifecycle smoke without provider credentials or model requests.
 [Persistent session ledger](../docs/SESSION-LEDGER.md): distinct project, run,
 task and native CLI IDs, with exact run resolution after client restart.
 
+[Follow-up instructions](../docs/INPUT-INSTRUCTIONS.md): exact-session browser/CLI
+submission, preserved drafts, shared input ordering, human conflict review,
+explicit interruption with native proof, and honest unsupported-steer fallback.
+
 [Task preflight](../docs/TASK-PREFLIGHT.md) checks the required CLI, cwd, disk,
 port, dependencies, GPU/WSL and selected authentication before an ACP session.
 

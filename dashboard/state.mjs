@@ -16,7 +16,16 @@ import {
   applyReplyAck,
   publicAnswerApplications,
   validateAnswerApplications,
+  replyQueueBlocker,
+  replyQueueIndex,
 } from "./answer-applications.mjs";
+import {
+  submitInstruction,
+  resolveInstruction,
+  applyInstructionControl,
+  validateInstructions,
+  queueRevision,
+} from "./instruction-queue.mjs";
 
 // Bucket D display notes (no schema change; schema stays 1):
 // #12 task contract, #13 review inbox, #14 outcome cards, #15 dependencies.
@@ -100,20 +109,27 @@ export class ProjectStore {
       );
     validateQuestionContracts(value);
     validateAnswerApplications(value);
+    validateInstructions(value);
     return new ProjectStore(project, value);
   }
   async mutate(operation, input) {
     const next = structuredClone(this.value);
     applyOperation(next, operation, input);
+    validateInstructions(next);
     return this.commit(next, operation, input);
   }
   async mutateReply(operation, input, context) {
     const next = structuredClone(this.value);
-    const result =
-      operation === "register"
-        ? registerReplyConsumer(next, input)
-        : applyReplyAck(next, input, context);
+    const handlers = {
+      register: registerReplyConsumer,
+      ack: applyReplyAck,
+      instruction_submit: submitInstruction,
+      instruction_resolve: resolveInstruction,
+      control: applyInstructionControl,
+    };
+    const result = handlers[operation](next, input, context);
     validateAnswerApplications(next);
+    validateInstructions(next);
     await this.commit(next);
     return structuredClone(result);
   }
@@ -156,6 +172,36 @@ export class ProjectStore {
 }
 export function publicState(value, observations, deliveries) {
   const { changes, ...visible } = value;
+  visible.input_queue_revision = queueRevision(value);
+  if (visible.instructions) {
+    visible.instructions = structuredClone(visible.instructions);
+    const queueIndex = replyQueueIndex(value);
+    for (const command of Object.values(visible.instructions.commands)) {
+      const observation = observations?.[command.consumer_id] || {
+        status: "unknown",
+        reason: "live_consumer_not_observed",
+        observed_at: null,
+        owner_id: null,
+      };
+      command.target_observation = observation;
+      command.display_phase =
+        command.phase === "started" &&
+        (observation.status !== "available" ||
+          observation.owner_id !== command.attempt_owner_id)
+          ? "unknown"
+          : ["saved", "read"].includes(command.phase) &&
+              observation.status === "unavailable"
+            ? "unapplied"
+            : command.phase;
+      command.execution_authorized = false;
+      const blocker = ["saved", "read"].includes(command.phase)
+        ? replyQueueBlocker(value, command, queueIndex)
+        : null;
+      command.queue_blocker = blocker
+        ? { command_id: blocker.command_id, phase: blocker.phase }
+        : null;
+    }
+  }
   const contracts = publicQuestionContracts(value);
   const applications = publicAnswerApplications(
     value,
