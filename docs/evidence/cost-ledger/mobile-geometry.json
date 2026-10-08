@@ -1,0 +1,36 @@
+{
+  "cards": [
+    {
+      "scrollWidth": 345,
+      "width": 347
+    },
+    {
+      "scrollWidth": 345,
+      "width": 347
+    },
+    {
+      "scrollWidth": 345,
+      "width": 347
+    },
+    {
+      "scrollWidth": 345,
+      "width": 347
+    }
+  ],
+  "document": {
+    "clientWidth": 375,
+    "scrollWidth": 375
+  },
+  "requested": {
+    "height": 844,
+    "width": 390
+  },
+  "select": {
+    "height": 44,
+    "width": 347
+  },
+  "viewport": {
+    "height": 844,
+    "width": 390
+  }
+}

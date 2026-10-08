@@ -19,6 +19,7 @@ import { ModelRouting } from "./model-routing.mjs";
 import { requestedSelection, validSelection } from "./model-selection.mjs";
 import { ReplyConsumer } from "./reply-consumer.mjs";
 import { instructionRequest } from "./instruction-client.mjs";
+import { costRequest } from "./cost-client.mjs";
 import { allInputCommands } from "./instruction-queue.mjs";
 import { ProjectStore, publicState } from "./state.mjs";
 import { setTimeout as delay } from "node:timers/promises";
@@ -49,6 +50,8 @@ rdsh-dashboard session-ledger list|record|resolve|start|resume --project <direct
 rdsh-dashboard reply-consumer inspect|once|serve --project <directory> [--run-id <run_id>] [--command-id <reply_id>] [--executable <original-dsh>] [--entrypoint <bin.js>]
 rdsh-dashboard instruction context --project <directory> --consumer-id <consumer_id>
 rdsh-dashboard instruction submit|resolve --project <directory> --input-file <json>
+rdsh-dashboard cost-ledger declare|report --project <directory> --input-file <json>
+rdsh-dashboard cost-ledger inspect --project <directory>
 
 Project mode: project metrics, tasks, questions, human feedback, and /mcp.
 Harness mode: a separate managed DeepSeek Harness Web UI and QR landing page.
@@ -190,6 +193,34 @@ try {
     throw new Error("Model route options require routing");
   if (values.help || !command) {
     console.log(help);
+  } else if (command === "cost-ledger") {
+    const action = positionals[1],
+      allowed = new Set(["project", "input-file", "help"]);
+    if (
+      positionals.length !== 2 ||
+      !["declare", "report", "inspect"].includes(action) ||
+      Object.keys(values).some((key) => !allowed.has(key)) ||
+      (action === "inspect"
+        ? values["input-file"] !== undefined
+        : !values["input-file"])
+    )
+      throw new Error(
+        "Cost ledger declare/report requires --input-file; inspect takes no input file",
+      );
+    const project = await identity(values.project || process.cwd());
+    console.log(
+      JSON.stringify(
+        await costRequest(
+          project,
+          action,
+          action === "inspect"
+            ? undefined
+            : await localJson(values["input-file"]),
+        ),
+        null,
+        2,
+      ),
+    );
   } else if (command === "instruction") {
     const action = positionals[1],
       allowed = new Set(["project", "consumer-id", "input-file", "help"]);

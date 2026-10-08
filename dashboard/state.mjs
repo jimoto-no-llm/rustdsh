@@ -26,6 +26,12 @@ import {
   validateInstructions,
   queueRevision,
 } from "./instruction-queue.mjs";
+import {
+  declareCostScope,
+  recordCostReport,
+  validateCostLedger,
+  publicCostLedger,
+} from "./cost-ledger.mjs";
 
 // Bucket D display notes (no schema change; schema stays 1):
 // #12 task contract, #13 review inbox, #14 outcome cards, #15 dependencies.
@@ -110,12 +116,14 @@ export class ProjectStore {
     validateQuestionContracts(value);
     validateAnswerApplications(value);
     validateInstructions(value);
+    validateCostLedger(value);
     return new ProjectStore(project, value);
   }
   async mutate(operation, input) {
     const next = structuredClone(this.value);
     applyOperation(next, operation, input);
     validateInstructions(next);
+    validateCostLedger(next);
     return this.commit(next, operation, input);
   }
   async mutateReply(operation, input, context) {
@@ -172,6 +180,7 @@ export class ProjectStore {
 }
 export function publicState(value, observations, deliveries) {
   const { changes, ...visible } = value;
+  if (value.cost_ledger) visible.cost_ledger = publicCostLedger(value);
   visible.input_queue_revision = queueRevision(value);
   if (visible.instructions) {
     visible.instructions = structuredClone(visible.instructions);
@@ -239,7 +248,9 @@ export function applyOperation(state, operation, input) {
     case "metrics": {
       if (
         Object.keys(input).some(
-          (key) => !metricNames.includes(key) && key !== "session_id",
+          (key) =>
+            !metricNames.includes(key) &&
+            !["session_id", "cost_scope", "cost_report"].includes(key),
         )
       )
         throw new Error("Unknown metric");
@@ -271,6 +282,8 @@ export function applyOperation(state, operation, input) {
         m.tool_errors > m.tool_calls
       )
         throw new Error("Tool errors exceed tool calls");
+      if ("cost_scope" in input) declareCostScope(state, input.cost_scope);
+      if ("cost_report" in input) recordCostReport(state, input.cost_report);
       break;
     }
     case "task": {

@@ -179,13 +179,22 @@ Webhook delivery and cursor reads remain separate from application evidence.
 This is an opt-in input channel under the session's existing permissions.
 
 Unknown metrics display **未取得**. This component does not scrape billing,
-estimate spend, or infer context loss. Report measured values using:
+calculate spend, or infer context loss. Report measured values using:
 `total_cost_usd`, `total_budget_usd`, `session_cost_usd`, `session_budget_usd`,
 `session_id`, `input_tokens`, `cached_input_tokens`, `model_calls`, `tool_calls`,
 `tool_errors`, `context_misses`, `auto_continues`, `refusals`, `api_errors`.
 Omitted fields retain their previous value; `null` clears a numeric field.
 Cache read percentage is cached input tokens / input tokens. Tool error rate is
-tool errors / tool calls. Costs are reported API-equivalent values, not invoices.
+tool errors / tool calls. Legacy numeric costs are reported API-equivalent values.
+Optional [source-aware cost ledger inputs](../docs/COST-LEDGER.md) on the same
+metrics tool declare a period and expected workers/sessions, then record stable
+event IDs and event/cumulative sequences. Provider usage, CLI reports, explicit
+external API estimates and invoice reports remain separate by source/currency.
+Duplicate observations do not add costs; missing workers/costs stay unknown and
+partial. The folded metrics section shows each amount's provenance and history.
+`cost-ledger declare|report|inspect` uses the existing authenticated reporting
+endpoint; browser credentials are read-only for these inputs. No prices are
+looked up and legacy numeric costs are not merged with this optional ledger.
 
 Artifact references are displayed as text. Local file contents are never opened
 or served. Treat all user-authored questions, answers, progress, and paths as data.

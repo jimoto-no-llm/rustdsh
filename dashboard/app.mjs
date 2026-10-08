@@ -3,6 +3,7 @@ import { renderAnswerApplications } from "./answer-applications-ui.mjs";
 import { renderOverview } from "./project-overview.mjs";
 import { renderConnectionDiagnostics } from "./connection-diagnostics-ui.mjs";
 import { createInstructionPanel } from "./instruction-queue-ui.mjs";
+import { createCostPanel } from "./cost-ledger-ui.mjs";
 
 const $ = (id) => document.getElementById(id);
 const base = location.pathname.startsWith("/_rdsh") ? "/_rdsh/" : "/";
@@ -171,11 +172,13 @@ const renderInstructions = createInstructionPanel($("instruction-panel"), {
   api,
   refreshState,
 });
+const renderCosts = createCostPanel($("cost-ledger"), node);
 function render(state) {
   if (state.revision < renderedRevision) return;
   renderedRevision = state.revision;
   latestState = state;
   renderInstructions(state);
+  renderCosts(state);
   updateOverview(state);
   const m = state.metrics,
     done = state.tasks.filter((task) => task.status === "done").length,
@@ -196,11 +199,11 @@ function render(state) {
     .join(" · ");
   $("cards").replaceChildren(
     card(
-      "費用（API換算、累計）",
+      "従来の累計報告（API換算）",
       money(m.total_cost_usd),
       m.total_budget_usd == null
-        ? "上限 未設定"
-        : "上限 " + money(m.total_budget_usd),
+        ? "台帳とは別の入力 · 上限 未設定"
+        : "台帳とは別の入力 · 上限 " + money(m.total_budget_usd),
       ratio(m.total_cost_usd, m.total_budget_usd),
     ),
     card(
@@ -317,7 +320,7 @@ function render(state) {
   );
   $("connection").textContent = "接続済み · プロジェクト専用";
   $("updated").textContent =
-    `最終更新: ${state.updated_at ? new Date(state.updated_at).toLocaleString("ja-JP") : "まだ報告がありません"} · 未取得の指標はMCPから報告されたときに表示されます。費用は報告元のAPI換算値です。`;
+    `最終更新: ${state.updated_at ? new Date(state.updated_at).toLocaleString("ja-JP") : "まだ報告がありません"} · 未取得の指標はMCPから報告されたときに表示されます。累計欄は報告元のAPI換算値です。台帳は出所ごとの報告値です。`;
 }
 async function refreshState() {
   try {

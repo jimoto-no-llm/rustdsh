@@ -371,7 +371,8 @@ export async function startDashboard(options) {
           route === "/project-overview.mjs" ||
           route === "/connection-diagnostics-ui.mjs" ||
           route === "/answer-applications-ui.mjs" ||
-          route === "/instruction-queue-ui.mjs");
+          route === "/instruction-queue-ui.mjs" ||
+          route === "/cost-ledger-ui.mjs");
       if (
         !publicAsset &&
         !adminAuthorized &&
@@ -444,6 +445,7 @@ export async function startDashboard(options) {
           "/connection-diagnostics-ui.mjs",
           "/answer-applications-ui.mjs",
           "/instruction-queue-ui.mjs",
+          "/cost-ledger-ui.mjs",
         ].includes(route)
       ) {
         res.writeHead(200, {

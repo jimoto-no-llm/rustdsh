@@ -12,6 +12,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { metricNames } from "./state.mjs";
 import { feedbackValidity } from "./question-contracts.mjs";
+import { costScopeSchema, costReportSchema } from "./cost-ledger.mjs";
 
 // Bucket E (MCP) diagnostics — Issues #76-#79:
 // Exposure control (#76), remote OAuth (#77), single-screen server
@@ -70,7 +71,7 @@ export const tools = [
   {
     name: "dashboard_update_metrics",
     description:
-      "Replace reported project metrics with measured values. Omit unknown metrics; never estimate costs or cache/error rates from unrelated data. Counters are cumulative snapshots, not increments.",
+      "Replace reported project metrics with measured values. Counters are cumulative snapshots, not increments. Optional cost_scope declares an immutable period and expected workers/sessions; cost_report records a source-labelled observation with stable event ID and sequence. Repeat IDs never add costs. Report an API estimate only with explicit external calculation basis; unknown costs remain null. Provider/CLI reports, estimates and invoices remain separate.",
     inputSchema: object(
       Object.fromEntries([
         ...metricNames.map((name) => [
@@ -78,6 +79,8 @@ export const tools = [
           { type: ["number", "null"], minimum: 0 },
         ]),
         ["session_id", string],
+        ["cost_scope", costScopeSchema],
+        ["cost_report", costReportSchema],
       ]),
     ),
   },
@@ -137,7 +140,7 @@ export const tools = [
   {
     name: "dashboard_get_state",
     description:
-      "Read this project’s metrics, tasks, questions, and recent events.",
+      "Read this project’s metrics, tasks, questions, recent events and optional source-aware cost ledger. Ledger totals are per declared period/source/currency; missing workers remain unknown and invoice amounts are never used to correct estimates.",
     inputSchema: object({}),
   },
 ];
