@@ -329,7 +329,7 @@ before/after output checks are described in [BENCHMARKS.md](docs/BENCHMARKS.md).
 ## Community
 
 - Start with [CONTRIBUTING.md](CONTRIBUTING.md) (4-line PRs, screenshot rules).
-- Bugs and ideas: [issue forms](https://github.com/sahenjp/rustdsh/issues/new/choose) (Japanese OK).
+- Bugs and ideas: [issue forms](https://github.com/jimoto-no-llm/rustdsh/issues/new/choose) (Japanese OK).
 - Questions: [Issues](https://github.com/sahenjp/rustdsh/issues).
 - Security: never file public issues — see [SECURITY.md](SECURITY.md).
 - Design docs: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) ·
