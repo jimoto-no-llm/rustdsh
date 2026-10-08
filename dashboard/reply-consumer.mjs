@@ -91,8 +91,18 @@ export class ReplyConsumer {
       "Answer targets a different native session",
     );
     const id = message.reply_command_id;
-    if (message.contract_validity !== "current")
+    if (message.contract_validity !== "current") {
+      if (["started", "unknown"].includes(message.application.phase)) {
+        const result = await this.ack(id, "reconcile");
+        return {
+          ...result.command,
+          phase: finalReplyPhases.includes(result.command.phase)
+            ? "invalidated"
+            : "unknown",
+        };
+      }
       return { command_id: id, phase: "invalidated" };
+    }
     if (
       ["started", "unknown", ...finalReplyPhases].includes(
         message.application.phase,
@@ -125,6 +135,13 @@ export class ReplyConsumer {
       };
     }
     if (!claim.claimed) {
+      if (claim.waiting_for)
+        return {
+          command_id: id,
+          phase: "queued",
+          waiting_for: claim.waiting_for,
+          result_reason: claim.reason,
+        };
       const result = await this.ack(id, "reconcile");
       return {
         ...result.command,
@@ -166,8 +183,9 @@ export class ReplyConsumer {
         phase: applied.phase,
         native_command_id: applied.native_command_id || null,
         result_reason: applied.result_reason || null,
+        ...(applied.waiting_for ? { waiting_for: applied.waiting_for } : {}),
       });
-      if (applied.phase === "unknown")
+      if (["unknown", "queued"].includes(applied.phase))
         return { processed, next_cursor: this.cursor, blocked: true };
       this.cursor = message.sequence;
     }

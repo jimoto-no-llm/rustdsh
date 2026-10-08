@@ -151,6 +151,25 @@ export function replyMessage(state, command) {
     (message) => message.sequence === command.feedback_sequence,
   );
 }
+// A late cursor or a second caller cannot bypass an earlier instruction.
+// Started/unknown attempts block the target even if their question was revised:
+// changing the question is not proof that its native effect did not occur.
+export function replyQueueBlocker(state, command) {
+  return (
+    Object.values(state.answer_applications?.commands || {})
+      .filter(
+        (item) =>
+          item.consumer_id === command.consumer_id &&
+          item.command_id !== command.command_id &&
+          (["started", "unknown"].includes(item.phase) ||
+            (item.feedback_sequence < command.feedback_sequence &&
+              ["saved", "read"].includes(item.phase) &&
+              feedbackValidity(state, replyMessage(state, item))
+                .contract_validity === "current")),
+      )
+      .sort((a, b) => a.feedback_sequence - b.feedback_sequence)[0] || null
+  );
+}
 export function applyReplyAck(state, input, context) {
   const command = replyCommand(state, input.command_id, context.consumer);
   const now = new Date().toISOString();
@@ -181,6 +200,19 @@ export function applyReplyAck(state, input, context) {
         .contract_validity === "current",
       "Answer revision is invalidated; application blocked",
     );
+    const blocker = replyQueueBlocker(state, command);
+    if (blocker)
+      return {
+        claimed: false,
+        command,
+        waiting_for: blocker.command_id,
+        reason:
+          blocker.phase === "unknown"
+            ? "earlier_result_unknown"
+            : blocker.phase === "started"
+              ? "target_input_active"
+              : "earlier_input_pending",
+      };
     replyCheck(
       !Object.values(state.answer_applications.commands).some(
         (item) => item.native_command_id === input.native_command_id,

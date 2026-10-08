@@ -222,6 +222,86 @@ const begin = () => ({
 });
 
 test(
+  "late cursors and simultaneous callers cannot bypass earlier or uncertain inputs to the same native target",
+  options,
+  async (t) => {
+    const f = await setup(t),
+      attached = await f.attach(),
+      client = await f.client(attached);
+    for (const id of ["Q1", "Q2"]) {
+      await f.ask(id, client);
+      await f.answer(
+        id,
+        id === "Q1"
+          ? "先にテストを確認してください"
+          : "その後で修正してください",
+      );
+    }
+    const messages = (await client.read(0)).messages;
+    const later = await client.apply(messages[1]);
+    assert.equal(later.phase, "queued");
+    assert.equal(later.waiting_for, messages[0].reply_command_id);
+    assert.equal(later.result_reason, "earlier_input_pending");
+    assert.equal(await f.effects(), 0);
+    assert.equal((await client.apply(messages[0])).phase, "succeeded");
+    assert.equal((await client.apply(messages[1])).phase, "succeeded");
+    assert.equal(await f.effects(), 2);
+    assert.equal((await client.apply(messages[1])).phase, "succeeded");
+    assert.equal(
+      await f.effects(),
+      2,
+      "A duplicate late apply never sends twice",
+    );
+    const decision = await f.ask("Q3", client);
+    await f.answer("Q3");
+    await f.ask("Q4", client);
+    await f.answer("Q4");
+    const pending = (await client.read(messages[1].sequence)).messages,
+      attempt = begin();
+    await client.ack(pending[0].reply_command_id, "read");
+    assert.equal(
+      (await client.ack(pending[0].reply_command_id, "begin", attempt)).claimed,
+      true,
+    );
+    let blocked = await client.apply(pending[1]);
+    assert.equal(blocked.phase, "queued");
+    assert.equal(blocked.result_reason, "target_input_active");
+    await client.ack(pending[0].reply_command_id, "unknown", {
+      attempt_id: attempt.attempt_id,
+    });
+    assert.equal(
+      (
+        await f.post(
+          "update/question",
+          {
+            id: "Q3",
+            action: "revise",
+            expected_revision: 1,
+            question: "条件を変更したので確認してください",
+            decision: {
+              ...decision,
+              target: { ...decision.target, revision: "input-v2" },
+            },
+          },
+          "mcp",
+        )
+      ).status,
+      200,
+    );
+    blocked = await client.apply(pending[1]);
+    assert.equal(blocked.phase, "queued");
+    assert.equal(blocked.result_reason, "earlier_result_unknown");
+    const output = await client.poll();
+    assert.equal(output.blocked, true);
+    assert.equal(
+      await f.effects(),
+      2,
+      "A revised question cannot authorize bypassing an uncertain native effect",
+    );
+  },
+);
+
+test(
   "saved, webhook delivered, cursor GET, target read, begin and correlated ACP result stay separate",
   options,
   async (t) => {
@@ -284,6 +364,71 @@ test(
     assert.ok(
       !bytes.includes(client.token) &&
         !bytes.includes("fixture-secret-must-not-be-saved"),
+    );
+  },
+);
+
+test(
+  "an invalidated input may reconcile its already-issued native result without replaying or changing the new question",
+  options,
+  async (t) => {
+    const f = await setup(t),
+      attached = await f.attach(),
+      client = await f.client(attached);
+    const decision = await f.ask("Q1", client);
+    await f.answer("Q1");
+    await f.ask("Q2", client);
+    await f.answer("Q2");
+    const messages = (await client.read(0)).messages,
+      attempt = begin();
+    await client.ack(messages[0].reply_command_id, "read");
+    assert.equal(
+      (await client.ack(messages[0].reply_command_id, "begin", attempt))
+        .claimed,
+      true,
+    );
+    await attached.adapter.send(
+      client.consumer.session_id,
+      replyPrompt(messages[0], client.consumer),
+      { command_id: attempt.native_command_id },
+    );
+    await client.ack(messages[0].reply_command_id, "unknown", {
+      attempt_id: attempt.attempt_id,
+    });
+    assert.equal(
+      (
+        await f.post(
+          "update/question",
+          {
+            id: "Q1",
+            action: "revise",
+            expected_revision: 1,
+            question: "変更した対象を再確認してください",
+            decision: {
+              ...decision,
+              target: { ...decision.target, revision: "input-v2" },
+            },
+          },
+          "mcp",
+        )
+      ).status,
+      200,
+    );
+    const current = (await client.read(0)).messages;
+    assert.equal(current[0].contract_validity, "invalidated");
+    const reconciliation = await client.apply(current[0]);
+    assert.equal(reconciliation.phase, "invalidated");
+    assert.equal(command(await f.state(), messages[0]).phase, "succeeded");
+    assert.equal(
+      f.server.store.value.questions.find((q) => q.id === "Q1").answer,
+      null,
+    );
+    assert.equal((await client.apply(current[1])).phase, "succeeded");
+    assert.equal(await f.effects(), 2);
+    assert.equal(
+      (await f.trace()).filter((event) => event.method === "session/prompt")
+        .length,
+      2,
     );
   },
 );
