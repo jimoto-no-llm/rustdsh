@@ -97,8 +97,28 @@ async function setup(t, webhook = false) {
   };
   await start();
   t.after(async () => {
-    for (const attached of attachedRuns) await attached.adapter.stop();
-    for (const owned of servers) await owned.close();
+    const failures = [];
+    for (const attached of attachedRuns) {
+      try {
+        await attached.adapter.stop();
+      } catch (error) {
+        failures.push(error);
+      }
+    }
+    // A failed stop assertion must not leave HTTP listeners holding the test
+    // worker open. Preserve its fixture files and every original failure.
+    for (const owned of servers) {
+      try {
+        await owned.close();
+      } catch (error) {
+        failures.push(error);
+      }
+    }
+    if (failures.length)
+      throw new AggregateError(
+        failures,
+        `fixture_cleanup_unconfirmed: ${failures.map((error) => error.cause?.code || error.code || error.name).join(", ")}`,
+      );
     assert.equal(path.dirname(path.resolve(root)), path.resolve(os.tmpdir()));
     assert.ok(path.basename(root).startsWith("rdsh-reply-test-"));
     await fs.rm(root, { recursive: true });

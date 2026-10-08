@@ -32,7 +32,7 @@ Unsupported/missing inventory and `N/A` stay unknown and block GPU admission.
   memory. Exit code **75** means temporary admission wait. No ACP/version probe,
   reply claim or native session creation occurs in this path.
 - For an initial wait, explicitly run `session-ledger retry-start --project ...
-  --run-id <reported-run-id> --executable ... --entrypoint ...` after capacity
+--run-id <reported-run-id> --executable ... --entrypoint ...` after capacity
   changes. Only the same never-dispatched GPU run with no native ID, process,
   scope or commands can use this action. It performs one admission attempt and
   one original `start`, without an automatic launch loop. Existing native
@@ -60,7 +60,9 @@ per-process VRAM when WDDM reports `N/A`. A shared request must fit this remaind
 An exclusive request conflicts with **every** held lease on that UUID; a shared
 request conflicts with an exclusive lease. Different state homes, unmanaged
 applications and other OS users do not participate. This is a cooperative start
-gate and environment selector, not a driver quota or a guarantee that VRAM stays
+gate within one operating system; sharing its ledger across Windows/WSL or a
+network filesystem is unsupported because the lock primitives differ. It is a
+start gate and environment selector, not a driver quota or a guarantee that VRAM stays
 free after admission. The existing GPU preflight remains a check without a lease.
 
 The live controller heartbeats every 10 seconds; expiry is 30 seconds and never
