@@ -62,6 +62,32 @@ cp "$BIN" $SB/bin/dsh
 if PATH="$SB/bin:$SB/orig:$PATH" DSH_ORIG_BIN="$SB/orig/dsh" $SB/bin/dsh --version | grep -q FAKE-ORIG; then ok "dsh-mode delegates"; else echo "FAIL: dsh-mode delegates"; exit 1; fi
 if PATH="$SB/bin:$SB/orig:$PATH" DSH_ORIG_BIN="$SB/orig/dsh" $SB/bin/dsh doctor | grep -q rdsh; then ok "dsh-mode native"; else echo "FAIL: dsh-mode native"; exit 1; fi
 if PATH="$SB/bin:$SB/orig:$PATH" RDSH_ORIG_BIN="$SB/orig/dsh" $SB/bin/dsh --version | grep -q FAKE-ORIG; then ok "RDSH_ORIG_BIN primary"; else echo "FAIL: RDSH_ORIG_BIN primary"; exit 1; fi
+# --- sessions --tokens cache: a `?` from a zstd-less run must not stick once zstd exists ---
+# p (two sessions) takes the batch path, q (one session) the per-session path.
+ZC=/tmp/rdsh-zcache-$$
+mkdir -p "$ZC/dsh/sessions/p/s1" "$ZC/dsh/sessions/p/s2" "$ZC/dsh/sessions/q/s2" "$ZC/nozstd" "$ZC/ok" "$ZC/bad" "$ZC/cache"
+{ printf '\050\265\057\375\040\310\101\006\000'; head -c 200 /dev/zero; } > "$ZC/dsh/sessions/p/s1/a.zstd"
+for d in p q; do { printf '\050\265\057\375\000\000\041\000\000'; printf 'abcd'; } > "$ZC/dsh/sessions/$d/s2/a.zstd"; done
+# ok: a working zstd for the 4-byte raw block; bad: present but `-dc` fails.
+printf '#!/bin/sh\ncase "$1" in --version) exit 0 ;; -dc) printf abcd; exit 0 ;; esac\nexit 1\n' > "$ZC/ok/zstd"
+printf '#!/bin/sh\ncase "$1" in --version) exit 0 ;; esac\nexit 1\n' > "$ZC/bad/zstd"
+chmod +x "$ZC/ok/zstd" "$ZC/bad/zstd"
+zc() { PATH="$1" XDG_CACHE_HOME="$ZC/cache" DSH_HOME="$ZC/dsh" $BIN sessions --tokens --project "$2" --limit 5 > "$ZC/out" 2> "$ZC/err"; }
+for d in p q; do
+  zc "$ZC/nozstd" $d
+  if grep "$d/s2" "$ZC/out" | grep -q "?"; then ok "tokens cache: $d/s2 is ? without zstd"; else echo "FAIL(output): $d/s2 without zstd"; cat "$ZC/out"; exit 1; fi
+  if grep -q '"decomp":null' "$ZC/cache/rdsh/sessions-tokens.json" 2>/dev/null; then echo "FAIL: zstd-less ? cached ($d)"; cat "$ZC/cache/rdsh/sessions-tokens.json"; exit 1; else ok "tokens cache: zstd-less ? not cached ($d)"; fi
+  zc "$ZC/ok" $d
+  if grep "$d/s2" "$ZC/out" | grep -q "~1tok " && ! grep "$d/s2" "$ZC/out" | grep -q "?"; then ok "tokens cache: $d/s2 resolves once zstd exists"; else echo "FAIL(output): $d/s2 stuck after zstd install"; cat "$ZC/out"; exit 1; fi
+done
+# Legacy cache (no `cli` field) holding null from an old zstd-less run: recomputed when zstd exists.
+rm -rf "$ZC/cache"; mkdir -p "$ZC/cache"
+zc "$ZC/bad" q
+sed 's/"cli":true,//g' "$ZC/cache/rdsh/sessions-tokens.json" > "$ZC/legacy" && mv "$ZC/legacy" "$ZC/cache/rdsh/sessions-tokens.json"
+if grep -q '"decomp":null' "$ZC/cache/rdsh/sessions-tokens.json" && ! grep -q '"cli"' "$ZC/cache/rdsh/sessions-tokens.json"; then :; else echo "FAIL(setup): legacy null cache"; cat "$ZC/cache/rdsh/sessions-tokens.json"; exit 1; fi
+zc "$ZC/ok" q
+if grep "q/s2" "$ZC/out" | grep -q "~1tok " && ! grep "q/s2" "$ZC/out" | grep -q "?"; then ok "tokens cache: legacy null entry rechecked with zstd"; else echo "FAIL(output): legacy null entry stuck"; cat "$ZC/out"; exit 1; fi
+rm -rf "$ZC"
 WB=/tmp/rdsh-wrapper-$$
 mkdir -p $WB/.local/bin
 printf '#!/bin/sh\nexec node "$(readlink -f "$(command -v dsh)")" --profile web\n' > $WB/.local/bin/dsh-web-local
