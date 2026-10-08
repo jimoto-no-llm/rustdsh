@@ -8,6 +8,9 @@ import { promisify } from "node:util";
 import { writeJson } from "./state.mjs";
 import { adapterCatalog, createCliAdapter } from "./adapters.mjs";
 import { preflightTask, taskRequirements, requireReady } from "./preflight.mjs";
+import { RunHistory, HistoryError } from "./run-history.mjs";
+import { readProcessIdentity } from "./process-identity.mjs";
+import { trackAdapter } from "./tracked-adapter.mjs";
 
 const exec = promisify(execFile);
 const scopeKeys = [
@@ -475,6 +478,37 @@ export async function attachRecordedSession({
   }
   if (record.git.status === "unavailable")
     throw new LedgerError("repository_context_unknown");
+  const history = await RunHistory.open(ledger.project);
+  if (run_id !== null) {
+    let previous;
+    try {
+      previous = await history.inspect(record.run_id);
+    } catch (error) {
+      if (error.code !== "run_not_found") throw error;
+    }
+    if (previous?.process) {
+      const status = previous.process_observation.status;
+      if (["gone", "pid_reused"].includes(status))
+        await history.confirmAbsent(record.run_id);
+      else if (!["exit_confirmed", "absence_observed"].includes(status))
+        throw new HistoryError("run_process_unconfirmed");
+    }
+  }
+  await history.register(record.run_id, record.cli_session_id);
+  const commandId = await history.recordCommand(
+    record.run_id,
+    run_id === null ? "start" : "resume",
+  );
+  await history.transition(record.run_id, "starting", "request_recorded");
+  await history.commandPhase(commandId, "dispatched");
+  let processBound = false;
+  const exitWrites = {
+    pending: [],
+    error: null,
+    async flush() {
+      await Promise.all(this.pending);
+    },
+  };
   const adapter = createCliAdapter({
     cli: record.cli,
     command,
@@ -482,6 +516,24 @@ export async function attachRecordedSession({
     env,
     requestTimeout,
     stopTimeout,
+    onOwnedSpawn: async (pid) => {
+      const observed = await readProcessIdentity(pid);
+      await history.bindProcess(
+        record.run_id,
+        observed.status === "observed" ? observed.identity : null,
+        pid,
+      );
+      processBound = true;
+      if (adapter.stopped) await history.processExited(record.run_id);
+    },
+  });
+  adapter.on("event", (event) => {
+    if (event.type === "process_exit" && processBound)
+      exitWrites.pending.push(
+        history.processExited(record.run_id).catch((error) => {
+          exitWrites.error ||= error;
+        }),
+      );
   });
   try {
     const report = await adapter.probe();
@@ -494,15 +546,39 @@ export async function attachRecordedSession({
       run_id === null
         ? await adapter.start()
         : await adapter.resume(record.cli_session_id);
+    await history.bindSession(record.run_id, attached.session_id);
+    await history.commandPhase(commandId, "acknowledged", "session_attached");
     const confirmed = await ledger.confirm(
       record.run_id,
       attached.session_id,
       attached.cli_version,
     );
-    return { record: confirmed, adapter };
+    if (!adapter.stopped)
+      await history.transition(
+        record.run_id,
+        "waiting-human",
+        "cli_session_attached",
+      );
+    return {
+      record: confirmed,
+      adapter: trackAdapter(adapter, history, record.run_id, exitWrites),
+      history,
+      command_id: commandId,
+    };
   } catch (error) {
     try {
+      await history.commandPhase(commandId, "unknown");
+    } catch {}
+    try {
+      await history.transition(
+        record.run_id,
+        "unknown",
+        "operation_unconfirmed",
+      );
+    } catch {}
+    try {
       await adapter.stop();
+      await exitWrites.flush();
     } catch {
       throw new LedgerError("cleanup_unconfirmed");
     }

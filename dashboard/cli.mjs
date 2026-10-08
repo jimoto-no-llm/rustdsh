@@ -10,6 +10,7 @@ import { adapterCatalog, createCliAdapter } from "./adapters.mjs";
 import { smokeAdapter } from "./adapter-smoke.mjs";
 import { SessionLedger, attachRecordedSession } from "./session-ledger.mjs";
 import { preflightCli, readRequirements } from "./preflight.mjs";
+import { RunHistory } from "./run-history.mjs";
 
 const help = `rdsh-dashboard project --project <directory> [--port <port>] [--no-tailscale] [--open]
 rdsh-dashboard harness [--port 38081] [--harness-port 3081] [--no-tailscale] [--open]
@@ -21,6 +22,7 @@ rdsh-dashboard mcp --project <directory>
 rdsh-dashboard adapters [--cli dsh] [--executable <original-dsh>] [--entrypoint <bin.js>] [--project <directory>]
 rdsh-dashboard adapter-smoke --executable <original-dsh> [--entrypoint <bin.js>] [--project <directory>]
 rdsh-dashboard preflight --project <directory> [--requirements <json>] [--executable <original-dsh>] [--entrypoint <bin.js>] [--verify-auth]
+rdsh-dashboard run-history list|inspect|events --project <directory> [--run-id <run_id>] [--cursor <number>] [--limit <number>]
 rdsh-dashboard session-ledger list|record|resolve|start|resume --project <directory> [--run-id <run_id>] [--task-id <id>] [--session-id <id>] [--label <name>] [--provider <name>] [--cwd <directory>] [--cli <name>] [--executable <original-dsh>] [--entrypoint <bin.js>]
 
 Project mode: project metrics, tasks, questions, human feedback, and /mcp.
@@ -49,6 +51,8 @@ const { values, positionals } = parseArgs({
     cwd: { type: "string" },
     requirements: { type: "string" },
     "verify-auth": { type: "boolean" },
+    cursor: { type: "string" },
+    limit: { type: "string" },
     help: { type: "boolean", short: "h" },
   },
 });
@@ -79,6 +83,32 @@ try {
     console.log(help);
   } else if (command === "preflight") {
     await preflightCli(process.argv.slice(3));
+  } else if (command === "run-history") {
+    const action = positionals[1];
+    if (
+      positionals.length !== 2 ||
+      !["list", "inspect", "events"].includes(action)
+    )
+      throw new Error("Specify run-history list, inspect or events");
+    const history = await RunHistory.open(
+      await identity(values.project || process.cwd()),
+    );
+    const paging = {
+      after: values.cursor === undefined ? 0 : Number(values.cursor),
+      ...(values.limit === undefined ? {} : { limit: Number(values.limit) }),
+    };
+    if (
+      action === "inspect" &&
+      (values.cursor !== undefined || values.limit !== undefined)
+    )
+      throw new Error("Paging applies to list or events");
+    const result =
+      action === "list"
+        ? await history.list(paging)
+        : action === "events"
+          ? await history.events(values["run-id"], paging)
+          : await history.inspect(values["run-id"]);
+    console.log(JSON.stringify(result, null, 2));
   } else if (command === "session-ledger") {
     const action = positionals[1];
     if (
@@ -147,6 +177,8 @@ try {
       const stopped = await attached.adapter.stop();
       result = {
         run: attached.record,
+        command_id: attached.command_id,
+        history: await attached.history.inspect(attached.record.run_id),
         lifecycle: "attachment_verified_process_stopped",
         process: stopped,
       };

@@ -1,0 +1,381 @@
+{
+  "captured_at": "2026-10-05T20:26:15.709Z",
+  "platform": "win32",
+  "cli_source": "ACP fixture peer with actual Windows process observations",
+  "cli_version": "0.2.0-rc.2",
+  "isolated_native_home": true,
+  "live_root": {
+    "run_id": "run_c80dd9ed-16b3-4371-97f2-8fcc4755ce07",
+    "native_session_id": "fixture-session",
+    "state": "unknown",
+    "updated_at": "2026-10-05T20:26:12.758Z",
+    "last_observed_at": "2026-10-05T20:26:12.758Z",
+    "reason": "cli_session_attached",
+    "process": {
+      "identity": {
+        "platform": "win32",
+        "pid": 6464,
+        "birth": "639268287723482362",
+        "scope": "c8ab4f2b11f1adedbd9b8f18f04a32dab9fbfaf4118df38ad6fedaafcd88fb37"
+      },
+      "pid": 6464,
+      "owner_id": "owner_36c17bdb-07f3-44a5-8d4b-e903da5c212e",
+      "status": "last_observed_alive",
+      "observed_at": "2026-10-05T20:26:12.732Z"
+    },
+    "commands": [
+      {
+        "command_id": "cmd_5092e982-2508-4f02-8ad9-567d7345aee5",
+        "operation": "start",
+        "phase": "acknowledged",
+        "ack_id": "ack_7fd5f69e-a70a-4fbf-94fe-8ad9370a2f71",
+        "outcome": "session_attached",
+        "run_id": "run_c80dd9ed-16b3-4371-97f2-8fcc4755ce07",
+        "recorded_at": "2026-10-05T20:26:12.176Z",
+        "updated_at": "2026-10-05T20:26:12.750Z",
+        "recovery_outcome": "acknowledged"
+      }
+    ],
+    "rejected_transitions": [],
+    "revision": 8,
+    "recorded_state": "waiting-human",
+    "state_basis": "process_alive; native_run_state_unobservable",
+    "observed_at": "2026-10-05T20:26:13.099Z",
+    "ui_connection": "disconnected",
+    "process_observation": {
+      "status": "alive",
+      "pid": 6464,
+      "scope": "owned_root_process_only; descendants_unverified"
+    },
+    "commands_total": 1,
+    "recovery": {
+      "mode": "read_only",
+      "replayed_commands": 0,
+      "automatically_restarted": false,
+      "incomplete_tail_bytes": 0,
+      "repair_required": false,
+      "writer_lock": {
+        "present": false,
+        "automatic_removal": false
+      }
+    }
+  },
+  "after_owned_stop": {
+    "process": {
+      "sequence": 4,
+      "type": "stopped",
+      "cli": "dsh",
+      "cli_version": "0.2.0-rc.2",
+      "observed_at": "2026-10-05T20:26:13.127Z",
+      "provenance": {
+        "source": "cli_adapter",
+        "trust": "untrusted_data"
+      },
+      "confirmed": true,
+      "code": 0,
+      "signal": null,
+      "command_id": "cmd_1238fb28-ec5e-44aa-8310-ed2198533901"
+    },
+    "history": {
+      "run_id": "run_c80dd9ed-16b3-4371-97f2-8fcc4755ce07",
+      "native_session_id": "fixture-session",
+      "state": "disconnected",
+      "updated_at": "2026-10-05T20:26:13.137Z",
+      "last_observed_at": "2026-10-05T20:26:13.129Z",
+      "reason": "owned_exit_confirmed",
+      "process": {
+        "identity": {
+          "platform": "win32",
+          "pid": 6464,
+          "birth": "639268287723482362",
+          "scope": "c8ab4f2b11f1adedbd9b8f18f04a32dab9fbfaf4118df38ad6fedaafcd88fb37"
+        },
+        "pid": 6464,
+        "owner_id": "owner_36c17bdb-07f3-44a5-8d4b-e903da5c212e",
+        "status": "exit_confirmed",
+        "observed_at": "2026-10-05T20:26:13.129Z"
+      },
+      "commands": [
+        {
+          "command_id": "cmd_5092e982-2508-4f02-8ad9-567d7345aee5",
+          "operation": "start",
+          "phase": "acknowledged",
+          "ack_id": "ack_7fd5f69e-a70a-4fbf-94fe-8ad9370a2f71",
+          "outcome": "session_attached",
+          "run_id": "run_c80dd9ed-16b3-4371-97f2-8fcc4755ce07",
+          "recorded_at": "2026-10-05T20:26:12.176Z",
+          "updated_at": "2026-10-05T20:26:12.750Z",
+          "recovery_outcome": "acknowledged"
+        },
+        {
+          "command_id": "cmd_1238fb28-ec5e-44aa-8310-ed2198533901",
+          "operation": "stop",
+          "phase": "acknowledged",
+          "ack_id": "ack_968552ae-02df-480c-a468-b5e74407f33a",
+          "outcome": "process_exit_confirmed",
+          "run_id": "run_c80dd9ed-16b3-4371-97f2-8fcc4755ce07",
+          "recorded_at": "2026-10-05T20:26:13.101Z",
+          "updated_at": "2026-10-05T20:26:13.137Z",
+          "recovery_outcome": "acknowledged"
+        }
+      ],
+      "rejected_transitions": [],
+      "revision": 14,
+      "recorded_state": "disconnected",
+      "state_basis": "process_exit_observed; native_session_can_still_exist",
+      "observed_at": "2026-10-05T20:26:13.144Z",
+      "ui_connection": "unknown",
+      "process_observation": {
+        "status": "exit_confirmed",
+        "pid": 6464,
+        "scope": "owned_root_process_only; descendants_unverified"
+      },
+      "commands_total": 2,
+      "recovery": {
+        "mode": "read_only",
+        "replayed_commands": 0,
+        "automatically_restarted": false,
+        "incomplete_tail_bytes": 0,
+        "repair_required": false,
+        "writer_lock": {
+          "present": false,
+          "automatic_removal": false
+        }
+      }
+    }
+  },
+  "comparison": {
+    "baseline_commit": "4ac7e95577ca92e886779d35e39749de5c8db0bb",
+    "command": "run-history inspect --project <temporary-project> --run-id <persisted-run>",
+    "before": {
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "[rdsh-dashboard] Unknown command; use --help\n"
+    },
+    "after": {
+      "exit_code": 0,
+      "stdout": {
+        "run_id": "run_c80dd9ed-16b3-4371-97f2-8fcc4755ce07",
+        "native_session_id": "fixture-session",
+        "state": "disconnected",
+        "updated_at": "2026-10-05T20:26:13.137Z",
+        "last_observed_at": "2026-10-05T20:26:13.129Z",
+        "reason": "owned_exit_confirmed",
+        "process": {
+          "identity": {
+            "platform": "win32",
+            "pid": 6464,
+            "birth": "639268287723482362",
+            "scope": "c8ab4f2b11f1adedbd9b8f18f04a32dab9fbfaf4118df38ad6fedaafcd88fb37"
+          },
+          "pid": 6464,
+          "owner_id": "owner_36c17bdb-07f3-44a5-8d4b-e903da5c212e",
+          "status": "exit_confirmed",
+          "observed_at": "2026-10-05T20:26:13.129Z"
+        },
+        "commands": [
+          {
+            "command_id": "cmd_5092e982-2508-4f02-8ad9-567d7345aee5",
+            "operation": "start",
+            "phase": "acknowledged",
+            "ack_id": "ack_7fd5f69e-a70a-4fbf-94fe-8ad9370a2f71",
+            "outcome": "session_attached",
+            "run_id": "run_c80dd9ed-16b3-4371-97f2-8fcc4755ce07",
+            "recorded_at": "2026-10-05T20:26:12.176Z",
+            "updated_at": "2026-10-05T20:26:12.750Z",
+            "recovery_outcome": "acknowledged"
+          },
+          {
+            "command_id": "cmd_1238fb28-ec5e-44aa-8310-ed2198533901",
+            "operation": "stop",
+            "phase": "acknowledged",
+            "ack_id": "ack_968552ae-02df-480c-a468-b5e74407f33a",
+            "outcome": "process_exit_confirmed",
+            "run_id": "run_c80dd9ed-16b3-4371-97f2-8fcc4755ce07",
+            "recorded_at": "2026-10-05T20:26:13.101Z",
+            "updated_at": "2026-10-05T20:26:13.137Z",
+            "recovery_outcome": "acknowledged"
+          }
+        ],
+        "rejected_transitions": [],
+        "revision": 14,
+        "recorded_state": "disconnected",
+        "state_basis": "process_exit_observed; native_session_can_still_exist",
+        "observed_at": "2026-10-05T20:26:13.860Z",
+        "ui_connection": "unknown",
+        "process_observation": {
+          "status": "exit_confirmed",
+          "pid": 6464,
+          "scope": "owned_root_process_only; descendants_unverified"
+        },
+        "commands_total": 2,
+        "recovery": {
+          "mode": "read_only",
+          "replayed_commands": 0,
+          "automatically_restarted": false,
+          "incomplete_tail_bytes": 0,
+          "repair_required": false,
+          "writer_lock": {
+            "present": false,
+            "automatic_removal": false
+          }
+        }
+      }
+    },
+    "entrypoint_source_only": true,
+    "common_dependencies": "current installed dashboard dependencies"
+  },
+  "explicit_resume_from_separate_client": {
+    "run": {
+      "run_id": "run_c80dd9ed-16b3-4371-97f2-8fcc4755ce07",
+      "project_id": "97921a53af0b3488",
+      "task_id": null,
+      "label": null,
+      "cli": "dsh",
+      "cli_session_id": "fixture-session",
+      "binding": "confirmed",
+      "cwd": "C:\\Users\\owner\\AppData\\Local\\Temp\\rdsh-run-recovery-local-ZZqeEq\\project",
+      "branch": "recovery-qa",
+      "git": {
+        "status": "observed",
+        "root": "C:\\Users\\owner\\AppData\\Local\\Temp\\rdsh-run-recovery-local-ZZqeEq\\project",
+        "head": null
+      },
+      "launch": {
+        "method": "acp-stdio-v1",
+        "executable": "C:\\Users\\owner\\AppData\\Local\\nodejs\\node-v24.18.0-win-x64\\node.exe",
+        "entrypoint": "M:\\Codex\\home\\worktrees\\cli-adapters\\rustdsh\\dashboard\\test\\fixtures\\acp-cli.mjs",
+        "profile": "acp"
+      },
+      "scope": {
+        "effective_home": "C:\\Users\\owner\\AppData\\Local\\Temp\\rdsh-run-recovery-local-ZZqeEq",
+        "HOME": "C:\\Users\\owner\\AppData\\Local\\Temp\\rdsh-run-recovery-local-ZZqeEq",
+        "USERPROFILE": "C:\\Users\\owner\\AppData\\Local\\Temp\\rdsh-run-recovery-local-ZZqeEq",
+        "DSH_HOME": "C:\\Users\\owner\\AppData\\Local\\Temp\\rdsh-run-recovery-local-ZZqeEq\\dsh",
+        "XDG_CONFIG_HOME": null,
+        "XDG_DATA_HOME": null,
+        "APPDATA": null,
+        "LOCALAPPDATA": null
+      },
+      "provider": null,
+      "cli_version": "0.2.0-rc.2",
+      "created_at": "2026-10-05T20:26:11.689Z",
+      "last_attached_at": "2026-10-05T20:26:15.638Z",
+      "unknown_fields": [
+        "task_id",
+        "provider"
+      ],
+      "cli_session_display": "fixture-session"
+    },
+    "command_id": "cmd_bb13d9e6-2aec-46d8-9a8c-912e9cf86e1e",
+    "history": {
+      "run_id": "run_c80dd9ed-16b3-4371-97f2-8fcc4755ce07",
+      "native_session_id": "fixture-session",
+      "state": "disconnected",
+      "updated_at": "2026-10-05T20:26:15.680Z",
+      "last_observed_at": "2026-10-05T20:26:15.672Z",
+      "reason": "owned_exit_confirmed",
+      "process": {
+        "identity": {
+          "platform": "win32",
+          "pid": 67176,
+          "birth": "639268287750999442",
+          "scope": "c8ab4f2b11f1adedbd9b8f18f04a32dab9fbfaf4118df38ad6fedaafcd88fb37"
+        },
+        "pid": 67176,
+        "owner_id": "owner_8810942d-640a-458d-9b42-bf0030b8589b",
+        "status": "exit_confirmed",
+        "observed_at": "2026-10-05T20:26:15.672Z"
+      },
+      "commands": [
+        {
+          "command_id": "cmd_5092e982-2508-4f02-8ad9-567d7345aee5",
+          "operation": "start",
+          "phase": "acknowledged",
+          "ack_id": "ack_7fd5f69e-a70a-4fbf-94fe-8ad9370a2f71",
+          "outcome": "session_attached",
+          "run_id": "run_c80dd9ed-16b3-4371-97f2-8fcc4755ce07",
+          "recorded_at": "2026-10-05T20:26:12.176Z",
+          "updated_at": "2026-10-05T20:26:12.750Z",
+          "recovery_outcome": "acknowledged"
+        },
+        {
+          "command_id": "cmd_1238fb28-ec5e-44aa-8310-ed2198533901",
+          "operation": "stop",
+          "phase": "acknowledged",
+          "ack_id": "ack_968552ae-02df-480c-a468-b5e74407f33a",
+          "outcome": "process_exit_confirmed",
+          "run_id": "run_c80dd9ed-16b3-4371-97f2-8fcc4755ce07",
+          "recorded_at": "2026-10-05T20:26:13.101Z",
+          "updated_at": "2026-10-05T20:26:13.137Z",
+          "recovery_outcome": "acknowledged"
+        },
+        {
+          "command_id": "cmd_bb13d9e6-2aec-46d8-9a8c-912e9cf86e1e",
+          "operation": "resume",
+          "phase": "acknowledged",
+          "ack_id": "ack_b3b70e30-fce8-4d93-924f-98161ba75c61",
+          "outcome": "session_attached",
+          "run_id": "run_c80dd9ed-16b3-4371-97f2-8fcc4755ce07",
+          "recorded_at": "2026-10-05T20:26:14.948Z",
+          "updated_at": "2026-10-05T20:26:15.634Z",
+          "recovery_outcome": "acknowledged"
+        },
+        {
+          "command_id": "cmd_c9fd996d-656a-4301-9817-6741fda7eec4",
+          "operation": "stop",
+          "phase": "acknowledged",
+          "ack_id": "ack_16bd609a-1499-47e8-b9a5-fce10854e58c",
+          "outcome": "process_exit_confirmed",
+          "run_id": "run_c80dd9ed-16b3-4371-97f2-8fcc4755ce07",
+          "recorded_at": "2026-10-05T20:26:15.648Z",
+          "updated_at": "2026-10-05T20:26:15.680Z",
+          "recovery_outcome": "acknowledged"
+        }
+      ],
+      "rejected_transitions": [],
+      "revision": 27,
+      "recorded_state": "disconnected",
+      "state_basis": "process_exit_observed; native_session_can_still_exist",
+      "observed_at": "2026-10-05T20:26:15.691Z",
+      "ui_connection": "unknown",
+      "process_observation": {
+        "status": "exit_confirmed",
+        "pid": 67176,
+        "scope": "owned_root_process_only; descendants_unverified"
+      },
+      "commands_total": 4,
+      "recovery": {
+        "mode": "read_only",
+        "replayed_commands": 0,
+        "automatically_restarted": false,
+        "incomplete_tail_bytes": 0,
+        "repair_required": false,
+        "writer_lock": {
+          "present": false,
+          "automatic_removal": false
+        }
+      }
+    },
+    "lifecycle": "attachment_verified_process_stopped",
+    "process": {
+      "sequence": 4,
+      "type": "stopped",
+      "cli": "dsh",
+      "cli_version": "0.2.0-rc.2",
+      "observed_at": "2026-10-05T20:26:15.671Z",
+      "provenance": {
+        "source": "cli_adapter",
+        "trust": "untrusted_data"
+      },
+      "confirmed": true,
+      "code": 0,
+      "signal": null,
+      "command_id": "cmd_c9fd996d-656a-4301-9817-6741fda7eec4"
+    }
+  },
+  "provider_authentication": "not_exercised",
+  "model_prompt": false,
+  "ui_connection": "synthetic caller observation; no actual browser or phone disconnect test",
+  "descendants": "not_observed"
+}

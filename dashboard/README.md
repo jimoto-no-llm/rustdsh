@@ -10,6 +10,9 @@ task and native CLI IDs, with exact run resolution after client restart.
 [Task preflight](../docs/TASK-PREFLIGHT.md) checks the required CLI, cwd, disk,
 port, dependencies, GPU/WSL and selected authentication before an ACP session.
 
+[Durable run recovery](../docs/RUN-RECOVERY.md) records control request/ack IDs
+and separates recorded run state, root-process observations and UI connectivity.
+
 `rdsh-dashboard` provides two separate entry points:
 
 | Mode      | Purpose                                                    | Data source                                      |

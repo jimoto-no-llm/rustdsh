@@ -85,6 +85,7 @@ class CliAdapter extends EventEmitter {
     profile = "acp",
     requestTimeout = 15000,
     stopTimeout = 3000,
+    onOwnedSpawn = null,
   } = {}) {
     super();
     if (!adapterCatalog().some((a) => a.id === cli))
@@ -102,6 +103,8 @@ class CliAdapter extends EventEmitter {
     for (const value of [requestTimeout, stopTimeout])
       if (!Number.isInteger(value) || value < 50 || value > 600000)
         throw new AdapterError("invalid_timeout");
+    if (onOwnedSpawn !== null && typeof onOwnedSpawn !== "function")
+      throw new AdapterError("invalid_spawn_observer");
     this.cli = cli;
     this.command = command === null ? null : [...command]; // Operator argv, never a shell.
     this.cwd = cwd;
@@ -109,6 +112,7 @@ class CliAdapter extends EventEmitter {
     this.profile = profile;
     this.requestTimeout = requestTimeout;
     this.stopTimeout = stopTimeout;
+    this.onOwnedSpawn = onOwnedSpawn;
     this.version = null;
     this.processVersion = null;
     this.health = cli === "dsh" ? "unverified" : "unsupported";
@@ -298,6 +302,8 @@ class CliAdapter extends EventEmitter {
       );
       this.child.once("exit", (code, signal) => finish({ code, signal }));
     });
+    // A durable caller can bind the owned PID before the first protocol request.
+    if (this.onOwnedSpawn) await this.onOwnedSpawn(this.child.pid);
     const requests = new Map();
     let buffer = Buffer.alloc(0);
     let controller;
