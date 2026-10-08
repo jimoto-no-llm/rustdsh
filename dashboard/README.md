@@ -19,6 +19,9 @@ uncertain writes. Public retry is opt-in for original CLI version queries only.
 [Checkpoint recovery](../docs/CHECKPOINTS.md) distinguishes a verified native
 resume from an explicit new conversation with an operator-provided summary.
 
+[Acceptance evidence](../docs/ACCEPTANCE-EVIDENCE.md) separates reported `done`
+from current full checks, preserves partial results and rejects stale evidence.
+
 `rdsh-dashboard` provides two separate entry points:
 
 | Mode      | Purpose                                                    | Data source                                      |

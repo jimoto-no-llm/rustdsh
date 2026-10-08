@@ -14,6 +14,7 @@ import { RunHistory } from "./run-history.mjs";
 import { RetryHistory } from "./retry.mjs";
 import { probeCliWithRetry } from "./retry-probe.mjs";
 import { Checkpoints } from "./checkpoints.mjs";
+import { AcceptanceStore } from "./acceptance.mjs";
 
 const help = `rdsh-dashboard project --project <directory> [--port <port>] [--no-tailscale] [--open]
 rdsh-dashboard harness [--port 38081] [--harness-port 3081] [--no-tailscale] [--open]
@@ -28,6 +29,7 @@ rdsh-dashboard preflight --project <directory> [--requirements <json>] [--execut
 rdsh-dashboard run-history list|inspect|events --project <directory> [--run-id <run_id>] [--cursor <number>] [--limit <number>]
 rdsh-dashboard retry-history list|inspect --project <directory> [--operation-id <id>]
 rdsh-dashboard checkpoint record|list|inspect|resume|start-new --project <directory> [--run-id <id>] [--checkpoint-id <id>] [--executable <original-dsh>] [--entrypoint <bin.js>] [--verify-native] [--retry-operation-id <id>] [--summary-file <file> --accept-context-loss]
+rdsh-dashboard acceptance define|run|report|inspect --project <directory> --task-id <id> [--criterion-id <id>] [--criteria-file <json>] [--argv-file <json>] [--result-file <json>] [--scope full|partial] [--timeout-ms <ms>] [--image <relative-path>]
 rdsh-dashboard session-ledger list|record|resolve|start|resume --project <directory> [--run-id <run_id>] [--task-id <id>] [--session-id <id>] [--label <name>] [--provider <name>] [--cwd <directory>] [--cli <name>] [--executable <original-dsh>] [--entrypoint <bin.js>]
 
 Project mode: project metrics, tasks, questions, human feedback, and /mcp.
@@ -67,6 +69,13 @@ const { values, positionals } = parseArgs({
     "verify-native": { type: "boolean" },
     "summary-file": { type: "string" },
     "accept-context-loss": { type: "boolean" },
+    "criterion-id": { type: "string" },
+    "criteria-file": { type: "string" },
+    "argv-file": { type: "string" },
+    "result-file": { type: "string" },
+    scope: { type: "string" },
+    "timeout-ms": { type: "string" },
+    image: { type: "string", multiple: true },
     help: { type: "boolean", short: "h" },
   },
 });
@@ -91,6 +100,27 @@ function portValue(value) {
     throw new Error("Port must be an integer between 1024 and 65535");
   return port;
 }
+async function localJson(file) {
+  if (!file) throw new Error("Specify the input JSON file");
+  const handle = await fs.open(file, "r");
+  try {
+    const stat = await handle.stat();
+    if (!stat.isFile() || stat.size > 256 * 1024)
+      throw new Error("Input JSON must be a regular file of at most 256 KiB");
+    const bytes = await handle.readFile();
+    if (bytes.length > 256 * 1024)
+      throw new Error("Input JSON exceeds 256 KiB");
+    try {
+      return JSON.parse(
+        new TextDecoder("utf-8", { fatal: true }).decode(bytes),
+      );
+    } catch {
+      throw new Error("Input JSON is invalid");
+    }
+  } finally {
+    await handle.close();
+  }
+}
 try {
   const command = positionals[0];
   if (
@@ -114,8 +144,92 @@ try {
     ].some((value) => value !== undefined)
   )
     throw new Error("Checkpoint options require checkpoint");
+  if (
+    command !== "acceptance" &&
+    [
+      "criterion-id",
+      "criteria-file",
+      "argv-file",
+      "result-file",
+      "scope",
+      "timeout-ms",
+      "image",
+    ].some((key) => values[key] !== undefined)
+  )
+    throw new Error("Acceptance options require acceptance");
   if (values.help || !command) {
     console.log(help);
+  } else if (command === "acceptance") {
+    const action = positionals[1];
+    if (
+      positionals.length !== 2 ||
+      !["define", "run", "report", "inspect"].includes(action)
+    )
+      throw new Error("Specify acceptance define, run, report or inspect");
+    const acceptanceOptions = new Set([
+      "project",
+      "task-id",
+      "criterion-id",
+      "criteria-file",
+      "argv-file",
+      "result-file",
+      "scope",
+      "timeout-ms",
+      "image",
+      "help",
+    ]);
+    if (Object.keys(values).some((key) => !acceptanceOptions.has(key)))
+      throw new Error("Unsupported option for acceptance");
+    const store = await AcceptanceStore.open(
+        await identity(values.project || process.cwd()),
+      ),
+      task = values["task-id"];
+    if (
+      (action !== "define" && values["criteria-file"] !== undefined) ||
+      (action !== "run" &&
+        (values["argv-file"] !== undefined ||
+          values["timeout-ms"] !== undefined)) ||
+      (action !== "report" && values["result-file"] !== undefined)
+    )
+      throw new Error("Input options must match the acceptance action");
+    if (
+      ["define", "inspect"].includes(action) &&
+      [values["criterion-id"], values.scope, values.image].some(
+        (value) => value !== undefined,
+      )
+    )
+      throw new Error(
+        "Criterion, scope and images apply to run or report only",
+      );
+    let result;
+    if (action === "define")
+      result = await store.define(
+        task,
+        await localJson(values["criteria-file"]),
+      );
+    else if (action === "inspect") result = await store.inspect(task);
+    else
+      result = await store.perform({
+        task_id: task,
+        criterion_id: values["criterion-id"],
+        scope: values.scope || "full",
+        images: values.image || [],
+        ...(action === "run"
+          ? {
+              argv: await localJson(values["argv-file"]),
+              timeout_ms:
+                values["timeout-ms"] === undefined
+                  ? 60000
+                  : Number(values["timeout-ms"]),
+            }
+          : { reported: await localJson(values["result-file"]) }),
+      });
+    console.log(JSON.stringify(result, null, 2));
+    if (
+      ["run", "report"].includes(action) &&
+      ["fail", "blocked"].includes(result.status)
+    )
+      process.exitCode = 1;
   } else if (command === "preflight") {
     await preflightCli(process.argv.slice(3));
   } else if (command === "checkpoint") {
