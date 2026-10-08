@@ -264,11 +264,10 @@ no AVX, older distros, no Node at all).
   replaces the old one only after it runs and passes `tests/regress.sh` in a
   throwaway `HOME`. To follow `main` with a source build instead, set
   `RDSH_SYNC_FROM_SOURCE=1` (it runs under `nice -n 19`, and `ionice -c3` when
-  available). Like `install.sh`, `sync-dsh.sh` checks the release download
-  against its `.sha256` file; on a mismatch, or a missing or empty `.sha256`,
-  it logs the reason and leaves the binaries untouched.
-  `systemd/rdsh-sync.service` runs it at low priority; point its `ExecStart` at
-  your checkout.
+  available). `sync-dsh.sh` does not verify the release's `.sha256` (it trusts
+  HTTPS and GitHub Releases); use `install.sh --from-release` for a verified
+  install. `systemd/rdsh-sync.service` runs it at low priority; point its
+  `ExecStart` at your checkout.
 
 ## Using with Smart-DSH
 
