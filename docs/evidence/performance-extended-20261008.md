@@ -8,8 +8,10 @@ cases use separate blocks; small differences cannot establish an optimization ga
 
 Base source: `f2a7dc6b2850a6f0c0e1ea1b53494b12cd2e1221`.
 Candidate binary source: `b8ac3bc045b04683f384e7a64cf72654b8f8261d`, PR #177
-maintenance changes including the session exactness fixes. Later documentation-only
-commits do not change the measured Rust source.
+maintenance changes including the session exactness fixes. Later commits add
+documentation and Windows log-path handling; they do not change these measured
+session/search/compact/HTTP/delegation paths. The binary hashes below identify the
+measured snapshot, not a later rebuilt binary.
 Measured release binary SHA-256:
 
 - Candidate: `3b9b4164e61f8de77d9d01dfe3a23c9562135922609c7fa0e618c1e5fa06dece`

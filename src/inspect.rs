@@ -987,11 +987,14 @@ fn stream_many_decompressed_bytes(paths: &[&std::path::PathBuf]) -> Option<u64> 
 pub fn cmd_logs(tail: usize, grep: Option<String>, file: Option<String>) -> anyhow::Result<()> {
     let dir = format!("{}/logs", dsh_home());
     let path = match file {
-        Some(f) => std::path::PathBuf::from(if f.contains('/') {
-            f
-        } else {
-            format!("{dir}/{f}")
-        }),
+        Some(f) => {
+            let path = std::path::PathBuf::from(&f);
+            if path.is_absolute() || path.components().count() > 1 || f.contains('/') {
+                path
+            } else {
+                std::path::Path::new(&dir).join(path)
+            }
+        }
         None => match latest_file(&dir) {
             Some(p) => p,
             None => {

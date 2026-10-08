@@ -525,6 +525,14 @@ fn cli_tokens_prune_compact_search_logs_guard_and_settings_work_together() {
     ))
     .unwrap()
     .contains("error last"));
+    let logs_dir = f.0.join("dsh/logs");
+    fs::create_dir_all(&logs_dir).unwrap();
+    fs::write(logs_dir.join("named.log"), "named log\n").unwrap();
+    assert!(
+        String::from_utf8(f.ok(&["logs", "--file", "named.log"], b""))
+            .unwrap()
+            .contains("named log")
+    );
     f.ok(&["settings", "set", "guard.deny", "danger*"], b"");
     assert_eq!(
         f.run(&["guard"], b"danger operation").status.code(),
