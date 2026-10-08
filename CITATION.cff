@@ -2,7 +2,8 @@ cff-version: 1.2.0
 title: rdsh
 message: If you use rdsh, please cite it as below.
 type: software
-repository-code: https://github.com/sahenjp/rustdsh
+repository-code: https://github.com/jimoto-no-llm/rustdsh
 license: MIT
 authors:
-  - github: sahenjp
+  - name: sahenjp
+    website: https://github.com/sahenjp

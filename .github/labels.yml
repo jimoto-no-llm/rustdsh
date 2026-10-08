@@ -30,3 +30,21 @@
 - name: ja
   color: 0e8a16
   description: Japanese-language thread (Japanese OK)
+- name: release
+  color: 1d76db
+  description: Versioning, release notes, tags and publishing
+- name: ci
+  color: 0052cc
+  description: Builds, tests and GitHub Actions configuration
+- name: P0
+  color: b60205
+  description: Critical security or release blocker
+- name: P1
+  color: d93f0b
+  description: High priority; next milestone
+- name: P2
+  color: fbca04
+  description: Normal priority; planned improvement
+- name: P3
+  color: c2e0c6
+  description: Low priority; backlog

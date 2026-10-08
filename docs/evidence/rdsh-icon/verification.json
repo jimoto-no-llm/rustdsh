@@ -1,0 +1,24 @@
+{
+  "source_sha256": "ad3e5003f51188335d5e54b0fa2b636ca37089cfd0d83fb715ef461f17656726",
+  "source_preserved_byte_for_byte": true,
+  "derived_sizes": [
+    256,
+    128,
+    64,
+    48,
+    32,
+    24,
+    16
+  ],
+  "assets": {
+    "icon.png": "ad3e5003f51188335d5e54b0fa2b636ca37089cfd0d83fb715ef461f17656726",
+    "icon-256.png": "68015e843f1e901f2adcfd8b87c99ccf6d7e73bf6ea811517b56d34b3e61c6e9",
+    "icon.svg": "d637c2aeff7c73b99500014e528b4dddf2acde2f0d0d1ecab347679b251008aa",
+    "icon.ico": "c8cec5a94bf0a0b81ced74e0489c11e43e0c82070e9aa0f6134280cb2b2c7351"
+  },
+  "windows_focused_passed": 18,
+  "native_static_asset_servers_passed": 2,
+  "browser_flows": 8,
+  "historical_assets": "unchanged",
+  "source_file": "rushDSH.png"
+}

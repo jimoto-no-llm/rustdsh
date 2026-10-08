@@ -91,6 +91,23 @@ fn handle(
         )?;
         return Ok(());
     }
+    if req.method.as_str() == "GET" {
+        let asset = match req.target.as_str() {
+            "/icon.png" => Some((
+                "image/png",
+                include_bytes!("../assets/icon-256.png").as_slice(),
+            )),
+            "/favicon.ico" => Some((
+                "image/x-icon",
+                include_bytes!("../assets/icon.ico").as_slice(),
+            )),
+            _ => None,
+        };
+        if let Some((ctype, bytes)) = asset {
+            crate::local_http::respond(&mut s, 200, ctype, bytes)?;
+            return Ok(());
+        }
+    }
     let (status, ctype, payload): (u16, &str, Cow<str>) =
         match (req.method.as_str(), req.target.as_str()) {
             ("GET", "/") => (200, "text/html; charset=utf-8", Cow::Borrowed(HTML)),
@@ -172,7 +189,7 @@ fn handle(
                 Cow::Borrowed("{\"error\":\"not found\"}"),
             ),
         };
-    crate::local_http::respond(&mut s, status, ctype, &payload)?;
+    crate::local_http::respond(&mut s, status, ctype, payload.as_bytes())?;
     Ok(())
 }
 

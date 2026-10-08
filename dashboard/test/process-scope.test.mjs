@@ -99,7 +99,7 @@ test("cooperative EOF/TERM exits require no forced kill on Linux and retain trut
     );
 });
 test("root exit cannot confirm descendant exit and changing the exposed PID to an independent canary never redirects a kernel-handle stop", async (t) => {
-  const { root, tree, rows } = await setup(t),
+  const { root, tree, rows, own } = await setup(t),
     { p, trace } = await tree("root_exit"),
     { p: other, trace: otherTrace } = await tree();
   const canaryTrace = path.join(root, "human-terminal.jsonl");
@@ -108,11 +108,14 @@ test("root exit cannot confirm descendant exit and changing the exposed PID to a
     [fixture, "canary", "stubborn", canaryTrace],
     { stdio: "ignore", windowsHide: true },
   );
-  t.after(async () => {
-    if (canary.exitCode !== null || canary.signalCode !== null) return;
-    const exit = new Promise((r) => canary.once("exit", r));
-    canary.kill("SIGKILL");
-    await exit;
+  // Stop every trace writer before setup removes their shared directory.
+  own({
+    stop: async () => {
+      if (canary.exitCode !== null || canary.signalCode !== null) return;
+      const closed = new Promise((r) => canary.once("close", r));
+      canary.kill("SIGKILL");
+      await closed;
+    },
   });
   await waitFor(async () =>
     (await rows(canaryTrace)).some((r) => r.type === "heartbeat"),

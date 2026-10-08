@@ -23,6 +23,28 @@ def regular_file(path):
         raise ValueError(f"missing or invalid release asset: {path.name}")
 
 
+def sha256_file(path):
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def missing_assets(directory, existing):
+    """Reuse identical draft assets; fail before upload if any differ."""
+    directory, existing = Path(directory), Path(existing)
+    verify(directory)
+    names = (*ARCHIVES, *(name + ".sha256" for name in ARCHIVES), *INSTALLERS)
+    for path in existing.iterdir():
+        if path.name not in names:
+            raise ValueError(f"unexpected draft asset: {path.name}")
+        regular_file(path)
+        if sha256_file(path) != sha256_file(directory / path.name):
+            raise ValueError(f"draft asset differs; refusing overwrite: {path.name}")
+    return [directory.resolve() / name for name in names if not (existing / name).exists()]
+
+
 def verify(directory):
     directory = Path(directory)
     for name in INSTALLERS:
@@ -39,11 +61,7 @@ def verify(directory):
                 or not re.fullmatch(r"[a-fA-F0-9]{64}", fields[0])
                 or (len(fields) == 2 and fields[1].lstrip("*") != name)):
             raise ValueError(f"invalid checksum: {sidecar.name}")
-        digest = hashlib.sha256()
-        with archive.open("rb") as stream:
-            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-                digest.update(chunk)
-        if digest.hexdigest() != fields[0].lower():
+        if sha256_file(archive) != fields[0].lower():
             raise ValueError(f"checksum mismatch: {name}")
         if name.endswith(".zip"):
             with zipfile.ZipFile(archive) as package:
@@ -66,6 +84,14 @@ def verify(directory):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("directory", type=Path)
+    parser.add_argument("--existing-directory", type=Path)
+    parser.add_argument("--missing-output", type=Path)
     arguments = parser.parse_args()
-    verify(arguments.directory)
+    if bool(arguments.existing_directory) != bool(arguments.missing_output):
+        parser.error("--existing-directory and --missing-output must be used together")
+    if arguments.existing_directory:
+        pending = missing_assets(arguments.directory, arguments.existing_directory)
+        arguments.missing_output.write_text("".join(f"{path}\n" for path in pending), encoding="utf-8")
+    else:
+        verify(arguments.directory)
     print("Verified 5 binary archives, 5 checksums and 2 installers")

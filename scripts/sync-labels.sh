@@ -1,8 +1,9 @@
 #!/bin/sh
 # Sync .github/labels.yml to the repo using the gh CLI.
 # Usage: sh scripts/sync-labels.sh   (needs: gh auth login, repo scope)
-set -e
-REPO="${REPO:-sahenjp/rustdsh}"
+set -eu
+cd "$(dirname "$0")/.."
+REPO="${REPO:-jimoto-no-llm/rustdsh}"
 if ! command -v gh >/dev/null 2>&1; then
   echo "gh CLI not found. See https://cli.github.com/" >&2
   exit 1
@@ -22,10 +23,7 @@ with open(path) as f:
     labels = yaml.safe_load(f)
 for lb in labels:
     name, color, desc = lb["name"], lb["color"].lstrip("#"), lb.get("description", "")
-    r = subprocess.run(["gh", "label", "create", name, "--repo", repo,
-                        "--color", color, "--description", desc])
-    if r.returncode != 0:
-        subprocess.run(["gh", "label", "edit", name, "--repo", repo,
-                        "--color", color, "--description", desc], check=True)
+    subprocess.run(["gh", "label", "create", name, "--repo", repo, "--force",
+                    "--color", color, "--description", desc], check=True)
 print(f"synced {len(labels)} labels to {repo}")
 PYEOF

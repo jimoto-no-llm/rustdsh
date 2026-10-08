@@ -27,6 +27,7 @@ fn default_base() -> String {
 }
 
 fn encode_query(s: &str) -> String {
+    use std::fmt::Write as _;
     let mut out = String::with_capacity(s.len());
     for b in s.bytes() {
         if b.is_ascii_alphanumeric() || b"-_.~".contains(&b) {
@@ -34,7 +35,7 @@ fn encode_query(s: &str) -> String {
         } else if b == b' ' {
             out.push('+');
         } else {
-            out.push_str(&format!("%{b:02X}"));
+            let _ = write!(out, "%{b:02X}");
         }
     }
     out

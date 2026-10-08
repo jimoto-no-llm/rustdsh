@@ -80,12 +80,21 @@ test("Harness proxy removes dashboard credentials before forwarding", async (t) 
   await new Promise((resolve) => upstream.listen(0, "127.0.0.1", resolve));
   t.after(() => upstream.close());
   const front = http.createServer((req, res) =>
-    proxyHarness(req, res, upstream.address().port, "rdsh_harness", "admin-key"),
+    proxyHarness(
+      req,
+      res,
+      upstream.address().port,
+      "rdsh_harness",
+      "admin-key",
+    ),
   );
   await new Promise((resolve) => front.listen(0, "127.0.0.1", resolve));
   t.after(() => front.close());
   const response = await fetch(`http://127.0.0.1:${front.address().port}/`, {
-    headers: { cookie: "rdsh_harness=secret; upstream=keep", authorization: "Bearer admin-key" },
+    headers: {
+      cookie: "rdsh_harness=secret; upstream=keep",
+      authorization: "Bearer admin-key",
+    },
   });
   assert.equal(await response.text(), "ok");
   assert.equal(received.cookie, "upstream=keep");
@@ -130,7 +139,19 @@ test("project state, HTTP/stdio MCP, subscriptions, answers, and auth work toget
     "content-type": "application/json",
   };
   assert.equal((await fetch(dashboard.localUrl + "api/state")).status, 401);
-  assert.equal((await fetch(dashboard.localUrl + "favicon.ico")).status, 204);
+  const favicon = await fetch(dashboard.localUrl + "favicon.ico");
+  assert.equal(favicon.status, 200);
+  assert.equal(favicon.headers.get("content-type"), "image/x-icon");
+  assert.deepEqual(
+    Buffer.from(await favicon.arrayBuffer()),
+    await fs.readFile(new URL("../../assets/icon.ico", import.meta.url)),
+  );
+  const brandIcon = await fetch(dashboard.localUrl + "icon.png");
+  assert.equal(brandIcon.headers.get("content-type"), "image/png");
+  assert.deepEqual(
+    Buffer.from(await brandIcon.arrayBuffer()),
+    await fs.readFile(new URL("../../assets/icon-256.png", import.meta.url)),
+  );
   assert.equal(
     (
       await fetch(dashboard.localUrl + "api/state", {
@@ -178,7 +199,9 @@ test("project state, HTTP/stdio MCP, subscriptions, answers, and auth work toget
   );
   await client.connect(
     new StreamableHTTPClientTransport(new URL(dashboard.localUrl + "mcp"), {
-      requestInit: { headers: { ...headers, authorization: `Bearer ${runtime.mcp_token}` } },
+      requestInit: {
+        headers: { ...headers, authorization: `Bearer ${runtime.mcp_token}` },
+      },
     }),
   );
   assert.equal((await client.listTools()).tools.length, 6);

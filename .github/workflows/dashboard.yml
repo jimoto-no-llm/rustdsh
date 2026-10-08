@@ -2,9 +2,9 @@ name: dashboard
 
 on:
   push:
-    paths: ["dashboard/**", ".github/workflows/dashboard.yml"]
+    paths: ["dashboard/**", "assets/**", ".github/workflows/dashboard.yml"]
   pull_request:
-    paths: ["dashboard/**", ".github/workflows/dashboard.yml"]
+    paths: ["dashboard/**", "assets/**", ".github/workflows/dashboard.yml"]
 
 permissions:
   contents: read
@@ -32,7 +32,9 @@ jobs:
           cache-dependency-path: dashboard/package-lock.json
       - run: npm ci
       - if: runner.os == 'Windows'
-        run: npm test
+        # Native GUI startup must not compete with every process-heavy fixture.
+        # Run every test with the same assertions and startup deadlines.
+        run: node --test --test-concurrency=1 test/*.test.mjs
       - if: runner.os == 'Linux'
         shell: bash
         run: |

@@ -1,0 +1,50 @@
+{
+  "description": "Rust launcher for DSH with native fast commands, guarded agent tools and a local project dashboard",
+  "homepage": "https://github.com/jimoto-no-llm/rustdsh#readme",
+  "delete_branch_on_merge": true,
+  "allow_auto_merge": true,
+  "topics": [
+    "rust",
+    "cli",
+    "dsh",
+    "deepseek",
+    "dashboard",
+    "developer-tools",
+    "cross-platform",
+    "performance",
+    "ai-agents",
+    "command-line",
+    "token-optimization"
+  ],
+  "required_checks": [
+    "Rust lint",
+    "release-policy",
+    "plugin-security",
+    "security-boundaries",
+    "update-banner-windows",
+    "test (ubuntu-latest, true)",
+    "test (macos-latest, true)",
+    "test (windows-latest, false)",
+    "browser-e2e"
+  ],
+  "security_and_analysis": {
+    "secret_scanning": {
+      "status": "enabled"
+    },
+    "secret_scanning_push_protection": {
+      "status": "enabled"
+    },
+    "dependabot_security_updates": {
+      "status": "enabled"
+    }
+  },
+  "vulnerability_alerts": true,
+  "main_review": {
+    "required_approving_review_count": 1,
+    "dismiss_stale_reviews": true,
+    "require_last_push_approval": true,
+    "required_conversation_resolution": true,
+    "enforce_admins": false
+  },
+  "private_vulnerability_reporting": true
+}

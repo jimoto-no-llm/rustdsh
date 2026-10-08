@@ -1,6 +1,6 @@
 # rdsh-update-banner
 
-Update notification banner for [rdsh](https://github.com/sahenjp/rustdsh) on the dsh web GUI.
+Update notification banner for [rdsh](https://github.com/jimoto-no-llm/rustdsh) on the dsh web GUI.
 
 When `sync-dsh.sh` (shipped with rdsh) records an update in
 `~/.local/share/rdsh/update-state.json`, a notification card appears at the
@@ -79,7 +79,7 @@ Do not publish new versions to npm.
 
 Retirement steps (docs only; no code deleted here):
 
-1. `npm deprecate rdsh-update-banner "moved into sahenjp/rustdsh: plugins/rdsh-update-banner"`
+1. `npm deprecate rdsh-update-banner "moved into jimoto-no-llm/rustdsh: plugins/rdsh-update-banner"`
    (preferred; keeps installs resolving with a pointer).
 2. Only if deprecation is not enough: `npm unpublish rdsh-update-banner@1.0.0`
    (needs a classic token + fresh OTP; granular 2FA-bypass tokens are

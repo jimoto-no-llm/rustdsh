@@ -2,7 +2,7 @@
 
 The dashboard's Node module provides a version-checked CLI client, without
 replacing DSH's agent loop, tools, persistence or profile boot.
-Related: [issue #17](https://github.com/sahenjp/rustdsh/issues/17).
+Related: [issue #17](https://github.com/jimoto-no-llm/rustdsh/issues/17).
 
 ## Supported versions and operations
 

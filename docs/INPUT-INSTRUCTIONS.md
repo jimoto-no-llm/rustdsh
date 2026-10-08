@@ -1,6 +1,6 @@
 # 同じsessionへの追指示
 
-Issue [#19](https://github.com/sahenjp/rustdsh/issues/19) の追指示投稿・適用タイミング・
+Issue [#19](https://github.com/jimoto-no-llm/rustdsh/issues/19) の追指示投稿・適用タイミング・
 同時入力の確認を実装します。[既存の入力順](INPUT-QUEUE-ORDERING.md) と
 [回答適用](ANSWER-APPLICATION.md) の契約を使い、元のACPクライアントの
 `send` / `interrupt` に配送します。

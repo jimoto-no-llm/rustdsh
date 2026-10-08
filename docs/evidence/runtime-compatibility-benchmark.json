@@ -1,0 +1,175 @@
+{
+  "baselineCommit": "96dbcbbd6e1295b2e92ba31e9cf9037770107b24",
+  "candidateCommit": "81e38f32d3442de9c89e95fa2d7a034c54771621",
+  "os": "Linux",
+  "release": "6.6.87.2-microsoft-standard-WSL2",
+  "cpu": "AMD Ryzen 9 7950X3D 16-Core Processor",
+  "node": "v24.21.0",
+  "warmups": 5,
+  "n": 30,
+  "order": "alternating before/after; reverse every other pair",
+  "fixture": "Two copies of the same actual Node runtime, with matching-tree DSH metadata entry and synthetic HOME. No model/provider calls.",
+  "beforeBinarySha256": "ac0318c27b96082d39e6d509b940ba0f37c80d3b4ec206fe6d74569b09c8c964",
+  "afterBinarySha256": "dda06ebd901e2c6d59386ea048cfdc8180c4ed46012232a9b28fed9f48b4f5bc",
+  "before": {
+    "medianMs": 25.179847,
+    "p95Ms": 27.658018,
+    "minMs": 24.143026,
+    "maxMs": 28.329245,
+    "samplesMs": [
+      26.748029,
+      25.365991,
+      25.26026,
+      25.276452,
+      24.743357,
+      25.596309,
+      25.178765,
+      24.27722,
+      27.030364,
+      24.143026,
+      26.204846,
+      25.180929,
+      24.305114,
+      25.850902,
+      24.840762,
+      24.686189,
+      25.889315,
+      25.788315,
+      27.658018,
+      27.528162,
+      28.329245,
+      24.360428,
+      24.32428,
+      24.735733,
+      24.505094,
+      25.0435,
+      26.545082,
+      25.059796,
+      24.483916,
+      24.933428
+    ]
+  },
+  "after": {
+    "medianMs": 25.2493295,
+    "p95Ms": 26.534793,
+    "minMs": 23.832765,
+    "maxMs": 27.712621,
+    "samplesMs": [
+      25.39162,
+      25.230944,
+      24.819242,
+      25.756612,
+      26.134983,
+      24.258596,
+      25.489647,
+      25.362143,
+      24.7075,
+      25.258897,
+      25.239762,
+      24.45002,
+      24.769085,
+      24.829362,
+      23.832765,
+      24.534069,
+      25.561833,
+      25.792351,
+      24.679756,
+      26.534793,
+      25.856153,
+      24.892259,
+      26.231987,
+      25.096588,
+      26.19151,
+      27.712621,
+      24.404022,
+      24.411596,
+      26.280399,
+      25.720084
+    ]
+  },
+  "delegation": {
+    "before": "/tmp/rdsh-runtime-bench-9sgoHZ/system-bin/node",
+    "after": "/tmp/rdsh-runtime-bench-9sgoHZ/node-v24.21.0-linux-x64/bin/node",
+    "args": [
+      "--version"
+    ],
+    "bothExitZero": true
+  },
+  "updateOutputDifferences": [
+    {
+      "name": "stable beats release candidate",
+      "current": "0.2.0",
+      "versions": [
+        "0.2.0-rc.99",
+        "0.2.0"
+      ],
+      "format": "pretty",
+      "before": {
+        "exitCode": 0,
+        "stdout": "2026-10-08T12:56:20Z using npm: /tmp/rdsh-runtime-bench-9sgoHZ/npm\n2026-10-08T12:56:20Z installed=0.2.0 latest(any)=0.2.0-rc.99\n2026-10-08T12:56:20Z dsh update available: 0.2.0-rc.99\n2026-10-08T12:56:20Z rdsh update check: release channel (RDSH_SYNC_VERSION=latest)\n2026-10-08T12:56:20Z done\n",
+        "stderr": ""
+      },
+      "after": {
+        "exitCode": 0,
+        "stdout": "2026-10-08T12:56:20Z using npm: /tmp/rdsh-runtime-bench-9sgoHZ/npm\n2026-10-08T12:56:20Z installed=0.2.0 latest(any)=0.2.0\n2026-10-08T12:56:20Z dsh up to date (no newer SemVer in selected channel)\n2026-10-08T12:56:20Z rdsh update check: release channel (RDSH_SYNC_VERSION=latest)\n2026-10-08T12:56:20Z done\n",
+        "stderr": ""
+      }
+    },
+    {
+      "name": "numeric rc ordering with compact JSON",
+      "current": "0.2.0-rc.2",
+      "versions": [
+        "0.2.0-rc.2",
+        "0.2.0-rc.10"
+      ],
+      "format": "compact",
+      "before": {
+        "exitCode": 0,
+        "stdout": "2026-10-08T12:56:20Z using npm: /tmp/rdsh-runtime-bench-9sgoHZ/npm\n2026-10-08T12:56:20Z installed=0.2.0-rc.2 latest(any)=0.2.0-rc.20.2.0-rc.10\n2026-10-08T12:56:20Z dsh update available: 0.2.0-rc.20.2.0-rc.10\n2026-10-08T12:56:20Z rdsh update check: release channel (RDSH_SYNC_VERSION=latest)\n2026-10-08T12:56:20Z done\n",
+        "stderr": ""
+      },
+      "after": {
+        "exitCode": 0,
+        "stdout": "2026-10-08T12:56:20Z using npm: /tmp/rdsh-runtime-bench-9sgoHZ/npm\n2026-10-08T12:56:20Z installed=0.2.0-rc.2 latest(any)=0.2.0-rc.10\n2026-10-08T12:56:20Z dsh update available: 0.2.0-rc.10\n2026-10-08T12:56:20Z rdsh update check: release channel (RDSH_SYNC_VERSION=latest)\n2026-10-08T12:56:20Z done\n",
+        "stderr": ""
+      }
+    },
+    {
+      "name": "no downgrade",
+      "current": "9.0.0",
+      "versions": [
+        "8.0.0",
+        "8.1.0-rc.1"
+      ],
+      "format": "pretty",
+      "before": {
+        "exitCode": 0,
+        "stdout": "2026-10-08T12:56:20Z using npm: /tmp/rdsh-runtime-bench-9sgoHZ/npm\n2026-10-08T12:56:20Z installed=9.0.0 latest(any)=8.1.0-rc.1\n2026-10-08T12:56:20Z dsh update available: 8.1.0-rc.1\n2026-10-08T12:56:20Z rdsh update check: release channel (RDSH_SYNC_VERSION=latest)\n2026-10-08T12:56:20Z done\n",
+        "stderr": ""
+      },
+      "after": {
+        "exitCode": 0,
+        "stdout": "2026-10-08T12:56:20Z using npm: /tmp/rdsh-runtime-bench-9sgoHZ/npm\n2026-10-08T12:56:20Z installed=9.0.0 latest(any)=8.1.0-rc.1\n2026-10-08T12:56:20Z dsh up to date (no newer SemVer in selected channel)\n2026-10-08T12:56:20Z rdsh update check: release channel (RDSH_SYNC_VERSION=latest)\n2026-10-08T12:56:20Z done\n",
+        "stderr": ""
+      }
+    },
+    {
+      "name": "build metadata has no precedence",
+      "current": "1.0.0",
+      "versions": [
+        "1.0.0+another-build"
+      ],
+      "format": "pretty",
+      "before": {
+        "exitCode": 0,
+        "stdout": "2026-10-08T12:56:20Z using npm: /tmp/rdsh-runtime-bench-9sgoHZ/npm\n2026-10-08T12:56:20Z installed=1.0.0 latest(any)=1.0.0+another-build\n2026-10-08T12:56:20Z dsh update available: 1.0.0+another-build\n2026-10-08T12:56:20Z rdsh update check: release channel (RDSH_SYNC_VERSION=latest)\n2026-10-08T12:56:20Z done\n",
+        "stderr": ""
+      },
+      "after": {
+        "exitCode": 0,
+        "stdout": "2026-10-08T12:56:20Z using npm: /tmp/rdsh-runtime-bench-9sgoHZ/npm\n2026-10-08T12:56:20Z installed=1.0.0 latest(any)=1.0.0+another-build\n2026-10-08T12:56:20Z dsh up to date (no newer SemVer in selected channel)\n2026-10-08T12:56:20Z rdsh update check: release channel (RDSH_SYNC_VERSION=latest)\n2026-10-08T12:56:20Z done\n",
+        "stderr": ""
+      }
+    }
+  ]
+}

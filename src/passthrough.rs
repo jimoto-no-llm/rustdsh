@@ -208,17 +208,53 @@ pub fn find_node_bin() -> Option<String> {
     }
 }
 
+// A versioned Node installation can contain native DSH dependencies built for
+// its interpreter. Prefer that interpreter over an older distribution Node on
+// PATH, resolving launcher symlinks first. Other OS/CPU trees are not usable.
+fn node_for_dsh(orig: &str) -> Option<String> {
+    let entry = std::fs::canonicalize(orig).ok()?;
+    let (wanted_os, wanted_arch) = current_os_arch();
+    for ancestor in entry.ancestors().skip(1) {
+        let Some((_, os, arch)) = ancestor
+            .file_name()
+            .and_then(|name| name.to_str())
+            .and_then(parse_node_tree_version)
+        else {
+            continue;
+        };
+        if os != wanted_os || arch != wanted_arch {
+            continue;
+        }
+        let node = ancestor
+            .join("bin")
+            .join(if cfg!(windows) { "node.exe" } else { "node" });
+        if node.is_file() {
+            return Some(node.to_string_lossy().into_owned());
+        }
+        #[cfg(windows)]
+        {
+            // The official Windows archive keeps node.exe at the tree root.
+            let node = ancestor.join("node.exe");
+            if node.is_file() {
+                return Some(node.to_string_lossy().into_owned());
+            }
+        }
+    }
+    None
+}
+
 fn base_cmd(orig: &str, dry: bool, metadata_only: bool) -> anyhow::Result<std::process::Command> {
+    let selected_node = || node_for_dsh(orig).or_else(find_node_bin);
     if dry || metadata_only {
         if orig.ends_with(".js") {
             let mut command =
-                std::process::Command::new(find_node_bin().unwrap_or_else(|| "node".to_string()));
+                std::process::Command::new(selected_node().unwrap_or_else(|| "node".to_string()));
             command.arg(orig);
             return Ok(command);
         }
         return Ok(std::process::Command::new(orig));
     }
-    let bin = find_node_bin()
+    let bin = selected_node()
         .ok_or_else(|| anyhow::anyhow!("RDSH_SECURITY: compatible Node runtime is required"))?;
     crate::tool_security::command(orig, &bin)
 }

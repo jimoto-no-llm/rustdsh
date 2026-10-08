@@ -289,6 +289,12 @@ test("mismatched, absent or malformed native routes block a tracked prompt befor
       0,
     );
     assert.doesNotMatch(JSON.stringify(view), /fixture-peer-secret/);
+    // Finish each owned fixture before opening the next one. Cleanup hooks still
+    // cover failures, but must not leave several Windows stop sequences competing.
+    const stopped = await attached.adapter.stop();
+    assert.equal(stopped.confirmed, true);
+    assert.equal(stopped.scope.status, "exit_confirmed");
+    assert.equal(stopped.scope.resources_released, true);
   }
 });
 test("only an exact unexpired operator authorization accepts a changed native route and its history retains before, after and source", async (t) => {
@@ -456,7 +462,9 @@ test("separate public clients bind, probe and inspect a native configuration wit
           ],
           {
             env: f.env,
-            timeout: 20000,
+            // Windows ownership checks and cleanup have separate deadlines.
+            // Let them finish before the outer fixture terminates the CLI.
+            timeout: process.platform === "win32" ? 60000 : 20000,
             maxBuffer: 1024 * 1024,
             windowsHide: true,
           },

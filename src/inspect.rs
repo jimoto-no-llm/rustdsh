@@ -1469,7 +1469,7 @@ mod tests {
             .arg("-o")
             .arg(&dst)
             .status();
-        if status.map(|s| s.success()).unwrap_or(false) {
+        if status.is_ok_and(|s| s.success()) {
             assert_eq!(
                 zstd_frame_content_size(&dst),
                 stream_decompressed_bytes(&dst)

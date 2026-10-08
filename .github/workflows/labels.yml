@@ -1,0 +1,26 @@
+name: labels
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/labels.yml', 'scripts/sync-labels.sh', '.github/workflows/labels.yml']
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: labels
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: python3 -m pip install PyYAML==6.0.3
+      - run: sh scripts/sync-labels.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}

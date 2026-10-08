@@ -129,4 +129,4 @@ also requires the existing task report to be `done`. Human review and Production
 adoption remain explicitly `not_assessed`; no task status is rewritten.
 
 See [local before/after evidence](evidence/acceptance-evidence.md) and
-[issue #39](https://github.com/sahenjp/rustdsh/issues/39).
+[issue #39](https://github.com/jimoto-no-llm/rustdsh/issues/39).

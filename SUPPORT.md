@@ -4,8 +4,7 @@
 
 | Channel     | Use for                                              |
 | ----------- | ---------------------------------------------------- |
-| Issues      | Bugs and feature requests (use the templates)        |
-| Discussions | Questions, ideas, show-and-tell                      |
+| Issues      | Bugs, feature requests and usage questions           |
 | Advisories  | Vulnerabilities - see SECURITY.md, never pub issues  |
 
 Japanese is welcome (Japanese OK). The issue forms accept Japanese.

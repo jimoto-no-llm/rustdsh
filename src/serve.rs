@@ -94,6 +94,23 @@ fn handle(mut s: std::net::TcpStream, token: &str, port: u16) -> anyhow::Result<
         "\"}"
     );
     const NOT_FOUND_JSON: &str = "{\"error\":\"not found\"}";
+    if method == "GET" {
+        let asset = match path {
+            "/icon.png" => Some((
+                "image/png",
+                include_bytes!("../assets/icon-256.png").as_slice(),
+            )),
+            "/favicon.ico" => Some((
+                "image/x-icon",
+                include_bytes!("../assets/icon.ico").as_slice(),
+            )),
+            _ => None,
+        };
+        if let Some((ctype, bytes)) = asset {
+            crate::local_http::respond(&mut s, 200, ctype, bytes)?;
+            return Ok(());
+        }
+    }
     let (status, ctype, payload): (u16, &str, Cow<'_, str>) = match (method, path) {
         ("GET", "/") => (200, "text/html; charset=utf-8", Cow::Borrowed(UI)),
         ("GET", "/icon.svg") => (200, "image/svg+xml", Cow::Borrowed(ICON)),
@@ -153,7 +170,7 @@ fn handle(mut s: std::net::TcpStream, token: &str, port: u16) -> anyhow::Result<
         ),
         _ => (404, "application/json", Cow::Borrowed(NOT_FOUND_JSON)),
     };
-    crate::local_http::respond(&mut s, status, ctype, &payload)?;
+    crate::local_http::respond(&mut s, status, ctype, payload.as_bytes())?;
     Ok(())
 }
 

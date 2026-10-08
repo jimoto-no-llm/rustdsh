@@ -1,0 +1,6 @@
+# Keep v0.2.0's single PR list, author credits and Full Changelog link.
+changelog:
+  categories:
+    - title: What's Changed
+      labels:
+        - '*'

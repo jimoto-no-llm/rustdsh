@@ -65,7 +65,7 @@ if ($Restore) {
 
 if ($FromRelease) {
   $base = $env:RDSH_RELEASE_BASE
-  if ([string]::IsNullOrEmpty($base)) { $base = 'https://github.com/sahenjp/rustdsh/releases' }
+  if ([string]::IsNullOrEmpty($base)) { $base = 'https://github.com/jimoto-no-llm/rustdsh/releases' }
   if ($Version -eq 'latest') { $url = "$base/latest/download/rdsh-windows-x64.zip" }
   else { $url = "$base/download/$Version/rdsh-windows-x64.zip" }
   $tmpd = Join-Path ([System.IO.Path]::GetTempPath()) ("rdsh-rel-" + [System.Guid]::NewGuid().ToString("N"))

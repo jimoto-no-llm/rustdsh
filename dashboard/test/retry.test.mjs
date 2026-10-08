@@ -411,7 +411,7 @@ test("authority is checked after preparation and again after backoff, with no sc
 });
 
 test("an in-flight deadline stops new attempts, aborts cooperatively and ignores a late response", async (t) => {
-  const { history } = await setup(t);
+  const { history, timing, clock } = await setup(t);
   let calls = 0,
     aborted = false;
   const report = await runWithRetry({
@@ -419,13 +419,17 @@ test("an in-flight deadline stops new attempts, aborts cooperatively and ignores
     kind: "external_send",
     scope_digest: scope,
     authorize: authorized,
-    budget: { total_ms: 2500 },
+    // Keep persistence outside this test's in-flight deadline. The real timer
+    // still aborts the callback; other tests cover budgets spent before dispatch.
+    budget: { total_ms: 100 },
+    ...timing,
     execute: async ({ signal }) => {
       calls++;
       await new Promise((resolve) =>
         signal.addEventListener(
           "abort",
           () => {
+            clock.value = 100;
             aborted = true;
             resolve();
           },

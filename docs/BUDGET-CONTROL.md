@@ -1,6 +1,6 @@
 # Budget admission control
 
-[#45](https://github.com/sahenjp/rustdsh/issues/45) adds opt-in soft warnings and
+[#45](https://github.com/jimoto-no-llm/rustdsh/issues/45) adds opt-in soft warnings and
 hard admission limits for the verified DSH 0.2.0-rc.2 ACP adapter. New guarded
 jobs and model calls are checked at their entry. Existing calls continue. The
 original native `llm/stream` waterfall covers conversation, title, compaction

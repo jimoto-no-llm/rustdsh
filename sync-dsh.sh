@@ -19,6 +19,10 @@ for a in "$@"; do
     *) echo "unknown arg: $a" >&2; exit 2 ;;
   esac
 done
+case "$CHANNEL" in
+  rc|any) ;;
+  *) echo "unsupported channel: $CHANNEL (use rc or any)" >&2; exit 2 ;;
+esac
 LOGDIR="${HOME}/.local/share/rdsh"
 LOCK="$LOGDIR/sync.lock"
 mkdir -p "$LOGDIR"
@@ -138,7 +142,7 @@ fetch_rdsh_release() {
   # its <asset>.sha256 sidecar. Honors RDSH_RELEASE_BASE (tests: file:///path)
   # and RDSH_SYNC_VERSION (default: latest).
   dest="$1"
-  base="${RDSH_RELEASE_BASE:-https://github.com/sahenjp/rustdsh/releases}"
+  base="${RDSH_RELEASE_BASE:-https://github.com/jimoto-no-llm/rustdsh/releases}"
   ver="${RDSH_SYNC_VERSION:-latest}"
   asset="$(rdsh_release_asset)" || { log "no prebuilt rdsh binary for this host; set RDSH_SYNC_FROM_SOURCE=1 to build"; return 1; }
   if [ "$ver" = "latest" ]; then url="$base/latest/download/$asset"; else url="$base/download/$ver/$asset"; fi
@@ -166,35 +170,62 @@ PKGROOT="$("$NPM" root -g 2>/dev/null)/@deepseek-ai/dsh"
 if [ ! -f "$PKGROOT/package.json" ]; then log "dsh package not found under $PKGROOT"; exit 1; fi
 INSTALLED="$(node -p "require(process.argv[1]).version" "$PKGROOT/package.json" 2>/dev/null)"
 if [ -z "$INSTALLED" ]; then log "cannot read installed version"; exit 1; fi
-ALL="$("$NPM" view @deepseek-ai/dsh versions --json 2>/dev/null | tr -d " [],\"" | tr "," "\n" | grep -E "^[0-9]+\.[0-9]+\.[0-9]+" || true)"
+ALL="$("$NPM" view @deepseek-ai/dsh versions --json 2>/dev/null || true)"
 if [ -z "$ALL" ]; then log "registry unreachable; try later"; exit 0; fi
-# sort -V is GNU-only (absent on macOS/BSD). Use it when present so the
-# ordering is unchanged there; otherwise fall back to an awk key sort
-# (major.minor.patch, then -rc.N after the bare release).
-if printf '1\n' | sort -V >/dev/null 2>&1; then
-  version_sort() { sort -V; }
-else
-  version_sort() {
-    awk '{
-      v=$0; s=$0;
-      rc=""; if (sub(/-rc\./, " ", s)) { split(s, a, " "); s=a[1]; rc=a[2] }
-      tag=(rc=="" ? 0 : 1); n=(rc=="" ? 0 : rc)+0;
-      split(s, p, ".");
-      printf "%d.%d.%d.%d.%09d\t%s\n", p[1], p[2], p[3], tag, n, v
-    }' | sort -t. -k1,1n -k2,2n -k3,3n -k4,4n -k5,5n | cut -f2-
-  }
-fi
+# SemVer 2.0.0 precedence: stable follows its prereleases, numeric identifiers
+# compare numerically, build metadata has no precedence. Use the Node runtime
+# already required above, without a new package or GNU-only sort dependency.
 pick() {
-  case "$CHANNEL" in
-    any) printf "%s\n" $ALL | version_sort | tail -n 1 ;;
-    *) printf "%s\n" $ALL | grep -E "^[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$" | version_sort | tail -n 1 ;;
-  esac
+  node - "$INSTALLED" "$CHANNEL" "$ALL" <<'SEMVER'
+const [installed, channel, versions] = process.argv.slice(2);
+function parse(value) {
+  const match = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(value);
+  if (!match) return null;
+  const pre = match[4]?.split('.') || [];
+  if (pre.some(part => /^[0-9]+$/.test(part) && part.length > 1 && part[0] === '0')) return null;
+  return {value, core:match.slice(1,4).map(BigInt), pre};
 }
-LATEST="$(pick)"
+function compare(a,b) {
+  for (let i=0;i<3;i++) if (a.core[i] !== b.core[i]) return a.core[i] > b.core[i] ? 1 : -1;
+  if (!a.pre.length || !b.pre.length) return a.pre.length ? -1 : b.pre.length ? 1 : 0;
+  for (let i=0;i<Math.max(a.pre.length,b.pre.length);i++) {
+    const x=a.pre[i], y=b.pre[i];
+    if (x === undefined || y === undefined) return x === undefined ? -1 : 1;
+    if (x === y) continue;
+    const nx=/^[0-9]+$/.test(x), ny=/^[0-9]+$/.test(y);
+    if (nx && ny) return BigInt(x) > BigInt(y) ? 1 : -1;
+    if (nx !== ny) return nx ? -1 : 1;
+    return x > y ? 1 : -1;
+  }
+  return 0;
+}
+const current=parse(installed);
+if (!current) {console.error('Installed DSH version is not valid SemVer'); process.exit(1);}
+let candidates;
+try {
+  const data=JSON.parse(versions);
+  candidates=Array.isArray(data) ? data : typeof data === 'string' ? [data] : null;
+  if (!candidates || candidates.some(value => typeof value !== 'string')) throw new Error('Expected version strings');
+} catch {
+  console.error('Registry DSH versions are not valid JSON version strings'); process.exit(1);
+}
+let latest;
+for (const value of candidates) {
+  const candidate=parse(value);
+  if (!candidate || (channel === 'rc' && candidate.pre.length && !/^rc\.(0|[1-9][0-9]*)$/.test(candidate.pre.join('.')))) continue;
+  if (!latest || compare(candidate,latest) > 0) latest=candidate;
+}
+if (!latest) {console.error('No valid DSH version in selected channel'); process.exit(1);}
+console.log(`${latest.value}|${compare(latest,current)}`);
+SEMVER
+}
+SELECTED="$(pick)" || { log "cannot compare DSH versions; binaries untouched"; exit 1; }
+LATEST="${SELECTED%|*}"
+PRECEDENCE="${SELECTED##*|}"
 log "installed=$INSTALLED latest($CHANNEL)=$LATEST"
 DSH_CHANGED=0
-if [ "$INSTALLED" = "$LATEST" ]; then
-  log "dsh up to date"
+if [ "$PRECEDENCE" -le 0 ]; then
+  log "dsh up to date (no newer SemVer in selected channel)"
 else
   DSH_CHANGED=1
   if [ "$CHECK_ONLY" = 1 ]; then log "dsh update available: $LATEST"; fi
