@@ -316,7 +316,18 @@ fn main() {
         "RDSH_SHARED_FILES",
         serde_json::to_string(&cli.share_file).unwrap(),
     );
-    let cfg = rdsh_config::load();
+    // Explicit recovery must work even when the current settings cannot be read.
+    // Every other command still fails closed on a corrupt settings document.
+    let cfg = if matches!(
+        &cli.command,
+        Some(Commands::Settings {
+            action: SettingsAction::Init { force: true }
+        })
+    ) {
+        rdsh_config::RdshSettings::default()
+    } else {
+        rdsh_config::load()
+    };
     let pass = cli.passthrough || passthrough::env_passthrough() || cfg.general.passthrough;
     let slim = !cli.no_slim && !pass && (cli.slim || cfg.general.slim);
     let dry = cli.dry_run || passthrough::env_dry() || cfg.general.dry_run;
@@ -746,8 +757,11 @@ fn doctor() -> anyhow::Result<()> {
     for w in node_wrapper_warnings(shadowed) {
         say(w);
     }
-    say("[rdsh] note: dsh web GUI and `rdsh serve` both default to 3080; co-use with".to_string());
-    say("[rdsh] note: `rdsh serve --port 38080` while dsh web keeps 3080".to_string());
+    say("[rdsh] note: dsh web GUI defaults to 3080; `rdsh serve` defaults to 38080".to_string());
+    say(
+        "[rdsh] note: enable the serve extra first; `rdsh serve --port 0` picks a free port"
+            .to_string(),
+    );
     if orig.is_none() {
         anyhow::bail!("original 'dsh' not found; set DSH_ORIG_BIN or install @deepseek-ai/dsh");
     }

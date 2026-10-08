@@ -130,6 +130,7 @@ test("project state, HTTP/stdio MCP, subscriptions, answers, and auth work toget
     "content-type": "application/json",
   };
   assert.equal((await fetch(dashboard.localUrl + "api/state")).status, 401);
+  assert.equal((await fetch(dashboard.localUrl + "favicon.ico")).status, 204);
   assert.equal(
     (
       await fetch(dashboard.localUrl + "api/state", {

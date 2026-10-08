@@ -277,6 +277,21 @@ fn fetch(base: &str, query: &str) -> anyhow::Result<Vec<Hit>> {
         raw.extend_from_slice(&chunk[..n]);
     }
     let text = String::from_utf8_lossy(&raw);
+    let status = text
+        .lines()
+        .next()
+        .and_then(|line| {
+            let mut parts = line.split_whitespace();
+            let protocol = parts.next()?;
+            if !matches!(protocol, "HTTP/1.0" | "HTTP/1.1") {
+                return None;
+            }
+            parts.next()?.parse::<u16>().ok()
+        })
+        .ok_or_else(|| anyhow::anyhow!("bad HTTP response from {base}"))?;
+    if !(200..300).contains(&status) {
+        anyhow::bail!("SearXNG returned HTTP {status} from {base}");
+    }
     let body = match text.find("\r\n\r\n") {
         Some(i) => &text[i + 4..],
         None => anyhow::bail!("bad HTTP response from {base}"),

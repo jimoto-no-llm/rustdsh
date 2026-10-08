@@ -1,0 +1,28 @@
+%% purpose: Separate native CLI work, delegated model execution, and the optional Node dashboard
+%% owner: rustdsh maintainers
+%% sources: src/main.rs, src/passthrough.rs, src/serve.rs, dashboard/cli.mjs, dashboard/harness.mjs
+%% update_triggers: Dispatch ownership, dashboard modes, or execution boundaries change
+%% last_verified: 2026-10-08
+flowchart LR
+    User["利用者"]
+    Launcher["Rust CLI rdsh"]
+    Dispatch{"処理の入口"}
+    Native["推定・検索・圧縮・一覧"]
+    Gate{"Extrasでserveが有効"}
+    Status["Rust状態画面 / 127.0.0.1"]
+    Original["本家DSH / Node runtime"]
+    Models["モデル通信・会話"]
+    NodeCLI["任意のNode dashboard"]
+    Project["project / 指標・質問・回答"]
+    Harness["harness / Windows・WSL中継"]
+    User --> Launcher
+    Launcher --> Dispatch
+    Dispatch --> Native
+    Dispatch --> Gate
+    Gate --> Status
+    Dispatch --> Original
+    Original --> Models
+    User --> NodeCLI
+    NodeCLI --> Project
+    NodeCLI --> Harness
+    Harness --> Original

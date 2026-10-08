@@ -1,0 +1,32 @@
+%% purpose: Show the supported installation, setup, usage, and recovery path
+%% owner: rustdsh maintainers
+%% sources: install.sh, src/main.rs, src/setup_web.rs, dashboard/cli.mjs
+%% update_triggers: CLI commands, extra gates, setup behavior, or launch platforms change
+%% last_verified: 2026-10-08
+flowchart TD
+    Install["rdshを導入"]
+    Check["版とdoctorで導入確認"]
+    Setup["setup --webで接続・Extrasを設定"]
+    Purpose{"何をしたいか"}
+    Chat["tui / webで本家DSHへ委譲"]
+    Response["選択したモデルの応答を確認"]
+    Native["tokens / search / prune"]
+    Local["serveを有効化して状態画面を開く"]
+    Project["Node dashboardでプロジェクトを開く"]
+    Broken["設定破損で停止"]
+    Backup["元の設定を退避・確認"]
+    Reset["明示的にinit --forceで既定値へ復旧"]
+    Verify["設定とdenyルールを再確認"]
+    Install --> Check
+    Check --> Setup
+    Setup --> Purpose
+    Purpose --> Chat
+    Chat --> Response
+    Purpose --> Native
+    Purpose --> Local
+    Purpose --> Project
+    Check --> Broken
+    Broken --> Backup
+    Backup --> Reset
+    Reset --> Verify
+    Verify --> Setup

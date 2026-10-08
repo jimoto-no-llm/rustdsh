@@ -1,0 +1,7 @@
+{
+  "name": "rdsh-browser-e2e",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node browser.mjs", "test:harness": "node harness-settings.mjs" },
+  "devDependencies": { "playwright": "1.62.1" }
+}

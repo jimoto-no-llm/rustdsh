@@ -34,11 +34,20 @@ rdsh settings set search.max 50
 rdsh settings set context.goal "dsh互換性を維持する"
 rdsh settings set guard.deny '["rm -rf /*","*token*"]'
 rdsh settings unset search.max   # 既定値に戻す
-rdsh context status   # 記憶の状態を見る
+rdsh settings set beta.context_engine true  # 実験機能を使う場合だけ
+rdsh context status   # 有効化後に記憶の状態を見る
 ```
 
 設定は `$DSH_HOME/rdsh.json` に保存され、コマンドと画面で共有されます。
 旧 `rdsh-context.json` は `rdsh.json` に context がないときだけ読みます。
+
+ローカル状態画面とWeb検索のオン／オフは `setup --web` のExtras、または
+`rdsh settings set extras.enable serve,search-web` で変更します。
+ローカル状態画面の既定ポートは38080です。
+
+設定破損時は読み込みを止めます。元のファイルを退避し、既定値へ戻すと決めた
+場合だけ `rdsh settings init --force` を実行してください。
+[復旧後の確認と利用の流れ](USER-FLOW.md#4-設定が読めないとき)。
 
 ## context engine（実験的、既定OFF）
 
