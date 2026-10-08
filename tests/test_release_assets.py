@@ -4,6 +4,8 @@ import io
 from pathlib import Path
 import tarfile
 import tempfile
+import subprocess
+import sys
 import unittest
 import zipfile
 
@@ -16,7 +18,7 @@ spec.loader.exec_module(release)
 
 class ReleaseAssetsTests(unittest.TestCase):
     def setUp(self):
-        self.temporary = tempfile.TemporaryDirectory(prefix="rdsh-release-test-")
+        self.temporary = tempfile.TemporaryDirectory(prefix="rdsh release test ")
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
         for name in release.INSTALLERS:
@@ -94,6 +96,49 @@ class ReleaseAssetsTests(unittest.TestCase):
         path.symlink_to(self.root / release.INSTALLERS[1])
         with self.assertRaisesRegex(ValueError, "missing or invalid"):
             release.verify(self.root)
+
+    def test_draft_retry_reuses_identical_files_and_uploads_only_missing(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            existing = Path(temporary)
+            self.assertEqual(len(release.missing_assets(self.root, existing)), 12)
+            for name in release.INSTALLERS:
+                (existing / name).write_bytes((self.root / name).read_bytes())
+            pending = release.missing_assets(self.root, existing)
+            self.assertEqual(len(pending), 10)
+            self.assertFalse(any(path.name in release.INSTALLERS for path in pending))
+            for path in pending:
+                (existing / path.name).write_bytes(path.read_bytes())
+            self.assertEqual(release.missing_assets(self.root, existing), [])
+
+    def test_draft_retry_refuses_changed_unexpected_or_linked_assets(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            existing = Path(temporary)
+            path = existing / release.INSTALLERS[0]
+            path.write_text("DUMMY_ORIGINAL")
+            with self.assertRaisesRegex(ValueError, "refusing overwrite"):
+                release.missing_assets(self.root, existing)
+            self.assertEqual(path.read_text(), "DUMMY_ORIGINAL")
+            path.unlink()
+            path = existing / "unexpected.txt"
+            path.write_text("DUMMY_ORIGINAL")
+            with self.assertRaisesRegex(ValueError, "unexpected draft asset"):
+                release.missing_assets(self.root, existing)
+            path.unlink()
+            path = existing / release.INSTALLERS[0]
+            path.symlink_to(self.root / release.INSTALLERS[0])
+            with self.assertRaisesRegex(ValueError, "missing or invalid"):
+                release.missing_assets(self.root, existing)
+
+    def test_draft_retry_cli_writes_safe_paths_for_space_containing_directory(self):
+        with tempfile.TemporaryDirectory(prefix="rdsh draft ") as temporary:
+            existing = Path(temporary) / "existing"
+            existing.mkdir()
+            output = Path(temporary) / "pending.txt"
+            result = subprocess.run([sys.executable, str(Path(spec.origin)), str(self.root),
+                                     "--existing-directory", str(existing), "--missing-output", str(output)],
+                                    capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(len(output.read_text().splitlines()), 12)
 
 
 if __name__ == "__main__":

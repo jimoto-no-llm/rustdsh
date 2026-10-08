@@ -5,6 +5,14 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Changed
+
+- Standardize future release notes on the v0.2.0 format, validate annotated tags
+  and version metadata, stage all five builds before publishing, and keep
+  prereleases out of the stable installer channel.
+- Align project metadata, installer and documentation URLs with the canonical
+  `jimoto-no-llm/rustdsh` repository; record label and repository settings.
+
 ## [0.2.0] - 2026-10-08
 
 ### Security
@@ -110,8 +118,8 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 [Unreleased]: #unreleased
 [0.2.0]: docs/releases/v0.2.0.md
-[0.1.5]: https://github.com/sahenjp/rustdsh/compare/v0.1.4...v0.1.5
-[0.1.4]: https://github.com/sahenjp/rustdsh/compare/v0.1.3...v0.1.4
-[0.1.3]: https://github.com/sahenjp/rustdsh/compare/v0.1.2...v0.1.3
-[0.1.2]: https://github.com/sahenjp/rustdsh/releases/tag/v0.1.2
-[0.1.0]: https://github.com/sahenjp/rustdsh/tree/806c583
+[0.1.5]: https://github.com/jimoto-no-llm/rustdsh/compare/v0.1.4...v0.1.5
+[0.1.4]: https://github.com/jimoto-no-llm/rustdsh/compare/v0.1.3...v0.1.4
+[0.1.3]: https://github.com/jimoto-no-llm/rustdsh/compare/v0.1.2...v0.1.3
+[0.1.2]: https://github.com/jimoto-no-llm/rustdsh/releases/tag/v0.1.2
+[0.1.0]: https://github.com/jimoto-no-llm/rustdsh/tree/806c583
