@@ -7,6 +7,9 @@ with raw samples, streaming/growing sessions, concurrent writers, real HTTP and
 original DSH delegation. CLI startup/RSS measurements do not describe Desktop memory
 or the performance of delegated model execution.
 
+For real Codex/Claude tasks, see the [Rust model runner](MODEL_BENCHMARKS.md)
+and [2026-10-08 model runtime results](evidence/model-runtime-20261008.md).
+
 ## Headline numbers
 
 | Case | rdsh | Baseline | Factor |

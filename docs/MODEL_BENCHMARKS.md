@@ -5,6 +5,22 @@ installed official DSH headless profile through the real `rdsh` executable.
 It does not implement an agent loop or invoke provider APIs independently.
 CI runs only the offline acceptance and fence tests; it never uses model credentials.
 
+The [2026-10-08 results](evidence/model-runtime-20261008.md) include failures and
+separate model completion from normal headless shutdown.
+
+```mermaid
+flowchart LR
+  Rust["Rust benchmark runner"] --> Launcher["rdsh or original DSH"]
+  Launcher --> Headless["Official DSH headless"]
+  Headless --> Provider["Codex or Claude"]
+  Headless --> Fence["Fixture tools and request limits"]
+  Provider --> Turn["Committed answer and turn end"]
+  Turn --> Model["Model and Cargo oracle acceptance"]
+  Turn --> Exit["Final event and normal exit acceptance"]
+  Model --> Report["Sanitized report"]
+  Exit --> Report
+```
+
 ## Run locally
 
 Prerequisites: a clean committed checkout, Rust/Cargo, `zstd`, `shasum`, an
@@ -29,6 +45,9 @@ path. The report fingerprints the Rust binary, original launcher and optional
 runtime bundle with SHA-256, and records both versions and the source commit.
 The live runner is verified on macOS; offline Rust tests also run in the repository's
 Linux/macOS/Windows matrix. A new run directory is required each time.
+
+Use `--only-case rust_fix` and optionally `--only-provider anthropic` for a
+bounded follow-up. Follow-up results remain separate from the original benchmark.
 
 ## Conditions and acceptance
 
@@ -88,9 +107,13 @@ results so a model response never hides a broken headless shutdown.
 the official JSON projection does not expose first-token timing. Do not label it
 TTFT or derive generation throughput from it.
 
-Reports include all attempts and failures, successful median/p95/max, tool count,
+Reports include all attempts and failures, successful nearest-rank p50/p95/max, tool count,
 step count, recorded provider attempts, and per-step reported token usage. Cached
 tokens remain separate where the provider supplies them. Three samples have a
 p95 equal to the maximum, so this run does not establish stable tail latency,
 model ranking or Rust launcher overhead amid network/model variability. Use the
 local startup benchmark in [BENCHMARKS.md](BENCHMARKS.md) for launcher overhead.
+The JSON field `median_success_seconds` is nearest-rank p50 (the lower middle
+sample for an even successful sample count). Rust repairs additionally record
+`generated_source_allowed` and `cargo_oracle_passed`; `null` means the Cargo
+oracle was not executed, rather than passed.

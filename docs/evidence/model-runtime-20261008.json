@@ -1,0 +1,1261 @@
+{
+  "all_model_passed": false,
+  "all_passed": false,
+  "architecture": "aarch64",
+  "authentication": "existing official credential provider; normal OAuth refresh permitted; no credential export",
+  "dsh_version": "0.2.0-rc.2",
+  "measurement": "response from spawn to committed turn_end; process lifetime and normal exit tracked separately; first text is not first token",
+  "ordering": "sequential; alternate provider and launcher order every sample; no automatic retries",
+  "original_launcher_sha256": "61647349bd61a5cfff40c338c7d5af767a22f409ddce36feabfb2f693d1e66af",
+  "platform": "macos",
+  "rdsh_sha256": "809b9833e17d01d410e8306c7a7e328dba5845c9b11cd15bd32d476aa9de73ea",
+  "rdsh_version": "rdsh 0.1.5",
+  "runs": [
+    {
+      "answer_ok": false,
+      "case": "response",
+      "configured_reasoning_effort": "high",
+      "configured_retry_limit": 0,
+      "effort_verified": true,
+      "elapsed_seconds": 4.911400667,
+      "exit_code": null,
+      "failure_class": "shutdown_timeout",
+      "final_event_count": 1,
+      "first_committed_text_seconds": 2.8749835839999998,
+      "index": 1,
+      "launcher": "original",
+      "max_model_requests": 1,
+      "model": "gpt-6.1-sol",
+      "model_passed": true,
+      "oracle_ok": true,
+      "passed": false,
+      "provider": "openai-codex",
+      "recorded_provider_attempts": 1,
+      "response_elapsed_seconds": 2.875282792,
+      "retry_attempt_events": 0,
+      "route_ok": true,
+      "sample": 1,
+      "session_request_routes": [
+        [
+          "openai-codex",
+          "gpt-6.1-sol"
+        ]
+      ],
+      "shutdown_timeout": true,
+      "step_count": 1,
+      "step_usage": [
+        {
+          "inputTokens": 232,
+          "outputTokens": 32,
+          "totalTokens": 264
+        }
+      ],
+      "timed_out": false,
+      "tool_call_count": 0,
+      "tool_catalog_ok": true
+    },
+    {
+      "answer_ok": false,
+      "case": "response",
+      "configured_reasoning_effort": "high",
+      "configured_retry_limit": 0,
+      "effort_verified": true,
+      "elapsed_seconds": 5.195342416,
+      "exit_code": null,
+      "failure_class": "shutdown_timeout",
+      "final_event_count": 1,
+      "first_committed_text_seconds": 3.174499125,
+      "index": 2,
+      "launcher": "rdsh",
+      "max_model_requests": 1,
+      "model": "gpt-6.1-sol",
+      "model_passed": true,
+      "oracle_ok": true,
+      "passed": false,
+      "provider": "openai-codex",
+      "recorded_provider_attempts": 1,
+      "response_elapsed_seconds": 3.17561775,
+      "retry_attempt_events": 0,
+      "route_ok": true,
+      "sample": 1,
+      "session_request_routes": [
+        [
+          "openai-codex",
+          "gpt-6.1-sol"
+        ]
+      ],
+      "shutdown_timeout": true,
+      "step_count": 1,
+      "step_usage": [
+        {
+          "inputTokens": 238,
+          "outputTokens": 48,
+          "totalTokens": 286
+        }
+      ],
+      "timed_out": false,
+      "tool_call_count": 0,
+      "tool_catalog_ok": true
+    },
+    {
+      "answer_ok": false,
+      "case": "read",
+      "configured_reasoning_effort": "high",
+      "configured_retry_limit": 0,
+      "effort_verified": true,
+      "elapsed_seconds": 6.621272917,
+      "exit_code": null,
+      "failure_class": "shutdown_timeout",
+      "final_event_count": 1,
+      "first_committed_text_seconds": 4.587005875,
+      "index": 3,
+      "launcher": "rdsh",
+      "max_model_requests": 2,
+      "model": "gpt-6.1-sol",
+      "model_passed": true,
+      "oracle_ok": true,
+      "passed": false,
+      "provider": "openai-codex",
+      "recorded_provider_attempts": 2,
+      "response_elapsed_seconds": 4.5872785,
+      "retry_attempt_events": 0,
+      "route_ok": true,
+      "sample": 1,
+      "session_request_routes": [
+        [
+          "openai-codex",
+          "gpt-6.1-sol"
+        ]
+      ],
+      "shutdown_timeout": true,
+      "step_count": 2,
+      "step_usage": [
+        {
+          "inputTokens": 695,
+          "outputTokens": 19,
+          "totalTokens": 714
+        },
+        {
+          "inputTokens": 824,
+          "outputTokens": 23,
+          "totalTokens": 847
+        }
+      ],
+      "timed_out": false,
+      "tool_call_count": 1,
+      "tool_catalog_ok": true
+    },
+    {
+      "answer_ok": false,
+      "case": "rust_fix",
+      "configured_reasoning_effort": "high",
+      "configured_retry_limit": 0,
+      "effort_verified": true,
+      "elapsed_seconds": 9.753778375,
+      "exit_code": null,
+      "failure_class": "shutdown_timeout",
+      "final_event_count": 1,
+      "first_committed_text_seconds": 7.725073667,
+      "index": 4,
+      "launcher": "rdsh",
+      "max_model_requests": 4,
+      "model": "gpt-6.1-sol",
+      "model_passed": true,
+      "oracle_ok": true,
+      "passed": false,
+      "provider": "openai-codex",
+      "recorded_provider_attempts": 3,
+      "response_elapsed_seconds": 7.72573025,
+      "retry_attempt_events": 0,
+      "route_ok": true,
+      "sample": 1,
+      "session_request_routes": [
+        [
+          "openai-codex",
+          "gpt-6.1-sol"
+        ]
+      ],
+      "shutdown_timeout": true,
+      "step_count": 3,
+      "step_usage": [
+        {
+          "inputTokens": 738,
+          "outputTokens": 20,
+          "totalTokens": 758
+        },
+        {
+          "inputTokens": 860,
+          "outputTokens": 73,
+          "totalTokens": 933
+        },
+        {
+          "inputTokens": 990,
+          "outputTokens": 6,
+          "totalTokens": 996
+        }
+      ],
+      "timed_out": false,
+      "tool_call_count": 2,
+      "tool_catalog_ok": true
+    },
+    {
+      "answer_ok": true,
+      "case": "response",
+      "configured_reasoning_effort": "high",
+      "configured_retry_limit": 0,
+      "effort_verified": true,
+      "elapsed_seconds": 2.289773125,
+      "exit_code": 0,
+      "failure_class": null,
+      "final_event_count": 1,
+      "first_committed_text_seconds": 2.079329917,
+      "index": 5,
+      "launcher": "original",
+      "max_model_requests": 1,
+      "model": "claude-sonnet-5-5",
+      "model_passed": true,
+      "oracle_ok": true,
+      "passed": true,
+      "provider": "anthropic",
+      "recorded_provider_attempts": 1,
+      "response_elapsed_seconds": 2.079608875,
+      "retry_attempt_events": 0,
+      "route_ok": true,
+      "sample": 1,
+      "session_request_routes": [
+        [
+          "anthropic",
+          "claude-sonnet-5-5"
+        ]
+      ],
+      "shutdown_timeout": false,
+      "step_count": 1,
+      "step_usage": [
+        {
+          "inputTokens": 380,
+          "outputTokens": 21,
+          "totalTokens": 401
+        }
+      ],
+      "timed_out": false,
+      "tool_call_count": 0,
+      "tool_catalog_ok": true
+    },
+    {
+      "answer_ok": true,
+      "case": "response",
+      "configured_reasoning_effort": "high",
+      "configured_retry_limit": 0,
+      "effort_verified": true,
+      "elapsed_seconds": 1.8232811249999998,
+      "exit_code": 0,
+      "failure_class": null,
+      "final_event_count": 1,
+      "first_committed_text_seconds": 1.78715725,
+      "index": 6,
+      "launcher": "rdsh",
+      "max_model_requests": 1,
+      "model": "claude-sonnet-5-5",
+      "model_passed": true,
+      "oracle_ok": true,
+      "passed": true,
+      "provider": "anthropic",
+      "recorded_provider_attempts": 1,
+      "response_elapsed_seconds": 1.787723042,
+      "retry_attempt_events": 0,
+      "route_ok": true,
+      "sample": 1,
+      "session_request_routes": [
+        [
+          "anthropic",
+          "claude-sonnet-5-5"
+        ]
+      ],
+      "shutdown_timeout": false,
+      "step_count": 1,
+      "step_usage": [
+        {
+          "inputTokens": 388,
+          "outputTokens": 27,
+          "totalTokens": 415
+        }
+      ],
+      "timed_out": false,
+      "tool_call_count": 0,
+      "tool_catalog_ok": true
+    },
+    {
+      "answer_ok": true,
+      "case": "read",
+      "configured_reasoning_effort": "high",
+      "configured_retry_limit": 0,
+      "effort_verified": true,
+      "elapsed_seconds": 3.138534125,
+      "exit_code": 0,
+      "failure_class": null,
+      "final_event_count": 1,
+      "first_committed_text_seconds": 3.07562625,
+      "index": 7,
+      "launcher": "rdsh",
+      "max_model_requests": 2,
+      "model": "claude-sonnet-5-5",
+      "model_passed": true,
+      "oracle_ok": true,
+      "passed": true,
+      "provider": "anthropic",
+      "recorded_provider_attempts": 2,
+      "response_elapsed_seconds": 3.076022666,
+      "retry_attempt_events": 0,
+      "route_ok": true,
+      "sample": 1,
+      "session_request_routes": [
+        [
+          "anthropic",
+          "claude-sonnet-5-5"
+        ]
+      ],
+      "shutdown_timeout": false,
+      "step_count": 2,
+      "step_usage": [
+        {
+          "cacheWriteTokens": 1657,
+          "inputTokens": 4,
+          "outputTokens": 109,
+          "totalTokens": 1770
+        },
+        {
+          "cacheReadTokens": 1657,
+          "cacheWriteTokens": 257,
+          "inputTokens": 2,
+          "outputTokens": 23,
+          "totalTokens": 1939
+        }
+      ],
+      "timed_out": false,
+      "tool_call_count": 1,
+      "tool_catalog_ok": true
+    },
+    {
+      "answer_ok": true,
+      "case": "rust_fix",
+      "configured_reasoning_effort": "high",
+      "configured_retry_limit": 0,
+      "effort_verified": true,
+      "elapsed_seconds": 4.9454213750000005,
+      "exit_code": 0,
+      "failure_class": null,
+      "final_event_count": 1,
+      "first_committed_text_seconds": 4.883368875,
+      "index": 8,
+      "launcher": "rdsh",
+      "max_model_requests": 4,
+      "model": "claude-sonnet-5-5",
+      "model_passed": true,
+      "oracle_ok": true,
+      "passed": true,
+      "provider": "anthropic",
+      "recorded_provider_attempts": 3,
+      "response_elapsed_seconds": 4.884822042,
+      "retry_attempt_events": 0,
+      "route_ok": true,
+      "sample": 1,
+      "session_request_routes": [
+        [
+          "anthropic",
+          "claude-sonnet-5-5"
+        ]
+      ],
+      "shutdown_timeout": false,
+      "step_count": 3,
+      "step_usage": [
+        {
+          "cacheReadTokens": 1108,
+          "cacheWriteTokens": 622,
+          "inputTokens": 4,
+          "outputTokens": 115,
+          "totalTokens": 1849
+        },
+        {
+          "cacheReadTokens": 1730,
+          "cacheWriteTokens": 260,
+          "inputTokens": 2,
+          "outputTokens": 177,
+          "totalTokens": 2169
+        },
+        {
+          "cacheReadTokens": 1990,
+          "cacheWriteTokens": 260,
+          "inputTokens": 2,
+          "outputTokens": 6,
+          "totalTokens": 2258
+        }
+      ],
+      "timed_out": false,
+      "tool_call_count": 2,
+      "tool_catalog_ok": true
+    },
+    {
+      "answer_ok": true,
+      "case": "response",
+      "configured_reasoning_effort": "high",
+      "configured_retry_limit": 0,
+      "effort_verified": true,
+      "elapsed_seconds": 1.830563459,
+      "exit_code": 0,
+      "failure_class": null,
+      "final_event_count": 1,
+      "first_committed_text_seconds": 1.784630167,
+      "index": 9,
+      "launcher": "rdsh",
+      "max_model_requests": 1,
+      "model": "claude-sonnet-5-5",
+      "model_passed": true,
+      "oracle_ok": true,
+      "passed": true,
+      "provider": "anthropic",
+      "recorded_provider_attempts": 1,
+      "response_elapsed_seconds": 1.784958959,
+      "retry_attempt_events": 0,
+      "route_ok": true,
+      "sample": 2,
+      "session_request_routes": [
+        [
+          "anthropic",
+          "claude-sonnet-5-5"
+        ]
+      ],
+      "shutdown_timeout": false,
+      "step_count": 1,
+      "step_usage": [
+        {
+          "inputTokens": 387,
+          "outputTokens": 26,
+          "totalTokens": 413
+        }
+      ],
+      "timed_out": false,
+      "tool_call_count": 0,
+      "tool_catalog_ok": true
+    },
+    {
+      "answer_ok": true,
+      "case": "response",
+      "configured_reasoning_effort": "high",
+      "configured_retry_limit": 0,
+      "effort_verified": true,
+      "elapsed_seconds": 1.4499503329999999,
+      "exit_code": 0,
+      "failure_class": null,
+      "final_event_count": 1,
+      "first_committed_text_seconds": 1.406720792,
+      "index": 10,
+      "launcher": "original",
+      "max_model_requests": 1,
+      "model": "claude-sonnet-5-5",
+      "model_passed": true,
+      "oracle_ok": true,
+      "passed": true,
+      "provider": "anthropic",
+      "recorded_provider_attempts": 1,
+      "response_elapsed_seconds": 1.407706333,
+      "retry_attempt_events": 0,
+      "route_ok": true,
+      "sample": 2,
+      "session_request_routes": [
+        [
+          "anthropic",
+          "claude-sonnet-5-5"
+        ]
+      ],
+      "shutdown_timeout": false,
+      "step_count": 1,
+      "step_usage": [
+        {
+          "inputTokens": 385,
+          "outputTokens": 26,
+          "totalTokens": 411
+        }
+      ],
+      "timed_out": false,
+      "tool_call_count": 0,
+      "tool_catalog_ok": true
+    },
+    {
+      "answer_ok": true,
+      "case": "read",
+      "configured_reasoning_effort": "high",
+      "configured_retry_limit": 0,
+      "effort_verified": true,
+      "elapsed_seconds": 5.176066833,
+      "exit_code": 0,
+      "failure_class": null,
+      "final_event_count": 1,
+      "first_committed_text_seconds": 5.134781583,
+      "index": 11,
+      "launcher": "rdsh",
+      "max_model_requests": 2,
+      "model": "claude-sonnet-5-5",
+      "model_passed": true,
+      "oracle_ok": true,
+      "passed": true,
+      "provider": "anthropic",
+      "recorded_provider_attempts": 2,
+      "response_elapsed_seconds": 5.135079708,
+      "retry_attempt_events": 0,
+      "route_ok": true,
+      "sample": 2,
+      "session_request_routes": [
+        [
+          "anthropic",
+          "claude-sonnet-5-5"
+        ]
+      ],
+      "shutdown_timeout": false,
+      "step_count": 2,
+      "step_usage": [
+        {
+          "cacheReadTokens": 1108,
+          "cacheWriteTokens": 549,
+          "inputTokens": 4,
+          "outputTokens": 109,
+          "totalTokens": 1770
+        },
+        {
+          "cacheReadTokens": 1657,
+          "cacheWriteTokens": 258,
+          "inputTokens": 2,
+          "outputTokens": 24,
+          "totalTokens": 1941
+        }
+      ],
+      "timed_out": false,
+      "tool_call_count": 1,
+      "tool_catalog_ok": true
+    },
+    {
+      "answer_ok": true,
+      "case": "rust_fix",
+      "configured_reasoning_effort": "high",
+      "configured_retry_limit": 0,
+      "effort_verified": true,
+      "elapsed_seconds": 4.277257458,
+      "exit_code": 0,
+      "failure_class": "runtime_or_oracle_failure",
+      "final_event_count": 1,
+      "first_committed_text_seconds": 4.238223583,
+      "index": 12,
+      "launcher": "rdsh",
+      "max_model_requests": 4,
+      "model": "claude-sonnet-5-5",
+      "model_passed": false,
+      "oracle_ok": false,
+      "passed": false,
+      "provider": "anthropic",
+      "recorded_provider_attempts": 3,
+      "response_elapsed_seconds": 4.238767291,
+      "retry_attempt_events": 0,
+      "route_ok": true,
+      "sample": 2,
+      "session_request_routes": [
+        [
+          "anthropic",
+          "claude-sonnet-5-5"
+        ]
+      ],
+      "shutdown_timeout": false,
+      "step_count": 3,
+      "step_usage": [
+        {
+          "cacheReadTokens": 1108,
+          "cacheWriteTokens": 622,
+          "inputTokens": 4,
+          "outputTokens": 115,
+          "totalTokens": 1849
+        },
+        {
+          "cacheReadTokens": 1730,
+          "cacheWriteTokens": 260,
+          "inputTokens": 2,
+          "outputTokens": 177,
+          "totalTokens": 2169
+        },
+        {
+          "cacheReadTokens": 1990,
+          "cacheWriteTokens": 260,
+          "inputTokens": 2,
+          "outputTokens": 6,
+          "totalTokens": 2258
+        }
+      ],
+      "timed_out": false,
+      "tool_call_count": 2,
+      "tool_catalog_ok": true
+    },
+    {
+      "answer_ok": false,
+      "case": "response",
+      "configured_reasoning_effort": "high",
+      "configured_retry_limit": 0,
+      "effort_verified": true,
+      "elapsed_seconds": 5.671398709,
+      "exit_code": null,
+      "failure_class": "shutdown_timeout",
+      "final_event_count": 1,
+      "first_committed_text_seconds": 3.644323167,
+      "index": 13,
+      "launcher": "rdsh",
+      "max_model_requests": 1,
+      "model": "gpt-6.1-sol",
+      "model_passed": true,
+      "oracle_ok": true,
+      "passed": false,
+      "provider": "openai-codex",
+      "recorded_provider_attempts": 1,
+      "response_elapsed_seconds": 3.645016459,
+      "retry_attempt_events": 0,
+      "route_ok": true,
+      "sample": 2,
+      "session_request_routes": [
+        [
+          "openai-codex",
+          "gpt-6.1-sol"
+        ]
+      ],
+      "shutdown_timeout": true,
+      "step_count": 1,
+      "step_usage": [
+        {
+          "inputTokens": 237,
+          "outputTokens": 48,
+          "totalTokens": 285
+        }
+      ],
+      "timed_out": false,
+      "tool_call_count": 0,
+      "tool_catalog_ok": true
+    },
+    {
+      "answer_ok": false,
+      "case": "response",
+      "configured_reasoning_effort": "high",
+      "configured_retry_limit": 0,
+      "effort_verified": true,
+      "elapsed_seconds": 7.040956292,
+      "exit_code": null,
+      "failure_class": "shutdown_timeout",
+      "final_event_count": 1,
+      "first_committed_text_seconds": 5.019740042,
+      "index": 14,
+      "launcher": "original",
+      "max_model_requests": 1,
+      "model": "gpt-6.1-sol",
+      "model_passed": true,
+      "oracle_ok": true,
+      "passed": false,
+      "provider": "openai-codex",
+      "recorded_provider_attempts": 1,
+      "response_elapsed_seconds": 5.02056925,
+      "retry_attempt_events": 0,
+      "route_ok": true,
+      "sample": 2,
+      "session_request_routes": [
+        [
+          "openai-codex",
+          "gpt-6.1-sol"
+        ]
+      ],
+      "shutdown_timeout": true,
+      "step_count": 1,
+      "step_usage": [
+        {
+          "inputTokens": 234,
+          "outputTokens": 49,
+          "totalTokens": 283
+        }
+      ],
+      "timed_out": false,
+      "tool_call_count": 0,
+      "tool_catalog_ok": true
+    },
+    {
+      "answer_ok": false,
+      "case": "read",
+      "configured_reasoning_effort": "high",
+      "configured_retry_limit": 0,
+      "effort_verified": true,
+      "elapsed_seconds": 8.649409458000001,
+      "exit_code": null,
+      "failure_class": "shutdown_timeout",
+      "final_event_count": 1,
+      "first_committed_text_seconds": 6.6216476669999995,
+      "index": 15,
+      "launcher": "rdsh",
+      "max_model_requests": 2,
+      "model": "gpt-6.1-sol",
+      "model_passed": true,
+      "oracle_ok": true,
+      "passed": false,
+      "provider": "openai-codex",
+      "recorded_provider_attempts": 2,
+      "response_elapsed_seconds": 6.622627583,
+      "retry_attempt_events": 0,
+      "route_ok": true,
+      "sample": 2,
+      "session_request_routes": [
+        [
+          "openai-codex",
+          "gpt-6.1-sol"
+        ]
+      ],
+      "shutdown_timeout": true,
+      "step_count": 2,
+      "step_usage": [
+        {
+          "inputTokens": 695,
+          "outputTokens": 19,
+          "totalTokens": 714
+        },
+        {
+          "inputTokens": 823,
+          "outputTokens": 22,
+          "totalTokens": 845
+        }
+      ],
+      "timed_out": false,
+      "tool_call_count": 1,
+      "tool_catalog_ok": true
+    },
+    {
+      "answer_ok": false,
+      "case": "rust_fix",
+      "configured_reasoning_effort": "high",
+      "configured_retry_limit": 0,
+      "effort_verified": true,
+      "elapsed_seconds": 11.1759695,
+      "exit_code": null,
+      "failure_class": "shutdown_timeout",
+      "final_event_count": 1,
+      "first_committed_text_seconds": 9.130606042,
+      "index": 16,
+      "launcher": "rdsh",
+      "max_model_requests": 4,
+      "model": "gpt-6.1-sol",
+      "model_passed": true,
+      "oracle_ok": true,
+      "passed": false,
+      "provider": "openai-codex",
+      "recorded_provider_attempts": 3,
+      "response_elapsed_seconds": 9.131431708,
+      "retry_attempt_events": 0,
+      "route_ok": true,
+      "sample": 2,
+      "session_request_routes": [
+        [
+          "openai-codex",
+          "gpt-6.1-sol"
+        ]
+      ],
+      "shutdown_timeout": true,
+      "step_count": 3,
+      "step_usage": [
+        {
+          "inputTokens": 738,
+          "outputTokens": 57,
+          "totalTokens": 795
+        },
+        {
+          "inputTokens": 897,
+          "outputTokens": 110,
+          "totalTokens": 1007
+        },
+        {
+          "inputTokens": 1064,
+          "outputTokens": 6,
+          "totalTokens": 1070
+        }
+      ],
+      "timed_out": false,
+      "tool_call_count": 2,
+      "tool_catalog_ok": true
+    },
+    {
+      "answer_ok": false,
+      "case": "response",
+      "configured_reasoning_effort": "high",
+      "configured_retry_limit": 0,
+      "effort_verified": true,
+      "elapsed_seconds": 6.8665945,
+      "exit_code": null,
+      "failure_class": "shutdown_timeout",
+      "final_event_count": 1,
+      "first_committed_text_seconds": 4.82377475,
+      "index": 17,
+      "launcher": "original",
+      "max_model_requests": 1,
+      "model": "gpt-6.1-sol",
+      "model_passed": true,
+      "oracle_ok": true,
+      "passed": false,
+      "provider": "openai-codex",
+      "recorded_provider_attempts": 1,
+      "response_elapsed_seconds": 4.824582959,
+      "retry_attempt_events": 0,
+      "route_ok": true,
+      "sample": 3,
+      "session_request_routes": [
+        [
+          "openai-codex",
+          "gpt-6.1-sol"
+        ]
+      ],
+      "shutdown_timeout": true,
+      "step_count": 1,
+      "step_usage": [
+        {
+          "inputTokens": 235,
+          "outputTokens": 49,
+          "totalTokens": 284
+        }
+      ],
+      "timed_out": false,
+      "tool_call_count": 0,
+      "tool_catalog_ok": true
+    },
+    {
+      "answer_ok": false,
+      "case": "response",
+      "configured_reasoning_effort": "high",
+      "configured_retry_limit": 0,
+      "effort_verified": true,
+      "elapsed_seconds": 6.504302042,
+      "exit_code": null,
+      "failure_class": "shutdown_timeout",
+      "final_event_count": 1,
+      "first_committed_text_seconds": 4.473927084,
+      "index": 18,
+      "launcher": "rdsh",
+      "max_model_requests": 1,
+      "model": "gpt-6.1-sol",
+      "model_passed": true,
+      "oracle_ok": true,
+      "passed": false,
+      "provider": "openai-codex",
+      "recorded_provider_attempts": 1,
+      "response_elapsed_seconds": 4.475209625,
+      "retry_attempt_events": 0,
+      "route_ok": true,
+      "sample": 3,
+      "session_request_routes": [
+        [
+          "openai-codex",
+          "gpt-6.1-sol"
+        ]
+      ],
+      "shutdown_timeout": true,
+      "step_count": 1,
+      "step_usage": [
+        {
+          "inputTokens": 240,
+          "outputTokens": 51,
+          "totalTokens": 291
+        }
+      ],
+      "timed_out": false,
+      "tool_call_count": 0,
+      "tool_catalog_ok": true
+    },
+    {
+      "answer_ok": false,
+      "case": "read",
+      "configured_reasoning_effort": "high",
+      "configured_retry_limit": 0,
+      "effort_verified": true,
+      "elapsed_seconds": 6.781286708,
+      "exit_code": null,
+      "failure_class": "shutdown_timeout",
+      "final_event_count": 1,
+      "first_committed_text_seconds": 4.741122958,
+      "index": 19,
+      "launcher": "rdsh",
+      "max_model_requests": 2,
+      "model": "gpt-6.1-sol",
+      "model_passed": true,
+      "oracle_ok": true,
+      "passed": false,
+      "provider": "openai-codex",
+      "recorded_provider_attempts": 2,
+      "response_elapsed_seconds": 4.741995791,
+      "retry_attempt_events": 0,
+      "route_ok": true,
+      "sample": 3,
+      "session_request_routes": [
+        [
+          "openai-codex",
+          "gpt-6.1-sol"
+        ]
+      ],
+      "shutdown_timeout": true,
+      "step_count": 2,
+      "step_usage": [
+        {
+          "inputTokens": 695,
+          "outputTokens": 19,
+          "totalTokens": 714
+        },
+        {
+          "inputTokens": 825,
+          "outputTokens": 24,
+          "totalTokens": 849
+        }
+      ],
+      "timed_out": false,
+      "tool_call_count": 1,
+      "tool_catalog_ok": true
+    },
+    {
+      "answer_ok": false,
+      "case": "rust_fix",
+      "configured_reasoning_effort": "high",
+      "configured_retry_limit": 0,
+      "effort_verified": true,
+      "elapsed_seconds": 10.782904959,
+      "exit_code": null,
+      "failure_class": "shutdown_timeout",
+      "final_event_count": 1,
+      "first_committed_text_seconds": 8.697891292,
+      "index": 20,
+      "launcher": "rdsh",
+      "max_model_requests": 4,
+      "model": "gpt-6.1-sol",
+      "model_passed": true,
+      "oracle_ok": true,
+      "passed": false,
+      "provider": "openai-codex",
+      "recorded_provider_attempts": 3,
+      "response_elapsed_seconds": 8.6987825,
+      "retry_attempt_events": 0,
+      "route_ok": true,
+      "sample": 3,
+      "session_request_routes": [
+        [
+          "openai-codex",
+          "gpt-6.1-sol"
+        ]
+      ],
+      "shutdown_timeout": true,
+      "step_count": 3,
+      "step_usage": [
+        {
+          "inputTokens": 738,
+          "outputTokens": 20,
+          "totalTokens": 758
+        },
+        {
+          "inputTokens": 860,
+          "outputTokens": 73,
+          "totalTokens": 933
+        },
+        {
+          "inputTokens": 990,
+          "outputTokens": 6,
+          "totalTokens": 996
+        }
+      ],
+      "timed_out": false,
+      "tool_call_count": 2,
+      "tool_catalog_ok": true
+    },
+    {
+      "answer_ok": true,
+      "case": "response",
+      "configured_reasoning_effort": "high",
+      "configured_retry_limit": 0,
+      "effort_verified": true,
+      "elapsed_seconds": 1.890843917,
+      "exit_code": 0,
+      "failure_class": null,
+      "final_event_count": 1,
+      "first_committed_text_seconds": 1.830359584,
+      "index": 21,
+      "launcher": "original",
+      "max_model_requests": 1,
+      "model": "claude-sonnet-5-5",
+      "model_passed": true,
+      "oracle_ok": true,
+      "passed": true,
+      "provider": "anthropic",
+      "recorded_provider_attempts": 1,
+      "response_elapsed_seconds": 1.8311323750000001,
+      "retry_attempt_events": 0,
+      "route_ok": true,
+      "sample": 3,
+      "session_request_routes": [
+        [
+          "anthropic",
+          "claude-sonnet-5-5"
+        ]
+      ],
+      "shutdown_timeout": false,
+      "step_count": 1,
+      "step_usage": [
+        {
+          "inputTokens": 383,
+          "outputTokens": 25,
+          "totalTokens": 408
+        }
+      ],
+      "timed_out": false,
+      "tool_call_count": 0,
+      "tool_catalog_ok": true
+    },
+    {
+      "answer_ok": true,
+      "case": "response",
+      "configured_reasoning_effort": "high",
+      "configured_retry_limit": 0,
+      "effort_verified": true,
+      "elapsed_seconds": 2.173180125,
+      "exit_code": 0,
+      "failure_class": null,
+      "final_event_count": 1,
+      "first_committed_text_seconds": 2.129206625,
+      "index": 22,
+      "launcher": "rdsh",
+      "max_model_requests": 1,
+      "model": "claude-sonnet-5-5",
+      "model_passed": true,
+      "oracle_ok": true,
+      "passed": true,
+      "provider": "anthropic",
+      "recorded_provider_attempts": 1,
+      "response_elapsed_seconds": 2.129797709,
+      "retry_attempt_events": 0,
+      "route_ok": true,
+      "sample": 3,
+      "session_request_routes": [
+        [
+          "anthropic",
+          "claude-sonnet-5-5"
+        ]
+      ],
+      "shutdown_timeout": false,
+      "step_count": 1,
+      "step_usage": [
+        {
+          "inputTokens": 386,
+          "outputTokens": 24,
+          "totalTokens": 410
+        }
+      ],
+      "timed_out": false,
+      "tool_call_count": 0,
+      "tool_catalog_ok": true
+    },
+    {
+      "answer_ok": true,
+      "case": "read",
+      "configured_reasoning_effort": "high",
+      "configured_retry_limit": 0,
+      "effort_verified": true,
+      "elapsed_seconds": 3.756844083,
+      "exit_code": 0,
+      "failure_class": null,
+      "final_event_count": 1,
+      "first_committed_text_seconds": 3.711322,
+      "index": 23,
+      "launcher": "rdsh",
+      "max_model_requests": 2,
+      "model": "claude-sonnet-5-5",
+      "model_passed": true,
+      "oracle_ok": true,
+      "passed": true,
+      "provider": "anthropic",
+      "recorded_provider_attempts": 2,
+      "response_elapsed_seconds": 3.712165416,
+      "retry_attempt_events": 0,
+      "route_ok": true,
+      "sample": 3,
+      "session_request_routes": [
+        [
+          "anthropic",
+          "claude-sonnet-5-5"
+        ]
+      ],
+      "shutdown_timeout": false,
+      "step_count": 2,
+      "step_usage": [
+        {
+          "cacheReadTokens": 1108,
+          "cacheWriteTokens": 549,
+          "inputTokens": 4,
+          "outputTokens": 109,
+          "totalTokens": 1770
+        },
+        {
+          "cacheReadTokens": 1657,
+          "cacheWriteTokens": 257,
+          "inputTokens": 2,
+          "outputTokens": 23,
+          "totalTokens": 1939
+        }
+      ],
+      "timed_out": false,
+      "tool_call_count": 1,
+      "tool_catalog_ok": true
+    },
+    {
+      "answer_ok": true,
+      "case": "rust_fix",
+      "configured_reasoning_effort": "high",
+      "configured_retry_limit": 0,
+      "effort_verified": true,
+      "elapsed_seconds": 3.794601375,
+      "exit_code": 0,
+      "failure_class": null,
+      "final_event_count": 1,
+      "first_committed_text_seconds": 3.731739625,
+      "index": 24,
+      "launcher": "rdsh",
+      "max_model_requests": 4,
+      "model": "claude-sonnet-5-5",
+      "model_passed": true,
+      "oracle_ok": true,
+      "passed": true,
+      "provider": "anthropic",
+      "recorded_provider_attempts": 3,
+      "response_elapsed_seconds": 3.7324699580000003,
+      "retry_attempt_events": 0,
+      "route_ok": true,
+      "sample": 3,
+      "session_request_routes": [
+        [
+          "anthropic",
+          "claude-sonnet-5-5"
+        ]
+      ],
+      "shutdown_timeout": false,
+      "step_count": 3,
+      "step_usage": [
+        {
+          "cacheReadTokens": 1108,
+          "cacheWriteTokens": 622,
+          "inputTokens": 4,
+          "outputTokens": 115,
+          "totalTokens": 1849
+        },
+        {
+          "cacheReadTokens": 1730,
+          "cacheWriteTokens": 260,
+          "inputTokens": 2,
+          "outputTokens": 177,
+          "totalTokens": 2169
+        },
+        {
+          "cacheReadTokens": 1990,
+          "cacheWriteTokens": 260,
+          "inputTokens": 2,
+          "outputTokens": 6,
+          "totalTokens": 2258
+        }
+      ],
+      "timed_out": false,
+      "tool_call_count": 2,
+      "tool_catalog_ok": true
+    }
+  ],
+  "runtime_artifact_sha256": "18d5036bbb58eaff41d351ede99314b8d06505aec06fb2e164c49874ada30f9e",
+  "samples_per_condition": 3,
+  "schema": 1,
+  "source_commit": "c3d59d901ab2a43f90104bd19915f1103012a3e6",
+  "started_unix_seconds": 1791423010,
+  "summaries": [
+    {
+      "attempts": 3,
+      "case": "response",
+      "launcher": "original",
+      "max_success_seconds": 5.02056925,
+      "median_success_seconds": 4.824582959,
+      "model": "gpt-6.1-sol",
+      "p95_success_seconds": 5.02056925,
+      "passed": 3,
+      "runtime_passed": 0
+    },
+    {
+      "attempts": 3,
+      "case": "response",
+      "launcher": "rdsh",
+      "max_success_seconds": 4.475209625,
+      "median_success_seconds": 3.645016459,
+      "model": "gpt-6.1-sol",
+      "p95_success_seconds": 4.475209625,
+      "passed": 3,
+      "runtime_passed": 0
+    },
+    {
+      "attempts": 3,
+      "case": "read",
+      "launcher": "rdsh",
+      "max_success_seconds": 6.622627583,
+      "median_success_seconds": 4.741995791,
+      "model": "gpt-6.1-sol",
+      "p95_success_seconds": 6.622627583,
+      "passed": 3,
+      "runtime_passed": 0
+    },
+    {
+      "attempts": 3,
+      "case": "rust_fix",
+      "launcher": "rdsh",
+      "max_success_seconds": 9.131431708,
+      "median_success_seconds": 8.6987825,
+      "model": "gpt-6.1-sol",
+      "p95_success_seconds": 9.131431708,
+      "passed": 3,
+      "runtime_passed": 0
+    },
+    {
+      "attempts": 3,
+      "case": "response",
+      "launcher": "original",
+      "max_success_seconds": 2.079608875,
+      "median_success_seconds": 1.8311323750000001,
+      "model": "claude-sonnet-5-5",
+      "p95_success_seconds": 2.079608875,
+      "passed": 3,
+      "runtime_passed": 3
+    },
+    {
+      "attempts": 3,
+      "case": "response",
+      "launcher": "rdsh",
+      "max_success_seconds": 2.129797709,
+      "median_success_seconds": 1.787723042,
+      "model": "claude-sonnet-5-5",
+      "p95_success_seconds": 2.129797709,
+      "passed": 3,
+      "runtime_passed": 3
+    },
+    {
+      "attempts": 3,
+      "case": "read",
+      "launcher": "rdsh",
+      "max_success_seconds": 5.135079708,
+      "median_success_seconds": 3.712165416,
+      "model": "claude-sonnet-5-5",
+      "p95_success_seconds": 5.135079708,
+      "passed": 3,
+      "runtime_passed": 3
+    },
+    {
+      "attempts": 3,
+      "case": "rust_fix",
+      "launcher": "rdsh",
+      "max_success_seconds": 4.884822042,
+      "median_success_seconds": 3.7324699580000003,
+      "model": "claude-sonnet-5-5",
+      "p95_success_seconds": 4.884822042,
+      "passed": 2,
+      "runtime_passed": 2
+    }
+  ]
+}
