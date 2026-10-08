@@ -588,6 +588,8 @@ fn web_search_gate_and_real_http_results_and_failure() {
                     Err(e) => panic!("{e}"),
                 }
             };
+            // Accepted sockets can inherit the listener's nonblocking mode.
+            stream.set_nonblocking(false).unwrap();
             stream
                 .set_read_timeout(Some(Duration::from_secs(5)))
                 .unwrap();
