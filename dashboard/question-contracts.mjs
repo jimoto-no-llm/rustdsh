@@ -56,6 +56,7 @@ export function normalizeDecision(input) {
     "conditions",
     "cost",
     "expires_at",
+    "consumer_id",
   ]);
   check(
     ["consultation", "approval"].includes(input.kind),
@@ -143,6 +144,15 @@ export function normalizeDecision(input) {
     cost,
     expires_at: timestamp(input.expires_at),
   };
+  // Omit this optional field for old cards so their canonical fingerprints
+  // and stored revisions remain byte-compatible.
+  if (input.consumer_id !== undefined) {
+    result.consumer_id = identifier(input.consumer_id, "consumer_id");
+    check(
+      target?.run_id && target?.session_id,
+      "An answer consumer requires exact run/session IDs",
+    );
+  }
   if (result.kind === "approval") {
     check(
       target?.action_id &&
@@ -367,6 +377,7 @@ function changedFields(before, after) {
     conditions: "条件",
     cost: "費用上限",
     expires_at: "期限",
+    consumer_id: "回答consumer",
   };
   const previous = { ...before, ...before.decision },
     next = { ...after, ...after.decision };

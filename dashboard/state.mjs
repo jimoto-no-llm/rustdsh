@@ -9,6 +9,14 @@ import {
   feedbackValidity,
   validateQuestionContracts,
 } from "./question-contracts.mjs";
+import {
+  registerReplyConsumer,
+  recordAnswerApplication,
+  validateReplyRecipient,
+  applyReplyAck,
+  publicAnswerApplications,
+  validateAnswerApplications,
+} from "./answer-applications.mjs";
 
 // Bucket D display notes (no schema change; schema stays 1):
 // #12 task contract, #13 review inbox, #14 outcome cards, #15 dependencies.
@@ -91,11 +99,25 @@ export class ProjectStore {
         "Dashboard state belongs to a different project or version",
       );
     validateQuestionContracts(value);
+    validateAnswerApplications(value);
     return new ProjectStore(project, value);
   }
   async mutate(operation, input) {
     const next = structuredClone(this.value);
     applyOperation(next, operation, input);
+    return this.commit(next, operation, input);
+  }
+  async mutateReply(operation, input, context) {
+    const next = structuredClone(this.value);
+    const result =
+      operation === "register"
+        ? registerReplyConsumer(next, input)
+        : applyReplyAck(next, input, context);
+    validateAnswerApplications(next);
+    await this.commit(next);
+    return structuredClone(result);
+  }
+  async commit(next, operation = null, input = {}) {
     next.revision++;
     next.updated_at = new Date().toISOString();
     const names = {
@@ -111,29 +133,36 @@ export class ProjectStore {
         : operation === "question"
           ? input.question || input.cancel_reason
           : input.title || "指標を更新";
-    next.changes ||= [];
-    next.changes.push({
-      eventId: `evt_${this.project.id}_${next.revision}`,
-      name: names[operation],
-      timestamp: next.updated_at,
-      data: {
-        project_id: this.project.id,
-        revision: next.revision,
-        entity_id: input.id || "",
-        summary: String(summary).slice(0, 1000),
-      },
-      cursor: null,
-    });
-    next.changes = next.changes.slice(-10000);
+    if (operation) {
+      next.changes ||= [];
+      next.changes.push({
+        eventId: `evt_${this.project.id}_${next.revision}`,
+        name: names[operation],
+        timestamp: next.updated_at,
+        data: {
+          project_id: this.project.id,
+          revision: next.revision,
+          entity_id: input.id || "",
+          summary: String(summary).slice(0, 1000),
+        },
+        cursor: null,
+      });
+      next.changes = next.changes.slice(-10000);
+    }
     await writeJson(path.join(this.project.directory, "state.json"), next);
     this.value = next;
     return next;
   }
 }
-export function publicState(value) {
+export function publicState(value, observations, deliveries) {
   const { changes, ...visible } = value;
   const contracts = publicQuestionContracts(value);
-  return contracts
+  const applications = publicAnswerApplications(
+    value,
+    observations,
+    deliveries,
+  );
+  const result = contracts
     ? {
         ...visible,
         question_contracts: contracts,
@@ -142,6 +171,9 @@ export function publicState(value) {
         ),
       }
     : visible;
+  return applications
+    ? { ...result, answer_applications: applications }
+    : result;
 }
 function text(value, label, max = 8000) {
   if (typeof value !== "string" || !value.trim() || value.length > max)
@@ -228,6 +260,10 @@ export function applyOperation(state, operation, input) {
         input.expected_revision !== undefined
       ) {
         changeQuestionContract(state, input);
+        validateReplyRecipient(
+          state,
+          state.question_contracts.cards[input.id].snapshot.decision,
+        );
         break;
       }
       // #13 review inbox: the inbox shows only answer === null, ordered by
@@ -274,6 +310,7 @@ export function applyOperation(state, operation, input) {
         created_at: question.answered_at,
         ...(contract || {}),
       });
+      recordAnswerApplication(state, state.feedback.at(-1));
       break;
     }
     case "event": {

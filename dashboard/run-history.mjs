@@ -90,6 +90,8 @@ const outcomes = [
   null,
   "session_attached",
   "prompt_result_received",
+  "prompt_refused",
+  "prompt_limit_reached",
   "cancelled_result",
   "process_exit_confirmed",
 ];
@@ -257,7 +259,18 @@ function validateData(type, data) {
     );
   else if (type === "command")
     check(
-      exact(data, ["command_id", "operation", "phase", "ack_id", "outcome"]) &&
+      (exact(data, ["command_id", "operation", "phase", "ack_id", "outcome"]) ||
+        (exact(data, [
+          "command_id",
+          "operation",
+          "phase",
+          "ack_id",
+          "outcome",
+          "input_hash",
+        ]) &&
+          data.operation === "send" &&
+          typeof data.input_hash === "string" &&
+          /^[0-9a-f]{64}$/.test(data.input_hash))) &&
         uuid(data.command_id, "cmd") &&
         operations.includes(data.operation) &&
         phases.includes(data.phase) &&
@@ -371,6 +384,8 @@ function apply(state, event) {
         check(
           existing.run_id === id &&
             existing.operation === data.operation &&
+            (data.input_hash === undefined ||
+              data.input_hash === existing.input_hash) &&
             phaseNext[existing.phase].includes(data.phase),
         );
         Object.assign(existing, data, { updated_at: event.observed_at });
@@ -697,7 +712,12 @@ export class RunHistory {
         });
     });
   }
-  async recordCommand(id, operation, command_id = "cmd_" + randomUUID()) {
+  async recordCommand(
+    id,
+    operation,
+    command_id = "cmd_" + randomUUID(),
+    input_hash = null,
+  ) {
     check(
       operations.includes(operation) && uuid(command_id, "cmd"),
       "invalid_command",
@@ -710,6 +730,7 @@ export class RunHistory {
         phase: "recorded",
         ack_id: null,
         outcome: null,
+        ...(input_hash === null ? {} : { input_hash }),
       });
       return command_id;
     });

@@ -62,6 +62,7 @@ const decision = object(
       ["currency", "max"],
     ),
     expires_at: { type: "string", format: "date-time" },
+    consumer_id: string,
   },
   ["kind"],
 );
@@ -130,7 +131,7 @@ export const tools = [
   {
     name: "dashboard_get_feedback",
     description:
-      "Read durable human answers after a sequence cursor. Pass next_cursor on the next call. Reads never consume or delete feedback; poll at appropriate workflow checkpoints if resource subscriptions are unavailable.",
+      "Read durable human answers after a sequence cursor. Pass next_cursor on the next call. Reads never consume, acknowledge or apply feedback. A consumer-bound reply has a stable reply_command_id; application acknowledgements require its separate run/session credential. Poll at appropriate workflow checkpoints if resource subscriptions are unavailable.",
     inputSchema: object({ after: { type: "integer", minimum: 0 } }),
   },
   {

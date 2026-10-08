@@ -17,6 +17,9 @@ import { Checkpoints } from "./checkpoints.mjs";
 import { AcceptanceStore } from "./acceptance.mjs";
 import { ModelRouting } from "./model-routing.mjs";
 import { requestedSelection, validSelection } from "./model-selection.mjs";
+import { ReplyConsumer } from "./reply-consumer.mjs";
+import { ProjectStore, publicState } from "./state.mjs";
+import { setTimeout as delay } from "node:timers/promises";
 
 const help = `rdsh-dashboard project --project <directory> [--port <port>] [--no-tailscale] [--open]
 rdsh-dashboard harness [--port 38081] [--harness-port 3081] [--no-tailscale] [--open]
@@ -34,11 +37,13 @@ rdsh-dashboard checkpoint record|list|inspect|resume|start-new --project <direct
 rdsh-dashboard acceptance define|run|report|inspect --project <directory> --task-id <id> [--criterion-id <id>] [--criteria-file <json>] [--argv-file <json>] [--result-file <json>] [--scope full|partial] [--timeout-ms <ms>] [--image <relative-path>]
 rdsh-dashboard routing bind|inspect|probe|allow-change --project <directory> --run-id <id> [--route-file <json>] [--authorization-file <json>] [--executable <original-dsh>] [--entrypoint <bin.js>]
 rdsh-dashboard session-ledger list|record|resolve|start|resume --project <directory> [--run-id <run_id>] [--task-id <id>] [--session-id <id>] [--label <name>] [--provider <name>] [--cwd <directory>] [--cli <name>] [--executable <original-dsh>] [--entrypoint <bin.js>]
+rdsh-dashboard reply-consumer inspect|once|serve --project <directory> [--run-id <run_id>] [--command-id <reply_id>] [--executable <original-dsh>] [--entrypoint <bin.js>]
 
 Project mode: project metrics, tasks, questions, human feedback, and /mcp.
 Harness mode: a separate managed DeepSeek Harness Web UI and QR landing page.
 Tailscale Serve shares each loopback server privately over HTTPS.
 Session-ledger start/resume confirms the native ID then stops its owned ACP process; it sends no prompt.
+Reply-consumer once/serve explicitly resumes that exact native session and sends current human replies once. Replies grant no new execution permissions. Missing results block replay.
 `;
 const { values, positionals } = parseArgs({
   allowPositionals: true,
@@ -81,6 +86,7 @@ const { values, positionals } = parseArgs({
     image: { type: "string", multiple: true },
     "route-file": { type: "string" },
     "authorization-file": { type: "string" },
+    "command-id": { type: "string" },
     help: { type: "boolean", short: "h" },
   },
 });
@@ -171,6 +177,97 @@ try {
     throw new Error("Model route options require routing");
   if (values.help || !command) {
     console.log(help);
+  } else if (command === "reply-consumer") {
+    const action = positionals[1];
+    const allowed = new Set([
+      "project",
+      "run-id",
+      "command-id",
+      "executable",
+      "entrypoint",
+      "help",
+    ]);
+    if (
+      positionals.length !== 2 ||
+      !["inspect", "once", "serve"].includes(action) ||
+      Object.keys(values).some((key) => !allowed.has(key))
+    )
+      throw new Error(
+        "Specify reply-consumer inspect, once or serve with supported options",
+      );
+    const project = await identity(values.project || process.cwd());
+    if (action === "inspect") {
+      if (values.executable || values.entrypoint)
+        throw new Error("Reply inspection never launches a CLI");
+      const state = publicState((await ProjectStore.open(project)).value);
+      const commands = Object.values(
+        state.answer_applications?.commands || {},
+      ).filter(
+        (item) =>
+          (!values["run-id"] || item.run_id === values["run-id"]) &&
+          (!values["command-id"] || item.command_id === values["command-id"]),
+      );
+      console.log(
+        JSON.stringify(
+          { project_id: project.id, mode: "read_only", commands },
+          null,
+          2,
+        ),
+      );
+    } else {
+      if (values.entrypoint && !values.executable)
+        throw new Error("An entrypoint requires the original executable");
+      if (!values["run-id"] || values["command-id"])
+        throw new Error(
+          "Reply consumption requires an exact --run-id; individual command IDs are for inspection only",
+        );
+      const ledger = await SessionLedger.open(project);
+      const attached = await attachRecordedSession({
+        ledger,
+        run_id: values["run-id"],
+        command: values.executable
+          ? [
+              values.executable,
+              ...(values.entrypoint ? [values.entrypoint] : []),
+            ]
+          : undefined,
+      });
+      const controller = new AbortController();
+      const stop = () => {
+        controller.abort();
+        void attached.adapter.stop().catch(() => {});
+      };
+      for (const signal of ["SIGINT", "SIGTERM"]) process.once(signal, stop);
+      try {
+        const consumer = await ReplyConsumer.open({ project, attached });
+        console.log(
+          JSON.stringify({
+            consumer_id: consumer.consumer.consumer_id,
+            run_id: attached.record.run_id,
+            session_id: attached.record.cli_session_id,
+          }),
+        );
+        do {
+          const result = await consumer.poll();
+          if (result.processed.length || action === "once")
+            console.log(JSON.stringify(result));
+          if (result.blocked) {
+            process.exitCode = 1;
+            break;
+          }
+          if (action === "once" || controller.signal.aborted) break;
+          await delay(2000, undefined, { signal: controller.signal }).catch(
+            (error) => {
+              if (error.name !== "AbortError") throw error;
+            },
+          );
+        } while (!controller.signal.aborted);
+      } finally {
+        for (const signal of ["SIGINT", "SIGTERM"])
+          process.removeListener(signal, stop);
+        await attached.adapter.stop();
+      }
+    }
   } else if (command === "routing") {
     const action = positionals[1];
     if (

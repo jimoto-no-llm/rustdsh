@@ -191,6 +191,22 @@ if (process.argv.includes("--version")) {
           ...(routeOptions() ? { configOptions: routeOptions() } : {}),
         });
     } else if (msg.method === "session/prompt") {
+      if (
+        ["reply_effect", "reply_effect_lost", "reply_refusal"].includes(mode)
+      ) {
+        fs.appendFileSync(
+          process.env.RDSH_ADAPTER_FIXTURE_REPLY_COUNTER,
+          "effect\n",
+        );
+        if (mode === "reply_effect_lost") {
+          process.exit(9);
+          return;
+        }
+        if (mode === "reply_refusal") {
+          reply(msg.id, { stopReason: "refusal" });
+          return;
+        }
+      }
       if (mode === "route_drift")
         output({
           jsonrpc: "2.0",

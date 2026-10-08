@@ -1,4 +1,5 @@
 import { renderQuestionCards } from "./question-cards-ui.mjs";
+import { renderAnswerApplications } from "./answer-applications-ui.mjs";
 
 const $ = (id) => document.getElementById(id);
 const base = location.pathname.startsWith("/_rdsh") ? "/_rdsh/" : "/";
@@ -159,6 +160,7 @@ function render(state) {
     api,
     refreshState,
   });
+  renderAnswerApplications($("reply-status"), state, node);
   $("events").replaceChildren(
     ...state.events
       .slice(-30)

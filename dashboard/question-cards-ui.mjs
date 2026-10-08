@@ -98,6 +98,7 @@ export function renderQuestionCards(
                 .join(" · ")
             : "指定なし",
         );
+        if (decision.consumer_id) add("回答consumer", decision.consumer_id);
         const previous = contract.history.at(-1)?.snapshot.decision;
         if (previous && contract.changed_fields.includes("費用上限"))
           article.append(

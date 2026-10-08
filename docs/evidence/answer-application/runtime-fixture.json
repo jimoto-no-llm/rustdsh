@@ -1,0 +1,602 @@
+{
+  "schema": 1,
+  "observed_at": "2026-10-06T00:57:18.544Z",
+  "source_before": "fc6cae9c91b84519f0ca483aa00ad610b576b18a",
+  "source_after": "working tree for issue 41",
+  "transport": "actual original ACP profile client with instrumented fixture peer; no provider/model calls",
+  "questions": [
+    {
+      "id": "Q1",
+      "question": "テスト失敗への対応をどう進めますか？",
+      "urgency": "normal",
+      "default_action": "",
+      "created_at": "2026-10-06T00:35:10.341Z",
+      "answer": "先に失敗したテストを直してください",
+      "answered_at": "2026-10-06T00:35:44.185Z"
+    },
+    {
+      "id": "Q2",
+      "question": "拒否された回答入力の状態を確認",
+      "urgency": "normal",
+      "default_action": "",
+      "created_at": "2026-10-06T00:41:42.779Z",
+      "answer": "先に失敗したテストを直してください",
+      "answered_at": "2026-10-06T00:41:43.116Z"
+    },
+    {
+      "id": "Q3",
+      "question": "入力の応答が欠けた場合の状態を確認",
+      "urgency": "normal",
+      "default_action": "",
+      "created_at": "2026-10-06T00:42:58.992Z",
+      "answer": "先に失敗したテストを直してください",
+      "answered_at": "2026-10-06T00:42:59.341Z"
+    },
+    {
+      "id": "Q4",
+      "question": "回答を保存したまま対象が終了した状態を確認",
+      "urgency": "normal",
+      "default_action": "",
+      "created_at": "2026-10-06T00:55:14.879Z",
+      "answer": "先に失敗したテストを直してください",
+      "answered_at": "2026-10-06T00:55:15.255Z"
+    }
+  ],
+  "question_contracts": {
+    "schema": 1,
+    "cards": {
+      "Q1": {
+        "revision": 1,
+        "fingerprint": "c55e26df5a98b6cdef76d5ec6fe2ae9439e131271f91b661781f0f964e64b82e",
+        "snapshot": {
+          "question": "テスト失敗への対応をどう進めますか？",
+          "urgency": "normal",
+          "default_action": "",
+          "decision": {
+            "kind": "consultation",
+            "target": {
+              "task_id": "T1",
+              "run_id": "run_0b18e09f-825a-4c7a-84a7-0c46e8a53030",
+              "session_id": "fixture-session",
+              "action_id": null,
+              "revision": "input-v1"
+            },
+            "choices": [],
+            "recommended_choice": null,
+            "recommendation_reason": "",
+            "diff": "",
+            "impact": "",
+            "conditions": "",
+            "cost": null,
+            "expires_at": null,
+            "consumer_id": "consumer_5ec0147034d3d2e0e878197d503aeafb"
+          }
+        },
+        "status": "answered",
+        "created_at": "2026-10-06T00:35:10.341Z",
+        "updated_at": "2026-10-06T00:35:44.185Z",
+        "answer": {
+          "text": "先に失敗したテストを直してください",
+          "choice_id": null,
+          "answered_at": "2026-10-06T00:35:44.185Z",
+          "contract_fingerprint": "c55e26df5a98b6cdef76d5ec6fe2ae9439e131271f91b661781f0f964e64b82e"
+        },
+        "cancel_reason": null,
+        "history": [],
+        "changed_fields": [],
+        "execution_authorized": false
+      },
+      "Q2": {
+        "revision": 1,
+        "fingerprint": "f6bd0680fe51f0456fd3bd3b92c6b20a6edaeed1562bc28f03e5f45955972941",
+        "snapshot": {
+          "question": "拒否された回答入力の状態を確認",
+          "urgency": "normal",
+          "default_action": "",
+          "decision": {
+            "kind": "consultation",
+            "target": {
+              "task_id": "T1",
+              "run_id": "run_a6161541-5881-47d5-9d66-db1a2ad83c08",
+              "session_id": "fixture-session",
+              "action_id": null,
+              "revision": "input-v1"
+            },
+            "choices": [],
+            "recommended_choice": null,
+            "recommendation_reason": "",
+            "diff": "",
+            "impact": "",
+            "conditions": "",
+            "cost": null,
+            "expires_at": null,
+            "consumer_id": "consumer_1b4031803a9ef1dfce1a4470a91c6025"
+          }
+        },
+        "status": "answered",
+        "created_at": "2026-10-06T00:41:42.779Z",
+        "updated_at": "2026-10-06T00:41:43.116Z",
+        "answer": {
+          "text": "先に失敗したテストを直してください",
+          "choice_id": null,
+          "answered_at": "2026-10-06T00:41:43.116Z",
+          "contract_fingerprint": "f6bd0680fe51f0456fd3bd3b92c6b20a6edaeed1562bc28f03e5f45955972941"
+        },
+        "cancel_reason": null,
+        "history": [],
+        "changed_fields": [],
+        "execution_authorized": false
+      },
+      "Q3": {
+        "revision": 1,
+        "fingerprint": "1c1aa54948767f588a92f1039ab3ac1731a5e496c6813485ef8024501bd40349",
+        "snapshot": {
+          "question": "入力の応答が欠けた場合の状態を確認",
+          "urgency": "normal",
+          "default_action": "",
+          "decision": {
+            "kind": "consultation",
+            "target": {
+              "task_id": "T1",
+              "run_id": "run_0f7e6ff5-5a86-4a3a-ae77-2b5984dad94f",
+              "session_id": "fixture-session",
+              "action_id": null,
+              "revision": "input-v1"
+            },
+            "choices": [],
+            "recommended_choice": null,
+            "recommendation_reason": "",
+            "diff": "",
+            "impact": "",
+            "conditions": "",
+            "cost": null,
+            "expires_at": null,
+            "consumer_id": "consumer_f2e46d40abeb546046f1869c5aea27ce"
+          }
+        },
+        "status": "answered",
+        "created_at": "2026-10-06T00:42:58.992Z",
+        "updated_at": "2026-10-06T00:42:59.341Z",
+        "answer": {
+          "text": "先に失敗したテストを直してください",
+          "choice_id": null,
+          "answered_at": "2026-10-06T00:42:59.341Z",
+          "contract_fingerprint": "1c1aa54948767f588a92f1039ab3ac1731a5e496c6813485ef8024501bd40349"
+        },
+        "cancel_reason": null,
+        "history": [],
+        "changed_fields": [],
+        "execution_authorized": false
+      },
+      "Q4": {
+        "revision": 1,
+        "fingerprint": "a8b264cdeb69796d52753464e6cfe66bf034bf11fb89b893e66d01d314348b16",
+        "snapshot": {
+          "question": "回答を保存したまま対象が終了した状態を確認",
+          "urgency": "normal",
+          "default_action": "",
+          "decision": {
+            "kind": "consultation",
+            "target": {
+              "task_id": "T1",
+              "run_id": "run_6dffd0a9-b912-409c-a54f-8d43a77a8493",
+              "session_id": "fixture-session",
+              "action_id": null,
+              "revision": "input-v1"
+            },
+            "choices": [],
+            "recommended_choice": null,
+            "recommendation_reason": "",
+            "diff": "",
+            "impact": "",
+            "conditions": "",
+            "cost": null,
+            "expires_at": null,
+            "consumer_id": "consumer_d45123e8ea14fcf314ea0e513c0df760"
+          }
+        },
+        "status": "answered",
+        "created_at": "2026-10-06T00:55:14.879Z",
+        "updated_at": "2026-10-06T00:55:15.255Z",
+        "answer": {
+          "text": "先に失敗したテストを直してください",
+          "choice_id": null,
+          "answered_at": "2026-10-06T00:55:15.255Z",
+          "contract_fingerprint": "a8b264cdeb69796d52753464e6cfe66bf034bf11fb89b893e66d01d314348b16"
+        },
+        "cancel_reason": null,
+        "history": [],
+        "changed_fields": [],
+        "execution_authorized": false
+      }
+    }
+  },
+  "answer_applications": {
+    "schema": 1,
+    "consumers": {
+      "consumer_5ec0147034d3d2e0e878197d503aeafb": {
+        "consumer_id": "consumer_5ec0147034d3d2e0e878197d503aeafb",
+        "project_id": "0fd21d6af8f2eec8",
+        "run_id": "run_0b18e09f-825a-4c7a-84a7-0c46e8a53030",
+        "session_id": "fixture-session",
+        "task_id": "T1",
+        "created_at": "2026-10-06T00:35:10.330Z"
+      },
+      "consumer_1b4031803a9ef1dfce1a4470a91c6025": {
+        "consumer_id": "consumer_1b4031803a9ef1dfce1a4470a91c6025",
+        "project_id": "0fd21d6af8f2eec8",
+        "run_id": "run_a6161541-5881-47d5-9d66-db1a2ad83c08",
+        "session_id": "fixture-session",
+        "task_id": "T1",
+        "created_at": "2026-10-06T00:41:42.776Z"
+      },
+      "consumer_f2e46d40abeb546046f1869c5aea27ce": {
+        "consumer_id": "consumer_f2e46d40abeb546046f1869c5aea27ce",
+        "project_id": "0fd21d6af8f2eec8",
+        "run_id": "run_0f7e6ff5-5a86-4a3a-ae77-2b5984dad94f",
+        "session_id": "fixture-session",
+        "task_id": "T1",
+        "created_at": "2026-10-06T00:42:58.989Z"
+      },
+      "consumer_d45123e8ea14fcf314ea0e513c0df760": {
+        "consumer_id": "consumer_d45123e8ea14fcf314ea0e513c0df760",
+        "project_id": "0fd21d6af8f2eec8",
+        "run_id": "run_6dffd0a9-b912-409c-a54f-8d43a77a8493",
+        "session_id": "fixture-session",
+        "task_id": "T1",
+        "created_at": "2026-10-06T00:55:14.876Z"
+      }
+    },
+    "commands": {
+      "reply_4db58071-1791-4959-a6d1-49a884218f6f": {
+        "command_id": "reply_4db58071-1791-4959-a6d1-49a884218f6f",
+        "project_id": "0fd21d6af8f2eec8",
+        "consumer_id": "consumer_5ec0147034d3d2e0e878197d503aeafb",
+        "run_id": "run_0b18e09f-825a-4c7a-84a7-0c46e8a53030",
+        "session_id": "fixture-session",
+        "question_id": "Q1",
+        "contract_revision": 1,
+        "contract_fingerprint": "c55e26df5a98b6cdef76d5ec6fe2ae9439e131271f91b661781f0f964e64b82e",
+        "feedback_sequence": 1,
+        "answer_event_id": "evt_0fd21d6af8f2eec8_4",
+        "input_hash": "8029858353eca4e48d61e159686248653d3ba9e80b7650f464c277af1923c8a3",
+        "saved_at": "2026-10-06T00:35:44.185Z",
+        "read_at": "2026-10-06T00:36:29.854Z",
+        "started_at": "2026-10-06T00:38:53.156Z",
+        "completed_at": "2026-10-06T00:40:12.960Z",
+        "phase": "succeeded",
+        "attempt_id": "attempt_ff77c19b-2f23-4418-bd2f-3f250acb8d0f",
+        "attempt_owner_id": "owner_58f4ef01-705f-4d51-8982-12d54d097405",
+        "native_command_id": "cmd_a0b7f6bc-4738-4e6d-a158-fbd42ae6591e",
+        "result_reason": "native_prompt_completed",
+        "display_phase": "succeeded",
+        "target_observation": {
+          "status": "unavailable",
+          "reason": "target_process_ended",
+          "observed_at": "2026-10-06T00:57:18.542Z",
+          "owner_id": null
+        },
+        "delivery": [
+          {
+            "event_id": "evt_0fd21d6af8f2eec8_4",
+            "subscription_id": "13871d35da58f2e37c45e946a4348015",
+            "status": "delivered",
+            "observed_at": "2026-10-06T00:35:44.188Z"
+          }
+        ],
+        "contract_validity": "current",
+        "execution_authorized": false
+      },
+      "reply_93ccebbe-4b54-4fe7-8cf3-aa5c7ca1f1b7": {
+        "command_id": "reply_93ccebbe-4b54-4fe7-8cf3-aa5c7ca1f1b7",
+        "project_id": "0fd21d6af8f2eec8",
+        "consumer_id": "consumer_1b4031803a9ef1dfce1a4470a91c6025",
+        "run_id": "run_a6161541-5881-47d5-9d66-db1a2ad83c08",
+        "session_id": "fixture-session",
+        "question_id": "Q2",
+        "contract_revision": 1,
+        "contract_fingerprint": "f6bd0680fe51f0456fd3bd3b92c6b20a6edaeed1562bc28f03e5f45955972941",
+        "feedback_sequence": 2,
+        "answer_event_id": "evt_0fd21d6af8f2eec8_10",
+        "input_hash": "42708f0bfc75f99c7ad771b18678a17dd69fd20c009f82f173d3df0590d9a315",
+        "saved_at": "2026-10-06T00:41:43.116Z",
+        "read_at": "2026-10-06T00:41:44.042Z",
+        "started_at": "2026-10-06T00:41:44.362Z",
+        "completed_at": "2026-10-06T00:41:44.399Z",
+        "phase": "failed",
+        "attempt_id": "attempt_7aacddbb-ee27-4c98-adb1-5f4a3ce4fd5d",
+        "attempt_owner_id": "owner_7bcf36e9-50e1-4f7d-bb4d-675c5b6367a9",
+        "native_command_id": "cmd_11ad4607-b75d-45cf-bc40-a5f5e8670c67",
+        "result_reason": "native_prompt_refused",
+        "display_phase": "failed",
+        "target_observation": {
+          "status": "unavailable",
+          "reason": "target_process_ended",
+          "observed_at": "2026-10-06T00:57:18.542Z",
+          "owner_id": null
+        },
+        "delivery": [
+          {
+            "event_id": "evt_0fd21d6af8f2eec8_10",
+            "subscription_id": "13871d35da58f2e37c45e946a4348015",
+            "status": "delivered",
+            "observed_at": "2026-10-06T00:41:43.119Z"
+          }
+        ],
+        "contract_validity": "current",
+        "execution_authorized": false
+      },
+      "reply_71f80a3f-eaf3-4c1b-80ca-246195427842": {
+        "command_id": "reply_71f80a3f-eaf3-4c1b-80ca-246195427842",
+        "project_id": "0fd21d6af8f2eec8",
+        "consumer_id": "consumer_f2e46d40abeb546046f1869c5aea27ce",
+        "run_id": "run_0f7e6ff5-5a86-4a3a-ae77-2b5984dad94f",
+        "session_id": "fixture-session",
+        "question_id": "Q3",
+        "contract_revision": 1,
+        "contract_fingerprint": "1c1aa54948767f588a92f1039ab3ac1731a5e496c6813485ef8024501bd40349",
+        "feedback_sequence": 3,
+        "answer_event_id": "evt_0fd21d6af8f2eec8_16",
+        "input_hash": "7bdd5fb3c36bc6c3afa2ecfd61c0c258f93c15306815080956c618edd685226b",
+        "saved_at": "2026-10-06T00:42:59.341Z",
+        "read_at": "2026-10-06T00:43:00.298Z",
+        "started_at": "2026-10-06T00:43:00.613Z",
+        "completed_at": null,
+        "phase": "unknown",
+        "attempt_id": "attempt_7b8ec471-3d63-48c2-92e8-48d901248f26",
+        "attempt_owner_id": "owner_6c29c086-aada-40ad-8215-ca1619d6cf67",
+        "native_command_id": "cmd_a2472717-b334-4556-8a34-d053ad91852b",
+        "result_reason": "native_result_missing",
+        "display_phase": "unknown",
+        "target_observation": {
+          "status": "unavailable",
+          "reason": "target_process_ended",
+          "observed_at": "2026-10-06T00:57:18.542Z",
+          "owner_id": null
+        },
+        "delivery": [
+          {
+            "event_id": "evt_0fd21d6af8f2eec8_16",
+            "subscription_id": "13871d35da58f2e37c45e946a4348015",
+            "status": "delivered",
+            "observed_at": "2026-10-06T00:42:59.353Z"
+          }
+        ],
+        "contract_validity": "current",
+        "execution_authorized": false
+      },
+      "reply_55ee21a8-08c3-458d-a4db-f3f667b57437": {
+        "command_id": "reply_55ee21a8-08c3-458d-a4db-f3f667b57437",
+        "project_id": "0fd21d6af8f2eec8",
+        "consumer_id": "consumer_d45123e8ea14fcf314ea0e513c0df760",
+        "run_id": "run_6dffd0a9-b912-409c-a54f-8d43a77a8493",
+        "session_id": "fixture-session",
+        "question_id": "Q4",
+        "contract_revision": 1,
+        "contract_fingerprint": "a8b264cdeb69796d52753464e6cfe66bf034bf11fb89b893e66d01d314348b16",
+        "feedback_sequence": 4,
+        "answer_event_id": "evt_0fd21d6af8f2eec8_22",
+        "input_hash": "402c3ea6834ee9213c81f40316423adc81d77d47be255aa0520617957b797f12",
+        "saved_at": "2026-10-06T00:55:15.255Z",
+        "read_at": null,
+        "started_at": null,
+        "completed_at": null,
+        "phase": "saved",
+        "attempt_id": null,
+        "attempt_owner_id": null,
+        "native_command_id": null,
+        "result_reason": null,
+        "display_phase": "unapplied",
+        "target_observation": {
+          "status": "unavailable",
+          "reason": "target_process_ended",
+          "observed_at": "2026-10-06T00:57:18.542Z",
+          "owner_id": null
+        },
+        "delivery": [],
+        "contract_validity": "current",
+        "execution_authorized": false
+      }
+    }
+  },
+  "feedback": [
+    {
+      "sequence": 1,
+      "type": "question_answered",
+      "question_id": "Q1",
+      "question": "テスト失敗への対応をどう進めますか？",
+      "answer": "先に失敗したテストを直してください",
+      "created_at": "2026-10-06T00:35:44.185Z",
+      "contract_fingerprint": "c55e26df5a98b6cdef76d5ec6fe2ae9439e131271f91b661781f0f964e64b82e",
+      "contract_revision": 1,
+      "question_kind": "consultation",
+      "target": {
+        "task_id": "T1",
+        "run_id": "run_0b18e09f-825a-4c7a-84a7-0c46e8a53030",
+        "session_id": "fixture-session",
+        "action_id": null,
+        "revision": "input-v1"
+      },
+      "choice_id": null,
+      "execution_authorized": false,
+      "reply_command_id": "reply_4db58071-1791-4959-a6d1-49a884218f6f",
+      "consumer_id": "consumer_5ec0147034d3d2e0e878197d503aeafb",
+      "decision": {
+        "kind": "consultation",
+        "target": {
+          "task_id": "T1",
+          "run_id": "run_0b18e09f-825a-4c7a-84a7-0c46e8a53030",
+          "session_id": "fixture-session",
+          "action_id": null,
+          "revision": "input-v1"
+        },
+        "choices": [],
+        "recommended_choice": null,
+        "recommendation_reason": "",
+        "diff": "",
+        "impact": "",
+        "conditions": "",
+        "cost": null,
+        "expires_at": null,
+        "consumer_id": "consumer_5ec0147034d3d2e0e878197d503aeafb"
+      },
+      "contract_validity": "current",
+      "invalidation_reason": null
+    },
+    {
+      "sequence": 2,
+      "type": "question_answered",
+      "question_id": "Q2",
+      "question": "拒否された回答入力の状態を確認",
+      "answer": "先に失敗したテストを直してください",
+      "created_at": "2026-10-06T00:41:43.116Z",
+      "contract_fingerprint": "f6bd0680fe51f0456fd3bd3b92c6b20a6edaeed1562bc28f03e5f45955972941",
+      "contract_revision": 1,
+      "question_kind": "consultation",
+      "target": {
+        "task_id": "T1",
+        "run_id": "run_a6161541-5881-47d5-9d66-db1a2ad83c08",
+        "session_id": "fixture-session",
+        "action_id": null,
+        "revision": "input-v1"
+      },
+      "choice_id": null,
+      "execution_authorized": false,
+      "reply_command_id": "reply_93ccebbe-4b54-4fe7-8cf3-aa5c7ca1f1b7",
+      "consumer_id": "consumer_1b4031803a9ef1dfce1a4470a91c6025",
+      "decision": {
+        "kind": "consultation",
+        "target": {
+          "task_id": "T1",
+          "run_id": "run_a6161541-5881-47d5-9d66-db1a2ad83c08",
+          "session_id": "fixture-session",
+          "action_id": null,
+          "revision": "input-v1"
+        },
+        "choices": [],
+        "recommended_choice": null,
+        "recommendation_reason": "",
+        "diff": "",
+        "impact": "",
+        "conditions": "",
+        "cost": null,
+        "expires_at": null,
+        "consumer_id": "consumer_1b4031803a9ef1dfce1a4470a91c6025"
+      },
+      "contract_validity": "current",
+      "invalidation_reason": null
+    },
+    {
+      "sequence": 3,
+      "type": "question_answered",
+      "question_id": "Q3",
+      "question": "入力の応答が欠けた場合の状態を確認",
+      "answer": "先に失敗したテストを直してください",
+      "created_at": "2026-10-06T00:42:59.341Z",
+      "contract_fingerprint": "1c1aa54948767f588a92f1039ab3ac1731a5e496c6813485ef8024501bd40349",
+      "contract_revision": 1,
+      "question_kind": "consultation",
+      "target": {
+        "task_id": "T1",
+        "run_id": "run_0f7e6ff5-5a86-4a3a-ae77-2b5984dad94f",
+        "session_id": "fixture-session",
+        "action_id": null,
+        "revision": "input-v1"
+      },
+      "choice_id": null,
+      "execution_authorized": false,
+      "reply_command_id": "reply_71f80a3f-eaf3-4c1b-80ca-246195427842",
+      "consumer_id": "consumer_f2e46d40abeb546046f1869c5aea27ce",
+      "decision": {
+        "kind": "consultation",
+        "target": {
+          "task_id": "T1",
+          "run_id": "run_0f7e6ff5-5a86-4a3a-ae77-2b5984dad94f",
+          "session_id": "fixture-session",
+          "action_id": null,
+          "revision": "input-v1"
+        },
+        "choices": [],
+        "recommended_choice": null,
+        "recommendation_reason": "",
+        "diff": "",
+        "impact": "",
+        "conditions": "",
+        "cost": null,
+        "expires_at": null,
+        "consumer_id": "consumer_f2e46d40abeb546046f1869c5aea27ce"
+      },
+      "contract_validity": "current",
+      "invalidation_reason": null
+    },
+    {
+      "sequence": 4,
+      "type": "question_answered",
+      "question_id": "Q4",
+      "question": "回答を保存したまま対象が終了した状態を確認",
+      "answer": "先に失敗したテストを直してください",
+      "created_at": "2026-10-06T00:55:15.255Z",
+      "contract_fingerprint": "a8b264cdeb69796d52753464e6cfe66bf034bf11fb89b893e66d01d314348b16",
+      "contract_revision": 1,
+      "question_kind": "consultation",
+      "target": {
+        "task_id": "T1",
+        "run_id": "run_6dffd0a9-b912-409c-a54f-8d43a77a8493",
+        "session_id": "fixture-session",
+        "action_id": null,
+        "revision": "input-v1"
+      },
+      "choice_id": null,
+      "execution_authorized": false,
+      "reply_command_id": "reply_55ee21a8-08c3-458d-a4db-f3f667b57437",
+      "consumer_id": "consumer_d45123e8ea14fcf314ea0e513c0df760",
+      "decision": {
+        "kind": "consultation",
+        "target": {
+          "task_id": "T1",
+          "run_id": "run_6dffd0a9-b912-409c-a54f-8d43a77a8493",
+          "session_id": "fixture-session",
+          "action_id": null,
+          "revision": "input-v1"
+        },
+        "choices": [],
+        "recommended_choice": null,
+        "recommendation_reason": "",
+        "diff": "",
+        "impact": "",
+        "conditions": "",
+        "cost": null,
+        "expires_at": null,
+        "consumer_id": "consumer_d45123e8ea14fcf314ea0e513c0df760"
+      },
+      "contract_validity": "current",
+      "invalidation_reason": null
+    }
+  ],
+  "signed_notification_fixtures": [
+    {
+      "event_id": null,
+      "type": "verification",
+      "verified": true
+    },
+    {
+      "event_id": "evt_0fd21d6af8f2eec8_4",
+      "type": "dashboard.answer.created",
+      "verified": true
+    },
+    {
+      "event_id": "evt_0fd21d6af8f2eec8_10",
+      "type": "dashboard.answer.created",
+      "verified": true
+    },
+    {
+      "event_id": "evt_0fd21d6af8f2eec8_16",
+      "type": "dashboard.answer.created",
+      "verified": true
+    }
+  ],
+  "native_prompt_count": 3,
+  "native_session_ids": [
+    "fixture-session"
+  ]
+}

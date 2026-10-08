@@ -129,6 +129,7 @@ export class EventsHub {
     this.getState = getState;
     this.post = post;
     this.subscriptions = [];
+    this.deliveryHistory = [];
     this.busy = false;
     this.queue = Promise.resolve();
     this.verified = new Map();
@@ -142,6 +143,31 @@ export class EventsHub {
       if (saved.schema !== 1 || !Array.isArray(saved.subscriptions))
         throw new Error("Invalid event subscription state");
       hub.subscriptions = saved.subscriptions;
+      if (saved.deliveries !== undefined) {
+        if (
+          !Array.isArray(saved.deliveries) ||
+          saved.deliveries.length > 1000 ||
+          saved.deliveries.some(
+            (item) =>
+              !item ||
+              typeof item.event_id !== "string" ||
+              typeof item.subscription_id !== "string" ||
+              !["delivered", "retrying", "failed"].includes(item.status) ||
+              !Number.isFinite(Date.parse(item.observed_at)) ||
+              Object.keys(item).some(
+                (key) =>
+                  ![
+                    "event_id",
+                    "subscription_id",
+                    "status",
+                    "observed_at",
+                  ].includes(key),
+              ),
+          )
+        )
+          throw new Error("Invalid event delivery history");
+        hub.deliveryHistory = saved.deliveries;
+      }
     } catch (e) {
       if (e.code !== "ENOENT") throw e;
     }
@@ -151,6 +177,9 @@ export class EventsHub {
     return writeJson(path.join(this.project.directory, "events.json"), {
       schema: 1,
       subscriptions: this.subscriptions,
+      ...(this.deliveryHistory.length
+        ? { deliveries: this.deliveryHistory }
+        : {}),
     });
   }
   serial(work) {
@@ -300,6 +329,18 @@ export class EventsHub {
       failures: this.subscriptions.filter((item) => item.last_error).length,
     };
   }
+  deliveries() {
+    return Object.fromEntries(
+      [...new Set(this.deliveryHistory.map((item) => item.event_id))].map(
+        (id) => [
+          id,
+          this.deliveryHistory
+            .filter((item) => item.event_id === id)
+            .map((item) => ({ ...item })),
+        ],
+      ),
+    );
+  }
   async flush() {
     if (this.busy) return;
     this.busy = true;
@@ -330,6 +371,21 @@ export class EventsHub {
             (response.status >= 400 &&
               response.status < 500 &&
               response.status !== 429);
+          this.deliveryHistory = this.deliveryHistory.filter(
+            (item) =>
+              item.event_id !== next.eventId || item.subscription_id !== sub.id,
+          );
+          this.deliveryHistory.push({
+            event_id: next.eventId,
+            subscription_id: sub.id,
+            status: success
+              ? "delivered"
+              : permanent || sub.attempts >= 4
+                ? "failed"
+                : "retrying",
+            observed_at: new Date().toISOString(),
+          });
+          this.deliveryHistory = this.deliveryHistory.slice(-1000);
           if (success || permanent || sub.attempts >= 4) {
             sub.last_revision = next.data.revision;
             sub.last_error = success

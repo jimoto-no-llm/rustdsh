@@ -12,6 +12,7 @@ import { enableShare } from "./tailscale.mjs";
 import { startHarness, proxyHarness, upgradeHarness } from "./harness.mjs";
 import { EventsHub } from "./webhooks.mjs";
 import { modernMcpHandler } from "./mcp2.mjs";
+import { AnswerApplicationServer } from "./answer-application-server.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const equal = (a, b) =>
@@ -88,11 +89,17 @@ export async function startDashboard(options) {
   const live = new Set(),
     sessions = new Map();
   const sockets = new Set();
+  const applications = store
+    ? new AnswerApplicationServer(project, () => store.value, mutateReply)
+    : null;
+  const visibleState = async () =>
+    publicState(
+      store.value,
+      await applications.observations(),
+      eventsHub.deliveries(),
+    );
   const modern = store
-    ? modernMcpHandler(
-        { getState: async () => publicState(store.value), mutate },
-        eventsHub,
-      )
+    ? modernMcpHandler({ getState: visibleState, mutate }, eventsHub)
     : null;
   const deliveryTimer = eventsHub
     ? setInterval(() => {
@@ -224,7 +231,18 @@ export async function startDashboard(options) {
         response.write(`event: changed\ndata: ${state.revision}\n\n`);
       for (const { mcp } of sessions.values()) void mcp.notify();
       void eventsHub.flush().catch(() => {});
-      return publicState(state);
+      return visibleState();
+    });
+    updateQueue = task.catch(() => {});
+    return task;
+  }
+  async function mutateReply(operation, input, context) {
+    const task = updateQueue.then(async () => {
+      const result = await store.mutateReply(operation, input, context);
+      for (const response of live)
+        response.write(`event: changed\ndata: ${store.value.revision}\n\n`);
+      for (const { mcp } of sessions.values()) void mcp.notify();
+      return result;
     });
     updateQueue = task.catch(() => {});
     return task;
@@ -273,17 +291,24 @@ export async function startDashboard(options) {
         agentRoute &&
         equal(req.headers.authorization, `Bearer ${mcpToken}`);
       const humanAuthorized = browserAuthorized(req, url, route);
+      const consumerRoute =
+        kind === "project" &&
+        ((req.method === "GET" && route === "/api/replies/read") ||
+          (req.method === "POST" && route === "/api/replies/ack"));
+      const consumerToken = req.headers["x-rdsh-consumer-token"];
       const publicAsset =
         kind === "project" &&
         req.method === "GET" &&
         (route === "/" ||
           route === "/app.mjs" ||
-          route === "/question-cards-ui.mjs");
+          route === "/question-cards-ui.mjs" ||
+          route === "/answer-applications-ui.mjs");
       if (
         !publicAsset &&
         !adminAuthorized &&
         !mcpAuthorized &&
-        !humanAuthorized
+        !humanAuthorized &&
+        !(consumerRoute && typeof consumerToken === "string")
       )
         return json(res, 401, {
           error:
@@ -343,7 +368,11 @@ export async function startDashboard(options) {
       }
       if (
         req.method === "GET" &&
-        ["/app.mjs", "/question-cards-ui.mjs"].includes(route)
+        [
+          "/app.mjs",
+          "/question-cards-ui.mjs",
+          "/answer-applications-ui.mjs",
+        ].includes(route)
       ) {
         res.writeHead(200, {
           "content-type": "text/javascript; charset=utf-8",
@@ -376,6 +405,38 @@ export async function startDashboard(options) {
         return res.end(svg);
       }
       if (kind === "project") {
+        if (req.method === "POST" && route === "/api/replies/register") {
+          if (!adminAuthorized)
+            return json(res, 403, {
+              error: "Local administrator must bind the verified ACP owner",
+            });
+          return json(
+            res,
+            200,
+            await applications.register(await readBody(req)),
+          );
+        }
+        if (consumerRoute) {
+          if (typeof consumerToken !== "string")
+            return json(res, 403, {
+              error: "Separate consumer credential required",
+            });
+          if (req.method === "GET")
+            return json(
+              res,
+              200,
+              await applications.read(
+                url.searchParams.get("consumer_id"),
+                consumerToken,
+                Number(url.searchParams.get("after") || "0"),
+              ),
+            );
+          return json(
+            res,
+            200,
+            await applications.ack(await readBody(req), consumerToken),
+          );
+        }
         if (req.method === "POST" && route === "/api/decision/cancel") {
           if (!humanAuthorized)
             return json(res, 403, {
@@ -389,9 +450,15 @@ export async function startDashboard(options) {
           );
         }
         if (req.method === "GET" && route === "/api/state")
-          return json(res, 200, publicState(store.value));
+          return json(res, 200, await visibleState());
         if (req.method === "POST" && route?.startsWith("/api/update/")) {
           const operation = route.slice("/api/update/".length);
+          if (
+            !["metrics", "task", "question", "answer", "event"].includes(
+              operation,
+            )
+          )
+            return json(res, 404, { error: "Unknown project operation" });
           if (
             operation === "answer"
               ? !humanAuthorized
@@ -431,7 +498,7 @@ export async function startDashboard(options) {
             });
           if (!session && req.method === "POST" && isInitializeRequest(body)) {
             const mcp = createMcpServer({
-              getState: async () => publicState(store.value),
+              getState: visibleState,
               mutate,
             });
             const transport = new StreamableHTTPServerTransport({
@@ -455,7 +522,9 @@ export async function startDashboard(options) {
       json(res, 404, { error: "Not found" });
     } catch (e) {
       if (!res.headersSent)
-        json(res, e.status === 409 ? 409 : 400, { error: e.message });
+        json(res, [401, 403, 409].includes(e.status) ? e.status : 400, {
+          error: e.message,
+        });
       else res.end();
     }
   });

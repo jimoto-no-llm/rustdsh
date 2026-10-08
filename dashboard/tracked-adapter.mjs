@@ -1,5 +1,6 @@
 // Durable control requests around an existing adapter; no agent loop or replay.
 import { HistoryError } from "./run-history.mjs";
+import { createHash } from "node:crypto";
 
 export function trackAdapter(
   adapter,
@@ -21,10 +22,24 @@ export function trackAdapter(
       await history.transition(runId, "unknown", "operation_unconfirmed");
     } catch {}
   };
-  adapter.send = async (sessionId, text) => {
+  adapter.send = async (sessionId, text, options = {}) => {
+    if (
+      !options ||
+      typeof options !== "object" ||
+      Array.isArray(options) ||
+      Object.keys(options).some((key) => key !== "command_id")
+    )
+      throw new HistoryError("invalid_command");
     adapter.requireOperation("send", sessionId);
     if (beforeSend) await beforeSend(sessionId);
-    const id = await history.recordCommand(runId, "send");
+    const id = await history.recordCommand(
+      runId,
+      "send",
+      options.command_id,
+      options.command_id === undefined
+        ? null
+        : createHash("sha256").update(text).digest("hex"),
+    );
     await history.transition(runId, "running", "cli_prompt_pending");
     await history.commandPhase(id, "dispatched");
     try {
@@ -34,7 +49,11 @@ export function trackAdapter(
         "acknowledged",
         result.stop_reason === "cancelled"
           ? "cancelled_result"
-          : "prompt_result_received",
+          : result.stop_reason === "refusal"
+            ? "prompt_refused"
+            : ["max_tokens", "max_turn_requests"].includes(result.stop_reason)
+              ? "prompt_limit_reached"
+              : "prompt_result_received",
       );
       if (!adapter.stopped && !adapter.stopping)
         await history.transition(runId, "waiting-human", "cli_prompt_result");

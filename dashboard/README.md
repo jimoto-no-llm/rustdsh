@@ -161,6 +161,14 @@ cancelled replies cannot answer a new revision. Durable feedback includes the
 current contract validity; saving a reply grants no execution authority and
 does not claim application by its consumer.
 
+Optional [answer application acknowledgements](../docs/ANSWER-APPLICATION.md)
+bind a card's `decision.consumer_id` to a confirmed run/native session. The
+original ACP transport consumer records read, one-time input dispatch and a
+correlated native result with an input digest. `reply-consumer once|serve`
+explicitly resumes that exact session; missing results block automatic replay.
+Webhook delivery and cursor reads remain separate from application evidence.
+This is an opt-in input channel under the session's existing permissions.
+
 Unknown metrics display **未取得**. This component does not scrape billing,
 estimate spend, or infer context loss. Report measured values using:
 `total_cost_usd`, `total_budget_usd`, `session_cost_usd`, `session_budget_usd`,
