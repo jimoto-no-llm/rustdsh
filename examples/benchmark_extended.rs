@@ -5,9 +5,12 @@ use serde_json::{json, Value};
 use std::{
     collections::BTreeMap,
     env, fs,
+    io::{BufRead, BufReader, Read, Write},
+    net::TcpStream,
     path::{Path, PathBuf},
-    process::Command,
+    process::{Child, Command, Stdio},
     sync::atomic::{AtomicU64, Ordering},
+    sync::mpsc,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
@@ -166,7 +169,7 @@ fn percentile(samples: &[f64], q: f64) -> f64 {
 }
 fn stats(v: &[f64], bytes: u64) -> Value {
     let median = percentile(v, 0.5);
-    json!({"median_ms":median,"p95_ms":percentile(v,0.95),"throughput_mib_s":if median == 0.0 { Value::Null } else { json!(bytes as f64/1_048_576.0/(median/1000.0)) },"samples_ms":v})
+    json!({"median_ms":median,"p95_ms":percentile(v,0.95),"throughput_mib_s":if median == 0.0 || bytes == 0 { Value::Null } else { json!(bytes as f64/1_048_576.0/(median/1000.0)) },"samples_ms":v})
 }
 fn fingerprint(bytes: &[u8]) -> String {
     let mut h = 0xcbf29ce484222325u64;
@@ -272,7 +275,11 @@ fn copy_dir(from: &Path, to: &Path) -> Result<()> {
         if e.file_type()?.is_dir() {
             copy_dir(&e.path(), &d)?
         } else {
-            fs::copy(e.path(), d)?;
+            fs::copy(e.path(), &d)?;
+            fs::File::options()
+                .write(true)
+                .open(d)?
+                .set_modified(e.metadata()?.modified()?)?;
         }
     }
     Ok(())
@@ -387,6 +394,8 @@ fn run_case(
     n: usize,
 ) -> Result<Value> {
     let (mut outs, mut results) = (BTreeMap::new(), serde_json::Map::new());
+    let mut samples: BTreeMap<String, Vec<f64>> =
+        bins.keys().map(|k| (k.clone(), Vec::new())).collect();
     for (label, bin) in bins {
         let s = &boxes[label];
         let mut standard = None;
@@ -404,23 +413,35 @@ fn run_case(
             standard = Some(o);
         }
         let want = standard.unwrap();
-        let mut samples = vec![];
-        for _ in 0..n {
+        outs.insert(label.clone(), want);
+    }
+    for iteration in 0..n {
+        let mut labels: Vec<_> = bins.keys().collect();
+        if iteration % 2 == 1 {
+            labels.reverse();
+        }
+        for label in labels {
+            let s = &boxes[label];
             if case.clear {
                 let _ = fs::remove_file(s.cache_file());
             }
-            let (ms, o) = invoke(s, bin, &case.argv, case.cache)?;
+            let (ms, o) = invoke(s, &bins[label], &case.argv, case.cache)?;
             validate(&case.expect, &o)?;
-            if o != want {
+            if o != outs[label] {
                 bail!("stdout changed for {}/{}", case.name, label)
             }
-            samples.push(ms);
+            samples.get_mut(label).unwrap().push(ms);
         }
-        let mut r = stats(&samples, case.bytes);
+    }
+    for (label, bin) in bins {
+        let s = &boxes[label];
+        let mut r = stats(&samples[label], case.bytes);
+        if case.clear {
+            let _ = fs::remove_file(s.cache_file());
+        }
         r["peak_rss_bytes"] =
             peak_rss(s, bin, &case.argv, case.cache)?.map_or(Value::Null, Value::from);
         results.insert(label.clone(), r);
-        outs.insert(label.clone(), want);
     }
     if outs
         .values()
@@ -454,6 +475,7 @@ fn concurrent_check(bin: &Path, s: &Sandbox, argv: &[String], n: usize) -> Resul
     cache_json(s)?;
     let mut samples = Vec::with_capacity(n);
     for _ in 0..n {
+        let _ = fs::remove_file(s.cache_file());
         let started = Instant::now();
         let mut wave = vec![];
         for _ in 0..4 {
@@ -471,6 +493,193 @@ fn concurrent_check(bin: &Path, s: &Sandbox, argv: &[String], n: usize) -> Resul
     }
     cache_json(s)?;
     Ok(stats(&samples, 4 * 20 * 1_048_576))
+}
+
+fn growing_case(bin: &Path, s: &Sandbox, z: &Path, argv: &[String], n: usize) -> Result<Value> {
+    let p = s.dsh.join("sessions/streaming/s00/messages.jsonl.zstd");
+    let original = fs::read(&p)?;
+    let part = s.root.join("growth-part");
+    fs::write(&part, vec![b'z'; 262_144])?;
+    let frame = compress(z, &part, true)?;
+    let _ = fs::remove_file(s.cache_file());
+    validate_sessions(&invoke(s, bin, argv, true)?.1, 262_144, 20)?;
+    let result = (|| -> Result<Value> {
+        let mut samples = Vec::new();
+        for i in 0..n + 3 {
+            fs::OpenOptions::new()
+                .append(true)
+                .open(&p)?
+                .write_all(&frame)?;
+            let (ms, out) = invoke(s, bin, argv, true)?;
+            let rows: Value = serde_json::from_slice(&out)?;
+            let rows = rows["sessions"]
+                .as_array()
+                .ok_or_else(|| anyhow!("missing sessions"))?;
+            if rows.len() != 20 {
+                bail!("missing growing sessions");
+            }
+            for row in rows {
+                let expected = if row["id"] == "s00" {
+                    262_144 + 65_536 * (i + 1)
+                } else {
+                    262_144
+                };
+                if row["tokens"] != expected || row["tokens_exact"] != true {
+                    bail!("growing stream oracle mismatch: {row}");
+                }
+            }
+            if i >= 3 {
+                samples.push(ms);
+            }
+        }
+        Ok(
+            json!({"passed":true,"append_bytes_per_invocation":262144,"initial_bytes_per_session":1048576,"n":n,"results":stats(&samples,0)}),
+        )
+    })();
+    fs::write(p, original)?;
+    let _ = fs::remove_file(s.cache_file());
+    result
+}
+
+struct Server(Child);
+impl Drop for Server {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+
+fn http_case(bin: &Path, s: &Sandbox, n: usize) -> Result<Value> {
+    let config = s.dsh.join("rdsh.json");
+    let mut settings: Value = serde_json::from_slice(&fs::read(&config)?)?;
+    settings["extras"] = json!({"enable":["serve"]});
+    fs::write(config, settings.to_string())?;
+    let mut command = s.command(bin, &["serve".into(), "--port".into(), "0".into()], true);
+    let mut server = Server(
+        command
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped())
+            .spawn()?,
+    );
+    let stderr = server.0.stderr.take().unwrap();
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+            if let Some(url) = line
+                .split_whitespace()
+                .find(|x| x.starts_with("http://127.0.0.1:"))
+            {
+                let _ = tx.send(url.to_owned());
+            }
+        }
+    });
+    let url = rx.recv_timeout(Duration::from_secs(15))?;
+    let (port, token) = url
+        .trim_start_matches("http://127.0.0.1:")
+        .split_once("/#key=")
+        .ok_or_else(|| anyhow!("invalid readiness URL"))?;
+    let port: u16 = port.parse()?;
+    let mut report = serde_json::Map::new();
+    let text = "a".repeat(40960);
+    for (name, method, route, body) in [
+        ("version", "GET", "/api/version", String::new()),
+        (
+            "tokens_40kib",
+            "POST",
+            "/api/tokens",
+            json!({"text":text}).to_string(),
+        ),
+        (
+            "prune_40kib",
+            "POST",
+            "/api/prune",
+            json!({"text":text,"max_tokens":1000}).to_string(),
+        ),
+    ] {
+        let mut samples = Vec::new();
+        for i in 0..n + 3 {
+            let started = Instant::now();
+            let mut stream = TcpStream::connect(("127.0.0.1", port))?;
+            stream.set_read_timeout(Some(Duration::from_secs(5)))?;
+            stream.set_write_timeout(Some(Duration::from_secs(5)))?;
+            write!(stream,"{method} {route} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-RDSH-Token: {token}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",body.len())?;
+            let mut response = String::new();
+            stream.read_to_string(&mut response)?;
+            let elapsed = started.elapsed().as_secs_f64() * 1000.0;
+            let (head, payload) = response
+                .split_once("\r\n\r\n")
+                .ok_or_else(|| anyhow!("incomplete HTTP response"))?;
+            if head.split_whitespace().nth(1) != Some("200") {
+                bail!("HTTP benchmark request failed");
+            }
+            let value: Value = serde_json::from_str(payload)?;
+            match name {
+                "version" if value["name"] != "rdsh" => bail!("version oracle failed"),
+                "tokens_40kib" if value["tokens"] != 10240 => bail!("tokens oracle failed"),
+                "prune_40kib"
+                    if value["budget"] != 1000
+                        || value["after"].as_u64().is_none_or(|x| x > 1000) =>
+                {
+                    bail!("prune oracle failed")
+                }
+                _ => {}
+            }
+            if i >= 3 {
+                samples.push(elapsed);
+            }
+        }
+        report.insert(name.into(), stats(&samples, body.len() as u64));
+    }
+    Ok(
+        json!({"timing":"TCP connect + HTTP response, persistent Rust server, no browser rendering","cases":report}),
+    )
+}
+
+fn delegation_case(bin: &Path, original: &Path, s: &Sandbox, n: usize) -> Result<Value> {
+    let shim_dir = s.root.join("shim-bin");
+    fs::create_dir_all(&shim_dir)?;
+    let shim = shim_dir.join(if cfg!(windows) { "dsh.exe" } else { "dsh" });
+    fs::copy(bin, &shim)?;
+    let args = vec!["--version".into()];
+    let expected = invoke(s, original, &args, true)?.1;
+    let cache_dir = s.root.join("home/.cache/rdsh-node-compile-cache");
+    let mut report = serde_json::Map::new();
+    for name in [
+        "compile_cache_off",
+        "compile_cache_warm",
+        "compile_cache_empty",
+    ] {
+        let mut samples = Vec::new();
+        for i in 0..n + 3 {
+            if name == "compile_cache_empty" {
+                let _ = fs::remove_dir_all(&cache_dir);
+            }
+            let started = Instant::now();
+            let out = s
+                .command(&shim, &args, true)
+                .env("RDSH_ORIG_BIN", original)
+                .env(
+                    "RDSH_NODE_COMPILE_CACHE",
+                    if name == "compile_cache_off" {
+                        "0"
+                    } else {
+                        "1"
+                    },
+                )
+                .output()?;
+            if !out.status.success() || out.stdout != expected {
+                bail!("real DSH delegation version oracle failed");
+            }
+            if i >= 3 {
+                samples.push(started.elapsed().as_secs_f64() * 1000.0);
+            }
+        }
+        report.insert(name.into(),json!({"results":stats(&samples,0),"compile_cache_directory_written":cache_dir.exists(),"stdout_matches_original":true}));
+    }
+    Ok(
+        json!({"scope":"copied unchanged rdsh invoked as dsh, delegated real original --version; no model calls, no Desktop startup","cases":report}),
+    )
 }
 
 fn main() -> Result<()> {
@@ -577,7 +786,11 @@ fn main() -> Result<()> {
                 "--max".into(),
                 "100".into(),
             ],
-            bytes: 256,
+            bytes: fs::read_dir(&f.small)?
+                .map(|e| e.and_then(|e| e.metadata()).map(|m| m.len()))
+                .collect::<std::io::Result<Vec<_>>>()?
+                .into_iter()
+                .sum(),
             cache: true,
             clear: false,
             expect: Validation::Search(16),
@@ -592,7 +805,11 @@ fn main() -> Result<()> {
                 "--max".into(),
                 "100".into(),
             ],
-            bytes: 640,
+            bytes: fs::read_dir(&f.large)?
+                .map(|e| e.and_then(|e| e.metadata()).map(|m| m.len()))
+                .collect::<std::io::Result<Vec<_>>>()?
+                .into_iter()
+                .sum(),
             cache: true,
             clear: false,
             expect: Validation::Search(40),
@@ -615,6 +832,21 @@ fn main() -> Result<()> {
     for c in &cases {
         report_cases.insert(c.name.into(), run_case(c, &bins, &boxes, a.n)?);
     }
+    let mut growing = serde_json::Map::new();
+    for (label, bin) in &bins {
+        let result = growing_case(bin, &boxes[label], &z, &cases[3].argv, a.n);
+        if label == "candidate" {
+            growing.insert(label.clone(), result?);
+        } else {
+            growing.insert(
+                label.clone(),
+                match result {
+                    Ok(v) => v,
+                    Err(e) => json!({"passed":false,"error":e.to_string()}),
+                },
+            );
+        }
+    }
     let original = if let Some(dsh) = a.dsh {
         let s = Sandbox::new(tmp.path(), "original-dsh")?;
         let av = vec!["--version".into()];
@@ -625,20 +857,24 @@ fn main() -> Result<()> {
         for _ in 0..a.n {
             v.push(invoke(&s, &dsh, &av, true)?.0);
         }
-        json!({"version_only":true,"results":stats(&v,0),"peak_rss_bytes":peak_rss(&s,&dsh,&av,true)?})
+        json!({"version_only":true,"results":stats(&v,0),"peak_rss_bytes":peak_rss(&s,&dsh,&av,true)?,"delegated_candidate":delegation_case(&bins["candidate"],&dsh,&s,a.n)?})
     } else {
         Value::Null
     };
+    let mut native_http = serde_json::Map::new();
+    for (label, bin) in &bins {
+        native_http.insert(label.clone(), http_case(bin, &boxes[label], a.n)?);
+    }
     let mut hashes = serde_json::Map::new();
     for (label, b) in &bins {
         hashes.insert(label.clone(), Value::String(fingerprint(&fs::read(b)?)));
     }
-    let report = json!({"n":a.n,"warmups":3,"timing":"parent wall clock including process launch; OS filesystem remains warm by design","scope":"synthetic fixtures only; no model calls or credentials","binaries":hashes,"cases":report_cases,"concurrent_4_writers":concurrent,"original_dsh":original});
+    let report = json!({"n":a.n,"warmups":3,"timing":"parent wall clock including process launch; OS filesystem remains warm by design","scope":"synthetic fixtures only; no model calls or credentials","comparison_order":"alternates per sample for sequential cases; separate blocks for concurrent/growing/HTTP/delegation cases","throughput":"logical fixture bytes per second, not physical IO throughput; growing has no single fixed byte count","binaries":hashes,"cases":report_cases,"concurrent_4_writers":concurrent,"growing_stream":growing,"original_dsh":original,"native_http":native_http});
     if let Some(p) = a.output.parent() {
         fs::create_dir_all(p)?;
     }
     fs::write(a.output, serde_json::to_vec_pretty(&report)?)?;
-    println!("{}", serde_json::to_string(&report["cases"])?);
+    println!("saved {} cases with {} samples each", cases.len(), a.n);
     Ok(())
 }
 

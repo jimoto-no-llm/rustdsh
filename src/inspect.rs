@@ -362,6 +362,11 @@ impl TokensCache {
                 if let Ok(v) = serde_json::from_str::<serde_json::Value>(&text) {
                     if let Some(obj) = v.as_object() {
                         for (k, e) in obj {
+                            // Older cache writers could store an inexact value as
+                            // exact. Its provenance cannot be recovered: recompute.
+                            if e.get("schema").and_then(|x| x.as_u64()) != Some(2) {
+                                continue;
+                            }
                             // Cap on load so a foreign huge file stays harmless.
                             if map.len() >= 2000 {
                                 break;
@@ -447,7 +452,7 @@ impl TokensCache {
             if let Some((m, b, d, t)) = self.map.get(k) {
                 obj.insert(
                     k.clone(),
-                    serde_json::json!({"mtime": m, "bytes": b, "decomp": d, "ts": t}),
+                    serde_json::json!({"schema": 2, "mtime": m, "bytes": b, "decomp": d, "ts": t}),
                 );
             }
         }
@@ -478,7 +483,7 @@ fn batch_decompressed(
     for (i, sess) in shown.iter().enumerate() {
         let key = TokensCache::key(root, &sess.project, &sess.id);
         match cache.get(&key, sess.mtime, sess.bytes) {
-            Some(hit) => out[i] = (hit, true),
+            Some(hit) => out[i] = (hit, hit.is_some()),
             None => pending.push((i, (*sess).clone())),
         }
     }
@@ -504,16 +509,9 @@ fn batch_decompressed(
                 ));
             }
             for (i, h) in handles {
-                if let Ok(((r, _), local)) = h.join() {
+                if let Ok(((r, exact), local)) = h.join() {
                     cache.merge(&local);
-                    let sess = &shown[i];
-                    cache.put(
-                        &TokensCache::key(root, &sess.project, &sess.id),
-                        sess.mtime,
-                        sess.bytes,
-                        r,
-                    );
-                    out[i] = (r, true);
+                    out[i] = (r, exact);
                 }
             }
         });
@@ -543,7 +541,7 @@ fn session_decompressed_bytes(
 ) -> (Option<u64>, bool) {
     let key = TokensCache::key(root, &sess.project, &sess.id);
     if let Some(hit) = cache.get(&key, sess.mtime, sess.bytes) {
-        return (hit, true);
+        return (hit, hit.is_some());
     }
     let (r, exact) = session_decompressed_bytes_uncached(
         root,
@@ -553,7 +551,11 @@ fn session_decompressed_bytes(
         stale_secs,
         cache,
     );
-    cache.put(&key, sess.mtime, sess.bytes, r);
+    // A reused value from a growing file is deliberately inexact. Do not
+    // associate it with the new content identity and promote it on a cache hit.
+    if exact || r.is_none() {
+        cache.put(&key, sess.mtime, sess.bytes, r);
+    }
     (r, exact)
 }
 
@@ -601,6 +603,7 @@ fn session_decompressed_bytes_uncached(
                 continue;
             };
             let Some((mtime, bytes)) = file_meta(p) else {
+                estimated = true;
                 continue;
             };
             let fkey = TokensCache::file_key(root, project, id, &name);
@@ -609,6 +612,8 @@ fn session_decompressed_bytes_uncached(
                     if let Some(n) = hit {
                         total += n;
                         any = true;
+                    } else {
+                        estimated = true;
                     }
                 }
                 None => todo.push(p.clone()),
@@ -619,15 +624,18 @@ fn session_decompressed_bytes_uncached(
         let stale_window = stale_secs;
         let mut todo2: Vec<std::path::PathBuf> = vec![];
         for p in &todo {
-            let stale_hit = p
-                .file_name()
-                .map(|s| s.to_string_lossy().into_owned())
-                .and_then(|name| {
-                    cache.stale(
-                        &TokensCache::file_key(root, project, id, &name),
-                        stale_window,
-                    )
-                });
+            let stale_hit = (stale_window > 0)
+                .then(|| {
+                    p.file_name()
+                        .map(|s| s.to_string_lossy().into_owned())
+                        .and_then(|name| {
+                            cache.stale(
+                                &TokensCache::file_key(root, project, id, &name),
+                                stale_window,
+                            )
+                        })
+                })
+                .flatten();
             match stale_hit {
                 Some(n) => {
                     total += n;
@@ -652,7 +660,11 @@ fn session_decompressed_bytes_uncached(
                     if let Some(n) = n {
                         total += n;
                         any = true;
+                    } else {
+                        estimated = true;
                     }
+                } else {
+                    estimated = true;
                 }
             }
         } else if !todo.is_empty() {
@@ -670,6 +682,8 @@ fn session_decompressed_bytes_uncached(
                         if let Some(n) = stream_decompressed_bytes(p) {
                             total += n;
                             any = true;
+                        } else {
+                            estimated = true;
                         }
                     }
                 }

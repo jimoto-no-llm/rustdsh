@@ -44,7 +44,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
+      - if: runner.os == 'Linux'
+        run: command -v zstd || (sudo apt-get update && sudo apt-get install -y zstd)
+      - if: runner.os == 'macOS'
+        run: command -v zstd || brew install zstd
       - run: cargo test
+      - run: cargo test --example benchmark_extended
       - run: cargo build
       - if: matrix.regress
         shell: bash
@@ -67,3 +72,25 @@ jobs:
           $setup = ./target/debug/rdsh.exe setup --json | Out-String
           if ($setup -notmatch '"needed":true') { throw 'setup should report needed on first run' }
           ./target/debug/rdsh.exe doctor
+
+  browser-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: cargo build --release
+      - run: npm ci --prefix dashboard
+      - run: npm ci --prefix tests/e2e
+      - run: npx playwright install --with-deps chromium
+        working-directory: tests/e2e
+      - run: npm test --prefix tests/e2e
+        env:
+          RDSH_E2E_BIN: ./target/release/rdsh
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: browser-e2e
+          path: target/e2e

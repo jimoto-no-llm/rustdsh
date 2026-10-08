@@ -17,8 +17,11 @@ Full test matrix before a PR:
 cargo fmt --check
 cargo clippy --all-targets -- -D warnings
 cargo test --release
+cargo test --release --example benchmark_extended
 sh tests/regress.sh
 (cd dashboard && npm ci && npm test)   # if you touched dashboard/
+# If UI or HTTP behavior changed, follow tests/e2e/README.md and run:
+RDSH_E2E_BIN=./target/release/rdsh npm test --prefix tests/e2e
 ```
 
 ## Pull Request

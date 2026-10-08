@@ -2,7 +2,9 @@
 
 The historical headline numbers below were measured on Linux x86_64.
 For a current Mac run, see [2026-10-08 CLI verification](evidence/performance-20261008.md)
-and its raw samples. CLI startup/RSS measurements do not describe Desktop memory
+and [extended Rust measurements](evidence/performance-extended-20261008.md)
+with raw samples, streaming/growing sessions, concurrent writers, real HTTP and
+original DSH delegation. CLI startup/RSS measurements do not describe Desktop memory
 or the performance of delegated model execution.
 
 ## Headline numbers
@@ -23,16 +25,19 @@ For synthetic workloads and before/after output checks:
 
 ```sh
 cargo build --release
-python3 scripts/benchmark.py --bin ./target/release/rdsh \
-  --baseline /path/to/base/target/release/rdsh --n 15 \
+cargo run --release --example benchmark_extended -- \
+  --bin ./target/release/rdsh --baseline /path/to/base/target/release/rdsh --n 15 \
   --output /tmp/rdsh-performance.json
 ```
 
 The runner uses temporary HOME, DSH_HOME, and XDG directories. It generates
-ASCII/CJK text, a 300-file search tree, and compressed sessions when zstd is
-available. The JSON includes all samples, median/p95, workload sizes, binary
-hashes, peak RSS when supported, and stdout equality. A failed command or
-incorrect/different output stops the run.
+known-size and streaming compressed sessions, growing logs, search trees and JSONL
+input; zstd is required. The JSON includes all samples, median/p95, workload sizes,
+binary fingerprints, peak RSS when supported, and stdout equality. A candidate
+failure or incorrect/different sequential output stops the run. An incorrect growing
+base is explicitly recorded as failed correctness, with no comparative speed ratio.
+The earlier `scripts/benchmark.py` run remains as evidence for ASCII/CJK and the
+300-file search corpus; new native performance cases are Rust Cargo examples.
 
 For the built-in startup comparison:
 

@@ -255,13 +255,17 @@ export async function startDashboard(options) {
         (req.method === "POST" && ["metrics", "task", "question", "event"].some((operation) => route === `/api/update/${operation}`));
       const mcpAuthorized = kind === "project" && agentRoute && equal(req.headers.authorization, `Bearer ${mcpToken}`);
       const humanAuthorized = browserAuthorized(req, url, route);
-      const publicAsset = kind === "project" && req.method === "GET" && (route === "/" || route === "/app.mjs");
+      const publicAsset = kind === "project" && req.method === "GET" && (route === "/" || route === "/app.mjs" || route === "/favicon.ico");
       if (!publicAsset && !adminAuthorized && !mcpAuthorized && !humanAuthorized)
         return json(res, 401, {
           error:
             "Open this dashboard through rdsh-dashboard open or its QR code",
         });
       if (closing) return json(res, 503, { error: "Dashboard is stopping" });
+      if (publicAsset && route === "/favicon.ico") {
+        res.writeHead(204);
+        return res.end();
+      }
       if (req.method === "POST" && route === "/api/stop") {
         if (!adminAuthorized)
           return json(res, 401, {

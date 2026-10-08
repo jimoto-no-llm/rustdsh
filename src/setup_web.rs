@@ -178,16 +178,20 @@ fn handle(
 
 fn store_extras_body(body: &str) -> anyhow::Result<Vec<String>> {
     let v: serde_json::Value = serde_json::from_str(body)?;
-    let arr = v.get("enable").and_then(|x| x.as_array());
+    let arr = v
+        .get("enable")
+        .and_then(|x| x.as_array())
+        .ok_or_else(|| anyhow::anyhow!("enable must be an array of extra names"))?;
+    if arr.iter().any(|x| !x.is_string()) {
+        anyhow::bail!("enable must be an array of extra names");
+    }
     let mut cfg = crate::rdsh_config::load();
     let mut enable = Vec::new();
-    if let Some(items) = arr {
-        for x in items {
-            if let Some(s) = x.as_str() {
-                let s = s.trim().to_string();
-                if crate::rdsh_config::KNOWN_EXTRAS.contains(&s.as_str()) && !enable.contains(&s) {
-                    enable.push(s);
-                }
+    for x in arr {
+        if let Some(s) = x.as_str() {
+            let s = s.trim().to_string();
+            if crate::rdsh_config::KNOWN_EXTRAS.contains(&s.as_str()) && !enable.contains(&s) {
+                enable.push(s);
             }
         }
     }
