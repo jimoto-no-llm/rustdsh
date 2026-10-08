@@ -36,11 +36,19 @@ struct Args {
 
 fn accepted(events: &[Value], expected: &str, needs_tool: bool, exit_ok: bool) -> bool {
     exit_ok
+        && events.iter().any(|e| e["type"] == "final")
+        && response_accepted(events, expected, needs_tool)
+}
+
+fn response_accepted(events: &[Value], expected: &str, needs_tool: bool) -> bool {
+    events
+        .iter()
+        .rev()
+        .find(|e| e["type"] == "final" || e["type"] == "text")
+        .and_then(|e| e["text"].as_str())
+        .is_some_and(|s| s.trim() == expected)
         && events.iter().any(|e| {
             e["type"] == "status" && e["phase"] == "turn_end" && e["reason"]["kind"] == "completed"
-        })
-        && events.iter().any(|e| {
-            e["type"] == "final" && e["text"].as_str().is_some_and(|s| s.trim() == expected)
         })
         && !events.iter().any(|e| {
             e["type"] == "error" || (e["type"] == "tool_result" && e["status"] != "completed")
@@ -178,6 +186,8 @@ fn patch(args: &Args, run: &Path, selection: (&str, &str), config: &Value, case:
         "tool-web",
         "ptc-runtime",
         "workflow-ptc",
+        "plan-mode",
+        "user-questions",
     ] {
         entries.push(json!({"id":id,"disabled":true}));
     }
@@ -425,19 +435,27 @@ fn run_one(
     });
     let mut events = Vec::new();
     let mut first_committed_text = None;
-    let (exit, timed_out) = loop {
+    let mut response_elapsed = None;
+    let (exit, timed_out, shutdown_timeout) = loop {
         for (t, event) in rx.try_iter() {
             if event["type"] == "text" && first_committed_text.is_none() {
                 first_committed_text = Some(t);
             }
+            if event["type"] == "status" && event["phase"] == "turn_end" {
+                response_elapsed = Some(t);
+            }
             events.push(event);
         }
         if let Some(status) = child.try_wait()? {
-            break (status, false);
+            break (status, false, false);
+        }
+        if response_elapsed.is_some_and(|t| start.elapsed().as_secs_f64() >= t + 2.0) {
+            terminate(&mut child);
+            break (child.wait()?, false, true);
         }
         if start.elapsed() >= Duration::from_secs(args.timeout_seconds) {
             terminate(&mut child);
-            break (child.wait()?, true);
+            break (child.wait()?, true, false);
         }
         thread::sleep(Duration::from_millis(20));
     };
@@ -446,6 +464,9 @@ fn run_one(
     for (t, event) in rx.try_iter() {
         if event["type"] == "text" && first_committed_text.is_none() {
             first_committed_text = Some(t);
+        }
+        if event["type"] == "status" && event["phase"] == "turn_end" {
+            response_elapsed = Some(t);
         }
         events.push(event);
     }
@@ -475,12 +496,21 @@ fn run_one(
         fs::read(cwd.join("fixture.json"))?
             == serde_json::to_vec(&json!({"nonce":nonce,"numbers":[3,7,11,28]}))?
     };
-    let passed = answer_ok
+    let max_requests = if case == "response" {
+        1
+    } else if case == "read" {
+        2
+    } else {
+        4
+    };
+    let model_passed = response_accepted(&events, expected_answer, case != "response")
         && route_ok
         && oracle_ok
         && effort_ok
         && facts.catalog_ok
-        && facts.retry_attempts == 0;
+        && facts.retry_attempts == 0
+        && facts.provider_attempts <= max_requests;
+    let passed = model_passed && answer_ok && !shutdown_timeout;
     let usage: Vec<Value> = events
         .iter()
         .filter(|v| v["type"] == "status" && v["phase"] == "step_end")
@@ -494,15 +524,17 @@ fn run_one(
     let result = json!({"index":index,"sample":sample,"provider":provider,"model":model,"case":case,"launcher":launcher,
         "configured_reasoning_effort":"high","effort_verified":effort_ok,"elapsed_seconds":elapsed,"first_committed_text_seconds":first_committed_text,
         "passed":passed,"answer_ok":answer_ok,"session_request_routes":facts.routes,"route_ok":route_ok,"oracle_ok":oracle_ok,
+        "model_passed":model_passed,"response_elapsed_seconds":response_elapsed,"shutdown_timeout":shutdown_timeout,
+        "final_event_count":events.iter().filter(|e|e["type"]=="final").count(),
         "exit_code":exit.code(),"timed_out":timed_out,"tool_call_count":tool_call_count,"step_usage":usage,
         "step_count":step_count,"recorded_provider_attempts":facts.provider_attempts,"retry_attempt_events":facts.retry_attempts,
         "tool_catalog_ok":facts.catalog_ok,"configured_retry_limit":0,"max_model_requests":if case == "response" {1} else if case == "read" {2} else {4},
-        "failure_class":if passed {None} else {Some(classify(&events,timed_out))}});
+        "failure_class":if passed {None} else if shutdown_timeout {Some("shutdown_timeout")} else {Some(classify(&events,timed_out))}});
     fs::write(run.join("result.json"), serde_json::to_vec_pretty(&result)?)?;
     cleanup.clean().context("raw model run cleanup failed")?;
     println!(
-        "{} {} {} sample={} passed={} elapsed={:.3}s",
-        model, case, launcher, sample, passed, elapsed
+        "{} {} {} sample={} model_passed={} runtime_passed={} response={:?}s",
+        model, case, launcher, sample, model_passed, passed, response_elapsed
     );
     Ok(result)
 }
@@ -580,7 +612,7 @@ fn main() -> Result<()> {
         "rdsh_sha256":fingerprint(&args.bin)?,"original_launcher_sha256":fingerprint(&args.original)?,
         "rdsh_version":version(&args.bin)?,"dsh_version":version(&args.original)?,
         "runtime_artifact_sha256":args.runtime_artifact.as_deref().map(fingerprint).transpose()?,
-        "measurement":"process spawn to exit; first text is committed message, not time to first token",
+        "measurement":"response from spawn to committed turn_end; process lifetime and normal exit tracked separately; first text is not first token",
         "ordering":"sequential; alternate provider and launcher order every sample; no automatic retries",
         "authentication":"existing official credential provider; normal OAuth refresh permitted; no credential export",
         "runs":[]});
@@ -644,17 +676,20 @@ fn main() -> Result<()> {
                 .collect();
             let times: Vec<f64> = group
                 .iter()
-                .filter(|v| v["passed"] == true)
-                .filter_map(|v| v["elapsed_seconds"].as_f64())
+                .filter(|v| v["model_passed"] == true)
+                .filter_map(|v| v["response_elapsed_seconds"].as_f64())
                 .collect();
             summaries.push(json!({"model":model,"case":case,"launcher":launcher,"attempts":group.len(),"passed":times.len(),
+                "runtime_passed":group.iter().filter(|v|v["passed"]==true).count(),
                 "median_success_seconds":percentile(&times,0.5),"p95_success_seconds":percentile(&times,0.95),
                 "max_success_seconds":percentile(&times,1.0)}));
         }
     }
     let all_ok = runs.iter().all(|v| v["passed"] == true);
+    let all_model_ok = runs.iter().all(|v| v["model_passed"] == true);
     report["summaries"] = json!(summaries);
     report["all_passed"] = json!(all_ok);
+    report["all_model_passed"] = json!(all_model_ok);
     fs::write(
         args.out.join("report.json"),
         serde_json::to_vec_pretty(&report)?,
@@ -671,6 +706,18 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn completed_model_answer_does_not_hide_a_missing_final_or_failed_exit() {
+        let mut events = good();
+        events.pop();
+        events.push(json!({"type":"text","text":"nonce:49"}));
+        assert!(response_accepted(&events, "nonce:49", true));
+        assert!(!accepted(&events, "nonce:49", true, true));
+        assert!(!accepted(&good(), "nonce:49", true, false));
+        events.push(json!({"type":"text","text":"wrong"}));
+        assert!(!response_accepted(&events, "nonce:49", true));
+    }
 
     #[test]
     fn never_executes_arbitrary_generated_rust() {

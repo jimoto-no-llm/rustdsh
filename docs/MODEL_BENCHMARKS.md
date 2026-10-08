@@ -76,8 +76,15 @@ Model reasoning, raw tool payloads, error messages and stderr are not published.
 
 ## Reading the measurements
 
-Elapsed time runs from process spawn to exit, including DSH boot, network and
-model time. `first_committed_text_seconds` is a whole committed assistant message;
+Response time runs from process spawn to the committed `turn_end`, including DSH
+boot, network and model time. Process lifetime is also recorded separately.
+If a completed turn does not exit within two seconds, the runner terminates its
+own process group and records `shutdown_timeout`; runtime acceptance stays failed.
+`model_passed` requires the exact committed answer, completed turn, tools and
+independent oracle, route, effort, catalog and attempt checks. `passed` additionally
+requires the official final event and a clean process exit. These are separate
+results so a model response never hides a broken headless shutdown.
+`first_committed_text_seconds` is a whole committed assistant message;
 the official JSON projection does not expose first-token timing. Do not label it
 TTFT or derive generation throughput from it.
 
