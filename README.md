@@ -2,14 +2,16 @@
 
 # rdsh — a fast, safe Rust launcher for `dsh`
 
-[![ci](https://github.com/sahenjp/rustdsh/actions/workflows/ci.yml/badge.svg)](https://github.com/sahenjp/rustdsh/actions/workflows/ci.yml)
-[![dashboard](https://github.com/sahenjp/rustdsh/actions/workflows/dashboard.yml/badge.svg)](https://github.com/sahenjp/rustdsh/actions/workflows/dashboard.yml)
-[![docs](https://github.com/sahenjp/rustdsh/actions/workflows/docs.yml/badge.svg)](https://github.com/sahenjp/rustdsh/actions/workflows/docs.yml)
-[![release](https://img.shields.io/github/v/release/sahenjp/rustdsh.svg)](https://github.com/sahenjp/rustdsh/releases)
+[![ci](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/ci.yml/badge.svg)](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/ci.yml)
+[![dashboard](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/dashboard.yml/badge.svg)](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/dashboard.yml)
+[![docs](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/docs.yml/badge.svg)](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/docs.yml)
+[![release](https://img.shields.io/github/v/release/jimoto-no-llm/rustdsh.svg)](https://github.com/jimoto-no-llm/rustdsh/releases)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![rust](https://img.shields.io/badge/rust-1.73%2B-orange.svg)](https://www.rust-lang.org/)
+[![rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org/)
 
 [日本語版](README.ja.md)
+
+An independent community project; not an official DeepSeek or DeepSeek Harness project.
 
 `rdsh` is a drop-in fast path for [dsh](https://github.com/deepseek-ai/deepseek-harness)
 (the DeepSeek Harness CLI). Instead of a full rewrite, it **ports only the hot paths
@@ -20,8 +22,8 @@ delegated model calls.
 
 - `--version` startup median **~0.90ms** (original `dsh`: ~88ms, Linux)
 - `--version` peak RSS **~2.9MB** (original: ~66MB, Linux)
-- Safe by construction: agent loop and profile boot are never reimplemented,
-  delegation is a verbatim `exec`, and every optimization is output-identical
+- Compatibility: the agent loop and profile boot stay upstream; delegated arguments
+  are preserved and optimized commands have before/after output checks.
 
 ## Contents
 
@@ -68,26 +70,33 @@ Measured on Linux x86_64, including before/after comparisons for the optimizatio
 Reproduce with `rdsh bench --n 5` and `/usr/bin/time -v`.
 Details: [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
 
+Current source also includes bounded search workers, credential/tool-boundary
+hardening, and persistent update-notice dismissal. On a dense synthetic search
+fixture, the median changed from 197.77 ms to 4.61 ms; these Linux measurements
+are specific to that fixture. See [measurement evidence](docs/evidence/performance-security-audit.md).
+Check the release notes before installing binaries: source changes after v0.2.0
+are not included in that published release.
+
 ## Install
 
 Fastest (prebuilt binary, no Rust needed):
 
 ```sh
 # Linux / macOS / WSL
-curl -fsSL https://github.com/sahenjp/rustdsh/releases/latest/download/install.sh | bash -s -- --from-release
+curl -fsSL https://github.com/jimoto-no-llm/rustdsh/releases/latest/download/install.sh | bash -s -- --from-release
 ```
 
 ```powershell
 # Windows (PowerShell)
 $f = Join-Path $env:TEMP 'rdsh-install.ps1'
-Invoke-WebRequest -Uri https://github.com/sahenjp/rustdsh/releases/latest/download/install.ps1 -OutFile $f -UseBasicParsing
+Invoke-WebRequest -Uri https://github.com/jimoto-no-llm/rustdsh/releases/latest/download/install.ps1 -OutFile $f -UseBasicParsing
 & $f -FromRelease
 ```
 
 From source:
 
 ```sh
-git clone https://github.com/sahenjp/rustdsh.git
+git clone https://github.com/jimoto-no-llm/rustdsh.git
 cd rustdsh
 ./install.sh                 # build + install to ~/.local/bin/rdsh
 ./install.sh --as-dsh        # also shadow `dsh` (original kept as dsh-orig)
@@ -99,7 +108,7 @@ install.sh covers Linux, macOS, and WSL (auto-detects WSL, auto-installs
 Rust via rustup unless `--no-rustup`). Native Windows uses install.ps1:
 
 ```powershell
-git clone https://github.com/sahenjp/rustdsh.git
+git clone https://github.com/jimoto-no-llm/rustdsh.git
 cd rustdsh
 .\install.ps1              # build + install to %LOCALAPPDATA%\rdsh\bin (+ user PATH)
 .\install.ps1 -AsDsh       # also shadow `dsh` (original kept as dsh-orig)
@@ -118,7 +127,7 @@ you at the DeepSeek prompt: run `rdsh setup` (or `rdsh setup --login` to
 start the Codex/opencode OAuth flow right away).
 
 Or build directly: `cargo build --release` produces `target/release/rdsh`.
-Requires Rust 1.73+.
+Requires Rust 1.85+.
 
 ## Usage
 
@@ -313,6 +322,21 @@ The Node.js dashboard adds project metrics, tasks, human Q&A, and Tailscale
 QR access: `rdsh-dashboard project --project <directory>` for a project,
 `rdsh-dashboard harness` for the original Harness Web UI.
 
+On native Windows, the installed `rdsh-dashboard` launcher runs `project` and
+`harness` in the notification area, without a resident console window. Right-click
+its icon for **Open / 開く** or **Exit / 終了**; double-click opens the page. Windows
+controls whether the icon appears in the hidden-icons overflow. Exit stops this
+owned Dashboard and its managed Harness run after ownership verification;
+independent sessions remain running. Use `--no-tray` for foreground terminal mode.
+Install or refresh the launcher with `pwsh -NoProfile -ExecutionPolicy Bypass -File dashboard/install-windows.ps1`.
+This tray belongs to the optional Node.js Dashboard; `rdsh serve` stays a terminal command.
+
+For the original Harness update banner, **Dismiss** and **×** keep that component's
+same target version hidden across projects and browsers for the same OS user.
+A different target version can notify again. Restart the GUI server and reload the
+page after updating; [persistence limits and verification](docs/evidence/update-dismissal/README.md)
+apply when storage is unavailable. Cross-port pages reflect dismissal on their next poll.
+
 ## Safety design
 
 1. The agent loop and profile boot are never reimplemented — delegation only.
@@ -330,7 +354,7 @@ before/after output checks are described in [BENCHMARKS.md](docs/BENCHMARKS.md).
 
 - Start with [CONTRIBUTING.md](CONTRIBUTING.md) (4-line PRs, screenshot rules).
 - Bugs and ideas: [issue forms](https://github.com/jimoto-no-llm/rustdsh/issues/new/choose) (Japanese OK).
-- Questions: [Issues](https://github.com/sahenjp/rustdsh/issues).
+- Questions: [Issues](https://github.com/jimoto-no-llm/rustdsh/issues).
 - Security: never file public issues — see [SECURITY.md](SECURITY.md).
 - Design docs: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) ·
   [docs/BENCHMARKS.md](docs/BENCHMARKS.md) · [docs/ROADMAP.md](docs/ROADMAP.md) ·
@@ -348,8 +372,13 @@ before/after output checks are described in [BENCHMARKS.md](docs/BENCHMARKS.md).
 
 ## Credits
 
-Ideas: [@studio_yebisu](https://x.com/studio_yebisu), [@remydre8](https://x.com/remydre8).
+DeepSeek Harness provides the upstream runtime; without it, rustdsh would not exist.
+Thanks to the upstream developers and everyone contributing code, reviews, tests and ideas.
+
+- [GrEarl](https://github.com/GrEarl) and [PENTACoXIAN](https://x.com/PENTACoXIAN): security reports and review.
+- [StudioYebisu](https://github.com/yebisu0529-ship-it), [RNA4219](https://github.com/RNA4219), and [eightman999](https://github.com/eightman999): contributions and improvement reports.
+- [@remydre8](https://x.com/remydre8): ideas and product suggestions.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE). Upstream DeepSeek Harness and its dependencies retain their own license terms.

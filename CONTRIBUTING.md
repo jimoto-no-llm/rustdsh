@@ -5,7 +5,7 @@ English summary first, 日本語の詳細は後に続きます.
 ## Quick start
 
 ```sh
-git clone https://github.com/sahenjp/rustdsh.git
+git clone https://github.com/jimoto-no-llm/rustdsh.git
 cd rustdsh
 cargo build
 cargo test
@@ -60,6 +60,10 @@ For the full proposal backlog, see the index at
 
 Admin settings live in [issue #11](https://github.com/jimoto-no-llm/rustdsh/issues/11).
 Contributors only need this: open PRs against `main`, keep checks green.
+
+Current repository settings and label conventions are documented in
+[PROJECT-SETUP.md](docs/PROJECT-SETUP.md). Release preparation follows
+[RELEASING.md](docs/RELEASING.md) and the published v0.2.0 format.
 
 ---
 
