@@ -208,15 +208,19 @@ pub fn find_node_bin() -> Option<String> {
     }
 }
 
-fn base_cmd(orig: &str) -> std::process::Command {
-    if orig.ends_with(".js") {
-        let bin = find_node_bin().unwrap_or_else(|| "node".to_string());
-        let mut c = std::process::Command::new(bin);
-        c.arg(orig);
-        c
-    } else {
-        std::process::Command::new(orig)
+fn base_cmd(orig: &str, dry: bool, metadata_only: bool) -> anyhow::Result<std::process::Command> {
+    if dry || metadata_only {
+        if orig.ends_with(".js") {
+            let mut command =
+                std::process::Command::new(find_node_bin().unwrap_or_else(|| "node".to_string()));
+            command.arg(orig);
+            return Ok(command);
+        }
+        return Ok(std::process::Command::new(orig));
     }
+    let bin = find_node_bin()
+        .ok_or_else(|| anyhow::anyhow!("RDSH_SECURITY: compatible Node runtime is required"))?;
+    crate::tool_security::command(orig, &bin)
 }
 
 fn apply_slim(cmd: &mut std::process::Command, slim: bool) {
@@ -270,14 +274,13 @@ pub fn exec_boot(
     dry: bool,
     slim: bool,
 ) -> anyhow::Result<()> {
-    if !dry {
-        // One credential scan drives both the mirror import and the
-        // first-boot banner decision.
-        crate::auth::pre_boot(true);
-    }
     let orig = find_original_dsh()
         .ok_or_else(|| anyhow::anyhow!("original dsh not found in PATH (set DSH_ORIG_BIN)"))?;
-    let mut cmd = base_cmd(&orig);
+    let mut cmd = base_cmd(&orig, dry, false)?;
+    if !dry {
+        // Status is read-only and runs only after enforcement validation.
+        crate::auth::pre_boot(true);
+    }
     cmd.arg("--profile").arg(profile);
     if let Some(f) = from_default {
         cmd.arg("--from-default-profile").arg(f);
@@ -302,12 +305,12 @@ pub fn exec_dump_config(
     dry: bool,
     slim: bool,
 ) -> anyhow::Result<()> {
+    let orig = find_original_dsh()
+        .ok_or_else(|| anyhow::anyhow!("original dsh not found in PATH (set DSH_ORIG_BIN)"))?;
+    let mut cmd = base_cmd(&orig, dry, false)?;
     if !dry {
         crate::auth::pre_boot(false);
     }
-    let orig = find_original_dsh()
-        .ok_or_else(|| anyhow::anyhow!("original dsh not found in PATH (set DSH_ORIG_BIN)"))?;
-    let mut cmd = base_cmd(&orig);
     cmd.arg("--profile").arg(profile);
     for p in patches {
         cmd.arg("--patch").arg(p);
@@ -321,13 +324,16 @@ pub fn exec_dump_config(
 pub fn exec_raw(args: &[String], dry: bool, slim: bool) -> anyhow::Result<()> {
     // Same first-boot guidance as exec_boot: `dsh` (shadowed) is the usual
     // first thing a newcomer runs.
-    if !dry {
-        crate::auth::pre_boot(true);
-    }
+
     let orig = find_original_dsh().ok_or_else(|| {
         anyhow::anyhow!("original dsh not found (set DSH_ORIG_BIN or reinstall with install.sh)")
     })?;
-    let mut cmd = base_cmd(&orig);
+    let metadata_only =
+        args.len() == 1 && matches!(args[0].as_str(), "--version" | "-V" | "--help" | "-h");
+    let mut cmd = base_cmd(&orig, dry, metadata_only)?;
+    if !dry {
+        crate::auth::pre_boot(true);
+    }
     cmd.args(args);
     apply_slim(&mut cmd, slim);
     exec_or_spawn(cmd, dry)
@@ -339,12 +345,12 @@ pub fn exec_plugin(
     dry: bool,
     slim: bool,
 ) -> anyhow::Result<()> {
+    let orig = find_original_dsh()
+        .ok_or_else(|| anyhow::anyhow!("original dsh not found in PATH (set DSH_ORIG_BIN)"))?;
+    let mut cmd = base_cmd(&orig, dry, false)?;
     if !dry {
         crate::auth::pre_boot(false);
     }
-    let orig = find_original_dsh()
-        .ok_or_else(|| anyhow::anyhow!("original dsh not found in PATH (set DSH_ORIG_BIN)"))?;
-    let mut cmd = base_cmd(&orig);
     cmd.arg("plugin").arg("--profile").arg(profile);
     cmd.args(pnpm_args);
     apply_slim(&mut cmd, slim);

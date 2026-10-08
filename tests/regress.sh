@@ -187,7 +187,7 @@ mkdir -p $AB/home/.codex $AB/home/.local/share/opencode $AB/dsh
 printf '%s' '{"tokens":{"access_token":"a","refresh_token":"r","account_id":"1"}}' > $AB/home/.codex/auth.json
 printf '%s' '{"openai":{"type":"oauth","refresh":"r2","access":"a2","expires":1991708802841,"accountId":"9"}}' > $AB/home/.local/share/opencode/auth.json
 if HOME="$AB/home" DSH_HOME="$AB/dsh" $BIN auth 2>/dev/null | grep -q "openai-codex"; then ok "auth detects opencode login"; else echo "FAIL(output): auth detects opencode login"; exit 1; fi
-if HOME="$AB/home" DSH_HOME="$AB/dsh" $BIN auth --import >/dev/null 2>&1 && grep -q "llm-pi-ai/openai-codex" "$AB/dsh/.credentials.yaml"; then ok "auth import writes record"; else echo "FAIL(output): auth import writes record"; exit 1; fi
+if HOME="$AB/home" DSH_HOME="$AB/dsh" $BIN auth --import --provider openai-codex >/dev/null 2>&1 && grep -q "llm-pi-ai/openai-codex" "$AB/dsh/.credentials.yaml"; then ok "auth import writes record"; else echo "FAIL(output): auth import writes record"; exit 1; fi
 if HOME="$AB/home" DSH_HOME="$AB/dsh" $BIN auth 2>/dev/null | grep -q "already recognized"; then ok "auth import recognized"; else echo "FAIL(output): auth import recognized"; exit 1; fi
 fmode="$(stat -c %a "$AB/dsh/.credentials.yaml" 2>/dev/null || stat -f "%Lp" "$AB/dsh/.credentials.yaml")"
 if [ "$fmode" = "600" ]; then ok "auth file mode 600"; else echo "FAIL(mode): auth file mode"; exit 1; fi
@@ -195,9 +195,9 @@ if HOME="$AB/home" DSH_HOME="$AB/dsh" $BIN setup --json 2>/dev/null | grep -q "\
 SB2="$RG_TMP/setup"
 mkdir -p $SB2/home $SB2/dsh
 if env -u DEEPSEEK_API_KEY -u OPENAI_API_KEY -u ANTHROPIC_API_KEY HOME="$SB2/home" DSH_HOME="$SB2/dsh" $BIN setup --json 2>/dev/null | grep -q "\"needed\":true"; then ok "setup needed on first run"; else echo "FAIL(output): setup needed on first run"; exit 1; fi
-if env -u DEEPSEEK_API_KEY -u OPENAI_API_KEY -u ANTHROPIC_API_KEY HOME="$SB2/home" DSH_HOME="$SB2/dsh" DSH_ORIG_BIN="$SB/orig/dsh" $SB/bin/dsh --profile tui 2>&1 | grep -q "rdsh setup"; then ok "first-boot banner"; else echo "FAIL(output): first-boot banner"; exit 1; fi
+if env -u DEEPSEEK_API_KEY -u OPENAI_API_KEY -u ANTHROPIC_API_KEY HOME="$SB2/home" DSH_HOME="$SB2/dsh" DSH_ORIG_BIN="$SB/orig/dsh" $SB/bin/dsh --profile tui 2>&1 | grep -q "RDSH_SECURITY"; then ok "unsupported runtime refused"; else echo "FAIL(output): unsupported runtime refused"; exit 1; fi
 rm -rf $SB2
-FR=/tmp/rdsh-fr-AA
+FR="$RR_SANDBOX/release"
 mkdir -p $FR/pkg $FR/bin $FR/latest/download
 cp "$BIN" $FR/pkg/rdsh
 for a in rdsh-linux-x64 rdsh-macos-arm64 rdsh-macos-x64; do tar -czf "$FR/latest/download/$a.tar.gz" -C $FR/pkg rdsh; done
@@ -243,14 +243,14 @@ r="$(pick x 'echo "glibc 2.41"' 'exit 1' --musl)"
 if [ "$r" = fake-musl ]; then ok "install: --musl forces musl"; else echo "FAIL: --musl picked $r"; exit 1; fi
 rm -rf $MS
 printf "version: 1\nrecords:\n  llm-pi-ai/openai-codex:\n    kind: api-key\n    key: sk-user-key\n" > "$AB/dsh/.credentials.yaml"
-if HOME="$AB/home" DSH_HOME="$AB/dsh" $BIN auth --import >/dev/null 2>&1 && grep -q "kind: api-key" "$AB/dsh/.credentials.yaml" && HOME="$AB/home" DSH_HOME="$AB/dsh" $BIN auth 2>/dev/null | grep -q "left alone"; then ok "auth keeps api-key records"; else echo "FAIL(output): auth keeps api-key records"; exit 1; fi
+if HOME="$AB/home" DSH_HOME="$AB/dsh" $BIN auth --import --provider openai-codex >/dev/null 2>&1 && grep -q "kind: api-key" "$AB/dsh/.credentials.yaml" && HOME="$AB/home" DSH_HOME="$AB/dsh" $BIN auth 2>/dev/null | grep -q "left alone"; then ok "auth keeps api-key records"; else echo "FAIL(output): auth keeps api-key records"; exit 1; fi
 for t in "$FR"/latest/download/*.tar.gz; do printf "tampered" >> "$t"; done
 if RDSH_RELEASE_BASE="file://$FR" DSH_HOME="$FR/dsh" bash ./install.sh --from-release --prefix="$FR/bin-evil" >$FR/install-evil.log 2>&1; then echo "FAIL(output): tampered release refused"; exit 1; else ok "tampered release refused"; fi
 rm -rf $FR
 # sync-dsh.sh release self-update against a file:// release with npm/node shims.
 # The script runs from a copy (no tests/regress.sh or target/ next to it), so it
 # does not recurse into this suite.
-FS=/tmp/rdsh-fs-AA
+FS="$RR_SANDBOX/sync-release"
 rm -rf $FS
 mkdir -p $FS/pkg $FS/rel/latest/download $FS/repo $FS/home/.local/bin $FS/npmroot/@deepseek-ai/dsh $FS/bin
 cp "$BIN" $FS/pkg/rdsh
@@ -274,7 +274,7 @@ for a in rdsh-linux-x64 rdsh-linux-x64-musl rdsh-macos-arm64 rdsh-macos-x64; do 
 fs_sync "$FS/bin" $FS/sync-empty.log
 if grep -q "empty checksum sidecar" $FS/sync-empty.log && grep -q "binaries untouched" $FS/sync-empty.log && [ "$(cat $FS/bin/rdsh)" = "old" ]; then ok "sync-dsh refuses empty sha256"; else echo "FAIL(output): sync-dsh refuses empty sha256"; tail -n 8 $FS/sync-empty.log; exit 1; fi
 rm -rf $FS
-SW=/tmp/rdsh-setupweb-AA
+SW="$RR_SANDBOX/setupweb"
 mkdir -p $SW/home $SW/dsh
 HOME="$SW/home" DSH_HOME="$SW/dsh" $BIN setup --web --port 38082 >/dev/null 2>"$SW/setup.log" & SRV=$!
 SETUP_TOKEN=""
@@ -292,7 +292,7 @@ if printf "%s" "{\"name\":\"DEEPSEEK_API_KEY\",\"value\":\"smoke-only-key\"}" | 
 curl -fsS --max-time 5 -X POST -H "X-RDSH-Token: $SETUP_TOKEN" --data-binary '{}' http://127.0.0.1:38082/api/done >/dev/null 2>&1
 wait $SRV 2>/dev/null || true
 rm -rf $SW
-SWB=/tmp/rdsh-searchweb-AA
+SWB="$RR_SANDBOX/searchweb"
 mkdir -p $SWB
 printf "%s" "<html><body><article class=\"result\"><h3><a href=\"https://example.com/a\">Alpha result</a></h3><p class=\"content\">first snippet</p></article><article class=\"result\"><h3><a href=\"https://example.com/b\">Beta result</a></h3></article></body></html>" > $SWB/fixture.html
 python3 - "$SWB/fixture.html" 38083 <<PYEOF >/dev/null 2>&1 &

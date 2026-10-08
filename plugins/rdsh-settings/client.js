@@ -85,7 +85,7 @@ window.__ModuleLoader__.load({
             h('label', { style: row }, h('input', { type: 'checkbox', checked: !!cx.include_git_diff, onChange: (e) => setPath('context', 'include_git_diff', e.target.checked) }), 'git差分を含める')),
           h('div', { style: grid2 },
             h('div', { style: row }, h('span', { style: label }, 'コード取得上限'), h('input', { type: 'number', min: 1, max: 100, value: cx.max_code_hits, onChange: (e) => num('context', 'max_code_hits', e.target.value, 20), style: { ...input, maxWidth: 110 } })),
-            h('div', { style: row }, h('span', { style: label }, 'セッション参照数'), h('input', { type: 'number', min: 0, max: 100, value: cx.max_sessions, onChange: (e) => num('context', 'max_sessions', e.target.value, 10), style: { ...input, maxWidth: 110 } }))),
+            h('div', { style: row }, h('span', { style: label }, '旧履歴参照数（自動取り込みは無効）'), h('input', { type: 'number', min: 0, max: 100, value: cx.max_sessions, onChange: (e) => num('context', 'max_sessions', e.target.value, 0), style: { ...input, maxWidth: 110 } }))),
           h('div', null, h('div', { style: label }, 'ゴール'), h('input', { value: cx.goal || '', placeholder: '例: dsh互換性を維持する', onChange: (e) => setPath('context', 'goal', e.target.value), style: input })),
           h('div', null, h('div', { style: label }, '作業中ファイル (1行1件)'), h('textarea', { value: toLines(cx.working_files), rows: 3, onChange: (e) => setPath('context', 'working_files', fromLines(e.target.value)), style: { ...input, minHeight: 56 } })),
           h('div', null, h('div', { style: label }, '未解決タスク (1行1件)'), h('textarea', { value: toLines(cx.open_tasks), rows: 3, onChange: (e) => setPath('context', 'open_tasks', e.target.value), style: { ...input, minHeight: 56 } }))

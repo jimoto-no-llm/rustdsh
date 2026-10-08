@@ -118,7 +118,7 @@ Requires Rust 1.73+.
 ```sh
 rdsh web                          # same as: dsh --profile web (with slim env)
 rdsh --profile web --patch x.yml  # boot with an extra overlay
-rdsh --passthrough web           # byte-identical delegation, no slim env
+rdsh --passthrough web           # no slim env; tool isolation remains
 rdsh --dry-run web -- --resume abc  # print what would be executed
 ```
 
@@ -148,9 +148,9 @@ rdsh bench --n 5                     # compare rdsh vs dsh startup
 rdsh serve                           # local web dashboard (:38080)
 ```
 
-### `rdsh auth`: OAuth auto-recognition (drop it in and it works)
+### `rdsh auth`: explicit credential import
 
-Logins you already did elsewhere are mirrored into
+With `rdsh auth --import --provider openai-codex`, logins you already did elsewhere are mirrored into
 `$DSH_HOME/.credentials.yaml`, the credential store dsh itself reads:
 
 - Codex CLI (`~/.codex/auth.json`, ChatGPT OAuth)
@@ -159,7 +159,7 @@ Logins you already did elsewhere are mirrored into
 
 ```sh
 rdsh auth            # status: what was found, what dsh already recognizes
-rdsh auth --import   # write missing/older grants (0600, other entries untouched)
+rdsh auth --import --provider openai-codex   # write missing/older grants (0600, other entries untouched)
 rdsh auth --json     # machine-readable status
 rdsh setup           # first-run wizard: import, DeepSeek-key paste, --login/--open
 rdsh setup --web     # floating glass setup UI on localhost (browser auto-opens)
@@ -185,16 +185,47 @@ rdsh settings get extras.enable
 | `serve` | `rdsh serve` local dashboard |
 | `search-web` | `rdsh search-web` web search |
 
-Booting (`rdsh web`, `dump-config`, `plugin`) auto-syncs first, so logging
-in with Codex/opencode is enough. `RDSH_AUTH_AUTOSYNC=0` disables it.
-A dsh-side token that is newer is never overwritten, and non-grant
-records (API keys) are left alone.
+Boot, diagnostics and setup never copy external login stores. Select OAuth
+with `rdsh auth --import --provider openai-codex --source codex`, or an API
+key with `--ref OPENAI_API_KEY`. Bulk import and `RDSH_AUTH_AUTOSYNC` are
+ disabled. `setup --yes` only authorizes saving known keys from the environment.
+
+### Mandatory agent tool isolation
+
+On Linux x86_64, with bubblewrap, prlimit and audited DSH 0.2.0-rc.2, model tools
+are restricted to `rdsh_inspect`. Only copies of files explicitly shared
+by the human are mounted, read-only. Kernel policies deny network access
+and writes to the host and project; host credentials and environment variables
+are unavailable. Commands can use disposable storage inside the sandbox.
+
+```sh
+rdsh --share-file README.md --share-file src/main.rs --profile web
+```
+
+Shared contents can reach the model: never share a file containing secrets.
+Hidden files, symlinks and multiply linked files are refused. Legacy bash,
+read/write/edit, MCP and run_code tools are denied. Unsupported platforms,
+DSH versions, modified tool runtimes or missing bubblewrap fail closed.
+`--passthrough` changes environment tuning and cannot disable this gate.
+Protection applies to new processes launched through rustdsh; directly
+launched DSH and existing processes do not receive it. Configured plugins
+and profiles remain trusted code.
 
 ### `rdsh guard`: a fast hook command for hooks.json
 
+Context generation never automatically retrieves session history, even
+with a saved positive `context.max_sessions`. Use the explicit native
+`rdsh context search` command to inspect history.
+
+Native context and recursive search use no-follow, directory-relative file
+opens on Unix and reject multiply linked files and special files. Native
+search is refused on Windows; context file reads are omitted there until
+a safe handle-relative implementation is available.
+
 `guard` scans stdin (hook JSON or raw text) for deny patterns and blocks on
 match: exit code 2 with the reason on stderr, exit 0 otherwise. With `--json`
-it prints `{"decision":"block"}` / `{"decision":"approve"}` instead. `*` in a
+it prints `{"decision":"block"}` / `{}` instead. A deny-list miss does not
+approve execution; the host must still enforce its permissions. `*` in a
 pattern matches any string. At ~1ms startup and ~3MB RSS, per-tool-call hook
 cost is effectively zero.
 
@@ -330,7 +361,7 @@ QR access: `rdsh-dashboard project --project <directory>` for a project,
 3. Launcher error cases from the original (`desktop` profile, mutually exclusive
 dumps, missing `--profile`) are reproduced in Rust.
 4. Read paths never write: tokens/search/compact/dump/native APIs touch nothing.
-5. Instant retreats: `--passthrough`, `RDSH_PASSTHROUGH=1`, `./install.sh --restore`.
+5. `--passthrough` disables environment tuning. Restoring the original DSH with `./install.sh --restore` also removes rustdsh protection.
 
 Verified with `cargo test` (26 unit tests) and `tests/regress.sh`
 (35 CLI checks), plus byte-for-byte output equality on optimizations.

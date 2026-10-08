@@ -3,6 +3,7 @@ mod auth;
 mod compact;
 mod context;
 mod dsh_args;
+mod file_security;
 mod guard;
 mod inspect;
 mod local_http;
@@ -13,6 +14,7 @@ mod serve;
 mod setup_web;
 mod slim;
 mod tokens;
+mod tool_security;
 mod websearch;
 
 #[derive(Parser, Debug)]
@@ -20,9 +22,12 @@ mod websearch;
     name = "rdsh",
     version,
     about = "Rust fast launcher for dsh (safe: native fast-paths + passthrough)",
-    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|dump-config|boot)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import              mirror codex/opencode OAuth into dsh credentials\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh --passthrough tui          byte-identical delegation, no slim env\n  rdsh --dry-run tui -- --resume abc   show what would exec"
+    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|dump-config|boot)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh --passthrough tui          no slim env; mandatory tool isolation remains\n  rdsh --dry-run tui -- --resume abc   show what would exec"
 )]
 struct Cli {
+    /// Explicitly share a project file with isolated model tools (repeatable).
+    #[arg(long = "share-file", global = true)]
+    share_file: Vec<String>,
     #[arg(long = "passthrough", global = true)]
     passthrough: bool,
     #[arg(long = "dry-run", global = true)]
@@ -135,6 +140,12 @@ enum Commands {
     Auth {
         #[arg(long = "import")]
         import: bool,
+        #[arg(long)]
+        provider: Option<String>,
+        #[arg(long)]
+        source: Option<String>,
+        #[arg(long = "ref")]
+        key_ref: Option<String>,
         #[arg(long = "json")]
         json: bool,
     },
@@ -286,6 +297,7 @@ fn main() {
             .map(|s| NATIVE_FIRST.contains(&s.as_str()))
             .unwrap_or(false);
         if !first_is_native {
+            std::env::set_var("RDSH_SHARED_FILES", "[]");
             let scfg = rdsh_config::load();
             let slim =
                 !passthrough::env_passthrough() && !scfg.general.passthrough && scfg.general.slim;
@@ -300,6 +312,10 @@ fn main() {
     }
     // NOTE: --version/-V is served by clap itself (prints "rdsh x.y.z", exit 0).
     let cli = Cli::parse();
+    std::env::set_var(
+        "RDSH_SHARED_FILES",
+        serde_json::to_string(&cli.share_file).unwrap(),
+    );
     let cfg = rdsh_config::load();
     let pass = cli.passthrough || passthrough::env_passthrough() || cfg.general.passthrough;
     let slim = !cli.no_slim && !pass && (cli.slim || cfg.general.slim);
@@ -514,7 +530,13 @@ fn main() {
                 ContextAction::Explain { query, budget } => context::cmd_explain(query, budget),
             }
         }
-        Some(Commands::Auth { import, json }) => auth::cmd_auth(import, json),
+        Some(Commands::Auth {
+            import,
+            json,
+            provider,
+            source,
+            key_ref,
+        }) => auth::cmd_auth(import, json, provider, source, key_ref),
         Some(Commands::Setup {
             open,
             login,

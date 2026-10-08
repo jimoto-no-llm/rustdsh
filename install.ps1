@@ -73,6 +73,12 @@ if ($FromRelease) {
   try {
     Write-Host "fetching $url"
     Invoke-WebRequest -Uri $url -OutFile (Join-Path $tmpd 'pkg.zip')
+    Invoke-WebRequest -Uri "$url.sha256" -OutFile (Join-Path $tmpd 'pkg.zip.sha256')
+    $checksumText = (Get-Content -LiteralPath (Join-Path $tmpd 'pkg.zip.sha256') -Raw).Trim()
+    $expectedHash = ($checksumText -split '\s+')[0]
+    if ($expectedHash -notmatch '^[a-fA-F0-9]{64}$') { throw 'invalid release checksum; refusing install' }
+    $actualHash = (Get-FileHash -LiteralPath (Join-Path $tmpd 'pkg.zip') -Algorithm SHA256).Hash
+    if ($actualHash -ne $expectedHash) { throw 'release checksum mismatch; refusing install' }
     Expand-Archive -Path (Join-Path $tmpd 'pkg.zip') -DestinationPath $tmpd -Force
     $builtExe = Join-Path $tmpd 'rdsh.exe'
     if (-not (Test-Path $builtExe)) { throw 'release archive has no rdsh.exe' }

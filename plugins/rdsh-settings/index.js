@@ -1,6 +1,7 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, access, rename, unlink } from 'node:fs/promises';
+import { randomBytes } from 'node:crypto';
 
 export const inject = ['webServer', 'connection'];
 
@@ -9,6 +10,16 @@ function dshHome() {
 }
 function cfgPath() { return join(dshHome(), 'rdsh-context.json'); }
 function settingsPath() { return join(dshHome(), 'rdsh.json'); }
+
+async function savePrivateJson(path, value) {
+  const temporary = `${path}.tmp.${randomBytes(16).toString('hex')}`;
+  try {
+    await writeFile(temporary, JSON.stringify(value, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
+    await rename(temporary, path);
+  } finally {
+    await unlink(temporary).catch((error) => { if (error.code !== 'ENOENT') throw error; });
+  }
+}
 
 function defaults() {
   return { token_budget: 4000, enable_retriever: true, enable_packer: true, enable_verifier: true, goal: '', decisions: [], constraints: [], working_files: [], open_tasks: [] };
@@ -28,7 +39,7 @@ function settingsDefaults() {
     bench: { n: 5 },
     setup: { web_port: 0 },
     beta: { context_engine: false },
-    context: { token_budget: 4000, enable_retriever: true, enable_packer: true, enable_verifier: true, goal: '', decisions: [], constraints: [], working_files: [], open_tasks: [], max_code_hits: 20, max_sessions: 10, include_git_diff: true },
+    context: { token_budget: 4000, enable_retriever: true, enable_packer: true, enable_verifier: true, goal: '', decisions: [], constraints: [], working_files: [], open_tasks: [], max_code_hits: 20, max_sessions: 0, include_git_diff: true },
   };
 }
 
@@ -256,7 +267,7 @@ export function apply(ctx, config) {
           const input = await readBody(req);
           const cfg = sanitize(input.config ?? input);
           await mkdir(dshHome(), { recursive: true });
-          await writeFile(cfgPath(), JSON.stringify(cfg, null, 2) + '\n', { mode: 0o600 });
+          await savePrivateJson(cfgPath(), cfg);
           const body = JSON.stringify({ ok: true, config: cfg });
           res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'content-length': Buffer.byteLength(body) });
           res.end(body);
@@ -297,7 +308,7 @@ export function apply(ctx, config) {
           const input = await readBody(req, 1024 * 1024);
           const cfg = await mergeSettings(await readSettingsDocument(), input.config ?? input);
           await mkdir(dshHome(), { recursive: true });
-          await writeFile(settingsPath(), JSON.stringify(cfg, null, 2) + '\n', { mode: 0o600 });
+          await savePrivateJson(settingsPath(), cfg);
           json(res, 200, { ok: true, config: await settingsForForm(cfg) });
         } catch (e) {
           res.writeHead(400, { 'content-type': 'application/json' });

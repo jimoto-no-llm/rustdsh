@@ -19,6 +19,24 @@ jobs:
           node-version: 22
       - run: node --test tests/plugin-security.test.mjs
 
+  security-boundaries:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --locked
+      - run: sudo apt-get update && sudo apt-get install -y bubblewrap
+      - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - run: node --test tests/security-boundaries.test.mjs tests/tool-isolation.test.mjs
+      - run: python3 -m unittest discover -s tests -p 'test_release_assets.py'
+      - name: Verify the audited dispatcher and late middleware changes
+        run: |
+          npm install --prefix "$RUNNER_TEMP/rdsh-runtime" --ignore-scripts --no-audit --no-fund @deepseek-ai/dsh-tools@0.2.0-rc.2
+          RDSH_TOOL_RUNTIME="$RUNNER_TEMP/rdsh-runtime/node_modules/@deepseek-ai/dsh-tools/lib/index.js" RDSH_SECURE_WORKSPACE="$GITHUB_WORKSPACE" RDSH_SHARED_FILES='[]' node --import ./security/preload.mjs tests/guarded-runtime-probe.mjs
+
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -54,6 +72,7 @@ jobs:
       - if: '! matrix.regress'
         shell: pwsh
         run: |
+          ./tests/installer-security.ps1
           $tmp = Join-Path $env:RUNNER_TEMP 'rdsh-smoke'
           $h = Join-Path $tmp 'home'
           $d = Join-Path $tmp 'dsh'
@@ -67,4 +86,3 @@ jobs:
           $setup = ./target/debug/rdsh.exe setup --json | Out-String
           if ($setup -notmatch '"needed":true') { throw 'setup should report needed on first run' }
           ./target/debug/rdsh.exe doctor
-
