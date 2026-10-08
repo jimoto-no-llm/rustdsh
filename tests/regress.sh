@@ -112,11 +112,13 @@ if env -u NODE_COMPILE_CACHE HOME="$CC/home" RDSH_PASSTHROUGH=1 DSH_ORIG_BIN="$S
 if env -u NODE_COMPILE_CACHE HOME="$CC/home" RDSH_NODE_COMPILE_CACHE=0 DSH_ORIG_BIN="$SB/orig/dsh" $BIN --dry-run tui 2>/dev/null | grep -q 'NODE_COMPILE_CACHE="'; then echo "FAIL: RDSH_NODE_COMPILE_CACHE=0 opt-out ignored"; exit 1; else ok "RDSH_NODE_COMPILE_CACHE=0 opts out"; fi
 # A value the user already exports is left alone: rdsh adds nothing to the exec line.
 if NODE_COMPILE_CACHE=/tmp/rdsh-mine HOME="$CC/home" DSH_ORIG_BIN="$SB/orig/dsh" $BIN --dry-run tui 2>/dev/null | grep "would exec" | grep -q 'NODE_COMPILE_CACHE='; then echo "FAIL: user NODE_COMPILE_CACHE must not be overridden (dry-run)"; exit 1; else ok "user NODE_COMPILE_CACHE respected (dry-run)"; fi
-if NODE_COMPILE_CACHE=/tmp/rdsh-mine HOME="$CC/home" DSH_HOME="$CC/dsh" DSH_ORIG_BIN="$CC/envdsh" $BIN tui 2>/dev/null | grep -q "CACHE=/tmp/rdsh-mine "; then ok "boot passes the user's NODE_COMPILE_CACHE through"; else echo "FAIL(output): boot must keep the user's NODE_COMPILE_CACHE"; exit 1; fi
+if NODE_COMPILE_CACHE=/tmp/rdsh-mine HOME="$CC/home" DSH_HOME="$CC/dsh" DSH_ORIG_BIN="$CC/envdsh" "$SB/bin/dsh" --version 2>/dev/null | grep -q "CACHE=/tmp/rdsh-mine "; then ok "metadata exec passes the user's NODE_COMPILE_CACHE through"; else echo "FAIL(output): metadata exec must keep the user's NODE_COMPILE_CACHE"; exit 1; fi
 # Real exec (not dry-run): the child sees the default value and the directory exists.
 # (The dry-runs above already made it, so start from a clean slate.)
 rm -rf "$CC/home/.cache"
-if env -u NODE_COMPILE_CACHE HOME="$CC/home" DSH_HOME="$CC/dsh" DSH_ORIG_BIN="$CC/envdsh" $BIN tui 2>/dev/null | grep -q "CACHE=$CCDEF " && [ -d "$CCDEF" ]; then ok "boot exports NODE_COMPILE_CACHE and creates the dir"; else echo "FAIL(output): boot exports NODE_COMPILE_CACHE"; exit 1; fi
+if env -u NODE_COMPILE_CACHE HOME="$CC/home" DSH_HOME="$CC/dsh" DSH_ORIG_BIN="$CC/envdsh" "$SB/bin/dsh" --version 2>/dev/null | grep -q "CACHE=$CCDEF " && [ -d "$CCDEF" ]; then ok "metadata exec exports NODE_COMPILE_CACHE and creates the dir"; else echo "FAIL(output): metadata exec exports NODE_COMPILE_CACHE"; exit 1; fi
+rm -rf "$CC/home/.cache"
+if env -u NODE_COMPILE_CACHE HOME="$CC/home" DSH_HOME="$CC/dsh" DSH_ORIG_BIN="$CC/envdsh" $BIN tui > "$CC/out" 2> "$CC/err"; then echo "FAIL: unsupported agent runtime executed"; exit 1; elif grep -q "RDSH_SECURITY" "$CC/err" && [ ! -d "$CCDEF" ]; then ok "unsupported agent boot refuses before creating a cache"; else echo "FAIL: unsupported agent boot cache side effect"; cat "$CC/err"; exit 1; fi
 rm -rf "$CC"
 # --- doctor on a host with no Node/dsh: fails with a clear error ---
 ND="$RG_TMP/nodsh"
