@@ -71,7 +71,7 @@ for local use and must be installed and signed in for phone access.
 
 ```powershell
 # From the repository root; installs dependencies and a launcher in ~/.local/bin.
-pwsh -NoProfile -File ./dashboard/install-windows.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass -File ./dashboard/install-windows.ps1
 
 # A project-specific dashboard. The default port is stable for each project path.
 rdsh-dashboard project --project C:\Projects\MyProject --open
@@ -86,7 +86,41 @@ rdsh-dashboard open --harness
 rdsh-dashboard stop --harness
 ```
 
-The checkout must stay in place: the installed launcher points to its `cli.mjs`.
+On native Windows the installed launcher starts `project` and `harness` in the
+notification area without keeping a console window open. Right-click the icon for
+**Open / 開く** or **Exit / 終了**; double-click also opens the authenticated page.
+Windows notification-area settings control whether it sits in the hidden-icons overflow.
+Each icon's tooltip identifies its project (or `rdsh Harness`). The helper receives
+only a small Windows runtime environment; provider credentials are not forwarded.
+Exit calls this instance's existing scoped shutdown: a managed Harness run must
+have verified stopped before the icon/server disappear. If verification fails,
+the icon remains with a warning so you can inspect the stop status and retry.
+Closing the browser leaves the server running. CLI `stop` removes its tray too.
+Independent Harness sessions and other project dashboards are not stopped.
+
+```powershell
+# Keep terminal output and Ctrl-C behavior for scripts or troubleshooting.
+rdsh-dashboard project --project C:\Projects\MyProject --no-tray
+```
+
+Other subcommands remain foreground commands. Direct `node dashboard/cli.mjs ...`
+remains foreground; native Windows can explicitly request `--tray` there.
+Startup failure returns an error to the caller, rather than reporting a ready tray.
+If startup exceeds 60 seconds, the launcher reports that readiness is unconfirmed;
+the owned server may still start. Use `open` or `stop` with that same project to
+inspect or stop it before starting another instance.
+The helper runs this checkout's PowerShell script with process-local execution
+policy; machine/user policy is not changed and enforced Group Policy still applies.
+Opening a browser passes its authenticated URL to the Windows URL handler, as the
+existing `open` command does. Other processes with the same OS-user access can
+observe that short-lived command line; the tray helper itself receives no URL/key.
+Re-run the installer after upgrading to refresh an older launcher.
+Installation uses the lockfile's native prebuilts without package lifecycle
+scripts and verifies that Koffi loads before writing the launchers. An unavailable
+native prebuilt fails installation; ownership checks are retained. The installed
+wrapper also preserves the Node executable selected at installation time.
+
+The checkout must stay in place: the installed launcher points to its `windows-launcher.mjs`.
 To run without installing a launcher, use `node dashboard/cli.mjs ...`.
 On Linux/macOS, install with `npm ci --prefix dashboard` and use the Node CLI.
 Project mode is portable. The current Harness launcher targets Windows + WSL;

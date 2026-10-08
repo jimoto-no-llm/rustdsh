@@ -11,6 +11,8 @@
 
 [日本語版](README.ja.md)
 
+An independent community project; not an official DeepSeek or DeepSeek Harness project.
+
 `rdsh` is a drop-in fast path for [dsh](https://github.com/deepseek-ai/deepseek-harness)
 (the DeepSeek Harness CLI). Instead of a full rewrite, it **ports only the hot paths
 to Rust and delegates conversation and model execution to the original `dsh` binary**.
@@ -20,8 +22,8 @@ delegated model calls.
 
 - `--version` startup median **~0.90ms** (original `dsh`: ~88ms, Linux)
 - `--version` peak RSS **~2.9MB** (original: ~66MB, Linux)
-- Safe by construction: agent loop and profile boot are never reimplemented,
-  delegation is a verbatim `exec`, and every optimization is output-identical
+- Compatibility: the agent loop and profile boot stay upstream; delegated arguments
+  are preserved and optimized commands have before/after output checks.
 
 ## Contents
 
@@ -67,6 +69,13 @@ Measured on Linux x86_64, including before/after comparisons for the optimizatio
 
 Reproduce with `rdsh bench --n 5` and `/usr/bin/time -v`.
 Details: [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
+
+Current source also includes bounded search workers, credential/tool-boundary
+hardening, and persistent update-notice dismissal. On a dense synthetic search
+fixture, the median changed from 197.77 ms to 4.61 ms; these Linux measurements
+are specific to that fixture. See [measurement evidence](docs/evidence/performance-security-audit.md).
+Check the release notes before installing binaries: source changes after v0.2.0
+are not included in that published release.
 
 ## Install
 
@@ -313,6 +322,21 @@ The Node.js dashboard adds project metrics, tasks, human Q&A, and Tailscale
 QR access: `rdsh-dashboard project --project <directory>` for a project,
 `rdsh-dashboard harness` for the original Harness Web UI.
 
+On native Windows, the installed `rdsh-dashboard` launcher runs `project` and
+`harness` in the notification area, without a resident console window. Right-click
+its icon for **Open / 開く** or **Exit / 終了**; double-click opens the page. Windows
+controls whether the icon appears in the hidden-icons overflow. Exit stops this
+owned Dashboard and its managed Harness run after ownership verification;
+independent sessions remain running. Use `--no-tray` for foreground terminal mode.
+Install or refresh the launcher with `pwsh -NoProfile -ExecutionPolicy Bypass -File dashboard/install-windows.ps1`.
+This tray belongs to the optional Node.js Dashboard; `rdsh serve` stays a terminal command.
+
+For the original Harness update banner, **Dismiss** and **×** keep that component's
+same target version hidden across projects and browsers for the same OS user.
+A different target version can notify again. Restart the GUI server and reload the
+page after updating; [persistence limits and verification](docs/evidence/update-dismissal/README.md)
+apply when storage is unavailable. Cross-port pages reflect dismissal on their next poll.
+
 ## Safety design
 
 1. The agent loop and profile boot are never reimplemented — delegation only.
@@ -348,8 +372,13 @@ before/after output checks are described in [BENCHMARKS.md](docs/BENCHMARKS.md).
 
 ## Credits
 
-Ideas: [@studio_yebisu](https://x.com/studio_yebisu), [@remydre8](https://x.com/remydre8).
+DeepSeek Harness provides the upstream runtime; without it, rustdsh would not exist.
+Thanks to the upstream developers and everyone contributing code, reviews, tests and ideas.
+
+- [GrEarl](https://github.com/GrEarl) and [PENTACoXIAN](https://x.com/PENTACoXIAN): security reports and review.
+- [StudioYebisu](https://github.com/yebisu0529-ship-it), [RNA4219](https://github.com/RNA4219), and [eightman999](https://github.com/eightman999): contributions and improvement reports.
+- [@remydre8](https://x.com/remydre8): ideas and product suggestions.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE). Upstream DeepSeek Harness and its dependencies retain their own license terms.
