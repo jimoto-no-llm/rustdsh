@@ -1,0 +1,40 @@
+{
+  "kind": "real_browser_captures",
+  "captures": [
+    {
+      "name": "after.png",
+      "width": 1265,
+      "height": 2583
+    },
+    {
+      "name": "before.png",
+      "width": 1265,
+      "height": 1927
+    },
+    {
+      "name": "empty.png",
+      "width": 1265,
+      "height": 2027
+    },
+    {
+      "name": "mobile-390px.png",
+      "width": 375,
+      "height": 3659
+    },
+    {
+      "name": "partial.png",
+      "width": 1265,
+      "height": 2599
+    },
+    {
+      "name": "provenance.png",
+      "width": 1265,
+      "height": 5736
+    }
+  ],
+  "gif_frames": ["empty.png", "partial.png", "after.png"],
+  "frame_seconds": 2,
+  "gif_width": 800,
+  "gif_height": 1646,
+  "encoding": "Original browser bytes re-encoded to PNG without image-content filters. GIF scales actual frames and adds white padding outside the captures; no synthesized UI."
+}

@@ -30,6 +30,10 @@ Reload the web GUI to pick it up.
 
 - `demo: true` shows a demo notification without touching any state file.
 - Without updates recorded, the banner stays hidden.
+- Both API routes require the DSH GUI session and its Host/Origin checks.
+  DSH must provide `connection.requestRejection` (verified with 0.2.0-rc.2).
+  Without the `connection` service, the plugin is not loaded. If the service
+  lacks the authentication API, requests are refused with 503.
 
 ## Live GUI verification (Issue #5)
 

@@ -2,10 +2,51 @@ import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
+import {
+  changeQuestionContract,
+  answerQuestionContract,
+  publicQuestionContracts,
+  feedbackValidity,
+  validateQuestionContracts,
+} from "./question-contracts.mjs";
+import {
+  registerReplyConsumer,
+  recordAnswerApplication,
+  validateReplyRecipient,
+  applyReplyAck,
+  publicAnswerApplications,
+  validateAnswerApplications,
+  replyQueueBlocker,
+  replyQueueIndex,
+} from "./answer-applications.mjs";
+import {
+  submitInstruction,
+  resolveInstruction,
+  applyInstructionControl,
+  validateInstructions,
+  queueRevision,
+} from "./instruction-queue.mjs";
+import {
+  declareCostScope,
+  recordCostReport,
+  validateCostLedger,
+  publicCostLedger,
+} from "./cost-ledger.mjs";
+import {
+  applyBudgetOperation,
+  validateBudgetAdmission,
+  publicBudgetAdmission,
+} from "./budget-admission.mjs";
+import {
+  restoreHistoryBackup,
+  validateRestoredHistory,
+  validateHistoryConflicts,
+} from "./history-backup.mjs";
 
 // Bucket D display notes (no schema change; schema stays 1):
 // #12 task contract, #13 review inbox, #14 outcome cards, #15 dependencies.
-// Field shapes below are frozen; only comments and wording may change here.
+// Legacy field shapes remain unchanged. Optional question_contracts metadata
+// has its own schema and explicit revision contract (#40).
 
 export const metricNames = [
   "total_cost_usd",
@@ -57,6 +98,14 @@ export class ProjectStore {
   constructor(project, value) {
     this.project = project;
     this.value = value;
+    this.historyIds = validateRestoredHistory(value);
+    this.protectedHistory = freezeHistory(value.history_backups);
+  }
+  clone() {
+    const { history_backups, ...value } = this.value;
+    const next = structuredClone(value);
+    if (history_backups !== undefined) next.history_backups = history_backups;
+    return next;
   }
   static async open(project) {
     let value;
@@ -82,11 +131,41 @@ export class ProjectStore {
       throw new Error(
         "Dashboard state belongs to a different project or version",
       );
+    validateQuestionContracts(value);
+    validateAnswerApplications(value);
+    validateInstructions(value);
+    validateCostLedger(value);
+    validateBudgetAdmission(value);
     return new ProjectStore(project, value);
   }
   async mutate(operation, input) {
-    const next = structuredClone(this.value);
+    const next = this.clone();
     applyOperation(next, operation, input);
+    validateInstructions(next);
+    validateCostLedger(next);
+    return this.commit(next, operation, input);
+  }
+  async mutateReply(operation, input, context) {
+    const next = this.clone();
+    const handlers = {
+      register: registerReplyConsumer,
+      ack: applyReplyAck,
+      instruction_submit: submitInstruction,
+      instruction_resolve: resolveInstruction,
+      control: applyInstructionControl,
+    };
+    const result = handlers[operation](next, input, context);
+    validateAnswerApplications(next);
+    validateInstructions(next);
+    await this.commit(next);
+    return structuredClone(result);
+  }
+  async commit(next, operation = null, input = {}) {
+    const historyChanged = next.history_backups !== this.protectedHistory;
+    const historyIds = historyChanged
+      ? validateRestoredHistory(next)
+      : this.historyIds;
+    validateHistoryConflicts(next, historyIds);
     next.revision++;
     next.updated_at = new Date().toISOString();
     const names = {
@@ -100,30 +179,110 @@ export class ProjectStore {
       operation === "answer"
         ? input.answer
         : operation === "question"
-          ? input.question
+          ? input.question || input.cancel_reason
           : input.title || "指標を更新";
-    next.changes ||= [];
-    next.changes.push({
-      eventId: `evt_${this.project.id}_${next.revision}`,
-      name: names[operation],
-      timestamp: next.updated_at,
-      data: {
-        project_id: this.project.id,
-        revision: next.revision,
-        entity_id: input.id || "",
-        summary: String(summary).slice(0, 1000),
-      },
-      cursor: null,
-    });
-    next.changes = next.changes.slice(-10000);
+    if (operation) {
+      next.changes ||= [];
+      next.changes.push({
+        eventId: `evt_${this.project.id}_${next.revision}`,
+        name: names[operation],
+        timestamp: next.updated_at,
+        data: {
+          project_id: this.project.id,
+          revision: next.revision,
+          entity_id: input.id || "",
+          summary: String(summary).slice(0, 1000),
+        },
+        cursor: null,
+      });
+      next.changes = next.changes.slice(-10000);
+    }
     await writeJson(path.join(this.project.directory, "state.json"), next);
+    if (historyChanged) {
+      this.protectedHistory = freezeHistory(next.history_backups);
+      this.historyIds = historyIds;
+    }
     this.value = next;
     return next;
   }
+  async mutateBudget(operation, input) {
+    const next = this.clone();
+    const result = applyBudgetOperation(next, operation, input);
+    await this.commit(next);
+    return structuredClone(result);
+  }
+  async restoreBackup(input, evidenceIds, acceptanceTaskIds) {
+    const next = structuredClone(this.value);
+    const result = restoreHistoryBackup(
+      next,
+      input,
+      evidenceIds,
+      acceptanceTaskIds,
+    );
+    await this.commit(next);
+    return { ...result, revision: next.revision };
+  }
 }
-export function publicState(value) {
+function freezeHistory(value) {
+  if (value && typeof value === "object") {
+    for (const child of Object.values(value)) freezeHistory(child);
+    Object.freeze(value);
+  }
+  return value;
+}
+export function publicState(value, observations, deliveries, budgetJobs) {
   const { changes, ...visible } = value;
-  return visible;
+  if (value.cost_ledger) visible.cost_ledger = publicCostLedger(value);
+  if (value.budget_admission)
+    visible.budget_admission = publicBudgetAdmission(value, budgetJobs);
+  visible.input_queue_revision = queueRevision(value);
+  if (visible.instructions) {
+    visible.instructions = structuredClone(visible.instructions);
+    const queueIndex = replyQueueIndex(value);
+    for (const command of Object.values(visible.instructions.commands)) {
+      const observation = observations?.[command.consumer_id] || {
+        status: "unknown",
+        reason: "live_consumer_not_observed",
+        observed_at: null,
+        owner_id: null,
+      };
+      command.target_observation = observation;
+      command.display_phase =
+        command.phase === "started" &&
+        (observation.status !== "available" ||
+          observation.owner_id !== command.attempt_owner_id)
+          ? "unknown"
+          : ["saved", "read"].includes(command.phase) &&
+              observation.status === "unavailable"
+            ? "unapplied"
+            : command.phase;
+      command.execution_authorized = false;
+      const blocker = ["saved", "read"].includes(command.phase)
+        ? replyQueueBlocker(value, command, queueIndex)
+        : null;
+      command.queue_blocker = blocker
+        ? { command_id: blocker.command_id, phase: blocker.phase }
+        : null;
+    }
+  }
+  const contracts = publicQuestionContracts(value);
+  const applications = publicAnswerApplications(
+    value,
+    observations,
+    deliveries,
+  );
+  const result = contracts
+    ? {
+        ...visible,
+        question_contracts: contracts,
+        feedback: value.feedback.map((message) =>
+          feedbackValidity(value, message),
+        ),
+      }
+    : visible;
+  return applications
+    ? { ...result, answer_applications: applications }
+    : result;
 }
 function text(value, label, max = 8000) {
   if (typeof value !== "string" || !value.trim() || value.length > max)
@@ -143,7 +302,9 @@ export function applyOperation(state, operation, input) {
     case "metrics": {
       if (
         Object.keys(input).some(
-          (key) => !metricNames.includes(key) && key !== "session_id",
+          (key) =>
+            !metricNames.includes(key) &&
+            !["session_id", "cost_scope", "cost_report"].includes(key),
         )
       )
         throw new Error("Unknown metric");
@@ -175,6 +336,8 @@ export function applyOperation(state, operation, input) {
         m.tool_errors > m.tool_calls
       )
         throw new Error("Tool errors exceed tool calls");
+      if ("cost_scope" in input) declareCostScope(state, input.cost_scope);
+      if ("cost_report" in input) recordCostReport(state, input.cost_report);
       break;
     }
     case "task": {
@@ -204,6 +367,18 @@ export function applyOperation(state, operation, input) {
       break;
     }
     case "question": {
+      if (
+        input.decision !== undefined ||
+        input.action !== undefined ||
+        input.expected_revision !== undefined
+      ) {
+        changeQuestionContract(state, input);
+        validateReplyRecipient(
+          state,
+          state.question_contracts.cards[input.id].snapshot.decision,
+        );
+        break;
+      }
       // #13 review inbox: the inbox shows only answer === null, ordered by
       // urgency then created_at. Plain event/metrics appends must not raise
       // warnings there; answering removes the item but keeps this history.
@@ -238,6 +413,7 @@ export function applyOperation(state, operation, input) {
         throw new Error("Question already answered");
       question.answer = text(input.answer, "answer");
       question.answered_at = new Date().toISOString();
+      const contract = answerQuestionContract(state, question, input);
       state.feedback.push({
         sequence: (state.feedback.at(-1)?.sequence || 0) + 1,
         type: "question_answered",
@@ -245,7 +421,9 @@ export function applyOperation(state, operation, input) {
         question: question.question,
         answer: question.answer,
         created_at: question.answered_at,
+        ...(contract || {}),
       });
+      recordAnswerApplication(state, state.feedback.at(-1));
       break;
     }
     case "event": {

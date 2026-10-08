@@ -106,11 +106,17 @@ test("webhooks verify, persist, deduplicate subscriptions, retain event ids, and
   });
   fail = true;
   await hub.flush();
+  assert.equal(hub.diagnostics().callback.reason, "http_5xx");
+  assert.ok(hub.diagnostics().callback.last_failure);
+  assert.equal(hub.diagnostics().verification.state, "observed");
   assert.equal(hub.subscriptions[0].last_revision, 0);
   hub = await EventsHub.open(project, () => state, post);
   hub.subscriptions[0].next_attempt = 0;
   fail = false;
   await hub.flush();
+  assert.equal(hub.diagnostics().callback.state, "observed");
+  assert.ok(hub.diagnostics().callback.last_success);
+  assert.ok(hub.diagnostics().callback.last_failure);
   assert.equal(hub.subscriptions[0].last_revision, 1);
   assert.equal(
     deliveries.at(-1).headers["webhook-id"],
@@ -125,6 +131,8 @@ test("webhooks verify, persist, deduplicate subscriptions, retain event ids, and
   gone = true;
   await hub.flush();
   assert.equal(hub.status().active, 0);
+  assert.equal(hub.diagnostics().subscriptions.expired, 1);
+  assert.equal(hub.diagnostics().callback.reason, "http_4xx");
   await hub.unsubscribe(subscription);
   await hub.unsubscribe(subscription);
   assert.equal(hub.subscriptions.length, 0);
@@ -143,6 +151,12 @@ test("webhooks verify, persist, deduplicate subscriptions, retain event ids, and
     (error) => error.code === -32015,
   );
   assert.equal(bad.subscriptions.length, 0);
+  assert.equal(bad.diagnostics().verification.reason, "challenge_failed");
+  assert.equal(
+    (await EventsHub.open(project, () => state, post)).diagnostics()
+      .verification.state,
+    "failed",
+  );
   await hub.subscribe(subscription);
   await hub.revoke();
   assert.equal(hub.status().active, 0);
@@ -223,6 +237,17 @@ test("MCP 2.0 discovers events and serves the same tools on an authenticated end
   assert.deepEqual(discovery.capabilities.events, {});
   assert.equal((await request("events/list")).events.length, 5);
   assert.equal((await request("tools/list")).tools.length, 6);
+  const diagnostics = async () =>
+    (
+      await fetch(dashboard.localUrl + "api/diagnostics", {
+        headers: { authorization: "Bearer " + runtime.token },
+      })
+    ).json();
+  const discovered = await diagnostics();
+  for (const stage of ["discovery", "tools", "events"])
+    assert.equal(discovered.dot[stage].state, "observed", stage);
+  assert.equal(discovered.dot.response.state, "unconfirmed");
+  assert.equal(discovered.end_to_end.state, "unconfirmed");
   const result = await request("tools/call", {
     name: "dashboard_upsert_task",
     arguments: { id: "T1", title: "MCP 2 test", status: "todo" },
@@ -252,6 +277,10 @@ test("MCP 2.0 discovers events and serves the same tools on an authenticated end
     -32015,
   );
   assert.equal(failure.data.reason, "challenge_failed");
+  assert.equal(
+    (await diagnostics()).dot.verification.reason,
+    "challenge_failed",
+  );
   await request(
     "events/subscribe",
     { ...subscription, arguments: { project_id: "other-project" } },
@@ -265,6 +294,23 @@ test("MCP 2.0 discovers events and serves the same tools on an authenticated end
   // Flush is serialized with the automatic mutation-triggered delivery.
   await new Promise((resolve) => setImmediate(resolve));
   await dashboard.close();
+  // Read persisted observations after the serialized signed delivery has completed.
+  const persistedHub = await EventsHub.open(
+    project,
+    () => dashboard.store.value,
+    webhookPost,
+  );
+  const eventsDiagnostic = persistedHub.diagnostics();
+  assert.equal(eventsDiagnostic.callback.state, "observed");
+  assert.equal(eventsDiagnostic.subscriptions.active, 1);
+  const copy = JSON.stringify(eventsDiagnostic);
+  for (const sensitive of [
+    secret,
+    "receiver.example",
+    runtime.token,
+    runtime.mcp_token,
+  ])
+    assert.ok(!copy.includes(sensitive));
   dashboard = null;
   assert.equal(delivered.length, 1);
   assert.equal(delivered[0].data.entity_id, "Q1");

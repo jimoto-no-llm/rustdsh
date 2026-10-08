@@ -1,0 +1,38 @@
+{
+  "baseline_commit": "d9c3bc50a764c0fa830033ba7298f15dbcce73ee",
+  "node": "v22.23.3",
+  "platform": "win32",
+  "method": "alternating equal-data ProjectStore metrics commits; four warmups excluded; 20 samples each",
+  "samples": [
+    {
+      "history_records": 0,
+      "same_history_bytes": 0,
+      "samples_each": 20,
+      "old": {
+        "median_ms": 1.0641000000000531,
+        "mean_ms": 1.0530850000000556,
+        "max_ms": 1.1554000000000997
+      },
+      "new": {
+        "median_ms": 1.0646999999999025,
+        "mean_ms": 1.0476399999999786,
+        "max_ms": 1.130200000000059
+      }
+    },
+    {
+      "history_records": 512,
+      "same_history_bytes": 657737,
+      "samples_each": 20,
+      "old": {
+        "median_ms": 5.896700000000237,
+        "mean_ms": 5.707475,
+        "max_ms": 7.244599999999991
+      },
+      "new": {
+        "median_ms": 4.775900000000092,
+        "mean_ms": 4.749649999999997,
+        "max_ms": 6.83179999999993
+      }
+    }
+  ]
+}

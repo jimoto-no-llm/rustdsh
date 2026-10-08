@@ -1,0 +1,369 @@
+{
+  "observed_at": "2026-10-05T22:26:33.339Z",
+  "platform": "linux",
+  "architecture": "x64",
+  "node_version": "v24.21.0",
+  "os_release": "6.6.87.2-microsoft-standard-WSL2",
+  "source": "installed original DSH 0.2.0-rc.2 in the existing WSL distribution with an empty selected home",
+  "command": "node dashboard/cli.mjs routing probe --project <isolated-native-git-project> --run-id <exact-run-id> --executable <explicit-original-cli>",
+  "baseline": {
+    "head_sha": "5a7235e740ed9eadee60032fe0f051be5a643632",
+    "comparison": "baseline entrypoint with current common dependencies",
+    "exit_code": 1,
+    "stderr": "[rdsh-dashboard] Unknown command; use --help"
+  },
+  "initial_native_configuration": {
+    "status": "observed",
+    "selection": {
+      "provider": "deepseek-official",
+      "model": "deepseek-v4-flash",
+      "effort": "high"
+    },
+    "reason": null,
+    "source": "acp_session_new",
+    "cli_version": "0.2.0-rc.2",
+    "observed_at": "2026-10-05T22:26:06.590Z",
+    "actual_execution_verified": false
+  },
+  "declaration": {
+    "run_id": "run_12fc43ad-7ca9-4dc2-a85a-17ffb7410001",
+    "requested": {
+      "provider": "deepseek",
+      "model": "qa-model-that-must-not-run",
+      "effort": "high"
+    },
+    "context_hash": "47d6a86b3e861bbfd466127586a7a8cf8641153d2f48434cd91160c620f645ae",
+    "revision": 1,
+    "permission_expanded": false,
+    "native_route_changed": false
+  },
+  "before_observation": {
+    "run_id": "run_12fc43ad-7ca9-4dc2-a85a-17ffb7410001",
+    "session_id": "1fb47c51-3950-49a1-a1b8-23ef6e29bc61",
+    "context_hash": "47d6a86b3e861bbfd466127586a7a8cf8641153d2f48434cd91160c620f645ae",
+    "revision": 1,
+    "requested": {
+      "provider": "deepseek",
+      "model": "qa-model-that-must-not-run",
+      "effort": "high"
+    },
+    "active_route": {
+      "provider": "deepseek",
+      "model": "qa-model-that-must-not-run",
+      "effort": "high"
+    },
+    "provenance": {
+      "source": "explicit_operator_request",
+      "role": null,
+      "effort_source": "explicit",
+      "warning": null,
+      "source_hash": "ca5c70325d8cf083633187315869bf8033c394e7d8cd9317250ae42592f22fca"
+    },
+    "observation": null,
+    "comparison": {
+      "status": "unknown",
+      "reason": "native_selection_unavailable",
+      "matches": false
+    },
+    "active_authorization": null,
+    "authorization_expired": false,
+    "prompt_allowed_by_route_assertion": false,
+    "actual_model_execution_verified": false,
+    "permission_expanded": false,
+    "native_route_changed": false,
+    "route_required": true,
+    "observation_is_historical": true,
+    "events": [
+      {
+        "sequence": 1,
+        "event_id": "route_56aa0926-9497-46fd-87c6-3a080e9bb3cc",
+        "type": "request_bound",
+        "at": "2026-10-05T22:26:16.290Z",
+        "observation": null,
+        "authorization": null
+      }
+    ],
+    "writer_lock": "absent"
+  },
+  "public_probe": {
+    "exit_code": 1,
+    "result": {
+      "run_id": "run_12fc43ad-7ca9-4dc2-a85a-17ffb7410001",
+      "session_id": "1fb47c51-3950-49a1-a1b8-23ef6e29bc61",
+      "context_hash": "47d6a86b3e861bbfd466127586a7a8cf8641153d2f48434cd91160c620f645ae",
+      "revision": 2,
+      "requested": {
+        "provider": "deepseek",
+        "model": "qa-model-that-must-not-run",
+        "effort": "high"
+      },
+      "active_route": {
+        "provider": "deepseek",
+        "model": "qa-model-that-must-not-run",
+        "effort": "high"
+      },
+      "provenance": {
+        "source": "explicit_operator_request",
+        "role": null,
+        "effort_source": "explicit",
+        "warning": null,
+        "source_hash": "ca5c70325d8cf083633187315869bf8033c394e7d8cd9317250ae42592f22fca"
+      },
+      "observation": {
+        "status": "observed",
+        "selection": {
+          "provider": "deepseek-official",
+          "model": "deepseek-v4-flash",
+          "effort": "high"
+        },
+        "reason": null,
+        "source": "acp_session_resume",
+        "cli_version": "0.2.0-rc.2",
+        "observed_at": "2026-10-05T22:26:27.058Z",
+        "actual_execution_verified": false
+      },
+      "comparison": {
+        "status": "mismatch",
+        "reason": "native_selection_differs",
+        "mismatched_fields": [
+          "provider",
+          "model"
+        ],
+        "matches": false
+      },
+      "active_authorization": null,
+      "authorization_expired": false,
+      "prompt_allowed_by_route_assertion": false,
+      "actual_model_execution_verified": false,
+      "permission_expanded": false,
+      "native_route_changed": false,
+      "model_prompts_sent": 0,
+      "owned_root_stopped": true
+    }
+  },
+  "rejected_prompt": {
+    "reason": "route_mismatch",
+    "history_commands_before": 5,
+    "history_commands_after": 5,
+    "dispatch_intent_added": false
+  },
+  "blocked_view": {
+    "run_id": "run_12fc43ad-7ca9-4dc2-a85a-17ffb7410001",
+    "session_id": "1fb47c51-3950-49a1-a1b8-23ef6e29bc61",
+    "context_hash": "47d6a86b3e861bbfd466127586a7a8cf8641153d2f48434cd91160c620f645ae",
+    "revision": 3,
+    "requested": {
+      "provider": "deepseek",
+      "model": "qa-model-that-must-not-run",
+      "effort": "high"
+    },
+    "active_route": {
+      "provider": "deepseek",
+      "model": "qa-model-that-must-not-run",
+      "effort": "high"
+    },
+    "provenance": {
+      "source": "explicit_operator_request",
+      "role": null,
+      "effort_source": "explicit",
+      "warning": null,
+      "source_hash": "ca5c70325d8cf083633187315869bf8033c394e7d8cd9317250ae42592f22fca"
+    },
+    "observation": {
+      "status": "observed",
+      "selection": {
+        "provider": "deepseek-official",
+        "model": "deepseek-v4-flash",
+        "effort": "high"
+      },
+      "reason": null,
+      "source": "acp_session_resume",
+      "cli_version": "0.2.0-rc.2",
+      "observed_at": "2026-10-05T22:26:28.246Z",
+      "actual_execution_verified": false
+    },
+    "comparison": {
+      "status": "mismatch",
+      "reason": "native_selection_differs",
+      "mismatched_fields": [
+        "provider",
+        "model"
+      ],
+      "matches": false
+    },
+    "active_authorization": null,
+    "authorization_expired": false,
+    "prompt_allowed_by_route_assertion": false,
+    "actual_model_execution_verified": false,
+    "permission_expanded": false,
+    "native_route_changed": false,
+    "route_required": true,
+    "observation_is_historical": true,
+    "events": [
+      {
+        "sequence": 1,
+        "event_id": "route_56aa0926-9497-46fd-87c6-3a080e9bb3cc",
+        "type": "request_bound",
+        "at": "2026-10-05T22:26:16.290Z",
+        "observation": null,
+        "authorization": null
+      },
+      {
+        "sequence": 2,
+        "event_id": "route_7863693a-143e-419d-87c2-da6b7135d36b",
+        "type": "native_selection_observed",
+        "at": "2026-10-05T22:26:27.102Z",
+        "observation": {
+          "status": "observed",
+          "selection": {
+            "provider": "deepseek-official",
+            "model": "deepseek-v4-flash",
+            "effort": "high"
+          },
+          "reason": null,
+          "source": "acp_session_resume",
+          "cli_version": "0.2.0-rc.2",
+          "observed_at": "2026-10-05T22:26:27.058Z",
+          "actual_execution_verified": false
+        },
+        "authorization": null
+      },
+      {
+        "sequence": 3,
+        "event_id": "route_2e289dc8-8077-41d4-9a76-4551b0fd3917",
+        "type": "native_selection_observed",
+        "at": "2026-10-05T22:26:28.292Z",
+        "observation": {
+          "status": "observed",
+          "selection": {
+            "provider": "deepseek-official",
+            "model": "deepseek-v4-flash",
+            "effort": "high"
+          },
+          "reason": null,
+          "source": "acp_session_resume",
+          "cli_version": "0.2.0-rc.2",
+          "observed_at": "2026-10-05T22:26:28.246Z",
+          "actual_execution_verified": false
+        },
+        "authorization": null
+      }
+    ],
+    "writer_lock": "absent"
+  },
+  "authorized_change": null,
+  "authorization": null,
+  "after_authorized_change": null,
+  "fixture_requests": null,
+  "final_passive_inspection": {
+    "run_id": "run_12fc43ad-7ca9-4dc2-a85a-17ffb7410001",
+    "session_id": "1fb47c51-3950-49a1-a1b8-23ef6e29bc61",
+    "context_hash": "47d6a86b3e861bbfd466127586a7a8cf8641153d2f48434cd91160c620f645ae",
+    "revision": 3,
+    "requested": {
+      "provider": "deepseek",
+      "model": "qa-model-that-must-not-run",
+      "effort": "high"
+    },
+    "active_route": {
+      "provider": "deepseek",
+      "model": "qa-model-that-must-not-run",
+      "effort": "high"
+    },
+    "provenance": {
+      "source": "explicit_operator_request",
+      "role": null,
+      "effort_source": "explicit",
+      "warning": null,
+      "source_hash": "ca5c70325d8cf083633187315869bf8033c394e7d8cd9317250ae42592f22fca"
+    },
+    "observation": {
+      "status": "observed",
+      "selection": {
+        "provider": "deepseek-official",
+        "model": "deepseek-v4-flash",
+        "effort": "high"
+      },
+      "reason": null,
+      "source": "acp_session_resume",
+      "cli_version": "0.2.0-rc.2",
+      "observed_at": "2026-10-05T22:26:28.246Z",
+      "actual_execution_verified": false
+    },
+    "comparison": {
+      "status": "mismatch",
+      "reason": "native_selection_differs",
+      "mismatched_fields": [
+        "provider",
+        "model"
+      ],
+      "matches": false
+    },
+    "active_authorization": null,
+    "authorization_expired": false,
+    "prompt_allowed_by_route_assertion": false,
+    "actual_model_execution_verified": false,
+    "permission_expanded": false,
+    "native_route_changed": false,
+    "route_required": true,
+    "observation_is_historical": true,
+    "events": [
+      {
+        "sequence": 1,
+        "event_id": "route_56aa0926-9497-46fd-87c6-3a080e9bb3cc",
+        "type": "request_bound",
+        "at": "2026-10-05T22:26:16.290Z",
+        "observation": null,
+        "authorization": null
+      },
+      {
+        "sequence": 2,
+        "event_id": "route_7863693a-143e-419d-87c2-da6b7135d36b",
+        "type": "native_selection_observed",
+        "at": "2026-10-05T22:26:27.102Z",
+        "observation": {
+          "status": "observed",
+          "selection": {
+            "provider": "deepseek-official",
+            "model": "deepseek-v4-flash",
+            "effort": "high"
+          },
+          "reason": null,
+          "source": "acp_session_resume",
+          "cli_version": "0.2.0-rc.2",
+          "observed_at": "2026-10-05T22:26:27.058Z",
+          "actual_execution_verified": false
+        },
+        "authorization": null
+      },
+      {
+        "sequence": 3,
+        "event_id": "route_2e289dc8-8077-41d4-9a76-4551b0fd3917",
+        "type": "native_selection_observed",
+        "at": "2026-10-05T22:26:28.292Z",
+        "observation": {
+          "status": "observed",
+          "selection": {
+            "provider": "deepseek-official",
+            "model": "deepseek-v4-flash",
+            "effort": "high"
+          },
+          "reason": null,
+          "source": "acp_session_resume",
+          "cli_version": "0.2.0-rc.2",
+          "observed_at": "2026-10-05T22:26:28.246Z",
+          "actual_execution_verified": false
+        },
+        "authorization": null
+      }
+    ],
+    "writer_lock": "absent"
+  },
+  "limitations": [
+    "native session configuration is separate from provider-side model execution proof",
+    "no DSH routing implementation or configuration setter is replaced",
+    "operator approvals are local CLI provenance, not cryptographic authentication",
+    "fixture prompt effects are local only; no live provider/model invocation was performed",
+    "CLI assertions do not impose OS sandboxing, global controls on original DSH clients or child role enforcement"
+  ]
+}

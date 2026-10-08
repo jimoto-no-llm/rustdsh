@@ -20,7 +20,7 @@ for a in "$@"; do
   esac
 done
 LOGDIR="${HOME}/.local/share/rdsh"
-LOCK="/tmp/rdsh-sync.lock"
+LOCK="$LOGDIR/sync.lock"
 mkdir -p "$LOGDIR"
 log() { printf "%s %s\n" "$(date -u +%FT%TZ)" "$*" | tee -a "$LOGDIR/sync.log"; }
 if command -v flock >/dev/null 2>&1; then
@@ -74,7 +74,7 @@ sandboxed_regress() {
   # Run regress with a throwaway HOME/DSH_HOME (issue #85 item 8).
   sb="$(mktemp -d 2>/dev/null || mktemp -d -t rdsh-sync-regress)"
   mkdir -p "$sb/home" "$sb/dsh"
-  if HOME="$sb/home" DSH_HOME="$sb/dsh" BIN="$1" sh "$REPO/tests/regress.sh" >> "$LOGDIR/sync.log" 2>&1; then
+  if env -i PATH="$PATH" HOME="$sb/home" DSH_HOME="$sb/dsh" BIN="$1" sh "$REPO/tests/regress.sh" >> "$LOGDIR/sync.log" 2>&1; then
     rc=0
   else
     rc=1
@@ -102,9 +102,41 @@ rdsh_release_asset() {
     *) return 1 ;;
   esac
 }
+verify_sha256() {
+  # Same check as install.sh: the first field of sidecar $2 must equal the
+  # sha256 of $1 (case-insensitive). A missing or empty sidecar fails.
+  line="$(cat "$2" 2>/dev/null)"
+  want="${line%% *}"
+  if [ -z "$want" ]; then
+    log "empty checksum sidecar"
+    return 1
+  fi
+  if ! printf '%s\n' "$want" | grep -Eq '^[a-fA-F0-9]{64}$'; then
+    log "invalid release checksum; refusing update"
+    return 1
+  fi
+  if command -v sha256sum >/dev/null 2>&1; then
+    out="$(sha256sum "$1")"
+  elif command -v shasum >/dev/null 2>&1; then
+    out="$(shasum -a 256 "$1")"
+  else
+    log "no sha256sum or shasum available"
+    return 1
+  fi
+  got="${out%% *}"
+  lwant="$(printf %s "$want" | tr A-F a-f)"
+  lgot="$(printf %s "$got" | tr A-F a-f)"
+  if [ -n "$lgot" ] && [ "$lwant" = "$lgot" ]; then
+    log "checksum ok"
+    return 0
+  fi
+  log "CHECKSUM MISMATCH"
+  return 1
+}
 fetch_rdsh_release() {
-  # Install the prebuilt release rdsh binary to $1. Honors RDSH_RELEASE_BASE
-  # (tests: file:///path) and RDSH_SYNC_VERSION (default: latest).
+  # Install the prebuilt release rdsh binary to $1 after checking it against
+  # its <asset>.sha256 sidecar. Honors RDSH_RELEASE_BASE (tests: file:///path)
+  # and RDSH_SYNC_VERSION (default: latest).
   dest="$1"
   base="${RDSH_RELEASE_BASE:-https://github.com/sahenjp/rustdsh/releases}"
   ver="${RDSH_SYNC_VERSION:-latest}"
@@ -113,6 +145,10 @@ fetch_rdsh_release() {
   tmpd="$(mktemp -d 2>/dev/null || mktemp -d -t rdsh-sync-fetch)"
   log "fetching rdsh release: $url"
   if ! curl -fsSL -o "$tmpd/pkg.tgz" "$url"; then rm -rf "$tmpd"; return 1; fi
+  if ! curl -fsSL -o "$tmpd/pkg.tgz.sha256" "$url.sha256" 2>/dev/null; then
+    log "no checksum sidecar: $url.sha256"; rm -rf "$tmpd"; return 1
+  fi
+  if ! verify_sha256 "$tmpd/pkg.tgz" "$tmpd/pkg.tgz.sha256"; then rm -rf "$tmpd"; return 1; fi
   if ! tar -xzf "$tmpd/pkg.tgz" -C "$tmpd"; then rm -rf "$tmpd"; return 1; fi
   if [ ! -x "$tmpd/rdsh" ]; then rm -rf "$tmpd"; return 1; fi
   install -m755 "$tmpd/rdsh" "$dest"

@@ -29,3 +29,6 @@ Thumbs.db
 # Scratch / local state
 /tmp/
 *.tmp
+
+# Python verification artifacts
+__pycache__/

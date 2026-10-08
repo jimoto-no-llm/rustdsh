@@ -1,0 +1,97 @@
+--- CLI at b805a6a (#42)
++++ CLI with connection diagnostics
+-[rdsh-dashboard] Unknown command; use --help
++{
++  "schema": 1,
++  "project_id": "a57a4b67fd700abc",
++  "observed_at": "2026-10-06T01:49:21.835Z",
++  "browser": {
++    "dashboard": {
++      "state": "ready",
++      "started_at": "2026-10-06T01:49:21.563Z"
++    },
++    "authentication": {
++      "state": "unconfirmed",
++      "reason": "not_observed",
++      "observed_at": null,
++      "last_success": null,
++      "last_failure": null
++    },
++    "tailscale": {
++      "state": "disabled",
++      "observed_at": "2026-10-06T01:49:21.835Z"
++    },
++    "phone": {
++      "state": "unconfirmed",
++      "reason": "device_not_identified"
++    }
++  },
++  "dot": {
++    "tunnel": {
++      "state": "unconfirmed",
++      "reason": "not_recorded",
++      "observed_at": "2026-10-06T01:49:21.835Z",
++      "started_at": null,
++      "ended_at": null,
++      "health": null,
++      "readiness": null
++    },
++    "authentication": {
++      "state": "unconfirmed",
++      "reason": "not_observed",
++      "observed_at": null,
++      "last_success": null,
++      "last_failure": null
++    },
++    "discovery": {
++      "state": "unconfirmed",
++      "reason": "not_observed",
++      "observed_at": null,
++      "last_success": null,
++      "last_failure": null
++    },
++    "tools": {
++      "state": "unconfirmed",
++      "reason": "not_observed",
++      "observed_at": null,
++      "last_success": null,
++      "last_failure": null
++    },
++    "events": {
++      "state": "unconfirmed",
++      "reason": "not_observed",
++      "observed_at": null,
++      "last_success": null,
++      "last_failure": null
++    },
++    "subscriptions": {
++      "active": 0,
++      "expired": 0,
++      "observed_at": "2026-10-06T01:49:21.835Z",
++      "items": []
++    },
++    "verification": {
++      "state": "unconfirmed",
++      "reason": "not_observed",
++      "observed_at": null,
++      "last_success": null,
++      "last_failure": null
++    },
++    "callback": {
++      "state": "unconfirmed",
++      "reason": "not_observed",
++      "observed_at": null,
++      "last_success": null,
++      "last_failure": null
++    },
++    "response": {
++      "state": "unconfirmed",
++      "reason": "dot_response_not_observed",
++      "observed_at": null
++    }
++  },
++  "end_to_end": {
++    "state": "unconfirmed",
++    "reason": "real_dot_response_required"
++  }
++}

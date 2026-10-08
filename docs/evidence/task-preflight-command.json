@@ -1,0 +1,113 @@
+{
+  "baseline_commit": "6770adbebde41ba1a9285e9f45817f23f892d57b",
+  "captured_at": "2026-10-05T19:51:11.571624+00:00",
+  "platform": "win32",
+  "before": {
+    "command": "baseline CLI source via stdin: preflight --project <temporary-project>",
+    "exit_code": 1,
+    "stdout": "",
+    "stderr": "[rdsh-dashboard] Unknown command; use --help\n"
+  },
+  "after": {
+    "command": "node dashboard/cli.mjs preflight --project <temporary-project> --requirements <fixture-requirements.json>",
+    "requirements": {
+      "schema": 1,
+      "min_free_bytes": 9007199254740991
+    },
+    "exit_code": 1,
+    "stdout": {
+      "schema": 1,
+      "ready": false,
+      "observed_at": "2026-10-05T19:51:11.558Z",
+      "checks": [
+        {
+          "id": "node",
+          "status": "pass",
+          "stage": "configuration",
+          "reason": "node_version_supported",
+          "fix": null,
+          "observed_at": "2026-10-05T19:51:11.551Z"
+        },
+        {
+          "id": "cwd",
+          "status": "pass",
+          "stage": "existence",
+          "reason": "directory_exists",
+          "fix": null,
+          "observed_at": "2026-10-05T19:51:11.558Z"
+        },
+        {
+          "id": "cli",
+          "status": "not_required",
+          "stage": null,
+          "reason": "not_required",
+          "fix": null,
+          "observed_at": "2026-10-05T19:51:11.558Z"
+        },
+        {
+          "id": "profile",
+          "status": "not_required",
+          "stage": null,
+          "reason": "not_required",
+          "fix": null,
+          "observed_at": "2026-10-05T19:51:11.558Z"
+        },
+        {
+          "id": "disk",
+          "status": "blocked",
+          "stage": "existence",
+          "reason": "insufficient_disk_space",
+          "fix": "対象driveの空き容量を確認し、必要量を確保してください。",
+          "observed_at": "2026-10-05T19:51:11.558Z",
+          "free_bytes": "98742329344",
+          "required_bytes": 9007199254740991
+        },
+        {
+          "id": "port",
+          "status": "not_required",
+          "stage": null,
+          "reason": "not_required",
+          "fix": null,
+          "observed_at": "2026-10-05T19:51:11.558Z"
+        },
+        {
+          "id": "dependencies",
+          "status": "not_required",
+          "stage": null,
+          "reason": "not_required",
+          "fix": null,
+          "observed_at": "2026-10-05T19:51:11.558Z"
+        },
+        {
+          "id": "wsl",
+          "status": "not_required",
+          "stage": null,
+          "reason": "not_required",
+          "fix": null,
+          "observed_at": "2026-10-05T19:51:11.558Z"
+        },
+        {
+          "id": "gpu",
+          "status": "not_required",
+          "stage": null,
+          "reason": "not_required",
+          "fix": null,
+          "observed_at": "2026-10-05T19:51:11.558Z"
+        },
+        {
+          "id": "auth",
+          "status": "not_required",
+          "stage": null,
+          "reason": "not_required",
+          "fix": null,
+          "observed_at": "2026-10-05T19:51:11.558Z"
+        }
+      ],
+      "execution_authority": false,
+      "automatic_repairs": false
+    },
+    "stderr": ""
+  },
+  "provider_authentication": "not_exercised",
+  "model_prompt": false
+}

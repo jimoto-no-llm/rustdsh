@@ -1,0 +1,4 @@
+- insert:
+    - id: rdsh-budget-guard
+      name: "rdsh-budget-guard"
+      config: {}

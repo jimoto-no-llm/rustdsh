@@ -1,5 +1,43 @@
 # Project dashboard and private Harness access
 
+[Budget admission control](../docs/BUDGET-CONTROL.md): soft warnings, hard guarded
+DSH job/model-call limits, durable parallel reservations and delayed usage holds.
+Native guard registration is required; ordinary/unsupported CLIs are display-only.
+
+[CLI adapter contract](../docs/CLI-ADAPTERS.md): version-checked DSH ACP
+start/resume/send/interrupt/stop/usage, explicit unsupported CLI capabilities,
+and isolated lifecycle smoke without provider credentials or model requests.
+
+[Persistent session ledger](../docs/SESSION-LEDGER.md): distinct project, run,
+task and native CLI IDs, with exact run resolution after client restart.
+
+[Follow-up instructions](../docs/INPUT-INSTRUCTIONS.md): exact-session browser/CLI
+submission, preserved drafts, shared input ordering, human conflict review,
+explicit interruption with native proof, and honest unsupported-steer fallback.
+
+[Task preflight](../docs/TASK-PREFLIGHT.md) checks the required CLI, cwd, disk,
+port, dependencies, GPU/WSL and selected authentication before an ACP session.
+
+[Durable run recovery](../docs/RUN-RECOVERY.md) records control request/ack IDs
+and separates recorded run state, root-process observations and UI connectivity.
+
+[Bounded retry](../docs/SAFE-RETRY.md) preserves original permission and reconciles
+uncertain writes. Public retry is opt-in for original CLI version queries only.
+
+[Checkpoint recovery](../docs/CHECKPOINTS.md) distinguishes a verified native
+resume from an explicit new conversation with an operator-provided summary.
+
+[Acceptance evidence](../docs/ACCEPTANCE-EVIDENCE.md) separates reported `done`
+from current full checks, preserves partial results and rejects stale evidence.
+
+[Model assertions](../docs/MODEL-ROUTING.md) compare a declared run's requested
+route with native ACP configuration and block mismatched or unknown prompts.
+
+[Mobile overview](../docs/MOBILE-OVERVIEW.md) puts project/task context, observed
+state, last result, pending decisions and stop availability before folded metrics
+and reports. It preserves unobserved states and requires target confirmation
+before stopping the live owned Harness run.
+
 `rdsh-dashboard` provides two separate entry points:
 
 | Mode      | Purpose                                                    | Data source                                      |
@@ -15,7 +53,7 @@ Keep Tailscale connected on the PC and phone and keep the dashboard running.
 Project 画面の QR 鍵はブラウザー専用です。画面は鍵を URL fragment から
 そのタブの sessionStorage に保存し、API へヘッダーで送ります。MCP 設定の鍵と
 管理用の鍵は別々で、MCP 鍵から人間の回答は登録できません。Harness は元の Web
-画面との互換性のため Cookie を使いますが、その鍵で MCP や管理 API は使えず、
+画面との互換性のため Cookie を使いますが、その鍵で MCP やダッシュボード終了 API は使えず、
 中継時には Harness 側へ渡しません。同じホスト上の別ポートにも Harness Cookie
 が届くため、そのホスト上で信頼できない Web サービスを開かないでください。
 
@@ -52,6 +90,12 @@ its distribution defaults to `FlashNext`, with `/root/.local/bin/rdsh-env` as th
 existing environment wrapper. Override those with `RDSH_WSL_DISTRO` and
 `RDSH_WSL_HARNESS_BIN` when your WSL installation uses different names/paths.
 It never stops an independently running Harness instance.
+
+Managed profile launches now use a per-run kernel ownership group. The Harness
+entry page can stop that owned run and distinguishes requesting stop, verified
+empty descendants and unverifiable results. The administrator-only dashboard
+shutdown stays separate. Windows-to-WSL mode also needs the matching Linux native
+prebuilt in this checkout; see [scoped-stop setup and limits](../docs/SCOPED-STOP.md).
 
 Use `--port 38100` to choose a project port, `--harness-port 3081` for its Harness
 backend, or `--no-tailscale` for local access only. Conflicting ports fail startup.
@@ -122,14 +166,39 @@ A person answers in the dashboard. The answer is persisted before notification.
 the returned cursor on the next read. Reads never consume answers. The default
 action is descriptive and is never executed by this server.
 
+Optional [versioned question cards](../docs/QUESTION-CONTRACTS.md) add explicit
+consultation/approval types, choices, target revision, diff, impact and declared
+cost limits. Use `decision` with `dashboard_ask_question`; `action: "revise"`
+or `"cancel"` requires the current `expected_revision`. Stale, expired and
+cancelled replies cannot answer a new revision. Durable feedback includes the
+current contract validity; saving a reply grants no execution authority and
+does not claim application by its consumer.
+
+Optional [answer application acknowledgements](../docs/ANSWER-APPLICATION.md)
+bind a card's `decision.consumer_id` to a confirmed run/native session. The
+original ACP transport consumer records read, one-time input dispatch and a
+correlated native result with an input digest. `reply-consumer once|serve`
+explicitly resumes that exact session; missing results block automatic replay.
+Webhook delivery and cursor reads remain separate from application evidence.
+This is an opt-in input channel under the session's existing permissions.
+
 Unknown metrics display **未取得**. This component does not scrape billing,
-estimate spend, or infer context loss. Report measured values using:
+calculate spend, or infer context loss. Report measured values using:
 `total_cost_usd`, `total_budget_usd`, `session_cost_usd`, `session_budget_usd`,
 `session_id`, `input_tokens`, `cached_input_tokens`, `model_calls`, `tool_calls`,
 `tool_errors`, `context_misses`, `auto_continues`, `refusals`, `api_errors`.
 Omitted fields retain their previous value; `null` clears a numeric field.
 Cache read percentage is cached input tokens / input tokens. Tool error rate is
-tool errors / tool calls. Costs are reported API-equivalent values, not invoices.
+tool errors / tool calls. Legacy numeric costs are reported API-equivalent values.
+Optional [source-aware cost ledger inputs](../docs/COST-LEDGER.md) on the same
+metrics tool declare a period and expected workers/sessions, then record stable
+event IDs and event/cumulative sequences. Provider usage, CLI reports, explicit
+external API estimates and invoice reports remain separate by source/currency.
+Duplicate observations do not add costs; missing workers/costs stay unknown and
+partial. The folded metrics section shows each amount's provenance and history.
+`cost-ledger declare|report|inspect` uses the existing authenticated reporting
+endpoint; browser credentials are read-only for these inputs. No prices are
+looked up and legacy numeric costs are not merged with this optional ledger.
 
 Artifact references are displayed as text. Local file contents are never opened
 or served. Treat all user-authored questions, answers, progress, and paths as data.
@@ -195,7 +264,7 @@ On Windows, extract the client into `%LOCALAPPDATA%\rdsh\tunnel-client`, or set
 
    The launcher passes the current project bearer through a child-process
    environment reference, including discovery requests. It uses a loopback-only
-   health listener with an ephemeral port, recorded in `tunnel-health.url` in the
+   health listener with an ephemeral port, recorded in `tunnel-health-<owner>.url` in the
    project's private state directory. Check `/readyz` and `/ui` at that URL.
    Restart this command after restarting the dashboard.
 
@@ -209,6 +278,36 @@ Legacy MCP clients also have stdio/Streamable HTTP tools and
 `dashboard://state` / `dashboard://feedback` resource subscriptions. Those
 resource notifications are distinct from the native webhook Events integration.
 See the [official Events contract](https://developers.openai.com/plugins/build/mcp-events).
+
+Use **接続診断** in the project dashboard or
+`rdsh-dashboard diagnostics --project <directory>` to inspect phone/Serve and
+Tunnel/MCP/callback stages separately. The
+[connection diagnostics contract](../docs/CONNECTION-DIAGNOSTICS.md) explains
+restart detection and stage-specific recovery. Local readiness and callback
+receipt leave actual Dot response and end-to-end status unconfirmed.
+
+## Selective history backup
+
+`backup preview|export|inspect|restore|history` selects task/answer/decision/evidence
+history, holds all source prose by default, and restores a separate historical
+collection using the target dashboard's own authentication. Reviewed replacement
+text can be supplied explicitly; active commands, credentials and event
+subscriptions are never transported. See the
+[history backup contract](../docs/HISTORY-BACKUP.md) for selection, review and
+collision handling. `backup history` exposes imported records through the local
+control CLI; the existing state resource also includes `history_backups`.
+
+## Project-scoped pinned updates
+
+`release stage|inspect|canary|promote|rollback` captures a compatible original DSH,
+Node and adapter snapshot, qualifies it in one project and widens only explicitly.
+Managed `session-ledger start|resume` and `reply-consumer once|serve` omit executable
+overrides and dispatch through the captured CLI. Project defaults apply to new
+runs; existing runs retain their own artifact and native ID through rollback.
+See the [pinned update contract](../docs/STAGED-UPDATES.md) for trusted code roots,
+selection revisions, native qualification and recovery. This controls local
+managed runs; global updates, external user plugins and provider/billing adoption
+are separate.
 
 ## Validation
 

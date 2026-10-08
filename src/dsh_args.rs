@@ -113,7 +113,7 @@ pub fn split_launcher_args(profile_flag: Option<String>, extra: Vec<String>) -> 
     }
     let dumps = [dump, dump_default, dump_schema]
         .iter()
-        .filter(|x| **x)
+        .filter(|&&x| x)
         .count();
     if dumps > 1 {
         return Launcher::Error("error: --dump-config, --dump-default-config, and --dump-config-schema are mutually exclusive".into());
