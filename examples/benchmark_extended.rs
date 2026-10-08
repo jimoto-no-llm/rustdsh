@@ -8,7 +8,7 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
     sync::atomic::{AtomicU64, Ordering},
-    time::{Instant, SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 static NEXT_TEMP: AtomicU64 = AtomicU64::new(0);
@@ -96,6 +96,11 @@ impl Sandbox {
             .env("XDG_CONFIG_HOME", self.root.join("config"))
             .env("XDG_CACHE_HOME", &self.cache)
             .env("RDSH_TOKENS_CACHE", if cache { "1" } else { "0" });
+        for key in ["PATH", "SystemRoot", "COMSPEC", "TEMP"] {
+            if let Some(value) = env::var_os(key) {
+                c.env(key, value);
+            }
+        }
         c
     }
     fn cache_file(&self) -> PathBuf {
@@ -148,7 +153,8 @@ fn peak_rss(s: &Sandbox, bin: &Path, argv: &[String], cache: bool) -> Result<Opt
             .and_then(|x| x.parse().ok())
             .map(|n: u64| n * 1024)
     };
-    Ok(n)
+    n.map(Some)
+        .ok_or_else(|| anyhow!("time did not report peak RSS"))
 }
 fn percentile(samples: &[f64], q: f64) -> f64 {
     assert!(!samples.is_empty());
@@ -202,8 +208,10 @@ struct Fixtures {
 }
 fn fixtures(root: &Path, z: &Path) -> Result<Fixtures> {
     let dsh = root.join("fixtures-dsh");
-    let sessions = dsh.join("sessions/project");
+    let sessions = dsh.join("sessions/known");
+    let stream_sessions = dsh.join("sessions/streaming");
     fs::create_dir_all(&sessions)?;
+    fs::create_dir_all(&stream_sessions)?;
     fs::write(dsh.join("rdsh.json"), r#"{"sessions":{"stale_secs":0}}"#)?;
     let one = root.join("one");
     let half = root.join("half");
@@ -211,14 +219,6 @@ fn fixtures(root: &Path, z: &Path) -> Result<Fixtures> {
     fs::write(&half, vec![b'y'; 524_288])?;
     let known = compress(z, &one, false)?;
     let half_known = compress(z, &half, false)?;
-    // Create the no-content-size session first, so the 20 known-size entries
-    // are the deterministic first page for the cache-miss/warm cases.
-    let streaming = sessions.join("streaming");
-    fs::create_dir_all(&streaming)?;
-    fs::write(
-        streaming.join("messages.jsonl.zstd"),
-        compress(z, &one, true)?,
-    )?;
     for i in 0..20 {
         let d = sessions.join(format!("s{i:02}"));
         fs::create_dir_all(&d)?;
@@ -230,6 +230,15 @@ fn fixtures(root: &Path, z: &Path) -> Result<Fixtures> {
                 known.clone()
             },
         )?;
+        fs::File::open(d.join("messages.jsonl.zstd"))?
+            .set_modified(UNIX_EPOCH + Duration::from_secs(1_700_000_000 + i as u64))?;
+    }
+    for i in 0..20 {
+        let d = stream_sessions.join(format!("s{i:02}"));
+        fs::create_dir_all(&d)?;
+        fs::write(d.join("messages.jsonl.zstd"), compress(z, &one, true)?)?;
+        fs::File::open(d.join("messages.jsonl.zstd"))?
+            .set_modified(UNIX_EPOCH + Duration::from_secs(1_700_100_000 + i as u64))?;
     }
     let small = root.join("search-under-32");
     let large = root.join("search-at-least-32");
@@ -283,28 +292,46 @@ fn validate_sessions(out: &[u8], tokens: u64, count: usize) -> Result<()> {
     }
     Ok(())
 }
+fn validate_grown_sessions(out: &[u8]) -> Result<()> {
+    let v: Value = serde_json::from_slice(out)?;
+    let rows = v["sessions"]
+        .as_array()
+        .ok_or_else(|| anyhow!("sessions JSON lacks rows"))?;
+    if rows.len() != 20 {
+        bail!("expected 20 grown sessions")
+    }
+    let mut normal = 0;
+    let mut grown = 0;
+    for row in rows {
+        if row["tokens_exact"].as_bool() != Some(true) {
+            bail!("grown session is not exact: {row}")
+        }
+        match row["tokens"].as_u64() {
+            Some(262_144) => normal += 1,
+            Some(327_680) => grown += 1,
+            _ => bail!("unexpected grown session tokens: {row}"),
+        }
+    }
+    if normal != 19 || grown != 1 {
+        bail!("expected 19 ordinary + 1 grown session")
+    }
+    Ok(())
+}
 fn validate_streaming_sessions(out: &[u8]) -> Result<()> {
     let v: Value = serde_json::from_slice(out).context("sessions stdout is not JSON")?;
     let rows = v["sessions"]
         .as_array()
         .ok_or_else(|| anyhow!("sessions JSON lacks rows"))?;
-    if rows.len() != 21 {
-        bail!("expected 21 sessions, got {}", rows.len())
+    if rows.len() != 20 {
+        bail!("expected 20 sessions, got {}", rows.len())
     }
-    let mut ordinary = 0usize;
-    let mut grown = 0usize;
     for row in rows {
         if row["tokens_exact"].as_bool() != Some(true) {
             bail!("streaming session was not exact: {row}")
         }
-        match row["tokens"].as_u64() {
-            Some(262_144) => ordinary += 1,
-            Some(327_680) => grown += 1,
-            other => bail!("unexpected streaming token count {other:?}"),
+        if row["tokens"].as_u64() != Some(262_144) {
+            bail!("unexpected streaming token count: {row}")
         }
-    }
-    if ordinary != 20 || grown != 1 {
-        bail!("streaming session oracle mismatch: ordinary={ordinary}, grown={grown}")
     }
     Ok(())
 }
@@ -406,7 +433,7 @@ fn run_case(
         json!({"bytes":case.bytes,"stdout_equal":true,"stdout_fnv1a64":fingerprint(outs.values().next().unwrap()),"results":results}),
     )
 }
-fn concurrent_check(bin: &Path, s: &Sandbox, argv: &[String]) -> Result<()> {
+fn concurrent_check(bin: &Path, s: &Sandbox, argv: &[String], n: usize) -> Result<Value> {
     let _ = fs::remove_file(s.cache_file());
     let mut hs = vec![];
     for _ in 0..4 {
@@ -424,7 +451,26 @@ fn concurrent_check(bin: &Path, s: &Sandbox, argv: &[String]) -> Result<()> {
         }
         first = Some(o)
     }
-    cache_json(s)
+    cache_json(s)?;
+    let mut samples = Vec::with_capacity(n);
+    for _ in 0..n {
+        let started = Instant::now();
+        let mut wave = vec![];
+        for _ in 0..4 {
+            let (s, b, a) = (s.clone(), bin.to_path_buf(), argv.to_vec());
+            wave.push(std::thread::spawn(move || invoke(&s, &b, &a, true)));
+        }
+        for h in wave {
+            validate_sessions(
+                &h.join().map_err(|_| anyhow!("writer panicked"))??.1,
+                262_144,
+                20,
+            )?;
+        }
+        samples.push(started.elapsed().as_secs_f64() * 1000.0);
+    }
+    cache_json(s)?;
+    Ok(stats(&samples, 4 * 20 * 1_048_576))
 }
 
 fn main() -> Result<()> {
@@ -445,6 +491,8 @@ fn main() -> Result<()> {
     }
     let sessions = vec![
         "sessions".into(),
+        "--project".into(),
+        "known".into(),
         "--limit".into(),
         "20".into(),
         "--tokens".into(),
@@ -452,13 +500,19 @@ fn main() -> Result<()> {
     ];
     let streaming_sessions = vec![
         "sessions".into(),
+        "--project".into(),
+        "streaming".into(),
         "--limit".into(),
-        "21".into(),
+        "20".into(),
         "--tokens".into(),
         "--json".into(),
     ];
+    let mut concurrent = serde_json::Map::new();
     for (label, bin) in &bins {
-        concurrent_check(bin, &boxes[label], &sessions)?;
+        concurrent.insert(
+            label.clone(),
+            concurrent_check(bin, &boxes[label], &sessions, a.n)?,
+        );
     }
     // stale_secs=0: grow a no-content-size frame and require the exact new answer before timing.
     for (label, bin) in &bins {
@@ -467,11 +521,18 @@ fn main() -> Result<()> {
         let quarter = tmp.path().join("quarter");
         fs::write(&quarter, vec![b'z'; 262_144])?;
         let grow = compress(&z, &quarter, true)?;
-        let p = s.dsh.join("sessions/project/s00/messages.jsonl.zstd");
+        let p = s.dsh.join("sessions/known/s00/messages.jsonl.zstd");
         let mut old = fs::read(&p)?;
         old.extend(grow);
         fs::write(p, old)?;
-        validate_sessions(&invoke(s, bin, &sessions, true)?.1, 327_680, 20)?;
+        validate_grown_sessions(&invoke(s, bin, &sessions, true)?.1)?;
+    }
+    // The growth assertion is an E2E correctness check only; timing keeps the
+    // named known-frame workload free of no-content-size appended frames.
+    for s in boxes.values() {
+        fs::remove_dir_all(&s.dsh)?;
+        copy_dir(&f.dsh, &s.dsh)?;
+        let _ = fs::remove_file(s.cache_file());
     }
     let cases = vec![
         Case {
@@ -480,7 +541,7 @@ fn main() -> Result<()> {
             bytes: 20 * 1_048_576,
             cache: true,
             clear: true,
-            expect: Validation::Sessions(327_680),
+            expect: Validation::Sessions(262_144),
         },
         Case {
             name: "sessions_cache_disabled",
@@ -488,7 +549,7 @@ fn main() -> Result<()> {
             bytes: 20 * 1_048_576,
             cache: false,
             clear: false,
-            expect: Validation::Sessions(327_680),
+            expect: Validation::Sessions(262_144),
         },
         Case {
             name: "sessions_cache_warm",
@@ -496,12 +557,12 @@ fn main() -> Result<()> {
             bytes: 20 * 1_048_576,
             cache: true,
             clear: false,
-            expect: Validation::Sessions(327_680),
+            expect: Validation::Sessions(262_144),
         },
         Case {
             name: "sessions_streaming_zstd_no_content_size",
             argv: streaming_sessions,
-            bytes: 21 * 1_048_576,
+            bytes: 20 * 1_048_576,
             cache: true,
             clear: true,
             expect: Validation::Streaming,
@@ -572,7 +633,7 @@ fn main() -> Result<()> {
     for (label, b) in &bins {
         hashes.insert(label.clone(), Value::String(fingerprint(&fs::read(b)?)));
     }
-    let report = json!({"n":a.n,"warmups":3,"timing":"parent wall clock including process launch; OS filesystem remains warm by design","scope":"synthetic fixtures only; no model calls or credentials","binaries":hashes,"cases":report_cases,"original_dsh":original});
+    let report = json!({"n":a.n,"warmups":3,"timing":"parent wall clock including process launch; OS filesystem remains warm by design","scope":"synthetic fixtures only; no model calls or credentials","binaries":hashes,"cases":report_cases,"concurrent_4_writers":concurrent,"original_dsh":original});
     if let Some(p) = a.output.parent() {
         fs::create_dir_all(p)?;
     }
