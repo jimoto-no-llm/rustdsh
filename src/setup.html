@@ -80,7 +80,7 @@ button.ghost { background: none; border: 1px solid rgba(255,255,255,.16); border
 <h3 id="h2">DeepSeekキーを使う</h3>
 <div class="field"><input type="password" id="key" placeholder="DEEPSEEK_API_KEY"><button class="primary" onclick="save()">保存</button></div>
 <p class="hint" id="kh">platform.deepseek.com で発行したキーを貼り付け（0600で保存）</p>
-<div><button class="ghost" id="issue" onclick="window.open('https://platform.deepseek.com','_blank')">キーを発行する</button></div>
+<div><button class="ghost" id="issue" onclick="window.open('https://platform.deepseek.com','_blank','noopener')">キーを発行する</button></div>
 <div class="foot"><button class="ghost" onclick="load()">更新</button><button class="ghost" id="done" onclick="bye()" style="display:none">閉じる</button></div>
 </div>
 <script>

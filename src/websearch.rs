@@ -42,6 +42,14 @@ fn encode_query(s: &str) -> String {
 
 /// Split an `http://host[:port][/prefix]` base URL.
 fn split_base(base: &str) -> anyhow::Result<(String, u16, String)> {
+    // The configured endpoint is a human-selected capability, not a URL from
+    // search results. Preserve remote instances, but never interpolate request
+    // separators, userinfo, queries, or fragments into the HTTP request.
+    anyhow::ensure!(
+        !base.chars().any(|c| c.is_control() || c.is_whitespace())
+            && !base.contains(['@', '?', '#']),
+        "invalid SearXNG URL"
+    );
     let rest = base
         .strip_prefix("http://")
         .ok_or_else(|| anyhow::anyhow!("only http:// SearXNG URLs are supported: {base}"))?;
@@ -49,19 +57,36 @@ fn split_base(base: &str) -> anyhow::Result<(String, u16, String)> {
         Some(i) => (&rest[..i], rest[i..].to_string()),
         None => (rest, String::new()),
     };
-    let (host, port) = match hostport.rfind(':') {
-        Some(i) => (
-            hostport[..i].to_string(),
-            hostport[i + 1..]
-                .parse::<u16>()
-                .map_err(|_| anyhow::anyhow!("bad port in {base}"))?,
-        ),
-        None => (hostport.to_string(), 80),
+    let (host, port_text) = if hostport.starts_with('[') {
+        let end = hostport
+            .find(']')
+            .ok_or_else(|| anyhow::anyhow!("invalid IPv6 SearXNG host"))?;
+        hostport[1..end]
+            .parse::<std::net::Ipv6Addr>()
+            .map_err(|_| anyhow::anyhow!("invalid IPv6 SearXNG host"))?;
+        (&hostport[..=end], &hostport[end + 1..])
+    } else {
+        let end = hostport.find(':').unwrap_or(hostport.len());
+        let host = &hostport[..end];
+        anyhow::ensure!(
+            !host.is_empty()
+                && host
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b".-_".contains(&b)),
+            "invalid SearXNG host"
+        );
+        (host, &hostport[end..])
     };
-    if host.is_empty() {
-        anyhow::bail!("bad SearXNG URL: {base}");
-    }
-    Ok((host, port, prefix))
+    let port = if port_text.is_empty() {
+        80
+    } else {
+        port_text
+            .strip_prefix(':')
+            .and_then(|s| s.parse::<u16>().ok())
+            .filter(|port| *port != 0)
+            .ok_or_else(|| anyhow::anyhow!("invalid SearXNG port"))?
+    };
+    Ok((host.to_string(), port, prefix))
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -247,18 +272,35 @@ fn find_snippet(blk: &str) -> Option<String> {
 
 fn fetch(base: &str, query: &str) -> anyhow::Result<Vec<Hit>> {
     use std::io::{Read, Write};
+    use std::net::ToSocketAddrs;
     let (host, port, prefix) = split_base(base)?;
     let target = format!("{prefix}/search?q={}", encode_query(query));
-    let mut s = std::net::TcpStream::connect(format!("{host}:{port}")).map_err(|e| {
-        anyhow::anyhow!(
-            "cannot reach SearXNG at {base} ({e}); is it running? SEARXNG_URL overrides"
-        )
-    })?;
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
+    let mut stream = None;
+    for address in format!("{host}:{port}").to_socket_addrs()? {
+        let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+        if remaining.is_zero() {
+            break;
+        }
+        if let Ok(connected) = std::net::TcpStream::connect_timeout(&address, remaining) {
+            stream = Some(connected);
+            break;
+        }
+    }
+    let mut s = stream.ok_or_else(|| {
+        anyhow::anyhow!("cannot reach SearXNG at {base}; is it running? SEARXNG_URL overrides")
+    })?;
     let ua = format!("rdsh/{}", env!("CARGO_PKG_VERSION"));
-    s.write_all(
-        format!("GET {target} HTTP/1.0\r\nHost: {host}\r\nUser-Agent: {ua}\r\nAccept: text/html\r\nConnection: close\r\n\r\n").as_bytes(),
-    )?;
+    let request = format!("GET {target} HTTP/1.0\r\nHost: {host}\r\nUser-Agent: {ua}\r\nAccept: text/html\r\nConnection: close\r\n\r\n");
+    let mut pending = request.as_bytes();
+    while !pending.is_empty() {
+        let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+        anyhow::ensure!(!remaining.is_zero(), "SearXNG request timed out");
+        s.set_write_timeout(Some(remaining))?;
+        let n = s.write(pending)?;
+        anyhow::ensure!(n != 0, "SearXNG request connection closed");
+        pending = &pending[n..];
+    }
     let mut raw = Vec::new();
     let mut chunk = [0u8; 8192];
     loop {
@@ -362,6 +404,87 @@ mod tests {
             ("h".to_string(), 80, "/searx".to_string())
         );
         assert!(split_base("https://h/").is_err());
+        assert_eq!(
+            split_base("http://[::1]/searx").unwrap(),
+            ("[::1]".to_string(), 80, "/searx".to_string())
+        );
+        assert_eq!(
+            split_base("http://searx.example:8888/prefix").unwrap(),
+            ("searx.example".to_string(), 8888, "/prefix".to_string())
+        );
+    }
+
+    #[test]
+    fn base_rejects_http_request_injection_and_malformed_authorities() {
+        for base in [
+            "http://127.0.0.1:8888/prefix\r\nInjected: yes",
+            "http://127.0.0.1:8888/path HTTP/1.0",
+            "http://localhost\t:8888",
+            "http://user@localhost:8888",
+            "http://localhost:8888/path?other=query",
+            "http://localhost:8888/#fragment",
+            "http://[::1]extra:8888",
+            "http://[bad]:8888",
+            "http://::1",
+            "http://localhost:0",
+            "http://localhost:65536",
+            "http://localhost:",
+            "http:///path",
+        ] {
+            assert!(split_base(base).is_err(), "{base:?}");
+        }
+        // The query is encoded separately and cannot create a second request.
+        assert_eq!(encode_query("\r\nInjected: yes"), "%0D%0AInjected%3A+yes");
+    }
+
+    #[test]
+    fn fetch_encodes_query_and_preserves_configured_prefix() {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = std::thread::spawn(move || {
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+            let mut stream = loop {
+                match listener.accept() {
+                    Ok((stream, _)) => break stream,
+                    Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                        assert!(
+                            std::time::Instant::now() < deadline,
+                            "no fixture connection"
+                        );
+                        std::thread::sleep(std::time::Duration::from_millis(5));
+                    }
+                    Err(e) => panic!("fixture accept: {e}"),
+                }
+            };
+            stream
+                .set_read_timeout(Some(std::time::Duration::from_secs(3)))
+                .unwrap();
+            let mut request = Vec::new();
+            while !request.ends_with(b"\r\n\r\n") {
+                let mut byte = [0];
+                assert_eq!(stream.read(&mut byte).unwrap(), 1);
+                request.push(byte[0]);
+                assert!(request.len() < 8192);
+            }
+            let body = "<article class=\"result\"><a href=\"https://example.invalid/\">DUMMY_RESULT</a></article>";
+            write!(
+                stream,
+                "HTTP/1.0 200 OK\r\nContent-Length: {}\r\n\r\n{body}",
+                body.len()
+            )
+            .unwrap();
+            String::from_utf8(request).unwrap()
+        });
+        let hits = fetch(
+            &format!("http://{address}/prefix"),
+            "hello\r\nInjected: yes",
+        );
+        let request = server.join().unwrap();
+        assert_eq!(hits.unwrap()[0].title, "DUMMY_RESULT");
+        assert!(request.starts_with("GET /prefix/search?q=hello%0D%0AInjected%3A+yes HTTP/1.0\r\n"));
+        assert!(!request.contains("\r\nInjected:"));
     }
 
     #[test]

@@ -1,0 +1,126 @@
+{
+  "path_redaction": "temporary fixture root and TCP port only",
+  "network": "loopback fixture only",
+  "cases": [
+    {
+      "case": "ordinary log tail/grep",
+      "command": [
+        "logs",
+        "--file",
+        "app.log",
+        "--tail",
+        "1",
+        "--grep",
+        "DUMMY_MATCH"
+      ],
+      "equal": true,
+      "before": {
+        "exit_code": 0,
+        "stdout": "DUMMY_MATCH new\n",
+        "stderr": "[rdsh] reading FIXTURE_ROOT/dsh/logs/app.log\n[rdsh] 2 line(s) matching \"DUMMY_MATCH\"\n"
+      },
+      "after": {
+        "exit_code": 0,
+        "stdout": "DUMMY_MATCH new\n",
+        "stderr": "[rdsh] reading FIXTURE_ROOT/dsh/logs/app.log\n[rdsh] 2 line(s) matching \"DUMMY_MATCH\"\n"
+      }
+    },
+    {
+      "case": "relative DSH_HOME latest log",
+      "command": [
+        "logs",
+        "--tail",
+        "1",
+        "--grep",
+        "DUMMY_MATCH"
+      ],
+      "equal": true,
+      "before": {
+        "exit_code": 0,
+        "stdout": "DUMMY_MATCH new\n",
+        "stderr": "[rdsh] reading dsh/logs/app.log\n[rdsh] 2 line(s) matching \"DUMMY_MATCH\"\n"
+      },
+      "after": {
+        "exit_code": 0,
+        "stdout": "DUMMY_MATCH new\n",
+        "stderr": "[rdsh] reading dsh/logs/app.log\n[rdsh] 2 line(s) matching \"DUMMY_MATCH\"\n"
+      }
+    },
+    {
+      "case": "outside absolute log rejected",
+      "command": [
+        "logs",
+        "--file",
+        "FIXTURE_ROOT/outside.log"
+      ],
+      "equal": false,
+      "before": {
+        "exit_code": 0,
+        "stdout": "DUMMY_OUTSIDE_LOG\n",
+        "stderr": "[rdsh] reading FIXTURE_ROOT/outside.log\n[rdsh] 1 line(s)\n"
+      },
+      "after": {
+        "exit_code": 1,
+        "stdout": "",
+        "stderr": "[rdsh] error: log file must be inside FIXTURE_ROOT/dsh/logs\n"
+      }
+    },
+    {
+      "case": "outside traversal log rejected",
+      "command": [
+        "logs",
+        "--file",
+        "FIXTURE_ROOT/dsh/logs/../../outside.log"
+      ],
+      "equal": false,
+      "before": {
+        "exit_code": 0,
+        "stdout": "DUMMY_OUTSIDE_LOG\n",
+        "stderr": "[rdsh] reading FIXTURE_ROOT/dsh/logs/../../outside.log\n[rdsh] 1 line(s)\n"
+      },
+      "after": {
+        "exit_code": 1,
+        "stdout": "",
+        "stderr": "[rdsh] error: log file must be inside FIXTURE_ROOT/dsh/logs\n"
+      }
+    },
+    {
+      "case": "outside symlink log rejected",
+      "command": [
+        "logs",
+        "--file",
+        "linked.log"
+      ],
+      "equal": false,
+      "before": {
+        "exit_code": 0,
+        "stdout": "DUMMY_OUTSIDE_LOG\n",
+        "stderr": "[rdsh] reading FIXTURE_ROOT/dsh/logs/linked.log\n[rdsh] 1 line(s)\n"
+      },
+      "after": {
+        "exit_code": 1,
+        "stdout": "",
+        "stderr": "[rdsh] error: log file must be inside FIXTURE_ROOT/dsh/logs\n"
+      }
+    },
+    {
+      "case": "ordinary configured web endpoint",
+      "command": [
+        "search-web",
+        "dummy query",
+        "--json"
+      ],
+      "equal": true,
+      "before": {
+        "exit_code": 0,
+        "stdout": "{\"engine\":\"http://127.0.0.1:FIXTURE_PORT/prefix\",\"query\":\"dummy query\",\"results\":[{\"content\":\"\",\"title\":\"DUMMY_RESULT\",\"url\":\"https://example.invalid/\"}]}\n",
+        "stderr": ""
+      },
+      "after": {
+        "exit_code": 0,
+        "stdout": "{\"engine\":\"http://127.0.0.1:FIXTURE_PORT/prefix\",\"query\":\"dummy query\",\"results\":[{\"content\":\"\",\"title\":\"DUMMY_RESULT\",\"url\":\"https://example.invalid/\"}]}\n",
+        "stderr": ""
+      }
+    }
+  ]
+}

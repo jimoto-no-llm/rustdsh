@@ -109,11 +109,24 @@ struct Session {
 /// Missing root yields an empty vec.
 fn scan_sessions(root: &str, project: Option<&str>) -> Vec<Session> {
     let projs: Vec<String> = match project {
-        Some(p) => vec![p.to_string()],
+        // Project ids are single directory names: reject traversal so
+        // `--project ../../.ssh` cannot list outside the sessions root.
+        Some(p) if !p.is_empty() && !p.contains(['/', '\\']) && p != "." && p != ".." => {
+            // The entry itself must not be a link: lstat never follows, so a
+            // planted `sessions/<proj>` symlink fails closed here. (A swap
+            // after this check needs DSH_HOME write; descriptor enumeration
+            // of project dirs belongs in file_security as follow-up.)
+            let dir = std::path::Path::new(root).join(p);
+            if std::fs::symlink_metadata(&dir).is_ok_and(|m| m.file_type().is_symlink()) {
+                return vec![];
+            }
+            vec![p.to_string()]
+        }
+        Some(_) => return vec![],
         None => match std::fs::read_dir(root) {
             Ok(e) => e
                 .filter_map(|e| e.ok())
-                .filter(|e| e.metadata().is_ok_and(|m| m.is_dir()))
+                .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
                 .map(|e| e.file_name().to_string_lossy().into_owned())
                 .collect(),
             Err(_) => return vec![],
@@ -253,12 +266,18 @@ pub fn cmd_sessions(
 
 fn scan_project(pdir: &std::path::Path, proj: &str) -> Vec<Session> {
     let mut v = vec![];
+    // Reject a linked project dir itself (lstat, no following).
+    if std::fs::symlink_metadata(pdir).is_ok_and(|m| m.file_type().is_symlink()) {
+        return v;
+    }
     let entries = match std::fs::read_dir(pdir) {
         Ok(e) => e,
         Err(_) => return v,
     };
     for e in entries.filter_map(|e| e.ok()) {
-        if !e.metadata().is_ok_and(|m| m.is_dir()) {
+        // file_type does not traverse symlinks: a planted link never
+        // pulls an outside directory into the walk.
+        if !e.file_type().is_ok_and(|t| t.is_dir()) {
             continue;
         }
         let id = e.file_name().to_string_lossy().into_owned();
@@ -280,6 +299,10 @@ fn dir_size_mtime(dir: &std::path::Path) -> (u64, u64, String) {
     let mut best: Option<std::time::SystemTime> = None;
     if let Ok(entries) = std::fs::read_dir(dir) {
         for e in entries.filter_map(|e| e.ok()) {
+            // Skip links before statting: sizes must describe files inside.
+            if !e.file_type().is_ok_and(|t| t.is_file()) {
+                continue;
+            }
             // One stat per entry: size + mtime come from the same metadata.
             let md = match e.metadata() {
                 Ok(m) => m,
@@ -480,11 +503,31 @@ impl TokensCache {
                 return;
             }
         }
-        // Atomic replace so concurrent readers never see a torn file.
-        let tmp = format!("{p}.tmp");
-        if std::fs::write(&tmp, text).is_ok() {
-            let _ = std::fs::rename(&tmp, p);
+        // Randomized exclusive tmp + rename: a predictable `{p}.tmp` would
+        // let a planted symlink truncate an unrelated file on write.
+        let tmp = match crate::local_http::random_token() {
+            Ok(nonce) => format!("{p}.tmp.{nonce}"),
+            Err(_) => return,
+        };
+        let mut options = std::fs::OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
         }
+        if let Ok(mut file) = options.open(&tmp) {
+            use std::io::Write;
+            if file.write_all(text.as_bytes()).is_ok() {
+                let _ = file.sync_all();
+                drop(file);
+                // Atomic replace so concurrent readers never see a torn file.
+                // The new inode was already created privately. Avoid a
+                // path-based chmod after rename, which could follow a swap.
+                let _ = std::fs::rename(&tmp, p);
+            }
+        }
+        let _ = std::fs::remove_file(&tmp);
     }
 }
 
@@ -599,6 +642,12 @@ fn session_decompressed_bytes_uncached(
             continue;
         };
         if !name.ends_with(".zstd") {
+            continue;
+        }
+        // Never measure through a link, and never label the remaining partial
+        // sum exact when a compressed entry was deliberately omitted.
+        if !e.file_type().is_ok_and(|t| t.is_file()) {
+            estimated = true;
             continue;
         }
         match zstd_frame_content_size(&p) {
@@ -1002,27 +1051,94 @@ fn stream_many_decompressed_bytes(paths: &[&std::path::PathBuf]) -> Option<u64> 
     }
 }
 
+/// Open a validated logs path without following links: on Unix the open
+/// walks directory fds with O_NOFOLLOW and rejects hardlinked or
+/// non-regular files, closing the check/open race a canonicalize-then-read
+/// leaves behind (link swapped in after validation, FIFO block, hardlinked
+/// outside file). Callers confine `resolved` under `root` first.
+#[cfg(unix)]
+fn open_log_file(
+    root: &std::path::Path,
+    resolved: &std::path::Path,
+) -> anyhow::Result<std::fs::File> {
+    crate::file_security::open_beneath(root, resolved)
+        .ok_or_else(|| anyhow::anyhow!("cannot open log file"))
+}
+
+#[cfg(not(unix))]
+fn open_log_file(
+    root: &std::path::Path,
+    resolved: &std::path::Path,
+) -> anyhow::Result<std::fs::File> {
+    // No no-follow directory-fd opens on this platform: keep the lexical
+    // confinement check (done by the caller) and open normally.
+    let _ = root;
+    std::fs::File::open(resolved).map_err(|e| anyhow::anyhow!("cannot open log file: {e}"))
+}
+
+/// Resolve a logs candidate under the selected canonical logs dir.
+fn confine_log_path(
+    root: &std::path::Path,
+    cand: &std::path::Path,
+) -> anyhow::Result<std::path::PathBuf> {
+    // Preserve the existing CLI contract: bare names are logs-root-relative,
+    // while paths with a separator are relative to the caller's working dir.
+    let joined = if cand.is_absolute()
+        || cand.components().count() > 1
+        || cand.to_string_lossy().contains('/')
+    {
+        cand.to_path_buf()
+    } else {
+        root.join(cand)
+    };
+    let resolved =
+        std::fs::canonicalize(&joined).map_err(|e| anyhow::anyhow!("cannot read log file: {e}"))?;
+    if !resolved.starts_with(root) {
+        anyhow::bail!("log file must be inside {}", root.display());
+    }
+    Ok(resolved)
+}
+
 pub fn cmd_logs(tail: usize, grep: Option<String>, file: Option<String>) -> anyhow::Result<()> {
     let dir = format!("{}/logs", dsh_home());
-    let path = match file {
+    let (display, mut handle) = match file {
         Some(f) => {
-            let path = std::path::PathBuf::from(&f);
-            if path.is_absolute() || path.components().count() > 1 || f.contains('/') {
-                path
+            // Confine explicit selections to the logs dir (fail closed):
+            // without this `--file /etc/passwd` or `../../.credentials.yaml`
+            // prints arbitrary files to stdout.
+            let root =
+                std::fs::canonicalize(&dir).map_err(|_| anyhow::anyhow!("no logs at {dir}"))?;
+            let candidate = std::path::Path::new(&f);
+            let resolved = confine_log_path(&root, candidate)?;
+            let handle = open_log_file(&root, &resolved)?;
+            let display = if candidate.is_absolute() {
+                candidate.to_path_buf()
             } else {
-                std::path::Path::new(&dir).join(path)
-            }
+                std::path::Path::new(&dir).join(candidate)
+            };
+            (display, handle)
         }
         None => match latest_file(&dir) {
-            Some(p) => p,
+            Some(p) => {
+                let root =
+                    std::fs::canonicalize(&dir).map_err(|_| anyhow::anyhow!("no logs at {dir}"))?;
+                // read_dir already returned a path including `dir`; resolve
+                // it directly even when DSH_HOME is relative.
+                let candidate = std::fs::canonicalize(&p)?;
+                let resolved = confine_log_path(&root, &candidate)?;
+                let handle = open_log_file(&root, &resolved)?;
+                (p, handle)
+            }
             None => {
                 println!("# no logs at {dir}");
                 return Ok(());
             }
         },
     };
-    eprintln!("[rdsh] reading {}", path.display());
-    let text = std::fs::read_to_string(&path)?;
+    eprintln!("[rdsh] reading {}", display.display());
+    use std::io::Read as _;
+    let mut text = String::new();
+    handle.read_to_string(&mut text)?;
     // Single pass: count matches while keeping only the last `tail` lines.
     // (Old code collected every line, then filtered in a second pass.)
     let pat = grep.as_deref();
@@ -1058,6 +1174,11 @@ pub fn cmd_logs(tail: usize, grep: Option<String>, file: Option<String>) -> anyh
 fn latest_file(dir: &str) -> Option<std::path::PathBuf> {
     let mut best: Option<(u64, std::path::PathBuf)> = None;
     for e in std::fs::read_dir(dir).ok()?.filter_map(|e| e.ok()) {
+        // Never follow a planted link out of the logs dir (file_type does
+        // not traverse symlinks, unlike metadata below).
+        if !e.file_type().is_ok_and(|t| t.is_file()) {
+            continue;
+        }
         // One stat per entry; the display string is not needed here.
         let md = match e.metadata() {
             Ok(m) => m,
@@ -1083,7 +1204,7 @@ fn dir_names(dir: &str) -> Vec<String> {
     let mut names: Vec<String> = std::fs::read_dir(dir)
         .map(|e| {
             e.filter_map(|e| e.ok())
-                .filter(|e| e.metadata().is_ok_and(|m| m.is_dir()))
+                .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
                 .map(|e| e.file_name().to_string_lossy().into_owned())
                 .collect()
         })

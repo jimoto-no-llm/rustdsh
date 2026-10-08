@@ -24,6 +24,15 @@ questions and browser answers, draft retention across SSE, process restart, and
 revocation of the previous browser key. Linux CI installs Chromium and retains PNGs
 and JSON even when the job fails.
 
+The default command also runs `update-banner.mjs` with the real React component
+and plugin HTTP handlers in an isolated browser host. Its dummy HOME and two
+loopback ports cover dismiss/close, timestamp changes, the old two-hour timeout,
+project remount, same-origin tabs, separate browser contexts/ports, new versions,
+legacy migration, and unavailable browser storage. It does not restart the user's
+DSH or execute the updater. Run just this flow with `npm run test:updates`.
+Set `RDSH_UPDATE_E2E_OUTPUT` for its PNGs/JSON; optionally supply the previous
+client source with `RDSH_UPDATE_BASELINE_CLIENT` for a real before/after comparison.
+
 ## Optional installed DSH integration
 
 ```sh

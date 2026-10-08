@@ -10,6 +10,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  update-banner-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: node --test tests/update-banner.test.mjs
+
   plugin-security:
     runs-on: ubuntu-latest
     steps:
@@ -17,7 +26,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-      - run: node --test tests/plugin-security.test.mjs tests/settings-client.test.mjs tests/model_benchmark/fence.test.mjs
+      - run: node --test tests/plugin-security.test.mjs tests/settings-client.test.mjs tests/update-banner.test.mjs tests/model_benchmark/fence.test.mjs
 
   security-boundaries:
     runs-on: ubuntu-latest

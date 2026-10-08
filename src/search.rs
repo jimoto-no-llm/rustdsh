@@ -8,12 +8,13 @@ pub fn cmd_search(pattern: &str, dir: &str, max: usize) -> anyhow::Result<()> {
         "RDSH_SECURITY: secure native search is unavailable on this platform"
     );
     let root = std::fs::canonicalize(dir)?;
+    let reader = crate::file_security::Root::new(&root);
     let files = collect_parallel(&root);
     let nfiles = files.len();
-    let per_file: Vec<Vec<String>> = if nfiles >= 32 {
-        grep_parallel(pattern, &files, &root)
-    } else {
-        files.iter().map(|p| grep_one(pattern, p, &root)).collect()
+    let per_file: Vec<Vec<String>> = match reader {
+        Some(reader) if nfiles >= 32 => grep_parallel(pattern, &files, &reader, max),
+        Some(reader) => grep_chunk(pattern, &files, &reader, max),
+        None => vec![],
     };
     // One locked, buffered stdout for the whole dump (same bytes out).
     use std::io::Write;
@@ -24,6 +25,9 @@ pub fn cmd_search(pattern: &str, dir: &str, max: usize) -> anyhow::Result<()> {
     for (path, fh) in files.iter().zip(&per_file) {
         if outer_done {
             break;
+        }
+        if fh.is_empty() {
+            continue;
         }
         let prefix = format!("{}:", path.display());
         let display_path = std::path::Path::new(dir).join(path.strip_prefix(&root)?);
@@ -184,9 +188,9 @@ fn collect_parallel(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
 /// Read at most 2MB+1 bytes as UTF-8. Returns None for missing files,
 /// files over 2MB, and non-UTF-8 content — the same skip set as the old
 /// metadata-check plus read_to_string combination (verified by diff).
-fn read_capped(path: &std::path::Path, root: &std::path::Path) -> Option<String> {
+fn read_capped(path: &std::path::Path, root: &crate::file_security::Root) -> Option<String> {
     use std::io::Read;
-    let f = crate::file_security::open_beneath(root, path)?;
+    let f = root.open(path)?;
     // One fstat on the open fd (no path lookup): skip oversized files
     // without reading, and pre-size the buffer to avoid regrowth.
     // Same skip set as the old metadata-check combination (verified by diff).
@@ -202,8 +206,16 @@ fn read_capped(path: &std::path::Path, root: &std::path::Path) -> Option<String>
     String::from_utf8(buf).ok()
 }
 
-fn grep_one(pattern: &str, path: &std::path::Path, root: &std::path::Path) -> Vec<String> {
+fn grep_one(
+    pattern: &str,
+    path: &std::path::Path,
+    root: &crate::file_security::Root,
+    max: usize,
+) -> Vec<String> {
     let mut hits = vec![];
+    if max == 0 {
+        return hits;
+    }
     if let Some(text) = read_capped(path, root) {
         for (i, line) in text.lines().enumerate() {
             if line.contains(pattern) {
@@ -213,31 +225,49 @@ fn grep_one(pattern: &str, path: &std::path::Path, root: &std::path::Path) -> Ve
                     i + 1,
                     truncate(line, 240)
                 ));
+                if hits.len() == max {
+                    break;
+                }
             }
         }
     }
     hits
 }
 
+/// An ordered chunk never contributes more than the global output limit.
+/// Retain at most workers × max hits, even when every line in every file matches.
+fn grep_chunk(
+    pattern: &str,
+    files: &[std::path::PathBuf],
+    root: &crate::file_security::Root,
+    mut remaining: usize,
+) -> Vec<Vec<String>> {
+    files
+        .iter()
+        .map(|path| {
+            let hits = grep_one(pattern, path, root, remaining);
+            remaining -= hits.len();
+            hits
+        })
+        .collect()
+}
+
 fn grep_parallel(
     pattern: &str,
     files: &[std::path::PathBuf],
-    root: &std::path::Path,
+    root: &crate::file_security::Root,
+    max: usize,
 ) -> Vec<Vec<String>> {
     let threads = crate::inspect::parallelism();
     if threads <= 1 {
-        return files.iter().map(|p| grep_one(pattern, p, root)).collect();
+        return grep_chunk(pattern, files, root, max);
     }
     let chunk = files.len().div_ceil(threads);
     let mut out: Vec<Vec<Vec<String>>> = vec![];
     std::thread::scope(|s| {
         let mut handles = vec![];
         for c in files.chunks(chunk) {
-            handles.push(s.spawn(move || {
-                c.iter()
-                    .map(|p| grep_one(pattern, p, root))
-                    .collect::<Vec<_>>()
-            }));
+            handles.push(s.spawn(move || grep_chunk(pattern, c, root, max)));
         }
         for h in handles {
             out.push(h.join().unwrap_or_default());
@@ -263,6 +293,48 @@ mod tests {
     fn worker_cap() {
         // Issue #85-4: walker/grep threads follow cores, clamped 1..=8.
         assert!((1..=8).contains(&crate::inspect::parallelism()));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn bounded_workers_preserve_global_prefix_and_skip_reads_at_zero() {
+        let temporary = std::env::temp_dir().join(format!(
+            "rdsh-search-limit-{}",
+            crate::local_http::random_token().unwrap()
+        ));
+        std::fs::create_dir(&temporary).unwrap();
+        let root = std::fs::canonicalize(&temporary).unwrap();
+        let reader = crate::file_security::Root::new(&root).unwrap();
+        let mut files = Vec::new();
+        let mut expected = Vec::new();
+        for i in 0..65 {
+            let path = root.join(format!("file-{i}.txt"));
+            // Some chunks start with files containing no matches.
+            let text = if i % 4 == 0 {
+                "ordinary\n"
+            } else {
+                "match A\nordinary\nmatch B\n"
+            };
+            std::fs::write(&path, text).unwrap();
+            if i % 4 != 0 {
+                expected.push(format!("{}:1: match A", path.display()));
+                expected.push(format!("{}:3: match B", path.display()));
+            }
+            files.push(path);
+        }
+        for max in [0, 1, 3, 19, 300] {
+            let hits = grep_parallel("match", &files, &reader, max)
+                .into_iter()
+                .flatten()
+                .collect::<Vec<_>>();
+            assert!(hits.len() <= crate::inspect::parallelism() * max);
+            assert_eq!(
+                hits.into_iter().take(max).collect::<Vec<_>>(),
+                expected.iter().take(max).cloned().collect::<Vec<_>>()
+            );
+        }
+        assert!(grep_one("match", &root.join("missing"), &reader, 0).is_empty());
+        std::fs::remove_dir_all(temporary).unwrap();
     }
 
     #[cfg(unix)]
@@ -301,17 +373,20 @@ mod tests {
         std::fs::write(&slot, "safe").unwrap();
         std::fs::write(&outside, "DUMMY_SEARCH_SECRET").unwrap();
         let collected = collect_parallel(&root);
+        let reader = crate::file_security::Root::new(&root).unwrap();
         assert_eq!(collected, vec![slot.clone()]);
         std::fs::remove_file(&slot).unwrap();
         std::os::unix::fs::symlink(&outside, &slot).unwrap();
-        assert!(grep_one("DUMMY_SEARCH_SECRET", &collected[0], &root).is_empty());
+        assert!(grep_one("DUMMY_SEARCH_SECRET", &collected[0], &reader, 10).is_empty());
         std::fs::remove_file(&slot).unwrap();
         std::fs::hard_link(&outside, &slot).unwrap();
-        assert!(grep_parallel("DUMMY_SEARCH_SECRET", &collected, &root)
-            .into_iter()
-            .flatten()
-            .next()
-            .is_none());
+        assert!(
+            grep_parallel("DUMMY_SEARCH_SECRET", &collected, &reader, 10)
+                .into_iter()
+                .flatten()
+                .next()
+                .is_none()
+        );
         std::fs::remove_dir_all(temporary).unwrap();
     }
 
@@ -324,6 +399,7 @@ mod tests {
         ));
         std::fs::create_dir(&dir).unwrap();
         let dir = std::fs::canonicalize(dir).unwrap();
+        let reader = crate::file_security::Root::new(&dir).unwrap();
         let exact = dir.join("rdsh-cap-exact.txt");
         let over = dir.join("rdsh-cap-over.txt");
         let bin = dir.join("rdsh-cap-bin.bin");
@@ -332,10 +408,10 @@ mod tests {
         big.push(121);
         std::fs::write(&over, big).unwrap();
         std::fs::write(&bin, [0u8, 159, 146, 150]).unwrap();
-        assert!(read_capped(&exact, &dir).is_some());
-        assert!(read_capped(&over, &dir).is_none());
-        assert!(read_capped(&bin, &dir).is_none());
-        assert!(read_capped(&dir.join("rdsh-cap-missing.txt"), &dir).is_none());
+        assert!(read_capped(&exact, &reader).is_some());
+        assert!(read_capped(&over, &reader).is_none());
+        assert!(read_capped(&bin, &reader).is_none());
+        assert!(read_capped(&dir.join("rdsh-cap-missing.txt"), &reader).is_none());
         std::fs::remove_dir_all(dir).unwrap();
     }
 }

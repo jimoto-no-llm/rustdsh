@@ -1,0 +1,13 @@
+{
+  "before": "window.open('https://platform.deepseek.com','_blank')",
+  "before_open_args": [
+    "https://platform.deepseek.com",
+    "_blank"
+  ],
+  "after": "window.open('https://platform.deepseek.com','_blank','noopener')",
+  "after_open_args": [
+    "https://platform.deepseek.com",
+    "_blank",
+    "noopener"
+  ]
+}

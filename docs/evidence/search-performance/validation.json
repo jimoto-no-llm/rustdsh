@@ -1,0 +1,47 @@
+{
+  "baseline_commit": "57777a61f7b3043b890f52cd5fd400ed761290b1",
+  "source_sha256": {
+    "src/file_security.rs": "ce4a56111eec0682bb1c374c6e709987226441cb124f94196a8def5bacfc96be",
+    "src/search.rs": "a953da24a4ca973469508cd3133d9688ea946ffcf89c419e908fe14e89204b6c",
+    "src/inspect.rs": "29ec79e89cecdf5ad279978ee42b21e1e92039841d52ac3a98a217b6884e0b6e",
+    "src/websearch.rs": "b959e710ac1b6479f807490ee0b05d8a76468572125a3f8cf2e867bebf2be15d",
+    "src/setup.html": "687294f77985766e311b7d214326d5430ac6fdb49c6a9ea66db57c29164db80d",
+    "tests/log_session_boundaries.rs": "c6655d4386a6c3148e012a7f0066a2bd999bc0e5d45f03ee7928ac46582d3ee2",
+    "src/main.rs": "7e4d500ff40b35512f9cb1e62f72383d32e3202d90849de5537aa8c320beb355",
+    "src/rdsh_config.rs": "3a50ac0ac3f8f03b2ebf1b9dbc8fb30e46b80a6ac19076a5b02f94f50385dfb5",
+    "src/setup_web.rs": "c83e81ee0c869a2875a593e29043861bcb337fca428336a816393338ac6b136b",
+    "tests/native_e2e.rs": "a823cde79e75be20c895d3a73c1639cc18c455b3fb0c267a0683f87c56c913b0",
+    "tests/regress.sh": "8f7041ac3ede6880d5ce063c5774bab2db69ad2b1880361ce29fc9adc73784d7"
+  },
+  "candidate_binary_sha256": "e16a9aece63f671d9a318417755a8b7e8c950252f50e6ea8ebb3c01fd72caa88",
+  "review": {
+    "correctness": 3,
+    "style": 3,
+    "tests": 3,
+    "blocking_findings_in_changed_scope": [],
+    "limits_documented": "session path races require same-user DSH_HOME writes; non-Unix native log opens; OS DNS timeout"
+  },
+  "validation": {
+    "rust_unit_passed": 78,
+    "rust_cli_boundaries_passed": 11,
+    "cli_regress_passed": 53,
+    "node_security_passed": 36,
+    "node_security_skipped": 0,
+    "release_assets_passed": 6,
+    "patched_approval_fixture_passed": 4,
+    "guarded_tool_runtime": "passed",
+    "fmt": "passed",
+    "release_clippy_warnings_denied": "passed",
+    "rust_native_e2e_passed": 11,
+    "rust_settings_cli_passed": 3,
+    "rust_examples_passed": 7,
+    "browser_e2e": "passed; 3 complete flows, no page/console errors",
+    "regress_reverse_dns_disabled_fixture": "passed",
+    "npm_production_audit_vulnerabilities": 0
+  },
+  "performance_cases_output_equal": 12,
+  "compatibility_cases_output_equal": 192,
+  "integrated_main_commit": "98abc67d7e5c5d3f2a5321d9a56adb6a83ff93e2",
+  "github_open_code_scanning_alerts": 0,
+  "github_dependabot_alerts": "disabled; API unavailable, not an assertion of zero alerts"
+}

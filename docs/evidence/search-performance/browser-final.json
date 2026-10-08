@@ -1,0 +1,22 @@
+{
+  "scope": "real Rust setup/serve and Node project CLI+HTTP MCP+browser; no model calls, Tailscale or Electron Desktop",
+  "browser": "Browser plugin not available; Playwright",
+  "viewports": [
+    {
+      "width": 1280,
+      "height": 900
+    },
+    {
+      "width": 390,
+      "height": 844
+    }
+  ],
+  "flows": [
+    "setup: missing model connection rendered -> Extras enable -> file readback -> reload retained",
+    "native serve: authenticated URL -> tokens -> prune -> sessions -> reload key retained",
+    "project CLI: real MCP task/question -> browser draft preserved on SSE -> browser answer -> MCP/file readback -> process restart retained answer and revoked old key"
+  ],
+  "page_errors": [],
+  "console_errors": [],
+  "result": "PASS"
+}
