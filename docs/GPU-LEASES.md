@@ -71,7 +71,9 @@ free after admission. The existing GPU preflight remains a check without a lease
 
 The live controller heartbeats every 10 seconds; expiry is 30 seconds and never
 frees memory by itself. Root exit also cannot free a reservation while descendants
-live. Release requires the original held Job/cgroup to report an empty group and
+live. Windows membership and accounting queries must both report an empty Job;
+contradictory observations retain the scope and are polled again. Release
+requires the original held Job/cgroup to report an empty group and
 an actual root identity/absence observation. No kernel handle is reconstructed
 from a saved path/PID. `gpu reconcile` checks at most eight expired leases per
 invocation using PID **and birth/host identity**. It can release a never-launched

@@ -75,6 +75,9 @@ const timings = {
 const sourceFiles = [
   "package.json",
   "package-lock.json",
+  "process-scope.mjs",
+  "process-scope-backends.mjs",
+  "tracked-adapter.mjs",
   "gpu-telemetry.mjs",
   "gpu-lock.mjs",
   "gpu-leases.mjs",
