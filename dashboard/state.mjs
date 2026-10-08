@@ -32,6 +32,11 @@ import {
   validateCostLedger,
   publicCostLedger,
 } from "./cost-ledger.mjs";
+import {
+  applyBudgetOperation,
+  validateBudgetAdmission,
+  publicBudgetAdmission,
+} from "./budget-admission.mjs";
 
 // Bucket D display notes (no schema change; schema stays 1):
 // #12 task contract, #13 review inbox, #14 outcome cards, #15 dependencies.
@@ -117,6 +122,7 @@ export class ProjectStore {
     validateAnswerApplications(value);
     validateInstructions(value);
     validateCostLedger(value);
+    validateBudgetAdmission(value);
     return new ProjectStore(project, value);
   }
   async mutate(operation, input) {
@@ -177,10 +183,18 @@ export class ProjectStore {
     this.value = next;
     return next;
   }
+  async mutateBudget(operation, input) {
+    const next = structuredClone(this.value);
+    const result = applyBudgetOperation(next, operation, input);
+    await this.commit(next);
+    return structuredClone(result);
+  }
 }
-export function publicState(value, observations, deliveries) {
+export function publicState(value, observations, deliveries, budgetJobs) {
   const { changes, ...visible } = value;
   if (value.cost_ledger) visible.cost_ledger = publicCostLedger(value);
+  if (value.budget_admission)
+    visible.budget_admission = publicBudgetAdmission(value, budgetJobs);
   visible.input_queue_revision = queueRevision(value);
   if (visible.instructions) {
     visible.instructions = structuredClone(visible.instructions);

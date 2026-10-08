@@ -20,6 +20,7 @@ import { requestedSelection, validSelection } from "./model-selection.mjs";
 import { ReplyConsumer } from "./reply-consumer.mjs";
 import { instructionRequest } from "./instruction-client.mjs";
 import { costRequest } from "./cost-client.mjs";
+import { budgetRequest } from "./budget-client.mjs";
 import { allInputCommands } from "./instruction-queue.mjs";
 import { ProjectStore, publicState } from "./state.mjs";
 import { setTimeout as delay } from "node:timers/promises";
@@ -52,6 +53,10 @@ rdsh-dashboard instruction context --project <directory> --consumer-id <consumer
 rdsh-dashboard instruction submit|resolve --project <directory> --input-file <json>
 rdsh-dashboard cost-ledger declare|report --project <directory> --input-file <json>
 rdsh-dashboard cost-ledger inspect --project <directory>
+rdsh-dashboard budget policy|usage --project <directory> --input-file <json>
+rdsh-dashboard budget inspect --project <directory>
+rdsh-dashboard session-ledger start|resume --budget-guard --worker-id <id> --project <directory> --executable <original-dsh> [--entrypoint <bin.js>] [--run-id <id>]
+rdsh-dashboard reply-consumer once|serve --budget-guard --worker-id <id> --project <directory> --run-id <id> --executable <original-dsh> [--entrypoint <bin.js>]
 
 Project mode: project metrics, tasks, questions, human feedback, and /mcp.
 Harness mode: a separate managed DeepSeek Harness Web UI and QR landing page.
@@ -103,6 +108,8 @@ const { values, positionals } = parseArgs({
     "command-id": { type: "string" },
     "consumer-id": { type: "string" },
     "input-file": { type: "string" },
+    "budget-guard": { type: "boolean" },
+    "worker-id": { type: "string" },
     help: { type: "boolean", short: "h" },
   },
 });
@@ -150,6 +157,20 @@ async function localJson(file) {
 }
 try {
   const command = positionals[0];
+  if (
+    values["budget-guard"] !== undefined ||
+    values["worker-id"] !== undefined
+  ) {
+    const permitted =
+      (command === "session-ledger" &&
+        ["start", "resume"].includes(positionals[1])) ||
+      (command === "reply-consumer" &&
+        ["once", "serve"].includes(positionals[1]));
+    if (!permitted || !values["budget-guard"] || !values["worker-id"])
+      throw new Error(
+        "Budget enforcement requires --budget-guard and --worker-id on session-ledger start/resume or reply-consumer once/serve",
+      );
+  }
   if (
     command !== "retry-history" &&
     !values.retry &&
@@ -221,6 +242,33 @@ try {
         2,
       ),
     );
+  } else if (command === "budget") {
+    const action = positionals[1];
+    const allowed = new Set(["project", "input-file", "help"]);
+    if (
+      positionals.length !== 2 ||
+      !["policy", "usage", "inspect"].includes(action) ||
+      Object.keys(values).some((key) => !allowed.has(key)) ||
+      (action === "inspect"
+        ? values["input-file"] !== undefined
+        : !values["input-file"])
+    )
+      throw new Error(
+        "Budget policy/usage requires --input-file; inspect is read only",
+      );
+    console.log(
+      JSON.stringify(
+        await budgetRequest(
+          await identity(values.project || process.cwd()),
+          action,
+          action === "inspect"
+            ? undefined
+            : await localJson(values["input-file"]),
+        ),
+        null,
+        2,
+      ),
+    );
   } else if (command === "instruction") {
     const action = positionals[1],
       allowed = new Set(["project", "consumer-id", "input-file", "help"]);
@@ -252,6 +300,8 @@ try {
       "executable",
       "entrypoint",
       "help",
+      "budget-guard",
+      "worker-id",
     ]);
     if (
       positionals.length !== 2 ||
@@ -289,6 +339,9 @@ try {
       const attached = await attachRecordedSession({
         ledger,
         run_id: values["run-id"],
+        budget: values["budget-guard"]
+          ? { worker_id: values["worker-id"] }
+          : null,
         command: values.executable
           ? [
               values.executable,
@@ -670,6 +723,9 @@ try {
       const attached = await attachRecordedSession({
         ...options,
         run_id: action === "resume" ? values["run-id"] : null,
+        budget: values["budget-guard"]
+          ? { worker_id: values["worker-id"] }
+          : null,
         requirements: values.requirements
           ? await readRequirements(values.requirements)
           : null,

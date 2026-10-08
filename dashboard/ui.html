@@ -259,6 +259,17 @@
         font-size: 24px;
         overflow-wrap: anywhere;
       }
+      #budget-admission .budget-grid {
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+      }
+      #budget-admission p,
+      #budget-admission h3 {
+        overflow-wrap: anywhere;
+      }
+      #budget-admission .value {
+        overflow-wrap: anywhere;
+        font-size: clamp(1.4rem, 3vw, 2rem);
+      }
       #cost-ledger p,
       #cost-ledger h3 {
         overflow-wrap: anywhere;
@@ -788,6 +799,7 @@
           aria-labelledby="pending-heading"
           aria-describedby="pending-note"
         ></div>
+        <section id="budget-admission" aria-label="予算制御"></section>
         <details class="fold" id="metrics-detail">
           <summary>プロジェクト全体の数値</summary>
           <h2 id="metrics-heading" tabindex="-1">数値の詳細</h2>

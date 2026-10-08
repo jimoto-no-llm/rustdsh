@@ -4,6 +4,7 @@ import { renderOverview } from "./project-overview.mjs";
 import { renderConnectionDiagnostics } from "./connection-diagnostics-ui.mjs";
 import { createInstructionPanel } from "./instruction-queue-ui.mjs";
 import { createCostPanel } from "./cost-ledger-ui.mjs";
+import { renderBudget } from "./budget-ui.mjs";
 
 const $ = (id) => document.getElementById(id);
 const base = location.pathname.startsWith("/_rdsh") ? "/_rdsh/" : "/";
@@ -179,6 +180,7 @@ function render(state) {
   latestState = state;
   renderInstructions(state);
   renderCosts(state);
+  renderBudget($("budget-admission"), state, node);
   updateOverview(state);
   const m = state.metrics,
     done = state.tasks.filter((task) => task.status === "done").length,

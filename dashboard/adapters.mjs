@@ -94,6 +94,7 @@ class CliAdapter extends EventEmitter {
     requestTimeout = 15000,
     stopTimeout = 3000,
     onOwnedSpawn = null,
+    patch = null,
     owner_id,
     onStopStage = async () => {},
   } = {}) {
@@ -110,6 +111,13 @@ class CliAdapter extends EventEmitter {
       throw new AdapterError("invalid_command");
     if (!/^[a-zA-Z0-9_-]{1,80}$/.test(profile))
       throw new AdapterError("invalid_profile");
+    if (
+      patch !== null &&
+      (typeof patch !== "string" ||
+        !path.isAbsolute(patch) ||
+        patch.includes("\0"))
+    )
+      throw new AdapterError("invalid_patch");
     for (const value of [requestTimeout, stopTimeout])
       if (!Number.isInteger(value) || value < 50 || value > 600000)
         throw new AdapterError("invalid_timeout");
@@ -120,6 +128,7 @@ class CliAdapter extends EventEmitter {
     this.cwd = cwd;
     this.env = { ...env };
     this.profile = profile;
+    this.patch = patch;
     this.requestTimeout = requestTimeout;
     this.stopTimeout = stopTimeout;
     this.onOwnedSpawn = onOwnedSpawn;
@@ -184,6 +193,18 @@ class CliAdapter extends EventEmitter {
         }),
       ),
       usage_scope: "context_occupancy_tokens; not billable usage or cost",
+      budget_enforcement: {
+        supported: Boolean(
+          ready && this.nativeBudgetGuard?.status === "guard_registered",
+        ),
+        status:
+          ready && this.nativeBudgetGuard?.status === "guard_registered"
+            ? "guard_registered"
+            : "display_only",
+        job_id: this.nativeBudgetGuard?.job_id || null,
+        boundary:
+          "opt_in_native_llm_stream_and_attachment_launch; not_unwrapped_CLIs",
+      },
       interrupt_ack:
         "notification sent; confirmed only by cancelled prompt result",
       stop_scope: this.ownedScope?.state ?? null,
@@ -215,7 +236,7 @@ class CliAdapter extends EventEmitter {
         kill: {
           supported: Boolean(
             this.ownedScope &&
-              ["running", "stopping"].includes(this.ownedScope.state.status),
+            ["running", "stopping"].includes(this.ownedScope.state.status),
           ),
           method: this.ownedScope?.descriptor.kind ?? null,
           deadline_ms: this.stopTimeout,
@@ -331,7 +352,12 @@ class CliAdapter extends EventEmitter {
     // ACP is a shipped DSH profile; --from-default-profile is for custom targets.
     this.launchAttempted = true;
     this.ownedScope = await spawnOwnedProcess({
-      command: [...this.command, "--profile", this.profile],
+      command: [
+        ...this.command,
+        "--profile",
+        this.profile,
+        ...(this.patch === null ? [] : ["--patch", this.patch]),
+      ],
       cwd: this.cwd,
       env: this.env,
       owner_id: this.owner_id,

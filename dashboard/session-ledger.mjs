@@ -12,6 +12,7 @@ import { RunHistory, HistoryError } from "./run-history.mjs";
 import { readProcessIdentity } from "./process-identity.mjs";
 import { trackAdapter } from "./tracked-adapter.mjs";
 import { ModelRouting } from "./model-routing.mjs";
+import { prepareBudgetAttachment } from "./budget-client.mjs";
 
 const exec = promisify(execFile);
 const scopeKeys = [
@@ -455,6 +456,7 @@ export async function attachRecordedSession({
   stopTimeout,
   requirements = null,
   verifyAuth = false,
+  budget = null,
 } = {}) {
   env = { ...env };
   if (Array.isArray(command)) command = [...command];
@@ -514,13 +516,30 @@ export async function attachRecordedSession({
         throw new HistoryError("run_process_unconfirmed");
     }
   }
-  await history.register(record.run_id, record.cli_session_id);
-  const commandId = await history.recordCommand(
-    record.run_id,
-    run_id === null ? "start" : "resume",
-  );
-  await history.transition(record.run_id, "starting", "request_recorded");
-  await history.commandPhase(commandId, "dispatched");
+  const budgetGuard =
+    budget === null
+      ? null
+      : await prepareBudgetAttachment(
+          ledger.project,
+          record,
+          budget,
+          command,
+          env,
+        );
+  if (budgetGuard) env = budgetGuard.env;
+  let commandId;
+  try {
+    await history.register(record.run_id, record.cli_session_id);
+    commandId = await history.recordCommand(
+      record.run_id,
+      run_id === null ? "start" : "resume",
+    );
+    await history.transition(record.run_id, "starting", "request_recorded");
+    await history.commandPhase(commandId, "dispatched");
+  } catch (error) {
+    await budgetGuard?.close();
+    throw error;
+  }
   let processBound = false;
   const exitWrites = {
     pending: [],
@@ -529,36 +548,59 @@ export async function attachRecordedSession({
       await Promise.all(this.pending);
     },
   };
-  const adapter = createCliAdapter({
-    cli: record.cli,
-    command,
-    cwd: record.cwd,
-    env,
-    requestTimeout,
-    stopTimeout,
-    owner_id: history.owner_id,
-    onStopStage: async (stage) => {
+  let adapter;
+  try {
+    adapter = createCliAdapter({
+      cli: record.cli,
+      command,
+      cwd: record.cwd,
+      env,
+      patch: budgetGuard?.patch || null,
+      requestTimeout,
+      stopTimeout,
+      owner_id: history.owner_id,
+      onStopStage: async (stage) => {
+        try {
+          await history.stopStage(record.run_id, stage);
+        } catch (error) {
+          exitWrites.error ||= error;
+        }
+      },
+      onOwnedSpawn: async (pid, scope) => {
+        await history.bindScope(record.run_id, scope);
+        const observed = scope.root_identity
+          ? { status: "observed", identity: scope.root_identity }
+          : await readProcessIdentity(pid);
+        await history.bindProcess(
+          record.run_id,
+          observed.status === "observed" ? observed.identity : null,
+          pid,
+        );
+        processBound = true;
+        if (adapter.stopped) await history.processExited(record.run_id);
+      },
+    });
+  } catch (error) {
+    await budgetGuard?.close();
+    throw error;
+  }
+  if (budgetGuard) {
+    const originalStop = adapter.stop.bind(adapter);
+    adapter.stop = async () => {
       try {
-        await history.stopStage(record.run_id, stage);
-      } catch (error) {
-        exitWrites.error ||= error;
+        return await originalStop();
+      } finally {
+        await budgetGuard.close();
       }
-    },
-    onOwnedSpawn: async (pid, scope) => {
-      await history.bindScope(record.run_id, scope);
-      const observed = scope.root_identity
-        ? { status: "observed", identity: scope.root_identity }
-        : await readProcessIdentity(pid);
-      await history.bindProcess(
-        record.run_id,
-        observed.status === "observed" ? observed.identity : null,
-        pid,
-      );
-      processBound = true;
-      if (adapter.stopped) await history.processExited(record.run_id);
-    },
-  });
+    };
+  }
   adapter.on("event", (event) => {
+    if (event.type === "process_exit" && budgetGuard)
+      exitWrites.pending.push(
+        budgetGuard.close().catch((error) => {
+          exitWrites.error ||= error;
+        }),
+      );
     if (event.type === "process_exit" && processBound)
       exitWrites.pending.push(
         history.processExited(record.run_id).catch((error) => {
@@ -579,6 +621,7 @@ export async function attachRecordedSession({
         ? await adapter.start()
         : await adapter.resume(record.cli_session_id);
     await history.bindSession(record.run_id, attached.session_id);
+    if (budgetGuard) adapter.nativeBudgetGuard = await budgetGuard.ready();
     await history.commandPhase(commandId, "acknowledged", "session_attached");
     const confirmed = await ledger.confirm(
       record.run_id,
@@ -601,6 +644,7 @@ export async function attachRecordedSession({
         async (sessionId) => {
           if (sessionId !== confirmed.cli_session_id)
             throw new LedgerError("native_session_changed");
+          if (budgetGuard) await budgetGuard.ready();
           return ModelRouting.open(ledger.project).guard(confirmed, adapter);
         },
       ),

@@ -13,6 +13,7 @@ import { startHarness, proxyHarness, upgradeHarness } from "./harness.mjs";
 import { EventsHub } from "./webhooks.mjs";
 import { modernMcpHandler } from "./mcp2.mjs";
 import { AnswerApplicationServer } from "./answer-application-server.mjs";
+import { BudgetAdmissionServer } from "./budget-server.mjs";
 import {
   ConnectionObservations,
   connectionReport,
@@ -105,7 +106,9 @@ export async function startDashboard(options) {
       store.value,
       await applications.observations(),
       eventsHub.deliveries(),
+      budgets.observations(),
     );
+  const budgets = store ? new BudgetAdmissionServer(mutateBudget) : null;
   const modern = store
     ? modernMcpHandler(
         { getState: visibleState, mutate },
@@ -291,6 +294,17 @@ export async function startDashboard(options) {
     updateQueue = task.catch(() => {});
     return task;
   }
+  async function mutateBudget(operation, input) {
+    const task = updateQueue.then(async () => {
+      const result = await store.mutateBudget(operation, input);
+      for (const response of live)
+        response.write(`event: changed\ndata: ${store.value.revision}\n\n`);
+      for (const { mcp } of sessions.values()) void mcp.notify();
+      return result;
+    });
+    updateQueue = task.catch(() => {});
+    return task;
+  }
   const server = http.createServer(async (req, res) => {
     res.setHeader("cache-control", "no-store");
     res.setHeader("referrer-policy", "no-referrer");
@@ -362,6 +376,11 @@ export async function startDashboard(options) {
           (req.method === "POST" &&
             ["/api/replies/ack", "/api/replies/control"].includes(route)));
       const consumerToken = req.headers["x-rdsh-consumer-token"];
+      const budgetProducerRoute =
+        kind === "project" &&
+        req.method === "POST" &&
+        route?.startsWith("/api/budget/producer/");
+      const budgetToken = req.headers["x-rdsh-budget-token"];
       const publicAsset =
         kind === "project" &&
         req.method === "GET" &&
@@ -372,12 +391,14 @@ export async function startDashboard(options) {
           route === "/connection-diagnostics-ui.mjs" ||
           route === "/answer-applications-ui.mjs" ||
           route === "/instruction-queue-ui.mjs" ||
-          route === "/cost-ledger-ui.mjs");
+          route === "/cost-ledger-ui.mjs" ||
+          route === "/budget-ui.mjs");
       if (
         !publicAsset &&
         !adminAuthorized &&
         !mcpAuthorized &&
         !humanAuthorized &&
+        !(budgetProducerRoute && typeof budgetToken === "string") &&
         !(consumerRoute && typeof consumerToken === "string")
       )
         return json(res, 401, {
@@ -446,6 +467,7 @@ export async function startDashboard(options) {
           "/answer-applications-ui.mjs",
           "/instruction-queue-ui.mjs",
           "/cost-ledger-ui.mjs",
+          "/budget-ui.mjs",
         ].includes(route)
       ) {
         res.writeHead(200, {
@@ -486,6 +508,46 @@ export async function startDashboard(options) {
         return res.end(svg);
       }
       if (kind === "project") {
+        if (req.method === "POST" && route?.startsWith("/api/budget/")) {
+          if (
+            !["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(
+              req.socket.remoteAddress,
+            )
+          )
+            return json(res, 403, {
+              error: "Budget control requires loopback access",
+            });
+          const action = route.slice("/api/budget/".length);
+          const input = await readBody(req);
+          if (budgetProducerRoute)
+            return json(
+              res,
+              200,
+              await budgets.producer(
+                action.slice("producer/".length),
+                input,
+                budgetToken,
+              ),
+            );
+          if (!adminAuthorized)
+            return json(res, 403, {
+              error:
+                "Local administrator credential required for budget control",
+            });
+          if (action === "launch")
+            return json(res, 200, await budgets.launch(input));
+          if (action === "revoke")
+            return json(res, 200, await budgets.revoke(input));
+          if (action === "inspect")
+            return json(
+              res,
+              200,
+              (await visibleState()).budget_admission || null,
+            );
+          if (["policy", "usage"].includes(action))
+            return json(res, 200, await mutateBudget(action, input));
+          return json(res, 404, { error: "Unknown budget operation" });
+        }
         if (req.method === "GET" && route === "/api/instructions/context")
           return json(
             res,

@@ -1,5 +1,9 @@
 # Project dashboard and private Harness access
 
+[Budget admission control](../docs/BUDGET-CONTROL.md): soft warnings, hard guarded
+DSH job/model-call limits, durable parallel reservations and delayed usage holds.
+Native guard registration is required; ordinary/unsupported CLIs are display-only.
+
 [CLI adapter contract](../docs/CLI-ADAPTERS.md): version-checked DSH ACP
 start/resume/send/interrupt/stop/usage, explicit unsupported CLI capabilities,
 and isolated lifecycle smoke without provider credentials or model requests.
