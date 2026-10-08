@@ -18,6 +18,8 @@ cargo fmt --check
 cargo clippy --all-targets -- -D warnings
 cargo test --release
 cargo test --release --example benchmark_extended
+cargo test --release --example benchmark_models
+node --test tests/model_benchmark/fence.test.mjs
 sh tests/regress.sh
 (cd dashboard && npm ci && npm test)   # if you touched dashboard/
 # If UI or HTTP behavior changed, follow tests/e2e/README.md and run:

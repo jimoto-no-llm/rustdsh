@@ -17,7 +17,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-      - run: node --test tests/plugin-security.test.mjs tests/settings-client.test.mjs
+      - run: node --test tests/plugin-security.test.mjs tests/settings-client.test.mjs tests/model_benchmark/fence.test.mjs
 
   lint:
     runs-on: ubuntu-latest
@@ -50,6 +50,7 @@ jobs:
         run: command -v zstd || brew install zstd
       - run: cargo test
       - run: cargo test --example benchmark_extended
+      - run: cargo test --example benchmark_models
       - run: cargo build
       - if: matrix.regress
         shell: bash
