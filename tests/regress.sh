@@ -98,6 +98,33 @@ if HOME="$AB/home" DSH_HOME="$AB/dsh" $BIN auth --import >/dev/null 2>&1 && grep
 for t in "$FR"/latest/download/*.tar.gz; do printf "tampered" >> "$t"; done
 if RDSH_RELEASE_BASE="file://$FR" DSH_HOME="$FR/dsh" bash ./install.sh --from-release --prefix="$FR/bin-evil" >$FR/install-evil.log 2>&1; then echo "FAIL(output): tampered release refused"; exit 1; else ok "tampered release refused"; fi
 rm -rf $FR
+# sync-dsh.sh release self-update against a file:// release with npm/node shims.
+# The script runs from a copy (no tests/regress.sh or target/ next to it), so it
+# does not recurse into this suite.
+FS=/tmp/rdsh-fs-AA
+rm -rf $FS
+mkdir -p $FS/pkg $FS/rel/latest/download $FS/repo $FS/home/.local/bin $FS/npmroot/@deepseek-ai/dsh $FS/bin
+cp "$BIN" $FS/pkg/rdsh
+cp ./sync-dsh.sh $FS/repo/sync-dsh.sh
+for a in rdsh-linux-x64 rdsh-linux-x64-musl rdsh-macos-arm64 rdsh-macos-x64; do tar -czf "$FS/rel/latest/download/$a.tar.gz" -C $FS/pkg rdsh; (cd "$FS/rel/latest/download" && $SUM "$a.tar.gz" > "$a.tar.gz.sha256"); done
+printf '{"version":"1.0.0"}\n' > $FS/npmroot/@deepseek-ai/dsh/package.json
+printf '#!/bin/sh\ncase "$1" in root) echo "%s" ;; view) echo "[\\"1.0.0\\"]" ;; *) exit 1 ;; esac\n' "$FS/npmroot" > $FS/npm
+printf '#!/bin/sh\necho 1.0.0\n' > $FS/home/.local/bin/node
+chmod +x $FS/npm $FS/home/.local/bin/node
+fs_sync() { env -u RDSH_SYNC_FROM_SOURCE -u RDSH_SYNC_VERSION -u RDSH_MUSL HOME="$FS/home" NPM_BIN="$FS/npm" PREFIX_BIN="$1" RDSH_RELEASE_BASE="file://$FS/rel" sh $FS/repo/sync-dsh.sh > "$2" 2>&1; }
+fs_sync "$FS/bin" $FS/sync-ok.log
+if grep -q "checksum ok" $FS/sync-ok.log && grep -q "rdsh updated OK via release binary" $FS/sync-ok.log && "$FS/bin/rdsh" --version 2>/dev/null | grep -q "rdsh"; then ok "sync-dsh release update with valid sha256"; else echo "FAIL(output): sync-dsh release update with valid sha256"; tail -n 8 $FS/sync-ok.log; exit 1; fi
+for c in "$FS"/rel/latest/download/*.sha256; do printf '%064d  x.tar.gz\n' 0 > "$c"; done
+printf 'old\n' > $FS/bin/rdsh
+fs_sync "$FS/bin" $FS/sync-bad.log
+if grep -q "CHECKSUM MISMATCH" $FS/sync-bad.log && grep -q "binaries untouched" $FS/sync-bad.log && [ "$(cat $FS/bin/rdsh)" = "old" ]; then ok "sync-dsh refuses bad sha256"; else echo "FAIL(output): sync-dsh refuses bad sha256"; tail -n 8 $FS/sync-bad.log; exit 1; fi
+rm -f "$FS"/rel/latest/download/*.sha256
+fs_sync "$FS/bin" $FS/sync-none.log
+if grep -q "no checksum sidecar" $FS/sync-none.log && grep -q "binaries untouched" $FS/sync-none.log && [ "$(cat $FS/bin/rdsh)" = "old" ]; then ok "sync-dsh refuses missing sha256"; else echo "FAIL(output): sync-dsh refuses missing sha256"; tail -n 8 $FS/sync-none.log; exit 1; fi
+for a in rdsh-linux-x64 rdsh-linux-x64-musl rdsh-macos-arm64 rdsh-macos-x64; do : > "$FS/rel/latest/download/$a.tar.gz.sha256"; done
+fs_sync "$FS/bin" $FS/sync-empty.log
+if grep -q "empty checksum sidecar" $FS/sync-empty.log && grep -q "binaries untouched" $FS/sync-empty.log && [ "$(cat $FS/bin/rdsh)" = "old" ]; then ok "sync-dsh refuses empty sha256"; else echo "FAIL(output): sync-dsh refuses empty sha256"; tail -n 8 $FS/sync-empty.log; exit 1; fi
+rm -rf $FS
 SW=/tmp/rdsh-setupweb-AA
 mkdir -p $SW/home $SW/dsh
 HOME="$SW/home" DSH_HOME="$SW/dsh" $BIN setup --web --port 38082 >/dev/null 2>"$SW/setup.log" & SRV=$!
