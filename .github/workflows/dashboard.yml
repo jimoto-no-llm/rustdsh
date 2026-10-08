@@ -2,9 +2,9 @@ name: dashboard
 
 on:
   push:
-    paths: ["dashboard/**", ".github/workflows/dashboard.yml"]
+    paths: ["dashboard/**", "assets/**", ".github/workflows/dashboard.yml"]
   pull_request:
-    paths: ["dashboard/**", ".github/workflows/dashboard.yml"]
+    paths: ["dashboard/**", "assets/**", ".github/workflows/dashboard.yml"]
 
 permissions:
   contents: read
