@@ -1,11 +1,12 @@
 // CLI clients only: the agent loop, tools, persistence and profile boot stay in DSH.
 import { client, methods, PROTOCOL_VERSION } from "@agentclientprotocol/sdk";
 import { EventEmitter } from "node:events";
-import { spawn, execFile } from "node:child_process";
+import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
+import { spawnOwnedProcess } from "./process-scope.mjs";
 import {
   nativeSelection,
   selected,
@@ -70,7 +71,7 @@ export function adapterCatalog() {
                   resume: "session/resume",
                   send: "session/prompt",
                   interrupt: "session/cancel",
-                  stop: "session/close then owned process exit",
+                  stop: "cancel input, session/close and EOF, scoped kernel termination, descendant verification",
                   usage: "session/update:usage_update",
                 }[name],
         },
@@ -93,6 +94,8 @@ class CliAdapter extends EventEmitter {
     requestTimeout = 15000,
     stopTimeout = 3000,
     onOwnedSpawn = null,
+    owner_id,
+    onStopStage = async () => {},
   } = {}) {
     super();
     if (!adapterCatalog().some((a) => a.id === cli))
@@ -120,6 +123,8 @@ class CliAdapter extends EventEmitter {
     this.requestTimeout = requestTimeout;
     this.stopTimeout = stopTimeout;
     this.onOwnedSpawn = onOwnedSpawn;
+    this.owner_id = owner_id;
+    this.onStopStage = onStopStage;
     this.version = null;
     this.processVersion = null;
     this.health = cli === "dsh" ? "unverified" : "unsupported";
@@ -181,6 +186,45 @@ class CliAdapter extends EventEmitter {
       usage_scope: "context_occupancy_tokens; not billable usage or cost",
       interrupt_ack:
         "notification sent; confirmed only by cancelled prompt result",
+      stop_scope: this.ownedScope?.state ?? null,
+      stop_stages: {
+        input_interrupt: {
+          supported: Boolean(ready && !this.disabled.has("interrupt")),
+          method: "session/cancel",
+          acknowledgment: "cancelled_prompt_result_only",
+        },
+        graceful: {
+          supported: Boolean(ready),
+          session_close_advertised: object(
+            this.negotiated?.sessionCapabilities?.close,
+          ),
+          method: "session/close_if_advertised_then_stdin_eof",
+          deadline_ms: this.stopTimeout,
+        },
+        termination: {
+          supported: this.ownedScope?.descriptor.kind === "linux_cgroup_v2",
+          method:
+            this.ownedScope?.descriptor.kind === "linux_cgroup_v2"
+              ? "pidfd_sigterm"
+              : null,
+          reason:
+            this.ownedScope?.descriptor.kind === "windows_job"
+              ? "no_scoped_windows_term_signal"
+              : null,
+        },
+        kill: {
+          supported: Boolean(
+            this.ownedScope &&
+              ["running", "stopping"].includes(this.ownedScope.state.status),
+          ),
+          method: this.ownedScope?.descriptor.kind ?? null,
+          deadline_ms: this.stopTimeout,
+        },
+        verification: {
+          scope: "owned_kernel_group_and_descendants",
+          source: this.ownedScope?.descriptor.kind ?? null,
+        },
+      },
     };
   }
 
@@ -265,13 +309,7 @@ class CliAdapter extends EventEmitter {
     this.health = "incompatible";
     this.record("incompatible");
     this.connection?.close(new AdapterError("protocol_mismatch"));
-    if (this.child && !this.stopped) {
-      this.child.kill("SIGTERM");
-      this.killTimer = setTimeout(() => {
-        if (!this.stopped) this.child.kill("SIGKILL");
-      }, this.stopTimeout);
-      this.killTimer.unref();
-    }
+    if (this.ownedScope) void this.stop().catch(() => {});
   }
 
   async connect() {
@@ -291,17 +329,15 @@ class CliAdapter extends EventEmitter {
       throw new AdapterError(this.health, "start");
     this.processVersion = this.version;
     // ACP is a shipped DSH profile; --from-default-profile is for custom targets.
-    this.child = spawn(
-      this.command[0],
-      [...this.command.slice(1), "--profile", this.profile],
-      {
-        cwd: this.cwd,
-        env: this.env,
-        windowsHide: true,
-        shell: false,
-        stdio: ["pipe", "pipe", "pipe"],
-      },
-    );
+    this.launchAttempted = true;
+    this.ownedScope = await spawnOwnedProcess({
+      command: [...this.command, "--profile", this.profile],
+      cwd: this.cwd,
+      env: this.env,
+      owner_id: this.owner_id,
+      onStage: this.onStopStage,
+    });
+    this.child = this.ownedScope.child;
     // Never forward stderr or peer error strings; either can contain secrets.
     this.child.stderr.resume();
     this.child.stdin.on("error", () =>
@@ -321,13 +357,18 @@ class CliAdapter extends EventEmitter {
         this.record("process_exit", outcome);
         resolve(outcome);
       };
-      this.child.once("error", () =>
-        finish({ code: null, signal: null, error: "spawn_failed" }),
-      );
+      this.child.once("error", () => {
+        this.health = "ownership_monitor_lost";
+        this.connection?.close(new AdapterError("stop_unconfirmed"));
+        this.record("ownership_monitor_lost");
+      });
       this.child.once("exit", (code, signal) => finish({ code, signal }));
+      if (this.child.exitOutcome) finish(this.child.exitOutcome);
     });
     // A durable caller can bind the owned PID before the first protocol request.
-    if (this.onOwnedSpawn) await this.onOwnedSpawn(this.child.pid);
+    if (this.onOwnedSpawn)
+      await this.onOwnedSpawn(this.child.pid, this.ownedScope.descriptor);
+    await this.ownedScope.release();
     const requests = new Map();
     let buffer = Buffer.alloc(0);
     let controller;
@@ -766,9 +807,11 @@ class CliAdapter extends EventEmitter {
 
   async stop() {
     if (this.cli !== "dsh") throw new AdapterError("unsupported", "stop");
-    if (!this.child) return { status: "not_running", confirmed: true };
-    if (this.stopped)
-      return { status: "stopped", confirmed: true, ...this.exitOutcome };
+    if (!this.child) {
+      if (this.launchAttempted)
+        throw new AdapterError("stop_unconfirmed", "stop");
+      return { status: "not_running", confirmed: true };
+    }
     if (this.stoppingPromise) return this.stoppingPromise;
     this.stoppingPromise = this.finishStop();
     return this.stoppingPromise;
@@ -776,45 +819,55 @@ class CliAdapter extends EventEmitter {
 
   async finishStop() {
     this.stopping = true;
-    const wait = async () => {
-      let timer;
-      const result = await Promise.race([
-        this.exit,
-        new Promise((resolve) => {
-          timer = setTimeout(() => resolve(null), this.stopTimeout);
-        }),
-      ]);
-      clearTimeout(timer);
-      return result;
-    };
-    if (
-      this.health === "compatible" &&
-      object(this.negotiated?.sessionCapabilities?.close)
-    ) {
-      await Promise.allSettled(
-        [...this.sessions].map((sessionId) =>
-          this.request(
-            methods.agent.session.close,
-            { sessionId },
-            "stop",
-            Math.min(this.requestTimeout, this.stopTimeout),
-          ),
-        ),
-      );
-    }
-    this.child.stdin.end();
-    let outcome = await wait();
-    if (!outcome) {
-      this.child.kill("SIGTERM");
-      outcome = await wait();
-    }
-    if (!outcome) {
-      this.child.kill("SIGKILL");
-      outcome = await wait();
-    }
+    const scope = await this.ownedScope.stop({
+      gracefulTimeout: this.stopTimeout,
+      killTimeout: this.stopTimeout,
+      interrupt: async () => {
+        if (this.health !== "compatible" || this.disabled.has("interrupt"))
+          return {
+            status: "unsupported",
+            reason: "input_interrupt_unavailable",
+          };
+        for (const sessionId of this.prompts)
+          await this.connection.agent.notify(methods.agent.session.cancel, {
+            sessionId,
+          });
+        return {
+          status: "requested",
+          reason: this.prompts.size
+            ? "acp_cancel_notification_no_ack"
+            : "no_active_prompt",
+        };
+      },
+      graceful: async () => {
+        if (
+          this.health === "compatible" &&
+          object(this.negotiated?.sessionCapabilities?.close)
+        )
+          await Promise.allSettled(
+            [...this.sessions].map((sessionId) =>
+              this.request(
+                methods.agent.session.close,
+                { sessionId },
+                "stop",
+                Math.min(this.requestTimeout, this.stopTimeout),
+              ),
+            ),
+          );
+        return {
+          status: "requested",
+          reason: "session_close_if_advertised_and_stdin_eof",
+        };
+      },
+    });
     this.connection?.close();
-    if (!outcome) throw new AdapterError("stop_unconfirmed", "stop");
+    if (!scope.confirmed) throw new AdapterError("stop_unconfirmed", "stop");
+    this.stopped = true;
     if (this.health !== "incompatible") this.health = "stopped";
-    return this.record("stopped", { confirmed: true, ...outcome });
+    return this.record("stopped", {
+      confirmed: true,
+      ...this.exitOutcome,
+      scope,
+    });
   }
 }

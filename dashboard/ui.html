@@ -431,6 +431,19 @@
           HarnessのWeb画面を起動しています。プロジェクト別の指標・質問は、専用ダッシュボードで扱います。
         </div>
         <a id="harness-open" class="button">Harnessを開く</a>
+        <section class="card" aria-labelledby="managed-heading">
+          <h2 id="managed-heading">管理中の実行</h2>
+          <p id="managed-status" role="status" aria-live="polite">
+            所有範囲を確認中…
+          </p>
+          <p id="managed-remaining" class="sub"></p>
+          <details>
+            <summary>実行IDと停止履歴</summary>
+            <code id="managed-run"></code>
+            <ul id="managed-stages"></ul>
+          </details>
+          <button id="managed-stop" disabled>この実行を停止</button>
+        </section>
       </section>
       <div id="project-content" tabindex="-1">
         <!-- #42: 数値カードを開かなくても状態・判断要否だけ掴める一行要約。 -->

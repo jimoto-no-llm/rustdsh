@@ -64,7 +64,10 @@ export function trackAdapter(
     stopping = (async () => {
       let id,
         writeError = null;
-      if (!adapter.stopped) {
+      if (
+        !adapter.stopped ||
+        adapter.ownedScope?.state.status !== "exit_confirmed"
+      ) {
         try {
           id = await history.recordCommand(runId, "stop");
           await history.transition(runId, "stopping", "owned_stop_requested");
@@ -97,6 +100,7 @@ export function trackAdapter(
       }
       if (writeError) {
         const error = new HistoryError("history_unconfirmed_after_owned_stop");
+        error.cause = writeError;
         error.process_result = result;
         throw error;
       }

@@ -1,5 +1,7 @@
 import fs from "node:fs";
 import readline from "node:readline";
+import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
 const fixture = JSON.parse(
   fs.readFileSync(
     new URL("./dsh-acp-0.2.0-rc.2.json", import.meta.url),
@@ -29,6 +31,28 @@ if (process.argv.includes("--version")) {
     process.exit(0);
   }
 } else {
+  if (mode === "descendants") {
+    const trace = process.env.RDSH_ADAPTER_FIXTURE_CHILD_TRACE;
+    const child = spawn(
+      process.execPath,
+      [
+        fileURLToPath(new URL("./owned-tree.mjs", import.meta.url)),
+        "child",
+        "stubborn",
+        trace,
+      ],
+      { detached: true, windowsHide: true, stdio: "ignore" },
+    );
+    child.unref();
+    for (let i = 0; i < 200; i++) {
+      if (
+        fs.existsSync(trace) &&
+        fs.readFileSync(trace, "utf8").includes('"grandchild"')
+      )
+        break;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+  }
   if (
     JSON.stringify(process.argv.slice(2)) !==
     JSON.stringify(["--profile", "acp"])

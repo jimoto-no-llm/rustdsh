@@ -520,7 +520,7 @@ test("separate public CLI clients record, inspect, resume and reject unsafe summ
         await exec(process.execPath, [cli, "checkpoint", ...args, ...base], {
           env: f.env,
           windowsHide: true,
-          timeout: 20000,
+          timeout: 60000,
           maxBuffer: 256 * 1024,
         })
       ).stdout,

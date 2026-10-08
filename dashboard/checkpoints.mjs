@@ -473,6 +473,11 @@ export class Checkpoints {
         reasons.push("unconfirmed_control_operation");
       const status = current.inspection.process_observation.status;
       if (
+        current.run.scope &&
+        current.inspection.scope_observation.status !== "exit_confirmed"
+      )
+        reasons.push("owned_descendants_unconfirmed");
+      if (
         current.run.process &&
         !["gone", "pid_reused", "exit_confirmed", "absence_observed"].includes(
           status,

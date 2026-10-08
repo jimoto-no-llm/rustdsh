@@ -133,8 +133,11 @@ export async function startDashboard(options) {
   };
   function browserAuthorized(req, url, route) {
     if (kind === "project")
-      return equal(req.headers["x-rdsh-browser-token"], browserToken) ||
-        (route === "/api/live" && equal(url.searchParams.get("key"), browserToken));
+      return (
+        equal(req.headers["x-rdsh-browser-token"], browserToken) ||
+        (route === "/api/live" &&
+          equal(url.searchParams.get("key"), browserToken))
+      );
     return (req.headers.cookie || "").split(";").some((item) => {
       const [name, value] = item.trim().split("=");
       return name === cookieName && equal(value, browserToken);
@@ -234,7 +237,11 @@ export async function startDashboard(options) {
       if (!trusted(req))
         return json(res, 403, { error: "Untrusted host or origin" });
       const url = new URL(req.url, localUrl);
-      if (kind === "harness" && req.method === "GET" && equal(url.searchParams.get("rdsh_dashboard_key"), browserToken)) {
+      if (
+        kind === "harness" &&
+        req.method === "GET" &&
+        equal(url.searchParams.get("rdsh_dashboard_key"), browserToken)
+      ) {
         url.searchParams.delete("rdsh_dashboard_key");
         const secure =
           share.url && req.headers.host === new URL(share.url).host
@@ -250,27 +257,71 @@ export async function startDashboard(options) {
       const route = url.pathname.startsWith(prefix + "/")
         ? url.pathname.slice(prefix.length)
         : null;
-      const adminAuthorized = equal(req.headers.authorization, `Bearer ${token}`);
-      const agentRoute = route === "/mcp" || route === "/api/state" ||
-        (req.method === "POST" && ["metrics", "task", "question", "event"].some((operation) => route === `/api/update/${operation}`));
-      const mcpAuthorized = kind === "project" && agentRoute && equal(req.headers.authorization, `Bearer ${mcpToken}`);
+      const adminAuthorized = equal(
+        req.headers.authorization,
+        `Bearer ${token}`,
+      );
+      const agentRoute =
+        route === "/mcp" ||
+        route === "/api/state" ||
+        (req.method === "POST" &&
+          ["metrics", "task", "question", "event"].some(
+            (operation) => route === `/api/update/${operation}`,
+          ));
+      const mcpAuthorized =
+        kind === "project" &&
+        agentRoute &&
+        equal(req.headers.authorization, `Bearer ${mcpToken}`);
       const humanAuthorized = browserAuthorized(req, url, route);
-      const publicAsset = kind === "project" && req.method === "GET" && (route === "/" || route === "/app.mjs");
-      if (!publicAsset && !adminAuthorized && !mcpAuthorized && !humanAuthorized)
+      const publicAsset =
+        kind === "project" &&
+        req.method === "GET" &&
+        (route === "/" || route === "/app.mjs");
+      if (
+        !publicAsset &&
+        !adminAuthorized &&
+        !mcpAuthorized &&
+        !humanAuthorized
+      )
         return json(res, 401, {
           error:
             "Open this dashboard through rdsh-dashboard open or its QR code",
         });
       if (closing) return json(res, 503, { error: "Dashboard is stopping" });
+      if (req.method === "GET" && route === "/api/managed-process")
+        return json(
+          res,
+          200,
+          harness
+            ? await harness.inspect()
+            : { run_id: null, scope: null, stages: [] },
+        );
+      if (req.method === "POST" && route === "/api/managed-stop") {
+        if (!harness)
+          return json(res, 409, { error: "No owned Harness process" });
+        if (!adminAuthorized && !humanAuthorized)
+          return json(res, 401, {
+            error: "Human browser or administrator required",
+          });
+        void harness.stop().catch(() => {});
+        return json(res, 202, { requested: true, run_id: harness.run_id });
+      }
       if (req.method === "POST" && route === "/api/stop") {
         if (!adminAuthorized)
           return json(res, 401, {
             error: "Administrator bearer token required",
           });
+        const result = harness ? await harness.stop() : null;
+        if (result && !result.confirmed)
+          return json(res, 409, {
+            error:
+              "Managed descendants are unverified; dashboard remains available",
+            managed_stop: result,
+          });
         res.once("finish", () => {
-          void close();
+          void close().catch(() => {});
         });
-        return json(res, 200, { stopping: true });
+        return json(res, 200, { stopping: true, managed_stop: result });
       }
       if (
         req.method === "POST" &&
@@ -324,13 +375,15 @@ export async function startDashboard(options) {
           return json(res, 200, publicState(store.value));
         if (req.method === "POST" && route?.startsWith("/api/update/")) {
           const operation = route.slice("/api/update/".length);
-          if (operation === "answer" ? !humanAuthorized : !(mcpAuthorized || adminAuthorized))
-            return json(res, 403, { error: "This credential cannot perform that operation" });
-          return json(
-            res,
-            200,
-            await mutate(operation, await readBody(req)),
-          );
+          if (
+            operation === "answer"
+              ? !humanAuthorized
+              : !(mcpAuthorized || adminAuthorized)
+          )
+            return json(res, 403, {
+              error: "This credential cannot perform that operation",
+            });
+          return json(res, 200, await mutate(operation, await readBody(req)));
         }
         if (req.method === "GET" && route === "/api/live") {
           res.writeHead(200, {
@@ -393,7 +446,8 @@ export async function startDashboard(options) {
     socket.once("close", () => sockets.delete(socket));
   });
   server.on("upgrade", (req, socket, head) => {
-    const authorizedUpgrade = equal(req.headers.authorization, `Bearer ${token}`) ||
+    const authorizedUpgrade =
+      equal(req.headers.authorization, `Bearer ${token}`) ||
       (kind === "harness" && browserAuthorized(req, null, null));
     if (kind !== "harness" || !harness || !trusted(req) || !authorizedUpgrade) {
       socket.write("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
@@ -404,6 +458,10 @@ export async function startDashboard(options) {
   });
   async function close() {
     if (closing) return;
+    if (harness && !(await harness.stop()).confirmed)
+      throw new Error(
+        "Owned Harness exit unverified; dashboard remains available",
+      );
     closing = true;
     if (deliveryTimer) clearInterval(deliveryTimer);
     for (const response of live) response.end();
@@ -412,7 +470,6 @@ export async function startDashboard(options) {
     await eventsHub?.queue;
     for (const socket of sockets) socket.destroy();
     await new Promise((resolve) => server.close(resolve));
-    if (harness) await harness.stop();
     await fs.unlink(lockFile).catch(() => {});
   }
   try {
@@ -421,7 +478,11 @@ export async function startDashboard(options) {
       server.listen(port, "127.0.0.1", resolve);
     });
     if (kind === "harness")
-      harness = await startHarness(options.harnessPort || 3081, port);
+      harness = await startHarness(options.harnessPort || 3081, port, {
+        ...options.harnessOptions,
+        project: { id: "managed-harness", directory },
+      });
+    if (harness && options.observeHarness) options.observeHarness(harness);
     await refreshShare();
   } catch (e) {
     await close();

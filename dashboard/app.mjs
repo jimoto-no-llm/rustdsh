@@ -1,8 +1,11 @@
 const $ = (id) => document.getElementById(id);
 const base = location.pathname.startsWith("/_rdsh") ? "/_rdsh/" : "/";
-const browserToken = base === "/"
-  ? new URLSearchParams(location.hash.slice(1)).get("key") || sessionStorage.getItem("rdsh_project_browser_token") || ""
-  : "";
+const browserToken =
+  base === "/"
+    ? new URLSearchParams(location.hash.slice(1)).get("key") ||
+      sessionStorage.getItem("rdsh_project_browser_token") ||
+      ""
+    : "";
 if (browserToken) {
   sessionStorage.setItem("rdsh_project_browser_token", browserToken);
   history.replaceState(null, "", location.pathname + location.search);
@@ -418,12 +421,83 @@ try {
     $("connection").textContent = "接続済み · Harness専用の入口";
     $("share").hidden = false;
     $("share-toggle").setAttribute("aria-expanded", "true");
+    let stopRequested = false;
+    const refreshManaged = async () => {
+      try {
+        const value = await api("managed-process"),
+          scope = value.scope;
+        const labels = {
+          running: "実行中",
+          stopping: "停止要求中 · 子孫の終了を確認しています",
+          exit_confirmed: "終了確認済み · 所有する子孫プロセスは0件",
+          unverifiable: "終了確認不能 · 停止済みとは確認できません",
+        };
+        $("managed-status").textContent =
+          labels[scope?.status] ?? "所有する実行はありません";
+        $("managed-remaining").textContent = scope
+          ? `残存プロセス ${scope.remaining_count ?? "未確認"} 件` +
+            (scope.remaining_pids.length
+              ? ` · PID ${scope.remaining_pids.join(", ")}`
+              : "") +
+            (scope.members_truncated ? " · 一覧は一部または未確認" : "") +
+            (scope.confirmed && !scope.resources_released
+              ? " · 管理用の資源解放は未確認"
+              : "")
+          : "";
+        $("managed-run").textContent = value.run_id ?? "";
+        const names = {
+          input_interrupt: "入力中断",
+          graceful: "協調終了",
+          termination: "終了要求",
+          kill: "期限後の強制終了",
+          verification: "子孫の終了確認",
+        };
+        const results = {
+          requested: "要求送信",
+          unsupported: "非対応",
+          running: "残存あり",
+          exit_confirmed: "終了確認済み",
+          unverifiable: "確認不能",
+        };
+        $("managed-stages").replaceChildren(
+          ...value.stages.map((stage) =>
+            node(
+              "li",
+              `${names[stage.stage]} · ${stage.phase === "request" ? "要求を記録" : results[stage.status]}`,
+            ),
+          ),
+        );
+        $("managed-stop").disabled =
+          stopRequested || scope?.status !== "running";
+        $("harness-open").hidden = scope?.status === "exit_confirmed";
+      } catch {
+        $("managed-status").textContent =
+          "監視に接続できません · 終了は未確認です";
+        $("managed-stop").disabled = true;
+      }
+    };
+    $("managed-stop").onclick = async () => {
+      stopRequested = true;
+      $("managed-stop").disabled = true;
+      $("managed-status").textContent =
+        "停止要求中 · 子孫の終了を確認しています";
+      try {
+        await api("managed-stop", {});
+      } catch (error) {
+        $("managed-status").textContent = error.message;
+      }
+      await refreshManaged();
+    };
+    await refreshManaged();
+    setInterval(refreshManaged, 500);
   } else {
     $("title").textContent = config.project.name;
     $("location").textContent = config.project.root;
     document.title = config.project.name + " · Project dashboard";
     await refreshState();
-    const source = new EventSource(base + "api/live?key=" + encodeURIComponent(browserToken));
+    const source = new EventSource(
+      base + "api/live?key=" + encodeURIComponent(browserToken),
+    );
     source.addEventListener("changed", refreshState);
     source.onerror = () => {
       $("connection").textContent = "再接続中…";

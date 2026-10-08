@@ -176,6 +176,79 @@ function validateData(type, data) {
     );
   else if (type === "process_exit")
     check(exact(data, ["owner_id"]) && uuid(data.owner_id, "owner"));
+  else if (type === "scope_intent")
+    check(exact(data, ["owner_id"]) && uuid(data.owner_id, "owner"));
+  else if (type === "scope_bound")
+    check(
+      exact(data, [
+        "owner_id",
+        "kind",
+        "kernel_id",
+        "root_identity",
+        "root_pid",
+      ]) &&
+        uuid(data.owner_id, "owner") &&
+        ["linux_cgroup_v2", "windows_job"].includes(data.kind) &&
+        typeof data.kernel_id === "string" &&
+        /^[a-z0-9_-]{1,80}$/.test(data.kernel_id) &&
+        Number.isSafeInteger(data.root_pid) &&
+        data.root_pid > 0 &&
+        data.root_pid <= 2147483647 &&
+        (data.root_identity === null ||
+          (validProcessIdentity(data.root_identity) &&
+            data.root_identity.pid === data.root_pid)),
+    );
+  else if (type === "stop_stage")
+    check(
+      exact(data, [
+        "owner_id",
+        "stage",
+        "phase",
+        "status",
+        "reason",
+        "deadline_ms",
+        "observed_at",
+        "remaining_pids",
+        "remaining_count",
+      ]) &&
+        uuid(data.owner_id, "owner") &&
+        [
+          "input_interrupt",
+          "graceful",
+          "termination",
+          "kill",
+          "verification",
+        ].includes(data.stage) &&
+        ["request", "result"].includes(data.phase) &&
+        [
+          "requested",
+          "unsupported",
+          "running",
+          "exit_confirmed",
+          "unverifiable",
+        ].includes(data.status) &&
+        (data.reason === null ||
+          (typeof data.reason === "string" &&
+            /^[a-z_]{1,100}$/.test(data.reason))) &&
+        (data.deadline_ms === null ||
+          (Number.isInteger(data.deadline_ms) &&
+            data.deadline_ms >= 50 &&
+            data.deadline_ms <= 600000)) &&
+        time(data.observed_at) &&
+        Array.isArray(data.remaining_pids) &&
+        data.remaining_pids.length <= 256 &&
+        data.remaining_pids.every(
+          (p) => Number.isSafeInteger(p) && p > 0 && p <= 2147483647,
+        ) &&
+        (data.remaining_count === null ||
+          (Number.isSafeInteger(data.remaining_count) &&
+            data.remaining_count >= data.remaining_pids.length)) &&
+        (data.status !== "exit_confirmed" ||
+          (data.stage === "verification" &&
+            data.phase === "result" &&
+            data.remaining_count === 0 &&
+            data.remaining_pids.length === 0)),
+    );
   else if (type === "process_absent")
     check(
       exact(data, ["identity", "observation"]) &&
@@ -208,6 +281,7 @@ function apply(state, event) {
       last_observed_at: event.observed_at,
       reason: "registered",
       process: null,
+      scope: null,
       commands: [],
       rejected_transitions: [],
       revision: event.sequence,
@@ -235,6 +309,30 @@ function apply(state, event) {
           run.native_session_id === data.native_session_id,
       );
       run.native_session_id = data.native_session_id;
+    } else if (type === "scope_intent") {
+      check(!run.scope || run.scope.status === "exit_confirmed");
+      run.scope = {
+        owner_id: data.owner_id,
+        status: "unverifiable",
+        descriptor: null,
+        stages: [],
+      };
+    } else if (type === "scope_bound") {
+      check(
+        run.scope?.owner_id === data.owner_id && run.scope.descriptor === null,
+      );
+      run.scope.descriptor = structuredClone(data);
+      run.scope.status = "running";
+    } else if (type === "stop_stage") {
+      check(run.scope?.owner_id === data.owner_id);
+      run.scope.stages.push(structuredClone(data));
+      run.scope.last_observed_at = data.observed_at;
+      run.scope.status =
+        data.stage === "verification" ? data.status : "stopping";
+      if (data.stage === "verification") {
+        run.scope.remaining_pids = [...data.remaining_pids];
+        run.scope.remaining_count = data.remaining_count;
+      }
     } else if (type === "process_bound") {
       check(
         !run.process ||
@@ -517,6 +615,33 @@ export class RunHistory {
       append(id, "process_bound", { identity, pid, owner_id: this.owner_id });
     });
   }
+  async scopeIntent(id) {
+    return this.mutate((state, append) => {
+      append(id, "scope_intent", { owner_id: this.owner_id });
+    });
+  }
+  async bindScope(id, descriptor) {
+    return this.mutate((state, append) => {
+      append(id, "scope_bound", descriptor);
+    });
+  }
+  async stopStage(id, stage) {
+    return this.mutate((state, append) => {
+      append(id, "stop_stage", stage);
+      const run = state.runs.get(id);
+      if (
+        stage.stage === "verification" &&
+        stage.status === "exit_confirmed" &&
+        !terminal(run.state) &&
+        run.state !== "disconnected"
+      )
+        append(id, "transition", {
+          from: run.state,
+          to: "disconnected",
+          reason: "owned_exit_confirmed",
+        });
+    });
+  }
   async bindSession(id, native_session_id) {
     check(
       native_session_id !== null && nativeId(native_session_id),
@@ -560,7 +685,11 @@ export class RunHistory {
       check(run?.process?.owner_id === this.owner_id, "process_owner_mismatch");
       if (run.process.status !== "exit_confirmed")
         append(id, "process_exit", { owner_id: this.owner_id });
-      if (!terminal(run.state) && run.state !== "disconnected")
+      if (
+        (!run.scope || run.scope.status === "exit_confirmed") &&
+        !terminal(run.state) &&
+        run.state !== "disconnected"
+      )
         append(id, "transition", {
           from: run.state,
           to: "disconnected",
@@ -656,6 +785,21 @@ export class RunHistory {
     const lock = await this.lockObservation();
     return {
       ...structuredClone(run),
+      scope_observation: run.scope
+        ? {
+            status:
+              run.scope.status === "exit_confirmed"
+                ? "exit_confirmed"
+                : "unverifiable",
+            last_observed_at: run.scope.last_observed_at ?? null,
+            kernel_handles_reconstructed: false,
+            stop_authority: false,
+            reason:
+              run.scope.status === "exit_confirmed"
+                ? "recorded_kernel_group_empty"
+                : "live_owner_required",
+          }
+        : null,
       recorded_state: run.state,
       state,
       state_basis: terminal(run.state)

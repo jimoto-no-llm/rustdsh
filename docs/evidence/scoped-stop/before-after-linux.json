@@ -1,0 +1,23 @@
+{
+  "observed_at": "2026-10-05T23:04:10.861Z",
+  "baseline_sha": "ccd60824a255fc19a1bb8645a93b71b7689b150d",
+  "source": "baseline_adapter_entrypoint_current_pinned_dependencies",
+  "os": "linux",
+  "node": "v24.21.0",
+  "results": [
+    {
+      "phase": "before",
+      "root_stop_confirmed": true,
+      "descendant_heartbeats_continue": true,
+      "remaining_count": null,
+      "scope": "owned_root_only"
+    },
+    {
+      "phase": "after",
+      "root_stop_confirmed": true,
+      "descendant_heartbeats_continue": false,
+      "remaining_count": 0,
+      "scope": "linux_cgroup_v2"
+    }
+  ]
+}

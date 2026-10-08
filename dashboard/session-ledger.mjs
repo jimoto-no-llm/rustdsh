@@ -500,6 +500,14 @@ export async function attachRecordedSession({
     }
     if (previous?.process) {
       const status = previous.process_observation.status;
+      if (
+        previous.scope &&
+        previous.scope_observation.status !== "exit_confirmed" &&
+        ["gone", "pid_reused", "exit_confirmed", "absence_observed"].includes(
+          status,
+        )
+      )
+        throw new HistoryError("run_descendants_unconfirmed");
       if (["gone", "pid_reused"].includes(status))
         await history.confirmAbsent(record.run_id);
       else if (!["exit_confirmed", "absence_observed"].includes(status))
@@ -528,8 +536,19 @@ export async function attachRecordedSession({
     env,
     requestTimeout,
     stopTimeout,
-    onOwnedSpawn: async (pid) => {
-      const observed = await readProcessIdentity(pid);
+    owner_id: history.owner_id,
+    onStopStage: async (stage) => {
+      try {
+        await history.stopStage(record.run_id, stage);
+      } catch (error) {
+        exitWrites.error ||= error;
+      }
+    },
+    onOwnedSpawn: async (pid, scope) => {
+      await history.bindScope(record.run_id, scope);
+      const observed = scope.root_identity
+        ? { status: "observed", identity: scope.root_identity }
+        : await readProcessIdentity(pid);
       await history.bindProcess(
         record.run_id,
         observed.status === "observed" ? observed.identity : null,
@@ -554,6 +573,7 @@ export async function attachRecordedSession({
       report.detected_version !== record.cli_version
     )
       throw new LedgerError("cli_version_changed");
+    await history.scopeIntent(record.run_id);
     const attached =
       run_id === null
         ? await adapter.start()

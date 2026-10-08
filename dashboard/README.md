@@ -40,7 +40,7 @@ Keep Tailscale connected on the PC and phone and keep the dashboard running.
 Project 画面の QR 鍵はブラウザー専用です。画面は鍵を URL fragment から
 そのタブの sessionStorage に保存し、API へヘッダーで送ります。MCP 設定の鍵と
 管理用の鍵は別々で、MCP 鍵から人間の回答は登録できません。Harness は元の Web
-画面との互換性のため Cookie を使いますが、その鍵で MCP や管理 API は使えず、
+画面との互換性のため Cookie を使いますが、その鍵で MCP やダッシュボード終了 API は使えず、
 中継時には Harness 側へ渡しません。同じホスト上の別ポートにも Harness Cookie
 が届くため、そのホスト上で信頼できない Web サービスを開かないでください。
 
@@ -77,6 +77,12 @@ its distribution defaults to `FlashNext`, with `/root/.local/bin/rdsh-env` as th
 existing environment wrapper. Override those with `RDSH_WSL_DISTRO` and
 `RDSH_WSL_HARNESS_BIN` when your WSL installation uses different names/paths.
 It never stops an independently running Harness instance.
+
+Managed profile launches now use a per-run kernel ownership group. The Harness
+entry page can stop that owned run and distinguishes requesting stop, verified
+empty descendants and unverifiable results. The administrator-only dashboard
+shutdown stays separate. Windows-to-WSL mode also needs the matching Linux native
+prebuilt in this checkout; see [scoped-stop setup and limits](../docs/SCOPED-STOP.md).
 
 Use `--port 38100` to choose a project port, `--harness-port 3081` for its Harness
 backend, or `--no-tailscale` for local access only. Conflicting ports fail startup.

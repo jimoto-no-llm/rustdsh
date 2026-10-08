@@ -1,25 +1,19 @@
-import { spawn, execFile } from "node:child_process";
-import { promisify } from "node:util";
 import http from "node:http";
 import net from "node:net";
+import { randomUUID } from "node:crypto";
+import { spawnOwnedProcess } from "./process-scope.mjs";
+import { RunHistory } from "./run-history.mjs";
 
-export async function startHarness(port, frontPort) {
+export async function startHarness(port, frontPort, options = {}) {
   // A managed instance keeps the original Harness process token and its browser fence intact.
-  if (process.platform !== "win32")
+  if (process.platform !== "win32" && !options.command)
     throw new Error(
       "Harness mode currently requires Windows + WSL; project mode is portable",
     );
   const distro = process.env.RDSH_WSL_DISTRO || "FlashNext";
   const wrapper =
     process.env.RDSH_WSL_HARNESS_BIN || "/root/.local/bin/rdsh-env";
-  const arguments_ = [
-    "-d",
-    distro,
-    "--exec",
-    "bash",
-    "-c",
-    'printf "RDSH_MANAGED_PID=%s\\n" "$$"; wrapper="$1"; shift; exec "$wrapper" "$@"',
-    "rdsh-dashboard",
+  const command = options.command ?? [
     wrapper,
     "dsh",
     "--profile",
@@ -33,20 +27,90 @@ export async function startHarness(port, frontPort) {
     `127.0.0.1:${frontPort}`,
     `localhost:${frontPort}`,
   ];
-  const child = spawn("wsl.exe", arguments_, {
-    windowsHide: true,
-    stdio: ["ignore", "pipe", "pipe"],
+  const history = await RunHistory.open(options.project);
+  const run_id = "run_" + randomUUID();
+  await history.register(run_id);
+  await history.transition(run_id, "starting", "request_recorded");
+  await history.scopeIntent(run_id);
+  let historyError = null;
+  const stages = [];
+  const owned = await spawnOwnedProcess({
+    command,
+    cwd: options.cwd ?? "/root",
+    env: options.env,
+    wsl: options.wsl ?? (options.command ? null : distro),
+    wslNode: process.env.RDSH_WSL_NODE,
+    owner_id: history.owner_id,
+    onStage: async (stage) => {
+      stages.push(stage);
+      try {
+        await history.stopStage(run_id, stage);
+      } catch {
+        historyError = "history_write_failed";
+      }
+    },
+  });
+  const child = owned.child;
+  try {
+    await history.bindScope(run_id, owned.descriptor);
+    await history.bindProcess(
+      run_id,
+      owned.descriptor.root_identity,
+      child.pid,
+    );
+  } catch (error) {
+    await owned.stop();
+    throw error;
+  }
+  child.on("exit", () => {
+    void history.processExited(run_id).catch(() => {
+      historyError = "history_write_failed";
+    });
   });
   let output = "";
-  let linuxPid = null;
-  const stop = async () => {
-    if (linuxPid)
-      await promisify(execFile)(
-        "wsl.exe",
-        ["-d", distro, "--exec", "kill", "-TERM", String(linuxPid)],
-        { windowsHide: true, timeout: 5000 },
-      ).catch(() => {});
-    child.kill();
+  let stopping = null,
+    final = null;
+  const stop = () => {
+    stopping ??= (async () => {
+      const commandId = await history
+        .recordCommand(run_id, "stop")
+        .catch(() => {
+          historyError = "history_write_failed";
+        });
+      if (commandId) {
+        try {
+          await history.transition(run_id, "stopping", "owned_stop_requested");
+          await history.commandPhase(commandId, "dispatched");
+        } catch {
+          historyError = "history_write_failed";
+        }
+      }
+      const result = await owned.stop({
+        gracefulTimeout: options.stopTimeout ?? 3000,
+        killTimeout: options.stopTimeout ?? 3000,
+      });
+      if (commandId) {
+        try {
+          await history.commandPhase(
+            commandId,
+            result.confirmed ? "acknowledged" : "unknown",
+            result.confirmed ? "process_exit_confirmed" : null,
+          );
+        } catch {
+          historyError = "history_write_failed";
+        }
+      }
+      final = historyError
+        ? {
+            ...result,
+            status: "unverifiable",
+            confirmed: false,
+            reason: historyError,
+          }
+        : result;
+      return final;
+    })();
+    return stopping;
   };
   const ready = new Promise((resolve, reject) => {
     const timeout = setTimeout(
@@ -60,8 +124,6 @@ export async function startHarness(port, frontPort) {
     );
     const capture = (chunk) => {
       output = (output + chunk.toString()).slice(-32000);
-      linuxPid =
-        Number(output.match(/RDSH_MANAGED_PID=(\d+)/)?.[1]) || linuxPid;
       const match = output.match(
         /dsh web: (http:\/\/127\.0\.0\.1:\d+\/[^\s]*)/,
       );
@@ -86,7 +148,26 @@ export async function startHarness(port, frontPort) {
     });
   });
   try {
-    return { child, url: await ready, port, stop };
+    await owned.release();
+    const url = await ready;
+    await history.transition(run_id, "waiting-human", "cli_session_attached");
+    return {
+      child,
+      url,
+      port,
+      stop,
+      run_id,
+      inspect: async () => ({
+        run_id,
+        scope:
+          final ??
+          (stopping
+            ? { ...owned.state, status: "stopping", confirmed: false }
+            : await owned.inspect()),
+        stages: structuredClone(stages),
+      }),
+      disconnectMonitor: () => owned.disconnectMonitor(),
+    };
   } catch (error) {
     await stop();
     throw error;
@@ -95,11 +176,15 @@ export async function startHarness(port, frontPort) {
 function upstreamHeaders(req, port, cookieName, adminToken) {
   const headers = { ...req.headers, host: `127.0.0.1:${port}` };
   if (headers.cookie) {
-    headers.cookie = headers.cookie.split(";").map((item) => item.trim())
-      .filter((item) => item.split("=", 1)[0] !== cookieName).join("; ");
+    headers.cookie = headers.cookie
+      .split(";")
+      .map((item) => item.trim())
+      .filter((item) => item.split("=", 1)[0] !== cookieName)
+      .join("; ");
     if (!headers.cookie) delete headers.cookie;
   }
-  if (headers.authorization === `Bearer ${adminToken}`) delete headers.authorization;
+  if (headers.authorization === `Bearer ${adminToken}`)
+    delete headers.authorization;
   return headers;
 }
 export function proxyHarness(req, res, port, cookieName, adminToken) {
@@ -126,7 +211,14 @@ export function proxyHarness(req, res, port, cookieName, adminToken) {
   });
   req.pipe(upstream);
 }
-export function upgradeHarness(req, socket, head, port, cookieName, adminToken) {
+export function upgradeHarness(
+  req,
+  socket,
+  head,
+  port,
+  cookieName,
+  adminToken,
+) {
   const upstream = net.connect(port, "127.0.0.1", () => {
     const headers = upstreamHeaders(req, port, cookieName, adminToken);
     if (headers.origin) headers.origin = `http://127.0.0.1:${port}`;
