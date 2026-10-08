@@ -212,6 +212,22 @@ struct SessionFacts {
     retry_attempts: usize,
     provider_attempts: usize,
 }
+fn valid_tool_catalog(header: &Value, needs_tool: bool) -> bool {
+    match header.get("tools") {
+        None => !needs_tool,
+        Some(Value::Array(tools)) => {
+            if needs_tool {
+                !tools.is_empty()
+                    && tools.iter().all(|tool| {
+                        matches!(tool["name"].as_str(), Some("read" | "edit" | "write"))
+                    })
+            } else {
+                tools.is_empty()
+            }
+        }
+        _ => false,
+    }
+}
 fn session_facts(root: &Path, needs_tool: bool) -> Result<SessionFacts> {
     let mut facts = SessionFacts {
         effort_ok: true,
@@ -249,14 +265,7 @@ fn session_facts(root: &Path, needs_tool: bool) -> Result<SessionFacts> {
                         facts.headers += 1;
                         facts.effort_ok &=
                             v["data"]["header"]["config"]["reasoningEffort"] == "high";
-                        if let Some(tools) = v["data"]["header"]["tools"].as_array() {
-                            facts.catalog_ok &= !needs_tool || !tools.is_empty();
-                            facts.catalog_ok &= tools.iter().all(|tool| {
-                                matches!(tool["name"].as_str(), Some("read" | "edit" | "write"))
-                            });
-                        } else {
-                            facts.catalog_ok &= !needs_tool;
-                        }
+                        facts.catalog_ok &= valid_tool_catalog(&v["data"]["header"], needs_tool);
                     }
                     if v["type"] == "assistant/attempt" {
                         facts.retry_attempts += 1;
@@ -751,6 +760,23 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tool_runs_require_a_nonempty_valid_catalog() {
+        assert!(valid_tool_catalog(
+            &json!({"tools":[{"name":"read"},{"name":"edit"},{"name":"write"}]}),
+            true
+        ));
+        assert!(!valid_tool_catalog(&json!({}), true));
+        assert!(valid_tool_catalog(&json!({}), false));
+        assert!(!valid_tool_catalog(&json!({"tools":[]}), true));
+        assert!(!valid_tool_catalog(&json!({"tools":null}), false));
+        assert!(!valid_tool_catalog(
+            &json!({"tools":[{"name":"read_image"}]}),
+            true
+        ));
+        assert!(!valid_tool_catalog(&json!({"tools":[{}]}), true));
+    }
 
     #[test]
     fn completed_model_answer_does_not_hide_a_missing_final_or_failed_exit() {
