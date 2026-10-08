@@ -883,7 +883,9 @@ mod tests {
     use super::*;
     #[test]
     fn p95_uses_nearest_rank_and_keeps_last_sample() {
-        assert_eq!(percentile(&[1., 2., 3., 4., 5.], 0.95), 5.)
+        assert_eq!(percentile(&[1., 2., 3., 4., 5.], 0.95), 5.);
+        let samples: Vec<_> = (1..=20).map(f64::from).collect();
+        assert_eq!(percentile(&samples, 0.95), 19.);
     }
     #[test]
     fn session_oracle_rejects_wrong_or_inexact_values() {

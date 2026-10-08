@@ -4,6 +4,7 @@
 import argparse
 import hashlib
 import json
+import math
 import os
 import platform
 import re
@@ -40,7 +41,7 @@ def describe(samples):
     ordered = sorted(samples)
     return {
         "median_ms": statistics.median(samples),
-        "p95_ms": ordered[min(len(ordered) - 1, int(len(ordered) * 0.95))],
+        "p95_ms": ordered[math.ceil(len(ordered) * 0.95) - 1],
         "samples_ms": samples,
     }
 
