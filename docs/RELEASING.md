@@ -36,7 +36,8 @@ Generation failure stops publication.
    `/releases/download/vX.Y.Z-rc.N/` and pass `--version=vX.Y.Z-rc.N` to the
    Unix installer or `-Version vX.Y.Z-rc.N` to the Windows installer. Downloading
    a candidate's installer alone does not select its binary: both installers
-   otherwise fetch `latest`. Candidate examples:
+   otherwise fetch `latest`. Keep the selectors on the actual commands in code
+   blocks or inline code, rather than only in explanatory prose. Candidate examples:
 
    ```sh
    curl -fsSL https://github.com/jimoto-no-llm/rustdsh/releases/download/vX.Y.Z-rc.N/install.sh | bash -s -- --from-release --version=vX.Y.Z-rc.N

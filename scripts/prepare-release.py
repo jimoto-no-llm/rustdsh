@@ -57,11 +57,23 @@ def validate(root, tag):
                 or any(channel != f"download/{tag}" for channel, _ in installers)):
             raise ValueError("prerelease installer URLs must use this exact tag URL")
         instructions = re.sub(r"<!--.*?-->", "", authored, flags=re.S)
-        unix_versions = [value.strip("'\"") for value in re.findall(r"--version=([^\s`]+)", instructions)]
-        windows_versions = [value.strip("'\"") for value in re.findall(r"(?i:-Version)[ \t]+([^\s`]+)", instructions)]
-        if (not unix_versions or not windows_versions
-                or any(value != tag for value in (*unix_versions, *windows_versions))):
-            raise ValueError("prerelease installers require --version=TAG and -Version TAG matching this tag")
+        snippets = re.findall(r"```[^\n]*\n(.*?)\n```|`([^`\n]+)`", instructions, re.S)
+        unix_commands, windows_commands = [], []
+        for block, inline in snippets:
+            code = re.sub(r"[\\`]\r?\n", " ", block or inline)
+            for line in code.splitlines():
+                for command in re.split(r"[|;]", line):
+                    if (re.match(r"\s*(?:bash|sh)\b", command) and "install.sh" in line
+                            or re.match(r"\s*(?:\S*/)?install\.sh(?:\s|$)", command)):
+                        unix_commands.append(command)
+                    if re.match(r"\s*(?:&\s+)?(?:\S*[/\\])?install\.ps1(?:\s|$)", command, re.I):
+                        windows_commands.append(command)
+        for commands, option in ((unix_commands, r"--version=([^\s]+)"),
+                                 (windows_commands, r"(?i:-Version)[ \t]+([^\s]+)")):
+            if not commands or any(not (values := re.findall(option, command))
+                                   or any(value.strip("'\"") != tag for value in values)
+                                   for command in commands):
+                raise ValueError("prerelease installers require --version=TAG and -Version TAG matching this tag")
     if previous_tag(authored) == tag:
         raise ValueError("previous-tag must differ from the release tag")
     return authored

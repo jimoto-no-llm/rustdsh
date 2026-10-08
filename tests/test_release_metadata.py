@@ -153,6 +153,34 @@ class ReleaseMetadataTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "matching this tag"):
             release.validate(self.root, "v1.2.3-rc.1")
 
+    def test_candidate_flags_in_prose_do_not_replace_installer_arguments(self):
+        for option in ("--version=v1.2.3-rc.1", "-Version v1.2.3-rc.1"):
+            for hint in (option, f"`{option}`"):
+                notes = self.fixture("1.2.3-rc.1")
+                text = notes.read_text(encoding="utf-8").replace(option, "")
+                notes.write_text(text + f"\n- Remember to use {hint}.\n", encoding="utf-8")
+                with self.subTest(option=option, hint=hint), self.assertRaisesRegex(ValueError, "matching this tag"):
+                    release.validate(self.root, "v1.2.3-rc.1")
+
+    def test_each_candidate_installer_invocation_must_select_the_tag(self):
+        for extra in ("```sh\ncurl https://github.com/org/repo/releases/download/v1.2.3-rc.1/install.sh | bash -s -- --from-release\n```",
+                      "`./install.ps1 -FromRelease`",
+                      "`./install.ps1 -FromRelease; Write-Output -Version v1.2.3-rc.1`",
+                      "```sh\ncurl https://github.com/org/repo/releases/download/v1.2.3-rc.1/install.sh | bash -s -- --from-release; echo --version=v1.2.3-rc.1\n```"):
+            notes = self.fixture("1.2.3-rc.1")
+            notes.write_text(notes.read_text(encoding="utf-8") + "\n" + extra + "\n", encoding="utf-8")
+            with self.subTest(extra=extra), self.assertRaisesRegex(ValueError, "matching this tag"):
+                release.validate(self.root, "v1.2.3-rc.1")
+
+    def test_candidate_installer_commands_accept_line_continuations(self):
+        notes = self.fixture("1.2.3-rc.1")
+        text = notes.read_text(encoding="utf-8")
+        text = text.replace("--from-release --version", "--from-release \\\n  --version")
+        text = text.replace("`install.ps1 -FromRelease -Version v1.2.3-rc.1`",
+                            "```powershell\n& ./install.ps1 -FromRelease `\n  -Version v1.2.3-rc.1\n```")
+        notes.write_text(text, encoding="utf-8")
+        release.validate(self.root, "v1.2.3-rc.1")
+
     def test_publication_reads_the_persisted_previous_tag_without_cli_override(self):
         notes = self.fixture()
         notes.write_text(notes.read_text(encoding="utf-8") + "<!-- previous-tag: v1.2.2 -->\n", encoding="utf-8")
