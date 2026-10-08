@@ -522,7 +522,11 @@ fn cli_tokens_prune_compact_search_logs_guard_and_settings_work_together() {
             );
         }
     }
-    let log = f.0.join("test.log");
+    // Positive log selection stays under the approved logs root. Outside-file
+    // refusals are pinned separately in log_session_boundaries.rs.
+    let logs_dir = f.0.join("dsh/logs");
+    fs::create_dir_all(&logs_dir).unwrap();
+    let log = logs_dir.join("test.log");
     fs::write(&log, "old\nerror first\nnormal\nerror last\n").unwrap();
     assert!(String::from_utf8(f.ok(
         &[
@@ -538,8 +542,6 @@ fn cli_tokens_prune_compact_search_logs_guard_and_settings_work_together() {
     ))
     .unwrap()
     .contains("error last"));
-    let logs_dir = f.0.join("dsh/logs");
-    fs::create_dir_all(&logs_dir).unwrap();
     fs::write(logs_dir.join("named.log"), "named log\n").unwrap();
     assert!(
         String::from_utf8(f.ok(&["logs", "--file", "named.log"], b""))

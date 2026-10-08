@@ -1,0 +1,122 @@
+{
+  "baseline_source": "b749d82609ceecafcf35e473c7577fa67fbf3982",
+  "baseline_native_sources_identical_to_main": "98abc67d7e5c5d3f2a5321d9a56adb6a83ff93e2",
+  "candidate_source": "be16d68efa511bdaeb52e6b81dbd2321cd12a413",
+  "binaries_sha256": {
+    "before": "d73c9add7b22a5de43d94975ee2c88dc00dc3b8f8cc9fd068ed79250de2ced5f",
+    "after": "ac0318c27b96082d39e6d509b940ba0f37c80d3b4ec206fe6d74569b09c8c964"
+  },
+  "actual_models_or_credentials": false,
+  "cases": [
+    {
+      "case": "bare_name",
+      "args": [
+        "logs",
+        "--file",
+        "app.log",
+        "--tail",
+        "1",
+        "--grep",
+        "DUMMY"
+      ],
+      "before": {
+        "exit_code": 0,
+        "stdout": "DUMMY_MATCH new\n",
+        "stderr": "[rdsh] reading <fixture>/dsh/logs/app.log\n[rdsh] 2 line(s) matching \"DUMMY\"\n"
+      },
+      "after": {
+        "exit_code": 0,
+        "stdout": "DUMMY_MATCH new\n",
+        "stderr": "[rdsh] reading <fixture>/dsh/logs/app.log\n[rdsh] 2 line(s) matching \"DUMMY\"\n"
+      }
+    },
+    {
+      "case": "cwd_relative",
+      "args": [
+        "logs",
+        "--file",
+        "dsh/logs/app.log",
+        "--tail",
+        "1",
+        "--grep",
+        "DUMMY"
+      ],
+      "before": {
+        "exit_code": 0,
+        "stdout": "DUMMY_MATCH new\n",
+        "stderr": "[rdsh] reading dsh/logs/app.log\n[rdsh] 2 line(s) matching \"DUMMY\"\n"
+      },
+      "after": {
+        "exit_code": 0,
+        "stdout": "DUMMY_MATCH new\n",
+        "stderr": "[rdsh] reading <fixture>/dsh/logs/dsh/logs/app.log\n[rdsh] 2 line(s) matching \"DUMMY\"\n"
+      }
+    },
+    {
+      "case": "cwd_relative_dot",
+      "args": [
+        "logs",
+        "--file",
+        "./dsh/logs/app.log",
+        "--tail",
+        "1",
+        "--grep",
+        "DUMMY"
+      ],
+      "before": {
+        "exit_code": 0,
+        "stdout": "DUMMY_MATCH new\n",
+        "stderr": "[rdsh] reading ./dsh/logs/app.log\n[rdsh] 2 line(s) matching \"DUMMY\"\n"
+      },
+      "after": {
+        "exit_code": 0,
+        "stdout": "DUMMY_MATCH new\n",
+        "stderr": "[rdsh] reading <fixture>/dsh/logs/./dsh/logs/app.log\n[rdsh] 2 line(s) matching \"DUMMY\"\n"
+      }
+    },
+    {
+      "case": "absolute_inside",
+      "args": [
+        "logs",
+        "--file",
+        "<fixture>/dsh/logs/app.log",
+        "--tail",
+        "1",
+        "--grep",
+        "DUMMY"
+      ],
+      "before": {
+        "exit_code": 0,
+        "stdout": "DUMMY_MATCH new\n",
+        "stderr": "[rdsh] reading <fixture>/dsh/logs/app.log\n[rdsh] 2 line(s) matching \"DUMMY\"\n"
+      },
+      "after": {
+        "exit_code": 0,
+        "stdout": "DUMMY_MATCH new\n",
+        "stderr": "[rdsh] reading <fixture>/dsh/logs/app.log\n[rdsh] 2 line(s) matching \"DUMMY\"\n"
+      }
+    },
+    {
+      "case": "absolute_outside",
+      "args": [
+        "logs",
+        "--file",
+        "<fixture>/DUMMY_OUTSIDE.txt",
+        "--tail",
+        "1",
+        "--grep",
+        "DUMMY"
+      ],
+      "before": {
+        "exit_code": 0,
+        "stdout": "DUMMY_SECRET_MARKER\n",
+        "stderr": "[rdsh] reading <fixture>/DUMMY_OUTSIDE.txt\n[rdsh] 1 line(s) matching \"DUMMY\"\n"
+      },
+      "after": {
+        "exit_code": 1,
+        "stdout": "",
+        "stderr": "[rdsh] error: log file must be inside <fixture>/dsh/logs\n"
+      }
+    }
+  ]
+}

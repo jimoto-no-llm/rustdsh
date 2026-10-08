@@ -65,8 +65,8 @@ test('plugin security boundary and settings preservation', async (t) => {
   const initialSettings = await readFile(settingsFile, 'utf8');
   const initialContext = await readFile(contextFile, 'utf8');
 
-  await t.test('all six routes reject before body consumption or side effects', async () => {
-    assert.equal(routes.size, 6);
+  await t.test('all seven routes reject before body consumption or side effects', async () => {
+    assert.equal(routes.size, 7);
     for (const rejection of [401, 403]) {
       for (const path of routes.keys()) {
         for (const method of ['GET', 'HEAD', 'POST']) {
