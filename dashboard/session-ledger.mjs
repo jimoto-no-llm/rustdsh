@@ -7,6 +7,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { writeJson } from "./state.mjs";
 import { adapterCatalog, createCliAdapter } from "./adapters.mjs";
+import { preflightTask, taskRequirements, requireReady } from "./preflight.mjs";
 
 const exec = promisify(execFile);
 const scopeKeys = [
@@ -408,9 +409,25 @@ export async function attachRecordedSession({
   provider = null,
   requestTimeout,
   stopTimeout,
+  requirements = null,
+  verifyAuth = false,
 } = {}) {
   env = { ...env };
   if (Array.isArray(command)) command = [...command];
+  if (requirements !== null) {
+    const selected = taskRequirements(requirements);
+    selected.cli ||= "dsh";
+    const target = run_id === null ? cwd : (await ledger.resolve(run_id)).cwd;
+    requireReady(
+      await preflightTask({
+        requirements: selected,
+        cwd: target,
+        command,
+        env,
+        verifyAuth,
+      }),
+    );
+  }
   let record;
   if (run_id === null)
     record = await ledger.record({

@@ -9,6 +9,7 @@ import { runStdio } from "./mcp.mjs";
 import { adapterCatalog, createCliAdapter } from "./adapters.mjs";
 import { smokeAdapter } from "./adapter-smoke.mjs";
 import { SessionLedger, attachRecordedSession } from "./session-ledger.mjs";
+import { preflightCli, readRequirements } from "./preflight.mjs";
 
 const help = `rdsh-dashboard project --project <directory> [--port <port>] [--no-tailscale] [--open]
 rdsh-dashboard harness [--port 38081] [--harness-port 3081] [--no-tailscale] [--open]
@@ -19,6 +20,7 @@ rdsh-dashboard tunnel --project <directory> --tunnel-id <tunnel_id>
 rdsh-dashboard mcp --project <directory>
 rdsh-dashboard adapters [--cli dsh] [--executable <original-dsh>] [--entrypoint <bin.js>] [--project <directory>]
 rdsh-dashboard adapter-smoke --executable <original-dsh> [--entrypoint <bin.js>] [--project <directory>]
+rdsh-dashboard preflight --project <directory> [--requirements <json>] [--executable <original-dsh>] [--entrypoint <bin.js>] [--verify-auth]
 rdsh-dashboard session-ledger list|record|resolve|start|resume --project <directory> [--run-id <run_id>] [--task-id <id>] [--session-id <id>] [--label <name>] [--provider <name>] [--cwd <directory>] [--cli <name>] [--executable <original-dsh>] [--entrypoint <bin.js>]
 
 Project mode: project metrics, tasks, questions, human feedback, and /mcp.
@@ -45,6 +47,8 @@ const { values, positionals } = parseArgs({
     label: { type: "string" },
     provider: { type: "string" },
     cwd: { type: "string" },
+    requirements: { type: "string" },
+    "verify-auth": { type: "boolean" },
     help: { type: "boolean", short: "h" },
   },
 });
@@ -73,6 +77,8 @@ try {
   const command = positionals[0];
   if (values.help || !command) {
     console.log(help);
+  } else if (command === "preflight") {
+    await preflightCli(process.argv.slice(3));
   } else if (command === "session-ledger") {
     const action = positionals[1];
     if (
@@ -133,6 +139,10 @@ try {
       const attached = await attachRecordedSession({
         ...options,
         run_id: action === "resume" ? values["run-id"] : null,
+        requirements: values.requirements
+          ? await readRequirements(values.requirements)
+          : null,
+        verifyAuth: values["verify-auth"] || false,
       });
       const stopped = await attached.adapter.stop();
       result = {
@@ -308,6 +318,7 @@ try {
       });
   } else throw new Error("Unknown command; use --help");
 } catch (e) {
-  console.error(`[rdsh-dashboard] ${e.message}`);
+  if (e.report) console.log(JSON.stringify(e.report, null, 2));
+  else console.error(`[rdsh-dashboard] ${e.message}`);
   process.exitCode = 1;
 }
