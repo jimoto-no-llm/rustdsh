@@ -6,6 +6,11 @@ import { promisify } from "node:util";
 import { realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
+import {
+  nativeSelection,
+  selected,
+  compareSelection,
+} from "./model-selection.mjs";
 
 export const operations = Object.freeze([
   "start",
@@ -121,6 +126,8 @@ class CliAdapter extends EventEmitter {
     this.sessions = new Set();
     this.prompts = new Set();
     this.meters = new Map();
+    this.routeObservations = new Map();
+    this.routeAssertions = new Map();
     this.disabled = new Set();
     this.stopping = false;
     this.stopped = false;
@@ -450,6 +457,15 @@ class CliAdapter extends EventEmitter {
         throw new Error();
       if (!this.sessions.has(params.sessionId)) return;
       const update = params.update;
+      if (update.sessionUpdate === "config_option_update")
+        this.routeObservations.set(
+          params.sessionId,
+          nativeSelection(
+            update.configOptions,
+            "acp_config_update",
+            this.processVersion,
+          ),
+        );
       if (update.sessionUpdate === "usage_update") {
         if (
           !Number.isSafeInteger(update.used) ||
@@ -579,6 +595,14 @@ class CliAdapter extends EventEmitter {
       throw new AdapterError("duplicate_session", "start");
     }
     this.sessions.add(result.sessionId);
+    this.routeObservations.set(
+      result.sessionId,
+      nativeSelection(
+        result.configOptions,
+        "acp_session_new",
+        this.processVersion,
+      ),
+    );
     return this.record("started", { session_id: result.sessionId });
   }
 
@@ -589,12 +613,20 @@ class CliAdapter extends EventEmitter {
     this.requireOperation("resume");
     if (this.sessions.has(sessionId))
       throw new AdapterError("already_attached", "resume");
-    await this.request(
+    const result = await this.request(
       methods.agent.session.resume,
       { sessionId, cwd: this.cwd, mcpServers: [] },
       "resume",
     );
     this.sessions.add(sessionId);
+    this.routeObservations.set(
+      sessionId,
+      nativeSelection(
+        result.configOptions,
+        "acp_session_resume",
+        this.processVersion,
+      ),
+    );
     return this.record("resumed", { session_id: sessionId });
   }
 
@@ -661,6 +693,8 @@ class CliAdapter extends EventEmitter {
 
   async send(sessionId, text) {
     this.requireOperation("send", sessionId);
+    if (this.routeAssertions.has(sessionId))
+      this.requireRouting(sessionId, this.routeAssertions.get(sessionId));
     if (
       typeof text !== "string" ||
       !text.trim() ||
@@ -704,6 +738,30 @@ class CliAdapter extends EventEmitter {
       status: measurement ? "observed" : "unavailable",
       measurement: measurement ? structuredClone(measurement) : null,
     };
+  }
+
+  routing(sessionId) {
+    if (!identifier(sessionId) || !this.sessions.has(sessionId))
+      throw new AdapterError("session_not_attached", "routing");
+    return structuredClone(
+      this.routeObservations.get(sessionId) ??
+        nativeSelection(
+          null,
+          "native_selection_unavailable",
+          this.processVersion,
+        ),
+    );
+  }
+
+  requireRouting(sessionId, expectation) {
+    expectation = selected(expectation);
+    const result = compareSelection(expectation, this.routing(sessionId));
+    if (!result.matches)
+      throw new AdapterError(
+        result.status === "unknown" ? "routing_unverified" : "routing_mismatch",
+        "send",
+      );
+    this.routeAssertions.set(sessionId, expectation);
   }
 
   async stop() {

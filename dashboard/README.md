@@ -22,6 +22,9 @@ resume from an explicit new conversation with an operator-provided summary.
 [Acceptance evidence](../docs/ACCEPTANCE-EVIDENCE.md) separates reported `done`
 from current full checks, preserves partial results and rejects stale evidence.
 
+[Model assertions](../docs/MODEL-ROUTING.md) compare a declared run's requested
+route with native ACP configuration and block mismatched or unknown prompts.
+
 `rdsh-dashboard` provides two separate entry points:
 
 | Mode      | Purpose                                                    | Data source                                      |

@@ -10,6 +10,7 @@ import {
 import { RunHistory } from "./run-history.mjs";
 import { RetryHistory, retryKinds } from "./retry.mjs";
 import { createCliAdapter } from "./adapters.mjs";
+import { ModelRouting } from "./model-routing.mjs";
 
 const sum = (value) =>
   createHash("sha256").update(JSON.stringify(value)).digest("hex");
@@ -424,6 +425,7 @@ export class Checkpoints {
           : "recovery_action_uncertain",
       );
     let record,
+      new_run_requires_model_declaration = false,
       current,
       native = { status: "not_checked", resume_verified: false },
       context;
@@ -437,6 +439,8 @@ export class Checkpoints {
           record.cli_version === checkpoint.cli_version,
         "session_binding_changed",
       );
+      new_run_requires_model_declaration =
+        (await ModelRouting.open(this.project).read(record)) !== null;
       if (command === null) reasons.push("explicit_original_cli_required");
       else {
         try {
@@ -541,8 +545,9 @@ export class Checkpoints {
           verified_only_after_native_resume: true,
         },
         summary_start_new: {
-          available: !blocked,
+          available: !blocked && !new_run_requires_model_declaration,
           same_session: false,
+          new_run_requires_model_declaration,
           requires_operator_summary: true,
           requires_context_loss_choice: true,
         },

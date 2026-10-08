@@ -15,6 +15,8 @@ import { RetryHistory } from "./retry.mjs";
 import { probeCliWithRetry } from "./retry-probe.mjs";
 import { Checkpoints } from "./checkpoints.mjs";
 import { AcceptanceStore } from "./acceptance.mjs";
+import { ModelRouting } from "./model-routing.mjs";
+import { requestedSelection, validSelection } from "./model-selection.mjs";
 
 const help = `rdsh-dashboard project --project <directory> [--port <port>] [--no-tailscale] [--open]
 rdsh-dashboard harness [--port 38081] [--harness-port 3081] [--no-tailscale] [--open]
@@ -30,6 +32,7 @@ rdsh-dashboard run-history list|inspect|events --project <directory> [--run-id <
 rdsh-dashboard retry-history list|inspect --project <directory> [--operation-id <id>]
 rdsh-dashboard checkpoint record|list|inspect|resume|start-new --project <directory> [--run-id <id>] [--checkpoint-id <id>] [--executable <original-dsh>] [--entrypoint <bin.js>] [--verify-native] [--retry-operation-id <id>] [--summary-file <file> --accept-context-loss]
 rdsh-dashboard acceptance define|run|report|inspect --project <directory> --task-id <id> [--criterion-id <id>] [--criteria-file <json>] [--argv-file <json>] [--result-file <json>] [--scope full|partial] [--timeout-ms <ms>] [--image <relative-path>]
+rdsh-dashboard routing bind|inspect|probe|allow-change --project <directory> --run-id <id> [--route-file <json>] [--authorization-file <json>] [--executable <original-dsh>] [--entrypoint <bin.js>]
 rdsh-dashboard session-ledger list|record|resolve|start|resume --project <directory> [--run-id <run_id>] [--task-id <id>] [--session-id <id>] [--label <name>] [--provider <name>] [--cwd <directory>] [--cli <name>] [--executable <original-dsh>] [--entrypoint <bin.js>]
 
 Project mode: project metrics, tasks, questions, human feedback, and /mcp.
@@ -76,6 +79,8 @@ const { values, positionals } = parseArgs({
     scope: { type: "string" },
     "timeout-ms": { type: "string" },
     image: { type: "string", multiple: true },
+    "route-file": { type: "string" },
+    "authorization-file": { type: "string" },
     help: { type: "boolean", short: "h" },
   },
 });
@@ -157,8 +162,100 @@ try {
     ].some((key) => values[key] !== undefined)
   )
     throw new Error("Acceptance options require acceptance");
+  if (
+    command !== "routing" &&
+    [values["route-file"], values["authorization-file"]].some(
+      (value) => value !== undefined,
+    )
+  )
+    throw new Error("Model route options require routing");
   if (values.help || !command) {
     console.log(help);
+  } else if (command === "routing") {
+    const action = positionals[1];
+    if (
+      positionals.length !== 2 ||
+      !["bind", "inspect", "probe", "allow-change"].includes(action)
+    )
+      throw new Error("Specify routing bind, inspect, probe or allow-change");
+    const allowed = new Set([
+      "project",
+      "run-id",
+      "route-file",
+      "authorization-file",
+      "executable",
+      "entrypoint",
+      "help",
+    ]);
+    if (Object.keys(values).some((key) => !allowed.has(key)))
+      throw new Error("Unsupported option for routing");
+    if (
+      (!["bind", "allow-change"].includes(action) &&
+        values["route-file"] !== undefined) ||
+      (action !== "allow-change" &&
+        values["authorization-file"] !== undefined) ||
+      (action !== "probe" &&
+        [values.executable, values.entrypoint].some(
+          (value) => value !== undefined,
+        ))
+    )
+      throw new Error("Options must match the routing action");
+    const ledger = await SessionLedger.open(
+      await identity(values.project || process.cwd()),
+    );
+    const record = await ledger.resolve(values["run-id"]),
+      store = ModelRouting.open(ledger.project);
+    store.file(record);
+    let result;
+    if (action === "inspect") result = await store.inspect(record);
+    else if (action === "bind") {
+      const input = await localJson(values["route-file"]);
+      let persisted;
+      if (!validSelection(input)) {
+        const routePath = path.join(
+          record.scope.DSH_HOME ||
+            path.join(record.scope.effective_home, ".dsh"),
+          "oh-my-dsh",
+          "routes.json",
+        );
+        persisted = await localJson(routePath).catch((error) => {
+          if (error.code === "ENOENT") return { version: 1, routes: {} };
+          throw error;
+        });
+      }
+      result = await store.bind(
+        record,
+        requestedSelection(input, process.env, persisted),
+      );
+    } else if (action === "allow-change")
+      result = await store.allowChange(
+        record,
+        await localJson(values["route-file"]),
+        await localJson(values["authorization-file"]),
+      );
+    else {
+      if (!values.executable)
+        throw new Error("probe requires the original CLI executable");
+      if ((await store.read(record)) === null)
+        throw new Error("Bind the model request before probing it");
+      const command = [
+        values.executable,
+        ...(values.entrypoint ? [values.entrypoint] : []),
+      ];
+      const attached = await attachRecordedSession({
+        ledger,
+        run_id: record.run_id,
+        command,
+      });
+      try {
+        result = await store.observe(attached.record, attached.adapter);
+      } finally {
+        await attached.adapter.stop();
+      }
+      result = { ...result, model_prompts_sent: 0, owned_root_stopped: true };
+      if (!result.prompt_allowed_by_route_assertion) process.exitCode = 1;
+    }
+    console.log(JSON.stringify(result, null, 2));
   } else if (command === "acceptance") {
     const action = positionals[1];
     if (

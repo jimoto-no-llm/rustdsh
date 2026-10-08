@@ -41,6 +41,34 @@ if (process.argv.includes("--version")) {
   }
   const output = (msg) => process.stdout.write(JSON.stringify(msg) + "\n");
   const reply = (id, result) => output({ jsonrpc: "2.0", id, result });
+  const routeOptions = (changed = false) => {
+    if (!mode.startsWith("route_")) return undefined;
+    const pair =
+      mode === "route_changed" || changed
+        ? ["fixture-provider", "model-B"]
+        : ["fixture-provider", "model-A"];
+    const currentValue =
+      mode === "route_invalid"
+        ? "fixture-peer-secret-not-a-model"
+        : JSON.stringify(pair);
+    const model = {
+      id: "model",
+      name: "Model",
+      category: "model",
+      type: "select",
+      currentValue,
+      options: [{ value: currentValue, name: "Fixture model" }],
+    };
+    const reasoning = {
+      id: "reasoning_effort",
+      name: "Effort",
+      category: "thought_level",
+      type: "select",
+      currentValue: "high",
+      options: [{ value: "high", name: "High" }],
+    };
+    return mode === "route_no_effort" ? [model] : [model, reasoning];
+  };
   const trace = (msg) => {
     if (process.env.RDSH_ADAPTER_FIXTURE_TRACE)
       fs.appendFileSync(
@@ -99,7 +127,11 @@ if (process.argv.includes("--version")) {
         ].includes(mode)
       )
         reply(msg.id, { sessionId: "fixture-new-session" });
-      else reply(msg.id, fixture.start);
+      else
+        reply(msg.id, {
+          ...fixture.start,
+          ...(routeOptions() ? { configOptions: routeOptions() } : {}),
+        });
     } else if (msg.method === "session/list") {
       if (mode === "bad_list")
         reply(msg.id, {
@@ -129,8 +161,24 @@ if (process.argv.includes("--version")) {
     } else if (msg.method === "session/resume") {
       if (msg.params.sessionId === "missing") {
         output({ jsonrpc: "2.0", id: msg.id, error: fixture.error });
-      } else reply(msg.id, fixture.resume);
+      } else
+        reply(msg.id, {
+          ...fixture.resume,
+          ...(routeOptions() ? { configOptions: routeOptions() } : {}),
+        });
     } else if (msg.method === "session/prompt") {
+      if (mode === "route_drift")
+        output({
+          jsonrpc: "2.0",
+          method: "session/update",
+          params: {
+            sessionId: msg.params.sessionId,
+            update: {
+              sessionUpdate: "config_option_update",
+              configOptions: routeOptions(true),
+            },
+          },
+        });
       if (mode === "summary_response_lost") {
         fs.appendFileSync(
           process.env.RDSH_ADAPTER_FIXTURE_SUMMARY_COUNTER,

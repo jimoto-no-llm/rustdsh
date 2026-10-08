@@ -11,6 +11,7 @@ import { preflightTask, taskRequirements, requireReady } from "./preflight.mjs";
 import { RunHistory, HistoryError } from "./run-history.mjs";
 import { readProcessIdentity } from "./process-identity.mjs";
 import { trackAdapter } from "./tracked-adapter.mjs";
+import { ModelRouting } from "./model-routing.mjs";
 
 const exec = promisify(execFile);
 const scopeKeys = [
@@ -572,7 +573,17 @@ export async function attachRecordedSession({
       );
     return {
       record: confirmed,
-      adapter: trackAdapter(adapter, history, record.run_id, exitWrites),
+      adapter: trackAdapter(
+        adapter,
+        history,
+        record.run_id,
+        exitWrites,
+        async (sessionId) => {
+          if (sessionId !== confirmed.cli_session_id)
+            throw new LedgerError("native_session_changed");
+          return ModelRouting.open(ledger.project).guard(confirmed, adapter);
+        },
+      ),
       history,
       command_id: commandId,
     };

@@ -1,7 +1,13 @@
 // Durable control requests around an existing adapter; no agent loop or replay.
 import { HistoryError } from "./run-history.mjs";
 
-export function trackAdapter(adapter, history, runId, exitWrites) {
+export function trackAdapter(
+  adapter,
+  history,
+  runId,
+  exitWrites,
+  beforeSend = null,
+) {
   const send = adapter.send.bind(adapter),
     interrupt = adapter.interrupt.bind(adapter),
     stop = adapter.stop.bind(adapter);
@@ -17,6 +23,7 @@ export function trackAdapter(adapter, history, runId, exitWrites) {
   };
   adapter.send = async (sessionId, text) => {
     adapter.requireOperation("send", sessionId);
+    if (beforeSend) await beforeSend(sessionId);
     const id = await history.recordCommand(runId, "send");
     await history.transition(runId, "running", "cli_prompt_pending");
     await history.commandPhase(id, "dispatched");

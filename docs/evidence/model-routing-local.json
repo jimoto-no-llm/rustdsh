@@ -1,0 +1,641 @@
+{
+  "observed_at": "2026-10-05T22:22:20.737Z",
+  "platform": "win32",
+  "architecture": "x64",
+  "node_version": "v24.18.0",
+  "os_release": "10.0.26200",
+  "source": "actual local Node children running a pinned ACP wire fixture",
+  "command": "node dashboard/cli.mjs routing probe --project <isolated-native-git-project> --run-id <exact-run-id> --executable <explicit-original-cli>",
+  "baseline": {
+    "head_sha": "5a7235e740ed9eadee60032fe0f051be5a643632",
+    "comparison": "baseline entrypoint with current common dependencies",
+    "exit_code": 1,
+    "stderr": "[rdsh-dashboard] Unknown command; use --help"
+  },
+  "declaration": {
+    "run_id": "run_3c9a8ee1-43f4-45e2-b0cb-4ce3026c0fcc",
+    "requested": {
+      "provider": "fixture-provider",
+      "model": "model-A",
+      "effort": "high"
+    },
+    "context_hash": "65de323a658bc452b216d8aa67c83bce9c78e80d31689d5774def203301106a7",
+    "revision": 1,
+    "permission_expanded": false,
+    "native_route_changed": false
+  },
+  "before_observation": {
+    "run_id": "run_3c9a8ee1-43f4-45e2-b0cb-4ce3026c0fcc",
+    "session_id": "fixture-session",
+    "context_hash": "65de323a658bc452b216d8aa67c83bce9c78e80d31689d5774def203301106a7",
+    "revision": 1,
+    "requested": {
+      "provider": "fixture-provider",
+      "model": "model-A",
+      "effort": "high"
+    },
+    "active_route": {
+      "provider": "fixture-provider",
+      "model": "model-A",
+      "effort": "high"
+    },
+    "provenance": {
+      "source": "explicit_operator_request",
+      "role": null,
+      "effort_source": "explicit",
+      "warning": null,
+      "source_hash": "e94a90a2c41ad8f95673a38c73b593d1683876a8cffaea9c6cd539c197b42eec"
+    },
+    "observation": null,
+    "comparison": {
+      "status": "unknown",
+      "reason": "native_selection_unavailable",
+      "matches": false
+    },
+    "active_authorization": null,
+    "authorization_expired": false,
+    "prompt_allowed_by_route_assertion": false,
+    "actual_model_execution_verified": false,
+    "permission_expanded": false,
+    "native_route_changed": false,
+    "route_required": true,
+    "observation_is_historical": true,
+    "events": [
+      {
+        "sequence": 1,
+        "event_id": "route_10d2e1c8-9bf8-4c1b-853b-544a8765f3b0",
+        "type": "request_bound",
+        "at": "2026-10-05T22:22:15.386Z",
+        "observation": null,
+        "authorization": null
+      }
+    ],
+    "writer_lock": "absent"
+  },
+  "public_probe": {
+    "exit_code": 0,
+    "result": {
+      "run_id": "run_3c9a8ee1-43f4-45e2-b0cb-4ce3026c0fcc",
+      "session_id": "fixture-session",
+      "context_hash": "65de323a658bc452b216d8aa67c83bce9c78e80d31689d5774def203301106a7",
+      "revision": 2,
+      "requested": {
+        "provider": "fixture-provider",
+        "model": "model-A",
+        "effort": "high"
+      },
+      "active_route": {
+        "provider": "fixture-provider",
+        "model": "model-A",
+        "effort": "high"
+      },
+      "provenance": {
+        "source": "explicit_operator_request",
+        "role": null,
+        "effort_source": "explicit",
+        "warning": null,
+        "source_hash": "e94a90a2c41ad8f95673a38c73b593d1683876a8cffaea9c6cd539c197b42eec"
+      },
+      "observation": {
+        "status": "observed",
+        "selection": {
+          "provider": "fixture-provider",
+          "model": "model-A",
+          "effort": "high"
+        },
+        "reason": null,
+        "source": "acp_session_resume",
+        "cli_version": "0.2.0-rc.2",
+        "observed_at": "2026-10-05T22:22:18.256Z",
+        "actual_execution_verified": false
+      },
+      "comparison": {
+        "status": "matches_native_configuration",
+        "reason": null,
+        "mismatched_fields": [],
+        "matches": true
+      },
+      "active_authorization": null,
+      "authorization_expired": false,
+      "prompt_allowed_by_route_assertion": true,
+      "actual_model_execution_verified": false,
+      "permission_expanded": false,
+      "native_route_changed": false,
+      "model_prompts_sent": 0,
+      "owned_root_stopped": true
+    }
+  },
+  "rejected_prompt": {
+    "reason": "route_mismatch",
+    "history_commands_before": 5,
+    "history_commands_after": 5,
+    "dispatch_intent_added": false
+  },
+  "blocked_view": {
+    "run_id": "run_3c9a8ee1-43f4-45e2-b0cb-4ce3026c0fcc",
+    "session_id": "fixture-session",
+    "context_hash": "65de323a658bc452b216d8aa67c83bce9c78e80d31689d5774def203301106a7",
+    "revision": 3,
+    "requested": {
+      "provider": "fixture-provider",
+      "model": "model-A",
+      "effort": "high"
+    },
+    "active_route": {
+      "provider": "fixture-provider",
+      "model": "model-A",
+      "effort": "high"
+    },
+    "provenance": {
+      "source": "explicit_operator_request",
+      "role": null,
+      "effort_source": "explicit",
+      "warning": null,
+      "source_hash": "e94a90a2c41ad8f95673a38c73b593d1683876a8cffaea9c6cd539c197b42eec"
+    },
+    "observation": {
+      "status": "observed",
+      "selection": {
+        "provider": "fixture-provider",
+        "model": "model-B",
+        "effort": "high"
+      },
+      "reason": null,
+      "source": "acp_session_resume",
+      "cli_version": "0.2.0-rc.2",
+      "observed_at": "2026-10-05T22:22:19.644Z",
+      "actual_execution_verified": false
+    },
+    "comparison": {
+      "status": "mismatch",
+      "reason": "native_selection_differs",
+      "mismatched_fields": [
+        "model"
+      ],
+      "matches": false
+    },
+    "active_authorization": null,
+    "authorization_expired": false,
+    "prompt_allowed_by_route_assertion": false,
+    "actual_model_execution_verified": false,
+    "permission_expanded": false,
+    "native_route_changed": false,
+    "route_required": true,
+    "observation_is_historical": true,
+    "events": [
+      {
+        "sequence": 1,
+        "event_id": "route_10d2e1c8-9bf8-4c1b-853b-544a8765f3b0",
+        "type": "request_bound",
+        "at": "2026-10-05T22:22:15.386Z",
+        "observation": null,
+        "authorization": null
+      },
+      {
+        "sequence": 2,
+        "event_id": "route_0c44f2f2-e782-4a63-992b-764ab3326768",
+        "type": "native_selection_observed",
+        "at": "2026-10-05T22:22:18.283Z",
+        "observation": {
+          "status": "observed",
+          "selection": {
+            "provider": "fixture-provider",
+            "model": "model-A",
+            "effort": "high"
+          },
+          "reason": null,
+          "source": "acp_session_resume",
+          "cli_version": "0.2.0-rc.2",
+          "observed_at": "2026-10-05T22:22:18.256Z",
+          "actual_execution_verified": false
+        },
+        "authorization": null
+      },
+      {
+        "sequence": 3,
+        "event_id": "route_52cc66f4-2266-4e97-8ed1-883ca19073c2",
+        "type": "native_selection_observed",
+        "at": "2026-10-05T22:22:19.685Z",
+        "observation": {
+          "status": "observed",
+          "selection": {
+            "provider": "fixture-provider",
+            "model": "model-B",
+            "effort": "high"
+          },
+          "reason": null,
+          "source": "acp_session_resume",
+          "cli_version": "0.2.0-rc.2",
+          "observed_at": "2026-10-05T22:22:19.644Z",
+          "actual_execution_verified": false
+        },
+        "authorization": null
+      }
+    ],
+    "writer_lock": "absent"
+  },
+  "authorized_change": {
+    "exit_code": 0,
+    "result": {
+      "run_id": "run_3c9a8ee1-43f4-45e2-b0cb-4ce3026c0fcc",
+      "requested": {
+        "provider": "fixture-provider",
+        "model": "model-A",
+        "effort": "high"
+      },
+      "active_route": {
+        "provider": "fixture-provider",
+        "model": "model-B",
+        "effort": "high"
+      },
+      "authorization": {
+        "authorization_id": "qa-explicit-route-change",
+        "source": "explicit_operator_cli",
+        "run_id": "run_3c9a8ee1-43f4-45e2-b0cb-4ce3026c0fcc",
+        "session_id": "fixture-session",
+        "context_hash": "65de323a658bc452b216d8aa67c83bce9c78e80d31689d5774def203301106a7",
+        "from": {
+          "provider": "fixture-provider",
+          "model": "model-A",
+          "effort": "high"
+        },
+        "to": {
+          "provider": "fixture-provider",
+          "model": "model-B",
+          "effort": "high"
+        },
+        "request_revision": 3,
+        "issued_at": "2026-10-05T22:22:18.698Z",
+        "expires_at": "2026-10-05T22:23:19.698Z"
+      },
+      "revision": 4,
+      "permission_expanded": false,
+      "native_route_changed": false
+    }
+  },
+  "authorization": {
+    "authorization_id": "qa-explicit-route-change",
+    "source": "explicit_operator_cli",
+    "run_id": "run_3c9a8ee1-43f4-45e2-b0cb-4ce3026c0fcc",
+    "session_id": "fixture-session",
+    "context_hash": "65de323a658bc452b216d8aa67c83bce9c78e80d31689d5774def203301106a7",
+    "from": {
+      "provider": "fixture-provider",
+      "model": "model-A",
+      "effort": "high"
+    },
+    "to": {
+      "provider": "fixture-provider",
+      "model": "model-B",
+      "effort": "high"
+    },
+    "request_revision": 3,
+    "issued_at": "2026-10-05T22:22:18.698Z",
+    "expires_at": "2026-10-05T22:23:19.698Z"
+  },
+  "after_authorized_change": {
+    "run_id": "run_3c9a8ee1-43f4-45e2-b0cb-4ce3026c0fcc",
+    "session_id": "fixture-session",
+    "context_hash": "65de323a658bc452b216d8aa67c83bce9c78e80d31689d5774def203301106a7",
+    "revision": 5,
+    "requested": {
+      "provider": "fixture-provider",
+      "model": "model-A",
+      "effort": "high"
+    },
+    "active_route": {
+      "provider": "fixture-provider",
+      "model": "model-B",
+      "effort": "high"
+    },
+    "provenance": {
+      "source": "explicit_operator_request",
+      "role": null,
+      "effort_source": "explicit",
+      "warning": null,
+      "source_hash": "e94a90a2c41ad8f95673a38c73b593d1683876a8cffaea9c6cd539c197b42eec"
+    },
+    "observation": {
+      "status": "observed",
+      "selection": {
+        "provider": "fixture-provider",
+        "model": "model-B",
+        "effort": "high"
+      },
+      "reason": null,
+      "source": "acp_session_resume",
+      "cli_version": "0.2.0-rc.2",
+      "observed_at": "2026-10-05T22:22:19.644Z",
+      "actual_execution_verified": false
+    },
+    "comparison": {
+      "status": "matches_native_configuration",
+      "reason": null,
+      "mismatched_fields": [],
+      "matches": true
+    },
+    "active_authorization": {
+      "authorization_id": "qa-explicit-route-change",
+      "source": "explicit_operator_cli",
+      "run_id": "run_3c9a8ee1-43f4-45e2-b0cb-4ce3026c0fcc",
+      "session_id": "fixture-session",
+      "context_hash": "65de323a658bc452b216d8aa67c83bce9c78e80d31689d5774def203301106a7",
+      "from": {
+        "provider": "fixture-provider",
+        "model": "model-A",
+        "effort": "high"
+      },
+      "to": {
+        "provider": "fixture-provider",
+        "model": "model-B",
+        "effort": "high"
+      },
+      "request_revision": 3,
+      "issued_at": "2026-10-05T22:22:18.698Z",
+      "expires_at": "2026-10-05T22:23:19.698Z"
+    },
+    "authorization_expired": false,
+    "prompt_allowed_by_route_assertion": true,
+    "actual_model_execution_verified": false,
+    "permission_expanded": false,
+    "native_route_changed": false,
+    "route_required": true,
+    "observation_is_historical": true,
+    "events": [
+      {
+        "sequence": 1,
+        "event_id": "route_10d2e1c8-9bf8-4c1b-853b-544a8765f3b0",
+        "type": "request_bound",
+        "at": "2026-10-05T22:22:15.386Z",
+        "observation": null,
+        "authorization": null
+      },
+      {
+        "sequence": 2,
+        "event_id": "route_0c44f2f2-e782-4a63-992b-764ab3326768",
+        "type": "native_selection_observed",
+        "at": "2026-10-05T22:22:18.283Z",
+        "observation": {
+          "status": "observed",
+          "selection": {
+            "provider": "fixture-provider",
+            "model": "model-A",
+            "effort": "high"
+          },
+          "reason": null,
+          "source": "acp_session_resume",
+          "cli_version": "0.2.0-rc.2",
+          "observed_at": "2026-10-05T22:22:18.256Z",
+          "actual_execution_verified": false
+        },
+        "authorization": null
+      },
+      {
+        "sequence": 3,
+        "event_id": "route_52cc66f4-2266-4e97-8ed1-883ca19073c2",
+        "type": "native_selection_observed",
+        "at": "2026-10-05T22:22:19.685Z",
+        "observation": {
+          "status": "observed",
+          "selection": {
+            "provider": "fixture-provider",
+            "model": "model-B",
+            "effort": "high"
+          },
+          "reason": null,
+          "source": "acp_session_resume",
+          "cli_version": "0.2.0-rc.2",
+          "observed_at": "2026-10-05T22:22:19.644Z",
+          "actual_execution_verified": false
+        },
+        "authorization": null
+      },
+      {
+        "sequence": 4,
+        "event_id": "route_44954659-f47e-42cf-8b8e-7ce7acd65aa4",
+        "type": "change_authorized",
+        "at": "2026-10-05T22:22:20.129Z",
+        "observation": null,
+        "authorization": {
+          "authorization_id": "qa-explicit-route-change",
+          "source": "explicit_operator_cli",
+          "run_id": "run_3c9a8ee1-43f4-45e2-b0cb-4ce3026c0fcc",
+          "session_id": "fixture-session",
+          "context_hash": "65de323a658bc452b216d8aa67c83bce9c78e80d31689d5774def203301106a7",
+          "from": {
+            "provider": "fixture-provider",
+            "model": "model-A",
+            "effort": "high"
+          },
+          "to": {
+            "provider": "fixture-provider",
+            "model": "model-B",
+            "effort": "high"
+          },
+          "request_revision": 3,
+          "issued_at": "2026-10-05T22:22:18.698Z",
+          "expires_at": "2026-10-05T22:23:19.698Z"
+        }
+      },
+      {
+        "sequence": 5,
+        "event_id": "route_0640887a-c51a-4f6b-9a0b-bb1c1e20b496",
+        "type": "native_selection_observed",
+        "at": "2026-10-05T22:22:20.165Z",
+        "observation": {
+          "status": "observed",
+          "selection": {
+            "provider": "fixture-provider",
+            "model": "model-B",
+            "effort": "high"
+          },
+          "reason": null,
+          "source": "acp_session_resume",
+          "cli_version": "0.2.0-rc.2",
+          "observed_at": "2026-10-05T22:22:19.644Z",
+          "actual_execution_verified": false
+        },
+        "authorization": null
+      }
+    ],
+    "writer_lock": "absent"
+  },
+  "fixture_requests": {
+    "prompt_messages": 1,
+    "native_configuration_setters": 0
+  },
+  "final_passive_inspection": {
+    "run_id": "run_3c9a8ee1-43f4-45e2-b0cb-4ce3026c0fcc",
+    "session_id": "fixture-session",
+    "context_hash": "65de323a658bc452b216d8aa67c83bce9c78e80d31689d5774def203301106a7",
+    "revision": 5,
+    "requested": {
+      "provider": "fixture-provider",
+      "model": "model-A",
+      "effort": "high"
+    },
+    "active_route": {
+      "provider": "fixture-provider",
+      "model": "model-B",
+      "effort": "high"
+    },
+    "provenance": {
+      "source": "explicit_operator_request",
+      "role": null,
+      "effort_source": "explicit",
+      "warning": null,
+      "source_hash": "e94a90a2c41ad8f95673a38c73b593d1683876a8cffaea9c6cd539c197b42eec"
+    },
+    "observation": {
+      "status": "observed",
+      "selection": {
+        "provider": "fixture-provider",
+        "model": "model-B",
+        "effort": "high"
+      },
+      "reason": null,
+      "source": "acp_session_resume",
+      "cli_version": "0.2.0-rc.2",
+      "observed_at": "2026-10-05T22:22:19.644Z",
+      "actual_execution_verified": false
+    },
+    "comparison": {
+      "status": "matches_native_configuration",
+      "reason": null,
+      "mismatched_fields": [],
+      "matches": true
+    },
+    "active_authorization": {
+      "authorization_id": "qa-explicit-route-change",
+      "source": "explicit_operator_cli",
+      "run_id": "run_3c9a8ee1-43f4-45e2-b0cb-4ce3026c0fcc",
+      "session_id": "fixture-session",
+      "context_hash": "65de323a658bc452b216d8aa67c83bce9c78e80d31689d5774def203301106a7",
+      "from": {
+        "provider": "fixture-provider",
+        "model": "model-A",
+        "effort": "high"
+      },
+      "to": {
+        "provider": "fixture-provider",
+        "model": "model-B",
+        "effort": "high"
+      },
+      "request_revision": 3,
+      "issued_at": "2026-10-05T22:22:18.698Z",
+      "expires_at": "2026-10-05T22:23:19.698Z"
+    },
+    "authorization_expired": false,
+    "prompt_allowed_by_route_assertion": true,
+    "actual_model_execution_verified": false,
+    "permission_expanded": false,
+    "native_route_changed": false,
+    "route_required": true,
+    "observation_is_historical": true,
+    "events": [
+      {
+        "sequence": 1,
+        "event_id": "route_10d2e1c8-9bf8-4c1b-853b-544a8765f3b0",
+        "type": "request_bound",
+        "at": "2026-10-05T22:22:15.386Z",
+        "observation": null,
+        "authorization": null
+      },
+      {
+        "sequence": 2,
+        "event_id": "route_0c44f2f2-e782-4a63-992b-764ab3326768",
+        "type": "native_selection_observed",
+        "at": "2026-10-05T22:22:18.283Z",
+        "observation": {
+          "status": "observed",
+          "selection": {
+            "provider": "fixture-provider",
+            "model": "model-A",
+            "effort": "high"
+          },
+          "reason": null,
+          "source": "acp_session_resume",
+          "cli_version": "0.2.0-rc.2",
+          "observed_at": "2026-10-05T22:22:18.256Z",
+          "actual_execution_verified": false
+        },
+        "authorization": null
+      },
+      {
+        "sequence": 3,
+        "event_id": "route_52cc66f4-2266-4e97-8ed1-883ca19073c2",
+        "type": "native_selection_observed",
+        "at": "2026-10-05T22:22:19.685Z",
+        "observation": {
+          "status": "observed",
+          "selection": {
+            "provider": "fixture-provider",
+            "model": "model-B",
+            "effort": "high"
+          },
+          "reason": null,
+          "source": "acp_session_resume",
+          "cli_version": "0.2.0-rc.2",
+          "observed_at": "2026-10-05T22:22:19.644Z",
+          "actual_execution_verified": false
+        },
+        "authorization": null
+      },
+      {
+        "sequence": 4,
+        "event_id": "route_44954659-f47e-42cf-8b8e-7ce7acd65aa4",
+        "type": "change_authorized",
+        "at": "2026-10-05T22:22:20.129Z",
+        "observation": null,
+        "authorization": {
+          "authorization_id": "qa-explicit-route-change",
+          "source": "explicit_operator_cli",
+          "run_id": "run_3c9a8ee1-43f4-45e2-b0cb-4ce3026c0fcc",
+          "session_id": "fixture-session",
+          "context_hash": "65de323a658bc452b216d8aa67c83bce9c78e80d31689d5774def203301106a7",
+          "from": {
+            "provider": "fixture-provider",
+            "model": "model-A",
+            "effort": "high"
+          },
+          "to": {
+            "provider": "fixture-provider",
+            "model": "model-B",
+            "effort": "high"
+          },
+          "request_revision": 3,
+          "issued_at": "2026-10-05T22:22:18.698Z",
+          "expires_at": "2026-10-05T22:23:19.698Z"
+        }
+      },
+      {
+        "sequence": 5,
+        "event_id": "route_0640887a-c51a-4f6b-9a0b-bb1c1e20b496",
+        "type": "native_selection_observed",
+        "at": "2026-10-05T22:22:20.165Z",
+        "observation": {
+          "status": "observed",
+          "selection": {
+            "provider": "fixture-provider",
+            "model": "model-B",
+            "effort": "high"
+          },
+          "reason": null,
+          "source": "acp_session_resume",
+          "cli_version": "0.2.0-rc.2",
+          "observed_at": "2026-10-05T22:22:19.644Z",
+          "actual_execution_verified": false
+        },
+        "authorization": null
+      }
+    ],
+    "writer_lock": "absent"
+  },
+  "limitations": [
+    "native session configuration is separate from provider-side model execution proof",
+    "no DSH routing implementation or configuration setter is replaced",
+    "operator approvals are local CLI provenance, not cryptographic authentication",
+    "fixture prompt effects are local only; no live provider/model invocation was performed",
+    "CLI assertions do not impose OS sandboxing, global controls on original DSH clients or child role enforcement"
+  ]
+}
