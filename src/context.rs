@@ -109,7 +109,7 @@ fn query_terms(query: &str) -> Vec<String> {
         if matches!(t, "the" | "and" | "for" | "with" | "this" | "that") {
             continue;
         }
-        if !terms.contains(&t.to_string()) {
+        if !terms.iter().any(|x| x.as_str() == t) {
             terms.push(t.to_string());
         }
         if terms.len() >= 8 {

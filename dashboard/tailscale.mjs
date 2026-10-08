@@ -39,7 +39,7 @@ export function checkPortConfig(config, hostname, port, target) {
   visit(config);
   return Boolean(
     config?.TCP?.[String(port)]?.HTTPS &&
-      config?.Web?.[authority]?.Handlers?.["/"]?.Proxy === target,
+    config?.Web?.[authority]?.Handlers?.["/"]?.Proxy === target,
   );
 }
 export async function enableShare(port) {
@@ -118,5 +118,43 @@ export async function enableShare(port) {
       consent_url: consentUrl || null,
       url: null,
     };
+  }
+}
+
+// Read-only route inspection. Unlike enableShare, this never runs `serve --bg`.
+export async function inspectShare(port, { executable, execute = exec } = {}) {
+  const observed_at = new Date().toISOString();
+  const command = executable || (await tailscaleExecutable());
+  if (!command) return { state: "not_installed", observed_at };
+  try {
+    const status = JSON.parse(
+      (
+        await execute(command, ["status", "--json"], {
+          timeout: 5000,
+          windowsHide: true,
+        })
+      ).stdout,
+    );
+    if (status.BackendState !== "Running" || !status.Self?.Online)
+      return { state: "login_required", observed_at };
+    const hostname = status.Self?.DNSName?.replace(/\.$/, "");
+    if (!hostname || !/^[a-z0-9.-]+\.ts\.net$/i.test(hostname))
+      return { state: "dns_required", observed_at };
+    const config = JSON.parse(
+      (
+        await execute(command, ["serve", "status", "--json"], {
+          timeout: 5000,
+          windowsHide: true,
+        })
+      ).stdout || "{}",
+    );
+    return {
+      state: checkPortConfig(config, hostname, port, `http://127.0.0.1:${port}`)
+        ? "ready"
+        : "route_missing",
+      observed_at,
+    };
+  } catch {
+    return { state: "unconfirmed", reason: "route_check_failed", observed_at };
   }
 }

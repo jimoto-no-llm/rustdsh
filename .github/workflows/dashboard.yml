@@ -31,4 +31,13 @@ jobs:
           cache: npm
           cache-dependency-path: dashboard/package-lock.json
       - run: npm ci
-      - run: npm test
+      - if: runner.os == 'Windows'
+        run: npm test
+      - if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          # A delegated service owns only this test run's cgroup; no global PID signals.
+          sudo systemd-run --unit="rdsh-dashboard-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --wait --pipe --collect --property=Delegate=yes \
+            --property=DelegateSubgroup=supervisor --uid="$(id -u)" \
+            --working-directory="$PWD" /usr/bin/env HOME="$HOME" PATH="$PATH" npm test

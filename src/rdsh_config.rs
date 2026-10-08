@@ -669,8 +669,7 @@ impl RdshSettings {
             "all" | "" => *self = d,
             _ => {
                 // 単項目は既定節から写す
-                let tmp = d.clone();
-                self.set_dotted_fallback(&key, &tmp)?;
+                self.set_dotted_fallback(&key, &d)?;
             }
         }
         self.sanitize();

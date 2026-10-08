@@ -1,0 +1,146 @@
+{
+  "command": "node cli.mjs adapters",
+  "base_commit": "190dd7ce60ec051cdc5e52cd15950b182f820baa",
+  "before": {
+    "exit": 1,
+    "stdout": "",
+    "stderr": "[rdsh-dashboard] Unknown command; use --help"
+  },
+  "after": {
+    "exit": 0,
+    "report": {
+      "adapters": [
+        {
+          "id": "dsh",
+          "protocol": "acp-stdio-v1",
+          "verified_versions": [
+            "0.2.0-rc.2"
+          ],
+          "verification": "versioned wire fixtures and isolated DSH ACP lifecycle smoke",
+          "operations": {
+            "start": {
+              "status": "requires_version_and_protocol_check",
+              "method": "session/new"
+            },
+            "resume": {
+              "status": "requires_version_and_protocol_check",
+              "method": "session/resume"
+            },
+            "send": {
+              "status": "requires_version_and_protocol_check",
+              "method": "session/prompt"
+            },
+            "interrupt": {
+              "status": "requires_version_and_protocol_check",
+              "method": "session/cancel"
+            },
+            "stop": {
+              "status": "requires_version_and_protocol_check",
+              "method": "session/close then owned process exit"
+            },
+            "usage": {
+              "status": "requires_version_and_protocol_check",
+              "method": "session/update:usage_update"
+            }
+          }
+        },
+        {
+          "id": "codex",
+          "protocol": null,
+          "verified_versions": [],
+          "verification": "no implementation or verified CLI version",
+          "operations": {
+            "start": {
+              "status": "unsupported",
+              "method": null
+            },
+            "resume": {
+              "status": "unsupported",
+              "method": null
+            },
+            "send": {
+              "status": "unsupported",
+              "method": null
+            },
+            "interrupt": {
+              "status": "unsupported",
+              "method": null
+            },
+            "stop": {
+              "status": "unsupported",
+              "method": null
+            },
+            "usage": {
+              "status": "unsupported",
+              "method": null
+            }
+          }
+        },
+        {
+          "id": "claude",
+          "protocol": null,
+          "verified_versions": [],
+          "verification": "no implementation or verified CLI version",
+          "operations": {
+            "start": {
+              "status": "unsupported",
+              "method": null
+            },
+            "resume": {
+              "status": "unsupported",
+              "method": null
+            },
+            "send": {
+              "status": "unsupported",
+              "method": null
+            },
+            "interrupt": {
+              "status": "unsupported",
+              "method": null
+            },
+            "stop": {
+              "status": "unsupported",
+              "method": null
+            },
+            "usage": {
+              "status": "unsupported",
+              "method": null
+            }
+          }
+        },
+        {
+          "id": "kimi",
+          "protocol": null,
+          "verified_versions": [],
+          "verification": "no implementation or verified CLI version",
+          "operations": {
+            "start": {
+              "status": "unsupported",
+              "method": null
+            },
+            "resume": {
+              "status": "unsupported",
+              "method": null
+            },
+            "send": {
+              "status": "unsupported",
+              "method": null
+            },
+            "interrupt": {
+              "status": "unsupported",
+              "method": null
+            },
+            "stop": {
+              "status": "unsupported",
+              "method": null
+            },
+            "usage": {
+              "status": "unsupported",
+              "method": null
+            }
+          }
+        }
+      ]
+    }
+  }
+}

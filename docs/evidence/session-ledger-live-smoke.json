@@ -1,0 +1,123 @@
+{
+  "status": "passed",
+  "checks": {
+    "separate_client_processes": true,
+    "native_session_created": true,
+    "ledger_reopened": true,
+    "native_session_resumed": true,
+    "owned_process_exits_confirmed": true,
+    "same_label_and_task_distinct_runs": true,
+    "unknown_native_id_preserved": true
+  },
+  "run": {
+    "run_id": "run_1955e1d9-2383-4d57-8f1f-b959c0547337",
+    "project_id": "5dfa2613d699f9d1",
+    "task_id": "qa-task",
+    "label": "isolated ledger QA",
+    "cli": "dsh",
+    "cli_session_id": "9666a73d-fb8d-4a7a-8f20-5dc3cd60ef6f",
+    "binding": "confirmed",
+    "cwd": "/tmp/rdsh-ledger-live-qjvjA0/project",
+    "branch": "ledger-qa",
+    "git": {
+      "status": "observed",
+      "root": "/tmp/rdsh-ledger-live-qjvjA0/project",
+      "head": null
+    },
+    "launch": {
+      "method": "acp-stdio-v1",
+      "executable": "/root/.local/opt/rdsh-node/lib/node_modules/@deepseek-ai/dsh/lib/bin.js",
+      "entrypoint": null,
+      "profile": "acp"
+    },
+    "scope": {
+      "effective_home": "/tmp/rdsh-ledger-live-qjvjA0",
+      "HOME": "/tmp/rdsh-ledger-live-qjvjA0",
+      "USERPROFILE": "/tmp/rdsh-ledger-live-qjvjA0",
+      "DSH_HOME": "/tmp/rdsh-ledger-live-qjvjA0/dsh",
+      "XDG_CONFIG_HOME": "/tmp/rdsh-ledger-live-qjvjA0/config",
+      "XDG_DATA_HOME": "/tmp/rdsh-ledger-live-qjvjA0/data",
+      "APPDATA": "/tmp/rdsh-ledger-live-qjvjA0/data",
+      "LOCALAPPDATA": "/tmp/rdsh-ledger-live-qjvjA0/local"
+    },
+    "provider": null,
+    "cli_version": "0.2.0-rc.2",
+    "created_at": "2026-10-05T19:21:26.429Z",
+    "last_attached_at": "2026-10-05T19:21:28.126Z",
+    "unknown_fields": [
+      "provider"
+    ],
+    "cli_session_display": "9666a73d-fb8d-4a7a-8f20-5dc3cd60ef6f"
+  },
+  "resumed_run": {
+    "run_id": "run_1955e1d9-2383-4d57-8f1f-b959c0547337",
+    "project_id": "5dfa2613d699f9d1",
+    "task_id": "qa-task",
+    "label": "isolated ledger QA",
+    "cli": "dsh",
+    "cli_session_id": "9666a73d-fb8d-4a7a-8f20-5dc3cd60ef6f",
+    "binding": "confirmed",
+    "cwd": "/tmp/rdsh-ledger-live-qjvjA0/project",
+    "branch": "ledger-qa",
+    "git": {
+      "status": "observed",
+      "root": "/tmp/rdsh-ledger-live-qjvjA0/project",
+      "head": null
+    },
+    "launch": {
+      "method": "acp-stdio-v1",
+      "executable": "/root/.local/opt/rdsh-node/lib/node_modules/@deepseek-ai/dsh/lib/bin.js",
+      "entrypoint": null,
+      "profile": "acp"
+    },
+    "scope": {
+      "effective_home": "/tmp/rdsh-ledger-live-qjvjA0",
+      "HOME": "/tmp/rdsh-ledger-live-qjvjA0",
+      "USERPROFILE": "/tmp/rdsh-ledger-live-qjvjA0",
+      "DSH_HOME": "/tmp/rdsh-ledger-live-qjvjA0/dsh",
+      "XDG_CONFIG_HOME": "/tmp/rdsh-ledger-live-qjvjA0/config",
+      "XDG_DATA_HOME": "/tmp/rdsh-ledger-live-qjvjA0/data",
+      "APPDATA": "/tmp/rdsh-ledger-live-qjvjA0/data",
+      "LOCALAPPDATA": "/tmp/rdsh-ledger-live-qjvjA0/local"
+    },
+    "provider": null,
+    "cli_version": "0.2.0-rc.2",
+    "created_at": "2026-10-05T19:21:26.429Z",
+    "last_attached_at": "2026-10-05T19:21:38.236Z",
+    "unknown_fields": [
+      "provider"
+    ],
+    "cli_session_display": "9666a73d-fb8d-4a7a-8f20-5dc3cd60ef6f"
+  },
+  "unknown_run": {
+    "run_id": "run_4b288050-08dd-4076-9dfe-0b4f590f5fea",
+    "project_id": "5dfa2613d699f9d1",
+    "task_id": "qa-task",
+    "label": "isolated ledger QA",
+    "cli": "dsh",
+    "cli_session_id": null,
+    "binding": "unknown",
+    "cwd": "/tmp/rdsh-ledger-live-qjvjA0/project",
+    "branch": "ledger-qa",
+    "git": {
+      "status": "observed",
+      "root": "/tmp/rdsh-ledger-live-qjvjA0/project",
+      "head": null
+    },
+    "launch": null,
+    "scope": null,
+    "provider": null,
+    "cli_version": null,
+    "created_at": "2026-10-05T19:21:42.942Z",
+    "last_attached_at": null,
+    "unknown_fields": [
+      "cli_session_id",
+      "provider",
+      "launch"
+    ],
+    "cli_session_display": "不明"
+  },
+  "prompt_sent": false,
+  "provider_authentication": "not_verified",
+  "credential_isolation": "temporary homes, no inherited provider credentials"
+}

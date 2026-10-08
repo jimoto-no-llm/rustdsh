@@ -1,0 +1,49 @@
+{
+  "observed_at": "2026-10-05T23:16:18.643Z",
+  "source": "native_linux_independent_original_dsh_and_bash_fixture",
+  "managed_before": {
+    "owner_id": "owner_f476074a-8475-46f4-b3d2-bb8a4ee86033",
+    "kind": "linux_cgroup_v2",
+    "kernel_id": "2493",
+    "root_identity": {
+      "platform": "linux",
+      "pid": 445,
+      "birth": "600",
+      "scope": "8f73ac39e4a6fdeb4e44436520a6366ffd276d0c8c6e0a338d9d3e8964d07ec0"
+    },
+    "root_pid": 445,
+    "status": "running",
+    "remaining_pids": [
+      445,
+      453,
+      460
+    ],
+    "remaining_count": 3,
+    "members_truncated": false,
+    "confirmed": false
+  },
+  "managed_after": {
+    "owner_id": "owner_f476074a-8475-46f4-b3d2-bb8a4ee86033",
+    "kind": "linux_cgroup_v2",
+    "kernel_id": "2493",
+    "root_identity": {
+      "platform": "linux",
+      "pid": 445,
+      "birth": "600",
+      "scope": "8f73ac39e4a6fdeb4e44436520a6366ffd276d0c8c6e0a338d9d3e8964d07ec0"
+    },
+    "root_pid": 445,
+    "status": "exit_confirmed",
+    "remaining_pids": [],
+    "remaining_count": 0,
+    "members_truncated": false,
+    "confirmed": true,
+    "resources_released": true
+  },
+  "independent_dsh_identity_unchanged": true,
+  "independent_dsh_http_status_after": 401,
+  "shell_heartbeats_continue": true,
+  "shell_term_requests": 0,
+  "prompt_requests": 0,
+  "provider_authentication_verified": false
+}

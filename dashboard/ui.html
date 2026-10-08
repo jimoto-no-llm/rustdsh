@@ -36,7 +36,7 @@
       main {
         max-width: 1480px;
         margin: auto;
-        padding: 32px;
+        padding: 32px 32px 120px;
       }
       header {
         display: flex;
@@ -49,6 +49,7 @@
         margin: 4px 0;
         font-size: 28px;
         letter-spacing: -0.02em;
+        overflow-wrap: anywhere;
       }
       h2 {
         font-size: 21px;
@@ -64,6 +65,121 @@
         color: var(--mut);
         font-size: 13px;
         overflow-wrap: anywhere;
+      }
+      header > div {
+        min-width: 0;
+      }
+      .header-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .summary-card {
+        margin: 16px 0 24px;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--card);
+        overflow-wrap: anywhere;
+      }
+      .summary-card h2 {
+        margin: 0 0 12px;
+      }
+      .summary-card label {
+        display: block;
+      }
+      .summary-card select {
+        display: block;
+        width: 100%;
+        min-height: 44px;
+        margin: 6px 0;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 8px;
+        background: white;
+        font: inherit;
+      }
+      .summary-facts {
+        display: grid;
+        grid-template-columns: 100px minmax(0, 1fr);
+        gap: 12px;
+      }
+      .summary-facts dt {
+        color: var(--mut);
+      }
+      .summary-facts dd {
+        margin: 0;
+        min-width: 0;
+      }
+      .summary-facts p {
+        margin: 4px 0 0;
+      }
+      #overview-context {
+        font-weight: 600;
+      }
+      #overview-pending {
+        padding-left: 22px;
+      }
+      #overview-pending a {
+        display: block;
+        padding: 10px 0;
+      }
+      .fold {
+        margin: 18px 0;
+      }
+      .fold > summary {
+        padding: 12px;
+        cursor: pointer;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: white;
+      }
+      #diagnostics-result {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+      #diagnostics-result > .notice {
+        grid-column: 1 / -1;
+      }
+      .diagnostic-stage {
+        padding: 10px 0;
+        border-top: 1px solid var(--line);
+        overflow-wrap: anywhere;
+      }
+      #quick-actions {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 5;
+        border-top: 1px solid var(--line);
+        background: var(--bg);
+        padding: 8px 14px calc(8px + env(safe-area-inset-bottom));
+      }
+      #quick-context {
+        margin: 0 auto 4px;
+        max-width: 900px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .quick-buttons {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 6px;
+        max-width: 900px;
+        margin: auto;
+      }
+      .quick-buttons button {
+        min-height: 44px;
+        padding: 6px;
+        font-size: 14px;
+      }
+      section,
+      h2,
+      #overview-stop {
+        scroll-margin: 18px;
       }
       button,
       a.button {
@@ -139,6 +255,48 @@
       .warn {
         color: var(--red);
       }
+      .cost-grid .value {
+        font-size: 24px;
+        overflow-wrap: anywhere;
+      }
+      #budget-admission .budget-grid {
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+      }
+      #budget-admission p,
+      #budget-admission h3 {
+        overflow-wrap: anywhere;
+      }
+      #budget-admission .value {
+        overflow-wrap: anywhere;
+        font-size: clamp(1.4rem, 3vw, 2rem);
+      }
+      #cost-ledger p,
+      #cost-ledger h3 {
+        overflow-wrap: anywhere;
+      }
+      #cost-ledger label {
+        display: block;
+        margin-bottom: 6px;
+      }
+      #cost-scope {
+        display: block;
+        width: 100%;
+        min-width: 0;
+        min-height: 44px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px;
+        font: inherit;
+        background: white;
+      }
+      #cost-scope:focus-visible {
+        outline: 3px solid #85aaff;
+        outline-offset: 3px;
+      }
+      .cost-entry {
+        padding: 16px 0;
+        border-bottom: 1px solid var(--line);
+      }
       .table-box {
         overflow: auto;
         border: 1px solid var(--line);
@@ -192,6 +350,70 @@
       .question {
         min-width: 240px;
       }
+      .decision-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr));
+        gap: 16px;
+      }
+      .decision-card {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 16px;
+        min-width: 0;
+        overflow-wrap: anywhere;
+        background: var(--card);
+      }
+      .decision-heading {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+      }
+      .decision-card h3 {
+        font-size: 18px;
+        margin: 12px 0;
+      }
+      .decision-details {
+        display: grid;
+        grid-template-columns: 90px minmax(0, 1fr);
+        gap: 8px;
+        margin: 12px 0;
+      }
+      .decision-details dt {
+        color: var(--mut);
+      }
+      .decision-details dd {
+        margin: 0;
+        white-space: pre-wrap;
+      }
+      .decision-card fieldset {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 12px;
+      }
+      .decision-choice {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 6px 10px;
+        padding: 8px 0;
+        align-items: start;
+        cursor: pointer;
+      }
+      .decision-choice input {
+        width: auto;
+        margin-top: 4px;
+      }
+      .choice-detail {
+        grid-column: 2;
+      }
+      .decision-card textarea {
+        width: 100%;
+        min-height: 90px;
+        margin: 12px 0;
+      }
+      .decision-card button {
+        margin: 4px 8px 4px 0;
+      }
       textarea {
         display: block;
         margin-top: 12px;
@@ -201,6 +423,27 @@
         border: 1px solid var(--line);
         border-radius: 8px;
         padding: 10px;
+        font: inherit;
+      }
+      #instruction-panel form {
+        margin-bottom: 20px;
+      }
+      #instruction-panel label {
+        display: block;
+        margin: 12px 0 6px;
+      }
+      #instruction-panel select {
+        width: 100%;
+        min-width: 0;
+        font: inherit;
+        padding: 8px;
+      }
+      #instruction-panel button {
+        margin: 8px 8px 8px 0;
+      }
+      .instruction-text {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
         font: inherit;
       }
       .error {
@@ -270,7 +513,7 @@
         background: #edf1f7;
         border-radius: 8px;
       }
-      /* #42/#61: 配置は変えず、待避線・種別表示・パレット分だけ足す。 */
+      /* Stable anchors and the existing command palette remain usable. */
       .skip {
         position: absolute;
         left: 12px;
@@ -300,6 +543,20 @@
         border-radius: 14px;
         padding: 18px 20px;
         width: min(560px, calc(100vw - 40px));
+      }
+      #managed-stop-dialog {
+        max-width: min(560px, calc(100vw - 28px));
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 18px;
+        overflow-wrap: anywhere;
+      }
+      #managed-stop-dialog::backdrop {
+        background: rgb(0 0 0 / 0.25);
+      }
+      #managed-stop-dialog button {
+        min-height: 44px;
+        margin: 4px;
       }
       #palette::backdrop {
         background: rgb(0 0 0 / 0.25);
@@ -332,17 +589,57 @@
         }
       }
       @media (max-width: 600px) {
+        #diagnostics-result {
+          grid-template-columns: 1fr;
+        }
         main {
-          padding: 18px 14px;
+          padding: 18px 14px 120px;
         }
         header {
           align-items: flex-start;
+          flex-direction: column;
         }
         h1 {
           font-size: 23px;
         }
         .cards {
           gap: 10px;
+        }
+        .cost-grid {
+          grid-template-columns: 1fr;
+        }
+        .summary-facts {
+          grid-template-columns: 76px minmax(0, 1fr);
+          gap: 10px;
+        }
+        .table-box {
+          overflow: visible;
+        }
+        table,
+        tbody,
+        tr,
+        td {
+          display: block;
+        }
+        thead {
+          display: none;
+        }
+        tr {
+          padding: 10px;
+        }
+        td {
+          display: grid;
+          grid-template-columns: 76px minmax(0, 1fr);
+          gap: 8px;
+          overflow-wrap: anywhere;
+        }
+        td::before {
+          content: attr(data-label);
+          color: var(--mut);
+          font-family: system-ui;
+        }
+        td.id {
+          white-space: normal;
         }
         .card {
           padding: 16px;
@@ -381,9 +678,12 @@
         <div>
           <div class="eyebrow" id="kind">PROJECT DASHBOARD</div>
           <h1 id="title">読み込み中…</h1>
-          <div class="sub" id="location"></div>
+          <details>
+            <summary class="sub">場所・接続先</summary>
+            <div class="sub" id="location"></div>
+          </details>
         </div>
-        <div>
+        <div class="header-actions">
           <!-- #61: 主要操作をキーボードで呼ぶ入口。Ctrl/⌘+K でも開きます。 -->
           <button
             id="palette-toggle"
@@ -425,62 +725,152 @@
           <div id="mcp-info" class="sub"></div>
         </div>
       </section>
+      <details class="fold" id="connection-detail">
+        <summary>接続診断</summary>
+        <p class="sub">
+          スマホ閲覧とDot連携の経路を個別に確認します。診断は読み取り専用です。
+        </p>
+        <button id="diagnostics-refresh">診断を取得</button>
+        <p id="diagnostics-status" role="status" aria-live="polite">
+          診断は未取得です。
+        </p>
+        <div id="diagnostics-result"></div>
+      </details>
       <section id="harness" hidden>
         <div class="notice">
           DeepSeek
           HarnessのWeb画面を起動しています。プロジェクト別の指標・質問は、専用ダッシュボードで扱います。
         </div>
         <a id="harness-open" class="button">Harnessを開く</a>
+        <section class="card" aria-labelledby="managed-heading">
+          <h2 id="managed-heading">管理中の実行</h2>
+          <p id="managed-status" role="status" aria-live="polite">
+            所有範囲を確認中…
+          </p>
+          <p id="managed-remaining" class="sub"></p>
+          <details>
+            <summary>実行IDと停止履歴</summary>
+            <code id="managed-run"></code>
+            <ul id="managed-stages"></ul>
+          </details>
+          <button id="managed-stop" disabled>この実行を停止</button>
+        </section>
       </section>
       <div id="project-content" tabindex="-1">
-        <!-- #42: 数値カードを開かなくても状態・判断要否だけ掴める一行要約。 -->
-        <p class="sub" id="overview" role="status" aria-live="polite"></p>
-        <div class="cards" id="cards"></div>
-        <h2 id="tasks-heading" tabindex="-1">
-          タスク <span class="sub" id="task-milestones"></span>
-        </h2>
-        <div class="table-box">
-          <!-- #57: 各行に task-<id> の目印を付け、端末を替えても同じ行へ戻れるようにします。 -->
-          <table aria-labelledby="tasks-heading">
-            <thead>
-              <tr>
-                <th scope="col">ID</th>
-                <th scope="col">状態</th>
-                <th scope="col">題名</th>
-                <th scope="col">ブロック要因</th>
-              </tr>
-            </thead>
-            <tbody id="tasks"></tbody>
-          </table>
-        </div>
-        <!-- #40: 回答は返答のみで実行権限を生みません。承認依頼と相談を同じ表で区別します。 -->
+        <section
+          id="project-overview"
+          class="summary-card"
+          aria-labelledby="overview-heading"
+        >
+          <h2 id="overview-heading" tabindex="-1">いまの状況</h2>
+          <label for="overview-task">確認する範囲</label
+          ><select id="overview-task"></select>
+          <p id="overview-context"></p>
+          <dl class="summary-facts">
+            <dt>状態</dt>
+            <dd>
+              <div id="overview-state">実行状態は未取得</div>
+              <p class="sub" id="overview-task-report"></p>
+            </dd>
+            <dt>観測</dt>
+            <dd>
+              <div id="overview-observed">実行の観測記録なし</div>
+              <p class="sub" id="overview-report-updated"></p>
+            </dd>
+            <dt>最後の結果</dt>
+            <dd>
+              <div id="overview-result">未取得</div>
+              <p class="sub" id="overview-result-detail"></p>
+            </dd>
+            <dt>判断</dt>
+            <dd id="overview-decision">確認中…</dd>
+            <dt>停止</dt>
+            <dd id="overview-stop">この画面からの停止は非対応</dd>
+          </dl>
+          <ul id="overview-pending"></ul>
+        </section>
         <h2 id="pending-heading" tabindex="-1">未回答の質問</h2>
         <p class="sub" id="pending-note">
-          回答はこの質問への返答のみです。回答しただけで実行権限は生まれません。対象・条件が変わった場合は回答前に内容を再確認してください。
+          プロジェクト全体の質問です。回答はこの質問への返答のみです。対象・条件が変わった場合は回答前に内容を再確認してください。回答しただけで実行権限は生まれません。
         </p>
-        <div class="table-box">
-          <table
-            aria-labelledby="pending-heading"
-            aria-describedby="pending-note"
+        <div
+          id="questions"
+          class="decision-grid"
+          aria-labelledby="pending-heading"
+          aria-describedby="pending-note"
+        ></div>
+        <section id="budget-admission" aria-label="予算制御"></section>
+        <details class="fold" id="metrics-detail">
+          <summary>プロジェクト全体の数値</summary>
+          <h2 id="metrics-heading" tabindex="-1">数値の詳細</h2>
+          <div class="cards" id="cards"></div>
+          <h2>費用の明細と出所</h2>
+          <section id="cost-ledger" aria-label="費用台帳"></section>
+        </details>
+        <details class="fold" id="tasks-detail">
+          <summary>タスク一覧</summary>
+          <h2 id="tasks-heading" tabindex="-1">
+            タスク <span class="sub" id="task-milestones"></span>
+          </h2>
+          <div class="table-box">
+            <!-- #57: 各行に task-<id> の目印を付け、端末を替えても同じ行へ戻れるようにします。 -->
+            <table aria-labelledby="tasks-heading">
+              <thead>
+                <tr>
+                  <th scope="col">ID</th>
+                  <th scope="col">状態</th>
+                  <th scope="col">題名</th>
+                  <th scope="col">ブロック要因</th>
+                </tr>
+              </thead>
+              <tbody id="tasks"></tbody>
+            </table>
+          </div>
+        </details>
+        <details class="fold" id="instruction-detail">
+          <summary>同じsessionへ追指示を送る</summary>
+          <h2>追指示と適用タイミング</h2>
+          <p class="sub">
+            下書きはこの端末で保持します。入力は順番に配送し、結果不明の入力がある場合は保留します。指示の保存で新しい実行権限は発行されません。
+          </p>
+          <section
+            id="instruction-panel"
+            aria-label="追指示の投稿と確認"
+          ></section>
+        </details>
+        <details class="fold" id="reply-detail">
+          <summary>回答の保存・適用を確認</summary>
+          <section
+            id="reply-applications"
+            hidden
+            aria-labelledby="reply-heading"
           >
-            <thead>
-              <tr>
-                <th scope="col">ID</th>
-                <th scope="col">緊急度</th>
-                <th scope="col">問い・回答</th>
-                <th scope="col">既定の行動（参考表示）</th>
-              </tr>
-            </thead>
-            <tbody id="questions"></tbody>
-          </table>
-        </div>
-        <h2>進捗・成果物</h2>
-        <div class="feed" id="events"></div>
+            <h2 id="reply-heading">回答の適用状況</h2>
+            <p class="sub">
+              保存・通知配送・対象consumerの読取・入力処理の結果を分けて確認します。完了表示はこの回答入力へのACP応答です。作業の完了は受入検証で確認します。
+            </p>
+            <div id="reply-status" class="decision-grid"></div>
+          </section>
+        </details>
+        <details class="fold" id="progress-detail">
+          <summary>進捗・成果物の報告</summary>
+          <h2>進捗・成果物</h2>
+          <div class="feed" id="events"></div>
+        </details>
         <details id="answered">
           <summary>回答済みの質問</summary>
           <div class="feed" id="answers"></div>
         </details>
       </div>
+      <nav id="quick-actions" aria-label="プロジェクトの操作" hidden>
+        <p id="quick-context" class="sub"></p>
+        <div class="quick-buttons">
+          <button id="quick-overview">概要</button
+          ><button id="quick-pending">判断</button
+          ><button id="quick-details">詳細</button
+          ><button id="quick-stop">停止案内</button>
+        </div>
+      </nav>
       <!-- #61: 主要操作をキーボードで呼ぶ小さな一覧。既存ボタンの操作を再利用し、権限・状態チェックは各操作側で行います。 -->
       <dialog id="palette" aria-labelledby="palette-title">
         <h2 id="palette-title">コマンド</h2>
@@ -496,6 +886,14 @@
         />
         <p class="sub" id="palette-count" role="status"></p>
         <ul id="palette-list"></ul>
+      </dialog>
+      <dialog id="managed-stop-dialog" aria-labelledby="managed-stop-title">
+        <h2 id="managed-stop-title">停止する対象を確認</h2>
+        <p id="managed-stop-target"></p>
+        <p id="managed-stop-impact"></p>
+        <p class="warn" id="managed-stop-error" role="alert"></p>
+        <button id="managed-stop-cancel">戻る</button>
+        <button id="managed-stop-confirm">確認した対象を停止</button>
       </dialog>
       <footer id="updated">
         未取得の指標はMCPから報告されたときに表示されます。費用は報告元のAPI換算値で、請求額とは別です。

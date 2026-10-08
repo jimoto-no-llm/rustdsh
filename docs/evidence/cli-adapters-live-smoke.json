@@ -1,0 +1,61 @@
+{
+  "status": "passed",
+  "cli": "dsh",
+  "cli_version": "0.2.0-rc.2",
+  "protocol": "acp-stdio-v1",
+  "checks": {
+    "start": "acknowledged",
+    "resume": "acknowledged",
+    "send": "not_exercised_no_model_request",
+    "interrupt": "notification_written",
+    "stop": "exit_confirmed",
+    "usage": "unavailable"
+  },
+  "negotiated_capabilities": {
+    "cli": "dsh",
+    "protocol": "acp-stdio-v1",
+    "verified_versions": [
+      "0.2.0-rc.2"
+    ],
+    "detected_version": "0.2.0-rc.2",
+    "active_process_version": "0.2.0-rc.2",
+    "health": "compatible",
+    "operations": {
+      "start": {
+        "supported": true,
+        "status": "supported",
+        "reason": null
+      },
+      "resume": {
+        "supported": true,
+        "status": "supported",
+        "reason": null
+      },
+      "send": {
+        "supported": true,
+        "status": "supported",
+        "reason": null
+      },
+      "interrupt": {
+        "supported": true,
+        "status": "supported",
+        "reason": null
+      },
+      "stop": {
+        "supported": true,
+        "status": "supported",
+        "reason": null
+      },
+      "usage": {
+        "supported": true,
+        "status": "supported",
+        "reason": null
+      }
+    },
+    "usage_scope": "context_occupancy_tokens; not billable usage or cost",
+    "interrupt_ack": "notification sent; confirmed only by cancelled prompt result"
+  },
+  "runtime_state": "stopped",
+  "authentication": "not_verified",
+  "isolation": "temporary home, no inherited provider credentials"
+}

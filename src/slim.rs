@@ -40,7 +40,7 @@ pub fn resolve_node_compile_cache(
     existing: Option<&str>,
     default_dir: &str,
 ) -> Option<String> {
-    if rdsh_hint == Some("0") {
+    if rdsh_hint.is_some_and(|v| v == "0") {
         return None;
     }
     if existing.is_some_and(|v| !v.is_empty()) {

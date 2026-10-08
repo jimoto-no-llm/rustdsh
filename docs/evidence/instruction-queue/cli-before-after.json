@@ -1,0 +1,70 @@
+{
+  "source_before": "c80879ef90943e6020f3283033fb988209af5359",
+  "kind": "actual_cli_with_owned_native_fixture",
+  "real_provider_requests": 0,
+  "physical_phone_test": "not_performed",
+  "before": {
+    "context": {
+      "exit_code": 1,
+      "stderr": "node:internal/util/parse_args/parse_args:102\r\n      throw new ERR_PARSE_ARGS_UNKNOWN_OPTION(\r\n            ^\r\n\r\nTypeError [ERR_PARSE_ARGS_UNKNOWN_OPTION]: Unknown option '--consumer-id'. To specify a positional argument starting with a '-', place it at the end of the command after '--', as in '-- \"--consumer-id\"\r\n    at checkOptionUsage (node:internal/util/parse_args/parse_args:102:13)\r\n    at node:internal/util/parse_args/parse_args:377:9\r\n    at Array.forEach (<anonymous>)\r\n    at parseArgs (node:internal/util/parse_args/parse_args:374:3)\r\n    at file:///C:/Users/owner/AppData/Local/Temp/rdsh-input19-diff-gNvDCF/baseline/dashboard/cli.mjs:55:33 {\r\n  code: 'ERR_PARSE_ARGS_UNKNOWN_OPTION'\r\n}\r\n\r\nNode.js v24.18.0"
+    },
+    "submit": {
+      "exit_code": 1,
+      "stderr": "node:internal/util/parse_args/parse_args:102\r\n      throw new ERR_PARSE_ARGS_UNKNOWN_OPTION(\r\n            ^\r\n\r\nTypeError [ERR_PARSE_ARGS_UNKNOWN_OPTION]: Unknown option '--input-file'. To specify a positional argument starting with a '-', place it at the end of the command after '--', as in '-- \"--input-file\"\r\n    at checkOptionUsage (node:internal/util/parse_args/parse_args:102:13)\r\n    at node:internal/util/parse_args/parse_args:377:9\r\n    at Array.forEach (<anonymous>)\r\n    at parseArgs (node:internal/util/parse_args/parse_args:374:3)\r\n    at file:///C:/Users/owner/AppData/Local/Temp/rdsh-input19-diff-gNvDCF/baseline/dashboard/cli.mjs:55:33 {\r\n  code: 'ERR_PARSE_ARGS_UNKNOWN_OPTION'\r\n}\r\n\r\nNode.js v24.18.0"
+    }
+  },
+  "after": {
+    "context": {
+      "consumer": {
+        "consumer_id": "consumer_7dc37365bec59e3d68de8b5ff5ff8c6d",
+        "project_id": "c0bf7f7bcd3768c3",
+        "run_id": "run_0d5eea8a-f63b-4651-b351-89896aa1bc08",
+        "session_id": "fixture-session",
+        "task_id": "T1",
+        "created_at": "2026-10-06T02:44:44.438Z"
+      },
+      "queue_revision": 0,
+      "steer": {
+        "supported": false,
+        "fallback": "next_turn",
+        "reason": "dsh_acp_no_verified_steer"
+      },
+      "inputs": [],
+      "active_command_id": null,
+      "target_observation": {
+        "status": "available",
+        "reason": "registered_owner_and_native_session",
+        "observed_at": "2026-10-06T02:44:45.353Z",
+        "owner_id": "owner_ec9e1673-e424-4b1a-8c2c-d67ce4cd1c09"
+      }
+    },
+    "saved": {
+      "duplicate": false,
+      "command_id": "input_01e33d97-15f4-418e-b5d7-587a4480eb80",
+      "phase": "saved",
+      "actor": "management_agent",
+      "requested_mode": "steer",
+      "effective_mode": "next_turn",
+      "timing_reason": "dsh_acp_no_verified_steer"
+    },
+    "repeat": {
+      "duplicate": true,
+      "command_id": "input_01e33d97-15f4-418e-b5d7-587a4480eb80"
+    },
+    "application": {
+      "processed": [
+        {
+          "command_id": "input_01e33d97-15f4-418e-b5d7-587a4480eb80",
+          "phase": "succeeded",
+          "native_command_id": "cmd_465121e7-84b0-44a9-ba3b-7b99cdffe68b",
+          "result_reason": "native_prompt_completed"
+        }
+      ],
+      "next_cursor": 1,
+      "blocked": false
+    },
+    "native_prompt_count": 1,
+    "effect_count": 1,
+    "native_session_count": 1
+  }
+}

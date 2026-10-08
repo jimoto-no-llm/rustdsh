@@ -1,0 +1,84 @@
+{
+  "nativeAttachment": {
+    "cli_version": "0.2.0-rc.2",
+    "session_id_from_original_DSH": true,
+    "profile_patch_registered": true,
+    "prompt_sent": false
+  },
+  "native_runtime": "original dsh-llm LlmRuntime + Cordis waterfall",
+  "concurrent_workers": 2,
+  "permitted_provider_dispatches": 1,
+  "denied_model_calls": 2,
+  "denied_new_jobs": 1,
+  "receivedRoutes": [
+    {
+      "provider": "fixture-provider",
+      "model": "fixture-model"
+    },
+    {
+      "provider": "fixture-provider",
+      "model": "fixture-model"
+    },
+    {
+      "provider": "fixture-provider",
+      "model": "fixture-model"
+    },
+    {
+      "provider": "fixture-provider",
+      "model": "fixture-model"
+    },
+    {
+      "provider": "fixture-provider",
+      "model": "fixture-model"
+    },
+    {
+      "provider": "fixture-provider",
+      "model": "fixture-model"
+    },
+    {
+      "provider": "fixture-provider",
+      "model": "fixture-model"
+    },
+    {
+      "provider": "fixture-provider",
+      "model": "fixture-model"
+    },
+    {
+      "provider": "fixture-provider",
+      "model": "fixture-model"
+    },
+    {
+      "provider": "fixture-provider",
+      "model": "fixture-model"
+    },
+    {
+      "provider": "fixture-provider",
+      "model": "fixture-model"
+    }
+  ],
+  "outstanding_before_usage": "0.3",
+  "late_usage_amount": "0.4",
+  "overspend": "0.1",
+  "actual_provider_requests": 0,
+  "price_lookup": "not_performed",
+  "invoice_verification": "not_performed",
+  "gate_latency_fixture": {
+    "count": 10,
+    "mean_ms": 7.005819499999961,
+    "median_ms": 6.0815764999997555,
+    "max_ms": 12.7983949999998,
+    "samples_ms": [
+      6.08454299999903,
+      8.058595000000423,
+      5.958468000000721,
+      5.433006999999634,
+      7.107722999999169,
+      6.078610000000481,
+      9.442551000000094,
+      12.7983949999998,
+      4.670297999999093,
+      4.426005000001169
+    ],
+    "scope": "original LlmRuntime local chunks + durable admission/finish HTTP; excludes external usage receipt"
+  }
+}

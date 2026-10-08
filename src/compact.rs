@@ -103,7 +103,7 @@ pub fn cmd_compact(file: &str, max_tokens: usize) -> anyhow::Result<()> {
         eprintln!("[rdsh] no compaction needed ({total} <= {max_tokens} tokens)");
         return Ok(());
     }
-    let first = lines.first().copied().unwrap_or("");
+    let first = lines.first().copied().unwrap_or_default();
     let mut kept: Vec<&str> = vec![];
     let mut used = toks.first().copied().unwrap_or(0) + 200;
     for (l, t) in lines.iter().zip(toks.iter()).rev() {

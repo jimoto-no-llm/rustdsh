@@ -1,0 +1,381 @@
+{
+  "captured_at": "2026-10-05T20:23:59.899Z",
+  "platform": "linux",
+  "cli_source": "explicit original DSH in existing WSL; no legacy shim",
+  "cli_version": "0.2.0-rc.2",
+  "isolated_native_home": true,
+  "live_root": {
+    "run_id": "run_d7d17cec-2c62-479c-bf54-50fd3be8def0",
+    "native_session_id": "af86aa76-2e30-4d83-8501-ebd4b2ea666e",
+    "state": "unknown",
+    "updated_at": "2026-10-05T20:23:42.553Z",
+    "last_observed_at": "2026-10-05T20:23:42.553Z",
+    "reason": "cli_session_attached",
+    "process": {
+      "identity": {
+        "platform": "linux",
+        "pid": 1473,
+        "birth": "3611",
+        "scope": "37cadde0a8f6229513bdb0c2ff2e8d992245a484d729bba14a11ff72169c05a7"
+      },
+      "pid": 1473,
+      "owner_id": "owner_bcc1de6b-3b46-4ce4-a269-d06bd84e8920",
+      "status": "last_observed_alive",
+      "observed_at": "2026-10-05T20:23:40.965Z"
+    },
+    "commands": [
+      {
+        "command_id": "cmd_6256a9f7-0bda-4a1d-8c00-6b14fb534675",
+        "operation": "start",
+        "phase": "acknowledged",
+        "ack_id": "ack_d1df6a92-ab22-4326-bd01-53c5cf3c1345",
+        "outcome": "session_attached",
+        "run_id": "run_d7d17cec-2c62-479c-bf54-50fd3be8def0",
+        "recorded_at": "2026-10-05T20:23:40.766Z",
+        "updated_at": "2026-10-05T20:23:42.542Z",
+        "recovery_outcome": "acknowledged"
+      }
+    ],
+    "rejected_transitions": [],
+    "revision": 8,
+    "recorded_state": "waiting-human",
+    "state_basis": "process_alive; native_run_state_unobservable",
+    "observed_at": "2026-10-05T20:23:42.560Z",
+    "ui_connection": "disconnected",
+    "process_observation": {
+      "status": "alive",
+      "pid": 1473,
+      "scope": "owned_root_process_only; descendants_unverified"
+    },
+    "commands_total": 1,
+    "recovery": {
+      "mode": "read_only",
+      "replayed_commands": 0,
+      "automatically_restarted": false,
+      "incomplete_tail_bytes": 0,
+      "repair_required": false,
+      "writer_lock": {
+        "present": false,
+        "automatic_removal": false
+      }
+    }
+  },
+  "after_owned_stop": {
+    "process": {
+      "sequence": 4,
+      "type": "stopped",
+      "cli": "dsh",
+      "cli_version": "0.2.0-rc.2",
+      "observed_at": "2026-10-05T20:23:42.650Z",
+      "provenance": {
+        "source": "cli_adapter",
+        "trust": "untrusted_data"
+      },
+      "confirmed": true,
+      "code": 0,
+      "signal": null,
+      "command_id": "cmd_c368b6a7-bf81-494f-8263-dee0558ea012"
+    },
+    "history": {
+      "run_id": "run_d7d17cec-2c62-479c-bf54-50fd3be8def0",
+      "native_session_id": "af86aa76-2e30-4d83-8501-ebd4b2ea666e",
+      "state": "disconnected",
+      "updated_at": "2026-10-05T20:23:42.665Z",
+      "last_observed_at": "2026-10-05T20:23:42.655Z",
+      "reason": "owned_exit_confirmed",
+      "process": {
+        "identity": {
+          "platform": "linux",
+          "pid": 1473,
+          "birth": "3611",
+          "scope": "37cadde0a8f6229513bdb0c2ff2e8d992245a484d729bba14a11ff72169c05a7"
+        },
+        "pid": 1473,
+        "owner_id": "owner_bcc1de6b-3b46-4ce4-a269-d06bd84e8920",
+        "status": "exit_confirmed",
+        "observed_at": "2026-10-05T20:23:42.655Z"
+      },
+      "commands": [
+        {
+          "command_id": "cmd_6256a9f7-0bda-4a1d-8c00-6b14fb534675",
+          "operation": "start",
+          "phase": "acknowledged",
+          "ack_id": "ack_d1df6a92-ab22-4326-bd01-53c5cf3c1345",
+          "outcome": "session_attached",
+          "run_id": "run_d7d17cec-2c62-479c-bf54-50fd3be8def0",
+          "recorded_at": "2026-10-05T20:23:40.766Z",
+          "updated_at": "2026-10-05T20:23:42.542Z",
+          "recovery_outcome": "acknowledged"
+        },
+        {
+          "command_id": "cmd_c368b6a7-bf81-494f-8263-dee0558ea012",
+          "operation": "stop",
+          "phase": "acknowledged",
+          "ack_id": "ack_43b73371-1d6c-4a00-bbd3-ec0f9852d091",
+          "outcome": "process_exit_confirmed",
+          "run_id": "run_d7d17cec-2c62-479c-bf54-50fd3be8def0",
+          "recorded_at": "2026-10-05T20:23:42.565Z",
+          "updated_at": "2026-10-05T20:23:42.665Z",
+          "recovery_outcome": "acknowledged"
+        }
+      ],
+      "rejected_transitions": [],
+      "revision": 14,
+      "recorded_state": "disconnected",
+      "state_basis": "process_exit_observed; native_session_can_still_exist",
+      "observed_at": "2026-10-05T20:23:42.674Z",
+      "ui_connection": "unknown",
+      "process_observation": {
+        "status": "exit_confirmed",
+        "pid": 1473,
+        "scope": "owned_root_process_only; descendants_unverified"
+      },
+      "commands_total": 2,
+      "recovery": {
+        "mode": "read_only",
+        "replayed_commands": 0,
+        "automatically_restarted": false,
+        "incomplete_tail_bytes": 0,
+        "repair_required": false,
+        "writer_lock": {
+          "present": false,
+          "automatic_removal": false
+        }
+      }
+    }
+  },
+  "comparison": {
+    "baseline_commit": "4ac7e95577ca92e886779d35e39749de5c8db0bb",
+    "command": "run-history inspect --project <temporary-project> --run-id <persisted-run>",
+    "before": {
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "[rdsh-dashboard] Unknown command; use --help\n"
+    },
+    "after": {
+      "exit_code": 0,
+      "stdout": {
+        "run_id": "run_d7d17cec-2c62-479c-bf54-50fd3be8def0",
+        "native_session_id": "af86aa76-2e30-4d83-8501-ebd4b2ea666e",
+        "state": "disconnected",
+        "updated_at": "2026-10-05T20:23:42.665Z",
+        "last_observed_at": "2026-10-05T20:23:42.655Z",
+        "reason": "owned_exit_confirmed",
+        "process": {
+          "identity": {
+            "platform": "linux",
+            "pid": 1473,
+            "birth": "3611",
+            "scope": "37cadde0a8f6229513bdb0c2ff2e8d992245a484d729bba14a11ff72169c05a7"
+          },
+          "pid": 1473,
+          "owner_id": "owner_bcc1de6b-3b46-4ce4-a269-d06bd84e8920",
+          "status": "exit_confirmed",
+          "observed_at": "2026-10-05T20:23:42.655Z"
+        },
+        "commands": [
+          {
+            "command_id": "cmd_6256a9f7-0bda-4a1d-8c00-6b14fb534675",
+            "operation": "start",
+            "phase": "acknowledged",
+            "ack_id": "ack_d1df6a92-ab22-4326-bd01-53c5cf3c1345",
+            "outcome": "session_attached",
+            "run_id": "run_d7d17cec-2c62-479c-bf54-50fd3be8def0",
+            "recorded_at": "2026-10-05T20:23:40.766Z",
+            "updated_at": "2026-10-05T20:23:42.542Z",
+            "recovery_outcome": "acknowledged"
+          },
+          {
+            "command_id": "cmd_c368b6a7-bf81-494f-8263-dee0558ea012",
+            "operation": "stop",
+            "phase": "acknowledged",
+            "ack_id": "ack_43b73371-1d6c-4a00-bbd3-ec0f9852d091",
+            "outcome": "process_exit_confirmed",
+            "run_id": "run_d7d17cec-2c62-479c-bf54-50fd3be8def0",
+            "recorded_at": "2026-10-05T20:23:42.565Z",
+            "updated_at": "2026-10-05T20:23:42.665Z",
+            "recovery_outcome": "acknowledged"
+          }
+        ],
+        "rejected_transitions": [],
+        "revision": 14,
+        "recorded_state": "disconnected",
+        "state_basis": "process_exit_observed; native_session_can_still_exist",
+        "observed_at": "2026-10-05T20:23:53.097Z",
+        "ui_connection": "unknown",
+        "process_observation": {
+          "status": "exit_confirmed",
+          "pid": 1473,
+          "scope": "owned_root_process_only; descendants_unverified"
+        },
+        "commands_total": 2,
+        "recovery": {
+          "mode": "read_only",
+          "replayed_commands": 0,
+          "automatically_restarted": false,
+          "incomplete_tail_bytes": 0,
+          "repair_required": false,
+          "writer_lock": {
+            "present": false,
+            "automatic_removal": false
+          }
+        }
+      }
+    },
+    "entrypoint_source_only": true,
+    "common_dependencies": "current installed dashboard dependencies"
+  },
+  "explicit_resume_from_separate_client": {
+    "run": {
+      "run_id": "run_d7d17cec-2c62-479c-bf54-50fd3be8def0",
+      "project_id": "7b7dc8c5f223d744",
+      "task_id": null,
+      "label": null,
+      "cli": "dsh",
+      "cli_session_id": "af86aa76-2e30-4d83-8501-ebd4b2ea666e",
+      "binding": "confirmed",
+      "cwd": "/tmp/rdsh-run-recovery-local-B914LG/project",
+      "branch": "recovery-qa",
+      "git": {
+        "status": "observed",
+        "root": "/tmp/rdsh-run-recovery-local-B914LG/project",
+        "head": null
+      },
+      "launch": {
+        "method": "acp-stdio-v1",
+        "executable": "/root/.local/opt/rdsh-node/lib/node_modules/@deepseek-ai/dsh/lib/bin.js",
+        "entrypoint": null,
+        "profile": "acp"
+      },
+      "scope": {
+        "effective_home": "/tmp/rdsh-run-recovery-local-B914LG",
+        "HOME": "/tmp/rdsh-run-recovery-local-B914LG",
+        "USERPROFILE": "/tmp/rdsh-run-recovery-local-B914LG",
+        "DSH_HOME": "/tmp/rdsh-run-recovery-local-B914LG/dsh",
+        "XDG_CONFIG_HOME": null,
+        "XDG_DATA_HOME": null,
+        "APPDATA": null,
+        "LOCALAPPDATA": null
+      },
+      "provider": null,
+      "cli_version": "0.2.0-rc.2",
+      "created_at": "2026-10-05T20:23:40.745Z",
+      "last_attached_at": "2026-10-05T20:23:59.743Z",
+      "unknown_fields": [
+        "task_id",
+        "provider"
+      ],
+      "cli_session_display": "af86aa76-2e30-4d83-8501-ebd4b2ea666e"
+    },
+    "command_id": "cmd_93098726-74cc-4c63-bcfb-002802563909",
+    "history": {
+      "run_id": "run_d7d17cec-2c62-479c-bf54-50fd3be8def0",
+      "native_session_id": "af86aa76-2e30-4d83-8501-ebd4b2ea666e",
+      "state": "disconnected",
+      "updated_at": "2026-10-05T20:23:59.875Z",
+      "last_observed_at": "2026-10-05T20:23:59.864Z",
+      "reason": "owned_exit_confirmed",
+      "process": {
+        "identity": {
+          "platform": "linux",
+          "pid": 1534,
+          "birth": "5377",
+          "scope": "37cadde0a8f6229513bdb0c2ff2e8d992245a484d729bba14a11ff72169c05a7"
+        },
+        "pid": 1534,
+        "owner_id": "owner_8f2edb29-2f72-4a97-a71a-16164a7d350b",
+        "status": "exit_confirmed",
+        "observed_at": "2026-10-05T20:23:59.864Z"
+      },
+      "commands": [
+        {
+          "command_id": "cmd_6256a9f7-0bda-4a1d-8c00-6b14fb534675",
+          "operation": "start",
+          "phase": "acknowledged",
+          "ack_id": "ack_d1df6a92-ab22-4326-bd01-53c5cf3c1345",
+          "outcome": "session_attached",
+          "run_id": "run_d7d17cec-2c62-479c-bf54-50fd3be8def0",
+          "recorded_at": "2026-10-05T20:23:40.766Z",
+          "updated_at": "2026-10-05T20:23:42.542Z",
+          "recovery_outcome": "acknowledged"
+        },
+        {
+          "command_id": "cmd_c368b6a7-bf81-494f-8263-dee0558ea012",
+          "operation": "stop",
+          "phase": "acknowledged",
+          "ack_id": "ack_43b73371-1d6c-4a00-bbd3-ec0f9852d091",
+          "outcome": "process_exit_confirmed",
+          "run_id": "run_d7d17cec-2c62-479c-bf54-50fd3be8def0",
+          "recorded_at": "2026-10-05T20:23:42.565Z",
+          "updated_at": "2026-10-05T20:23:42.665Z",
+          "recovery_outcome": "acknowledged"
+        },
+        {
+          "command_id": "cmd_93098726-74cc-4c63-bcfb-002802563909",
+          "operation": "resume",
+          "phase": "acknowledged",
+          "ack_id": "ack_70d4ed5e-1606-4c4e-8adf-c1866f7d6841",
+          "outcome": "session_attached",
+          "run_id": "run_d7d17cec-2c62-479c-bf54-50fd3be8def0",
+          "recorded_at": "2026-10-05T20:23:58.423Z",
+          "updated_at": "2026-10-05T20:23:59.737Z",
+          "recovery_outcome": "acknowledged"
+        },
+        {
+          "command_id": "cmd_35e70e8f-5d16-4cbe-90da-acd4dbd20950",
+          "operation": "stop",
+          "phase": "acknowledged",
+          "ack_id": "ack_265b92a9-77d1-4479-b887-ba966b16a3c2",
+          "outcome": "process_exit_confirmed",
+          "run_id": "run_d7d17cec-2c62-479c-bf54-50fd3be8def0",
+          "recorded_at": "2026-10-05T20:23:59.759Z",
+          "updated_at": "2026-10-05T20:23:59.875Z",
+          "recovery_outcome": "acknowledged"
+        }
+      ],
+      "rejected_transitions": [],
+      "revision": 27,
+      "recorded_state": "disconnected",
+      "state_basis": "process_exit_observed; native_session_can_still_exist",
+      "observed_at": "2026-10-05T20:23:59.887Z",
+      "ui_connection": "unknown",
+      "process_observation": {
+        "status": "exit_confirmed",
+        "pid": 1534,
+        "scope": "owned_root_process_only; descendants_unverified"
+      },
+      "commands_total": 4,
+      "recovery": {
+        "mode": "read_only",
+        "replayed_commands": 0,
+        "automatically_restarted": false,
+        "incomplete_tail_bytes": 0,
+        "repair_required": false,
+        "writer_lock": {
+          "present": false,
+          "automatic_removal": false
+        }
+      }
+    },
+    "lifecycle": "attachment_verified_process_stopped",
+    "process": {
+      "sequence": 4,
+      "type": "stopped",
+      "cli": "dsh",
+      "cli_version": "0.2.0-rc.2",
+      "observed_at": "2026-10-05T20:23:59.858Z",
+      "provenance": {
+        "source": "cli_adapter",
+        "trust": "untrusted_data"
+      },
+      "confirmed": true,
+      "code": 0,
+      "signal": null,
+      "command_id": "cmd_35e70e8f-5d16-4cbe-90da-acd4dbd20950"
+    }
+  },
+  "provider_authentication": "not_exercised",
+  "model_prompt": false,
+  "ui_connection": "synthetic caller observation; no actual browser or phone disconnect test",
+  "descendants": "not_observed"
+}

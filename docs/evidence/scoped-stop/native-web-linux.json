@@ -1,0 +1,50 @@
+{
+  "observed_at": "2026-10-05T23:01:10.216Z",
+  "os": "linux",
+  "node": "v24.21.0",
+  "source": "original_dsh_web_empty_home",
+  "web_startup_observed": true,
+  "before": {
+    "run_id": "run_aebfd550-0a1b-4c62-9de1-d6ed06562bff",
+    "scope": {
+      "owner_id": "owner_34cc7e51-2341-41ad-8ce4-1713b1dc4bb0",
+      "kind": "linux_cgroup_v2",
+      "kernel_id": "2493",
+      "root_identity": {
+        "platform": "linux",
+        "pid": 432,
+        "birth": "413",
+        "scope": "41b1c7e0981eaa78c8c4ef718e29852d7d8606da1e542bc634466b0ba28101a5"
+      },
+      "root_pid": 432,
+      "status": "running",
+      "remaining_pids": [
+        432
+      ],
+      "remaining_count": 1,
+      "members_truncated": false,
+      "confirmed": false
+    },
+    "stages": []
+  },
+  "after": {
+    "owner_id": "owner_34cc7e51-2341-41ad-8ce4-1713b1dc4bb0",
+    "kind": "linux_cgroup_v2",
+    "kernel_id": "2493",
+    "root_identity": {
+      "platform": "linux",
+      "pid": 432,
+      "birth": "413",
+      "scope": "41b1c7e0981eaa78c8c4ef718e29852d7d8606da1e542bc634466b0ba28101a5"
+    },
+    "root_pid": 432,
+    "status": "exit_confirmed",
+    "remaining_pids": [],
+    "remaining_count": 0,
+    "members_truncated": false,
+    "confirmed": true,
+    "resources_released": true
+  },
+  "prompt_requests": 0,
+  "provider_authentication_verified": false
+}
