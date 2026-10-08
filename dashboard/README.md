@@ -4,6 +4,9 @@
 start/resume/send/interrupt/stop/usage, explicit unsupported CLI capabilities,
 and isolated lifecycle smoke without provider credentials or model requests.
 
+[Persistent session ledger](../docs/SESSION-LEDGER.md): distinct project, run,
+task and native CLI IDs, with exact run resolution after client restart.
+
 `rdsh-dashboard` provides two separate entry points:
 
 | Mode      | Purpose                                                    | Data source                                      |

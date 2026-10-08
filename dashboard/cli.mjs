@@ -8,6 +8,7 @@ import { startDashboard } from "./server.mjs";
 import { runStdio } from "./mcp.mjs";
 import { adapterCatalog, createCliAdapter } from "./adapters.mjs";
 import { smokeAdapter } from "./adapter-smoke.mjs";
+import { SessionLedger, attachRecordedSession } from "./session-ledger.mjs";
 
 const help = `rdsh-dashboard project --project <directory> [--port <port>] [--no-tailscale] [--open]
 rdsh-dashboard harness [--port 38081] [--harness-port 3081] [--no-tailscale] [--open]
@@ -18,10 +19,12 @@ rdsh-dashboard tunnel --project <directory> --tunnel-id <tunnel_id>
 rdsh-dashboard mcp --project <directory>
 rdsh-dashboard adapters [--cli dsh] [--executable <original-dsh>] [--entrypoint <bin.js>] [--project <directory>]
 rdsh-dashboard adapter-smoke --executable <original-dsh> [--entrypoint <bin.js>] [--project <directory>]
+rdsh-dashboard session-ledger list|record|resolve|start|resume --project <directory> [--run-id <run_id>] [--task-id <id>] [--session-id <id>] [--label <name>] [--provider <name>] [--cwd <directory>] [--cli <name>] [--executable <original-dsh>] [--entrypoint <bin.js>]
 
 Project mode: project metrics, tasks, questions, human feedback, and /mcp.
 Harness mode: a separate managed DeepSeek Harness Web UI and QR landing page.
 Tailscale Serve shares each loopback server privately over HTTPS.
+Session-ledger start/resume confirms the native ID then stops its owned ACP process; it sends no prompt.
 `;
 const { values, positionals } = parseArgs({
   allowPositionals: true,
@@ -36,6 +39,12 @@ const { values, positionals } = parseArgs({
     cli: { type: "string" },
     executable: { type: "string" },
     entrypoint: { type: "string" },
+    "run-id": { type: "string" },
+    "task-id": { type: "string" },
+    "session-id": { type: "string" },
+    label: { type: "string" },
+    provider: { type: "string" },
+    cwd: { type: "string" },
     help: { type: "boolean", short: "h" },
   },
 });
@@ -64,6 +73,75 @@ try {
   const command = positionals[0];
   if (values.help || !command) {
     console.log(help);
+  } else if (command === "session-ledger") {
+    const action = positionals[1];
+    if (
+      positionals.length !== 2 ||
+      !["list", "record", "resolve", "start", "resume"].includes(action)
+    )
+      throw new Error(
+        "Specify session-ledger list, record, resolve, start or resume",
+      );
+    const ledger = await SessionLedger.open(
+      await identity(values.project || process.cwd()),
+    );
+    const argv = values.executable ? [values.executable] : null;
+    if (values.entrypoint && !argv)
+      throw new Error("--entrypoint requires --executable");
+    if (values.entrypoint) argv.push(values.entrypoint);
+    const options = {
+      ledger,
+      command: argv,
+      cwd: values.cwd || ledger.project.root,
+      task_id: values["task-id"] || null,
+      label: values.label || null,
+      provider: values.provider || null,
+    };
+    let result;
+    if (action === "list") result = { runs: await ledger.list() };
+    else if (action === "resolve")
+      result = await ledger.resolve(values["run-id"]);
+    else if (action === "record") {
+      if (values["run-id"]) throw new Error("record allocates a new run ID");
+      result = await ledger.record({
+        ...options,
+        cli: values.cli || "dsh",
+        cli_session_id: values["session-id"] || null,
+      });
+    } else {
+      if (!argv)
+        throw new Error(
+          "Specify the original DSH executable with --executable",
+        );
+      if (values.cli && values.cli !== "dsh")
+        throw new Error("Only DSH ACP can be attached");
+      if (values["session-id"])
+        throw new Error(
+          "Use run-id for resume; session IDs come from the native CLI",
+        );
+      if (action === "start" && values["run-id"])
+        throw new Error("start allocates a new run ID");
+      if (action === "resume" && !values["run-id"])
+        throw new Error("resume requires --run-id");
+      if (
+        action === "resume" &&
+        [values.cwd, values["task-id"], values.label, values.provider].some(
+          (value) => value !== undefined,
+        )
+      )
+        throw new Error("resume uses the recorded cwd, task and provider");
+      const attached = await attachRecordedSession({
+        ...options,
+        run_id: action === "resume" ? values["run-id"] : null,
+      });
+      const stopped = await attached.adapter.stop();
+      result = {
+        run: attached.record,
+        lifecycle: "attachment_verified_process_stopped",
+        process: stopped,
+      };
+    }
+    console.log(JSON.stringify(result, null, 2));
   } else if (command === "adapters" || command === "adapter-smoke") {
     const argv = values.executable ? [values.executable] : null;
     if (values.entrypoint && !argv)
