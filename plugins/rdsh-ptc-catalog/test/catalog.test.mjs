@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SEARCH, DESCRIBE, normalizedIdentifier, validateConfig } from '../catalog.js';
 import { fixture, tool, renderers, sdkSchemas, canonicalValue } from './fixtures.mjs';
+import * as bundle from '../index.js';
 
 test('catalog reads only the real calling scope, including shadowing and inherited restrictions', async t => {
   const f = fixture(); t.after(() => f.close());
@@ -209,4 +210,20 @@ test('configuration and normalization never provide authority or executable alia
   assert.throws(() => validateConfig({ inlineTools: ['a', 'a'] }), { code: 'RDSH_CATALOG_INPUT' });
   assert.throws(() => validateConfig({ mode: 'ptc' }), { code: 'RDSH_CATALOG_INPUT' });
   assert.throws(() => validateConfig({ inlineTools: ['run_code'] }), { code: 'RDSH_CATALOG_INPUT' });
+});
+
+test('the real Cordis plugin lifecycle supplies defaults and disposes only its own registrations', async t => {
+  const f = fixture({ catalog: false }); t.after(() => f.close());
+  f.tools.register(tool('retained.lifecycle'));
+  const plugin = await f.ctx.plugin(bundle, { inlineTools: ['retained.lifecycle'] });
+  assert.ok(f.tools.get(SEARCH));
+  assert.ok(f.tools.get(DESCRIBE));
+  const agent = f.agent();
+  const sdk = (await f.prompt.assemble({ scope: agent })).sections.find(section => section.name === 'tools:sdk').text;
+  assert.ok(Buffer.byteLength(sdk) <= 16384);
+  assert.match(sdk, /retained\.lifecycle/);
+  await plugin.dispose();
+  assert.equal(f.tools.get(SEARCH), undefined);
+  assert.equal(f.tools.get(DESCRIBE), undefined);
+  assert.ok(f.tools.get('retained.lifecycle'));
 });
