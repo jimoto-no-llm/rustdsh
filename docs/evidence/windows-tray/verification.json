@@ -1,0 +1,39 @@
+{
+  "platform": "native Windows 11 / Node 24.21.0 / PowerShell 7.6.6; Linux Node 24.16.0",
+  "dummy_data_only": true,
+  "model_calls": 0,
+  "results": {
+    "windows_dashboard_suite": {
+      "passed": 195,
+      "failed": 0,
+      "after_install_without_lifecycle_scripts": true
+    },
+    "latest_windows_tray_tests": {
+      "passed": 13,
+      "failed": 0
+    },
+    "linux_tray_tests": {
+      "passed": 8,
+      "skipped_windows_only": 5
+    },
+    "rust_tests": 103,
+    "rust_example_tests": 7,
+    "cli_regressions": 53,
+    "browser_flows": 8,
+    "dependency_advisories": 0,
+    "real_windows_installer": "passed: quoted destination, prebuilt load, captured Node after PATH change"
+  },
+  "source_sha256": {
+    "dashboard/windows-launcher.mjs": "0d77bd060fc36d417d6e6118f96aebf2d31e2d58418e24a378ca977ff26f67cc",
+    "dashboard/windows-tray.mjs": "b15b90434acd702630afaeddf0ec376ccd4cca828169139c976f83d66e26a7f3",
+    "dashboard/windows-tray.ps1": "b7fb2110f94bf96ac83920ac12253792e38984e83892c814172c88f94a26bee8",
+    "dashboard/rdsh-dashboard.ps1": "4267364185036e07cd0db3d408f49b3ea80a3cd224037fd3d319f803bb9ce9ef",
+    "dashboard/install-windows.ps1": "1ec2f4d60ea318736775b7de8a448db715c05477aec7bf3e50f28ea43937b6a5",
+    "dashboard/cli.mjs": "d32ef62e41f97c273af0095df2baab99e36d9a6fa170a44594ab2dc69a59d6d0",
+    "dashboard/test/windows-tray.test.mjs": "09c5cbf4e6ff757b61413e5045a1e76d982ca70de9ca2e9f678653661c7787c1",
+    "dashboard/test/windows-launcher.test.mjs": "6281c56b45a791dc64f52d276a84849c0c2c75b70a2f7fd086b214440f295ff0",
+    "dashboard/test/windows-tray-native.ps1": "5d19326e7cd697e60c42081f08b954a0a3d8261d69e2f2e277525ecb1147cb06"
+  },
+  "capture": "Actual Windows WinForms controls via PrintWindow; neutral owned dummy window before/after menu; native menu.png; no desktop content.",
+  "hash_basis": "Git text blobs, CRLF normalized to LF"
+}

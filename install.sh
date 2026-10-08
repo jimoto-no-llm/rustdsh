@@ -107,7 +107,7 @@ verify_sha256() {
 fetch_release() {
   # Print the path of the extracted prebuilt rdsh binary.
   # Overridable for tests: RDSH_RELEASE_BASE=file:///path/to/dir.
-  base="${RDSH_RELEASE_BASE:-https://github.com/sahenjp/rustdsh/releases}"
+  base="${RDSH_RELEASE_BASE:-https://github.com/jimoto-no-llm/rustdsh/releases}"
   case "$OS/$ARCH" in
     Linux/x86_64)
       gv="$(glibc_version)"

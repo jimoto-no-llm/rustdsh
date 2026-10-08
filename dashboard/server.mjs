@@ -436,7 +436,9 @@ export async function startDashboard(options) {
           route === "/instruction-queue-ui.mjs" ||
           route === "/cost-ledger-ui.mjs" ||
           route === "/budget-ui.mjs" ||
-          route === "/favicon.ico");
+          route === "/favicon.ico" ||
+          route === "/icon.png" ||
+          route === "/icon.svg");
       if (
         !publicAsset &&
         !adminAuthorized &&
@@ -450,9 +452,22 @@ export async function startDashboard(options) {
             "Open this dashboard through rdsh-dashboard open or its QR code",
         });
       if (closing) return json(res, 503, { error: "Dashboard is stopping" });
-      if (publicAsset && route === "/favicon.ico") {
-        res.writeHead(204);
-        return res.end();
+      if (
+        req.method === "GET" &&
+        ["/favicon.ico", "/icon.png", "/icon.svg"].includes(route)
+      ) {
+        const [file, type] =
+          route === "/favicon.ico"
+            ? ["icon.ico", "image/x-icon"]
+            : route === "/icon.png"
+              ? ["icon-256.png", "image/png"]
+              : ["icon.svg", "image/svg+xml"];
+        const bytes = await fs.readFile(path.join(here, "../assets", file));
+        res.writeHead(200, {
+          "content-type": type,
+          "x-content-type-options": "nosniff",
+        });
+        return res.end(bytes);
       }
       if (req.method === "GET" && route === "/api/managed-process")
         return json(

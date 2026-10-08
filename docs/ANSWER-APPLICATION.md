@@ -3,7 +3,7 @@
 A saved answer, a delivered webhook, a consumer read and a native input result
 are separate facts. Optional consumer-bound question cards make those facts
 visible without changing the six MCP tools or consuming the original feedback.
-This implements [issue #41](https://github.com/sahenjp/rustdsh/issues/41).
+This implements [issue #41](https://github.com/jimoto-no-llm/rustdsh/issues/41).
 
 ## Bind an existing native session
 
