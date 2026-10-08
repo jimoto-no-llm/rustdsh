@@ -1,6 +1,6 @@
 # Task prerequisite diagnostic evidence
 
-Issue: [#38](https://github.com/sahenjp/rustdsh/issues/38).
+Issue: [#38](https://github.com/jimoto-no-llm/rustdsh/issues/38).
 Captured on 2026-10-06 JST, based on the session ledger PR
 [#122](https://github.com/sahenjp/rustdsh/pull/122), commit
 `6770adbebde41ba1a9285e9f45817f23f892d57b`.

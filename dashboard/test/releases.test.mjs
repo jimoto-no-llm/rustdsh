@@ -9,6 +9,7 @@ import { promisify } from "node:util";
 import { Releases } from "../releases.mjs";
 import { identity } from "../state.mjs";
 import { SessionLedger } from "../session-ledger.mjs";
+import { runGpuRequest } from "../gpu-leases.mjs";
 import { verifyRelease } from "../release-artifacts.mjs";
 import { qualifyRelease } from "../release-qualification.mjs";
 
@@ -66,7 +67,7 @@ async function fixture(t) {
       executable: process.execPath,
       dsh_root: source,
       entrypoint: "bin.mjs",
-      adapter_root: repo,
+      adapter_root: overrides.adapter_root || repo,
       changes: "Fixture build " + name,
       rollback: "Requalify a previous project release before selecting it",
       provenance: "Local ACP fixture; not native Cordis proof",
@@ -101,6 +102,76 @@ async function fixture(t) {
   });
   return { root, releases, projects, env, stage, attach };
 }
+
+test("a captured pre-GPU adapter cannot silently ignore an explicit or restored run GPU request", async (t) => {
+  const {
+    root,
+    releases,
+    projects: [project],
+    env,
+    stage,
+  } = await fixture(t);
+  const legacy = path.join(root, "legacy-adapter");
+  await fs.mkdir(path.join(legacy, "dashboard"), { recursive: true });
+  for (const file of await fs.readdir(path.join(repo, "dashboard"))) {
+    if (
+      file.endsWith(".mjs") ||
+      ["package.json", "package-lock.json"].includes(file)
+    ) {
+      const source = await fs.readFile(path.join(repo, "dashboard", file));
+      await fs.writeFile(
+        path.join(legacy, "dashboard", file),
+        file === "session-ledger.mjs"
+          ? source
+              .toString()
+              .replace(/^export const gpuLeaseProtocol = .*;\r?\n/m, "")
+          : source,
+      );
+    }
+  }
+  await fs.cp(
+    path.join(repo, "dashboard/node_modules"),
+    path.join(legacy, "dashboard/node_modules"),
+    { recursive: true, dereference: false },
+  );
+  for (const plugin of ["rdsh-budget-guard", "rdsh-release-probe"])
+    await fs.cp(
+      path.join(repo, "plugins", plugin),
+      path.join(legacy, "plugins", plugin),
+      { recursive: true },
+    );
+  const release = await stage("legacy-gpu", { adapter_root: legacy });
+  const plan = { manifest: { release_id: release.release_id }, pin: null };
+  const gpu = {
+    device_id: "GPU-00000000-0000-0000-0000-000000000001",
+    requested_vram_mib: 4096,
+    mode: "exclusive",
+  };
+  await assert.rejects(
+    releases.attach(project, plan, { env, gpu }),
+    code("gpu_lease_capability_unavailable_use_qualified_release"),
+  );
+  const ledger = await SessionLedger.open(project);
+  const recorded = await ledger.record({
+    cli_session_id: "fixture-existing-session",
+    command: [process.execPath],
+    env,
+  });
+  await runGpuRequest(project, recorded.run_id, gpu);
+  await assert.rejects(
+    releases.attach(
+      project,
+      { ...plan, pin: { run_id: recorded.run_id } },
+      { env, run_id: recorded.run_id },
+    ),
+    code("gpu_lease_capability_unavailable_use_qualified_release"),
+  );
+  assert.deepEqual((await releases.inspect(project)).pins, []);
+  await assert.rejects(
+    fs.access(path.join(project.directory, "run-history.jsonl")),
+    { code: "ENOENT" },
+  );
+});
 
 test("failed one-project canary retains observations and cannot alter or roll out to the other project", async (t) => {
   const {

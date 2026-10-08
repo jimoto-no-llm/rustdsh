@@ -11,8 +11,12 @@ import { preflightTask, taskRequirements, requireReady } from "./preflight.mjs";
 import { RunHistory, HistoryError } from "./run-history.mjs";
 import { readProcessIdentity } from "./process-identity.mjs";
 import { trackAdapter } from "./tracked-adapter.mjs";
+import { prepareGpuAttachment } from "./gpu-attachment.mjs";
+import { runGpuRequest } from "./gpu-leases.mjs";
 import { ModelRouting } from "./model-routing.mjs";
 import { prepareBudgetAttachment } from "./budget-client.mjs";
+
+export const gpuLeaseProtocol = "rdsh-gpu-leases/1";
 
 const exec = promisify(execFile);
 const scopeKeys = [
@@ -446,6 +450,7 @@ export async function verifyRecordedContext(
 export async function attachRecordedSession({
   ledger,
   run_id = null,
+  retryStart = false,
   command,
   cwd = ledger.project.root,
   env = process.env,
@@ -457,8 +462,12 @@ export async function attachRecordedSession({
   requirements = null,
   verifyAuth = false,
   budget = null,
+  gpu = null,
+  gpuLeases = null,
   onRecord = null,
 } = {}) {
+  if (typeof retryStart !== "boolean" || (retryStart && run_id === null))
+    throw new LedgerError("pending_gpu_start_required");
   env = { ...env };
   if (Array.isArray(command)) command = [...command];
   if (requirements !== null) {
@@ -487,8 +496,10 @@ export async function attachRecordedSession({
     });
   else {
     record = await ledger.resolve(run_id);
-    if (record.cli_session_id === null)
+    if (record.cli_session_id === null && !retryStart)
       throw new LedgerError("session_id_unknown");
+    if (retryStart && record.cli_session_id !== null)
+      throw new LedgerError("pending_gpu_start_required");
     await verifyRecordedContext(record, command, env);
   }
   if (record.git.status === "unavailable")
@@ -503,6 +514,16 @@ export async function attachRecordedSession({
     } catch (error) {
       if (error.code !== "run_not_found") throw error;
     }
+    if (
+      retryStart &&
+      (!previous ||
+        previous.state !== "waiting-resource" ||
+        previous.process !== null ||
+        previous.scope !== null ||
+        previous.commands.length !== 0 ||
+        (await runGpuRequest(ledger.project, record.run_id)) === null)
+    )
+      throw new LedgerError("pending_gpu_start_required");
     if (previous?.process) {
       const status = previous.process_observation.status;
       if (
@@ -531,16 +552,26 @@ export async function attachRecordedSession({
         );
   if (budgetGuard) env = budgetGuard.env;
   let commandId;
+  let gpuGuard;
   try {
     await history.register(record.run_id, record.cli_session_id);
+    gpuGuard = await prepareGpuAttachment(
+      ledger.project,
+      record,
+      history,
+      gpu,
+      env,
+      gpuLeases,
+    );
     commandId = await history.recordCommand(
       record.run_id,
-      run_id === null ? "start" : "resume",
+      run_id === null || retryStart ? "start" : "resume",
     );
     await history.transition(record.run_id, "starting", "request_recorded");
     await history.commandPhase(commandId, "dispatched");
   } catch (error) {
     await budgetGuard?.close();
+    await gpuGuard?.close();
     throw error;
   }
   let processBound = false;
@@ -568,8 +599,21 @@ export async function attachRecordedSession({
         } catch (error) {
           exitWrites.error ||= error;
         }
+        if (
+          stage.stage === "verification" &&
+          stage.status === "exit_confirmed" &&
+          gpuGuard
+        ) {
+          // A ledger failure must not interrupt the original owned-process stop.
+          try {
+            await gpuGuard.observe();
+          } catch (error) {
+            gpuGuard.lastError = error.code || "gpu_release_unconfirmed";
+          }
+        }
       },
       onOwnedSpawn: async (pid, scope) => {
+        if (gpuGuard) await gpuGuard.bind(scope);
         await history.bindScope(record.run_id, scope);
         const observed = scope.root_identity
           ? { status: "observed", identity: scope.root_identity }
@@ -583,21 +627,42 @@ export async function attachRecordedSession({
         if (adapter.stopped) await history.processExited(record.run_id);
       },
     });
+    gpuGuard?.connect(adapter);
   } catch (error) {
     await budgetGuard?.close();
+    await gpuGuard?.close();
     throw error;
   }
-  if (budgetGuard) {
+  if (budgetGuard || gpuGuard) {
     const originalStop = adapter.stop.bind(adapter);
     adapter.stop = async () => {
+      let stopError;
       try {
         return await originalStop();
+      } catch (error) {
+        stopError = error;
+        throw error;
       } finally {
-        await budgetGuard.close();
+        const closed = await Promise.allSettled([
+          budgetGuard?.close(),
+          gpuGuard?.close(),
+        ]);
+        const failures = closed.filter((item) => item.status === "rejected");
+        if (failures.length && !stopError) throw failures[0].reason;
+        if (stopError && failures.length)
+          stopError.resource_cleanup = failures.map(
+            (item) => item.reason.code || "resource_cleanup_unconfirmed",
+          );
       }
     };
   }
   adapter.on("event", (event) => {
+    if (event.type === "process_exit" && gpuGuard)
+      exitWrites.pending.push(
+        gpuGuard.observe().catch((error) => {
+          gpuGuard.lastError = error.code || "gpu_release_unconfirmed";
+        }),
+      );
     if (event.type === "process_exit" && budgetGuard)
       exitWrites.pending.push(
         budgetGuard.close().catch((error) => {
@@ -619,8 +684,9 @@ export async function attachRecordedSession({
     )
       throw new LedgerError("cli_version_changed");
     await history.scopeIntent(record.run_id);
+    if (gpuGuard) await gpuGuard.beginLaunch();
     const attached =
-      run_id === null
+      run_id === null || retryStart
         ? await adapter.start()
         : await adapter.resume(record.cli_session_id);
     await history.bindSession(record.run_id, attached.session_id);
@@ -648,11 +714,20 @@ export async function attachRecordedSession({
           if (sessionId !== confirmed.cli_session_id)
             throw new LedgerError("native_session_changed");
           if (budgetGuard) await budgetGuard.ready();
+          if (gpuGuard) await gpuGuard.ready();
           return ModelRouting.open(ledger.project).guard(confirmed, adapter);
         },
       ),
       history,
       command_id: commandId,
+      ...(gpuGuard
+        ? {
+            gpu: {
+              lease_id: gpuGuard.lease.lease_id,
+              request: gpuGuard.lease.request,
+            },
+          }
+        : {}),
     };
   } catch (error) {
     try {

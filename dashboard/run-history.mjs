@@ -59,10 +59,11 @@ const transitions = {
     "unknown",
     "failed",
   ],
-  disconnected: ["starting", "unknown"],
+  disconnected: ["starting", "waiting-resource", "unknown"],
   stopping: ["disconnected", "unknown", "failed"],
   unknown: [
     "starting",
+    "waiting-resource",
     "running",
     "waiting-human",
     "stopping",
@@ -792,16 +793,20 @@ export class RunHistory {
       "gone",
       "pid_reused",
     ].includes(status);
+    const resourceWait =
+      run.state === "waiting-resource" && (!run.process || knownExit);
     let state = terminal(run.state)
       ? run.state
-      : knownExit
-        ? "disconnected"
-        : run.process ||
-            ["starting", "running", "waiting-human", "stopping"].includes(
-              run.state,
-            )
-          ? "unknown"
-          : run.state;
+      : resourceWait
+        ? "waiting-resource"
+        : knownExit
+          ? "disconnected"
+          : run.process ||
+              ["starting", "running", "waiting-human", "stopping"].includes(
+                run.state,
+              )
+            ? "unknown"
+            : run.state;
     if (loaded.tail_bytes && !terminal(state)) state = "unknown";
     const lock = await this.lockObservation();
     return {
@@ -825,13 +830,15 @@ export class RunHistory {
       state,
       state_basis: terminal(run.state)
         ? "recorded_terminal_result"
-        : knownExit
-          ? "process_exit_observed; native_session_can_still_exist"
-          : status === "alive"
-            ? "process_alive; native_run_state_unobservable"
-            : state === "unknown"
-              ? "run_state_unverified"
-              : "recorded_control_state",
+        : resourceWait
+          ? "recorded_resource_wait; native_process_not_running"
+          : knownExit
+            ? "process_exit_observed; native_session_can_still_exist"
+            : status === "alive"
+              ? "process_alive; native_run_state_unobservable"
+              : state === "unknown"
+                ? "run_state_unverified"
+                : "recorded_control_state",
       observed_at: new Date().toISOString(),
       ui_connection,
       process_observation: {

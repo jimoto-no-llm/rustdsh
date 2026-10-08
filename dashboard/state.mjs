@@ -63,11 +63,11 @@ export const metricNames = [
   "refusals",
   "api_errors",
 ];
-export function stateHome() {
+export function stateHome(env = process.env) {
   return (
-    process.env.RDSH_DASHBOARD_HOME ||
+    env.RDSH_DASHBOARD_HOME ||
     path.join(
-      process.env.LOCALAPPDATA || path.join(os.homedir(), ".local", "state"),
+      env.LOCALAPPDATA || path.join(os.homedir(), ".local", "state"),
       "rdsh",
       "dashboard",
     )

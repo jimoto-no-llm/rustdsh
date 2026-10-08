@@ -53,12 +53,12 @@ Use the issue forms (bug / feature / performance / docs). Include:
 `rdsh --version`, `rdsh doctor`, OS/shell, repro steps.
 
 For the full proposal backlog, see the index at
-[issue #74](https://github.com/sahenjp/rustdsh/issues/74)
+[issue #74](https://github.com/jimoto-no-llm/rustdsh/issues/74)
 (all 72 proposals mapped to feature issues, priority P0-P3).
 
 ## Branch protection (`main`)
 
-Admin settings live in [issue #11](https://github.com/sahenjp/rustdsh/issues/11).
+Admin settings live in [issue #11](https://github.com/jimoto-no-llm/rustdsh/issues/11).
 Contributors only need this: open PRs against `main`, keep checks green.
 
 ---
@@ -68,7 +68,7 @@ Contributors only need this: open PRs against `main`, keep checks green.
 ### main の保護設定
 
 設定は管理者権限が必要なため、詳しくは
-[Issue #11](https://github.com/sahenjp/rustdsh/issues/11)を見てください。
+[Issue #11](https://github.com/jimoto-no-llm/rustdsh/issues/11)を見てください。
 寄稿者は `main` へのPRとチェック通過だけ意識すれば十分です。
 
 ### Pull Request

@@ -1,6 +1,6 @@
 # Session ledger command and lifecycle evidence
 
-Issue: [#18](https://github.com/sahenjp/rustdsh/issues/18).
+Issue: [#18](https://github.com/jimoto-no-llm/rustdsh/issues/18).
 Captured on 2026-10-06 JST, based on CLI adapter PR
 [#120](https://github.com/sahenjp/rustdsh/pull/120), commit
 `5b636a00d5881ed4e06d2401dcf4aa839b4ed126`.

@@ -12,6 +12,7 @@ import {
   compatible,
 } from "./release-artifacts.mjs";
 import { qualifyRelease } from "./release-qualification.mjs";
+import { runGpuRequest } from "./gpu-leases.mjs";
 
 const projectId = (id) => /^[a-f0-9]{16}$/.test(id || "");
 const runId = (id) =>
@@ -428,6 +429,13 @@ export class Releases {
         path.join(artifact.slot, "adapter/dashboard/session-ledger.mjs"),
       ).href
     );
+    const gpuRequired =
+      options.gpu ||
+      (options.run_id && (await runGpuRequest(project, options.run_id)));
+    if (gpuRequired && module.gpuLeaseProtocol !== "rdsh-gpu-leases/1")
+      throw new ReleaseError(
+        "gpu_lease_capability_unavailable_use_qualified_release",
+      );
     const ledger = await module.SessionLedger.open(project);
     const attached = await module.attachRecordedSession({
       ...options,

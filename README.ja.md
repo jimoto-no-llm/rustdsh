@@ -293,7 +293,7 @@ rdsh serve
 ## コミュニティ
 
 - まず [CONTRIBUTING.md](CONTRIBUTING.md)（PRは4行、スクリーンショット規定）。
-- バグ・要望：[Issueフォーム](https://github.com/sahenjp/rustdsh/issues/new/choose)（日本語OK）。
+- バグ・要望：[Issueフォーム](https://github.com/jimoto-no-llm/rustdsh/issues/new/choose)（日本語OK）。
 - 質問・相談：[Issues](https://github.com/sahenjp/rustdsh/issues)。
 - 脆弱性は公開Issueに書かず [SECURITY.md](SECURITY.md) へ。
 - 設計資料：[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)・
