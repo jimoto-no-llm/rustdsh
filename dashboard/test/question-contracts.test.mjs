@@ -7,6 +7,7 @@ import net from "node:net";
 import { ProjectStore, publicState } from "../state.mjs";
 import { executeTool, feedbackSince, tools } from "../mcp.mjs";
 import { startDashboard } from "../server.mjs";
+import { draftReviewState } from "../question-cards-ui.mjs";
 
 function approval(max = 5, action = "publish-fixture", revision = "target-v1") {
   return {
@@ -97,6 +98,22 @@ test("restoring an older snapshot never revalidates that older revision's answer
     ask(approval(), { action: "revise", expected_revision: 2 }),
   );
   assert.equal(f.card().fingerprint, first.fingerprint);
+  const draft = {
+    fingerprint: first.fingerprint,
+    revision: first.revision,
+    reviewed: first.fingerprint,
+    reviewedRevision: first.revision,
+  };
+  assert.deepEqual(draftReviewState(draft, f.card()), {
+    changedDraft: true,
+    reviewRequired: true,
+  });
+  assert.equal(
+    draftReviewState({ ...draft, reviewedRevision: 3 }, f.card())
+      .reviewRequired,
+    false,
+  );
+  assert.equal(draftReviewState(draft, first).changedDraft, false);
   await f.store.mutate(
     "answer",
     answer(f.card(), { answer: "最新版の対象は保留", choice_id: "hold" }),

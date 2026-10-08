@@ -6,6 +6,21 @@ const statusNames = {
   superseded: "旧版 · 回答は無効",
 };
 
+export function draftReviewState(draft, contract) {
+  const changedDraft = Boolean(
+    draft?.fingerprint &&
+      (draft.fingerprint !== contract?.fingerprint ||
+        draft.revision !== contract?.revision),
+  );
+  return {
+    changedDraft,
+    reviewRequired:
+      changedDraft &&
+      (draft.reviewed !== contract?.fingerprint ||
+        draft.reviewedRevision !== contract?.revision),
+  };
+}
+
 export function renderQuestionCards(
   container,
   questions,
@@ -21,7 +36,9 @@ export function renderQuestionCards(
           text: area.value,
           choice: form.querySelector('input[type="radio"]:checked')?.value,
           fingerprint: form.dataset.draftFingerprint,
+          revision: Number(form.dataset.draftRevision) || null,
           reviewed: form.dataset.reviewedFingerprint,
+          reviewedRevision: Number(form.dataset.reviewedRevision) || null,
           error: form.querySelector('[role="alert"]').textContent,
         },
       ];
@@ -47,11 +64,10 @@ export function renderQuestionCards(
       const decision = contract?.snapshot.decision;
       const draft = drafts.get(question.id);
       const editable = !contract || contract.status === "open";
-      const changedDraft = Boolean(
-        draft?.fingerprint && draft.fingerprint !== contract?.fingerprint,
+      const { changedDraft, reviewRequired } = draftReviewState(
+        draft,
+        contract,
       );
-      const reviewRequired =
-        changedDraft && draft?.reviewed !== contract.fingerprint;
       const article = node("article", undefined, "decision-card");
       article.id = "question-" + question.id;
       const heading = node("div", undefined, "decision-heading");
@@ -150,7 +166,9 @@ export function renderQuestionCards(
       form.dataset.id = question.id;
       form.dataset.draftFingerprint =
         draft?.fingerprint || contract?.fingerprint || "";
+      form.dataset.draftRevision = draft?.revision || contract?.revision || "";
       form.dataset.reviewedFingerprint = draft?.reviewed || "";
+      form.dataset.reviewedRevision = draft?.reviewedRevision || "";
       const choices = decision?.choices || [];
       if (choices.length) {
         const group = node("fieldset");
@@ -202,6 +220,9 @@ export function renderQuestionCards(
         review.addEventListener("change", () => {
           form.dataset.reviewedFingerprint = review.checked
             ? contract.fingerprint
+            : "";
+          form.dataset.reviewedRevision = review.checked
+            ? contract.revision
             : "";
           button.disabled = !editable || !review.checked;
         });

@@ -36,7 +36,7 @@
       main {
         max-width: 1480px;
         margin: auto;
-        padding: 32px;
+        padding: 32px 32px 120px;
       }
       header {
         display: flex;
@@ -49,6 +49,7 @@
         margin: 4px 0;
         font-size: 28px;
         letter-spacing: -0.02em;
+        overflow-wrap: anywhere;
       }
       h2 {
         font-size: 21px;
@@ -64,6 +65,108 @@
         color: var(--mut);
         font-size: 13px;
         overflow-wrap: anywhere;
+      }
+      header > div {
+        min-width: 0;
+      }
+      .header-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .summary-card {
+        margin: 16px 0 24px;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--card);
+        overflow-wrap: anywhere;
+      }
+      .summary-card h2 {
+        margin: 0 0 12px;
+      }
+      .summary-card label {
+        display: block;
+      }
+      .summary-card select {
+        display: block;
+        width: 100%;
+        min-height: 44px;
+        margin: 6px 0;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 8px;
+        background: white;
+        font: inherit;
+      }
+      .summary-facts {
+        display: grid;
+        grid-template-columns: 100px minmax(0, 1fr);
+        gap: 12px;
+      }
+      .summary-facts dt {
+        color: var(--mut);
+      }
+      .summary-facts dd {
+        margin: 0;
+        min-width: 0;
+      }
+      .summary-facts p {
+        margin: 4px 0 0;
+      }
+      #overview-context {
+        font-weight: 600;
+      }
+      #overview-pending {
+        padding-left: 22px;
+      }
+      #overview-pending a {
+        display: block;
+        padding: 10px 0;
+      }
+      .fold {
+        margin: 18px 0;
+      }
+      .fold > summary {
+        padding: 12px;
+        cursor: pointer;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: white;
+      }
+      #quick-actions {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 5;
+        border-top: 1px solid var(--line);
+        background: var(--bg);
+        padding: 8px 14px calc(8px + env(safe-area-inset-bottom));
+      }
+      #quick-context {
+        margin: 0 auto 4px;
+        max-width: 900px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .quick-buttons {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 6px;
+        max-width: 900px;
+        margin: auto;
+      }
+      .quick-buttons button {
+        min-height: 44px;
+        padding: 6px;
+        font-size: 14px;
+      }
+      section,
+      h2,
+      #overview-stop {
+        scroll-margin: 18px;
       }
       button,
       a.button {
@@ -334,7 +437,7 @@
         background: #edf1f7;
         border-radius: 8px;
       }
-      /* #42/#61: 配置は変えず、待避線・種別表示・パレット分だけ足す。 */
+      /* Stable anchors and the existing command palette remain usable. */
       .skip {
         position: absolute;
         left: 12px;
@@ -364,6 +467,20 @@
         border-radius: 14px;
         padding: 18px 20px;
         width: min(560px, calc(100vw - 40px));
+      }
+      #managed-stop-dialog {
+        max-width: min(560px, calc(100vw - 28px));
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 18px;
+        overflow-wrap: anywhere;
+      }
+      #managed-stop-dialog::backdrop {
+        background: rgb(0 0 0 / 0.25);
+      }
+      #managed-stop-dialog button {
+        min-height: 44px;
+        margin: 4px;
       }
       #palette::backdrop {
         background: rgb(0 0 0 / 0.25);
@@ -397,16 +514,50 @@
       }
       @media (max-width: 600px) {
         main {
-          padding: 18px 14px;
+          padding: 18px 14px 120px;
         }
         header {
           align-items: flex-start;
+          flex-direction: column;
         }
         h1 {
           font-size: 23px;
         }
         .cards {
           gap: 10px;
+        }
+        .summary-facts {
+          grid-template-columns: 76px minmax(0, 1fr);
+          gap: 10px;
+        }
+        .table-box {
+          overflow: visible;
+        }
+        table,
+        tbody,
+        tr,
+        td {
+          display: block;
+        }
+        thead {
+          display: none;
+        }
+        tr {
+          padding: 10px;
+        }
+        td {
+          display: grid;
+          grid-template-columns: 76px minmax(0, 1fr);
+          gap: 8px;
+          overflow-wrap: anywhere;
+        }
+        td::before {
+          content: attr(data-label);
+          color: var(--mut);
+          font-family: system-ui;
+        }
+        td.id {
+          white-space: normal;
         }
         .card {
           padding: 16px;
@@ -445,9 +596,12 @@
         <div>
           <div class="eyebrow" id="kind">PROJECT DASHBOARD</div>
           <h1 id="title">読み込み中…</h1>
-          <div class="sub" id="location"></div>
+          <details>
+            <summary class="sub">場所・接続先</summary>
+            <div class="sub" id="location"></div>
+          </details>
         </div>
-        <div>
+        <div class="header-actions">
           <!-- #61: 主要操作をキーボードで呼ぶ入口。Ctrl/⌘+K でも開きます。 -->
           <button
             id="palette-toggle"
@@ -510,30 +664,41 @@
         </section>
       </section>
       <div id="project-content" tabindex="-1">
-        <!-- #42: 数値カードを開かなくても状態・判断要否だけ掴める一行要約。 -->
-        <p class="sub" id="overview" role="status" aria-live="polite"></p>
-        <div class="cards" id="cards"></div>
-        <h2 id="tasks-heading" tabindex="-1">
-          タスク <span class="sub" id="task-milestones"></span>
-        </h2>
-        <div class="table-box">
-          <!-- #57: 各行に task-<id> の目印を付け、端末を替えても同じ行へ戻れるようにします。 -->
-          <table aria-labelledby="tasks-heading">
-            <thead>
-              <tr>
-                <th scope="col">ID</th>
-                <th scope="col">状態</th>
-                <th scope="col">題名</th>
-                <th scope="col">ブロック要因</th>
-              </tr>
-            </thead>
-            <tbody id="tasks"></tbody>
-          </table>
-        </div>
-        <!-- #40: 回答は返答のみで実行権限を生みません。承認依頼と相談を同じ表で区別します。 -->
+        <section
+          id="project-overview"
+          class="summary-card"
+          aria-labelledby="overview-heading"
+        >
+          <h2 id="overview-heading" tabindex="-1">いまの状況</h2>
+          <label for="overview-task">確認する範囲</label
+          ><select id="overview-task"></select>
+          <p id="overview-context"></p>
+          <dl class="summary-facts">
+            <dt>状態</dt>
+            <dd>
+              <div id="overview-state">実行状態は未取得</div>
+              <p class="sub" id="overview-task-report"></p>
+            </dd>
+            <dt>観測</dt>
+            <dd>
+              <div id="overview-observed">実行の観測記録なし</div>
+              <p class="sub" id="overview-report-updated"></p>
+            </dd>
+            <dt>最後の結果</dt>
+            <dd>
+              <div id="overview-result">未取得</div>
+              <p class="sub" id="overview-result-detail"></p>
+            </dd>
+            <dt>判断</dt>
+            <dd id="overview-decision">確認中…</dd>
+            <dt>停止</dt>
+            <dd id="overview-stop">この画面からの停止は非対応</dd>
+          </dl>
+          <ul id="overview-pending"></ul>
+        </section>
         <h2 id="pending-heading" tabindex="-1">未回答の質問</h2>
         <p class="sub" id="pending-note">
-          回答はこの質問への返答のみです。回答しただけで実行権限は生まれません。対象・条件が変わった場合は回答前に内容を再確認してください。
+          プロジェクト全体の質問です。回答はこの質問への返答のみです。対象・条件が変わった場合は回答前に内容を再確認してください。回答しただけで実行権限は生まれません。
         </p>
         <div
           id="questions"
@@ -541,20 +706,64 @@
           aria-labelledby="pending-heading"
           aria-describedby="pending-note"
         ></div>
-        <section id="reply-applications" hidden aria-labelledby="reply-heading">
-          <h2 id="reply-heading">回答の適用状況</h2>
-          <p class="sub">
-            保存・通知配送・対象consumerの読取・入力処理の結果を分けて確認します。完了表示はこの回答入力へのACP応答です。作業の完了は受入検証で確認します。
-          </p>
-          <div id="reply-status" class="decision-grid"></div>
-        </section>
-        <h2>進捗・成果物</h2>
-        <div class="feed" id="events"></div>
+        <details class="fold" id="metrics-detail">
+          <summary>プロジェクト全体の数値</summary>
+          <h2 id="metrics-heading" tabindex="-1">数値の詳細</h2>
+          <div class="cards" id="cards"></div>
+        </details>
+        <details class="fold" id="tasks-detail">
+          <summary>タスク一覧</summary>
+          <h2 id="tasks-heading" tabindex="-1">
+            タスク <span class="sub" id="task-milestones"></span>
+          </h2>
+          <div class="table-box">
+            <!-- #57: 各行に task-<id> の目印を付け、端末を替えても同じ行へ戻れるようにします。 -->
+            <table aria-labelledby="tasks-heading">
+              <thead>
+                <tr>
+                  <th scope="col">ID</th>
+                  <th scope="col">状態</th>
+                  <th scope="col">題名</th>
+                  <th scope="col">ブロック要因</th>
+                </tr>
+              </thead>
+              <tbody id="tasks"></tbody>
+            </table>
+          </div>
+        </details>
+        <details class="fold" id="reply-detail">
+          <summary>回答の保存・適用を確認</summary>
+          <section
+            id="reply-applications"
+            hidden
+            aria-labelledby="reply-heading"
+          >
+            <h2 id="reply-heading">回答の適用状況</h2>
+            <p class="sub">
+              保存・通知配送・対象consumerの読取・入力処理の結果を分けて確認します。完了表示はこの回答入力へのACP応答です。作業の完了は受入検証で確認します。
+            </p>
+            <div id="reply-status" class="decision-grid"></div>
+          </section>
+        </details>
+        <details class="fold" id="progress-detail">
+          <summary>進捗・成果物の報告</summary>
+          <h2>進捗・成果物</h2>
+          <div class="feed" id="events"></div>
+        </details>
         <details id="answered">
           <summary>回答済みの質問</summary>
           <div class="feed" id="answers"></div>
         </details>
       </div>
+      <nav id="quick-actions" aria-label="プロジェクトの操作" hidden>
+        <p id="quick-context" class="sub"></p>
+        <div class="quick-buttons">
+          <button id="quick-overview">概要</button
+          ><button id="quick-pending">判断</button
+          ><button id="quick-details">詳細</button
+          ><button id="quick-stop">停止案内</button>
+        </div>
+      </nav>
       <!-- #61: 主要操作をキーボードで呼ぶ小さな一覧。既存ボタンの操作を再利用し、権限・状態チェックは各操作側で行います。 -->
       <dialog id="palette" aria-labelledby="palette-title">
         <h2 id="palette-title">コマンド</h2>
@@ -570,6 +779,14 @@
         />
         <p class="sub" id="palette-count" role="status"></p>
         <ul id="palette-list"></ul>
+      </dialog>
+      <dialog id="managed-stop-dialog" aria-labelledby="managed-stop-title">
+        <h2 id="managed-stop-title">停止する対象を確認</h2>
+        <p id="managed-stop-target"></p>
+        <p id="managed-stop-impact"></p>
+        <p class="warn" id="managed-stop-error" role="alert"></p>
+        <button id="managed-stop-cancel">戻る</button>
+        <button id="managed-stop-confirm">確認した対象を停止</button>
       </dialog>
       <footer id="updated">
         未取得の指標はMCPから報告されたときに表示されます。費用は報告元のAPI換算値で、請求額とは別です。

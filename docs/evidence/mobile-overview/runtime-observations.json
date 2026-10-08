@@ -1,0 +1,19 @@
+{
+  "source_before": "a09688725fc5f4a5fa9f3f48c2a0fbc4e479242e",
+  "native_input_effects": 1,
+  "owned_stop_http_requests": 1,
+  "managed_run_id": "run_25be8155-9865-42c6-8bc3-9a24adbb7387",
+  "managed_scope": {
+    "status": "exit_confirmed",
+    "remaining_count": 0,
+    "confirmed": true
+  },
+  "provider_requests": 0,
+  "human_usability_test": "not_performed",
+  "native_prompt_requests": 1,
+  "after_cancel_and_target_change": {
+    "owned_stop_http_requests": 0,
+    "scope_status": "running",
+    "remaining_count": 5
+  }
+}

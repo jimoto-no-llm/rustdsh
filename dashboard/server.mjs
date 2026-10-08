@@ -302,6 +302,7 @@ export async function startDashboard(options) {
         (route === "/" ||
           route === "/app.mjs" ||
           route === "/question-cards-ui.mjs" ||
+          route === "/project-overview.mjs" ||
           route === "/answer-applications-ui.mjs");
       if (
         !publicAsset &&
@@ -371,6 +372,7 @@ export async function startDashboard(options) {
         [
           "/app.mjs",
           "/question-cards-ui.mjs",
+          "/project-overview.mjs",
           "/answer-applications-ui.mjs",
         ].includes(route)
       ) {

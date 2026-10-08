@@ -25,6 +25,11 @@ from current full checks, preserves partial results and rejects stale evidence.
 [Model assertions](../docs/MODEL-ROUTING.md) compare a declared run's requested
 route with native ACP configuration and block mismatched or unknown prompts.
 
+[Mobile overview](../docs/MOBILE-OVERVIEW.md) puts project/task context, observed
+state, last result, pending decisions and stop availability before folded metrics
+and reports. It preserves unobserved states and requires target confirmation
+before stopping the live owned Harness run.
+
 `rdsh-dashboard` provides two separate entry points:
 
 | Mode      | Purpose                                                    | Data source                                      |
