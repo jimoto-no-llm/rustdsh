@@ -1,6 +1,6 @@
 # GPU lease evidence
 
-Source commit: `82a38bd3f0bcd9fb3da7cc6c8b8487e830a9a68b`, with actual main
+Original measurement source: `82a38bd3f0bcd9fb3da7cc6c8b8487e830a9a68b`, with actual main
 `39c5dd1325f91de05870166c7da75e6424948ab7` integrated. Both measured runs hash
 the same 17 runtime/fixture files as
 `5572992d552c69f084c761017209ba69cf3d0110b400a5a2099e73c1393e86a7`.
@@ -94,3 +94,52 @@ Run `node --test --test-concurrency=1 test/*.test.mjs` and then
 The reservation is a cooperative admission gate for one OS/state home.
 Unmanaged competition after admission, Windows/WSL or network-filesystem sharing,
 AMD/MIG, actual VRAM enforcement and model quality remain outside this proof.
+
+## Windows aliases and current main
+
+Source `45dbbf3b4dff6ae4256115774b37a160f4ee0d80` integrates actual main
+`93b3bcaa7759fb27461b02f1dd0b0012e946b329` and fixes a Windows CI failure that
+the original local-path runs did not exercise. The two `e2f9a1e` Windows CI runs
+each had 197 passes and 19 `gpu_directory_untrusted` failures. A real NTFS 8.3
+alias reproduced the failure locally before the fix.
+
+Windows directory checks now expand short names with `GetLongPathNameW`, reject
+reparse attributes in every ancestor and compare with the actual filesystem
+path. A real short/long-name pair must contend for the same kernel ledger lock;
+a junction through that same alias must still be refused. Space/Unicode paths
+and direct/ancestor redirects have independent regressions. Lock sharing,
+no-unlink ownership and fail-closed validation are retained.
+
+[Windows current raw results](windows-main93.json), [Linux current raw
+results](linux-main93.json), and [current summary](before-after-main93.json)
+record a new measurement series. Both platforms hash the same 17 selected
+runtime/fixture files as
+`333834197bf53aa40cd49a2524e8d5d265229b6df830f8037d366e12e161e012`.
+The earlier `82a38bd` files and measurements above remain historical evidence.
+
+- Windows: all 219 dashboard tests passed with zero failures, cancellations or
+  skips, including the actual 8.3 alias test. The GPU/path target suite passed
+  all 22 cases.
+- Linux: 219 dashboard tests, 213 passed and six Windows-only cases skipped;
+  no failures/cancellations. Rust release tests (103) and benchmark example
+  tests (7), fence (2), CLI (53), security boundaries (11), icon asset checks,
+  fmt and release Clippy with zero warnings passed.
+- Both measurement runs verifiably released all three admitted reservations
+  through `held_kernel_group_empty` and ended with zero active reservations.
+  The low-capacity opt-in path still returned the wait before starting a native
+  process. No physical GPU allocation, model/API call or power-loss test ran.
+
+| Runtime               | Operation     | Disabled median, ms | Leased median, ms |
+| --------------------- | ------------- | ------------------: | ----------------: |
+| Windows, Node 22.23.3 | attach        |            1,192.55 |          1,180.28 |
+| Windows, Node 22.23.3 | send          |               38.13 |             41.37 |
+| Windows, Node 22.23.3 | verified stop |              165.87 |            457.70 |
+| Linux, Node 24.21.0   | attach        |              276.69 |            318.69 |
+| Linux, Node 24.21.0   | send          |               50.60 |             56.05 |
+| Linux, Node 24.21.0   | verified stop |              137.21 |            149.20 |
+
+Absent-request lookup median/p95 was 0.167/0.273 ms on Windows and
+0.201/0.261 ms on Linux. Three alternating attachments per mode do not establish
+a speed improvement; the raw samples and durable guard/stop overhead are
+retained. The current hosted CI must be checked independently on the final PR
+head; the failed earlier CI is not counted as a pass.

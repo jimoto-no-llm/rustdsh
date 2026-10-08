@@ -1,0 +1,125 @@
+{
+  "schema": 1,
+  "source_commit": "45dbbf3b4dff6ae4256115774b37a160f4ee0d80",
+  "merged_main": "93b3bcaa7759fb27461b02f1dd0b0012e946b329",
+  "runtime_source_sha256": "333834197bf53aa40cd49a2524e8d5d265229b6df830f8037d366e12e161e012",
+  "scope": "fixed_driver_inventory_and_original_ACP_peer; actual_kernel_process_ownership; no_GPU_workload_or_model",
+  "platforms": {
+    "windows": {
+      "platform": "win32",
+      "node": "v22.23.3",
+      "before_after_low_capacity": {
+        "before": {
+          "opt_in": false,
+          "native_process_started": true,
+          "process_stop": "owned_group_exit_confirmed",
+          "reservation_mib": 0
+        },
+        "after": {
+          "opt_in": true,
+          "status": "waiting-resource",
+          "reason": "gpu_capacity_insufficient",
+          "device_id": "GPU-00000000-0000-0000-0000-000000000001",
+          "requested_vram_mib": 4096,
+          "driver_free_mib": 1024,
+          "reserved_mib": 0,
+          "native_process_started": false
+        }
+      },
+      "medians": {
+        "disabled": {
+          "attach_ms": 1192.5450999999994,
+          "send_ms": 38.13259999999991,
+          "stop_ms": 165.8719000000001
+        },
+        "leased": {
+          "attach_ms": 1180.278699999999,
+          "send_ms": 41.374000000000706,
+          "stop_ms": 457.6999999999998
+        }
+      },
+      "transport_samples": {
+        "attach_per_mode": 3,
+        "send_per_mode": 24,
+        "stop_per_mode": 3
+      },
+      "marker_miss_200": {
+        "median_ms": 0.16709999999994807,
+        "p95_ms": 0.2728000000000179
+      },
+      "final_active_reservations": 0
+    },
+    "linux": {
+      "platform": "linux",
+      "node": "v24.21.0",
+      "before_after_low_capacity": {
+        "before": {
+          "opt_in": false,
+          "native_process_started": true,
+          "process_stop": "owned_group_exit_confirmed",
+          "reservation_mib": 0
+        },
+        "after": {
+          "opt_in": true,
+          "status": "waiting-resource",
+          "reason": "gpu_capacity_insufficient",
+          "device_id": "GPU-00000000-0000-0000-0000-000000000001",
+          "requested_vram_mib": 4096,
+          "driver_free_mib": 1024,
+          "reserved_mib": 0,
+          "native_process_started": false
+        }
+      },
+      "medians": {
+        "disabled": {
+          "attach_ms": 276.69242099999997,
+          "send_ms": 50.603721999999834,
+          "stop_ms": 137.20595400000002
+        },
+        "leased": {
+          "attach_ms": 318.6851640000001,
+          "send_ms": 56.04901800000016,
+          "stop_ms": 149.20216000000028
+        }
+      },
+      "transport_samples": {
+        "attach_per_mode": 3,
+        "send_per_mode": 24,
+        "stop_per_mode": 3
+      },
+      "marker_miss_200": {
+        "median_ms": 0.20111099999999738,
+        "p95_ms": 0.2606049999999982
+      },
+      "final_active_reservations": 0
+    }
+  },
+  "validation": {
+    "windows_dashboard": {
+      "tests": 219,
+      "pass": 219,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    "linux_dashboard": {
+      "tests": 219,
+      "pass": 213,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 6
+    },
+    "rust_release_tests": 103,
+    "benchmark_example_tests": 7,
+    "fence_tests": 2,
+    "cli_checks": 53,
+    "security_boundary_tests": 11,
+    "fmt": "pass",
+    "release_clippy_zero_warnings": "pass"
+  },
+  "limitations": [
+    "fixed inventory, no physical GPU allocations or model/provider calls",
+    "local samples, not provider throughput",
+    "one OS/state home; Windows/WSL and network-filesystem sharing unsupported"
+  ]
+}
