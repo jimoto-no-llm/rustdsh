@@ -1,5 +1,5 @@
 {
-  "sourceSha256": "e2a68170836c7eab66a825da841b7d83aa2a0d6da299cd062cccd1f32dcf92cc",
+  "sourceSha256": "ba8f1a1d6c91b068270e0c2bf7c96018d752100c494caae78bea9a99ffb11cf3",
   "fixture": {
     "tools": 1000,
     "cases": 80,
@@ -48,14 +48,14 @@
       "schemaTokens": 59002,
       "fullAssemblyTokens": 59048,
       "schemaBytes": 265891,
-      "activationMs": 331.87890000000004,
-      "firstPromptMs": 336.76649999999995,
+      "activationMs": 406.5265,
+      "firstPromptMs": 411.8268,
       "firstPromptBeforeListRelease": false,
       "assemblyMs": {
         "samples": 5,
-        "median": 2.565400000000068,
-        "min": 2.262100000000032,
-        "max": 2.665499999999952
+        "median": 2.685200000000009,
+        "min": 2.4313000000000784,
+        "max": 2.9904999999999973
       }
     },
     "correctness": {
@@ -96,14 +96,14 @@
       "schemaTokens": 239,
       "fullAssemblyTokens": 372,
       "schemaBytes": 1186,
-      "activationMs": 2.9665999999999713,
-      "firstPromptMs": 13.190500000000156,
+      "activationMs": 4.020100000000184,
+      "firstPromptMs": 15.498100000000022,
       "firstPromptBeforeListRelease": true,
       "assemblyMs": {
         "samples": 5,
-        "median": 125.17560000000003,
-        "min": 121.38020000000006,
-        "max": 142.53870000000006
+        "median": 131.58550000000014,
+        "min": 126.53189999999995,
+        "max": 136.89980000000014
       }
     },
     "after80Loads": {
@@ -113,9 +113,9 @@
       "fullAssemblyTokens": 5092,
       "assemblyMs": {
         "samples": 5,
-        "median": 159.98379999999815,
-        "min": 155.58789999999863,
-        "max": 178.78490000000238
+        "median": 182.44590000000244,
+        "min": 159.39909999999873,
+        "max": 200.25599999999758
       }
     },
     "correctness": {

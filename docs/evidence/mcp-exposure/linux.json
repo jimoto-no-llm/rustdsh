@@ -1,9 +1,9 @@
 {
   "format": "rdsh-mcp-exposure-fixture-v1",
-  "measuredAt": "2026-10-08T20:39:36.627Z",
-  "platform": "win32",
+  "measuredAt": "2026-10-08T20:41:00.175Z",
+  "platform": "linux",
   "arch": "x64",
-  "node": "v22.23.3",
+  "node": "v24.21.0",
   "source": {
     "files": [
       {
@@ -93,14 +93,14 @@
       "schemaTokens": 59002,
       "fullAssemblyTokens": 59048,
       "schemaBytes": 265891,
-      "activationMs": 406.5265,
-      "firstPromptMs": 411.8268,
+      "activationMs": 430.93053199999997,
+      "firstPromptMs": 437.65040899999997,
       "firstPromptBeforeListRelease": false,
       "assemblyMs": {
         "samples": 5,
-        "median": 2.685200000000009,
-        "min": 2.4313000000000784,
-        "max": 2.9904999999999973
+        "median": 3.97529899999995,
+        "min": 1.7564099999999598,
+        "max": 6.325808000000052
       }
     },
     "after80Loads": {
@@ -110,9 +110,9 @@
       "fullAssemblyTokens": 59048,
       "assemblyMs": {
         "samples": 5,
-        "median": 2.3876000000000204,
-        "min": 2.328399999999874,
-        "max": 3.0054000000000087
+        "median": 1.846460999999863,
+        "min": 1.8288480000001073,
+        "max": 2.2975890000000163
       }
     },
     "correctness": {
@@ -126,9 +126,9 @@
       "startupProbeSearchCalls": 0,
       "nativeMcpCallMs": {
         "samples": 80,
-        "median": 1.9266999999999825,
-        "min": 1.6374999999999318,
-        "max": 15.597599999999943
+        "median": 1.78282999999999,
+        "min": 1.38862000000006,
+        "max": 11.618511000000012
       }
     }
   },
@@ -164,14 +164,14 @@
       "schemaTokens": 239,
       "fullAssemblyTokens": 372,
       "schemaBytes": 1186,
-      "activationMs": 4.020100000000184,
-      "firstPromptMs": 15.498100000000022,
+      "activationMs": 2.595734999999877,
+      "firstPromptMs": 11.959219000000076,
       "firstPromptBeforeListRelease": true,
       "assemblyMs": {
         "samples": 5,
-        "median": 131.58550000000014,
-        "min": 126.53189999999995,
-        "max": 136.89980000000014
+        "median": 122.0237360000001,
+        "min": 120.83332199999995,
+        "max": 123.27715899999976
       }
     },
     "after80Loads": {
@@ -181,9 +181,9 @@
       "fullAssemblyTokens": 5092,
       "assemblyMs": {
         "samples": 5,
-        "median": 182.44590000000244,
-        "min": 159.39909999999873,
-        "max": 200.25599999999758
+        "median": 131.62133300000278,
+        "min": 129.61728399999993,
+        "max": 135.7255010000008
       }
     },
     "correctness": {
@@ -198,15 +198,15 @@
       "startupProbeSearchCalls": 1,
       "nativeMcpCallMs": {
         "samples": 80,
-        "median": 3.9406999999991967,
-        "min": 2.8277000000016415,
-        "max": 5.391700000000128
+        "median": 3.290456999999151,
+        "min": 2.609651999999187,
+        "max": 4.776602000001731
       },
       "searchAndLoadMs": {
         "samples": 80,
-        "median": 347.6364999999987,
-        "min": 283.12429999999995,
-        "max": 421.2044999999998
+        "median": 260.52886299999955,
+        "min": 247.94654600000013,
+        "max": 304.47142200000053
       }
     }
   }
