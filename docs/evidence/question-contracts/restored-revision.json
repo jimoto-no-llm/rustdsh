@@ -1,0 +1,45 @@
+{
+  "scenario": "Content A answered at revision 1, revised to B, then restored to A and answered at revision 3",
+  "source_before": "fc6cae9c91b84519f0ca483aa00ad610b576b18a",
+  "before": {
+    "old_answer": {
+      "question_id": "Q1",
+      "contract_revision": 1,
+      "contract_fingerprint": "restored-identical-content",
+      "answer": "old reply to revision 1",
+      "contract_validity": "current",
+      "invalidation_reason": null,
+      "execution_authorized": false
+    },
+    "current_answer": {
+      "question_id": "Q1",
+      "contract_revision": 3,
+      "contract_fingerprint": "restored-identical-content",
+      "answer": "new reply to revision 3",
+      "contract_validity": "current",
+      "invalidation_reason": null,
+      "execution_authorized": false
+    }
+  },
+  "after": {
+    "old_answer": {
+      "question_id": "Q1",
+      "contract_revision": 1,
+      "contract_fingerprint": "restored-identical-content",
+      "answer": "old reply to revision 1",
+      "contract_validity": "invalidated",
+      "invalidation_reason": "question_contract_changed",
+      "execution_authorized": false
+    },
+    "current_answer": {
+      "question_id": "Q1",
+      "contract_revision": 3,
+      "contract_fingerprint": "restored-identical-content",
+      "answer": "new reply to revision 3",
+      "contract_validity": "current",
+      "invalidation_reason": null,
+      "execution_authorized": false
+    }
+  },
+  "immutable_answer_retained": true
+}

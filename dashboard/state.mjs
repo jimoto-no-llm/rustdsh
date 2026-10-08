@@ -2,10 +2,18 @@ import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
+import {
+  changeQuestionContract,
+  answerQuestionContract,
+  publicQuestionContracts,
+  feedbackValidity,
+  validateQuestionContracts,
+} from "./question-contracts.mjs";
 
 // Bucket D display notes (no schema change; schema stays 1):
 // #12 task contract, #13 review inbox, #14 outcome cards, #15 dependencies.
-// Field shapes below are frozen; only comments and wording may change here.
+// Legacy field shapes remain unchanged. Optional question_contracts metadata
+// has its own schema and explicit revision contract (#40).
 
 export const metricNames = [
   "total_cost_usd",
@@ -82,6 +90,7 @@ export class ProjectStore {
       throw new Error(
         "Dashboard state belongs to a different project or version",
       );
+    validateQuestionContracts(value);
     return new ProjectStore(project, value);
   }
   async mutate(operation, input) {
@@ -100,7 +109,7 @@ export class ProjectStore {
       operation === "answer"
         ? input.answer
         : operation === "question"
-          ? input.question
+          ? input.question || input.cancel_reason
           : input.title || "指標を更新";
     next.changes ||= [];
     next.changes.push({
@@ -123,7 +132,16 @@ export class ProjectStore {
 }
 export function publicState(value) {
   const { changes, ...visible } = value;
-  return visible;
+  const contracts = publicQuestionContracts(value);
+  return contracts
+    ? {
+        ...visible,
+        question_contracts: contracts,
+        feedback: value.feedback.map((message) =>
+          feedbackValidity(value, message),
+        ),
+      }
+    : visible;
 }
 function text(value, label, max = 8000) {
   if (typeof value !== "string" || !value.trim() || value.length > max)
@@ -204,6 +222,14 @@ export function applyOperation(state, operation, input) {
       break;
     }
     case "question": {
+      if (
+        input.decision !== undefined ||
+        input.action !== undefined ||
+        input.expected_revision !== undefined
+      ) {
+        changeQuestionContract(state, input);
+        break;
+      }
       // #13 review inbox: the inbox shows only answer === null, ordered by
       // urgency then created_at. Plain event/metrics appends must not raise
       // warnings there; answering removes the item but keeps this history.
@@ -238,6 +264,7 @@ export function applyOperation(state, operation, input) {
         throw new Error("Question already answered");
       question.answer = text(input.answer, "answer");
       question.answered_at = new Date().toISOString();
+      const contract = answerQuestionContract(state, question, input);
       state.feedback.push({
         sequence: (state.feedback.at(-1)?.sequence || 0) + 1,
         type: "question_answered",
@@ -245,6 +272,7 @@ export function applyOperation(state, operation, input) {
         question: question.question,
         answer: question.answer,
         created_at: question.answered_at,
+        ...(contract || {}),
       });
       break;
     }

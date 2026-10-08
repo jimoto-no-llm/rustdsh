@@ -153,6 +153,14 @@ A person answers in the dashboard. The answer is persisted before notification.
 the returned cursor on the next read. Reads never consume answers. The default
 action is descriptive and is never executed by this server.
 
+Optional [versioned question cards](../docs/QUESTION-CONTRACTS.md) add explicit
+consultation/approval types, choices, target revision, diff, impact and declared
+cost limits. Use `decision` with `dashboard_ask_question`; `action: "revise"`
+or `"cancel"` requires the current `expected_revision`. Stale, expired and
+cancelled replies cannot answer a new revision. Durable feedback includes the
+current contract validity; saving a reply grants no execution authority and
+does not claim application by its consumer.
+
 Unknown metrics display **未取得**. This component does not scrape billing,
 estimate spend, or infer context loss. Report measured values using:
 `total_cost_usd`, `total_budget_usd`, `session_cost_usd`, `session_budget_usd`,

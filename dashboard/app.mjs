@@ -1,3 +1,5 @@
+import { renderQuestionCards } from "./question-cards-ui.mjs";
+
 const $ = (id) => document.getElementById(id);
 const base = location.pathname.startsWith("/_rdsh") ? "/_rdsh/" : "/";
 const browserToken =
@@ -64,11 +66,19 @@ function emptyRow(text, columns) {
   tr.append(cell);
   return tr;
 }
+let renderedRevision = -1;
 function render(state) {
+  if (state.revision < renderedRevision) return;
+  renderedRevision = state.revision;
   const m = state.metrics,
     done = state.tasks.filter((task) => task.status === "done").length,
-    pending = state.questions.filter((question) => question.answer === null),
-    answered = state.questions.length - pending.length;
+    unanswered = state.questions.filter((question) => question.answer === null),
+    pending = unanswered.filter(
+      (question) =>
+        !state.question_contracts?.cards[question.id] ||
+        state.question_contracts.cards[question.id].status === "open",
+    ),
+    answered = state.questions.length - unanswered.length;
   const cache = ratio(m.cached_input_tokens, m.input_tokens),
     errors = ratio(m.tool_errors, m.tool_calls);
   const counts = ["done", "doing", "todo", "blocked"]
@@ -144,81 +154,11 @@ function render(state) {
   );
   if (!state.tasks.length)
     $("tasks").append(emptyRow("タスクはまだ登録されていません", 4));
-  // #40: SSE 更新中も回答下書き・フォーカスを保持し、未回答・期限切れ・取消しを承認扱いにしない。
-  // Preserve in-progress human drafts while incoming events refresh the dashboard.
-  const drafts = new Map(
-    [...$("questions").querySelectorAll("textarea")].map((area) => [
-      area.dataset.id,
-      area.value,
-    ]),
-  );
-  const active = document.activeElement?.dataset?.id;
-  $("questions").replaceChildren(
-    ...pending.map((question) => {
-      // #40: 相談と承認依頼を同じカード上で区別する。default_action
-      // があるものは承認依頼として示す。対象・条件の変更検知と無効化は
-      // server 側の契約（案53・43）に委ね、ここでは再確認を促す文言に留める。
-      // #57: 端末を替えても同じ質問へ戻れる安定アンカー。
-      const isApproval = Boolean(question.default_action);
-      const tr = node("tr"),
-        cell = node("td", undefined, "question");
-      tr.id = "question-" + question.id;
-      cell.append(
-        node(
-          "span",
-          isApproval ? "承認依頼" : "相談",
-          "kind" + (isApproval ? " kind-approval" : ""),
-        ),
-      );
-      cell.append(node("div", question.question));
-      const form = node("form"),
-        textarea = node("textarea");
-      textarea.dataset.id = question.id;
-      textarea.setAttribute("aria-label", `質問 ${question.id} への回答`);
-      textarea.required = true;
-      textarea.maxLength = 8000;
-      textarea.value = drafts.get(question.id) || "";
-      const button = node("button", "回答を返す", "primary");
-      button.type = "submit";
-      const error = node("div", undefined, "error");
-      error.setAttribute("role", "alert");
-      form.append(textarea, button, error);
-      form.addEventListener("submit", async (event) => {
-        event.preventDefault();
-        button.disabled = true;
-        try {
-          await api("update/answer", {
-            id: question.id,
-            answer: textarea.value,
-          });
-          await refreshState();
-        } catch (e) {
-          error.textContent = e.message;
-          button.disabled = false;
-        }
-      });
-      cell.append(form);
-      // #40: 既定の行動は参考表示であり、回答しても自動実行されない。
-      const defaultCell = node("td");
-      defaultCell.append(node("div", question.default_action || "指定なし"));
-      if (isApproval)
-        defaultCell.append(
-          node("div", "参考表示（回答しても自動実行されません）", "sub"),
-        );
-      tr.append(
-        node("td", question.id, "id"),
-        node("td", question.urgency),
-        cell,
-        defaultCell,
-      );
-      return tr;
-    }),
-  );
-  if (!pending.length) $("questions").append(emptyRow("なし", 4));
-  if (active)
-    [...$("questions").querySelectorAll("textarea")]
-      .find((area) => area.dataset.id === active)
-      ?.focus();
+  renderQuestionCards($("questions"), unanswered, state.question_contracts, {
+    node,
+    api,
+    refreshState,
+  });
   $("events").replaceChildren(
     ...state.events
       .slice(-30)
@@ -252,6 +192,16 @@ function render(state) {
         element.append(
           node("strong", question.question),
           node("p", question.answer),
+        );
+        const contract = state.question_contracts?.cards[question.id];
+        element.append(
+          node(
+            "p",
+            contract
+              ? `版 ${contract.revision} · ${contract.status === "answered" ? "回答を保存済み" : contract.status === "expired" ? "期限切れ · 回答は無効" : "取消し · 回答は無効"} · 実行権限は発行していません`
+              : "相談への返答を保存済み · 実行権限は発行していません",
+            "sub",
+          ),
         );
         return element;
       }),
@@ -503,6 +453,8 @@ try {
       $("connection").textContent = "再接続中…";
     };
     source.onopen = refreshState;
+    // Expiration needs a clock update even when publishers send no SSE event.
+    setInterval(refreshState, 5000);
   }
 } catch (e) {
   $("connection").textContent = e.message;

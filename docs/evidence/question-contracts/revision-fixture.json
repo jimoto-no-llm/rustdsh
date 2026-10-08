@@ -1,0 +1,137 @@
+{
+  "source": "actual temporary project server",
+  "schema": 1,
+  "current_revision": 3,
+  "status": "cancelled",
+  "fingerprint": "a05082bff21047c864115decece9434086a1084d60787fd16ae3b7ae23f91e0d",
+  "execution_authorized": false,
+  "feedback": [
+    {
+      "sequence": 1,
+      "type": "question_answered",
+      "question_id": "Q1",
+      "question": "この版の文書を公開しますか？",
+      "answer": "公開する前に対象を確認したい",
+      "created_at": "2026-10-05T23:45:28.888Z",
+      "contract_fingerprint": "56a64aa496a91d6b5dcee0ae83bb9b297b6bc719b854d39bb41a468385a462c2",
+      "contract_revision": 2,
+      "question_kind": "approval",
+      "target": {
+        "task_id": "T1",
+        "run_id": "run-fixture-1",
+        "session_id": "native-fixture-1",
+        "action_id": "publish-another-fixture",
+        "revision": "target-v2"
+      },
+      "choice_id": "hold",
+      "execution_authorized": false,
+      "contract_validity": "invalidated",
+      "invalidation_reason": "question_contract_changed"
+    }
+  ],
+  "history": [
+    {
+      "revision": 1,
+      "fingerprint": "0ac4c781741e1e032933e790d82e987ab536519fcfccbfdb7a1cec20c32b45c4",
+      "snapshot": {
+        "question": "この版の文書を公開しますか？",
+        "urgency": "high",
+        "default_action": "人間の回答があるまで保留する",
+        "decision": {
+          "kind": "approval",
+          "target": {
+            "task_id": "T1",
+            "run_id": "run-fixture-1",
+            "session_id": "native-fixture-1",
+            "action_id": "publish-fixture",
+            "revision": "target-v1"
+          },
+          "choices": [
+            {
+              "id": "proceed",
+              "label": "この条件で進める",
+              "detail": "対象の版と上限額を確認"
+            },
+            {
+              "id": "hold",
+              "label": "保留する",
+              "detail": ""
+            }
+          ],
+          "recommended_choice": "hold",
+          "recommendation_reason": "公開対象を確認してから進めるため",
+          "diff": "fixture.mdのみ公開対象に加える",
+          "impact": "公開された文書を他の利用者が閲覧できます",
+          "conditions": "指定したtask・run・対象の版に限定。mergeや課金は別判断",
+          "cost": {
+            "currency": "USD",
+            "max": 5,
+            "description": "申告された上限。費用の実測ではありません"
+          },
+          "expires_at": null
+        }
+      },
+      "status": "superseded",
+      "created_at": "2026-10-05T23:43:56.615Z",
+      "updated_at": "2026-10-05T23:43:56.615Z",
+      "answer": null,
+      "cancel_reason": null,
+      "invalidated_at": "2026-10-05T23:45:04.151Z",
+      "invalidation_reason": "question_contract_changed"
+    },
+    {
+      "revision": 2,
+      "fingerprint": "56a64aa496a91d6b5dcee0ae83bb9b297b6bc719b854d39bb41a468385a462c2",
+      "snapshot": {
+        "question": "この版の文書を公開しますか？",
+        "urgency": "high",
+        "default_action": "人間の回答があるまで保留する",
+        "decision": {
+          "kind": "approval",
+          "target": {
+            "task_id": "T1",
+            "run_id": "run-fixture-1",
+            "session_id": "native-fixture-1",
+            "action_id": "publish-another-fixture",
+            "revision": "target-v2"
+          },
+          "choices": [
+            {
+              "id": "proceed",
+              "label": "この条件で進める",
+              "detail": "対象の版と上限額を確認"
+            },
+            {
+              "id": "hold",
+              "label": "保留する",
+              "detail": ""
+            }
+          ],
+          "recommended_choice": "hold",
+          "recommendation_reason": "公開対象を確認してから進めるため",
+          "diff": "fixture.mdのみ公開対象に加える",
+          "impact": "公開された文書を他の利用者が閲覧できます",
+          "conditions": "指定したtask・run・対象の版に限定。mergeや課金は別判断",
+          "cost": {
+            "currency": "USD",
+            "max": 12,
+            "description": "申告された上限。費用の実測ではありません"
+          },
+          "expires_at": null
+        }
+      },
+      "status": "superseded",
+      "created_at": "2026-10-05T23:43:56.615Z",
+      "updated_at": "2026-10-05T23:45:28.888Z",
+      "answer": {
+        "text": "公開する前に対象を確認したい",
+        "choice_id": "hold",
+        "answered_at": "2026-10-05T23:45:28.888Z",
+        "contract_fingerprint": "56a64aa496a91d6b5dcee0ae83bb9b297b6bc719b854d39bb41a468385a462c2"
+      },
+      "cancel_reason": null,
+      "invalidated_at": "2026-10-05T23:45:29.442Z",
+      "invalidation_reason": "question_contract_changed"
+    }
+  ]
+}

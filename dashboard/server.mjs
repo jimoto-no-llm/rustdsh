@@ -276,7 +276,9 @@ export async function startDashboard(options) {
       const publicAsset =
         kind === "project" &&
         req.method === "GET" &&
-        (route === "/" || route === "/app.mjs");
+        (route === "/" ||
+          route === "/app.mjs" ||
+          route === "/question-cards-ui.mjs");
       if (
         !publicAsset &&
         !adminAuthorized &&
@@ -339,11 +341,14 @@ export async function startDashboard(options) {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         return res.end(await fs.readFile(path.join(here, "ui.html")));
       }
-      if (req.method === "GET" && route === "/app.mjs") {
+      if (
+        req.method === "GET" &&
+        ["/app.mjs", "/question-cards-ui.mjs"].includes(route)
+      ) {
         res.writeHead(200, {
           "content-type": "text/javascript; charset=utf-8",
         });
-        return res.end(await fs.readFile(path.join(here, "app.mjs")));
+        return res.end(await fs.readFile(path.join(here, route.slice(1))));
       }
       if (req.method === "GET" && route === "/api/config")
         return json(res, 200, {
@@ -371,6 +376,18 @@ export async function startDashboard(options) {
         return res.end(svg);
       }
       if (kind === "project") {
+        if (req.method === "POST" && route === "/api/decision/cancel") {
+          if (!humanAuthorized)
+            return json(res, 403, {
+              error: "Human browser credential required",
+            });
+          const input = await readBody(req);
+          return json(
+            res,
+            200,
+            await mutate("question", { ...input, action: "cancel" }),
+          );
+        }
         if (req.method === "GET" && route === "/api/state")
           return json(res, 200, publicState(store.value));
         if (req.method === "POST" && route?.startsWith("/api/update/")) {
@@ -437,7 +454,8 @@ export async function startDashboard(options) {
         return proxyHarness(req, res, harness.port, cookieName, token);
       json(res, 404, { error: "Not found" });
     } catch (e) {
-      if (!res.headersSent) json(res, 400, { error: e.message });
+      if (!res.headersSent)
+        json(res, e.status === 409 ? 409 : 400, { error: e.message });
       else res.end();
     }
   });

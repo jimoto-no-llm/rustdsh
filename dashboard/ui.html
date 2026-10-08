@@ -192,6 +192,70 @@
       .question {
         min-width: 240px;
       }
+      .decision-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr));
+        gap: 16px;
+      }
+      .decision-card {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 16px;
+        min-width: 0;
+        overflow-wrap: anywhere;
+        background: var(--card);
+      }
+      .decision-heading {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+      }
+      .decision-card h3 {
+        font-size: 18px;
+        margin: 12px 0;
+      }
+      .decision-details {
+        display: grid;
+        grid-template-columns: 90px minmax(0, 1fr);
+        gap: 8px;
+        margin: 12px 0;
+      }
+      .decision-details dt {
+        color: var(--mut);
+      }
+      .decision-details dd {
+        margin: 0;
+        white-space: pre-wrap;
+      }
+      .decision-card fieldset {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 12px;
+      }
+      .decision-choice {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 6px 10px;
+        padding: 8px 0;
+        align-items: start;
+        cursor: pointer;
+      }
+      .decision-choice input {
+        width: auto;
+        margin-top: 4px;
+      }
+      .choice-detail {
+        grid-column: 2;
+      }
+      .decision-card textarea {
+        width: 100%;
+        min-height: 90px;
+        margin: 12px 0;
+      }
+      .decision-card button {
+        margin: 4px 8px 4px 0;
+      }
       textarea {
         display: block;
         margin-top: 12px;
@@ -471,22 +535,12 @@
         <p class="sub" id="pending-note">
           回答はこの質問への返答のみです。回答しただけで実行権限は生まれません。対象・条件が変わった場合は回答前に内容を再確認してください。
         </p>
-        <div class="table-box">
-          <table
-            aria-labelledby="pending-heading"
-            aria-describedby="pending-note"
-          >
-            <thead>
-              <tr>
-                <th scope="col">ID</th>
-                <th scope="col">緊急度</th>
-                <th scope="col">問い・回答</th>
-                <th scope="col">既定の行動（参考表示）</th>
-              </tr>
-            </thead>
-            <tbody id="questions"></tbody>
-          </table>
-        </div>
+        <div
+          id="questions"
+          class="decision-grid"
+          aria-labelledby="pending-heading"
+          aria-describedby="pending-note"
+        ></div>
         <h2>進捗・成果物</h2>
         <div class="feed" id="events"></div>
         <details id="answered">
