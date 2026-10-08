@@ -24,6 +24,10 @@ Unsupported/missing inventory and `N/A` stay unknown and block GPU admission.
   `--gpu-request`. The run's checksummed request survives client restart; later
   resume/consumer attachments automatically reacquire it even without the flag.
   Changing a recorded request requires a new run, rather than a silent rebind.
+  The checksummed run journal independently retains the requirement. A lost or
+  replaced request file blocks resume before any ACP/version probe, including
+  when the flag is omitted; restore the original metadata rather than silently
+  converting an existing GPU run to CPU-only operation.
 - `session-ledger start/resume` still verifies attachment then stops its owned
   process without sending a prompt. A reply consumer holds the reservation for
   its live original ACP process and checks the durable lease before every send.

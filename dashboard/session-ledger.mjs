@@ -554,7 +554,10 @@ export async function attachRecordedSession({
   let commandId;
   let gpuGuard;
   try {
-    await history.register(record.run_id, record.cli_session_id);
+    const registered = await history.register(
+      record.run_id,
+      record.cli_session_id,
+    );
     gpuGuard = await prepareGpuAttachment(
       ledger.project,
       record,
@@ -562,6 +565,7 @@ export async function attachRecordedSession({
       gpu,
       env,
       gpuLeases,
+      registered.gpu_request ?? null,
     );
     commandId = await history.recordCommand(
       record.run_id,

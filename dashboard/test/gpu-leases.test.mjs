@@ -376,6 +376,75 @@ test("the original ACP peer sees a prior reservation, and resume restores its GP
   );
 });
 
+test("losing a GPU run's request file cannot drop or replace its journaled requirement on resume", async (t) => {
+  const { ledger, leases, command, env, adapters } = await setup(t);
+  const first = await attachRecordedSession({
+    ledger,
+    command,
+    env,
+    gpu: request,
+    gpuLeases: leases,
+    stopTimeout: 200,
+  });
+  adapters.push(first.adapter);
+  await first.adapter.stop();
+  const recorded = (
+    await (await RunHistory.open(ledger.project)).read()
+  ).runs.get(first.record.run_id);
+  assert.deepEqual(recorded.gpu_request, request);
+  const file = path.join(
+    ledger.project.directory,
+    "gpu-runs",
+    first.record.run_id + ".json",
+  );
+  const original = await fs.readFile(file);
+  const trace = await fs.readFile(env.RDSH_ADAPTER_FIXTURE_TRACE);
+  await fs.unlink(file);
+  for (const gpu of [
+    undefined,
+    request,
+    { ...request, requested_vram_mib: 1024 },
+  ]) {
+    await assert.rejects(
+      attachRecordedSession({
+        ledger,
+        command,
+        env,
+        run_id: first.record.run_id,
+        gpu,
+        gpuLeases: leases,
+      }),
+      code("gpu_run_request_missing"),
+    );
+  }
+  await assert.rejects(
+    runGpuRequest(ledger.project, first.record.run_id),
+    code("gpu_run_request_missing"),
+  );
+  await assert.rejects(
+    (await RunHistory.open(ledger.project)).gpuRequirement(
+      first.record.run_id,
+      { ...request, mode: "shared" },
+    ),
+    code("gpu_run_request_changed"),
+  );
+  assert.deepEqual(await fs.readFile(env.RDSH_ADAPTER_FIXTURE_TRACE), trace);
+  assert.equal((await leases.read()).leases.length, 0);
+  await fs.writeFile(file, original);
+  const resumed = await attachRecordedSession({
+    ledger,
+    command,
+    env,
+    run_id: first.record.run_id,
+    gpuLeases: leases,
+    stopTimeout: 200,
+  });
+  adapters.push(resumed.adapter);
+  assert.equal(resumed.record.cli_session_id, first.record.cli_session_id);
+  assert.deepEqual(resumed.gpu.request, request);
+  await resumed.adapter.stop();
+});
+
 test("retry-start explicitly retries the same never-dispatched GPU run after capacity recovers", async (t) => {
   const { ledger, leases, command, env, adapters } = await setup(t);
   leases.observe = async () =>

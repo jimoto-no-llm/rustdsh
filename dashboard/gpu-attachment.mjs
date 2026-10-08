@@ -114,9 +114,16 @@ export async function prepareGpuAttachment(
   requested,
   env,
   leases = null,
+  recordedRequest = undefined,
 ) {
-  const request = await runGpuRequest(project, record.run_id, requested);
+  const request = await runGpuRequest(
+    project,
+    record.run_id,
+    requested,
+    recordedRequest,
+  );
   if (request === null) return null;
+  await history.gpuRequirement(record.run_id, request);
   visible(env, request);
   leases ||= new GpuLeases({
     home: path.join(stateHome(env), "gpu-resources"),

@@ -2,6 +2,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID, createHash } from "node:crypto";
+import { gpuRequest } from "./gpu-telemetry.mjs";
 import {
   readProcessIdentity,
   validProcessIdentity,
@@ -157,7 +158,12 @@ function validateData(type, data) {
         data.native_session_id !== null &&
         nativeId(data.native_session_id),
     );
-  else if (type === "transition" || type === "transition_rejected")
+  else if (type === "gpu_requirement") {
+    check(exact(data, ["request"]));
+    check(
+      JSON.stringify(gpuRequest(data.request)) === JSON.stringify(data.request),
+    );
+  } else if (type === "transition" || type === "transition_rejected")
     check(
       exact(data, ["from", "to", "reason"]) &&
         runStates.includes(data.from) &&
@@ -323,6 +329,9 @@ function apply(state, event) {
           run.native_session_id === data.native_session_id,
       );
       run.native_session_id = data.native_session_id;
+    } else if (type === "gpu_requirement") {
+      check(!run.gpu_request);
+      run.gpu_request = structuredClone(data.request);
     } else if (type === "scope_intent") {
       check(!run.scope || run.scope.status === "exit_confirmed");
       run.scope = {
@@ -599,6 +608,19 @@ export class RunHistory {
       }
       append(id, "registered", { native_session_id });
       return structuredClone(state.runs.get(id));
+    });
+  }
+  async gpuRequirement(id, request) {
+    request = gpuRequest(request);
+    return this.mutate((state, append) => {
+      const run = state.runs.get(id);
+      check(run, "run_not_found");
+      if (run.gpu_request) {
+        check(
+          JSON.stringify(run.gpu_request) === JSON.stringify(request),
+          "gpu_run_request_changed",
+        );
+      } else append(id, "gpu_requirement", { request });
     });
   }
   async transition(id, to, reason) {

@@ -264,8 +264,18 @@ async function durableWrite(file, payload, exclusive = false) {
 }
 // A run's explicit GPU request survives native-session resume, including other
 // attachment entry points. Omitting the flag cannot silently drop its lease.
-export async function runGpuRequest(project, run_id, requested = null) {
+export async function runGpuRequest(
+  project,
+  run_id,
+  requested = null,
+  recorded = undefined,
+) {
   check(projectId(project.id) && uuid(run_id, "run"), "invalid_gpu_run");
+  if (recorded === undefined) {
+    const history = await new RunHistory(project).read();
+    check(!history.tail_bytes, "gpu_run_history_incomplete");
+    recorded = history.runs.get(run_id)?.gpu_request ?? null;
+  }
   const directory = path.join(project.directory, "gpu-runs");
   const file = path.join(directory, run_id + ".json");
   let old = await readGpuJson(file);
@@ -278,6 +288,11 @@ export async function runGpuRequest(project, run_id, requested = null) {
       "gpu_run_invalid",
     );
     const request = gpuRequest(old.request);
+    if (recorded !== null)
+      check(
+        hash(request) === hash(gpuRequest(recorded)),
+        "gpu_run_request_changed",
+      );
     if (requested !== null)
       check(
         hash(request) === hash(gpuRequest(requested)),
@@ -285,6 +300,7 @@ export async function runGpuRequest(project, run_id, requested = null) {
       );
     return request;
   }
+  check(recorded === null, "gpu_run_request_missing");
   if (requested === null) return null;
   const request = gpuRequest(requested);
   await gpuDirectory(directory);
@@ -296,7 +312,7 @@ export async function runGpuRequest(project, run_id, requested = null) {
     );
   } catch (error) {
     if (error.code !== "EEXIST") throw error;
-    old = await runGpuRequest(project, run_id, request);
+    old = await runGpuRequest(project, run_id, request, recorded);
     return old;
   }
   return request;
