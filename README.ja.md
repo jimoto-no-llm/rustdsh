@@ -60,7 +60,7 @@ curl -fsSL https://github.com/sahenjp/rustdsh/releases/latest/download/install.s
 Linux/x86_64 では、glibc版（`rdsh-linux-x64.tar.gz`、glibc 2.34以上が必要）を選びます。
 2.34未満のglibcを検出したときは、完全静的な `rdsh-linux-x64-musl.tar.gz` を選びます。
 `--musl`（または `RDSH_MUSL=1`）で静的版を強制できます。glibcを検出できないmusl専用環境
-（Alpine等）では、自分で `--musl` を付けてください。ダウンロードは `.sha256` ファイルで検証します。
+（Alpine等）では、自分で `--musl` を付けてください。インストーラーはダウンロードを `.sha256` ファイルで検証します。
 
 ```powershell
 # Windows（PowerShell）
@@ -132,7 +132,7 @@ echo ... | rdsh prune --max-tokens 4000   # head+tailを残して予算内に切
 rdsh search TODO --dir . --max 100 # 再帰grep（並列・出力順は逐次と同一）
 rdsh search-web "rust async" --limit 5  # Web検索（SearXNG経由、既定 http://127.0.0.1:8888、`$SEARXNG_URL` で変更）
 rdsh compact ./s.jsonl --max-tokens 8000 # セッションJSONLの圧縮（元ファイル不変）
-rdsh sessions --limit 20 --tokens  # セッション一覧＋トークン見積（zstdヘッダーから読取、展開なし）
+rdsh sessions --limit 20 --tokens  # セッション一覧＋トークン見積（zstdヘッダーまたはzstd CLIで正確なサイズ）
 rdsh logs --tail 50 --grep ERROR   # 起動ログの参照
 rdsh profiles / rdsh skills        # プロファイル・スキル一覧
 rdsh doctor                        # 本家dsh・DSH_HOME・slim設定の確認
@@ -202,7 +202,7 @@ echo "$input" | rdsh guard --deny "rm -rf /*" --deny "*token*"
 rdsh固有の先頭サブコマンド（`tokens`/`guard`/`serve`/`sessions`等）以外は、**引数を一字も変えず本家へexec委譲**します（`dsh --version`・`dsh --profile tui`・`dsh --help`は完全互換）。探索順などの詳細は[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)を見てください。
 
 - 一時退避： `RDSH_PASSTHROUGH=1 dsh ...`（slim無し）、`RDSH_DRY_RUN=1 dsh ...`（実行内容のみ表示）
-- 既定プロファイル： `RDSH_DEFAULT_PROFILE` → ローカルの `tui` → 案内付きエラーの順
+- 既定プロファイル： `RDSH_DEFAULT_PROFILE` → `general.default_profile` → ローカルの `tui` → 案内付きエラーの順
 - 注意： `dsh tokens` のようにプロファイル名が予約語と衝突する場合は `dsh --profile tokens` で起動してください
 - `node "$(... dsh ...)"` 形式のスクリプトは置換中に壊れます。`dsh`/`rdsh` を直接実行してください。対象は `rdsh doctor` が一覧表示します
 
@@ -217,10 +217,13 @@ rdsh固有の先頭サブコマンド（`tokens`/`guard`/`serve`/`sessions`等�
   無効になります。slimのその他の変数（`RDSH_*`）は本家dshが読まないヒントです
 - **ビルド済みバイナリ**は素のx86-64（AVX/BMIなし）なので、Celeron/Pentiumでも動きます。
   古いglibcには静的musl版が対応します
-- **`sessions --tokens`** はzstdフレームヘッダーから展開後サイズを読みます（展開なし、
-  `zstd` CLI不要）。サイズを記録していないフレームだけ `zstd` CLIにフォールバックし、
-  どちらも使えない場合だけ `?` を付けます
-- **スレッド数**：`search` と `sessions` の走査はホストのコア数に合わせます（最大8）
+- **`sessions --tokens`** はサイズを記録したフレームならヘッダーから読みます（展開なし）。
+  dshが書くストリーミングフレームは通常サイズを記録しないため、多くのセッションは
+  `zstd -dc` CLIで数えます（8〜32プロセスを並列実行）。結果は
+  `~/.cache/rdsh/sessions-tokens.json`（`$XDG_CACHE_HOME` を優先、`RDSH_TOKENS_CACHE=0` で無効）に
+  キャッシュし、変わっていないセッションは再計算しません。サイズを読めなかったセッション（zstd CLIが無い場合など）には `?` を付けます
+- **スレッド数**：`search` と `sessions` の走査スレッドはホストのコア数に合わせます（最大8）。
+  `zstd` CLIへのフォールバックは8〜32プロセスを並列で起動します
 - **ホストにNodeが無い場合**：ネイティブコマンド（`tokens`・`search`・`sessions` など）は
   そのまま使えます。`rdsh doctor` は本家dshが見つからないことを報告してexit 1で終わります。
   dshを起動するには `DSH_ORIG_BIN`（または `RDSH_ORIG_BIN`）を指定するか
@@ -230,7 +233,9 @@ rdsh固有の先頭サブコマンド（`tokens`/`guard`/`serve`/`sessions`等�
   cargoビルドは走らず、`main` のコミットはタグが付いてから届きます。新しいバイナリは、
   起動確認と、使い捨ての `HOME` での `tests/regress.sh` に通ったときだけ置き換えます。
   `main` に追従してソースからビルドしたい場合は `RDSH_SYNC_FROM_SOURCE=1` を指定します
-  （`nice -n 19`、あれば `ionice -c3` 下で実行）。`systemd/rdsh-sync.service` はidle優先度で
+  （`nice -n 19`、あれば `ionice -c3` 下で実行）。`sync-dsh.sh` も `install.sh` と同じく
+  ダウンロードを `.sha256` ファイルで検証し、不一致や `.sha256` の欠落・空の場合は理由をログに残して
+  バイナリを置き換えません。`systemd/rdsh-sync.service` は低優先度で
   動かすので、`ExecStart` は各自のcheckoutに合わせてください
 
 ## Smart-DSH との併用

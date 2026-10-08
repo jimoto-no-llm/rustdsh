@@ -66,7 +66,7 @@ On Linux/x86_64 the installer picks the glibc build (`rdsh-linux-x64.tar.gz`,
 needs glibc >= 2.34), or the fully static `rdsh-linux-x64-musl.tar.gz` when it
 detects an older glibc. Force the static build with `--musl` (or `RDSH_MUSL=1`);
 on musl-only systems such as Alpine, where glibc cannot be detected, pass
-`--musl` yourself. Each download is checked against its `.sha256` file.
+`--musl` yourself. The installer checks each download against its `.sha256` file.
 
 ```powershell
 # Windows (PowerShell)
@@ -140,7 +140,7 @@ echo ... | rdsh prune --max-tokens 4000  # keep head+tail within a token budget
 rdsh search TODO --dir . --max 100   # recursive grep (parallel, same order as sequential)
 rdsh search-web "rust async" --limit 5  # web search via SearXNG (default http://127.0.0.1:8888, $SEARXNG_URL wins)
 rdsh compact ./s.jsonl --max-tokens 8000 # compact a session transcript (source untouched)
-rdsh sessions --limit 20 --tokens    # list sessions with token estimates (read from zstd headers, no decompression)
+rdsh sessions --limit 20 --tokens    # list sessions with token estimates (exact size from zstd headers or the zstd CLI)
 rdsh logs --tail 50 --grep ERROR     # inspect startup logs
 rdsh profiles / rdsh skills          # list profiles and skills
 rdsh doctor                          # check original dsh, DSH_HOME, slim setup
@@ -224,7 +224,7 @@ Full discovery order and naming rules: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.
 
 - One-shot escapes: `RDSH_PASSTHROUGH=1 dsh ...` (no slim env),
   `RDSH_DRY_RUN=1 dsh ...` (print only)
-- Default profile: `RDSH_DEFAULT_PROFILE`, then local `tui`, else a guided error
+- Default profile: `RDSH_DEFAULT_PROFILE`, then `general.default_profile`, then local `tui`, else a guided error
 - Name shadowing: a bare `dsh tokens` runs the rdsh subcommand; a profile
   literally named `tokens` still boots via `dsh --profile tokens`
 - Scripts that run `node "$(... dsh ...)"` break while `dsh` is
@@ -244,12 +244,15 @@ no AVX, older distros, no Node at all).
   are hints that upstream dsh itself does not read.
 - **Prebuilt binaries** are plain x86-64 (no AVX/BMI), so they run on
   Celeron/Pentium parts; the static musl build covers old glibc.
-- **`sessions --tokens`** reads each session's decompressed size from the zstd
-  frame header (no decompression, no `zstd` CLI needed). Only a frame that
-  records no size falls back to the `zstd` CLI; `?` marks sessions where
-  neither worked.
-- **Threads.** `search` and the `sessions` scan use as many threads as the
-  host has cores (at most 8).
+- **`sessions --tokens`** reads the decompressed size from the zstd frame
+  header when the frame records it (no decompression). The streaming frames
+  dsh writes usually do not, so most sessions are counted with the `zstd -dc`
+  CLI instead (8 to 32 processes in parallel). Results are cached in
+  `~/.cache/rdsh/sessions-tokens.json` (`$XDG_CACHE_HOME` wins; disable with
+  `RDSH_TOKENS_CACHE=0`), so unchanged sessions are not recounted. `?` marks
+  sessions whose size could not be read (for example, no zstd CLI).
+- **Threads.** The `search` and `sessions` scan threads follow the host's core
+  count (at most 8). The `zstd` CLI fallback runs 8 to 32 processes in parallel.
 - **No Node on the host?** The native commands (`tokens`, `search`,
   `sessions`, ...) keep working. `rdsh doctor` reports the missing original
   dsh and exits with 1; set `DSH_ORIG_BIN` (or `RDSH_ORIG_BIN`) or install
@@ -261,8 +264,11 @@ no AVX, older distros, no Node at all).
   replaces the old one only after it runs and passes `tests/regress.sh` in a
   throwaway `HOME`. To follow `main` with a source build instead, set
   `RDSH_SYNC_FROM_SOURCE=1` (it runs under `nice -n 19`, and `ionice -c3` when
-  available). `systemd/rdsh-sync.service` runs it at idle priority; point its
-  `ExecStart` at your checkout.
+  available). Like `install.sh`, `sync-dsh.sh` checks the release download
+  against its `.sha256` file; on a mismatch, or a missing or empty `.sha256`,
+  it logs the reason and leaves the binaries untouched.
+  `systemd/rdsh-sync.service` runs it at low priority; point its `ExecStart` at
+  your checkout.
 
 ## Using with Smart-DSH
 

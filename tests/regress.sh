@@ -1,26 +1,33 @@
 #!/bin/sh
 # rdsh CLI regression. Fails on first mismatch (set -e + explicit checks).
-BIN="${BIN:-./target/release/rdsh}"
-# Hermetic by default: rdsh's auth autosync (boot/dump-config/plugin/raw) must
-# never write into a real ~/.dsh when this script is run by hand. Tests that
-# exercise auth use their own sandbox HOME/DSH_HOME and the `auth` subcommand
-# (not autosync). HOME stays as is on purpose: original-dsh discovery looks there.
+# Works from any cwd: a relative BIN is taken relative to the caller's cwd, the
+# default is <repo>/target/release/rdsh, then we cd to the repo root (the checks
+# below use ./install.sh, ./sync-dsh.sh and --dir src).
+case "${BIN:-}" in ""|/*) ;; */*) BIN="$(pwd)/$BIN" ;; esac
+cd "$(dirname "$0")/.." || exit 1
+BIN="${BIN:-$PWD/target/release/rdsh}"
+# Hermetic: this suite must never write to the real ~/.dsh (issue #85 item 8).
+# Unless the caller already sandboxed it (RDSH_REGRESS_SANDBOXED=1), HOME and
+# DSH_HOME point at a throwaway tree under RG_TMP, so the original dsh is found
+# only via DSH_ORIG_BIN / RDSH_ORIG_BIN / PATH. Tests that need fixtures override
+# HOME/DSH_HOME explicitly. rdsh's auth autosync is off for the same reason.
 export RDSH_AUTH_AUTOSYNC=0
 unset RDSH_DEFAULT_PROFILE
-RG_TMP="$(mktemp -d)" || exit 1
+RG_TMP="$(mktemp -d 2>/dev/null || mktemp -d -t rdsh-regress)" || exit 1
 trap 'rm -rf "$RG_TMP"' EXIT
-if [ -z "${DSH_HOME:-}" ]; then DSH_HOME="$RG_TMP/dsh"; export DSH_HOME; mkdir -p "$DSH_HOME"; fi
-pass=0
-ok() { pass=$((pass+1)); echo "ok: $1"; }
-# Sandboxed HOME/DSH_HOME: this suite must never write to the real ~/.dsh
-# (issue #85 item 8). Tests that need fixtures override HOME/DSH_HOME explicitly.
+trap 'exit 1' INT TERM
+# Child mktemp calls (install.sh's download dir, ...) land under RG_TMP too.
+mkdir -p "$RG_TMP/tmp"; TMPDIR="$RG_TMP/tmp"; export TMPDIR
 if [ "${RDSH_REGRESS_SANDBOXED:-}" != 1 ]; then
-  RR_SANDBOX="$(mktemp -d 2>/dev/null || mktemp -d -t rdsh-regress)"
+  RR_SANDBOX="$RG_TMP/sandbox"
   mkdir -p "$RR_SANDBOX/home" "$RR_SANDBOX/dsh"
   HOME="$RR_SANDBOX/home"; DSH_HOME="$RR_SANDBOX/dsh"; RDSH_REGRESS_SANDBOXED=1
   export HOME DSH_HOME RDSH_REGRESS_SANDBOXED RR_SANDBOX
-  trap 'rm -rf "$RR_SANDBOX"' EXIT INT TERM
+elif [ -z "${DSH_HOME:-}" ]; then
+  DSH_HOME="$RG_TMP/dsh"; export DSH_HOME; mkdir -p "$DSH_HOME"
 fi
+pass=0
+ok() { pass=$((pass+1)); echo "ok: $1"; }
 need_ok() {
   desc="$1"; shift
   if "$@" >/tmp/rr-out 2>/tmp/rr-err; then ok "$desc"; else echo "FAIL(exit): $desc"; cat /tmp/rr-err; exit 1; fi
@@ -82,10 +89,15 @@ if [ "$code" = 1 ] && grep -q "no profile specified" "$DP/err"; then ok "dump-co
 if dp_dry DSH_HOME="$DP/empty" RDSH_DEFAULT_PROFILE=web $BIN --dry-run boot 2>/dev/null | grep -q '"--profile" "web"'; then ok "RDSH_DEFAULT_PROFILE=web dry-run shows --profile web"; else echo "FAIL(output): RDSH_DEFAULT_PROFILE"; exit 1; fi
 if dp_dry DSH_HOME="$DP/withtui" $BIN --dry-run boot 2>/dev/null | grep -q '"--profile" "tui"'; then ok "local tui profile dir keeps tui as default"; else echo "FAIL(output): tui dir default"; exit 1; fi
 if dp_dry DSH_HOME="$DP/withtui" RDSH_DEFAULT_PROFILE=headless $BIN --dry-run boot 2>/dev/null | grep -q '"--profile" "headless"'; then ok "RDSH_DEFAULT_PROFILE beats local tui dir"; else echo "FAIL(output): env beats tui dir"; exit 1; fi
+# general.default_profile (rdsh.json under DSH_HOME): beats the local tui dir, loses to the env var.
+mkdir -p "$DP/cfg/profiles/tui"
+DSH_HOME="$DP/cfg" $BIN settings set general.default_profile headless >/dev/null 2>&1
+if dp_dry DSH_HOME="$DP/cfg" $BIN --dry-run boot 2>/dev/null | grep -q '"--profile" "headless"'; then ok "general.default_profile beats local tui dir"; else echo "FAIL(output): settings default_profile beats tui dir"; exit 1; fi
+if dp_dry DSH_HOME="$DP/cfg" RDSH_DEFAULT_PROFILE=web $BIN --dry-run boot 2>/dev/null | grep -q '"--profile" "web"'; then ok "RDSH_DEFAULT_PROFILE beats general.default_profile"; else echo "FAIL(output): env beats settings default_profile"; exit 1; fi
 if dp_dry DSH_HOME="$DP/empty" $BIN --dry-run --profile tui 2>/dev/null | grep -q '"--profile" "tui"' && dp_dry DSH_HOME="$DP/empty" $BIN --dry-run tui 2>/dev/null | grep -q '"--profile" "tui"'; then ok "explicit tui passes through verbatim"; else echo "FAIL(output): explicit tui passthrough"; exit 1; fi
 # --- slim: Node compile cache (the part of slim that really speeds up Node boot) ---
 # Default dir is $HOME/.cache/rdsh-node-compile-cache (XDG_CACHE_HOME is not consulted).
-CC=/tmp/rdsh-cc-$$
+CC="$RG_TMP/cc"
 mkdir -p "$CC/home" "$CC/dsh" "$CC/home-pt"
 cat > "$CC/envdsh" << 'ENVEOF'
 #!/bin/sh
@@ -102,36 +114,69 @@ if env -u NODE_COMPILE_CACHE HOME="$CC/home" RDSH_NODE_COMPILE_CACHE=0 DSH_ORIG_
 if NODE_COMPILE_CACHE=/tmp/rdsh-mine HOME="$CC/home" DSH_ORIG_BIN="$SB/orig/dsh" $BIN --dry-run tui 2>/dev/null | grep "would exec" | grep -q 'NODE_COMPILE_CACHE='; then echo "FAIL: user NODE_COMPILE_CACHE must not be overridden (dry-run)"; exit 1; else ok "user NODE_COMPILE_CACHE respected (dry-run)"; fi
 if NODE_COMPILE_CACHE=/tmp/rdsh-mine HOME="$CC/home" DSH_HOME="$CC/dsh" DSH_ORIG_BIN="$CC/envdsh" $BIN tui 2>/dev/null | grep -q "CACHE=/tmp/rdsh-mine "; then ok "boot passes the user's NODE_COMPILE_CACHE through"; else echo "FAIL(output): boot must keep the user's NODE_COMPILE_CACHE"; exit 1; fi
 # Real exec (not dry-run): the child sees the default value and the directory exists.
+# (The dry-runs above already made it, so start from a clean slate.)
+rm -rf "$CC/home/.cache"
 if env -u NODE_COMPILE_CACHE HOME="$CC/home" DSH_HOME="$CC/dsh" DSH_ORIG_BIN="$CC/envdsh" $BIN tui 2>/dev/null | grep -q "CACHE=$CCDEF " && [ -d "$CCDEF" ]; then ok "boot exports NODE_COMPILE_CACHE and creates the dir"; else echo "FAIL(output): boot exports NODE_COMPILE_CACHE"; exit 1; fi
 rm -rf "$CC"
 # --- doctor on a host with no Node/dsh: fails with a clear error ---
-ND=/tmp/rdsh-nodsh-$$
+ND="$RG_TMP/nodsh"
 mkdir -p "$ND/home"
 env -u RDSH_ORIG_BIN -u DSH_ORIG_BIN HOME="$ND/home" PATH="/nonexistent" $BIN doctor > "$ND/out" 2> "$ND/err"
 code=$?
 if [ "$code" = 1 ] && grep -q "original 'dsh' not found" "$ND/err"; then ok "doctor exits 1 when original dsh is missing"; else echo "FAIL(output): doctor missing-dsh error (exit $code)"; cat "$ND/err"; exit 1; fi
 rm -rf "$ND"
-# --- sessions --tokens: exact size from zstd frame headers, no zstd process ---
-ZS=/tmp/rdsh-zst-$$
+# --- sessions --tokens: exact size from zstd frame headers when recorded, zstd CLI only otherwise ---
+ZS="$RG_TMP/zst"
 mkdir -p "$ZS/dsh/sessions/p/s1" "$ZS/dsh/sessions/p/s2" "$ZS/shim"
 # s1: one frame, single-segment, FCS=200 (0xC8), one raw last block of 200 bytes.
 { printf '\050\265\057\375\040\310\101\006\000'; head -c 200 /dev/zero; } > "$ZS/dsh/sessions/p/s1/a.zstd"
 # s2: frame with no content size (window byte, no FCS), raw last block of 4 bytes.
 { printf '\050\265\057\375\000\000\041\000\000'; printf 'abcd'; } > "$ZS/dsh/sessions/p/s2/a.zstd"
-# A zstd on PATH that records being run: the header path must never spawn it.
-printf '#!/bin/sh\ntouch "%s/spawned"\nexit 1\n' "$ZS" > "$ZS/shim/zstd"
+# A zstd on PATH that logs its arguments: `--version` succeeds (the CLI counts as
+# available), anything else fails. Only the size-less s2 may be handed to `-dc`.
+printf '#!/bin/sh\necho "$*" >> "%s/calls"\ncase "$1" in --version) echo "zstd shim"; exit 0 ;; esac\nexit 1\n' "$ZS" > "$ZS/shim/zstd"
 chmod +x "$ZS/shim/zstd"
-PATH="$ZS/shim:$PATH" DSH_HOME="$ZS/dsh" $BIN sessions --tokens --project p --limit 5 > "$ZS/out" 2> "$ZS/err"
+# RDSH_TOKENS_CACHE=0: results must come from the headers, not from a cache hit.
+PATH="$ZS/shim:$PATH" RDSH_TOKENS_CACHE=0 DSH_HOME="$ZS/dsh" $BIN sessions --tokens --project p --limit 5 > "$ZS/out" 2> "$ZS/err"
 if grep "p/s1" "$ZS/out" | grep -q "~50tok " && ! grep "p/s1" "$ZS/out" | grep -q "?"; then ok "sessions --tokens exact from FCS (no ? marker)"; else echo "FAIL(output): sessions --tokens FCS"; cat "$ZS/out"; exit 1; fi
 if grep "p/s2" "$ZS/out" | grep -q "?"; then ok "sessions --tokens marks unknown size with ?"; else echo "FAIL(output): sessions --tokens ? marker"; cat "$ZS/out"; exit 1; fi
-rm -f "$ZS/spawned"
+if grep -q -- "--version" "$ZS/calls" 2>/dev/null; then ok "sessions --tokens probes the zstd CLI"; else echo "FAIL(output): zstd shim never probed with --version"; exit 1; fi
+if grep -- "-dc" "$ZS/calls" | grep -q "/p/s1/"; then echo "FAIL: zstd -dc spawned for a frame with a content size"; cat "$ZS/calls"; exit 1; else ok "no zstd -dc for frames with a content size"; fi
+if grep -- "-dc" "$ZS/calls" | grep -q "/p/s2/"; then ok "zstd -dc only for the frame without a content size"; else echo "FAIL: zstd -dc not used for s2"; cat "$ZS/calls" 2>/dev/null; exit 1; fi
+if grep -q "zstd CLI not found" "$ZS/err"; then echo "FAIL: zstd note printed although the CLI is available"; exit 1; else ok "no zstd note when the CLI exists"; fi
 rm -f "$ZS/shim/zstd"
-PATH="$ZS/shim" DSH_HOME="$ZS/dsh" $BIN sessions --tokens --project p --limit 5 > "$ZS/out" 2> "$ZS/err"
+PATH="$ZS/shim" RDSH_TOKENS_CACHE=0 DSH_HOME="$ZS/dsh" $BIN sessions --tokens --project p --limit 5 > "$ZS/out" 2> "$ZS/err"
 if grep -q "zstd CLI not found" "$ZS/err" && grep "p/s1" "$ZS/out" | grep -q "~50tok "; then ok "zstd-missing note only when a fallback was needed"; else echo "FAIL(output): zstd missing note"; cat "$ZS/err"; exit 1; fi
 rm -rf "$ZS/dsh/sessions/p/s2"
-PATH="$ZS/shim" DSH_HOME="$ZS/dsh" $BIN sessions --tokens --project p --limit 5 > "$ZS/out" 2> "$ZS/err"
+PATH="$ZS/shim" RDSH_TOKENS_CACHE=0 DSH_HOME="$ZS/dsh" $BIN sessions --tokens --project p --limit 5 > "$ZS/out" 2> "$ZS/err"
 if grep -q "zstd CLI not found" "$ZS/err"; then echo "FAIL: zstd note printed although headers sufficed"; exit 1; else ok "no zstd note when headers suffice"; fi
 rm -rf "$ZS"
+# --- sessions --tokens cache: a `?` from a zstd-less run must not stick once zstd exists ---
+# p (two sessions) takes the batch path, q (one session) the per-session path.
+ZC="$RG_TMP/zcache"
+mkdir -p "$ZC/dsh/sessions/p/s1" "$ZC/dsh/sessions/p/s2" "$ZC/dsh/sessions/q/s2" "$ZC/nozstd" "$ZC/ok" "$ZC/bad" "$ZC/cache"
+{ printf '\050\265\057\375\040\310\101\006\000'; head -c 200 /dev/zero; } > "$ZC/dsh/sessions/p/s1/a.zstd"
+for d in p q; do { printf '\050\265\057\375\000\000\041\000\000'; printf 'abcd'; } > "$ZC/dsh/sessions/$d/s2/a.zstd"; done
+# ok: a working zstd for the 4-byte raw block; bad: present but `-dc` fails.
+printf '#!/bin/sh\ncase "$1" in --version) exit 0 ;; -dc) printf abcd; exit 0 ;; esac\nexit 1\n' > "$ZC/ok/zstd"
+printf '#!/bin/sh\ncase "$1" in --version) exit 0 ;; esac\nexit 1\n' > "$ZC/bad/zstd"
+chmod +x "$ZC/ok/zstd" "$ZC/bad/zstd"
+zc() { PATH="$1" XDG_CACHE_HOME="$ZC/cache" DSH_HOME="$ZC/dsh" $BIN sessions --tokens --project "$2" --limit 5 > "$ZC/out" 2> "$ZC/err"; }
+for d in p q; do
+  zc "$ZC/nozstd" $d
+  if grep "$d/s2" "$ZC/out" | grep -q "?"; then ok "tokens cache: $d/s2 is ? without zstd"; else echo "FAIL(output): $d/s2 without zstd"; cat "$ZC/out"; exit 1; fi
+  if grep -q '"decomp":null' "$ZC/cache/rdsh/sessions-tokens.json" 2>/dev/null; then echo "FAIL: zstd-less ? cached ($d)"; cat "$ZC/cache/rdsh/sessions-tokens.json"; exit 1; else ok "tokens cache: zstd-less ? not cached ($d)"; fi
+  zc "$ZC/ok" $d
+  if grep "$d/s2" "$ZC/out" | grep -q "~1tok " && ! grep "$d/s2" "$ZC/out" | grep -q "?"; then ok "tokens cache: $d/s2 resolves once zstd exists"; else echo "FAIL(output): $d/s2 stuck after zstd install"; cat "$ZC/out"; exit 1; fi
+done
+# Legacy cache (no `cli` field) holding null from an old zstd-less run: recomputed when zstd exists.
+rm -rf "$ZC/cache"; mkdir -p "$ZC/cache"
+zc "$ZC/bad" q
+sed 's/"cli":true,//g' "$ZC/cache/rdsh/sessions-tokens.json" > "$ZC/legacy" && mv "$ZC/legacy" "$ZC/cache/rdsh/sessions-tokens.json"
+if grep -q '"decomp":null' "$ZC/cache/rdsh/sessions-tokens.json" && ! grep -q '"cli"' "$ZC/cache/rdsh/sessions-tokens.json"; then :; else echo "FAIL(setup): legacy null cache"; cat "$ZC/cache/rdsh/sessions-tokens.json"; exit 1; fi
+zc "$ZC/ok" q
+if grep "q/s2" "$ZC/out" | grep -q "~1tok " && ! grep "q/s2" "$ZC/out" | grep -q "?"; then ok "tokens cache: legacy null entry rechecked with zstd"; else echo "FAIL(output): legacy null entry stuck"; cat "$ZC/out"; exit 1; fi
+rm -rf "$ZC"
 WB=/tmp/rdsh-wrapper-$$
 mkdir -p $WB/.local/bin
 printf '#!/bin/sh\nexec node "$(readlink -f "$(command -v dsh)")" --profile web\n' > $WB/.local/bin/dsh-web-local
@@ -164,7 +209,7 @@ tar -czf "$FR/latest/download/rdsh-linux-x64-musl.tar.gz" -C $FR/pkg rdsh
 (cd "$FR/latest/download" && $SUM "rdsh-linux-x64-musl.tar.gz" > "rdsh-linux-x64-musl.tar.gz.sha256")
 if RDSH_RELEASE_BASE="file://$FR" DSH_HOME="$FR/dsh" bash ./install.sh --from-release --musl --prefix="$FR/bin-musl" >$FR/install-musl.log 2>&1 && "$FR/bin-musl/rdsh" --version 2>/dev/null | grep -q "rdsh"; then ok "from-release musl install"; else echo "FAIL(output): from-release musl install"; tail -n 8 $FR/install-musl.log; exit 1; fi
 # --- install.sh asset selection (Linux/x86_64 via PATH shims; file:// release fixtures) ---
-MS=/tmp/rdsh-musl-AA
+MS="$RG_TMP/musl"
 rm -rf $MS
 mkdir -p $MS/shim $MS/rel/latest/download $MS/gnu $MS/musl
 printf '#!/bin/sh\necho fake-gnu\n' > $MS/gnu/rdsh
@@ -176,6 +221,7 @@ tar -czf $MS/rel/latest/download/rdsh-linux-x64-musl.tar.gz -C $MS/musl rdsh
 for a in rdsh-linux-x64 rdsh-linux-x64-musl; do (cd "$MS/rel/latest/download" && $SUM "$a.tar.gz" > "$a.tar.gz.sha256"); done
 printf '#!/bin/sh\ncase "$1" in -s) echo Linux ;; -m) echo x86_64 ;; *) exec /usr/bin/uname "$@" ;; esac\n' > $MS/shim/uname
 chmod +x $MS/shim/uname
+# install.sh asks ldd first and falls back to getconf, so "ldd exit 1" cases exercise the getconf fallback.
 # pick NAME GETCONF_BODY LDD_BODY [install flags...] -> which fake binary got installed
 pick() {
   rm -rf $MS/prefix
@@ -188,11 +234,11 @@ pick() {
 }
 mkdir -p $MS/home
 r="$(pick x 'echo "glibc 2.41"' 'exit 1')"
-if [ "$r" = fake-gnu ]; then ok "install: glibc 2.41 picks gnu"; else echo "FAIL: glibc 2.41 picked $r"; exit 1; fi
+if [ "$r" = fake-gnu ]; then ok "install: getconf fallback glibc 2.41 picks gnu"; else echo "FAIL: glibc 2.41 picked $r"; exit 1; fi
 r="$(pick x 'echo "glibc 2.31"' 'exit 1')"
-if [ "$r" = fake-musl ]; then ok "install: glibc 2.31 picks musl"; else echo "FAIL: glibc 2.31 picked $r"; exit 1; fi
+if [ "$r" = fake-musl ]; then ok "install: getconf fallback glibc 2.31 picks musl"; else echo "FAIL: glibc 2.31 picked $r"; exit 1; fi
 r="$(pick x 'exit 1' 'echo "ldd (Debian GLIBC 2.36-9) 2.36"')"
-if [ "$r" = fake-gnu ]; then ok "install: ldd fallback glibc 2.36 picks gnu"; else echo "FAIL: ldd 2.36 picked $r"; exit 1; fi
+if [ "$r" = fake-gnu ]; then ok "install: ldd glibc 2.36 picks gnu"; else echo "FAIL: ldd 2.36 picked $r"; exit 1; fi
 r="$(pick x 'echo "glibc 2.41"' 'exit 1' --musl)"
 if [ "$r" = fake-musl ]; then ok "install: --musl forces musl"; else echo "FAIL: --musl picked $r"; exit 1; fi
 rm -rf $MS
