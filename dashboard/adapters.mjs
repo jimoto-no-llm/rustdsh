@@ -189,7 +189,8 @@ class CliAdapter extends EventEmitter {
     return event;
   }
 
-  async probe() {
+  async probe({ signal } = {}) {
+    this.probeFailureCategory = null;
     if (this.cli !== "dsh") return this.capabilities();
     if (this.health === "incompatible" || this.stopped)
       return this.capabilities(); // Protocol failures require an explicit new adapter.
@@ -219,6 +220,7 @@ class CliAdapter extends EventEmitter {
           shell: false,
           timeout: Math.min(this.requestTimeout, 5000),
           maxBuffer: 4096,
+          signal,
         },
       );
       const candidate = stdout.trim();
@@ -230,8 +232,21 @@ class CliAdapter extends EventEmitter {
         return this.capabilities();
       }
       this.health = connected ? "compatible" : "version_matched";
-    } catch {
+    } catch (error) {
       this.health = "cli_unavailable";
+      this.probeFailureCategory =
+        error.killed || ["ETIMEDOUT", "ABORT_ERR"].includes(error.code)
+          ? "timeout"
+          : ["EAGAIN", "EMFILE", "ENFILE"].includes(error.code)
+            ? "unavailable"
+            : [
+                  "ENOENT",
+                  "EACCES",
+                  "ENOEXEC",
+                  "ERR_CHILD_PROCESS_STDIO_MAXBUFFER",
+                ].includes(error.code)
+              ? "permanent"
+              : "unknown";
     }
     return this.capabilities();
   }

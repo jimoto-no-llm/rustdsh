@@ -11,6 +11,8 @@ import { smokeAdapter } from "./adapter-smoke.mjs";
 import { SessionLedger, attachRecordedSession } from "./session-ledger.mjs";
 import { preflightCli, readRequirements } from "./preflight.mjs";
 import { RunHistory } from "./run-history.mjs";
+import { RetryHistory } from "./retry.mjs";
+import { probeCliWithRetry } from "./retry-probe.mjs";
 
 const help = `rdsh-dashboard project --project <directory> [--port <port>] [--no-tailscale] [--open]
 rdsh-dashboard harness [--port 38081] [--harness-port 3081] [--no-tailscale] [--open]
@@ -19,10 +21,11 @@ rdsh-dashboard stop --project <directory> | --harness
 rdsh-dashboard revoke-events --project <directory>
 rdsh-dashboard tunnel --project <directory> --tunnel-id <tunnel_id>
 rdsh-dashboard mcp --project <directory>
-rdsh-dashboard adapters [--cli dsh] [--executable <original-dsh>] [--entrypoint <bin.js>] [--project <directory>]
+rdsh-dashboard adapters [--cli dsh] [--executable <original-dsh>] [--entrypoint <bin.js>] [--project <directory>] [--retry] [--retry-attempts <n>] [--retry-total-ms <ms>]
 rdsh-dashboard adapter-smoke --executable <original-dsh> [--entrypoint <bin.js>] [--project <directory>]
 rdsh-dashboard preflight --project <directory> [--requirements <json>] [--executable <original-dsh>] [--entrypoint <bin.js>] [--verify-auth]
 rdsh-dashboard run-history list|inspect|events --project <directory> [--run-id <run_id>] [--cursor <number>] [--limit <number>]
+rdsh-dashboard retry-history list|inspect --project <directory> [--operation-id <id>]
 rdsh-dashboard session-ledger list|record|resolve|start|resume --project <directory> [--run-id <run_id>] [--task-id <id>] [--session-id <id>] [--label <name>] [--provider <name>] [--cwd <directory>] [--cli <name>] [--executable <original-dsh>] [--entrypoint <bin.js>]
 
 Project mode: project metrics, tasks, questions, human feedback, and /mcp.
@@ -53,6 +56,10 @@ const { values, positionals } = parseArgs({
     "verify-auth": { type: "boolean" },
     cursor: { type: "string" },
     limit: { type: "string" },
+    retry: { type: "boolean" },
+    "retry-attempts": { type: "string" },
+    "retry-total-ms": { type: "string" },
+    "operation-id": { type: "string" },
     help: { type: "boolean", short: "h" },
   },
 });
@@ -79,10 +86,32 @@ function portValue(value) {
 }
 try {
   const command = positionals[0];
+  if (
+    command !== "retry-history" &&
+    !values.retry &&
+    (values["retry-attempts"] !== undefined ||
+      values["retry-total-ms"] !== undefined ||
+      values["operation-id"] !== undefined)
+  )
+    throw new Error("Retry options require --retry");
+  if (values.retry && command !== "adapters")
+    throw new Error("--retry is available for adapters only");
   if (values.help || !command) {
     console.log(help);
   } else if (command === "preflight") {
     await preflightCli(process.argv.slice(3));
+  } else if (command === "retry-history") {
+    const action = positionals[1];
+    if (positionals.length !== 2 || !["list", "inspect"].includes(action))
+      throw new Error("Specify retry-history list or inspect");
+    const history = await RetryHistory.open(
+      await identity(values.project || process.cwd()),
+    );
+    const result =
+      action === "list"
+        ? await history.list()
+        : await history.inspect(values["operation-id"]);
+    console.log(JSON.stringify(result, null, 2));
   } else if (command === "run-history") {
     const action = positionals[1];
     if (
@@ -189,7 +218,32 @@ try {
     if (values.entrypoint && !argv)
       throw new Error("--entrypoint requires --executable");
     if (values.entrypoint) argv.push(values.entrypoint);
-    if (command === "adapter-smoke") {
+    if (values.retry) {
+      if (command !== "adapters" || values.cli !== "dsh" || !argv)
+        throw new Error(
+          "--retry requires adapters --cli dsh and explicit original CLI paths",
+        );
+      const budget = {
+        ...(values["retry-attempts"] === undefined
+          ? {}
+          : { max_attempts: Number(values["retry-attempts"]) }),
+        ...(values["retry-total-ms"] === undefined
+          ? {}
+          : { total_ms: Number(values["retry-total-ms"]) }),
+      };
+      const report = await probeCliWithRetry({
+        history: await RetryHistory.open(
+          await identity(values.project || process.cwd()),
+        ),
+        operation_id: values["operation-id"],
+        command: argv,
+        cwd: values.project || process.cwd(),
+        budget,
+      });
+      console.log(JSON.stringify(report, null, 2));
+      if (report.retry.status !== "completed" || report.adapter === null)
+        process.exitCode = 1;
+    } else if (command === "adapter-smoke") {
       if (!argv)
         throw new Error(
           "Specify the original DSH executable with --executable",

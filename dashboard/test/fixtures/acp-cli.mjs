@@ -8,7 +8,16 @@ const fixture = JSON.parse(
 );
 const mode = process.env.RDSH_ADAPTER_FIXTURE_MODE || "normal";
 if (process.argv.includes("--version")) {
-  if (mode === "version_timeout") setInterval(() => {}, 1000);
+  let firstTimeout = false;
+  if (mode === "version_timeout_once") {
+    const counter = process.env.RDSH_ADAPTER_FIXTURE_VERSION_COUNTER;
+    const previous = fs.existsSync(counter)
+      ? Number(fs.readFileSync(counter, "utf8"))
+      : 0;
+    fs.writeFileSync(counter, String(previous + 1));
+    firstTimeout = previous === 0;
+  }
+  if (mode === "version_timeout" || firstTimeout) setInterval(() => {}, 1000);
   else {
     console.log(
       mode === "new_version"

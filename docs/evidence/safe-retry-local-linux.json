@@ -1,0 +1,318 @@
+{
+  "captured_at": "2026-10-05T21:03:20.116Z",
+  "platform": "linux",
+  "cli_source": "explicit original DSH in the existing WSL distribution; no legacy shim",
+  "cli_version": "0.2.0-rc.2",
+  "isolated_native_home": true,
+  "comparison": {
+    "baseline_commit": "739d93a",
+    "command": "adapters --cli dsh --project <temporary-project> --executable <explicit-original-cli> --retry --retry-attempts 3 --retry-total-ms 10000",
+    "before": {
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "TypeError [ERR_PARSE_ARGS_UNKNOWN_OPTION]: Unknown option '--retry'. To specify a positional argument starting with a '-', place it at the end of the command after '--', as in '-- \"--retry\""
+    },
+    "after": {
+      "exit_code": 0,
+      "stdout": {
+        "adapter": {
+          "cli": "dsh",
+          "protocol": "acp-stdio-v1",
+          "verified_versions": [
+            "0.2.0-rc.2"
+          ],
+          "detected_version": "0.2.0-rc.2",
+          "active_process_version": null,
+          "health": "version_matched",
+          "operations": {
+            "start": {
+              "supported": false,
+              "status": "requires_protocol_check",
+              "reason": "version_matched"
+            },
+            "resume": {
+              "supported": false,
+              "status": "requires_protocol_check",
+              "reason": "version_matched"
+            },
+            "send": {
+              "supported": false,
+              "status": "requires_protocol_check",
+              "reason": "version_matched"
+            },
+            "interrupt": {
+              "supported": false,
+              "status": "requires_protocol_check",
+              "reason": "version_matched"
+            },
+            "stop": {
+              "supported": false,
+              "status": "requires_protocol_check",
+              "reason": "version_matched"
+            },
+            "usage": {
+              "supported": false,
+              "status": "requires_protocol_check",
+              "reason": "version_matched"
+            }
+          },
+          "usage_scope": "context_occupancy_tokens; not billable usage or cost",
+          "interrupt_ack": "notification sent; confirmed only by cancelled prompt result"
+        },
+        "retry": {
+          "schema": 1,
+          "project_id": "2ccf3c476ac65b1b",
+          "operation_id": "op_77fe9bc6-e8c8-49a8-8d65-3bc13fea62cd",
+          "kind": "cli_version_probe",
+          "scope_digest": "9380c8db2d8fceb18c8444327818bb0d5f7a6e16fe159b33c1c0119a644bf12b",
+          "budget": {
+            "max_attempts": 3,
+            "total_ms": 10000,
+            "base_ms": 200,
+            "max_delay_ms": 2000
+          },
+          "status": "completed",
+          "certainty": "response_observed",
+          "attempts": 1,
+          "elapsed_ms": 132,
+          "wait_ms": 0,
+          "created_at": "2026-10-05T21:03:10.090Z",
+          "updated_at": "2026-10-05T21:03:10.222Z",
+          "next_attempt_at": null,
+          "history": [
+            {
+              "sequence": 1,
+              "step": "planned",
+              "attempt": 0,
+              "category": null,
+              "reason": null,
+              "elapsed_ms": 5,
+              "wait_ms": 0,
+              "next_attempt_at": null,
+              "reconciliation": null,
+              "evidence_digest": null,
+              "observed_at": "2026-10-05T21:03:10.094Z"
+            },
+            {
+              "sequence": 2,
+              "step": "attempt_started",
+              "attempt": 1,
+              "category": null,
+              "reason": null,
+              "elapsed_ms": 11,
+              "wait_ms": 0,
+              "next_attempt_at": null,
+              "reconciliation": null,
+              "evidence_digest": null,
+              "observed_at": "2026-10-05T21:03:10.101Z"
+            },
+            {
+              "sequence": 3,
+              "step": "dispatching",
+              "attempt": 1,
+              "category": null,
+              "reason": null,
+              "elapsed_ms": 17,
+              "wait_ms": 0,
+              "next_attempt_at": null,
+              "reconciliation": null,
+              "evidence_digest": null,
+              "observed_at": "2026-10-05T21:03:10.107Z"
+            },
+            {
+              "sequence": 4,
+              "step": "response_observed",
+              "attempt": 1,
+              "category": null,
+              "reason": "response_observed",
+              "elapsed_ms": 132,
+              "wait_ms": 0,
+              "next_attempt_at": null,
+              "reconciliation": null,
+              "evidence_digest": null,
+              "observed_at": "2026-10-05T21:03:10.222Z"
+            }
+          ],
+          "recorded_status": "completed",
+          "recovery": "read_only; no automatic replay",
+          "permission_expanded": false,
+          "reused_operation": false
+        },
+        "scope": "original CLI --version only; no profile, prompt, provider request or automatic model retry"
+      }
+    },
+    "entrypoint_source_only": true,
+    "common_dependencies": "current installed dashboard dependencies"
+  },
+  "separate_client_inspection": {
+    "schema": 1,
+    "project_id": "2ccf3c476ac65b1b",
+    "operation_id": "op_77fe9bc6-e8c8-49a8-8d65-3bc13fea62cd",
+    "kind": "cli_version_probe",
+    "scope_digest": "9380c8db2d8fceb18c8444327818bb0d5f7a6e16fe159b33c1c0119a644bf12b",
+    "budget": {
+      "max_attempts": 3,
+      "total_ms": 10000,
+      "base_ms": 200,
+      "max_delay_ms": 2000
+    },
+    "status": "completed",
+    "certainty": "response_observed",
+    "attempts": 1,
+    "elapsed_ms": 132,
+    "wait_ms": 0,
+    "created_at": "2026-10-05T21:03:10.090Z",
+    "updated_at": "2026-10-05T21:03:10.222Z",
+    "next_attempt_at": null,
+    "history": [
+      {
+        "sequence": 1,
+        "step": "planned",
+        "attempt": 0,
+        "category": null,
+        "reason": null,
+        "elapsed_ms": 5,
+        "wait_ms": 0,
+        "next_attempt_at": null,
+        "reconciliation": null,
+        "evidence_digest": null,
+        "observed_at": "2026-10-05T21:03:10.094Z"
+      },
+      {
+        "sequence": 2,
+        "step": "attempt_started",
+        "attempt": 1,
+        "category": null,
+        "reason": null,
+        "elapsed_ms": 11,
+        "wait_ms": 0,
+        "next_attempt_at": null,
+        "reconciliation": null,
+        "evidence_digest": null,
+        "observed_at": "2026-10-05T21:03:10.101Z"
+      },
+      {
+        "sequence": 3,
+        "step": "dispatching",
+        "attempt": 1,
+        "category": null,
+        "reason": null,
+        "elapsed_ms": 17,
+        "wait_ms": 0,
+        "next_attempt_at": null,
+        "reconciliation": null,
+        "evidence_digest": null,
+        "observed_at": "2026-10-05T21:03:10.107Z"
+      },
+      {
+        "sequence": 4,
+        "step": "response_observed",
+        "attempt": 1,
+        "category": null,
+        "reason": "response_observed",
+        "elapsed_ms": 132,
+        "wait_ms": 0,
+        "next_attempt_at": null,
+        "reconciliation": null,
+        "evidence_digest": null,
+        "observed_at": "2026-10-05T21:03:10.222Z"
+      }
+    ],
+    "recorded_status": "completed",
+    "recovery": "read_only; no automatic replay",
+    "permission_expanded": false,
+    "writer_lock_present": false,
+    "automatic_lock_removal": false
+  },
+  "repeated_operation": {
+    "exit_code": 1,
+    "stdout": {
+      "adapter": null,
+      "retry": {
+        "schema": 1,
+        "project_id": "2ccf3c476ac65b1b",
+        "operation_id": "op_77fe9bc6-e8c8-49a8-8d65-3bc13fea62cd",
+        "kind": "cli_version_probe",
+        "scope_digest": "9380c8db2d8fceb18c8444327818bb0d5f7a6e16fe159b33c1c0119a644bf12b",
+        "budget": {
+          "max_attempts": 3,
+          "total_ms": 10000,
+          "base_ms": 200,
+          "max_delay_ms": 2000
+        },
+        "status": "completed",
+        "certainty": "response_observed",
+        "attempts": 1,
+        "elapsed_ms": 132,
+        "wait_ms": 0,
+        "created_at": "2026-10-05T21:03:10.090Z",
+        "updated_at": "2026-10-05T21:03:10.222Z",
+        "next_attempt_at": null,
+        "history": [
+          {
+            "sequence": 1,
+            "step": "planned",
+            "attempt": 0,
+            "category": null,
+            "reason": null,
+            "elapsed_ms": 5,
+            "wait_ms": 0,
+            "next_attempt_at": null,
+            "reconciliation": null,
+            "evidence_digest": null,
+            "observed_at": "2026-10-05T21:03:10.094Z"
+          },
+          {
+            "sequence": 2,
+            "step": "attempt_started",
+            "attempt": 1,
+            "category": null,
+            "reason": null,
+            "elapsed_ms": 11,
+            "wait_ms": 0,
+            "next_attempt_at": null,
+            "reconciliation": null,
+            "evidence_digest": null,
+            "observed_at": "2026-10-05T21:03:10.101Z"
+          },
+          {
+            "sequence": 3,
+            "step": "dispatching",
+            "attempt": 1,
+            "category": null,
+            "reason": null,
+            "elapsed_ms": 17,
+            "wait_ms": 0,
+            "next_attempt_at": null,
+            "reconciliation": null,
+            "evidence_digest": null,
+            "observed_at": "2026-10-05T21:03:10.107Z"
+          },
+          {
+            "sequence": 4,
+            "step": "response_observed",
+            "attempt": 1,
+            "category": null,
+            "reason": "response_observed",
+            "elapsed_ms": 132,
+            "wait_ms": 0,
+            "next_attempt_at": null,
+            "reconciliation": null,
+            "evidence_digest": null,
+            "observed_at": "2026-10-05T21:03:10.222Z"
+          }
+        ],
+        "recorded_status": "completed",
+        "recovery": "read_only; no automatic replay",
+        "permission_expanded": false,
+        "reused_operation": true
+      },
+      "scope": "original CLI --version only; no profile, prompt, provider request or automatic model retry"
+    },
+    "stored_bytes_unchanged": true
+  },
+  "provider_authentication": "not_exercised",
+  "profile_boot": false,
+  "model_prompt": false,
+  "external_send": false
+}
