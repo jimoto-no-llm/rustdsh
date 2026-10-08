@@ -1,0 +1,6 @@
+- insert:
+    - id: rdsh-ptc-catalog
+      name: "rdsh-ptc-catalog"
+      config:
+        inlineTokenBudget: 16384
+        inlineTools: []

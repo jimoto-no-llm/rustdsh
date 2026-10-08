@@ -43,8 +43,8 @@ jobs:
       - run: python3 -m unittest discover -s tests -p 'test_release_assets.py'
       - name: Verify the audited dispatcher and late middleware changes
         run: |
-          npm install --prefix "$RUNNER_TEMP/rdsh-runtime" --ignore-scripts --no-audit --no-fund @deepseek-ai/dsh-tools@0.2.0-rc.2
-          RDSH_TOOL_RUNTIME="$RUNNER_TEMP/rdsh-runtime/node_modules/@deepseek-ai/dsh-tools/lib/index.js" RDSH_SECURE_WORKSPACE="$GITHUB_WORKSPACE" RDSH_SHARED_FILES='[]' node --import ./security/preload.mjs tests/guarded-runtime-probe.mjs
+          npm ci --prefix plugins/rdsh-ptc-catalog --ignore-scripts --no-audit --no-fund
+          RDSH_TOOL_RUNTIME="$GITHUB_WORKSPACE/plugins/rdsh-ptc-catalog/node_modules/@deepseek-ai/dsh-tools/lib/index.js" RDSH_SECURE_WORKSPACE="$GITHUB_WORKSPACE" RDSH_SHARED_FILES='[]' node --import ./security/preload.mjs tests/guarded-runtime-probe.mjs
 
   lint:
     runs-on: ubuntu-latest

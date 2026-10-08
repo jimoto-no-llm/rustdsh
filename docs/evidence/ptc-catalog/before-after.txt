@@ -1,0 +1,5 @@
+Actual output: original DSH PTC assembly versus rdsh-ptc-catalog, same 1000 visible tools and 80 fixed fixtures.
+Before: sdkInputTokens=78400; sdkUtf8Bytes=289814; lookup=80/80; incorrectBodyCalls=0; outerPTCperFixture=1; stableAfterAddition=False
+After: sdkInputTokens=909; sdkUtf8Bytes=4339; lookup=80/80; incorrectBodyCalls=0; outerPTCperFixture=2; stableAfterAddition=True
+Encoding: js-tiktoken 1.0.21 cl100k_base. Fixed fixture results, not provider usage or model-quality measurements.
+Observed assembly median (5 samples): before=45.090 ms; after=91.568 ms. The hook still incurs original full SDK assembly.

@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
+import { apply as applyPtcCatalog } from '../plugins/rdsh-ptc-catalog/index.js';
 const root = path.resolve(process.env.RDSH_TOOL_RUNTIME, '../../..');
 const { Context } = await import(pathToFileURL(path.join(root, 'cordis/lib/index.js')));
 const { createScope } = await import(pathToFileURL(path.join(root, 'dsh-scope/lib/index.js')));
@@ -9,6 +10,9 @@ const { default: ToolRuntime } = await import(pathToFileURL(process.env.RDSH_TOO
 const ctx = new Context();
 ctx.provide('systemPrompt', { tools() {}, section() {}, getSectionOrder() { return 1; } });
 const tools = new ToolRuntime(ctx, { mode: 'ptc' });
+assert.throws(() => applyPtcCatalog(ctx), { code: 'RDSH_CATALOG_GUARDED_NATIVE' });
+assert.equal(tools.get('rdsh_catalog_search'), undefined);
+assert.equal(tools.get('rdsh_catalog_describe'), undefined);
 assert.equal(tools.defaultMode, 'native');
 assert.equal(tools.modeFor(), 'native');
 const agent = {};
@@ -50,4 +54,4 @@ for (const callId of ['dummy-after-policy', 'dummy-late-shadow']) {
   assert.equal(shadowInvoked, false, 'a late scoped replacement must not bypass the guard');
   assert.match(JSON.stringify(rewritten), /RDSH_SECURITY/);
 }
-console.log('guarded runtime dispatched inspection and rejected other tools with kernel isolation');
+console.log('guarded runtime rejected PTC catalog activation, dispatched inspection and rejected other tools with kernel isolation');
