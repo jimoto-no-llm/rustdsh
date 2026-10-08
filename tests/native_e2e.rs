@@ -494,7 +494,7 @@ fn cli_tokens_prune_compact_search_logs_guard_and_settings_work_together() {
         for i in 0..count {
             fs::write(dir.join(format!("{i}.txt")), "nothing\nneedle\n").unwrap();
         }
-        let output = f.ok(
+        let output = f.run(
             &[
                 "search",
                 "needle",
@@ -505,9 +505,22 @@ fn cli_tokens_prune_compact_search_logs_guard_and_settings_work_together() {
             ],
             b"",
         );
-        let text = String::from_utf8(output).unwrap();
-        assert_eq!(text.lines().count(), 3);
-        assert!(!text.contains("ignored.txt"));
+        if cfg!(unix) {
+            assert!(
+                output.status.success(),
+                "search: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            let text = String::from_utf8(output.stdout).unwrap();
+            assert_eq!(text.lines().count(), 3);
+            assert!(!text.contains("ignored.txt"));
+        } else {
+            // #184 security gate: native search is Unix-only.
+            assert!(!output.status.success());
+            assert!(
+                String::from_utf8_lossy(&output.stderr).contains("unavailable on this platform")
+            );
+        }
     }
     let log = f.0.join("test.log");
     fs::write(&log, "old\nerror first\nnormal\nerror last\n").unwrap();
