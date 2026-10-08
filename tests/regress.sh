@@ -98,12 +98,7 @@ if dp_dry DSH_HOME="$DP/empty" $BIN --dry-run --profile tui 2>/dev/null | grep -
 # --- slim: Node compile cache (the part of slim that really speeds up Node boot) ---
 # Default dir is $HOME/.cache/rdsh-node-compile-cache (XDG_CACHE_HOME is not consulted).
 CC="$RG_TMP/cc"
-mkdir -p "$CC/home" "$CC/dsh" "$CC/home-pt"
-cat > "$CC/envdsh" << 'ENVEOF'
-#!/bin/sh
-echo "CACHE=${NODE_COMPILE_CACHE:-unset} HINT=${RDSH_SLIM:-unset}"
-ENVEOF
-chmod +x "$CC/envdsh"
+mkdir -p "$CC/home" "$CC/home-pt"
 CCDEF="$CC/home/.cache/rdsh-node-compile-cache"
 if env -u NODE_COMPILE_CACHE -u RDSH_NODE_COMPILE_CACHE HOME="$CC/home" DSH_ORIG_BIN="$SB/orig/dsh" $BIN --dry-run tui 2>/dev/null | grep -q "NODE_COMPILE_CACHE=\"$CCDEF\""; then ok "slim dry-run shows NODE_COMPILE_CACHE"; else echo "FAIL(output): slim dry-run shows NODE_COMPILE_CACHE"; exit 1; fi
 if env -u NODE_COMPILE_CACHE HOME="$CC/home-pt" DSH_ORIG_BIN="$SB/orig/dsh" $BIN --dry-run --passthrough tui 2>/dev/null | grep -q "NODE_COMPILE_CACHE\|RDSH_SLIM"; then echo "FAIL: --passthrough must add no env"; exit 1; else ok "passthrough adds no env"; fi

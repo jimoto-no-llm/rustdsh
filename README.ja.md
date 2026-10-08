@@ -263,9 +263,9 @@ rdsh固有の先頭サブコマンド（`tokens`/`guard`/`serve`/`sessions`等�
   cargoビルドは走らず、`main` のコミットはタグが付いてから届きます。新しいバイナリは、
   起動確認と、使い捨ての `HOME` での `tests/regress.sh` に通ったときだけ置き換えます。
   `main` に追従してソースからビルドしたい場合は `RDSH_SYNC_FROM_SOURCE=1` を指定します
-  （`nice -n 19`、あれば `ionice -c3` 下で実行）。`sync-dsh.sh` はリリースの `.sha256` を
-  候補バイナリの実行前に検証し、不在・空・不一致なら更新を中止します。
-  `install.sh --from-release` もダウンロードを検証します。`systemd/rdsh-sync.service` は低優先度で
+  （`nice -n 19`、あれば `ionice -c3` 下で実行）。`sync-dsh.sh` も `install.sh` と同じく
+  ダウンロードを `.sha256` ファイルで検証し、不一致や `.sha256` の欠落・空の場合は理由をログに残して
+  バイナリを置き換えません。`systemd/rdsh-sync.service` は低優先度で
   動かすので、`ExecStart` は各自のcheckoutに合わせてください
 
 ## Smart-DSH との併用
