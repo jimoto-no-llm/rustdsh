@@ -13,6 +13,7 @@ import { preflightCli, readRequirements } from "./preflight.mjs";
 import { RunHistory } from "./run-history.mjs";
 import { RetryHistory } from "./retry.mjs";
 import { probeCliWithRetry } from "./retry-probe.mjs";
+import { Checkpoints } from "./checkpoints.mjs";
 
 const help = `rdsh-dashboard project --project <directory> [--port <port>] [--no-tailscale] [--open]
 rdsh-dashboard harness [--port 38081] [--harness-port 3081] [--no-tailscale] [--open]
@@ -26,6 +27,7 @@ rdsh-dashboard adapter-smoke --executable <original-dsh> [--entrypoint <bin.js>]
 rdsh-dashboard preflight --project <directory> [--requirements <json>] [--executable <original-dsh>] [--entrypoint <bin.js>] [--verify-auth]
 rdsh-dashboard run-history list|inspect|events --project <directory> [--run-id <run_id>] [--cursor <number>] [--limit <number>]
 rdsh-dashboard retry-history list|inspect --project <directory> [--operation-id <id>]
+rdsh-dashboard checkpoint record|list|inspect|resume|start-new --project <directory> [--run-id <id>] [--checkpoint-id <id>] [--executable <original-dsh>] [--entrypoint <bin.js>] [--verify-native] [--retry-operation-id <id>] [--summary-file <file> --accept-context-loss]
 rdsh-dashboard session-ledger list|record|resolve|start|resume --project <directory> [--run-id <run_id>] [--task-id <id>] [--session-id <id>] [--label <name>] [--provider <name>] [--cwd <directory>] [--cli <name>] [--executable <original-dsh>] [--entrypoint <bin.js>]
 
 Project mode: project metrics, tasks, questions, human feedback, and /mcp.
@@ -60,6 +62,11 @@ const { values, positionals } = parseArgs({
     "retry-attempts": { type: "string" },
     "retry-total-ms": { type: "string" },
     "operation-id": { type: "string" },
+    "checkpoint-id": { type: "string" },
+    "retry-operation-id": { type: "string", multiple: true },
+    "verify-native": { type: "boolean" },
+    "summary-file": { type: "string" },
+    "accept-context-loss": { type: "boolean" },
     help: { type: "boolean", short: "h" },
   },
 });
@@ -96,10 +103,103 @@ try {
     throw new Error("Retry options require --retry");
   if (values.retry && command !== "adapters")
     throw new Error("--retry is available for adapters only");
+  if (
+    command !== "checkpoint" &&
+    [
+      values["checkpoint-id"],
+      values["retry-operation-id"],
+      values["verify-native"],
+      values["summary-file"],
+      values["accept-context-loss"],
+    ].some((value) => value !== undefined)
+  )
+    throw new Error("Checkpoint options require checkpoint");
   if (values.help || !command) {
     console.log(help);
   } else if (command === "preflight") {
     await preflightCli(process.argv.slice(3));
+  } else if (command === "checkpoint") {
+    const action = positionals[1];
+    if (
+      positionals.length !== 2 ||
+      !["record", "list", "inspect", "resume", "start-new"].includes(action)
+    )
+      throw new Error(
+        "Specify checkpoint record, list, inspect, resume or start-new",
+      );
+    const store = await Checkpoints.open(
+      await identity(values.project || process.cwd()),
+    );
+    const argv = values.executable ? [values.executable] : null;
+    if (values.entrypoint && !argv)
+      throw new Error("--entrypoint requires --executable");
+    if (values.entrypoint) argv.push(values.entrypoint);
+    if (values.cli && values.cli !== "dsh")
+      throw new Error("Checkpoint native recovery supports DSH only");
+    if (
+      action !== "start-new" &&
+      (values["summary-file"] !== undefined || values["accept-context-loss"])
+    )
+      throw new Error(
+        "Summary and context-loss choice apply to start-new only",
+      );
+    if (
+      action !== "record" &&
+      (values["run-id"] !== undefined ||
+        values["retry-operation-id"] !== undefined)
+    )
+      throw new Error("Run and retry references apply to record only");
+    if (action !== "inspect" && values["verify-native"])
+      throw new Error("--verify-native applies to inspect only");
+    if (action === "list" && (argv || values["checkpoint-id"]))
+      throw new Error("list takes no executable or checkpoint ID");
+    let result;
+    if (action === "list") result = await store.list();
+    else if (action === "record") {
+      if (values["checkpoint-id"])
+        throw new Error("record allocates a checkpoint ID");
+      if (!argv) throw new Error("Specify the original CLI executable");
+      result = await store.record({
+        run_id: values["run-id"],
+        command: argv,
+        retry_operations: values["retry-operation-id"] || [],
+      });
+    } else if (action === "inspect") {
+      result = await store.inspect(values["checkpoint-id"], {
+        command: argv,
+        verify_native: values["verify-native"] || false,
+      });
+    } else {
+      if (!argv) throw new Error("Specify the original CLI executable");
+      let summary = null;
+      if (action === "start-new") {
+        if (!values["summary-file"] || !values["accept-context-loss"])
+          throw new Error(
+            "start-new requires --summary-file and --accept-context-loss",
+          );
+        const handle = await fs.open(values["summary-file"], "r");
+        try {
+          const stat = await handle.stat();
+          if (!stat.isFile() || stat.size > 65536)
+            throw new Error(
+              "Summary must be a regular file of at most 65536 bytes",
+            );
+          const bytes = await handle.readFile();
+          if (bytes.length > 65536)
+            throw new Error("Summary exceeds 65536 bytes");
+          summary = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+        } finally {
+          await handle.close();
+        }
+      }
+      result = await store.recover(values["checkpoint-id"], {
+        mode: action === "resume" ? "resume" : "start_new",
+        command: argv,
+        summary,
+        accept_context_loss: values["accept-context-loss"] || false,
+      });
+    }
+    console.log(JSON.stringify(result, null, 2));
   } else if (command === "retry-history") {
     const action = positionals[1];
     if (positionals.length !== 2 || !["list", "inspect"].includes(action))

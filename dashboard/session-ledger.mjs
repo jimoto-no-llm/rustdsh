@@ -401,6 +401,46 @@ export class SessionLedger {
   }
 }
 
+export async function verifyRecordedContext(
+  record,
+  command,
+  env = process.env,
+) {
+  if (record.cli !== "dsh" || record.launch === null)
+    throw new LedgerError("launch_unknown_or_unsupported");
+  const current = await context(record.cwd, command, env);
+  const equalLaunch =
+    current.launch &&
+    Object.keys(record.launch).every((key) =>
+      record.launch[key] === null
+        ? current.launch[key] === null
+        : key === "executable" || key === "entrypoint"
+          ? typeof current.launch[key] === "string" &&
+            samePath(record.launch[key], current.launch[key])
+          : record.launch[key] === current.launch[key],
+    );
+  if (!equalLaunch) throw new LedgerError("launch_changed");
+  if (
+    !samePath(current.cwd, record.cwd) ||
+    current.git.status !== record.git.status ||
+    current.branch !== record.branch ||
+    !sameOptionalPath(record.git.root, current.git.root) ||
+    (record.branch === null && current.git.head !== record.git.head)
+  )
+    throw new LedgerError("repository_context_changed");
+  if (
+    !Object.keys(record.scope).every((key) =>
+      record.scope[key] === null
+        ? current.scope[key] === null
+        : samePath(record.scope[key], current.scope[key]),
+    )
+  )
+    throw new LedgerError("session_scope_changed");
+  if (current.git.status === "unavailable")
+    throw new LedgerError("repository_context_unknown");
+  return current;
+}
+
 export async function attachRecordedSession({
   ledger,
   run_id = null,
@@ -445,36 +485,7 @@ export async function attachRecordedSession({
     record = await ledger.resolve(run_id);
     if (record.cli_session_id === null)
       throw new LedgerError("session_id_unknown");
-    if (record.cli !== "dsh" || record.launch === null)
-      throw new LedgerError("launch_unknown_or_unsupported");
-    const current = await context(record.cwd, command, env);
-    const equalLaunch =
-      current.launch &&
-      Object.keys(record.launch).every((key) =>
-        record.launch[key] === null
-          ? current.launch[key] === null
-          : key === "executable" || key === "entrypoint"
-            ? typeof current.launch[key] === "string" &&
-              samePath(record.launch[key], current.launch[key])
-            : record.launch[key] === current.launch[key],
-      );
-    if (!equalLaunch) throw new LedgerError("launch_changed");
-    if (
-      !samePath(current.cwd, record.cwd) ||
-      current.git.status !== record.git.status ||
-      current.branch !== record.branch ||
-      !sameOptionalPath(record.git.root, current.git.root) ||
-      (record.branch === null && current.git.head !== record.git.head)
-    )
-      throw new LedgerError("repository_context_changed");
-    if (
-      !Object.keys(record.scope).every((key) =>
-        record.scope[key] === null
-          ? current.scope[key] === null
-          : samePath(record.scope[key], current.scope[key]),
-      )
-    )
-      throw new LedgerError("session_scope_changed");
+    await verifyRecordedContext(record, command, env);
   }
   if (record.git.status === "unavailable")
     throw new LedgerError("repository_context_unknown");

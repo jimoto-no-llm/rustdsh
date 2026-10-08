@@ -4,6 +4,8 @@ import { EventEmitter } from "node:events";
 import { spawn, execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { realpath, stat } from "node:fs/promises";
+import path from "node:path";
+import { performance } from "node:perf_hooks";
 
 export const operations = Object.freeze([
   "start",
@@ -499,6 +501,24 @@ class CliAdapter extends EventEmitter {
     if (method === methods.agent.session.new && !identifier(result.sessionId))
       throw new Error();
     if (
+      method === methods.agent.session.list &&
+      (!Array.isArray(result.sessions) ||
+        result.sessions.length > 1000 ||
+        new Set(result.sessions.map((entry) => entry?.sessionId)).size !==
+          result.sessions.length ||
+        result.sessions.some(
+          (entry) =>
+            !object(entry) ||
+            !identifier(entry.sessionId) ||
+            typeof entry.cwd !== "string" ||
+            entry.cwd.length > 4096 ||
+            !path.isAbsolute(entry.cwd) ||
+            /[\x00-\x1f\x7f]/.test(entry.cwd),
+        ) ||
+        (result.nextCursor != null && !identifier(result.nextCursor)))
+    )
+      throw new Error();
+    if (
       method === methods.agent.session.prompt &&
       !stopReasons.has(result.stopReason)
     )
@@ -576,6 +596,67 @@ class CliAdapter extends EventEmitter {
     );
     this.sessions.add(sessionId);
     return this.record("resumed", { session_id: sessionId });
+  }
+
+  async inspectSession(sessionId) {
+    if (!identifier(sessionId))
+      throw new AdapterError("invalid_session", "inspect");
+    await this.connect();
+    const observed_at = new Date().toISOString();
+    const base = {
+      session_id: sessionId,
+      cli_version: this.processVersion,
+      observed_at,
+      resume_advertised: this.capabilities().operations.resume.supported,
+      source: "acp_session_list",
+      resume_verified: false,
+    };
+    if (!object(this.negotiated?.sessionCapabilities?.list))
+      return { ...base, status: "unsupported" };
+    const cursors = new Set(),
+      ids = new Set(),
+      deadline = performance.now() + this.requestTimeout;
+    let cursor;
+    for (let page = 0; page < 20; page++) {
+      const remaining = Math.floor(deadline - performance.now());
+      if (remaining <= 0) return { ...base, status: "unknown" };
+      const result = await this.request(
+        methods.agent.session.list,
+        { cwd: this.cwd, ...(cursor === undefined ? {} : { cursor }) },
+        "inspect",
+        remaining,
+      );
+      for (const entry of result.sessions) {
+        if (ids.has(entry.sessionId)) {
+          this.invalidate();
+          throw new AdapterError("duplicate_session", "inspect");
+        }
+        ids.add(entry.sessionId);
+        if (ids.size > 5000) return { ...base, status: "unknown" };
+        if (entry.sessionId === sessionId) {
+          const equal =
+            process.platform === "win32"
+              ? entry.cwd.toLowerCase() === this.cwd.toLowerCase()
+              : entry.cwd === this.cwd;
+          if (!equal) return { ...base, status: "cwd_mismatch" };
+          if (
+            entry.additionalDirectories != null &&
+            (!Array.isArray(entry.additionalDirectories) ||
+              entry.additionalDirectories.length)
+          )
+            return { ...base, status: "scope_unverified" };
+          return { ...base, status: "listed" };
+        }
+      }
+      if (result.nextCursor == null) return { ...base, status: "not_listed" };
+      if (cursors.has(result.nextCursor)) {
+        this.invalidate();
+        throw new AdapterError("invalid_cursor", "inspect");
+      }
+      cursors.add(result.nextCursor);
+      cursor = result.nextCursor;
+    }
+    return { ...base, status: "unknown" };
   }
 
   async send(sessionId, text) {

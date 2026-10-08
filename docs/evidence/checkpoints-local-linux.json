@@ -1,0 +1,238 @@
+{
+  "captured_at": "2026-10-05T21:29:27.659Z",
+  "platform": "linux",
+  "cli_source": "explicit original DSH in existing WSL distribution; no legacy shim",
+  "cli_version": "0.2.0-rc.2",
+  "isolated_native_home": true,
+  "comparison": {
+    "baseline_commit": "f6dbd05e208be6721b6322e827e6b52ac49248ff",
+    "command": "checkpoint list --project <temporary-project>",
+    "before": {
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "[rdsh-dashboard] Unknown command; use --help"
+    },
+    "after": {
+      "exit_code": 0,
+      "stdout": {
+        "checkpoints": [
+          {
+            "schema": 1,
+            "project_id": "e560e45a89ad8819",
+            "checkpoint_id": "cp_13d8cb30-009e-4aa1-af10-4f8b0cb783fb",
+            "run_id": "run_04710536-872a-4a4f-8e25-a90f52110be2",
+            "task_id": null,
+            "cli": "dsh",
+            "cli_session_id": "a67d5056-918a-4681-9a56-4ad2aadcbefa",
+            "binding": "confirmed",
+            "cli_version": "0.2.0-rc.2",
+            "context": {
+              "cwd": "/tmp/rdsh-checkpoint-local-I8KQtU/project",
+              "branch": "checkpoint-qa",
+              "git": {
+                "status": "observed",
+                "root": "/tmp/rdsh-checkpoint-local-I8KQtU/project",
+                "head": null
+              },
+              "launch": {
+                "method": "acp-stdio-v1",
+                "executable": "/root/.local/opt/rdsh-node/lib/node_modules/@deepseek-ai/dsh/lib/bin.js",
+                "entrypoint": null,
+                "profile": "acp"
+              },
+              "scope": {
+                "effective_home": "/tmp/rdsh-checkpoint-local-I8KQtU",
+                "HOME": "/tmp/rdsh-checkpoint-local-I8KQtU",
+                "USERPROFILE": "/tmp/rdsh-checkpoint-local-I8KQtU",
+                "DSH_HOME": "/tmp/rdsh-checkpoint-local-I8KQtU/dsh",
+                "XDG_CONFIG_HOME": null,
+                "XDG_DATA_HOME": null,
+                "APPDATA": null,
+                "LOCALAPPDATA": null
+              }
+            },
+            "journal": {
+              "last_event": {
+                "event_id": "evt_10faacb5-031e-45ae-8a97-dd5abcb9226f",
+                "sequence": 14,
+                "hash": "7a2192361622522564cd95e34df2e434e94eec0932172fbe69347b0864045666"
+              },
+              "last_confirmed_event": {
+                "event_id": "evt_10faacb5-031e-45ae-8a97-dd5abcb9226f",
+                "sequence": 14,
+                "hash": "7a2192361622522564cd95e34df2e434e94eec0932172fbe69347b0864045666"
+              },
+              "unresolved_count": 0,
+              "unresolved": [],
+              "incomplete_tail_bytes": 0
+            },
+            "retry_operations": [],
+            "saved_at": "2026-10-05T21:29:01.200Z",
+            "checksum": "cd46652ae4a0dfe218e32b1375640b0ef4df920dd838ee7663dd85e1530f12d3"
+          }
+        ],
+        "truncated": false
+      }
+    },
+    "entrypoint_source_only": true,
+    "common_dependencies": "current installed dashboard dependencies"
+  },
+  "separate_client_inspection": {
+    "checkpoint": {
+      "schema": 1,
+      "project_id": "e560e45a89ad8819",
+      "checkpoint_id": "cp_13d8cb30-009e-4aa1-af10-4f8b0cb783fb",
+      "run_id": "run_04710536-872a-4a4f-8e25-a90f52110be2",
+      "task_id": null,
+      "cli": "dsh",
+      "cli_session_id": "a67d5056-918a-4681-9a56-4ad2aadcbefa",
+      "binding": "confirmed",
+      "cli_version": "0.2.0-rc.2",
+      "context": {
+        "cwd": "/tmp/rdsh-checkpoint-local-I8KQtU/project",
+        "branch": "checkpoint-qa",
+        "git": {
+          "status": "observed",
+          "root": "/tmp/rdsh-checkpoint-local-I8KQtU/project",
+          "head": null
+        },
+        "launch": {
+          "method": "acp-stdio-v1",
+          "executable": "/root/.local/opt/rdsh-node/lib/node_modules/@deepseek-ai/dsh/lib/bin.js",
+          "entrypoint": null,
+          "profile": "acp"
+        },
+        "scope": {
+          "effective_home": "/tmp/rdsh-checkpoint-local-I8KQtU",
+          "HOME": "/tmp/rdsh-checkpoint-local-I8KQtU",
+          "USERPROFILE": "/tmp/rdsh-checkpoint-local-I8KQtU",
+          "DSH_HOME": "/tmp/rdsh-checkpoint-local-I8KQtU/dsh",
+          "XDG_CONFIG_HOME": null,
+          "XDG_DATA_HOME": null,
+          "APPDATA": null,
+          "LOCALAPPDATA": null
+        }
+      },
+      "journal": {
+        "last_event": {
+          "event_id": "evt_10faacb5-031e-45ae-8a97-dd5abcb9226f",
+          "sequence": 14,
+          "hash": "7a2192361622522564cd95e34df2e434e94eec0932172fbe69347b0864045666"
+        },
+        "last_confirmed_event": {
+          "event_id": "evt_10faacb5-031e-45ae-8a97-dd5abcb9226f",
+          "sequence": 14,
+          "hash": "7a2192361622522564cd95e34df2e434e94eec0932172fbe69347b0864045666"
+        },
+        "unresolved_count": 0,
+        "unresolved": [],
+        "incomplete_tail_bytes": 0
+      },
+      "retry_operations": [],
+      "saved_at": "2026-10-05T21:29:01.200Z",
+      "checksum": "cd46652ae4a0dfe218e32b1375640b0ef4df920dd838ee7663dd85e1530f12d3"
+    },
+    "action": null,
+    "native": {
+      "session_id": "a67d5056-918a-4681-9a56-4ad2aadcbefa",
+      "cli_version": "0.2.0-rc.2",
+      "observed_at": "2026-10-05T21:29:15.785Z",
+      "resume_advertised": true,
+      "source": "acp_session_list",
+      "resume_verified": false,
+      "status": "listed"
+    },
+    "journal": {
+      "last_event": {
+        "event_id": "evt_10faacb5-031e-45ae-8a97-dd5abcb9226f",
+        "sequence": 14,
+        "hash": "7a2192361622522564cd95e34df2e434e94eec0932172fbe69347b0864045666"
+      },
+      "last_confirmed_event": {
+        "event_id": "evt_10faacb5-031e-45ae-8a97-dd5abcb9226f",
+        "sequence": 14,
+        "hash": "7a2192361622522564cd95e34df2e434e94eec0932172fbe69347b0864045666"
+      },
+      "unresolved_count": 0,
+      "unresolved": [],
+      "incomplete_tail_bytes": 0
+    },
+    "candidates": {
+      "formal_resume": {
+        "available": true,
+        "same_session": true,
+        "verified_only_after_native_resume": true
+      },
+      "summary_start_new": {
+        "available": true,
+        "same_session": false,
+        "requires_operator_summary": true,
+        "requires_context_loss_choice": true
+      },
+      "unavailable": {
+        "selected": false,
+        "reasons": []
+      }
+    },
+    "lost_context": [
+      "Checkpoint contains control metadata, not conversation history or external dependency snapshots."
+    ],
+    "replayed_operations": 0,
+    "permission_expanded": false,
+    "uncertainty_since_checkpoint": {
+      "control_event_count": 0,
+      "control_events_added": false,
+      "unresolved_count": 0
+    },
+    "writer_lock_present": false,
+    "automatic_lock_removal": false
+  },
+  "same_native_session_resume": {
+    "schema": 1,
+    "checkpoint_id": "cp_13d8cb30-009e-4aa1-af10-4f8b0cb783fb",
+    "action_id": "recover_76507f65-8e04-4c17-8766-25bdb8fa5a24",
+    "mode": "resume",
+    "status": "completed",
+    "run_id": "run_04710536-872a-4a4f-8e25-a90f52110be2",
+    "cli_session_id": "a67d5056-918a-4681-9a56-4ad2aadcbefa",
+    "summary_digest": null,
+    "summary_bytes": 0,
+    "summary_status": "not_requested",
+    "created_at": "2026-10-05T21:29:21.660Z",
+    "updated_at": "2026-10-05T21:29:22.874Z",
+    "reused_recovery": false,
+    "native_resume_verified": true,
+    "same_session": true,
+    "source_checkpoint": "cp_13d8cb30-009e-4aa1-af10-4f8b0cb783fb",
+    "summary_is_semantic_acceptance": false,
+    "replayed_operations": 0,
+    "owned_root_exit_confirmed": true
+  },
+  "repeated_recovery": {
+    "result": {
+      "schema": 1,
+      "checkpoint_id": "cp_13d8cb30-009e-4aa1-af10-4f8b0cb783fb",
+      "action_id": "recover_76507f65-8e04-4c17-8766-25bdb8fa5a24",
+      "mode": "resume",
+      "status": "completed",
+      "run_id": "run_04710536-872a-4a4f-8e25-a90f52110be2",
+      "cli_session_id": "a67d5056-918a-4681-9a56-4ad2aadcbefa",
+      "summary_digest": null,
+      "summary_bytes": 0,
+      "summary_status": "not_requested",
+      "created_at": "2026-10-05T21:29:21.660Z",
+      "updated_at": "2026-10-05T21:29:22.874Z",
+      "reused_recovery": true,
+      "observation": "historical; no native operation repeated"
+    },
+    "stored_bytes_unchanged": true
+  },
+  "new_session_with_operator_summary": {
+    "exercised": false,
+    "reason": "Native model request intentionally absent; operator-summary delivery is covered by isolated wire fixtures."
+  },
+  "provider_authentication": "not_exercised",
+  "real_model_prompt": false,
+  "external_dependencies": "not_snapshotted",
+  "descendants": "not_observed"
+}

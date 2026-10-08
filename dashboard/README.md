@@ -16,6 +16,9 @@ and separates recorded run state, root-process observations and UI connectivity.
 [Bounded retry](../docs/SAFE-RETRY.md) preserves original permission and reconciles
 uncertain writes. Public retry is opt-in for original CLI version queries only.
 
+[Checkpoint recovery](../docs/CHECKPOINTS.md) distinguishes a verified native
+resume from an explicit new conversation with an operator-provided summary.
+
 `rdsh-dashboard` provides two separate entry points:
 
 | Mode      | Purpose                                                    | Data source                                      |

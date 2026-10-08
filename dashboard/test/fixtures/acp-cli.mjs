@@ -74,6 +74,9 @@ if (process.argv.includes("--version")) {
       }
       if (mode === "timeout") return;
       const result = structuredClone(fixture.initialize);
+      result.agentCapabilities.sessionCapabilities.list = {};
+      if (mode === "missing_list")
+        delete result.agentCapabilities.sessionCapabilities.list;
       if (mode === "wrong_protocol") result.protocolVersion = 999;
       if (mode === "missing_resume")
         delete result.agentCapabilities.sessionCapabilities.resume;
@@ -87,12 +90,55 @@ if (process.argv.includes("--version")) {
         reply(msg.id, {});
         return;
       }
-      reply(msg.id, fixture.start);
+      if (
+        [
+          "new_session",
+          "expired_session",
+          "missing_session",
+          "summary_response_lost",
+        ].includes(mode)
+      )
+        reply(msg.id, { sessionId: "fixture-new-session" });
+      else reply(msg.id, fixture.start);
+    } else if (msg.method === "session/list") {
+      if (mode === "bad_list")
+        reply(msg.id, {
+          sessions: [{ sessionId: "fixture-list-secret", cwd: "relative" }],
+        });
+      else if (mode === "list_loop")
+        reply(msg.id, { sessions: [], nextCursor: "repeat" });
+      else if (["expired_session", "missing_session"].includes(mode))
+        reply(msg.id, { sessions: [] });
+      else if (mode === "list_error")
+        output({ jsonrpc: "2.0", id: msg.id, error: fixture.error });
+      else
+        reply(msg.id, {
+          sessions: [
+            {
+              sessionId: fixture.start.sessionId,
+              cwd:
+                mode === "list_cwd_mismatch"
+                  ? process.platform === "win32"
+                    ? "C:\\other"
+                    : "/other"
+                  : process.cwd(),
+              title: "fixture-title-secret-must-not-copy",
+            },
+          ],
+        });
     } else if (msg.method === "session/resume") {
       if (msg.params.sessionId === "missing") {
         output({ jsonrpc: "2.0", id: msg.id, error: fixture.error });
       } else reply(msg.id, fixture.resume);
     } else if (msg.method === "session/prompt") {
+      if (mode === "summary_response_lost") {
+        fs.appendFileSync(
+          process.env.RDSH_ADAPTER_FIXTURE_SUMMARY_COUNTER,
+          "effect\n",
+        );
+        process.exit(9);
+        return;
+      }
       if (mode === "cli_error" || mode === "unsupported_send") {
         output({
           jsonrpc: "2.0",
