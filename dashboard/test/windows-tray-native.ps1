@@ -1,7 +1,10 @@
 ﻿param([string]$EvidenceDirectory)
 $ErrorActionPreference = 'Stop'
 # Load the actual menu and callbacks. Only the message-loop entry is deferred.
-$taskSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot '../windows-tray.ps1') -Raw
+$taskHelper = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../windows-tray.ps1')).Path
+$taskSource = Get-Content -LiteralPath $taskHelper -Raw
+# Keep the production asset path relative to the helper while deferring its loop.
+$taskSource = $taskSource.Replace('$PSScriptRoot', ("'" + (Split-Path -Parent $taskHelper).Replace("'", "''") + "'"))
 $taskOutput = New-Object System.IO.StringWriter
 [Console]::SetOut($taskOutput)
 Invoke-Expression $taskSource.Substring(0, $taskSource.LastIndexOf("try {"))
@@ -55,6 +58,7 @@ try {
 } finally {
     $taskIcon.Visible = $false
     $taskIcon.Dispose()
+    $taskBrandIcon.Dispose()
     $taskMenu.Dispose()
     $taskTimer.Dispose()
     $taskContext.Dispose()

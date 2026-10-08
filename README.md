@@ -1,4 +1,4 @@
-<img src="assets/icon.svg" width="96" alt="rdsh icon">
+<img src="assets/icon.png" width="96" alt="rdsh icon">
 
 # rdsh — a fast, safe Rust launcher for `dsh`
 
