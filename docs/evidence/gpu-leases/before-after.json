@@ -1,0 +1,158 @@
+{
+  "schema": 1,
+  "source_commit": "82a38bd3f0bcd9fb3da7cc6c8b8487e830a9a68b",
+  "merged_main": "39c5dd1325f91de05870166c7da75e6424948ab7",
+  "runtime_source_sha256": "5572992d552c69f084c761017209ba69cf3d0110b400a5a2099e73c1393e86a7",
+  "scope": "fixed_driver_inventory_and_original_ACP_peer; actual_kernel_process_ownership; no_GPU_workload_or_model",
+  "platforms": {
+    "windows": {
+      "platform": "win32",
+      "node": "v22.23.3",
+      "before_after_low_capacity": {
+        "before": {
+          "opt_in": false,
+          "native_process_started": true,
+          "process_stop": "owned_group_exit_confirmed",
+          "reservation_mib": 0
+        },
+        "after": {
+          "opt_in": true,
+          "status": "waiting-resource",
+          "reason": "gpu_capacity_insufficient",
+          "device_id": "GPU-00000000-0000-0000-0000-000000000001",
+          "requested_vram_mib": 4096,
+          "driver_free_mib": 1024,
+          "reserved_mib": 0,
+          "native_process_started": false
+        }
+      },
+      "medians": {
+        "disabled": {
+          "attach_ms": 1156.1130999999996,
+          "send_ms": 35.55370000000039,
+          "stop_ms": 152.78439999999955
+        },
+        "leased": {
+          "attach_ms": 1222.5356000000002,
+          "send_ms": 41.35729999999967,
+          "stop_ms": 462.8609999999999
+        }
+      },
+      "transport_samples": {
+        "attach_per_mode": 3,
+        "send_per_mode": 24,
+        "stop_per_mode": 3
+      },
+      "marker_miss_200": {
+        "median_ms": 0.13900000000001,
+        "p95_ms": 0.22829999999999018
+      },
+      "final_active_reservations": 0
+    },
+    "linux": {
+      "platform": "linux",
+      "node": "v24.21.0",
+      "before_after_low_capacity": {
+        "before": {
+          "opt_in": false,
+          "native_process_started": true,
+          "process_stop": "owned_group_exit_confirmed",
+          "reservation_mib": 0
+        },
+        "after": {
+          "opt_in": true,
+          "status": "waiting-resource",
+          "reason": "gpu_capacity_insufficient",
+          "device_id": "GPU-00000000-0000-0000-0000-000000000001",
+          "requested_vram_mib": 4096,
+          "driver_free_mib": 1024,
+          "reserved_mib": 0,
+          "native_process_started": false
+        }
+      },
+      "medians": {
+        "disabled": {
+          "attach_ms": 313.97970499999974,
+          "send_ms": 52.45521999999983,
+          "stop_ms": 144.59219200000007
+        },
+        "leased": {
+          "attach_ms": 331.45753700000023,
+          "send_ms": 56.44274399999995,
+          "stop_ms": 154.75356799999963
+        }
+      },
+      "transport_samples": {
+        "attach_per_mode": 3,
+        "send_per_mode": 24,
+        "stop_per_mode": 3
+      },
+      "marker_miss_200": {
+        "median_ms": 0.25007600000000707,
+        "p95_ms": 0.32060200000000805
+      },
+      "final_active_reservations": 0
+    }
+  },
+  "validation": {
+    "windows": {
+      "dashboard": {
+        "total": 216,
+        "passed": 216,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      "process_scope_checkpoint_gpu_targeted": {
+        "total": 40,
+        "passed": 40
+      }
+    },
+    "linux": {
+      "dashboard": {
+        "total": 216,
+        "passed": 211,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 5,
+        "skip_scope": "Windows-native tray and PowerShell wrapper cases"
+      },
+      "rust_release": {
+        "total": 110,
+        "passed": 110
+      },
+      "benchmark_examples": {
+        "total": 7,
+        "passed": 7
+      },
+      "fence": {
+        "total": 2,
+        "passed": 2
+      },
+      "cli_regress": {
+        "checks": 53,
+        "passed": 53
+      },
+      "security_boundaries": {
+        "total": 11,
+        "passed": 11
+      },
+      "fmt": "passed",
+      "release_clippy_warnings": 0
+    }
+  },
+  "earlier_failed_source": {
+    "commit": "fecbdc04f87b86956fb8eb2ff1db4b62532c67e4",
+    "windows": {
+      "total": 215,
+      "passed": 214,
+      "failed": 1,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    "failure": "checkpoint setup rejected history_unconfirmed_after_owned_stop; independent Windows Job membership/accounting queries could return contradictory emptiness evidence",
+    "resolution": "require both membership and accounting to be empty; contradictory observations remain running and are polled again"
+  },
+  "physical_GPU_workload_tested": false,
+  "actual_provider_or_model_tested": false
+}
