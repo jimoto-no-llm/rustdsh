@@ -22,6 +22,9 @@ anyhow = "1.0"
 getrandom = "0.4"
 libc = "0.2"
 
+[build-dependencies]
+embed-resource = "=3.0.11"
+
 [profile.release]
 opt-level = "z"
 lto = true

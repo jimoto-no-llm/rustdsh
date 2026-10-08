@@ -181,8 +181,9 @@ pub fn respond(
     stream: &mut TcpStream,
     status: u16,
     ctype: &str,
-    payload: &str,
+    payload: impl AsRef<[u8]>,
 ) -> std::io::Result<()> {
+    let payload = payload.as_ref();
     let reason = match status {
         200 => "OK",
         400 => "Bad Request",
@@ -195,7 +196,7 @@ pub fn respond(
         _ => "Error",
     };
     write!(stream, "HTTP/1.1 {status} {reason}\r\nContent-Type: {ctype}\r\nContent-Length: {}\r\nConnection: close\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\n\r\n", payload.len())?;
-    stream.write_all(payload.as_bytes())
+    stream.write_all(payload)
 }
 
 pub struct ConnectionSlot(Arc<AtomicUsize>);
