@@ -42,7 +42,9 @@ than hidden behind the token reduction.
 
 ## Local validation scope
 
-Windows Node 22: 11 tests passed, failed/cancelled/skipped 0. The original Node
+Windows Node 22 and Linux Node 24: 12 tests passed, failed/cancelled/skipped 0
+on each OS. This includes actual Cordis injection, default configuration and
+disposal, added in source `838f38b`. The original Node
 PTC provider returned this actual fixed-program result:
 
 ```json
@@ -55,12 +57,26 @@ collisions, complete schemas, both original language renderers, explicit budget
 failure, stable SDK bytes, late restriction, original guards/typed-return
 failures, parallel dispatch, complete prompt authority and effect disposal.
 
+The matching runtime source `ca09567` also passed `cargo fmt --check`, release
+Clippy with zero warnings, Rust 103 tests, 7 example tests and 53 regress checks.
+Its Linux dashboard suite passed all 182 tests, skipped 0. The explicit
+release-binary security invocation passed all 15 checks; the kernel-isolated
+dispatcher probe rejected catalog activation while still allowing approved
+inspection. A first local security invocation omitted `BIN` and could not
+start its CLI fixtures; it is not counted as successful verification.
+
 This execution fixture uses a fresh home/workspace and no inherited provider
 credentials. Its fixed program uses full access; it is not a sandbox security
-claim. The existing kernel-isolated probe separately checks Native enforcement
-and refusal to activate this catalog. Linux/macOS and Rust checks are recorded
-in the PR's validation statement only after execution; the machine benchmark
-here records Windows specifically.
+claim. The [matching Linux machine report](linux-benchmark.json) records the
+same token/lookup/dispatch results with Node 24.21.0; its assembly medians were
+46.438 ms before and 76.823 ms after. Token/payload numbers agree across OSes;
+timings are environment-specific.
+
+The initial [three-OS CI run](https://github.com/jimoto-no-llm/rustdsh/actions/runs/37828833871)
+on runtime source `ca09567` passed the then-current 11 tests plus the benchmark
+on Linux, macOS and Windows. The additional lifecycle test and evidence-only
+changes are tracked separately by the latest PR checks; earlier CI is not
+presented as a check on a later head.
 
 Reproduce with the bundle's documented `npm ci`, tests and benchmark. The
 workflow uploads a separate benchmark report for each OS. No live model,
