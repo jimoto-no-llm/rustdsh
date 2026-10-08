@@ -14,23 +14,23 @@ if [ "${RDSH_REGRESS_SANDBOXED:-}" != 1 ]; then
 fi
 need_ok() {
   desc="$1"; shift
-  if "$@" >/tmp/rr-out 2>/tmp/rr-err; then ok "$desc"; else echo "FAIL(exit): $desc"; cat /tmp/rr-err; exit 1; fi
+  if "$@" >"$RR_SANDBOX/rr-out" 2>"$RR_SANDBOX/rr-err"; then ok "$desc"; else echo "FAIL(exit): $desc"; cat "$RR_SANDBOX/rr-err"; exit 1; fi
 }
 need_exit() {
   want="$1"; desc="$2"; shift 2
-  "$@" >/tmp/rr-out 2>/tmp/rr-err
+  "$@" >"$RR_SANDBOX/rr-out" 2>"$RR_SANDBOX/rr-err"
   code=$?
   if [ "$code" = "$want" ]; then ok "$desc"; else echo "FAIL(exit $code want $want): $desc"; exit 1; fi
 }
 need_grep() {
   pat="$1"; desc="$2"; shift 2
-  "$@" >/tmp/rr-out 2>/tmp/rr-err
-  if grep -q "$pat" /tmp/rr-out; then ok "$desc"; else echo "FAIL(output): $desc"; exit 1; fi
+  "$@" >"$RR_SANDBOX/rr-out" 2>"$RR_SANDBOX/rr-err"
+  if grep -q "$pat" "$RR_SANDBOX/rr-out"; then ok "$desc"; else echo "FAIL(output): $desc"; exit 1; fi
 }
 need_grep "rdsh" "version string" $BIN --version
 need_ok "doctor" $BIN doctor
-printf "hello world, this is a token test" | $BIN tokens > /tmp/rr-out 2>/dev/null
-if grep -q "\"tokens\": 9" /tmp/rr-out; then ok "tokens stdin"; else echo "FAIL(output): tokens stdin"; exit 1; fi
+printf "hello world, this is a token test" | $BIN tokens > "$RR_SANDBOX/rr-out" 2>/dev/null
+if grep -q "\"tokens\": 9" "$RR_SANDBOX/rr-out"; then ok "tokens stdin"; else echo "FAIL(output): tokens stdin"; exit 1; fi
 need_ok "search" $BIN search estimate_tokens --dir src --max 5
 need_ok "profiles" $BIN profiles
 need_ok "skills" $BIN skills
@@ -49,9 +49,9 @@ need_exit 2 "reject plugin w/o args" $BIN plugin --profile tui
 need_grep "plugin" "plugin delegation dry-run" $BIN --dry-run plugin --profile web add ./dsh-notify-push
 need_grep "smart-dsh" "doctor reports smart-dsh" $BIN doctor
 python3 -c "print(5791 * 4)" | $BIN tokens > /dev/null
-printf "FROMSTDIN" > /tmp/rr-in.txt
-need_ok "compact noop" $BIN compact /tmp/rr-in.txt --max-tokens 8000
-SB=/tmp/rdsh-regress-$$
+printf "FROMSTDIN" > "$RR_SANDBOX/rr-in.txt"
+need_ok "compact noop" $BIN compact "$RR_SANDBOX/rr-in.txt" --max-tokens 8000
+SB="$RR_SANDBOX/wrapper"
 mkdir -p $SB/bin $SB/orig
 cat > $SB/orig/dsh << FAKEEOF
 #!/bin/sh
@@ -64,7 +64,7 @@ if PATH="$SB/bin:$SB/orig:$PATH" DSH_ORIG_BIN="$SB/orig/dsh" $SB/bin/dsh doctor 
 if PATH="$SB/bin:$SB/orig:$PATH" RDSH_ORIG_BIN="$SB/orig/dsh" $SB/bin/dsh --version | grep -q FAKE-ORIG; then ok "RDSH_ORIG_BIN primary"; else echo "FAIL: RDSH_ORIG_BIN primary"; exit 1; fi
 # --- sessions --tokens cache: a `?` from a zstd-less run must not stick once zstd exists ---
 # p (two sessions) takes the batch path, q (one session) the per-session path.
-ZC=/tmp/rdsh-zcache-$$
+ZC="$RR_SANDBOX/zcache"
 mkdir -p "$ZC/dsh/sessions/p/s1" "$ZC/dsh/sessions/p/s2" "$ZC/dsh/sessions/q/s2" "$ZC/nozstd" "$ZC/ok" "$ZC/bad" "$ZC/cache"
 { printf '\050\265\057\375\040\310\101\006\000'; head -c 200 /dev/zero; } > "$ZC/dsh/sessions/p/s1/a.zstd"
 for d in p q; do { printf '\050\265\057\375\000\000\041\000\000'; printf 'abcd'; } > "$ZC/dsh/sessions/$d/s2/a.zstd"; done
@@ -88,27 +88,27 @@ if grep -q '"decomp":null' "$ZC/cache/rdsh/sessions-tokens.json" && ! grep -q '"
 zc "$ZC/ok" q
 if grep "q/s2" "$ZC/out" | grep -q "~1tok " && ! grep "q/s2" "$ZC/out" | grep -q "?"; then ok "tokens cache: legacy null entry rechecked with zstd"; else echo "FAIL(output): legacy null entry stuck"; cat "$ZC/out"; exit 1; fi
 rm -rf "$ZC"
-WB=/tmp/rdsh-wrapper-$$
+WB="$RR_SANDBOX/wrapper-home"
 mkdir -p $WB/.local/bin
 printf '#!/bin/sh\nexec node "$(readlink -f "$(command -v dsh)")" --profile web\n' > $WB/.local/bin/dsh-web-local
 if HOME="$WB" $BIN doctor 2>/dev/null | grep -q "dsh-web-local"; then ok "doctor flags node-on-dsh wrapper"; else echo "FAIL(output): doctor flags node-on-dsh wrapper"; exit 1; fi
 rm -rf $WB
-AB=/tmp/rdsh-auth-AA
+AB="$RR_SANDBOX/auth"
 mkdir -p $AB/home/.codex $AB/home/.local/share/opencode $AB/dsh
 printf '%s' '{"tokens":{"access_token":"a","refresh_token":"r","account_id":"1"}}' > $AB/home/.codex/auth.json
 printf '%s' '{"openai":{"type":"oauth","refresh":"r2","access":"a2","expires":1991708802841,"accountId":"9"}}' > $AB/home/.local/share/opencode/auth.json
 if HOME="$AB/home" DSH_HOME="$AB/dsh" $BIN auth 2>/dev/null | grep -q "openai-codex"; then ok "auth detects opencode login"; else echo "FAIL(output): auth detects opencode login"; exit 1; fi
-if HOME="$AB/home" DSH_HOME="$AB/dsh" $BIN auth --import >/dev/null 2>&1 && grep -q "llm-pi-ai/openai-codex" "$AB/dsh/.credentials.yaml"; then ok "auth import writes record"; else echo "FAIL(output): auth import writes record"; exit 1; fi
+if HOME="$AB/home" DSH_HOME="$AB/dsh" $BIN auth --import --provider openai-codex >/dev/null 2>&1 && grep -q "llm-pi-ai/openai-codex" "$AB/dsh/.credentials.yaml"; then ok "auth import writes record"; else echo "FAIL(output): auth import writes record"; exit 1; fi
 if HOME="$AB/home" DSH_HOME="$AB/dsh" $BIN auth 2>/dev/null | grep -q "already recognized"; then ok "auth import recognized"; else echo "FAIL(output): auth import recognized"; exit 1; fi
 fmode="$(stat -c %a "$AB/dsh/.credentials.yaml" 2>/dev/null || stat -f "%Lp" "$AB/dsh/.credentials.yaml")"
 if [ "$fmode" = "600" ]; then ok "auth file mode 600"; else echo "FAIL(mode): auth file mode"; exit 1; fi
 if HOME="$AB/home" DSH_HOME="$AB/dsh" $BIN setup --json 2>/dev/null | grep -q "\"needed\":false"; then ok "setup connected"; else echo "FAIL(output): setup connected"; exit 1; fi
-SB2=/tmp/rdsh-setup-AA
+SB2="$RR_SANDBOX/setup"
 mkdir -p $SB2/home $SB2/dsh
 if env -u DEEPSEEK_API_KEY -u OPENAI_API_KEY -u ANTHROPIC_API_KEY HOME="$SB2/home" DSH_HOME="$SB2/dsh" $BIN setup --json 2>/dev/null | grep -q "\"needed\":true"; then ok "setup needed on first run"; else echo "FAIL(output): setup needed on first run"; exit 1; fi
-if env -u DEEPSEEK_API_KEY -u OPENAI_API_KEY -u ANTHROPIC_API_KEY HOME="$SB2/home" DSH_HOME="$SB2/dsh" DSH_ORIG_BIN="$SB/orig/dsh" $SB/bin/dsh --profile tui 2>&1 | grep -q "rdsh setup"; then ok "first-boot banner"; else echo "FAIL(output): first-boot banner"; exit 1; fi
+if env -u DEEPSEEK_API_KEY -u OPENAI_API_KEY -u ANTHROPIC_API_KEY HOME="$SB2/home" DSH_HOME="$SB2/dsh" DSH_ORIG_BIN="$SB/orig/dsh" $SB/bin/dsh --profile tui 2>&1 | grep -q "RDSH_SECURITY"; then ok "unsupported runtime refused"; else echo "FAIL(output): unsupported runtime refused"; exit 1; fi
 rm -rf $SB2
-FR=/tmp/rdsh-fr-AA
+FR="$RR_SANDBOX/release"
 mkdir -p $FR/pkg $FR/bin $FR/latest/download
 cp "$BIN" $FR/pkg/rdsh
 for a in rdsh-linux-x64 rdsh-macos-arm64 rdsh-macos-x64; do tar -czf "$FR/latest/download/$a.tar.gz" -C $FR/pkg rdsh; done
@@ -120,14 +120,14 @@ tar -czf "$FR/latest/download/rdsh-linux-x64-musl.tar.gz" -C $FR/pkg rdsh
 (cd "$FR/latest/download" && $SUM "rdsh-linux-x64-musl.tar.gz" > "rdsh-linux-x64-musl.tar.gz.sha256")
 if RDSH_RELEASE_BASE="file://$FR" DSH_HOME="$FR/dsh" bash ./install.sh --from-release --musl --prefix="$FR/bin-musl" >$FR/install-musl.log 2>&1 && "$FR/bin-musl/rdsh" --version 2>/dev/null | grep -q "rdsh"; then ok "from-release musl install"; else echo "FAIL(output): from-release musl install"; tail -n 8 $FR/install-musl.log; exit 1; fi
 printf "version: 1\nrecords:\n  llm-pi-ai/openai-codex:\n    kind: api-key\n    key: sk-user-key\n" > "$AB/dsh/.credentials.yaml"
-if HOME="$AB/home" DSH_HOME="$AB/dsh" $BIN auth --import >/dev/null 2>&1 && grep -q "kind: api-key" "$AB/dsh/.credentials.yaml" && HOME="$AB/home" DSH_HOME="$AB/dsh" $BIN auth 2>/dev/null | grep -q "left alone"; then ok "auth keeps api-key records"; else echo "FAIL(output): auth keeps api-key records"; exit 1; fi
+if HOME="$AB/home" DSH_HOME="$AB/dsh" $BIN auth --import --provider openai-codex >/dev/null 2>&1 && grep -q "kind: api-key" "$AB/dsh/.credentials.yaml" && HOME="$AB/home" DSH_HOME="$AB/dsh" $BIN auth 2>/dev/null | grep -q "left alone"; then ok "auth keeps api-key records"; else echo "FAIL(output): auth keeps api-key records"; exit 1; fi
 for t in "$FR"/latest/download/*.tar.gz; do printf "tampered" >> "$t"; done
 if RDSH_RELEASE_BASE="file://$FR" DSH_HOME="$FR/dsh" bash ./install.sh --from-release --prefix="$FR/bin-evil" >$FR/install-evil.log 2>&1; then echo "FAIL(output): tampered release refused"; exit 1; else ok "tampered release refused"; fi
 rm -rf $FR
 # sync-dsh.sh release self-update against a file:// release with npm/node shims.
 # The script runs from a copy (no tests/regress.sh or target/ next to it), so it
 # does not recurse into this suite.
-FS=/tmp/rdsh-fs-AA
+FS="$RR_SANDBOX/sync-release"
 rm -rf $FS
 mkdir -p $FS/pkg $FS/rel/latest/download $FS/repo $FS/home/.local/bin $FS/npmroot/@deepseek-ai/dsh $FS/bin
 cp "$BIN" $FS/pkg/rdsh
@@ -151,7 +151,7 @@ for a in rdsh-linux-x64 rdsh-linux-x64-musl rdsh-macos-arm64 rdsh-macos-x64; do 
 fs_sync "$FS/bin" $FS/sync-empty.log
 if grep -q "empty checksum sidecar" $FS/sync-empty.log && grep -q "binaries untouched" $FS/sync-empty.log && [ "$(cat $FS/bin/rdsh)" = "old" ]; then ok "sync-dsh refuses empty sha256"; else echo "FAIL(output): sync-dsh refuses empty sha256"; tail -n 8 $FS/sync-empty.log; exit 1; fi
 rm -rf $FS
-SW=/tmp/rdsh-setupweb-AA
+SW="$RR_SANDBOX/setupweb"
 mkdir -p $SW/home $SW/dsh
 HOME="$SW/home" DSH_HOME="$SW/dsh" $BIN setup --web --port 38082 >/dev/null 2>"$SW/setup.log" & SRV=$!
 SETUP_TOKEN=""
@@ -169,7 +169,7 @@ if printf "%s" "{\"name\":\"DEEPSEEK_API_KEY\",\"value\":\"smoke-only-key\"}" | 
 curl -fsS --max-time 5 -X POST -H "X-RDSH-Token: $SETUP_TOKEN" --data-binary '{}' http://127.0.0.1:38082/api/done >/dev/null 2>&1
 wait $SRV 2>/dev/null || true
 rm -rf $SW
-SWB=/tmp/rdsh-searchweb-AA
+SWB="$RR_SANDBOX/searchweb"
 mkdir -p $SWB
 printf "%s" "<html><body><article class=\"result\"><h3><a href=\"https://example.com/a\">Alpha result</a></h3><p class=\"content\">first snippet</p></article><article class=\"result\"><h3><a href=\"https://example.com/b\">Beta result</a></h3></article></body></html>" > $SWB/fixture.html
 python3 - "$SWB/fixture.html" 38083 <<PYEOF >/dev/null 2>&1 &
@@ -204,5 +204,5 @@ if bash ./install.sh --help 2>/dev/null | grep -q -- "--musl"; then ok "install.
 if grep -q "RDSH_SYNC_FROM_SOURCE" ./sync-dsh.sh && grep -q "sandboxed_regress" ./sync-dsh.sh; then ok "sync-dsh release-first + sandboxed regress"; else echo "FAIL(output): sync-dsh release-first + sandboxed regress"; exit 1; fi
 if [ "${RDSH_REGRESS_SANDBOXED:-}" = 1 ] && [ -n "${RR_SANDBOX:-}" ] && [ "$HOME" = "$RR_SANDBOX/home" ] && [ "$DSH_HOME" = "$RR_SANDBOX/dsh" ]; then ok "regress sandboxed HOME"; else echo "FAIL(output): regress sandboxed HOME"; exit 1; fi
 rm -rf $AB
-rm -rf $SB /tmp/rr-in.txt /tmp/rr-out /tmp/rr-err
+rm -rf $SB "$RR_SANDBOX/rr-in.txt" "$RR_SANDBOX/rr-out" "$RR_SANDBOX/rr-err"
 echo "ALL PASS ($pass checks)"

@@ -1,0 +1,8 @@
+--- origin/main (1fdec5f)
++++ v0.2.0 release candidate
+@@ -1,3 +1,3 @@
+ dismiss → poll: hidden
+-dismiss → reload: visible
+-dismiss state: memory only
++dismiss → reload: hidden
++dismiss state: localStorage, keyed by update, expires after 2 hours

@@ -28,7 +28,11 @@ What happens next:
 
 ## Scope Notes
 
-- rdsh delegates the agent loop to the original dsh binary via verbatim exec.
-  Bugs in the upstream Harness itself belong upstream; we will help route them.
+- Agent execution through rdsh requires the audited DSH tool adapter and
+  Linux x86_64 kernel isolation. Unsupported combinations fail closed.
+  Only explicitly shared project files are exposed to model tools; their
+  contents may reach the configured model provider. Plugins and profiles
+  are trusted code. Direct upstream DSH execution is outside this protection.
+  Upstream Harness vulnerabilities should also be reported upstream.
 - The Node dashboard (dashboard/*) binds to loopback by default. Tailscale
   Serve QR URLs are credentials - never paste them into public issues.

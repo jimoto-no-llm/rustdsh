@@ -537,7 +537,7 @@ fn splice_entry(text: &str, section: &str, key: &str, block: &[String]) -> Optio
     Some(out)
 }
 
-fn write_creds(path: &str, text: &str) -> anyhow::Result<()> {
+pub(crate) fn write_creds(path: &str, text: &str) -> anyhow::Result<()> {
     use std::io::Write;
     if let Some(parent) = std::path::Path::new(path).parent() {
         std::fs::create_dir_all(parent)?;
@@ -605,11 +605,21 @@ struct Scan {
 }
 
 fn scan() -> Scan {
+    scan_selected(None, None, None)
+}
+
+fn scan_selected(provider: Option<&str>, source: Option<&str>, key_ref: Option<&str>) -> Scan {
     let mut grants: Vec<OauthGrant> = Vec::new();
     let mut keys: Vec<ApiKey> = Vec::new();
     let mut notes: Vec<String> = Vec::new();
     scan_codex(&mut grants, &mut keys);
     scan_opencode(&mut grants, &mut notes);
+    if provider.is_some() || source.is_some() || key_ref.is_some() {
+        grants.retain(|g| {
+            provider == Some(g.provider.as_str()) && source.is_none_or(|v| v == g.from)
+        });
+        keys.retain(|k| key_ref == Some(k.name.as_str()) && source.is_none_or(|v| v == k.from));
+    }
     let path = creds_path();
     let doc = load_doc(&path);
     let creds_mtime = mtime_ms(&path);
@@ -690,19 +700,12 @@ fn scan() -> Scan {
     }
 }
 
-fn autosync_enabled() -> bool {
-    std::env::var("RDSH_AUTH_AUTOSYNC").as_deref() != Ok("0")
-}
-
 /// Best-effort mirror before delegating to dsh (boot/dump/plugin/raw).
 /// Never fails: a broken store must not break launching. When `banner` is
 /// set, a no-connection state also prints the first-run guidance once —
 /// both from a single `scan()`, instead of re-crawling the stores.
 pub fn pre_boot(banner: bool) {
     let s = scan();
-    if autosync_enabled() {
-        let _ = apply_imports(&s, true);
-    }
     if banner && setup_needed_in(&s) {
         print_first_boot_banner();
     }
@@ -803,8 +806,25 @@ fn layout_refused(s: &Scan) -> bool {
     !s.doc.text.is_empty() && !s.doc.version_ok
 }
 
-pub fn cmd_auth(import: bool, json: bool) -> anyhow::Result<()> {
-    let s = scan();
+pub fn cmd_auth(
+    import: bool,
+    json: bool,
+    provider: Option<String>,
+    source: Option<String>,
+    key_ref: Option<String>,
+) -> anyhow::Result<()> {
+    if import && provider.is_none() && key_ref.is_none() {
+        anyhow::bail!(
+            "credential import requires --provider <id> or --ref <name>; bulk copying is disabled"
+        );
+    }
+    if let Some(ref value) = source {
+        anyhow::ensure!(
+            value == "codex" || value == "opencode",
+            "unknown credential source"
+        );
+    }
+    let s = scan_selected(provider.as_deref(), source.as_deref(), key_ref.as_deref());
     let (grants, keys, notes, doc, decisions, path) =
         (&s.grants, &s.keys, &s.notes, &s.doc, &s.decisions, &s.path);
     let wrote = if import {
@@ -867,7 +887,7 @@ pub fn cmd_auth(import: bool, json: bool) -> anyhow::Result<()> {
     for need in provider_needs(&s) {
         let mark = match need.state {
             "ok" => "credential ok",
-            "importable" => "credential importable: run `rdsh auth --import`",
+            "importable" => "credential importable: run `rdsh auth --import --provider <id>`",
             _ => "credential missing: run `rdsh setup`",
         };
         println!(
@@ -887,7 +907,7 @@ pub fn cmd_auth(import: bool, json: bool) -> anyhow::Result<()> {
     } else if decisions.iter().any(|d| d.action != "ok")
         || keys.iter().any(|k| !doc.refs.contains_key(&k.name))
     {
-        println!("[rdsh auth] hint: `rdsh auth --import` writes this (boot also auto-syncs; RDSH_AUTH_AUTOSYNC=0 disables)");
+        println!("[rdsh auth] hint: `rdsh auth --import --provider <id>` copies these credentials; automatic copying is disabled; select --provider or --ref");
     } else {
         println!("[rdsh auth] everything already recognized");
     }
@@ -957,14 +977,10 @@ fn env_key_set(name: &str) -> bool {
         .unwrap_or(false)
 }
 
-/// True when no model credential is visible anywhere: no external OAuth
-/// logins, no known API-key env vars, and nothing stored yet. This is the
-/// "first boot demands a DeepSeek connection and I have no idea why" state.
+/// External stores are only candidates for import. A connection requires a
+/// credential already stored for DSH or a usable API-key environment variable.
 fn setup_needed_in(s: &Scan) -> bool {
-    let (grants, keys, doc) = (&s.grants, &s.keys, &s.doc);
-    if !grants.is_empty() || !keys.is_empty() {
-        return false;
-    }
+    let doc = &s.doc;
     if !doc.grants.is_empty() || !doc.refs.is_empty() {
         return false;
     }
@@ -1308,7 +1324,7 @@ fn print_guide() {
         println!("[rdsh setup]   1) サブスクで使う（APIキー不要・おすすめ）");
         println!("[rdsh setup]      opencode auth login  … OpenAI(GPT)等を選んでOAuth接続");
         println!("[rdsh setup]      codex login          … ChatGPTプランでGPTを使う場合");
-        println!("[rdsh setup]      終わったら次回起動で自動認識します（rdsh setup --login で今すぐ実行）");
+        println!("[rdsh setup]      終わったら rdsh auth --import --provider openai-codex で取り込みます（rdsh setup --login でも実行）");
         println!("[rdsh setup]   2) DeepSeekキーを使う（dshが最初に求める接続がこれです）");
         println!("[rdsh setup]      platform.deepseek.com で発行 → 上の入力欄に貼り付け");
         println!("[rdsh setup]      または DEEPSEEK_API_KEY=... rdsh setup --yes で保存");
@@ -1322,9 +1338,7 @@ fn print_guide() {
             "[rdsh setup]      opencode auth login  … pick OpenAI (GPT) and connect via OAuth"
         );
         println!("[rdsh setup]      codex login          … for ChatGPT-plan GPT access");
-        println!(
-            "[rdsh setup]      next boot picks it up automatically (or rdsh setup --login now)"
-        );
+        println!("[rdsh setup]      then run rdsh auth --import --provider openai-codex");
         println!("[rdsh setup]   2) Use a DeepSeek key (what dsh asks for by default)");
         println!("[rdsh setup]      issue one at platform.deepseek.com, then paste it above");
         println!("[rdsh setup]      or save it with DEEPSEEK_API_KEY=... rdsh setup --yes");
@@ -1340,7 +1354,6 @@ fn print_guide() {
 pub fn cmd_setup(open: bool, login: bool, json: bool, yes: bool) -> anyhow::Result<()> {
     // One scan drives the import, the env-key loop, and the "needed" verdict.
     let mut s = scan();
-    let _ = apply_imports(&s, json);
     let mut persisted: Vec<String> = Vec::new();
     // Refs already stored: seeded from the scan, extended as we write (the
     // old code re-read the credentials file once per env key).
@@ -1354,9 +1367,10 @@ pub fn cmd_setup(open: bool, login: bool, json: bool, yes: bool) -> anyhow::Resu
             continue;
         }
         let take = yes
-            || prompt_yes(&format!(
-                "[rdsh setup] save {k} from the environment into credentials? [y/N] "
-            ));
+            || (!json
+                && prompt_yes(&format!(
+                    "[rdsh setup] save {k} from the environment into credentials? [y/N] "
+                )));
         if take && store_ref(k, v.trim())? {
             known_refs.insert(k.to_string());
             persisted.push(k.to_string());
@@ -1364,7 +1378,7 @@ pub fn cmd_setup(open: bool, login: bool, json: bool, yes: bool) -> anyhow::Resu
     }
     {
         use std::io::IsTerminal as _;
-        if !yes && std::io::stdin().is_terminal() && setup_needed_in(&s) {
+        if !json && !yes && std::io::stdin().is_terminal() && setup_needed_in(&s) {
             if let Some(pasted) = prompt_line(
                 "[rdsh setup] paste DEEPSEEK_API_KEY here (Enter to skip, input is echoed): ",
             ) {
@@ -1382,16 +1396,15 @@ pub fn cmd_setup(open: bool, login: bool, json: bool, yes: bool) -> anyhow::Resu
     let mut login_run = false;
     if login {
         login_run = launch_login();
-        // The provider flow may have written new stores; rescan and import.
-        s = scan();
-        let _ = apply_imports(&s, json);
+        // Login never implicitly copies other applications' credentials.
     }
     if open {
         open_settings_dirs(json);
     }
     // `needed` reflects the post-import state: a key stored during this run
     // counts as a credential (the old code got this by rescanning the file).
-    let needed = setup_needed_in(&s) && persisted.is_empty();
+    s = scan();
+    let needed = setup_needed_in(&s);
     if json {
         println!(
             "{}",

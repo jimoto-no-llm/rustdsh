@@ -1,16 +1,16 @@
 // rdsh guard: tiny hook command for hooks.json (Claude Code / Codex bridges).
 // Scans stdin (hook JSON or raw text) for deny patterns and blocks on match.
-// Exit 2 = block with reason on stderr; anything else = allow. ~1ms startup.
+// Exit 2 = block with reason on stderr; exit 0 = no deny decision.
 //
-// Policy notes (Bucket C, issues #29/#30/#32/#33) — behavior unchanged:
+// Policy notes (Bucket C, issues #29/#30/#32/#33):
 // - #29 operation structure: deny patterns are structural (`a*b`, anchors),
 //   not semantic allow-lists; unanchored text matches as substring.
-// - #33 external input: JSON hook payloads are flattened to string values only
-//   (`collect_text`); keys/numbers/bools never match, raw text stays borrowed.
+// - #33 external input: match JSON string values separately so anchors cannot
+//   be displaced by metadata. Reject malformed and oversized hook input.
 // - #32 credential hygiene: prefer narrow deny globs (e.g. `*.credentials.yaml*`)
 //   shared minimally per call, not broad secrets dumped into the prompt.
-// - #30 approval ledger: JSON mode prints `{"decision": ...}` for ledgering;
-//   text mode exits 2 with the reason on stderr.
+// - #30 approval ledger: JSON mode emits a block decision or no decision (`{}`).
+//   Deny-list misses must never bypass the host's approval policy.
 
 pub fn wildcard_match(pattern: &str, text: &str) -> bool {
     if pattern == "*" || pattern.is_empty() {
@@ -48,74 +48,68 @@ pub fn wildcard_match(pattern: &str, text: &str) -> bool {
     }
     true
 }
-fn collect_text(raw: &str) -> std::borrow::Cow<'_, str> {
-    // Fast path: plain text never parses as the JSON shapes we care about
-    // (object/array/string roots), so borrow it without parsing or copying.
-    // Other scalar roots (numbers/bool/null) hold no strings, and fall back
-    // to `raw` below just the same.
-    let t = raw.trim_start();
-    let try_parse = matches!(t.as_bytes().first(), Some(b'{') | Some(b'[') | Some(b'"'));
-    if !try_parse {
-        return std::borrow::Cow::Borrowed(raw);
-    }
-    match serde_json::from_str::<serde_json::Value>(raw) {
-        Ok(v) => {
-            let mut out = String::with_capacity(raw.len());
-            push_strings(&v, &mut out);
-            if out.is_empty() {
-                std::borrow::Cow::Borrowed(raw)
-            } else {
-                std::borrow::Cow::Owned(out)
-            }
-        }
-        Err(_) => std::borrow::Cow::Borrowed(raw),
+fn matches_value(pattern: &str, value: &serde_json::Value) -> bool {
+    match value {
+        serde_json::Value::String(s) => wildcard_match(pattern, s),
+        serde_json::Value::Array(a) => a.iter().any(|v| matches_value(pattern, v)),
+        serde_json::Value::Object(m) => m.values().any(|v| matches_value(pattern, v)),
+        _ => false,
     }
 }
 
-fn push_strings(v: &serde_json::Value, out: &mut String) {
-    match v {
-        serde_json::Value::String(s) => {
-            out.push_str(s);
-            out.push('\n');
-        }
-        serde_json::Value::Array(a) => {
-            for x in a {
-                push_strings(x, out);
-            }
-        }
-        serde_json::Value::Object(m) => {
-            for x in m.values() {
-                push_strings(x, out);
-            }
-        }
-        _ => {}
+fn denied_pattern<'a>(raw: &str, deny: &'a [String]) -> anyhow::Result<Option<&'a String>> {
+    let t = raw.trim_start();
+    if matches!(t.as_bytes().first(), Some(b'{') | Some(b'[') | Some(b'"')) {
+        let value = serde_json::from_str::<serde_json::Value>(raw)?;
+        Ok(deny.iter().find(|p| matches_value(p, &value)))
+    } else {
+        Ok(deny.iter().find(|p| wildcard_match(p, raw)))
+    }
+}
+
+fn block(msg: &str, json_out: bool) {
+    if json_out {
+        println!(
+            "{}",
+            serde_json::json!({"decision": "block", "reason": msg})
+        );
+    } else {
+        eprintln!("{msg}");
+        std::process::exit(2);
     }
 }
 
 pub fn cmd_guard(deny: Vec<String>, reason: Option<String>, json_out: bool) -> anyhow::Result<()> {
     use std::io::Read;
+    const MAX_INPUT: u64 = 1024 * 1024;
     let mut raw = String::new();
-    std::io::stdin().read_to_string(&mut raw)?;
-    let text = collect_text(&raw);
-    let hit = deny.iter().find(|p| wildcard_match(p, &text));
+    if std::io::stdin()
+        .take(MAX_INPUT + 1)
+        .read_to_string(&mut raw)
+        .is_err()
+        || raw.len() as u64 > MAX_INPUT
+    {
+        block("rdsh guard: unreadable or oversized input", json_out);
+        return Ok(());
+    }
+    let hit = match denied_pattern(&raw, &deny) {
+        Ok(hit) => hit,
+        Err(_) => {
+            block("rdsh guard: invalid JSON input", json_out);
+            return Ok(());
+        }
+    };
     match hit {
         Some(p) => {
             let msg = reason.unwrap_or_else(|| "blocked by rdsh guard".to_owned());
             eprintln!("[rdsh guard] pattern hit: {}", p);
-            if json_out {
-                println!(
-                    "{}",
-                    serde_json::json!({"decision": "block", "reason": msg})
-                );
-                Ok(())
-            } else {
-                eprintln!("{msg}");
-                std::process::exit(2);
-            }
+            block(&msg, json_out);
+            Ok(())
         }
         None => {
             if json_out {
-                println!("{}", serde_json::json!({"decision": "approve"}));
+                // A deny-list miss is not authority to bypass the host's approval policy.
+                println!("{{}}");
             }
             Ok(())
         }
@@ -151,8 +145,9 @@ mod tests {
 
     #[test]
     fn collect_json_strings() {
-        let t = collect_text("plain text here");
-        assert_eq!(t, "plain text here");
+        assert!(denied_pattern("plain text here", &["plain*".into()])
+            .unwrap()
+            .is_some());
     }
 
     // #29 operation structure: multi-star order + anchor edges.
@@ -179,17 +174,23 @@ mod tests {
         ));
     }
 
-    // #33 external input: JSON values flatten, keys/scalars never match.
+    // #33 external input: JSON string values match; keys/scalars never match.
     #[test]
     fn collect_nested_json_values_only() {
         let raw = r#"{"tool_input": {"cmd": ["run", "rm -rf / x"]}, "n": 42}"#;
-        let t = collect_text(raw);
-        assert!(t.contains("rm -rf / x"));
-        assert!(!t.contains("tool_input"));
-        assert!(!t.contains("42"));
-        assert!(wildcard_match("rm -rf /*", &t) || wildcard_match("*rm -rf*", &t));
-        for scalar in ["123", "true", "null"] {
-            assert_eq!(collect_text(scalar), scalar);
+        assert!(denied_pattern(raw, &["rm -rf /*".into()])
+            .unwrap()
+            .is_some());
+        for pattern in ["tool_input", "42"] {
+            assert!(denied_pattern(raw, &[pattern.into()]).unwrap().is_none());
         }
+    }
+
+    #[test]
+    fn anchored_pattern_matches_command_inside_hook_payload() {
+        let raw = r#"{"cwd":"/tmp/example","tool_name":"Bash","tool_input":{"description":"List files","command":"rm -rf / example"}}"#;
+        assert!(denied_pattern(raw, &["rm -rf /*".into()])
+            .unwrap()
+            .is_some());
     }
 }

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, rm, symlink, lstat, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { Readable } from 'node:stream';
@@ -246,6 +246,20 @@ test('plugin security boundary and settings preservation', async (t) => {
     const oversized = JSON.stringify({ config: loaded, padding: 'x'.repeat(1024 * 1024) });
     assert.equal((await request('/api/rdsh-settings/save', { method: 'POST', body: oversized })).status, 400);
     assert.equal(await readFile(settingsFile, 'utf8'), stored);
+  });
+
+  await t.test('saves replace symlinks without overwriting their targets and tighten existing file permissions', async () => {
+    for (const [file, route] of [[settingsFile, '/api/rdsh-settings/save'], [contextFile, '/api/rdsh-context/save']]) {
+      const outside = join(home, 'unrelated-' + route.split('/')[2] + '.json');
+      const raw = JSON.stringify(original);
+      await writeFile(outside, raw);
+      await rm(file, { force: true });
+      await symlink(outside, file);
+      assert.equal((await request(route, { method: 'POST', body: '{}' })).status, 200);
+      assert.equal(await readFile(outside, 'utf8'), raw);
+      assert.equal((await lstat(file)).isSymbolicLink(), false);
+      if (process.platform !== 'win32') assert.equal((await stat(file)).mode & 0o777, 0o600);
+    }
   });
 
   await t.test('unreadable settings are never replaced with defaults', async () => {

@@ -1,0 +1,5 @@
+{
+  "before": "hidden on poll but reappeared after reload",
+  "after": "hidden after poll and reload",
+  "persisted": true
+}

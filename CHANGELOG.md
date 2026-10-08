@@ -5,6 +5,38 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-08
+
+### Security
+
+- Agent tools launched through rustdsh now require Linux x86_64, bubblewrap,
+  prlimit, and the audited DSH 0.2.0-rc.2 runtime. They can inspect only files
+  explicitly shared with `--share-file`, without host credentials or network.
+  Unsupported agent environments fail closed; native commands remain available
+  subject to the platform limits documented in README.
+- External CLI credentials are no longer imported automatically. Imports require
+  an explicit provider or record. Hook misses no longer grant approval.
+- File reads reject symlink races, hard links and FIFOs; settings and credentials
+  use private atomic writes. Plugin routes require authenticated sessions.
+- Release updates require valid SHA256 sidecars before extraction. Release
+  publishing waits for every platform asset and verifies all checksums.
+
+### Added
+
+- Dashboard CLI adapters, session ledger, run recovery, scoped stops, checkpoints,
+  retries, model routing, task preflight and acceptance evidence.
+- Reviewed question/reply workflows, follow-up ordering, mobile overview,
+  connection diagnostics, cost and budget controls, credential-free history
+  backups, and staged release qualification.
+
+### Fixed
+
+- Preserve unmodeled settings and explicit working-file clears when saving forms.
+- Do not cache unknown session token sizes when the zstd CLI is unavailable;
+  recheck legacy unknown sizes once zstd becomes available.
+- Dismissed update banners remain hidden across polls and reloads for two hours,
+  unless a new update is recorded.
+
 ## [0.1.5] - 2026-10-06
 
 ### Changed
@@ -76,7 +108,8 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 - Floating setup UI, dsh-default detection, SearXNG search.
 - Installers: install.sh (Linux/macOS/WSL), install.ps1 (Windows).
 
-[Unreleased]: https://github.com/sahenjp/rustdsh/compare/v0.1.5...HEAD
+[Unreleased]: #unreleased
+[0.2.0]: docs/releases/v0.2.0.md
 [0.1.5]: https://github.com/sahenjp/rustdsh/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/sahenjp/rustdsh/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/sahenjp/rustdsh/compare/v0.1.2...v0.1.3

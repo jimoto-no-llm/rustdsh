@@ -20,7 +20,7 @@ for a in "$@"; do
   esac
 done
 LOGDIR="${HOME}/.local/share/rdsh"
-LOCK="/tmp/rdsh-sync.lock"
+LOCK="$LOGDIR/sync.lock"
 mkdir -p "$LOGDIR"
 log() { printf "%s %s\n" "$(date -u +%FT%TZ)" "$*" | tee -a "$LOGDIR/sync.log"; }
 if command -v flock >/dev/null 2>&1; then
@@ -74,7 +74,7 @@ sandboxed_regress() {
   # Run regress with a throwaway HOME/DSH_HOME (issue #85 item 8).
   sb="$(mktemp -d 2>/dev/null || mktemp -d -t rdsh-sync-regress)"
   mkdir -p "$sb/home" "$sb/dsh"
-  if HOME="$sb/home" DSH_HOME="$sb/dsh" BIN="$1" sh "$REPO/tests/regress.sh" >> "$LOGDIR/sync.log" 2>&1; then
+  if env -i PATH="$PATH" HOME="$sb/home" DSH_HOME="$sb/dsh" BIN="$1" sh "$REPO/tests/regress.sh" >> "$LOGDIR/sync.log" 2>&1; then
     rc=0
   else
     rc=1
@@ -109,6 +109,10 @@ verify_sha256() {
   want="${line%% *}"
   if [ -z "$want" ]; then
     log "empty checksum sidecar"
+    return 1
+  fi
+  if ! printf '%s\n' "$want" | grep -Eq '^[a-fA-F0-9]{64}$'; then
+    log "invalid release checksum; refusing update"
     return 1
   fi
   if command -v sha256sum >/dev/null 2>&1; then

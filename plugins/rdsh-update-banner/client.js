@@ -58,17 +58,27 @@ window.__ModuleLoader__.load({
       const resPair = useState("");
       const result = resPair[0];
       const setResult = resPair[1];
-      // Dismissed update key (to + at). Reset on page reload by design:
-      // the same update never reappears, a newer one does.
+      // Dismissed update key (to + at), persisted so reloads stay quiet.
+      // Reappears only for a newer update or after 2 hours.
+      const DISMISS_KEY = "rdsh-update-dismissed";
+      const DISMISS_TTL = 2 * 60 * 60 * 1000;
       const dismissedRef = useRef(null);
+      try {
+        const raw = localStorage.getItem(DISMISS_KEY);
+        if (raw) dismissedRef.current = JSON.parse(raw);
+      } catch (e) {}
       const updateKey = (j) => ((j && j.to) || "") + "@" + ((j && j.at) || "");
+      const dismissedRecently = (key) => {
+        const d = dismissedRef.current;
+        return !!d && d.key === key && (Date.now() - d.at) < DISMISS_TTL;
+      };
       const load = useCallback(async () => {
         try {
           const r = await fetch(ENDPOINT, { cache: "no-store" });
           if (!r.ok) return;
           const j = await r.json();
           if (!j || !j.ok) return;
-          if (j.updated && dismissedRef.current === updateKey(j)) return;
+          if (j.updated && dismissedRecently(updateKey(j))) return;
           setData(j);
         } catch (e) {}
       }, []);
@@ -78,7 +88,12 @@ window.__ModuleLoader__.load({
         return () => clearInterval(t);
       }, [load]);
       const dismiss = () => {
-        if (data) dismissedRef.current = updateKey(data);
+        if (data) {
+          dismissedRef.current = { key: updateKey(data), at: Date.now() };
+          try {
+            localStorage.setItem(DISMISS_KEY, JSON.stringify(dismissedRef.current));
+          } catch (e) {}
+        }
         setData({ ok: true, updated: false });
       };
       const runUpdate = useCallback(async () => {

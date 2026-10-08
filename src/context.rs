@@ -11,11 +11,14 @@
 //! - verifier warnings (missing files surface explicitly)
 
 use std::io::Write;
+use std::path::Path;
+
+use crate::file_security::open_beneath;
 
 const SCHEMA: u32 = 2;
 const DEFAULT_BUDGET: usize = 4000;
 const DEFAULT_CODE_HITS: usize = 20;
-const DEFAULT_SESSIONS: usize = 10;
+const DEFAULT_SESSIONS: usize = 0;
 
 #[derive(Debug, Clone)]
 pub struct ContextConfig {
@@ -133,7 +136,17 @@ fn score_line(line_lower: &str, terms: &[String]) -> usize {
 // ---- file helpers ----
 
 fn read_bounded(path: &str, cap: usize) -> Option<String> {
-    let bytes = std::fs::read(path).ok()?;
+    use std::io::Read;
+    let root = std::fs::canonicalize(".").ok()?;
+    let target = std::fs::canonicalize(path).ok()?;
+    if !target.starts_with(&root) {
+        return None;
+    }
+    // Open every path component relative to directory fds with O_NOFOLLOW.
+    // This closes the check/open race for both final files and parent dirs.
+    let file = open_beneath(&root, &target)?;
+    let mut bytes = Vec::new();
+    file.take(cap as u64).read_to_end(&mut bytes).ok()?;
     if bytes.contains(&0) {
         return None; // binary
     }
@@ -149,6 +162,19 @@ fn read_bounded(path: &str, cap: usize) -> Option<String> {
     } else {
         Some(text)
     }
+}
+
+fn read_small_regular(path: &std::path::Path, root: &Path, cap: usize) -> Option<Vec<u8>> {
+    use std::io::Read;
+    let root = std::fs::canonicalize(root).ok()?;
+    let target = std::fs::canonicalize(path).ok()?;
+    if !target.starts_with(&root) {
+        return None;
+    }
+    let file = open_beneath(&root, &target)?;
+    let mut bytes = Vec::new();
+    file.take(cap as u64 + 1).read_to_end(&mut bytes).ok()?;
+    (bytes.len() <= cap).then_some(bytes)
 }
 
 fn git_branch() -> Option<String> {
@@ -272,7 +298,12 @@ fn recent_sessions(query: &str, limit: usize) -> Vec<String> {
     }
     let mut scored: Vec<(usize, u64, String)> = vec![];
     for p in session_files_sorted(4).into_iter().take(120) {
-        let bytes = std::fs::read(&p).unwrap_or_default();
+        let bytes = read_small_regular(
+            &p,
+            &std::path::PathBuf::from(format!("{}/sessions", crate::inspect::dsh_home())),
+            256 * 1024,
+        )
+        .unwrap_or_default();
         if bytes.is_empty() || bytes.len() > 256 * 1024 || bytes.contains(&0) {
             continue;
         }
@@ -342,7 +373,11 @@ fn code_hits(query: &str, max: usize) -> Vec<String> {
         return vec![];
     }
     let mut scored: Vec<(usize, String)> = vec![];
-    let mut stack = vec![std::path::PathBuf::from(".")];
+    let root = std::fs::canonicalize(".").ok();
+    let Some(root) = root else {
+        return vec![];
+    };
+    let mut stack = vec![root.clone()];
     let mut files_seen = 0usize;
     while let Some(dir) = stack.pop() {
         let entries = std::fs::read_dir(&dir)
@@ -354,11 +389,18 @@ fn code_hits(query: &str, max: usize) -> Vec<String> {
                 continue;
             }
             let p = e.path();
-            let is_dir = e.file_type().is_ok_and(|t| t.is_dir());
+            let kind = match e.file_type() {
+                Ok(kind) if !kind.is_symlink() => kind,
+                _ => continue,
+            };
+            let is_dir = kind.is_dir();
             if is_dir {
                 if files_seen < 4000 {
                     stack.push(p);
                 }
+                continue;
+            }
+            if !kind.is_file() {
                 continue;
             }
             let keep = p
@@ -373,9 +415,9 @@ fn code_hits(query: &str, max: usize) -> Vec<String> {
             if files_seen > 4000 {
                 break;
             }
-            let bytes = match std::fs::read(&p) {
-                Ok(b) => b,
-                Err(_) => continue,
+            let bytes = match read_small_regular(&p, &root, 256 * 1024) {
+                Some(b) => b,
+                None => continue,
             };
             if bytes.is_empty() || bytes.len() > 256 * 1024 || bytes.contains(&0) {
                 continue;
@@ -503,9 +545,8 @@ fn assemble(query: &str, cfg: &ContextConfig) -> Vec<Section> {
         for h in code_hits(q, cfg.max_code_hits) {
             parts.push(h);
         }
-        for s in recent_sessions(q, cfg.max_sessions) {
-            parts.push(s);
-        }
+        // Cross-project session history is available only through an explicit
+        // native context search, never automatically sent to a model.
         if !parts.is_empty() {
             secs.push(Section {
                 name: "retrieved",
