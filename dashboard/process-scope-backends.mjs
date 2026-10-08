@@ -7,6 +7,23 @@ import { EventEmitter } from "node:events";
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const maxMembers = 256;
 
+// Membership and accounting are separate kernel queries. A process can exit or
+// spawn between them; neither observation may override contradictory evidence.
+export function windowsJobObservation(assigned, pids, accountingEmpty) {
+  const membershipEmpty = assigned === 0 && pids.length === 0;
+  const empty = membershipEmpty && accountingEmpty;
+  return {
+    status: empty ? "exit_confirmed" : "running",
+    remaining_pids: pids,
+    remaining_count:
+      membershipEmpty && !accountingEmpty
+        ? null
+        : Math.max(assigned, pids.length),
+    members_truncated:
+      assigned > pids.length || (membershipEmpty && !accountingEmpty),
+  };
+}
+
 export async function linuxScope(config, stdio) {
   const { default: koffi } = await import("koffi");
   const libc = koffi.load("libc.so.6");
@@ -233,12 +250,7 @@ export async function windowsScope(config) {
     const pids = Array.from({ length: count }, (_, i) =>
       Number(buffer.readBigUInt64LE(8 + i * 8)),
     );
-    return {
-      status: win.isJobEmpty(api, info.job) ? "exit_confirmed" : "running",
-      remaining_pids: pids,
-      remaining_count: assigned,
-      members_truncated: assigned > count,
-    };
+    return windowsJobObservation(assigned, pids, win.isJobEmpty(api, info.job));
   };
   return {
     child,
