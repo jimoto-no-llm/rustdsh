@@ -2,7 +2,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
 
-export const inject = ['webServer'];
+export const inject = ['webServer', 'connection'];
 
 function dshHome() {
   return process.env.DSH_HOME || join(homedir(), '.dsh');
@@ -32,21 +32,61 @@ function settingsDefaults() {
   };
 }
 
-async function loadCfg() {
+async function readLegacyContext() {
   try {
-    const raw = await readFile(cfgPath(), 'utf8');
-    const j = JSON.parse(raw);
-    const d = defaults();
-    return sanitize({ ...d, ...j });
-  } catch (e) { return defaults(); }
+    return obj(JSON.parse(await readFile(cfgPath(), 'utf8')));
+  } catch (e) { return {}; }
+}
+
+async function loadCfg() {
+  return sanitize(await readLegacyContext());
+}
+
+async function settingsForForm(current) {
+  return sanitizeSettings({ ...current, context: current.context ?? await readLegacyContext() });
 }
 
 async function loadSettings() {
   try {
-    const raw = await readFile(settingsPath(), 'utf8');
-    const j = JSON.parse(raw);
-    return sanitizeSettings(j && typeof j === 'object' ? j : {});
+    return await settingsForForm(await readSettingsDocument());
   } catch (e) { return settingsDefaults(); }
+}
+
+async function readSettingsDocument() {
+  try {
+    const value = JSON.parse(await readFile(settingsPath(), 'utf8'));
+    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('invalid settings');
+    return value;
+  } catch (e) {
+    if (e.code === 'ENOENT') return {};
+    throw e;
+  }
+}
+
+async function mergeSettings(current, input) {
+  input = obj(input);
+  const hasContext = current.context != null || input.context != null;
+  if (current.context == null && input.context != null) {
+    current = { ...current, context: (await settingsForForm(current)).context };
+  }
+  const source = { ...current, ...input };
+  for (const [key, value] of Object.entries(settingsDefaults())) {
+    if (typeof value === 'object') source[key] = { ...obj(current[key]), ...obj(input[key]) };
+  }
+  const normalized = sanitizeSettings(source);
+  const result = { ...current, ...normalized };
+  for (const [key, value] of Object.entries(normalized)) {
+    if (typeof value === 'object') result[key] = { ...obj(current[key]), ...value };
+  }
+  if (hasContext) {
+    // The legacy alias has been migrated into working_files, including empty lists.
+    delete result.context.files;
+  } else {
+    // An unrelated partial save must not shadow the active legacy context.
+    if (Object.hasOwn(current, 'context')) result.context = current.context;
+    else delete result.context;
+  }
+  return result;
 }
 
 function strList(v, maxN, maxC) {
@@ -163,9 +203,9 @@ function sanitizeSettings(j) {
   };
 }
 
-async function readBody(req) {
+async function readBody(req, limit = 65536) {
   let size = 0; const chunks = [];
-  for await (const chunk of req) { size += chunk.length; if (size > 65536) throw new Error('too large'); chunks.push(chunk); }
+  for await (const chunk of req) { size += chunk.length; if (size > limit) throw new Error('too large'); chunks.push(chunk); }
   return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
 }
 
@@ -175,6 +215,14 @@ function json(res, code, body) {
   res.end(s);
 }
 
+function authorize(ctx, req, res) {
+  const status = typeof ctx.connection?.requestRejection === 'function'
+    ? ctx.connection.requestRejection(req) : 503;
+  if (status === undefined) return true;
+  json(res, status, { ok: false, error: status === 401 ? 'unauthorized' : status === 403 ? 'forbidden' : 'authentication-unavailable' });
+  return false;
+}
+
 export function apply(ctx, config) {
   return ctx.effect(() => {
     if (!ctx.webServer) return;
@@ -182,6 +230,7 @@ export function apply(ctx, config) {
       kind: 'exact',
       path: '/api/rdsh-context',
       handler: async (req, res) => {
+        if (!authorize(ctx, req, res)) return;
         if (req.method !== 'GET' && req.method !== 'HEAD') {
           res.writeHead(405, { 'content-type': 'application/json' });
           res.end(JSON.stringify({ error: 'method-not-allowed' }));
@@ -197,6 +246,7 @@ export function apply(ctx, config) {
       kind: 'exact',
       path: '/api/rdsh-context/save',
       handler: async (req, res) => {
+        if (!authorize(ctx, req, res)) return;
         if (req.method !== 'POST') {
           res.writeHead(405, { 'content-type': 'application/json' });
           res.end(JSON.stringify({ error: 'method-not-allowed' }));
@@ -220,6 +270,7 @@ export function apply(ctx, config) {
       kind: 'exact',
       path: '/api/rdsh-settings',
       handler: async (req, res) => {
+        if (!authorize(ctx, req, res)) return;
         if (req.method !== 'GET' && req.method !== 'HEAD') {
           res.writeHead(405, { 'content-type': 'application/json' });
           res.end(JSON.stringify({ error: 'method-not-allowed' }));
@@ -235,17 +286,19 @@ export function apply(ctx, config) {
       kind: 'exact',
       path: '/api/rdsh-settings/save',
       handler: async (req, res) => {
+        if (!authorize(ctx, req, res)) return;
         if (req.method !== 'POST') {
           res.writeHead(405, { 'content-type': 'application/json' });
           res.end(JSON.stringify({ error: 'method-not-allowed' }));
           return;
         }
         try {
-          const input = await readBody(req);
-          const cfg = sanitizeSettings(input.config ?? input);
+          // Covers every supported form field at its limit, including JSON escapes.
+          const input = await readBody(req, 1024 * 1024);
+          const cfg = await mergeSettings(await readSettingsDocument(), input.config ?? input);
           await mkdir(dshHome(), { recursive: true });
           await writeFile(settingsPath(), JSON.stringify(cfg, null, 2) + '\n', { mode: 0o600 });
-          json(res, 200, { ok: true, config: cfg });
+          json(res, 200, { ok: true, config: await settingsForForm(cfg) });
         } catch (e) {
           res.writeHead(400, { 'content-type': 'application/json' });
           res.end(JSON.stringify({ ok: false, error: 'bad-request' }));

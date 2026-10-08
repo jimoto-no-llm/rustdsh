@@ -1,0 +1,15 @@
+{
+  "requested_viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "dom_geometry": {
+    "document_width": 375,
+    "select_width": 347,
+    "textbox_width": 347,
+    "viewport_width": 375
+  },
+  "kind": "browser_viewport",
+  "physical_phone_test": "not_performed",
+  "submission": "saved_to_exact_unknown_target_pending_queue"
+}

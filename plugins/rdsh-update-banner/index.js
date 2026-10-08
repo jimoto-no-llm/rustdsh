@@ -3,10 +3,19 @@ import { join } from "node:path";
 import { readFile } from "node:fs/promises";
 import { execFile } from "node:child_process";
 
-export const inject = ["webServer"];
+export const inject = ["webServer", "connection"];
 
 const SYNC_SCRIPT = "/home/sahen/File/Prog/rustdsh/sync-dsh.sh";
 const RUN_TIMEOUT_MS = 5 * 60 * 1000;
+
+function authorize(ctx, req, res) {
+  const status = typeof ctx.connection?.requestRejection === "function"
+    ? ctx.connection.requestRejection(req) : 503;
+  if (status === undefined) return true;
+  res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+  res.end(JSON.stringify({ ok: false, error: status === 401 ? "unauthorized" : status === 403 ? "forbidden" : "authentication-unavailable" }));
+  return false;
+}
 
 function runSync() {
   return new Promise((resolve) => {
@@ -38,6 +47,7 @@ export function apply(ctx, config) {
       kind: "exact",
       path: "/api/rdsh-update/run",
       handler: async (req, res) => {
+        if (!authorize(ctx, req, res)) return;
         if (req.method !== "POST") {
           res.writeHead(405, { "content-type": "application/json" });
           res.end(JSON.stringify({ error: "method-not-allowed" }));
@@ -62,6 +72,7 @@ export function apply(ctx, config) {
       kind: "exact",
       path: "/api/rdsh-update",
       handler: async (req, res) => {
+        if (!authorize(ctx, req, res)) return;
         if (req.method !== "GET" && req.method !== "HEAD") {
           res.writeHead(405, { "content-type": "application/json" });
           res.end(JSON.stringify({ error: "method-not-allowed" }));

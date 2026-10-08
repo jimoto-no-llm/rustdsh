@@ -1,0 +1,460 @@
+{
+  "platform": "linux",
+  "status": "passed",
+  "cpu": {
+    "schema": 1,
+    "ready": true,
+    "observed_at": "2026-10-05T19:48:00.874Z",
+    "checks": [
+      {
+        "id": "node",
+        "status": "pass",
+        "stage": "configuration",
+        "reason": "node_version_supported",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.873Z"
+      },
+      {
+        "id": "cwd",
+        "status": "pass",
+        "stage": "existence",
+        "reason": "directory_exists",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.874Z"
+      },
+      {
+        "id": "cli",
+        "status": "not_required",
+        "stage": null,
+        "reason": "not_required",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.874Z"
+      },
+      {
+        "id": "profile",
+        "status": "not_required",
+        "stage": null,
+        "reason": "not_required",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.874Z"
+      },
+      {
+        "id": "disk",
+        "status": "not_required",
+        "stage": null,
+        "reason": "not_required",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.874Z"
+      },
+      {
+        "id": "port",
+        "status": "not_required",
+        "stage": null,
+        "reason": "not_required",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.874Z"
+      },
+      {
+        "id": "dependencies",
+        "status": "not_required",
+        "stage": null,
+        "reason": "not_required",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.874Z"
+      },
+      {
+        "id": "wsl",
+        "status": "not_required",
+        "stage": null,
+        "reason": "not_required",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.874Z"
+      },
+      {
+        "id": "gpu",
+        "status": "not_required",
+        "stage": null,
+        "reason": "not_required",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.874Z"
+      },
+      {
+        "id": "auth",
+        "status": "not_required",
+        "stage": null,
+        "reason": "not_required",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.874Z"
+      }
+    ],
+    "execution_authority": false,
+    "automatic_repairs": false
+  },
+  "disk": {
+    "schema": 1,
+    "ready": true,
+    "observed_at": "2026-10-05T19:48:00.874Z",
+    "checks": [
+      {
+        "id": "node",
+        "status": "pass",
+        "stage": "configuration",
+        "reason": "node_version_supported",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.874Z"
+      },
+      {
+        "id": "cwd",
+        "status": "pass",
+        "stage": "existence",
+        "reason": "directory_exists",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.874Z"
+      },
+      {
+        "id": "cli",
+        "status": "not_required",
+        "stage": null,
+        "reason": "not_required",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.874Z"
+      },
+      {
+        "id": "profile",
+        "status": "not_required",
+        "stage": null,
+        "reason": "not_required",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.874Z"
+      },
+      {
+        "id": "disk",
+        "status": "pass",
+        "stage": "existence",
+        "reason": "disk_space_available",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.874Z",
+        "free_bytes": "956158660608",
+        "required_bytes": 1
+      },
+      {
+        "id": "port",
+        "status": "not_required",
+        "stage": null,
+        "reason": "not_required",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.874Z"
+      },
+      {
+        "id": "dependencies",
+        "status": "not_required",
+        "stage": null,
+        "reason": "not_required",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.874Z"
+      },
+      {
+        "id": "wsl",
+        "status": "not_required",
+        "stage": null,
+        "reason": "not_required",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.874Z"
+      },
+      {
+        "id": "gpu",
+        "status": "not_required",
+        "stage": null,
+        "reason": "not_required",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.874Z"
+      },
+      {
+        "id": "auth",
+        "status": "not_required",
+        "stage": null,
+        "reason": "not_required",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.874Z"
+      }
+    ],
+    "execution_authority": false,
+    "automatic_repairs": false
+  },
+  "occupied_port": {
+    "schema": 1,
+    "ready": false,
+    "observed_at": "2026-10-05T19:48:00.879Z",
+    "checks": [
+      {
+        "id": "node",
+        "status": "pass",
+        "stage": "configuration",
+        "reason": "node_version_supported",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.878Z"
+      },
+      {
+        "id": "cwd",
+        "status": "pass",
+        "stage": "existence",
+        "reason": "directory_exists",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.878Z"
+      },
+      {
+        "id": "cli",
+        "status": "not_required",
+        "stage": null,
+        "reason": "not_required",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.878Z"
+      },
+      {
+        "id": "profile",
+        "status": "not_required",
+        "stage": null,
+        "reason": "not_required",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.878Z"
+      },
+      {
+        "id": "disk",
+        "status": "not_required",
+        "stage": null,
+        "reason": "not_required",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.878Z"
+      },
+      {
+        "id": "port",
+        "status": "blocked",
+        "stage": "existence",
+        "reason": "port_unavailable",
+        "fix": "指定portを使用中のサービスと、今回のport設定を確認してください。",
+        "observed_at": "2026-10-05T19:48:00.879Z",
+        "port": 44027,
+        "reservation": false
+      },
+      {
+        "id": "dependencies",
+        "status": "not_required",
+        "stage": null,
+        "reason": "not_required",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.879Z"
+      },
+      {
+        "id": "wsl",
+        "status": "not_required",
+        "stage": null,
+        "reason": "not_required",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.879Z"
+      },
+      {
+        "id": "gpu",
+        "status": "not_required",
+        "stage": null,
+        "reason": "not_required",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.879Z"
+      },
+      {
+        "id": "auth",
+        "status": "not_required",
+        "stage": null,
+        "reason": "not_required",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.879Z"
+      }
+    ],
+    "execution_authority": false,
+    "automatic_repairs": false
+  },
+  "wrong_cwd_and_profile": {
+    "schema": 1,
+    "ready": false,
+    "observed_at": "2026-10-05T19:48:00.880Z",
+    "checks": [
+      {
+        "id": "node",
+        "status": "pass",
+        "stage": "configuration",
+        "reason": "node_version_supported",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.879Z"
+      },
+      {
+        "id": "cwd",
+        "status": "blocked",
+        "stage": "existence",
+        "reason": "cwd_unavailable",
+        "fix": "対象projectの存在するdirectoryを指定してください。",
+        "observed_at": "2026-10-05T19:48:00.880Z"
+      },
+      {
+        "id": "profile",
+        "status": "blocked",
+        "stage": "configuration",
+        "reason": "unsupported_profile",
+        "fix": "対応済みのDSH ACP profileを選択してください。",
+        "observed_at": "2026-10-05T19:48:00.880Z"
+      },
+      {
+        "id": "cli",
+        "status": "blocked",
+        "stage": "configuration",
+        "reason": "prerequisite_blocked",
+        "fix": "先にNode・cwd・profileの失敗項目を直してください。",
+        "observed_at": "2026-10-05T19:48:00.880Z"
+      },
+      {
+        "id": "disk",
+        "status": "not_required",
+        "stage": null,
+        "reason": "not_required",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.880Z"
+      },
+      {
+        "id": "port",
+        "status": "not_required",
+        "stage": null,
+        "reason": "not_required",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.880Z"
+      },
+      {
+        "id": "dependencies",
+        "status": "not_required",
+        "stage": null,
+        "reason": "not_required",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.880Z"
+      },
+      {
+        "id": "wsl",
+        "status": "not_required",
+        "stage": null,
+        "reason": "not_required",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.880Z"
+      },
+      {
+        "id": "gpu",
+        "status": "not_required",
+        "stage": null,
+        "reason": "not_required",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.880Z"
+      },
+      {
+        "id": "auth",
+        "status": "not_required",
+        "stage": null,
+        "reason": "not_required",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.880Z"
+      }
+    ],
+    "execution_authority": false,
+    "automatic_repairs": false
+  },
+  "existing_wsl": null,
+  "original_dsh_version": {
+    "schema": 1,
+    "ready": true,
+    "observed_at": "2026-10-05T19:48:02.343Z",
+    "checks": [
+      {
+        "id": "node",
+        "status": "pass",
+        "stage": "configuration",
+        "reason": "node_version_supported",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.880Z"
+      },
+      {
+        "id": "cwd",
+        "status": "pass",
+        "stage": "existence",
+        "reason": "directory_exists",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.880Z"
+      },
+      {
+        "id": "profile",
+        "status": "pass",
+        "stage": "configuration",
+        "reason": "adapter_profile_selected",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:00.880Z"
+      },
+      {
+        "id": "cli",
+        "status": "pass",
+        "stage": "configuration",
+        "reason": "cli_version_matched",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:02.343Z",
+        "detected_version": "0.2.0-rc.2",
+        "protocol_checked": false
+      },
+      {
+        "id": "disk",
+        "status": "pass",
+        "stage": "existence",
+        "reason": "disk_space_available",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:02.343Z",
+        "free_bytes": "956158660608",
+        "required_bytes": 1
+      },
+      {
+        "id": "port",
+        "status": "not_required",
+        "stage": null,
+        "reason": "not_required",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:02.343Z"
+      },
+      {
+        "id": "dependencies",
+        "status": "not_required",
+        "stage": null,
+        "reason": "not_required",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:02.343Z"
+      },
+      {
+        "id": "wsl",
+        "status": "not_required",
+        "stage": null,
+        "reason": "not_required",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:02.343Z"
+      },
+      {
+        "id": "gpu",
+        "status": "not_required",
+        "stage": null,
+        "reason": "not_required",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:02.343Z"
+      },
+      {
+        "id": "auth",
+        "status": "not_required",
+        "stage": null,
+        "reason": "not_required",
+        "fix": null,
+        "observed_at": "2026-10-05T19:48:02.343Z"
+      }
+    ],
+    "execution_authority": false,
+    "automatic_repairs": false
+  },
+  "provider_authentication": "not_exercised",
+  "model_prompt": false
+}

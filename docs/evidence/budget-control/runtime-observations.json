@@ -1,0 +1,578 @@
+{
+  "source_before": "8fa6247066b5b21bf27eb6e0a9bd44a1089eeeaf",
+  "kind": "controlled_local_fixtures",
+  "providerDispatches": 1,
+  "real_provider_requests": 0,
+  "invoice_verification": "not_performed",
+  "physical_phone": "not_performed",
+  "snapshots": {
+    "soft_running": {
+      "schema": 1,
+      "project_id": "8c1662963b5e2da3",
+      "policies": [
+        {
+          "policy_id": "project-budget",
+          "revision": 1,
+          "run_id": null,
+          "period_start": "2026-10-05T12:24:14.455Z",
+          "period_end": "2026-10-07T12:24:14.455Z",
+          "currency": "USD",
+          "source_kind": "provider_usage",
+          "baseline": "0.2",
+          "baseline_basis": "ローカルfixtureの開始前費用。実請求の照合は未実施。",
+          "soft_limit": "0.3",
+          "hard_limit": "0.6",
+          "call_reservation": "0.3",
+          "paused": false,
+          "active": true,
+          "spent": "0.2",
+          "reserved": "0.3",
+          "effective": "0.5",
+          "executing": 1,
+          "awaiting_usage": 0,
+          "next_call_fits": false,
+          "status": "warning",
+          "overspend": "0"
+        }
+      ],
+      "jobs": [
+        {
+          "job_id": "5b3a4737-bbed-4627-8cd7-10be6c4afb46",
+          "run_id": "fixture-run-1",
+          "worker_id": "worker-1",
+          "admitted_at": "2026-10-06T12:25:23.981Z",
+          "registered_at": "2026-10-06T12:25:23.986Z",
+          "closed_at": null,
+          "enforcement": "guard_registered"
+        },
+        {
+          "job_id": "142b9d4d-af7b-4caa-89bc-66e85110a945",
+          "run_id": "fixture-run-2",
+          "worker_id": "worker-2",
+          "admitted_at": "2026-10-06T12:25:23.987Z",
+          "registered_at": "2026-10-06T12:25:23.995Z",
+          "closed_at": null,
+          "enforcement": "guard_registered"
+        }
+      ],
+      "calls": [
+        {
+          "call_id": "c153ba70-d98f-42cf-8f05-baaa7af2cfff",
+          "job_id": "5b3a4737-bbed-4627-8cd7-10be6c4afb46",
+          "run_id": "fixture-run-1",
+          "worker_id": "worker-1",
+          "session_id": "native-fixture-1",
+          "provider": "fixture-provider",
+          "model": "fixture-model",
+          "purpose": null,
+          "policy_ids": [
+            "project-budget"
+          ],
+          "currency": "USD",
+          "source_kind": "provider_usage",
+          "reservation": "0.3",
+          "admitted_at": "2026-10-06T12:25:23.990Z",
+          "finished_at": null,
+          "outcome": null,
+          "tokens": null,
+          "amount": null,
+          "receipt_id": null,
+          "accounting": "unconfirmed"
+        }
+      ],
+      "decisions": [
+        {
+          "sequence": 1,
+          "kind": "policy",
+          "policy": {
+            "policy_id": "project-budget",
+            "revision": 1,
+            "run_id": null,
+            "period_start": "2026-10-05T12:24:14.455Z",
+            "period_end": "2026-10-07T12:24:14.455Z",
+            "currency": "USD",
+            "source_kind": "provider_usage",
+            "baseline": "0.2",
+            "baseline_basis": "ローカルfixtureの開始前費用。実請求の照合は未実施。",
+            "soft_limit": "0.3",
+            "hard_limit": "0.6",
+            "call_reservation": "0.3",
+            "paused": false,
+            "active": true
+          },
+          "reason": "QA：並列予約と受付停止を再現する",
+          "actor": "local_administrator",
+          "recorded_at": "2026-10-06T12:25:23.973Z"
+        },
+        {
+          "sequence": 2,
+          "kind": "job",
+          "job_id": "5b3a4737-bbed-4627-8cd7-10be6c4afb46",
+          "run_id": "fixture-run-1",
+          "worker_id": "worker-1",
+          "allowed": true,
+          "warning": false,
+          "reason": null,
+          "policy_ids": [
+            "project-budget"
+          ],
+          "recorded_at": "2026-10-06T12:25:23.981Z"
+        },
+        {
+          "sequence": 3,
+          "kind": "ready",
+          "job_id": "5b3a4737-bbed-4627-8cd7-10be6c4afb46",
+          "recorded_at": "2026-10-06T12:25:23.986Z"
+        },
+        {
+          "sequence": 4,
+          "kind": "job",
+          "job_id": "142b9d4d-af7b-4caa-89bc-66e85110a945",
+          "run_id": "fixture-run-2",
+          "worker_id": "worker-2",
+          "allowed": true,
+          "warning": false,
+          "reason": null,
+          "policy_ids": [
+            "project-budget"
+          ],
+          "recorded_at": "2026-10-06T12:25:23.987Z"
+        },
+        {
+          "sequence": 5,
+          "kind": "call",
+          "call_id": "c153ba70-d98f-42cf-8f05-baaa7af2cfff",
+          "job_id": "5b3a4737-bbed-4627-8cd7-10be6c4afb46",
+          "provider": "fixture-provider",
+          "model": "fixture-model",
+          "session_id": "native-fixture-1",
+          "allowed": true,
+          "warning": true,
+          "reason": null,
+          "policy_ids": [
+            "project-budget"
+          ],
+          "recorded_at": "2026-10-06T12:25:23.990Z"
+        },
+        {
+          "sequence": 6,
+          "kind": "ready",
+          "job_id": "142b9d4d-af7b-4caa-89bc-66e85110a945",
+          "recorded_at": "2026-10-06T12:25:23.995Z"
+        },
+        {
+          "sequence": 7,
+          "kind": "call",
+          "call_id": "8e4b48fc-9d03-4410-8cf7-2d54a520d54c",
+          "job_id": "142b9d4d-af7b-4caa-89bc-66e85110a945",
+          "provider": "fixture-provider",
+          "model": "fixture-model",
+          "session_id": "native-fixture-2",
+          "allowed": false,
+          "warning": true,
+          "reason": "budget_hard_limit",
+          "policy_ids": [
+            "project-budget"
+          ],
+          "recorded_at": "2026-10-06T12:25:24.001Z"
+        }
+      ]
+    },
+    "awaiting_usage": {
+      "schema": 1,
+      "project_id": "8c1662963b5e2da3",
+      "policies": [
+        {
+          "policy_id": "project-budget",
+          "revision": 1,
+          "run_id": null,
+          "period_start": "2026-10-05T12:24:14.455Z",
+          "period_end": "2026-10-07T12:24:14.455Z",
+          "currency": "USD",
+          "source_kind": "provider_usage",
+          "baseline": "0.2",
+          "baseline_basis": "ローカルfixtureの開始前費用。実請求の照合は未実施。",
+          "soft_limit": "0.3",
+          "hard_limit": "0.6",
+          "call_reservation": "0.3",
+          "paused": false,
+          "active": true,
+          "spent": "0.2",
+          "reserved": "0.3",
+          "effective": "0.5",
+          "executing": 0,
+          "awaiting_usage": 1,
+          "next_call_fits": false,
+          "status": "warning",
+          "overspend": "0"
+        }
+      ],
+      "jobs": [
+        {
+          "job_id": "5b3a4737-bbed-4627-8cd7-10be6c4afb46",
+          "run_id": "fixture-run-1",
+          "worker_id": "worker-1",
+          "admitted_at": "2026-10-06T12:25:23.981Z",
+          "registered_at": "2026-10-06T12:25:23.986Z",
+          "closed_at": null,
+          "enforcement": "guard_registered"
+        },
+        {
+          "job_id": "142b9d4d-af7b-4caa-89bc-66e85110a945",
+          "run_id": "fixture-run-2",
+          "worker_id": "worker-2",
+          "admitted_at": "2026-10-06T12:25:23.987Z",
+          "registered_at": "2026-10-06T12:25:23.995Z",
+          "closed_at": null,
+          "enforcement": "guard_registered"
+        }
+      ],
+      "calls": [
+        {
+          "call_id": "c153ba70-d98f-42cf-8f05-baaa7af2cfff",
+          "job_id": "5b3a4737-bbed-4627-8cd7-10be6c4afb46",
+          "run_id": "fixture-run-1",
+          "worker_id": "worker-1",
+          "session_id": "native-fixture-1",
+          "provider": "fixture-provider",
+          "model": "fixture-model",
+          "purpose": null,
+          "policy_ids": [
+            "project-budget"
+          ],
+          "currency": "USD",
+          "source_kind": "provider_usage",
+          "reservation": "0.3",
+          "admitted_at": "2026-10-06T12:25:23.990Z",
+          "finished_at": "2026-10-06T12:26:08.472Z",
+          "outcome": "finished",
+          "tokens": {
+            "input": 3,
+            "cached_input": 2,
+            "cache_write": null,
+            "output": 4
+          },
+          "amount": null,
+          "receipt_id": null,
+          "accounting": "unconfirmed"
+        }
+      ],
+      "decisions": [
+        {
+          "sequence": 1,
+          "kind": "policy",
+          "policy": {
+            "policy_id": "project-budget",
+            "revision": 1,
+            "run_id": null,
+            "period_start": "2026-10-05T12:24:14.455Z",
+            "period_end": "2026-10-07T12:24:14.455Z",
+            "currency": "USD",
+            "source_kind": "provider_usage",
+            "baseline": "0.2",
+            "baseline_basis": "ローカルfixtureの開始前費用。実請求の照合は未実施。",
+            "soft_limit": "0.3",
+            "hard_limit": "0.6",
+            "call_reservation": "0.3",
+            "paused": false,
+            "active": true
+          },
+          "reason": "QA：並列予約と受付停止を再現する",
+          "actor": "local_administrator",
+          "recorded_at": "2026-10-06T12:25:23.973Z"
+        },
+        {
+          "sequence": 2,
+          "kind": "job",
+          "job_id": "5b3a4737-bbed-4627-8cd7-10be6c4afb46",
+          "run_id": "fixture-run-1",
+          "worker_id": "worker-1",
+          "allowed": true,
+          "warning": false,
+          "reason": null,
+          "policy_ids": [
+            "project-budget"
+          ],
+          "recorded_at": "2026-10-06T12:25:23.981Z"
+        },
+        {
+          "sequence": 3,
+          "kind": "ready",
+          "job_id": "5b3a4737-bbed-4627-8cd7-10be6c4afb46",
+          "recorded_at": "2026-10-06T12:25:23.986Z"
+        },
+        {
+          "sequence": 4,
+          "kind": "job",
+          "job_id": "142b9d4d-af7b-4caa-89bc-66e85110a945",
+          "run_id": "fixture-run-2",
+          "worker_id": "worker-2",
+          "allowed": true,
+          "warning": false,
+          "reason": null,
+          "policy_ids": [
+            "project-budget"
+          ],
+          "recorded_at": "2026-10-06T12:25:23.987Z"
+        },
+        {
+          "sequence": 5,
+          "kind": "call",
+          "call_id": "c153ba70-d98f-42cf-8f05-baaa7af2cfff",
+          "job_id": "5b3a4737-bbed-4627-8cd7-10be6c4afb46",
+          "provider": "fixture-provider",
+          "model": "fixture-model",
+          "session_id": "native-fixture-1",
+          "allowed": true,
+          "warning": true,
+          "reason": null,
+          "policy_ids": [
+            "project-budget"
+          ],
+          "recorded_at": "2026-10-06T12:25:23.990Z"
+        },
+        {
+          "sequence": 6,
+          "kind": "ready",
+          "job_id": "142b9d4d-af7b-4caa-89bc-66e85110a945",
+          "recorded_at": "2026-10-06T12:25:23.995Z"
+        },
+        {
+          "sequence": 7,
+          "kind": "call",
+          "call_id": "8e4b48fc-9d03-4410-8cf7-2d54a520d54c",
+          "job_id": "142b9d4d-af7b-4caa-89bc-66e85110a945",
+          "provider": "fixture-provider",
+          "model": "fixture-model",
+          "session_id": "native-fixture-2",
+          "allowed": false,
+          "warning": true,
+          "reason": "budget_hard_limit",
+          "policy_ids": [
+            "project-budget"
+          ],
+          "recorded_at": "2026-10-06T12:25:24.001Z"
+        },
+        {
+          "sequence": 8,
+          "kind": "finish",
+          "call_id": "c153ba70-d98f-42cf-8f05-baaa7af2cfff",
+          "outcome": "finished",
+          "recorded_at": "2026-10-06T12:26:08.472Z"
+        }
+      ]
+    },
+    "hard_after_late_usage": {
+      "schema": 1,
+      "project_id": "8c1662963b5e2da3",
+      "policies": [
+        {
+          "policy_id": "project-budget",
+          "revision": 1,
+          "run_id": null,
+          "period_start": "2026-10-05T12:24:14.455Z",
+          "period_end": "2026-10-07T12:24:14.455Z",
+          "currency": "USD",
+          "source_kind": "provider_usage",
+          "baseline": "0.2",
+          "baseline_basis": "ローカルfixtureの開始前費用。実請求の照合は未実施。",
+          "soft_limit": "0.3",
+          "hard_limit": "0.6",
+          "call_reservation": "0.3",
+          "paused": false,
+          "active": true,
+          "spent": "0.7",
+          "reserved": "0",
+          "effective": "0.7",
+          "executing": 0,
+          "awaiting_usage": 0,
+          "next_call_fits": false,
+          "status": "blocked",
+          "overspend": "0.1"
+        }
+      ],
+      "jobs": [
+        {
+          "job_id": "5b3a4737-bbed-4627-8cd7-10be6c4afb46",
+          "run_id": "fixture-run-1",
+          "worker_id": "worker-1",
+          "admitted_at": "2026-10-06T12:25:23.981Z",
+          "registered_at": "2026-10-06T12:25:23.986Z",
+          "closed_at": null,
+          "enforcement": "guard_registered"
+        },
+        {
+          "job_id": "142b9d4d-af7b-4caa-89bc-66e85110a945",
+          "run_id": "fixture-run-2",
+          "worker_id": "worker-2",
+          "admitted_at": "2026-10-06T12:25:23.987Z",
+          "registered_at": "2026-10-06T12:25:23.995Z",
+          "closed_at": null,
+          "enforcement": "guard_registered"
+        }
+      ],
+      "calls": [
+        {
+          "call_id": "c153ba70-d98f-42cf-8f05-baaa7af2cfff",
+          "job_id": "5b3a4737-bbed-4627-8cd7-10be6c4afb46",
+          "run_id": "fixture-run-1",
+          "worker_id": "worker-1",
+          "session_id": "native-fixture-1",
+          "provider": "fixture-provider",
+          "model": "fixture-model",
+          "purpose": null,
+          "policy_ids": [
+            "project-budget"
+          ],
+          "currency": "USD",
+          "source_kind": "provider_usage",
+          "reservation": "0.3",
+          "admitted_at": "2026-10-06T12:25:23.990Z",
+          "finished_at": "2026-10-06T12:26:08.472Z",
+          "outcome": "finished",
+          "tokens": {
+            "input": 3,
+            "cached_input": 2,
+            "cache_write": null,
+            "output": 4
+          },
+          "amount": "0.5",
+          "receipt_id": "fixture-late-fee",
+          "accounting": "source_reported"
+        }
+      ],
+      "decisions": [
+        {
+          "sequence": 1,
+          "kind": "policy",
+          "policy": {
+            "policy_id": "project-budget",
+            "revision": 1,
+            "run_id": null,
+            "period_start": "2026-10-05T12:24:14.455Z",
+            "period_end": "2026-10-07T12:24:14.455Z",
+            "currency": "USD",
+            "source_kind": "provider_usage",
+            "baseline": "0.2",
+            "baseline_basis": "ローカルfixtureの開始前費用。実請求の照合は未実施。",
+            "soft_limit": "0.3",
+            "hard_limit": "0.6",
+            "call_reservation": "0.3",
+            "paused": false,
+            "active": true
+          },
+          "reason": "QA：並列予約と受付停止を再現する",
+          "actor": "local_administrator",
+          "recorded_at": "2026-10-06T12:25:23.973Z"
+        },
+        {
+          "sequence": 2,
+          "kind": "job",
+          "job_id": "5b3a4737-bbed-4627-8cd7-10be6c4afb46",
+          "run_id": "fixture-run-1",
+          "worker_id": "worker-1",
+          "allowed": true,
+          "warning": false,
+          "reason": null,
+          "policy_ids": [
+            "project-budget"
+          ],
+          "recorded_at": "2026-10-06T12:25:23.981Z"
+        },
+        {
+          "sequence": 3,
+          "kind": "ready",
+          "job_id": "5b3a4737-bbed-4627-8cd7-10be6c4afb46",
+          "recorded_at": "2026-10-06T12:25:23.986Z"
+        },
+        {
+          "sequence": 4,
+          "kind": "job",
+          "job_id": "142b9d4d-af7b-4caa-89bc-66e85110a945",
+          "run_id": "fixture-run-2",
+          "worker_id": "worker-2",
+          "allowed": true,
+          "warning": false,
+          "reason": null,
+          "policy_ids": [
+            "project-budget"
+          ],
+          "recorded_at": "2026-10-06T12:25:23.987Z"
+        },
+        {
+          "sequence": 5,
+          "kind": "call",
+          "call_id": "c153ba70-d98f-42cf-8f05-baaa7af2cfff",
+          "job_id": "5b3a4737-bbed-4627-8cd7-10be6c4afb46",
+          "provider": "fixture-provider",
+          "model": "fixture-model",
+          "session_id": "native-fixture-1",
+          "allowed": true,
+          "warning": true,
+          "reason": null,
+          "policy_ids": [
+            "project-budget"
+          ],
+          "recorded_at": "2026-10-06T12:25:23.990Z"
+        },
+        {
+          "sequence": 6,
+          "kind": "ready",
+          "job_id": "142b9d4d-af7b-4caa-89bc-66e85110a945",
+          "recorded_at": "2026-10-06T12:25:23.995Z"
+        },
+        {
+          "sequence": 7,
+          "kind": "call",
+          "call_id": "8e4b48fc-9d03-4410-8cf7-2d54a520d54c",
+          "job_id": "142b9d4d-af7b-4caa-89bc-66e85110a945",
+          "provider": "fixture-provider",
+          "model": "fixture-model",
+          "session_id": "native-fixture-2",
+          "allowed": false,
+          "warning": true,
+          "reason": "budget_hard_limit",
+          "policy_ids": [
+            "project-budget"
+          ],
+          "recorded_at": "2026-10-06T12:25:24.001Z"
+        },
+        {
+          "sequence": 8,
+          "kind": "finish",
+          "call_id": "c153ba70-d98f-42cf-8f05-baaa7af2cfff",
+          "outcome": "finished",
+          "recorded_at": "2026-10-06T12:26:08.472Z"
+        },
+        {
+          "sequence": 9,
+          "kind": "usage",
+          "event_id": "fixture-late-fee",
+          "call_id": "c153ba70-d98f-42cf-8f05-baaa7af2cfff",
+          "amount": "0.5",
+          "currency": "USD",
+          "source_kind": "provider_usage",
+          "source_ref": "ローカルfixtureのusage観測",
+          "observed_at": "2026-10-06T12:26:10.717Z",
+          "basis": "予約0.3を超えたfixture最終額。実providerの課金ではありません。",
+          "actor": "local_administrator",
+          "recorded_at": "2026-10-06T12:26:10.722Z"
+        },
+        {
+          "sequence": 10,
+          "kind": "job",
+          "job_id": "c81da150-a148-4973-95ed-19a0a7a295c7",
+          "run_id": "fixture-run-3",
+          "worker_id": "worker-3",
+          "allowed": false,
+          "warning": true,
+          "reason": "budget_hard_limit",
+          "policy_ids": [
+            "project-budget"
+          ],
+          "recorded_at": "2026-10-06T12:26:10.726Z"
+        }
+      ]
+    }
+  }
+}

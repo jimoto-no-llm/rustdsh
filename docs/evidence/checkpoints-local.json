@@ -1,0 +1,259 @@
+{
+  "captured_at": "2026-10-05T21:28:57.408Z",
+  "platform": "win32",
+  "cli_source": "version-pinned ACP fixture with actual Node child processes",
+  "cli_version": "0.2.0-rc.2",
+  "isolated_native_home": true,
+  "comparison": {
+    "baseline_commit": "f6dbd05e208be6721b6322e827e6b52ac49248ff",
+    "command": "checkpoint list --project <temporary-project>",
+    "before": {
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "[rdsh-dashboard] Unknown command; use --help"
+    },
+    "after": {
+      "exit_code": 0,
+      "stdout": {
+        "checkpoints": [
+          {
+            "schema": 1,
+            "project_id": "2b1d558816cf5829",
+            "checkpoint_id": "cp_cb4df383-f86c-4e75-ab8a-df39918e7fcd",
+            "run_id": "run_dfdf5986-80a0-4c54-b92c-e767a453a728",
+            "task_id": null,
+            "cli": "dsh",
+            "cli_session_id": "fixture-session",
+            "binding": "confirmed",
+            "cli_version": "0.2.0-rc.2",
+            "context": {
+              "cwd": "C:\\Users\\owner\\AppData\\Local\\Temp\\rdsh-checkpoint-local-iSP4Ux\\project",
+              "branch": "checkpoint-qa",
+              "git": {
+                "status": "observed",
+                "root": "C:\\Users\\owner\\AppData\\Local\\Temp\\rdsh-checkpoint-local-iSP4Ux\\project",
+                "head": null
+              },
+              "launch": {
+                "method": "acp-stdio-v1",
+                "executable": "C:\\Users\\owner\\AppData\\Local\\nodejs\\node-v24.18.0-win-x64\\node.exe",
+                "entrypoint": "M:\\Codex\\home\\worktrees\\cli-adapters\\rustdsh\\dashboard\\test\\fixtures\\acp-cli.mjs",
+                "profile": "acp"
+              },
+              "scope": {
+                "effective_home": "C:\\Users\\owner\\AppData\\Local\\Temp\\rdsh-checkpoint-local-iSP4Ux",
+                "HOME": "C:\\Users\\owner\\AppData\\Local\\Temp\\rdsh-checkpoint-local-iSP4Ux",
+                "USERPROFILE": "C:\\Users\\owner\\AppData\\Local\\Temp\\rdsh-checkpoint-local-iSP4Ux",
+                "DSH_HOME": "C:\\Users\\owner\\AppData\\Local\\Temp\\rdsh-checkpoint-local-iSP4Ux\\dsh",
+                "XDG_CONFIG_HOME": null,
+                "XDG_DATA_HOME": null,
+                "APPDATA": null,
+                "LOCALAPPDATA": null
+              }
+            },
+            "journal": {
+              "last_event": {
+                "event_id": "evt_7cfae08e-2719-49cf-8d42-a85442041bd4",
+                "sequence": 14,
+                "hash": "553347ac1b7289d1d0d8d9204b8886bc718ed5e3d2620191601c8f13b5863b34"
+              },
+              "last_confirmed_event": {
+                "event_id": "evt_7cfae08e-2719-49cf-8d42-a85442041bd4",
+                "sequence": 14,
+                "hash": "553347ac1b7289d1d0d8d9204b8886bc718ed5e3d2620191601c8f13b5863b34"
+              },
+              "unresolved_count": 0,
+              "unresolved": [],
+              "incomplete_tail_bytes": 0
+            },
+            "retry_operations": [],
+            "saved_at": "2026-10-05T21:28:51.836Z",
+            "checksum": "a311ccfbd130964eae0135f8e89c3e81789fd952e03393921ca07508a0a65746"
+          }
+        ],
+        "truncated": false
+      }
+    },
+    "entrypoint_source_only": true,
+    "common_dependencies": "current installed dashboard dependencies"
+  },
+  "separate_client_inspection": {
+    "checkpoint": {
+      "schema": 1,
+      "project_id": "2b1d558816cf5829",
+      "checkpoint_id": "cp_cb4df383-f86c-4e75-ab8a-df39918e7fcd",
+      "run_id": "run_dfdf5986-80a0-4c54-b92c-e767a453a728",
+      "task_id": null,
+      "cli": "dsh",
+      "cli_session_id": "fixture-session",
+      "binding": "confirmed",
+      "cli_version": "0.2.0-rc.2",
+      "context": {
+        "cwd": "C:\\Users\\owner\\AppData\\Local\\Temp\\rdsh-checkpoint-local-iSP4Ux\\project",
+        "branch": "checkpoint-qa",
+        "git": {
+          "status": "observed",
+          "root": "C:\\Users\\owner\\AppData\\Local\\Temp\\rdsh-checkpoint-local-iSP4Ux\\project",
+          "head": null
+        },
+        "launch": {
+          "method": "acp-stdio-v1",
+          "executable": "C:\\Users\\owner\\AppData\\Local\\nodejs\\node-v24.18.0-win-x64\\node.exe",
+          "entrypoint": "M:\\Codex\\home\\worktrees\\cli-adapters\\rustdsh\\dashboard\\test\\fixtures\\acp-cli.mjs",
+          "profile": "acp"
+        },
+        "scope": {
+          "effective_home": "C:\\Users\\owner\\AppData\\Local\\Temp\\rdsh-checkpoint-local-iSP4Ux",
+          "HOME": "C:\\Users\\owner\\AppData\\Local\\Temp\\rdsh-checkpoint-local-iSP4Ux",
+          "USERPROFILE": "C:\\Users\\owner\\AppData\\Local\\Temp\\rdsh-checkpoint-local-iSP4Ux",
+          "DSH_HOME": "C:\\Users\\owner\\AppData\\Local\\Temp\\rdsh-checkpoint-local-iSP4Ux\\dsh",
+          "XDG_CONFIG_HOME": null,
+          "XDG_DATA_HOME": null,
+          "APPDATA": null,
+          "LOCALAPPDATA": null
+        }
+      },
+      "journal": {
+        "last_event": {
+          "event_id": "evt_7cfae08e-2719-49cf-8d42-a85442041bd4",
+          "sequence": 14,
+          "hash": "553347ac1b7289d1d0d8d9204b8886bc718ed5e3d2620191601c8f13b5863b34"
+        },
+        "last_confirmed_event": {
+          "event_id": "evt_7cfae08e-2719-49cf-8d42-a85442041bd4",
+          "sequence": 14,
+          "hash": "553347ac1b7289d1d0d8d9204b8886bc718ed5e3d2620191601c8f13b5863b34"
+        },
+        "unresolved_count": 0,
+        "unresolved": [],
+        "incomplete_tail_bytes": 0
+      },
+      "retry_operations": [],
+      "saved_at": "2026-10-05T21:28:51.836Z",
+      "checksum": "a311ccfbd130964eae0135f8e89c3e81789fd952e03393921ca07508a0a65746"
+    },
+    "action": null,
+    "native": {
+      "session_id": "fixture-session",
+      "cli_version": "0.2.0-rc.2",
+      "observed_at": "2026-10-05T21:28:52.889Z",
+      "resume_advertised": true,
+      "source": "acp_session_list",
+      "resume_verified": false,
+      "status": "listed"
+    },
+    "journal": {
+      "last_event": {
+        "event_id": "evt_7cfae08e-2719-49cf-8d42-a85442041bd4",
+        "sequence": 14,
+        "hash": "553347ac1b7289d1d0d8d9204b8886bc718ed5e3d2620191601c8f13b5863b34"
+      },
+      "last_confirmed_event": {
+        "event_id": "evt_7cfae08e-2719-49cf-8d42-a85442041bd4",
+        "sequence": 14,
+        "hash": "553347ac1b7289d1d0d8d9204b8886bc718ed5e3d2620191601c8f13b5863b34"
+      },
+      "unresolved_count": 0,
+      "unresolved": [],
+      "incomplete_tail_bytes": 0
+    },
+    "candidates": {
+      "formal_resume": {
+        "available": true,
+        "same_session": true,
+        "verified_only_after_native_resume": true
+      },
+      "summary_start_new": {
+        "available": true,
+        "same_session": false,
+        "requires_operator_summary": true,
+        "requires_context_loss_choice": true
+      },
+      "unavailable": {
+        "selected": false,
+        "reasons": []
+      }
+    },
+    "lost_context": [
+      "Checkpoint contains control metadata, not conversation history or external dependency snapshots."
+    ],
+    "replayed_operations": 0,
+    "permission_expanded": false,
+    "uncertainty_since_checkpoint": {
+      "control_event_count": 0,
+      "control_events_added": false,
+      "unresolved_count": 0
+    },
+    "writer_lock_present": false,
+    "automatic_lock_removal": false
+  },
+  "same_native_session_resume": {
+    "schema": 1,
+    "checkpoint_id": "cp_cb4df383-f86c-4e75-ab8a-df39918e7fcd",
+    "action_id": "recover_7079e981-ca83-490e-9450-5aae4fbb76d3",
+    "mode": "resume",
+    "status": "completed",
+    "run_id": "run_dfdf5986-80a0-4c54-b92c-e767a453a728",
+    "cli_session_id": "fixture-session",
+    "summary_digest": null,
+    "summary_bytes": 0,
+    "summary_status": "not_requested",
+    "created_at": "2026-10-05T21:28:53.427Z",
+    "updated_at": "2026-10-05T21:28:54.790Z",
+    "reused_recovery": false,
+    "native_resume_verified": true,
+    "same_session": true,
+    "source_checkpoint": "cp_cb4df383-f86c-4e75-ab8a-df39918e7fcd",
+    "summary_is_semantic_acceptance": false,
+    "replayed_operations": 0,
+    "owned_root_exit_confirmed": true
+  },
+  "repeated_recovery": {
+    "result": {
+      "schema": 1,
+      "checkpoint_id": "cp_cb4df383-f86c-4e75-ab8a-df39918e7fcd",
+      "action_id": "recover_7079e981-ca83-490e-9450-5aae4fbb76d3",
+      "mode": "resume",
+      "status": "completed",
+      "run_id": "run_dfdf5986-80a0-4c54-b92c-e767a453a728",
+      "cli_session_id": "fixture-session",
+      "summary_digest": null,
+      "summary_bytes": 0,
+      "summary_status": "not_requested",
+      "created_at": "2026-10-05T21:28:53.427Z",
+      "updated_at": "2026-10-05T21:28:54.790Z",
+      "reused_recovery": true,
+      "observation": "historical; no native operation repeated"
+    },
+    "stored_bytes_unchanged": true
+  },
+  "new_session_with_operator_summary": {
+    "exercised": true,
+    "source": "isolated ACP fixture; no provider",
+    "result": {
+      "schema": 1,
+      "checkpoint_id": "cp_f8f53bd6-afbf-43fe-9576-be4aca534212",
+      "action_id": "recover_b04e3229-d444-4474-9cfe-5473b3d4ec95",
+      "mode": "start_new",
+      "status": "completed",
+      "run_id": "run_d12b4838-1333-4278-a3f0-26a2a1f64b40",
+      "cli_session_id": "fixture-new-session",
+      "summary_digest": "44ab5b0b56a1e661f5ee2907953471be422caf7f91b5ea36d4d2f02b18296268",
+      "summary_bytes": 63,
+      "summary_status": "response_observed",
+      "created_at": "2026-10-05T21:28:55.803Z",
+      "updated_at": "2026-10-05T21:28:57.388Z",
+      "reused_recovery": false,
+      "native_resume_verified": false,
+      "same_session": false,
+      "source_checkpoint": "cp_f8f53bd6-afbf-43fe-9576-be4aca534212",
+      "summary_is_semantic_acceptance": false,
+      "replayed_operations": 0,
+      "owned_root_exit_confirmed": true
+    }
+  },
+  "provider_authentication": "not_exercised",
+  "real_model_prompt": false,
+  "external_dependencies": "not_snapshotted",
+  "descendants": "not_observed"
+}

@@ -1,0 +1,144 @@
+{
+  "observed_at": "2026-10-05T23:01:46.883Z",
+  "source": "windows_wsl_control_bridge_fixture",
+  "node": "v24.18.0",
+  "stdio_preserved": true,
+  "before": {
+    "owner_id": "owner_a2ad8b9b-8dbd-4627-865d-cceedc5ce2b9",
+    "kind": "linux_cgroup_v2",
+    "kernel_id": "5628",
+    "root_identity": {
+      "platform": "linux",
+      "pid": 396,
+      "birth": "4271",
+      "scope": "582ec0ca626623f7b35b17581ba6c9dafba83588bf13f5ccb739679c67b9f90e"
+    },
+    "root_pid": 396,
+    "status": "running",
+    "remaining_pids": [
+      396
+    ],
+    "remaining_count": 1,
+    "members_truncated": false,
+    "confirmed": false
+  },
+  "after": {
+    "owner_id": "owner_a2ad8b9b-8dbd-4627-865d-cceedc5ce2b9",
+    "kind": "linux_cgroup_v2",
+    "kernel_id": "5628",
+    "root_identity": {
+      "platform": "linux",
+      "pid": 396,
+      "birth": "4271",
+      "scope": "582ec0ca626623f7b35b17581ba6c9dafba83588bf13f5ccb739679c67b9f90e"
+    },
+    "root_pid": 396,
+    "status": "exit_confirmed",
+    "remaining_pids": [],
+    "remaining_count": 0,
+    "members_truncated": false,
+    "confirmed": true,
+    "resources_released": true
+  },
+  "stages": [
+    {
+      "owner_id": "owner_a2ad8b9b-8dbd-4627-865d-cceedc5ce2b9",
+      "stage": "input_interrupt",
+      "phase": "request",
+      "status": "requested",
+      "reason": "explicit_owned_stop",
+      "deadline_ms": 150,
+      "observed_at": "2026-10-05T23:01:46.679Z",
+      "remaining_pids": [],
+      "remaining_count": null
+    },
+    {
+      "owner_id": "owner_a2ad8b9b-8dbd-4627-865d-cceedc5ce2b9",
+      "stage": "input_interrupt",
+      "phase": "result",
+      "status": "unsupported",
+      "reason": "no_input_interrupt_capability",
+      "deadline_ms": null,
+      "observed_at": "2026-10-05T23:01:46.680Z",
+      "remaining_pids": [],
+      "remaining_count": null
+    },
+    {
+      "owner_id": "owner_a2ad8b9b-8dbd-4627-865d-cceedc5ce2b9",
+      "stage": "graceful",
+      "phase": "request",
+      "status": "requested",
+      "reason": "explicit_owned_stop",
+      "deadline_ms": 150,
+      "observed_at": "2026-10-05T23:01:46.680Z",
+      "remaining_pids": [],
+      "remaining_count": null
+    },
+    {
+      "owner_id": "owner_a2ad8b9b-8dbd-4627-865d-cceedc5ce2b9",
+      "stage": "graceful",
+      "phase": "result",
+      "status": "requested",
+      "reason": "stdin_eof",
+      "deadline_ms": null,
+      "observed_at": "2026-10-05T23:01:46.680Z",
+      "remaining_pids": [],
+      "remaining_count": null
+    },
+    {
+      "owner_id": "owner_a2ad8b9b-8dbd-4627-865d-cceedc5ce2b9",
+      "stage": "termination",
+      "phase": "request",
+      "status": "requested",
+      "reason": "graceful_shutdown",
+      "deadline_ms": 150,
+      "observed_at": "2026-10-05T23:01:46.680Z",
+      "remaining_pids": [],
+      "remaining_count": null
+    },
+    {
+      "owner_id": "owner_a2ad8b9b-8dbd-4627-865d-cceedc5ce2b9",
+      "stage": "termination",
+      "phase": "result",
+      "status": "requested",
+      "reason": "pidfd_sigterm_owned_members",
+      "deadline_ms": null,
+      "observed_at": "2026-10-05T23:01:46.682Z",
+      "remaining_pids": [],
+      "remaining_count": null
+    },
+    {
+      "owner_id": "owner_a2ad8b9b-8dbd-4627-865d-cceedc5ce2b9",
+      "stage": "kill",
+      "phase": "request",
+      "status": "requested",
+      "reason": "graceful_deadline_exceeded",
+      "deadline_ms": 1500,
+      "observed_at": "2026-10-05T23:01:46.834Z",
+      "remaining_pids": [],
+      "remaining_count": null
+    },
+    {
+      "owner_id": "owner_a2ad8b9b-8dbd-4627-865d-cceedc5ce2b9",
+      "stage": "kill",
+      "phase": "result",
+      "status": "requested",
+      "reason": "cgroup_kill_held_descriptor",
+      "deadline_ms": null,
+      "observed_at": "2026-10-05T23:01:46.835Z",
+      "remaining_pids": [],
+      "remaining_count": null
+    },
+    {
+      "owner_id": "owner_a2ad8b9b-8dbd-4627-865d-cceedc5ce2b9",
+      "stage": "verification",
+      "phase": "result",
+      "status": "exit_confirmed",
+      "reason": null,
+      "deadline_ms": null,
+      "observed_at": "2026-10-05T23:01:46.863Z",
+      "remaining_pids": [],
+      "remaining_count": 0
+    }
+  ]
+}

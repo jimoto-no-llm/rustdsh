@@ -1,0 +1,370 @@
+[
+  {
+    "step": "before-390",
+    "measurement": {
+      "width": 390,
+      "documentWidth": 375,
+      "context": null,
+      "execution": null,
+      "decision": null,
+      "result": null,
+      "stop": null,
+      "details": [
+        {
+          "id": "answered",
+          "open": false
+        }
+      ],
+      "buttons": [],
+      "stopRequests": null
+    }
+  },
+  {
+    "step": "after-390",
+    "measurement": {
+      "width": 390,
+      "documentWidth": 375,
+      "context": "rustdsh overview QA · プロジェクト全体",
+      "execution": "実行状態は未取得",
+      "decision": "判断待ち 3 件",
+      "result": "この範囲の結果は未取得",
+      "stop": "この画面からの停止は非対応。元のCLIで対象を確認してください",
+      "selectedTask": "",
+      "details": [
+        {
+          "id": "metrics-detail",
+          "open": false
+        },
+        {
+          "id": "tasks-detail",
+          "open": false
+        },
+        {
+          "id": "reply-detail",
+          "open": false
+        },
+        {
+          "id": "progress-detail",
+          "open": false
+        },
+        {
+          "id": "answered",
+          "open": false
+        }
+      ],
+      "buttons": [
+        {
+          "text": "概要",
+          "width": 82.25,
+          "height": 44
+        },
+        {
+          "text": "判断 3件",
+          "width": 82.25,
+          "height": 44
+        },
+        {
+          "text": "詳細",
+          "width": 82.25,
+          "height": 44
+        },
+        {
+          "text": "停止案内",
+          "width": 82.25,
+          "height": 44
+        }
+      ],
+      "stopRequests": null
+    }
+  },
+  {
+    "step": "task-detail",
+    "dom": {
+      "context": "rustdsh overview QA · T1 失敗したテストを直して確認する",
+      "draft": "先に失敗ケースを確認します",
+      "metricsOpen": true,
+      "selectedTask": "T1"
+    }
+  },
+  {
+    "step": "task-after-sse",
+    "dom": {
+      "context": "rustdsh overview QA · T1 失敗したテストを直して確認する",
+      "draft": "先に失敗ケースを確認します",
+      "metricsOpen": true,
+      "selectedTask": "T1"
+    }
+  },
+  {
+    "step": "stop-confirmation",
+    "dom": "- link \"内容へ移動\":\n  - /url: \"#project-content\"\n- main:\n  - generic: DEEPSEEK HARNESS\n  - heading \"Harnessを開く\" [level=1]\n  - generic \"場所・接続先\"\n  - button \"コマンド\"\n  - button \"スマホで開く\" [expanded]\n  - status: 接続済み · Harness専用の入口\n  - generic: 接続準備中\n  - heading \"QRコードで開く\" [level=2]\n  - paragraph: ローカル接続のみ。Tailscale共有は起動時に有効にできます。\n  - code\n  - button \"接続を更新\"\n  - paragraph: \"同じTailscaleネットワークに接続した端末から開けます。このPCでダッシュボードを起動しておいてください。タスク・質問の各行には #task-<id>・#question-<id> の目印があり、端末を替えても同じ対象へ戻れます。対象の表示と端末の認証は別の役割で、未認証の端末は認証を終えるまで内容・操作へ進めません。\"\n  - generic: DeepSeek HarnessのWeb画面を起動しています。プロジェクト別の指標・質問は、専用ダッシュボードで扱います。\n  - link \"Harnessを開く\":\n    - /url: /?fixture=local-only\n  - region \"管理中の実行\":\n    - heading \"管理中の実行\" [level=2]\n    - status: 実行中\n    - paragraph: 残存プロセス 5 件 · PID 57668, 68024, 9956, 19424, 70340\n    - generic \"実行IDと停止履歴\"\n    - button \"この実行を停止\"\n  - dialog \"停止する対象を確認\":\n    - heading \"停止する対象を確認\" [level=2]\n    - paragraph: run run_25be8155-9865-42c6-8bc3-9a24adbb7387 · owner owner_40da35bb-64e3-4b8b-8936-07fdc4036f7d\n    - paragraph: このrunが所有する子孫プロセスを停止します。現在の残存 5 件（増減あり）。他のrun・外部プロセスは対象外です。停止後の作業結果は未確認です。\n    - alert\n    - button \"戻る\" [active]\n    - button \"確認した対象を停止\"\n  - generic: 未取得の指標はMCPから報告されたときに表示されます。費用は報告元のAPI換算値で、請求額とは別です。"
+  },
+  {
+    "step": "changed-stop-target",
+    "dom": "- link \"内容へ移動\":\n  - /url: \"#project-content\"\n- main:\n  - generic: DEEPSEEK HARNESS\n  - heading \"Harnessを開く\" [level=1]\n  - generic \"場所・接続先\"\n  - button \"コマンド\"\n  - button \"スマホで開く\" [expanded]\n  - status: 接続済み · Harness専用の入口\n  - generic: 接続準備中\n  - heading \"QRコードで開く\" [level=2]\n  - paragraph: ローカル接続のみ。Tailscale共有は起動時に有効にできます。\n  - code\n  - button \"接続を更新\"\n  - paragraph: \"同じTailscaleネットワークに接続した端末から開けます。このPCでダッシュボードを起動しておいてください。タスク・質問の各行には #task-<id>・#question-<id> の目印があり、端末を替えても同じ対象へ戻れます。対象の表示と端末の認証は別の役割で、未認証の端末は認証を終えるまで内容・操作へ進めません。\"\n  - generic: DeepSeek HarnessのWeb画面を起動しています。プロジェクト別の指標・質問は、専用ダッシュボードで扱います。\n  - link \"Harnessを開く\":\n    - /url: /?fixture=local-only\n  - region \"管理中の実行\":\n    - heading \"管理中の実行\" [level=2]\n    - status: 実行中\n    - paragraph: 残存プロセス 5 件 · PID 57668, 68024, 9956, 19424, 70340\n    - generic \"実行IDと停止履歴\"\n    - button \"この実行を停止\"\n  - dialog \"停止する対象を確認\":\n    - heading \"停止する対象を確認\" [level=2]\n    - paragraph: run run_25be8155-9865-42c6-8bc3-9a24adbb7387 · owner owner_40da35bb-64e3-4b8b-8936-07fdc4036f7d\n    - paragraph: このrunが所有する子孫プロセスを停止します。現在の残存 5 件（増減あり）。他のrun・外部プロセスは対象外です。停止後の作業結果は未確認です。\n    - alert: 停止対象が変わりました。閉じて対象を確認し直してください\n    - button \"戻る\"\n    - button \"確認した対象を停止\"\n  - generic: 未取得の指標はMCPから報告されたときに表示されます。費用は報告元のAPI換算値で、請求額とは別です。"
+  },
+  {
+    "step": "width-320",
+    "measurement": {
+      "width": 320,
+      "documentWidth": 305,
+      "context": "rustdsh overview QA · プロジェクト全体",
+      "execution": "実行状態は未取得",
+      "decision": "判断待ち 3 件",
+      "result": "報告: タスクを変えずに更新を確認 · 2026/10/6 10:11:00",
+      "stop": "この画面からの停止は非対応。元のCLIで対象を確認してください",
+      "selectedTask": "",
+      "details": [
+        {
+          "id": "metrics-detail",
+          "open": false
+        },
+        {
+          "id": "tasks-detail",
+          "open": false
+        },
+        {
+          "id": "reply-detail",
+          "open": false
+        },
+        {
+          "id": "progress-detail",
+          "open": false
+        },
+        {
+          "id": "answered",
+          "open": false
+        }
+      ],
+      "buttons": [
+        {
+          "text": "概要",
+          "width": 64.75,
+          "height": 58.78125
+        },
+        {
+          "text": "判断 3件",
+          "width": 64.75,
+          "height": 58.78125
+        },
+        {
+          "text": "詳細",
+          "width": 64.75,
+          "height": 58.78125
+        },
+        {
+          "text": "停止案内",
+          "width": 64.75,
+          "height": 58.78125
+        }
+      ],
+      "stopRequests": null
+    }
+  },
+  {
+    "step": "width-430-task",
+    "measurement": {
+      "width": 430,
+      "documentWidth": 415,
+      "context": "rustdsh overview QA · T1 失敗したテストを直して確認する",
+      "execution": "実行状態は未取得",
+      "decision": "判断待ち 2 件 · タスク未指定 1 件は全体で確認",
+      "result": "この範囲の結果は未取得",
+      "stop": "この画面からの停止は非対応。元のCLIで対象を確認してください",
+      "selectedTask": "T1",
+      "details": [
+        {
+          "id": "metrics-detail",
+          "open": false
+        },
+        {
+          "id": "tasks-detail",
+          "open": false
+        },
+        {
+          "id": "reply-detail",
+          "open": false
+        },
+        {
+          "id": "progress-detail",
+          "open": false
+        },
+        {
+          "id": "answered",
+          "open": false
+        }
+      ],
+      "buttons": [
+        {
+          "text": "概要",
+          "width": 92.25,
+          "height": 44
+        },
+        {
+          "text": "判断 2件",
+          "width": 92.25,
+          "height": 44
+        },
+        {
+          "text": "詳細",
+          "width": 92.25,
+          "height": 44
+        },
+        {
+          "text": "停止案内",
+          "width": 92.25,
+          "height": 44
+        }
+      ],
+      "stopRequests": null
+    }
+  },
+  {
+    "step": "width-390-task",
+    "measurement": {
+      "width": 390,
+      "documentWidth": 375,
+      "context": "rustdsh overview QA · T1 失敗したテストを直して確認する",
+      "execution": "実行状態は未取得",
+      "decision": "判断待ち 1 件 · タスク未指定 1 件は全体で確認",
+      "result": "この範囲の結果は未取得",
+      "stop": "この画面からの停止は非対応。元のCLIで対象を確認してください",
+      "selectedTask": "T1",
+      "details": [
+        {
+          "id": "metrics-detail",
+          "open": false
+        },
+        {
+          "id": "tasks-detail",
+          "open": false
+        },
+        {
+          "id": "reply-detail",
+          "open": false
+        },
+        {
+          "id": "progress-detail",
+          "open": false
+        },
+        {
+          "id": "answered",
+          "open": false
+        }
+      ],
+      "buttons": [
+        {
+          "text": "概要",
+          "width": 82.25,
+          "height": 44
+        },
+        {
+          "text": "判断 1件",
+          "width": 82.25,
+          "height": 44
+        },
+        {
+          "text": "詳細",
+          "width": 82.25,
+          "height": 44
+        },
+        {
+          "text": "停止案内",
+          "width": 82.25,
+          "height": 44
+        }
+      ],
+      "stopRequests": null
+    }
+  },
+  {
+    "step": "restored-draft-revision",
+    "dom": {
+      "draft": "同じ内容でも新版を確認します",
+      "draftRevision": "1",
+      "reviewChecked": false,
+      "submitDisabled": true,
+      "warning": "質問が更新されました。下書きは保存しています。更新後の対象と条件を確認し、選択肢を選び直してください。\n\n更新後の対象と条件を確認した\n回答を返す\nこの質問を取消す"
+    }
+  },
+  {
+    "step": "owned-stop-finished",
+    "dom": "- link \"内容へ移動\":\n  - /url: \"#project-content\"\n- main:\n  - generic: DEEPSEEK HARNESS\n  - heading \"Harnessを開く\" [level=1]\n  - generic \"場所・接続先\"\n  - button \"コマンド\"\n  - button \"スマホで開く\" [expanded]\n  - status: 接続済み · Harness専用の入口\n  - generic: 接続準備中\n  - heading \"QRコードで開く\" [level=2]\n  - paragraph: ローカル接続のみ。Tailscale共有は起動時に有効にできます。\n  - code\n  - button \"接続を更新\"\n  - paragraph: \"同じTailscaleネットワークに接続した端末から開けます。このPCでダッシュボードを起動しておいてください。タスク・質問の各行には #task-<id>・#question-<id> の目印があり、端末を替えても同じ対象へ戻れます。対象の表示と端末の認証は別の役割で、未認証の端末は認証を終えるまで内容・操作へ進めません。\"\n  - generic: DeepSeek HarnessのWeb画面を起動しています。プロジェクト別の指標・質問は、専用ダッシュボードで扱います。\n  - region \"管理中の実行\":\n    - heading \"管理中の実行\" [level=2]\n    - status: 終了確認済み · 所有する子孫プロセスは0件\n    - paragraph: 残存プロセス 0 件\n    - generic \"実行IDと停止履歴\"\n    - button \"この実行を停止\" [disabled]\n  - generic: 未取得の指標はMCPから報告されたときに表示されます。費用は報告元のAPI換算値で、請求額とは別です。"
+  },
+  {
+    "step": "native-result-no-decisions",
+    "dom": {
+      "context": "rustdsh overview QA · プロジェクト全体",
+      "decision": "この範囲の判断待ちは0件",
+      "execution": "回答対象: 接続確認 1 · 終了観測 0 · 不明 0。作業の完了は未確認",
+      "result": "回答入力の処理完了（ACP応答） · 2026/10/6 10:14:54"
+    }
+  },
+  {
+    "step": "final-width-320",
+    "measurement": {
+      "width": 320,
+      "documentWidth": 305,
+      "context": "rustdsh overview QA · T1 一覧にないタスク",
+      "execution": "回答対象: 接続確認 1 · 終了観測 0 · 不明 0。作業の完了は未確認",
+      "decision": "この範囲の判断待ちは0件",
+      "result": "回答入力の処理完了（ACP応答） · 2026/10/6 10:14:54",
+      "stop": "この画面からの停止は非対応。元のCLIで対象を確認してください",
+      "selectedTask": "T1",
+      "details": [
+        {
+          "id": "metrics-detail",
+          "open": false
+        },
+        {
+          "id": "tasks-detail",
+          "open": false
+        },
+        {
+          "id": "reply-detail",
+          "open": false
+        },
+        {
+          "id": "progress-detail",
+          "open": false
+        },
+        {
+          "id": "answered",
+          "open": false
+        }
+      ],
+      "buttons": [
+        {
+          "text": "概要",
+          "width": 64.75,
+          "height": 58.78125
+        },
+        {
+          "text": "判断 0件",
+          "width": 64.75,
+          "height": 58.78125
+        },
+        {
+          "text": "詳細",
+          "width": 64.75,
+          "height": 58.78125
+        },
+        {
+          "text": "停止案内",
+          "width": 64.75,
+          "height": 58.78125
+        }
+      ],
+      "stopRequests": null
+    }
+  },
+  {
+    "step": "selected-task-missing",
+    "dom": {
+      "context": "rustdsh overview QA · T1 一覧にないタスク",
+      "selectedLabel": "T1 · 現在の一覧にありません",
+      "selectedTask": "T1",
+      "taskReport": "選択タスクは現在の一覧にありません"
+    }
+  }
+]

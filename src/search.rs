@@ -48,7 +48,7 @@ fn collect_files(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
         Ok(e) => e,
         Err(_) => return,
     };
-    for e in entries.filter_map(|e| e.ok()) {
+    for e in entries.filter_map(Result::ok) {
         let p = e.path();
         let name = e.file_name().to_string_lossy().into_owned();
         match entry_kind(&e, &p, &name) {
@@ -72,7 +72,7 @@ enum EntryKind {
 fn entry_kind(e: &std::fs::DirEntry, p: &std::path::Path, name: &str) -> EntryKind {
     match e.file_type() {
         Ok(t) if t.is_dir() => {
-            if SKIP.contains(&name) || name.starts_with(".") {
+            if SKIP.contains(&name) || name.starts_with('.') {
                 EntryKind::Skip
             } else {
                 EntryKind::Dir
@@ -81,7 +81,7 @@ fn entry_kind(e: &std::fs::DirEntry, p: &std::path::Path, name: &str) -> EntryKi
         Ok(t) if t.is_file() => EntryKind::File,
         _ => {
             if p.is_dir() {
-                if SKIP.contains(&name) || name.starts_with(".") {
+                if SKIP.contains(&name) || name.starts_with('.') {
                     EntryKind::Skip
                 } else {
                     EntryKind::Dir
@@ -100,7 +100,7 @@ fn entry_kind(e: &std::fs::DirEntry, p: &std::path::Path, name: &str) -> EntryKi
 /// Falls back to the plain sequential walk for narrow trees.
 fn collect_parallel(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
     let entries: Vec<std::fs::DirEntry> = match std::fs::read_dir(dir) {
-        Ok(e) => e.filter_map(|e| e.ok()).collect(),
+        Ok(e) => e.filter_map(Result::ok).collect(),
         Err(_) => return vec![],
     };
     let mut subdirs = vec![];

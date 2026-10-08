@@ -1,0 +1,715 @@
+{
+  "source_before": "b805a6a1642e629a677f26b3ecf34645ba4e96c5",
+  "kind": "local_fixture",
+  "callback_verifications": 2,
+  "callback_attempts": 6,
+  "real_dot_requests": 0,
+  "physical_phone_test": "not_performed",
+  "snapshots": {
+    "auth-fail": {
+      "schema": 1,
+      "project_id": "03ab310d9411110d",
+      "observed_at": "2026-10-06T01:42:40.908Z",
+      "browser": {
+        "dashboard": {
+          "state": "ready",
+          "started_at": "2026-10-06T01:41:35.594Z"
+        },
+        "authentication": {
+          "last_success": "2026-10-06T01:42:37.054Z",
+          "last_failure": null,
+          "state": "observed",
+          "reason": "authenticated",
+          "observed_at": "2026-10-06T01:42:37.054Z",
+          "channel": "loopback"
+        },
+        "tailscale": {
+          "state": "disabled",
+          "observed_at": "2026-10-06T01:42:40.624Z"
+        },
+        "phone": {
+          "state": "unconfirmed",
+          "reason": "device_not_identified"
+        }
+      },
+      "dot": {
+        "tunnel": {
+          "state": "ready",
+          "reason": "health_check",
+          "observed_at": "2026-10-06T01:42:40.624Z",
+          "started_at": "2026-10-06T01:42:05.519Z",
+          "ended_at": null,
+          "health": 200,
+          "readiness": 200
+        },
+        "authentication": {
+          "last_success": "2026-10-06T01:42:12.026Z",
+          "last_failure": "2026-10-06T01:42:40.623Z",
+          "state": "failed",
+          "reason": "unauthorized",
+          "observed_at": "2026-10-06T01:42:40.623Z"
+        },
+        "discovery": {
+          "last_success": "2026-10-06T01:42:11.719Z",
+          "last_failure": null,
+          "state": "observed",
+          "reason": "protocol_response",
+          "observed_at": "2026-10-06T01:42:11.719Z"
+        },
+        "tools": {
+          "last_success": "2026-10-06T01:42:11.725Z",
+          "last_failure": null,
+          "state": "observed",
+          "reason": "protocol_response",
+          "observed_at": "2026-10-06T01:42:11.725Z"
+        },
+        "events": {
+          "last_success": "2026-10-06T01:42:11.730Z",
+          "last_failure": null,
+          "state": "observed",
+          "reason": "protocol_response",
+          "observed_at": "2026-10-06T01:42:11.730Z"
+        },
+        "subscriptions": {
+          "active": 1,
+          "expired": 0,
+          "observed_at": "2026-10-06T01:42:40.908Z",
+          "items": [
+            {
+              "id": "c97dec7a748a5cd88f73be4a6406b344",
+              "event": "dashboard.answer.created",
+              "state": "active",
+              "expires_at": "2026-10-06T01:43:12.028Z"
+            }
+          ]
+        },
+        "verification": {
+          "last_success": "2026-10-06T01:42:12.029Z",
+          "last_failure": null,
+          "state": "observed",
+          "reason": "challenge_verified",
+          "observed_at": "2026-10-06T01:42:12.029Z"
+        },
+        "callback": {
+          "last_success": null,
+          "last_failure": "2026-10-06T01:42:27.613Z",
+          "state": "failed",
+          "reason": "http_5xx",
+          "observed_at": "2026-10-06T01:42:27.613Z"
+        },
+        "response": {
+          "state": "unconfirmed",
+          "reason": "dot_response_not_observed",
+          "observed_at": null
+        }
+      },
+      "end_to_end": {
+        "state": "unconfirmed",
+        "reason": "real_dot_response_required"
+      }
+    },
+    "tunnel-ready": {
+      "schema": 1,
+      "project_id": "03ab310d9411110d",
+      "observed_at": "2026-10-06T01:42:05.806Z",
+      "browser": {
+        "dashboard": {
+          "state": "ready",
+          "started_at": "2026-10-06T01:41:35.594Z"
+        },
+        "authentication": {
+          "state": "unconfirmed",
+          "reason": "not_observed",
+          "observed_at": null,
+          "last_success": null,
+          "last_failure": null
+        },
+        "tailscale": {
+          "state": "disabled",
+          "observed_at": "2026-10-06T01:42:05.522Z"
+        },
+        "phone": {
+          "state": "unconfirmed",
+          "reason": "device_not_identified"
+        }
+      },
+      "dot": {
+        "tunnel": {
+          "state": "ready",
+          "reason": "health_check",
+          "observed_at": "2026-10-06T01:42:05.522Z",
+          "started_at": "2026-10-06T01:42:05.519Z",
+          "ended_at": null,
+          "health": 200,
+          "readiness": 200
+        },
+        "authentication": {
+          "last_success": null,
+          "last_failure": "2026-10-06T01:42:05.169Z",
+          "state": "failed",
+          "reason": "unauthorized",
+          "observed_at": "2026-10-06T01:42:05.169Z"
+        },
+        "discovery": {
+          "state": "unconfirmed",
+          "reason": "not_observed",
+          "observed_at": null,
+          "last_success": null,
+          "last_failure": null
+        },
+        "tools": {
+          "state": "unconfirmed",
+          "reason": "not_observed",
+          "observed_at": null,
+          "last_success": null,
+          "last_failure": null
+        },
+        "events": {
+          "state": "unconfirmed",
+          "reason": "not_observed",
+          "observed_at": null,
+          "last_success": null,
+          "last_failure": null
+        },
+        "subscriptions": {
+          "active": 0,
+          "expired": 0,
+          "observed_at": "2026-10-06T01:42:05.806Z",
+          "items": []
+        },
+        "verification": {
+          "state": "unconfirmed",
+          "reason": "not_observed",
+          "observed_at": null,
+          "last_success": null,
+          "last_failure": null
+        },
+        "callback": {
+          "state": "unconfirmed",
+          "reason": "not_observed",
+          "observed_at": null,
+          "last_success": null,
+          "last_failure": null
+        },
+        "response": {
+          "state": "unconfirmed",
+          "reason": "dot_response_not_observed",
+          "observed_at": null
+        }
+      },
+      "end_to_end": {
+        "state": "unconfirmed",
+        "reason": "real_dot_response_required"
+      }
+    },
+    "discover": {
+      "schema": 1,
+      "project_id": "03ab310d9411110d",
+      "observed_at": "2026-10-06T01:42:51.876Z",
+      "browser": {
+        "dashboard": {
+          "state": "ready",
+          "started_at": "2026-10-06T01:41:35.594Z"
+        },
+        "authentication": {
+          "last_success": "2026-10-06T01:42:47.052Z",
+          "last_failure": null,
+          "state": "observed",
+          "reason": "authenticated",
+          "observed_at": "2026-10-06T01:42:47.052Z",
+          "channel": "loopback"
+        },
+        "tailscale": {
+          "state": "disabled",
+          "observed_at": "2026-10-06T01:42:51.589Z"
+        },
+        "phone": {
+          "state": "unconfirmed",
+          "reason": "device_not_identified"
+        }
+      },
+      "dot": {
+        "tunnel": {
+          "state": "ready",
+          "reason": "health_check",
+          "observed_at": "2026-10-06T01:42:51.589Z",
+          "started_at": "2026-10-06T01:42:05.519Z",
+          "ended_at": null,
+          "health": 200,
+          "readiness": 200
+        },
+        "authentication": {
+          "last_success": "2026-10-06T01:42:51.585Z",
+          "last_failure": "2026-10-06T01:42:40.623Z",
+          "state": "observed",
+          "reason": "authenticated",
+          "observed_at": "2026-10-06T01:42:51.585Z"
+        },
+        "discovery": {
+          "last_success": "2026-10-06T01:42:51.581Z",
+          "last_failure": null,
+          "state": "observed",
+          "reason": "protocol_response",
+          "observed_at": "2026-10-06T01:42:51.581Z"
+        },
+        "tools": {
+          "last_success": "2026-10-06T01:42:51.583Z",
+          "last_failure": null,
+          "state": "observed",
+          "reason": "protocol_response",
+          "observed_at": "2026-10-06T01:42:51.583Z"
+        },
+        "events": {
+          "last_success": "2026-10-06T01:42:51.586Z",
+          "last_failure": null,
+          "state": "observed",
+          "reason": "protocol_response",
+          "observed_at": "2026-10-06T01:42:51.586Z"
+        },
+        "subscriptions": {
+          "active": 1,
+          "expired": 0,
+          "observed_at": "2026-10-06T01:42:51.876Z",
+          "items": [
+            {
+              "id": "c97dec7a748a5cd88f73be4a6406b344",
+              "event": "dashboard.answer.created",
+              "state": "active",
+              "expires_at": "2026-10-06T01:43:12.028Z"
+            }
+          ]
+        },
+        "verification": {
+          "last_success": "2026-10-06T01:42:12.029Z",
+          "last_failure": null,
+          "state": "observed",
+          "reason": "challenge_verified",
+          "observed_at": "2026-10-06T01:42:12.029Z"
+        },
+        "callback": {
+          "last_success": null,
+          "last_failure": "2026-10-06T01:42:27.613Z",
+          "state": "failed",
+          "reason": "http_5xx",
+          "observed_at": "2026-10-06T01:42:27.613Z"
+        },
+        "response": {
+          "state": "unconfirmed",
+          "reason": "dot_response_not_observed",
+          "observed_at": null
+        }
+      },
+      "end_to_end": {
+        "state": "unconfirmed",
+        "reason": "real_dot_response_required"
+      }
+    },
+    "callback-fail": {
+      "schema": 1,
+      "project_id": "03ab310d9411110d",
+      "observed_at": "2026-10-06T01:42:12.534Z",
+      "browser": {
+        "dashboard": {
+          "state": "ready",
+          "started_at": "2026-10-06T01:41:35.594Z"
+        },
+        "authentication": {
+          "last_success": "2026-10-06T01:42:12.051Z",
+          "last_failure": null,
+          "state": "observed",
+          "reason": "authenticated",
+          "observed_at": "2026-10-06T01:42:12.051Z",
+          "channel": "loopback"
+        },
+        "tailscale": {
+          "state": "disabled",
+          "observed_at": "2026-10-06T01:42:12.241Z"
+        },
+        "phone": {
+          "state": "unconfirmed",
+          "reason": "device_not_identified"
+        }
+      },
+      "dot": {
+        "tunnel": {
+          "state": "ready",
+          "reason": "health_check",
+          "observed_at": "2026-10-06T01:42:12.241Z",
+          "started_at": "2026-10-06T01:42:05.519Z",
+          "ended_at": null,
+          "health": 200,
+          "readiness": 200
+        },
+        "authentication": {
+          "last_success": "2026-10-06T01:42:12.026Z",
+          "last_failure": "2026-10-06T01:42:05.169Z",
+          "state": "observed",
+          "reason": "authenticated",
+          "observed_at": "2026-10-06T01:42:12.026Z"
+        },
+        "discovery": {
+          "last_success": "2026-10-06T01:42:11.719Z",
+          "last_failure": null,
+          "state": "observed",
+          "reason": "protocol_response",
+          "observed_at": "2026-10-06T01:42:11.719Z"
+        },
+        "tools": {
+          "last_success": "2026-10-06T01:42:11.725Z",
+          "last_failure": null,
+          "state": "observed",
+          "reason": "protocol_response",
+          "observed_at": "2026-10-06T01:42:11.725Z"
+        },
+        "events": {
+          "last_success": "2026-10-06T01:42:11.730Z",
+          "last_failure": null,
+          "state": "observed",
+          "reason": "protocol_response",
+          "observed_at": "2026-10-06T01:42:11.730Z"
+        },
+        "subscriptions": {
+          "active": 1,
+          "expired": 0,
+          "observed_at": "2026-10-06T01:42:12.534Z",
+          "items": [
+            {
+              "id": "c97dec7a748a5cd88f73be4a6406b344",
+              "event": "dashboard.answer.created",
+              "state": "active",
+              "expires_at": "2026-10-06T01:43:12.028Z"
+            }
+          ]
+        },
+        "verification": {
+          "last_success": "2026-10-06T01:42:12.029Z",
+          "last_failure": null,
+          "state": "observed",
+          "reason": "challenge_verified",
+          "observed_at": "2026-10-06T01:42:12.029Z"
+        },
+        "callback": {
+          "last_success": null,
+          "last_failure": "2026-10-06T01:42:12.037Z",
+          "state": "failed",
+          "reason": "http_5xx",
+          "observed_at": "2026-10-06T01:42:12.037Z"
+        },
+        "response": {
+          "state": "unconfirmed",
+          "reason": "dot_response_not_observed",
+          "observed_at": null
+        }
+      },
+      "end_to_end": {
+        "state": "unconfirmed",
+        "reason": "real_dot_response_required"
+      }
+    },
+    "callback-ok": {
+      "schema": 1,
+      "project_id": "03ab310d9411110d",
+      "observed_at": "2026-10-06T01:44:32.203Z",
+      "browser": {
+        "dashboard": {
+          "state": "ready",
+          "started_at": "2026-10-06T01:41:35.594Z"
+        },
+        "authentication": {
+          "last_success": "2026-10-06T01:44:32.052Z",
+          "last_failure": null,
+          "state": "observed",
+          "reason": "authenticated",
+          "observed_at": "2026-10-06T01:44:32.052Z",
+          "channel": "loopback"
+        },
+        "tailscale": {
+          "state": "disabled",
+          "observed_at": "2026-10-06T01:44:31.924Z"
+        },
+        "phone": {
+          "state": "unconfirmed",
+          "reason": "device_not_identified"
+        }
+      },
+      "dot": {
+        "tunnel": {
+          "state": "unreachable",
+          "reason": "health_check",
+          "observed_at": "2026-10-06T01:44:31.924Z",
+          "started_at": "2026-10-06T01:42:05.519Z",
+          "ended_at": null,
+          "health": null,
+          "readiness": null
+        },
+        "authentication": {
+          "last_success": "2026-10-06T01:44:29.251Z",
+          "last_failure": "2026-10-06T01:42:40.623Z",
+          "state": "observed",
+          "reason": "authenticated",
+          "observed_at": "2026-10-06T01:44:29.251Z"
+        },
+        "discovery": {
+          "last_success": "2026-10-06T01:42:51.581Z",
+          "last_failure": null,
+          "state": "observed",
+          "reason": "protocol_response",
+          "observed_at": "2026-10-06T01:42:51.581Z"
+        },
+        "tools": {
+          "last_success": "2026-10-06T01:42:51.583Z",
+          "last_failure": null,
+          "state": "observed",
+          "reason": "protocol_response",
+          "observed_at": "2026-10-06T01:42:51.583Z"
+        },
+        "events": {
+          "last_success": "2026-10-06T01:42:51.586Z",
+          "last_failure": null,
+          "state": "observed",
+          "reason": "protocol_response",
+          "observed_at": "2026-10-06T01:42:51.586Z"
+        },
+        "subscriptions": {
+          "active": 1,
+          "expired": 0,
+          "observed_at": "2026-10-06T01:44:32.203Z",
+          "items": [
+            {
+              "id": "c97dec7a748a5cd88f73be4a6406b344",
+              "event": "dashboard.answer.created",
+              "state": "active",
+              "expires_at": "2026-10-06T01:54:29.253Z"
+            }
+          ]
+        },
+        "verification": {
+          "last_success": "2026-10-06T01:44:29.253Z",
+          "last_failure": null,
+          "state": "observed",
+          "reason": "challenge_verified",
+          "observed_at": "2026-10-06T01:44:29.253Z"
+        },
+        "callback": {
+          "last_success": "2026-10-06T01:44:29.655Z",
+          "last_failure": "2026-10-06T01:42:27.613Z",
+          "state": "observed",
+          "reason": "delivered",
+          "observed_at": "2026-10-06T01:44:29.655Z"
+        },
+        "response": {
+          "state": "unconfirmed",
+          "reason": "dot_response_not_observed",
+          "observed_at": null
+        }
+      },
+      "end_to_end": {
+        "state": "unconfirmed",
+        "reason": "real_dot_response_required"
+      }
+    },
+    "tunnel-down": {
+      "schema": 1,
+      "project_id": "03ab310d9411110d",
+      "observed_at": "2026-10-06T01:43:57.546Z",
+      "browser": {
+        "dashboard": {
+          "state": "ready",
+          "started_at": "2026-10-06T01:41:35.594Z"
+        },
+        "authentication": {
+          "last_success": "2026-10-06T01:43:57.053Z",
+          "last_failure": null,
+          "state": "observed",
+          "reason": "authenticated",
+          "observed_at": "2026-10-06T01:43:57.053Z",
+          "channel": "loopback"
+        },
+        "tailscale": {
+          "state": "disabled",
+          "observed_at": "2026-10-06T01:43:57.258Z"
+        },
+        "phone": {
+          "state": "unconfirmed",
+          "reason": "device_not_identified"
+        }
+      },
+      "dot": {
+        "tunnel": {
+          "state": "unreachable",
+          "reason": "health_check",
+          "observed_at": "2026-10-06T01:43:57.258Z",
+          "started_at": "2026-10-06T01:42:05.519Z",
+          "ended_at": null,
+          "health": null,
+          "readiness": null
+        },
+        "authentication": {
+          "last_success": "2026-10-06T01:42:51.585Z",
+          "last_failure": "2026-10-06T01:42:40.623Z",
+          "state": "observed",
+          "reason": "authenticated",
+          "observed_at": "2026-10-06T01:42:51.585Z"
+        },
+        "discovery": {
+          "last_success": "2026-10-06T01:42:51.581Z",
+          "last_failure": null,
+          "state": "observed",
+          "reason": "protocol_response",
+          "observed_at": "2026-10-06T01:42:51.581Z"
+        },
+        "tools": {
+          "last_success": "2026-10-06T01:42:51.583Z",
+          "last_failure": null,
+          "state": "observed",
+          "reason": "protocol_response",
+          "observed_at": "2026-10-06T01:42:51.583Z"
+        },
+        "events": {
+          "last_success": "2026-10-06T01:42:51.586Z",
+          "last_failure": null,
+          "state": "observed",
+          "reason": "protocol_response",
+          "observed_at": "2026-10-06T01:42:51.586Z"
+        },
+        "subscriptions": {
+          "active": 0,
+          "expired": 1,
+          "observed_at": "2026-10-06T01:43:57.546Z",
+          "items": [
+            {
+              "id": "c97dec7a748a5cd88f73be4a6406b344",
+              "event": "dashboard.answer.created",
+              "state": "expired",
+              "expires_at": "2026-10-06T01:43:12.028Z"
+            }
+          ]
+        },
+        "verification": {
+          "last_success": "2026-10-06T01:42:12.029Z",
+          "last_failure": null,
+          "state": "observed",
+          "reason": "challenge_verified",
+          "observed_at": "2026-10-06T01:42:12.029Z"
+        },
+        "callback": {
+          "last_success": null,
+          "last_failure": "2026-10-06T01:42:27.613Z",
+          "state": "failed",
+          "reason": "http_5xx",
+          "observed_at": "2026-10-06T01:42:27.613Z"
+        },
+        "response": {
+          "state": "unconfirmed",
+          "reason": "dot_response_not_observed",
+          "observed_at": null
+        }
+      },
+      "end_to_end": {
+        "state": "unconfirmed",
+        "reason": "real_dot_response_required"
+      }
+    },
+    "stale": {
+      "schema": 1,
+      "project_id": "03ab310d9411110d",
+      "observed_at": "2026-10-06T01:45:01.853Z",
+      "browser": {
+        "dashboard": {
+          "state": "ready",
+          "started_at": "2026-10-06T01:45:01.565Z"
+        },
+        "authentication": {
+          "state": "unconfirmed",
+          "reason": "not_observed",
+          "observed_at": null,
+          "last_success": null,
+          "last_failure": null
+        },
+        "tailscale": {
+          "state": "disabled",
+          "observed_at": "2026-10-06T01:45:01.576Z"
+        },
+        "phone": {
+          "state": "unconfirmed",
+          "reason": "device_not_identified"
+        }
+      },
+      "dot": {
+        "tunnel": {
+          "state": "stale_credentials",
+          "reason": "dashboard_restarted",
+          "observed_at": "2026-10-06T01:45:01.576Z",
+          "started_at": "2026-10-06T01:42:05.519Z",
+          "ended_at": null,
+          "health": null,
+          "readiness": null
+        },
+        "authentication": {
+          "state": "unconfirmed",
+          "reason": "not_observed",
+          "observed_at": null,
+          "last_success": null,
+          "last_failure": null
+        },
+        "discovery": {
+          "state": "unconfirmed",
+          "reason": "not_observed",
+          "observed_at": null,
+          "last_success": null,
+          "last_failure": null
+        },
+        "tools": {
+          "state": "unconfirmed",
+          "reason": "not_observed",
+          "observed_at": null,
+          "last_success": null,
+          "last_failure": null
+        },
+        "events": {
+          "state": "unconfirmed",
+          "reason": "not_observed",
+          "observed_at": null,
+          "last_success": null,
+          "last_failure": null
+        },
+        "subscriptions": {
+          "active": 1,
+          "expired": 0,
+          "observed_at": "2026-10-06T01:45:01.853Z",
+          "items": [
+            {
+              "id": "c97dec7a748a5cd88f73be4a6406b344",
+              "event": "dashboard.answer.created",
+              "state": "active",
+              "expires_at": "2026-10-06T01:54:29.253Z"
+            }
+          ]
+        },
+        "verification": {
+          "last_success": "2026-10-06T01:44:29.253Z",
+          "last_failure": null,
+          "state": "observed",
+          "reason": "challenge_verified",
+          "observed_at": "2026-10-06T01:44:29.253Z"
+        },
+        "callback": {
+          "last_success": "2026-10-06T01:44:29.655Z",
+          "last_failure": "2026-10-06T01:42:27.613Z",
+          "state": "observed",
+          "reason": "delivered",
+          "observed_at": "2026-10-06T01:44:29.655Z"
+        },
+        "response": {
+          "state": "unconfirmed",
+          "reason": "dot_response_not_observed",
+          "observed_at": null
+        }
+      },
+      "end_to_end": {
+        "state": "unconfirmed",
+        "reason": "real_dot_response_required"
+      }
+    }
+  }
+}

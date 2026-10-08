@@ -234,8 +234,8 @@ rdsh固有の先頭サブコマンド（`tokens`/`guard`/`serve`/`sessions`等�
   起動確認と、使い捨ての `HOME` での `tests/regress.sh` に通ったときだけ置き換えます。
   `main` に追従してソースからビルドしたい場合は `RDSH_SYNC_FROM_SOURCE=1` を指定します
   （`nice -n 19`、あれば `ionice -c3` 下で実行）。`sync-dsh.sh` はリリースの `.sha256` を
-  検証しません（HTTPSとGitHub Releasesを信頼します）。検証付きで入れたい場合は
-  `install.sh --from-release` を使ってください。`systemd/rdsh-sync.service` は低優先度で
+  候補バイナリの実行前に検証し、不在・空・不一致なら更新を中止します。
+  `install.sh --from-release` もダウンロードを検証します。`systemd/rdsh-sync.service` は低優先度で
   動かすので、`ExecStart` は各自のcheckoutに合わせてください
 
 ## Smart-DSH との併用

@@ -1,0 +1,661 @@
+{
+  "before": {
+    "source": "77b4f66b7fa65b24caedbb27491d7be037284b48",
+    "exit_code": 1,
+    "stderr": "[rdsh-dashboard] Unknown command; use --help"
+  },
+  "after": {
+    "repeat_report": {
+      "project": "0feeb875e9284aa3",
+      "revision": 13,
+      "cost_ledger": {
+        "schema": 1,
+        "project_id": "0feeb875e9284aa3",
+        "scopes": [
+          {
+            "scope_id": "october-workers",
+            "project_id": "0feeb875e9284aa3",
+            "period_start": "2026-10-06T00:00:00.000Z",
+            "period_end": "2026-10-07T00:00:00.000Z",
+            "membership_complete": true,
+            "targets": [
+              {
+                "target_id": "target-1",
+                "worker_id": "worker-1",
+                "session_id": "native-session-1",
+                "run_id": "run-1",
+                "provider": "fixture-provider",
+                "model": "fixture-model"
+              },
+              {
+                "target_id": "target-2",
+                "worker_id": "worker-2",
+                "session_id": "native-session-2",
+                "run_id": "run-2",
+                "provider": "fixture-provider",
+                "model": "fixture-model"
+              }
+            ],
+            "declared_at": "2026-10-06T03:17:31.426Z",
+            "groups": [
+              {
+                "source_kind": "provider_usage",
+                "currency": "USD",
+                "level": "targets",
+                "amount": "0.3",
+                "certainty": "reported",
+                "partial": false,
+                "missing_targets": [],
+                "covered_targets": ["target-2", "target-1"],
+                "included_reports": 2,
+                "observed_at": "2026-10-06T02:00:00.000Z",
+                "tokens": {
+                  "input": {
+                    "value": "20",
+                    "partial": false
+                  },
+                  "cached_input": {
+                    "value": "4",
+                    "partial": false
+                  },
+                  "output": {
+                    "value": "10",
+                    "partial": false
+                  }
+                }
+              },
+              {
+                "source_kind": "cli_report",
+                "currency": "USD",
+                "level": "targets",
+                "amount": "0.29",
+                "certainty": "reported",
+                "partial": false,
+                "missing_targets": [],
+                "covered_targets": ["target-1", "target-2"],
+                "included_reports": 2,
+                "observed_at": "2026-10-06T01:00:00.000Z",
+                "tokens": {
+                  "input": {
+                    "value": "20",
+                    "partial": false
+                  },
+                  "cached_input": {
+                    "value": "4",
+                    "partial": false
+                  },
+                  "output": {
+                    "value": "10",
+                    "partial": false
+                  }
+                }
+              },
+              {
+                "source_kind": "api_estimate",
+                "currency": "USD",
+                "level": "targets",
+                "amount": "0.33",
+                "certainty": "estimated",
+                "partial": false,
+                "missing_targets": [],
+                "covered_targets": ["target-1", "target-2"],
+                "included_reports": 2,
+                "observed_at": "2026-10-06T01:00:00.000Z",
+                "tokens": {
+                  "input": {
+                    "value": "20",
+                    "partial": false
+                  },
+                  "cached_input": {
+                    "value": "4",
+                    "partial": false
+                  },
+                  "output": {
+                    "value": "10",
+                    "partial": false
+                  }
+                }
+              },
+              {
+                "source_kind": "invoice_actual",
+                "currency": "USD",
+                "level": "project_invoice",
+                "amount": "0.27",
+                "certainty": "confirmed",
+                "partial": false,
+                "missing_targets": [],
+                "covered_targets": [],
+                "included_reports": 1,
+                "observed_at": "2026-10-07T02:00:00.000Z",
+                "tokens": {
+                  "input": {
+                    "value": null,
+                    "partial": true
+                  },
+                  "cached_input": {
+                    "value": null,
+                    "partial": true
+                  },
+                  "output": {
+                    "value": null,
+                    "partial": true
+                  }
+                }
+              }
+            ],
+            "unreported_sources": [],
+            "reports": [
+              {
+                "event_id": "invoice-period",
+                "scope_id": "october-workers",
+                "target_id": null,
+                "source_kind": "invoice_actual",
+                "source_ref": "fixture invoice / period 2026-10-06 UTC",
+                "observed_at": "2026-10-07T02:00:00.000Z",
+                "mode": "cumulative",
+                "sequence": 1,
+                "currency": "USD",
+                "amount": "0.27",
+                "certainty": "confirmed",
+                "tokens": null,
+                "basis": "Fixture invoice amount for the declared UTC period. Worker allocation is unknown.",
+                "received_at": "2026-10-06T03:17:32.768Z",
+                "included": true
+              },
+              {
+                "event_id": "usage-2-known",
+                "scope_id": "october-workers",
+                "target_id": "target-2",
+                "source_kind": "provider_usage",
+                "source_ref": "fixture provider report / meter-1",
+                "observed_at": "2026-10-06T02:00:00.000Z",
+                "mode": "cumulative",
+                "sequence": 2,
+                "currency": "USD",
+                "amount": "0.2",
+                "certainty": "reported",
+                "tokens": {
+                  "input": 10,
+                  "cached_input": 2,
+                  "output": 5
+                },
+                "basis": "Fixture provider-reported amount; no price lookup or actual billing.",
+                "received_at": "2026-10-06T03:17:32.738Z",
+                "included": true
+              },
+              {
+                "event_id": "api_estimate-1",
+                "scope_id": "october-workers",
+                "target_id": "target-1",
+                "source_kind": "api_estimate",
+                "source_ref": "fixture api_estimate statement",
+                "observed_at": "2026-10-06T01:00:00.000Z",
+                "mode": "cumulative",
+                "sequence": 1,
+                "currency": "USD",
+                "amount": "0.11",
+                "certainty": "estimated",
+                "tokens": {
+                  "input": 10,
+                  "cached_input": 2,
+                  "output": 5
+                },
+                "basis": "Fixture reported token amounts converted with an explicit fixture rate; no current price lookup.",
+                "received_at": "2026-10-06T03:17:32.757Z",
+                "included": true
+              },
+              {
+                "event_id": "api_estimate-2",
+                "scope_id": "october-workers",
+                "target_id": "target-2",
+                "source_kind": "api_estimate",
+                "source_ref": "fixture api_estimate statement",
+                "observed_at": "2026-10-06T01:00:00.000Z",
+                "mode": "cumulative",
+                "sequence": 1,
+                "currency": "USD",
+                "amount": "0.22",
+                "certainty": "estimated",
+                "tokens": {
+                  "input": 10,
+                  "cached_input": 2,
+                  "output": 5
+                },
+                "basis": "Fixture reported token amounts converted with an explicit fixture rate; no current price lookup.",
+                "received_at": "2026-10-06T03:17:32.762Z",
+                "included": true
+              },
+              {
+                "event_id": "cli_report-1",
+                "scope_id": "october-workers",
+                "target_id": "target-1",
+                "source_kind": "cli_report",
+                "source_ref": "fixture cli_report statement",
+                "observed_at": "2026-10-06T01:00:00.000Z",
+                "mode": "cumulative",
+                "sequence": 1,
+                "currency": "USD",
+                "amount": "0.09",
+                "certainty": "reported",
+                "tokens": {
+                  "input": 10,
+                  "cached_input": 2,
+                  "output": 5
+                },
+                "basis": "Fixture CLI cost report; not a paid service request.",
+                "received_at": "2026-10-06T03:17:32.748Z",
+                "included": true
+              },
+              {
+                "event_id": "cli_report-2",
+                "scope_id": "october-workers",
+                "target_id": "target-2",
+                "source_kind": "cli_report",
+                "source_ref": "fixture cli_report statement",
+                "observed_at": "2026-10-06T01:00:00.000Z",
+                "mode": "cumulative",
+                "sequence": 1,
+                "currency": "USD",
+                "amount": "0.2",
+                "certainty": "reported",
+                "tokens": {
+                  "input": 10,
+                  "cached_input": 2,
+                  "output": 5
+                },
+                "basis": "Fixture CLI cost report; not a paid service request.",
+                "received_at": "2026-10-06T03:17:32.753Z",
+                "included": true
+              },
+              {
+                "event_id": "usage-1",
+                "scope_id": "october-workers",
+                "target_id": "target-1",
+                "source_kind": "provider_usage",
+                "source_ref": "fixture provider report / meter-1",
+                "observed_at": "2026-10-06T01:00:00.000Z",
+                "mode": "cumulative",
+                "sequence": 1,
+                "currency": "USD",
+                "amount": "0.1",
+                "certainty": "reported",
+                "tokens": {
+                  "input": 10,
+                  "cached_input": 2,
+                  "output": 5
+                },
+                "basis": "Fixture provider-reported amount; no price lookup or actual billing.",
+                "received_at": "2026-10-06T03:17:31.437Z",
+                "included": true
+              },
+              {
+                "event_id": "usage-1-reported-again",
+                "scope_id": "october-workers",
+                "target_id": "target-1",
+                "source_kind": "provider_usage",
+                "source_ref": "fixture provider report / meter-1",
+                "observed_at": "2026-10-06T01:00:00.000Z",
+                "mode": "cumulative",
+                "sequence": 1,
+                "currency": "USD",
+                "amount": "0.1",
+                "certainty": "reported",
+                "tokens": {
+                  "input": 10,
+                  "cached_input": 2,
+                  "output": 5
+                },
+                "basis": "Fixture provider-reported amount; no price lookup or actual billing.",
+                "received_at": "2026-10-06T03:17:32.743Z",
+                "included": false
+              },
+              {
+                "event_id": "usage-2-missing",
+                "scope_id": "october-workers",
+                "target_id": "target-2",
+                "source_kind": "provider_usage",
+                "source_ref": "fixture provider report / meter-1",
+                "observed_at": "2026-10-06T01:00:00.000Z",
+                "mode": "cumulative",
+                "sequence": 1,
+                "currency": "USD",
+                "amount": null,
+                "certainty": "unknown",
+                "tokens": null,
+                "basis": "Fixture provider-reported amount; no price lookup or actual billing.",
+                "received_at": "2026-10-06T03:17:31.443Z",
+                "included": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "inspect": {
+      "project": "0feeb875e9284aa3",
+      "revision": 13,
+      "cost_ledger": {
+        "schema": 1,
+        "project_id": "0feeb875e9284aa3",
+        "scopes": [
+          {
+            "scope_id": "october-workers",
+            "project_id": "0feeb875e9284aa3",
+            "period_start": "2026-10-06T00:00:00.000Z",
+            "period_end": "2026-10-07T00:00:00.000Z",
+            "membership_complete": true,
+            "targets": [
+              {
+                "target_id": "target-1",
+                "worker_id": "worker-1",
+                "session_id": "native-session-1",
+                "run_id": "run-1",
+                "provider": "fixture-provider",
+                "model": "fixture-model"
+              },
+              {
+                "target_id": "target-2",
+                "worker_id": "worker-2",
+                "session_id": "native-session-2",
+                "run_id": "run-2",
+                "provider": "fixture-provider",
+                "model": "fixture-model"
+              }
+            ],
+            "declared_at": "2026-10-06T03:17:31.426Z",
+            "groups": [
+              {
+                "source_kind": "provider_usage",
+                "currency": "USD",
+                "level": "targets",
+                "amount": "0.3",
+                "certainty": "reported",
+                "partial": false,
+                "missing_targets": [],
+                "covered_targets": ["target-2", "target-1"],
+                "included_reports": 2,
+                "observed_at": "2026-10-06T02:00:00.000Z",
+                "tokens": {
+                  "input": {
+                    "value": "20",
+                    "partial": false
+                  },
+                  "cached_input": {
+                    "value": "4",
+                    "partial": false
+                  },
+                  "output": {
+                    "value": "10",
+                    "partial": false
+                  }
+                }
+              },
+              {
+                "source_kind": "cli_report",
+                "currency": "USD",
+                "level": "targets",
+                "amount": "0.29",
+                "certainty": "reported",
+                "partial": false,
+                "missing_targets": [],
+                "covered_targets": ["target-1", "target-2"],
+                "included_reports": 2,
+                "observed_at": "2026-10-06T01:00:00.000Z",
+                "tokens": {
+                  "input": {
+                    "value": "20",
+                    "partial": false
+                  },
+                  "cached_input": {
+                    "value": "4",
+                    "partial": false
+                  },
+                  "output": {
+                    "value": "10",
+                    "partial": false
+                  }
+                }
+              },
+              {
+                "source_kind": "api_estimate",
+                "currency": "USD",
+                "level": "targets",
+                "amount": "0.33",
+                "certainty": "estimated",
+                "partial": false,
+                "missing_targets": [],
+                "covered_targets": ["target-1", "target-2"],
+                "included_reports": 2,
+                "observed_at": "2026-10-06T01:00:00.000Z",
+                "tokens": {
+                  "input": {
+                    "value": "20",
+                    "partial": false
+                  },
+                  "cached_input": {
+                    "value": "4",
+                    "partial": false
+                  },
+                  "output": {
+                    "value": "10",
+                    "partial": false
+                  }
+                }
+              },
+              {
+                "source_kind": "invoice_actual",
+                "currency": "USD",
+                "level": "project_invoice",
+                "amount": "0.27",
+                "certainty": "confirmed",
+                "partial": false,
+                "missing_targets": [],
+                "covered_targets": [],
+                "included_reports": 1,
+                "observed_at": "2026-10-07T02:00:00.000Z",
+                "tokens": {
+                  "input": {
+                    "value": null,
+                    "partial": true
+                  },
+                  "cached_input": {
+                    "value": null,
+                    "partial": true
+                  },
+                  "output": {
+                    "value": null,
+                    "partial": true
+                  }
+                }
+              }
+            ],
+            "unreported_sources": [],
+            "reports": [
+              {
+                "event_id": "invoice-period",
+                "scope_id": "october-workers",
+                "target_id": null,
+                "source_kind": "invoice_actual",
+                "source_ref": "fixture invoice / period 2026-10-06 UTC",
+                "observed_at": "2026-10-07T02:00:00.000Z",
+                "mode": "cumulative",
+                "sequence": 1,
+                "currency": "USD",
+                "amount": "0.27",
+                "certainty": "confirmed",
+                "tokens": null,
+                "basis": "Fixture invoice amount for the declared UTC period. Worker allocation is unknown.",
+                "received_at": "2026-10-06T03:17:32.768Z",
+                "included": true
+              },
+              {
+                "event_id": "usage-2-known",
+                "scope_id": "october-workers",
+                "target_id": "target-2",
+                "source_kind": "provider_usage",
+                "source_ref": "fixture provider report / meter-1",
+                "observed_at": "2026-10-06T02:00:00.000Z",
+                "mode": "cumulative",
+                "sequence": 2,
+                "currency": "USD",
+                "amount": "0.2",
+                "certainty": "reported",
+                "tokens": {
+                  "input": 10,
+                  "cached_input": 2,
+                  "output": 5
+                },
+                "basis": "Fixture provider-reported amount; no price lookup or actual billing.",
+                "received_at": "2026-10-06T03:17:32.738Z",
+                "included": true
+              },
+              {
+                "event_id": "api_estimate-1",
+                "scope_id": "october-workers",
+                "target_id": "target-1",
+                "source_kind": "api_estimate",
+                "source_ref": "fixture api_estimate statement",
+                "observed_at": "2026-10-06T01:00:00.000Z",
+                "mode": "cumulative",
+                "sequence": 1,
+                "currency": "USD",
+                "amount": "0.11",
+                "certainty": "estimated",
+                "tokens": {
+                  "input": 10,
+                  "cached_input": 2,
+                  "output": 5
+                },
+                "basis": "Fixture reported token amounts converted with an explicit fixture rate; no current price lookup.",
+                "received_at": "2026-10-06T03:17:32.757Z",
+                "included": true
+              },
+              {
+                "event_id": "api_estimate-2",
+                "scope_id": "october-workers",
+                "target_id": "target-2",
+                "source_kind": "api_estimate",
+                "source_ref": "fixture api_estimate statement",
+                "observed_at": "2026-10-06T01:00:00.000Z",
+                "mode": "cumulative",
+                "sequence": 1,
+                "currency": "USD",
+                "amount": "0.22",
+                "certainty": "estimated",
+                "tokens": {
+                  "input": 10,
+                  "cached_input": 2,
+                  "output": 5
+                },
+                "basis": "Fixture reported token amounts converted with an explicit fixture rate; no current price lookup.",
+                "received_at": "2026-10-06T03:17:32.762Z",
+                "included": true
+              },
+              {
+                "event_id": "cli_report-1",
+                "scope_id": "october-workers",
+                "target_id": "target-1",
+                "source_kind": "cli_report",
+                "source_ref": "fixture cli_report statement",
+                "observed_at": "2026-10-06T01:00:00.000Z",
+                "mode": "cumulative",
+                "sequence": 1,
+                "currency": "USD",
+                "amount": "0.09",
+                "certainty": "reported",
+                "tokens": {
+                  "input": 10,
+                  "cached_input": 2,
+                  "output": 5
+                },
+                "basis": "Fixture CLI cost report; not a paid service request.",
+                "received_at": "2026-10-06T03:17:32.748Z",
+                "included": true
+              },
+              {
+                "event_id": "cli_report-2",
+                "scope_id": "october-workers",
+                "target_id": "target-2",
+                "source_kind": "cli_report",
+                "source_ref": "fixture cli_report statement",
+                "observed_at": "2026-10-06T01:00:00.000Z",
+                "mode": "cumulative",
+                "sequence": 1,
+                "currency": "USD",
+                "amount": "0.2",
+                "certainty": "reported",
+                "tokens": {
+                  "input": 10,
+                  "cached_input": 2,
+                  "output": 5
+                },
+                "basis": "Fixture CLI cost report; not a paid service request.",
+                "received_at": "2026-10-06T03:17:32.753Z",
+                "included": true
+              },
+              {
+                "event_id": "usage-1",
+                "scope_id": "october-workers",
+                "target_id": "target-1",
+                "source_kind": "provider_usage",
+                "source_ref": "fixture provider report / meter-1",
+                "observed_at": "2026-10-06T01:00:00.000Z",
+                "mode": "cumulative",
+                "sequence": 1,
+                "currency": "USD",
+                "amount": "0.1",
+                "certainty": "reported",
+                "tokens": {
+                  "input": 10,
+                  "cached_input": 2,
+                  "output": 5
+                },
+                "basis": "Fixture provider-reported amount; no price lookup or actual billing.",
+                "received_at": "2026-10-06T03:17:31.437Z",
+                "included": true
+              },
+              {
+                "event_id": "usage-1-reported-again",
+                "scope_id": "october-workers",
+                "target_id": "target-1",
+                "source_kind": "provider_usage",
+                "source_ref": "fixture provider report / meter-1",
+                "observed_at": "2026-10-06T01:00:00.000Z",
+                "mode": "cumulative",
+                "sequence": 1,
+                "currency": "USD",
+                "amount": "0.1",
+                "certainty": "reported",
+                "tokens": {
+                  "input": 10,
+                  "cached_input": 2,
+                  "output": 5
+                },
+                "basis": "Fixture provider-reported amount; no price lookup or actual billing.",
+                "received_at": "2026-10-06T03:17:32.743Z",
+                "included": false
+              },
+              {
+                "event_id": "usage-2-missing",
+                "scope_id": "october-workers",
+                "target_id": "target-2",
+                "source_kind": "provider_usage",
+                "source_ref": "fixture provider report / meter-1",
+                "observed_at": "2026-10-06T01:00:00.000Z",
+                "mode": "cumulative",
+                "sequence": 1,
+                "currency": "USD",
+                "amount": null,
+                "certainty": "unknown",
+                "tokens": null,
+                "basis": "Fixture provider-reported amount; no price lookup or actual billing.",
+                "received_at": "2026-10-06T03:17:31.443Z",
+                "included": false
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

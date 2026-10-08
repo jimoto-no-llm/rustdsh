@@ -275,8 +275,7 @@ fn invoked_as_dsh() -> bool {
         .file_name()
         .and_then(|s| s.to_str())
         // Native Windows installs run as dsh.exe.
-        .map(|s| s == "dsh" || s == "dsh.exe")
-        .unwrap_or(false)
+        .is_some_and(|s| s == "dsh" || s == "dsh.exe")
 }
 
 fn main() {
@@ -389,10 +388,10 @@ fn main() {
                         std::fs::read_to_string(rdsh_config::settings_path())
                             .ok()
                             .and_then(|text| serde_json::from_str(&text).ok())
-                            .unwrap_or(serde_json::Value::Null);
+                            .unwrap_or_default();
                     for annotated in rdsh_config::RdshSettings::keys() {
                         let key = annotated.split('(').next().unwrap_or(annotated);
-                        let value = cfg.get_dotted(key).unwrap_or(serde_json::Value::Null);
+                        let value = cfg.get_dotted(key).unwrap_or_default();
                         let rendered = match &value {
                             serde_json::Value::String(s) => s.clone(),
                             _ => serde_json::to_string(&value).unwrap_or_else(|_| "-".to_string()),
@@ -624,12 +623,7 @@ fn profile_or_default(opt: Option<String>) -> anyhow::Result<String> {
 
 fn resolve_default_profile() -> anyhow::Result<String> {
     let env = std::env::var("RDSH_DEFAULT_PROFILE").ok();
-    if env
-        .as_deref()
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .is_none()
-    {
+    if !env.as_deref().is_some_and(|e| !e.trim().is_empty()) {
         let configured = rdsh_config::load().general.default_profile;
         if !configured.trim().is_empty() {
             return Ok(configured.trim().to_string());
@@ -667,7 +661,7 @@ fn dump_config_native(profile: &str, patches: &[String]) -> anyhow::Result<()> {
         Ok(entries) => {
             println!("# layers under {root}:");
             let mut names: Vec<String> = entries
-                .filter_map(|e| e.ok())
+                .filter_map(Result::ok)
                 .map(|e| e.file_name().to_string_lossy().into_owned())
                 .collect();
             names.sort();
@@ -801,10 +795,7 @@ fn node_wrapper_warnings(shadowed: bool) -> Vec<String> {
             }
             // Size-gate before reading: ~/.local/bin can hold huge binaries and
             // reading them fully just to discard costs seconds in `doctor`.
-            if std::fs::metadata(&path)
-                .map(|m| m.len() > 65536)
-                .unwrap_or(false)
-            {
+            if std::fs::metadata(&path).is_ok_and(|m| m.len() > 65536) {
                 continue;
             }
             let bytes = std::fs::read(&path).unwrap_or_default();

@@ -1,0 +1,26 @@
+{
+  "unrelated_update": {
+    "draft": "公開する前に対象を確認したい",
+    "focused": "質問 Q1 への回答",
+    "selected": "proceed",
+    "selection": [
+      14,
+      14
+    ]
+  },
+  "changed_contract": {
+    "draft": "公開する前に対象を確認したい",
+    "focused": "質問 Q1 への回答",
+    "reviewChecked": false,
+    "selected": null,
+    "selection": [
+      14,
+      14
+    ],
+    "submitDisabled": true
+  },
+  "mobile": {
+    "iframe_width": 390,
+    "mode": "390px responsive iframe of the actual project UI"
+  }
+}

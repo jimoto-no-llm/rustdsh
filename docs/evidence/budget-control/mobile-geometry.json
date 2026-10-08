@@ -1,0 +1,17 @@
+{
+  "budget": [
+    {
+      "left": 14,
+      "right": 361,
+      "width": 347
+    }
+  ],
+  "document": {
+    "clientWidth": 375,
+    "scrollWidth": 375
+  },
+  "viewport": {
+    "height": 844,
+    "width": 390
+  }
+}

@@ -76,6 +76,39 @@ const names = [
   "dashboard.progress.updated",
   "dashboard.metrics.updated",
 ];
+const diagnosticReasons = [
+  "challenge_verified",
+  "challenge_failed",
+  "timeout",
+  "delivered",
+  "http_4xx",
+  "rate_limited",
+  "http_5xx",
+  "network",
+  "invalid_response",
+];
+function validObservation(value) {
+  return (
+    value &&
+    ["observed", "failed"].includes(value.state) &&
+    diagnosticReasons.includes(value.reason) &&
+    Number.isFinite(Date.parse(value.observed_at)) &&
+    [value.last_success, value.last_failure].every(
+      (date) =>
+        date === null ||
+        (typeof date === "string" && Number.isFinite(Date.parse(date))),
+    ) &&
+    Object.keys(value).every((key) =>
+      [
+        "state",
+        "reason",
+        "observed_at",
+        "last_success",
+        "last_failure",
+      ].includes(key),
+    )
+  );
+}
 export const eventDefinitions = names.map((name) => ({
   name,
   description: {
@@ -129,9 +162,11 @@ export class EventsHub {
     this.getState = getState;
     this.post = post;
     this.subscriptions = [];
+    this.deliveryHistory = [];
     this.busy = false;
     this.queue = Promise.resolve();
     this.verified = new Map();
+    this.connectionObservations = {};
   }
   static async open(project, getState, post) {
     const hub = new EventsHub(project, getState, post);
@@ -142,6 +177,46 @@ export class EventsHub {
       if (saved.schema !== 1 || !Array.isArray(saved.subscriptions))
         throw new Error("Invalid event subscription state");
       hub.subscriptions = saved.subscriptions;
+      if (saved.connection_observations !== undefined) {
+        const observations = saved.connection_observations;
+        if (
+          !observations ||
+          typeof observations !== "object" ||
+          Array.isArray(observations) ||
+          Object.entries(observations).some(
+            ([key, value]) =>
+              !["verification", "callback"].includes(key) ||
+              !validObservation(value),
+          )
+        )
+          throw new Error("Invalid callback observations");
+        hub.connectionObservations = observations;
+      }
+      if (saved.deliveries !== undefined) {
+        if (
+          !Array.isArray(saved.deliveries) ||
+          saved.deliveries.length > 1000 ||
+          saved.deliveries.some(
+            (item) =>
+              !item ||
+              typeof item.event_id !== "string" ||
+              typeof item.subscription_id !== "string" ||
+              !["delivered", "retrying", "failed"].includes(item.status) ||
+              !Number.isFinite(Date.parse(item.observed_at)) ||
+              Object.keys(item).some(
+                (key) =>
+                  ![
+                    "event_id",
+                    "subscription_id",
+                    "status",
+                    "observed_at",
+                  ].includes(key),
+              ),
+          )
+        )
+          throw new Error("Invalid event delivery history");
+        hub.deliveryHistory = saved.deliveries;
+      }
     } catch (e) {
       if (e.code !== "ENOENT") throw e;
     }
@@ -151,6 +226,12 @@ export class EventsHub {
     return writeJson(path.join(this.project.directory, "events.json"), {
       schema: 1,
       subscriptions: this.subscriptions,
+      ...(Object.keys(this.connectionObservations).length
+        ? { connection_observations: this.connectionObservations }
+        : {}),
+      ...(this.deliveryHistory.length
+        ? { deliveries: this.deliveryHistory }
+        : {}),
     });
   }
   serial(work) {
@@ -260,11 +341,14 @@ export class EventsHub {
               ? "timeout"
               : "challenge_failed",
           };
+          this.observe("verification", false, failure.data.reason);
+          await this.persist();
           throw failure;
         }
         for (const [key, expiry] of this.verified)
           if (expiry <= Date.now()) this.verified.delete(key);
         this.verified.set(verificationKey, Date.now() + 60000);
+        this.observe("verification", true, "challenge_verified");
       }
       if (previous)
         this.subscriptions[this.subscriptions.indexOf(previous)] = subscription;
@@ -300,6 +384,68 @@ export class EventsHub {
       failures: this.subscriptions.filter((item) => item.last_error).length,
     };
   }
+  observe(stage, success, reason) {
+    const observed_at = new Date().toISOString();
+    this.connectionObservations[stage] = {
+      ...(this.connectionObservations[stage] || {
+        last_success: null,
+        last_failure: null,
+      }),
+      state: success ? "observed" : "failed",
+      reason,
+      observed_at,
+      [success ? "last_success" : "last_failure"]: observed_at,
+    };
+  }
+  diagnostics() {
+    const now = Date.now();
+    const subscriptions = this.subscriptions
+      .filter(
+        (sub) =>
+          sub.arguments?.project_id === this.project.id &&
+          /^[0-9a-f]{32}$/.test(sub.id) &&
+          names.includes(sub.name) &&
+          Number.isFinite(sub.expires_at),
+      )
+      .map((sub) => ({
+        id: sub.id,
+        event: sub.name,
+        state: sub.expires_at > now ? "active" : "expired",
+        expires_at: new Date(sub.expires_at).toISOString(),
+      }));
+    const unconfirmed = {
+      state: "unconfirmed",
+      reason: "not_observed",
+      observed_at: null,
+      last_success: null,
+      last_failure: null,
+    };
+    return {
+      subscriptions: {
+        active: subscriptions.filter((item) => item.state === "active").length,
+        expired: subscriptions.filter((item) => item.state === "expired")
+          .length,
+        observed_at: new Date(now).toISOString(),
+        items: subscriptions,
+      },
+      verification: {
+        ...(this.connectionObservations.verification || unconfirmed),
+      },
+      callback: { ...(this.connectionObservations.callback || unconfirmed) },
+    };
+  }
+  deliveries() {
+    return Object.fromEntries(
+      [...new Set(this.deliveryHistory.map((item) => item.event_id))].map(
+        (id) => [
+          id,
+          this.deliveryHistory
+            .filter((item) => item.event_id === id)
+            .map((item) => ({ ...item })),
+        ],
+      ),
+    );
+  }
   async flush() {
     if (this.busy) return;
     this.busy = true;
@@ -324,12 +470,42 @@ export class EventsHub {
           }
           dirty = true;
           const success = response.status >= 200 && response.status < 300;
+          this.observe(
+            "callback",
+            success,
+            success
+              ? "delivered"
+              : response.status === 0
+                ? "network"
+                : response.status === 429
+                  ? "rate_limited"
+                  : response.status >= 500 && response.status <= 599
+                    ? "http_5xx"
+                    : response.status >= 400 && response.status <= 499
+                      ? "http_4xx"
+                      : "invalid_response",
+          );
           const permanent =
             response.status === 410 ||
             response.status === 413 ||
             (response.status >= 400 &&
               response.status < 500 &&
               response.status !== 429);
+          this.deliveryHistory = this.deliveryHistory.filter(
+            (item) =>
+              item.event_id !== next.eventId || item.subscription_id !== sub.id,
+          );
+          this.deliveryHistory.push({
+            event_id: next.eventId,
+            subscription_id: sub.id,
+            status: success
+              ? "delivered"
+              : permanent || sub.attempts >= 4
+                ? "failed"
+                : "retrying",
+            observed_at: new Date().toISOString(),
+          });
+          this.deliveryHistory = this.deliveryHistory.slice(-1000);
           if (success || permanent || sub.attempts >= 4) {
             sub.last_revision = next.data.revision;
             sub.last_error = success

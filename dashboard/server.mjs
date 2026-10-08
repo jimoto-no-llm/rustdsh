@@ -8,10 +8,19 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { ProjectStore, writeJson, stateHome, publicState } from "./state.mjs";
 import { createMcpServer } from "./mcp.mjs";
-import { enableShare } from "./tailscale.mjs";
+import { enableShare, inspectShare } from "./tailscale.mjs";
 import { startHarness, proxyHarness, upgradeHarness } from "./harness.mjs";
 import { EventsHub } from "./webhooks.mjs";
 import { modernMcpHandler } from "./mcp2.mjs";
+import { AnswerApplicationServer } from "./answer-application-server.mjs";
+import { BudgetAdmissionServer } from "./budget-server.mjs";
+import { createHistoryBackup, backupMaximum } from "./history-backup.mjs";
+import { AcceptanceStore } from "./acceptance.mjs";
+import {
+  ConnectionObservations,
+  connectionReport,
+  inspectTunnel,
+} from "./connection-diagnostics.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const equal = (a, b) =>
@@ -23,12 +32,12 @@ function json(res, status, value) {
   res.writeHead(status, { "content-type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(value));
 }
-async function readBody(req) {
+async function readBody(req, maximum = 131072) {
   let size = 0,
     chunks = [];
   for await (const chunk of req) {
     size += chunk.length;
-    if (size > 131072) throw new Error("Request body too large");
+    if (size > maximum) throw new Error("Request body too large");
     chunks.push(chunk);
   }
   return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
@@ -73,6 +82,9 @@ export async function startDashboard(options) {
   const token = randomBytes(32).toString("hex"); // local administrator
   const mcpToken = randomBytes(32).toString("hex");
   const browserToken = randomBytes(32).toString("hex");
+  const instanceId = randomUUID();
+  const startedAt = new Date().toISOString();
+  const connections = new ConnectionObservations();
   const localUrl = `http://127.0.0.1:${port}/`;
   const cookieName = `rdsh_${kind === "project" ? project.id : "harness"}`;
   let store, eventsHub;
@@ -88,10 +100,22 @@ export async function startDashboard(options) {
   const live = new Set(),
     sessions = new Map();
   const sockets = new Set();
+  const applications = store
+    ? new AnswerApplicationServer(project, () => store.value, mutateReply)
+    : null;
+  const visibleState = async () =>
+    publicState(
+      store.value,
+      await applications.observations(),
+      eventsHub.deliveries(),
+      budgets.observations(),
+    );
+  const budgets = store ? new BudgetAdmissionServer(mutateBudget) : null;
   const modern = store
     ? modernMcpHandler(
-        { getState: async () => publicState(store.value), mutate },
+        { getState: visibleState, mutate },
         eventsHub,
+        connections,
       )
     : null;
   const deliveryTimer = eventsHub
@@ -133,8 +157,11 @@ export async function startDashboard(options) {
   };
   function browserAuthorized(req, url, route) {
     if (kind === "project")
-      return equal(req.headers["x-rdsh-browser-token"], browserToken) ||
-        (route === "/api/live" && equal(url.searchParams.get("key"), browserToken));
+      return (
+        equal(req.headers["x-rdsh-browser-token"], browserToken) ||
+        (route === "/api/live" &&
+          equal(url.searchParams.get("key"), browserToken))
+      );
     return (req.headers.cookie || "").split(";").some((item) => {
       const [name, value] = item.trim().split("=");
       return name === cookieName && equal(value, browserToken);
@@ -165,6 +192,7 @@ export async function startDashboard(options) {
       schema: 1,
       kind,
       project_id: project?.id || null,
+      instance_id: instanceId,
       pid: process.pid,
       port,
       local_url: localUrl,
@@ -212,6 +240,37 @@ export async function startDashboard(options) {
       refreshPromise = null;
     }
   }
+  let diagnosticPromise = null;
+  async function diagnostics() {
+    if (diagnosticPromise) return diagnosticPromise;
+    diagnosticPromise = (async () => {
+      const [currentShare, tunnel] = await Promise.all([
+        tailscale
+          ? (options.inspectShare || inspectShare)(port)
+          : { state: "disabled", observed_at: new Date().toISOString() },
+        inspectTunnel(project, instanceId),
+      ]);
+      return connectionReport({
+        project,
+        startedAt,
+        browser: connections.snapshot("browser_auth"),
+        mcp: {
+          authentication: connections.snapshot("mcp_auth"),
+          discovery: connections.snapshot("server/discover"),
+          tools: connections.snapshot("tools/list"),
+          events: connections.snapshot("events/list"),
+        },
+        share: currentShare,
+        tunnel,
+        events: eventsHub.diagnostics(),
+      });
+    })();
+    try {
+      return await diagnosticPromise;
+    } finally {
+      diagnosticPromise = null;
+    }
+  }
   async function mutate(operation, input) {
     if (!store)
       throw new Error("Project operations are unavailable in Harness mode");
@@ -221,7 +280,70 @@ export async function startDashboard(options) {
         response.write(`event: changed\ndata: ${state.revision}\n\n`);
       for (const { mcp } of sessions.values()) void mcp.notify();
       void eventsHub.flush().catch(() => {});
-      return publicState(state);
+      return visibleState();
+    });
+    updateQueue = task.catch(() => {});
+    return task;
+  }
+  async function mutateReply(operation, input, context) {
+    const task = updateQueue.then(async () => {
+      const result = await store.mutateReply(operation, input, context);
+      for (const response of live)
+        response.write(`event: changed\ndata: ${store.value.revision}\n\n`);
+      for (const { mcp } of sessions.values()) void mcp.notify();
+      return result;
+    });
+    updateQueue = task.catch(() => {});
+    return task;
+  }
+  async function mutateBudget(operation, input) {
+    const task = updateQueue.then(async () => {
+      const result = await store.mutateBudget(operation, input);
+      for (const response of live)
+        response.write(`event: changed\ndata: ${store.value.revision}\n\n`);
+      for (const { mcp } of sessions.values()) void mcp.notify();
+      return result;
+    });
+    updateQueue = task.catch(() => {});
+    return task;
+  }
+  async function backupOperation(action, input) {
+    const task = updateQueue.then(async () => {
+      if (action === "history") {
+        if (Object.keys(input).length)
+          throw new Error("History takes no input");
+        return {
+          project_id: project.id,
+          revision: store.value.revision,
+          history_backups: structuredClone(store.value.history_backups || []),
+        };
+      }
+      const acceptance = await (await AcceptanceStore.open(project)).read();
+      if (action === "preview") {
+        if (
+          !input ||
+          typeof input !== "object" ||
+          Array.isArray(input) ||
+          !Object.hasOwn(input, "selection") ||
+          Object.keys(input).some((k) => !["selection", "review"].includes(k))
+        )
+          throw new Error("Invalid backup preview fields");
+        return createHistoryBackup(
+          store.value,
+          acceptance,
+          input.selection,
+          input.review,
+        );
+      }
+      const result = await store.restoreBackup(
+        input,
+        acceptance.evidence.map((r) => r.evidence_id),
+        acceptance.tasks.map((r) => r.id),
+      );
+      for (const response of live)
+        response.write(`event: changed\ndata: ${store.value.revision}\n\n`);
+      for (const { mcp } of sessions.values()) void mcp.notify();
+      return result;
     });
     updateQueue = task.catch(() => {});
     return task;
@@ -234,7 +356,11 @@ export async function startDashboard(options) {
       if (!trusted(req))
         return json(res, 403, { error: "Untrusted host or origin" });
       const url = new URL(req.url, localUrl);
-      if (kind === "harness" && req.method === "GET" && equal(url.searchParams.get("rdsh_dashboard_key"), browserToken)) {
+      if (
+        kind === "harness" &&
+        req.method === "GET" &&
+        equal(url.searchParams.get("rdsh_dashboard_key"), browserToken)
+      ) {
         url.searchParams.delete("rdsh_dashboard_key");
         const secure =
           share.url && req.headers.host === new URL(share.url).host
@@ -250,27 +376,113 @@ export async function startDashboard(options) {
       const route = url.pathname.startsWith(prefix + "/")
         ? url.pathname.slice(prefix.length)
         : null;
-      const adminAuthorized = equal(req.headers.authorization, `Bearer ${token}`);
-      const agentRoute = route === "/mcp" || route === "/api/state" ||
-        (req.method === "POST" && ["metrics", "task", "question", "event"].some((operation) => route === `/api/update/${operation}`));
-      const mcpAuthorized = kind === "project" && agentRoute && equal(req.headers.authorization, `Bearer ${mcpToken}`);
+      const adminAuthorized = equal(
+        req.headers.authorization,
+        `Bearer ${token}`,
+      );
+      const agentRoute =
+        route === "/mcp" ||
+        route === "/api/state" ||
+        route === "/api/instructions/context" ||
+        (req.method === "POST" && route === "/api/instructions/submit") ||
+        (req.method === "POST" &&
+          ["metrics", "task", "question", "event"].some(
+            (operation) => route === `/api/update/${operation}`,
+          ));
+      const mcpAuthorized =
+        kind === "project" &&
+        agentRoute &&
+        equal(req.headers.authorization, `Bearer ${mcpToken}`);
       const humanAuthorized = browserAuthorized(req, url, route);
-      const publicAsset = kind === "project" && req.method === "GET" && (route === "/" || route === "/app.mjs");
-      if (!publicAsset && !adminAuthorized && !mcpAuthorized && !humanAuthorized)
+      if (kind === "project" && route === "/mcp")
+        connections.record(
+          "mcp_auth",
+          mcpAuthorized,
+          mcpAuthorized ? "authenticated" : "unauthorized",
+        );
+      if (
+        kind === "project" &&
+        ["/api/state", "/api/config"].includes(route) &&
+        (humanAuthorized || req.headers["x-rdsh-browser-token"])
+      )
+        connections.record(
+          "browser_auth",
+          humanAuthorized,
+          humanAuthorized ? "authenticated" : "unauthorized",
+          share.url && req.headers.host === new URL(share.url).host
+            ? "tailscale"
+            : "loopback",
+        );
+      const consumerRoute =
+        kind === "project" &&
+        ((req.method === "GET" && route === "/api/replies/read") ||
+          (req.method === "POST" &&
+            ["/api/replies/ack", "/api/replies/control"].includes(route)));
+      const consumerToken = req.headers["x-rdsh-consumer-token"];
+      const budgetProducerRoute =
+        kind === "project" &&
+        req.method === "POST" &&
+        route?.startsWith("/api/budget/producer/");
+      const budgetToken = req.headers["x-rdsh-budget-token"];
+      const publicAsset =
+        kind === "project" &&
+        req.method === "GET" &&
+        (route === "/" ||
+          route === "/app.mjs" ||
+          route === "/question-cards-ui.mjs" ||
+          route === "/project-overview.mjs" ||
+          route === "/connection-diagnostics-ui.mjs" ||
+          route === "/answer-applications-ui.mjs" ||
+          route === "/instruction-queue-ui.mjs" ||
+          route === "/cost-ledger-ui.mjs" ||
+          route === "/budget-ui.mjs");
+      if (
+        !publicAsset &&
+        !adminAuthorized &&
+        !mcpAuthorized &&
+        !humanAuthorized &&
+        !(budgetProducerRoute && typeof budgetToken === "string") &&
+        !(consumerRoute && typeof consumerToken === "string")
+      )
         return json(res, 401, {
           error:
             "Open this dashboard through rdsh-dashboard open or its QR code",
         });
       if (closing) return json(res, 503, { error: "Dashboard is stopping" });
+      if (req.method === "GET" && route === "/api/managed-process")
+        return json(
+          res,
+          200,
+          harness
+            ? await harness.inspect()
+            : { run_id: null, scope: null, stages: [] },
+        );
+      if (req.method === "POST" && route === "/api/managed-stop") {
+        if (!harness)
+          return json(res, 409, { error: "No owned Harness process" });
+        if (!adminAuthorized && !humanAuthorized)
+          return json(res, 401, {
+            error: "Human browser or administrator required",
+          });
+        void harness.stop().catch(() => {});
+        return json(res, 202, { requested: true, run_id: harness.run_id });
+      }
       if (req.method === "POST" && route === "/api/stop") {
         if (!adminAuthorized)
           return json(res, 401, {
             error: "Administrator bearer token required",
           });
+        const result = harness ? await harness.stop() : null;
+        if (result && !result.confirmed)
+          return json(res, 409, {
+            error:
+              "Managed descendants are unverified; dashboard remains available",
+            managed_stop: result,
+          });
         res.once("finish", () => {
-          void close();
+          void close().catch(() => {});
         });
-        return json(res, 200, { stopping: true });
+        return json(res, 200, { stopping: true, managed_stop: result });
       }
       if (
         req.method === "POST" &&
@@ -288,15 +500,34 @@ export async function startDashboard(options) {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         return res.end(await fs.readFile(path.join(here, "ui.html")));
       }
-      if (req.method === "GET" && route === "/app.mjs") {
+      if (
+        req.method === "GET" &&
+        [
+          "/app.mjs",
+          "/question-cards-ui.mjs",
+          "/project-overview.mjs",
+          "/connection-diagnostics-ui.mjs",
+          "/answer-applications-ui.mjs",
+          "/instruction-queue-ui.mjs",
+          "/cost-ledger-ui.mjs",
+          "/budget-ui.mjs",
+        ].includes(route)
+      ) {
         res.writeHead(200, {
           "content-type": "text/javascript; charset=utf-8",
         });
-        return res.end(await fs.readFile(path.join(here, "app.mjs")));
+        return res.end(await fs.readFile(path.join(here, route.slice(1))));
       }
+      if (
+        kind === "project" &&
+        req.method === "GET" &&
+        route === "/api/diagnostics"
+      )
+        return json(res, 200, await diagnostics());
       if (req.method === "GET" && route === "/api/config")
         return json(res, 200, {
           kind,
+          instance_id: instanceId,
           project: project
             ? { id: project.id, name: project.name, root: project.root }
             : null,
@@ -320,17 +551,164 @@ export async function startDashboard(options) {
         return res.end(svg);
       }
       if (kind === "project") {
-        if (req.method === "GET" && route === "/api/state")
-          return json(res, 200, publicState(store.value));
-        if (req.method === "POST" && route?.startsWith("/api/update/")) {
-          const operation = route.slice("/api/update/".length);
-          if (operation === "answer" ? !humanAuthorized : !(mcpAuthorized || adminAuthorized))
-            return json(res, 403, { error: "This credential cannot perform that operation" });
+        if (req.method === "POST" && route?.startsWith("/api/backup/")) {
+          if (
+            !adminAuthorized ||
+            !["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(
+              req.socket.remoteAddress,
+            )
+          )
+            return json(res, 403, {
+              error: "Backup requires the local administrator credential",
+            });
+          const action = route.slice("/api/backup/".length);
+          if (!["preview", "restore", "history"].includes(action))
+            return json(res, 404, { error: "Unknown backup operation" });
           return json(
             res,
             200,
-            await mutate(operation, await readBody(req)),
+            await backupOperation(
+              action,
+              await readBody(req, backupMaximum + 65536),
+            ),
           );
+        }
+        if (req.method === "POST" && route?.startsWith("/api/budget/")) {
+          if (
+            !["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(
+              req.socket.remoteAddress,
+            )
+          )
+            return json(res, 403, {
+              error: "Budget control requires loopback access",
+            });
+          const action = route.slice("/api/budget/".length);
+          const input = await readBody(req);
+          if (budgetProducerRoute)
+            return json(
+              res,
+              200,
+              await budgets.producer(
+                action.slice("producer/".length),
+                input,
+                budgetToken,
+              ),
+            );
+          if (!adminAuthorized)
+            return json(res, 403, {
+              error:
+                "Local administrator credential required for budget control",
+            });
+          if (action === "launch")
+            return json(res, 200, await budgets.launch(input));
+          if (action === "revoke")
+            return json(res, 200, await budgets.revoke(input));
+          if (action === "inspect")
+            return json(
+              res,
+              200,
+              (await visibleState()).budget_admission || null,
+            );
+          if (["policy", "usage"].includes(action))
+            return json(res, 200, await mutateBudget(action, input));
+          return json(res, 404, { error: "Unknown budget operation" });
+        }
+        if (req.method === "GET" && route === "/api/instructions/context")
+          return json(
+            res,
+            200,
+            await applications.instructionContext(
+              url.searchParams.get("consumer_id"),
+            ),
+          );
+        if (
+          req.method === "POST" &&
+          ["/api/instructions/submit", "/api/instructions/resolve"].includes(
+            route,
+          )
+        ) {
+          const resolve = route.endsWith("/resolve");
+          if (resolve && !humanAuthorized && !adminAuthorized)
+            return json(res, 403, { error: "Human confirmation required" });
+          return json(
+            res,
+            200,
+            await applications.instruction(
+              await readBody(req),
+              adminAuthorized
+                ? "administrator"
+                : mcpAuthorized
+                  ? "management_agent"
+                  : "human",
+              resolve,
+            ),
+          );
+        }
+        if (req.method === "POST" && route === "/api/replies/register") {
+          if (!adminAuthorized)
+            return json(res, 403, {
+              error: "Local administrator must bind the verified ACP owner",
+            });
+          return json(
+            res,
+            200,
+            await applications.register(await readBody(req)),
+          );
+        }
+        if (consumerRoute) {
+          if (typeof consumerToken !== "string")
+            return json(res, 403, {
+              error: "Separate consumer credential required",
+            });
+          if (req.method === "GET")
+            return json(
+              res,
+              200,
+              await applications.read(
+                url.searchParams.get("consumer_id"),
+                consumerToken,
+                Number(url.searchParams.get("after") || "0"),
+              ),
+            );
+          return json(
+            res,
+            200,
+            route.endsWith("/control")
+              ? await applications.control(await readBody(req), consumerToken)
+              : await applications.ack(await readBody(req), consumerToken),
+          );
+        }
+        if (req.method === "POST" && route === "/api/decision/cancel") {
+          if (!humanAuthorized)
+            return json(res, 403, {
+              error: "Human browser credential required",
+            });
+          const input = await readBody(req);
+          return json(
+            res,
+            200,
+            await mutate("question", { ...input, action: "cancel" }),
+          );
+        }
+        if (req.method === "GET" && route === "/api/state")
+          return json(res, 200, await visibleState());
+        if (req.method === "POST" && route?.startsWith("/api/update/")) {
+          const operation = route.slice("/api/update/".length);
+          if (
+            !["metrics", "task", "question", "answer", "event"].includes(
+              operation,
+            )
+          )
+            return json(res, 404, { error: "Unknown project operation" });
+          if (
+            operation === "answer"
+              ? !humanAuthorized
+              : !(mcpAuthorized || adminAuthorized)
+          )
+            return json(res, 403, {
+              error: "This credential cannot perform that operation",
+            });
+          return json(res, 200, await mutate(operation, await readBody(req)));
         }
         if (req.method === "GET" && route === "/api/live") {
           res.writeHead(200, {
@@ -361,7 +739,7 @@ export async function startDashboard(options) {
             });
           if (!session && req.method === "POST" && isInitializeRequest(body)) {
             const mcp = createMcpServer({
-              getState: async () => publicState(store.value),
+              getState: visibleState,
               mutate,
             });
             const transport = new StreamableHTTPServerTransport({
@@ -384,7 +762,10 @@ export async function startDashboard(options) {
         return proxyHarness(req, res, harness.port, cookieName, token);
       json(res, 404, { error: "Not found" });
     } catch (e) {
-      if (!res.headersSent) json(res, 400, { error: e.message });
+      if (!res.headersSent)
+        json(res, [401, 403, 409].includes(e.status) ? e.status : 400, {
+          error: e.message,
+        });
       else res.end();
     }
   });
@@ -393,7 +774,8 @@ export async function startDashboard(options) {
     socket.once("close", () => sockets.delete(socket));
   });
   server.on("upgrade", (req, socket, head) => {
-    const authorizedUpgrade = equal(req.headers.authorization, `Bearer ${token}`) ||
+    const authorizedUpgrade =
+      equal(req.headers.authorization, `Bearer ${token}`) ||
       (kind === "harness" && browserAuthorized(req, null, null));
     if (kind !== "harness" || !harness || !trusted(req) || !authorizedUpgrade) {
       socket.write("HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n");
@@ -404,6 +786,10 @@ export async function startDashboard(options) {
   });
   async function close() {
     if (closing) return;
+    if (harness && !(await harness.stop()).confirmed)
+      throw new Error(
+        "Owned Harness exit unverified; dashboard remains available",
+      );
     closing = true;
     if (deliveryTimer) clearInterval(deliveryTimer);
     for (const response of live) response.end();
@@ -412,7 +798,6 @@ export async function startDashboard(options) {
     await eventsHub?.queue;
     for (const socket of sockets) socket.destroy();
     await new Promise((resolve) => server.close(resolve));
-    if (harness) await harness.stop();
     await fs.unlink(lockFile).catch(() => {});
   }
   try {
@@ -421,7 +806,11 @@ export async function startDashboard(options) {
       server.listen(port, "127.0.0.1", resolve);
     });
     if (kind === "harness")
-      harness = await startHarness(options.harnessPort || 3081, port);
+      harness = await startHarness(options.harnessPort || 3081, port, {
+        ...options.harnessOptions,
+        project: { id: "managed-harness", directory },
+      });
+    if (harness && options.observeHarness) options.observeHarness(harness);
     await refreshShare();
   } catch (e) {
     await close();

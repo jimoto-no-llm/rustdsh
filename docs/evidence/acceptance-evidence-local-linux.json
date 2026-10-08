@@ -1,0 +1,642 @@
+{
+  "observed_at": "2026-10-05T21:58:57.835Z",
+  "platform": "linux",
+  "architecture": "x64",
+  "node_version": "v24.21.0",
+  "os_release": "6.6.87.2-microsoft-standard-WSL2",
+  "command": "node dashboard/cli.mjs acceptance inspect --project <isolated-native-git-project> --task-id task-qa",
+  "baseline": {
+    "head_sha": "786f2acc6f37da98791efde7aa0298d33b33bff6",
+    "comparison": "baseline entrypoint evaluated with the current common dependencies",
+    "exit_code": 1,
+    "stderr": "[rdsh-dashboard] Unknown command; use --help"
+  },
+  "done_not_run": {
+    "reported_task_status": "done",
+    "reported_done_with_verified_checks": false,
+    "verification": {
+      "all_declared_full_checks_pass": false,
+      "status": "unverified",
+      "source": "local_test_execution_and_current_code_environment_observations",
+      "human_review": "not_assessed",
+      "production_adoption": "not_assessed"
+    },
+    "replayed_tests": 0,
+    "conditions": [
+      {
+        "criterion_id": "correct-result",
+        "status": "not-run",
+        "verified_full_check": false,
+        "full": null,
+        "partial": null
+      }
+    ]
+  },
+  "full_pass": {
+    "reported_task_status": "done",
+    "reported_done_with_verified_checks": true,
+    "verification": {
+      "all_declared_full_checks_pass": true,
+      "status": "verified_checks",
+      "source": "local_test_execution_and_current_code_environment_observations",
+      "human_review": "not_assessed",
+      "production_adoption": "not_assessed"
+    },
+    "replayed_tests": 0,
+    "conditions": [
+      {
+        "criterion_id": "correct-result",
+        "status": "pass",
+        "verified_full_check": true,
+        "full": {
+          "evidence_id": "evi_29bbe43c-326d-4777-951f-e77a56ada1c5",
+          "status": "pass",
+          "source": "local_runner",
+          "exit_code": 0,
+          "command": {
+            "executable": "/root/.local/opt/rdsh-node/bin/node",
+            "arguments_digest": "a46edc4a4a0a52dc6354621bc5c863c381de44619db867b32a0a72b2cbdcff65",
+            "argument_count": 1,
+            "private_argv_file": "command.json"
+          },
+          "command_integrity": "intact",
+          "freshness": {
+            "state": "current",
+            "reason": null
+          },
+          "target": {
+            "observed_at": "2026-10-05T21:58:24.885Z",
+            "head_sha": "d02e8091105ee5d42bfbf003de0e059a9926cb49",
+            "branch": "acceptance-qa",
+            "inputs_hash": "94776e97da57a3e73b3fee3973f5b6f221ed64b2eb43106c4516531b7bf5e2b4",
+            "worktree_hash": "fbdbff2625796365e7cbd97c36fae31336220da9384139c3ad1292e0b231995b",
+            "environment": {
+              "platform": "linux",
+              "architecture": "x64",
+              "os_release": "6.6.87.2-microsoft-standard-WSL2",
+              "node_version": "v24.21.0"
+            },
+            "environment_hash": "fb3ca34143cd8f3581df527e2a255e360fab17ab7ac08ec82f66ddb9201f1b9e",
+            "status": "observed",
+            "reason": null
+          },
+          "started_at": "2026-10-05T21:58:24.936Z",
+          "finished_at": "2026-10-05T21:58:25.039Z",
+          "artifacts": [
+            {
+              "name": "stdout.log",
+              "mime": "text/plain",
+              "sha256": "d50d139cf41b41201ed08b2e8a446e1540977f186118df7b74d3fbb28eef5178",
+              "bytes": 20,
+              "captured_at": "2026-10-05T21:58:24.996Z",
+              "imported_at": "2026-10-05T21:58:24.996Z",
+              "source": "local_runner_log",
+              "integrity": "intact",
+              "target": {
+                "observed_at": "2026-10-05T21:58:24.885Z",
+                "head_sha": "d02e8091105ee5d42bfbf003de0e059a9926cb49",
+                "branch": "acceptance-qa",
+                "inputs_hash": "94776e97da57a3e73b3fee3973f5b6f221ed64b2eb43106c4516531b7bf5e2b4",
+                "worktree_hash": "fbdbff2625796365e7cbd97c36fae31336220da9384139c3ad1292e0b231995b",
+                "environment": {
+                  "platform": "linux",
+                  "architecture": "x64",
+                  "os_release": "6.6.87.2-microsoft-standard-WSL2",
+                  "node_version": "v24.21.0"
+                },
+                "environment_hash": "fb3ca34143cd8f3581df527e2a255e360fab17ab7ac08ec82f66ddb9201f1b9e",
+                "status": "observed",
+                "reason": null
+              },
+              "freshness": {
+                "state": "current",
+                "reason": null
+              },
+              "target_binding": "observed_execution",
+              "visual_review": "not_assessed"
+            },
+            {
+              "name": "stderr.log",
+              "mime": "text/plain",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0,
+              "captured_at": "2026-10-05T21:58:25.001Z",
+              "imported_at": "2026-10-05T21:58:25.001Z",
+              "source": "local_runner_log",
+              "integrity": "intact",
+              "target": {
+                "observed_at": "2026-10-05T21:58:24.885Z",
+                "head_sha": "d02e8091105ee5d42bfbf003de0e059a9926cb49",
+                "branch": "acceptance-qa",
+                "inputs_hash": "94776e97da57a3e73b3fee3973f5b6f221ed64b2eb43106c4516531b7bf5e2b4",
+                "worktree_hash": "fbdbff2625796365e7cbd97c36fae31336220da9384139c3ad1292e0b231995b",
+                "environment": {
+                  "platform": "linux",
+                  "architecture": "x64",
+                  "os_release": "6.6.87.2-microsoft-standard-WSL2",
+                  "node_version": "v24.21.0"
+                },
+                "environment_hash": "fb3ca34143cd8f3581df527e2a255e360fab17ab7ac08ec82f66ddb9201f1b9e",
+                "status": "observed",
+                "reason": null
+              },
+              "freshness": {
+                "state": "current",
+                "reason": null
+              },
+              "target_binding": "observed_execution",
+              "visual_review": "not_assessed"
+            },
+            {
+              "name": "image-0.png",
+              "mime": "image/png",
+              "sha256": "12c5f2d047c104162162d8a5a74281257ecd3b38e225d4fb8bda77e3427d65dd",
+              "bytes": 68,
+              "captured_at": null,
+              "imported_at": "2026-10-05T21:58:25.006Z",
+              "source": "operator_supplied_image",
+              "integrity": "intact",
+              "target": {
+                "observed_at": "2026-10-05T21:58:24.885Z",
+                "head_sha": "d02e8091105ee5d42bfbf003de0e059a9926cb49",
+                "branch": "acceptance-qa",
+                "inputs_hash": "94776e97da57a3e73b3fee3973f5b6f221ed64b2eb43106c4516531b7bf5e2b4",
+                "worktree_hash": "fbdbff2625796365e7cbd97c36fae31336220da9384139c3ad1292e0b231995b",
+                "environment": {
+                  "platform": "linux",
+                  "architecture": "x64",
+                  "os_release": "6.6.87.2-microsoft-standard-WSL2",
+                  "node_version": "v24.21.0"
+                },
+                "environment_hash": "fb3ca34143cd8f3581df527e2a255e360fab17ab7ac08ec82f66ddb9201f1b9e",
+                "status": "observed",
+                "reason": null
+              },
+              "freshness": {
+                "state": "current",
+                "reason": null
+              },
+              "target_binding": "operator_supplied; capture_target_unverified",
+              "visual_review": "not_assessed"
+            }
+          ]
+        },
+        "partial": null
+      }
+    ]
+  },
+  "related_change": {
+    "reported_task_status": "done",
+    "reported_done_with_verified_checks": false,
+    "verification": {
+      "all_declared_full_checks_pass": false,
+      "status": "unverified",
+      "source": "local_test_execution_and_current_code_environment_observations",
+      "human_review": "not_assessed",
+      "production_adoption": "not_assessed"
+    },
+    "replayed_tests": 0,
+    "conditions": [
+      {
+        "criterion_id": "correct-result",
+        "status": "pass",
+        "verified_full_check": false,
+        "full": {
+          "evidence_id": "evi_29bbe43c-326d-4777-951f-e77a56ada1c5",
+          "status": "pass",
+          "source": "local_runner",
+          "exit_code": 0,
+          "command": {
+            "executable": "/root/.local/opt/rdsh-node/bin/node",
+            "arguments_digest": "a46edc4a4a0a52dc6354621bc5c863c381de44619db867b32a0a72b2cbdcff65",
+            "argument_count": 1,
+            "private_argv_file": "command.json"
+          },
+          "command_integrity": "intact",
+          "freshness": {
+            "state": "stale",
+            "reason": "related_input_changed"
+          },
+          "target": {
+            "observed_at": "2026-10-05T21:58:24.885Z",
+            "head_sha": "d02e8091105ee5d42bfbf003de0e059a9926cb49",
+            "branch": "acceptance-qa",
+            "inputs_hash": "94776e97da57a3e73b3fee3973f5b6f221ed64b2eb43106c4516531b7bf5e2b4",
+            "worktree_hash": "fbdbff2625796365e7cbd97c36fae31336220da9384139c3ad1292e0b231995b",
+            "environment": {
+              "platform": "linux",
+              "architecture": "x64",
+              "os_release": "6.6.87.2-microsoft-standard-WSL2",
+              "node_version": "v24.21.0"
+            },
+            "environment_hash": "fb3ca34143cd8f3581df527e2a255e360fab17ab7ac08ec82f66ddb9201f1b9e",
+            "status": "observed",
+            "reason": null
+          },
+          "started_at": "2026-10-05T21:58:24.936Z",
+          "finished_at": "2026-10-05T21:58:25.039Z",
+          "artifacts": [
+            {
+              "name": "stdout.log",
+              "mime": "text/plain",
+              "sha256": "d50d139cf41b41201ed08b2e8a446e1540977f186118df7b74d3fbb28eef5178",
+              "bytes": 20,
+              "captured_at": "2026-10-05T21:58:24.996Z",
+              "imported_at": "2026-10-05T21:58:24.996Z",
+              "source": "local_runner_log",
+              "integrity": "intact",
+              "target": {
+                "observed_at": "2026-10-05T21:58:24.885Z",
+                "head_sha": "d02e8091105ee5d42bfbf003de0e059a9926cb49",
+                "branch": "acceptance-qa",
+                "inputs_hash": "94776e97da57a3e73b3fee3973f5b6f221ed64b2eb43106c4516531b7bf5e2b4",
+                "worktree_hash": "fbdbff2625796365e7cbd97c36fae31336220da9384139c3ad1292e0b231995b",
+                "environment": {
+                  "platform": "linux",
+                  "architecture": "x64",
+                  "os_release": "6.6.87.2-microsoft-standard-WSL2",
+                  "node_version": "v24.21.0"
+                },
+                "environment_hash": "fb3ca34143cd8f3581df527e2a255e360fab17ab7ac08ec82f66ddb9201f1b9e",
+                "status": "observed",
+                "reason": null
+              },
+              "freshness": {
+                "state": "stale",
+                "reason": "related_input_changed"
+              },
+              "target_binding": "observed_execution",
+              "visual_review": "not_assessed"
+            },
+            {
+              "name": "stderr.log",
+              "mime": "text/plain",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0,
+              "captured_at": "2026-10-05T21:58:25.001Z",
+              "imported_at": "2026-10-05T21:58:25.001Z",
+              "source": "local_runner_log",
+              "integrity": "intact",
+              "target": {
+                "observed_at": "2026-10-05T21:58:24.885Z",
+                "head_sha": "d02e8091105ee5d42bfbf003de0e059a9926cb49",
+                "branch": "acceptance-qa",
+                "inputs_hash": "94776e97da57a3e73b3fee3973f5b6f221ed64b2eb43106c4516531b7bf5e2b4",
+                "worktree_hash": "fbdbff2625796365e7cbd97c36fae31336220da9384139c3ad1292e0b231995b",
+                "environment": {
+                  "platform": "linux",
+                  "architecture": "x64",
+                  "os_release": "6.6.87.2-microsoft-standard-WSL2",
+                  "node_version": "v24.21.0"
+                },
+                "environment_hash": "fb3ca34143cd8f3581df527e2a255e360fab17ab7ac08ec82f66ddb9201f1b9e",
+                "status": "observed",
+                "reason": null
+              },
+              "freshness": {
+                "state": "stale",
+                "reason": "related_input_changed"
+              },
+              "target_binding": "observed_execution",
+              "visual_review": "not_assessed"
+            },
+            {
+              "name": "image-0.png",
+              "mime": "image/png",
+              "sha256": "12c5f2d047c104162162d8a5a74281257ecd3b38e225d4fb8bda77e3427d65dd",
+              "bytes": 68,
+              "captured_at": null,
+              "imported_at": "2026-10-05T21:58:25.006Z",
+              "source": "operator_supplied_image",
+              "integrity": "intact",
+              "target": {
+                "observed_at": "2026-10-05T21:58:24.885Z",
+                "head_sha": "d02e8091105ee5d42bfbf003de0e059a9926cb49",
+                "branch": "acceptance-qa",
+                "inputs_hash": "94776e97da57a3e73b3fee3973f5b6f221ed64b2eb43106c4516531b7bf5e2b4",
+                "worktree_hash": "fbdbff2625796365e7cbd97c36fae31336220da9384139c3ad1292e0b231995b",
+                "environment": {
+                  "platform": "linux",
+                  "architecture": "x64",
+                  "os_release": "6.6.87.2-microsoft-standard-WSL2",
+                  "node_version": "v24.21.0"
+                },
+                "environment_hash": "fb3ca34143cd8f3581df527e2a255e360fab17ab7ac08ec82f66ddb9201f1b9e",
+                "status": "observed",
+                "reason": null
+              },
+              "freshness": {
+                "state": "stale",
+                "reason": "related_input_changed"
+              },
+              "target_binding": "operator_supplied; capture_target_unverified",
+              "visual_review": "not_assessed"
+            }
+          ]
+        },
+        "partial": null
+      }
+    ]
+  },
+  "full_failed_with_partial_success": {
+    "reported_task_status": "done",
+    "reported_done_with_verified_checks": false,
+    "verification": {
+      "all_declared_full_checks_pass": false,
+      "status": "unverified",
+      "source": "local_test_execution_and_current_code_environment_observations",
+      "human_review": "not_assessed",
+      "production_adoption": "not_assessed"
+    },
+    "replayed_tests": 0,
+    "conditions": [
+      {
+        "criterion_id": "correct-result",
+        "status": "fail",
+        "verified_full_check": false,
+        "full": {
+          "evidence_id": "evi_7496e7a0-efcb-4f0b-9f7e-a6551ac265f2",
+          "status": "fail",
+          "source": "local_runner",
+          "exit_code": 1,
+          "command": {
+            "executable": "/root/.local/opt/rdsh-node/bin/node",
+            "arguments_digest": "a46edc4a4a0a52dc6354621bc5c863c381de44619db867b32a0a72b2cbdcff65",
+            "argument_count": 1,
+            "private_argv_file": "command.json"
+          },
+          "command_integrity": "intact",
+          "freshness": {
+            "state": "current",
+            "reason": null
+          },
+          "target": {
+            "observed_at": "2026-10-05T21:58:36.307Z",
+            "head_sha": "d02e8091105ee5d42bfbf003de0e059a9926cb49",
+            "branch": "acceptance-qa",
+            "inputs_hash": "0ad13817a92c2bea9df688f7fedb254dde34909e7d8f9b4fdbcd659787c39427",
+            "worktree_hash": "ca7d03293201aad6bd6ae42f57270fcc08b2569f702ed30353c03910cad5d36d",
+            "environment": {
+              "platform": "linux",
+              "architecture": "x64",
+              "os_release": "6.6.87.2-microsoft-standard-WSL2",
+              "node_version": "v24.21.0"
+            },
+            "environment_hash": "fb3ca34143cd8f3581df527e2a255e360fab17ab7ac08ec82f66ddb9201f1b9e",
+            "status": "observed",
+            "reason": null
+          },
+          "started_at": "2026-10-05T21:58:36.347Z",
+          "finished_at": "2026-10-05T21:58:36.428Z",
+          "artifacts": [
+            {
+              "name": "stdout.log",
+              "mime": "text/plain",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0,
+              "captured_at": "2026-10-05T21:58:36.397Z",
+              "imported_at": "2026-10-05T21:58:36.397Z",
+              "source": "local_runner_log",
+              "integrity": "intact",
+              "target": {
+                "observed_at": "2026-10-05T21:58:36.307Z",
+                "head_sha": "d02e8091105ee5d42bfbf003de0e059a9926cb49",
+                "branch": "acceptance-qa",
+                "inputs_hash": "0ad13817a92c2bea9df688f7fedb254dde34909e7d8f9b4fdbcd659787c39427",
+                "worktree_hash": "ca7d03293201aad6bd6ae42f57270fcc08b2569f702ed30353c03910cad5d36d",
+                "environment": {
+                  "platform": "linux",
+                  "architecture": "x64",
+                  "os_release": "6.6.87.2-microsoft-standard-WSL2",
+                  "node_version": "v24.21.0"
+                },
+                "environment_hash": "fb3ca34143cd8f3581df527e2a255e360fab17ab7ac08ec82f66ddb9201f1b9e",
+                "status": "observed",
+                "reason": null
+              },
+              "freshness": {
+                "state": "current",
+                "reason": null
+              },
+              "target_binding": "observed_execution",
+              "visual_review": "not_assessed"
+            },
+            {
+              "name": "stderr.log",
+              "mime": "text/plain",
+              "sha256": "5c1d6ace7e47037dbf7b1b2043a20e40bc774b106371719333b18df7c837c631",
+              "bytes": 574,
+              "captured_at": "2026-10-05T21:58:36.402Z",
+              "imported_at": "2026-10-05T21:58:36.402Z",
+              "source": "local_runner_log",
+              "integrity": "intact",
+              "target": {
+                "observed_at": "2026-10-05T21:58:36.307Z",
+                "head_sha": "d02e8091105ee5d42bfbf003de0e059a9926cb49",
+                "branch": "acceptance-qa",
+                "inputs_hash": "0ad13817a92c2bea9df688f7fedb254dde34909e7d8f9b4fdbcd659787c39427",
+                "worktree_hash": "ca7d03293201aad6bd6ae42f57270fcc08b2569f702ed30353c03910cad5d36d",
+                "environment": {
+                  "platform": "linux",
+                  "architecture": "x64",
+                  "os_release": "6.6.87.2-microsoft-standard-WSL2",
+                  "node_version": "v24.21.0"
+                },
+                "environment_hash": "fb3ca34143cd8f3581df527e2a255e360fab17ab7ac08ec82f66ddb9201f1b9e",
+                "status": "observed",
+                "reason": null
+              },
+              "freshness": {
+                "state": "current",
+                "reason": null
+              },
+              "target_binding": "observed_execution",
+              "visual_review": "not_assessed"
+            }
+          ]
+        },
+        "partial": {
+          "evidence_id": "evi_a61b6140-4be7-4f35-8b26-3070bfa42f5b",
+          "status": "pass",
+          "source": "local_runner",
+          "exit_code": 0,
+          "freshness": {
+            "state": "current",
+            "reason": null
+          }
+        }
+      }
+    ]
+  },
+  "repaired_full_pass": {
+    "reported_task_status": "done",
+    "reported_done_with_verified_checks": true,
+    "verification": {
+      "all_declared_full_checks_pass": true,
+      "status": "verified_checks",
+      "source": "local_test_execution_and_current_code_environment_observations",
+      "human_review": "not_assessed",
+      "production_adoption": "not_assessed"
+    },
+    "replayed_tests": 0,
+    "conditions": [
+      {
+        "criterion_id": "correct-result",
+        "status": "pass",
+        "verified_full_check": true,
+        "full": {
+          "evidence_id": "evi_519812c6-997c-4e39-af95-2a3f864ee38d",
+          "status": "pass",
+          "source": "local_runner",
+          "exit_code": 0,
+          "command": {
+            "executable": "/root/.local/opt/rdsh-node/bin/node",
+            "arguments_digest": "a46edc4a4a0a52dc6354621bc5c863c381de44619db867b32a0a72b2cbdcff65",
+            "argument_count": 1,
+            "private_argv_file": "command.json"
+          },
+          "command_integrity": "intact",
+          "freshness": {
+            "state": "current",
+            "reason": null
+          },
+          "target": {
+            "observed_at": "2026-10-05T21:58:47.500Z",
+            "head_sha": "d02e8091105ee5d42bfbf003de0e059a9926cb49",
+            "branch": "acceptance-qa",
+            "inputs_hash": "21336aec605305ee63f2a07d2aefef271ac69156aea8e894ca777ca211cac609",
+            "worktree_hash": "7e18253230521b9aaa6b3a3a4abf1fe2c146c58f18d105c714fc5c4f76d7229d",
+            "environment": {
+              "platform": "linux",
+              "architecture": "x64",
+              "os_release": "6.6.87.2-microsoft-standard-WSL2",
+              "node_version": "v24.21.0"
+            },
+            "environment_hash": "fb3ca34143cd8f3581df527e2a255e360fab17ab7ac08ec82f66ddb9201f1b9e",
+            "status": "observed",
+            "reason": null
+          },
+          "started_at": "2026-10-05T21:58:47.542Z",
+          "finished_at": "2026-10-05T21:58:47.621Z",
+          "artifacts": [
+            {
+              "name": "stdout.log",
+              "mime": "text/plain",
+              "sha256": "d50d139cf41b41201ed08b2e8a446e1540977f186118df7b74d3fbb28eef5178",
+              "bytes": 20,
+              "captured_at": "2026-10-05T21:58:47.592Z",
+              "imported_at": "2026-10-05T21:58:47.592Z",
+              "source": "local_runner_log",
+              "integrity": "intact",
+              "target": {
+                "observed_at": "2026-10-05T21:58:47.500Z",
+                "head_sha": "d02e8091105ee5d42bfbf003de0e059a9926cb49",
+                "branch": "acceptance-qa",
+                "inputs_hash": "21336aec605305ee63f2a07d2aefef271ac69156aea8e894ca777ca211cac609",
+                "worktree_hash": "7e18253230521b9aaa6b3a3a4abf1fe2c146c58f18d105c714fc5c4f76d7229d",
+                "environment": {
+                  "platform": "linux",
+                  "architecture": "x64",
+                  "os_release": "6.6.87.2-microsoft-standard-WSL2",
+                  "node_version": "v24.21.0"
+                },
+                "environment_hash": "fb3ca34143cd8f3581df527e2a255e360fab17ab7ac08ec82f66ddb9201f1b9e",
+                "status": "observed",
+                "reason": null
+              },
+              "freshness": {
+                "state": "current",
+                "reason": null
+              },
+              "target_binding": "observed_execution",
+              "visual_review": "not_assessed"
+            },
+            {
+              "name": "stderr.log",
+              "mime": "text/plain",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "bytes": 0,
+              "captured_at": "2026-10-05T21:58:47.596Z",
+              "imported_at": "2026-10-05T21:58:47.596Z",
+              "source": "local_runner_log",
+              "integrity": "intact",
+              "target": {
+                "observed_at": "2026-10-05T21:58:47.500Z",
+                "head_sha": "d02e8091105ee5d42bfbf003de0e059a9926cb49",
+                "branch": "acceptance-qa",
+                "inputs_hash": "21336aec605305ee63f2a07d2aefef271ac69156aea8e894ca777ca211cac609",
+                "worktree_hash": "7e18253230521b9aaa6b3a3a4abf1fe2c146c58f18d105c714fc5c4f76d7229d",
+                "environment": {
+                  "platform": "linux",
+                  "architecture": "x64",
+                  "os_release": "6.6.87.2-microsoft-standard-WSL2",
+                  "node_version": "v24.21.0"
+                },
+                "environment_hash": "fb3ca34143cd8f3581df527e2a255e360fab17ab7ac08ec82f66ddb9201f1b9e",
+                "status": "observed",
+                "reason": null
+              },
+              "freshness": {
+                "state": "current",
+                "reason": null
+              },
+              "target_binding": "observed_execution",
+              "visual_review": "not_assessed"
+            }
+          ]
+        },
+        "partial": {
+          "evidence_id": "evi_a61b6140-4be7-4f35-8b26-3070bfa42f5b",
+          "status": "pass",
+          "source": "local_runner",
+          "exit_code": 0,
+          "freshness": {
+            "state": "stale",
+            "reason": "related_input_changed"
+          }
+        }
+      }
+    ]
+  },
+  "retained_old_image": {
+    "name": "image-0.png",
+    "mime": "image/png",
+    "sha256": "12c5f2d047c104162162d8a5a74281257ecd3b38e225d4fb8bda77e3427d65dd",
+    "bytes": 68,
+    "captured_at": null,
+    "imported_at": "2026-10-05T21:58:25.006Z",
+    "source": "operator_supplied_image",
+    "integrity": "intact",
+    "target": {
+      "observed_at": "2026-10-05T21:58:24.885Z",
+      "head_sha": "d02e8091105ee5d42bfbf003de0e059a9926cb49",
+      "branch": "acceptance-qa",
+      "inputs_hash": "94776e97da57a3e73b3fee3973f5b6f221ed64b2eb43106c4516531b7bf5e2b4",
+      "worktree_hash": "fbdbff2625796365e7cbd97c36fae31336220da9384139c3ad1292e0b231995b",
+      "environment": {
+        "platform": "linux",
+        "architecture": "x64",
+        "os_release": "6.6.87.2-microsoft-standard-WSL2",
+        "node_version": "v24.21.0"
+      },
+      "environment_hash": "fb3ca34143cd8f3581df527e2a255e360fab17ab7ac08ec82f66ddb9201f1b9e",
+      "status": "observed",
+      "reason": null
+    },
+    "freshness": {
+      "state": "stale",
+      "reason": "related_input_changed"
+    },
+    "target_binding": "operator_supplied; capture_target_unverified",
+    "visual_review": "not_assessed"
+  },
+  "original_task_state_bytes_unchanged": true,
+  "original_task_schema": 1,
+  "native_or_model_requests": 0,
+  "limitations": [
+    "commands execute in actual local Node processes against a disposable Git fixture",
+    "the imported one-pixel PNG is a payload fixture, not a screen capture or visual QA",
+    "no native DSH/model/provider or external service was contacted",
+    "before/after code observations do not establish OS sandboxing or continuous filesystem attestation"
+  ]
+}

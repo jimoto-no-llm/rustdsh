@@ -109,7 +109,7 @@ fn query_terms(query: &str) -> Vec<String> {
         if matches!(t, "the" | "and" | "for" | "with" | "this" | "that") {
             continue;
         }
-        if !terms.contains(&t.to_string()) {
+        if !terms.iter().any(|x| x.as_str() == t) {
             terms.push(t.to_string());
         }
         if terms.len() >= 8 {
@@ -354,7 +354,7 @@ fn code_hits(query: &str, max: usize) -> Vec<String> {
                 continue;
             }
             let p = e.path();
-            let is_dir = e.file_type().map(|t| t.is_dir()).unwrap_or(false);
+            let is_dir = e.file_type().is_ok_and(|t| t.is_dir());
             if is_dir {
                 if files_seen < 4000 {
                     stack.push(p);

@@ -1,0 +1,132 @@
+{
+  "baseline_commit": "d9c3bc50a764c0fa830033ba7298f15dbcce73ee",
+  "command": "node dashboard/cli.mjs backup inspect --archive-file <same-valid-archive>",
+  "before": {
+    "exit_code": 1,
+    "stderr": "node:internal/util/parse_args/parse_args:102\r\n      throw new ERR_PARSE_ARGS_UNKNOWN_OPTION(\r\n            ^\r\n\r\nTypeError [ERR_PARSE_ARGS_UNKNOWN_OPTION]: Unknown option '--archive-file'. To specify a positional argument starting with a '-', place it at the end of the command after '--', as in '-- \"--archive-file\"\r\n    at checkOptionUsage (node:internal/util/parse_args/parse_args:102:13)\r\n    at node:internal/util/parse_args/parse_args:376:9\r\n    at Array.forEach (<anonymous>)\r\n    at parseArgs (node:internal/util/parse_args/parse_args:373:3)\r\n    at file:///C:/Users/owner/AppData/Local/Temp/rdsh-backup-qa-9a3u1g/before/dashboard/cli.mjs:67:33 {\r\n  code: 'ERR_PARSE_ARGS_UNKNOWN_OPTION'\r\n}\r\n\r\nNode.js v22.23.3"
+  },
+  "after": {
+    "exit_code": 0,
+    "stdout": {
+      "archive_id": "backup_9ce239bd-485b-4ad9-8c4e-346e4e51ab03",
+      "integrity": {
+        "algorithm": "sha256",
+        "digest": "485d4e5a5e857d3d956de4ee0d157de5dd379c76f19de66478808cab19386497"
+      },
+      "source": {
+        "project_id": "f664880f6f74bfb8",
+        "revision": 4,
+        "acceptance_revision": 1
+      },
+      "created_at": "2026-10-06T13:18:50.880Z",
+      "selection": {
+        "types": [
+          "answers",
+          "decisions",
+          "evidence",
+          "tasks"
+        ],
+        "task_ids": [
+          "task-1"
+        ],
+        "question_ids": null,
+        "evidence_ids": null,
+        "since": null,
+        "until": null
+      },
+      "selection_digest": "7c6ec61b4d2e8d531f9945b06e128b6d73853d3a4faa36aafd3c5dad64617010",
+      "counts": {
+        "tasks": 1,
+        "questions": 1,
+        "answers": 1,
+        "decisions": 1,
+        "evidence": 1
+      },
+      "reviewed_fields": [
+        "answers/answer_1/answer",
+        "questions/question-1/question",
+        "tasks/task-1/title"
+      ],
+      "withheld_fields": [
+        "decisions/decision_70f73ca2075be923f45c793499ec7cb7/choices/later/label",
+        "decisions/decision_70f73ca2075be923f45c793499ec7cb7/choices/yes/label",
+        "decisions/decision_70f73ca2075be923f45c793499ec7cb7/conditions",
+        "decisions/decision_70f73ca2075be923f45c793499ec7cb7/diff",
+        "decisions/decision_70f73ca2075be923f45c793499ec7cb7/impact",
+        "tasks/task-1/blocker",
+        "tasks/task-1/milestone"
+      ],
+      "policy": {
+        "mode": "historical-only",
+        "execution_authorized": false,
+        "event_subscriptions_restored": false,
+        "content_mode": "withheld-or-reviewed-replacement"
+      },
+      "records": {
+        "tasks": [
+          {
+            "id": "task-1",
+            "title": "Reviewed task title",
+            "status": "done",
+            "milestone": null,
+            "blocker": null,
+            "updated_at": "2026-10-06T13:18:50.250Z"
+          }
+        ],
+        "questions": [
+          {
+            "id": "question-1",
+            "question": "Apply the reviewed change?",
+            "created_at": "2026-10-06T13:18:50.254Z"
+          }
+        ],
+        "answers": [
+          {
+            "id": "answer_1",
+            "sequence": 1,
+            "question_id": "question-1",
+            "decision_id": "decision_70f73ca2075be923f45c793499ec7cb7",
+            "choice_id": "yes",
+            "answer": "Yes, apply that change",
+            "created_at": "2026-10-06T13:18:50.255Z"
+          }
+        ],
+        "decisions": [
+          {
+            "id": "decision_70f73ca2075be923f45c793499ec7cb7",
+            "question_id": "question-1",
+            "task_id": "task-1",
+            "revision": 1,
+            "kind": "consultation",
+            "source_status": "answered",
+            "updated_at": "2026-10-06T13:18:50.255Z",
+            "choices": [
+              {
+                "id": "yes",
+                "label": null
+              },
+              {
+                "id": "later",
+                "label": null
+              }
+            ],
+            "diff": null,
+            "impact": null,
+            "conditions": null
+          }
+        ],
+        "evidence": [
+          {
+            "id": "evi_a07c5332-cc56-4899-9c05-6ca5eff69e9a",
+            "task_id": "task-1",
+            "criterion_id": "criterion-1",
+            "sequence": 1,
+            "scope": "full",
+            "reference": "rdsh-evidence:f664880f6f74bfb8/evi_a07c5332-cc56-4899-9c05-6ca5eff69e9a",
+            "freshness": "unverified"
+          }
+        ]
+      }
+    }
+  }
+}

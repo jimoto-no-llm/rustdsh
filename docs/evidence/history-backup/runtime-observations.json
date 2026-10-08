@@ -1,0 +1,42 @@
+{
+  "platform": "win32",
+  "node": "v22.23.3",
+  "fixture_only": true,
+  "counts": {
+    "tasks": 1,
+    "questions": 1,
+    "answers": 1,
+    "decisions": 1,
+    "evidence": 1
+  },
+  "export_cli_ms": 300.1454,
+  "restore_cli_ms": 296.2596000000001,
+  "restored": {
+    "archive_id": "backup_9ce239bd-485b-4ad9-8c4e-346e4e51ab03",
+    "target_project_id": "3b8104db9509f9b6",
+    "mode": "historical-only",
+    "execution_authorized": false,
+    "revision": 1
+  },
+  "old_credential_status": {
+    "administrator": 401,
+    "mcp": 401,
+    "browser": 401
+  },
+  "collision": {
+    "reason": "backup_id_collision",
+    "target_bytes_unchanged": true
+  },
+  "corruption": {
+    "reason": "backup_integrity_mismatch",
+    "target_bytes_unchanged": true
+  },
+  "reexport_byte_identical": true,
+  "raw_fixture_and_runtime_credentials_absent": true,
+  "active_target": {
+    "tasks": 0,
+    "questions": 0,
+    "feedback": 0
+  },
+  "copied_code_or_assets": false
+}

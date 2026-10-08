@@ -1,0 +1,17 @@
+{
+  "source_before": "fbc177cb944991216cea0e3cd836bebf5da1d529",
+  "scenario": "actual begin-decision functions on a durable fixture; no native send",
+  "before": {
+    "claimed": true,
+    "phase": "started",
+    "reason": null,
+    "waiting_for": null
+  },
+  "after": {
+    "claimed": false,
+    "phase": "read",
+    "reason": "earlier_input_pending",
+    "waiting_for": "earlier_reply"
+  },
+  "native_requests": 0
+}

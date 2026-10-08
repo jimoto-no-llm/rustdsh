@@ -202,8 +202,7 @@ fn bench_json(query: &str) -> String {
             let ok = std::process::Command::new(&exe)
                 .arg("--version")
                 .status()
-                .map(|s| s.success())
-                .unwrap_or(false);
+                .is_ok_and(|s| s.success());
             if !ok {
                 break;
             }

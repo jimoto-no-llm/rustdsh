@@ -13,10 +13,23 @@ DSH設定サイドバーに rdsh セクションを追加するテスト用プ�
 
 - DSH_HOME/rdsh.json（単一設定源。context・beta・全体設定すべて）
 - 旧 DSH_HOME/rdsh-context.json は読み替え専用。rdsh.json に context が
-  ある場合は無視されるので、移行後は削除してかまいません。
+  ない場合（nullを含む）は画面に旧文脈を読み込み、全体保存で移行します。
+  contextを含まない部分保存では、未設定のcontextを新規作成しません。
+  旧ファイルを削除する前に、rdsh.jsonへの文脈の保存を確認してください。
 - Rust側 `rdsh context build/search/status/explain` と同じファイルを読み書きします
 
 ## 試す
+
+APIにはDSHのGUIセッション認証とHost/Origin検証を適用します。
+`connection.requestRejection` を提供するDSHが必要です（0.2.0-rc.2で検証済み）。
+`connection`サービスがない場合、プラグインは読み込まれません。
+サービスに認証APIがない場合、リクエストは503で拒否します。
+設定画面が扱わない既存キー（`extras.enable`など）は、保存時にも保持します。
+GETと保存応答は画面が扱う項目だけを返し、未対応項目はディスク上で保持します。
+設定保存のリクエスト上限は1MiBです。画面が返す項目の最大サイズを含みます。
+Working Filesの空リストは明示的な指定として扱い、旧形式のファイル一覧には戻りません。
+旧キー`context.files`は保存時に`working_files`へ移行します。
+この読込動作を反映するには、Rustランチャーも更新してください。
 
 ```sh
 dsh plugin --profile web add ./plugins/rdsh-settings

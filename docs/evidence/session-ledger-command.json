@@ -1,0 +1,42 @@
+{
+  "baseline_commit": "5b636a00d5881ed4e06d2401dcf4aa839b4ed126",
+  "before": {
+    "command": "session-ledger list",
+    "exit_code": 1,
+    "stderr": "[rdsh-dashboard] Unknown command; use --help"
+  },
+  "after": {
+    "command": "session-ledger record then resolve in a new process",
+    "exit_code": 0,
+    "run": {
+      "run_id": "run_f74a2471-640a-4050-9cdd-c9473def1078",
+      "project_id": "7be5e48d316a5314",
+      "task_id": "qa-task",
+      "label": "same screen",
+      "cli": "dsh",
+      "cli_session_id": null,
+      "binding": "unknown",
+      "cwd": "C:\\Users\\owner\\AppData\\Local\\Temp\\rdsh-ledger-command-92wrtcua",
+      "branch": null,
+      "git": {
+        "status": "not_a_repository",
+        "root": null,
+        "head": null
+      },
+      "launch": null,
+      "scope": null,
+      "provider": null,
+      "cli_version": null,
+      "created_at": "2026-10-05T19:20:57.767Z",
+      "last_attached_at": null,
+      "unknown_fields": [
+        "cli_session_id",
+        "branch",
+        "provider",
+        "launch"
+      ],
+      "cli_session_display": "不明"
+    }
+  },
+  "scope": "isolated temporary project; Git discovery bounded to temp parent; no CLI child or model request"
+}
