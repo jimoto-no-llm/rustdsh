@@ -188,6 +188,8 @@ fn patch(args: &Args, run: &Path, selection: (&str, &str), config: &Value, case:
         "workflow-ptc",
         "plan-mode",
         "user-questions",
+        "attachment-local",
+        "image-offload",
     ] {
         entries.push(json!({"id":id,"disabled":true}));
     }
@@ -371,8 +373,8 @@ fn run_one(
         }
     }
     let prompt = match case {
-        "response" => format!("Return only {nonce}: followed by the sum of 3, 7, 11, 28. No tools or explanation."),
-        "read" => "Use the read tool to read only fixture.json. Return only its nonce, colon, and the sum of numbers. Do not write, delegate, or read any other file.".to_string(),
+        "response" => format!("Reply exactly in the form NONCE:TOTAL, with no spaces, code fences or other text. NONCE is {nonce}. TOTAL is the sum of 3, 7, 11, 28. No tools."),
+        "read" => "Use the read tool to read only fixture.json. Reply exactly in the form NONCE:TOTAL, with no spaces, code fences or other text. NONCE is the file's nonce and TOTAL is the sum of its numbers. Do not write, delegate, or read any other file.".to_string(),
         _ => "Read src/lib.rs and fix sum_inclusive so it returns the sum of integers 1 through n, inclusive, also correct for n=0. Keep the same function signature and use the inclusive range sum or the arithmetic formula; no other items or comments. Edit only src/lib.rs using file tools. No other files, shell, delegation or network. Return only FIXED when finished.".to_string(),
     };
     let patch_path = run.join("patch.json");
