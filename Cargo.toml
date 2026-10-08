@@ -2,8 +2,14 @@
 name = "rdsh"
 version = "0.2.0"
 edition = "2021"
+rust-version = "1.85"
 description = "Rust port/shim for dsh: fast launcher, token saver, zero behavior breakage via passthrough"
 license = "MIT"
+repository = "https://github.com/jimoto-no-llm/rustdsh"
+homepage = "https://github.com/jimoto-no-llm/rustdsh"
+readme = "README.md"
+keywords = ["dsh", "cli", "launcher", "dashboard", "deepseek"]
+categories = ["command-line-utilities", "development-tools"]
 
 [[bin]]
 name = "rdsh"

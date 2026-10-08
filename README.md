@@ -2,12 +2,12 @@
 
 # rdsh — a fast, safe Rust launcher for `dsh`
 
-[![ci](https://github.com/sahenjp/rustdsh/actions/workflows/ci.yml/badge.svg)](https://github.com/sahenjp/rustdsh/actions/workflows/ci.yml)
-[![dashboard](https://github.com/sahenjp/rustdsh/actions/workflows/dashboard.yml/badge.svg)](https://github.com/sahenjp/rustdsh/actions/workflows/dashboard.yml)
-[![docs](https://github.com/sahenjp/rustdsh/actions/workflows/docs.yml/badge.svg)](https://github.com/sahenjp/rustdsh/actions/workflows/docs.yml)
-[![release](https://img.shields.io/github/v/release/sahenjp/rustdsh.svg)](https://github.com/sahenjp/rustdsh/releases)
+[![ci](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/ci.yml/badge.svg)](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/ci.yml)
+[![dashboard](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/dashboard.yml/badge.svg)](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/dashboard.yml)
+[![docs](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/docs.yml/badge.svg)](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/docs.yml)
+[![release](https://img.shields.io/github/v/release/jimoto-no-llm/rustdsh.svg)](https://github.com/jimoto-no-llm/rustdsh/releases)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![rust](https://img.shields.io/badge/rust-1.73%2B-orange.svg)](https://www.rust-lang.org/)
+[![rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org/)
 
 [日本語版](README.ja.md)
 
@@ -74,20 +74,20 @@ Fastest (prebuilt binary, no Rust needed):
 
 ```sh
 # Linux / macOS / WSL
-curl -fsSL https://github.com/sahenjp/rustdsh/releases/latest/download/install.sh | bash -s -- --from-release
+curl -fsSL https://github.com/jimoto-no-llm/rustdsh/releases/latest/download/install.sh | bash -s -- --from-release
 ```
 
 ```powershell
 # Windows (PowerShell)
 $f = Join-Path $env:TEMP 'rdsh-install.ps1'
-Invoke-WebRequest -Uri https://github.com/sahenjp/rustdsh/releases/latest/download/install.ps1 -OutFile $f -UseBasicParsing
+Invoke-WebRequest -Uri https://github.com/jimoto-no-llm/rustdsh/releases/latest/download/install.ps1 -OutFile $f -UseBasicParsing
 & $f -FromRelease
 ```
 
 From source:
 
 ```sh
-git clone https://github.com/sahenjp/rustdsh.git
+git clone https://github.com/jimoto-no-llm/rustdsh.git
 cd rustdsh
 ./install.sh                 # build + install to ~/.local/bin/rdsh
 ./install.sh --as-dsh        # also shadow `dsh` (original kept as dsh-orig)
@@ -99,7 +99,7 @@ install.sh covers Linux, macOS, and WSL (auto-detects WSL, auto-installs
 Rust via rustup unless `--no-rustup`). Native Windows uses install.ps1:
 
 ```powershell
-git clone https://github.com/sahenjp/rustdsh.git
+git clone https://github.com/jimoto-no-llm/rustdsh.git
 cd rustdsh
 .\install.ps1              # build + install to %LOCALAPPDATA%\rdsh\bin (+ user PATH)
 .\install.ps1 -AsDsh       # also shadow `dsh` (original kept as dsh-orig)
@@ -118,7 +118,7 @@ you at the DeepSeek prompt: run `rdsh setup` (or `rdsh setup --login` to
 start the Codex/opencode OAuth flow right away).
 
 Or build directly: `cargo build --release` produces `target/release/rdsh`.
-Requires Rust 1.73+.
+Requires Rust 1.85+.
 
 ## Usage
 
@@ -330,7 +330,7 @@ before/after output checks are described in [BENCHMARKS.md](docs/BENCHMARKS.md).
 
 - Start with [CONTRIBUTING.md](CONTRIBUTING.md) (4-line PRs, screenshot rules).
 - Bugs and ideas: [issue forms](https://github.com/jimoto-no-llm/rustdsh/issues/new/choose) (Japanese OK).
-- Questions: [Issues](https://github.com/sahenjp/rustdsh/issues).
+- Questions: [Issues](https://github.com/jimoto-no-llm/rustdsh/issues).
 - Security: never file public issues — see [SECURITY.md](SECURITY.md).
 - Design docs: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) ·
   [docs/BENCHMARKS.md](docs/BENCHMARKS.md) · [docs/ROADMAP.md](docs/ROADMAP.md) ·

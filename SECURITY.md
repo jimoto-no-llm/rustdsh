@@ -3,11 +3,12 @@
 ## Supported Versions
 
 | Version | Supported |
-| ------- | --------- |
-| 0.1.x   | Yes       |
-| < 0.1.0 | No        |
+| --- | --- |
+| Latest stable release | Yes |
+| Earlier releases | No |
+| Release candidates | Preview only |
 
-Only the latest release (see Releases page) is supported. Prebuilt
+Only the [latest stable release](https://github.com/jimoto-no-llm/rustdsh/releases/latest) is supported. Prebuilt
 installers (install.sh / install.ps1) always pull the latest release
 unless pinned.
 
@@ -15,7 +16,7 @@ unless pinned.
 
 Do not open a public issue for security reports.
 
-1. Go to Security > Advisories > New draft advisory on GitHub.
+1. Use GitHub's [private vulnerability report](https://github.com/jimoto-no-llm/rustdsh/security/advisories/new).
 2. Include: affected version/commit, OS, repro steps or PoC, and impact
    (credential exposure, arbitrary exec, sandbox escape, ...).
 3. Expect an initial response within 72 hours.

@@ -2,10 +2,10 @@
 
 [English](README.md)
 
-[![ci](https://github.com/sahenjp/rustdsh/actions/workflows/ci.yml/badge.svg)](https://github.com/sahenjp/rustdsh/actions/workflows/ci.yml)
-[![dashboard](https://github.com/sahenjp/rustdsh/actions/workflows/dashboard.yml/badge.svg)](https://github.com/sahenjp/rustdsh/actions/workflows/dashboard.yml)
-[![docs](https://github.com/sahenjp/rustdsh/actions/workflows/docs.yml/badge.svg)](https://github.com/sahenjp/rustdsh/actions/workflows/docs.yml)
-[![release](https://img.shields.io/github/v/release/sahenjp/rustdsh.svg)](https://github.com/sahenjp/rustdsh/releases)
+[![ci](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/ci.yml/badge.svg)](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/ci.yml)
+[![dashboard](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/dashboard.yml/badge.svg)](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/dashboard.yml)
+[![docs](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/docs.yml/badge.svg)](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/docs.yml)
+[![release](https://img.shields.io/github/v/release/jimoto-no-llm/rustdsh.svg)](https://github.com/jimoto-no-llm/rustdsh/releases)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 <img src="assets/icon.svg" width="96" alt="rdsh icon">
@@ -67,20 +67,20 @@ Linux上の `--version` で起動約98倍・最大RSS約1/23を測定してい�
 
 ```sh
 # Linux / macOS / WSL
-curl -fsSL https://github.com/sahenjp/rustdsh/releases/latest/download/install.sh | bash -s -- --from-release
+curl -fsSL https://github.com/jimoto-no-llm/rustdsh/releases/latest/download/install.sh | bash -s -- --from-release
 ```
 
 ```powershell
 # Windows（PowerShell）
 $f = Join-Path $env:TEMP 'rdsh-install.ps1'
-Invoke-WebRequest -Uri https://github.com/sahenjp/rustdsh/releases/latest/download/install.ps1 -OutFile $f -UseBasicParsing
+Invoke-WebRequest -Uri https://github.com/jimoto-no-llm/rustdsh/releases/latest/download/install.ps1 -OutFile $f -UseBasicParsing
 & $f -FromRelease
 ```
 
 ソースから入れる場合：
 
 ```sh
-git clone https://github.com/sahenjp/rustdsh.git
+git clone https://github.com/jimoto-no-llm/rustdsh.git
 cd rustdsh
 ./install.sh                 # ビルド＋ ~/.local/bin/rdsh に導入
 ./install.sh --as-dsh        # rdsh を `dsh` 名でも使えるよう置換（元は dsh-orig に退避）
@@ -92,7 +92,7 @@ install.sh は Linux / macOS / WSL 用です（WSL自動検出、cargoがなけ�
 rustupで自動導入。`--no-rustup` で無効化）。Windowsネイティブは install.ps1：
 
 ```powershell
-git clone https://github.com/sahenjp/rustdsh.git
+git clone https://github.com/jimoto-no-llm/rustdsh.git
 cd rustdsh
 .\install.ps1              # ビルド＋ %LOCALAPPDATA%\rdsh\bin に導入（PATH追加つき）
 .\install.ps1 -AsDsh       # `dsh` 名でも使えるよう置換（元は dsh-orig に退避）
@@ -110,7 +110,7 @@ cd rustdsh
 `rdsh setup` を実行してください（`rdsh setup --login` ならCodex/opencodeの
 OAuthフローをその場で起動します）。
 
-ソースから直接ビルドする場合は `cargo build --release` で `target/release/rdsh` ができます（Rust 1.73+が必要）。
+ソースから直接ビルドする場合は `cargo build --release` で `target/release/rdsh` ができます（Rust 1.85+が必要）。
 
 ## 使い方
 
@@ -294,7 +294,7 @@ rdsh serve
 
 - まず [CONTRIBUTING.md](CONTRIBUTING.md)（PRは4行、スクリーンショット規定）。
 - バグ・要望：[Issueフォーム](https://github.com/jimoto-no-llm/rustdsh/issues/new/choose)（日本語OK）。
-- 質問・相談：[Issues](https://github.com/sahenjp/rustdsh/issues)。
+- 質問・相談：[Issues](https://github.com/jimoto-no-llm/rustdsh/issues)。
 - 脆弱性は公開Issueに書かず [SECURITY.md](SECURITY.md) へ。
 - 設計資料：[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)・
   [docs/BENCHMARKS.md](docs/BENCHMARKS.md)・[docs/ROADMAP.md](docs/ROADMAP.md)・
