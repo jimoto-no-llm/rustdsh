@@ -9,13 +9,20 @@ export function tool(name, description = 'Read a fixed fixture value.') {
 }
 
 /** Actual MCP SDK and loopback HTTP; all capabilities are fixed test data. */
-export async function mcpFixture({ tools = [tool('read')], blocked = false } = {}) {
+export async function mcpFixture({ tools = [tool('read')], blocked = false, listDelayMs = 0 } = {}) {
   const sdk = new Server({ name: 'rdsh-fixed-mcp-fixture', version: '1' }, { capabilities: { tools: { listChanged: true } } });
   const transport = new NodeStreamableHTTPServerTransport({ sessionIdGenerator: () => randomUUID(), enableJsonResponse: true });
   const calls = [], handlers = [];
-  let descriptors = tools, listing = 0, released = !blocked, release;
+  let descriptors = tools, listing = 0, released = !blocked, release, releaseTimer;
   const gate = new Promise(resolve => { release = () => { released = true; resolve(); }; });
-  sdk.setRequestHandler('tools/list', async () => { listing++; if (!released) await gate; return { tools: descriptors }; });
+  sdk.setRequestHandler('tools/list', async () => {
+    listing++;
+    if (!released) {
+      if (listing === 1 && listDelayMs > 0) releaseTimer = setTimeout(release, listDelayMs);
+      await gate;
+    }
+    return { tools: descriptors };
+  });
   sdk.setRequestHandler('tools/call', async request => {
     calls.push({ name: request.params.name, arguments: request.params.arguments });
     const value = { value: `FIXTURE:${request.params.name}:${request.params.arguments?.key ?? ''}` };
@@ -36,6 +43,7 @@ export async function mcpFixture({ tools = [tool('read')], blocked = false } = {
     get released() { return released; },
     async replace(next) { descriptors = next; await sdk.sendToolListChanged(); },
     async close() {
+      clearTimeout(releaseTimer);
       release();
       const errors = [];
       try { await sdk.close(); } catch (error) { errors.push(error); }

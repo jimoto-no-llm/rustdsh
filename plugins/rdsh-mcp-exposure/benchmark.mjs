@@ -37,14 +37,12 @@ async function sampleAssembly(f, agent) {
 }
 
 async function run(candidate) {
-  const remote = await mcpFixture({ tools: descriptors, blocked: true });
+  const remote = await mcpFixture({ tools: descriptors, blocked: true, listDelayMs: controlledListDelayMs });
   const f = fixture({ setupDiscovery: false });
-  let releaseTimer;
   try {
     const connection = McpClient.Config({ transport: 'streamable-http', serverName: 'fixed', url: remote.url,
       failOnStartupError: true, reconnect: { enabled: false } });
     const start = performance.now();
-    releaseTimer = setTimeout(remote.release, controlledListDelayMs);
     if (candidate) await bundle.apply(f.ctx, bundle.Config({ servers: [{ connection, exposure: 'deferred' }] }));
     else await McpClient.apply(f.ctx, connection);
     const activationMs = performance.now() - start;
@@ -101,7 +99,7 @@ async function run(candidate) {
         ...(candidate ? { searchAndLoadMs: timing(discoveryTimes) } : {}) },
     };
   } finally {
-    clearTimeout(releaseTimer); remote.release();
+    remote.release();
     const results = await Promise.allSettled([f.close(), remote.close()]);
     const failures = results.filter(result => result.status === 'rejected');
     if (failures.length) throw new AggregateError(failures.map(result => result.reason), 'MCP benchmark cleanup failed');
