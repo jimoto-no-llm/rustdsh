@@ -18,6 +18,10 @@ async function bindings() {
       ),
       error: lib.func("uint32_t __stdcall GetLastError()"),
       close: lib.func("int __stdcall CloseHandle(uintptr_t handle)"),
+      longPath: lib.func(
+        "uint32_t __stdcall GetLongPathNameW(str16 name, void *buffer, uint32_t size)",
+      ),
+      attributes: lib.func("uint32_t __stdcall GetFileAttributesW(str16 name)"),
     };
   } else if (process.platform === "linux") {
     const lib = koffi.load("libc.so.6");
@@ -29,6 +33,33 @@ async function bindings() {
   } else throw new GpuError("gpu_lock_platform_unsupported");
   return api;
 }
+async function windowsLongDirectory(directory) {
+  const native = await bindings();
+  // A short name is an alias, not a redirect. Reject actual reparse points in
+  // every ancestor before expanding aliases; checking only the leaf permits
+  // a junction farther up the path to redirect ledger writes.
+  for (let cursor = directory; ; ) {
+    // Preserve an already namespaced drive root: toNamespacedPath can remove
+    // its final separator, producing an invalid native attribute query.
+    const attributes = native.attributes(
+      cursor.startsWith("\\\\?\\") ? cursor : path.toNamespacedPath(cursor),
+    );
+    if (attributes === 0xffffffff || attributes & 0x400)
+      throw new GpuError("gpu_directory_untrusted");
+    const parent = path.dirname(cursor);
+    if (parent === cursor) break;
+    cursor = parent;
+  }
+  const buffer = Buffer.alloc(65536);
+  const length = native.longPath(
+    path.toNamespacedPath(directory),
+    buffer,
+    buffer.length / 2,
+  );
+  if (length === 0 || length >= buffer.length / 2)
+    throw new GpuError("gpu_directory_untrusted");
+  return buffer.toString("utf16le", 0, length * 2);
+}
 export async function gpuDirectory(directory) {
   await fs.mkdir(directory, { recursive: true, mode: 0o700 });
   const stat = await fs.lstat(directory);
@@ -38,7 +69,8 @@ export async function gpuDirectory(directory) {
     !stat.isDirectory() ||
     stat.isSymbolicLink() ||
     (process.platform === "win32"
-      ? real.toLowerCase() !== requested.toLowerCase()
+      ? path.toNamespacedPath(real).toLowerCase() !==
+        (await windowsLongDirectory(requested)).toLowerCase()
       : real !== requested)
   )
     throw new GpuError("gpu_directory_untrusted");
