@@ -36,5 +36,9 @@ jobs:
       - uses: lycheeverse/lychee-action@v2
         with:
           # x.com returns 403 to link-checker bots; the links are fine for humans.
-          args: --verbose --no-progress --exclude x\.com README.md README.ja.md CHANGELOG.md CONTRIBUTING.md SECURITY.md SUPPORT.md docs/**/*.md dashboard/README.md
+          # Check transferred repository URLs at their canonical owner.
+          args: >-
+            --verbose --no-progress --exclude x\.com
+            --remap '^https://github[.]com/sahenjp/rustdsh(/.*)?$ https://github.com/jimoto-no-llm/rustdsh$1'
+            README.md README.ja.md CHANGELOG.md CONTRIBUTING.md SECURITY.md SUPPORT.md docs/**/*.md dashboard/README.md
           fail: true

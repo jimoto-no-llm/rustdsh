@@ -10,6 +10,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.85.0
+      - run: cargo check --locked --all-targets
+
+  release-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Test release metadata and asset validation
+        run: python3 -m unittest discover -s tests -p 'test_release_*.py'
+      - name: Check the current version's release notes
+        run: |
+          version=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["package"]["version"])')
+          python3 scripts/prepare-release.py "v$version"
+
   update-banner-windows:
     runs-on: windows-latest
     steps:
@@ -47,6 +65,7 @@ jobs:
           RDSH_TOOL_RUNTIME="$RUNNER_TEMP/rdsh-runtime/node_modules/@deepseek-ai/dsh-tools/lib/index.js" RDSH_SECURE_WORKSPACE="$GITHUB_WORKSPACE" RDSH_SHARED_FILES='[]' node --import ./security/preload.mjs tests/guarded-runtime-probe.mjs
 
   lint:
+    name: Rust lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -79,6 +98,10 @@ jobs:
       - run: cargo test --example benchmark_extended
       - run: cargo test --example benchmark_models
       - run: cargo build
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: node --test tests/runtime-compatibility.test.mjs
       - if: matrix.regress
         shell: bash
         run: |
