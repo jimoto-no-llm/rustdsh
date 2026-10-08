@@ -6,7 +6,8 @@ Reviewed source `18d0445fa58604fa1ea07a817fe393eb612c0aba` integrates main
 `98abc67d7e5c5d3f2a5321d9a56adb6a83ff93e2` and contributor head
 `0e37d5eb1ad736a3d4ddb2a54d7a3a0d37863caa`.
 The profile, compile-cache and session-size Rust implementations are already
-present in that main commit; this final PR adds the operational guidance,+low-priority systemd synchronization and their isolated regression checks.
+present in that main commit; this final PR adds the operational guidance,
+low-priority systemd synchronization and their isolated regression checks.
 It also removes main's tracked host-specific `dashboard/node_modules` symlink.
 
 The profile order is environment, saved default, existing local `tui`, then a
