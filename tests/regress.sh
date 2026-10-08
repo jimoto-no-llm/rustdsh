@@ -137,7 +137,8 @@ cp ./sync-dsh.sh $FS/repo/sync-dsh.sh
 for a in rdsh-linux-x64 rdsh-linux-x64-musl rdsh-macos-arm64 rdsh-macos-x64; do tar -czf "$FS/rel/latest/download/$a.tar.gz" -C $FS/pkg rdsh; (cd "$FS/rel/latest/download" && $SUM "$a.tar.gz" > "$a.tar.gz.sha256"); done
 printf '{"version":"1.0.0"}\n' > $FS/npmroot/@deepseek-ai/dsh/package.json
 printf '#!/bin/sh\ncase "$1" in root) echo "%s" ;; view) echo "[\\"1.0.0\\"]" ;; *) exit 1 ;; esac\n' "$FS/npmroot" > $FS/npm
-printf '#!/bin/sh\necho 1.0.0\n' > $FS/home/.local/bin/node
+ln -s "$(command -v node)" "$FS/home/.local/bin/rdsh-test-node"
+printf '#!/bin/sh\ncase "$1" in -p) echo 1.0.0 ;; *) exec "$(dirname "$0")/rdsh-test-node" "$@" ;; esac\n' > $FS/home/.local/bin/node
 chmod +x $FS/npm $FS/home/.local/bin/node
 fs_sync() { env -u RDSH_SYNC_FROM_SOURCE -u RDSH_SYNC_VERSION -u RDSH_MUSL HOME="$FS/home" NPM_BIN="$FS/npm" PREFIX_BIN="$1" RDSH_RELEASE_BASE="file://$FS/rel" sh $FS/repo/sync-dsh.sh > "$2" 2>&1; }
 fs_sync "$FS/bin" $FS/sync-ok.log

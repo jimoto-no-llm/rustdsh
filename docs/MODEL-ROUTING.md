@@ -4,7 +4,7 @@
 from a native ACP session's configured selection. It strengthens the existing
 DSH routing path: it does not implement model selection, provider fallback,
 agent loops or profile boot. This is the CLI and tracked-client portion of
-[issue #20](https://github.com/sahenjp/rustdsh/issues/20); live provider execution
+[issue #20](https://github.com/jimoto-no-llm/rustdsh/issues/20); live provider execution
 attestation and dashboard presentation remain separate work.
 
 ## Bind an explicit request

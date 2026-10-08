@@ -77,6 +77,8 @@ rdsh-dashboard reply-consumer once|serve --budget-guard --worker-id <id> --proje
 
 Project mode: project metrics, tasks, questions, human feedback, and /mcp.
 Harness mode: a separate managed DeepSeek Harness Web UI and QR landing page.
+Windows launcher: notification-area tray by default for project/harness; --no-tray keeps terminal mode.
+Direct Node CLI: --tray enables the tray on native Windows.
 Tailscale Serve shares each loopback server privately over HTTPS.
 Session-ledger start/resume confirms the native ID then stops its owned ACP process; it sends no prompt.
 Reply-consumer once/serve explicitly resumes that exact native session and sends current human replies once. Replies grant no new execution permissions. Missing results block replay.
@@ -90,6 +92,7 @@ const { values, positionals } = parseArgs({
     "no-tailscale": { type: "boolean" },
     "tunnel-id": { type: "string" },
     open: { type: "boolean" },
+    tray: { type: "boolean" },
     harness: { type: "boolean" },
     cli: { type: "string" },
     executable: { type: "string" },
@@ -1272,6 +1275,10 @@ try {
   } else if (command === "mcp") {
     await runStdio(await identity(values.project || process.cwd()));
   } else if (command === "project" || command === "harness") {
+    if (values.tray && process.platform !== "win32")
+      throw new Error(
+        "--tray requires native Windows; omit it for terminal mode",
+      );
     const dashboard = await startDashboard({
       kind: command,
       project:
@@ -1282,6 +1289,23 @@ try {
       harnessPort: portValue(values["harness-port"]),
       tailscale: !values["no-tailscale"],
     });
+    if (values.tray) {
+      try {
+        const { startWindowsTray } = await import("./windows-tray.mjs");
+        await startWindowsTray({
+          dashboard,
+          open: openUrl,
+          label:
+            command === "harness"
+              ? "rdsh Harness"
+              : `rdsh: ${path.basename(path.resolve(values.project || process.cwd()))}`,
+        });
+        if (process.connected) process.send({ ready: true });
+      } catch (error) {
+        await dashboard.close();
+        throw error;
+      }
+    }
     console.log(`[rdsh-dashboard] ${command}: ${dashboard.localUrl}`);
     console.log(`[rdsh-dashboard] Tailscale: ${dashboard.getShare().state}`);
     console.log(`[rdsh-dashboard] ${dashboard.getShare().message}`);
@@ -1296,6 +1320,7 @@ try {
       });
   } else throw new Error("Unknown command; use --help");
 } catch (e) {
+  if (process.connected) process.send({ error: e.message });
   if (e.report) console.log(JSON.stringify(e.report, null, 2));
   else console.error(`[rdsh-dashboard] ${e.message}`);
   process.exitCode = 1;
