@@ -8,11 +8,16 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { ProjectStore, writeJson, stateHome, publicState } from "./state.mjs";
 import { createMcpServer } from "./mcp.mjs";
-import { enableShare } from "./tailscale.mjs";
+import { enableShare, inspectShare } from "./tailscale.mjs";
 import { startHarness, proxyHarness, upgradeHarness } from "./harness.mjs";
 import { EventsHub } from "./webhooks.mjs";
 import { modernMcpHandler } from "./mcp2.mjs";
 import { AnswerApplicationServer } from "./answer-application-server.mjs";
+import {
+  ConnectionObservations,
+  connectionReport,
+  inspectTunnel,
+} from "./connection-diagnostics.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const equal = (a, b) =>
@@ -74,6 +79,9 @@ export async function startDashboard(options) {
   const token = randomBytes(32).toString("hex"); // local administrator
   const mcpToken = randomBytes(32).toString("hex");
   const browserToken = randomBytes(32).toString("hex");
+  const instanceId = randomUUID();
+  const startedAt = new Date().toISOString();
+  const connections = new ConnectionObservations();
   const localUrl = `http://127.0.0.1:${port}/`;
   const cookieName = `rdsh_${kind === "project" ? project.id : "harness"}`;
   let store, eventsHub;
@@ -99,7 +107,11 @@ export async function startDashboard(options) {
       eventsHub.deliveries(),
     );
   const modern = store
-    ? modernMcpHandler({ getState: visibleState, mutate }, eventsHub)
+    ? modernMcpHandler(
+        { getState: visibleState, mutate },
+        eventsHub,
+        connections,
+      )
     : null;
   const deliveryTimer = eventsHub
     ? setInterval(() => {
@@ -175,6 +187,7 @@ export async function startDashboard(options) {
       schema: 1,
       kind,
       project_id: project?.id || null,
+      instance_id: instanceId,
       pid: process.pid,
       port,
       local_url: localUrl,
@@ -220,6 +233,37 @@ export async function startDashboard(options) {
       return await refreshPromise;
     } finally {
       refreshPromise = null;
+    }
+  }
+  let diagnosticPromise = null;
+  async function diagnostics() {
+    if (diagnosticPromise) return diagnosticPromise;
+    diagnosticPromise = (async () => {
+      const [currentShare, tunnel] = await Promise.all([
+        tailscale
+          ? (options.inspectShare || inspectShare)(port)
+          : { state: "disabled", observed_at: new Date().toISOString() },
+        inspectTunnel(project, instanceId),
+      ]);
+      return connectionReport({
+        project,
+        startedAt,
+        browser: connections.snapshot("browser_auth"),
+        mcp: {
+          authentication: connections.snapshot("mcp_auth"),
+          discovery: connections.snapshot("server/discover"),
+          tools: connections.snapshot("tools/list"),
+          events: connections.snapshot("events/list"),
+        },
+        share: currentShare,
+        tunnel,
+        events: eventsHub.diagnostics(),
+      });
+    })();
+    try {
+      return await diagnosticPromise;
+    } finally {
+      diagnosticPromise = null;
     }
   }
   async function mutate(operation, input) {
@@ -291,6 +335,25 @@ export async function startDashboard(options) {
         agentRoute &&
         equal(req.headers.authorization, `Bearer ${mcpToken}`);
       const humanAuthorized = browserAuthorized(req, url, route);
+      if (kind === "project" && route === "/mcp")
+        connections.record(
+          "mcp_auth",
+          mcpAuthorized,
+          mcpAuthorized ? "authenticated" : "unauthorized",
+        );
+      if (
+        kind === "project" &&
+        ["/api/state", "/api/config"].includes(route) &&
+        (humanAuthorized || req.headers["x-rdsh-browser-token"])
+      )
+        connections.record(
+          "browser_auth",
+          humanAuthorized,
+          humanAuthorized ? "authenticated" : "unauthorized",
+          share.url && req.headers.host === new URL(share.url).host
+            ? "tailscale"
+            : "loopback",
+        );
       const consumerRoute =
         kind === "project" &&
         ((req.method === "GET" && route === "/api/replies/read") ||
@@ -303,6 +366,7 @@ export async function startDashboard(options) {
           route === "/app.mjs" ||
           route === "/question-cards-ui.mjs" ||
           route === "/project-overview.mjs" ||
+          route === "/connection-diagnostics-ui.mjs" ||
           route === "/answer-applications-ui.mjs");
       if (
         !publicAsset &&
@@ -373,6 +437,7 @@ export async function startDashboard(options) {
           "/app.mjs",
           "/question-cards-ui.mjs",
           "/project-overview.mjs",
+          "/connection-diagnostics-ui.mjs",
           "/answer-applications-ui.mjs",
         ].includes(route)
       ) {
@@ -381,9 +446,16 @@ export async function startDashboard(options) {
         });
         return res.end(await fs.readFile(path.join(here, route.slice(1))));
       }
+      if (
+        kind === "project" &&
+        req.method === "GET" &&
+        route === "/api/diagnostics"
+      )
+        return json(res, 200, await diagnostics());
       if (req.method === "GET" && route === "/api/config")
         return json(res, 200, {
           kind,
+          instance_id: instanceId,
           project: project
             ? { id: project.id, name: project.name, root: project.root }
             : null,

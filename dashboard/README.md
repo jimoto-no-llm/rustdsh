@@ -247,7 +247,7 @@ On Windows, extract the client into `%LOCALAPPDATA%\rdsh\tunnel-client`, or set
 
    The launcher passes the current project bearer through a child-process
    environment reference, including discovery requests. It uses a loopback-only
-   health listener with an ephemeral port, recorded in `tunnel-health.url` in the
+   health listener with an ephemeral port, recorded in `tunnel-health-<owner>.url` in the
    project's private state directory. Check `/readyz` and `/ui` at that URL.
    Restart this command after restarting the dashboard.
 
@@ -261,6 +261,13 @@ Legacy MCP clients also have stdio/Streamable HTTP tools and
 `dashboard://state` / `dashboard://feedback` resource subscriptions. Those
 resource notifications are distinct from the native webhook Events integration.
 See the [official Events contract](https://developers.openai.com/plugins/build/mcp-events).
+
+Use **接続診断** in the project dashboard or
+`rdsh-dashboard diagnostics --project <directory>` to inspect phone/Serve and
+Tunnel/MCP/callback stages separately. The
+[connection diagnostics contract](../docs/CONNECTION-DIAGNOSTICS.md) explains
+restart detection and stage-specific recovery. Local readiness and callback
+receipt leave actual Dot response and end-to-end status unconfirmed.
 
 ## Validation
 

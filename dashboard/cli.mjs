@@ -20,6 +20,12 @@ import { requestedSelection, validSelection } from "./model-selection.mjs";
 import { ReplyConsumer } from "./reply-consumer.mjs";
 import { ProjectStore, publicState } from "./state.mjs";
 import { setTimeout as delay } from "node:timers/promises";
+import { randomUUID } from "node:crypto";
+import {
+  loopbackBase,
+  recordTunnel,
+  finishTunnel,
+} from "./connection-diagnostics.mjs";
 
 const help = `rdsh-dashboard project --project <directory> [--port <port>] [--no-tailscale] [--open]
 rdsh-dashboard harness [--port 38081] [--harness-port 3081] [--no-tailscale] [--open]
@@ -27,6 +33,7 @@ rdsh-dashboard open --project <directory> | --harness
 rdsh-dashboard stop --project <directory> | --harness
 rdsh-dashboard revoke-events --project <directory>
 rdsh-dashboard tunnel --project <directory> --tunnel-id <tunnel_id>
+rdsh-dashboard diagnostics --project <directory>
 rdsh-dashboard mcp --project <directory>
 rdsh-dashboard adapters [--cli dsh] [--executable <original-dsh>] [--entrypoint <bin.js>] [--project <directory>] [--retry] [--retry-attempts <n>] [--retry-total-ms <ms>]
 rdsh-dashboard adapter-smoke --executable <original-dsh> [--entrypoint <bin.js>] [--project <directory>]
@@ -722,6 +729,55 @@ try {
         `[rdsh-dashboard] ${command === "stop" ? "Stopping dashboard" : "Event subscriptions revoked"}`,
       );
     }
+  } else if (command === "diagnostics") {
+    const project = await identity(values.project || process.cwd());
+    let report;
+    try {
+      const runtime = await localJson(
+        path.join(project.directory, "runtime.json"),
+      );
+      if (
+        runtime.kind !== "project" ||
+        runtime.project_id !== project.id ||
+        typeof runtime.token !== "string" ||
+        !/^[0-9a-f]{64}$/.test(runtime.token)
+      )
+        throw new Error();
+      const response = await fetch(
+        loopbackBase(runtime.local_url) + "api/diagnostics",
+        {
+          headers: { authorization: `Bearer ${runtime.token}` },
+          redirect: "error",
+          signal: AbortSignal.timeout(20000),
+        },
+      );
+      if (!response.ok)
+        report = {
+          schema: 1,
+          project_id: project.id,
+          observed_at: new Date().toISOString(),
+          state: "unconfirmed",
+          reason:
+            response.status === 401
+              ? "dashboard_authentication_failed"
+              : "diagnostics_unavailable",
+        };
+      else {
+        report = await response.json();
+        if (report.schema !== 1 || report.project_id !== project.id)
+          throw new Error();
+      }
+    } catch {
+      report = {
+        schema: 1,
+        project_id: project.id,
+        observed_at: new Date().toISOString(),
+        state: "unconfirmed",
+        reason: "dashboard_unreachable_or_runtime_invalid",
+      };
+    }
+    console.log(JSON.stringify(report, null, 2));
+    if (report.state === "unconfirmed") process.exitCode = 1;
   } else if (command === "tunnel") {
     if (!/^tunnel_[a-z0-9]{32}$/.test(values["tunnel-id"] || ""))
       throw new Error(
@@ -735,14 +791,30 @@ try {
     const runtime = JSON.parse(
       await fs.readFile(path.join(project.directory, "runtime.json"), "utf8"),
     );
-    const response = await fetch(runtime.local_url + "api/state", {
+    const base = loopbackBase(runtime.local_url);
+    if (!/^[0-9a-f]{64}$/.test(runtime.mcp_token || ""))
+      throw new Error(
+        "Invalid dashboard MCP credential; restart the dashboard",
+      );
+    if (runtime.project_id !== project.id || runtime.kind !== "project")
+      throw new Error("Wrong project dashboard runtime");
+    const response = await fetch(base + "api/config", {
       headers: { authorization: `Bearer ${runtime.token}` },
       signal: AbortSignal.timeout(5000),
+      redirect: "error",
     });
     if (!response.ok)
       throw new Error(
         "Start the project dashboard before connecting its tunnel",
       );
+    const config = await response.json();
+    if (
+      !config.instance_id ||
+      config.instance_id !== runtime.instance_id ||
+      config.project?.id !== project.id
+    )
+      throw new Error("Restart the dashboard before connecting its tunnel");
+    const owner = randomUUID();
     const command =
       process.env.RDSH_TUNNEL_CLIENT ||
       (process.platform === "win32"
@@ -762,7 +834,7 @@ try {
         "--control-plane.api-key",
         "env:CONTROL_PLANE_API_KEY",
         "--mcp.server-url",
-        runtime.local_url + "mcp",
+        base + "mcp",
         "--mcp.extra-headers",
         "Authorization: env:RDSH_DASHBOARD_AUTHORIZATION",
         "--mcp.discovery-extra-headers",
@@ -770,7 +842,7 @@ try {
         "--health.listen-addr",
         "127.0.0.1:0",
         "--health.url-file",
-        path.join(project.directory, "tunnel-health.url"),
+        path.join(project.directory, `tunnel-health-${owner}.url`),
       ],
       {
         windowsHide: true,
@@ -781,10 +853,27 @@ try {
         },
       },
     );
-    process.exitCode = await new Promise((resolve, reject) => {
+    const completion = new Promise((resolve, reject) => {
       child.once("error", reject);
       child.once("exit", (code) => resolve(code ?? 1));
     });
+    // Attach the rejection handler before the asynchronous process observation.
+    void completion.catch(() => {});
+    let record;
+    try {
+      record = await recordTunnel(
+        project,
+        runtime.instance_id,
+        child.pid,
+        owner,
+      );
+      process.exitCode = await completion;
+    } catch (error) {
+      child.kill();
+      throw error;
+    } finally {
+      if (record) await finishTunnel(project, record);
+    }
   } else if (command === "mcp") {
     await runStdio(await identity(values.project || process.cwd()));
   } else if (command === "project" || command === "harness") {

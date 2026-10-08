@@ -14,7 +14,7 @@ import { tools, executeTool } from "./mcp.mjs";
 // the outer layers. No large feature additions here.
 import { eventDefinitions } from "./webhooks.mjs";
 
-export function modernMcpHandler(api, hub) {
+export function modernMcpHandler(api, hub, observations) {
   const handler = createMcpHandler(
     () => {
       const server = new Server(
@@ -79,7 +79,26 @@ export function modernMcpHandler(api, hub) {
     },
     { legacy: "reject" },
   );
-  const node = toNodeHandler(handler);
+  const node = toNodeHandler({
+    fetch: async (request, context) => {
+      const response = await handler.fetch(request, context);
+      const method = request.headers.get("mcp-method");
+      if (["server/discover", "tools/list", "events/list"].includes(method)) {
+        try {
+          const body = await response.clone().json();
+          const success = response.ok && body.result && !body.error;
+          observations?.record(
+            method,
+            Boolean(success),
+            success ? "protocol_response" : "protocol_error",
+          );
+        } catch {
+          observations?.record(method, false, "protocol_error");
+        }
+      }
+      return response;
+    },
+  });
   return {
     handle: (req, res, body) => node(req, res, body),
     isLegacy: async (req, body) =>

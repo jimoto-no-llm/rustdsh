@@ -1,6 +1,7 @@
 import { renderQuestionCards } from "./question-cards-ui.mjs";
 import { renderAnswerApplications } from "./answer-applications-ui.mjs";
 import { renderOverview } from "./project-overview.mjs";
+import { renderConnectionDiagnostics } from "./connection-diagnostics-ui.mjs";
 
 const $ = (id) => document.getElementById(id);
 const base = location.pathname.startsWith("/_rdsh") ? "/_rdsh/" : "/";
@@ -139,6 +140,22 @@ $("quick-overview").onclick = () => navigateTo("overview-heading");
 $("quick-pending").onclick = () => navigateTo("pending-heading");
 $("quick-details").onclick = () => navigateTo("metrics-heading");
 $("quick-stop").onclick = () => navigateTo("overview-stop");
+$("diagnostics-refresh").onclick = async () => {
+  $("diagnostics-refresh").disabled = true;
+  $("diagnostics-status").textContent = "接続の各段階を確認中…";
+  try {
+    const report = await api("diagnostics");
+    renderConnectionDiagnostics($("diagnostics-result"), report, node);
+    $("diagnostics-status").textContent =
+      "診断を取得しました。各日時はその段階を観測した時点です。";
+  } catch {
+    $("diagnostics-status").textContent =
+      "診断を取得できません。現在の接続は未確認です。最新のQRまたは rdsh-dashboard open から開き直してください。";
+    $("diagnostics-result").replaceChildren();
+  } finally {
+    $("diagnostics-refresh").disabled = false;
+  }
+};
 function render(state) {
   if (state.revision < renderedRevision) return;
   renderedRevision = state.revision;
@@ -319,7 +336,7 @@ async function renderShare(config) {
   if (share.consent_url) $("consent").href = share.consent_url;
   $("mcp-info").textContent =
     config.kind === "project"
-      ? `Dotsのイベント購読: ${config.events?.active || 0} 件` +
+      ? `MCPのイベント購読: ${config.events?.active || 0} 件` +
         (config.events?.failures
           ? ` · 配信エラー ${config.events.failures} 件`
           : "") +
@@ -439,6 +456,7 @@ try {
   const config = await api("config");
   await renderShare(config);
   if (config.kind === "harness") {
+    $("connection-detail").hidden = true;
     $("kind").textContent = "DEEPSEEK HARNESS";
     $("title").textContent = "Harnessを開く";
     $("location").textContent = "会話・ツール実行のWeb画面";
