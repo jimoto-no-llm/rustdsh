@@ -266,7 +266,11 @@ function render(state) {
       }),
   );
   applyDeepLink(state);
-  if (focusedId) $(focusedId)?.focus({ preventScroll: true });
+  const restoredFocus = focusedId ? $(focusedId) : null;
+  if (restoredFocus) {
+    if (restoredFocus.tabIndex < 0) restoredFocus.tabIndex = -1;
+    restoredFocus.focus({ preventScroll: true });
+  }
   $("connection").textContent = "接続済み · プロジェクト専用";
   $("updated").textContent =
     `最終受信: ${state.updated_at ? new Date(state.updated_at).toLocaleString("ja-JP") : "まだ報告がありません"} · 鮮度は各項目の観測時刻から判定します。累計欄は報告元のAPI換算値です。台帳は出所ごとの報告値です。`;
