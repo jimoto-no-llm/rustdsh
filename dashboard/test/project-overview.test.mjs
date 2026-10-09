@@ -12,6 +12,27 @@ const state = () => ({
   questions: [],
   events: [],
 });
+
+test("overview expires completion reports and separates estimates from current reports", () => {
+  const now = Date.parse("2026-10-08T10:00:00Z");
+  const s = state();
+  const observation = (kind, age) => ({ kind, source: "fixture", observed_at: new Date(now - age).toISOString(), max_age_seconds: 60 });
+  s.tasks = [
+    { id: "fresh", title: "Fresh", status: "done", observation: observation("measured", 0) },
+    { id: "old", title: "Old", status: "done", observation: observation("agent_reported", 61000) },
+    { id: "legacy", title: "Legacy", status: "done" },
+    { id: "guess", title: "Guess", status: "done", observation: observation("estimated", 0) },
+  ];
+  s.events = [{ title: "Old result", created_at: new Date(now).toISOString(), observation: observation("agent_reported", 61000) }];
+  const view = overviewModel(s, "", now);
+  assert.match(view.taskReport, /完了 1 · 古い情報 1 · 鮮度未確認 1 · 推定 1/);
+  assert.match(view.lastResult.title, /古い情報/);
+  assert.match(view.lastResult.detail, /agent報告.*報告元 fixture/);
+  assert.match(overviewModel(s, "old", now).taskReport, /完了の申告（古い情報）/);
+  assert.match(overviewModel(s, "guess", now).taskReport, /推定 完了の申告/);
+  assert.match(overviewModel(s, "", now + 60000).taskReport, /完了 0/);
+  assert.equal(view.execution, "実行状態は未取得");
+});
 test("follow-up review counts and a newer unknown instruction remain visible in the task overview", () => {
   const s = state();
   s.answer_applications = {

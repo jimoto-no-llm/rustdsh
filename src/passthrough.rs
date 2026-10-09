@@ -263,7 +263,7 @@ fn apply_slim(cmd: &mut std::process::Command, slim: bool) {
     if !slim {
         return;
     }
-    for (k, v) in crate::slim::slim_env() {
+    for &(k, v) in crate::slim::slim_env() {
         cmd.env(k, v);
     }
     // V8 code cache for the delegated Node process. Set unconditionally:

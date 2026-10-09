@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 import { spawnOwnedProcess } from "../process-scope.mjs";
+import { windowsJobObservation } from "../process-scope-backends.mjs";
 import { startHarness } from "../harness.mjs";
 import { RunHistory } from "../run-history.mjs";
 import { startDashboard } from "../server.mjs";
@@ -14,6 +15,22 @@ const fixture = fileURLToPath(
   new URL("./fixtures/owned-tree.mjs", import.meta.url),
 );
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+test("a Windows job cannot be confirmed empty when membership and accounting disagree", () => {
+  const exitedBetweenQueries = windowsJobObservation(1, [12345], true);
+  assert.equal(exitedBetweenQueries.status, "running");
+  assert.deepEqual(exitedBetweenQueries.remaining_pids, [12345]);
+  assert.equal(exitedBetweenQueries.remaining_count, 1);
+  const spawnedBetweenQueries = windowsJobObservation(0, [], false);
+  assert.equal(spawnedBetweenQueries.status, "running");
+  assert.equal(spawnedBetweenQueries.remaining_count, null);
+  assert.equal(spawnedBetweenQueries.members_truncated, true);
+  assert.deepEqual(windowsJobObservation(0, [], true), {
+    status: "exit_confirmed",
+    remaining_pids: [],
+    remaining_count: 0,
+    members_truncated: false,
+  });
+});
 async function waitFor(check, budget = 10000) {
   const end = Date.now() + budget;
   while (Date.now() < end) {
