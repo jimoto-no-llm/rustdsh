@@ -72,7 +72,8 @@ Reproduce with `rdsh bench --n 5` and `/usr/bin/time -v`.
 Details: [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
 
 Current source also includes bounded search workers, credential/tool-boundary
-hardening, and persistent update-notice dismissal. On a dense synthetic search
+hardening, and live update notifications with scheduled reminders. On a dense
+synthetic search
 fixture, the median changed from 197.77 ms to 4.61 ms; these Linux measurements
 are specific to that fixture. See [measurement evidence](docs/evidence/performance-security-audit.md).
 Check the release notes before installing binaries: source changes after v0.2.0
@@ -387,11 +388,12 @@ independent sessions remain running. Use `--no-tray` for foreground terminal mod
 Install or refresh the launcher with `pwsh -NoProfile -ExecutionPolicy Bypass -File dashboard/install-windows.ps1`.
 This tray belongs to the optional Node.js Dashboard; `rdsh serve` stays a terminal command.
 
-For the original Harness update banner, **Dismiss** and **×** keep that component's
-same target version hidden across projects and browsers for the same OS user.
-A different target version can notify again. Restart the GUI server and reload the
-page after updating; [persistence limits and verification](docs/evidence/update-dismissal/README.md)
-apply when storage is unavailable. Cross-port pages reflect dismissal on their next poll.
+The original Harness update banner appears immediately when an actual update is
+recorded, every **two hours** from its update time, and on every full page reload.
+**Dismiss** and **×** close the current occurrence; the two-hour schedule continues.
+Project remounts keep it closed until the next reminder. Close events also reach
+other GUI ports running as the same OS user. Activate the new code with one normal
+GUI restart/reload; see [browser verification](docs/evidence/update-notice-repeat/README.md).
 
 ## Safety design
 
@@ -438,6 +440,8 @@ before/after output checks are described in [BENCHMARKS.md](docs/BENCHMARKS.md).
 
 DeepSeek Harness provides the upstream runtime; without it, rustdsh would not exist.
 Thanks to the upstream developers and everyone contributing code, reviews, tests and ideas.
+
+- Icon by [PENTACoXIAN](https://x.com/PENTACoXIAN)
 
 - [GrEarl](https://github.com/GrEarl) and [PENTACoXIAN](https://x.com/PENTACoXIAN): security reports and review.
 - [StudioYebisu](https://github.com/yebisu0529-ship-it), [RNA4219](https://github.com/RNA4219), and [eightman999](https://github.com/eightman999): contributions and improvement reports.

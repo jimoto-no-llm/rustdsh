@@ -2,31 +2,30 @@
 
 Update notification banner for [rdsh](https://github.com/jimoto-no-llm/rustdsh) on the dsh web GUI.
 
-When `sync-dsh.sh` (shipped with rdsh) records an update in
-`~/.local/share/rdsh/update-state.json`, a notification card appears at the
-top of the web GUI. From the card you can run the update check, see details,
-minimize it, or dismiss it (dismissed versions stay dismissed).
+When `sync-dsh.sh` records an actual update in
+`~/.local/share/rdsh/update-state.json`, the open web GUI receives a notification
+through the authenticated `/api/rdsh-update/events` stream. File changes trigger
+push delivery; a one-second server check covers missed filesystem events. If the
+stream is unavailable, the client checks every five seconds and reconnects.
 
-Both **dismiss** and **x** remember the update's component (`kind`) and target
-version/commit (`to`), without a time limit. Rewriting an update's timestamp,
-reloading, or changing projects cannot make the same target appear again.
-Different target versions still appear; minimizing keeps the notification.
+The card appears immediately, on every full page reload, and every **two hours**
+from the recorded update time. **Dismiss** and **×** close the current occurrence.
+Closing, polling, reloading, or switching projects does not reset the two-hour
+schedule. A project remount keeps the current occurrence closed; the next reminder
+or an actual new update appears again. Minimizing keeps the notification.
 
-Dismissals are shared by all projects and profiles running as the same OS user.
-The authenticated `POST /api/rdsh-update/dismiss` route creates a private marker
-under `~/.local/share/rdsh/update-dismissals/`, separate from `update-state.json`.
-Each target gets its own marker, so simultaneous acknowledgements do not erase
-older ones. Same-origin browser tabs close immediately through storage events;
-other GUI ports or browsers observe the acknowledgement on their next poll
-(within 60 seconds) or page load. Separate OS accounts keep separate records.
+Same-origin tabs share close events through browser storage. Independent GUI
+ports running as the same OS user also share live close events through the private,
+atomically replaced `~/.local/share/rdsh/update-notice-close.json` file. The
+notification identifies the component, target, update time and two-hour period, so
+an old close cannot hide a newer update or reminder. Existing close records are
+not replayed on page load. Separate OS accounts keep separate records.
 
-The previous browser dismissal record is migrated, including records whose old
-two-hour timeout expired. If browser storage is disabled, in-memory suppression
-lasts across project remounts and server acknowledgement lasts across reloads.
-If the server cannot save and browser storage is also disabled, persistence
-across a full browser reload is unavailable. Demo dismissals are browser-local
-and never write account state. New server/client code takes effect after the
-normal GUI restart/reload; no running user session is restarted automatically.
+Legacy permanent dismissal records are ignored and retained on disk. Closing
+works in memory when browser storage is disabled, including project remounts;
+full reload intentionally shows the notification again. Demo closes never write
+account state. Activate the new server/client code through the normal GUI
+restart/reload once; running user sessions are not restarted automatically.
 
 ## Install
 
@@ -51,7 +50,7 @@ Reload the web GUI to pick it up.
 
 - `demo: true` shows a demo notification without touching any state file.
 - Without updates recorded, the banner stays hidden.
-- Both API routes require the DSH GUI session and its Host/Origin checks.
+- All four API routes require the DSH GUI session and its Host/Origin checks.
   DSH must provide `connection.requestRejection` (verified with 0.2.0-rc.2).
   Without the `connection` service, the plugin is not loaded. If the service
   lacks the authentication API, requests are refused with 503.
@@ -65,9 +64,12 @@ on the `:38080` demo instance).
 
 After the next GUI restart, confirm on `:3080`:
 
-1. The banner appears when `~/.local/share/rdsh/update-state.json` records an update.
-2. Dismiss, minimize, and update-all actions work.
-3. No boot errors appear in the GUI logs.
+1. An actual update appears in an open page without reloading.
+2. Dismiss/× close it; full reload and the next two-hour boundary show it again.
+3. Minimize and updater actions still work; no boot errors appear in GUI logs.
+
+[Reproducible browser evidence](../../docs/evidence/update-notice-repeat/README.md)
+uses isolated authenticated hosts and dummy state without restarting the live GUI.
 
 Then stop creating demo instances for this check.
 
