@@ -1,0 +1,27 @@
+@font-face{font-family:NotoFilm;src:url('../public/NotoSansJP.ttf') format('truetype');font-weight:100 900;font-display:block}
+@font-face{font-family:InstrumentFilm;src:url('../public/InstrumentSans.ttf') format('truetype');font-weight:400 700;font-display:block}
+.s-film{background:#fafbff;color:#172232;font-family:InstrumentFilm,NotoFilm,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden}
+.s-film *{box-sizing:border-box}
+.s-center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);white-space:nowrap}
+.s-brand{display:flex;justify-content:center;align-items:center;font-family:InstrumentFilm;font-size:126px;line-height:1;font-weight:500;letter-spacing:-7px}
+.s-mist{position:absolute;left:-280px;top:490px;width:2400px;height:1100px;background:radial-gradient(ellipse at 65% 65%,#9bc8f433,transparent 60%),radial-gradient(ellipse at 30% 45%,#9dbdf71c,transparent 54%);pointer-events:none}
+.s-perspective{position:absolute;inset:0;perspective:1500px;perspective-origin:50% 46%;transform-style:preserve-3d}
+.s-console{position:absolute;left:252px;top:326px;width:1416px;height:475px;border-radius:30px;background:#ffffff;box-shadow:0 45px 110px #3762921a,0 3px 9px #37629209;overflow:hidden;transform-origin:50% 50%}
+.s-console-top{height:77px;padding:0 43px;display:flex;align-items:center;gap:17px;border-bottom:1px solid #eaf0f7;font-size:24px;color:#65798e}
+.s-console-version{margin-left:auto;font-size:18px;color:#8a9bad}
+.s-console-body{padding:39px 51px;font-family:monospace}
+.s-command{font-size:32px;letter-spacing:-.3px;height:42px;color:#172232;white-space:nowrap}
+.s-command>span:first-child{color:#075cbe}
+.s-output{font-size:25px;line-height:1.5;color:#778ba1;margin-top:14px}
+.s-caret{display:inline-block;width:2px;height:30px;background:#075cbe;margin-left:5px;vertical-align:-5px}
+.s-demo{position:absolute;bottom:36px;width:100%;text-align:center;font-size:18px;color:#8e9fb0;letter-spacing:.5px}
+.s-dashboard{position:absolute;left:190px;top:235px;width:1540px;padding-bottom:8px;transform-origin:50% 46%;border-radius:24px;background:#f7f7f4;box-shadow:0 36px 100px #37629220,0 2px 6px #3762920b;overflow:hidden}
+.s-app-heading{height:72px;display:flex;align-items:center;gap:15px;padding:0 30px;font-size:25px;background:#fff;border-bottom:1px solid #edf1f5}
+.s-app-heading>span{font-size:19px;margin-left:auto;color:#8e9fb0}
+.s-answer{position:absolute;left:210px;top:329px;width:1500px;transform-origin:50% 46%;border-radius:26px;background:#fff;box-shadow:0 38px 100px #37629220,0 2px 9px #3762920b;overflow:visible}
+.s-answer>img{border-radius:26px}
+.s-phone{position:absolute;left:1155px;top:113px;width:426px;height:880px;padding:16px;border-radius:52px;background:linear-gradient(120deg,#fff,#dde7f0 38%,#a6b7c8 50%,#e2eaf3 64%,#fff);border:1px solid #bacbdc;box-shadow:28px 50px 90px #274b7620,6px 3px 1px #bdd0e4;transform-origin:50% 55%}
+.s-phone-screen{position:relative;width:390px;height:844px;border-radius:36px;overflow:hidden;background:#f7f7f4;box-shadow:0 0 0 2px #243446}
+.s-phone-camera{position:absolute;width:82px;height:17px;left:172px;top:27px;border-radius:20px;background:#162433}
+.s-close-content{position:absolute;left:0;right:0;top:224px;text-align:center}
+.s-install{display:inline-block;padding:15px 28px;border-radius:16px;background:#ffffffa6;backdrop-filter:blur(10px);color:#23517f;font-size:25px;font-family:monospace;border:1px solid #ffffffbb}

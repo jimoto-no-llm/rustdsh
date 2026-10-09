@@ -14,6 +14,14 @@ Closing, polling, reloading, or switching projects does not reset the two-hour
 schedule. A project remount keeps the current occurrence closed; the next reminder
 or an actual new update appears again. Minimizing keeps the notification.
 
+A successful **update** / **update again** check closes the occurrence that started
+the request, like Dismiss, without resetting the schedule. Failed checks remain
+visible and retryable. A newer update arriving during the request remains visible.
+The release updater compares verified binary bytes with the installed binary:
+an unchanged payload neither reinstalls nor rewrites the notification time. A
+changed payload still updates even if its version label is the same. See
+[loop regression evidence](../../docs/evidence/update-notice-noop/README.md).
+
 Same-origin tabs share close events through browser storage. Independent GUI
 ports running as the same OS user also share live close events through the private,
 atomically replaced `~/.local/share/rdsh/update-notice-close.json` file. The

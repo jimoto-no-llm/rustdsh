@@ -31,6 +31,9 @@ Thumbs.db
 # Scratch / local state
 /tmp/
 *.tmp
+.local/
+.serena/
+/strix_runs/
 
 # Python verification artifacts
 __pycache__/
