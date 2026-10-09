@@ -25,7 +25,7 @@ export function guardedPlanSource(packageName, source) {
     return (
       source +
       `\n{ const proto = SubagentRuntime.prototype; const start = proto.start;
-      proto.start = function(name, request) { return ${boundary}.subagent(request, delegationDepthOf(request.parent) + 1, () => start.call(this, name, request), this.getProvider(name)); };
+      proto.start = function(name, request) { return ${boundary}.subagent(request, () => delegationDepthOf(request.parent) + 1, () => start.call(this, name, request), this.getProvider(name)); };
       proto.startContinuable = function() { return ${boundary}.unplanned(); };
     }\n`
     );

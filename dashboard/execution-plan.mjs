@@ -647,7 +647,19 @@ export class ExecutionPlans {
       v,
     );
     check(!result.blockers.length, "prerequisite_unverified");
-    check(Date.parse(p.definition.limits.stop_at) > Date.now(), "plan_expired");
+    check(!(await this.problems(p)).length, "plan_graph_invalid");
+    // Acceptance observation performs I/O. An operator may stop the plan while
+    // those checks are running; read admission authority again after them.
+    const current = await this.read(),
+      finalPlan = this.find(current, claim.plan_id),
+      finalClaim = current.claims.find((c) => c.claim_id === claim.claim_id);
+    check(
+      finalPlan.context_hash === claim.context_hash &&
+        finalClaim?.phase === "reserved",
+      "claim_context_changed",
+    );
+    const finalReason = this.stopReason(current, finalPlan);
+    check(!finalReason, finalReason);
   }
   async update(claim_id, action, input = null) {
     return this.mutate((v) => {

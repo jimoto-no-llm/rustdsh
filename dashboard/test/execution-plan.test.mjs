@@ -468,3 +468,44 @@ test("CLI defines and inspects drafts without starting a CLI or accepting mispla
   );
   assert.equal((await f.plans.read()).claims.length, 0);
 });
+test("stop during prerequisite I/O and a changed native parent block the final dispatch", async (t) => {
+  const f = await setup(t),
+    binding = await f.bind(),
+    request = {
+      task_id: "a",
+      parent_session_id: "native-root",
+      native_depth: 1,
+    },
+    a = await f.plans.admit("plan-qa", binding.context_hash, request);
+  f.plans.prerequisites = async () => {
+    await f.plans.stop("plan-qa");
+    return { blockers: [], receipts: [] };
+  };
+  await assert.rejects(f.plans.beforeDispatch(a), fail("operator_stopped"));
+  const g = await setup(t),
+    otherBinding = await g.bind(),
+    guard = nativePlanBoundary(g.plans, otherBinding),
+    parent = { session: { id: "native-root" } },
+    provider = guard.register({});
+  let starts = 0;
+  const original = g.plans.beforeDispatch.bind(g.plans);
+  g.plans.beforeDispatch = async (claim) => {
+    await original(claim);
+    parent.session.id = "another-parent";
+  };
+  await assert.rejects(
+    guard.child("a", parent, () =>
+      guard.subagent(
+        { parent },
+        1,
+        () => {
+          starts++;
+        },
+        provider,
+      ),
+    ),
+    fail("native_context_changed_before_start"),
+  );
+  assert.equal(starts, 0);
+  assert.equal((await g.plans.read()).claims[0].phase, "finished");
+});

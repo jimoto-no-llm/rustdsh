@@ -45,6 +45,8 @@ export function nativePlanBoundary(plans, binding) {
       if (!c || c.parent !== request.parent)
         denial("explicit_workflow_task_required");
       if (!providers.has(provider)) denial("in_process_provider_required");
+      const depth = () =>
+        typeof native_depth === "function" ? native_depth() : native_depth;
       request.signal?.throwIfAborted();
       const claim = await plans.admit(
         binding.definition.plan_id,
@@ -52,7 +54,7 @@ export function nativePlanBoundary(plans, binding) {
         {
           task_id: c.task_id,
           parent_session_id: request.parent?.session?.id,
-          native_depth,
+          native_depth: depth(),
         },
       );
       let dispatched = false,
@@ -60,6 +62,12 @@ export function nativePlanBoundary(plans, binding) {
       try {
         await plans.beforeDispatch(claim);
         request.signal?.throwIfAborted();
+        if (
+          request.parent !== c.parent ||
+          request.parent?.session?.id !== claim.parent_session_id ||
+          depth() !== claim.native_depth
+        )
+          denial("native_context_changed_before_start");
         // No await between the final signal/deadline check and native factory.
         if (Date.parse(binding.definition.limits.stop_at) <= Date.now())
           denial("plan_expired");
