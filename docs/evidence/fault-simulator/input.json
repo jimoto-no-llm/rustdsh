@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "simulator_version": 1,
+  "seed": 1,
+  "scenarios": [
+    "duplicate_events",
+    "out_of_order",
+    "network_disconnect",
+    "restart",
+    "disk_full",
+    "gpu_loss"
+  ],
+  "clock": {
+    "type": "logical",
+    "origin_ms": 0,
+    "step_ms": 2
+  },
+  "fault_points": {
+    "restart": "mock_effect_before_native_ack",
+    "disk_full": "sync"
+  }
+}

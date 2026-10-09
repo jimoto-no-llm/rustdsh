@@ -37,8 +37,15 @@ pub fn command(orig: &str, node: &str) -> anyhow::Result<std::process::Command> 
         .ok_or_else(|| anyhow::anyhow!("RDSH_SECURITY: invalid DSH package path"))?;
     let manifest: serde_json::Value =
         serde_json::from_slice(&std::fs::read(package.join("package.json"))?)?;
+    // Audited DSH releases: latest rc (0.2.0-rc.2) and 0.2.1-alpha.1 share the
+    // same lib/bin.js surface; both carry the audited dsh-tools runtime path.
+    // Keep the list explicit: any other version needs a new audit.
+    const AUDITED_DSH_VERSIONS: [&str; 2] = ["0.2.0-rc.2", "0.2.1-alpha.1"];
     anyhow::ensure!(
-        manifest["name"] == "@deepseek-ai/dsh" && manifest["version"] == "0.2.0-rc.2",
+        manifest["name"] == "@deepseek-ai/dsh"
+            && manifest["version"]
+                .as_str()
+                .is_some_and(|v| AUDITED_DSH_VERSIONS.contains(&v)),
         "RDSH_SECURITY: unsupported DSH version; an audited execution adapter is required"
     );
     let runtime = package.join("node_modules/@deepseek-ai/dsh-tools/lib/index.js");

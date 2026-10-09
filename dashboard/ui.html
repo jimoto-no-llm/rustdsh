@@ -242,6 +242,30 @@
         font-size: 14px;
         min-height: 23px;
       }
+      .observation {
+        margin-top: 12px;
+        font-size: 12px;
+        overflow-wrap: anywhere;
+      }
+      .observation-heading {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 5px;
+      }
+      .provenance-badge {
+        display: inline-block;
+        padding: 1px 6px;
+        border-radius: 5px;
+        background: #eef0eb;
+      }
+      .provenance-badge.measured { color: #235a3c; background: #e5f1e8; }
+      .provenance-badge.agent_reported { color: #315994; background: #e8eef9; }
+      .provenance-badge.estimated { color: #765a18; background: #faf0d5; }
+      .provenance-badge.stale { color: var(--red); background: #fbece5; }
+      .provenance-badge.unknown, .provenance-badge.unavailable { color: var(--mut); }
+      .observation-details { color: var(--mut); margin-top: 3px; }
+      .observation-details summary { cursor: pointer; }
       .bar {
         height: 9px;
         background: #e1e3dd;
@@ -858,7 +882,7 @@
         </details>
         <details class="fold" id="progress-detail">
           <summary>進捗・成果物の報告</summary>
-          <h2>進捗・成果物</h2>
+          <h2>進捗・成果物の報告履歴</h2>
           <div class="feed" id="events"></div>
         </details>
         <details id="answered">

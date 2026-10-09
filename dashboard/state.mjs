@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
+import { normalizeObservation } from "./observations.mjs";
 import {
   changeQuestionContract,
   answerQuestionContract,
@@ -302,12 +303,28 @@ export function applyOperation(state, operation, input) {
     case "metrics": {
       if (
         Object.keys(input).some(
-          (key) =>
-            !metricNames.includes(key) &&
-            !["session_id", "cost_scope", "cost_report"].includes(key),
+          (key) => !metricNames.includes(key) &&
+            !["session_id", "observation", "cost_scope", "cost_report"].includes(key),
         )
       )
         throw new Error("Unknown metric");
+      const now = Date.now();
+      const sessionId = "session_id" in input
+        ? text(input.session_id, "session_id", 160)
+        : null;
+      const observation = {
+        ...normalizeObservation(input.observation, { now, sessionId }),
+        report_id: randomBytes(16).toString("hex"),
+      };
+      const metrics = { ...state.metrics };
+      const observations = { ...state.metric_observations };
+      // Session-scoped costs must not inherit values from the previous session.
+      if (sessionId && sessionId !== metrics.session_id) {
+        for (const key of ["session_cost_usd", "session_budget_usd"]) {
+          delete metrics[key];
+          delete observations[key];
+        }
+      }
       for (const key of metricNames) {
         if (!(key in input)) continue;
         const n = input[key];
@@ -319,11 +336,23 @@ export function applyOperation(state, operation, input) {
             (!key.endsWith("_usd") && !Number.isInteger(n)))
         )
           throw new Error(`Invalid ${key}`);
-        state.metrics[key] = n;
+        if (n !== null && observation.kind === "unavailable")
+          throw new Error("Unavailable observations cannot contain numeric values");
+        metrics[key] = n;
+        observations[key] = {
+          ...observation,
+          kind: n === null ? "unavailable" : observation.kind,
+          reference: observation.reference ?? key,
+        };
       }
-      if ("session_id" in input)
-        state.metrics.session_id = text(input.session_id, "session_id", 160);
-      const m = state.metrics;
+      if (sessionId) {
+        metrics.session_id = sessionId;
+        observations.session_id = {
+          ...observation,
+          reference: observation.reference ?? sessionId,
+        };
+      }
+      const m = metrics;
       if (
         m.cached_input_tokens != null &&
         m.input_tokens != null &&
@@ -336,6 +365,8 @@ export function applyOperation(state, operation, input) {
         m.tool_errors > m.tool_calls
       )
         throw new Error("Tool errors exceed tool calls");
+      state.metrics = metrics;
+      state.metric_observations = observations;
       if ("cost_scope" in input) declareCostScope(state, input.cost_scope);
       if ("cost_report" in input) recordCostReport(state, input.cost_report);
       break;
@@ -360,6 +391,9 @@ export function applyOperation(state, operation, input) {
           : "",
         blocker: input.blocker ? text(input.blocker, "blocker", 2000) : "",
         updated_at: new Date().toISOString(),
+        observation: normalizeObservation(input.observation, {
+          reference: input.id,
+        }),
       };
       const index = state.tasks.findIndex((item) => item.id === task.id);
       if (index < 0) state.tasks.push(task);
@@ -438,6 +472,9 @@ export function applyOperation(state, operation, input) {
         detail: input.detail ? text(input.detail, "detail") : "",
         artifact: input.artifact ? text(input.artifact, "artifact", 2000) : "",
         created_at: new Date().toISOString(),
+        observation: normalizeObservation(input.observation, {
+          reference: input.artifact || null,
+        }),
       };
       state.events.push(event);
       // Full state and all feedback are durable; retain the latest 1000 display events.

@@ -1,0 +1,5 @@
+{
+  "version": "rdsh 0.2.0",
+  "search": "./README.md:3: TODO: add a welcome screen",
+  "tokens": "10  README.md"
+}
