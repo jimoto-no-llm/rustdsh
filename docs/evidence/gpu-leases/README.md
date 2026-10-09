@@ -144,7 +144,6 @@ a speed improvement; the raw samples and durable guard/stop overhead are
 retained. The current hosted CI must be checked independently on the final PR
 head; the failed earlier CI is not counted as a pass.
 
-
 ## Short-path receipt recovery after the hosted Windows failure
 
 Measured source: `04f363f9ea5d5a5ea6d887c4264aac6c556c0414`, including merged main
