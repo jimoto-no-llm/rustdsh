@@ -302,7 +302,7 @@ rdsh serve
 
 | API | Purpose |
 | --- | --- |
-| `GET /api/version` | version |
+| `GET /api/version` | version (requires key) |
 | `GET /api/doctor` | health check |
 | `POST /api/tokens` | token estimate for `{"text"}` |
 | `POST /api/prune` | prune `{"text","max_tokens"}` to budget |
@@ -310,7 +310,7 @@ rdsh serve
 | `GET /api/sessions?limit=20` | recent sessions |
 | `GET /api/skills`, `/api/profiles` | name lists |
 
-APIs other than `/api/version` require the per-launch key in the
+All APIs require the per-launch key in the
 `X-RDSH-Token` header (the browser UI uses the key from its URL).
 No CDN is used; the page works offline.
 

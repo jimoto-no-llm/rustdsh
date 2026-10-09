@@ -271,7 +271,7 @@ rdsh serve
 
 | API | 内容 |
 | --- | --- |
-| `GET /api/version` | バージョン |
+| `GET /api/version` | バージョン（要キー） |
 | `GET /api/doctor` | 状態確認 |
 | `POST /api/tokens` | トークン推定（`{"text"}`） |
 | `POST /api/prune` | 切り詰め（`{"text","max_tokens"}`） |
@@ -279,7 +279,7 @@ rdsh serve
 | `GET /api/sessions?limit=20` | セッション一覧 |
 | `GET /api/skills` / `/api/profiles` | 一覧 |
 
-`/api/version` 以外のAPIは起動ごとの鍵が必要です。画面がURLから読み取り、
+すべてのAPIは起動ごとの鍵が必要です。画面がURLから読み取り、
 `X-RDSH-Token` ヘッダーで送ります。CDN不要・オフラインで使えます。
 
 手元の状態確認だけなら `serve` を有効化して `rdsh serve` を使います。
