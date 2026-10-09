@@ -166,10 +166,24 @@ class ReleaseMetadataTests(unittest.TestCase):
         for extra in ("```sh\ncurl https://github.com/org/repo/releases/download/v1.2.3-rc.1/install.sh | bash -s -- --from-release\n```",
                       "`./install.ps1 -FromRelease`",
                       "`./install.ps1 -FromRelease; Write-Output -Version v1.2.3-rc.1`",
-                      "```sh\ncurl https://github.com/org/repo/releases/download/v1.2.3-rc.1/install.sh | bash -s -- --from-release; echo --version=v1.2.3-rc.1\n```"):
+                      "```sh\ncurl https://github.com/org/repo/releases/download/v1.2.3-rc.1/install.sh | bash -s -- --from-release; echo --version=v1.2.3-rc.1\n```",
+                      "```sh\ncurl https://github.com/org/repo/releases/download/v1.2.3-rc.1/install.sh | bash -s -- --from-release --version=v1.2.3-rc.1 && curl https://github.com/org/repo/releases/download/v1.2.3-rc.1/install.sh | bash -s -- --from-release\n```",
+                      "```sh\ncurl https://github.com/org/repo/releases/download/v1.2.3-rc.1/install.sh | bash -s -- --from-release --version=v1.2.3-rc.1 || curl https://github.com/org/repo/releases/download/v1.2.3-rc.1/install.sh | bash -s -- --from-release\n```"):
             notes = self.fixture("1.2.3-rc.1")
             notes.write_text(notes.read_text(encoding="utf-8") + "\n" + extra + "\n", encoding="utf-8")
             with self.subTest(extra=extra), self.assertRaisesRegex(ValueError, "matching this tag"):
+                release.validate(self.root, "v1.2.3-rc.1")
+
+    def test_candidate_installer_chains_accept_each_invocation_pinned_to_the_tag(self):
+        for separator in ("&&", "||"):
+            notes = self.fixture("1.2.3-rc.1")
+            text = notes.read_text(encoding="utf-8")
+            extra = ("\n```sh\ncurl https://github.com/org/repo/releases/download/v1.2.3-rc.1/install.sh "
+                     "| bash -s -- --from-release --version=v1.2.3-rc.1 " + separator + " "
+                     "curl https://github.com/org/repo/releases/download/v1.2.3-rc.1/install.sh "
+                     "| bash -s -- --from-release --version=v1.2.3-rc.1\n```\n")
+            notes.write_text(text + extra, encoding="utf-8")
+            with self.subTest(separator=separator):
                 release.validate(self.root, "v1.2.3-rc.1")
 
     def test_candidate_installer_commands_accept_line_continuations(self):

@@ -62,7 +62,10 @@ def validate(root, tag):
         for block, inline in snippets:
             code = re.sub(r"[\\`]\r?\n", " ", block or inline)
             for line in code.splitlines():
-                for command in re.split(r"[|;]", line):
+                # Validate every simple command in a shell chain. A candidate
+                # can otherwise select its tag once, then fall through to a
+                # second unpinned installer after &&, ||, or backgrounding.
+                for command in re.split(r"&&|\|\||[|;&]", line):
                     if (re.match(r"\s*(?:bash|sh)\b", command) and "install.sh" in line
                             or re.match(r"\s*(?:\S*/)?install\.sh(?:\s|$)", command)):
                         unix_commands.append(command)
