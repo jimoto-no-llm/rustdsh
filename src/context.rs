@@ -685,7 +685,7 @@ pub fn cmd_status(json: bool) -> anyhow::Result<()> {
         cfg.max_sessions,
         if cfg.include_git_diff { "on" } else { "off" }
     )?;
-    writeln!(out, "working memory: {} (~{} tokens)", wm, wm_tokens)?;
+    writeln!(out, "working memory: {wm} (~{wm_tokens} tokens)")?;
     if cfg.goal.trim().is_empty() {
         writeln!(
             out,
