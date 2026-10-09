@@ -95,14 +95,30 @@ async function setup(t, webhook = false) {
     );
     return server;
   };
-  await start();
   t.after(async () => {
-    for (const attached of attachedRuns) await attached.adapter.stop();
-    for (const owned of servers) await owned.close();
+    const failures = [];
+    for (const attached of attachedRuns) {
+      try { await attached.adapter.stop(); }
+      catch (failure) { failures.push(failure); }
+    }
+    // A persistence/owned-stop failure still fails this test, but must not leave
+    // an unrelated listener alive and prevent the rest of the suite from ending.
+    for (const owned of servers) {
+      try {
+        await owned.close();
+        assert.equal(owned.server.listening, false);
+      } catch (failure) { failures.push(failure); }
+    }
+    if (failures.length) {
+      const codes = failures.map((failure) =>
+        [failure.code || failure.name, failure.cause?.code].filter(Boolean).join(":"));
+      throw new AggregateError(failures, "Fixture cleanup failed: " + codes.join(", "));
+    }
     assert.equal(path.dirname(path.resolve(root)), path.resolve(os.tmpdir()));
     assert.ok(path.basename(root).startsWith("rdsh-reply-test-"));
     await fs.rm(root, { recursive: true });
   });
+  await start();
   const post = async (route, body, credential = "human", origin) => {
     const headers =
       credential === "human"

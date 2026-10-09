@@ -62,13 +62,23 @@ fn collect_files(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
         Err(_) => return,
     };
     for e in entries.filter_map(Result::ok) {
-        let p = e.path();
-        let name = e.file_name().to_string_lossy().into_owned();
-        match entry_kind(&e, &p, &name) {
-            EntryKind::Dir => collect_files(&p, out),
-            EntryKind::File => out.push(p),
-            EntryKind::Skip => {}
+        // file_type is free from dirent, no stat. Files need no name check.
+        let ft = match e.file_type() {
+            Ok(t) => t,
+            Err(_) => continue,
+        };
+        if ft.is_file() {
+            out.push(e.path());
+            continue;
         }
+        if !ft.is_dir() {
+            continue;
+        }
+        if is_skip_dir_name(&e.file_name()) {
+            continue;
+        }
+        let p = e.path();
+        collect_files(&p, out);
     }
 }
 
@@ -79,22 +89,38 @@ enum EntryKind {
     Skip,
 }
 
+/// True for hidden or vendor dirs, byte compare, no String alloc.
+/// Same skip set as before, hidden check is first byte '.'.
+fn is_skip_dir_name(name: &std::ffi::OsStr) -> bool {
+    let b = name.as_encoded_bytes();
+    if b.first() == Some(&b'.') {
+        return true;
+    }
+    for s in SKIP {
+        if b == s.as_bytes() {
+            return true;
+        }
+    }
+    false
+}
+
 /// Classify without stat in the common case (dirent type is free).
 /// Skip symlinks and unknown types to keep repository traversal local.
-fn entry_kind(e: &std::fs::DirEntry, _p: &std::path::Path, name: &str) -> EntryKind {
-    match e.file_type() {
-        Ok(t) if t.is_dir() => {
-            if SKIP.contains(&name) || name.starts_with('.') {
-                EntryKind::Skip
-            } else {
-                EntryKind::Dir
-            }
-        }
-        Ok(t) if t.is_file() => EntryKind::File,
-        // Repository-controlled links must not disclose files outside the search root
-        // or recurse through cycles. Unknown types also fail closed.
-        _ => EntryKind::Skip,
+fn entry_kind(e: &std::fs::DirEntry) -> EntryKind {
+    let ft = match e.file_type() {
+        Ok(t) => t,
+        Err(_) => return EntryKind::Skip,
+    };
+    if ft.is_file() {
+        return EntryKind::File;
     }
+    if !ft.is_dir() {
+        return EntryKind::Skip;
+    }
+    if is_skip_dir_name(&e.file_name()) {
+        return EntryKind::Skip;
+    }
+    EntryKind::Dir
 }
 
 /// Walk subdirectories in parallel while preserving exact sequential order:
@@ -107,8 +133,7 @@ fn collect_parallel(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
     };
     let mut subdirs = vec![];
     for e in &entries {
-        let name = e.file_name().to_string_lossy().into_owned();
-        if entry_kind(e, &e.path(), &name) == EntryKind::Dir {
+        if entry_kind(e) == EntryKind::Dir {
             subdirs.push(e.path());
         }
     }
@@ -124,16 +149,14 @@ fn collect_parallel(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
     let mut segs: Vec<Seg> = vec![];
     let mut pending: Vec<std::path::PathBuf> = vec![];
     for e in &entries {
-        let p = e.path();
-        let name = e.file_name().to_string_lossy().into_owned();
-        match entry_kind(e, &p, &name) {
+        match entry_kind(e) {
             EntryKind::Dir => {
                 if !pending.is_empty() {
                     segs.push(Seg::Files(std::mem::take(&mut pending)));
                 }
-                segs.push(Seg::Sub(p));
+                segs.push(Seg::Sub(e.path()));
             }
-            EntryKind::File => pending.push(p),
+            EntryKind::File => pending.push(e.path()),
             EntryKind::Skip => {}
         }
     }

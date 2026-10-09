@@ -1,0 +1,12 @@
+Command: node dashboard/fault-simulator.mjs --help
+Before: main 96dbcbbd6e1295b2e92ba31e9cf9037770107b24, exit 1 (entry point absent)
+- Error code: MODULE_NOT_FOUND
+After: source 9f4f7eb49097da7eaa31ae324f57366c7578de35, exit 0
++ node dashboard/fault-simulator.mjs run --output <new-directory> [--scenario <name|all>] [--seed <uint32>]
++ node dashboard/fault-simulator.mjs replay --manifest <input.json> --output <new-directory>
++ Scenarios: duplicate_events, out_of_order, network_disconnect, restart, disk_full, gpu_loss
+
+Command: run --seed 1, then replay from input.json
++ run: passed=true, 6/6 scenarios
++ replay: passed=true, 6/6 scenarios, byte-identical input
++ disk_full seed=0: passed=true, injected write ENOSPC, 0 effects/acks

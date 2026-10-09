@@ -1,43 +1,33 @@
-# Low-end host re-review
+# PR #86 re-review evidence
 
 ## Current scope
 
-Reviewed source `18d0445fa58604fa1ea07a817fe393eb612c0aba` integrates main
-`98abc67d7e5c5d3f2a5321d9a56adb6a83ff93e2` and contributor head
-`0e37d5eb1ad736a3d4ddb2a54d7a3a0d37863caa`.
-The profile, compile-cache and session-size Rust implementations are already
-present in that main commit; this final PR adds the operational guidance,
-low-priority systemd synchronization and their isolated regression checks.
-It also removes main's tracked host-specific `dashboard/node_modules` symlink.
+This update integrates the PR branch at `bc9a6568e2382722e5299e764187296f48ddbe59`
+with current `main` at `c73183a964ec4c3c0637f4e2beeb860b5a0c908a`. It keeps the
+low-end host guide in both READMEs, documents the saved default-profile setting,
+adds low-priority systemd guidance, expands isolated release and CLI regressions,
+and makes Windows job-membership reporting consistent when kernel observations
+race.
 
-The profile order is environment, saved default, existing local `tui`, then a
-guided error. Explicit profile names are forwarded unchanged. The compile cache
-respects an existing user value, passthrough and the opt-out. Version metadata
-delegation checks the actual child environment. Unsupported agent runtimes
-are refused before any compile-cache side effect, retaining main's enforcement.
+## Reviewer requests
 
-## Verification
+- The release sync path checks the downloaded asset against its published
+  `.sha256` sidecar before replacing the installed binary. Missing, empty, or
+  mismatched sidecars leave the current binary in place; `tests/regress.sh`
+  exercises these cases. The READMEs now state that checksum behavior.
+- A profile-less `rdsh boot` uses `RDSH_DEFAULT_PROFILE`, then the saved
+  `general.default_profile`, then an existing local `tui` profile, and otherwise
+  exits with guidance. Explicit profile names continue to be passed through.
+  The README examples and regression cases now describe and cover this order.
 
-An isolated Linux release build passed formatting and release Clippy on all
-targets with warnings denied, 88 Rust tests (74 unit, 11 native E2E, 3 settings),
-7 benchmark-example tests, 31 Node security tests with zero skips, 6 Python
-release-artifact tests and 83 CLI regression checks. The CLI suite ran from
-outside the repository and kept HOME, DSH_HOME and temporary paths isolated.
+## Verification status
 
-The regressions cover profile precedence, default-cache and explicit-cache
-environment values, passthrough, opt-out, zstd frame-size handling, the absence
-of the zstd CLI, and rejection of unsupported agent runtimes. Fixture
-credentials and executables are synthetic. No model or paid API was run.
-
-Existing timing figures in the README belong to their stated historical
-measurement; this run verifies behavior and makes no new speed claim.
-
-## Addressed owner feedback
-
-Current main verifies the matching published SHA-256 checksum before executing
-or replacing the downloaded release candidate. Missing, empty or mismatched
-checksums abort. The fresh security regression checks those cases, and both
-language guides now describe the actual checksum verification and profile order.
-This closes the technical findings previously reported by the owner. The owner's
-existing `REQUEST_CHANGES` review still requires their own re-review; another
-reviewer's approval cannot dismiss it.
+The updated regression suite covers saved-profile precedence, explicit profile
+delegation, Node compile-cache opt-out and passthrough behavior, zstd header and
+CLI paths, release checksum failures, and bounded test-side filesystem writes.
+Markdown lint passed for both READMEs and this evidence note. The dashboard
+process-scope test file passed all 8 tests, and `bash -n tests/regress.sh` passed.
+The Rust toolchain is unavailable in this Windows worktree, so the Linux release
+build, Rust tests, and full CLI regression run still need to pass in CI before
+the PR is considered ready. The existing `REQUEST_CHANGES` review remains for
+the reviewer to reassess; no review state is cleared by this evidence note.
