@@ -22,6 +22,9 @@ export function fixtureWorkflow(scenario = "match") {
   const ctx = new Context(),
     dispatches = [],
     disposals = [],
+    active = new Set(),
+    lifecycle = { maximum_active: 0 },
+    childReady = Promise.withResolvers(),
     parent = {
       session: { id: "native-root", header: { delegationDepth: 0 } },
       options: {},
@@ -45,7 +48,14 @@ export function fixtureWorkflow(scenario = "match") {
       dispatches.push({ id, parent_id: request.parent.session.id });
       if (scenario === "startup-error")
         throw new Error("fixture startup outcome unknown");
-      const result = scenario === "hold" ? Promise.withResolvers() : null;
+      active.add(id);
+      lifecycle.maximum_active = Math.max(
+        lifecycle.maximum_active,
+        active.size,
+      );
+      const result = ["hold", "concurrent-held"].includes(scenario)
+        ? Promise.withResolvers()
+        : null;
       return {
         id,
         result:
@@ -66,6 +76,7 @@ export function fixtureWorkflow(scenario = "match") {
           result?.resolve({ output: [], stopReason: "cancelled" });
           if (scenario === "dispose-error")
             throw new Error("fixture disposal unconfirmed");
+          active.delete(id);
         },
       };
     },
@@ -85,9 +96,23 @@ export function fixtureWorkflow(scenario = "match") {
       async function () {},
     ).constructor;
     try {
+      const original = request.bindings[0].functions;
+      const bindings =
+        scenario === "hold"
+          ? {
+              ...original,
+              childResult(value) {
+                // Native host has published the exact child and subscribed to its
+                // result. Cancellation can now test disposal without a clock race.
+                const result = original.childResult(value);
+                childReady.resolve();
+                return result;
+              },
+            }
+          : original;
       return {
         value: await new AsyncFunction("workflowHost", request.program)(
-          request.bindings[0].functions,
+          bindings,
         ),
       };
     } catch (error) {
@@ -103,5 +128,13 @@ export function fixtureWorkflow(scenario = "match") {
     maxItemsPerCall: 4096,
     syncTimeoutMs: 5000,
   });
-  return { engine, subagents, parent, dispatches, disposals };
+  return {
+    engine,
+    subagents,
+    parent,
+    dispatches,
+    disposals,
+    lifecycle,
+    childReady: childReady.promise,
+  };
 }

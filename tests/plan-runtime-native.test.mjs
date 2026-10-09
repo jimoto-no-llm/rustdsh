@@ -201,10 +201,11 @@ test("native Workflow result and task done alone do not start a dependent child"
 test("native parallel children cannot exceed durable concurrency", async (t) => {
   const f = await setup(t),
     result = await f.invoke(
-      "concurrent",
+      "concurrent-held",
       'return await parallel([() => agent("one", {rdshTaskId:"a"}), () => agent("two", {rdshTaskId:"c"}), () => agent("three", {rdshTaskId:"d"})]);',
     );
-  assert.ok(result.dispatches.length <= 2);
+  assert.equal(result.dispatches.length, 2);
+  assert.equal(result.maximum_active, 2);
   assert.equal(result.outcome.stopReason, "error");
   assert.match(result.outcome.error, /concurrency_limit/);
   assert.equal(result.disposals.length, result.dispatches.length);

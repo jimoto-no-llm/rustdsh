@@ -1,8 +1,15 @@
 // Original published Workflow/PTC guest; isolated provider/transport, no boot.
 import { fixtureWorkflow } from "./plan-native-services.mjs";
 const scenario = process.env.RDSH_TEST_PLAN_SCENARIO || "match";
-const { engine, subagents, parent, dispatches, disposals } =
-  fixtureWorkflow(scenario);
+const {
+  engine,
+  subagents,
+  parent,
+  dispatches,
+  disposals,
+  lifecycle,
+  childReady,
+} = fixtureWorkflow(scenario);
 let error = null,
   outcome = null;
 const timings = [],
@@ -34,7 +41,7 @@ try {
         signal: new AbortController().signal,
       });
       if (scenario === "hold")
-        setTimeout(() => run.cancel("fixture cancel"), 100);
+        void childReady.then(() => run.cancel("fixture cancel"));
       outcome = await run.result;
       await run.dispose();
       timings.push(performance.now() - started);
@@ -48,6 +55,7 @@ process.stdout.write(
     scenario,
     dispatches,
     disposals,
+    maximum_active: lifecycle.maximum_active,
     outcome,
     error,
     timings_ms: timings,
