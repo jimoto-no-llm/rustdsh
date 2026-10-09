@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
-import { ProjectStore } from "./state.mjs";
+import { ProjectStore, identity } from "./state.mjs";
 import { AcceptanceStore } from "./acceptance.mjs";
 
 const object = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
@@ -402,12 +402,19 @@ export class ExecutionPlans {
     return null;
   }
   async enforce(id, record) {
+    let context = null;
+    try {
+      if (typeof record?.cwd === "string" && path.isAbsolute(record.cwd))
+        context = await identity(record.cwd);
+    } catch {
+      // A missing or inaccessible native cwd cannot bind an execution plan.
+    }
     check(
       record?.binding === "confirmed" &&
         record.cli === "dsh" &&
         record.cli_version === "0.2.0-rc.2" &&
         text(record.cli_session_id) &&
-        path.resolve(record.cwd) === path.resolve(this.project.root),
+        context?.id === this.project.id,
       "plan_native_context_unconfirmed",
     );
     return this.mutate(async (v) => {

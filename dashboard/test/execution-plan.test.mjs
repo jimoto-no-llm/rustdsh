@@ -134,6 +134,23 @@ export async function setup(t) {
     complete,
   };
 }
+test("native cwd uses canonical project identity and refuses another or missing directory", async (t) => {
+  const f = await setup(t);
+  await f.plans.define(f.definition);
+  const other = path.join(f.root, "other");
+  await fs.mkdir(other);
+  for (const cwd of [other, path.join(f.root, "missing"), "."])
+    await assert.rejects(
+      f.plans.enforce("plan-qa", { ...f.record, cwd }),
+      fail("plan_native_context_unconfirmed"),
+    );
+  const cwd = process.platform === "win32" ? f.cwd.toLowerCase() : f.cwd;
+  assert.equal((await identity(cwd)).id, f.project.id);
+  const bound = await f.plans.enforce("plan-qa", { ...f.record, cwd });
+  assert.equal(bound.binding.cwd, cwd);
+  assert.equal((await f.plans.read()).claims.length, 0);
+});
+
 test("draft graph exposes unknown dependencies, cycles and branch depth; enforce refuses before start", async (t) => {
   const f = await setup(t);
   const def = {
