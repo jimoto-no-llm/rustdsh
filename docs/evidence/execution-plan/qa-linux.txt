@@ -1,6 +1,4 @@
-wsl: 'M:\AI\FlashNext\swap\flashnext-swap.vhdx' k0�0�0�0�0 �0�0�0�0�0\Obg0M0~0[0�0g0W0_0: c�[U0�0_0�0�0L0��d0K0�0~0[0�00
 
-wsl: Failed to translate 'D:\nodejs\'
 
 added 141 packages in 2s
 npm warn install-scripts 2 packages have install scripts not yet covered by allowScripts:
