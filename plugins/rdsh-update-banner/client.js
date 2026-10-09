@@ -8,44 +8,18 @@ window.__ModuleLoader__.load({
     const useCallback = React.useCallback;
     const useRef = React.useRef;
     const ENDPOINT = "/api/rdsh-update";
-    const DISMISS_KEY = "rdsh-update-dismissed";
-    const DISMISS_PREFIX = DISMISS_KEY + ":v2:";
-    // Shared across overlay remounts even when browser storage is unavailable.
-    const dismissedUpdates = new Set();
-    const updateKey = (j) => JSON.stringify([j.kind || "update", j.to || ""]);
+    const CLOSE_KEY = "rdsh-update-close:v3";
+    const REMINDER_MS = 2 * 60 * 60 * 1000;
+    // Project remounts keep this occurrence closed; a full page load starts fresh.
+    let dismissedOccurrence = null;
+    const cycle = (j) => Math.max(0, Math.floor((Date.now() - Number(j.at)) / REMINDER_MS));
+    const occurrence = (j, period = cycle(j)) => JSON.stringify([j.kind || "update", j.to, Number(j.at), period]);
     function acknowledge(j) {
       return fetch(ENDPOINT + "/dismiss", {
         method: "POST", cache: "no-store",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ to: j.to, kind: j.kind || "update" }),
+        body: JSON.stringify(j),
       }).catch(() => {});
-    }
-    function remember(j) {
-      const key = updateKey(j);
-      dismissedUpdates.add(key);
-      try { localStorage.setItem(DISMISS_PREFIX + key, "1"); } catch (e) {}
-    }
-    function isDismissed(j) {
-      if (!j) return false;
-      const key = updateKey(j);
-      if (j.dismissed || dismissedUpdates.has(key)) return true;
-      try {
-        if (localStorage.getItem(DISMISS_PREFIX + key) === "1") {
-          dismissedUpdates.add(key);
-          return true;
-        }
-        // Migrate the previous timestamp-based record, including expired ones.
-        const old = JSON.parse(localStorage.getItem(DISMISS_KEY) || "null");
-        const separator = typeof old?.key === "string" ? old.key.lastIndexOf("@") : -1;
-        if (separator > 0 && old.key.slice(0, separator) === j.to) {
-          remember(j);
-          // Once assigned to this component, the legacy wildcard must not hide
-          // a future update of a different component with the same version.
-          try { localStorage.removeItem(DISMISS_KEY); } catch (e) {}
-          return true;
-        }
-      } catch (e) {}
-      return false;
     }
     const CSS = ".rub-wrap{position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:900;" +
       "width:min(400px,calc(100vw - 24px));box-sizing:border-box;" +
@@ -98,6 +72,40 @@ window.__ModuleLoader__.load({
       const result = resPair[0];
       const setResult = resPair[1];
       const loadGeneration = useRef(0);
+      const latest = useRef(null);
+      const lastOccurrence = useRef(null);
+      const reminder = useRef(null);
+      const reload = useRef(null);
+      const updating = useRef(false);
+      const accept = useCallback((j) => {
+        if (!j || !j.ok) return;
+        if (!j.updated) {
+          latest.current = null; lastOccurrence.current = null; dismissedOccurrence = null;
+          clearTimeout(reminder.current); setData(null); return;
+        }
+        if (typeof j.to !== "string" || !Number.isFinite(Number(j.at)) || Number(j.at) <= 0) return;
+        const current = occurrence(j);
+        latest.current = j;
+        if (lastOccurrence.current !== current) {
+          lastOccurrence.current = current;
+          setExpanded(true); setResult("");
+          setRunning((value) => value === "busy" ? value : "idle");
+        }
+        setData(dismissedOccurrence === current ? null : j);
+        clearTimeout(reminder.current);
+        // Recompute the fixed boundary; polls, reloads and close never restart it.
+        const delay = Number(j.at) + (cycle(j) + 1) * REMINDER_MS - Date.now();
+        reminder.current = setTimeout(() => {
+          ++loadGeneration.current;
+          accept(latest.current); reload.current?.();
+        }, Math.max(1, Math.min(REMINDER_MS, delay)));
+      }, []);
+      const hide = useCallback((value) => {
+        const current = latest.current;
+        if (!current || occurrence(current) !== occurrence(value, value.cycle)) return;
+        dismissedOccurrence = occurrence(current);
+        ++loadGeneration.current; setData(null);
+      }, []);
       const load = useCallback(async () => {
         const generation = ++loadGeneration.current;
         try {
@@ -105,40 +113,78 @@ window.__ModuleLoader__.load({
           if (!r.ok) return;
           const j = await r.json();
           if (!j || !j.ok || generation !== loadGeneration.current) return;
-          // Clear a visible banner too, including a response arriving after close.
-          const hidden = j.updated && isDismissed(j);
-          if (hidden && !j.dismissed) acknowledge(j);
-          setData(hidden ? null : j);
+          accept(j);
         } catch (e) {}
       }, []);
+      reload.current = load;
       useEffect(() => {
+        let disposed = false, connected = false, retry;
+        const controller = new AbortController();
         load();
-        const t = setInterval(load, 60000);
+        const t = setInterval(() => { if (!connected) load(); }, 5000);
         const onStorage = (event) => {
-          if (event.key?.startsWith(DISMISS_PREFIX) && event.newValue === "1") {
-            dismissedUpdates.add(event.key.slice(DISMISS_PREFIX.length));
-          }
-          if (event.key === DISMISS_KEY || event.key?.startsWith(DISMISS_PREFIX)) {
-            setData((current) => isDismissed(current) ? null : current);
-          }
+          if (event.key !== CLOSE_KEY || !event.newValue) return;
+          try { hide(JSON.parse(event.newValue)); } catch (e) {}
         };
+        const wake = () => { accept(latest.current); load(); };
+        const visible = () => { if (document.visibilityState === "visible") wake(); };
+        async function listen() {
+          let reader;
+          try {
+            // Use the same authenticated fetch transport as the existing API.
+            const response = await fetch(ENDPOINT + "/events", { cache: "no-store", signal: controller.signal });
+            if (!response.ok || !response.body?.getReader || disposed) return;
+            connected = true; reader = response.body.getReader();
+            const decoder = new TextDecoder(); let buffer = "";
+            while (!disposed) {
+              const chunk = await reader.read();
+              if (disposed || chunk.done) break;
+              buffer += decoder.decode(chunk.value, { stream: true });
+              if (buffer.length > 16384) throw new Error("notification frame too large");
+              let separator;
+              while ((separator = buffer.indexOf("\n\n")) !== -1) {
+                const frame = buffer.slice(0, separator); buffer = buffer.slice(separator + 2);
+                const event = frame.split("\n").find((line) => line.startsWith("event: "))?.slice(7);
+                const payload = frame.split("\n").filter((line) => line.startsWith("data: ")).map((line) => line.slice(6)).join("\n");
+                if (!payload) continue;
+                try {
+                  const value = JSON.parse(payload);
+                  if (event === "state") { ++loadGeneration.current; accept(value); }
+                  else if (event === "close") hide(value);
+                } catch (e) {}
+              }
+            }
+          } catch (e) { /* Normal disconnects are retried and covered by polling. */ }
+          finally {
+            connected = false;
+            if (reader) await reader.cancel().catch(() => {});
+            if (!disposed) retry = setTimeout(listen, 1000);
+          }
+        }
+        listen();
         window.addEventListener("storage", onStorage);
+        window.addEventListener("focus", wake);
+        document.addEventListener("visibilitychange", visible);
         return () => {
-          clearInterval(t);
+          disposed = true; controller.abort();
+          clearInterval(t); clearTimeout(retry); clearTimeout(reminder.current);
           window.removeEventListener("storage", onStorage);
+          window.removeEventListener("focus", wake);
+          document.removeEventListener("visibilitychange", visible);
           ++loadGeneration.current;
         };
       }, [load]);
       const dismiss = () => {
         if (data) {
-          remember(data);
-          // Account-wide acknowledgement also spans GUI ports and browsers.
-          acknowledge(data);
+          const close = { kind: data.kind || "update", to: data.to, at: Number(data.at), cycle: cycle(data) };
+          hide(close);
+          try { localStorage.setItem(CLOSE_KEY, JSON.stringify({ ...close, nonce: Math.random() })); } catch (e) {}
+          acknowledge(close);
         }
-        setData(null);
       };
       const runUpdate = useCallback(async () => {
-        if (running !== "idle") return;
+        if (updating.current) return;
+        updating.current = true;
         setRunning("busy");
         setResult("");
         try {
@@ -151,7 +197,7 @@ window.__ModuleLoader__.load({
         } catch (e) {
           setRunning("done");
           setResult("request failed");
-        }
+        } finally { updating.current = false; }
       }, [running, load]);
       if (!data || !data.updated) return null;
       const inner = expanded ? h("div", { className: "rub-card" },

@@ -1,0 +1,20 @@
+{
+  "result": "PASS",
+  "scope": "Actual React banner and authenticated plugin routes in two isolated loopback hosts; dummy HOME; no production DSH restart or updater execution",
+  "flows": [
+    "State and event routes reject unauthenticated and foreign-Origin requests",
+    "Baseline: no immediate notification; permanent dismissal also suppressed reload",
+    "File update pushes to an open page without reload or polling",
+    "Close propagates to another tab and another independent GUI host without reloading",
+    "Project remount keeps closed; full reload shows; exact two-hour boundary shows again",
+    "Reload and Dismiss midway through the next period preserve the original repeat cadence",
+    "Minimize/expand retained; the next reminder opens the full card",
+    "A new version or a new update time notifies immediately after closing the previous occurrence",
+    "Old permanent dismissal records cannot suppress the requested new notification behavior",
+    "Disabled browser storage still supports close, project remount suppression, and reload notification"
+  ],
+  "page_errors": [],
+  "console_errors": [],
+  "before": "Baseline client receives no live update and stays hidden until reload or its 60-second poll",
+  "live_notification_ms": 78
+}
