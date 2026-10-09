@@ -1,0 +1,70 @@
+{
+  "schema": 1,
+  "result": "PASS",
+  "source_head": "b9059072dc8117c940e333917397e2c17c7e6bbb",
+  "base_head": "7a7435b292497bd9992e63bf900bd20ffa97f999",
+  "scope": "final frozen runtime source; later additions are evidence and isolated reproduction scripts only",
+  "windows": {
+    "node": "v24.18.0",
+    "dashboard": {
+      "tests": 206,
+      "pass": 206,
+      "fail": 0,
+      "skipped": 0
+    },
+    "native_plan": {
+      "tests": 12,
+      "pass": 12,
+      "skipped": 0
+    }
+  },
+  "linux": {
+    "node": "v24.21.0",
+    "dashboard": {
+      "tests": 206,
+      "pass": 201,
+      "fail": 0,
+      "skipped": 5
+    },
+    "native_plan": {
+      "tests": 12,
+      "pass": 12,
+      "skipped": 0
+    },
+    "rust_release": 103,
+    "examples": 7,
+    "fence": 2,
+    "cli_regression": 55,
+    "plugin_security_update": 49,
+    "fmt": "PASS",
+    "release_clippy_zero_warnings": "PASS",
+    "browser_suites": [
+      "existing-browser",
+      "update-banner",
+      "execution-plan"
+    ]
+  },
+  "logs": [
+    {
+      "path": "qa-windows.txt",
+      "sha256": "ad51c050aa69335e88f0804986086fad3dcd9b6317205900d5bc2b5fbce9f4fe",
+      "original_sha256": "8e3f5e52210d46831bcbf8919362922571dd9ab27487442ce5c9edfb31c7d223",
+      "normalization": "UTF-8, LF, remove terminal NUL padding and trailing whitespace"
+    },
+    {
+      "path": "qa-linux.txt",
+      "sha256": "44908b9087410c574f4adc7085df138bc4630b9552200a075c00aa3d9eb01a7f",
+      "original_sha256": "3cb95f59112ecf96c2ea03004567a941204fe6ce75a538407aee97ea9723906a",
+      "normalization": "UTF-8, LF, remove terminal NUL padding and trailing whitespace"
+    }
+  ],
+  "initial_harness_correction": "An earlier Windows run invoked the stdio test from repository root and failed its relative cli.mjs entry point. The final whole suite ran from dashboard and passed 206/206; no stdio production code was changed.",
+  "not_executed": [
+    "actual model/provider calls",
+    "real profile boot",
+    "production PTC confinement",
+    "independent external ACP/SDK descendants",
+    "human UX acceptance",
+    "main merge"
+  ]
+}

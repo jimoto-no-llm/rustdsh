@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "platform": "linux",
+  "node": "v24.21.0",
+  "scope": "20 original Workflow start/result/disposal operations; synthetic provider with 5ms delay; no dependencies/acceptance criteria; Node boot excluded, guest parsing and durable local audit included; no network/inference claim",
+  "before": {
+    "count": 20,
+    "median_ms": 6.095709999999997,
+    "p95_ms": 6.886724999999998,
+    "total_ms": 128.78656000000007
+  },
+  "after": {
+    "count": 20,
+    "median_ms": 43.98753499999998,
+    "p95_ms": 47.46054400000003,
+    "total_ms": 887.3704990000003
+  },
+  "added_median_ms": 37.89182499999998,
+  "source_head": "b9059072dc8117c940e333917397e2c17c7e6bbb",
+  "base_head": "7a7435b292497bd9992e63bf900bd20ffa97f999"
+}
