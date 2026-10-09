@@ -284,6 +284,7 @@ rdsh serve
 手元の状態確認だけなら `serve` を有効化して `rdsh serve` を使います。
 プロジェクトの指標・質問と回答・スマホ接続には [Node.js ダッシュボード](dashboard/README.md) を使います（Node.js 22 以上が必要です）。
 `rdsh-dashboard project --project <ディレクトリ>` でプロジェクト用、`rdsh-dashboard harness` で元の Harness Web 画面を起動します。
+`project --include-project <ディレクトリ>` を追加すると、その起動時に明示したprojectだけの稼働・待ち・要確認件数を横断表示します。詳細は各project専用dashboardに残り、読取不能時は前回観測時刻と不明状態を表示します。
 
 Windows ネイティブ用の `rdsh-dashboard` ランチャーでは、`project`・`harness` が通知領域のトレイに常駐します。
 右クリックの Open / 開く で画面を開き、Exit / 終了 でその Dashboard と管理対象の Harness を止めます。

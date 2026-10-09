@@ -40,7 +40,7 @@ import {
   finishTunnel,
 } from "./connection-diagnostics.mjs";
 
-const help = `rdsh-dashboard project --project <directory> [--port <port>] [--no-tailscale] [--open]
+const help = `rdsh-dashboard project --project <directory> [--include-project <directory> ...] [--port <port>] [--no-tailscale] [--open]
 rdsh-dashboard harness [--port 38081] [--harness-port 3081] [--no-tailscale] [--open]
 rdsh-dashboard open --project <directory> | --harness
 rdsh-dashboard stop --project <directory> | --harness
@@ -93,6 +93,7 @@ const { values, positionals } = parseArgs({
   allowPositionals: true,
   options: {
     project: { type: "string" },
+    "include-project": { type: "string", multiple: true },
     port: { type: "string" },
     "harness-port": { type: "string" },
     "no-tailscale": { type: "boolean" },
@@ -266,6 +267,11 @@ async function pinnedAttachment(project, options) {
 }
 try {
   const command = positionals[0];
+  if (
+    values["include-project"]?.length &&
+    command !== "project"
+  )
+    throw new Error("--include-project is available for project mode only");
   if (
     command !== "release" &&
     ["release-id", "selection-revision"].some((k) => values[k] !== undefined)
@@ -1337,12 +1343,29 @@ try {
       throw new Error(
         "--tray requires native Windows; omit it for terminal mode",
       );
+    const project =
+      command === "project"
+        ? await identity(values.project || process.cwd())
+        : null;
+    const includedDirectories = values["include-project"] || [];
+    if (
+      includedDirectories.length > 31 ||
+      includedDirectories.some((directory) => !directory.trim())
+    )
+      throw new Error("Specify 1–31 non-empty --include-project directories");
+    const overviewProjects = await Promise.all(
+      includedDirectories.map((directory) => identity(directory)),
+    );
+    const projectCount = (project ? 1 : 0) + overviewProjects.length;
+    const distinctProjectCount = new Set(
+      [project, ...overviewProjects].filter(Boolean).map((item) => item.id),
+    ).size;
+    if (distinctProjectCount !== projectCount)
+      throw new Error("Cross-project overview directories must be distinct");
     const dashboard = await startDashboard({
       kind: command,
-      project:
-        command === "project"
-          ? await identity(values.project || process.cwd())
-          : null,
+      project,
+      overviewProjects,
       port: portValue(values.port),
       harnessPort: portValue(values["harness-port"]),
       tailscale: !values["no-tailscale"],

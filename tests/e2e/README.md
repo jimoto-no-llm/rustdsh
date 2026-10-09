@@ -21,7 +21,9 @@ The runner creates isolated HOME/DSH_HOME/XDG directories, starts loopback serve
 and removes its own processes and fixtures. It never connects a provider or enables
 Tailscale. It checks persisted settings, tokens/prune, session display, actual MCP
 questions and browser answers, draft retention across SSE, process restart, and
-revocation of the previous browser key. Linux CI installs Chromium and retains PNGs
+revocation of the previous browser key. The separate project-overview browser
+flow checks the explicit project allowlist, summary-only state, per-project detail
+authentication, and mobile layout. Linux CI installs Chromium and retains PNGs
 and JSON even when the job fails.
 
 The default command also runs `update-banner.mjs` with the real React component

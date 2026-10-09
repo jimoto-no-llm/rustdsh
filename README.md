@@ -266,6 +266,10 @@ Q&A, and phone access, use the optional [Node.js dashboard](dashboard/README.md)
 `rdsh-dashboard harness` for the original Harness Web UI. On native Windows
 the launcher can live in the tray (right-click Open / Exit,
 double-click opens; `--no-tray` stays in the terminal).
+Add `--include-project <directory>` to a project launch to show read-only
+active, waiting, and needs-attention counts for only the projects explicitly
+listed at startup. Details stay in each project's dashboard; unreadable
+projects show their last successful observation time and an unknown state.
 
 The original Harness update banner appears right after an update is recorded,
 every two hours from its update time, and on every full page reload.

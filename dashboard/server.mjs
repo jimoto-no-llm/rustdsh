@@ -16,6 +16,7 @@ import { AnswerApplicationServer } from "./answer-application-server.mjs";
 import { BudgetAdmissionServer } from "./budget-server.mjs";
 import { createHistoryBackup, backupMaximum } from "./history-backup.mjs";
 import { AcceptanceStore } from "./acceptance.mjs";
+import { createProjectCrossOverview } from "./project-cross-overview.mjs";
 import {
   ConnectionObservations,
   connectionReport,
@@ -43,7 +44,18 @@ async function readBody(req, maximum = 131072) {
   return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
 }
 export async function startDashboard(options) {
-  const { kind = "project", project, tailscale = true } = options;
+  const {
+    kind = "project",
+    project,
+    tailscale = true,
+    overviewProjects = [],
+  } = options;
+  if (
+    !Array.isArray(overviewProjects) ||
+    (overviewProjects.length && kind !== "project") ||
+    overviewProjects.length > 31
+  )
+    throw new Error("Cross-project overview is available only in project mode");
   const port =
     options.port ||
     (kind === "harness"
@@ -87,12 +99,29 @@ export async function startDashboard(options) {
   const connections = new ConnectionObservations();
   const localUrl = `http://127.0.0.1:${port}/`;
   const cookieName = `rdsh_${kind === "project" ? project.id : "harness"}`;
-  let store, eventsHub;
+  let store, eventsHub, projectCrossOverview;
   try {
     store = kind === "project" ? await ProjectStore.open(project) : null;
     eventsHub = store
       ? await EventsHub.open(project, () => store.value, options.webhookPost)
       : null;
+    if (overviewProjects.length) {
+      projectCrossOverview = createProjectCrossOverview(
+        [project, ...overviewProjects],
+        path.join(directory, "project-cross-overview.json"),
+        {
+          readState: async (target) =>
+            target.id === project.id
+              ? store.value
+              : JSON.parse(
+                  await fs.readFile(
+                    path.join(target.directory, "state.json"),
+                    "utf8",
+                  ),
+                ),
+        },
+      );
+    }
   } catch (error) {
     await fs.unlink(lockFile);
     throw error;
@@ -551,6 +580,7 @@ export async function startDashboard(options) {
       if (req.method === "GET" && route === "/api/config")
         return json(res, 200, {
           kind,
+          project_overview_enabled: Boolean(projectCrossOverview),
           instance_id: instanceId,
           project: project
             ? { id: project.id, name: project.name, root: project.root }
@@ -716,6 +746,17 @@ export async function startDashboard(options) {
         }
         if (req.method === "GET" && route === "/api/state")
           return json(res, 200, await visibleState());
+        if (req.method === "GET" && route === "/api/projects/overview") {
+          if (!humanAuthorized)
+            return json(res, 403, {
+              error: "Human browser credential required",
+            });
+          if (!projectCrossOverview)
+            return json(res, 404, {
+              error: "Cross-project overview is not configured",
+            });
+          return json(res, 200, await projectCrossOverview.snapshot());
+        }
         if (req.method === "POST" && route?.startsWith("/api/update/")) {
           const operation = route.slice("/api/update/".length);
           if (
