@@ -93,10 +93,15 @@ fn split_base(base: &str) -> anyhow::Result<(String, u16, String)> {
 /// Loopback check for the SearXNG warning: 127/8, ::1 and localhost names.
 /// Bracketed IPv6 literals (as kept by split_base) are unwrapped first.
 fn is_loopback_host(host: &str) -> bool {
-    let h = host.strip_prefix('[').and_then(|s| s.strip_suffix(']')).unwrap_or(host);
+    let h = host
+        .strip_prefix('[')
+        .and_then(|s| s.strip_suffix(']'))
+        .unwrap_or(host);
     h == "localhost"
-        || h.parse::<std::net::Ipv4Addr>().is_ok_and(|ip| ip.is_loopback())
-        || h.parse::<std::net::Ipv6Addr>().is_ok_and(|ip| ip.is_loopback())
+        || h.parse::<std::net::Ipv4Addr>()
+            .is_ok_and(|ip| ip.is_loopback())
+        || h.parse::<std::net::Ipv6Addr>()
+            .is_ok_and(|ip| ip.is_loopback())
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -518,7 +523,13 @@ mod tests {
         for good in ["127.0.0.1", "127.1.2.3", "localhost", "::1", "[::1]"] {
             assert!(is_loopback_host(good), "{good:?}");
         }
-        for bad in ["192.168.1.1", "10.0.0.1", "example.com", "", "127.0.0.1:8888"] {
+        for bad in [
+            "192.168.1.1",
+            "10.0.0.1",
+            "example.com",
+            "",
+            "127.0.0.1:8888",
+        ] {
             assert!(!is_loopback_host(bad), "{bad:?}");
         }
     }

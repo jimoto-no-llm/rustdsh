@@ -131,10 +131,14 @@ fetch_release() {
   echo "fetching $url" >&2
   # Pin TLS like the rustup fetch below; a future sigstore/cosign check
   # belongs here (same-channel SHA256 alone cannot survive a mirror breach).
-  curl --proto '=https' --tlsv1.2 -fsSL -o "$FETCH_TMPD/pkg.tgz" "$url" || { echo "download failed: $url" >&2; exit 1; }
+  # The documented explicit file:// fixture/mirror override is local-only.
+  # Network downloads and redirects remain restricted to HTTPS.
+  download_protocol='=https'
+  case "$base" in file://*) download_protocol='=file' ;; esac
+  curl --proto "$download_protocol" --proto-redir '=https' --tlsv1.2 -fsSL -o "$FETCH_TMPD/pkg.tgz" "$url" || { echo "download failed: $url" >&2; exit 1; }
   if [ "${RDSH_NO_CHECKSUM:-0}" = 1 ]; then
     echo "WARNING: checksum verification skipped (RDSH_NO_CHECKSUM=1); only use this with a trusted release base" >&2
-  elif curl --proto '=https' --tlsv1.2 -fsSL -o "$FETCH_TMPD/pkg.tgz.sha256" "$url.sha256" 2>/dev/null; then
+  elif curl --proto "$download_protocol" --proto-redir '=https' --tlsv1.2 -fsSL -o "$FETCH_TMPD/pkg.tgz.sha256" "$url.sha256" 2>/dev/null; then
     verify_sha256 "$FETCH_TMPD/pkg.tgz" "$FETCH_TMPD/pkg.tgz.sha256" || exit 1
   else
     echo "no checksum sidecar: refusing release install (set RDSH_NO_CHECKSUM=1 to override)" >&2

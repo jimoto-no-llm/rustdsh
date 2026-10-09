@@ -1099,7 +1099,11 @@ fn prompt_secret(prompt: &str) -> Option<String> {
         return None;
     }
     let s = s.trim().to_string();
-    if s.is_empty() { None } else { Some(s) }
+    if s.is_empty() {
+        None
+    } else {
+        Some(s)
+    }
 }
 
 #[cfg(not(unix))]
@@ -1107,7 +1111,8 @@ fn prompt_secret(prompt: &str) -> Option<String> {
     prompt_line(prompt)
 }
 
-fn prompt_yes(prompt: &str) -> bool {    match prompt_line(prompt) {
+fn prompt_yes(prompt: &str) -> bool {
+    match prompt_line(prompt) {
         Some(s) => matches!(s.trim().to_lowercase().as_str(), "y" | "yes"),
         None => false,
     }
