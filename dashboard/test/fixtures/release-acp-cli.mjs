@@ -34,8 +34,14 @@ const error = (id) =>
   );
 readline.createInterface({ input: process.stdin }).on("line", (line) => {
   const msg = JSON.parse(line);
-  if (msg.method === "initialize") reply(msg.id, template.initialize);
-  else if (msg.method === "session/new") {
+  if (msg.method === "initialize") {
+    if (build.initialize_delay_ms)
+      setTimeout(
+        () => reply(msg.id, template.initialize),
+        build.initialize_delay_ms,
+      );
+    else reply(msg.id, template.initialize);
+  } else if (msg.method === "session/new") {
     const id = build.name + "-" + randomUUID();
     known.push(id);
     fs.writeFileSync(sessions, JSON.stringify(known));

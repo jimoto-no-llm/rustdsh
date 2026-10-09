@@ -453,6 +453,7 @@ fn http_truncated_and_oversized_requests_do_not_damage_serve() {
         stream.read_to_string(&mut answer).unwrap();
         assert!(answer.starts_with("HTTP/1.1 400") || answer.starts_with("HTTP/1.1 413"));
     }
+    assert_eq!(server.request("GET", "/api/version", "", false, "").0, 401);
     assert_eq!(server.request("GET", "/api/version", "", true, "").0, 200);
 }
 
