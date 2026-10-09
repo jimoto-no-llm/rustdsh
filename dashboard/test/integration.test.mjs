@@ -254,6 +254,19 @@ test("timeouts and interrupted intent never pass or automatically replay", async
   r = await f.queue.inspect();
   assert.equal(r.validation.status, "unconfirmed");
   assert.equal(r.validation.retryable, false);
+  r = await f.queue.enqueue(
+    await f.source(
+      "after-unknown",
+      "a.txt",
+      "queued after uncertain dispatch\n",
+    ),
+    r.revision,
+  );
+  assert.equal(r.can_apply, false);
+  await assert.rejects(
+    f.queue.apply(guard(r)),
+    error("interrupted_operation_requires_inspection"),
+  );
   await assert.rejects(
     f.queue.validate(guard(r)),
     error("interrupted_operation_requires_inspection"),
@@ -281,6 +294,21 @@ test("unconfirmed dispatch errors cannot be retried or bypassed by retarget", as
     f.queue.retarget(guard(r)),
     error("interrupted_operation_requires_inspection"),
   );
+});
+test("a corrupted registry cannot disable validation after an integration", async (t) => {
+  const f = await setup(t);
+  let r = await f.init();
+  r = await f.queue.enqueue(await f.source("a", "a.txt", "new\n"), r.revision);
+  r = await f.queue.apply(guard(r));
+  const state = await f.queue.read();
+  state.queue.requires_validation = false;
+  const forged = JSON.stringify(state);
+  await fs.writeFile(f.queue.file, forged);
+  await assert.rejects(
+    f.queue.inspect(),
+    error("invalid_integration_validation_gate"),
+  );
+  assert.equal(await fs.readFile(f.queue.file, "utf8"), forged);
 });
 test("integration never overwrites ignored human files", async (t) => {
   const f = await setup(t);

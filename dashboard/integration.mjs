@@ -161,6 +161,12 @@ export class IntegrationQueue {
       "invalid_integration_queue",
     );
     checks(q.checks);
+    check(
+      q.requires_validation ||
+        (q.target_sha === q.base_sha &&
+          !q.entries.some((e) => e.state === "integrated")),
+      "invalid_integration_validation_gate",
+    );
     const heads = new Set();
     for (const [index, entry] of q.entries.entries()) {
       check(
@@ -510,6 +516,7 @@ export class IntegrationQueue {
         : null,
       can_apply:
         q.state === "ready" &&
+        q.attempts.at(-1)?.phase !== "running" &&
         target.clean === true &&
         target.head_sha === q.target_sha &&
         Boolean(next && ["queued", "conflict"].includes(next.state)) &&
@@ -653,6 +660,10 @@ export class IntegrationQueue {
     return this.mutate(expectedRevision, async (state) => {
       const q = this.queue(state),
         target = await this.guardedTarget(q, expectedHead);
+      check(
+        q.attempts.at(-1)?.phase !== "running",
+        "interrupted_operation_requires_inspection",
+      );
       check(
         !q.requires_validation || (await this.verification(q, target)).verified,
         "previous_integration_validation_required",
