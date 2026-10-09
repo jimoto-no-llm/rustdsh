@@ -57,7 +57,7 @@ rdsh tui                        # 会話を始め、選んだモデルの返答�
 | 項目 | 内容 |
 | --- | --- |
 | OS | Linux、macOS、WSL、Windows（ネイティブ）。エージェントの隔離には Linux x86_64 + bubblewrap + prlimit が必要です。 |
-| DSH 本体 | 会話には本家の `dsh` が必要です。実行アダプターが対応する監査済み版は 0.2.0-rc.2 です。 |
+| DSH 本体 | 会話には本家の `dsh` が必要です。実行アダプターが対応する監査済み版は 0.2.0-rc.2 と 0.2.1-alpha.1 です。 |
 | Rust | ソースから作る場合のみ 1.85 以上が必要です。ビルド済みバイナリには Rust はいりません。 |
 | 任意 | [Node.js ダッシュボード](dashboard/README.md)には Node.js 22 以上、`search-web` には SearXNG、正確な圧縮見積りには `zstd` CLI が必要です。 |
 
@@ -270,7 +270,7 @@ rdsh serve
 
 | API | 内容 |
 | --- | --- |
-| `GET /api/version` | バージョン（キー不要） |
+| `GET /api/version` | バージョン（要キー） |
 | `GET /api/doctor` | 状態確認 |
 | `POST /api/tokens` | トークン推定（`{"text"}`） |
 | `POST /api/prune` | 切り詰め（`{"text","max_tokens"}`） |
@@ -278,7 +278,7 @@ rdsh serve
 | `GET /api/sessions?limit=20` | セッション一覧 |
 | `GET /api/skills` / `/api/profiles` | 一覧 |
 
-`GET /api/version` 以外の API は起動ごとの鍵が必要です。画面が URL から読み取り、
+すべての API は起動ごとの鍵が必要です。画面が URL から読み取り、
 `X-RDSH-Token` ヘッダーで送ります。CDN 不要・オフラインで使えます。
 
 手元の状態確認だけなら `serve` を有効化して `rdsh serve` を使います。
