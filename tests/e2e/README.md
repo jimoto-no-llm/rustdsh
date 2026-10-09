@@ -53,3 +53,58 @@ bundled Playwright can set `RDSH_PLAYWRIGHT_MODULE` to its module path.
 
 See [the verification matrix](../../docs/evidence/e2e-20261008.md) for observed
 coverage and remaining environment-specific checks.
+
+## Discord integration
+
+`harness-settings.mjs` also saves/reloads the Discord controls in the original DSH
+Web UI, with presence disabled so it never publishes to a user's Discord. It checks
+preview, partial save with another section's draft retained, ID reset, icon loading,
+and the rdsh section's navigation/content layout at 390px.
+The default regression suite includes a real local IPC fixture:
+
+```sh
+node --test tests/discord-presence.test.mjs tests/settings-client.test.mjs tests/plugin-security.test.mjs
+```
+
+Optional installed DSH check exercises the actual AgentLoop and Cordis lifecycle
+(idle → two running agents → idle). It rejects fixture work before any model call
+and sends activities to an in-memory receiver:
+
+```sh
+RDSH_NATIVE_MODULES=/path/to/original/dsh/node_modules node tests/e2e/discord-native.mjs
+```
+
+On WSL with Windows PowerShell available, this separate test uses a randomly named
+Windows pipe to verify the real bridge, Unicode payloads, Windows PID, ACK and clear.
+It never uses the actual Discord pipe or a Discord account:
+
+```sh
+node tests/e2e/discord-wsl.mjs
+```
+
+常駐サービス相当の環境でも確認できます。WSL環境変数とWindows PATHがなくても、
+製品側の判定と名前付きパイプへの接続が動くことを確認します。
+
+```sh
+env -u WSL_DISTRO_NAME PATH=/home/sahen/.local/bin:/usr/local/bin:/usr/bin:/bin node tests/e2e/discord-wsl.mjs
+```
+
+The bundled dsh Application ID is used by default. To explicitly publish a live
+integration test to the logged-in Discord desktop client:
+
+```sh
+RDSH_NATIVE_MODULES=/path/to/original/dsh/node_modules node tests/e2e/discord-live.mjs --hold-seconds 60
+```
+
+This runs the real AgentLoop with work held before model dispatch, publishes
+idle → two running agents → idle, and clears the activity when disabled. It
+records sanitized Discord acknowledgement fields in
+`target/discord-live/with-application-id.json`; it does not log account details.
+It changes the user's visible activity temporarily, so it is never part of CI
+or ordinary regression tests. RPC acknowledgement and actual profile UI rendering
+are separate results; the script only verifies the former.
+
+Add `--extras` to publish a temporary project link alongside the bundled icon.
+The live report includes acknowledged assets, buttons, status display type and
+timestamps. Button acknowledgement does not mean it will appear on your own profile;
+Discord displays Rich Presence buttons to other users.
