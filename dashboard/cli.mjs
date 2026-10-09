@@ -45,6 +45,7 @@ rdsh-dashboard harness [--port 38081] [--harness-port 3081] [--no-tailscale] [--
 rdsh-dashboard open --project <directory> | --harness
 rdsh-dashboard stop --project <directory> | --harness
 rdsh-dashboard revoke-events --project <directory>
+rdsh-dashboard set-contract --project <directory> --file <contract.json>
 rdsh-dashboard tunnel --project <directory> --tunnel-id <tunnel_id>
 rdsh-dashboard diagnostics --project <directory>
 rdsh-dashboard mcp --project <directory>
@@ -93,6 +94,7 @@ const { values, positionals } = parseArgs({
   allowPositionals: true,
   options: {
     project: { type: "string" },
+    file: { type: "string" },
     port: { type: "string" },
     "harness-port": { type: "string" },
     "no-tailscale": { type: "boolean" },
@@ -370,6 +372,59 @@ try {
     throw new Error("Model route options require routing");
   if (values.help || !command) {
     console.log(help);
+  } else if (command === "set-contract") {
+    if (values.harness || !values.file)
+      throw new Error("Provide --file <contract.json> in project mode");
+    const project = await identity(values.project || process.cwd());
+    const runtime = JSON.parse(
+      await fs.readFile(path.join(project.directory, "runtime.json"), "utf8"),
+    );
+    if (runtime.kind !== "project" || runtime.project_id !== project.id)
+      throw new Error("Dashboard runtime belongs to a different project");
+    let input;
+    try {
+      const contents = await fs.readFile(values.file, "utf8");
+      if (Buffer.byteLength(contents) > 131072) throw new Error("Too large");
+      input = JSON.parse(contents);
+    } catch {
+      throw new Error("Contract file must be readable JSON within 128 KiB");
+    }
+    const response = await fetch(runtime.local_url + "api/contracts/update", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${runtime.token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(input),
+      signal: AbortSignal.timeout(15000),
+    });
+    let state;
+    try {
+      state = await response.json();
+    } catch {
+      throw new Error(
+        "Dashboard returned an invalid contract response; verify saved state before retrying",
+      );
+    }
+    if (!response.ok)
+      throw new Error(
+        typeof state?.error === "string"
+          ? state.error
+          : `HTTP ${response.status}`,
+      );
+    const history = Array.isArray(state?.contracts)
+      ? state.contracts.find((item) => item?.task_id === input.task_id)
+      : null;
+    const version = Array.isArray(history?.versions)
+      ? history.versions.at(-1)?.version
+      : null;
+    if (!Number.isSafeInteger(version) || version < 1)
+      throw new Error(
+        "Dashboard response is missing the saved contract version; verify saved state before retrying",
+      );
+    console.log(
+      `[rdsh-dashboard] Task contract saved: v${version}; prior approvals require revalidation`,
+    );
   } else if (command === "release") {
     const action = positionals[1];
     const allowed = new Set([

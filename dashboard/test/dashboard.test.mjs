@@ -5,6 +5,8 @@ import os from "node:os";
 import path from "node:path";
 import net from "node:net";
 import http from "node:http";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
@@ -204,7 +206,7 @@ test("project state, HTTP/stdio MCP, subscriptions, answers, and auth work toget
       },
     }),
   );
-  assert.equal((await client.listTools()).tools.length, 6);
+  assert.ok((await client.listTools()).tools.some((tool) => tool.name === "dashboard_check_task_contract"));
   let notified;
   const notification = new Promise((resolve) => {
     notified = resolve;
@@ -247,6 +249,57 @@ test("project state, HTTP/stdio MCP, subscriptions, answers, and auth work toget
     status: "doing",
     milestone: "M3",
   });
+  const contractInput = {
+    task_id: "M3.6", expected_version: 0, purpose: "Validate locally",
+    repository: alpha.root, allowed_scope: "Only alpha",
+    write_roots: [alpha.root], forbidden_actions: ["No publication"],
+    completion_conditions: ["Tests pass"], change_reason: "Initial scope",
+  };
+  const contractRequest = (credential, input, route = "contracts/update") =>
+    fetch(dashboard.localUrl + "api/" + route, {
+      method: "POST", headers: { ...credential, "content-type": "application/json" },
+      body: JSON.stringify(input),
+    });
+  const agentHeaders = { authorization: `Bearer ${runtime.mcp_token}` };
+  assert.equal((await contractRequest(agentHeaders, contractInput)).status, 401);
+  assert.equal((await contractRequest(browserHeaders, contractInput)).status, 403);
+  assert.equal((await contractRequest(agentHeaders, contractInput, "update/contract")).status, 401);
+  assert.equal((await contractRequest(headers, contractInput, "update/contract")).status, 403);
+  assert.equal((await contractRequest(headers, contractInput)).status, 200);
+  const preflight = {
+    task_id: "M3.6", contract_version: 1, repository: alpha.root,
+    cwd: alpha.root, write_paths: ["new-test-file"],
+  };
+  assert.equal((await call("dashboard_check_task_contract", preflight)).decision, "within_scope");
+  assert.equal((await contractRequest({}, preflight, "contracts/check")).status, 401);
+  for (const credential of [headers, agentHeaders, browserHeaders])
+    assert.equal((await contractRequest(credential, preflight, "contracts/check")).status, 200);
+  assert.equal((await call("dashboard_check_task_contract", { ...preflight, cwd: beta.root })).decision, "block");
+  const beforeCheck = dashboard.store.value.revision;
+  const deniedCheck = await contractRequest(agentHeaders, { ...preflight, repository: beta.root }, "contracts/check");
+  assert.equal(deniedCheck.status, 409);
+  assert.equal((await deniedCheck.json()).reason, "repository_outside_contract");
+  assert.equal(dashboard.store.value.revision, beforeCheck);
+  const revisions = await Promise.all([
+    contractRequest(headers, { ...contractInput, expected_version: 1, purpose: "Second scope" }),
+    contractRequest(headers, { ...contractInput, expected_version: 1, purpose: "Competing scope" }),
+  ]);
+  assert.deepEqual(revisions.map((response) => response.status).sort(), [200, 400]);
+  assert.equal((await call("dashboard_check_task_contract", preflight)).reason, "contract_version_changed");
+  assert.equal((await call("dashboard_check_task_contract", { ...preflight, contract_version: 2 })).decision, "within_scope");
+  const policyInput = {
+    task_id: "M3.6", contract_version: 2, repository: alpha.root,
+    operation: { schema: "rdsh.operation.v1", tool_name: "file.write", tool_input: { cwd: alpha.root, path: "new-file", content: "dummy-secret-policy-content" } },
+  };
+  const policyResult = await call("dashboard_check_operation", policyInput);
+  assert.equal(policyResult.decision, "within_policy");
+  assert.equal(policyResult.execution, "hold");
+  assert.ok(!JSON.stringify(policyResult).includes("dummy-secret-policy-content"));
+  const policyDenied = await contractRequest(agentHeaders, {
+    ...policyInput, operation: { ...policyInput.operation, tool_input: { ...policyInput.operation.tool_input, cwd: beta.root } },
+  }, "policy/check");
+  assert.equal(policyDenied.status, 409);
+  assert.equal((await policyDenied.json()).reason, "cwd_outside_contract");
   await call("dashboard_ask_question", {
     id: "Q1",
     question: "Choose a test answer",
@@ -289,6 +342,7 @@ test("project state, HTTP/stdio MCP, subscriptions, answers, and auth work toget
     body: JSON.stringify({ id: "Q1", answer: "Approved for test" }),
   });
   assert.equal(answer.status, 200);
+  assert.equal(dashboard.store.value.contracts[0].versions.length, 2);
   await Promise.race([
     notification,
     new Promise((_, reject) =>
@@ -323,8 +377,54 @@ test("project state, HTTP/stdio MCP, subscriptions, answers, and auth work toget
     JSON.parse(stdioFeedback.content[0].text).messages[0].answer,
     "Approved for test",
   );
+  const stdioCheck = await stdio.callTool({
+    name: "dashboard_check_task_contract", arguments: preflight,
+  });
+  assert.notEqual(stdioCheck.isError, true);
+  assert.equal(JSON.parse(stdioCheck.content[0].text).reason, "contract_version_changed");
+  const stdioPolicy = await stdio.callTool({ name: "dashboard_check_operation", arguments: policyInput });
+  assert.notEqual(stdioPolicy.isError, true);
+  assert.equal(JSON.parse(stdioPolicy.content[0].text).operation_digest, policyResult.operation_digest);
+  const approvalBound = { ...policyInput, run_id: "integration-run", command_id: "integration-command" };
+  const approvalRequest = { ...approvalBound, id: "integration-approval", expected_version: 0,
+    source_ref: "fixture:integration-command", expires_at: new Date(Date.now() + 60000).toISOString(),
+    limits: { max_cost_usd: 1, max_attempts: 1 } };
+  const requested = await stdio.callTool({ name: "dashboard_request_approval", arguments: approvalRequest });
+  assert.notEqual(requested.isError, true);
+  assert.equal(JSON.parse(requested.content[0].text).status, "pending");
+  const approvalUse = { ...approvalBound, id: approvalRequest.id, request_version: 1, attempt: 1, cost_usd: 0.5 };
+  assert.equal((await call("dashboard_check_approval", approvalUse)).reason, "approval_pending");
+  assert.equal((await contractRequest(browserHeaders,
+    { id: approvalRequest.id, request_version: 1, decision: "grant" }, "approvals/decide")).status, 200);
+  const claimed = await call("dashboard_claim_approval", approvalUse);
+  assert.equal(claimed.reservation, "reserved");
+  assert.equal(claimed.execution, "hold");
+  const replay = await stdio.callTool({ name: "dashboard_claim_approval", arguments: approvalUse });
+  assert.notEqual(replay.isError, true);
+  assert.equal(JSON.parse(replay.content[0].text).reason, "approval_retry_limit_or_replay");
+  const workerInput = { task_id: "M3.6", contract_version: 2, repository: alpha.root, run_id: "held-run", worker_role: "implementation" };
+  const worker = await call("dashboard_check_worker_start", workerInput);
+  assert.equal(worker.decision, "hold");
+  assert.equal(worker.effective_permissions, null);
+  assert.equal((await contractRequest(agentHeaders, workerInput, "workers/check")).status, 409);
+  const stdioWorker = await stdio.callTool({ name: "dashboard_check_worker_start", arguments: workerInput });
+  assert.notEqual(stdioWorker.isError, true);
+  assert.deepEqual(JSON.parse(stdioWorker.content[0].text), worker);
+  const contractFile = path.join(temporary, "contract.json");
+  await fs.writeFile(contractFile, JSON.stringify({ ...contractInput, expected_version: 2, purpose: "CLI revision" }));
+  const runContractCli = () => promisify(execFile)(process.execPath, [
+    path.resolve("cli.mjs"), "set-contract", "--project", alpha.root, "--file", contractFile,
+  ], { env: { ...process.env }, windowsHide: true });
+  const cliResult = await runContractCli();
+  assert.match(cliResult.stdout, /saved: v3/);
+  assert.ok(!cliResult.stdout.includes(runtime.token));
+  await fs.writeFile(contractFile, "{invalid:dummy-secret-json}");
+  await assert.rejects(runContractCli, (error) =>
+    /readable JSON/.test(error.stderr) && !error.stderr.includes("dummy-secret-json"));
   const persisted = await ProjectStore.open(alpha);
   assert.equal(persisted.value.questions[0].answer, "Approved for test");
+  assert.deepEqual(persisted.value.contracts, dashboard.store.value.contracts);
+  assert.equal(persisted.value.contracts[0].versions.at(-1).version, 3);
   assert.deepEqual(persisted.value.metric_observations, dashboard.store.value.metric_observations);
   await assert.rejects(
     () => startDashboard({ project: alpha, port: 39099, tailscale: false }),

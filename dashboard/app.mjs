@@ -1,4 +1,5 @@
 import { renderReports } from "./reports-view.mjs";
+import { renderTaskContract, renderOperations } from "./contract-view.mjs";
 import { renderQuestionCards } from "./question-cards-ui.mjs";
 import { renderAnswerApplications } from "./answer-applications-ui.mjs";
 import { renderOverview } from "./project-overview.mjs";
@@ -152,6 +153,15 @@ function render(state) {
   renderBudget($("budget-admission"), state, node);
   updateOverview(state);
   renderReports(state);
+  for (const task of state.tasks) {
+    const title = document.getElementById("task-" + task.id)?.children[2];
+    title?.append(renderTaskContract(task, state, node));
+  }
+  renderOperations(state, $("policy-checks"), $("approvals"), {
+    node,
+    api,
+    refreshState,
+  });
   const unanswered = state.questions.filter((question) => question.answer === null);
   renderQuestionCards($("questions"), unanswered, state.question_contracts, {
     node,
