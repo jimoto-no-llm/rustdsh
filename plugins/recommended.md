@@ -39,18 +39,24 @@ tooling, not an installable plugin, and `plugins/install.sh` does not install it
 It adds the board and shared workflow UI projection rules; build and adoption
 of the patched DSH remain separate operator decisions.
 
-## Filesystem skills (rtk + ponytail)
+## Filesystem skills (rdsh-docs + ponytail + rtk)
 
 Install with `./plugins/install-skills.sh` (defaults to `~/.dsh/skills`).
 
 | Skill | Source | Notes |
 | --- | --- | --- |
-| ponytail + 5 companions | `DietrichGebert/ponytail@main` | shallow clone, `FORCE=1` refreshes with timestamped backup |
+| rdsh-docs | `plugins/skills/rdsh-docs` in this source checkout | Documents the verified DSH/rdsh version scope and read-only inspection procedure |
+| ponytail + 5 companions | `DietrichGebert/ponytail@main` | shallow clone, `FORCE=1` refreshes with backup under `$DSH_HOME/skill-backups/` |
 | rtk | local `rtk` binary (want 0.46.0+) | verified by the script; its `SKILL.md` is kept as-is |
 
 ```sh
 ./plugins/install-skills.sh                  # into ~/.dsh/skills
 DSH_HOME=/tmp/test sh plugins/install-skills.sh  # sandbox trial
-FORCE=1 ./plugins/install-skills.sh          # refresh ponytail from upstream
+FORCE=1 ./plugins/install-skills.sh          # refresh installed skills; preserve old copies outside skills/
 DRY_RUN=1 ./plugins/install-skills.sh        # preview only
 ```
+
+The bundled `rdsh-docs` skill is installed only from a source checkout. It targets the `web` profile's `standard` and
+`cordis` presets and tells agents to check the installed DSH version before relying on its version-pinned references.
+Model selection and runtime skill loading require a separate DSH acceptance run; the installer and `rdsh skills` do not
+prove that a model loaded or followed the skill.
