@@ -294,10 +294,11 @@ Windows ネイティブ版の `rdsh-dashboard` ランチャーでは、`project`
 導入・更新は `pwsh -NoProfile -ExecutionPolicy Bypass -File dashboard/install-windows.ps1` です。
 このトレイは Node.js Dashboard 用です。`rdsh serve` は端末から起動します。
 
-本家 Harness の更新通知は、**Dismiss**／**×** で閉じたコンポーネントの同じ更新先バージョンを、
-同じ OS ユーザーの各プロジェクト・ブラウザーで非表示にします。新しい更新先は再び通知します。
-更新後は GUI サーバーを再起動し、画面を再読み込みしてください。別ポートの画面には次回の確認で反映されます。
-保存できない場合の限界は[検証記録](docs/evidence/update-dismissal/README.md)に記載しています。
+本家 Harness の更新通知は、実際の更新直後・更新時刻から **2時間ごと**・ページの再読み込みで表示します。
+**Dismiss**／**×** はその回の通知を閉じます。閉じても2時間の周期は継続します。
+プロジェクトを切り替えてもその回は閉じたままで、次の2時間枠で再表示します。
+閉じる操作は同じ OS ユーザーの別ポートにも配信します。
+新コードの適用時だけ通常の GUI 再起動・画面再読み込みが必要です。[ブラウザー検証](docs/evidence/update-notice-repeat/README.md)も参照してください。
 
 ## 安全設計
 

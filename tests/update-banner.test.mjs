@@ -4,64 +4,80 @@ import { readFile, writeFile, mkdtemp, mkdir, readdir, rm, symlink, link, stat }
 import os from 'node:os';
 import path from 'node:path';
 import { Readable } from 'node:stream';
+import { EventEmitter } from 'node:events';
 import { syncBuiltinESMExports } from 'node:module';
 import vm from 'node:vm';
 
 const source = await readFile(new URL('../plugins/rdsh-update-banner/client.js', import.meta.url), 'utf8');
-const update = (to = 'v-next', extra = {}) => ({ ok: true, updated: true, kind: 'rustdsh', from: 'v-old', to, at: 100, ...extra });
-const prefix = 'rdsh-update-dismissed:v2:';
-const key = (value) => prefix + JSON.stringify([value.kind, value.to]);
+const PERIOD = 7200000, START = 1700000000000, CLOSE_KEY = 'rdsh-update-close:v3';
+const update = (to = 'v-next', extra = {}) => ({ ok: true, updated: true, kind: 'rustdsh', from: 'v-old', to, at: START, ...extra });
 const response = (value) => ({ ok: true, json: async () => value });
-const settle = () => new Promise((resolve) => setImmediate(resolve));
+const settle = async () => { for (let i = 0; i < 3; i++) await new Promise((resolve) => setImmediate(resolve)); };
 
-function host({ storage = new Map(), storageFails = false, initial = update() } = {}) {
-  let state = [], cursor = 0, component, current = initial, requestOverride;
-  const effects = new Map(), listeners = new Set(), intervals = new Set(), posts = [];
+function host({ storage = new Map(), storageFails = false, initial = update(), now = START, streaming = false } = {}) {
+  let state = [], cursor = 0, component, current = initial, requestOverride, clock = now, waiting;
+  const effects = new Map(), listeners = new Map(), intervals = new Set(), timers = new Map(), posts = [], chunks = [];
   const React = {
     createElement: (tag, props, ...children) => ({ tag, props: props || {}, children: children.flat() }),
-    useState(initial) {
-      const i = cursor++;
-      if (!(i in state)) state[i] = initial;
-      return [state[i], (v) => { state[i] = typeof v === 'function' ? v(state[i]) : v; }];
-    },
-    useRef(initial) {
-      const i = cursor++;
-      if (!(i in state)) state[i] = { current: initial };
-      return state[i];
-    },
+    useState(initial) { const i = cursor++; if (!(i in state)) state[i] = initial;
+      return [state[i], (v) => { state[i] = typeof v === 'function' ? v(state[i]) : v; }]; },
+    useRef(initial) { const i = cursor++; if (!(i in state)) state[i] = { current: initial }; return state[i]; },
     useCallback: (callback) => callback,
     useEffect(callback) { const i = cursor++; if (!effects.has(i)) effects.set(i, callback()); },
   };
+  const events = {
+    addEventListener(name, f) { if (!listeners.has(name)) listeners.set(name, new Set()); listeners.get(name).add(f); },
+    removeEventListener(name, f) { listeners.get(name)?.delete(f); },
+  };
+  const reader = {
+    read: () => chunks.length ? Promise.resolve(chunks.shift()) : new Promise((resolve) => { waiting = resolve; }),
+    cancel: async () => { waiting?.({ done: true }); waiting = null; },
+  };
   vm.runInNewContext(source, {
+    Date: class extends Date { static now() { return clock; } }, AbortController, TextDecoder,
     localStorage: {
       getItem(k) { if (storageFails) throw new Error('storage disabled'); return storage.get(k) ?? null; },
       setItem(k, v) { if (storageFails) throw new Error('storage disabled'); storage.set(k, v); },
-      removeItem(k) { if (storageFails) throw new Error('storage disabled'); storage.delete(k); },
     },
-    fetch: async (_url, options) => {
-      if (options.method === 'POST') { posts.push(JSON.parse(options.body)); return response({ ok: true }); }
+    fetch: async (url, options) => {
+      if (options.method === 'POST') { posts.push({ url, ...JSON.parse(options.body || '{}') }); return response({ ok: true }); }
+      if (url.endsWith('/events')) {
+        if (!streaming) return { ok: false };
+        options.signal.addEventListener('abort', () => reader.cancel(), { once: true });
+        return { ok: true, body: { getReader: () => reader } };
+      }
       return requestOverride ? requestOverride() : response(current);
     },
-    setInterval: (f) => { intervals.add(f); return f; },
-    clearInterval: (f) => intervals.delete(f),
-    window: {
-      addEventListener: (_name, f) => listeners.add(f),
-      removeEventListener: (_name, f) => listeners.delete(f),
-      __ModuleLoader__: { load(module) {
-        module.factory(() => React).apply({ slots: {
-          inject: (_name, f) => f(), register: (_options, c) => { component = c; },
-        } });
-      } },
-    },
+    setInterval: (f) => { intervals.add(f); return f; }, clearInterval: (f) => intervals.delete(f),
+    setTimeout: (f, ms) => { const id = {}; timers.set(id, { f, at: clock + ms }); return id; },
+    clearTimeout: (id) => timers.delete(id),
+    document: { ...events, visibilityState: 'visible' },
+    window: { ...events, __ModuleLoader__: { load(module) {
+      module.factory(() => React).apply({ slots: { inject: (_name, f) => f(), register: (_options, c) => { component = c; } } });
+    } } },
   });
   return {
     render() { cursor = 0; return component(); },
-    async poll() { await Promise.all([...intervals].map((f) => f())); },
+    async poll() { await Promise.all([...intervals].map((f) => f())); await settle(); },
+    async advance(ms) {
+      const end = clock + ms;
+      for (;;) { const entry = [...timers].filter(([, t]) => t.at <= end).sort((a, b) => a[1].at - b[1].at)[0];
+        if (!entry) break; clock = entry[1].at; timers.delete(entry[0]); entry[1].f(); await settle(); }
+      clock = end; await settle();
+    },
     remount() { for (const f of effects.values()) f?.(); effects.clear(); state = []; this.render(); },
-    setUpdate(value) { current = value; },
-    setRequest(f) { requestOverride = f; },
-    event(event) { for (const f of listeners) f(event); },
-    posts, storage,
+    dispose() { for (const f of effects.values()) f?.(); effects.clear(); },
+    setUpdate(value) { current = value; }, setRequest(f) { requestOverride = f; },
+    setStreaming(value) { streaming = value; },
+    async disconnect() { await reader.cancel(); await settle(); },
+    jump(ms) { clock += ms; },
+    event(event, name = 'storage') { for (const f of listeners.get(name) || []) f(event); },
+    async push(event, value) {
+      const chunk = { value: new TextEncoder().encode(`event: ${event}\ndata: ${JSON.stringify(value)}\n\n`), done: false };
+      if (waiting) { const resolve = waiting; waiting = null; resolve(chunk); } else chunks.push(chunk);
+      await settle();
+    },
+    posts, storage, timers, intervals,
   };
 }
 function find(node, predicate) {
@@ -69,8 +85,8 @@ function find(node, predicate) {
   if (predicate(node)) return node;
   return node.children.map((child) => find(child, predicate)).find(Boolean);
 }
-async function shown(options) {
-  const fixture = host(options); fixture.render(); await settle();
+async function shown(t, options) {
+  const fixture = host(options); t.after(() => fixture.dispose()); fixture.render(); await settle();
   assert.ok(fixture.render()); return fixture;
 }
 function close(fixture, which = 'dismiss') {
@@ -78,145 +94,174 @@ function close(fixture, which = 'dismiss') {
     (which === 'close' ? n.props['aria-label'] === 'close' : n.children.includes('dismiss')));
   assert.ok(button); button.props.onClick(); assert.equal(fixture.render(), null);
 }
-
 for (const which of ['dismiss', 'close']) {
-  test(`${which} survives timestamp changes, old timestamps, remount and reload`, async () => {
-    const fixture = await shown(); close(fixture, which);
-    fixture.setUpdate(update('v-next', { at: Date.now() + 3 * 3600000 }));
-    await fixture.poll(); assert.equal(fixture.render(), null);
+  test(`${which} closes only this occurrence; remount keeps it closed and full reload shows it`, async (t) => {
+    const fixture = await shown(t); close(fixture, which); await fixture.poll(); assert.equal(fixture.render(), null);
     fixture.remount(); await settle(); assert.equal(fixture.render(), null);
-    const reload = host({ storage: fixture.storage, initial: update('v-next', { at: -1 }) });
-    reload.render(); await settle(); assert.equal(reload.render(), null);
-    assert.ok(fixture.posts.every((p) => p.to === 'v-next' && p.kind === 'rustdsh'));
+    await shown(t, { storage: fixture.storage });
+    assert.equal(fixture.posts[0].at, START); assert.equal(fixture.posts[0].cycle, 0);
   });
 }
-test('multiple dismissed targets stay hidden; another kind or genuinely new target appears', async () => {
-  const fixture = await shown(); close(fixture);
-  fixture.setUpdate(update('v-second')); await fixture.poll(); assert.ok(fixture.render()); close(fixture);
-  for (const to of ['v-next', 'v-second']) {
-    fixture.setUpdate(update(to)); await fixture.poll(); assert.equal(fixture.render(), null);
-  }
-  fixture.setUpdate(update('v-next', { kind: 'dsh' })); await fixture.poll(); assert.ok(fixture.render());
-  fixture.setUpdate(update('v-third')); await fixture.poll(); assert.ok(fixture.render());
+test('two-hour cadence is anchored to update time, continues through close/reload, and repeats', async (t) => {
+  const fixture = await shown(t, { now: START + PERIOD - 600000 }); close(fixture);
+  await fixture.advance(599999); assert.equal(fixture.render(), null);
+  await fixture.advance(1); assert.ok(fixture.render()); close(fixture);
+  await fixture.advance(PERIOD - 1); assert.equal(fixture.render(), null);
+  await fixture.advance(1); assert.ok(fixture.render());
+  const reload = await shown(t, { storage: fixture.storage, now: START + 2 * PERIOD + 3600000 }); close(reload);
+  await reload.advance(3599999); assert.equal(reload.render(), null);
+  await reload.advance(1); assert.ok(reload.render());
 });
-test('storage errors never overwrite an in-memory dismissal, including remount', async () => {
-  const fixture = await shown({ storageFails: true }); close(fixture);
-  for (let i = 0; i < 3; i++) { await fixture.poll(); assert.equal(fixture.render(), null); }
-  fixture.remount(); await settle(); assert.equal(fixture.render(), null);
-});
-test('old expired records migrate and corrupt records do not break rendering', async () => {
-  const storage = new Map([['rdsh-update-dismissed', JSON.stringify({ key: 'v-next@1', at: 1 })]]);
-  const fixture = host({ storage }); fixture.render(); await settle(); assert.equal(fixture.render(), null);
-  assert.equal(storage.get(key(update())), '1');
-  assert.equal(fixture.posts.length, 1); // Migrated dismissal also reaches the account.
-  assert.equal(storage.has('rdsh-update-dismissed'), false);
-  fixture.setUpdate(update('v-next', { kind: 'dsh' })); await fixture.poll(); assert.ok(fixture.render());
-  for (const raw of ['{broken', JSON.stringify({ key: 'v-nextX' }), 'null', '[]']) {
-    await shown({ storage: new Map([['rdsh-update-dismissed', raw]]) });
-  }
-});
-test('another tab closes an already visible banner immediately and persists on remount', async () => {
-  const storage = new Map(); const a = await shown({ storage }); const b = await shown({ storage });
-  close(a); b.event({ key: key(update()), newValue: '1' }); assert.equal(b.render(), null);
-  b.remount(); await settle(); assert.equal(b.render(), null);
-  assert.equal(b.posts.length, 1);
-});
-test('a delayed poll cannot resurrect a dismissal or overwrite a newer update', async () => {
-  const fixture = await shown(); let finish;
-  fixture.setRequest(() => new Promise((resolve) => { finish = resolve; }));
-  const pending = fixture.poll(); close(fixture); finish(response(update())); await pending;
-  assert.equal(fixture.render(), null);
-  fixture.setRequest(() => new Promise((resolve) => { finish = resolve; }));
-  const old = fixture.poll();
-  fixture.setRequest(null); fixture.setUpdate(update('v-newest')); await fixture.poll();
-  finish(response(update('v-stale'))); await old;
-  assert.ok(JSON.stringify(fixture.render()).includes('v-newest'));
-});
-test('server acknowledgement hides the banner without browser storage; minimizing is not dismissal', async () => {
-  const fixture = host({ storageFails: true, initial: update('v-next', { dismissed: true }) });
+test('live state reaches an idle page without polling; a new update time starts a new occurrence', async (t) => {
+  const fixture = host({ initial: { ok: true, updated: false }, streaming: true }); t.after(() => fixture.dispose());
   fixture.render(); await settle(); assert.equal(fixture.render(), null);
-  const visible = await shown();
-  find(visible.render(), (n) => n.props.className === 'rub-row1').props.onClick();
-  assert.ok(find(visible.render(), (n) => n.props.className === 'rub-mini'));
-  assert.equal(visible.posts.length, 0); await visible.poll();
-  assert.ok(find(visible.render(), (n) => n.props.className === 'rub-mini'));
+  await fixture.push('state', update()); assert.ok(fixture.render()); close(fixture);
+  await fixture.push('state', update()); assert.equal(fixture.render(), null);
+  await fixture.push('state', update('v-next', { at: START + 1 })); assert.ok(fixture.render());
+});
+test('late reads cannot resurrect a close or overwrite a streamed newer update', async (t) => {
+  const fixture = await shown(t); let finish;
+  fixture.setRequest(() => new Promise((resolve) => { finish = resolve; }));
+  const pending = fixture.poll(); close(fixture); finish(response(update())); await pending; assert.equal(fixture.render(), null);
+  const live = await shown(t, { streaming: true });
+  live.setRequest(() => new Promise((resolve) => { finish = resolve; }));
+  live.event({}, 'focus'); await settle();
+  await live.push('state', update('v-newest')); finish(response(update('v-stale'))); await settle();
+  assert.ok(JSON.stringify(live.render()).includes('v-newest'));
+});
+test('storage and stream closes match the current update and period, never a later reminder', async (t) => {
+  const fixture = await shown(t, { streaming: true });
+  const ack = { kind: 'rustdsh', to: 'v-next', at: START, cycle: 0 };
+  fixture.event({ key: CLOSE_KEY, newValue: JSON.stringify({ ...ack, to: 'wrong' }) }); assert.ok(fixture.render());
+  fixture.event({ key: CLOSE_KEY, newValue: '{broken' }); assert.ok(fixture.render());
+  fixture.event({ key: CLOSE_KEY, newValue: JSON.stringify(ack) }); assert.equal(fixture.render(), null);
+  await fixture.advance(PERIOD); assert.ok(fixture.render());
+  await fixture.push('close', ack); assert.ok(fixture.render());
+  await fixture.push('close', { ...ack, cycle: 1 }); assert.equal(fixture.render(), null);
+});
+test('legacy permanent dismissals are ignored; storage failures still support close, remount and reminders', async (t) => {
+  await shown(t, { initial: update('v-next', { dismissed: true }), storage: new Map([
+    ['rdsh-update-dismissed', JSON.stringify({ key: 'v-next@1', at: 1 })],
+    ['rdsh-update-dismissed:v2:["rustdsh","v-next"]', '1'],
+  ]) });
+  const fixture = await shown(t, { storageFails: true }); close(fixture); fixture.remount(); await settle();
+  assert.equal(fixture.render(), null); await fixture.advance(PERIOD); assert.ok(fixture.render());
+});
+test('disconnected streams fall back to polling and reconnect without reopening a closed occurrence', async (t) => {
+  const fixture = await shown(t, { streaming: true }); close(fixture);
+  fixture.setStreaming(false); await fixture.disconnect();
+  fixture.setUpdate(update('v-during-disconnect')); await fixture.poll(); assert.ok(fixture.render()); close(fixture);
+  fixture.setStreaming(true); await fixture.advance(1000);
+  await fixture.push('state', update('v-during-disconnect')); assert.equal(fixture.render(), null);
+  await fixture.push('state', update('v-after-reconnect')); assert.ok(fixture.render());
+});
+test('returning to a suspended page catches up to the fixed cadence without resetting it', async (t) => {
+  const fixture = await shown(t); close(fixture); fixture.jump(PERIOD + 3600000);
+  fixture.event({}, 'visibilitychange'); await settle(); assert.ok(fixture.render()); close(fixture);
+  await fixture.advance(3599999); assert.equal(fixture.render(), null);
+  await fixture.advance(1); assert.ok(fixture.render());
+});
+test('updater UI accepts another check after completion', async (t) => {
+  const fixture = await shown(t);
+  const run = (label) => find(fixture.render(), (n) => n.tag === 'button' && n.children.includes(label)).props.onClick();
+  await run('update'); await settle(); await run('update again'); await settle();
+  assert.equal(fixture.posts.filter((p) => p.url.endsWith('/run')).length, 2);
+});
+test('minimize persists within an occurrence; the next reminder expands it; cleanup removes timers', async (t) => {
+  const fixture = await shown(t);
+  find(fixture.render(), (n) => n.props.className === 'rub-row1').props.onClick(); await fixture.poll();
+  assert.ok(find(fixture.render(), (n) => n.props.className === 'rub-mini')); assert.equal(fixture.posts.length, 0);
+  await fixture.advance(PERIOD); assert.ok(find(fixture.render(), (n) => n.props.className === 'rub-card'));
+  fixture.dispose(); assert.equal(fixture.timers.size, 0); assert.equal(fixture.intervals.size, 0);
 });
 
-test('account-wide dismissal API preserves authentication and isolated update state', async (t) => {
-  const root = await mkdtemp(path.join(os.tmpdir(), 'rdsh-update-ack-'));
+test('authenticated occurrence-close API keeps updater state intact and streams bounded', async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'rdsh-update-close-'));
   const originalHome = os.homedir; os.homedir = () => root; syncBuiltinESMExports();
   t.after(async () => { os.homedir = originalHome; syncBuiltinESMExports(); await rm(root, { recursive: true, force: true }); });
-  const updates = await import('../plugins/rdsh-update-banner/index.js');
-  const directory = path.join(root, '.local/share/rdsh');
-  const markers = path.join(directory, 'update-dismissals');
+  const { apply } = await import('../plugins/rdsh-update-banner/index.js');
+  const directory = path.join(root, '.local/share/rdsh'), closePath = path.join(directory, 'update-notice-close.json');
   await mkdir(directory, { recursive: true });
   const statePath = path.join(directory, 'update-state.json');
   const setState = (value) => writeFile(statePath, JSON.stringify(value));
   const routes = new Map();
   const ctx = { effect: (f) => f(), connection: { requestRejection: (req) => req.rejection },
     webServer: { register(route) { routes.set(route.path, route.handler); return () => routes.delete(route.path); } } };
-  const dispose = updates.apply(ctx, {}); t.after(dispose);
+  const dispose = apply(ctx, {}); t.after(dispose);
   async function request(route, { method = 'GET', body = '{}', rejection } = {}) {
     const req = Readable.from([Buffer.from(body)]); Object.assign(req, { method, rejection });
     let status, data; await routes.get(route)(req, { writeHead(v) { status = v; }, end(v) { data = JSON.parse(v); } });
     return { status, data, consumed: req.readableEnded };
   }
-  const dismiss = (value) => request('/api/rdsh-update/dismiss', { method: 'POST', body: JSON.stringify({ to: value.to, kind: value.kind }) });
+  const dismiss = (value) => request('/api/rdsh-update/dismiss', { method: 'POST', body: JSON.stringify(value) });
   const get = () => request('/api/rdsh-update');
   await setState(update()); const initialRaw = await readFile(statePath, 'utf8');
-  await t.test('authentication precedes body reads and file writes; methods and input are bounded', async () => {
-    for (const rejection of [401, 403]) {
-      const result = await request('/api/rdsh-update/dismiss', { method: 'POST', rejection, body: '{bad' });
+  await t.test('authentication precedes stream/body access; methods, bodies and occurrence inputs are bounded', async () => {
+    for (const rejection of [401, 403, 503]) for (const route of ['/api/rdsh-update/dismiss', '/api/rdsh-update/events']) {
+      const result = await request(route, { method: 'POST', rejection, body: '{bad' });
       assert.equal(result.status, rejection); assert.equal(result.consumed, false);
     }
     assert.equal((await request('/api/rdsh-update/dismiss')).status, 405);
+    assert.equal((await request('/api/rdsh-update/events', { method: 'POST' })).status, 405);
     for (const body of ['{bad', 'null', '[]', '{}', JSON.stringify({ to: 'v-next', kind: '' }), JSON.stringify({ to: 'x'.repeat(513), kind: 'dsh' }), ' '.repeat(4097)]) {
       assert.equal((await request('/api/rdsh-update/dismiss', { method: 'POST', body })).status, 400);
     }
+    for (const cycle of [-1, 0.5, '0', 1000001]) assert.equal((await dismiss({ ...update(), cycle })).status, 400);
     assert.equal((await dismiss(update('wrong'))).status, 409);
+    assert.equal((await dismiss(update('v-next', { at: START + 1 }))).status, 409);
     assert.equal(await readFile(statePath, 'utf8'), initialRaw);
-    await assert.rejects(readdir(markers), { code: 'ENOENT' });
   });
-  await t.test('dismissals survive timestamps, separate plugin instances and versions without changing updater state', async () => {
-    assert.equal((await get()).data.dismissed, false);
-    assert.equal((await dismiss(update())).status, 200);
+  await t.test('atomic private closes never suppress reload or mutate update state; legacy markers stay intact', async () => {
+    const markers = path.join(directory, 'update-dismissals'); await mkdir(markers);
+    await writeFile(path.join(markers, 'legacy'), 'DUMMY_LEGACY');
+    assert.equal((await dismiss({ ...update(), cycle: 0 })).status, 200);
     assert.equal(await readFile(statePath, 'utf8'), initialRaw);
-    await setState(update('v-next', { at: 99999999 })); assert.equal((await get()).data.dismissed, true);
-    await setState(update('v-other')); assert.equal((await get()).data.dismissed, false);
-    await Promise.all(Array.from({ length: 8 }, () => dismiss(update('v-other'))));
-    assert.equal((await get()).data.dismissed, true);
-    await setState(update()); assert.equal((await get()).data.dismissed, true);
-    const second = updates.apply(ctx, {}); assert.equal((await get()).data.dismissed, true); second();
-    updates.apply(ctx, {});
-    const files = await readdir(markers); assert.equal(files.length, 2);
-    for (const name of files) {
-      assert.match(name, /^[a-f0-9]{64}$/);
-      if (process.platform !== 'win32') assert.equal((await stat(path.join(markers, name))).mode & 0o777, 0o600);
-    }
-    await setState(update('v-without-kind', { kind: '' }));
-    assert.equal((await get()).data.kind, 'update');
-    assert.equal((await dismiss(update('v-without-kind', { kind: 'update' }))).status, 200);
-    assert.equal((await get()).data.dismissed, true);
+    assert.equal((await get()).data.dismissed, undefined);
+    await Promise.all(Array.from({ length: 8 }, () => dismiss({ ...update(), cycle: 1 })));
+    const value = JSON.parse(await readFile(closePath, 'utf8')); assert.equal(value.cycle, 1);
+    assert.equal((await readdir(directory)).filter((n) => n.endsWith('.tmp')).length, 0);
+    assert.equal(await readFile(path.join(markers, 'legacy'), 'utf8'), 'DUMMY_LEGACY');
+    if (process.platform !== 'win32') assert.equal((await stat(closePath)).mode & 0o777, 0o600);
+    await setState(update('v-without-kind', { kind: '', at: -1 }));
+    const legacy = (await get()).data; assert.equal(legacy.kind, 'update'); assert.ok(legacy.at > 0);
+    assert.equal((await get()).data.at, legacy.at);
+    await setState(update());
   });
-  if (process.platform !== 'win32') await t.test('planted marker links cannot truncate outside files; linked directories are refused', async () => {
+  if (process.platform !== 'win32') await t.test('planted close links cannot modify outside files; linked directories are refused', async () => {
     const outside = path.join(root, 'DUMMY-outside'); await writeFile(outside, 'DUMMY_UNCHANGED');
-    const { createHash } = await import('node:crypto');
-    const value = update('v-planted');
-    const target = path.join(markers, createHash('sha256').update(JSON.stringify([value.kind, value.to])).digest('hex'));
-    await setState(value); await symlink(outside, target);
-    assert.equal((await dismiss(value)).status, 500); assert.equal((await get()).data.dismissed, false);
-    assert.equal(await readFile(outside, 'utf8'), 'DUMMY_UNCHANGED');
-    await rm(target); await link(outside, target); assert.equal((await dismiss(value)).status, 500);
-    assert.equal(await readFile(outside, 'utf8'), 'DUMMY_UNCHANGED');
-    await rm(markers, { recursive: true }); const elsewhere = path.join(root, 'elsewhere'); await mkdir(elsewhere);
-    await symlink(elsewhere, markers); assert.equal((await dismiss(value)).status, 500);
-    assert.deepEqual(await readdir(elsewhere), []);
+    await rm(closePath); await symlink(outside, closePath);
+    assert.equal((await dismiss(update())).status, 500); assert.equal(await readFile(outside, 'utf8'), 'DUMMY_UNCHANGED');
+    await rm(closePath); await link(outside, closePath); assert.equal((await dismiss(update())).status, 500);
+    assert.equal(await readFile(outside, 'utf8'), 'DUMMY_UNCHANGED'); await rm(closePath);
+    const real = path.join(root, 'real'); await mkdir(real); await writeFile(path.join(real, 'update-state.json'), initialRaw);
+    await rm(directory, { recursive: true }); await symlink(real, directory);
+    assert.equal((await dismiss(update())).status, 500); assert.deepEqual(await readdir(real), ['update-state.json']);
+    await rm(directory); await mkdir(directory); await setState(update());
   });
-  await t.test('demo dismissal never writes account state', async () => {
-    const before = await readdir(markers);
-    const disposeDemo = updates.apply(ctx, { demo: true });
-    assert.equal((await dismiss({ kind: 'demo', to: '0.2.1-rc.1' })).status, 200);
-    assert.deepEqual(await readdir(markers), before);
-    disposeDemo();
+  await t.test('streams cap subscribers, disconnect slow readers, bootstrap without old closes, and dispose', async () => {
+    const streams = [];
+    class Sink extends EventEmitter {
+      frames = []; status; blocked = false;
+      writeHead(status) { this.status = status; }
+      write(frame) { this.frames.push(frame); return !this.blocked; }
+      end(frame) { if (frame) this.frames.push(frame); this.emit('close'); }
+      destroy() { this.emit('close'); }
+    }
+    const subscribe = async (sink) => { await routes.get('/api/rdsh-update/events')({ method: 'GET' }, sink); return sink; };
+    for (let i = 0; i < 32; i++) streams.push(await subscribe(new Sink()));
+    const excess = await subscribe(new Sink()); assert.equal(excess.status, 429);
+    assert.ok(streams.every((s) => s.frames.some((v) => v.includes('event: state'))));
+    assert.ok(streams.every((s) => !s.frames.some((v) => v.includes('event: close'))));
+    streams[0].blocked = true; await dismiss({ ...update(), cycle: 0 });
+    assert.ok(streams[1].frames.some((v) => v.includes('event: close')));
+    const fresh = await subscribe(new Sink()); assert.equal(fresh.status, 200);
+    assert.ok(!fresh.frames.some((v) => v.includes('event: close')));
+    dispose(); assert.equal(routes.size, 0);
+  });
+  await t.test('demo closes never write account files and use a stable update time', async () => {
+    const before = await readdir(directory), disposeDemo = apply(ctx, { demo: true });
+    const demo = (await get()).data; assert.equal((await get()).data.at, demo.at);
+    assert.equal((await dismiss({ ...demo, cycle: 0 })).status, 200);
+    assert.deepEqual(await readdir(directory), before); disposeDemo();
   });
 });
