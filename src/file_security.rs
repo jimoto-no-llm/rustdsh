@@ -210,7 +210,12 @@ pub(crate) fn validate_share_files(files: &[String]) -> Result<(), String> {
         if f.is_empty() || f.len() > 1024 {
             return Err(format!("invalid --share-file entry {f:?}"));
         }
-        if f.starts_with('/') || f.starts_with('\\') {
+        let path_bytes = f.as_bytes();
+        let has_windows_drive_root = path_bytes.len() >= 3
+            && path_bytes[0].is_ascii_alphabetic()
+            && path_bytes[1] == b':'
+            && matches!(path_bytes[2], b'/' | b'\\');
+        if f.starts_with('/') || f.starts_with('\\') || has_windows_drive_root {
             return Err(format!("--share-file must be workspace-relative: {f:?}"));
         }
         if f.split(['/', '\\']).any(|part| part == "..") {
@@ -235,7 +240,15 @@ mod share_validation_tests {
 
     #[test]
     fn rejects_absolute_parent_and_overflow() {
-        for bad in ["", "/etc/passwd", "a/../../b", "..\\x", "a\0b"] {
+        for bad in [
+            "",
+            "/etc/passwd",
+            "C:\\Windows\\win.ini",
+            "C:/Windows/win.ini",
+            "a/../../b",
+            "..\\x",
+            "a\0b",
+        ] {
             assert!(validate_share_files(&[bad.into()]).is_err(), "{bad:?}");
         }
         let many = vec!["a".to_string(); 257];
