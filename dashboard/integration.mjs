@@ -508,6 +508,7 @@ export class IntegrationQueue {
             state: next.state,
             reason: next.reason,
             retryable:
+              q.attempts.at(-1)?.phase !== "running" &&
               ["queued", "conflict"].includes(next.state) &&
               target.clean === true &&
               target.head_sha === q.target_sha &&

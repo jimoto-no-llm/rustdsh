@@ -267,6 +267,7 @@ test("timeouts and interrupted intent never pass or automatically replay", async
     f.queue.apply(guard(r)),
     error("interrupted_operation_requires_inspection"),
   );
+  assert.equal(r.next_integration.retryable, false);
   await assert.rejects(
     f.queue.validate(guard(r)),
     error("interrupted_operation_requires_inspection"),
