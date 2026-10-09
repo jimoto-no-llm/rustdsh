@@ -276,7 +276,7 @@ export function createUpdateSummary(root, {
   let projectId = null;
   let storage = null;
   let baseline = null;
-  let firstView = false;
+  let initialBaselineRevision = null;
   let latestState = null;
   let storageUnavailable = false;
   let changeRecords = [];
@@ -342,8 +342,8 @@ export function createUpdateSummary(root, {
       }
       const saved = loadBaseline(projectId);
       baseline = saved.kind === "valid" ? saved.value : null;
-      firstView = saved.kind === "missing";
-      if (firstView) saveBaseline(state);
+      initialBaselineRevision = saved.kind === "missing" ? state.revision : null;
+      if (initialBaselineRevision !== null) saveBaseline(state);
       else if (saved.kind === "invalid")
         baseline = { schema: 0, revision: -1, timestamp: "invalid" };
       changeRecords = [];
@@ -360,10 +360,9 @@ export function createUpdateSummary(root, {
       change_history_gap: changeHistoryGap,
     };
     let result = updateSummary(summaryState, baseline);
-    if (firstView) {
+    if (state.revision === initialBaselineRevision) {
       result = { ...result, mode: "initial" };
-      firstView = false;
-    }
+    } else initialBaselineRevision = null;
     const shouldFetch = baseline?.schema === 1 &&
       typeof loadChangeRecords === "function" &&
       state.revision > changeCursor &&
