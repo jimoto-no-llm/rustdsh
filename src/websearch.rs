@@ -224,10 +224,7 @@ fn find_link_text(blk: &str) -> Option<String> {
         let tag = &rest[a..];
         let close = tag.find('>')?;
         let head = &tag[..close];
-        let ok = match attr(head, "href") {
-            Some(u) => !u.is_empty() && !u.starts_with('#'),
-            None => false,
-        };
+        let ok = attr(head, "href").is_some_and(|u| !u.is_empty() && !u.starts_with('#'));
         let after = &tag[close + 1..];
         if ok {
             let end = after.find("</a>").unwrap_or(after.len());
