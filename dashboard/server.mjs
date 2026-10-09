@@ -15,6 +15,7 @@ import { modernMcpHandler } from "./mcp2.mjs";
 import { AnswerApplicationServer } from "./answer-application-server.mjs";
 import { BudgetAdmissionServer } from "./budget-server.mjs";
 import { createHistoryBackup, backupMaximum } from "./history-backup.mjs";
+import { createArtifactPreview } from "./artifact-preview.mjs";
 import { AcceptanceStore } from "./acceptance.mjs";
 import {
   ConnectionObservations,
@@ -716,6 +717,35 @@ export async function startDashboard(options) {
         }
         if (req.method === "GET" && route === "/api/state")
           return json(res, 200, await visibleState());
+        if (
+          kind === "project" &&
+          req.method === "GET" &&
+          route?.startsWith("/api/artifacts/")
+        ) {
+          const match = route.match(/^\/api\/artifacts\/(\d+)$/);
+          if (!match)
+            return json(res, 404, { error: "成果物の記録が見つかりません" });
+          const preview = await createArtifactPreview(
+            project,
+            store.value.events,
+            Number(match[1]),
+          );
+          if (preview.status !== 200)
+            return json(res, preview.status, { error: preview.reason });
+          res.writeHead(200, {
+            "content-type": preview.mime,
+            "content-disposition": 'inline; filename="artifact-preview"',
+            "content-security-policy": "default-src 'none'; sandbox",
+            "x-content-type-options": "nosniff",
+            "cache-control": "private, no-store",
+            "referrer-policy": "no-referrer",
+            "x-rdsh-preview-kind": preview.kind,
+            "x-rdsh-preview-redacted": String(preview.redacted),
+            "x-rdsh-preview-truncated": String(preview.truncated),
+            "content-length": String(preview.bytes.length),
+          });
+          return res.end(preview.bytes);
+        }
         if (req.method === "POST" && route?.startsWith("/api/update/")) {
           const operation = route.slice("/api/update/".length);
           if (

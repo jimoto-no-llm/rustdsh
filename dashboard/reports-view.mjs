@@ -109,7 +109,11 @@ function rateText(state, a, b, now) {
   if (views.some((view) => view.freshness === "unknown")) return "鮮度未確認";
   return "未取得";
 }
-export function renderReports(state, now = Date.now()) {
+export function renderReports(
+  state,
+  now = Date.now(),
+  onPreviewArtifact = () => {},
+) {
   openObservations = new Set(
     [...document.querySelectorAll("details.observation-details[open]")]
       .map((element) => element.dataset.observationId),
@@ -234,7 +238,17 @@ function renderEvents(state, now) {
           ),
         );
         if (event.detail) element.append(node("p", event.detail));
-        if (event.artifact) element.append(node("code", event.artifact));
+        if (event.artifact) {
+          element.append(node("code", event.artifact));
+          if (event.type === "artifact") {
+            const preview = node("button", "プレビュー");
+            preview.type = "button";
+            preview.addEventListener("click", () =>
+              onPreviewArtifact(event.sequence),
+            );
+            element.append(preview);
+          }
+        }
         element.append(provenance(
           observationView(event.title, event.observation, now),
           undefined, String, "event:" + event.sequence,

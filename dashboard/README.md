@@ -299,8 +299,17 @@ time. Their numeric values are retained as previous reports, not treated as
 current measurements. Send explicit observation metadata to show current values.
 Reference strings and sources are displayed as text, never opened or executed.
 
-Artifact references are displayed as text. Local file contents are never opened
-or served. Treat all user-authored questions, answers, progress, and paths as data.
+Artifact references remain text until a human selects **プレビュー** on an
+artifact event. The authenticated project browser can read only that event's
+relative path beneath the project root; absolute paths, parent traversal,
+dotfiles, symlinks, HTML/SVG, and files over 1 MiB are refused. UTF-8 text,
+diffs, logs, and JSON are shown as text (never rendered as HTML), with common
+credential patterns redacted and text previews capped at 128 KiB. PNG, JPEG,
+GIF, and WebP are accepted only when their extension and signature agree.
+Responses are private and non-cacheable. Previews never write, publish, or
+share the source file. Credential redaction is a best-effort screen, not a
+guarantee that arbitrary text or image content contains no secrets; inspect
+the source when that assurance matters. Treat all user-authored paths as data.
 
 ## OpenAI ChatGPT Dots and MCP Events
 

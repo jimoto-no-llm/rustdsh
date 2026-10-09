@@ -528,6 +528,37 @@
         overflow-wrap: anywhere;
         font-size: 13px;
       }
+      #artifact-preview {
+        width: min(900px, calc(100vw - 28px));
+        max-height: 85vh;
+        overflow: auto;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 18px;
+      }
+      #artifact-preview::backdrop {
+        background: rgb(0 0 0 / 0.25);
+      }
+      #artifact-preview-content {
+        max-height: 68vh;
+        overflow: auto;
+      }
+      .artifact-preview-text {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        margin: 0;
+        padding: 12px;
+        border-radius: 8px;
+        background: var(--bg);
+        font: 13px/1.5 ui-monospace, monospace;
+      }
+      .artifact-preview-image {
+        display: block;
+        max-width: 100%;
+        max-height: 65vh;
+        margin: auto;
+        object-fit: contain;
+      }
       footer {
         margin-top: 24px;
         color: var(--mut);
@@ -884,6 +915,12 @@
           <h2>進捗・成果物の報告履歴</h2>
           <div class="feed" id="events"></div>
         </details>
+        <dialog id="artifact-preview" aria-labelledby="artifact-preview-title">
+          <h2 id="artifact-preview-title">成果物のプレビュー</h2>
+          <p id="artifact-preview-status" class="sub" role="status"></p>
+          <div id="artifact-preview-content"></div>
+          <button id="artifact-preview-close" type="button">閉じる</button>
+        </dialog>
         <details id="answered">
           <summary>回答済みの質問</summary>
           <div class="feed" id="answers"></div>
