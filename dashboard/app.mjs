@@ -5,6 +5,7 @@ import { renderConnectionDiagnostics } from "./connection-diagnostics-ui.mjs";
 import { createInstructionPanel } from "./instruction-queue-ui.mjs";
 import { createCostPanel } from "./cost-ledger-ui.mjs";
 import { renderBudget } from "./budget-ui.mjs";
+import { createPlanPanel } from "./execution-plan-ui.mjs";
 
 const $ = (id) => document.getElementById(id);
 const base = location.pathname.startsWith("/_rdsh") ? "/_rdsh/" : "/";
@@ -324,7 +325,9 @@ function render(state) {
   $("updated").textContent =
     `最終更新: ${state.updated_at ? new Date(state.updated_at).toLocaleString("ja-JP") : "まだ報告がありません"} · 未取得の指標はMCPから報告されたときに表示されます。累計欄は報告元のAPI換算値です。台帳は出所ごとの報告値です。`;
 }
+const refreshPlans = createPlanPanel($("execution-plans"), api, node);
 async function refreshState() {
+  void refreshPlans();
   try {
     render(await api("state"));
   } catch (e) {
