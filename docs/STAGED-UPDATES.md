@@ -47,14 +47,14 @@ The same version string can identify different code builds; inspect their releas
 IDs and change notes. Provenance text is operator-declared, not independently
 verified publisher identity. Current supported tuple:
 
-| Component            | Contract                                     |
+| Component | Contract |
 | -------------------- | -------------------------------------------- |
-| Local dashboard CLI  | `0.1.0`, captured source/dependencies        |
-| ACP adapter          | `acp-stdio-v1`, captured source/dependencies |
-| Original DSH         | `0.2.0-rc.2`, `0.2.1-alpha.1`               |
-| Qualification plugin | `rdsh-release-probe`, contract 1             |
-| Node                 | Exact captured binary/version, Node 22+      |
-| Platform             | Exact OS and architecture                    |
+| Local dashboard CLI | `0.1.0`, captured source/dependencies |
+| ACP adapter | `acp-stdio-v1`, captured source/dependencies |
+| Original DSH | `0.2.0-rc.2`, `0.2.1-alpha.1` |
+| Qualification plugin | `rdsh-release-probe`, contract 1 |
+| Node | Exact captured binary/version, Node 22+ |
+| Platform | Exact OS and architecture |
 
 A slot is limited to 1 GiB and 50,000 files (a 16 MiB manifest); the registry holds at most 100
 releases, 5,000 project selections and 10,000 run pins. Slots are kept in

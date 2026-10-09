@@ -40,7 +40,6 @@ dsh plugin --profile web add ./plugins/rdsh-settings
 テスト実装なので context engine は既定OFF（beta.context_engine=false）。
 使うときだけONにします。
 
-
 ## Discord Rich Presence
 
 設定 → rdsh → **Discord Rich Presence** で変更します。既定ONです。
