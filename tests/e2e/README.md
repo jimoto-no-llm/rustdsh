@@ -35,6 +35,20 @@ PNGs and a verification report; it never restarts production DSH or executes the
 updater. Run just this flow with `npm run test:updates`. Set
 `RDSH_UPDATE_BASELINE_CLIENT` to the previous client file for before/after captures.
 
+The default command also runs `causal-timeline.mjs` against an actual isolated
+project dashboard. It covers summary-only reads, problem details, stable IDs,
+unknown native intent, exact question/answer/native correlations, an actual local
+acceptance command, staleness after editing its input, refresh retention, escaped
+producer text, and 390-pixel layout. Stored native receipts are explicit fixtures;
+this test never sends a provider prompt or validates production native execution.
+Run only this flow with `npm run test:timeline --prefix tests/e2e`. Results go to
+`target/e2e/causal-timeline`; override with `RDSH_TIMELINE_E2E_OUTPUT`.
+Set `RDSH_TIMELINE_BASELINE_HTML` and `RDSH_TIMELINE_BASELINE_APP` to unchanged
+previous frontend files for real before/after screenshots over the same isolated
+backend. That comparison measures the frontend only. `runtime-observations.json`
+includes actual stage/ID observations and separates the native fixtures from
+local acceptance and browser proof. See [the contract](../../docs/CAUSAL-TIMELINE.md).
+
 ## Optional installed DSH integration
 
 ```sh
