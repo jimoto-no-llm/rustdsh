@@ -1,4 +1,5 @@
 /target
+/tests/e2e/target/
 /dashboard/node_modules/
 /tests/e2e/node_modules/
 
