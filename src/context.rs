@@ -385,7 +385,7 @@ fn code_hits(query: &str, max: usize) -> Vec<String> {
             .unwrap_or_default();
         for e in entries {
             let name = e.file_name().to_string_lossy().into_owned();
-            if name.starts_with(".") || name == "target" || name == "node_modules" {
+            if name.starts_with('.') || name == "target" || name == "node_modules" {
                 continue;
             }
             let p = e.path();
