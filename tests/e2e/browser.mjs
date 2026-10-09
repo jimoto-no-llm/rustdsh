@@ -80,6 +80,7 @@ try{
  await unauthenticatedPage.waitForFunction(()=>localStorage.getItem('rdsh_pending_project_deep_link_v1')!==null);
  const pairedPage=await pairedContext.newPage();await pairedPage.goto(runtime.browser_url);await pairedPage.locator('#task-T1').waitFor();
  await pairedPage.waitForFunction(()=>document.querySelector('#tasks-detail')?.open&&document.activeElement?.id==='task-T1');
+ await pairedPage.waitForTimeout(5200);assert.equal(await pairedPage.evaluate(()=>document.activeElement?.id==='task-T1'),true,'a same-revision refresh must preserve deep-link focus');
  assert.equal(new URL(pairedPage.url()).hash,'');assert.equal(new URL(pairedPage.url()).searchParams.has('rdsh_id'),false);
  assert.equal(await pairedPage.evaluate(()=>localStorage.getItem('rdsh_pending_project_deep_link_v1')),null);
  await pairedPage.setViewportSize(report.viewports[1]);await pairedPage.goto(questionLink);await pairedPage.locator('#question-Q1').waitFor();
