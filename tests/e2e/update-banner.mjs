@@ -1,41 +1,32 @@
-// Real banner/React and plugin HTTP routes in an isolated browser host.
-// No agent loop, user profile, real updater, provider, or external network.
-import assert from 'node:assert/strict';
+import { chromium } from 'playwright';
+import { build } from 'esbuild';
 import { createServer } from 'node:http';
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, rename, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { build } from 'esbuild';
-import { chromium } from 'playwright';
+import assert from 'node:assert/strict';
 import { apply } from '../../plugins/rdsh-update-banner/index.js';
 import { setTimeout as sleep } from 'node:timers/promises';
 
 const repo = path.resolve(import.meta.dirname, '../..');
 const output = path.resolve(process.env.RDSH_UPDATE_E2E_OUTPUT || path.join(repo, 'target/e2e/update-banner'));
 const root = await mkdtemp(path.join(os.tmpdir(), 'rdsh-update-browser-'));
-const previousHome = process.env.HOME;
-const previousProfile = process.env.USERPROFILE;
-process.env.HOME = root;
-process.env.USERPROFILE = root;
+const previousHome = process.env.HOME, previousProfile = process.env.USERPROFILE;
+process.env.HOME = root; process.env.USERPROFILE = root;
 assert.equal(os.homedir(), root, 'All update state must use the temporary HOME');
 const stateFile = path.join(root, '.local/share/rdsh/update-state.json');
-await mkdir(path.dirname(stateFile), { recursive: true });
-await mkdir(output, { recursive: true });
-const state = (to = 'DUMMY-v-next', extra = {}) => ({ updated: true, kind: 'rustdsh', from: 'DUMMY-v-old', to, at: 1700000000000, ...extra });
-const setState = (value) => writeFile(stateFile, JSON.stringify(value));
+await mkdir(path.dirname(stateFile), { recursive: true }); await mkdir(output, { recursive: true });
+const START = Date.now(), PERIOD = 7200000;
+const state = (to = 'DUMMY-v-next', extra = {}) => ({ updated: true, kind: 'rustdsh', from: 'DUMMY-v-old', to, at: START, ...extra });
+const setState = async (value) => { await writeFile(stateFile + '.tmp', JSON.stringify(value)); await rename(stateFile + '.tmp', stateFile); };
 const clientFile = path.join(repo, 'plugins/rdsh-update-banner/client.js');
 const baseline = process.env.RDSH_UPDATE_BASELINE_CLIENT;
-const report = { result: 'FAIL', scope: 'Actual React banner and authenticated plugin routes in isolated loopback hosts; not a production DSH restart', flows: [], page_errors: [], console_errors: [] };
-const servers = [], routes = new Map(), bundles = new Map();
-let browser;
+const report = { result: 'FAIL', scope: 'Actual React banner and authenticated plugin routes in two isolated loopback hosts; dummy HOME; no production DSH restart or updater execution', flows: [], page_errors: [], console_errors: [] };
+const servers = [], disposers = [], bundles = new Map(); let browser;
 
 async function bundle(file) {
   const result = await build({
     stdin: { contents: `import React from 'react'; import {createRoot} from 'react-dom/client';
-      const originalFetch=window.fetch.bind(window); window.__updateLoads=0;window.__updatePending=0;
-      window.fetch=async(...args)=>{const loading=args[0]==='/api/rdsh-update';if(loading)window.__updatePending++;
-      const r=await originalFetch(...args);if(loading){const json=r.json.bind(r);r.json=async()=>{try{return await json();}
-      finally{window.__updatePending--;window.__updateLoads++;}};}return r;};
       let root = createRoot(document.getElementById('app'));
       window.__ModuleLoader__={load(item){const plugin=item.factory(name=>{if(name==='react')return React;throw new Error(name)});
       plugin.apply({slots:{inject(_name,fn){fn()},register(_definition,Component){root.render(React.createElement(Component));
@@ -46,27 +37,31 @@ async function bundle(file) {
   return result.outputFiles[0].contents;
 }
 async function host() {
+  const routes = new Map();
   const server = createServer(async (req, res) => {
     try {
       const pathname = new URL(req.url, 'http://localhost').pathname;
       if (routes.has(pathname)) return await routes.get(pathname)(req, res);
       if (pathname === '/client.js') {
-        const body = bundles.get(req.url.includes('before') ? 'before' : 'after');
-        res.writeHead(200, { 'content-type': 'text/javascript' }); res.end(body); return;
+        res.writeHead(200, { 'content-type': 'text/javascript' }); res.end(bundles.get(req.url.includes('before') ? 'before' : 'after')); return;
       }
       if (pathname === '/favicon.ico') { res.writeHead(204); res.end(); return; }
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-      res.end(`<!doctype html><html><head><meta charset="utf-8"><title>Update dismissal browser verification</title></head>
+      res.end(`<!doctype html><html><head><meta charset="utf-8"><title>Update notification verification</title></head>
         <body style="margin:0;background:#101014;color:#a0a0a8;font:16px system-ui">
         <main style="padding:220px 48px"><h1>Update notification verification</h1>
         <p>Real rdsh component and API · isolated dummy update · project A/B</p>
         <button id="project" onclick="window.remountProject()">Switch project</button></main>
         <div id="app"></div><script src="/client.js?${pathname.includes('before') ? 'before' : 'after'}"></script></body></html>`);
-    } catch (error) { res.writeHead(500); res.end('fixture request failed'); }
+    } catch { if (!res.headersSent) res.writeHead(500); res.end('fixture request failed'); }
   });
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  servers.push(server);
-  return `http://127.0.0.1:${server.address().port}`;
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve)); servers.push(server);
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  disposers.push(apply({ effect: (f) => f(), connection: { requestRejection(req) {
+    if (!req.headers.cookie?.includes('fixture-session=DUMMY_AUTH')) return 401;
+    if (`http://${req.headers.host}` !== origin || (req.headers.origin && req.headers.origin !== origin)) return 403;
+  } }, webServer: { register(route) { routes.set(route.path, route.handler); return () => routes.delete(route.path); } } }, {}));
+  return origin;
 }
 async function context(origin, { storageFails = false } = {}) {
   const c = await browser.newContext({ viewport: { width: 1100, height: 760 } });
@@ -76,95 +71,90 @@ async function context(origin, { storageFails = false } = {}) {
     p.on('pageerror', (e) => report.page_errors.push(e.message));
     p.on('console', (m) => { if (m.type() === 'error') report.console_errors.push(m.text()); });
   });
-  await c.route('**/*', (route) => {
-    const url = new URL(route.request().url());
-    return url.hostname === '127.0.0.1' ? route.continue() : route.abort();
-  });
+  await c.route('**/*', (route) => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
   return c;
 }
-async function closeBanner(page, button) {
+const banner = (page) => page.getByTestId('rdsh-update');
+async function closeBanner(page, button = 'dismiss') {
   const ack = page.waitForResponse((r) => r.url().endsWith('/api/rdsh-update/dismiss') && r.request().method() === 'POST');
-  await page.getByRole('button', { name: button, exact: true }).click();
-  assert.equal((await ack).status(), 200);
-  await page.getByTestId('rdsh-update').waitFor({ state: 'hidden' });
+  await page.getByRole('button', { name: button, exact: true }).click(); assert.equal((await ack).status(), 200);
+  await banner(page).waitFor({ state: 'hidden' });
 }
-async function hidden(page) {
-  // Playwright's browser clock also freezes its network-idle timer. Wait for
-  // actual JSON loading from the Node test clock instead of relying on idle.
-  const deadline = Date.now() + 5000;
-  while (!await page.evaluate(() => window.__updateLoads > 0 && window.__updatePending === 0)) {
-    assert.ok(Date.now() < deadline, 'Update response did not settle');
-    await sleep(20);
-  }
-  await sleep(30);
-  assert.equal(await page.getByTestId('rdsh-update').count(), 0);
+async function hidden(page) { await sleep(100); assert.equal(await banner(page).count(), 0); }
+async function ready(page, url) {
+  const bootstrap = page.waitForResponse((r) => r.url().endsWith('/api/rdsh-update') && r.request().method() === 'GET');
+  const stream = page.waitForResponse((r) => r.url().endsWith('/api/rdsh-update/events'));
+  await page.goto(url); assert.equal((await bootstrap).status(), 200); assert.equal((await stream).status(), 200); await sleep(100);
 }
 try {
-  bundles.set('after', await bundle(clientFile));
-  if (baseline) bundles.set('before', await bundle(path.resolve(baseline)));
+  bundles.set('after', await bundle(clientFile)); if (baseline) bundles.set('before', await bundle(path.resolve(baseline)));
   const origin = await host(), otherOrigin = await host();
-  apply({ effect: (f) => f(), connection: { requestRejection(req) {
-    if (!req.headers.cookie?.includes('fixture-session=DUMMY_AUTH')) return 401;
-    const expected = `http://${req.headers.host}`;
-    if (![origin, otherOrigin].includes(expected) || (req.headers.origin && req.headers.origin !== expected)) return 403;
-  } }, webServer: { register(route) { routes.set(route.path, route.handler); return () => routes.delete(route.path); } } }, {});
-  browser = await chromium.launch({ headless: true, ...(process.env.RDSH_CHROME_PATH ? { executablePath: process.env.RDSH_CHROME_PATH } : {}) });
-  await setState(state());
-  if (baseline) {
-    const old = await context(origin), page = await old.newPage(); await page.clock.install();
-    await page.goto(origin + '/before'); await page.getByTestId('rdsh-update').waitFor();
-    await page.getByRole('button', { name: 'dismiss', exact: true }).click();
-    await page.getByTestId('rdsh-update').waitFor({ state: 'hidden' });
-    await setState(state('DUMMY-v-next', { at: 1700000000001 }));
-    await page.clock.runFor(61000); await page.getByTestId('rdsh-update').waitFor();
-    await page.screenshot({ path: path.join(output, 'before.png'), animations: 'disabled' });
-    report.before = 'Same target with a changed timestamp reappears on the next poll';
-    await old.close();
+  for (const route of ['/api/rdsh-update', '/api/rdsh-update/events']) {
+    assert.equal((await fetch(origin + route)).status, 401);
+    assert.equal((await fetch(origin + route, { headers: { cookie: 'fixture-session=DUMMY_AUTH', origin: 'https://DUMMY.invalid' } })).status, 403);
   }
-  await setState(state());
+  report.flows.push('State and event routes reject unauthenticated and foreign-Origin requests');
+  browser = await chromium.launch({ headless: true, ...(process.env.RDSH_CHROME_PATH ? { executablePath: process.env.RDSH_CHROME_PATH } : {}) });
+  if (baseline) {
+    await setState({ updated: false });
+    const old = await context(origin), page = await old.newPage(); await page.clock.install({ time: new Date(START - 1000) }); await page.clock.pauseAt(new Date(START));
+    const loaded = page.waitForResponse((r) => r.url().endsWith('/api/rdsh-update'));
+    await page.goto(origin + '/before'); await loaded; await sleep(100);
+    await setState(state()); await sleep(300); await hidden(page);
+    await page.screenshot({ path: path.join(output, 'before.png'), animations: 'disabled' });
+    report.before = 'Baseline client receives no live update and stays hidden until reload or its 60-second poll';
+    await page.reload(); await banner(page).waitFor(); await closeBanner(page); await page.reload(); await hidden(page);
+    report.flows.push('Baseline: no immediate notification; permanent dismissal also suppressed reload'); await old.close();
+  }
+  await setState({ updated: false });
   const c = await context(origin), a = await c.newPage(), b = await c.newPage();
-  await a.clock.install(); await a.goto(origin + '/project/a'); await a.getByTestId('rdsh-update').waitFor();
-  await b.goto(origin + '/project/b'); await b.getByTestId('rdsh-update').waitFor();
-  await a.screenshot({ path: path.join(output, 'visible.png'), animations: 'disabled' });
-  await closeBanner(a, 'close'); await b.getByTestId('rdsh-update').waitFor({ state: 'hidden' });
-  await setState(state('DUMMY-v-next', { at: 1700000000001 }));
-  await a.clock.fastForward(3 * 3600000 + 61000); await hidden(a);
-  await a.getByRole('button', { name: 'Switch project', exact: true }).click(); await hidden(a);
-  await a.reload(); await hidden(a);
+  await a.clock.install({ time: new Date(START - 1000) }); await a.clock.pauseAt(new Date(START)); await ready(a, origin + '/project/a'); await hidden(a);
+  const detectionStarted = Date.now(); await setState(state()); await banner(a).waitFor();
+  report.live_notification_ms = Date.now() - detectionStarted;
+  assert.ok(report.live_notification_ms < 2000, 'Live update must arrive without waiting for the five-second fallback');
   await a.screenshot({ path: path.join(output, 'after.png'), animations: 'disabled' });
-  report.flows.push('close -> other tab hidden immediately -> changed timestamp -> >2 hours -> project remount -> reload stays hidden');
+  report.flows.push('File update pushes to an open page without reload or polling');
+  await ready(b, origin + '/project/b'); await banner(b).waitFor();
   const different = await context(otherOrigin), remote = await different.newPage();
-  await remote.goto(otherOrigin + '/project/other'); await hidden(remote);
-  report.flows.push('Separate browser context and GUI port use the account acknowledgement');
-  await setState(state('DUMMY-v-new'));
-  await a.reload(); await a.getByTestId('rdsh-update').waitFor();
+  await ready(remote, otherOrigin + '/project/other'); await banner(remote).waitFor();
+  await closeBanner(a, 'close'); await banner(b).waitFor({ state: 'hidden' }); await banner(remote).waitFor({ state: 'hidden' });
+  await a.screenshot({ path: path.join(output, 'dismissed.png'), animations: 'disabled' });
+  report.flows.push('Close propagates to another tab and another independent GUI host without reloading');
+  await a.getByRole('button', { name: 'Switch project', exact: true }).click(); await hidden(a);
+  await ready(a, origin + '/project/a'); await banner(a).waitFor(); await closeBanner(a);
+  await a.clock.fastForward(PERIOD - 1); await hidden(a);
+  await a.clock.runFor(1); await banner(a).waitFor();
+  await a.screenshot({ path: path.join(output, 'reminder.png'), animations: 'disabled' });
+  report.flows.push('Project remount keeps closed; full reload shows; exact two-hour boundary shows again');
+  await closeBanner(a); await a.clock.fastForward(3600000); await hidden(a);
+  await ready(a, origin + '/project/a'); await banner(a).waitFor(); await closeBanner(a);
+  await a.clock.fastForward(3599999); await hidden(a); await a.clock.runFor(1); await banner(a).waitFor();
+  report.flows.push('Reload and Dismiss midway through the next period preserve the original repeat cadence');
   await a.locator('.rub-row1').click(); await a.locator('.rub-mini').waitFor();
-  await a.locator('.rub-mini').click(); await a.getByRole('button', { name: 'dismiss', exact: true }).waitFor();
-  await a.screenshot({ path: path.join(output, 'new-update.png'), animations: 'disabled' });
-  await closeBanner(a, 'dismiss');
-  for (const to of ['DUMMY-v-next', 'DUMMY-v-new']) { await setState(state(to)); await a.reload(); await hidden(a); }
-  report.flows.push('New target appears, minimize/expand works, dismiss works, both old targets stay dismissed');
-  await setState(state('DUMMY-legacy'));
-  await a.evaluate(() => localStorage.setItem('rdsh-update-dismissed', JSON.stringify({ key: 'DUMMY-legacy@1', at: 1 })));
-  const migrated = a.waitForResponse((r) => r.url().endsWith('/api/rdsh-update/dismiss'));
-  await a.reload(); assert.equal((await migrated).status(), 200); await hidden(a);
-  await remote.reload(); await hidden(remote);
-  report.flows.push('Expired legacy dismissal migrates locally and reaches a separate GUI');
-  await setState(state('DUMMY-no-storage'));
+  await a.clock.fastForward(PERIOD); await a.locator('.rub-card').waitFor();
+  report.flows.push('Minimize/expand retained; the next reminder opens the full card');
+  await closeBanner(a); await setState(state('DUMMY-v-new', { at: START + 1 })); await banner(a).waitFor();
+  await closeBanner(a); await setState(state('DUMMY-v-new', { at: START + 2 })); await banner(a).waitFor();
+  report.flows.push('A new version or a new update time notifies immediately after closing the previous occurrence');
+  await a.evaluate(() => {
+    localStorage.setItem('rdsh-update-dismissed', JSON.stringify({ key: 'DUMMY-v-new@1', at: 1 }));
+    localStorage.setItem('rdsh-update-dismissed:v2:["rustdsh","DUMMY-v-new"]', '1');
+  });
+  await ready(a, origin + '/project/a'); await banner(a).waitFor();
+  report.flows.push('Old permanent dismissal records cannot suppress the requested new notification behavior');
   const denied = await context(origin, { storageFails: true }), d = await denied.newPage();
-  await d.goto(origin + '/project/no-storage'); await d.getByTestId('rdsh-update').waitFor(); await closeBanner(d, 'dismiss');
+  await ready(d, origin + '/project/no-storage'); await banner(d).waitFor(); await closeBanner(d);
   await d.getByRole('button', { name: 'Switch project', exact: true }).click(); await hidden(d);
-  await d.reload(); await hidden(d);
-  report.flows.push('Browser storage unavailable: close, remount and reload remain hidden through the account acknowledgement');
-  assert.deepEqual(report.page_errors, []); assert.deepEqual(report.console_errors, []);
-  report.result = 'PASS';
+  await ready(d, origin + '/project/no-storage'); await banner(d).waitFor();
+  report.flows.push('Disabled browser storage still supports close, project remount suppression, and reload notification');
+  await d.screenshot({ path: path.join(output, 'reload.png'), animations: 'disabled' });
+  assert.deepEqual(report.page_errors, []); assert.deepEqual(report.console_errors, []); report.result = 'PASS';
 } catch (error) { report.error = error.message; throw error; }
 finally {
-  if (browser) await browser.close();
+  if (browser) await browser.close(); for (const dispose of disposers) dispose();
   for (const server of servers) await new Promise((resolve) => server.close(resolve));
   if (previousHome === undefined) delete process.env.HOME; else process.env.HOME = previousHome;
   if (previousProfile === undefined) delete process.env.USERPROFILE; else process.env.USERPROFILE = previousProfile;
-  await writeFile(path.join(output, 'verification.json'), JSON.stringify(report, null, 2) + '\n');
-  await rm(root, { recursive: true, force: true });
+  await writeFile(path.join(output, 'verification.json'), JSON.stringify(report, null, 2) + '\n'); await rm(root, { recursive: true, force: true });
 }
-console.log(JSON.stringify({ result: report.result, flows: report.flows.length, output }, null, 2));
+console.log(JSON.stringify({ result: report.result, flows: report.flows.length, live_notification_ms: report.live_notification_ms, output }, null, 2));

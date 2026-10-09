@@ -25,13 +25,13 @@ revocation of the previous browser key. Linux CI installs Chromium and retains P
 and JSON even when the job fails.
 
 The default command also runs `update-banner.mjs` with the real React component
-and plugin HTTP handlers in an isolated browser host. Its dummy HOME and two
-loopback ports cover dismiss/close, timestamp changes, the old two-hour timeout,
-project remount, same-origin tabs, separate browser contexts/ports, new versions,
-legacy migration, and unavailable browser storage. It does not restart the user's
-DSH or execute the updater. Run just this flow with `npm run test:updates`.
-Set `RDSH_UPDATE_E2E_OUTPUT` for its PNGs/JSON; optionally supply the previous
-client source with `RDSH_UPDATE_BASELINE_CLIENT` for a real before/after comparison.
+and two independent authenticated plugin hosts. Dummy HOME and loopback ports
+cover live update push, cross-tab/port close events, two-hour boundaries, reload
+notification, project remounts, legacy records and unavailable browser storage.
+The browser clock advances the cadence without waiting two hours. It saves real
+PNGs and a verification report; it never restarts production DSH or executes the
+updater. Run just this flow with `npm run test:updates`. Set
+`RDSH_UPDATE_BASELINE_CLIENT` to the previous client file for before/after captures.
 
 ## Optional installed DSH integration
 

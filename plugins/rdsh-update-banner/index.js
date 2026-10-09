@@ -1,7 +1,8 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { readFile, writeFile, mkdir, lstat } from "node:fs/promises";
-import { createHash } from "node:crypto";
+import { readFile, writeFile, mkdir, lstat, stat, rename, unlink } from "node:fs/promises";
+import { watch } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 
 export const inject = ["webServer", "connection"];
@@ -9,42 +10,114 @@ export const inject = ["webServer", "connection"];
 const SYNC_SCRIPT = "/home/sahen/File/Prog/rustdsh/sync-dsh.sh";
 const RUN_TIMEOUT_MS = 5 * 60 * 1000;
 const updateDirectory = () => join(homedir(), ".local", "share", "rdsh");
-const dismissalDirectory = () => join(updateDirectory(), "update-dismissals");
+const closePath = () => join(updateDirectory(), "update-notice-close.json");
+const REMINDER_MS = 2 * 60 * 60 * 1000;
+const validTarget = (s) => typeof s?.to === "string" && s.to.length > 0 && s.to.length <= 512 &&
+  typeof s.kind === "string" && s.kind.length > 0 && s.kind.length <= 64;
+const validClose = (s) => validTarget(s) && typeof s.id === "string" && /^[a-f0-9-]{36}$/.test(s.id) &&
+  Number.isFinite(s.at) && s.at > 0 && Number.isSafeInteger(s.cycle) && s.cycle >= 0 && s.cycle <= 1000000;
 
-function dismissalPath(state) {
-  if (typeof state.to !== "string" || !state.to || state.to.length > 512 ||
-      typeof state.kind !== "string" || state.kind.length > 64) return null;
-  const key = createHash("sha256").update(JSON.stringify([state.kind, state.to])).digest("hex");
-  return join(dismissalDirectory(), key);
+async function readClose() {
+  try {
+    const file = await lstat(closePath());
+    if (!file.isFile() || file.isSymbolicLink() || file.nlink !== 1 || file.size > 4096) return null;
+    const value = JSON.parse(await readFile(closePath(), "utf8"));
+    return validClose(value) ? value : null;
+  } catch { return null; }
 }
 
-async function wasDismissed(state) {
-  const path = dismissalPath(state);
-  if (!path) return false;
+async function writeClose(value) {
+  const directory = updateDirectory();
+  await mkdir(directory, { recursive: true, mode: 0o700 });
+  const folder = await lstat(directory);
+  if (!folder.isDirectory() || folder.isSymbolicLink()) throw new Error("invalid notification directory");
   try {
-    const directory = await lstat(dismissalDirectory());
-    if (!directory.isDirectory() || directory.isSymbolicLink()) return false;
-    const file = await lstat(path);
-    return file.isFile() && !file.isSymbolicLink() && file.nlink === 1;
-  } catch (error) {
-    // Unreadable acknowledgement state must not hide a genuine new update.
-    return false;
-  }
+    const file = await lstat(closePath());
+    if (!file.isFile() || file.isSymbolicLink() || file.nlink !== 1) throw new Error("invalid close record");
+  } catch (error) { if (error.code !== "ENOENT") throw error; }
+  const temporary = join(directory, ".update-close-" + randomUUID() + ".tmp");
+  try {
+    await writeFile(temporary, JSON.stringify(value), { flag: "wx", mode: 0o600 });
+    // Replacing the leaf is atomic and never follows a planted leaf link.
+    await rename(temporary, closePath());
+  } finally { await unlink(temporary).catch(() => {}); }
 }
 
-async function dismissState(state) {
-  const path = dismissalPath(state);
-  if (!path) throw new Error("invalid update target");
-  await mkdir(dismissalDirectory(), { recursive: true, mode: 0o700 });
-  const directory = await lstat(dismissalDirectory());
-  if (!directory.isDirectory() || directory.isSymbolicLink()) throw new Error("invalid dismissal directory");
-  try {
-    // One exclusive marker per target: concurrent versions never overwrite each
-    // other, and an existing link is never followed or truncated.
-    await writeFile(path, "\n", { flag: "wx", mode: 0o600 });
-  } catch (error) {
-    if (error.code !== "EEXIST" || !await wasDismissed(state)) throw error;
+function notificationStream(getState) {
+  const clients = new Set();
+  const ready = new Set();
+  let disposed = false, poll, heartbeat, watcher, debounce, refreshing, pending = false;
+  let current = { ok: true, updated: false }, fingerprint, lastClose;
+  function stop() {
+    clearInterval(poll); clearInterval(heartbeat); clearTimeout(debounce);
+    watcher?.close(); watcher = poll = heartbeat = debounce = undefined;
   }
+  function remove(res) { ready.delete(res); clients.delete(res); if (!clients.size) stop(); }
+  function send(res, event, value) {
+    if (!clients.has(res)) return;
+    try {
+      if (!res.write(event ? `event: ${event}\ndata: ${JSON.stringify(value)}\n\n` : ": keepalive\n\n")) {
+        remove(res); res.destroy();
+      }
+    } catch { remove(res); res.destroy(); }
+  }
+  function emit(event, value) {
+    for (const res of clients) if (event !== "close" || ready.has(res)) send(res, event, value);
+  }
+  async function refresh() {
+    if (disposed) return;
+    if (refreshing) { pending = true; return refreshing; }
+    refreshing = (async () => {
+      do {
+        pending = false;
+        const state = await getState();
+        if (disposed) return;
+        if (state.ok) {
+          const key = JSON.stringify(state);
+          current = state;
+          if (key !== fingerprint) { fingerprint = key; emit("state", state); }
+        }
+        const close = await readClose();
+        if (disposed) return;
+        if (lastClose !== undefined && close && close.id !== lastClose) emit("close", close);
+        lastClose = close?.id || null;
+      } while (pending && !disposed);
+    })();
+    try { await refreshing; } finally { refreshing = undefined; }
+  }
+  function observe() {
+    if (watcher || disposed || !clients.size) return;
+    try {
+      watcher = watch(updateDirectory(), { persistent: false }, (_event, filename) => {
+        if (filename && !["update-state.json", "update-notice-close.json"].includes(String(filename))) return;
+        clearTimeout(debounce);
+        debounce = setTimeout(() => { void refresh(); }, 25);
+      });
+      watcher.on("error", () => { watcher?.close(); watcher = undefined; });
+    } catch { /* The periodic check also discovers a directory created later. */ }
+  }
+  return {
+    get full() { return clients.size >= 32; },
+    async subscribe(res) {
+      clients.add(res);
+      res.once("close", () => remove(res));
+      res.once("error", () => remove(res));
+      if (!poll) {
+        poll = setInterval(() => { observe(); void refresh(); }, 1000); poll.unref?.();
+        heartbeat = setInterval(() => emit(null), 15000); heartbeat.unref?.();
+      }
+      observe();
+      await refresh();
+      if (!disposed) { send(res, "state", current); if (clients.has(res)) ready.add(res); }
+    },
+    close(value) { lastClose = value.id; emit("close", value); },
+    dispose() {
+      disposed = true; stop();
+      for (const res of clients) res.end();
+      clients.clear();
+      ready.clear();
+    },
+  };
 }
 
 function json(res, status, value) {
@@ -88,6 +161,9 @@ export function apply(ctx, config) {
   const demo = config && config.demo === true;
   return ctx.effect(() => {
     if (!ctx.webServer) return;
+    const demoState = { ok: true, updated: true, kind: "demo", from: "0.2.0-rc.2", to: "0.2.1-rc.1", at: Date.now(), demo: true };
+    const getState = () => demo ? Promise.resolve(demoState) : readState();
+    const stream = notificationStream(getState);
     const off1 = ctx.webServer.register({
       kind: "exact",
       path: "/api/rdsh-update/run",
@@ -126,7 +202,7 @@ export function apply(ctx, config) {
         try {
           let body;
           if (demo) {
-            body = JSON.stringify({ ok: true, updated: true, kind: "demo", from: "0.2.0-rc.2", to: "0.2.1-rc.1", at: Date.now(), demo: true });
+            body = JSON.stringify(demoState);
           } else {
             body = JSON.stringify(await readState());
           }
@@ -158,18 +234,34 @@ export function apply(ctx, config) {
               typeof input.kind !== "string" || !input.kind || input.kind.length > 64) throw new Error("invalid target");
         } catch (error) { return json(res, 400, { ok: false, error: "invalid-target" }); }
         try {
-          // Demo closes locally without creating any account state.
-          if (demo && input.kind === "demo" && input.to === "0.2.1-rc.1") return json(res, 200, { ok: true });
-          const current = await readState();
-          if (!current.updated || current.to !== input.to || current.kind !== input.kind) {
+          const current = await getState();
+          if (!current.updated || current.to !== input.to || current.kind !== input.kind ||
+              (input.at !== undefined && input.at !== current.at)) {
             return json(res, 409, { ok: false, error: "update-changed" });
           }
-          await dismissState(current);
+          const close = { id: randomUUID(), kind: current.kind, to: current.to, at: current.at,
+            cycle: input.cycle ?? Math.max(0, Math.floor((Date.now() - current.at) / REMINDER_MS)) };
+          if (!validClose(close)) return json(res, 400, { ok: false, error: "invalid-target" });
+          if (!demo) await writeClose(close);
+          stream.close(close);
           json(res, 200, { ok: true });
         } catch (error) { json(res, 500, { ok: false, error: "dismiss-failed" }); }
       },
     });
+    const off4 = ctx.webServer.register({
+      kind: "exact", path: "/api/rdsh-update/events",
+      handler: async (req, res) => {
+        if (!authorize(ctx, req, res)) return;
+        if (req.method !== "GET") return json(res, 405, { ok: false, error: "method-not-allowed" });
+        if (stream.full) return json(res, 429, { ok: false, error: "too-many-streams" });
+        res.writeHead(200, { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-store, no-transform",
+          "x-content-type-options": "nosniff" });
+        res.flushHeaders?.();
+        await stream.subscribe(res);
+      },
+    });
     return () => {
+      stream.dispose();
       try {
         if (typeof off1 === "function") off1();
       } catch (e) {}
@@ -177,17 +269,26 @@ export function apply(ctx, config) {
         if (typeof off2 === "function") off2();
       } catch (e) {}
       try { if (typeof off3 === "function") off3(); } catch (e) {}
+      try { if (typeof off4 === "function") off4(); } catch (e) {}
     };
   });
 }
 
 async function readState() {
   try {
-    const raw = await readFile(join(updateDirectory(), "update-state.json"), "utf8");
+    const path = join(updateDirectory(), "update-state.json");
+    const file = await stat(path);
+    if (!file.isFile() || file.size > 4096) return { ok: false };
+    const raw = await readFile(path, "utf8");
     const s = JSON.parse(raw);
-    const state = { ok: true, updated: !!s.updated, kind: typeof s.kind === "string" && s.kind ? s.kind : "update", from: s.from || null, to: s.to || null, at: s.at || null };
-    return { ...state, dismissed: await wasDismissed(state) };
+    if (!s?.updated) return { ok: true, updated: false };
+    const kind = typeof s.kind === "string" && s.kind ? s.kind : "update";
+    if (!validTarget({ kind, to: s.to })) return { ok: false };
+    const timestamp = Number(s.at);
+    const at = Number.isFinite(timestamp) && timestamp > 0 && timestamp <= file.mtimeMs + 60000
+      ? timestamp : Math.floor(file.mtimeMs);
+    return { ok: true, updated: true, kind, from: typeof s.from === "string" ? s.from.slice(0, 512) : null, to: s.to, at };
   } catch (e) {
-    return { ok: true, updated: false };
+    return e.code === "ENOENT" ? { ok: true, updated: false } : { ok: false };
   }
 }

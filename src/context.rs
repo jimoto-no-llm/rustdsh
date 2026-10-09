@@ -102,9 +102,6 @@ fn query_terms(query: &str) -> Vec<String> {
         let t = raw
             .trim()
             .trim_matches(|c| c == '_' || c == '-' || c == '/');
-        if t.len() < 2 && t.chars().count() < 1 {
-            continue;
-        }
         if t.is_empty() {
             continue;
         }
