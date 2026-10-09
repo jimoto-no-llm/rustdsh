@@ -240,7 +240,7 @@ fn find_link_text(blk: &str) -> Option<String> {
 
 fn attr(tag_head: &str, name: &str) -> Option<String> {
     // Matches name="..." or name='...' without quote escapes in source.
-    const SQ: u8 = 39;
+    const SQ: u8 = b'\'';
     let mut rest = tag_head;
     while let Some(i) = rest.find(name) {
         let after = &rest[i + name.len()..];
