@@ -270,7 +270,8 @@ double-click opens; `--no-tray` stays in the terminal).
 The original Harness update banner appears right after an update is recorded,
 every two hours from its update time, and on every full page reload.
 Dismiss / X or a successful updater check closes the current occurrence; the
-two-hour schedule continues. Unchanged release checks do not record a new update. Switching projects keeps it closed until the next slot, and close
+two-hour schedule continues. Unchanged release checks do not record a new update.
+Switching projects keeps it closed until the next slot, and close
 events reach other GUI ports of the same OS user. Activating new code needs one
 normal GUI restart/reload; see [browser verification](docs/evidence/update-notice-repeat/README.md).
 
