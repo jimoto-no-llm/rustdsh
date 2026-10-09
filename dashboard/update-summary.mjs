@@ -441,11 +441,15 @@ export function createUpdateSummary(root, {
     markRead.type = "button";
     markRead.id = "update-summary-mark-read";
     markRead.dataset.summaryFocus = "mark-read";
-    markRead.disabled = shouldFetch || changeFetchPending || changeFetchFailed ||
-      (state.revision === baseline.revision &&
-        result.mode !== "reset" && result.mode !== "unavailable");
+    const awaitingHistory = shouldFetch || changeFetchPending || changeFetchFailed;
+    const alreadyCurrent = state.revision === baseline.revision &&
+      result.mode !== "reset" && result.mode !== "unavailable";
+    markRead.disabled = alreadyCurrent;
+    markRead.setAttribute("aria-disabled", String(awaitingHistory || alreadyCurrent));
+    if (awaitingHistory)
+      markRead.title = "更新記録の取得が終わるまで確認位置を進められません。";
     markRead.addEventListener("click", () => {
-      if (!latestState) return;
+      if (!latestState || awaitingHistory || alreadyCurrent) return;
       saveBaseline(latestState);
       changeRecords = [];
       changeCursor = latestState.revision;
