@@ -209,6 +209,29 @@ rdsh --share-file README.md --share-file src/main.rs --profile tui
 echo "$input" | rdsh guard --deny "rm -rf /*" --deny "*token*"
 ```
 
+対応するファイル操作を構造で判定する場合は、任意でpolicy fileを指定できます。
+次の例は、既存のプロジェクトディレクトリ内の `Read` だけを分類上許可します。
+
+```json
+{
+  "schema": 1,
+  "rules": [
+    { "id": "project-read", "tool": "Read", "access": "read", "roots": ["/absolute/project/path"] }
+  ]
+}
+```
+
+```sh
+echo "$hook_json" | rdsh guard --policy-file ./hook-policy.json --json
+```
+
+構造判定が対応するのは `Read`・`Write`・`Edit` のファイルpath schemaです。
+作業ディレクトリと対象pathを正規化し、toolとread/write範囲を既存rootに照合して、
+秘密を含まない理由とともに `allow`・`deny`・`unknown` を返します。JSONの `allow` は分類結果だけで、
+ホストのpermission/approvalを意味しません。そのため `decision` は出力せず、最終的な権限判断はホストに残します。
+未知のtool、shell command、壊れた入力、未対応の引数はfail closedです。shell構文解析とnetwork先の判定は未対応です。
+path判定後にファイルシステムが変わる競合もあり、このhookはOS sandboxではありません。実際の強制には実行sandboxを使ってください。
+
 ```json
 {
   "hooks": {
