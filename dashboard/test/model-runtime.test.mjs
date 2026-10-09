@@ -147,6 +147,63 @@ test("a lost outcome stays pending and a surviving writer lock prevents any new 
     "another-writer",
   );
 });
+
+test("permission expiring while admission is persisted blocks before the adapter factory and records the actual reason", async (t) => {
+  const f = await setup(t);
+  await f.routing.enforceNative(f.record);
+  const current = await f.routing.inspect(f.record);
+  const target = { ...selected, model: "model-B" };
+  await f.routing.allowChange(f.record, target, {
+    authorization_id: "short-lived-change",
+    source: "explicit_operator_cli",
+    run_id: f.record.run_id,
+    session_id: f.record.cli_session_id,
+    context_hash: current.context_hash,
+    request_revision: current.revision,
+    from: selected,
+    to: target,
+    issued_at: new Date(Date.now() - 1000).toISOString(),
+    expires_at: new Date(Date.now() + 2000).toISOString(),
+  });
+  const delayed = Object.create(f.routing);
+  delayed.admitNativeCall = async (...args) => {
+    const receipt = await f.routing.admitNativeCall(...args);
+    assert.equal(receipt.allowed, true);
+    await new Promise((resolve) =>
+      setTimeout(
+        resolve,
+        Math.max(0, Date.parse(receipt.authorization_expires_at) - Date.now()) +
+          25,
+      ),
+    );
+    return receipt;
+  };
+  let entered = false;
+  await assert.rejects(
+    async () => {
+      for await (const chunk of nativeModelBoundary(delayed, f.record).stream(
+        {
+          provider: target.provider,
+          model: target.model,
+          reasoningEffort: target.effort,
+          sessionId: f.record.cli_session_id,
+        },
+        () => {
+          entered = true;
+          assert.fail("expired permission entered the adapter factory");
+        },
+        {},
+      ))
+        assert.fail(chunk);
+    },
+    (error) => error.code === "RDSH_MODEL_GUARD_DENIED",
+  );
+  assert.equal(entered, false);
+  const last = (await f.routing.inspect(f.record)).native_calls.at(-1);
+  assert.equal(last.dispatch_started, false);
+  assert.equal(last.outcome, "blocked");
+  assert.equal(last.reason, "route_authorization_expired");
+});
 test("the human HTTP view rejects unauthenticated and MCP producers, publishes no paths, and cannot authorize a route change", async (t) => {
   const f = await setup(t);
   await ProjectStore.open(f.project);
@@ -175,5 +232,40 @@ test("the human HTTP view rejects unauthenticated and MCP producers, publishes n
     (await fetch(endpoint, { method: "POST", headers })).status,
     404,
   );
+  const changes = [
+    { ...selected, model: "model-B" },
+    { ...selected, model: "model-C" },
+  ];
+  for (const [index, target] of changes.entries()) {
+    const current = await f.routing.inspect(f.record);
+    await f.routing.allowChange(f.record, target, {
+      authorization_id: `human-change-${index}`,
+      source: "explicit_operator_cli",
+      run_id: f.record.run_id,
+      session_id: f.record.cli_session_id,
+      context_hash: current.context_hash,
+      request_revision: current.revision,
+      from: current.active_route,
+      to: target,
+      issued_at: new Date(Date.now() - 1000).toISOString(),
+      expires_at: new Date(Date.now() + 3600000).toISOString(),
+    });
+  }
+  const changed = (await (await fetch(endpoint, { headers })).json()).runs[0];
+  assert.deepEqual(changed.requested, selected);
+  assert.deepEqual(changed.active_route, changes[1]);
+  assert.deepEqual(
+    changed.change_history.map(({ from, to, source }) => ({
+      from,
+      to,
+      source,
+    })),
+    [
+      { from: selected, to: changes[0], source: "explicit_operator_cli" },
+      { from: changes[0], to: changes[1], source: "explicit_operator_cli" },
+    ],
+  );
+  assert.ok(changed.change_history.every((change) => change.applied_at));
+  assert.ok(!JSON.stringify(changed).includes(f.root));
   assert.deepEqual((await modelRoutingViews(f.project))[0].requested, selected);
 });

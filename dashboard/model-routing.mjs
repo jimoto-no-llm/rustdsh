@@ -253,6 +253,7 @@ function validate(value, project, record) {
               : [
                   "request_changed_before_dispatch",
                   "request_interrupted_before_dispatch",
+                  "route_authorization_expired",
                 ].includes(call.reason)) &&
             call.outcome !== "pending" &&
             (call.dispatch_started
@@ -681,6 +682,8 @@ export class ModelRouting {
           allowed: reason === null,
           reason,
           call_id: observation.call_id,
+          authorization_expires_at:
+            value.active_authorization?.expires_at ?? null,
         },
       };
     });
@@ -688,11 +691,19 @@ export class ModelRouting {
   async finishNativeCall(record, callId, result) {
     check(
       identifier(callId) &&
-        exact(result, ["outcome", "dispatch_started"]) &&
+        (exact(result, ["outcome", "dispatch_started"]) ||
+          exact(result, ["outcome", "dispatch_started", "reason"])) &&
         ["blocked", "succeeded", "failed", "interrupted"].includes(
           result.outcome,
         ) &&
-        typeof result.dispatch_started === "boolean",
+        typeof result.dispatch_started === "boolean" &&
+        (result.reason === undefined ||
+          (!result.dispatch_started &&
+            result.outcome === "blocked" &&
+            [
+              "request_changed_before_dispatch",
+              "route_authorization_expired",
+            ].includes(result.reason))),
       "native_call_outcome_invalid",
     );
     return this.mutate(record, (value) => {
@@ -709,7 +720,7 @@ export class ModelRouting {
         reason: result.dispatch_started
           ? null
           : result.outcome === "blocked"
-            ? "request_changed_before_dispatch"
+            ? (result.reason ?? "request_changed_before_dispatch")
             : "request_interrupted_before_dispatch",
         phase: "finished",
         observed_at: new Date().toISOString(),

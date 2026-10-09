@@ -87,6 +87,25 @@ export function renderModelRouting(container, runs, node) {
           "sub",
         ),
       );
+    if (run.change_history?.length) {
+      const history = node("details");
+      history.append(
+        node(
+          "summary",
+          `モデル変更の許可履歴（${run.change_history.length}件）`,
+        ),
+      );
+      const list = node("ol");
+      for (const change of run.change_history)
+        list.append(
+          node(
+            "li",
+            `${change.applied_at} · ${change.id} · ${change.source} · ${tuple(change.from)} → ${tuple(change.to)} · ${change.expired ? "期限切れ" : `期限 ${change.expires_at}`}`,
+          ),
+        );
+      history.append(list);
+      card.append(history);
+    }
     card.append(
       node(
         "p",

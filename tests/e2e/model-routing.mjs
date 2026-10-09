@@ -240,6 +240,10 @@ try {
     .getByText("呼出し要求を照合 · adapterの完了を観測", { exact: true })
     .waitFor();
   await panel.getByText(/変更許可 human-model-change-qa/).waitFor();
+  const history = panel.locator("details");
+  await history.locator("summary").click();
+  await history.getByText(/model-A.*model-B/).waitFor();
+  await page.setViewportSize({ width: 1100, height: 1050 });
   await panel.screenshot({ path: path.join(output, "permitted-desktop.png") });
   const mobile = await browser.newContext({
     viewport: { width: 390, height: 844 },
@@ -257,6 +261,8 @@ try {
       () => document.documentElement.scrollWidth <= innerWidth + 1,
     ),
   );
+  await phone.setViewportSize({ width: 390, height: 1150 });
+  await phone.locator("#model-routing details summary").click();
   await phone
     .locator("#model-routing")
     .screenshot({ path: path.join(output, "permitted-mobile.png") });

@@ -38,6 +38,17 @@ export async function modelRoutingViews(project) {
                 expired: view.authorization_expired,
               }
             : null,
+          change_history: view.events
+            .filter((event) => event.type === "change_authorized")
+            .map((event) => ({
+              id: event.authorization.authorization_id,
+              source: event.authorization.source,
+              from: event.authorization.from,
+              to: event.authorization.to,
+              applied_at: event.at,
+              expires_at: event.authorization.expires_at,
+              expired: Date.parse(event.authorization.expires_at) <= Date.now(),
+            })),
           error: null,
           actual_model_execution_verified: false,
         };

@@ -45,8 +45,16 @@ export function nativeModelBoundary(routing, record) {
       if (!receipt.allowed) throw denial(receipt.reason);
       let dispatched = false,
         outcome = "interrupted";
+      let blockedReason = null;
       try {
         options.signal?.throwIfAborted();
+        if (
+          receipt.authorization_expires_at !== null &&
+          Date.parse(receipt.authorization_expires_at) <= Date.now()
+        ) {
+          blockedReason = "route_authorization_expired";
+          throw denial(blockedReason);
+        }
         // Hand-built requests belong to their caller. Recheck after durable I/O;
         // do not rewrite controls, messages, replay state or the original signal.
         if (
@@ -75,6 +83,7 @@ export function nativeModelBoundary(routing, record) {
           await routing.finishNativeCall(record, receipt.call_id, {
             outcome,
             dispatch_started: dispatched,
+            ...(blockedReason ? { reason: blockedReason } : {}),
           });
         } catch (error) {
           // Never turn an unrecorded outcome into a confirmed success or replay.
