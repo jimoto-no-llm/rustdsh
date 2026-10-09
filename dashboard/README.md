@@ -574,9 +574,10 @@ has only `id`, `request_version`, `attempt`, `cost_usd`; it cannot mint a grant.
 It is consumed as a binding once per check, without consuming the ledger's
 retry/cost allowance. External `repository`, `tool_result`, `web` and `agent`
 envelopes created by `provenance.mjs` always have `untrusted_data` authority.
-Summary/forward transformations preserve original references, content digests
-and lineage. These are self-reported attribution, not identity authentication or
-cryptographic proof. `renderExternalQuote` renders content/references using
+Summary/forward transformations preserve original references and link every
+content digest to the immediately preceding digest. These are self-reported
+attribution, not identity authentication or cryptographic proof.
+`renderExternalQuote` renders content/references using
 `textContent`; audit reports retain metadata/digests, not source or operation
 bodies. Reports list uninspected session replay, compaction, context injection
 and direct-backend paths. Automatic source capture through those DSH subsystems

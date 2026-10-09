@@ -1,6 +1,7 @@
 import { object, text, digest } from "./contracts.mjs";
 
 const kinds = ["repository", "tool_result", "web", "agent"];
+const schema = "rdsh.external-source.v2";
 function body(value) {
   if (typeof value !== "string" || Buffer.byteLength(value) > 65536)
     throw new Error("External text must be at most 64 KiB");
@@ -19,13 +20,14 @@ export function externalSource(kind, reference, content) {
   if (!kinds.includes(kind)) throw new Error("Unknown external source kind");
   text(reference, "source reference", 2000);
   const content_digest = digest(body(content));
-  return seal({ schema: "rdsh.external-source.v1", authority: "untrusted_data",
+  return seal({ schema, authority: "untrusted_data",
     origin: { kind, reference, content_digest }, content, content_digest,
-    lineage: [{ action: "capture", content_digest }] });
+    lineage: [{ action: "capture", parent_digest: null, content_digest }] });
 }
 export function validateExternalSource(value) {
   object(value, ["schema", "authority", "origin", "content", "content_digest", "lineage"]);
-  if (value.schema !== "rdsh.external-source.v1" || value.authority !== "untrusted_data")
+  if (value.schema !== schema) throw new Error("Unsupported external source schema");
+  if (value.authority !== "untrusted_data")
     throw new Error("External source cannot carry instruction authority");
   object(value.origin, ["kind", "reference", "content_digest"]);
   if (!kinds.includes(value.origin.kind)) throw new Error("Unknown external source kind");
@@ -35,9 +37,11 @@ export function validateExternalSource(value) {
       !Array.isArray(value.lineage) || !value.lineage.length || value.lineage.length > 32)
     throw new Error("Invalid external source lineage");
   for (const [index, item] of value.lineage.entries()) {
-    object(item, ["action", "content_digest"]);
-    if (!hash(item.content_digest) || (index === 0 ? item.action !== "capture" :
+    object(item, ["action", "parent_digest", "content_digest"]);
+    if (!hash(item.content_digest) || (index === 0 ? item.action !== "capture" || item.parent_digest !== null :
         !["summary", "forward"].includes(item.action))) throw new Error("Invalid external source lineage");
+    if (index > 0 && (item.parent_digest !== value.lineage[index - 1].content_digest ||
+        !hash(item.parent_digest))) throw new Error("External source lineage is not linked");
   }
   if (value.lineage[0].content_digest !== value.origin.content_digest ||
       value.lineage.at(-1).content_digest !== value.content_digest)
@@ -50,7 +54,8 @@ export function deriveExternalSource(source, action, content) {
     throw new Error("Unsupported external source transformation");
   const content_digest = digest(body(content));
   return seal({ ...original, origin: { ...original.origin }, content, content_digest,
-    lineage: [...original.lineage, { action, content_digest }] });
+    lineage: [...original.lineage, { action,
+      parent_digest: original.content_digest, content_digest }] });
 }
 export function sourceMetadata(source) {
   const value = validateExternalSource(source);
