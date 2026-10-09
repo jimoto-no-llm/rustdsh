@@ -186,3 +186,47 @@ checks; hosted CI is evaluated separately on the current PR head.
 | --- | --- | --- |
 | windows | {"disabled": {"attach_ms": 1193.5612999999994, "send_ms": 41.41160000000036, "stop_ms": 165.20790000000034}, "leased": {"attach_ms": 1256.8760999999995, "send_ms": 43.123099999999795, "stop_ms": 479.7992999999997}} | {"median_ms": 0.24220000000002528, "p95_ms": 0.29700000000002547} |
 | linux | {"disabled": {"attach_ms": 261.333176, "send_ms": 48.105139000000236, "stop_ms": 139.3467559999999}, "leased": {"attach_ms": 325.83575999999994, "send_ms": 54.892005000000154, "stop_ms": 138.62116500000002}} | {"median_ms": 0.20621999999997342, "p95_ms": 0.29064900000000193} |
+
+## Windows tray integration after main d705ed7
+
+Measured source: `0f4e8ced93ebeefb4799571b5ae56f75409ba844`, including merged main
+`d705ed7f4c39c8776426cbd7b2b0f789b2008243`.
+The earlier receipt-reader and short-path records above stay historical.
+
+The [hosted Windows run on source 45fb49c](https://github.com/jimoto-no-llm/rustdsh/actions/runs/37870281544/job/113626541245)
+passed 219 tests and failed the tray launcher ready check at its original
+15-second deadline, with `System.Threading.Tasks.VoidTaskResult` in stderr.
+The verified PR #203 startup change replaces per-launch C# reader compilation
+with the CLR delegate, records bounded startup phases/version/stderr hashes
+and observes only its own helper's exit. Tray/launcher/native-menu deadlines
+remain 15/60/25 seconds. CLI integration preserves GPU resource-wait exit code
+75. Issue #209's underlying hosted-runner cause is still unconfirmed.
+
+| Suite | Total | Pass | Fail/cancel | Skip |
+| --- | ---: | ---: | ---: | ---: |
+| Windows launcher/tray/GPU targets, Node 22 | 39 | 39 | 0 | 0 |
+| Linux delegated-cgroup dashboard, Node 24 | 223 | 215 | 0 | 8 Windows-only |
+
+The 17 measured runtime/fixture files, including `cli.mjs`, have the same
+fingerprint on both OSes:
+`cce045a07930385fcda51c4acdeca043f316fe952d8264ced114eefb0c47dea2`.
+Both runs released their three fixture leases through
+`held_kernel_group_empty`, ended with zero active reservations, and refused
+the low-capacity opt-in before starting a native process.
+
+Machine results: [Windows](windows-tray-startup.json),
+[Linux](linux-tray-startup.json) and
+[before/after](before-after-tray-startup.json).
+Full Windows and final-head hosted CI are checked separately; this table only
+records the completed local suites. No physical GPU allocation, model/API call
+or power-loss test ran. Three alternating attachments per mode do not prove a
+speed improvement; raw samples and stop-verification overhead are retained.
+
+| Runtime | Operation | Disabled median, ms | Leased median, ms |
+| --- | --- | ---: | ---: |
+| windows, v22.23.3 | attach_ms | 1119.94 | 1146.97 |
+| windows, v22.23.3 | send_ms | 32.69 | 35.96 |
+| windows, v22.23.3 | stop_ms | 150.70 | 462.56 |
+| linux, v24.21.0 | attach_ms | 246.65 | 299.15 |
+| linux, v24.21.0 | send_ms | 46.97 | 49.45 |
+| linux, v24.21.0 | stop_ms | 122.55 | 134.85 |
