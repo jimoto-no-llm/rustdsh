@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "nativeVersion": "0.2.0-rc.2",
+  "sdkVersion": "2.0.0",
+  "originalSha256": "758d8fc473b700b5d351158d06ce9f9e92c16e8b25497b08bb7bd2122a87f5dd",
+  "patchedSha256": "2f34c35c7a96e83fbf8a6446eff374f165c81e0c70375f188064783d0b67300f",
+  "modelCalls": 0,
+  "before": {
+    "connected": false,
+    "publicTools": [],
+    "status": "unauthorized"
+  },
+  "after": {
+    "connected": true,
+    "publicTools": [
+      "mcp__work__echo"
+    ],
+    "callText": "fixture call succeeded",
+    "credentialsConfigured": true
+  },
+  "logout": {
+    "configured": false
+  }
+}
