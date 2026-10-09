@@ -35,6 +35,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { Releases } from "./releases.mjs";
+import { WorkerWorkspaces } from "./workers.mjs";
 import {
   loopbackBase,
   recordTunnel,
@@ -69,6 +70,11 @@ rdsh-dashboard gpu inspect|reconcile
 rdsh-dashboard session-ledger retry-start --project <directory> --run-id <pending-GPU-run> [--executable <original-dsh> --entrypoint <bin.js>]
 rdsh-dashboard session-ledger start|resume --gpu-request <json> --project <directory> [--run-id <id>] [--executable <original-dsh> --entrypoint <bin.js>]
 rdsh-dashboard reply-consumer once|serve --gpu-request <json> --project <directory> --run-id <id> [--executable <original-dsh> --entrypoint <bin.js>]
+rdsh-dashboard workers plan --project <directory> --input-file <worker-json>
+rdsh-dashboard workers prepare --project <directory> --input-file <worker-json> --expected-revision <n> --expected-head <sha>
+rdsh-dashboard workers inspect --project <directory>
+rdsh-dashboard workers renew --project <directory> --worker-id <id> --lease-seconds <n> --expected-revision <n>
+rdsh-dashboard workers release --project <directory> --worker-id <id> --expected-revision <n>
 rdsh-dashboard backup preview|export --project <directory> --selection-file <json> [--review-file <json>] [--output-file <new-json>]
 rdsh-dashboard backup inspect --archive-file <json>
 rdsh-dashboard backup restore --project <directory> --archive-file <json> --expected-revision <n>
@@ -137,6 +143,8 @@ const { values, positionals } = parseArgs({
     "budget-guard": { type: "boolean" },
     "gpu-request": { type: "string" },
     "worker-id": { type: "string" },
+    "lease-seconds": { type: "string" },
+    "expected-head": { type: "string" },
     "selection-file": { type: "string" },
     "review-file": { type: "string" },
     "archive-file": { type: "string" },
@@ -318,14 +326,23 @@ try {
       "review-file",
       "archive-file",
       "output-file",
-      "expected-revision",
       "archive-id",
     ].some((k) => values[k] !== undefined)
   )
     throw new Error("Backup options require backup");
   if (
+    values["expected-revision"] !== undefined &&
+    !["backup", "workers"].includes(command)
+  )
+    throw new Error("Backup options require backup");
+  if (
+    command !== "workers" &&
+    ["expected-head", "lease-seconds"].some((k) => values[k] !== undefined)
+  )
+    throw new Error("Worker workspace options require workers");
+  if (
     values["budget-guard"] !== undefined ||
-    values["worker-id"] !== undefined
+    (values["worker-id"] !== undefined && command !== "workers")
   ) {
     const permitted =
       (command === "session-ledger" &&
@@ -523,6 +540,47 @@ try {
       } else result = await backupRequest(project, "history");
     }
     console.log(JSON.stringify(result, null, 2));
+  } else if (command === "workers") {
+    const action = positionals[1];
+    const options = {
+      plan: ["project", "input-file"],
+      prepare: ["project", "input-file", "expected-revision", "expected-head"],
+      inspect: ["project"],
+      renew: ["project", "worker-id", "lease-seconds", "expected-revision"],
+      release: ["project", "worker-id", "expected-revision"],
+    };
+    if (
+      positionals.length !== 2 ||
+      !Object.hasOwn(options, action) ||
+      Object.keys(values).some((k) => !options[action].includes(k))
+    )
+      throw new Error("Invalid workers action/options");
+    const workers = await WorkerWorkspaces.open(
+      await identity(values.project || process.cwd()),
+    );
+    let result;
+    const expected =
+      values["expected-revision"] === undefined
+        ? undefined
+        : Number(values["expected-revision"]);
+    if (action === "plan")
+      result = await workers.plan(await localJson(values["input-file"]));
+    else if (action === "prepare")
+      result = await workers.prepare(await localJson(values["input-file"]), {
+        expectedRevision: expected,
+        expectedHead: values["expected-head"],
+      });
+    else if (action === "renew")
+      result = await workers.renew(
+        values["worker-id"],
+        Number(values["lease-seconds"]),
+        expected,
+      );
+    else if (action === "release")
+      result = await workers.release(values["worker-id"], expected);
+    else result = await workers.inspect();
+    console.log(JSON.stringify(result));
+    if (result.provisioning_error) process.exitCode = 1;
   } else if (command === "cost-ledger") {
     const action = positionals[1],
       allowed = new Set(["project", "input-file", "help"]);

@@ -1,5 +1,8 @@
 # Project dashboard and private Harness access
 
+[Worker scopes and worktrees](../docs/WORKER-WORKSPACES.md): local CLI allocation,
+source/worker conflict scans and retained checkouts after lease expiry or release.
+
 [Budget admission control](../docs/BUDGET-CONTROL.md): soft warnings, hard guarded
 DSH job/model-call limits, durable parallel reservations and delayed usage holds.
 Native guard registration is required; ordinary/unsupported CLIs are display-only.
@@ -27,6 +30,9 @@ and separates recorded run state, root-process observations and UI connectivity.
 
 [Bounded retry](../docs/SAFE-RETRY.md) preserves original permission and reconciles
 uncertain writes. Public retry is opt-in for original CLI version queries only.
+
+[Offline fault simulator](../docs/FAULT-SIMULATOR.md) reproduces six seeded
+control-plane failures with local mock peers, saved input/reports, and Windows/Linux CI.
 
 [Checkpoint recovery](../docs/CHECKPOINTS.md) distinguishes a verified native
 resume from an explicit new conversation with an operator-provided summary.
@@ -238,6 +244,65 @@ partial. The folded metrics section shows each amount's provenance and history.
 endpoint; browser credentials are read-only for these inputs. No prices are
 looked up and legacy numeric costs are not merged with this optional ledger.
 
+### Observation source and freshness (#16)
+
+`dashboard_update_metrics`, `dashboard_upsert_task`, and
+`dashboard_publish_event` accept an optional `observation` object:
+
+```json
+{
+  "total_cost_usd": 2.45,
+  "session_id": "session-123",
+  "observation": {
+    "kind": "measured",
+    "observed_at": "2026-10-05T12:00:00Z",
+    "source": "provider usage response",
+    "session_id": "session-123",
+    "reference": "request-456 / commit abc123",
+    "max_age_seconds": 900
+  }
+}
+```
+
+Use the actual observation time, including a timezone. Source kinds are
+`measured` (**実測**), `agent_reported` (**agent報告**), `estimated` (**推定**),
+and `unavailable` (**未取得**). These are the authenticated reporter's claims;
+the dashboard does not independently verify measurements or artifact quality.
+Measured reports require both `source` and `observed_at`. Explicit estimates
+remain visibly marked; missing values are never filled with zero or estimates.
+`unavailable` permits only `null` numeric values. `null` always clears the value
+and sets its kind to `unavailable`, even in a mixed measured report.
+
+The server stores `recorded_at` separately from `observed_at`. It accepts past
+observations, rejects future or invalid timestamps, and marks a report stale
+when its observation age reaches `max_age_seconds` (default 900; allowed range
+1–604800). Receipt time, unrelated events and metadata-only writes never make
+an old observation fresh. The browser checks expiry every 30 seconds and when
+the page becomes visible, including during a disconnected or idle session.
+Expired values remain visible as previous reports, with **古い情報** replacing
+the current value. Task counts include only fresh, non-estimated `done` reports;
+this is a report count, not an acceptance or QA gate. Progress/artifact entries
+remain history and show their own observation source and time.
+
+Metric provenance is stored per field in `metric_observations`, including source,
+reporting session, reference, observation/receipt times, and a server-generated
+`report_id`. An observation applies only to numeric fields supplied in that
+call (and an explicitly supplied `session_id`). Omitted fields retain both
+their value and provenance. Report the numerator and denominator of cache/error
+rates together: partial updates from different snapshots display **比較不可**,
+and stale/missing counters do not produce a precise rate. When `session_id`
+changes, session cost/budget values are cleared; project totals and cumulative
+counters keep their original provenance. Supplying `observation.session_id`
+alongside `session_id` requires them to match. Tasks/events store provenance in
+their own `observation`; references default to the task ID or artifact path.
+
+Existing schema-1 state and callers without `observation` remain readable.
+Existing values without provenance display **出所未確認 / 鮮度未確認**; new
+legacy-style reports default to `agent_reported` with no invented observation
+time. Their numeric values are retained as previous reports, not treated as
+current measurements. Send explicit observation metadata to show current values.
+Reference strings and sources are displayed as text, never opened or executed.
+
 Artifact references are displayed as text. Local file contents are never opened
 or served. Treat all user-authored questions, answers, progress, and paths as data.
 
@@ -360,3 +425,6 @@ resource notifications, native MCP 2.0 Events lifecycle, callback signatures,
 retry/restart behavior, invalid callbacks, and private Serve conflicts. CI runs
 these on Windows and Linux. Browser/phone access and real Dot triggers require
 their respective account configurations and are checked separately.
+Observation tests additionally cover idle expiry, independent field freshness,
+source/session/reference persistence, legacy state, invalid metadata, explicit
+unknown values, session cost resets, and incompatible ratio snapshots.

@@ -190,13 +190,26 @@ test("failed one-project canary retains observations and cannot alter or roll ou
   );
   await releases.promote(beta, stable.release_id, 0);
   const before = (await releases.inspect(beta)).selection;
-  const candidate = await stage("bad-plugin", { plugin: "fail" });
+  const candidate = await stage("bad-plugin", {
+    plugin: "fail",
+    initialize_delay_ms: 500,
+  });
   const failed = await releases.check(alpha, candidate.release_id, 1, {
-    requestTimeout: 300,
+    // Exercise missing plugin evidence after a real ACP acknowledgement, even
+    // when the peer's initialize reply takes longer than 300 ms.
+    requestTimeout: 3000,
   });
   assert.equal(failed.changed, false);
   assert.equal(failed.qualification.status, "failed");
-  assert.equal(failed.qualification.checks.start, "acknowledged");
+  assert.equal(
+    failed.qualification.checks.start,
+    "acknowledged",
+    JSON.stringify({
+      checks: failed.qualification.checks,
+      error: failed.qualification.error,
+      cleanup: failed.qualification.cleanup,
+    }),
+  );
   assert.equal(failed.qualification.error, "native_plugin_load_unconfirmed");
   assert.deepEqual((await releases.inspect(beta)).selection, before);
   const badResume = await stage("bad-resume", { resume: "fail" });

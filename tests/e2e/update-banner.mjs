@@ -21,7 +21,7 @@ const state = (to = 'DUMMY-v-next', extra = {}) => ({ updated: true, kind: 'rust
 const setState = async (value) => { await writeFile(stateFile + '.tmp', JSON.stringify(value)); await rename(stateFile + '.tmp', stateFile); };
 const clientFile = path.join(repo, 'plugins/rdsh-update-banner/client.js');
 const baseline = process.env.RDSH_UPDATE_BASELINE_CLIENT;
-const report = { result: 'FAIL', scope: 'Actual React banner and authenticated plugin routes in two isolated loopback hosts; dummy HOME; no production DSH restart or updater execution', flows: [], page_errors: [], console_errors: [] };
+const report = { result: 'FAIL', scope: 'Actual React banner and authenticated state/close/stream routes in two isolated loopback hosts; updater responses mocked; dummy HOME; no production DSH restart or updater execution', flows: [], page_errors: [], console_errors: [] };
 const servers = [], disposers = [], bundles = new Map(); let browser;
 
 async function bundle(file) {
@@ -96,15 +96,18 @@ try {
   report.flows.push('State and event routes reject unauthenticated and foreign-Origin requests');
   browser = await chromium.launch({ headless: true, ...(process.env.RDSH_CHROME_PATH ? { executablePath: process.env.RDSH_CHROME_PATH } : {}) });
   if (baseline) {
-    await setState({ updated: false });
-    const old = await context(origin), page = await old.newPage(); await page.clock.install({ time: new Date(START - 1000) }); await page.clock.pauseAt(new Date(START));
-    const loaded = page.waitForResponse((r) => r.url().endsWith('/api/rdsh-update'));
-    await page.goto(origin + '/before'); await loaded; await sleep(100);
-    await setState(state()); await sleep(300); await hidden(page);
+    await setState(state());
+    const old = await context(origin), page = await old.newPage();
+    await page.clock.install({ time: new Date(START - 1000) }); await page.clock.pauseAt(new Date(START));
+    await page.route('**/api/rdsh-update/run', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, message: 'DUMMY unchanged release' }) }));
+    await ready(page, origin + '/before'); await banner(page).waitFor();
+    await page.getByRole('button', { name: 'update', exact: true }).click();
+    await page.getByRole('button', { name: 'update again', exact: true }).waitFor();
+    await page.getByRole('button', { name: 'update again', exact: true }).click();
+    await page.getByRole('button', { name: 'update again', exact: true }).waitFor();
     await page.screenshot({ path: path.join(output, 'before.png'), animations: 'disabled' });
-    report.before = 'Baseline client receives no live update and stays hidden until reload or its 60-second poll';
-    await page.reload(); await banner(page).waitFor(); await closeBanner(page); await page.reload(); await hidden(page);
-    report.flows.push('Baseline: no immediate notification; permanent dismissal also suppressed reload'); await old.close();
+    report.before = 'A successful unchanged updater check left the card open with update again, including after another check';
+    report.flows.push('Baseline: repeated successful updater checks leave update again visible'); await old.close();
   }
   await setState({ updated: false });
   const c = await context(origin), a = await c.newPage(), b = await c.newPage();
@@ -148,6 +151,39 @@ try {
   await ready(d, origin + '/project/no-storage'); await banner(d).waitFor();
   report.flows.push('Disabled browser storage still supports close, project remount suppression, and reload notification');
   await d.screenshot({ path: path.join(output, 'reload.png'), animations: 'disabled' });
+  await setState(state('DUMMY-noop-check')); await banner(d).getByText('DUMMY-noop-check', { exact: true }).waitFor();
+  await d.route('**/api/rdsh-update/run', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, message: 'DUMMY unchanged release' }) }));
+  const completed = d.waitForResponse((r) => r.url().endsWith('/api/rdsh-update/dismiss'));
+  await d.getByRole('button', { name: 'update', exact: true }).click(); assert.equal((await completed).status(), 200);
+  await hidden(d); await banner(remote).waitFor({ state: 'hidden' });
+  await d.screenshot({ path: path.join(output, 'after.png'), animations: 'disabled' });
+  await d.getByRole('button', { name: 'Switch project', exact: true }).click(); await hidden(d);
+  report.flows.push('Successful unchanged updater check closes the card and other GUI; remount and storage failure do not resurrect it');
+  await ready(d, origin + '/project/no-storage'); await banner(d).waitFor();
+  await d.unroute('**/api/rdsh-update/run');
+  await d.route('**/api/rdsh-update/run', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: false, message: 'DUMMY update failure' }) }));
+  await d.getByRole('button', { name: 'update', exact: true }).click(); await banner(d).getByText('DUMMY update failure').waitFor();
+  await d.getByRole('button', { name: 'update again', exact: true }).waitFor();
+  report.flows.push('Failed updater remains visible and retryable; reload still displays the notification');
+  await d.unroute('**/api/rdsh-update/run');
+  await d.route('**/api/rdsh-update/run', async (route) => {
+    await setState(state('DUMMY-update-during-run', { at: START + 3 }));
+    await banner(d).getByText('DUMMY-update-during-run', { exact: true }).waitFor();
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, message: 'DUMMY old check finished' }) });
+  });
+  await d.getByRole('button', { name: 'update again', exact: true }).click();
+  await d.getByRole('button', { name: 'update', exact: true }).waitFor();
+  await banner(d).getByText('DUMMY-update-during-run', { exact: true }).waitFor();
+  report.flows.push('Completion of an older updater request does not acknowledge or label a newer live update as update again');
+  await a.clock.fastForward(PERIOD - 600000); await setState(state('DUMMY-cadence-after-check', { at: START }));
+  await banner(a).getByText('DUMMY-cadence-after-check', { exact: true }).waitFor();
+  await a.route('**/api/rdsh-update/run', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true }) }));
+  const ack = a.waitForResponse((r) => r.url().endsWith('/api/rdsh-update/dismiss'));
+  await a.getByRole('button', { name: 'update', exact: true }).click(); assert.equal((await ack).status(), 200);
+  await hidden(a); await a.clock.fastForward(599999); await hidden(a);
+  await a.clock.runFor(1); await banner(a).waitFor();
+  await a.screenshot({ path: path.join(output, 'reminder-after-check.png'), animations: 'disabled' });
+  report.flows.push('Successful updater completion preserves the fixed next two-hour boundary');
   assert.deepEqual(report.page_errors, []); assert.deepEqual(report.console_errors, []); report.result = 'PASS';
 } catch (error) { report.error = error.message; throw error; }
 finally {

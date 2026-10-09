@@ -1,0 +1,12 @@
+BEFORE: head 55a72f65584dc4626b06325093f233d451160cb4
+Windows dashboard: 200 tests, 199 passed, 1 failed.
+Seed-0 disk_full CLI replay differed only in repeated ENOSPC events during cleanup.
+Each additional failed journal write shifted the logical owned_stop_observed timestamp.
+
+AFTER: fixed source d59f6d679c76426a5dbbc937a0966f04bd9e927a
+Windows dashboard: 202/202 passed; Linux: 197 passed, 5 Windows-only skips, 0 failed.
+Both OS CLI run/replay pairs retain identical input, facts and four logical events.
+injected_ENOSPC is recorded once at the write boundary; every failed write remains in runtime_observations.journal_failures.
+Observed run/replay failure counts: windows 10/10, linux 10/10.
+The controlled regression varies attempts from 2 to 18 at write and fsync boundaries without changing the logical trace.
+No native effect/ack is invented; durable history remains unconfirmed after verified owned cleanup.

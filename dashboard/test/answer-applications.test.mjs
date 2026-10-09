@@ -95,7 +95,6 @@ async function setup(t, webhook = false) {
     );
     return server;
   };
-  await start();
   t.after(async () => {
     const failures = [];
     for (const attached of attachedRuns) {
@@ -106,23 +105,29 @@ async function setup(t, webhook = false) {
       }
     }
     // A failed stop assertion must not leave HTTP listeners holding the test
-    // worker open. Preserve its fixture files and every original failure.
+    // worker open. Preserve fixture files and every original failure.
     for (const owned of servers) {
       try {
         await owned.close();
+        assert.equal(owned.server.listening, false);
       } catch (error) {
         failures.push(error);
       }
     }
-    if (failures.length)
+    if (failures.length) {
+      const codes = failures.map((error) =>
+        [error.code || error.name, error.cause?.code].filter(Boolean).join(":"),
+      );
       throw new AggregateError(
         failures,
-        `fixture_cleanup_unconfirmed: ${failures.map((error) => error.cause?.code || error.code || error.name).join(", ")}`,
+        `fixture_cleanup_unconfirmed: ${codes.join(", ")}`,
       );
+    }
     assert.equal(path.dirname(path.resolve(root)), path.resolve(os.tmpdir()));
     assert.ok(path.basename(root).startsWith("rdsh-reply-test-"));
     await fs.rm(root, { recursive: true });
   });
+  await start();
   const post = async (route, body, credential = "human", origin) => {
     const headers =
       credential === "human"

@@ -1,0 +1,33 @@
+{
+  "source": "b17358ca2968f57f1f53f292c65b88ab3e2ddf0f",
+  "baseline": "98abc67d7e5c5d3f2a5321d9a56adb6a83ff93e2",
+  "runtime": "Windows Chrome, production HTTP/state in an isolated fixture",
+  "actual_models_or_paid_apis": false,
+  "page_errors": [],
+  "geometry": [
+    {
+      "viewport": 1440,
+      "document": 1440,
+      "injected_images": 0
+    },
+    {
+      "viewport": 390,
+      "document": 390,
+      "injected_images": 0
+    }
+  ],
+  "fresh_completed_reports": 1,
+  "stale_completed_reports": 1,
+  "unknown_completed_reports": 1,
+  "estimated_completed_reports": 1,
+  "stale_result_excluded_from_current_claims": true,
+  "initial_cache_ratio": "80.0%",
+  "partial_cache_ratio": "比較不可",
+  "expired_cache_ratio": "古い情報",
+  "unsent_draft_focus_and_selection_preserved": true,
+  "provenance_fold_preserved": true,
+  "pending_after_cancel": 1,
+  "answered_questions": 0,
+  "cancellation_and_expiration_are_not_answers": true,
+  "execution": "実行状態は未取得"
+}
