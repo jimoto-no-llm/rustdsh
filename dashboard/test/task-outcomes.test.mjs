@@ -85,16 +85,19 @@ test("existing HTTP MCP task publication accepts outcome metadata without adding
   assert.equal(dashboard.store.value.schema, 1);
 });
 
-test("legacy task shape is preserved and omitted outcome fields retain earlier reports", async (t) => {
+test("legacy task shape retains observation metadata and omitted outcome fields retain earlier reports", async (t) => {
   const f = await setup(t);
   assert.deepEqual(Object.keys(f.state.value.tasks[0]).sort(), [
     "blocker",
     "id",
     "milestone",
+    "observation",
     "status",
     "title",
     "updated_at",
   ]);
+  assert.equal(f.state.value.tasks[0].observation.kind, "agent_reported");
+  assert.equal(f.state.value.tasks[0].observation.reference, "goal");
   await f.state.mutate("task", {
     id: "goal",
     title: "Updated title",

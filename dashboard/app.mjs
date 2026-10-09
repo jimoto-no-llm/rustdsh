@@ -1,3 +1,4 @@
+import { renderReports } from "./reports-view.mjs";
 import { renderQuestionCards } from "./question-cards-ui.mjs";
 import { renderAnswerApplications } from "./answer-applications-ui.mjs";
 import { renderOverview } from "./project-overview.mjs";
@@ -43,38 +44,6 @@ function node(tag, text, className) {
   if (text !== undefined) result.textContent = text;
   if (className) result.className = className;
   return result;
-}
-const number = (value) =>
-  value == null ? "未取得" : value.toLocaleString("ja-JP");
-const money = (value) => (value == null ? "未取得" : "$" + value.toFixed(2));
-const ratio = (numerator, denominator) =>
-  numerator == null || denominator == null || denominator === 0
-    ? null
-    : numerator / denominator;
-const percentage = (value) =>
-  value == null ? "未取得" : (value * 100).toFixed(1) + "%";
-function card(label, value, detail, progress, warning = false) {
-  const element = node("section", undefined, "card");
-  element.append(
-    node("div", label, "label"),
-    node("div", value, "value" + (warning ? " warn" : "")),
-    node("div", detail, "detail"),
-  );
-  if (progress != null) {
-    const bar = node("div", undefined, "bar");
-    const fill = node("span");
-    fill.style.width = Math.min(100, Math.max(0, progress * 100)) + "%";
-    bar.append(fill);
-    element.append(bar);
-  }
-  return element;
-}
-function emptyRow(text, columns) {
-  const tr = node("tr");
-  const cell = node("td", text, "empty");
-  cell.colSpan = columns;
-  tr.append(cell);
-  return tr;
 }
 let renderedRevision = -1;
 let latestState = null;
@@ -188,67 +157,8 @@ function render(state) {
   renderCosts(state);
   renderBudget($("budget-admission"), state, node);
   updateOverview(state);
-  const m = state.metrics,
-    done = state.tasks.filter((task) => task.status === "done").length,
-    unanswered = state.questions.filter((question) => question.answer === null),
-    pending = unanswered.filter(
-      (question) =>
-        !state.question_contracts?.cards[question.id] ||
-        state.question_contracts.cards[question.id].status === "open",
-    ),
-    answered = state.questions.length - unanswered.length;
-  const cache = ratio(m.cached_input_tokens, m.input_tokens),
-    errors = ratio(m.tool_errors, m.tool_calls);
-  const counts = ["done", "doing", "todo", "blocked"]
-    .map(
-      (status) =>
-        `${status} ${state.tasks.filter((task) => task.status === status).length}`,
-    )
-    .join(" · ");
-  $("cards").replaceChildren(
-    card(
-      "従来の累計報告（API換算）",
-      money(m.total_cost_usd),
-      m.total_budget_usd == null
-        ? "台帳とは別の入力 · 上限 未設定"
-        : "台帳とは別の入力 · 上限 " + money(m.total_budget_usd),
-      ratio(m.total_cost_usd, m.total_budget_usd),
-    ),
-    card(
-      "直近のセッション",
-      money(m.session_cost_usd),
-      `${m.session_id || "未取得"}　上限 ${m.session_budget_usd == null ? "未設定" : money(m.session_budget_usd)}`,
-      ratio(m.session_cost_usd, m.session_budget_usd),
-    ),
-    card(
-      "キャッシュ読み込み率",
-      percentage(cache),
-      `${number(m.model_calls)} 回の呼び出し（入力トークン加重）`,
-    ),
-    card(
-      "ツールのエラー率",
-      percentage(errors),
-      `${number(m.tool_errors)} / ${number(m.tool_calls)} 件`,
-    ),
-    card(
-      "文脈の読み落とし",
-      number(m.context_misses),
-      "報告元で検出した回数",
-      undefined,
-      m.context_misses > 0,
-    ),
-    card(
-      "自動続行",
-      number(m.auto_continues),
-      `拒否 ${number(m.refusals)} · APIエラー ${number(m.api_errors)}`,
-    ),
-    card(
-      "作業の申告",
-      `${done} / ${state.tasks.length}`,
-      counts + " · 件数は受入条件の達成率ではありません",
-    ),
-    card("未回答の質問", String(pending.length), `回答済み ${answered}`),
-  );
+  renderReports(state);
+  const unanswered = state.questions.filter((question) => question.answer === null);
   renderTaskOutcomes(state);
   renderQuestionCards($("questions"), unanswered, state.question_contracts, {
     node,
@@ -256,29 +166,6 @@ function render(state) {
     refreshState,
   });
   renderAnswerApplications($("reply-status"), state, node);
-  $("events").replaceChildren(
-    ...state.events
-      .slice(-30)
-      .reverse()
-      .map((event) => {
-        const element = node("article", undefined, "event");
-        element.append(
-          node("strong", event.title),
-          node(
-            "div",
-            `${event.type} · ${new Date(event.created_at).toLocaleString("ja-JP")}`,
-            "sub",
-          ),
-        );
-        if (event.detail) element.append(node("p", event.detail));
-        if (event.artifact) element.append(node("code", event.artifact));
-        return element;
-      }),
-  );
-  if (!state.events.length)
-    $("events").append(
-      node("div", "進捗・成果物の報告はまだありません", "empty"),
-    );
   $("answers").replaceChildren(
     ...state.questions
       .filter((question) => question.answer !== null)
@@ -305,7 +192,7 @@ function render(state) {
   );
   $("connection").textContent = "接続済み · プロジェクト専用";
   $("updated").textContent =
-    `最終更新: ${state.updated_at ? new Date(state.updated_at).toLocaleString("ja-JP") : "まだ報告がありません"} · 未取得の指標はMCPから報告されたときに表示されます。累計欄は報告元のAPI換算値です。台帳は出所ごとの報告値です。`;
+    `最終受信: ${state.updated_at ? new Date(state.updated_at).toLocaleString("ja-JP") : "まだ報告がありません"} · 鮮度は各項目の観測時刻から判定します。累計欄は報告元のAPI換算値です。台帳は出所ごとの報告値です。`;
 }
 async function refreshState() {
   try {

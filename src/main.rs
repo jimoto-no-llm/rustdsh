@@ -311,10 +311,16 @@ fn main() {
     }
     // NOTE: --version/-V is served by clap itself (prints "rdsh x.y.z", exit 0).
     let cli = Cli::parse();
-    std::env::set_var(
-        "RDSH_SHARED_FILES",
-        serde_json::to_string(&cli.share_file).unwrap(),
-    );
+    // Fast path: empty share list is by far the common case; skip JSON serializer.
+    // Same bytes out ("[]"), one allocation saved per invocation.
+    if cli.share_file.is_empty() {
+        std::env::set_var("RDSH_SHARED_FILES", "[]");
+    } else {
+        std::env::set_var(
+            "RDSH_SHARED_FILES",
+            serde_json::to_string(&cli.share_file).unwrap(),
+        );
+    }
     // Explicit recovery must work even when the current settings cannot be read.
     // Every other command still fails closed on a corrupt settings document.
     let cfg = if matches!(
@@ -394,7 +400,7 @@ fn main() {
                 Ok(())
             }
             SettingsAction::Show { json } => {
-                let cfg = rdsh_config::load();
+                // Reuse outer cfg (same file, same parse); second load was pure overhead.
                 let v = cfg.to_value();
                 if json {
                     match serde_json::to_string_pretty(&v) {
@@ -562,28 +568,32 @@ fn main() {
             }
         }
         Some(Commands::DumpConfig { profile, native }) => {
-            profile_or_default(profile.or(cli.profile)).and_then(|p| {
-                if native {
-                    dump_config_native(&p, &cli.patch)
-                } else {
-                    passthrough::exec_dump_config(&p, &cli.patch, dry, slim)
-                }
-            })
+            profile_or_default(profile.or(cli.profile), &cfg.general.default_profile).and_then(
+                |p| {
+                    if native {
+                        dump_config_native(&p, &cli.patch)
+                    } else {
+                        passthrough::exec_dump_config(&p, &cli.patch, dry, slim)
+                    }
+                },
+            )
         }
         Some(Commands::Boot {
             profile,
             from_default_profile,
             args,
-        }) => profile_or_default(profile.or(cli.profile)).and_then(|p| {
-            passthrough::exec_boot(
-                &p,
-                from_default_profile.as_deref(),
-                &cli.patch,
-                &args,
-                dry,
-                slim,
-            )
-        }),
+        }) => profile_or_default(profile.or(cli.profile), &cfg.general.default_profile).and_then(
+            |p| {
+                passthrough::exec_boot(
+                    &p,
+                    from_default_profile.as_deref(),
+                    &cli.patch,
+                    &args,
+                    dry,
+                    slim,
+                )
+            },
+        ),
         None => {
             let parsed = dsh_args::split_launcher_args(cli.profile, cli.extra);
             match parsed {
@@ -646,20 +656,19 @@ fn pick_default_profile(env: Option<&str>, local_tui: bool) -> Result<String, St
     Err("no profile specified and no local \u{2018}tui\u{2019} profile found (dsh 0.2.0 ships acp, web, headless, sdk and sdk-minimal templates, but no tui template). Boot with --profile <name> (e.g. --profile web) or set RDSH_DEFAULT_PROFILE=<name>".to_string())
 }
 
-fn profile_or_default(opt: Option<String>) -> anyhow::Result<String> {
+fn profile_or_default(opt: Option<String>, configured_default: &str) -> anyhow::Result<String> {
     match opt {
         Some(p) => Ok(p),
-        None => resolve_default_profile(),
+        None => resolve_default_profile(configured_default),
     }
 }
 
-fn resolve_default_profile() -> anyhow::Result<String> {
+fn resolve_default_profile(configured_default: &str) -> anyhow::Result<String> {
     let env = std::env::var("RDSH_DEFAULT_PROFILE").ok();
-    if !env.as_deref().is_some_and(|e| !e.trim().is_empty()) {
-        let configured = rdsh_config::load().general.default_profile;
-        if !configured.trim().is_empty() {
-            return Ok(configured.trim().to_string());
-        }
+    if !env.as_deref().is_some_and(|e| !e.trim().is_empty())
+        && !configured_default.trim().is_empty()
+    {
+        return Ok(configured_default.trim().to_string());
     }
     let home = crate::inspect::dsh_home();
     let local_tui = std::path::Path::new(&format!("{home}/profiles/tui")).is_dir();
