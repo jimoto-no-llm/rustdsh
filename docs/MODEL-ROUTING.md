@@ -129,8 +129,9 @@ or fallback. Ordinary provider failures retain DSH's existing behavior.
 
 Each call records its selected tuple, permission ID, policy revision and terminal
 outcome. A checked call without a durable terminal receipt stays pending; it does
-not become a successful execution or a reason to replay. Authorization expiry
-blocks new calls without retroactively cancelling an already admitted stream.
+not become a successful execution or a reason to replay. Authorization expiry is
+checked again after admission persistence, immediately before the adapter factory.
+It blocks a new dispatch without retroactively cancelling an already started stream.
 The `actual_model_execution_verified` field remains false: native dispatch facts
 cannot attest which model the remote provider actually ran or charged for.
 
@@ -143,6 +144,8 @@ and response text, credentials and native error messages. It has no route-change
 endpoint and cannot be accessed with the six-tool MCP producer credential. The
 visible page refreshes this historical view every five seconds; an HTTP failure
 shows unavailable rather than retaining a current-looking success.
+All authorized changes retain their original from/to/source/time in the expandable
+history, whose open state is preserved through refreshes.
 
 ## Explicitly permitted changes
 

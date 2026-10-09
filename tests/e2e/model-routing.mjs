@@ -243,6 +243,10 @@ try {
   const history = panel.locator("details");
   await history.locator("summary").click();
   await history.getByText(/model-A.*model-B/).waitFor();
+  const repeated = await invoke(run, "mismatch");
+  assert.deepEqual(repeated.dispatches, [target]);
+  await panel.locator("dd").filter({ hasText: /^4$/ }).waitFor();
+  assert.equal(await history.evaluate((element) => element.open), true);
   await page.setViewportSize({ width: 1100, height: 1050 });
   await panel.screenshot({ path: path.join(output, "permitted-desktop.png") });
   const mobile = await browser.newContext({

@@ -18,6 +18,12 @@ const reasons = {
   request_interrupted_before_dispatch: "送信前に中断されました",
 };
 export function renderModelRouting(container, runs, node) {
+  const expandedHistory = new Set(
+    Array.from(
+      container.querySelectorAll("article[data-run-id] details[open]"),
+      (details) => details.closest("article").dataset.runId,
+    ),
+  );
   container.replaceChildren();
   container.append(node("h2", "モデル呼出しの照合履歴"));
   container.append(
@@ -89,6 +95,7 @@ export function renderModelRouting(container, runs, node) {
       );
     if (run.change_history?.length) {
       const history = node("details");
+      history.open = expandedHistory.has(run.run_id);
       history.append(
         node(
           "summary",
