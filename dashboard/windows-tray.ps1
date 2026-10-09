@@ -15,7 +15,8 @@ $taskMenu = New-Object System.Windows.Forms.ContextMenuStrip
 $taskOpen = $taskMenu.Items.Add('Open / 開く')
 $taskExit = $taskMenu.Items.Add('Exit / 終了')
 $taskIcon = New-Object System.Windows.Forms.NotifyIcon
-$taskIcon.Icon = [System.Drawing.SystemIcons]::Application
+$taskBrandIcon = [System.Drawing.Icon]::new((Join-Path $PSScriptRoot '../assets/icon.ico'))
+$taskIcon.Icon = $taskBrandIcon
 $taskIcon.Text = if ($env:RDSH_TRAY_LABEL) { $env:RDSH_TRAY_LABEL } else { 'rdsh-dashboard' }
 $taskIcon.ContextMenuStrip = $taskMenu
 $taskOpen.add_Click({ [Console]::Out.WriteLine('open'); [Console]::Out.Flush() })
@@ -45,6 +46,7 @@ try {
     $taskTimer.Stop()
     $taskIcon.Visible = $false
     $taskIcon.Dispose()
+    $taskBrandIcon.Dispose()
     $taskMenu.Dispose()
     $taskTimer.Dispose()
     $taskContext.Dispose()

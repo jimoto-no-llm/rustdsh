@@ -10,7 +10,7 @@ rustdsh は独立したコミュニティプロジェクトです。DeepSeek お
 [![release](https://img.shields.io/github/v/release/jimoto-no-llm/rustdsh.svg)](https://github.com/jimoto-no-llm/rustdsh/releases)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-<img src="assets/icon.svg" width="96" alt="rdsh icon">
+<img src="assets/icon.png" width="96" alt="rdsh icon">
 
 フル移植ではなく**ホットパスだけ Rust 化＋残りは本家 dsh に委譲**する設計です。
 Linux上の `--version` で起動約98倍・最大RSS約1/23を測定しています。

@@ -462,7 +462,9 @@ test("separate public clients bind, probe and inspect a native configuration wit
           ],
           {
             env: f.env,
-            timeout: 20000,
+            // Windows ownership checks and cleanup have separate deadlines.
+            // Let them finish before the outer fixture terminates the CLI.
+            timeout: process.platform === "win32" ? 60000 : 20000,
             maxBuffer: 1024 * 1024,
             windowsHide: true,
           },
