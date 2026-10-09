@@ -283,8 +283,7 @@ fn main() {
         let raw: Vec<String> = std::env::args().skip(1).collect();
         let first_is_native = raw
             .first()
-            .map(|s| NATIVE_FIRST.contains(&s.as_str()))
-            .unwrap_or(false);
+            .is_some_and(|s| NATIVE_FIRST.contains(&s.as_str()));
         if !first_is_native {
             std::env::set_var("RDSH_SHARED_FILES", "[]");
             let scfg = rdsh_config::load();
@@ -855,9 +854,7 @@ fn shadowing_original() -> bool {
         .map(|p| {
             p.split(':').any(|dir| {
                 let cand = format!("{dir}/dsh");
-                std::fs::canonicalize(&cand)
-                    .map(|c| c == me)
-                    .unwrap_or(false)
+                std::fs::canonicalize(&cand).is_ok_and(|c| c == me)
             })
         })
         .unwrap_or(false)
