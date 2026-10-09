@@ -5,6 +5,7 @@ import { renderConnectionDiagnostics } from "./connection-diagnostics-ui.mjs";
 import { createInstructionPanel } from "./instruction-queue-ui.mjs";
 import { createCostPanel } from "./cost-ledger-ui.mjs";
 import { renderBudget } from "./budget-ui.mjs";
+import { createTaskOutcomesPanel } from "./task-outcomes-ui.mjs";
 
 const $ = (id) => document.getElementById(id);
 const base = location.pathname.startsWith("/_rdsh") ? "/_rdsh/" : "/";
@@ -174,6 +175,11 @@ const renderInstructions = createInstructionPanel($("instruction-panel"), {
   refreshState,
 });
 const renderCosts = createCostPanel($("cost-ledger"), node);
+const renderTaskOutcomes = createTaskOutcomesPanel(
+  $("tasks"),
+  $("task-milestones"),
+  { node, api },
+);
 function render(state) {
   if (state.revision < renderedRevision) return;
   renderedRevision = state.revision;
@@ -236,37 +242,14 @@ function render(state) {
       number(m.auto_continues),
       `拒否 ${number(m.refusals)} · APIエラー ${number(m.api_errors)}`,
     ),
-    card("タスク", `${done} / ${state.tasks.length}`, counts),
+    card(
+      "作業の申告",
+      `${done} / ${state.tasks.length}`,
+      counts + " · 件数は受入条件の達成率ではありません",
+    ),
     card("未回答の質問", String(pending.length), `回答済み ${answered}`),
   );
-  $("task-milestones").textContent = [
-    ...new Set(state.tasks.map((task) => task.milestone).filter(Boolean)),
-  ].join(" / ");
-  $("tasks").replaceChildren(
-    ...state.tasks.map((task) => {
-      // #57: 端末を替えても同じ行へ戻れる安定アンカー。
-      const tr = node("tr");
-      tr.id = "task-" + task.id;
-      const status = node("td");
-      status.append(node("span", task.status, "status " + task.status));
-      tr.append(
-        node("td", task.id, "id"),
-        status,
-        node("td", task.title),
-        node("td", task.blocker),
-      );
-      const taskLink = node("a", task.id);
-      taskLink.href = "#task-" + encodeURIComponent(task.id);
-      taskLink.dataset.taskId = task.id;
-      tr.children[0].replaceChildren(taskLink);
-      [...tr.children].forEach((cell, index) => {
-        cell.dataset.label = ["ID", "状態", "題名", "ブロック要因"][index];
-      });
-      return tr;
-    }),
-  );
-  if (!state.tasks.length)
-    $("tasks").append(emptyRow("タスクはまだ登録されていません", 4));
+  renderTaskOutcomes(state);
   renderQuestionCards($("questions"), unanswered, state.question_contracts, {
     node,
     api,
