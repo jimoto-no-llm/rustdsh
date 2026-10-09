@@ -6,6 +6,7 @@ import { renderConnectionDiagnostics } from "./connection-diagnostics-ui.mjs";
 import { createInstructionPanel } from "./instruction-queue-ui.mjs";
 import { createCostPanel } from "./cost-ledger-ui.mjs";
 import { renderBudget } from "./budget-ui.mjs";
+import { createNotificationPanel } from "./notifications-ui.mjs";
 
 const $ = (id) => document.getElementById(id);
 const base = location.pathname.startsWith("/_rdsh") ? "/_rdsh/" : "/";
@@ -53,6 +54,7 @@ function navigateTo(id) {
   if (!target) return;
   for (let parent = target.parentElement; parent; parent = parent.parentElement)
     if (parent.tagName === "DETAILS") parent.open = true;
+  if (target.tagName === "DETAILS") target.open = true;
   target.tabIndex = -1;
   target.focus();
   target.scrollIntoView({ block: "start" });
@@ -142,12 +144,18 @@ const renderInstructions = createInstructionPanel($("instruction-panel"), {
   api,
   refreshState,
 });
+const renderNotifications = createNotificationPanel({
+  api,
+  refreshState,
+  navigateTo,
+});
 const renderCosts = createCostPanel($("cost-ledger"), node);
 function render(state) {
   if (state.revision < renderedRevision) return;
   renderedRevision = state.revision;
   latestState = state;
   renderInstructions(state);
+  renderNotifications(state);
   renderCosts(state);
   renderBudget($("budget-admission"), state, node);
   updateOverview(state);

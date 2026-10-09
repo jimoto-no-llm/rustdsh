@@ -184,7 +184,33 @@ export class ProjectStore {
           : input.title || "指標を更新";
     if (operation) {
       next.changes ||= [];
-      next.changes.push({
+      let notification;
+      if (operation === "task") {
+        const previous = this.value.tasks.find((task) => task.id === input.id);
+        const current = next.tasks.find((task) => task.id === input.id);
+        if (current)
+          notification = {
+            kind: "task_status",
+            previous_status: previous?.status ?? null,
+            status: current.status,
+            previous_title: previous?.title ?? "",
+            title: current.title,
+            previous_blocker: previous?.blocker ?? "",
+            blocker: current.blocker,
+          };
+      } else if (
+        operation === "question" &&
+        input.decision === undefined &&
+        input.action === undefined &&
+        input.expected_revision === undefined
+      ) {
+        const question = next.questions.find((item) => item.id === input.id);
+        if (question)
+          notification = { kind: "question_waiting", urgency: question.urgency };
+      } else if (operation === "answer") {
+        notification = { kind: "question_answered" };
+      }
+      const change = {
         eventId: `evt_${this.project.id}_${next.revision}`,
         name: names[operation],
         timestamp: next.updated_at,
@@ -195,7 +221,9 @@ export class ProjectStore {
           summary: String(summary).slice(0, 1000),
         },
         cursor: null,
-      });
+      };
+      if (notification) change.notification = notification;
+      next.changes.push(change);
       next.changes = next.changes.slice(-10000);
     }
     await writeJson(path.join(this.project.directory, "state.json"), next);

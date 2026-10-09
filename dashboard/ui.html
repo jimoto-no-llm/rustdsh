@@ -528,6 +528,51 @@
         overflow-wrap: anywhere;
         font-size: 13px;
       }
+      .notification-list {
+        display: grid;
+        gap: 10px;
+      }
+      .notification-item[data-delivery-state="held"] {
+        border-left: 4px solid #bd7b00;
+      }
+      .notification-heading,
+      .notification-actions {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .notification-heading {
+        justify-content: space-between;
+      }
+      .notification-badge {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 2px 9px;
+        color: var(--mut);
+        font-size: 12px;
+      }
+      .notification-controls {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+        align-items: end;
+        gap: 12px;
+      }
+      .notification-controls label {
+        display: grid;
+        gap: 5px;
+      }
+      .notification-controls input,
+      .notification-controls select {
+        box-sizing: border-box;
+        width: 100%;
+        min-width: 0;
+        padding: 8px;
+        font: inherit;
+      }
+      .notification-controls input[type="checkbox"] {
+        width: auto;
+      }
       footer {
         margin-top: 24px;
         color: var(--mut);
@@ -815,6 +860,46 @@
             <dd id="overview-stop">この画面からの停止は非対応</dd>
           </dl>
           <ul id="overview-pending"></ul>
+        </section>
+        <section id="notification-panel" aria-labelledby="notifications-heading">
+          <h2 id="notifications-heading" tabindex="-1">通知</h2>
+          <p id="notifications-summary" class="sub" role="status" aria-live="polite">
+            通知を読み込み中…
+          </p>
+          <div id="notifications" class="notification-list"></div>
+          <details class="fold">
+            <summary>通知設定</summary>
+            <p class="sub">
+              重要度の低い進捗・数値報告は初期状態でまとめて省きます。静かな時間中はcritical以外を保留します。既読はこのプロジェクトを開く端末間で共有します。
+            </p>
+            <form id="notification-settings">
+              <div class="notification-controls">
+                <label for="notification-minimum">最低重要度
+                  <select id="notification-minimum" name="minimum_importance">
+                    <option value="low">低</option>
+                    <option value="normal">通常</option>
+                    <option value="high">高</option>
+                    <option value="critical">最重要</option>
+                  </select>
+                </label>
+                <label>
+                  <span>静かな時間</span>
+                  <span><input id="notification-quiet-enabled" type="checkbox"> 有効にする</span>
+                </label>
+                <label for="notification-quiet-start">開始
+                  <input id="notification-quiet-start" type="time" value="22:00">
+                </label>
+                <label for="notification-quiet-end">終了
+                  <input id="notification-quiet-end" type="time" value="08:00">
+                </label>
+                <label for="notification-time-zone">タイムゾーン
+                  <input id="notification-time-zone" type="text" maxlength="100" autocomplete="off">
+                </label>
+              </div>
+              <p id="notification-settings-status" class="sub" role="status" aria-live="polite"></p>
+              <button type="submit">設定を保存</button>
+            </form>
+          </details>
         </section>
         <h2 id="pending-heading" tabindex="-1">未回答の質問</h2>
         <p class="sub" id="pending-note">

@@ -341,6 +341,27 @@ multi-user roles. Removing a ChatGPT connection must also revoke its subscriptio
 or stop the dashboard. Full Dot subscription/trigger validation requires a real
 ChatGPT plugin connection; local protocol tests alone do not establish that.
 
+## Project notification inbox
+
+The human-authenticated project dashboard also provides a local notification
+inbox. It prioritizes unanswered questions, explicitly recorded failed or
+succeeded run transitions, and blocked or completed task reports. A task's
+`done` status remains a report rather than acceptance proof, and a process exit,
+disconnect, or unknown run state does not become a failure or completion alert.
+Repeated reports for the same task and status, and events for the same run, are
+grouped with their source event IDs and a bounded run-event summary.
+
+Progress and metrics are grouped into one low-importance item per category and
+filtered by the default `normal` importance. The inbox distinguishes filtered,
+quiet-hours-held, ready, unread and read states; `critical` questions bypass
+quiet hours. Quiet hours use the configured IANA time zone. Read state and
+preferences are stored in the project's private dashboard state directory, so
+they are shared by browsers for that project. The inbox is part of the dashboard
+and does not create OS push notifications or change the native MCP Events
+subscription, expiry, signature or retry contract. If the run-history journal
+cannot be read, the dashboard says run notifications are unconfirmed while
+continuing to show other inbox items.
+
 ### Connect a private server using Secure MCP Tunnel
 
 Tailscale provides the phone/browser connection. A cloud Dot also needs an MCP

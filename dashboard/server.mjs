@@ -11,6 +11,8 @@ import { createMcpServer } from "./mcp.mjs";
 import { enableShare, inspectShare } from "./tailscale.mjs";
 import { startHarness, proxyHarness, upgradeHarness } from "./harness.mjs";
 import { EventsHub } from "./webhooks.mjs";
+import { NotificationInbox } from "./notifications.mjs";
+import { RunHistory } from "./run-history.mjs";
 import { modernMcpHandler } from "./mcp2.mjs";
 import { AnswerApplicationServer } from "./answer-application-server.mjs";
 import { BudgetAdmissionServer } from "./budget-server.mjs";
@@ -87,12 +89,14 @@ export async function startDashboard(options) {
   const connections = new ConnectionObservations();
   const localUrl = `http://127.0.0.1:${port}/`;
   const cookieName = `rdsh_${kind === "project" ? project.id : "harness"}`;
-  let store, eventsHub;
+  let store, eventsHub, notificationInbox, runHistory;
   try {
     store = kind === "project" ? await ProjectStore.open(project) : null;
     eventsHub = store
       ? await EventsHub.open(project, () => store.value, options.webhookPost)
       : null;
+    notificationInbox = store ? await NotificationInbox.open(project) : null;
+    runHistory = store ? new RunHistory(project) : null;
   } catch (error) {
     await fs.unlink(lockFile);
     throw error;
@@ -103,13 +107,61 @@ export async function startDashboard(options) {
   const applications = store
     ? new AnswerApplicationServer(project, () => store.value, mutateReply)
     : null;
-  const visibleState = async () =>
-    publicState(
-      store.value,
+  let runHistoryCache = null;
+  const readRunHistory = async () => {
+    let stat;
+    try {
+      stat = await fs.stat(runHistory.file);
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+      const history = await runHistory.read();
+      runHistoryCache = { size: 0, mtimeMs: null, history };
+      return history;
+    }
+    if (
+      runHistoryCache?.size === stat.size &&
+      runHistoryCache.mtimeMs === stat.mtimeMs
+    ) {
+      if (runHistoryCache.error) throw runHistoryCache.error;
+      return runHistoryCache.history;
+    }
+    try {
+      const history = await runHistory.read();
+      runHistoryCache = { size: stat.size, mtimeMs: stat.mtimeMs, history };
+      return history;
+    } catch (error) {
+      runHistoryCache = { size: stat.size, mtimeMs: stat.mtimeMs, error };
+      throw error;
+    }
+  };
+  const visibleState = async (includeNotifications = false) => {
+    const current = store.value;
+    const state = publicState(
+      current,
       await applications.observations(),
       eventsHub.deliveries(),
       budgets.observations(),
     );
+    if (!includeNotifications || !notificationInbox) return state;
+    let historyEvents = [],
+      runHistoryStatus = "available";
+    try {
+      const history = await readRunHistory();
+      historyEvents = history.events;
+      if (history.tail_bytes) runHistoryStatus = "incomplete";
+    } catch {
+      runHistoryStatus = "unavailable";
+    }
+    return {
+      ...state,
+      notifications: notificationInbox.snapshot(
+        current,
+        Date.now(),
+        historyEvents,
+        runHistoryStatus,
+      ),
+    };
+  };
   const budgets = store ? new BudgetAdmissionServer(mutateBudget) : null;
   const modern = store
     ? modernMcpHandler(
@@ -438,6 +490,7 @@ export async function startDashboard(options) {
           route === "/instruction-queue-ui.mjs" ||
           route === "/cost-ledger-ui.mjs" ||
           route === "/budget-ui.mjs" ||
+          route === "/notifications-ui.mjs" ||
           route === "/favicon.ico" ||
           route === "/icon.png" ||
           route === "/icon.svg");
@@ -535,6 +588,7 @@ export async function startDashboard(options) {
           "/instruction-queue-ui.mjs",
           "/cost-ledger-ui.mjs",
           "/budget-ui.mjs",
+          "/notifications-ui.mjs",
         ].includes(route)
       ) {
         res.writeHead(200, {
@@ -714,8 +768,47 @@ export async function startDashboard(options) {
             await mutate("question", { ...input, action: "cancel" }),
           );
         }
+        if (
+          req.method === "POST" &&
+          ["/api/notifications/read", "/api/notifications/preferences"].includes(route)
+        ) {
+          if (!humanAuthorized || !notificationInbox)
+            return json(res, 403, { error: "Human browser credential required" });
+          const input = await readBody(req, 8192);
+          try {
+            let history;
+            try {
+              history = await readRunHistory();
+            } catch {
+              return json(res, 503, { error: "run_history_unavailable" });
+            }
+            const result =
+              route === "/api/notifications/read"
+                ? await notificationInbox.markRead(
+                    input,
+                    store.value,
+                    history.events,
+                    history.tail_bytes ? "incomplete" : "available",
+                  )
+                : await notificationInbox.updatePreferences(
+                    input,
+                    store.value,
+                    history.events,
+                    history.tail_bytes ? "incomplete" : "available",
+                  );
+            return json(res, 200, result);
+          } catch (error) {
+            const status =
+              error.code === "notification_changed"
+                ? 409
+                : error.code === "notification_not_found"
+                  ? 404
+                  : 400;
+            return json(res, status, { error: error.code || "Invalid notification request" });
+          }
+        }
         if (req.method === "GET" && route === "/api/state")
-          return json(res, 200, await visibleState());
+          return json(res, 200, await visibleState(humanAuthorized));
         if (req.method === "POST" && route?.startsWith("/api/update/")) {
           const operation = route.slice("/api/update/".length);
           if (
