@@ -375,6 +375,8 @@ before/after output checks are described in [BENCHMARKS.md](docs/BENCHMARKS.md).
 DeepSeek Harness provides the upstream runtime; without it, rustdsh would not exist.
 Thanks to the upstream developers and everyone contributing code, reviews, tests and ideas.
 
+- Icon by [PENTACoXIAN](https://x.com/PENTACoXIAN)
+
 - [GrEarl](https://github.com/GrEarl) and [PENTACoXIAN](https://x.com/PENTACoXIAN): security reports and review.
 - [StudioYebisu](https://github.com/yebisu0529-ship-it), [RNA4219](https://github.com/RNA4219), and [eightman999](https://github.com/eightman999): contributions and improvement reports.
 - [@remydre8](https://x.com/remydre8): ideas and product suggestions.
