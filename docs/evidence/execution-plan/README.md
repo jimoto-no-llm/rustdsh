@@ -4,6 +4,18 @@ Issue [#15](https://github.com/jimoto-no-llm/rustdsh/issues/15).
 Runtime source: `b9059072dc8117c940e333917397e2c17c7e6bbb`.
 Main baseline: `7a7435b292497bd9992e63bf900bd20ffa97f999`.
 The subsequent commit adds evidence and isolated reproduction scripts only.
+The [native matrix follow-up](native-matrix.json), tested at
+`e1d3405242a12e222be738b1eb978e07e36b5b60`, changes three fixture/test files and
+leaves runtime source unchanged. All 12 native tests pass on Windows and Linux,
+each with Node 22.23.3 and Node 24 (24.18.0 Windows, 24.21.0 Linux).
+
+Initial Node 22 CI exposed two clock-dependent assertions: a 100 ms cancellation
+timer could fire before child creation, and a cumulative start count was asserted
+as a concurrency count even after an earlier child was correctly disposed.
+The concurrent fixture now keeps children pending until original Workflow
+disposal, records the actual peak active handles, and confirms two children plus
+the third refusal. Cancellation waits for the original host's `childResult`
+subscription after child publication. No runtime limit was relaxed.
 
 ## Actual before/after outputs
 

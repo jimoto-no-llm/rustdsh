@@ -1,0 +1,20 @@
+✔ audited source rejects changed bytes and leaves original packages intact (426.004169ms)
+✔ native Workflow result and task done alone do not start a dependent child (497.131115ms)
+✔ native parallel children cannot exceed durable concurrency (395.177367ms)
+✔ native duplicate and undeclared task starts are refused before provider (556.771348ms)
+✔ missing metadata, direct subagent and continuable entry points fail closed (788.093323ms)
+✔ providers outside the audited in-process spawn seam are rejected before factory (248.942061ms)
+✔ persisted native delegation depth and parent identity are checked before start (438.024156ms)
+✔ native failure stops further starts and failed disposal keeps a held claim (612.265224ms)
+✔ deadline is checked after guest body begins and before native provider dispatch (1966.34444ms)
+✔ native cancellation preserves the Workflow disposal lifecycle (295.511948ms)
+✔ tracked ACP resume attaches the guard before send and leaves default process behavior unchanged (976.072828ms)
+✔ losing the bound index blocks attachment rather than resuming without enforcement (55.907022ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7379.979282
