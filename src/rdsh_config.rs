@@ -1224,7 +1224,10 @@ mod rdsh_config_tests {
         let mut c = RdshSettings::default();
         // get
         assert_eq!(c.get_dotted("search.max").unwrap(), serde_json::json!(100));
-        assert!(c.get_dotted("beta.context_engine").unwrap().as_bool() == Some(false));
+        assert_eq!(
+            c.get_dotted("beta.context_engine").unwrap().as_bool(),
+            Some(false)
+        );
         // set: 数値・真偽・文字・配列
         c.set_dotted("search.max", "42").unwrap();
         assert_eq!(c.search.max, 42);
