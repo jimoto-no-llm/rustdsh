@@ -60,8 +60,9 @@ async function windowsLongDirectory(directory) {
     throw new GpuError("gpu_directory_untrusted");
   return buffer.toString("utf16le", 0, length * 2);
 }
-export async function gpuDirectory(directory) {
-  await fs.mkdir(directory, { recursive: true, mode: 0o700 });
+// Receipt readers validate an existing directory without creating missing
+// state. Writers use the same alias/reparse checks after ensuring it exists.
+export async function inspectGpuDirectory(directory) {
   const stat = await fs.lstat(directory);
   const real = path.resolve(await fs.realpath(directory)),
     requested = path.resolve(directory);
@@ -74,6 +75,10 @@ export async function gpuDirectory(directory) {
       : real !== requested)
   )
     throw new GpuError("gpu_directory_untrusted");
+}
+export async function gpuDirectory(directory) {
+  await fs.mkdir(directory, { recursive: true, mode: 0o700 });
+  await inspectGpuDirectory(directory);
 }
 async function regular(file) {
   try {

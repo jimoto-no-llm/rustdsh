@@ -45,8 +45,29 @@ async function waitFor(check, timeout = 10000) {
   }
   throw new Error("GPU fixture did not reach the expected state");
 }
-async function setup(t) {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-gpu-"));
+async function setup(t, { shortPaths = false } = {}) {
+  const fixtureRoot = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-gpu-"));
+  let root = fixtureRoot,
+    hasShortAlias = false;
+  if (shortPaths) {
+    const { default: koffi } = await import("koffi");
+    const shortPath = koffi
+      .load("kernel32.dll")
+      .func(
+        "uint32_t __stdcall GetShortPathNameW(str16 path, void *buffer, uint32_t size)",
+      );
+    const buffer = Buffer.alloc(65536);
+    const length = shortPath(
+      path.toNamespacedPath(fixtureRoot),
+      buffer,
+      buffer.length / 2,
+    );
+    assert(length > 0 && length < buffer.length / 2);
+    root = buffer.toString("utf16le", 0, length * 2);
+    hasShortAlias =
+      root.toLowerCase() !==
+      path.toNamespacedPath(await fs.realpath(fixtureRoot)).toLowerCase();
+  }
   const cwd = path.join(root, "project");
   await fs.mkdir(cwd);
   await exec("git", ["-C", cwd, "init", "-b", "gpu-qa"]);
@@ -103,9 +124,12 @@ async function setup(t) {
     }
     const failures = results.filter((result) => result.status === "rejected");
     if (failures.length) throw failures[0].reason;
-    assert.equal(path.dirname(path.resolve(root)), path.resolve(os.tmpdir()));
-    assert(path.basename(root).startsWith("rdsh-gpu-"));
-    await fs.rm(root, { recursive: true, force: true });
+    assert.equal(
+      path.dirname(path.resolve(fixtureRoot)),
+      path.resolve(os.tmpdir()),
+    );
+    assert(path.basename(fixtureRoot).startsWith("rdsh-gpu-"));
+    await fs.rm(fixtureRoot, { recursive: true, force: true });
   });
   async function worker() {
     const child = fork(workerFile, [], {
@@ -121,6 +145,7 @@ async function setup(t) {
   }
   return {
     root,
+    hasShortAlias,
     project,
     env,
     leases,
@@ -666,8 +691,17 @@ test("expired heartbeat cannot release an alive owner or an unbound launch with 
   assert.equal((await leases.read()).leases.length, 1);
 });
 
-test("root absence and PID reuse need a matching durable kernel-empty receipt", async (t) => {
-  const { project, leases } = await setup(t);
+async function durableReceipt(t, options) {
+  const {
+    root: fixtureRoot,
+    project,
+    leases,
+    hasShortAlias,
+  } = await setup(t, options);
+  if (options?.shortPaths && !hasShortAlias) {
+    t.skip("The fixture volume does not provide an 8.3 alias");
+    return;
+  }
   const history = await RunHistory.open(project),
     id = run();
   const acquired = await leases.acquire({
@@ -720,10 +754,33 @@ test("root absence and PID reuse need a matching durable kernel-empty receipt", 
     history.file,
     bytes.subarray(0, bytes.lastIndexOf(10) + 1),
   );
+  // A receipt read must neither recreate a missing project directory nor
+  // follow a junction/symlink to accept a receipt from a redirected directory.
+  const relocated = path.join(fixtureRoot, "relocated-history");
+  await fs.rename(project.directory, relocated);
+  assert.equal((await leases.reconcile()).checked[0].status, "retained");
+  await assert.rejects(fs.access(project.directory), { code: "ENOENT" });
+  await fs.symlink(
+    relocated,
+    project.directory,
+    process.platform === "win32" ? "junction" : "dir",
+  );
+  assert.equal((await leases.reconcile()).checked[0].status, "retained");
+  await fs.unlink(project.directory);
+  await fs.rename(relocated, project.directory);
   const result = await leases.reconcile();
   assert.equal(result.checked[0].status, "released");
   assert.equal(result.checked[0].reason, "recorded_kernel_group_empty");
-});
+}
+
+test("root absence and PID reuse need a matching durable kernel-empty receipt", (t) =>
+  durableReceipt(t));
+
+test(
+  "Windows 8.3 project paths reclaim only a matching durable kernel-empty receipt",
+  { skip: process.platform !== "win32" },
+  (t) => durableReceipt(t, { shortPaths: true }),
+);
 
 test("corrupt or hard-linked ledger fails before native dispatch", async (t) => {
   const { project, leases, ledger, command, env } = await setup(t);

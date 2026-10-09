@@ -10,7 +10,11 @@ import {
   matchProcessIdentity,
 } from "./process-identity.mjs";
 import { GpuError, gpuRequest, observeGpu } from "./gpu-telemetry.mjs";
-import { gpuDirectory, lockGpuLedger } from "./gpu-lock.mjs";
+import {
+  gpuDirectory,
+  inspectGpuDirectory,
+  lockGpuLedger,
+} from "./gpu-lock.mjs";
 
 const maximum = 512 * 1024;
 const activeLimit = 128,
@@ -414,17 +418,7 @@ export class GpuLeases {
         "projects",
         lease.project_id,
       );
-      const stat = await fs.lstat(directory);
-      const real = path.resolve(await fs.realpath(directory)),
-        requested = path.resolve(directory);
-      if (
-        !stat.isDirectory() ||
-        stat.isSymbolicLink() ||
-        (process.platform === "win32"
-          ? real.toLowerCase() !== requested.toLowerCase()
-          : real !== requested)
-      )
-        return false;
+      await inspectGpuDirectory(directory);
       const fileStat = await fs.lstat(
         path.join(directory, "run-history.jsonl"),
       );
