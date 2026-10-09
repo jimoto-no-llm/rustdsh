@@ -702,13 +702,24 @@ fn scan_selected(provider: Option<&str>, source: Option<&str>, key_ref: Option<&
 
 /// Best-effort mirror before delegating to dsh (boot/dump/plugin/raw).
 /// Never fails: a broken store must not break launching. When `banner` is
-/// set, a no-connection state also prints the first-run guidance once —
-/// both from a single `scan()`, instead of re-crawling the stores.
+/// set, a no-connection state also prints the first-run guidance once.
+/// Fast path: banner decision needs only env + credentials doc (same result
+/// as setup_needed_in), so external codex/opencode scans are skipped here.
+/// Same stderr bytes out, 3 file reads + parses saved per boot.
 pub fn pre_boot(banner: bool) {
-    let s = scan();
-    if banner && setup_needed_in(&s) {
-        print_first_boot_banner();
+    if !banner {
+        return;
     }
+    for k in KNOWN_ENV_KEYS {
+        if env_key_set(k) {
+            return;
+        }
+    }
+    let doc = load_doc(&creds_path());
+    if !doc.grants.is_empty() || !doc.refs.is_empty() {
+        return;
+    }
+    print_first_boot_banner();
 }
 
 /// Import missing-or-older grants/refs from a pre-computed scan. Quiet mode

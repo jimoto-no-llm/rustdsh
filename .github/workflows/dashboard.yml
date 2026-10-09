@@ -43,3 +43,47 @@ jobs:
             --wait --pipe --collect --property=Delegate=yes \
             --property=DelegateSubgroup=supervisor --uid="$(id -u)" \
             --working-directory="$PWD" /usr/bin/env HOME="$HOME" PATH="$PATH" npm test
+
+  fault-simulator:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: dashboard
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+      - run: npm ci
+      - if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory ../fault-simulator-results | Out-Null
+          node fault-simulator.mjs run --seed 1 --output ../fault-simulator-results/run
+          $faultRunCode = $LASTEXITCODE
+          node fault-simulator.mjs replay --manifest ../fault-simulator-results/run/input.json --output ../fault-simulator-results/replay
+          $faultReplayCode = $LASTEXITCODE
+          node fault-simulator.mjs run --scenario disk_full --seed 0 --output ../fault-simulator-results/write-full
+          if ($faultRunCode -ne 0 -or $faultReplayCode -ne 0 -or $LASTEXITCODE -ne 0) { exit 1 }
+      - if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          mkdir ../fault-simulator-results
+          sudo systemd-run --unit="rdsh-fault-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --wait --pipe --collect --property=Delegate=yes \
+            --property=DelegateSubgroup=supervisor --uid="$(id -u)" \
+            --working-directory="$PWD" /usr/bin/env HOME="$HOME" PATH="$PATH" \
+            bash -c 'set -eu; node fault-simulator.mjs run --seed 1 --output ../fault-simulator-results/run; node fault-simulator.mjs replay --manifest ../fault-simulator-results/run/input.json --output ../fault-simulator-results/replay; node fault-simulator.mjs run --scenario disk_full --seed 0 --output ../fault-simulator-results/write-full'
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: fault-simulator-${{ matrix.os }}
+          path: fault-simulator-results/
+          if-no-files-found: error

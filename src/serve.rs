@@ -17,7 +17,7 @@ pub fn cmd_serve(port: u16) -> anyhow::Result<()> {
     let port = listener.local_addr()?.port();
     let token = Arc::new(crate::local_http::random_token()?);
     eprintln!(
-        "[rdsh] dashboard: http://127.0.0.1:{port}/#key={token}  (Ctrl-C to stop, localhost only)"
+        "[rdsh] dashboard: http://127.0.0.1:{port}/#key={token}  (Ctrl-C to stop, localhost only; this URL is a credential — do not share it)"
     );
     let connections = Arc::new(AtomicUsize::new(0));
     for stream in listener.incoming() {
@@ -76,7 +76,7 @@ fn handle(mut s: std::net::TcpStream, token: &str, port: u16) -> anyhow::Result<
         Some(i) => (&target[..i], &target[i + 1..]),
         None => (target, ""),
     };
-    if path.starts_with("/api/") && path != "/api/version" && !req.authorized(token) {
+    if path.starts_with("/api/") && !req.authorized(token) {
         crate::local_http::respond(
             &mut s,
             401,
