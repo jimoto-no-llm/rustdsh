@@ -597,17 +597,17 @@ fn lockdown_creds_file(path: &str) -> anyhow::Result<()> {
     if user.is_empty() || user.len() > 256 {
         anyhow::bail!("unexpected whoami output");
     }
-    let st = std::process::Command::new("icacls")
+    let output = std::process::Command::new("icacls")
         .arg(path)
         .arg("/inheritance:r")
         .arg("/grant:r")
         .arg(format!("{user}:F"))
-        .status()
+        .output()
         .map_err(|e| anyhow::anyhow!("icacls unavailable: {e}"))?;
-    if st.success() {
+    if output.status.success() {
         Ok(())
     } else {
-        anyhow::bail!("icacls exited {st}")
+        anyhow::bail!("icacls exited {}", output.status)
     }
 }
 
@@ -1067,33 +1067,35 @@ fn prompt_line(prompt: &str) -> Option<String> {
     }
 }
 
-/// Secret prompt with echo disabled (Unix TTY only). Falls back to echoed
-/// input when echo cannot be controlled; non-Unix keeps prompt_line.
+/// Secret prompt with echo disabled (Unix TTY only). Skip when echo cannot
+/// be controlled; non-Unix explicitly labels its echoed input.
 /// Always restores the terminal mode before returning.
 #[cfg(unix)]
-fn prompt_secret(prompt: &str) -> Option<String> {
+fn prompt_secret() -> Option<String> {
     use std::io::IsTerminal as _;
     use std::os::fd::AsRawFd;
     if !std::io::stdin().is_terminal() {
         return None;
     }
-    eprint!("{prompt}");
-    use std::io::Write as _;
-    let _ = std::io::stderr().flush();
     let fd = std::io::stdin().as_raw_fd();
     // SAFETY: tcgetattr/tcsetattr on our own stdin fd; restored below.
     let mut old: libc::termios = unsafe { std::mem::zeroed() };
-    let mut silenced = false;
-    if unsafe { libc::tcgetattr(fd, &mut old) } == 0 {
-        let mut new = old;
-        new.c_lflag &= !libc::ECHO;
-        silenced = unsafe { libc::tcsetattr(fd, libc::TCSANOW, &new) } == 0;
+    if unsafe { libc::tcgetattr(fd, &mut old) } != 0 {
+        eprintln!("[rdsh setup] cannot hide input; skipping key paste");
+        return None;
     }
+    let mut new = old;
+    new.c_lflag &= !libc::ECHO;
+    if unsafe { libc::tcsetattr(fd, libc::TCSANOW, &new) } != 0 {
+        eprintln!("[rdsh setup] cannot hide input; skipping key paste");
+        return None;
+    }
+    eprint!("[rdsh setup] paste DEEPSEEK_API_KEY here (Enter to skip, input hidden): ");
+    use std::io::Write as _;
+    let _ = std::io::stderr().flush();
     let mut s = String::new();
     let res = std::io::stdin().read_line(&mut s);
-    if silenced {
-        unsafe { libc::tcsetattr(fd, libc::TCSANOW, &old) };
-    }
+    unsafe { libc::tcsetattr(fd, libc::TCSANOW, &old) };
     eprintln!();
     if res.is_err() {
         return None;
@@ -1107,8 +1109,8 @@ fn prompt_secret(prompt: &str) -> Option<String> {
 }
 
 #[cfg(not(unix))]
-fn prompt_secret(prompt: &str) -> Option<String> {
-    prompt_line(prompt)
+fn prompt_secret() -> Option<String> {
+    prompt_line("[rdsh setup] paste DEEPSEEK_API_KEY here (Enter to skip, input echoed): ")
 }
 
 fn prompt_yes(prompt: &str) -> bool {
@@ -1501,9 +1503,7 @@ pub fn cmd_setup(open: bool, login: bool, json: bool, yes: bool) -> anyhow::Resu
     {
         use std::io::IsTerminal as _;
         if !json && !yes && std::io::stdin().is_terminal() && setup_needed_in(&s) {
-            if let Some(pasted) = prompt_secret(
-                "[rdsh setup] paste DEEPSEEK_API_KEY here (Enter to skip, input hidden): ",
-            ) {
+            if let Some(pasted) = prompt_secret() {
                 match store_ref("DEEPSEEK_API_KEY", &pasted) {
                     Ok(true) => {
                         known_refs.insert("DEEPSEEK_API_KEY".to_string());
