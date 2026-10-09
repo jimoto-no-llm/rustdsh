@@ -1376,8 +1376,16 @@ try {
       });
   } else throw new Error("Unknown command; use --help");
 } catch (e) {
-  if (process.connected) process.send({ error: e.message });
+  if (process.connected)
+    process.send({
+      error: e.message,
+      ...(e.trayDiagnostics ? { tray_diagnostics: e.trayDiagnostics } : {}),
+    });
   if (e.report) console.log(JSON.stringify(e.report, null, 2));
   else console.error(`[rdsh-dashboard] ${e.message}`);
+  if (e.trayDiagnostics)
+    console.error(
+      `[rdsh-dashboard] tray diagnostics: ${JSON.stringify(e.trayDiagnostics)}`,
+    );
   process.exitCode = e.code === "gpu_waiting_resource" ? 75 : 1;
 }
