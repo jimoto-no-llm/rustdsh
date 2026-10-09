@@ -246,7 +246,7 @@ $("share-refresh").addEventListener("click", async () => {
 });
 // #61: コマンドパレット。既存操作への別導線であり、権限・状態チェックや
 // 確認は各操作側（回答フォームなど）で行い、ここで迂回しない。
-// 入力欄での誤発動を避け、Esc・Ctrl/⌘+K・元フォーカス復帰だけを扱う。
+// 入力欄での誤発動を避け、検索・選択・取消しとフォーカス復帰を扱う。
 const paletteCommands = [
   {
     id: "toggle-share",
@@ -287,9 +287,36 @@ const paletteCommands = [
   },
 ];
 let paletteReturnFocus = null;
+let paletteMatches = [];
+let paletteSelectedIndex = -1;
+let paletteCommandAfterClose = null;
+function setPaletteSelection(index) {
+  if (!paletteMatches.length) {
+    paletteSelectedIndex = -1;
+    $("palette-search").removeAttribute("aria-activedescendant");
+    $("palette-count").textContent = "該当なし";
+    return;
+  }
+  paletteSelectedIndex = (index + paletteMatches.length) % paletteMatches.length;
+  const command = paletteMatches[paletteSelectedIndex];
+  const options = $("palette-list").querySelectorAll('[role="option"]');
+  options.forEach((option, optionIndex) =>
+    option.setAttribute(
+      "aria-selected",
+      String(optionIndex === paletteSelectedIndex),
+    ),
+  );
+  $("palette-search").setAttribute(
+    "aria-activedescendant",
+    `palette-option-${command.id}`,
+  );
+  $("palette-count").textContent =
+    `${paletteSelectedIndex + 1} / ${paletteMatches.length} 件 · ` +
+    `${command.ja} · ${command.en}`;
+}
 function renderPalette(filter = "") {
   const query = filter.trim().toLowerCase();
-  const matched = paletteCommands.filter(
+  paletteMatches = paletteCommands.filter(
     (command) =>
       !query ||
       (command.ja + " " + command.en + " " + command.keys)
@@ -297,26 +324,37 @@ function renderPalette(filter = "") {
         .includes(query),
   );
   $("palette-list").replaceChildren(
-    ...matched.map((command) => {
-      const item = node("li");
-      const button = node("button", command.ja + " · " + command.en);
-      button.type = "button";
-      button.addEventListener("click", () => {
-        $("palette").close();
-        command.run();
+    ...paletteMatches.map((command, index) => {
+      const item = node("li", command.ja + " · " + command.en);
+      item.id = `palette-option-${command.id}`;
+      item.setAttribute("role", "option");
+      item.setAttribute("aria-selected", "false");
+      item.addEventListener("pointermove", () => {
+        if (paletteSelectedIndex !== index) setPaletteSelection(index);
       });
-      item.append(button);
+      item.addEventListener("click", () => activatePalette(index));
       return item;
     }),
   );
-  $("palette-count").textContent = matched.length
-    ? matched.length + " 件"
-    : "該当なし";
+  setPaletteSelection(0);
+}
+function activatePalette(index = paletteSelectedIndex) {
+  const command = paletteMatches[index];
+  if (!command) return;
+  paletteCommandAfterClose = command;
+  $("palette").close();
 }
 function openPalette() {
-  paletteReturnFocus = document.activeElement;
-  renderPalette("");
+  const active = document.activeElement;
+  paletteReturnFocus =
+    active && active !== document.body && active.isConnected
+      ? active
+      : $("palette-toggle");
+  paletteCommandAfterClose = null;
   $("palette-search").value = "";
+  $("palette-search").setAttribute("aria-expanded", "true");
+  $("palette-toggle").setAttribute("aria-expanded", "true");
+  renderPalette("");
   $("palette").showModal();
   $("palette-search").focus();
 }
@@ -324,16 +362,46 @@ $("palette-toggle").addEventListener("click", openPalette);
 $("palette-search").addEventListener("input", (event) =>
   renderPalette(event.target.value),
 );
+$("palette-search").addEventListener("keydown", (event) => {
+  if (event.key === "ArrowDown") {
+    event.preventDefault();
+    setPaletteSelection(paletteSelectedIndex + 1);
+  } else if (event.key === "ArrowUp") {
+    event.preventDefault();
+    setPaletteSelection(paletteSelectedIndex - 1);
+  } else if (event.key === "Enter" && paletteSelectedIndex >= 0) {
+    event.preventDefault();
+    activatePalette();
+  }
+});
 $("palette").addEventListener("close", () => {
-  if (paletteReturnFocus?.focus) paletteReturnFocus.focus();
+  $("palette-search").setAttribute("aria-expanded", "false");
+  $("palette-search").removeAttribute("aria-activedescendant");
+  $("palette-toggle").setAttribute("aria-expanded", "false");
+  const returnFocus = paletteReturnFocus;
+  const command = paletteCommandAfterClose;
+  paletteReturnFocus = null;
+  paletteCommandAfterClose = null;
+  if (returnFocus?.isConnected && returnFocus.focus) returnFocus.focus();
+  command?.run();
 });
 document.addEventListener("keydown", (event) => {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+    if ($("palette").open) {
+      event.preventDefault();
+      $("palette").close();
+      return;
+    }
     const tag = document.activeElement?.tagName;
-    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+    if (
+      tag === "INPUT" ||
+      tag === "TEXTAREA" ||
+      tag === "SELECT" ||
+      document.activeElement?.isContentEditable
+    )
+      return;
     event.preventDefault();
-    if ($("palette").open) $("palette").close();
-    else openPalette();
+    openPalette();
   }
 });
 try {

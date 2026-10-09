@@ -605,9 +605,20 @@
         display: grid;
         gap: 6px;
       }
-      #palette-list button {
-        width: 100%;
-        text-align: left;
+      #palette-list [role="option"] {
+        min-height: 44px;
+        padding: 9px 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      #palette-list [role="option"][aria-selected="true"] {
+        border-color: var(--blue);
+        background: #edf1f7;
+      }
+      #palette-list [role="option"]:focus-visible {
+        outline: 2px solid var(--blue);
+        outline-offset: 2px;
       }
       @media (max-width: 1000px) {
         .cards {
@@ -716,6 +727,7 @@
             id="palette-toggle"
             aria-haspopup="dialog"
             aria-controls="palette"
+            aria-expanded="false"
           >
             コマンド
           </button>
@@ -902,17 +914,22 @@
       <dialog id="palette" aria-labelledby="palette-title">
         <h2 id="palette-title">コマンド</h2>
         <p class="sub">
-          日本語・英語で絞り込めます。Escで閉じて元の位置に戻ります。
+          日本語・英語で絞り込み、↑↓で選択・Enterで実行できます。Escで閉じて元の位置に戻ります。
         </p>
         <input
           id="palette-search"
           type="search"
+          role="combobox"
           aria-label="コマンドを絞り込む"
+          aria-autocomplete="list"
+          aria-haspopup="listbox"
+          aria-controls="palette-list"
+          aria-expanded="false"
           placeholder="例: 共有 / share"
           autocomplete="off"
         />
         <p class="sub" id="palette-count" role="status"></p>
-        <ul id="palette-list"></ul>
+        <ul id="palette-list" role="listbox" aria-label="操作候補"></ul>
       </dialog>
       <dialog id="managed-stop-dialog" aria-labelledby="managed-stop-title">
         <h2 id="managed-stop-title">停止する対象を確認</h2>
