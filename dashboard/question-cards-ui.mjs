@@ -1,3 +1,5 @@
+import { deepLinkButton } from "./deep-link-ui.mjs";
+
 const statusNames = {
   open: "回答待ち",
   answered: "回答を保存済み",
@@ -25,7 +27,7 @@ export function renderQuestionCards(
   container,
   questions,
   contracts,
-  { node, api, refreshState },
+  { node, api, refreshState, makeDeepLink },
 ) {
   const drafts = new Map(
     [...container.querySelectorAll("form")].map((form) => {
@@ -79,7 +81,10 @@ export function renderQuestionCards(
         ),
         node("span", `${question.id} · ${question.urgency}`, "sub"),
       );
-      article.append(heading, node("h3", question.question));
+      article.append(heading);
+      const link = deepLinkButton(node, makeDeepLink, "question", question.id, `質問 ${question.id}`);
+      if (link) article.append(link);
+      article.append(node("h3", question.question));
       if (contract) {
         article.append(
           node(

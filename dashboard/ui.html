@@ -524,6 +524,16 @@
         margin: 6px 0;
         white-space: pre-wrap;
       }
+      .deep-link-control {
+        display: inline-flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+        margin: 4px 8px 4px 0;
+      }
+      .deep-link-control button {
+        min-height: 36px;
+      }
       .event code {
         overflow-wrap: anywhere;
         font-size: 13px;
@@ -727,6 +737,7 @@
       <div id="connection" class="sub" role="status" aria-live="polite">
         接続中…
       </div>
+      <p id="deep-link-status" class="sub" role="status" aria-live="polite"></p>
       <section class="share" id="share" hidden>
         <div>
           <img
@@ -745,9 +756,7 @@
             >利用設定を開く</a
           >
           <p class="sub">
-            同じTailscaleネットワークに接続した端末から開けます。このPCでダッシュボードを起動しておいてください。タスク・質問の各行には
-            #task-&lt;id&gt;・#question-&lt;id&gt;
-            の目印があり、端末を替えても同じ対象へ戻れます。対象の表示と端末の認証は別の役割で、未認証の端末は認証を終えるまで内容・操作へ進めません。
+            同じTailscaleネットワークに接続した端末から開けます。このPCでダッシュボードを起動しておいてください。各タスク・質問・session・進捗報告の「リンクをコピー」から同じproject内の対象へ戻れます。リンクには認証情報を含めず、端末認証はQRのpairingで別に行います。認証が必要なリンクはpairing後に元の対象へ戻ります。
           </p>
           <div id="mcp-info" class="sub"></div>
         </div>
