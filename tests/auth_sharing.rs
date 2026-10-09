@@ -97,6 +97,35 @@ fn one_time_key_reference_does_not_enable_automatic_copying() {
     assert_eq!(imported["sharing"]["autosync_enabled"], false);
 }
 
+#[test]
+fn one_time_key_reference_rejects_unlisted_names_without_writing() {
+    let fixture = Fixture::new();
+    fixture.seed();
+    let output = fixture.run(&[
+        "auth",
+        "--import",
+        "--source",
+        "codex",
+        "--ref",
+        "UNKNOWN_SECRET_REF",
+        "--json",
+    ]);
+    assert!(!output.status.success());
+    let text = public_output(&output);
+    assert!(text.contains("no credential sharing selected"));
+    for secret in [
+        CODEX_ACCESS,
+        CODEX_REFRESH,
+        CODEX_KEY,
+        OPENCODE_ACCESS,
+        OPENCODE_REFRESH,
+    ] {
+        assert!(!text.contains(secret));
+    }
+    assert!(!fixture.root.join("dsh/.credentials.yaml").exists());
+    assert!(!fixture.root.join("dsh/rdsh-auth-sharing.json").exists());
+}
+
 struct Fixture {
     root: PathBuf,
 }
