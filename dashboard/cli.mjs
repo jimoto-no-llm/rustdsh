@@ -33,6 +33,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { Releases } from "./releases.mjs";
+import { IntegrationQueue } from "./integration.mjs";
 import {
   loopbackBase,
   recordTunnel,
@@ -63,6 +64,10 @@ rdsh-dashboard cost-ledger declare|report --project <directory> --input-file <js
 rdsh-dashboard cost-ledger inspect --project <directory>
 rdsh-dashboard budget policy|usage --project <directory> --input-file <json>
 rdsh-dashboard budget inspect --project <directory>
+rdsh-dashboard integration init --project <directory> --input-file <checks-json> --expected-revision 0 --expected-head <sha>
+rdsh-dashboard integration enqueue|reject --project <directory> --input-file <json> --expected-revision <n>
+rdsh-dashboard integration inspect --project <directory>
+rdsh-dashboard integration apply|validate|retarget --project <directory> --expected-revision <n> --expected-head <sha>
 rdsh-dashboard backup preview|export --project <directory> --selection-file <json> [--review-file <json>] [--output-file <new-json>]
 rdsh-dashboard backup inspect --archive-file <json>
 rdsh-dashboard backup restore --project <directory> --archive-file <json> --expected-revision <n>
@@ -135,6 +140,7 @@ const { values, positionals } = parseArgs({
     "archive-file": { type: "string" },
     "output-file": { type: "string" },
     "expected-revision": { type: "string" },
+    "expected-head": { type: "string" },
     "archive-id": { type: "string" },
     "release-id": { type: "string" },
     "selection-revision": { type: "string" },
@@ -291,11 +297,17 @@ try {
       "review-file",
       "archive-file",
       "output-file",
-      "expected-revision",
       "archive-id",
     ].some((k) => values[k] !== undefined)
   )
     throw new Error("Backup options require backup");
+  if (
+    values["expected-revision"] !== undefined &&
+    !["backup", "integration"].includes(command)
+  )
+    throw new Error("Backup options require backup");
+  if (values["expected-head"] !== undefined && command !== "integration")
+    throw new Error("Integration options require integration");
   if (
     values["budget-guard"] !== undefined ||
     values["worker-id"] !== undefined
@@ -496,6 +508,58 @@ try {
       } else result = await backupRequest(project, "history");
     }
     console.log(JSON.stringify(result, null, 2));
+  } else if (command === "integration") {
+    const action = positionals[1];
+    const options = {
+      init: ["project", "input-file", "expected-revision", "expected-head"],
+      enqueue: ["project", "input-file", "expected-revision"],
+      reject: ["project", "input-file", "expected-revision"],
+      inspect: ["project"],
+      apply: ["project", "expected-revision", "expected-head"],
+      validate: ["project", "expected-revision", "expected-head"],
+      retarget: ["project", "expected-revision", "expected-head"],
+    };
+    if (
+      positionals.length !== 2 ||
+      !Object.hasOwn(options, action) ||
+      Object.keys(values).some((key) => !options[action].includes(key))
+    )
+      throw new Error("Invalid integration action/options");
+    const queue = await IntegrationQueue.open(
+      await identity(values.project || process.cwd()),
+    );
+    if (
+      action !== "inspect" &&
+      !/^\d+$/.test(values["expected-revision"] || "")
+    )
+      throw new Error("Specify --expected-revision");
+    const expected = {
+      expectedRevision: Number(values["expected-revision"]),
+      expectedHead: values["expected-head"],
+    };
+    let result;
+    if (action === "inspect") result = await queue.inspect();
+    else if (["enqueue", "reject"].includes(action))
+      result = await queue[action](
+        await localJson(values["input-file"]),
+        expected.expectedRevision,
+      );
+    else if (action === "init")
+      result = await queue.init(
+        await localJson(values["input-file"]),
+        expected,
+      );
+    else result = await queue[action](expected);
+    console.log(JSON.stringify(result));
+    if (
+      (action === "init" && result.queue.state !== "ready") ||
+      (action === "apply" &&
+        result.queue.entries.some((row) =>
+          ["conflict", "unconfirmed"].includes(row.state),
+        )) ||
+      (action === "validate" && !result.validation.verified)
+    )
+      process.exitCode = 1;
   } else if (command === "cost-ledger") {
     const action = positionals[1],
       allowed = new Set(["project", "input-file", "help"]);
