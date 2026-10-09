@@ -90,6 +90,15 @@ fn split_base(base: &str) -> anyhow::Result<(String, u16, String)> {
     Ok((host.to_string(), port, prefix))
 }
 
+/// Loopback check for the SearXNG warning: 127/8, ::1 and localhost names.
+/// Bracketed IPv6 literals (as kept by split_base) are unwrapped first.
+fn is_loopback_host(host: &str) -> bool {
+    let h = host.strip_prefix('[').and_then(|s| s.strip_suffix(']')).unwrap_or(host);
+    h == "localhost"
+        || h.parse::<std::net::Ipv4Addr>().is_ok_and(|ip| ip.is_loopback())
+        || h.parse::<std::net::Ipv6Addr>().is_ok_and(|ip| ip.is_loopback())
+}
+
 #[derive(Debug, Clone, PartialEq)]
 struct Hit {
     title: String,
@@ -275,6 +284,11 @@ fn fetch(base: &str, query: &str) -> anyhow::Result<Vec<Hit>> {
     use std::io::{Read, Write};
     use std::net::ToSocketAddrs;
     let (host, port, prefix) = split_base(base)?;
+    if !is_loopback_host(&host) {
+        // Plain-http to a non-loopback host is observable on the network.
+        // Advisory only: remote instances stay usable via an SSH tunnel.
+        eprintln!("[rdsh] warning: SearXNG host {host} is not loopback; prefer an SSH tunnel to localhost");
+    }
     let target = format!("{prefix}/search?q={}", encode_query(query));
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
     let mut stream = None;
@@ -292,7 +306,14 @@ fn fetch(base: &str, query: &str) -> anyhow::Result<Vec<Hit>> {
         anyhow::anyhow!("cannot reach SearXNG at {base}; is it running? SEARXNG_URL overrides")
     })?;
     let ua = format!("rdsh/{}", env!("CARGO_PKG_VERSION"));
-    let request = format!("GET {target} HTTP/1.0\r\nHost: {host}\r\nUser-Agent: {ua}\r\nAccept: text/html\r\nConnection: close\r\n\r\n");
+    // Virtual-hosted instances need the port to route; the default port is
+    // omitted per convention. Bracketed IPv6 literals pass through as-is.
+    let host_header = if port == 80 {
+        host.clone()
+    } else {
+        format!("{host}:{port}")
+    };
+    let request = format!("GET {target} HTTP/1.0\r\nHost: {host_header}\r\nUser-Agent: {ua}\r\nAccept: text/html\r\nConnection: close\r\n\r\n");
     let mut pending = request.as_bytes();
     while !pending.is_empty() {
         let remaining = deadline.saturating_duration_since(std::time::Instant::now());
@@ -488,6 +509,18 @@ mod tests {
         assert_eq!(hits.unwrap()[0].title, "DUMMY_RESULT");
         assert!(request.starts_with("GET /prefix/search?q=hello%0D%0AInjected%3A+yes HTTP/1.0\r\n"));
         assert!(!request.contains("\r\nInjected:"));
+        // Ephemeral port: the Host header must carry it for vhost routing.
+        assert!(request.contains(&format!("\r\nHost: {address}\r\n")));
+    }
+
+    #[test]
+    fn loopback_classification() {
+        for good in ["127.0.0.1", "127.1.2.3", "localhost", "::1", "[::1]"] {
+            assert!(is_loopback_host(good), "{good:?}");
+        }
+        for bad in ["192.168.1.1", "10.0.0.1", "example.com", "", "127.0.0.1:8888"] {
+            assert!(!is_loopback_host(bad), "{bad:?}");
+        }
     }
 
     #[test]

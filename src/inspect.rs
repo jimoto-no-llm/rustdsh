@@ -773,6 +773,9 @@ fn session_decompressed_bytes_uncached(
 /// sequence of frames — the caller then streams `zstd -dc` instead.
 fn zstd_frame_content_size(path: &std::path::Path) -> Option<u64> {
     const MAGIC: u32 = 0xFD2F_B528;
+    if !plain_file_no_follow(path) {
+        return None;
+    }
     // Prefix sniff first: session logs are streaming-written with the size
     // omitted, so most files are decided from the first frame header alone
     // instead of reading megabytes just to discard them.
@@ -904,8 +907,19 @@ fn zstd_frame_content_size(path: &std::path::Path) -> Option<u64> {
 /// or an omitted frame content size. Anything indecisive (short/truncated
 /// prefix, skippable first frame) returns false so the full walk decides.
 /// Output-identical by construction: it only shortcuts definite rejections.
+/// Revalidate a session entry right before measuring it: collection already
+/// skipped non-regular files without following links, but a link swapped in
+/// afterwards must be neither read nor handed to `zstd`. Callers treat the
+/// resulting None as inexact/skipped, never as zero.
+fn plain_file_no_follow(path: &std::path::Path) -> bool {
+    std::fs::symlink_metadata(path).is_ok_and(|m| m.file_type().is_file())
+}
+
 fn first_frame_denies_size(path: &std::path::Path) -> bool {
     const MAGIC: u32 = 0xFD2F_B528;
+    if !plain_file_no_follow(path) {
+        return false;
+    }
     let prefix: Vec<u8> = match std::fs::File::open(path) {
         Ok(mut f) => {
             use std::io::Read;
@@ -972,6 +986,9 @@ fn now_secs() -> u64 {
 
 /// (mtime_ms, bytes) for cache identity; None when the file is unreadable.
 fn file_meta(path: &std::path::Path) -> Option<(u64, u64)> {
+    if !plain_file_no_follow(path) {
+        return None;
+    }
     let md = std::fs::metadata(path).ok()?;
     let mtime = md
         .modified()
@@ -984,6 +1001,9 @@ fn file_meta(path: &std::path::Path) -> Option<(u64, u64)> {
 
 fn stream_decompressed_bytes(path: &std::path::Path) -> Option<u64> {
     use std::io::Read;
+    if !plain_file_no_follow(path) {
+        return None;
+    }
     let mut child = std::process::Command::new("zstd")
         .arg("-dc")
         .arg("--")
@@ -1020,6 +1040,12 @@ fn stream_decompressed_bytes(path: &std::path::Path) -> Option<u64> {
 fn stream_many_decompressed_bytes(paths: &[&std::path::PathBuf]) -> Option<u64> {
     use std::io::Read;
     if paths.is_empty() {
+        return None;
+    }
+    // A single swapped-in link must fail the whole batch (not silently drop
+    // one file): the caller falls back to the per-file loop, which marks the
+    // round inexact. Returning a partial sum would overstate exactness.
+    if paths.iter().any(|p| !plain_file_no_follow(p)) {
         return None;
     }
     let mut child = std::process::Command::new("zstd")
@@ -1509,5 +1535,30 @@ mod tests {
             }
         }
         assert!(checked > 0, "expected real session fixtures");
+    }
+}
+
+#[cfg(all(test, unix))]
+mod measurement_gate_tests {
+    use super::{file_meta, plain_file_no_follow, stream_decompressed_bytes};
+
+    #[test]
+    fn links_swapped_in_after_collection_are_not_measured() {
+        let dir = std::env::temp_dir().join(format!(
+            "rdsh-measure-gate-{}",
+            crate::local_http::random_token().unwrap()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let real = dir.join("real.txt");
+        std::fs::write(&real, b"hello").unwrap();
+        assert!(plain_file_no_follow(&real));
+        assert!(file_meta(&real).is_some());
+        let link = dir.join("link.txt");
+        std::os::unix::fs::symlink("/dev/null", &link).unwrap();
+        assert!(!plain_file_no_follow(&link));
+        assert!(file_meta(&link).is_none());
+        // /dev/null would stream zero bytes successfully; the gate must stop it.
+        assert!(stream_decompressed_bytes(&link).is_none());
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

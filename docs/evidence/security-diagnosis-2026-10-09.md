@@ -92,3 +92,22 @@ Strix: 1.7.0でquickスキャンを試行しましたが、LLMブリッジ上流
 5. `search-web` のhttps対応または文書化（Info-2）
 
 重いスタックは常駐させていません。Decepticon/PentAGIは未起動、ARTEX未使用、Strixコンテナはpreflight失敗で停止済みです。追加の侵入検証が必要になったら、対象・期間・禁止事項を決めてARTEX等で回すのがおすすめです。完了状態は「診断・報告済み、修正は未適用」です。
+
+## 5. 追加診断と残件対応（第2ラウンド、同日）
+
+opencode（muse-spark）による追加監査の指摘を精査し、妥当なものを修正しました。監査指摘の一部（計測系の「リンク追従で任意読み」等）は既存ガード済みで誇張があり、実害のある形（収集後の差し替え）に絞って対策しています。
+
+- H-2 Windowsの認証情報ACL: `src/auth.rs` の `write_creds` に `lockdown_creds_file`（icaclsで継承剥離＋現ユーザーのみ）を追加。失敗時は警告して保存は維持。`cargo check --target x86_64-pc-windows-gnu` でコンパイル確認
+- M-1 guard回避の構造的限界: `src/guard.rs` に境界注記（deny-listは気休めで、重要操作はtool isolation依存）と空deny警告を追加。意味論的回避の完全除去は不可のため文書化で対応
+- M-2 実行対象の差し替え: `src/auth.rs` の `which_bin` を通常ファイル＋実行ビット必須に。`src/passthrough.rs` はenv/origin明示選択が他者所有・緩い権限・非通常ファイルの場合に警告（選択自体は維持）
+- M-3 APIキー入力のecho: `src/auth.rs` にUnix TTY限定の `prompt_secret`（termiosでECHO抑止・必ず復元）を追加し、ペースト入力に使用。非Unixは従来動作
+- M-4 インストーラ署名: `install.sh` の2箇所のcurlに `--proto '=https' --tlsv1.2` を追加（rustup行と同等化）。署名検証（sigstore等）は未導入のためsidecar同梱配布の旨を注記
+- M-5 search-webの非loopback平文: `src/websearch.rs` の `fetch` で非loopbackホストにSSHトンネル推奨の警告。`split_base` の既存拒否（https拒否・空ホスト拒否）は維持
+- M-6 計測系の差し替え読み: `src/inspect.rs` の5経路（header走査・先頭確認・file_meta・単体stream・複数stream）に `plain_file_no_follow`（symlink_metadataで通常ファイル再確認）ゲートを追加。複数streamは1件でも不審なら全体Noneでinexact側に倒す。単体テスト追加
+- L-1 Hostヘッダのport欠落: `src/websearch.rs` で非80番は `host:port` 形式に。既存テストを拡張してfixtureのephemeral portで検証
+- L-2 store上限の不統一: `src/auth.rs` の `store_ref` にweb経路と同じ512文字上限を追加
+- L-3 share-fileのRust側検証: `src/file_security.rs` に `validate_share_files`（空・絶対・親逃げ・NUL・257件超を拒否）を追加し、`src/main.rs` でexit 2のfail-fast。JS側の厳密検証は維持
+- L-4 env汚染の可視化: `src/auth.rs` の `auth`/`setup` で `DSH_HOME` がenv由来の場合に実効値を明示
+- L-5 インストーラ判定の脆さ: `install.sh` のrestore/as-dsh判定を `--version` バナー照合に変更。wrapper走査は直下・通常ファイル・64KB未満に限定（macOS互換の `xargs -0` 方式）
+
+検証: `cargo test` 108件通過（新規5件含む）、`bash -n install.sh` 正常、Windowsターゲットcheck正常。完了状態は「残件対応済み、同一PRへpush予定」です。

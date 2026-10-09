@@ -11,6 +11,9 @@
 //   shared minimally per call, not broad secrets dumped into the prompt.
 // - #30 approval ledger: JSON mode emits a block decision or no decision (`{}`).
 //   Deny-list misses must never bypass the host's approval policy.
+// - Boundary note: this is a best-effort misoperation guard, not a sandbox.
+//   Patterns are bypassable by construction (case, splitting, aliases), so
+//   critical operations must rely on tool isolation, not on deny-list hits.
 
 pub fn wildcard_match(pattern: &str, text: &str) -> bool {
     if pattern == "*" || pattern.is_empty() {
@@ -91,6 +94,9 @@ fn block(msg: &str, json_out: bool) {
 pub fn cmd_guard(deny: Vec<String>, reason: Option<String>, json_out: bool) -> anyhow::Result<()> {
     use std::io::Read;
     const MAX_INPUT: u64 = 1024 * 1024;
+    if deny.iter().all(|p| p.trim().is_empty()) {
+        eprintln!("[rdsh guard] warning: no deny patterns configured; this hook is a best-effort aid, not a security boundary");
+    }
     let mut raw = String::new();
     if std::io::stdin()
         .take(MAX_INPUT + 1)
