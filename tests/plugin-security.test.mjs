@@ -34,14 +34,19 @@ test('plugin security boundary and settings preservation', async (t) => {
   const routes = new Map();
   const ctx = {
     effect: (effect) => effect(),
+    on: () => () => {},
+    inject(names, setup) {
+      const dispose = names.every(name => this[name]) ? setup(this) : undefined;
+      return { dispose: async () => { if (typeof dispose === 'function') await dispose(); } };
+    },
     webServer: { register(route) { routes.set(route.path, route.handler); return () => routes.delete(route.path); } },
     connection: { requestRejection(req) { return req.rejection; } },
   };
-  assert.ok(settings.inject.includes('connection'));
+  assert.deepEqual(settings.inject, []);
   assert.ok(updates.inject.includes('connection'));
   const disposeSettings = settings.apply(ctx, {});
   const disposeUpdates = updates.apply(ctx, { demo: true });
-  t.after(() => { disposeSettings(); disposeUpdates(); });
+  t.after(async () => { await disposeSettings(); disposeUpdates(); });
 
   async function request(path, { rejection, method = 'GET', body = '{}' } = {}) {
     const req = Readable.from([Buffer.from(body)]);
@@ -49,7 +54,7 @@ test('plugin security boundary and settings preservation', async (t) => {
     let status, output;
     const res = { writeHead(code) { status = code; }, end(value) { output = value; } };
     await routes.get(path)(req, res);
-    return { status, body: JSON.parse(output), consumed: req.readableEnded };
+    return { status, body: Buffer.isBuffer(output) ? output : output === undefined ? undefined : JSON.parse(output), consumed: req.readableEnded };
   }
 
   const original = {
@@ -65,8 +70,8 @@ test('plugin security boundary and settings preservation', async (t) => {
   const initialSettings = await readFile(settingsFile, 'utf8');
   const initialContext = await readFile(contextFile, 'utf8');
 
-  await t.test('all eight routes reject before body consumption or side effects', async () => {
-    assert.equal(routes.size, 8);
+  await t.test('all ten routes reject before body consumption or side effects', async () => {
+    assert.equal(routes.size, 10);
     for (const rejection of [401, 403]) {
       for (const path of routes.keys()) {
         for (const method of ['GET', 'HEAD', 'POST']) {
@@ -97,6 +102,14 @@ test('plugin security boundary and settings preservation', async (t) => {
     assert.equal(JSON.parse(await readFile(contextFile, 'utf8')).goal, 'new legacy goal');
     assert.equal((await request('/api/rdsh-update/run', { method: 'POST' })).status, 200);
     assert.equal(updateCalls, 1);
+  });
+
+  await t.test('the authenticated icon serves the supplied PNG exactly and supports HEAD', async () => {
+    const supplied = await readFile(new URL('../plugins/rdsh-settings/assets/rushDSH.png', import.meta.url));
+    const icon = await request('/api/rdsh-discord/icon');
+    assert.equal(icon.status, 200); assert.deepEqual(icon.body, supplied);
+    assert.equal((await request('/api/rdsh-discord/icon', { method: 'HEAD' })).body, undefined);
+    assert.equal((await request('/api/rdsh-discord/icon', { method: 'POST' })).status, 405);
   });
 
   await t.test('round-trip and partial saves preserve keys outside the form', async () => {

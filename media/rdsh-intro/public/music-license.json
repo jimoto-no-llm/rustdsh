@@ -1,0 +1,25 @@
+{
+  "track": {
+    "title": "Chill Wave",
+    "filename": "Chill Wave.mp3",
+    "length": "00:04:00",
+    "instruments": "Synths, Bass, Drum, Guitar",
+    "genre": "8",
+    "bpm": "100",
+    "description": "I was looking for a subject to analogize the depth of my knowledge for the Chill Wave genre of music. Wikipedia was there for me with entire things that I didn't even know were things; Randle Cotgrave! Yeon Namgeon!  Digital Mammographic Imaging! Rebelj, Serbia! In brief... I know nothing about Chill Wave. Hope you enjoy the fruits of ignorance!",
+    "feel": "Grooving, Relaxed",
+    "uploaded": "2016-08-20",
+    "isrc": "USUAN1600048",
+    "collection": "7",
+    "sheetmusic": null,
+    "video": "https://youtu.be/TRiBpYgjFD4",
+    "itunes": "https://itunes.apple.com/us/album/chill-wave/id1187877605?i=1187877610",
+    "filmmusicURL": "https://incompetech.filmmusic.io/song/3498-chill-wave/"
+  },
+  "license": "CC BY 4.0",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "source_url": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1600048",
+  "download_url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Chill%20Wave.mp3",
+  "changes": "Excerpt from 24s; trimmed to 44s, faded, level adjusted and overlaid with original UI sound effects",
+  "latest_edit": "24-second excerpt starting at 24s; the approved 44-second bed is preserved sample-for-sample, with only a new ending fade and retimed original UI sounds"
+}
