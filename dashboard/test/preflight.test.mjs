@@ -198,7 +198,8 @@ test("required WSL checks the named distribution only on Windows and preserves n
       platform: "win32",
       exec: async (file, args, options) => {
         calls++;
-        assert.equal(file, "wsl.exe");
+        assert.ok(path.win32.isAbsolute(file), file);
+        assert.equal(path.win32.basename(file), "wsl.exe");
         assert.deepEqual(args, ["-d", "FixtureWSL", "--exec", "/bin/true"]);
         assert.equal(options.shell, false);
         return { stdout: "peer-secret-not-for-report" };
