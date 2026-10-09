@@ -16,10 +16,14 @@ pub fn cmd_setup_web(port: u16) -> anyhow::Result<()> {
     let token = Arc::new(crate::local_http::random_token()?);
     // The fragment never leaves the browser as part of an HTTP request.
     let url = format!("http://127.0.0.1:{port}/#key={token}");
-    eprintln!("[rdsh setup] floating UI: {url}  (localhost only, Ctrl-C to stop)");
+    eprintln!("[rdsh setup] floating UI: {url}  (localhost only, Ctrl-C to stop; this URL is a credential — do not share it)");
     use std::io::IsTerminal as _;
     if std::io::stdin().is_terminal() {
-        if let Err(e) = crate::auth::open_browser(&url) {
+        // argv is visible to other local users via ps, so the token
+        // fragment must not travel there. Open the base URL only; the
+        // page explains how to complete it from the terminal output.
+        let base = format!("http://127.0.0.1:{port}/");
+        if let Err(e) = crate::auth::open_browser(&base) {
             eprintln!("[rdsh setup] could not open browser ({e:#}); open the URL manually");
         }
     }

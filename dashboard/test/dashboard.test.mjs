@@ -226,7 +226,21 @@ test("project state, HTTP/stdio MCP, subscriptions, answers, and auth work toget
     total_cost_usd: 90.71,
     total_budget_usd: 300,
     session_id: "test-only",
+    observation: {
+      kind: "measured",
+      source: "integration fixture usage report",
+      observed_at: new Date(Date.now() - 1000).toISOString(),
+      session_id: "test-only",
+      reference: "fixture-request-1",
+    },
   });
+  const reported = await call("dashboard_get_state", {});
+  assert.equal(reported.metric_observations.total_cost_usd.kind, "measured");
+  assert.equal(reported.metric_observations.total_cost_usd.session_id, "test-only");
+  assert.equal(reported.metric_observations.total_cost_usd.reference, "fixture-request-1");
+  const observationAsset = await fetch(dashboard.localUrl + "observations.mjs");
+  assert.equal(observationAsset.status, 200);
+  assert.match(observationAsset.headers.get("content-type"), /javascript/);
   await call("dashboard_upsert_task", {
     id: "M3.6",
     title: "A test task",
@@ -311,6 +325,7 @@ test("project state, HTTP/stdio MCP, subscriptions, answers, and auth work toget
   );
   const persisted = await ProjectStore.open(alpha);
   assert.equal(persisted.value.questions[0].answer, "Approved for test");
+  assert.deepEqual(persisted.value.metric_observations, dashboard.store.value.metric_observations);
   await assert.rejects(
     () => startDashboard({ project: alpha, port: 39099, tailscale: false }),
     /already running/,

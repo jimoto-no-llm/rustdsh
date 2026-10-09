@@ -1,0 +1,9 @@
+{
+  "name": "rdsh-workflow-board-source-patch",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Verified DSH workflow member board source patch for rdsh",
+  "license": "MIT",
+  "scripts": { "test": "node --test tests/source-patch.test.mjs" }
+}

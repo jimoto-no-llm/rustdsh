@@ -1,0 +1,33 @@
+{
+  "name": "rdsh-intro-video",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "capture": "node scripts/capture.mjs",
+    "studio": "remotion studio src/sharp.tsx",
+    "render": "remotion render src/sharp.tsx RdshSharp out/rdsh-intro-sharp-4k-ja.mp4 --codec=h264 --crf=15 --concurrency=3",
+    "render:classic": "remotion render src/index.tsx RdshIntro out/rdsh-intro-ja.mp4 --codec=h264 --crf=18 --concurrency=4",
+    "verify": "python3 scripts/verify.py --sharp",
+    "typecheck": "tsc --noEmit",
+    "render:stylish": "remotion render src/stylish.tsx RdshStylish out/rdsh-intro-stylish-ja.mp4 --codec=h264 --crf=18 --concurrency=3",
+    "audio": "python3 scripts/sharp-audio.py",
+    "render:original": "remotion render src/original.tsx RdshOriginal out/rdsh-intro-original-ja.mp4 --codec=h264 --crf=18 --concurrency=4",
+    "audio:original": "python3 scripts/original-audio.py",
+    "capture:sharp": "RDSH_VIDEO_CAPTURE_DIR=../public/sharp RDSH_VIDEO_DPR=6 node scripts/capture.mjs"
+  },
+  "dependencies": {
+    "@react-three/fiber": "9.8.1",
+    "@remotion/cli": "4.0.534",
+    "@remotion/three": "4.0.534",
+    "@remotion/transitions": "4.0.534",
+    "@types/three": "0.183.1",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "remotion": "4.0.534",
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.0",
+    "typescript": "5.9.3"
+  }
+}
