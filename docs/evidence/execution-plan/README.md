@@ -1,7 +1,7 @@
 # Bounded execution plan evidence
 
 Issue [#15](https://github.com/jimoto-no-llm/rustdsh/issues/15).
-Runtime source: `b9059072dc8117c940e333917397e2c17c7e6bbb`.
+Original frozen runtime source: `b9059072dc8117c940e333917397e2c17c7e6bbb`.
 Main baseline: `7a7435b292497bd9992e63bf900bd20ffa97f999`.
 The subsequent commit adds evidence and isolated reproduction scripts only.
 The [native matrix follow-up](native-matrix.json), tested at
@@ -16,6 +16,17 @@ The concurrent fixture now keeps children pending until original Workflow
 disposal, records the actual peak active handles, and confirms two children plus
 the third refusal. Cancellation waits for the original host's `childResult`
 subscription after child publication. No runtime limit was relaxed.
+
+The [current canonical-project correction](canonical-project-qa.json) was tested
+at `d4320ebff395e2d93618ba8dcc29b629430d238e`. Windows CI at the earlier head
+refused an otherwise valid fixture cwd whose case differed from `realpath`.
+Plan binding now uses the repository's existing canonical project identity,
+including Windows case folding. A different, missing or relative cwd still
+refuses before binding; a new test covers those cases and the same-directory
+case variant. All 207 dashboard tests pass on Windows/Node 22.23.3; Linux/Node
+22.23.3 passes 202 with five Windows-only skips. The 12 native tests also pass
+on both operating systems with Node 22 and 24. The earlier Rust and browser
+evidence below retains its original source identity; those sources did not change.
 
 ## Actual before/after outputs
 

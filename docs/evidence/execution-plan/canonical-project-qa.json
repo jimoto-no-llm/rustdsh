@@ -1,0 +1,63 @@
+{
+  "schema": 1,
+  "result": "PASS",
+  "source_head": "d4320ebff395e2d93618ba8dcc29b629430d238e",
+  "previous_head": "3097def672c30651afca6b332b42a610bfe6e743",
+  "change": "native cwd binding uses the existing realpath and Windows case-folded project identity; different, missing and relative cwd still refused",
+  "windows_dashboard": {
+    "node": "v22.23.3",
+    "tests": 207,
+    "pass": 207,
+    "fail": 0,
+    "skipped": 0
+  },
+  "linux_dashboard": {
+    "node": "v22.23.3",
+    "tests": 207,
+    "pass": 202,
+    "fail": 0,
+    "skipped": 5
+  },
+  "native": {
+    "windows_node22.23.3": {
+      "tests": 12,
+      "pass": 12,
+      "fail": 0,
+      "skipped": 0
+    },
+    "windows_node24.18.0": {
+      "tests": 12,
+      "pass": 12,
+      "fail": 0,
+      "skipped": 0
+    },
+    "linux_node22.23.3": {
+      "tests": 12,
+      "pass": 12,
+      "fail": 0,
+      "skipped": 0
+    },
+    "linux_node24.21.0": {
+      "tests": 12,
+      "pass": 12,
+      "fail": 0,
+      "skipped": 0
+    }
+  },
+  "earlier_runtime_checks": "verification.json",
+  "scope": "current full dashboard and native tests; earlier Rust and UI checks retain their original source identity; no provider, model or credential use",
+  "outputs": [
+    {
+      "path": "canonical-project-windows.txt",
+      "sha256": "d8aab9e1578c63c3359cddd37a8c6a65519e41d8c255d0fcb67a0e460dfc2224",
+      "original_sha256": "362553f668275de2cf47f722261d462cdb3e8f55ca2b88791be3836c29528e7b",
+      "normalization": "start at actual TAP stdout; omit unrelated launcher stderr prefix; UTF8 LF and trailing whitespace only"
+    },
+    {
+      "path": "canonical-project-linux.txt",
+      "sha256": "946baf55145af4633fee215f82f3e555fb7a001399fc9644c612acc72ee680bd",
+      "original_sha256": "33512580db948dab5a50fac04e27e3b4a5d1549caeee08faff7a301349617e8c",
+      "normalization": "start at actual TAP stdout; omit unrelated launcher stderr prefix; UTF8 LF and trailing whitespace only"
+    }
+  ]
+}
