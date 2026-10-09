@@ -1,5 +1,5 @@
-# These two existing author profiles return HTTP 403 to automated clients.
+# These existing author profiles return HTTP 403 to automated clients.
 # Keep checking all other URLs, including GitHub release and support links.
 exclude = [
-    '^https://x[.]com/(studio_yebisu|remydre8)/?$',
+    '^https://x[.]com/(studio_yebisu|remydre8|PENTACoXIAN)/?$',
 ]
