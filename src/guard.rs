@@ -131,18 +131,17 @@ fn valid_tool_input(tool: &str, input: &serde_json::Map<String, serde_json::Valu
         _ => return false,
     };
     if input.keys().any(|key| !allowed.contains(&key.as_str()))
-        || input.get("file_path").and_then(serde_json::Value::as_str).is_none()
+        || input
+            .get("file_path")
+            .and_then(serde_json::Value::as_str)
+            .is_none()
     {
         return false;
     }
     match tool {
-        "Read" => {
-            ["limit", "offset"].iter().all(|key| {
-                input
-                    .get(*key)
-                    .is_none_or(|value| value.as_u64().is_some())
-            })
-        }
+        "Read" => ["limit", "offset"]
+            .iter()
+            .all(|key| input.get(*key).is_none_or(|value| value.as_u64().is_some())),
         "Write" => input
             .get("content")
             .and_then(serde_json::Value::as_str)
@@ -167,8 +166,14 @@ fn valid_tool_input(tool: &str, input: &serde_json::Map<String, serde_json::Valu
 fn parse_policy(bytes: &[u8]) -> anyhow::Result<GuardPolicy> {
     anyhow::ensure!(bytes.len() <= 64 * 1024, "policy too large");
     let value: serde_json::Value = serde_json::from_slice(bytes)?;
-    anyhow::ensure!(exact_keys(&value, &["schema", "rules"]), "invalid policy schema");
-    anyhow::ensure!(value["schema"].as_u64() == Some(1), "unsupported policy schema");
+    anyhow::ensure!(
+        exact_keys(&value, &["schema", "rules"]),
+        "invalid policy schema"
+    );
+    anyhow::ensure!(
+        value["schema"].as_u64() == Some(1),
+        "unsupported policy schema"
+    );
     let rules = value["rules"]
         .as_array()
         .ok_or_else(|| anyhow::anyhow!("invalid policy rules"))?;
@@ -189,7 +194,10 @@ fn parse_policy(bytes: &[u8]) -> anyhow::Result<GuardPolicy> {
             .as_str()
             .ok_or_else(|| anyhow::anyhow!("invalid policy tool"))?;
         let access = tool_access(tool).ok_or_else(|| anyhow::anyhow!("unsupported policy tool"))?;
-        anyhow::ensure!(rule["access"].as_str() == Some(access), "policy access mismatch");
+        anyhow::ensure!(
+            rule["access"].as_str() == Some(access),
+            "policy access mismatch"
+        );
         let roots = rule["roots"]
             .as_array()
             .filter(|roots| !roots.is_empty() && roots.len() <= 32)
@@ -712,7 +720,8 @@ mod tests {
         assert!(parse_policy(unknown).is_err());
         let relative = br#"{"schema":1,"rules":[{"id":"bad","tool":"Read","access":"read","roots":["relative"]}]}"#;
         assert!(parse_policy(relative).is_err());
-        let unsupported = br#"{"schema":1,"rules":[{"id":"shell","tool":"Bash","access":"read","roots":["/"]}]}"#;
+        let unsupported =
+            br#"{"schema":1,"rules":[{"id":"shell","tool":"Bash","access":"read","roots":["/"]}]}"#;
         assert!(parse_policy(unsupported).is_err());
     }
 }

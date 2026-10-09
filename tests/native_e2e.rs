@@ -593,7 +593,10 @@ fn cli_tokens_prune_compact_search_logs_guard_and_settings_work_together() {
         .to_string()
     };
     let classify = |input: String| {
-        let result = f.run(&["guard", "--policy-file", policy_path, "--json"], input.as_bytes());
+        let result = f.run(
+            &["guard", "--policy-file", policy_path, "--json"],
+            input.as_bytes(),
+        );
         assert!(
             result.status.success(),
             "structured JSON decision should use stdout: {}",
@@ -630,7 +633,10 @@ fn cli_tokens_prune_compact_search_logs_guard_and_settings_work_together() {
         .to_string(),
     );
     assert_eq!(unsupported_shell["classification"], "unknown");
-    assert_eq!(unsupported_shell["reason"], "shell_command_parse_unsupported");
+    assert_eq!(
+        unsupported_shell["reason"],
+        "shell_command_parse_unsupported"
+    );
     let unsupported_argument = classify(
         json!({
             "cwd": allowed.to_string_lossy(),
@@ -644,7 +650,9 @@ fn cli_tokens_prune_compact_search_logs_guard_and_settings_work_together() {
     let malformed = classify("{broken".to_owned());
     assert_eq!(malformed["classification"], "unknown");
     assert_eq!(malformed["reason"], "invalid_json");
-    assert!(!outside_file.to_string().contains(outside.to_string_lossy().as_ref()));
+    assert!(!outside_file
+        .to_string()
+        .contains(outside.to_string_lossy().as_ref()));
 
     f.ok(&["settings", "set", "search.max", "42"], b"");
     assert!(!f

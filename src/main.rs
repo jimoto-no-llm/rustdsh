@@ -384,7 +384,12 @@ fn main() {
             }
         }
         Some(Commands::Bench { n }) => bench(n.unwrap_or(cfg.bench.n)),
-        Some(Commands::Guard { deny, policy_file, reason, json }) => {
+        Some(Commands::Guard {
+            deny,
+            policy_file,
+            reason,
+            json,
+        }) => {
             let mut merged = cfg.guard.deny.clone();
             merged.extend(deny);
             let reason = reason.or_else(|| {
