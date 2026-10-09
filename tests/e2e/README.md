@@ -54,7 +54,6 @@ bundled Playwright can set `RDSH_PLAYWRIGHT_MODULE` to its module path.
 See [the verification matrix](../../docs/evidence/e2e-20261008.md) for observed
 coverage and remaining environment-specific checks.
 
-
 ## Discord integration
 
 `harness-settings.mjs` also saves/reloads the Discord controls in the original DSH
