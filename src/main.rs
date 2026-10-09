@@ -866,15 +866,12 @@ fn shadowing_original() -> bool {
         return true;
     }
     let me = std::fs::canonicalize(std::env::current_exe().unwrap_or_default()).unwrap_or_default();
-    std::env::var("PATH")
-        .ok()
-        .map(|p| {
-            p.split(':').any(|dir| {
-                let cand = format!("{dir}/dsh");
-                std::fs::canonicalize(&cand).is_ok_and(|c| c == me)
-            })
+    std::env::var("PATH").ok().is_some_and(|p| {
+        p.split(':').any(|dir| {
+            let cand = format!("{dir}/dsh");
+            std::fs::canonicalize(&cand).is_ok_and(|c| c == me)
         })
-        .unwrap_or(false)
+    })
 }
 
 fn bench(n: u32) -> anyhow::Result<()> {
