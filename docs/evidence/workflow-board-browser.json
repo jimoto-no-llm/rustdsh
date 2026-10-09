@@ -1,0 +1,60 @@
+{
+  "source_base": "f97c0438fb1608bbc4c08c88a27344249795ea22",
+  "source_board": "7bd9ac31c23fe369d1fa9a6849869f04967d6ee5",
+  "runtime": "Windows Chrome / production components + scripted records",
+  "installed_server": false,
+  "results": [
+    {
+      "width": 1440,
+      "theme": "light",
+      "state": "PASS",
+      "started_members": 5,
+      "completed_before": 1,
+      "completed_after": 2,
+      "child_catalog": "PASS",
+      "escape_focus": "PASS",
+      "sidebar_selection": "PASS",
+      "horizontal_overflow": false,
+      "page_errors": []
+    },
+    {
+      "width": 1440,
+      "theme": "dark",
+      "state": "PASS",
+      "started_members": 5,
+      "completed_before": 1,
+      "completed_after": 2,
+      "child_catalog": "PASS",
+      "escape_focus": "PASS",
+      "sidebar_selection": "PASS",
+      "horizontal_overflow": false,
+      "page_errors": []
+    },
+    {
+      "width": 390,
+      "theme": "light",
+      "state": "PASS",
+      "started_members": 5,
+      "completed_before": 1,
+      "completed_after": 2,
+      "child_catalog": "PASS",
+      "escape_focus": "PASS",
+      "sidebar_selection": "PASS",
+      "horizontal_overflow": false,
+      "page_errors": []
+    },
+    {
+      "width": 390,
+      "theme": "dark",
+      "state": "PASS",
+      "started_members": 5,
+      "completed_before": 1,
+      "completed_after": 2,
+      "child_catalog": "PASS",
+      "escape_focus": "PASS",
+      "sidebar_selection": "PASS",
+      "horizontal_overflow": false,
+      "page_errors": []
+    }
+  ]
+}

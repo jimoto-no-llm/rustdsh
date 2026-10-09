@@ -56,6 +56,10 @@ if (
       );
     else {
       console.error(`[rdsh-dashboard] ${message.error || "Startup failed"}`);
+      if (message.tray_diagnostics)
+        console.error(
+          `[rdsh-dashboard] tray diagnostics: ${JSON.stringify(message.tray_diagnostics)}`,
+        );
       process.exitCode = 1;
     }
     detach();

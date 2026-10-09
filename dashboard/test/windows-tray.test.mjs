@@ -12,6 +12,7 @@ function fixture(close) {
   const server = new EventEmitter();
   const child = new EventEmitter();
   child.stdout = new PassThrough();
+  child.stderr = new PassThrough();
   child.stdin = new PassThrough();
   child.kill = () => {
     child.killed = true;
@@ -143,6 +144,64 @@ test("failed tray startup cleans only its owned helper", async () => {
   assert.equal(f.server.listenerCount("close"), 0);
 });
 
+test("an unready tray retains its original 15-second startup deadline and owns only its helper", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  let calls = 0;
+  const slow = fixture(async () => {
+    calls++;
+  });
+  let ready = false;
+  slow.pending.then(() => {
+    ready = true;
+  });
+  t.mock.timers.tick(14999);
+  await tick();
+  assert.equal(ready, false);
+  assert.equal(slow.child.killed, undefined);
+  slow.child.stdout.write("ready\n");
+  const tray = await slow.pending;
+  tray.dispose();
+
+  const lost = fixture(async () => {
+    calls++;
+  });
+  const rejected = assert.rejects(lost.pending, /did not become ready/);
+  t.mock.timers.tick(14999);
+  await tick();
+  assert.equal(lost.child.killed, undefined);
+  t.mock.timers.tick(1);
+  await rejected;
+  assert.equal(lost.child.killed, true);
+  assert.equal(lost.server.listenerCount("close"), 0);
+  assert.equal(calls, 0);
+});
+
+test("tray diagnostics bound stderr and keep its contents out of observations", async () => {
+  const f = fixture(async () => {});
+  f.child.stdout.write("phase:powershell-start:7.5.2\nphase:forms-loaded\n");
+  f.child.stdout.write("phase:untrusted:DUMMY_PHASE_SECRET\n");
+  f.child.stderr.write("DUMMY_STDERR_SECRET".repeat(2000));
+  f.child.stdout.write("ready\n");
+  const tray = await f.pending;
+  const report = tray.diagnostics();
+  assert.equal(report.powershell, "7.5.2");
+  assert.equal(report.stderr.bytes, 16384);
+  assert.equal(report.stderr.truncated, true);
+  assert.match(report.stderr.sha256, /^[0-9a-f]{64}$/);
+  assert.doesNotMatch(JSON.stringify(report), /DUMMY_|untrusted/);
+  report.phases.length = 0;
+  assert.ok(tray.diagnostics().phases.some((entry) => entry.phase === "ready"));
+  tray.dispose();
+});
+
+async function stopFixtureHelper(child) {
+  if (!child?.pid || child.exitCode !== null || child.signalCode !== null)
+    return;
+  const exited = once(child, "exit", { signal: AbortSignal.timeout(5000) });
+  child.kill();
+  await exited;
+}
+
 test("a lost warning pipe cannot leak a rejected stop promise", async () => {
   const f = fixture(async () => {
     throw new Error("unverified");
@@ -164,7 +223,7 @@ test(
     skip: process.platform !== "win32",
     timeout: 25000,
   },
-  async () => {
+  async (t) => {
     const child = spawn(
       "pwsh.exe",
       [
@@ -179,7 +238,8 @@ test(
       ],
       { windowsHide: true, stdio: "ignore" },
     );
-    const [code] = await once(child, "exit");
+    t.after(() => stopFixtureHelper(child));
+    const [code] = await once(child, "exit", { signal: t.signal });
     assert.equal(code, 0);
   },
 );
@@ -190,9 +250,10 @@ test(
     skip: process.platform !== "win32",
     timeout: 25000,
   },
-  async () => {
+  async (t) => {
     const server = new EventEmitter();
     let helper;
+    t.after(() => stopFixtureHelper(helper));
     const tray = await startWindowsTray({
       dashboard: {
         server,
@@ -205,10 +266,60 @@ test(
         return helper;
       },
     });
-    const exit = once(helper, "exit");
+    const exit = once(helper, "exit", { signal: t.signal });
     server.emit("close");
     tray.dispose();
     const [code] = await exit;
     assert.equal(code, 0);
+    t.diagnostic(JSON.stringify({ tray_startup: tray.diagnostics() }));
+  },
+);
+
+test(
+  "native Windows timeout reports phases and observes its exact helper's exit",
+  {
+    skip: process.platform !== "win32",
+    timeout: 25000,
+  },
+  async (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    let helper, started;
+    const phase = new Promise((resolve) => {
+      started = resolve;
+    });
+    t.after(() => stopFixtureHelper(helper));
+    const pending = startWindowsTray({
+      dashboard: { server: new EventEmitter(), close: async () => {} },
+      open: () => assert.fail("failed fixture must never open a browser"),
+      spawnProcess: (command, args, options) => {
+        const parameters = [...args];
+        parameters[parameters.length - 1] = fileURLToPath(
+          new URL("./fixtures/windows-tray-timeout.ps1", import.meta.url),
+        );
+        helper = spawn(command, parameters, options);
+        helper.stderr.once("data", started);
+        return helper;
+      },
+    });
+    let failure;
+    const rejected = assert.rejects(pending, (error) => {
+      failure = error;
+      return /did not become ready/.test(error.message);
+    });
+    await phase;
+    t.mock.timers.tick(15000);
+    await rejected;
+    assert.equal(failure.trayDiagnostics.cleanup.exit_observed, true);
+    assert.ok(
+      failure.trayDiagnostics.phases.some(
+        (entry) => entry.phase === "ready-timeout",
+      ),
+    );
+    assert.notEqual(failure.trayDiagnostics.helper_exit, null);
+    assert.doesNotMatch(
+      JSON.stringify(failure.trayDiagnostics),
+      /DUMMY_TRAY_STDERR_SECRET/,
+    );
+    t.diagnostic(JSON.stringify({ tray_timeout: failure.trayDiagnostics }));
   },
 );
