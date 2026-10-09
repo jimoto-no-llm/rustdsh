@@ -12,6 +12,7 @@ import {
   sameSelection,
   compareSelection,
 } from "./model-selection.mjs";
+import { modelRuntimeHash } from "./model-runtime-source.mjs";
 
 const runId = (value) =>
   typeof value === "string" && /^run_[0-9a-f-]{36}$/.test(value);
@@ -77,6 +78,45 @@ const observed = (value) =>
       value.cli_version.length <= 80)) &&
   timestamp(value.observed_at) &&
   value.actual_execution_verified === false;
+const nativeCall = (value) =>
+  exact(value, [
+    "source",
+    "call_id",
+    "selection",
+    "phase",
+    "reason",
+    "outcome",
+    "dispatch_started",
+    "session_matched",
+    "authorization_id",
+    "policy_revision",
+    "actual_execution_verified",
+    "observed_at",
+  ]) &&
+  value.source === "dsh_adapter_dispatch" &&
+  identifier(value.call_id) &&
+  (value.selection === null || validSelection(value.selection)) &&
+  ["admitted", "blocked", "finished"].includes(value.phase) &&
+  (value.reason === null ||
+    [
+      "native_session_mismatch",
+      "native_selection_unavailable",
+      "native_effort_unavailable",
+      "native_route_mismatch",
+      "route_authorization_expired",
+      "request_changed_before_dispatch",
+      "request_interrupted_before_dispatch",
+    ].includes(value.reason)) &&
+  ["pending", "blocked", "succeeded", "failed", "interrupted"].includes(
+    value.outcome,
+  ) &&
+  typeof value.dispatch_started === "boolean" &&
+  typeof value.session_matched === "boolean" &&
+  (value.authorization_id === null || identifier(value.authorization_id)) &&
+  Number.isSafeInteger(value.policy_revision) &&
+  value.policy_revision >= 1 &&
+  value.actual_execution_verified === false &&
+  timestamp(value.observed_at);
 function permit(value) {
   check(
     exact(value, [
@@ -124,7 +164,7 @@ function validate(value, project, record) {
       "events",
       "record_hash",
     ]) &&
-      value.schema === 1 &&
+      [1, 2].includes(value.schema) &&
       value.project_id === project.id &&
       value.run_id === record.run_id &&
       value.session_id === record.cli_session_id &&
@@ -144,7 +184,9 @@ function validate(value, project, record) {
   );
   const eventIds = new Set();
   const authorizationIds = new Set();
+  const calls = new Map();
   let active = value.requested;
+  let activeAuthorization = null;
   for (const [index, event] of value.events.entries()) {
     check(
       exact(event, [
@@ -162,9 +204,13 @@ function validate(value, project, record) {
           "request_bound",
           "native_selection_observed",
           "change_authorized",
+          "native_enforcement_required",
+          "native_call_observed",
         ].includes(event.type) &&
         timestamp(event.at) &&
-        (event.observation === null || observed(event.observation)) &&
+        (event.observation === null ||
+          observed(event.observation) ||
+          nativeCall(event.observation)) &&
         (event.authorization === null || permit(event.authorization)),
       "invalid_route_history",
     );
@@ -178,10 +224,70 @@ function validate(value, project, record) {
       );
     else if (event.type === "native_selection_observed")
       check(
-        event.observation !== null && event.authorization === null,
+        observed(event.observation) && event.authorization === null,
         "invalid_route_history",
       );
-    else {
+    else if (event.type === "native_enforcement_required")
+      check(
+        value.schema === 2 &&
+          event.observation === null &&
+          event.authorization === null,
+        "invalid_route_history",
+      );
+    else if (event.type === "native_call_observed") {
+      const call = event.observation;
+      check(
+        value.schema === 2 && nativeCall(call) && event.authorization === null,
+        "invalid_native_call_history",
+      );
+      if (call.phase === "finished") {
+        const admitted = calls.get(call.call_id);
+        check(
+          admitted?.phase === "admitted" &&
+            sameSelection(call.selection, admitted.selection) &&
+            call.authorization_id === admitted.authorization_id &&
+            call.policy_revision === admitted.policy_revision &&
+            call.session_matched &&
+            (call.dispatch_started
+              ? call.reason === null
+              : [
+                  "request_changed_before_dispatch",
+                  "request_interrupted_before_dispatch",
+                ].includes(call.reason)) &&
+            call.outcome !== "pending" &&
+            (call.dispatch_started
+              ? call.outcome !== "blocked"
+              : ["blocked", "interrupted"].includes(call.outcome)),
+          "invalid_native_call_history",
+        );
+      } else {
+        check(
+          !calls.has(call.call_id) &&
+            call.policy_revision === index &&
+            !call.dispatch_started &&
+            call.authorization_id ===
+              (activeAuthorization?.authorization_id ?? null),
+          "invalid_native_call_history",
+        );
+        if (call.phase === "admitted")
+          check(
+            call.session_matched &&
+              sameSelection(call.selection, active) &&
+              call.reason === null &&
+              call.outcome === "pending" &&
+              (activeAuthorization === null ||
+                Date.parse(activeAuthorization.expires_at) >
+                  Date.parse(event.at)),
+            "invalid_native_call_history",
+          );
+        else
+          check(
+            call.reason !== null && call.outcome === "blocked",
+            "invalid_native_call_history",
+          );
+      }
+      calls.set(call.call_id, call);
+    } else {
       const auth = event.authorization;
       check(
         auth !== null &&
@@ -195,6 +301,7 @@ function validate(value, project, record) {
       );
       authorizationIds.add(auth.authorization_id);
       active = auth.to;
+      activeAuthorization = auth;
     }
   }
   check(
@@ -263,8 +370,16 @@ export class ModelRouting {
         new TextDecoder("utf-8", { fatal: true }).decode(bytes),
       );
       check(
-        exact(value, ["schema", "context_hash", "requested_hash"]) &&
-          value.schema === 1 &&
+        ((exact(value, ["schema", "context_hash", "requested_hash"]) &&
+          value.schema === 1) ||
+          (exact(value, [
+            "schema",
+            "context_hash",
+            "requested_hash",
+            "native_dispatch_required",
+          ]) &&
+            value.schema === 2 &&
+            value.native_dispatch_required === true)) &&
           value.context_hash === contextHash(record) &&
           digest(value.requested_hash),
         "route_requirement_unconfirmed",
@@ -300,6 +415,10 @@ export class ModelRouting {
         required !== null &&
           required.requested_hash === routeHash(value.requested),
         "route_requirement_unconfirmed",
+      );
+      check(
+        value.schema !== 2 || required.native_dispatch_required === true,
+        "native_requirement_unconfirmed",
       );
       return value;
     } catch (error) {
@@ -474,6 +593,131 @@ export class ModelRouting {
       };
     });
   }
+  async enforceNative(record) {
+    return this.mutate(record, async (value) => {
+      check(value !== null, "route_request_not_bound");
+      const required = await this.required(record);
+      if (!required.native_dispatch_required) {
+        const temporary =
+          this.file(record) + ".required." + randomUUID() + ".tmp";
+        try {
+          await fs.writeFile(
+            temporary,
+            JSON.stringify({
+              ...required,
+              schema: 2,
+              native_dispatch_required: true,
+            }) + "\n",
+            { flag: "wx", mode: 0o600 },
+          );
+          await fs.rename(temporary, this.file(record) + ".required");
+        } finally {
+          await fs.unlink(temporary).catch((error) => {
+            if (error.code !== "ENOENT") throw error;
+          });
+        }
+        value.schema = 2;
+        this.event(value, "native_enforcement_required");
+        value.revision++;
+      }
+      return {
+        value,
+        result: {
+          run_id: value.run_id,
+          native_dispatch_required: true,
+          reattach_required: true,
+          permission_expanded: false,
+          native_route_changed: false,
+        },
+      };
+    });
+  }
+  async admitNativeCall(record, input) {
+    check(
+      exact(input, ["selection", "session_matched", "effort_resolved"]) &&
+        (input.selection === null || validSelection(input.selection)) &&
+        typeof input.session_matched === "boolean" &&
+        typeof input.effort_resolved === "boolean",
+      "native_call_observation_invalid",
+    );
+    return this.mutate(record, async (value) => {
+      check(
+        value !== null &&
+          (await this.required(record))?.native_dispatch_required,
+        "native_enforcement_not_required",
+      );
+      const reason = !input.session_matched
+        ? "native_session_mismatch"
+        : input.selection === null
+          ? "native_selection_unavailable"
+          : !input.effort_resolved
+            ? "native_effort_unavailable"
+            : value.active_authorization &&
+                Date.parse(value.active_authorization.expires_at) <= Date.now()
+              ? "route_authorization_expired"
+              : !sameSelection(input.selection, value.active_route)
+                ? "native_route_mismatch"
+                : null;
+      const observation = {
+        source: "dsh_adapter_dispatch",
+        call_id: "call_" + randomUUID(),
+        selection: input.selection,
+        phase: reason === null ? "admitted" : "blocked",
+        reason,
+        outcome: reason === null ? "pending" : "blocked",
+        dispatch_started: false,
+        session_matched: input.session_matched,
+        authorization_id: value.active_authorization?.authorization_id ?? null,
+        policy_revision: value.revision,
+        actual_execution_verified: false,
+        observed_at: new Date().toISOString(),
+      };
+      value.schema = 2;
+      this.event(value, "native_call_observed", observation);
+      value.revision++;
+      return {
+        value,
+        result: {
+          allowed: reason === null,
+          reason,
+          call_id: observation.call_id,
+        },
+      };
+    });
+  }
+  async finishNativeCall(record, callId, result) {
+    check(
+      identifier(callId) &&
+        exact(result, ["outcome", "dispatch_started"]) &&
+        ["blocked", "succeeded", "failed", "interrupted"].includes(
+          result.outcome,
+        ) &&
+        typeof result.dispatch_started === "boolean",
+      "native_call_outcome_invalid",
+    );
+    return this.mutate(record, (value) => {
+      check(value !== null, "route_request_not_bound");
+      const prior = value.events.findLast(
+        (event) =>
+          event.type === "native_call_observed" &&
+          event.observation.call_id === callId,
+      )?.observation;
+      check(prior?.phase === "admitted", "native_call_outcome_unconfirmed");
+      this.event(value, "native_call_observed", {
+        ...prior,
+        ...result,
+        reason: result.dispatch_started
+          ? null
+          : result.outcome === "blocked"
+            ? "request_changed_before_dispatch"
+            : "request_interrupted_before_dispatch",
+        phase: "finished",
+        observed_at: new Date().toISOString(),
+      });
+      value.revision++;
+      return { value, result: { recorded: true } };
+    });
+  }
   async observe(record, adapter) {
     const observation = adapter.routing(record.cli_session_id);
     check(observed(observation), "native_route_observation_invalid");
@@ -528,19 +772,34 @@ export class ModelRouting {
         writer_lock,
       };
     const observation =
-      value.events.findLast((event) => event.observation !== null)
-        ?.observation ?? null;
+      value.events.findLast(
+        (event) => event.type === "native_selection_observed",
+      )?.observation ?? null;
     return {
       ...this.view(value, observation),
       route_required: true,
       observation_is_historical: true,
       events: value.events,
       writer_lock,
+      native_dispatch_required: Boolean(
+        (await this.required(record))?.native_dispatch_required,
+      ),
+      native_calls: value.events
+        .filter((event) => event.type === "native_call_observed")
+        .map((event) => event.observation),
     };
   }
   async guard(record, adapter) {
     if ((await this.read(record)) === null) return null;
     const result = await this.observe(record, adapter);
+    if ((await this.required(record))?.native_dispatch_required)
+      check(
+        adapter.nativeModelGuard?.run_id === result.run_id &&
+          adapter.nativeModelGuard.context_hash === result.context_hash &&
+          adapter.nativeModelGuard.status === "native_dispatch_guard_loaded" &&
+          adapter.nativeModelGuard.native_source_sha256 === modelRuntimeHash,
+        "native_guard_unavailable",
+      );
     check(!result.authorization_expired, "route_authorization_expired");
     check(
       result.comparison.matches,
