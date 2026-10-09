@@ -1,0 +1,2365 @@
+diff --git a/.github/ISSUE_TEMPLATE/config.yml b/.github/ISSUE_TEMPLATE/config.yml
+index 2204ea0..c077817 100644
+--- a/.github/ISSUE_TEMPLATE/config.yml
++++ b/.github/ISSUE_TEMPLATE/config.yml
+@@ -1,8 +1,8 @@
+ blank_issues_enabled: false
+ contact_links:
+-  - name: Question / Discussion (質問・相談)
+-    url: https://github.com/sahenjp/rustdsh/discussions
++  - name: Question / Support (質問・相談)
++    url: https://github.com/jimoto-no-llm/rustdsh/issues
+     about: Usage questions and ideas. Japanese OK.
+   - name: Security report (脆弱性の報告)
+-    url: https://github.com/sahenjp/rustdsh/security/advisories/new
++    url: https://github.com/jimoto-no-llm/rustdsh/security/advisories/new
+     about: Never file vulnerabilities as public issues. See SECURITY.md.
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 4552426..e5a0468 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -79,6 +79,10 @@ jobs:
+       - run: cargo test --example benchmark_extended
+       - run: cargo test --example benchmark_models
+       - run: cargo build
++      - uses: actions/setup-node@v7
++        with:
++          node-version: 22
++      - run: node --test tests/icon-assets.test.mjs
+       - if: matrix.regress
+         shell: bash
+         run: |
+@@ -88,6 +92,7 @@ jobs:
+         shell: pwsh
+         run: |
+           ./tests/installer-security.ps1
++          ./tests/icon-assets.ps1
+           $tmp = Join-Path $env:RUNNER_TEMP 'rdsh-smoke'
+           $h = Join-Path $tmp 'home'
+           $d = Join-Path $tmp 'dsh'
+diff --git a/.github/workflows/dashboard.yml b/.github/workflows/dashboard.yml
+index d97b28c..cf3f633 100644
+--- a/.github/workflows/dashboard.yml
++++ b/.github/workflows/dashboard.yml
+@@ -2,9 +2,9 @@ name: dashboard
+ 
+ on:
+   push:
+-    paths: ["dashboard/**", ".github/workflows/dashboard.yml"]
++    paths: ["dashboard/**", "assets/**", ".github/workflows/dashboard.yml"]
+   pull_request:
+-    paths: ["dashboard/**", ".github/workflows/dashboard.yml"]
++    paths: ["dashboard/**", "assets/**", ".github/workflows/dashboard.yml"]
+ 
+ permissions:
+   contents: read
+diff --git a/Cargo.lock b/Cargo.lock
+index 505eb43..d60ed91 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -38,7 +38,7 @@ version = "1.1.5"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "40c48f72fd53cd289104fc64099abca73db4166ad86ea0b4341abe65af83dadc"
+ dependencies = [
+- "windows-sys",
++ "windows-sys 0.61.2",
+ ]
+ 
+ [[package]]
+@@ -49,7 +49,7 @@ checksum = "291e6a250ff86cd4a820112fb8898808a366d8f9f58ce16d1f538353ad55747d"
+ dependencies = [
+  "anstyle",
+  "once_cell_polyfill",
+- "windows-sys",
++ "windows-sys 0.61.2",
+ ]
+ 
+ [[package]]
+@@ -58,6 +58,16 @@ version = "1.0.104"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
+ 
++[[package]]
++name = "cc"
++version = "1.6.0"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "f74872d07caf508b30a21f6836e7d7016a2eaf7d9ff4f48deaa58cd8a0407630"
++dependencies = [
++ "find-msvc-tools",
++ "shlex",
++]
++
+ [[package]]
+ name = "cfg-if"
+ version = "1.0.5"
+@@ -110,6 +120,32 @@ version = "1.0.5"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "1d07550c9036bf2ae0c684c4297d503f838287c83c53686d05370d0e139ae570"
+ 
++[[package]]
++name = "embed-resource"
++version = "3.0.11"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "fbfdaacccebec3b28e4866b8973543c7647797db5ada1bdab552e48fe665fbbd"
++dependencies = [
++ "cc",
++ "memchr",
++ "rustc_version",
++ "toml",
++ "vswhom",
++ "winreg",
++]
++
++[[package]]
++name = "equivalent"
++version = "1.0.2"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
++
++[[package]]
++name = "find-msvc-tools"
++version = "0.1.14"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "aedcfb3409746eddb02b9e19ebda1c3394f759a152e48ee875a0844d1b955484"
++
+ [[package]]
+ name = "getrandom"
+ version = "0.4.3"
+@@ -121,12 +157,28 @@ dependencies = [
+  "r-efi",
+ ]
+ 
++[[package]]
++name = "hashbrown"
++version = "0.17.1"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
++
+ [[package]]
+ name = "heck"
+ version = "0.5.0"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
+ 
++[[package]]
++name = "indexmap"
++version = "2.14.2"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "cc4e190f5d26ca7051642629da2c52fc03bde85a03197c99408dcd291734c855"
++dependencies = [
++ "equivalent",
++ "hashbrown",
++]
++
+ [[package]]
+ name = "is_terminal_polyfill"
+ version = "1.70.2"
+@@ -187,11 +239,27 @@ version = "0.2.0"
+ dependencies = [
+  "anyhow",
+  "clap",
++ "embed-resource",
+  "getrandom",
+  "libc",
+  "serde_json",
+ ]
+ 
++[[package]]
++name = "rustc_version"
++version = "0.4.1"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "cfcb3a22ef46e85b45de6ee7e79d063319ebb6594faafcf1c225ea92ab6e9b92"
++dependencies = [
++ "semver",
++]
++
++[[package]]
++name = "semver"
++version = "1.0.28"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "8a7852d02fc848982e0c167ef163aaff9cd91dc640ba85e263cb1ce46fae51cd"
++
+ [[package]]
+ name = "serde"
+ version = "1.0.229"
+@@ -234,6 +302,21 @@ dependencies = [
+  "zmij",
+ ]
+ 
++[[package]]
++name = "serde_spanned"
++version = "1.1.2"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "4e7523beb55eece201a2356bee0bbca0d1ab466c14c07703b2e0ee6d42cb0c2c"
++dependencies = [
++ "serde_core",
++]
++
++[[package]]
++name = "shlex"
++version = "2.0.1"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
++
+ [[package]]
+ name = "strsim"
+ version = "0.11.1"
+@@ -251,6 +334,45 @@ dependencies = [
+  "unicode-ident",
+ ]
+ 
++[[package]]
++name = "toml"
++version = "1.1.7+spec-1.1.0"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "7874cd34dd99040fc24e30923aa64a60a81ff3ddfe2b8129ccc84ba24949deed"
++dependencies = [
++ "indexmap",
++ "serde_core",
++ "serde_spanned",
++ "toml_datetime",
++ "toml_parser",
++ "toml_writer",
++ "winnow",
++]
++
++[[package]]
++name = "toml_datetime"
++version = "1.1.2+spec-1.1.0"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "2b86d767906c6c42421dcba507eb9d203e779497710a47782a224bb871653053"
++dependencies = [
++ "serde_core",
++]
++
++[[package]]
++name = "toml_parser"
++version = "1.1.4+spec-1.1.0"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "bed810ee007d8e7f9cf20b4774e7198142fa27186e0f805871da7f3c39eaf333"
++dependencies = [
++ "winnow",
++]
++
++[[package]]
++name = "toml_writer"
++version = "1.1.3+spec-1.1.0"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "06bdbd8cfc056b8d2e2e85f29b56a3bdbecb527cef81eb39e3e7b98af4652770"
++
+ [[package]]
+ name = "unicode-ident"
+ version = "1.0.26"
+@@ -263,12 +385,41 @@ version = "0.2.2"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
+ 
++[[package]]
++name = "vswhom"
++version = "0.1.0"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "be979b7f07507105799e854203b470ff7c78a1639e330a58f183b5fea574608b"
++dependencies = [
++ "libc",
++ "vswhom-sys",
++]
++
++[[package]]
++name = "vswhom-sys"
++version = "0.1.3"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "fb067e4cbd1ff067d1df46c9194b5de0e98efd2810bbc95c5d5e5f25a3231150"
++dependencies = [
++ "cc",
++ "libc",
++]
++
+ [[package]]
+ name = "windows-link"
+ version = "0.2.1"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "f0805222e57f7521d6a62e36fa9163bc891acd422f971defe97d64e70d0a4fe5"
+ 
++[[package]]
++name = "windows-sys"
++version = "0.59.0"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "1e38bc4d79ed67fd075bcc251a1c39b32a1776bbe92e5bef1f0bf1f8c531853b"
++dependencies = [
++ "windows-targets",
++]
++
+ [[package]]
+ name = "windows-sys"
+ version = "0.61.2"
+@@ -278,6 +429,86 @@ dependencies = [
+  "windows-link",
+ ]
+ 
++[[package]]
++name = "windows-targets"
++version = "0.52.6"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "9b724f72796e036ab90c1021d4780d4d3d648aca59e491e6b98e725b84e99973"
++dependencies = [
++ "windows_aarch64_gnullvm",
++ "windows_aarch64_msvc",
++ "windows_i686_gnu",
++ "windows_i686_gnullvm",
++ "windows_i686_msvc",
++ "windows_x86_64_gnu",
++ "windows_x86_64_gnullvm",
++ "windows_x86_64_msvc",
++]
++
++[[package]]
++name = "windows_aarch64_gnullvm"
++version = "0.52.6"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "32a4622180e7a0ec044bb555404c800bc9fd9ec262ec147edd5989ccd0c02cd3"
++
++[[package]]
++name = "windows_aarch64_msvc"
++version = "0.52.6"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "09ec2a7bb152e2252b53fa7803150007879548bc709c039df7627cabbd05d469"
++
++[[package]]
++name = "windows_i686_gnu"
++version = "0.52.6"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "8e9b5ad5ab802e97eb8e295ac6720e509ee4c243f69d781394014ebfe8bbfa0b"
++
++[[package]]
++name = "windows_i686_gnullvm"
++version = "0.52.6"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "0eee52d38c090b3caa76c563b86c3a4bd71ef1a819287c19d586d7334ae8ed66"
++
++[[package]]
++name = "windows_i686_msvc"
++version = "0.52.6"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "240948bc05c5e7c6dabba28bf89d89ffce3e303022809e73deaefe4f6ec56c66"
++
++[[package]]
++name = "windows_x86_64_gnu"
++version = "0.52.6"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "147a5c80aabfbf0c7d901cb5895d1de30ef2907eb21fbbab29ca94c5b08b1a78"
++
++[[package]]
++name = "windows_x86_64_gnullvm"
++version = "0.52.6"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "24d5b23dc417412679681396f2b49f3de8c1473deb516bd34410872eff51ed0d"
++
++[[package]]
++name = "windows_x86_64_msvc"
++version = "0.52.6"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
++
++[[package]]
++name = "winnow"
++version = "1.0.4"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "23b97319f7b8343df12cc98938e5c3eb436064524c8d2b4e30a1d3a36eecdf81"
++
++[[package]]
++name = "winreg"
++version = "0.55.0"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "cb5a765337c50e9ec252c2069be9bf91c7df47afb103b642ba3a53bf8101be97"
++dependencies = [
++ "cfg-if",
++ "windows-sys 0.59.0",
++]
++
+ [[package]]
+ name = "zmij"
+ version = "1.0.23"
+diff --git a/Cargo.toml b/Cargo.toml
+index 5ec17c5..be5c43c 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -16,6 +16,9 @@ anyhow = "1.0"
+ getrandom = "0.4"
+ libc = "0.2"
+ 
++[build-dependencies]
++embed-resource = "=3.0.11"
++
+ [profile.release]
+ opt-level = "z"
+ lto = true
+diff --git a/README.ja.md b/README.ja.md
+index a564265..e305e6e 100644
+--- a/README.ja.md
++++ b/README.ja.md
+@@ -2,13 +2,15 @@
+ 
+ [English](README.md)
+ 
+-[![ci](https://github.com/sahenjp/rustdsh/actions/workflows/ci.yml/badge.svg)](https://github.com/sahenjp/rustdsh/actions/workflows/ci.yml)
+-[![dashboard](https://github.com/sahenjp/rustdsh/actions/workflows/dashboard.yml/badge.svg)](https://github.com/sahenjp/rustdsh/actions/workflows/dashboard.yml)
+-[![docs](https://github.com/sahenjp/rustdsh/actions/workflows/docs.yml/badge.svg)](https://github.com/sahenjp/rustdsh/actions/workflows/docs.yml)
+-[![release](https://img.shields.io/github/v/release/sahenjp/rustdsh.svg)](https://github.com/sahenjp/rustdsh/releases)
++rustdsh は独立したコミュニティプロジェクトです。DeepSeek および DeepSeek Harness の公式プロジェクトではありません。
++
++[![ci](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/ci.yml/badge.svg)](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/ci.yml)
++[![dashboard](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/dashboard.yml/badge.svg)](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/dashboard.yml)
++[![docs](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/docs.yml/badge.svg)](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/docs.yml)
++[![release](https://img.shields.io/github/v/release/jimoto-no-llm/rustdsh.svg)](https://github.com/jimoto-no-llm/rustdsh/releases)
+ [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+ 
+-<img src="assets/icon.svg" width="96" alt="rdsh icon">
++<img src="assets/icon.png" width="96" alt="rdsh icon">
+ 
+ フル移植ではなく**ホットパスだけ Rust 化＋残りは本家 dsh に委譲**する設計です。
+ Linux上の `--version` で起動約98倍・最大RSS約1/23を測定しています。
+@@ -61,26 +63,31 @@ Linux上の `--version` で起動約98倍・最大RSS約1/23を測定してい
+ 
+ 測定コマンドは `rdsh bench --n 5` と `/usr/bin/time -v` です。詳しくは[docs/BENCHMARKS.md](docs/BENCHMARKS.md)を見てください。
+ 
++現在のソースには、検索の並列処理・メモリ使用量の改善、認証情報とツールの境界の強化、更新通知の非表示状態の永続化も含まれます。
++高密度の検索フィクスチャでは中央値 197.77 ms → 4.61 ms でした。Linux の特定条件での測定です。
++[測定の証拠](docs/evidence/performance-security-audit.md)とリリースノートを確認してください。
++v0.2.0 公開後のソース修正は、その公開済みバイナリには含まれません。
++
+ ## インストール
+ 
+ いちばん速い方法（ビルド済みバイナリ、Rust不要）：
+ 
+ ```sh
+ # Linux / macOS / WSL
+-curl -fsSL https://github.com/sahenjp/rustdsh/releases/latest/download/install.sh | bash -s -- --from-release
++curl -fsSL https://github.com/jimoto-no-llm/rustdsh/releases/latest/download/install.sh | bash -s -- --from-release
+ ```
+ 
+ ```powershell
+ # Windows（PowerShell）
+ $f = Join-Path $env:TEMP 'rdsh-install.ps1'
+-Invoke-WebRequest -Uri https://github.com/sahenjp/rustdsh/releases/latest/download/install.ps1 -OutFile $f -UseBasicParsing
++Invoke-WebRequest -Uri https://github.com/jimoto-no-llm/rustdsh/releases/latest/download/install.ps1 -OutFile $f -UseBasicParsing
+ & $f -FromRelease
+ ```
+ 
+ ソースから入れる場合：
+ 
+ ```sh
+-git clone https://github.com/sahenjp/rustdsh.git
++git clone https://github.com/jimoto-no-llm/rustdsh.git
+ cd rustdsh
+ ./install.sh                 # ビルド＋ ~/.local/bin/rdsh に導入
+ ./install.sh --as-dsh        # rdsh を `dsh` 名でも使えるよう置換（元は dsh-orig に退避）
+@@ -92,7 +99,7 @@ install.sh は Linux / macOS / WSL 用です（WSL自動検出、cargoがなけ
+ rustupで自動導入。`--no-rustup` で無効化）。Windowsネイティブは install.ps1：
+ 
+ ```powershell
+-git clone https://github.com/sahenjp/rustdsh.git
++git clone https://github.com/jimoto-no-llm/rustdsh.git
+ cd rustdsh
+ .\install.ps1              # ビルド＋ %LOCALAPPDATA%\rdsh\bin に導入（PATH追加つき）
+ .\install.ps1 -AsDsh       # `dsh` 名でも使えるよう置換（元は dsh-orig に退避）
+@@ -110,7 +117,7 @@ cd rustdsh
+ `rdsh setup` を実行してください（`rdsh setup --login` ならCodex/opencodeの
+ OAuthフローをその場で起動します）。
+ 
+-ソースから直接ビルドする場合は `cargo build --release` で `target/release/rdsh` ができます（Rust 1.73+が必要）。
++ソースから直接ビルドする場合は `cargo build --release` で `target/release/rdsh` ができます（Rust 1.85+が必要）。
+ 
+ ## 使い方
+ 
+@@ -279,6 +286,19 @@ rdsh serve
+ プロジェクトの指標・質問と回答・スマホ接続には [Node.jsダッシュボード](dashboard/README.md) を使います（Node.js 22+が必要）。
+ `rdsh-dashboard project --project <ディレクトリ>` でプロジェクト用、`rdsh-dashboard harness` で元のHarness Web画面を起動します。
+ 
++Windows ネイティブ版の `rdsh-dashboard` ランチャーでは、`project`／`harness` が通知領域のトレイに常駐します。
++右クリックの **Open / 開く** で画面を開き、**Exit / 終了** でその Dashboard と管理対象の Harness を停止します。
++停止対象の確認に失敗した場合は終了せず、再試行できます。独立したセッションは継続します。
++ダブルクリックでも画面を開けます。隠しアイコンに入れるかは Windows の通知領域設定で選びます。
++端末に表示して動かす場合は `--no-tray` を付けてください。
++導入・更新は `pwsh -NoProfile -ExecutionPolicy Bypass -File dashboard/install-windows.ps1` です。
++このトレイは Node.js Dashboard 用です。`rdsh serve` は端末から起動します。
++
++本家 Harness の更新通知は、**Dismiss**／**×** で閉じたコンポーネントの同じ更新先バージョンを、
++同じ OS ユーザーの各プロジェクト・ブラウザーで非表示にします。新しい更新先は再び通知します。
++更新後は GUI サーバーを再起動し、画面を再読み込みしてください。別ポートの画面には次回の確認で反映されます。
++保存できない場合の限界は[検証記録](docs/evidence/update-dismissal/README.md)に記載しています。
++
+ ## 安全設計
+ 
+ 1. agent loop・profile bootの再実装はしません。`exec`委譲のみです
+@@ -293,8 +313,8 @@ rdsh serve
+ ## コミュニティ
+ 
+ - まず [CONTRIBUTING.md](CONTRIBUTING.md)（PRは4行、スクリーンショット規定）。
+-- バグ・要望：[Issueフォーム](https://github.com/sahenjp/rustdsh/issues/new/choose)（日本語OK）。
+-- 質問・相談：[Issues](https://github.com/sahenjp/rustdsh/issues)。
++- バグ・要望：[Issueフォーム](https://github.com/jimoto-no-llm/rustdsh/issues/new/choose)（日本語OK）。
++- 質問・相談：[Issues](https://github.com/jimoto-no-llm/rustdsh/issues)。
+ - 脆弱性は公開Issueに書かず [SECURITY.md](SECURITY.md) へ。
+ - 設計資料：[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)・
+   [docs/BENCHMARKS.md](docs/BENCHMARKS.md)・[docs/ROADMAP.md](docs/ROADMAP.md)・
+@@ -309,9 +329,14 @@ rdsh serve
+ 
+ ## クレジット
+ 
+-アイディア： [@studio_yebisu](https://x.com/studio_yebisu)、
+-[@remydre8](https://x.com/remydre8)。
++本家 DeepSeek Harness の開発者・貢献者の皆さんに感謝します。本家のランタイムが rustdsh の基盤です。
++
++- [GrEarl](https://github.com/GrEarl)、[PENTACoXIAN](https://x.com/PENTACoXIAN)：脆弱性の報告・セキュリティレビュー。
++- [StudioYebisu](https://github.com/yebisu0529-ship-it)、[RNA4219](https://github.com/RNA4219)、[eightman999](https://github.com/eightman999)：実装・改善・問題の報告。
++- [@remydre8](https://x.com/remydre8)：アイディアと製品提案。
++
++Issue、レビュー、検証を通じて協力してくださる皆さんにも感謝します。
+ 
+ ## ライセンス
+ 
+-MIT（[LICENSE](LICENSE)）です。
++MIT（[LICENSE](LICENSE)）です。本家 DeepSeek Harness と依存ライブラリにはそれぞれのライセンスが適用されます。
+diff --git a/README.md b/README.md
+index 673faa1..0cb8703 100644
+--- a/README.md
++++ b/README.md
+@@ -1,16 +1,18 @@
+-<img src="assets/icon.svg" width="96" alt="rdsh icon">
++<img src="assets/icon.png" width="96" alt="rdsh icon">
+ 
+ # rdsh — a fast, safe Rust launcher for `dsh`
+ 
+-[![ci](https://github.com/sahenjp/rustdsh/actions/workflows/ci.yml/badge.svg)](https://github.com/sahenjp/rustdsh/actions/workflows/ci.yml)
+-[![dashboard](https://github.com/sahenjp/rustdsh/actions/workflows/dashboard.yml/badge.svg)](https://github.com/sahenjp/rustdsh/actions/workflows/dashboard.yml)
+-[![docs](https://github.com/sahenjp/rustdsh/actions/workflows/docs.yml/badge.svg)](https://github.com/sahenjp/rustdsh/actions/workflows/docs.yml)
+-[![release](https://img.shields.io/github/v/release/sahenjp/rustdsh.svg)](https://github.com/sahenjp/rustdsh/releases)
++[![ci](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/ci.yml/badge.svg)](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/ci.yml)
++[![dashboard](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/dashboard.yml/badge.svg)](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/dashboard.yml)
++[![docs](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/docs.yml/badge.svg)](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/docs.yml)
++[![release](https://img.shields.io/github/v/release/jimoto-no-llm/rustdsh.svg)](https://github.com/jimoto-no-llm/rustdsh/releases)
+ [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+-[![rust](https://img.shields.io/badge/rust-1.73%2B-orange.svg)](https://www.rust-lang.org/)
++[![rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org/)
+ 
+ [日本語版](README.ja.md)
+ 
++An independent community project; not an official DeepSeek or DeepSeek Harness project.
++
+ `rdsh` is a drop-in fast path for [dsh](https://github.com/deepseek-ai/deepseek-harness)
+ (the DeepSeek Harness CLI). Instead of a full rewrite, it **ports only the hot paths
+ to Rust and delegates conversation and model execution to the original `dsh` binary**.
+@@ -20,8 +22,8 @@ delegated model calls.
+ 
+ - `--version` startup median **~0.90ms** (original `dsh`: ~88ms, Linux)
+ - `--version` peak RSS **~2.9MB** (original: ~66MB, Linux)
+-- Safe by construction: agent loop and profile boot are never reimplemented,
+-  delegation is a verbatim `exec`, and every optimization is output-identical
++- Compatibility: the agent loop and profile boot stay upstream; delegated arguments
++  are preserved and optimized commands have before/after output checks.
+ 
+ ## Contents
+ 
+@@ -68,26 +70,33 @@ Measured on Linux x86_64, including before/after comparisons for the optimizatio
+ Reproduce with `rdsh bench --n 5` and `/usr/bin/time -v`.
+ Details: [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
+ 
++Current source also includes bounded search workers, credential/tool-boundary
++hardening, and persistent update-notice dismissal. On a dense synthetic search
++fixture, the median changed from 197.77 ms to 4.61 ms; these Linux measurements
++are specific to that fixture. See [measurement evidence](docs/evidence/performance-security-audit.md).
++Check the release notes before installing binaries: source changes after v0.2.0
++are not included in that published release.
++
+ ## Install
+ 
+ Fastest (prebuilt binary, no Rust needed):
+ 
+ ```sh
+ # Linux / macOS / WSL
+-curl -fsSL https://github.com/sahenjp/rustdsh/releases/latest/download/install.sh | bash -s -- --from-release
++curl -fsSL https://github.com/jimoto-no-llm/rustdsh/releases/latest/download/install.sh | bash -s -- --from-release
+ ```
+ 
+ ```powershell
+ # Windows (PowerShell)
+ $f = Join-Path $env:TEMP 'rdsh-install.ps1'
+-Invoke-WebRequest -Uri https://github.com/sahenjp/rustdsh/releases/latest/download/install.ps1 -OutFile $f -UseBasicParsing
++Invoke-WebRequest -Uri https://github.com/jimoto-no-llm/rustdsh/releases/latest/download/install.ps1 -OutFile $f -UseBasicParsing
+ & $f -FromRelease
+ ```
+ 
+ From source:
+ 
+ ```sh
+-git clone https://github.com/sahenjp/rustdsh.git
++git clone https://github.com/jimoto-no-llm/rustdsh.git
+ cd rustdsh
+ ./install.sh                 # build + install to ~/.local/bin/rdsh
+ ./install.sh --as-dsh        # also shadow `dsh` (original kept as dsh-orig)
+@@ -99,7 +108,7 @@ install.sh covers Linux, macOS, and WSL (auto-detects WSL, auto-installs
+ Rust via rustup unless `--no-rustup`). Native Windows uses install.ps1:
+ 
+ ```powershell
+-git clone https://github.com/sahenjp/rustdsh.git
++git clone https://github.com/jimoto-no-llm/rustdsh.git
+ cd rustdsh
+ .\install.ps1              # build + install to %LOCALAPPDATA%\rdsh\bin (+ user PATH)
+ .\install.ps1 -AsDsh       # also shadow `dsh` (original kept as dsh-orig)
+@@ -118,7 +127,7 @@ you at the DeepSeek prompt: run `rdsh setup` (or `rdsh setup --login` to
+ start the Codex/opencode OAuth flow right away).
+ 
+ Or build directly: `cargo build --release` produces `target/release/rdsh`.
+-Requires Rust 1.73+.
++Requires Rust 1.85+.
+ 
+ ## Usage
+ 
+@@ -313,6 +322,21 @@ The Node.js dashboard adds project metrics, tasks, human Q&A, and Tailscale
+ QR access: `rdsh-dashboard project --project <directory>` for a project,
+ `rdsh-dashboard harness` for the original Harness Web UI.
+ 
++On native Windows, the installed `rdsh-dashboard` launcher runs `project` and
++`harness` in the notification area, without a resident console window. Right-click
++its icon for **Open / 開く** or **Exit / 終了**; double-click opens the page. Windows
++controls whether the icon appears in the hidden-icons overflow. Exit stops this
++owned Dashboard and its managed Harness run after ownership verification;
++independent sessions remain running. Use `--no-tray` for foreground terminal mode.
++Install or refresh the launcher with `pwsh -NoProfile -ExecutionPolicy Bypass -File dashboard/install-windows.ps1`.
++This tray belongs to the optional Node.js Dashboard; `rdsh serve` stays a terminal command.
++
++For the original Harness update banner, **Dismiss** and **×** keep that component's
++same target version hidden across projects and browsers for the same OS user.
++A different target version can notify again. Restart the GUI server and reload the
++page after updating; [persistence limits and verification](docs/evidence/update-dismissal/README.md)
++apply when storage is unavailable. Cross-port pages reflect dismissal on their next poll.
++
+ ## Safety design
+ 
+ 1. The agent loop and profile boot are never reimplemented — delegation only.
+@@ -329,8 +353,8 @@ before/after output checks are described in [BENCHMARKS.md](docs/BENCHMARKS.md).
+ ## Community
+ 
+ - Start with [CONTRIBUTING.md](CONTRIBUTING.md) (4-line PRs, screenshot rules).
+-- Bugs and ideas: [issue forms](https://github.com/sahenjp/rustdsh/issues/new/choose) (Japanese OK).
+-- Questions: [Issues](https://github.com/sahenjp/rustdsh/issues).
++- Bugs and ideas: [issue forms](https://github.com/jimoto-no-llm/rustdsh/issues/new/choose) (Japanese OK).
++- Questions: [Issues](https://github.com/jimoto-no-llm/rustdsh/issues).
+ - Security: never file public issues — see [SECURITY.md](SECURITY.md).
+ - Design docs: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) ·
+   [docs/BENCHMARKS.md](docs/BENCHMARKS.md) · [docs/ROADMAP.md](docs/ROADMAP.md) ·
+@@ -348,8 +372,13 @@ before/after output checks are described in [BENCHMARKS.md](docs/BENCHMARKS.md).
+ 
+ ## Credits
+ 
+-Ideas: [@studio_yebisu](https://x.com/studio_yebisu), [@remydre8](https://x.com/remydre8).
++DeepSeek Harness provides the upstream runtime; without it, rustdsh would not exist.
++Thanks to the upstream developers and everyone contributing code, reviews, tests and ideas.
++
++- [GrEarl](https://github.com/GrEarl) and [PENTACoXIAN](https://x.com/PENTACoXIAN): security reports and review.
++- [StudioYebisu](https://github.com/yebisu0529-ship-it), [RNA4219](https://github.com/RNA4219), and [eightman999](https://github.com/eightman999): contributions and improvement reports.
++- [@remydre8](https://x.com/remydre8): ideas and product suggestions.
+ 
+ ## License
+ 
+-MIT — see [LICENSE](LICENSE).
++MIT — see [LICENSE](LICENSE). Upstream DeepSeek Harness and its dependencies retain their own license terms.
+diff --git a/assets/icon.svg b/assets/icon.svg
+index f80f806..9d8ce77 100644
+--- a/assets/icon.svg
++++ b/assets/icon.svg
+@@ -1,15 +1 @@
+-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+-  <defs>
+-    <linearGradient id="rdsh-bg" x1="0" y1="0" x2="1" y2="1">
+-      <stop offset="0" stop-color="#161b22"/>
+-      <stop offset="1" stop-color="#0d1117"/>
+-    </linearGradient>
+-    <linearGradient id="rdsh-bolt" x1="0" y1="0" x2="0" y2="1">
+-      <stop offset="0" stop-color="#3fb950"/>
+-      <stop offset="1" stop-color="#238636"/>
+-    </linearGradient>
+-  </defs>
+-  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#rdsh-bg)" stroke="#30363d" stroke-width="8"/>
+-  <path d="M60 106 L102 128 L60 150" fill="none" stroke="#58a6ff" stroke-width="17" stroke-linecap="round" stroke-linejoin="round"/>
+-  <path d="M160 54 L116 142 L149 142 L134 202 L186 114 L151 114 Z" fill="url(#rdsh-bolt)"/>
+-</svg>
++<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><image width="256" height="256" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAYAAABccqhmAAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAAGYktHRAD/AP8A/6C9p5MAAAAJcEhZcwAACxMAAAsTAQCanBgAAAAHdElNRQfqCggWCx1sVsjaAAAAJXRFWHRkYXRlOmNyZWF0ZQAyMDI2LTEwLTA4VDIyOjExOjI4KzAwOjAwtq0UeQAAACV0RVh0ZGF0ZTptb2RpZnkAMjAyNi0xMC0wOFQyMjoxMToyOCswMDowMMfwrMUAAAAodEVYdGRhdGU6dGltZXN0YW1wADIwMjYtMTAtMDhUMjI6MTE6MjkrMDA6MDA2koauAACAAElEQVR42uy9d6BlVXX4/1nn3tf7zJveG8wwDL0LUqSIvff+06ix957YjS2iMcZEE7+JMXaNHRFUFOkdhgGm9/7m9Xrv2b8/9ilr77PvmwEGCDgL3tx7T9l99bXXhiNwBI7AETgCR+AIHIEjcASOwBE4AkfgCByBI3AEjsAROAJH4AgcgSNwBI7AETgCR+AIPF5AHu0GHIGHDAJMAY4Cjkm+R0ArMDP5LoF3AEzgt38PYALYDowBI8B6YA2wAxh9tAfgCByBv1ZoBd4O3Ar0AlUs4j6cfzEW6TcDPwfO5wgjOQJH4BGHJuDLwDgPP9JP9rcDeNGjPRhH4Aj8tcFrgWEeXeRP/7YB5z7aA3IEjsBfC8wHVvPoI77++xXQ8mgPzBF4YFB+tBtwBB4UnAAs1ReaynDOYlg1GzoaoS4SSpEgIpQi+4wBRCBKNHaTmPkiybFYxCr0sVFKf2yIY8NIBbb1wZ074ZbNhmrstOkUYDFw16M9OEfg0OEIAXhswllAvb7wkpOFLzxV6Gg0SGbHNxab09/iG/0VSPJP9kzxnhEwErG5P+L5/zbBLVucZ6divRBHCMBjCI4QgMcetGIJQAb1JXjqcuhshGrsobd4RABwPXzqkpiMZqQXrV8wEQsiAWLmtRlOnAe3bHFKKOFJJUfg/z4cIQCPPZiHh2jTW2F5NxAbl4HLIXjnXGqBZEif/k4gdQCKoSxw1DQTKu3o5FXDEXhMQPRoN+AIPGBYhhW38wvdMLtNMp3egs/2hUSGT65HxWsCiNSmG8ZYImAMR08TGorsYwXQ+WgP0BE4dDhCAB57sBJP/185Q2irs+K75b0qmC9FcE0cjGCMca9n76KIRHLJsfdbIrB4asTUos1/PjD70R6gI3DocIQAPLYgAlbpCwKsmi5EGdsWF5E9Z53JMDp5RP80JMQBMJqgpEULiGAQZrcLc7sKokIHsODRHqQjcOhwhAAcGtQB07Di7aMZ9joFa2nPoK0BjplmrN8uxg3YLXjrxWr1GWIbpePnkoKY/Hexs/ZKaz0s7S7cbQCWPIrjk0IdR9b2IcERI+DkMB14AXABdrPNEHAn8EvgcuzmmEcS5iZ/GcxphwXtESY1/ytBILPmabegup1b+6yLTxwVwroD0ldEJHcrGqiPYlZMD9r6lj/CY5JCN3ZfwhlYY+Q+4GbgOqxrcvxRatf/aThCAMIwBXg28DrgZNxxOg0b+/5N4OPAgUewXUdhxewMlncL3c2JuO7z6xRnjftbP2kS95+lAGQiv0Mqsuv2izHW23DsTKG+ZBivOrWuAJqxYcqPFJwM/AM2HLlOXX8FsB/4IfBPwL1wxEOh4YiYVIQnAN8D/gU4nTCRbAXeAnyOR9bqfbzfnuNnCU3plVR0T9i+McZz/ycifnafTOSXVG1ICpLsPyUZGCBOVIVYWDJF6C4aAhdhJadHCs4C/hO4EBf5SQaiG3gDNlT5Ldi5OwIJHCEAOcwCPgB8H7iI4mLyoQS8GvgMj0wMfCtwtr5QX4LjZqDYuWf0o2gEzBA9Bkl1/NS6n30X97tTZnLLwOw2w7yuQjun88gFBJ0OfB3rGZkMBEuYPoeV3E56hNr3fx6OEAA7BhcBPwY+CcwJPdRcZxHOg5QIvJWDE4yHCvOwMQAZTGuBo7ojF1FjyRE8MwQqV2Bi5Tf6XgqOq1DXlEgViniY2NDWEHHUtMISagaOe5jHAuBY4F/xvCIAjWUohU21DcALgZ8Cb8Ruqf6rhtJDL+IxDVOBdwKfxRqvCsumpQ6eezR85tyIVdMjbthhGHN13jLW8NQH3HSY2ydAO3aTzbOBS1FzduIs4W9OLtEQmRyZ05h+pxTJSivYBSH3DnhxQ9n97JI4N8si3L/PcOXaglodA/cDFayhNObwwkKsTv8E/8Zp8+Gy5wirZgtr90BfOF9RB9awOxdrIOw9zO17zMBfKwEQ7OL5KvAqoM1/IBI4dRZ85onCu04WjpkqnDJTqIuEa7YZKu6ar8caotZhDU0PBeqxUsgTgb8F3ge8A4v8TgDQk5cKzz5Kie6iIvoQXFTPO+7/FhwDfzAnWE4fUspgw4YPjAo/ubuwM3AJ1nvyHKza0o21wo/w0K3xC7Bi/yX+jRPnwjdeGHH+MuHMBXDOsoihCWH9XkOlSILqgBOBc4CtwEb+Cg2Ef40EoB54JfA17Lbaggzb3QRvPkn4/BMjzpoFdZGNjy+ZmBNnCP3jcNOuwmppwS6om7EJMg4VBCuJnAK8BHg38B7gNVgiNQ+r/xfm6lXHC2fMBpOl/ROnVEMY/d12e0+lRkLjmAHV29m+IUAYp8SP7qwyOFaoqBFrDzgWS7yeDzwFa8hsxqYVG+SBSQed2CxIz/JvLJsG//J84fSFQmwMgmFup3DJCmFep3D/HsP+oeDYz07aJ8Dt/JW5C//aCMBcrJ7/Abx4erBc/9y58I8XRLxmJXTVJ/tfJEeChghOnSlsHYC79hXKn4o1TN2MTZU1GdRjkf4dwN9hLdSXYn3YXRzERdtaD287PWJRZ2TbqJDbFdTTazmS54Y/iqHD4hKSXI7QhCC5kuQa+Pk9MTv7J+1rhCWQ85LxeXbydzI2j+FuDp5ctAPr6nsZHtGe1wlfeU7EhcvSrUy2lQahXuCkOcJ5SyP6RoW1YWmgCSupLMEmWtnPXwn8NRGAlcC/YTlRvX9zSgO840Ths2dHnNBtgpwzFZFb6uDUWRF374MNfYV6ZmCj9X5PUbcULBI8H/gwVry/EOuBaCBggwhBXQQnzBRef2o97fWu9d7q8rnOb0V3zeGTvhSEXYX4yTsiKI9AUZ7AGErGcOM2uG8vvhowGZSwRO444BnAk7DSwgDQQ1EqqMfGXLwJjzBOa4UvPTPiWSvTQZACESOGma3CxUcLM9qFO3ca+ovkpow1KD4RaxfYesi9eQzDX0M21wiri36CGlFqJ02Dj5wmPGWBFffjSJBICmHwYHfIi4EoEm7bJ7z6NzF37A2qjr/GWpq3YMd5OVasfzqW0xxSEFY5gpmtsGyKsKLbsKRTWNwVsXK6sKhTiBSuGKMQWNJoPsGI9etnNkLFJx2tITX2ZzsCFfJnYoMCE0MMO/oN9x6I2HBA2Li/yr174f59hq19MHDoArUB9gC/w1r3b8SK43XA24CP4rlb2xrg80+L+P9Og0iM7Z+Ir9GkQY2IGGKEazcJH7s85vfrjLeDMoO1wEewnqHKIffgMQiPdwJQhxUZP4c1RDnQUILnHyX83anC0nYb4ZblzFKeLz1QRky2oKJIuHqH8P9dXmV9b7D+/wb+HXgaVuRdxEHGXICuRlgxFU6bLZwyG06YAXM6IlrLibYvgpHEnQd5JJ8qRXLZ3e1A2g+skJzuCNahBJlHQO/s1+87MQMm3SOU3DKMVoT9o7C2B27dATdui7l5myUIE4cmJewD/pSM32Is8jsBPM118HcXwtvPFurKup+q7Tr0MWmwJOO3fSDis1dV+ffrDcMTwTb0Y71DX+SRD/l+xODxTACmAh/EZs9t929Ob4L3nSz8fyuFjgZDnC1MtYB8f1lKFEyKPIJE8LN18IbfxewuBr+OYxdPK5OMtWC5/Omz4Zy5EWfMNBw9RehsNJRKqQs/lUi0eB/aquMaAkOuvRxMgEhI+FlRA2FwvlupyOSGR0nx0I7laCVia5/hxm2GqzfF/HmzYd1+Qrq4D+mINuuL9SV4/3nw/vOExjorsTj91W0tQELARRipCN++GT75uyrb+mrW/6/Ap3ic2gUerwSgC/gS8HICVv4VXfCZMyOetsAQRZp5pgtJHK+aBePYyzTuGRH+a43wrt9XOPAAeEVz2XL3py2NePJiOLoLmko4OGbE5FxN++ozMT+nTQbxMgIpvT1DEuPNulFli/euLiuwUcDbWlwsm8x2IGIlhYoRtvcLf9hg+NmamGu2GPY9gF0DkcCbzhQ+dbHQWp/OiagcJ0VjaKa+eGYMazKM+P16eN8vYm7dFtQHYuA72HiRfTzO4PFoBFyCRf4Xhvp34Vz4l/Mizpul9sQbQZT+nHKU1B3mIpE4XgGwi/LYbqEcCX/eZqgexJs8owWec7Tw4bMi3nNaxMULhVnNUE4TeChkFyIcGVv7+I3L8CRpq8kMfSqMV1OOQJ/SgjIXX/pMUoZWE/yw4PSSg/ui6k3abBL5pLMeTpgJTzsq4oLFwrRWYf+woWfk4I74F50gfOYSoasxtXnk/TJK9ZECvvvBUfnHkm7h7MURm3pg3b6gdXQVNjbjGh7ZTU4POzzeCMASrM79VDzOXxfBS48SLjs7YkWXMoKhUmCli0esNT3fOedx3vRZciQpieGEaTA0DjftDju357fBq48VPn1uidcdLxw7FZrLthKTcuDkTxvhJCMALpe2j3j6ikJ41zUouoNJAfp3TlA0mEQUyvwgOu4ouS8SyBvg+CPdAbamA0N9yTCvAy5YJDzl6BJz24UDI4Y9Qza9gQ+XHi186Skwuw1io9qeEq60CrXj0aRkR5RY5YgGdp5ntBrOXVpi/7Bh9a5C/YKNZ5iDtU08bojA44kALMfu4Dvfv9FchnccJ3ziVGFmk8k5RxARIPd8F5FNq8kZPhibaqc+gtNmRewahjv25vUv7oQ3Hi988izhJcstIYgg28KbSRwp8vvIKkXEzJ9zLiY7/PIyjMlXvUswwEF+n5CoMZDMwufX5hFHheASGNPMPpCPaCZZTGmEM+fB046OWDIlYv8I7BrMEfG8xcLXnlFicVdir/HTlhEYI33NeciTgJLsRx0NhnOXRFSBW7cWbBSaCDxuJIHHCwFIOf95/o22OvjIScJ7jnfz5qXiaO7ySsAhApCyxdyolT+c2QUVYjTXC6fOFNYegJ5ReOVK4R/PL/GCo4SZzSbhmj6hyfV5kZD+6lskQ99ysT9f9B7yZ/0LILzPcQuigLKPGLetPohoIuCWmSlXjpSTBPAYaG+AU+aUeNpRJaa3GDYeMCzsgq89XVg5PeX8akwkL894RNEhRA6xC3fUYGiqM5y9SKgvw41b8HMdPO4kgceDEbAL+AbwXP9GdyN84mTh1UdDnSZ1CRsK+Y1DI+QaBEXJvv6zuZ1++5CwZwRWdMY0lp3kW04bshccPFaLUnxkN84zRT0359apoqOJSUbw9MXUSKaJmxiFwMbBdJP0XbL2KXsKFGmoLtO9ov51ubVgiA2s740gMiztSoN8dEXKvCFWzNfD545d7vJ01L48rjm7IMBYNeJr18LHrqjSXzTsGuyaezt2f8NjFh4PEsC7sQkfHJ1/bgt86cyIly2FcoDiZ9xBI4MpPObayiaD1NCV+MbbG6xhr4RJjIzJQ0EupMAznGVrM2ibcosxmUSRxyqIx+lzx4B4bwt+gRK4lt1JDaIFI5/U4Ly+uoDbLl/KSfYkTG0RpjZpUSNXi3T9qd1GUzd3bDKFJkCgiraQssAp84S2xohrNxV2gAo22nMdj/GTkB7rBGAW8Hls+G0G81rgq2eVeM5Cj6EWRFLBsXanl5PPnH96BjXNDb13LDPVOrNkfmeX03sIWEtHDVjcayXpcBJ+SkYKnPJEdF8Dun2aOCSTNjzxRAkgJhMacv3e2XdQoC/a9uC1W6kiJmsr3rWCVca6SYsykpozydrkeyo8+UgtD/ulJIaT5hjaGyKu3WwYc2MC67DxCT/hMRwt+FgnACdht8xmsf2zm+GfnlDiGfMURulFrA1uubPdKdTHTcs53eXihglrQbNonAvvtfflf49jpitZH9qR9QdvUXt6fJDLgojaNaiJgNR6XxGUvFKn/7lWlLv58rHQXfVFKVc60A87hsfgWOdt1nTV8ZSSD6Ek9RY0NjU3QYHMJERgntBQjvjzhsJGonosATjAYxQe6xmBjsILEX3WQuGZ8yU8oVj9NRXTxZBkzTGkcbWOHpr8pfd0nnwxuUiZWt6dPPqODx6cZZwaItNYXi3mZ5l9KIT35nXkRCaLVVC5AEnjGmLy9OBpOzVSp3/JGBg1DsWBy8chlxJAoZ8jeDuSUkHCENyTidK50d11RflcnfEhZKfwU5coY0E6LmoOxHiSUtrGxCtTXzK85lTDCcUjT7qxm7ses/BYzwq8Bxtq25BeuH0/7BqB2U2pC8yzGqF+guK05GKtRxadxaTZSq2oFUdfTa/lXF3HIBhVpiOVZPK0esmEOJW1yqdol0UHpif/pNVmSOadHuyUpMdHRyCqThX6XBQ7jCYCaaP9x5xyJGm7LtafIHfYi83Sbs6AbS8ZhPzdfOyDGZXTlyIggq19hu3FLc8jPMazCT3WJYB7sEQgg+t3G755X2yj8VKuFbscPF8iJuf05Bw/4+SqDIN3TUkOEhtMbJAYN4Ou86z6XuM5E+cc2DgbbjxpwuPEGaT6fSYR4EomnrTh5gbMr9s2Kgki/a25v2qXqSnNBPqv+uC2S9y+OKDsA9lEBO5n9gJTnANDHvFpJJf4nP4ExtvAaEX42rWwtbfQsI3A5sO9qB9JeKwTgC3A9fpCDHzj3phbeyDSvctEWOMuVn/BYtWC0OI0zm8pXk/KMZqz1kK+OFvNiDHZEnYRTBWuRVhCyOjXo8Ryv6zYXfwm9L4hP20oReA4IRixOEgiug1ozqvGWevO6XP+IDltd5/VhNqxV+B89ep369T9zc5LiHEyJfvSm4hw5Vr4we1B6nQNj2H9Hx77RsAqVgR7KirDa/8EDFXg4rlJwkzIOH/RvueYo7PPgh3Nv56JmtoCrQyMofdrivEoN6H/Uqgg1QaNMIo7pkax0H5339rt9je3nGsd3A97CFtZjEJuLyhHhRP7ilm4Xb7VVNsaXAOm5F+dpmT7l4JqR24cDIJAJMKe4Yh3/7zKvXsKT+zAJnXZzmMYHusEAKwUsAibXiqDdf2wrAOO7/KYKKnl1zUThTxivurquNWMwTc1gWvUdu+4V6UmUfBqrWXNLDQ4T4fl68euBd5zpRWQ38cT3UvPcp++UVN0z4Yq6bO4JYaorPYYaG+AUSYRPdBZid6cTjJ0rkGx5gCDCP92Y8w3b4h9QmqwuQm/w2McHg8EIAY2AU/GRgUCNo5784Dh4jkRXfXkEoC3cOyHciupGHN3LRZCVYILP7Q+C0tMhf1m5TmuymKpxrtsmb2HUMFfyb+Sf7oyi4vUKZLl3gUtrxu3Y/rkIZ/Y+P0Q3Rbj9scxeEr6iI/jRWatcbhQl7KDFB6uMTNqgqMI1uyDd/+qyr5iMtHrsOncBniMw+OBAIA1BMbY/HpZn3aOQFNZOHeGMnaIm+orWyyAZTMu99E+/IIxW3CJgsKzHIybW6/4AK4D26MqykXlvpWl5nQ7kxThW8A1h8wlGbJt0JrD6Z2QtRBGi8/2u1EDQBC3NAf3x88HR3qv9dDB7qUPmDwtWnrNJUD5XKUjOm6ET/8h5vL7ClS+H5vI9RYeB/B4IQBgD6I4Be9Yqvv7DKdNExa3pOqy1JLPEynBF4iVbq/+TPZ8DpJYoJ0y/CAkN0CdfDEarwbVAsc74WvXyXOSI3PeYuMgvwrULfQDbVgzAYwK2ABcdCKIiK7kosZG9L0aQTqHIKWbZNz9WIOaNov0w0ix7EQkiyK4fB187Moqo8UYv59h8008ZqP/NDyeCMAoNpPrU1HJI4cqdlfeJbOTQzTVTrYM2QLbXfNNQvnFwjIVj1OlzxT01dqNNg4KSKA2oRD4owtN+5HZOKRYZWj/gcnb7erVrgifI7dkfwWVI6DLmwJNMM5HYbO1r3odZNzyefPUGhEgCpBsrbroej3JRGDfiPDuX1dZUzT87cRuANrE4wQeTwQA7IEcXdgDNbIZ3zQIi1rh5KkqXDUTP12UyhDC2yWY5ZOQHFkPAb/z+95Dxng3AiKzSxDsb/HeMe4Xr063vz6hy6UE1ZPUdaD1mmywxAlWcseDBIkVGfKMm+44FHm/M56eWO70zNkMlDcvk7+kBtKHtkArOmLVNeGbtxj+7aaC4a+K3XfyPR5H8HgjAAZ7NNcF2I1CAFQNbBmCi+ZETG3wJN4sWm4Si5Jz5p7eFjQ5pMQltHPYcd9J6F3Xxeh6EPKdd1pNcGINdPoynVJMSzyqcgk0QArNc3fb52pE3tIsV0D6hsP4FacPcXz93bhUxni1O+TCj3+o5W4tDKfrG45EuGev4V2XBw1/fwbey+MgB4CGxxsBAGuZncCeHZeFOu8ehZII58+IiBJjny8BZMtZcL0FakHlPM6DAJMq3EqDiPAP3XIflFqL2+Q2BdGIj9KDFad31ByPWPjGzJBD3hECCLQtKSz/pp6SYA+dazawx3jvqjId3T4qbBCyFg3fcavmwHen+puenDG3OQA+fnXMFcXDToexPv/Dffjrow6P9UjAWvAHAie7fHt9zDW7Y6I0FCwL58WNBEwj9eI8aswgTjAdePqzAmfxpu8nobVp+K3xkFBARbqlocfazaZ0a00QII+y8zCxEKKb/RmvbYp2eG1Py8sITGwKfcMkodAq4MLosXNCme1FZ6NQVr794UcomhhEhUlnkYVO3yT7K5JXE+yTX/9VG2K+d2cwV/le7JFhjzt4PBKA+dhjpBb5N/on4P5eo8I+jUKIfIFpJJN0PYQszY5IS2FRmULIsMvRcyRwy8mJjN79l3ymSBjHGEVJXMJgnNBWk+xVMBqx4kB/kjY65gJVjksEjLqmd0Wq8Yztn6TjHAvEgsSSEaacqBonJDcYnhzrsbN9TPdfpGPpEjB3/NP2uPMk2c7LPQMw4Sb+SGEB8AXsISWPK3i8qQDd2PP/nodH3FrK8P4VwusW2QMjfXEwwwUPOUPivvhycXYDJ6efu0E29Lh9yuDuhBOlJmSNSO0UygjniP3aFO4hti7Da27gh1KITF5A6oYshkP51s2gFcXpcV62MkT6JXkqSTaSGrnVQ0aPdU2rbMCgmHyaOGbFVKGjKeLG7XHI/bcUe77kNTzGdwBqeDwRgE7s+X8vwkP+tjJ8dKXw9qOFljI4izfFp0liwv2015mAmbEbspUX1O6liBR5ScXrxkEuRQxEL2EXEZ0w20zUBn+bbFqDTpDhpCdM2+ohWN4icRqctSchDjphRxbNFxhDTXxF7QQMGyM9YuMQK7cxaaslEMuQzrPfDvs81AmcMkuY21nm+m1VBovnGi7GSgPXAX08DuDxQgAagE9jD+N0+tRWho8dK7xpmdCQStoOKJeSRwRyg1v6nPot7nMiEtiFpo1QGm11jHvOYdNnM9SW/He+Z1373YXUOGaMNmdmVI0M2UVya73CG4ewJTd9G1nOpbUbMg/ndQ2KReKnw4zdOkV5SHLC6RgK/bL0l0D+Px3upEbAkcj086kqks5HCWHV9Ii5HRHXbI0ZKhKB5dhENL/jceAReLwQgFcAH0IlBgFor4NPHgtvXCLURwlnVUbg3N+vxUeXq2qpukAg9LWargEJX3c9UN472kulF7MgWchtqj7kZThqjFryGSp5yBlSAUz2VkBnUP3N7yp3oCh09CmNU5Un+IciD8V/To2MR4FzBUKccdBngWRT64PJ+5COYmQMx3QLczsi/rI1Zqh4eOhSrOXgT4TPgHnMwOOBADwXe4LrFH2xqQQfWSG8ZalF/tjLQ486citLwRfAiPBu4WJm2TT7kEMw9EsmTESMRlEjGB/xEmT2d8Hliz6AqBoDVOstwXIt4gVpRlUjmkilOK0lFcnb79s7XKRNxpmQlEKG7DlB9MKpjW6iuLVkG5YkV7WUrcKXD4IEWSeEzSQjw8ruiBntJf68JWbEtQkIcCIwhD3GPEj+HwvwaBGAFiwVPQloIz9F94EO5MnY01vn64t1Au88SnjPUVBfSpVQPOOdBNeCA+L/9NJeOlK8hF/35N6Mq6UczuRXTXojK0Clvc5aQIa16WIPo53JysjbkyCFcVHC5X/qFWc2PGKiDQfqlpsHUO8+cEmVcd4T911NHFKk9e8lhsB8C3QoQCsnToUcCP5cOVJg2hfDsdMiOpsi/rQl9g8Jqceu39uB9TwwEOyJ1cuSMlqwoezjD7CchwwHQ4HDDS3AS4EXY3WpTiwV3QzcBlwN3IyNtT7YgQvTgG9jA34ceNVC4R9XCR11xjsIQ6sARX3fCSrRamYCDq8tSP6pGOHltlN6uKt+JMvVldsztcTZVOSsf3Eb4Wf8EH09JwLZaT1JXcYhEAmaelJN1i7tEVFqU+aQ0N4C5zk1LpOttMQKJ45vtPheKkGZ5Jd4dMGl7ynhd091dhrpUOi8/86ODAMTBj5zXcyn/hIzURT4bwBegM1LMRk0YROIrgLOAU7DnmjVgd1huBH4FfB1vDR3Dyc8kgSgA/gk8Do8XV1BFdgN3A1cBVwL3EFx33UZa/F/L57F/6IZ8I2TI+Y3GmK1iPKFA6kluGjjhtznliKkuIuSXOLUSOtkBkrNyuk7aiF7xvXiTHhWaocjZwKDt5o1EYjUm+nBehK5yKKCFhwLey5SZG1Jy87SnDkEwCOaPvPVUpY+aUhJTpKOZ4KAGSFK6wlBRnxzYmvE648mHppYS25XEV2O6omfnFQw9I9HvOOqKt8KBwr9O3aLsL9OG7CuwwuAi5Lv07FnCoQgxhKBN3NwgnJY4JEiAGUs8r+bQ1c7DHZArwd+gyUG64AerBTxL1j1IYOVHfDfp0ac0EF2RHcaC++fheGasEPGruSxKCwSZ69Liie5KGqZplF7T6RIY3C5lyt7+uasvEFG9O9ESjDGLYsEkTKk9U7PRbe32MbUDiGi2pBQPeN5FdwxUzH7ksswGbKF7CYe0Sg+l0hO6jgyZx7TkfTnNyPc7hj4z4l6XzOEzMWbtDES2DoU8fKfT3D1lgIFn8CGCn8Oe1jIYiyHvxh4EjCVB4Zr/wO8Hhh8AO88KHikCMCTge9iRf4HAwYbfLEBuBU4D6s/ZdBdD/92SolnzUoZX4gTBDi9HorMlqTExkjryaZ4ynTIpqTuG8GmGdcs2EBB3VCFucZ6KZSnDV4ZIXJUARNkni7Xy/8tbFvO2lLk7kbVjVeWjlVIC87jBnJDnVNkgRDlDXL2YHnExiRExrYyVQeMa5vQ7zkELr/nzqHoZYA3YUSR8Kdthpf9vMLWYorwHdgUYccBJ2CD0h6sjW0MeC3w3w/y/UOGR8II2Ax8Cms1zaC9DOdPtRF6/RNQmdz8J1gdajbW8DfV6YTA+1ZEvGZBbtl3Nnjr3zU4fl5NOCKlsPMO9zETKMrZEOPiZ/qA94KHCCYnPbk0nsQcaA7mZCE2XpFF0SN1J9pyNbUx+JTDkWxU09LH81TrXkoTCTxH0qfsuydB+ANv/Ov5n6RlqWd1GwrjnBEWL1TLmYKUAPuzmUiRxjC/XWisi/j9pthfs63AWVjjdisHCbNvLMPybjh7nnBgFD/oqIwlID/nYT589JEgABdh86dlx3cJ8J5lwmWrIp47p8QTuoW5TXb6Biow9gA9q0+fJXxiZYnWcl6+OBOfPJhYjvVTvqXJkcQ1XtSoO7MtZP8kbkVf7KdmAU6b3QXsFqARxF+jWehyAWnSxhsHKf3MRW6HswYkKcuTMVIcNQsL9m0XDjfNx0YwxUApffiHloA896A/R7p9OYN3RicvM6NGofeF/Oi1ACmX0BuGldMitvbD7XuMV9jkM97RACfOghccI7z7jIh3n1HiFatKNJSEqzaZzGSTwCzgPqwN7GGDh1sFaMWKMc/UF0/phJ+cHjG3wSQn8Qgx0Dsh3DtouLYHfr/XcFuvYe/Y5JEWC5vhe6eWOH2K9fVr0d84CMBBuL/SAJXBMA/31SJxqgur8ox+H1eU9cJr0mc8D2G2HjN3ZYY9rrqSi8biVm/yluYnXuRlF3vuuQ0l7ZsWgVPRXZOO9LKrlIseE63CJLsaC9nQSPdBKGKhxiIjAJL0p8CYfQu+QKRtDsaZB9sGbQqVrBUZcfOEMlcNsvejSFhzIOJ5P57gnn2Ti67tDXDsNLhokfCkRREruoWu+phSJHYHpcCe0RLP+1GFP28tlPUn4DnAfh4meLglgBdgraPZvvyywAePjrigu7ghrakE85vhrCnCM2ZHXDpDOKZDaCzBQMWm99LP10fwkeURz5oV5eIxicHPUWy1+K5lZxTnTh8voonPKVN3lL9afLFSh+96BfrqboBz69oC7dFUIy3AoUnGlX69x52ifU0kIyQ1pBgTKiykqru9KRSVDICOdgTlLcjGSov6rvsyFKkVSvkthObVIau+7hB8CsCIML1FaKmPuGJD7B8YSns9nDwTXnFsxAfOEN5+SsSTFwsL26CxlDCYjJ4JrQ1CVBJ+sy7OjNcJzMGmIbuBhwkeTgmgC/gpcK6+eM5U+MGpETPqrY/eGI+TkovPadjrSCxsGBL+vM/w210x1/XE7BmD58wSvnlSREed64bLuYGvfx+K8p41QhXlKvCZ2Uq5yXRii5y7BxBIN1O8dBbFFDyFBvpGQC0o6HYUsC440xqZ/Pp0Q323RVpTPne1JGwtkdUcZye8WEkivioWGEOn3RlVVQbHwjiEbDzmIOOUPyeZlCYMTgiv+02F76+Jaa2HE6YJ588XLpgnHNsNU5psgtE4K9jaWHzjpgA94xEv/t8Kv9tQWJB3YvNcbuNhgIeTADwXaxXNfP4NEXzjBOFlc11/di6ZizsRJhdI7eWIoQrcMwA3HYg5d4phZbvkA5ziZMp5ktRZDgHwJ9p4n0qndQZIyA7WNIECtLDvGBzF/5ksAhUwlKsFanEU/GM1Zk08f4aTz0/1pcieXdCqju8g8d/LZGwfmTwiLIFrXnFZ9iVfB1fzoBUwvRmp0KgCwpus7wVXpN8mnVSgJrjrJ5KIO/fBD9dUOWsOnDYzYkpDQhqNZXAFa2iQ0Bgiifjh/YZX/aLCsLv3IAbeBVzGwwAPFwFowCL/c/XF87rhh6dETKnL3Wz59lGyv0JGWeMGfApAmuCi4ON3xT5lmysukOwAzVTm9fVdl/uYEHckrcC/pREk5diulJDVjXKvTaaD+g0SvMHyOLkSgNyApoDXIKgj1LhuTPBR55r2wkwGjsfGG2WvT7l9I++CEzkd4SKb0x79vShVZTaDQl/0jkU9z7nBV4tgmd2psOaS8XeovrIbYeivRLz051V+ta5g9boWeDo2BuawwsNlA3gi1vKfnddXl+j+Z3epDFbpYETiLFY3Gk6y3ylCpym68sUjAQSQIv6k+qTe1qsMg3nMuHht8NEwsKgTfVYnu0y6krcnlUhSD1HWZsmf9RFG9CryxemQu0r/jsFUkbhqiaiUkFI91DVBYxs0tUNDKzQ0Q7kBojJgk2MQVxFzEHeMQxz9Sx5i+6qer2anbTf5HEl+wT6mjlgvUAAJ1F8QhUIcXu+EEIIEy/gbyXRl6SEqkTtXQQIoOTFWsm1KT5vK1sD4q3UFF+N0bHTs3RxmKD/0IgpQB/wN3u68UzrhqdPFprFSg6J4ooPknlCdUFo/mMSdCBdMlqG2MKkB6THnz/qislG4bMkDCZeb3HOal+kQKbHwrPW6vKwpHjfTHgddrZgkCspAuQ5apsHU+TB9MWb6YuieB+3TobkTmtugrj4vYWIMRodguA/6diP7t8Ke9bB3A/RswQzuRypjCdEt5bVmdhbjIV8Nl2RhoJTon3kyDEJEbvlXSkAhllrpK8b55eoN2doJeBMQfyCddrqMJCVKmnCLkiK99hm3fIcW6hExQhwbLpwfceYc4Q9utGEDFqcu5zCfRvxwEIATsLHPGUTAi+YIM+qM4/o1HuI4MfYJovjzImlIavKceIjr4oijPSYjX1wsetFoc0GWQCMT012p26kw71ReStIHIyRbfVUlTkFKwFRyrmR+bk+sVKvJvpNw6voWmHkUHHUWLDsN5q6ErtnQ3A7lhnyh1oKMnibPVcZgpB/Tsx3ZthrW3wDrr4dda2FswOHcfpbizH5TUNd9g6KLkHaK0v4a1V49W6rJTpeMVwYuEYCEgPiSjbGXfDtEQMDKXaNu03OhTDE4fydZxs58ApZ/7W6El66MuGZb1d94dDpwNvALDiM8HDaAjwF/py8c2wa/PC1iflM+fJmv3TeKJGKw1rlyBFU6u/rt/lLIkixO493N3yk6hzSDSWMAjKYQQfG/hk3AWQeuqyv7LIj8tSbHkxLEQFyFUh3MWgKrLoLjLoaFJ0L7NCiVFQKZPF+Bj0OB39rTlqpaIgJxBfr3wubb4a7fwurfwZ51YCpWATfhlhfm17cpiqornRWnCM/O4Rt1lR0onyavDEcbSMtTyBz0wOi2ew0XP5TKa2MgsCjXYDTlcKU5AXaNCs/6SYUbdxaI9X9gN9MdtiQkh1sCmIZ1WTjw7FnCvCZXis6QSut1SjzT++WlQIr1oIs31noikvsJNy8sINF0IhFjTU6n7X5z2zjHoKhB1ZNfU0E/+iTc0NZdpRuHpIuQVImpQrkJlp2CnPUCzAkXQ/d8KJVtcAkJccjq9I/zCoAaQ1+KSiURYwQ6ZiDHX2oJzr4tcOflcP33YPMtUBmxhEAX6AthsVedJCKSIRCCmz4p+VgVxGvyjUKZx6DWetEUWVvpFEJ6U+msK4eIhVyfRaOISdd1/mK+b8Fbi+lrM5vhBcsjbtxZSFF8DjCXw7hT8HBLAC8E/h/QmF6Y2QA/PzXi1M6EbOl98Irq2jF1qXE2kan6lu6Ai9N810klUSoJCKkp2JEcs56KS4W8287cu6plWJIV3S5vrWuV1eEVrhxQ2Oqr6i0KFlWI6mDZqXDha+GEJ0N7t60njlUNeX2O1uC3X3c8bYMJLIqgWitIMu7074U7Loerv4nZeAMSVxI7AUkUoDh4JqGGiLse9MIICmDae4Jx5iEbPL8jflSUF9+RTUi2TIzLXELSKkqzVJQ6oxmimY/bpOLc2HcjgTUHhKf8eIJNfU4PJoBXYXcLHhY4nASgGfgxdudfBi+cJfzH8RGNJeOudk9lzHX/vFn5XNvosIG4xJZKM4PlTsYbplIpNyMITVGFlniUtrifDtNPsxmmvjpGFFcyEdakImpGU1IDjjcjamiMXpwmYG+Q/Itvm8olAH/Ejfu+L41kwyPuwjAG5i6HJ70OznoedM7IRfyACF+TOYUkmEnMAjXf1xVECdfv3QXXfheu/jdkzzqMg20uGMdomAyGxwDyenLsceiWsjK6iCRueSkx1M+JLtsdgKLt2BQJgMNATKHZ1nWdG4BzRhAYU7d2ACpGeMNVVb51V0Ha/x3WvT7AYYDDSQBOwlopp6UXGiP4zxMiXjDLZvrQIZqGAMaE1OFEnN43UeIdG2dzVV8nE/VdVFtmErfMoNS1kMZpS6nvnE9jfSPTol5mVrexYGQ9x4yt5piJ+1g0sZGuSi911YmECPj2B58akXBv1UbfuJe8r5NLhGxd+WJJF5HJJR5nEvzIt4RgxlVoaoMnvBie9haYZXdBOwjkI2UISdNbQYupiztBAkLtMjOIkkHYfg/85stw4/dhfDi/rgpI9eCM1Gfzb3xsThA/J4g6fFoyImBc7A7RHj3fNQhANpeOAKEGVNRvnWcB43D0bH4yNTOQsiy0ASn5HYnw0w2Gl/yywqirCfRgmexhOabscNoALkQhP8Bx7fDEKYnep7llqNPOAnGNfyLC/ko9Vx9oZtd4BONDMLAOqmvsA/WtRB1zYcaJrF9wDsw4n2rnM2iQClOlj/nVzRw3egdn9F/HycPXs2h0Iy3xMFDCOD75vC21maIEr+Q2jdA94xTsqJKpwC7e7jyD9cXPW4l57gfg1KdDfWMm6jumB79ehSBFQ6Op8VUpQVrs9sX2EHFJH0i3s81ZCa+4DJacivnl55D9m3IpIZHCXBkvb7A44eFefdpuhPbfpwaGwhJy26qNhyTlOBmQtHZQlCDyV3MKLurl1Oth0k0uBYnAFYKZpJ/GGE6fDsdMhVvdBGFTsGnwDgsBOFyBQG3AR7GHJmTwmrnCU7vTadJcVqsCjlKWIby+Ygw0RVVuG2xk9UhL8o4SjaoTmOF9mN13E2/6M2y7ifLwPkqNHYw1z2JX3VzuqD+Ry5uezE+bns51TacwXGqhq9pLuxkkQrlugsjvtCZrnxbTHaRUXcsFB0ckUN+UYpHRCWMR5pRnweu+AseeC1EJJuP6Cmldt5jCBm9bbCGsoiZI6CNgOMnrNaU6ZOFJyJLTkT0brcEQj2unbfIaUTiYNR0r8S0pJhy96+pS+Zg7Yo4/tzAJ1Q/XkamU+WQYFZqog4fy9e8ZZE2oYDtQLXURWweFP28PPvQjrE3gIcHhIgDHAO/EJv0EoKsMH1pSYkGTYCMB8iOt83nwjDYZhxSySLDEKt+AYVqd4Td9XQxVBVJDYCbOJZFYpoIZ2k284xbirdfBwF6ihnakoZNKXMegdLK28Vh+33EpV7VfwvaG2bTHvXRP7KUcV3GQXC0Sf4dZMb23ByElPLTT0BF3k37VNcNT3wIv/yRMm+9av33O5jE/10V6EAVfgl+dK64Bzi0v5FlwpDsB6Z4PK86FwX2w9R6IYy84TqcRI1CelhVSCpSPRU50Q6KJr8xrQlDDPuGpgdbGIuqz+II+3MQdF1fOSduio02LolTenVIUUSpH/HRtlTFXDWjDpsnbxUOEw0UAno81TGS9OasL3jy/REMkbrx2pv+nQ+OvaD8EN2XJwpzGmM2jZW7ur090vjT4OxXj0wm2f2Z8iHjvGiqb/4IZ3E7UMoNyUxd1AkZK7C9P59qms/hl85PZWJ7H9IndzKjuoaR0FifjvQr1FKfNanJTYuGsx4I8WHxbLPKbtinIi/4envUOG8BjYneB+VJzQc+thfjhE38C6OK1sLiMDYTQMqveOTrNGBt5uPxczPg4bL4NMVVPjEibnbRIeWok/dSOfr1Xo6BJFpHQiUJ2vrj1abXHXiiKg5lWpccoDS1PtAYr6iup0d/gkTK5AlOQ7Pk0XLitIeLKLVW2udkBW4B7OAzbhA8HAejAJvwsiP8XTZF8R5QJdNaRQfNPV8zLF1k5gul1FX7d08RAXEfmc3Yoajonkt+fGCbes5p4xy0ghlLHXMr1TZbbVmGQDm5pOo3ftl3M/nIXCyc2MqVyQJ0vJ9li9NVpydpcwMSs7f7uwOAbJoaO6cirPodc9Gob4KPz5elvPiMKiuE+BElW8ClT80093AXFOufiBdXeQH0TcvQTkBjMupsSV6EiIFoS0vspfCnFqLoy+5/SE0iZQipBZvJF7V6Z5Gg1401uCLRKovtt3FLTw0kkiwPJU7uJXvOZcKcYjCJUTWXY0G+4pqgGDGO32z+koKDDQQBWYcX/bOPP1Dr4wGJhQaMlAOJPZkj/cobV05PTTTQxTCtXWT/WwC1DrUWC4uh7GukSYjA+SLzzdsyBdUjrdGielky8XTaD5U5uan8C17adTWNlkIVjG2iIx8kyg+KKpI707ivECtFzUP5q3U1joHMG8tovwBNfmBCugyikmdgrTtnO7RqjW0sSqEUYal13XaKKk6vhyAxfBqSu3oYoT4zD+pvsJiW/dMdSlo+gM8yaiBp10ZMAnRlwOqnWBuSENlSRJ6YXpKa0b96AZKskkz60SuWPqL9u8vtRUsD/rosZd1G9FfgZD3GH4OEgAE/BZv7JWv2ELuHNC+uoL0keA6934GkIcG+HhegdVsbuNGovG37R28FIHBXf0YtAla+tD3HfdipbryWOx5EpS5ByI5FYCSMSYVdpDle2XcTGurmsHL2H7ng/JqXhGZ5rUVPHAXgI6WFbLsrnxh7apiKv+izmiS/CwRxXAS+OvL/PXyjoBCExf3KOXrM2f20G7nvsWrzHDVCqQ5aehgz2wMbb1JyhiJpuT4I4osrPdHOye4UKfQGiQLEN7slCoY7qEGPJpst5NLXB+N5I1WUtyYkvOYlfZ/6RSg4t9RGXb47ZOeRU3Qj8EZs38EHD4SAArwVO1RdeObfEJdNKhRNt81x7Ht+RwDINLjRLBKbVxdwy1Mi9Iw1FBEkljgQZits4E8yaGCLecTtmcDul7qWUGrtyd7UxVKSe1S0ncn3LGcwa38ai8Q2UMvodptY5eueeApLy0vsZ908v1bfASz4KF74Sd2eL1EQ2n874D+bewZzreKPkfM+HsDZ2i/d2LQlD2wd0E5036xqQxSfD9rWw8z5FADTyJwioSnIMhfkmfnfLdaEb4tBb13rvEcTC4EjhcmpQyFaBqOso6c7zwGRENkh9/ToT53DyeHNZuHWv4VY3CWkZuAV7VPmDhodKACLglVgvgC1Q4LUL6lnVbIirsXbmH0JxAbbhcVERoSEyTCD8qreFKp4U4LkVg2xL7e4xBzYR77uPUvcioubp2RqMxHZuR91c/th6AQ1mlFWjd1JnqmlDajeSXDIozreWjUvI098Kz3qb1fmz9oFPFINhBt6mKAK/dKiAeL9Dun7Bg1ij3Mlms2ALyOZOIU5zGyw4HnPvtdC7M0yEaiChCdTnZhYUt9L0qyl2yuAtEZ8PmTRcQIsbubqjiW1+LkKeBDXvhlYBTLg+fwyx+QH6J+BXG2Lu2Fd47CrgLzwEeKgEwGCTf5ymL/RNGBY2xMyus2I1UTTZpreaHhzf1q63s3bVxfy2t5U9E3UBKSAZQof7e3paqidKhBncQ2XnHUjbDErt87JFKkBkDEOlNv7Sdg6j0sAJw7fQFI/kkoYuc5IJLYikJoYznoO84hPQ1EoS/REsw9QqWm87rUFgD8ZwQipBVqu4+rcnvKp7nl/AQ2Jx3jW5l6RjOtI5E7njdzA+kucWmKwfATeck285U/nI1pAlPCb3ppq8YZro5RGYBxkz9Z4mArp+Z4o0EQohf2A3qURCbODG3fDBa6v8eJ3xE4ZOAP8GrOEhwOFQAWYAz9C93jBs+PU+Q09VWNxWZkp9lOtsMtlk+iOZmtlz15pJ9L+WMqwZaeCmwZagGpD+FmeGJDDoCfKM9FLdcSvSNo1y12KH+ERAReq5qeU0dkbTOHXoBtriIYLoFVq/2toNNrx3wXHwxi/D9PmWGGgfc02ucJCyvUQrtWiRU01N24yXxpwi4vvivoTqTf3emXCXj5EBZOYSGBrE3H9tsrnIJaq5KpW7gyXQzpAq6Y5J+HqOnweJ0zd5/f5Ua2KgX89yHSqiUJNXKOFXImHjAHzxNsMHr61ywy585AebLfiLPMSU4YeDAAxhz0Drdi5W4bpewx/2x7REsKRZaBSH+BIeETWJCmndk+iEMoaBasQvelup+rwsJPZr4uDfT1ftxDDVXXchnbMpdy60j6tYoyol7m46gb3lbs4Y+gstZgSjPASFaXVYR76QpakDefU/wKpzE+RnUimiNl+s+UpRcPakhMm/pb/Dm4ilxmfwuRTRajg1pFSCOcuRtdfD/q1uqUHDsPqd8ohAY1xC5B4j7hJAr/RQZxxPQ/hBITMPOOVam5KSnaTGuEki7leEH6yNecefq/x4bcxAONavCnwNu/nuIO6iyeFwEIAeYC9wPnZHoAN7xuG3+2LuHjLMboyY2yi2UqOOpvI3cmSDUlscFCxn/t+eVvqrpQKyFQW35DPAEbK6owjGh6nuvgfpmk/UPq+4SCTi3pZV9JfbOXPwLzSZ0VwOxH9YQRr8IYJc/Bp4+pvy+HjdqYNhuvdoQUR31AKvz8YE6UxIWvDFfd2PWjQuHD8QIDAKl4wxSGuHzU94+2+hMq7anjysTO+ZV1eVWiB2uEioxywL1soKDNkNanx62FsrW5wTmKjnSU1FJg8kiD8B/GkXvO/aKl++LfYDfzQMAF8FPouNBXhIcLgiAdcA64FjsZKAMxsVA/cOGi7fW2WoCktbIzrKyRB4bj4jvoiXTpR/ydAg8PuBFjaMNXhI73N5TyVwrvk/bbxAde99yIwVlFpmkIqHqTQQE3F30/FMSMSZg3+hjkoheMXxAqSNjw0y7xjkdZ/DdE7HmPjg+K7HB88qkkaMZRtNxCUC/sARRvSQeF+7PYd2OafnSjHwNSSNDNMWwJZ7YNtqSxgD9fi6tpYifa4bGoGw/12Psz8AKaVK/3I11jGWqsYUXgd8LdQpPYLNQ8Lnb4v50LUVbttjap2TabB49l4sARjiMMAh8JsHBEuAtwAvwtoGChABJ3cIb1pQ4pnTSnTUJWH9uIuw1hDoPH1GIt6zbSaX7Zo2ycryeWRABdBDnD5nYqJZJ9B03ocptc7KJJZUWo9FaGCYT239AK/r+XoiWkYuRumqjUGiMrz2C/CMN6iMPbWbUooi7lqzkR//4s9Uq5WkGJMgvDVqzZ8zgxc950l0tDerPIh6gZpg2ZOggkMQHij4xMStLyECXmXWIVKC26+Cr7wIRnq9uSI/pDSwSHIczHeaCpJEiCsy7MTbKL+gF5iV6/Mepk+2ZAoDYVzaDU4dUUnoG4efrK/y5bti7txnJhvzXuzp2l8C1j7IqQnC4U4Jth57iMH/AB/CBgk5dcTATX2GN9xd4afTYt6xuI4z2oQ6k58VkPriXUpql5Yko24MlIk5pnGMksSJHSB7ODQjXj6CpCBnksnJdRQR77qT0Vv/H41nvY2o1Ix+MDKGUWnh87Pfx5Lx+7lw4MpcmtE+57TlcQzHnIE88bn20AgIpun3VZnV927i01/5HyYmxhNDVJy/JBENTa2s3byLv3vXS+loayGOTbamiwsqGUPf767H1rkSepv83aBNIYdapMchQGkx1RhZcSbmuIvhL9+FUomahNorXEta+ZpJ/Xf6eRPA42L5tVaQE6ZQaIcr5Sibd3YdsRy/guEvuwyX3VHl15tif7+/hgngt9hDQf7EYdj958PDcS6AAbYnDd8JLKSGWnDfkOFXe6rsGjPMa46YVu/twHNHGLt4crlKROiplvjpgTbGjZeLTgJkV7nuHL1RK2nqMgLmwEakqYvytBUF1iYY+sodrG9ayvn9V9FZ7cvqyRBEsCfslhvgJR+EY86EVPQPNFFDJMIdd6/j55f/iVhKFnGjCIkipFRGSiUqMdx8x3309fRx+snH0NyUHcTkGd4S9C3swNRjHUb6IGnNpJwQWzSF6zlipsRGin0uN9gzC27+FVTHHbUujdPP/w0MmtNQV9QwBIe42EmHKNdSE0Njor6lXdOx/REQCZuGIr5we5UPXVfh5trifhV7JNingY9jRf/DlghUw8N5OOgocCM2S5ABVqByBaYwXIUb+gxX7IsZM7CiyWYSIt2OKx6yOu5eYdiU+f6BLgbjUECQ/a4j93Jep2LMNEvyF7WpEB/YTDTrOKRpmoNDdl4NO+vnUJUy5w78gZJR5Dx1gcUxHHUGvOQD0NBEAdyuOZfvuHsdP7v8T1RNRL77MZdmhJhqtcJtd9zD3r29nHHqKlpbmyhugQuxL9x76opCvdpPBeIEnHcC2OaoAqFV0zEds/o6ZO861V8t/nsvZtdCRCFnx1rGqTXVzk3H2KBiCAr9dw8w11GJWtwQifjt9pi/uXqCn6yPGaxQC3qBfwLeBvwei0cPGzzcpwODPcjg98Bq7JnnswioHgcm4Nb+mIu7I+Y3RZlRy42KKy7GsVj4fk8HPVXdlXTi9cLA/Z6VpArMbntccnwQMz5Aae7pSKk+C2vWxGlt01GsGL6H5aP3JrYALfbVwfPeAccrtx9uM9wIPxI9scTqezfxs9/eYFUctQoz6ShB9Bjhzns2sHNnD6edvIL29ha78J2FLIU6wDj0Lyz+uny3eMcdRq2+S62SUgatxx6BhiZkdBBz5xUFUT1Tm9KgPEdKFHdhOEQiP5EnyxvsSBQ+FFWVrC+aEGR7+/X4hmWmSCJ+sMHw3XU15f0xbGz/O7Hpv/t4BCB66EUcEkxgdy49C3vCyd0EVMRlLcKS1nJ+1r1yWxljsr0FWbJJI9QT0xwFBlUt8JzbS/EhbSQLiX0ISInq5uupbLraVmska0+a4aYv6uKfZ72T3XUz7ZFa6c3YYGYuglMuLnY5hCGeDymKSiClXP9P/lKjWLoRRiSiivA///s73vqBr7Bl2x6iKCKVcpxq8gHO7rvt8kXrsPuQg1zz3xHvpqn1xnEXwJQFVnIqzI/67idFTQlDFjAm9nS07BmTv5dagdQtsmGxFFmMejT5s6tPjZ/fvuxPcs+QAaox50wXOlTEt4I1WOP587Cq82HX9WvBI0UAUugF/gu7e/B2/+bZXUJ3ybiG64Tk+7pW+rsM1NdSYJ0njVoI6fVU9s5mtzZUx5hY/WOqw7twmHHyWskYbmw5jR9PeV5y2WQTz/Hnw4x5ec68Wsqo5oTZYo4x1bEE8Q1uGkqcgtJwl/+9/C+85X1fZv3GHUQlJY04DmvFpp2xcgTkDDkKUvdBYNIpcbDNuxXHMH0hctSZmKpJiC0ZpjqiuDE5IdT4mP3Z+1mYSayrN7mh2cPjbK0Q4PrpeKg2uRRE/2syYmBiwzEdsLIruMi+kfw9IlxfwyNNAFIYQKUPA3t0+FkdECnuliJDIDFLDuJyKgsm/3Dyz6lnTGHW3XcD9ZietUysvwKTcEQn16cxjMd1/Hfny9gRzbRnF8Qx1Lcgp1xiz+o7FNTRDCWOOeWEo3niWSeDRIg+/laJ2C4JsFtYf3Hltbz5fV9m7bptRJF6IrCYCxEq3qEKtQyDByMKNWybzhMmJBrUN8CqC6y6ZbBJRGIyrpoLSUJOpEzhz9SQDuybOXd2mmCswTG4zyPj7OT4Had1ka038dsS26xOU+rh7JlBlDuWRwkXHy0CsBx7wkkGCxrhhJZEZHXCdQNLSCWfqCKMFQ6MlODXnGKb4j0IrOKiabh6/xXE/dvIssBYKd8eCVeNWV1/LJe3XUIUG6hWYeYiZNmJOfcPgCOUJCsydSQsWzKXr3/+7TzlvFMw8YQ9XJWcG5pQOdaAwOVX38Qb3vUF7l6ziaiUb8jK4lq0fVArvJNC2NhWMKMcEmgO6l6WpSfbg0wDxm9JdXgtYjvyN+GBSdQ1x5DsUNxEXdAivi4mva+WhahyjYP4STFxLpZEGJ44XWguWt7OBuYc8rAdRni0CMBxeGHDJ7cLsxsib7qF4IJTtoFxI15iEA2+kBwAbb492MqVCNO3jfF1VxKbOOePat1NRA38eMaL6ClPtfx4+amYrulFaaO2SKNuG+JqlaWLZvOVT7+FZ154urUvSIrMJohDGV+M4PfX3sbr3/VFbr1jnbUJaJqmRfuU83t2kCJCu5ilZQRNS2p2UQI//GvGYKYvgHlHZ+OWivHiFJzXm99XVvm0f75B0GECvqkxty85HfFNEU4nxaEZ7lQrIhUbju2MmN9aGJV5WKb4iMOjQQAi4ET/4oltNoGoY3BRFLs4qNaq2xvXMRiXCEsK9qOmHuoYcMK8tAhVquuvoDq4I/fzKmQqE3NH6ync3HYKUVSGFafZM/tCBsAQeIZ6Y6AaxyxeOIuvfO7dvOBZF1Eqla2nweugsnZk4q+UIq69+U5e984vctPta4lKpQKxy3+6klRo/RvvymS2dFGqhUkrcsUdj2oo6tTYCvNXWdE/TteAcY122djXQFpnIP1xkuC9wjV/PUJ+fmRsMmJiQu+k5wMkHoc4hpn1hlWdhfFqwh6s84jDo0EAOlEJRACaIljZkoxapIlyPtv5MsqNN4Jh+1jEQOG050Oc0TDJrgHp4oqgfzvxtmutXYCUuOeRjH108Ov2S5lo7YYlq9K386agqp6sykSmtszZMH/udL70yTfz8uecT4kq/tu56p73zxgDpRK33nUfr3/nF7juxtWJJCAUpIGUXaaehYD7z5EYnIYWm16w83lcV28TKFjbogjmHYNQysRoSQuNXUnAXlZSov6Oy1ScxvvXAzaD4tpw1Y9cBfDk1JR6eypBvQgnTAl634/jUcDHR4MAzMfLIDynEY5usVRVsIdORqmRS2xEXLZYYoWwxrBmqI4hrQIUdFlfDQgonNlnCB0V28gQJqa64U/EY70YJFFb8oVWrcI1jU9gz8yTiKbNxV2pDwAcBi/EcczM6V189u9ez6tfcAnlSMjPQ0ie9A7dSKUUKQm3rV7L69/9Jf78lzsd7uxUqTE9U43883aT+gpqkxsU41klPEKQensmoYIzl2LKLZ6klnZTc/20jQlbmEyYMyZcZy13Y03xXlyaVfgLqHwGJI45th3qi5i3GM8w/kjAIxEIlIwircBsbCzApSjic3pnxCsWNiHVmPGKYSSG4QqMxjCBUBEhRoiTo69LJaEUCeMxfH1fF3eNNOcWLc1VFDdzm+L4xHD4m/jXAu+IYMb6kenLkfYFNtRXVW0MjEgjl8weYsETT8Ok6b5CFm/dZlW+T8jysg2tzY084YzjGBwc5fY1m6hWfVaWjkVeYRpGvGdvD9ffdDfLly5k8SK7yamW9uSMTCHIRT/sjo9uBRRH2x/bYjRecmF8DPPnHyPDfbixCcqKqU/iSWovZN3RNoODuS4K+o4iKBkD0IRNTVRG5wPJRTI1wjBqIn60JWaoGA34Ix5ilt8HCod7M5CGNuBorL5/MlbsX4g9P9Cpd+1QzFtXj9E/FjMwYQnAeHI2R10kNERCUwmaI0NHCRY2RyxtEYgjrhtI3WsaQb2WpLHpKZIV1nB6X0+mbyTyzGwTI1Q3/YnS7NNBbA7/XEAxDEUt3DnvYs6payyKlZmqKt4CTX4E9qjr2mNjmNLVzic/9Frq6uv552/9mPHxal5e1m5bXi4uG4iENRu28Mb3fJYvffJtPOXiM1z6k0YPagLkECPPshbgdpM5FrxRDENaXlsXUfsU2LcxyZ3gEkxJx8qburzN4or1wX0LgUaTRkcKBcmgsBxyYp1rM95DXhGzGg2zm2C3G+Q7BesJWMcjCIebADQCy7AZgp6B9W92chBVY90wrBuuFRwdItMxJaCurpmx5jqIQhwweTfJDFzcbCmTV3MwjwAQb7+VeGAHpbaF5CKthbG4zJrGZcSRFI/C1vRI12e08KIIUWDhGmNob2vm79/zCkpU+ad//yFjEyZXCVSn9L8igoki1m3ezpvf/498JX4nT3vymfn4aYLk2CD0mPhtkyARUEUEPAkhD0A+EAaDNLZCxzRl0tE7OnPEzpqRGOfEsW+48ofrATa6Sq8VnmRhVFE1mp49l11ICLAnJLSVDHObhdsOOJU24qnGjwQcLhVgJvZosI8B78eK+Qux1s1DQKUHDgah0jAd6jooHqQRmBqt0zrPeKK+3n9gcJFP/xZgfAjpWkQ0dYW2wCEixDEcPS3i6ceqxD++VpEXWhD31Z3kotun1DDYUF/HWaeuAiJuunM9lWqIYOq6EojK9A2McO2NdzF3RjfLl83Pkasg/1NE/hrt8sEXJkJzFCo6JYLmhl8hW+9JkoSkoj+5tJJNr1J1nC5rdcDLBlRrafq5FTOJQ42FcYlEJgEYd5mFaihFwg09cOP+AgtYiJWUT8DayqYl1ys8TOHBD1UCqANeCLw7aXjdAy9CICpDqd5+psd5mdhuCa2OgwnE+te1Q/0UkDJh7u9Btgq1uuAj/+RFFBa7ialuu4Fo8ZMRqXc4tyCMV6xKUEo5ZEiFTsVHL+3VwSC3nxlaW5v4wDteRnNzC//w1e/SPzBIIetG9qJRiBSxZccu3v7BzzM2OsKLnncxpXLk2iNMxnzdxolXnlOXcR4rjrb6psvVDwlIFBHXNZOeqKs9C+lDJm+mMzpiPJagRC6TlpZitB8t6o+ccYckp93aZhOW8vx5xliuu7AluMhOTP7SXo4C+4AdwL3YQ0B2YvNurAf2YLcOP2h4KASgHngH8GGsgW9ykBI0dSIdc6BrMVHHfGjphuZp0NSNqe+E+iaI6uxAxlUYH0CGdmOG9hEP7sIM7obB7cjYAMSNmIkqVIbts5EAUQ3kzZU08ah7kSB4sp6XNMMNPY4we++j2r+VUucyJ9rPYBiLJbk0GUrX5o1mkmdce6GhuamRV77wIn79u2u45sa7XLFDs9gsFjgpIIrYuXsv3/7Br7n0krPpntpGXFVYJaH2eNilja4JyxS9kSvrgRS6ohm0292UhZYwsXGPAEtL1c+lENs5Ko64JNd9a39gbgIiiyOw+Y8VXIWmSPBSPSoGxDClnG9KD0Da0WasJDAfOCPtITYd2Hbs7sHLeAinAz0UAvBq4CNM5rqoa4Hu5TDndGT2yZRmraSuax6msQsjDcTKl+rbaYy3cUNiA3GFkhmjZMaIRwao9mzG7LkHdt0JBzZhRnqhOjGpWFrgFEg+XYWJDwuvzjSN7MfsvgM6lzmuYwMMjsVMxBENzmI1xTKcQ0AlsyLnT+cbX0PNikTYu6+Xj3/h29x05wYolZMB9JAf3cA4kbZKnHH6qXzyI2+mqzPJKFRQS1yC4G7VUIY2T8JxBSrP4BlSoAsUw2TIb2JrwLT0JWQT8bUqd6yz5ok40lbeoYBhpkj5ClNYIAIp3fKn2quzu8FQH8HYA0/zEWEN7MuTvzOwp3Pd8oBL4sETgMVYsb+I/FEdMuMYZNklRAsuIJ52PKaxGymXoCRJliajIrxMpnrbocmtJbGy4EYCJipjqKMirVA3FWlfBAueiEwMY4b2IPvuw2y7CbPzdujbbtWHKI0SDEyE+MnGsf7lTH6srcFmr8UVzPabMEuehpQaE/OVhd5hGJ2Atga96HxpI+11iuohY5qn/2vkjyJ27T3ABz7xDb79499TNak3wLe7pgs8wu6RrUI8ztmnn8g/f+5dHHfMIqrVqpJicozSuJ3nGRElSHgP+m2upT54fSlKBwaZGM0dIynN0l4brZ/r8fVi9rWBU3RbNOcJeRLSPgeIwWTCprN+nHdtPUtahAtnCBuHoGfcMDABI9UHlfbnBOzp3C/G7rZ9QPBgCcDx+BZLiZC5pxMd/3JkyUXQMRehhMQ2VEbEUMLuaEspcWaJVQOcH99UFJEkWYE5Did6V10zpmMRdC6GRRcSDe2GnbdgNv0Zs+tOGOrBFd/TBeuK9Cb4xWdbepUk4ua+e6n2byPqWpaXCxwYgaFxmA42X6Cz6IqybwE/vEXpL7goitixez/v+sg/8YNf/ImYyC0lc20aHH1VIpgY5/wzV/HVz7+LY5YvKnoqFCKLTyQ9qe0BmXkDmlRNqFZgqD8hNMlqiV1biluMQ6pIzvRyg8hyd0FxikMcH0UwJpNgghOpKIi6XjWGZc3wndPqGKgKB0Zj9o7GbB2BnWPC1uGY7SOG7SOwc9RwYAJGJycO6elcVzyAmQAePAE4Ft/g1308rPgbjHQT338zmBszY5NEJUypDPUNxPWNSGMbNHYije2YhlZMuRFJddYkgUMt4TuVIFJKatLxTbeASgnTOgc5ai4svhg5sB42/AE2/hHTu9kGZEeRa9FXImc+x5MZEzWSAaM9mN23E3dZO0Bqae4bEfYPw6IpXgGZFZuMrYb4vh8PoH9FUcTWHXt55999lR//8s9Jd/RZt1JYyLmoW+YpF53Dlz7+RpYtmUccp+nJlfQTmgCPoTk2NB+JlNpbGL9g8T5GC4yNQv8BnGwQHuK6NFxhaDa3eaPT5C2F6cQjCnqw8YhGgXLlPcnxPlcndPiJbqUgtJUMbZFhTh1Ia4RJ/IWGiLEYBivCvjGTEYONI7BtxHDVnphN7okAzTzCBKCzcKVlAWagH9O3152VdDOIgRi7sVsAojJSroemdqR9OqZzBlH7dGieCqVGO+mBGH0tEhckTjVpVmdshKnHIlNWICueBRv+CGt/jdm/Hms8FZzMsWjzjfr0Z9E99RFMjNl5Eyx9KkaasncHxwzbe+GUeRSRUa8fXGRwIslEvPtCVIrYtHkHb//wV/j5727CSJRYDgzoTUIFaaAKcZVnXXo2X/7Um5g/dzpxtaqeTAhHKPd2cRLc9nsYnRKFwKOu2aBgcyF/cbgfBnutxJLYi7JpcPYTBJR0pQIYZRNwbE2S2hM88utrL/rMb6+j2Tr1RdVE3M+XjZpoSZlXznBicgOhiE1yM7Vs6C7D8hbJ3oujiE/cW+FjqwvG/zSnwAPSIh4MARCsVOtdLZEhi6d/mnTgjDLCxBXMeAXGh6FvF7JNqJbrkeZ2pHMO0r0IOmZDXQtSgxikk1vLmJvHnAumeS5y7Eth0UXIpj/C/b/A9KxT7MuZcq+c9B9xaUN2rQT774O+TdB5TFbvWMWwft8k1q6gyJnnrdNMMaWpURRx79rNvOODX+a3V9+KiUpKYSJUYFZWZITnPf2JfOHjb2LenOnJ3nbBxLFKMqrloMCgSrH9hRGrpWf792shf1pP/z7ioQNA5AhOPvmfVG7LxthkxbrkIs3fHxEjVKoxI7FhMBYGq8JQ1TBSMYzHhnQDeBRBXSmioSQ0lqBVDK1RTEsJ6sslSmKTgmSpG/TmNBWy7uRE1M3N+prvl5BE8oxEaCkHCXMzjxABKAEd4VspB/InNe+cqfVebDDjw5iRfti3Gdl4I7RPI5pxFMxcTtQyHSNlNaDFahxC6xOGVMxungErX4gsPA9Z/1u472eYvuRMOocbeDJtioWpXonnaho9ANuuR7pW5CpfLKzeCZXUS+kPRto+rev7eJD8K2KIooi71mzgLe//R66+/m7SAKg8222KEKZQSblUx8uffymf/uArmT6tk7hatenFnU1BJjnbgHBjfFtCiPMW+la8XPyhn82lR7N3OwwPOFIkWHtKKsrn9DsR5NXpPRIYS8HORSzCSDVmTyVi64hh/WDMuiHYNBizfSRm77hhqApjVWupryomn2T4phzZTT1NJeioE2Y2CHNbDEtbhGWtMK9ZmNNg6KqHusgzyqYG6IRISDqmekFrKpGOTWySvR8F2IMNGHpA8GAIQJWQtVHrqwHlzxFklXEqPbbZEOeTLyVMXIUDO6j27kA23YLpXoTMORa6FmBKTdY9pMcqAOI3LR3cGEzTDOTYl8P8s2HNT2DdFTDam/jPA6vTEfsLNVg1YOufkKVPh4bubFbv2WnoHRGmNvuIGfADZ0jg1S8gRNx027289YNf5vpb70MiK3GZhDMUCJKSf+tK8LoXP4WPf+DVTJ3SSlyNs3vpjkETlLACVMsRlnInakGrdyLwVP8K5QfE5+ROvHkNjI/mMQ1KbDCIx0ET4mVEmXZMhvCIMFoxbBsV7hk03Nxb5bbemPuHKuxNrPAPKaJGSUyCTW3fXgdzGoVVncKZU4VTppZZ1iK01kFkqiqfQGHK0DmWQrQyAAMPptUPhgAYgjuWfLKb9sioJ5SYqedeVKrsjBvmiGjGhqhuvRPZeQ/SNRuZcyJMX46pa8knX4+M8VoVWGcZ8rQthlPehsw9G3Pnf8OuW8l95J5sZvIfBd4oAn0bMbtuhoWXZu1at0fYsA+6F9Q2iDkFJd8dnV8irr3xTt70ns9x+z2brO0kXd6pEdEhAnmHG+pL/O2rns2H3/EypkxpzfVhY2wOA+32SwcxKAkdZEVIPg+Z8VuVIFFg119IVUlhYhyz/i6VnNOlIlKriKQxkdiQ7KHYsG4Arj0Q88d9Mbf2xewYtRvOHi4wwEgMI2Owe8xwa5/hf7bAtMaYle0R53QL502D49oM7ZG2UZAlcjEJAwn185DSVxwiPFgjYHH40sCTBMSJxjKJf73YGSfLbUb0ch1UTJyJeaYyjtm9HvZtQabcisw/BbqPxpSbHQ6mXq+9fDPKG1uJY9YZyNTlsPbnmNU/gOG9ri1DiaY5bVYsyABmAjZdicx9IiayGc96BmJu3CicttC3kOVt1XiXj0aiJyJcfe0dvOX9/8hd96yHUr112ekte9lXxYWNobmhzDve8CLe99YX09LcSFy1ur6IIFHE5VfewI9+8QeiUskmHDXGHmFmbMaNjP8EWZCWZ6TQtXT+4zhm1rQO3v63L2bqlI6kfIploq5JhDmwB7Px7iyOI48/gAL1VWspioSKgY1D9mj6X++Nuak3ZtfYA1SOpQSlRqhrg7pWqG+FUguUGuw9Q2JUnYB4BCaGYGIQxnuhMgKmotplVYidI4YdI1V+txum1MEpXcJzZgtPmSHMaUqNiamtQhs808G1XybCHXlQJO0wEoC0w5p35Yso1c1Sq2p6dFuK9Va1tostX0QqaUQ665HNkW/2b8Yc2IZ0zYUFZ0D3URA1ZLq+74LN26m/CBphTF0nsvJlSPcquOM/MDtvpUA+Murs69vJotl3D+y9C2aeAdWYuApXr4X/72xrMDJO49SrAQ0jiiJuu/N+3vT+y1h9/1Yo13vWcJP3Q0SNFbQ1N/L+N7+Ut73xeTQ3NVjEA0U84PbV6/n3b//CZiyO6izixxUcwlKLhDpIHFIVUrdulaMXz+C1r3wWU6d0hN+XAiZjNt2D2b0VE0XJsWAJI0BLErlhLwKGqnDzgZif7Kry270xG0dqHr3l1VcHDVOhdT60L0HaliHtizEt8zBN3UhdG1LXiInqQdJ0bHb8xVQQM4GpjGHGh2BkLzK4FTOwDgbXI4MbYXALZnQXpjqeVdkzAVfsMfxxr+EbHcKL5grPniUsajS1ia9YqW80jOoPWP+Hw0oAUg0qt9Fq/czhVKTGmrSDUeI7NYkOl9oFNIIq+0HKcasTmD3roGczMmM5LDoHOuZhjL870PtpvHYpomBigeknIecsQO77EWbNT2Csz9NDwWVJabsEJgYxG34D3ceB2GPLb9oCm/fD8hlpta4BrXgyXz5Qa9dvY+3G7QnhU8/UUtmrVTrbm/n7d7+WN7z66TQ0lDNrf9rulAiIlKCuyXrZwCJtNFn6ct/TIIU7mcCeud1ioijC3znnqGs+/Yhj4lv/iBketJY2Nc6p3ccIRAilyEbS/WFfle/siLn6QMyBg6JCBA3ToHM5TD8VmXYypn0FUcssTH2HRXRFZJ3lUvAhJFNZMtAAtC/HzJCE2U0QTQwQD+3CHLgd9vwJ9twA/Wuhak/3njBwS6/h9r4K/28TvGq+8NIFJWY2Rcm5CGpUk52QlTABeFAmjMNHAGJFANRWLKtu5jOeR8SlC0Rb2dN3lXApybHb2TTolZMs7OoE7LgD9m+EeScj887ANE5JWmmKyF+Lo2V9iTH1U+DY18CUY+D2b8CBtfjcMAsb9lfwjutg9y0w+2wAtvfG/GmdYflM33Ku2lP0iyXjJ+S5kqPEXuJJLzlVZWpXB594/2v4/172NMrlKNlToQiwsiYbKdldmGYiIeCSE7Ki0cSz79QawlSXzU/1MUxiZNR2YbCqSO9eqrf+0bonjVgrXmr5T4aqJNAzYc+U/Nb2KtcdiBmaTAiWErTMQaadCrMvgKmnI+2LiBs6MVGU2UQy1zHuOszXqDdXqUQXmXxeEunHmDLVcid0dEL70TDv2TC6H+m9C/b8AXZcAb1rIB6namD1IHxgjeGXe2Lee3TEk7qhLlGBJcrrGw17AR5RCaDYAr1l10nC4Vsz80VhiYMp3AFR4n8yoGKSI7dwkSidDBPBaD/m/ith92pkyUWY6ceSbxcOtNq3tjuEwgAlmH020jYPc8c3YcvVbj9TVuSIpAbGB2Ddz5HpJ2FKzVSqwv/eAS88GdobtAoxCTdX7TBxxfYvY9UpdVW/qxNMmzqFz/7dG3n5Cy60iT89QmEFrJTwavUBtQdAfDqXP+d7etT8mgIx0vd1J5PC9ftaCBMw99+KbLvPSl2xlQytEdGmguufqHLFnirf2Frlml5TSyS2UNcB005DFj4d5lyAaVsEUVMytEmtsSogtDlBe7UK6opR2qR4ayo/w8E+UwfNc6BlLtGcS4hWvIXq1isw6/8beq6H6igVA1fvi7m7f4JXzoe3LY6Y1xzZ8Y0N1bhK73iww9t4EHD4CEA8HpzQTG/T3DuNhNKid7Y0Uikg37MtvviftsCJ0FPl92zB9H8HmXMyLLkA0+zn5fcR33gr0L1nWhfAae9DupbAmu9jRvvIc9IFhiQqwZ7bYOe1yPyLMAb+si7muo3w5GOwasakzFSpB6mv3hkwte1Z7MKYOW0Kn//7v+XFz7uQKOjWS5A0HTcRTLWSbJhKxyStJ6DT68/sQxNur/mJalc8DNWfB1eCMhNjxNf8DCojSDmyyBnHRAiVKOLPPTH/tHmCK/bHDNcUegVaFyALLoFFz4Opp2Lq29214ucx0Dpr0G7kjUE+QaoPinj64y9CGiNjYmNzXNbPg0WvhplPhd2/hfX/AftuQOIx9o8bLlsHt/XGfPa4Ok7pNJhKTKVi6CumBjHYLcIPGB4sAdhfuFIZUR315hgX2XPbkWSpnlNG7h4BnSygkF/J+JwlJSPGImB1DLP5GjiwETnqYsyM40hz9wWHz//uSwPlFljxcuhYALd9HdLgIcj3vmedECQeg/t+CN3HQuNM+ocN37vZcN6yiPqSelbnswrYAKzeV7ZiOlU7JpIQgLgKBubNmcUX//4NPPtpZ3vxOWn5buck1dFNDNVRjNQn1vZcBJ4UsukwvuvCE5sT5Ei5o5r3IEgEG1cT33iFHcMosYZPVLlrwPBvO+Enu6vsqZUbR0pI53JY9HxY/FzMlGXWDuOk8w1YWzUR12OXLEibezDGmIRgxqNIdRTi8UQ6ixODXYREZYyUMdIIUg9RPRLVI1JK0ombfJjjqp2D+qkw/6VEcy5Ftv6U+N6vQN89xMAf9hlefdMEn14pXNoVYxDG46CI9oh6AXbik+7qaCIeR2pBKyTN2qzvGeeRFAmyqdL55vxJlACl1nEGYNvSvwNz+3eR+etg8YWYhqnZQRNFxK9hqMoeKcGc86F5BnLr1zC7by+sn1SHNgj03Af3/wSOex1EEb+5y3Dr2XDWYi11ivdu1vnsbrkklKuJySkqQSkhZNWYebOncdkn3spTLzk9KUeNkzYTqIamWku5rkypLBb3S/Xo04eL6Wy89taCjOBEEJWJq2LteGnAUTEFcF5FPEH1yu8T79tmU8OXI/pMie9sr/CVrVXWj9aqNIKulXD0y2HJczEtC5Ny4+QvYLzMpCrP0k4MlVFkoh9G92KGd8HIThjZB2MHYLwPKsOYyiiYiqM+mDQ1eVSy7sJyM9R3QOM0TNMMaJpD1DibuL4bomZrl8jsWxGmfhrRsr+BqWfBHX8PO36JmAlWD1R5423wxWMiLp5Vor9oBYyxx4s/YHiwBGAMy47y9yujdjCyOOUcwcVZk8ZZn+mcOKotkLMyfxV7C0dzS6deJc5VRmH91Ziezcjyp8CUY6ynwCiM0KAbY7zFYwSmrISzPgx3fBM2/s4uBJU226qMCSKt/zlMXwWzzmbPoOFb18LJ84T6ksmLV+ccaOJpjOGUk5bzn1/9sN2rD0hUyiP3jGHRglmcsGrppJPlUOqkPhPHPP2Ss1g4b4a9LKWkCYcgAWjVR5sM/OhPiZI05nV0T+moYQhMni1FxGvvZPwPP0KqVajCdQeEy7bGXLE/ZiQg7gsCHUth6Stg2Usx7QvUdCmpcVIDZAXG+5HhXZj+LTCwEQY32ziQ8V6kMgLxRMaWMjUVxaCyEg0m3ewWgqiOuNRimVDrAug6DjpWQuNsJGoAA5UJoGUlnPQv0HECrLsMxg+wYwzef59hWAy9E4X+DGMzBD1gkAfzEnAm9hzztuxK8yw45i1Q367GV+lbmHxxZYw/yf6qTgQWx4Gfil4GMYm4pMXUzNIc59+zZ2JliU5CjuMq0tAKi8+HuediSq25/l/UKMK/bSPtZ2UIued/MPf+wKpAziaolKpVoWs5cvbHMG3zmdYc871XwwVHS559JxUNC9vQFDFUl7WEZIw6lFJ3IqDK+7ghkQ0IchDTt2lKqGav1BCCOTn4bPtySSldAAqRqhXir7+Pyo++ys6JmG/tMHxje8zOCZeWZ9A4HVn2UuTY12Haj1KeIt2udCwsh7X1VWFiABneCX0boO9eTP9GZHgPTAxbKTZdQ84iUKnC/aGpuVD8tWByxgBWSmichnQdh0w7G9pXEkcdlpEakCimtO07VG75AIztJopgRhn6KjDsCgH7gfOBu3iA8GCzAncBL0cf8BnVQfepNg1YNrH+mshXdSFrm+hnlNErpeBOwoqEe5ITCwlMWI78JEKBQGUUs/9+ZGA7tM6E+s5CG8LzWZxyonpk2nFIUxfsX5PbQVIJJP0b7bEZhGefzFClnv4RuPQYoTFzUCgDkt+AbChMEjueE9L0u+j21rBVqaKcKjKGH1tirI+7TsvPzuSLTfFa8F5yPU6Dd5Tx110Q9iOK4ParMd/9LDfsG+Jd91X5r10x/bHb9ggwpSZY8GQ483Ow4tWY5lng5Ov2XAoIQgxjPdBzB2y5HFn/E9j4c9h5LfStQ0Z7rBE7dVsmNos8v0KK+DklSiP1pAbi21iLbHmSb9eWJKakZBXF6jAMbsTsvQFz4FYbVdjYbfEoKiOdx9mYhT1/wlRHGaza2AEPRoBvA7t5gPBgCUAZmw14an4pgu6ToKELrdu7vEt9y1atGuICAuR/rnfGt9Spc+PSEU/CWaVQXjJpg7ts1F5dI7TNJg/vrNVlz2KcdaIEXUchbfOh514Y680RP+M6EQxsRUoNRNNXsnEPzGiDUxeqcsRTdkKGd50bIPmngOeeWOq21yvTu+bb6pwhDhnysqpM/l3n5NdNEa/iLKVXRNS3l75/ei/f/NOtvHddzK0DcWEaBEG6j6d05ifglA9gulbgB1TlHUl2xY73wP47kE2/RtZ9D9n8a2T/3TCy1xrwtOooUhg2baLSXS2MI54Ap01eyYVMOcwTEbheFDMBo7th/03Qfw80TiFqmUUcl6BlOZgy7LuGGvE+ZeBy4H4eIDxYAlDCEoDZ+aUYulZZVSA7vZE8TkY8JhUWAPIRzL4pxE1fzKR2rZflon5GNAozKW5bxgdh32qbWbh9HpSaDt7zIIEQaF8AU1cgA5theA/ZZqYsj30MPWuhcSqVpoXctyPm7KMi5nSmiS7z/mYLRdkVHFE7hN/6kUOx3wXWe7BwKb432ePhIlXjRBMtgbjK/d/+Mh/8529x2ZYq+ydMoUrqO2H5q+DsLyDzn4QpNZKeB5idCJwO4MQQ0nsvsvnXcP/3YNNvoGc1MtaTMYVaXgj3MFSjvtd4XhGAWmEd6ft5nii/vFwtzn6P7YXe25B4BNM83ya26VwFQ+uhf3WtUf4ZcM8hzIYDD5YAVIGnAkc5HelYBq0LST0SxeQLuWhf3E+XP5OKtVb3V9ze5/J6lDUBEMXKg2xVEYe4CgfWQ/8WpG0mNHaRUYhJVYLAteaZRDNPxAzvg/4t5Bbn5H5lBPbeCW1zOFBaxN5+w8UrI5ob1JITwXV7enYBbavwbjlOltA7mEkWv9utGtUE5yy75hAKR3QpXE83JF3561/wN+/9CL/bOejwtgiQUh3MPhd5wmdh5euhaXqeLTrjpJHlnoNbYdvv4f7vIht/DvtuR8Z6bKy+UPA++JmFQwwo9ES2mUqnk/O6H9rX4UvCrrDrTZhESDyO6b0bhjZBx3JomU2pbSFm+6+gUtj5OwD8Mw/CEPhgCUAMXILNSJpDyzzoOBoX+cQbEC2KFwc7pZWugupKlyKp3qupdGCwJTA73ntZ44b3IPvXIHWN0DLLHlJSC+lTma9Qq8HUd8DMk6y/uHc9eeRg0pfKkJU6OuezfnQeTfXCWUvs9lW3rFCP1Ke4zQEfiY3bPx85A5jtJENOhy+tKut38T2nHV4qOFcRzl+Mooibb7qJN7zpLazeuLlYXvNMOP49lM7+FDLjZJsMRrdfBJkYQPbegaz7Edz3PavTD+9C4jRQoGhzyE5L9lSuIrLnqzMjhp4pw/W2qn2tknN9Ms4vqn41ajWMzPapGIa2wlgP0dQTKbUuwPSvhQO3+m8MAt/AJgV5QPBQjgY7FrjAudIwBaYcV2tUyUX5/Pw2ydDdM9qR8MQMWRMEKkioRo2jshWI+5TfhpQ45ItWrPi47x6o9CHtc6Gu+dBsAn4fS00w4wSksQ3puc9al7PXIpgYgAP3Ercv4o4Dc1gwVVg1O1DepNl5Jm+N6PdUdJDR9zJCVixN42+h5lBTQ+2uEfwTRRFr167lrW95C7fcfLNbUFSPLLgEecI/Yo56IXFdh5KMEkv/8G7Y/gdY8z+w4Rc23qI6nMy/K1u6onfe78m0GkKu6qQNbpdEZVQyhfIKqox6LKQGF8bKiI0pGNsNBqLOE2zYwfb/RW83Tor7ObCRBwgPhQBMBZ7tlFFuhqknJVFlOAvY4ntItDKZqpz3pmiNy6VY4w6i806AkjuWmdrIIwnpFlNFejdi+jZAyzRomkqak85vtlNhQSCoQ6augI55cGCd9QSkhCYq2f3j++5mpNzN7b3zOGZ2xNJpkxGBtA4pNKFQfyZ2h1eYhMr2uyCTEIiEKtQK6Kt9wyL/5s2beetb38qVV/7OTZXWOh9O+gClMz+OmXoMud0AMBNI33pkw69gzXdg69UwtJM8BqPQO48P+Tp4vt/eZcra3uTq69pCoB93ybM2DITHIkvcUtMOo8cxKX1oC6ZxNqZlMez4BUw4OXnK2FOCbucBwkMhAAK8AOdYsBJ0n2g5pxrAgmoYEiENBYqpvTmpQFY4ez0hIMaRDoouQ/x31LvFRWNgeB/sX42UykjrbGwYMf5s1/6efmlbgExbhQztgsEdmfiKiE0gse9ODozUc2vfQo5bWMeCKVJsci5XUkBsbTwKxBHgjcRkCy6gndZ4I9WHJysoRV6X82/btp13v/td/OxnP8vnvL6ZaPFzkHO/gFn8LEypOR+j6jDsvQPu+z7c+yPYfZtNuuE0LSAdpZ7Yg/S7eMqQ5ASuRuk6HiC94hCKJDdDGqeRW//Tp7WkO1n8gHqvOmi9GlPOgb1Xw/BG70HuwBKBBwQPhQBUsEeAz8kvVWHKKuvHdIXNSfuYf/givmvwk8KgpcivCC5+TEDynAmUq69kUkXKAQSpjFr//shuSwTq2ylulHH7USwYG+wx81REYqRvo80ik43iEOy5hb37R7hp4ChWLWxmQddBeXf416QD7b8TfnhyRYMMq1ymq0R+USfwZm5LIYoiNmzYwNvf/nZ+9rOfJkFQwJRjkDM+TnTa+zHtS/NcDmM9yI7rYM13Yd0voOf+JNgq1MIAV1F6eG06lawmbU+W8JPFQdKu6VTClWD5RTnL/XpQ/EgbODEAnSdD760wsMZ/8hrgDzxAeCgEYAK4CHsqcNKhOPEEzMd3b7hntgc4mEdu8z0s+QU/E4yjxyv3n8kmw+f03gQ4+pwiHGo9GVNF+rfCgXuRhjZomQFSKpbhz6JvPSo3I9NPhPY50L/ZJiBNHzRV6LufPVu3cv2e2SxdOJUl0yK3iqxNjmPedV8XVpIvBB8c8hObnIsKuWtw1VSFckc4IwS33XYbb33rW/jNb35j57ZpOqx4FZz9WZh/MXHUCMTIyF7Y+ke459uw8QoY2Gat/GnfJ1Pj8lHJxeysVWHR0z2SRb3hRV86U+CZOLQLNxuu4JTkCVRrz0Xq41bzkLlRY2hZBAP3QH+BAHwXuJkHCA+FABjsaSRnOVdbZlm3Rbo5yeHwUDiCKliwUToYtixJ3YfguPmypuSf/jI0NcQtF3FqiGIp7Rjvx+y7Eyb6kLa5dndguiRC6nbwWhk6liAzTrCbTfo3W2kgiuzf0Fb2rb2BazbVM33eIpbPrqcc+SG04q7C5Ouk+vikuro4CO7YGZTKkRGGAGKk5RSQX4TYGC6//HLe/KY3cf0NN9i0bfMvITr/C5hVr7VxI8YgA9sw638Jq/8Htv3ZxuKbqku4vbprKSe+OWRSt6Zx3y4YDAPGPTcupbh2QmQmvxdiaN7bWaPTeYjy+anrgL7VMLxZvxQD3wFqBgnUgodCAMCeTnqpc6W+DaYer0ZHI6fbaVOTMXsuQElEe/HL816ulQBQ44BTqXjIr7irdvmkiFCdsAa9nvugsc2eMSCRy5QPBkagYQoy61SkuRv6t8J4P9k+gol+ejfdzh9u2cNo40xWLemitT7y1qlmMZrv4RxiowaUHGUU6oSIg1+u4HKjwKMh9SOKIgb6B/jXf/1X3vfe97J+w2ZkxqlEp30Ec9r7MNNW2XnuWw/3/wzu+S7svMHuuDN+tNtkenIqtbhSTtF4V2y38ZBQEiIzKbNInXsJkoYCHw05orvEJ4/v0AexBPsnbn+yyFJjoPcOmOjVTw8D/wps5gHCQyUAHcDz0OcEShISXGpwO2g8SmrSQcrvuVZoHynVpzHuJcc46HLGHDfDbkR72VPGCnTETbjJaA+k0kDrLJs11o96mhQMRPUwZTky8yS70Wlwh9pQZBjdt55r//wX7t0+wbIlc5g5pYUokiJ7czridD1n7Dh0IicIIaz2sh9PxmmdCtLrybt33303H/rgB/nqP32VA3E3pZPeiZz9Kcy880BKyP77LeLf/T2bin2iX5UVEqfCLZEAeqeyiP+Gb0CWwPj5z+txyb19JkDzQ5JC+jsvu4jwnjrsc39doghUR6D/3iQBTwa9wNeBvTxAeKgEIAaei90clFypQNexlst53D80KPlHSDVwkV9nCHYlh4D/X0mxro0gAKJjCdxiCsbDFHniCvSug541SH0d0jyTzFPgVjw5NE610kDXYhjZb/edJwsgHuvnvrvu5Kpr7sFE9SxdMJ3WlsbiGIWSsAQVdYrP+a8pPT80G44aoJ4VsYa+vr4+vv1f/493veu9/OHOXVRXvR7O/DgseRZCHfGum+HeH8K9P0H23I1UhgkhX3gAa1PYtA2BbiVvBrxHioG4y8Zk6yrtrmSlECxdt9ZF3cBBt6Ef4XAMfJLEyA7758K9wL9gNwU9IHioBGAMeDKwOG9jBdoWQct8IEYCiC8EqLH/RXPcbIGogdbuLzzXjBMBGFAZjE+BJWuPaz5Ka02XY+rSUY0d64O9dyFD25GmKTaUWKLwhNbk3mW7P3zWWXaH4nivlTKoQhRxYP8+/vDH67j51jW0tzYzd/Y0GhtTYqPF+QD1U18cIcAVlA7NQKiNDanYnYT0jo6OcPUff8+H/u5j/PP3r2H3zOdReuKniZc83Ubx7bgFs/o7sPbn0LsR4rFEaNIEzHj98Nsmk7QNtKpSCMtIUdibe00r87VhvAIC0pVaE7plBQkiK0dJqI7AaUKF5nOaQeIdGdpsPUcu/Bb4/iFMYQEeKgGoAKcApztX6zuha0XSCePjsbdWawtTQgB5A4icSa3iXi9WXLsMHX6fJi1xDUkm+Lpgg4cY2Ap7bkMq/UjzNHughKuD1FZGEduOUpPNHTD7dFvG2AGbYNRUqcYVNmzawm+uup6712ykrbmZGdOn0NBQ7/qytcwfiFLzq3fOEsFHNnGphVYNxKbsGh0Z4obrruMzX/wan/nv67m1fAETp7yPaPFTMJUKZsPv4O7vwsYrE6NnNWAfsmVLAXsPWafydOWQADS59BDUOgJKhKt01D7G3rX055JEYQuL84o2PHltkJI1GA9vdt3IVgr/Z+C2Qx6s0Lg9BHgF8C30qaCtC2D5G5LcAOkA5Fw876zBSb6QGf7Sfe7Jvdjml5dgIpC0DDUe2XPGu5++qxKLJN/TPdt5/XHudUjKTCl6vrdbc48ksQkxtMy1u9ZmnWXDo7PU3N6I61Vq9EVADDK2D/bciNn8B9h7t9WTozKYiM62Js45dSUveM5FnPeEE5k5s5tyuZQlB3HXs28z8YiC3tiSZblNr7k2AbuKq/Ts3891t9zFD666i9/dF7On8USiWadgyo1U96+DbTfCjpuRgS1Je3xC5P7WRFbnjyxCkRu7peoZSeYlfdMEygwZjtP1khhm9XxPRkxdO5TyQinPl/ZNFUiz3l/iiP+JAXB8Hxy4Cy/93yasO34dDwIOBwE4AbgCmJZdKTXBitdD+9JkAeWIlq35PBOFg7CZBTWdBJOkWcoIRWoE1FmAcsTNiYdCcKcs+64oQuLsC88IQl6XEKsyU7rvin5G9y+u2sXTsRBZcBFm+mnWfeMsgVqc2ReHQSpD0LMGdl4De27HDOywkkEc09jcyoqlC3jyBadz0fmnc8zyhUyd0p4TA0xxjecrzqkzhKKp1B8bYWh4nPVb93DlzVv55a093N7TTn/zUkzzDKKJYdhzD2bzHzG774KxAbVQa1lXa7TJIQD5u5Y4TMZC/X6lX91y8p6aJOtwYlcqCSURypEQlUsYIibGx6lWxjCUoVRS68wdr6JxL10Xpnbb3AfdkddSXWxtXDKyhXhgo//mz4HnA+M8CDgcBKAVuxfZ3Ri08Dkw+0lA1eXIvmhUQGyFxNkCTrl/isi1JACvnNgmhXQIgvPppRjLJkJ9D7UvOzzCFzFNRrCy9kV11vc/71yYcQrUTyFLz12TAPiLPBUDK8jIPsy+1bDrRuhdaw2H40NgKnS1NrJ04SxOO/FoTj/leI5dsYQ5c6bR0dFKXbnkbmMlXH+61aJSNQyMwd4BWLsXbtpS5aaNI9y1dZBdg01Uy+2IGBjcjtl+A+y4Gfq22NwKhfIfCAFI10X6vNosls1PYMj8d2vR13RuxNDUUM+saZ0smj+XZYtms2jBDGZMm0JXeysNjfVUq1V6evrZtmM3d67ZwtU33smO3fuTNRw74b5ZUwJtcZsT6EcwIECsulQdZ8b0bi4673Su+/0PWH//3f6D7wU+f4gDO/nQPQR4L/BZ58rUE2DZq6zukhkDfeRR3NpDzBxpYytaZQRAifaOOlCUBGxuNfXb/17IMYj7vpnsU42gQzRiCok1jbHHebfPh1lPwMw4BZpmWuIQe89mi0QyvM8XjCHLumyqlKv9xIM7MD33YQ7ca3XsoV0wPkhdXR3dnZ3MnTWNxfOnsXDedObO6mb6tE6mdLXS0tRIqa4eKTUQR80M0cb+ajO7ByJ29sVs3m/YsE/Y0W/YOyQMj6dcKUZGemD/fbDrFszeu+y+CaoUeeKh6/CF/hcYfUCt8RXwguRg8u9xFSFmSmcbxy5fzNmnreTUE5Zz9NJ5TJ/WSXNToz3CTHCiVuPYpkmbqFS55Y77efdHv87Nd6wJeFDUnCninjVR0iZ7BECJ+m6GoJgZU9p46oVn8LIXPRMz0c8Ln/8s9u3bp6sdxObl+NODHOgHnRXYhxuTxuQbg4a2WQt501TwOJ5JBiD95cTmkEoJOcIXxH9HZXCzAPn6riPe+2BlW/U7R263Ter5VCcuxCKk16Ro7EkumL5Nlktu/h10r0JmnY5pX2rjCNIzEPzWOqte6+olqnVToKsLOleAqdg4gsoAjA9SrfSxe7SXneMD3LR5BNaNI3EPdXV9NDY1Ud/YStQ0BZq6MQ3CWKnEqIGJOE3HlWY0AkwVGevFHFgLu2/B7FsDQ7uhOpb1zxT2SDw45A+RjVQOEAJuOFOjFJFEvK/Q2NjIsUcv4snnncJF553KiqMW0N7WTBRZ7h0nYk81TtU4z3xnoFyKOOfMVbzttc/mte9az9jERMDFZ5zlJxlzmMSJqCiESRjarOndPOWCM3nx8y7ixFVHU9/QwBc+/xkf+cHq/Wt4CHC4CMB92CikldmVsQM2mUFTt0v5MkNaMiTGNb6lCG4SHV9SJHe4b37uXJYL0OfOmREvIHJlTTEuBy9wnQB78bFbg0C6Wcg+5gh9yQOx3c++eSdm+zU2l+D0E2DacZiWNMQ4ygldJgFovTARLdX5e0gZyh3W1tCSH80WJeOTPjouwriTzcZY5p0c6ZBlJIonrLrRuxH23Q3770GGdmImRtFIYpxl/WA5vh7zbCCdez6zz4mTb7VI5jGu0NHezBNPO5YXPusCnnjmKqZ3dxJFNhuzMYZqesaeuOXm8kNO0EUEExsWzptBc0OJsYlx/Nkt9CWbm3zN5/xClKBiEX/m9Ck8/ZJzeMlzL2Hl8sWU68pgDD09Pfzx91eFqrmaBxH8o+FwEYBd2I0IOQEwVei/3+4OLPo71J/67XH31GgXTC+uCYf/njYIJhMhobr0JNXkPQTvFxek/4w2rHl1g82EWx3F9NxrdflNv4G2uciUY6BrOaZlDjR02IhBP+W1Ue3XIX5pg2JDNZO49NFcudfbHtKh5qo6gYz1w/Au6N2A6bkf07cRRnvtKUdpeG6KY0J+itOkYzg5SAHhIExgA3si0vq1yB9X6Ops59LzT+Wlz30SZ5y8grbWJuLYqmbVONw+X9AyWdnJbwyVqmHLtl0MDw8kAxAFrfvqzczFGKzV2GPPZs/s5mkXn8OLnn0Rxx27jHK5TLVapVqtEkUl7rv3Hu666w7/7QHgFw9osANwuAiAwW5FfBk6tqB/nXVd1XWQkkC9RDIVAO0V0NQyWRYF3R3wiEgoo1A+EQFi4yAGxUXs6XIFxE61AU/nzWp3Qp89r7SSDiQ5dtyMD9osxfvXQKkBaezEtM2HjsXQNg9pmgH1nXavfFS2haSbRPJmeVMC+hxBy2yqUB1FKoPI+AHiod3Qvw0GtmAGtlujYmXE9isrP/mezYNTIG4DfJSo5f7LyziYyz9oQvRTssVVmpsauPjcM3j9K57KmaceQ1NjPXEc20NVPCeAW5b3QyG/9oZWqxP8+brbGBurQLkuJ0SBdjrBwuk6Sp+NLUOaO2saz3jyE3nBsy/imKMXJZ4b216rQghRBFf/8Sp6epwEIAA3YVXvhwSHiwAAXI+VBPL8ACN7YHCLTRNmyM/QS8dcG/0SMd8ExHHHd6/eMwUDICCmsFCcE7wNatFqPT4Rz5N3MttCRgTErSedT0/3zfTCZLJ937MvtabkyxaVlFUdtXsDBnfYDTJRCVNutinXG6ZA01SkoQvT0GFjLcpNUG60R4Zlum/V6ujVEaiMIRMD1iYzegBG9xOP7rcn4lTG8vEnJ0xk7Q8fOZc/66pJuZdBPEbukWXxrjtHvblsIuf8FN/DEBFz0nFLeetrn8NTLjot4fiGuKrarov3iE1GtpU+7kO5HLHmvq1c8afbodyQTaSeP3elSL42UykttsbwhfNm8+ynnsfznvkkjl46n6gUEVdjmyMhVcEMlKKIgf5efv/7K0NTcBVWCnhIcDgJwGasGpATAFOB3nuhc6VvB3T1cH3JGCtuihCVSkTlRqL6Okr1dUT1DUR19UipRHoMU1ytYiYmiMdH7d/oENWxUUxlwvrj42qCo6IWrQnUn9oUEimi1mpJr2YisJ1yk8rFzjv6mPN0zfgcMX3fg0S8NMZAtQLVPovAZmPyfGITELGeFinlHNv3kuiYiewaihMq67Oo78G+iyvBKA1Agu6svPyCScXb8OL7+QtCmKofY8X96d1dvPpFT+a1L72U+XOmERtDtRrXVNgKo2+SmjNZ3W1r6uqbmKjw79/5FRu370nyDhpdgLuk3ZUC1ZgoEpYsnsOzLz2P5z7jSSxdMo9SFFnVJDZZFqF0UCOBUqnEnXfczt13FQ786QP+zGGAw0kARoEfYN0Sebn9a2H8ADR0gickZSMdV5EISo2N1Hd20dDdTUNXN3UdXZSb2yk3NFEq10GpnJyqEmWv2hNzYntKazzBxNgI40MDVAZ6mejbx8T+3Yz37Kba10N1ZNAiUxZokS+m1CUZ3pTk6vbBjSXZohFSo6cvHIaRqriP3uEemTqSIjsu0TIxxe2zojiZb64zUBNR87bmCph71e2B4AkM+TNKaCoW4FrZPRtc1r+MOPkHwRooieGcM47n/W99MeeccSylcpRY8d02WvUy+yeZY7dt6Xhrw58eplIp4orf38B3fnR5EuRlcFUQCRIbTEwpgqOWzuf5z7yIZz/9PBbOmw0RxHFMrNqbLUkFlWqF3/z6VwwMFBj9auBODgMcTgIAVg3YBizMrozutYctNk4hS/CgxPC65mZaZkyndd58mmbNo76ji6i+CRCSU6ryOP1Y25ztiIkBExmgHkSoa+qk3DkrmQqDqVaJx0aoDPYysW8bozs2MLpzMxM9e6mODJMdP+6J5W4IvYu0GfBDE1cAADt/SURBVC+RlGO4IaB2CaSEItd50/3muQCS38+dXPlmJNecdCigO5ESixgjaZkHM9C5EkwBOdU1o1h/kZ4oS6GjZqnRUxw2xJ9dopgtGqhW6Whv4/Uvu5Q3veYZzJjelSBTsW+pRJlLEe4khywTadvS0SqVIjZs2s4nv/Rf7D8wYBmQNhCGxi6uUCqVOGbFYl74rAt5xpPPZd7cGZauJHEF2foIEWNjbUNbtmzid1f8NjRRV2KlgIcMh5sAbMEaJxbmnalC7z0w5fjkd4yUSjRPm0bHkiW0LVhEU+dUpFyHMbkobUwuhrtqn8s9jEbeOBXj80UllIgaWik1tNHYPY/Wo0+nOj7E2IE9jGxZx8jGuxnfvYl4uD95KQqs6JAREY9AqMWbcTGTieqZ/SMRGcWxREmG+o7OGzZ/1QCNSV77THwIqO+n0MqNWZMTgfQZd15ysV/rfgrNM8nZJTYK1QtGNqoVjl4yh4+885U88ylnUVeKiOMqFOqmQHD8s/r8oc2ljbwxkQgHegf42Of+g5vuuM+GAuudZ47Hyf4uRcLRyxbwomdfwnOefgFz50wHTOZ6LIxRjbZEIvzx979j3bq1/lT1Ar87hAVxSHC4CUAFS52ei94c1HcfDO+E5lk0z5jBjJXH0rV4CdLUmgTrmUQtNQ4KKHtIjZwdxkF2IwYxRT+ufTgGY0NhS/VtNM1so3HGEtqPeyLj+7YxvPF2RtbfxcTenZjqOCg+nC2vQshwCloJNGoxS+FREbXCtJhhcv4vmIRr40kLSvfGIwv+QnLyJR6chIT3tQU2rPjlJUS5aMMIX9Co6tsQcwRRhgXV3wvPPZVPvv9VHH/sYkwc2wAeh4yEG5vFY/iml8IPkwkukUSMjo7xucv+mx/+4g/Fzgs5capWiSTmqKULeenzLuZZTz2XubNnYKBAoILjaLypE2Ggv5ef/e9PXTXBwpU8iNx/teBwEwCw1snNwKLsyngfpZG1TDv3acw47ngaW9uoxmRiW57+PEHb1BiKYMRQNETnYrfDe5U+mqZj9q3wuaHR/ijVNdI4axkNs5fSduJFjG65l6F7rmVsy32Y0SGQyCJjrQVT0I5djlkMBsJ7R5xFnl5z9XbbKaOlB0X8VKe94ieJg3SaXjSZhb7XBqnxhnhYVxRSQu+lRjlLtys0lCNe8YJL+dDbX8zMGV3Wui/hGvNxL94pCGy6paqpkQhjY+Nc9vUf8i/f/gWVqpZEtMHQXl6yaC4vfNaTeP4zL2ThAqt+xtnJyIA+IFOPs7NLMPeMRKWIW265iZtuvMHv1gjwn1h722GBh4MAbAR+CbxFX2yIdjPz+BWUm9oYHq4yNhYTV6rJcewmIQbJco2EqCyUyxFRKUJKNumERHYQUwZnxTrJxcnku6kh4zkG+JRbpzhjoNzYSevRZ9C0+HhGdqxj+O5rGN1wJ/HwYOai0xJHWpArzmoulksitbRbF0nDqJeVIVgvQqpi+0tffCWiBucJMXs9XpkRRLc6YOhyRPRcfnGekvQAjhCBMUHs1bnzWluaeOfrnsNb/+bZtLQ0WsQK0BvjTHAgaFg12WuEkwtVJGJkZJTL/uX7fPFff8jo+ASkqdgyFcG6WWfPms6Lnn0JL3vexSxaaM/JTdexYyZwNUTHwuOPqQAT4+P85Ec/DBn/7uMw+P41PBwEIMaeU/Zc1OnBI1vuZNOfr6U69XzGhoaJJ6pWL8pWs0Fv3RUxRGKISlCuiyg3lKlvLlPfUk9Daz11TXWU68uuXpchorfoUkRUi8VlTMngG3u9VGqked4qGmcfzcTuDQzd8XuG195GPDqUu8nUSvKEULdBWY0hez/k5kLNoZRkhF4agPhtD1R7SO64GoUoIcIoBHdJqtLv07uZ2lH0j+j4D7d/6U66gi4AxjClq4O/f9dLeNULL6KuXHINff5XhyD69eXFhxUd2/SoFNE/MMTnvvzffO1bP2F0vJJ4nXLuTBwzpbOVZ1xyNq96ydM5buXSLLyYGnXWDB8PNCYqlbjrztv47W9/E5qd3/Agzv+bDB4OAgD2nPJbUATAjA7S+5fvwmknWYqaZjnNdvjpnX5YH39CEMaNIhAYSmWh3FCiqaOR5qktNHU2U25uICpFyi7jGsLyqEJ3AnKUdFmEYIiiOhrnLKd+5mIaj7mHwZt+y9jmu6CS7PfP3syJgG/cyupRSKf5c0FUTVhHGoQkviTjQDEBumcx9Wpz360tCRiKQT4+hLi34v4m7EbU9h1TCyniKt1TOviHD72aFz/nvOzZVOJzhir7rmQfk85JQE8wqWHWrbNUiti5ez+f+MK3+M6Pf89EJc4RNwmuaqiv57yzTuFvX/Nczjp9FXV1ZRtwFBtVSWL9ETXXATXQ2YaijMLVSoUf//D77N61yx+ZPcBPOczwcBGAMWyesqehh3rb72DxbTDjtLz3BQTI5NsaTMpQHY+pjlUY6xuhd2sP5foSDe2NtExvo6W7nbqWRiSKrIdPc0xfwg6oBPoxgSQZQx1NC0+kftYyhu+7nsGbf0tlzza0aFEwRykHuXjl4zcnWwSapPjoJ7nKU0NfL76RvJf98tBRAgPsP+Zxz0lBSQyii1AW+Nxeozm/Kx9P7erkHz70Gl70nPMympzmDjSBKvOxUJZ5Ex7FEFGLoog77l7L3//DN7nqL3fYeFBJdmcmzGf50vm88dXP5dlPPZeOjlaq1dSPXyzPsbsYU7PN+fzbyY9KEWvvW8PPf/6/odH9MXArhxkeak7AyeAA9syAqdmV6ohNFz7nSQkH1dt800FTRMEZW0OBKiSYFU9UmRgcZWhvH0O7ehnrGwIMpYY6onIpmwyjF3JAGteCQ8G6bQxRqY76GYtpXHI8UhIq+7fb3XHitTspzfNaOs1O/3K3YHJP1L2CnkjGWSbnzqkPIuVGkvXHO6lR9RyF7FK7Dq1LUSyqIF47hi73WHfN+ewDMR3tLXzqA6/mZc8735N+XCpUQCpVro22DClm+rQda+yrVKv84jdX864PX8aNt63BRFE+AXGVjvZWXvGCS/nMR97E+eecTH19Xc7xvZTok+W1ztXS0HTlpPob//rP/PpXv/Sf2IPNubGNwwwPJwHowaYJO9e5OrILZl8ATdOxe1D9QVFKqP50HjTB5wWoTlQZ6x9mcFcPw/v6iKtVSk31RHVlXHeV2h/oMe1Ck5TlPcIQNbbSsGAl5ZmLiPv3Uu3f74iYAQkz0A0DYpw1lKnReA/7tr7At/x3spgkYSzOgQC52q7PtSsUl7m4jP+wGhC3FbYaD92cqcwJpFucZOpRU0OZD7/jpbzuZU+2ZyBkLfC5aUANcAJ+Qnim2itQLpXYu/8A//jV7/CpL/4723ftt6c2ZyqgcNKxy/j0h9/I37zimXRP7XD1fG9IXDUyv5a3qUiQsqTqYqWQ9evv5+Mf/TAHDhzwG/9zbN7/8MaMhwAPJwEA2IeVAjqzK5VBKLXAzLPVyHnyeMFI5XL+dMHYhWdczM1cNIbK8Bgje3oZ3tNLtVKl1FhPVF8HpJ6DMKeYTNTN7V4RdV2zaFx8AlKOmNi7DSbGCm0EZRvz9wqErFHJFzdLscZNqdE+CfxUHD9dhCotmMvApDa+F+ooKh65XCJO9zLN3LiI74y6CKUI3viKp/HONzyPunKJmnTQoI39pDpCEfkDxlYhSwLy5+tu430f+xe+/7M/MDKaHM8GUK3Q0tjAK1/0NP7h7/+WU05YgURSEHpCttZ0C3HaZ5fja2lStSqZhDiu8rWvXsZvfv0rv+cDwEewHoDDDg83AdiDVQGKUsCs86FpGg7y+8pRDR01F5dN5ht3Z99l5dXRcUb29jK6dz+mGlNqbiQql926krIn85y5D9qLUUMTDfNXUjdjHpV924gHelQbTeEdRxqQYi0+7XMEdqlFMQLn4yipRW/WcTQfP/4gTUJa7HBwWBzCpMrKDxh1rxU9LwnEMU+/6Aw+/cFX09bWFAgQSolIrflA6fzhFopERFHEjp17+ad/+wEf/dy/s/reTRgd+RlXWTh/Fh997+t58988nyld7QXrfg2zVJGB+LYJ71lHFSmVuGf1nXziYx9hoL/fL/1XwD9ig+wOOzzcBACsLeCZQFt2ZaLf2gJmnqeGTK/6gEyeiMzowdNit0NeA6tXDNXRcUb39DC67wBEQl1LE1KKMP5y9S3NPvUXhwUhItRPnUPjgmOoDvVR2b8dHb2UbQ1OxN+CFp8Up3X2Ii3K+yWKUBTtDFJ4Pr1unw2flatQpUCAXMVJkRujbBLi9seJfSgMosKCOGbFktl8+ZN/y4J5M6yf3x2dQAgtkxCDYu9KpRKDQyP8/NdX8/6P/TM//tUfGRwes1xfwO68NJxz+nF86VPv5JILz0w8Sh4l8gbNURmdLZ/erJn8sruy7FxXqxW+/I+f449/+D0e7APeAxTigQ8XPBIEYC+wDDjZuTq0HWY8EZpmkBsDAyObD6P6rq/VEt7d76IWYXV0jNHd+xjv7aPU1EC5uTEPWFHCdsjikP7O5zm38peaOqhffDxSrqOyawOmMpYbeHI7nItEulzP7mlwkS/UtUz/DjQwoEXjGlcDYr+zHdc4nc2JjeTqlwaZ9Kdj/EuhtaWBT3/gNZx39glOaK/XlKLlvNaApBWIde2NT0xwzfV38PHPfpOv/sdP2bJtN04cg4lpqCvxsuddwmc/+maOPmqhx/UlWEPuWapxYoCTtSgEaRtL3HLzDXzmUx9neKhw4s/3sId+HHbdP4VHggAY7AaGp6KThlYG7fl6M8/DbsDxh7CWRBAYbq1v1yQK3nUTUxkYYnTXXqoT45TbWojq6gpFFxZhgYV7xrVSPfXzVhBNmcnEro2Y4YGE64YRL60uJwout/Xb4zIkbReRtIFBrq0eJICaRZurCT1VfMnfrxNue9hoi4l5wTPP4+2vf24ew+GNu6PbJxSyVp0pRy2VIibGJ7jp1tV89rL/4nNf/Q533L2OiThWxk2rcra1NvGO17+Q97/jVUzp6vBi73PkdwVM18pg1E2l9Bxs9ECEkeFBPvmxj3DrLYXw/n3Ah4ENBy/owcPDFQfgw1+AbwIfcq5u/QUseJq1BxRUnISFaa6Qmrb9jTgmtQxlpkF1239evRdFVCcqDKzdwuieHtqOWkTzrOmIlJKtxxby6DrjUPzMqo0bJitENC8/m1J7N/1X/gcTW++1uibaKKa6lfzrJ07Nn5cwMdCCpdEGwhDyB7hkUOLQv7Wc4z6Tn5LkczlTeDJYfxwzs7udv3n5U2hqrM8y8urpdsRnXw3zJBer4wsDA0PccPPdfP9/r+LKq29m3/5eG3hWyvemIRFUJ5g5bQp/957X8YLnXEipVEqQv4anoTg1WTuMGnU5COJr3lGKIq684je1ov5+AlzDwwyPhASQwjasR2BKdiUeg4lhmH1hkudOy66+uJhT7aAVvRDtYzxuWes5SQyFY4zu3kt1dIRSW2vuLVA2gQJx0ZZoD4yBqHU65fkrqfbvpdqzXbVEc263NbUMgIXueqUVjYBuWx11JSWkkyo5IW1ajYKvOuh3E4zJ26WxJikxrvDcpzyBl7/w0kIdPoHNRSTv2NZIKJVKGAM7d+3ll7+9hs986T/5p2/8gFvvuI/hsYl8LenxMIbF82fx+Y+9lWc/43xloDQFcudKIMX2GTwC4YNowpxDFEXs3r2Dj3zwvWzetMl/ay3wbmyKvYcVHikJAGx48HeAv3eu7voDbPsNLHourrDlWVM0OC615EIxGb/z2xSuS2HmzESVwQ1bGdt3gLblS2iaOZP0fLi8FA9jFSLp/YmWe8WU22fT9uQ3MdjaydgdV0GWoDJ5x4T7WouPaEQOKUTakJdyJDciThSC+sY93QDdz7Qmd1ek87yj0hSPyzZe2Q1NLVx60RNobKjLkmAq2uG+qMT2SOymsNgY+voGuPue9fz2qmu58k83s27TTsbHxi3Hj0r5+zo3X1zlmGUL+MIn3s4TzjgukEUoJxK+iO8je8b3a9gnUsnFIVoJw4jjmG//539w802FvT0x8DWgkAfs4YBHkgAA/DfwQmB5dqU6Cvd+HaadCi3zQKout1Bbd/PFkMThh0ivn4Ai5dAmsCSDNEaY6Bug95a7GF94gJaliyk1NWdEo1il8T7Sbbs5V4maOmk//9WMtLQzdP3PMBNjbhtqF5e77hyErrHY0i/qmv5MF2yBxPoGq4JYkori4X2GmtMbp2ST/O+L/4aWpnrmz51BuSRUk5wQzrwnFUTJZhwDVCpVensPcO/9m7nmhjv507W3cfea9fT1D9g1UUr+/FZm+/YrnLjqKL7wibdz8onLc+RP22gUUuPZfyBglzDeb1cay61SelSEUjnixuv/wv/7j2+E9kPczIM86vvBwCNNANYBX8BaNhuyq72rYe23YdX7oFTDAueMqlKetSSgkd/ZJgjpefa5ayfMdW3xNkvr0LpNjPf00HrMcuq7p6lFrybV43zZuX8ZwUg8EOVmms94AabcxPBfvo8ZG5nESqz4vMm3GoWkggL9qCmau8+mwUnB3P419G0TKtD4Cz4ZiYy+BpKKCAwNDXHf/Zs55YSl1NWVqFRijJFs520cx0xMVOjrH2Drtj3ctWYDN9+6mttXr2fj1p30DwznDKFUVo0MqTU2rv+U44/iS59+F8cdexTVOI9CzRFYWfyd4tRuTaPm37jLkUDNLkmxwklf7wG+etkXQxt++oDPADt5hOAQTJWHHdqxksDTnasN3XDWv8KMM7AGQUPhGG+dgklnuI1DmW+Ney09YTg7dzA5w69wPmC6otN6K0QNdbQcdRTNixYSRWXSI7j9YXQWRcA+YIDYVBm98wqG//TfmJF+9K7C8MT47kn3KXdrkHpLbdXNmuJLF05Z6fkMom6k/cwXPNTIY+eUXJTOCsqGqbBodjcvfs4FrFyxkPr6BuJqzODwCHv29bBt2042bdnJ5m172LlnH70DI1QnJkjC+YqdsZ1WbU6vRVCtcvLxy/jKP7yHlccsIa7mWXqyFHTKaJlPb1gN0M/5Hcx3O3onRiQ8KSpF/Nd//Csfev+7mZiY8Afw68BbgcKNhwseDQIANjLwh+gjxQFmng9nfhUa2smR10dQ/4BQF8ldgmEJQ3regJiY9KhxEyQYevGkv6s2n3skNM6fQ8vyFZSaW/L8gxSNQgXxkHzhWI4RM7bmaoav+g/i4V6l46pp0bKky7trTqQvz9RGU61M+Pd826q3ygMSRlqa24Ia4r/uQ1wFM0FdOaJcLmMoUakaKtUJqIza+ZEoCdiJVG3q06FmWurLWfiJq5Zx2affyfEJ589Ttbmtc0X88N4CrQq4Y1SUg6xbMn8+KpW4+87b+JtXv4SNGwvevbXYgLmHdNbfA4VH0gugYSsW+c9Er7ehLVDXBdNOSy4Yj3Vpa0yuY+YX/U+XEzkL3lkkqmWSamq+pm2o9PYxvr+HqLWZcnNL/q6WoI1SA3wrvNqJU562EOmYRmXbGhgbTha4BNriloO64hruavv2DwpKYwq6GwOBWXkufWV41O+KW4grx6ixlYjYGCrVmEo1zwGRIX1h95L+rKUUpQQm5rjlC7nsM+/mhFVH2xOCDtI9bXIKq0IK2Z2tox4BF3GaLCL09/fysQ+/l5tuvN5vdAX4FDaT1iMKjxYBMMA9wNnAXOfywHqYfho0zcbuFlRiP7izU0B+/dvlAsV7/ru54SqMOBZL4uFhJvbsgXKZcnt7nibao02ZFkFefF6TXaSl7gVEHTOobLsHxkdqKO6eNOB3VXxiIF7FuTqg8xKB1f/TXXyhd0NIEGqAFlR00lL7WWueApJBRpQD5xkWpCR3DJzxEsDELF86j3/89Ls56YQVjrVfV+cMq0nPg3LHL19u+QyGhiU/U8Sbx4QA/Ne3vsG3vvn1UKLPy4GPYnP+PaLwaBEAsLuceoGnAPXZ1YkBe0DlzPPsEUxZNiDIuUb6sIfgGddRv00I4d1rosvTnDu4BQzMxAQTe/cQT4xT7upCynV5gs7U2xCgV045SR2lqfOQjulUtq1OJIGQZz/fXONzfXGapjbhGOVB0Lij3AW1ogVzfPWVCr/+sHXCDrtxk7HUQvgCYdNzmSC+j/x+KGD2TPJebFg0bwZf/MQ7OOv0E9wEnYSb4XoBvLEwOWELFuMRen9EyqUSN97wFz76kffT39fnv70ReBOwnkcBHk0CQNLp+cBJztXBzVCqh+5T7W9fTw9ycXHvZxJqSDXI3xOfmAQhVyEypIljqgd6qAwOUOrsJKpvzBaCXVCey7BQfM5zo6nzidqmUtl2N2QJRtyXJR0HCZdju5z79sX9x38an8z4VgbxHi46LFIik5ej5YjJTlGfdKx92qcb64vZugHptThm9owpfOGT7+CCJ56WW/t1FcagRyCE/LWylWX3JtWv8ptRKWL3nl18+H3v4J7VBdf+ODYu5mc8SvBoE4AqcC9wHjAjv2yg737oPBZaF5DvhQjIv7UQPCT2e3qpI0lkIQMpMfHezV7POZQgVAcHqPTsI2ptI0rsArnIOEkWGFWHAKXu+UQtHVS23AWVMSW9ECRSkhiY3MAco3A2yZ4s+g1dgtZl8QimRmej3IV+O9yxdJyrxpNI8AiyYyPxDXoF5yaTQ9qPmO6uDj714b/lqZecQ5weiBLQ8f2iaxoDs8dkcinCmZmEMEXC+Pg4l33h0/zvT34Yeu0nwMexhOBRgUebAIDNHLQHuARozK5WR2BwA0w/E+o7ybbXhnwvNalxej+0YGsRDr8Idd+YAscUhHhkmMrePdDYQKmtg1RHLDa1hjVfACKi7oXQ0Ehl691QmcgekYTLaV3fZLWnReRpMC0hU9yYIgfPnstPOS0OoyKCaU05LSpig3h1Gk08RevQXgUGCiGG5mBEQBGwRNxoa23mo++zsf1uE0URZTWdoRq8ZVBwB+qqtVql60uSrkgU8ZMf/Q9f+sJnmBgv4Pg92NT5hz3N1wOB/wsEAKwLpBvrFchhZJfdNTjtLIjqcLh40J7kIxUUUlU76yqgSoTEz0yCcFFISwRmYpzqvj2YklDq6LIbigBMetaPkokLa1syiSGavgQpl6luW23dZCpfnL9k0wNNU1Um5duafxf6rQiRqyIl19Jstia3pxWIngkbSos4oVSYQo4DV13LXjpk7q+9DobmxgY+8PZX8qqXPM0mhPXDwI2P1C4N86WCVOPPvM2qY7k1wG1raocB6/K75cZr+cgH3sW+vXv9xvcBbwP+xKMM/1cIQIw98fRMYJ5zp38d1HXAlOOUMUjbBFIImrGc28VFa2o/79+XwHW/+jimsn8PpjJO1DkFieryNyaTH532l5AZy8BUMDvuIYttUGK0kaJAn0Y6hlKJpO8FBSUn1bZ27+kDS5XdOzWYOW2uIUF4XXMMmYqYFu0QErrojX/OdhvrIt7++hfyxte+gHK55Pr3HV5hHPG+IPZny8uN/CsGT08enBVFETu3b+WD730bq+8uHOKbxvp/jYdxn/+hwv8VAgDQjw0VvhAbLWjBVG2ocPtSaFuCTtWcPOB8AA7XDmfQM7h2BUcJTspQSyRDCLtwfSu4fSRfkNUD+4iHBoi6phDVNXgcyOepqYSgSpQy0cyjiEcHMLtVKjiTc1KX3+SuxVAcf1ZV2k2jL7hcOdfhc7tItsk4oAIVhsKnw456kffSt2fmKoN+OSCka8OGMdSVhTe++nm8/c0vo6G+Ljk/QDUpNeloiSCoCuh/UzrgSRH5BBFEfrF7FwYG+vnUxz7AFb/5FQH4KfA+YIj/A/B/iQCAPVNQgAuctlVHoG+tDRBq7K6B/CFLjyIUznrybQMpiEM8smczOpBEFPrcl3zDjiR1xgP9xH09lDq7kIZmRbPSABGN9Dn7yVCsVI/MWgHD+2DvRrftEkKevI1aAahl5XcJiMmQVTwkTO9r9HBIR9r0wDbB/JTkgGOjACFC4c2XlrqNoVwSXvOyZ/C+t7+a5qYGYuOG5xq1LkISQZAoBNqXB3Z5a8Xrkk3vVeXrX/0i//nv/xry998L/C12nf+fgP9rBADgbmxw0HHoUR7bD6N7YNoToNSIDRYJGfJcrp3NuFE+bOdUzRCEVIODGBwNDrIIYIYHqR7Yg7S2QVObMqUZh1P7x5ym5xBG5UaiWSuIe7dj9m/y+qXF6DwLkDZX5YiaGDCDbNtFXN9RoihbGILmlZS4uGJ+TSOgb50LSQIe8S5Hhle88Gl86N2vo7WlKTlmTkkv6dMhPT8gAQTFfVPk9AXFRfc/Ev7/9s48Sq67uvOf33tVXdVL9aretVuS5U2ywRsGD7GTyWDAkyELhJB4CIEhORgTzGAGMB4IDickxJzAZBKSwORwshAGHGzG2LHi3ZZB8iYbI8uSJcuytm71ol6ru6veb/64b/n93nvVkowtd0vve06drn77e/Xu/d37vcvvB9//Dl/5ky9SLidyekaB64H7WUBYiApgFvgJkhuw2loz/iJ4c5IfEDQQqSmQsRdHGem9Fn+TxibGRi10jb+1zhucU6HL01SPHIL6BlRTi+Gj69RDBaNN+FLmG1A96/EGd8PRA9ZQakT44hdhmN81lF38/Y0bNfGrUpG9EEUQdCIUmbiOxCUmhujY9mkKwDopOUfxO+95Jzd+8kOUSo3Sw09jBQ4sos+wPswsv4S57ytju4NxvAOU8foYLKnrujx4/yZu+swnGB46En8QM8CfInNmvu5+v4mFqAAAJpDIwH8EWqLFGo5uh3wztG2oIcTGyGiF8GqdKpCE5D62gGnZZt6RsMZJKnN4Q4chl0O1dCDTThnrY70KdFwY60qo3jPRgzthbCAkQxN+dXgEOw6QKnzGddckCI39lLFtdCg97z7WY5lPGcUtuFoWh9bkHPjtd7+DG2/4MC3NTYksv0TGnorpGcsFsNcHV2ylAsd+C5NXCMhT13XZ9uRWPvPJj7H3xT1pN/e/gS/wOsb7a2GhKgCQ+OgQUjlYHy7VVRh5Ghr6oXmdLDOFL84ApSoJO35sE35xdioxRIfCkHwzggE6ZfipVtFDh8XLb11iKAGjoNd4a3XQ5zA4brENp2ct3qHtMHGEMOgXM8FNoY9TfOmwcwkSNxt/amGMPnCpzOm+7BE8YUElInw69nyN7VKiJnU5xQfe9yt8+hMfpLmpMfSx4/ep03cPMzTT7lDHFYO5QWpoWG7QdV1e2Lmd/3H9R9IYfxCT/xNIe/wFh4WsAED4ABAlEF2rNwMjz4gCaFxBktEHWwiPZbKnkH6JXVIcR3OYsBRCfKTzRVN76OEBdGVGlICTi4xqc8iCUMiscb5hCapzFfrAT2F6lKCXgDIEx35fzXi/eTWqxjsdKaI4XxAdKXo4Acl2DC/ZWJ7mZ6SY/QlF4dFQX8dHP/SbfPyj19DU2IAO5g9QyccdjQG+Eg2jANFwH/n8WAo4bthYP0tMGbiuy/6X93LjDX/ITx59hBQ8Bvw3XuPOvj8PFroC0MDTSG7ARszHX5kQS6D5TLEGlBfbLT7qxIWVyNQ0kmnsbYMD6KSAh3/irgPG9kkordGjR9DTE6i2LlSujuhNNolBYi+2P51ZUzd0rIADz0B5LLwdDVY9TLrwpysEWRbbUtXaTi5s3iKfcEyOdTqGY3yPncnPrWhtaeSTH3s/v/9776ZYqJOSYXPPFJ/ebt2trGepa1yy6UyFFGaN39FxXQYHDvH5z36CezbdlbbJC8C1iBJYsFjoCgDEb9oMrALOtteMSo5A20YodpMQ0DQzPbJj/WU6uV0qdIxZwn45YgpCcgYw4va2karHR9BjI+jWDlSh3g5MxEapKFLgX25zH7Qvh/1P+0ogajke7wYc+quGeZAg88wnYig1M7U3YQGl3FP8eOZya/TUtZWGtbfnsby/iy9+9lre8+tvI+emJfnoUPuZLbrNQ+r4d+ObpWit/VWNK1M4rsvQkQH+6HOf5I7b/zXtZdkHfBi4lwWOxaAAQJImnkT6B/Raa2aG4OgOaN8obcUCdyAh1GlKYZ4XMVW4ayiWIEPRym5TpGUMhJoBhZ4aQ48egeZ2VNEvJNL+vjoSeGvnQMpalkJbH+zfBjOT4TGDbULeMibwKdGrGtcYM/st2zimAEKZSUkRDq4hNZxYw1FHg/a46Pyz+PIffZwrr7gkqi7UZr2jrtnAI070kaIXo76FMdVtmlMxu99xXEZHjvClL3yaH3w/tXfnCJLocyuLAItFAYAUDT0PXIrUDUQoH4ajz0lkoNBBbWGdn+RKLKsZZzPcBRWN9qHI+AtquxQqksbyFHroEDQ24TS0xC415q1bNqlCtS6Htj70gWd8JeDEz2I78ylzDiaaiCrrDLHrr2Ul2euj8n1jf+vE81lbmrqc4l3vuJIvff5jnHPOGRHZF54mci0sf9/gUlLN9+DROw6uK6++pzVKOYZisX9zCQvKAR3XZWhogJtvuoF//d530tK7A+H/+2Pc5ILBYlIAAC8i/dL/A+YEIyCFQ6PPQutZUOwyVhzLB621TBtC6P9vT3iP/bbZsAphaxJqPubK6OFD6LoCNLUTRgGU6bsaJmkQ8NagWleg2pahDz4L5XFT+qK9kh6BNRgHykvhdzBO6VYcNQMxh9l5FEMgbKYCnjfXAPCq9PYs4fprr+Hj115DZ2cb1aoX+uNWDD8x2itDIJV9LiV1+UopJienee753Tzw4E/40V0P8m93P8DhQwOsXr2Surp8gncJ4DguQ0cOcfNNN3Dbrd9NE/4Z4Iu8xnP5vdo4VoxooeKXkQ6qqxJrWs6CDZ+DtnNBVwgzBs0GowQNQiHy7T37r5FIlOwg7KXsZ1gdqd2LzW1Mp9NYlqvDWXk2zopzpCFKuM4kBwPFIBmDSknegN73GPqBr8LISyjHTXqygSYIDxcpuNRYt703drWC3SU4DcpQRPZm5v1E95JzHd5y6flcf+01XPiGc/wRWacIerBrdJyELBo37TgOlUqF3btf4t4HHuWBR57guZ27GR4ZkwQir0J9Ic+f/8mNvP1tv0ClUrXOpJGR/8D+fXzp8zdw1x231xL+WxAFcNLbev08WGwWQIAXiHoKtllrZo7A6NNQWgf1vYbQQ/JljbkJCb+fFBWpax+nhj41G2jWhAa8KnrkMHp2CtXa6SsBbEM80B/m0K4VtPThdK2FwZ3oqaHwcuzolVgxUVGPSr0MReB8mMSeDlcGKiD9mRrP01BcyVP5V+ZV6e/t5KMffh+f+vgHWHPG8rDEOV60Y3+NCX9gbfjEq+u6TE5O8cijT/BXf/tP/MVffZs7Nz3E3n2HmCrPRZaZm6PiwRvOP5vzN57tzwwc3b3r5tizeyc3feo67tmUOoffDPDnSFPPRSX8sHgVAEhs9TngMhJKYBiGn4CGPmhYHtstzccnReDjfntETiVWkxyCzDZ19kiaMrV23F8eG4apUSi1Q74++fInGDt/WWMPqvdcOPoyjB2QtcpkEewD1SocjD8aU+B1zT1qISBITT9EBL+luZH/8o4r+J+f/ghX/afLqa8vRAU0hsVindn6WZSlbJSjcB2H4ZExNt3zCF/5i2/xN3//XZ7ctp3xySmpsVCxO1OKfF097/21t7F2zQqqVY9gghfHcXjm6cf53Keu48ebH0q7uWngq8DNLELhDx/zIscvIe7AGYk1hSWw/lrov0oIMh2Yd/FJRsASbi9lLoLQBYjPVYAs8zvZWgk1RA077BCiJjGRSbiOyEkvtaLWXYRqX5qIVmrsCToixaBg8jD6sW/B85tQXiXkBRLKQwWefwzBhippJ6Sb/rVeoyR5SrVCU6mBt77pQn77N6/mkos2UCjkRfBTuiJHj802y6Oji+ArpRgYHOLf793M939wN0//bCfl8qzMIpd6XYEFUqG/t4t//NYtrFy5zHcBhPzb/PB9fPHG/86unc+lHWQEuAmZ9brMIsXJnhrstcC/A79PmhKYOQLPfkX+rnwPuAXhBWrygcrySxOkVeJ/2S54EXU4dsiBbfLOJsLM+r3UEygFE6Pw7MPo1edDzzq0csPzqRSiLuQIGrpRl12HKnWjt30XPTsZ3VOCEUybuktFcTKwu3Ol+v2Re5CqDHz+paWlxOWXXsC7f/Uq3nTxBhob66l6XjTq1+BUzdZepj/hOA5Kwf6DA9x194Pc+sNN/Gz7C8xVKjI5qDMf6+gv96qcu34NHZ2dVCpeyBncdut3uOXLX+Dggf1pOwds/zdZRIRfGk4FBQCiBD6MMLBnWmsqE/D8NyRKsPZDUNeC9CJVWCy26WzGSZ5wyqlwQbStElZe+d+VNrvzafsYaYyWNSlnyNGH59HladixBTUxCis3Qr4hrFyLriIQwOCsGu02wsZroHUFaus3YWQvOpyGLCIHku55QtoNDXACpr8n1o2bz7O0r4e3XnYhV7/9CjZuWE9DfQHteVSq1ZgiFHIj9IjiCsFXzo7f8mvf/oPc+W8P8P3bN7Fj5x6qVX9CEcc5zmtV5AtFrrjicvJ+45bpqQm+9bd/yTf+8qtMjI+l7TQAfAb4Pyxy4ZcncGrhfODrCDmYvNWuN8O6P4DGVUjqcA3THEIzX6zxwAWopjP8mHMNmtn7gfeqo8jCvBECe7/of98Hb++F1W+EUleiNX64qamrfB/ZGd6Ffuyb6Bc3+30GnSSzqEzaL3B7SPruoQKJS6j2p0vzcHN5ujvb2HDeWVxx+aVcetEGli3tJp93w9He4jBjVpg2b8a4UcdRVKsee17cxw/vvI//d9f9vLBnH17VcB/iD8XScIYF4RdjnbV2BX/99S/R3dPFwf17+V+33Mztt/5L2rx9IOTzdcCdnJA2XLg41RQASGjwy8CvkeYBltbC2j+Q6ciVwu42bPIDYBF/aSE/MzSIX5Rj9SHQhAkm8clNE6HAZEGTxb4H71uxAVZtRHevlWIiY5BWcQUQQDmo2THYfhv6me/B5JFEgpAQl34s3avK9SjXFxQv4kUIpjDT4k4pjZuro6W5kaV9PZx71louesN5bNiwnqX9PRSLEs6Mh84sAjIWRLFbKihc12F2do4dz+/mtjvu4c5ND7Lv5cOynRO74fikhfFloYvl4jg5rv/INXzwd9/LM09t4U//+LNs/fHDtd6rLUhVX80NFiNORQUAMu/gzcA1mK3GA9S1werfgaVXg1tPqmAbQq3TJhElEn4RQg9tKAFrBuFU5QG2MjDPKessFiE8lIdyHeheDSvPRxdbMcW9phJAofBg4KfoJ78NL28BryKNVZRDULijtEdzfY5isY45L0elUsWrzOAoj0KhSLG+gfpiPS3NTfR2tbNyZT9rzljF6tXLWNrXTWtLiVzO9X174xkYKcnhFcW8IuM2JXqhHCanpnhq28+47Y57uf+hLRwe8EuhnTSeRsVG+xrwFfeZ687gG1/7Ak9ufYRbvvx59r30YtrWHnAf0sL7pE7ceTJwqioAkB4CH0RmXulIrHXy0PuLsOoaaFiKZXrHRnXLhA/nrQuiAdgjP6bwxyIJUFPRBK5DqERicXYzaSlcX2qHlRegO1aIIGtDYQSbBxEFM8G3fBR23w3bf4A++rIhifJZ3tvNL195GZddcj7Nzc2AJp93KTUWKRYLuPkChUKBhvoixUIex4Gqp9FeZLynFvwo26SPeyFaCbEHMDg4xMOPPs4Pf3QfW594hvHxSdt1CXYMD2JwG6k5wMZ2SpF3PH73t67GmRvkH779d0yMj6e9Q2WE5f9j4NBr9aK+njiVFQCIvfpbyA+4PHWL0ho44/eg81IxebUX4wdigmv58V4kkDogBH3FoQPzP6YMzDbfCVcj8vc1nj/ya0Og4l2AgFwddK1ELz8P6ttiw74hIQarH/jwamIfPHc77LwbPTXgm/w5cFwK+Tyrl3Zw2cUb+cUr3sIFG9bR1tbMXBVmZqsoNI6jcXy3wWItwkE/lg0YnJu4ByJputPlGXa9sJd77t/Mpvs28/yuvczOzEAifj8fVPqyoE7Cf44t9VX6W2bYsf1pa9ZgAyNIgs8tLNIY//HgVFcAAS4B/gwhB5P3nCvBsqth+W9AXQeoKnasP+73x0du300IR1v5q7QIctIaEOUhJcBpSiA4JuFor00FkPCfNTS0oJadDZ1noHP1xnFUpEAsU9kXRK+CHnwWnr8d9m+FmQl/G0+mKNMeTaU21qxeyRs3ruENF5zLWWeuob+vk6bGIkopKhWPqudZLbkhLrOiKJRPTCqlcJRDtVrl0OEjbHnsaTbdt5mtj29j8Miw1Ds4TvRs0lhPc5mpgdKmEg+mGtdVmN4PU/vBq9mhaxdwA3A7EjI6ZXG6KAAQC+Am4H2k8QIoaD0PVr0X2i+UOHJsUg5bAdgKIvTbdW1FYVkVqREAwu1Flxiug2kxWL9axMQrx4HWbug7G93aD24+7klE9xqQBGHewxzO6C7YfQ9670Po8QOyzsnJ+qoH1RnqCjl6untYv/5MLjhvDevXraKvr4eO9laamhrI53Iox8FxVOimh49CCZOP9hgeOcqT257jvgd/zKNbnmLvy4dl+qxaKcPh7cYUQar/H+wXY/0r4zD1kmSKppP4HtKQ9gZOMbKvFk4nBQDCC/xXZC727tQtck2SObj0XVDs8d2BGEOfKtyE31VsxNZ4vkvgJV2CwNQn8P/9VQnrg5jLYP6Vr0ohbH0uJ2XCfWdBc5+Y9iGCvAMj+cY3sZVSYhEc3QN770PvfQSO7oPKFKFAKcePDIjA1eUcWkt1dHZ10tfbS193B709nSxZ0kFrcxOFQh7Hcf2kHcXExCSPb/sZm3/yFDt37WZqckqO57gShTCeY3jPiZCBSi6zrANlf/QclA/C9IH5Rv1JpGvvnwEHTu5r+frhdFMAILzALyFdWi8mNVlUCTew4jckd8ApxqyBWi4Bhnlv+O7KH8l1nFSMCpXMnMAwcTfcHqwROy1XwCQJfUWgc3noWAa966G5R4hPz9jekhkVO6xGTQ+iDz8Oex+Awz+Nyo3DxCifCA0nwHAAScZx3Dyu0rjKw3Fdf5o0zdzsLLOzs4RMfuLRG756cK9BlY8Ga/bmWOmzlcHoFlDFNnRlDIa2wcwg82AvUsn3D0hxz2mDxVwM9EqhkYSOHwFzSK/BQmKr2WE4sgUmX4Jih88NGLoinlYbHDnAsVSrSYIFpJzvG0dcvh+fN2ry/Dxg+wBaGasMmtCroiaHUEMvoaaGwHWkuMjJG8cwTOW4YeE2QOtaWPoW1NI347SvglwB5sowNw3Vsk+auuC6RhYeaF3Fq1aoVD3mqpq5SpW5uQrVaiVMUJLn6Rj3omLfA5dHhfdoNz40FANArgFV6kV1rEOVetBTL8LAVpgdqfUrzCKde64D7uAU9/fTcDpaACbywK8gPt8bqVE6Ql0b9FwBfW+HhhURmWQlDnmGUjBCf/EsvzRS0bACCP8zRnWIuRYkIhEWrDAm0bndHJQ60UtWQdsyKLaEGXF2UhIGaeib/Y6Sh1Mtw/h+vMFnYeBJGN4FU8MwNwXVWSIZihFw4T0Z1sLxzgRs9UVQhPyLWw+NnahSP5T6UQ096OkR2H8v+uBDUB6a77d/AfgaktI7zmmK010BBOhHOri+H+ipuVV9H/RdJfkDhU7kha6SIPaAJPFn+rRJYtAM71mRgfBrkG4cbDfP8S2FYhYoEfEQxSZU21LoWI1u6hLLQDmSzmulAcd0oqUsKqi5cZgegNG9MLITfXQ3amoAZsalCKk657sIZvUjhithjvgmsSq8AEoSlXDzUGiBxm5UqQ9KvVDqg0ILemoGdWQ77N+EPvjgscz9SeB7iK//7Ov0vi0YZAogggO8GSEI30pN90hBaTX0vg06L4NCuy8UAVlojtxxoYwpiFjYL9gvGgejETkc/WumKWMvD/c3GqJYYUWfp3DroKEVWnqgrR8alkC+UQQvXjkYchf+PfmWgdQR+KFQbxanOgEzY3hTIzA9jCoPwfQIemYM5iagUhbFoH1rQbkSbXBzkteQq0fVlaDYJtdTbEPnSyinHk0ONVeGiUH0+CEY3QOHH4WhzVA+ZNx7AhrYgaSJ/zOnma9fC5kCSGIJ8AH/s45az0g5MilJz5Ww5M1+W3JIDR0Gf3VSCZgRAzsRKNikdrQhqQBi4bIEYUnsO9F3BcrNQaEJ3bgEVepCNy6BYjPk6v25GJV9W1bnXGNkj4XgIuITxBLw8yzCUmTf0lBB7F9cLFUpo2enpfX5xDCMD4i7MTuNmhmEkSfQQ1uk0rN2YZ5GmsfcCvwNEuPP4CNTALVxBjKb668DXbU3U5JK3HW5zFxc3++n5ZqJQbbw2/lxNaIJhjCreEZhsD6sUoxHBSCRwYjNIUSRBuNOzCwj5YCTQ+eLUGgURdDQDvUtYiHki9KyTPl5AsoXXJV6CxgnJeIuqihvDl2ZFWJxZhJmxmFmTDoilceEbNSez1XMwtRBmRBm5Alf8GuO+CDZfLchE3Oecnn8rwYyBTA/8sAFSCHIO4HWebcuLIGON0LXWyWM6DZgNyMNEDPjg7BhguCrsb02R1MPa2RP7JNW3RjoJh1VGukoghDaINrYX3uAEjPdqRMFkC9CvgC5onAIubyfOOQamXfIiO/5n+qsfCozUTShUobKrO8WeOE1hPF+bwamXoaRx2H0p/Ox+gHGgAeRdl0PswAn5VwoyBTA8aEOuBL4Q6Qlef28W+caZcqyzjdJdmFdp28VQNI9MIivePswq2+gbcZbKcI1+woQLldgFAbFow/GaTCUQyzRiCAmH/IB/rowNIm9T7Ba+XaP3dCvtvsC8lxmj8L48zCyDSb3SARifkwhgv814AH//wzzIFMAJ4YSMmX5+4HLOZZFgAP13TJhSfvFMplpvpmwP2HYY7BWtCA4zjwuQmqZcooSIBjsgzJjI/oQFjERRiMiWQ2Wx3sHakNbEF2rlbnnn0eZrkGsMs86ZBXmjsLkbpkGfny35GPMb+aDjPiPIJV7mziNw3onikwBvDIUkUjBx5DIQfMx93AK0LRc5jFs2yjdinNNgKkM0gXXVgApy1P5AW353PEeA1bREbGMe8vaEAStzXW4HuNcxjVFpgZRyFNFrkYi8ceD2TGY2gfjO2BsB5QHkTkdjolA8L+OjPyTr+mvfgoiUwA/HxqBixCi8J3AUo4nu9ItyozGpTOh9RxpUVbXYoTeAp87QAo3ME9CkSWUvuCFlYcaYjORkhxhU6IEQJLhM90VY9Q3Q4bmNMOBueHNysg+uQ8mXoCJPVA+Ajq1DVccVWAP0pbrVmArmeC/YmQK4NWBi7Qi+1Wk2GgtQiAeGyoHxU5oWgXNa6FxtUxtlmsCVSfbhDkGxKyAeHtyonVx4i91nbEsuiBSFYn5XaftZx4/lqPvzYhpPzMgI/3kXinHnRuH4++rOY3E8f8J+L/ASyeyc4Z0ZArg1Uc/wg+8C7EOlnK8ygAkvbWwREKLjcuhcZmvEFpkXVDZF5YkxxKB0ojGVIFP4xqCIpvwP78dmlkNSUzuTfLPj/FXp2Tq9pkBmDog9ffTh0UJHJ9pH2AGmRB2MxLOewwYPJEDZJgfmQJ47ZAH+oD/jFgG5yKtyU7smasc5EuiFOp7pES52CWzIOdKkGsQS0G5MYbedBFMnzw4cNzNiJXTGuHBhJsRNAStzkJ1GubGYHZIMvHKA5KKOzsqikCf8CCtESHfCvwLcDfSivuYTGCGE0emAE4OGoH1wFXAm4DzkJqD47cMTChHSpRzjVDXDPkWqGuVT75F3Idck2zjFkDlJa8+yLYzq+sSnIJf3qs8X8jLUJ2ByiRUxiQ0NzsqsfjZUWmyUZmSbV65RV4GDgJPIWTe/ci0b4t2xp3FgkwBnHwUkO5EFyKViJcAvaSVJL8iKD+3Pi8JO25R/jo5iUQ4OT97zy+ysWoKqiLI3ox0DA4UgDcL3pwse3Xcbo0w+HuRRJ07kMKcA0iJdoaThEwBvL7IIxzBOQhfcBFiKXQhyUbOKz/0gsIcMIEQd08hPfafQPLyh8nIvNcNmQJYWCgg1sAKYA1iHVyMWAwlFsdUbhoh74YQ1v5hYBvwIqIAMoFfQMgUwMKGA7QjCmElYims8j8rEKXQhFgSJ9taqCI59uPAUSQ2vwsputmBmPcvk6XjLmhkCmBxohGJKLQhzU37kdmQWpDIQ6e/rAtRDk1E1kPwm7vYMbyq8R2gggi3RgT8gP/Zj7D0B5DJMg4Co8jInpF2iwyZAjg1UYcIfbv/vQdoICrUdxFXI0hhLiOj9RxhdhFTiIBXEP99xN8uC8dlyJAhQ4YMGTJkyJAhQ4YMGTJkyJAhQ4YMGTJkyJAhQ4YMGTJkyJAhQ4YMGTJkyJAhQ4YMGTJkyJAhQ4YMGTJkyJAhQ4YMGTK8hvj/Glxa+03Wdb0AAAAASUVORK5CYII="/></svg>
+diff --git a/dashboard/README.md b/dashboard/README.md
+index 976e06f..d3d6f41 100644
+--- a/dashboard/README.md
++++ b/dashboard/README.md
+@@ -67,7 +67,7 @@ for local use and must be installed and signed in for phone access.
+ 
+ ```powershell
+ # From the repository root; installs dependencies and a launcher in ~/.local/bin.
+-pwsh -NoProfile -File ./dashboard/install-windows.ps1
++pwsh -NoProfile -ExecutionPolicy Bypass -File ./dashboard/install-windows.ps1
+ 
+ # A project-specific dashboard. The default port is stable for each project path.
+ rdsh-dashboard project --project C:\Projects\MyProject --open
+@@ -82,7 +82,41 @@ rdsh-dashboard open --harness
+ rdsh-dashboard stop --harness
+ ```
+ 
+-The checkout must stay in place: the installed launcher points to its `cli.mjs`.
++On native Windows the installed launcher starts `project` and `harness` in the
++notification area without keeping a console window open. Right-click the icon for
++**Open / 開く** or **Exit / 終了**; double-click also opens the authenticated page.
++Windows notification-area settings control whether it sits in the hidden-icons overflow.
++Each icon's tooltip identifies its project (or `rdsh Harness`). The helper receives
++only a small Windows runtime environment; provider credentials are not forwarded.
++Exit calls this instance's existing scoped shutdown: a managed Harness run must
++have verified stopped before the icon/server disappear. If verification fails,
++the icon remains with a warning so you can inspect the stop status and retry.
++Closing the browser leaves the server running. CLI `stop` removes its tray too.
++Independent Harness sessions and other project dashboards are not stopped.
++
++```powershell
++# Keep terminal output and Ctrl-C behavior for scripts or troubleshooting.
++rdsh-dashboard project --project C:\Projects\MyProject --no-tray
++```
++
++Other subcommands remain foreground commands. Direct `node dashboard/cli.mjs ...`
++remains foreground; native Windows can explicitly request `--tray` there.
++Startup failure returns an error to the caller, rather than reporting a ready tray.
++If startup exceeds 60 seconds, the launcher reports that readiness is unconfirmed;
++the owned server may still start. Use `open` or `stop` with that same project to
++inspect or stop it before starting another instance.
++The helper runs this checkout's PowerShell script with process-local execution
++policy; machine/user policy is not changed and enforced Group Policy still applies.
++Opening a browser passes its authenticated URL to the Windows URL handler, as the
++existing `open` command does. Other processes with the same OS-user access can
++observe that short-lived command line; the tray helper itself receives no URL/key.
++Re-run the installer after upgrading to refresh an older launcher.
++Installation uses the lockfile's native prebuilts without package lifecycle
++scripts and verifies that Koffi loads before writing the launchers. An unavailable
++native prebuilt fails installation; ownership checks are retained. The installed
++wrapper also preserves the Node executable selected at installation time.
++
++The checkout must stay in place: the installed launcher points to its `windows-launcher.mjs`.
+ To run without installing a launcher, use `node dashboard/cli.mjs ...`.
+ On Linux/macOS, install with `npm ci --prefix dashboard` and use the Node CLI.
+ Project mode is portable. The current Harness launcher targets Windows + WSL;
+diff --git a/dashboard/cli.mjs b/dashboard/cli.mjs
+index e7f294a..093f664 100644
+--- a/dashboard/cli.mjs
++++ b/dashboard/cli.mjs
+@@ -77,6 +77,8 @@ rdsh-dashboard reply-consumer once|serve --budget-guard --worker-id <id> --proje
+ 
+ Project mode: project metrics, tasks, questions, human feedback, and /mcp.
+ Harness mode: a separate managed DeepSeek Harness Web UI and QR landing page.
++Windows launcher: notification-area tray by default for project/harness; --no-tray keeps terminal mode.
++Direct Node CLI: --tray enables the tray on native Windows.
+ Tailscale Serve shares each loopback server privately over HTTPS.
+ Session-ledger start/resume confirms the native ID then stops its owned ACP process; it sends no prompt.
+ Reply-consumer once/serve explicitly resumes that exact native session and sends current human replies once. Replies grant no new execution permissions. Missing results block replay.
+@@ -90,6 +92,7 @@ const { values, positionals } = parseArgs({
+     "no-tailscale": { type: "boolean" },
+     "tunnel-id": { type: "string" },
+     open: { type: "boolean" },
++    tray: { type: "boolean" },
+     harness: { type: "boolean" },
+     cli: { type: "string" },
+     executable: { type: "string" },
+@@ -1272,6 +1275,10 @@ try {
+   } else if (command === "mcp") {
+     await runStdio(await identity(values.project || process.cwd()));
+   } else if (command === "project" || command === "harness") {
++    if (values.tray && process.platform !== "win32")
++      throw new Error(
++        "--tray requires native Windows; omit it for terminal mode",
++      );
+     const dashboard = await startDashboard({
+       kind: command,
+       project:
+@@ -1282,6 +1289,23 @@ try {
+       harnessPort: portValue(values["harness-port"]),
+       tailscale: !values["no-tailscale"],
+     });
++    if (values.tray) {
++      try {
++        const { startWindowsTray } = await import("./windows-tray.mjs");
++        await startWindowsTray({
++          dashboard,
++          open: openUrl,
++          label:
++            command === "harness"
++              ? "rdsh Harness"
++              : `rdsh: ${path.basename(path.resolve(values.project || process.cwd()))}`,
++        });
++        if (process.connected) process.send({ ready: true });
++      } catch (error) {
++        await dashboard.close();
++        throw error;
++      }
++    }
+     console.log(`[rdsh-dashboard] ${command}: ${dashboard.localUrl}`);
+     console.log(`[rdsh-dashboard] Tailscale: ${dashboard.getShare().state}`);
+     console.log(`[rdsh-dashboard] ${dashboard.getShare().message}`);
+@@ -1296,6 +1320,7 @@ try {
+       });
+   } else throw new Error("Unknown command; use --help");
+ } catch (e) {
++  if (process.connected) process.send({ error: e.message });
+   if (e.report) console.log(JSON.stringify(e.report, null, 2));
+   else console.error(`[rdsh-dashboard] ${e.message}`);
+   process.exitCode = 1;
+diff --git a/dashboard/install-windows.ps1 b/dashboard/install-windows.ps1
+index cd446c8..c4155e5 100644
+--- a/dashboard/install-windows.ps1
++++ b/dashboard/install-windows.ps1
+@@ -2,26 +2,53 @@
+ param([string]$BinDirectory = (Join-Path $env:USERPROFILE '.local\bin'))
+ $ErrorActionPreference = 'Stop'
+ $taskNode = (Get-Command node.exe -ErrorAction Stop).Source
+-$taskCli = Join-Path $PSScriptRoot 'cli.mjs'
++$taskLauncher = Join-Path $PSScriptRoot 'rdsh-dashboard.ps1'
++$taskNpm = Join-Path (Split-Path (Get-Command npm.cmd -ErrorAction Stop).Source) 'node_modules/npm/bin/npm-cli.js'
++if (-not (Test-Path -LiteralPath $taskNpm -PathType Leaf)) { throw 'Cannot locate npm CLI beside npm.cmd' }
++function Invoke-DashboardInstallerProcess([string]$Executable, [string[]]$Arguments, [switch]$Capture) {
++    $taskStart = [System.Diagnostics.ProcessStartInfo]::new()
++    $taskStart.FileName = $Executable
++    $taskStart.WorkingDirectory = $PSScriptRoot
++    $taskStart.UseShellExecute = $false
++    $taskStart.RedirectStandardOutput = $true
++    $taskStart.RedirectStandardError = $true
++    foreach ($taskArgument in $Arguments) { $taskStart.ArgumentList.Add($taskArgument) }
++    $taskProcess = [System.Diagnostics.Process]::Start($taskStart)
++    try {
++        $taskOutput = if ($Capture) { $taskProcess.StandardOutput.ReadToEndAsync() } else { $taskProcess.StandardOutput.BaseStream.CopyToAsync([Console]::OpenStandardOutput()) }
++        $taskErrorStream = if ($Capture) { [System.IO.Stream]::Null } else { [Console]::OpenStandardError() }
++        $taskError = $taskProcess.StandardError.BaseStream.CopyToAsync($taskErrorStream)
++        $taskProcess.WaitForExit()
++        $taskText = $taskOutput.GetAwaiter().GetResult()
++        $taskError.GetAwaiter().GetResult()
++        return [pscustomobject]@{ ExitCode = $taskProcess.ExitCode; Output = $taskText }
++    } finally { $taskProcess.Dispose() }
++}
+ Push-Location $PSScriptRoot
+ try {
+-    & npm.cmd ci --omit=dev
+-    if ($LASTEXITCODE -ne 0) { throw 'Dashboard dependency installation failed' }
++    # Install the pinned native prebuilts without running package lifecycle shells.
++    $taskInstall = Invoke-DashboardInstallerProcess $taskNode @($taskNpm, 'ci', '--omit=dev', '--ignore-scripts')
++    if ($taskInstall.ExitCode -ne 0) { throw 'Dashboard dependency installation failed' }
++    $taskNative = Invoke-DashboardInstallerProcess $taskNode @('--input-type=module', '--eval', "import koffi from 'koffi'; if (!koffi.version) throw new Error('Native Koffi unavailable'); console.log(koffi.version);") -Capture
++    if ($taskNative.ExitCode -ne 0) { throw 'Windows native prebuilt unavailable; installation did not complete' }
++    $taskKoffiVersion = $taskNative.Output.Trim()
++    if ($taskKoffiVersion -notmatch '^\d+\.\d+\.\d+$') { throw 'Native Koffi version could not be verified' }
+     # Co-install the pinned native binary for an existing WSL distribution.
+     # This does not create a distribution or run the DSH environment wrapper.
+     $taskDistribution = if ($env:RDSH_WSL_DISTRO) { $env:RDSH_WSL_DISTRO } else { 'FlashNext' }
+     if (Get-Command wsl.exe -ErrorAction SilentlyContinue) {
+-        $taskMachine = & wsl.exe -d $taskDistribution --exec uname -m 2>$null
+-        $taskWslStatus = $LASTEXITCODE
++        $taskWsl = Invoke-DashboardInstallerProcess (Get-Command wsl.exe).Source @('-d', $taskDistribution, '--exec', 'uname', '-m') -Capture
++        $taskMachine = $taskWsl.Output
++        $taskWslStatus = $taskWsl.ExitCode
+         $taskArchitecture = @{ x86_64 = 'x64'; aarch64 = 'arm64' }[($taskMachine -join '').Trim()]
+         if ($taskWslStatus -eq 0 -and $taskArchitecture) {
+-            & npm.cmd install --no-save --package-lock=false --ignore-scripts --force "@koromix/koffi-linux-$taskArchitecture@3.1.1"
+-            if ($LASTEXITCODE -ne 0) { throw 'WSL native dependency installation failed' }
++            $taskInstall = Invoke-DashboardInstallerProcess $taskNode @($taskNpm, 'install', '--no-save', '--package-lock=false', '--ignore-scripts', '--force', "@koromix/koffi-linux-$taskArchitecture@$taskKoffiVersion")
++            if ($taskInstall.ExitCode -ne 0) { throw 'WSL native dependency installation failed' }
+         } else { Write-Verbose 'WSL native dependency not selected; see docs/SCOPED-STOP.md before Harness launch.' }
+     }
+ } finally { Pop-Location }
+ New-Item -ItemType Directory -Force -Path $BinDirectory | Out-Null
+-$taskWrapper = "& '" + $taskNode.Replace("'", "''") + "' '" + $taskCli.Replace("'", "''") + "' @args`nexit `$LASTEXITCODE`n"
++$taskWrapper = "`$taskInstalledDashboardNode = '" + $taskNode.Replace("'", "''") + "'`n& '" + $taskLauncher.Replace("'", "''") + "' @args`nexit `$LASTEXITCODE`n"
+ Set-Content -LiteralPath (Join-Path $BinDirectory 'rdsh-dashboard.ps1') -Value $taskWrapper -Encoding utf8NoBOM
+-Set-Content -LiteralPath (Join-Path $BinDirectory 'rdsh-dashboard.cmd') -Value '@echo off', 'pwsh.exe -NoLogo -NoProfile -File "%~dp0rdsh-dashboard.ps1" %*' -Encoding ascii
++Set-Content -LiteralPath (Join-Path $BinDirectory 'rdsh-dashboard.cmd') -Value '@echo off', 'pwsh.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0rdsh-dashboard.ps1" %*' -Encoding ascii
+ Write-Host "Installed rdsh-dashboard in $BinDirectory. Add that directory to PATH if needed."
+diff --git a/dashboard/rdsh-dashboard.cmd b/dashboard/rdsh-dashboard.cmd
+index f6100b8..eb2f9be 100644
+--- a/dashboard/rdsh-dashboard.cmd
++++ b/dashboard/rdsh-dashboard.cmd
+@@ -1,2 +1,2 @@
+ @echo off
+-pwsh.exe -NoLogo -NoProfile -File "%~dp0rdsh-dashboard.ps1" %*
++pwsh.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0rdsh-dashboard.ps1" %*
+diff --git a/dashboard/rdsh-dashboard.ps1 b/dashboard/rdsh-dashboard.ps1
+index f7dd92a..bfa7cfb 100644
+--- a/dashboard/rdsh-dashboard.ps1
++++ b/dashboard/rdsh-dashboard.ps1
+@@ -1,3 +1,19 @@
+-$taskNode = (Get-Command node.exe -ErrorAction Stop).Source
+-& $taskNode (Join-Path $PSScriptRoot 'cli.mjs') @args
+-exit $LASTEXITCODE
++$ErrorActionPreference = 'Stop'
++$taskStart = [System.Diagnostics.ProcessStartInfo]::new()
++# Installed wrappers retain their captured Node path; direct launches use PATH.
++$taskPinnedNode = Get-Variable -Name taskInstalledDashboardNode -ValueOnly -ErrorAction SilentlyContinue
++$taskStart.FileName = if ($taskPinnedNode) { [string]$taskPinnedNode } else { (Get-Command node.exe -ErrorAction Stop).Source }
++$taskStart.UseShellExecute = $false
++$taskStart.RedirectStandardOutput = $true
++$taskStart.RedirectStandardError = $true
++$taskStart.ArgumentList.Add((Join-Path $PSScriptRoot 'windows-launcher.mjs'))
++foreach ($taskArgument in $args) { $taskStart.ArgumentList.Add([string]$taskArgument) }
++$taskProcess = [System.Diagnostics.Process]::Start($taskStart)
++try {
++    $taskOutput = $taskProcess.StandardOutput.BaseStream.CopyToAsync([Console]::OpenStandardOutput())
++    $taskError = $taskProcess.StandardError.BaseStream.CopyToAsync([Console]::OpenStandardError())
++    $taskProcess.WaitForExit()
++    $taskOutput.GetAwaiter().GetResult()
++    $taskError.GetAwaiter().GetResult()
++    exit $taskProcess.ExitCode
++} finally { $taskProcess.Dispose() }
+diff --git a/dashboard/server.mjs b/dashboard/server.mjs
+index f9ce551..ba61af5 100644
+--- a/dashboard/server.mjs
++++ b/dashboard/server.mjs
+@@ -436,7 +436,9 @@ export async function startDashboard(options) {
+           route === "/instruction-queue-ui.mjs" ||
+           route === "/cost-ledger-ui.mjs" ||
+           route === "/budget-ui.mjs" ||
+-          route === "/favicon.ico");
++          route === "/favicon.ico" ||
++          route === "/icon.png" ||
++          route === "/icon.svg");
+       if (
+         !publicAsset &&
+         !adminAuthorized &&
+@@ -450,9 +452,22 @@ export async function startDashboard(options) {
+             "Open this dashboard through rdsh-dashboard open or its QR code",
+         });
+       if (closing) return json(res, 503, { error: "Dashboard is stopping" });
+-      if (publicAsset && route === "/favicon.ico") {
+-        res.writeHead(204);
+-        return res.end();
++      if (
++        req.method === "GET" &&
++        ["/favicon.ico", "/icon.png", "/icon.svg"].includes(route)
++      ) {
++        const [file, type] =
++          route === "/favicon.ico"
++            ? ["icon.ico", "image/x-icon"]
++            : route === "/icon.png"
++              ? ["icon-256.png", "image/png"]
++              : ["icon.svg", "image/svg+xml"];
++        const bytes = await fs.readFile(path.join(here, "../assets", file));
++        res.writeHead(200, {
++          "content-type": type,
++          "x-content-type-options": "nosniff",
++        });
++        return res.end(bytes);
+       }
+       if (req.method === "GET" && route === "/api/managed-process")
+         return json(
+diff --git a/dashboard/test/dashboard.test.mjs b/dashboard/test/dashboard.test.mjs
+index f12b855..6ff6a6b 100644
+--- a/dashboard/test/dashboard.test.mjs
++++ b/dashboard/test/dashboard.test.mjs
+@@ -80,12 +80,21 @@ test("Harness proxy removes dashboard credentials before forwarding", async (t)
+   await new Promise((resolve) => upstream.listen(0, "127.0.0.1", resolve));
+   t.after(() => upstream.close());
+   const front = http.createServer((req, res) =>
+-    proxyHarness(req, res, upstream.address().port, "rdsh_harness", "admin-key"),
++    proxyHarness(
++      req,
++      res,
++      upstream.address().port,
++      "rdsh_harness",
++      "admin-key",
++    ),
+   );
+   await new Promise((resolve) => front.listen(0, "127.0.0.1", resolve));
+   t.after(() => front.close());
+   const response = await fetch(`http://127.0.0.1:${front.address().port}/`, {
+-    headers: { cookie: "rdsh_harness=secret; upstream=keep", authorization: "Bearer admin-key" },
++    headers: {
++      cookie: "rdsh_harness=secret; upstream=keep",
++      authorization: "Bearer admin-key",
++    },
+   });
+   assert.equal(await response.text(), "ok");
+   assert.equal(received.cookie, "upstream=keep");
+@@ -130,7 +139,19 @@ test("project state, HTTP/stdio MCP, subscriptions, answers, and auth work toget
+     "content-type": "application/json",
+   };
+   assert.equal((await fetch(dashboard.localUrl + "api/state")).status, 401);
+-  assert.equal((await fetch(dashboard.localUrl + "favicon.ico")).status, 204);
++  const favicon = await fetch(dashboard.localUrl + "favicon.ico");
++  assert.equal(favicon.status, 200);
++  assert.equal(favicon.headers.get("content-type"), "image/x-icon");
++  assert.deepEqual(
++    Buffer.from(await favicon.arrayBuffer()),
++    await fs.readFile(new URL("../../assets/icon.ico", import.meta.url)),
++  );
++  const brandIcon = await fetch(dashboard.localUrl + "icon.png");
++  assert.equal(brandIcon.headers.get("content-type"), "image/png");
++  assert.deepEqual(
++    Buffer.from(await brandIcon.arrayBuffer()),
++    await fs.readFile(new URL("../../assets/icon-256.png", import.meta.url)),
++  );
+   assert.equal(
+     (
+       await fetch(dashboard.localUrl + "api/state", {
+@@ -178,7 +199,9 @@ test("project state, HTTP/stdio MCP, subscriptions, answers, and auth work toget
+   );
+   await client.connect(
+     new StreamableHTTPClientTransport(new URL(dashboard.localUrl + "mcp"), {
+-      requestInit: { headers: { ...headers, authorization: `Bearer ${runtime.mcp_token}` } },
++      requestInit: {
++        headers: { ...headers, authorization: `Bearer ${runtime.mcp_token}` },
++      },
+     }),
+   );
+   assert.equal((await client.listTools()).tools.length, 6);
+diff --git a/dashboard/test/model-routing.test.mjs b/dashboard/test/model-routing.test.mjs
+index ab40dc9..0f40805 100644
+--- a/dashboard/test/model-routing.test.mjs
++++ b/dashboard/test/model-routing.test.mjs
+@@ -456,7 +456,9 @@ test("separate public clients bind, probe and inspect a native configuration wit
+           ],
+           {
+             env: f.env,
+-            timeout: 20000,
++            // Windows ownership checks and cleanup have separate deadlines.
++            // Let them finish before the outer fixture terminates the CLI.
++            timeout: process.platform === "win32" ? 60000 : 20000,
+             maxBuffer: 1024 * 1024,
+             windowsHide: true,
+           },
+diff --git a/dashboard/ui.html b/dashboard/ui.html
+index 9c2d1e5..758d6af 100644
+--- a/dashboard/ui.html
++++ b/dashboard/ui.html
+@@ -4,6 +4,8 @@
+     <meta charset="utf-8" />
+     <meta name="viewport" content="width=device-width,initial-scale=1" />
+     <title>Project dashboard</title>
++    <link rel="icon" type="image/png" href="./icon.png" />
++    <link rel="apple-touch-icon" href="./icon.png" />
+     <style>
+       :root {
+         color-scheme: light;
+@@ -676,6 +678,7 @@
+     <main>
+       <header>
+         <div>
++          <img src="./icon.png" width="40" height="40" alt="rdsh" />
+           <div class="eyebrow" id="kind">PROJECT DASHBOARD</div>
+           <h1 id="title">読み込み中…</h1>
+           <details>
+diff --git a/docs/releases/v0.2.0.md b/docs/releases/v0.2.0.md
+index c525146..5a58a9e 100644
+--- a/docs/releases/v0.2.0.md
++++ b/docs/releases/v0.2.0.md
+@@ -1,6 +1,9 @@
+-# rustdsh v0.2.0
++## 0.2.0 — guarded agent runtime + dashboard/session overhaul
+ 
+-セキュリティ修正と、最新mainに入ったDashboard・セッション管理の改善を含みます。
++- agent実行をguard化: Linux x86_64 + bubblewrap/prlimit/DSH 0.2.0-rc.2が必須。`--share-file`で共有したファイルだけ読み取り、認証情報の自動取込なし、未対応環境はfail-closed。
++- Dashboardに段階更新の互換版固定・run pin、run復元、チェックポイント、再試行制御、モデル照合、preflight診断、費用・予算台帳、質問/返信フロー、スマホoverview、接続診断を追加。
++- セッションは永続台帳と再開先の照合を追加。zstdなしで得た `?` をtokenキャッシュに保存しない修正を含む。
++- Fixes: インストール・自動更新のSHA256検証、全OS配布物が揃ってからの公開、更新バナーdismiss保持(2時間)。
+ 
+ ## 更新前に確認
+ 
+@@ -9,18 +12,60 @@
+ - 外部Codex/opencodeの認証情報は自動取込しません。必要なら `rdsh auth --import --provider <provider>` で明示的に取り込みます。
+ - 修正はこのbinaryから起動した新規rustdshプロセスに適用されます。既存プロセスは再起動してください。元DSH・OpenCode・Dashboardの明示的な元CLI直接実行は、このlauncherの保護対象外です。
+ 
+-## 含まれる改善
+-
+-- プラグインAPIの認証、設定保存、ファイル読み取り、guard、agentツールの実行境界を強化。
+-- インストール・自動更新でSHA256を確認し、全OSの配布物が揃ってからReleaseを公開。
+-- 最新mainのセッションtokenキャッシュ修正、DashboardのCLI連携・復元・質問/返信・費用/予算・履歴backup・段階更新を同梱。
+-- 更新バナーのdismiss状態を保持。更新処理が成功した環境で表示され、全利用者への一斉Push通知ではありません。
+-
+-Linux/macOS/WSLの配布binaryを更新する場合:
++Install/update:
+ 
+ ```sh
+ curl -fsSL https://github.com/sahenjp/rustdsh/releases/latest/download/install.sh | bash -s -- --from-release
+ ```
+ 
+ Windowsは同じReleaseの `install.ps1 -FromRelease` を使用してください。
++
++## What's Changed
++
++* feat: optional server extras off by default by @sahenjp in https://github.com/sahenjp/rustdsh/pull/146
++* perf: sessions token estimate reuse by @sahenjp in https://github.com/sahenjp/rustdsh/pull/158
++* contextのfile_type判定をis_ok_andに by @sahenjp in https://github.com/sahenjp/rustdsh/pull/156
++* [P0] プラグインAPIの認証漏れと設定保存時のキー消失を修正 by @GrEarl in https://github.com/sahenjp/rustdsh/pull/169
++* [P1][#47] 互換版を固定した段階更新とrun pinを実装 by @yebisu0529-ship-it in https://github.com/sahenjp/rustdsh/pull/159
++* serveのbench判定をis_ok_andに by @sahenjp in https://github.com/sahenjp/rustdsh/pull/161
++* regressの固定sleep待ちをポーリングに by @sahenjp in https://github.com/sahenjp/rustdsh/pull/162
++* 起動判定をis_some_andに by @sahenjp in https://github.com/sahenjp/rustdsh/pull/163
++* dsh_argsの二重derefを簡略化 by @sahenjp in https://github.com/sahenjp/rustdsh/pull/164
++* profile環境変数判定を簡略化 by @sahenjp in https://github.com/sahenjp/rustdsh/pull/165
++* zstd判定をis_ok_andに by @sahenjp in https://github.com/sahenjp/rustdsh/pull/166
++* compactの既定値をunwrap_or_defaultに by @sahenjp in https://github.com/sahenjp/rustdsh/pull/167
++* slimのopt-out判定をis_some_andに by @sahenjp in https://github.com/sahenjp/rustdsh/pull/168
++* [P1][#46] 履歴の選択backupと新しい認証での復元を実装 by @yebisu0529-ship-it in https://github.com/sahenjp/rustdsh/pull/157
++* feat(adapters): CLI能力契約とDSH ACP版別検証を追加 by @yebisu0529-ship-it in https://github.com/sahenjp/rustdsh/pull/120
++* 設定表示のNull既定値を簡略化 by @sahenjp in https://github.com/sahenjp/rustdsh/pull/171
++* searchのstarts_withを文字指定に by @sahenjp in https://github.com/sahenjp/rustdsh/pull/172
++* searchの冗長クロージャを解消 by @sahenjp in https://github.com/sahenjp/rustdsh/pull/173
++* terms重複判定の一時確保を削減 by @sahenjp in https://github.com/sahenjp/rustdsh/pull/174
++* 設定適用の一時cloneを除去 by @sahenjp in https://github.com/sahenjp/rustdsh/pull/176
++* dump層列挙の冗長クロージャを解消 by @sahenjp in https://github.com/sahenjp/rustdsh/pull/178
++* scopedスレッドのproj借用化 by @sahenjp in https://github.com/sahenjp/rustdsh/pull/179
++* feat(sessions): 永続CLIセッション台帳と再開先の照合を追加 by @yebisu0529-ship-it in https://github.com/sahenjp/rustdsh/pull/122
++* feat(preflight): タスクに必要な前提だけを開始前に診断 by @yebisu0529-ship-it in https://github.com/sahenjp/rustdsh/pull/123
++* feat(recovery): run・指示・応答の耐久履歴と根拠付き復元 by @yebisu0529-ship-it in https://github.com/sahenjp/rustdsh/pull/124
++* feat: 副作用の照合と予算・権限内の再試行制御 by @yebisu0529-ship-it in https://github.com/sahenjp/rustdsh/pull/126
++* feat: チェックポイントと正式resume・新規会話の選択 by @yebisu0529-ship-it in https://github.com/sahenjp/rustdsh/pull/127
++* feat: 受入条件と対象版に結び付いた証拠で検証済みを判定 by @yebisu0529-ship-it in https://github.com/sahenjp/rustdsh/pull/128
++* feat: runのモデル照合と許可されたroute変更の記録 by @yebisu0529-ship-it in https://github.com/sahenjp/rustdsh/pull/129
++* feat(dashboard): scope staged stops to owned process descendants by @yebisu0529-ship-it in https://github.com/sahenjp/rustdsh/pull/131
++* feat(dashboard): bind human replies to explicit question revisions by @yebisu0529-ship-it in https://github.com/sahenjp/rustdsh/pull/132
++* feat(dashboard): track human reply application to the original session by @yebisu0529-ship-it in https://github.com/sahenjp/rustdsh/pull/133
++* feat(dashboard): prioritize project and task context in the mobile overview by @yebisu0529-ship-it in https://github.com/sahenjp/rustdsh/pull/135
++* feat(dashboard): スマホ閲覧とDot連携の接続診断を分離 by @yebisu0529-ship-it in https://github.com/sahenjp/rustdsh/pull/137
++* fix(dashboard): 同じnative sessionへの入力順序を耐久claimで守る by @yebisu0529-ship-it in https://github.com/sahenjp/rustdsh/pull/138
++* [P1][#19] 追指示の投稿・競合確認・明示中断を実装 by @yebisu0529-ship-it in https://github.com/sahenjp/rustdsh/pull/139
++* [P1][#44] 費用の出所を追える作業者・session別台帳を追加 by @yebisu0529-ship-it in https://github.com/sahenjp/rustdsh/pull/141
++* [P1][#45] 並列予約を含むDSHのsoft/hard予算制御を実装 by @yebisu0529-ship-it in https://github.com/sahenjp/rustdsh/pull/155
++* fix(sync): sync-dsh.sh でリリースの .sha256 を検証する by @eightman999 in https://github.com/sahenjp/rustdsh/pull/181
++* fix(sessions): zstdなしで得た `?` をトークンキャッシュに保存しない by @eightman999 in https://github.com/sahenjp/rustdsh/pull/182
++* doctorのsize-gateをis_ok_andに by @sahenjp in https://github.com/sahenjp/rustdsh/pull/183
++* fix: 設定とセッション精度を修正しRust性能・モデルE2E検証を追加 by @Nicolas0315 in https://github.com/sahenjp/rustdsh/pull/177
++* perf: preserve search output while bounding work and hardening native inspection by @sahenjp in https://github.com/sahenjp/rustdsh/pull/186
++
++**Full Changelog**: https://github.com/sahenjp/rustdsh/compare/v0.1.5...v0.2.0
++
+ 全変更は [CHANGELOG](https://github.com/sahenjp/rustdsh/blob/main/CHANGELOG.md) に記載しています。
+diff --git a/install.ps1 b/install.ps1
+index 8839be2..571aa3d 100644
+--- a/install.ps1
++++ b/install.ps1
+@@ -65,7 +65,7 @@ if ($Restore) {
+ 
+ if ($FromRelease) {
+   $base = $env:RDSH_RELEASE_BASE
+-  if ([string]::IsNullOrEmpty($base)) { $base = 'https://github.com/sahenjp/rustdsh/releases' }
++  if ([string]::IsNullOrEmpty($base)) { $base = 'https://github.com/jimoto-no-llm/rustdsh/releases' }
+   if ($Version -eq 'latest') { $url = "$base/latest/download/rdsh-windows-x64.zip" }
+   else { $url = "$base/download/$Version/rdsh-windows-x64.zip" }
+   $tmpd = Join-Path ([System.IO.Path]::GetTempPath()) ("rdsh-rel-" + [System.Guid]::NewGuid().ToString("N"))
+diff --git a/install.sh b/install.sh
+index 10a834d..59d6196 100755
+--- a/install.sh
++++ b/install.sh
+@@ -107,7 +107,7 @@ verify_sha256() {
+ fetch_release() {
+   # Print the path of the extracted prebuilt rdsh binary.
+   # Overridable for tests: RDSH_RELEASE_BASE=file:///path/to/dir.
+-  base="${RDSH_RELEASE_BASE:-https://github.com/sahenjp/rustdsh/releases}"
++  base="${RDSH_RELEASE_BASE:-https://github.com/jimoto-no-llm/rustdsh/releases}"
+   case "$OS/$ARCH" in
+     Linux/x86_64)
+       gv="$(glibc_version)"
+diff --git a/plugins/rdsh-settings/README.md b/plugins/rdsh-settings/README.md
+index 2bf1a9b..37482cf 100644
+--- a/plugins/rdsh-settings/README.md
++++ b/plugins/rdsh-settings/README.md
+@@ -22,7 +22,8 @@ DSH設定サイドバーに rdsh セクションを追加するテスト用プ
+ 
+ APIにはDSHのGUIセッション認証とHost/Origin検証を適用します。
+ `connection.requestRejection` を提供するDSHが必要です（0.2.0-rc.2で検証済み）。
+-`connection`サービスがない場合、プラグインは読み込まれません。
++`webServer`と`connection`が揃った場合だけHTTPルートを登録します。
++Discord連携はweb/headless/TUIの各プロファイルでも動きます。
+ サービスに認証APIがない場合、リクエストは503で拒否します。
+ 設定画面が扱わない既存キー（`extras.enable`など）は、保存時にも保持します。
+ GETと保存応答は画面が扱う項目だけを返し、未対応項目はディスク上で保持します。
+@@ -38,3 +39,87 @@ dsh plugin --profile web add ./plugins/rdsh-settings
+ 外すときはプロファイルのプラグイン一覧から rdsh-settings を外します。
+ テスト実装なので context engine は既定OFF（beta.context_engine=false）。
+ 使うときだけONにします。
++
++
++## Discord Rich Presence
++
++設定 → rdsh → **Discord Rich Presence** で変更します。既定ONです。
++
++新規設定やDiscord設定が未指定の場合は、そのまま作業状態を表示します。
++表示しない場合は「Discordに作業状態を表示する」をOFFにして保存します。
++保存済みのOFF設定は維持します。
++Discordデスクトップアプリを起動し、Discord側でも活動の表示を有効にしてください。
++共通のdshアプリ（Application ID: `1557873849280888903`）を同梱しているため、
++利用者がDeveloper Portalでアプリを作成したりIDを入力したりする必要はありません。
++このIDは公開識別子で、Bot tokenやClient secretではありません。
++
++独自のアプリを使う場合だけ「独自のDiscordアプリを使う」を開いてIDを変更します。
++Application IDが未設定・空欄のときや `rdsh settings unset discord.application_id` で
++リセットしたときは、共通のdshアプリに戻ります。
++
++既定の表示文は「dshで作業中」です。表示文、agentの状態・稼働数、経過時間を
++個別に変更できます。DSHの `agent/status` イベントから「agent稼働中 (2)」や
++「待機中」に更新し、終了したagentは集計から除きます。読み込み済みのagentも
++現在の状態から集計します。プロンプト、ファイル名、プロジェクトパスは送りません。
++表示文はDiscordの送信上限に合わせてUTF-8で128バイト以内に短縮します。
++
++設定画面には保存前の表示プレビュー、未保存の印、Discord専用の保存ボタンがあります。
++Discordだけを保存しても、他の項目の編集中の内容は残ります。
++接続済みと表示への反映は分けて扱い、Discordから更新の応答が返ってから反映済みにします。
++活動の共有をDiscord側で無効にしている場合、接続済みでも他の人には表示されません。
++
++「詳細設定」ではメンバー一覧に出す内容を表示文・agent状態・アプリ名から選べます。
++agentの表示をOFFにしている場合、一覧のagent状態は表示文に切り替わります。
++共通アプリ名はDeveloper Portalで登録された `rdsh` です。画像は登録済みのアイコンを
++既定で使い、「アプリの画像を表示する」でOFFにできます。プレビューには添付元PNG
++`assets/rushDSH.png` を同梱し、認証済み `/api/rdsh-discord/icon` から表示します。
++Discord本体はDeveloper Portalに登録済みのアプリアイコンをCDNから取得します。
++共通アプリの公開メタデータを最大1分間キャッシュし、App Iconの変更に自動追従します。
++メタデータの取得に失敗しても、ローカルIPC連携は保持します。
++添付PNGはDeveloper PortalのGeneral Information → App Iconにも登録してください。
++カスタム画像は
++Rich Presence → Art Assetsの画像キー（半角英小文字・数字・`_`・`-`）か公開画像URLを指定します。
++リンクボタンは名前とhttp/https URLを両方指定します。Discordの仕様上、
++ボタンは他の人に見え、自分のプロフィールには表示されません。
++画像やリンクを空欄にすると既定に戻ります。独自アプリで画像が空欄なら画像を送りません。
++
++送信は5秒以上の間隔を空け、連続したagent状態の変化は最新の状態にまとめます。
++OFFへの変更は待機中の更新を取り消し、表示を解除します。
++
++Linux/macOSはローカルのUnix socket、Windowsは名前付きパイプを使います。
++WSLではローカルのDiscordが見つからなければ、Windows PowerShellを介して
++Windows側のDiscordに接続します。Discord未起動時は5秒間隔で再接続します。
++常駐サービスで`WSL_DISTRO_NAME`がない場合もカーネル情報からWSLを判定します。
++Windowsの実行ファイルがPATHにない環境では、存在確認済みの
++`/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe`を使います。
++設定をOFFにするかプラグインを外すと表示を解除します。
++Discord Web版には対応しません。
++
++設定は `$DSH_HOME/rdsh.json` の `discord` 節で、Rust CLIと共有します。
++CLIからも変更でき、起動中のプラグインが5秒以内を目安に再読み込みします。
++
++```sh
++rdsh settings set discord.enabled true
++rdsh settings set discord.show_agent_status true
++rdsh settings set discord.show_elapsed true
++rdsh settings set discord.show_image true
++rdsh settings set discord.status_display state
++rdsh settings set discord.details 'dshで作業中'
++rdsh settings set discord.enabled false
++```
++
++使うプロファイルにプラグインを追加してください。headless/TUIの場合も同じパッケージです。
++
++```sh
++dsh plugin --profile headless add ./plugins/rdsh-settings
++```
++
++接続状態は設定画面に表示します。認証済みGET `/api/rdsh-discord` でも
++`state`、`running_agents`、`started_at`（Unix秒）、`updated_at`（Unixミリ秒）、
++`published_activity`（応答が返った最新の送信内容）を取得できます。
++画面をスマホ幅で開くとrdsh設定のナビを上に並べます。ホストの
++`data-shortcut-modal="settings"` を持つ設定モーダルに限定した調整です。
++プロトコルは [Discord公式IPCの説明](https://github.com/discord/discord-rpc/blob/master/documentation/hard-mode.md)
++と [RPCのSET_ACTIVITY仕様](https://docs.discord.com/developers/topics/rpc#set-activity)、
++[Activityの表示フィールド](https://docs.discord.com/developers/events/gateway-events#activity-object)
++に基づいています。
+diff --git a/plugins/rdsh-settings/client.js b/plugins/rdsh-settings/client.js
+index f279176..a7f59b9 100644
+--- a/plugins/rdsh-settings/client.js
++++ b/plugins/rdsh-settings/client.js
+@@ -19,6 +19,21 @@ window.__ModuleLoader__.load({
+     const warn = { margin: '0', fontSize: '12px', color: 'var(--dsw-alias-label-warning, #b7791f)' };
+     const cssText = '.rdsh-settings input,.rdsh-settings textarea,.rdsh-settings select{background:var(--dsw-alias-bg-module-platform);color:var(--dsw-alias-label-primary);border:.5px solid var(--dsw-alias-border-l3);outline:none}.rdsh-settings input:focus,.rdsh-settings textarea:focus,.rdsh-settings select:focus{box-shadow:0 0 0 2px var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));border-color:transparent}.rdsh-settings input::placeholder,.rdsh-settings textarea::placeholder{color:var(--dsw-alias-label-dimmed)}.rdsh-settings input[type=checkbox]{accent-color:var(--dsw-alias-button-primary-fill);width:15px;height:15px;background:none;border:none;padding:0}.rdsh-settings button{font:inherit}.rdsh-btn-pri{background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground);border:none}.rdsh-btn-pri:hover{background:var(--dsw-alias-button-primary-hover)}.rdsh-btn-pri:disabled{opacity:.4;cursor:default}.rdsh-btn-sec{background:transparent;color:var(--dsw-alias-label-primary);border:.5px solid var(--dsw-alias-border-l3)}.rdsh-btn-sec:hover{background:var(--dsw-alias-interactive-bg-hover)}.rdsh-btn-sec:disabled{opacity:.4;cursor:default}.rdsh-msg{font-size:12px;color:var(--dsw-alias-label-secondary)}';
+     const grid2 = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' };
++    const discordDesc = { ...desc, color: 'var(--dsw-alias-label-secondary)', lineHeight: 1.6 };
++    const defaultDiscordId = '1557873849280888903';
++    const defaultDiscordImage = 'https://cdn.discordapp.com/app-icons/1557873849280888903/3abd404070c831dcaa59310cc29982df.png?size=256';
++    // Scope the host layout adjustment to this mounted section; use semantic anchors, not generated CSS names.
++    const narrowCss = '@media(max-width:640px){[data-shortcut-modal=settings]:has(.rdsh-settings){flex-direction:column}[data-shortcut-modal=settings]:has(.rdsh-settings)>nav{width:100%;padding:16px 12px 0;gap:8px}[data-shortcut-modal=settings]:has(.rdsh-settings)>nav>div:last-child{flex-direction:row;overflow-x:auto;overflow-y:hidden}[data-shortcut-modal=settings]:has(.rdsh-settings)>nav button{flex:none}[data-shortcut-modal=settings]:has(.rdsh-settings)>nav+div{min-height:0}[data-shortcut-modal=settings]:has(.rdsh-settings)>nav+div>div:first-child{height:48px;padding:8px 12px}[data-shortcut-modal=settings]:has(.rdsh-settings)>nav+div>div:last-child{padding:0 12px 16px}}';
++    const discordCss = '.rdsh-discord{min-width:0;overflow-wrap:anywhere}.rdsh-discord fieldset{border:0;padding:0;margin:0;min-width:0;display:flex;flex-direction:column;gap:12px}.rdsh-discord label{line-height:1.6}.rdsh-discord summary{cursor:pointer;padding:8px 0;min-height:32px;box-sizing:border-box}.rdsh-discord summary:focus-visible,.rdsh-settings button:focus-visible{outline:2px solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));outline-offset:3px}.rdsh-discord-fields{display:flex;flex-direction:column;gap:12px;padding:8px 0}.rdsh-discord-preview{margin:0;padding:12px 0;border-block:1px solid var(--dsw-alias-border-l3);display:flex;flex-direction:column;gap:6px;font-size:13px}.rdsh-discord-preview p{margin:0}.rdsh-discord-preview strong{font-size:15px}.rdsh-discord-meta{font-size:12px;color:var(--dsw-alias-label-secondary);line-height:1.6}.rdsh-discord-actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px}.rdsh-discord-actions button{padding:9px 12px;min-height:36px;border-radius:8px;cursor:pointer;font-size:13px}.rdsh-discord-pill{font-size:12px;color:var(--dsw-alias-label-secondary);background:var(--dsw-alias-bg-module-platform);border:1px solid var(--dsw-alias-border-l3);border-radius:12px;padding:3px 9px}.rdsh-discord-link{align-self:flex-start;font-size:12px;padding:6px 12px;background:var(--dsw-alias-interactive-bg-hover);border-radius:8px}.rdsh-discord input,.rdsh-discord select{min-height:34px}.rdsh-discord input[type=checkbox]{min-height:15px;flex-shrink:0}.rdsh-discord select{width:100%}.rdsh-discord ::selection{background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground)}';
++    function wireText(value) {
++      let result = '';
++      for (const char of value) { if (new TextEncoder().encode(result + char).length > 128) break; result += char; }
++      return result;
++    }
++    function validUrl(value) {
++      try { const url = new URL(value); return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password; }
++      catch { return false; }
++    }
+     function toLines(v) { return Array.isArray(v) ? v.join('\n') : ''; }
+     function fromLines(s) { return String(s || '').split('\n').map((x) => x.trim()).filter((x) => x !== ''); }
+     function RdshSection() {
+@@ -28,13 +43,16 @@ window.__ModuleLoader__.load({
+       const legacy = lg[0]; const setLegacy = lg[1];
+       const ld = useState(true); const loading = ld[0]; const setLoading = ld[1];
+       const sv = useState(false); const saving = sv[0]; const setSaving = sv[1];
++      const ds = useState(null); const discordStatus = ds[0]; const setDiscordStatus = ds[1];
++      const sd = useState(null); const savedDiscord = sd[0]; const setSavedDiscord = sd[1];
++      const dm = useState(''); const discordMsg = dm[0]; const setDiscordMsg = dm[1];
+       const ms = useState(''); const msg = ms[0]; const setMsg = ms[1];
+       const load = useCallback(async () => {
+         setLoading(true); setMsg(''); setAll(null);
+         try {
+           const r2 = await fetch(GET_ALL, { cache: 'no-store' });
+           const j2 = await r2.json();
+-          if (r2.ok && j2 && j2.config) { setAll(j2.config); setLegacy(!!j2.legacy_present); }
++          if (r2.ok && j2 && j2.config) { setAll(j2.config); setSavedDiscord(j2.config.discord || {}); setDiscordMsg(''); setLegacy(!!j2.legacy_present); }
+           else setMsg(j2?.error === 'invalid-settings'
+             ? '設定ファイルを読み込めません。元の設定を確認してから再読み込みしてください。'
+             : '読み込みに失敗しました。接続と権限を確認してから再読み込みしてください。');
+@@ -42,17 +60,34 @@ window.__ModuleLoader__.load({
+         setLoading(false);
+       }, []);
+       useEffect(() => { load(); }, [load]);
++      useEffect(() => {
++        let active = true;
++        const poll = async () => {
++          try {
++            const response = await fetch('/api/rdsh-discord', { cache: 'no-store' });
++            const value = await response.json();
++            if (active) setDiscordStatus(response.ok && value.ok ? value : null);
++          } catch { if (active) setDiscordStatus(null); }
++        };
++        poll(); const timer = setInterval(poll, 5000);
++        return () => { active = false; clearInterval(timer); };
++      }, []);
+       const setPath = (sec, k, v) => setAll((c) => ({ ...c, [sec]: { ...(c ? c[sec] : {}), [k]: v } }));
+       const sec = (name) => (all && all[name]) || {};
+-      const saveAll = async () => {
++      const saveAll = async (discordOnly = false) => {
+         if (!all || saving) return;
+-        setSaving(true); setMsg('保存中…');
++        const showMsg = discordOnly ? setDiscordMsg : setMsg;
++        setSaving(true); showMsg('保存中…');
+         try {
+-          const r = await fetch(SAVE_ALL, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ config: all }) });
++          const r = await fetch(SAVE_ALL, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ config: discordOnly ? { discord: all.discord } : all }) });
+           const j = await r.json();
+-          if (r.ok && j && j.ok) { setAll(j.config); if ('legacy_present' in j) setLegacy(!!j.legacy_present); setMsg('保存しました (rdsh.json)'); }
+-          else setMsg('保存に失敗しました');
+-        } catch (e) { setMsg('保存に失敗しました'); }
++          if (r.ok && j && j.ok) {
++            setAll(c => discordOnly ? { ...c, discord: j.config.discord } : j.config);
++            setSavedDiscord(j.config.discord || {});
++            if ('legacy_present' in j) setLegacy(!!j.legacy_present);
++            showMsg(discordOnly ? '保存しました。Discordへの反映を待っています。' : '保存しました (rdsh.json)');
++          } else showMsg('保存できませんでした。接続を確認して、もう一度保存してください。');
++        } catch (e) { showMsg('保存できませんでした。接続を確認して、もう一度保存してください。'); }
+         setSaving(false);
+       };
+       const num = (secName, key, v, fb) => {
+@@ -66,13 +101,87 @@ window.__ModuleLoader__.load({
+       const g = sec('general'); const tk = sec('tokens'); const se = sec('search');
+       const co = sec('compact'); const ss = sec('sessions'); const lg2 = sec('logs');
+       const svv = sec('serve'); const gu = sec('guard'); const be = sec('bench');
++      const dc = sec('discord');
++      const discordDirty = JSON.stringify(dc) !== JSON.stringify(savedDiscord);
++      const detailsText = wireText(dc.details?.trim() ? dc.details : 'dshで作業中');
++      const agentText = discordStatus?.running_agents > 0 ? `agent稼働中 (${discordStatus.running_agents})` : '待機中';
++      const commonApp = !dc.application_id?.trim() || dc.application_id.trim() === defaultDiscordId;
++      const appName = commonApp ? 'rdsh' : '独自のアプリ名';
++      const previewImage = dc.show_image === false ? '' : dc.large_image?.trim() ? (validUrl(dc.large_image.trim()) ? dc.large_image.trim() : '') : commonApp ? '/api/rdsh-discord/icon' : '';
++      const memberText = dc.status_display === 'name' ? appName : dc.status_display === 'state' && dc.show_agent_status !== false ? agentText : detailsText;
++      const assetValid = !dc.large_image || /^[a-z0-9_-]+$/.test(dc.large_image.trim()) || validUrl(dc.large_image.trim());
++      const idValid = !dc.application_id?.trim() || /^[1-9][0-9]{16,19}$/.test(dc.application_id.trim());
++      const buttonValid = !dc.button_url?.trim() || validUrl(dc.button_url.trim());
++      const buttonComplete = !!dc.button_url?.trim() === !!dc.button_label?.trim();
++      const discordValid = assetValid && idValid && buttonValid && buttonComplete;
++      const connectionText = ({ disabled: '接続状態: OFF', needs_application_id: 'Application IDを確認してください', connecting: 'Discordに接続中…', connected: 'Discordに接続済み', disconnected: 'Discordに接続できません', invalid_settings: '設定ファイルを読み込めません' })[discordStatus?.state] || '接続状態を確認中…';
++      const elapsed = Math.max(0, Math.floor(Date.now() / 1000) - (discordStatus?.started_at || Math.floor(Date.now() / 1000)));
++      const elapsedText = `${Math.floor(elapsed / 3600).toString().padStart(2, '0')}:${Math.floor(elapsed / 60 % 60).toString().padStart(2, '0')}:${(elapsed % 60).toString().padStart(2, '0')} 経過`;
++      const published = discordStatus?.published_activity;
++      const expectedDisplay = dc.status_display === 'name' ? 0 : dc.status_display === 'state' && dc.show_agent_status !== false ? 1 : 2;
++      const reflected = discordStatus?.state === 'connected' && published?.details === detailsText && published?.status_display_type === expectedDisplay
++        && published?.state === (dc.show_agent_status === false ? undefined : agentText)
++        && !!published?.timestamps === (dc.show_elapsed !== false)
++        && (published?.assets?.large_image || '') === (dc.show_image === false ? '' : dc.large_image?.trim() || (commonApp ? discordStatus?.default_image || defaultDiscordImage : ''))
++        && (published?.assets?.large_text || '') === (dc.show_image !== false && (dc.large_image?.trim() || commonApp) ? wireText(dc.large_text || 'dsh') : '')
++        && (published?.buttons?.[0]?.label || '') === (dc.button_label?.trim() || '') && (published?.buttons?.[0]?.url || '') === (dc.button_url?.trim() || '');
++      const discordFeedback = discordMsg.includes('保存できません') ? discordMsg : discordDirty ? '変更はまだ反映されていません'
++        : !dc.enabled && discordStatus?.state === 'disabled' ? '保存済み。表示はOFFです。'
++        : reflected ? 'Discordに反映しました' : discordMsg || '保存済み';
+       const su = sec('setup'); const bt = sec('beta'); const cx = sec('context');
+       const cxActive = Object.keys(cx).some((k) => {
+         const v = cx[k];
+         return Array.isArray(v) ? v.length > 0 : (typeof v === 'string' ? v !== '' : false);
+       });
+       return h('div', { className: 'rdsh-settings', style: { maxWidth: 720, display: 'flex', flexDirection: 'column', gap: 12 } },
+-        h('style', null, cssText),
++        h('style', null, cssText + discordCss + narrowCss),
++        h('section', { className: 'rdsh-discord', style: card, 'aria-label': 'Discord Rich Presence' },
++          h('div', { style: { ...row, justifyContent: 'space-between', flexWrap: 'wrap' } }, h('h3', { style: title }, 'Discord Rich Presence'), h('span', { className: 'rdsh-discord-pill' }, discordDirty ? '未保存' : dc.enabled ? '表示 ON' : '表示 OFF')),
++          h('p', { style: discordDesc }, 'Discordで、dshの作業状態を共有します。変更は保存すると反映されます。'),
++          h('fieldset', { disabled: saving },
++          h('label', { style: row }, h('input', { type: 'checkbox', checked: !!dc.enabled, onChange: (e) => setPath('discord', 'enabled', e.target.checked) }), 'Discordに作業状態を表示する'),
++          h('label', { style: label }, '表示文', h('input', { style: input, value: dc.details ?? 'dshで作業中', maxLength: 128, placeholder: 'dshで作業中', onChange: (e) => setPath('discord', 'details', e.target.value) })),
++          detailsText !== (dc.details?.trim() ? dc.details : 'dshで作業中') ? h('p', { style: warn }, 'Discordの文字数制限に合わせ、プレビューの長さで送信します。') : null,
++          h('label', { style: row }, h('input', { type: 'checkbox', checked: dc.show_agent_status !== false, onChange: (e) => setPath('discord', 'show_agent_status', e.target.checked) }), 'agentの稼働状態・稼働数を表示する'),
++          h('label', { style: row }, h('input', { type: 'checkbox', checked: dc.show_elapsed !== false, onChange: (e) => setPath('discord', 'show_elapsed', e.target.checked) }), '経過時間を表示する'),
++          h('figure', { className: 'rdsh-discord-preview', 'aria-label': 'Discord表示プレビュー' },
++            h('figcaption', { className: 'rdsh-discord-meta' }, '表示プレビュー', discordDirty ? '（未保存）' : ''),
++            h('div', { style: { display: 'flex', alignItems: 'center', gap: 12 } },
++              previewImage ? h('img', { src: previewImage, width: 48, height: 48, alt: '', referrerPolicy: 'no-referrer', style: { borderRadius: 8, objectFit: 'cover', flexShrink: 0 }, onError: e => { e.currentTarget.hidden = true; } }) : null,
++              h('div', null, h('strong', null, appName), h('p', null, detailsText))),
++            dc.show_agent_status !== false ? h('p', null, agentText) : null,
++            dc.show_elapsed !== false ? h('p', { className: 'rdsh-discord-meta' }, elapsedText) : null,
++            dc.button_label?.trim() && dc.button_url?.trim() && buttonValid ? h('span', { className: 'rdsh-discord-link' }, dc.button_label.trim()) : null,
++            h('p', { className: 'rdsh-discord-meta' }, 'メンバー一覧: ', memberText),
++            h('p', { className: 'rdsh-discord-meta' }, dc.enabled ? '現在のagent数を使った表示例です。Discord側の見た目は環境によって異なります。' : 'OFFのため公開されません。ONにして保存すると、この内容を表示します。'),
++            dc.show_image !== false && dc.large_image ? h('p', { className: 'rdsh-discord-meta' }, '画像はDiscord上で確認できます。') : null),
++          h('details', null,
++            h('summary', { style: label }, '詳細設定（一覧の表示・画像・リンク）'),
++            h('div', { className: 'rdsh-discord-fields' },
++              h('label', { style: label }, 'メンバー一覧に表示する内容', h('select', { style: input, value: dc.status_display || 'details', onChange: e => setPath('discord', 'status_display', e.target.value) }, h('option', { value: 'details' }, '表示文'), h('option', { value: 'state', disabled: dc.show_agent_status === false }, 'agentの状態'), h('option', { value: 'name' }, 'アプリ名'))),
++              dc.status_display === 'state' && dc.show_agent_status === false ? h('p', { style: discordDesc }, 'agentの表示がOFFの間は、一覧に表示文を使います。') : null,
++              h('label', { style: row }, h('input', { type: 'checkbox', checked: dc.show_image !== false, onChange: e => setPath('discord', 'show_image', e.target.checked) }), 'アプリの画像を表示する'),
++              h('label', { style: label }, '画像キー / 画像URL', h('input', { style: input, value: dc.large_image || '', maxLength: 512, placeholder: '例: dsh_logo または https://…/logo.png', onChange: e => setPath('discord', 'large_image', e.target.value), 'aria-invalid': !assetValid })),
++              h('p', { style: discordDesc }, 'Art Assetsの画像キー、または公開画像のURLを使います。空欄では共通アプリのアイコンを表示します。独自アプリなら画像なし。'),
++              !assetValid ? h('p', { role: 'alert', style: warn }, '画像キーは半角英小文字・数字・_・-、画像URLはhttp / httpsを使ってください。') : null,
++              h('label', { style: label }, '画像にカーソルを合わせたときの説明', h('input', { style: input, value: dc.large_text || '', maxLength: 128, placeholder: 'dsh', onChange: e => setPath('discord', 'large_text', e.target.value) })),
++              h('label', { style: label }, 'リンクボタンの名前', h('input', { style: input, value: dc.button_label || '', maxLength: 32, placeholder: '例: dshについて', onChange: e => setPath('discord', 'button_label', e.target.value) })),
++              h('label', { style: label }, 'リンク先', h('input', { style: input, type: 'url', value: dc.button_url || '', maxLength: 512, placeholder: 'https://…', onChange: e => setPath('discord', 'button_url', e.target.value), 'aria-invalid': !buttonValid })),
++              !buttonValid || !buttonComplete ? h('p', { role: 'alert', style: warn }, '名前とhttp / httpsのURLを両方入力するか、両方を空欄にしてください。') : null,
++              h('p', { style: discordDesc }, 'リンクボタンは他の人に表示されます。自分のプロフィールには表示されません。'))),
++          h('details', null,
++            h('summary', { style: label }, '独自のDiscordアプリを使う'),
++            h('div', { className: 'rdsh-discord-fields' },
++              h('p', { style: discordDesc }, '通常は変更不要です。共通アプリ（rdsh）を使います。アプリ名はDeveloper PortalのGeneral Informationで設定します。'),
++              h('label', { style: label }, 'Application ID', h('input', { style: input, value: dc.application_id || '', inputMode: 'numeric', maxLength: 20, placeholder: 'Discord Application ID', onChange: (e) => setPath('discord', 'application_id', e.target.value), 'aria-invalid': !idValid })),
++              !idValid ? h('p', { role: 'alert', style: warn }, 'Application IDは17〜20桁の数字です。空欄で共通アプリに戻せます。') : null,
++              h('p', { style: discordDesc }, '空欄で保存すると共通アプリに戻ります。Bot tokenやClient secretは不要です。')))),
++          h('div', { className: 'rdsh-discord-actions' }, h('button', { className: 'rdsh-btn-pri', disabled: saving || !discordDirty || !discordValid, onClick: () => saveAll(true) }, saving ? '保存中…' : 'Discord設定を保存'), h('span', { role: discordMsg.includes('保存できません') ? 'alert' : 'status', className: 'rdsh-discord-meta' }, discordFeedback)),
++          h('p', { role: 'status', className: 'rdsh-discord-meta' }, connectionText, discordStatus?.state === 'connected' && discordStatus.updated_at ? ` / 最終反映 ${new Date(discordStatus.updated_at).toLocaleTimeString()}` : ''),
++          discordStatus?.state === 'disconnected' || discordStatus?.state === 'connecting' ? h('p', { style: discordDesc }, 'Discordデスクトップアプリを起動してください。WSLからWindows側にも接続します。5秒ごとに自動再接続します。') : null,
++          discordStatus?.state === 'connected' ? h('p', { style: discordDesc }, '表示が見えない場合は、Discordの「アクティビティのプライバシー」で共有設定を確認してください。') : null,
++          h('p', { style: discordDesc }, 'プロンプト、ファイル名、プロジェクトのパスは送信しません。'),
++        ),
+         h('div', { style: card },
+           h('p', { style: title }, 'rdsh context engine（実験的、既定OFF）'),
+           h('p', { style: desc }, '毎ターン必要な文脈だけ再構成します。全文履歴は渡しません。使うときだけONにします。設定は rdsh.json に保存され、`rdsh context` コマンドと共有されます。'),
+@@ -137,7 +246,7 @@ window.__ModuleLoader__.load({
+           h('div', { style: row }, h('span', { style: label }, 'Webポート (0=ランダム)'), h('input', { type: 'number', min: 0, max: 65535, value: su.web_port, onChange: (e) => num('setup', 'web_port', e.target.value, 0), style: { ...input, maxWidth: 110 } }))
+         ),
+         h('div', { style: { display: 'flex', gap: 8, alignItems: 'center' } },
+-          h('button', { className: 'rdsh-btn-pri', onClick: saveAll, disabled: saving, style: { padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontSize: 14 } }, saving ? '保存中…' : '保存する'),
++          h('button', { className: 'rdsh-btn-pri', onClick: () => saveAll(), disabled: saving || !discordValid, style: { padding: '8px 16px', borderRadius: 8, cursor: 'pointer', fontSize: 14 } }, saving ? '保存中…' : '保存する'),
+           h('button', { className: 'rdsh-btn-sec', onClick: load, disabled: saving, style: { padding: '8px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 13 } }, '再読み込み'),
+           h('span', { className: 'rdsh-msg' }, msg))
+       );
+diff --git a/plugins/rdsh-settings/index.js b/plugins/rdsh-settings/index.js
+index d3ba18f..daaf903 100644
+--- a/plugins/rdsh-settings/index.js
++++ b/plugins/rdsh-settings/index.js
+@@ -3,7 +3,10 @@ import { join } from 'node:path';
+ import { readFile, writeFile, mkdir, access, rename, unlink } from 'node:fs/promises';
+ import { randomBytes } from 'node:crypto';
+ 
+-export const inject = ['webServer', 'connection'];
++import { discordDefaults, normalizeDiscord, installDiscordPresence } from './discord.js';
++
++// The presence also runs in headless/TUI profiles; HTTP routes need both services.
++export const inject = [];
+ 
+ function dshHome() {
+   return process.env.DSH_HOME || join(homedir(), '.dsh');
+@@ -28,6 +31,7 @@ function defaults() {
+ function settingsDefaults() {
+   return {
+     schema: 1,
++    discord: { ...discordDefaults },
+     general: { slim: true, passthrough: false, dry_run: false, default_profile: '' },
+     tokens: { default_budget: 4000 },
+     search: { dir: '.', max: 100, web_limit: 10, searxng_url: '' },
+@@ -154,6 +158,7 @@ function sanitizeSettings(j) {
+   const cx = obj(src.context);
+   return {
+     schema: 1,
++    discord: normalizeDiscord(src.discord),
+     general: {
+       slim: bool(g.slim, dg.slim),
+       passthrough: bool(g.passthrough, dg.passthrough),
+@@ -232,9 +237,33 @@ function authorize(ctx, req, res) {
+   return false;
+ }
+ 
+-export function apply(ctx, config) {
++function registerWeb(ctx, presence) {
+   return ctx.effect(() => {
+-    if (!ctx.webServer) return;
++    const offDiscordIcon = ctx.webServer.register({
++      kind: 'exact', path: '/api/rdsh-discord/icon',
++      handler: async (req, res) => {
++        if (!authorize(ctx, req, res)) return;
++        if (req.method !== 'GET' && req.method !== 'HEAD') {
++          json(res, 405, { ok: false, error: 'method-not-allowed' }); return;
++        }
++        try {
++          const icon = await readFile(new URL('./assets/rushDSH.png', import.meta.url));
++          res.writeHead(200, { 'content-type': 'image/png', 'content-length': icon.length,
++            'cache-control': 'private, no-cache', 'x-content-type-options': 'nosniff' });
++          res.end(req.method === 'HEAD' ? undefined : icon);
++        } catch { json(res, 500, { ok: false, error: 'icon-unavailable' }); }
++      },
++    });
++    const offDiscord = ctx.webServer.register({
++      kind: 'exact', path: '/api/rdsh-discord',
++      handler: (req, res) => {
++        if (!authorize(ctx, req, res)) return;
++        if (req.method !== 'GET' && req.method !== 'HEAD') {
++          json(res, 405, { ok: false, error: 'method-not-allowed' }); return;
++        }
++        json(res, 200, { ok: true, ...presence.status() });
++      },
++    });
+     const offGet = ctx.webServer.register({
+       kind: 'exact',
+       path: '/api/rdsh-context',
+@@ -313,6 +342,7 @@ export function apply(ctx, config) {
+           const cfg = await mergeSettings(await readSettingsDocument(), input.config ?? input);
+           await mkdir(dshHome(), { recursive: true });
+           await savePrivateJson(settingsPath(), cfg);
++          void presence.refresh();
+           json(res, 200, { ok: true, config: await settingsForForm(cfg) });
+         } catch (e) {
+           res.writeHead(400, { 'content-type': 'application/json' });
+@@ -320,6 +350,24 @@ export function apply(ctx, config) {
+         }
+       },
+     });
+-    return () => { try { if (typeof offGet === 'function') offGet(); } catch (e) {} try { if (typeof offPost === 'function') offPost(); } catch (e) {} try { if (typeof offGetSettings === 'function') offGetSettings(); } catch (e) {} try { if (typeof offPostSettings === 'function') offPostSettings(); } catch (e) {} };
++    return () => {
++      for (const off of [offDiscordIcon, offDiscord, offGet, offPost, offGetSettings, offPostSettings]) {
++        if (typeof off === 'function') off();
++      }
++    };
++  });
++}
++
++export function apply(ctx) {
++  return ctx.effect(() => {
++    const presence = installDiscordPresence(ctx);
++    // Cordis injection is a required-service map, so mount HTTP separately.
++    const web = ctx.inject(['webServer', 'connection'], webCtx => registerWeb(webCtx, presence));
++    const agents = ctx.inject(['agents'], agentCtx => {
++      for (const agent of agentCtx.agents.list()) presence.observe(agent);
++    });
++    return async () => {
++      await web.dispose(); await agents.dispose(); await presence.stop();
++    };
+   });
+ }
+diff --git a/plugins/rdsh-settings/package.json b/plugins/rdsh-settings/package.json
+index 02fec69..d776db7 100644
+--- a/plugins/rdsh-settings/package.json
++++ b/plugins/rdsh-settings/package.json
+@@ -2,7 +2,7 @@
+   "name": "rdsh-settings",
+   "version": "0.1.0",
+   "type": "module",
+-  "description": "rdsh context engine settings section (test prototype)",
++  "description": "rdsh settings and Discord Rich Presence",
+   "exports": {
+     ".": "./index.js",
+     "./client": "./client.js"
+@@ -19,6 +19,6 @@
+   },
+   "meta": {
+     "title": "rdsh設定",
+-    "description": "context engine + rdsh.json 全体設定 (budget, working memory, general/search/serve/guard 他)"
++    "description": "Discord Rich Presence + context engine + rdsh.json 全体設定"
+   }
+ }
+diff --git a/plugins/rdsh-update-banner/README.md b/plugins/rdsh-update-banner/README.md
+index c369852..bda3939 100644
+--- a/plugins/rdsh-update-banner/README.md
++++ b/plugins/rdsh-update-banner/README.md
+@@ -1,6 +1,6 @@
+ # rdsh-update-banner
+ 
+-Update notification banner for [rdsh](https://github.com/sahenjp/rustdsh) on the dsh web GUI.
++Update notification banner for [rdsh](https://github.com/jimoto-no-llm/rustdsh) on the dsh web GUI.
+ 
+ When `sync-dsh.sh` (shipped with rdsh) records an update in
+ `~/.local/share/rdsh/update-state.json`, a notification card appears at the
+@@ -79,7 +79,7 @@ Do not publish new versions to npm.
+ 
+ Retirement steps (docs only; no code deleted here):
+ 
+-1. `npm deprecate rdsh-update-banner "moved into sahenjp/rustdsh: plugins/rdsh-update-banner"`
++1. `npm deprecate rdsh-update-banner "moved into jimoto-no-llm/rustdsh: plugins/rdsh-update-banner"`
+    (preferred; keeps installs resolving with a pointer).
+ 2. Only if deprecation is not enough: `npm unpublish rdsh-update-banner@1.0.0`
+    (needs a classic token + fresh OTP; granular 2FA-bypass tokens are
+diff --git a/scripts/sync-labels.sh b/scripts/sync-labels.sh
+index 7bf763d..b9a70ad 100755
+--- a/scripts/sync-labels.sh
++++ b/scripts/sync-labels.sh
+@@ -1,8 +1,9 @@
+ #!/bin/sh
+ # Sync .github/labels.yml to the repo using the gh CLI.
+ # Usage: sh scripts/sync-labels.sh   (needs: gh auth login, repo scope)
+-set -e
+-REPO="${REPO:-sahenjp/rustdsh}"
++set -eu
++cd "$(dirname "$0")/.."
++REPO="${REPO:-jimoto-no-llm/rustdsh}"
+ if ! command -v gh >/dev/null 2>&1; then
+   echo "gh CLI not found. See https://cli.github.com/" >&2
+   exit 1
+@@ -22,10 +23,7 @@ with open(path) as f:
+     labels = yaml.safe_load(f)
+ for lb in labels:
+     name, color, desc = lb["name"], lb["color"].lstrip("#"), lb.get("description", "")
+-    r = subprocess.run(["gh", "label", "create", name, "--repo", repo,
+-                        "--color", color, "--description", desc])
+-    if r.returncode != 0:
+-        subprocess.run(["gh", "label", "edit", name, "--repo", repo,
+-                        "--color", color, "--description", desc], check=True)
++    subprocess.run(["gh", "label", "create", name, "--repo", repo, "--force",
++                    "--color", color, "--description", desc], check=True)
+ print(f"synced {len(labels)} labels to {repo}")
+ PYEOF
+diff --git a/src/local_http.rs b/src/local_http.rs
+index 61514af..3c0c513 100644
+--- a/src/local_http.rs
++++ b/src/local_http.rs
+@@ -181,8 +181,9 @@ pub fn respond(
+     stream: &mut TcpStream,
+     status: u16,
+     ctype: &str,
+-    payload: &str,
++    payload: impl AsRef<[u8]>,
+ ) -> std::io::Result<()> {
++    let payload = payload.as_ref();
+     let reason = match status {
+         200 => "OK",
+         400 => "Bad Request",
+@@ -195,7 +196,7 @@ pub fn respond(
+         _ => "Error",
+     };
+     write!(stream, "HTTP/1.1 {status} {reason}\r\nContent-Type: {ctype}\r\nContent-Length: {}\r\nConnection: close\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\n\r\n", payload.len())?;
+-    stream.write_all(payload.as_bytes())
++    stream.write_all(payload)
+ }
+ 
+ pub struct ConnectionSlot(Arc<AtomicUsize>);
+diff --git a/src/rdsh_config.rs b/src/rdsh_config.rs
+index 51c7ede..a7d68a7 100644
+--- a/src/rdsh_config.rs
++++ b/src/rdsh_config.rs
+@@ -23,6 +23,7 @@ const URL_CHARS: usize = 2000;
+ pub struct RdshSettings {
+     pub schema: u32,
+     pub general: GeneralSection,
++    pub discord: DiscordSection,
+     pub tokens: TokensSection,
+     pub search: SearchSection,
+     pub compact: CompactSection,
+@@ -62,6 +63,76 @@ pub struct GeneralSection {
+     pub default_profile: String,
+ }
+ 
++/// Shared public Discord application identifier (not a credential).
++pub const DEFAULT_DISCORD_APPLICATION_ID: &str = "1557873849280888903";
++
++/// Discord Rich Presence; never publishes prompts, files, or project paths.
++#[derive(Debug, Clone, PartialEq)]
++pub struct DiscordSection {
++    pub enabled: bool,
++    pub application_id: String,
++    pub details: String,
++    pub show_agent_status: bool,
++    pub show_elapsed: bool,
++    pub show_image: bool,
++    pub status_display: String,
++    pub large_image: String,
++    pub large_text: String,
++    pub button_label: String,
++    pub button_url: String,
++}
++
++impl Default for DiscordSection {
++    fn default() -> Self {
++        Self {
++            enabled: true,
++            application_id: DEFAULT_DISCORD_APPLICATION_ID.into(),
++            details: "dshで作業中".into(),
++            show_agent_status: true,
++            show_elapsed: true,
++            show_image: true,
++            status_display: "details".into(),
++            large_image: String::new(),
++            large_text: String::new(),
++            button_label: String::new(),
++            button_url: String::new(),
++        }
++    }
++}
++
++impl DiscordSection {
++    fn from_value(v: &serde_json::Value) -> Self {
++        let details = text(v, "details", 128);
++        let application_id = text(v, "application_id", 20);
++        Self {
++            enabled: flag(v, "enabled", true),
++            application_id: if application_id.trim().is_empty() {
++                DEFAULT_DISCORD_APPLICATION_ID.into()
++            } else {
++                application_id.trim().into()
++            },
++            details: if details.trim().is_empty() {
++                Self::default().details
++            } else {
++                details
++            },
++            show_agent_status: flag(v, "show_agent_status", true),
++            show_elapsed: flag(v, "show_elapsed", true),
++            show_image: flag(v, "show_image", true),
++            status_display: match v["status_display"].as_str() {
++                Some("name") => "name",
++                Some("state") => "state",
++                _ => "details",
++            }
++            .into(),
++            large_image: text(v, "large_image", 512).trim().into(),
++            large_text: text(v, "large_text", 128),
++            button_label: text(v, "button_label", 32).trim().into(),
++            button_url: text(v, "button_url", 512).trim().into(),
++        }
++    }
++}
++
+ #[derive(Debug, Clone, PartialEq)]
+ pub struct TokensSection {
+     pub default_budget: usize,
+@@ -224,6 +295,7 @@ impl Default for RdshSettings {
+         Self {
+             schema: SCHEMA_VERSION,
+             general: GeneralSection::default(),
++            discord: DiscordSection::default(),
+             tokens: TokensSection::default(),
+             search: SearchSection::default(),
+             compact: CompactSection::default(),
+@@ -344,6 +416,7 @@ impl RdshSettings {
+                 dry_run: flag(&g, "dry_run", false),
+                 default_profile: text(&g, "default_profile", PROFILE_CHARS),
+             },
++            discord: DiscordSection::from_value(&sec("discord")),
+             tokens: TokensSection {
+                 default_budget: clamp_u64(num(&t, "default_budget"), 4000, 500, 200000) as usize,
+             },
+@@ -433,6 +506,7 @@ impl RdshSettings {
+         out.general.passthrough = flag(&g, "passthrough", false);
+         out.general.dry_run = flag(&g, "dry_run", false);
+         out.general.default_profile = text(&g, "default_profile", PROFILE_CHARS);
++        out.discord = DiscordSection::from_value(&v["discord"]);
+         let t = v.get("tokens").cloned().unwrap_or(serde_json::Value::Null);
+         out.tokens.default_budget =
+             clamp_u64(num(&t, "default_budget"), 4000, 500, 200000) as usize;
+@@ -504,6 +578,19 @@ impl RdshSettings {
+                 "dry_run": self.general.dry_run,
+                 "default_profile": self.general.default_profile,
+             },
++            "discord": {
++                "enabled": self.discord.enabled,
++                "application_id": self.discord.application_id,
++                "details": self.discord.details,
++                "show_agent_status": self.discord.show_agent_status,
++                "show_elapsed": self.discord.show_elapsed,
++                "show_image": self.discord.show_image,
++                "status_display": self.discord.status_display,
++                "large_image": self.discord.large_image,
++                "large_text": self.discord.large_text,
++                "button_label": self.discord.button_label,
++                "button_url": self.discord.button_url,
++            },
+             "tokens": { "default_budget": self.tokens.default_budget },
+             "search": {
+                 "dir": self.search.dir,
+@@ -562,6 +649,22 @@ impl RdshSettings {
+             "general.default_profile" => {
+                 self.general.default_profile = parse_string(raw, PROFILE_CHARS)
+             }
++            "discord.enabled" => self.discord.enabled = parse_bool(raw)?,
++            "discord.application_id" => self.discord.application_id = parse_string(raw, 20),
++            "discord.details" => self.discord.details = parse_string(raw, 128),
++            "discord.show_agent_status" => self.discord.show_agent_status = parse_bool(raw)?,
++            "discord.show_elapsed" => self.discord.show_elapsed = parse_bool(raw)?,
++            "discord.show_image" => self.discord.show_image = parse_bool(raw)?,
++            "discord.status_display" => {
++                if !matches!(raw, "name" | "state" | "details") {
++                    anyhow::bail!("discord.status_display must be name, state, or details");
++                }
++                self.discord.status_display = raw.into();
++            }
++            "discord.large_image" => self.discord.large_image = parse_string(raw, 512),
++            "discord.large_text" => self.discord.large_text = parse_string(raw, 128),
++            "discord.button_label" => self.discord.button_label = parse_string(raw, 32),
++            "discord.button_url" => self.discord.button_url = parse_string(raw, 512),
+             "tokens.default_budget" => {
+                 self.tokens.default_budget = parse_usize(raw, 4000)? as usize
+             }
+@@ -615,6 +718,7 @@ impl RdshSettings {
+         let known_section = matches!(
+             key.as_str(),
+             "general"
++                | "discord"
+                 | "tokens"
+                 | "search"
+                 | "compact"
+@@ -638,6 +742,7 @@ impl RdshSettings {
+         let d = RdshSettings::default();
+         match key.as_str() {
+             "general" => self.general = d.general,
++            "discord" => self.discord = d.discord,
+             "tokens" => self.tokens = d.tokens,
+             "search" => self.search = d.search,
+             "compact" => self.compact = d.compact,
+@@ -680,6 +785,17 @@ impl RdshSettings {
+             "general.passthrough(bool)",
+             "general.dry_run(bool)",
+             "general.default_profile(string)",
++            "discord.enabled(bool, default ON)",
++            "discord.application_id(string)",
++            "discord.details(string, max 128 chars)",
++            "discord.show_agent_status(bool)",
++            "discord.show_elapsed(bool)",
++            "discord.show_image(bool)",
++            "discord.status_display(name|state|details)",
++            "discord.large_image(string, asset key or image URL)",
++            "discord.large_text(string)",
++            "discord.button_label(string, max 32 chars)",
++            "discord.button_url(string, HTTP/HTTPS URL)",
+             "tokens.default_budget(500-200000)",
+             "search.dir(string)",
+             "search.max(1-100)",
+diff --git a/src/serve.rs b/src/serve.rs
+index c789778..0ff00b5 100644
+--- a/src/serve.rs
++++ b/src/serve.rs
+@@ -94,6 +94,23 @@ fn handle(mut s: std::net::TcpStream, token: &str, port: u16) -> anyhow::Result<
+         "\"}"
+     );
+     const NOT_FOUND_JSON: &str = "{\"error\":\"not found\"}";
++    if method == "GET" {
++        let asset = match path {
++            "/icon.png" => Some((
++                "image/png",
++                include_bytes!("../assets/icon-256.png").as_slice(),
++            )),
++            "/favicon.ico" => Some((
++                "image/x-icon",
++                include_bytes!("../assets/icon.ico").as_slice(),
++            )),
++            _ => None,
++        };
++        if let Some((ctype, bytes)) = asset {
++            crate::local_http::respond(&mut s, 200, ctype, bytes)?;
++            return Ok(());
++        }
++    }
+     let (status, ctype, payload): (u16, &str, Cow<'_, str>) = match (method, path) {
+         ("GET", "/") => (200, "text/html; charset=utf-8", Cow::Borrowed(UI)),
+         ("GET", "/icon.svg") => (200, "image/svg+xml", Cow::Borrowed(ICON)),
+@@ -153,7 +170,7 @@ fn handle(mut s: std::net::TcpStream, token: &str, port: u16) -> anyhow::Result<
+         ),
+         _ => (404, "application/json", Cow::Borrowed(NOT_FOUND_JSON)),
+     };
+-    crate::local_http::respond(&mut s, status, ctype, &payload)?;
++    crate::local_http::respond(&mut s, status, ctype, payload.as_bytes())?;
+     Ok(())
+ }
+ 
+diff --git a/src/setup.html b/src/setup.html
+index 1d584dd..1e2008c 100644
+--- a/src/setup.html
++++ b/src/setup.html
+@@ -4,7 +4,8 @@
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1">
+ <title>rdsh setup</title>
+-<link rel="icon" type="image/svg+xml" href="/icon.svg">
++<link rel="icon" type="image/png" href="/icon.png">
++<link rel="apple-touch-icon" href="/icon.png">
+ <style>
+ * { box-sizing: border-box; }
+ body { margin: 0; min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif; background: #000; color: #f5f5f7; -webkit-font-smoothing: antialiased; }
+@@ -62,9 +63,10 @@ button.ghost { background: none; border: 1px solid rgba(255,255,255,.16); border
+ </style>
+ </head>
+ <body>
+-<div class="stage"><div class="app"><div class="side"><div class="logo">dsh <span class="chip">HARNESS</span></div><div class="newbtn">＋ 新しいセッション</div><div class="nav">プラグイン</div><div class="sect">ワークスペース</div><div class="srow">適当</div><div class="srow on">rustdsh</div><div class="srow">dshの現在の状況を確認</div><div class="srow">Flaxia</div><div class="sect">設定</div></div><div class="main"><p class="hero">新しい発見へ <em>プレビュー</em></p><div class="ask"><div class="ph">作りたいものを説明してください（/コマンド、@ファイル／セッション）</div><div class="bar"><span>＋　Full access</span><span style="margin-left:auto">Muse Spark 1.3 Contributor</span><span class="send"></span></div></div></div></div></div>
++<div class="stage"><div class="app"><div class="side"><div class="logo"><img src="/icon.png" width="28" height="28" alt="rdsh"> rdsh <span class="chip">SETUP</span></div><div class="newbtn">＋ 新しいセッション</div><div class="nav">プラグイン</div><div class="sect">ワークスペース</div><div class="srow">適当</div><div class="srow on">rustdsh</div><div class="srow">dshの現在の状況を確認</div><div class="srow">Flaxia</div><div class="sect">設定</div></div><div class="main"><p class="hero">新しい発見へ <em>プレビュー</em></p><div class="ask"><div class="ph">作りたいものを説明してください（/コマンド、@ファイル／セッション）</div><div class="bar"><span>＋　Full access</span><span style="margin-left:auto">Muse Spark 1.3 Contributor</span><span class="send"></span></div></div></div></div></div>
+ <div class="scrim"></div>
+ <div class="card">
++<img src="/icon.png" width="44" height="44" alt="rdsh">
+ <h1 id="t">モデル接続</h1>
+ <p class="sub" id="s">Codex / opencode のログインをdshに接続します</p>
+ <div class="okbar" id="okbar"></div>
+diff --git a/src/setup_web.rs b/src/setup_web.rs
+index 03e7ad7..4e8cde1 100644
+--- a/src/setup_web.rs
++++ b/src/setup_web.rs
+@@ -91,6 +91,23 @@ fn handle(
+         )?;
+         return Ok(());
+     }
++    if req.method.as_str() == "GET" {
++        let asset = match req.target.as_str() {
++            "/icon.png" => Some((
++                "image/png",
++                include_bytes!("../assets/icon-256.png").as_slice(),
++            )),
++            "/favicon.ico" => Some((
++                "image/x-icon",
++                include_bytes!("../assets/icon.ico").as_slice(),
++            )),
++            _ => None,
++        };
++        if let Some((ctype, bytes)) = asset {
++            crate::local_http::respond(&mut s, 200, ctype, bytes)?;
++            return Ok(());
++        }
++    }
+     let (status, ctype, payload): (u16, &str, Cow<str>) =
+         match (req.method.as_str(), req.target.as_str()) {
+             ("GET", "/") => (200, "text/html; charset=utf-8", Cow::Borrowed(HTML)),
+@@ -172,7 +189,7 @@ fn handle(
+                 Cow::Borrowed("{\"error\":\"not found\"}"),
+             ),
+         };
+-    crate::local_http::respond(&mut s, status, ctype, &payload)?;
++    crate::local_http::respond(&mut s, status, ctype, payload.as_bytes())?;
+     Ok(())
+ }
+ 
+diff --git a/src/ui.html b/src/ui.html
+index 416a957..54d8b69 100644
+--- a/src/ui.html
++++ b/src/ui.html
+@@ -4,12 +4,13 @@
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1">
+ <title>rdsh dashboard</title>
+-<link rel="icon" type="image/svg+xml" href="/icon.svg">
++<link rel="icon" type="image/png" href="/icon.png">
++<link rel="apple-touch-icon" href="/icon.png">
+ <style>
+ :root { color-scheme: dark; --bg: #0d1117; --card: #161b22; --line: #30363d; --fg: #e6edf3; --mut: #8b949e; --acc: #58a6ff; --ok: #3fb950; --warn: #d29922; }
+ * { box-sizing: border-box; }
+ body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.6 system-ui, "Hiragino Sans", sans-serif; }
+-header { padding: 20px 24px; border-bottom: 1px solid var(--line); display: flex; gap: 12px; align-items: baseline; }
++header { padding: 20px 24px; border-bottom: 1px solid var(--line); display: flex; gap: 12px; align-items: center; }
+ header h1 { margin: 0; font-size: 20px; }
+ header span { color: var(--mut); font-size: 12px; }
+ main { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; padding: 20px 24px; max-width: 1100px; }
+@@ -31,7 +32,7 @@ footer { padding: 0 24px 24px; color: var(--mut); font-size: 12px; }
+ </style>
+ </head>
+ <body>
+-<header><h1>rdsh dashboard</h1><span id="ver">…</span></header>
++<header><img src="/icon.png" width="40" height="40" alt="rdsh"><h1>rdsh dashboard</h1><span id="ver">…</span></header>
+ <main>
+ <section class="card"><h2>状態 (doctor)</h2><p>本家dsh・DSH_HOME・slim設定を確認</p>
+ <button class="ghost" onclick="doctor()">更新</button><pre id="doctor">未取得</pre></section>
+diff --git a/tests/e2e/README.md b/tests/e2e/README.md
+index 246b664..950cecb 100644
+--- a/tests/e2e/README.md
++++ b/tests/e2e/README.md
+@@ -51,3 +51,59 @@ bundled Playwright can set `RDSH_PLAYWRIGHT_MODULE` to its module path.
+ 
+ See [the verification matrix](../../docs/evidence/e2e-20261008.md) for observed
+ coverage and remaining environment-specific checks.
++
++
++## Discord integration
++
++`harness-settings.mjs` also saves/reloads the Discord controls in the original DSH
++Web UI, with presence disabled so it never publishes to a user's Discord. It checks
++preview, partial save with another section's draft retained, ID reset, icon loading,
++and the rdsh section's navigation/content layout at 390px.
++The default regression suite includes a real local IPC fixture:
++
++```sh
++node --test tests/discord-presence.test.mjs tests/settings-client.test.mjs tests/plugin-security.test.mjs
++```
++
++Optional installed DSH check exercises the actual AgentLoop and Cordis lifecycle
++(idle → two running agents → idle). It rejects fixture work before any model call
++and sends activities to an in-memory receiver:
++
++```sh
++RDSH_NATIVE_MODULES=/path/to/original/dsh/node_modules node tests/e2e/discord-native.mjs
++```
++
++On WSL with Windows PowerShell available, this separate test uses a randomly named
++Windows pipe to verify the real bridge, Unicode payloads, Windows PID, ACK and clear.
++It never uses the actual Discord pipe or a Discord account:
++
++```sh
++node tests/e2e/discord-wsl.mjs
++```
++
++常駐サービス相当の環境でも確認できます。WSL環境変数とWindows PATHがなくても、
++製品側の判定と名前付きパイプへの接続が動くことを確認します。
++
++```sh
++env -u WSL_DISTRO_NAME PATH=/home/sahen/.local/bin:/usr/local/bin:/usr/bin:/bin node tests/e2e/discord-wsl.mjs
++```
++
++The bundled dsh Application ID is used by default. To explicitly publish a live
++integration test to the logged-in Discord desktop client:
++
++```sh
++RDSH_NATIVE_MODULES=/path/to/original/dsh/node_modules node tests/e2e/discord-live.mjs --hold-seconds 60
++```
++
++This runs the real AgentLoop with work held before model dispatch, publishes
++idle → two running agents → idle, and clears the activity when disabled. It
++records sanitized Discord acknowledgement fields in
++`target/discord-live/with-application-id.json`; it does not log account details.
++It changes the user's visible activity temporarily, so it is never part of CI
++or ordinary regression tests. RPC acknowledgement and actual profile UI rendering
++are separate results; the script only verifies the former.
++
++Add `--extras` to publish a temporary project link alongside the bundled icon.
++The live report includes acknowledged assets, buttons, status display type and
++timestamps. Button acknowledgement does not mean it will appear on your own profile;
++Discord displays Rich Presence buttons to other users.
+diff --git a/tests/e2e/harness-settings.mjs b/tests/e2e/harness-settings.mjs
+index ba0cbda..1af4fc8 100644
+--- a/tests/e2e/harness-settings.mjs
++++ b/tests/e2e/harness-settings.mjs
+@@ -36,17 +36,40 @@ try{
+  await later.waitFor({timeout:15000});await later.click();
+  await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'rdsh',exact:true}).click();
+  const section=page.locator('.rdsh-settings');const goal=section.getByPlaceholder('例: dsh互換性を維持する');await goal.waitFor();
+- await goal.fill('Genuine DSH plugin E2E');await section.getByText('ポート',{exact:true}).locator('..').locator('input').fill('');
++ await section.getByRole('status').filter({hasText:'接続状態: OFF'}).waitFor();
++ await section.getByText('独自のDiscordアプリを使う',{exact:true}).click();
++ await section.getByPlaceholder('Discord Application ID').fill('123456789012345678');
++ await section.getByPlaceholder('dshで作業中').fill('Discord settings E2E');
++ await section.getByLabel('agentの稼働状態・稼働数を表示する').uncheck();
++ await section.getByLabel('経過時間を表示する').uncheck();
++ await goal.fill('Genuine DSH plugin E2E');
++ await section.getByRole('button',{name:'Discord設定を保存',exact:true}).click();
++ await section.getByRole('status').filter({hasText:'保存済み。表示はOFFです。'}).waitFor();
++ const partial=JSON.parse(await readFile(settings,'utf8'));assert.equal(partial.context.goal,'Before E2E');assert.equal(await goal.inputValue(),'Genuine DSH plugin E2E');
++ assert.equal(await section.getByRole('button',{name:'Discord設定を保存',exact:true}).isDisabled(),true);
++ assert.equal(await section.getByRole('figure',{name:'Discord表示プレビュー'}).getByText('Discord settings E2E',{exact:true}).count(),1);
++ await section.getByText('ポート',{exact:true}).locator('..').locator('input').fill('');
+  await section.getByRole('button',{name:'保存する',exact:true}).click();await section.locator('.rdsh-msg').filter({hasText:'保存しました'}).waitFor();
+- const saved=JSON.parse(await readFile(settings,'utf8'));assert.equal(saved.context.goal,'Genuine DSH plugin E2E');assert.equal(saved.serve.port,38080);assert.deepEqual(saved.extras.enable,['serve']);
++ const saved=JSON.parse(await readFile(settings,'utf8'));assert.deepEqual(saved.discord,{enabled:false,application_id:'123456789012345678',details:'Discord settings E2E',show_agent_status:false,show_elapsed:false,show_image:true,status_display:'details',large_image:'',large_text:'',button_label:'',button_url:''});assert.equal(saved.context.goal,'Genuine DSH plugin E2E');assert.equal(saved.serve.port,38080);assert.deepEqual(saved.extras.enable,['serve']);
+  await section.getByRole('button',{name:'再読み込み',exact:true}).click();await goal.waitFor();assert.equal(await goal.inputValue(),'Genuine DSH plugin E2E');
+- await goal.scrollIntoViewIfNeeded();await page.screenshot({path:path.join(output,'harness-settings-saved.png')});
++ await section.getByText('独自のDiscordアプリを使う',{exact:true}).click();
++ await section.getByPlaceholder('Discord Application ID').fill('');
++ await section.getByRole('button',{name:'Discord設定を保存',exact:true}).click();
++ await section.getByRole('status').filter({hasText:'保存済み。表示はOFFです。'}).waitFor();
++ saved.discord.application_id='1557873849280888903';
++ assert.equal(JSON.parse(await readFile(settings,'utf8')).discord.application_id,saved.discord.application_id);
++ await section.getByText('独自のDiscordアプリを使う',{exact:true}).click();
++ await section.getByRole('figure',{name:'Discord表示プレビュー'}).locator('img').evaluate(image => image.decode());
++ await section.getByText('Discord Rich Presence',{exact:true}).scrollIntoViewIfNeeded();if(process.env.RDSH_E2E_SKIP_SCREENSHOTS!=='1')await page.screenshot({path:path.join(output,'harness-settings-saved.png')});
+  await writeFile(settings,'{broken');await section.getByRole('button',{name:'再読み込み',exact:true}).click();await page.getByRole('alert').filter({hasText:'設定ファイルを読み込めません'}).waitFor();assert.equal(await page.getByRole('button',{name:'保存する',exact:true}).count(),0);
+  await page.screenshot({path:path.join(output,'harness-settings-error.png')});
+  await writeFile(settings,JSON.stringify(saved));await page.getByRole('button',{name:'再読み込み',exact:true}).click();await goal.waitFor();assert.equal(await goal.inputValue(),'Genuine DSH plugin E2E');
+  await page.setViewportSize(report.viewports[1]);await page.screenshot({path:path.join(output,'harness-settings-mobile.png')});
+  report.mobile_content_width=await section.evaluate(e=>e.getBoundingClientRect().width);
+- report.mobile_readability=report.mobile_content_width>=240?'requires visual review':'FAIL: upstream DSH settings navigation compresses the content area';
++ assert.ok(report.mobile_content_width>=280,'rdsh content should remain usable at 390px');
++ report.mobile_overflow=await section.evaluate(e=>e.scrollWidth>e.clientWidth+1);assert.equal(report.mobile_overflow,false);
++ report.mobile_readability='PASS: navigation above content, no horizontal overflow';
++ report.mobile_accepted=true;
+  assert.deepEqual(report.page_errors,[]);assert.ok(report.console_errors.every(m=>m.includes('400 (Bad Request)')));
+  assert.equal(report.settings_requests.filter(x=>x.status===400).length,1);
+  report.functional_result='PASS';report.flow='Settings -> rdsh -> edit -> save -> file readback -> reload -> corrupt -> API400/error -> repair -> retry';report.port_verified=38080;report.extras_retained=true;
+diff --git a/tests/plugin-security.test.mjs b/tests/plugin-security.test.mjs
+index ef89ad0..2fafde2 100644
+--- a/tests/plugin-security.test.mjs
++++ b/tests/plugin-security.test.mjs
+@@ -34,14 +34,19 @@ test('plugin security boundary and settings preservation', async (t) => {
+   const routes = new Map();
+   const ctx = {
+     effect: (effect) => effect(),
++    on: () => () => {},
++    inject(names, setup) {
++      const dispose = names.every(name => this[name]) ? setup(this) : undefined;
++      return { dispose: async () => { if (typeof dispose === 'function') await dispose(); } };
++    },
+     webServer: { register(route) { routes.set(route.path, route.handler); return () => routes.delete(route.path); } },
+     connection: { requestRejection(req) { return req.rejection; } },
+   };
+-  assert.ok(settings.inject.includes('connection'));
++  assert.deepEqual(settings.inject, []);
+   assert.ok(updates.inject.includes('connection'));
+   const disposeSettings = settings.apply(ctx, {});
+   const disposeUpdates = updates.apply(ctx, { demo: true });
+-  t.after(() => { disposeSettings(); disposeUpdates(); });
++  t.after(async () => { await disposeSettings(); disposeUpdates(); });
+ 
+   async function request(path, { rejection, method = 'GET', body = '{}' } = {}) {
+     const req = Readable.from([Buffer.from(body)]);
+@@ -49,7 +54,7 @@ test('plugin security boundary and settings preservation', async (t) => {
+     let status, output;
+     const res = { writeHead(code) { status = code; }, end(value) { output = value; } };
+     await routes.get(path)(req, res);
+-    return { status, body: JSON.parse(output), consumed: req.readableEnded };
++    return { status, body: Buffer.isBuffer(output) ? output : output === undefined ? undefined : JSON.parse(output), consumed: req.readableEnded };
+   }
+ 
+   const original = {
+@@ -65,8 +70,8 @@ test('plugin security boundary and settings preservation', async (t) => {
+   const initialSettings = await readFile(settingsFile, 'utf8');
+   const initialContext = await readFile(contextFile, 'utf8');
+ 
+-  await t.test('all seven routes reject before body consumption or side effects', async () => {
+-    assert.equal(routes.size, 7);
++  await t.test('all nine routes reject before body consumption or side effects', async () => {
++    assert.equal(routes.size, 9);
+     for (const rejection of [401, 403]) {
+       for (const path of routes.keys()) {
+         for (const method of ['GET', 'HEAD', 'POST']) {
+@@ -99,6 +104,14 @@ test('plugin security boundary and settings preservation', async (t) => {
+     assert.equal(updateCalls, 1);
+   });
+ 
++  await t.test('the authenticated icon serves the supplied PNG exactly and supports HEAD', async () => {
++    const supplied = await readFile(new URL('../plugins/rdsh-settings/assets/rushDSH.png', import.meta.url));
++    const icon = await request('/api/rdsh-discord/icon');
++    assert.equal(icon.status, 200); assert.deepEqual(icon.body, supplied);
++    assert.equal((await request('/api/rdsh-discord/icon', { method: 'HEAD' })).body, undefined);
++    assert.equal((await request('/api/rdsh-discord/icon', { method: 'POST' })).status, 405);
++  });
++
+   await t.test('round-trip and partial saves preserve keys outside the form', async () => {
+     const loaded = (await request('/api/rdsh-settings')).body.config;
+     assert.equal(loaded.extras, undefined);
+diff --git a/tests/settings-client.test.mjs b/tests/settings-client.test.mjs
+index e1410b9..8e0d5d6 100644
+--- a/tests/settings-client.test.mjs
++++ b/tests/settings-client.test.mjs
+@@ -30,6 +30,8 @@ async function host(fetch) {
+   const source = await readFile(new URL('../plugins/rdsh-settings/client.js', import.meta.url), 'utf8');
+   vm.runInNewContext(source, {
+     fetch,
++    TextEncoder, URL,
++    setInterval: () => 1, clearInterval: () => {},
+     window: { __ModuleLoader__: { load(module) {
+       module.factory(() => React).apply({ slots: {
+         inject: (_name, install) => install(),
+@@ -103,3 +105,90 @@ test('clearing the dashboard port saves its default rather than privileged port
+   await find(updated, (node) => node.tag === 'button' && node.children.includes('保存する')).props.onClick();
+   assert.equal(saved.serve.port, 38080);
+ });
++
++test('Discord controls save changes without status polling overwriting edits', async () => {
++  let saved;
++  const config = { context: {}, beta: {}, discord: { enabled: false, application_id: '', details: 'dshで作業中', show_agent_status: true, show_elapsed: true } };
++  const fixture = await host(async (path, options) => {
++    if (path === '/api/rdsh-discord') return { ok: true, json: async () => ({ ok: true, state: 'disabled' }) };
++    if (options.method === 'POST') saved = JSON.parse(options.body).config;
++    return { ok: true, json: async () => ({ ok: true, config: saved ?? config }) };
++  });
++  fixture.render(); await fixture.settle();
++  let ui = fixture.render();
++  const enable = find(ui, node => node.tag === 'label' && node.children.includes('Discordに作業状態を表示する'));
++  find(enable, node => node.tag === 'input').props.onChange({ target: { checked: true } });
++  find(ui, node => node.tag === 'input' && node.props.placeholder === 'Discord Application ID').props.onChange({ target: { value: '123456789012345678' } });
++  const agent = find(ui, node => node.tag === 'label' && node.children.includes('agentの稼働状態・稼働数を表示する'));
++  find(agent, node => node.tag === 'input').props.onChange({ target: { checked: false } });
++  ui = fixture.render();
++  await find(ui, node => node.tag === 'button' && node.children.includes('保存する')).props.onClick();
++  assert.deepEqual(saved.discord, { enabled: true, application_id: '123456789012345678', details: 'dshで作業中', show_agent_status: false, show_elapsed: true });
++});
++
++test('Discord preview and partial save preserve drafts in other sections', async () => {
++  let submitted;
++  const config = { context: { goal: 'Saved goal' }, beta: {}, discord: { enabled: false, details: 'dshで作業中' } };
++  const fixture = await host(async (path, options) => {
++    if (path === '/api/rdsh-discord') return { ok: true, json: async () => ({ ok: true, state: 'disabled', running_agents: 2 }) };
++    if (options.method === 'POST') {
++      submitted = JSON.parse(options.body).config;
++      return { ok: true, json: async () => ({ ok: true, config: { ...config, ...submitted } }) };
++    }
++    return { ok: true, json: async () => ({ ok: true, config }) };
++  });
++  fixture.render(); await fixture.settle(); let ui = fixture.render();
++  find(ui, node => node.props.placeholder === '例: dsh互換性を維持する').props.onChange({ target: { value: 'Unsaved goal' } });
++  find(ui, node => node.props.placeholder === 'dshで作業中').props.onChange({ target: { value: 'あ'.repeat(100) } });
++  ui = fixture.render();
++  const preview = find(ui, node => node.props['aria-label'] === 'Discord表示プレビュー');
++  assert.ok(JSON.stringify(preview).includes('agent稼働中 (2)'));
++  assert.ok(JSON.stringify(preview).includes('あ'.repeat(42)));
++  assert.ok(!JSON.stringify(preview).includes('あ'.repeat(43)));
++  await find(ui, node => node.tag === 'button' && node.children.includes('Discord設定を保存')).props.onClick();
++  assert.deepEqual(Object.keys(submitted), ['discord']);
++  ui = fixture.render();
++  assert.equal(find(ui, node => node.props.placeholder === '例: dsh互換性を維持する').props.value, 'Unsaved goal');
++  assert.equal(find(ui, node => node.tag === 'button' && node.children.includes('Discord設定を保存')).props.disabled, true);
++});
++
++test('invalid Discord URLs block saving with an actionable error, then recover', async () => {
++  const fixture = await host(async path => ({ ok: true, json: async () => path === '/api/rdsh-discord' ? { ok: true, state: 'disabled' } : { ok: true, config: { context: {}, discord: {} } } }));
++  fixture.render(); await fixture.settle(); let ui = fixture.render();
++  find(ui, node => node.props.placeholder === 'https://…').props.onChange({ target: { value: 'javascript:alert(1)' } });
++  ui = fixture.render();
++  assert.ok(find(ui, node => node.props.role === 'alert'));
++  assert.equal(find(ui, node => node.tag === 'button' && node.children.includes('Discord設定を保存')).props.disabled, true);
++  find(ui, node => node.props.placeholder === 'https://…').props.onChange({ target: { value: 'https://example.com' } });
++  find(ui, node => node.props.placeholder === '例: dshについて').props.onChange({ target: { value: '詳しく見る' } });
++  assert.equal(find(fixture.render(), node => node.tag === 'button' && node.children.includes('Discord設定を保存')).props.disabled, false);
++});
++
++test('Discord save failures keep the draft and provide a working retry', async () => {
++  let failed = true;
++  const config = { context: {}, discord: { details: 'Saved' } };
++  const fixture = await host(async (path, options) => {
++    if (path === '/api/rdsh-discord') return { ok: true, json: async () => ({ ok: true, state: 'disabled' }) };
++    if (options.method === 'POST') return { ok: !failed, json: async () => failed ? { ok: false } : { ok: true, config: { ...config, ...JSON.parse(options.body).config } } };
++    return { ok: true, json: async () => ({ config }) };
++  });
++  fixture.render(); await fixture.settle(); let ui = fixture.render();
++  find(ui, node => node.props.placeholder === 'dshで作業中').props.onChange({ target: { value: 'Draft' } });
++  const save = () => find(fixture.render(), node => node.tag === 'button' && node.children.includes('Discord設定を保存')).props.onClick();
++  await save(); ui = fixture.render();
++  assert.ok(find(ui, node => node.props.role === 'alert' && node.children.some(c => typeof c === 'string' && c.includes('保存できません'))));
++  assert.equal(find(ui, node => node.props.placeholder === 'dshで作業中').props.value, 'Draft');
++  failed = false; await save();
++  assert.equal(find(fixture.render(), node => node.tag === 'button' && node.children.includes('Discord設定を保存')).props.disabled, true);
++});
++
++test('connection alone is not reported as an acknowledged current preview', async () => {
++  for (const details of ['Old', 'Current']) {
++    const fixture = await host(async path => ({ ok: true, json: async () => path === '/api/rdsh-discord'
++      ? { ok: true, state: 'connected', running_agents: 0, published_activity: { details, status_display_type: 2, state: '待機中' } }
++      : { config: { context: {}, discord: { enabled: true, details: 'Current', show_elapsed: false, show_image: false } } } }));
++    fixture.render(); await fixture.settle();
++    const reflected = find(fixture.render(), node => node.props.role === 'status' && node.children.includes('Discordに反映しました'));
++    assert.equal(!!reflected, details === 'Current');
++  }
++});
+diff --git a/tests/settings_cli.rs b/tests/settings_cli.rs
+index 7094e47..fff0079 100644
+--- a/tests/settings_cli.rs
++++ b/tests/settings_cli.rs
+@@ -76,3 +76,124 @@ fn init_without_force_preserves_existing_valid_settings() {
+     assert_eq!(fixture.run(&["settings", "init"]).status.code(), Some(2));
+     assert_eq!(fixture.read(), raw);
+ }
++
++#[test]
++fn discord_settings_round_trip_through_cli_and_section_reset() {
++    let fixture = Fixture::new("{}");
++    for (key, value) in [
++        ("discord.enabled", "true"),
++        ("discord.application_id", "123456789012345678"),
++        ("discord.details", "dshで作業中"),
++        ("discord.show_agent_status", "false"),
++        ("discord.show_elapsed", "false"),
++        ("discord.show_image", "false"),
++        ("discord.status_display", "state"),
++        ("discord.large_image", "dsh_logo"),
++        ("discord.large_text", "dsh作業中"),
++        ("discord.button_label", "サイトを見る"),
++        ("discord.button_url", "https://example.com/dsh"),
++    ] {
++        assert!(fixture
++            .run(&["settings", "set", key, value])
++            .status
++            .success());
++    }
++    let settings: serde_json::Value = serde_json::from_str(&fixture.read()).unwrap();
++    assert_eq!(
++        settings["discord"],
++        serde_json::json!({
++            "enabled": true, "application_id": "123456789012345678",
++            "details": "dshで作業中", "show_agent_status": false, "show_elapsed": false, "show_image": false,
++            "status_display": "state", "large_image": "dsh_logo", "large_text": "dsh作業中",
++            "button_label": "サイトを見る", "button_url": "https://example.com/dsh",
++        })
++    );
++    // Unrelated Rust CLI saves must preserve the new section too.
++    assert!(fixture
++        .run(&["settings", "set", "search.max", "42"])
++        .status
++        .success());
++    let after: serde_json::Value = serde_json::from_str(&fixture.read()).unwrap();
++    assert_eq!(after["discord"], settings["discord"]);
++    assert!(!fixture
++        .run(&["settings", "set", "discord.status_display", "invalid"])
++        .status
++        .success());
++    assert_eq!(
++        serde_json::from_str::<serde_json::Value>(&fixture.read()).unwrap(),
++        after
++    );
++    assert!(fixture
++        .run(&["settings", "unset", "discord"])
++        .status
++        .success());
++    let reset: serde_json::Value = serde_json::from_str(&fixture.read()).unwrap();
++    assert_eq!(reset["discord"]["enabled"], true);
++    assert_eq!(reset["discord"]["details"], "dshで作業中");
++    assert_eq!(reset["discord"]["show_agent_status"], true);
++    assert_eq!(reset["discord"]["show_image"], true);
++}
++
++#[test]
++fn discord_defaults_on_and_preserves_explicit_off() {
++    for (raw, expected) in [
++        ("{}", true),
++        (r#"{"discord":{}}"#, true),
++        (r#"{"discord":{"enabled":false}}"#, false),
++    ] {
++        let fixture = Fixture::new(raw);
++        assert!(fixture
++            .run(&["settings", "set", "search.max", "42"])
++            .status
++            .success());
++        let settings: serde_json::Value = serde_json::from_str(&fixture.read()).unwrap();
++        assert_eq!(settings["discord"]["enabled"], expected);
++    }
++    let fixture = Fixture::new("{}");
++    std::fs::remove_file(fixture.0.join("rdsh.json")).unwrap();
++    assert!(fixture.run(&["settings", "init"]).status.success());
++    let settings: serde_json::Value = serde_json::from_str(&fixture.read()).unwrap();
++    assert_eq!(settings["discord"]["enabled"], true);
++    assert!(fixture
++        .run(&["settings", "set", "discord.enabled", "false"])
++        .status
++        .success());
++    assert!(fixture
++        .run(&["settings", "unset", "discord.enabled"])
++        .status
++        .success());
++    let reset: serde_json::Value = serde_json::from_str(&fixture.read()).unwrap();
++    assert_eq!(reset["discord"]["enabled"], true);
++}
++
++#[test]
++fn discord_uses_bundled_application_id_until_explicitly_overridden() {
++    for raw in [
++        "{}",
++        r#"{"discord":{"application_id":""}}"#,
++        r#"{"discord":{"application_id":"  "}}"#,
++    ] {
++        let fixture = Fixture::new(raw);
++        assert!(fixture
++            .run(&["settings", "set", "discord.enabled", "true"])
++            .status
++            .success());
++        let settings: serde_json::Value = serde_json::from_str(&fixture.read()).unwrap();
++        assert_eq!(settings["discord"]["application_id"], "1557873849280888903");
++        assert!(fixture
++            .run(&[
++                "settings",
++                "set",
++                "discord.application_id",
++                "123456789012345678"
++            ])
++            .status
++            .success());
++        assert!(fixture
++            .run(&["settings", "unset", "discord.application_id"])
++            .status
++            .success());
++        let reset: serde_json::Value = serde_json::from_str(&fixture.read()).unwrap();
++        assert_eq!(reset["discord"]["application_id"], "1557873849280888903");
++    }
++}
