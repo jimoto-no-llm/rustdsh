@@ -42,7 +42,7 @@ Delegated conversations need the original DSH runtime.
 | Item | Detail |
 | --- | --- |
 | OS | Linux, macOS, WSL, Windows (native). Agent isolation needs Linux x86_64 + bubblewrap + prlimit. |
-| DSH runtime | Original `dsh` for conversations. Audited versions: 0.2.0-rc.2, 0.2.1-alpha.1. |
+| DSH runtime | Original `dsh` for conversations. The execution adapter supports audited version 0.2.0-rc.2. |
 | Rust | 1.85+ (source builds only). Prebuilt binaries need no Rust. |
 | Optional | Node.js 22+ for the [Node.js dashboard](dashboard/README.md); SearXNG for `search-web`; `zstd` CLI for exact compressed token sizes. |
 
@@ -249,7 +249,7 @@ rdsh serve
 
 | API | Purpose |
 | --- | --- |
-| `GET /api/version` | version (requires key) |
+| `GET /api/version` | version (no key required) |
 | `GET /api/doctor` | health check |
 | `POST /api/tokens` | token estimate for `{"text"}` |
 | `POST /api/prune` | prune `{"text","max_tokens"}` to budget |
@@ -257,7 +257,7 @@ rdsh serve
 | `GET /api/sessions?limit=20` | recent sessions |
 | `GET /api/skills`, `/api/profiles` | name lists |
 
-All APIs require the per-launch key in the `X-RDSH-Token` header (the
+APIs other than `GET /api/version` require the per-launch key in the `X-RDSH-Token` header (the
 browser UI reads it from its URL). No CDN is used; the page works offline.
 
 `rdsh serve` is the quick local status page. For project metrics, human
@@ -340,7 +340,7 @@ before/after output checks are in [BENCHMARKS.md](docs/BENCHMARKS.md).
 DeepSeek Harness provides the upstream runtime; without it, rustdsh would not exist.
 Thanks to the upstream developers and everyone contributing code, reviews, tests, and ideas.
 
-- Icon by [PENTACoXIAN](https://x.com/PENTACoXIAN)
+Icon by [PENTACoXIAN](https://x.com/PENTACoXIAN).
 
 - [GrEarl](https://github.com/GrEarl) and [PENTACoXIAN](https://x.com/PENTACoXIAN): security reports and review.
 - [StudioYebisu](https://github.com/yebisu0529-ship-it), [RNA4219](https://github.com/RNA4219), and [eightman999](https://github.com/eightman999): contributions and improvement reports.
