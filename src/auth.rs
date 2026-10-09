@@ -773,7 +773,8 @@ fn autosync_enabled() -> bool {
     std::env::var("RDSH_AUTH_AUTOSYNC").as_deref() != Ok("0")
 }
 
-/// Upstream's combined pre-boot entry point, retaining explicit sharing.
+/// Apply only previously selected sharing, then optionally print first-run guidance.
+/// With no selected sources, the sync path does not scan external login stores.
 pub fn pre_boot(banner: bool) {
     auto_sync();
     if banner {

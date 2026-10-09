@@ -143,6 +143,17 @@ chmod +x $FS/npm $FS/home/.local/bin/node
 fs_sync() { env -u RDSH_SYNC_FROM_SOURCE -u RDSH_SYNC_VERSION -u RDSH_MUSL HOME="$FS/home" NPM_BIN="$FS/npm" PREFIX_BIN="$1" RDSH_RELEASE_BASE="file://$FS/rel" sh $FS/repo/sync-dsh.sh > "$2" 2>&1; }
 fs_sync "$FS/bin" $FS/sync-ok.log
 if grep -q "checksum ok" $FS/sync-ok.log && grep -q "rdsh updated OK via release binary" $FS/sync-ok.log && "$FS/bin/rdsh" --version 2>/dev/null | grep -q "rdsh"; then ok "sync-dsh release update with valid sha256"; else echo "FAIL(output): sync-dsh release update with valid sha256"; tail -n 8 $FS/sync-ok.log; exit 1; fi
+# A no-op check must not masquerade as a new update and restart notification time.
+printf '{"updated":true,"kind":"DUMMY","to":"previous","at":1}\n' > "$FS/home/.local/share/rdsh/update-state.json"
+cp "$FS/home/.local/share/rdsh/update-state.json" "$FS/state-noop.json"
+fs_sync "$FS/bin" "$FS/sync-noop.log"
+if grep -q "checksum ok" "$FS/sync-noop.log" && grep -q "rdsh up to date (release binary unchanged)" "$FS/sync-noop.log" && cmp -s "$FS/state-noop.json" "$FS/home/.local/share/rdsh/update-state.json"; then ok "sync-dsh unchanged release preserves notification state"; else echo "FAIL(output): unchanged release rewrote notification state"; exit 1; fi
+# Version labels alone cannot identify rebuilt payloads; different bytes still update.
+SYNC_VERSION="$("$FS/pkg/rdsh" --version)"
+printf '#!/bin/sh\nprintf "%%s\\n" "%s"\n' "$SYNC_VERSION" > "$FS/bin/rdsh"
+chmod +x "$FS/bin/rdsh"
+fs_sync "$FS/bin" "$FS/sync-rebuilt.log"
+if grep -q "rdsh updated OK via release binary" "$FS/sync-rebuilt.log" && cmp -s "$FS/pkg/rdsh" "$FS/bin/rdsh" && ! cmp -s "$FS/state-noop.json" "$FS/home/.local/share/rdsh/update-state.json"; then ok "sync-dsh changed payload updates even with the same version label"; else echo "FAIL(output): rebuilt release was suppressed by its version label"; exit 1; fi
 for c in "$FS"/rel/latest/download/*.sha256; do printf '%064d  x.tar.gz\n' 0 > "$c"; done
 printf 'old\n' > $FS/bin/rdsh
 fs_sync "$FS/bin" $FS/sync-bad.log
