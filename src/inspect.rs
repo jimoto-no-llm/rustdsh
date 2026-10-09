@@ -978,8 +978,10 @@ fn open_session_file(
     }
     #[cfg(not(any(unix, windows)))]
     {
-        let file = std::fs::File::open(&path).ok()?;
-        file.metadata().ok()?.is_file().then_some(file)
+        // Do not weaken the no-follow contract on platforms without a
+        // descriptor/reparse-aware open implementation.
+        let _ = (root, path);
+        None
     }
 }
 
