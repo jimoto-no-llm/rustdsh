@@ -116,6 +116,8 @@ policy; machine/user policy is not changed and enforced Group Policy still appli
 Opening a browser passes its authenticated URL to the Windows URL handler, as the
 existing `open` command does. Other processes with the same OS-user access can
 observe that short-lived command line; the tray helper itself receives no URL/key.
+PowerShell 7 is resolved from PATH and the URL handler from the Windows system
+directory; an executable placed in the project or working directory is never used.
 Re-run the installer after upgrading to refresh an older launcher.
 Installation uses the lockfile's native prebuilts without package lifecycle
 scripts and verifies that Koffi loads before writing the launchers. An unavailable
