@@ -403,8 +403,7 @@ fn code_hits(query: &str, max: usize) -> Vec<String> {
             let keep = p
                 .extension()
                 .and_then(|s| s.to_str())
-                .map(|x| CODE_EXTS.contains(&x.to_lowercase().as_str()))
-                .unwrap_or(false);
+                .is_some_and(|x| CODE_EXTS.contains(&x.to_lowercase().as_str()));
             if !keep {
                 continue;
             }

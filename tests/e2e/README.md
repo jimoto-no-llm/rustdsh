@@ -28,6 +28,8 @@ The default command also runs `update-banner.mjs` with the real React component
 and two independent authenticated plugin hosts. Dummy HOME and loopback ports
 cover live update push, cross-tab/port close events, two-hour boundaries, reload
 notification, project remounts, legacy records and unavailable browser storage.
+Mocked updater responses also cover successful close, failed retry, and a newer
+update arriving during a request; the actual updater never runs in this fixture.
 The browser clock advances the cadence without waiting two hours. It saves real
 PNGs and a verification report; it never restarts production DSH or executes the
 updater. Run just this flow with `npm run test:updates`. Set

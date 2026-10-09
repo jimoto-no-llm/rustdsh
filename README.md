@@ -334,7 +334,8 @@ This tray belongs to the optional Node.js Dashboard; `rdsh serve` stays a termin
 
 The original Harness update banner appears immediately when an actual update is
 recorded, every **two hours** from its update time, and on every full page reload.
-**Dismiss** and **×** close the current occurrence; the two-hour schedule continues.
+**Dismiss**, **×**, and a successful updater check close the current occurrence;
+the two-hour schedule continues. Unchanged release checks do not record a new update.
 Project remounts keep it closed until the next reminder. Close events also reach
 other GUI ports running as the same OS user. Activate the new code with one normal
 GUI restart/reload; see [browser verification](docs/evidence/update-notice-repeat/README.md).
