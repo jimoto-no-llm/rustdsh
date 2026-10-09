@@ -298,6 +298,9 @@ else
       log "rdsh release fetch failed; binaries untouched"
     elif ! "$NEWBIN" --version >/dev/null 2>&1; then
       log "rdsh release binary failed to run; binaries untouched"
+    elif cmp -s "$NEWBIN" "$PREFIX_BIN/rdsh"; then
+      # Checking again is not a new update; keep the original notice cadence.
+      log "rdsh up to date (release binary unchanged)"
     elif [ -f "$REPO/tests/regress.sh" ] && ! sandboxed_regress "$NEWBIN"; then
       log "rdsh release regress failed; binaries untouched"
     else
