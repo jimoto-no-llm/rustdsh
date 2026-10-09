@@ -37,6 +37,7 @@ const manifest = {
     "real local project server and Chromium; fixture checks only; no models, provider authentication, Tailscale or production adoption",
   node: process.version,
   source_files: {},
+  captures: {},
   flows: [],
   page_errors: errors,
 };
@@ -80,9 +81,26 @@ async function open(server) {
 }
 async function capture(page, name) {
   await page.evaluate(() => document.fonts.ready);
-  await page
-    .locator("#tasks-detail")
-    .screenshot({ path: path.join(output, name + ".png") });
+  const panel = page.locator("#tasks-detail");
+  const viewport = page.viewportSize();
+  const bounds = await panel.boundingBox();
+  // Leave room for the real fixed action bar below this full-panel capture.
+  // The actual phone viewport is tested separately and restored afterwards.
+  const captureViewport = {
+    width: viewport.width,
+    height: Math.max(viewport.height, Math.ceil(bounds.height) + 400),
+  };
+  try {
+    await page.setViewportSize(captureViewport);
+    await panel.screenshot({ path: path.join(output, name + ".png") });
+    manifest.captures[name] = {
+      selector: "#tasks-detail",
+      viewport: captureViewport,
+      interaction_viewport: viewport,
+    };
+  } finally {
+    await page.setViewportSize(viewport);
+  }
 }
 async function inspect(page, selector, expected) {
   const element = page.locator(selector);
@@ -192,7 +210,21 @@ try {
     ),
   );
   await capture(page, "after-mobile");
-  manifest.mobile = { width: 390, horizontal_overflow: false };
+  for (const [name, selector] of [
+    ["after-mobile-viewport", "#task-goal"],
+    ["after-mobile-milestone", "#task-milestones"],
+  ]) {
+    await page
+      .locator(selector)
+      .evaluate((element) => element.scrollIntoView({ block: "start" }));
+    await page.screenshot({ path: path.join(output, name + ".png") });
+    manifest.captures[name] = {
+      selector: "viewport",
+      viewport: page.viewportSize(),
+      focus: selector,
+    };
+  }
+  manifest.mobile = { width: 390, height: 844, horizontal_overflow: false };
   await fs.writeFile(
     path.join(f.root, "module.mjs"),
     "export const answer = 2;\n",
