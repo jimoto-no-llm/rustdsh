@@ -101,7 +101,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-      - run: node --test tests/runtime-compatibility.test.mjs
+      - run: node --test tests/runtime-compatibility.test.mjs tests/icon-assets.test.mjs
       - if: matrix.regress
         shell: bash
         run: |
@@ -112,6 +112,7 @@ jobs:
         run: |
           ./tests/installer-security.ps1
           ./tests/installer-security.ps1 -Version v0.0.0-rc.1
+          ./tests/icon-assets.ps1
           $tmp = Join-Path $env:RUNNER_TEMP 'rdsh-smoke'
           $h = Join-Path $tmp 'home'
           $d = Join-Path $tmp 'dsh'
