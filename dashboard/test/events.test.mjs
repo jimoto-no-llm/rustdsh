@@ -254,6 +254,19 @@ test("MCP 2.0 discovers events and serves the same tools on an authenticated end
   });
   assert.equal(result.resultType, "complete");
   assert.equal(dashboard.store.value.tasks.length, 1);
+  await request("tools/call", {
+    name: "dashboard_update_metrics",
+    arguments: {
+      total_cost_usd: 1.25,
+      observation: {
+        kind: "estimated", source: "MCP 2 fixture estimate",
+        observed_at: new Date(Date.now() - 1000).toISOString(),
+        session_id: "mcp2-session", reference: "fixture-budget",
+      },
+    },
+  });
+  assert.equal(dashboard.store.value.metric_observations.total_cost_usd.kind, "estimated");
+  assert.equal(dashboard.store.value.metric_observations.total_cost_usd.reference, "fixture-budget");
   const subscription = {
     name: "dashboard.answer.created",
     arguments: { project_id: project.id },

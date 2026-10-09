@@ -5,19 +5,20 @@
 // NOTE: upstream dsh (0.2.0) does not read any RDSH_* key; they only tune
 // rdsh-side behavior. The one env below that the Node runtime itself reads
 // is NODE_COMPILE_CACHE (effective on Node >= 22.1; ignored on older).
-pub fn slim_env() -> Vec<(String, String)> {
-    vec![
-        ("RDSH_SLIM".into(), "1".into()),
-        ("RDSH_LAZY_PLUGINS".into(), "1".into()),
-        ("RDSH_DISABLE_VOICE".into(), "1".into()),
-        ("RDSH_DISABLE_AUTO_REVIEW".into(), "1".into()),
-        ("RDSH_TOKEN_BUDGET".into(), "8000".into()),
-        ("RDSH_TOOL_RESULT_BUDGET".into(), "4000".into()),
+// Static table: no per-boot heap allocation (same 6 pairs, same bytes out).
+pub fn slim_env() -> &'static [(&'static str, &'static str)] {
+    &[
+        ("RDSH_SLIM", "1"),
+        ("RDSH_LAZY_PLUGINS", "1"),
+        ("RDSH_DISABLE_VOICE", "1"),
+        ("RDSH_DISABLE_AUTO_REVIEW", "1"),
+        ("RDSH_TOKEN_BUDGET", "8000"),
+        ("RDSH_TOOL_RESULT_BUDGET", "4000"),
     ]
 }
 
-pub fn describe() -> String {
-    "RDSH_SLIM=1 RDSH_LAZY_PLUGINS=1 RDSH_DISABLE_VOICE=1 RDSH_DISABLE_AUTO_REVIEW=1 NODE_COMPILE_CACHE=<cache-dir> (effective on Node >= 22.1), RDSH_NODE_COMPILE_CACHE=0 to disable".to_string()
+pub fn describe() -> &'static str {
+    "RDSH_SLIM=1 RDSH_LAZY_PLUGINS=1 RDSH_DISABLE_VOICE=1 RDSH_DISABLE_AUTO_REVIEW=1 NODE_COMPILE_CACHE=<cache-dir> (effective on Node >= 22.1), RDSH_NODE_COMPILE_CACHE=0 to disable"
 }
 
 // Default on-disk dir for the Node compile cache (V8 code cache for the

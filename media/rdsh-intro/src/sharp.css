@@ -1,0 +1,5 @@
+.q-stage{position:absolute;left:0;top:0;width:1920px;height:1080px;transform:scale(2);transform-origin:0 0;perspective:1500px;perspective-origin:50% 46%}
+.q-scene3d{position:absolute;inset:0;transform-style:preserve-3d}
+.q-ground{position:absolute;height:44px;border-radius:50%;background:radial-gradient(ellipse at center,#0F172A30,transparent 70%);filter:blur(7px);pointer-events:none}
+.q-title{font-family:NotoOriginal,sans-serif;font-size:94px;font-weight:700;line-height:1.55;letter-spacing:-.01em;margin:0;white-space:nowrap}
+.q-detail{font-family:NotoOriginal,sans-serif;font-size:38px;font-weight:500;line-height:1.6;letter-spacing:0;margin-top:14px}

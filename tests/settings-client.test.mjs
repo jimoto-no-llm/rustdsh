@@ -30,6 +30,8 @@ async function host(fetch) {
   const source = await readFile(new URL('../plugins/rdsh-settings/client.js', import.meta.url), 'utf8');
   vm.runInNewContext(source, {
     fetch,
+    TextEncoder, URL,
+    setInterval: () => 1, clearInterval: () => {},
     window: { __ModuleLoader__: { load(module) {
       module.factory(() => React).apply({ slots: {
         inject: (_name, install) => install(),
@@ -102,4 +104,91 @@ test('clearing the dashboard port saves its default rather than privileged port 
   const updated = fixture.render();
   await find(updated, (node) => node.tag === 'button' && node.children.includes('保存する')).props.onClick();
   assert.equal(saved.serve.port, 38080);
+});
+
+test('Discord controls save changes without status polling overwriting edits', async () => {
+  let saved;
+  const config = { context: {}, beta: {}, discord: { enabled: false, application_id: '', details: 'dshで作業中', show_agent_status: true, show_elapsed: true } };
+  const fixture = await host(async (path, options) => {
+    if (path === '/api/rdsh-discord') return { ok: true, json: async () => ({ ok: true, state: 'disabled' }) };
+    if (options.method === 'POST') saved = JSON.parse(options.body).config;
+    return { ok: true, json: async () => ({ ok: true, config: saved ?? config }) };
+  });
+  fixture.render(); await fixture.settle();
+  let ui = fixture.render();
+  const enable = find(ui, node => node.tag === 'label' && node.children.includes('Discordに作業状態を表示する'));
+  find(enable, node => node.tag === 'input').props.onChange({ target: { checked: true } });
+  find(ui, node => node.tag === 'input' && node.props.placeholder === 'Discord Application ID').props.onChange({ target: { value: '123456789012345678' } });
+  const agent = find(ui, node => node.tag === 'label' && node.children.includes('agentの稼働状態・稼働数を表示する'));
+  find(agent, node => node.tag === 'input').props.onChange({ target: { checked: false } });
+  ui = fixture.render();
+  await find(ui, node => node.tag === 'button' && node.children.includes('保存する')).props.onClick();
+  assert.deepEqual(saved.discord, { enabled: true, application_id: '123456789012345678', details: 'dshで作業中', show_agent_status: false, show_elapsed: true });
+});
+
+test('Discord preview and partial save preserve drafts in other sections', async () => {
+  let submitted;
+  const config = { context: { goal: 'Saved goal' }, beta: {}, discord: { enabled: false, details: 'dshで作業中' } };
+  const fixture = await host(async (path, options) => {
+    if (path === '/api/rdsh-discord') return { ok: true, json: async () => ({ ok: true, state: 'disabled', running_agents: 2 }) };
+    if (options.method === 'POST') {
+      submitted = JSON.parse(options.body).config;
+      return { ok: true, json: async () => ({ ok: true, config: { ...config, ...submitted } }) };
+    }
+    return { ok: true, json: async () => ({ ok: true, config }) };
+  });
+  fixture.render(); await fixture.settle(); let ui = fixture.render();
+  find(ui, node => node.props.placeholder === '例: dsh互換性を維持する').props.onChange({ target: { value: 'Unsaved goal' } });
+  find(ui, node => node.props.placeholder === 'dshで作業中').props.onChange({ target: { value: 'あ'.repeat(100) } });
+  ui = fixture.render();
+  const preview = find(ui, node => node.props['aria-label'] === 'Discord表示プレビュー');
+  assert.ok(JSON.stringify(preview).includes('agent稼働中 (2)'));
+  assert.ok(JSON.stringify(preview).includes('あ'.repeat(42)));
+  assert.ok(!JSON.stringify(preview).includes('あ'.repeat(43)));
+  await find(ui, node => node.tag === 'button' && node.children.includes('Discord設定を保存')).props.onClick();
+  assert.deepEqual(Object.keys(submitted), ['discord']);
+  ui = fixture.render();
+  assert.equal(find(ui, node => node.props.placeholder === '例: dsh互換性を維持する').props.value, 'Unsaved goal');
+  assert.equal(find(ui, node => node.tag === 'button' && node.children.includes('Discord設定を保存')).props.disabled, true);
+});
+
+test('invalid Discord URLs block saving with an actionable error, then recover', async () => {
+  const fixture = await host(async path => ({ ok: true, json: async () => path === '/api/rdsh-discord' ? { ok: true, state: 'disabled' } : { ok: true, config: { context: {}, discord: {} } } }));
+  fixture.render(); await fixture.settle(); let ui = fixture.render();
+  find(ui, node => node.props.placeholder === 'https://…').props.onChange({ target: { value: 'javascript:alert(1)' } });
+  ui = fixture.render();
+  assert.ok(find(ui, node => node.props.role === 'alert'));
+  assert.equal(find(ui, node => node.tag === 'button' && node.children.includes('Discord設定を保存')).props.disabled, true);
+  find(ui, node => node.props.placeholder === 'https://…').props.onChange({ target: { value: 'https://example.com' } });
+  find(ui, node => node.props.placeholder === '例: dshについて').props.onChange({ target: { value: '詳しく見る' } });
+  assert.equal(find(fixture.render(), node => node.tag === 'button' && node.children.includes('Discord設定を保存')).props.disabled, false);
+});
+
+test('Discord save failures keep the draft and provide a working retry', async () => {
+  let failed = true;
+  const config = { context: {}, discord: { details: 'Saved' } };
+  const fixture = await host(async (path, options) => {
+    if (path === '/api/rdsh-discord') return { ok: true, json: async () => ({ ok: true, state: 'disabled' }) };
+    if (options.method === 'POST') return { ok: !failed, json: async () => failed ? { ok: false } : { ok: true, config: { ...config, ...JSON.parse(options.body).config } } };
+    return { ok: true, json: async () => ({ config }) };
+  });
+  fixture.render(); await fixture.settle(); let ui = fixture.render();
+  find(ui, node => node.props.placeholder === 'dshで作業中').props.onChange({ target: { value: 'Draft' } });
+  const save = () => find(fixture.render(), node => node.tag === 'button' && node.children.includes('Discord設定を保存')).props.onClick();
+  await save(); ui = fixture.render();
+  assert.ok(find(ui, node => node.props.role === 'alert' && node.children.some(c => typeof c === 'string' && c.includes('保存できません'))));
+  assert.equal(find(ui, node => node.props.placeholder === 'dshで作業中').props.value, 'Draft');
+  failed = false; await save();
+  assert.equal(find(fixture.render(), node => node.tag === 'button' && node.children.includes('Discord設定を保存')).props.disabled, true);
+});
+
+test('connection alone is not reported as an acknowledged current preview', async () => {
+  for (const details of ['Old', 'Current']) {
+    const fixture = await host(async path => ({ ok: true, json: async () => path === '/api/rdsh-discord'
+      ? { ok: true, state: 'connected', running_agents: 0, published_activity: { details, status_display_type: 2, state: '待機中' } }
+      : { config: { context: {}, discord: { enabled: true, details: 'Current', show_elapsed: false, show_image: false } } } }));
+    fixture.render(); await fixture.settle();
+    const reflected = find(fixture.render(), node => node.props.role === 'status' && node.children.includes('Discordに反映しました'));
+    assert.equal(!!reflected, details === 'Current');
+  }
 });

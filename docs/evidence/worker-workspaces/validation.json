@@ -1,0 +1,93 @@
+{
+  "schema": 1,
+  "result": "PASS",
+  "source_commit": "355ff3a8ad2b02b85dc68618a4ac30707438fcd3",
+  "baseline_commit": "17cabfc659a7fdccbeae7a29d1b7ca8440909a92",
+  "source_blobs": {
+    "dashboard/README.md": "84b14f8d28156a030bb752a61355e77390ef2c06",
+    "dashboard/cli.mjs": "7fe4c9221431d6bb9812b3917c07da61b9cda9f7",
+    "dashboard/test/workers.test.mjs": "a59c19096282893554860c38e6e97b0f51bad167",
+    "dashboard/worker-git.mjs": "9f7f4df600365827a7f9f4bd823b71619ef38dde",
+    "dashboard/worker-scopes.mjs": "d4390d08ddb7e0fb0c57c1055f1dc33a050f614b",
+    "dashboard/workers.mjs": "7f3705d80250c8b7f2a43749d3cbb3225d840d6a",
+    "docs/WORKER-WORKSPACES.md": "625327bace46cb72a0960f35bea28ab5033fad64"
+  },
+  "dashboard_windows": {
+    "tests": 208,
+    "pass": 208,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "duration_ms": 182623.8663
+  },
+  "dashboard_linux": {
+    "tests": 208,
+    "pass": 203,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 5,
+    "duration_ms": 123459.402911
+  },
+  "worker_windows_targeted": {
+    "tests": 13,
+    "pass": 13,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "duration_ms": 48639.4301
+  },
+  "linux_core": {
+    "fmt": "PASS",
+    "release_clippy_zero_warnings": "PASS",
+    "rust_release_pass": 103,
+    "examples_pass": 7,
+    "fence_pass": 2,
+    "cli_regress_pass": 53,
+    "security_boundaries_pass": 11
+  },
+  "browser_flows_pass": 8,
+  "browser_reports": [
+    {
+      "scope": "real Rust setup/serve and Node project CLI+HTTP MCP+browser; no model calls, Tailscale or Electron Desktop",
+      "browser": "Browser plugin not available; Playwright",
+      "viewports": [
+        {
+          "width": 1280,
+          "height": 900
+        },
+        {
+          "width": 390,
+          "height": 844
+        }
+      ],
+      "flows": [
+        "setup: missing model connection rendered -> Extras enable -> file readback -> reload retained",
+        "native serve: authenticated URL -> tokens -> prune -> sessions -> reload key retained",
+        "project CLI: real MCP task/question -> browser draft preserved on SSE -> browser answer -> MCP/file readback -> process restart retained answer and revoked old key"
+      ],
+      "page_errors": [],
+      "console_errors": [],
+      "result": "PASS"
+    },
+    {
+      "result": "PASS",
+      "scope": "Actual React banner and authenticated plugin routes in isolated loopback hosts; not a production DSH restart",
+      "flows": [
+        "close -> other tab hidden immediately -> changed timestamp -> >2 hours -> project remount -> reload stays hidden",
+        "Separate browser context and GUI port use the account acknowledgement",
+        "New target appears, minimize/expand works, dismiss works, both old targets stay dismissed",
+        "Expired legacy dismissal migrates locally and reaches a separate GUI",
+        "Browser storage unavailable: close, remount and reload remain hidden through the account acknowledgement"
+      ],
+      "page_errors": [],
+      "console_errors": []
+    }
+  ],
+  "cli_observations_pass": 14,
+  "log_sha256": {
+    "rustdsh-issue21-windows-full.log": "44cda3237535e6ebd73d74fb91e416cee03f5929702a91879d2aaee0501258bb",
+    "rustdsh-issue21-windows-targeted.log": "782af8017e82c03172b16a31f9c90d6c7fe00c47f2a48275777f8de15c921d8e",
+    "rustdsh-issue21-355ff3a-linux-review.log": "5c3aa671e3bcc17462210889cc4e2fb7a8e9da2bc4b1589f6e3c85eafab8f20f"
+  },
+  "scope": "Local worker administration CLI using real disposable Git repositories; no remote, model or provider calls. Lease expiry measured with actual wall-clock time. Runtime enforcement remains native DSH tool policy/sandbox."
+}

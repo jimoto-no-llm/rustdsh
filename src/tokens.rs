@@ -94,6 +94,12 @@ pub fn prune_to_budget(s: &str, max_tokens: usize) -> String {
     prune_with_total(s, max_tokens, estimate_tokens(s))
 }
 
+/// Fast char count for valid UTF-8: lead bytes only (same as chars().count()).
+#[inline]
+fn char_count(s: &str) -> usize {
+    s.as_bytes().iter().filter(|&&b| b & 0xC0 != 0x80).count()
+}
+
 /// Shared impl for callers that already estimated `s` (saves a scan).
 fn prune_with_total(s: &str, max_tokens: usize, total: usize) -> String {
     if total <= max_tokens {
@@ -102,7 +108,7 @@ fn prune_with_total(s: &str, max_tokens: usize, total: usize) -> String {
     if max_tokens == 0 {
         return String::new();
     }
-    let chars = s.chars().count();
+    let chars = char_count(s);
     let marker = format!("\n\n...[rdsh pruned {total}->{max_tokens} tokens]...\n\n");
     if estimate_tokens(&marker) >= max_tokens {
         // A tiny budget cannot fit the marker. Preserve as much of the head
@@ -191,7 +197,11 @@ pub fn cmd_prune(max_tokens: usize, file: Option<String>) -> anyhow::Result<()> 
     };
     // Borrow the content field when present; otherwise the raw text.
     // The old code cloned the whole input here on the common path.
-    let parsed: Option<serde_json::Value> = serde_json::from_str(&text).ok();
+    // Fast path: plain text never parses; skip failed parse (same fallback).
+    let parsed: Option<serde_json::Value> = match text.trim_start().as_bytes().first() {
+        Some(123) | Some(91) | Some(34) => serde_json::from_str(&text).ok(),
+        _ => None,
+    };
     let raw: &str = parsed
         .as_ref()
         .and_then(|v| v.get("content"))

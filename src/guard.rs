@@ -59,11 +59,20 @@ fn matches_value(pattern: &str, value: &serde_json::Value) -> bool {
 
 fn denied_pattern<'a>(raw: &str, deny: &'a [String]) -> anyhow::Result<Option<&'a String>> {
     let t = raw.trim_start();
+    // Empty patterns match everything by definition; ignore them so a
+    // misconfigured empty entry (--deny "" or a stray list item) cannot
+    // block every hook invocation.
     if matches!(t.as_bytes().first(), Some(b'{') | Some(b'[') | Some(b'"')) {
         let value = serde_json::from_str::<serde_json::Value>(raw)?;
-        Ok(deny.iter().find(|p| matches_value(p, &value)))
+        Ok(deny
+            .iter()
+            .filter(|p| !p.trim().is_empty())
+            .find(|p| matches_value(p, &value)))
     } else {
-        Ok(deny.iter().find(|p| wildcard_match(p, raw)))
+        Ok(deny
+            .iter()
+            .filter(|p| !p.trim().is_empty())
+            .find(|p| wildcard_match(p, raw)))
     }
 }
 
@@ -192,5 +201,17 @@ mod tests {
         assert!(denied_pattern(raw, &["rm -rf /*".into()])
             .unwrap()
             .is_some());
+    }
+
+    #[test]
+    fn empty_patterns_never_match() {
+        for pattern in ["", "   "] {
+            assert!(denied_pattern("anything at all", &[pattern.into()])
+                .unwrap()
+                .is_none());
+            assert!(denied_pattern(r#"{"a":"b"}"#, &[pattern.into()])
+                .unwrap()
+                .is_none());
+        }
     }
 }

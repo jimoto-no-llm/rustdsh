@@ -333,10 +333,14 @@ fn dir_size_mtime(dir: &std::path::Path) -> (u64, u64, String) {
 /// 2-core host stays responsive while bigger machines still parallelize.
 /// Crate-wide: `search` uses the same cap.
 pub(crate) fn parallelism() -> usize {
-    std::thread::available_parallelism()
-        .map(|n| n.get())
-        .unwrap_or(4)
-        .clamp(1, 8)
+    // Cache affinity query (syscall) once per process; value is fixed for the run.
+    static CACHED: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    *CACHED.get_or_init(|| {
+        std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(4)
+            .clamp(1, 8)
+    })
 }
 
 /// Subprocess batch width: external `zstd` calls pay spawn latency each,

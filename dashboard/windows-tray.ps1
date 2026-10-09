@@ -1,14 +1,13 @@
 ﻿$ErrorActionPreference = 'Stop'
+[Console]::Out.WriteLine('phase:powershell-start:' + $PSVersionTable.PSVersion.ToString())
+[Console]::Out.Flush()
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
-Add-Type @'
-using System.Threading.Tasks;
-public static class RdshTrayInput {
-    public static Task<string> ReadLine() {
-        return Task.Run(() => System.Console.In.ReadLine());
-    }
-}
-'@
+[Console]::Out.WriteLine('phase:forms-loaded')
+[Console]::Out.Flush()
+# A CLR delegate can read stdin on the thread pool without a PowerShell runspace
+# or compiling a new C# type during every cold notification-area startup.
+$taskReadLine = [System.Delegate]::CreateDelegate([Func[string]], [Console].GetMethod('ReadLine', [Type[]]@()))
 [void][System.Windows.Forms.Application]::SetHighDpiMode([System.Windows.Forms.HighDpiMode]::PerMonitorV2)
 [System.Windows.Forms.Application]::EnableVisualStyles()
 $taskMenu = New-Object System.Windows.Forms.ContextMenuStrip
@@ -25,7 +24,9 @@ $taskIcon.add_DoubleClick({ [Console]::Out.WriteLine('open'); [Console]::Out.Flu
 $taskContext = New-Object System.Windows.Forms.ApplicationContext
 $taskTimer = New-Object System.Windows.Forms.Timer
 $taskTimer.Interval = 100
-$script:taskRead = [RdshTrayInput]::ReadLine()
+$script:taskRead = [System.Threading.Tasks.Task]::Run($taskReadLine)
+[Console]::Out.WriteLine('phase:stdin-reader-started')
+[Console]::Out.Flush()
 $taskTimer.add_Tick({
     if (-not $script:taskRead.IsCompleted) { return }
     $taskLine = $script:taskRead.GetAwaiter().GetResult()
@@ -34,7 +35,7 @@ $taskTimer.add_Tick({
     if ($taskMessage.error) {
         $taskIcon.ShowBalloonTip(5000, 'rdsh-dashboard', [string]$taskMessage.error, [System.Windows.Forms.ToolTipIcon]::Warning)
     }
-    $script:taskRead = [RdshTrayInput]::ReadLine()
+    $script:taskRead = [System.Threading.Tasks.Task]::Run($taskReadLine)
 })
 try {
     $taskIcon.Visible = $true

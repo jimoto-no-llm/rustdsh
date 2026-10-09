@@ -1,0 +1,985 @@
+From 7bd9ac31c23fe369d1fa9a6849869f04967d6ee5 Mon Sep 17 00:00:00 2001
+From: Codex <codex@local.invalid>
+Date: Mon, 5 Oct 2026 15:14:12 +0900
+Subject: [PATCH] feat(ui-workflow-run): show durable member progress boards
+
+---
+ .../client/ui-workflow-run/README.i18n.yaml   |   4 +-
+ packages/client/ui-workflow-run/README.md     |   2 +
+ packages/client/ui-workflow-run/README.zh.md  |   2 +
+ packages/client/ui-workflow-run/package.json  |   8 +-
+ .../src/client/WorkflowBoard.module.css       |  88 ++++++
+ .../src/client/WorkflowBoard.tsx              |  80 ++++++
+ .../src/client/WorkflowBoardTab.tsx           |  43 +++
+ .../src/client/WorkflowRunPanel.module.css    |   8 +
+ .../src/client/WorkflowRunPanel.tsx           |  50 ++--
+ .../ui-workflow-run/src/client/board-store.ts |  15 ++
+ .../ui-workflow-run/src/client/index.ts       |  22 +-
+ .../ui-workflow-run/src/client/locales.ts     |  14 +
+ .../ui-workflow-run/src/client/navigation.ts  |  32 +++
+ .../src/client/workflow-definition.ts         |   6 +-
+ .../tests/fixtures/board-loader.yml           |   3 +
+ .../tests/workflow-run.client.spec.tsx        | 251 +++++++++++++++++-
+ packages/client/ui-workflow-run/tsconfig.json |   3 +
+ pnpm-lock.yaml                                |   9 +
+ 18 files changed, 606 insertions(+), 34 deletions(-)
+ create mode 100644 packages/client/ui-workflow-run/src/client/WorkflowBoard.module.css
+ create mode 100644 packages/client/ui-workflow-run/src/client/WorkflowBoard.tsx
+ create mode 100644 packages/client/ui-workflow-run/src/client/WorkflowBoardTab.tsx
+ create mode 100644 packages/client/ui-workflow-run/src/client/board-store.ts
+ create mode 100644 packages/client/ui-workflow-run/src/client/navigation.ts
+ create mode 100644 packages/client/ui-workflow-run/tests/fixtures/board-loader.yml
+
+diff --git a/packages/client/ui-workflow-run/README.i18n.yaml b/packages/client/ui-workflow-run/README.i18n.yaml
+index d34e6a8b..ab90d1ab 100644
+--- a/packages/client/ui-workflow-run/README.i18n.yaml
++++ b/packages/client/ui-workflow-run/README.i18n.yaml
+@@ -15,8 +15,8 @@
+   en: d152484eb41ac6b4
+   zh: 09388d293f9be9cb
+ /deepseek-ai-dsh-client-ui-workflow-run/use-this-package:
+-  en: 9712b1ed5f00f24f
+-  zh: c8f72b2ef448d9af
++  en: ca7357573a196afe
++  zh: df4e79594650ac62
+ /deepseek-ai-dsh-client-ui-workflow-run/use-this-package/navigating-the-node:
+   en: ced9d82bdf540585
+   zh: 34651e03ed937508
+diff --git a/packages/client/ui-workflow-run/README.md b/packages/client/ui-workflow-run/README.md
+index f48efe1f..96646548 100644
+--- a/packages/client/ui-workflow-run/README.md
++++ b/packages/client/ui-workflow-run/README.md
+@@ -27,6 +27,8 @@ Use `dsh-client-ui-workflow-run` to inspect each durable top-level workflow run
+ 
+ A top-level workflow run through `dsh-tool-workflow` appears in the conversation as its own node: expand the run to see its phases, and expand a phase to see its members. Phase groups come only from members that started, and settlement changes status without removing or reordering members.
+ 
++The Workflow board action opens a read-only in-chat board; Open in sidebar selects the same run in the existing right sidebar. Columns show running, completed, failed, cancelled, and interrupted members, keyed by run identity and member sequence. Progress counts completed members against members that actually started. Member labels and exact phase identities come from durable records; no model identity, queued work, task count, result, log, or artifact is inferred. Only the selected run key is persisted per Session; reload reads current facts from its keyed Chat source. A record outside the loaded history window shows an empty state until the card is loaded.
++
+ ### Navigating the node
+ 
+ The run uses a 32-pixel row with persistent chevrons, an inline state dot, and status text; phases use disclosure rows with title and member count in the main area and a fixed aggregate-status tail; members use a 16-pixel dot slot, a truncating name area, and a fixed status column. Opening a member's child Session requires both member and child to be running, and the child must belong to the current Session's direct-child catalog. Child activity uses the unified UI status, falling back to the Session summary when unknown. Session summaries do not establish membership; absent, wrong-parent, or terminal catalog entries remain non-interactive.
+diff --git a/packages/client/ui-workflow-run/README.zh.md b/packages/client/ui-workflow-run/README.zh.md
+index 9fa6f59b..253d939b 100644
+--- a/packages/client/ui-workflow-run/README.zh.md
++++ b/packages/client/ui-workflow-run/README.zh.md
+@@ -27,6 +27,8 @@ kind: "package-reference"
+ 
+ 经 `dsh-tool-workflow` 发起的顶层工作流运行会在对话中显示为独立节点：展开运行查看其阶段，展开阶段查看其成员。阶段组只来自开始过的成员；成员结算只改变状态，不删除或重排成员。
+ 
++工作流看板提供只读的会话内看板，也可在现有右侧栏打开同一运行。列按运行中、已完成、失败、已取消和已中断分组，以运行标识和成员序号识别卡片。进度为已完成成员数与实际启动成员数；成员标签和阶段来自持久记录，不推测模型、排队任务、任务总数、结果、日志或产物。每个会话仅保存所选运行键，重新加载时读取该键的当前 Chat 投影；记录不在已加载历史窗口时显示空状态。
++
+ ### 导航节点
+ 
+ 运行使用 32 像素行，带常驻 chevron、行内状态点与状态文字；阶段使用 disclosure 行，在主区显示标题与成员数、在固定尾部显示聚合状态；成员使用 16 像素状态点槽、可省略名称区与固定状态列。打开成员的子 Session 需要成员与子级均在运行，且子级属于当前 Session 的直接子级目录。子级活动状态使用统一 UI status，未知时使用 Session 摘要。Session 摘要不建立成员关系；目录中缺失、父级不符或终态的条目不可交互。
+diff --git a/packages/client/ui-workflow-run/package.json b/packages/client/ui-workflow-run/package.json
+index 29342ad3..4523becd 100644
+--- a/packages/client/ui-workflow-run/package.json
++++ b/packages/client/ui-workflow-run/package.json
+@@ -34,7 +34,8 @@
+         "@deepseek-ai/dsh-client-ui-conversation",
+         "@deepseek-ai/dsh-client-ui-renderer",
+         "@deepseek-ai/dsh-client-ui-session",
+-        "@deepseek-ai/dsh-client-ui-workspace"
++        "@deepseek-ai/dsh-client-ui-workspace",
++        "@deepseek-ai/dsh-client-ui-sidebar-right"
+       ],
+       "platform": "web"
+     }
+@@ -53,6 +54,8 @@
+     "@deepseek-ai/cordis": "workspace:~"
+   },
+   "devDependencies": {
++    "@deepseek-ai/cordis-plugin-loader": "workspace:~",
++    "@deepseek-ai/cordis-plugin-include": "workspace:~",
+     "@deepseek-ai/dsh-api-session-controller": "workspace:*",
+     "@deepseek-ai/dsh-client-locale": "workspace:*",
+     "@deepseek-ai/dsh-client-store": "workspace:*",
+@@ -69,6 +72,7 @@
+     "@deepseek-ai/dsh-workflow": "workspace:*",
+     "@types/react": "~18.3.1",
+     "@deepseek-ai/cordis": "workspace:~",
+-    "react": "^18.2.0"
++    "react": "^18.2.0",
++    "@deepseek-ai/dsh-client-ui-sidebar-right": "workspace:*"
+   }
+ }
+diff --git a/packages/client/ui-workflow-run/src/client/WorkflowBoard.module.css b/packages/client/ui-workflow-run/src/client/WorkflowBoard.module.css
+new file mode 100644
+index 00000000..8b36a715
+--- /dev/null
++++ b/packages/client/ui-workflow-run/src/client/WorkflowBoard.module.css
+@@ -0,0 +1,88 @@
++.board {
++  min-width: 0;
++  color: var(--dsw-alias-label-secondary);
++  font-size: var(--dsh-content-font-size-secondary, 13px);
++  line-height: calc(20px + var(--dsh-content-font-delta-secondary, 0px));
++}
++
++.progress {
++  display: flex;
++  flex-wrap: wrap;
++  align-items: center;
++  gap: 8px;
++  padding: 8px 0;
++}
++
++.progress progress {
++  width: 120px;
++  max-width: 100%;
++  accent-color: var(--dsw-alias-state-business-primary);
++}
++
++.columns {
++  display: grid;
++  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
++  gap: 8px;
++}
++
++.column {
++  min-width: 0;
++  padding: 8px;
++  border-radius: var(--dsw-radius-md);
++  background: var(--dsw-alias-bg-module-platform);
++}
++
++.column h3 {
++  display: flex;
++  justify-content: space-between;
++  gap: 8px;
++  margin: 0 0 8px;
++  font-size: inherit;
++  font-weight: 500;
++}
++
++.card {
++  min-width: 0;
++  margin-top: 8px;
++  padding: 8px;
++  border: 0.5px solid var(--dsw-alias-border-l4);
++  border-radius: var(--dsw-radius-sm);
++}
++
++.card dl { margin: 0; }
++.card:focus-visible {
++  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color);
++  outline-offset: 2px;
++}
++.card dt { margin-top: 4px; }
++.card dd {
++  margin: 0;
++  color: var(--dsw-alias-label-primary);
++  overflow-wrap: anywhere;
++  white-space: pre-wrap;
++}
++
++.link {
++  color: var(--dsw-alias-link);
++  font-weight: 500;
++}
++
++.link:hover,
++.link:focus-visible {
++  text-decoration: underline dotted;
++  text-underline-offset: 3px;
++}
++
++.sidebar {
++  box-sizing: border-box;
++  height: 100%;
++  overflow: auto;
++  min-width: 0;
++  padding: 12px;
++}
++
++.sidebar h2 {
++  font-size: var(--dsh-content-font-size, 14px);
++  font-weight: 500;
++  overflow-wrap: anywhere;
++}
+diff --git a/packages/client/ui-workflow-run/src/client/WorkflowBoard.tsx b/packages/client/ui-workflow-run/src/client/WorkflowBoard.tsx
+new file mode 100644
+index 00000000..31b7fa1c
+--- /dev/null
++++ b/packages/client/ui-workflow-run/src/client/WorkflowBoard.tsx
+@@ -0,0 +1,80 @@
++import { useId, useLayoutEffect, useRef } from 'react'
++import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
++import { shallowEqual } from '@deepseek-ai/dsh-client-store'
++import type { WorkflowRunPanelProps } from './WorkflowRunPanel.tsx'
++import type { WorkflowRunChatData, WorkflowRunStatus } from './workflow-definition.ts'
++import { navigableMembers } from './navigation.ts'
++import css from './WorkflowBoard.module.css'
++
++const STATUSES: readonly WorkflowRunStatus[] = ['running', 'completed', 'failed', 'cancelled', 'interrupted']
++
++/** Only the navigation and live status inputs required by the board. */
++export type WorkflowBoardInputs = Pick<WorkflowRunPanelProps,
++  'sessionId' | 'useSessions' | 'useSessionStatus' | 'openSession' | 't'>
++
++/**
++ * Render started members by their durable status, without task controls or invented queue entries.
++ * @param props - the run identity, current projected facts, and scoped navigation inputs.
++ * @returns a read-only responsive board with completed/started progress.
++ */
++export function WorkflowBoard({ runId, data, sessionId, useSessions, useSessionStatus, openSession, t }:
++  WorkflowBoardInputs & { readonly runId: string; readonly data: WorkflowRunChatData }) {
++  const labelId = useId()
++  const boardRef = useRef<HTMLElement>(null)
++  const focusedMember = useRef<string | null>(null)
++  const statuses = useSessionStatus(value => value)
++  const navigable = useSessions(sessions => navigableMembers(sessions, data.phases, sessionId, statuses), shallowEqual)
++  const members = data.phases.flatMap(phase => phase.members.map(member => ({ member, phase: phase.phase })))
++  const completed = members.filter(({ member }) => member.status === 'completed').length
++  useLayoutEffect(() => {
++    const board = boardRef.current
++    if (board === null || focusedMember.current === null || board.contains(board.ownerDocument.activeElement)) return
++    const card = [...board.querySelectorAll<HTMLElement>('[data-board-member]')]
++      .find(element => element.dataset.boardMember === focusedMember.current)
++    if (card !== undefined) (card.querySelector<HTMLButtonElement>('button') ?? card).focus()
++  }, [data, navigable])
++  return (
++    <section ref={boardRef} className={css.board} data-workflow-board={runId} aria-label={t('board.title')}
++      onFocusCapture={event => {
++        focusedMember.current = event.target.closest<HTMLElement>('[data-board-member]')?.dataset.boardMember ?? null
++      }}
++      onBlurCapture={event => {
++        if (!event.currentTarget.contains(event.relatedTarget)) focusedMember.current = null
++      }}>
++      <div className={css.progress}>
++        <span id={labelId}>{t('board.progress', { completed, total: members.length })}</span>
++        <progress aria-labelledby={labelId} max={Math.max(1, members.length)} value={completed} />
++      </div>
++      {members.length === 0 && <p>{t('run.empty')}</p>}
++      <div className={css.columns}>
++        {STATUSES.map(status => {
++          const column = members.filter(({ member }) => member.status === status)
++          return (
++            <section key={status} className={css.column} data-board-status={status} aria-label={t(`status.${status}`)}>
++              <h3>{t(`status.${status}`)} <span>{column.length}</span></h3>
++              {column.map(({ member, phase }) => (
++                <article key={member.seq} className={css.card}
++                  tabIndex={-1}
++                  data-board-member={`${runId.length}:${runId}:${member.seq}`}>
++                  <dl>
++                    <dt>{t('board.assignee')}</dt>
++                    <dd>{member.label === '' ? t('member.empty') : member.label}</dd>
++                    <dt>{t('board.phase')}</dt>
++                    <dd>{phase === null ? t('phase.unassigned') : phase === '' ? t('phase.empty') : phase}</dd>
++                  </dl>
++                  {navigable.includes(member.childId) && (
++                    <Button size="sm" variant="ghost" className={css.link}
++                      aria-label={t('member.open', { name: member.label === '' ? t('member.empty') : member.label })}
++                      onClick={() => { openSession({ parentSessionId: sessionId, childSessionId: member.childId, mode: 'one-shot' }) }}>
++                      {t('board.child')}
++                    </Button>
++                  )}
++                </article>
++              ))}
++            </section>
++          )
++        })}
++      </div>
++    </section>
++  )
++}
+diff --git a/packages/client/ui-workflow-run/src/client/WorkflowBoardTab.tsx b/packages/client/ui-workflow-run/src/client/WorkflowBoardTab.tsx
+new file mode 100644
+index 00000000..58e65d41
+--- /dev/null
++++ b/packages/client/ui-workflow-run/src/client/WorkflowBoardTab.tsx
+@@ -0,0 +1,43 @@
++import { useSyncExternalStore } from 'react'
++import { PluginArtworkSubagent } from '@deepseek-ai/dsh-client-ui-primitives'
++import type { PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
++import type { ChatNode } from '@deepseek-ai/dsh-client-ui-chat/client'
++import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
++import type { WorkflowRunInjected } from './WorkflowRunPanel.tsx'
++import type { createWorkflowBoardStore } from './board-store.ts'
++import { WorkflowBoard } from './WorkflowBoard.tsx'
++import css from './WorkflowBoard.module.css'
++
++/** Session-scoped sidebar board using the existing per-key Chat source. */
++export type WorkflowBoardTabProps = PropsRuntime<'sidebar.right.pane.tab'> & PropsLocale<'workflowRun'>
++  & PropsStore<ReturnType<typeof createWorkflowBoardStore>> & Pick<WorkflowRunInjected, 'openSession'>
++
++const noSubscription = (): (() => void) => () => {}
++const noNode = () => undefined
++
++/**
++ * Restore the selected run identity and subscribe to its live Chat projection.
++ * @param props - the Session-scoped tab, selected identity, and existing navigation.
++ * @returns the selected run board, or an empty state when its facts are not loaded.
++ */
++export function WorkflowBoardTab({ useStore, useChat, t, ...inputs }: WorkflowBoardTabProps) {
++  const key = useStore(state => state.selectedKey)
++  const source = useChat(snapshot => typeof key === 'string' ? snapshot.nodes.source(key) : undefined)
++  const node = useSyncExternalStore(source?.subscribe ?? noSubscription, source?.getSnapshot ?? noNode)
++  if (node?.kind !== 'workflow-run') return <p className={css.sidebar}>{t('board.unavailable')}</p>
++  // Chat's keyed reader is untyped; this registered kind is owned by workflowRunDefinition.
++  const workflow = node as ChatNode<'workflow-run'>
++  return <div className={css.sidebar}>
++    <h2>{workflow.data.name}</h2>
++    <WorkflowBoard {...inputs} t={t} runId={workflow.id} data={workflow.data} />
++  </div>
++}
++
++/**
++ * Render the board tab's icon and localized title.
++ * @param props - the localized copy seat.
++ * @returns the standard member icon and board title.
++ */
++export function WorkflowBoardTabTitle({ t }: PropsLocale<'workflowRun'>) {
++  return <><PluginArtworkSubagent size={16} />{t('board.title')}</>
++}
+diff --git a/packages/client/ui-workflow-run/src/client/WorkflowRunPanel.module.css b/packages/client/ui-workflow-run/src/client/WorkflowRunPanel.module.css
+index 290c479d..54eafc7f 100644
+--- a/packages/client/ui-workflow-run/src/client/WorkflowRunPanel.module.css
++++ b/packages/client/ui-workflow-run/src/client/WorkflowRunPanel.module.css
+@@ -3,6 +3,14 @@
+   min-width: 0;
+ }
+ 
++.boardToolbar {
++  display: flex;
++  flex-wrap: wrap;
++  justify-content: flex-end;
++  gap: 4px;
++  margin-bottom: 4px;
++}
++
+ .runHeader {
+   box-sizing: border-box;
+   display: flex;
+diff --git a/packages/client/ui-workflow-run/src/client/WorkflowRunPanel.tsx b/packages/client/ui-workflow-run/src/client/WorkflowRunPanel.tsx
+index ee98a85f..b2442a00 100644
+--- a/packages/client/ui-workflow-run/src/client/WorkflowRunPanel.tsx
++++ b/packages/client/ui-workflow-run/src/client/WorkflowRunPanel.tsx
+@@ -3,14 +3,16 @@ import {
+   type FocusEvent, type MouseEvent, type ReactNode,
+ } from 'react'
+ import {
+-  DisclosureRow, IconChevronRightOutlineRegular, StateDot,
++  Button, DisclosureRow, IconChevronRightOutlineRegular, StateDot,
+   type DisclosureRowProps, type StateDotState,
+ } from '@deepseek-ai/dsh-client-ui-primitives'
+-import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+-import type { SessionListState, SessionTarget } from '@deepseek-ai/dsh-api-session-controller/client'
++import type { PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
++import type { SessionTarget } from '@deepseek-ai/dsh-api-session-controller/client'
+ import { shallowEqual } from '@deepseek-ai/dsh-client-store'
+ import type { SessionId } from '@deepseek-ai/dsh-session/types'
+-import type { SessionStatusSnapshot } from '@deepseek-ai/dsh-client-ui-session/client'
++import { navigableMembers } from './navigation.ts'
++import type { createWorkflowBoardStore } from './board-store.ts'
++import { WorkflowBoard } from './WorkflowBoard.tsx'
+ import type { WorkflowRunKey } from './locales.ts'
+ import type {
+   WorkflowRunMemberData, WorkflowRunPhaseData, WorkflowRunStatus,
+@@ -20,6 +22,7 @@ import css from './WorkflowRunPanel.module.css'
+ /** Navigation action injected from the plugin's own Session Controller access. */
+ export interface WorkflowRunInjected {
+   readonly openSession: (target: SessionTarget) => void
++  readonly openBoard: () => void
+ }
+ 
+ /** Complete keyed Chat renderer props. */
+@@ -27,6 +30,7 @@ export type WorkflowRunPanelProps =
+   PropsRuntime<'conversation.chat.node', 'workflow-run'>
+   & PropsLocale<'workflowRun'>
+   & WorkflowRunInjected
++  & PropsStore<ReturnType<typeof createWorkflowBoardStore>>
+ 
+ const STATUS_KEYS = {
+   running: 'status.running',
+@@ -180,26 +184,6 @@ function phaseStatusSummary(members: readonly WorkflowRunMemberData[], t: Workfl
+   return visible.map(status => statusCount(status, count(status), t)).join(' · ')
+ }
+ 
+-function navigableMembers(
+-  sessions: SessionListState,
+-  phases: readonly WorkflowRunPhaseData[],
+-  parentId: SessionId,
+-  statuses: SessionStatusSnapshot,
+-): readonly SessionId[] {
+-  const catalog = sessions.projectionsBySession[parentId]
+-  const result: SessionId[] = []
+-  for (const phase of phases) {
+-    for (const member of phase.members) {
+-      const child = catalog?.values.subagentCatalog?.find(entry => entry.id === member.childId)
+-      if (member.status === 'running'
+-        && child !== undefined && (statuses.get(child.id)?.running ?? sessions.byId[child.id]?.running) === true) {
+-        result.push(member.childId)
+-      }
+-    }
+-  }
+-  return result
+-}
+-
+ function RunHeader({ children, count, name, onToggle, open, status, t }: {
+   readonly children: ReactNode
+   readonly count: number
+@@ -340,7 +324,9 @@ function PhaseSection({
+ }
+ 
+ /** Render one durable workflow run with status-driven run and phase disclosure. */
+-export function WorkflowRunPanel({ node, sessionId, useSessions, useSessionStatus, openSession, t }: WorkflowRunPanelProps) {
++export function WorkflowRunPanel({ node, sessionId, useSessions, useSessionStatus, openSession, openBoard, actions, t }: WorkflowRunPanelProps) {
++  const [boardOpen, setBoardOpen] = useState(false)
++  const boardToggleRef = useRef<HTMLButtonElement>(null)
+   const phaseFacts = useMemo(() => node.data.phases.map(phase => (
+     [phase.key, phaseDisclosureFacts(phase)] as const
+   )), [node.data.phases])
+@@ -441,6 +427,20 @@ export function WorkflowRunPanel({ node, sessionId, useSessions, useSessionStatu
+         ? preventPendingHeaderFocus
+         : undefined}
+     >
++      <div className={css.boardToolbar}>
++        <Button ref={boardToggleRef} size="sm" variant="ghost" aria-expanded={boardOpen}
++          onClick={() => { setBoardOpen(value => !value) }}>{t('board.title')}</Button>
++        <Button size="sm" variant="ghost"
++          onClick={() => { actions.select(node.key); openBoard() }}>{t('board.side')}</Button>
++      </div>
++      {boardOpen && <div onKeyDown={event => {
++        if (event.key !== 'Escape' || event.nativeEvent.isComposing) return
++        event.stopPropagation()
++        setBoardOpen(false)
++        boardToggleRef.current?.focus()
++      }}><WorkflowBoard runId={node.id} data={node.data}
++        sessionId={sessionId} useSessions={useSessions} useSessionStatus={useSessionStatus}
++        openSession={openSession} t={t} /></div>}
+       <RunHeader
+         count={totalMembers}
+         name={node.data.name}
+diff --git a/packages/client/ui-workflow-run/src/client/board-store.ts b/packages/client/ui-workflow-run/src/client/board-store.ts
+new file mode 100644
+index 00000000..02263f6d
+--- /dev/null
++++ b/packages/client/ui-workflow-run/src/client/board-store.ts
+@@ -0,0 +1,15 @@
++import { defineStore } from '@deepseek-ai/dsh-client-store'
++
++/**
++ * Keep the selected run key per Session; workflow facts remain in the Chat projection.
++ * @returns a handle shared by the in-chat card and the sidebar tab in the same Session scope.
++ */
++export function createWorkflowBoardStore() {
++  return defineStore({
++    init: (): { selectedKey: string | null } => ({ selectedKey: null }),
++    persist: 'dsh:workflow-board',
++    actions: {
++      select: (draft, key: string) => { draft.selectedKey = key },
++    },
++  })
++}
+diff --git a/packages/client/ui-workflow-run/src/client/index.ts b/packages/client/ui-workflow-run/src/client/index.ts
+index 9c0d2b49..8be6b62b 100644
+--- a/packages/client/ui-workflow-run/src/client/index.ts
++++ b/packages/client/ui-workflow-run/src/client/index.ts
+@@ -8,6 +8,9 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
+ import type {} from '@deepseek-ai/dsh-client-ui-session/client'
+ import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
++import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
++import { createWorkflowBoardStore } from './board-store.ts'
++import { WorkflowBoardTab, WorkflowBoardTabTitle } from './WorkflowBoardTab.tsx'
+ import { WorkflowRunPanel, type WorkflowRunInjected } from './WorkflowRunPanel.tsx'
+ import { en, NS, type WorkflowRunKey, zh } from './locales.ts'
+ import { workflowRunDefinition } from './workflow-definition.ts'
+@@ -20,18 +23,33 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
+ }
+ 
+ /** Required services for Definition, keyed renderer, navigation, and copy. */
+-export const inject = ['uiConversation', 'uiWorkspace', 'slots', 'sessions', 'locale']
++export const inject = ['uiConversation', 'uiWorkspace', 'slots', 'sessions', 'locale', 'sidebarRight', 'sidebarRightTabs']
+ 
+ /** Register the workflow Definition, dictionary, and keyed Chat renderer. */
+ export function apply(ctx: ClientContext): void {
++  const store = createWorkflowBoardStore()
++  const t = ctx.locale.bind(NS)
++  const boardId = '@deepseek-ai/dsh-client-ui-workflow-run'
++  ctx.effect(() => ctx.sidebarRightTabs.register({
++    id: boardId, kind: 'workflow-board', priority: 'builtin', title: () => t('board.title'),
++  }), 'ui-workflow-run: board tab')
++  ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({
++    name: 'sidebar.right.pane.tab', key: boardId, locale: NS, store,
++    inject: () => ({ openSession: (target: SessionTarget) => { ctx.uiWorkspace.openSession(target) } }),
++  }, WorkflowBoardTab))
++  ctx.slots.inject('sidebar.right.pane.tab.title', () => ctx.slots.register({
++    name: 'sidebar.right.pane.tab.title', key: boardId, locale: NS,
++  }, WorkflowBoardTabTitle))
+   ctx.uiConversation.events.register(workflowRunDefinition)
+   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-workflow-run: dictionaries')
+   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({
+     name: 'conversation.chat.node',
+     key: 'workflow-run',
+     locale: NS,
+-    inject: (): WorkflowRunInjected => ({
++    store,
++    inject: (sessionId): WorkflowRunInjected => ({
+       openSession: (target: SessionTarget) => { ctx.uiWorkspace.openSession(target) },
++      openBoard: () => { ctx.sidebarRight.openTabIn(sessionId, 'workflow-board') },
+     }),
+   }, WorkflowRunPanel))
+ }
+diff --git a/packages/client/ui-workflow-run/src/client/locales.ts b/packages/client/ui-workflow-run/src/client/locales.ts
+index 99d8c969..364f34de 100644
+--- a/packages/client/ui-workflow-run/src/client/locales.ts
++++ b/packages/client/ui-workflow-run/src/client/locales.ts
+@@ -5,6 +5,13 @@ export const NS = 'workflowRun'
+ 
+ /** Simplified Chinese dictionary (the key-set source of truth). */
+ export const zh = {
++  'board.title': '工作流看板',
++  'board.side': '在侧栏中打开',
++  'board.assignee': '成员',
++  'board.phase': '阶段',
++  'board.child': '打开子会话',
++  'board.progress': '已完成 {completed} / {total} 个已启动成员',
++  'board.unavailable': '从会话中的工作流卡片打开看板；所选记录可能尚未加载',
+   'run.title': '{name}',
+   'run.members.one': '{count} 个成员',
+   'run.members.other': '{count} 个成员',
+@@ -27,6 +34,13 @@ export const zh = {
+ 
+ /** English dictionary (same key set). */
+ export const en: Record<WorkflowRunKey, string> = {
++  'board.title': 'Workflow board',
++  'board.side': 'Open in sidebar',
++  'board.assignee': 'Member',
++  'board.phase': 'Phase',
++  'board.child': 'Open child conversation',
++  'board.progress': 'Completed {completed} of {total} started members',
++  'board.unavailable': 'Open a board from a workflow card in this conversation; the selected record may not be loaded yet',
+   'run.title': '{name}',
+   'run.members.one': '{count} member',
+   'run.members.other': '{count} members',
+diff --git a/packages/client/ui-workflow-run/src/client/navigation.ts b/packages/client/ui-workflow-run/src/client/navigation.ts
+new file mode 100644
+index 00000000..c74389f5
+--- /dev/null
++++ b/packages/client/ui-workflow-run/src/client/navigation.ts
+@@ -0,0 +1,32 @@
++import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
++import type { SessionId } from '@deepseek-ai/dsh-session/types'
++import type { SessionStatusSnapshot } from '@deepseek-ai/dsh-client-ui-session/client'
++import type { WorkflowRunPhaseData } from './workflow-definition.ts'
++
++/**
++ * Select running members whose running child is in the parent's direct-child catalog.
++ * @param sessions - Session summaries and the parent's catalog.
++ * @param phases - started members from the durable projection.
++ * @param parentId - the current Session scope.
++ * @param statuses - unified live child status, preferred over summaries.
++ * @returns only child identities that the existing one-shot opener may receive.
++ */
++export function navigableMembers(
++  sessions: SessionListState,
++  phases: readonly WorkflowRunPhaseData[],
++  parentId: SessionId,
++  statuses: SessionStatusSnapshot,
++): readonly SessionId[] {
++  const catalog = sessions.projectionsBySession[parentId]
++  const result: SessionId[] = []
++  for (const phase of phases) {
++    for (const member of phase.members) {
++      const child = catalog?.values.subagentCatalog?.find(entry => entry.id === member.childId)
++      if (member.status === 'running'
++        && child !== undefined && (statuses.get(child.id)?.running ?? sessions.byId[child.id]?.running) === true) {
++        result.push(member.childId)
++      }
++    }
++  }
++  return result
++}
+diff --git a/packages/client/ui-workflow-run/src/client/workflow-definition.ts b/packages/client/ui-workflow-run/src/client/workflow-definition.ts
+index 7f1eba77..af5739f3 100644
+--- a/packages/client/ui-workflow-run/src/client/workflow-definition.ts
++++ b/packages/client/ui-workflow-run/src/client/workflow-definition.ts
+@@ -108,7 +108,7 @@ function projectWorkflow(
+       label: member.label,
+       childId: member.childId,
+       status: member.outcome === undefined
+-        ? interrupted ? 'interrupted' : 'running'
++        ? interrupted || state.stopReason !== undefined ? 'interrupted' : 'running'
+         : statusFromOutcome(member.outcome),
+     })
+   }
+@@ -127,6 +127,7 @@ function projectWorkflow(
+ }
+ 
+ function updateAgentStart(state: WorkflowState, data: ToolWorkflowAgentStartData): WorkflowState {
++  if (state.stopReason !== undefined || state.members.some(member => member.seq === data.seq)) return state
+   const member: WorkflowMemberState = {
+     seq: data.seq,
+     label: data.label,
+@@ -139,7 +140,7 @@ function updateAgentStart(state: WorkflowState, data: ToolWorkflowAgentStartData
+ function updateAgentEnd(state: WorkflowState, data: ToolWorkflowAgentEndData): WorkflowState {
+   return {
+     ...state,
+-    members: state.members.map(member => member.seq === data.seq
++    members: state.members.map(member => member.seq === data.seq && member.outcome === undefined
+       ? { ...member, outcome: data.outcome }
+       : member),
+   }
+@@ -172,6 +173,7 @@ export const workflowRunDefinition: ConversationNodeDefinition<WorkflowState> =
+       return updateAgentEnd(context.state, match.event.data)
+     }
+     if (match.event.type === 'tool-workflow/run-end') {
++      if (context.state.stopReason !== undefined) return context.state
+       return { ...context.state, stopReason: match.event.data.stopReason }
+     }
+     return context.state
+diff --git a/packages/client/ui-workflow-run/tests/fixtures/board-loader.yml b/packages/client/ui-workflow-run/tests/fixtures/board-loader.yml
+new file mode 100644
+index 00000000..11a7ff3a
+--- /dev/null
++++ b/packages/client/ui-workflow-run/tests/fixtures/board-loader.yml
+@@ -0,0 +1,3 @@
++- name: cordis:board-fixture-services
++- name: cordis:board-fixture-locale
++- name: cordis:board-production-client
+diff --git a/packages/client/ui-workflow-run/tests/workflow-run.client.spec.tsx b/packages/client/ui-workflow-run/tests/workflow-run.client.spec.tsx
+index 728efbf9..82817a9c 100644
+--- a/packages/client/ui-workflow-run/tests/workflow-run.client.spec.tsx
++++ b/packages/client/ui-workflow-run/tests/workflow-run.client.spec.tsx
+@@ -32,6 +32,15 @@ import {
+ } from '../src/client/workflow-definition.ts'
+ import { apply as applyNode } from '../src/index.ts'
+ import type {} from '../src/client/index.ts'
++import { WorkflowBoard } from '../src/client/WorkflowBoard.tsx'
++import { WorkflowBoardTab, type WorkflowBoardTabProps } from '../src/client/WorkflowBoardTab.tsx'
++import { createWorkflowBoardStore } from '../src/client/board-store.ts'
++import { en } from '../src/client/locales.ts'
++import Loader from '@deepseek-ai/cordis-plugin-loader'
++import Include from '@deepseek-ai/cordis-plugin-include'
++import { SidebarRightTabRegistry } from '../../ui-sidebar-right/src/client/tab-registry.ts'
++import { resolve } from 'node:path'
++import { pathToFileURL } from 'node:url'
+ 
+ // Every session-scope fixture carries the resource hook the resources plugin merges into GlobalStandardProps.
+ const useResource = (() => ({ status: 'none' as const, value: undefined, failure: undefined, reload: () => {} })) as GlobalStandardProps['useResource']
+@@ -344,6 +353,9 @@ function panelProps(data: WorkflowRunChatData, sessions = listState(), openSessi
+     renderMessageImages: () => null,
+     fileMentions: () => undefined,
+     openSession,
++    openBoard: vi.fn(),
++    useStore: selector => selector({ selectedKey: null }),
++    actions: { select: vi.fn() },
+     t: makeTranslate(zh),
+   }
+ }
+@@ -898,7 +910,230 @@ describe('WorkflowRunPanel', () => {
+   })
+ })
+ 
++describe('workflow board durable and live inputs', () => {
++  it('recovers a rejected raw live reversal through the existing ordered reconnect window', () => {
++    const events = completeEvents()
++    const live = assembler(events.slice(0, 5))
++    live.append(events[6]!)
++    expect(() => live.append(events[5]!)).toThrow('non-appended Match')
++    live.replaceWindow([...events].reverse(), false)
++    live.flush()
++    expect(workflowData(live)).toEqual(workflowData(assembler(events)))
++  })
++
++  it('replays a reversed persisted window and reconnects to the same two-member board', () => {
++    const events = completeEvents()
++    const expected = workflowData(assembler(events))
++    expect(workflowData(assembler([...events].reverse()))).toEqual(expected)
++    const live = assembler(events.slice(0, 3))
++    for (const event of events.slice(3)) {
++      live.append(event)
++      live.append(event)
++    }
++    live.flush()
++    expect(workflowData(live)).toEqual(expected)
++    live.replaceWindow(events, false)
++    live.flush()
++    expect(workflowData(live)).toEqual(expected)
++  })
++
++  it('keeps one card per run/member and does not reopen terminal state on delayed events', () => {
++    const events = completeEvents()
++    const live = assembler(events)
++    live.append(at(11, 'tool-workflow/agent-start', {
++      runId: 'run-1', seq: 1, label: 'duplicate', phase: 'wrong', childId: 'foreign',
++    }))
++    live.append(at(12, 'tool-workflow/agent-end', { runId: 'run-1', seq: 1, outcome: 'failed' }))
++    live.append(at(13, 'tool-workflow/run-end', { runId: 'run-1', stopReason: 'completed' }))
++    live.append(at(14, 'tool-workflow/agent-start', { runId: 'run-1', seq: 3, label: 'too late', childId: 'late' }))
++    live.flush()
++    expect(workflowData(live)).toEqual(workflowData(assembler(events)))
++    const duringRun = assembler(events.slice(0, 5))
++    duringRun.append(at(6, 'tool-workflow/agent-start', {
++      runId: 'run-1', seq: 1, label: 'duplicate', childId: 'foreign',
++    }))
++    duringRun.flush()
++    expect(workflowData(duringRun)?.phases.flatMap(value => value.members)).toHaveLength(2)
++  })
++
++  it.each(['completed', 'cancelled', 'error'])('shows a missing member ending as interrupted after run %s', (stopReason) => {
++    const live = assembler(completeEvents().slice(0, 5))
++    live.append(at(6, 'tool-workflow/agent-end', { runId: 'run-1', seq: 1, outcome: 'completed' }))
++    live.append(at(7, 'tool-workflow/run-end', { runId: 'run-1', stopReason }))
++    live.flush()
++    expect(workflowData(live)?.phases.flatMap(value => value.members).map(member => member.status))
++      .toEqual(['completed', 'interrupted'])
++    live.append(at(8, 'tool-workflow/agent-end', { runId: 'run-1', seq: 2, outcome: 'cancelled' }))
++    live.flush()
++    expect(workflowData(live)?.phases[1]?.members[0]?.status).toBe('cancelled')
++  })
++
++  it('separates the same member sequence across runs', () => {
++    const live = assembler([
++      at(1, 'tool-workflow/run-start', { runId: 'a', name: 'first' }),
++      at(2, 'tool-workflow/agent-start', { runId: 'a', seq: 1, label: 'A', childId: 'a-child' }),
++      at(3, 'tool-workflow/run-start', { runId: 'b', name: 'second' }),
++      at(4, 'tool-workflow/agent-start', { runId: 'b', seq: 1, label: 'B', childId: 'b-child' }),
++      at(5, 'tool-workflow/agent-end', { runId: 'b', seq: 1, outcome: 'failed' }),
++    ])
++    const nodes = [...(live.snapshot('chat') as ChatSnapshot).nodes.values()]
++    expect(nodes.map(value => [value.id, (value.data as WorkflowRunChatData).phases[0]?.members[0]?.status]))
++      .toEqual([['a', 'running'], ['b', 'failed']])
++  })
++})
++
++describe('read-only workflow board', () => {
++  const englishProps = (data: WorkflowRunChatData, sessions = listState(), openSession = vi.fn()) => ({
++    ...panelProps(data, sessions, openSession), runId: 'run-1', data, t: makeTranslate(en),
++  })
++
++  it('shows recorded phases, stable IDs, exact started counts and escaped arbitrary labels', () => {
++    const data = workflowData(assembler(completeEvents()))!
++    const malicious = '<img src=x onerror=alert(1)> & "member"'
++    const input = { ...data, phases: [
++      phase({ members: [{ seq: 1, label: malicious, childId: CHILD_ID, status: 'running' }] }),
++      phase({ key: 'value:0:', phase: '', members: [{ seq: 2, label: 'done', childId: SECOND_ID, status: 'completed' }] }),
++    ] }
++    const view = render(<WorkflowBoard {...englishProps(input)} />)
++    expect(screen.getByText(malicious)).toBeTruthy()
++    expect(view.container.querySelector('img')).toBeNull()
++    expect(screen.getByText('Unphased')).toBeTruthy()
++    expect(screen.getByText('Empty phase name')).toBeTruthy()
++    expect(screen.getByRole('progressbar').getAttribute('value')).toBe('1')
++    expect(screen.getByRole('progressbar').getAttribute('max')).toBe('2')
++    expect([...view.container.querySelectorAll('[data-board-member]')].map(value => value.getAttribute('data-board-member')))
++      .toEqual(['5:run-1:1', '5:run-1:2'])
++    expect(view.container.querySelectorAll('[data-board-status]')).toHaveLength(5)
++    expect(screen.queryByText(/queued|artifact|7 tasks|4 agents/i)).toBeNull()
++  })
++
++  it('updates columns live and preserves recorded failure and cancellation after a remount', () => {
++    const live = workflowData(assembler(completeEvents().slice(0, 5)))!
++    const view = render(<WorkflowBoard {...englishProps(live)} />)
++    expect(view.container.querySelector('[data-board-status="running"]')?.querySelectorAll('article')).toHaveLength(2)
++    const settled = workflowData(assembler(completeEvents()))!
++    view.rerender(<WorkflowBoard {...englishProps(settled)} />)
++    expect(view.container.querySelector('[data-board-status="completed"]')?.querySelectorAll('article')).toHaveLength(1)
++    expect(view.container.querySelector('[data-board-status="failed"]')?.querySelectorAll('article')).toHaveLength(1)
++    expect(view.container.querySelector('[data-board-status="running"]')?.querySelectorAll('article')).toHaveLength(0)
++    view.unmount()
++    const restored = render(<WorkflowBoard {...englishProps(settled)} />)
++    expect([...restored.container.querySelectorAll('[data-board-status]')].map(column => column.textContent))
++      .toMatchInlineSnapshot(`
++        [
++          "Running 0",
++          "Completed 1MemberfirstPhaseEmpty phase name",
++          "Failed 1MembersecondPhaseUnphased",
++          "Cancelled 0",
++          "Interrupted 0",
++        ]
++      `)
++  })
++
++  it('opens only a catalog-owned running member with the canonical one-shot target', () => {
++    const data: WorkflowRunChatData = { name: 'audit', status: 'running', phases: [phase()] }
++    const open = vi.fn()
++    const view = render(<WorkflowBoard {...englishProps(data, listState(), open)} />)
++    fireEvent.click(screen.getByRole('button', { name: 'Open worker' }))
++    expect(open).toHaveBeenCalledExactlyOnceWith({ parentSessionId: PARENT_ID, childSessionId: CHILD_ID, mode: 'one-shot' })
++    view.rerender(<WorkflowBoard {...englishProps(data, listState({ projectionsBySession: {} }), open)} />)
++    expect(screen.queryByRole('button')).toBeNull()
++    view.rerender(<WorkflowBoard {...englishProps(data, listState({ byId: { [CHILD_ID]: { ...listState().byId[CHILD_ID]!, running: false } } }), open)} />)
++    expect(screen.queryByRole('button')).toBeNull()
++    view.rerender(<WorkflowBoard {...englishProps({ ...data, phases: [phase({ members: [{ seq: 1, label: 'worker', childId: CHILD_ID, status: 'completed' }] })] }, listState(), open)} />)
++    expect(screen.queryByRole('button')).toBeNull()
++    expect(open).toHaveBeenCalledTimes(1)
++  })
++
++  it('provides a collapsible in-chat board and opens the selected run in the sidebar', () => {
++    const props = { ...panelProps(workflowData(assembler(completeEvents()))!), t: makeTranslate(en) }
++    const view = render(<WorkflowRunPanel {...props} />)
++    expect(view.container.querySelector('[data-workflow-board]')).toBeNull()
++    fireEvent.click(screen.getByRole('button', { name: 'Workflow board' }))
++    expect(view.container.querySelector('[data-workflow-board]')).toBeTruthy()
++    fireEvent.click(screen.getByRole('button', { name: 'Open in sidebar' }))
++    expect(props.actions.select).toHaveBeenCalledExactlyOnceWith(props.node.key)
++    expect(props.openBoard).toHaveBeenCalledTimes(1)
++    fireEvent.click(screen.getByRole('button', { name: 'Workflow board' }))
++    expect(view.container.querySelector('[data-workflow-board]')).toBeNull()
++  })
++
++  it('restores only a selected identity per Session and reads current facts from a keyed source', () => {
++    const first = createWorkflowBoardStore().create('board-test-parent')
++    first.actions.select('restored-key')
++    const restored = createWorkflowBoardStore().create('board-test-parent')
++    expect(restored.store.getSnapshot()).toEqual({ selectedKey: 'restored-key' })
++    expect(createWorkflowBoardStore().create('other-parent').store.getSnapshot()).toEqual({ selectedKey: null })
++    const data = workflowData(assembler(completeEvents()))!
++    const source = createSnapshotStore<WorkflowRunPanelProps['node'] | undefined>(node(data))
++    const props: WorkflowBoardTabProps = { ...englishProps(data),
++      actions: restored.actions,
++      useStore: selector => selector(restored.store.getSnapshot()),
++      useChat: selector => selector({ ...panelChat, nodes: { ...panelChat.nodes, source: () => source } }),
++      useTabInfo: () => { throw new Error('unused') },
++    }
++    // Runtime supplies the remaining tab hooks, unused by this read-only body.
++    const view = render(<WorkflowBoardTab {...props} />)
++    expect(screen.getByText('Completed 1 of 2 started members')).toBeTruthy()
++    view.unmount()
++    const missing: WorkflowBoardTabProps = { ...props, useChat: selector => selector(panelChat) }
++    render(<WorkflowBoardTab {...missing} />)
++    expect(screen.getByText(/selected record may not be loaded/)).toBeTruthy()
++    localStorage.removeItem('dsh:workflow-board:board-test-parent')
++  })
++})
++
+ describe('plugin lifecycle', () => {
++  it('loads the production client plugin from a test-only YAML composition', async () => {
++    const ctx = new Context()
++    const open = vi.fn()
++    const errors: unknown[] = []
++    ctx.logger.exporter({ levels: { default: 3 }, export: message => { if (message.type === 'error') errors.push(...message.args) } })
++    try {
++      await ctx.plugin(SlotRegistry).await()
++      await ctx.plugin(Loader).await()
++      ctx.loader.builtins.include = Include
++      ctx.loader.builtins['board-fixture-services'] = { inject: ['slots'], apply: (scope: Context) => {
++        scope.provide('connection', { api: { settings: {} }, isLoopback: false } as never)
++        scope.provide('remote', { $on: () => () => {} } as never)
++        scope.provide('configForms', { developerTools: { enabled: createSnapshotStore(true) }, get: () => stubConfigForm().scope } as never)
++        scope.provide('sessions', new TestSessions(async action => { await action() }, scope))
++        scope.provide('uiWorkspace', { openSession: vi.fn() } as never)
++        scope.provide('sidebarRight', { openTabIn: open } as never)
++        scope.provide('sidebarRightTabs', new SidebarRightTabRegistry(scope))
++        new UiConversation(scope, scope.get('sessions')!)
++        scope.slots.register({ name: 'root', children: {
++          'conversation.chat.node': { kind: 'keyed', scope: 'session' },
++          'sidebar.right.pane.tab': { kind: 'keyed', scope: 'session' },
++          'sidebar.right.pane.tab.title': { kind: 'keyed', scope: 'session' },
++        } } as never, () => null)
++      } }
++      ctx.loader.builtins['board-fixture-locale'] = { inject: localeInject, apply: applyLocale }
++      ctx.loader.builtins['board-production-client'] = { inject, apply }
++      await ctx.loader.create({ name: 'cordis:include', config: {
++        path: pathToFileURL(resolve('packages/client/ui-workflow-run/tests/fixtures/board-loader.yml')).href,
++      } })
++      await ctx.loader.await()
++      expect(errors).toEqual([])
++      expect(ctx.get('uiConversation')?.events.entries().map(entry => entry.kind)).toEqual(['workflow-run'])
++      expect(ctx.get('sidebarRightTabs')?.get('workflow-board')?.id).toBe('@deepseek-ai/dsh-client-ui-workflow-run')
++      const chat = ctx.slots.entries('conversation.chat.node')[0]!
++      const sidebar = ctx.slots.entries('sidebar.right.pane.tab')[0]!
++      expect(chat.store).toBe(sidebar.store)
++      const navigation = (chat.inject as (id: SessionId) => Record<string, unknown>)(PARENT_ID)
++      if (typeof navigation.openBoard !== 'function') throw new Error('board opener missing')
++      navigation.openBoard()
++      expect(open).toHaveBeenCalledExactlyOnceWith(PARENT_ID, 'workflow-board')
++      const data = workflowData(assembler(completeEvents()))!
++      const view = render(<WorkflowRunPanel {...panelProps(data)} t={makeTranslate(en)} />)
++      fireEvent.click(screen.getByRole('button', { name: 'Workflow board' }))
++      expect(view.container.querySelectorAll('[data-board-member]')).toHaveLength(2)
++    } finally {
++      cleanup()
++      await ctx.fiber.dispose()
++    }
++  })
++
+   it('registers and removes the Definition and keyed renderer with its fiber', async () => {
+     const ctx = new Context()
+     await ctx.plugin(SlotRegistry).await()
+@@ -909,16 +1144,28 @@ describe('plugin lifecycle', () => {
+     ctx.provide('sessions', sessions)
+     const openSession = vi.fn(async () => {})
+     ctx.provide('uiWorkspace', { openSession } as never)
++    const tabTypes = new Map<string, object>()
++    ctx.provide('sidebarRight', { openTabIn: vi.fn() } as never)
++    ctx.provide('sidebarRightTabs', { register: (definition: { id: string }) => {
++      tabTypes.set(definition.id, definition)
++      return () => { tabTypes.delete(definition.id) }
++    } } as never)
+     const conversationEvents = new UiConversation(ctx, ctx.sessions).events
+     ctx.slots.register({
+       name: 'root',
+-      children: { 'conversation.chat.node': { kind: 'keyed', scope: 'session' } },
++      children: {
++        'conversation.chat.node': { kind: 'keyed', scope: 'session' },
++        'sidebar.right.pane.tab': { kind: 'keyed', scope: 'session' },
++        'sidebar.right.pane.tab.title': { kind: 'keyed', scope: 'session' },
++      },
+     } as never, () => null)
+     await ctx.plugin({ inject: localeInject, apply: applyLocale }).await()
+     const fiber = ctx.plugin({ inject: [...inject], apply })
+     await fiber.await()
+     expect(conversationEvents.entries().map(entry => entry.kind)).toEqual(['workflow-run'])
+     expect(ctx.slots.entries('conversation.chat.node')).toHaveLength(1)
++    expect(tabTypes.size).toBe(1)
++    expect(ctx.slots.entries('sidebar.right.pane.tab')).toHaveLength(1)
+     const entry = ctx.slots.entries('conversation.chat.node')[0]!
+     const face = entry.inject?.() as unknown as WorkflowRunInjected
+     face.openSession(CHILD_ID)
+@@ -926,6 +1173,8 @@ describe('plugin lifecycle', () => {
+     await fiber.dispose()
+     expect(conversationEvents.entries()).toEqual([])
+     expect(ctx.slots.entries('conversation.chat.node')).toEqual([])
++    expect(tabTypes.size).toBe(0)
++    expect(ctx.slots.entries('sidebar.right.pane.tab')).toEqual([])
+ 
+     const replacement = ctx.plugin({ inject: [...inject], apply })
+     await replacement.await()
+diff --git a/packages/client/ui-workflow-run/tsconfig.json b/packages/client/ui-workflow-run/tsconfig.json
+index 2f3c83a4..e5dd3e60 100644
+--- a/packages/client/ui-workflow-run/tsconfig.json
++++ b/packages/client/ui-workflow-run/tsconfig.json
+@@ -49,6 +49,9 @@
+     },
+     {
+       "path": "../../workflow/tool-workflow"
++    },
++    {
++      "path": "../ui-sidebar-right"
+     }
+   ]
+ }
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index 36dc0506..c941974c 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -5969,6 +5969,12 @@ importers:
+       '@deepseek-ai/cordis':
+         specifier: workspace:~
+         version: link:../../../vendor/cordis
++      '@deepseek-ai/cordis-plugin-include':
++        specifier: workspace:~
++        version: link:../../../vendor/include
++      '@deepseek-ai/cordis-plugin-loader':
++        specifier: workspace:~
++        version: link:../../../vendor/loader
+       '@deepseek-ai/dsh-api-session-controller':
+         specifier: workspace:*
+         version: link:../../api/session-controller
+@@ -5999,6 +6005,9 @@ importers:
+       '@deepseek-ai/dsh-client-ui-slots':
+         specifier: workspace:*
+         version: link:../ui-slots
++      '@deepseek-ai/dsh-client-ui-sidebar-right':
++        specifier: workspace:*
++        version: link:../ui-sidebar-right
+       '@deepseek-ai/dsh-client-ui-workspace':
+         specifier: workspace:*
+         version: link:../ui-workspace
+-- 
+2.55.0.windows.3
+

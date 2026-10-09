@@ -26,8 +26,13 @@ libc = "0.2"
 embed-resource = "=3.0.11"
 
 [profile.release]
-opt-level = "z"
-lto = true
+# Speed-first: opt 3 + fat LTO beats opt-z for launcher + search/token loops.
+# Output/behavior unchanged; binary grows slightly (acceptable for absolute speed).
+opt-level = 3
+lto = "fat"
 codegen-units = 1
 strip = true
 panic = "abort"
+debug-assertions = false
+overflow-checks = false
+incremental = false

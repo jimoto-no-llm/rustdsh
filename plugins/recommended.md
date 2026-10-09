@@ -31,6 +31,14 @@ profile, so the rdsh settings UI is available by default:
 | --- | --- |
 | `rdsh-settings` | rdsh section in DSH settings (budgets, retrieval, memory, beta flags) |
 
+## Workflow board source preparation
+
+The [workflow board toolkit](workflow-board/README.md) prepares an explicitly
+selected, isolated DSH source checkout at its pinned revision. It is source
+tooling, not an installable plugin, and `plugins/install.sh` does not install it.
+It adds the board and shared workflow UI projection rules; build and adoption
+of the patched DSH remain separate operator decisions.
+
 ## Filesystem skills (rtk + ponytail)
 
 Install with `./plugins/install-skills.sh` (defaults to `~/.dsh/skills`).

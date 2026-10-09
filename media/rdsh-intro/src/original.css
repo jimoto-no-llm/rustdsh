@@ -1,0 +1,20 @@
+@font-face{font-family:NotoOriginal;src:url('../public/NotoSansJP.ttf') format('truetype');font-weight:400;font-display:block}
+@font-face{font-family:NotoOriginal;src:url('../public/NotoSansJP.ttf') format('truetype');font-weight:500;font-display:block}
+@font-face{font-family:NotoOriginal;src:url('../public/NotoSansJP.ttf') format('truetype');font-weight:700;font-display:block}
+@font-face{font-family:InstrumentOriginal;src:url('../public/InstrumentSans.ttf') format('truetype');font-weight:400;font-display:block}
+@font-face{font-family:InstrumentOriginal;src:url('../public/InstrumentSans.ttf') format('truetype');font-weight:700;font-display:block}
+@font-face{font-family:CommandOriginal;src:url('../public/CommandMono.ttf') format('truetype');font-display:block}
+.o-film{font-family:InstrumentOriginal,NotoOriginal,sans-serif;background:#e8e9e6;color:#382c46;-webkit-font-smoothing:antialiased;overflow:hidden}
+.o-film *{box-sizing:border-box}
+.o-head{font-family:NotoOriginal,sans-serif;font-size:88px;font-weight:650;letter-spacing:-.045em;line-height:1.4;margin:0}
+.o-note{font-size:25px;line-height:1.8;color:#706778;font-weight:450}
+.o-command{font-family:CommandOriginal,monospace;letter-spacing:0;white-space:nowrap}
+.o-footer{position:absolute;left:112px;bottom:52px;font-size:20px;color:#827888;letter-spacing:0}
+.o-panel{border-radius:16px;overflow:hidden;background:#f8f9f6;box-shadow:0 25px 60px #382c4613}
+.o-panel-header{height:66px;display:flex;align-items:center;gap:12px;padding:0 25px;background:#fff;border-bottom:1px solid #e2e0e5;font-size:22px;font-weight:500}
+.o-panel-header img{width:29px;height:29px}
+.o-row{display:flex;align-items:center;gap:18px}
+.o-brand{font-family:InstrumentOriginal,sans-serif;font-size:242px;letter-spacing:-.04em;font-weight:700;line-height:1}
+.o-copy{font-size:32px;line-height:1.7}
+.o-handheld{width:348px;height:753px;overflow:hidden;border-radius:28px;box-shadow:0 0 0 8px #f8f9f6,0 30px 65px #382c4620;background:#f8f9f6}
+.o-handheld img{display:block;width:348px;height:753px}

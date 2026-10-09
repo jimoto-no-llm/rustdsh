@@ -102,9 +102,10 @@ window.__ModuleLoader__.load({
       }, []);
       const hide = useCallback((value) => {
         const current = latest.current;
-        if (!current || occurrence(current) !== occurrence(value, value.cycle)) return;
+        if (!current || occurrence(current) !== occurrence(value, value.cycle)) return false;
         dismissedOccurrence = occurrence(current);
         ++loadGeneration.current; setData(null);
+        return true;
       }, []);
       const load = useCallback(async () => {
         const generation = ++loadGeneration.current;
@@ -174,31 +175,41 @@ window.__ModuleLoader__.load({
           ++loadGeneration.current;
         };
       }, [load]);
-      const dismiss = () => {
-        if (data) {
-          const close = { kind: data.kind || "update", to: data.to, at: Number(data.at), cycle: cycle(data) };
-          hide(close);
-          try { localStorage.setItem(CLOSE_KEY, JSON.stringify({ ...close, nonce: Math.random() })); } catch (e) {}
-          acknowledge(close);
-        }
-      };
+      const closeOccurrence = useCallback((close) => {
+        if (!close || !hide(close)) return;
+        try { localStorage.setItem(CLOSE_KEY, JSON.stringify({ ...close, nonce: Math.random() })); } catch (e) {}
+        acknowledge(close);
+      }, [hide]);
+      const dismiss = () => closeOccurrence(data && {
+        kind: data.kind || "update", to: data.to, at: Number(data.at), cycle: cycle(data),
+      });
       const runUpdate = useCallback(async () => {
         if (updating.current) return;
+        const current = latest.current;
+        const requested = current && {
+          kind: current.kind || "update", to: current.to, at: Number(current.at), cycle: cycle(current),
+        };
+        const sameOccurrence = () => requested && latest.current &&
+          occurrence(latest.current) === occurrence(requested, requested.cycle);
         updating.current = true;
         setRunning("busy");
         setResult("");
         try {
           const r = await fetch(ENDPOINT + "/run", { method: "POST", cache: "no-store" });
           const j = await r.json();
-          setRunning("done");
-          setResult(j && j.message ? j.message : (j && j.ok ? "done" : "failed"));
-          setExpanded(true);
+          if (sameOccurrence()) {
+            setRunning("done");
+            setResult(j && j.message ? j.message : (r.ok && j && j.ok ? "done" : "failed"));
+            setExpanded(true);
+            // A completed check acknowledges this card, including a no-op.
+            if (r.ok && j && j.ok) closeOccurrence(requested);
+          } else setRunning("idle");
           load();
         } catch (e) {
-          setRunning("done");
-          setResult("request failed");
+          setRunning(sameOccurrence() ? "done" : "idle");
+          if (sameOccurrence()) setResult("request failed");
         } finally { updating.current = false; }
-      }, [running, load]);
+      }, [closeOccurrence, load]);
       if (!data || !data.updated) return null;
       const inner = expanded ? h("div", { className: "rub-card" },
         h("button", { className: "rub-x", onClick: dismiss, "aria-label": "close" }, "x"),

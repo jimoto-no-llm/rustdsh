@@ -15,7 +15,7 @@ const response = (value) => ({ ok: true, json: async () => value });
 const settle = async () => { for (let i = 0; i < 3; i++) await new Promise((resolve) => setImmediate(resolve)); };
 
 function host({ storage = new Map(), storageFails = false, initial = update(), now = START, streaming = false } = {}) {
-  let state = [], cursor = 0, component, current = initial, requestOverride, clock = now, waiting;
+  let state = [], cursor = 0, component, current = initial, requestOverride, postOverride, clock = now, waiting;
   const effects = new Map(), listeners = new Map(), intervals = new Set(), timers = new Map(), posts = [], chunks = [];
   const React = {
     createElement: (tag, props, ...children) => ({ tag, props: props || {}, children: children.flat() }),
@@ -40,7 +40,10 @@ function host({ storage = new Map(), storageFails = false, initial = update(), n
       setItem(k, v) { if (storageFails) throw new Error('storage disabled'); storage.set(k, v); },
     },
     fetch: async (url, options) => {
-      if (options.method === 'POST') { posts.push({ url, ...JSON.parse(options.body || '{}') }); return response({ ok: true }); }
+      if (options.method === 'POST') {
+        posts.push({ url, ...JSON.parse(options.body || '{}') });
+        return url.endsWith('/run') && postOverride ? postOverride() : response({ ok: true });
+      }
       if (url.endsWith('/events')) {
         if (!streaming) return { ok: false };
         options.signal.addEventListener('abort', () => reader.cancel(), { once: true });
@@ -68,6 +71,7 @@ function host({ storage = new Map(), storageFails = false, initial = update(), n
     remount() { for (const f of effects.values()) f?.(); effects.clear(); state = []; this.render(); },
     dispose() { for (const f of effects.values()) f?.(); effects.clear(); },
     setUpdate(value) { current = value; }, setRequest(f) { requestOverride = f; },
+    setPostRequest(f) { postOverride = f; },
     setStreaming(value) { streaming = value; },
     async disconnect() { await reader.cancel(); await settle(); },
     jump(ms) { clock += ms; },
@@ -161,10 +165,41 @@ test('returning to a suspended page catches up to the fixed cadence without rese
   await fixture.advance(3599999); assert.equal(fixture.render(), null);
   await fixture.advance(1); assert.ok(fixture.render());
 });
-test('updater UI accepts another check after completion', async (t) => {
+test('successful updater check closes its occurrence, preserves the cadence and allows reload', async (t) => {
   const fixture = await shown(t);
-  const run = (label) => find(fixture.render(), (n) => n.tag === 'button' && n.children.includes(label)).props.onClick();
-  await run('update'); await settle(); await run('update again'); await settle();
+  await fixture.advance(PERIOD - 600000);
+  await run(fixture); await settle(); assert.equal(fixture.render(), null);
+  await fixture.poll(); assert.equal(fixture.render(), null);
+  fixture.remount(); await settle(); assert.equal(fixture.render(), null);
+  await shown(t, { storage: fixture.storage });
+  await fixture.advance(599999); assert.equal(fixture.render(), null);
+  await fixture.advance(1); assert.ok(fixture.render());
+});
+function run(fixture, label = 'update') {
+  const button = find(fixture.render(), (n) => n.tag === 'button' && n.children.includes(label));
+  assert.ok(button); return button.props.onClick();
+}
+test('failed updater remains retryable; success closes the card; HTTP errors never acknowledge it', async (t) => {
+  const fixture = await shown(t); fixture.setPostRequest(() => response({ ok: false, message: 'DUMMY failure' }));
+  await run(fixture); await settle(); assert.ok(JSON.stringify(fixture.render()).includes('DUMMY failure'));
+  assert.equal(fixture.posts.filter((p) => p.url.endsWith('/dismiss')).length, 0);
+  fixture.setPostRequest(() => ({ ...response({ ok: true }), ok: false }));
+  await run(fixture, 'update again'); await settle(); assert.ok(fixture.render());
+  fixture.setPostRequest(null); await run(fixture, 'update again'); await settle(); assert.equal(fixture.render(), null);
+  assert.equal(fixture.posts.filter((p) => p.url.endsWith('/run')).length, 3);
+});
+test('an in-flight updater blocks duplicate clicks and cannot dismiss a newer update', async (t) => {
+  const fixture = await shown(t, { streaming: true }); let finish;
+  fixture.setPostRequest(() => new Promise((resolve) => { finish = resolve; }));
+  const button = find(fixture.render(), (n) => n.tag === 'button' && n.children.includes('update'));
+  const pending = button.props.onClick(); await button.props.onClick();
+  assert.equal(fixture.posts.filter((p) => p.url.endsWith('/run')).length, 1);
+  await fixture.push('state', update('v-during-run')); fixture.setUpdate(update('v-during-run'));
+  finish(response({ ok: true })); await pending; await settle(); assert.ok(fixture.render());
+  assert.ok(JSON.stringify(fixture.render()).includes('v-during-run'));
+  assert.ok(find(fixture.render(), (n) => n.tag === 'button' && n.children.includes('update')));
+  assert.equal(fixture.posts.filter((p) => p.url.endsWith('/dismiss')).length, 0);
+  fixture.setPostRequest(null); await run(fixture); await settle(); assert.equal(fixture.render(), null);
   assert.equal(fixture.posts.filter((p) => p.url.endsWith('/run')).length, 2);
 });
 test('minimize persists within an occurrence; the next reminder expands it; cleanup removes timers', async (t) => {

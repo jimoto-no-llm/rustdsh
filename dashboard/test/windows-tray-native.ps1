@@ -8,6 +8,8 @@ $taskSource = $taskSource.Replace('$PSScriptRoot', ("'" + (Split-Path -Parent $t
 $taskOutput = New-Object System.IO.StringWriter
 [Console]::SetOut($taskOutput)
 Invoke-Expression $taskSource.Substring(0, $taskSource.LastIndexOf("try {"))
+[void]$taskOutput.GetStringBuilder().Clear()
+if ($EvidenceDirectory) {
 Add-Type @'
 using System;
 using System.Runtime.InteropServices;
@@ -16,6 +18,7 @@ public static class RdshTrayCapture {
     public static extern bool PrintWindow(IntPtr hwnd, IntPtr hdc, uint flags);
 }
 '@
+}
 $taskForm = New-Object System.Windows.Forms.Form
 $taskForm.Text = 'rdsh tray verification (dummy data)'
 $taskForm.ClientSize = New-Object System.Drawing.Size(380, 140)

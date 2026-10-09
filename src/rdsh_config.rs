@@ -23,6 +23,7 @@ const URL_CHARS: usize = 2000;
 pub struct RdshSettings {
     pub schema: u32,
     pub general: GeneralSection,
+    pub discord: DiscordSection,
     pub tokens: TokensSection,
     pub search: SearchSection,
     pub compact: CompactSection,
@@ -60,6 +61,76 @@ pub struct GeneralSection {
     pub passthrough: bool,
     pub dry_run: bool,
     pub default_profile: String,
+}
+
+/// Shared public Discord application identifier (not a credential).
+pub const DEFAULT_DISCORD_APPLICATION_ID: &str = "1557873849280888903";
+
+/// Discord Rich Presence; never publishes prompts, files, or project paths.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DiscordSection {
+    pub enabled: bool,
+    pub application_id: String,
+    pub details: String,
+    pub show_agent_status: bool,
+    pub show_elapsed: bool,
+    pub show_image: bool,
+    pub status_display: String,
+    pub large_image: String,
+    pub large_text: String,
+    pub button_label: String,
+    pub button_url: String,
+}
+
+impl Default for DiscordSection {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            application_id: DEFAULT_DISCORD_APPLICATION_ID.into(),
+            details: "dshで作業中".into(),
+            show_agent_status: true,
+            show_elapsed: true,
+            show_image: true,
+            status_display: "details".into(),
+            large_image: String::new(),
+            large_text: String::new(),
+            button_label: String::new(),
+            button_url: String::new(),
+        }
+    }
+}
+
+impl DiscordSection {
+    fn from_value(v: &serde_json::Value) -> Self {
+        let details = text(v, "details", 128);
+        let application_id = text(v, "application_id", 20);
+        Self {
+            enabled: flag(v, "enabled", true),
+            application_id: if application_id.trim().is_empty() {
+                DEFAULT_DISCORD_APPLICATION_ID.into()
+            } else {
+                application_id.trim().into()
+            },
+            details: if details.trim().is_empty() {
+                Self::default().details
+            } else {
+                details
+            },
+            show_agent_status: flag(v, "show_agent_status", true),
+            show_elapsed: flag(v, "show_elapsed", true),
+            show_image: flag(v, "show_image", true),
+            status_display: match v["status_display"].as_str() {
+                Some("name") => "name",
+                Some("state") => "state",
+                _ => "details",
+            }
+            .into(),
+            large_image: text(v, "large_image", 512).trim().into(),
+            large_text: text(v, "large_text", 128),
+            button_label: text(v, "button_label", 32).trim().into(),
+            button_url: text(v, "button_url", 512).trim().into(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -224,6 +295,7 @@ impl Default for RdshSettings {
         Self {
             schema: SCHEMA_VERSION,
             general: GeneralSection::default(),
+            discord: DiscordSection::default(),
             tokens: TokensSection::default(),
             search: SearchSection::default(),
             compact: CompactSection::default(),
@@ -269,17 +341,22 @@ pub fn load() -> RdshSettings {
 /// 行/列・復旧手順つきの Err を返す（guard 系設定の fail-open 禁止）。
 pub fn try_load() -> anyhow::Result<RdshSettings> {
     let path = settings_path();
-    let (raw, existed) = match std::fs::read_to_string(&path) {
-        Ok(raw) => (raw, true),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => (String::new(), false),
+    let raw: Option<String> = match std::fs::read_to_string(&path) {
+        Ok(raw) => Some(raw),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
         Err(e) => {
             return Err(anyhow::anyhow!("cannot read settings file at {path}: {e}"));
         }
     };
+    // Missing file: defaults + legacy complement without a failed JSON parse.
+    // Same result as before (Null branch), one error allocation saved.
+    let Some(raw) = raw else {
+        let mut cfg = RdshSettings::default();
+        complement_from_legacy(&mut cfg, false);
+        return Ok(cfg);
+    };
     let parsed: serde_json::Value = match serde_json::from_str(&raw) {
         Ok(v) => v,
-        // 欠落ファイルは従来どおり Null 扱い（既定値 + legacy 補完）。
-        Err(_) if !existed => serde_json::Value::Null,
         Err(e) => {
             return Err(anyhow::anyhow!(
                 "invalid settings file at {path}: {e} (line {}, column {}); run `rdsh settings init --force` to restore defaults",
@@ -288,7 +365,7 @@ pub fn try_load() -> anyhow::Result<RdshSettings> {
             ));
         }
     };
-    if existed && !parsed.is_object() {
+    if !parsed.is_object() {
         return Err(anyhow::anyhow!(
             "invalid settings file at {path}: expected a JSON object; run `rdsh settings init --force` to restore defaults"
         ));
@@ -344,6 +421,7 @@ impl RdshSettings {
                 dry_run: flag(&g, "dry_run", false),
                 default_profile: text(&g, "default_profile", PROFILE_CHARS),
             },
+            discord: DiscordSection::from_value(&sec("discord")),
             tokens: TokensSection {
                 default_budget: clamp_u64(num(&t, "default_budget"), 4000, 500, 200000) as usize,
             },
@@ -433,6 +511,7 @@ impl RdshSettings {
         out.general.passthrough = flag(&g, "passthrough", false);
         out.general.dry_run = flag(&g, "dry_run", false);
         out.general.default_profile = text(&g, "default_profile", PROFILE_CHARS);
+        out.discord = DiscordSection::from_value(&v["discord"]);
         let t = v.get("tokens").cloned().unwrap_or(serde_json::Value::Null);
         out.tokens.default_budget =
             clamp_u64(num(&t, "default_budget"), 4000, 500, 200000) as usize;
@@ -504,6 +583,19 @@ impl RdshSettings {
                 "dry_run": self.general.dry_run,
                 "default_profile": self.general.default_profile,
             },
+            "discord": {
+                "enabled": self.discord.enabled,
+                "application_id": self.discord.application_id,
+                "details": self.discord.details,
+                "show_agent_status": self.discord.show_agent_status,
+                "show_elapsed": self.discord.show_elapsed,
+                "show_image": self.discord.show_image,
+                "status_display": self.discord.status_display,
+                "large_image": self.discord.large_image,
+                "large_text": self.discord.large_text,
+                "button_label": self.discord.button_label,
+                "button_url": self.discord.button_url,
+            },
             "tokens": { "default_budget": self.tokens.default_budget },
             "search": {
                 "dir": self.search.dir,
@@ -562,6 +654,22 @@ impl RdshSettings {
             "general.default_profile" => {
                 self.general.default_profile = parse_string(raw, PROFILE_CHARS)
             }
+            "discord.enabled" => self.discord.enabled = parse_bool(raw)?,
+            "discord.application_id" => self.discord.application_id = parse_string(raw, 20),
+            "discord.details" => self.discord.details = parse_string(raw, 128),
+            "discord.show_agent_status" => self.discord.show_agent_status = parse_bool(raw)?,
+            "discord.show_elapsed" => self.discord.show_elapsed = parse_bool(raw)?,
+            "discord.show_image" => self.discord.show_image = parse_bool(raw)?,
+            "discord.status_display" => {
+                if !matches!(raw, "name" | "state" | "details") {
+                    anyhow::bail!("discord.status_display must be name, state, or details");
+                }
+                self.discord.status_display = raw.into();
+            }
+            "discord.large_image" => self.discord.large_image = parse_string(raw, 512),
+            "discord.large_text" => self.discord.large_text = parse_string(raw, 128),
+            "discord.button_label" => self.discord.button_label = parse_string(raw, 32),
+            "discord.button_url" => self.discord.button_url = parse_string(raw, 512),
             "tokens.default_budget" => {
                 self.tokens.default_budget = parse_usize(raw, 4000)? as usize
             }
@@ -615,6 +723,7 @@ impl RdshSettings {
         let known_section = matches!(
             key.as_str(),
             "general"
+                | "discord"
                 | "tokens"
                 | "search"
                 | "compact"
@@ -638,6 +747,7 @@ impl RdshSettings {
         let d = RdshSettings::default();
         match key.as_str() {
             "general" => self.general = d.general,
+            "discord" => self.discord = d.discord,
             "tokens" => self.tokens = d.tokens,
             "search" => self.search = d.search,
             "compact" => self.compact = d.compact,
@@ -680,6 +790,17 @@ impl RdshSettings {
             "general.passthrough(bool)",
             "general.dry_run(bool)",
             "general.default_profile(string)",
+            "discord.enabled(bool, default ON)",
+            "discord.application_id(string)",
+            "discord.details(string, max 128 chars)",
+            "discord.show_agent_status(bool)",
+            "discord.show_elapsed(bool)",
+            "discord.show_image(bool)",
+            "discord.status_display(name|state|details)",
+            "discord.large_image(string, asset key or image URL)",
+            "discord.large_text(string)",
+            "discord.button_label(string, max 32 chars)",
+            "discord.button_url(string, HTTP/HTTPS URL)",
             "tokens.default_budget(500-200000)",
             "search.dir(string)",
             "search.max(1-100)",

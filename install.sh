@@ -108,6 +108,9 @@ fetch_release() {
   # Print the path of the extracted prebuilt rdsh binary.
   # Overridable for tests: RDSH_RELEASE_BASE=file:///path/to/dir.
   base="${RDSH_RELEASE_BASE:-https://github.com/jimoto-no-llm/rustdsh/releases}"
+  if [ -n "${RDSH_RELEASE_BASE:-}" ]; then
+    echo "warning: custom release base in use (RDSH_RELEASE_BASE=$base); checksum verification stays mandatory" >&2
+  fi
   case "$OS/$ARCH" in
     Linux/x86_64)
       gv="$(glibc_version)"
@@ -127,7 +130,7 @@ fetch_release() {
   echo "fetching $url" >&2
   curl -fsSL -o "$FETCH_TMPD/pkg.tgz" "$url" || { echo "download failed: $url" >&2; exit 1; }
   if [ "${RDSH_NO_CHECKSUM:-0}" = 1 ]; then
-    echo "checksum verification skipped (RDSH_NO_CHECKSUM=1)" >&2
+    echo "WARNING: checksum verification skipped (RDSH_NO_CHECKSUM=1); only use this with a trusted release base" >&2
   elif curl -fsSL -o "$FETCH_TMPD/pkg.tgz.sha256" "$url.sha256" 2>/dev/null; then
     verify_sha256 "$FETCH_TMPD/pkg.tgz" "$FETCH_TMPD/pkg.tgz.sha256" || exit 1
   else

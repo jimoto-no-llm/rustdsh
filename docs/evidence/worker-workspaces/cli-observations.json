@@ -1,0 +1,886 @@
+{
+  "schema": 1,
+  "result": "PASS",
+  "observed_at": "2026-10-09T06:50:53.214Z",
+  "source_commit": "355ff3a8ad2b02b85dc68618a4ac30707438fcd3",
+  "baseline_commit": "17cabfc659a7fdccbeae7a29d1b7ca8440909a92",
+  "baseline_cli_blob": "093f6642065c00aebc5c621107848328cefb56d7",
+  "source_blobs": {
+    "dashboard/README.md": "84b14f8d28156a030bb752a61355e77390ef2c06",
+    "dashboard/cli.mjs": "7fe4c9221431d6bb9812b3917c07da61b9cda9f7",
+    "dashboard/test/workers.test.mjs": "a59c19096282893554860c38e6e97b0f51bad167",
+    "dashboard/worker-git.mjs": "9f7f4df600365827a7f9f4bd823b71619ef38dde",
+    "dashboard/worker-scopes.mjs": "d4390d08ddb7e0fb0c57c1055f1dc33a050f614b",
+    "dashboard/workers.mjs": "7f3705d80250c8b7f2a43749d3cbb3225d840d6a",
+    "docs/WORKER-WORKSPACES.md": "625327bace46cb72a0960f35bea28ab5033fad64"
+  },
+  "fixture_kind": "real disposable Git repository with no remotes; public Node CLI; actual wall-clock lease expiry",
+  "source_head_and_human_files_retained": true,
+  "released_dirty_worktree_and_branch_retained": true,
+  "runtime_enforcement": "native DSH tool policy and sandbox remain separate; declarations and scans only",
+  "records": [
+    {
+      "label": "before: exact main CLI rejects worker allocation",
+      "command": "node baseline-cli.mjs workers plan --input-file <fixture>/editor-a.json --project <fixture>/project",
+      "exit_code": 1,
+      "stdout": null,
+      "stderr": "[rdsh-dashboard] Unknown command; use --help"
+    },
+    {
+      "label": "editor-a: plan",
+      "command": "node dashboard/cli.mjs workers plan --input-file <fixture>/editor-a.json --project <fixture>/project",
+      "exit_code": 0,
+      "stdout": {
+        "project_id": "175afdee74654b85",
+        "revision": 0,
+        "source": {
+          "head_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+          "branch": "fixture-main",
+          "dirty_paths": [
+            "tests/human.txt"
+          ]
+        },
+        "declaration": {
+          "worker_id": "editor-a",
+          "role": "edit",
+          "read_paths": [
+            "."
+          ],
+          "write_paths": [
+            "Cargo.lock",
+            "src/a.txt"
+          ],
+          "modules": [
+            "fixture"
+          ],
+          "forbidden_paths": [
+            "src/private"
+          ],
+          "lease_seconds": 60
+        },
+        "proposed_worktree": "<fixture>/state/projects/175afdee74654b85/workers/worktrees/editor-a",
+        "warnings": [],
+        "can_prepare": true,
+        "runtime_policy": "declarations_and_git_change_scan; native_DSH_tool_policy_and_sandbox_are_separate"
+      },
+      "stderr": ""
+    },
+    {
+      "label": "editor-a: actual checkout allocation",
+      "command": "node dashboard/cli.mjs workers prepare --input-file <fixture>/editor-a.json --expected-revision 0 --expected-head 178ac8e9675f6bb4cc5096f30ce52437a56acdf5 --project <fixture>/project",
+      "exit_code": 0,
+      "stdout": {
+        "revision": 2,
+        "worker": {
+          "worker_id": "editor-a",
+          "state": "ready",
+          "lease": {
+            "state": "active",
+            "expires_at": "2026-10-09T06:51:36.422Z"
+          },
+          "role": "edit",
+          "declaration": {
+            "worker_id": "editor-a",
+            "role": "edit",
+            "read_paths": [
+              "."
+            ],
+            "write_paths": [
+              "Cargo.lock",
+              "src/a.txt"
+            ],
+            "modules": [
+              "fixture"
+            ],
+            "forbidden_paths": [
+              "src/private"
+            ],
+            "lease_seconds": 60
+          },
+          "worktree": "<fixture>/state/projects/175afdee74654b85/workers/worktrees/editor-a",
+          "branch": "codex/worker-editor-a-3990d49c-dbb3-4bea-957a-fb4c68dc37b7",
+          "base_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+          "tree": {
+            "status": "observed",
+            "dirty": false,
+            "head_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+            "dirty_paths": [],
+            "committed_paths": [],
+            "changed_paths": [],
+            "scope_violations": [],
+            "reason": null
+          }
+        },
+        "source_after": {
+          "head_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+          "branch": "fixture-main",
+          "dirty_paths": [
+            "tests/human.txt"
+          ]
+        },
+        "provisioning_error": null
+      },
+      "stderr": ""
+    },
+    {
+      "label": "overlap: common lockfile blocks assignment before Git",
+      "command": "node dashboard/cli.mjs workers plan --input-file <fixture>/conflict.json --project <fixture>/project",
+      "exit_code": 0,
+      "stdout": {
+        "project_id": "175afdee74654b85",
+        "revision": 2,
+        "source": {
+          "head_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+          "branch": "fixture-main",
+          "dirty_paths": [
+            "tests/human.txt"
+          ]
+        },
+        "declaration": {
+          "worker_id": "conflict",
+          "role": "edit",
+          "read_paths": [
+            "."
+          ],
+          "write_paths": [
+            "Cargo.lock"
+          ],
+          "modules": [
+            "fixture"
+          ],
+          "forbidden_paths": [
+            "src/private"
+          ],
+          "lease_seconds": 60
+        },
+        "proposed_worktree": "<fixture>/state/projects/175afdee74654b85/workers/worktrees/conflict",
+        "warnings": [
+          {
+            "code": "worker_scope_overlap",
+            "worker_id": "editor-a",
+            "path": "Cargo.lock"
+          },
+          {
+            "code": "shared_file_overlap",
+            "worker_id": "editor-a",
+            "path": "Cargo.lock"
+          }
+        ],
+        "can_prepare": false,
+        "runtime_policy": "declarations_and_git_change_scan; native_DSH_tool_policy_and_sandbox_are_separate"
+      },
+      "stderr": ""
+    },
+    {
+      "label": "human: preexisting untracked work blocks overlapping assignment",
+      "command": "node dashboard/cli.mjs workers plan --input-file <fixture>/human-conflict.json --project <fixture>/project",
+      "exit_code": 0,
+      "stdout": {
+        "project_id": "175afdee74654b85",
+        "revision": 2,
+        "source": {
+          "head_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+          "branch": "fixture-main",
+          "dirty_paths": [
+            "tests/human.txt"
+          ]
+        },
+        "declaration": {
+          "worker_id": "human-conflict",
+          "role": "edit",
+          "read_paths": [
+            "."
+          ],
+          "write_paths": [
+            "tests"
+          ],
+          "modules": [
+            "fixture"
+          ],
+          "forbidden_paths": [
+            "src/private"
+          ],
+          "lease_seconds": 60
+        },
+        "proposed_worktree": "<fixture>/state/projects/175afdee74654b85/workers/worktrees/human-conflict",
+        "warnings": [
+          {
+            "code": "human_dirty_scope_overlap",
+            "path": "tests/human.txt"
+          }
+        ],
+        "can_prepare": false,
+        "runtime_policy": "declarations_and_git_change_scan; native_DSH_tool_policy_and_sandbox_are_separate"
+      },
+      "stderr": ""
+    },
+    {
+      "label": "editor-b: plan",
+      "command": "node dashboard/cli.mjs workers plan --input-file <fixture>/editor-b.json --project <fixture>/project",
+      "exit_code": 0,
+      "stdout": {
+        "project_id": "175afdee74654b85",
+        "revision": 2,
+        "source": {
+          "head_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+          "branch": "fixture-main",
+          "dirty_paths": [
+            "tests/human.txt"
+          ]
+        },
+        "declaration": {
+          "worker_id": "editor-b",
+          "role": "edit",
+          "read_paths": [
+            "."
+          ],
+          "write_paths": [
+            "src/b.txt"
+          ],
+          "modules": [
+            "fixture"
+          ],
+          "forbidden_paths": [
+            "src/private"
+          ],
+          "lease_seconds": 60
+        },
+        "proposed_worktree": "<fixture>/state/projects/175afdee74654b85/workers/worktrees/editor-b",
+        "warnings": [],
+        "can_prepare": true,
+        "runtime_policy": "declarations_and_git_change_scan; native_DSH_tool_policy_and_sandbox_are_separate"
+      },
+      "stderr": ""
+    },
+    {
+      "label": "editor-b: actual checkout allocation",
+      "command": "node dashboard/cli.mjs workers prepare --input-file <fixture>/editor-b.json --expected-revision 2 --expected-head 178ac8e9675f6bb4cc5096f30ce52437a56acdf5 --project <fixture>/project",
+      "exit_code": 0,
+      "stdout": {
+        "revision": 4,
+        "worker": {
+          "worker_id": "editor-b",
+          "state": "ready",
+          "lease": {
+            "state": "active",
+            "expires_at": "2026-10-09T06:51:40.624Z"
+          },
+          "role": "edit",
+          "declaration": {
+            "worker_id": "editor-b",
+            "role": "edit",
+            "read_paths": [
+              "."
+            ],
+            "write_paths": [
+              "src/b.txt"
+            ],
+            "modules": [
+              "fixture"
+            ],
+            "forbidden_paths": [
+              "src/private"
+            ],
+            "lease_seconds": 60
+          },
+          "worktree": "<fixture>/state/projects/175afdee74654b85/workers/worktrees/editor-b",
+          "branch": "codex/worker-editor-b-20a4d443-153e-4463-87f2-651bf913f309",
+          "base_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+          "tree": {
+            "status": "observed",
+            "dirty": false,
+            "head_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+            "dirty_paths": [],
+            "committed_paths": [],
+            "changed_paths": [],
+            "scope_violations": [],
+            "reason": null
+          }
+        },
+        "source_after": {
+          "head_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+          "branch": "fixture-main",
+          "dirty_paths": [
+            "tests/human.txt"
+          ]
+        },
+        "provisioning_error": null
+      },
+      "stderr": ""
+    },
+    {
+      "label": "reviewer: plan",
+      "command": "node dashboard/cli.mjs workers plan --input-file <fixture>/reviewer.json --project <fixture>/project",
+      "exit_code": 0,
+      "stdout": {
+        "project_id": "175afdee74654b85",
+        "revision": 4,
+        "source": {
+          "head_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+          "branch": "fixture-main",
+          "dirty_paths": [
+            "tests/human.txt"
+          ]
+        },
+        "declaration": {
+          "worker_id": "reviewer",
+          "role": "review",
+          "read_paths": [
+            "."
+          ],
+          "write_paths": [],
+          "modules": [
+            "fixture"
+          ],
+          "forbidden_paths": [
+            "src/private"
+          ],
+          "lease_seconds": 60
+        },
+        "proposed_worktree": "<fixture>/state/projects/175afdee74654b85/workers/worktrees/reviewer",
+        "warnings": [],
+        "can_prepare": true,
+        "runtime_policy": "declarations_and_git_change_scan; native_DSH_tool_policy_and_sandbox_are_separate"
+      },
+      "stderr": ""
+    },
+    {
+      "label": "reviewer: actual checkout allocation",
+      "command": "node dashboard/cli.mjs workers prepare --input-file <fixture>/reviewer.json --expected-revision 4 --expected-head 178ac8e9675f6bb4cc5096f30ce52437a56acdf5 --project <fixture>/project",
+      "exit_code": 0,
+      "stdout": {
+        "revision": 6,
+        "worker": {
+          "worker_id": "reviewer",
+          "state": "ready",
+          "lease": {
+            "state": "active",
+            "expires_at": "2026-10-09T06:51:43.306Z"
+          },
+          "role": "review",
+          "declaration": {
+            "worker_id": "reviewer",
+            "role": "review",
+            "read_paths": [
+              "."
+            ],
+            "write_paths": [],
+            "modules": [
+              "fixture"
+            ],
+            "forbidden_paths": [
+              "src/private"
+            ],
+            "lease_seconds": 60
+          },
+          "worktree": "<fixture>/state/projects/175afdee74654b85/workers/worktrees/reviewer",
+          "branch": "codex/worker-reviewer-2c8af88f-7f8e-4f20-bccf-ad35d1717863",
+          "base_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+          "tree": {
+            "status": "observed",
+            "dirty": false,
+            "head_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+            "dirty_paths": [],
+            "committed_paths": [],
+            "changed_paths": [],
+            "scope_violations": [],
+            "reason": null
+          }
+        },
+        "source_after": {
+          "head_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+          "branch": "fixture-main",
+          "dirty_paths": [
+            "tests/human.txt"
+          ]
+        },
+        "provisioning_error": null
+      },
+      "stderr": ""
+    },
+    {
+      "label": "after: real dirty paths, scope violations and shared changes",
+      "command": "node dashboard/cli.mjs workers inspect --project <fixture>/project",
+      "exit_code": 0,
+      "stdout": {
+        "project_id": "175afdee74654b85",
+        "revision": 6,
+        "source": {
+          "head_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+          "branch": "fixture-main",
+          "dirty_paths": [
+            "tests/human.txt"
+          ]
+        },
+        "workers": [
+          {
+            "worker_id": "editor-a",
+            "state": "ready",
+            "lease": {
+              "state": "active",
+              "expires_at": "2026-10-09T06:51:36.422Z"
+            },
+            "role": "edit",
+            "declaration": {
+              "worker_id": "editor-a",
+              "role": "edit",
+              "read_paths": [
+                "."
+              ],
+              "write_paths": [
+                "Cargo.lock",
+                "src/a.txt"
+              ],
+              "modules": [
+                "fixture"
+              ],
+              "forbidden_paths": [
+                "src/private"
+              ],
+              "lease_seconds": 60
+            },
+            "worktree": "<fixture>/state/projects/175afdee74654b85/workers/worktrees/editor-a",
+            "branch": "codex/worker-editor-a-3990d49c-dbb3-4bea-957a-fb4c68dc37b7",
+            "base_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+            "tree": {
+              "status": "observed",
+              "dirty": true,
+              "head_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+              "dirty_paths": [
+                "Cargo.lock",
+                "src/a.txt"
+              ],
+              "committed_paths": [],
+              "changed_paths": [
+                "Cargo.lock",
+                "src/a.txt"
+              ],
+              "scope_violations": [],
+              "reason": null
+            }
+          },
+          {
+            "worker_id": "editor-b",
+            "state": "ready",
+            "lease": {
+              "state": "active",
+              "expires_at": "2026-10-09T06:51:40.624Z"
+            },
+            "role": "edit",
+            "declaration": {
+              "worker_id": "editor-b",
+              "role": "edit",
+              "read_paths": [
+                "."
+              ],
+              "write_paths": [
+                "src/b.txt"
+              ],
+              "modules": [
+                "fixture"
+              ],
+              "forbidden_paths": [
+                "src/private"
+              ],
+              "lease_seconds": 60
+            },
+            "worktree": "<fixture>/state/projects/175afdee74654b85/workers/worktrees/editor-b",
+            "branch": "codex/worker-editor-b-20a4d443-153e-4463-87f2-651bf913f309",
+            "base_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+            "tree": {
+              "status": "observed",
+              "dirty": true,
+              "head_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+              "dirty_paths": [
+                "Cargo.lock"
+              ],
+              "committed_paths": [],
+              "changed_paths": [
+                "Cargo.lock"
+              ],
+              "scope_violations": [
+                "Cargo.lock"
+              ],
+              "reason": null
+            }
+          },
+          {
+            "worker_id": "reviewer",
+            "state": "ready",
+            "lease": {
+              "state": "active",
+              "expires_at": "2026-10-09T06:51:43.306Z"
+            },
+            "role": "review",
+            "declaration": {
+              "worker_id": "reviewer",
+              "role": "review",
+              "read_paths": [
+                "."
+              ],
+              "write_paths": [],
+              "modules": [
+                "fixture"
+              ],
+              "forbidden_paths": [
+                "src/private"
+              ],
+              "lease_seconds": 60
+            },
+            "worktree": "<fixture>/state/projects/175afdee74654b85/workers/worktrees/reviewer",
+            "branch": "codex/worker-reviewer-2c8af88f-7f8e-4f20-bccf-ad35d1717863",
+            "base_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+            "tree": {
+              "status": "observed",
+              "dirty": true,
+              "head_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+              "dirty_paths": [
+                "src/b.txt"
+              ],
+              "committed_paths": [],
+              "changed_paths": [
+                "src/b.txt"
+              ],
+              "scope_violations": [
+                "src/b.txt"
+              ],
+              "reason": null
+            }
+          }
+        ],
+        "conflicts": [
+          {
+            "code": "shared_file_changes",
+            "workers": [
+              "editor-a",
+              "editor-b"
+            ],
+            "path": "Cargo.lock"
+          }
+        ],
+        "observed_at": "2026-10-09T06:50:46.601Z",
+        "runtime_policy": "declarations_and_git_change_scan; native_DSH_tool_policy_and_sandbox_are_separate"
+      },
+      "stderr": ""
+    },
+    {
+      "label": "lease: renew with actual one-second wall-clock lifetime",
+      "command": "node dashboard/cli.mjs workers renew --worker-id editor-a --lease-seconds 1 --expected-revision 6 --project <fixture>/project",
+      "exit_code": 0,
+      "stdout": {
+        "revision": 7,
+        "worker": {
+          "worker_id": "editor-a",
+          "state": "ready",
+          "lease": {
+            "state": "active",
+            "expires_at": "2026-10-09T06:50:48.527Z"
+          },
+          "role": "edit",
+          "declaration": {
+            "worker_id": "editor-a",
+            "role": "edit",
+            "read_paths": [
+              "."
+            ],
+            "write_paths": [
+              "Cargo.lock",
+              "src/a.txt"
+            ],
+            "modules": [
+              "fixture"
+            ],
+            "forbidden_paths": [
+              "src/private"
+            ],
+            "lease_seconds": 60
+          },
+          "worktree": "<fixture>/state/projects/175afdee74654b85/workers/worktrees/editor-a",
+          "branch": "codex/worker-editor-a-3990d49c-dbb3-4bea-957a-fb4c68dc37b7",
+          "base_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+          "tree": {
+            "status": "observed",
+            "dirty": true,
+            "head_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+            "dirty_paths": [
+              "Cargo.lock",
+              "src/a.txt"
+            ],
+            "committed_paths": [],
+            "changed_paths": [
+              "Cargo.lock",
+              "src/a.txt"
+            ],
+            "scope_violations": [],
+            "reason": null
+          }
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "label": "lease: actual expiry retains dirty checkout",
+      "command": "node dashboard/cli.mjs workers inspect --project <fixture>/project",
+      "exit_code": 0,
+      "stdout": {
+        "project_id": "175afdee74654b85",
+        "revision": 7,
+        "source": {
+          "head_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+          "branch": "fixture-main",
+          "dirty_paths": [
+            "tests/human.txt"
+          ]
+        },
+        "workers": [
+          {
+            "worker_id": "editor-a",
+            "state": "ready",
+            "lease": {
+              "state": "expired",
+              "expires_at": "2026-10-09T06:50:48.527Z"
+            },
+            "role": "edit",
+            "declaration": {
+              "worker_id": "editor-a",
+              "role": "edit",
+              "read_paths": [
+                "."
+              ],
+              "write_paths": [
+                "Cargo.lock",
+                "src/a.txt"
+              ],
+              "modules": [
+                "fixture"
+              ],
+              "forbidden_paths": [
+                "src/private"
+              ],
+              "lease_seconds": 60
+            },
+            "worktree": "<fixture>/state/projects/175afdee74654b85/workers/worktrees/editor-a",
+            "branch": "codex/worker-editor-a-3990d49c-dbb3-4bea-957a-fb4c68dc37b7",
+            "base_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+            "tree": {
+              "status": "observed",
+              "dirty": true,
+              "head_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+              "dirty_paths": [
+                "Cargo.lock",
+                "src/a.txt"
+              ],
+              "committed_paths": [],
+              "changed_paths": [
+                "Cargo.lock",
+                "src/a.txt"
+              ],
+              "scope_violations": [],
+              "reason": null
+            }
+          },
+          {
+            "worker_id": "editor-b",
+            "state": "ready",
+            "lease": {
+              "state": "active",
+              "expires_at": "2026-10-09T06:51:40.624Z"
+            },
+            "role": "edit",
+            "declaration": {
+              "worker_id": "editor-b",
+              "role": "edit",
+              "read_paths": [
+                "."
+              ],
+              "write_paths": [
+                "src/b.txt"
+              ],
+              "modules": [
+                "fixture"
+              ],
+              "forbidden_paths": [
+                "src/private"
+              ],
+              "lease_seconds": 60
+            },
+            "worktree": "<fixture>/state/projects/175afdee74654b85/workers/worktrees/editor-b",
+            "branch": "codex/worker-editor-b-20a4d443-153e-4463-87f2-651bf913f309",
+            "base_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+            "tree": {
+              "status": "observed",
+              "dirty": true,
+              "head_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+              "dirty_paths": [
+                "Cargo.lock"
+              ],
+              "committed_paths": [],
+              "changed_paths": [
+                "Cargo.lock"
+              ],
+              "scope_violations": [
+                "Cargo.lock"
+              ],
+              "reason": null
+            }
+          },
+          {
+            "worker_id": "reviewer",
+            "state": "ready",
+            "lease": {
+              "state": "active",
+              "expires_at": "2026-10-09T06:51:43.306Z"
+            },
+            "role": "review",
+            "declaration": {
+              "worker_id": "reviewer",
+              "role": "review",
+              "read_paths": [
+                "."
+              ],
+              "write_paths": [],
+              "modules": [
+                "fixture"
+              ],
+              "forbidden_paths": [
+                "src/private"
+              ],
+              "lease_seconds": 60
+            },
+            "worktree": "<fixture>/state/projects/175afdee74654b85/workers/worktrees/reviewer",
+            "branch": "codex/worker-reviewer-2c8af88f-7f8e-4f20-bccf-ad35d1717863",
+            "base_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+            "tree": {
+              "status": "observed",
+              "dirty": true,
+              "head_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+              "dirty_paths": [
+                "src/b.txt"
+              ],
+              "committed_paths": [],
+              "changed_paths": [
+                "src/b.txt"
+              ],
+              "scope_violations": [
+                "src/b.txt"
+              ],
+              "reason": null
+            }
+          }
+        ],
+        "conflicts": [
+          {
+            "code": "shared_file_changes",
+            "workers": [
+              "editor-a",
+              "editor-b"
+            ],
+            "path": "Cargo.lock"
+          }
+        ],
+        "observed_at": "2026-10-09T06:50:50.911Z",
+        "runtime_policy": "declarations_and_git_change_scan; native_DSH_tool_policy_and_sandbox_are_separate"
+      },
+      "stderr": ""
+    },
+    {
+      "label": "lease: expired allocation still blocks overlap",
+      "command": "node dashboard/cli.mjs workers plan --input-file <fixture>/expired-conflict.json --project <fixture>/project",
+      "exit_code": 0,
+      "stdout": {
+        "project_id": "175afdee74654b85",
+        "revision": 7,
+        "source": {
+          "head_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+          "branch": "fixture-main",
+          "dirty_paths": [
+            "tests/human.txt"
+          ]
+        },
+        "declaration": {
+          "worker_id": "expired-conflict",
+          "role": "edit",
+          "read_paths": [
+            "."
+          ],
+          "write_paths": [
+            "src/a.txt"
+          ],
+          "modules": [
+            "fixture"
+          ],
+          "forbidden_paths": [
+            "src/private"
+          ],
+          "lease_seconds": 60
+        },
+        "proposed_worktree": "<fixture>/state/projects/175afdee74654b85/workers/worktrees/expired-conflict",
+        "warnings": [
+          {
+            "code": "worker_scope_overlap",
+            "worker_id": "editor-a",
+            "path": "src/a.txt"
+          }
+        ],
+        "can_prepare": false,
+        "runtime_policy": "declarations_and_git_change_scan; native_DSH_tool_policy_and_sandbox_are_separate"
+      },
+      "stderr": ""
+    },
+    {
+      "label": "lease: explicit release retains files and branch",
+      "command": "node dashboard/cli.mjs workers release --worker-id editor-a --expected-revision 7 --project <fixture>/project",
+      "exit_code": 0,
+      "stdout": {
+        "revision": 8,
+        "worker": {
+          "worker_id": "editor-a",
+          "state": "released",
+          "lease": {
+            "state": "released",
+            "expires_at": "2026-10-09T06:50:48.527Z"
+          },
+          "role": "edit",
+          "declaration": {
+            "worker_id": "editor-a",
+            "role": "edit",
+            "read_paths": [
+              "."
+            ],
+            "write_paths": [
+              "Cargo.lock",
+              "src/a.txt"
+            ],
+            "modules": [
+              "fixture"
+            ],
+            "forbidden_paths": [
+              "src/private"
+            ],
+            "lease_seconds": 60
+          },
+          "worktree": "<fixture>/state/projects/175afdee74654b85/workers/worktrees/editor-a",
+          "branch": "codex/worker-editor-a-3990d49c-dbb3-4bea-957a-fb4c68dc37b7",
+          "base_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+          "tree": {
+            "status": "observed",
+            "dirty": true,
+            "head_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+            "dirty_paths": [
+              "Cargo.lock",
+              "src/a.txt"
+            ],
+            "committed_paths": [],
+            "changed_paths": [
+              "Cargo.lock",
+              "src/a.txt"
+            ],
+            "scope_violations": [],
+            "reason": null
+          }
+        }
+      },
+      "stderr": ""
+    }
+  ]
+}

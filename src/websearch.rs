@@ -53,7 +53,7 @@ fn split_base(base: &str) -> anyhow::Result<(String, u16, String)> {
     );
     let rest = base
         .strip_prefix("http://")
-        .ok_or_else(|| anyhow::anyhow!("only http:// SearXNG URLs are supported: {base}"))?;
+        .ok_or_else(|| anyhow::anyhow!("only http:// SearXNG URLs are supported (for a remote instance use an SSH tunnel to localhost): {base}"))?;
     let (hostport, prefix) = match rest.find('/') {
         Some(i) => (&rest[..i], rest[i..].to_string()),
         None => (rest, String::new()),

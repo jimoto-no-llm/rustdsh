@@ -3,7 +3,10 @@ import { join } from 'node:path';
 import { readFile, writeFile, mkdir, access, rename, unlink } from 'node:fs/promises';
 import { randomBytes } from 'node:crypto';
 
-export const inject = ['webServer', 'connection'];
+import { discordDefaults, normalizeDiscord, installDiscordPresence } from './discord.js';
+
+// The presence also runs in headless/TUI profiles; HTTP routes need both services.
+export const inject = [];
 
 function dshHome() {
   return process.env.DSH_HOME || join(homedir(), '.dsh');
@@ -28,6 +31,7 @@ function defaults() {
 function settingsDefaults() {
   return {
     schema: 1,
+    discord: { ...discordDefaults },
     general: { slim: true, passthrough: false, dry_run: false, default_profile: '' },
     tokens: { default_budget: 4000 },
     search: { dir: '.', max: 100, web_limit: 10, searxng_url: '' },
@@ -154,6 +158,7 @@ function sanitizeSettings(j) {
   const cx = obj(src.context);
   return {
     schema: 1,
+    discord: normalizeDiscord(src.discord),
     general: {
       slim: bool(g.slim, dg.slim),
       passthrough: bool(g.passthrough, dg.passthrough),
@@ -232,9 +237,33 @@ function authorize(ctx, req, res) {
   return false;
 }
 
-export function apply(ctx, config) {
+function registerWeb(ctx, presence) {
   return ctx.effect(() => {
-    if (!ctx.webServer) return;
+    const offDiscordIcon = ctx.webServer.register({
+      kind: 'exact', path: '/api/rdsh-discord/icon',
+      handler: async (req, res) => {
+        if (!authorize(ctx, req, res)) return;
+        if (req.method !== 'GET' && req.method !== 'HEAD') {
+          json(res, 405, { ok: false, error: 'method-not-allowed' }); return;
+        }
+        try {
+          const icon = await readFile(new URL('./assets/rushDSH.png', import.meta.url));
+          res.writeHead(200, { 'content-type': 'image/png', 'content-length': icon.length,
+            'cache-control': 'private, no-cache', 'x-content-type-options': 'nosniff' });
+          res.end(req.method === 'HEAD' ? undefined : icon);
+        } catch { json(res, 500, { ok: false, error: 'icon-unavailable' }); }
+      },
+    });
+    const offDiscord = ctx.webServer.register({
+      kind: 'exact', path: '/api/rdsh-discord',
+      handler: (req, res) => {
+        if (!authorize(ctx, req, res)) return;
+        if (req.method !== 'GET' && req.method !== 'HEAD') {
+          json(res, 405, { ok: false, error: 'method-not-allowed' }); return;
+        }
+        json(res, 200, { ok: true, ...presence.status() });
+      },
+    });
     const offGet = ctx.webServer.register({
       kind: 'exact',
       path: '/api/rdsh-context',
@@ -313,6 +342,7 @@ export function apply(ctx, config) {
           const cfg = await mergeSettings(await readSettingsDocument(), input.config ?? input);
           await mkdir(dshHome(), { recursive: true });
           await savePrivateJson(settingsPath(), cfg);
+          void presence.refresh();
           json(res, 200, { ok: true, config: await settingsForForm(cfg) });
         } catch (e) {
           res.writeHead(400, { 'content-type': 'application/json' });
@@ -320,6 +350,24 @@ export function apply(ctx, config) {
         }
       },
     });
-    return () => { try { if (typeof offGet === 'function') offGet(); } catch (e) {} try { if (typeof offPost === 'function') offPost(); } catch (e) {} try { if (typeof offGetSettings === 'function') offGetSettings(); } catch (e) {} try { if (typeof offPostSettings === 'function') offPostSettings(); } catch (e) {} };
+    return () => {
+      for (const off of [offDiscordIcon, offDiscord, offGet, offPost, offGetSettings, offPostSettings]) {
+        if (typeof off === 'function') off();
+      }
+    };
+  });
+}
+
+export function apply(ctx) {
+  return ctx.effect(() => {
+    const presence = installDiscordPresence(ctx);
+    // Cordis injection is a required-service map, so mount HTTP separately.
+    const web = ctx.inject(['webServer', 'connection'], webCtx => registerWeb(webCtx, presence));
+    const agents = ctx.inject(['agents'], agentCtx => {
+      for (const agent of agentCtx.agents.list()) presence.observe(agent);
+    });
+    return async () => {
+      await web.dispose(); await agents.dispose(); await presence.stop();
+    };
   });
 }

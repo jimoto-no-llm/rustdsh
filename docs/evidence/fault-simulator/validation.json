@@ -1,0 +1,272 @@
+{
+  "source_commit": "9f4f7eb49097da7eaa31ae324f57366c7578de35",
+  "ci_run": "https://github.com/jimoto-no-llm/rustdsh/actions/runs/37815662307",
+  "scope": "offline mock control-plane; no real model, provider API, GPU or power-loss verification",
+  "source_fingerprint": "300e28f670d252bb5130652e16fdccb35ee70e1cb49491471ee1c9677891b1af",
+  "platforms": {
+    "linux": {
+      "ci_job": "https://github.com/jimoto-no-llm/rustdsh/actions/runs/37815662307/job/113443521301",
+      "runtime": {
+        "platform": "linux",
+        "node": "22.23.3"
+      },
+      "all_scenarios": [
+        {
+          "scenario": "duplicate_events",
+          "passed": true,
+          "checks": 8,
+          "all_checks_passed": true,
+          "facts": {
+            "native_effects": 1,
+            "ack": true,
+            "recorded_state": "waiting-human",
+            "effective_state": "unknown",
+            "send_error": null,
+            "durable_save": "confirmed",
+            "resource_release_before_stop": "unconfirmed",
+            "remaining_count_before_stop": 1,
+            "resource_release_after_stop": true
+          }
+        },
+        {
+          "scenario": "out_of_order",
+          "passed": true,
+          "checks": 8,
+          "all_checks_passed": true,
+          "facts": {
+            "native_effects": 1,
+            "ack": true,
+            "recorded_state": "waiting-human",
+            "effective_state": "unknown",
+            "send_error": null,
+            "durable_save": "confirmed",
+            "resource_release_before_stop": "unconfirmed",
+            "remaining_count_before_stop": 1,
+            "resource_release_after_stop": true
+          }
+        },
+        {
+          "scenario": "network_disconnect",
+          "passed": true,
+          "checks": 10,
+          "all_checks_passed": true,
+          "facts": {
+            "native_effects": 1,
+            "attempts": 1,
+            "certainty": "reconciled_applied",
+            "retry_state": "completed",
+            "ack": "authoritative_mock_receipt",
+            "resource_release": "confirmed_listener_closed"
+          }
+        },
+        {
+          "scenario": "restart",
+          "passed": true,
+          "checks": 10,
+          "all_checks_passed": true,
+          "facts": {
+            "native_effects": 1,
+            "ack": false,
+            "recorded_state": "running",
+            "effective_state": "disconnected",
+            "resource_release": "unconfirmed",
+            "automatically_restarted": false,
+            "control_process_restarted": true,
+            "mock_root_exit_observed": true
+          }
+        },
+        {
+          "scenario": "disk_full",
+          "passed": true,
+          "checks": 9,
+          "all_checks_passed": true,
+          "facts": {
+            "native_effects": 0,
+            "ack": false,
+            "recorded_state": "waiting-human",
+            "effective_state": "unknown",
+            "send_error": "history_write_failed",
+            "durable_save": "unconfirmed",
+            "resource_release_before_stop": "unconfirmed",
+            "remaining_count_before_stop": 1,
+            "resource_release_after_stop": true
+          }
+        },
+        {
+          "scenario": "gpu_loss",
+          "passed": true,
+          "checks": 11,
+          "all_checks_passed": true,
+          "facts": {
+            "native_effects": 0,
+            "ack": false,
+            "recorded_state": "unknown",
+            "effective_state": "unknown",
+            "send_error": "cli_error",
+            "durable_save": "confirmed",
+            "resource_release_before_stop": "unconfirmed",
+            "remaining_count_before_stop": 1,
+            "resource_release_after_stop": true
+          }
+        }
+      ],
+      "replay": {
+        "passed": true,
+        "scenarios": 6,
+        "input_byte_identical": true,
+        "same_effect_and_ack_outcomes": true
+      },
+      "write_full": {
+        "passed": true,
+        "facts": {
+          "native_effects": 0,
+          "ack": false,
+          "recorded_state": "waiting-human",
+          "effective_state": "unknown",
+          "send_error": "history_write_failed",
+          "durable_save": "unconfirmed",
+          "resource_release_before_stop": "unconfirmed",
+          "remaining_count_before_stop": 1,
+          "resource_release_after_stop": true
+        }
+      },
+      "downloaded_report_sha256": {
+        "run": "19193ea03102d9b36f4f1fd39b5fe11dc094c47da08a59354b30201264cbcbe3",
+        "replay": "92d421798c69b7ca66b61dece4ca115ae034e610029aa58ddd2f8bd7537e531b",
+        "write-full": "d250dd3d0cf16d299c7c63a383317e25013e361448050894ca923ae56af3c1fb"
+      }
+    },
+    "windows": {
+      "ci_job": "https://github.com/jimoto-no-llm/rustdsh/actions/runs/37815662307/job/113443520854",
+      "runtime": {
+        "platform": "win32",
+        "node": "22.23.3"
+      },
+      "all_scenarios": [
+        {
+          "scenario": "duplicate_events",
+          "passed": true,
+          "checks": 8,
+          "all_checks_passed": true,
+          "facts": {
+            "native_effects": 1,
+            "ack": true,
+            "recorded_state": "waiting-human",
+            "effective_state": "unknown",
+            "send_error": null,
+            "durable_save": "confirmed",
+            "resource_release_before_stop": "unconfirmed",
+            "remaining_count_before_stop": 1,
+            "resource_release_after_stop": true
+          }
+        },
+        {
+          "scenario": "out_of_order",
+          "passed": true,
+          "checks": 8,
+          "all_checks_passed": true,
+          "facts": {
+            "native_effects": 1,
+            "ack": true,
+            "recorded_state": "waiting-human",
+            "effective_state": "unknown",
+            "send_error": null,
+            "durable_save": "confirmed",
+            "resource_release_before_stop": "unconfirmed",
+            "remaining_count_before_stop": 1,
+            "resource_release_after_stop": true
+          }
+        },
+        {
+          "scenario": "network_disconnect",
+          "passed": true,
+          "checks": 10,
+          "all_checks_passed": true,
+          "facts": {
+            "native_effects": 1,
+            "attempts": 1,
+            "certainty": "reconciled_applied",
+            "retry_state": "completed",
+            "ack": "authoritative_mock_receipt",
+            "resource_release": "confirmed_listener_closed"
+          }
+        },
+        {
+          "scenario": "restart",
+          "passed": true,
+          "checks": 10,
+          "all_checks_passed": true,
+          "facts": {
+            "native_effects": 1,
+            "ack": false,
+            "recorded_state": "running",
+            "effective_state": "unknown",
+            "resource_release": "unconfirmed",
+            "automatically_restarted": false,
+            "control_process_restarted": true,
+            "mock_root_exit_observed": true
+          }
+        },
+        {
+          "scenario": "disk_full",
+          "passed": true,
+          "checks": 9,
+          "all_checks_passed": true,
+          "facts": {
+            "native_effects": 0,
+            "ack": false,
+            "recorded_state": "waiting-human",
+            "effective_state": "unknown",
+            "send_error": "history_write_failed",
+            "durable_save": "unconfirmed",
+            "resource_release_before_stop": "unconfirmed",
+            "remaining_count_before_stop": 1,
+            "resource_release_after_stop": true
+          }
+        },
+        {
+          "scenario": "gpu_loss",
+          "passed": true,
+          "checks": 11,
+          "all_checks_passed": true,
+          "facts": {
+            "native_effects": 0,
+            "ack": false,
+            "recorded_state": "unknown",
+            "effective_state": "unknown",
+            "send_error": "cli_error",
+            "durable_save": "confirmed",
+            "resource_release_before_stop": "unconfirmed",
+            "remaining_count_before_stop": 1,
+            "resource_release_after_stop": true
+          }
+        }
+      ],
+      "replay": {
+        "passed": true,
+        "scenarios": 6,
+        "input_byte_identical": true,
+        "same_effect_and_ack_outcomes": true
+      },
+      "write_full": {
+        "passed": true,
+        "facts": {
+          "native_effects": 0,
+          "ack": false,
+          "recorded_state": "waiting-human",
+          "effective_state": "unknown",
+          "send_error": "history_write_failed",
+          "durable_save": "unconfirmed",
+          "resource_release_before_stop": "unconfirmed",
+          "remaining_count_before_stop": 1,
+          "resource_release_after_stop": true
+        }
+      },
+      "downloaded_report_sha256": {
+        "run": "eb1425f2578bf4329a8522ae6ed7ba097643fab41935c4d9624d4a117de282bd",
+        "replay": "435971ff17ab69a8e02280df7d687a137b830222325c7b6b1a256cd400e1126c",
+        "write-full": "4be747c50719ed29238562daff5d6caac02e9452ec42ac19c704da876cc72788"
+      }
+    }
+  }
+}

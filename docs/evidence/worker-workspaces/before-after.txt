@@ -1,0 +1,285 @@
+Before: exact CLI bytes from main 17cabfc659a7fdccbeae7a29d1b7ca8440909a92.
+After: actual public CLI from source 355ff3a8ad2b02b85dc68618a4ac30707438fcd3.
+Paths replaced with <fixture>; stdout fields selected for readability. Full records: cli-observations.json.
+No external repository or provider was used.
+
+before: exact main CLI rejects worker allocation
+$ node baseline-cli.mjs workers plan --input-file <fixture>/editor-a.json --project <fixture>/project
+exit: 1
+[rdsh-dashboard] Unknown command; use --help
+
+editor-a: actual checkout allocation
+$ node dashboard/cli.mjs workers prepare --input-file <fixture>/editor-a.json --expected-revision 0 --expected-head 178ac8e9675f6bb4cc5096f30ce52437a56acdf5 --project <fixture>/project
+exit: 0
+{
+  "revision": 2,
+  "worker": {
+    "worker_id": "editor-a",
+    "lease": {
+      "state": "active",
+      "expires_at": "2026-10-09T06:51:36.422Z"
+    },
+    "worktree": "<fixture>/state/projects/175afdee74654b85/workers/worktrees/editor-a",
+    "branch": "codex/worker-editor-a-3990d49c-dbb3-4bea-957a-fb4c68dc37b7",
+    "tree": {
+      "status": "observed",
+      "dirty": false,
+      "head_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+      "dirty_paths": [],
+      "committed_paths": [],
+      "changed_paths": [],
+      "scope_violations": [],
+      "reason": null
+    }
+  }
+}
+
+overlap: common lockfile blocks assignment before Git
+$ node dashboard/cli.mjs workers plan --input-file <fixture>/conflict.json --project <fixture>/project
+exit: 0
+{
+  "revision": 2,
+  "warnings": [
+    {
+      "code": "worker_scope_overlap",
+      "worker_id": "editor-a",
+      "path": "Cargo.lock"
+    },
+    {
+      "code": "shared_file_overlap",
+      "worker_id": "editor-a",
+      "path": "Cargo.lock"
+    }
+  ],
+  "can_prepare": false
+}
+
+human: preexisting untracked work blocks overlapping assignment
+$ node dashboard/cli.mjs workers plan --input-file <fixture>/human-conflict.json --project <fixture>/project
+exit: 0
+{
+  "revision": 2,
+  "warnings": [
+    {
+      "code": "human_dirty_scope_overlap",
+      "path": "tests/human.txt"
+    }
+  ],
+  "can_prepare": false
+}
+
+after: real dirty paths, scope violations and shared changes
+$ node dashboard/cli.mjs workers inspect --project <fixture>/project
+exit: 0
+{
+  "revision": 6,
+  "workers": [
+    {
+      "worker_id": "editor-a",
+      "lease": {
+        "state": "active",
+        "expires_at": "2026-10-09T06:51:36.422Z"
+      },
+      "branch": "codex/worker-editor-a-3990d49c-dbb3-4bea-957a-fb4c68dc37b7",
+      "tree": {
+        "status": "observed",
+        "dirty": true,
+        "head_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+        "dirty_paths": [
+          "Cargo.lock",
+          "src/a.txt"
+        ],
+        "committed_paths": [],
+        "changed_paths": [
+          "Cargo.lock",
+          "src/a.txt"
+        ],
+        "scope_violations": [],
+        "reason": null
+      }
+    },
+    {
+      "worker_id": "editor-b",
+      "lease": {
+        "state": "active",
+        "expires_at": "2026-10-09T06:51:40.624Z"
+      },
+      "branch": "codex/worker-editor-b-20a4d443-153e-4463-87f2-651bf913f309",
+      "tree": {
+        "status": "observed",
+        "dirty": true,
+        "head_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+        "dirty_paths": [
+          "Cargo.lock"
+        ],
+        "committed_paths": [],
+        "changed_paths": [
+          "Cargo.lock"
+        ],
+        "scope_violations": [
+          "Cargo.lock"
+        ],
+        "reason": null
+      }
+    },
+    {
+      "worker_id": "reviewer",
+      "lease": {
+        "state": "active",
+        "expires_at": "2026-10-09T06:51:43.306Z"
+      },
+      "branch": "codex/worker-reviewer-2c8af88f-7f8e-4f20-bccf-ad35d1717863",
+      "tree": {
+        "status": "observed",
+        "dirty": true,
+        "head_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+        "dirty_paths": [
+          "src/b.txt"
+        ],
+        "committed_paths": [],
+        "changed_paths": [
+          "src/b.txt"
+        ],
+        "scope_violations": [
+          "src/b.txt"
+        ],
+        "reason": null
+      }
+    }
+  ],
+  "conflicts": [
+    {
+      "code": "shared_file_changes",
+      "workers": [
+        "editor-a",
+        "editor-b"
+      ],
+      "path": "Cargo.lock"
+    }
+  ],
+  "runtime_policy": "declarations_and_git_change_scan; native_DSH_tool_policy_and_sandbox_are_separate"
+}
+
+lease: actual expiry retains dirty checkout
+$ node dashboard/cli.mjs workers inspect --project <fixture>/project
+exit: 0
+{
+  "revision": 7,
+  "workers": [
+    {
+      "worker_id": "editor-a",
+      "lease": {
+        "state": "expired",
+        "expires_at": "2026-10-09T06:50:48.527Z"
+      },
+      "branch": "codex/worker-editor-a-3990d49c-dbb3-4bea-957a-fb4c68dc37b7",
+      "tree": {
+        "status": "observed",
+        "dirty": true,
+        "head_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+        "dirty_paths": [
+          "Cargo.lock",
+          "src/a.txt"
+        ],
+        "committed_paths": [],
+        "changed_paths": [
+          "Cargo.lock",
+          "src/a.txt"
+        ],
+        "scope_violations": [],
+        "reason": null
+      }
+    },
+    {
+      "worker_id": "editor-b",
+      "lease": {
+        "state": "active",
+        "expires_at": "2026-10-09T06:51:40.624Z"
+      },
+      "branch": "codex/worker-editor-b-20a4d443-153e-4463-87f2-651bf913f309",
+      "tree": {
+        "status": "observed",
+        "dirty": true,
+        "head_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+        "dirty_paths": [
+          "Cargo.lock"
+        ],
+        "committed_paths": [],
+        "changed_paths": [
+          "Cargo.lock"
+        ],
+        "scope_violations": [
+          "Cargo.lock"
+        ],
+        "reason": null
+      }
+    },
+    {
+      "worker_id": "reviewer",
+      "lease": {
+        "state": "active",
+        "expires_at": "2026-10-09T06:51:43.306Z"
+      },
+      "branch": "codex/worker-reviewer-2c8af88f-7f8e-4f20-bccf-ad35d1717863",
+      "tree": {
+        "status": "observed",
+        "dirty": true,
+        "head_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+        "dirty_paths": [
+          "src/b.txt"
+        ],
+        "committed_paths": [],
+        "changed_paths": [
+          "src/b.txt"
+        ],
+        "scope_violations": [
+          "src/b.txt"
+        ],
+        "reason": null
+      }
+    }
+  ],
+  "conflicts": [
+    {
+      "code": "shared_file_changes",
+      "workers": [
+        "editor-a",
+        "editor-b"
+      ],
+      "path": "Cargo.lock"
+    }
+  ],
+  "runtime_policy": "declarations_and_git_change_scan; native_DSH_tool_policy_and_sandbox_are_separate"
+}
+
+lease: explicit release retains files and branch
+$ node dashboard/cli.mjs workers release --worker-id editor-a --expected-revision 7 --project <fixture>/project
+exit: 0
+{
+  "revision": 8,
+  "worker": {
+    "worker_id": "editor-a",
+    "lease": {
+      "state": "released",
+      "expires_at": "2026-10-09T06:50:48.527Z"
+    },
+    "worktree": "<fixture>/state/projects/175afdee74654b85/workers/worktrees/editor-a",
+    "branch": "codex/worker-editor-a-3990d49c-dbb3-4bea-957a-fb4c68dc37b7",
+    "tree": {
+      "status": "observed",
+      "dirty": true,
+      "head_sha": "178ac8e9675f6bb4cc5096f30ce52437a56acdf5",
+      "dirty_paths": [
+        "Cargo.lock",
+        "src/a.txt"
+      ],
+      "committed_paths": [],
+      "changed_paths": [
+        "Cargo.lock",
+        "src/a.txt"
+      ],
+      "scope_violations": [],
+      "reason": null
+    }
+  }
+}

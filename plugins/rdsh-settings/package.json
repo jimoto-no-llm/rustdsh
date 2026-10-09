@@ -2,7 +2,7 @@
   "name": "rdsh-settings",
   "version": "0.1.0",
   "type": "module",
-  "description": "rdsh context engine settings section (test prototype)",
+  "description": "rdsh settings and Discord Rich Presence",
   "exports": {
     ".": "./index.js",
     "./client": "./client.js"
@@ -19,6 +19,6 @@
   },
   "meta": {
     "title": "rdsh設定",
-    "description": "context engine + rdsh.json 全体設定 (budget, working memory, general/search/serve/guard 他)"
+    "description": "Discord Rich Presence + context engine + rdsh.json 全体設定"
   }
 }

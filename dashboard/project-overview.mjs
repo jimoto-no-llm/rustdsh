@@ -1,4 +1,5 @@
 // A display projection of existing public evidence, never an execution control.
+import { observationView } from "./observations.mjs";
 const taskLabels = {
   todo: "未着手",
   doing: "進行中",
@@ -64,11 +65,18 @@ export function overviewModel(state, taskId = "", now = Date.now()) {
   let execution = "実行状態は未取得";
   if (targets.length)
     execution = `${commands.some((c) => c.source_kind === "instruction") ? "入力対象" : "回答対象"}: 接続確認 ${live} · 終了観測 ${ended} · 不明 ${unknown}。作業の完了は未確認`;
+  const reportLabel = (item) => {
+    const view = observationView(item.status, item.observation, now);
+    const freshness = view.freshness === "stale" ? "古い情報" : "鮮度未確認";
+    return `${view.kind === "estimated" ? "推定 " : ""}${taskLabels[item.status] || "未取得"}${view.current ? "" : `（${freshness}）`}`;
+  };
+  const taskViews = state.tasks.map((item) => ({ item, view: observationView(item.status, item.observation, now) }));
+  const currentTasks = taskViews.filter(({ view }) => view.current && view.kind !== "estimated");
   const taskReport = taskId
     ? task
-      ? `${task.id}: ${taskLabels[task.status] || "未取得"}`
+      ? `${task.id}: ${reportLabel(task)}`
       : "選択タスクは現在の一覧にありません"
-    : `タスク申告: 進行中 ${state.tasks.filter((item) => item.status === "doing").length} · 保留 ${state.tasks.filter((item) => item.status === "blocked").length} · 完了 ${state.tasks.filter((item) => item.status === "done").length}`;
+    : `鮮度内のタスク申告: 進行中 ${currentTasks.filter(({ item }) => item.status === "doing").length} · 保留 ${currentTasks.filter(({ item }) => item.status === "blocked").length} · 完了 ${currentTasks.filter(({ item }) => item.status === "done").length} · 古い情報 ${taskViews.filter(({ view }) => view.freshness === "stale").length} · 鮮度未確認 ${taskViews.filter(({ view }) => ["unknown", "unavailable"].includes(view.freshness)).length} · 推定 ${taskViews.filter(({ view }) => view.current && view.kind === "estimated").length}`;
   const resultNames = {
     succeeded: "回答入力の処理完了（ACP応答）",
     failed: "回答入力が中断（ACP応答）",
@@ -90,12 +98,14 @@ export function overviewModel(state, taskId = "", now = Date.now()) {
     }));
   // Legacy progress/artifact reports have no task binding or acceptance proof.
   if (!taskId)
-    for (const event of state.events)
+    for (const event of state.events) {
+      const view = observationView(event.title, event.observation, now);
       results.push({
-        title: `報告: ${event.title}`,
-        detail: "プロジェクトへの申告（受入検証は別）",
+        title: `${view.kind === "estimated" ? "推定 " : ""}報告: ${event.title}${view.current ? "" : view.freshness === "stale" ? "（古い情報）" : "（鮮度未確認）"}`,
+        detail: `プロジェクトへの申告（受入検証は別） · ${view.label} · 観測 ${at(event.observation?.observed_at)} · 報告元 ${event.observation?.source || "未申告"}`,
         at: event.created_at,
       });
+    }
   const lastResult =
     results.sort((a, b) => times(b.at) - times(a.at))[0] || null;
   return {

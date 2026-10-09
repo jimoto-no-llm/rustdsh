@@ -6,12 +6,12 @@ Related: [issue #17](https://github.com/jimoto-no-llm/rustdsh/issues/17).
 
 ## Supported versions and operations
 
-| CLI         | Verified version | Transport         | Operations                                  |
+| CLI | Verified version | Transport | Operations |
 | ----------- | ---------------- | ----------------- | ------------------------------------------- |
-| DSH         | 0.2.0-rc.2       | ACP v1 over stdio | start, resume, send, interrupt, stop, usage |
-| Codex       | None             | Not implemented   | All unsupported                             |
-| Claude Code | None             | Not implemented   | All unsupported                             |
-| Kimi        | None             | Not implemented   | All unsupported                             |
+| DSH | 0.2.0-rc.2, 0.2.1-alpha.1 | ACP v1 over stdio | start, resume, send, interrupt, stop, usage |
+| Codex | None | Not implemented | All unsupported |
+| Claude Code | None | Not implemented | All unsupported |
+| Kimi | None | Not implemented | All unsupported |
 
 DSH support is conditional on a successful version probe and ACP initialization.
 Resume also requires the peer to advertise sessionCapabilities.resume.
@@ -50,16 +50,16 @@ Import createCliAdapter from dashboard/adapters.mjs and provide an explicit
 command array, canonical project cwd and, when needed, a controlled environment.
 Every adapter exposes the same methods:
 
-| Method         | Result or failure                                                       |
+| Method | Result or failure |
 | -------------- | ----------------------------------------------------------------------- |
-| capabilities() | All six operations, verified/detected versions and current health       |
-| probe()        | Version check; capabilities still require protocol negotiation          |
-| start()        | session/new acknowledgement and the CLI-generated session ID            |
-| resume(id)     | session/resume acknowledgement for exactly that session and cwd         |
-| send(id, text) | Text ACP prompt; completion requires the peer's stopReason              |
-| interrupt(id)  | Cancel notification written, acknowledged=false                         |
-| usage(id)      | Observed context occupancy, or unavailable with no fabricated zero      |
-| stop()         | Close owned sessions, EOF, then TERM/KILL if needed; confirm child exit |
+| capabilities() | All six operations, verified/detected versions and current health |
+| probe() | Version check; capabilities still require protocol negotiation |
+| start() | session/new acknowledgement and the CLI-generated session ID |
+| resume(id) | session/resume acknowledgement for exactly that session and cwd |
+| send(id, text) | Text ACP prompt; completion requires the peer's stopReason |
+| interrupt(id) | Cancel notification written, acknowledged=false |
+| usage(id) | Observed context occupancy, or unavailable with no fabricated zero |
+| stop() | Close owned sessions, EOF, then TERM/KILL if needed; confirm child exit |
 
 Send and usage require a session attached through this adapter. Simultaneous
 prompts to one session are rejected as busy. Cancellation is confirmed by a

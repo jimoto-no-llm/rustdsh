@@ -95,6 +95,10 @@ jobs:
       - if: runner.os == 'macOS'
         run: command -v zstd || brew install zstd
       - run: cargo test
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: node --test plugins/workflow-board/tests/source-patch.test.mjs
       - run: cargo test --example benchmark_extended
       - run: cargo test --example benchmark_models
       - run: cargo build
