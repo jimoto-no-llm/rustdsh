@@ -90,10 +90,10 @@ enum EntryKind {
 }
 
 /// True for hidden or vendor dirs, byte compare, no String alloc.
-/// Same skip set as before, hidden check is first byte 46.
+/// Same skip set as before, hidden check is first byte '.'.
 fn is_skip_dir_name(name: &std::ffi::OsStr) -> bool {
     let b = name.as_encoded_bytes();
-    if b.first() == Some(&46u8) {
+    if b.first() == Some(&b'.') {
         return true;
     }
     for s in SKIP {
