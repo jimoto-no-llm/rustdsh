@@ -1,0 +1,536 @@
+diff --git a/src/auth.rs b/src/auth.rs
+index aca97c3..bbc0953 100644
+--- a/src/auth.rs
++++ b/src/auth.rs
+@@ -692,10 +692,39 @@ pub fn auto_sync() {
+     let _ = apply_imports(true);
+ }
+ 
++/// Combined pre-boot step for `boot`/`raw`: one `plan()` serves both the
++/// quiet auto-import and the first-boot banner. The old code ran `plan()`
++/// twice per boot (via `auto_sync` + `setup_needed`), each pass reading
++/// and JSON-parsing every external store plus the credentials file.
++/// Never fails: a broken store must not break launching.
++pub fn pre_boot(with_banner: bool) {
++    if !autosync_enabled() {
++        if with_banner {
++            first_boot_banner();
++        }
++        return;
++    }
++    let (grants, keys, _notes, doc, decisions, path) = plan();
++    let _ = apply_plan(&doc, &decisions, &keys, &path, true);
++    if with_banner && setup_needed_from(&grants, &keys, &doc) {
++        print_banner();
++    }
++}
++
+ /// Import missing-or-older grants/refs. Quiet mode stays silent unless it
+ /// actually writes (used by auto_sync before boot).
+ fn apply_imports(quiet: bool) -> anyhow::Result<Vec<String>> {
+     let (_grants, keys, _notes, doc, decisions, path) = plan();
++    apply_plan(&doc, &decisions, &keys, &path, quiet)
++}
++
++fn apply_plan(
++    doc: &CredsDoc,
++    decisions: &[Decision],
++    keys: &[ApiKey],
++    path: &str,
++    quiet: bool,
++) -> anyhow::Result<Vec<String>> {
+     if !doc.text.is_empty() && !doc.version_ok {
+         if !quiet {
+             eprintln!("[rdsh auth] refuse: {path} uses the pre-release flat layout; add `version: 1` first");
+@@ -729,7 +758,7 @@ fn apply_imports(quiet: bool) -> anyhow::Result<Vec<String>> {
+             }
+         }
+     }
+-    for k in &keys {
++    for k in keys {
+         if doc.refs.contains_key(&k.name) {
+             continue;
+         }
+@@ -750,7 +779,7 @@ fn apply_imports(quiet: bool) -> anyhow::Result<Vec<String>> {
+     if done.is_empty() {
+         return Ok(done);
+     }
+-    write_creds(&path, &text)?;
++    write_creds(path, &text)?;
+     for d in &done {
+         eprintln!("[rdsh auth] {d} -> {path}");
+     }
+@@ -931,6 +960,11 @@ fn env_key_set(name: &str) -> bool {
+ /// "first boot demands a DeepSeek connection and I have no idea why" state.
+ pub fn setup_needed() -> bool {
+     let (grants, keys, _notes, doc, _decisions, _path) = plan();
++    setup_needed_from(&grants, &keys, &doc)
++}
++
++/// `setup_needed` over an already-computed `plan()` (saves a rescan).
++fn setup_needed_from(grants: &[OauthGrant], keys: &[ApiKey], doc: &CredsDoc) -> bool {
+     if !grants.is_empty() || !keys.is_empty() {
+         return false;
+     }
+@@ -946,6 +980,10 @@ pub fn first_boot_banner() {
+     if !setup_needed() {
+         return;
+     }
++    print_banner();
++}
++
++fn print_banner() {
+     if is_japanese() {
+         eprintln!("[rdsh] モデル接続がまだありません（初回セットアップが必要です）");
+         eprintln!(
+@@ -1399,7 +1437,7 @@ pub fn setup_status_json() -> String {
+         "refs_known": keys.iter().map(|k| &k.name).collect::<Vec<_>>(),
+         "refs_stored": doc.refs.keys().cloned().collect::<Vec<_>>(),
+         "notes": notes,
+-        "needed": setup_needed(),
++        "needed": setup_needed_from(&grants, &keys, &doc),
+         "opencode_config": opencode_config_path(),
+         "defaults": provider_needs()
+             .iter()
+diff --git a/src/inspect.rs b/src/inspect.rs
+index 0d02af1..2e19ff9 100644
+--- a/src/inspect.rs
++++ b/src/inspect.rs
+@@ -503,6 +503,11 @@ pub fn cmd_logs(tail: usize, grep: Option<String>, file: Option<String>) -> anyh
+         },
+     };
+     eprintln!("[rdsh] reading {}", path.display());
++    // Pure tail (no grep): seek to the last bytes instead of reading the
++    // whole log into memory. Grep still needs the full scan below.
++    if grep.is_none() {
++        return tail_file(&path, tail);
++    }
+     let text = std::fs::read_to_string(&path)?;
+     // Single pass: count matches while keeping only the last `tail` lines.
+     // (Old code collected every line, then filtered in a second pass.)
+@@ -536,6 +541,44 @@ pub fn cmd_logs(tail: usize, grep: Option<String>, file: Option<String>) -> anyh
+     Ok(())
+ }
+ 
++/// Print the last `tail` lines by reading only the file's tail bytes.
++/// Falls back to a full read for tiny files or unreadable metadata.
++fn tail_file(path: &std::path::Path, tail: usize) -> anyhow::Result<()> {
++    use std::io::{Read, Seek, SeekFrom, Write};
++    if tail == 0 {
++        eprintln!("[rdsh] 0 line(s)");
++        return Ok(());
++    }
++    let mut f = std::fs::File::open(path)?;
++    let len = f.metadata().map(|m| m.len()).unwrap_or(0);
++    // ~256 bytes/line heuristic, clamped; big enough that one read suffices.
++    let want = (tail as u64).saturating_mul(256).clamp(4096, 8 << 20);
++    let (skip_first, text) = if want < len {
++        f.seek(SeekFrom::End(-(want as i64)))?;
++        let mut buf = Vec::with_capacity(want as usize + 1);
++        f.read_to_end(&mut buf)?;
++        // First line may start mid-line (or mid-char): drop it.
++        (true, String::from_utf8_lossy(&buf).into_owned())
++    } else {
++        let mut s = String::new();
++        f.read_to_string(&mut s)?;
++        (false, s)
++    };
++    let mut lines: Vec<&str> = text.lines().collect();
++    if skip_first && !lines.is_empty() {
++        lines.remove(0);
++    }
++    let start = lines.len().saturating_sub(tail);
++    let stdout = std::io::stdout();
++    let mut out = std::io::BufWriter::new(stdout.lock());
++    for l in &lines[start..] {
++        let _ = writeln!(out, "{l}");
++    }
++    let _ = out.flush();
++    eprintln!("[rdsh] showing last {} line(s)", lines.len() - start);
++    Ok(())
++}
++
+ fn latest_file(dir: &str) -> Option<std::path::PathBuf> {
+     let mut best: Option<(u64, std::path::PathBuf)> = None;
+     for e in std::fs::read_dir(dir).ok()?.filter_map(|e| e.ok()) {
+diff --git a/src/passthrough.rs b/src/passthrough.rs
+index 3a9f293..32ba98d 100644
+--- a/src/passthrough.rs
++++ b/src/passthrough.rs
+@@ -10,16 +10,51 @@ pub fn env_dry() -> bool {
+ 
+ fn origin_file() -> Option<String> {
+     // install.ps1 records the backup here on native Windows (USERPROFILE).
+-    let home = std::env::var("HOME")
+-        .or_else(|_| std::env::var("USERPROFILE"))
+-        .ok()?;
+-    let p = format!("{home}/.config/rdsh/origin");
+-    let s = std::fs::read_to_string(p).ok()?;
+-    let s = s.trim().to_string();
+-    if s.is_empty() {
++    // Cached: read once per process (doctor/bench call sites share it).
++    static CACHE: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
++    CACHE
++        .get_or_init(|| {
++            let home = std::env::var("HOME")
++                .or_else(|_| std::env::var("USERPROFILE"))
++                .ok()?;
++            let p = format!("{home}/.config/rdsh/origin");
++            let s = std::fs::read_to_string(p).ok()?;
++            let s = s.trim().to_string();
++            if s.is_empty() { None } else { Some(s) }
++        })
++        .clone()
++}
++
++/// (dev, ino) of our own binary, cached. Lets the PATH scan skip ourselves
++/// with the single stat it already performs, instead of two `canonicalize`
++/// calls per candidate (path resolution on every boot). Identity by file,
++/// not by path string, so symlinked/copied installs are handled exactly.
++fn self_file_id() -> Option<(u64, u64)> {
++    static CACHE: std::sync::OnceLock<Option<(u64, u64)>> = std::sync::OnceLock::new();
++    *CACHE.get_or_init(|| {
++        let exe = std::env::current_exe().ok()?;
++        let md = std::fs::metadata(exe).ok()?;
++        file_id(&md)
++    })
++}
++
++#[cfg(unix)]
++fn file_id(md: &std::fs::Metadata) -> Option<(u64, u64)> {
++    use std::os::unix::fs::MetadataExt;
++    Some((md.dev(), md.ino()))
++}
++
++#[cfg(not(unix))]
++fn file_id(md: &std::fs::Metadata) -> Option<(u64, u64)> {
++    #[cfg(target_os = "windows")]
++    {
++        use std::os::windows::fs::MetadataExt;
++        Some((md.volume_serial_number()?, md.file_index()?))
++    }
++    #[cfg(not(target_os = "windows"))]
++    {
++        let _ = md;
+         None
+-    } else {
+-        Some(s)
+     }
+ }
+ 
+@@ -51,6 +86,10 @@ pub fn find_original_dsh() -> Option<String> {
+             }
+         }
+     }
++    // Ourselves, by file identity (dev+ino from one cached stat). Falls back
++    // to the exe path string when identity is unavailable (non-unix non-win).
++    let me_id = self_file_id();
++    let me_path = me.as_deref();
+     if let Ok(path) = std::env::var("PATH") {
+         // split_paths handles : on unix and ; on Windows.
+         for dir in std::env::split_paths(&path) {
+@@ -60,16 +99,17 @@ pub fn find_original_dsh() -> Option<String> {
+             let names = ["dsh"];
+             for n in names {
+                 let cand = dir.join(n);
+-                if std::fs::metadata(&cand).is_ok() {
+-                    let mut skip = false;
+-                    if let (Some(m), Ok(c)) = (&me, std::fs::canonicalize(&cand)) {
+-                        if let Ok(m) = std::fs::canonicalize(m) {
+-                            skip = m == c;
+-                        }
+-                    }
+-                    if !skip {
+-                        return Some(cand.to_string_lossy().into_owned());
+-                    }
++                // One stat: existence + type + self-skip all come from it.
++                let md = match std::fs::metadata(&cand) {
++                    Ok(m) if m.is_file() => m,
++                    _ => continue,
++                };
++                let is_self = match (me_id, file_id(&md)) {
++                    (Some(a), Some(b)) => a == b,
++                    _ => me_path == Some(cand.as_path()),
++                };
++                if !is_self {
++                    return Some(cand.to_string_lossy().into_owned());
+                 }
+             }
+         }
+@@ -295,10 +335,8 @@ pub fn exec_boot(
+     slim: bool,
+ ) -> anyhow::Result<()> {
+     if !dry {
+-        crate::auth::auto_sync();
+-        // First boot with no model credential: say the exact next step
+-        // instead of letting dsh open with a bare DeepSeek prompt.
+-        crate::auth::first_boot_banner();
++        // Single plan() for auto-import + first-boot banner (see pre_boot).
++        crate::auth::pre_boot(true);
+     }
+     let orig = find_original_dsh()
+         .ok_or_else(|| anyhow::anyhow!("original dsh not found in PATH (set DSH_ORIG_BIN)"))?;
+@@ -347,8 +385,7 @@ pub fn exec_raw(args: &[String], dry: bool, slim: bool) -> anyhow::Result<()> {
+     // Same first-boot guidance as exec_boot: `dsh` (shadowed) is the usual
+     // first thing a newcomer runs.
+     if !dry {
+-        crate::auth::auto_sync();
+-        crate::auth::first_boot_banner();
++        crate::auth::pre_boot(true);
+     }
+     let orig = find_original_dsh().ok_or_else(|| {
+         anyhow::anyhow!("original dsh not found (set DSH_ORIG_BIN or reinstall with install.sh)")
+diff --git a/src/search.rs b/src/search.rs
+index c71ebbd..519781c 100644
+--- a/src/search.rs
++++ b/src/search.rs
+@@ -50,8 +50,8 @@ fn collect_files(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+     };
+     for e in entries.filter_map(|e| e.ok()) {
+         let p = e.path();
+-        let name = e.file_name().to_string_lossy().into_owned();
+-        match entry_kind(&e, &p, &name) {
++        // No per-entry String alloc: the skip check runs on the raw OsStr.
++        match entry_kind(&e, &p, &e.file_name()) {
+             EntryKind::Dir => collect_files(&p, out),
+             EntryKind::File => out.push(p),
+             EntryKind::Skip => {}
+@@ -69,10 +69,30 @@ enum EntryKind {
+ /// Classify without stat in the common case (dirent type is free).
+ /// Symlinks and unknown types fall back to stat, matching the old
+ /// follow-links behavior exactly.
+-fn entry_kind(e: &std::fs::DirEntry, p: &std::path::Path, name: &str) -> EntryKind {
++/// Skip check on the raw file name: no UTF-8 decode, no allocation.
++/// Matches the old semantics (SKIP list or dotfile).
++#[cfg(unix)]
++fn name_skipped(name: &std::ffi::OsStr) -> bool {
++    use std::os::unix::ffi::OsStrExt;
++    let b = name.as_bytes();
++    if b.first() == Some(&b'.') {
++        return true;
++    }
++    SKIP.iter().any(|s| *s.as_bytes() == *b)
++}
++
++#[cfg(not(unix))]
++fn name_skipped(name: &std::ffi::OsStr) -> bool {
++    if name.to_string_lossy().starts_with('.') {
++        return true;
++    }
++    SKIP.iter().any(|s| name == *s)
++}
++
++fn entry_kind(e: &std::fs::DirEntry, p: &std::path::Path, name: &std::ffi::OsStr) -> EntryKind {
+     match e.file_type() {
+         Ok(t) if t.is_dir() => {
+-            if SKIP.contains(&name) || name.starts_with(".") {
++            if name_skipped(name) {
+                 EntryKind::Skip
+             } else {
+                 EntryKind::Dir
+@@ -81,7 +101,7 @@ fn entry_kind(e: &std::fs::DirEntry, p: &std::path::Path, name: &str) -> EntryKi
+         Ok(t) if t.is_file() => EntryKind::File,
+         _ => {
+             if p.is_dir() {
+-                if SKIP.contains(&name) || name.starts_with(".") {
++                if name_skipped(name) {
+                     EntryKind::Skip
+                 } else {
+                     EntryKind::Dir
+@@ -114,8 +134,7 @@ fn collect_parallel(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
+     };
+     let mut subdirs = vec![];
+     for e in &entries {
+-        let name = e.file_name().to_string_lossy().into_owned();
+-        if entry_kind(e, &e.path(), &name) == EntryKind::Dir {
++        if entry_kind(e, &e.path(), &e.file_name()) == EntryKind::Dir {
+             subdirs.push(e.path());
+         }
+     }
+@@ -132,8 +151,7 @@ fn collect_parallel(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
+     let mut pending: Vec<std::path::PathBuf> = vec![];
+     for e in &entries {
+         let p = e.path();
+-        let name = e.file_name().to_string_lossy().into_owned();
+-        match entry_kind(e, &p, &name) {
++        match entry_kind(e, &p, &e.file_name()) {
+             EntryKind::Dir => {
+                 if !pending.is_empty() {
+                     segs.push(Seg::Files(std::mem::take(&mut pending)));
+@@ -153,30 +171,51 @@ fn collect_parallel(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
+         .filter(|(_, s)| matches!(s, Seg::Sub(_)))
+         .map(|(i, _)| i)
+         .collect();
++    // One scope for the whole walk: subdirs are dealt into contiguous groups
++    // (one per worker) so thread spawn/join happens once, not per batch of 8.
++    // Order is preserved: group k owns sub_idx range k, joined back in place.
++    let workers = std::thread::available_parallelism()
++        .map(|n| n.get())
++        .unwrap_or(4)
++        .clamp(1, 8)
++        .min(sub_idx.len().max(1));
+     let mut resolved: Vec<Vec<std::path::PathBuf>> = vec![];
+     resolved.resize_with(sub_idx.len(), Vec::new);
+-    for batch in sub_idx.chunks(parallelism().max(1)) {
+-        std::thread::scope(|s| {
+-            let mut handles = vec![];
+-            for (k, seg_i) in batch.iter().enumerate() {
+-                if let Seg::Sub(p) = &segs[*seg_i] {
+-                    handles.push((
+-                        k,
+-                        s.spawn(move || {
+-                            let mut v = vec![];
+-                            collect_files(p, &mut v);
+-                            v
+-                        }),
+-                    ));
++    // Each group holds (pos, seg) pairs; results zip back 1:1, no clone.
++    let mut groups: Vec<Vec<(usize, usize)>> = vec![];
++    groups.resize_with(workers, Vec::new);
++    for (pos, seg_i) in sub_idx.iter().enumerate() {
++        groups[pos * workers / sub_idx.len()].push((pos, *seg_i));
++    }
++    std::thread::scope(|s| {
++        let mut handles = vec![];
++        for g in &groups {
++            // Borrow each subtree path out of `segs` for the worker.
++            let paths: Vec<&std::path::Path> = g
++                .iter()
++                .filter_map(|(_, seg_i)| match &segs[*seg_i] {
++                    Seg::Sub(p) => Some(p.as_path()),
++                    _ => None,
++                })
++                .collect();
++            let worker = s.spawn(move || {
++                let mut out: Vec<Vec<std::path::PathBuf>> = Vec::with_capacity(paths.len());
++                for p in paths {
++                    let mut v = vec![];
++                    collect_files(p, &mut v);
++                    out.push(v);
+                 }
++                out
++            });
++            handles.push((g.clone(), worker));
++        }
++        for (g, h) in handles {
++            let walked = h.join().unwrap_or_default();
++            for ((pos, _), v) in g.iter().zip(walked) {
++                resolved[*pos] = v;
+             }
+-            for (k, h) in handles {
+-                let slot = batch[k];
+-                let pos = sub_idx.iter().position(|x| *x == slot).unwrap_or(0);
+-                resolved[pos] = h.join().unwrap_or_default();
+-            }
+-        });
+-    }
++        }
++    });
+     let mut files = vec![];
+     let mut ri = 0;
+     for seg in segs {
+diff --git a/src/serve.rs b/src/serve.rs
+index 0445768..e1e444a 100644
+--- a/src/serve.rs
++++ b/src/serve.rs
+@@ -19,26 +19,44 @@ pub fn cmd_serve(port: u16) -> anyhow::Result<()> {
+     eprintln!(
+         "[rdsh] dashboard: http://127.0.0.1:{port}/#key={token}  (Ctrl-C to stop, localhost only)"
+     );
++    // Fixed worker pool (std-only): the old code spawned one OS thread per
++    // connection, paying thread create + stack each time a tab polls the API.
++    // Token auth and the connection bound come from the upstream side.
+     let connections = Arc::new(AtomicUsize::new(0));
+-    for stream in listener.incoming() {
+-        match stream {
+-            Ok(mut s) => {
+-                let Some(slot) = crate::local_http::ConnectionSlot::acquire(&connections) else {
+-                    let _ = crate::local_http::respond(
+-                        &mut s,
+-                        503,
+-                        "application/json",
+-                        "{\"error\":\"busy\"}",
+-                    );
+-                    continue;
+-                };
+-                let token = token.clone();
+-                std::thread::spawn(move || {
+-                    let _slot = slot;
++    let (tx, rx) = std::sync::mpsc::channel::<std::net::TcpStream>();
++    let rx = std::sync::Arc::new(std::sync::Mutex::new(rx));
++    for _ in 0..4 {
++        let rx = rx.clone();
++        let token = token.clone();
++        let connections = connections.clone();
++        std::thread::spawn(move || loop {
++            let s = rx.lock().expect("serve queue").recv();
++            match s {
++                Ok(mut s) => {
++                    let Some(_slot) = crate::local_http::ConnectionSlot::acquire(&connections)
++                    else {
++                        let _ = crate::local_http::respond(
++                            &mut s,
++                            503,
++                            "application/json",
++                            "{\"error\":\"busy\"}",
++                        );
++                        continue;
++                    };
+                     if let Err(e) = handle(s, &token, port) {
+                         eprintln!("[rdsh serve] {e:#}");
+                     }
+-                });
++                }
++                Err(_) => break,
++            }
++        });
++    }
++    for stream in listener.incoming() {
++        match stream {
++            Ok(s) => {
++                if tx.send(s).is_err() {
++                    break;
++                }
+             }
+             Err(e) => eprintln!("[rdsh serve] accept: {e}"),
+         }
+diff --git a/src/tokens.rs b/src/tokens.rs
+index 844b37c..ea12085 100644
+--- a/src/tokens.rs
++++ b/src/tokens.rs
+@@ -179,7 +179,14 @@ pub fn cmd_prune(max_tokens: usize, file: Option<String>) -> anyhow::Result<()>
+     };
+     // Borrow the content field when present; otherwise the raw text.
+     // The old code cloned the whole input here on the common path.
+-    let parsed: Option<serde_json::Value> = serde_json::from_str(&text).ok();
++    // Guard the speculative parse: plain text never starts with `{`, so
++    // skip a full serde_json scan of (usually failing) input (same fast
++    // path as guard::collect_text).
++    let parsed: Option<serde_json::Value> = if text.trim_start().starts_with('{') {
++        serde_json::from_str(&text).ok()
++    } else {
++        None
++    };
+     let raw: &str = parsed
+         .as_ref()
+         .and_then(|v| v.get("content"))
+diff --git a/src/websearch.rs b/src/websearch.rs
+index 893a620..447d858 100644
+--- a/src/websearch.rs
++++ b/src/websearch.rs
+@@ -127,7 +127,14 @@ fn decode_entities(s: &str) -> String {
+ }
+ 
+ fn clean(s: &str) -> String {
+-    decode_entities(&strip_tags(s))
++    let t = strip_tags(s);
++    // Entity decoding costs ~5 allocating passes; most snippets carry no
++    // entities at all, so only pay for it when `&` is present.
++    if t.contains('&') {
++        decode_entities(&t)
++    } else {
++        t
++    }
+ }
+ 
+ /// First `href` + link text inside an `<article class="...result...">` block.
