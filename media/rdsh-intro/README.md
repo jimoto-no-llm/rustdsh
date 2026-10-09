@@ -35,7 +35,7 @@ npm run verify
 ## 構成
 
 | 秒 | 内容 |
-|---|---|
+| --- | --- |
 | 0–2.4 | コマンドの結果をブラウザで見る |
 | 2.4–6 | 起動性能の比較（約0.90ms・約98倍） |
 | 6–9.6 | TODO全件検索の入力と見つかった場所 |
@@ -70,8 +70,8 @@ Desktop全体やモデル応答の性能を示す数字ではありません。
 - UI: リポジトリのsetup / project dashboard
 - BGM: “Chill Wave” / Kevin MacLeod / incompetech.com / CC BY 4.0
   - 公式音源の24秒から24秒を抜粋、音量調整、フェードと操作音を追加
-  - 出典: https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1600048
-  - ライセンス: https://creativecommons.org/licenses/by/4.0/
+  - 出典: <https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1600048>
+  - ライセンス: <https://creativecommons.org/licenses/by/4.0/>
   - 元の音源と出典記録: `public/chill-wave-source.mp3`, `public/music-license.json`
   - `scripts/sharp-audio.py`で編集と操作音の合成を再現
   - クレジットは動画内にも表示。投稿用文面は`MUSIC-CREDITS.md`。
@@ -79,7 +79,7 @@ Desktop全体やモデル応答の性能を示す数字ではありません。
 - 最新版のフォント: Instrument Sans / Noto Sans JP / DejaVu Sans Mono、同梱のライセンスを参照
 - 旧版のフォント: IPA Pゴシック / DejaVu Sans、同梱のライセンスを参照
 - 前版の立体リボン: Three.jsのメッシュと手続き生成の反射テクスチャ
-- Remotion: https://www.remotion.dev/
+- Remotion: <https://www.remotion.dev/>
 
 ## 確認
 
