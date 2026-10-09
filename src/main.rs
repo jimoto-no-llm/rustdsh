@@ -721,7 +721,7 @@ fn doctor() -> anyhow::Result<()> {
     }
     say(format!("[rdsh] slim env: {}", slim::describe()));
     say(format!("[rdsh] auth: {}", auth::summary_line()));
-    if let Some(v) = original_version(orig.as_deref().unwrap_or("")) {
+    if let Some(v) = original_version(orig.as_deref().unwrap_or_default()) {
         say(format!("[rdsh] dsh version: {v}"));
     }
     say(format!("[rdsh] smart-dsh: {}", smart_dsh_status(&home)));
