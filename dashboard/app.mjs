@@ -372,6 +372,9 @@ $("palette-search").addEventListener("keydown", (event) => {
   } else if (event.key === "Enter" && paletteSelectedIndex >= 0) {
     event.preventDefault();
     activatePalette();
+  } else if (event.key === "Escape") {
+    event.preventDefault();
+    $("palette").close();
   }
 });
 $("palette").addEventListener("close", () => {
