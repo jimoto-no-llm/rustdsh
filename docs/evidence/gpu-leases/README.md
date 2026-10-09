@@ -143,3 +143,47 @@ Absent-request lookup median/p95 was 0.167/0.273 ms on Windows and
 a speed improvement; the raw samples and durable guard/stop overhead are
 retained. The current hosted CI must be checked independently on the final PR
 head; the failed earlier CI is not counted as a pass.
+
+
+## Short-path receipt recovery after the hosted Windows failure
+
+Measured source: `04f363f9ea5d5a5ea6d887c4264aac6c556c0414`, including merged main
+`93b3bcaa7759fb27461b02f1dd0b0012e946b329`. The previous source-45/82 results above
+remain historical evidence; they do not validate this receipt-reader change.
+
+The hosted Windows run on `66d1514` passed 218 tests and failed one durable
+kernel-empty receipt assertion: a real 8.3 temporary-directory alias was still
+compared literally against its expanded project path in `recordedExit`.
+A new real-filesystem project test reproduced `retained` before the fix and
+`released / recorded_kernel_group_empty` afterward. The reader now uses the
+same native alias expansion and ancestor reparse rejection as the writer,
+without creating a missing project directory. Corrupt tails, missing directories,
+junction/symlink receipts, mismatched descriptors and uncertain process facts
+retain their reservations.
+
+Current-source validation:
+
+| Suite | Total | Pass | Fail/cancel | Skip |
+| --- | ---: | ---: | ---: | ---: |
+| Windows dashboard, Node 22 | 220 | 220 | 0 | 0 |
+| Linux delegated cgroup dashboard, Node 24 | 220 | 213 | 0 | 7 Windows-only |
+| Windows GPU tests with actual 8.3 TEMP/TMP | 23 | 23 | 0 | 0 |
+
+Rust release tests: 103, benchmark examples: 7, fence: 2, CLI regressions: 53,
+security boundaries: 11. fmt and release Clippy with zero warnings passed.
+The 17 measured runtime/fixture files have the same fingerprint on both OSes:
+`96b4ba739a0e4db97d6a38a92b34489bd0aeb31c483364be35719e0f7ff837b4`.
+Both measured runs released their three fixture leases only with
+`held_kernel_group_empty`; final active reservations were zero.
+
+The machine results are in [Windows](windows-short-path-receipts.json),
+[Linux](linux-short-path-receipts.json) and
+[before/after](before-after-short-path-receipts.json). The same fixed inventory,
+public CLI, native Job/delegated-cgroup fixtures and no-model scope apply.
+No physical GPU memory or provider throughput was measured. These are local
+checks; hosted CI is evaluated separately on the current PR head.
+
+| OS | attach/send/stop medians in ms | GPU-marker miss, 200 samples |
+| --- | --- | --- |
+| windows | {"disabled": {"attach_ms": 1193.5612999999994, "send_ms": 41.41160000000036, "stop_ms": 165.20790000000034}, "leased": {"attach_ms": 1256.8760999999995, "send_ms": 43.123099999999795, "stop_ms": 479.7992999999997}} | {"median_ms": 0.24220000000002528, "p95_ms": 0.29700000000002547} |
+| linux | {"disabled": {"attach_ms": 261.333176, "send_ms": 48.105139000000236, "stop_ms": 139.3467559999999}, "leased": {"attach_ms": 325.83575999999994, "send_ms": 54.892005000000154, "stop_ms": 138.62116500000002}} | {"median_ms": 0.20621999999997342, "p95_ms": 0.29064900000000193} |
