@@ -258,6 +258,28 @@ test("project state, HTTP/stdio MCP, subscriptions, answers, and auth work toget
     type: "artifact",
     artifact: "reference-only.png",
   });
+  assert.equal(
+    (await fetch(dashboard.localUrl + "api/changes?after_revision=3")).status,
+    401,
+  );
+  const changeDelta = await fetch(
+    dashboard.localUrl + "api/changes?after_revision=3",
+    { headers: browserHeaders },
+  );
+  assert.equal(changeDelta.status, 200);
+  const changeView = await changeDelta.json();
+  assert.equal(changeView.revision, 4);
+  assert.equal(changeView.records.length, 1);
+  assert.equal(changeView.records[0].name, "dashboard.progress.updated");
+  assert.equal("summary" in changeView.records[0], false);
+  assert.equal(
+    (
+      await fetch(dashboard.localUrl + "api/changes?after_revision=-1", {
+        headers: browserHeaders,
+      })
+    ).status,
+    400,
+  );
   const forgedAnswer = await fetch(dashboard.localUrl + "api/update/answer", {
     method: "POST",
     headers: { ...headers, authorization: `Bearer ${runtime.mcp_token}` },
