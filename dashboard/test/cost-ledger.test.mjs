@@ -350,7 +350,7 @@ test("scope identity, source certainty, dates and malformed persisted ledger fai
   assert.equal(await fs.readFile(file, "utf8"), bytes);
 });
 
-test("existing MCP metrics tool records ledger reports; old metrics and exactly six tool names remain compatible", async (t) => {
+test("existing MCP metrics tool records ledger reports; old metrics remain compatible", async (t) => {
   const { store, project } = await setup(t);
   const api = {
     mutate: (...args) => store.mutate(...args),
@@ -367,7 +367,7 @@ test("existing MCP metrics tool records ledger reports; old metrics and exactly 
     3,
   );
   assert.equal(group(store).amount, "0.1");
-  assert.equal(tools.length, 6);
+  assert.equal(tools.length, 8);
   assert.ok(
     tools.find((tool) => tool.name === "dashboard_update_metrics").inputSchema
       .properties.cost_report,

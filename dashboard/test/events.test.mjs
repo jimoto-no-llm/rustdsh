@@ -214,7 +214,9 @@ test("MCP 2.0 discovers events and serves the same tools on an authenticated end
         accept: "application/json, text/event-stream",
         "mcp-protocol-version": "2026-07-28",
         "mcp-method": method,
-        ...(params.name ? { "mcp-name": params.name } : {}),
+        ...(params.name || params.uri
+          ? { "mcp-name": params.name || params.uri }
+          : {}),
       },
       body: JSON.stringify({
         jsonrpc: "2.0",
@@ -236,7 +238,11 @@ test("MCP 2.0 discovers events and serves the same tools on an authenticated end
   assert.ok(discovery.supportedVersions.includes("2026-07-28"));
   assert.deepEqual(discovery.capabilities.events, {});
   assert.equal((await request("events/list")).events.length, 5);
-  assert.equal((await request("tools/list")).tools.length, 6);
+  assert.equal((await request("tools/list")).tools.length, 8);
+  const resources = await request("resources/list");
+  assert.ok(
+    resources.resources.some((resource) => resource.uri === "dashboard://handoff"),
+  );
   const diagnostics = async () =>
     (
       await fetch(dashboard.localUrl + "api/diagnostics", {
@@ -254,6 +260,18 @@ test("MCP 2.0 discovers events and serves the same tools on an authenticated end
   });
   assert.equal(result.resultType, "complete");
   assert.equal(dashboard.store.value.tasks.length, 1);
+  const createdHandoff = await request("tools/call", {
+    name: "dashboard_create_handoff",
+    arguments: { task_id: "T1" },
+  });
+  assert.equal(createdHandoff.resultType, "complete");
+  const handoffResource = await request("resources/read", {
+    uri: "dashboard://handoff",
+  });
+  assert.equal(
+    JSON.parse(handoffResource.contents[0].text).task_id,
+    "T1",
+  );
   await request("tools/call", {
     name: "dashboard_update_metrics",
     arguments: {

@@ -48,7 +48,7 @@ before stopping the live owned Harness run.
 
 | Mode      | Purpose                                                    | Data source                                      |
 | --------- | ---------------------------------------------------------- | ------------------------------------------------ |
-| `project` | Project metrics, tasks, questions, human answers, progress | Six project-scoped MCP tools                     |
+| `project` | Project metrics, tasks, questions, human answers, progress | Eight project-scoped MCP tools                   |
 | `harness` | Launch and open the original DeepSeek Harness Web UI       | A separately managed `dsh --profile web` process |
 
 Both bind to loopback and can use **Tailscale Serve** for private HTTPS access.
@@ -172,14 +172,16 @@ configuration after a restart, because the bearer key rotates.
 `runtime.json` の `token` は管理用、`mcp_token` は MCP 用です。ブラウザー用の
 鍵は `browser_url` に含まれます。これらを別用途で使い回さないでください。
 
-| Tool                       | Effect                                       |
-| -------------------------- | -------------------------------------------- |
-| `dashboard_update_metrics` | Report measured cumulative snapshots         |
-| `dashboard_upsert_task`    | Create/update a task by ID                   |
-| `dashboard_ask_question`   | Ask a human a question with a unique ID      |
-| `dashboard_publish_event`  | Report progress or an artifact reference     |
-| `dashboard_get_feedback`   | Read durable answers after a sequence cursor |
-| `dashboard_get_state`      | Read this project's current state            |
+| Tool                       | Effect                                        |
+| -------------------------- | --------------------------------------------- |
+| `dashboard_update_metrics` | Report measured cumulative snapshots          |
+| `dashboard_upsert_task`    | Create/update a task by ID                    |
+| `dashboard_ask_question`   | Ask a human a question with a unique ID       |
+| `dashboard_publish_event`  | Report progress or an artifact reference      |
+| `dashboard_get_feedback`   | Read durable answers after a sequence cursor  |
+| `dashboard_get_state`      | Read this project's current state             |
+| `dashboard_create_handoff` | Save a source-linked snapshot for one task    |
+| `dashboard_get_handoff`    | Read the latest snapshot and source freshness |
 
 Example tool arguments:
 
@@ -373,9 +375,16 @@ On Windows, extract the client into `%LOCALAPPDATA%\rdsh\tunnel-client`, or set
 5. Verify a real question → human answer → signed webhook → Dot response, then
    stop monitoring and check that unsubscribe removes the subscription.
 
-Legacy MCP clients also have stdio/Streamable HTTP tools and
-`dashboard://state` / `dashboard://feedback` resource subscriptions. Those
-resource notifications are distinct from the native webhook Events integration.
+Project MCP clients expose `dashboard://state`, `dashboard://feedback`,
+`dashboard://handoff`, and `dashboard://acceptance` resources. Legacy and stdio
+clients also support resource subscriptions. The handoff is a human-readable
+snapshot, not a session resume; missing details stay unknown, arbitrary event
+artifact references are not opened, and test commands are not rerun. Registered
+acceptance evidence is inspected read-only for integrity metadata without
+copying file contents or private paths. Reads compare saved source fingerprints
+with current task, decision, artifact, and acceptance records. Resource
+notifications are distinct from the native webhook Events integration. See the
+[handoff packet contract](HANDOFF-PACKETS.md).
 See the [official Events contract](https://developers.openai.com/plugins/build/mcp-events).
 
 Use **接続診断** in the project dashboard or

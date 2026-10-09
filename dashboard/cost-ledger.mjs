@@ -523,8 +523,8 @@ export function publicCostLedger(state) {
   return { schema: 1, project_id: ledger.project_id, scopes };
 }
 
-// The six existing MCP tools remain the only tools. Extend measured metrics
-// with optional explicit ledger inputs; authoritative validation is above.
+// The metrics tool accepts optional explicit ledger inputs; authoritative
+// validation is above. Project-level feature tools live in mcp.mjs.
 const str = { type: "string", minLength: 1, maxLength: 160 };
 const nullable = { type: ["string", "null"], minLength: 1, maxLength: 160 };
 const timestamp = { type: "string", format: "date-time" };
