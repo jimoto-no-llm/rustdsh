@@ -5,7 +5,10 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
-import { spawnOwnedProcess } from "../process-scope.mjs";
+import {
+  handleSupervisorResponse,
+  spawnOwnedProcess,
+} from "../process-scope.mjs";
 import { windowsJobObservation } from "../process-scope-backends.mjs";
 import { startHarness } from "../harness.mjs";
 import { RunHistory } from "../run-history.mjs";
@@ -30,6 +33,39 @@ test("a Windows job cannot be confirmed empty when membership and accounting dis
     remaining_count: 0,
     members_truncated: false,
   });
+});
+test("a late supervisor response is discarded without blocking a later response", () => {
+  const pending = new Map();
+  assert.equal(
+    handleSupervisorResponse(
+      { type: "response", id: 41, result: { status: "stale" } },
+      pending,
+    ),
+    true,
+  );
+
+  let laterResult = null;
+  pending.set(42, {
+    resolve(value) {
+      laterResult = value;
+    },
+    reject(error) {
+      throw error;
+    },
+  });
+  assert.equal(
+    handleSupervisorResponse(
+      { type: "response", id: 42, result: { status: "exit_confirmed" } },
+      pending,
+    ),
+    true,
+  );
+  assert.deepEqual(laterResult, { status: "exit_confirmed" });
+  assert.equal(pending.size, 0);
+  assert.equal(
+    handleSupervisorResponse({ type: "response", id: 0, result: null }, pending),
+    false,
+  );
 });
 async function waitFor(check, budget = 10000) {
   const end = Date.now() + budget;
