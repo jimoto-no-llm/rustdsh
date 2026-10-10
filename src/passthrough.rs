@@ -1,11 +1,11 @@
 /// Env overrides for drop-in `dsh` mode (see install.sh --as-dsh).
 /// RDSH_PASSTHROUGH=1 disables slim env; RDSH_DRY_RUN=1 only prints the exec.
 pub fn env_passthrough() -> bool {
-    std::env::var("RDSH_PASSTHROUGH").as_deref() == Ok("1")
+    std::env::var("RDSH_PASSTHROUGH").is_ok_and(|v| v == "1")
 }
 
 pub fn env_dry() -> bool {
-    std::env::var("RDSH_DRY_RUN").as_deref() == Ok("1")
+    std::env::var("RDSH_DRY_RUN").is_ok_and(|v| v == "1")
 }
 
 fn origin_file() -> Option<String> {
