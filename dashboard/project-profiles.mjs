@@ -78,12 +78,14 @@ function commandArguments(command, index) {
     string(argument, `verification_commands[${index}] argument`, 1000),
   );
   for (let position = 0; position < args.length; position++) {
-    const option = /^(?:-u|--user|--username|--proxy-user|--ftp-user)(?:=(.*))?$/i.exec(
-      args[position],
-    );
-    const credential = option?.[1] ?? (option ? args[position + 1] : null);
-    if (typeof credential === "string" && credential.includes(":"))
-      throw new Error(`verification_commands[${index}] must not contain user credentials`);
+    if (
+      /^(?:-u|--user(?:name)?|--proxy-user|--ftp-user|--oauth2-bearer|--proxy-bearer|--cookie|-b)(?:=.*)?$/i.test(
+        args[position],
+      )
+    )
+      throw new Error(
+        `verification_commands[${index}] must not contain credential-bearing options`,
+      );
   }
   return args;
 }
