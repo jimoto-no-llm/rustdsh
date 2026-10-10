@@ -63,6 +63,14 @@ Project 画面の QR 鍵はブラウザー専用です。画面は鍵を URL fra
 中継時には Harness 側へ渡しません。同じホスト上の別ポートにも Harness Cookie
 が届くため、そのホスト上で信頼できない Web サービスを開かないでください。
 
+プロジェクト画面では、Dashboard と同じ host・OS view から見える別terminalの
+CLI process をPIDで読取専用登録できます。表示するのはprocessの生存状態と、登録時の
+開始識別子・所有者が続いているかだけです。コマンドライン、環境変数、会話、ログは
+読みません。観測解除やDashboard再起動で外部processへsignalを送りません。登録情報は
+Dashboardのproject別状態ディレクトリにある `observed-cli.json` に保持し、所有者はOSの
+UID/SIDそのものではなくscope付きSHA-256 fingerprintで保存します。Dashboardを別hostやPID namespaceから起動した
+場合、同じPIDを同じprocessとは扱わず、識別できない状態にします。
+
 This optional Node.js component is separate from the Rust launcher's `rdsh serve`
 status page. It does not replace the original Harness agent loop.
 

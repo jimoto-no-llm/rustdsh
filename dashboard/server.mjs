@@ -16,6 +16,7 @@ import { AnswerApplicationServer } from "./answer-application-server.mjs";
 import { BudgetAdmissionServer } from "./budget-server.mjs";
 import { createHistoryBackup, backupMaximum } from "./history-backup.mjs";
 import { AcceptanceStore } from "./acceptance.mjs";
+import { ObservedCliStore } from "./observed-cli.mjs";
 import {
   ConnectionObservations,
   connectionReport,
@@ -87,11 +88,16 @@ export async function startDashboard(options) {
   const connections = new ConnectionObservations();
   const localUrl = `http://127.0.0.1:${port}/`;
   const cookieName = `rdsh_${kind === "project" ? project.id : "harness"}`;
-  let store, eventsHub;
+  let store, eventsHub, observedCli;
   try {
     store = kind === "project" ? await ProjectStore.open(project) : null;
     eventsHub = store
       ? await EventsHub.open(project, () => store.value, options.webhookPost)
+      : null;
+    observedCli = store
+      ? await ObservedCliStore.open(project, {
+          observe: options.observeExternalCli,
+        })
       : null;
   } catch (error) {
     await fs.unlink(lockFile);
@@ -438,6 +444,7 @@ export async function startDashboard(options) {
           route === "/instruction-queue-ui.mjs" ||
           route === "/cost-ledger-ui.mjs" ||
           route === "/budget-ui.mjs" ||
+          route === "/observed-cli-ui.mjs" ||
           route === "/favicon.ico" ||
           route === "/icon.png" ||
           route === "/icon.svg");
@@ -535,12 +542,50 @@ export async function startDashboard(options) {
           "/instruction-queue-ui.mjs",
           "/cost-ledger-ui.mjs",
           "/budget-ui.mjs",
+          "/observed-cli-ui.mjs",
         ].includes(route)
       ) {
         res.writeHead(200, {
           "content-type": "text/javascript; charset=utf-8",
         });
         return res.end(await fs.readFile(path.join(here, route.slice(1))));
+      }
+      if (kind === "project" && route === "/api/observed-cli") {
+        if (!humanAuthorized)
+          return json(res, 403, { error: "Dashboard owner browser required" });
+        if (req.method === "GET")
+          return json(res, 200, await observedCli.inspect(store.value));
+        if (req.method === "POST") {
+          const record = await observedCli.register(
+            await readBody(req, 4096),
+            store.value,
+          );
+          return json(res, 201, {
+            process: {
+              id: record.id,
+              task_id: record.task_id,
+              cli_kind: record.cli_kind,
+              pid: record.pid,
+              registered_at: record.registered_at,
+            },
+          });
+        }
+        return json(res, 405, { error: "Method not allowed" });
+      }
+      if (
+        kind === "project" &&
+        route?.startsWith("/api/observed-cli/")
+      ) {
+        if (!humanAuthorized)
+          return json(res, 403, { error: "Dashboard owner browser required" });
+        const match = route.match(/^\/api\/observed-cli\/([0-9a-f-]{36})$/);
+        if (req.method !== "DELETE" || !match)
+          return json(res, 404, { error: "Unknown observed CLI operation" });
+        return json(
+          res,
+          200,
+          await observedCli.unregister({ id: match[1] }),
+        );
       }
       if (
         kind === "project" &&
