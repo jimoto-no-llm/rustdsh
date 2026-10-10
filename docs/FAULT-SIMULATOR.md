@@ -62,6 +62,15 @@ and fsync failure. Hard-process termination is not a power-loss/storage-device t
 - `input.json` contains the versioned scenario selection, seed, logical-clock
   settings and fault points. Unknown fields and arbitrary executable/endpoint
   additions are rejected before creating a new output directory.
+- `reproducibility.json` records the Node runtime, fixture CLI version, locked
+  and installed dependency versions, input digest, fixture digest, target commit,
+  and a tracked-worktree hash. The worktree hash covers `HEAD` and tracked file
+  changes; untracked and ignored files are excluded. Missing installed versions
+  and version mismatches are listed separately.
+- Environment variable names and values are never copied into the manifest.
+  It records only aggregate omission counts, and the accepted input schema
+  rejects arbitrary config or prompt fields. The manifest keeps a reference and
+  digest for `input.json` rather than embedding another copy of its contents.
 - `report.json` and each scenario's `result.json` contain individual checks,
   observed effect counts, ack/persistence/resource results, logical events,
   runtime I/O observations and failure phase/code. A failed worker is recorded
@@ -69,10 +78,12 @@ and fsync failure. Hard-process termination is not a power-loss/storage-device t
 - The mock CLI trace and isolated state remain beside each result. Bounded worker
   diagnostics are retained when present. Simulator state is disposable, but the
   command never deletes it. Do not use these mock sessions to resume a real run.
-- `source_fingerprint`, its declared scope, and Node/platform metadata distinguish
-  source/runtime changes from the saved input. Wall-clock times, generated native
-  IDs and process identities can differ across replays; the input and semantic
-  outcome checks are reproducible.
+- `source_fingerprint`, `reproducibility.json`, and Node/platform metadata
+  distinguish source/runtime changes from the saved input. The result claims a
+  bounded offline fixture replay, not complete reproducibility: host process and
+  filesystem behavior remain external, and provider/model/GPU behavior is not
+  exercised. Wall-clock times, generated native IDs and process identities can
+  differ across replays; the input and semantic outcome checks are reproducible.
 
 The dashboard workflow runs all six cases and replay on Windows/Linux, adds the
 write-failure seed, and uploads the reports even when a run fails. The regular

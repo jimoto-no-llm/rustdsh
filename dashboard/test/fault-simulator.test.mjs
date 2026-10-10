@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { runFaultSimulation, faultScenarios } from "../fault-simulator.mjs";
@@ -51,7 +52,44 @@ test("all six real control-plane scenarios expose effects, persistence and resou
   assert(gpu.facts.remaining_count_before_stop > 0);
   for (const result of [duplicate, order, disk, gpu])
     assert.equal(result.facts.resource_release_after_stop, true);
-  assert.doesNotMatch(JSON.stringify(report), /fault-test-credential-must-not/);
+  const manifest = JSON.parse(await fs.readFile(path.join(root, "all", "reproducibility.json"), "utf8"));
+  const inputBytes = await fs.readFile(path.join(root, "all", "input.json"));
+  assert.equal(manifest.schema, 1);
+  assert.equal(manifest.run.input_reference.path, "input.json");
+  assert.equal(manifest.run.input_reference.sha256, createHash("sha256").update(inputBytes).digest("hex"));
+  assert.match(manifest.target.commit_sha, /^[0-9a-f]{40,64}$/);
+  assert.match(manifest.target.tracked_worktree_hash, /^[0-9a-f]{64}$/);
+  assert.match(manifest.source.fingerprint_sha256, /^[0-9a-f]{64}$/);
+  assert.match(manifest.source.fixture.sha256, /^[0-9a-f]{64}$/);
+  assert.equal(manifest.runtime.node, process.version);
+  assert(manifest.dependencies.packages.some((item) => item.name === "@agentclientprotocol/sdk"));
+  assert.equal(manifest.tools.invoked.length, 0);
+  assert(manifest.tools.fixture_protocol_methods.includes("session/prompt"));
+  assert.equal(manifest.redaction.environment.variable_names_persisted, false);
+  assert.equal(manifest.redaction.environment.variable_values_persisted, false);
+  assert(manifest.redaction.environment.credential_like_variable_count > 0);
+  assert.equal(manifest.redaction.input.unknown_fields_rejected, true);
+  assert.equal(manifest.replayability.same_input_replay_supported, true);
+  assert.equal(manifest.replayability.fully_reproducible, false);
+  assert.deepEqual(manifest.replayability.external_services, []);
+  assert(manifest.replayability.external_dependencies.length > 0);
+  assert(manifest.replayability.replay_blocked_cases.length > 0);
+  assert.equal(report.reproducibility_manifest.path, "reproducibility.json");
+  assert.equal(report.reproducibility_manifest.sha256,
+    createHash("sha256").update(await fs.readFile(path.join(root, "all", "reproducibility.json"))).digest("hex"));
+  assert.doesNotMatch(JSON.stringify({ report, manifest }), /fault-test-credential-must-not/);
+  assert.doesNotMatch(JSON.stringify({ report, manifest }), /PROVIDER_API_KEY/);
+  for (const file of ["input.json", "report.json", "reproducibility.json",
+    ...faultScenarios.map((name) => path.join(name, "result.json"))])
+    assert.doesNotMatch(await fs.readFile(path.join(root, "all", file), "utf8"), /fault-test-credential-must-not/);
+  const inputSecret = "fault-test-secret-input-must-not-be-copied";
+  const secretInput = path.join(root, "secret-input.json");
+  await fs.writeFile(secretInput, JSON.stringify({ ...JSON.parse(inputBytes.toString("utf8")),
+    credentials: inputSecret }));
+  const rejectedOutput = path.join(root, "secret-replay");
+  await assert.rejects(runFaultSimulation({ replay: secretInput, outputDirectory: rejectedOutput }));
+  await assert.rejects(fs.stat(rejectedOutput), (failure) => failure.code === "ENOENT");
+  assert.doesNotMatch(JSON.stringify({ report, manifest }), new RegExp(inputSecret));
   assert.match(report.source_fingerprint, /^[0-9a-f]{64}$/);
   assert.deepEqual(JSON.parse(await fs.readFile(path.join(root, "all", "report.json"), "utf8")), report);
 });
