@@ -59,8 +59,29 @@ else
   export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
 fi
 write_state() {
-  printf "{\"updated\":true,\"kind\":\"%s\",\"from\":\"%s\",\"to\":\"%s\",\"at\":%s}\n" \
-    "$1" "$2" "$3" "$(date +%s)000" > "$LOGDIR/update-state.json"
+  node - "$LOGDIR/update-state.json" "$1" "$2" "$3" "$(date +%s)000" <<'JSON'
+const fs = require('node:fs');
+const [target, kind, from, to, at] = process.argv.slice(2);
+const timestamp = Number(at);
+if (!Number.isSafeInteger(timestamp)) process.exit(1);
+const temporary = `${target}.${process.pid}.tmp`;
+let created = false;
+let fd;
+try {
+  fd = fs.openSync(temporary, 'wx', 0o600);
+  created = true;
+  fs.writeFileSync(fd, `${JSON.stringify({updated:true,kind,from,to,at:timestamp})}\n`);
+  fs.closeSync(fd);
+  fd = undefined;
+  fs.renameSync(temporary, target);
+  created = false;
+} catch (error) {
+  if (fd !== undefined) try { fs.closeSync(fd); } catch {}
+  if (created) try { fs.unlinkSync(temporary); } catch {}
+  process.stderr.write(`failed to write update state: ${error.message}\n`);
+  process.exitCode = 1;
+}
+JSON
 }
 FROM_SOURCE="${RDSH_SYNC_FROM_SOURCE:-0}"
 PREFIX_BIN="${PREFIX_BIN:-$HOME/.local/bin}"
