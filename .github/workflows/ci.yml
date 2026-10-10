@@ -44,7 +44,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-      - run: node --test tests/plugin-security.test.mjs tests/settings-client.test.mjs tests/update-banner.test.mjs tests/model_benchmark/fence.test.mjs
+      - run: node --test tests/plugin-security.test.mjs tests/settings-client.test.mjs tests/update-banner.test.mjs tests/discord-presence.test.mjs tests/model_benchmark/fence.test.mjs
 
   security-boundaries:
     runs-on: ubuntu-latest
