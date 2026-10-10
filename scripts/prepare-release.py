@@ -22,6 +22,45 @@ def previous_tag(notes, requested=None):
     return base
 
 
+def without_shell_comment(command):
+    quote = None
+    escaped = False
+    index = 0
+    while index < len(command):
+        char = command[index]
+        if escaped:
+            escaped = False
+            index += 1
+            continue
+        if quote == "'":
+            if char == "'":
+                if index + 1 < len(command) and command[index + 1] == "'":
+                    index += 2
+                    continue
+                quote = None
+            index += 1
+            continue
+        if quote == '"':
+            if char == "\\":
+                escaped = True
+            elif char == '"':
+                quote = None
+            index += 1
+            continue
+        if char == "\\":
+            escaped = True
+        elif char in "'\"":
+            quote = char
+        elif char == "#" and (
+            index == 0
+            or command[index - 1].isspace()
+            or command[index - 1] in ";|&"
+        ):
+            return command[:index]
+        index += 1
+    return command
+
+
 def validate(root, tag):
     if not TAG.fullmatch(tag):
         raise ValueError("tag must be vX.Y.Z or vX.Y.Z-{alpha,beta,rc}.N")
@@ -62,6 +101,7 @@ def validate(root, tag):
         for block, inline in snippets:
             code = re.sub(r"[\\`]\r?\n", " ", block or inline)
             for line in code.splitlines():
+                line = without_shell_comment(line)
                 # Validate every simple command in a shell chain. A candidate
                 # can otherwise select its tag once, then fall through to a
                 # second unpinned installer after &&, ||, or backgrounding.

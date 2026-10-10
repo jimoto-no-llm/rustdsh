@@ -174,6 +174,45 @@ class ReleaseMetadataTests(unittest.TestCase):
             with self.subTest(extra=extra), self.assertRaisesRegex(ValueError, "matching this tag"):
                 release.validate(self.root, "v1.2.3-rc.1")
 
+    def test_candidate_tags_in_shell_comments_are_not_installer_arguments(self):
+        extras = (
+            "```sh\ncurl https://github.com/org/repo/releases/download/v1.2.3-rc.1/install.sh "
+            "| bash -s -- --from-release # --version=v1.2.3-rc.1\n```",
+            "```powershell\n./install.ps1 -FromRelease # -Version v1.2.3-rc.1\n```",
+        )
+        for extra in extras:
+            notes = self.fixture("1.2.3-rc.1")
+            notes.write_text(notes.read_text(encoding="utf-8") + "\n" + extra + "\n", encoding="utf-8")
+            with self.subTest(extra=extra), self.assertRaisesRegex(ValueError, "matching this tag"):
+                release.validate(self.root, "v1.2.3-rc.1")
+
+    def test_comment_markers_inside_quotes_are_not_treated_as_comments(self):
+        notes = self.fixture("1.2.3-rc.1")
+        text = notes.read_text(encoding="utf-8")
+        text = text.replace(
+            "--version=v1.2.3-rc.1",
+            "--version=v1.2.3-rc.1 # '--version=v1.2.4'",
+        )
+        text = text.replace(
+            "-Version v1.2.3-rc.1",
+            "-Version v1.2.3-rc.1 # '-Version v1.2.4'",
+        )
+        notes.write_text(text, encoding="utf-8")
+        release.validate(self.root, "v1.2.3-rc.1")
+
+    def test_quoted_comment_markers_do_not_hide_later_unpinned_installers(self):
+        extras = (
+            "```sh\nprintf '%s' '# keep' && curl "
+            "https://github.com/org/repo/releases/download/v1.2.3-rc.1/install.sh "
+            "| bash -s -- --from-release\n```",
+            "```powershell\nWrite-Output '# keep'; ./install.ps1 -FromRelease\n```",
+        )
+        for extra in extras:
+            notes = self.fixture("1.2.3-rc.1")
+            notes.write_text(notes.read_text(encoding="utf-8") + "\n" + extra + "\n", encoding="utf-8")
+            with self.subTest(extra=extra), self.assertRaisesRegex(ValueError, "matching this tag"):
+                release.validate(self.root, "v1.2.3-rc.1")
+
     def test_candidate_installer_chains_accept_each_invocation_pinned_to_the_tag(self):
         for separator in ("&&", "||"):
             notes = self.fixture("1.2.3-rc.1")
