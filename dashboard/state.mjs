@@ -2,6 +2,9 @@ import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
+import { prepareContract } from "./contracts.mjs";
+import { evaluateOperation } from "./policy.mjs";
+import { prepareApprovalRequest, decideApproval, claimApproval, checkApproval } from "./approvals.mjs";
 import { normalizeObservation } from "./observations.mjs";
 import {
   changeQuestionContract,
@@ -123,6 +126,7 @@ export class ProjectStore {
         updated_at: null,
         metrics: {},
         tasks: [],
+        contracts: [],
         questions: [],
         events: [],
         feedback: [],
@@ -139,9 +143,45 @@ export class ProjectStore {
     validateBudgetAdmission(value);
     return new ProjectStore(project, value);
   }
-  async mutate(operation, input) {
+  async mutate(operation, input, authority = "agent") {
     const next = this.clone();
-    applyOperation(next, operation, input);
+    if (operation === "contract") {
+      if (authority !== "local_administrator")
+        throw new Error("Only the local administrator can change a task contract");
+      const version = await prepareContract(next, input);
+      next.contracts ||= [];
+      let history = next.contracts.find((item) => item.task_id === input.task_id);
+      if (!history) {
+        history = { task_id: input.task_id, versions: [] };
+        next.contracts.push(history);
+      }
+      history.versions.push(version);
+    } else if (operation === "approval_request") {
+      const version = await prepareApprovalRequest(next, input);
+      next.approval_requests ||= [];
+      let history = next.approval_requests.find((item) => item.id === input.id);
+      if (!history) {
+        history = { id: input.id, versions: [] };
+        next.approval_requests.push(history);
+      }
+      history.versions.push(version);
+    } else if (operation === "approval_decision") {
+      decideApproval(next, input, authority);
+    } else if (["approval_claim", "approval_check"].includes(operation)) {
+      const result = operation === "approval_claim" ? await claimApproval(next, input) : await checkApproval(next, input);
+      next.approval_checks ||= [];
+      next.approval_checks.push({ checked_at: new Date().toISOString(), ...result });
+      next.approval_checks = next.approval_checks.slice(-1000);
+    } else if (operation === "policy") {
+      const result = await evaluateOperation(next, input);
+      next.policy_checks ||= [];
+      next.policy_checks.push({
+        id: `policy_${next.revision + 1}`, checked_at: new Date().toISOString(), ...result,
+      });
+      next.policy_checks = next.policy_checks.slice(-1000);
+    } else {
+      applyOperation(next, operation, input);
+    }
     validateInstructions(next);
     validateCostLedger(next);
     return this.commit(next, operation, input);
@@ -175,13 +215,25 @@ export class ProjectStore {
       task: "dashboard.task.updated",
       event: "dashboard.progress.updated",
       metrics: "dashboard.metrics.updated",
+      contract: "dashboard.contract.updated",
+      policy: "dashboard.policy.checked",
+      approval_request: "dashboard.approval.requested",
+      approval_decision: "dashboard.approval.decided",
+      approval_claim: "dashboard.approval.claimed",
+      approval_check: "dashboard.approval.checked",
     };
     const summary =
       operation === "answer"
         ? input.answer
         : operation === "question"
           ? input.question || input.cancel_reason
-          : input.title || "指標を更新";
+          : operation === "contract"
+            ? "タスク契約を更新"
+            : operation === "policy"
+              ? "操作構造を照合"
+              : operation?.startsWith("approval_")
+                ? "操作承認の台帳を更新"
+                : input.title || "指標を更新";
     if (operation) {
       next.changes ||= [];
       next.changes.push({
@@ -191,7 +243,7 @@ export class ProjectStore {
         data: {
           project_id: this.project.id,
           revision: next.revision,
-          entity_id: input.id || "",
+          entity_id: input?.id || input?.task_id || "",
           summary: String(summary).slice(0, 1000),
         },
         cursor: null,

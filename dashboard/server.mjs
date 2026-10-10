@@ -12,6 +12,8 @@ import { enableShare, inspectShare } from "./tailscale.mjs";
 import { startHarness, proxyHarness, upgradeHarness } from "./harness.mjs";
 import { EventsHub } from "./webhooks.mjs";
 import { modernMcpHandler } from "./mcp2.mjs";
+import { checkContract } from "./contracts.mjs";
+import { checkWorkerStart } from "./enforcement.mjs";
 import { AnswerApplicationServer } from "./answer-application-server.mjs";
 import { BudgetAdmissionServer } from "./budget-server.mjs";
 import { createHistoryBackup, backupMaximum } from "./history-backup.mjs";
@@ -113,7 +115,8 @@ export async function startDashboard(options) {
   const budgets = store ? new BudgetAdmissionServer(mutateBudget) : null;
   const modern = store
     ? modernMcpHandler(
-        { getState: visibleState, mutate },
+        { getState: visibleState, mutate, checkContract: preflight, checkOperation: policyCheck,
+          requestApproval, checkApproval: approvalCheck, claimApproval: approvalClaim, checkWorkerStart: workerStartCheck },
         eventsHub,
         connections,
       )
@@ -271,11 +274,11 @@ export async function startDashboard(options) {
       diagnosticPromise = null;
     }
   }
-  async function mutate(operation, input) {
+  async function mutate(operation, input, authority = "agent") {
     if (!store)
       throw new Error("Project operations are unavailable in Harness mode");
     const task = updateQueue.then(async () => {
-      const state = await store.mutate(operation, input);
+      const state = await store.mutate(operation, input, authority);
       for (const response of live)
         response.write(`event: changed\ndata: ${state.revision}\n\n`);
       for (const { mcp } of sessions.values()) void mcp.notify();
@@ -348,6 +351,33 @@ export async function startDashboard(options) {
     updateQueue = task.catch(() => {});
     return task;
   }
+  async function preflight(input) {
+    // Share the writer queue so the check observes preceding contract changes.
+    const task = updateQueue.then(() => checkContract(store.value, input));
+    updateQueue = task.catch(() => {});
+    return task;
+  }
+  async function policyCheck(input) {
+    const state = await mutate("policy", input);
+    return state.policy_checks.at(-1);
+  }
+  async function requestApproval(input) {
+    const state = await mutate("approval_request", input);
+    return { id: input.id, ...state.approval_requests.find((item) => item.id === input.id).versions.at(-1) };
+  }
+  async function approvalCheck(input) {
+    const state = await mutate("approval_check", input);
+    return state.approval_checks.at(-1);
+  }
+  async function approvalClaim(input) {
+    const state = await mutate("approval_claim", input);
+    return state.approval_checks.at(-1);
+  }
+  async function workerStartCheck(input) {
+    const task = updateQueue.then(() => checkWorkerStart(store.value, input));
+    updateQueue = task.catch(() => {});
+    return task;
+  }
   const server = http.createServer(async (req, res) => {
     res.setHeader("cache-control", "no-store");
     res.setHeader("referrer-policy", "no-referrer");
@@ -381,6 +411,7 @@ export async function startDashboard(options) {
         `Bearer ${token}`,
       );
       const agentRoute =
+        ["/api/contracts/check", "/api/policy/check", "/api/workers/check", "/api/approvals/request", "/api/approvals/check", "/api/approvals/claim"].includes(route) ||
         route === "/mcp" ||
         route === "/api/state" ||
         route === "/api/instructions/context" ||
@@ -429,6 +460,7 @@ export async function startDashboard(options) {
         req.method === "GET" &&
         (route === "/" ||
           route === "/app.mjs" ||
+          route === "/contract-view.mjs" ||
           route === "/observations.mjs" ||
           route === "/reports-view.mjs" ||
           route === "/question-cards-ui.mjs" ||
@@ -526,6 +558,7 @@ export async function startDashboard(options) {
         req.method === "GET" &&
         [
           "/app.mjs",
+          "/contract-view.mjs",
           "/observations.mjs",
           "/reports-view.mjs",
           "/question-cards-ui.mjs",
@@ -575,6 +608,37 @@ export async function startDashboard(options) {
         return res.end(svg);
       }
       if (kind === "project") {
+        // The shared 401 gate above authenticates all project checks. Claiming
+        // a retry/cost reservation additionally requires the execution credential.
+        if (req.method === "POST" && route === "/api/contracts/update") {
+          if (!adminAuthorized)
+            return json(res, 403, { error: "Administrator bearer token required" });
+          return json(res, 200, await mutate("contract", await readBody(req), "local_administrator"));
+        }
+        if (req.method === "POST" && route === "/api/contracts/check") {
+          if (!(adminAuthorized || mcpAuthorized || humanAuthorized))
+            return json(res, 403, { error: "Project credential required" });
+          const result = await preflight(await readBody(req));
+          return json(res, result.decision === "within_scope" ? 200 : 409, result);
+        }
+        if (req.method === "POST" && route === "/api/policy/check") {
+          const result = await policyCheck(await readBody(req));
+          return json(res, result.decision === "within_policy" ? 200 : 409, result);
+        }
+        if (req.method === "POST" && route === "/api/approvals/request")
+          return json(res, 200, await requestApproval(await readBody(req)));
+        if (req.method === "POST" && ["/api/approvals/check", "/api/approvals/claim"].includes(route)) {
+          if (route.endsWith("claim") && !mcpAuthorized)
+            return json(res, 403, { error: "Execution bearer token required" });
+          const result = await (route.endsWith("claim") ? approvalClaim : approvalCheck)(await readBody(req));
+          return json(res, result.decision === "approval_valid" ? 200 : 409, result);
+        }
+        if (req.method === "POST" && route === "/api/approvals/decide") {
+          if (!humanAuthorized) return json(res, 403, { error: "Human browser credential required" });
+          return json(res, 200, await mutate("approval_decision", await readBody(req), "human_browser"));
+        }
+        if (req.method === "POST" && route === "/api/workers/check")
+          return json(res, 409, await workerStartCheck(await readBody(req)));
         if (req.method === "POST" && route?.startsWith("/api/backup/")) {
           if (
             !adminAuthorized ||
@@ -718,6 +782,8 @@ export async function startDashboard(options) {
           return json(res, 200, await visibleState());
         if (req.method === "POST" && route?.startsWith("/api/update/")) {
           const operation = route.slice("/api/update/".length);
+          if (["contract", "policy", "approval_request", "approval_decision", "approval_check", "approval_claim"].includes(operation))
+            return json(res, 403, { error: "Use the administrator contract endpoint" });
           if (
             !["metrics", "task", "question", "answer", "event"].includes(
               operation,
@@ -765,6 +831,12 @@ export async function startDashboard(options) {
             const mcp = createMcpServer({
               getState: visibleState,
               mutate,
+              checkContract: preflight,
+              checkOperation: policyCheck,
+              requestApproval,
+              checkApproval: approvalCheck,
+              claimApproval: approvalClaim,
+              checkWorkerStart: workerStartCheck,
             });
             const transport = new StreamableHTTPServerTransport({
               sessionIdGenerator: randomUUID,

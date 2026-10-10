@@ -29,6 +29,17 @@ const object = (properties, required = []) => ({
   required,
   additionalProperties: false,
 });
+const operationSchema = object({
+  schema: { const: "rdsh.operation.v1" },
+  tool_name: { enum: ["file.read", "file.write", "process.exec", "network.request"] },
+  tool_input: { type: "object" },
+}, ["schema", "tool_name", "tool_input"]);
+const boundOperation = { task_id: string, contract_version: { type: "integer", minimum: 1 }, repository: string, operation: operationSchema };
+const approvalUseSchema = object({
+  ...boundOperation, id: string, request_version: { type: "integer", minimum: 1 },
+  run_id: string, command_id: string, attempt: { type: "integer", minimum: 1 },
+  cost_usd: { type: "number", minimum: 0, maximum: 1000000 },
+}, ["id", "request_version", "task_id", "contract_version", "repository", "run_id", "command_id", "operation", "attempt", "cost_usd"]);
 const decision = object(
   {
     kind: { enum: ["consultation", "approval"] },
@@ -69,6 +80,13 @@ const decision = object(
   ["kind"],
 );
 export const tools = [
+  {
+    name: "dashboard_check_worker_start",
+    description: "Resolve the task's requested review/implementation worker permissions. No enforcing OS adapter is registered: startup stays held, effective permissions are null, and fallback is disabled. Reported capabilities or approval cannot start a worker.",
+    inputSchema: object({ task_id: string, contract_version: { type: "integer", minimum: 1 },
+      repository: string, run_id: string, worker_role: { enum: ["review", "implementation"] } },
+    ["task_id", "contract_version", "repository", "run_id", "worker_role"]),
+  },
   {
     name: "dashboard_update_metrics",
     description:
@@ -147,6 +165,50 @@ export const tools = [
       "Read this project’s metrics, tasks, questions, recent events and optional source-aware cost ledger. Ledger totals are per declared period/source/currency; missing workers remain unknown and invoice amounts are never used to correct estimates.",
     inputSchema: object({}),
   },
+  {
+    name: "dashboard_check_task_contract",
+    description:
+      "Check declared repository, cwd and write paths against the current task contract before an operation. Only within_scope passes this preflight; block and unparsed must stop. This does not grant approval, parse commands, or enforce an OS sandbox. Recheck immediately before use; contracts can change.",
+    inputSchema: object({
+      task_id: string,
+      contract_version: { type: "integer", minimum: 1 },
+      repository: string,
+      cwd: string,
+      write_paths: { type: "array", maxItems: 100, items: string },
+    }, ["task_id", "contract_version", "repository", "cwd", "write_paths"]),
+  },
+  {
+    name: "dashboard_check_operation",
+    description:
+      "Parse and audit a declared rdsh.operation.v1 tool operation against the task contract. Supported schemas: file.read, file.write, process.exec with direct argv, network.request. Unknown tools, fields and shell syntax are unparsed. within_policy is only structural preflight; execution remains on hold without approval and an enforcing adapter.",
+    inputSchema: object({
+      task_id: string, contract_version: { type: "integer", minimum: 1 }, repository: string,
+      operation: object({
+        schema: { const: "rdsh.operation.v1" },
+        tool_name: { enum: ["file.read", "file.write", "process.exec", "network.request"] },
+        tool_input: { type: "object" },
+      }, ["schema", "tool_name", "tool_input"]),
+    }, ["task_id", "contract_version", "repository", "operation"]),
+  },
+  {
+    name: "dashboard_request_approval",
+    description: "Create a pending versioned approval request bound to the current parsed operation, run, command, cost/retry limits and expiry. This cannot grant human approval. Raw bodies, URL queries and argv values are represented by digests.",
+    inputSchema: object({
+      ...boundOperation, id: string, expected_version: { type: "integer", minimum: 0 },
+      run_id: string, command_id: string, source_ref: string, expires_at: string,
+      limits: object({ max_cost_usd: { type: "number", minimum: 0, maximum: 1000000 }, max_attempts: { type: "integer", minimum: 1, maximum: 10 } }, ["max_cost_usd", "max_attempts"]),
+    }, ["id", "expected_version", "task_id", "contract_version", "repository", "run_id", "command_id", "source_ref", "expires_at", "limits", "operation"]),
+  },
+  {
+    name: "dashboard_check_approval",
+    description: "Check an existing human approval against the exact current operation and next retry/cost reservation. This does not reserve an attempt or execute anything; execution remains on hold without enforcement.",
+    inputSchema: approvalUseSchema,
+  },
+  {
+    name: "dashboard_claim_approval",
+    description: "Atomically reserve one approved attempt and declared cost. Prevents duplicate/replayed reservations. It does not execute the operation or prove billing/enforcement; execution remains on hold.",
+    inputSchema: approvalUseSchema,
+  },
 ];
 const routes = {
   dashboard_update_metrics: "metrics",
@@ -172,6 +234,12 @@ export function diagnoseUnknownTool(name) {
 }
 export async function executeTool(api, name, args = {}) {
   if (name === "dashboard_get_state") return await api.getState();
+  if (name === "dashboard_check_worker_start") return await api.checkWorkerStart(args);
+  if (name === "dashboard_check_task_contract") return await api.checkContract(args);
+  if (name === "dashboard_check_operation") return await api.checkOperation(args);
+  if (name === "dashboard_request_approval") return await api.requestApproval(args);
+  if (name === "dashboard_check_approval") return await api.checkApproval(args);
+  if (name === "dashboard_claim_approval") return await api.claimApproval(args);
   if (name === "dashboard_get_feedback")
     return feedbackSince(await api.getState(), args.after ?? 0);
   if (routes[name]) {
@@ -307,13 +375,19 @@ export async function runStdio(project) {
       signal: AbortSignal.timeout(10000),
     });
     const result = await response.json();
-    if (!response.ok)
+    if (!response.ok && !(["api/contracts/check", "api/policy/check", "api/approvals/check", "api/approvals/claim", "api/workers/check"].includes(route) && response.status === 409))
       throw new Error(result.error || `HTTP ${response.status}`);
     return result;
   }
   const mcp = createMcpServer({
     getState: () => request("api/state"),
     mutate: (operation, input) => request(`api/update/${operation}`, input),
+    checkContract: (input) => request("api/contracts/check", input),
+    checkOperation: (input) => request("api/policy/check", input),
+    requestApproval: (input) => request("api/approvals/request", input),
+    checkApproval: (input) => request("api/approvals/check", input),
+    claimApproval: (input) => request("api/approvals/claim", input),
+    checkWorkerStart: (input) => request("api/workers/check", input),
   });
   await mcp.server.connect(new StdioServerTransport());
   // Resource subscribers receive change notifications; disconnected clients can recover with cursors.

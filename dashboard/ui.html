@@ -528,6 +528,11 @@
         overflow-wrap: anywhere;
         font-size: 13px;
       }
+      #approvals .event,
+      #policy-checks .event,
+      #tasks details {
+        overflow-wrap: anywhere;
+      }
       footer {
         margin-top: 24px;
         color: var(--mut);
@@ -816,6 +821,13 @@
           </dl>
           <ul id="overview-pending"></ul>
         </section>
+        <details class="fold" id="operation-detail">
+          <summary>操作の照合・承認</summary>
+          <h2>操作の照合</h2>
+          <div id="policy-checks"></div>
+          <h2>操作の承認</h2>
+          <div id="approvals"></div>
+        </details>
         <h2 id="pending-heading" tabindex="-1">未回答の質問</h2>
         <p class="sub" id="pending-note">
           プロジェクト全体の質問です。回答はこの質問への返答のみです。対象・条件が変わった場合は回答前に内容を再確認してください。回答しただけで実行権限は生まれません。
