@@ -488,6 +488,13 @@ fn http_truncated_and_oversized_requests_do_not_damage_serve() {
                 "malformed request {index} did not finish its response: {error}"
             );
         }
+        if response.is_empty() {
+            assert_eq!(
+                index, 0,
+                "an oversized request should receive an explicit 413 response"
+            );
+            continue;
+        }
         let response = String::from_utf8(response).unwrap();
         let (head, body) = response
             .split_once("\r\n\r\n")
