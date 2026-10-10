@@ -1,12 +1,40 @@
-import test from "node:test";
+import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { PassThrough } from "node:stream";
 import { setImmediate as tick } from "node:timers/promises";
 import { startWindowsTray } from "../windows-tray.mjs";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { fileURLToPath } from "node:url";
+
+const originalPath = process.env.PATH;
+const originalCwd = process.cwd();
+let placeholder;
+// Non-Windows hosts have no pwsh.exe; a trailing PATH entry lets mock tests resolve one.
+before(async () => {
+  placeholder = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-tray-path-"));
+  await fs.writeFile(path.join(placeholder, "pwsh.exe"), "");
+  process.env.PATH = [originalPath, placeholder]
+    .filter(Boolean)
+    .join(path.delimiter);
+});
+after(async () => {
+  process.env.PATH = originalPath;
+  process.chdir(originalCwd);
+  await fs.rm(placeholder, { recursive: true, force: true });
+});
+async function plantedDirectory(executable) {
+  const planted = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-tray-cwd-"));
+  const decoy = path.join(planted, "pwsh.exe");
+  if (executable) await fs.copyFile(executable, decoy);
+  else await fs.writeFile(decoy, "");
+  process.chdir(planted);
+  return planted;
+}
 
 function fixture(close) {
   const server = new EventEmitter();
@@ -49,6 +77,51 @@ test("tray passes no URL/credential to PowerShell; Open uses its exact server", 
   assert.deepEqual(f.opened, [f.dashboard.browserUrl]);
   tray.dispose();
   assert.equal(f.child.stdin.writableEnded, true);
+});
+
+test("tray helper is resolved from an absolute PATH entry, never the working directory", async () => {
+  const planted = await plantedDirectory();
+  const searched = process.env.PATH;
+  process.env.PATH = "." + path.delimiter + searched;
+  try {
+    const f = fixture(async () => {});
+    f.child.stdout.write("ready\n");
+    (await f.pending).dispose();
+    const [command] = f.invocation;
+    assert.ok(path.isAbsolute(command), command);
+    assert.equal(path.basename(command), "pwsh.exe");
+    assert.notEqual(path.dirname(command), planted);
+    await fs.access(command);
+  } finally {
+    process.env.PATH = searched;
+    process.chdir(originalCwd);
+    await fs.rm(planted, { recursive: true, force: true });
+  }
+});
+
+test("tray fails closed before spawning when PATH has no pwsh.exe", async () => {
+  const empty = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-tray-empty-"));
+  const searched = process.env.PATH;
+  process.env.PATH = empty;
+  const server = new EventEmitter();
+  let spawned = false;
+  try {
+    await assert.rejects(
+      startWindowsTray({
+        dashboard: { server, close: async () => {} },
+        open: () => {},
+        spawnProcess: () => {
+          spawned = true;
+        },
+      }),
+      /pwsh\.exe/,
+    );
+    assert.equal(spawned, false);
+    assert.equal(server.listenerCount("close"), 0);
+  } finally {
+    process.env.PATH = searched;
+    await fs.rm(empty, { recursive: true, force: true });
+  }
 });
 
 test("tray tooltip identifies its project and bounds Unicode labels", async () => {
@@ -272,6 +345,45 @@ test(
     const [code] = await exit;
     assert.equal(code, 0);
     t.diagnostic(JSON.stringify({ tray_startup: tray.diagnostics() }));
+  },
+);
+
+test(
+  "native Windows runs real PowerShell despite a planted pwsh.exe in the working directory",
+  {
+    skip: process.platform !== "win32",
+    timeout: 25000,
+  },
+  async (t) => {
+    // A genuine executable under the helper's name: it exits on PowerShell's
+    // arguments instead of printing "ready", so selecting it fails this test.
+    const planted = await plantedDirectory(process.execPath);
+    const server = new EventEmitter();
+    let helper;
+    t.after(async () => {
+      process.chdir(originalCwd);
+      await stopFixtureHelper(helper);
+      await fs.rm(planted, { recursive: true, force: true });
+    });
+    const tray = await startWindowsTray({
+      dashboard: {
+        server,
+        browserUrl: "http://127.0.0.1:38101/#key=dummy",
+        close: async () => server.emit("close"),
+      },
+      open: () => {},
+      spawnProcess: (...args) => {
+        helper = spawn(...args);
+        return helper;
+      },
+    });
+    assert.notEqual(path.dirname(helper.spawnfile), planted);
+    assert.match(tray.diagnostics().powershell, /^\d+\./);
+    const exit = once(helper, "exit", { signal: t.signal });
+    server.emit("close");
+    tray.dispose();
+    const [code] = await exit;
+    assert.equal(code, 0);
   },
 );
 

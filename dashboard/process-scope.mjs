@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { PassThrough, Writable } from "node:stream";
 import { randomUUID } from "node:crypto";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { performance } from "node:perf_hooks";
 
@@ -51,7 +52,13 @@ export async function spawnOwnedProcess({
       .replace(/^([a-zA-Z]):/, (_, drive) => "/mnt/" + drive.toLowerCase());
     if (!wslNode.startsWith("/") || wslNode.includes("\0"))
       throw new ScopeError("ownership_unavailable");
-    launcher = ["wsl.exe", "-d", wsl, "--exec", wslNode, linuxHelper];
+    // A bare name would be searched in the inherited working directory first (CWE-427).
+    const wslExe = path.join(
+      process.env.SystemRoot || "C:\\Windows",
+      "System32",
+      "wsl.exe",
+    );
+    launcher = [wslExe, "-d", wsl, "--exec", wslNode, linuxHelper];
     framed = true;
   }
   const monitor = spawn(launcher[0], launcher.slice(1), {

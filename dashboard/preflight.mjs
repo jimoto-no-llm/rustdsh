@@ -367,7 +367,11 @@ export async function preflightTask(
   else {
     try {
       await query(
-        "wsl.exe",
+        path.join(
+          process.env.SystemRoot || "C:\\Windows",
+          "System32",
+          "wsl.exe",
+        ),
         ["-d", required.wsl.distribution, "--exec", "/bin/true"],
         {
           env,

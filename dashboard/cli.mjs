@@ -158,7 +158,13 @@ function openUrl(url) {
     console.log(url);
     return;
   }
-  const child = spawn("rundll32.exe", ["url.dll,FileProtocolHandler", url], {
+  // A bare name would be searched in the working directory first (CWE-427).
+  const rundll32 = path.join(
+    process.env.SystemRoot || "C:\\Windows",
+    "System32",
+    "rundll32.exe",
+  );
+  const child = spawn(rundll32, ["url.dll,FileProtocolHandler", url], {
     windowsHide: true,
     detached: true,
     stdio: "ignore",

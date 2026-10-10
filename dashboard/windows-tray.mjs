@@ -1,7 +1,21 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+import path from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
+
+// spawn() with a bare name tries the working directory before PATH (CWE-427).
+function powershellPath() {
+  for (const directory of (process.env.PATH || "").split(path.delimiter)) {
+    if (!path.isAbsolute(directory)) continue;
+    const candidate = path.join(directory, "pwsh.exe");
+    if (existsSync(candidate)) return candidate;
+  }
+  throw new Error(
+    "pwsh.exe is not on PATH; the Windows tray requires PowerShell 7",
+  );
+}
 
 // The tray receives no credentials or URLs. It controls only this server object.
 export async function startWindowsTray({
@@ -65,7 +79,7 @@ export async function startWindowsTray({
   // Process-local policy permits this checkout's script (including WSL UNC paths).
   // Machine/user policy is never changed; enforced group policy still applies.
   const child = spawnProcess(
-    "pwsh.exe",
+    powershellPath(),
     [
       "-NoLogo",
       "-NoProfile",
