@@ -152,12 +152,21 @@ try {
       return handle;
     };
     if (config.scenario === "restart") {
+      // Capture the root identity before dispatch: the mock CLI may exit
+      // immediately after committing its effect, before the parent handles the
+      // checkpoint message. The durable process-bound record is the earliest
+      // observation and remains tied to this exact owned PID.
+      const boundRun = (await history.read()).runs.get(record.run_id);
+      const rootIdentity = boundRun?.process?.identity ?? adapter.ownedScope.descriptor.root_identity;
+      if (!rootIdentity)
+        throw Object.assign(new Error("Process identity unavailable before restart fixture dispatch"), {
+          code: "fixture_process_identity_unavailable",
+        });
       adapter.on("event", (event) => {
         if (event.type !== "session_update" ||
             event.update?.content?.text !== "fault-effect-committed") return;
         process.send({ type: "restart_checkpoint", run_id: record.run_id,
-          project, root_pid: adapter.child.pid,
-          root_identity: adapter.ownedScope.descriptor.root_identity });
+          project, root_pid: adapter.child.pid, root_identity: rootIdentity });
       });
       await adapter.send(record.cli_session_id, "fixed simulator effect", { command_id: id("send") });
       throw new Error("The parent did not stop at the restart checkpoint");

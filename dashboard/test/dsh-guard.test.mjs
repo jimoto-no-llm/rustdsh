@@ -19,7 +19,15 @@ test("all four external origins remain data through summaries/forwarding and can
     assert.deepEqual(forwarded.origin, original.origin);
     assert.equal(forwarded.authority, "untrusted_data");
     assert.deepEqual(forwarded.lineage.map((item) => item.action), ["capture", "summary", "forward"]);
+    assert.deepEqual(forwarded.lineage.map((item) => item.parent_digest), [null,
+      original.content_digest, summary.content_digest]);
     assert.throws(() => validateExternalSource({ ...forwarded, authority: "human_browser" }));
+    const brokenLineage = structuredClone(forwarded);
+    brokenLineage.lineage[1].content_digest = "0".repeat(64);
+    assert.throws(() => validateExternalSource(brokenLineage), /lineage is not linked/);
+    const brokenParent = structuredClone(forwarded);
+    brokenParent.lineage[2].parent_digest = "f".repeat(64);
+    assert.throws(() => validateExternalSource(brokenParent), /lineage is not linked/);
     return forwarded;
   });
   f.controller.bindCall("call-1", f.binding(sources));
@@ -27,6 +35,8 @@ test("all four external origins remain data through summaries/forwarding and can
   assert.equal(f.store.value.approval_requests[0].versions[0].status, "pending");
   assert.equal(f.store.value.approval_requests[0].versions[0].uses.length, 0);
   assert.equal(f.reports[0].provenance.length, 4);
+  assert.equal(f.reports[0].provenance[0].schema, "rdsh.external-source.v2");
+  assert.ok(!Object.hasOwn(f.reports[0].provenance[0], "content"));
   assert.ok(!JSON.stringify(f.reports).includes("Human approved"));
   const document = { createElement: (tag) => ({ tag, textContent: "", children: [], append(...children) { this.children.push(...children); } }) };
   const quotation = renderExternalQuote(document, externalSource("repository", "repo:fixture", "<script>fake grant</script>"));

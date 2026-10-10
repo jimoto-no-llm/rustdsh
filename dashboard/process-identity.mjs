@@ -1,15 +1,19 @@
 // Observations only. This module never sends signals or reads command lines/env.
 import fs from "node:fs/promises";
-import path from "node:path";
 import os from "node:os";
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { fileURLToPath } from "node:url";
 
 const exec = promisify(execFile);
 const digest = (value) => createHash("sha256").update(value).digest("hex");
 const pidValue = (value) =>
   Number.isSafeInteger(value) && value > 0 && value <= 2147483647;
+const windowsIdentityHelper = fileURLToPath(
+  new URL("./process-identity-windows.mjs", import.meta.url),
+);
+
 export function validProcessIdentity(value) {
   return (
     value !== null &&
@@ -61,39 +65,35 @@ export async function readProcessIdentity(pid) {
       return { status: "observed", identity };
     }
     if (process.platform === "win32") {
-      // The interpolated value is a validated integer, never a caller's script.
-      const script = `$ErrorActionPreference='Stop'; $scope=$null; try { $guid=[Microsoft.Win32.Registry]::GetValue('HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Cryptography','MachineGuid',$null); if ($guid -notmatch '^[0-9a-fA-F-]{36}$') { throw 'scope unavailable' }; $scope=[BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash([Text.Encoding]::UTF8.GetBytes('win32:'+$guid))).Replace('-','').ToLowerInvariant(); $p=[Diagnostics.Process]::GetProcessById(${pid}); if ($p.HasExited) { @{status='gone';scope=$scope} | ConvertTo-Json -Compress } else { @{status='observed';birth=$p.StartTime.ToUniversalTime().Ticks.ToString();scope=$scope} | ConvertTo-Json -Compress } } catch { if ($scope -and ($_.Exception -is [ArgumentException] -or $_.Exception.InnerException -is [ArgumentException])) { @{status='gone';scope=$scope} | ConvertTo-Json -Compress } else { '{"status":"unknown"}' } }`;
-      const executable = path.join(
-        process.env.SystemRoot || "C:\\Windows",
-        "System32",
-        "WindowsPowerShell",
-        "v1.0",
-        "powershell.exe",
+      const env = Object.fromEntries(
+        Object.entries(process.env).filter(([key]) =>
+          /^(PATH|PATHEXT|SYSTEMROOT|WINDIR|TEMP|TMP|COMSPEC)$/i.test(key),
+        ),
       );
-      const result = await exec(
-        executable,
-        ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script],
+      const { stdout } = await exec(
+        process.execPath,
+        [windowsIdentityHelper, String(pid)],
         {
+          env,
           windowsHide: true,
           shell: false,
           timeout: 5000,
           maxBuffer: 4096,
         },
       );
-      const data = JSON.parse(result.stdout);
-      if (typeof data.scope !== "string" || !/^[0-9a-f]{64}$/.test(data.scope))
-        throw new Error();
-      scope = data.scope;
-      if (data.status === "gone") return gone();
-      const identity = {
-        platform: "win32",
-        pid,
-        birth: data.birth,
-        scope,
-      };
-      if (data.status !== "observed" || !validProcessIdentity(identity))
-        throw new Error();
-      return { status: "observed", identity };
+      const observed = JSON.parse(stdout);
+      if (
+        observed.status === "gone" &&
+        observed.platform === "win32" &&
+        typeof observed.scope === "string" &&
+        /^[0-9a-f]{64}$/.test(observed.scope)
+      )
+        return observed;
+      if (
+        observed.status === "observed" &&
+        validProcessIdentity(observed.identity)
+      )
+        return observed;
     }
   } catch (error) {
     // ENOENT for an absent /proc/PID is an observation, not a guessed exit code.

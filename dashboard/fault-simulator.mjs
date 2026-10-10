@@ -43,7 +43,8 @@ async function sourceFingerprint() {
   const hash = createHash("sha256");
   for (const name of ["fault-simulator.mjs", "fault-simulator-worker.mjs", "fault-simulator-trace.mjs", "fault-simulator-cli.mjs",
     "fault-simulator-network.mjs", "adapters.mjs", "tracked-adapter.mjs", "session-ledger.mjs",
-    "run-history.mjs", "process-scope.mjs", "process-scope-backends.mjs", "retry.mjs"]) {
+    "run-history.mjs", "process-identity.mjs", "process-identity-windows.mjs",
+    "process-scope.mjs", "process-scope-backends.mjs", "retry.mjs"]) {
     hash.update(name + "\0");
     hash.update(await fs.readFile(new URL(name, import.meta.url)));
   }
@@ -147,7 +148,7 @@ export async function runFaultSimulation({ outputDirectory, scenario = "all", se
   const report = { schema: 1, simulator_version: 1, seed: input.seed,
     source_fingerprint: fingerprint, output_directory: directory,
     runtime: { platform: process.platform, node: process.versions.node },
-    source_fingerprint_scope: "simulator files, adapters, tracked-adapter, session-ledger, run-history, process-scope, process-scope-backends and retry",
+    source_fingerprint_scope: "simulator files, adapters, tracked-adapter, session-ledger, run-history, process-identity, process-scope, process-scope-backends and retry",
     verification_scope: "offline_control_plane_with_mock_CLI_and_mock_GPU; no_real_model_or_GPU_verification",
     passed: results.every((r) => r.passed), results };
   await fs.writeFile(path.join(directory, "report.json"), json(report), { flag: "wx", mode: 0o600 });
