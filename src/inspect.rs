@@ -1433,6 +1433,7 @@ mod tests {
         p
     }
 
+    #[cfg(unix)]
     #[test]
     fn frame_header_sizes() {
         // 1-byte FCS (single segment): exact size.
@@ -1460,6 +1461,7 @@ mod tests {
         }
     }
 
+    #[cfg(unix)]
     #[test]
     fn frame_header_fallback_cases() {
         // Multi-frame streams sum.
@@ -1502,6 +1504,7 @@ mod tests {
         }
     }
 
+    #[cfg(unix)]
     #[test]
     fn tokens_cache_skips_none_without_cli() {
         // A FCS-less frame is `?` without the zstd CLI; that `None` must not
