@@ -1,5 +1,5 @@
-// The model never receives the host filesystem, environment or network.
-// Unsupported hosts/runners throw; there is no unconfined retry.
+// The rdsh_inspect tool never receives the host filesystem, environment or
+// network. Unsupported hosts/runners throw; there is no unconfined retry.
 import fs from 'node:fs/promises';
 import { openSync, closeSync, constants } from 'node:fs';
 import path from 'node:path';
@@ -117,7 +117,7 @@ export async function executeIsolated({ workspace, command, sharedFiles = [], ti
 }
 
 export function installToolBoundary(tools, { workspace, sharedFiles = [] }) {
-  if (!tools || typeof tools.guard !== 'function' || typeof tools.get !== 'function') throw new Error('required monotonic tools guard unavailable');
+  if (!tools || typeof tools.register !== 'function') throw new Error('required tool registration API unavailable');
   const definition = {
     name: 'rdsh_inspect',
     description: 'Inspect this project in a kernel sandbox. Only files explicitly shared by the human are available, read-only. Disposable temporary storage is available. No network, host writes, escalation, plugins or background jobs.',
@@ -128,9 +128,7 @@ export function installToolBoundary(tools, { workspace, sharedFiles = [] }) {
       return executeIsolated({ workspace, sharedFiles, command: args.command });
     },
   };
-  // Register the denial before exposing any capability. Identity comparison
-  // rejects a child/scoped tool that shadows the trusted tool's name.
-  tools.guard(exec => exec.name === definition.name && tools.get(exec.name, exec.agent) === definition
-    ? undefined : 'RDSH_SECURITY: this tool has no credential-isolated, network-denying execution adapter');
+  // Add rdsh's isolated inspection capability without replacing DSH's normal
+  // tool permissions or globally denying tools provided by integrations.
   tools.register(definition);
 }

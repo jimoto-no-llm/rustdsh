@@ -29,11 +29,11 @@ What happens next:
 
 ## Scope Notes
 
-- Agent execution through rdsh requires the audited DSH tool adapter and
-  Linux x86_64 kernel isolation. Unsupported combinations fail closed.
-  Only explicitly shared project files are exposed to model tools; their
-  contents may reach the configured model provider. Plugins and profiles
-  are trusted code. Direct upstream DSH execution is outside this protection.
+- The additional `rdsh_inspect` tool requires an audited DSH adapter and
+  Linux x86_64 kernel isolation. Only explicitly shared project files are
+  exposed to it; their contents may reach the configured model provider.
+  Other DSH and integration tools retain upstream permissions and approvals
+  and are outside this isolation. Plugins and profiles are trusted code.
   Upstream Harness vulnerabilities should also be reported upstream.
 - The Node dashboard (dashboard/*) binds to loopback by default. Tailscale
   Serve QR URLs are credentials - never paste them into public issues.
