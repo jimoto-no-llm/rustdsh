@@ -58,6 +58,10 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y bubblewrap
       - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - run: node --test tests/security-boundaries.test.mjs tests/tool-isolation.test.mjs
+      - name: Install pinned upstream tool-bash for approval integrity test
+        run: npm install --prefix "$RUNNER_TEMP/rdsh-runtime" --ignore-scripts --no-audit --no-fund @deepseek-ai/dsh-tool-bash@0.2.0-rc.2
+      - name: Test approval integrity against pinned upstream source
+        run: DSH_TOOL_BASH_SOURCE="$RUNNER_TEMP/rdsh-runtime/node_modules/@deepseek-ai/dsh-tool-bash/lib/index.js" node --test tests/upstream-approval-integrity.test.mjs
       - run: python3 -m unittest discover -s tests -p 'test_release_assets.py'
       - name: Verify the audited dispatcher and late middleware changes
         run: |
