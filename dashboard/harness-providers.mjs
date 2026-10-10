@@ -27,7 +27,14 @@ function readReadyUrl(child, { timeout = 45_000, port }) {
     const capture = (chunk) => {
       output = (output + chunk.toString()).slice(-32_000);
       const match = output.match(/dsh web: (http:\/\/127\.0\.0\.1:\d+\/[^\s]*)/);
-      if (match) finish(null, new URL(match[1]));
+      if (match) {
+        const url = new URL(match[1]);
+        if (url.port !== String(port)) {
+          finish(new Error(`Harness reported an unexpected port; expected ${port}`));
+          return;
+        }
+        finish(null, url);
+      }
     };
     const onError = (error) => finish(error);
     const onExit = (code) =>

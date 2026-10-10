@@ -1,9 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
 import fs from "node:fs/promises";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
+import { PassThrough } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { startHarness } from "../harness.mjs";
 import { RunHistory } from "../run-history.mjs";
@@ -81,6 +83,30 @@ test("unsupported providers and platforms fail with a reason and no fallback", (
     }),
     (error) => error.provider === "remote" && /no fallback was attempted/.test(error.message),
   );
+});
+
+test("provider readiness accepts only the selected loopback port", async () => {
+  const provider = resolveHarnessProvider({ command: ["unused"], cwd: process.cwd() });
+  const createChild = () => {
+    const child = new EventEmitter();
+    child.stdout = new PassThrough();
+    child.stderr = new PassThrough();
+    return child;
+  };
+
+  const mismatched = createChild();
+  const mismatchResult = provider.waitUntilReady(mismatched, { port: 3081 });
+  mismatched.stdout.write("dsh web: http://127.0.0.1:3082/\n");
+  await assert.rejects(mismatchResult, /unexpected port/);
+  mismatched.stdout.destroy();
+  mismatched.stderr.destroy();
+
+  const matching = createChild();
+  const matchingResult = provider.waitUntilReady(matching, { port: 3081 });
+  matching.stdout.write("dsh web: http://127.0.0.1:3081/\n");
+  assert.equal((await matchingResult).port, "3081");
+  matching.stdout.destroy();
+  matching.stderr.destroy();
 });
 
 test("verified stop permits a clean managed-Harness restart with a distinct run", async (t) => {
