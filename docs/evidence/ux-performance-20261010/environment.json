@@ -1,0 +1,52 @@
+{
+  "recorded_at_utc": "2026-10-10T00:52:49.176886+00:00",
+  "baseline_commit": "e81782a8f38745076e9ee4e0cb6cf4e532bf4e17",
+  "candidate": "uncommitted working tree on codex/ux-performance-review",
+  "os": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.43",
+  "cpu": "AMD Ryzen 7 5700X 8-Core Processor",
+  "logical_cpus_available": 12,
+  "native_affinity_cpus": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "browser_affinity": "not pinned",
+  "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+  "cargo": "cargo 1.98.1 (797e8a9bc 2026-08-05)",
+  "node": "v24.16.0",
+  "python": "3.14.4",
+  "chrome": "Google Chrome 154.0.8037.57",
+  "zstd": "*** Zstandard CLI (64-bit) v1.5.7, by Yann Collet ***",
+  "build": "cargo build --release; opt-level=3, lto=fat, codegen-units=1, strip=true, panic=abort",
+  "binaries": {
+    "baseline": {
+      "bytes": 1956552,
+      "sha256": "3b234d8dd4d7947cb04dbfcc6938500432a03e7420d747ca428eb2666190faa4"
+    },
+    "candidate": {
+      "bytes": 1968752,
+      "sha256": "ea91fba65bde48303083faa3ce86b1dcc1b2085c4b38e050145d3bf63b3e4d49"
+    }
+  },
+  "candidate_source_sha256": {
+    "src/main.rs": "bf782e9d9711cd2b4b890eebfca5ab9f59c09cfa57a55b77bf3f309f71422cc2",
+    "src/tokens.rs": "eafa28b4671c2194abfb2a393075f3eb14925009e8e6495dde591aba27297b25",
+    "src/search.rs": "546b9e27b71d2d2f3c46b5a1e7ee0995992db9452121cf1c446066d325d14bed",
+    "src/setup.html": "bd69b16f75b559fffd576c3a5176d2a52a4d346ca2dd505767c36de4483c1ea6",
+    "src/setup_web.rs": "48284a75a13113a1f1d27bbf03dd57403c14be7e0438d7eb87b806380831d7d3",
+    "src/ui.html": "79b64a42fb4b37ac6c5ec5555ad3ed36baa9b8f974f22ce9c71d5673e29a523b",
+    "plugins/rdsh-settings/client.js": "ad6d0596f631c158f54f5fcdfd5d4db58281c2c380f7cebd82a51c61eb659fb4",
+    "plugins/rdsh-settings/index.js": "dc47197920b74ce4f08fa1518e372f32fe9f0b76a57c2c1f75d85e39a88e1d48",
+    "dashboard/app.mjs": "61668623cc28b546bbb8e18db9c25f1a48188886f7384c19e4157c96848f2575",
+    "dashboard/reports-view.mjs": "67f53863a461d1a2dac2d99f941f9a8fbf33b6a64be0b31ca6d1595efb68fe7c",
+    "dashboard/ui.html": "52341e1f59ae4ace1dc3ffb0286242974de0214fee3491f3e0bb60e8871daa97",
+    "scripts/benchmark.py": "3591925b3f91d668ccf80c8298559adc751ea2fc2c1e0be14e1e3c53bab7052c",
+    "scripts/benchmark-search.py": "7c9153fc67920ae0c1aeab14f701ee9b8fce44fcc8ac6f204c7c950c258d1d2a",
+    "tests/e2e/benchmark-dashboard.mjs": "f87de3c4f73ca88d3fdcebf9a883abd5f30e2fb78f0d9d52d6421ff9c4da9443",
+    "tests/e2e/browser.mjs": "46d680eb2345c07d4515d03c2fff5c496c962f711a6bff80a9f29305c912882d",
+    "tests/e2e/harness-settings.mjs": "03a12b3b72187c74f82cf7e6cbe0470dcac4ec05559fe036f370cf2d059ab019",
+    "tests/settings-client.test.mjs": "4c8af4cf7365ef3ef807dcfc19be5c809c536929cd88f13d6380486511875baa",
+    "tests/plugin-security.test.mjs": "41eb2ce3dfe5429147c0ee054dd8983e7de357c66d1e10f5199a4291522c8bae"
+  }
+}

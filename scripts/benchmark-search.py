@@ -58,7 +58,7 @@ def main():
             return result.stdout, result.stderr, (time.perf_counter() - start) * 1000
 
         for case, count, lines, matching, depth in [
-            ("dense", 160, 6000, True, 0), ("sparse", 1500, 40, False, 0),
+            ("dense", 160, 6000, True, 0), ("no_match_long", 160, 6000, False, 0), ("sparse", 1500, 40, False, 0),
             ("deep", 800, 40, False, 5), ("mixed", 160, 1000, True, 2),
         ]:
             directory = root / case
@@ -128,7 +128,7 @@ def main():
         args.output.write_text(text)
     print(json.dumps({case: {name: value[name] for name in binaries}
                       for case, value in report["cases"].items()}, indent=2))
-    print(f"Output equality: 4 performance cases and {len(report['compatibility'])} compatibility cases")
+    print(f"Output equality: {len(report['cases'])} performance cases and {len(report['compatibility'])} compatibility cases")
 
 
 if __name__ == "__main__":

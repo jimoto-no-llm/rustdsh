@@ -1,0 +1,77 @@
+{
+  "cases": [
+    {
+      "flags": [
+        "--version"
+      ],
+      "exit": 0,
+      "stdout_stderr_equal": true
+    },
+    {
+      "flags": [
+        "-V"
+      ],
+      "exit": 0,
+      "stdout_stderr_equal": true
+    },
+    {
+      "flags": [
+        "--version",
+        "--version"
+      ],
+      "exit": 0,
+      "stdout_stderr_equal": true
+    },
+    {
+      "flags": [
+        "--dry-run",
+        "--version"
+      ],
+      "exit": 0,
+      "stdout_stderr_equal": true
+    },
+    {
+      "flags": [
+        "--no-slim",
+        "-V"
+      ],
+      "exit": 0,
+      "stdout_stderr_equal": true
+    },
+    {
+      "flags": [
+        "--version",
+        "tokens"
+      ],
+      "exit": 0,
+      "stdout_stderr_equal": true
+    },
+    {
+      "flags": [
+        "--version",
+        {
+          "bytes_hex": "ff"
+        }
+      ],
+      "exit": 0,
+      "stdout_stderr_equal": true
+    },
+    {
+      "flags": [
+        {
+          "bytes_hex": "ff"
+        }
+      ],
+      "exit": 2,
+      "stdout_stderr_equal": true
+    }
+  ],
+  "intentional_help_text_change": {
+    "flags": [
+      "--",
+      "--version"
+    ],
+    "exit_equal": true,
+    "help_shown": true
+  }
+}

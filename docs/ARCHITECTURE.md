@@ -81,12 +81,23 @@ value wins, `RDSH_NODE_COMPILE_CACHE=0` opts out).
 
 ## Performance notes
 
+- Standalone native `--version` / `-V` bypass parser construction with identical
+  version output. Combined flags retain Clap parsing; the `dsh` alias delegates.
 - Token estimation: pure-ASCII input is one `len/4` step; non-ASCII keeps the
   exact scan (identical results).
 - Search: sequential walk fixes order, files are grepped in parallel, hits merge
   back in walk order. Trees under 32 files keep the sequential path.
-- `sessions --tokens`: parallel zstd expansion (same numbers, order kept).
-- Release profile: `opt-level=z`, LTO, `strip`, `panic=abort` (~806KB).
+- ASCII pruning solves the existing head/tail budget directly; Unicode retains
+  the bounded search. The estimator, markers and output bytes are unchanged.
+- Search skips line splitting when the bounded buffer has no literal match.
+- `sessions --tokens`: zstd frame sizes or bounded parallel decompression, with
+  cached estimates for growing histories (same numbers, order kept).
+- Release profile: `opt-level=3`, fat LTO, one codegen unit, `strip`,
+  `panic=abort`; current binary sizes are in the dated benchmark evidence.
+- Browser polling coalesces concurrent state reads and pauses hidden tabs.
+  Unchanged regions keep their DOM. Local expiry/freshness checks continue on
+  visible idle ticks, including when fetching current state fails. Runtime target
+  observations and queue revisions remain part of the relevant region keys.
 
 ## Invariants for contributors
 

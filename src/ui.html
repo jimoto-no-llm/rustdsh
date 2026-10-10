@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>rdsh dashboard</title>
+<title>rdsh dashboard · 状態とツール</title>
 <link rel="icon" type="image/png" href="/icon.png">
 <link rel="apple-touch-icon" href="/icon.png">
 <style>
@@ -11,16 +11,22 @@
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.6 system-ui, "Hiragino Sans", sans-serif; }
 header { padding: 20px 24px; border-bottom: 1px solid var(--line); display: flex; gap: 12px; align-items: center; }
+header { flex-wrap: wrap; }
 header h1 { margin: 0; font-size: 20px; }
 header span { color: var(--mut); font-size: 12px; }
-main { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; padding: 20px 24px; max-width: 1100px; }
+main { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 16px; padding: 20px 24px; max-width: 1100px; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
 .card h2 { margin: 0 0 8px; font-size: 15px; }
 .card p { color: var(--mut); font-size: 12px; margin: 0 0 10px; }
 textarea, input[type=number] { width: 100%; background: #0d1117; color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 8px; font: 13px monospace; }
 textarea { min-height: 110px; resize: vertical; }
 button { background: #238636; color: #fff; border: 0; border-radius: 6px; padding: 7px 14px; font-size: 13px; cursor: pointer; margin-top: 8px; }
-button:hover { background: #2ea043; }
+button:disabled { opacity: .55; cursor: wait; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, pre:focus-visible { outline: 2px solid var(--acc); outline-offset: 3px; }
+::selection { background: #1f6feb; color: #fff; }
+pre { scrollbar-color: var(--line) var(--bg); }
+@media (max-width: 480px) { main { padding: 16px 12px; } header { padding: 16px 12px; } .row { flex-wrap: wrap; } }
+button:hover { background: #1f7a31; }
 button.ghost { background: transparent; border: 1px solid var(--line); color: var(--fg); }
 pre { background: #0d1117; border: 1px solid var(--line); border-radius: 6px; padding: 8px; overflow: auto; max-height: 220px; font-size: 12px; white-space: pre-wrap; }
 .badge { display: inline-block; padding: 1px 8px; border-radius: 20px; font-size: 12px; }
@@ -32,29 +38,29 @@ footer { padding: 0 24px 24px; color: var(--mut); font-size: 12px; }
 </style>
 </head>
 <body>
-<header><img src="/icon.png" width="40" height="40" alt="rdsh"><h1>rdsh dashboard</h1><span id="ver">…</span></header>
+<header><img src="/icon.png" width="40" height="40" alt="rdsh"><h1>rdsh 状態とツール</h1><span id="ver">…</span></header>
 <main>
-<section class="card"><h2>状態 (doctor)</h2><p>本家dsh・DSH_HOME・slim設定を確認</p>
-<button class="ghost" onclick="doctor()">更新</button><pre id="doctor">未取得</pre></section>
-<section class="card"><h2>トークン推定</h2><p>初期入力トークンの見積もり（約4文字=1トークン）</p>
-<textarea id="ttext" placeholder="ここにテキストを貼り付け"></textarea>
-<button onclick="tokens()">推定する</button><pre id="tout">-</pre></section>
-<section class="card"><h2>prune（切り詰め）</h2><p>head+tailを残して予算内に収める</p>
-<textarea id="ptext" placeholder="長いツール出力を貼り付け"></textarea>
-<div class="row"><label>予算</label><input id="pmax" type="number" value="4000" min="100"></div>
-<button onclick="prune()">prune実行</button> <button class="ghost" id="pcopy" onclick="copyPrune()">コピー</button><pre id="pout">-</pre></section>
-<section class="card"><h2>セッション</h2><p>最新のセッション一覧（Nodeなし）</p>
-<button class="ghost" onclick="sessions()">更新</button><pre id="sess">未取得</pre></section>
+<section class="card"><h2>状態 (doctor)</h2><p>元のDSHの場所・設定ディレクトリ・起動設定を確認します。</p>
+<button class="ghost" id="doctor-button" onclick="doctor()">状態を更新</button><p id="doctor-status" role="status"></p><pre id="doctor" tabindex="0">未取得</pre></section>
+<section class="card"><h2>トークン推定</h2><p>ASCIIは約4文字、非ASCIIは1文字を1トークンとして推定します。モデルの実測値とは異なります。</p>
+<label for="ttext">推定するテキスト</label><textarea id="ttext" placeholder="ここにテキストを貼り付け"></textarea>
+<button id="tokens-button" onclick="tokens()">推定する</button><p id="tout-status" role="status"></p><pre id="tout" tabindex="0">-</pre></section>
+<section class="card"><h2>長い出力を切り詰める（prune）</h2><p>先頭と末尾を残し、推定トークン数を上限内に収めます。元のテキストやファイルは変更しません。</p>
+<label for="ptext">切り詰めるテキスト</label><textarea id="ptext" placeholder="長いツール出力を貼り付け"></textarea>
+<div class="row"><label for="pmax">トークン上限</label><input id="pmax" type="number" value="4000" min="100" max="200000" step="1"></div>
+<button id="prune-button" onclick="prune()">上限に収める</button> <button class="ghost" id="pcopy" onclick="copyPrune()" disabled>結果をコピー</button><p id="pout-status" role="status"></p><pre id="pout" tabindex="0">-</pre></section>
+<section class="card"><h2>セッション</h2><p>新しい順に最大10件表示します。履歴は削除しません。</p>
+<button class="ghost" id="sessions-button" onclick="sessions()">一覧を更新</button><p id="sess-status" role="status"></p><pre id="sess" tabindex="0">未取得</pre></section>
 <section class="card"><h2>スキル</h2><p>導入済みスキル一覧</p>
-<button class="ghost" onclick="skills()">更新</button><pre id="sk">未取得</pre></section>
-<section class="card"><h2>ベンチ</h2><p>rdsh vs dsh の起動速度を比較</p>
-<button class="ghost" onclick="bench()">計測 (n=3)</button><pre id="bench">未計測</pre></section>
+<button class="ghost" id="skills-button" onclick="skills()">一覧を更新</button><p id="sk-status" role="status"></p><pre id="sk" tabindex="0">未取得</pre></section>
+<section class="card"><h2>起動速度の計測</h2><p>rdsh --versionを3回実行します。このサーバーの起動中は初回の計測結果を再利用します。会話やモデルの速度は測りません。</p>
+<button class="ghost" id="bench-button" onclick="bench()">起動時間を計測</button><p id="bench-status" role="status"></p><pre id="bench" tabindex="0">未計測</pre></section>
 </main>
-<footer>rdsh は本家dshを壊さない安全なRustランチャーです。serveは127.0.0.1のみで待ち受けます。</footer>
+<footer>このページは127.0.0.1で動きます。会話の開始や設定の保存は、DSHまたはrdshのコマンドから行ってください。</footer>
 <script>
-const dashboardToken = new URLSearchParams(location.hash.slice(1)).get("key") || sessionStorage.getItem("rdsh_dashboard_token") || "";
-if (dashboardToken) sessionStorage.setItem("rdsh_dashboard_token", dashboardToken);
-history.replaceState(null, "", location.pathname);
+let dashboardToken = new URLSearchParams(location.hash.slice(1)).get('key') || '';
+try { dashboardToken ||= sessionStorage.getItem('rdsh_dashboard_token') || ''; if (dashboardToken) sessionStorage.setItem('rdsh_dashboard_token', dashboardToken); } catch {}
+history.replaceState(null, '', location.pathname);
 function statusMessage(status, path){
   switch (status){
     case 400: return "不正なリクエスト (400): " + path + " への送信内容を確認してください。";
@@ -79,13 +85,13 @@ async function checkRes(r, path){
 }
 async function jget(p){
   let r;
-  try { r = await fetch(p, {headers:{"X-RDSH-Token":dashboardToken}}); }
+  try { r = await fetch(p, {headers:{"X-RDSH-Token":dashboardToken}, signal:AbortSignal.timeout(15000)}); }
   catch(e){ throw new Error("接続できません: rdsh serve が起動しているか確認し、再試行してください。"); }
   return checkRes(r, p);
 }
 async function jpost(p, b){
   let r;
-  try { r = await fetch(p, {method:"POST", headers:{"Content-Type":"application/json","X-RDSH-Token":dashboardToken}, body: JSON.stringify(b)}); }
+  try { r = await fetch(p, {method:"POST", headers:{"Content-Type":"application/json","X-RDSH-Token":dashboardToken}, body: JSON.stringify(b), signal:AbortSignal.timeout(15000)}); }
   catch(e){ throw new Error("接続できません: rdsh serve が起動しているか確認し、再試行してください。"); }
   return checkRes(r, p);
 }
@@ -107,33 +113,65 @@ function clearRetry(outId){
   const btn = document.getElementById(outId + "-retry");
   if (btn) btn.hidden = true;
 }
-(async () => { try { const v = await jget("/api/version"); document.getElementById("ver").textContent = v.name + " " + v.version; } catch(e){ document.getElementById("ver").textContent = "エラー: " + e.message; } })();
-async function doctor(){ try { clearRetry("doctor"); const d = await jget("/api/doctor"); document.getElementById("doctor").textContent = JSON.stringify(d, null, 2); } catch(e){ fail("doctor", e.message, doctor); } }
-async function tokens(){ try { clearRetry("tout"); const t = document.getElementById("ttext").value; const r = await jpost("/api/tokens", {text: t}); document.getElementById("tout").textContent = "tokens: " + r.tokens + " / chars: " + r.chars; } catch(e){ fail("tout", e.message, tokens); } }
-let lastPruned = "";
+(async () => { try { const v = await jget('/api/version'); document.getElementById('ver').textContent = v.name + ' ' + v.version; } catch(e){ document.getElementById('ver').textContent = e.message; } })();
+const busy = new Set();
+async function action(outId, buttonId, task, retry, fields = []) {
+  if (busy.has(outId)) return;
+  busy.add(outId);
+  const controls = [buttonId, ...fields].map(id => document.getElementById(id));
+  const status = document.getElementById(outId + '-status');
+  controls.forEach(control => control.disabled = true);
+  clearRetry(outId); status.textContent = '取得・処理中…';
+  try { await task(); status.textContent = '完了'; }
+  catch(error) { status.textContent = '処理できませんでした。下の案内を確認してください。'; fail(outId, error.message, retry); }
+  finally { controls.forEach(control => control.disabled = false); busy.delete(outId); document.getElementById('pcopy').disabled = !lastPruned || busy.has('pout'); }
+}
+async function doctor(){ return action('doctor', 'doctor-button', async () => {
+  const d = await jget('/api/doctor');
+  document.getElementById('doctor').textContent = 'rdsh ' + d.version + '\nDSHの起動先: ' + (d.original_dsh || '未検出 · rdsh doctorで導入状況を確認してください') + '\n設定ディレクトリ: ' + d.dsh_home + '\nローカルプロファイル数: ' + d.local_profiles + '\n起動最適化が使う設定:\n' + d.slim;
+}, doctor); }
+async function tokens(){ return action('tout','tokens-button',async () => {
+  const r = await jpost('/api/tokens', {text: document.getElementById('ttext').value});
+  document.getElementById('tout').textContent = r.tokens.toLocaleString('ja-JP') + ' 推定トークン / ' + r.chars.toLocaleString('ja-JP') + ' バイト';
+},tokens,['ttext']); }
+let lastPruned = '';
+function invalidatePrune(){ lastPruned=''; document.getElementById('pcopy').disabled=true; }
+document.getElementById('ptext').addEventListener('input',invalidatePrune);
+document.getElementById('pmax').addEventListener('input',invalidatePrune);
 async function prune(){
-  try {
-    clearRetry("pout");
-    const t = document.getElementById("ptext").value;
-    const m = +document.getElementById("pmax").value || 4000;
-    const r = await jpost("/api/prune", {text: t, max_tokens: m});
-    lastPruned = r.pruned;
-    document.getElementById("pout").textContent = "[before " + r.before + " -> after " + r.after + "] (" + r.pruned.length + " chars)\n" + r.pruned;
-  } catch(e){ fail("pout", e.message, prune); }
-}
+  const field = document.getElementById('pmax');
+  if (!field.checkValidity()) {
+    field.reportValidity();
+    document.getElementById('pout-status').textContent = 'トークン上限は100〜200,000の整数で入力してください。';
+    return;
+  }
+  const max = field.value === '' ? 4000 : Number(field.value);
+  return action('pout','prune-button',async () => {
+  const r = await jpost('/api/prune',{text:document.getElementById('ptext').value,max_tokens:max});
+  lastPruned=r.pruned;
+  document.getElementById('pout').textContent = '推定 ' + r.before + ' → ' + r.after + ' トークン（上限 ' + r.budget + '）\n' + r.pruned;
+},prune,['ptext','pmax','pcopy']); }
 async function copyPrune(){
-  const btn = document.getElementById("pcopy");
+  const btn=document.getElementById('pcopy');
   try {
-    if (!lastPruned) throw new Error("コピー対象がありません。先にprune実行してください。");
-    await navigator.clipboard.writeText(lastPruned);
-    const old = btn.textContent;
-    btn.textContent = "コピー済み";
-    setTimeout(() => { btn.textContent = old; }, 1500);
-  } catch(e){ fail("pout", e.message, prune); }
+    if (!lastPruned) throw new Error('先にテキストを上限に収めてください。');
+    await navigator.clipboard.writeText(lastPruned);btn.textContent='コピー済み';setTimeout(()=>{btn.textContent='結果をコピー';},1500);
+  } catch(error){ document.getElementById('pout-status').textContent='コピーできません。結果の文字を選択してコピーしてください。'; }
 }
-async function bench(){ try { clearRetry("bench"); document.getElementById("bench").textContent = "計測中…"; const r = await jget("/api/bench?n=3"); document.getElementById("bench").textContent = JSON.stringify(r, null, 2); } catch(e){ fail("bench", e.message, bench); } }
-async function sessions(){ try { clearRetry("sess"); const r = await jget("/api/sessions?limit=10"); document.getElementById("sess").textContent = r.sessions.map(s => s.mtime + " " + s.project + "/" + s.id).join("\n") + "\n(" + r.projects + " projects)"; } catch(e){ fail("sess", e.message, sessions); } }
-async function skills(){ try { clearRetry("sk"); const r = await jget("/api/skills"); document.getElementById("sk").textContent = r.names.join("\n"); } catch(e){ fail("sk", e.message, skills); } }
+async function bench(){ return action('bench','bench-button',async () => {
+  const r=await jget('/api/bench?n=3');
+  if (!r.rdsh_version_ms.length) throw new Error('起動時間を取得できませんでした。rdsh benchで確認してください。');
+  const samples=[...r.rdsh_version_ms].sort((a,b)=>a-b); const middle=Math.floor(samples.length/2);
+  const median=samples.length%2 ? samples[middle] : (samples[middle-1]+samples[middle])/2;
+  document.getElementById('bench').textContent='起動時間の中央値: '+median.toFixed(2)+' ms\n各回: '+r.rdsh_version_ms.map(ms=>ms.toFixed(2)+' ms').join(' / ');
+},bench); }
+async function sessions(){ return action('sess','sessions-button',async () => {
+  const r=await jget('/api/sessions?limit=10');
+  document.getElementById('sess').textContent=r.sessions.length ? r.sessions.map(s=>s.mtime+' '+s.project+'/'+s.id).join('\n')+'\n（'+r.projects+' プロジェクト）' : 'セッションはまだありません。DSHで会話を始めると表示されます。';
+},sessions); }
+async function skills(){ return action('sk','skills-button',async () => {
+  const r=await jget('/api/skills');document.getElementById('sk').textContent=r.names.length ? r.names.join('\n') : 'スキルはまだ導入されていません。';
+},skills); }
 doctor(); sessions(); skills();
 </script>
 </body>

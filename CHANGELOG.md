@@ -7,6 +7,12 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Changed
 
+- Clarify CLI/setup/settings labels and scope, keep unsaved multiline settings
+  and partial Discord edits, and add the session estimate cache interval to the UI.
+- Preserve unchanged dashboard regions, coalesce state refreshes, pause hidden
+  polling, and update cached decision/observation expiry during disconnection.
+- Speed up standalone native version output, ASCII pruning and nonmatching file searches with unchanged output;
+  add reproducible before/after CLI and browser rendering measurements.
 - Standardize future release notes on the v0.2.0 format, validate annotated tags
   and version metadata, stage all five builds before publishing, and keep
   prereleases out of the stable installer channel.

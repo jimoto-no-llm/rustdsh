@@ -1,7 +1,34 @@
 # Benchmarks
 
+## Current checkout: 2026-10-10 UX and performance review
+
+Measured against `e81782a` on Linux/WSL x86_64 (Ryzen 7 5700X), with release
+builds, alternating before/after samples and isolated generated data:
+
+| Case | Before median | After median | Before / after |
+| --- | --- | --- | --- |
+| Native `--version`, n=21 | 1.065 ms | 0.908 ms | 1.17x |
+| ASCII prune, 10 MiB / 4000-token budget, n=21 | 10.770 ms | 7.830 ms | 1.38x |
+| Nonmatching search, 160 files / 960k lines, n=21 | 8.998 ms | 5.390 ms | 1.67x |
+| Idle browser render + forced layout, n=21 | 30.50 ms | 0.40 ms | 76.3x |
+| Metrics-only browser render + forced layout, n=21 | 28.90 ms | 3.30 ms | 8.8x |
+
+The browser fixture has 100 tasks, 40 questions and 30 events. This is rendering
+time, not network latency, model execution or INP. Native samples include process
+startup and use four allowed CPUs. Outputs, visible data, drafts and caret positions
+are checked. Some other cases are slightly slower; see the **complete tables**, raw
+samples, environment, source/binary hashes, regression matrix, real PNGs and GIF in
+[the dated evidence](evidence/ux-performance-20261010/README.md).
+The current binary is 1,968,752 bytes (~1.97 MB); source changes are unreleased.
+
+The dated page includes commands for `scripts/benchmark.py`,
+`scripts/benchmark-search.py`, the Rust extended runner and
+`tests/e2e/benchmark-dashboard.mjs`, plus instructions for building the baseline.
+
+## Historical measurements
+
 The historical headline numbers below were measured on Linux x86_64.
-For a current Mac run, see [2026-10-08 CLI verification](evidence/performance-20261008.md)
+For the earlier Mac run, see [2026-10-08 CLI verification](evidence/performance-20261008.md)
 and [extended Rust measurements](evidence/performance-extended-20261008.md)
 with raw samples, streaming/growing sessions, concurrent writers, real HTTP and
 original DSH delegation. CLI startup/RSS measurements do not describe Desktop memory
@@ -10,7 +37,7 @@ or the performance of delegated model execution.
 For real Codex/Claude tasks, see the [Rust model runner](MODEL_BENCHMARKS.md)
 and [2026-10-08 model runtime results](evidence/model-runtime-20261008.md).
 
-## Headline numbers
+### Historical headline numbers
 
 | Case | rdsh | Baseline | Factor |
 | ---- | ---- | -------- | ------ |
@@ -21,6 +48,9 @@ and [2026-10-08 model runtime results](evidence/model-runtime-20261008.md).
 | tokens (9.6MB text) | ~12ms | before ~35ms | ~2.9x |
 | sessions --tokens (20 sessions) | ~0.41s | before ~1.65s | ~4.0x |
 | Distribution size | one ~806KB binary | ~508MB Node tree | -- |
+
+These rows describe earlier revisions/builds and are retained as historical
+evidence. They are not the current binary size or the 2026-10-10 comparison.
 
 ## How to reproduce
 
@@ -39,8 +69,8 @@ input; zstd is required. The JSON includes all samples, median/p95, workload siz
 binary fingerprints, peak RSS when supported, and stdout equality. A candidate
 failure or incorrect/different sequential output stops the run. An incorrect growing
 base is explicitly recorded as failed correctness, with no comparative speed ratio.
-The earlier `scripts/benchmark.py` run remains as evidence for ASCII/CJK and the
-300-file search corpus; new native performance cases are Rust Cargo examples.
+`scripts/benchmark.py` measures ASCII/CJK input, pruning and the 300-file search
+corpus. The Rust example adds streaming, growing, concurrent and HTTP cases.
 
 For the built-in startup comparison:
 
