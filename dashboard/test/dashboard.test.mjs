@@ -204,7 +204,12 @@ test("project state, HTTP/stdio MCP, subscriptions, answers, and auth work toget
       },
     }),
   );
-  assert.equal((await client.listTools()).tools.length, 6);
+  const listedTools = (await client.listTools()).tools;
+  assert.equal(listedTools.length, 8);
+  assert.ok(listedTools.some((tool) => tool.name === "dashboard_record_review"));
+  assert.ok(
+    listedTools.some((tool) => tool.name === "dashboard_get_review_evidence"),
+  );
   let notified;
   const notification = new Promise((resolve) => {
     notified = resolve;
@@ -235,6 +240,12 @@ test("project state, HTTP/stdio MCP, subscriptions, answers, and auth work toget
     },
   });
   const reported = await call("dashboard_get_state", {});
+  assert.equal(reported.review_evidence.revision, 0);
+  assert.deepEqual(reported.review_evidence.reports, []);
+  const emptyReviews = await call("dashboard_get_review_evidence", {
+    task_id: "M3.6",
+  });
+  assert.deepEqual(emptyReviews.reports, []);
   assert.equal(reported.metric_observations.total_cost_usd.kind, "measured");
   assert.equal(reported.metric_observations.total_cost_usd.session_id, "test-only");
   assert.equal(reported.metric_observations.total_cost_usd.reference, "fixture-request-1");

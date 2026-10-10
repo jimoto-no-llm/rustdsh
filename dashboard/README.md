@@ -172,14 +172,16 @@ configuration after a restart, because the bearer key rotates.
 `runtime.json` の `token` は管理用、`mcp_token` は MCP 用です。ブラウザー用の
 鍵は `browser_url` に含まれます。これらを別用途で使い回さないでください。
 
-| Tool                       | Effect                                       |
-| -------------------------- | -------------------------------------------- |
-| `dashboard_update_metrics` | Report measured cumulative snapshots         |
-| `dashboard_upsert_task`    | Create/update a task by ID                   |
-| `dashboard_ask_question`   | Ask a human a question with a unique ID      |
-| `dashboard_publish_event`  | Report progress or an artifact reference     |
-| `dashboard_get_feedback`   | Read durable answers after a sequence cursor |
-| `dashboard_get_state`      | Read this project's current state            |
+| Tool                            | Effect                                          |
+| ------------------------------- | ----------------------------------------------- |
+| `dashboard_update_metrics`      | Report measured cumulative snapshots            |
+| `dashboard_upsert_task`         | Create/update a task by ID                      |
+| `dashboard_ask_question`        | Ask a human a question with a unique ID         |
+| `dashboard_publish_event`       | Report progress or an artifact reference        |
+| `dashboard_get_feedback`        | Read durable answers after a sequence cursor    |
+| `dashboard_get_state`           | Read this project's current state               |
+| `dashboard_record_review`       | Store a version-bound independent-review report |
+| `dashboard_get_review_evidence` | Read review reports and freshness status        |
 
 Example tool arguments:
 
@@ -213,6 +215,27 @@ or `"cancel"` requires the current `expected_revision`. Stale, expired and
 cancelled replies cannot answer a new revision. Durable feedback includes the
 current contract validity; saving a reply grants no execution authority and
 does not claim application by its consumer.
+
+### Independent review evidence
+
+`dashboard_record_review` stores a caller-submitted review report for an existing task. It validates the worker records and target commit, but does not invoke or authenticate a reviewer; the upstream subagent service remains the execution owner.
+The implementation and reviewer worker IDs must resolve to separate active
+worktrees. The implementation worker must have role `edit`; the reviewer must
+have role `review` with an empty declared write scope. Both checkouts and the
+clean project root must match `head_sha`. `base_sha` and `head_sha` identify the
+binary diff whose SHA-256 is stored with the report. Reuse `review_id` when
+retrying the same report; changing the contents under an existing ID is
+rejected.
+
+Reports retain findings, checks that were not run, and unavailable reviews as
+different states. A project HEAD change, uncommitted source edit, or task update
+makes an earlier report stale. `dashboard_get_review_evidence` and the browser
+panel show the exact target, report digest, references, and freshness. A clear
+caller-reported result only makes that exact target eligible for human review;
+it is not an approval, correctness guarantee, or permission grant. The worker
+role and read-only declaration are recorded evidence, not proof that the native
+runtime enforced an OS sandbox. Evidence references are displayed as text and
+are never fetched or executed.
 
 Optional [answer application acknowledgements](../docs/ANSWER-APPLICATION.md)
 bind a card's `decision.consumer_id` to a confirmed run/native session. The
