@@ -1254,7 +1254,10 @@ fn provider_needs(s: &Scan) -> Vec<ProviderNeed> {
 
 /// Ref/env name for well-known API-key routes (mirrors profile `apiKeyEnv`).
 fn key_name(provider: &str) -> String {
-    provider.to_uppercase().replace('-', "_") + "_API_KEY"
+    match provider {
+        "openai-codex" => "OPENAI_API_KEY".to_string(),
+        _ => provider.to_uppercase().replace('-', "_") + "_API_KEY",
+    }
 }
 
 fn via_name(api_key_env: &Option<String>) -> String {
@@ -1497,6 +1500,12 @@ mod tests {
         assert_eq!(provider_id("openai").as_deref(), Some("openai-codex"));
         assert_eq!(provider_id("anthropic").as_deref(), Some("anthropic"));
         assert!(provider_id("OpenAI").is_none());
+    }
+
+    #[test]
+    fn api_key_names_follow_provider_routes() {
+        assert_eq!(key_name("openai-codex"), "OPENAI_API_KEY");
+        assert_eq!(key_name("anthropic"), "ANTHROPIC_API_KEY");
     }
 
     #[test]
