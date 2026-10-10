@@ -24,6 +24,23 @@ import {
 import { DeviceRegistry } from "./devices.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+const dashboardAssets = new Set([
+  "/",
+  "/app.mjs",
+  "/devices-ui.mjs",
+  "/observations.mjs",
+  "/reports-view.mjs",
+  "/question-cards-ui.mjs",
+  "/project-overview.mjs",
+  "/connection-diagnostics-ui.mjs",
+  "/answer-applications-ui.mjs",
+  "/instruction-queue-ui.mjs",
+  "/cost-ledger-ui.mjs",
+  "/budget-ui.mjs",
+  "/favicon.ico",
+  "/icon.png",
+  "/icon.svg",
+]);
 const equal = (a, b) =>
   typeof a === "string" &&
   typeof b === "string" &&
@@ -91,7 +108,7 @@ export async function startDashboard(options) {
   let store, eventsHub, devices;
   try {
     store = kind === "project" ? await ProjectStore.open(project) : null;
-    devices = store
+    devices = store || kind === "harness"
       ? await DeviceRegistry.open(path.join(directory, "devices.json"))
       : null;
     eventsHub = store
@@ -174,18 +191,28 @@ export async function startDashboard(options) {
   async function browserIdentity(req, url, route) {
     if (browserAuthorized(req, url, route))
       return { role: "owner", capabilities: ["read", "reply", "control"] };
-    if (kind !== "project") return null;
+    if (!devices) return null;
     const credential =
       req.headers["x-rdsh-browser-token"] ||
       (route === "/api/live" ? url.searchParams.get("key") : null);
     return devices.authenticate(credential);
   }
-  function deviceCanAccess(method, route, identity) {
+  function deviceCanAccess(method, route, identity, dashboardKind) {
     if (identity?.role !== "device") return true;
     const capabilities = new Set(identity.capabilities);
     if (!capabilities.has("read")) return false;
-    if (method === "GET") return route !== "/api/qr.svg";
+    if (method === "GET") {
+      if (route === "/api/qr.svg") return false;
+      if (dashboardKind === "harness")
+        return (
+          dashboardAssets.has(route) ||
+          ["/api/config", "/api/managed-process"].includes(route)
+        );
+      return true;
+    }
     if (method !== "POST") return false;
+    if (dashboardKind === "harness")
+      return route === "/api/managed-stop" && capabilities.has("control");
     if (
       ["/api/update/answer", "/api/instructions/resolve"].includes(route)
     )
@@ -194,7 +221,6 @@ export async function startDashboard(options) {
       [
         "/api/decision/cancel",
         "/api/instructions/submit",
-        "/api/managed-stop",
       ].includes(route)
     )
       return capabilities.has("control");
@@ -431,7 +457,7 @@ export async function startDashboard(options) {
       if (
         !adminAuthorized &&
         browserAccess?.role === "device" &&
-        !deviceCanAccess(req.method, route, browserAccess)
+        !deviceCanAccess(req.method, route, browserAccess, kind)
       )
         return json(res, 403, {
           error: "This device is not allowed to perform that operation",
@@ -467,23 +493,13 @@ export async function startDashboard(options) {
         route?.startsWith("/api/budget/producer/");
       const budgetToken = req.headers["x-rdsh-budget-token"];
       const publicAsset =
-        kind === "project" &&
+        (kind === "project" || kind === "harness") &&
         req.method === "GET" &&
-        (route === "/" ||
-          route === "/app.mjs" ||
-          route === "/devices-ui.mjs" ||
-          route === "/observations.mjs" ||
-          route === "/reports-view.mjs" ||
-          route === "/question-cards-ui.mjs" ||
-          route === "/project-overview.mjs" ||
-          route === "/connection-diagnostics-ui.mjs" ||
-          route === "/answer-applications-ui.mjs" ||
-          route === "/instruction-queue-ui.mjs" ||
-          route === "/cost-ledger-ui.mjs" ||
-          route === "/budget-ui.mjs" ||
-          route === "/favicon.ico" ||
-          route === "/icon.png" ||
-          route === "/icon.svg");
+        dashboardAssets.has(route);
+      // Device credentials are for the scoped management API only. They must not
+      // turn into access to the proxied, fully interactive Harness application.
+      if (kind === "harness" && route === null && browserAccess?.role === "device")
+        return json(res, 403, { error: "Harness UI requires its owner session" });
       if (
         !publicAsset &&
         !adminAuthorized &&
@@ -497,20 +513,25 @@ export async function startDashboard(options) {
             "Open this dashboard through rdsh-dashboard open or its QR code",
         });
       if (closing) return json(res, 503, { error: "Dashboard is stopping" });
-      if (kind === "project" && route === "/api/devices") {
+      if (devices && route === "/api/devices") {
         if (!adminAuthorized && browserAccess?.role !== "owner")
-          return json(res, 403, { error: "Project owner required" });
+          return json(res, 403, { error: "Dashboard owner required" });
         if (req.method === "GET")
           return json(res, 200, { devices: devices.list() });
         if (req.method === "POST") {
-          const result = await devices.create(await readBody(req, 4096));
+          const input = await readBody(req, 4096);
+          if (kind === "harness" && input.capabilities?.includes("reply"))
+            return json(res, 400, {
+              error: "Harness devices can only read or control the managed run",
+            });
+          const result = await devices.create(input);
           return json(res, 201, result);
         }
         return json(res, 405, { error: "Method not allowed" });
       }
-      if (kind === "project" && route?.startsWith("/api/devices/")) {
+      if (devices && route?.startsWith("/api/devices/")) {
         if (!adminAuthorized && browserAccess?.role !== "owner")
-          return json(res, 403, { error: "Project owner required" });
+          return json(res, 403, { error: "Dashboard owner required" });
         const match = route.match(/^\/api\/devices\/([0-9a-f-]{36})$/);
         if (req.method !== "DELETE" || !match)
           return json(res, 404, { error: "Unknown device operation" });
@@ -630,7 +651,7 @@ export async function startDashboard(options) {
           share,
           events: eventsHub?.status() || null,
           mcp_url: kind === "project" && share.url ? `${share.url}mcp` : null,
-          harness_url: harness
+          harness_url: harness && browserAccess?.role !== "device"
             ? "/" + harness.url.search + harness.url.hash
             : null,
         });

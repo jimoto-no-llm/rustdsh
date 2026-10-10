@@ -810,8 +810,8 @@
           <fieldset>
             <legend>付与する権限</legend>
             <label><input type="checkbox" checked disabled /> 閲覧</label>
-            <label><input type="checkbox" id="device-reply" /> 質問への回答</label>
-            <label><input type="checkbox" id="device-control" /> 追指示・質問取消し</label>
+            <label id="device-reply-option"><input type="checkbox" id="device-reply" /> <span>質問への回答</span></label>
+            <label><input type="checkbox" id="device-control" /> <span id="device-control-label">追指示・質問取消し</span></label>
           </fieldset>
           <button id="device-create" type="submit">端末鍵を発行</button>
         </form>

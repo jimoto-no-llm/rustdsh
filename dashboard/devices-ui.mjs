@@ -1,9 +1,3 @@
-const capabilityLabels = {
-  read: "閲覧",
-  reply: "質問への回答",
-  control: "追指示・質問取消し",
-};
-
 function textElement(tag, value, className) {
   const element = document.createElement(tag);
   if (value !== undefined) element.textContent = value;
@@ -22,13 +16,16 @@ function deviceLink(config, base, credential) {
 export async function setupDeviceAccess({ api, config, base }) {
   const detail = document.getElementById("device-detail");
   const notice = document.getElementById("device-access-notice");
-  if (config.kind !== "project" || !config.device_access) return;
+  if (!["project", "harness"].includes(config.kind) || !config.device_access)
+    return;
+  const controlLabel =
+    config.kind === "harness" ? "管理中の実行を停止" : "追指示・質問取消し";
 
   if (config.device_access.role === "device") {
     const capabilities = new Set(config.device_access.capabilities);
     const labels = ["閲覧"];
     if (capabilities.has("reply")) labels.push("質問への回答");
-    if (capabilities.has("control")) labels.push("追指示・質問取消し");
+    if (capabilities.has("control")) labels.push(controlLabel);
     notice.textContent = `この端末の権限: ${labels.join("・")}。別の端末の権限を変更するには所有者に依頼してください。`;
     notice.hidden = false;
     document.getElementById("share-toggle").hidden = true;
@@ -45,6 +42,10 @@ export async function setupDeviceAccess({ api, config, base }) {
   const name = document.getElementById("device-name");
   const reply = document.getElementById("device-reply");
   const control = document.getElementById("device-control");
+  if (config.kind === "harness") {
+    document.getElementById("device-reply-option").hidden = true;
+    document.getElementById("device-control-label").textContent = controlLabel;
+  }
   const status = document.getElementById("device-status");
   const list = document.getElementById("device-list");
   const credential = document.getElementById("device-credential");
@@ -64,7 +65,15 @@ export async function setupDeviceAccess({ api, config, base }) {
         `${device.name} · ${device.status === "active" ? "有効" : "失効済み"}`,
       );
       const permissions = device.capabilities
-        .map((capability) => capabilityLabels[capability] || capability)
+        .map((capability) =>
+          capability === "read"
+            ? "閲覧"
+            : capability === "reply"
+              ? "質問への回答"
+              : capability === "control"
+                ? controlLabel
+                : capability,
+        )
         .join("・");
       item.append(heading);
       item.append(textElement("p", `権限: ${permissions}`));

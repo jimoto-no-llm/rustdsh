@@ -109,6 +109,16 @@ test("device permissions are scoped, persistent, and revoked connections close",
     ).status,
     403,
   );
+  assert.equal(
+    (
+      await fetch(dashboard.localUrl + "api/managed-stop", {
+        method: "POST",
+        headers: { ...ownerHeaders, "x-rdsh-browser-token": controller.credential },
+        body: "{}",
+      })
+    ).status,
+    403,
+  );
   const deviceFile = await fs.readFile(
     path.join(project.directory, "devices.json"),
     "utf8",

@@ -11,16 +11,13 @@ import { setupDeviceAccess } from "./devices-ui.mjs";
 const $ = (id) => document.getElementById(id);
 const base = location.pathname.startsWith("/_rdsh") ? "/_rdsh/" : "/";
 let deviceAccess = null;
-const suppliedBrowserToken =
-  base === "/" ? new URLSearchParams(location.hash.slice(1)).get("key") : null;
+const suppliedBrowserToken = new URLSearchParams(location.hash.slice(1)).get("key");
+const browserTokenKey =
+  base === "/" ? "rdsh_project_browser_token" : "rdsh_harness_browser_token";
 const browserToken =
-  base === "/"
-    ? suppliedBrowserToken ||
-      sessionStorage.getItem("rdsh_project_browser_token") ||
-      ""
-    : "";
+  suppliedBrowserToken || sessionStorage.getItem(browserTokenKey) || "";
 if (browserToken) {
-  sessionStorage.setItem("rdsh_project_browser_token", browserToken);
+  sessionStorage.setItem(browserTokenKey, browserToken);
   if (suppliedBrowserToken !== null)
     history.replaceState(null, "", location.pathname + location.search);
 }
@@ -365,7 +362,7 @@ try {
   const config = await api("config");
   deviceAccess = config.device_access;
   await setupDeviceAccess({ api, config, base });
-  await renderShare(config);
+  if (deviceAccess?.role !== "device") await renderShare(config);
   if (config.kind === "harness") {
     $("connection-detail").hidden = true;
     $("kind").textContent = "DEEPSEEK HARNESS";
@@ -373,10 +370,13 @@ try {
     $("location").textContent = "会話・ツール実行のWeb画面";
     $("project-content").hidden = true;
     $("harness").hidden = false;
-    $("harness-open").href = config.harness_url;
+    $("harness-open").href = config.harness_url || "#";
+    $("harness-open").hidden = deviceAccess?.role === "device";
     $("connection").textContent = "接続済み · Harness専用の入口";
-    $("share").hidden = false;
-    $("share-toggle").setAttribute("aria-expanded", "true");
+    if (deviceAccess?.role !== "device") {
+      $("share").hidden = false;
+      $("share-toggle").setAttribute("aria-expanded", "true");
+    }
     let stopRequested = false;
     let pendingStop = null;
     const refreshManaged = async () => {
@@ -426,7 +426,8 @@ try {
         );
         $("managed-stop").disabled =
           stopRequested || scope?.status !== "running";
-        $("harness-open").hidden = scope?.status === "exit_confirmed";
+        $("harness-open").hidden =
+          deviceAccess?.role === "device" || scope?.status === "exit_confirmed";
       } catch {
         $("managed-status").textContent =
           "監視に接続できません · 終了は未確認です";

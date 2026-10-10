@@ -305,6 +305,127 @@ test("authenticated Harness API separates stopping from verified empty descendan
   );
 });
 
+test("Harness device keys are scoped to read or managed-run stop and cannot open the Harness UI", async (t) => {
+  const { root, own } = await setup(t),
+    previous = process.env.RDSH_DASHBOARD_HOME;
+  process.env.RDSH_DASHBOARD_HOME = path.join(root, "device-dashboard-home");
+  t.after(() => {
+    if (previous === undefined) delete process.env.RDSH_DASHBOARD_HOME;
+    else process.env.RDSH_DASHBOARD_HOME = previous;
+  });
+  const probe = net.createServer();
+  await new Promise((resolve) => probe.listen(0, "127.0.0.1", resolve));
+  const port = probe.address().port;
+  await new Promise((resolve) => probe.close(resolve));
+  const d = await startDashboard({
+    kind: "harness",
+    port,
+    tailscale: false,
+    harnessOptions: {
+      cwd: root,
+      command: [
+        process.execPath,
+        fixture,
+        "root",
+        "stubborn",
+        path.join(root, "device-harness.jsonl"),
+      ],
+      stopTimeout: 150,
+    },
+  });
+  own({ stop: () => d.close() });
+  const url = d.localUrl + "_rdsh/api/";
+  const bootstrap = await fetch(new URL(d.browserUrl), { redirect: "manual" });
+  assert.equal(bootstrap.status, 303);
+  const cookie = bootstrap.headers.get("set-cookie").split(";", 1)[0];
+  const ownerHeaders = { cookie, "content-type": "application/json" };
+  async function createDevice(name, capabilities) {
+    const response = await fetch(url + "devices", {
+      method: "POST",
+      headers: ownerHeaders,
+      body: JSON.stringify({ name, capabilities }),
+    });
+    return { response, value: await response.json() };
+  }
+
+  const viewer = await createDevice("harness-viewer", ["read"]);
+  assert.equal(viewer.response.status, 201);
+  const controller = await createDevice("harness-controller", ["read", "control"]);
+  assert.equal(controller.response.status, 201);
+  assert.equal(
+    (await createDevice("harness-reply", ["read", "reply"])).response.status,
+    400,
+  );
+
+  const viewerHeaders = { "x-rdsh-browser-token": viewer.value.credential };
+  const controlHeaders = {
+    ...viewerHeaders,
+    "x-rdsh-browser-token": controller.value.credential,
+  };
+  const configResponse = await fetch(url + "config", {
+    headers: controlHeaders,
+  });
+  assert.equal(configResponse.status, 200);
+  const config = await configResponse.json();
+  assert.equal(config.device_access.role, "device");
+  assert.equal(config.harness_url, null);
+  assert.equal((await fetch(d.localUrl + "_rdsh/")).status, 200);
+  assert.equal((await fetch(d.localUrl + "_rdsh/app.mjs")).status, 200);
+  assert.equal(
+    (await fetch(d.localUrl, { headers: controlHeaders })).status,
+    403,
+  );
+  assert.equal(
+    (await fetch(url + "managed-process", { headers: viewerHeaders })).status,
+    200,
+  );
+  assert.equal(
+    (
+      await fetch(url + "managed-stop", {
+        method: "POST",
+        headers: { ...viewerHeaders, "content-type": "application/json" },
+        body: "{}",
+      })
+    ).status,
+    403,
+  );
+  for (const route of ["decision/cancel", "instructions/submit", "stop"]) {
+    assert.equal(
+      (
+        await fetch(url + route, {
+          method: "POST",
+          headers: { ...controlHeaders, "content-type": "application/json" },
+          body: "{}",
+        })
+      ).status,
+      403,
+      route,
+    );
+  }
+  const stopped = await fetch(url + "managed-stop", {
+    method: "POST",
+    headers: { ...controlHeaders, "content-type": "application/json" },
+    body: "{}",
+  });
+  assert.equal(stopped.status, 202);
+  let state;
+  await waitFor(async () => {
+    state = await (await fetch(url + "managed-process", { headers: controlHeaders })).json();
+    return state.scope.status === "exit_confirmed";
+  });
+  assert.equal(state.scope.remaining_count, 0);
+
+  const revoked = await fetch(
+    url + `devices/${controller.value.device.id}`,
+    { method: "DELETE", headers: ownerHeaders },
+  );
+  assert.equal(revoked.status, 200);
+  assert.equal(
+    (await fetch(url + "config", { headers: controlHeaders })).status,
+    401,
+  );
+});
+
 test("lost Harness monitor remains unverifiable in HTTP responses and administrator shutdown refuses to hide the uncertain result", async (t) => {
   const { root } = await setup(t),
     previous = process.env.RDSH_DASHBOARD_HOME;
