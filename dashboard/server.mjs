@@ -21,6 +21,7 @@ import {
   connectionReport,
   inspectTunnel,
 } from "./connection-diagnostics.mjs";
+import { HumanAnnotationStore } from "./human-annotations.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const equal = (a, b) =>
@@ -87,9 +88,10 @@ export async function startDashboard(options) {
   const connections = new ConnectionObservations();
   const localUrl = `http://127.0.0.1:${port}/`;
   const cookieName = `rdsh_${kind === "project" ? project.id : "harness"}`;
-  let store, eventsHub;
+  let store, eventsHub, humanAnnotations;
   try {
     store = kind === "project" ? await ProjectStore.open(project) : null;
+    humanAnnotations = store ? await HumanAnnotationStore.open(project) : null;
     eventsHub = store
       ? await EventsHub.open(project, () => store.value, options.webhookPost)
       : null;
@@ -429,6 +431,8 @@ export async function startDashboard(options) {
         req.method === "GET" &&
         (route === "/" ||
           route === "/app.mjs" ||
+          route === "/human-annotations-ui.mjs" ||
+          route === "/annotation-identifiers.mjs" ||
           route === "/observations.mjs" ||
           route === "/reports-view.mjs" ||
           route === "/question-cards-ui.mjs" ||
@@ -526,6 +530,8 @@ export async function startDashboard(options) {
         req.method === "GET" &&
         [
           "/app.mjs",
+          "/human-annotations-ui.mjs",
+          "/annotation-identifiers.mjs",
           "/observations.mjs",
           "/reports-view.mjs",
           "/question-cards-ui.mjs",
@@ -713,6 +719,29 @@ export async function startDashboard(options) {
             200,
             await mutate("question", { ...input, action: "cancel" }),
           );
+        }
+        if (route === "/api/annotations") {
+          if (!humanAnnotations)
+            return json(res, 404, { error: "Project annotations are unavailable" });
+          if (!humanAuthorized)
+            return json(res, 403, { error: "Human browser credential required" });
+          if (req.method === "GET")
+            return json(res, 200, await humanAnnotations.inspect(store.value));
+          if (req.method === "POST") {
+            const input = await readBody(req);
+            if (!input || typeof input !== "object" || Array.isArray(input))
+              return json(res, 400, { error: "Invalid annotation input" });
+            const result =
+              input.action === "delete"
+                ? await humanAnnotations.remove(input)
+                : input.action === "create"
+                  ? await humanAnnotations.add(input, store.value)
+                  : null;
+            if (!result)
+              return json(res, 400, { error: "Unknown annotation action" });
+            return json(res, input.action === "create" ? 201 : 200, result);
+          }
+          return json(res, 405, { error: "Method not allowed" });
         }
         if (req.method === "GET" && route === "/api/state")
           return json(res, 200, await visibleState());
