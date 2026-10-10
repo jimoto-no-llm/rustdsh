@@ -15,6 +15,7 @@ import { RetryHistory } from "./retry.mjs";
 import { probeCliWithRetry } from "./retry-probe.mjs";
 import { Checkpoints } from "./checkpoints.mjs";
 import { AcceptanceStore } from "./acceptance.mjs";
+import { registerDashboardShutdown } from "./shutdown.mjs";
 import { ModelRouting } from "./model-routing.mjs";
 import { requestedSelection, validSelection } from "./model-selection.mjs";
 import { ReplyConsumer } from "./reply-consumer.mjs";
@@ -1371,11 +1372,7 @@ try {
       "[rdsh-dashboard] Open with rdsh-dashboard open; Ctrl-C to stop.",
     );
     if (values.open) openUrl(dashboard.browserUrl);
-    for (const signal of ["SIGINT", "SIGTERM"])
-      process.once(signal, async () => {
-        await dashboard.close();
-        process.exit(0);
-      });
+    registerDashboardShutdown(() => dashboard.close());
   } else throw new Error("Unknown command; use --help");
 } catch (e) {
   if (process.connected)
