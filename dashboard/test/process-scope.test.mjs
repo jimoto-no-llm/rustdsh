@@ -45,7 +45,13 @@ async function setup(t) {
   t.after(async () => {
     for (const p of owned)
       await p.stop({ gracefulTimeout: 100, killTimeout: 1000 });
-    await fs.rm(root, { recursive: true, force: true });
+    // Windows can briefly retain a file handle after the owned Job reaches zero.
+    await fs.rm(root, {
+      recursive: true,
+      force: true,
+      maxRetries: 10,
+      retryDelay: 100,
+    });
   });
   const rows = async (trace) =>
     (await fs.readFile(trace, "utf8").catch(() => ""))

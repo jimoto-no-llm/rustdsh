@@ -44,6 +44,69 @@ function node(tag, text, className) {
   if (className) result.className = className;
   return result;
 }
+let artifactPreviewUrl = null;
+let artifactPreviewRequest = 0;
+async function previewArtifact(sequence) {
+  const request = ++artifactPreviewRequest;
+  const dialog = $("artifact-preview");
+  const status = $("artifact-preview-status");
+  const content = $("artifact-preview-content");
+  content.replaceChildren();
+  status.textContent = "成果物を読み取っています…";
+  dialog.showModal();
+  try {
+    const response = await fetch(
+      base + "api/artifacts/" + encodeURIComponent(sequence),
+      {
+        headers: browserToken
+          ? { "x-rdsh-browser-token": browserToken }
+          : {},
+      },
+    );
+    if (request !== artifactPreviewRequest) return;
+    if (!response.ok) {
+      let reason = "成果物をプレビューできません";
+      try {
+        reason = (await response.json()).error || reason;
+      } catch {}
+      throw new Error(reason);
+    }
+    const blob = await response.blob();
+    if (request !== artifactPreviewRequest) return;
+    const redacted = response.headers.get("x-rdsh-preview-redacted") === "true";
+    const truncated = response.headers.get("x-rdsh-preview-truncated") === "true";
+    if (response.headers.get("x-rdsh-preview-kind") === "image") {
+      artifactPreviewUrl = URL.createObjectURL(blob);
+      const image = node("img", undefined, "artifact-preview-image");
+      image.src = artifactPreviewUrl;
+      image.alt = "成果物の画像プレビュー";
+      content.append(image);
+      status.textContent = "画像を読み取り専用で表示しています。";
+    } else {
+      content.append(node("pre", await blob.text(), "artifact-preview-text"));
+      status.textContent = [
+        redacted
+          ? "認証情報らしき値を伏せて表示しています。"
+          : "読み取り専用のテキスト表示です。",
+        truncated ? "先頭128 KiBまで表示しています。" : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
+    }
+  } catch (error) {
+    if (request !== artifactPreviewRequest) return;
+    content.replaceChildren(node("p", error.message, "warn"));
+    status.textContent = "表示できる内容はありません。元ファイルは変更していません。";
+  }
+}
+$("artifact-preview-close").addEventListener("click", () =>
+  $("artifact-preview").close(),
+);
+$("artifact-preview").addEventListener("close", () => {
+  artifactPreviewRequest++;
+  if (artifactPreviewUrl) URL.revokeObjectURL(artifactPreviewUrl);
+  artifactPreviewUrl = null;
+});
 let renderedRevision = -1;
 let latestState = null;
 let selectedTask = "";
@@ -151,7 +214,7 @@ function render(state) {
   renderCosts(state);
   renderBudget($("budget-admission"), state, node);
   updateOverview(state);
-  renderReports(state);
+  renderReports(state, Date.now(), previewArtifact);
   const unanswered = state.questions.filter((question) => question.answer === null);
   renderQuestionCards($("questions"), unanswered, state.question_contracts, {
     node,
