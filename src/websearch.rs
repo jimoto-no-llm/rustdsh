@@ -207,10 +207,8 @@ fn find_href(blk: &str) -> Option<String> {
         let tag = &rest[a..];
         let close = tag.find('>')?;
         let head = &tag[..close];
-        if let Some(u) = attr(head, "href") {
-            if !u.is_empty() && !u.starts_with('#') {
-                return Some(decode_entities(&u));
-            }
+        if let Some(u) = attr(head, "href").filter(|u| !u.is_empty() && !u.starts_with('#')) {
+            return Some(decode_entities(&u));
         }
         rest = &tag[close + 1..];
     }
