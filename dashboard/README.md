@@ -240,6 +240,29 @@ partial. The folded metrics section shows each amount's provenance and history.
 endpoint; browser credentials are read-only for these inputs. No prices are
 looked up and legacy numeric costs are not merged with this optional ledger.
 
+### Local human-effort metrics (#73)
+
+Human-effort metrics are **off by default**. A user can enable them in the
+project dashboard and choose 7, 30 or 90 days of local retention. The sidecar
+`human-metrics.json` is created only after opt-in and contains only event types,
+timestamps, durations and aggregate counts. Question, task, command and session
+IDs, text, credentials and secrets are not retained. The dedicated endpoint requires the browser credential;
+it is not an MCP tool, is absent from MCP state, and does not publish webhooks.
+Export downloads an aggregate JSON file in the browser and does not send it.
+Raw events are capped at 10,000; if older in-window records are dropped, the
+summary marks the affected metrics as partial.
+
+Decision time uses a user-started stopwatch that can be paused while away.
+Recovery time is wall-clock time from a user-selected blocked task to the user's
+stop action and can include waiting or absence. Question recurrence and
+instruction resend are counted only after the user marks a specific recorded
+item; text similarity and automatic replay are not inferred. Queue revision
+conflicts count only the existing `queue_revision_changed` outcome. Missing
+timer completions remain unpaired, and a metric with no completed samples stays
+unavailable instead of displaying zero. Token snapshots are exported separately
+from human-effort metrics so a token reduction cannot hide more resends or slower
+recovery.
+
 ### Observation source and freshness (#16)
 
 `dashboard_update_metrics`, `dashboard_upsert_task`, and
