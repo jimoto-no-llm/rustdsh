@@ -390,7 +390,7 @@ document.addEventListener("keydown", (event) => {
 try {
   const config = await api("config");
   if (config.kind === "project") observedCli = setupObservedCli({ api });
-  restoreWorkspaceLayout(config.project_id);
+  restoreWorkspaceLayout(config.project?.id);
   await renderShare(config);
   if (config.kind === "harness") {
     $("connection-detail").hidden = true;
