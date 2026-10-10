@@ -118,8 +118,8 @@ if ($Wsl) {
 }
 
 Write-Host 'Try: rdsh --version'
-Write-Host 'Local tokens/prune tools need no DSH or model login.'
-Write-Host 'Claude Code / Codex MCP: https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/CODING-AGENTS.md'
-Write-Host '--- optional DSH diagnostics ---'
+Write-Host 'For DSH conversations, install in WSL and follow the model setup in the migration guide.'
+Write-Host 'Migrating from Claude Code / Codex to DSH: https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/CODING-AGENTS.md'
+Write-Host '--- DSH diagnostics ---'
 & (Join-Path $Prefix 'rdsh.exe') doctor | Select-Object -First 12
-Write-Host "For DSH conversations: run 'rdsh setup' to connect a model."
+Write-Host 'Native Windows supports local tools; protected DSH agent startup requires Linux x86_64 (WSL).'

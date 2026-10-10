@@ -9,18 +9,21 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Added
 
-- English and Japanese onboarding for existing Claude Code and Codex users:
-  local text tools without DSH, and project progress/questions through the
-  existing MCP bridge. Clarify client registration, recovery and adapter limits.
+- English and Japanese migration guides from Claude Code / Codex to DSH:
+  runtime installation, explicit model connection, existing instruction files,
+  first conversation, current editing limits and return to the previous client.
+- Anthropic, OpenAI and DeepSeek API-key selection in the first-run setup UI,
+  using the existing bounded credential storage API.
 
 ### Changed
 
-- Installers introduce local tools and the MCP guide first, with DSH connection
-  and diagnostics identified as optional for those users.
+- Installers point to model setup and the DSH migration guide after installation.
 - Clarify CLI/setup/settings labels and scope, keep unsaved multiline settings
   and partial Discord edits, and add the session estimate cache interval to the UI.
 - Preserve unchanged dashboard regions, coalesce state refreshes, pause hidden
   polling, and update cached decision/observation expiry during disconnection.
+- Clip oversized settings strings without allocating their entire Unicode
+  character array, while retaining scalar limits and unknown settings.
 - Speed up standalone native version output, ASCII pruning and nonmatching file searches with unchanged output;
   add reproducible before/after CLI and browser rendering measurements.
 - Standardize future release notes on the v0.2.0 format, validate annotated tags

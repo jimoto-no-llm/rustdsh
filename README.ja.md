@@ -1,6 +1,6 @@
 <img src="assets/icon.png" width="96" alt="rdsh icon">
 
-# rdsh — Claude Code / Codexと使うローカルツール、DSH用Rustランチャー
+# rdsh — DeepSeek Harnessを速く使うRustランチャー
 
 [![ci](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/ci.yml/badge.svg)](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/ci.yml)
 [![dashboard](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/dashboard.yml/badge.svg)](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/dashboard.yml)
@@ -13,15 +13,14 @@
 
 独立したコミュニティプロジェクトです。DeepSeek や DeepSeek Harness の公式ではありません。
 
-**Claude CodeやCodexを普段使っている方も、そのまま使えます。**
-`rdsh`はトークン推定・ファイル検索・長いテキストの切り詰めを、モデル通信なしで実行します。
-必要ならMCPで進捗を共有し、ブラウザーからエージェントの質問に答えられます。
-**これらのローカルツールとプロジェクト画面にDSHは不要です。**
-[Claude Code／Codex向けの導入手順](docs/CODING-AGENTS.ja.md)から始めてください。
-
-DSHを使う場合は、[dsh](https://github.com/deepseek-ai/deepseek-harness)（DeepSeek Harness の CLI）を
+[dsh](https://github.com/deepseek-ai/deepseek-harness)（DeepSeek Harness の CLI）を
 速く使うためのランチャーです。全部を書き換えるのではなく、よく使う速い処理だけ Rust にして、
 会話やモデルの実行は本家の `dsh` にそのまま任せます。今お使いの引数はそのまま動きます。
+
+**Claude Code／CodexからDSHへ移行する方へ。**
+[移行ガイド](docs/CODING-AGENTS.ja.md)に、導入・モデル接続・いつものプロジェクトでの
+最初の会話までをまとめました。プロジェクトの`AGENTS.md`／`CLAUDE.md`は、
+標準のDSHプロファイルがそのまま読みます。
 
 ## rdsh を選ぶ理由
 
@@ -49,33 +48,35 @@ DSHを使う場合は、[dsh](https://github.com/deepseek-ai/deepseek-harness)�
 
 ## はじめに
 
-下のインストール手順で導入し、まずローカルツールを試します。
+下のインストール手順で導入します。会話には本家DSHも必要です。
+[移行ガイドの導入手順](docs/CODING-AGENTS.ja.md#1-rdshと本家dshを用意する)で
+対応する版を用意し、導入を確認します。
 
 ```sh
 rdsh --version
-printf 'hello rdsh\n' | rdsh tokens
+rdsh doctor
 ```
 
-PowerShellでは `"hello rdsh" | rdsh tokens` を使います。ログインも本家DSHも不要です。
-既存の指示ファイルは `rdsh tokens AGENTS.md` や `rdsh tokens CLAUDE.md` で確認できます。
-トークン数は概算で、請求額の計測ではありません。
-
-| したいこと | 入口 | 必要なもの |
-| --- | --- | --- |
-| Claude Code／Codexに渡すテキストの準備 | `tokens`・`prune`・`compact`、Unixの`search` | rdshバイナリ |
-| 進捗を見る・エージェントの質問に答える | [プロジェクトMCP接続](docs/CODING-AGENTS.ja.md#進捗と質問をmcpで共有する) | Node.js 22+とソースcheckout |
-| DSHで会話を始める | 以下のコマンド | 本家DSHとモデル接続 |
-
-DSHで会話する場合は、接続を設定します。
+CodexのChatGPTログインを使う場合は、`rdsh auth --import --provider openai-codex --source codex`で取り込みます。
+続いて、`README.md`があるプロジェクトでDSHを起動します。
 
 ```sh
-rdsh --version && rdsh doctor   # 導入と本家 dsh の確認
-rdsh setup --web                # 表示される #key=... 付き URL を開き、モデルに接続します
-rdsh tui                        # 会話を始め、選んだモデルの返答まで確かめます
+cd /absolute/path/to/your/project
+rdsh --share-file README.md --profile web
 ```
 
-詳しい [導入・利用・復旧の流れ](docs/USER-FLOW.md)、[設定画面](docs/RDSH-SETTINGS.md)、
-[構成図](docs/ARCHITECTURE.md)も用意しています。会話の委譲には本家の DSH が必要です。
+DSHの**Settings → Models**で接続先とAPIキー（または取り込んだCodex OAuth）を追加します。
+**Choose workspace**で起動時と同じプロジェクトを選び、**New Session**で会話を作ります。
+入力欄でモデルを選び、返答を確認してください。
+[移行ガイド](docs/CODING-AGENTS.ja.md)に、本家DSHの導入・ログイン取り込み・指示の引き継ぎ・
+復旧手順があります。Webプロファイルは初回に自動初期化されます。
+`rdsh tui`は`tui`プロファイルを導入済みの場合に使えます。
+
+現在、保護された会話起動にはLinux x86_64（WindowsはWSL）・本家DSH・Node.js・
+bubblewrap・prlimitが必要です。モデルのツールは共有ファイルの読み取り専用で、
+コード編集やホストのテスト実行は未対応です。
+単独のCLIはDSHなしでも使えます：`printf 'hello rdsh\n' | rdsh tokens`
+（PowerShellでは`"hello rdsh" | rdsh tokens`）。
 
 ## 動作環境
 
@@ -387,7 +388,8 @@ v0.2.0 公開後のソース修正は、その公開済みバイナリには含�
 | 資料 | 内容 |
 | --- | --- |
 | [docs/USER-FLOW.md](docs/USER-FLOW.md) | 導入から設定・利用・復旧までの流れです。 |
-| [docs/CODING-AGENTS.ja.md](docs/CODING-AGENTS.ja.md) | Claude Code／Codexのローカルツール・MCP接続・解除手順です。 |
+| [docs/CODING-AGENTS.ja.md](docs/CODING-AGENTS.ja.md) | Claude Code／Codexからの移行：導入・モデル接続・指示・最初の会話です。 |
+| [docs/PROJECT-MCP.ja.md](docs/PROJECT-MCP.ja.md) | 任意のプロジェクトMCP接続・解除手順です。 |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 委譲と設定管理、クレート構成です。 |
 | [docs/BENCHMARKS.md](docs/BENCHMARKS.md) | 再現できる測定手順です。 |
 | [docs/RDSH-SETTINGS.md](docs/RDSH-SETTINGS.md) | 設定画面と CLI キーです。 |

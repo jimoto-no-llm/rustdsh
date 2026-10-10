@@ -33,13 +33,13 @@ body:
     id: client
     attributes:
       label: How are you using rdsh?
-      description: DSH is optional for local tools and project MCP.
+      description: Include your previous client when reporting a migration issue.
       options:
-        - Local CLI tools only
-        - Codex with project MCP
-        - Claude Code with project MCP
+        - Migrating from Claude Code to DSH
+        - Migrating from Codex to DSH
         - DSH launcher or settings
-        - Other MCP client
+        - Local CLI tools only
+        - Optional project MCP dashboard
     validations:
       required: true
   - type: textarea

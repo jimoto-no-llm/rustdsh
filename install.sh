@@ -176,11 +176,11 @@ if [ "$MODE" = as-dsh ]; then
   fi
 fi
 echo "Try: \"$PREFIX/rdsh\" --version"
-echo "Local tokens/prune tools need no DSH or model login."
-echo "Claude Code / Codex MCP: https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/CODING-AGENTS.md"
-echo "--- optional DSH diagnostics ---"
+echo "Next: rdsh doctor, then follow the migration guide to connect a model in DSH."
+echo "Migrating from Claude Code / Codex to DSH: https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/CODING-AGENTS.md"
+echo "--- DSH diagnostics ---"
 "$PREFIX/rdsh" doctor 2>&1 | head -n 12 || true
-echo "For DSH conversations: run '$PREFIX/rdsh setup' to connect a model."
+echo "Start DSH in your project: rdsh --profile web (protected agent tools require Linux x86_64)."
 if [ -f "./plugins/install.sh" ]; then
   echo "For DSH Web: PROFILE=web ./plugins/install.sh adds recommended plugins, including the rdsh settings UI"
 fi

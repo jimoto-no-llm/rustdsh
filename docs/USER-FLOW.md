@@ -1,8 +1,7 @@
 # 導入から利用・復旧まで
 
-Claude Code／Codexを普段使う場合は、[既存のクライアント向け手順](CODING-AGENTS.ja.md)から
-始められます。ローカルツールとMCPのプロジェクト画面には、本家DSHや認証の取り込みは不要です。
-以下はDSHで会話する場合の導入・設定・復旧手順です。
+Claude Code／CodexからDSHへ移行する場合は、[移行ガイド](CODING-AGENTS.ja.md)から
+始めてください。以下はDSHで会話する場合の導入・設定・復旧手順です。
 
 rdsh は端末で使う高速な補助CLIです。会話やモデル通信は本家DSHが担当します。
 Desktopアプリ全体の起動時間・常駐メモリと、CLIの測定結果は区別してください。
@@ -31,13 +30,19 @@ rdsh setup --web
 ```sh
 codex login                                   # 未ログインの場合
 rdsh auth                                     # 見つかったプロバイダーを確認
-rdsh auth --import --provider openai-codex      # 使うものだけ取り込み
+rdsh auth --import --provider openai-codex --source codex   # Codexから取り込み
 ```
 
 opencodeの場合は`opencode auth login`後に`rdsh auth`で表示されたIDを指定します。
 取り込み後、初回設定画面の「接続状況を更新」で保存状態を確認します。
 接続状態の表示だけではモデルの応答を確認したことにはなりません。
-実際に `rdsh tui` で会話を開始し、選んだモデルの応答まで確認してください。
+実際に `rdsh --profile web` で会話を開始し、選んだモデルの応答まで確認してください。
+`tui`プロファイルが導入済みの場合は`rdsh tui`も使えます。
+初回設定画面のAPIキー欄はAnthropic・OpenAI・DeepSeekから接続先を選べます。
+新規の接続先はDSHの「Settings → Models」で追加します。Codexの取り込み済みOAuthは
+`openai-codex`を選んでキー欄を空にし、APIキーの場合は接続先とキーを一度に登録します。
+「Choose workspace」で起動したプロジェクトを選び、「New Session」で会話を作って
+モデルを選択します。[画面の順序](CODING-AGENTS.ja.md#3-いつものプロジェクトで会話を始める)。
 
 Web検索とローカル状態画面は既定でOFFです。設定画面のExtrasで必要なものだけ
 有効にするか、コマンドで指定します。この指定は一覧全体を置き換えます。
@@ -54,7 +59,7 @@ Web検索には別途SearXNGが必要です。DSH内のrdsh設定プラグイン
 
 | 目的 | 入口 | 必要なもの |
 | --- | --- | --- |
-| AIとの会話 | `rdsh tui` / `rdsh --profile web` | 本家DSHとモデル接続 |
+| AIとの会話 | `rdsh --profile web` / 導入済みの`rdsh tui` | 本家DSHとモデル接続、対応するLinux環境 |
 | トークン推定・検索・圧縮 | `rdsh tokens` / `search` / `prune` | rdshバイナリ |
 | 手元の状態を確認 | `rdsh serve --port 0` | `serve` をExtrasで有効化 |
 | プロジェクト指標・人への質問と回答 | `node dashboard/cli.mjs project --project <path> --no-tailscale --open` | Node.js 22+、dashboard依存の導入 |

@@ -1,163 +1,136 @@
-# Claude Code／Codexをそのまま使って始める
+# Claude Code／CodexからDSHへ移行する
 
 [English](CODING-AGENTS.md) · [rdshのインストール](../README.ja.md#インストール)
 
-普段のログインと作業の進め方を保ったまま、rdshのローカルツールを追加できます。
-テキスト処理とプロジェクト画面に、本家DSH・DSHのアカウント・APIキーは不要です。
+rdshを導入し、いつものプロジェクトでDSHの新しい会話を始める手順です。
+プロジェクトの指示ファイルはそのまま使い、モデル接続だけを選んで設定します。
 
-| したいこと | 使うもの | 必要なもの |
-| --- | --- | --- |
-| 指示ファイルの大きさを見積もる | `rdsh tokens AGENTS.md` / `CLAUDE.md` | rdsh |
-| 長いログを上限内に収める | `rdsh prune build.log --max-tokens 4000` | rdsh |
-| ファイルから文字列を探す | `rdsh search TODO --dir . --max 20` | Unixのrdsh |
-| 進捗を見る・質問に答える | MCP経由のプロジェクト画面 | Node.js 22+・ソースcheckout・対応するクライアント |
-| DSHで会話する | DSHランチャー・初回設定 | 本家DSH・モデル接続 |
+## 最初に確認すること
 
-## ローカルツールを試す
+| 引き継ぐもの | 移行先での扱い |
+| --- | --- |
+| プロジェクトの`AGENTS.md`／`CLAUDE.md` | 標準のDSHプロファイルが自動で読みます。名前の変更・変換は不要です。 |
+| CodexのChatGPTログイン（OAuth） | `rdsh auth --import --provider openai-codex --source codex`で明示的に取り込めます。 |
+| Claude Codeのログイン・契約 | 直接取り込む機能はありません。Anthropic等のAPIキー、または対応する別のモデル接続を選びます。 |
+| 元の会話履歴・resume | そのクライアントに残ります。DSHでは新しい会話を開始します。 |
+| MCP・hooks・skills・承認設定 | 自動変換しません。DSHで必要なものを個別に設定します。 |
+| コードの編集・テスト実行 | 現行のrdsh経由のモデルツールは共有ファイルの読み取り専用です。書き込み・ネットワーク・ホストのテスト実行は許可しません。 |
 
-[Unix／Windowsの導入手順](../README.ja.md#インストール)でビルド済みバイナリを入れます。
-Rustは不要です。作業するプロジェクトのディレクトリで実行します。
+現行版は会話・共有コードの分析から移行を始める構成です。
+Claude Code／Codexの編集や実行までをすべて置き換えることはできません。
+既存のクライアントと設定を残して、小さなプロジェクトで確認してください。
 
-```sh
-rdsh --version
-printf 'hello rdsh\n' | rdsh tokens
-```
+会話には**Linux x86_64（WindowsはWSL）・本家DSH・Node.js・bubblewrap・prlimit**が必要です。
+macOS／WindowsネイティブではローカルCLIは使えますが、保護されたagent起動は未対応です。
 
-PowerShellの場合：
+## 1. rdshと本家DSHを用意する
 
-```powershell
-rdsh --version
-"hello rdsh" | rdsh tokens
-```
-
-既存ファイルには次を使えます。存在する指示ファイルを選び、ログは自分のものを指定してください。
+[インストール手順](../README.ja.md#インストール)でrdshを導入します。
+Windowsで会話する場合はWSLの端末でUnixの手順を使ってください。
+本家DSHが未導入なら、監査済みの版を入れます。Node.jsの実機検証は24です。
 
 ```sh
-rdsh tokens AGENTS.md       # Codex向けの指示がある場合
-rdsh tokens CLAUDE.md       # Claude Code向けの指示がある場合
-rdsh prune build.log --max-tokens 4000 > build-for-review.txt
+npm install --global @deepseek-ai/dsh@0.2.0-rc.2
+rdsh --version
+rdsh doctor
 ```
 
-pruneは先頭と末尾を残して切り詰めます。意味を要約する処理ではなく、途中の重要な行が省かれる場合があります。
-元ファイルを残し、必要な箇所は原文で確認してください。トークン数は概算で、モデル固有の数や請求額ではありません。
-ネイティブ検索は現在Windowsで停止する設計です。WSLで使うか、普段のクライアントの検索を使ってください。
+`doctor`で本家DSHの場所と版を確認します。監査済みは`0.2.0-rc.2`と`0.2.1-alpha.1`です。
+Ubuntu／WSLのUbuntuで隔離用コマンドが未導入なら、次を実行します。
 
-使い方をエージェントに伝えるなら、既存の`AGENTS.md`／`CLAUDE.md`へ以下を追記できます。
+```sh
+sudo apt-get install bubblewrap util-linux
+```
+
+本家DSHは[開発者プレビュー](https://github.com/deepseek-ai/deepseek-harness)です。
+版を無条件に最新へ上げるとrdshの実行保護に対応しない場合があります。
+起動を拒否された場合は、診断に従って対応する環境・版を揃えます。
+
+## 2. モデル接続を選ぶ
+
+移行元に合わせて、モデルの認証方法を選びます。
+
+**Codexから移行し、既存のログインを使う場合：**
+
+```sh
+rdsh auth
+rdsh auth --import --provider openai-codex --source codex
+```
+
+未ログインの場合だけ、先に`codex login`します。取り込みはDSH側へのコピーで、
+元のCodex設定を変更しません。`setup --login`でログインを開いた場合も、取り込みは別の操作です。
+保存状態は`rdsh auth`、または`rdsh setup --web`の「接続状況を更新」で確認できます。
+ログイン元は同じOSのユーザー環境です。WSLからWindows側のログインは自動探索しません。
+見つからない場合はWSL内でCodexへログインするか、APIキーの接続を選んでください。
+
+**Claude Codeから移行する場合、またはAPIキーを使う場合：**
+
+DSHの「Settings → Models」で、接続先とAPIキーを一度に追加します。
+次の節でDSHを起動してから、画面の手順に進んでください。
+APIキーとサブスクリプションのログインは別です。Claude Codeの契約は自動で引き継ぎません。
+Claude以外のモデルを使う場合は、対応するCodexログインやDeepSeekキーも選べます。
+
+既に接続先を設定済みでキーだけ保存・更新したい場合は、`rdsh setup --web`でも
+Anthropic・OpenAI・DeepSeekを選べます。キーの保存だけで使用モデルは変わりません。
+
+## 3. いつものプロジェクトで会話を始める
+
+プロジェクトへ移動します。次の例は`README.md`が存在する場合です。
+別のファイルを読ませたい場合は、共有するファイル名を置き換えます。
+
+```sh
+cd /absolute/path/to/your/project
+rdsh --share-file README.md --profile web
+```
+
+Webプロファイルは初回に自動初期化されます。開いたDSHで次を行います。
+
+1. 初回のプレビュー案内を確認して「Continue」を押します。DeepSeekの接続を求められ、他の接続を使う場合は「Configure later」を選びます。
+2. 「Settings → Models → Add model provider」で「Third-party model provider」を選びます。CodexのOAuthは`openai-codex`、Claudeは`anthropic`、OpenAIのAPIキーは`openai`です。
+3. Codexの取り込み済みOAuthならAPIキー欄は空のまま「Apply」。Claude／OpenAIならこの欄にAPIキーを入力して「Apply」です。DeepSeekの場合は既存のDeepSeekカードでキーを設定します。
+4. Settingsを閉じ、「Choose workspace」で**起動時と同じプロジェクトのフォルダー**を選びます。初期ワークスペースが別のフォルダーなら切り替えてください。
+5. 「New Session」を押して会話を作り、入力欄のモデル選択から追加したプロバイダーのモデルを選びます。最初の依頼は次の内容にします。
 
 ```text
-大きなテキストを渡す前に、必要ならrdsh tokensで推定サイズを確認し、
-rdsh pruneで先頭と末尾を上限内に収めてください。元のファイルは残し、
-省かれた内容が必要なら原文を確認してください。Unixではrdsh searchで
-文字列を検索できます。既存の実行権限の範囲で、役立つ場合に使ってください。
+このプロジェクトに適用される指示ファイルの名前を確認し、共有したREADMEを要約してください。
+変更はまだ行わないでください。
 ```
 
-## 進捗と質問をMCPで共有する
+フォルダー選択がDSH内の画面で開く場合は「Edit path」でプロジェクトの絶対パスを
+入力し、「Open」で決定できます。
 
-MCP（Model Context Protocol）は、今使っているエージェントに外部ツールをつなぐ仕組みです。
-rdshの画面へ進捗や質問を報告し、回答を読めます。エージェント本体を切り替える必要はありません。
+モデルの返答とファイルの内容を確認できれば、最初の会話は完了です。
+読むファイルを増やすときは`--share-file`を追加して起動し直します。
+ディレクトリ全体は指定できません。既存のコードや履歴は書き換えません。
 
-プロジェクト画面は任意のNodeコンポーネントです。ReleaseのアーカイブにはRust CLIを収録し、
-画面はソースcheckoutから別途導入します。登録後もcheckoutをその場所に残してください。
+### 指示ファイルを引き継ぐ
 
-```sh
-git clone https://github.com/jimoto-no-llm/rustdsh.git
-cd rustdsh
-npm ci --prefix dashboard
-```
+監査済みDSHの標準プロファイルは`AGENTS.md`・`CLAUDE.md`、各`.local.md`を読みます。
+同じ場所で内容が同じファイルは重複しません。既存ファイルをコピー・改名する必要はありません。
+カスタムプロファイルでは読み込みを無効化できるため、設定を確認してください。
 
-Unixではcheckoutと作業プロジェクトの絶対パスを指定し、画面を起動します。
+全体に適用する指示はDSHでは`$DSH_HOME/AGENTS.md`（通常`~/.dsh/AGENTS.md`）です。
+`~/.codex/AGENTS.md`・`~/.claude/CLAUDE.md`の必要な文章だけ確認して追加し、
+DSH側に既存の指示がある場合は内容を統合してください。全体の上書きは不要です。
+Claude固有の`@`参照・hooks・MCP名やCodex固有の設定は、そのまま動くとは限りません。
 
-```sh
-rdsh_repo="$PWD"
-work_project="/absolute/path/to/your/project"
-node "$rdsh_repo/dashboard/cli.mjs" project --project "$work_project" --no-tailscale --open
-```
+## 操作の対応表
 
-Windows PowerShellでは次の形です。
+| いつもの操作 | DSH／rdshでの入口 |
+| --- | --- |
+| `claude`／`codex`で対話を始める | プロジェクト内で`rdsh --profile web` |
+| 端末だけで会話する | `rdsh tui`（`tui`プロファイル導入済みの場合） |
+| 一回の依頼を実行する | `rdsh --share-file README.md --profile headless "READMEを要約してください"` |
+| モデルを選ぶ | DSHのモデル選択画面。Claude／Codex固有のCLIフラグは移植しません。 |
+| ログイン・接続状態を見る | `rdsh auth`、`rdsh doctor`、`rdsh setup --web` |
+| セッションを探す | `rdsh sessions`（DSHの履歴。移行元の履歴は含みません） |
+| 進捗や質問の画面を追加する | 任意の[プロジェクトDashboard](../dashboard/README.md) |
 
-```powershell
-$rdshRepo = (Get-Location).Path
-$workProject = "C:\Projects\my-app"
-node "$rdshRepo/dashboard/cli.mjs" project --project "$workProject" --no-tailscale --open
-```
+## 困ったとき・元の環境に戻る
 
-起動した端末は開いたままにします。2つ目の端末でも同じcheckout・プロジェクトのパスを設定し、
-作業プロジェクトへ移動してから、使っているクライアントだけを登録します。
-`rdsh-my-app`は他のプロジェクトと重ならない名前にしてください。
+- **本家DSHが見つからない：** 本家の導入後、`rdsh doctor`で探索結果を確認します。
+- **接続できない：** 認証を用意したプロバイダーと選択モデルが一致するか確認し、期限切れならログイン更新後に明示的に取り込みます。
+- **ファイルが見えない：** 起動したプロジェクトと`--share-file`を確認します。共有は読み取り専用です。
+- **元の作業を再開する：** DSHを終了し、同じプロジェクトで`claude`／`codex`を開きます。元の履歴と設定はそのまま残っています。
 
-```sh
-rdsh_repo="/absolute/path/to/rustdsh"
-work_project="/absolute/path/to/your/project"
-cd "$work_project"
-```
-
-Codexの場合：
-
-```sh
-codex mcp add rdsh-my-app -- node "$rdsh_repo/dashboard/cli.mjs" mcp --project "$work_project"
-codex mcp get rdsh-my-app
-```
-
-Claude Codeの場合（このプロジェクトで自分だけが使う設定）：
-
-```sh
-claude mcp add --transport stdio --scope local rdsh-my-app -- node "$rdsh_repo/dashboard/cli.mjs" mcp --project "$work_project"
-claude mcp get rdsh-my-app
-```
-
-PowerShellの登録コマンド：
-
-```powershell
-$rdshRepo = "C:\Projects\rustdsh"
-$workProject = "C:\Projects\my-app"
-Set-Location $workProject
-# 使っているクライアントの行だけ実行します。
-codex mcp add rdsh-my-app -- node "$rdshRepo/dashboard/cli.mjs" mcp --project "$workProject"
-claude mcp add --transport stdio --scope local rdsh-my-app -- node "$rdshRepo/dashboard/cli.mjs" mcp --project "$workProject"
-```
-
-Codexは名前付きサーバーを設定へ保存し、Claudeのlocal設定は登録したプロジェクトだけに適用します。
-コマンドの仕様は[Codex公式MCP手順](https://learn.chatgpt.com/docs/extend/mcp?surface=cli)と
-[Claude Code公式のstdio・local設定](https://code.claude.com/docs/en/mcp)を参照しています。
-登録後は新しいエージェントのセッションを開き、6つのツールが使えることを確認してください。
-WindowsとWSLではパスも状態ファイルも異なるため、サーバーとクライアントは同じ環境で起動します。
-GUIのクライアントではMCP設定画面、またはCLIと共有する設定を使います。
-[生成済みの設定](../dashboard/README.md#report-project-data-through-mcp)には、正確なNode実行ファイルと引数が入っています。
-
-stdioの中継は操作ごとに、このプロジェクトの最新の認証情報を読みます。
-登録コマンドへ鍵を貼る必要はなく、サーバーを再起動しても登録の書き換えは不要です。
-モデル用のログインは、今使っているクライアントに残します。
-
-エージェントへ伝える例：
-
-```text
-今回の作業ではrdshのプロジェクトMCPを使ってください。最初にdashboard_get_stateで状態を確認し、
-dashboard_upsert_taskでタスクを登録・更新し、dashboard_publish_eventで進捗を報告してください。
-判断が必要ならdashboard_ask_questionで私に質問し、dashboard_get_feedbackで回答を読んでください。
-次回の取得には返されたnext_cursorを使い、数値は実測したものだけ報告してください。
-回答が保存されたことだけで、新しい実行権限が与えられたとは扱わないでください。
-```
-
-画面に出るのはエージェントが報告したデータです。他のクライアントの履歴や請求額を自動収集しません。
-Codex／Claudeの起動・resume・割り込み・停止・厳格な予算制御は、現時点の[アダプター](CLI-ADAPTERS.md)では未対応です。
-作業は元のクライアントで続け、回答はMCPで読んでください。クライアントへの自動入力は実装していません。
-
-## つながらないとき・解除する
-
-画面を起動した端末、Node依存、クライアントとサーバーの絶対パスを確認します。
-再表示は `node /absolute/path/to/rustdsh/dashboard/cli.mjs open --project /absolute/path/to/your/project` です。
-中継は画面を止めてもツール一覧を出せるため、`dashboard_get_state`の成功まで確認してください。
-
-解除は登録したプロジェクトで、使っているクライアントの名前だけを指定します。
-
-```sh
-codex mcp remove rdsh-my-app
-claude mcp remove --scope local rdsh-my-app
-```
-
-画面は起動した端末のCtrl-C、または対象プロジェクトの`stop`コマンドで終了します。
-MCP登録の解除は、保存した報告や回答を削除しません。
-
-困ったときは[Issueフォーム](https://github.com/jimoto-no-llm/rustdsh/issues/new/choose)へ、
-rdshの版・OS・クライアント・再現手順を記載してください。鍵や起動URLは載せないでください。
-DSHの接続は別の[導入・復旧手順](USER-FLOW.md)で説明しています。
+詳しい[設定・復旧手順](USER-FLOW.md)と[設定画面](RDSH-SETTINGS.md)も確認できます。

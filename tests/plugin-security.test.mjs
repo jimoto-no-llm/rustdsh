@@ -260,6 +260,60 @@ test('plugin security boundary and settings preservation', async (t) => {
     assert.equal(JSON.parse(await readFile(settingsFile, 'utf8')).sessions.stale_secs, 120);
   });
 
+  await t.test('settings truncate oversized fields without traversing their entire value', async () => {
+    const fixtureHome = await mkdtemp(join(home, 'large-settings-'));
+    const large = '🦀'.repeat(100000);
+    const childSource = `
+      import { Readable } from 'node:stream';
+      const settings = await import(process.argv[1]);
+      const iterate = String.prototype[Symbol.iterator];
+      String.prototype[Symbol.iterator] = function* () {
+        let traversed = 0;
+        for (const character of iterate.call(this)) {
+          if (this.length === 200000 && ++traversed > Number(process.argv[2]) + 1) {
+            throw new Error('Settings traversed the oversized suffix');
+          }
+          yield character;
+        }
+      };
+      const routes = new Map();
+      const ctx = {
+        effect: fn => fn(), on: () => () => {},
+        inject(names, setup) {
+          const cleanup = names.every(name => this[name]) ? setup(this) : undefined;
+          return { dispose: async () => { if (typeof cleanup === 'function') await cleanup(); } };
+        },
+        webServer: { register(route) { routes.set(route.path, route.handler); return () => routes.delete(route.path); } },
+        connection: { requestRejection: () => undefined },
+      };
+      const dispose = settings.apply(ctx, {});
+      try {
+        const req = Readable.from([]);
+        Object.assign(req, { method: 'GET', headers: {} });
+        let status, body;
+        await routes.get('/api/rdsh-settings')(req, {
+          writeHead(code) { status = code; },
+          end(value) { body = JSON.parse(value); },
+        });
+        if (status !== 200) throw new Error('Settings GET failed: ' + status);
+        console.log(JSON.stringify(body.config));
+      } finally { String.prototype[Symbol.iterator] = iterate; await dispose(); }
+    `;
+    for (const [config, select, limit, expected] of [
+      [{ general: { default_profile: large } }, value => value.general.default_profile, 200, '🦀'.repeat(200)],
+      [{ context: { goal: large } }, value => value.context.goal, 2000, '🦀'.repeat(2000)],
+      [{ guard: { deny: [large] } }, value => value.guard.deny, 500, ['🦀'.repeat(500)]],
+    ]) {
+      await writeFile(join(fixtureHome, 'rdsh.json'), JSON.stringify(config));
+      const child = childProcess.spawnSync(process.execPath, [
+        '--input-type=module', '--eval', childSource,
+        new URL('../plugins/rdsh-settings/index.js', import.meta.url).href, String(limit),
+      ], { env: { ...process.env, DSH_HOME: fixtureHome }, encoding: 'utf8', timeout: 15000 });
+      assert.equal(child.status, 0, child.stderr?.slice(-2000));
+      assert.deepEqual(select(JSON.parse(child.stdout)), expected);
+    }
+  });
+
   await t.test('all supported form fields fit within the bounded save body', async () => {
     // JSON escapes cost six bytes per character, exceeding multibyte UTF-8 paths.
     const text = (n) => '\u0001'.repeat(n);

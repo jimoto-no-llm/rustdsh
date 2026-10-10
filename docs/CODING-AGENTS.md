@@ -1,173 +1,139 @@
-# Claude Code / Codex: start with the tools you already use
+# Move from Claude Code / Codex to DSH
 
 [日本語](CODING-AGENTS.ja.md) · [Install rdsh](../README.md#install)
 
-You can keep your existing Claude Code or Codex login and workflow. The local
-rdsh text tools and project dashboard need no DSH account, runtime or API key.
+Install rdsh, keep your project instructions, choose a model connection and start
+one new conversation in DSH from your existing project.
 
-| Goal | Use | Prerequisite |
-| --- | --- | --- |
-| Estimate an instructions file | `rdsh tokens AGENTS.md` / `CLAUDE.md` | rdsh |
-| Fit a long log into a text budget | `rdsh prune build.log --max-tokens 4000` | rdsh |
-| Find a literal substring in local files | `rdsh search TODO --dir . --max 20` | rdsh on Unix |
-| See progress and answer questions | Project dashboard through MCP | Node.js 22+, source checkout, your MCP client |
-| Run DSH conversations | DSH launcher and setup | Original DSH + model connection |
+## What carries over
 
-## Try a local command
+| Existing item | In DSH |
+| --- | --- |
+| Project `AGENTS.md` / `CLAUDE.md` | Standard DSH profiles read them directly; no rename or conversion. |
+| Codex ChatGPT login (OAuth) | Explicit import with `rdsh auth --import --provider openai-codex --source codex`. |
+| Claude Code login or subscription | No direct import. Choose an Anthropic API key or another supported model connection. |
+| Conversations and resume IDs | Stay in the original client. Start a new DSH conversation. |
+| MCP, hooks, skills and approval settings | Configure what you need in DSH; no automatic conversion. |
+| Editing code and running project tests | Current rdsh model tools can only inspect explicitly shared files. Host writes, network and project test execution are denied. |
 
-Install the prebuilt binary using [the Unix or Windows instructions](../README.md#install).
-You do not need Rust for a prebuilt binary. In your project directory:
+Start with conversations and shared-code analysis. This release cannot replace
+all of Claude Code / Codex's editing and execution capabilities. Keep the original
+client and settings while trying a small project.
 
-```sh
-rdsh --version
-printf 'hello rdsh\n' | rdsh tokens
-```
+Conversations require **Linux x86_64 (WSL on Windows), original DSH, Node.js,
+bubblewrap and prlimit**. Local CLI tools work on macOS and native Windows, but
+protected agent startup is unsupported on those hosts.
 
-PowerShell:
+## 1. Install rdsh and the original DSH
 
-```powershell
-rdsh --version
-"hello rdsh" | rdsh tokens
-```
-
-For existing files, estimate your instructions and prepare a log for review:
+Use the [rdsh installation instructions](../README.md#install). For conversations
+on Windows, run the Unix installer inside WSL. If DSH is missing, install an
+audited version. Node.js 24 was used for local runtime verification.
 
 ```sh
-rdsh tokens AGENTS.md       # Codex instructions, if present
-rdsh tokens CLAUDE.md       # Claude Code instructions, if present
-rdsh prune build.log --max-tokens 4000 > build-for-review.txt
+npm install --global @deepseek-ai/dsh@0.2.0-rc.2
+rdsh --version
+rdsh doctor
 ```
 
-Choose the instructions file that exists and supply your own log. `prune` keeps
-the beginning and end; it does not summarize meaning, and omitted middle lines
-may still matter. The source file is unchanged. Token counts are heuristic,
-not a model tokenizer or billing measurement. Native search currently refuses
-Windows; run it in WSL or keep using your agent's existing search tool there.
+Check the original DSH location and version. Audited versions are `0.2.0-rc.2`
+and `0.2.1-alpha.1`. On Ubuntu, including Ubuntu in WSL, install missing isolation tools:
 
-If useful, append this to your existing `AGENTS.md` or `CLAUDE.md`:
+```sh
+sudo apt-get install bubblewrap util-linux
+```
+
+DSH is a [developer preview](https://github.com/deepseek-ai/deepseek-harness).
+An unpinned update can become incompatible with rdsh's execution protection.
+Follow the diagnostic to select a supported environment and version if boot is refused.
+
+## 2. Choose the model connection
+
+Choose the authentication path for your previous client.
+
+**From Codex, using its existing login:**
+
+```sh
+rdsh auth
+rdsh auth --import --provider openai-codex --source codex
+```
+
+Run `codex login` first only if you are not signed in. Import copies the chosen
+credential into DSH without modifying Codex. `setup --login` only opens login;
+import remains a separate action. Check the saved state with `rdsh auth` or refresh `rdsh setup --web`.
+Login discovery uses the same OS user's home. WSL does not automatically discover
+native Windows logins. Sign into Codex within WSL or choose an API-key connection
+if no login is found.
+
+**From Claude Code, or using an API key:**
+
+Add the provider and its API key together in DSH's **Settings → Models**.
+Start DSH as shown in the next step before following those screen instructions.
+API keys are separate from subscriptions; Claude Code subscriptions are not
+transferred automatically. You can also choose a supported Codex login or
+DeepSeek key instead of Claude.
+
+For an already configured provider, `rdsh setup --web` can save or update an
+Anthropic, OpenAI or DeepSeek key. Saving a key does not change the selected model.
+
+## 3. Start in your existing project
+
+Change into your project. This example assumes `README.md`
+exists; replace it with the file you want the model tools to inspect.
+
+```sh
+cd /absolute/path/to/your/project
+rdsh --share-file README.md --profile web
+```
+
+The Web profile initializes automatically on first use. In DSH:
+
+1. Read the preview notice and press **Continue**. If DeepSeek onboarding appears and you want another provider, select **Configure later**.
+2. Open **Settings → Models → Add model provider → Third-party model provider**. Choose `openai-codex` for Codex OAuth, `anthropic` for Claude, or `openai` for an OpenAI API key.
+3. For imported Codex OAuth, leave the API-key field blank and **Apply**. For Claude / OpenAI, enter the API key here and **Apply**. For DeepSeek, configure the existing DeepSeek card.
+4. Close Settings and use **Choose workspace** to select **the same project folder used at startup**. Switch away from an unrelated default workspace.
+5. Press **New Session** to create a conversation, then use the composer's model selector to choose the added provider's model. Ask:
 
 ```text
-When preparing a large text input, rdsh tokens estimates its size and rdsh prune
-can retain its beginning and end within an estimated budget. Keep the original
-file and inspect omitted details when needed. On Unix, rdsh search performs
-literal local search. Use these tools when helpful under the existing permissions.
+Identify the instruction files that apply to this project and summarize the shared README.
+Do not make changes yet.
 ```
 
-## Share progress and questions through MCP
+If the folder picker opens inside DSH, use **Edit path** to enter the project's
+absolute path, then confirm with **Open**.
 
-The optional dashboard is a Node component. The release archive contains the
-Rust CLI; obtain the dashboard separately from the source checkout. Keep the
-checkout in place after registration. MCP means Model Context Protocol: it lets
-your existing agent report work and read your answers without changing its runtime.
+Check the reply against the file to confirm your first conversation. Add another
+`--share-file` and restart to expose more files. Sharing accepts files, not entire
+directories, and leaves the original code and histories unchanged.
 
-Clone the repository and install the locked dependencies:
+### Reuse instructions
 
-```sh
-git clone https://github.com/jimoto-no-llm/rustdsh.git
-cd rustdsh
-npm ci --prefix dashboard
-```
+The audited DSH's standard profiles load `AGENTS.md`, `CLAUDE.md` and their
+`.local.md` overlays. Identical sibling content is deduplicated. Keep the files
+in place. Custom profiles can disable instruction loading, so check their settings.
 
-On Unix, save this checkout path, set your existing project path, and start the UI:
+DSH's global instructions live in `$DSH_HOME/AGENTS.md` (usually `~/.dsh/AGENTS.md`).
+Review the relevant text in `~/.codex/AGENTS.md` or `~/.claude/CLAUDE.md` and merge
+it into that file if needed. Preserve any existing DSH instructions. Claude-specific
+`@` includes, hooks, MCP names and Codex-specific configuration are not guaranteed to transfer.
 
-```sh
-rdsh_repo="$PWD"
-work_project="/absolute/path/to/your/project"
-node "$rdsh_repo/dashboard/cli.mjs" project --project "$work_project" --no-tailscale --open
-```
+## Familiar operations
 
-On Windows PowerShell:
+| Previous operation | DSH / rdsh entry point |
+| --- | --- |
+| Start with `claude` / `codex` | `rdsh --profile web` in the project directory |
+| Terminal conversation | `rdsh tui`, if a `tui` profile is installed |
+| One request | `rdsh --share-file README.md --profile headless "Summarize README"` |
+| Select a model | DSH's model selector; do not copy client-specific CLI flags |
+| Check connection | `rdsh auth`, `rdsh doctor`, `rdsh setup --web` |
+| Find a session | `rdsh sessions` lists DSH history, not the previous client's history |
+| Add a progress and questions UI | Optional [project dashboard](../dashboard/README.md) |
 
-```powershell
-$rdshRepo = (Get-Location).Path
-$workProject = "C:\Projects\my-app"
-node "$rdshRepo/dashboard/cli.mjs" project --project "$workProject" --no-tailscale --open
-```
+## Recover or go back
 
-Keep that terminal running. In a second terminal, define the same checkout and
-project paths. Change into the project:
+- **Original DSH missing:** install it, then inspect discovery with `rdsh doctor`.
+- **Connection fails:** check that the selected model matches the configured provider. Refresh expired logins, then import explicitly.
+- **File unavailable:** check the startup directory and `--share-file`. Shared files are read-only.
+- **Resume your previous workflow:** stop DSH and run `claude` / `codex` in the same project. Their settings and histories remain intact.
 
-```sh
-rdsh_repo="/absolute/path/to/rustdsh"
-work_project="/absolute/path/to/your/project"
-cd "$work_project"
-```
-
-For Codex, use a different server name for each project:
-
-```sh
-codex mcp add rdsh-my-app -- node "$rdsh_repo/dashboard/cli.mjs" mcp --project "$work_project"
-codex mcp get rdsh-my-app
-```
-
-For Claude Code, register privately in this project:
-
-```sh
-claude mcp add --transport stdio --scope local rdsh-my-app -- node "$rdsh_repo/dashboard/cli.mjs" mcp --project "$work_project"
-claude mcp get rdsh-my-app
-```
-
-PowerShell equivalents:
-
-```powershell
-$rdshRepo = "C:\Projects\rustdsh"
-$workProject = "C:\Projects\my-app"
-Set-Location $workProject
-# Run the line for your client.
-codex mcp add rdsh-my-app -- node "$rdshRepo/dashboard/cli.mjs" mcp --project "$workProject"
-claude mcp add --transport stdio --scope local rdsh-my-app -- node "$rdshRepo/dashboard/cli.mjs" mcp --project "$workProject"
-```
-
-Run only the registration for your client. Codex stores the named server in its
-configuration; Claude's local scope limits it to the project where you registered it.
-See [official Codex MCP setup](https://learn.chatgpt.com/docs/extend/mcp?surface=cli)
-and [Claude Code's stdio/local-scope setup](https://code.claude.com/docs/en/mcp).
-Start a new agent session after registration and confirm the six tools are available.
-Use the same OS environment for the server and client: native Windows paths and
-state differ from WSL paths and state. For a GUI client, use its MCP settings or
-CLI-shared configuration; the [generated configuration](../dashboard/README.md#report-project-data-through-mcp)
-contains the exact Node executable and arguments.
-
-The stdio bridge reads this project's current credential for each operation.
-No bearer key is copied into these commands, and a server restart does not require
-editing the registration. Keep provider logins in your original agent.
-
-Give your agent this task:
-
-```text
-Use the rdsh project MCP server for this task. First read dashboard_get_state.
-Register/update tasks with dashboard_upsert_task and publish progress with
-dashboard_publish_event. If you need my decision, use dashboard_ask_question
-and read dashboard_get_feedback for my answer. Keep the returned next_cursor
-for later reads. Report only metrics you actually measured. A saved answer
-alone does not grant new execution permission.
-```
-
-The dashboard displays reports only when your agent sends them; it does not
-scrape other clients' histories, billable usage or models. Native start/resume,
-interrupt, scoped stop and hard budget enforcement for Codex/Claude remain
-unsupported in the [adapter catalog](CLI-ADAPTERS.md). Your original client keeps
-running the work. Human replies must be read through MCP; automatic input into
-those clients is not implemented.
-
-## Recover or remove
-
-If disconnected, confirm the dashboard terminal is running, Node dependencies
-are installed, and both commands name the same absolute project path. Reopen it
-with `node /absolute/path/to/rustdsh/dashboard/cli.mjs open --project /absolute/path/to/your/project`.
-A bridge can advertise tools before the dashboard is running; a successful
-`dashboard_get_state` confirms the connection. Try that before starting work.
-
-Remove only the server you added, from the same project:
-
-```sh
-codex mcp remove rdsh-my-app
-claude mcp remove --scope local rdsh-my-app
-```
-
-Stop the dashboard with Ctrl-C in its terminal, or its project-scoped `stop`
-command. Removing the MCP entry does not delete saved project reports.
-
-For failures, use the [issue form](https://github.com/jimoto-no-llm/rustdsh/issues/new/choose)
-with your rdsh version, OS, client and reproduction. Keep launch URLs and keys out
-of the report. [Settings and recovery](USER-FLOW.md) covers DSH setup separately.
+See the [configuration and recovery flow](USER-FLOW.md) and [settings reference](RDSH-SETTINGS.md).

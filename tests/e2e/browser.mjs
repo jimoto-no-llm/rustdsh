@@ -23,7 +23,7 @@ function launch(command,args,pattern){
  child.stdout.on('data',read);child.stderr.on('data',read);child.once('error',e=>{clearTimeout(timer);reject(e);});child.once('exit',code=>{clearTimeout(timer);if(!pattern.test(text))reject(new Error(`server exited ${code}`));});});
 }
 async function stop(child){if(child.exitCode!==null)return;await new Promise(resolve=>{const t=setTimeout(()=>{child.kill('SIGKILL');},5000);child.once('exit',()=>{clearTimeout(t);resolve();});child.kill('SIGTERM');});children.delete(child);}
-async function pageFor(browser,url){const context=await browser.newContext({viewport:report.viewports[0],locale:'ja-JP'});contexts.push(context);const page=await context.newPage();page.on('pageerror',e=>report.page_errors.push(e.message));page.on('console',msg=>{if(msg.type()==='error')report.console_errors.push({text:msg.text(),path:msg.location().url?new URL(msg.location().url).pathname:''});});await page.goto(url);return page;}
+async function pageFor(browser,url,locale='ja-JP'){const context=await browser.newContext({viewport:report.viewports[0],locale});contexts.push(context);const page=await context.newPage();page.on('pageerror',e=>report.page_errors.push(e.message));page.on('console',msg=>{if(msg.type()==='error')report.console_errors.push({text:msg.text(),path:msg.location().url?new URL(msg.location().url).pathname:''});});await page.goto(url);return page;}
 async function screenshot(page,name){await page.evaluate(async()=>{window.scrollTo(0,0);await document.fonts.ready;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));});await page.screenshot({path:path.join(output,name+'.png'),fullPage:false});}
 async function freePort(){const server=net.createServer();await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});const port=server.address().port;await new Promise(resolve=>server.close(resolve));return String(port);}
 async function check(page,title){assert.match(await page.title(),title);assert.ok((await page.locator('body').innerText()).trim().length>100);assert.equal(await page.locator('vite-error-overlay,nextjs-portal').count(),0);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth+1),'page overflow');}
@@ -44,9 +44,32 @@ try{
  await page.getByLabel('DeepSeek APIキー',{exact:true}).press('Enter');
  await page.locator('#key-status').filter({hasText:'処理に失敗しました'}).waitFor();
  assert.equal(await page.locator('#key').inputValue(),'synthetic-key-not-a-credential');
- assert.equal(await page.locator('#save-key').isEnabled(),true);await page.unroute('**/api/key');await page.locator('#key').fill('');
- await screenshot(page,'setup-desktop');await page.setViewportSize(report.viewports[1]);await check(page,/rdsh setup/);await screenshot(page,'setup-mobile');
- await page.close();await stop(setup.child);report.flows.push('setup: missing model connection rendered -> Extras enable -> file readback -> reload retained');
+ assert.equal(await page.locator('#save-key').isEnabled(),true);await page.unroute('**/api/key');
+ // Provider changes discard the previous provider's draft; all choices use the
+ // real bounded key API and persist only the selected provider's reference.
+ assert.match(await page.locator('#migration-guide').getAttribute('href'),/CODING-AGENTS\.ja\.md$/);
+ for(const [provider,host] of [['ANTHROPIC_API_KEY','console.anthropic.com'],['OPENAI_API_KEY','platform.openai.com'],['DEEPSEEK_API_KEY','platform.deepseek.com']]) {
+  await page.locator('#key-provider').selectOption(provider);
+  assert.equal(await page.locator('#key').inputValue(),'');
+  assert.equal(await page.locator('#key').getAttribute('placeholder'),provider);
+  assert.equal(new URL(await page.locator('#issue').getAttribute('href')).hostname,host);
+  const value='synthetic-'+provider+'-not-a-credential';await page.locator('#key').fill(value);
+  const savedResponse=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/key');
+  await page.locator('#key').press('Enter');const saved=await savedResponse;
+  assert.equal(saved.status(),200);assert.deepEqual(saved.request().postDataJSON(),{name:provider,value});
+  await page.waitForFunction(()=>!document.querySelector('#save-key').disabled);
+  assert.equal(await page.locator('#key').inputValue(),'');
+  assert.equal(await page.locator('#key-provider').isEnabled(),true);
+  const credentials=await readFile(path.join(env.DSH_HOME,'.credentials.yaml'),'utf8');
+  assert.ok(credentials.includes(provider+':'));assert.ok(credentials.includes(value));
+ }
+ await page.locator('#key-provider').selectOption('ANTHROPIC_API_KEY');
+ await screenshot(page,'setup-desktop');await page.locator('#jump-key').click();await page.screenshot({path:path.join(output,'setup-api-desktop.png')});
+ await page.setViewportSize(report.viewports[1]);await check(page,/rdsh setup/);await screenshot(page,'setup-mobile');await page.locator('#jump-key').click();await page.screenshot({path:path.join(output,'setup-api-mobile.png')});
+ const english=await pageFor(browser,setup.url,'en-US');await english.getByLabel('Provider',{exact:true}).selectOption('ANTHROPIC_API_KEY');
+ assert.equal(await english.getByLabel('Anthropic API key',{exact:true}).getAttribute('placeholder'),'ANTHROPIC_API_KEY');
+ assert.match(await english.locator('#migration-guide').getAttribute('href'),/CODING-AGENTS\.md$/);await english.close();
+ await page.close();await stop(setup.child);report.flows.push('setup: missing model connection -> Extras enable/readback/reload -> failed key save retains draft -> provider switch clears draft -> Anthropic/OpenAI/DeepSeek API save/readback');
 
  const session=path.join(env.DSH_HOME,'sessions','example','session-one');await mkdir(session,{recursive:true});await writeFile(path.join(session,'messages.jsonl'),'synthetic session');
  const skills=path.join(env.DSH_HOME,'skills','e2e-skill');await mkdir(skills,{recursive:true});await writeFile(path.join(skills,'SKILL.md'),'# Synthetic skill');
