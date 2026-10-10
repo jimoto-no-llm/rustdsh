@@ -548,6 +548,7 @@ pub(crate) fn write_creds(path: &str, text: &str) -> anyhow::Result<()> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::OpenOptionsExt;
+        // Set the mode on the new inode before it becomes visible at `path`.
         options.mode(0o600);
     }
     let result = (|| -> anyhow::Result<()> {
@@ -562,11 +563,6 @@ pub(crate) fn write_creds(path: &str, text: &str) -> anyhow::Result<()> {
         let _ = std::fs::remove_file(&tmp);
     }
     result?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
-    }
     Ok(())
 }
 
