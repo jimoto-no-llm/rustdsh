@@ -355,3 +355,48 @@ fn cache_file_is_0600() {
         & 0o777;
     assert_eq!(mode, 0o600);
 }
+
+#[test]
+fn logs_tail_preserves_grep_zero_and_unterminated_final_line() {
+    let f = Fixture::fresh("logs-stream-tail");
+    std::fs::write(
+        f.dsh.join("logs").join("app.log"),
+        "first line\nMATCH middle line\nlast MATCH",
+    )
+    .unwrap();
+
+    let unfiltered = f
+        .cmd()
+        .args(["logs", "--tail", "2", "--file", "app.log"])
+        .output()
+        .unwrap();
+    assert!(unfiltered.status.success());
+    assert_eq!(
+        String::from_utf8(unfiltered.stdout).unwrap(),
+        "MATCH middle line\nlast MATCH\n"
+    );
+
+    let filtered = f
+        .cmd()
+        .args([
+            "logs", "--tail", "2", "--grep", "MATCH", "--file", "app.log",
+        ])
+        .output()
+        .unwrap();
+    assert!(filtered.status.success());
+    assert_eq!(
+        String::from_utf8(filtered.stdout).unwrap(),
+        "MATCH middle line\nlast MATCH\n"
+    );
+
+    let count_only = f
+        .cmd()
+        .args([
+            "logs", "--tail", "0", "--grep", "MATCH", "--file", "app.log",
+        ])
+        .output()
+        .unwrap();
+    assert!(count_only.status.success());
+    assert!(count_only.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&count_only.stderr).contains("2 line(s)"));
+}

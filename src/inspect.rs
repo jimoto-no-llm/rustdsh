@@ -1105,7 +1105,7 @@ fn confine_log_path(
 
 pub fn cmd_logs(tail: usize, grep: Option<String>, file: Option<String>) -> anyhow::Result<()> {
     let dir = format!("{}/logs", dsh_home());
-    let (display, mut handle) = match file {
+    let (display, handle) = match file {
         Some(f) => {
             // Confine explicit selections to the logs dir (fail closed):
             // without this `--file /etc/passwd` or `../../.credentials.yaml`
@@ -1140,16 +1140,14 @@ pub fn cmd_logs(tail: usize, grep: Option<String>, file: Option<String>) -> anyh
         },
     };
     eprintln!("[rdsh] reading {}", display.display());
-    use std::io::Read as _;
-    let mut text = String::new();
-    handle.read_to_string(&mut text)?;
-    // Single pass: count matches while keeping only the last `tail` lines.
-    // (Old code collected every line, then filtered in a second pass.)
+    use std::io::BufRead as _;
+    // Stream the log; only the requested tail remains resident.
     let pat = grep.as_deref();
     let mut n = 0usize;
-    let mut kept: std::collections::VecDeque<&str> =
+    let mut kept: std::collections::VecDeque<String> =
         std::collections::VecDeque::with_capacity(tail.min(512));
-    for line in text.lines() {
+    for line in std::io::BufReader::new(handle).lines() {
+        let line = line?;
         if pat.map(|p| line.contains(p)).unwrap_or(true) {
             n += 1;
             if tail > 0 {
