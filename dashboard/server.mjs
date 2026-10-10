@@ -17,6 +17,10 @@ import { BudgetAdmissionServer } from "./budget-server.mjs";
 import { createHistoryBackup, backupMaximum } from "./history-backup.mjs";
 import { AcceptanceStore } from "./acceptance.mjs";
 import {
+  emptyProfileCatalog,
+  previewProjectProfile,
+} from "./project-profiles.mjs";
+import {
   ConnectionObservations,
   connectionReport,
   inspectTunnel,
@@ -716,6 +720,35 @@ export async function startDashboard(options) {
         }
         if (req.method === "GET" && route === "/api/state")
           return json(res, 200, await visibleState());
+        if (kind === "project" && req.method === "GET" && route === "/api/profiles") {
+          if (!humanAuthorized)
+            return json(res, 403, { error: "Human browser credential required" });
+          return json(res, 200, store.value.profile_catalog || emptyProfileCatalog());
+        }
+        if (
+          kind === "project" &&
+          req.method === "POST" &&
+          ["/api/profiles/save", "/api/profiles/activate"].includes(route)
+        ) {
+          if (!humanAuthorized)
+            return json(res, 403, { error: "Human browser credential required" });
+          const operation = route.endsWith("/save") ? "profile_save" : "profile_activate";
+          await mutate(operation, await readBody(req));
+          return json(res, 200, store.value.profile_catalog);
+        }
+        if (
+          kind === "project" &&
+          req.method === "POST" &&
+          route === "/api/profiles/preview"
+        ) {
+          if (!humanAuthorized)
+            return json(res, 403, { error: "Human browser credential required" });
+          return json(
+            res,
+            200,
+            previewProjectProfile(store.value, await readBody(req)),
+          );
+        }
         if (req.method === "POST" && route?.startsWith("/api/update/")) {
           const operation = route.slice("/api/update/".length);
           if (

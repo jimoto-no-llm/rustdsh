@@ -827,6 +827,41 @@
           aria-describedby="pending-note"
         ></div>
         <section id="budget-admission" aria-label="予算制御"></section>
+        <details class="fold" id="profiles-detail">
+          <summary>プロジェクト運用プロファイル</summary>
+          <h2>設定の保存と優先順位</h2>
+          <p class="sub" id="profile-contract">
+            有効値は既定値 → 個人共通設定 → プロジェクト設定 → allowlist環境変数 → 起動時指定の順で決まります。プロジェクト設定はこのdashboardのローカル状態に版付きで保存できます。個人共通設定と起動時指定は現在プレビュー専用です。プレビューは設定を表示するだけで、コマンド実行や実行権限の付与は行いません。
+          </p>
+          <label for="profile-select">保存済みprofileの版</label>
+          <select id="profile-select" aria-describedby="profile-status"></select>
+          <label for="profile-id">profile ID</label>
+          <input id="profile-id" maxlength="64" autocomplete="off" />
+          <label for="profile-name">表示名</label>
+          <input id="profile-name" maxlength="120" autocomplete="off" />
+          <label for="profile-values">プロジェクト設定 (JSON)</label>
+          <textarea id="profile-values" rows="8" spellcheck="false">
+{
+  "verification_commands": [],
+  "permissions": { "read_paths": [], "write_paths": [], "network_hosts": [] },
+  "max_parallel": 1,
+  "notifications": "actionable"
+}
+          </textarea>
+          <label for="profile-user-values">個人共通設定 (このプレビュー用JSON)</label>
+          <textarea id="profile-user-values" rows="5" spellcheck="false">{}</textarea>
+          <label for="profile-invocation-values">起動時指定 (このプレビュー用JSON)</label>
+          <textarea id="profile-invocation-values" rows="5" spellcheck="false">{}</textarea>
+          <div class="quick-buttons">
+            <button id="profile-save">保存して選択</button>
+            <button id="profile-activate">この版を選択</button>
+            <button id="profile-preview">有効値をプレビュー</button>
+          </div>
+          <p id="profile-status" role="status" aria-live="polite">
+            profileは未設定です。保存した設定は実行に自動適用されません。
+          </p>
+          <pre id="profile-preview-result" aria-live="polite"></pre>
+        </details>
         <details class="fold" id="metrics-detail">
           <summary>プロジェクト全体の数値</summary>
           <h2 id="metrics-heading" tabindex="-1">数値の詳細</h2>

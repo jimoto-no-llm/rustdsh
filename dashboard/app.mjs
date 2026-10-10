@@ -143,6 +143,126 @@ const renderInstructions = createInstructionPanel($("instruction-panel"), {
   refreshState,
 });
 const renderCosts = createCostPanel($("cost-ledger"), node);
+let profileCatalog = null;
+function selectedProfileVersion() {
+  try {
+    const selected = JSON.parse($("profile-select").value || "null");
+    return selected && typeof selected.id === "string" && typeof selected.version === "string"
+      ? selected
+      : null;
+  } catch {
+    return null;
+  }
+}
+function profileVersionEntry(selection) {
+  return profileCatalog?.profiles?.[selection?.id]?.versions?.find(
+    (entry) => entry.version === selection.version,
+  ) || null;
+}
+function loadProfileSelection() {
+  const selection = selectedProfileVersion();
+  const profile = profileCatalog?.profiles?.[selection?.id];
+  const version = profileVersionEntry(selection);
+  if (!profile || !version) return;
+  $("profile-id").value = profile.id;
+  $("profile-name").value = profile.name;
+  $("profile-values").value = JSON.stringify(version.values, null, 2);
+}
+async function refreshProfiles() {
+  profileCatalog = await api("profiles");
+  const active = profileCatalog.active;
+  const versions = Object.values(profileCatalog.profiles || {})
+    .flatMap((profile) => profile.versions.map((version) => ({ profile, version })))
+    .sort((a, b) => a.profile.name.localeCompare(b.profile.name) ||
+      b.version.created_at.localeCompare(a.version.created_at));
+  const options = versions.map(({ profile, version }) => {
+    const option = node(
+      "option",
+      `${profile.name} · ${profile.id} · ${version.version.slice(0, 19)}`,
+    );
+    option.value = JSON.stringify({ id: profile.id, version: version.version });
+    return option;
+  });
+  $("profile-select").replaceChildren(...options);
+  if (active) {
+    $("profile-select").value = JSON.stringify(active);
+  } else if (options.length) {
+    $("profile-select").value = options[0].value;
+  }
+  if (versions.length) {
+    loadProfileSelection();
+    const isActive = active && versions.some(({ profile, version }) =>
+      profile.id === active.id && version.version === active.version);
+    $("profile-status").textContent = isActive
+      ? `選択中: ${active.id} · ${active.version}`
+      : "保存済みprofileがあります。実行へは自動適用されません。";
+  } else {
+    $("profile-id").value = "";
+    $("profile-name").value = "";
+    $("profile-status").textContent =
+      "profileは未設定です。保存した設定は実行に自動適用されません。";
+  }
+}
+$("profile-select").addEventListener("change", loadProfileSelection);
+$("profile-save").addEventListener("click", async () => {
+  const button = $("profile-save");
+  button.disabled = true;
+  try {
+    const values = JSON.parse($("profile-values").value || "{}");
+    const catalog = await api("profiles/save", {
+      id: $("profile-id").value,
+      name: $("profile-name").value,
+      values,
+      activate: true,
+    });
+    profileCatalog = catalog;
+    await refreshProfiles();
+    $("profile-status").textContent =
+      `保存して選択しました: ${catalog.active.id} · ${catalog.active.version}`;
+    $("profile-preview-result").textContent = "プレビューは未取得です。";
+  } catch (error) {
+    $("profile-status").textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+});
+$("profile-activate").addEventListener("click", async () => {
+  const button = $("profile-activate");
+  button.disabled = true;
+  try {
+    const selection = selectedProfileVersion();
+    if (!selection) throw new Error("選択する保存済みprofileがありません");
+    profileCatalog = await api("profiles/activate", selection);
+    await refreshProfiles();
+    $("profile-status").textContent =
+      `選択しました: ${selection.id} · ${selection.version}`;
+    $("profile-preview-result").textContent = "プレビューは未取得です。";
+  } catch (error) {
+    $("profile-status").textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+});
+$("profile-preview").addEventListener("click", async () => {
+  const button = $("profile-preview");
+  button.disabled = true;
+  try {
+    const selection = selectedProfileVersion();
+    if (!selection) throw new Error("プレビューする保存済みprofileがありません");
+    const result = await api("profiles/preview", {
+      ...selection,
+      user: JSON.parse($("profile-user-values").value || "{}"),
+      invocation: JSON.parse($("profile-invocation-values").value || "{}"),
+    });
+    $("profile-preview-result").textContent = JSON.stringify(result, null, 2);
+    $("profile-status").textContent =
+      "優先順位と出所を表示しました。実行・権限変更は発生していません。";
+  } catch (error) {
+    $("profile-status").textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+});
 function render(state) {
   if (state.revision < renderedRevision) return;
   renderedRevision = state.revision;
@@ -481,6 +601,7 @@ try {
       } catch {}
     }
     $("quick-actions").hidden = false;
+    await refreshProfiles();
     await refreshState();
     const source = new EventSource(
       base + "api/live?key=" + encodeURIComponent(browserToken),
