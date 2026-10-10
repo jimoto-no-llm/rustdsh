@@ -1,8 +1,8 @@
-import { object, text, version } from "./contracts.mjs";
+import { digest, object, text, version } from "./contracts.mjs";
 import { evaluateOperation } from "./policy.mjs";
 
-const requestKeys = ["id", "expected_version", "task_id", "contract_version", "repository", "run_id", "command_id", "operation", "limits", "expires_at", "source_ref"];
-const useKeys = ["id", "request_version", "task_id", "contract_version", "repository", "run_id", "command_id", "operation", "attempt", "cost_usd"];
+const requestKeys = ["id", "expected_version", "task_id", "contract_version", "repository", "run_id", "command_id", "operation", "worker_role", "limits", "expires_at", "source_ref"];
+const useKeys = ["id", "request_version", "task_id", "contract_version", "repository", "run_id", "command_id", "operation", "worker_role", "attempt", "cost_usd"];
 export function currentRequest(state, id) {
   return state.approval_requests?.find((item) => item.id === id)?.versions.at(-1) || null;
 }
@@ -22,6 +22,27 @@ function policyInput(input) {
   return { task_id: input.task_id, contract_version: input.contract_version,
     repository: input.repository, operation: input.operation };
 }
+function role(input, fallback = "review") {
+  const value = input ?? fallback;
+  if (!["review", "implementation"].includes(value)) throw new Error("Invalid worker role");
+  return value;
+}
+function roleAllowed(contract, workerRole) {
+  const allowed = contract.worker_roles || ["review"];
+  if (!allowed.includes(workerRole)) throw new Error("Worker role is outside the task contract");
+}
+function roleOperationAllowed(workerRole, tool) {
+  if (workerRole === "review" && tool !== "file.read")
+    throw new Error("Review workers are read-only");
+}
+function boundDigest(state, input, checked, workerRole) {
+  const contract = state.contracts?.find((item) => item.task_id === input.task_id)?.versions.at(-1);
+  return digest({
+    project_id: state.project.id, task_id: input.task_id,
+    contract_version: contract?.version, repository: contract?.repository,
+    worker_role: workerRole, operation_digest: checked.operation_digest,
+  });
+}
 export async function prepareApprovalRequest(state, input, now = Date.now()) {
   object(input, requestKeys);
   text(input.id, "request id", 160);
@@ -35,12 +56,17 @@ export async function prepareApprovalRequest(state, input, now = Date.now()) {
     throw new Error("Invalid retry limit");
   const checked = await evaluateOperation(state, policyInput(input));
   if (checked.decision !== "within_policy") throw new Error("Approval request is outside a parsed task policy");
+  const workerRole = role(input.worker_role);
+  const contract = state.contracts?.find((item) => item.task_id === input.task_id)?.versions.at(-1);
+  roleAllowed(contract, workerRole);
+  roleOperationAllowed(workerRole, checked.attributes.tool);
   return {
     version: (previous?.version || 0) + 1,
     task_id: input.task_id, contract_version: input.contract_version,
     project_id: state.project.id,
     run_id: text(input.run_id, "run_id", 160), command_id: text(input.command_id, "command_id", 160),
-    operation_digest: checked.operation_digest, attributes: checked.attributes,
+    operation_digest: boundDigest(state, input, checked, workerRole),
+    attributes: checked.attributes, worker_role: workerRole,
     limits: { max_cost_usd: maxCost / 1000000, max_attempts: input.limits.max_attempts },
     expires_at: expiry(input.expires_at, now), source_ref: text(input.source_ref, "source_ref", 2000),
     created_at: new Date(now).toISOString(), status: "pending",
@@ -89,16 +115,28 @@ export async function checkApproval(state, input, now = Date.now()) {
     if (input.task_id !== request.task_id || input.contract_version !== request.contract_version ||
         input.run_id !== request.run_id || input.command_id !== request.command_id)
       return result("block", "approval_context_changed", ref);
+    const workerRole = role(input.worker_role, request.worker_role || "review");
+    if (workerRole !== (request.worker_role || "review"))
+      return result("block", "approval_worker_role_changed", ref);
     const checked = await evaluateOperation(state, policyInput(input));
     if (checked.decision !== "within_policy") return result(checked.decision, checked.reason, ref);
-    if (checked.operation_digest !== request.operation_digest) return result("block", "approval_operation_changed", ref);
+    const contract = state.contracts?.find((item) => item.task_id === input.task_id)?.versions.at(-1);
+    try {
+      roleAllowed(contract, workerRole);
+      roleOperationAllowed(workerRole, checked.attributes.tool);
+    } catch {
+      return result("block", "approval_worker_role_outside_contract", ref);
+    }
+    if (boundDigest(state, input, checked, workerRole) !== request.operation_digest)
+      return result("block", "approval_operation_changed", ref);
     if (input.attempt !== request.uses.length + 1 || input.attempt > request.limits.max_attempts)
       return result("block", "approval_retry_limit_or_replay", ref);
     if (request.reserved_cost_microusd + declaredCost > cost(request.limits.max_cost_usd))
       return result("block", "approval_cost_limit", ref);
     return result("approval_valid", "request_scope_and_limits_match", {
-      ...ref, operation_digest: checked.operation_digest,
-      attempt: input.attempt, declared_cost_microusd: declaredCost,
+      ...ref, operation_digest: boundDigest(state, input, checked, workerRole),
+      attributes: checked.attributes, worker_role: workerRole, attempt: input.attempt,
+      declared_cost_microusd: declaredCost,
     });
   } catch {
     return result("unparsed", "unsupported_or_unresolved_approval_input");
@@ -109,8 +147,56 @@ export async function claimApproval(state, input, now = Date.now()) {
   if (checked.decision === "approval_valid") {
     const request = currentRequest(state, input.id);
     request.uses.push({ attempt: input.attempt, reserved_cost_microusd: checked.declared_cost_microusd,
+      worker_role: checked.worker_role, operation_digest: request.operation_digest,
       claimed_at: new Date(now).toISOString(), execution: "not_started" });
     request.reserved_cost_microusd += checked.declared_cost_microusd;
   }
   return { ...checked, reservation: checked.decision === "approval_valid" ? "reserved" : "not_reserved" };
+}
+
+// An executing operation consumes its attempt and records the irreversible
+// start before any filesystem, process, or network side effect begins.
+export async function startApproval(state, input, now = Date.now()) {
+  const checked = await checkApproval(state, input, now);
+  if (checked.decision !== "approval_valid")
+    return { ...checked, reservation: "not_reserved" };
+  const request = currentRequest(state, input.id);
+  request.uses.push({
+    attempt: input.attempt,
+    reserved_cost_microusd: checked.declared_cost_microusd,
+    worker_role: checked.worker_role,
+    operation_digest: request.operation_digest,
+    claimed_at: new Date(now).toISOString(),
+    started_at: new Date(now).toISOString(),
+    execution: "started",
+  });
+  request.reserved_cost_microusd += checked.declared_cost_microusd;
+  return {
+    ...checked, decision: "approval_started", reason: "approved_operation_started",
+    execution: "started", reservation: "started",
+  };
+}
+
+export function finishApproval(state, input, now = Date.now()) {
+  object(input, ["id", "request_version", "attempt", "execution", "reason", "exit_code"]);
+  text(input.id, "request id", 160);
+  version(input.request_version, 1);
+  version(input.attempt, 1);
+  if (!["completed", "failed", "unknown"].includes(input.execution))
+    throw new Error("Invalid execution result");
+  if (input.reason !== null) text(input.reason, "execution reason", 120);
+  if (input.exit_code !== null && (!Number.isSafeInteger(input.exit_code) || input.exit_code < 0 || input.exit_code > 255))
+    throw new Error("Invalid exit code");
+  const history = state.approval_requests?.find((item) => item.id === input.id);
+  const request = history?.versions.find((item) => item.version === input.request_version);
+  const use = request?.uses.find((item) => item.attempt === input.attempt);
+  if (!use || use.execution !== "started")
+    throw new Error("Started approval attempt not found");
+  use.execution = input.execution;
+  use.finished_at = new Date(now).toISOString();
+  use.result = { execution: input.execution, reason: input.reason, exit_code: input.exit_code };
+  return {
+    decision: "execution_finished", reason: input.reason || "execution_finished",
+    execution: input.execution, attempt: input.attempt,
+  };
 }

@@ -127,6 +127,7 @@ test("project state, HTTP/stdio MCP, subscriptions, answers, and auth work toget
     project: alpha,
     port: await freePort(),
     tailscale: false,
+    sandboxProbe: async () => ({ supported: false, reason: "sandbox_runner_unavailable" }),
   });
   other = await startDashboard({
     project: beta,
@@ -254,6 +255,7 @@ test("project state, HTTP/stdio MCP, subscriptions, answers, and auth work toget
     repository: alpha.root, allowed_scope: "Only alpha",
     write_roots: [alpha.root], forbidden_actions: ["No publication"],
     completion_conditions: ["Tests pass"], change_reason: "Initial scope",
+    worker_roles: ["review", "implementation"],
   };
   const contractRequest = (credential, input, route = "contracts/update") =>
     fetch(dashboard.localUrl + "api/" + route, {
@@ -387,6 +389,7 @@ test("project state, HTTP/stdio MCP, subscriptions, answers, and auth work toget
   assert.equal(JSON.parse(stdioPolicy.content[0].text).operation_digest, policyResult.operation_digest);
   const approvalBound = { ...policyInput, run_id: "integration-run", command_id: "integration-command" };
   const approvalRequest = { ...approvalBound, id: "integration-approval", expected_version: 0,
+    worker_role: "implementation",
     source_ref: "fixture:integration-command", expires_at: new Date(Date.now() + 60000).toISOString(),
     limits: { max_cost_usd: 1, max_attempts: 1 } };
   const requested = await stdio.callTool({ name: "dashboard_request_approval", arguments: approvalRequest });
@@ -405,6 +408,7 @@ test("project state, HTTP/stdio MCP, subscriptions, answers, and auth work toget
   const workerInput = { task_id: "M3.6", contract_version: 2, repository: alpha.root, run_id: "held-run", worker_role: "implementation" };
   const worker = await call("dashboard_check_worker_start", workerInput);
   assert.equal(worker.decision, "hold");
+  assert.equal(worker.reason, "sandbox_runner_unavailable");
   assert.equal(worker.effective_permissions, null);
   assert.equal((await contractRequest(agentHeaders, workerInput, "workers/check")).status, 409);
   const stdioWorker = await stdio.callTool({ name: "dashboard_check_worker_start", arguments: workerInput });

@@ -56,7 +56,12 @@ export function attachDshGuard(ctx, config) {
       const binding = bindings.get(exec.callId);
       bindings.delete(exec.callId);
       const provenance = (binding?.sources || []).map(sourceMetadata);
-      const worker = await checkWorkerStart(state, task);
+      // This adapter cannot replace DSH's local tool invocation. Keep direct
+      // filesystem tools denied even when the dashboard sandbox is available;
+      // model operations must go through its separately approved MCP executor.
+      const worker = await checkWorkerStart(state, task, {
+        probe: async () => ({ supported: false, reason: "direct_dsh_tool_execution_disabled" }),
+      });
       let policy = { decision: "unparsed", reason: "unsupported_dsh_tool_or_input" };
       let approval = { decision: "block", reason: "approval_binding_missing" };
       try {
@@ -69,14 +74,15 @@ export function attachDshGuard(ctx, config) {
         });
       } catch { /* Unsupported tool fields never fall back to string matching. */ }
       const reason = policy.decision !== "within_policy" ? policy.reason :
-        approval.decision !== "approval_valid" ? approval.reason : worker.reason;
+        approval.decision !== "approval_valid" ? approval.reason : "direct_dsh_tool_execution_disabled";
       report = { schema: "rdsh.dsh-guard-check.v1", checked_at: new Date().toISOString(),
         ...task, command_id: text(exec.callId, "command_id", 160),
         tool_name: text(exec.name, "tool name", 160), policy, approval, worker, provenance,
         decision: "hold", reason, execution: "not_started", enforcement: "not_applied",
         fallback: "disabled", reservation: "not_reserved",
         uninspected_paths: ["session_replay", "compaction", "context_injection", "direct_backend_access"] };
-      // Deliberately no claim or allow path: no complete OS adapter is registered.
+      // Deliberately no claim or allow path: the DSH call itself would execute
+      // outside the dashboard's sandboxed operation adapter.
       await config.recordCheck(structuredClone(report));
       reasons.set(exec.token, `rdsh:${reason}`);
     } catch {
@@ -87,7 +93,9 @@ export function attachDshGuard(ctx, config) {
   return Object.freeze({
     async ready() {
       if (stopped) throw new Error("DSH guard stopped");
-      return checkWorkerStart(structuredClone(await config.readState()), task);
+      return checkWorkerStart(structuredClone(await config.readState()), task, {
+        probe: async () => ({ supported: false, reason: "direct_dsh_tool_execution_disabled" }),
+      });
     },
     bindCall(callId, binding) {
       if (stopped) throw new Error("DSH guard stopped");

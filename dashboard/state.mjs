@@ -4,7 +4,7 @@ import path from "node:path";
 import os from "node:os";
 import { prepareContract } from "./contracts.mjs";
 import { evaluateOperation } from "./policy.mjs";
-import { prepareApprovalRequest, decideApproval, claimApproval, checkApproval } from "./approvals.mjs";
+import { prepareApprovalRequest, decideApproval, claimApproval, checkApproval, startApproval, finishApproval } from "./approvals.mjs";
 import { normalizeObservation } from "./observations.mjs";
 import {
   changeQuestionContract,
@@ -167,8 +167,15 @@ export class ProjectStore {
       history.versions.push(version);
     } else if (operation === "approval_decision") {
       decideApproval(next, input, authority);
-    } else if (["approval_claim", "approval_check"].includes(operation)) {
-      const result = operation === "approval_claim" ? await claimApproval(next, input) : await checkApproval(next, input);
+    } else if (["approval_claim", "approval_check", "approval_start"].includes(operation)) {
+      const result = operation === "approval_claim" ? await claimApproval(next, input)
+        : operation === "approval_start" ? await startApproval(next, input)
+          : await checkApproval(next, input);
+      next.approval_checks ||= [];
+      next.approval_checks.push({ checked_at: new Date().toISOString(), ...result });
+      next.approval_checks = next.approval_checks.slice(-1000);
+    } else if (operation === "approval_finish") {
+      const result = finishApproval(next, input);
       next.approval_checks ||= [];
       next.approval_checks.push({ checked_at: new Date().toISOString(), ...result });
       next.approval_checks = next.approval_checks.slice(-1000);
@@ -221,6 +228,8 @@ export class ProjectStore {
       approval_decision: "dashboard.approval.decided",
       approval_claim: "dashboard.approval.claimed",
       approval_check: "dashboard.approval.checked",
+      approval_start: "dashboard.approval.started",
+      approval_finish: "dashboard.approval.finished",
     };
     const summary =
       operation === "answer"

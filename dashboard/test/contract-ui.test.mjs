@@ -92,7 +92,7 @@ test("contracts and approval scopes render as literal text; human choices bind r
   assert.ok(approvals.some((node) => node.textContent === "過去の要求（1版）"));
   assert.ok(approvals.some((node) => node.textContent === "v2: revoked（現在の操作には適用不可）"));
   assert.ok(approvals.some((node) => node.textContent.includes("判断: revoke / dashboard_owner / human_browser_credential / fixture-time")));
-  assert.ok(approvals.some((node) => node.textContent.includes("予約: attempt 1 / $0.5 / not_started")));
+  assert.ok(approvals.some((node) => node.textContent.includes("実行: attempt 1 / $0.5 / not_started")));
   assert.equal(approvals.filter((node) => node.tag === "button").length, 2);
   await approvals.find((node) => node.tag === "button" && node.textContent === "この操作範囲を承認").listeners.click();
   assert.deepEqual(decisions, [{ id: "R1", request_version: 3, decision: "grant" }]);

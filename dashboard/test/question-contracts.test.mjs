@@ -167,7 +167,7 @@ test("legacy consultations retain their field shapes and a default action grants
     "answer",
     "created_at",
   ]);
-  assert.equal(tools.length, 12);
+  assert.equal(tools.length, 13);
 });
 
 test("typed choices, fixed target and a human answer persist atomically without creating execution authority", async (t) => {
