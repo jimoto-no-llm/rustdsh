@@ -32,6 +32,8 @@ jobs:
           cache-dependency-path: dashboard/package-lock.json
       - if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install --no-install-recommends -y bubblewrap
+      - if: runner.os == 'Linux'
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - run: npm ci
       - if: runner.os == 'Windows'
         # Native GUI startup must not compete with every process-heavy fixture.
