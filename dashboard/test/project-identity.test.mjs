@@ -93,7 +93,10 @@ test("explicit move and rename preserve the same task, answer and evidence state
   const moved = await identity(targetRoot);
   assert.equal(moved.id, source.id);
   const movedState = (await ProjectStore.open(moved)).value;
-  assert.equal(movedState.project.root, targetRoot);
+  assert.equal(
+    await fs.realpath(movedState.project.root),
+    await fs.realpath(targetRoot),
+  );
   assert.deepEqual(movedState.tasks, before.tasks);
   assert.deepEqual(movedState.questions, before.questions);
   assert.deepEqual(movedState.events, before.events);
