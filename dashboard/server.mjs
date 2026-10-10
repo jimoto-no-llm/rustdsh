@@ -6,7 +6,14 @@ import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import QRCode from "qrcode";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
-import { ProjectStore, writeJson, stateHome, publicState } from "./state.mjs";
+import {
+  ProjectStore,
+  writeJson,
+  stateHome,
+  publicState,
+  identity,
+} from "./state.mjs";
+import { acquireProjectIdentityLock } from "./project-identity.mjs";
 import { createMcpServer } from "./mcp.mjs";
 import { enableShare, inspectShare } from "./tailscale.mjs";
 import { startHarness, proxyHarness, upgradeHarness } from "./harness.mjs";
@@ -43,42 +50,75 @@ async function readBody(req, maximum = 131072) {
   return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
 }
 export async function startDashboard(options) {
-  const { kind = "project", project, tailscale = true } = options;
-  const port =
-    options.port ||
-    (kind === "harness"
-      ? 38081
-      : 38100 + (parseInt(project.id.slice(0, 4), 16) % 1000));
-  const directory =
-    kind === "project" ? project.directory : path.join(stateHome(), "harness");
-  await fs.mkdir(directory, { recursive: true });
-  // Exclusive live-instance lock: never launch two writers for the same project.
-  const lockFile = path.join(directory, "server.lock");
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      await fs.writeFile(lockFile, String(process.pid), {
-        flag: "wx",
-        mode: 0o600,
-      });
-      break;
-    } catch (e) {
-      if (e.code !== "EEXIST") throw e;
-      const pid = Number(await fs.readFile(lockFile, "utf8"));
-      let alive = false;
-      try {
-        process.kill(pid, 0);
-        alive = true;
-      } catch (error) {
-        if (error.code === "EPERM") alive = true;
-      }
-      if (alive)
-        throw new Error(
-          "This dashboard is already running; use rdsh-dashboard open with the same project",
-        );
-      await fs.unlink(lockFile);
-      if (attempt === 1) throw new Error("Could not acquire dashboard lock");
+  const { kind = "project", tailscale = true } = options;
+  let project = options.project;
+  const projectHome =
+    kind === "project" &&
+    path.basename(path.dirname(project?.directory || "")) === "projects"
+      ? path.dirname(path.dirname(project.directory))
+      : stateHome();
+  let port, directory, lockFile;
+  let releaseIdentityLock;
+  try {
+    if (kind === "project" && /^[0-9a-f]{16}$/.test(project?.id || "")) {
+      releaseIdentityLock = await acquireProjectIdentityLock(projectHome);
+      project = await identity(project.root, projectHome);
     }
+    port =
+      options.port ||
+      (kind === "harness"
+        ? 38081
+        : 38100 + (parseInt(project.id.slice(0, 4), 16) % 1000));
+    directory =
+      kind === "project" ? project.directory : path.join(stateHome(), "harness");
+    await fs.mkdir(directory, { recursive: true });
+    // The identity lock makes migration and server startup mutually exclusive.
+    lockFile = path.join(directory, "server.lock");
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        await fs.writeFile(
+          lockFile,
+          JSON.stringify({
+            pid: process.pid,
+            platform: process.platform,
+            token: randomUUID(),
+          }),
+          { flag: "wx", mode: 0o600 },
+        );
+        break;
+      } catch (e) {
+        if (e.code !== "EEXIST") throw e;
+        const lockContents = await fs.readFile(lockFile, "utf8");
+        let owner;
+        try {
+          owner = JSON.parse(lockContents);
+        } catch {
+          owner = { pid: Number(lockContents) };
+        }
+        let alive =
+          typeof owner.platform === "string" &&
+          owner.platform !== process.platform;
+        if (!alive) {
+          try {
+            process.kill(Number(owner.pid), 0);
+            alive = true;
+          } catch (error) {
+            if (error.code === "EPERM") alive = true;
+          }
+        }
+        if (alive)
+          throw new Error(
+            "This dashboard is already running; use rdsh-dashboard open with the same project",
+          );
+        await fs.unlink(lockFile);
+        if (attempt === 1) throw new Error("Could not acquire dashboard lock");
+      }
+    }
+  } catch (error) {
+    await releaseIdentityLock?.();
+    throw error;
   }
+  await releaseIdentityLock?.();
   const token = randomBytes(32).toString("hex"); // local administrator
   const mcpToken = randomBytes(32).toString("hex");
   const browserToken = randomBytes(32).toString("hex");
