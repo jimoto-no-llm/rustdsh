@@ -10,8 +10,19 @@ import { readProcessIdentity } from "./process-identity.mjs";
 const send = (frame) => process.stdout.write(JSON.stringify(frame) + "\n");
 let scope = null,
   starting = false,
-  closing = false;
+  closing = false,
+  inputClosed = false,
+  startupCleanupConfirmed = null;
 let queue = Promise.resolve();
+let cleanupOnClose = null;
+let startupCleanupSent = false;
+const reportStartupCleanup = (confirmed) => {
+  startupCleanupConfirmed = confirmed === true;
+  if (!startupCleanupSent) {
+    startupCleanupSent = true;
+    send({ type: "startup_cleanup", confirmed: startupCleanupConfirmed });
+  }
+};
 const input = readline.createInterface({ input: process.stdin });
 input.on("line", (line) => {
   if (line.length > 1024 * 1024) {
@@ -19,6 +30,9 @@ input.on("line", (line) => {
     return;
   }
   queue = queue.then(async () => {
+    // A startup frame can still be buffered when the parent times out and
+    // closes the pipe. Do not begin acquiring process ownership after cancel.
+    if (inputClosed) return;
     let frame;
     try {
       frame = JSON.parse(line);
@@ -49,7 +63,14 @@ input.on("line", (line) => {
             );
           scope.child.stdin.on("error", () => {});
         }
+        if (inputClosed) {
+          reportStartupCleanup(
+            cleanupOnClose ? await cleanupOnClose : await cleanupScope(scope),
+          );
+          return;
+        }
         const observation = await readProcessIdentity(scope.child.pid);
+        if (inputClosed) return;
         send({
           type: "ready",
           pid: scope.child.pid,
@@ -82,18 +103,40 @@ input.on("line", (line) => {
       } else throw new Error();
       send({ type: "response", id: frame.id, result });
       if (closing) process.exit(0);
-    } catch {
+    } catch (error) {
+      if (frame?.op === "start")
+        startupCleanupConfirmed =
+          error?.cleanupConfirmed ?? scope === null;
       send(
         frame?.id
           ? { type: "response", id: frame.id, error: "ownership_unverifiable" }
-          : { type: "monitor_error" },
+          : {
+              type: "monitor_error",
+              reason:
+                error?.message === "cleanup_unconfirmed"
+                  ? "cleanup_unconfirmed"
+                  : "ownership_unavailable",
+            },
       );
     }
   });
 });
 input.on("close", () => {
+  inputClosed = true;
+  if (scope && !closing)
+    cleanupOnClose = cleanupScope(scope).then((confirmed) => {
+      reportStartupCleanup(confirmed);
+      return confirmed;
+    });
   void queue.finally(async () => {
-    if (!closing && scope) await cleanupScope(scope);
-    process.exit(0);
+    const confirmed = closing
+      ? true
+      : cleanupOnClose
+        ? await cleanupOnClose
+        : scope
+          ? await cleanupScope(scope)
+          : (startupCleanupConfirmed ?? true);
+    reportStartupCleanup(confirmed);
+    process.exit(confirmed ? 0 : 1);
   });
 });
