@@ -783,11 +783,11 @@ fn simple_glob_match(pat: &str, s: &str) -> bool {
 }
 
 fn is_code_file(p: &std::path::Path) -> bool {
-    if let Some(name) = p.file_name().and_then(|s| s.to_str()) {
-        let lower = name.to_lowercase();
-        if CODE_FILENAMES.contains(&lower.as_str()) {
-            return true;
-        }
+    if p.file_name()
+        .and_then(|s| s.to_str())
+        .is_some_and(|name| CODE_FILENAMES.contains(&name.to_lowercase().as_str()))
+    {
+        return true;
     }
     p.extension()
         .and_then(|s| s.to_str())
