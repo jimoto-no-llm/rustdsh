@@ -183,6 +183,12 @@ configuration after a restart, because the bearer key rotates.
 
 Example tool arguments:
 
+Optional [outcome cards and fixed milestone criteria](../docs/TASK-OUTCOMES.md)
+add purpose, ownership, latest outcome and next step to these tasks. Inspect
+existing acceptance evidence from each card; reported `done`, partial checks and
+operator reports never substitute for current full-check evidence. Task splits
+do not change a milestone's declared criterion list.
+
 ```json
 {
   "id": "M3.6",

@@ -399,6 +399,27 @@
         font-size: 18px;
         margin: 12px 0;
       }
+      .outcome-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr));
+        gap: 16px;
+      }
+      .outcome-checks {
+        border-top: 1px solid var(--line);
+        padding-top: 12px;
+      }
+      .outcome-checks ul {
+        padding-left: 22px;
+      }
+      .outcome-checks li {
+        margin: 12px 0;
+      }
+      .outcome-checks p {
+        margin: 4px 0 8px;
+      }
+      .outcome-checks code {
+        overflow-wrap: anywhere;
+      }
       .decision-details {
         display: grid;
         grid-template-columns: 90px minmax(0, 1fr);
@@ -835,24 +856,22 @@
           <section id="cost-ledger" aria-label="費用台帳"></section>
         </details>
         <details class="fold" id="tasks-detail">
-          <summary>タスク一覧</summary>
-          <h2 id="tasks-heading" tabindex="-1">
-            タスク <span class="sub" id="task-milestones"></span>
-          </h2>
-          <div class="table-box">
-            <!-- #57: 各行に task-<id> の目印を付け、端末を替えても同じ行へ戻れるようにします。 -->
-            <table aria-labelledby="tasks-heading">
-              <thead>
-                <tr>
-                  <th scope="col">ID</th>
-                  <th scope="col">状態</th>
-                  <th scope="col">題名</th>
-                  <th scope="col">ブロック要因</th>
-                </tr>
-              </thead>
-              <tbody id="tasks"></tbody>
-            </table>
-          </div>
+          <summary>成果と受入条件</summary>
+          <h2 id="tasks-heading" tabindex="-1">成果中心のタスクカード</h2>
+          <p class="sub">
+            done は作業の申告です。受入条件の検証結果とは別に確認します。
+          </p>
+          <div
+            id="tasks"
+            class="outcome-grid"
+            aria-labelledby="tasks-heading"
+          ></div>
+          <h2 id="milestones-heading">マイルストーンの終了条件</h2>
+          <div
+            id="task-milestones"
+            class="outcome-grid"
+            aria-labelledby="milestones-heading"
+          ></div>
         </details>
         <details class="fold" id="instruction-detail">
           <summary>同じsessionへ追指示を送る</summary>

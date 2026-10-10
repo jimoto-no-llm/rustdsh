@@ -35,6 +35,14 @@ PNGs and a verification report; it never restarts production DSH or executes the
 updater. Run just this flow with `npm run test:updates`. Set
 `RDSH_UPDATE_BASELINE_CLIENT` to the previous client file for before/after captures.
 
+The default command also runs `task-outcomes.mjs` against the actual project
+server and isolated acceptance checks. It covers reported done versus verified,
+partial/full checks, fixed milestones after task splits, stale code and an old
+response arriving after an SSE update. `RDSH_OUTCOMES_OUTPUT` selects its evidence
+directory; `RDSH_OUTCOMES_BASELINE` optionally points to a previous `server.mjs`.
+Full-panel PNGs use extra viewport height to keep the fixed action bar clear;
+separate phone PNGs and overflow checks use the actual 390 x 844 viewport.
+
 ## Optional installed DSH integration
 
 ```sh

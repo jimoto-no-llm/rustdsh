@@ -1,0 +1,82 @@
+{
+  "schema": 1,
+  "source_commit": "3c8375a811541c1181fb446e47fa9464da7c1b49",
+  "implementation_commit": "e3cbbf1a88b862407d842be2ecd1dc7f04b6fc7a",
+  "main_commit": "81986d68da3d7fdf3640e0fe557dd39e7dcb4b47",
+  "scope": "Isolated project, real dashboard/MCP/acceptance checks and Chromium; no models, provider credentials or production adoption.",
+  "source_reuse": "All dashboard code and tests are byte-identical between implementation_commit and source_commit; follow-up changes test capture geometry and main's single-character starts_with.",
+  "dashboard": [
+    {
+      "os": "Windows",
+      "node": "22.23.3",
+      "source_commit": "e3cbbf1a88b862407d842be2ecd1dc7f04b6fc7a",
+      "tests": 202,
+      "passed": 202,
+      "failed": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "duration_ms": 473035.503
+    },
+    {
+      "os": "Linux",
+      "node": "24.21.0",
+      "source_commit": "e3cbbf1a88b862407d842be2ecd1dc7f04b6fc7a",
+      "tests": 202,
+      "passed": 197,
+      "failed": 0,
+      "cancelled": 0,
+      "skipped": 5,
+      "skip_reason": "Windows-only native qualification",
+      "duration_ms": 124625.856349
+    }
+  ],
+  "rust": {
+    "os": "Linux",
+    "source_commit": "3c8375a811541c1181fb446e47fa9464da7c1b49",
+    "fmt": "PASS",
+    "clippy_release_all_targets_warnings": 0,
+    "release_build": "PASS",
+    "release_tests": [78, 11, 11, 3],
+    "examples": [2, 5],
+    "fence_tests": 2,
+    "cli_regress_checks": 53,
+    "security_boundary_tests": 11
+  },
+  "browser": {
+    "source_commit": "3c8375a811541c1181fb446e47fa9464da7c1b49",
+    "linux_default_npm_test": {
+      "setup_native_project_flows": 3,
+      "update_banner_flows": 5,
+      "task_outcomes_flows": 5,
+      "result": "PASS"
+    },
+    "windows_task_outcomes_flows": 5,
+    "result": "PASS",
+    "phone_viewport": {
+      "width": 390,
+      "height": 844,
+      "horizontal_overflow": false
+    },
+    "page_errors": 0,
+    "manifests": [
+      "browser-observations.json",
+      "linux-browser-observations.json"
+    ]
+  },
+  "gif": {
+    "file": "flow.gif",
+    "source_frames": ["after-unverified.png", "after-partial.png", "after.png"],
+    "each_phase_seconds": 2,
+    "duration_seconds": 6,
+    "width": 1216,
+    "height": 1310,
+    "frames": 6,
+    "processing": "Join real captures on a common white padded canvas; no UI mockup or annotation."
+  },
+  "performance_scope": "Warm component rendering including DOM/layout, 5 samples after warmup, 40 and 200 fixture tasks, no network or checks; platform values in manifests. Single first-task timings are observations, not a performance improvement claim.",
+  "caveats": [
+    "Verification is a timestamped read, not an automatic background check.",
+    "Human acceptance and production adoption remain separate.",
+    "Hosted CI must be checked on the latest PR head."
+  ]
+}

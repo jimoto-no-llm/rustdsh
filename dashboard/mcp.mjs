@@ -14,6 +14,7 @@ import { metricNames } from "./state.mjs";
 import { observationSchema } from "./observations.mjs";
 import { feedbackValidity } from "./question-contracts.mjs";
 import { costScopeSchema, costReportSchema } from "./cost-ledger.mjs";
+import { outcomeSchema, milestoneSchema } from "./task-outcomes.mjs";
 
 // Bucket E (MCP) diagnostics — Issues #76-#79:
 // Exposure control (#76), remote OAuth (#77), single-screen server
@@ -89,7 +90,7 @@ export const tools = [
   {
     name: "dashboard_upsert_task",
     description:
-      "Create or update a project task shown in the project dashboard.",
+      "Create or update a project task. Optional outcome reports purpose, owner, latest_outcome, next_step and an acceptance_task_id (omitted fields retain earlier reports; null clears one). Optional milestone_contract fixes criterion references and descriptions under a stable ID; changed criteria require a new ID. Task status is a report, never proof of verification. Actual checks remain in the explicit acceptance CLI.",
     inputSchema: object(
       {
         id: string,
@@ -97,6 +98,8 @@ export const tools = [
         status: { enum: ["todo", "doing", "done", "blocked"] },
         milestone: string,
         blocker: string,
+        outcome: outcomeSchema,
+        milestone_contract: milestoneSchema,
         observation: observationSchema,
       },
       ["id", "title", "status"],
