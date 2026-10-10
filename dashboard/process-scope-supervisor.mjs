@@ -103,7 +103,7 @@ input.on("line", (line) => {
         if (result.closed) closing = true;
       } else throw new Error();
       send({ type: "response", id: frame.id, result });
-      if (closing) process.exit(0);
+      if (closing) process.stdout.end(() => process.exit(0));
     } catch (error) {
       if (frame?.op === "start")
         startupCleanupConfirmed =
@@ -138,6 +138,6 @@ input.on("close", () => {
           ? await cleanupScope(scope)
           : (startupCleanupConfirmed ?? true);
     reportStartupCleanup(confirmed);
-    process.exit(confirmed ? 0 : 1);
+    process.stdout.end(() => process.exit(confirmed ? 0 : 1));
   });
 });

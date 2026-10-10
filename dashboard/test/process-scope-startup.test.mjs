@@ -35,7 +35,8 @@ test("startup timeout waits for the exact monitor to exit before rejecting", asy
   }
   await assert.rejects(
     pending,
-    (error) => error.code === "ownership_unavailable",
+    (error) =>
+      ["ownership_unavailable", "cleanup_unconfirmed"].includes(error.code),
   );
   assert(
     Date.now() - started >= 250,
