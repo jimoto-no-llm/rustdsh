@@ -1,11 +1,355 @@
 // Kernel ownership, never process-name matching or a persisted PID kill list.
 import fs from "node:fs/promises";
 import path from "node:path";
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
+import { PassThrough } from "node:stream";
+import { promisify } from "node:util";
 
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const maxMembers = 256;
+const execFileAsync = promisify(execFile);
+
+async function systemdCommand(file, args, options = {}) {
+  try {
+    return await execFileAsync(file, args, {
+      timeout: 5000,
+      maxBuffer: 64 * 1024,
+      encoding: "utf8",
+      env: { ...process.env, LC_ALL: "C" },
+      ...options,
+    });
+  } catch {
+    throw new Error("ownership_unavailable");
+  }
+}
+
+async function systemdUnit(unit) {
+  const { stdout } = await systemdCommand("/usr/bin/systemctl", [
+    "show",
+    "--no-pager",
+    "--property=LoadState",
+    "--property=ActiveState",
+    "--property=SubState",
+    "--property=ControlGroup",
+    "--property=InvocationID",
+    unit,
+  ]);
+  return Object.fromEntries(
+    stdout
+      .trim()
+      .split("\n")
+      .map((line) => {
+        const separator = line.indexOf("=");
+        return separator < 0
+          ? ["", ""]
+          : [line.slice(0, separator), line.slice(separator + 1)];
+      })
+      .filter(([key]) => key),
+  );
+}
+
+function systemdScopePath(controlGroup, unit) {
+  if (
+    typeof controlGroup !== "string" ||
+    !controlGroup.startsWith("/") ||
+    controlGroup.includes("..") ||
+    controlGroup.split("/").at(-1) !== unit
+  )
+    throw new Error("ownership_unavailable");
+  const directory = path.resolve("/sys/fs/cgroup", controlGroup.slice(1));
+  if (!directory.startsWith("/sys/fs/cgroup/"))
+    throw new Error("ownership_unavailable");
+  return directory;
+}
+
+async function linuxSystemdScope(config, stdio) {
+  const suffix = config.owner_id.slice("owner_".length).replaceAll("-", "");
+  const unitName = `rdsh-${suffix}`;
+  const unit = unitName + ".scope";
+  const before = await systemdUnit(unit);
+  if (before.LoadState !== "not-found")
+    throw new Error("ownership_unavailable");
+
+  const childProcess = spawn(
+    "/usr/bin/systemd-run",
+    [
+      "--scope",
+      "--quiet",
+      "--unit",
+      unitName,
+      "--",
+      "/bin/sh",
+      "-c",
+      'printf "RDSH_SCOPE_PID:%s\\n" "$$"; IFS= read -r gate || exit 125; test "$gate" = GO || exit 125; exec "$@"',
+      "rdsh-owned",
+      ...config.command,
+    ],
+    {
+      cwd: config.cwd,
+      env: config.env ?? process.env,
+      windowsHide: true,
+      shell: false,
+      stdio: ["pipe", "pipe", "pipe"],
+    },
+  );
+  const child = new EventEmitter();
+  child.on("error", () => {});
+  child.stdin = childProcess.stdin;
+  child.stdout = new PassThrough();
+  child.stderr = new PassThrough();
+  childProcess.stderr.pipe(child.stderr);
+  childProcess.stderr.once("end", () => child.stderr.end());
+  let outputPrefix = Buffer.alloc(0);
+  let rootPid = null;
+  let readyResolve, readyReject;
+  const ready = new Promise((resolve, reject) => {
+    readyResolve = resolve;
+    readyReject = reject;
+  });
+  childProcess.stdout.on("data", (chunk) => {
+    if (rootPid !== null) {
+      child.stdout.write(chunk);
+      return;
+    }
+    outputPrefix = Buffer.concat([outputPrefix, chunk]);
+    if (outputPrefix.length > 256) {
+      readyReject(new Error("ownership_unavailable"));
+      return;
+    }
+    const newline = outputPrefix.indexOf(10);
+    if (newline < 0) return;
+    const firstLine = outputPrefix.subarray(0, newline).toString("ascii");
+    const match = /^RDSH_SCOPE_PID:([1-9][0-9]*)$/.exec(firstLine);
+    if (!match) {
+      readyReject(new Error("ownership_unavailable"));
+      return;
+    }
+    rootPid = Number(match[1]);
+    if (!Number.isSafeInteger(rootPid) || rootPid > 2147483647) {
+      readyReject(new Error("ownership_unavailable"));
+      return;
+    }
+    child.pid = rootPid;
+    const remainder = outputPrefix.subarray(newline + 1);
+    if (remainder.length) child.stdout.write(remainder);
+    outputPrefix = Buffer.alloc(0);
+    readyResolve();
+  });
+  childProcess.stdout.once("end", () => {
+    child.stdout.end();
+    if (rootPid === null) readyReject(new Error("ownership_unavailable"));
+  });
+  childProcess.once("error", (error) => {
+    readyReject(error);
+    child.emit("error", error);
+  });
+  childProcess.once("exit", (code, signal) => {
+    child.exitOutcome = { code, signal };
+    child.emit("exit", code, signal);
+  });
+
+  const terminateUnit = async (signal) => {
+    const props = await systemdUnit(unit);
+    if (
+      props.LoadState !== "loaded" ||
+      props.InvocationID !== invocationId ||
+      props.ControlGroup !== controlGroup
+    )
+      throw new Error("ownership_unavailable");
+    await systemdCommand("/usr/bin/systemctl", [
+      "kill",
+      "--kill-whom=all",
+      `--signal=${signal}`,
+      unit,
+    ]);
+    return {
+      status: "requested",
+      reason:
+        signal === "SIGTERM"
+          ? "systemd_scope_sigterm"
+          : "systemd_scope_sigkill",
+    };
+  };
+
+  let invocationId = null;
+  let controlGroup = null;
+  let scopeDirectory = null;
+  let scopeBound = false;
+  const confirmedExit = () => ({
+    status: "exit_confirmed",
+    remaining_pids: [],
+    remaining_count: 0,
+    members_truncated: false,
+  });
+  const snapshot = async () => {
+    const props = await systemdUnit(unit);
+    if (props.LoadState === "not-found") {
+      if (
+        invocationId &&
+        props.ControlGroup === "" &&
+        props.ActiveState === "inactive" &&
+        scopeDirectory &&
+        !(await fs.stat(scopeDirectory).then(() => true, () => false))
+      )
+        return confirmedExit();
+      throw new Error("ownership_unavailable");
+    }
+    if (
+      props.LoadState !== "loaded" ||
+      props.InvocationID !== invocationId ||
+      (props.ControlGroup && props.ControlGroup !== controlGroup)
+    )
+      throw new Error("ownership_unavailable");
+    if (props.ActiveState === "inactive" || props.ActiveState === "failed") {
+      const populated = await fs
+        .readFile(path.join(scopeDirectory, "cgroup.events"), "utf8")
+        .then((contents) => contents.match(/^populated ([01])$/m)?.[1] ?? null)
+        .catch((error) => (error.code === "ENOENT" ? "0" : null));
+      if (
+        (!props.ControlGroup || props.ControlGroup === controlGroup) &&
+        populated === "0"
+      )
+        return confirmedExit();
+      throw new Error("ownership_unavailable");
+    }
+    if (
+      !["active", "activating", "deactivating"].includes(props.ActiveState) ||
+      props.ControlGroup !== controlGroup
+    )
+      throw new Error("ownership_unavailable");
+    const events = await fs.readFile(
+      path.join(scopeDirectory, "cgroup.events"),
+      "utf8",
+    );
+    const populated = events.match(/^populated ([01])$/m)?.[1];
+    if (populated === undefined) throw new Error("ownership_unavailable");
+    if (populated === "0")
+      return {
+        status: "running",
+        remaining_pids: [],
+        remaining_count: null,
+        members_truncated: true,
+      };
+    const pids = new Set();
+    const groups = [];
+    const visit = async (directory) => {
+      if (groups.length >= 128) throw new Error("ownership_unavailable");
+      groups.push(directory);
+      for (const entry of await fs.readdir(directory, { withFileTypes: true }))
+        if (entry.isDirectory()) await visit(path.join(directory, entry.name));
+    };
+    await visit(scopeDirectory);
+    for (const directory of groups) {
+      const members = await fs.readFile(path.join(directory, "cgroup.procs"), "utf8");
+      for (const line of members.trim().split("\n"))
+        if (/^[1-9][0-9]*$/.test(line)) pids.add(Number(line));
+    }
+    const remaining = [...pids];
+    return {
+      status: "running",
+      remaining_pids: remaining.slice(0, maxMembers),
+      remaining_count: remaining.length,
+      members_truncated: remaining.length > maxMembers,
+    };
+  };
+
+  const cleanupFailedLaunch = async () => {
+    try {
+      const props = await systemdUnit(unit);
+      if (
+        scopeBound &&
+        invocationId &&
+        props.LoadState === "loaded" &&
+        props.ActiveState !== "inactive" &&
+        props.InvocationID === invocationId &&
+        props.ControlGroup === controlGroup
+      ) {
+        const failedPath = scopeDirectory;
+        const members = await fs.readFile(
+          path.join(failedPath, "cgroup.events"),
+          "utf8",
+        );
+        if (/^populated 1$/m.test(members)) {
+          await systemdCommand("/usr/bin/systemctl", [
+            "kill",
+            "--kill-whom=all",
+            "--signal=SIGKILL",
+            unit,
+          ]);
+          for (let attempt = 0; attempt < 100; attempt++) {
+            const after = await systemdUnit(unit);
+            if (
+              after.ActiveState === "inactive" &&
+              !after.ControlGroup &&
+              !(await fs.stat(failedPath).then(() => true, () => false))
+            )
+              break;
+            await pause(20);
+          }
+        }
+      }
+    } catch {
+      // Never broaden cleanup beyond this unique systemd scope.
+    }
+    childProcess.stdin.destroy();
+  };
+
+  try {
+    await Promise.race([
+      ready,
+      pause(5000).then(() => {
+        throw new Error("ownership_unavailable");
+      }),
+    ]);
+    const props = await systemdUnit(unit);
+    if (
+      props.LoadState !== "loaded" ||
+      props.ActiveState !== "active" ||
+      !/^[a-f0-9]{32}$/.test(props.InvocationID ?? "")
+    )
+      throw new Error("ownership_unavailable");
+    invocationId = props.InvocationID;
+    controlGroup = props.ControlGroup;
+    scopeDirectory = systemdScopePath(controlGroup, unit);
+    const member = (await fs.readFile(`/proc/${rootPid}/cgroup`, "utf8")).match(
+      /^0::([^\n]+)$/m,
+    )?.[1];
+    if (
+      member !== controlGroup &&
+      !member?.startsWith(controlGroup + "/")
+    )
+      throw new Error("ownership_unavailable");
+    scopeBound = true;
+    if ((await snapshot()).status !== "running")
+      throw new Error("ownership_unavailable");
+    return {
+      child,
+      release: async () => {
+        await new Promise((resolve, reject) =>
+          child.stdin.write("GO\n", (error) => (error ? reject(error) : resolve())),
+        );
+      },
+      kind: "linux_systemd_scope",
+      kernel_id: unitName,
+      snapshot,
+      term: async () => {
+        if ((await snapshot()).status === "exit_confirmed")
+          return { status: "requested", reason: "systemd_scope_already_exited" };
+        return terminateUnit("SIGTERM");
+      },
+      kill: async () => {
+        if ((await snapshot()).status === "exit_confirmed")
+          return { status: "requested", reason: "systemd_scope_already_exited" };
+        return terminateUnit("SIGKILL");
+      },
+      close: async () => (await snapshot()).status === "exit_confirmed",
+    };
+  } catch {
+    await cleanupFailedLaunch();
+    throw new Error("ownership_unavailable");
+  }
+}
 
 // Membership and accounting are separate kernel queries. A process can exit or
 // spawn between them; neither observation may override contradictory evidence.
@@ -25,19 +369,15 @@ export function windowsJobObservation(assigned, pids, accountingEmpty) {
 }
 
 export async function linuxScope(config, stdio) {
-  const { default: koffi } = await import("koffi");
-  const libc = koffi.load("libc.so.6");
-  const openPid = libc.func("int pidfd_open(int pid, unsigned int flags)");
-  const signalPid = libc.func(
-    "int pidfd_send_signal(int fd, int sig, void *info, unsigned int flags)",
-  );
-  const closePid = libc.func("int close(int fd)");
   // Default to the caller's delegated cgroup, without mounts/controller changes.
   const current = (await fs.readFile("/proc/self/cgroup", "utf8")).match(
     /^0::([^\n]+)$/m,
   )?.[1];
   if (!current || current.includes(".."))
     throw new Error("ownership_unavailable");
+  // WSL's systemd init scope is not delegated to the harness. A transient
+  // systemd scope is the manager-owned boundary available in that environment.
+  if (current === "/init.scope") return linuxSystemdScope(config, stdio);
   const parent = config.cgroup_parent ?? path.join("/sys/fs/cgroup", current);
   const parentReal = await fs.realpath(parent);
   if (
@@ -50,7 +390,20 @@ export async function linuxScope(config, stdio) {
   const directory = path.join(parentReal, "rdsh-" + config.owner_id);
   let dir, kill, events;
   try {
-    await fs.mkdir(directory);
+    try {
+      await fs.mkdir(directory);
+    } catch (error) {
+      if (["EACCES", "EPERM", "EROFS"].includes(error.code))
+        return await linuxSystemdScope(config, stdio);
+      throw error;
+    }
+    const { default: koffi } = await import("koffi");
+    const libc = koffi.load("libc.so.6");
+    const openPid = libc.func("int pidfd_open(int pid, unsigned int flags)");
+    const signalPid = libc.func(
+      "int pidfd_send_signal(int fd, int sig, void *info, unsigned int flags)",
+    );
+    const closePid = libc.func("int close(int fd)");
     dir = await fs.open(directory, "r");
     const held = "/proc/self/fd/" + dir.fd;
     // Held kernel descriptors cannot turn into a replacement cgroup by path reuse.

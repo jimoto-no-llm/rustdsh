@@ -223,11 +223,15 @@ class CliAdapter extends EventEmitter {
           deadline_ms: this.stopTimeout,
         },
         termination: {
-          supported: this.ownedScope?.descriptor.kind === "linux_cgroup_v2",
+          supported: ["linux_cgroup_v2", "linux_systemd_scope"].includes(
+            this.ownedScope?.descriptor.kind,
+          ),
           method:
             this.ownedScope?.descriptor.kind === "linux_cgroup_v2"
               ? "pidfd_sigterm"
-              : null,
+              : this.ownedScope?.descriptor.kind === "linux_systemd_scope"
+                ? "systemd_scope_sigterm"
+                : null,
           reason:
             this.ownedScope?.descriptor.kind === "windows_job"
               ? "no_scoped_windows_term_signal"

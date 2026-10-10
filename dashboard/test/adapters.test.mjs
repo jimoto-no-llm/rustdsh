@@ -74,6 +74,20 @@ test("capability catalog names all six operations and does not claim unimplement
   }
 });
 
+test("systemd-owned Linux scopes advertise their verified graceful termination capability", () => {
+  const adapter = createCliAdapter();
+  adapter.ownedScope = {
+    descriptor: { kind: "linux_systemd_scope" },
+    state: { status: "running" },
+  };
+  const termination = adapter.capabilities().stop_stages.termination;
+  assert.deepEqual(termination, {
+    supported: true,
+    method: "systemd_scope_sigterm",
+    reason: null,
+  });
+});
+
 test("start/send/usage use versioned ACP requests and measurements instead of shell input", async (t) => {
   const { adapter, root, events, trace } = await setup(t);
   assert.equal(adapter.capabilities().health, "unverified");

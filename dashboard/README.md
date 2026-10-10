@@ -125,10 +125,15 @@ wrapper also preserves the Node executable selected at installation time.
 The checkout must stay in place: the installed launcher points to its `windows-launcher.mjs`.
 To run without installing a launcher, use `node dashboard/cli.mjs ...`.
 On Linux/macOS, install with `npm ci --prefix dashboard` and use the Node CLI.
-Project mode is portable. The current Harness launcher targets Windows + WSL;
-its distribution defaults to `FlashNext`, with `/root/.local/bin/rdsh-env` as the
-existing environment wrapper. Override those with `RDSH_WSL_DISTRO` and
-`RDSH_WSL_HARNESS_BIN` when your WSL installation uses different names/paths.
+Project mode is portable. Managed Harness startup is selected through
+`RDSH_HARNESS_PROVIDER`; `windows-wsl` is the default and the only verified
+provider. It preserves the `web` profile, loopback readiness, process-scope
+health observation, and verified owned-descendant stop. Its distribution defaults
+to `FlashNext`, with `/root/.local/bin/rdsh-env` as the environment wrapper;
+override those with `RDSH_WSL_DISTRO` and `RDSH_WSL_HARNESS_BIN` when needed.
+`linux-native`, `macos-native`, `remote`, unknown providers, and `windows-wsl` on
+other platforms fail with a specific reason and no silent fallback. Add a provider
+only after its launch, readiness, health, and scoped-stop contract is verified.
 It never stops an independently running Harness instance.
 
 Managed profile launches now use a per-run kernel ownership group. The Harness
@@ -136,6 +141,9 @@ entry page can stop that owned run and distinguishes requesting stop, verified
 empty descendants and unverifiable results. The administrator-only dashboard
 shutdown stays separate. Windows-to-WSL mode also needs the matching Linux native
 prebuilt in this checkout; see [scoped-stop setup and limits](../docs/SCOPED-STOP.md).
+When WSL runs the supervisor in systemd's un-delegated `init.scope`, it uses a
+unique transient systemd scope and confirms that exact unit and cgroup are empty
+before reporting stop success.
 
 Use `--port 38100` to choose a project port, `--harness-port 3081` for its Harness
 backend, or `--no-tailscale` for local access only. Conflicting ports fail startup.

@@ -364,6 +364,9 @@ try {
         };
         $("managed-status").textContent =
           labels[scope?.status] ?? "所有する実行はありません";
+        $("managed-provider").textContent = value.provider
+          ? `起動先: ${value.provider.label} · ${value.provider.capabilities.connection} · 停止: ${value.provider.capabilities.stop}`
+          : "";
         $("managed-remaining").textContent = scope
           ? `残存プロセス ${scope.remaining_count ?? "未確認"} 件` +
             (scope.remaining_pids.length

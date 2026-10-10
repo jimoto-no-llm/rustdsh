@@ -278,6 +278,8 @@ test("authenticated Harness API separates stopping from verified empty descendan
     state = await (await fetch(url + "managed-process", { headers })).json();
     return state.scope.status === "exit_confirmed";
   });
+  assert.equal(state.provider.id, "provided-command");
+  assert.equal(state.provider.capabilities.stop, "verified-owned-descendants");
   assert.equal(state.scope.remaining_count, 0);
   assert.equal(state.scope.confirmed, true);
   assert.equal(

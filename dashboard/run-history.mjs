@@ -189,8 +189,10 @@ function validateData(type, data) {
         "root_identity",
         "root_pid",
       ]) &&
-        uuid(data.owner_id, "owner") &&
-        ["linux_cgroup_v2", "windows_job"].includes(data.kind) &&
+          uuid(data.owner_id, "owner") &&
+        ["linux_cgroup_v2", "linux_systemd_scope", "windows_job"].includes(
+          data.kind,
+        ) &&
         typeof data.kernel_id === "string" &&
         /^[a-z0-9_-]{1,80}$/.test(data.kernel_id) &&
         Number.isSafeInteger(data.root_pid) &&
