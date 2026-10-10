@@ -253,7 +253,9 @@ countdown. Reports expire from `observed_at` using `max_age_seconds` (default
 900, maximum 604800), after which retry hints are hidden and the UI asks for a
 new observation. Each project is limited to 64 provider/scope records.
 
-The dashboard is a reporting surface, not a provider adapter. An agent or
+The dashboard is a reporting surface, not a provider adapter. Reports submitted
+through this MCP tool are always marked `agent_reported`; the dashboard checks
+their shape and age but does not authenticate provider origin. An agent or
 integrator must obtain status through a supported provider interface and report
 the result; the dashboard does not scrape provider sites or inspect CLI error
 text. It displays all reported values as text and does not retry requests, run
