@@ -19,9 +19,7 @@ pub fn cmd_serve(port: u16) -> anyhow::Result<()> {
     let port = listener.local_addr()?.port();
     let token = Arc::new(crate::local_http::random_token()?);
     let handoff = crate::token_handoff::TokenHandoff::create(&token)?;
-    eprintln!(
-        "[rdsh] dashboard: http://127.0.0.1:{port}/ (Ctrl-C to stop, localhost only)"
-    );
+    eprintln!("[rdsh] dashboard: http://127.0.0.1:{port}/ (Ctrl-C to stop, localhost only)");
     eprintln!("[rdsh] token handoff file: {}", handoff.path().display());
     eprintln!("[rdsh] enter the file contents in the dashboard; the token is never printed");
     let connections = Arc::new(AtomicUsize::new(0));

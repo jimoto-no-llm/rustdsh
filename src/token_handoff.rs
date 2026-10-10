@@ -21,7 +21,10 @@ impl TokenHandoff {
                 Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
                 Err(error) => {
                     return Err(error).with_context(|| {
-                        format!("cannot create protected token handoff file {}", path.display())
+                        format!(
+                            "cannot create protected token handoff file {}",
+                            path.display()
+                        )
                     });
                 }
             };
@@ -32,7 +35,10 @@ impl TokenHandoff {
             }
             return Ok(Self { path });
         }
-        bail!("could not create a unique token handoff file in {}", dir.display())
+        bail!(
+            "could not create a unique token handoff file in {}",
+            dir.display()
+        )
     }
 
     pub fn path(&self) -> &Path {
@@ -112,9 +118,17 @@ fn restrict_windows_acl(path: &Path) -> Result<()> {
         .arg("*S-1-5-18:(F)")
         .creation_flags(CREATE_NO_WINDOW)
         .output()
-        .with_context(|| format!("cannot set permissions on token handoff file {}", path.display()))?;
+        .with_context(|| {
+            format!(
+                "cannot set permissions on token handoff file {}",
+                path.display()
+            )
+        })?;
     if !acl.status.success() {
-        bail!("cannot set permissions on token handoff file {}", path.display());
+        bail!(
+            "cannot set permissions on token handoff file {}",
+            path.display()
+        );
     }
     Ok(())
 }
@@ -128,7 +142,11 @@ fn parse_whoami_sid(line: &str) -> Option<String> {
         return None;
     }
     let rest: Vec<_> = parts.collect();
-    if rest.len() < 2 || rest.iter().any(|part| part.is_empty() || !part.bytes().all(|b| b.is_ascii_digit())) {
+    if rest.len() < 2
+        || rest
+            .iter()
+            .any(|part| part.is_empty() || !part.bytes().all(|b| b.is_ascii_digit()))
+    {
         return None;
     }
     Some(sid.to_owned())
@@ -147,7 +165,14 @@ mod tests {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            assert_eq!(std::fs::metadata(handoff.path()).unwrap().permissions().mode() & 0o777, 0o600);
+            assert_eq!(
+                std::fs::metadata(handoff.path())
+                    .unwrap()
+                    .permissions()
+                    .mode()
+                    & 0o777,
+                0o600
+            );
         }
         let path = handoff.path().to_owned();
         drop(handoff);

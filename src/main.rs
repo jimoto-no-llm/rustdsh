@@ -11,12 +11,12 @@ mod passthrough;
 mod rdsh_config;
 mod search;
 mod serve;
-mod shutdown;
 mod setup_web;
+mod shutdown;
 mod slim;
+mod token_handoff;
 mod tokens;
 mod tool_security;
-mod token_handoff;
 mod websearch;
 
 #[derive(Parser, Debug)]

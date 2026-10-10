@@ -19,7 +19,10 @@ pub fn cmd_setup_web(port: u16) -> anyhow::Result<()> {
     let handoff = crate::token_handoff::TokenHandoff::create(&token)?;
     let base = format!("http://127.0.0.1:{port}/");
     eprintln!("[rdsh setup] floating UI: {base} (localhost only, Ctrl-C to stop)");
-    eprintln!("[rdsh setup] token handoff file: {}", handoff.path().display());
+    eprintln!(
+        "[rdsh setup] token handoff file: {}",
+        handoff.path().display()
+    );
     eprintln!("[rdsh setup] enter the file contents in the setup page; the token is never printed");
     use std::io::IsTerminal as _;
     if std::io::stdin().is_terminal() {

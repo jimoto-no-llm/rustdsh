@@ -311,22 +311,28 @@ impl Server {
                 }
                 if let (Some(address), Some(path)) = (&address, &handoff_path) {
                     let token = std::fs::read_to_string(path).unwrap_or_default();
-                    let logged_token = !token.is_empty()
-                        && startup_lines.iter().any(|line| line.contains(&token));
+                    let logged_token =
+                        !token.is_empty() && startup_lines.iter().any(|line| line.contains(&token));
                     let has_key_fragment = startup_lines.iter().any(|line| line.contains("#key="));
-                    let _ = tx.send((address.clone(), path.clone(), logged_token, has_key_fragment));
+                    let _ = tx.send((
+                        address.clone(),
+                        path.clone(),
+                        logged_token,
+                        has_key_fragment,
+                    ));
                     break;
                 }
             }
         });
-        let (url, handoff_path, logged_token, has_key_fragment) = match rx.recv_timeout(Duration::from_secs(15)) {
-            Ok(values) => values,
-            Err(e) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                panic!("server did not become ready: {e}");
-            }
-        };
+        let (url, handoff_path, logged_token, has_key_fragment) =
+            match rx.recv_timeout(Duration::from_secs(15)) {
+                Ok(values) => values,
+                Err(e) => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    panic!("server did not become ready: {e}");
+                }
+            };
         assert!(!logged_token, "server must not print the bearer token");
         assert!(!has_key_fragment, "server must not print a token-bearing URL");
         let token = std::fs::read_to_string(&handoff_path)
