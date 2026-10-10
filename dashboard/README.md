@@ -148,6 +148,18 @@ configuration, follow **利用設定を開く**, then select **接続を更新**
 only after the route has been verified. Harness QR codes open the actual Harness
 UI, while project QR codes open the project's metrics and questions.
 
+Project rows provide a **リンクをコピー** action for tasks, questions, registered
+run/session pairs, and progress events. These links contain the project ID and exact
+target ID only; they strip the current URL's query and fragment, so the browser key
+is not copied. The browser still requires its own pairing/authentication before it
+can read project state or submit an answer. If a target link is opened first, its
+navigation hint is held in same-origin local storage for up to ten minutes so a QR
+pairing in another tab can resume it. The target is matched against the authenticated
+project ID and exact task/question/session/event ID; a different project, missing
+target, or ambiguous run/session is reported instead of selecting a same-named item.
+Session links bind both the native session ID and run ID. Event links identify the
+event sequence and can reopen an older event outside the default recent-30 view.
+
 Existing Serve routes are preserved. A conflicting route or public Funnel on the
 chosen port is rejected. Stop closes the local server and managed Harness child;
 the private Serve route remains configured for the next launch.

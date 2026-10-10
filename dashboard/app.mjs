@@ -6,9 +6,30 @@ import { renderConnectionDiagnostics } from "./connection-diagnostics-ui.mjs";
 import { createInstructionPanel } from "./instruction-queue-ui.mjs";
 import { createCostPanel } from "./cost-ledger-ui.mjs";
 import { renderBudget } from "./budget-ui.mjs";
+import {
+  clearPendingProjectDeepLink,
+  clearProjectDeepLinkUrl,
+  createProjectDeepLink,
+  parseProjectDeepLink,
+  pendingProjectDeepLink,
+  rememberProjectDeepLink,
+  resolveProjectDeepLink,
+} from "./deep-links.mjs";
+import { deepLinkButton } from "./deep-link-ui.mjs";
 
 const $ = (id) => document.getElementById(id);
 const base = location.pathname.startsWith("/_rdsh") ? "/_rdsh/" : "/";
+let deepLinkStorage = null;
+try {
+  deepLinkStorage = localStorage;
+} catch {}
+const urlDeepLink = parseProjectDeepLink(location.href);
+if (urlDeepLink.status === "target")
+  rememberProjectDeepLink(deepLinkStorage, urlDeepLink);
+const requestedDeepLink =
+  urlDeepLink.status === "none"
+    ? pendingProjectDeepLink(deepLinkStorage)
+    : urlDeepLink;
 const suppliedBrowserToken =
   base === "/" ? new URLSearchParams(location.hash.slice(1)).get("key") : null;
 const browserToken =
@@ -48,6 +69,17 @@ let renderedRevision = -1;
 let latestState = null;
 let selectedTask = "";
 let selectionKey = "";
+let deepLinkHandled = false;
+function makeDeepLink(kind, id, runId) {
+  if (!latestState?.project?.id) throw new Error("Project state is unavailable");
+  return createProjectDeepLink(
+    location.href,
+    latestState.project.id,
+    kind,
+    id,
+    runId,
+  );
+}
 function navigateTo(id) {
   const target = $(id);
   if (!target) return;
@@ -56,6 +88,46 @@ function navigateTo(id) {
   target.tabIndex = -1;
   target.focus();
   target.scrollIntoView({ block: "start" });
+}
+function applyDeepLink(state) {
+  if (deepLinkHandled || requestedDeepLink.status === "none") return;
+  deepLinkHandled = true;
+  const status = $("deep-link-status");
+  if (requestedDeepLink.status === "invalid") {
+    status.textContent =
+      "リンクの対象情報を読み取れません。project・対象・IDを確認してください。";
+  } else {
+    const target = resolveProjectDeepLink(requestedDeepLink, state);
+    if (target.status === "wrong_project") {
+      status.textContent =
+        "このリンクは別projectの対象です。対象projectの認証済み画面から開いてください。";
+    } else if (target.status === "not_found") {
+      status.textContent =
+        "リンク先はこのprojectの現在の状態にありません。削除済みか、接続先が異なる可能性があります。";
+    } else if (target.status === "ambiguous") {
+      status.textContent =
+        "同じrun/sessionの対象を一意に確認できません。元の画面でリンクを作り直してください。";
+    } else if (target.status === "found" && target.kind === "session") {
+      if (renderInstructions.selectTarget(target.consumerId)) {
+        navigateTo("instruction-detail");
+        status.textContent = `登録済みのrun/session ${requestedDeepLink.runId} / ${requestedDeepLink.id} を表示しました。現在の接続状態は未確認です。`;
+      } else {
+        status.textContent =
+          "session対象を確認しましたが、追指示の保存処理中です。処理後にリンクを開き直してください。";
+      }
+    } else if (target.status === "found") {
+      navigateTo(target.elementId);
+      status.textContent = `${target.kind} ${target.id} を表示しました。`;
+    } else {
+      status.textContent = "リンク先を確認できません。対象情報を確認してください。";
+    }
+  }
+  clearPendingProjectDeepLink(deepLinkStorage);
+  history.replaceState(
+    null,
+    "",
+    clearProjectDeepLinkUrl(location.href),
+  );
 }
 function updateOverview(state) {
   const select = $("overview-task");
@@ -141,22 +213,29 @@ const renderInstructions = createInstructionPanel($("instruction-panel"), {
   node,
   api,
   refreshState,
+  makeDeepLink,
 });
 const renderCosts = createCostPanel($("cost-ledger"), node);
 function render(state) {
   if (state.revision < renderedRevision) return;
+  const focusedId = document.activeElement?.id || "";
   renderedRevision = state.revision;
   latestState = state;
   renderInstructions(state);
   renderCosts(state);
   renderBudget($("budget-admission"), state, node);
   updateOverview(state);
-  renderReports(state);
+  const focusedEventSequence = requestedDeepLink.status === "target" &&
+    requestedDeepLink.kind === "event" && requestedDeepLink.projectId === state.project.id
+    ? requestedDeepLink.id
+    : null;
+  renderReports(state, Date.now(), makeDeepLink, focusedEventSequence);
   const unanswered = state.questions.filter((question) => question.answer === null);
   renderQuestionCards($("questions"), unanswered, state.question_contracts, {
     node,
     api,
     refreshState,
+    makeDeepLink,
   });
   renderAnswerApplications($("reply-status"), state, node);
   $("answers").replaceChildren(
@@ -166,10 +245,13 @@ function render(state) {
       .reverse()
       .map((question) => {
         const element = node("article", undefined, "event");
+        element.id = "question-" + question.id;
         element.append(
           node("strong", question.question),
           node("p", question.answer),
         );
+        const link = deepLinkButton(node, makeDeepLink, "question", question.id, `質問 ${question.id}`);
+        if (link) element.append(link);
         const contract = state.question_contracts?.cards[question.id];
         element.append(
           node(
@@ -183,6 +265,12 @@ function render(state) {
         return element;
       }),
   );
+  applyDeepLink(state);
+  const restoredFocus = focusedId ? $(focusedId) : null;
+  if (restoredFocus) {
+    if (restoredFocus.tabIndex < 0) restoredFocus.tabIndex = -1;
+    restoredFocus.focus({ preventScroll: true });
+  }
   $("connection").textContent = "接続済み · プロジェクト専用";
   $("updated").textContent =
     `最終受信: ${state.updated_at ? new Date(state.updated_at).toLocaleString("ja-JP") : "まだ報告がありません"} · 鮮度は各項目の観測時刻から判定します。累計欄は報告元のAPI換算値です。台帳は出所ごとの報告値です。`;

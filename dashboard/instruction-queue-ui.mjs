@@ -1,3 +1,5 @@
+import { deepLinkButton } from "./deep-link-ui.mjs";
+
 const labels = {
   saved: "保存済み · 次ターン待ち",
   read: "対象が読取済み · 適用待ち",
@@ -42,7 +44,7 @@ const inputText = (state, c) =>
     : state.feedback.find((m) => m.sequence === c.feedback_sequence)?.answer ||
       "";
 
-export function createInstructionPanel(root, { node, api, refreshState }) {
+export function createInstructionPanel(root, { node, api, refreshState, makeDeepLink }) {
   let confirmedActiveId = null,
     posting = false;
   let state,
@@ -57,7 +59,7 @@ export function createInstructionPanel(root, { node, api, refreshState }) {
   const status = node("p", "対象sessionを選んで追指示を保存します。", "sub"),
     interrupt = node("input"),
     interruptLabel = node("label"),
-    targetNote = node("p", "", "sub");
+    targetNote = node("div", undefined, "sub");
   const submit = node("button", "追指示を保存"),
     clear = node("button", "別の追指示を作る"),
     cards = node("div", undefined, "decision-grid");
@@ -155,9 +157,14 @@ export function createInstructionPanel(root, { node, api, refreshState }) {
     text.readOnly = frozen;
     timing.disabled = frozen;
     interruptLabel.hidden = timing.value !== "interrupt";
-    targetNote.textContent = consumer
+    targetNote.replaceChildren(node("span", consumer
       ? `task ${consumer.task_id || "未紐付け"} · run ${consumer.run_id} · session ${consumer.session_id}${active ? ` · 現在の入力 ${active.command_id}` : " · 処理中の入力は未確認"}`
-      : "接続済みの対象がありません。reply-consumerで元のsessionへ接続してください。";
+      : "接続済みの対象がありません。reply-consumerで元のsessionへ接続してください。"));
+    if (consumer) {
+      const link = deepLinkButton(node, makeDeepLink, "session", consumer.session_id,
+        `session ${consumer.session_id}`, consumer.run_id);
+      if (link) targetNote.append(link);
+    }
     submit.disabled =
       posting ||
       !consumer ||
@@ -405,12 +412,13 @@ export function createInstructionPanel(root, { node, api, refreshState }) {
     renderRequests();
   };
   render.selectTarget = (id) => {
-    if (posting || !state.answer_applications?.consumers[id] || id === target)
-      return;
+    if (posting || !state.answer_applications?.consumers[id]) return false;
+    if (id === target) return true;
     target = id;
     select.value = target;
     load();
     renderRequests();
+    return true;
   };
   return render;
 }

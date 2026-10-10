@@ -1,4 +1,5 @@
 import { metricView, observationView, ratioView } from "./observations.mjs";
+import { deepLinkButton } from "./deep-link-ui.mjs";
 
 const $ = (id) => document.getElementById(id);
 function node(tag, text, className) {
@@ -109,7 +110,7 @@ function rateText(state, a, b, now) {
   if (views.some((view) => view.freshness === "unknown")) return "鮮度未確認";
   return "未取得";
 }
-export function renderReports(state, now = Date.now()) {
+export function renderReports(state, now = Date.now(), makeDeepLink, focusedEventSequence = null) {
   openObservations = new Set(
     [...document.querySelectorAll("details.observation-details[open]")]
       .map((element) => element.dataset.observationId),
@@ -195,6 +196,8 @@ export function renderReports(state, now = Date.now()) {
       ));
       const title = node("td", task.title);
       title.append(provenance(view, undefined, String, "task:" + task.id));
+      const link = deepLinkButton(node, makeDeepLink, "task", task.id, `タスク ${task.id}`);
+      if (link) title.append(link);
       tr.append(
         node("td", task.id, "id"),
         status,
@@ -213,18 +216,24 @@ export function renderReports(state, now = Date.now()) {
   );
   if (!state.tasks.length)
     $("tasks").append(emptyRow("タスクはまだ登録されていません", 4));
-  renderEvents(state, now);
+  renderEvents(state, now, makeDeepLink, focusedEventSequence);
   if (activeDisclosure)
     [...document.querySelectorAll("summary[data-observation-id]")]
       .find((summary) => summary.dataset.observationId === activeDisclosure)?.focus();
 }
-function renderEvents(state, now) {
+function renderEvents(state, now, makeDeepLink, focusedEventSequence) {
+  const visible = state.events.slice(-30);
+  const focused = focusedEventSequence === null
+    ? null
+    : state.events.find((event) => String(event.sequence) === focusedEventSequence);
+  if (focused && !visible.some((event) => event.sequence === focused.sequence))
+    visible.push(focused);
   $("events").replaceChildren(
-    ...state.events
-      .slice(-30)
+    ...visible
       .reverse()
       .map((event) => {
         const element = node("article", undefined, "event");
+        element.id = "event-" + event.sequence;
         element.append(
           node("strong", event.title),
           node(
@@ -239,6 +248,8 @@ function renderEvents(state, now) {
           observationView(event.title, event.observation, now),
           undefined, String, "event:" + event.sequence,
         ));
+        const link = deepLinkButton(node, makeDeepLink, "event", String(event.sequence), `報告 ${event.sequence}`);
+        if (link) element.append(link);
         return element;
       }),
   );
