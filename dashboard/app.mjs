@@ -382,7 +382,7 @@ document.addEventListener("keydown", (event) => {
 });
 try {
   const config = await api("config");
-  restoreWorkspaceLayout(config.project_id);
+  restoreWorkspaceLayout(config.project?.id);
   await renderShare(config);
   if (config.kind === "harness") {
     $("connection-detail").hidden = true;

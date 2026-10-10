@@ -63,7 +63,8 @@ try{
  await call('dashboard_ask_question',{id:'Q1',question:'E2E: choose an answer',urgency:'high'});
  const projectPage=await pageFor(browser,runtime.browser_url);await projectPage.locator('#question-Q1 textarea').waitFor();await check(projectPage,/dashboard/i);
  const config=await projectPage.evaluate(async()=>{const token=sessionStorage.getItem('rdsh_project_browser_token');const response=await fetch('/api/config',{headers:{'x-rdsh-browser-token':token}});return response.json();});
- const layoutKey=`rdsh:workspace-layout:v1:${encodeURIComponent(config.project_id)}`;
+ assert.equal(typeof config.project?.id,'string');
+ const layoutKey=`rdsh:workspace-layout:v1:${encodeURIComponent(config.project.id)}`;
  assert.equal(await projectPage.locator('#workspace-grid').getAttribute('data-layout'),'3');
  await projectPage.getByLabel('2列').check();
  assert.equal(await projectPage.locator('#workspace-grid').getAttribute('data-layout'),'2');
