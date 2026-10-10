@@ -131,6 +131,40 @@ existing environment wrapper. Override those with `RDSH_WSL_DISTRO` and
 `RDSH_WSL_HARNESS_BIN` when your WSL installation uses different names/paths.
 It never stops an independently running Harness instance.
 
+### Keep project history after moving a folder
+
+Project IDs normally follow the canonical folder path. To keep the same tasks,
+answers and evidence references after a rename or move, capture the ID before
+moving the folder, then preview and explicitly apply the mapping at its new
+location. The operation reuses the existing state directory; it does not copy,
+merge or rewrite project history. Stop the project's dashboard first.
+
+```powershell
+rdsh-dashboard project-id --project C:\Projects\OldName
+# Move or rename the project folder in Explorer or with your usual file tool.
+rdsh-dashboard project-move preview --project D:\Work\NewName --from-id <project_id>
+rdsh-dashboard project-move apply --project D:\Work\NewName --from-id <project_id> --expected-revision <source_revision>
+rdsh-dashboard project-move rollback --migration-id <migration_id>
+```
+
+`preview` reports the source revision and task/answer counts. `apply` refuses a
+changed source revision, an active dashboard, or any state already registered
+for the destination path. The returned migration ID can remove the new path
+mapping; rollback leaves the source state untouched. If a move is interrupted,
+rerun `project-id` and `project-move preview` at the destination: an applied
+mapping is reported as `already_moved` and does not duplicate history.
+An abandoned identity lock expires after 30 seconds; stale same-runtime
+dashboard locks are cleared only after their recorded process has exited. If a
+command reports that `project-identity.lock.mutation` is busy, inspect its owner
+and confirm no project-move or dashboard startup/shutdown is active before
+removing that stale guard. Never remove `project-identity.lock` while its owner
+may still be active.
+
+WSL and native Windows share a project identity only when both runtimes use the
+same `RDSH_DASHBOARD_HOME`. Capture the ID in the runtime that currently owns
+the history and apply the explicit mapping from the runtime that will use the
+new path. Paths are never joined by matching folder names.
+
 Managed profile launches now use a per-run kernel ownership group. The Harness
 entry page can stop that owned run and distinguishes requesting stop, verified
 empty descendants and unverifiable results. The administrator-only dashboard
