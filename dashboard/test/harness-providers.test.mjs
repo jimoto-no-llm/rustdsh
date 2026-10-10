@@ -113,7 +113,7 @@ test("verified stop permits a clean managed-Harness restart with a distinct run"
 });
 
 test(
-  "a failed managed launch is recorded as uncertain instead of remaining in starting",
+  "a failed managed launch is durably recorded as uncertain",
   async (t) => {
     const root = await fs.mkdtemp(
       path.join(os.tmpdir(), "rdsh-provider-failed-start-"),
@@ -136,7 +136,7 @@ test(
     const firstEvent = journal.trim().split("\n")[0];
     const runId = JSON.parse(firstEvent).run_id;
     const run = await history.inspect(runId);
-    assert.equal(run.state, "unknown");
+    assert.equal(run.recorded_state, "unknown");
     assert.equal(run.reason, "operation_unconfirmed");
   },
 );
