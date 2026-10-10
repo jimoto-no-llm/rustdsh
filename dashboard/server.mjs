@@ -403,7 +403,7 @@ export async function startDashboard(options) {
         route === "/api/instructions/context" ||
         (req.method === "POST" && route === "/api/instructions/submit") ||
         (req.method === "POST" &&
-          ["metrics", "task", "question", "event"].some(
+          ["metrics", "task", "question", "event", "provider_status"].some(
             (operation) => route === `/api/update/${operation}`,
           ));
       const mcpAuthorized =
@@ -449,6 +449,8 @@ export async function startDashboard(options) {
           route === "/human-annotations-ui.mjs" ||
           route === "/annotation-identifiers.mjs" ||
           route === "/observations.mjs" ||
+          route === "/provider-status.mjs" ||
+          route === "/provider-status-ui.mjs" ||
           route === "/reports-view.mjs" ||
           route === "/question-cards-ui.mjs" ||
           route === "/project-overview.mjs" ||
@@ -549,6 +551,8 @@ export async function startDashboard(options) {
           "/human-annotations-ui.mjs",
           "/annotation-identifiers.mjs",
           "/observations.mjs",
+          "/provider-status.mjs",
+          "/provider-status-ui.mjs",
           "/reports-view.mjs",
           "/question-cards-ui.mjs",
           "/project-overview.mjs",
@@ -794,7 +798,7 @@ export async function startDashboard(options) {
         if (req.method === "POST" && route?.startsWith("/api/update/")) {
           const operation = route.slice("/api/update/".length);
           if (
-            !["metrics", "task", "question", "answer", "event"].includes(
+            !["metrics", "task", "question", "answer", "event", "provider_status"].includes(
               operation,
             )
           )

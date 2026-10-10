@@ -8,6 +8,7 @@ import { createCostPanel } from "./cost-ledger-ui.mjs";
 import { renderBudget } from "./budget-ui.mjs";
 import { createHumanAnnotationPanel } from "./human-annotations-ui.mjs";
 import { setupObservedCli } from "./observed-cli-ui.mjs";
+import { renderProviderStatuses } from "./provider-status-ui.mjs";
 
 const $ = (id) => document.getElementById(id);
 const base = location.pathname.startsWith("/_rdsh") ? "/_rdsh/" : "/";
@@ -154,6 +155,7 @@ function render(state) {
   observedCli?.render(state);
   renderInstructions(state);
   renderCosts(state);
+  renderProviderStatuses($("provider-status"), state.provider_statuses, node);
   renderBudget($("budget-admission"), state, node);
   updateOverview(state);
   renderHumanAnnotations(state);

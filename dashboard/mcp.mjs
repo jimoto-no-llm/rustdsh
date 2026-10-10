@@ -14,6 +14,7 @@ import { metricNames } from "./state.mjs";
 import { observationSchema } from "./observations.mjs";
 import { feedbackValidity } from "./question-contracts.mjs";
 import { costScopeSchema, costReportSchema } from "./cost-ledger.mjs";
+import { providerStatusSchema } from "./provider-status.mjs";
 
 // Bucket E (MCP) diagnostics — Issues #76-#79:
 // Exposure control (#76), remote OAuth (#77), single-screen server
@@ -69,6 +70,12 @@ const decision = object(
   ["kind"],
 );
 export const tools = [
+  {
+    name: "dashboard_report_provider_status",
+    description:
+      "Record one provider/CLI status report for this project. Use only explicit provider evidence; classify rate_limited, quota_exhausted, authentication_failed, or unknown. Include the actual observed_at, a safe source label, a stable event_id and a strictly increasing per-scope sequence. Add quota counts or retry_after only when the provider explicitly supplies them; omit unavailable values. Reports expire by max_age_seconds. This only stores observations: it does not scrape providers, retry requests, log in, or change credentials/budgets.",
+    inputSchema: providerStatusSchema,
+  },
   {
     name: "dashboard_update_metrics",
     description:
@@ -144,11 +151,12 @@ export const tools = [
   {
     name: "dashboard_get_state",
     description:
-      "Read this project’s metrics, tasks, questions, recent events and optional source-aware cost ledger. Ledger totals are per declared period/source/currency; missing workers remain unknown and invoice amounts are never used to correct estimates.",
+      "Read this project’s provider status reports, metrics, tasks, questions, recent events and optional source-aware cost ledger. Provider retry hints remain provider-reported and expire by observation age. Ledger totals are per declared period/source/currency; missing workers remain unknown and invoice amounts are never used to correct estimates.",
     inputSchema: object({}),
   },
 ];
 const routes = {
+  dashboard_report_provider_status: "provider_status",
   dashboard_update_metrics: "metrics",
   dashboard_upsert_task: "task",
   dashboard_ask_question: "question",

@@ -75,6 +75,7 @@ const names = [
   "dashboard.task.updated",
   "dashboard.progress.updated",
   "dashboard.metrics.updated",
+  "dashboard.provider_status.updated",
 ];
 const diagnosticReasons = [
   "challenge_verified",
@@ -120,6 +121,8 @@ export const eventDefinitions = names.map((name) => ({
     "dashboard.progress.updated":
       "New progress or an artifact reference was reported.",
     "dashboard.metrics.updated": "Measured project metrics were updated.",
+    "dashboard.provider_status.updated":
+      "A provider status, quota or provider-reported retry hint was updated.",
   }[name],
   delivery: ["webhook"],
   inputSchema: {
