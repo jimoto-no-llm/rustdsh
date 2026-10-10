@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "fixture": "1000-tool-scoped-original-ptc",
+  "runtime": {
+    "node": "22.23.3",
+    "platform": "win32",
+    "dshTools": "0.2.0-rc.2",
+    "tokenizer": "js-tiktoken 1.0.21 cl100k_base"
+  },
+  "limitations": [
+    "No model or paid API was called. Fixed callbacks exercise the original run_code dispatcher with a test provider; the separate Node-provider test exercises real program execution.",
+    "Encoded strings use cl100k_base, not a DeepSeek tokenizer or provider-billed usage. Input payload totals include the complete prompt per PTC submission and the discovery result, excluding request envelopes and earlier conversation.",
+    "Lookup and miscall rates are scripted fixture results; the baseline knows the intended exact name. They are not model-quality measurements.",
+    "PTC submissions count outer run_code requests. Search and describe are nested calls in one discovery submission; invocation is the second submission.",
+    "The public assembly hook still incurs original full SDK assembly CPU cost. The budget bounds model-facing declarations, not that upstream allocation."
+  ],
+  "sourceFiles": {
+    "catalog.js": "8bb12450097f227838313652710110736028ddb2a450e92c8822d14dab7e1fc9",
+    "tools.js": "6ce047c939917414d3fee315a78767b8838f69a0091374aaacad1458d6c1a886",
+    "index.js": "c3b032b5533ac84e98c9171c19f7c888c09b87396bc44f8a9aae4f70409c4cdd",
+    "benchmark.mjs": "e41f1dcaf8a80d2fb6ffd24938f1578ceed51cd3c647d46d75d6684aff13c189",
+    "test/fixtures.mjs": "ea4fc855345ff99e69406efb5459a78dd0dc9d09efe758c12d9c5a147f7c18dd",
+    "package-lock.json": "5b7652f89383b37e4ae759772aa048979ed5b345b9639396e2e08eb1c33ce9c7"
+  },
+  "baseline": {
+    "visibleCapabilityTools": 1000,
+    "queryFixtures": 80,
+    "encoding": "cl100k_base",
+    "sdkInputTokens": 78400,
+    "completePromptInputTokens": 78434,
+    "sdkUtf8Bytes": 289814,
+    "inlineBudgetTokenUpperBound": null,
+    "inputPayloadTokens": 6274720,
+    "inputPayloadTokensPerFixture": 78434,
+    "lookupSuccesses": 80,
+    "lookupSuccessRate": 1,
+    "incorrectBodyCalls": 0,
+    "scriptedMiscallRate": 0,
+    "completed": 80,
+    "actualBodyCalls": 80,
+    "ptcSubmissions": 80,
+    "ptcSubmissionsPerFixture": 1,
+    "nestedDispatches": 80,
+    "sdkStableAfterUnrelatedAddition": false,
+    "assemblyMedianMs": 45.08989999999994,
+    "retrievalMedianMs": null
+  },
+  "catalog": {
+    "visibleCapabilityTools": 1000,
+    "queryFixtures": 80,
+    "encoding": "cl100k_base",
+    "sdkInputTokens": 909,
+    "completePromptInputTokens": 943,
+    "sdkUtf8Bytes": 4339,
+    "inlineBudgetTokenUpperBound": 16384,
+    "inputPayloadTokens": 245960,
+    "inputPayloadTokensPerFixture": 3074.5,
+    "lookupSuccesses": 80,
+    "lookupSuccessRate": 1,
+    "incorrectBodyCalls": 0,
+    "scriptedMiscallRate": 0,
+    "completed": 80,
+    "actualBodyCalls": 80,
+    "ptcSubmissions": 160,
+    "ptcSubmissionsPerFixture": 2,
+    "nestedDispatches": 240,
+    "sdkStableAfterUnrelatedAddition": true,
+    "assemblyMedianMs": 91.56829999999991,
+    "retrievalMedianMs": 138.1317999999992
+  },
+  "comparison": {
+    "sdkInputTokenReduction": 0.988405612244898,
+    "payloadInputTokenReduction": 0.960801438151822
+  }
+}

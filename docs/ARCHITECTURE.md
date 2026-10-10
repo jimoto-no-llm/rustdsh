@@ -67,6 +67,12 @@ See `dashboard/README.md`.
 - `sync-dsh.sh` + `systemd/rdsh-sync.*`: keep the upstream Harness in sync.
 - `plugins/`: Smart-DSH compat bundle, update banner, skill installer.
 
+The optional [PTC catalog bundle](../plugins/rdsh-ptc-catalog/README.md) adds
+scope-bound discovery and a declaration budget to an existing authorized DSH
+PTC composition. It uses the original registry/renderers and public prompt
+waterfall. The guarded rdsh launcher continues to force Native tools and
+refuses this bundle's activation.
+
 ## Original-binary discovery (`dsh` name)
 
 When invoked as `dsh`, the lookup order is: `RDSH_ORIG_BIN` (legacy

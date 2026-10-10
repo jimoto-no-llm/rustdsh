@@ -1,0 +1,36 @@
+name: ptc-catalog
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ptc-catalog-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scoped-catalog:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: plugins/rdsh-ptc-catalog/package-lock.json
+      - run: npm ci --prefix plugins/rdsh-ptc-catalog --ignore-scripts --no-audit --no-fund
+      - run: npm test --prefix plugins/rdsh-ptc-catalog
+      - name: Compare the original PTC and catalog with 1000 visible tools
+        shell: bash
+        run: node plugins/rdsh-ptc-catalog/benchmark.mjs --output "$RUNNER_TEMP/ptc-catalog-benchmark.json"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ptc-catalog-${{ matrix.os }}
+          path: ${{ runner.temp }}/ptc-catalog-benchmark.json
+          if-no-files-found: ignore
