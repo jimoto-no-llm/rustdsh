@@ -62,6 +62,25 @@ try{
  await call('dashboard_upsert_task',{id:'T1',title:'E2E task',status:'doing'});
  await call('dashboard_ask_question',{id:'Q1',question:'E2E: choose an answer',urgency:'high'});
  const projectPage=await pageFor(browser,runtime.browser_url);await projectPage.locator('#question-Q1 textarea').waitFor();await check(projectPage,/dashboard/i);
+ const config=await projectPage.evaluate(async()=>{const token=sessionStorage.getItem('rdsh_project_browser_token');const response=await fetch('/api/config',{headers:{'x-rdsh-browser-token':token}});return response.json();});
+ assert.equal(typeof config.project?.id,'string');
+ const layoutKey=`rdsh:workspace-layout:v1:${encodeURIComponent(config.project.id)}`;
+ assert.equal(await projectPage.locator('#workspace-grid').getAttribute('data-layout'),'3');
+ await projectPage.getByLabel('2列').check();
+ assert.equal(await projectPage.locator('#workspace-grid').getAttribute('data-layout'),'2');
+ assert.equal(await projectPage.evaluate(key=>localStorage.getItem(key),layoutKey),'2');
+ await projectPage.evaluate(()=>localStorage.setItem('rdsh:workspace-layout:v1:another-project','1'));
+ await projectPage.reload();await projectPage.locator('#question-Q1 textarea').waitFor();
+ assert.equal(await projectPage.locator('#workspace-grid').getAttribute('data-layout'),'2','the layout should restore for the same project');
+ await projectPage.locator('#workspace-grid').evaluate(e=>{const panes=[...e.querySelectorAll('.workspace-pane')];return panes.every(p=>p.id&&p.getAttribute('aria-labelledby')&&document.getElementById(p.getAttribute('aria-labelledby')))}).then(value=>assert.equal(value,true));
+ const paneLink=projectPage.getByRole('navigation',{name:'ワークスペースのペインへ移動'}).getByRole('link',{name:'タスクと作業'});
+ await paneLink.focus();await projectPage.keyboard.press('Enter');
+ assert.equal(await projectPage.evaluate(()=>document.activeElement.id),'workspace-work','keyboard pane navigation should focus its destination');
+ await projectPage.setViewportSize(report.viewports[1]);
+ const mobileColumns=await projectPage.locator('#workspace-grid').evaluate(e=>new Set([...e.querySelectorAll('.workspace-pane')].map(p=>Math.round(p.getBoundingClientRect().left))).size);
+ assert.equal(mobileColumns,1,'narrow layouts should use one column');
+ await check(projectPage,/dashboard/i);
+ await projectPage.setViewportSize(report.viewports[0]);
  await projectPage.locator('#question-Q1 textarea').fill('Keep this draft');
  const stateUpdate=projectPage.waitForResponse(r=>r.url().endsWith('/api/state')&&r.status()===200);
  await call('dashboard_update_metrics',{input_tokens:1000,cached_input_tokens:500,tool_calls:10,tool_errors:0});await stateUpdate;
@@ -78,7 +97,7 @@ try{
  assert.notEqual(fresh.browser_url,runtime.browser_url);
  const staleToken=new URL(runtime.browser_url).hash.slice('#key='.length);assert.equal((await fetch(fresh.local_url+'api/state',{headers:{'x-rdsh-browser-token':staleToken}})).status,401);
  const newPage=await pageFor(browser,fresh.browser_url);await newPage.locator('#tasks-detail').evaluate(e=>e.open=true);await newPage.locator('#task-T1').waitFor();await newPage.locator('#answered').evaluate(e=>e.open=true);await newPage.locator('#answers').filter({hasText:'E2E saved answer'}).waitFor();await check(newPage,/dashboard/i);await stop(restarted.child);
- report.flows.push('project CLI: real MCP task/question -> browser draft preserved on SSE -> browser answer -> MCP/file readback -> process restart retained answer and revoked old key');
+ report.flows.push('project CLI: real MCP task/question -> project-specific pane layout persistence, keyboard navigation and mobile one-column -> browser draft preserved on SSE -> browser answer -> MCP/file readback -> process restart retained answer and revoked old key');
  }finally{await client.close();}
  assert.deepEqual(report.page_errors,[]);assert.deepEqual(report.console_errors,[]);
  report.result='PASS';
