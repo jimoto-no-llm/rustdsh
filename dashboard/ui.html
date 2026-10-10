@@ -226,6 +226,54 @@
         background: var(--card);
         min-height: 172px;
       }
+      #human-metrics .human-metrics-settings,
+      #human-metrics .human-metrics-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+        margin: 12px 0;
+      }
+      #human-metrics .human-metrics-settings label,
+      #human-metrics .human-metrics-control label {
+        display: block;
+        margin: 8px 0;
+      }
+      #human-metrics .human-metrics-control {
+        min-width: min(100%, 280px);
+        padding: 12px 0;
+      }
+      #human-metrics .human-metrics-controls {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+        gap: 8px 18px;
+      }
+      #human-metrics .value {
+        font-size: 1.25rem;
+        line-height: 1.5;
+        overflow-wrap: anywhere;
+      }
+      #human-metrics .human-metrics-control select {
+        display: block;
+        width: 100%;
+        min-height: 42px;
+        margin-top: 6px;
+        padding: 8px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: white;
+        font: inherit;
+      }
+      #human-metrics .human-metrics-control button {
+        margin: 5px 8px 5px 0;
+      }
+      #human-metrics .human-metrics-control .sub {
+        overflow-wrap: anywhere;
+      }
+      #human-metrics #human-metrics-timer-actions[hidden],
+      #human-metrics button[hidden] {
+        display: none;
+      }
       .label {
         color: var(--mut);
         font-size: 16px;
@@ -833,6 +881,11 @@
           <div class="cards" id="cards"></div>
           <h2>費用の明細と出所</h2>
           <section id="cost-ledger" aria-label="費用台帳"></section>
+          <h2 id="human-metrics-heading">人の作業と復旧指標</h2>
+          <section
+            id="human-metrics"
+            aria-labelledby="human-metrics-heading"
+          ></section>
         </details>
         <details class="fold" id="tasks-detail">
           <summary>タスク一覧</summary>

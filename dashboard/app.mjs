@@ -6,6 +6,7 @@ import { renderConnectionDiagnostics } from "./connection-diagnostics-ui.mjs";
 import { createInstructionPanel } from "./instruction-queue-ui.mjs";
 import { createCostPanel } from "./cost-ledger-ui.mjs";
 import { renderBudget } from "./budget-ui.mjs";
+import { createHumanMetricsPanel } from "./human-metrics-ui.mjs";
 
 const $ = (id) => document.getElementById(id);
 const base = location.pathname.startsWith("/_rdsh") ? "/_rdsh/" : "/";
@@ -143,10 +144,21 @@ const renderInstructions = createInstructionPanel($("instruction-panel"), {
   refreshState,
 });
 const renderCosts = createCostPanel($("cost-ledger"), node);
+const renderHumanMetrics = createHumanMetricsPanel($("human-metrics"), {
+  api,
+  node,
+  confirm: (message) => window.confirm(message),
+});
+let humanMetricsRevision = -1;
 function render(state) {
   if (state.revision < renderedRevision) return;
   renderedRevision = state.revision;
   latestState = state;
+  renderHumanMetrics.render(state);
+  if (state.revision !== humanMetricsRevision) {
+    humanMetricsRevision = state.revision;
+    void renderHumanMetrics.reload();
+  }
   renderInstructions(state);
   renderCosts(state);
   renderBudget($("budget-admission"), state, node);
