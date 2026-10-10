@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildQaMatrix, qaCases, renderQaMatrixHtml } from './qa-matrix.mjs';
+import { buildQaMatrix, classifyBrowserConsoleError, qaCases, renderQaMatrixHtml } from './qa-matrix.mjs';
 
 const sha = 'a'.repeat(40);
 const report = (qa_results, source_sha = sha) => ({
@@ -42,4 +42,27 @@ test('missing evidence stays not-run and HTML exposes an accessible not-run filt
   assert.match(html, /未実施のみ/);
   assert.match(html, /Real Tailscale network/);
   assert.match(html, /viewport試験は実機スマホ/);
+});
+
+test('only the deliberate offline and dropped-response network errors are expected', () => {
+  assert.equal(classifyBrowserConsoleError({
+    case_id: 'desktop.offline-retry',
+    path: '/api/update/answer',
+    text: 'Failed to load resource: net::ERR_INTERNET_DISCONNECTED',
+  }), 'expected');
+  assert.equal(classifyBrowserConsoleError({
+    case_id: 'desktop.lost-response',
+    path: '/api/update/answer',
+    text: 'Failed to load resource: net::ERR_FAILED',
+  }), 'expected');
+  assert.equal(classifyBrowserConsoleError({
+    case_id: 'desktop.offline-retry',
+    path: '/api/update/answer',
+    text: 'TypeError: unexpected response',
+  }), 'error');
+  assert.equal(classifyBrowserConsoleError({
+    case_id: null,
+    path: '/api/state',
+    text: 'Failed to load resource: net::ERR_INTERNET_DISCONNECTED',
+  }), 'error');
 });

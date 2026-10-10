@@ -27,6 +27,21 @@ const statusNotes = {
   'connection.tailscale': 'No Tailscale connection test ran in this browser job; fixture results do not count.',
 };
 
+const expectedConsoleErrors = new Set([
+  JSON.stringify({ case_id: 'desktop.offline-retry', path: '/api/update/answer', text: 'Failed to load resource: net::ERR_INTERNET_DISCONNECTED' }),
+  JSON.stringify({ case_id: 'desktop.offline-retry', path: '/api/state', text: 'Failed to load resource: net::ERR_INTERNET_DISCONNECTED' }),
+  JSON.stringify({ case_id: 'desktop.lost-response', path: '/api/update/answer', text: 'Failed to load resource: net::ERR_FAILED' }),
+]);
+
+export function classifyBrowserConsoleError(error) {
+  const key = JSON.stringify({
+    case_id: error.case_id ?? null,
+    path: error.path ?? '',
+    text: error.text ?? '',
+  });
+  return expectedConsoleErrors.has(key) ? 'expected' : 'error';
+}
+
 export function buildQaMatrix(report) {
   const sha = typeof report?.source_sha === 'string' && /^[a-f0-9]{40}$/i.test(report.source_sha)
     ? report.source_sha.toLowerCase() : null;

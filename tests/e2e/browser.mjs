@@ -6,7 +6,7 @@ import {tmpdir} from 'node:os';
 import net from 'node:net';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {writeQaMatrix} from './qa-matrix.mjs';
+import {classifyBrowserConsoleError,writeQaMatrix} from './qa-matrix.mjs';
 
 const repo=path.resolve(import.meta.dirname,'../..');
 const {chromium}=await import(process.env.RDSH_PLAYWRIGHT_MODULE || 'playwright');
@@ -18,7 +18,7 @@ Object.assign(env,{HOME:root,USERPROFILE:root,DSH_HOME:path.join(root,'dsh'),XDG
 await mkdir(env.DSH_HOME);await mkdir(output,{recursive:true});
 let sourceSha=process.env.RDSH_E2E_SOURCE_SHA||null;
 if(!sourceSha){try{sourceSha=execFileSync('git',['rev-parse','HEAD'],{cwd:repo,encoding:'utf8',stdio:['ignore','pipe','ignore']}).trim();}catch{sourceSha=null;}}
-const children=new Set(); const contexts=[]; const report={scope:'real Rust setup/serve and Node project CLI+HTTP MCP+browser; no model calls, Tailscale or Electron Desktop',source_sha:sourceSha,tested_at:new Date().toISOString(),environment:{platform:process.platform,arch:process.arch,node:process.version,browser:null},viewports:[{width:1280,height:900},{width:390,height:844}],flows:[],qa_results:[],page_errors:[],console_errors:[]};
+const children=new Set(); const contexts=[]; const report={scope:'real Rust setup/serve and Node project CLI+HTTP MCP+browser; no model calls, Tailscale or Electron Desktop',source_sha:sourceSha,tested_at:new Date().toISOString(),environment:{platform:process.platform,arch:process.arch,node:process.version,browser:null},viewports:[{width:1280,height:900},{width:390,height:844}],flows:[],qa_results:[],page_errors:[],console_errors:[],expected_console_errors:[]};
 let activeQaCase=null;
 function beginQaCase(caseId){activeQaCase=caseId;}
 function passQaCase(caseId,evidenceRef){report.qa_results.push({case_id:caseId,status:'pass',mode:'browser',source_sha:report.source_sha,tested_at:new Date().toISOString(),evidence_ref:evidenceRef});activeQaCase=null;}
@@ -29,7 +29,7 @@ function launch(command,args,pattern){
  child.stdout.on('data',read);child.stderr.on('data',read);child.once('error',e=>{clearTimeout(timer);reject(e);});child.once('exit',code=>{clearTimeout(timer);if(!pattern.test(text))reject(new Error(`server exited ${code}`));});});
 }
 async function stop(child){if(child.exitCode!==null)return;await new Promise(resolve=>{const t=setTimeout(()=>{child.kill('SIGKILL');},5000);child.once('exit',()=>{clearTimeout(t);resolve();});child.kill('SIGTERM');});children.delete(child);}
-async function pageFor(browser,url){const context=await browser.newContext({viewport:report.viewports[0],locale:'ja-JP'});contexts.push(context);const page=await context.newPage();page.on('pageerror',e=>report.page_errors.push(e.message));page.on('console',msg=>{if(msg.type()==='error')report.console_errors.push({text:msg.text(),path:msg.location().url?new URL(msg.location().url).pathname:''});});await page.goto(url);return page;}
+async function pageFor(browser,url){const context=await browser.newContext({viewport:report.viewports[0],locale:'ja-JP'});contexts.push(context);const page=await context.newPage();page.on('pageerror',e=>report.page_errors.push(e.message));page.on('console',msg=>{if(msg.type()==='error'){const error={case_id:activeQaCase,text:msg.text(),path:msg.location().url?new URL(msg.location().url).pathname:''};report[classifyBrowserConsoleError(error)==='expected'?'expected_console_errors':'console_errors'].push(error);}});await page.goto(url);return page;}
 async function screenshot(page,name){await page.evaluate(async()=>{window.scrollTo(0,0);await document.fonts.ready;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));});await page.screenshot({path:path.join(output,name+'.png'),fullPage:false});}
 async function freePort(){const server=net.createServer();await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});const port=server.address().port;await new Promise(resolve=>server.close(resolve));return String(port);}
 async function check(page,title){assert.match(await page.title(),title);assert.ok((await page.locator('body').innerText()).trim().length>100);assert.equal(await page.locator('vite-error-overlay,nextjs-portal').count(),0);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth+1),'page overflow');}
