@@ -691,12 +691,7 @@ fn settings_key_in_file(raw: &serde_json::Value, dotted: &str) -> bool {
 
 fn dump_config_native(profile: &str, patches: &[String]) -> anyhow::Result<()> {
     let home = crate::inspect::dsh_home();
-    // Debug-format {:?} prints like JSON here but doesn't escape the same
-    // way; emit a real JSON array so consumers can actually parse it.
-    let patches_json = serde_json::json!(patches);
-    println!(
-        "{{\"profile\": \"{profile}\", \"dsh_home\": \"{home}\", \"patches\": {patches_json}}}"
-    );
+    println!("{}", native_dump_config_json(profile, &home, patches));
     let root = format!("{home}/profiles/{profile}");
     match std::fs::read_dir(&root) {
         Ok(entries) => {
@@ -715,6 +710,15 @@ fn dump_config_native(profile: &str, patches: &[String]) -> anyhow::Result<()> {
         }
     }
     Ok(())
+}
+
+fn native_dump_config_json(profile: &str, home: &str, patches: &[String]) -> String {
+    serde_json::json!({
+        "profile": profile,
+        "dsh_home": home,
+        "patches": patches,
+    })
+    .to_string()
 }
 
 /// Server-type extras are off by default: refuse with enable guidance.
@@ -964,5 +968,24 @@ mod default_profile_tests {
                 );
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod native_dump_tests {
+    use super::native_dump_config_json;
+
+    #[test]
+    fn native_dump_escapes_untrusted_profile_and_home_strings() {
+        let profile = "profile \"quoted\"\\name\nnext";
+        let home = "C:\\Users\\a \"quoted\"\\folder";
+        let patches = vec!["patch \"one\"\\overlay.yml".to_string()];
+
+        let encoded = native_dump_config_json(profile, home, &patches);
+        let decoded: serde_json::Value = serde_json::from_str(&encoded).unwrap();
+
+        assert_eq!(decoded["profile"], profile);
+        assert_eq!(decoded["dsh_home"], home);
+        assert_eq!(decoded["patches"], serde_json::json!(patches));
     }
 }
