@@ -18,6 +18,7 @@ main { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)
 .card h2 { margin: 0 0 8px; font-size: 15px; }
 .card p { color: var(--mut); font-size: 12px; margin: 0 0 10px; }
 textarea, input[type=number] { width: 100%; background: #0d1117; color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 8px; font: 13px monospace; }
+input[type=password] { width: min(100%, 520px); background: #0d1117; color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 8px; font: 13px monospace; }
 textarea { min-height: 110px; resize: vertical; }
 button { background: #238636; color: #fff; border: 0; border-radius: 6px; padding: 7px 14px; font-size: 13px; cursor: pointer; margin-top: 8px; }
 button:hover { background: #2ea043; }
@@ -33,6 +34,10 @@ footer { padding: 0 24px 24px; color: var(--mut); font-size: 12px; }
 </head>
 <body>
 <header><img src="/icon.png" width="40" height="40" alt="rdsh"><h1>rdsh dashboard</h1><span id="ver">…</span></header>
+<section id="auth" class="card" style="margin:16px 24px 0" hidden>
+<h2>ダッシュボードに接続</h2><p>端末に表示された保護済みトークンファイルの内容を入力してください。トークンはアドレスバーに保存されません。</p>
+<input id="dashboard-token" type="password" autocomplete="off" spellcheck="false" aria-label="Dashboard token">
+<button onclick="connectDashboard()">接続</button><p id="auth-error" role="alert"></p></section>
 <main>
 <section class="card"><h2>状態 (doctor)</h2><p>本家dsh・DSH_HOME・slim設定を確認</p>
 <button class="ghost" onclick="doctor()">更新</button><pre id="doctor">未取得</pre></section>
@@ -52,13 +57,33 @@ footer { padding: 0 24px 24px; color: var(--mut); font-size: 12px; }
 </main>
 <footer>rdsh は本家dshを壊さない安全なRustランチャーです。serveは127.0.0.1のみで待ち受けます。</footer>
 <script>
-const dashboardToken = new URLSearchParams(location.hash.slice(1)).get("key") || sessionStorage.getItem("rdsh_dashboard_token") || "";
+let dashboardToken = new URLSearchParams(location.hash.slice(1)).get("key") || sessionStorage.getItem("rdsh_dashboard_token") || "";
 if (dashboardToken) sessionStorage.setItem("rdsh_dashboard_token", dashboardToken);
 history.replaceState(null, "", location.pathname);
+function showAuth(message){
+  dashboardToken = "";
+  sessionStorage.removeItem("rdsh_dashboard_token");
+  document.getElementById("auth").hidden = false;
+  document.getElementById("auth-error").textContent = message || "";
+}
+async function connectDashboard(candidateInput){
+  const candidate = typeof candidateInput === "string" ? candidateInput : document.getElementById("dashboard-token").value.trim();
+  const error = document.getElementById("auth-error");
+  try {
+    const response = await fetch("/api/doctor", {headers:{"X-RDSH-Token":candidate}});
+    if (!response.ok) throw new Error("トークンを確認できません。ファイルの内容を確認してください。");
+    dashboardToken = candidate;
+    sessionStorage.setItem("rdsh_dashboard_token", dashboardToken);
+    document.getElementById("dashboard-token").value = "";
+    document.getElementById("auth").hidden = true;
+    const version = await jget("/api/version");
+    document.getElementById("ver").textContent = version.name + " " + version.version;
+  } catch(e) { showAuth(e.message); error.textContent = e.message; }
+}
 function statusMessage(status, path){
   switch (status){
     case 400: return "不正なリクエスト (400): " + path + " への送信内容を確認してください。";
-    case 401: return "認証エラー (401): トークンが無効か期限切れです。起動時に表示された URL（http://127.0.0.1:<ポート>/#key=...）を開き直してください。";
+    case 401: showAuth("トークンが無効か期限切れです。保護済みトークンファイルを確認してください。"); return "認証エラー (401): dashboard token required.";
     case 403: return "アクセス拒否 (403): 信頼できないホスト/オリジンです。127.0.0.1 のダッシュボードURLから直接開いてください。";
     case 404: return "見つかりません (404): " + path + " は存在しません。";
     case 413: return "送信データが大きすぎます (413): テキストを短くして再試行してください。";
@@ -107,7 +132,7 @@ function clearRetry(outId){
   const btn = document.getElementById(outId + "-retry");
   if (btn) btn.hidden = true;
 }
-(async () => { try { const v = await jget("/api/version"); document.getElementById("ver").textContent = v.name + " " + v.version; } catch(e){ document.getElementById("ver").textContent = "エラー: " + e.message; } })();
+if (dashboardToken) connectDashboard(dashboardToken); else showAuth("");
 async function doctor(){ try { clearRetry("doctor"); const d = await jget("/api/doctor"); document.getElementById("doctor").textContent = JSON.stringify(d, null, 2); } catch(e){ fail("doctor", e.message, doctor); } }
 async function tokens(){ try { clearRetry("tout"); const t = document.getElementById("ttext").value; const r = await jpost("/api/tokens", {text: t}); document.getElementById("tout").textContent = "tokens: " + r.tokens + " / chars: " + r.chars; } catch(e){ fail("tout", e.message, tokens); } }
 let lastPruned = "";

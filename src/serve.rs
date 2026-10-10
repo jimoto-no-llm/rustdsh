@@ -14,15 +14,20 @@ pub fn cmd_serve(port: u16) -> anyhow::Result<()> {
             "cannot listen on {addr}: {e} (dsh web GUI uses 3080; rdsh serve defaults to 38080, or try --port 0)"
         )
     })?;
+    listener.set_nonblocking(true)?;
+    crate::shutdown::install()?;
     let port = listener.local_addr()?.port();
     let token = Arc::new(crate::local_http::random_token()?);
+    let handoff = crate::token_handoff::TokenHandoff::create(&token)?;
     eprintln!(
-        "[rdsh] dashboard: http://127.0.0.1:{port}/#key={token}  (Ctrl-C to stop, localhost only; this URL is a credential — do not share it)"
+        "[rdsh] dashboard: http://127.0.0.1:{port}/ (Ctrl-C to stop, localhost only)"
     );
+    eprintln!("[rdsh] token handoff file: {}", handoff.path().display());
+    eprintln!("[rdsh] enter the file contents in the dashboard; the token is never printed");
     let connections = Arc::new(AtomicUsize::new(0));
-    for stream in listener.incoming() {
-        match stream {
-            Ok(mut s) => {
+    while !crate::shutdown::requested() {
+        match listener.accept() {
+            Ok((mut s, _)) => {
                 let Some(slot) = crate::local_http::ConnectionSlot::acquire(&connections) else {
                     let _ = crate::local_http::respond(
                         &mut s,
@@ -40,6 +45,10 @@ pub fn cmd_serve(port: u16) -> anyhow::Result<()> {
                     }
                 });
             }
+            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
             Err(e) => eprintln!("[rdsh serve] accept: {e}"),
         }
     }

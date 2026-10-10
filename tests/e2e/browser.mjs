@@ -15,11 +15,11 @@ const root=await mkdtemp(path.join(tmpdir(),'rdsh-browser-e2e-'));
 const env=Object.fromEntries(['PATH','SystemRoot','WINDIR','COMSPEC','TEMP','TMP'].filter(k=>process.env[k]).map(k=>[k,process.env[k]]));
 Object.assign(env,{HOME:root,USERPROFILE:root,DSH_HOME:path.join(root,'dsh'),XDG_CACHE_HOME:path.join(root,'cache'),XDG_CONFIG_HOME:path.join(root,'config'),XDG_DATA_HOME:path.join(root,'data'),RDSH_ORIG_BIN:path.join(root,'no-original'),RDSH_DASHBOARD_HOME:path.join(root,'projects-state')});
 await mkdir(env.DSH_HOME);await mkdir(output,{recursive:true});
-const children=new Set(); const contexts=[]; const report={scope:'real Rust setup/serve and Node project CLI+HTTP MCP+browser; no model calls, Tailscale or Electron Desktop',browser:'Browser plugin not available; Playwright',viewports:[{width:1280,height:900},{width:390,height:844}],flows:[],page_errors:[],console_errors:[]};
+const children=new Set(); const contexts=[]; const handoffFiles=[]; const report={scope:'real Rust setup/serve and Node project CLI+HTTP MCP+browser; no model calls, Tailscale or Electron Desktop',browser:'Browser plugin not available; Playwright',viewports:[{width:1280,height:900},{width:390,height:844}],flows:[],page_errors:[],console_errors:[]};
 function launch(command,args,pattern){
  const child=spawn(command,args,{env,cwd:root,stdio:['ignore','pipe','pipe']});children.add(child);
  return new Promise((resolve,reject)=>{let text='';const timer=setTimeout(()=>reject(new Error('server readiness deadline exceeded')),20000);
- const read=b=>{text+=b;const match=text.match(pattern);if(match){clearTimeout(timer);resolve({child,url:match[1]});}};
+ const read=b=>{text+=b;const match=text.match(pattern);if(match){clearTimeout(timer);resolve({child,url:match[1],tokenFile:match[2]?.trim()});}};
  child.stdout.on('data',read);child.stderr.on('data',read);child.once('error',e=>{clearTimeout(timer);reject(e);});child.once('exit',code=>{clearTimeout(timer);if(!pattern.test(text))reject(new Error(`server exited ${code}`));});});
 }
 async function stop(child){if(child.exitCode!==null)return;await new Promise(resolve=>{const t=setTimeout(()=>{child.kill('SIGKILL');},5000);child.once('exit',()=>{clearTimeout(t);resolve();});child.kill('SIGTERM');});children.delete(child);}
@@ -29,24 +29,24 @@ async function freePort(){const server=net.createServer();await new Promise((res
 async function check(page,title){assert.match(await page.title(),title);assert.ok((await page.locator('body').innerText()).trim().length>100);assert.equal(await page.locator('vite-error-overlay,nextjs-portal').count(),0);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth+1),'page overflow');}
 const browser=await chromium.launch({headless:true,...(process.env.RDSH_CHROME_PATH?{executablePath:process.env.RDSH_CHROME_PATH}:{})});
 try{
- const setup=await launch(binary,['setup','--web','--port','0'],/(http:\/\/127\.0\.0\.1:\d+\/#key=[a-f0-9]+)/);
- const page=await pageFor(browser,setup.url);await page.locator('#extras .row').first().waitFor();await check(page,/rdsh setup/);
+ const setup=await launch(binary,['setup','--web','--port','0'],/(http:\/\/127\.0\.0\.1:\d+\/)[\s\S]*?token handoff file: ([^\r\n]+)/);handoffFiles.push(setup.tokenFile);assert.equal(new URL(setup.url).hash,'');
+ const page=await pageFor(browser,setup.url);await page.locator('#token-box').waitFor({state:'visible'});await page.locator('#setup-token').fill((await readFile(setup.tokenFile,'utf8')).trim());await page.getByRole('button',{name:'接続'}).click();await page.locator('#extras .row').first().waitFor();await check(page,/rdsh setup/);
  assert.equal(new URL(page.url()).hash,'');await page.locator('#extras .row').filter({hasText:'rdsh serve'}).click();
  await page.waitForFunction(()=>document.querySelector('#extras .row')?.textContent.includes('有効'));
  assert.deepEqual(JSON.parse(await readFile(path.join(env.DSH_HOME,'rdsh.json'),'utf8')).extras.enable,['serve']);
  await page.reload();await page.waitForFunction(()=>document.querySelector('#extras .row')?.textContent.includes('有効'));
  await screenshot(page,'setup-desktop');await page.setViewportSize(report.viewports[1]);await check(page,/rdsh setup/);await screenshot(page,'setup-mobile');
- await page.close();await stop(setup.child);report.flows.push('setup: missing model connection rendered -> Extras enable -> file readback -> reload retained');
+ await page.close();await stop(setup.child);await rm(setup.tokenFile,{force:true});report.flows.push('setup: protected token handoff -> Extras enable -> file readback -> reload retained');
 
  const session=path.join(env.DSH_HOME,'sessions','example','session-one');await mkdir(session,{recursive:true});await writeFile(path.join(session,'messages.jsonl'),'synthetic session');
  const skills=path.join(env.DSH_HOME,'skills','e2e-skill');await mkdir(skills,{recursive:true});await writeFile(path.join(skills,'SKILL.md'),'# Synthetic skill');
- const serve=await launch(binary,['serve','--port','0'],/(http:\/\/127\.0\.0\.1:\d+\/#key=[a-f0-9]+)/);
- const native=await pageFor(browser,serve.url);await native.locator('#sess').filter({hasText:'session-one'}).waitFor();await check(native,/rdsh dashboard/);
+ const serve=await launch(binary,['serve','--port','0'],/(http:\/\/127\.0\.0\.1:\d+\/)[\s\S]*?token handoff file: ([^\r\n]+)/);handoffFiles.push(serve.tokenFile);assert.equal(new URL(serve.url).hash,'');
+ const native=await pageFor(browser,serve.url);await native.locator('#auth').waitFor({state:'visible'});await native.locator('#dashboard-token').fill((await readFile(serve.tokenFile,'utf8')).trim());await native.getByRole('button',{name:'接続'}).click();await native.locator('#sess').filter({hasText:'session-one'}).waitFor();await check(native,/rdsh dashboard/);
  await native.locator('#ttext').fill('abcd日本語');await native.getByRole('button',{name:'推定する',exact:true}).click();await native.waitForFunction(()=>document.querySelector('#tout').textContent.includes('4'));
  await native.locator('#ptext').fill('START\n'+'日本語 context\n'.repeat(1000)+'END');await native.locator('#pmax').fill('100');await native.getByRole('button',{name:'prune実行',exact:true}).click();await native.locator('#pout').filter({hasText:'rdsh pruned'}).waitFor();
  assert.ok((await native.locator('#pout').innerText()).includes('START'));assert.ok((await native.locator('#pout').innerText()).includes('END'));
  await screenshot(native,'native-desktop');await native.reload();await native.locator('#sess').filter({hasText:'session-one'}).waitFor();await native.setViewportSize(report.viewports[1]);await check(native,/rdsh dashboard/);await screenshot(native,'native-mobile');
- await native.close();await stop(serve.child);report.flows.push('native serve: authenticated URL -> tokens -> prune -> sessions -> reload key retained');
+ await native.close();await stop(serve.child);await rm(serve.tokenFile,{force:true});report.flows.push('native serve: protected token handoff -> tokens -> prune -> sessions -> reload retained');
 
  const {identity}=await import(pathToFileURL(path.join(repo,'dashboard/state.mjs')));
  process.env.RDSH_DASHBOARD_HOME=env.RDSH_DASHBOARD_HOME;
@@ -83,7 +83,7 @@ try{
  assert.deepEqual(report.page_errors,[]);assert.deepEqual(report.console_errors,[]);
  report.result='PASS';
 }catch(error){report.result='FAIL';report.error=error.message;throw error;}finally{
- for(const context of contexts)await context.close();await browser.close();for(const child of children)await stop(child);
+ for(const context of contexts)await context.close();await browser.close();for(const child of children)await stop(child);for(const file of handoffFiles)await rm(file,{force:true});
  await writeFile(path.join(output,'browser-results.json'),JSON.stringify(report,null,2)+'\n');await rm(root,{recursive:true,force:true});
 }
 console.log(JSON.stringify({result:report.result,flows:report.flows,output},null,2));

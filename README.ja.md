@@ -45,7 +45,7 @@
 
 ```sh
 rdsh --version && rdsh doctor   # 導入と本家 dsh の確認
-rdsh setup --web                # 表示される #key=... 付き URL を開き、モデルに接続します
+rdsh setup --web                # localhostを開き、保護済みファイルのトークンで接続します
 rdsh tui                        # 会話を始め、選んだモデルの返答まで確かめます
 ```
 
@@ -153,7 +153,7 @@ rdsh auth            # 状態確認です。見つかったログインと認識
 rdsh auth --import --provider openai-codex   # 不足・古い分だけ書きます（0600、他は不変）
 rdsh auth --json     # 機械可読の状態出力です
 rdsh setup           # 初回ウィザードです。取り込み、キー貼付、--login/--open に対応します
-rdsh setup --web     # localhost の設定画面です（ブラウザが自動で開き、起動ごとの #key=... が必要）
+rdsh setup --web     # localhost の設定画面です（ブラウザが自動で開き、保護済みファイルのトークンが必要）
 ```
 
 起動・診断・setup は他のアプリの認証情報を勝手に写しません。
@@ -264,9 +264,16 @@ DSHの会話GUIに読み取り専用のworkflow進捗ボードを追加する場
 ```sh
 rdsh settings set extras.enable serve  # 有効な補助機能の一覧を置き換えます
 rdsh serve
-# 起動時に表示される #key=... 付き URL を開きます（localhost のみ）
+# localhostを開き、起動時に表示される保護済みファイルのトークンを入力します
 # dsh Web GUI（:3080）と競合しません。--port 0 で自動選択もできます
 ```
+
+トークン自体は端末出力やブラウザー起動引数へ出しません。端末に表示された一時ファイルの
+パスを確認し、内容を画面へ貼り付けてください。ファイルは現在のユーザーだけが読める権限で
+作成し、通常終了時に削除します。強制終了では期限切れの保護済みファイルが残ることが
+ありますが、サーバー停止後は認証に使えません。起動時に表示されたパスから削除できます。
+手動で接続する場合は、PowerShell の `Get-Content -Raw '<path>'` または Unix の
+`cat '<path>'` で内容を表示し、画面のパスワード欄へ貼り付けます。
 
 | API | 内容 |
 | --- | --- |

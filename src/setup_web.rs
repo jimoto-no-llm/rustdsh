@@ -12,26 +12,26 @@ const ICON: &str = include_str!("../assets/icon.svg");
 pub fn cmd_setup_web(port: u16) -> anyhow::Result<()> {
     let listener = std::net::TcpListener::bind(format!("127.0.0.1:{port}"))
         .map_err(|e| anyhow::anyhow!("cannot listen on 127.0.0.1:{port}: {e}"))?;
+    listener.set_nonblocking(true)?;
+    crate::shutdown::install()?;
     let port = listener.local_addr()?.port();
     let token = Arc::new(crate::local_http::random_token()?);
-    // The fragment never leaves the browser as part of an HTTP request.
-    let url = format!("http://127.0.0.1:{port}/#key={token}");
-    eprintln!("[rdsh setup] floating UI: {url}  (localhost only, Ctrl-C to stop; this URL is a credential — do not share it)");
+    let handoff = crate::token_handoff::TokenHandoff::create(&token)?;
+    let base = format!("http://127.0.0.1:{port}/");
+    eprintln!("[rdsh setup] floating UI: {base} (localhost only, Ctrl-C to stop)");
+    eprintln!("[rdsh setup] token handoff file: {}", handoff.path().display());
+    eprintln!("[rdsh setup] enter the file contents in the setup page; the token is never printed");
     use std::io::IsTerminal as _;
     if std::io::stdin().is_terminal() {
-        // argv is visible to other local users via ps, so the token
-        // fragment must not travel there. Open the base URL only; the
-        // page explains how to complete it from the terminal output.
-        let base = format!("http://127.0.0.1:{port}/");
+        // Keep the bearer token out of the browser-launch argv.
         if let Err(e) = crate::auth::open_browser(&base) {
             eprintln!("[rdsh setup] could not open browser ({e:#}); open the URL manually");
         }
     }
-    listener.set_nonblocking(true)?;
     let done = Arc::new(AtomicBool::new(false));
     let connections = Arc::new(AtomicUsize::new(0));
     loop {
-        if done.load(Ordering::Relaxed) {
+        if done.load(Ordering::Relaxed) || crate::shutdown::requested() {
             break;
         }
         match listener.accept() {
@@ -57,6 +57,7 @@ pub fn cmd_setup_web(port: u16) -> anyhow::Result<()> {
             Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                 std::thread::sleep(std::time::Duration::from_millis(100));
             }
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
             Err(e) => {
                 eprintln!("[rdsh setup] accept: {e:#}");
                 break;

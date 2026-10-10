@@ -281,6 +281,7 @@ struct Server {
     child: Child,
     port: u16,
     token: String,
+    handoff_path: std::path::PathBuf,
 }
 impl Server {
     fn start(f: &Fixture, args: &[&str]) -> Self {
@@ -294,31 +295,48 @@ impl Server {
         let stderr = child.stderr.take().unwrap();
         let (tx, rx) = mpsc::channel();
         std::thread::spawn(move || {
+            let mut address = None;
+            let mut handoff_path = None;
+            let mut startup_lines = Vec::new();
             for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+                startup_lines.push(line.clone());
                 if let Some(url) = line
                     .split_whitespace()
                     .find(|s| s.starts_with("http://127.0.0.1:"))
                 {
-                    let _ = tx.send(url.to_owned());
+                    address = Some(url.trim_end_matches('/').to_owned());
+                }
+                if let Some((_, path)) = line.split_once("token handoff file: ") {
+                    handoff_path = Some(std::path::PathBuf::from(path.trim()));
+                }
+                if let (Some(address), Some(path)) = (&address, &handoff_path) {
+                    let token = std::fs::read_to_string(path).unwrap_or_default();
+                    let logged_token = !token.is_empty()
+                        && startup_lines.iter().any(|line| line.contains(&token));
+                    let has_key_fragment = startup_lines.iter().any(|line| line.contains("#key="));
+                    let _ = tx.send((address.clone(), path.clone(), logged_token, has_key_fragment));
+                    break;
                 }
             }
         });
-        let url = match rx.recv_timeout(Duration::from_secs(15)) {
-            Ok(url) => url,
+        let (url, handoff_path, logged_token, has_key_fragment) = match rx.recv_timeout(Duration::from_secs(15)) {
+            Ok(values) => values,
             Err(e) => {
                 let _ = child.kill();
                 let _ = child.wait();
                 panic!("server did not become ready: {e}");
             }
         };
-        let (address, token) = url
-            .trim_start_matches("http://127.0.0.1:")
-            .split_once("/#key=")
-            .unwrap();
+        assert!(!logged_token, "server must not print the bearer token");
+        assert!(!has_key_fragment, "server must not print a token-bearing URL");
+        let token = std::fs::read_to_string(&handoff_path)
+            .expect("server should create its protected token handoff file");
+        let address = url.trim_start_matches("http://127.0.0.1:");
         Self {
             child,
             port: address.parse().unwrap(),
-            token: token.to_owned(),
+            token,
+            handoff_path,
         }
     }
     fn request(
@@ -361,6 +379,7 @@ impl Drop for Server {
     fn drop(&mut self) {
         let _ = self.child.kill();
         let _ = self.child.wait();
+        let _ = std::fs::remove_file(&self.handoff_path);
     }
 }
 
