@@ -1,6 +1,6 @@
 # Acceptance evidence
 
-Issue: [#39](https://github.com/sahenjp/rustdsh/issues/39).
+Issue: [#39](https://github.com/jimoto-no-llm/rustdsh/issues/39).
 The before/after comparison evaluates the baseline CLI entrypoint from
 `786f2acc6f37da98791efde7aa0298d33b33bff6` with current common dependencies.
 It rejects `acceptance inspect`; the new CLI inspects conditions and evidence.

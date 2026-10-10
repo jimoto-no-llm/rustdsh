@@ -1,6 +1,6 @@
 # 追指示の投稿・競合・適用タイミングの検証
 
-対象は [Issue #19](https://github.com/sahenjp/rustdsh/issues/19) と
+対象は [Issue #19](https://github.com/jimoto-no-llm/rustdsh/issues/19) と
 [実装契約](../../INPUT-INSTRUCTIONS.md) です。変更前は
 `c80879ef90943e6020f3283033fb988209af5359`（PR #138）です。
 ローカルfixtureと実画面での技術QAを完了しました。
