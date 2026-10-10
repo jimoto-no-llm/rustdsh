@@ -1,0 +1,56 @@
+{
+  "source_revision": "ba73929e060d23e7b79a86bb6e042c55f4170a1b",
+  "base_main": "cf1762a447e188e636c863110ca6599062121f1c",
+  "fingerprints": {
+    "dashboard/cli.mjs": "379493760256c2091c983a81a5b3aa4531b34a1cbee2cf3e73ba6c22a7d96b77",
+    "dashboard/integration.mjs": "b291987cfa054d1653b2364615132050266f5e81f88c6340bb671cc6c7066820",
+    "dashboard/integration-git.mjs": "db0f71fe57dd1dbcabee9e347f42aee58ac718df480442b1cc12ef1c0ea7e9e5",
+    "dashboard/test/integration.test.mjs": "491a0c7e78e0f58cc02dc01f642a06e33fab62ae8790751333396d6e1985180e",
+    "dashboard/package.json": "4145adb37edeaed4309733b9a7dc5984bd8c5bbf9376974c8d5019b2ee79ebd7",
+    "dashboard/package-lock.json": "392e4b55bc0d205339a0c9bbe2c0cae2bad780b4df8d38c3002750bd24502049"
+  },
+  "windows": {
+    "tests": 209,
+    "pass": 209,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "duration_ms": 256264.1433,
+    "private_log": "rustdsh-issue22-pinned-windows-full-rerun.log",
+    "log_sha256": "f1ca289bd899dc99139b2ded15e2b01770b150dc912882fa16d55e14986fb707"
+  },
+  "linux": {
+    "tests": 209,
+    "pass": 204,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 5,
+    "duration_ms": 187380.768057,
+    "private_log": "rustdsh-issue22-pinned-linux-dashboard.log",
+    "log_sha256": "5c98168a5ae6de61cb95753e9be7b3b0c1b288195074abe1e6556397a787059e"
+  },
+  "integration_cases": 14,
+  "cli_observations": 13,
+  "core": {
+    "validation_source": "01fbe82a50119cee1020843dea47ee87a15959b5",
+    "native_input_tree_sha256": "64e9383119c0904209e25646aee81fa9140ce0a82bc04fa3c26607de3e067360",
+    "native_inputs_identical_to_final_source": true,
+    "fmt": "pass",
+    "release_clippy_warnings": 0,
+    "release_tests": 103,
+    "example_tests": 7,
+    "fence_tests": 2,
+    "cli_regression_checks": 53,
+    "security_tests": 11
+  },
+  "earlier_attempts": {
+    "wrong_windows_cwd": "excluded; stdio CLI path resolved outside dashboard",
+    "pinned_windows_parallel_failure": "preserved; answer-applications teardown reported history_unconfirmed_after_owned_stop; isolated same-source rerun passed; interrupted hung full runner; final complete suite rerun required",
+    "final_windows_test_concurrency": 4
+  },
+  "ui_changed": false,
+  "provider_calls": 0,
+  "publication_actions": 0,
+  "human_review": "not_assessed",
+  "production_adoption": "not_assessed"
+}

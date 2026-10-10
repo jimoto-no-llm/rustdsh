@@ -302,6 +302,11 @@ Reference strings and sources are displayed as text, never opened or executed.
 Artifact references are displayed as text. Local file contents are never opened
 or served. Treat all user-authored questions, answers, progress, and paths as data.
 
+The opt-in [local integration queue](../docs/INTEGRATION-QUEUE.md) applies fixed
+worker commits in order to a dedicated worktree and requires current full-check
+evidence before the next integration. Only explicit local CLI actions execute
+Git/checks; queue registration and dashboard/MCP reads grant no push authority.
+
 ## OpenAI ChatGPT Dots and MCP Events
 
 The project HTTP `/mcp` endpoint implements MCP 2.0 (`2026-07-28`) discovery and

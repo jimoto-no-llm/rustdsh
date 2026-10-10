@@ -1,0 +1,55 @@
+before: main has no integration command
+  exit=1 revision=null target=null
+  entries= validation=none verified=false ready_for_review=false publish_authority=false
+  [rdsh-dashboard] Unknown command; use --help
+
+init: no checks dispatched
+  exit=0 revision=2 target=db5f462e4a146d37a5ae0065d4dc72906650d559
+  entries= validation=not-run verified=false ready_for_review=false publish_authority=false
+
+enqueue worker-a: target unchanged
+  exit=0 revision=3 target=db5f462e4a146d37a5ae0065d4dc72906650d559
+  entries=1:queued validation=not-run verified=false ready_for_review=false publish_authority=false
+
+enqueue worker-b: target unchanged
+  exit=0 revision=4 target=db5f462e4a146d37a5ae0065d4dc72906650d559
+  entries=1:queued,2:queued validation=not-run verified=false ready_for_review=false publish_authority=false
+
+apply sequence 1
+  exit=0 revision=6 target=18e85501c6c42d36ce03800a4d85ec345933ab88
+  entries=1:integrated,2:queued validation=not-run verified=false ready_for_review=false publish_authority=false
+
+full validation fails with exit 7
+  exit=1 revision=10 target=18e85501c6c42d36ce03800a4d85ec345933ab88
+  entries=1:integrated,2:queued validation=failed verified=false ready_for_review=false publish_authority=false
+
+sequence 2 blocked until complete checks pass
+  exit=1 revision=null target=null
+  entries= validation=none verified=false ready_for_review=false publish_authority=false
+  [rdsh-dashboard] Integration queue: previous_integration_validation_required
+
+retry runs all checks on same target
+  exit=0 revision=14 target=18e85501c6c42d36ce03800a4d85ec345933ab88
+  entries=1:integrated,2:queued validation=passed verified=true ready_for_review=false publish_authority=false
+
+apply sequence 2 invalidates old success
+  exit=0 revision=16 target=0da45d734e45e28032a25cbd3060187806674ce7
+  entries=1:integrated,2:integrated validation=stale verified=false ready_for_review=false publish_authority=false
+
+complete checks pass on sequence 2
+  exit=0 revision=20 target=0da45d734e45e28032a25cbd3060187806674ce7
+  entries=1:integrated,2:integrated validation=passed verified=true ready_for_review=true publish_authority=false
+
+changed target invalidates recorded pass
+  exit=0 revision=20 target=0da45d734e45e28032a25cbd3060187806674ce7
+  entries=1:integrated,2:integrated validation=stale verified=false ready_for_review=false publish_authority=false
+
+retarget records clean descendant
+  exit=0 revision=21 target=1873754aa5e4215a2e3f8af87b691a6c7bf0499d
+  entries=1:integrated,2:integrated validation=stale verified=false ready_for_review=false publish_authority=false
+
+complete checks rerun on changed target
+  exit=0 revision=25 target=1873754aa5e4215a2e3f8af87b691a6c7bf0499d
+  entries=1:integrated,2:integrated validation=passed verified=true ready_for_review=true publish_authority=false
+
+Source HEAD/status/remote configuration unchanged; untracked human file retained.
