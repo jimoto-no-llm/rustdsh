@@ -263,7 +263,10 @@ export class EventsHub {
       .slice(0, 32);
   }
   async signedPost(subscription, event, verification = false) {
-    const body = JSON.stringify(event),
+    // Notification grouping metadata stays inside the project's state file and
+    // is not part of the public MCP Events payload.
+    const { notification: _notification, ...publicEvent } = event;
+    const body = JSON.stringify(publicEvent),
       id = verification
         ? `msg_verification_${randomBytes(16).toString("hex")}`
         : event.eventId,
