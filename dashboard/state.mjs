@@ -4,6 +4,11 @@ import path from "node:path";
 import os from "node:os";
 import { normalizeObservation } from "./observations.mjs";
 import {
+  maxProviderStatusesPerProject,
+  normalizeProviderStatus,
+  validateProviderStatuses,
+} from "./provider-status.mjs";
+import {
   changeQuestionContract,
   answerQuestionContract,
   publicQuestionContracts,
@@ -137,6 +142,7 @@ export class ProjectStore {
     validateInstructions(value);
     validateCostLedger(value);
     validateBudgetAdmission(value);
+    validateProviderStatuses(value);
     return new ProjectStore(project, value);
   }
   async mutate(operation, input) {
@@ -144,6 +150,7 @@ export class ProjectStore {
     applyOperation(next, operation, input);
     validateInstructions(next);
     validateCostLedger(next);
+    validateProviderStatuses(next);
     return this.commit(next, operation, input);
   }
   async mutateReply(operation, input, context) {
@@ -175,13 +182,16 @@ export class ProjectStore {
       task: "dashboard.task.updated",
       event: "dashboard.progress.updated",
       metrics: "dashboard.metrics.updated",
+      provider_status: "dashboard.provider_status.updated",
     };
     const summary =
       operation === "answer"
         ? input.answer
         : operation === "question"
           ? input.question || input.cancel_reason
-          : input.title || "指標を更新";
+          : operation === "provider_status"
+            ? `${input.provider_id}/${input.scope_id} provider status`
+            : input.title || "指標を更新";
     if (operation) {
       next.changes ||= [];
       next.changes.push({
@@ -191,7 +201,10 @@ export class ProjectStore {
         data: {
           project_id: this.project.id,
           revision: next.revision,
-          entity_id: input.id || "",
+          entity_id:
+            operation === "provider_status"
+              ? `${input.provider_id}/${input.scope_id}`
+              : input.id || "",
           summary: String(summary).slice(0, 1000),
         },
         cursor: null,
@@ -233,6 +246,7 @@ function freezeHistory(value) {
 }
 export function publicState(value, observations, deliveries, budgetJobs) {
   const { changes, ...visible } = value;
+  visible.provider_statuses ||= [];
   if (value.cost_ledger) visible.cost_ledger = publicCostLedger(value);
   if (value.budget_admission)
     visible.budget_admission = publicBudgetAdmission(value, budgetJobs);
@@ -369,6 +383,30 @@ export function applyOperation(state, operation, input) {
       state.metric_observations = observations;
       if ("cost_scope" in input) declareCostScope(state, input.cost_scope);
       if ("cost_report" in input) recordCostReport(state, input.cost_report);
+      break;
+    }
+    case "provider_status": {
+      const status = normalizeProviderStatus(input);
+      const statuses = state.provider_statuses || [];
+      const index = statuses.findIndex(
+        (item) => item.provider_id === status.provider_id && item.scope_id === status.scope_id,
+      );
+      if (index < 0) {
+        if (statuses.length >= maxProviderStatusesPerProject)
+          throw new Error("Provider status scope limit reached");
+        state.provider_statuses = [...statuses, status];
+        break;
+      }
+      const previous = statuses[index];
+      if (status.sequence <= previous.sequence)
+        throw new Error("Provider status sequence must increase for this scope");
+      if (Date.parse(status.observed_at) < Date.parse(previous.observed_at))
+        throw new Error("Provider status observation cannot move backwards");
+      if (status.event_id === previous.event_id)
+        throw new Error("Provider status event_id must be unique for this scope");
+      const updated = statuses.slice();
+      updated[index] = status;
+      state.provider_statuses = updated;
       break;
     }
     case "task": {
