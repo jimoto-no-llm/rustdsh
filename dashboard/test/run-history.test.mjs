@@ -401,6 +401,39 @@ test("a dead writer lock permits read-only restoration but is never silently sto
   assert.equal(await fs.readFile(f.history.lock, "utf8"), unavailableOwner);
 });
 
+test("a lock cleanup failure reports the committed event and retains the lock to block retries", async (t) => {
+  const f = await setup(t),
+    id = runId(),
+    originalUnlink = fs.unlink;
+  let failure;
+  t.mock.method(fs, "unlink", async (file, ...args) => {
+    if (path.resolve(file) === path.resolve(f.history.lock)) {
+      const error = new Error("fixture lock cleanup failure");
+      error.code = "EACCES";
+      throw error;
+    }
+    return originalUnlink(file, ...args);
+  });
+
+  await assert.rejects(f.history.register(id), (error) => {
+    failure = error;
+    return error.code === "history_lock_cleanup_unconfirmed";
+  });
+  assert.equal(failure.committed, true);
+  assert.equal(failure.lock_cleanup_unconfirmed, true);
+  const state = await f.history.read();
+  assert.equal(state.runs.has(id), true);
+  assert.equal(state.events.length, 1);
+  assert.deepEqual(failure.event_ids, [state.events[0].event_id]);
+  const lock = await fs.readFile(f.history.lock, "utf8"),
+    inspected = await f.history.inspect(id);
+  assert.equal(inspected.recovery.writer_lock.present, true);
+  assert.equal(inspected.recovery.writer_lock.automatic_removal, false);
+  await assert.rejects(f.history.register(id), error("history_busy"));
+  assert.deepEqual(await fs.readFile(f.history.lock, "utf8"), lock);
+  assert.equal((await f.history.read()).events.length, 1);
+});
+
 test("corrupt, foreign-project and unknown-schema histories are preserved and rejected", async (t) => {
   const { history, project } = await setup(t),
     id = runId();
