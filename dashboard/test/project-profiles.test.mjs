@@ -137,6 +137,20 @@ test("profiles reject unknown and credential-like fields before state changes", 
       /credential-like/,
     );
   }
+  for (const command of [
+    ["curl", "-u", "alice:secret-value"],
+    ["curl", "--user=alice:secret-value"],
+  ]) {
+    assert.throws(
+      () =>
+        createProjectProfile(state, {
+          id: "unsafe",
+          name: "Unsafe",
+          values: completeProfile({ verification_commands: [command] }),
+        }),
+      /user credentials/,
+    );
+  }
   assert.deepEqual(state, {});
 });
 
