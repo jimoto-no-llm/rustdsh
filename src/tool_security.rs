@@ -76,6 +76,6 @@ pub fn command(orig: &str, node: &str) -> anyhow::Result<std::process::Command> 
         std::env::var("RDSH_SHARED_FILES").unwrap_or_else(|_| "[]".into()),
     );
     command.env("RDSH_SECURE_WORKSPACE", std::fs::canonicalize(".")?);
-    eprintln!("[rdsh security] tools: explicitly shared files only; network and writes denied");
+    eprintln!("[rdsh security] rdsh_inspect is isolated; other DSH tools use upstream permissions");
     Ok(command)
 }

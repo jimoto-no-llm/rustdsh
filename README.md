@@ -165,10 +165,12 @@ picks a free port. API and dashboard details: [Web dashboard](#web-dashboard).
 
 ### Agent tool isolation
 
-On Linux x86_64 with bubblewrap, prlimit, and an audited DSH, model tools are
-limited to `rdsh_inspect`. Only copies of files you explicitly share are
-mounted read-only; network and writes to host/project are denied at the kernel
-level, with no host credentials or environment passed through.
+On Linux x86_64 with bubblewrap, prlimit, and an audited DSH, the additional
+`rdsh_inspect` tool runs in a kernel sandbox. Only copies of files you
+explicitly share are mounted read-only; network and writes to host/project are
+denied, with no host credentials or environment passed through. Other DSH and
+integration tools remain available and use their normal DSH permission and
+approval behavior; they are not covered by the `rdsh_inspect` isolation.
 
 ```sh
 rdsh --share-file README.md --share-file src/main.rs --profile tui
