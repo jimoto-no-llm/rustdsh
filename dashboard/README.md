@@ -396,6 +396,15 @@ subscriptions are never transported. See the
 collision handling. `backup history` exposes imported records through the local
 control CLI; the existing state resource also includes `history_backups`.
 
+## Safe project-state migration
+
+`state-migrate inspect|dry-run|apply|rollback` handles the explicit schema 1 to
+2 transition. Stop the project dashboard before applying it. Dry-run preserves
+the source; apply creates a checksum-linked exact snapshot and atomically cuts
+over the state file. Rollback refuses to discard state written after migration.
+See the [state migration contract](../docs/STATE-MIGRATIONS.md) for recovery
+after interruption and stale-lock handling.
+
 ## Project-scoped pinned updates
 
 `release stage|inspect|canary|promote|rollback` captures a compatible original DSH,

@@ -29,6 +29,13 @@ import {
 } from "./backup-files.mjs";
 import { allInputCommands } from "./instruction-queue.mjs";
 import { ProjectStore, publicState } from "./state.mjs";
+import {
+  applyStateMigration,
+  clearStaleStateMigrationLock,
+  dryRunStateMigration,
+  inspectStateMigrations,
+  rollbackStateMigration,
+} from "./state-migrations.mjs";
 import { setTimeout as delay } from "node:timers/promises";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
@@ -47,6 +54,9 @@ rdsh-dashboard stop --project <directory> | --harness
 rdsh-dashboard revoke-events --project <directory>
 rdsh-dashboard tunnel --project <directory> --tunnel-id <tunnel_id>
 rdsh-dashboard diagnostics --project <directory>
+rdsh-dashboard state-migrate inspect|dry-run|apply --project <directory>
+rdsh-dashboard state-migrate rollback --project <directory> --migration-id <id>
+rdsh-dashboard state-migrate clear-stale-lock --project <directory> --confirm-stale-lock
 rdsh-dashboard mcp --project <directory>
 rdsh-dashboard adapters [--cli dsh] [--executable <original-dsh>] [--entrypoint <bin.js>] [--project <directory>] [--retry] [--retry-attempts <n>] [--retry-total-ms <ms>]
 rdsh-dashboard adapter-smoke --executable <original-dsh> [--entrypoint <bin.js>] [--project <directory>]
@@ -144,6 +154,8 @@ const { values, positionals } = parseArgs({
     "output-file": { type: "string" },
     "expected-revision": { type: "string" },
     "archive-id": { type: "string" },
+    "migration-id": { type: "string" },
+    "confirm-stale-lock": { type: "boolean" },
     "release-id": { type: "string" },
     "selection-revision": { type: "string" },
     "managed-release-id": { type: "string" },
@@ -272,6 +284,13 @@ try {
   )
     throw new Error("Release selection options require release");
   if (
+    command !== "state-migrate" &&
+    ["migration-id", "confirm-stale-lock"].some(
+      (key) => values[key] !== undefined,
+    )
+  )
+    throw new Error("Migration options require state-migrate");
+  if (
     ["managed-release-id", "managed-revision"].some(
       (k) => values[k] !== undefined,
     ) &&
@@ -370,6 +389,48 @@ try {
     throw new Error("Model route options require routing");
   if (values.help || !command) {
     console.log(help);
+  } else if (command === "state-migrate") {
+    const action = positionals[1];
+    const allowed = new Set([
+      "project",
+      "migration-id",
+      "confirm-stale-lock",
+      "help",
+    ]);
+    if (
+      positionals.length !== 2 ||
+      ![
+        "inspect",
+        "dry-run",
+        "apply",
+        "rollback",
+        "clear-stale-lock",
+      ].includes(action) ||
+      Object.keys(values).some((key) => !allowed.has(key)) ||
+      (action === "rollback"
+        ? !values["migration-id"] || values["confirm-stale-lock"]
+        : Boolean(values["migration-id"])) ||
+      (action === "clear-stale-lock"
+        ? !values["confirm-stale-lock"]
+        : Boolean(values["confirm-stale-lock"]))
+    )
+      throw new Error(
+        "Specify state-migrate inspect, dry-run, apply, rollback or clear-stale-lock with the required options",
+      );
+    const project = await identity(values.project || process.cwd());
+    const report =
+      action === "inspect"
+        ? await inspectStateMigrations(project)
+        : action === "dry-run"
+          ? await dryRunStateMigration(project)
+          : action === "apply"
+            ? await applyStateMigration(project)
+            : action === "rollback"
+              ? await rollbackStateMigration(project, values["migration-id"])
+              : await clearStaleStateMigrationLock(project, {
+                  confirmed: values["confirm-stale-lock"],
+                });
+    console.log(JSON.stringify(report, null, 2));
   } else if (command === "release") {
     const action = positionals[1];
     const allowed = new Set([
