@@ -385,6 +385,15 @@ Tunnel/MCP/callback stages separately. The
 restart detection and stage-specific recovery. Local readiness and callback
 receipt leave actual Dot response and end-to-end status unconfirmed.
 
+The project dashboard's **最新push・CI・レビュー状態** panel is a separate,
+manual, read-only check. It compares the local HEAD and working tree with the
+configured upstream branch's current SHA, then compares that SHA with the PR
+head before showing required checks, review decision and each check's GitHub
+event (`push` or `pull_request`). It uses the installed GitHub CLI's existing
+authentication. A missing upstream/PR, changed SHA, dirty tree, pending check
+or unavailable response remains unconfirmed; it never pushes, edits protection
+rules or merges. The snapshot is timestamped and is not continuously refreshed.
+
 ## Selective history backup
 
 `backup preview|export|inspect|restore|history` selects task/answer/decision/evidence

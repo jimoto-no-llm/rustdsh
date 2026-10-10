@@ -816,6 +816,22 @@
           </dl>
           <ul id="overview-pending"></ul>
         </section>
+        <details class="fold" id="github-status-detail">
+          <summary>最新push・CI・レビュー状態</summary>
+          <p class="sub">
+            ローカルHEAD、追跡先の実SHA、PR headを照合します。GitHubのrequired判定とpush／pull_request起動を分けて表示します。取得できない状態は成功として扱いません。
+          </p>
+          <button id="github-status-refresh">GitHub状態を読み取る</button>
+          <p id="github-status-message" class="sub" role="status" aria-live="polite">
+            未確認 · ボタンを押すと最新状態を取得します。
+          </p>
+          <section
+            id="github-status-result"
+            class="decision-grid"
+            aria-label="GitHub push・CI・レビュー状態"
+            aria-live="polite"
+          ></section>
+        </details>
         <h2 id="pending-heading" tabindex="-1">未回答の質問</h2>
         <p class="sub" id="pending-note">
           プロジェクト全体の質問です。回答はこの質問への返答のみです。対象・条件が変わった場合は回答前に内容を再確認してください。回答しただけで実行権限は生まれません。

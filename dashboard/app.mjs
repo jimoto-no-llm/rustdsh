@@ -3,6 +3,7 @@ import { renderQuestionCards } from "./question-cards-ui.mjs";
 import { renderAnswerApplications } from "./answer-applications-ui.mjs";
 import { renderOverview } from "./project-overview.mjs";
 import { renderConnectionDiagnostics } from "./connection-diagnostics-ui.mjs";
+import { renderGitHubStatus } from "./github-status-ui.mjs";
 import { createInstructionPanel } from "./instruction-queue-ui.mjs";
 import { createCostPanel } from "./cost-ledger-ui.mjs";
 import { renderBudget } from "./budget-ui.mjs";
@@ -135,6 +136,24 @@ $("diagnostics-refresh").onclick = async () => {
     $("diagnostics-result").replaceChildren();
   } finally {
     $("diagnostics-refresh").disabled = false;
+  }
+};
+$("github-status-refresh").onclick = async () => {
+  const button = $("github-status-refresh");
+  button.disabled = true;
+  $("github-status-message").textContent =
+    "ローカルSHA・追跡先・GitHubの状態を取得中…";
+  try {
+    const report = await api("github/status");
+    renderGitHubStatus($("github-status-result"), report, node);
+    $("github-status-message").textContent =
+      "読み取り専用の観測結果です。時刻とSHAを確認してください。";
+  } catch {
+    $("github-status-result").replaceChildren();
+    $("github-status-message").textContent =
+      "状態を取得できません。未確認として扱い、成功表示へ置き換えません。";
+  } finally {
+    button.disabled = false;
   }
 };
 const renderInstructions = createInstructionPanel($("instruction-panel"), {
