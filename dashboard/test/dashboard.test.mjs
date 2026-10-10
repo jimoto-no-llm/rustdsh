@@ -204,7 +204,7 @@ test("project state, HTTP/stdio MCP, subscriptions, answers, and auth work toget
       },
     }),
   );
-  assert.equal((await client.listTools()).tools.length, 6);
+  assert.equal((await client.listTools()).tools.length, 7);
   let notified;
   const notification = new Promise((resolve) => {
     notified = resolve;

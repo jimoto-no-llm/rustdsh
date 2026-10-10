@@ -48,7 +48,7 @@ before stopping the live owned Harness run.
 
 | Mode      | Purpose                                                    | Data source                                      |
 | --------- | ---------------------------------------------------------- | ------------------------------------------------ |
-| `project` | Project metrics, tasks, questions, human answers, progress | Six project-scoped MCP tools                     |
+| `project` | Project metrics, tasks, questions, human answers, progress | Seven project-scoped MCP tools                   |
 | `harness` | Launch and open the original DeepSeek Harness Web UI       | A separately managed `dsh --profile web` process |
 
 Both bind to loopback and can use **Tailscale Serve** for private HTTPS access.
@@ -172,14 +172,15 @@ configuration after a restart, because the bearer key rotates.
 `runtime.json` の `token` は管理用、`mcp_token` は MCP 用です。ブラウザー用の
 鍵は `browser_url` に含まれます。これらを別用途で使い回さないでください。
 
-| Tool                       | Effect                                       |
-| -------------------------- | -------------------------------------------- |
-| `dashboard_update_metrics` | Report measured cumulative snapshots         |
-| `dashboard_upsert_task`    | Create/update a task by ID                   |
-| `dashboard_ask_question`   | Ask a human a question with a unique ID      |
-| `dashboard_publish_event`  | Report progress or an artifact reference     |
-| `dashboard_get_feedback`   | Read durable answers after a sequence cursor |
-| `dashboard_get_state`      | Read this project's current state            |
+| Tool                               | Effect                                           |
+| ---------------------------------- | ------------------------------------------------ |
+| `dashboard_report_provider_status` | Report provider status, quota and retry evidence |
+| `dashboard_update_metrics`         | Report measured cumulative snapshots             |
+| `dashboard_upsert_task`            | Create/update a task by ID                       |
+| `dashboard_ask_question`           | Ask a human a question with a unique ID          |
+| `dashboard_publish_event`          | Report progress or an artifact reference         |
+| `dashboard_get_feedback`           | Read durable answers after a sequence cursor     |
+| `dashboard_get_state`              | Read this project's current state                |
 
 Example tool arguments:
 
@@ -239,6 +240,31 @@ partial. The folded metrics section shows each amount's provenance and history.
 `cost-ledger declare|report|inspect` uses the existing authenticated reporting
 endpoint; browser credentials are read-only for these inputs. No prices are
 looked up and legacy numeric costs are not merged with this optional ledger.
+
+### Provider status, quota and retry hints (#59)
+
+`dashboard_report_provider_status` records one latest report per provider and
+scope. It accepts only an explicitly reported status (`rate_limited`,
+`quota_exhausted`, `authentication_failed`, or `unknown`), a source label, the
+actual `observed_at`, stable `event_id`, and a sequence that increases for that
+scope. Quota amounts, a reason code, and `retry_after` are optional and must be
+present in the provider evidence; the dashboard does not infer counts or a
+countdown. Reports expire from `observed_at` using `max_age_seconds` (default
+900, maximum 604800), after which retry hints are hidden and the UI asks for a
+new observation. Each project is limited to 64 provider/scope records.
+
+The dashboard is a reporting surface, not a provider adapter. Reports submitted
+through this MCP tool are always marked `agent_reported`; the dashboard checks
+their shape and age but does not authenticate provider origin. An agent or
+integrator must obtain status through a supported provider interface and report
+the result; the dashboard does not scrape provider sites or inspect CLI error
+text. It displays all reported values as text and does not retry requests, run
+login flows, renew credentials, or change budgets. Authentication failures and
+quota exhaustion have separate guidance. The existing bounded retry coordinator
+continues to honor trusted retry delays and refuses to shorten a delay that
+exceeds its configured budget; this report tool does not connect provider
+observations to retry execution. Browser credentials are read-only for reports;
+the MCP bearer credential is required to write one.
 
 ### Observation source and freshness (#16)
 
@@ -313,6 +339,7 @@ project bearer authentication used for tools. Available events:
 - `dashboard.task.updated`
 - `dashboard.progress.updated`
 - `dashboard.metrics.updated`
+- `dashboard.provider_status.updated`
 
 Each requires the project's `project_id` filter. Subscribe to
 `dashboard.answer.created` when a Dot should react to human replies, then retrieve

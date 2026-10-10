@@ -827,6 +827,13 @@
           aria-describedby="pending-note"
         ></div>
         <section id="budget-admission" aria-label="予算制御"></section>
+        <details class="fold" id="provider-status-detail">
+          <summary>Provider利用枠・再試行状態</summary>
+          <p class="sub">
+            providerが報告した状態だけを表示します。利用枠や再試行時刻を推測せず、認証の再ログイン・providerへの再試行も自動実行しません。
+          </p>
+          <div id="provider-status" aria-live="polite"></div>
+        </details>
         <details class="fold" id="metrics-detail">
           <summary>プロジェクト全体の数値</summary>
           <h2 id="metrics-heading" tabindex="-1">数値の詳細</h2>

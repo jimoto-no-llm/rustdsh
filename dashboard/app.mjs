@@ -6,6 +6,7 @@ import { renderConnectionDiagnostics } from "./connection-diagnostics-ui.mjs";
 import { createInstructionPanel } from "./instruction-queue-ui.mjs";
 import { createCostPanel } from "./cost-ledger-ui.mjs";
 import { renderBudget } from "./budget-ui.mjs";
+import { renderProviderStatuses } from "./provider-status-ui.mjs";
 
 const $ = (id) => document.getElementById(id);
 const base = location.pathname.startsWith("/_rdsh") ? "/_rdsh/" : "/";
@@ -149,6 +150,7 @@ function render(state) {
   latestState = state;
   renderInstructions(state);
   renderCosts(state);
+  renderProviderStatuses($("provider-status"), state.provider_statuses, node);
   renderBudget($("budget-admission"), state, node);
   updateOverview(state);
   renderReports(state);
