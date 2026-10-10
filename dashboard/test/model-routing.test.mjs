@@ -445,32 +445,52 @@ test("separate public clients bind, probe and inspect a native configuration wit
   await attached.adapter.stop();
   const request = path.join(f.root, "route.json");
   await fs.writeFile(request, JSON.stringify(first));
-  const call = async (action, ...args) =>
-    JSON.parse(
-      (
-        await exec(
-          process.execPath,
-          [
-            cli,
-            "routing",
-            action,
-            "--project",
-            f.cwd,
-            "--run-id",
-            attached.record.run_id,
-            ...args,
-          ],
-          {
-            env: f.env,
-            // Windows ownership checks and cleanup have separate deadlines.
-            // Let them finish before the outer fixture terminates the CLI.
-            timeout: process.platform === "win32" ? 60000 : 20000,
-            maxBuffer: 1024 * 1024,
-            windowsHide: true,
-          },
-        )
-      ).stdout,
-    );
+  const call = async (action, ...args) => {
+    const started = performance.now();
+    try {
+      const { stdout } = await exec(
+        process.execPath,
+        [
+          cli,
+          "routing",
+          action,
+          "--project",
+          f.cwd,
+          "--run-id",
+          attached.record.run_id,
+          ...args,
+        ],
+        {
+          env: f.env,
+          // Keep the existing fixture deadline; diagnostics above show
+          // whether a timeout occurred during a specific routing action.
+          timeout: process.platform === "win32" ? 60000 : 20000,
+          maxBuffer: 1024 * 1024,
+          windowsHide: true,
+        },
+      );
+      t.diagnostic(
+        JSON.stringify({
+          routing_phase: action,
+          elapsed_ms: performance.now() - started,
+          exit_code: 0,
+        }),
+      );
+      return JSON.parse(stdout);
+    } catch (error) {
+      t.diagnostic(
+        JSON.stringify({
+          routing_phase: action,
+          elapsed_ms: performance.now() - started,
+          exit_code: error.code ?? null,
+          signal: error.signal ?? null,
+          killed: !!error.killed,
+          stderr_bytes: Buffer.byteLength(error.stderr ?? ""),
+        }),
+      );
+      throw error;
+    }
+  };
   await call("bind", "--route-file", request);
   const proof = await call(
     "probe",
