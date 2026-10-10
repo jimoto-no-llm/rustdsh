@@ -132,6 +132,23 @@ async function detailUrl(project, processApi) {
   }
 }
 
+export async function projectDashboardUrl(
+  project,
+  processApi = process,
+  fragment = "",
+) {
+  if (
+    fragment &&
+    !/^(?:task|question|event)-[A-Za-z0-9._~%-]{1,2048}$/.test(fragment)
+  )
+    return null;
+  const href = await detailUrl(project, processApi);
+  if (!href) return null;
+  const url = new URL(href);
+  url.hash = fragment ? `#${fragment}` : "";
+  return url.href;
+}
+
 export function createProjectCrossOverview(
   projects,
   cacheFile,
@@ -184,6 +201,7 @@ export function createProjectCrossOverview(
           if (cached && typeof cached.last_observed_at === "string")
             nextCache[project.id] = cached;
           return {
+            project_id: project.id,
             name: project.name,
             status: "unknown",
             last_observed_at:
@@ -200,7 +218,8 @@ export function createProjectCrossOverview(
           status: "observed",
           last_observed_at: observedAt,
           counts: summary,
-          detail_url: await detailUrl(project, processApi),
+          project_id: project.id,
+          detail_url: await projectDashboardUrl(project, processApi),
         };
       }),
     );
