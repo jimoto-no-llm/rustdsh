@@ -89,7 +89,7 @@ export const tools = [
   {
     name: "dashboard_upsert_task",
     description:
-      "Create or update a project task shown in the project dashboard.",
+      "Create or update a project task shown in the project dashboard. Optionally set policy_decision_id to a human decision in the decision log; references to replaced, held or withdrawn decisions are flagged for confirmation and are never rewritten automatically.",
     inputSchema: object(
       {
         id: string,
@@ -98,6 +98,7 @@ export const tools = [
         milestone: string,
         blocker: string,
         observation: observationSchema,
+        policy_decision_id: { type: ["string", "null"] },
       },
       ["id", "title", "status"],
     ),
@@ -144,7 +145,7 @@ export const tools = [
   {
     name: "dashboard_get_state",
     description:
-      "Read this project’s metrics, tasks, questions, recent events and optional source-aware cost ledger. Ledger totals are per declared period/source/currency; missing workers remain unknown and invoice amounts are never used to correct estimates.",
+      "Read this project’s metrics, tasks, questions, recent events, optional human decision log and source-aware cost ledger. Tasks referencing replaced, held or withdrawn decisions include a confirmation_required decision_reference; the server does not rewrite their policy. Ledger totals are per declared period/source/currency; missing workers remain unknown and invoice amounts are never used to correct estimates.",
     inputSchema: object({}),
   },
 ];
