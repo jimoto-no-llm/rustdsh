@@ -38,6 +38,8 @@ from current full checks, preserves partial results and rejects stale evidence.
 
 [Model assertions](../docs/MODEL-ROUTING.md) compare a declared run's requested
 route with native ACP configuration and block mismatched or unknown prompts.
+`routing enforce` adds the audited native dispatch guard on reattachment; the
+human view compares actual request tuples and retains fallback permission history.
 
 [Mobile overview](../docs/MOBILE-OVERVIEW.md) puts project/task context, observed
 state, last result, pending decisions and stop availability before folded metrics

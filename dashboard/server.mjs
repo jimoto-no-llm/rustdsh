@@ -16,6 +16,7 @@ import { AnswerApplicationServer } from "./answer-application-server.mjs";
 import { BudgetAdmissionServer } from "./budget-server.mjs";
 import { createHistoryBackup, backupMaximum } from "./history-backup.mjs";
 import { AcceptanceStore } from "./acceptance.mjs";
+import { modelRoutingViews } from "./model-routing-view.mjs";
 import {
   ConnectionObservations,
   connectionReport,
@@ -438,6 +439,7 @@ export async function startDashboard(options) {
           route === "/instruction-queue-ui.mjs" ||
           route === "/cost-ledger-ui.mjs" ||
           route === "/budget-ui.mjs" ||
+          route === "/model-routing-ui.mjs" ||
           route === "/favicon.ico" ||
           route === "/icon.png" ||
           route === "/icon.svg");
@@ -535,6 +537,7 @@ export async function startDashboard(options) {
           "/instruction-queue-ui.mjs",
           "/cost-ledger-ui.mjs",
           "/budget-ui.mjs",
+          "/model-routing-ui.mjs",
         ].includes(route)
       ) {
         res.writeHead(200, {
@@ -542,6 +545,12 @@ export async function startDashboard(options) {
         });
         return res.end(await fs.readFile(path.join(here, route.slice(1))));
       }
+      if (
+        kind === "project" &&
+        req.method === "GET" &&
+        route === "/api/model-routing"
+      )
+        return json(res, 200, { runs: await modelRoutingViews(project) });
       if (
         kind === "project" &&
         req.method === "GET" &&

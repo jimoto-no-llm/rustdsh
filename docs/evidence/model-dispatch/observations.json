@@ -1,0 +1,133 @@
+{
+  "baseline_frontend_commit": "2bf6e22142b9f54e2b226bf4a80318fbe83f4f6e",
+  "native_source_sha256": "9132c8a8053ee82b9fb1ded4f98c85cf557f288a15a85c552c6b1fb319ead120",
+  "node": "v24.18.0",
+  "platform": "win32",
+  "provider": "synthetic only",
+  "actual_model_execution_verified": false,
+  "observations": [
+    {
+      "case": "baseline",
+      "result": {
+        "scenario": "mismatch",
+        "dispatches": [
+          {
+            "provider": "fixture-provider",
+            "model": "model-B",
+            "effort": "high"
+          }
+        ],
+        "chunks": [
+          {
+            "type": "text-delta"
+          },
+          {
+            "type": "finish",
+            "outcome": "stop"
+          }
+        ],
+        "error": null,
+        "timings_ms": {
+          "count": 1,
+          "median": 0.5357000000000021,
+          "p95": 0.5357000000000021,
+          "total": 0.5357000000000021
+        }
+      }
+    },
+    {
+      "case": "matched",
+      "result": {
+        "scenario": "default-effort",
+        "dispatches": [
+          {
+            "provider": "fixture-provider",
+            "model": "model-A",
+            "effort": "high"
+          }
+        ],
+        "chunks": [
+          {
+            "type": "text-delta"
+          },
+          {
+            "type": "finish",
+            "outcome": "stop"
+          }
+        ],
+        "error": null,
+        "timings_ms": {
+          "count": 1,
+          "median": 20.891400000000004,
+          "p95": 20.891400000000004,
+          "total": 20.891400000000004
+        }
+      }
+    },
+    {
+      "case": "stopped",
+      "result": {
+        "scenario": "mismatch",
+        "dispatches": [],
+        "chunks": [],
+        "error": {
+          "code": "RDSH_MODEL_GUARD_DENIED",
+          "message": "Native model guard: native_route_mismatch"
+        },
+        "timings_ms": {
+          "count": 0,
+          "median": null,
+          "p95": null,
+          "total": 0
+        }
+      }
+    },
+    {
+      "case": "permitted",
+      "result": {
+        "scenario": "mismatch",
+        "dispatches": [
+          {
+            "provider": "fixture-provider",
+            "model": "model-B",
+            "effort": "high"
+          }
+        ],
+        "chunks": [
+          {
+            "type": "text-delta"
+          },
+          {
+            "type": "finish",
+            "outcome": "stop"
+          }
+        ],
+        "error": null,
+        "timings_ms": {
+          "count": 1,
+          "median": 20.896,
+          "p95": 20.896,
+          "total": 20.896
+        }
+      }
+    }
+  ],
+  "page_errors": [],
+  "benchmark": {
+    "calls_each": 100,
+    "baseline_ms": {
+      "count": 100,
+      "median": 0.007999999999995566,
+      "p95": 0.034900000000000375,
+      "total": 2.094799999999978
+    },
+    "guarded_ms": {
+      "count": 100,
+      "median": 18.71849999999995,
+      "p95": 21.12189999999987,
+      "total": 1878.2146
+    },
+    "scope": "sequential local native adapter calls; excludes Node boot; synthetic provider, zero network"
+  },
+  "result": "PASS"
+}

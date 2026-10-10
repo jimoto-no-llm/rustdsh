@@ -1,0 +1,39 @@
+name: native model assertion
+on: [push, pull_request]
+permissions:
+  contents: read
+concurrency:
+  group: native-model-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  dispatch:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: npm ci
+        working-directory: dashboard
+      - name: Install only the isolated native service dependency
+        shell: bash
+        run: npm install --prefix "$RUNNER_TEMP/rdsh-model-native" --ignore-scripts --no-audit --no-fund @deepseek-ai/dsh-llm@0.2.0-rc.2 @deepseek-ai/cordis@4.0.4
+      - name: Verify the real native adapter boundary with a synthetic provider on Windows
+        if: runner.os == 'Windows'
+        shell: bash
+        run: RDSH_TEST_LLM_PACKAGE="$RUNNER_TEMP/rdsh-model-native/package.json" node --test tests/model-runtime-native.test.mjs
+      - name: Verify the real native adapter boundary in its delegated Linux cgroup
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          # The tracked ACP fixture owns only this job's delegated cgroup.
+          sudo systemd-run --unit="rdsh-model-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --wait --pipe --collect --property=Delegate=yes \
+            --property=DelegateSubgroup=supervisor --uid="$(id -u)" \
+            --working-directory="$PWD" /usr/bin/env HOME="$HOME" PATH="$PATH" \
+            RDSH_TEST_LLM_PACKAGE="$RUNNER_TEMP/rdsh-model-native/package.json" \
+            node --test tests/model-runtime-native.test.mjs
