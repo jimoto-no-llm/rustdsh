@@ -197,3 +197,46 @@ fn discord_uses_bundled_application_id_until_explicitly_overridden() {
         assert_eq!(reset["discord"]["application_id"], "1557873849280888903");
     }
 }
+
+#[test]
+fn settings_set_rejects_values_that_do_not_fit_storage_types() {
+    let fixture = Fixture::new("{}");
+
+    for (key, value) in [
+        ("serve.port", "70000"),
+        ("setup.web_port", "65536"),
+        ("bench.n", "4294967296"),
+    ] {
+        let before = fixture.read();
+        let output = fixture.run(&["settings", "set", key, value]);
+        assert!(
+            !output.status.success(),
+            "accepted {key}={value}: stdout={} stderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert_eq!(fixture.read(), before, "{key}={value} changed settings");
+    }
+}
+
+#[test]
+fn settings_set_preserves_valid_port_boundaries_and_random_web_port() {
+    let fixture = Fixture::new("{}");
+
+    for (key, value, section, field, expected) in [
+        ("serve.port", "65535", "serve", "port", 65535),
+        ("setup.web_port", "65535", "setup", "web_port", 65535),
+        ("setup.web_port", "0", "setup", "web_port", 0),
+        ("bench.n", "20", "bench", "n", 20),
+    ] {
+        let output = fixture.run(&["settings", "set", key, value]);
+        assert!(
+            output.status.success(),
+            "rejected {key}={value}: stdout={} stderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let settings: serde_json::Value = serde_json::from_str(&fixture.read()).unwrap();
+        assert_eq!(settings[section][field], serde_json::json!(expected));
+    }
+}
