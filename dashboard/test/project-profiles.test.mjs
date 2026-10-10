@@ -122,6 +122,9 @@ test("profiles reject unknown and credential-like fields before state changes", 
   );
   for (const argument of [
     "--token secret-value",
+    "Authorization: Bearer secret-value",
+    "--header=Cookie: session=secret-value",
+    "Proxy-Authorization: Basic secret-value",
     "https://alice:secret-value@example.com/api",
   ]) {
     assert.throws(
