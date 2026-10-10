@@ -37,6 +37,5 @@ What happens next:
   shared project files are exposed to model tools; their contents may reach the
   configured model provider. Plugins and profiles are trusted code. Direct
   upstream DSH execution is outside this protection. Upstream Harness
-  vulnerabilities should also be reported upstream.
-- The Node dashboard (dashboard/*) binds to loopback by default. Tailscale
+  vulnerabilities should also be reported upstream.- The Node dashboard (dashboard/*) binds to loopback by default. Tailscale
   Serve QR URLs are credentials - never paste them into public issues.
