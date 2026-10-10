@@ -874,12 +874,25 @@ fn shadowing_original() -> bool {
     if invoked_as_dsh() {
         return true;
     }
-    let me = std::fs::canonicalize(std::env::current_exe().unwrap_or_default()).unwrap_or_default();
-    std::env::var("PATH").ok().is_some_and(|p| {
-        p.split(':').any(|dir| {
-            let cand = format!("{dir}/dsh");
-            std::fs::canonicalize(&cand).is_ok_and(|c| c == me)
-        })
+    let Ok(me) = std::env::current_exe().and_then(|path| std::fs::canonicalize(path)) else {
+        return false;
+    };
+    std::env::var_os("PATH").is_some_and(|path| path_shadows_current(&path, &me))
+}
+
+fn path_shadows_current(path: &std::ffi::OsStr, me: &std::path::Path) -> bool {
+    #[cfg(windows)]
+    const NAMES: &[&str] = &["dsh", "dsh.exe"];
+    #[cfg(not(windows))]
+    const NAMES: &[&str] = &["dsh"];
+
+    std::env::split_paths(path).any(|dir| {
+        NAMES
+            .iter()
+            .any(|name| {
+                std::fs::canonicalize(dir.join(name))
+                    .is_ok_and(|candidate| candidate.as_path() == me)
+            })
     })
 }
 
@@ -964,5 +977,48 @@ mod default_profile_tests {
                 );
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod shadowing_original_tests {
+    use super::path_shadows_current;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn searches_os_path_components_for_platform_binary_name() {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "rdsh-shadow-path-{}-{nonce}",
+            std::process::id()
+        ));
+        let decoy = root.join("first");
+        let binary_dir = root.join("second");
+        fs::create_dir_all(&decoy).unwrap();
+        fs::create_dir_all(&binary_dir).unwrap();
+
+        #[cfg(windows)]
+        const TEST_NAMES: &[&str] = &["dsh", "dsh.exe"];
+        #[cfg(not(windows))]
+        const TEST_NAMES: &[&str] = &["dsh"];
+
+        for binary_name in TEST_NAMES {
+            let candidate = binary_dir.join(*binary_name);
+            fs::write(&candidate, b"test executable path").unwrap();
+        }
+        let current = fs::canonicalize(binary_dir.join(TEST_NAMES[0])).unwrap();
+        let path = std::env::join_paths([decoy.as_os_str(), binary_dir.as_os_str()]).unwrap();
+        for binary_name in TEST_NAMES {
+            let candidate = fs::canonicalize(binary_dir.join(*binary_name)).unwrap();
+            assert!(path_shadows_current(&path, &candidate), "{binary_name}");
+        }
+
+        let path_without_candidate = std::env::join_paths([decoy.as_os_str()]).unwrap();
+        assert!(!path_shadows_current(&path_without_candidate, &current));
+        fs::remove_dir_all(root).unwrap();
     }
 }
