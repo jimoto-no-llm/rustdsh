@@ -149,6 +149,33 @@ async function setup(t, count = 1) {
   }
   return { root, projects, start };
 }
+test("backup API rejects proxy-forwarded requests even when the peer is loopback", async (t) => {
+  const f = await setup(t),
+    dashboard = await f.start(f.projects[0]),
+    runtime = JSON.parse(
+      await fs.readFile(
+        path.join(f.projects[0].directory, "runtime.json"),
+        "utf8",
+      ),
+    );
+  const post = (extraHeaders = {}) =>
+    fetch(`${dashboard.localUrl}api/backup/history`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${runtime.token}`,
+        "content-type": "application/json",
+        ...extraHeaders,
+      },
+      body: "{}",
+    });
+
+  assert.equal((await post()).status, 200);
+  for (const name of ["forwarded", "x-forwarded-for", "x-forwarded-host"]) {
+    const response = await post({ [name]: "198.51.100.7" });
+    assert.equal(response.status, 403, `${name} must mark a proxied request`);
+    assert.match((await response.json()).error, /direct loopback/);
+  }
+});
 function reviewFor(archive, replacements = []) {
   return {
     source: archive.source,
