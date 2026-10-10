@@ -1,0 +1,28 @@
+✔ serve serves the common icon bytes without granting API access (116.999736ms)
+✔ setup serves the common icon bytes without granting API access (923.10838ms)
+✔ metadata delegation uses the selected DSH tree interpreter, resolves aliases, and retains PATH fallbacks (693.151228ms)
+✔ sync --check-only follows SemVer precedence and never upgrades to a lower version (89029.497915ms)
+✔ deny hook never supplies an affirmative approval on a miss (8.251769ms)
+✔ anchored deny cannot be bypassed by hook metadata (4.49029ms)
+✔ malformed or oversized hook input fails closed (13.560928ms)
+✔ unsupported runtime is refused without copying external login credentials (70.687286ms)
+✔ context working files cannot read credentials outside the current repository (5.742145ms)
+✔ native search does not read hard links or symlinks to outside files (8.484013ms)
+✔ context working files reject in-tree symlinks and hard links to outside files (11.406386ms)
+✔ context rejects a FIFO without blocking while opening it (13.984599ms)
+✔ context does not retrieve other projects sessions by default (9.953605ms)
+✔ automatic updater refuses bad or missing checksums before installing (333.853435ms)
+✔ imports require an explicit provider or ref and copy only the selected source (13.01568ms)
+✔ kernel isolation blocks credentials, network, writes and inherited environment (346.976165ms)
+✔ unavailable enforcement fails closed and never runs the requested command (1.939689ms)
+✔ global monotonic guard denies every other tool and a scoped name replacement (0.348581ms)
+✔ explicit sharing rejects hard links and hidden credentials (5.509011ms)
+﹣ approval includes the exact command and cwd even without the chat detail slot (0.781247ms) # SKIP
+ℹ tests 20
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 89786.463677

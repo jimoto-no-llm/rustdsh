@@ -1,0 +1,22 @@
+{
+  "result": "PASS",
+  "scope": "Actual React banner and authenticated state/close/stream routes in two isolated loopback hosts; updater responses mocked; dummy HOME; no production DSH restart or updater execution",
+  "flows": [
+    "State and event routes reject unauthenticated and foreign-Origin requests",
+    "File update pushes to an open page without reload or polling",
+    "Close propagates to another tab and another independent GUI host without reloading",
+    "Project remount keeps closed; full reload shows; exact two-hour boundary shows again",
+    "Reload and Dismiss midway through the next period preserve the original repeat cadence",
+    "Minimize/expand retained; the next reminder opens the full card",
+    "A new version or a new update time notifies immediately after closing the previous occurrence",
+    "Old permanent dismissal records cannot suppress the requested new notification behavior",
+    "Disabled browser storage still supports close, project remount suppression, and reload notification",
+    "Successful unchanged updater check closes the card and other GUI; remount and storage failure do not resurrect it",
+    "Failed updater remains visible and retryable; reload still displays the notification",
+    "Completion of an older updater request does not acknowledge or label a newer live update as update again",
+    "Successful updater completion preserves the fixed next two-hour boundary"
+  ],
+  "page_errors": [],
+  "console_errors": [],
+  "live_notification_ms": 81
+}

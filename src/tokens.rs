@@ -108,8 +108,21 @@ fn prune_with_total(s: &str, max_tokens: usize, total: usize) -> String {
     if max_tokens == 0 {
         return String::new();
     }
-    let chars = char_count(s);
     let marker = format!("\n\n...[rdsh pruned {total}->{max_tokens} tokens]...\n\n");
+    // For ASCII, char and byte offsets coincide, and the joined result is
+    // exactly ceil((kept bytes + marker bytes) / 4). Solve the same search
+    // directly, retaining its head/tail split and tiny-budget behavior.
+    if s.is_ascii() {
+        let capacity = max_tokens.saturating_mul(4);
+        if estimate_tokens(&marker) >= max_tokens {
+            return s[..s.len().min(capacity)].to_string();
+        }
+        let keep = s.len().saturating_sub(1).min(capacity - marker.len());
+        let head = keep * 2 / 3;
+        let tail = keep - head;
+        return format!("{}{}{}", &s[..head], marker, &s[s.len() - tail..]);
+    }
+    let chars = char_count(s);
     if estimate_tokens(&marker) >= max_tokens {
         // A tiny budget cannot fit the marker. Preserve as much of the head
         // as the estimator permits instead of returning an over-budget label.
@@ -259,6 +272,45 @@ mod tests {
             for budget in [0, 1, 2, 4, 8, 16, 32, 100] {
                 let result = prune_to_budget(&source, budget);
                 assert!(estimate_tokens(&result) <= budget, "budget {budget}");
+            }
+        }
+    }
+
+    #[test]
+    fn ascii_prune_matches_exhaustive_budget_oracle() {
+        // Enumerate possible outputs independently of the optimized path.
+        // Distinct bytes expose head/tail off-by-one errors at marker and
+        // four-byte token boundaries, including budgets too small for a marker.
+        for length in (0usize..180).chain([999, 1000, 3999, 4000, 4001, 40000]) {
+            let source: String = (0..length)
+                .map(|i| (b'!' + (i % 90) as u8) as char)
+                .collect();
+            let total = length.div_ceil(4);
+            for budget in 0..81 {
+                let expected = if total <= budget {
+                    source.clone()
+                } else if budget == 0 {
+                    String::new()
+                } else {
+                    let marker = format!("\n\n...[rdsh pruned {total}->{budget} tokens]...\n\n");
+                    if marker.len().div_ceil(4) >= budget {
+                        source[..length.min(budget * 4)].to_string()
+                    } else {
+                        (0..length.min(budget * 4))
+                            .map(|keep| {
+                                let head = keep * 2 / 3;
+                                let tail = keep - head;
+                                format!("{}{}{}", &source[..head], marker, &source[length - tail..])
+                            })
+                            .rfind(|candidate| candidate.len().div_ceil(4) <= budget)
+                            .unwrap()
+                    }
+                };
+                assert_eq!(
+                    prune_to_budget(&source, budget),
+                    expected,
+                    "length={length}, budget={budget}"
+                );
             }
         }
     }

@@ -5,8 +5,27 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-10
+
+### Added
+
+- English and Japanese migration guides from Claude Code / Codex to DSH:
+  runtime installation, explicit model connection, existing instruction files,
+  first conversation, current editing limits and return to the previous client.
+- Anthropic, OpenAI and DeepSeek API-key selection in the first-run setup UI,
+  using the existing bounded credential storage API.
+
 ### Changed
 
+- Installers point to model setup and the DSH migration guide after installation.
+- Clarify CLI/setup/settings labels and scope, keep unsaved multiline settings
+  and partial Discord edits, and add the session estimate cache interval to the UI.
+- Preserve unchanged dashboard regions, coalesce state refreshes, pause hidden
+  polling, and update cached decision/observation expiry during disconnection.
+- Clip oversized settings strings without allocating their entire Unicode
+  character array, while retaining scalar limits and unknown settings.
+- Speed up standalone native version output, ASCII pruning and nonmatching file searches with unchanged output;
+  add reproducible before/after CLI and browser rendering measurements.
 - Standardize future release notes on the v0.2.0 format, validate annotated tags
   and version metadata, stage all five builds before publishing, and keep
   prereleases out of the stable installer channel.
@@ -117,6 +136,7 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 - Installers: install.sh (Linux/macOS/WSL), install.ps1 (Windows).
 
 [Unreleased]: #unreleased
+[0.2.1]: docs/releases/v0.2.1.md
 [0.2.0]: docs/releases/v0.2.0.md
 [0.1.5]: https://github.com/jimoto-no-llm/rustdsh/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/jimoto-no-llm/rustdsh/compare/v0.1.3...v0.1.4

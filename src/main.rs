@@ -21,20 +21,23 @@ mod websearch;
 #[command(
     name = "rdsh",
     version,
-    about = "Rust fast launcher for dsh (safe: native fast-paths + passthrough)",
+    about = "Fast DSH launcher with native local tools",
     after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|dump-config|boot)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh --passthrough tui          no slim env; mandatory tool isolation remains\n  rdsh --dry-run tui -- --resume abc   show what would exec"
 )]
 struct Cli {
     /// Explicitly share a project file with isolated model tools (repeatable).
     #[arg(long = "share-file", global = true)]
     share_file: Vec<String>,
+    /// Skip startup optimizations; keep mandatory tool isolation.
     #[arg(long = "passthrough", global = true)]
     passthrough: bool,
+    /// Print the delegated command without executing it.
     #[arg(long = "dry-run", global = true)]
     dry_run: bool,
     /// Force slim delegation (default follows settings general.slim).
     #[arg(long = "slim", default_value_t = false, global = true)]
     slim: bool,
+    /// Disable startup optimizations for this invocation.
     #[arg(long = "no-slim", global = true)]
     no_slim: bool,
     #[arg(long = "patch", global = true)]
@@ -49,6 +52,7 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
+    /// Start an original DSH profile with the current rdsh settings.
     Boot {
         #[arg(long = "profile")]
         profile: Option<String>,
@@ -57,6 +61,7 @@ enum Commands {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
+    /// Show the resolved profile (delegates to DSH unless --native).
     #[command(name = "dump-config")]
     DumpConfig {
         #[arg(long = "profile")]
@@ -64,17 +69,20 @@ enum Commands {
         #[arg(long = "native")]
         native: bool,
     },
+    /// Estimate tokens in files, or stdin when no files are supplied.
     Tokens {
         files: Vec<String>,
         #[arg(long = "preview", default_value_t = 0)]
         preview: usize,
     },
+    /// Keep the beginning and end within a token estimate budget; print to stdout.
     Prune {
         /// Trim to budget (default: settings tokens.default_budget).
         #[arg(long = "max-tokens")]
         max_tokens: Option<usize>,
         file: Option<String>,
     },
+    /// Find a literal, case-sensitive substring in local text files.
     Search {
         pattern: String,
         /// Search root (default: settings search.dir).
@@ -94,12 +102,14 @@ enum Commands {
         #[arg(long = "json")]
         json: bool,
     },
+    /// Prune plain or zstd-compressed text and print it without modifying the file.
     Compact {
         file: String,
         /// Token budget (default: settings compact.max_tokens).
         #[arg(long = "max-tokens")]
         max_tokens: Option<usize>,
     },
+    /// Inspect installation, settings and delegation; no model request is sent.
     Doctor,
     /// List sessions under $DSH_HOME (newest first, Node-free)
     Sessions {
@@ -108,7 +118,7 @@ enum Commands {
         /// Session count (default: settings sessions.limit).
         #[arg(long = "limit")]
         limit: Option<usize>,
-        /// Estimate tokens via zstd decompression (falls back to stored-bytes/4)
+        /// Estimate from zstd frame sizes or bounded decompression (cache-aware).
         #[arg(long = "tokens")]
         tokens: bool,
         /// Machine-readable JSON for sidecar use
@@ -129,14 +139,13 @@ enum Commands {
         #[arg(long = "file")]
         file: Option<String>,
     },
-    /// Start the local dashboard (127.0.0.1 only, read-only API)
+    /// Start local status and text tools (127.0.0.1 only; does not edit files).
     Serve {
         /// Listen port (default: settings serve.port).
         #[arg(long = "port")]
         port: Option<u16>,
     },
-    /// OAuth auto-recognition: external logins (codex/opencode) mirrored
-    /// into $DSH_HOME/.credentials.yaml ("drop in and recognized")
+    /// Inspect external logins; import only an explicitly selected provider or key.
     Auth {
         #[arg(long = "import")]
         import: bool,
@@ -149,8 +158,7 @@ enum Commands {
         #[arg(long = "json")]
         json: bool,
     },
-    /// First-run connect: import what exists, persist env keys, optionally
-    /// run the provider login flow or reveal settings dirs, else show next step
+    /// Inspect first-run model setup and show login/import steps.
     Setup {
         #[arg(long = "open")]
         open: bool,
@@ -160,13 +168,14 @@ enum Commands {
         json: bool,
         #[arg(long = "yes")]
         yes: bool,
-        /// Floating glass setup UI on localhost (auto-opens a browser tab)
+        /// Open the local, authenticated model setup page in a browser.
         #[arg(long = "web")]
         web: bool,
         /// Local port for --web (0 = random, default: settings setup.web_port).
         #[arg(long = "port")]
         port: Option<u16>,
     },
+    /// Measure --version startup (rdsh and original DSH when detected).
     Bench {
         /// Iterations (default: settings bench.n).
         #[arg(long = "n")]
@@ -195,7 +204,7 @@ enum Commands {
 
 #[derive(Subcommand, Debug)]
 enum ContextAction {
-    /// Assemble the context to pass to the LLM this turn (prototype)
+    /// Print assembled context; it is not automatically injected into DSH (prototype).
     Build {
         #[arg(long = "query")]
         query: Option<String>,
@@ -309,7 +318,17 @@ fn main() {
         }
         // else: fall through to the normal CLI (rdsh-native subcommand)
     }
-    // NOTE: --version/-V is served by clap itself (prints "rdsh x.y.z", exit 0).
+    // The alias branch above owns dsh --version. Only a standalone native
+    // version flag skips parser construction; combined flags still use clap.
+    let mut version_args = std::env::args_os().skip(1);
+    if version_args
+        .next()
+        .is_some_and(|arg| matches!(arg.to_str(), Some("--version" | "-V")))
+        && version_args.next().is_none()
+    {
+        println!("{NATIVE_VERSION}");
+        return;
+    }
     let cli = Cli::parse();
     // Fast path: empty share list is by far the common case; skip JSON serializer.
     // Same bytes out ("[]"), one allocation saved per invocation.
@@ -639,6 +658,22 @@ fn main() {
     if let Err(e) = result {
         eprintln!("[rdsh] error: {e:#}");
         std::process::exit(1);
+    }
+}
+
+const NATIVE_VERSION: &str = concat!("rdsh ", env!("CARGO_PKG_VERSION"));
+
+#[cfg(test)]
+mod cli_version_tests {
+    use super::*;
+
+    #[test]
+    fn native_version_text_matches_clap_for_both_flags() {
+        for flag in ["--version", "-V"] {
+            let error = Cli::try_parse_from(["rdsh", flag]).unwrap_err();
+            assert_eq!(error.kind(), clap::error::ErrorKind::DisplayVersion);
+            assert_eq!(error.to_string(), format!("{NATIVE_VERSION}\n"));
+        }
     }
 }
 

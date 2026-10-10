@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Migrate from Claude Code / Codex (DSHへの移行)
+    url: https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/CODING-AGENTS.md
+    about: Install DSH, connect a model, reuse project instructions and start your first conversation. Japanese guide linked inside.
   - name: Question / Support (質問・相談)
     url: https://github.com/jimoto-no-llm/rustdsh/issues
     about: Usage questions and ideas. Japanese OK.

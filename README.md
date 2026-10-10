@@ -1,6 +1,6 @@
 <img src="assets/icon.png" width="96" alt="rdsh icon">
 
-# rdsh — a fast, safe Rust launcher for `dsh`
+# rdsh — a fast Rust launcher for DeepSeek Harness
 
 [![ci](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/ci.yml/badge.svg)](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/ci.yml)
 [![dashboard](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/dashboard.yml/badge.svg)](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/dashboard.yml)
@@ -18,33 +18,58 @@ An independent community project; not an official DeepSeek or DeepSeek Harness p
 the hot paths to Rust and delegates conversations and model runs to the
 original `dsh` binary. Arguments you already use keep working as-is.
 
+**Moving from Claude Code or Codex to DSH?**
+The [migration guide](docs/CODING-AGENTS.md) takes you from installation and model
+connection to your first DSH conversation in your existing project. Keep your
+`AGENTS.md` / `CLAUDE.md`; standard DSH profiles already read them.
+
 ## Why rdsh?
 
-- Fast startup, small footprint. `--version` replies in about 0.90 ms with about 2.9 MB peak RSS on Linux x86_64 (original `dsh`: about 88 ms and 66 MB). Short-CLI numbers only; they do not describe the resident Desktop app or model calls.
+- Fast startup, small footprint. In the [2026-10-10 measurement](docs/evidence/ux-performance-20261010/README.md), `--version` took 0.91 ms median with 2.75 MB peak RSS on Linux/WSL x86_64 (original `dsh`: 73 ms and 68 MB). These short CLI calls do not describe the resident Desktop app or model calls.
 - Drop-in compatible. Anything that is not an rdsh-native subcommand is passed to the original binary unchanged, so existing scripts keep running.
 - Useful native commands. Token estimates, search, compaction, session listing, and health checks run without starting Node.
 - Safe by default. Read paths never write, server features stay off until enabled, and agent tools run under mandatory isolation on supported Linux.
 
 ## Getting started
 
+Install using the commands below. Conversations also need the original DSH;
+the [migration guide](docs/CODING-AGENTS.md#1-install-rdsh-and-the-original-dsh)
+shows its pinned installation. Then verify the installation:
+
 ```sh
-rdsh --version && rdsh doctor   # verify install and original dsh
-rdsh setup --web                # open the printed #key=... URL, connect a model
-rdsh tui                        # start a conversation, confirm a model reply
+rdsh --version
+rdsh doctor
 ```
 
-See the [usage and recovery flow](docs/USER-FLOW.md),
-[settings](docs/RDSH-SETTINGS.md), and [architecture](docs/ARCHITECTURE.md).
-Delegated conversations need the original DSH runtime.
+To reuse a Codex ChatGPT login, run `rdsh auth --import --provider openai-codex --source codex`.
+Then start DSH in a project with a `README.md`:
+
+```sh
+cd /absolute/path/to/your/project
+rdsh --share-file README.md --profile web
+```
+
+In DSH, open **Settings → Models** to add the provider and API key (or imported Codex OAuth).
+Choose the same project in **Choose workspace**, press **New Session**, select
+its model and confirm a reply.
+The [migration guide](docs/CODING-AGENTS.md) includes the pinned DSH install,
+login import, instruction reuse and recovery steps. The Web profile initializes
+on first use; `rdsh tui` requires an installed `tui` profile.
+
+Protected conversations currently require Linux x86_64 (WSL on Windows), original
+DSH, Node.js, bubblewrap and prlimit. Model tools inspect explicitly shared files
+read-only; full code editing and project test execution are not supported yet.
+Native CLI tools remain usable without DSH: `printf 'hello rdsh\n' | rdsh tokens`
+(PowerShell: `"hello rdsh" | rdsh tokens`).
 
 ## Requirements
 
 | Item | Detail |
 | --- | --- |
 | OS | Linux, macOS, WSL, Windows (native). Agent isolation needs Linux x86_64 + bubblewrap + prlimit. |
-| DSH runtime | Original `dsh` for conversations. Audited versions: 0.2.0-rc.2, 0.2.1-alpha.1. |
+| DSH runtime | Required only for DSH conversations, not local text tools or the project MCP dashboard. Audited versions: 0.2.0-rc.2, 0.2.1-alpha.1. |
 | Rust | 1.85+ (source builds only). Prebuilt binaries need no Rust. |
-| Optional | Node.js 22+ for the [Node.js dashboard](dashboard/README.md); SearXNG for `search-web`; `zstd` CLI for exact compressed token sizes. |
+| Optional | Node.js 22+ for the [Node.js dashboard](dashboard/README.md); SearXNG for `search-web`; `zstd` CLI for bounded decompression of sessions whose frame headers omit content size. |
 
 ## Install
 
@@ -137,7 +162,7 @@ did elsewhere into `$DSH_HOME/.credentials.yaml`, the store dsh itself reads:
 rdsh auth            # status: what was found, what dsh already recognizes
 rdsh auth --import --provider openai-codex   # write missing/older grants only (0600, others untouched)
 rdsh auth --json     # machine-readable status
-rdsh setup           # first-run wizard: import, key paste, --login/--open
+rdsh setup           # inspect model setup and show explicit login/import steps
 rdsh setup --web     # localhost setup UI (browser auto-opens, per-launch #key=... URL)
 ```
 
@@ -184,8 +209,8 @@ configured remain trusted code.
 `guard` scans stdin (hook JSON or raw text) for `--deny` patterns:
 exit 2 blocks with a reason, exit 0 passes. `--json` prints
 `{"decision":"block"}` or `{}`. A miss is not an approval; the host
-must still enforce permissions. `*` matches any string. At about 1 ms
-startup, per-tool-call cost is effectively zero.
+must still enforce permissions. `*` matches any string. Guard is a short native
+CLI invocation; its cost depends on the input and machine.
 
 ```sh
 echo "$input" | rdsh guard --deny "rm -rf /*" --deny "*token*"
@@ -239,6 +264,14 @@ export `DSH_PACKAGE_DIR`.
 
 ## Web dashboard
 
+The [rdsh settings page](docs/RDSH-SETTINGS.md) keeps multiline drafts while typing,
+shows unsaved changes, and confirms before discarding them on reload. Saving only
+Discord preserves drafts in the other sections. Section navigation and a sticky
+save bar are available on desktop and mobile; failed saves keep the input.
+Setup and local tools explain what they change and offer recovery steps.
+Project updates keep unchanged question controls in place, preserving focus and
+the caret. [Real screens, edit/save GIF, and regression results](docs/evidence/ux-performance-20261010/README.md).
+
 For the read-only workflow member board in DSH's conversation GUI, use the [verified source-patch preparation tool](plugins/workflow-board/README.md) with an isolated compatible source checkout. It includes the 18-file board/UI projection patch, compatibility diagnostics and fixture tests; building and adopting the patched DSH are separate steps.
 
 ```sh
@@ -276,7 +309,28 @@ normal GUI restart/reload; see [browser verification](docs/evidence/update-notic
 
 ## Benchmarks
 
-Measured on Linux x86_64, including before/after comparisons:
+Current checkout, measured on 2026-10-10 against `e81782a` on Linux/WSL x86_64:
+
+| Case | Before | After | Before / after |
+| --- | --- | --- | --- |
+| Native `--version` (median, n=21) | 1.065 ms | 0.908 ms | 1.17x |
+| ASCII prune (10 MiB, budget 4000, n=21) | 10.770 ms | 7.830 ms | 1.38x |
+| No-match search (160 files, 960k lines, n=21) | 8.998 ms | 5.390 ms | 1.67x |
+| Browser idle render + layout (n=21) | 30.50 ms | 0.40 ms | 76.3x |
+| Browser metrics-only render + layout (n=21) | 28.90 ms | 3.30 ms | 8.8x |
+| Release binary size | 1,956,552 bytes | 1,968,752 bytes | — |
+
+The browser fixture contains 100 tasks, 40 questions and 30 events. It measures
+rendering with synthetic data, not network latency, model execution or INP.
+CLI outputs and visible browser data/drafts were checked for equality. Other
+commands show small gains or slowdowns: the full table, raw samples, environment,
+screenshots and reproduction are in the [dated evidence](docs/evidence/ux-performance-20261010/README.md).
+These changes are included in v0.2.1; earlier v0.2.0 binaries do not include them.
+
+### Historical Linux measurements
+
+The earlier measurements below used different revisions, builds and workloads.
+The 806 KB size is historical; the current release build is about 1.97 MB.
 
 | Case | rdsh | Baseline | Factor |
 | --- | --- | --- | --- |
@@ -312,6 +366,8 @@ before/after output checks are in [BENCHMARKS.md](docs/BENCHMARKS.md).
 | Doc | What it covers |
 | --- | --- |
 | [docs/USER-FLOW.md](docs/USER-FLOW.md) | Install to setup to use to recover. |
+| [docs/CODING-AGENTS.md](docs/CODING-AGENTS.md) | Move from Claude Code / Codex: install, model connection, instructions and first conversation. |
+| [docs/PROJECT-MCP.md](docs/PROJECT-MCP.md) | Optional project MCP setup and removal for existing clients. |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Delegation, settings ownership, crate layout. |
 | [docs/BENCHMARKS.md](docs/BENCHMARKS.md) | Reproducible measurements. |
 | [docs/RDSH-SETTINGS.md](docs/RDSH-SETTINGS.md) | Settings UI and CLI keys. |
@@ -332,7 +388,7 @@ before/after output checks are in [BENCHMARKS.md](docs/BENCHMARKS.md).
 - Port is busy? The dsh web GUI uses 3080; `rdsh serve` defaults to 38080. Use `--port 0` for a free port.
 - A profile collides with a subcommand name? Boot it explicitly: `dsh --profile <name>`.
 - Revert the replacement? `./install.sh --restore` brings the original back.
-- What does `~123tok?` mean? Without the `zstd` CLI the estimate falls back to compressed-bytes/4; the `?` marks that.
+- What does `~123tok?` mean? The unpacked size could not be determined, so the estimate uses compressed-bytes/4. Known-size zstd frame headers need no CLI; other frames need working bounded decompression.
 
 ## Credits
 

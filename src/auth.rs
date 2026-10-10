@@ -1331,29 +1331,35 @@ fn print_guide() {
     let cfg =
         opencode_config_path().unwrap_or_else(|| "<config dir>/opencode/opencode.json".to_string());
     if is_japanese() {
-        println!("[rdsh setup] まだ使えるモデルがありません。楽な順に3択です:");
-        println!("[rdsh setup]   1) サブスクで使う（APIキー不要・おすすめ）");
-        println!("[rdsh setup]      opencode auth login  … OpenAI(GPT)等を選んでOAuth接続");
-        println!("[rdsh setup]      codex login          … ChatGPTプランでGPTを使う場合");
-        println!("[rdsh setup]      終わったら rdsh auth --import --provider openai-codex で取り込みます（rdsh setup --login でも実行）");
-        println!("[rdsh setup]   2) DeepSeekキーを使う（dshが最初に求める接続がこれです）");
-        println!("[rdsh setup]      platform.deepseek.com で発行 → 上の入力欄に貼り付け");
-        println!("[rdsh setup]      または DEEPSEEK_API_KEY=... rdsh setup --yes で保存");
-        println!("[rdsh setup]   3) あとで：このまま起動するとdshがDeepSeek接続を求めます");
+        println!("[rdsh setup] モデル接続が未設定です。接続方法を選んでください:");
+        println!("[rdsh setup]   1) Codexの既存ログインを使う");
+        println!("[rdsh setup]      rdsh auth --import --provider openai-codex --source codex");
+        println!("[rdsh setup]      未ログインの場合だけ、先に codex login を実行します");
+        println!("[rdsh setup]   2) APIキーを使う（Claude等）");
+        println!("[rdsh setup]      DSHの Settings → Models で接続先とAPIキーを一緒に追加します");
+        println!("[rdsh setup]      APIキーはサブスクリプションのログインとは別です");
+        println!("[rdsh setup]   3) opencodeのログインを使う");
+        println!("[rdsh setup]      opencode auth login → rdsh auth でプロバイダーIDを確認します");
+        println!("[rdsh setup]      rdsh auth --import --provider <id> --source opencode");
+        println!(
+            "[rdsh setup] setup --login はログインだけを開きます。取り込みは別途指定してください"
+        );
+        println!("[rdsh setup] Claude Codeの契約・認証・履歴は自動移行しません");
         println!("[rdsh setup] 認証ファイル: {creds}");
         println!("[rdsh setup] opencode設定: {cfg}");
     } else {
-        println!("[rdsh setup] no usable model yet. Easiest first:");
-        println!("[rdsh setup]   1) Use a subscription (no API key needed, recommended)");
-        println!(
-            "[rdsh setup]      opencode auth login  … pick OpenAI (GPT) and connect via OAuth"
-        );
-        println!("[rdsh setup]      codex login          … for ChatGPT-plan GPT access");
-        println!("[rdsh setup]      then run rdsh auth --import --provider openai-codex");
-        println!("[rdsh setup]   2) Use a DeepSeek key (what dsh asks for by default)");
-        println!("[rdsh setup]      issue one at platform.deepseek.com, then paste it above");
-        println!("[rdsh setup]      or save it with DEEPSEEK_API_KEY=... rdsh setup --yes");
-        println!("[rdsh setup]   3) Later: booting as-is leads to the DeepSeek prompt");
+        println!("[rdsh setup] no model connection configured. Choose a connection:");
+        println!("[rdsh setup]   1) Use an existing Codex login");
+        println!("[rdsh setup]      rdsh auth --import --provider openai-codex --source codex");
+        println!("[rdsh setup]      run codex login first only if you are not signed in");
+        println!("[rdsh setup]   2) Use an API key (including Claude)");
+        println!("[rdsh setup]      DSH Settings → Models: add the provider and API key together");
+        println!("[rdsh setup]      API keys are separate from subscription logins");
+        println!("[rdsh setup]   3) Use an opencode login");
+        println!("[rdsh setup]      opencode auth login, then rdsh auth to find the provider ID");
+        println!("[rdsh setup]      rdsh auth --import --provider <id> --source opencode");
+        println!("[rdsh setup] setup --login opens login only; import separately");
+        println!("[rdsh setup] Claude Code subscriptions, credentials and history are not migrated automatically");
         println!("[rdsh setup] credentials file: {creds}");
         println!("[rdsh setup] opencode settings: {cfg}");
     }

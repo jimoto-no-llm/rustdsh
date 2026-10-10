@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
 # rdsh installer: install as `rdsh`, optionally shadow `dsh` (with backup + restore).
-# Release checklist (Issue #7, docs only):
-# 1) bump version in Cargo.toml, 2) cargo build/test/regress green,
-# 3) commit + push, 4) cargo publish (needs crates.io token + verified email),
-# 5) refresh live install via ./install.sh --as-dsh and verify `dsh --version`
-# delegation, 6) confirm sync-dsh.sh picks up the new version on its next run.
+# Release metadata, verification and publication: docs/RELEASING.md
 set -euo pipefail
 # Release-download scratch dir (set by fetch_release); cleaned at exit.
 FETCH_TMPD=""
@@ -179,9 +175,12 @@ if [ "$MODE" = as-dsh ]; then
     echo "note: exec dsh/rdsh directly instead of via node; 'rdsh doctor' lists the offenders."
   fi
 fi
-echo "--- rdsh doctor ---"
+echo "Try: \"$PREFIX/rdsh\" --version"
+echo "Next: rdsh doctor, then follow the migration guide to connect a model in DSH."
+echo "Migrating from Claude Code / Codex to DSH: https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/CODING-AGENTS.md"
+echo "--- DSH diagnostics ---"
 "$PREFIX/rdsh" doctor 2>&1 | head -n 12 || true
-echo "next: run '$PREFIX/rdsh setup' to connect a model (GPT subscription via OAuth needs no API key)"
+echo "Start DSH in your project: rdsh --profile web (protected agent tools require Linux x86_64)."
 if [ -f "./plugins/install.sh" ]; then
-  echo "next: PROFILE=web ./plugins/install.sh adds recommended plugins, including the rdsh settings UI"
+  echo "For DSH Web: PROFILE=web ./plugins/install.sh adds recommended plugins, including the rdsh settings UI"
 fi

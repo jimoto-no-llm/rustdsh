@@ -1,0 +1,43 @@
+{
+  "scope": "real Rust setup/serve and Node project CLI+HTTP MCP+browser; no model calls, Tailscale or Electron Desktop",
+  "browser": "Browser plugin not available; Playwright",
+  "viewports": [
+    {
+      "width": 1280,
+      "height": 900
+    },
+    {
+      "width": 390,
+      "height": 844
+    }
+  ],
+  "flows": [
+    "setup: missing model connection -> Extras enable/readback/reload -> failed key save retains draft -> provider switch clears draft -> Anthropic/OpenAI/DeepSeek API save/readback",
+    "native serve: authenticated URL -> tokens -> prune -> sessions -> reload key retained",
+    "project updates: unchanged question DOM/caret retained; SSE burst coalesced to at most two GETs",
+    "project clock: cached decision expired and observation marked stale while HTTP503; connection recovered",
+    "project CLI: real MCP task/question -> browser draft preserved on SSE -> browser answer -> MCP/file readback -> process restart retained answer and revoked old key"
+  ],
+  "page_errors": [],
+  "console_errors": [
+    {
+      "text": "Failed to load resource: the server responded with a status of 500 (Internal Server Error)",
+      "path": "/api/key"
+    },
+    {
+      "text": "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
+      "path": "/api/state"
+    }
+  ],
+  "expected_console_errors": [
+    {
+      "path": "/api/key",
+      "status": 500
+    },
+    {
+      "path": "/api/state",
+      "status": 503
+    }
+  ],
+  "result": "PASS"
+}

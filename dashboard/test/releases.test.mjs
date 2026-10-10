@@ -221,6 +221,8 @@ test("existing run keeps the original adapter/Node/DSH command and native ID thr
     candidate.release_id,
   );
   await fs.writeFile(oldFile, oldBytes, { mode: 0o444 });
+  // Creation mode is filtered by umask; restore the pinned mode exactly.
+  await fs.chmod(oldFile, 0o444);
   const rolled = await releases.check(alpha, old.release_id, 2, {
     rollback: true,
   });
@@ -394,6 +396,7 @@ test("tampered, missing, incompatible and unqualified bytes block dispatch; lega
     (err) => err.code === "ENOENT",
   );
   await fs.writeFile(file, bytes, { mode: 0o444 });
+  await fs.chmod(file, 0o444);
   const legacy = await (
     await SessionLedger.open(alpha)
   ).record({ cli_session_id: "external-unpinned" });
@@ -488,6 +491,7 @@ test("stale selection plans never start native work, while exclusive registry ow
     );
     await fs.unlink(source);
     await fs.writeFile(source, sourceBytes, { mode: sourceMode });
+    await fs.chmod(source, sourceMode);
     const codeDirectory = path.dirname(source);
     const copiedDirectory = path.join(rootFor(alpha), "linked-code");
     const heldDirectory = path.join(rootFor(alpha), "held-code");

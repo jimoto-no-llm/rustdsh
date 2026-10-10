@@ -1,0 +1,45 @@
+✔ checks without writing; applies to a checkout with spaces; repeats with nested new files (247.140353ms)
+﹣ Windows drive-letter casing still identifies the same source root (0.235539ms) # SKIP
+✔ rejects modified source, untracked files, wrong roots and unsupported revisions (200.954566ms)
+✔ rejects changed patch bytes, header and unexpected paths before writing (195.939867ms)
+✔ rejects unsafe or unpinned manifest paths (165.908054ms)
+✔ a conflicting multi-file patch applies no partial changes (161.186614ms)
+✔ user whitespace preferences cannot reject the pinned patch (184.429147ms)
+✔ already-applied refuses unrelated tracked or untracked changes (263.073026ms)
+✔ reverse-applicable target edits still fail exact blob verification (156.985464ms)
+✔ a different staged target cannot hide behind matching working files (133.96145ms)
+✔ CRLF text checkout bytes match the pinned Git text blobs (138.509523ms)
+✔ APPLY_FAILED is reported without claiming success or reverting user files (127.766483ms)
+✔ VERIFY_FAILED catches post-write edits outside patch context and retains the evidence (140.845414ms)
+✔ Git ownership protection is retained (85.688512ms)
+✔ preparation never invokes repository fsmonitor commands (133.622576ms)
+✔ bundled checksum, patch header, numstat and blob coverage agree (93.070227ms)
+✔ CLI executes through a linked bundle and diagnoses non-Git package directories (234.219975ms)
+✔ dismiss closes only this occurrence; remount keeps it closed and full reload shows it (14.877443ms)
+✔ close closes only this occurrence; remount keeps it closed and full reload shows it (3.1026ms)
+✔ two-hour cadence is anchored to update time, continues through close/reload, and repeats (550.188747ms)
+✔ live state reaches an idle page without polling; a new update time starts a new occurrence (20.059454ms)
+✔ late reads cannot resurrect a close or overwrite a streamed newer update (6.887143ms)
+✔ storage and stream closes match the current update and period, never a later reminder (3.618983ms)
+✔ legacy permanent dismissals are ignored; storage failures still support close, remount and reminders (418.121685ms)
+✔ disconnected streams fall back to polling and reconnect without reopening a closed occurrence (3.40842ms)
+✔ returning to a suspended page catches up to the fixed cadence without resetting it (602.151828ms)
+✔ successful updater check closes its occurrence, preserves the cadence and allows reload (229.342029ms)
+✔ failed updater remains retryable; success closes the card; HTTP errors never acknowledge it (2.559217ms)
+✔ an in-flight updater blocks duplicate clicks and cannot dismiss a newer update (2.47585ms)
+✔ minimize persists within an occurrence; the next reminder expands it; cleanup removes timers (320.791032ms)
+▶ authenticated occurrence-close API keeps updater state intact and streams bounded
+  ✔ authentication precedes stream/body access; methods, bodies and occurrence inputs are bounded (10.702613ms)
+  ✔ atomic private closes never suppress reload or mutate update state; legacy markers stay intact (20.746618ms)
+  ✔ planted close links cannot modify outside files; linked directories are refused (13.07432ms)
+  ✔ streams cap subscribers, disconnect slow readers, bootstrap without old closes, and dispose (26.421076ms)
+  ✔ demo closes never write account files and use a stable update time (3.643479ms)
+✔ authenticated occurrence-close API keeps updater state intact and streams bounded (89.979799ms)
+ℹ tests 36
+ℹ suites 0
+ℹ pass 35
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 2761.409839

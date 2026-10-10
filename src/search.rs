@@ -240,6 +240,12 @@ fn grep_one(
         return hits;
     }
     if let Some(text) = read_capped(path, root) {
+        // Most searched files have no match. Scan the whole buffer once using
+        // str's substring search before paying for per-line splitting/search.
+        // A match still takes the same lines() path (including CRLF/truncation).
+        if !text.contains(pattern) {
+            return hits;
+        }
         for (i, line) in text.lines().enumerate() {
             if line.contains(pattern) {
                 hits.push(format!(

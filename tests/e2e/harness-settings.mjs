@@ -49,8 +49,18 @@ try{
  assert.equal(await section.getByRole('button',{name:'Discord設定を保存',exact:true}).isDisabled(),true);
  assert.equal(await section.getByRole('figure',{name:'Discord表示プレビュー'}).getByText('Discord settings E2E',{exact:true}).count(),1);
  await section.getByText('ポート',{exact:true}).locator('..').locator('input').fill('');
- await section.getByRole('button',{name:'保存する',exact:true}).click();await section.locator('.rdsh-msg').filter({hasText:'保存しました'}).waitFor();
+ const tasks=section.getByLabel('未解決タスク (1行1件)',{exact:true});
+ await tasks.fill('First task');await tasks.scrollIntoViewIfNeeded();await page.screenshot({path:path.join(output,'multiline-first.png')});
+ await tasks.press('End');await tasks.press('Enter');assert.equal(await tasks.inputValue(),'First task\n');
+ await tasks.pressSequentially('Second task');assert.equal(await tasks.inputValue(),'First task\nSecond task');
+ // Real captures for the short multiline editing/save flow GIF.
+ await tasks.scrollIntoViewIfNeeded();await page.screenshot({path:path.join(output,'multiline-draft.png')});
+ const beforeReload=await goal.inputValue();page.once('dialog',dialog=>dialog.dismiss());
+ await section.getByRole('button',{name:'再読み込み',exact:true}).click();assert.equal(await goal.inputValue(),beforeReload);assert.equal(await tasks.inputValue(),'First task\nSecond task');
+ await section.getByRole('button',{name:'保存する',exact:true}).click();await section.locator('.rdsh-msg').filter({hasText:'設定を保存しました'}).waitFor();
+ await page.screenshot({path:path.join(output,'multiline-saved.png')});
  const saved=JSON.parse(await readFile(settings,'utf8'));assert.deepEqual(saved.discord,{enabled:false,application_id:'123456789012345678',details:'Discord settings E2E',show_agent_status:false,show_elapsed:false,show_image:true,status_display:'details',large_image:'',large_text:'',button_label:'',button_url:''});assert.equal(saved.context.goal,'Genuine DSH plugin E2E');assert.equal(saved.serve.port,38080);assert.deepEqual(saved.extras.enable,['serve']);
+ assert.deepEqual(saved.context.open_tasks,['First task','Second task']);
  await section.getByRole('button',{name:'再読み込み',exact:true}).click();await goal.waitFor();assert.equal(await goal.inputValue(),'Genuine DSH plugin E2E');
  await section.getByText('独自のDiscordアプリを使う',{exact:true}).click();
  await section.getByPlaceholder('Discord Application ID').fill('');
@@ -65,6 +75,8 @@ try{
  await page.screenshot({path:path.join(output,'harness-settings-error.png')});
  await writeFile(settings,JSON.stringify(saved));await page.getByRole('button',{name:'再読み込み',exact:true}).click();await goal.waitFor();assert.equal(await goal.inputValue(),'Genuine DSH plugin E2E');
  await page.setViewportSize(report.viewports[1]);await page.screenshot({path:path.join(output,'harness-settings-mobile.png')});
+ await section.getByRole('button',{name:'起動とコマンド',exact:true}).click();await page.screenshot({path:path.join(output,'harness-settings-general-mobile.png')});
+ await section.getByRole('button',{name:'文脈（実験）',exact:true}).click();await page.screenshot({path:path.join(output,'harness-settings-context-mobile.png')});
  report.mobile_content_width=await section.evaluate(e=>e.getBoundingClientRect().width);
  assert.ok(report.mobile_content_width>=280,'rdsh content should remain usable at 390px');
  report.mobile_overflow=await section.evaluate(e=>e.scrollWidth>e.clientWidth+1);assert.equal(report.mobile_overflow,false);

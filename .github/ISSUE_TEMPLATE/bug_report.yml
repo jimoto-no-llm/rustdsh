@@ -8,7 +8,7 @@ body:
     attributes:
       label: Version
       description: Output of `rdsh --version` (or tag/commit).
-      placeholder: "v0.1.2"
+      placeholder: "v0.2.1"
     validations:
       required: true
   - type: input
@@ -23,10 +23,23 @@ body:
     id: repro
     attributes:
       label: Reproduction steps
-      description: Minimal commands. Include `rdsh doctor` output.
+      description: Minimal commands. Include `rdsh doctor` output for DSH delegation bugs. Remove keys, credentials and private paths.
       placeholder: |
         1. ...
         2. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: client
+    attributes:
+      label: How are you using rdsh?
+      description: Include your previous client when reporting a migration issue.
+      options:
+        - Migrating from Claude Code to DSH
+        - Migrating from Codex to DSH
+        - DSH launcher or settings
+        - Local CLI tools only
+        - Optional project MCP dashboard
     validations:
       required: true
   - type: textarea

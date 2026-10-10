@@ -1,6 +1,6 @@
 <img src="assets/icon.png" width="96" alt="rdsh icon">
 
-# rdsh — `dsh` を速く・安全に起動する Rust 製ランチャー
+# rdsh — DeepSeek Harnessを速く使うRustランチャー
 
 [![ci](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/ci.yml/badge.svg)](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/ci.yml)
 [![dashboard](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/dashboard.yml/badge.svg)](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/dashboard.yml)
@@ -13,13 +13,18 @@
 
 独立したコミュニティプロジェクトです。DeepSeek や DeepSeek Harness の公式ではありません。
 
-`rdsh` は [dsh](https://github.com/deepseek-ai/deepseek-harness)（DeepSeek Harness の CLI）を
+[dsh](https://github.com/deepseek-ai/deepseek-harness)（DeepSeek Harness の CLI）を
 速く使うためのランチャーです。全部を書き換えるのではなく、よく使う速い処理だけ Rust にして、
 会話やモデルの実行は本家の `dsh` にそのまま任せます。今お使いの引数はそのまま動きます。
 
+**Claude Code／CodexからDSHへ移行する方へ。**
+[移行ガイド](docs/CODING-AGENTS.ja.md)に、導入・モデル接続・いつものプロジェクトでの
+最初の会話までをまとめました。プロジェクトの`AGENTS.md`／`CLAUDE.md`は、
+標準のDSHプロファイルがそのまま読みます。
+
 ## rdsh を選ぶ理由
 
-- 起動が速く、メモリも軽いです。Linux x86_64 の `--version` で約0.90ミリ秒・最大約2.9MB を測定しました（本家 `dsh` は約88ミリ秒・約66MB）。短い CLI 呼び出しの数値で、常駐する Desktop 全体やモデル通信の軽さを表すものではありません。
+- 起動が速く、メモリも軽いです。[2026-10-10の測定](docs/evidence/ux-performance-20261010/README.md)ではLinux/WSL x86_64の `--version` が中央値0.91ms・最大RSS 2.75MBでした（本家 `dsh` は73ms・68MB）。短いCLI呼び出しの数値で、Desktop全体やモデル通信の性能を表すものではありません。
 - 互換性を壊しません。rdsh 固有のサブコマンド以外は引数を変えずに本家へ渡すので、既存のスクリプトはそのまま動きます。
 - 便利な高速コマンドがあります。トークン見積りや検索、圧縮、セッション一覧、状態確認を Node なしで実行できます。
 - 初期状態から安全です。参照系は書き込みをせず、サーバー機能は有効化するまで動きません。対応する Linux ではエージェントのツールを隔離して動かします。
@@ -43,23 +48,44 @@
 
 ## はじめに
 
+下のインストール手順で導入します。会話には本家DSHも必要です。
+[移行ガイドの導入手順](docs/CODING-AGENTS.ja.md#1-rdshと本家dshを用意する)で
+対応する版を用意し、導入を確認します。
+
 ```sh
-rdsh --version && rdsh doctor   # 導入と本家 dsh の確認
-rdsh setup --web                # 表示される #key=... 付き URL を開き、モデルに接続します
-rdsh tui                        # 会話を始め、選んだモデルの返答まで確かめます
+rdsh --version
+rdsh doctor
 ```
 
-詳しい [導入・利用・復旧の流れ](docs/USER-FLOW.md)、[設定画面](docs/RDSH-SETTINGS.md)、
-[構成図](docs/ARCHITECTURE.md)も用意しています。会話の委譲には本家の DSH が必要です。
+CodexのChatGPTログインを使う場合は、`rdsh auth --import --provider openai-codex --source codex`で取り込みます。
+続いて、`README.md`があるプロジェクトでDSHを起動します。
+
+```sh
+cd /absolute/path/to/your/project
+rdsh --share-file README.md --profile web
+```
+
+DSHの**Settings → Models**で接続先とAPIキー（または取り込んだCodex OAuth）を追加します。
+**Choose workspace**で起動時と同じプロジェクトを選び、**New Session**で会話を作ります。
+入力欄でモデルを選び、返答を確認してください。
+[移行ガイド](docs/CODING-AGENTS.ja.md)に、本家DSHの導入・ログイン取り込み・指示の引き継ぎ・
+復旧手順があります。Webプロファイルは初回に自動初期化されます。
+`rdsh tui`は`tui`プロファイルを導入済みの場合に使えます。
+
+現在、保護された会話起動にはLinux x86_64（WindowsはWSL）・本家DSH・Node.js・
+bubblewrap・prlimitが必要です。モデルのツールは共有ファイルの読み取り専用で、
+コード編集やホストのテスト実行は未対応です。
+単独のCLIはDSHなしでも使えます：`printf 'hello rdsh\n' | rdsh tokens`
+（PowerShellでは`"hello rdsh" | rdsh tokens`）。
 
 ## 動作環境
 
 | 項目 | 内容 |
 | --- | --- |
 | OS | Linux、macOS、WSL、Windows（ネイティブ）。エージェントの隔離には Linux x86_64 + bubblewrap + prlimit が必要です。 |
-| DSH 本体 | 会話には本家の `dsh` が必要です。監査済みは 0.2.0-rc.2 と 0.2.1-alpha.1 です。 |
+| DSH 本体 | DSHでの会話にだけ必要です。ローカルツールとプロジェクトMCP画面には不要です。監査済みは 0.2.0-rc.2 と 0.2.1-alpha.1 です。 |
 | Rust | ソースから作る場合のみ 1.85 以上が必要です。ビルド済みバイナリには Rust はいりません。 |
-| 任意 | [Node.js ダッシュボード](dashboard/README.md)には Node.js 22 以上、`search-web` には SearXNG、正確な圧縮見積りには `zstd` CLI が必要です。 |
+| 任意 | [Node.js ダッシュボード](dashboard/README.md)には Node.js 22 以上、`search-web` には SearXNG が必要です。サイズ情報のないzstd履歴の展開には `zstd` CLI を使います。 |
 
 ## インストール
 
@@ -152,7 +178,7 @@ rdsh bench --n 5                   # rdsh と dsh の起動比較です
 rdsh auth            # 状態確認です。見つかったログインと認識済みの一覧を出します
 rdsh auth --import --provider openai-codex   # 不足・古い分だけ書きます（0600、他は不変）
 rdsh auth --json     # 機械可読の状態出力です
-rdsh setup           # 初回ウィザードです。取り込み、キー貼付、--login/--open に対応します
+rdsh setup           # モデル設定を確認し、ログイン・明示的な取り込み手順を表示します
 rdsh setup --web     # localhost の設定画面です（ブラウザが自動で開き、起動ごとの #key=... が必要）
 ```
 
@@ -203,7 +229,7 @@ rdsh --share-file README.md --share-file src/main.rs --profile tui
 標準入力（フック JSON または生テキスト）を走査し、拒否パターンに当たれば exit 2 と理由で止め、
 当たらなければ exit 0 で通します。`--json` は止めるとき `{"decision":"block"}`、
 当たらないとき `{}` を返します。当たらないことは実行の許可ではなく、ホスト側の権限確認が別に必要です。
-パターンの `*` は任意文字列に当たります。起動約1ミリ秒・約3MB のため、毎回のフック費用はほぼゼロです。
+パターンの `*` は任意文字列に当たります。guardは短いネイティブCLI呼び出しで、所要時間は入力と実行環境によります。
 
 ```sh
 echo "$input" | rdsh guard --deny "rm -rf /*" --deny "*token*"
@@ -259,6 +285,12 @@ rdsh --profile web                             # slim 環境変数付きで起�
 
 ## Web UI
 
+[rdsh設定画面](docs/RDSH-SETTINGS.md)では、改行入力と未保存の変更を保持し、再読み込みで破棄する前に確認します。
+Discordだけの保存でも、他の項目の下書きは残ります。上部の保存ボタンと項目への移動はスマホでも使え、保存に失敗しても入力は消えません。
+初回設定とローカル状態画面には、操作の意味とエラーから戻る手順を表示します。
+プロジェクト画面は変わった部分だけを更新し、質問への入力中もフォーカスとカーソル位置を保ちます。
+[実画面・編集から保存までのGIF・回帰検証](docs/evidence/ux-performance-20261010/README.md)。
+
 DSHの会話GUIに読み取り専用のworkflow進捗ボードを追加する場合は、[対応sourceへの適用・診断ツール](plugins/workflow-board/README.ja.md)を隔離した対応checkoutに使います。boardと共通表示projectionを変更する18ファイルのpatch・fixtureテストを同梱し、patched DSHのbuild・採用は別工程です。
 
 ```sh
@@ -302,7 +334,26 @@ Dismiss・X、または更新確認の成功でその回の通知を閉じます
 
 ## 実測
 
-手元環境（Linux x86_64）での測定値です。条件をそろえた前後比較も含みます。
+2026-10-10に、現在のソースと改修前 `e81782a` をLinux/WSL x86_64で比較しました。
+
+| 項目 | 改修前 | 改修後 | 前 / 後 |
+| --- | --- | --- | --- |
+| `--version` 起動（中央値、n=21） | 1.065ms | 0.908ms | 1.17倍 |
+| ASCII prune（10MiB、上限4000、n=21） | 10.770ms | 7.830ms | 1.38倍 |
+| 該当なしの検索（160ファイル・96万行、n=21） | 8.998ms | 5.390ms | 1.67倍 |
+| 同じ状態のブラウザー描画＋レイアウト（n=21） | 30.50ms | 0.40ms | 76.3倍 |
+| 指標だけ変更したブラウザー描画＋レイアウト（n=21） | 28.90ms | 3.30ms | 8.8倍 |
+| releaseバイナリのサイズ | 1,956,552バイト | 1,968,752バイト | — |
+
+ブラウザーはタスク100件・質問40件・イベント30件の合成データで測定しました。
+描画処理の測定であり、通信・モデル実行・利用者の操作応答時間（INP）の測定ではありません。
+CLIの出力一致、ブラウザーの表示内容と入力中の下書きの一致を確認しています。
+他のコマンドには小幅な改善や悪化もあります。[全項目の結果・生データ・環境・実画面・再現手順](docs/evidence/ux-performance-20261010/README.md)に残しています。
+この修正はv0.2.1に含まれます。以前のv0.2.0バイナリには含まれません。
+
+### 過去のLinux測定
+
+以下は以前の版・ビルド・入力条件での測定です。約806KBは当時のサイズで、現在のreleaseビルドは約1.97MBです。
 
 | 項目 | rdsh | 比較対象 | 倍率 |
 | --- | --- | --- | --- |
@@ -337,6 +388,8 @@ v0.2.0 公開後のソース修正は、その公開済みバイナリには含�
 | 資料 | 内容 |
 | --- | --- |
 | [docs/USER-FLOW.md](docs/USER-FLOW.md) | 導入から設定・利用・復旧までの流れです。 |
+| [docs/CODING-AGENTS.ja.md](docs/CODING-AGENTS.ja.md) | Claude Code／Codexからの移行：導入・モデル接続・指示・最初の会話です。 |
+| [docs/PROJECT-MCP.ja.md](docs/PROJECT-MCP.ja.md) | 任意のプロジェクトMCP接続・解除手順です。 |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 委譲と設定管理、クレート構成です。 |
 | [docs/BENCHMARKS.md](docs/BENCHMARKS.md) | 再現できる測定手順です。 |
 | [docs/RDSH-SETTINGS.md](docs/RDSH-SETTINGS.md) | 設定画面と CLI キーです。 |
@@ -357,7 +410,7 @@ v0.2.0 公開後のソース修正は、その公開済みバイナリには含�
 - ポートが使用中と言われる：dsh Web GUI は 3080、`rdsh serve` は既定 38080 です。`--port 0` で空きポートを使えます
 - プロファイル名がサブコマンドと重なる：`dsh --profile <name>` 形式で起動してください
 - 元に戻したい：`./install.sh --restore`（退避した本家を復元します）
-- `--tokens` の `?` 付き表示：zstd CLI がない環境では圧縮サイズからの概算である印です
+- `--tokens` の `?` 付き表示：展開後のサイズを取得できず、圧縮サイズから概算した印です。サイズ情報のあるzstdヘッダーはCLIなしで読め、それ以外は展開が必要です
 
 ## 謝辞
 

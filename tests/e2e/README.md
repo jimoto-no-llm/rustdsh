@@ -24,6 +24,12 @@ questions and browser answers, draft retention across SSE, process restart, and
 revocation of the previous browser key. Linux CI installs Chromium and retains PNGs
 and JSON even when the job fails.
 
+The UX regression flow also checks setup checkboxes with the keyboard, failed key
+saves without losing input, prune budget validation and copy invalidation, question
+DOM/focus/caret retention, coalesced SSE bursts, and local decision/observation expiry
+while HTTP is unavailable. HTTP500/503 responses are deliberate fixtures, and their
+handled console messages are recorded; unexpected browser errors still fail the run.
+
 The default command also runs `update-banner.mjs` with the real React component
 and two independent authenticated plugin hosts. Dummy HOME and loopback ports
 cover live update push, cross-tab/port close events, two-hour boundaries, reload
@@ -47,12 +53,28 @@ or model calls, and does not start the Electron Desktop GUI. DSH must already be
 installed; the optional test is not part of CI. The report separates
 `functional_result` from `mobile_accepted` and `mobile_readability`; command success
 means the settings flow passed, not that mobile UX was accepted.
+The flow also types multiple task lines, cancels a reload with unsaved changes,
+checks array persistence, and captures the draft/saved steps as real PNGs.
 
 For an existing browser installation, set `RDSH_CHROME_PATH`; an environment with
 bundled Playwright can set `RDSH_PLAYWRIGHT_MODULE` to its module path.
 
 See [the verification matrix](../../docs/evidence/e2e-20261008.md) for observed
 coverage and remaining environment-specific checks.
+
+## Rendering benchmark
+
+```sh
+RDSH_CHROME_PATH=/path/to/chrome node tests/e2e/benchmark-dashboard.mjs \
+  --baseline-ref <before-commit> --n 21 --output /tmp/rdsh-rendering.json
+```
+
+The runner serves the actual frontend modules from the chosen commit and working
+tree with synthetic public-state fixtures: 100 tasks, 40 questions, 30 events.
+It disables background timers and SSE only in the test browser, measures render plus
+forced layout, alternates sample order, and verifies visible data and focused drafts.
+It records source hashes, raw samples, median/p95, DOM mutations and question identity.
+This measures rendering, not network latency, model execution or user INP.
 
 ## Discord integration
 

@@ -1,7 +1,7 @@
 import { renderReports } from "./reports-view.mjs";
 import { renderQuestionCards } from "./question-cards-ui.mjs";
 import { renderAnswerApplications } from "./answer-applications-ui.mjs";
-import { renderOverview } from "./project-overview.mjs";
+import { overviewModel, renderOverview } from "./project-overview.mjs";
 import { renderConnectionDiagnostics } from "./connection-diagnostics-ui.mjs";
 import { createInstructionPanel } from "./instruction-queue-ui.mjs";
 import { createCostPanel } from "./cost-ledger-ui.mjs";
@@ -11,14 +11,12 @@ const $ = (id) => document.getElementById(id);
 const base = location.pathname.startsWith("/_rdsh") ? "/_rdsh/" : "/";
 const suppliedBrowserToken =
   base === "/" ? new URLSearchParams(location.hash.slice(1)).get("key") : null;
-const browserToken =
-  base === "/"
-    ? suppliedBrowserToken ||
-      sessionStorage.getItem("rdsh_project_browser_token") ||
-      ""
-    : "";
-if (browserToken) {
-  sessionStorage.setItem("rdsh_project_browser_token", browserToken);
+let browserToken = suppliedBrowserToken || "";
+if (base === "/") {
+  try {
+    browserToken ||= sessionStorage.getItem("rdsh_project_browser_token") || "";
+    if (browserToken) sessionStorage.setItem("rdsh_project_browser_token", browserToken);
+  } catch {}
   if (suppliedBrowserToken !== null)
     history.replaceState(null, "", location.pathname + location.search);
 }
@@ -27,15 +25,22 @@ async function api(route, body) {
   const response = await fetch(
     base + "api/" + route,
     body === undefined
-      ? { headers }
+      ? { headers, signal: AbortSignal.timeout(15000) }
       : {
           method: "POST",
+          signal: AbortSignal.timeout(15000),
           headers: { ...headers, "content-type": "application/json" },
           body: JSON.stringify(body),
         },
   );
   const result = await response.json();
-  if (!response.ok) throw new Error(result.error || "接続できません");
+  if (!response.ok) throw new Error(
+    response.status === 401
+      ? "認証が切れました。最新のQRまたは rdsh-dashboard open から開き直してください。"
+      : response.status === 403
+        ? "この操作は許可されていません。接続先と操作できる対象を確認してください。"
+        : result.error || "接続できません。ダッシュボードの起動状態を確認してください。",
+  );
   return result;
 }
 function node(tag, text, className) {
@@ -46,6 +51,7 @@ function node(tag, text, className) {
 }
 let renderedRevision = -1;
 let latestState = null;
+let stateUnavailable = false;
 let selectedTask = "";
 let selectionKey = "";
 function navigateTo(id) {
@@ -80,6 +86,7 @@ function updateOverview(state) {
   }
   select.value = selectedTask;
   const view = renderOverview($("project-overview"), state, selectedTask, node);
+  if (stateUnavailable) $("overview-state").textContent = "接続を確認中 · 対象の現在状態は不明";
   $("quick-context").textContent = view.context;
   $("quick-context").title = view.context;
   $("quick-pending").textContent =
@@ -143,23 +150,36 @@ const renderInstructions = createInstructionPanel($("instruction-panel"), {
   refreshState,
 });
 const renderCosts = createCostPanel($("cost-ledger"), node);
-function render(state) {
+// Compare each visible region, rather than replacing every control on an idle
+// poll. Expiry is part of the key: equal revisions can still become stale.
+const renderedRegions = new Map();
+function updateRegion(name, value, update) {
+  const signature = JSON.stringify(value);
+  if (renderedRegions.get(name) === signature) return;
+  update();
+  renderedRegions.set(name, signature);
+}
+function render(state, connected = true) {
   if (state.revision < renderedRevision) return;
   renderedRevision = state.revision;
   latestState = state;
-  renderInstructions(state);
-  renderCosts(state);
-  renderBudget($("budget-admission"), state, node);
-  updateOverview(state);
+  if (connected) stateUnavailable = false;
+  updateRegion("instructions", [state.instructions, state.answer_applications, state.input_queue_revision, state.feedback], () => renderInstructions(state));
+  updateRegion("costs", state.cost_ledger, () => renderCosts(state));
+  updateRegion("budget", state.budget_admission, () => renderBudget($("budget-admission"), state, node));
+  updateRegion("overview", [stateUnavailable, overviewModel(state, selectedTask), state.tasks.map(task => [task.id, task.title])], () => updateOverview(state));
   renderReports(state);
   const unanswered = state.questions.filter((question) => question.answer === null);
-  renderQuestionCards($("questions"), unanswered, state.question_contracts, {
-    node,
-    api,
-    refreshState,
+  const expired = unanswered.map(question => {
+    const deadline = state.question_contracts?.cards[question.id]?.snapshot.decision.expires_at;
+    return Boolean(deadline && Date.parse(deadline) <= Date.now());
   });
-  renderAnswerApplications($("reply-status"), state, node);
-  $("answers").replaceChildren(
+  updateRegion("questions", [unanswered, state.question_contracts, expired], () =>
+    renderQuestionCards($("questions"), unanswered, state.question_contracts, { node, api, refreshState }),
+  );
+  updateRegion("replies", [state.answer_applications, state.feedback], () => renderAnswerApplications($("reply-status"), state, node));
+  const answered = state.questions.filter(question => question.answer !== null);
+  updateRegion("answers", [answered, state.question_contracts], () => $("answers").replaceChildren(
     ...state.questions
       .filter((question) => question.answer !== null)
       .slice()
@@ -182,18 +202,37 @@ function render(state) {
         );
         return element;
       }),
-  );
-  $("connection").textContent = "接続済み · プロジェクト専用";
-  $("updated").textContent =
+  ));
+  const connection = "接続済み · プロジェクト専用";
+  if (connected && $("connection").textContent !== connection) $("connection").textContent = connection;
+  const updated =
     `最終受信: ${state.updated_at ? new Date(state.updated_at).toLocaleString("ja-JP") : "まだ報告がありません"} · 鮮度は各項目の観測時刻から判定します。累計欄は報告元のAPI換算値です。台帳は出所ごとの報告値です。`;
+  if ($("updated").textContent !== updated) $("updated").textContent = updated;
 }
-async function refreshState() {
-  try {
-    render(await api("state"));
-  } catch (e) {
-    $("connection").textContent = e.message;
-    $("overview-state").textContent = "画面の更新に失敗 · 対象の現在状態は不明";
+let stateRequest = null, refreshPending = false;
+function refreshState() {
+  if (stateRequest) {
+    refreshPending = true;
+    return stateRequest;
   }
+  stateRequest = (async () => {
+    try { render(await api("state")); }
+    catch (error) {
+      stateUnavailable = true;
+      if (latestState) render(latestState, false);
+      $("connection").textContent = error.name === "TimeoutError"
+        ? "応答待ちが長引いています。接続先を確認し、画面を更新してください。"
+        : error.message;
+      $("overview-state").textContent = "画面の更新に失敗 · 対象の現在状態は不明";
+    }
+  })().finally(() => {
+    stateRequest = null;
+    if (refreshPending && !document.hidden) {
+      refreshPending = false;
+      void refreshState();
+    }
+  });
+  return stateRequest;
 }
 let qrObjectUrl = null;
 async function renderShare(config) {
@@ -352,7 +391,10 @@ try {
     $("share-toggle").setAttribute("aria-expanded", "true");
     let stopRequested = false;
     let pendingStop = null;
+    let managedRequest = false;
     const refreshManaged = async () => {
+      if (managedRequest) return;
+      managedRequest = true;
       try {
         const value = await api("managed-process"),
           scope = value.scope;
@@ -404,7 +446,7 @@ try {
         $("managed-status").textContent =
           "監視に接続できません · 終了は未確認です";
         $("managed-stop").disabled = true;
-      }
+      } finally { managedRequest = false; }
     };
     $("managed-stop").onclick = async () => {
       try {
@@ -465,7 +507,8 @@ try {
       await refreshManaged();
     };
     await refreshManaged();
-    setInterval(refreshManaged, 500);
+    setInterval(() => { if (!document.hidden || stopRequested) refreshManaged(); }, 500);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshManaged(); });
   } else {
     $("title").textContent = config.project.name;
     $("location").textContent = config.project.root;
@@ -485,14 +528,28 @@ try {
     const source = new EventSource(
       base + "api/live?key=" + encodeURIComponent(browserToken),
     );
-    source.addEventListener("changed", refreshState);
+    source.addEventListener("changed", () => {
+      if (document.hidden) refreshPending = true;
+      else refreshState();
+    });
     source.onerror = () => {
+      stateUnavailable = true;
+      if (latestState) render(latestState, false);
       $("connection").textContent = "再接続中…";
       $("overview-state").textContent = "再接続中 · 対象の現在状態は不明";
     };
     source.onopen = refreshState;
     // Expiration needs a clock update even when publishers send no SSE event.
-    setInterval(refreshState, 5000);
+    setInterval(() => {
+      if (document.hidden) return;
+      if (latestState) render(latestState, false);
+      void refreshState();
+    }, 5000);
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) return;
+      if (latestState) render(latestState, false);
+      void refreshState();
+    });
   }
 } catch (e) {
   $("connection").textContent = e.message;

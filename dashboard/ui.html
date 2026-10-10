@@ -13,7 +13,7 @@
         --card: #fff;
         --line: #deded8;
         --fg: #22231f;
-        --mut: #74766d;
+        --mut: #6c6e65;
         --blue: #386ed6;
         --red: #b34432;
         --green: #498460;
@@ -847,7 +847,7 @@
                   <th scope="col">ID</th>
                   <th scope="col">状態</th>
                   <th scope="col">題名</th>
-                  <th scope="col">ブロック要因</th>
+                  <th scope="col">進められない理由</th>
                 </tr>
               </thead>
               <tbody id="tasks"></tbody>
@@ -855,8 +855,8 @@
           </div>
         </details>
         <details class="fold" id="instruction-detail">
-          <summary>同じsessionへ追指示を送る</summary>
-          <h2>追指示と適用タイミング</h2>
+          <summary>同じセッションに追加指示を送る</summary>
+          <h2>追加指示と適用タイミング</h2>
           <p class="sub">
             下書きはこの端末で保持します。入力は順番に配送し、結果不明の入力がある場合は保留します。指示の保存で新しい実行権限は発行されません。
           </p>
@@ -874,7 +874,7 @@
           >
             <h2 id="reply-heading">回答の適用状況</h2>
             <p class="sub">
-              保存・通知配送・対象consumerの読取・入力処理の結果を分けて確認します。完了表示はこの回答入力へのACP応答です。作業の完了は受入検証で確認します。
+              保存・通知配送・回答を受け取る対象の読取・入力処理の結果を分けて確認します。完了表示はこの回答入力への元のCLIが返した応答です。作業の完了は受入検証で確認します。
             </p>
             <div id="reply-status" class="decision-grid"></div>
           </section>
