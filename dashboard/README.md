@@ -172,15 +172,15 @@ configuration after a restart, because the bearer key rotates.
 `runtime.json` の `token` は管理用、`mcp_token` は MCP 用です。ブラウザー用の
 鍵は `browser_url` に含まれます。これらを別用途で使い回さないでください。
 
-| Tool                       | Effect                                       |
-| -------------------------- | -------------------------------------------- |
+| Tool                               | Effect                                           |
+| ---------------------------------- | ------------------------------------------------ |
 | `dashboard_report_provider_status` | Report provider status, quota and retry evidence |
-| `dashboard_update_metrics` | Report measured cumulative snapshots         |
-| `dashboard_upsert_task`    | Create/update a task by ID                   |
-| `dashboard_ask_question`   | Ask a human a question with a unique ID      |
-| `dashboard_publish_event`  | Report progress or an artifact reference     |
-| `dashboard_get_feedback`   | Read durable answers after a sequence cursor |
-| `dashboard_get_state`      | Read this project's current state            |
+| `dashboard_update_metrics`         | Report measured cumulative snapshots             |
+| `dashboard_upsert_task`            | Create/update a task by ID                       |
+| `dashboard_ask_question`           | Ask a human a question with a unique ID          |
+| `dashboard_publish_event`          | Report progress or an artifact reference         |
+| `dashboard_get_feedback`           | Read durable answers after a sequence cursor     |
+| `dashboard_get_state`              | Read this project's current state                |
 
 Example tool arguments:
 
