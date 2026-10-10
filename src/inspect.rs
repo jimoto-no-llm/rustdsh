@@ -941,15 +941,12 @@ fn plain_file_no_follow(path: &std::path::Path) -> bool {
 /// Open one session file without following the final link/reparse point.
 /// Unix also opens every component beneath the sessions root by directory
 /// handle, so replacing a parent after enumeration cannot redirect the read.
-fn open_session_file(
-    root: &std::path::Path,
-    path: &std::path::Path,
-) -> Option<std::fs::File> {
+fn open_session_file(root: &std::path::Path, path: &std::path::Path) -> Option<std::fs::File> {
     let relative = path.strip_prefix(root).ok()?;
     if relative.as_os_str().is_empty()
-        || relative.components().any(|component| {
-            !matches!(component, std::path::Component::Normal(_))
-        })
+        || relative
+            .components()
+            .any(|component| !matches!(component, std::path::Component::Normal(_)))
     {
         return None;
     }
@@ -1137,7 +1134,7 @@ fn stream_decompressed_file_for_identity(
 /// Feed the already-open files to one zstd process through stdin. The child
 /// never resolves session paths; metadata is checked again after streaming.
 fn stream_many_decompressed_files(files: &mut [DeferredZstdFile]) -> Option<u64> {
-    use std::io::{Read, Seek, SeekFrom, Write};
+    use std::io::{Read, Seek, SeekFrom};
     if files.is_empty() {
         return None;
     }
@@ -1186,13 +1183,9 @@ fn stream_many_decompressed_files(files: &mut [DeferredZstdFile]) -> Option<u64>
     drop(input);
     let total = reader.join().ok()??;
     let success = child.wait().ok()?.success();
-    let stable = files
-        .iter()
-        .zip(before)
-        .all(|(entry, identity)| {
-            file_metadata(&entry.file) == Some(identity)
-                && identity == (entry.mtime, entry.bytes)
-        });
+    let stable = files.iter().zip(before).all(|(entry, identity)| {
+        file_metadata(&entry.file) == Some(identity) && identity == (entry.mtime, entry.bytes)
+    });
     if input_ok && success && stable {
         Some(total)
     } else {
@@ -1768,15 +1761,21 @@ mod measurement_gate_tests {
         std::os::unix::fs::symlink(&outside, &path).unwrap();
 
         let passthrough = session_root.join("zstd-passthrough.sh");
-        std::fs::write(&passthrough, b"#!/bin/sh\n[ \"$1\" = \"-dc\" ] || exit 2\ncat\n")
-            .unwrap();
+        std::fs::write(
+            &passthrough,
+            b"#!/bin/sh\n[ \"$1\" = \"-dc\" ] || exit 2\ncat\n",
+        )
+        .unwrap();
         std::fs::set_permissions(&passthrough, std::fs::Permissions::from_mode(0o700)).unwrap();
         assert_eq!(
             stream_decompressed_file_with(&mut opened, passthrough.as_os_str()),
             Some(original.len() as u64)
         );
         assert_eq!(file_meta(&path), None);
-        assert_eq!(file_meta(&session_root.join("opened-file.zstd")), Some(identity));
+        assert_eq!(
+            file_meta(&session_root.join("opened-file.zstd")),
+            Some(identity)
+        );
 
         std::fs::remove_dir_all(&dir).unwrap();
     }
