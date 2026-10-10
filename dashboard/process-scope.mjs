@@ -33,6 +33,7 @@ export async function spawnOwnedProcess({
   wslNode = "/root/.local/opt/rdsh-node/bin/node",
   cgroupParent = null,
   onStage = async () => {},
+  startupTimeoutMs = 10000,
 }) {
   if (
     !Array.isArray(command) ||
@@ -41,6 +42,12 @@ export async function spawnOwnedProcess({
     !/^owner_[a-f0-9-]{36}$/.test(owner_id)
   )
     throw new ScopeError("invalid_launch");
+  if (
+    !Number.isInteger(startupTimeoutMs) ||
+    startupTimeoutMs < 50 ||
+    startupTimeoutMs > 600000
+  )
+    throw new ScopeError("invalid_deadline");
   let launcher = [process.execPath, helper],
     framed = false;
   if (wsl) {
@@ -64,8 +71,11 @@ export async function spawnOwnedProcess({
       : ["pipe", "pipe", "pipe", "pipe", "pipe", "pipe"],
   });
   const monitorExit = new Promise((resolve) => {
-    monitor.once("exit", resolve);
-    monitor.once("error", resolve);
+    // `close` follows process exit and drains its output, including the exact
+    // startup-cleanup result sent by the supervisor.
+    monitor.once("close", (code, signal) =>
+      resolve({ exited: monitor.pid != null, code, signal }),
+    );
   });
   monitor.stderr.resume(); // Transport diagnostics can contain environment information.
   const child = new EventEmitter();
@@ -97,6 +107,7 @@ export async function spawnOwnedProcess({
   let lost = false,
     disposed = false,
     resourcesReleased = false,
+    startupCleanupConfirmed = null,
     sequence = 0,
     buffer = "",
     stopping = null,
@@ -107,20 +118,78 @@ export async function spawnOwnedProcess({
     readyResolve = resolve;
     readyReject = reject;
   });
-  const lose = () => {
+  const awaitMonitorExit = async (timeout) => {
+    let timer;
+    try {
+      return await Promise.race([
+        monitorExit,
+        new Promise((_, reject) => {
+          timer = setTimeout(
+            () => reject(new ScopeError("monitor_exit_timeout")),
+            timeout,
+          );
+        }),
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+  const cancelStartup = async (cause) => {
+    try {
+      monitor.stdin.end();
+    } catch {}
+    let exit;
+    try {
+      exit = await awaitMonitorExit(5000);
+    } catch (error) {
+      if (error.code !== "monitor_exit_timeout") throw cause;
+    }
+    if (exit) {
+      if (!exit.exited) throw cause;
+      if (startupCleanupConfirmed === true && exit.code === 0) throw cause;
+      throw new ScopeError("cleanup_unconfirmed");
+    }
+    // Killing the exact supervisor bounds the orphan risk, but cannot prove
+    // that a process group it created is empty. Keep that distinction visible.
+    if (
+      monitor.pid != null &&
+      monitor.exitCode === null &&
+      monitor.signalCode === null
+    ) {
+      try {
+        monitor.kill("SIGTERM");
+      } catch {}
+      try {
+        await awaitMonitorExit(1000);
+      } catch {
+        try {
+          monitor.kill("SIGKILL");
+        } catch {}
+        try {
+          await awaitMonitorExit(1000);
+        } catch {
+          throw new ScopeError("cleanup_unconfirmed");
+        }
+      }
+      if (startupCleanupConfirmed === true) throw cause;
+      throw new ScopeError("cleanup_unconfirmed");
+    }
+    throw new ScopeError("cleanup_unconfirmed");
+  };
+  const lose = (code = "ownership_unavailable") => {
     if (disposed || lost) return;
     lost = true;
-    readyReject(new ScopeError("ownership_unavailable"));
+    readyReject(new ScopeError(code));
     for (const { reject } of pending.values())
       reject(new ScopeError("monitor_lost"));
     pending.clear();
     child.emit("error", new ScopeError("monitor_lost"));
   };
-  monitor.on("error", lose);
-  monitor.on("exit", lose);
-  monitor.stdin.on("error", lose);
+  monitor.on("error", () => lose());
+  monitor.on("exit", () => lose());
+  monitor.stdin.on("error", () => lose());
   monitor.stdout.on("data", (chunk) => {
-    if (lost || disposed) return;
+    if (disposed) return;
     buffer += chunk.toString("utf8");
     if (buffer.length > 2 * 1024 * 1024) {
       lose();
@@ -132,6 +201,11 @@ export async function spawnOwnedProcess({
       buffer = buffer.slice(newline + 1);
       try {
         const frame = JSON.parse(line);
+        if (frame.type === "startup_cleanup") {
+          startupCleanupConfirmed = frame.confirmed === true;
+          continue;
+        }
+        if (lost) continue;
         if (frame.type === "ready") {
           initial = frame;
           child.pid = frame.pid;
@@ -146,7 +220,12 @@ export async function spawnOwnedProcess({
           pending.delete(frame.id);
           if (frame.error) p.reject(new ScopeError("ownership_unverifiable"));
           else p.resolve(frame.result);
-        } else if (frame.type === "monitor_error") lose();
+        } else if (frame.type === "monitor_error")
+          lose(
+            frame.reason === "cleanup_unconfirmed"
+              ? "cleanup_unconfirmed"
+              : "ownership_unavailable",
+          );
         else throw new Error();
       } catch {
         lose();
@@ -186,13 +265,12 @@ export async function spawnOwnedProcess({
       new Promise((_, reject) => {
         readyTimer = setTimeout(
           () => reject(new ScopeError("ownership_unavailable")),
-          10000,
+          startupTimeoutMs,
         );
       }),
     ]);
   } catch (error) {
-    monitor.stdin.end();
-    throw error;
+    await cancelStartup(error);
   } finally {
     clearTimeout(readyTimer);
   }
