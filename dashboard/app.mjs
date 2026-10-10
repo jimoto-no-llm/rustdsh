@@ -6,6 +6,7 @@ import { renderConnectionDiagnostics } from "./connection-diagnostics-ui.mjs";
 import { createInstructionPanel } from "./instruction-queue-ui.mjs";
 import { createCostPanel } from "./cost-ledger-ui.mjs";
 import { renderBudget } from "./budget-ui.mjs";
+import { createUpdateSummary } from "./update-summary.mjs";
 
 const $ = (id) => document.getElementById(id);
 const base = location.pathname.startsWith("/_rdsh") ? "/_rdsh/" : "/";
@@ -143,6 +144,21 @@ const renderInstructions = createInstructionPanel($("instruction-panel"), {
   refreshState,
 });
 const renderCosts = createCostPanel($("cost-ledger"), node);
+let summarySourceRecords = [];
+const renderUpdateSummary = createUpdateSummary($("update-summary"), {
+  node,
+  navigateTo,
+  loadChangeRecords: (afterRevision) =>
+    api(`changes?after_revision=${encodeURIComponent(afterRevision)}`),
+  onSourceRecords: (records, sourceEventIds, state) => {
+    summarySourceRecords = records;
+    renderReports(
+      { ...state, change_records: records },
+      Date.now(),
+      sourceEventIds,
+    );
+  },
+});
 function render(state) {
   if (state.revision < renderedRevision) return;
   renderedRevision = state.revision;
@@ -151,7 +167,13 @@ function render(state) {
   renderCosts(state);
   renderBudget($("budget-admission"), state, node);
   updateOverview(state);
-  renderReports(state);
+  const summarySources = renderUpdateSummary(state);
+  summarySourceRecords = summarySources.records;
+  renderReports(
+    { ...state, change_records: summarySourceRecords },
+    Date.now(),
+    summarySources.sourceEventIds,
+  );
   const unanswered = state.questions.filter((question) => question.answer === null);
   renderQuestionCards($("questions"), unanswered, state.question_contracts, {
     node,
@@ -166,6 +188,7 @@ function render(state) {
       .reverse()
       .map((question) => {
         const element = node("article", undefined, "event");
+        element.id = `answer-${question.id}`;
         element.append(
           node("strong", question.question),
           node("p", question.answer),

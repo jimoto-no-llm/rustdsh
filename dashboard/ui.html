@@ -208,6 +208,10 @@
         opacity: 0.55;
         cursor: wait;
       }
+      button[aria-disabled="true"]:not(:disabled) {
+        opacity: 0.55;
+        cursor: wait;
+      }
       button:focus-visible,
       a:focus-visible,
       textarea:focus-visible {
@@ -816,6 +820,13 @@
           </dl>
           <ul id="overview-pending"></ul>
         </section>
+        <section class="summary-card" aria-labelledby="update-summary-heading">
+          <h2 id="update-summary-heading">前回確認からの変化</h2>
+          <p class="sub">
+            確認位置はこのブラウザーのプロジェクト別保存領域に記録します。完了報告と検証済みは区別して表示します。
+          </p>
+          <div id="update-summary"></div>
+        </section>
         <h2 id="pending-heading" tabindex="-1">未回答の質問</h2>
         <p class="sub" id="pending-note">
           プロジェクト全体の質問です。回答はこの質問への返答のみです。対象・条件が変わった場合は回答前に内容を再確認してください。回答しただけで実行権限は生まれません。
@@ -883,6 +894,13 @@
           <summary>進捗・成果物の報告</summary>
           <h2>進捗・成果物の報告履歴</h2>
           <div class="feed" id="events"></div>
+          <details class="fold" id="change-records-detail">
+            <summary>状態更新イベント（最新30件）</summary>
+            <p class="sub">
+              タスク・質問・指標の更新元を確認できます。記録にはイベントID、版、対象を表示します。
+            </p>
+            <div class="feed" id="change-records"></div>
+          </details>
         </details>
         <details id="answered">
           <summary>回答済みの質問</summary>

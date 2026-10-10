@@ -196,7 +196,10 @@ export class ProjectStore {
         },
         cursor: null,
       });
-      next.changes = next.changes.slice(-10000);
+      if (next.changes.length > 10000) {
+        next.change_history_truncated = true;
+        next.changes = next.changes.slice(-10000);
+      }
     }
     await writeJson(path.join(this.project.directory, "state.json"), next);
     if (historyChanged) {
@@ -232,7 +235,8 @@ function freezeHistory(value) {
   return value;
 }
 export function publicState(value, observations, deliveries, budgetJobs) {
-  const { changes, ...visible } = value;
+  const visible = { ...value };
+  delete visible.changes;
   if (value.cost_ledger) visible.cost_ledger = publicCostLedger(value);
   if (value.budget_admission)
     visible.budget_admission = publicBudgetAdmission(value, budgetJobs);
@@ -284,6 +288,38 @@ export function publicState(value, observations, deliveries, budgetJobs) {
   return applications
     ? { ...result, answer_applications: applications }
     : result;
+}
+export function publicChangeRecords(value, afterRevision = 0) {
+  const rawChanges = Array.isArray(value.changes) ? value.changes : [];
+  const records = rawChanges
+    .map((change) => ({
+      event_id: typeof change?.eventId === "string" ? change.eventId.slice(0, 200) : "",
+      name: typeof change?.name === "string" ? change.name.slice(0, 100) : "",
+      timestamp: typeof change?.timestamp === "string"
+        ? change.timestamp.slice(0, 64)
+        : null,
+      revision: Number.isSafeInteger(change?.data?.revision)
+        ? change.data.revision
+        : null,
+      entity_id: typeof change?.data?.entity_id === "string"
+        ? change.data.entity_id.slice(0, 200)
+        : "",
+    }))
+    .filter((change) => change.event_id && change.name && change.revision !== null)
+    .sort((a, b) => a.revision - b.revision);
+  const oldestRevision = records[0]?.revision ?? null;
+  const truncated = Object.hasOwn(value, "change_history_truncated")
+    ? value.change_history_truncated === true
+    : rawChanges.length >= 10000;
+  return {
+    revision: Number.isSafeInteger(value.revision) ? value.revision : 0,
+    records: records.filter((record) => record.revision > afterRevision),
+    history_gap: truncated && (
+      oldestRevision === null
+        ? afterRevision < value.revision
+        : afterRevision < oldestRevision
+    ),
+  };
 }
 function text(value, label, max = 8000) {
   if (typeof value !== "string" || !value.trim() || value.length > max)
