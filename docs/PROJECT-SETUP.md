@@ -8,11 +8,11 @@ files; changing the JSON file alone does not change repository settings.
 
 ## Discovery and maintenance
 
-- The repository description describes local Rust tools, an MCP project dashboard
-  for Claude Code/Codex, and the DSH launcher. Topics cover Rust, DSH, DeepSeek,
-  CLI, dashboard, performance, MCP, Claude Code and Codex. The homepage points to
-  the README's getting-started section. Local tools and project MCP need no DSH;
-  DSH-only runtime controls remain explicit in the adapter catalog.
+- The repository description introduces the fast DSH launcher and migration
+  from Claude Code/Codex. Topics cover Rust, DSH, DeepSeek, CLI, dashboard,
+  performance, MCP, Claude Code and Codex. The homepage points to the README's
+  getting-started section. The migration guide distinguishes reusable instructions
+  and Codex OAuth from unsupported history, subscription and execution migration.
 - Merged PR branches are automatically deleted; local checkouts are unaffected.
 - Automatic merge is available after the required checks and other-person review
   succeed. It does not bypass branch protection.

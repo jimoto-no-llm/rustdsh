@@ -12,7 +12,7 @@
     }
   ],
   "flows": [
-    "setup: missing model connection rendered -> Extras enable -> file readback -> reload retained",
+    "setup: missing model connection -> Extras enable/readback/reload -> failed key save retains draft -> provider switch clears draft -> Anthropic/OpenAI/DeepSeek API save/readback",
     "native serve: authenticated URL -> tokens -> prune -> sessions -> reload key retained",
     "project updates: unchanged question DOM/caret retained; SSE burst coalesced to at most two GETs",
     "project clock: cached decision expired and observation marked stale while HTTP503; connection recovered",

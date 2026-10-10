@@ -1,0 +1,25 @@
+{
+  "result": "PASS",
+  "rdsh_version": "rdsh 0.2.1",
+  "upstream_version": "0.2.0-rc.2",
+  "scope": "Isolated synthetic Codex import and DSH instruction loader, fresh protected Web startup, synthetic Anthropic provider setup, original project workspace and model selection. No real credentials, history conversion or model prompts.",
+  "checks": {
+    "external_login_detected_without_automatic_import": true,
+    "selected_codex_import_and_private_storage": true,
+    "upstream_instruction_loader_reads_existing_names": true,
+    "original_client_and_project_files_unchanged": true,
+    "identical_sibling_instructions_deduplicated": true,
+    "anthropic_provider_added_with_key": true,
+    "anthropic_model_selected_without_a_prompt": true,
+    "startup_project_selected_as_workspace": true,
+    "empty_session_created_without_a_model_prompt": true,
+    "fresh_web_profile_initializes_and_renders_through_rdsh": true
+  },
+  "source_sha256": "e15b1a6340ea1cb7c64810a17049b7d930b89833fdf7b8d7868e46e7988a72e1",
+  "not_exercised": [
+    "live model reply",
+    "Claude subscription import (unsupported)",
+    "code editing or project test execution (unsupported)",
+    "native Windows/macOS agent startup (unsupported)"
+  ]
+}

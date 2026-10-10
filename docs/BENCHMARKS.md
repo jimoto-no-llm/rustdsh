@@ -26,6 +26,28 @@ The dated page includes commands for `scripts/benchmark.py`,
 `scripts/benchmark-search.py`, the Rust extended runner and
 `tests/e2e/benchmark-dashboard.mjs`, plus instructions for building the baseline.
 
+## Oversized settings: release follow-up
+
+A 32 MiB `general.default_profile` fixture compares `7e7e99b` with the bounded
+Unicode-prefix implementation, n=5 with one warmup per variant and alternating order:
+
+| Case | Before median | After median |
+| --- | --- | --- |
+| Peak RSS of settings probe | 472.9 MiB | 216.7 MiB |
+| Process startup + settings GET + disposal | 879.08 ms | 490.90 ms |
+
+Both retain exactly the first 200 characters. This is one oversized known-field
+fixture, not ordinary settings-page latency or full DSH memory. File parsing and
+plugin lifecycle reads remain included; JSON input itself is still read in full.
+Node 24.16.0 on Linux/WSL x86_64 used `--max-old-space-size=256`; this flag limits
+old-space, not total RSS. [Raw samples and source hashes](evidence/release-v0.2.1/settings-benchmark.json)
+record the scope and environment. Reproduce on Linux:
+
+```sh
+node scripts/benchmark-settings.mjs --baseline-ref 7e7e99b --n 5 \
+  --output /tmp/rdsh-settings-benchmark.json
+```
+
 ## Historical measurements
 
 The historical headline numbers below were measured on Linux x86_64.

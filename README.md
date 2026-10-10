@@ -1,6 +1,6 @@
 <img src="assets/icon.png" width="96" alt="rdsh icon">
 
-# rdsh — local tools for AI coding, plus a fast DSH launcher
+# rdsh — a fast Rust launcher for DeepSeek Harness
 
 [![ci](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/ci.yml/badge.svg)](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/ci.yml)
 [![dashboard](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/dashboard.yml/badge.svg)](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/dashboard.yml)
@@ -13,16 +13,15 @@
 
 An independent community project; not an official DeepSeek or DeepSeek Harness project.
 
-Already using **Claude Code or Codex**? Keep using them. `rdsh` estimates tokens,
-searches local files and fits long text into a budget without a model request.
-The optional MCP dashboard lets your agent share progress and ask you questions.
-**The local tools and project dashboard do not require DSH.**
-Start with the [Claude Code / Codex guide](docs/CODING-AGENTS.md).
-
-For DSH users, `rdsh` is a drop-in fast path for [dsh](https://github.com/deepseek-ai/deepseek-harness)
+`rdsh` is a drop-in fast path for [dsh](https://github.com/deepseek-ai/deepseek-harness)
 (the DeepSeek Harness CLI). Instead of rewriting everything, it ports only
 the hot paths to Rust and delegates conversations and model runs to the
 original `dsh` binary. Arguments you already use keep working as-is.
+
+**Moving from Claude Code or Codex to DSH?**
+The [migration guide](docs/CODING-AGENTS.md) takes you from installation and model
+connection to your first DSH conversation in your existing project. Keep your
+`AGENTS.md` / `CLAUDE.md`; standard DSH profiles already read them.
 
 ## Why rdsh?
 
@@ -33,34 +32,35 @@ original `dsh` binary. Arguments you already use keep working as-is.
 
 ## Getting started
 
-Install using the commands below, then try the local tools:
+Install using the commands below. Conversations also need the original DSH;
+the [migration guide](docs/CODING-AGENTS.md#1-install-rdsh-and-the-original-dsh)
+shows its pinned installation. Then verify the installation:
 
 ```sh
 rdsh --version
-printf 'hello rdsh\n' | rdsh tokens
+rdsh doctor
 ```
 
-In PowerShell, use `"hello rdsh" | rdsh tokens`. No login or original DSH is
-needed for these commands. Run `rdsh tokens AGENTS.md` or `rdsh tokens CLAUDE.md`
-to estimate an existing instructions file; the estimate is heuristic, not billing.
-
-| What you want | Entry point | Requires |
-| --- | --- | --- |
-| Prepare text for Claude Code / Codex | `tokens`, `prune`, `compact`; `search` on Unix | rdsh binary |
-| See progress and answer agent questions | [Project MCP dashboard](docs/CODING-AGENTS.md#share-progress-and-questions-through-mcp) | Node.js 22+ and a source checkout |
-| Start a DSH conversation | Commands below | Original DSH and a model connection |
-
-For DSH conversations:
+To reuse a Codex ChatGPT login, run `rdsh auth --import --provider openai-codex --source codex`.
+Then start DSH in a project with a `README.md`:
 
 ```sh
-rdsh --version && rdsh doctor   # verify install and original dsh
-rdsh setup --web                # open the printed #key=... URL, connect a model
-rdsh tui                        # start a conversation, confirm a model reply
+cd /absolute/path/to/your/project
+rdsh --share-file README.md --profile web
 ```
 
-See the [usage and recovery flow](docs/USER-FLOW.md),
-[settings](docs/RDSH-SETTINGS.md), and [architecture](docs/ARCHITECTURE.md).
-Delegated conversations need the original DSH runtime.
+In DSH, open **Settings → Models** to add the provider and API key (or imported Codex OAuth).
+Choose the same project in **Choose workspace**, press **New Session**, select
+its model and confirm a reply.
+The [migration guide](docs/CODING-AGENTS.md) includes the pinned DSH install,
+login import, instruction reuse and recovery steps. The Web profile initializes
+on first use; `rdsh tui` requires an installed `tui` profile.
+
+Protected conversations currently require Linux x86_64 (WSL on Windows), original
+DSH, Node.js, bubblewrap and prlimit. Model tools inspect explicitly shared files
+read-only; full code editing and project test execution are not supported yet.
+Native CLI tools remain usable without DSH: `printf 'hello rdsh\n' | rdsh tokens`
+(PowerShell: `"hello rdsh" | rdsh tokens`).
 
 ## Requirements
 
@@ -366,7 +366,8 @@ before/after output checks are in [BENCHMARKS.md](docs/BENCHMARKS.md).
 | Doc | What it covers |
 | --- | --- |
 | [docs/USER-FLOW.md](docs/USER-FLOW.md) | Install to setup to use to recover. |
-| [docs/CODING-AGENTS.md](docs/CODING-AGENTS.md) | Claude Code / Codex: local tools, exact MCP setup and removal. |
+| [docs/CODING-AGENTS.md](docs/CODING-AGENTS.md) | Move from Claude Code / Codex: install, model connection, instructions and first conversation. |
+| [docs/PROJECT-MCP.md](docs/PROJECT-MCP.md) | Optional project MCP setup and removal for existing clients. |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Delegation, settings ownership, crate layout. |
 | [docs/BENCHMARKS.md](docs/BENCHMARKS.md) | Reproducible measurements. |
 | [docs/RDSH-SETTINGS.md](docs/RDSH-SETTINGS.md) | Settings UI and CLI keys. |

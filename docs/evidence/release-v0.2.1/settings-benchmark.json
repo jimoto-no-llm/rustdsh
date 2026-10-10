@@ -1,0 +1,89 @@
+{
+  "scope": "Synthetic settings GET for one oversized known string. RSS and elapsed time include Node startup and plugin lifecycle; no DSH server, models or live services.",
+  "fixture": {
+    "input_mib": 32,
+    "field": "general.default_profile",
+    "retained_characters": 200
+  },
+  "environment": {
+    "node": "v24.16.0",
+    "platform": "linux",
+    "arch": "x64",
+    "cpu": "AMD Ryzen 7 5700X 8-Core Processor",
+    "max_old_space_mib": 256
+  },
+  "baseline_commit": "7e7e99b0c96c152377445e6a20a427472006f1ed",
+  "source_sha256": {
+    "before": "dc47197920b74ce4f08fa1518e372f32fe9f0b76a57c2c1f75d85e39a88e1d48",
+    "after": "e0ec0e2348ab4edcee25e4b0704c9a773917f559c32ece1829a9a2e30f141abf"
+  },
+  "n": 5,
+  "warmups_per_variant": 1,
+  "sample_order": "alternating",
+  "samples": {
+    "before": [
+      {
+        "max_rss_kib": 484936,
+        "correct_prefix": true,
+        "elapsed_ms": 969.828577
+      },
+      {
+        "max_rss_kib": 484088,
+        "correct_prefix": true,
+        "elapsed_ms": 879.0794310000001
+      },
+      {
+        "max_rss_kib": 484148,
+        "correct_prefix": true,
+        "elapsed_ms": 761.090064
+      },
+      {
+        "max_rss_kib": 484216,
+        "correct_prefix": true,
+        "elapsed_ms": 910.2245659999999
+      },
+      {
+        "max_rss_kib": 484392,
+        "correct_prefix": true,
+        "elapsed_ms": 869.1549430000005
+      }
+    ],
+    "after": [
+      {
+        "max_rss_kib": 221916,
+        "correct_prefix": true,
+        "elapsed_ms": 489.06494999999995
+      },
+      {
+        "max_rss_kib": 221856,
+        "correct_prefix": true,
+        "elapsed_ms": 490.90297899999996
+      },
+      {
+        "max_rss_kib": 221896,
+        "correct_prefix": true,
+        "elapsed_ms": 490.0477639999999
+      },
+      {
+        "max_rss_kib": 222036,
+        "correct_prefix": true,
+        "elapsed_ms": 496.2473540000001
+      },
+      {
+        "max_rss_kib": 222184,
+        "correct_prefix": true,
+        "elapsed_ms": 501.3962590000001
+      }
+    ]
+  },
+  "medians": {
+    "before": {
+      "max_rss_kib": 484216,
+      "elapsed_ms": 879.0794310000001
+    },
+    "after": {
+      "max_rss_kib": 221916,
+      "elapsed_ms": 490.90297899999996
+    }
+  }
+}

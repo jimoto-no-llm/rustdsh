@@ -1,9 +1,11 @@
 # Project dashboard and private Harness access
 
-Using Claude Code or Codex? Start with the [exact MCP setup guide](../docs/CODING-AGENTS.md)
-([日本語](../docs/CODING-AGENTS.ja.md)). Project mode needs no original DSH.
-It shares reported progress and human answers with your existing agent; native
-start/resume/interrupt/budget enforcement for those CLIs is still unsupported.
+Moving from Claude Code or Codex to DSH? Start with the [migration guide](../docs/CODING-AGENTS.md)
+([日本語](../docs/CODING-AGENTS.ja.md)). The dashboard below is an optional component.
+For progress and questions from an existing MCP client, use the separate
+[project MCP guide](../docs/PROJECT-MCP.md) ([日本語](../docs/PROJECT-MCP.ja.md)).
+Project mode needs no original DSH; native start/resume/interrupt/budget enforcement
+for those external CLIs is still unsupported.
 
 [Worker scopes and worktrees](../docs/WORKER-WORKSPACES.md): local CLI allocation,
 source/worker conflict scans and retained checkouts after lease expiry or release.

@@ -33,9 +33,9 @@ button:hover { background:var(--line); }
 button.primary { background:var(--button); border-color:var(--button); color:#fff; }
 button:disabled { opacity:.55; cursor:wait; }
 a { color:var(--accent); text-underline-offset:3px; }
-input[type=password] { width:100%; min-width:0; min-height:44px; font:inherit; border:1px solid var(--line); border-radius:8px; padding:9px 12px; color:var(--fg); background:var(--bg); }
+input[type=password],select { width:100%; min-width:0; min-height:44px; font:inherit; border:1px solid var(--line); border-radius:8px; padding:9px 12px; color:var(--fg); background:var(--bg); }
 input[type=checkbox] { width:18px; height:18px; accent-color:var(--button); flex:none; }
-button:focus-visible,a:focus-visible,input:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
 .field { display:flex; gap:10px; margin-top:8px; }
 .foot { display:flex; flex-wrap:wrap; gap:10px; margin-top:24px; }
 ::selection { background:var(--button); color:#fff; }
@@ -52,6 +52,7 @@ h2 { scroll-margin-top:16px; }
 <main class="card">
 <header><img src="/icon.png" width="44" height="44" alt=""><h1 id="t">モデルを接続する</h1></header>
 <p class="sub" id="s">既存のログイン情報を確認し、DSHで使うモデルを準備します。</p>
+<p class="hint"><a id="migration-guide" href="https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/CODING-AGENTS.ja.md" target="_blank" rel="noopener noreferrer">Claude Code／CodexからDSHへの移行手順</a></p>
 <nav class="jump" aria-label="モデル設定の項目"><a id="jump-login" href="#h1">既存のログインを使う</a><a id="jump-key" href="#h2">APIキーを入力</a><a id="jump-extras" href="#hx">追加機能</a></nav>
 <div class="notice" id="okbar" role="status" hidden></div>
 <h2 id="login-heading">ログイン情報</h2>
@@ -64,13 +65,15 @@ h2 { scroll-margin-top:16px; }
 <div class="cmd"><code>opencode auth login</code><button data-copy>コピー</button></div>
 <div class="cmd"><code>codex login</code><button data-copy>コピー</button></div>
 <p class="hint" id="import-hint">ログイン後の取り込み: <code>rdsh auth --import --provider &lt;id&gt;</code>。Codexの場合は次のコマンドを使います。</p>
-<div class="cmd"><code>rdsh auth --import --provider openai-codex</code><button data-copy>コピー</button></div>
+<div class="cmd"><code>rdsh auth --import --provider openai-codex --source codex</code><button data-copy>コピー</button></div>
 <p class="hint" id="copy-status" role="status"></p>
-<h2 id="h2">DeepSeekのAPIキーで使う</h2>
+<h2 id="h2">APIキーを保存する</h2>
 <form id="key-form">
+<label for="key-provider" id="provider-label">接続先</label>
+<select id="key-provider" aria-describedby="kh"><option value="DEEPSEEK_API_KEY">DeepSeek</option><option value="ANTHROPIC_API_KEY">Anthropic（Claude）</option><option value="OPENAI_API_KEY">OpenAI</option></select>
 <label for="key" id="key-label">DeepSeek APIキー</label>
 <div class="field"><input type="password" id="key" placeholder="DEEPSEEK_API_KEY" autocomplete="off" spellcheck="false" required aria-describedby="kh"><button class="primary" id="save-key" type="submit">キーを保存</button></div>
-<p class="hint" id="kh">この端末のDSH設定に保存します。キーはDeepSeekの管理画面で発行できます。</p>
+<p class="hint" id="kh">この端末のDSH設定に保存します。APIキーはサブスクリプションのログインとは別です。新規の接続先はDSHの「Settings → Models」でAPIキーと一緒に追加できます。</p>
 <p class="hint" id="key-status" role="status"></p>
 </form>
 <a id="issue" href="https://platform.deepseek.com" target="_blank" rel="noopener noreferrer">DeepSeekの管理画面を開く</a>
@@ -90,12 +93,27 @@ let setupToken = new URLSearchParams(location.hash.slice(1)).get('key') || '';
 try { setupToken ||= sessionStorage.getItem('rdsh_setup_token') || ''; if (setupToken) sessionStorage.setItem('rdsh_setup_token', setupToken); } catch {}
 history.replaceState(null, '', location.pathname);
 if (!JA) {
- const copy = {t:'Connect a model',s:'Check existing logins and prepare a model for DSH.', 'login-heading':'Login information',h0:'Default DSH models',h1:'Use an existing login','login-hint':'Sign in from a terminal, check provider IDs with rdsh auth, import the provider you want, then refresh the connection status.',h2:'Use a DeepSeek API key','key-label':'DeepSeek API key','save-key':'Save key',kh:'Saved to DSH settings on this device. Create a key in the DeepSeek console.',issue:'Open the DeepSeek console',hx:'Optional features',khx:'Enable only what you use. Start the feature with its command after saving.',refresh:'Refresh connection status',done:'Finish setup',next:'Start a conversation in DSH to confirm that the model replies.'};
+ const copy = {t:'Connect a model',s:'Check existing logins and prepare a model for DSH.', 'login-heading':'Login information',h0:'Default DSH models',h1:'Use an existing login','login-hint':'Sign in from a terminal, check provider IDs with rdsh auth, import the provider you want, then refresh the connection status.',h2:'Save an API key','provider-label':'Provider','save-key':'Save key',kh:'Saved to DSH settings on this device. API keys are separate from subscription logins. For a new provider, add it with its API key in DSH Settings → Models.',hx:'Optional features',khx:'Enable only what you use. Start the feature with its command after saving.',refresh:'Refresh connection status',done:'Finish setup',next:'Start a conversation in DSH to confirm that the model replies.'};
  for (const [id,text] of Object.entries(copy)) $(id).textContent=text;
  $('import-hint').replaceChildren('After login, import only your chosen provider: ', Object.assign(document.createElement('code'), {textContent:'rdsh auth --import --provider <id>'}), '. For Codex, use the command below.');
  $('jump-login').textContent='Use an existing login';$('jump-key').textContent='Enter an API key';$('jump-extras').textContent='Optional features';document.querySelector('.jump').setAttribute('aria-label','Model setup sections');
  for (const button of document.querySelectorAll('[data-copy]')) button.textContent='Copy';
+ $('migration-guide').textContent='Move from Claude Code / Codex to DSH';$('migration-guide').href='https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/CODING-AGENTS.md';
+ $('key-provider').options[1].textContent='Anthropic (Claude)';
 }
+const keyProviders = {
+ DEEPSEEK_API_KEY:{name:'DeepSeek',url:'https://platform.deepseek.com'},
+ ANTHROPIC_API_KEY:{name:'Anthropic',url:'https://console.anthropic.com'},
+ OPENAI_API_KEY:{name:'OpenAI',url:'https://platform.openai.com/api-keys'},
+};
+function showKeyProvider() {
+ const provider=keyProviders[$('key-provider').value];
+ $('key-label').textContent=t(provider.name+' APIキー',provider.name+' API key');
+ $('key').placeholder=$('key-provider').value;
+ $('issue').textContent=t(provider.name+'の管理画面を開く','Open the '+provider.name+' console');$('issue').href=provider.url;
+}
+showKeyProvider();
+$('key-provider').onchange=()=>{showKeyProvider();$('key').value='';$('key-status').textContent='';};
 async function api(path, body) {
  const response = await fetch(path, {method:body === undefined ? 'GET' : 'POST',signal:AbortSignal.timeout(15000),headers:{'X-RDSH-Token':setupToken,...(body === undefined ? {} : {'Content-Type':'application/json'})},...(body === undefined ? {} : {body:JSON.stringify(body)})});
  if (!response.ok) throw new Error(response.status === 401 || response.status === 403
@@ -160,13 +178,13 @@ async function toggleExtra(id, want) {
 }
 $('key-form').onsubmit=async event=>{
  event.preventDefault();if($('save-key').disabled)return;
- $('save-key').disabled=true;$('key').disabled=true;$('key-status').classList.remove('error');$('key-status').textContent=t('キーを保存中…','Saving key…');
+ $('save-key').disabled=true;$('key').disabled=true;$('key-provider').disabled=true;$('key-status').classList.remove('error');$('key-status').textContent=t('キーを保存中…','Saving key…');
  try {
-  const result=await api('/api/key',{name:'DEEPSEEK_API_KEY',value:$('key').value});
+  const result=await api('/api/key',{name:$('key-provider').value,value:$('key').value});
   if(!result.stored)throw new Error(t('キーを保存できませんでした。入力を確認してください。','The key was not saved. Check the input.'));
   $('key').value='';$('key-status').textContent=t('キーを保存しました。DSHで接続を確認してください。','Key saved. Confirm the connection in DSH.');await load();
  }catch(error){$('key-status').classList.add('error');$('key-status').textContent=message(error);}
- finally{$('save-key').disabled=false;$('key').disabled=false;}
+ finally{$('save-key').disabled=false;$('key').disabled=false;$('key-provider').disabled=false;}
 };
 for(const button of document.querySelectorAll('[data-copy]'))button.onclick=async()=>{
  try{await navigator.clipboard.writeText(button.parentElement.querySelector('code').textContent);$('copy-status').textContent=t('コマンドをコピーしました。端末に貼り付けて実行してください。','Command copied. Paste it into your terminal.');}

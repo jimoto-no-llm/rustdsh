@@ -102,9 +102,25 @@ async function mergeSettings(current, input) {
   return result;
 }
 
+function textPrefix(value, maxC) {
+  const prefix = [];
+  for (const character of value) {
+    if (prefix.length >= maxC) break;
+    prefix.push(character);
+  }
+  return prefix.join('');
+}
+
 function strList(v, maxN, maxC) {
   if (!Array.isArray(v)) return [];
-  return v.filter((x) => typeof x === 'string').map((s) => [...s].slice(0, maxC).join('')).filter((s) => s.trim() !== '').slice(0, maxN);
+  const result = [];
+  for (const value of v) {
+    if (result.length >= maxN) break;
+    if (typeof value !== 'string') continue;
+    const text = textPrefix(value, maxC);
+    if (text.trim() !== '') result.push(text);
+  }
+  return result;
 }
 
 function sanitize(j) {
@@ -115,7 +131,7 @@ function sanitize(j) {
   for (const k of ['enable_retriever', 'enable_packer', 'enable_verifier']) {
     if (typeof j[k] === 'boolean') out[k] = j[k];
   }
-  if (typeof j.goal === 'string') out.goal = [...j.goal].slice(0, 2000).join('');
+  if (typeof j.goal === 'string') out.goal = textPrefix(j.goal, 2000);
   out.decisions = strList(j.decisions, 50, 500);
   out.constraints = strList(j.constraints, 50, 500);
   out.working_files = strList(j.working_files ?? j.files, 50, 300);
@@ -134,7 +150,7 @@ function bool(v, fb) {
 }
 
 function str(v, maxC, fb) {
-  return typeof v === 'string' ? [...v].slice(0, maxC).join('') : fb;
+  return typeof v === 'string' ? textPrefix(v, maxC) : fb;
 }
 
 function obj(v) {

@@ -1,5 +1,5 @@
 {
-  "description": "Local Rust tools and an MCP project dashboard for Codex/Claude Code; also a fast DSH launcher",
+  "description": "Fast Rust launcher for DeepSeek Harness, with clear Claude Code/Codex migration, model setup and lightweight local tools",
   "homepage": "https://github.com/jimoto-no-llm/rustdsh#getting-started",
   "delete_branch_on_merge": true,
   "allow_auto_merge": true,

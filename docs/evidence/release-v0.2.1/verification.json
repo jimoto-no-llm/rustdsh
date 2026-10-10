@@ -1,36 +1,36 @@
 {
   "version": "0.2.1",
-  "scope": "Local Linux/WSL release candidate after rebase onto 0f6b284 and version bump. Published platform archives and GitHub CI are separate later checks.",
+  "scope": "Local Linux/WSL v0.2.1 release candidate, including corrected DSH migration onboarding and bounded settings prefixes. Published archives and GitHub CI remain separate later checks.",
   "rust": [
     {
       "check": "fmt",
       "exit_code": 0,
-      "seconds": 0.27
+      "seconds": 0.18
     },
     {
       "check": "clippy",
       "exit_code": 0,
-      "seconds": 3.69
+      "seconds": 0.61
     },
     {
       "check": "rust-tests",
       "exit_code": 0,
-      "seconds": 29.47
+      "seconds": 19.05
     },
     {
       "check": "extended-tests",
       "exit_code": 0,
-      "seconds": 6.69
+      "seconds": 0.07
     },
     {
       "check": "model-tests",
       "exit_code": 0,
-      "seconds": 6.48
+      "seconds": 0.07
     },
     {
       "check": "regress",
       "exit_code": 0,
-      "seconds": 6.16
+      "seconds": 6.15
     }
   ],
   "counts": {
@@ -38,7 +38,7 @@
     "extended_tests_passed": 2,
     "model_tests_passed": 5,
     "regression_checks_passed": 55,
-    "node_tests_passed": 82,
+    "node_tests_passed": 83,
     "node_tests_skipped": 1,
     "dashboard": {
       "tests": 229,
@@ -52,14 +52,15 @@
     "update_banner_flows": 13
   },
   "metadata": "prepare-release.py v0.2.1; cargo check; cargo check --locked; YAML parsed; Markdown lint: PASS",
-  "onboarding": "stdio end-to-end plus actual Codex CLI 0.161.0 add/get/remove; no model calls; see onboarding.json",
+  "onboarding": "DSH migration verification is in migration-verification.json. onboarding.json retains the earlier optional existing-client MCP check; it is not evidence of switching clients.",
   "benchmark": "Retained original before/after measurements and source hashes at ../ux-performance-20261010; not relabelled as new measurements of version-bumped binaries.",
   "review": {
     "correctness": 3,
     "style": 3,
     "tests": 3,
     "scale": "0-3",
-    "blocking_findings": []
+    "blocking_findings": [],
+    "scope": "Final migration onboarding, API-key selector, bounded Unicode prefix and measured evidence diff review before commit."
   },
   "not_exercised_locally": [
     "native Windows and macOS",
@@ -68,10 +69,11 @@
     "live provider, Discord or Tailscale services"
   ],
   "installer_followup": {
-    "scope": "comments and follow-up wording only",
+    "scope": "Migration-oriented follow-up wording; native Windows explicitly directs protected conversations to WSL. Earlier local-tool wording was superseded.",
     "bash_syntax": "PASS",
     "regression_checks_passed": 55,
     "release_metadata_tests_passed": 21,
     "windows_line_endings": "CRLF preserved"
-  }
+  },
+  "msrv": "Rust 1.85: PASS"
 }
