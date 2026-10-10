@@ -1412,3 +1412,68 @@ pub fn cmd_explain(query: Option<String>, budget: Option<usize>) -> anyhow::Resu
     out.flush()?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn defaults_keep_retrieval_bounded_and_git_diff_enabled() {
+        let cfg = ContextConfig::default();
+
+        assert_eq!(cfg.token_budget, DEFAULT_BUDGET);
+        assert_eq!(cfg.max_code_hits, DEFAULT_CODE_HITS);
+        assert_eq!(cfg.max_sessions, DEFAULT_SESSIONS);
+        assert!(cfg.enable_retriever);
+        assert!(cfg.enable_packer);
+        assert!(cfg.enable_verifier);
+        assert!(cfg.include_git_diff);
+    }
+
+    #[test]
+    fn query_terms_split_identifiers_and_recall_cjk_bigrams() {
+        assert_eq!(
+            query_terms("fooBar2日本語 and a"),
+            vec![
+                "foo".to_string(),
+                "bar".to_string(),
+                "日本語".to_string(),
+                "日本".to_string(),
+                "本語".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn head_tail_truncates_by_unicode_characters() {
+        let (text, truncated) = head_tail("あいうえおABCDE", 2, 3);
+
+        assert!(truncated);
+        assert_eq!(text, "あい\n...[rdsh truncated 5 chars]...\nCDE");
+        assert_eq!(head_tail("short", 2, 3), ("short".to_string(), false));
+    }
+
+    #[test]
+    fn truncate_list_obeys_character_and_item_limits() {
+        let items = vec![
+            "alpha".to_string(),
+            "bravo".to_string(),
+            "charlie".to_string(),
+        ];
+
+        assert_eq!(
+            truncate_list(&items, 3, 10),
+            (
+                "alpha\n...[rdsh 2 more omitted]...".to_string(),
+                2
+            )
+        );
+        assert_eq!(truncate_list(&items, 2, 100).1, 1);
+    }
+
+    #[test]
+    fn shrinking_a_nonempty_section_keeps_at_least_one_line() {
+        assert_eq!(shrink_lines("first\nsecond\nthird", 0.1), "first");
+        assert_eq!(shrink_lines("first\nsecond", 1.0), "first\nsecond");
+    }
+}
