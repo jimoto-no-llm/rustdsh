@@ -6,7 +6,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 import { spawnOwnedProcess } from "../process-scope.mjs";
-import { windowsJobObservation } from "../process-scope-backends.mjs";
+import {
+  cleanupScope,
+  windowsJobObservation,
+} from "../process-scope-backends.mjs";
 import { startHarness } from "../harness.mjs";
 import { RunHistory } from "../run-history.mjs";
 import { startDashboard } from "../server.mjs";
@@ -76,6 +79,56 @@ async function setup(t) {
   };
   return { root, rows, tree, own: (p) => owned.push(p) };
 }
+test("deferred owned launch does not run the target before the caller releases its admission gate", async (t) => {
+  const { root, rows, own } = await setup(t);
+  const trace = path.join(root, "trace-deferred.jsonl");
+  const owned = await spawnOwnedProcess({
+    command: [process.execPath, fixture, "root", "cooperative", trace],
+    cwd: root,
+    deferStart: true,
+  });
+  own(owned);
+  owned.child.stdout.resume();
+  owned.child.stderr.resume();
+  await pause(120);
+  assert.deepEqual(await rows(trace), []);
+  await owned.release();
+  await waitFor(async () =>
+    (await rows(trace)).some(
+      (row) => row.role === "root" && row.type === "started",
+    ),
+  );
+  assert.equal(
+    (await owned.stop({ gracefulTimeout: 300, killTimeout: 1000 }))
+      .confirmed,
+    true,
+  );
+});
+test("supervisor cleanup retries until an empty kernel-scope proof is available", async () => {
+  let observations = 0,
+    kills = 0,
+    closes = 0;
+  const result = await cleanupScope({
+    async snapshot() {
+      observations++;
+      return observations < 3
+        ? { status: "running" }
+        : { status: "exit_confirmed" };
+    },
+    async kill() {
+      kills++;
+      return { status: "requested" };
+    },
+    async close() {
+      closes++;
+      return true;
+    },
+  });
+  assert.equal(result, true);
+  assert.equal(observations, 3);
+  assert.equal(kills, 2);
+  assert.equal(closes, 1);
+});
 test("owned children and detached grandchildren stop in order after a bounded graceful deadline, with duplicate requests sharing one result", async (t) => {
   const { tree, rows } = await setup(t),
     { p, trace, stages } = await tree("detached");

@@ -4,6 +4,10 @@ import { PassThrough, Writable } from "node:stream";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { performance } from "node:perf_hooks";
+import {
+  readProcessIdentity,
+  validProcessIdentity,
+} from "./process-identity.mjs";
 
 const helper = fileURLToPath(
   new URL("./process-scope-supervisor.mjs", import.meta.url),
@@ -29,6 +33,7 @@ export async function spawnOwnedProcess({
   cwd,
   env = process.env,
   owner_id = "owner_" + randomUUID(),
+  deferStart = false,
   wsl = null,
   wslNode = "/root/.local/opt/rdsh-node/bin/node",
   cgroupParent = null,
@@ -177,6 +182,7 @@ export async function spawnOwnedProcess({
     command,
     cwd,
     env: wsl && env === process.env ? null : env,
+    defer_start: deferStart,
     framed,
     cgroup_parent: cgroupParent,
   });
@@ -203,6 +209,11 @@ export async function spawnOwnedProcess({
     root_identity: initial.identity,
     root_pid: initial.pid,
   };
+  const supervisorObservation = await readProcessIdentity(monitor.pid);
+  const supervisorIdentity =
+    supervisorObservation.status === "observed"
+      ? supervisorObservation.identity
+      : null;
   let latest = {
     ...descriptor,
     status: "running",
@@ -275,8 +286,27 @@ export async function spawnOwnedProcess({
   return {
     child,
     descriptor,
+    supervisor_identity: supervisorIdentity,
+    scope_path: initial.scope_path ?? null,
     inspect,
-    release: () => request("release"),
+    async release() {
+      const result = await request("release");
+      if (Number.isSafeInteger(result?.root_pid) && result.root_pid > 0) {
+        descriptor.root_pid = result.root_pid;
+        descriptor.root_identity = validProcessIdentity(result.root_identity)
+          ? result.root_identity
+          : null;
+        child.pid = result.root_pid;
+        latest = {
+          ...latest,
+          root_pid: result.root_pid,
+          root_identity: descriptor.root_identity,
+          remaining_pids: [result.root_pid],
+          remaining_count: 1,
+        };
+      }
+      return result;
+    },
     get state() {
       return structuredClone(
         lost && !disposed
