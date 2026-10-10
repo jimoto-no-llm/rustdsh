@@ -26,7 +26,9 @@ impl FileLock {
         #[cfg(unix)]
         {
             use std::os::unix::fs::OpenOptionsExt;
-            options.mode(0o600).custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW);
+            options
+                .mode(0o600)
+                .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW);
         }
         let file = options
             .open(&lock_path)
@@ -139,15 +141,8 @@ impl Drop for FileLock {
         {
             use std::os::windows::io::AsRawHandle;
             // SAFETY: both the file handle and OVERLAPPED are alive until here.
-            let _ = unsafe {
-                UnlockFileEx(
-                    self.file.as_raw_handle(),
-                    0,
-                    1,
-                    0,
-                    &mut *self.overlapped,
-                )
-            };
+            let _ =
+                unsafe { UnlockFileEx(self.file.as_raw_handle(), 0, 1, 0, &mut *self.overlapped) };
         }
     }
 }

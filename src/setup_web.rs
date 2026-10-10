@@ -211,8 +211,7 @@ fn store_extras_body(body: &str) -> anyhow::Result<Vec<String>> {
         for x in arr {
             if let Some(s) = x.as_str() {
                 let s = s.trim().to_string();
-                if crate::rdsh_config::KNOWN_EXTRAS.contains(&s.as_str()) && !enable.contains(&s)
-                {
+                if crate::rdsh_config::KNOWN_EXTRAS.contains(&s.as_str()) && !enable.contains(&s) {
                     enable.push(s);
                 }
             }

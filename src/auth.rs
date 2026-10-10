@@ -637,10 +637,7 @@ fn decisions_for(grants: &[OauthGrant], doc: &CredsDoc, creds_mtime: u64) -> Vec
                 provider: p,
                 from: g.from.clone(),
                 action: "ok",
-                detail: format!(
-                    "record {key} kept: dsh-side token is newer than {}",
-                    g.from
-                ),
+                detail: format!("record {key} kept: dsh-side token is newer than {}", g.from),
                 grant: None,
             }),
         }

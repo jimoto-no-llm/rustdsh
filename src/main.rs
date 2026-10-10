@@ -3,8 +3,8 @@ mod auth;
 mod compact;
 mod context;
 mod dsh_args;
-mod file_security;
 mod file_lock;
+mod file_security;
 mod guard;
 mod inspect;
 mod local_http;
@@ -447,7 +447,9 @@ fn main() {
                         Ok(())
                     }
                     Ok(false) => {
-                        eprintln!("[rdsh] settings already exist at {path} (use --force to overwrite)");
+                        eprintln!(
+                            "[rdsh] settings already exist at {path} (use --force to overwrite)"
+                        );
                         std::process::exit(2);
                     }
                     Err(e) => Err(e),
