@@ -15,6 +15,8 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Changed
 
+- Installers introduce local tools and the MCP guide first, with DSH connection
+  and diagnostics identified as optional for those users.
 - Clarify CLI/setup/settings labels and scope, keep unsaved multiline settings
   and partial Discord edits, and add the session estimate cache interval to the UI.
 - Preserve unchanged dashboard regions, coalesce state refreshes, pause hidden

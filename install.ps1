@@ -1,11 +1,6 @@
 #!/usr/bin/env pwsh
 # rdsh installer for native Windows, with optional WSL side-install.
-# Release checklist (Issue #7, docs only):
-# 1) bump version in Cargo.toml, 2) cargo build/test/regress green,
-# 3) commit + push, 4) cargo publish (needs crates.io token + verified email),
-# 5) refresh live install via install.ps1 -AsDsh (or install.sh --as-dsh in WSL)
-# and verify `dsh --version` delegation, 6) confirm sync-dsh.sh picks up
-# the new version on its next run.
+# Release metadata, verification and publication: docs/RELEASING.md
 #   .\install.ps1                  # build + install rdsh
 #   .\install.ps1 -AsDsh           # also shadow dsh (backs up to dsh-orig)
 #   .\install.ps1 -Restore         # restore the backed-up original dsh
@@ -122,6 +117,9 @@ if ($Wsl) {
   & wsl bash "$nix/install.sh" @wargs
 }
 
-Write-Host '--- rdsh doctor ---'
+Write-Host 'Try: rdsh --version'
+Write-Host 'Local tokens/prune tools need no DSH or model login.'
+Write-Host 'Claude Code / Codex MCP: https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/CODING-AGENTS.md'
+Write-Host '--- optional DSH diagnostics ---'
 & (Join-Path $Prefix 'rdsh.exe') doctor | Select-Object -First 12
-Write-Host "next: run 'rdsh setup' to connect a model (GPT subscription via OAuth needs no API key)"
+Write-Host "For DSH conversations: run 'rdsh setup' to connect a model."
