@@ -71,6 +71,23 @@ function stringList(value, label, maximumItems, maximumLength) {
   return [...new Set(value.map((item) => string(item, label, maximumLength)))].sort();
 }
 
+function commandArguments(command, index) {
+  if (!Array.isArray(command) || command.length < 1 || command.length > 32)
+    throw new Error(`verification_commands[${index}] must be an argv array`);
+  const args = command.map((argument) =>
+    string(argument, `verification_commands[${index}] argument`, 1000),
+  );
+  for (let position = 0; position < args.length; position++) {
+    const option = /^(?:-u|--user|--username|--proxy-user|--ftp-user)(?:=(.*))?$/i.exec(
+      args[position],
+    );
+    const credential = option?.[1] ?? (option ? args[position + 1] : null);
+    if (typeof credential === "string" && credential.includes(":"))
+      throw new Error(`verification_commands[${index}] must not contain user credentials`);
+  }
+  return args;
+}
+
 export function normalizeProfileValues(input, { partial = true } = {}) {
   const value = object(input, "profile values");
   exactKeys(value, profileKeys, "profile");
@@ -81,13 +98,7 @@ export function normalizeProfileValues(input, { partial = true } = {}) {
     const commands = value.verification_commands;
     if (!Array.isArray(commands) || commands.length > 16)
       throw new Error("verification_commands must be an array (max 16)");
-    result.verification_commands = commands.map((command, index) => {
-      if (!Array.isArray(command) || command.length < 1 || command.length > 32)
-        throw new Error(`verification_commands[${index}] must be an argv array`);
-      return command.map((argument) =>
-        string(argument, `verification_commands[${index}] argument`, 1000),
-      );
-    });
+    result.verification_commands = commands.map(commandArguments);
   }
   if ("permissions" in value) {
     const permissions = object(value.permissions, "permissions");
