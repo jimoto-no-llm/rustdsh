@@ -1,6 +1,6 @@
 <img src="assets/icon.png" width="96" alt="rdsh icon">
 
-# rdsh — `dsh` を速く・安全に起動する Rust 製ランチャー
+# rdsh — Claude Code / Codexと使うローカルツール、DSH用Rustランチャー
 
 [![ci](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/ci.yml/badge.svg)](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/ci.yml)
 [![dashboard](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/dashboard.yml/badge.svg)](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/dashboard.yml)
@@ -13,7 +13,13 @@
 
 独立したコミュニティプロジェクトです。DeepSeek や DeepSeek Harness の公式ではありません。
 
-`rdsh` は [dsh](https://github.com/deepseek-ai/deepseek-harness)（DeepSeek Harness の CLI）を
+**Claude CodeやCodexを普段使っている方も、そのまま使えます。**
+`rdsh`はトークン推定・ファイル検索・長いテキストの切り詰めを、モデル通信なしで実行します。
+必要ならMCPで進捗を共有し、ブラウザーからエージェントの質問に答えられます。
+**これらのローカルツールとプロジェクト画面にDSHは不要です。**
+[Claude Code／Codex向けの導入手順](docs/CODING-AGENTS.ja.md)から始めてください。
+
+DSHを使う場合は、[dsh](https://github.com/deepseek-ai/deepseek-harness)（DeepSeek Harness の CLI）を
 速く使うためのランチャーです。全部を書き換えるのではなく、よく使う速い処理だけ Rust にして、
 会話やモデルの実行は本家の `dsh` にそのまま任せます。今お使いの引数はそのまま動きます。
 
@@ -43,6 +49,25 @@
 
 ## はじめに
 
+下のインストール手順で導入し、まずローカルツールを試します。
+
+```sh
+rdsh --version
+printf 'hello rdsh\n' | rdsh tokens
+```
+
+PowerShellでは `"hello rdsh" | rdsh tokens` を使います。ログインも本家DSHも不要です。
+既存の指示ファイルは `rdsh tokens AGENTS.md` や `rdsh tokens CLAUDE.md` で確認できます。
+トークン数は概算で、請求額の計測ではありません。
+
+| したいこと | 入口 | 必要なもの |
+| --- | --- | --- |
+| Claude Code／Codexに渡すテキストの準備 | `tokens`・`prune`・`compact`、Unixの`search` | rdshバイナリ |
+| 進捗を見る・エージェントの質問に答える | [プロジェクトMCP接続](docs/CODING-AGENTS.ja.md#進捗と質問をmcpで共有する) | Node.js 22+とソースcheckout |
+| DSHで会話を始める | 以下のコマンド | 本家DSHとモデル接続 |
+
+DSHで会話する場合は、接続を設定します。
+
 ```sh
 rdsh --version && rdsh doctor   # 導入と本家 dsh の確認
 rdsh setup --web                # 表示される #key=... 付き URL を開き、モデルに接続します
@@ -57,7 +82,7 @@ rdsh tui                        # 会話を始め、選んだモデルの返答�
 | 項目 | 内容 |
 | --- | --- |
 | OS | Linux、macOS、WSL、Windows（ネイティブ）。エージェントの隔離には Linux x86_64 + bubblewrap + prlimit が必要です。 |
-| DSH 本体 | 会話には本家の `dsh` が必要です。監査済みは 0.2.0-rc.2 と 0.2.1-alpha.1 です。 |
+| DSH 本体 | DSHでの会話にだけ必要です。ローカルツールとプロジェクトMCP画面には不要です。監査済みは 0.2.0-rc.2 と 0.2.1-alpha.1 です。 |
 | Rust | ソースから作る場合のみ 1.85 以上が必要です。ビルド済みバイナリには Rust はいりません。 |
 | 任意 | [Node.js ダッシュボード](dashboard/README.md)には Node.js 22 以上、`search-web` には SearXNG が必要です。サイズ情報のないzstd履歴の展開には `zstd` CLI を使います。 |
 
@@ -323,7 +348,7 @@ Dismiss・X、または更新確認の成功でその回の通知を閉じます
 描画処理の測定であり、通信・モデル実行・利用者の操作応答時間（INP）の測定ではありません。
 CLIの出力一致、ブラウザーの表示内容と入力中の下書きの一致を確認しています。
 他のコマンドには小幅な改善や悪化もあります。[全項目の結果・生データ・環境・実画面・再現手順](docs/evidence/ux-performance-20261010/README.md)に残しています。
-この修正は未リリースで、公開済みv0.2.0バイナリには含まれません。
+この修正はv0.2.1に含まれます。以前のv0.2.0バイナリには含まれません。
 
 ### 過去のLinux測定
 
@@ -362,6 +387,7 @@ v0.2.0 公開後のソース修正は、その公開済みバイナリには含�
 | 資料 | 内容 |
 | --- | --- |
 | [docs/USER-FLOW.md](docs/USER-FLOW.md) | 導入から設定・利用・復旧までの流れです。 |
+| [docs/CODING-AGENTS.ja.md](docs/CODING-AGENTS.ja.md) | Claude Code／Codexのローカルツール・MCP接続・解除手順です。 |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 委譲と設定管理、クレート構成です。 |
 | [docs/BENCHMARKS.md](docs/BENCHMARKS.md) | 再現できる測定手順です。 |
 | [docs/RDSH-SETTINGS.md](docs/RDSH-SETTINGS.md) | 設定画面と CLI キーです。 |

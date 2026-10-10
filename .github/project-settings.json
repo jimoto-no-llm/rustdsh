@@ -1,6 +1,6 @@
 {
-  "description": "Rust launcher for DSH with native fast commands, guarded agent tools and a local project dashboard",
-  "homepage": "https://github.com/jimoto-no-llm/rustdsh#readme",
+  "description": "Local Rust tools and an MCP project dashboard for Codex/Claude Code; also a fast DSH launcher",
+  "homepage": "https://github.com/jimoto-no-llm/rustdsh#getting-started",
   "delete_branch_on_merge": true,
   "allow_auto_merge": true,
   "topics": [
@@ -14,7 +14,11 @@
     "performance",
     "ai-agents",
     "command-line",
-    "token-optimization"
+    "token-optimization",
+    "codex",
+    "claude-code",
+    "mcp",
+    "model-context-protocol"
   ],
   "required_checks": [
     "Rust lint",

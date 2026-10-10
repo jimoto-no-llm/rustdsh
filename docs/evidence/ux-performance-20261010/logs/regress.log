@@ -1,0 +1,62 @@
+ok: version string
+ok: doctor
+ok: tokens stdin
+ok: search
+ok: profiles
+ok: skills
+ok: logs
+ok: sessions
+ok: dump-native
+ok: boot dry-run
+ok: guard allow
+ok: guard block
+ok: reject desktop
+ok: reject double profile
+ok: reject dump with args
+ok: reject plugin w/o args
+ok: plugin delegation dry-run
+ok: doctor reports smart-dsh
+ok: compact noop
+[rdsh] no model connection yet (first-run setup needed)
+[rdsh]   rdsh setup   … guided connect: GPT subscription (OAuth) or a DeepSeek key
+[rdsh]   subscriptions need no API key. See also rdsh auth / rdsh doctor
+ok: dsh-mode delegates
+ok: dsh-mode native
+[rdsh] no model connection yet (first-run setup needed)
+[rdsh]   rdsh setup   … guided connect: GPT subscription (OAuth) or a DeepSeek key
+[rdsh]   subscriptions need no API key. See also rdsh auth / rdsh doctor
+ok: RDSH_ORIG_BIN primary
+ok: tokens cache: p/s2 is ? without zstd
+ok: tokens cache: zstd-less ? not cached (p)
+ok: tokens cache: p/s2 resolves once zstd exists
+ok: tokens cache: q/s2 is ? without zstd
+ok: tokens cache: zstd-less ? not cached (q)
+ok: tokens cache: q/s2 resolves once zstd exists
+ok: tokens cache: legacy null entry rechecked with zstd
+ok: doctor flags node-on-dsh wrapper
+ok: auth detects opencode login
+ok: auth import writes record
+ok: auth import recognized
+ok: auth file mode 600
+ok: setup connected
+ok: setup needed on first run
+ok: unsupported runtime refused
+ok: from-release install
+ok: from-release musl install
+ok: auth keeps api-key records
+ok: tampered release refused
+ok: sync-dsh release update with valid sha256
+ok: sync-dsh unchanged release preserves notification state
+ok: sync-dsh changed payload updates even with the same version label
+ok: sync-dsh refuses bad sha256
+ok: sync-dsh refuses missing sha256
+ok: sync-dsh refuses empty sha256
+ok: setup --web status requires key
+ok: setup --web status
+ok: setup --web key store
+ok: search-web refused while extra off
+ok: search-web via fixture
+ok: install.sh documents --musl
+ok: sync-dsh release-first + sandboxed regress
+ok: regress sandboxed HOME
+ALL PASS (55 checks)

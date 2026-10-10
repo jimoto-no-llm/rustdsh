@@ -1,0 +1,52 @@
+✔ WSL system services detect the Windows bridge without inherited WSL environment variables (0.957417ms)
+✔ real IPC handshake, fragmented/coalesced frames, ping, ACK and clear (18.895967ms)
+✔ rejected activity and acknowledgement timeout close the connection (59.698959ms)
+✔ malformed and oversized frames reject outstanding work without leaking sockets (12.883013ms)
+✔ settings gate actual connections; multiple agents, privacy, edits and disable reach IPC (10.382727ms)
+✔ disconnect reconnects and republishes current state; changing Application ID clears old presence (30.838981ms)
+✔ unavailable Discord and corrupt settings never fail agent work or retain published state (0.585021ms)
+✔ shutdown during connection prevents a late READY from restoring activity (6.602151ms)
+✔ platform paths and text limits preserve Unicode and omit disabled fields (0.855256ms)
+✔ unconfigured presence connects by default; missing or blank ID uses the bundled dsh application (20.005143ms)
+✔ RPC presentation selects a valid status field and gates optional assets and buttons (0.777601ms)
+✔ rate limiting coalesces agents and reports only acknowledged activity; disabling clears during a delayed update (120.104687ms)
+✔ public App Icon changes refresh through the cache; offline metadata keeps the last usable image (0.759658ms)
+✔ allow only existing fixture files; deny secrets, escapes, other tools and writes to read fixtures (1.528663ms)
+✔ restrict advertised tools and stop before a request exceeds the budget (1.91827ms)
+▶ plugin security boundary and settings preservation
+  ✔ all ten routes reject before body consumption or side effects (6.432755ms)
+  ✔ authenticated reads, saves and updater remain usable (8.513939ms)
+  ✔ the authenticated icon serves the supplied PNG exactly and supports HEAD (6.166137ms)
+  ✔ round-trip and partial saves preserve keys outside the form (7.429555ms)
+  ✔ cleared working files stay empty alongside legacy aliases (9.615745ms)
+  ✔ unrelated partial saves leave missing context unset (12.631513ms)
+  ✔ unrelated partial saves leave null context unset (4.471104ms)
+  ✔ form round-trip migrates active legacy context before unrelated edits (5.59333ms)
+  ✔ a context edit preserves other legacy values while honoring explicit clears (5.61115ms)
+  ✔ form round-trip remains saveable with long legacy paths (8.575353ms)
+  ✔ form round-trip remains saveable with large unmodeled section (46.926715ms)
+  ✔ Unicode limits and session cache interval agree with native settings (5.604128ms)
+  ✔ all supported form fields fit within the bounded save body (81.300953ms)
+  ✔ saves replace symlinks without overwriting their targets and tighten existing file permissions (8.794623ms)
+  ✔ unreadable settings are never replaced with defaults (4.931041ms)
+  ✔ reads report corrupt settings instead of displaying defaults (5.781048ms)
+  ✔ missing settings use the current Rust dashboard port (4.21764ms)
+✔ plugin security boundary and settings preservation (395.794761ms)
+✔ multiline drafts keep newlines while typing and save every list as an array (20.985934ms)
+✔ cancelled reload and failed save preserve drafts; Discord-only save keeps them dirty (7.52402ms)
+✔ failed settings load offers an error and retry instead of permanent loading (4.453822ms)
+✔ a failed refresh discards stale editable settings even if an error response includes config (3.207626ms)
+✔ clearing the dashboard port saves its default rather than privileged port one (3.682381ms)
+✔ Discord controls save changes without status polling overwriting edits (4.467168ms)
+✔ Discord preview and partial save preserve drafts in other sections (5.699275ms)
+✔ invalid Discord URLs block saving with an actionable error, then recover (4.358163ms)
+✔ Discord save failures keep the draft and provide a working retry (8.211934ms)
+✔ connection alone is not reported as an acknowledged current preview (6.056263ms)
+ℹ tests 43
+ℹ suites 0
+ℹ pass 43
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 488.461027
