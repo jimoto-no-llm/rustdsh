@@ -420,8 +420,14 @@ are separate.
 ```sh
 cd dashboard
 npm ci
-npm test
+# Linux / WSL with a systemd user session
+systemd-run --user --scope -p Delegate=yes --quiet npm test
 ```
+
+Process-containment checks on Linux need their own delegated cgroup. An ordinary
+shell may reject native cleanup and release qualification when that boundary is
+unavailable. On Windows, run `node --test --test-concurrency=1 test/*.test.mjs`
+after `npm ci`, matching CI's process-heavy test scheduling.
 
 Tests cover project isolation, durable feedback, HTTP/stdio compatibility,
 resource notifications, native MCP 2.0 Events lifecycle, callback signatures,

@@ -39,6 +39,7 @@ Unicode-prefix implementation, n=5 with one warmup per variant and alternating o
 Both retain exactly the first 200 characters. This is one oversized known-field
 fixture, not ordinary settings-page latency or full DSH memory. File parsing and
 plugin lifecycle reads remain included; JSON input itself is still read in full.
+RSS is sampled from Node after the settings GET; elapsed time also includes disposal.
 Node 24.16.0 on Linux/WSL x86_64 used `--max-old-space-size=256`; this flag limits
 old-space, not total RSS. [Raw samples and source hashes](evidence/release-v0.2.1/settings-benchmark.json)
 record the scope and environment. Reproduce on Linux:

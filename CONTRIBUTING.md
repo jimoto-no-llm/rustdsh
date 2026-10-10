@@ -21,10 +21,15 @@ cargo test --release --example benchmark_extended
 cargo test --release --example benchmark_models
 node --test tests/model_benchmark/fence.test.mjs
 sh tests/regress.sh
-(cd dashboard && npm ci && npm test)   # if you touched dashboard/
+(cd dashboard && npm ci && systemd-run --user --scope -p Delegate=yes --quiet npm test) # Linux/WSL, if dashboard/ changed
 # If UI or HTTP behavior changed, follow tests/e2e/README.md and run:
 RDSH_E2E_BIN=./target/release/rdsh npm test --prefix tests/e2e
 ```
+
+On Linux/WSL, the Dashboard process-containment tests need a delegated cgroup;
+the systemd scope above gives the test run its own boundary. Run it in a systemd
+user session. On Windows, use `npm ci` followed by
+`node --test --test-concurrency=1 test/*.test.mjs` inside `dashboard`, as CI does.
 
 ## Pull Request
 

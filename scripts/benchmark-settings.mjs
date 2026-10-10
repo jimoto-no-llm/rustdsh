@@ -81,7 +81,7 @@ try {
     return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
   };
   const report = {
-    scope: 'Synthetic settings GET for one oversized known string. RSS and elapsed time include Node startup and plugin lifecycle; no DSH server, models or live services.',
+    scope: 'Synthetic settings GET for one oversized known string. Node reports peak RSS after GET; elapsed time includes startup, GET and disposal. No DSH server, models or live services.',
     fixture: { input_mib: mib, field: 'general.default_profile', retained_characters: 200 },
     environment: { node: process.version, platform: process.platform, arch: process.arch, cpu: cpus()[0]?.model, max_old_space_mib: 256 },
     baseline_commit: baseline, source_sha256: { before: hash(before), after: hash(after) },

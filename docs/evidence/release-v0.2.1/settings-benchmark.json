@@ -85,5 +85,6 @@
       "max_rss_kib": 221916,
       "elapsed_ms": 490.90297899999996
     }
-  }
+  },
+  "measurement_notes": "Node peak RSS is sampled after GET and before disposal; elapsed time includes disposal. Raw samples and plugin source hashes are unchanged."
 }
