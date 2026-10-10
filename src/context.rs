@@ -1463,10 +1463,7 @@ mod tests {
 
         assert_eq!(
             truncate_list(&items, 3, 10),
-            (
-                "alpha\n...[rdsh 2 more omitted]...".to_string(),
-                2
-            )
+            ("alpha\n...[rdsh 2 more omitted]...".to_string(), 2)
         );
         assert_eq!(truncate_list(&items, 2, 100).1, 1);
     }
