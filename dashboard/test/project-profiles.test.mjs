@@ -140,6 +140,10 @@ test("profiles reject unknown and credential-like fields before state changes", 
   for (const command of [
     ["curl", "-u", "alice:secret-value"],
     ["curl", "--user=alice:secret-value"],
+    ["curl", "--cookie", "session=secret-value"],
+    ["curl", "-b", "session=secret-value"],
+    ["curl", "--oauth2-bearer", "secret-value"],
+    ["curl", "--proxy-bearer", "secret-value"],
   ]) {
     assert.throws(
       () =>
@@ -148,7 +152,7 @@ test("profiles reject unknown and credential-like fields before state changes", 
           name: "Unsafe",
           values: completeProfile({ verification_commands: [command] }),
         }),
-      /user credentials/,
+      /credential-bearing options/,
     );
   }
   assert.deepEqual(state, {});
