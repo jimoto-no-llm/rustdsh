@@ -1218,7 +1218,7 @@ fn dir_names(dir: &str) -> Vec<String> {
 }
 
 pub fn names_json(kind: &str) -> String {
-    let dir = format!("{}/{}", dsh_home(), kind);
+    let dir = format!("{}/{kind}", dsh_home());
     serde_json::json!({"kind": kind, "names": dir_names(&dir)}).to_string()
 }
 
