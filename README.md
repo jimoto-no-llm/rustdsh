@@ -241,6 +241,8 @@ export `DSH_PACKAGE_DIR`.
 
 For the read-only workflow member board in DSH's conversation GUI, use the [verified source-patch preparation tool](plugins/workflow-board/README.md) with an isolated compatible source checkout. It includes the 18-file board/UI projection patch, compatibility diagnostics and fixture tests; building and adopting the patched DSH are separate steps.
 
+For bounded MCP resource artifacts and explicit resource-link reads, use the [verified source-patch preparation tool](plugins/mcp-resource-artifacts/README.md) with an isolated checkout at its pinned DSH revision. Resource links are never fetched automatically, binary payloads stay out of model text, and building or adopting the patched DSH are separate steps.
+
 ```sh
 rdsh settings set extras.enable serve  # replaces the enabled-extra list
 rdsh serve
