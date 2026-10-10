@@ -434,18 +434,7 @@ fn load_doc(path: &str) -> CredsDoc {
 }
 
 fn quote(s: &str) -> String {
-    let plain_ok = !s.is_empty()
-        && s.bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b"._-+/= ".contains(&b))
-        && !s.starts_with(' ')
-        && !s.ends_with(' ')
-        && !s.contains(": ")
-        && !s.contains(" #");
-    if plain_ok {
-        s.to_string()
-    } else {
-        format!("'{}'", s.replace('\'', "''"))
-    }
+    format!("'{}'", s.replace('\'', "''"))
 }
 
 fn safe_scalar(s: &str) -> anyhow::Result<()> {
@@ -1587,6 +1576,63 @@ mod tests {
         assert!(safe_scalar("key\nrefs:\n  OTHER: injected").is_err());
         assert!(safe_scalar("key\rrecords:").is_err());
         assert!(safe_scalar("key\u{2028}records:").is_err());
+    }
+
+    #[test]
+    fn credential_values_are_always_single_quoted_yaml_strings() {
+        for value in [
+            "null",
+            "true",
+            "false",
+            "123",
+            "1.5",
+            "0x1f",
+            ".inf",
+            "~",
+            "ordinary-value",
+            "value with spaces",
+            "O'Connor",
+        ] {
+            let encoded = quote(value);
+            assert!(encoded.starts_with('\'') && encoded.ends_with('\''));
+            assert_eq!(unquote(&encoded), value);
+        }
+    }
+
+    #[test]
+    fn quoted_ref_write_preserves_existing_refs_and_records() {
+        let dir = std::env::temp_dir().join(format!(
+            "rdsh-auth-yaml-test-{}",
+            crate::local_http::random_token().unwrap()
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        let path = dir.join(".credentials.yaml");
+        let original = "version: 1\nrefs:\n  EXISTING_KEY: 'existing-value'\nrecords:\n  llm-pi-ai/existing:\n    kind: grant\n    payload:\n      access: 'saved-token'\n";
+        let updated = splice_entry(
+            original,
+            "refs",
+            "DEEPSEEK_API_KEY",
+            &[format!("  DEEPSEEK_API_KEY: {}", quote("true"))],
+        )
+        .unwrap();
+        std::fs::write(&path, updated).unwrap();
+
+        let doc = load_doc(path.to_str().unwrap());
+        assert!(doc.version_ok);
+        assert_eq!(
+            doc.refs.get("EXISTING_KEY").map(String::as_str),
+            Some("existing-value")
+        );
+        assert_eq!(
+            doc.refs.get("DEEPSEEK_API_KEY").map(String::as_str),
+            Some("true")
+        );
+        let record = doc.grants.get("llm-pi-ai/existing").unwrap();
+        assert_eq!(record.kind, "grant");
+        assert_eq!(record.access.as_deref(), Some("saved-token"));
+
+        std::fs::remove_file(&path).unwrap();
+        std::fs::remove_dir(&dir).unwrap();
     }
 
     #[cfg(unix)]

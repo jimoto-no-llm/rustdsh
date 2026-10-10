@@ -177,7 +177,17 @@ done
 if [ -z "$SETUP_TOKEN" ]; then echo "FAIL(output): setup --web URL"; kill $SRV 2>/dev/null; exit 1; fi
 if [ "$(curl -sS --max-time 5 -o /dev/null -w '%{http_code}' http://127.0.0.1:38082/api/status)" = "401" ]; then ok "setup --web status requires key"; else echo "FAIL(output): setup --web unauthed status"; kill $SRV 2>/dev/null; exit 1; fi
 if curl -fsS --max-time 5 -H "X-RDSH-Token: $SETUP_TOKEN" http://127.0.0.1:38082/api/status 2>/dev/null | grep -q "\"needed\":true"; then ok "setup --web status"; else echo "FAIL(output): setup --web status"; kill $SRV 2>/dev/null; exit 1; fi
-if printf "%s" "{\"name\":\"DEEPSEEK_API_KEY\",\"value\":\"smoke-only-key\"}" | curl -fsS --max-time 5 -X POST -H "Content-Type: application/json" -H "X-RDSH-Token: $SETUP_TOKEN" --data-binary "@-" http://127.0.0.1:38082/api/key 2>/dev/null | grep -q "\"stored\":true"; then ok "setup --web key store"; else echo "FAIL(output): setup --web key store"; kill $SRV 2>/dev/null; exit 1; fi
+cat > "$SW/dsh/.credentials.yaml" <<'YAML'
+version: 1
+refs:
+  EXISTING_KEY: 'existing-value'
+records:
+  llm-pi-ai/existing:
+    kind: grant
+    payload:
+      access: 'saved-token'
+YAML
+if printf "%s" "{\"name\":\"DEEPSEEK_API_KEY\",\"value\":\"true\"}" | curl -fsS --max-time 5 -X POST -H "Content-Type: application/json" -H "X-RDSH-Token: $SETUP_TOKEN" --data-binary "@-" http://127.0.0.1:38082/api/key 2>/dev/null | grep -q "\"stored\":true" && grep -q "^  DEEPSEEK_API_KEY: 'true'$" "$SW/dsh/.credentials.yaml" && grep -q "EXISTING_KEY: 'existing-value'" "$SW/dsh/.credentials.yaml" && grep -q "access: 'saved-token'" "$SW/dsh/.credentials.yaml"; then ok "setup --web stores YAML string and preserves existing credentials"; else echo "FAIL(output): setup --web key store"; kill $SRV 2>/dev/null; exit 1; fi
 curl -fsS --max-time 5 -X POST -H "X-RDSH-Token: $SETUP_TOKEN" --data-binary '{}' http://127.0.0.1:38082/api/done >/dev/null 2>&1
 wait $SRV 2>/dev/null || true
 rm -rf $SW
