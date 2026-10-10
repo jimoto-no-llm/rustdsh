@@ -397,8 +397,13 @@ fn setup_save_extras_restart_serve_and_use_real_http_api() {
     assert_eq!(fs::read(f.0.join("dsh/rdsh.json")).unwrap(), saved);
     assert_eq!(setup.request("POST", "/api/done", "{}", true, "").0, 200);
     setup.stopped();
+    fs::create_dir_all(f.0.join("dsh/skills/available")).unwrap();
+    fs::create_dir_all(f.0.join("dsh/profiles/default")).unwrap();
     let serve = Server::start(&f, &["serve", "--port", "0"]);
     assert_eq!(serve.request("GET", "/", "", false, "").0, 200);
+    for path in ["/api/skills", "/api/profiles", "/api/bench?n=1"] {
+        assert_eq!(serve.request("GET", path, "", false, "").0, 401, "{path}");
+    }
     assert_eq!(
         serve
             .request("POST", "/api/tokens", r#"{"text":"abcd日本語"}"#, false, "")
@@ -419,6 +424,31 @@ fn setup_save_extras_restart_serve_and_use_real_http_api() {
     assert_eq!(status, 200);
     let v: Value = serde_json::from_str(&body).unwrap();
     assert!(v["after"].as_u64().unwrap() <= 100);
+    let (status, body) = serve.request("GET", "/api/skills", "", true, "");
+    assert_eq!(status, 200);
+    let skills: Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(skills["kind"], "skills");
+    assert!(skills["names"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|name| name == "available"));
+    let (status, body) = serve.request("GET", "/api/profiles", "", true, "");
+    assert_eq!(status, 200);
+    let profiles: Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(profiles["kind"], "profiles");
+    assert!(profiles["names"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|name| name == "default"));
+    let (status, body) = serve.request("GET", "/api/bench?n=1", "", true, "");
+    assert_eq!(status, 200);
+    let bench: Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(bench["n"], 1);
+    let timings = bench["rdsh_version_ms"].as_array().unwrap();
+    assert_eq!(timings.len(), 1);
+    assert!(timings[0].as_f64().is_some_and(|ms| ms >= 0.0));
     assert_eq!(
         serve
             .request("GET", "/api/version", "", true, "Host: evil.example\r\n")
