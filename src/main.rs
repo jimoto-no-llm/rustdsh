@@ -424,9 +424,9 @@ fn main() {
                     for annotated in rdsh_config::RdshSettings::keys() {
                         let key = annotated.split('(').next().unwrap_or(annotated);
                         let value = cfg.get_dotted(key).unwrap_or_default();
-                        let rendered = match &value {
-                            serde_json::Value::String(s) => s.clone(),
-                            _ => serde_json::to_string(&value).unwrap_or_else(|_| "-".to_string()),
+                        let rendered = match value {
+                            serde_json::Value::String(s) => s,
+                            v => serde_json::to_string(&v).unwrap_or_else(|_| "-".to_string()),
                         };
                         let source = if settings_key_in_file(&raw, key) {
                             "config"
