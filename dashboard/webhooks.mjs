@@ -156,6 +156,90 @@ export function signingSecret(secret) {
     throw new Error("Webhook signing key must decode to 24–64 bytes");
   return secret;
 }
+function subscriptionId(projectId, url, name) {
+  return createHash("sha256")
+    .update(
+      JSON.stringify([projectId, url, name, { project_id: projectId }]),
+    )
+    .digest("hex")
+    .slice(0, 32);
+}
+function validSubscription(subscription, projectId) {
+  if (
+    !subscription ||
+    typeof subscription !== "object" ||
+    Array.isArray(subscription)
+  )
+    return false;
+  const required = [
+      "id",
+      "name",
+      "arguments",
+      "url",
+      "secret",
+      "expires_at",
+      "last_revision",
+      "attempts",
+      "next_attempt",
+      "last_error",
+    ],
+    allowed = new Set([...required, "old_secret", "rotation_until"]);
+  if (
+    required.some((key) => !Object.hasOwn(subscription, key)) ||
+    Object.keys(subscription).some((key) => !allowed.has(key)) ||
+    (Object.hasOwn(subscription, "old_secret") !==
+      Object.hasOwn(subscription, "rotation_until"))
+  )
+    return false;
+  if (
+    typeof subscription.id !== "string" ||
+    !/^[0-9a-f]{32}$/.test(subscription.id) ||
+    !names.includes(subscription.name) ||
+    !subscription.arguments ||
+    typeof subscription.arguments !== "object" ||
+    Array.isArray(subscription.arguments) ||
+    Object.getPrototypeOf(subscription.arguments) !== Object.prototype ||
+    Object.keys(subscription.arguments).length !== 1 ||
+    subscription.arguments.project_id !== projectId ||
+    typeof subscription.url !== "string" ||
+    !Number.isSafeInteger(subscription.expires_at) ||
+    subscription.expires_at <= 0 ||
+    !Number.isSafeInteger(subscription.last_revision) ||
+    subscription.last_revision < 0 ||
+    !Number.isSafeInteger(subscription.attempts) ||
+    subscription.attempts < 0 ||
+    !Number.isSafeInteger(subscription.next_attempt) ||
+    subscription.next_attempt < 0 ||
+    (subscription.last_error !== null &&
+      (typeof subscription.last_error !== "string" ||
+        subscription.last_error.length > 256))
+  )
+    return false;
+  try {
+    const url = new URL(subscription.url);
+    if (
+      url.href !== subscription.url ||
+      url.protocol !== "https:" ||
+      url.username ||
+      url.password ||
+      url.hash ||
+      signingSecret(subscription.secret) !== subscription.secret ||
+      subscription.id !==
+        subscriptionId(projectId, url.href, subscription.name)
+    )
+      return false;
+    if (Object.hasOwn(subscription, "old_secret"))
+      return (
+        subscription.old_secret !== subscription.secret &&
+        signingSecret(subscription.old_secret) === subscription.old_secret &&
+        Number.isSafeInteger(subscription.rotation_until) &&
+        subscription.rotation_until > 0
+      );
+    return true;
+  } catch {
+    return false;
+  }
+}
 export class EventsHub {
   constructor(project, getState, post = publicWebhookPost) {
     this.project = project;
@@ -174,7 +258,13 @@ export class EventsHub {
       const saved = JSON.parse(
         await fs.readFile(path.join(project.directory, "events.json"), "utf8"),
       );
-      if (saved.schema !== 1 || !Array.isArray(saved.subscriptions))
+      if (
+        saved.schema !== 1 ||
+        !Array.isArray(saved.subscriptions) ||
+        saved.subscriptions.some(
+          (subscription) => !validSubscription(subscription, project.id),
+        )
+      )
         throw new Error("Invalid event subscription state");
       hub.subscriptions = saved.subscriptions;
       if (saved.connection_observations !== undefined) {
@@ -250,17 +340,7 @@ export class EventsHub {
     const url = new URL(params.delivery.url);
     if (url.protocol !== "https:" || url.username || url.password || url.hash)
       throw new Error("Invalid callback URL");
-    return createHash("sha256")
-      .update(
-        JSON.stringify([
-          this.project.id,
-          url.href,
-          params.name,
-          { project_id: this.project.id },
-        ]),
-      )
-      .digest("hex")
-      .slice(0, 32);
+    return subscriptionId(this.project.id, url.href, params.name);
   }
   async signedPost(subscription, event, verification = false) {
     const body = JSON.stringify(event),
