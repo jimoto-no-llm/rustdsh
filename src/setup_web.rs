@@ -112,6 +112,7 @@ fn handle(
             return Ok(());
         }
     }
+    let mut finish_setup = false;
     let (status, ctype, payload): (u16, &str, Cow<str>) =
         match (req.method.as_str(), req.target.as_str()) {
             ("GET", "/") => (200, "text/html; charset=utf-8", Cow::Borrowed(HTML)),
@@ -184,7 +185,7 @@ fn handle(
                 Cow::Borrowed("{\"error\":\"unauthorized\"}"),
             ),
             ("POST", "/api/done") => {
-                done.store(true, Ordering::Relaxed);
+                finish_setup = true;
                 (200, "application/json", Cow::Borrowed("{\"ok\":true}"))
             }
             _ => (
@@ -194,6 +195,11 @@ fn handle(
             ),
         };
     crate::local_http::respond(&mut s, status, ctype, payload.as_bytes())?;
+    // The main thread can exit as soon as it observes done. Send the complete
+    // acknowledgement first, and keep serving if writing the response fails.
+    if finish_setup {
+        done.store(true, Ordering::Relaxed);
+    }
     Ok(())
 }
 

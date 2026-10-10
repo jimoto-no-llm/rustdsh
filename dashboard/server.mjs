@@ -429,6 +429,8 @@ export async function startDashboard(options) {
         req.method === "GET" &&
         (route === "/" ||
           route === "/app.mjs" ||
+          route === "/attention.mjs" ||
+          route === "/attention-view.mjs" ||
           route === "/observations.mjs" ||
           route === "/reports-view.mjs" ||
           route === "/question-cards-ui.mjs" ||
@@ -526,6 +528,8 @@ export async function startDashboard(options) {
         req.method === "GET" &&
         [
           "/app.mjs",
+          "/attention.mjs",
+          "/attention-view.mjs",
           "/observations.mjs",
           "/reports-view.mjs",
           "/question-cards-ui.mjs",

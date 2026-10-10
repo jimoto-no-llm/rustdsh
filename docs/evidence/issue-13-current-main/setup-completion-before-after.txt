@@ -1,0 +1,13 @@
+Before: 1d37a5963dd8568cd4fcf560bd5464665178472a
+Observed hosted Ubuntu debug native suite: 10 passed, 1 failed.
+https://github.com/jimoto-no-llm/rustdsh/actions/runs/37887608698/job/113681459162
+setup_save_extras_restart_serve_and_use_real_http_api: Option::unwrap() at tests/native_e2e.rs:345 (HTTP response delimiter missing).
+The authorized /api/done handler set the process completion flag before writing its HTTP response.
+
+After: dc60b12e9c67a34fb139bd048af6b26a7ac9b180
+Only set the completion flag after successfully writing the full response.
+Actual isolated-source Linux debug and release suites: 103 passed each, 0 failed.
+Actual completion flow repeated 15 times per build mode: 30 passed, 0 failed.
+The test requires unauthorized completion to return 401 without stopping setup,
+then authorized completion to return (200, {"ok":true}) and stop the owned server.
+The existing browser suite passed all 8 flows against the rebuilt Rust server.

@@ -281,6 +281,85 @@
       .warn {
         color: var(--red);
       }
+      .attention-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .attention-toolbar select {
+        padding: 9px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: white;
+        color: var(--fg);
+        font: inherit;
+      }
+      .attention-list {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--card);
+      }
+      .attention-group { border-bottom: 1px solid var(--line); }
+      .attention-group:last-child { border-bottom: 0; }
+      .attention-group > summary {
+        padding: 13px 18px;
+        cursor: pointer;
+        overflow-wrap: anywhere;
+      }
+      .attention-summary {
+        display: inline-grid;
+        width: calc(100% - 22px);
+        grid-template-columns: minmax(0, 1.6fr) 150px 90px minmax(0, 1fr);
+        gap: 16px;
+        vertical-align: top;
+      }
+      .attention-subject,
+      .attention-summary-value { display: grid; align-content: start; gap: 3px; min-width: 0; }
+      .attention-summary-value { font-size: 14px; }
+      .attention-title { font-weight: 600; }
+      .attention-preview {
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        overflow: hidden;
+        overflow-wrap: anywhere;
+      }
+      .attention-badges { display: flex; flex-wrap: wrap; gap: 4px; }
+      .attention-badges .kind,
+      .attention-badges .status { white-space: normal; }
+      .attention-members { border-top: 1px solid var(--line); padding: 16px 18px; }
+      .attention-history-entry {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--card);
+        padding: 18px;
+        overflow-wrap: anywhere;
+        min-width: 0;
+      }
+      .attention-member h3 {
+        margin: 8px 0;
+        font-size: 16px;
+      }
+      .attention-member + .attention-member {
+        border-top: 1px solid var(--line);
+        margin-top: 16px;
+        padding-top: 16px;
+      }
+      .attention-meta {
+        display: grid;
+        grid-template-columns: 5em minmax(0, 1fr);
+        gap: 6px 10px;
+        font-size: 14px;
+      }
+      .attention-meta dt { color: var(--mut); }
+      .attention-meta dd { margin: 0; overflow-wrap: anywhere; }
+      #attention-history { margin: 18px 0 24px; }
+      .attention-history-entry { margin-top: 12px; }
+      select:focus-visible,
+      .attention-group > summary:focus-visible,
+      tr:focus { outline: 3px solid #85aaff; outline-offset: 3px; }
       .cost-grid .value {
         font-size: 24px;
         overflow-wrap: anywhere;
@@ -610,11 +689,17 @@
         text-align: left;
       }
       @media (max-width: 1000px) {
+        .attention-summary { grid-template-columns: minmax(0, 1.4fr) 125px 75px minmax(0, 1fr); gap: 10px; }
         .cards {
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
       }
       @media (max-width: 600px) {
+        .attention-group > summary { padding: 12px; }
+        .attention-summary { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 12px; }
+        .attention-subject,
+        .attention-summary-value:last-child { grid-column: 1 / -1; }
+        .attention-members { padding: 12px; }
         #diagnostics-result {
           grid-template-columns: 1fr;
         }
@@ -815,6 +900,25 @@
             <dd id="overview-stop">この画面からの停止は非対応</dd>
           </dl>
           <ul id="overview-pending"></ul>
+        </section>
+        <section aria-labelledby="attention-heading">
+          <h2 id="attention-heading">判断待ちインボックス</h2>
+          <p class="sub">未回答と停止・失敗の報告をまとめています。開くと理由と対応先を確認できます。期限は対応の目安です。</p>
+          <div class="attention-toolbar">
+            <label for="attention-sort">並べ替え</label>
+            <select id="attention-sort">
+              <option value="priority">優先順（緊急度・期限・影響）</option>
+              <option value="deadline">期限が近い順</option>
+              <option value="impact">影響が大きい順</option>
+              <option value="next_action">次の操作順（回答・操作の確認・理由の確認）</option>
+            </select>
+            <span id="attention-count" class="sub" role="status" aria-live="polite"></span>
+          </div>
+          <div id="attention-list" class="attention-list"></div>
+          <details id="attention-history">
+            <summary>対応の履歴 <span id="attention-history-count">0</span> 件</summary>
+            <div id="attention-history-list"></div>
+          </details>
         </section>
         <h2 id="pending-heading" tabindex="-1">未回答の質問</h2>
         <p class="sub" id="pending-note">

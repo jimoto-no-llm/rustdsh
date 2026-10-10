@@ -1,0 +1,35 @@
+{
+  "runtime_source": "2c228c643a98b48187306016fb1232b625e01cf6",
+  "before_ui": "1fdec5fc2bb77f76901726fe616396b5371016f0",
+  "runtime": "Windows Chrome + real Project HTTP/state in a disposable fixture",
+  "models_or_real_tools": false,
+  "page_errors": [],
+  "sorts": [
+    "priority",
+    "deadline",
+    "impact",
+    "next_action"
+  ],
+  "shared_cause_grouping": true,
+  "ordinary_log_no_alert": true,
+  "draft_and_focus_preserved": true,
+  "task_fold_navigation": true,
+  "cancelled_and_expired_removed": true,
+  "original_history_retained": true,
+  "final_groups": 1,
+  "final_items": 1,
+  "results": [
+    {
+      "width": 1440,
+      "state": "PASS",
+      "horizontal_overflow": false,
+      "injected_markup": false
+    },
+    {
+      "width": 390,
+      "state": "PASS",
+      "horizontal_overflow": false,
+      "injected_markup": false
+    }
+  ]
+}

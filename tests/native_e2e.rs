@@ -342,7 +342,12 @@ impl Server {
         let mut bytes = Vec::new();
         stream.read_to_end(&mut bytes).unwrap();
         let response = String::from_utf8(bytes).unwrap();
-        let (head, body) = response.split_once("\r\n\r\n").unwrap();
+        let (head, body) = response.split_once("\r\n\r\n").unwrap_or_else(|| {
+            panic!(
+                "missing HTTP response for {method} {path}: {} bytes received",
+                response.len()
+            )
+        });
         (
             head.split_whitespace().nth(1).unwrap().parse().unwrap(),
             body.to_owned(),
@@ -369,6 +374,8 @@ fn setup_save_extras_restart_serve_and_use_real_http_api() {
     let f = Fixture::new();
     let mut setup = Server::start(&f, &["setup", "--web", "--port", "0"]);
     assert_eq!(setup.request("GET", "/api/status", "", false, "").0, 401);
+    assert_eq!(setup.request("POST", "/api/done", "{}", false, "").0, 401);
+    assert_eq!(setup.request("GET", "/api/status", "", true, "").0, 200);
     assert_eq!(
         setup
             .request(
@@ -395,7 +402,10 @@ fn setup_save_extras_restart_serve_and_use_real_http_api() {
         400
     );
     assert_eq!(fs::read(f.0.join("dsh/rdsh.json")).unwrap(), saved);
-    assert_eq!(setup.request("POST", "/api/done", "{}", true, "").0, 200);
+    assert_eq!(
+        setup.request("POST", "/api/done", "{}", true, ""),
+        (200, r#"{"ok":true}"#.to_owned())
+    );
     setup.stopped();
     let serve = Server::start(&f, &["serve", "--port", "0"]);
     assert_eq!(serve.request("GET", "/", "", false, "").0, 200);

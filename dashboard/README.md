@@ -302,6 +302,96 @@ Reference strings and sources are displayed as text, never opened or executed.
 Artifact references are displayed as text. Local file contents are never opened
 or served. Treat all user-authored questions, answers, progress, and paths as data.
 
+### Decision inbox
+
+The **判断待ちインボックス** groups unanswered questions, explicit failure or
+dependency reports, and existing `blocked` tasks. A blocked task without attention
+metadata appears as **停止中 · 種類未報告**, with its `blocker` as the reason;
+the inbox does not infer a failure or dependency type. Ordinary events and metric
+errors do not add alerts. Report attention through `dashboard_upsert_task`:
+
+```json
+{
+  "id": "build",
+  "title": "Restore the dependency download",
+  "status": "blocked",
+  "attention": {
+    "cause_id": "package-fetch",
+    "kind": "failure",
+    "deadline": "2026-10-08T12:00:00Z",
+    "impact": "high",
+    "next_action": "Check the download log"
+  }
+}
+```
+
+Task attention requires `kind` (`failure` or `dependency`). Optional fields are
+`cause_id` (1–160 characters), `deadline` (ISO date-time with timezone), `impact`
+(`low`, `medium`, `high`, `critical`), and `next_action` (1–2000 characters).
+Whitespace-only strings, invalid dates, unknown fields, and invalid types are
+rejected without saving. `dashboard_ask_question` accepts the same optional
+attention fields, without `kind`. Missing deadlines and impacts display 未報告.
+Without a reported next action, the inbox offers answering the question or
+reviewing the failure/stop reason.
+
+Within a project, identical explicit `cause_id` values group tasks and questions;
+without a known cause, each item stays separate. The default priority order uses
+question urgency, earliest deadline, greatest impact, next-operation type, oldest
+report, then ID. Urgency is not converted into impact. The selector also sorts by
+deadline, impact, or operation type, using the default priority to break ties.
+Operation order is: answer a question, review a reported next action, then review
+a failure/stop reason; free-text actions are not sorted alphabetically. Missing
+deadlines, impacts, and report times sort last within their comparison. Each
+member retains its reported values, and buttons open the existing task row or
+human answer form.
+
+Each cause starts as a compact summary row; expand it to see every member's full
+report and navigation button. Questions retain the existing approval/consultation
+label and reported urgency, including when grouped with tasks. A question's
+`default_action` is shown separately as informational and never runs automatically.
+Long summary text is shortened visually, with the full text available in the
+expanded report. Sorting and live updates preserve expanded groups and keyboard
+focus within the inbox.
+
+Omitting task `attention` preserves an explicit failure/dependency report until
+`status: "done"`; moving to `doing` alone does not resolve it. An unclassified
+blocked task resolves when its status changes to `todo`, `doing`, or `done`.
+Sending the required task fields with `"attention": null` resolves either kind
+and suppresses the blocked fallback for that stopped episode. A transition from
+another status back to `blocked` starts a new episode and restores legacy reporting;
+an explicit attention report can also reopen it.
+A `done` update with non-null attention is rejected. An elapsed deadline does not
+resolve anything. Resolving one member leaves other members of its cause group
+active; human answers remove only their question. These fields never grant
+permission or execute actions.
+
+Revisioned questions follow their existing question-contract lifecycle: cancelled
+or expired cards leave the actionable inbox and remain in its history. This is
+separate from the reported attention deadline, which does not expire a question.
+Typed approval/consultation labels use the current contract kind. Optional
+attention survives a question revision when omitted; answered history keeps the
+original report snapshot even if that question is later revised. Navigation to
+a task opens its folded section in the current overview layout.
+
+Task attention changes are stored in server-managed `attention_history`, separate
+from the bounded event log. The history includes report snapshots before changes,
+resolution, cause replacement, and recurrence; identical reports do not add
+history entries. Classified reports also retain the blocker and previous blocker,
+including updates that change only the stop reason. Resolving an existing blocked task with no prior history saves
+its original blocker in the resolution snapshot, without inventing an earlier
+report event. Original questions and answers remain in project state. The inbox's
+history section remains available after resolution and restart. Clients cannot
+supply or replace `attention_history`; its unclassified `blocked` snapshots are
+internal, not an accepted input kind.
+
+[#13](https://github.com/sahenjp/rustdsh/issues/13) requires actionable items with
+deadline/impact/operation sorting, same-cause grouping, and retained history after
+resolution. The priority and compatibility rules above are this implementation's
+design proposal. Producers remain the existing MCP tools and HTTP reporting API;
+this adds no automatic Harness monitoring. Dependency execution (#15), question
+contracts (#40), answer application (#41), and notification delivery (#56) remain
+separate work.
+
 ## OpenAI ChatGPT Dots and MCP Events
 
 The project HTTP `/mcp` endpoint implements MCP 2.0 (`2026-07-28`) discovery and

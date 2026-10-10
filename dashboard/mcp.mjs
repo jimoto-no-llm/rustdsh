@@ -11,6 +11,7 @@ import {
 import fs from "node:fs/promises";
 import path from "node:path";
 import { metricNames } from "./state.mjs";
+import { attentionSchema } from "./attention.mjs";
 import { observationSchema } from "./observations.mjs";
 import { feedbackValidity } from "./question-contracts.mjs";
 import { costScopeSchema, costReportSchema } from "./cost-ledger.mjs";
@@ -89,7 +90,7 @@ export const tools = [
   {
     name: "dashboard_upsert_task",
     description:
-      "Create or update a project task shown in the project dashboard.",
+      "Create or update a project task. A blocked task appears with its blocker as an unclassified stop. Optional attention reports failure/dependency, deadline, impact and next_action; use cause_id only when a shared cause is known. Omit to preserve it; null or status done resolves it. It never authorizes or executes an action.",
     inputSchema: object(
       {
         id: string,
@@ -97,6 +98,7 @@ export const tools = [
         status: { enum: ["todo", "doing", "done", "blocked"] },
         milestone: string,
         blocker: string,
+        attention: attentionSchema("task"),
         observation: observationSchema,
       },
       ["id", "title", "status"],
@@ -112,6 +114,7 @@ export const tools = [
         question: string,
         urgency: { enum: ["normal", "high", "critical"] },
         default_action: string,
+        attention: attentionSchema("question"),
         decision,
         action: { enum: ["create", "revise", "cancel"] },
         expected_revision: { type: "integer", minimum: 1 },

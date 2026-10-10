@@ -1,0 +1,38 @@
+{
+  "source_commit": "dc60b12e9c67a34fb139bd048af6b26a7ac9b180",
+  "previous_head": "1d37a5963dd8568cd4fcf560bd5464665178472a",
+  "main": "17cabfc659a7fdccbeae7a29d1b7ca8440909a92",
+  "source_blobs": {
+    "src/setup_web.rs": "47c83f0d95d3b8946a0c68b46219f5ea182d2740",
+    "tests/native_e2e.rs": "8e50e454ca0d7df3adb2af0ef791cba7f914041d"
+  },
+  "previous_ci": {
+    "url": "https://github.com/jimoto-no-llm/rustdsh/actions/runs/37887608698/job/113681459162",
+    "native_pass": 10,
+    "native_fail": 1,
+    "failure": "missing HTTP response delimiter; Option::unwrap() at tests/native_e2e.rs:345"
+  },
+  "qa": {
+    "environment": "Linux WSL2 FlashNext, isolated immutable source archive",
+    "fmt": "PASS",
+    "release_clippy_warnings": 0,
+    "rust_release_pass": 103,
+    "rust_debug_pass": 103,
+    "example_pass": 7,
+    "model_fence_pass": 2,
+    "cli_regression_pass": 53,
+    "security_boundaries_pass": 11,
+    "completion_stress": {
+      "debug_pass": 15,
+      "release_pass": 15
+    },
+    "browser_flows_pass": 8
+  },
+  "completion_assertions": [
+    "unauthenticated POST /api/done returns 401",
+    "authenticated GET /api/status still returns 200 after rejected completion",
+    "authenticated completion returns HTTP 200 with the complete {\"ok\":true} body before server exit",
+    "saved Extras survive restarting as native serve"
+  ],
+  "scope": "Native setup HTTP acknowledgement ordering only; dashboard and layout unchanged. Windows/macOS and latest-head CI require separate confirmation."
+}
