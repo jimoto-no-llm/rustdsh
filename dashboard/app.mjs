@@ -6,6 +6,7 @@ import { renderConnectionDiagnostics } from "./connection-diagnostics-ui.mjs";
 import { createInstructionPanel } from "./instruction-queue-ui.mjs";
 import { createCostPanel } from "./cost-ledger-ui.mjs";
 import { renderBudget } from "./budget-ui.mjs";
+import { renderReviewEvidence } from "./review-evidence-ui.mjs";
 
 const $ = (id) => document.getElementById(id);
 const base = location.pathname.startsWith("/_rdsh") ? "/_rdsh/" : "/";
@@ -152,6 +153,7 @@ function render(state) {
   renderBudget($("budget-admission"), state, node);
   updateOverview(state);
   renderReports(state);
+  renderReviewEvidence($("review-evidence"), state, node);
   const unanswered = state.questions.filter((question) => question.answer === null);
   renderQuestionCards($("questions"), unanswered, state.question_contracts, {
     node,

@@ -16,6 +16,8 @@ import { AnswerApplicationServer } from "./answer-application-server.mjs";
 import { BudgetAdmissionServer } from "./budget-server.mjs";
 import { createHistoryBackup, backupMaximum } from "./history-backup.mjs";
 import { AcceptanceStore } from "./acceptance.mjs";
+import { ReviewEvidenceStore } from "./review-evidence.mjs";
+import { WorkerWorkspaces } from "./workers.mjs";
 import {
   ConnectionObservations,
   connectionReport,
@@ -87,9 +89,10 @@ export async function startDashboard(options) {
   const connections = new ConnectionObservations();
   const localUrl = `http://127.0.0.1:${port}/`;
   const cookieName = `rdsh_${kind === "project" ? project.id : "harness"}`;
-  let store, eventsHub;
+  let store, eventsHub, reviewEvidence;
   try {
     store = kind === "project" ? await ProjectStore.open(project) : null;
+    reviewEvidence = store ? await ReviewEvidenceStore.open(project) : null;
     eventsHub = store
       ? await EventsHub.open(project, () => store.value, options.webhookPost)
       : null;
@@ -103,13 +106,17 @@ export async function startDashboard(options) {
   const applications = store
     ? new AnswerApplicationServer(project, () => store.value, mutateReply)
     : null;
-  const visibleState = async () =>
-    publicState(
+  const visibleState = async () => {
+    const state = publicState(
       store.value,
       await applications.observations(),
       eventsHub.deliveries(),
       budgets.observations(),
     );
+    if (reviewEvidence)
+      state.review_evidence = await reviewEvidence.list({ tasks: store.value.tasks });
+    return state;
+  };
   const budgets = store ? new BudgetAdmissionServer(mutateBudget) : null;
   const modern = store
     ? modernMcpHandler(
@@ -285,6 +292,36 @@ export async function startDashboard(options) {
     updateQueue = task.catch(() => {});
     return task;
   }
+  async function recordReview(input) {
+    if (!reviewEvidence || !project)
+      throw new Error("Review evidence is unavailable in Harness mode");
+    const task = updateQueue.then(async () => {
+      const workerInspection = await WorkerWorkspaces.open(project).then((workers) =>
+        workers.inspect(),
+      );
+      const saved = await reviewEvidence.record(input, {
+        state: store.value,
+        workerInspection,
+      });
+      for (const response of live)
+        response.write(`event: changed\ndata: ${store.value.revision}\n\n`);
+      for (const { mcp } of sessions.values()) void mcp.notify();
+      const evidence = await reviewEvidence.list({
+        tasks: store.value.tasks,
+        taskId: saved.report.task_id,
+      });
+      const report = evidence.reports.find(
+        (item) => item.review_id === saved.report.review_id,
+      );
+      return {
+        revision: saved.revision,
+        idempotent: saved.idempotent,
+        report,
+      };
+    });
+    updateQueue = task.catch(() => {});
+    return task;
+  }
   async function mutateReply(operation, input, context) {
     const task = updateQueue.then(async () => {
       const result = await store.mutateReply(operation, input, context);
@@ -438,6 +475,7 @@ export async function startDashboard(options) {
           route === "/instruction-queue-ui.mjs" ||
           route === "/cost-ledger-ui.mjs" ||
           route === "/budget-ui.mjs" ||
+          route === "/review-evidence-ui.mjs" ||
           route === "/favicon.ico" ||
           route === "/icon.png" ||
           route === "/icon.svg");
@@ -535,6 +573,7 @@ export async function startDashboard(options) {
           "/instruction-queue-ui.mjs",
           "/cost-ledger-ui.mjs",
           "/budget-ui.mjs",
+          "/review-evidence-ui.mjs",
         ].includes(route)
       ) {
         res.writeHead(200, {
@@ -765,6 +804,7 @@ export async function startDashboard(options) {
             const mcp = createMcpServer({
               getState: visibleState,
               mutate,
+              recordReview,
             });
             const transport = new StreamableHTTPServerTransport({
               sessionIdGenerator: randomUUID,

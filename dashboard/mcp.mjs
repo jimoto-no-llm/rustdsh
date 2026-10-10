@@ -147,6 +147,70 @@ export const tools = [
       "Read this project’s metrics, tasks, questions, recent events and optional source-aware cost ledger. Ledger totals are per declared period/source/currency; missing workers remain unknown and invoice amounts are never used to correct estimates.",
     inputSchema: object({}),
   },
+  {
+    name: "dashboard_record_review",
+    description:
+      "Record a caller-submitted report for a separately prepared edit worker and read-only review worker. The exact project HEAD must be clean and match both worker checkouts; base/head bind the binary diff digest. Findings, missing checks, and unavailable reviews stay distinct. This does not invoke or authenticate a reviewer, prove OS sandbox enforcement, grant permissions, or approve task completion.",
+    inputSchema: object(
+      {
+        review_id: { type: "string", minLength: 1, maxLength: 128 },
+        task_id: string,
+        implementation_worker_id: { type: "string", minLength: 1, maxLength: 40 },
+        reviewer_worker_id: { type: "string", minLength: 1, maxLength: 40 },
+        base_sha: { type: "string", pattern: "^[0-9a-f]{40,64}$" },
+        head_sha: { type: "string", pattern: "^[0-9a-f]{40,64}$" },
+        availability: { enum: ["complete", "partial", "unavailable"] },
+        findings: {
+          type: "array",
+          maxItems: 100,
+          items: object(
+            {
+              severity: { enum: ["critical", "major", "minor", "info"] },
+              title: { type: "string", minLength: 1, maxLength: 300 },
+              detail: { type: "string", minLength: 1, maxLength: 4000 },
+              path: { type: "string", minLength: 1, maxLength: 512 },
+              line: { type: "integer", minimum: 1 },
+            },
+            ["severity", "title", "detail"],
+          ),
+        },
+        unverified: {
+          type: "array",
+          maxItems: 100,
+          items: { type: "string", minLength: 1, maxLength: 1000 },
+        },
+        evidence_refs: {
+          type: "array",
+          maxItems: 100,
+          items: object(
+            {
+              label: { type: "string", minLength: 1, maxLength: 200 },
+              reference: { type: "string", minLength: 1, maxLength: 1000 },
+            },
+            ["label", "reference"],
+          ),
+        },
+      },
+      [
+        "review_id",
+        "task_id",
+        "implementation_worker_id",
+        "reviewer_worker_id",
+        "base_sha",
+        "head_sha",
+        "availability",
+        "findings",
+        "unverified",
+        "evidence_refs",
+      ],
+    ),
+  },
+  {
+    name: "dashboard_get_review_evidence",
+    description:
+      "Read stored independent-review reports and their current/stale/unknown status. A clear report is only eligible for a human completion decision; it is not an approval or correctness guarantee.",
+    inputSchema: object({ task_id: string }),
+  },
 ];
 const routes = {
   dashboard_update_metrics: "metrics",
@@ -172,6 +236,21 @@ export function diagnoseUnknownTool(name) {
 }
 export async function executeTool(api, name, args = {}) {
   if (name === "dashboard_get_state") return await api.getState();
+  if (name === "dashboard_record_review") {
+    if (typeof api.recordReview !== "function")
+      throw new Error("Review evidence reporting is unavailable");
+    return await api.recordReview(args);
+  }
+  if (name === "dashboard_get_review_evidence") {
+    const state = await api.getState();
+    const evidence = state.review_evidence || { revision: 0, reports: [] };
+    return {
+      revision: evidence.revision,
+      reports: args.task_id
+        ? evidence.reports.filter((report) => report.task_id === args.task_id)
+        : evidence.reports,
+    };
+  }
   if (name === "dashboard_get_feedback")
     return feedbackSince(await api.getState(), args.after ?? 0);
   if (routes[name]) {

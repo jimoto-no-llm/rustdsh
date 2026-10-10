@@ -854,6 +854,14 @@
             </table>
           </div>
         </details>
+        <details class="fold" id="review-evidence-detail">
+          <summary>独立レビュー記録</summary>
+          <h2 id="review-evidence-heading" tabindex="-1">レビュー結果と対象版</h2>
+          <p class="sub">
+            reportは対象commit・diff digestへ固定されます。対象が変わると古い記録になり、指摘・未確認・利用不可をclearと区別します。clearでも完了判断は人間に残ります。
+          </p>
+          <section id="review-evidence" aria-labelledby="review-evidence-heading"></section>
+        </details>
         <details class="fold" id="instruction-detail">
           <summary>同じsessionへ追指示を送る</summary>
           <h2>追指示と適用タイミング</h2>
