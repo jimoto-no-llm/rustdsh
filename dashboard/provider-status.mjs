@@ -15,7 +15,7 @@ export const providerStatusSchema = {
     provider_id: { ...identifier, pattern: "^[a-z0-9][a-z0-9._-]{0,47}$" },
     scope_id: { ...identifier, pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$" },
     status: { enum: providerStatusKinds },
-    kind: { enum: ["measured", "agent_reported"] },
+    kind: { enum: ["agent_reported"] },
     reason_code: { ...safeCode, type: ["string", "null"], pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$" },
     event_id: { ...safeCode, pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
     sequence: { type: "integer", minimum: 1 },
@@ -115,8 +115,8 @@ export function normalizeProviderStatus(input, { now = Date.now() } = {}) {
   if (!providerStatusKinds.includes(input.status))
     throw new Error("Invalid provider status status");
   const kind = input.kind ?? "agent_reported";
-  if (!["measured", "agent_reported"].includes(kind))
-    throw new Error("Invalid provider status kind");
+  if (kind !== "agent_reported")
+    throw new Error("Provider status reports must be agent-reported until a trusted adapter exists");
   const eventId = safeString(input.event_id, codePattern, "event_id", 128);
   if (!Number.isSafeInteger(input.sequence) || input.sequence < 1)
     throw new Error("Invalid provider status sequence");

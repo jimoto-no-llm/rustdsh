@@ -73,7 +73,7 @@ export const tools = [
   {
     name: "dashboard_report_provider_status",
     description:
-      "Record one provider/CLI status report for this project. Use only explicit provider evidence; classify rate_limited, quota_exhausted, authentication_failed, or unknown. Include the actual observed_at, a safe source label, a stable event_id and a strictly increasing per-scope sequence. Add quota counts or retry_after only when the provider explicitly supplies them; omit unavailable values. Reports expire by max_age_seconds. This only stores observations: it does not scrape providers, retry requests, log in, or change credentials/budgets.",
+      "Record one provider/CLI status report for this project. Reports are stored as agent-reported; the dashboard validates their shape and age but does not authenticate provider origin. Use explicit provider evidence; classify rate_limited, quota_exhausted, authentication_failed, or unknown. Include the actual observed_at, a safe source label, a stable event_id and a strictly increasing per-scope sequence. Add quota counts or retry_after only when the provider explicitly supplies them; omit unavailable values. Reports expire by max_age_seconds. This only stores observations: it does not scrape providers, retry requests, log in, or change credentials/budgets.",
     inputSchema: providerStatusSchema,
   },
   {

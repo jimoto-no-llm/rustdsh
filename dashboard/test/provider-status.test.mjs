@@ -17,7 +17,7 @@ const report = (overrides = {}) => ({
   provider_id: "codex",
   scope_id: "team:primary",
   status: "rate_limited",
-  kind: "measured",
+  kind: "agent_reported",
   event_id: "event-1",
   sequence: 1,
   quota: { remaining: 0, limit: 1000, unit: "tokens" },
@@ -64,6 +64,13 @@ test("provider statuses preserve only bounded source data and expire from observ
   assert.equal(stale.freshness, "stale");
   assert.equal(stale.retryMessage, "期限切れの再試行情報は表示しません。");
   assert.match(stale.nextAction, /現在の状態は未確認/);
+});
+
+test("MCP provider reports cannot claim measured provenance without a trusted adapter", () => {
+  assert.throws(
+    () => normalizeProviderStatus(report({ kind: "measured" })),
+    /must be agent-reported/,
+  );
 });
 
 test("provider status requires explicit retry evidence and keeps quota/auth guidance separate", () => {
@@ -205,6 +212,7 @@ test("MCP reporting stores a status without calling login, refresh or retry APIs
   const tool = tools.find((item) => item.name === "dashboard_report_provider_status");
   assert.ok(tool);
   assert.equal(tool.inputSchema.additionalProperties, false);
+  assert.deepEqual(tool.inputSchema.properties.kind.enum, ["agent_reported"]);
   const payload = report();
   const result = await executeTool(api, tool.name, payload);
   assert.deepEqual(calls, [["provider_status", payload]]);
