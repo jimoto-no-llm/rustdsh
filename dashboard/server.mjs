@@ -21,6 +21,7 @@ import {
   connectionReport,
   inspectTunnel,
 } from "./connection-diagnostics.mjs";
+import { DeviceRegistry } from "./devices.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const equal = (a, b) =>
@@ -87,9 +88,12 @@ export async function startDashboard(options) {
   const connections = new ConnectionObservations();
   const localUrl = `http://127.0.0.1:${port}/`;
   const cookieName = `rdsh_${kind === "project" ? project.id : "harness"}`;
-  let store, eventsHub;
+  let store, eventsHub, devices;
   try {
     store = kind === "project" ? await ProjectStore.open(project) : null;
+    devices = store
+      ? await DeviceRegistry.open(path.join(directory, "devices.json"))
+      : null;
     eventsHub = store
       ? await EventsHub.open(project, () => store.value, options.webhookPost)
       : null;
@@ -97,7 +101,7 @@ export async function startDashboard(options) {
     await fs.unlink(lockFile);
     throw error;
   }
-  const live = new Set(),
+  const live = new Map(),
     sessions = new Map();
   const sockets = new Set();
   const applications = store
@@ -166,6 +170,35 @@ export async function startDashboard(options) {
       const [name, value] = item.trim().split("=");
       return name === cookieName && equal(value, browserToken);
     });
+  }
+  async function browserIdentity(req, url, route) {
+    if (browserAuthorized(req, url, route))
+      return { role: "owner", capabilities: ["read", "reply", "control"] };
+    if (kind !== "project") return null;
+    const credential =
+      req.headers["x-rdsh-browser-token"] ||
+      (route === "/api/live" ? url.searchParams.get("key") : null);
+    return devices.authenticate(credential);
+  }
+  function deviceCanAccess(method, route, identity) {
+    if (identity?.role !== "device") return true;
+    const capabilities = new Set(identity.capabilities);
+    if (!capabilities.has("read")) return false;
+    if (method === "GET") return route !== "/api/qr.svg";
+    if (method !== "POST") return false;
+    if (
+      ["/api/update/answer", "/api/instructions/resolve"].includes(route)
+    )
+      return capabilities.has("reply");
+    if (
+      [
+        "/api/decision/cancel",
+        "/api/instructions/submit",
+        "/api/managed-stop",
+      ].includes(route)
+    )
+      return capabilities.has("control");
+    return false;
   }
   function trusted(req) {
     const host = req.headers.host;
@@ -276,7 +309,7 @@ export async function startDashboard(options) {
       throw new Error("Project operations are unavailable in Harness mode");
     const task = updateQueue.then(async () => {
       const state = await store.mutate(operation, input);
-      for (const response of live)
+      for (const response of live.keys())
         response.write(`event: changed\ndata: ${state.revision}\n\n`);
       for (const { mcp } of sessions.values()) void mcp.notify();
       void eventsHub.flush().catch(() => {});
@@ -288,7 +321,7 @@ export async function startDashboard(options) {
   async function mutateReply(operation, input, context) {
     const task = updateQueue.then(async () => {
       const result = await store.mutateReply(operation, input, context);
-      for (const response of live)
+      for (const response of live.keys())
         response.write(`event: changed\ndata: ${store.value.revision}\n\n`);
       for (const { mcp } of sessions.values()) void mcp.notify();
       return result;
@@ -299,7 +332,7 @@ export async function startDashboard(options) {
   async function mutateBudget(operation, input) {
     const task = updateQueue.then(async () => {
       const result = await store.mutateBudget(operation, input);
-      for (const response of live)
+      for (const response of live.keys())
         response.write(`event: changed\ndata: ${store.value.revision}\n\n`);
       for (const { mcp } of sessions.values()) void mcp.notify();
       return result;
@@ -340,7 +373,7 @@ export async function startDashboard(options) {
         acceptance.evidence.map((r) => r.evidence_id),
         acceptance.tasks.map((r) => r.id),
       );
-      for (const response of live)
+      for (const response of live.keys())
         response.write(`event: changed\ndata: ${store.value.revision}\n\n`);
       for (const { mcp } of sessions.values()) void mcp.notify();
       return result;
@@ -393,7 +426,16 @@ export async function startDashboard(options) {
         kind === "project" &&
         agentRoute &&
         equal(req.headers.authorization, `Bearer ${mcpToken}`);
-      const humanAuthorized = browserAuthorized(req, url, route);
+      const browserAccess = await browserIdentity(req, url, route);
+      const humanAuthorized = Boolean(browserAccess);
+      if (
+        !adminAuthorized &&
+        browserAccess?.role === "device" &&
+        !deviceCanAccess(req.method, route, browserAccess)
+      )
+        return json(res, 403, {
+          error: "This device is not allowed to perform that operation",
+        });
       if (kind === "project" && route === "/mcp")
         connections.record(
           "mcp_auth",
@@ -429,6 +471,7 @@ export async function startDashboard(options) {
         req.method === "GET" &&
         (route === "/" ||
           route === "/app.mjs" ||
+          route === "/devices-ui.mjs" ||
           route === "/observations.mjs" ||
           route === "/reports-view.mjs" ||
           route === "/question-cards-ui.mjs" ||
@@ -454,6 +497,33 @@ export async function startDashboard(options) {
             "Open this dashboard through rdsh-dashboard open or its QR code",
         });
       if (closing) return json(res, 503, { error: "Dashboard is stopping" });
+      if (kind === "project" && route === "/api/devices") {
+        if (!adminAuthorized && browserAccess?.role !== "owner")
+          return json(res, 403, { error: "Project owner required" });
+        if (req.method === "GET")
+          return json(res, 200, { devices: devices.list() });
+        if (req.method === "POST") {
+          const result = await devices.create(await readBody(req, 4096));
+          return json(res, 201, result);
+        }
+        return json(res, 405, { error: "Method not allowed" });
+      }
+      if (kind === "project" && route?.startsWith("/api/devices/")) {
+        if (!adminAuthorized && browserAccess?.role !== "owner")
+          return json(res, 403, { error: "Project owner required" });
+        const match = route.match(/^\/api\/devices\/([0-9a-f-]{36})$/);
+        if (req.method !== "DELETE" || !match)
+          return json(res, 404, { error: "Unknown device operation" });
+        const device = await devices.revoke(match[1]);
+        if (!device) return json(res, 404, { error: "Unknown device" });
+        for (const [response, deviceId] of live) {
+          if (deviceId === device.id) {
+            response.end();
+            live.delete(response);
+          }
+        }
+        return json(res, 200, { device });
+      }
       if (
         req.method === "GET" &&
         ["/favicon.ico", "/icon.png", "/icon.svg"].includes(route)
@@ -526,6 +596,7 @@ export async function startDashboard(options) {
         req.method === "GET" &&
         [
           "/app.mjs",
+          "/devices-ui.mjs",
           "/observations.mjs",
           "/reports-view.mjs",
           "/question-cards-ui.mjs",
@@ -552,6 +623,7 @@ export async function startDashboard(options) {
         return json(res, 200, {
           kind,
           instance_id: instanceId,
+          device_access: browserAccess,
           project: project
             ? { id: project.id, name: project.name, root: project.root }
             : null,
@@ -740,7 +812,10 @@ export async function startDashboard(options) {
             connection: "keep-alive",
           });
           res.write(": connected\n\n");
-          live.add(res);
+          live.set(
+            res,
+            browserAccess?.role === "device" ? browserAccess.device_id : null,
+          );
           const ping = setInterval(() => res.write(": ping\n\n"), 20000);
           req.on("close", () => {
             clearInterval(ping);
@@ -816,7 +891,8 @@ export async function startDashboard(options) {
       );
     closing = true;
     if (deliveryTimer) clearInterval(deliveryTimer);
-    for (const response of live) response.end();
+    for (const response of live.keys()) response.end();
+    await devices?.flush();
     for (const { mcp } of sessions.values()) await mcp.server.close();
     await updateQueue;
     await eventsHub?.queue;
