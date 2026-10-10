@@ -29,7 +29,7 @@ original `dsh` binary. Arguments you already use keep working as-is.
 
 ```sh
 rdsh --version && rdsh doctor   # verify install and original dsh
-rdsh setup --web                # open the printed #key=... URL, connect a model
+rdsh setup --web                # open localhost and paste the token from the protected handoff file
 rdsh tui                        # start a conversation, confirm a model reply
 ```
 
@@ -138,7 +138,7 @@ rdsh auth            # status: what was found, what dsh already recognizes
 rdsh auth --import --provider openai-codex   # write missing/older grants only (0600, others untouched)
 rdsh auth --json     # machine-readable status
 rdsh setup           # first-run wizard: import, key paste, --login/--open
-rdsh setup --web     # localhost setup UI (browser auto-opens, per-launch #key=... URL)
+rdsh setup --web     # localhost setup UI (browser auto-opens; token comes from a protected handoff file)
 ```
 
 Boot, diagnostics, and setup never copy other apps credentials on their own.
@@ -244,8 +244,17 @@ For the read-only workflow member board in DSH's conversation GUI, use the [veri
 ```sh
 rdsh settings set extras.enable serve  # replaces the enabled-extra list
 rdsh serve
-# open the URL containing #key=... printed by rdsh (localhost only)
+# open localhost and enter the token from the protected handoff file printed by rdsh
 ```
+
+The token itself is never printed or passed to the browser launcher. The server prints the
+path to a temporary file restricted to the current account; paste its contents into the
+dashboard password field. The file is removed on normal shutdown. A force-killed process can
+leave a stale protected file; its token stops working with the server, and the printed path can
+be removed manually.
+
+For manual access, read the printed path with `Get-Content -Raw '<path>'` in PowerShell or
+`cat '<path>'` on Unix, then paste the displayed value into the password field.
 
 | API | Purpose |
 | --- | --- |

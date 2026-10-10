@@ -167,19 +167,24 @@ SW="$RR_SANDBOX/setupweb"
 mkdir -p $SW/home $SW/dsh
 HOME="$SW/home" DSH_HOME="$SW/dsh" $BIN setup --web --port 38082 >/dev/null 2>"$SW/setup.log" & SRV=$!
 SETUP_TOKEN=""
+SETUP_TOKEN_FILE=""
 i=0
 while [ -z "$SETUP_TOKEN" ] && [ "$i" -lt 10 ]; do
   sleep 1
-  SETUP_TOKEN=$(sed -n 's/.*#key=\([0-9a-f]*\).*/\1/p' "$SW/setup.log" | head -n 1)
+  SETUP_TOKEN_FILE=$(sed -n 's/^\[rdsh setup\] token handoff file: //p' "$SW/setup.log" | head -n 1)
+  if [ -n "$SETUP_TOKEN_FILE" ] && [ -f "$SETUP_TOKEN_FILE" ]; then SETUP_TOKEN=$(cat "$SETUP_TOKEN_FILE"); fi
   kill -0 "$SRV" 2>/dev/null || break
   i=$((i+1))
 done
-if [ -z "$SETUP_TOKEN" ]; then echo "FAIL(output): setup --web URL"; kill $SRV 2>/dev/null; exit 1; fi
+if [ -z "$SETUP_TOKEN" ] || grep -q '#key=' "$SW/setup.log"; then echo "FAIL(output): setup --web token handoff"; kill $SRV 2>/dev/null; exit 1; fi
+HANDOFF_MODE=$(stat -c '%a' "$SETUP_TOKEN_FILE" 2>/dev/null || stat -f '%Lp' "$SETUP_TOKEN_FILE")
+if [ "$HANDOFF_MODE" != "600" ]; then echo "FAIL(mode): setup token handoff file is not 0600"; kill $SRV 2>/dev/null; exit 1; fi
 if [ "$(curl -sS --max-time 5 -o /dev/null -w '%{http_code}' http://127.0.0.1:38082/api/status)" = "401" ]; then ok "setup --web status requires key"; else echo "FAIL(output): setup --web unauthed status"; kill $SRV 2>/dev/null; exit 1; fi
 if curl -fsS --max-time 5 -H "X-RDSH-Token: $SETUP_TOKEN" http://127.0.0.1:38082/api/status 2>/dev/null | grep -q "\"needed\":true"; then ok "setup --web status"; else echo "FAIL(output): setup --web status"; kill $SRV 2>/dev/null; exit 1; fi
 if printf "%s" "{\"name\":\"DEEPSEEK_API_KEY\",\"value\":\"smoke-only-key\"}" | curl -fsS --max-time 5 -X POST -H "Content-Type: application/json" -H "X-RDSH-Token: $SETUP_TOKEN" --data-binary "@-" http://127.0.0.1:38082/api/key 2>/dev/null | grep -q "\"stored\":true"; then ok "setup --web key store"; else echo "FAIL(output): setup --web key store"; kill $SRV 2>/dev/null; exit 1; fi
 curl -fsS --max-time 5 -X POST -H "X-RDSH-Token: $SETUP_TOKEN" --data-binary '{}' http://127.0.0.1:38082/api/done >/dev/null 2>&1
 wait $SRV 2>/dev/null || true
+if [ -e "$SETUP_TOKEN_FILE" ]; then echo "FAIL(cleanup): setup token handoff file remains after server exit"; exit 1; fi
 rm -rf $SW
 SWB="$RR_SANDBOX/searchweb"
 mkdir -p $SWB

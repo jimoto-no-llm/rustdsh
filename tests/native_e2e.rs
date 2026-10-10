@@ -281,6 +281,7 @@ struct Server {
     child: Child,
     port: u16,
     token: String,
+    handoff_path: std::path::PathBuf,
 }
 impl Server {
     fn start(f: &Fixture, args: &[&str]) -> Self {
@@ -294,31 +295,57 @@ impl Server {
         let stderr = child.stderr.take().unwrap();
         let (tx, rx) = mpsc::channel();
         std::thread::spawn(move || {
+            let mut address = None;
+            let mut handoff_path = None;
+            let mut startup_lines = Vec::new();
             for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+                startup_lines.push(line.clone());
                 if let Some(url) = line
                     .split_whitespace()
                     .find(|s| s.starts_with("http://127.0.0.1:"))
                 {
-                    let _ = tx.send(url.to_owned());
+                    address = Some(url.trim_end_matches('/').to_owned());
+                }
+                if let Some((_, path)) = line.split_once("token handoff file: ") {
+                    handoff_path = Some(std::path::PathBuf::from(path.trim()));
+                }
+                if let (Some(address), Some(path)) = (&address, &handoff_path) {
+                    let token = std::fs::read_to_string(path).unwrap_or_default();
+                    let logged_token =
+                        !token.is_empty() && startup_lines.iter().any(|line| line.contains(&token));
+                    let has_key_fragment = startup_lines.iter().any(|line| line.contains("#key="));
+                    let _ = tx.send((
+                        address.clone(),
+                        path.clone(),
+                        logged_token,
+                        has_key_fragment,
+                    ));
+                    break;
                 }
             }
         });
-        let url = match rx.recv_timeout(Duration::from_secs(15)) {
-            Ok(url) => url,
-            Err(e) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                panic!("server did not become ready: {e}");
-            }
-        };
-        let (address, token) = url
-            .trim_start_matches("http://127.0.0.1:")
-            .split_once("/#key=")
-            .unwrap();
+        let (url, handoff_path, logged_token, has_key_fragment) =
+            match rx.recv_timeout(Duration::from_secs(15)) {
+                Ok(values) => values,
+                Err(e) => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    panic!("server did not become ready: {e}");
+                }
+            };
+        assert!(!logged_token, "server must not print the bearer token");
+        assert!(
+            !has_key_fragment,
+            "server must not print a token-bearing URL"
+        );
+        let token = std::fs::read_to_string(&handoff_path)
+            .expect("server should create its protected token handoff file");
+        let address = url.trim_start_matches("http://127.0.0.1:");
         Self {
             child,
             port: address.parse().unwrap(),
-            token: token.to_owned(),
+            token,
+            handoff_path,
         }
     }
     fn request(
@@ -361,6 +388,7 @@ impl Drop for Server {
     fn drop(&mut self) {
         let _ = self.child.kill();
         let _ = self.child.wait();
+        let _ = std::fs::remove_file(&self.handoff_path);
     }
 }
 
@@ -433,7 +461,7 @@ fn http_truncated_and_oversized_requests_do_not_damage_serve() {
     let f = Fixture::new();
     f.settings(json!({"extras":{"enable":["serve"]}}));
     let server = Server::start(&f, &["serve", "--port", "0"]);
-    for request in [
+    for (index, request) in [
         format!(
             "POST /api/tokens HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nContent-Length: 10\r\n\r\nx",
             server.port
@@ -442,16 +470,47 @@ fn http_truncated_and_oversized_requests_do_not_damage_serve() {
             "POST /api/tokens HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nContent-Length: 70000\r\n\r\n",
             server.port
         ),
-    ] {
+    ]
+    .into_iter()
+    .enumerate()
+    {
         let mut stream = TcpStream::connect(("127.0.0.1", server.port)).unwrap();
         stream
             .set_read_timeout(Some(Duration::from_secs(12)))
             .unwrap();
         stream.write_all(request.as_bytes()).unwrap();
         stream.shutdown(Shutdown::Write).unwrap();
-        let mut answer = String::new();
-        stream.read_to_string(&mut answer).unwrap();
-        assert!(answer.starts_with("HTTP/1.1 400") || answer.starts_with("HTTP/1.1 413"));
+        let mut response = Vec::new();
+        if let Err(error) = stream.read_to_end(&mut response) {
+            assert_eq!(
+                error.kind(),
+                std::io::ErrorKind::ConnectionReset,
+                "malformed request {index} did not finish its response: {error}"
+            );
+        }
+        if response.is_empty() {
+            assert_eq!(
+                index, 0,
+                "an oversized request should receive an explicit 413 response"
+            );
+            continue;
+        }
+        let response = String::from_utf8(response).unwrap();
+        let (head, body) = response
+            .split_once("\r\n\r\n")
+            .expect("malformed requests receive an HTTP error response");
+        let status = head.split_whitespace().nth(1).unwrap();
+        assert!(
+            status == "400" || status == "413",
+            "unexpected HTTP status {status}"
+        );
+        let content_length = head
+            .lines()
+            .find_map(|line| line.strip_prefix("Content-Length: "))
+            .unwrap()
+            .parse::<usize>()
+            .unwrap();
+        assert_eq!(body.len(), content_length, "truncated error response");
     }
     assert_eq!(server.request("GET", "/api/version", "", false, "").0, 401);
     assert_eq!(server.request("GET", "/api/version", "", true, "").0, 200);
