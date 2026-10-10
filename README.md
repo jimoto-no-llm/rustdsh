@@ -125,6 +125,10 @@ rdsh doctor                           # check original dsh, DSH_HOME, slim setup
 rdsh bench --n 5                      # compare rdsh vs dsh startup
 ```
 
+On Windows, compressed session histories are not opened until rdsh can reject
+parent junctions safely; `sessions --tokens` may omit those histories and its
+totals are inexact.
+
 ### Credentials: explicit import only
 
 `rdsh auth --import --provider openai-codex` mirrors a login you already
