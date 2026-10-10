@@ -461,7 +461,7 @@ fn http_truncated_and_oversized_requests_do_not_damage_serve() {
     let f = Fixture::new();
     f.settings(json!({"extras":{"enable":["serve"]}}));
     let server = Server::start(&f, &["serve", "--port", "0"]);
-    for request in [
+    for (index, request) in [
         format!(
             "POST /api/tokens HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nContent-Length: 10\r\n\r\nx",
             server.port
@@ -470,16 +470,40 @@ fn http_truncated_and_oversized_requests_do_not_damage_serve() {
             "POST /api/tokens HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nContent-Length: 70000\r\n\r\n",
             server.port
         ),
-    ] {
+    ]
+    .into_iter()
+    .enumerate()
+    {
         let mut stream = TcpStream::connect(("127.0.0.1", server.port)).unwrap();
         stream
             .set_read_timeout(Some(Duration::from_secs(12)))
             .unwrap();
         stream.write_all(request.as_bytes()).unwrap();
         stream.shutdown(Shutdown::Write).unwrap();
-        let mut answer = String::new();
-        stream.read_to_string(&mut answer).unwrap();
-        assert!(answer.starts_with("HTTP/1.1 400") || answer.starts_with("HTTP/1.1 413"));
+        let mut response = Vec::new();
+        if let Err(error) = stream.read_to_end(&mut response) {
+            assert_eq!(
+                error.kind(),
+                std::io::ErrorKind::ConnectionReset,
+                "malformed request {index} did not finish its response: {error}"
+            );
+        }
+        let response = String::from_utf8(response).unwrap();
+        let (head, body) = response
+            .split_once("\r\n\r\n")
+            .expect("malformed requests receive an HTTP error response");
+        let status = head.split_whitespace().nth(1).unwrap();
+        assert!(
+            status == "400" || status == "413",
+            "unexpected HTTP status {status}"
+        );
+        let content_length = head
+            .lines()
+            .find_map(|line| line.strip_prefix("Content-Length: "))
+            .unwrap()
+            .parse::<usize>()
+            .unwrap();
+        assert_eq!(body.len(), content_length, "truncated error response");
     }
     assert_eq!(server.request("GET", "/api/version", "", false, "").0, 401);
     assert_eq!(server.request("GET", "/api/version", "", true, "").0, 200);
