@@ -70,11 +70,14 @@ try{
  assert.equal(await viewerPage.locator('#question-Q1 textarea').isDisabled(),true);assert.equal(await viewerPage.locator('#question-Q1 button[type=submit]').isDisabled(),true);
  assert.equal(await viewerPage.locator('#share-toggle').isHidden(),true);assert.equal(await viewerPage.locator('#device-detail').isHidden(),true);
  await viewerPage.setViewportSize(report.viewports[1]);await check(viewerPage,/dashboard/i);
- assert.equal(await viewerPage.evaluate(async()=>{const token=sessionStorage.getItem('rdsh_project_browser_token');const response=await fetch('api/update/answer',{method:'POST',headers:{'x-rdsh-browser-token':token,'content-type':'application/json'},body:JSON.stringify({id:'Q1',answer:'forged'})});return response.status;}),403);
+ const viewerToken=await viewerPage.evaluate(()=>sessionStorage.getItem('rdsh_project_browser_token'));
+ const deniedAnswer=await fetch(new URL('api/update/answer',viewerPage.url()),{method:'POST',headers:{'x-rdsh-browser-token':viewerToken,'content-type':'application/json'},body:JSON.stringify({id:'Q1',answer:'forged'})});
+ assert.equal(deniedAnswer.status,403);
  await projectPage.locator('#device-list article').filter({hasText:'E2E viewer'}).getByRole('button',{name:'この端末を失効'}).waitFor();
  projectPage.once('dialog',dialog=>dialog.accept());await projectPage.locator('#device-list article').filter({hasText:'E2E viewer'}).getByRole('button',{name:'この端末を失効'}).click();
  await projectPage.locator('#device-list article').filter({hasText:'失効済み'}).waitFor();
- assert.equal(await viewerPage.evaluate(async()=>{const token=sessionStorage.getItem('rdsh_project_browser_token');return (await fetch('api/state',{headers:{'x-rdsh-browser-token':token}})).status;}),401);
+ const revokedState=await fetch(new URL('api/state',viewerPage.url()),{headers:{'x-rdsh-browser-token':viewerToken}});
+ assert.equal(revokedState.status,401);
  await viewerPage.close();
  await projectPage.locator('#question-Q1 textarea').fill('Keep this draft');
  const stateUpdate=projectPage.waitForResponse(r=>r.url().endsWith('/api/state')&&r.status()===200);
