@@ -222,6 +222,18 @@ explicitly resumes that exact session; missing results block automatic replay.
 Webhook delivery and cursor reads remain separate from application evidence.
 This is an opt-in input channel under the session's existing permissions.
 
+The **方針の決定ログ** keeps human-selected policy records separate from AI
+summaries and question history. A record can cite a saved question/answer and a
+task. Replacing a decision adds a new record and preserves the prior version,
+with an explicit replacement link; empty reasons and change summaries remain
+marked as unrecorded. Only the authenticated browser can create, hold, or
+withdraw decisions. MCP can read the log and optionally attach `policy_decision_id` to
+a task. Tasks that cite replaced, held, withdrawn, or missing decisions receive
+`decision_reference.confirmation_required`; the dashboard shows the referenced
+and replacement policies, and leaves both records and task reports untouched.
+Review and update the task's `policy_decision_id` explicitly after confirming the
+current policy.
+
 Unknown metrics display **未取得**. This component does not scrape billing,
 calculate spend, or infer context loss. Report measured values using:
 `total_cost_usd`, `total_budget_usd`, `session_cost_usd`, `session_budget_usd`,

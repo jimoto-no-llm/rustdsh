@@ -444,6 +444,7 @@ export async function startDashboard(options) {
           route === "/annotation-identifiers.mjs" ||
           route === "/observations.mjs" ||
           route === "/reports-view.mjs" ||
+          route === "/decision-log-ui.mjs" ||
           route === "/question-cards-ui.mjs" ||
           route === "/project-overview.mjs" ||
           route === "/connection-diagnostics-ui.mjs" ||
@@ -543,6 +544,7 @@ export async function startDashboard(options) {
           "/annotation-identifiers.mjs",
           "/observations.mjs",
           "/reports-view.mjs",
+          "/decision-log-ui.mjs",
           "/question-cards-ui.mjs",
           "/project-overview.mjs",
           "/connection-diagnostics-ui.mjs",
@@ -743,6 +745,19 @@ export async function startDashboard(options) {
             return json(res, input.action === "create" ? 201 : 200, result);
           }
           return json(res, 405, { error: "Method not allowed" });
+        }
+        if (req.method === "POST" && route === "/api/decision-log") {
+          if (!humanAuthorized)
+            return json(res, 403, {
+              error: "Human browser credential required",
+            });
+          if (!store)
+            return json(res, 404, { error: "Project decision log unavailable" });
+          return json(
+            res,
+            200,
+            await mutate("decision_log", await readBody(req)),
+          );
         }
         if (req.method === "GET" && route === "/api/state")
           return json(res, 200, await visibleState());

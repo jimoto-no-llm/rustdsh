@@ -7,6 +7,7 @@ import { createInstructionPanel } from "./instruction-queue-ui.mjs";
 import { createCostPanel } from "./cost-ledger-ui.mjs";
 import { renderBudget } from "./budget-ui.mjs";
 import { createHumanAnnotationPanel } from "./human-annotations-ui.mjs";
+import { createDecisionLogPanel } from "./decision-log-ui.mjs";
 
 const $ = (id) => document.getElementById(id);
 const base = location.pathname.startsWith("/_rdsh") ? "/_rdsh/" : "/";
@@ -148,6 +149,11 @@ const renderHumanAnnotations = createHumanAnnotationPanel(
   $("human-annotations-panel"),
   { api, node, navigateTo },
 );
+const renderDecisions = createDecisionLogPanel($("decision-log"), {
+  node,
+  api,
+  refreshState,
+});
 function render(state) {
   if (state.revision < renderedRevision) return;
   renderedRevision = state.revision;
@@ -155,6 +161,7 @@ function render(state) {
   renderInstructions(state);
   renderCosts(state);
   renderBudget($("budget-admission"), state, node);
+  renderDecisions(state);
   updateOverview(state);
   renderHumanAnnotations(state);
   renderReports(state);

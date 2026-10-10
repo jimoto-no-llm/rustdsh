@@ -10,6 +10,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { ResourceUpdatedNotificationSchema } from "@modelcontextprotocol/sdk/types.js";
 import { identity, applyOperation, ProjectStore } from "../state.mjs";
+import { publicDecisionReferences } from "../decision-log.mjs";
 import { startDashboard } from "../server.mjs";
 import { checkPortConfig } from "../tailscale.mjs";
 import { feedbackSince } from "../mcp.mjs";
@@ -241,6 +242,9 @@ test("project state, HTTP/stdio MCP, subscriptions, answers, and auth work toget
   const observationAsset = await fetch(dashboard.localUrl + "observations.mjs");
   assert.equal(observationAsset.status, 200);
   assert.match(observationAsset.headers.get("content-type"), /javascript/);
+  const decisionUiAsset = await fetch(dashboard.localUrl + "decision-log-ui.mjs");
+  assert.equal(decisionUiAsset.status, 200);
+  assert.match(decisionUiAsset.headers.get("content-type"), /javascript/);
   await call("dashboard_upsert_task", {
     id: "M3.6",
     title: "A test task",
@@ -271,6 +275,29 @@ test("project state, HTTP/stdio MCP, subscriptions, answers, and auth work toget
     body: JSON.stringify({ id: "Q1", answer: "admin forged" }),
   });
   assert.equal(adminAnswer.status, 403);
+  const adminDecision = await fetch(dashboard.localUrl + "api/decision-log", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      id: "D-forged",
+      subject: "test",
+      policy: "admin must not create this",
+    }),
+  });
+  assert.equal(adminDecision.status, 403);
+  const mcpDecision = await fetch(dashboard.localUrl + "api/decision-log", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${runtime.mcp_token}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      id: "D-forged-mcp",
+      subject: "test",
+      policy: "MCP must not create this",
+    }),
+  });
+  assert.equal(mcpDecision.status, 401);
   assert.equal(other.store.value.tasks.length, 0);
   assert.equal(other.store.value.questions.length, 0);
   const error = await client.callTool({
@@ -289,6 +316,74 @@ test("project state, HTTP/stdio MCP, subscriptions, answers, and auth work toget
     body: JSON.stringify({ id: "Q1", answer: "Approved for test" }),
   });
   assert.equal(answer.status, 200);
+  const saveDecision = (record) =>
+    fetch(dashboard.localUrl + "api/decision-log", {
+      method: "POST",
+      headers: {
+        ...browserHeaders,
+        "content-type": "application/json",
+        origin: new URL(dashboard.localUrl).origin,
+      },
+      body: JSON.stringify(record),
+    });
+  const decisionA = await saveDecision({
+    id: "D-A",
+    subject: "provider policy",
+    policy: "Use provider A",
+    rationale: "Initial selection",
+    question_id: "Q1",
+    task_id: "M3.6",
+  });
+  assert.equal(decisionA.status, 200);
+  await call("dashboard_upsert_task", {
+    id: "M3.6",
+    title: "A test task using A",
+    status: "doing",
+    policy_decision_id: "D-A",
+  });
+  const decisionB = await saveDecision({
+    id: "D-B",
+    subject: "provider policy",
+    policy: "Use provider B",
+    rationale: "",
+    change_summary: "A no longer meets the current requirement",
+    question_id: "Q1",
+    task_id: "M3.6",
+    supersedes_id: "D-A",
+  });
+  assert.equal(decisionB.status, 200);
+  await call("dashboard_upsert_task", {
+    id: "M3.6",
+    title: "Old plan still references A",
+    status: "doing",
+  });
+  const stateAfterReplacement = await call("dashboard_get_state", {});
+  assert.deepEqual(
+    stateAfterReplacement.decision_log.records.map((item) => [item.id, item.status]),
+    [["D-A", "replaced"], ["D-B", "current"]],
+  );
+  assert.equal(stateAfterReplacement.decision_log.records[1].rationale, "");
+  assert.equal(
+    stateAfterReplacement.decision_log.records[1].rationale_status,
+    "missing",
+  );
+  assert.equal(
+    stateAfterReplacement.decision_log.records[1].question.answer,
+    "Approved for test",
+  );
+  assert.equal(stateAfterReplacement.tasks[0].policy_decision_id, "D-A");
+  assert.equal(
+    stateAfterReplacement.tasks[0].decision_reference.confirmation_required,
+    true,
+  );
+  assert.equal(
+    stateAfterReplacement.tasks[0].decision_reference.replacement_id,
+    "D-B",
+  );
+  assert.equal(
+    stateAfterReplacement.decision_log.records[1].status,
+    "current",
+  );
   await Promise.race([
     notification,
     new Promise((_, reject) =>
@@ -325,6 +420,18 @@ test("project state, HTTP/stdio MCP, subscriptions, answers, and auth work toget
   );
   const persisted = await ProjectStore.open(alpha);
   assert.equal(persisted.value.questions[0].answer, "Approved for test");
+  assert.equal(persisted.value.decision_log.records[0].status, "replaced");
+  assert.equal(persisted.value.decision_log.records[1].rationale, "");
+  assert.equal(
+    persisted.value.decision_log.records[1].question.answer,
+    "Approved for test",
+  );
+  assert.equal(persisted.value.tasks[0].policy_decision_id, "D-A");
+  assert.equal(
+    publicDecisionReferences(persisted.value)[0].decision_reference
+      .confirmation_required,
+    true,
+  );
   assert.deepEqual(persisted.value.metric_observations, dashboard.store.value.metric_observations);
   await assert.rejects(
     () => startDashboard({ project: alpha, port: 39099, tailscale: false }),
