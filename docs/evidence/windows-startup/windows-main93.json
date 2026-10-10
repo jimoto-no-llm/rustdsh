@@ -1,0 +1,221 @@
+{
+  "schema": 1,
+  "node": "v22.23.3",
+  "at": "2026-10-08T23:28:25.315Z",
+  "scope": "three alternating real Windows NotifyIcon startups per mode; dummy label; exact helper exit; no model/API",
+  "before_commit": "93b3bcaa7759fb27461b02f1dd0b0012e946b329",
+  "after_commit": "81c4efeed56cafb5fa34ae8a7b185bb29526ba54",
+  "source_hashes": {
+    "before": {
+      "windows-tray.mjs": "b15b90434acd702630afaeddf0ec376ccd4cca828169139c976f83d66e26a7f3",
+      "windows-tray.ps1": "a9cd16f9f301834f935f9e72991236ebe6caa6f9a2b6fab61596af7cd3a7ace2"
+    },
+    "after": {
+      "windows-tray.mjs": "fadb3b93ff71c45bbd333a58483e3c409315ebcd90b022b4cc0c9d7fb6897ac6",
+      "windows-tray.ps1": "7c7795fb5343620a2eaefd851675cd5a4ee4bbd0a16069931757daa5670aac32"
+    }
+  },
+  "samples": {
+    "before": [
+      {
+        "ready_ms": 1091.1551,
+        "total_ms": 1319.4705,
+        "exit_code": 0,
+        "signal": null
+      },
+      {
+        "ready_ms": 814.453,
+        "total_ms": 1025.9999000000003,
+        "exit_code": 0,
+        "signal": null
+      },
+      {
+        "ready_ms": 827.5121999999997,
+        "total_ms": 1054.9014000000002,
+        "exit_code": 0,
+        "signal": null
+      }
+    ],
+    "after": [
+      {
+        "ready_ms": 705.4988000000001,
+        "total_ms": 881.4057,
+        "exit_code": 0,
+        "signal": null,
+        "diagnostics": {
+          "schema": 1,
+          "node": "v22.23.3",
+          "powershell": "7.6.6",
+          "elapsed_ms": 881.258,
+          "phases": [
+            {
+              "phase": "spawn-requested",
+              "elapsed_ms": 0
+            },
+            {
+              "phase": "process-spawned",
+              "elapsed_ms": 202.185
+            },
+            {
+              "phase": "powershell-start",
+              "elapsed_ms": 439.11
+            },
+            {
+              "phase": "forms-loaded",
+              "elapsed_ms": 571.54
+            },
+            {
+              "phase": "stdin-reader-started",
+              "elapsed_ms": 689.269
+            },
+            {
+              "phase": "ready",
+              "elapsed_ms": 705.233
+            },
+            {
+              "phase": "process-exited",
+              "elapsed_ms": 881.093
+            }
+          ],
+          "helper_exit": {
+            "code": 0,
+            "signal": null
+          },
+          "spawn_error_code": null,
+          "stderr": {
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "truncated": false
+          },
+          "cleanup": {
+            "requested": false,
+            "exit_observed": false
+          }
+        }
+      },
+      {
+        "ready_ms": 490.88229999999976,
+        "total_ms": 666.4802999999997,
+        "exit_code": 0,
+        "signal": null,
+        "diagnostics": {
+          "schema": 1,
+          "node": "v22.23.3",
+          "powershell": "7.6.6",
+          "elapsed_ms": 666.49,
+          "phases": [
+            {
+              "phase": "spawn-requested",
+              "elapsed_ms": 0
+            },
+            {
+              "phase": "process-spawned",
+              "elapsed_ms": 3.708
+            },
+            {
+              "phase": "powershell-start",
+              "elapsed_ms": 235.424
+            },
+            {
+              "phase": "forms-loaded",
+              "elapsed_ms": 366.594
+            },
+            {
+              "phase": "stdin-reader-started",
+              "elapsed_ms": 477.455
+            },
+            {
+              "phase": "ready",
+              "elapsed_ms": 490.797
+            },
+            {
+              "phase": "process-exited",
+              "elapsed_ms": 666.366
+            }
+          ],
+          "helper_exit": {
+            "code": 0,
+            "signal": null
+          },
+          "spawn_error_code": null,
+          "stderr": {
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "truncated": false
+          },
+          "cleanup": {
+            "requested": false,
+            "exit_observed": false
+          }
+        }
+      },
+      {
+        "ready_ms": 472.5014000000001,
+        "total_ms": 657.8954000000003,
+        "exit_code": 0,
+        "signal": null,
+        "diagnostics": {
+          "schema": 1,
+          "node": "v22.23.3",
+          "powershell": "7.6.6",
+          "elapsed_ms": 657.897,
+          "phases": [
+            {
+              "phase": "spawn-requested",
+              "elapsed_ms": 0
+            },
+            {
+              "phase": "process-spawned",
+              "elapsed_ms": 3.168
+            },
+            {
+              "phase": "powershell-start",
+              "elapsed_ms": 219.569
+            },
+            {
+              "phase": "forms-loaded",
+              "elapsed_ms": 344.668
+            },
+            {
+              "phase": "stdin-reader-started",
+              "elapsed_ms": 458.435
+            },
+            {
+              "phase": "ready",
+              "elapsed_ms": 472.403
+            },
+            {
+              "phase": "process-exited",
+              "elapsed_ms": 657.799
+            }
+          ],
+          "helper_exit": {
+            "code": 0,
+            "signal": null
+          },
+          "spawn_error_code": null,
+          "stderr": {
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "truncated": false
+          },
+          "cleanup": {
+            "requested": false,
+            "exit_observed": false
+          }
+        }
+      }
+    ]
+  },
+  "medians": {
+    "before": {
+      "ready_ms": 827.5121999999997,
+      "total_ms": 1054.9014000000002
+    },
+    "after": {
+      "ready_ms": 490.88229999999976,
+      "total_ms": 666.4802999999997
+    }
+  },
+  "hosted_runner_root_cause_confirmed": false
+}
