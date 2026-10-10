@@ -418,6 +418,14 @@ graphs on demand. See the [plan contract](../docs/BOUNDED-EXECUTION-PLANS.md) fo
 task IDs, native spawn scope and recovery; task schema 1 and six MCP tools stay
 compatible.
 
+## Reusable workflow recipes
+
+`recipe save|list|inspect|preview|apply` stores revisioned task workflows and
+previews their resolved target, inherited authority, budget policy, dependencies,
+and bounded branching before creating a disabled run plan. Risky steps wait for
+their own typed approval; recipes do not add permissions or start a process.
+See the [recipe format and CLI contract](../docs/WORKFLOW-RECIPES.md).
+
 ## Validation
 
 ```sh

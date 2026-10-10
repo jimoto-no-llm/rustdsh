@@ -5,6 +5,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { ProjectStore, identity } from "./state.mjs";
 import { AcceptanceStore } from "./acceptance.mjs";
+import { contractStatus } from "./question-contracts.mjs";
+import { publicBudgetAdmission } from "./budget-admission.mjs";
 
 const object = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 const text = (v) =>
@@ -25,6 +27,109 @@ const date = (v) =>
 const active = (c) => ["reserved", "running", "unknown"].includes(c.phase);
 const hash = (v) =>
   createHash("sha256").update(JSON.stringify(v)).digest("hex");
+function moneyUnits(value) {
+  if (typeof value !== "string" || !/^\d{1,16}(?:\.\d{1,9})?$/.test(value))
+    return null;
+  const [whole, fraction = ""] = value.split(".");
+  return BigInt(whole) * 1000000000n + BigInt(fraction.padEnd(9, "0"));
+}
+function recipeTaskDigest(state, taskIds) {
+  const tasks = new Map(state.tasks.map((task) => [task.id, task]));
+  return hash([...taskIds].sort().map((id) => {
+    const task = tasks.get(id);
+    return task ? {
+      id: task.id,
+      title: task.title,
+      milestone: task.milestone,
+      blocker: task.blocker,
+    } : { id, missing: true };
+  }));
+}
+function recipeBudgetDigest(state, runId) {
+  const policies = state.budget_admission?.policies || {};
+  return hash(Object.values(policies)
+    .filter((policy) => policy.active && (policy.run_id === null || policy.run_id === runId))
+    .map((policy) => ({
+      policy_id: policy.policy_id,
+      revision: policy.revision,
+      run_id: policy.run_id,
+      active: policy.active,
+      paused: policy.paused,
+      soft_limit: policy.soft_limit,
+      hard_limit: policy.hard_limit,
+      period_start: policy.period_start,
+      period_end: policy.period_end,
+      call_reservation: policy.call_reservation,
+    }))
+    .sort((a, b) => a.policy_id.localeCompare(b.policy_id)));
+}
+function recipeSnapshotReason(state, plan) {
+  const recipe = plan.definition.recipe;
+  if (!recipe) return null;
+  if (
+    recipe.task_digest !== recipeTaskDigest(
+      state,
+      plan.definition.nodes.map((node) => node.task_id),
+    ) ||
+    recipe.budget_digest !== recipeBudgetDigest(
+      state,
+      plan.definition.run_id,
+    )
+  )
+    return "recipe_target_changed";
+  return null;
+}
+function recipeBudgetBaselineMatches(state, plan, runId) {
+  const recipe = plan.definition.recipe,
+    policies = (publicBudgetAdmission(state)?.policies || []).filter((policy) =>
+      policy.active && !policy.paused && (policy.run_id === null || policy.run_id === runId),
+    );
+  if (!recipe || policies.length !== recipe.budget_baseline.length) return false;
+  const max = moneyUnits(recipe.max_budget_usd);
+  if (max === null) return false;
+  return recipe.budget_baseline.every((saved) => {
+    const current = policies.find((policy) => policy.policy_id === saved.policy_id),
+      effective = moneyUnits(current?.effective),
+      limit = moneyUnits(current?.hard_limit);
+    return Boolean(
+      current &&
+        current.currency === saved.currency &&
+        current.effective === saved.current_effective &&
+        current.hard_limit === saved.hard_limit &&
+        ["within_budget", "warning"].includes(current.status) &&
+        effective !== null &&
+        limit !== null &&
+        effective <= limit &&
+        max <= limit - effective,
+    );
+  });
+}
+function recipeApprovalReason(state, plan, node) {
+  if (!node?.approval) return null;
+  const ref = node.approval,
+    card = state.question_contracts?.cards?.[ref.question_id];
+  if (!card) return "recipe_approval_missing";
+  if (card.revision !== ref.revision || card.fingerprint !== ref.fingerprint)
+    return "recipe_approval_changed";
+  const decision = card.snapshot?.decision,
+    target = decision?.target;
+  if (
+    decision?.kind !== "approval" ||
+    target?.task_id !== node.task_id ||
+    target?.run_id !== plan.definition.run_id ||
+    target?.session_id !== plan.binding?.session_id ||
+    target?.action_id !== ref.action_id ||
+    target?.revision !== ref.action_revision
+  )
+    return "recipe_approval_target_changed";
+  const status = contractStatus(card);
+  if (status === "expired") return "recipe_approval_expired";
+  if (status === "cancelled") return "recipe_approval_cancelled";
+  if (status !== "answered") return "recipe_approval_pending";
+  if (card.answer?.choice_id !== "approve" || card.answer?.contract_fingerprint !== ref.fingerprint)
+    return "recipe_approval_rejected";
+  return null;
+}
 export class PlanError extends Error {
   constructor(code) {
     super("Execution plan: " + code);
@@ -36,7 +141,9 @@ const check = (v, code) => {
 };
 export function planDefinition(v) {
   check(
-    exact(v, ["plan_id", "run_id", "nodes", "limits"]) &&
+    object(v) &&
+      Object.keys(v).every((key) => ["plan_id", "run_id", "nodes", "limits", "recipe"].includes(key)) &&
+      ["plan_id", "run_id", "nodes", "limits"].every((key) => Object.hasOwn(v, key)) &&
       text(v.plan_id) &&
       text(v.run_id),
     "invalid_plan",
@@ -48,7 +155,9 @@ export function planDefinition(v) {
   const ids = new Set();
   for (const n of v.nodes) {
     check(
-      exact(n, ["task_id", "depends_on", "parent_task_id"]) &&
+      object(n) &&
+        Object.keys(n).every((key) => ["task_id", "depends_on", "parent_task_id", "approval"].includes(key)) &&
+        ["task_id", "depends_on", "parent_task_id"].every((key) => Object.hasOwn(n, key)) &&
         text(n.task_id) &&
         !ids.has(n.task_id) &&
         (n.parent_task_id === null || text(n.parent_task_id)) &&
@@ -58,8 +167,77 @@ export function planDefinition(v) {
         new Set(n.depends_on).size === n.depends_on.length,
       "invalid_plan_node",
     );
+    if (n.approval !== undefined)
+      check(
+        exact(n.approval, ["question_id", "revision", "fingerprint", "action_id", "action_revision"]) &&
+          text(n.approval.question_id) &&
+          integer(n.approval.revision, 1, Number.MAX_SAFE_INTEGER) &&
+          /^[a-f0-9]{64}$/.test(n.approval.fingerprint) &&
+          text(n.approval.action_id) &&
+          /^[a-f0-9]{64}$/.test(n.approval.action_revision),
+        "invalid_plan_approval",
+      );
     ids.add(n.task_id);
   }
+  if (v.recipe !== undefined)
+    check(
+      exact(v.recipe, ["recipe_id", "revision", "digest", "project_id", "target_hash", "session_id", "branch", "git_head", "scope_digest", "task_digest", "budget_digest", "budget_baseline", "max_budget_usd", "steps"]) &&
+        text(v.recipe.recipe_id) &&
+        integer(v.recipe.revision, 1, Number.MAX_SAFE_INTEGER) &&
+        /^[a-f0-9]{64}$/.test(v.recipe.digest) &&
+        text(v.recipe.project_id) &&
+        /^[a-f0-9]{64}$/.test(v.recipe.target_hash) &&
+        text(v.recipe.session_id) &&
+        (v.recipe.branch === null || text(v.recipe.branch, 1000)) &&
+        (v.recipe.git_head === null || /^[a-f0-9]{40}$/i.test(v.recipe.git_head)) &&
+        /^[a-f0-9]{64}$/.test(v.recipe.scope_digest) &&
+        /^[a-f0-9]{64}$/.test(v.recipe.task_digest) &&
+        /^[a-f0-9]{64}$/.test(v.recipe.budget_digest) &&
+        typeof v.recipe.max_budget_usd === "string" &&
+        /^\d{1,6}(?:\.\d{1,4})?$/.test(v.recipe.max_budget_usd) &&
+        Array.isArray(v.recipe.budget_baseline) &&
+        v.recipe.budget_baseline.length >= 1 &&
+        v.recipe.budget_baseline.length <= 100 &&
+        v.recipe.budget_baseline.every((policy) =>
+          exact(policy, ["policy_id", "currency", "current_effective", "hard_limit"]) &&
+          text(policy.policy_id) &&
+          policy.currency === "USD" &&
+          moneyUnits(policy.current_effective) !== null &&
+          moneyUnits(policy.hard_limit) !== null,
+        ) &&
+        new Set(v.recipe.budget_baseline.map((policy) => policy.policy_id)).size === v.recipe.budget_baseline.length &&
+        Array.isArray(v.recipe.steps) &&
+        v.recipe.steps.length === v.nodes.length &&
+        v.recipe.steps.every((step, index) =>
+          exact(step, ["key", "task_id", "task_status", "purpose", "risk", "approval_required", "inputs", "exit_conditions"]) &&
+          text(step.key) &&
+          step.task_id === v.nodes[index].task_id &&
+          ["todo", "doing", "done", "blocked", "unknown"].includes(step.task_status) &&
+          typeof step.purpose === "string" &&
+          step.purpose.trim().length > 0 &&
+          step.purpose.length <= 1000 &&
+          !/[\x00-\x1f\x7f]/.test(step.purpose) &&
+          ["read_only", "workspace_write", "network", "publish", "billing", "credential", "merge"].includes(step.risk) &&
+          typeof step.approval_required === "boolean" &&
+          (step.risk === "read_only" || step.approval_required) &&
+          (!v.nodes[index].approval || step.approval_required) &&
+          object(step.inputs) &&
+          Object.keys(step.inputs).length <= 3 &&
+          Object.keys(step.inputs).every((key) =>
+            ["task.title", "task.milestone", "task.blocker"].includes(key) &&
+            (step.inputs[key] === null ||
+              (typeof step.inputs[key] === "string" && step.inputs[key].length <= 2000)),
+          ) &&
+          Array.isArray(step.exit_conditions) &&
+          step.exit_conditions.length >= 1 &&
+          step.exit_conditions.length <= 2 &&
+          step.exit_conditions.every((condition) =>
+            ["dependencies.verified", "original_workflow.completed"].includes(condition),
+          ) &&
+          new Set(step.exit_conditions).size === step.exit_conditions.length,
+        ),
+      "invalid_plan_recipe",
+    );
   const l = v.limits;
   check(
     exact(l, [
@@ -77,6 +255,11 @@ export function planDefinition(v) {
     "invalid_plan_limits",
   );
   return structuredClone(v);
+}
+function recipeApprovalsComplete(definition) {
+  return !definition.recipe || definition.recipe.steps.every((step, index) =>
+    !step.approval_required || Boolean(definition.nodes[index].approval),
+  );
 }
 // Drafts may contain graph errors so operators can inspect their blockers.
 export function graphProblems(definition, taskIds) {
@@ -201,6 +384,7 @@ function database(v, project) {
       "plan_state_invalid",
     );
     planDefinition(p.definition);
+    check(recipeApprovalsComplete(p.definition), "plan_state_invalid");
     ids.add(p.definition.plan_id);
     check(
       p.binding === null ||
@@ -361,6 +545,7 @@ export class ExecutionPlans {
   }
   async define(input) {
     const definition = planDefinition(input);
+    check(recipeApprovalsComplete(definition), "recipe_approval_required");
     return this.mutate((v) => {
       check(
         v.plans.length < 20 &&
@@ -421,6 +606,41 @@ export class ExecutionPlans {
       const p = this.find(v, id);
       check(p.definition.run_id === record.run_id, "plan_run_mismatch");
       check(!p.enabled_at && !p.stopped_at, "plan_already_bound");
+      if (p.definition.recipe) {
+        const recipe = p.definition.recipe,
+          state = await ProjectStore.open(this.project);
+        const { WorkflowRecipes } = await import("./workflow-recipes.mjs");
+        let savedVersion;
+        try {
+          savedVersion = await WorkflowRecipes.open(this.project).get(
+            recipe.recipe_id,
+            recipe.revision,
+          );
+        } catch {
+          throw new PlanError("recipe_version_unavailable");
+        }
+        check(
+          savedVersion.digest === recipe.digest,
+          "recipe_version_changed",
+        );
+        check(
+          recipe.project_id === this.project.id &&
+            recipe.session_id === record.cli_session_id &&
+            text(recipe.branch) &&
+            /^[a-f0-9]{40}$/i.test(recipe.git_head || "") &&
+            recipe.branch === record.branch &&
+            recipe.git_head === record.git?.head &&
+            recipe.scope_digest === hash(record.scope) &&
+            recipe.task_digest === recipeTaskDigest(
+              state.value,
+              p.definition.nodes.map((node) => node.task_id),
+            ) &&
+            recipe.budget_digest === recipeBudgetDigest(state.value, record.run_id) &&
+            recipeBudgetBaselineMatches(state.value, p, record.run_id) &&
+            !recipeSnapshotReason(state.value, p),
+          "recipe_target_changed",
+        );
+      }
       check(!(await this.problems(p)).length, "plan_graph_invalid");
       check(
         Date.parse(p.definition.limits.stop_at) > Date.now(),
@@ -555,6 +775,14 @@ export class ExecutionPlans {
       const problems = await this.problems(p);
       reason ||= problems.length ? "plan_graph_invalid" : null;
       reason ||= !n ? "undeclared_task" : null;
+      if (!reason && p.definition.recipe) {
+        const state = await ProjectStore.open(this.project);
+        reason = recipeSnapshotReason(state.value, p);
+      }
+      if (!reason && n?.approval) {
+        const state = await ProjectStore.open(this.project);
+        reason = recipeApprovalReason(state.value, p, n);
+      }
       const parent = v.claims.find(
         (c) =>
           c.child_session_id === parent_session_id &&
@@ -667,6 +895,14 @@ export class ExecutionPlans {
     );
     const finalReason = this.stopReason(current, finalPlan);
     check(!finalReason, finalReason);
+    const finalNode = finalPlan.definition.nodes.find(
+        (node) => node.task_id === finalClaim.task_id,
+      ),
+      finalState = await ProjectStore.open(this.project),
+      snapshotReason = recipeSnapshotReason(finalState.value, finalPlan),
+      approvalReason = recipeApprovalReason(finalState.value, finalPlan, finalNode);
+    check(!snapshotReason, snapshotReason);
+    check(!approvalReason, approvalReason);
   }
   async update(claim_id, action, input = null) {
     return this.mutate((v) => {
@@ -737,10 +973,12 @@ export class ExecutionPlans {
       selected = id === null ? v.plans : [this.find(v, id)],
       plans = [],
       cache = new Map(),
-      live = v.claims.filter(active);
+      live = v.claims.filter(active),
+      projectState = await ProjectStore.open(this.project);
     for (const p of selected) {
       const problems = await this.problems(p),
         reason = this.stopReason(v, p),
+        snapshotReason = recipeSnapshotReason(projectState.value, p),
         nodes = [];
       for (const n of p.definition.nodes) {
         const c = v.claims.find((c) => c.task_id === n.task_id),
@@ -756,8 +994,11 @@ export class ExecutionPlans {
           ...problems.filter((x) => x.task_id === n.task_id),
           ...pre.blockers,
         ];
+        const approvalReason = recipeApprovalReason(projectState.value, p, n);
         const add = (code) =>
           blockers.push({ code, task_id: n.task_id, related_task_id: null });
+        if (approvalReason) add(approvalReason);
+        if (snapshotReason) add(snapshotReason);
         if (problems.length) add("plan_graph_invalid");
         if (
           live.length >= p.definition.limits.max_concurrent ||
@@ -814,6 +1055,17 @@ export class ExecutionPlans {
       plans.push({
         plan_id: p.definition.plan_id,
         run_id: p.definition.run_id,
+        recipe: p.definition.recipe
+          ? {
+              recipe_id: p.definition.recipe.recipe_id,
+              revision: p.definition.recipe.revision,
+              digest: p.definition.recipe.digest,
+              target_hash: p.definition.recipe.target_hash,
+              max_budget_usd: p.definition.recipe.max_budget_usd,
+              budget_baseline: structuredClone(p.definition.recipe.budget_baseline),
+              resolved_steps: structuredClone(p.definition.recipe.steps),
+            }
+          : null,
         limits: p.definition.limits,
         context_hash: p.context_hash,
         enabled: Boolean(p.enabled_at),
