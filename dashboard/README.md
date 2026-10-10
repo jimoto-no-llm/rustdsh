@@ -14,6 +14,9 @@ and isolated lifecycle smoke without provider credentials or model requests.
 [Persistent session ledger](../docs/SESSION-LEDGER.md): distinct project, run,
 task and native CLI IDs, with exact run resolution after client restart.
 
+[Project profiles](../docs/PROJECT-PROFILES.md): versioned project settings,
+precedence previews, and the current boundary between saved profiles and task execution.
+
 [Follow-up instructions](../docs/INPUT-INSTRUCTIONS.md): exact-session browser/CLI
 submission, preserved drafts, shared input ordering, human conflict review,
 explicit interruption with native proof, and honest unsupported-steer fallback.

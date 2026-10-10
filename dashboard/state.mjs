@@ -43,6 +43,12 @@ import {
   validateRestoredHistory,
   validateHistoryConflicts,
 } from "./history-backup.mjs";
+import {
+  activateProjectProfile,
+  createProjectProfile,
+  emptyProfileCatalog,
+  validateProfileCatalog,
+} from "./project-profiles.mjs";
 
 // Bucket D display notes (no schema change; schema stays 1):
 // #12 task contract, #13 review inbox, #14 outcome cards, #15 dependencies.
@@ -126,6 +132,7 @@ export class ProjectStore {
         questions: [],
         events: [],
         feedback: [],
+        profile_catalog: emptyProfileCatalog(),
       };
     }
     if (value.project.id !== project.id || value.schema !== 1)
@@ -137,6 +144,8 @@ export class ProjectStore {
     validateInstructions(value);
     validateCostLedger(value);
     validateBudgetAdmission(value);
+    if (value.profile_catalog !== undefined)
+      validateProfileCatalog(value.profile_catalog);
     return new ProjectStore(project, value);
   }
   async mutate(operation, input) {
@@ -175,13 +184,17 @@ export class ProjectStore {
       task: "dashboard.task.updated",
       event: "dashboard.progress.updated",
       metrics: "dashboard.metrics.updated",
+      profile_save: "dashboard.profile.updated",
+      profile_activate: "dashboard.profile.activated",
     };
     const summary =
       operation === "answer"
         ? input.answer
-        : operation === "question"
-          ? input.question || input.cancel_reason
-          : input.title || "指標を更新";
+          : operation === "question"
+            ? input.question || input.cancel_reason
+            : operation?.startsWith("profile_")
+              ? input.name || input.id || "運用プロファイルを更新"
+              : input.title || "指標を更新";
     if (operation) {
       next.changes ||= [];
       next.changes.push({
@@ -398,6 +411,14 @@ export function applyOperation(state, operation, input) {
       const index = state.tasks.findIndex((item) => item.id === task.id);
       if (index < 0) state.tasks.push(task);
       else state.tasks[index] = task;
+      break;
+    }
+    case "profile_save": {
+      createProjectProfile(state, input);
+      break;
+    }
+    case "profile_activate": {
+      activateProjectProfile(state, input);
       break;
     }
     case "question": {
