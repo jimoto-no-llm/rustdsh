@@ -206,18 +206,20 @@ fn store_extras_body(body: &str) -> anyhow::Result<Vec<String>> {
     if arr.iter().any(|x| !x.is_string()) {
         anyhow::bail!("enable must be an array of extra names");
     }
-    let mut cfg = crate::rdsh_config::load();
     let mut enable = Vec::new();
-    for x in arr {
-        if let Some(s) = x.as_str() {
-            let s = s.trim().to_string();
-            if crate::rdsh_config::KNOWN_EXTRAS.contains(&s.as_str()) && !enable.contains(&s) {
-                enable.push(s);
+    crate::rdsh_config::update(|cfg| {
+        for x in arr {
+            if let Some(s) = x.as_str() {
+                let s = s.trim().to_string();
+                if crate::rdsh_config::KNOWN_EXTRAS.contains(&s.as_str()) && !enable.contains(&s)
+                {
+                    enable.push(s);
+                }
             }
         }
-    }
-    cfg.extras.enable = enable.clone();
-    cfg.save()?;
+        cfg.extras.enable = enable.clone();
+        Ok(())
+    })?;
     Ok(enable)
 }
 

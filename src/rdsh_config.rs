@@ -341,7 +341,11 @@ pub fn load() -> RdshSettings {
 /// 行/列・復旧手順つきの Err を返す（guard 系設定の fail-open 禁止）。
 pub fn try_load() -> anyhow::Result<RdshSettings> {
     let path = settings_path();
-    let raw: Option<String> = match std::fs::read_to_string(&path) {
+    try_load_at(&path)
+}
+
+fn try_load_at(path: &str) -> anyhow::Result<RdshSettings> {
+    let raw: Option<String> = match std::fs::read_to_string(path) {
         Ok(raw) => Some(raw),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
         Err(e) => {
@@ -380,11 +384,42 @@ pub fn try_load() -> anyhow::Result<RdshSettings> {
     Ok(cfg)
 }
 
+/// Apply one settings mutation as a cross-process read-modify-write transaction.
+/// The lock spans load, caller mutation, and atomic rename so distinct updates
+/// cannot replace one another with snapshots read before either write.
+pub(crate) fn update<T>(
+    mutate: impl FnOnce(&mut RdshSettings) -> anyhow::Result<T>,
+) -> anyhow::Result<(RdshSettings, T)> {
+    let path = settings_path();
+    let _lock = crate::file_lock::FileLock::exclusive_for(std::path::Path::new(&path))?;
+    let mut cfg = try_load_at(&path)?;
+    let result = mutate(&mut cfg)?;
+    cfg.save_locked(&path)?;
+    Ok((cfg, result))
+}
+
+/// Initialize settings only if absent, or replace them when `force` is true.
+/// The existence check and write share the same lock as settings mutations.
+pub(crate) fn initialize(force: bool) -> anyhow::Result<bool> {
+    let path = settings_path();
+    let _lock = crate::file_lock::FileLock::exclusive_for(std::path::Path::new(&path))?;
+    if std::path::Path::new(&path).exists() && !force {
+        return Ok(false);
+    }
+    RdshSettings::default().save_locked(&path)?;
+    Ok(true)
+}
+
 impl RdshSettings {
     /// `mkdir -p` した上で mode 600 相当で保存する。
     pub fn save(&self) -> anyhow::Result<()> {
         let path = settings_path();
-        if let Some(parent) = std::path::Path::new(&path).parent() {
+        let _lock = crate::file_lock::FileLock::exclusive_for(std::path::Path::new(&path))?;
+        self.save_locked(&path)
+    }
+
+    fn save_locked(&self, path: &str) -> anyhow::Result<()> {
+        if let Some(parent) = std::path::Path::new(path).parent() {
             if !parent.as_os_str().is_empty() {
                 std::fs::create_dir_all(parent)?;
             }
@@ -394,7 +429,7 @@ impl RdshSettings {
         let text = serde_json::to_string_pretty(&clean.to_value())?;
         // Exclusive random temporary file + rename: never truncate a
         // repository-controlled link target or expose a partially written file.
-        crate::auth::write_creds(&path, &format!("{text}\n"))
+        crate::auth::write_creds(path, &format!("{text}\n"))
     }
 
     fn from_value(v: &serde_json::Value) -> Self {
@@ -1261,6 +1296,39 @@ mod rdsh_config_tests {
                 assert_eq!(mode, 0o600, "save は mode 600 相当のはず");
             }
             assert_eq!(load(), cfg);
+        });
+    }
+
+    #[test]
+    fn concurrent_settings_transactions_keep_both_updates() {
+        with_home("concurrent-rmw", |_| {
+            let barrier = std::sync::Arc::new(std::sync::Barrier::new(3));
+            let mut joins = Vec::new();
+            for update_passthrough in [true, false] {
+                let barrier = std::sync::Arc::clone(&barrier);
+                joins.push(std::thread::spawn(move || {
+                    barrier.wait();
+                    update(|cfg| {
+                        // Hold the transaction open so a competing process
+                        // reaches the same read-modify-write window.
+                        std::thread::sleep(std::time::Duration::from_millis(100));
+                        if update_passthrough {
+                            cfg.general.passthrough = true;
+                        } else {
+                            cfg.general.dry_run = true;
+                        }
+                        Ok(())
+                    })
+                    .unwrap();
+                }));
+            }
+            barrier.wait();
+            for join in joins {
+                join.join().unwrap();
+            }
+            let saved = try_load().unwrap();
+            assert!(saved.general.passthrough);
+            assert!(saved.general.dry_run);
         });
     }
 

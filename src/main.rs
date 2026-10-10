@@ -4,6 +4,7 @@ mod compact;
 mod context;
 mod dsh_args;
 mod file_security;
+mod file_lock;
 mod guard;
 mod inspect;
 mod local_http;
@@ -440,14 +441,14 @@ fn main() {
             }
             SettingsAction::Init { force } => {
                 let path = rdsh_config::settings_path();
-                if std::path::Path::new(&path).exists() && !force {
-                    eprintln!("[rdsh] settings already exist at {path} (use --force to overwrite)");
-                    std::process::exit(2);
-                }
-                match rdsh_config::RdshSettings::default().save() {
-                    Ok(()) => {
+                match rdsh_config::initialize(force) {
+                    Ok(true) => {
                         println!("{path}");
                         Ok(())
+                    }
+                    Ok(false) => {
+                        eprintln!("[rdsh] settings already exist at {path} (use --force to overwrite)");
+                        std::process::exit(2);
                     }
                     Err(e) => Err(e),
                 }
@@ -479,13 +480,9 @@ fn main() {
                 }
             }
             SettingsAction::Set { key, value } => {
-                let mut cfg = rdsh_config::load();
-                if let Err(e) = cfg.set_dotted(&key, &value) {
-                    Err(e)
-                } else if let Err(e) = cfg.save() {
-                    Err(e)
-                } else {
-                    match cfg.get_dotted(&key) {
+                match rdsh_config::update(|cfg| cfg.set_dotted(&key, &value)) {
+                    Err(e) => Err(e),
+                    Ok((cfg, ())) => match cfg.get_dotted(&key) {
                         Some(v) => {
                             if v.is_string() {
                                 println!("{}={}", key.trim(), v.as_str().unwrap_or_default());
@@ -501,22 +498,20 @@ fn main() {
                             }
                         }
                         None => Err(anyhow::anyhow!("set failed: {key}")),
-                    }
+                    },
                 }
             }
             SettingsAction::Unset { key } => {
-                let mut cfg = rdsh_config::load();
-                if let Err(e) = cfg.reset_dotted(&key) {
-                    Err(e)
-                } else if let Err(e) = cfg.save() {
-                    Err(e)
-                } else {
-                    println!(
-                        "reset {} (saved to {})",
-                        key.trim(),
-                        rdsh_config::settings_path()
-                    );
-                    Ok(())
+                match rdsh_config::update(|cfg| cfg.reset_dotted(&key)) {
+                    Err(e) => Err(e),
+                    Ok(_) => {
+                        println!(
+                            "reset {} (saved to {})",
+                            key.trim(),
+                            rdsh_config::settings_path()
+                        );
+                        Ok(())
+                    }
                 }
             }
             SettingsAction::Keys => {
