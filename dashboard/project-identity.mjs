@@ -27,6 +27,10 @@ function lockPath(home = stateHome()) {
   return path.join(home, "project-identity.lock");
 }
 
+function lockMutationPath(file) {
+  return `${file}.mutation`;
+}
+
 function normalizedRoot(root) {
   return process.platform === "win32" ? root.toLowerCase() : root;
 }
@@ -162,50 +166,96 @@ async function processIsAlive(pid) {
   }
 }
 
+async function createLockFile(file, owner) {
+  const temporary = `${file}.${process.pid}.${owner.token}.tmp`;
+  try {
+    await fs.writeFile(temporary, JSON.stringify(owner), {
+      flag: "wx",
+      mode: 0o600,
+    });
+    try {
+      await fs.link(temporary, file);
+      return true;
+    } catch (error) {
+      if (error.code === "EEXIST") return false;
+      throw error;
+    }
+  } finally {
+    await fs.unlink(temporary).catch(() => {});
+  }
+}
+
+async function acquireLockMutationLock(file) {
+  const mutationFile = lockMutationPath(file);
+  for (let attempt = 0; attempt < 1600; attempt++) {
+    const token = randomUUID();
+    const created = await createLockFile(mutationFile, {
+      pid: process.pid,
+      platform: process.platform,
+      token,
+      created_at_ms: Date.now(),
+    });
+    if (!created) {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      continue;
+    }
+    return async () => {
+      const owner = await lockOwner(mutationFile);
+      if (owner?.token === token) await fs.unlink(mutationFile);
+    };
+  }
+  throw new Error(
+    `Project identity lock mutation is busy; inspect ${mutationFile} before removing it`,
+  );
+}
+
 export async function acquireProjectIdentityLock(home = stateHome()) {
   const file = lockPath(home);
   await fs.mkdir(home, { recursive: true });
   for (let attempt = 0; attempt < 1600; attempt++) {
     const token = randomUUID();
-    let handle;
-    let created = false;
-    try {
-      handle = await fs.open(file, "wx", 0o600);
-      created = true;
-      await handle.writeFile(
-        JSON.stringify({
-          pid: process.pid,
-          platform: process.platform,
-          token,
-          created_at_ms: Date.now(),
-        }),
-      );
+    const created = await createLockFile(file, {
+      pid: process.pid,
+      platform: process.platform,
+      token,
+      created_at_ms: Date.now(),
+    });
+    if (created) {
       return async () => {
-        await handle.close();
-        const owner = await lockOwner(file);
-        if (owner?.token === token) await fs.unlink(file);
+        const releaseMutationLock = await acquireLockMutationLock(file);
+        try {
+          const owner = await lockOwner(file);
+          if (owner?.token === token) await fs.unlink(file);
+        } finally {
+          await releaseMutationLock();
+        }
       };
-    } catch (error) {
-      await handle?.close();
-      if (created) await fs.unlink(file).catch(() => {});
-      if (error.code !== "EEXIST") throw error;
-      const stale = await lockOwner(file);
-      if (!stale)
-        continue;
-      const samePlatform = stale.platform === process.platform;
-      const alive = samePlatform ? await processIsAlive(stale.pid) : true;
-      const foreignLeaseExpired =
-        !samePlatform && Date.now() - stale.created_at_ms >= identityLockLeaseMs;
-      if ((samePlatform && alive) || (!samePlatform && !foreignLeaseExpired)) {
-        if (attempt === 1599)
-          throw new Error(
-            "Project identity is in use by another runtime; retry after it finishes",
-          );
-        await new Promise((resolve) => setTimeout(resolve, 25));
-        continue;
-      }
+    }
+    const stale = await lockOwner(file);
+    if (!stale) continue;
+    const samePlatform = stale.platform === process.platform;
+    const alive = samePlatform ? await processIsAlive(stale.pid) : true;
+    const foreignLeaseExpired =
+      !samePlatform && Date.now() - stale.created_at_ms >= identityLockLeaseMs;
+    if ((samePlatform && alive) || (!samePlatform && !foreignLeaseExpired)) {
+      if (attempt === 1599)
+        throw new Error(
+          "Project identity is in use by another runtime; retry after it finishes",
+        );
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      continue;
+    }
+    const releaseMutationLock = await acquireLockMutationLock(file);
+    try {
       const current = await lockOwner(file);
-      if (current?.token === stale.token) await fs.unlink(file);
+      const currentIsStale =
+        current?.token === stale.token &&
+        (current.platform === process.platform
+          ? !(await processIsAlive(current.pid))
+          : Date.now() - current.created_at_ms >= identityLockLeaseMs);
+      if (currentIsStale) await fs.unlink(file);
+    } finally {
+      await releaseMutationLock();
     }
   }
   throw new Error("Could not acquire the project identity lock; retry the operation");

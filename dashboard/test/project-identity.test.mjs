@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs/promises";
 import net from "node:net";
 import os from "node:os";
@@ -199,6 +199,75 @@ test("an interrupted cross-runtime identity lock can be reclaimed after its leas
   const release = await acquireProjectIdentityLock();
   await release();
   await assert.rejects(fs.stat(lock), { code: "ENOENT" });
+});
+
+test("concurrent stale-lock recovery keeps each acquired identity lock exclusive", async (t) => {
+  const root = await setup(t);
+  const home = process.env.RDSH_DASHBOARD_HOME;
+  await fs.mkdir(home, { recursive: true });
+  await fs.writeFile(
+    path.join(home, "project-identity.lock"),
+    JSON.stringify({
+      pid: 123456789,
+      platform: process.platform === "win32" ? "linux" : "win32",
+      token: "12345678-1234-1234-1234-123456789abc",
+      created_at_ms: Date.now() - 31_000,
+    }),
+  );
+
+  const moduleUrl = new URL("../project-identity.mjs", import.meta.url).href;
+  const worker = `
+    import fs from "node:fs/promises";
+    import path from "node:path";
+    import { acquireProjectIdentityLock } from ${JSON.stringify(moduleUrl)};
+    const home = process.argv[1];
+    const release = await acquireProjectIdentityLock(home);
+    try {
+      const active = path.join(home, "active-owner");
+      const handle = await fs.open(active, "wx");
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      await handle.close();
+      await fs.unlink(active);
+    } finally {
+      await release();
+    }
+  `;
+  const children = Array.from({ length: 8 }, () =>
+    spawn(process.execPath, ["--input-type=module", "-e", worker, home], {
+      stdio: ["ignore", "pipe", "pipe"],
+      windowsHide: true,
+    }),
+  );
+  await Promise.all(
+    children.map(
+      (child) =>
+        new Promise((resolve, reject) => {
+          let stdout = "";
+          let stderr = "";
+          child.stdout.setEncoding("utf8").on("data", (chunk) => (stdout += chunk));
+          child.stderr.setEncoding("utf8").on("data", (chunk) => (stderr += chunk));
+          child.once("error", reject);
+          child.once("close", (code, signal) =>
+            code === 0
+              ? resolve()
+              : reject(
+                  new Error(
+                    `Lock worker exited with ${code ?? signal}: ${stderr || stdout}`,
+                  ),
+                ),
+          );
+        }),
+    ),
+  );
+  await assert.rejects(fs.stat(path.join(home, "active-owner")), {
+    code: "ENOENT",
+  });
+  await assert.rejects(fs.stat(path.join(home, "project-identity.lock")), {
+    code: "ENOENT",
+  });
+  await assert.rejects(fs.stat(path.join(home, "project-identity.lock.mutation")), {
+    code: "ENOENT",
+  });
 });
 
 test("move preview detects live servers, and rollback removes only its mapping", async (t) => {

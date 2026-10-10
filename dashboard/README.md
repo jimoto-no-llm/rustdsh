@@ -154,7 +154,11 @@ mapping; rollback leaves the source state untouched. If a move is interrupted,
 rerun `project-id` and `project-move preview` at the destination: an applied
 mapping is reported as `already_moved` and does not duplicate history.
 An abandoned identity lock expires after 30 seconds; stale same-runtime
-dashboard locks are cleared only after their recorded process has exited.
+dashboard locks are cleared only after their recorded process has exited. If a
+command reports that `project-identity.lock.mutation` is busy, inspect its owner
+and confirm no project-move or dashboard startup/shutdown is active before
+removing that stale guard. Never remove `project-identity.lock` while its owner
+may still be active.
 
 WSL and native Windows share a project identity only when both runtimes use the
 same `RDSH_DASHBOARD_HOME`. Capture the ID in the runtime that currently owns
