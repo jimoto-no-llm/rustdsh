@@ -5,10 +5,13 @@ $taskRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('rdsh-installer-securit
 New-Item -ItemType Directory -Path $taskRoot | Out-Null
 $priorBase = $env:RDSH_RELEASE_BASE
 $env:RDSH_RELEASE_BASE = 'https://fixture.invalid/releases'
-$global:RdshInstallerSecurityFixture = @{ extractions = 0; checksum = $null }
+$global:RdshInstallerSecurityFixture = @{ extractions = 0; checksum = $null; rustupChecksum = $null }
 function Invoke-WebRequest {
   param([string]$Uri, [string]$OutFile)
-  if ($Uri.EndsWith('.sha256')) {
+  if ($Uri -match '/rustup/dist/.+rustup-init\.exe\.sha256$') {
+    if ($null -eq $global:RdshInstallerSecurityFixture.rustupChecksum) { throw 'fixture rustup checksum unavailable' }
+    [System.IO.File]::WriteAllText($OutFile, $global:RdshInstallerSecurityFixture.rustupChecksum)
+  } elseif ($Uri.EndsWith('.sha256')) {
     if ($null -eq $global:RdshInstallerSecurityFixture.checksum) { throw 'fixture checksum unavailable' }
     [System.IO.File]::WriteAllText($OutFile, $global:RdshInstallerSecurityFixture.checksum)
   } else { [System.IO.File]::WriteAllText($OutFile, 'DUMMY_ARCHIVE_BYTES') }
@@ -41,6 +44,45 @@ try {
       if ($global:RdshInstallerSecurityFixture.extractions -ne $before -or $caught -notmatch 'checksum') { throw "$checksumCase checksum did not block before extraction: $caught" }
     }
     Write-Output "PASS: $checksumCase checksum"
+  }
+
+  $priorTemp = $env:TEMP
+  $env:TEMP = $taskRoot
+  function Get-Command {
+    param([string]$Name, [string]$ErrorAction)
+    if ($Name -in @('cargo', 'rustup', 'winget')) { return $null }
+    Microsoft.PowerShell.Core\Get-Command @PSBoundParameters
+  }
+  try {
+    $initBytes = [Text.Encoding]::UTF8.GetBytes('DUMMY_ARCHIVE_BYTES')
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try { $validRustupChecksum = [BitConverter]::ToString($sha.ComputeHash($initBytes)).Replace('-', '').ToLowerInvariant() }
+    finally { $sha.Dispose() }
+    foreach ($checksumCase in @('missing', 'mismatch', 'malformed', 'valid')) {
+      $global:RdshInstallerSecurityFixture.rustupChecksum = switch ($checksumCase) {
+        'missing' { $null }
+        'mismatch' { '0' * 64 }
+        'malformed' { 'not-a-checksum' }
+        'valid' { $validRustupChecksum }
+      }
+      $caught = $null
+      try { & $installer }
+      catch { $caught = $_.Exception.Message }
+      if ($checksumCase -eq 'valid') {
+        if ($caught -match 'checksum') { throw "valid rustup-init checksum was rejected: $caught" }
+      } else {
+        if ($caught -notmatch 'checksum') { throw "$checksumCase rustup-init checksum did not block execution: $caught" }
+      }
+      foreach ($file in @('rustup-init.exe', 'rustup-init.exe.sha256')) {
+        if (Test-Path -LiteralPath (Join-Path $taskRoot $file)) {
+          throw "$checksumCase rustup-init fixture was not removed: $file"
+        }
+      }
+      Write-Output "PASS: rustup-init $checksumCase checksum"
+    }
+  } finally {
+    $env:TEMP = $priorTemp
+    Remove-Item Function:Get-Command -ErrorAction SilentlyContinue
   }
 } finally {
   $env:RDSH_RELEASE_BASE = $priorBase
