@@ -254,6 +254,40 @@ async function posted(f, input, actor = "human") {
   return result;
 }
 test(
+  "registration rejects malformed owner IDs and unbounded session IDs before enrollment",
+  options,
+  async (t) => {
+    const f = await setup(t),
+      attached = await f.attach();
+    const input = {
+      run_id: attached.record.run_id,
+      session_id: attached.record.cli_session_id,
+      owner_id: attached.history.owner_id,
+    };
+    for (const owner_id of [null, 7, {}, "owner_not-a-uuid"]) {
+      const response = await f.post(
+        "replies/register",
+        { ...input, owner_id },
+        "admin",
+      );
+      assert.equal(response.status, 400);
+      assert.match((await response.json()).error, /Invalid registered owner ID/);
+    }
+    for (const session_id of [null, 7, {}, "", "  ", "s".repeat(257)]) {
+      const response = await f.post(
+        "replies/register",
+        { ...input, session_id },
+        "admin",
+      );
+      assert.equal(response.status, 400);
+      assert.match((await response.json()).error, /Invalid native session ID/);
+    }
+    const consumers = f.server.store.value.answer_applications?.consumers || {};
+    assert.equal(Object.keys(consumers).length, 0);
+  },
+);
+
+test(
   "general inputs and human replies share exact-session order and immutable IDs, including unsupported steer",
   options,
   async (t) => {
