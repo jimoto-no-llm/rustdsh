@@ -261,6 +261,8 @@ rdsh --profile web                             # slim 環境変数付きで起�
 
 DSHの会話GUIに読み取り専用のworkflow進捗ボードを追加する場合は、[対応sourceへの適用・診断ツール](plugins/workflow-board/README.ja.md)を隔離した対応checkoutに使います。boardと共通表示projectionを変更する18ファイルのpatch・fixtureテストを同梱し、patched DSHのbuild・採用は別工程です。
 
+MCP resourceを安全な添付成果物として開き、resource linkを明示操作で読む場合は、[対応sourceへの適用・診断ツール](plugins/mcp-resource-artifacts/README.ja.md)を指定revisionの隔離checkoutに使います。リンクは自動取得せず、binaryをモデル向けテキストに展開しません。patched DSHのbuild・採用は別工程です。
+
 ```sh
 rdsh settings set extras.enable serve  # 有効な補助機能の一覧を置き換えます
 rdsh serve

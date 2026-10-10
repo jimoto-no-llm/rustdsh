@@ -39,6 +39,14 @@ tooling, not an installable plugin, and `plugins/install.sh` does not install it
 It adds the board and shared workflow UI projection rules; build and adoption
 of the patched DSH remain separate operator decisions.
 
+## MCP resource artifact source preparation
+
+The [MCP resource artifact patch](mcp-resource-artifacts/README.md) prepares
+an explicitly selected DSH source checkout at its pinned revision. It is
+source tooling, not an installable plugin; it adds scoped resource-link reads
+and bounded image/file attachments while keeping binary payloads out of model
+text. Building and adopting the patched DSH remain separate operator decisions.
+
 ## Filesystem skills (rtk + ponytail)
 
 Install with `./plugins/install-skills.sh` (defaults to `~/.dsh/skills`).
