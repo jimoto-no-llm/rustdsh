@@ -7,6 +7,7 @@ import { startWindowsTray } from "../windows-tray.mjs";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
 
 function fixture(close) {
   const server = new EventEmitter();
@@ -178,13 +179,22 @@ test("an unready tray retains its original 15-second startup deadline and owns o
 
 test("tray diagnostics bound stderr and keep its contents out of observations", async () => {
   const f = fixture(async () => {});
-  f.child.stdout.write("phase:powershell-start:7.5.2\nphase:forms-loaded\n");
+  f.child.stdout.write(
+    "phase:powershell-start:7.5.2\nphase:forms-loaded\nphase:drawing-loaded\n",
+  );
   f.child.stdout.write("phase:untrusted:DUMMY_PHASE_SECRET\n");
   f.child.stderr.write("DUMMY_STDERR_SECRET".repeat(2000));
   f.child.stdout.write("ready\n");
   const tray = await f.pending;
   const report = tray.diagnostics();
   assert.equal(report.powershell, "7.5.2");
+  assert.deepEqual(report.phases.map((entry) => entry.phase), [
+    "spawn-requested",
+    "powershell-start",
+    "forms-loaded",
+    "drawing-loaded",
+    "ready",
+  ]);
   assert.equal(report.stderr.bytes, 16384);
   assert.equal(report.stderr.truncated, true);
   assert.match(report.stderr.sha256, /^[0-9a-f]{64}$/);
@@ -196,10 +206,11 @@ test("tray diagnostics bound stderr and keep its contents out of observations", 
 
 async function stopFixtureHelper(child) {
   if (!child?.pid || child.exitCode !== null || child.signalCode !== null)
-    return;
+    return true;
   const exited = once(child, "exit", { signal: AbortSignal.timeout(5000) });
   child.kill();
   await exited;
+  return child.exitCode !== null || child.signalCode !== null;
 }
 
 test("a lost warning pipe cannot leak a rejected stop promise", async () => {
@@ -224,6 +235,13 @@ test(
     timeout: 25000,
   },
   async (t) => {
+    const started = performance.now();
+    const phases = [];
+    const stderrHash = createHash("sha256");
+    let stderrBytes = 0,
+      hashedBytes = 0,
+      stderrTruncated = false,
+      pendingLine = "";
     const child = spawn(
       "pwsh.exe",
       [
@@ -236,10 +254,56 @@ test(
         "-File",
         fileURLToPath(new URL("./windows-tray-native.ps1", import.meta.url)),
       ],
-      { windowsHide: true, stdio: "ignore" },
+      { windowsHide: true, stdio: ["ignore", "ignore", "pipe"] },
     );
-    t.after(() => stopFixtureHelper(child));
-    const [code] = await once(child, "exit", { signal: t.signal });
+    child.stderr.on("data", (chunk) => {
+      const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      stderrBytes += bytes.length;
+      const remaining = 16384 - hashedBytes;
+      if (remaining > 0) {
+        stderrHash.update(bytes.subarray(0, remaining));
+        hashedBytes += Math.min(bytes.length, remaining);
+      }
+      if (bytes.length > remaining) stderrTruncated = true;
+      pendingLine += bytes.toString("utf8");
+      if (pendingLine.length > 512 && !pendingLine.includes("\n"))
+        pendingLine = pendingLine.slice(-512);
+      let newline;
+      while ((newline = pendingLine.indexOf("\n")) >= 0) {
+        const line = pendingLine.slice(0, newline).replace(/\r$/, "");
+        pendingLine = pendingLine.slice(newline + 1);
+        if (
+          /^RDSH_TRAY_TEST phase=[a-z-]+ elapsed_ms=\d+(?: powershell=[0-9A-Za-z.-]{1,32})?$/.test(
+            line,
+          ) &&
+          phases.length < 16
+        ) {
+          phases.push(line);
+          t.diagnostic(line);
+        }
+      }
+    });
+    t.after(async () => {
+      const cleanupExitObserved = await stopFixtureHelper(child);
+      t.diagnostic(
+        JSON.stringify({
+          tray_native_test: {
+            node: process.version,
+            elapsed_ms: Math.round(performance.now() - started),
+            exit_code: child.exitCode,
+            signal: child.signalCode,
+            cleanup_exit_observed: cleanupExitObserved,
+            phases,
+            stderr: {
+              bytes: stderrBytes,
+              sha256: stderrHash.digest("hex"),
+              truncated: stderrTruncated,
+            },
+          },
+        }),
+      );
+    });
+    const [code] = await once(child, "close", { signal: t.signal });
     assert.equal(code, 0);
   },
 );
