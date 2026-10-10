@@ -22,6 +22,9 @@ const profileKeys = [
 const notificationModes = ["all", "actionable", "none"];
 const secretMarker =
   /(?:api[_-]?key|access[_-]?token|bearer|credential|password|secret|token)\s*[:=]/i;
+const secretFlag =
+  /(?:^|\s)--(?:api[_-]?key|access[_-]?token|bearer|credential|password|secret|token)(?:=|\s+)/i;
+const credentialUrl = /\b[a-z][a-z\d+.-]*:\/\/[^/\s@]+@/i;
 
 function object(value, label) {
   if (!value || typeof value !== "object" || Array.isArray(value))
@@ -46,7 +49,7 @@ function findProfile(catalog, id) {
 function string(value, label, maximum) {
   if (typeof value !== "string" || !value.trim() || value.length > maximum)
     throw new Error(`${label} must be a non-empty string (max ${maximum})`);
-  if (secretMarker.test(value))
+  if (secretMarker.test(value) || secretFlag.test(value) || credentialUrl.test(value))
     throw new Error(`${label} must not contain credential-like values`);
   return value.trim();
 }
