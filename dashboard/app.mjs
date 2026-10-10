@@ -6,6 +6,7 @@ import { renderConnectionDiagnostics } from "./connection-diagnostics-ui.mjs";
 import { createInstructionPanel } from "./instruction-queue-ui.mjs";
 import { createCostPanel } from "./cost-ledger-ui.mjs";
 import { renderBudget } from "./budget-ui.mjs";
+import { createDecisionLogPanel } from "./decision-log-ui.mjs";
 
 const $ = (id) => document.getElementById(id);
 const base = location.pathname.startsWith("/_rdsh") ? "/_rdsh/" : "/";
@@ -143,6 +144,11 @@ const renderInstructions = createInstructionPanel($("instruction-panel"), {
   refreshState,
 });
 const renderCosts = createCostPanel($("cost-ledger"), node);
+const renderDecisions = createDecisionLogPanel($("decision-log"), {
+  node,
+  api,
+  refreshState,
+});
 function render(state) {
   if (state.revision < renderedRevision) return;
   renderedRevision = state.revision;
@@ -150,6 +156,7 @@ function render(state) {
   renderInstructions(state);
   renderCosts(state);
   renderBudget($("budget-admission"), state, node);
+  renderDecisions(state);
   updateOverview(state);
   renderReports(state);
   const unanswered = state.questions.filter((question) => question.answer === null);

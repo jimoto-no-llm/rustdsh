@@ -440,6 +440,22 @@
       .decision-card button {
         margin: 4px 8px 4px 0;
       }
+      .decision-field {
+        display: block;
+        margin: 12px 0;
+      }
+      .decision-field > span:first-child {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 600;
+      }
+      .decision-field input,
+      .decision-field select {
+        width: 100%;
+        min-width: 0;
+        padding: 8px;
+        font: inherit;
+      }
       textarea {
         display: block;
         margin-top: 12px;
@@ -883,6 +899,14 @@
           <summary>進捗・成果物の報告</summary>
           <h2>進捗・成果物の報告履歴</h2>
           <div class="feed" id="events"></div>
+        </details>
+        <details class="fold" id="decision-log-detail">
+          <summary>方針の決定ログ</summary>
+          <h2>人間が選んだ方針と変更履歴</h2>
+          <p class="sub">
+            AIの要約とは別に、方針・理由・元の回答・置換関係を保存します。置換済み・撤回・保留の決定を参照するタスクは確認対象として表示します。
+          </p>
+          <section id="decision-log" aria-label="方針の決定ログ"></section>
         </details>
         <details id="answered">
           <summary>回答済みの質問</summary>

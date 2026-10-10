@@ -195,6 +195,28 @@ export function renderReports(state, now = Date.now()) {
       ));
       const title = node("td", task.title);
       title.append(provenance(view, undefined, String, "task:" + task.id));
+      const reference = task.decision_reference;
+      if (reference) {
+        const successorStatus = {
+          current: "現行",
+          replaced: "置換済み",
+          withdrawn: "撤回",
+          hold: "保留",
+        }[reference.replacement_status];
+        const label = reference.confirmation_required
+          ? `要確認 · ${reference.reason} · 参照: ${reference.policy || reference.id}` +
+            (reference.replacement_policy
+              ? ` → 後継${successorStatus ? `（${successorStatus}）` : ""}: ${reference.replacement_policy}`
+              : "")
+          : `決定 ${reference.id} · ${reference.policy}`;
+        title.append(
+          node(
+            "div",
+            label,
+            reference.confirmation_required ? "warn" : "sub",
+          ),
+        );
+      }
       tr.append(
         node("td", task.id, "id"),
         status,
