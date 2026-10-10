@@ -199,7 +199,7 @@ fn jwt_exp_ms(token: &str) -> Option<i64> {
     let payload = parts.nth(1)?;
     let raw = b64url_decode(payload)?;
     let v: serde_json::Value = serde_json::from_slice(&raw).ok()?;
-    v.get("exp")?.as_i64().map(|s| s * 1000)
+    v.get("exp")?.as_i64()?.checked_mul(1000)
 }
 
 // --- external stores --------------------------------------------------------
@@ -1504,6 +1504,18 @@ mod tests {
         let tok = "eyJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3OTE3MDg4MDJ9.sig";
         assert_eq!(jwt_exp_ms(tok), Some(1791708802000));
         assert!(jwt_exp_ms("not-a-jwt").is_none());
+    }
+
+    #[test]
+    fn jwt_exp_overflow_is_rejected() {
+        let too_far_future = "header.eyJleHAiOjkyMjMzNzIwMzY4NTQ3NzZ9.sig";
+        let too_far_past = "header.eyJleHAiOi05MjIzMzcyMDM2ODU0Nzc2fQ.sig";
+        let largest_millisecond_value = "header.eyJleHAiOjkyMjMzNzIwMzY4NTQ3NzV9.sig";
+
+        assert_eq!(jwt_exp_ms(too_far_future), None);
+        assert_eq!(jwt_exp_ms(too_far_past), None);
+        let expected = 9_223_372_036_854_775_000;
+        assert_eq!(jwt_exp_ms(largest_millisecond_value), Some(expected));
     }
 
     #[test]
