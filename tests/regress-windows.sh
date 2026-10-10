@@ -40,8 +40,9 @@ if [ -z "$NODE_EXE" ]; then
   exit 1
 fi
 export RDSH_ORIG_BIN="$(cygpath -w "$NODE_EXE")"
-delegated="$("$TASK_ROOT/bin/dsh.exe" -e 'process.stdout.write("delegated-original")')"
-if [ "$delegated" != "delegated-original" ]; then
+node_version="$("$NODE_EXE" --version)"
+delegated="$("$TASK_ROOT/bin/dsh.exe" --version)"
+if [ "$delegated" != "$node_version" ]; then
   echo "FAIL: dsh.exe did not delegate to RDSH_ORIG_BIN" >&2
   exit 1
 fi
