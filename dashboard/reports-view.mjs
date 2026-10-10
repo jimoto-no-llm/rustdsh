@@ -102,6 +102,7 @@ function metricCard(state, now, label, value, detail, fields, progress, warning)
 function rateText(state, a, b, now) {
   const result = ratioView(state, a, b, now);
   if (result.reason === "incompatible") return "比較不可";
+  if (result.reason === "zero_denominator") return "対象なし";
   if (result.value !== null)
     return (metricView(state, a, now).kind === "estimated" ? "推定 " : "") + percentage(result.value);
   const views = [metricView(state, a, now), metricView(state, b, now)];

@@ -1,0 +1,123 @@
+{
+  "schema": 1,
+  "branch": "codex/issue-52-qa-matrix",
+  "base": "f2a7dc6b2850a6f0c0e1ea1b53494b12cd2e1221",
+  "checkout_head": "6040075f5ca339adafceeb81d39458c7c7bd64ae",
+  "working_tree_changes_included": true,
+  "source_snapshot_sha256": "5381ae16cc4d2a59e17a35b85680f519e4683494421edb1730b11bbca7e4a821",
+  "files": [
+    {
+      "path": "dashboard/app.mjs",
+      "sha256": "7b99e0b59275c495445d9d7a2bf31fe8dea28984942f9ba45a02942c26bf2e16"
+    },
+    {
+      "path": "dashboard/cli.mjs",
+      "sha256": "e77df3d9c79f40380e19f1154c74a814ab83c0e3d3830d5003f5239afa56eb64"
+    },
+    {
+      "path": "dashboard/harness.mjs",
+      "sha256": "7bc50211f8f2b47c157c466460239c098865a9066660d46c346fb64f656ce0b9"
+    },
+    {
+      "path": "dashboard/mcp.mjs",
+      "sha256": "3ac92218fc0187de5fc10c590a552c12be56f4f519631d49533868677049714d"
+    },
+    {
+      "path": "dashboard/mcp2.mjs",
+      "sha256": "4c514d3b836c34ceadf9b17ddd8040c2396f3de5e8ced8f411d86d992f54b185"
+    },
+    {
+      "path": "dashboard/package-lock.json",
+      "sha256": "40d9b9beeb4284728b6c94074fe3eac1297252fd95ba17c73e23703f9ae9fe12"
+    },
+    {
+      "path": "dashboard/package.json",
+      "sha256": "569e90765fc52dbf9a893c4d96f3cd8665a70fdfe8fcd4f07bab05511af243d8"
+    },
+    {
+      "path": "dashboard/qa/catalog.mjs",
+      "sha256": "dc3a65e86f6f020f13f93431e5f31136fe7c9d7140bb33009a0d3146986f70eb"
+    },
+    {
+      "path": "dashboard/qa/cli.mjs",
+      "sha256": "1c22372d7e9d274a4bd47ce552a1f1a1fd109c9a92a8219dd135f9fbbee45d0d"
+    },
+    {
+      "path": "dashboard/qa/fixture.mjs",
+      "sha256": "eb67dac629f947ace1f03089e095ddce2b4dbc7da01784bfe1372617a2324fae"
+    },
+    {
+      "path": "dashboard/qa/report.mjs",
+      "sha256": "517c84956740a9c413b9750965785238ba8a7ce256ded2ab2f3530507a9b3a71"
+    },
+    {
+      "path": "dashboard/qa/view.mjs",
+      "sha256": "0320d89967001604b826211b8e3045b503d3d39e8dba91bc91d5e84a5c0243ef"
+    },
+    {
+      "path": "dashboard/server.mjs",
+      "sha256": "f491d87bc2d75287c0288227739b525752d1ceaaa7a9433b5461d8abe486a5a4"
+    },
+    {
+      "path": "dashboard/state.mjs",
+      "sha256": "1bcca78a7aa28f2e0f661fbe2208f9d5c2faf5c94c83476b9bffe63042364e4f"
+    },
+    {
+      "path": "dashboard/tailscale.mjs",
+      "sha256": "756f283ab1f533d51e489aee510d794257bc62775e42bdd0f7c385022dac84a3"
+    },
+    {
+      "path": "dashboard/test/answer-dom.mjs",
+      "sha256": "3830ca5de239fb1a9391cf12d0c91548f6fe842760cae54d4fd8b1d8639e105d"
+    },
+    {
+      "path": "dashboard/test/answer-startup-recovery.test.mjs",
+      "sha256": "15356160843ae90c26c227dcb39c16f2150e6ab833844415e728fcd28783d7ac"
+    },
+    {
+      "path": "dashboard/test/answer-ui.test.mjs",
+      "sha256": "b3bf001386ffd93856715ae718b7ee5d7f32bf1bc88722d824506e8302aa5d3c"
+    },
+    {
+      "path": "dashboard/test/auth-notice.test.mjs",
+      "sha256": "b2b7a477f1de360492d9a12e9312e37f765f6a1f299289d86e945948e7a9274c"
+    },
+    {
+      "path": "dashboard/test/browser-link-recovery.test.mjs",
+      "sha256": "5c8c78db834a6938b37381f17bdcc9ee403109478eb843d2fa066be9f7b5af85"
+    },
+    {
+      "path": "dashboard/test/dashboard.test.mjs",
+      "sha256": "a307ed50ba3a42d2e74cd7ae71b01f1b88d52a0c77dd89bf6c8968848ef8cc94"
+    },
+    {
+      "path": "dashboard/test/events.test.mjs",
+      "sha256": "343fe852df131486a649f399ab71805f6583ed7207f5dfaf221418039697b643"
+    },
+    {
+      "path": "dashboard/test/mobile-presentation.test.mjs",
+      "sha256": "43046fa1d751a1a0365bc3794a0d8ed46da5f702fea8d4979018cb5d446ab43a"
+    },
+    {
+      "path": "dashboard/test/palette-mobile.test.mjs",
+      "sha256": "423870dd13b85dd22454d31881de4c03dffa5d342768b32fe15563c8febd7a11"
+    },
+    {
+      "path": "dashboard/test/qa-fixture.test.mjs",
+      "sha256": "82c0ddbf88c62608f2f9eccb4f3d98306ce192a4edd42cb4ee5d91fd0c3a9210"
+    },
+    {
+      "path": "dashboard/test/qa-report.test.mjs",
+      "sha256": "1aa31e9ab803ef787b150cd55407d374a96502099251c48271ff7edaa55a652f"
+    },
+    {
+      "path": "dashboard/ui.html",
+      "sha256": "bb6a64cf311b49aab6b5769e6021414c1b5387efcba8bec59d6b5231475c4371"
+    },
+    {
+      "path": "dashboard/webhooks.mjs",
+      "sha256": "c9936d8ff6a1123c06dcc5a7496eaa26508e262ad2fd8ac3de2db2092402c8ff"
+    }
+  ],
+  "note": "Historical source snapshot from before integration into main 96dbcbb. Four authentication-change files match the recorded Windows/WSL 74-test run on that earlier source. This manifest is preserved for provenance, not presented as the integrated source. See current-source-manifest.json and current-integration.md for the separate integration snapshot and checks."
+}

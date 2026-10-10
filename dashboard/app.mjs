@@ -1,5 +1,6 @@
 import { renderReports } from "./reports-view.mjs";
 import { renderQuestionCards } from "./question-cards-ui.mjs";
+import { createQuestionRecovery } from "./answer-recovery.mjs";
 import { renderAnswerApplications } from "./answer-applications-ui.mjs";
 import { renderOverview } from "./project-overview.mjs";
 import { renderConnectionDiagnostics } from "./connection-diagnostics-ui.mjs";
@@ -9,18 +10,81 @@ import { renderBudget } from "./budget-ui.mjs";
 
 const $ = (id) => document.getElementById(id);
 const base = location.pathname.startsWith("/_rdsh") ? "/_rdsh/" : "/";
+let tabStorage;
+let storageWarning = "";
+function storageFailed() {
+  storageWarning = "下書きをこのタブに保存できません。再読み込み・移動の前に回答をコピーしてください。";
+  if ($("draft-storage-note")) $("draft-storage-note").textContent = storageWarning;
+}
+function storageRead(key) {
+  try { return tabStorage?.getItem(key); }
+  catch { storageFailed(); return null; }
+}
+function storageWrite(key, value) {
+  try { tabStorage?.setItem(key, value); }
+  catch { storageFailed(); }
+}
+try { tabStorage = sessionStorage; }
+catch { storageFailed(); }
 const suppliedBrowserToken =
   base === "/" ? new URLSearchParams(location.hash.slice(1)).get("key") : null;
 const browserToken =
   base === "/"
     ? suppliedBrowserToken ||
-      sessionStorage.getItem("rdsh_project_browser_token") ||
+      storageRead("rdsh_project_browser_token") ||
       ""
     : "";
 if (browserToken) {
-  sessionStorage.setItem("rdsh_project_browser_token", browserToken);
+  storageWrite("rdsh_project_browser_token", browserToken);
   if (suppliedBrowserToken !== null)
     history.replaceState(null, "", location.pathname + location.search);
+}
+// Opening a fresh browser link in this tab may only change its fragment.
+// Reload to let the existing bootstrap adopt that key for both API and SSE.
+window.addEventListener("hashchange", () => {
+  if (base !== "/" || !new URLSearchParams(location.hash.slice(1)).get("key")) return;
+  if (storageWarning && recovery?.hasDrafts()) {
+    storageWarning = "新しい接続に切り替える前に、保存できていない下書きをコピーしてください。コピー後に再読み込みすると接続を更新できます。";
+    $("draft-storage-note").textContent = storageWarning;
+    $("connection").textContent = storageWarning;
+    return;
+  }
+  location.reload();
+});
+let authenticationRequired = false;
+let streamDisconnected = false;
+const authenticationMessage = "接続情報がないか、古くなっています。最新のURL・QRで開き直してください。";
+function setConnection(message) {
+  $("connection").textContent = authenticationRequired ? authenticationMessage : message;
+}
+function checkAuthentication(response) {
+  if (response.status !== 401) return;
+  if (!authenticationRequired) {
+    authenticationRequired = true;
+    $("auth-notice").replaceChildren(
+      node("h2", "最新のURL・QRで開き直してください"),
+      node("p", "起動元のPCで最新の完全URLまたはQRコードを取得して、開き直してください。サーバーの再起動後や別のブラウザーでは、以前の接続情報を使えないことがあります。"),
+      node("p", "未送信の下書きがある場合は、必要な本文をコピーしてから、このタブで最新の完全URLを開いてください。表示中の内容は、最後に取得した情報です。"),
+    );
+    $("auth-notice").hidden = false;
+    if (!latestState) {
+      $("title").textContent = "接続し直してください";
+      document.title = "接続し直してください · Dashboard";
+      $("project-content").hidden = true;
+    }
+    // The QR and URL belong to the rejected connection. Refreshing sharing
+    // cannot obtain a new browser credential through an unauthenticated API.
+    if (qrObjectUrl) URL.revokeObjectURL(qrObjectUrl);
+    qrObjectUrl = null;
+    $("qr").hidden = true;
+    $("qr-placeholder").hidden = false;
+    $("qr-placeholder").textContent = "接続し直してください";
+    $("share-url").textContent = "";
+    $("share-message").textContent = authenticationMessage;
+    $("share-refresh").disabled = true;
+  }
+  setConnection(authenticationMessage);
+  throw new Error(authenticationMessage);
 }
 async function api(route, body) {
   const headers = browserToken ? { "x-rdsh-browser-token": browserToken } : {};
@@ -34,6 +98,7 @@ async function api(route, body) {
           body: JSON.stringify(body),
         },
   );
+  checkAuthentication(response);
   const result = await response.json();
   if (!response.ok) throw new Error(result.error || "接続できません");
   return result;
@@ -46,6 +111,7 @@ function node(tag, text, className) {
 }
 let renderedRevision = -1;
 let latestState = null;
+let recovery = null;
 let selectedTask = "";
 let selectionKey = "";
 function navigateTo(id) {
@@ -157,8 +223,12 @@ function render(state) {
     node,
     api,
     refreshState,
+    recovery,
+    applyState,
+    rerender: () => render(latestState),
   });
   renderAnswerApplications($("reply-status"), state, node);
+  $("answered-summary").textContent = `回答済みの質問（${state.questions.filter((question) => question.answer !== null).length}件）`;
   $("answers").replaceChildren(
     ...state.questions
       .filter((question) => question.answer !== null)
@@ -167,6 +237,7 @@ function render(state) {
       .map((question) => {
         const element = node("article", undefined, "event");
         element.append(
+          node("code", question.id, "question-id"),
           node("strong", question.question),
           node("p", question.answer),
         );
@@ -183,37 +254,48 @@ function render(state) {
         return element;
       }),
   );
-  $("connection").textContent = "接続済み · プロジェクト専用";
+  setConnection(streamDisconnected ? "再接続中…" : "接続済み · プロジェクト専用");
   $("updated").textContent =
     `最終受信: ${state.updated_at ? new Date(state.updated_at).toLocaleString("ja-JP") : "まだ報告がありません"} · 鮮度は各項目の観測時刻から判定します。累計欄は報告元のAPI換算値です。台帳は出所ごとの報告値です。`;
 }
+function applyState(state, read = 0) {
+  if (recovery && !recovery.reconcile(state, read)) return;
+  render(state);
+}
 async function refreshState() {
+  const read = recovery?.beginRead() || 0;
   try {
-    render(await api("state"));
+    applyState(await api("state"), read);
   } catch (e) {
-    $("connection").textContent = e.message;
+    setConnection(streamDisconnected ? "再接続中…" : e.message);
     $("overview-state").textContent = "画面の更新に失敗 · 対象の現在状態は不明";
   }
 }
 let qrObjectUrl = null;
 async function renderShare(config) {
+  if (authenticationRequired) return;
   const share = config.share;
   $("share-message").textContent = share.message;
   $("share-url").textContent = share.url || "";
   $("qr").hidden = !share.url;
   $("qr-placeholder").hidden = Boolean(share.url);
   $("qr-placeholder").textContent =
-    share.state === "login_required"
-      ? "Tailscaleへのログイン待ち"
-      : "接続準備中";
+    share.state === "disabled"
+      ? "共有は無効"
+      : share.state === "login_required"
+        ? "Tailscaleへのログイン待ち"
+        : "QRコード未発行";
   if (qrObjectUrl) URL.revokeObjectURL(qrObjectUrl);
   qrObjectUrl = null;
   if (share.url) {
     const response = await fetch(base + "api/qr.svg?updated=" + Date.now(), {
       headers: browserToken ? { "x-rdsh-browser-token": browserToken } : {},
     });
+    checkAuthentication(response);
     if (!response.ok) throw new Error("QRコードを取得できません");
-    qrObjectUrl = URL.createObjectURL(await response.blob());
+    const blob = await response.blob();
+    if (authenticationRequired) return;
+    qrObjectUrl = URL.createObjectURL(blob);
     $("qr").src = qrObjectUrl;
   }
   $("consent").hidden = !share.consent_url;
@@ -241,7 +323,7 @@ $("share-refresh").addEventListener("click", async () => {
   } catch (e) {
     $("share-message").textContent = e.message;
   } finally {
-    $("share-refresh").disabled = false;
+    $("share-refresh").disabled = authenticationRequired;
   }
 });
 // #61: コマンドパレット。既存操作への別導線であり、権限・状態チェックや
@@ -250,8 +332,8 @@ $("share-refresh").addEventListener("click", async () => {
 const paletteCommands = [
   {
     id: "toggle-share",
-    ja: "共有表示を切り替える",
-    en: "Toggle phone view",
+    ja: "接続・共有の表示を切り替える",
+    en: "Toggle connection details",
     keys: "共有 スマホ QR share phone",
     run: () => $("share-toggle").click(),
   },
@@ -287,6 +369,29 @@ const paletteCommands = [
   },
 ];
 let paletteReturnFocus = null;
+let paletteViewport = null;
+function fitPaletteToViewport() {
+  if (!$("palette").open || !paletteViewport ||
+      paletteViewport.width <= 0 || paletteViewport.height <= 0) return;
+  const width = Math.min(560, Math.max(0, paletteViewport.width - 40));
+  const style = $("palette").style;
+  // Fixed positioning uses layout coordinates; offsets locate the visible area
+  // after the keyboard appears or the user pans a zoomed page.
+  style.left = `${paletteViewport.offsetLeft + (paletteViewport.width - width) / 2}px`;
+  style.top = `${paletteViewport.offsetTop + 20}px`;
+  style.right = "auto";
+  style.bottom = "auto";
+  style.margin = "0";
+  style.width = `${width}px`;
+  style.maxHeight = `${Math.max(0, paletteViewport.height - 40)}px`;
+}
+function stopPaletteViewport() {
+  paletteViewport?.removeEventListener("resize", fitPaletteToViewport);
+  paletteViewport?.removeEventListener("scroll", fitPaletteToViewport);
+  paletteViewport = null;
+  for (const property of ["left", "top", "right", "bottom", "margin", "width", "maxHeight"])
+    $("palette").style[property] = "";
+}
 function renderPalette(filter = "") {
   const query = filter.trim().toLowerCase();
   const matched = paletteCommands.filter(
@@ -314,18 +419,29 @@ function renderPalette(filter = "") {
     : "該当なし";
 }
 function openPalette() {
+  if ($("palette").open) return;
   paletteReturnFocus = document.activeElement;
   renderPalette("");
   $("palette-search").value = "";
   $("palette").showModal();
-  $("palette-search").focus();
+  stopPaletteViewport();
+  paletteViewport = window.visualViewport;
+  paletteViewport?.addEventListener("resize", fitPaletteToViewport);
+  paletteViewport?.addEventListener("scroll", fitPaletteToViewport);
+  fitPaletteToViewport();
+  // The close button receives showModal's initial focus. Request search focus
+  // explicitly without asking iOS to zoom or scroll the field into view.
+  $("palette-search").focus({ preventScroll: true });
 }
 $("palette-toggle").addEventListener("click", openPalette);
+$("palette-close").addEventListener("click", () => $("palette").close());
 $("palette-search").addEventListener("input", (event) =>
   renderPalette(event.target.value),
 );
 $("palette").addEventListener("close", () => {
-  if (paletteReturnFocus?.focus) paletteReturnFocus.focus();
+  if ($("palette").open) return;
+  stopPaletteViewport();
+  if (paletteReturnFocus?.focus) paletteReturnFocus.focus({ preventScroll: true });
 });
 document.addEventListener("keydown", (event) => {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
@@ -339,6 +455,7 @@ document.addEventListener("keydown", (event) => {
 try {
   const config = await api("config");
   await renderShare(config);
+  if (authenticationRequired) throw new Error(authenticationMessage);
   if (config.kind === "harness") {
     $("connection-detail").hidden = true;
     $("kind").textContent = "DEEPSEEK HARNESS";
@@ -347,7 +464,7 @@ try {
     $("project-content").hidden = true;
     $("harness").hidden = false;
     $("harness-open").href = config.harness_url;
-    $("connection").textContent = "接続済み · Harness専用の入口";
+    setConnection("接続済み · Harness専用の入口");
     $("share").hidden = false;
     $("share-toggle").setAttribute("aria-expanded", "true");
     let stopRequested = false;
@@ -480,20 +597,32 @@ try {
         sessionStorage.setItem(selectionKey, selectedTask);
       } catch {}
     }
+    recovery = createQuestionRecovery(config.project.id, {
+      read: storageRead, write: storageWrite, onStorageError: storageFailed,
+    });
     $("quick-actions").hidden = false;
     await refreshState();
+    window.addEventListener("pageshow", (event) => {
+      if (event.persisted) return refreshState();
+    });
     const source = new EventSource(
       base + "api/live?key=" + encodeURIComponent(browserToken),
     );
     source.addEventListener("changed", refreshState);
     source.onerror = () => {
-      $("connection").textContent = "再接続中…";
+      streamDisconnected = true;
+      setConnection("再接続中…");
       $("overview-state").textContent = "再接続中 · 対象の現在状態は不明";
+      // EventSource does not expose HTTP status. Recheck the authenticated API.
+      if (!authenticationRequired) return refreshState();
     };
-    source.onopen = refreshState;
+    source.onopen = () => {
+      streamDisconnected = false;
+      return refreshState();
+    };
     // Expiration needs a clock update even when publishers send no SSE event.
     setInterval(refreshState, 5000);
   }
 } catch (e) {
-  $("connection").textContent = e.message;
+  setConnection(e.message);
 }

@@ -1,0 +1,44 @@
+#52 audit — 2026-10-08
+Product/QA source: ec5fbf7c7ee5342fe9952dc0da0097c887aa427e
+
+Automated checks
+- Windows Node 22.23.3, cwd dashboard:
+  $testFiles = Get-ChildItem test -Filter '*.test.mjs' | ForEach-Object { $_.FullName }
+  & <node22.exe> --test @testFiles
+  45 tests / 45 pass / 0 fail / 0 skipped.
+- WSL Ubuntu Linux, native filesystem clean clone, cwd dashboard:
+  <node22-linux> --test test/*.test.mjs
+  45 tests / 45 pass / 0 fail / 0 skipped.
+- Node24 dashboard suite: 45/45 in independent code review.
+- node dashboard/qa/cli.mjs validate docs/evidence/issue-52-audit/results.json
+  Valid report: 57 recorded results. All referenced evidence paths exist.
+- node dashboard/qa/cli.mjs report docs/evidence/issue-52-audit/results.json docs/evidence/issue-52-audit/report.html
+  Generated successfully. Reviewer confirmed exact renderer/JSON agreement.
+- py -3 E:/home/.codex/tools/secscan.py
+  68 changed/untracked files inspected / 0 findings (audit evidence stage).
+  Previous source-only check: 5 changed files / 0 findings.
+- git diff --check: pass.
+
+Browser checks
+- Windows local desktop: 9 cells; WSL server from Windows browser: 9 cells.
+- Local mobile viewport: 9 cells, inner390/client375 by actual observation.
+- Structured matrix: 28 pass, 29 not-run, 0 fail, 0 blocked.
+- 28 cells includes one API suite cell and shared answer/keyboard observations.
+- Record-source validation asserted exact text, per-question counts, focus and width.
+- Live report filtering: 13 observation points, counts/rows matched source results.
+
+Independent reviews
+- review-changes: QA validator/view/test/doc source changes, no new findings.
+- requirements-review (fresh conversation): issue intent, source, matrix, DOM,
+  checkpoints, source identity, evidence links and filters, no unmet requirements.
+- A second evidence audit caught a viewport setup mistake. That run was excluded
+  and repeated only after measuring the actual narrow width.
+
+Limits
+- The first mobile390 Q-after trial contained an unintended final fullwidth k.
+  Cause unknown. It remains documented, not counted as clean input-preservation evidence.
+  Adopted Q-navigation repeat recorded exact input before/after fault and recovery.
+- Real phone, Tailscale, DSH Harness, installed launcher, touch and IME composition
+  are not verified. Browser fixtures use synthetic data; faults are proxy-induced.
+- This turn did not rerun Rust/CLI suites; those paths were unchanged.
+- No GitHub CI run or remote publication is claimed.

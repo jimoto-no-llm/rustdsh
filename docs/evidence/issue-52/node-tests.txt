@@ -1,0 +1,30 @@
+
+> rdsh-project-dashboard@0.1.0 test
+> node --test test/*.test.mjs
+
+✔ Serve preserves other services and refuses public Funnel or port conflicts (0.7125ms)
+✔ Harness proxy removes dashboard credentials before forwarding (27.3654ms)
+✔ project state, HTTP/stdio MCP, subscriptions, answers, and auth work together (377.3774ms)
+✔ unknown metrics and invalid reported counters are rejected (0.3288ms)
+✔ failed state startup releases the instance lock and administrative stop closes the server (23.0481ms)
+✔ callback addresses block private destinations, IP mappings, and credential URLs (1.7783ms)
+✔ webhooks verify, persist, deduplicate subscriptions, retain event ids, and stop on 410 (27.5508ms)
+✔ MCP 2.0 discovers events and serves the same tools on an authenticated endpoint (98.8789ms)
+✔ QA fixture serves real assets/state/SSE and holds answers without forwarding (89.1402ms)
+✔ drop-before never reaches the backend and closes SSE until resume (53.6142ms)
+✔ drop-after commits exactly once without exposing the response or SSE (37.7651ms)
+✔ offline answer retries remain attributed and reconcile with the request total (38.8936ms)
+✔ CLI stop exits even when the controlling stdin remains open (283.87ms)
+✔ catalogue includes every declared operation/device/route without pretending to test them (1.6984ms)
+✔ a local fixture or mobile viewport cannot certify an untested real connection (0.3904ms)
+✔ failed observations, missing evidence and malformed records cannot become passes (0.4241ms)
+✔ rendered report includes untested rows and escapes all reported text (1.5854ms)
+✔ CLI validates evidence existence and produces an adjacent offline report (631.4473ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5389.3164

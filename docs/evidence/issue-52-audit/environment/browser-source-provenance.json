@@ -1,0 +1,87 @@
+{
+  "recorded_at": "2026-10-08T07:13:54.944Z",
+  "target_sha": "ec5fbf7c7ee5342fe9952dc0da0097c887aa427e",
+  "node": "22.23.3",
+  "files": [
+    {
+      "path": "dashboard/app.mjs",
+      "sha256_lf": "626babe49569d92264b23d5d4ef07af2aff5e6315cd381323edbedd81143d359",
+      "previous_source_match": true,
+      "windows_match": true,
+      "wsl_snapshot_match": true
+    },
+    {
+      "path": "dashboard/ui.html",
+      "sha256_lf": "55be3006f21375dcc3b6f96bba9538f9459c115f6d819ae58b37254ac3d2f985",
+      "previous_source_match": true,
+      "windows_match": true,
+      "wsl_snapshot_match": true
+    },
+    {
+      "path": "dashboard/server.mjs",
+      "sha256_lf": "f491d87bc2d75287c0288227739b525752d1ceaaa7a9433b5461d8abe486a5a4",
+      "previous_source_match": true,
+      "windows_match": true,
+      "wsl_snapshot_match": true
+    },
+    {
+      "path": "dashboard/state.mjs",
+      "sha256_lf": "1bcca78a7aa28f2e0f661fbe2208f9d5c2faf5c94c83476b9bffe63042364e4f",
+      "previous_source_match": true,
+      "windows_match": true,
+      "wsl_snapshot_match": true
+    },
+    {
+      "path": "dashboard/qa/fixture.mjs",
+      "sha256_lf": "a3c2cbddd63f543703c4f559db53c5355048442fba28a13d9028a0c81f60fbb9",
+      "previous_source_match": true,
+      "windows_match": true,
+      "wsl_snapshot_match": true
+    }
+  ],
+  "runs": [
+    {
+      "prefix": "desktop",
+      "payload": "desktop22",
+      "device": "desktop",
+      "route": "local",
+      "run": "rdsh-qa-g9RyoD",
+      "port": 52134,
+      "source": "Windows work/rustdsh-issue52/dashboard",
+      "browser": "Windows Codex in-app browser"
+    },
+    {
+      "prefix": "wsl",
+      "payload": "wsl22",
+      "device": "desktop",
+      "route": "wsl",
+      "run": "rdsh-qa-kJc7Iv",
+      "port": 38823,
+      "source": "WSL linux/source/dashboard snapshot",
+      "browser": "Windows Codex in-app browser"
+    },
+    {
+      "prefix": "mobile390",
+      "payload": "mobile390",
+      "device": "mobile",
+      "route": "local",
+      "run": "rdsh-qa-WNxhR6",
+      "port": 57687,
+      "source": "Windows work/rustdsh-issue52/dashboard",
+      "browser": "Windows Codex in-app browser"
+    }
+  ],
+  "excluded": [
+    {
+      "run": "rdsh-qa-Np8ti5",
+      "prefix": "mobile",
+      "reason": "Viewport was client1265x720; not a mobile verification. Repeated with mobile390."
+    },
+    {
+      "run": "rdsh-qa-jJ1mMI",
+      "port": 38457,
+      "reason": "Agent preflight only; unavailable during root browser attempt, not adopted as browser evidence."
+    }
+  ],
+  "scope": "Synthetic Project data; actual WSL server for wsl cells. No physical phone, Tailscale, Harness, DSH agent loop or installed launcher."
+}

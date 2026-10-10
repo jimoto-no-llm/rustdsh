@@ -143,7 +143,7 @@ Only one writer can run for a given canonical project directory.
 
 ### QR access
 
-Open the dashboard and select **スマホで開く**. If Tailscale requests its first HTTPS
+Open the dashboard and select **接続・共有**. If Tailscale requests its first HTTPS
 configuration, follow **利用設定を開く**, then select **接続を更新**. The QR code appears
 only after the route has been verified. Harness QR codes open the actual Harness
 UI, while project QR codes open the project's metrics and questions.
@@ -302,6 +302,33 @@ Reference strings and sources are displayed as text, never opened or executed.
 Artifact references are displayed as text. Local file contents are never opened
 or served. Treat all user-authored questions, answers, progress, and paths as data.
 
+### Answer drafts and interrupted sends
+
+Project 画面の回答下書きは、入力のたびにそのタブの `sessionStorage` に保存します。
+同じタブ・同じ接続元（scheme、host、port）で再読込や「戻る」をした際に復元します。
+通常の質問は `project.id` と質問の `id`、`created_at`、`question`、`default_action` を
+照合し、別プロジェクトや内容が変わった質問へ下書きを移しません。版付き質問は本文を
+保持したまま新しい契約・revisionの確認を求め、以前の選択肢を解除します。利用者が
+変更内容を再確認するまで、その下書きを新しい版の回答として送りません。
+保存済みの回答が本文および版付き質問の契約・revision・選択肢と一致したと確認できるか、
+利用者が明示的に破棄するまで下書きを保持します。別の回答が保存されている場合や通常の
+質問が変わった場合は、コピーできる控えとして残します。
+
+送信中と送信結果が不明な間は、その質問の入力・送信・破棄を無効にします。
+進捗の更新が届いて画面が描画し直されても、送信中の操作は再度受け付けません。
+通信が失敗した場合は、失敗後に取得した最新の質問状態と照合します。回答済みなら
+保存された回答を表示し、照合も失敗したら下書きを保持したまま結果の確認を待ちます。
+取得結果が未回答でも、先の送信がまだ処理中の可能性があります。内容と状態を確認し、
+再送は利用者が選びます。自動再送はしません。サーバーの一質問一回答の制約も維持します。
+回答は人間からのフィードバックであり、エージェントの自動実行許可にはなりません。
+
+ブラウザーが保存領域を拒否したり容量が不足したりした場合は警告を表示し、
+開いているページのメモリー内で下書きを保持します。この場合、再読込をまたぐ復元は
+保証されません。タブを閉じた後の長期保存、別タブ・別端末との同期、圏外でのページ全体の
+表示は対象外です。local と Tailscale の URL は別の接続元となり、下書きは共有されません。
+この対応は [#71](https://github.com/sahenjp/rustdsh/issues/71) の全要件の完了を意味しません。
+元の DSH Harness Web UI の入力やセッションは、この保存・復元の対象には含みません。
+
 ## OpenAI ChatGPT Dots and MCP Events
 
 The project HTTP `/mcp` endpoint implements MCP 2.0 (`2026-07-28`) discovery and
@@ -421,6 +448,19 @@ resource notifications, native MCP 2.0 Events lifecycle, callback signatures,
 retry/restart behavior, invalid callbacks, and private Serve conflicts. CI runs
 these on Windows and Linux. Browser/phone access and real Dot triggers require
 their respective account configurations and are checked separately.
+
+For route-by-route browser checks, use the [QA fixture and report guide](qa/README.md).
+It covers desktop/mobile, keyboard, reload/back/cancel, double submission, and
+connection loss, and produces a filterable HTML matrix with evidence and the
+tested source version. API fixtures, actual browser observations, and real
+WSL/Tailscale/phone connections remain separate; untested routes stay `not-run`.
+This is a development report, separate from the running project dashboard and
+the original DSH Harness Web UI.
+
+The [Issue #52 verification summary](../docs/evidence/issue-52-submission/README.md)
+separates the checks after integration into main from earlier route and
+physical-phone results. Historical runs retain their original source version and
+environment; their passes do not certify untested connections on the integrated source.
 Observation tests additionally cover idle expiry, independent field freshness,
 source/session/reference persistence, legacy state, invalid metadata, explicit
 unknown values, session cost resets, and incompatible ratio snapshots.

@@ -1,0 +1,454 @@
+TAP version 13
+# Subtest: a failed send survives config failure and a hash-free reload before explicit retry
+ok 1 - a failed send survives config failure and a hash-free reload before explicit retry
+  ---
+  duration_ms: 41.8619
+  type: 'test'
+  ...
+# Subtest: a draft survives initial state failure and an explicit hash-free reload
+ok 2 - a draft survives initial state failure and an explicit hash-free reload
+  ---
+  duration_ms: 3.1441
+  type: 'test'
+  ...
+# Subtest: a saved answer with a lost response is confirmed after config failure without resending
+ok 3 - a saved answer with a lost response is confirmed after config failure without resending
+  ---
+  duration_ms: 5.771
+  type: 'test'
+  ...
+# Subtest: typed answer survives a fresh document using the same tab storage
+ok 4 - typed answer survives a fresh document using the same tab storage
+  ---
+  duration_ms: 41.3845
+  type: 'test'
+  ...
+# Subtest: a held answer remains locked after SSE redraw and repeated submit sends only once
+ok 5 - a held answer remains locked after SSE redraw and repeated submit sends only once
+  ---
+  duration_ms: 4.9058
+  type: 'test'
+  ...
+# Subtest: drafts remain separate for each question and project, including the shared route
+ok 6 - drafts remain separate for each question and project, including the shared route
+  ---
+  duration_ms: 5.6007
+  type: 'test'
+  ...
+# Subtest: a failed POST reconciles state and keeps an editable draft for explicit retry
+ok 7 - a failed POST reconciles state and keeps an editable draft for explicit retry
+  ---
+  duration_ms: 5.9785
+  type: 'test'
+  ...
+# Subtest: a committed answer with a lost response is reconciled without sending again
+ok 8 - a committed answer with a lost response is reconciled without sending again
+  ---
+  duration_ms: 5.1403
+  type: 'test'
+  ...
+# Subtest: confirmation clears a submitted draft whose whitespace is preserved by the server
+ok 9 - confirmation clears a submitted draft whose whitespace is preserved by the server
+  ---
+  duration_ms: 1.8405
+  type: 'test'
+  ...
+# Subtest: storage denial does not prevent startup, SSE draft retention, or answering
+ok 10 - storage denial does not prevent startup, SSE draft retention, or answering
+  ---
+  duration_ms: 2.9911
+  type: 'test'
+  ...
+# Subtest: an older overlapping state response cannot restore a question already answered
+ok 11 - an older overlapping state response cannot restore a question already answered
+  ---
+  duration_ms: 1.7062
+  type: 'test'
+  ...
+# Subtest: an uncertain answer stays locked until a separate state check confirms it was not saved
+ok 12 - an uncertain answer stays locked until a separate state check confirms it was not saved
+  ---
+  duration_ms: 3.9497
+  type: 'test'
+  ...
+# Subtest: back-forward cache restoration checks server state and keeps an unsent draft
+ok 13 - back-forward cache restoration checks server state and keeps an unsent draft
+  ---
+  duration_ms: 2.2418
+  type: 'test'
+  ...
+# Subtest: SSE redraw preserves the active answer's text selection
+ok 14 - SSE redraw preserves the active answer's text selection
+  ---
+  duration_ms: 3.0944
+  type: 'test'
+  ...
+# Subtest: a changed question preserves a copy without applying the old draft to the current question
+ok 15 - a changed question preserves a copy without applying the old draft to the current question
+  ---
+  duration_ms: 5.0417
+  type: 'test'
+  ...
+# Subtest: a changed created_at preserves a copy without applying the old draft to the current question
+ok 16 - a changed created_at preserves a copy without applying the old draft to the current question
+  ---
+  duration_ms: 3.0106
+  type: 'test'
+  ...
+# Subtest: a changed default_action preserves a copy without applying the old draft to the current question
+ok 17 - a changed default_action preserves a copy without applying the old draft to the current question
+  ---
+  duration_ms: 4.378
+  type: 'test'
+  ...
+# Subtest: a changed answer preserves a copy without applying the old draft to the current question
+ok 18 - a changed answer preserves a copy without applying the old draft to the current question
+  ---
+  duration_ms: 3.8536
+  type: 'test'
+  ...
+# Subtest: explicitly discarding an active draft keeps it empty after reload
+ok 19 - explicitly discarding an active draft keeps it empty after reload
+  ---
+  duration_ms: 2.8399
+  type: 'test'
+  ...
+# Subtest: explicitly discarding a retained copy removes it after reload
+ok 20 - explicitly discarding a retained copy removes it after reload
+  ---
+  duration_ms: 3.5167
+  type: 'test'
+  ...
+# Subtest: corrupted draft storage warns without overwriting the unreadable record
+ok 21 - corrupted draft storage warns without overwriting the unreadable record
+  ---
+  duration_ms: 2.5773
+  type: 'test'
+  ...
+# Subtest: exhausted storage warns while retaining the latest in-memory draft
+ok 22 - exhausted storage warns while retaining the latest in-memory draft
+  ---
+  duration_ms: 1.714
+  type: 'test'
+  ...
+# Subtest: a pending state read started before POST failure cannot release the uncertain-answer lock
+ok 23 - a pending state read started before POST failure cannot release the uncertain-answer lock
+  ---
+  duration_ms: 2.8091
+  type: 'test'
+  ...
+# Subtest: a whitespace-only answer shows an accessible error without posting
+ok 24 - a whitespace-only answer shows an accessible error without posting
+  ---
+  duration_ms: 2.2079
+  type: 'test'
+  ...
+# Subtest: SSE redraw preserves focus and selection while copying a retained draft
+ok 25 - SSE redraw preserves focus and selection while copying a retained draft
+  ---
+  duration_ms: 1.613
+  type: 'test'
+  ...
+# Subtest: an initial HTTP 401 explains how to obtain a fresh link without erasing stored drafts
+ok 26 - an initial HTTP 401 explains how to obtain a fresh link without erasing stored drafts
+  ---
+  duration_ms: 51.5023
+  type: 'test'
+  ...
+# Subtest: a state HTTP 401 after startup retains the project and unsent answer across SSE errors
+ok 27 - a state HTTP 401 after startup retains the project and unsent answer across SSE errors
+  ---
+  duration_ms: 3.7868
+  type: 'test'
+  ...
+# Subtest: an event-stream failure checks authentication without requiring a manual reload
+ok 28 - an event-stream failure checks authentication without requiring a manual reload
+  ---
+  duration_ms: 2.6648
+  type: 'test'
+  ...
+# Subtest: a reachable state API does not claim that a disconnected event stream has recovered
+ok 29 - a reachable state API does not claim that a disconnected event stream has recovered
+  ---
+  duration_ms: 3.3328
+  type: 'test'
+  ...
+# Subtest: an answer HTTP 401 preserves the uncertain draft and never retries the answer automatically
+ok 30 - an answer HTTP 401 preserves the uncertain draft and never retries the answer automatically
+  ---
+  duration_ms: 3.8272
+  type: 'test'
+  ...
+# Subtest: a share refresh HTTP 401 removes obsolete QR details and gives a fresh-link instruction
+ok 31 - a share refresh HTTP 401 removes obsolete QR details and gives a fresh-link instruction
+  ---
+  duration_ms: 5.3573
+  type: 'test'
+  ...
+# Subtest: a QR HTTP 401 uses the same recovery guidance instead of only a QR-download error
+ok 32 - a QR HTTP 401 uses the same recovery guidance instead of only a QR-download error
+  ---
+  duration_ms: 2.4372
+  type: 'test'
+  ...
+# Subtest: HTTP 403 does not claim that browser credentials expired
+ok 33 - HTTP 403 does not claim that browser credentials expired
+  ---
+  duration_ms: 1.9791
+  type: 'test'
+  ...
+# Subtest: HTTP 500 does not claim that browser credentials expired
+ok 34 - HTTP 500 does not claim that browser credentials expired
+  ---
+  duration_ms: 1.6912
+  type: 'test'
+  ...
+# Subtest: network disconnection does not claim that browser credentials expired
+ok 35 - network disconnection does not claim that browser credentials expired
+  ---
+  duration_ms: 1.4234
+  type: 'test'
+  ...
+# Subtest: a new browser link restarts a document whose initial config request failed
+ok 36 - a new browser link restarts a document whose initial config request failed
+  ---
+  duration_ms: 38.5872
+  type: 'test'
+  ...
+# Subtest: a new browser link preserves a draft through the requested reload without sending it
+ok 37 - a new browser link preserves a draft through the requested reload without sending it
+  ---
+  duration_ms: 5.3539
+  type: 'test'
+  ...
+# Subtest: question and task anchors do not reload or replace the current browser credential
+ok 38 - question and task anchors do not reload or replace the current browser credential
+  ---
+  duration_ms: 2.3722
+  type: 'test'
+  ...
+# Subtest: a new link cannot discard the latest draft when saving it exceeded storage quota
+ok 39 - a new link cannot discard the latest draft when saving it exceeded storage quota
+  ---
+  duration_ms: 2.4868
+  type: 'test'
+  ...
+# Subtest: storage failure without an unsaved answer does not prevent link recovery
+ok 40 - storage failure without an unsaved answer does not prevent link recovery
+  ---
+  duration_ms: 3.3985
+  type: 'test'
+  ...
+# Subtest: Serve preserves other services and refuses public Funnel or port conflicts
+ok 41 - Serve preserves other services and refuses public Funnel or port conflicts
+  ---
+  duration_ms: 0.9061
+  type: 'test'
+  ...
+# Subtest: Harness proxy removes dashboard credentials before forwarding
+ok 42 - Harness proxy removes dashboard credentials before forwarding
+  ---
+  duration_ms: 27.003
+  type: 'test'
+  ...
+# Subtest: project state, HTTP/stdio MCP, subscriptions, answers, and auth work together
+ok 43 - project state, HTTP/stdio MCP, subscriptions, answers, and auth work together
+  ---
+  duration_ms: 487.3691
+  type: 'test'
+  ...
+# Subtest: unknown metrics and invalid reported counters are rejected
+ok 44 - unknown metrics and invalid reported counters are rejected
+  ---
+  duration_ms: 0.3345
+  type: 'test'
+  ...
+# Subtest: failed state startup releases the instance lock and administrative stop closes the server
+ok 45 - failed state startup releases the instance lock and administrative stop closes the server
+  ---
+  duration_ms: 24.2113
+  type: 'test'
+  ...
+# Subtest: callback addresses block private destinations, IP mappings, and credential URLs
+ok 46 - callback addresses block private destinations, IP mappings, and credential URLs
+  ---
+  duration_ms: 2.3422
+  type: 'test'
+  ...
+# Subtest: webhooks verify, persist, deduplicate subscriptions, retain event ids, and stop on 410
+ok 47 - webhooks verify, persist, deduplicate subscriptions, retain event ids, and stop on 410
+  ---
+  duration_ms: 33.8617
+  type: 'test'
+  ...
+# Subtest: MCP 2.0 discovers events and serves the same tools on an authenticated endpoint
+ok 48 - MCP 2.0 discovers events and serves the same tools on an authenticated endpoint
+  ---
+  duration_ms: 132.3151
+  type: 'test'
+  ...
+# Subtest: unreported metrics, a zero denominator and measured zero remain distinct
+ok 49 - unreported metrics, a zero denominator and measured zero remain distinct
+  ---
+  duration_ms: 48.0657
+  type: 'test'
+  ...
+# Subtest: a reference is not inferred to be an approval and stays expanded while a draft refreshes
+ok 50 - a reference is not inferred to be an approval and stays expanded while a draft refreshes
+  ---
+  duration_ms: 4.1036
+  type: 'test'
+  ...
+# Subtest: answered questions retain their ID, question and answer and show a count
+ok 51 - answered questions retain their ID, question and answer and show a count
+  ---
+  duration_ms: 3.8366
+  type: 'test'
+  ...
+# Subtest: SSE redraw preserves focus on the same question's reference summary
+ok 52 - SSE redraw preserves focus on the same question's reference summary
+  ---
+  duration_ms: 3.4067
+  type: 'test'
+  ...
+# Subtest: reference focus does not transfer to a changed question or another question
+ok 53 - reference focus does not transfer to a changed question or another question
+  ---
+  duration_ms: 2.4163
+  type: 'test'
+  ...
+# Subtest: opening the palette focuses search without scrolling and its close button restores focus
+ok 54 - opening the palette focuses search without scrolling and its close button restores focus
+  ---
+  duration_ms: 42.6983
+  type: 'test'
+  ...
+# Subtest: an open palette fits the visual viewport after keyboard resize and viewport panning
+ok 55 - an open palette fits the visual viewport after keyboard resize and viewport panning
+  ---
+  duration_ms: 3.2317
+  type: 'test'
+  ...
+# Subtest: without VisualViewport the palette keeps CSS sizing and search filtering
+ok 56 - without VisualViewport the palette keeps CSS sizing and search filtering
+  ---
+  duration_ms: 2.0142
+  type: 'test'
+  ...
+# Subtest: QA fixture serves real assets/state/SSE and holds answers without forwarding
+ok 57 - QA fixture serves real assets/state/SSE and holds answers without forwarding
+  ---
+  duration_ms: 118.7595
+  type: 'test'
+  ...
+# Subtest: drop-before never reaches the backend and closes SSE until resume
+ok 58 - drop-before never reaches the backend and closes SSE until resume
+  ---
+  duration_ms: 58.6279
+  type: 'test'
+  ...
+# Subtest: drop-after commits exactly once without exposing the response or SSE
+ok 59 - drop-after commits exactly once without exposing the response or SSE
+  ---
+  duration_ms: 44.1628
+  type: 'test'
+  ...
+# Subtest: offline answer retries remain attributed and reconcile with the request total
+ok 60 - offline answer retries remain attributed and reconcile with the request total
+  ---
+  duration_ms: 59.1725
+  type: 'test'
+  ...
+# Subtest: CLI stop exits even when the controlling stdin remains open
+ok 61 - CLI stop exits even when the controlling stdin remains open
+  ---
+  duration_ms: 391.7597
+  type: 'test'
+  ...
+# Subtest: opt-in Tailscale fixture accepts only its verified Serve host and origin
+ok 62 - opt-in Tailscale fixture accepts only its verified Serve host and origin
+  ---
+  duration_ms: 51.3356
+  type: 'test'
+  ...
+# Subtest: Tailscale fixture publishes the verified proxy route through config, QR and refresh
+ok 63 - Tailscale fixture publishes the verified proxy route through config, QR and refresh
+  ---
+  duration_ms: 56.1068
+  type: 'test'
+  ...
+# Subtest: Tailscale fixture fails closed when route setup is not verified
+ok 64 - Tailscale fixture fails closed when route setup is not verified
+  ---
+  duration_ms: 47.0648
+  type: 'test'
+  ...
+# Subtest: catalogue includes every declared operation/device/route without pretending to test them
+ok 65 - catalogue includes every declared operation/device/route without pretending to test them
+  ---
+  duration_ms: 2.7963
+  type: 'test'
+  ...
+# Subtest: a local fixture or mobile viewport cannot certify an untested real connection
+ok 66 - a local fixture or mobile viewport cannot certify an untested real connection
+  ---
+  duration_ms: 0.5911
+  type: 'test'
+  ...
+# Subtest: failed observations, missing evidence and malformed records cannot become passes
+ok 67 - failed observations, missing evidence and malformed records cannot become passes
+  ---
+  duration_ms: 0.6998
+  type: 'test'
+  ...
+# Subtest: target SHA must be a string rather than a coercible JSON value
+ok 68 - target SHA must be a string rather than a coercible JSON value
+  ---
+  duration_ms: 0.1077
+  type: 'test'
+  ...
+# Subtest: rendered report includes untested rows and escapes all reported text
+ok 69 - rendered report includes untested rows and escapes all reported text
+  ---
+  duration_ms: 2.9109
+  type: 'test'
+  ...
+# Subtest: duplicate summary counts affected cells without adding shared observations as separate answers
+ok 70 - duplicate summary counts affected cells without adding shared observations as separate answers
+  ---
+  duration_ms: 2.1319
+  type: 'test'
+  ...
+# Subtest: every passing Project operation requires its observed answer outcome
+ok 71 - every passing Project operation requires its observed answer outcome
+  ---
+  duration_ms: 2.5269
+  type: 'test'
+  ...
+# Subtest: a pass distinguishes saved answers from unsent drafts and requires specified focus checks
+ok 72 - a pass distinguishes saved answers from unsent drafts and requires specified focus checks
+  ---
+  duration_ms: 1.5113
+  type: 'test'
+  ...
+# Subtest: failure and unavailable evidence remain distinct from a passing Project operation
+ok 73 - failure and unavailable evidence remain distinct from a passing Project operation
+  ---
+  duration_ms: 0.6767
+  type: 'test'
+  ...
+# Subtest: CLI validates evidence existence and produces an adjacent offline report
+ok 74 - CLI validates evidence existence and produces an adjacent offline report
+  ---
+  duration_ms: 670.4024
+  type: 'test'
+  ...
+1..74
+# tests 74
+# suites 0
+# pass 74
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5536.0847

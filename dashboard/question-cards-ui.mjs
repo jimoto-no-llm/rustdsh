@@ -1,3 +1,7 @@
+import { createQuestionRecovery, draftReviewState, questionEditable } from "./answer-recovery.mjs";
+export { draftReviewState } from "./answer-recovery.mjs";
+
+const localRecoveries = new WeakMap();
 const statusNames = {
   open: "回答待ち",
   answered: "回答を保存済み",
@@ -6,50 +10,31 @@ const statusNames = {
   superseded: "旧版 · 回答は無効",
 };
 
-export function draftReviewState(draft, contract) {
-  const changedDraft = Boolean(
-    draft?.fingerprint &&
-      (draft.fingerprint !== contract?.fingerprint ||
-        draft.revision !== contract?.revision),
-  );
-  return {
-    changedDraft,
-    reviewRequired:
-      changedDraft &&
-      (draft.reviewed !== contract?.fingerprint ||
-        draft.reviewedRevision !== contract?.revision),
-  };
-}
-
 export function renderQuestionCards(
   container,
   questions,
   contracts,
-  { node, api, refreshState },
+  options,
 ) {
-  const drafts = new Map(
-    [...container.querySelectorAll("form")].map((form) => {
-      const area = form.querySelector("textarea");
-      return [
-        form.dataset.id,
-        {
-          text: area.value,
-          choice: form.querySelector('input[type="radio"]:checked')?.value,
-          fingerprint: form.dataset.draftFingerprint,
-          revision: Number(form.dataset.draftRevision) || null,
-          reviewed: form.dataset.reviewedFingerprint,
-          reviewedRevision: Number(form.dataset.reviewedRevision) || null,
-          error: form.querySelector('[role="alert"]').textContent,
-        },
-      ];
-    }),
-  );
+  const { node, api, refreshState, applyState } = options;
+  // Keep the existing standalone renderer API usable without a project store.
+  if (!options.recovery && !localRecoveries.has(container))
+    localRecoveries.set(container, { recovery: createQuestionRecovery(""), revision: 0 });
+  const local = localRecoveries.get(container);
+  const recovery = options.recovery || local.recovery;
+  if (!options.recovery) recovery.reconcile({
+    revision: ++local.revision, questions, question_contracts: contracts,
+  });
+  const rerender = options.rerender || (() => renderQuestionCards(container, questions, contracts, options));
   const focused = document.activeElement;
   const active = focused?.dataset?.question;
   const field = focused?.dataset?.field;
+  const focusedReference = focused?.tagName === "SUMMARY" ? focused.parentElement?.dataset?.questionKey : null;
+  const expandedReferences = new Set([...container.querySelectorAll("details")]
+    .filter((item) => item.open && item.dataset.questionKey).map((item) => item.dataset.questionKey));
   const selection =
     focused?.tagName === "TEXTAREA"
-      ? [focused.selectionStart, focused.selectionEnd]
+      ? [focused.selectionStart, focused.selectionEnd, focused.selectionDirection]
       : null;
   container.replaceChildren(
     ...questions.map((question) => {
@@ -62,24 +47,26 @@ export function renderQuestionCards(
           ? { ...original, status: "expired" }
           : original;
       const decision = contract?.snapshot.decision;
-      const draft = drafts.get(question.id);
-      const editable = !contract || contract.status === "open";
+      const draft = recovery.draftFor(question, contract);
+      const editable = questionEditable(contract) && draft.phase !== "conflict";
+      const locked = draft.phase === "sending" || draft.phase === "checking";
       const { changedDraft, reviewRequired } = draftReviewState(
         draft,
         contract,
       );
       const article = node("article", undefined, "decision-card");
       article.id = "question-" + question.id;
-      const heading = node("div", undefined, "decision-heading");
+      const heading = node("div", undefined, "decision-heading question-meta");
       heading.append(
         node(
           "span",
           decision?.kind === "approval" ? "承認依頼" : "相談",
           "kind" + (decision?.kind === "approval" ? " kind-approval" : ""),
         ),
-        node("span", `${question.id} · ${question.urgency}`, "sub"),
+        node("code", question.id, "question-id"),
+        node("span", `緊急度: ${{ normal: "通常", high: "高", critical: "至急" }[question.urgency] || question.urgency}`, "sub question-urgency"),
       );
-      article.append(heading, node("h3", question.question));
+      article.append(heading, node("h3", question.question, "question-text"));
       if (contract) {
         article.append(
           node(
@@ -154,15 +141,15 @@ export function renderQuestionCards(
         if (contract.cancel_reason) add("取消し理由", contract.cancel_reason);
         article.append(detail);
       }
-      if (question.default_action)
-        article.append(
-          node(
-            "p",
-            `参考の行動: ${question.default_action}（自動実行しません）`,
-            "sub",
-          ),
-        );
-      const form = node("form");
+      if (question.default_action) {
+        const reference = node("details", undefined, "question-reference");
+        reference.dataset.questionKey = draft.key;
+        reference.open = expandedReferences.has(draft.key);
+        reference.append(node("summary", "回答前の参考情報"),
+          node("p", `${question.default_action}（自動実行しません）`));
+        article.append(reference);
+      }
+      const form = node("form", undefined, "answer-form");
       form.dataset.id = question.id;
       form.dataset.draftFingerprint =
         draft?.fingerprint || contract?.fingerprint || "";
@@ -181,8 +168,11 @@ export function renderQuestionCards(
           radio.value = choice.id;
           radio.dataset.question = question.id;
           radio.dataset.field = `choice-${choice.id}`;
-          radio.disabled = !editable;
+          radio.disabled = !editable || locked || reviewRequired;
           radio.checked = !reviewRequired && draft?.choice === choice.id;
+          radio.addEventListener("change", () => {
+            if (radio.checked) recovery.change(draft, { choice: choice.id });
+          });
           label.append(radio, node("span", choice.label));
           if (choice.detail)
             label.append(node("span", choice.detail, "sub choice-detail"));
@@ -191,17 +181,24 @@ export function renderQuestionCards(
         form.append(group);
       }
       const textarea = node("textarea");
+      textarea.id = "answer-" + question.id;
+      textarea.dataset.id = question.id;
       textarea.dataset.question = question.id;
       textarea.dataset.field = "answer";
       textarea.setAttribute("aria-label", `質問 ${question.id} への回答`);
       textarea.required = choices.length === 0;
       textarea.maxLength = 8000;
       textarea.disabled = !editable;
+      textarea.readOnly = locked;
       textarea.value = draft?.text || "";
-      form.append(textarea);
-      const button = node("button", "回答を返す", "primary");
+      textarea.addEventListener("input", () => recovery.change(draft, { text: textarea.value }));
+      const answerLabel = node("label", "回答");
+      answerLabel.setAttribute("for", textarea.id);
+      form.append(answerLabel, textarea);
+      const button = node("button", draft.phase === "sending" ? "送信中…" :
+        draft.phase === "checking" ? "結果確認待ち…" : draft.phase === "retry" ? "内容を確認して再送" : "回答を返す", "primary");
       button.type = "submit";
-      button.disabled = !editable || reviewRequired;
+      button.disabled = !editable || reviewRequired || locked;
       if (changedDraft) {
         form.append(
           node(
@@ -216,56 +213,68 @@ export function renderQuestionCards(
         review.dataset.question = question.id;
         review.dataset.field = "review";
         review.checked = !reviewRequired;
-        review.disabled = !editable;
+        review.disabled = !editable || locked;
         review.addEventListener("change", () => {
-          form.dataset.reviewedFingerprint = review.checked
-            ? contract.fingerprint
-            : "";
-          form.dataset.reviewedRevision = review.checked
-            ? contract.revision
-            : "";
-          button.disabled = !editable || !review.checked;
+          recovery.change(draft, { reviewed: review.checked ? contract.fingerprint : null,
+            reviewedRevision: review.checked ? contract.revision : null });
+          rerender();
         });
         label.append(review, node("span", "更新後の対象と条件を確認した"));
         form.append(label);
       }
       const error = node("div", draft?.error || "", "error");
       error.setAttribute("role", "alert");
-      form.append(button, error);
+      const actions = node("div", undefined, "answer-actions");
+      actions.append(button);
+      if (draft.phase === "checking") {
+        const check = node("button", "送信結果を確認");
+        check.type = "button";
+        check.addEventListener("click", refreshState);
+        actions.append(check);
+      }
+      const discard = node("button", "下書きを破棄");
+      discard.type = "button";
+      discard.disabled = locked;
+      discard.addEventListener("click", () => { recovery.discard(draft); rerender(); });
+      actions.append(discard);
+      const status = node("p", draft.phase === "checking" ?
+        "送信結果がまだ分かりません。接続後に保存状態を確認してください。" :
+        draft.phase === "retry" ? "保存済みの回答は見つかりませんでした。内容を確認して再送できます。" : "", "sub");
+      status.setAttribute("role", "status");
+      form.append(actions, status, error);
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
         if (!editable || button.disabled) return;
-        const choiceId =
-          form.querySelector('input[type="radio"]:checked')?.value ?? null;
-        const choice = choices.find((item) => item.id === choiceId);
-        const answer = textarea.value.trim() ? textarea.value : choice?.label;
-        if (!answer) {
-          error.textContent = "選択肢を選ぶか、回答を入力してください。";
+        recovery.change(draft, { text: textarea.value,
+          choice: form.querySelector('input[type="radio"]:checked')?.value ?? null });
+        const operation = recovery.beginSend(question, contract);
+        if (!operation) {
+          error.textContent = !textarea.value.trim() && !draft.choice
+            ? choices.length ? "空白以外の回答を入力するか、選択肢を選んでください。" : "空白以外の回答を入力してください。"
+            : "質問の対象・条件を確認し直してください。";
+          textarea.focus();
           return;
         }
-        button.disabled = true;
+        rerender();
         try {
-          await api("update/answer", {
-            id: question.id,
-            answer,
-            ...(contract
-              ? {
-                  expected_revision: contract.revision,
-                  contract_fingerprint: contract.fingerprint,
-                  choice_id: choiceId,
-                }
-              : {}),
-          });
-          await refreshState();
-        } catch (e) {
-          error.textContent = e.message;
-          button.disabled = false;
+          const state = await api("update/answer", operation.payload);
+          if (applyState) applyState(state);
+          else {
+            if (state) recovery.reconcile(state);
+            await refreshState();
+          }
+        } catch {
+          // A failed response is not proof that the answer was not saved.
+        }
+        if (recovery.checkResult(operation)) {
+          rerender();
           await refreshState();
         }
       });
       if (contract && editable) {
         const cancel = node("button", "この質問を取消す");
         cancel.type = "button";
+        cancel.disabled = locked;
         cancel.addEventListener("click", async () => {
           cancel.disabled = true;
           try {
@@ -280,7 +289,7 @@ export function renderQuestionCards(
             cancel.disabled = false;
           }
         });
-        form.append(cancel);
+        actions.append(cancel);
       }
       article.append(
         form,
@@ -312,5 +321,36 @@ export function renderQuestionCards(
       element.focus({ preventScroll: true });
       if (selection) element.setSelectionRange(...selection);
     }
+  }
+  if (focusedReference) [...container.querySelectorAll("details")]
+    .find((item) => item.dataset.questionKey === focusedReference)?.querySelector("summary")?.focus({ preventScroll: true });
+  renderRetainedDrafts(recovery, node, rerender);
+}
+
+function renderRetainedDrafts(recovery, node, rerender) {
+  const section = document.getElementById?.("retained-drafts");
+  const container = document.getElementById?.("retained-draft-list");
+  if (!section || !container) return;
+  const active = document.activeElement;
+  const selection = active?.dataset?.draftKey ? [active.selectionStart, active.selectionEnd, active.selectionDirection] : null;
+  const retained = recovery.retained();
+  section.hidden = !retained.length;
+  container.replaceChildren(...retained.map((entry) => {
+    const item = node("article", undefined, "event");
+    const copy = node("textarea");
+    copy.dataset.draftKey = entry.key;
+    copy.value = entry.text || entry.submitted?.answer || `選択肢: ${entry.choice}`;
+    copy.readOnly = true;
+    copy.setAttribute("aria-label", `以前の質問 ${entry.id} の下書き`);
+    const discard = node("button", "下書きを破棄");
+    discard.type = "button";
+    discard.addEventListener("click", () => { recovery.discard(entry); rerender(); });
+    item.append(node("strong", entry.id + " · " + entry.question), copy, discard);
+    return item;
+  }));
+  if (selection) {
+    const replacement = [...container.querySelectorAll("textarea")].find((item) => item.dataset.draftKey === active.dataset.draftKey);
+    replacement?.focus({ preventScroll: true });
+    replacement?.setSelectionRange(...selection);
   }
 }

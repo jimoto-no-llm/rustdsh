@@ -1,0 +1,6 @@
+secscan: 対象 150 ファイル / 指摘 0 件
+  注: semgrep: Syntax error at line dashboard\test\answer-dom.mjs:1:
+ `import fs from "node:fs/promises";
+import vm from "node:vm";
+
+co

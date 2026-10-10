@@ -1,0 +1,2407 @@
+
+> rdsh-project-dashboard@0.1.0 test
+> node --test test/*.test.mjs
+
+TAP version 13
+# Subtest: a task reported done stays unverified until every declared full check has a current observed result
+ok 1 - a task reported done stays unverified until every declared full check has a current observed result
+  ---
+  duration_ms: 1060.570653
+  type: 'test'
+  ...
+# Subtest: a reported pass and a partial observed pass cannot turn an unexecuted full criterion into verified
+ok 2 - a reported pass and a partial observed pass cannot turn an unexecuted full criterion into verified
+  ---
+  duration_ms: 439.108753
+  type: 'test'
+  ...
+# Subtest: related code changes stale a pass and only a new successful check restores current verification
+ok 3 - related code changes stale a pass and only a new successful check restores current verification
+  ---
+  duration_ms: 795.462367
+  type: 'test'
+  ...
+# Subtest: changes outside the declared input scope require reevaluation and definition or SHA changes cannot borrow an old pass
+ok 4 - changes outside the declared input scope require reevaluation and definition or SHA changes cannot borrow an old pass
+  ---
+  duration_ms: 649.246157
+  type: 'test'
+  ...
+# Subtest: image payloads keep their original target metadata and cannot claim a known capture target or visual review
+ok 5 - image payloads keep their original target metadata and cannot claim a known capture target or visual review
+  ---
+  duration_ms: 283.359181
+  type: 'test'
+  ...
+# Subtest: lost or modified commands/log artifacts and corrupt metadata cannot remain an eligible pass
+ok 6 - lost or modified commands/log artifacts and corrupt metadata cannot remain an eligible pass
+  ---
+  duration_ms: 304.073115
+  type: 'test'
+  ...
+# Subtest: explicit checks use a credential-free home and a timed-out process stays blocked without automatic replay
+ok 7 - explicit checks use a credential-free home and a timed-out process stays blocked without automatic replay
+  ---
+  duration_ms: 842.372541
+  type: 'test'
+  ...
+# Subtest: separate public CLI clients define, execute and inspect acceptance without extending task/MCP schemas
+ok 8 - separate public CLI clients define, execute and inspect acceptance without extending task/MCP schemas
+  ---
+  duration_ms: 1540.249399
+  type: 'test'
+  ...
+# Subtest: deleting a required input stales earlier evidence and prevents a new command from executing
+ok 9 - deleting a required input stales earlier evidence and prevents a new command from executing
+  ---
+  duration_ms: 475.206398
+  type: 'test'
+  ...
+# Subtest: a successful command that changes its observed code target remains blocked
+ok 10 - a successful command that changes its observed code target remains blocked
+  ---
+  duration_ms: 211.734356
+  type: 'test'
+  ...
+# Subtest: capability catalog names all six operations and does not claim unimplemented CLIs
+ok 11 - capability catalog names all six operations and does not claim unimplemented CLIs
+  ---
+  duration_ms: 4.963986
+  type: 'test'
+  ...
+# Subtest: start/send/usage use versioned ACP requests and measurements instead of shell input
+not ok 12 - start/send/usage use versioned ACP requests and measurements instead of shell input
+  ---
+  duration_ms: 203.217257
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/adapters.test.mjs:71:1'
+  failureType: 'testCodeFailure'
+  error: 'Owned process scope: ownership_unavailable'
+  code: 'ownership_unavailable'
+  stack: |-
+    lose (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/process-scope.mjs:113:17)
+    Socket.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/process-scope.mjs:149:52)
+    Socket.emit (node:events:519:28)
+    addChunk (node:internal/streams/readable:561:12)
+    readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    Readable.push (node:internal/streams/readable:392:5)
+    Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+  ...
+# Subtest: resume attaches the exact session and rejects failed attachment
+not ok 13 - resume attaches the exact session and rejects failed attachment
+  ---
+  duration_ms: 216.796392
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/adapters.test.mjs:112:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The validation function is expected to return "true". Received false
+
+    Caught error:
+
+    Error: Owned process scope: ownership_unavailable
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  stack: |-
+    process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/adapters.test.mjs:114:3)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: missing advertised resume is unsupported without writing a resume request
+not ok 14 - missing advertised resume is unsupported without writing a resume request
+  ---
+  duration_ms: 144.724412
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/adapters.test.mjs:131:1'
+  failureType: 'testCodeFailure'
+  error: 'Owned process scope: ownership_unavailable'
+  code: 'ownership_unavailable'
+  stack: |-
+    lose (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/process-scope.mjs:113:17)
+    Socket.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/process-scope.mjs:149:52)
+    Socket.emit (node:events:519:28)
+    addChunk (node:internal/streams/readable:561:12)
+    readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    Readable.push (node:internal/streams/readable:392:5)
+    Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+  ...
+# Subtest: simultaneous prompts are refused and interrupt is a request until the cancelled result
+not ok 15 - simultaneous prompts are refused and interrupt is a request until the cancelled result
+  ---
+  duration_ms: 152.823881
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/adapters.test.mjs:142:1'
+  failureType: 'testCodeFailure'
+  error: 'Owned process scope: ownership_unavailable'
+  code: 'ownership_unavailable'
+  stack: |-
+    lose (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/process-scope.mjs:113:17)
+    Socket.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/process-scope.mjs:149:52)
+    Socket.emit (node:events:519:28)
+    addChunk (node:internal/streams/readable:561:12)
+    readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    Readable.push (node:internal/streams/readable:392:5)
+    Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+  ...
+# Subtest: client-side permission and filesystem requests do not gain execution authority
+not ok 16 - client-side permission and filesystem requests do not gain execution authority
+  ---
+  duration_ms: 110.754167
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/adapters.test.mjs:157:1'
+  failureType: 'testCodeFailure'
+  error: 'Owned process scope: ownership_unavailable'
+  code: 'ownership_unavailable'
+  stack: |-
+    lose (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/process-scope.mjs:113:17)
+    Socket.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/process-scope.mjs:149:52)
+    Socket.emit (node:events:519:28)
+    addChunk (node:internal/streams/readable:561:12)
+    readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    Readable.push (node:internal/streams/readable:392:5)
+    Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+  ...
+# Subtest: unknown CLI version or malformed version disables capabilities before profile boot
+ok 17 - unknown CLI version or malformed version disables capabilities before profile boot
+  ---
+  duration_ms: 104.58804
+  type: 'test'
+  ...
+# Subtest: a changed executable version revokes capabilities on an already connected adapter
+not ok 18 - a changed executable version revokes capabilities on an already connected adapter
+  ---
+  duration_ms: 119.118219
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/adapters.test.mjs:190:1'
+  failureType: 'testCodeFailure'
+  error: 'Owned process scope: ownership_unavailable'
+  code: 'ownership_unavailable'
+  stack: |-
+    lose (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/process-scope.mjs:113:17)
+    Socket.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/process-scope.mjs:149:52)
+    Socket.emit (node:events:519:28)
+    addChunk (node:internal/streams/readable:561:12)
+    readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    Readable.push (node:internal/streams/readable:392:5)
+    Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+  ...
+# Subtest: invalid cwd and missing executable are distinct from compatible CLI
+ok 19 - invalid cwd and missing executable are distinct from compatible CLI
+  ---
+  duration_ms: 6.746757
+  type: 'test'
+  ...
+# Subtest: broken JSON, oversized frames, invalid UTF8, wrong protocol and invalid start fail closed
+not ok 20 - broken JSON, oversized frames, invalid UTF8, wrong protocol and invalid start fail closed
+  ---
+  duration_ms: 132.475909
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/adapters.test.mjs:213:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The validation function is expected to return "true". Received false
+
+    Caught error:
+
+    Error: Owned process scope: ownership_unavailable
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  stack: |-
+    process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/adapters.test.mjs:222:5)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: invalid usage cannot become a zero or fabricated measurement
+not ok 21 - invalid usage cannot become a zero or fabricated measurement
+  ---
+  duration_ms: 115.927
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/adapters.test.mjs:233:1'
+  failureType: 'testCodeFailure'
+  error: 'Owned process scope: ownership_unavailable'
+  code: 'ownership_unavailable'
+  stack: |-
+    lose (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/process-scope.mjs:113:17)
+    Socket.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/process-scope.mjs:149:52)
+    Socket.emit (node:events:519:28)
+    addChunk (node:internal/streams/readable:561:12)
+    readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    Readable.push (node:internal/streams/readable:392:5)
+    Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+  ...
+# Subtest: CLI errors retain no peer secret and missing methods disable the affected operation
+not ok 22 - CLI errors retain no peer secret and missing methods disable the affected operation
+  ---
+  duration_ms: 100.610246
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/adapters.test.mjs:241:1'
+  failureType: 'testCodeFailure'
+  error: 'Owned process scope: ownership_unavailable'
+  code: 'ownership_unavailable'
+  stack: |-
+    lose (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/process-scope.mjs:113:17)
+    Socket.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/process-scope.mjs:149:52)
+    Socket.emit (node:events:519:28)
+    addChunk (node:internal/streams/readable:561:12)
+    readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    Readable.push (node:internal/streams/readable:392:5)
+    Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+  ...
+# Subtest: timeouts and early exit are failures, never successful starts
+not ok 23 - timeouts and early exit are failures, never successful starts
+  ---
+  duration_ms: 103.331663
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/adapters.test.mjs:253:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The validation function is expected to return "true". Received false
+
+    Caught error:
+
+    Error: Owned process scope: ownership_unavailable
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  stack: |-
+    process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/adapters.test.mjs:255:3)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: duplicate session identifiers disable the adapter
+not ok 24 - duplicate session identifiers disable the adapter
+  ---
+  duration_ms: 90.517335
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/adapters.test.mjs:265:1'
+  failureType: 'testCodeFailure'
+  error: 'Owned process scope: ownership_unavailable'
+  code: 'ownership_unavailable'
+  stack: |-
+    lose (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/process-scope.mjs:113:17)
+    Socket.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/process-scope.mjs:149:52)
+    Socket.emit (node:events:519:28)
+    addChunk (node:internal/streams/readable:561:12)
+    readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    Readable.push (node:internal/streams/readable:392:5)
+    Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+  ...
+# Subtest: stop waits for the owned child to exit and escalates when EOF is ignored
+not ok 25 - stop waits for the owned child to exit and escalates when EOF is ignored
+  ---
+  duration_ms: 87.663661
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/adapters.test.mjs:272:1'
+  failureType: 'testCodeFailure'
+  error: 'Owned process scope: ownership_unavailable'
+  code: 'ownership_unavailable'
+  stack: |-
+    lose (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/process-scope.mjs:113:17)
+    Socket.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/process-scope.mjs:149:52)
+    Socket.emit (node:events:519:28)
+    addChunk (node:internal/streams/readable:561:12)
+    readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    Readable.push (node:internal/streams/readable:392:5)
+    Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+  ...
+# Subtest: isolated smoke covers restart/resume and accurately marks unexercised model work
+not ok 26 - isolated smoke covers restart/resume and accurately marks unexercised model work
+  ---
+  duration_ms: 87.437923
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/adapters.test.mjs:281:1'
+  failureType: 'testCodeFailure'
+  error: 'CLI adapter: smoke_cleanup_unconfirmed'
+  code: 'smoke_cleanup_unconfirmed'
+  stack: |-
+    smokeAdapter (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/adapter-smoke.mjs:87:13)
+    process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/adapters.test.mjs:284:18)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: public CLI exposes catalog/probe/smoke and requires an explicit original executable
+not ok 27 - public CLI exposes catalog/probe/smoke and requires an explicit original executable
+  ---
+  duration_ms: 1405.545332
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/adapters.test.mjs:298:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Command failed: <user-home>/rdsh-issue52-wsl-qa-20261008.QuwQzC/node-v22.23.3-linux-x64/bin/node <user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/cli.mjs adapter-smoke --executable <user-home>/rdsh-issue52-wsl-qa-20261008.QuwQzC/node-v22.23.3-linux-x64/bin/node --entrypoint <user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/fixtures/acp-cli.mjs --project /tmp/rdsh-adapter-cli-YDDksq
+    [rdsh-dashboard] CLI adapter: smoke_cleanup_unconfirmed
+
+  code: 1
+  stack: |-
+    genericNodeError (node:internal/errors:983:15)
+    wrappedFn (node:internal/errors:537:14)
+    ChildProcess.exithandler (node:child_process:417:12)
+    ChildProcess.emit (node:events:519:28)
+    maybeClose (node:internal/child_process:1101:16)
+    ChildProcess._handle.onexit (node:internal/child_process:304:5)
+  ...
+# Subtest: general inputs and human replies share exact-session order and immutable IDs, including unsupported steer
+not ok 28 - general inputs and human replies share exact-session order and immutable IDs, including unsupported steer
+  ---
+  duration_ms: 626.179067
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:240:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async Object.attach (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:126:22)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:245:18)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: legacy unbound feedback cannot advance a consumer cursor past a newly submitted instruction
+not ok 29 - legacy unbound feedback cannot advance a consumer cursor past a newly submitted instruction
+  ---
+  duration_ms: 379.227823
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:344:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async Object.attach (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:126:22)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:349:31)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: concurrent contradictory inputs retain both texts, require human comparison, and reject stale review decisions
+not ok 30 - concurrent contradictory inputs retain both texts, require human comparison, and reject stale review decisions
+  ---
+  duration_ms: 343.195117
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:383:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async Object.attach (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:126:22)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:388:31)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: human-approved interruption cancels only the currently awaited native prompt and confirms its correlated result before the follow-up
+not ok 31 - human-approved interruption cancels only the currently awaited native prompt and confirms its correlated result before the follow-up
+  ---
+  duration_ms: 308.166967
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:444:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async Object.attach (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:126:22)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:449:31)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: a cancel notification without a correlated prompt result cannot release the follow-up or be replayed after reconnect
+not ok 32 - a cancel notification without a correlated prompt result cannot release the follow-up or be replayed after reconnect
+  ---
+  duration_ms: 316.522885
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:521:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async Object.attach (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:126:22)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:526:18)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: a lost cancel claim response performs zero cancels and does not gain replay permission
+not ok 33 - a lost cancel claim response performs zero cancels and does not gain replay permission
+  ---
+  duration_ms: 293.287147
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:572:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async Object.attach (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:126:22)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:577:18)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: general-input result loss remains an ordered unknown barrier after explicit exact-session reconnection
+not ok 34 - general-input result loss remains an ordered unknown barrier after explicit exact-session reconnection
+  ---
+  duration_ms: 279.041768
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:626:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async Object.attach (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:126:22)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:631:18)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: public instruction CLI and lost HTTP submission responses reuse an immutable ID without launching native sessions
+not ok 35 - public instruction CLI and lost HTTP submission responses reuse an immutable ID without launching native sessions
+  ---
+  duration_ms: 263.034762
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:659:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async Object.attach (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:126:22)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:664:31)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: late cursors and simultaneous callers cannot bypass earlier or uncertain inputs to the same native target
+not ok 36 - late cursors and simultaneous callers cannot bypass earlier or uncertain inputs to the same native target
+  ---
+  duration_ms: 241.763
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:738:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async Object.attach (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:126:22)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:743:18)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: saved, webhook delivered, cursor GET, target read, begin and correlated ACP result stay separate
+not ok 37 - saved, webhook delivered, cursor GET, target read, begin and correlated ACP result stay separate
+  ---
+  duration_ms: 254.711468
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:818:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async Object.attach (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:126:22)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:823:18)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: an invalidated input may reconcile its already-issued native result without replaying or changing the new question
+not ok 38 - an invalidated input may reconcile its already-issued native result without replaying or changing the new question
+  ---
+  duration_ms: 285.992787
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:885:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async Object.attach (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:126:22)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:890:18)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: concurrent readers, old cursor rereads and duplicate begin IDs cannot repeat a native effect
+not ok 39 - concurrent readers, old cursor rereads and duplicate begin IDs cannot repeat a native effect
+  ---
+  duration_ms: 282.396563
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:950:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async Object.attach (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:126:22)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:955:18)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: stopped consumer retains its answer; explicit same-session resume rotates credentials and applies once
+not ok 40 - stopped consumer retains its answer; explicit same-session resume rotates credentials and applies once
+  ---
+  duration_ms: 298.084303
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:994:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async Object.attach (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:126:22)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:999:15)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: effect followed by native result loss stays unknown after explicit reconnect and never replays
+not ok 41 - effect followed by native result loss stays unknown after explicit reconnect and never replays
+  ---
+  duration_ms: 261.223474
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:1045:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async Object.attach (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:126:22)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:1050:15)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: dashboard restart and missing application ack reconcile an existing native result without another send
+not ok 42 - dashboard restart and missing application ack reconcile an existing native result without another send
+  ---
+  duration_ms: 284.431963
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:1076:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async Object.attach (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:126:22)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:1081:15)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: lost begin response commits a claim but performs zero sends and remains blocked on reread
+not ok 43 - lost begin response commits a claim but performs zero sends and remains blocked on reread
+  ---
+  duration_ms: 282.586774
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:1116:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async Object.attach (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:126:22)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:1121:18)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: wrong consumer/run, forged success, project MCP/admin/browser and ended-session acks fail closed
+not ok 44 - wrong consumer/run, forged success, project MCP/admin/browser and ended-session acks fail closed
+  ---
+  duration_ms: 291.804439
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:1143:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async Object.attach (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:126:22)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:1148:15)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: revision changes, cancellation and expiry retain original replies but forbid current application
+not ok 45 - revision changes, cancellation and expiry retain original replies but forbid current application
+  ---
+  duration_ms: 265.610774
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:1262:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async Object.attach (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:126:22)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:1267:18)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: a correlated native refusal is shown as failed input processing, never successful application
+not ok 46 - a correlated native refusal is shown as failed input processing, never successful application
+  ---
+  duration_ms: 268.991119
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:1384:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async Object.attach (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:126:22)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:1389:18)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: an acknowledged native command with different input cannot confirm application of the saved answer
+not ok 47 - an acknowledged native command with different input cannot confirm application of the saved answer
+  ---
+  duration_ms: 257.019616
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:1405:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async Object.attach (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:126:22)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:1410:18)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: unknown/corrupt application schemas preserve the original file and legacy unbound questions stay compatible
+ok 48 - unknown/corrupt application schemas preserve the original file and legacy unbound questions stay compatible
+  ---
+  duration_ms: 23.445981
+  type: 'test'
+  ...
+# Subtest: public CLI once resumes the exact session, applies once, and inspection never launches another prompt
+not ok 49 - public CLI once resumes the exact session, applies once, and inspection never launches another prompt
+  ---
+  duration_ms: 205.268591
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:1494:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async Object.attach (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:126:22)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/answer-applications.test.mjs:1499:15)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: a failed send survives config failure and a hash-free reload before explicit retry
+ok 50 - a failed send survives config failure and a hash-free reload before explicit retry
+  ---
+  duration_ms: 139.70738
+  type: 'test'
+  ...
+# Subtest: a draft survives initial state failure and an explicit hash-free reload
+ok 51 - a draft survives initial state failure and an explicit hash-free reload
+  ---
+  duration_ms: 38.028912
+  type: 'test'
+  ...
+# Subtest: a saved answer with a lost response is confirmed after config failure without resending
+ok 52 - a saved answer with a lost response is confirmed after config failure without resending
+  ---
+  duration_ms: 87.894384
+  type: 'test'
+  ...
+# Subtest: typed answer survives a fresh document using the same tab storage
+ok 53 - typed answer survives a fresh document using the same tab storage
+  ---
+  duration_ms: 174.743685
+  type: 'test'
+  ...
+# Subtest: a held answer remains locked after SSE redraw and repeated submit sends only once
+ok 54 - a held answer remains locked after SSE redraw and repeated submit sends only once
+  ---
+  duration_ms: 133.230898
+  type: 'test'
+  ...
+# Subtest: drafts remain separate for each question and project, including the shared route
+ok 55 - drafts remain separate for each question and project, including the shared route
+  ---
+  duration_ms: 73.644847
+  type: 'test'
+  ...
+# Subtest: a failed POST reconciles state and keeps an editable draft for explicit retry
+ok 56 - a failed POST reconciles state and keeps an editable draft for explicit retry
+  ---
+  duration_ms: 60.812756
+  type: 'test'
+  ...
+# Subtest: a committed answer with a lost response is reconciled without sending again
+ok 57 - a committed answer with a lost response is reconciled without sending again
+  ---
+  duration_ms: 62.842644
+  type: 'test'
+  ...
+# Subtest: confirmation clears a submitted draft whose whitespace is preserved by the server
+ok 58 - confirmation clears a submitted draft whose whitespace is preserved by the server
+  ---
+  duration_ms: 60.242632
+  type: 'test'
+  ...
+# Subtest: storage denial does not prevent startup, SSE draft retention, or answering
+ok 59 - storage denial does not prevent startup, SSE draft retention, or answering
+  ---
+  duration_ms: 24.200338
+  type: 'test'
+  ...
+# Subtest: an older overlapping state response cannot restore a question already answered
+ok 60 - an older overlapping state response cannot restore a question already answered
+  ---
+  duration_ms: 16.691926
+  type: 'test'
+  ...
+# Subtest: an uncertain answer stays locked until a separate state check confirms it was not saved
+ok 61 - an uncertain answer stays locked until a separate state check confirms it was not saved
+  ---
+  duration_ms: 21.179322
+  type: 'test'
+  ...
+# Subtest: back-forward cache restoration checks server state and keeps an unsent draft
+ok 62 - back-forward cache restoration checks server state and keeps an unsent draft
+  ---
+  duration_ms: 17.345087
+  type: 'test'
+  ...
+# Subtest: SSE redraw preserves the active answer's text selection
+ok 63 - SSE redraw preserves the active answer's text selection
+  ---
+  duration_ms: 21.517986
+  type: 'test'
+  ...
+# Subtest: a changed question preserves a copy without applying the old draft to the current question
+ok 64 - a changed question preserves a copy without applying the old draft to the current question
+  ---
+  duration_ms: 47.818951
+  type: 'test'
+  ...
+# Subtest: a changed created_at preserves a copy without applying the old draft to the current question
+ok 65 - a changed created_at preserves a copy without applying the old draft to the current question
+  ---
+  duration_ms: 31.00761
+  type: 'test'
+  ...
+# Subtest: a changed default_action preserves a copy without applying the old draft to the current question
+ok 66 - a changed default_action preserves a copy without applying the old draft to the current question
+  ---
+  duration_ms: 32.67494
+  type: 'test'
+  ...
+# Subtest: a changed answer preserves a copy without applying the old draft to the current question
+ok 67 - a changed answer preserves a copy without applying the old draft to the current question
+  ---
+  duration_ms: 26.373188
+  type: 'test'
+  ...
+# Subtest: explicitly discarding an active draft keeps it empty after reload
+ok 68 - explicitly discarding an active draft keeps it empty after reload
+  ---
+  duration_ms: 51.609019
+  type: 'test'
+  ...
+# Subtest: explicitly discarding a retained copy removes it after reload
+ok 69 - explicitly discarding a retained copy removes it after reload
+  ---
+  duration_ms: 42.961849
+  type: 'test'
+  ...
+# Subtest: corrupted draft storage warns without overwriting the unreadable record
+ok 70 - corrupted draft storage warns without overwriting the unreadable record
+  ---
+  duration_ms: 35.864181
+  type: 'test'
+  ...
+# Subtest: exhausted storage warns while retaining the latest in-memory draft
+ok 71 - exhausted storage warns while retaining the latest in-memory draft
+  ---
+  duration_ms: 18.421359
+  type: 'test'
+  ...
+# Subtest: a pending state read started before POST failure cannot release the uncertain-answer lock
+ok 72 - a pending state read started before POST failure cannot release the uncertain-answer lock
+  ---
+  duration_ms: 20.679718
+  type: 'test'
+  ...
+# Subtest: a whitespace-only answer shows an accessible error without posting
+ok 73 - a whitespace-only answer shows an accessible error without posting
+  ---
+  duration_ms: 19.202243
+  type: 'test'
+  ...
+# Subtest: SSE redraw preserves focus and selection while copying a retained draft
+ok 74 - SSE redraw preserves focus and selection while copying a retained draft
+  ---
+  duration_ms: 23.443251
+  type: 'test'
+  ...
+# Subtest: an initial HTTP 401 explains how to obtain a fresh link without erasing stored drafts
+ok 75 - an initial HTTP 401 explains how to obtain a fresh link without erasing stored drafts
+  ---
+  duration_ms: 149.34988
+  type: 'test'
+  ...
+# Subtest: a state HTTP 401 after startup retains the project and unsent answer across SSE errors
+ok 76 - a state HTTP 401 after startup retains the project and unsent answer across SSE errors
+  ---
+  duration_ms: 51.102417
+  type: 'test'
+  ...
+# Subtest: an event-stream failure checks authentication without requiring a manual reload
+ok 77 - an event-stream failure checks authentication without requiring a manual reload
+  ---
+  duration_ms: 36.752438
+  type: 'test'
+  ...
+# Subtest: a reachable state API does not claim that a disconnected event stream has recovered
+ok 78 - a reachable state API does not claim that a disconnected event stream has recovered
+  ---
+  duration_ms: 32.507422
+  type: 'test'
+  ...
+# Subtest: an answer HTTP 401 preserves the uncertain draft and never retries the answer automatically
+ok 79 - an answer HTTP 401 preserves the uncertain draft and never retries the answer automatically
+  ---
+  duration_ms: 37.857898
+  type: 'test'
+  ...
+# Subtest: a share refresh HTTP 401 removes obsolete QR details and gives a fresh-link instruction
+ok 80 - a share refresh HTTP 401 removes obsolete QR details and gives a fresh-link instruction
+  ---
+  duration_ms: 32.139864
+  type: 'test'
+  ...
+# Subtest: a QR HTTP 401 uses the same recovery guidance instead of only a QR-download error
+ok 81 - a QR HTTP 401 uses the same recovery guidance instead of only a QR-download error
+  ---
+  duration_ms: 20.183807
+  type: 'test'
+  ...
+# Subtest: a diagnostics HTTP 401 keeps the current project and draft while showing the same recovery notice
+ok 82 - a diagnostics HTTP 401 keeps the current project and draft while showing the same recovery notice
+  ---
+  duration_ms: 30.692367
+  type: 'test'
+  ...
+# Subtest: HTTP 403 does not claim that browser credentials expired
+ok 83 - HTTP 403 does not claim that browser credentials expired
+  ---
+  duration_ms: 27.491172
+  type: 'test'
+  ...
+# Subtest: HTTP 500 does not claim that browser credentials expired
+ok 84 - HTTP 500 does not claim that browser credentials expired
+  ---
+  duration_ms: 22.391528
+  type: 'test'
+  ...
+# Subtest: network disconnection does not claim that browser credentials expired
+ok 85 - network disconnection does not claim that browser credentials expired
+  ---
+  duration_ms: 18.212733
+  type: 'test'
+  ...
+# Subtest: a new browser link restarts a document whose initial config request failed
+ok 86 - a new browser link restarts a document whose initial config request failed
+  ---
+  duration_ms: 108.342372
+  type: 'test'
+  ...
+# Subtest: a new browser link preserves a draft through the requested reload without sending it
+ok 87 - a new browser link preserves a draft through the requested reload without sending it
+  ---
+  duration_ms: 83.94496
+  type: 'test'
+  ...
+# Subtest: question and task anchors do not reload or replace the current browser credential
+ok 88 - question and task anchors do not reload or replace the current browser credential
+  ---
+  duration_ms: 46.699106
+  type: 'test'
+  ...
+# Subtest: a stored browser key preserves an initial task anchor and selects its overview
+ok 89 - a stored browser key preserves an initial task anchor and selects its overview
+  ---
+  duration_ms: 33.735073
+  type: 'test'
+  ...
+# Subtest: a new link cannot discard the latest draft when saving it exceeded storage quota
+ok 90 - a new link cannot discard the latest draft when saving it exceeded storage quota
+  ---
+  duration_ms: 79.698297
+  type: 'test'
+  ...
+# Subtest: storage failure without an unsaved answer does not prevent link recovery
+ok 91 - storage failure without an unsaved answer does not prevent link recovery
+  ---
+  duration_ms: 60.93573
+  type: 'test'
+  ...
+# Subtest: soft warns without denying; hard and unknown spend reject a new job
+ok 92 - soft warns without denying; hard and unknown spend reject a new job
+  ---
+  duration_ms: 77.715873
+  type: 'test'
+  ...
+# Subtest: project and run policies reserve once each; decimal values, period and source stay exact
+ok 93 - project and run policies reserve once each; decimal values, period and source stay exact
+  ---
+  duration_ms: 48.63414
+  type: 'test'
+  ...
+# Subtest: two workers atomically reserve the remaining budget; late usage can exceed hard and never changes routes
+ok 94 - two workers atomically reserve the remaining budget; late usage can exceed hard and never changes routes
+  ---
+  duration_ms: 198.322688
+  type: 'test'
+  ...
+# Subtest: lost admission response keeps the charge reservation; no retry, duplicate dispatch or restart release
+ok 95 - lost admission response keeps the charge reservation; no retry, duplicate dispatch or restart release
+  ---
+  duration_ms: 71.789829
+  type: 'test'
+  ...
+# Subtest: only local admin changes policy or settles fees; producer key cannot create jobs or escape its job
+ok 96 - only local admin changes policy or settles fees; producer key cannot create jobs or escape its job
+  ---
+  duration_ms: 83.33392
+  type: 'test'
+  ...
+# Subtest: unknown receipt retains reservation; receipts are idempotent and cannot change source or completed money
+ok 97 - unknown receipt retains reservation; receipts are idempotent and cannot change source or completed money
+  ---
+  duration_ms: 21.548052
+  type: 'test'
+  ...
+# Subtest: real CLI input-file policy/inspect uses admin credential and rejects stray enforcement flags
+ok 98 - real CLI input-file policy/inspect uses admin credential and rejects stray enforcement flags
+  ---
+  duration_ms: 1224.484667
+  type: 'test'
+  ...
+# Subtest: guarded attachment verifies hook, scopes cleanup, and rejects hard job before native session starts
+not ok 99 - guarded attachment verifies hook, scopes cleanup, and rejects hard job before native session starts
+  ---
+  duration_ms: 390.046531
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/budget-admission.test.mjs:517:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/budget-admission.test.mjs:548:20)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: checkpoints bind the native ID, branch, durable event and timestamp without copying conversation or credentials
+not ok 100 - checkpoints bind the native ID, branch, durable event and timestamp without copying conversation or credentials
+  ---
+  duration_ms: 718.813807
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:89:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async setup (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:57:20)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:90:13)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: a fresh formal session-list observation enables a candidate without pretending a resume acknowledgement
+not ok 101 - a fresh formal session-list observation enables a candidate without pretending a resume acknowledgement
+  ---
+  duration_ms: 405.07861
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:116:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async setup (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:57:20)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:117:13)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: formal checkpoint resume confirms the same native ID and repeated recovery never replays it
+not ok 102 - formal checkpoint resume confirms the same native ID and repeated recovery never replays it
+  ---
+  duration_ms: 361.972478
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:132:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async setup (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:57:20)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:133:13)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: missing and expired-session fixtures require a new-session choice, while unsupported or malformed native evidence is distinct
+not ok 103 - missing and expired-session fixtures require a new-session choice, while unsupported or malformed native evidence is distinct
+  ---
+  duration_ms: 305.501907
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:171:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async setup (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:57:20)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:172:13)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: explicit context-loss choice creates a new native ID and sends the operator summary once with a checkpoint reference
+not ok 104 - explicit context-loss choice creates a new native ID and sends the operator summary once with a checkpoint reference
+  ---
+  duration_ms: 322.362413
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:203:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async setup (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:57:20)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:204:13)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: worktree moves, changed branch and changed HEAD block recovery before native profile boot
+not ok 105 - worktree moves, changed branch and changed HEAD block recovery before native profile boot
+  ---
+  duration_ms: 320.844126
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:250:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async setup (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:57:20)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:251:17)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: unconfirmed control commands block recovery and completed external effects are never replayed
+not ok 106 - unconfirmed control commands block recovery and completed external effects are never replayed
+  ---
+  duration_ms: 288.281483
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:308:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async setup (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:57:20)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:309:13)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: referenced external outcomes must be known before resume, including an applied operation whose response was lost
+not ok 107 - referenced external outcomes must be known before resume, including an applied operation whose response was lost
+  ---
+  duration_ms: 269.254383
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:334:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async setup (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:57:20)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:336:15)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: corrupt checkpoint data and missing committed journal events refuse recovery without overwriting evidence
+not ok 108 - corrupt checkpoint data and missing committed journal events refuse recovery without overwriting evidence
+  ---
+  duration_ms: 249.089573
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:383:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async setup (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:57:20)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:384:13)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: a lost summary response leaves the new session link uncertain and never dispatches the summary again
+not ok 109 - a lost summary response leaves the new session link uncertain and never dispatches the summary again
+  ---
+  duration_ms: 245.851464
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:416:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async setup (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:57:20)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:417:13)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: a flushed recovery intent blocks later clients if persistence fails before dispatch
+not ok 110 - a flushed recovery intent blocks later clients if persistence fails before dispatch
+  ---
+  duration_ms: 266.301677
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:453:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async setup (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:57:20)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:454:13)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: a surviving checkpoint writer lock remains visible and is never stolen to recover a session
+not ok 111 - a surviving checkpoint writer lock remains visible and is never stolen to recover a session
+  ---
+  duration_ms: 304.36405
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:481:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async setup (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:57:20)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:482:13)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: separate public CLI clients record, inspect, resume and reject unsafe summary options
+not ok 112 - separate public CLI clients record, inspect, resume and reject unsafe summary options
+  ---
+  duration_ms: 299.606877
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:507:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async setup (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:57:20)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/checkpoints.test.mjs:508:13)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: Tunnel readiness is read-only, scoped to its live generation and distinct from Dot response
+ok 113 - Tunnel readiness is read-only, scoped to its live generation and distinct from Dot response
+  ---
+  duration_ms: 141.867698
+  type: 'test'
+  ...
+# Subtest: Health diagnostics reject foreign projects, arbitrary URLs, redirects, oversized files and unknown processes
+ok 114 - Health diagnostics reject foreign projects, arbitrary URLs, redirects, oversized files and unknown processes
+  ---
+  duration_ms: 108.872177
+  type: 'test'
+  ...
+# Subtest: browser success, MCP auth failure, absent Tunnel and stale restart credentials remain independent through the public CLI
+ok 115 - browser success, MCP auth failure, absent Tunnel and stale restart credentials remain independent through the public CLI
+  ---
+  duration_ms: 981.733867
+  type: 'test'
+  ...
+# Subtest: Tailscale diagnostics inspect only status and never repair a missing or conflicting Serve route
+ok 116 - Tailscale diagnostics inspect only status and never repair a missing or conflicting Serve route
+  ---
+  duration_ms: 2.094061
+  type: 'test'
+  ...
+# Subtest: public Tunnel launcher records its actual child and retires only its own health file
+ok 117 - public Tunnel launcher records its actual child and retires only its own health file
+  ---
+  duration_ms: 4006.596917
+  type: 'test'
+  ...
+# Subtest: two independent workers sum exactly; identical IDs, reordered JSON and repeated cumulative reports never add
+ok 118 - two independent workers sum exactly; identical IDs, reordered JSON and repeated cumulative reports never add
+  ---
+  duration_ms: 123.41876
+  type: 'test'
+  ...
+# Subtest: out-of-order cumulative snapshots replace earlier totals; decreasing/reset counters and mixed deltas fail
+ok 119 - out-of-order cumulative snapshots replace earlier totals; decreasing/reset counters and mixed deltas fail
+  ---
+  duration_ms: 27.185326
+  type: 'test'
+  ...
+# Subtest: provider, CLI, explicit estimate and a different invoice retain separate amounts, references and period
+ok 120 - provider, CLI, explicit estimate and a different invoice retain separate amounts, references and period
+  ---
+  duration_ms: 48.551358
+  type: 'test'
+  ...
+# Subtest: missing workers and unknown amounts stay partial; unknown population and mixed currencies cannot become a full total
+ok 121 - missing workers and unknown amounts stay partial; unknown population and mixed currencies cannot become a full total
+  ---
+  duration_ms: 33.429788
+  type: 'test'
+  ...
+# Subtest: independent event sequences add once; an unknown event in a worker keeps its subtotal partial
+ok 122 - independent event sequences add once; an unknown event in a worker keeps its subtotal partial
+  ---
+  duration_ms: 27.128528
+  type: 'test'
+  ...
+# Subtest: scope identity, source certainty, dates and malformed persisted ledger fail without rewriting evidence
+ok 123 - scope identity, source certainty, dates and malformed persisted ledger fail without rewriting evidence
+  ---
+  duration_ms: 28.382705
+  type: 'test'
+  ...
+# Subtest: existing MCP metrics tool records ledger reports; old metrics and exactly six tool names remain compatible
+ok 124 - existing MCP metrics tool records ledger reports; old metrics and exactly six tool names remain compatible
+  ---
+  duration_ms: 11.910306
+  type: 'test'
+  ...
+# Subtest: HTTP parallel worker reports, lost response retry, browser read-only and public CLI share one durable ledger
+ok 125 - HTTP parallel worker reports, lost response retry, browser read-only and public CLI share one durable ledger
+  ---
+  duration_ms: 1010.208347
+  type: 'test'
+  ...
+# Subtest: Serve preserves other services and refuses public Funnel or port conflicts
+ok 126 - Serve preserves other services and refuses public Funnel or port conflicts
+  ---
+  duration_ms: 9.402162
+  type: 'test'
+  ...
+# Subtest: Harness proxy removes dashboard credentials before forwarding
+ok 127 - Harness proxy removes dashboard credentials before forwarding
+  ---
+  duration_ms: 62.976304
+  type: 'test'
+  ...
+# Subtest: project state, HTTP/stdio MCP, subscriptions, answers, and auth work together
+ok 128 - project state, HTTP/stdio MCP, subscriptions, answers, and auth work together
+  ---
+  duration_ms: 858.316529
+  type: 'test'
+  ...
+# Subtest: unknown metrics and invalid reported counters are rejected
+ok 129 - unknown metrics and invalid reported counters are rejected
+  ---
+  duration_ms: 0.492245
+  type: 'test'
+  ...
+# Subtest: failed state startup releases the instance lock and administrative stop closes the server
+ok 130 - failed state startup releases the instance lock and administrative stop closes the server
+  ---
+  duration_ms: 23.464917
+  type: 'test'
+  ...
+# Subtest: callback addresses block private destinations, IP mappings, and credential URLs
+ok 131 - callback addresses block private destinations, IP mappings, and credential URLs
+  ---
+  duration_ms: 3.58148
+  type: 'test'
+  ...
+# Subtest: webhooks verify, persist, deduplicate subscriptions, retain event ids, and stop on 410
+ok 132 - webhooks verify, persist, deduplicate subscriptions, retain event ids, and stop on 410
+  ---
+  duration_ms: 76.198987
+  type: 'test'
+  ...
+# Subtest: MCP 2.0 discovers events and serves the same tools on an authenticated endpoint
+ok 133 - MCP 2.0 discovers events and serves the same tools on an authenticated endpoint
+  ---
+  duration_ms: 248.955323
+  type: 'test'
+  ...
+# Subtest: selected task, original question revision, answer and evidence remain linked while all raw free text/code/credentials are withheld
+ok 134 - selected task, original question revision, answer and evidence remain linked while all raw free text/code/credentials are withheld
+  ---
+  duration_ms: 30.714918
+  type: 'test'
+  ...
+# Subtest: review is pinned to source and selection; unsafe replacements/metadata and nonexistent paths are refused
+ok 135 - review is pinned to source and selection; unsafe replacements/metadata and nonexistent paths are refused
+  ---
+  duration_ms: 11.491711
+  type: 'test'
+  ...
+# Subtest: answer date range restores its older decision revision and task dependencies, never replacing it with the current revision
+ok 136 - answer date range restores its older decision revision and task dependencies, never replacing it with the current revision
+  ---
+  duration_ms: 10.328181
+  type: 'test'
+  ...
+# Subtest: corruption, forged authority, unknown fields and broken relationships fail validation even with a recomputed checksum
+ok 137 - corruption, forged authority, unknown fields and broken relationships fail validation even with a recomputed checksum
+  ---
+  duration_ms: 14.057434
+  type: 'test'
+  ...
+# Subtest: empty target restores only historical data using fresh authentication; old keys cannot reconnect or recreate event subscriptions
+ok 138 - empty target restores only historical data using fresh authentication; old keys cannot reconnect or recreate event subscriptions
+  ---
+  duration_ms: 193.938258
+  type: 'test'
+  ...
+# Subtest: all collisions, stale revisions and corrupt restores leave state bytes unchanged; concurrent restores serialize atomically
+ok 139 - all collisions, stale revisions and corrupt restores leave state bytes unchanged; concurrent restores serialize atomically
+  ---
+  duration_ms: 90.274014
+  type: 'test'
+  ...
+# Subtest: CLI previews, reviews, exports, inspects, restores and re-exports a portable archive; exclusive files and invalid UTF-8 fail safely
+ok 140 - CLI previews, reviews, exports, inspects, restores and re-exports a portable archive; exclusive files and invalid UTF-8 fail safely
+  ---
+  duration_ms: 2295.04876
+  type: 'test'
+  ...
+# Subtest: existing question and acceptance evidence IDs reject import before writing, and imported history is validated on reopen
+ok 141 - existing question and acceptance evidence IDs reject import before writing, and imported history is validated on reopen
+  ---
+  duration_ms: 42.256079
+  type: 'test'
+  ...
+# Subtest: unreported metrics, a zero denominator and measured zero remain distinct
+ok 142 - unreported metrics, a zero denominator and measured zero remain distinct
+  ---
+  duration_ms: 171.029267
+  type: 'test'
+  ...
+# Subtest: a reference is not inferred to be an approval and stays expanded while a draft refreshes
+ok 143 - a reference is not inferred to be an approval and stays expanded while a draft refreshes
+  ---
+  duration_ms: 22.641583
+  type: 'test'
+  ...
+# Subtest: answered questions retain their ID, question and answer and show a count
+ok 144 - answered questions retain their ID, question and answer and show a count
+  ---
+  duration_ms: 18.448536
+  type: 'test'
+  ...
+# Subtest: SSE redraw preserves focus on the same question's reference summary
+ok 145 - SSE redraw preserves focus on the same question's reference summary
+  ---
+  duration_ms: 21.396358
+  type: 'test'
+  ...
+# Subtest: reference focus does not transfer to a changed question or another question
+ok 146 - reference focus does not transfer to a changed question or another question
+  ---
+  duration_ms: 39.272954
+  type: 'test'
+  ...
+# Subtest: existing DSH role priorities preserve explicit environment, saved role and parent inheritance without changing routing
+ok 147 - existing DSH role priorities preserve explicit environment, saved role and parent inheritance without changing routing
+  ---
+  duration_ms: 2.97012
+  type: 'test'
+  ...
+# Subtest: unsupported and malformed config options retain unknown values and never copy peer titles or claim actual model execution
+ok 148 - unsupported and malformed config options retain unknown values and never copy peer titles or claim actual model execution
+  ---
+  duration_ms: 0.984289
+  type: 'test'
+  ...
+# Subtest: a declared run persists requested and native configuration separately and guards an actual prompt without storing its body
+not ok 149 - a declared run persists requested and native configuration separately and guards an actual prompt without storing its body
+  ---
+  duration_ms: 659.2879
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/model-routing.test.mjs:233:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async Object.attach (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/model-routing.test.mjs:80:22)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/model-routing.test.mjs:235:16)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: mismatched, absent or malformed native routes block a tracked prompt before dispatch and never select another model
+not ok 150 - mismatched, absent or malformed native routes block a tracked prompt before dispatch and never select another model
+  ---
+  duration_ms: 452.570996
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/model-routing.test.mjs:264:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async Object.attach (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/model-routing.test.mjs:80:22)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/model-routing.test.mjs:272:18)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: only an exact unexpired operator authorization accepts a changed native route and its history retains before, after and source
+not ok 151 - only an exact unexpired operator authorization accepts a changed native route and its history retains before, after and source
+  ---
+  duration_ms: 365.118375
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/model-routing.test.mjs:294:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async Object.attach (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/model-routing.test.mjs:80:22)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/model-routing.test.mjs:296:16)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: the adapter repeats the assertion at its final send boundary after a native configuration update
+not ok 152 - the adapter repeats the assertion at its final send boundary after a native configuration update
+  ---
+  duration_ms: 113.414159
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/model-routing.test.mjs:371:1'
+  failureType: 'testCodeFailure'
+  error: 'Owned process scope: ownership_unavailable'
+  code: 'ownership_unavailable'
+  stack: |-
+    lose (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/process-scope.mjs:113:17)
+    Socket.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/process-scope.mjs:149:52)
+    Socket.emit (node:events:519:28)
+    addChunk (node:internal/streams/readable:561:12)
+    readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    Readable.push (node:internal/streams/readable:392:5)
+    Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+  ...
+# Subtest: corrupt route policies and surviving locks are preserved and block prompts instead of guessing an allowed route
+not ok 153 - corrupt route policies and surviving locks are preserved and block prompts instead of guessing an allowed route
+  ---
+  duration_ms: 327.518724
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/model-routing.test.mjs:394:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async Object.attach (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/model-routing.test.mjs:80:22)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/model-routing.test.mjs:396:16)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: separate public clients bind, probe and inspect a native configuration without sending a prompt or modifying DSH routing
+not ok 154 - separate public clients bind, probe and inspect a native configuration without sending a prompt or modifying DSH routing
+  ---
+  duration_ms: 342.663442
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/model-routing.test.mjs:436:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async Object.attach (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/model-routing.test.mjs:80:22)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/model-routing.test.mjs:438:16)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: a checkpoint cannot drop a declared model assertion while starting a new conversation with a summary
+not ok 155 - a checkpoint cannot drop a declared model assertion while starting a new conversation with a summary
+  ---
+  duration_ms: 303.624793
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/model-routing.test.mjs:504:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async Object.attach (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/model-routing.test.mjs:80:22)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/model-routing.test.mjs:506:16)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: opening the palette focuses search without scrolling and its close button restores focus
+ok 156 - opening the palette focuses search without scrolling and its close button restores focus
+  ---
+  duration_ms: 169.547373
+  type: 'test'
+  ...
+# Subtest: an open palette fits the visual viewport after keyboard resize and viewport panning
+ok 157 - an open palette fits the visual viewport after keyboard resize and viewport panning
+  ---
+  duration_ms: 28.342584
+  type: 'test'
+  ...
+# Subtest: without VisualViewport the palette keeps CSS sizing and search filtering
+ok 158 - without VisualViewport the palette keeps CSS sizing and search filtering
+  ---
+  duration_ms: 31.594969
+  type: 'test'
+  ...
+# Subtest: CPU-only tasks do not probe GPU, WSL, CLI or authentication
+ok 159 - CPU-only tasks do not probe GPU, WSL, CLI or authentication
+  ---
+  duration_ms: 13.672703
+  type: 'test'
+  ...
+# Subtest: missing CLI, wrong cwd/profile and unsupported Node report a blocking item and minimal fix
+ok 160 - missing CLI, wrong cwd/profile and unsupported Node report a blocking item and minimal fix
+  ---
+  duration_ms: 13.000136
+  type: 'test'
+  ...
+# Subtest: version-checked CLI is a configuration fact without pretending protocol or provider communication
+ok 161 - version-checked CLI is a configuration fact without pretending protocol or provider communication
+  ---
+  duration_ms: 156.098355
+  type: 'test'
+  ...
+# Subtest: insufficient or unobservable disk space blocks without fabricating a zero measurement
+ok 162 - insufficient or unobservable disk space blocks without fabricating a zero measurement
+  ---
+  duration_ms: 7.760756
+  type: 'test'
+  ...
+# Subtest: an actual occupied loopback port blocks and a released port is observed without reserving it
+ok 163 - an actual occupied loopback port blocks and a released port is observed without reserving it
+  ---
+  duration_ms: 57.454995
+  type: 'test'
+  ...
+# Subtest: project dependencies distinguish existing and missing files and reject traversal
+ok 164 - project dependencies distinguish existing and missing files and reject traversal
+  ---
+  duration_ms: 22.473433
+  type: 'test'
+  ...
+# Subtest: required WSL checks the named distribution only on Windows and preserves no subprocess output
+ok 165 - required WSL checks the named distribution only on Windows and preserves no subprocess output
+  ---
+  duration_ms: 5.904803
+  type: 'test'
+  ...
+# Subtest: required GPU distinguishes missing, hidden, insufficient and observed driver inventory
+ok 166 - required GPU distinguishes missing, hidden, insufficient and observed driver inventory
+  ---
+  duration_ms: 12.468778
+  type: 'test'
+  ...
+# Subtest: a present invalid credential is never authentication success and never enters copyable diagnostics
+ok 167 - a present invalid credential is never authentication success and never enters copyable diagnostics
+  ---
+  duration_ms: 42.432354
+  type: 'test'
+  ...
+# Subtest: opt-in authentication uses only the selected official models endpoint and exposes its limited scope
+ok 168 - opt-in authentication uses only the selected official models endpoint and exposes its limited scope
+  ---
+  duration_ms: 17.586129
+  type: 'test'
+  ...
+# Subtest: auth transport, malformed/oversized responses, redirects and disabled TLS never become verified
+ok 169 - auth transport, malformed/oversized responses, redirects and disabled TLS never become verified
+  ---
+  duration_ms: 11.225712
+  type: 'test'
+  ...
+# Subtest: preflight blocks session creation before a CLI profile or ledger write occurs
+ok 170 - preflight blocks session creation before a CLI profile or ledger write occurs
+  ---
+  duration_ms: 74.788022
+  type: 'test'
+  ...
+# Subtest: standalone and public CLI return copyable reports and nonzero exit on blocked prerequisites
+ok 171 - standalone and public CLI return copyable reports and nonzero exit on blocked prerequisites
+  ---
+  duration_ms: 694.162311
+  type: 'test'
+  ...
+# Subtest: owned children and detached grandchildren stop in order after a bounded graceful deadline, with duplicate requests sharing one result
+not ok 172 - owned children and detached grandchildren stop in order after a bounded graceful deadline, with duplicate requests sharing one result
+  ---
+  duration_ms: 87.816928
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/process-scope.test.mjs:62:1'
+  failureType: 'testCodeFailure'
+  error: 'Owned process scope: ownership_unavailable'
+  code: 'ownership_unavailable'
+  stack: |-
+    lose (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/process-scope.mjs:113:17)
+    Socket.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/process-scope.mjs:149:52)
+    Socket.emit (node:events:519:28)
+    addChunk (node:internal/streams/readable:561:12)
+    readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    Readable.push (node:internal/streams/readable:392:5)
+    Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+  ...
+# Subtest: cooperative EOF/TERM exits require no forced kill on Linux and retain truthful Windows graceful capability
+not ok 173 - cooperative EOF/TERM exits require no forced kill on Linux and retain truthful Windows graceful capability
+  ---
+  duration_ms: 90.086673
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/process-scope.test.mjs:87:1'
+  failureType: 'testCodeFailure'
+  error: 'Owned process scope: ownership_unavailable'
+  code: 'ownership_unavailable'
+  stack: |-
+    lose (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/process-scope.mjs:113:17)
+    Socket.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/process-scope.mjs:149:52)
+    Socket.emit (node:events:519:28)
+    addChunk (node:internal/streams/readable:561:12)
+    readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    Readable.push (node:internal/streams/readable:392:5)
+    Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+  ...
+# Subtest: root exit cannot confirm descendant exit and changing the exposed PID to an independent canary never redirects a kernel-handle stop
+not ok 174 - root exit cannot confirm descendant exit and changing the exposed PID to an independent canary never redirects a kernel-handle stop
+  ---
+  duration_ms: 98.350375
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/process-scope.test.mjs:101:1'
+  failureType: 'testCodeFailure'
+  error: 'Owned process scope: ownership_unavailable'
+  code: 'ownership_unavailable'
+  stack: |-
+    lose (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/process-scope.mjs:113:17)
+    Socket.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/process-scope.mjs:149:52)
+    Socket.emit (node:events:519:28)
+    addChunk (node:internal/streams/readable:561:12)
+    readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    Readable.push (node:internal/streams/readable:392:5)
+    Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+  ...
+# Subtest: monitor disconnect is unverifiable, sends no guessed PID kill, and never produces a confirmed stop
+not ok 175 - monitor disconnect is unverifiable, sends no guessed PID kill, and never produces a confirmed stop
+  ---
+  duration_ms: 96.797243
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/process-scope.test.mjs:143:1'
+  failureType: 'testCodeFailure'
+  error: 'Owned process scope: ownership_unavailable'
+  code: 'ownership_unavailable'
+  stack: |-
+    lose (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/process-scope.mjs:113:17)
+    Socket.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/process-scope.mjs:149:52)
+    Socket.emit (node:events:519:28)
+    addChunk (node:internal/streams/readable:561:12)
+    readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    Readable.push (node:internal/streams/readable:392:5)
+    Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+  ...
+# Subtest: managed Harness stores ownership before release and every stop stage including final empty-group proof; reloaded history cannot recreate signal authority
+not ok 176 - managed Harness stores ownership before release and every stop stage including final empty-group proof; reloaded history cannot recreate signal authority
+  ---
+  duration_ms: 151.958951
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/process-scope.test.mjs:160:1'
+  failureType: 'testCodeFailure'
+  error: 'Owned process scope: ownership_unavailable'
+  code: 'ownership_unavailable'
+  stack: |-
+    lose (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/process-scope.mjs:113:17)
+    Socket.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/process-scope.mjs:149:52)
+    Socket.emit (node:events:519:28)
+    addChunk (node:internal/streams/readable:561:12)
+    readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    Readable.push (node:internal/streams/readable:392:5)
+    Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+  ...
+# Subtest: authenticated Harness API separates stopping from verified empty descendants, duplicate human requests stop once, and MCP credentials cannot stop the owned run
+not ok 177 - authenticated Harness API separates stopping from verified empty descendants, duplicate human requests stop once, and MCP credentials cannot stop the owned run
+  ---
+  duration_ms: 160.425928
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/process-scope.test.mjs:195:1'
+  failureType: 'testCodeFailure'
+  error: 'Owned process scope: ownership_unavailable'
+  code: 'ownership_unavailable'
+  stack: |-
+    lose (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/process-scope.mjs:113:17)
+    Socket.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/process-scope.mjs:149:52)
+    Socket.emit (node:events:519:28)
+    addChunk (node:internal/streams/readable:561:12)
+    readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    Readable.push (node:internal/streams/readable:392:5)
+    Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+  ...
+# Subtest: lost Harness monitor remains unverifiable in HTTP responses and administrator shutdown refuses to hide the uncertain result
+not ok 178 - lost Harness monitor remains unverifiable in HTTP responses and administrator shutdown refuses to hide the uncertain result
+  ---
+  duration_ms: 145.409062
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/process-scope.test.mjs:288:1'
+  failureType: 'testCodeFailure'
+  error: 'Owned process scope: ownership_unavailable'
+  code: 'ownership_unavailable'
+  stack: |-
+    lose (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/process-scope.mjs:113:17)
+    Socket.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/process-scope.mjs:149:52)
+    Socket.emit (node:events:519:28)
+    addChunk (node:internal/streams/readable:561:12)
+    readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    Readable.push (node:internal/streams/readable:392:5)
+    Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+  ...
+# Subtest: follow-up review counts and a newer unknown instruction remain visible in the task overview
+ok 179 - follow-up review counts and a newer unknown instruction remain visible in the task overview
+  ---
+  duration_ms: 1.71656
+  type: 'test'
+  ...
+# Subtest: task completion reports and saved/delivered answers never become native success or live state
+ok 180 - task completion reports and saved/delivered answers never become native success or live state
+  ---
+  duration_ms: 0.292525
+  type: 'test'
+  ...
+# Subtest: task context excludes other tasks and retains unbound and expired decision truth
+ok 181 - task context excludes other tasks and retains unbound and expired decision truth
+  ---
+  duration_ms: 21.579396
+  type: 'test'
+  ...
+# Subtest: the latest unknown or invalidated input result does not inherit an earlier success or another task
+ok 182 - the latest unknown or invalidated input result does not inherit an earlier success or another task
+  ---
+  duration_ms: 41.664745
+  type: 'test'
+  ...
+# Subtest: QA fixture serves real assets/state/SSE and holds answers without forwarding
+ok 183 - QA fixture serves real assets/state/SSE and holds answers without forwarding
+  ---
+  duration_ms: 166.332172
+  type: 'test'
+  ...
+# Subtest: drop-before never reaches the backend and closes SSE until resume
+ok 184 - drop-before never reaches the backend and closes SSE until resume
+  ---
+  duration_ms: 86.199607
+  type: 'test'
+  ...
+# Subtest: drop-after commits exactly once without exposing the response or SSE
+ok 185 - drop-after commits exactly once without exposing the response or SSE
+  ---
+  duration_ms: 124.522983
+  type: 'test'
+  ...
+# Subtest: offline answer retries remain attributed and reconcile with the request total
+ok 186 - offline answer retries remain attributed and reconcile with the request total
+  ---
+  duration_ms: 81.154888
+  type: 'test'
+  ...
+# Subtest: CLI stop exits even when the controlling stdin remains open
+ok 187 - CLI stop exits even when the controlling stdin remains open
+  ---
+  duration_ms: 513.308093
+  type: 'test'
+  ...
+# Subtest: opt-in Tailscale fixture accepts only its verified Serve host and origin
+ok 188 - opt-in Tailscale fixture accepts only its verified Serve host and origin
+  ---
+  duration_ms: 45.970983
+  type: 'test'
+  ...
+# Subtest: Tailscale fixture publishes the verified proxy route through config, QR and refresh
+ok 189 - Tailscale fixture publishes the verified proxy route through config, QR and refresh
+  ---
+  duration_ms: 81.954978
+  type: 'test'
+  ...
+# Subtest: Tailscale fixture fails closed when route setup is not verified
+ok 190 - Tailscale fixture fails closed when route setup is not verified
+  ---
+  duration_ms: 46.429579
+  type: 'test'
+  ...
+# Subtest: catalogue includes every declared operation/device/route without pretending to test them
+ok 191 - catalogue includes every declared operation/device/route without pretending to test them
+  ---
+  duration_ms: 24.324558
+  type: 'test'
+  ...
+# Subtest: a local fixture or mobile viewport cannot certify an untested real connection
+ok 192 - a local fixture or mobile viewport cannot certify an untested real connection
+  ---
+  duration_ms: 0.846758
+  type: 'test'
+  ...
+# Subtest: failed observations, missing evidence and malformed records cannot become passes
+ok 193 - failed observations, missing evidence and malformed records cannot become passes
+  ---
+  duration_ms: 7.630635
+  type: 'test'
+  ...
+# Subtest: target SHA must be a string rather than a coercible JSON value
+ok 194 - target SHA must be a string rather than a coercible JSON value
+  ---
+  duration_ms: 0.233223
+  type: 'test'
+  ...
+# Subtest: rendered report includes untested rows and escapes all reported text
+ok 195 - rendered report includes untested rows and escapes all reported text
+  ---
+  duration_ms: 4.23944
+  type: 'test'
+  ...
+# Subtest: duplicate summary counts affected cells without adding shared observations as separate answers
+ok 196 - duplicate summary counts affected cells without adding shared observations as separate answers
+  ---
+  duration_ms: 13.164282
+  type: 'test'
+  ...
+# Subtest: every passing Project operation requires its observed answer outcome
+ok 197 - every passing Project operation requires its observed answer outcome
+  ---
+  duration_ms: 2.004577
+  type: 'test'
+  ...
+# Subtest: a pass distinguishes saved answers from unsent drafts and requires specified focus checks
+ok 198 - a pass distinguishes saved answers from unsent drafts and requires specified focus checks
+  ---
+  duration_ms: 1.515428
+  type: 'test'
+  ...
+# Subtest: failure and unavailable evidence remain distinct from a passing Project operation
+ok 199 - failure and unavailable evidence remain distinct from a passing Project operation
+  ---
+  duration_ms: 0.617382
+  type: 'test'
+  ...
+# Subtest: CLI validates evidence existence and produces an adjacent offline report
+ok 200 - CLI validates evidence existence and produces an adjacent offline report
+  ---
+  duration_ms: 1219.399697
+  type: 'test'
+  ...
+# Subtest: restoring an older snapshot never revalidates that older revision's answer
+ok 201 - restoring an older snapshot never revalidates that older revision's answer
+  ---
+  duration_ms: 42.930635
+  type: 'test'
+  ...
+# Subtest: legacy consultations retain their field shapes and a default action grants no typed approval
+ok 202 - legacy consultations retain their field shapes and a default action grants no typed approval
+  ---
+  duration_ms: 15.208954
+  type: 'test'
+  ...
+# Subtest: typed choices, fixed target and a human answer persist atomically without creating execution authority
+ok 203 - typed choices, fixed target and a human answer persist atomically without creating execution authority
+  ---
+  duration_ms: 28.496872
+  type: 'test'
+  ...
+# Subtest: changing an action and cost invalidates old answers and stale browser requests while retaining immutable feedback and revision history
+ok 204 - changing an action and cost invalidates old answers and stale browser requests while retaining immutable feedback and revision history
+  ---
+  duration_ms: 22.425193
+  type: 'test'
+  ...
+# Subtest: unanswered, expired and cancelled questions never become automatic approval and cancellation invalidates a saved answer
+ok 205 - unanswered, expired and cancelled questions never become automatic approval and cancellation invalidates a saved answer
+  ---
+  duration_ms: 26.802244
+  type: 'test'
+  ...
+# Subtest: incomplete approvals, duplicate choices, forged fields and corrupt persisted metadata preserve the last readable state
+ok 206 - incomplete approvals, duplicate choices, forged fields and corrupt persisted metadata preserve the last readable state
+  ---
+  duration_ms: 33.768071
+  type: 'test'
+  ...
+# Subtest: authenticated human HTTP answers bind the seen revision; MCP/admin cannot forge an answer or a human cancellation
+ok 207 - authenticated human HTTP answers bind the seen revision; MCP/admin cannot forge an answer or a human cancellation
+  ---
+  duration_ms: 143.630996
+  type: 'test'
+  ...
+# Subtest: a held answer stays locked across an SSE redraw
+ok 208 - a held answer stays locked across an SSE redraw
+  ---
+  duration_ms: 4.64756
+  type: 'test'
+  ...
+# Subtest: reload preserves text, choice and revision review without selecting or sending automatically
+ok 209 - reload preserves text, choice and revision review without selecting or sending automatically
+  ---
+  duration_ms: 2.867184
+  type: 'test'
+  ...
+# Subtest: returning to an earlier fingerprint at a new revision still requires a fresh review
+ok 210 - returning to an earlier fingerprint at a new revision still requires a fresh review
+  ---
+  duration_ms: 0.312624
+  type: 'test'
+  ...
+# Subtest: an uncertain POST is only released by a read started after its failure
+ok 211 - an uncertain POST is only released by a read started after its failure
+  ---
+  duration_ms: 0.466025
+  type: 'test'
+  ...
+# Subtest: a saved typed choice with a lost response is reconciled after reload
+ok 212 - a saved typed choice with a lost response is reconciled after reload
+  ---
+  duration_ms: 2.866153
+  type: 'test'
+  ...
+# Subtest: identical text with a different contract choice retains the unsent copy
+ok 213 - identical text with a different contract choice retains the unsent copy
+  ---
+  duration_ms: 0.316471
+  type: 'test'
+  ...
+# Subtest: cancelled questions retain drafts and cannot be submitted or revived on reload
+ok 214 - cancelled questions retain drafts and cannot be submitted or revived on reload
+  ---
+  duration_ms: 0.267849
+  type: 'test'
+  ...
+# Subtest: expired questions retain drafts and cannot be submitted or revived on reload
+ok 215 - expired questions retain drafts and cannot be submitted or revived on reload
+  ---
+  duration_ms: 0.155996
+  type: 'test'
+  ...
+# Subtest: an older GET cannot clear a current draft or release its request lock
+ok 216 - an older GET cannot clear a current draft or release its request lock
+  ---
+  duration_ms: 1.949531
+  type: 'test'
+  ...
+# Subtest: unreadable saved drafts are preserved while new drafts remain usable in memory
+ok 217 - unreadable saved drafts are preserved while new drafts remain usable in memory
+  ---
+  duration_ms: 0.470193
+  type: 'test'
+  ...
+# Subtest: legacy draft records restore under the same tab storage key
+ok 218 - legacy draft records restore under the same tab storage key
+  ---
+  duration_ms: 0.321129
+  type: 'test'
+  ...
+# Subtest: contract review, choice, reference expansion and text selection survive actual card redraws
+ok 219 - contract review, choice, reference expansion and text selection survive actual card redraws
+  ---
+  duration_ms: 1.471344
+  type: 'test'
+  ...
+# Subtest: failed one-project canary retains observations and cannot alter or roll out to the other project
+not ok 220 - failed one-project canary retains observations and cannot alter or roll out to the other project
+  ---
+  duration_ms: 9380.999094
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/releases.test.mjs:105:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+
+    false !== true
+
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/releases.test.mjs:112:10)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: existing run keeps the original adapter/Node/DSH command and native ID through update and verified rollback
+not ok 221 - existing run keeps the original adapter/Node/DSH command and native ID through update and verified rollback
+  ---
+  duration_ms: 6886.615331
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/releases.test.mjs:151:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The validation function is expected to return "true". Received false
+
+    Caught error:
+
+    Error: Managed release: selection_changed_refresh_revision
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  stack: |-
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/releases.test.mjs:161:3)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: public CLI re-execs the captured runtime and refuses overrides or changed pins
+not ok 222 - public CLI re-execs the captured runtime and refuses overrides or changed pins
+  ---
+  duration_ms: 9592.027724
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/releases.test.mjs:240:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Command failed: <user-home>/rdsh-issue52-wsl-qa-20261008.QuwQzC/node-v22.23.3-linux-x64/bin/node <user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/cli.mjs release canary --project /tmp/rdsh-releases-test-swyooL/alpha --release-id rel_c1e9fb7099846f7a0d146f3e7f795d8d0b6d6e7413a1d52278257ea837c2b260 --selection-revision 0
+
+  code: 1
+  stack: |-
+    genericNodeError (node:internal/errors:983:15)
+    wrappedFn (node:internal/errors:537:14)
+    ChildProcess.exithandler (node:child_process:417:12)
+    ChildProcess.emit (node:events:519:28)
+    maybeClose (node:internal/child_process:1101:16)
+    ChildProcess._handle.onexit (node:internal/child_process:304:5)
+  ...
+# Subtest: tampered, missing, incompatible and unqualified bytes block dispatch; legacy records are not silently pinned
+not ok 223 - tampered, missing, incompatible and unqualified bytes block dispatch; legacy records are not silently pinned
+  ---
+  duration_ms: 7108.16839
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/releases.test.mjs:347:1'
+  failureType: 'testCodeFailure'
+  error: "Cannot read properties of null (reading 'pin')"
+  code: 'ERR_TEST_FAILURE'
+  name: 'TypeError'
+  stack: |-
+    Releases.attach (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/releases.mjs:421:15)
+    attach (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/releases.test.mjs:76:37)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/releases.test.mjs:361:20)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: stale selection plans never start native work, while exclusive registry ownership preserves concurrent writers
+not ok 224 - stale selection plans never start native work, while exclusive registry ownership preserves concurrent writers
+  ---
+  duration_ms: 12152.189224
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/releases.test.mjs:405:1'
+  failureType: 'testCodeFailure'
+  error: 'Managed release: selection_changed_refresh_revision'
+  code: 'selection_changed_refresh_revision'
+  stack: |-
+    file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/releases.mjs:317:15
+    Releases.mutate (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/releases.mjs:190:28)
+    async Releases.check (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/releases.mjs:311:5)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/releases.test.mjs:416:3)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: read-only transient failures back off and succeed with durable reasons, times and budgets
+ok 225 - read-only transient failures back off and succeed with durable reasons, times and budgets
+  ---
+  duration_ms: 287.675451
+  type: 'test'
+  ...
+# Subtest: attempt, elapsed and delay caps stop automatic retries rather than shrinking a server cooldown
+ok 226 - attempt, elapsed and delay caps stop automatic retries rather than shrinking a server cooldown
+  ---
+  duration_ms: 370.003944
+  type: 'test'
+  ...
+# Subtest: a successful external send with a lost response is reconciled once and never sent twice
+ok 227 - a successful external send with a lost response is reconciled once and never sent twice
+  ---
+  duration_ms: 139.33285
+  type: 'test'
+  ...
+# Subtest: an actual disposable Git commit is not duplicated after its response is lost
+ok 228 - an actual disposable Git commit is not duplicated after its response is lost
+  ---
+  duration_ms: 141.206001
+  type: 'test'
+  ...
+# Subtest: authoritative final not-applied permits a bounded retry, while missing or mismatched reconciliation stops
+ok 229 - authoritative final not-applied permits a bounded retry, while missing or mismatched reconciliation stops
+  ---
+  duration_ms: 426.500617
+  type: 'test'
+  ...
+# Subtest: auth denial, permanent rejection and arbitrary secret peer errors are never transient retry signals
+ok 230 - auth denial, permanent rejection and arbitrary secret peer errors are never transient retry signals
+  ---
+  duration_ms: 212.540046
+  type: 'test'
+  ...
+# Subtest: authority is checked after preparation and again after backoff, with no scope expansion
+ok 231 - authority is checked after preparation and again after backoff, with no scope expansion
+  ---
+  duration_ms: 184.421702
+  type: 'test'
+  ...
+# Subtest: an in-flight deadline stops new attempts, aborts cooperatively and ignores a late response
+ok 232 - an in-flight deadline stops new attempts, aborts cooperatively and ignores a late response
+  ---
+  duration_ms: 2541.40073
+  type: 'test'
+  ...
+# Subtest: a deadline consumed by durable persistence prevents preparation and reconciliation callbacks
+ok 233 - a deadline consumed by durable persistence prevents preparation and reconciliation callbacks
+  ---
+  duration_ms: 132.762979
+  type: 'test'
+  ...
+# Subtest: CLI retry flags cannot silently enable another command or change the operation effect catalog
+ok 234 - CLI retry flags cannot silently enable another command or change the operation effect catalog
+  ---
+  duration_ms: 901.579919
+  type: 'test'
+  ...
+# Subtest: corrupt records, ID collisions and surviving locks refuse mutation and allow safe read-only diagnosis
+ok 235 - corrupt records, ID collisions and surviving locks refuse mutation and allow safe read-only diagnosis
+  ---
+  duration_ms: 77.708177
+  type: 'test'
+  ...
+# Subtest: original CLI version retry uses actual bounded children and persistent inspection without profile boot
+ok 236 - original CLI version retry uses actual bounded children and persistent inspection without profile boot
+  ---
+  duration_ms: 2827.907408
+  type: 'test'
+  ...
+# Subtest: run FSM persists rejected transitions and separates browser connection from process state
+ok 237 - run FSM persists rejected transitions and separates browser connection from process state
+  ---
+  duration_ms: 365.678621
+  type: 'test'
+  ...
+# Subtest: alive, gone, PID reuse and unavailable process facts have distinct conservative results
+ok 238 - alive, gone, PID reuse and unavailable process facts have distinct conservative results
+  ---
+  duration_ms: 332.320622
+  type: 'test'
+  ...
+# Subtest: native OS observation identifies an owned live process and then its exit without signalling other PIDs
+ok 239 - native OS observation identifies an owned live process and then its exit without signalling other PIDs
+  ---
+  duration_ms: 14.637985
+  type: 'test'
+  ...
+# Subtest: hard exits around intent and ack recover committed events without replaying a fixture side effect
+    # Subtest: before-write
+    ok 1 - before-write
+      ---
+      duration_ms: 937.235776
+      type: 'test'
+      ...
+    # Subtest: after-write
+    ok 2 - after-write
+      ---
+      duration_ms: 824.047081
+      type: 'test'
+      ...
+    # Subtest: before-ack
+    ok 3 - before-ack
+      ---
+      duration_ms: 764.692102
+      type: 'test'
+      ...
+    # Subtest: after-ack
+    ok 4 - after-ack
+      ---
+      duration_ms: 852.343517
+      type: 'test'
+      ...
+    1..4
+ok 240 - hard exits around intent and ack recover committed events without replaying a fixture side effect
+  ---
+  duration_ms: 3379.507183
+  type: 'test'
+  ...
+# Subtest: a torn final frame retains the committed prefix, exposes uncertainty and refuses to overwrite it
+ok 241 - a torn final frame retains the committed prefix, exposes uncertainty and refuses to overwrite it
+  ---
+  duration_ms: 166.325535
+  type: 'test'
+  ...
+# Subtest: a dead writer lock permits read-only restoration but is never silently stolen
+ok 242 - a dead writer lock permits read-only restoration but is never silently stolen
+  ---
+  duration_ms: 136.558105
+  type: 'test'
+  ...
+# Subtest: corrupt, foreign-project and unknown-schema histories are preserved and rejected
+ok 243 - corrupt, foreign-project and unknown-schema histories are preserved and rejected
+  ---
+  duration_ms: 32.454051
+  type: 'test'
+  ...
+# Subtest: command IDs are unique, simultaneous local writes serialize and no prompt or credential is stored
+ok 244 - command IDs are unique, simultaneous local writes serialize and no prompt or credential is stored
+  ---
+  duration_ms: 139.739022
+  type: 'test'
+  ...
+# Subtest: tracked attachment persists command and native ack IDs and stops once despite duplicate stop requests
+not ok 245 - tracked attachment persists command and native ack IDs and stops once despite duplicate stop requests
+  ---
+  duration_ms: 275.33788
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/run-history.test.mjs:494:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/run-history.test.mjs:496:20)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: a live or unverifiable recorded process blocks duplicate resume before a second ACP session starts
+not ok 246 - a live or unverifiable recorded process blocks duplicate resume before a second ACP session starts
+  ---
+  duration_ms: 282.180999
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/run-history.test.mjs:553:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/run-history.test.mjs:555:17)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: cancel notifications remain unacknowledged while the actual cancelled prompt result is recorded
+not ok 247 - cancel notifications remain unacknowledged while the actual cancelled prompt result is recorded
+  ---
+  duration_ms: 282.213651
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/run-history.test.mjs:581:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/run-history.test.mjs:583:20)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: journal failures block new profile boot yet still allow cleanup of an already owned child
+not ok 248 - journal failures block new profile boot yet still allow cleanup of an already owned child
+  ---
+  duration_ms: 270.100325
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/run-history.test.mjs:619:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/run-history.test.mjs:634:20)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: same task and display label preserve distinct project/run/native-session identities
+ok 249 - same task and display label preserve distinct project/run/native-session identities
+  ---
+  duration_ms: 204.317957
+  type: 'test'
+  ...
+# Subtest: unconfirmed IDs and unavailable launch/provider facts stay explicitly unknown
+ok 250 - unconfirmed IDs and unavailable launch/provider facts stay explicitly unknown
+  ---
+  duration_ms: 36.600991
+  type: 'test'
+  ...
+# Subtest: incompatible or malformed disk state is never overwritten or shown as a valid registry
+ok 251 - incompatible or malformed disk state is never overwritten or shown as a valid registry
+  ---
+  duration_ms: 33.896279
+  type: 'test'
+  ...
+# Subtest: separate writers share an exclusive lock and reload the last durable revision
+ok 252 - separate writers share an exclusive lock and reload the last durable revision
+  ---
+  duration_ms: 76.588973
+  type: 'test'
+  ...
+# Subtest: separate public CLI processes start, resolve and resume the same stored native session
+not ok 253 - separate public CLI processes start, resolve and resume the same stored native session
+  ---
+  duration_ms: 969.375099
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/session-ledger.test.mjs:203:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Command failed: <user-home>/rdsh-issue52-wsl-qa-20261008.QuwQzC/node-v22.23.3-linux-x64/bin/node <user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/cli.mjs session-ledger start --project /tmp/rdsh-ledger-test-zJqNNe/project --executable <user-home>/rdsh-issue52-wsl-qa-20261008.QuwQzC/node-v22.23.3-linux-x64/bin/node --entrypoint <user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/fixtures/acp-cli.mjs --task-id task-42 --label 同じ画面
+    [rdsh-dashboard] Session ledger: cleanup_unconfirmed
+
+  code: 1
+  stack: |-
+    genericNodeError (node:internal/errors:983:15)
+    wrappedFn (node:internal/errors:537:14)
+    ChildProcess.exithandler (node:child_process:417:12)
+    ChildProcess.emit (node:events:519:28)
+    maybeClose (node:internal/child_process:1101:16)
+    ChildProcess._handle.onexit (node:internal/child_process:304:5)
+  ...
+# Subtest: resume rejects changed executable, home, branch and CLI version before claiming attachment
+not ok 254 - resume rejects changed executable, home, branch and CLI version before claiming attachment
+  ---
+  duration_ms: 339.796558
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/session-ledger.test.mjs:283:1'
+  failureType: 'testCodeFailure'
+  error: 'Session ledger: cleanup_unconfirmed'
+  code: 'cleanup_unconfirmed'
+  stack: |-
+    attachRecordedSession (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/session-ledger.mjs:672:13)
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/session-ledger.test.mjs:288:19)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: failed starts retain an unknown ID; failed resumes retain only the reported identity
+not ok 255 - failed starts retain an unknown ID; failed resumes retain only the reported identity
+  ---
+  duration_ms: 300.823914
+  type: 'test'
+  location: '<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/session-ledger.test.mjs:345:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The validation function is expected to return "true". Received false
+
+    Caught error:
+
+    Error: Session ledger: cleanup_unconfirmed
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  stack: |-
+    async TestContext.<anonymous> (file://<user-home>/rdsh-issue52-main-FYJZ0GI6/source/dashboard/test/session-ledger.test.mjs:347:3)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: confirmed native ID cannot be reassigned and labels are never shell or file authority
+ok 256 - confirmed native ID cannot be reassigned and labels are never shell or file authority
+  ---
+  duration_ms: 19.487784
+  type: 'test'
+  ...
+# Subtest: size limits preserve the last readable durable revision instead of writing an oversized ledger
+ok 257 - size limits preserve the last readable durable revision instead of writing an oversized ledger
+  ---
+  duration_ms: 120.592489
+  type: 'test'
+  ...
+# Subtest: unreadable Git context is distinct from a non-Git directory and cannot attach a native session
+ok 258 - unreadable Git context is distinct from a non-Git directory and cannot attach a native session
+  ---
+  duration_ms: 22.56039
+  type: 'test'
+  ...
+1..258
+# tests 262
+# suites 0
+# pass 187
+# fail 75
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 45810.431691

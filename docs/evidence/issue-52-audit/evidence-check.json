@@ -1,0 +1,19 @@
+{
+  "checked_at": "2026-10-08T07:13:54.976Z",
+  "source_sha": "ec5fbf7c7ee5342fe9952dc0da0097c887aa427e",
+  "pass": 28,
+  "not_run": 29,
+  "cells": 57,
+  "browser_observations": 59,
+  "checks": [
+    "All adopted mobile observations client375x844 (390px outer viewport)",
+    "Exact retained text and visible saved answers",
+    "Per-question phase POST and feedback counts",
+    "SSE revision display change and focus",
+    "Back navigation authenticated connection",
+    "Held submission remains locked through SSE",
+    "Received-before versus saved-after fault phases",
+    "Source module identity across Windows and WSL",
+    "Both Node22 suites 45 pass / 0 fail / 0 skip"
+  ]
+}

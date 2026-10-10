@@ -1,0 +1,1690 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>QA確認レポート — Project dashboard / DSH Harness</title>
+  <style>
+    :root { color-scheme: light; --bg: #f7f7f4; --card: #fff; --line: #deded8; --fg: #22231f; --mut: #62655c; --green: #39714d; --red: #a23828; }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body { margin: 0; color: var(--fg); background: var(--bg); font: 15px/1.6 system-ui, -apple-system, "Segoe UI", "Yu Gothic", sans-serif; }
+    main { max-width: 1600px; margin: auto; padding: 32px; }
+    h1 { margin: 4px 0 10px; font-size: 28px; letter-spacing: -.02em; }
+    h2 { font-size: 20px; margin: 0 0 14px; }
+    p { margin: 0 0 12px; }
+    .eyebrow { color: var(--mut); font-size: 12px; font-weight: 700; letter-spacing: .12em; }
+    .sub { color: var(--mut); font-size: 13px; }
+    .panel { padding: 22px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); margin-top: 22px; }
+    .target { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 18px; margin: 0; }
+    dt { color: var(--mut); font-weight: 600; }
+    dd { margin: 0; min-width: 0; }
+    code, pre, .case-id { font-family: ui-monospace, "Cascadia Code", monospace; font-size: 13px; }
+    code, dd, p, td { overflow-wrap: anywhere; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
+    .cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin: 18px 0; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 20px; }
+    .value { display: block; font-size: 32px; font-weight: 700; line-height: 1.4; }
+    .status { display: inline-block; border: 1px solid var(--line); border-radius: 6px; padding: 1px 8px; white-space: nowrap; font-size: 14px; }
+    .card .status { white-space: normal; overflow-wrap: anywhere; }
+    .pass { color: var(--green); background: #edf5ef; }
+    .fail { color: var(--red); background: #fff0eb; }
+    .blocked { color: #795115; background: #fff5df; }
+    .not-run { color: #585b53; background: #f1f2ef; }
+    .measurements { display: flex; flex-wrap: wrap; gap: 12px 32px; }
+    .measurements p { margin: 0; }
+    fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+    legend { font-size: 20px; font-weight: 700; padding: 0; margin-bottom: 14px; }
+    .filters { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+    label { display: block; color: var(--mut); font-size: 14px; }
+    select { display: block; width: 100%; min-width: 0; margin-top: 5px; padding: 9px; border: 1px solid var(--line); border-radius: 8px; color: var(--fg); background: white; font: inherit; }
+    button { padding: 9px 15px; border: 1px solid var(--green); border-radius: 8px; background: var(--green); color: white; font: inherit; cursor: pointer; }
+    button:hover { background: #2d5b3d; }
+    button:disabled { cursor: default; opacity: .55; }
+    button:focus-visible, select:focus-visible, a:focus-visible, summary:focus-visible, .table-box:focus-visible { outline: 3px solid #386ed6; outline-offset: 3px; }
+    .filter-footer { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; margin-top: 16px; }
+    .filter-footer p { margin: 0; }
+    .table-box { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: white; margin-top: 22px; }
+    table { border-collapse: collapse; width: 100%; min-width: 1120px; text-align: left; table-layout: fixed; }
+    caption { text-align: left; padding: 16px 18px; font-weight: 700; }
+    th, td { border-top: 1px solid var(--line); padding: 13px 16px; vertical-align: top; }
+    th { color: var(--mut); font-size: 14px; background: #fafaf8; }
+    th:nth-child(1) { width: 15%; } th:nth-child(2) { width: 12%; } th:nth-child(3) { width: 12%; } th:nth-child(4) { width: 10%; } th:nth-child(5) { width: 12%; } th:nth-child(6) { width: 12%; } th:nth-child(7) { width: 27%; }
+    .reason { white-space: pre-wrap; }
+    summary { cursor: pointer; color: var(--green); border-top: 1px solid var(--line); padding-top: 8px; }
+    .details-body { margin-top: 12px; }
+    .detail-list { margin: 0; }
+    .detail-list > dt { margin-top: 14px; }
+    .detail-list > dd { margin-top: 3px; white-space: pre-wrap; }
+    .environment { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px 10px; margin: 0; }
+    ul { padding-left: 20px; margin: 0; }
+    a { color: var(--green); text-underline-offset: 3px; }
+    .empty { padding: 22px; }
+    footer { margin-top: 20px; color: var(--mut); font-size: 13px; }
+    @media (max-width: 900px) { main { padding: 20px; } .filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 520px) { main { padding: 14px; } h1 { font-size: 24px; } .panel { padding: 16px; } .filters { grid-template-columns: minmax(0, 1fr); } .target { grid-template-columns: minmax(0, 1fr); gap: 2px; } .target dd { margin-bottom: 12px; } .cards { gap: 8px; } .card { padding: 12px; } }
+    @media print { main { padding: 0; } .filter-panel { display: none; } .table-box { overflow: visible; } table { min-width: 0; font-size: 10px; } th, td { padding: 6px; } .card { break-inside: avoid; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="eyebrow">QA REPORT / 検証記録</div>
+    <h1>Project dashboard / DSH Harness 確認レポート</h1>
+    <p class="sub">開発用のQAレポートです。対象版・接続経路・証拠の水準ごとに確認結果を記録します。</p>
+  </header>
+  <section class="panel" aria-labelledby="target-heading">
+    <h2 id="target-heading">対象版</h2>
+    <dl class="target">
+      <dt>Git SHA</dt><dd><code>ec5fbf7c7ee5342fe9952dc0da0097c887aa427e</code></dd>
+      <dt>作業ツリー</dt><dd>dirty: false — 記載SHAのcheckout</dd>
+      <dt>対象の補足</dt><dd>ec5fbf7を対象。ブラウザー起動時の576d5fa由来snapshotとec5fbf7の実行モジュール同一性はbrowser-source-provenance.jsonで照合。実ブラウザー27セル+自動API1セル。共有試行を含むため独立した28試行ではない。実機スマホ、Tailscale、DSH Harness、通常ランチャー起動は未確認。</dd>
+    </dl>
+  </section>
+  <section class="panel" aria-labelledby="scope-heading">
+    <h2 id="scope-heading">証拠の読み方</h2>
+    <p>fixtureはAPI・模擬環境の回帰確認、browserは実ブラウザーの操作確認、real-connectionは記載経路の実接続確認です。通常のログやfixtureの成功だけで、実ブラウザー・WSL・Tailscale・Phoneを確認済みにはできません。</p>
+    <p>mobile viewportはPCブラウザーの表示幅による確認です。実機Phoneの実接続とは区別し、実行環境を詳細に記録します。Project dashboardとDSH Harness Web UIは別の対象です。</p>
+    <p class="sub">確認済み（pass）には対象経路に必要な証拠を伴います。実施できず（blocked）と未実施（not-run）は未確認です。観測値の未取得を「消失なし」「重複0件」として扱いません。</p>
+  </section>
+  <section aria-labelledby="summary-heading">
+    <h2 id="summary-heading" style="margin-top:24px">全57セルの状態</h2>
+    <div class="cards"><div class="card"><span class="status pass">確認済み / pass</span><span class="value">28</span><span class="sub">セル</span></div><div class="card"><span class="status fail">不具合あり / fail</span><span class="value">0</span><span class="sub">セル</span></div><div class="card"><span class="status blocked">実施できず / blocked</span><span class="value">0</span><span class="sub">セル</span></div><div class="card"><span class="status not-run">未実施 / not-run</span><span class="value">29</span><span class="sub">セル</span></div></div>
+    <div class="panel measurements">
+      <p><strong>入力消失: 0セルで消失 / 27セルを観測</strong><br><span class="sub">未取得 30セル</span></p>
+      <p><strong>重複回答: 0セルで発生 / 27セルを観測</strong><br><span class="sub">未取得 30セル</span></p>
+      <p><strong>未確認: 29セル</strong><br><span class="sub">blocked + not-run</span></p>
+    </div>
+  </section>
+  <section class="panel filter-panel" aria-label="結果の絞り込み">
+    <fieldset id="filter-controls" disabled>
+      <legend>結果を絞り込む</legend>
+      <div class="filters">
+        <label for="status">状態<select id="status" name="status"><option value="">すべて</option><option value="unconfirmed">未確認（blocked + not-run）</option><option value="pass">確認済み / pass</option><option value="fail">不具合あり / fail</option><option value="blocked">実施できず / blocked</option><option value="not-run">未実施 / not-run</option></select></label>
+        <label for="device">端末<select id="device" name="device"><option value="">すべて</option><option value="desktop">PC</option><option value="mobile">Phone / mobile viewport</option><option value="none">端末なし（API）</option></select></label>
+        <label for="operation">操作<select id="operation" name="operation"><option value="">すべて</option><option value="answer">回答と結果確認</option><option value="keyboard">キーボード操作</option><option value="sse-draft">入力中のSSE更新</option><option value="reload">再読込</option><option value="back">戻る操作</option><option value="cancel">操作の取消</option><option value="double-submit">二度押し</option><option value="disconnect-before">受理前の切断</option><option value="disconnect-after">保存後の応答消失</option><option value="api-regression">既存API回帰</option><option value="harness-connect">別モードの実接続</option></select></label>
+        <label for="route">接続経路<select id="route" name="route"><option value="">すべて</option><option value="local">ローカルloopback</option><option value="wsl">WSL内サーバーへの接続</option><option value="tailscale">Tailscale Serve経由</option><option value="fixture">ローカルAPI fixture</option><option value="wsl-tailscale">WSL上のDSH + Tailscale Serve</option></select></label>
+        <label for="level">取得した証拠の水準<select id="level" name="level"><option value="">すべて</option><option value="fixture">fixture（API / 模擬）</option><option value="browser">browser（実ブラウザー）</option><option value="real-connection">real-connection（実接続）</option><option value="unrecorded">未取得</option></select></label>
+      </div>
+      <div class="filter-footer"><button id="reset-filters" type="button">すべて表示</button><p id="shown-count" role="status" aria-live="polite">57 / 57セルを表示</p><span class="sub">すべての条件を満たす結果を表示します。</span></div>
+    </fieldset>
+    <noscript><p>JavaScriptが無効なため絞り込みは使えません。未実施を含む全57セルを下に表示しています。</p></noscript>
+  </section>
+  <div class="table-box" role="region" aria-label="QA結果一覧。狭い画面では左右にスクロールできます" tabindex="0">
+    <table>
+      <caption>確認結果一覧 — 未実施を含む全経路（57セル）</caption>
+      <thead><tr><th scope="col">経路・端末・画面</th><th scope="col">対象機能</th><th scope="col">操作</th><th scope="col">状態</th><th scope="col">証拠の水準</th><th scope="col">実測値</th><th scope="col">理由・実施詳細</th></tr></thead>
+      <tbody><tr class="result-row" data-status="pass" data-device="desktop" data-operation="answer" data-route="local" data-level="browser">
+    <td><strong>ローカルloopback</strong><div class="sub">PC</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>回答と結果確認<div class="sub">入力: 任意（入力方法を限定しない基本回答）</div></td>
+    <td><span class="status pass">確認済み</span><div class="sub">pass</div></td>
+    <td>browser（実ブラウザー）</td>
+    <td>入力消失: なし<br>重複回答: 0件</td>
+    <td><p class="reason">保存済み本文が入力と一致。Q-sseの回答とkeyboardは同じ試行を2セルに記録。独立した2回の試験ではない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-desktop-local-answer</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>Node 22+、隔離したproject、実ブラウザー。mobile viewportは実機phoneと区別する。</dd>
+      <dt>確認手順</dt><dd>回答を送信し、画面の回答と耐久feedbackが1件であることを確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>browser（実ブラウザー）</dd>
+      <dt>実際に確認した経路</dt><dd>local</dd>
+      <dt>実施日時（UTC）</dt><dd><time datetime="2026-10-08T06:53:04.384Z">2026-10-08T06:53:04.384Z</time></dd>
+      <dt>実行環境</dt><dd><dl class="environment"><dt>os</dt><dd>Windows</dd><dt>node</dt><dd>22.23.3</dd><dt>browser</dt><dd>Codex in-app browser (Chromium系、版番号未取得)</dd><dt>device</dt><dd>desktop viewport (client 1265x720)</dd></dl></dd>
+      <dt>実行コマンド</dt><dd><pre>Windows: node dashboard/qa/fixture.mjs --directory &lt;isolated-parent&gt;; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop</pre></dd>
+      <dt>入力消失</dt><dd>なし</dd>
+      <dt>重複回答</dt><dd>0件</dd>
+      <dt>回答POST数</dt><dd>1件</dd>
+      <dt>耐久feedback件数</dt><dd>1件</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>保存済み本文が入力と一致。Q-sseの回答とkeyboardは同じ試行を2セルに記録。独立した2回の試験ではない。</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd><ul><li><a href="browser-checks.md">browser-checks.md</a></li><li><a href="browser-observations.json">browser-observations.json</a></li><li><a href="desktop-keyboard.json">desktop-keyboard.json</a></li><li><a href="desktop-answer-visible.jpg">desktop-answer-visible.jpg</a></li><li><a href="environment/browser-source-provenance.json">environment/browser-source-provenance.json</a></li></ul></dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="pass" data-device="desktop" data-operation="keyboard" data-route="local" data-level="browser">
+    <td><strong>ローカルloopback</strong><div class="sub">PC</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>キーボード操作<div class="sub">入力: keyboard</div></td>
+    <td><span class="status pass">確認済み</span><div class="sub">pass</div></td>
+    <td>browser（実ブラウザー）</td>
+    <td>入力消失: なし<br>重複回答: 0件</td>
+    <td><p class="reason">Tab4回→回答入力→Tab→Return。送信後フォーム消失に伴いfocusはBODY。Q-sseの回答とkeyboardは同じ試行を2セルに記録。独立した2回の試験ではない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-desktop-local-keyboard</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>Node 22+、隔離したproject、実ブラウザー。mobile viewportは実機phoneと区別する。</dd>
+      <dt>確認手順</dt><dd>マウスなしで回答欄へ移動・入力・送信し、結果とfocusを確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>browser（実ブラウザー）</dd>
+      <dt>実際に確認した経路</dt><dd>local</dd>
+      <dt>実施日時（UTC）</dt><dd><time datetime="2026-10-08T06:53:04.384Z">2026-10-08T06:53:04.384Z</time></dd>
+      <dt>実行環境</dt><dd><dl class="environment"><dt>os</dt><dd>Windows</dd><dt>node</dt><dd>22.23.3</dd><dt>browser</dt><dd>Codex in-app browser (Chromium系、版番号未取得)</dd><dt>device</dt><dd>desktop viewport (client 1265x720)</dd></dl></dd>
+      <dt>実行コマンド</dt><dd><pre>Windows: node dashboard/qa/fixture.mjs --directory &lt;isolated-parent&gt;; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop</pre></dd>
+      <dt>入力消失</dt><dd>なし</dd>
+      <dt>重複回答</dt><dd>0件</dd>
+      <dt>回答POST数</dt><dd>1件</dd>
+      <dt>耐久feedback件数</dt><dd>1件</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>Tab4回→回答入力→Tab→Return。送信後フォーム消失に伴いfocusはBODY。Q-sseの回答とkeyboardは同じ試行を2セルに記録。独立した2回の試験ではない。</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd><ul><li><a href="browser-checks.md">browser-checks.md</a></li><li><a href="browser-observations.json">browser-observations.json</a></li><li><a href="desktop-keyboard.json">desktop-keyboard.json</a></li><li><a href="desktop-answer-visible.jpg">desktop-answer-visible.jpg</a></li><li><a href="environment/browser-source-provenance.json">environment/browser-source-provenance.json</a></li></ul></dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="pass" data-device="desktop" data-operation="sse-draft" data-route="local" data-level="browser">
+    <td><strong>ローカルloopback</strong><div class="sub">PC</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>入力中のSSE更新<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status pass">確認済み</span><div class="sub">pass</div></td>
+    <td>browser（実ブラウザー）</td>
+    <td>入力消失: なし<br>重複回答: 0件</td>
+    <td><p class="reason">logによる更新後も日本語2行とTEXTAREA focusを保持。POST0、feedback0。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-desktop-local-sse-draft</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>Node 22+、隔離したproject、実ブラウザー。mobile viewportは実機phoneと区別する。</dd>
+      <dt>確認手順</dt><dd>回答下書きへfocusを置いて進捗を更新し、本文・focus・未送信を確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>browser（実ブラウザー）</dd>
+      <dt>実際に確認した経路</dt><dd>local</dd>
+      <dt>実施日時（UTC）</dt><dd><time datetime="2026-10-08T06:52:28.397Z">2026-10-08T06:52:28.397Z</time></dd>
+      <dt>実行環境</dt><dd><dl class="environment"><dt>os</dt><dd>Windows</dd><dt>node</dt><dd>22.23.3</dd><dt>browser</dt><dd>Codex in-app browser (Chromium系、版番号未取得)</dd><dt>device</dt><dd>desktop viewport (client 1265x720)</dd></dl></dd>
+      <dt>実行コマンド</dt><dd><pre>Windows: node dashboard/qa/fixture.mjs --directory &lt;isolated-parent&gt;; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop</pre></dd>
+      <dt>入力消失</dt><dd>なし</dd>
+      <dt>重複回答</dt><dd>0件</dd>
+      <dt>回答POST数</dt><dd>0件</dd>
+      <dt>耐久feedback件数</dt><dd>0件</dd>
+      <dt>Focus保持</dt><dd>保持</dd>
+      <dt>観測メモ</dt><dd>logによる更新後も日本語2行とTEXTAREA focusを保持。POST0、feedback0。</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd><ul><li><a href="browser-checks.md">browser-checks.md</a></li><li><a href="browser-observations.json">browser-observations.json</a></li><li><a href="desktop-unsent.json">desktop-unsent.json</a></li><li><a href="desktop-sse.jpg">desktop-sse.jpg</a></li><li><a href="environment/browser-source-provenance.json">environment/browser-source-provenance.json</a></li></ul></dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="pass" data-device="desktop" data-operation="reload" data-route="local" data-level="browser">
+    <td><strong>ローカルloopback</strong><div class="sub">PC</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>再読込<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status pass">確認済み</span><div class="sub">pass</div></td>
+    <td>browser（実ブラウザー）</td>
+    <td>入力消失: なし<br>重複回答: 0件</td>
+    <td><p class="reason">再読込後、未送信の日本語2行を復元。POST0、feedback0。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-desktop-local-reload</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>Node 22+、隔離したproject、実ブラウザー。mobile viewportは実機phoneと区別する。</dd>
+      <dt>確認手順</dt><dd>未送信の下書きを入力して再読込し、下書きの消失と回答の有無を記録する。</dd>
+      <dt>必要な証拠の水準</dt><dd>browser（実ブラウザー）</dd>
+      <dt>実際に確認した経路</dt><dd>local</dd>
+      <dt>実施日時（UTC）</dt><dd><time datetime="2026-10-08T06:52:28.525Z">2026-10-08T06:52:28.525Z</time></dd>
+      <dt>実行環境</dt><dd><dl class="environment"><dt>os</dt><dd>Windows</dd><dt>node</dt><dd>22.23.3</dd><dt>browser</dt><dd>Codex in-app browser (Chromium系、版番号未取得)</dd><dt>device</dt><dd>desktop viewport (client 1265x720)</dd></dl></dd>
+      <dt>実行コマンド</dt><dd><pre>Windows: node dashboard/qa/fixture.mjs --directory &lt;isolated-parent&gt;; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop</pre></dd>
+      <dt>入力消失</dt><dd>なし</dd>
+      <dt>重複回答</dt><dd>0件</dd>
+      <dt>回答POST数</dt><dd>0件</dd>
+      <dt>耐久feedback件数</dt><dd>0件</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>再読込後、未送信の日本語2行を復元。POST0、feedback0。</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd><ul><li><a href="browser-checks.md">browser-checks.md</a></li><li><a href="browser-observations.json">browser-observations.json</a></li><li><a href="desktop-unsent.json">desktop-unsent.json</a></li><li><a href="desktop-back.jpg">desktop-back.jpg</a></li><li><a href="environment/browser-source-provenance.json">environment/browser-source-provenance.json</a></li></ul></dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="pass" data-device="desktop" data-operation="back" data-route="local" data-level="browser">
+    <td><strong>ローカルloopback</strong><div class="sub">PC</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>戻る操作<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status pass">確認済み</span><div class="sub">pass</div></td>
+    <td>browser（実ブラウザー）</td>
+    <td>入力消失: なし<br>重複回答: 0件</td>
+    <td><p class="reason">about:blankへ移動し戻る。接続済み表示と未送信本文を復元。POST0、feedback0。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-desktop-local-back</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>Node 22+、隔離したproject、実ブラウザー。mobile viewportは実機phoneと区別する。</dd>
+      <dt>確認手順</dt><dd>未送信の下書きを入力して別ページへ移動し、戻った後の本文・回答・認証状態を確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>browser（実ブラウザー）</dd>
+      <dt>実際に確認した経路</dt><dd>local</dd>
+      <dt>実施日時（UTC）</dt><dd><time datetime="2026-10-08T06:52:28.598Z">2026-10-08T06:52:28.598Z</time></dd>
+      <dt>実行環境</dt><dd><dl class="environment"><dt>os</dt><dd>Windows</dd><dt>node</dt><dd>22.23.3</dd><dt>browser</dt><dd>Codex in-app browser (Chromium系、版番号未取得)</dd><dt>device</dt><dd>desktop viewport (client 1265x720)</dd></dl></dd>
+      <dt>実行コマンド</dt><dd><pre>Windows: node dashboard/qa/fixture.mjs --directory &lt;isolated-parent&gt;; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop</pre></dd>
+      <dt>入力消失</dt><dd>なし</dd>
+      <dt>重複回答</dt><dd>0件</dd>
+      <dt>回答POST数</dt><dd>0件</dd>
+      <dt>耐久feedback件数</dt><dd>0件</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>about:blankへ移動し戻る。接続済み表示と未送信本文を復元。POST0、feedback0。</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd><ul><li><a href="browser-checks.md">browser-checks.md</a></li><li><a href="browser-observations.json">browser-observations.json</a></li><li><a href="desktop-unsent.json">desktop-unsent.json</a></li><li><a href="desktop-back.jpg">desktop-back.jpg</a></li><li><a href="environment/browser-source-provenance.json">environment/browser-source-provenance.json</a></li></ul></dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="pass" data-device="desktop" data-operation="cancel" data-route="local" data-level="browser">
+    <td><strong>ローカルloopback</strong><div class="sub">PC</div><div class="sub">Project dashboard</div></td>
+    <td>コマンドパレットと回答下書き</td>
+    <td>操作の取消<div class="sub">入力: keyboard</div></td>
+    <td><span class="status pass">確認済み</span><div class="sub">pass</div></td>
+    <td>browser（実ブラウザー）</td>
+    <td>入力消失: なし<br>重複回答: 0件</td>
+    <td><p class="reason">Ctrl+Kでコマンドパレットを開きEscapeで閉じる。元の送信ボタンへfocus復帰、本文保持。質問取消/送信取消ではない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-desktop-local-cancel</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>Node 22+、隔離したproject、実ブラウザー。mobile viewportは実機phoneと区別する。</dd>
+      <dt>確認手順</dt><dd>回答下書きからコマンドパレットを開き、Escapeで閉じて本文・focus・未送信を確認する（質問取消ではない）。</dd>
+      <dt>必要な証拠の水準</dt><dd>browser（実ブラウザー）</dd>
+      <dt>実際に確認した経路</dt><dd>local</dd>
+      <dt>実施日時（UTC）</dt><dd><time datetime="2026-10-08T06:52:28.474Z">2026-10-08T06:52:28.474Z</time></dd>
+      <dt>実行環境</dt><dd><dl class="environment"><dt>os</dt><dd>Windows</dd><dt>node</dt><dd>22.23.3</dd><dt>browser</dt><dd>Codex in-app browser (Chromium系、版番号未取得)</dd><dt>device</dt><dd>desktop viewport (client 1265x720)</dd></dl></dd>
+      <dt>実行コマンド</dt><dd><pre>Windows: node dashboard/qa/fixture.mjs --directory &lt;isolated-parent&gt;; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop</pre></dd>
+      <dt>入力消失</dt><dd>なし</dd>
+      <dt>重複回答</dt><dd>0件</dd>
+      <dt>回答POST数</dt><dd>0件</dd>
+      <dt>耐久feedback件数</dt><dd>0件</dd>
+      <dt>Focus保持</dt><dd>保持</dd>
+      <dt>観測メモ</dt><dd>Ctrl+Kでコマンドパレットを開きEscapeで閉じる。元の送信ボタンへfocus復帰、本文保持。質問取消/送信取消ではない。</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd><ul><li><a href="browser-checks.md">browser-checks.md</a></li><li><a href="browser-observations.json">browser-observations.json</a></li><li><a href="desktop-unsent.json">desktop-unsent.json</a></li><li><a href="desktop-back.jpg">desktop-back.jpg</a></li><li><a href="environment/browser-source-provenance.json">environment/browser-source-provenance.json</a></li></ul></dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="pass" data-device="desktop" data-operation="double-submit" data-route="local" data-level="browser">
+    <td><strong>ローカルloopback</strong><div class="sub">PC</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>二度押し<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status pass">確認済み</span><div class="sub">pass</div></td>
+    <td>browser（実ブラウザー）</td>
+    <td>入力消失: なし<br>重複回答: 0件</td>
+    <td><p class="reason">hold中の二度押し後もPOST1。log/SSE後も本文readonlyと送信disabledを確認。release後feedback1。disabled要素へのツール操作は送出されない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-desktop-local-double-submit</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>Node 22+、隔離したproject、実ブラウザー。mobile viewportは実機phoneと区別する。</dd>
+      <dt>確認手順</dt><dd>送信を保留して二度押しし、SSE更新後の再送も試す。POST数と耐久回答件数を分けて記録する。</dd>
+      <dt>必要な証拠の水準</dt><dd>browser（実ブラウザー）</dd>
+      <dt>実際に確認した経路</dt><dd>local</dd>
+      <dt>実施日時（UTC）</dt><dd><time datetime="2026-10-08T06:55:35.991Z">2026-10-08T06:55:35.991Z</time></dd>
+      <dt>実行環境</dt><dd><dl class="environment"><dt>os</dt><dd>Windows</dd><dt>node</dt><dd>22.23.3</dd><dt>browser</dt><dd>Codex in-app browser (Chromium系、版番号未取得)</dd><dt>device</dt><dd>desktop viewport (client 1265x720)</dd></dl></dd>
+      <dt>実行コマンド</dt><dd><pre>Windows: node dashboard/qa/fixture.mjs --directory &lt;isolated-parent&gt;; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop</pre></dd>
+      <dt>入力消失</dt><dd>なし</dd>
+      <dt>重複回答</dt><dd>0件</dd>
+      <dt>回答POST数</dt><dd>1件</dd>
+      <dt>耐久feedback件数</dt><dd>1件</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>hold中の二度押し後もPOST1。log/SSE後も本文readonlyと送信disabledを確認。release後feedback1。disabled要素へのツール操作は送出されない。</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd><ul><li><a href="browser-checks.md">browser-checks.md</a></li><li><a href="browser-observations.json">browser-observations.json</a></li><li><a href="desktop-double.json">desktop-double.json</a></li><li><a href="desktop-double-sse.jpg">desktop-double-sse.jpg</a></li><li><a href="environment/browser-source-provenance.json">environment/browser-source-provenance.json</a></li><li><a href="desktop-held.json">desktop-held.json</a></li><li><a href="desktop-double-sse.jpg">desktop-double-sse.jpg</a></li></ul></dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="pass" data-device="desktop" data-operation="disconnect-before" data-route="local" data-level="browser">
+    <td><strong>ローカルloopback</strong><div class="sub">PC</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>受理前の切断<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status pass">確認済み</span><div class="sub">pass</div></td>
+    <td>browser（実ブラウザー）</td>
+    <td>入力消失: なし<br>重複回答: 0件</td>
+    <td><p class="reason">drop-before時の本文保持、feedback0を確認。resume後の手動再送でfeedback1。POST2のうち保存1。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-desktop-local-disconnect-before</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>Node 22+、隔離したproject、実ブラウザー。mobile viewportは実機phoneと区別する。</dd>
+      <dt>確認手順</dt><dd>次の回答をサーバーへ渡す前に接続を切る。下書きとfeedback 0件を確認し、再接続後の再送で1件になるか確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>browser（実ブラウザー）</dd>
+      <dt>実際に確認した経路</dt><dd>local</dd>
+      <dt>実施日時（UTC）</dt><dd><time datetime="2026-10-08T06:56:21.890Z">2026-10-08T06:56:21.890Z</time></dd>
+      <dt>実行環境</dt><dd><dl class="environment"><dt>os</dt><dd>Windows</dd><dt>node</dt><dd>22.23.3</dd><dt>browser</dt><dd>Codex in-app browser (Chromium系、版番号未取得)</dd><dt>device</dt><dd>desktop viewport (client 1265x720)</dd></dl></dd>
+      <dt>実行コマンド</dt><dd><pre>Windows: node dashboard/qa/fixture.mjs --directory &lt;isolated-parent&gt;; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop</pre></dd>
+      <dt>入力消失</dt><dd>なし</dd>
+      <dt>重複回答</dt><dd>0件</dd>
+      <dt>回答POST数</dt><dd>2件</dd>
+      <dt>耐久feedback件数</dt><dd>1件</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>drop-before時の本文保持、feedback0を確認。resume後の手動再送でfeedback1。POST2のうち保存1。</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd><ul><li><a href="browser-checks.md">browser-checks.md</a></li><li><a href="browser-observations.json">browser-observations.json</a></li><li><a href="desktop-before-final.json">desktop-before-final.json</a></li><li><a href="desktop-after-saved.jpg">desktop-after-saved.jpg</a></li><li><a href="environment/browser-source-provenance.json">environment/browser-source-provenance.json</a></li><li><a href="desktop-before-offline.json">desktop-before-offline.json</a></li><li><a href="desktop-before-offline.jpg">desktop-before-offline.jpg</a></li></ul></dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="pass" data-device="desktop" data-operation="disconnect-after" data-route="local" data-level="browser">
+    <td><strong>ローカルloopback</strong><div class="sub">PC</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>保存後の応答消失<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status pass">確認済み</span><div class="sub">pass</div></td>
+    <td>browser（実ブラウザー）</td>
+    <td>入力消失: なし<br>重複回答: 0件</td>
+    <td><p class="reason">drop-after時に本文保持とfeedback1、resume後の回答表示を確認。自動/手動再送なし、POST1/feedback1。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-desktop-local-disconnect-after</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>Node 22+、隔離したproject、実ブラウザー。mobile viewportは実機phoneと区別する。</dd>
+      <dt>確認手順</dt><dd>回答保存後に応答とSSEを失わせ、再接続後の回答表示・下書き・耐久回答件数を確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>browser（実ブラウザー）</dd>
+      <dt>実際に確認した経路</dt><dd>local</dd>
+      <dt>実施日時（UTC）</dt><dd><time datetime="2026-10-08T06:57:33.759Z">2026-10-08T06:57:33.759Z</time></dd>
+      <dt>実行環境</dt><dd><dl class="environment"><dt>os</dt><dd>Windows</dd><dt>node</dt><dd>22.23.3</dd><dt>browser</dt><dd>Codex in-app browser (Chromium系、版番号未取得)</dd><dt>device</dt><dd>desktop viewport (client 1265x720)</dd></dl></dd>
+      <dt>実行コマンド</dt><dd><pre>Windows: node dashboard/qa/fixture.mjs --directory &lt;isolated-parent&gt;; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop</pre></dd>
+      <dt>入力消失</dt><dd>なし</dd>
+      <dt>重複回答</dt><dd>0件</dd>
+      <dt>回答POST数</dt><dd>1件</dd>
+      <dt>耐久feedback件数</dt><dd>1件</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>drop-after時に本文保持とfeedback1、resume後の回答表示を確認。自動/手動再送なし、POST1/feedback1。</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd><ul><li><a href="browser-checks.md">browser-checks.md</a></li><li><a href="browser-observations.json">browser-observations.json</a></li><li><a href="desktop-final.json">desktop-final.json</a></li><li><a href="desktop-after-saved.jpg">desktop-after-saved.jpg</a></li><li><a href="environment/browser-source-provenance.json">environment/browser-source-provenance.json</a></li><li><a href="desktop-after-offline.json">desktop-after-offline.json</a></li><li><a href="desktop-after-offline.jpg">desktop-after-offline.jpg</a></li></ul></dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="pass" data-device="mobile" data-operation="answer" data-route="local" data-level="browser">
+    <td><strong>ローカルloopback</strong><div class="sub">Phone / mobile viewport</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>回答と結果確認<div class="sub">入力: 任意（入力方法を限定しない基本回答）</div></td>
+    <td><span class="status pass">確認済み</span><div class="sub">pass</div></td>
+    <td>browser（実ブラウザー）</td>
+    <td>入力消失: なし<br>重複回答: 0件</td>
+    <td><p class="reason">保存済み本文が入力と一致。Q-sseの回答とkeyboardは同じ試行を2セルに記録。独立した2回の試験ではない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-mobile-local-answer</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>Node 22+、隔離したproject、実ブラウザー。mobile viewportは実機phoneと区別する。</dd>
+      <dt>確認手順</dt><dd>回答を送信し、画面の回答と耐久feedbackが1件であることを確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>browser（実ブラウザー）</dd>
+      <dt>実際に確認した経路</dt><dd>local</dd>
+      <dt>実施日時（UTC）</dt><dd><time datetime="2026-10-08T07:08:31.436Z">2026-10-08T07:08:31.436Z</time></dd>
+      <dt>実行環境</dt><dd><dl class="environment"><dt>os</dt><dd>Windows</dd><dt>node</dt><dd>22.23.3</dd><dt>browser</dt><dd>Codex in-app browser (Chromium系、版番号未取得)</dd><dt>device</dt><dd>mobile viewport 390x844 (client 375x844); desktop pointer/keyboard, not physical-phone</dd></dl></dd>
+      <dt>実行コマンド</dt><dd><pre>Windows: node dashboard/qa/fixture.mjs --directory &lt;isolated-parent&gt;; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop</pre></dd>
+      <dt>入力消失</dt><dd>なし</dd>
+      <dt>重複回答</dt><dd>0件</dd>
+      <dt>回答POST数</dt><dd>1件</dd>
+      <dt>耐久feedback件数</dt><dd>1件</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>保存済み本文が入力と一致。Q-sseの回答とkeyboardは同じ試行を2セルに記録。独立した2回の試験ではない。</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd><ul><li><a href="browser-checks.md">browser-checks.md</a></li><li><a href="browser-observations.json">browser-observations.json</a></li><li><a href="mobile390-keyboard.json">mobile390-keyboard.json</a></li><li><a href="mobile390-answer-visible.jpg">mobile390-answer-visible.jpg</a></li><li><a href="environment/browser-source-provenance.json">environment/browser-source-provenance.json</a></li></ul></dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="pass" data-device="mobile" data-operation="keyboard" data-route="local" data-level="browser">
+    <td><strong>ローカルloopback</strong><div class="sub">Phone / mobile viewport</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>キーボード操作<div class="sub">入力: keyboard</div></td>
+    <td><span class="status pass">確認済み</span><div class="sub">pass</div></td>
+    <td>browser（実ブラウザー）</td>
+    <td>入力消失: なし<br>重複回答: 0件</td>
+    <td><p class="reason">Tab4回→回答入力→Tab→Return。送信後フォーム消失に伴いfocusはBODY。Q-sseの回答とkeyboardは同じ試行を2セルに記録。独立した2回の試験ではない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-mobile-local-keyboard</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>Node 22+、隔離したproject、実ブラウザー。mobile viewportは実機phoneと区別する。</dd>
+      <dt>確認手順</dt><dd>マウスなしで回答欄へ移動・入力・送信し、結果とfocusを確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>browser（実ブラウザー）</dd>
+      <dt>実際に確認した経路</dt><dd>local</dd>
+      <dt>実施日時（UTC）</dt><dd><time datetime="2026-10-08T07:08:31.436Z">2026-10-08T07:08:31.436Z</time></dd>
+      <dt>実行環境</dt><dd><dl class="environment"><dt>os</dt><dd>Windows</dd><dt>node</dt><dd>22.23.3</dd><dt>browser</dt><dd>Codex in-app browser (Chromium系、版番号未取得)</dd><dt>device</dt><dd>mobile viewport 390x844 (client 375x844); desktop pointer/keyboard, not physical-phone</dd></dl></dd>
+      <dt>実行コマンド</dt><dd><pre>Windows: node dashboard/qa/fixture.mjs --directory &lt;isolated-parent&gt;; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop</pre></dd>
+      <dt>入力消失</dt><dd>なし</dd>
+      <dt>重複回答</dt><dd>0件</dd>
+      <dt>回答POST数</dt><dd>1件</dd>
+      <dt>耐久feedback件数</dt><dd>1件</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>Tab4回→回答入力→Tab→Return。送信後フォーム消失に伴いfocusはBODY。Q-sseの回答とkeyboardは同じ試行を2セルに記録。独立した2回の試験ではない。</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd><ul><li><a href="browser-checks.md">browser-checks.md</a></li><li><a href="browser-observations.json">browser-observations.json</a></li><li><a href="mobile390-keyboard.json">mobile390-keyboard.json</a></li><li><a href="mobile390-answer-visible.jpg">mobile390-answer-visible.jpg</a></li><li><a href="environment/browser-source-provenance.json">environment/browser-source-provenance.json</a></li></ul></dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="pass" data-device="mobile" data-operation="sse-draft" data-route="local" data-level="browser">
+    <td><strong>ローカルloopback</strong><div class="sub">Phone / mobile viewport</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>入力中のSSE更新<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status pass">確認済み</span><div class="sub">pass</div></td>
+    <td>browser（実ブラウザー）</td>
+    <td>入力消失: なし<br>重複回答: 0件</td>
+    <td><p class="reason">logによる更新後も日本語2行とTEXTAREA focusを保持。POST0、feedback0。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-mobile-local-sse-draft</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>Node 22+、隔離したproject、実ブラウザー。mobile viewportは実機phoneと区別する。</dd>
+      <dt>確認手順</dt><dd>回答下書きへfocusを置いて進捗を更新し、本文・focus・未送信を確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>browser（実ブラウザー）</dd>
+      <dt>実際に確認した経路</dt><dd>local</dd>
+      <dt>実施日時（UTC）</dt><dd><time datetime="2026-10-08T07:08:18.446Z">2026-10-08T07:08:18.446Z</time></dd>
+      <dt>実行環境</dt><dd><dl class="environment"><dt>os</dt><dd>Windows</dd><dt>node</dt><dd>22.23.3</dd><dt>browser</dt><dd>Codex in-app browser (Chromium系、版番号未取得)</dd><dt>device</dt><dd>mobile viewport 390x844 (client 375x844); desktop pointer/keyboard, not physical-phone</dd></dl></dd>
+      <dt>実行コマンド</dt><dd><pre>Windows: node dashboard/qa/fixture.mjs --directory &lt;isolated-parent&gt;; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop</pre></dd>
+      <dt>入力消失</dt><dd>なし</dd>
+      <dt>重複回答</dt><dd>0件</dd>
+      <dt>回答POST数</dt><dd>0件</dd>
+      <dt>耐久feedback件数</dt><dd>0件</dd>
+      <dt>Focus保持</dt><dd>保持</dd>
+      <dt>観測メモ</dt><dd>logによる更新後も日本語2行とTEXTAREA focusを保持。POST0、feedback0。</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd><ul><li><a href="browser-checks.md">browser-checks.md</a></li><li><a href="browser-observations.json">browser-observations.json</a></li><li><a href="mobile390-unsent.json">mobile390-unsent.json</a></li><li><a href="mobile390-sse.jpg">mobile390-sse.jpg</a></li><li><a href="environment/browser-source-provenance.json">environment/browser-source-provenance.json</a></li></ul></dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="pass" data-device="mobile" data-operation="reload" data-route="local" data-level="browser">
+    <td><strong>ローカルloopback</strong><div class="sub">Phone / mobile viewport</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>再読込<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status pass">確認済み</span><div class="sub">pass</div></td>
+    <td>browser（実ブラウザー）</td>
+    <td>入力消失: なし<br>重複回答: 0件</td>
+    <td><p class="reason">再読込後、未送信の日本語2行を復元。POST0、feedback0。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-mobile-local-reload</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>Node 22+、隔離したproject、実ブラウザー。mobile viewportは実機phoneと区別する。</dd>
+      <dt>確認手順</dt><dd>未送信の下書きを入力して再読込し、下書きの消失と回答の有無を記録する。</dd>
+      <dt>必要な証拠の水準</dt><dd>browser（実ブラウザー）</dd>
+      <dt>実際に確認した経路</dt><dd>local</dd>
+      <dt>実施日時（UTC）</dt><dd><time datetime="2026-10-08T07:08:18.587Z">2026-10-08T07:08:18.587Z</time></dd>
+      <dt>実行環境</dt><dd><dl class="environment"><dt>os</dt><dd>Windows</dd><dt>node</dt><dd>22.23.3</dd><dt>browser</dt><dd>Codex in-app browser (Chromium系、版番号未取得)</dd><dt>device</dt><dd>mobile viewport 390x844 (client 375x844); desktop pointer/keyboard, not physical-phone</dd></dl></dd>
+      <dt>実行コマンド</dt><dd><pre>Windows: node dashboard/qa/fixture.mjs --directory &lt;isolated-parent&gt;; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop</pre></dd>
+      <dt>入力消失</dt><dd>なし</dd>
+      <dt>重複回答</dt><dd>0件</dd>
+      <dt>回答POST数</dt><dd>0件</dd>
+      <dt>耐久feedback件数</dt><dd>0件</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>再読込後、未送信の日本語2行を復元。POST0、feedback0。</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd><ul><li><a href="browser-checks.md">browser-checks.md</a></li><li><a href="browser-observations.json">browser-observations.json</a></li><li><a href="mobile390-unsent.json">mobile390-unsent.json</a></li><li><a href="mobile390-reload.jpg">mobile390-reload.jpg</a></li><li><a href="environment/browser-source-provenance.json">environment/browser-source-provenance.json</a></li></ul></dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="pass" data-device="mobile" data-operation="back" data-route="local" data-level="browser">
+    <td><strong>ローカルloopback</strong><div class="sub">Phone / mobile viewport</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>戻る操作<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status pass">確認済み</span><div class="sub">pass</div></td>
+    <td>browser（実ブラウザー）</td>
+    <td>入力消失: なし<br>重複回答: 0件</td>
+    <td><p class="reason">about:blankへ移動し戻る。接続済み表示と未送信本文を復元。POST0、feedback0。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-mobile-local-back</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>Node 22+、隔離したproject、実ブラウザー。mobile viewportは実機phoneと区別する。</dd>
+      <dt>確認手順</dt><dd>未送信の下書きを入力して別ページへ移動し、戻った後の本文・回答・認証状態を確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>browser（実ブラウザー）</dd>
+      <dt>実際に確認した経路</dt><dd>local</dd>
+      <dt>実施日時（UTC）</dt><dd><time datetime="2026-10-08T07:08:18.675Z">2026-10-08T07:08:18.675Z</time></dd>
+      <dt>実行環境</dt><dd><dl class="environment"><dt>os</dt><dd>Windows</dd><dt>node</dt><dd>22.23.3</dd><dt>browser</dt><dd>Codex in-app browser (Chromium系、版番号未取得)</dd><dt>device</dt><dd>mobile viewport 390x844 (client 375x844); desktop pointer/keyboard, not physical-phone</dd></dl></dd>
+      <dt>実行コマンド</dt><dd><pre>Windows: node dashboard/qa/fixture.mjs --directory &lt;isolated-parent&gt;; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop</pre></dd>
+      <dt>入力消失</dt><dd>なし</dd>
+      <dt>重複回答</dt><dd>0件</dd>
+      <dt>回答POST数</dt><dd>0件</dd>
+      <dt>耐久feedback件数</dt><dd>0件</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>about:blankへ移動し戻る。接続済み表示と未送信本文を復元。POST0、feedback0。</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd><ul><li><a href="browser-checks.md">browser-checks.md</a></li><li><a href="browser-observations.json">browser-observations.json</a></li><li><a href="mobile390-unsent.json">mobile390-unsent.json</a></li><li><a href="mobile390-back.jpg">mobile390-back.jpg</a></li><li><a href="environment/browser-source-provenance.json">environment/browser-source-provenance.json</a></li></ul></dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="pass" data-device="mobile" data-operation="cancel" data-route="local" data-level="browser">
+    <td><strong>ローカルloopback</strong><div class="sub">Phone / mobile viewport</div><div class="sub">Project dashboard</div></td>
+    <td>コマンドパレットと回答下書き</td>
+    <td>操作の取消<div class="sub">入力: keyboard</div></td>
+    <td><span class="status pass">確認済み</span><div class="sub">pass</div></td>
+    <td>browser（実ブラウザー）</td>
+    <td>入力消失: なし<br>重複回答: 0件</td>
+    <td><p class="reason">Ctrl+Kでコマンドパレットを開きEscapeで閉じる。元の送信ボタンへfocus復帰、本文保持。質問取消/送信取消ではない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-mobile-local-cancel</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>Node 22+、隔離したproject、実ブラウザー。mobile viewportは実機phoneと区別する。</dd>
+      <dt>確認手順</dt><dd>回答下書きからコマンドパレットを開き、Escapeで閉じて本文・focus・未送信を確認する（質問取消ではない）。</dd>
+      <dt>必要な証拠の水準</dt><dd>browser（実ブラウザー）</dd>
+      <dt>実際に確認した経路</dt><dd>local</dd>
+      <dt>実施日時（UTC）</dt><dd><time datetime="2026-10-08T07:08:18.519Z">2026-10-08T07:08:18.519Z</time></dd>
+      <dt>実行環境</dt><dd><dl class="environment"><dt>os</dt><dd>Windows</dd><dt>node</dt><dd>22.23.3</dd><dt>browser</dt><dd>Codex in-app browser (Chromium系、版番号未取得)</dd><dt>device</dt><dd>mobile viewport 390x844 (client 375x844); desktop pointer/keyboard, not physical-phone</dd></dl></dd>
+      <dt>実行コマンド</dt><dd><pre>Windows: node dashboard/qa/fixture.mjs --directory &lt;isolated-parent&gt;; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop</pre></dd>
+      <dt>入力消失</dt><dd>なし</dd>
+      <dt>重複回答</dt><dd>0件</dd>
+      <dt>回答POST数</dt><dd>0件</dd>
+      <dt>耐久feedback件数</dt><dd>0件</dd>
+      <dt>Focus保持</dt><dd>保持</dd>
+      <dt>観測メモ</dt><dd>Ctrl+Kでコマンドパレットを開きEscapeで閉じる。元の送信ボタンへfocus復帰、本文保持。質問取消/送信取消ではない。</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd><ul><li><a href="browser-checks.md">browser-checks.md</a></li><li><a href="browser-observations.json">browser-observations.json</a></li><li><a href="mobile390-unsent.json">mobile390-unsent.json</a></li><li><a href="mobile390-cancel.jpg">mobile390-cancel.jpg</a></li><li><a href="environment/browser-source-provenance.json">environment/browser-source-provenance.json</a></li></ul></dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="pass" data-device="mobile" data-operation="double-submit" data-route="local" data-level="browser">
+    <td><strong>ローカルloopback</strong><div class="sub">Phone / mobile viewport</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>二度押し<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status pass">確認済み</span><div class="sub">pass</div></td>
+    <td>browser（実ブラウザー）</td>
+    <td>入力消失: なし<br>重複回答: 0件</td>
+    <td><p class="reason">hold中の二度押し後もPOST1。log/SSE後も本文readonlyと送信disabledを確認。release後feedback1。disabled要素へのツール操作は送出されない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-mobile-local-double-submit</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>Node 22+、隔離したproject、実ブラウザー。mobile viewportは実機phoneと区別する。</dd>
+      <dt>確認手順</dt><dd>送信を保留して二度押しし、SSE更新後の再送も試す。POST数と耐久回答件数を分けて記録する。</dd>
+      <dt>必要な証拠の水準</dt><dd>browser（実ブラウザー）</dd>
+      <dt>実際に確認した経路</dt><dd>local</dd>
+      <dt>実施日時（UTC）</dt><dd><time datetime="2026-10-08T07:09:19.517Z">2026-10-08T07:09:19.517Z</time></dd>
+      <dt>実行環境</dt><dd><dl class="environment"><dt>os</dt><dd>Windows</dd><dt>node</dt><dd>22.23.3</dd><dt>browser</dt><dd>Codex in-app browser (Chromium系、版番号未取得)</dd><dt>device</dt><dd>mobile viewport 390x844 (client 375x844); desktop pointer/keyboard, not physical-phone</dd></dl></dd>
+      <dt>実行コマンド</dt><dd><pre>Windows: node dashboard/qa/fixture.mjs --directory &lt;isolated-parent&gt;; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop</pre></dd>
+      <dt>入力消失</dt><dd>なし</dd>
+      <dt>重複回答</dt><dd>0件</dd>
+      <dt>回答POST数</dt><dd>1件</dd>
+      <dt>耐久feedback件数</dt><dd>1件</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>hold中の二度押し後もPOST1。log/SSE後も本文readonlyと送信disabledを確認。release後feedback1。disabled要素へのツール操作は送出されない。</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd><ul><li><a href="browser-checks.md">browser-checks.md</a></li><li><a href="browser-observations.json">browser-observations.json</a></li><li><a href="mobile390-double.json">mobile390-double.json</a></li><li><a href="mobile390-double-saved.jpg">mobile390-double-saved.jpg</a></li><li><a href="environment/browser-source-provenance.json">environment/browser-source-provenance.json</a></li><li><a href="mobile390-held.json">mobile390-held.json</a></li><li><a href="mobile390-double-sse.jpg">mobile390-double-sse.jpg</a></li></ul></dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="pass" data-device="mobile" data-operation="disconnect-before" data-route="local" data-level="browser">
+    <td><strong>ローカルloopback</strong><div class="sub">Phone / mobile viewport</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>受理前の切断<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status pass">確認済み</span><div class="sub">pass</div></td>
+    <td>browser（実ブラウザー）</td>
+    <td>入力消失: なし<br>重複回答: 0件</td>
+    <td><p class="reason">drop-before時の本文保持、feedback0を確認。resume後の手動再送でfeedback1。POST2のうち保存1。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-mobile-local-disconnect-before</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>Node 22+、隔離したproject、実ブラウザー。mobile viewportは実機phoneと区別する。</dd>
+      <dt>確認手順</dt><dd>次の回答をサーバーへ渡す前に接続を切る。下書きとfeedback 0件を確認し、再接続後の再送で1件になるか確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>browser（実ブラウザー）</dd>
+      <dt>実際に確認した経路</dt><dd>local</dd>
+      <dt>実施日時（UTC）</dt><dd><time datetime="2026-10-08T07:09:32.340Z">2026-10-08T07:09:32.340Z</time></dd>
+      <dt>実行環境</dt><dd><dl class="environment"><dt>os</dt><dd>Windows</dd><dt>node</dt><dd>22.23.3</dd><dt>browser</dt><dd>Codex in-app browser (Chromium系、版番号未取得)</dd><dt>device</dt><dd>mobile viewport 390x844 (client 375x844); desktop pointer/keyboard, not physical-phone</dd></dl></dd>
+      <dt>実行コマンド</dt><dd><pre>Windows: node dashboard/qa/fixture.mjs --directory &lt;isolated-parent&gt;; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop</pre></dd>
+      <dt>入力消失</dt><dd>なし</dd>
+      <dt>重複回答</dt><dd>0件</dd>
+      <dt>回答POST数</dt><dd>2件</dd>
+      <dt>耐久feedback件数</dt><dd>1件</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>drop-before時の本文保持、feedback0を確認。resume後の手動再送でfeedback1。POST2のうち保存1。</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd><ul><li><a href="browser-checks.md">browser-checks.md</a></li><li><a href="browser-observations.json">browser-observations.json</a></li><li><a href="mobile390-before-final.json">mobile390-before-final.json</a></li><li><a href="mobile390-before-saved.jpg">mobile390-before-saved.jpg</a></li><li><a href="environment/browser-source-provenance.json">environment/browser-source-provenance.json</a></li><li><a href="mobile390-before-offline.json">mobile390-before-offline.json</a></li><li><a href="mobile390-before-offline.jpg">mobile390-before-offline.jpg</a></li></ul></dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="pass" data-device="mobile" data-operation="disconnect-after" data-route="local" data-level="browser">
+    <td><strong>ローカルloopback</strong><div class="sub">Phone / mobile viewport</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>保存後の応答消失<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status pass">確認済み</span><div class="sub">pass</div></td>
+    <td>browser（実ブラウザー）</td>
+    <td>入力消失: なし<br>重複回答: 0件</td>
+    <td><p class="reason">drop-after時に本文保持とfeedback1、resume後の回答表示を確認。自動/手動再送なし、POST1/feedback1。Q-navigationの再確認を採用。初回Q-afterの末尾文字差異は原因未確定のためこのセルの証拠に使わない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-mobile-local-disconnect-after</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>Node 22+、隔離したproject、実ブラウザー。mobile viewportは実機phoneと区別する。</dd>
+      <dt>確認手順</dt><dd>回答保存後に応答とSSEを失わせ、再接続後の回答表示・下書き・耐久回答件数を確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>browser（実ブラウザー）</dd>
+      <dt>実際に確認した経路</dt><dd>local</dd>
+      <dt>実施日時（UTC）</dt><dd><time datetime="2026-10-08T07:10:55.857Z">2026-10-08T07:10:55.857Z</time></dd>
+      <dt>実行環境</dt><dd><dl class="environment"><dt>os</dt><dd>Windows</dd><dt>node</dt><dd>22.23.3</dd><dt>browser</dt><dd>Codex in-app browser (Chromium系、版番号未取得)</dd><dt>device</dt><dd>mobile viewport 390x844 (client 375x844); desktop pointer/keyboard, not physical-phone</dd></dl></dd>
+      <dt>実行コマンド</dt><dd><pre>Windows: node dashboard/qa/fixture.mjs --directory &lt;isolated-parent&gt;; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop</pre></dd>
+      <dt>入力消失</dt><dd>なし</dd>
+      <dt>重複回答</dt><dd>0件</dd>
+      <dt>回答POST数</dt><dd>1件</dd>
+      <dt>耐久feedback件数</dt><dd>1件</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>drop-after時に本文保持とfeedback1、resume後の回答表示を確認。自動/手動再送なし、POST1/feedback1。Q-navigationの再確認を採用。初回Q-afterの末尾文字差異は原因未確定のためこのセルの証拠に使わない。</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd><ul><li><a href="browser-checks.md">browser-checks.md</a></li><li><a href="browser-observations.json">browser-observations.json</a></li><li><a href="mobile390-final.json">mobile390-final.json</a></li><li><a href="mobile390-after-recheck-saved.jpg">mobile390-after-recheck-saved.jpg</a></li><li><a href="environment/browser-source-provenance.json">environment/browser-source-provenance.json</a></li><li><a href="mobile390-after-recheck-offline.json">mobile390-after-recheck-offline.json</a></li><li><a href="mobile390-after-recheck-offline.jpg">mobile390-after-recheck-offline.jpg</a></li></ul></dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="pass" data-device="desktop" data-operation="answer" data-route="wsl" data-level="real-connection">
+    <td><strong>WSL内サーバーへの接続</strong><div class="sub">PC</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>回答と結果確認<div class="sub">入力: 任意（入力方法を限定しない基本回答）</div></td>
+    <td><span class="status pass">確認済み</span><div class="sub">pass</div></td>
+    <td>real-connection（実接続）</td>
+    <td>入力消失: なし<br>重複回答: 0件</td>
+    <td><p class="reason">保存済み本文が入力と一致。Q-sseの回答とkeyboardは同じ試行を2セルに記録。独立した2回の試験ではない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-desktop-wsl-answer</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>WSL内で起動した実サーバーへブラウザーから到達できる環境。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>回答を送信し、画面の回答と耐久feedbackが1件であることを確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>wsl</dd>
+      <dt>実施日時（UTC）</dt><dd><time datetime="2026-10-08T06:55:36.668Z">2026-10-08T06:55:36.668Z</time></dd>
+      <dt>実行環境</dt><dd><dl class="environment"><dt>os</dt><dd>WSL Ubuntu 24.04.4 LTS Linux x86_64 server / Windows browser</dd><dt>node</dt><dd>22.23.3</dd><dt>browser</dt><dd>Codex in-app browser (Chromium系、版番号未取得)</dd><dt>device</dt><dd>desktop viewport (client 1265x720)</dd></dl></dd>
+      <dt>実行コマンド</dt><dd><pre>WSL Ubuntu: node dashboard/qa/fixture.mjs --directory &lt;isolated-parent&gt;; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop</pre></dd>
+      <dt>入力消失</dt><dd>なし</dd>
+      <dt>重複回答</dt><dd>0件</dd>
+      <dt>回答POST数</dt><dd>1件</dd>
+      <dt>耐久feedback件数</dt><dd>1件</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>保存済み本文が入力と一致。Q-sseの回答とkeyboardは同じ試行を2セルに記録。独立した2回の試験ではない。</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd><ul><li><a href="browser-checks.md">browser-checks.md</a></li><li><a href="browser-observations.json">browser-observations.json</a></li><li><a href="wsl-keyboard.json">wsl-keyboard.json</a></li><li><a href="wsl-answer-visible.jpg">wsl-answer-visible.jpg</a></li><li><a href="environment/browser-source-provenance.json">environment/browser-source-provenance.json</a></li></ul></dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="pass" data-device="desktop" data-operation="keyboard" data-route="wsl" data-level="real-connection">
+    <td><strong>WSL内サーバーへの接続</strong><div class="sub">PC</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>キーボード操作<div class="sub">入力: keyboard</div></td>
+    <td><span class="status pass">確認済み</span><div class="sub">pass</div></td>
+    <td>real-connection（実接続）</td>
+    <td>入力消失: なし<br>重複回答: 0件</td>
+    <td><p class="reason">Tab4回→回答入力→Tab→Return。送信後フォーム消失に伴いfocusはBODY。Q-sseの回答とkeyboardは同じ試行を2セルに記録。独立した2回の試験ではない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-desktop-wsl-keyboard</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>WSL内で起動した実サーバーへブラウザーから到達できる環境。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>マウスなしで回答欄へ移動・入力・送信し、結果とfocusを確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>wsl</dd>
+      <dt>実施日時（UTC）</dt><dd><time datetime="2026-10-08T06:55:36.668Z">2026-10-08T06:55:36.668Z</time></dd>
+      <dt>実行環境</dt><dd><dl class="environment"><dt>os</dt><dd>WSL Ubuntu 24.04.4 LTS Linux x86_64 server / Windows browser</dd><dt>node</dt><dd>22.23.3</dd><dt>browser</dt><dd>Codex in-app browser (Chromium系、版番号未取得)</dd><dt>device</dt><dd>desktop viewport (client 1265x720)</dd></dl></dd>
+      <dt>実行コマンド</dt><dd><pre>WSL Ubuntu: node dashboard/qa/fixture.mjs --directory &lt;isolated-parent&gt;; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop</pre></dd>
+      <dt>入力消失</dt><dd>なし</dd>
+      <dt>重複回答</dt><dd>0件</dd>
+      <dt>回答POST数</dt><dd>1件</dd>
+      <dt>耐久feedback件数</dt><dd>1件</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>Tab4回→回答入力→Tab→Return。送信後フォーム消失に伴いfocusはBODY。Q-sseの回答とkeyboardは同じ試行を2セルに記録。独立した2回の試験ではない。</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd><ul><li><a href="browser-checks.md">browser-checks.md</a></li><li><a href="browser-observations.json">browser-observations.json</a></li><li><a href="wsl-keyboard.json">wsl-keyboard.json</a></li><li><a href="wsl-answer-visible.jpg">wsl-answer-visible.jpg</a></li><li><a href="environment/browser-source-provenance.json">environment/browser-source-provenance.json</a></li></ul></dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="pass" data-device="desktop" data-operation="sse-draft" data-route="wsl" data-level="real-connection">
+    <td><strong>WSL内サーバーへの接続</strong><div class="sub">PC</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>入力中のSSE更新<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status pass">確認済み</span><div class="sub">pass</div></td>
+    <td>real-connection（実接続）</td>
+    <td>入力消失: なし<br>重複回答: 0件</td>
+    <td><p class="reason">logによる更新後も日本語2行とTEXTAREA focusを保持。POST0、feedback0。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-desktop-wsl-sse-draft</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>WSL内で起動した実サーバーへブラウザーから到達できる環境。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>回答下書きへfocusを置いて進捗を更新し、本文・focus・未送信を確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>wsl</dd>
+      <dt>実施日時（UTC）</dt><dd><time datetime="2026-10-08T06:55:13.194Z">2026-10-08T06:55:13.194Z</time></dd>
+      <dt>実行環境</dt><dd><dl class="environment"><dt>os</dt><dd>WSL Ubuntu 24.04.4 LTS Linux x86_64 server / Windows browser</dd><dt>node</dt><dd>22.23.3</dd><dt>browser</dt><dd>Codex in-app browser (Chromium系、版番号未取得)</dd><dt>device</dt><dd>desktop viewport (client 1265x720)</dd></dl></dd>
+      <dt>実行コマンド</dt><dd><pre>WSL Ubuntu: node dashboard/qa/fixture.mjs --directory &lt;isolated-parent&gt;; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop</pre></dd>
+      <dt>入力消失</dt><dd>なし</dd>
+      <dt>重複回答</dt><dd>0件</dd>
+      <dt>回答POST数</dt><dd>0件</dd>
+      <dt>耐久feedback件数</dt><dd>0件</dd>
+      <dt>Focus保持</dt><dd>保持</dd>
+      <dt>観測メモ</dt><dd>logによる更新後も日本語2行とTEXTAREA focusを保持。POST0、feedback0。</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd><ul><li><a href="browser-checks.md">browser-checks.md</a></li><li><a href="browser-observations.json">browser-observations.json</a></li><li><a href="wsl-unsent.json">wsl-unsent.json</a></li><li><a href="wsl-sse.jpg">wsl-sse.jpg</a></li><li><a href="environment/browser-source-provenance.json">environment/browser-source-provenance.json</a></li></ul></dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="pass" data-device="desktop" data-operation="reload" data-route="wsl" data-level="real-connection">
+    <td><strong>WSL内サーバーへの接続</strong><div class="sub">PC</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>再読込<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status pass">確認済み</span><div class="sub">pass</div></td>
+    <td>real-connection（実接続）</td>
+    <td>入力消失: なし<br>重複回答: 0件</td>
+    <td><p class="reason">再読込後、未送信の日本語2行を復元。POST0、feedback0。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-desktop-wsl-reload</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>WSL内で起動した実サーバーへブラウザーから到達できる環境。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>未送信の下書きを入力して再読込し、下書きの消失と回答の有無を記録する。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>wsl</dd>
+      <dt>実施日時（UTC）</dt><dd><time datetime="2026-10-08T06:55:13.340Z">2026-10-08T06:55:13.340Z</time></dd>
+      <dt>実行環境</dt><dd><dl class="environment"><dt>os</dt><dd>WSL Ubuntu 24.04.4 LTS Linux x86_64 server / Windows browser</dd><dt>node</dt><dd>22.23.3</dd><dt>browser</dt><dd>Codex in-app browser (Chromium系、版番号未取得)</dd><dt>device</dt><dd>desktop viewport (client 1265x720)</dd></dl></dd>
+      <dt>実行コマンド</dt><dd><pre>WSL Ubuntu: node dashboard/qa/fixture.mjs --directory &lt;isolated-parent&gt;; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop</pre></dd>
+      <dt>入力消失</dt><dd>なし</dd>
+      <dt>重複回答</dt><dd>0件</dd>
+      <dt>回答POST数</dt><dd>0件</dd>
+      <dt>耐久feedback件数</dt><dd>0件</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>再読込後、未送信の日本語2行を復元。POST0、feedback0。</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd><ul><li><a href="browser-checks.md">browser-checks.md</a></li><li><a href="browser-observations.json">browser-observations.json</a></li><li><a href="wsl-unsent.json">wsl-unsent.json</a></li><li><a href="wsl-back.jpg">wsl-back.jpg</a></li><li><a href="environment/browser-source-provenance.json">environment/browser-source-provenance.json</a></li></ul></dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="pass" data-device="desktop" data-operation="back" data-route="wsl" data-level="real-connection">
+    <td><strong>WSL内サーバーへの接続</strong><div class="sub">PC</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>戻る操作<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status pass">確認済み</span><div class="sub">pass</div></td>
+    <td>real-connection（実接続）</td>
+    <td>入力消失: なし<br>重複回答: 0件</td>
+    <td><p class="reason">about:blankへ移動し戻る。接続済み表示と未送信本文を復元。POST0、feedback0。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-desktop-wsl-back</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>WSL内で起動した実サーバーへブラウザーから到達できる環境。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>未送信の下書きを入力して別ページへ移動し、戻った後の本文・回答・認証状態を確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>wsl</dd>
+      <dt>実施日時（UTC）</dt><dd><time datetime="2026-10-08T06:55:13.432Z">2026-10-08T06:55:13.432Z</time></dd>
+      <dt>実行環境</dt><dd><dl class="environment"><dt>os</dt><dd>WSL Ubuntu 24.04.4 LTS Linux x86_64 server / Windows browser</dd><dt>node</dt><dd>22.23.3</dd><dt>browser</dt><dd>Codex in-app browser (Chromium系、版番号未取得)</dd><dt>device</dt><dd>desktop viewport (client 1265x720)</dd></dl></dd>
+      <dt>実行コマンド</dt><dd><pre>WSL Ubuntu: node dashboard/qa/fixture.mjs --directory &lt;isolated-parent&gt;; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop</pre></dd>
+      <dt>入力消失</dt><dd>なし</dd>
+      <dt>重複回答</dt><dd>0件</dd>
+      <dt>回答POST数</dt><dd>0件</dd>
+      <dt>耐久feedback件数</dt><dd>0件</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>about:blankへ移動し戻る。接続済み表示と未送信本文を復元。POST0、feedback0。</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd><ul><li><a href="browser-checks.md">browser-checks.md</a></li><li><a href="browser-observations.json">browser-observations.json</a></li><li><a href="wsl-unsent.json">wsl-unsent.json</a></li><li><a href="wsl-back.jpg">wsl-back.jpg</a></li><li><a href="environment/browser-source-provenance.json">environment/browser-source-provenance.json</a></li></ul></dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="pass" data-device="desktop" data-operation="cancel" data-route="wsl" data-level="real-connection">
+    <td><strong>WSL内サーバーへの接続</strong><div class="sub">PC</div><div class="sub">Project dashboard</div></td>
+    <td>コマンドパレットと回答下書き</td>
+    <td>操作の取消<div class="sub">入力: keyboard</div></td>
+    <td><span class="status pass">確認済み</span><div class="sub">pass</div></td>
+    <td>real-connection（実接続）</td>
+    <td>入力消失: なし<br>重複回答: 0件</td>
+    <td><p class="reason">Ctrl+Kでコマンドパレットを開きEscapeで閉じる。元の送信ボタンへfocus復帰、本文保持。質問取消/送信取消ではない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-desktop-wsl-cancel</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>WSL内で起動した実サーバーへブラウザーから到達できる環境。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>回答下書きからコマンドパレットを開き、Escapeで閉じて本文・focus・未送信を確認する（質問取消ではない）。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>wsl</dd>
+      <dt>実施日時（UTC）</dt><dd><time datetime="2026-10-08T06:55:13.276Z">2026-10-08T06:55:13.276Z</time></dd>
+      <dt>実行環境</dt><dd><dl class="environment"><dt>os</dt><dd>WSL Ubuntu 24.04.4 LTS Linux x86_64 server / Windows browser</dd><dt>node</dt><dd>22.23.3</dd><dt>browser</dt><dd>Codex in-app browser (Chromium系、版番号未取得)</dd><dt>device</dt><dd>desktop viewport (client 1265x720)</dd></dl></dd>
+      <dt>実行コマンド</dt><dd><pre>WSL Ubuntu: node dashboard/qa/fixture.mjs --directory &lt;isolated-parent&gt;; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop</pre></dd>
+      <dt>入力消失</dt><dd>なし</dd>
+      <dt>重複回答</dt><dd>0件</dd>
+      <dt>回答POST数</dt><dd>0件</dd>
+      <dt>耐久feedback件数</dt><dd>0件</dd>
+      <dt>Focus保持</dt><dd>保持</dd>
+      <dt>観測メモ</dt><dd>Ctrl+Kでコマンドパレットを開きEscapeで閉じる。元の送信ボタンへfocus復帰、本文保持。質問取消/送信取消ではない。</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd><ul><li><a href="browser-checks.md">browser-checks.md</a></li><li><a href="browser-observations.json">browser-observations.json</a></li><li><a href="wsl-unsent.json">wsl-unsent.json</a></li><li><a href="wsl-back.jpg">wsl-back.jpg</a></li><li><a href="environment/browser-source-provenance.json">environment/browser-source-provenance.json</a></li></ul></dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="pass" data-device="desktop" data-operation="double-submit" data-route="wsl" data-level="real-connection">
+    <td><strong>WSL内サーバーへの接続</strong><div class="sub">PC</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>二度押し<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status pass">確認済み</span><div class="sub">pass</div></td>
+    <td>real-connection（実接続）</td>
+    <td>入力消失: なし<br>重複回答: 0件</td>
+    <td><p class="reason">hold中の二度押し後もPOST1。log/SSE後も本文readonlyと送信disabledを確認。release後feedback1。disabled要素へのツール操作は送出されない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-desktop-wsl-double-submit</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>WSL内で起動した実サーバーへブラウザーから到達できる環境。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>送信を保留して二度押しし、SSE更新後の再送も試す。POST数と耐久回答件数を分けて記録する。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>wsl</dd>
+      <dt>実施日時（UTC）</dt><dd><time datetime="2026-10-08T06:57:33.795Z">2026-10-08T06:57:33.795Z</time></dd>
+      <dt>実行環境</dt><dd><dl class="environment"><dt>os</dt><dd>WSL Ubuntu 24.04.4 LTS Linux x86_64 server / Windows browser</dd><dt>node</dt><dd>22.23.3</dd><dt>browser</dt><dd>Codex in-app browser (Chromium系、版番号未取得)</dd><dt>device</dt><dd>desktop viewport (client 1265x720)</dd></dl></dd>
+      <dt>実行コマンド</dt><dd><pre>WSL Ubuntu: node dashboard/qa/fixture.mjs --directory &lt;isolated-parent&gt;; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop</pre></dd>
+      <dt>入力消失</dt><dd>なし</dd>
+      <dt>重複回答</dt><dd>0件</dd>
+      <dt>回答POST数</dt><dd>1件</dd>
+      <dt>耐久feedback件数</dt><dd>1件</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>hold中の二度押し後もPOST1。log/SSE後も本文readonlyと送信disabledを確認。release後feedback1。disabled要素へのツール操作は送出されない。</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd><ul><li><a href="browser-checks.md">browser-checks.md</a></li><li><a href="browser-observations.json">browser-observations.json</a></li><li><a href="wsl-double.json">wsl-double.json</a></li><li><a href="wsl-double-sse.jpg">wsl-double-sse.jpg</a></li><li><a href="environment/browser-source-provenance.json">environment/browser-source-provenance.json</a></li><li><a href="wsl-held.json">wsl-held.json</a></li><li><a href="wsl-double-sse.jpg">wsl-double-sse.jpg</a></li></ul></dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="pass" data-device="desktop" data-operation="disconnect-before" data-route="wsl" data-level="real-connection">
+    <td><strong>WSL内サーバーへの接続</strong><div class="sub">PC</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>受理前の切断<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status pass">確認済み</span><div class="sub">pass</div></td>
+    <td>real-connection（実接続）</td>
+    <td>入力消失: なし<br>重複回答: 0件</td>
+    <td><p class="reason">drop-before時の本文保持、feedback0を確認。resume後の手動再送でfeedback1。POST2のうち保存1。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-desktop-wsl-disconnect-before</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>WSL内で起動した実サーバーへブラウザーから到達できる環境。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>次の回答をサーバーへ渡す前に接続を切る。下書きとfeedback 0件を確認し、再接続後の再送で1件になるか確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>wsl</dd>
+      <dt>実施日時（UTC）</dt><dd><time datetime="2026-10-08T07:01:58.460Z">2026-10-08T07:01:58.460Z</time></dd>
+      <dt>実行環境</dt><dd><dl class="environment"><dt>os</dt><dd>WSL Ubuntu 24.04.4 LTS Linux x86_64 server / Windows browser</dd><dt>node</dt><dd>22.23.3</dd><dt>browser</dt><dd>Codex in-app browser (Chromium系、版番号未取得)</dd><dt>device</dt><dd>desktop viewport (client 1265x720)</dd></dl></dd>
+      <dt>実行コマンド</dt><dd><pre>WSL Ubuntu: node dashboard/qa/fixture.mjs --directory &lt;isolated-parent&gt;; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop</pre></dd>
+      <dt>入力消失</dt><dd>なし</dd>
+      <dt>重複回答</dt><dd>0件</dd>
+      <dt>回答POST数</dt><dd>2件</dd>
+      <dt>耐久feedback件数</dt><dd>1件</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>drop-before時の本文保持、feedback0を確認。resume後の手動再送でfeedback1。POST2のうち保存1。</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd><ul><li><a href="browser-checks.md">browser-checks.md</a></li><li><a href="browser-observations.json">browser-observations.json</a></li><li><a href="wsl-before-final.json">wsl-before-final.json</a></li><li><a href="wsl-before-saved.jpg">wsl-before-saved.jpg</a></li><li><a href="environment/browser-source-provenance.json">environment/browser-source-provenance.json</a></li><li><a href="wsl-before-offline.json">wsl-before-offline.json</a></li><li><a href="wsl-before-offline.jpg">wsl-before-offline.jpg</a></li></ul></dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="pass" data-device="desktop" data-operation="disconnect-after" data-route="wsl" data-level="real-connection">
+    <td><strong>WSL内サーバーへの接続</strong><div class="sub">PC</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>保存後の応答消失<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status pass">確認済み</span><div class="sub">pass</div></td>
+    <td>real-connection（実接続）</td>
+    <td>入力消失: なし<br>重複回答: 0件</td>
+    <td><p class="reason">drop-after時に本文保持とfeedback1、resume後の回答表示を確認。自動/手動再送なし、POST1/feedback1。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-desktop-wsl-disconnect-after</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>WSL内で起動した実サーバーへブラウザーから到達できる環境。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>回答保存後に応答とSSEを失わせ、再接続後の回答表示・下書き・耐久回答件数を確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>wsl</dd>
+      <dt>実施日時（UTC）</dt><dd><time datetime="2026-10-08T07:02:50.703Z">2026-10-08T07:02:50.703Z</time></dd>
+      <dt>実行環境</dt><dd><dl class="environment"><dt>os</dt><dd>WSL Ubuntu 24.04.4 LTS Linux x86_64 server / Windows browser</dd><dt>node</dt><dd>22.23.3</dd><dt>browser</dt><dd>Codex in-app browser (Chromium系、版番号未取得)</dd><dt>device</dt><dd>desktop viewport (client 1265x720)</dd></dl></dd>
+      <dt>実行コマンド</dt><dd><pre>WSL Ubuntu: node dashboard/qa/fixture.mjs --directory &lt;isolated-parent&gt;; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop</pre></dd>
+      <dt>入力消失</dt><dd>なし</dd>
+      <dt>重複回答</dt><dd>0件</dd>
+      <dt>回答POST数</dt><dd>1件</dd>
+      <dt>耐久feedback件数</dt><dd>1件</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>drop-after時に本文保持とfeedback1、resume後の回答表示を確認。自動/手動再送なし、POST1/feedback1。</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd><ul><li><a href="browser-checks.md">browser-checks.md</a></li><li><a href="browser-observations.json">browser-observations.json</a></li><li><a href="wsl-final.json">wsl-final.json</a></li><li><a href="wsl-after-saved.jpg">wsl-after-saved.jpg</a></li><li><a href="environment/browser-source-provenance.json">environment/browser-source-provenance.json</a></li><li><a href="wsl-after-offline.json">wsl-after-offline.json</a></li><li><a href="wsl-after-offline.jpg">wsl-after-offline.jpg</a></li></ul></dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="not-run" data-device="mobile" data-operation="answer" data-route="wsl" data-level="unrecorded">
+    <td><strong>WSL内サーバーへの接続</strong><div class="sub">Phone / mobile viewport</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>回答と結果確認<div class="sub">入力: 任意（入力方法を限定しない基本回答）</div></td>
+    <td><span class="status not-run">未実施</span><div class="sub">not-run</div></td>
+    <td>未取得</td>
+    <td>入力消失: 未取得<br>重複回答: 未取得</td>
+    <td><p class="reason">実機スマホからWSLへの接続は未実施。PCブラウザーの狭い画面では代用しない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-mobile-wsl-answer</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>WSL内で起動した実サーバーへブラウザーから到達できる環境。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>回答を送信し、画面の回答と耐久feedbackが1件であることを確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>未取得</dd>
+      <dt>実施日時（UTC）</dt><dd>未取得</dd>
+      <dt>実行環境</dt><dd>未取得</dd>
+      <dt>実行コマンド</dt><dd><pre>未取得</pre></dd>
+      <dt>入力消失</dt><dd>未取得</dd>
+      <dt>重複回答</dt><dd>未取得</dd>
+      <dt>回答POST数</dt><dd>未取得</dd>
+      <dt>耐久feedback件数</dt><dd>未取得</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>未取得</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd>未取得</dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="not-run" data-device="mobile" data-operation="keyboard" data-route="wsl" data-level="unrecorded">
+    <td><strong>WSL内サーバーへの接続</strong><div class="sub">Phone / mobile viewport</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>キーボード操作<div class="sub">入力: keyboard</div></td>
+    <td><span class="status not-run">未実施</span><div class="sub">not-run</div></td>
+    <td>未取得</td>
+    <td>入力消失: 未取得<br>重複回答: 未取得</td>
+    <td><p class="reason">実機スマホからWSLへの接続は未実施。PCブラウザーの狭い画面では代用しない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-mobile-wsl-keyboard</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>WSL内で起動した実サーバーへブラウザーから到達できる環境。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>マウスなしで回答欄へ移動・入力・送信し、結果とfocusを確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>未取得</dd>
+      <dt>実施日時（UTC）</dt><dd>未取得</dd>
+      <dt>実行環境</dt><dd>未取得</dd>
+      <dt>実行コマンド</dt><dd><pre>未取得</pre></dd>
+      <dt>入力消失</dt><dd>未取得</dd>
+      <dt>重複回答</dt><dd>未取得</dd>
+      <dt>回答POST数</dt><dd>未取得</dd>
+      <dt>耐久feedback件数</dt><dd>未取得</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>未取得</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd>未取得</dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="not-run" data-device="mobile" data-operation="sse-draft" data-route="wsl" data-level="unrecorded">
+    <td><strong>WSL内サーバーへの接続</strong><div class="sub">Phone / mobile viewport</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>入力中のSSE更新<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status not-run">未実施</span><div class="sub">not-run</div></td>
+    <td>未取得</td>
+    <td>入力消失: 未取得<br>重複回答: 未取得</td>
+    <td><p class="reason">実機スマホからWSLへの接続は未実施。PCブラウザーの狭い画面では代用しない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-mobile-wsl-sse-draft</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>WSL内で起動した実サーバーへブラウザーから到達できる環境。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>回答下書きへfocusを置いて進捗を更新し、本文・focus・未送信を確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>未取得</dd>
+      <dt>実施日時（UTC）</dt><dd>未取得</dd>
+      <dt>実行環境</dt><dd>未取得</dd>
+      <dt>実行コマンド</dt><dd><pre>未取得</pre></dd>
+      <dt>入力消失</dt><dd>未取得</dd>
+      <dt>重複回答</dt><dd>未取得</dd>
+      <dt>回答POST数</dt><dd>未取得</dd>
+      <dt>耐久feedback件数</dt><dd>未取得</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>未取得</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd>未取得</dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="not-run" data-device="mobile" data-operation="reload" data-route="wsl" data-level="unrecorded">
+    <td><strong>WSL内サーバーへの接続</strong><div class="sub">Phone / mobile viewport</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>再読込<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status not-run">未実施</span><div class="sub">not-run</div></td>
+    <td>未取得</td>
+    <td>入力消失: 未取得<br>重複回答: 未取得</td>
+    <td><p class="reason">実機スマホからWSLへの接続は未実施。PCブラウザーの狭い画面では代用しない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-mobile-wsl-reload</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>WSL内で起動した実サーバーへブラウザーから到達できる環境。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>未送信の下書きを入力して再読込し、下書きの消失と回答の有無を記録する。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>未取得</dd>
+      <dt>実施日時（UTC）</dt><dd>未取得</dd>
+      <dt>実行環境</dt><dd>未取得</dd>
+      <dt>実行コマンド</dt><dd><pre>未取得</pre></dd>
+      <dt>入力消失</dt><dd>未取得</dd>
+      <dt>重複回答</dt><dd>未取得</dd>
+      <dt>回答POST数</dt><dd>未取得</dd>
+      <dt>耐久feedback件数</dt><dd>未取得</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>未取得</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd>未取得</dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="not-run" data-device="mobile" data-operation="back" data-route="wsl" data-level="unrecorded">
+    <td><strong>WSL内サーバーへの接続</strong><div class="sub">Phone / mobile viewport</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>戻る操作<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status not-run">未実施</span><div class="sub">not-run</div></td>
+    <td>未取得</td>
+    <td>入力消失: 未取得<br>重複回答: 未取得</td>
+    <td><p class="reason">実機スマホからWSLへの接続は未実施。PCブラウザーの狭い画面では代用しない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-mobile-wsl-back</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>WSL内で起動した実サーバーへブラウザーから到達できる環境。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>未送信の下書きを入力して別ページへ移動し、戻った後の本文・回答・認証状態を確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>未取得</dd>
+      <dt>実施日時（UTC）</dt><dd>未取得</dd>
+      <dt>実行環境</dt><dd>未取得</dd>
+      <dt>実行コマンド</dt><dd><pre>未取得</pre></dd>
+      <dt>入力消失</dt><dd>未取得</dd>
+      <dt>重複回答</dt><dd>未取得</dd>
+      <dt>回答POST数</dt><dd>未取得</dd>
+      <dt>耐久feedback件数</dt><dd>未取得</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>未取得</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd>未取得</dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="not-run" data-device="mobile" data-operation="cancel" data-route="wsl" data-level="unrecorded">
+    <td><strong>WSL内サーバーへの接続</strong><div class="sub">Phone / mobile viewport</div><div class="sub">Project dashboard</div></td>
+    <td>コマンドパレットと回答下書き</td>
+    <td>操作の取消<div class="sub">入力: keyboard</div></td>
+    <td><span class="status not-run">未実施</span><div class="sub">not-run</div></td>
+    <td>未取得</td>
+    <td>入力消失: 未取得<br>重複回答: 未取得</td>
+    <td><p class="reason">実機スマホからWSLへの接続は未実施。PCブラウザーの狭い画面では代用しない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-mobile-wsl-cancel</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>WSL内で起動した実サーバーへブラウザーから到達できる環境。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>回答下書きからコマンドパレットを開き、Escapeで閉じて本文・focus・未送信を確認する（質問取消ではない）。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>未取得</dd>
+      <dt>実施日時（UTC）</dt><dd>未取得</dd>
+      <dt>実行環境</dt><dd>未取得</dd>
+      <dt>実行コマンド</dt><dd><pre>未取得</pre></dd>
+      <dt>入力消失</dt><dd>未取得</dd>
+      <dt>重複回答</dt><dd>未取得</dd>
+      <dt>回答POST数</dt><dd>未取得</dd>
+      <dt>耐久feedback件数</dt><dd>未取得</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>未取得</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd>未取得</dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="not-run" data-device="mobile" data-operation="double-submit" data-route="wsl" data-level="unrecorded">
+    <td><strong>WSL内サーバーへの接続</strong><div class="sub">Phone / mobile viewport</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>二度押し<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status not-run">未実施</span><div class="sub">not-run</div></td>
+    <td>未取得</td>
+    <td>入力消失: 未取得<br>重複回答: 未取得</td>
+    <td><p class="reason">実機スマホからWSLへの接続は未実施。PCブラウザーの狭い画面では代用しない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-mobile-wsl-double-submit</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>WSL内で起動した実サーバーへブラウザーから到達できる環境。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>送信を保留して二度押しし、SSE更新後の再送も試す。POST数と耐久回答件数を分けて記録する。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>未取得</dd>
+      <dt>実施日時（UTC）</dt><dd>未取得</dd>
+      <dt>実行環境</dt><dd>未取得</dd>
+      <dt>実行コマンド</dt><dd><pre>未取得</pre></dd>
+      <dt>入力消失</dt><dd>未取得</dd>
+      <dt>重複回答</dt><dd>未取得</dd>
+      <dt>回答POST数</dt><dd>未取得</dd>
+      <dt>耐久feedback件数</dt><dd>未取得</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>未取得</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd>未取得</dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="not-run" data-device="mobile" data-operation="disconnect-before" data-route="wsl" data-level="unrecorded">
+    <td><strong>WSL内サーバーへの接続</strong><div class="sub">Phone / mobile viewport</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>受理前の切断<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status not-run">未実施</span><div class="sub">not-run</div></td>
+    <td>未取得</td>
+    <td>入力消失: 未取得<br>重複回答: 未取得</td>
+    <td><p class="reason">実機スマホからWSLへの接続は未実施。PCブラウザーの狭い画面では代用しない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-mobile-wsl-disconnect-before</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>WSL内で起動した実サーバーへブラウザーから到達できる環境。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>次の回答をサーバーへ渡す前に接続を切る。下書きとfeedback 0件を確認し、再接続後の再送で1件になるか確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>未取得</dd>
+      <dt>実施日時（UTC）</dt><dd>未取得</dd>
+      <dt>実行環境</dt><dd>未取得</dd>
+      <dt>実行コマンド</dt><dd><pre>未取得</pre></dd>
+      <dt>入力消失</dt><dd>未取得</dd>
+      <dt>重複回答</dt><dd>未取得</dd>
+      <dt>回答POST数</dt><dd>未取得</dd>
+      <dt>耐久feedback件数</dt><dd>未取得</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>未取得</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd>未取得</dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="not-run" data-device="mobile" data-operation="disconnect-after" data-route="wsl" data-level="unrecorded">
+    <td><strong>WSL内サーバーへの接続</strong><div class="sub">Phone / mobile viewport</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>保存後の応答消失<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status not-run">未実施</span><div class="sub">not-run</div></td>
+    <td>未取得</td>
+    <td>入力消失: 未取得<br>重複回答: 未取得</td>
+    <td><p class="reason">実機スマホからWSLへの接続は未実施。PCブラウザーの狭い画面では代用しない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-mobile-wsl-disconnect-after</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>WSL内で起動した実サーバーへブラウザーから到達できる環境。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>回答保存後に応答とSSEを失わせ、再接続後の回答表示・下書き・耐久回答件数を確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>未取得</dd>
+      <dt>実施日時（UTC）</dt><dd>未取得</dd>
+      <dt>実行環境</dt><dd>未取得</dd>
+      <dt>実行コマンド</dt><dd><pre>未取得</pre></dd>
+      <dt>入力消失</dt><dd>未取得</dd>
+      <dt>重複回答</dt><dd>未取得</dd>
+      <dt>回答POST数</dt><dd>未取得</dd>
+      <dt>耐久feedback件数</dt><dd>未取得</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>未取得</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd>未取得</dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="not-run" data-device="desktop" data-operation="answer" data-route="tailscale" data-level="unrecorded">
+    <td><strong>Tailscale Serve経由</strong><div class="sub">PC</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>回答と結果確認<div class="sub">入力: 任意（入力方法を限定しない基本回答）</div></td>
+    <td><span class="status not-run">未実施</span><div class="sub">not-run</div></td>
+    <td>未取得</td>
+    <td>入力消失: 未取得<br>重複回答: 未取得</td>
+    <td><p class="reason">認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-desktop-tailscale-answer</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>PC/端末の実Tailscale接続と認証済みServe経路。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>回答を送信し、画面の回答と耐久feedbackが1件であることを確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>未取得</dd>
+      <dt>実施日時（UTC）</dt><dd>未取得</dd>
+      <dt>実行環境</dt><dd>未取得</dd>
+      <dt>実行コマンド</dt><dd><pre>未取得</pre></dd>
+      <dt>入力消失</dt><dd>未取得</dd>
+      <dt>重複回答</dt><dd>未取得</dd>
+      <dt>回答POST数</dt><dd>未取得</dd>
+      <dt>耐久feedback件数</dt><dd>未取得</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>未取得</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd>未取得</dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="not-run" data-device="desktop" data-operation="keyboard" data-route="tailscale" data-level="unrecorded">
+    <td><strong>Tailscale Serve経由</strong><div class="sub">PC</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>キーボード操作<div class="sub">入力: keyboard</div></td>
+    <td><span class="status not-run">未実施</span><div class="sub">not-run</div></td>
+    <td>未取得</td>
+    <td>入力消失: 未取得<br>重複回答: 未取得</td>
+    <td><p class="reason">認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-desktop-tailscale-keyboard</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>PC/端末の実Tailscale接続と認証済みServe経路。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>マウスなしで回答欄へ移動・入力・送信し、結果とfocusを確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>未取得</dd>
+      <dt>実施日時（UTC）</dt><dd>未取得</dd>
+      <dt>実行環境</dt><dd>未取得</dd>
+      <dt>実行コマンド</dt><dd><pre>未取得</pre></dd>
+      <dt>入力消失</dt><dd>未取得</dd>
+      <dt>重複回答</dt><dd>未取得</dd>
+      <dt>回答POST数</dt><dd>未取得</dd>
+      <dt>耐久feedback件数</dt><dd>未取得</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>未取得</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd>未取得</dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="not-run" data-device="desktop" data-operation="sse-draft" data-route="tailscale" data-level="unrecorded">
+    <td><strong>Tailscale Serve経由</strong><div class="sub">PC</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>入力中のSSE更新<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status not-run">未実施</span><div class="sub">not-run</div></td>
+    <td>未取得</td>
+    <td>入力消失: 未取得<br>重複回答: 未取得</td>
+    <td><p class="reason">認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-desktop-tailscale-sse-draft</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>PC/端末の実Tailscale接続と認証済みServe経路。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>回答下書きへfocusを置いて進捗を更新し、本文・focus・未送信を確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>未取得</dd>
+      <dt>実施日時（UTC）</dt><dd>未取得</dd>
+      <dt>実行環境</dt><dd>未取得</dd>
+      <dt>実行コマンド</dt><dd><pre>未取得</pre></dd>
+      <dt>入力消失</dt><dd>未取得</dd>
+      <dt>重複回答</dt><dd>未取得</dd>
+      <dt>回答POST数</dt><dd>未取得</dd>
+      <dt>耐久feedback件数</dt><dd>未取得</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>未取得</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd>未取得</dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="not-run" data-device="desktop" data-operation="reload" data-route="tailscale" data-level="unrecorded">
+    <td><strong>Tailscale Serve経由</strong><div class="sub">PC</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>再読込<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status not-run">未実施</span><div class="sub">not-run</div></td>
+    <td>未取得</td>
+    <td>入力消失: 未取得<br>重複回答: 未取得</td>
+    <td><p class="reason">認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-desktop-tailscale-reload</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>PC/端末の実Tailscale接続と認証済みServe経路。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>未送信の下書きを入力して再読込し、下書きの消失と回答の有無を記録する。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>未取得</dd>
+      <dt>実施日時（UTC）</dt><dd>未取得</dd>
+      <dt>実行環境</dt><dd>未取得</dd>
+      <dt>実行コマンド</dt><dd><pre>未取得</pre></dd>
+      <dt>入力消失</dt><dd>未取得</dd>
+      <dt>重複回答</dt><dd>未取得</dd>
+      <dt>回答POST数</dt><dd>未取得</dd>
+      <dt>耐久feedback件数</dt><dd>未取得</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>未取得</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd>未取得</dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="not-run" data-device="desktop" data-operation="back" data-route="tailscale" data-level="unrecorded">
+    <td><strong>Tailscale Serve経由</strong><div class="sub">PC</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>戻る操作<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status not-run">未実施</span><div class="sub">not-run</div></td>
+    <td>未取得</td>
+    <td>入力消失: 未取得<br>重複回答: 未取得</td>
+    <td><p class="reason">認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-desktop-tailscale-back</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>PC/端末の実Tailscale接続と認証済みServe経路。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>未送信の下書きを入力して別ページへ移動し、戻った後の本文・回答・認証状態を確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>未取得</dd>
+      <dt>実施日時（UTC）</dt><dd>未取得</dd>
+      <dt>実行環境</dt><dd>未取得</dd>
+      <dt>実行コマンド</dt><dd><pre>未取得</pre></dd>
+      <dt>入力消失</dt><dd>未取得</dd>
+      <dt>重複回答</dt><dd>未取得</dd>
+      <dt>回答POST数</dt><dd>未取得</dd>
+      <dt>耐久feedback件数</dt><dd>未取得</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>未取得</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd>未取得</dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="not-run" data-device="desktop" data-operation="cancel" data-route="tailscale" data-level="unrecorded">
+    <td><strong>Tailscale Serve経由</strong><div class="sub">PC</div><div class="sub">Project dashboard</div></td>
+    <td>コマンドパレットと回答下書き</td>
+    <td>操作の取消<div class="sub">入力: keyboard</div></td>
+    <td><span class="status not-run">未実施</span><div class="sub">not-run</div></td>
+    <td>未取得</td>
+    <td>入力消失: 未取得<br>重複回答: 未取得</td>
+    <td><p class="reason">認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-desktop-tailscale-cancel</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>PC/端末の実Tailscale接続と認証済みServe経路。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>回答下書きからコマンドパレットを開き、Escapeで閉じて本文・focus・未送信を確認する（質問取消ではない）。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>未取得</dd>
+      <dt>実施日時（UTC）</dt><dd>未取得</dd>
+      <dt>実行環境</dt><dd>未取得</dd>
+      <dt>実行コマンド</dt><dd><pre>未取得</pre></dd>
+      <dt>入力消失</dt><dd>未取得</dd>
+      <dt>重複回答</dt><dd>未取得</dd>
+      <dt>回答POST数</dt><dd>未取得</dd>
+      <dt>耐久feedback件数</dt><dd>未取得</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>未取得</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd>未取得</dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="not-run" data-device="desktop" data-operation="double-submit" data-route="tailscale" data-level="unrecorded">
+    <td><strong>Tailscale Serve経由</strong><div class="sub">PC</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>二度押し<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status not-run">未実施</span><div class="sub">not-run</div></td>
+    <td>未取得</td>
+    <td>入力消失: 未取得<br>重複回答: 未取得</td>
+    <td><p class="reason">認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-desktop-tailscale-double-submit</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>PC/端末の実Tailscale接続と認証済みServe経路。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>送信を保留して二度押しし、SSE更新後の再送も試す。POST数と耐久回答件数を分けて記録する。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>未取得</dd>
+      <dt>実施日時（UTC）</dt><dd>未取得</dd>
+      <dt>実行環境</dt><dd>未取得</dd>
+      <dt>実行コマンド</dt><dd><pre>未取得</pre></dd>
+      <dt>入力消失</dt><dd>未取得</dd>
+      <dt>重複回答</dt><dd>未取得</dd>
+      <dt>回答POST数</dt><dd>未取得</dd>
+      <dt>耐久feedback件数</dt><dd>未取得</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>未取得</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd>未取得</dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="not-run" data-device="desktop" data-operation="disconnect-before" data-route="tailscale" data-level="unrecorded">
+    <td><strong>Tailscale Serve経由</strong><div class="sub">PC</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>受理前の切断<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status not-run">未実施</span><div class="sub">not-run</div></td>
+    <td>未取得</td>
+    <td>入力消失: 未取得<br>重複回答: 未取得</td>
+    <td><p class="reason">認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-desktop-tailscale-disconnect-before</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>PC/端末の実Tailscale接続と認証済みServe経路。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>次の回答をサーバーへ渡す前に接続を切る。下書きとfeedback 0件を確認し、再接続後の再送で1件になるか確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>未取得</dd>
+      <dt>実施日時（UTC）</dt><dd>未取得</dd>
+      <dt>実行環境</dt><dd>未取得</dd>
+      <dt>実行コマンド</dt><dd><pre>未取得</pre></dd>
+      <dt>入力消失</dt><dd>未取得</dd>
+      <dt>重複回答</dt><dd>未取得</dd>
+      <dt>回答POST数</dt><dd>未取得</dd>
+      <dt>耐久feedback件数</dt><dd>未取得</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>未取得</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd>未取得</dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="not-run" data-device="desktop" data-operation="disconnect-after" data-route="tailscale" data-level="unrecorded">
+    <td><strong>Tailscale Serve経由</strong><div class="sub">PC</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>保存後の応答消失<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status not-run">未実施</span><div class="sub">not-run</div></td>
+    <td>未取得</td>
+    <td>入力消失: 未取得<br>重複回答: 未取得</td>
+    <td><p class="reason">認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-desktop-tailscale-disconnect-after</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>PC/端末の実Tailscale接続と認証済みServe経路。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>回答保存後に応答とSSEを失わせ、再接続後の回答表示・下書き・耐久回答件数を確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>未取得</dd>
+      <dt>実施日時（UTC）</dt><dd>未取得</dd>
+      <dt>実行環境</dt><dd>未取得</dd>
+      <dt>実行コマンド</dt><dd><pre>未取得</pre></dd>
+      <dt>入力消失</dt><dd>未取得</dd>
+      <dt>重複回答</dt><dd>未取得</dd>
+      <dt>回答POST数</dt><dd>未取得</dd>
+      <dt>耐久feedback件数</dt><dd>未取得</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>未取得</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd>未取得</dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="not-run" data-device="mobile" data-operation="answer" data-route="tailscale" data-level="unrecorded">
+    <td><strong>Tailscale Serve経由</strong><div class="sub">Phone / mobile viewport</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>回答と結果確認<div class="sub">入力: 任意（入力方法を限定しない基本回答）</div></td>
+    <td><span class="status not-run">未実施</span><div class="sub">not-run</div></td>
+    <td>未取得</td>
+    <td>入力消失: 未取得<br>重複回答: 未取得</td>
+    <td><p class="reason">認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-mobile-tailscale-answer</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>PC/端末の実Tailscale接続と認証済みServe経路。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>回答を送信し、画面の回答と耐久feedbackが1件であることを確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>未取得</dd>
+      <dt>実施日時（UTC）</dt><dd>未取得</dd>
+      <dt>実行環境</dt><dd>未取得</dd>
+      <dt>実行コマンド</dt><dd><pre>未取得</pre></dd>
+      <dt>入力消失</dt><dd>未取得</dd>
+      <dt>重複回答</dt><dd>未取得</dd>
+      <dt>回答POST数</dt><dd>未取得</dd>
+      <dt>耐久feedback件数</dt><dd>未取得</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>未取得</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd>未取得</dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="not-run" data-device="mobile" data-operation="keyboard" data-route="tailscale" data-level="unrecorded">
+    <td><strong>Tailscale Serve経由</strong><div class="sub">Phone / mobile viewport</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>キーボード操作<div class="sub">入力: keyboard</div></td>
+    <td><span class="status not-run">未実施</span><div class="sub">not-run</div></td>
+    <td>未取得</td>
+    <td>入力消失: 未取得<br>重複回答: 未取得</td>
+    <td><p class="reason">認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-mobile-tailscale-keyboard</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>PC/端末の実Tailscale接続と認証済みServe経路。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>マウスなしで回答欄へ移動・入力・送信し、結果とfocusを確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>未取得</dd>
+      <dt>実施日時（UTC）</dt><dd>未取得</dd>
+      <dt>実行環境</dt><dd>未取得</dd>
+      <dt>実行コマンド</dt><dd><pre>未取得</pre></dd>
+      <dt>入力消失</dt><dd>未取得</dd>
+      <dt>重複回答</dt><dd>未取得</dd>
+      <dt>回答POST数</dt><dd>未取得</dd>
+      <dt>耐久feedback件数</dt><dd>未取得</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>未取得</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd>未取得</dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="not-run" data-device="mobile" data-operation="sse-draft" data-route="tailscale" data-level="unrecorded">
+    <td><strong>Tailscale Serve経由</strong><div class="sub">Phone / mobile viewport</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>入力中のSSE更新<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status not-run">未実施</span><div class="sub">not-run</div></td>
+    <td>未取得</td>
+    <td>入力消失: 未取得<br>重複回答: 未取得</td>
+    <td><p class="reason">認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-mobile-tailscale-sse-draft</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>PC/端末の実Tailscale接続と認証済みServe経路。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>回答下書きへfocusを置いて進捗を更新し、本文・focus・未送信を確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>未取得</dd>
+      <dt>実施日時（UTC）</dt><dd>未取得</dd>
+      <dt>実行環境</dt><dd>未取得</dd>
+      <dt>実行コマンド</dt><dd><pre>未取得</pre></dd>
+      <dt>入力消失</dt><dd>未取得</dd>
+      <dt>重複回答</dt><dd>未取得</dd>
+      <dt>回答POST数</dt><dd>未取得</dd>
+      <dt>耐久feedback件数</dt><dd>未取得</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>未取得</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd>未取得</dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="not-run" data-device="mobile" data-operation="reload" data-route="tailscale" data-level="unrecorded">
+    <td><strong>Tailscale Serve経由</strong><div class="sub">Phone / mobile viewport</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>再読込<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status not-run">未実施</span><div class="sub">not-run</div></td>
+    <td>未取得</td>
+    <td>入力消失: 未取得<br>重複回答: 未取得</td>
+    <td><p class="reason">認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-mobile-tailscale-reload</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>PC/端末の実Tailscale接続と認証済みServe経路。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>未送信の下書きを入力して再読込し、下書きの消失と回答の有無を記録する。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>未取得</dd>
+      <dt>実施日時（UTC）</dt><dd>未取得</dd>
+      <dt>実行環境</dt><dd>未取得</dd>
+      <dt>実行コマンド</dt><dd><pre>未取得</pre></dd>
+      <dt>入力消失</dt><dd>未取得</dd>
+      <dt>重複回答</dt><dd>未取得</dd>
+      <dt>回答POST数</dt><dd>未取得</dd>
+      <dt>耐久feedback件数</dt><dd>未取得</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>未取得</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd>未取得</dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="not-run" data-device="mobile" data-operation="back" data-route="tailscale" data-level="unrecorded">
+    <td><strong>Tailscale Serve経由</strong><div class="sub">Phone / mobile viewport</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>戻る操作<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status not-run">未実施</span><div class="sub">not-run</div></td>
+    <td>未取得</td>
+    <td>入力消失: 未取得<br>重複回答: 未取得</td>
+    <td><p class="reason">認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-mobile-tailscale-back</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>PC/端末の実Tailscale接続と認証済みServe経路。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>未送信の下書きを入力して別ページへ移動し、戻った後の本文・回答・認証状態を確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>未取得</dd>
+      <dt>実施日時（UTC）</dt><dd>未取得</dd>
+      <dt>実行環境</dt><dd>未取得</dd>
+      <dt>実行コマンド</dt><dd><pre>未取得</pre></dd>
+      <dt>入力消失</dt><dd>未取得</dd>
+      <dt>重複回答</dt><dd>未取得</dd>
+      <dt>回答POST数</dt><dd>未取得</dd>
+      <dt>耐久feedback件数</dt><dd>未取得</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>未取得</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd>未取得</dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="not-run" data-device="mobile" data-operation="cancel" data-route="tailscale" data-level="unrecorded">
+    <td><strong>Tailscale Serve経由</strong><div class="sub">Phone / mobile viewport</div><div class="sub">Project dashboard</div></td>
+    <td>コマンドパレットと回答下書き</td>
+    <td>操作の取消<div class="sub">入力: keyboard</div></td>
+    <td><span class="status not-run">未実施</span><div class="sub">not-run</div></td>
+    <td>未取得</td>
+    <td>入力消失: 未取得<br>重複回答: 未取得</td>
+    <td><p class="reason">認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-mobile-tailscale-cancel</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>PC/端末の実Tailscale接続と認証済みServe経路。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>回答下書きからコマンドパレットを開き、Escapeで閉じて本文・focus・未送信を確認する（質問取消ではない）。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>未取得</dd>
+      <dt>実施日時（UTC）</dt><dd>未取得</dd>
+      <dt>実行環境</dt><dd>未取得</dd>
+      <dt>実行コマンド</dt><dd><pre>未取得</pre></dd>
+      <dt>入力消失</dt><dd>未取得</dd>
+      <dt>重複回答</dt><dd>未取得</dd>
+      <dt>回答POST数</dt><dd>未取得</dd>
+      <dt>耐久feedback件数</dt><dd>未取得</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>未取得</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd>未取得</dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="not-run" data-device="mobile" data-operation="double-submit" data-route="tailscale" data-level="unrecorded">
+    <td><strong>Tailscale Serve経由</strong><div class="sub">Phone / mobile viewport</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>二度押し<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status not-run">未実施</span><div class="sub">not-run</div></td>
+    <td>未取得</td>
+    <td>入力消失: 未取得<br>重複回答: 未取得</td>
+    <td><p class="reason">認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-mobile-tailscale-double-submit</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>PC/端末の実Tailscale接続と認証済みServe経路。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>送信を保留して二度押しし、SSE更新後の再送も試す。POST数と耐久回答件数を分けて記録する。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>未取得</dd>
+      <dt>実施日時（UTC）</dt><dd>未取得</dd>
+      <dt>実行環境</dt><dd>未取得</dd>
+      <dt>実行コマンド</dt><dd><pre>未取得</pre></dd>
+      <dt>入力消失</dt><dd>未取得</dd>
+      <dt>重複回答</dt><dd>未取得</dd>
+      <dt>回答POST数</dt><dd>未取得</dd>
+      <dt>耐久feedback件数</dt><dd>未取得</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>未取得</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd>未取得</dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="not-run" data-device="mobile" data-operation="disconnect-before" data-route="tailscale" data-level="unrecorded">
+    <td><strong>Tailscale Serve経由</strong><div class="sub">Phone / mobile viewport</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>受理前の切断<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status not-run">未実施</span><div class="sub">not-run</div></td>
+    <td>未取得</td>
+    <td>入力消失: 未取得<br>重複回答: 未取得</td>
+    <td><p class="reason">認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-mobile-tailscale-disconnect-before</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>PC/端末の実Tailscale接続と認証済みServe経路。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>次の回答をサーバーへ渡す前に接続を切る。下書きとfeedback 0件を確認し、再接続後の再送で1件になるか確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>未取得</dd>
+      <dt>実施日時（UTC）</dt><dd>未取得</dd>
+      <dt>実行環境</dt><dd>未取得</dd>
+      <dt>実行コマンド</dt><dd><pre>未取得</pre></dd>
+      <dt>入力消失</dt><dd>未取得</dd>
+      <dt>重複回答</dt><dd>未取得</dd>
+      <dt>回答POST数</dt><dd>未取得</dd>
+      <dt>耐久feedback件数</dt><dd>未取得</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>未取得</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd>未取得</dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="not-run" data-device="mobile" data-operation="disconnect-after" data-route="tailscale" data-level="unrecorded">
+    <td><strong>Tailscale Serve経由</strong><div class="sub">Phone / mobile viewport</div><div class="sub">Project dashboard</div></td>
+    <td>人間の質問・回答</td>
+    <td>保存後の応答消失<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status not-run">未実施</span><div class="sub">not-run</div></td>
+    <td>未取得</td>
+    <td>入力消失: 未取得<br>重複回答: 未取得</td>
+    <td><p class="reason">認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-mobile-tailscale-disconnect-after</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>PC/端末の実Tailscale接続と認証済みServe経路。ローカルproxy試験では代用不可。</dd>
+      <dt>確認手順</dt><dd>回答保存後に応答とSSEを失わせ、再接続後の回答表示・下書き・耐久回答件数を確認する。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>未取得</dd>
+      <dt>実施日時（UTC）</dt><dd>未取得</dd>
+      <dt>実行環境</dt><dd>未取得</dd>
+      <dt>実行コマンド</dt><dd><pre>未取得</pre></dd>
+      <dt>入力消失</dt><dd>未取得</dd>
+      <dt>重複回答</dt><dd>未取得</dd>
+      <dt>回答POST数</dt><dd>未取得</dd>
+      <dt>耐久feedback件数</dt><dd>未取得</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>未取得</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd>未取得</dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="pass" data-device="none" data-operation="api-regression" data-route="fixture" data-level="fixture">
+    <td><strong>ローカルAPI fixture</strong><div class="sub">端末なし（API）</div><div class="sub">Project dashboard</div></td>
+    <td>HTTP/MCP状態とfeedback</td>
+    <td>既存API回帰<div class="sub">入力: API</div></td>
+    <td><span class="status pass">確認済み</span><div class="sub">pass</div></td>
+    <td>fixture（API / 模擬）</td>
+    <td>入力消失: 未取得<br>重複回答: 未取得</td>
+    <td><p class="reason">Windows/Linuxそれぞれ45/45成功、skip0。2環境の自動テストをAPI回帰1セルの証拠とする。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">project-api-fixture</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>Node 22+とdashboard dependencies。</dd>
+      <dt>確認手順</dt><dd>npm testの実行結果とコマンドを保存する。ブラウザー操作の確認には使わない。</dd>
+      <dt>必要な証拠の水準</dt><dd>fixture（API / 模擬）</dd>
+      <dt>実際に確認した経路</dt><dd>fixture</dd>
+      <dt>実施日時（UTC）</dt><dd><time datetime="2026-10-08T06:57:27.476Z">2026-10-08T06:57:27.476Z</time></dd>
+      <dt>実行環境</dt><dd><dl class="environment"><dt>os</dt><dd>Windows / WSL Ubuntu 24.04.4 LTS (native Linux FS)</dd><dt>node</dt><dd>22.23.3</dd><dt>browser</dt><dd>none</dd><dt>device</dt><dd>none</dd></dl></dd>
+      <dt>実行コマンド</dt><dd><pre>cwd dashboard; Node v22.23.3: node --test test/*.test.mjs (各OSで実施)</pre></dd>
+      <dt>入力消失</dt><dd>未取得</dd>
+      <dt>重複回答</dt><dd>未取得</dd>
+      <dt>回答POST数</dt><dd>未取得</dd>
+      <dt>耐久feedback件数</dt><dd>未取得</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>API/MCP/イベント/回答UI単体/QA記録を自動検証。実ブラウザー操作と実機接続の代用ではない。</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd><ul><li><a href="environment/windows-node22-tests.txt">environment/windows-node22-tests.txt</a></li><li><a href="environment/linux-native-node22-tests.txt">environment/linux-native-node22-tests.txt</a></li><li><a href="environment/node22-verification-summary.json">environment/node22-verification-summary.json</a></li></ul></dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="not-run" data-device="desktop" data-operation="harness-connect" data-route="wsl-tailscale" data-level="unrecorded">
+    <td><strong>WSL上のDSH + Tailscale Serve</strong><div class="sub">PC</div><div class="sub">DSH Harness Web UI</div></td>
+    <td>既存Harnessの起動と接続</td>
+    <td>別モードの実接続<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status not-run">未実施</span><div class="sub">not-run</div></td>
+    <td>未取得</td>
+    <td>入力消失: 未取得<br>重複回答: 未取得</td>
+    <td><p class="reason">既存DSH/WSL/Tailscaleの実接続は未実施。Project fixture結果は転記しない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">harness-desktop-wsl-tailscale</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>既存DSH/WSL/実Tailscale経路と端末。モデル実行はこの接続確認の対象外。</dd>
+      <dt>確認手順</dt><dd>rdsh-dashboard harnessから元DSH Web UIを開き、対象と接続を確認する。Project質問fixtureの成功を転記しない。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>未取得</dd>
+      <dt>実施日時（UTC）</dt><dd>未取得</dd>
+      <dt>実行環境</dt><dd>未取得</dd>
+      <dt>実行コマンド</dt><dd><pre>未取得</pre></dd>
+      <dt>入力消失</dt><dd>未取得</dd>
+      <dt>重複回答</dt><dd>未取得</dd>
+      <dt>回答POST数</dt><dd>未取得</dd>
+      <dt>耐久feedback件数</dt><dd>未取得</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>未取得</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd>未取得</dd>
+    </dl>
+  </div></details></td>
+  </tr>
+<tr class="result-row" data-status="not-run" data-device="mobile" data-operation="harness-connect" data-route="wsl-tailscale" data-level="unrecorded">
+    <td><strong>WSL上のDSH + Tailscale Serve</strong><div class="sub">Phone / mobile viewport</div><div class="sub">DSH Harness Web UI</div></td>
+    <td>既存Harnessの起動と接続</td>
+    <td>別モードの実接続<div class="sub">入力: pointer/touch</div></td>
+    <td><span class="status not-run">未実施</span><div class="sub">not-run</div></td>
+    <td>未取得</td>
+    <td>入力消失: 未取得<br>重複回答: 未取得</td>
+    <td><p class="reason">既存DSH/WSL/Tailscaleの実接続は未実施。Project fixture結果は転記しない。</p><details><summary>手順・観測・証拠</summary><div class="details-body">
+    <p class="case-id">harness-mobile-wsl-tailscale</p>
+    <dl class="detail-list">
+      <dt>前提条件</dt><dd>既存DSH/WSL/実Tailscale経路と端末。モデル実行はこの接続確認の対象外。</dd>
+      <dt>確認手順</dt><dd>rdsh-dashboard harnessから元DSH Web UIを開き、対象と接続を確認する。Project質問fixtureの成功を転記しない。</dd>
+      <dt>必要な証拠の水準</dt><dd>real-connection（実接続）</dd>
+      <dt>実際に確認した経路</dt><dd>未取得</dd>
+      <dt>実施日時（UTC）</dt><dd>未取得</dd>
+      <dt>実行環境</dt><dd>未取得</dd>
+      <dt>実行コマンド</dt><dd><pre>未取得</pre></dd>
+      <dt>入力消失</dt><dd>未取得</dd>
+      <dt>重複回答</dt><dd>未取得</dd>
+      <dt>回答POST数</dt><dd>未取得</dd>
+      <dt>耐久feedback件数</dt><dd>未取得</dd>
+      <dt>Focus保持</dt><dd>未取得</dd>
+      <dt>観測メモ</dt><dd>未取得</dd>
+      <dt>証拠ファイル（このHTMLからの相対リンク）</dt><dd>未取得</dd>
+    </dl>
+  </div></details></td>
+  </tr></tbody>
+    </table>
+    <p id="no-results" class="empty" hidden>条件に合う結果はありません。「すべて表示」で絞り込みを解除できます。</p>
+  </div>
+  <footer>このHTMLは保存されたQA記録から生成した静的レポートです。状態と件数は対象版全体の記録、絞り込みは表示のみに適用されます。証拠ファイルはJSON・HTMLと同じディレクトリを基準に開きます。</footer>
+</main>
+<script>
+(() => {
+  const keys = ["status", "device", "operation", "route", "level"];
+  const controls = keys.map(key => document.getElementById(key));
+  const rows = Array.from(document.querySelectorAll(".result-row"));
+  const update = () => {
+    let count = 0;
+    for (const row of rows) {
+      const matches = controls.every((control, index) => {
+        const value = control.value;
+        if (!value) return true;
+        const actual = row.dataset[keys[index]];
+        return keys[index] === "status" && value === "unconfirmed" ? actual === "blocked" || actual === "not-run" : actual === value;
+      });
+      row.hidden = !matches;
+      if (matches) count++;
+    }
+    document.getElementById("shown-count").textContent = count + " / " + rows.length + "セルを表示";
+    document.getElementById("no-results").hidden = count !== 0;
+  };
+  controls.forEach(control => control.addEventListener("change", update));
+  document.getElementById("reset-filters").addEventListener("click", () => {
+    controls.forEach(control => { control.value = ""; });
+    update();
+  });
+  document.getElementById("filter-controls").disabled = false;
+})();
+</script>
+</body>
+</html>

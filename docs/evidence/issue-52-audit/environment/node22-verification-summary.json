@@ -1,0 +1,209 @@
+{
+  "recorded_at": "2026-10-08T06:57:27.476Z",
+  "source_head": "ec5fbf7c7ee5342fe9952dc0da0097c887aa427e",
+  "node_version": "v22.23.3",
+  "dashboard_files": 28,
+  "source_agreement": [
+    {
+      "path": "dashboard/README.md",
+      "git_blob_match": true,
+      "lf_sha256_match": true,
+      "raw_sha256_match": true
+    },
+    {
+      "path": "dashboard/app.mjs",
+      "git_blob_match": true,
+      "lf_sha256_match": true,
+      "raw_sha256_match": true
+    },
+    {
+      "path": "dashboard/cli.mjs",
+      "git_blob_match": true,
+      "lf_sha256_match": true,
+      "raw_sha256_match": true
+    },
+    {
+      "path": "dashboard/harness.mjs",
+      "git_blob_match": true,
+      "lf_sha256_match": true,
+      "raw_sha256_match": true
+    },
+    {
+      "path": "dashboard/install-windows.ps1",
+      "git_blob_match": true,
+      "lf_sha256_match": true,
+      "raw_sha256_match": true
+    },
+    {
+      "path": "dashboard/mcp.mjs",
+      "git_blob_match": true,
+      "lf_sha256_match": true,
+      "raw_sha256_match": true
+    },
+    {
+      "path": "dashboard/mcp2.mjs",
+      "git_blob_match": true,
+      "lf_sha256_match": true,
+      "raw_sha256_match": true
+    },
+    {
+      "path": "dashboard/package-lock.json",
+      "git_blob_match": true,
+      "lf_sha256_match": true,
+      "raw_sha256_match": true
+    },
+    {
+      "path": "dashboard/package.json",
+      "git_blob_match": true,
+      "lf_sha256_match": true,
+      "raw_sha256_match": true
+    },
+    {
+      "path": "dashboard/qa/README.md",
+      "git_blob_match": true,
+      "lf_sha256_match": true,
+      "raw_sha256_match": true
+    },
+    {
+      "path": "dashboard/qa/catalog.mjs",
+      "git_blob_match": true,
+      "lf_sha256_match": true,
+      "raw_sha256_match": true
+    },
+    {
+      "path": "dashboard/qa/cli.mjs",
+      "git_blob_match": true,
+      "lf_sha256_match": true,
+      "raw_sha256_match": true
+    },
+    {
+      "path": "dashboard/qa/fixture.mjs",
+      "git_blob_match": true,
+      "lf_sha256_match": true,
+      "raw_sha256_match": true
+    },
+    {
+      "path": "dashboard/qa/report.mjs",
+      "git_blob_match": true,
+      "lf_sha256_match": true,
+      "raw_sha256_match": true
+    },
+    {
+      "path": "dashboard/qa/view.mjs",
+      "git_blob_match": true,
+      "lf_sha256_match": true,
+      "raw_sha256_match": true
+    },
+    {
+      "path": "dashboard/rdsh-dashboard.cmd",
+      "git_blob_match": true,
+      "lf_sha256_match": true,
+      "raw_sha256_match": false
+    },
+    {
+      "path": "dashboard/rdsh-dashboard.ps1",
+      "git_blob_match": true,
+      "lf_sha256_match": true,
+      "raw_sha256_match": true
+    },
+    {
+      "path": "dashboard/server.mjs",
+      "git_blob_match": true,
+      "lf_sha256_match": true,
+      "raw_sha256_match": true
+    },
+    {
+      "path": "dashboard/state.mjs",
+      "git_blob_match": true,
+      "lf_sha256_match": true,
+      "raw_sha256_match": true
+    },
+    {
+      "path": "dashboard/tailscale.mjs",
+      "git_blob_match": true,
+      "lf_sha256_match": true,
+      "raw_sha256_match": true
+    },
+    {
+      "path": "dashboard/test/answer-dom.mjs",
+      "git_blob_match": true,
+      "lf_sha256_match": true,
+      "raw_sha256_match": true
+    },
+    {
+      "path": "dashboard/test/answer-ui.test.mjs",
+      "git_blob_match": true,
+      "lf_sha256_match": true,
+      "raw_sha256_match": true
+    },
+    {
+      "path": "dashboard/test/dashboard.test.mjs",
+      "git_blob_match": true,
+      "lf_sha256_match": true,
+      "raw_sha256_match": true
+    },
+    {
+      "path": "dashboard/test/events.test.mjs",
+      "git_blob_match": true,
+      "lf_sha256_match": true,
+      "raw_sha256_match": true
+    },
+    {
+      "path": "dashboard/test/qa-fixture.test.mjs",
+      "git_blob_match": true,
+      "lf_sha256_match": true,
+      "raw_sha256_match": true
+    },
+    {
+      "path": "dashboard/test/qa-report.test.mjs",
+      "git_blob_match": true,
+      "lf_sha256_match": true,
+      "raw_sha256_match": true
+    },
+    {
+      "path": "dashboard/ui.html",
+      "git_blob_match": true,
+      "lf_sha256_match": true,
+      "raw_sha256_match": false
+    },
+    {
+      "path": "dashboard/webhooks.mjs",
+      "git_blob_match": true,
+      "lf_sha256_match": true,
+      "raw_sha256_match": true
+    }
+  ],
+  "runs": [
+    {
+      "platform": "windows",
+      "log": "windows-node22-tests.txt",
+      "tests": 45,
+      "pass": 45,
+      "fail": 0,
+      "skipped": 0
+    },
+    {
+      "platform": "linux",
+      "log": "linux-native-node22-tests.txt",
+      "tests": 45,
+      "pass": 45,
+      "fail": 0,
+      "skipped": 0
+    }
+  ],
+  "initial_failures": [
+    {
+      "log": "windows-node22-tests-initial-no-git.txt",
+      "pass": 44,
+      "fail": 1,
+      "cause": "Snapshot lacked git metadata required by QA CLI init. Same suite passes in the real clean checkout."
+    },
+    {
+      "log": "linux-node22-tests-initial-mount-no-git.txt",
+      "pass": 43,
+      "fail": 2,
+      "cause": "Snapshot lacked git metadata; cold fixture CLI startup on /mnt/c exceeded existing 3-second limit. Unchanged tests pass in a clean Linux native-filesystem clone without increasing timeouts."
+    }
+  ],
+  "scope": "Automated tests only; browser-operation evidence is separate. No live Tailscale, DSHagentloop, or physical mobile device was exercised."
+}

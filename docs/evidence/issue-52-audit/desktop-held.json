@@ -1,0 +1,54 @@
+{
+  "updated_at": "2026-10-08T06:54:36.869Z",
+  "scope": "synthetic Project server/UI; not Harness, DSHagentloop, Tailscale, or CLI startup",
+  "online": true,
+  "next_fault": null,
+  "held": true,
+  "stopped": false,
+  "revision": 9,
+  "question_count": 5,
+  "pending_count": 4,
+  "feedback_count": 1,
+  "answer_post_attempts": 2,
+  "answer_post_forwarded": 1,
+  "answer_post_unattributed": 0,
+  "backend_commits": 1,
+  "log_events": 2,
+  "questions": [
+    {
+      "id": "Q-sse",
+      "answered": true,
+      "feedback_count": 1,
+      "answer_post_attempts": 1,
+      "answer_post_forwarded": 1
+    },
+    {
+      "id": "Q-double",
+      "answered": false,
+      "feedback_count": 0,
+      "answer_post_attempts": 1,
+      "answer_post_forwarded": 0
+    },
+    {
+      "id": "Q-before",
+      "answered": false,
+      "feedback_count": 0,
+      "answer_post_attempts": 0,
+      "answer_post_forwarded": 0
+    },
+    {
+      "id": "Q-after",
+      "answered": false,
+      "feedback_count": 0,
+      "answer_post_attempts": 0,
+      "answer_post_forwarded": 0
+    },
+    {
+      "id": "Q-navigation",
+      "answered": false,
+      "feedback_count": 0,
+      "answer_post_attempts": 0,
+      "answer_post_forwarded": 0
+    }
+  ]
+}

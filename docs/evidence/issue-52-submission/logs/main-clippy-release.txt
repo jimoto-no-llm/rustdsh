@@ -1,0 +1,47 @@
+    Checking windows-link v0.2.1
+    Checking anstyle v1.0.14
+    Checking utf8parse v0.2.2
+    Checking once_cell_polyfill v1.70.2
+    Checking colorchoice v1.0.5
+    Checking is_terminal_polyfill v1.70.2
+    Checking strsim v0.11.1
+    Checking clap_lex v1.1.1
+    Checking itoa v1.0.18
+    Checking memchr v2.8.3
+    Checking cfg-if v1.0.5
+    Checking serde_core v1.0.229
+    Checking zmij v1.0.23
+    Checking anyhow v1.0.104
+    Checking libc v0.2.190
+    Checking windows-sys v0.61.2
+    Checking anstyle-parse v1.0.0
+    Checking getrandom v0.4.3
+    Checking anstyle-query v1.1.5
+    Checking anstyle-wincon v3.0.11
+    Checking anstream v1.0.0
+    Checking clap_builder v4.6.7
+    Checking serde_json v1.0.151
+    Checking clap v4.6.7
+    Checking rdsh v0.2.0 (<workspace>\work\rustdsh-issue52-current)
+error: unused import: `super::*`
+   --> src\search.rs:290:9
+    |
+290 |     use super::*;
+    |         ^^^^^^^^
+    |
+    = note: `-D unused-imports` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(unused_imports)]`
+
+error: this boolean expression can be simplified
+   --> src\main.rs:659:8
+    |
+659 |     if !env.as_deref().is_some_and(|e| !e.trim().is_empty()) {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `env.as_deref().is_none_or(|e| e.trim().is_empty())`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.93.0/index.html#nonminimal_bool
+    = note: `-D clippy::nonminimal-bool` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::nonminimal_bool)]`
+
+error: could not compile `rdsh` (bin "rdsh") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `rdsh` (bin "rdsh" test) due to 2 previous errors

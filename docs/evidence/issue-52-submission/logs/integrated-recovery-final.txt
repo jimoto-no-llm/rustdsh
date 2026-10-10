@@ -1,0 +1,238 @@
+TAP version 13
+# Subtest: a failed send survives config failure and a hash-free reload before explicit retry
+ok 1 - a failed send survives config failure and a hash-free reload before explicit retry
+  ---
+  duration_ms: 47.2184
+  type: 'test'
+  ...
+# Subtest: a draft survives initial state failure and an explicit hash-free reload
+ok 2 - a draft survives initial state failure and an explicit hash-free reload
+  ---
+  duration_ms: 14.0681
+  type: 'test'
+  ...
+# Subtest: a saved answer with a lost response is confirmed after config failure without resending
+ok 3 - a saved answer with a lost response is confirmed after config failure without resending
+  ---
+  duration_ms: 15.1595
+  type: 'test'
+  ...
+# Subtest: typed answer survives a fresh document using the same tab storage
+ok 4 - typed answer survives a fresh document using the same tab storage
+  ---
+  duration_ms: 41.1954
+  type: 'test'
+  ...
+# Subtest: a held answer remains locked after SSE redraw and repeated submit sends only once
+ok 5 - a held answer remains locked after SSE redraw and repeated submit sends only once
+  ---
+  duration_ms: 7.8416
+  type: 'test'
+  ...
+# Subtest: drafts remain separate for each question and project, including the shared route
+ok 6 - drafts remain separate for each question and project, including the shared route
+  ---
+  duration_ms: 18.2806
+  type: 'test'
+  ...
+# Subtest: a failed POST reconciles state and keeps an editable draft for explicit retry
+ok 7 - a failed POST reconciles state and keeps an editable draft for explicit retry
+  ---
+  duration_ms: 12.0887
+  type: 'test'
+  ...
+# Subtest: a committed answer with a lost response is reconciled without sending again
+ok 8 - a committed answer with a lost response is reconciled without sending again
+  ---
+  duration_ms: 12.6404
+  type: 'test'
+  ...
+# Subtest: confirmation clears a submitted draft whose whitespace is preserved by the server
+ok 9 - confirmation clears a submitted draft whose whitespace is preserved by the server
+  ---
+  duration_ms: 5.9562
+  type: 'test'
+  ...
+# Subtest: storage denial does not prevent startup, SSE draft retention, or answering
+ok 10 - storage denial does not prevent startup, SSE draft retention, or answering
+  ---
+  duration_ms: 7.0303
+  type: 'test'
+  ...
+# Subtest: an older overlapping state response cannot restore a question already answered
+ok 11 - an older overlapping state response cannot restore a question already answered
+  ---
+  duration_ms: 4.6248
+  type: 'test'
+  ...
+# Subtest: an uncertain answer stays locked until a separate state check confirms it was not saved
+ok 12 - an uncertain answer stays locked until a separate state check confirms it was not saved
+  ---
+  duration_ms: 6.8635
+  type: 'test'
+  ...
+# Subtest: back-forward cache restoration checks server state and keeps an unsent draft
+ok 13 - back-forward cache restoration checks server state and keeps an unsent draft
+  ---
+  duration_ms: 5.5237
+  type: 'test'
+  ...
+# Subtest: SSE redraw preserves the active answer's text selection
+ok 14 - SSE redraw preserves the active answer's text selection
+  ---
+  duration_ms: 4.868
+  type: 'test'
+  ...
+# Subtest: a changed question preserves a copy without applying the old draft to the current question
+ok 15 - a changed question preserves a copy without applying the old draft to the current question
+  ---
+  duration_ms: 8.4665
+  type: 'test'
+  ...
+# Subtest: a changed created_at preserves a copy without applying the old draft to the current question
+ok 16 - a changed created_at preserves a copy without applying the old draft to the current question
+  ---
+  duration_ms: 8.3038
+  type: 'test'
+  ...
+# Subtest: a changed default_action preserves a copy without applying the old draft to the current question
+ok 17 - a changed default_action preserves a copy without applying the old draft to the current question
+  ---
+  duration_ms: 8.2206
+  type: 'test'
+  ...
+# Subtest: a changed answer preserves a copy without applying the old draft to the current question
+ok 18 - a changed answer preserves a copy without applying the old draft to the current question
+  ---
+  duration_ms: 8.1987
+  type: 'test'
+  ...
+# Subtest: explicitly discarding an active draft keeps it empty after reload
+ok 19 - explicitly discarding an active draft keeps it empty after reload
+  ---
+  duration_ms: 7.5837
+  type: 'test'
+  ...
+# Subtest: explicitly discarding a retained copy removes it after reload
+ok 20 - explicitly discarding a retained copy removes it after reload
+  ---
+  duration_ms: 8.3215
+  type: 'test'
+  ...
+# Subtest: corrupted draft storage warns without overwriting the unreadable record
+ok 21 - corrupted draft storage warns without overwriting the unreadable record
+  ---
+  duration_ms: 9.0636
+  type: 'test'
+  ...
+# Subtest: exhausted storage warns while retaining the latest in-memory draft
+ok 22 - exhausted storage warns while retaining the latest in-memory draft
+  ---
+  duration_ms: 5.7631
+  type: 'test'
+  ...
+# Subtest: a pending state read started before POST failure cannot release the uncertain-answer lock
+ok 23 - a pending state read started before POST failure cannot release the uncertain-answer lock
+  ---
+  duration_ms: 5.5541
+  type: 'test'
+  ...
+# Subtest: a whitespace-only answer shows an accessible error without posting
+ok 24 - a whitespace-only answer shows an accessible error without posting
+  ---
+  duration_ms: 4.756
+  type: 'test'
+  ...
+# Subtest: SSE redraw preserves focus and selection while copying a retained draft
+ok 25 - SSE redraw preserves focus and selection while copying a retained draft
+  ---
+  duration_ms: 5.9906
+  type: 'test'
+  ...
+# Subtest: maximum escaped legacy question keys restore all saved drafts
+ok 26 - maximum escaped legacy question keys restore all saved drafts
+  ---
+  duration_ms: 2.4902
+  type: 'test'
+  ...
+# Subtest: a held answer stays locked across an SSE redraw
+ok 27 - a held answer stays locked across an SSE redraw
+  ---
+  duration_ms: 1.1806
+  type: 'test'
+  ...
+# Subtest: reload preserves text, choice and revision review without selecting or sending automatically
+ok 28 - reload preserves text, choice and revision review without selecting or sending automatically
+  ---
+  duration_ms: 1.1405
+  type: 'test'
+  ...
+# Subtest: returning to an earlier fingerprint at a new revision still requires a fresh review
+ok 29 - returning to an earlier fingerprint at a new revision still requires a fresh review
+  ---
+  duration_ms: 0.1565
+  type: 'test'
+  ...
+# Subtest: an uncertain POST is only released by a read started after its failure
+ok 30 - an uncertain POST is only released by a read started after its failure
+  ---
+  duration_ms: 0.2237
+  type: 'test'
+  ...
+# Subtest: a saved typed choice with a lost response is reconciled after reload
+ok 31 - a saved typed choice with a lost response is reconciled after reload
+  ---
+  duration_ms: 0.1267
+  type: 'test'
+  ...
+# Subtest: identical text with a different contract choice retains the unsent copy
+ok 32 - identical text with a different contract choice retains the unsent copy
+  ---
+  duration_ms: 0.1372
+  type: 'test'
+  ...
+# Subtest: cancelled questions retain drafts and cannot be submitted or revived on reload
+ok 33 - cancelled questions retain drafts and cannot be submitted or revived on reload
+  ---
+  duration_ms: 0.0955
+  type: 'test'
+  ...
+# Subtest: expired questions retain drafts and cannot be submitted or revived on reload
+ok 34 - expired questions retain drafts and cannot be submitted or revived on reload
+  ---
+  duration_ms: 0.1698
+  type: 'test'
+  ...
+# Subtest: an older GET cannot clear a current draft or release its request lock
+ok 35 - an older GET cannot clear a current draft or release its request lock
+  ---
+  duration_ms: 0.3232
+  type: 'test'
+  ...
+# Subtest: unreadable saved drafts are preserved while new drafts remain usable in memory
+ok 36 - unreadable saved drafts are preserved while new drafts remain usable in memory
+  ---
+  duration_ms: 0.1555
+  type: 'test'
+  ...
+# Subtest: legacy draft records restore under the same tab storage key
+ok 37 - legacy draft records restore under the same tab storage key
+  ---
+  duration_ms: 0.1152
+  type: 'test'
+  ...
+# Subtest: contract review, choice, reference expansion and text selection survive actual card redraws
+ok 38 - contract review, choice, reference expansion and text selection survive actual card redraws
+  ---
+  duration_ms: 0.7555
+  type: 'test'
+  ...
+1..38
+# tests 38
+# suites 0
+# pass 38
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 271.9474

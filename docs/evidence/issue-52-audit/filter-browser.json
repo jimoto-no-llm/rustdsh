@@ -1,0 +1,2701 @@
+[
+  {
+    "label": "all",
+    "observed_at": "2026-10-08T07:15:06.361Z",
+    "count": 57,
+    "filters": [
+      {
+        "id": "status",
+        "value": ""
+      },
+      {
+        "id": "device",
+        "value": ""
+      },
+      {
+        "id": "operation",
+        "value": ""
+      },
+      {
+        "id": "route",
+        "value": ""
+      },
+      {
+        "id": "level",
+        "value": ""
+      }
+    ],
+    "rows": [
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "answer",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "keyboard",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "sse-draft",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "reload",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "back",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "cancel",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "double-submit",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "disconnect-before",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "disconnect-after",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "answer",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "keyboard",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "sse-draft",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "reload",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "back",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "cancel",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "double-submit",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "disconnect-before",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "disconnect-after",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "answer",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "keyboard",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "sse-draft",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "reload",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "back",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "cancel",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "double-submit",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "disconnect-before",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "disconnect-after",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "answer",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "keyboard",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "sse-draft",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "reload",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "back",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "cancel",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "double-submit",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "disconnect-before",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "disconnect-after",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "answer",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "keyboard",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "sse-draft",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "reload",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "back",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "cancel",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "double-submit",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "disconnect-before",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "disconnect-after",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "answer",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "keyboard",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "sse-draft",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "reload",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "back",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "cancel",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "double-submit",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "disconnect-before",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "disconnect-after",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "none",
+        "level": "fixture",
+        "operation": "api-regression",
+        "route": "fixture",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "harness-connect",
+        "route": "wsl-tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "harness-connect",
+        "route": "wsl-tailscale",
+        "status": "not-run"
+      }
+    ],
+    "summary": "入力消失: 0セルで消失 / 27セルを観測\n未取得 30セル\n\n重複回答: 0セルで発生 / 27セルを観測\n未取得 30セル\n\n未確認: 29セル\nblocked + not-run"
+  },
+  {
+    "label": "unconfirmed",
+    "observed_at": "2026-10-08T07:15:28.329Z",
+    "count": 29,
+    "filters": [
+      {
+        "id": "status",
+        "value": "unconfirmed"
+      },
+      {
+        "id": "device",
+        "value": ""
+      },
+      {
+        "id": "operation",
+        "value": ""
+      },
+      {
+        "id": "route",
+        "value": ""
+      },
+      {
+        "id": "level",
+        "value": ""
+      }
+    ],
+    "rows": [
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "answer",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "keyboard",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "sse-draft",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "reload",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "back",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "cancel",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "double-submit",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "disconnect-before",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "disconnect-after",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "answer",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "keyboard",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "sse-draft",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "reload",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "back",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "cancel",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "double-submit",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "disconnect-before",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "disconnect-after",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "answer",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "keyboard",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "sse-draft",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "reload",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "back",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "cancel",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "double-submit",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "disconnect-before",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "disconnect-after",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "harness-connect",
+        "route": "wsl-tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "harness-connect",
+        "route": "wsl-tailscale",
+        "status": "not-run"
+      }
+    ],
+    "summary": "入力消失: 0セルで消失 / 27セルを観測\n未取得 30セル\n\n重複回答: 0セルで発生 / 27セルを観測\n未取得 30セル\n\n未確認: 29セル\nblocked + not-run"
+  },
+  {
+    "label": "unconfirmed-wsl",
+    "observed_at": "2026-10-08T07:15:28.373Z",
+    "count": 9,
+    "filters": [
+      {
+        "id": "status",
+        "value": "unconfirmed"
+      },
+      {
+        "id": "device",
+        "value": ""
+      },
+      {
+        "id": "operation",
+        "value": ""
+      },
+      {
+        "id": "route",
+        "value": "wsl"
+      },
+      {
+        "id": "level",
+        "value": ""
+      }
+    ],
+    "rows": [
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "answer",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "keyboard",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "sse-draft",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "reload",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "back",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "cancel",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "double-submit",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "disconnect-before",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "disconnect-after",
+        "route": "wsl",
+        "status": "not-run"
+      }
+    ],
+    "summary": "入力消失: 0セルで消失 / 27セルを観測\n未取得 30セル\n\n重複回答: 0セルで発生 / 27セルを観測\n未取得 30セル\n\n未確認: 29セル\nblocked + not-run"
+  },
+  {
+    "label": "all-wsl",
+    "observed_at": "2026-10-08T07:15:28.394Z",
+    "count": 18,
+    "filters": [
+      {
+        "id": "status",
+        "value": ""
+      },
+      {
+        "id": "device",
+        "value": ""
+      },
+      {
+        "id": "operation",
+        "value": ""
+      },
+      {
+        "id": "route",
+        "value": "wsl"
+      },
+      {
+        "id": "level",
+        "value": ""
+      }
+    ],
+    "rows": [
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "answer",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "keyboard",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "sse-draft",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "reload",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "back",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "cancel",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "double-submit",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "disconnect-before",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "disconnect-after",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "answer",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "keyboard",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "sse-draft",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "reload",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "back",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "cancel",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "double-submit",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "disconnect-before",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "disconnect-after",
+        "route": "wsl",
+        "status": "not-run"
+      }
+    ],
+    "summary": "入力消失: 0セルで消失 / 27セルを観測\n未取得 30セル\n\n重複回答: 0セルで発生 / 27セルを観測\n未取得 30セル\n\n未確認: 29セル\nblocked + not-run"
+  },
+  {
+    "label": "pass-wsl",
+    "observed_at": "2026-10-08T07:15:28.413Z",
+    "count": 9,
+    "filters": [
+      {
+        "id": "status",
+        "value": "pass"
+      },
+      {
+        "id": "device",
+        "value": ""
+      },
+      {
+        "id": "operation",
+        "value": ""
+      },
+      {
+        "id": "route",
+        "value": "wsl"
+      },
+      {
+        "id": "level",
+        "value": ""
+      }
+    ],
+    "rows": [
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "answer",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "keyboard",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "sse-draft",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "reload",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "back",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "cancel",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "double-submit",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "disconnect-before",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "disconnect-after",
+        "route": "wsl",
+        "status": "pass"
+      }
+    ],
+    "summary": "入力消失: 0セルで消失 / 27セルを観測\n未取得 30セル\n\n重複回答: 0セルで発生 / 27セルを観測\n未取得 30セル\n\n未確認: 29セル\nblocked + not-run"
+  },
+  {
+    "label": "reset",
+    "observed_at": "2026-10-08T07:15:28.688Z",
+    "count": 57,
+    "filters": [
+      {
+        "id": "status",
+        "value": ""
+      },
+      {
+        "id": "device",
+        "value": ""
+      },
+      {
+        "id": "operation",
+        "value": ""
+      },
+      {
+        "id": "route",
+        "value": ""
+      },
+      {
+        "id": "level",
+        "value": ""
+      }
+    ],
+    "rows": [
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "answer",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "keyboard",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "sse-draft",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "reload",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "back",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "cancel",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "double-submit",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "disconnect-before",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "disconnect-after",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "answer",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "keyboard",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "sse-draft",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "reload",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "back",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "cancel",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "double-submit",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "disconnect-before",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "disconnect-after",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "answer",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "keyboard",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "sse-draft",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "reload",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "back",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "cancel",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "double-submit",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "disconnect-before",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "disconnect-after",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "answer",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "keyboard",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "sse-draft",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "reload",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "back",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "cancel",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "double-submit",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "disconnect-before",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "disconnect-after",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "answer",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "keyboard",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "sse-draft",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "reload",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "back",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "cancel",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "double-submit",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "disconnect-before",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "disconnect-after",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "answer",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "keyboard",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "sse-draft",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "reload",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "back",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "cancel",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "double-submit",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "disconnect-before",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "disconnect-after",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "none",
+        "level": "fixture",
+        "operation": "api-regression",
+        "route": "fixture",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "harness-connect",
+        "route": "wsl-tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "harness-connect",
+        "route": "wsl-tailscale",
+        "status": "not-run"
+      }
+    ],
+    "summary": "入力消失: 0セルで消失 / 27セルを観測\n未取得 30セル\n\n重複回答: 0セルで発生 / 27セルを観測\n未取得 30セル\n\n未確認: 29セル\nblocked + not-run"
+  },
+  {
+    "label": "tailscale",
+    "observed_at": "2026-10-08T07:15:28.710Z",
+    "count": 18,
+    "filters": [
+      {
+        "id": "status",
+        "value": ""
+      },
+      {
+        "id": "device",
+        "value": ""
+      },
+      {
+        "id": "operation",
+        "value": ""
+      },
+      {
+        "id": "route",
+        "value": "tailscale"
+      },
+      {
+        "id": "level",
+        "value": ""
+      }
+    ],
+    "rows": [
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "answer",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "keyboard",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "sse-draft",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "reload",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "back",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "cancel",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "double-submit",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "disconnect-before",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "disconnect-after",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "answer",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "keyboard",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "sse-draft",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "reload",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "back",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "cancel",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "double-submit",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "disconnect-before",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "disconnect-after",
+        "route": "tailscale",
+        "status": "not-run"
+      }
+    ],
+    "summary": "入力消失: 0セルで消失 / 27セルを観測\n未取得 30セル\n\n重複回答: 0セルで発生 / 27セルを観測\n未取得 30セル\n\n未確認: 29セル\nblocked + not-run"
+  },
+  {
+    "label": "pass-tailscale",
+    "observed_at": "2026-10-08T07:15:28.730Z",
+    "count": 0,
+    "filters": [
+      {
+        "id": "status",
+        "value": "pass"
+      },
+      {
+        "id": "device",
+        "value": ""
+      },
+      {
+        "id": "operation",
+        "value": ""
+      },
+      {
+        "id": "route",
+        "value": "tailscale"
+      },
+      {
+        "id": "level",
+        "value": ""
+      }
+    ],
+    "rows": [],
+    "summary": "入力消失: 0セルで消失 / 27セルを観測\n未取得 30セル\n\n重複回答: 0セルで発生 / 27セルを観測\n未取得 30セル\n\n未確認: 29セル\nblocked + not-run"
+  },
+  {
+    "label": "final-reset",
+    "observed_at": "2026-10-08T07:15:29.004Z",
+    "count": 57,
+    "filters": [
+      {
+        "id": "status",
+        "value": ""
+      },
+      {
+        "id": "device",
+        "value": ""
+      },
+      {
+        "id": "operation",
+        "value": ""
+      },
+      {
+        "id": "route",
+        "value": ""
+      },
+      {
+        "id": "level",
+        "value": ""
+      }
+    ],
+    "rows": [
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "answer",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "keyboard",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "sse-draft",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "reload",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "back",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "cancel",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "double-submit",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "disconnect-before",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "disconnect-after",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "answer",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "keyboard",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "sse-draft",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "reload",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "back",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "cancel",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "double-submit",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "disconnect-before",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "disconnect-after",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "answer",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "keyboard",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "sse-draft",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "reload",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "back",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "cancel",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "double-submit",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "disconnect-before",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "disconnect-after",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "answer",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "keyboard",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "sse-draft",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "reload",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "back",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "cancel",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "double-submit",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "disconnect-before",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "disconnect-after",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "answer",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "keyboard",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "sse-draft",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "reload",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "back",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "cancel",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "double-submit",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "disconnect-before",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "disconnect-after",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "answer",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "keyboard",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "sse-draft",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "reload",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "back",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "cancel",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "double-submit",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "disconnect-before",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "disconnect-after",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "none",
+        "level": "fixture",
+        "operation": "api-regression",
+        "route": "fixture",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "harness-connect",
+        "route": "wsl-tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "harness-connect",
+        "route": "wsl-tailscale",
+        "status": "not-run"
+      }
+    ],
+    "summary": "入力消失: 0セルで消失 / 27セルを観測\n未取得 30セル\n\n重複回答: 0セルで発生 / 27セルを観測\n未取得 30セル\n\n未確認: 29セル\nblocked + not-run"
+  },
+  {
+    "label": "mobile-local",
+    "observed_at": "2026-10-08T07:15:44.485Z",
+    "count": 9,
+    "filters": [
+      {
+        "id": "status",
+        "value": ""
+      },
+      {
+        "id": "device",
+        "value": "mobile"
+      },
+      {
+        "id": "operation",
+        "value": ""
+      },
+      {
+        "id": "route",
+        "value": "local"
+      },
+      {
+        "id": "level",
+        "value": ""
+      }
+    ],
+    "rows": [
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "answer",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "keyboard",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "sse-draft",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "reload",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "back",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "cancel",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "double-submit",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "disconnect-before",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "disconnect-after",
+        "route": "local",
+        "status": "pass"
+      }
+    ],
+    "summary": "入力消失: 0セルで消失 / 27セルを観測\n未取得 30セル\n\n重複回答: 0セルで発生 / 27セルを観測\n未取得 30セル\n\n未確認: 29セル\nblocked + not-run"
+  },
+  {
+    "label": "mobile-local-disconnect-after",
+    "observed_at": "2026-10-08T07:15:44.506Z",
+    "count": 1,
+    "filters": [
+      {
+        "id": "status",
+        "value": ""
+      },
+      {
+        "id": "device",
+        "value": "mobile"
+      },
+      {
+        "id": "operation",
+        "value": "disconnect-after"
+      },
+      {
+        "id": "route",
+        "value": "local"
+      },
+      {
+        "id": "level",
+        "value": ""
+      }
+    ],
+    "rows": [
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "disconnect-after",
+        "route": "local",
+        "status": "pass"
+      }
+    ],
+    "summary": "入力消失: 0セルで消失 / 27セルを観測\n未取得 30セル\n\n重複回答: 0セルで発生 / 27セルを観測\n未取得 30セル\n\n未確認: 29セル\nblocked + not-run"
+  },
+  {
+    "label": "real-connection",
+    "observed_at": "2026-10-08T07:15:44.792Z",
+    "count": 9,
+    "filters": [
+      {
+        "id": "status",
+        "value": ""
+      },
+      {
+        "id": "device",
+        "value": ""
+      },
+      {
+        "id": "operation",
+        "value": ""
+      },
+      {
+        "id": "route",
+        "value": ""
+      },
+      {
+        "id": "level",
+        "value": "real-connection"
+      }
+    ],
+    "rows": [
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "answer",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "keyboard",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "sse-draft",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "reload",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "back",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "cancel",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "double-submit",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "disconnect-before",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "disconnect-after",
+        "route": "wsl",
+        "status": "pass"
+      }
+    ],
+    "summary": "入力消失: 0セルで消失 / 27セルを観測\n未取得 30セル\n\n重複回答: 0セルで発生 / 27セルを観測\n未取得 30セル\n\n未確認: 29セル\nblocked + not-run"
+  },
+  {
+    "label": "complete-reset",
+    "observed_at": "2026-10-08T07:15:45.068Z",
+    "count": 57,
+    "filters": [
+      {
+        "id": "status",
+        "value": ""
+      },
+      {
+        "id": "device",
+        "value": ""
+      },
+      {
+        "id": "operation",
+        "value": ""
+      },
+      {
+        "id": "route",
+        "value": ""
+      },
+      {
+        "id": "level",
+        "value": ""
+      }
+    ],
+    "rows": [
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "answer",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "keyboard",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "sse-draft",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "reload",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "back",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "cancel",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "double-submit",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "disconnect-before",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "browser",
+        "operation": "disconnect-after",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "answer",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "keyboard",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "sse-draft",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "reload",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "back",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "cancel",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "double-submit",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "disconnect-before",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "browser",
+        "operation": "disconnect-after",
+        "route": "local",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "answer",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "keyboard",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "sse-draft",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "reload",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "back",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "cancel",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "double-submit",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "disconnect-before",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "real-connection",
+        "operation": "disconnect-after",
+        "route": "wsl",
+        "status": "pass"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "answer",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "keyboard",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "sse-draft",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "reload",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "back",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "cancel",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "double-submit",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "disconnect-before",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "disconnect-after",
+        "route": "wsl",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "answer",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "keyboard",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "sse-draft",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "reload",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "back",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "cancel",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "double-submit",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "disconnect-before",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "disconnect-after",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "answer",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "keyboard",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "sse-draft",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "reload",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "back",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "cancel",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "double-submit",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "disconnect-before",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "disconnect-after",
+        "route": "tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "none",
+        "level": "fixture",
+        "operation": "api-regression",
+        "route": "fixture",
+        "status": "pass"
+      },
+      {
+        "device": "desktop",
+        "level": "unrecorded",
+        "operation": "harness-connect",
+        "route": "wsl-tailscale",
+        "status": "not-run"
+      },
+      {
+        "device": "mobile",
+        "level": "unrecorded",
+        "operation": "harness-connect",
+        "route": "wsl-tailscale",
+        "status": "not-run"
+      }
+    ],
+    "summary": "入力消失: 0セルで消失 / 27セルを観測\n未取得 30セル\n\n重複回答: 0セルで発生 / 27セルを観測\n未取得 30セル\n\n未確認: 29セル\nblocked + not-run"
+  }
+]

@@ -1,0 +1,22 @@
+TAP version 13
+# Subtest: allow only existing fixture files; deny secrets, escapes, other tools and writes to read fixtures
+ok 1 - allow only existing fixture files; deny secrets, escapes, other tools and writes to read fixtures
+  ---
+  duration_ms: 2.324659
+  type: 'test'
+  ...
+# Subtest: restrict advertised tools and stop before a request exceeds the budget
+ok 2 - restrict advertised tools and stop before a request exceeds the budget
+  ---
+  duration_ms: 0.779343
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 41.407506

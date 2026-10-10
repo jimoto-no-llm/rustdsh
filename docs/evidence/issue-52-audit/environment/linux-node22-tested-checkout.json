@@ -1,0 +1,182 @@
+{
+  "recorded_at": "2026-10-08T06:56:44.644Z",
+  "platform": "linux",
+  "architecture": "x64",
+  "os_release": "6.18.33.2-microsoft-standard-WSL2",
+  "node_version": "v22.23.3",
+  "node_executable": "/tmp/rdsh-issue52-node22.kRaoHD/node-v22.23.3-linux-x64/bin/node",
+  "repository": "/tmp/rdsh-issue52-node22.kRaoHD/source",
+  "expected_head": "ec5fbf7c7ee5342fe9952dc0da0097c887aa427e",
+  "actual_head": "ec5fbf7c7ee5342fe9952dc0da0097c887aa427e",
+  "dashboard_status": "",
+  "files": [
+    {
+      "path": "dashboard/README.md",
+      "git_blob": "8b775207ce930d2160288cca37550f11d99e1ce1",
+      "sha256": "ed017b304dc442160d01886b85de18086ce4e7f978fbdc35eb12f379548dfaab",
+      "lf_sha256": "ed017b304dc442160d01886b85de18086ce4e7f978fbdc35eb12f379548dfaab"
+    },
+    {
+      "path": "dashboard/app.mjs",
+      "git_blob": "593634ffedc06bfc4d760e1ca74033ab1c336c51",
+      "sha256": "626babe49569d92264b23d5d4ef07af2aff5e6315cd381323edbedd81143d359",
+      "lf_sha256": "626babe49569d92264b23d5d4ef07af2aff5e6315cd381323edbedd81143d359"
+    },
+    {
+      "path": "dashboard/cli.mjs",
+      "git_blob": "0b32b6ead18fefded17d9e1dd01f74ec981d898e",
+      "sha256": "e77df3d9c79f40380e19f1154c74a814ab83c0e3d3830d5003f5239afa56eb64",
+      "lf_sha256": "e77df3d9c79f40380e19f1154c74a814ab83c0e3d3830d5003f5239afa56eb64"
+    },
+    {
+      "path": "dashboard/harness.mjs",
+      "git_blob": "3bc519734e4a873908e4390ee444be81db57e6b8",
+      "sha256": "7bc50211f8f2b47c157c466460239c098865a9066660d46c346fb64f656ce0b9",
+      "lf_sha256": "7bc50211f8f2b47c157c466460239c098865a9066660d46c346fb64f656ce0b9"
+    },
+    {
+      "path": "dashboard/install-windows.ps1",
+      "git_blob": "9fa1bd7afda1eb8b78129277dc8e703f4d1d5e34",
+      "sha256": "aee7c55ba70cf07005f003738e6dee13780e70c99893b3864233c48ac3307497",
+      "lf_sha256": "14f9f6d3df9ed1626b53d1919339b76e3377bb6479f29923840159a5c6268ead"
+    },
+    {
+      "path": "dashboard/mcp.mjs",
+      "git_blob": "99fd60b9a6efa3e2d85b4729df8067a08e0e9ad8",
+      "sha256": "3ac92218fc0187de5fc10c590a552c12be56f4f519631d49533868677049714d",
+      "lf_sha256": "3ac92218fc0187de5fc10c590a552c12be56f4f519631d49533868677049714d"
+    },
+    {
+      "path": "dashboard/mcp2.mjs",
+      "git_blob": "8b07a88e607f1609a79b08cbe24335a646291ca0",
+      "sha256": "4c514d3b836c34ceadf9b17ddd8040c2396f3de5e8ced8f411d86d992f54b185",
+      "lf_sha256": "4c514d3b836c34ceadf9b17ddd8040c2396f3de5e8ced8f411d86d992f54b185"
+    },
+    {
+      "path": "dashboard/package-lock.json",
+      "git_blob": "a60dde9c4f99736679cd133a59456acabcd5c185",
+      "sha256": "40d9b9beeb4284728b6c94074fe3eac1297252fd95ba17c73e23703f9ae9fe12",
+      "lf_sha256": "40d9b9beeb4284728b6c94074fe3eac1297252fd95ba17c73e23703f9ae9fe12"
+    },
+    {
+      "path": "dashboard/package.json",
+      "git_blob": "dfd860c52faa1669d43be7296f949c12cd54e188",
+      "sha256": "569e90765fc52dbf9a893c4d96f3cd8665a70fdfe8fcd4f07bab05511af243d8",
+      "lf_sha256": "569e90765fc52dbf9a893c4d96f3cd8665a70fdfe8fcd4f07bab05511af243d8"
+    },
+    {
+      "path": "dashboard/qa/README.md",
+      "git_blob": "7d528602ec62e2670593391e592f9035a8fc6f19",
+      "sha256": "f379582cda4a988a2dda89d1e3e1286e612120b6a697e7f5e3f8fb2ee57bd6f6",
+      "lf_sha256": "f379582cda4a988a2dda89d1e3e1286e612120b6a697e7f5e3f8fb2ee57bd6f6"
+    },
+    {
+      "path": "dashboard/qa/catalog.mjs",
+      "git_blob": "e26576143f09a725fd8a858ef5189af8bb999382",
+      "sha256": "dc3a65e86f6f020f13f93431e5f31136fe7c9d7140bb33009a0d3146986f70eb",
+      "lf_sha256": "dc3a65e86f6f020f13f93431e5f31136fe7c9d7140bb33009a0d3146986f70eb"
+    },
+    {
+      "path": "dashboard/qa/cli.mjs",
+      "git_blob": "4de264bed329a52179251c4cf4e170294f59da1b",
+      "sha256": "1c22372d7e9d274a4bd47ce552a1f1a1fd109c9a92a8219dd135f9fbbee45d0d",
+      "lf_sha256": "1c22372d7e9d274a4bd47ce552a1f1a1fd109c9a92a8219dd135f9fbbee45d0d"
+    },
+    {
+      "path": "dashboard/qa/fixture.mjs",
+      "git_blob": "bd3a64337c25ef4dd3fef6bf0b98c9aa30fe9944",
+      "sha256": "a3c2cbddd63f543703c4f559db53c5355048442fba28a13d9028a0c81f60fbb9",
+      "lf_sha256": "a3c2cbddd63f543703c4f559db53c5355048442fba28a13d9028a0c81f60fbb9"
+    },
+    {
+      "path": "dashboard/qa/report.mjs",
+      "git_blob": "c46b8a5ac72b0105eb49cb950dbae3455e18a4b2",
+      "sha256": "517c84956740a9c413b9750965785238ba8a7ce256ded2ab2f3530507a9b3a71",
+      "lf_sha256": "517c84956740a9c413b9750965785238ba8a7ce256ded2ab2f3530507a9b3a71"
+    },
+    {
+      "path": "dashboard/qa/view.mjs",
+      "git_blob": "942735d17cb293e798f1fb04f1e01f2b58eec0f7",
+      "sha256": "0320d89967001604b826211b8e3045b503d3d39e8dba91bc91d5e84a5c0243ef",
+      "lf_sha256": "0320d89967001604b826211b8e3045b503d3d39e8dba91bc91d5e84a5c0243ef"
+    },
+    {
+      "path": "dashboard/rdsh-dashboard.cmd",
+      "git_blob": "f6100b86bb9424c8ec400d99ca43ac067622971f",
+      "sha256": "31154923523bd0e5f1c5e8f2c02a1919af35e9b36cc440974700e3f0a4550d97",
+      "lf_sha256": "31154923523bd0e5f1c5e8f2c02a1919af35e9b36cc440974700e3f0a4550d97"
+    },
+    {
+      "path": "dashboard/rdsh-dashboard.ps1",
+      "git_blob": "f7dd92aa9edb8f97eed7124ac7654eebe9a89933",
+      "sha256": "761ceab6fc3de02998933e934aab81650c296932bd2a0818b5b853f8f4f22401",
+      "lf_sha256": "ef3d43e2459af10235e265da49c58c1dd964c878301c353b67713fd2895acc6a"
+    },
+    {
+      "path": "dashboard/server.mjs",
+      "git_blob": "2b15d82823a62819176965da88c7c2d6d6dc30db",
+      "sha256": "f491d87bc2d75287c0288227739b525752d1ceaaa7a9433b5461d8abe486a5a4",
+      "lf_sha256": "f491d87bc2d75287c0288227739b525752d1ceaaa7a9433b5461d8abe486a5a4"
+    },
+    {
+      "path": "dashboard/state.mjs",
+      "git_blob": "76bc158b9bee44d9deb0fecfbd7a02af842b86ee",
+      "sha256": "1bcca78a7aa28f2e0f661fbe2208f9d5c2faf5c94c83476b9bffe63042364e4f",
+      "lf_sha256": "1bcca78a7aa28f2e0f661fbe2208f9d5c2faf5c94c83476b9bffe63042364e4f"
+    },
+    {
+      "path": "dashboard/tailscale.mjs",
+      "git_blob": "4df7ea474319c1dc4b1a71dae37c268b370b7b22",
+      "sha256": "756f283ab1f533d51e489aee510d794257bc62775e42bdd0f7c385022dac84a3",
+      "lf_sha256": "756f283ab1f533d51e489aee510d794257bc62775e42bdd0f7c385022dac84a3"
+    },
+    {
+      "path": "dashboard/test/answer-dom.mjs",
+      "git_blob": "17e86d3f2e59d3a0315da098a7af1a26ee2a2404",
+      "sha256": "48d92859583200dc78dfd18b277970183b30b50adee33ee6f0570e7a91f5e07a",
+      "lf_sha256": "48d92859583200dc78dfd18b277970183b30b50adee33ee6f0570e7a91f5e07a"
+    },
+    {
+      "path": "dashboard/test/answer-ui.test.mjs",
+      "git_blob": "151af78e7e059e4b8bb305d8b442c650ac989390",
+      "sha256": "b3bf001386ffd93856715ae718b7ee5d7f32bf1bc88722d824506e8302aa5d3c",
+      "lf_sha256": "b3bf001386ffd93856715ae718b7ee5d7f32bf1bc88722d824506e8302aa5d3c"
+    },
+    {
+      "path": "dashboard/test/dashboard.test.mjs",
+      "git_blob": "8d42afa332951c2b145c624f873a9c84b9df2934",
+      "sha256": "a307ed50ba3a42d2e74cd7ae71b01f1b88d52a0c77dd89bf6c8968848ef8cc94",
+      "lf_sha256": "a307ed50ba3a42d2e74cd7ae71b01f1b88d52a0c77dd89bf6c8968848ef8cc94"
+    },
+    {
+      "path": "dashboard/test/events.test.mjs",
+      "git_blob": "1453eb80c33249e25607a9e3c0bf44cdb0071d5b",
+      "sha256": "343fe852df131486a649f399ab71805f6583ed7207f5dfaf221418039697b643",
+      "lf_sha256": "343fe852df131486a649f399ab71805f6583ed7207f5dfaf221418039697b643"
+    },
+    {
+      "path": "dashboard/test/qa-fixture.test.mjs",
+      "git_blob": "6089b8bc759941601037b4ada95319d50cc73b32",
+      "sha256": "9edc4fc84e932064e8076fdf3efcd201e7c6d902c5d90ec2dc9b891cf72f6ea2",
+      "lf_sha256": "9edc4fc84e932064e8076fdf3efcd201e7c6d902c5d90ec2dc9b891cf72f6ea2"
+    },
+    {
+      "path": "dashboard/test/qa-report.test.mjs",
+      "git_blob": "9e90f9e2a3bfa3ba2c5697304aa4b8f6470db50e",
+      "sha256": "1aa31e9ab803ef787b150cd55407d374a96502099251c48271ff7edaa55a652f",
+      "lf_sha256": "1aa31e9ab803ef787b150cd55407d374a96502099251c48271ff7edaa55a652f"
+    },
+    {
+      "path": "dashboard/ui.html",
+      "git_blob": "292a90cad07df499a8e79c7edc65bf95317e070d",
+      "sha256": "55be3006f21375dcc3b6f96bba9538f9459c115f6d819ae58b37254ac3d2f985",
+      "lf_sha256": "55be3006f21375dcc3b6f96bba9538f9459c115f6d819ae58b37254ac3d2f985"
+    },
+    {
+      "path": "dashboard/webhooks.mjs",
+      "git_blob": "5b232c08f6e4f904f42535ea9258c74bf94f172d",
+      "sha256": "c9936d8ff6a1123c06dcc5a7496eaa26508e262ad2fd8ac3de2db2092402c8ff",
+      "lf_sha256": "c9936d8ff6a1123c06dcc5a7496eaa26508e262ad2fd8ac3de2db2092402c8ff"
+    }
+  ]
+}

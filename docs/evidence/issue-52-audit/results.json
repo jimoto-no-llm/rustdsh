@@ -1,0 +1,1006 @@
+{
+  "schema": 1,
+  "target": {
+    "sha": "ec5fbf7c7ee5342fe9952dc0da0097c887aa427e",
+    "dirty": false,
+    "note": "ec5fbf7を対象。ブラウザー起動時の576d5fa由来snapshotとec5fbf7の実行モジュール同一性はbrowser-source-provenance.jsonで照合。実ブラウザー27セル+自動API1セル。共有試行を含むため独立した28試行ではない。実機スマホ、Tailscale、DSH Harness、通常ランチャー起動は未確認。"
+  },
+  "results": [
+    {
+      "case_id": "project-desktop-local-answer",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T06:53:04.384Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport (client 1265x720)"
+      },
+      "command": "Windows: node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop",
+      "reason": "保存済み本文が入力と一致。Q-sseの回答とkeyboardは同じ試行を2セルに記録。独立した2回の試験ではない。",
+      "evidence": [
+        "browser-checks.md",
+        "browser-observations.json",
+        "desktop-keyboard.json",
+        "desktop-answer-visible.jpg",
+        "environment/browser-source-provenance.json"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "保存済み本文が入力と一致。Q-sseの回答とkeyboardは同じ試行を2セルに記録。独立した2回の試験ではない。"
+      }
+    },
+    {
+      "case_id": "project-desktop-local-keyboard",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T06:53:04.384Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport (client 1265x720)"
+      },
+      "command": "Windows: node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop",
+      "reason": "Tab4回→回答入力→Tab→Return。送信後フォーム消失に伴いfocusはBODY。Q-sseの回答とkeyboardは同じ試行を2セルに記録。独立した2回の試験ではない。",
+      "evidence": [
+        "browser-checks.md",
+        "browser-observations.json",
+        "desktop-keyboard.json",
+        "desktop-answer-visible.jpg",
+        "environment/browser-source-provenance.json"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "Tab4回→回答入力→Tab→Return。送信後フォーム消失に伴いfocusはBODY。Q-sseの回答とkeyboardは同じ試行を2セルに記録。独立した2回の試験ではない。"
+      }
+    },
+    {
+      "case_id": "project-desktop-local-sse-draft",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T06:52:28.397Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport (client 1265x720)"
+      },
+      "command": "Windows: node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop",
+      "reason": "logによる更新後も日本語2行とTEXTAREA focusを保持。POST0、feedback0。",
+      "evidence": [
+        "browser-checks.md",
+        "browser-observations.json",
+        "desktop-unsent.json",
+        "desktop-sse.jpg",
+        "environment/browser-source-provenance.json"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": true,
+        "detail": "logによる更新後も日本語2行とTEXTAREA focusを保持。POST0、feedback0。"
+      }
+    },
+    {
+      "case_id": "project-desktop-local-reload",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T06:52:28.525Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport (client 1265x720)"
+      },
+      "command": "Windows: node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop",
+      "reason": "再読込後、未送信の日本語2行を復元。POST0、feedback0。",
+      "evidence": [
+        "browser-checks.md",
+        "browser-observations.json",
+        "desktop-unsent.json",
+        "desktop-back.jpg",
+        "environment/browser-source-provenance.json"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": null,
+        "detail": "再読込後、未送信の日本語2行を復元。POST0、feedback0。"
+      }
+    },
+    {
+      "case_id": "project-desktop-local-back",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T06:52:28.598Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport (client 1265x720)"
+      },
+      "command": "Windows: node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop",
+      "reason": "about:blankへ移動し戻る。接続済み表示と未送信本文を復元。POST0、feedback0。",
+      "evidence": [
+        "browser-checks.md",
+        "browser-observations.json",
+        "desktop-unsent.json",
+        "desktop-back.jpg",
+        "environment/browser-source-provenance.json"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": null,
+        "detail": "about:blankへ移動し戻る。接続済み表示と未送信本文を復元。POST0、feedback0。"
+      }
+    },
+    {
+      "case_id": "project-desktop-local-cancel",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T06:52:28.474Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport (client 1265x720)"
+      },
+      "command": "Windows: node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop",
+      "reason": "Ctrl+Kでコマンドパレットを開きEscapeで閉じる。元の送信ボタンへfocus復帰、本文保持。質問取消/送信取消ではない。",
+      "evidence": [
+        "browser-checks.md",
+        "browser-observations.json",
+        "desktop-unsent.json",
+        "desktop-back.jpg",
+        "environment/browser-source-provenance.json"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": true,
+        "detail": "Ctrl+Kでコマンドパレットを開きEscapeで閉じる。元の送信ボタンへfocus復帰、本文保持。質問取消/送信取消ではない。"
+      }
+    },
+    {
+      "case_id": "project-desktop-local-double-submit",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T06:55:35.991Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport (client 1265x720)"
+      },
+      "command": "Windows: node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop",
+      "reason": "hold中の二度押し後もPOST1。log/SSE後も本文readonlyと送信disabledを確認。release後feedback1。disabled要素へのツール操作は送出されない。",
+      "evidence": [
+        "browser-checks.md",
+        "browser-observations.json",
+        "desktop-double.json",
+        "desktop-double-sse.jpg",
+        "environment/browser-source-provenance.json",
+        "desktop-held.json",
+        "desktop-double-sse.jpg"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "hold中の二度押し後もPOST1。log/SSE後も本文readonlyと送信disabledを確認。release後feedback1。disabled要素へのツール操作は送出されない。"
+      }
+    },
+    {
+      "case_id": "project-desktop-local-disconnect-before",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T06:56:21.890Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport (client 1265x720)"
+      },
+      "command": "Windows: node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop",
+      "reason": "drop-before時の本文保持、feedback0を確認。resume後の手動再送でfeedback1。POST2のうち保存1。",
+      "evidence": [
+        "browser-checks.md",
+        "browser-observations.json",
+        "desktop-before-final.json",
+        "desktop-after-saved.jpg",
+        "environment/browser-source-provenance.json",
+        "desktop-before-offline.json",
+        "desktop-before-offline.jpg"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 2,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "drop-before時の本文保持、feedback0を確認。resume後の手動再送でfeedback1。POST2のうち保存1。"
+      }
+    },
+    {
+      "case_id": "project-desktop-local-disconnect-after",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T06:57:33.759Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport (client 1265x720)"
+      },
+      "command": "Windows: node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop",
+      "reason": "drop-after時に本文保持とfeedback1、resume後の回答表示を確認。自動/手動再送なし、POST1/feedback1。",
+      "evidence": [
+        "browser-checks.md",
+        "browser-observations.json",
+        "desktop-final.json",
+        "desktop-after-saved.jpg",
+        "environment/browser-source-provenance.json",
+        "desktop-after-offline.json",
+        "desktop-after-offline.jpg"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "drop-after時に本文保持とfeedback1、resume後の回答表示を確認。自動/手動再送なし、POST1/feedback1。"
+      }
+    },
+    {
+      "case_id": "project-desktop-wsl-answer",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "wsl",
+      "tested_at": "2026-10-08T06:55:36.668Z",
+      "environment": {
+        "os": "WSL Ubuntu 24.04.4 LTS Linux x86_64 server / Windows browser",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport (client 1265x720)"
+      },
+      "command": "WSL Ubuntu: node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop",
+      "reason": "保存済み本文が入力と一致。Q-sseの回答とkeyboardは同じ試行を2セルに記録。独立した2回の試験ではない。",
+      "evidence": [
+        "browser-checks.md",
+        "browser-observations.json",
+        "wsl-keyboard.json",
+        "wsl-answer-visible.jpg",
+        "environment/browser-source-provenance.json"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "保存済み本文が入力と一致。Q-sseの回答とkeyboardは同じ試行を2セルに記録。独立した2回の試験ではない。"
+      }
+    },
+    {
+      "case_id": "project-desktop-wsl-keyboard",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "wsl",
+      "tested_at": "2026-10-08T06:55:36.668Z",
+      "environment": {
+        "os": "WSL Ubuntu 24.04.4 LTS Linux x86_64 server / Windows browser",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport (client 1265x720)"
+      },
+      "command": "WSL Ubuntu: node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop",
+      "reason": "Tab4回→回答入力→Tab→Return。送信後フォーム消失に伴いfocusはBODY。Q-sseの回答とkeyboardは同じ試行を2セルに記録。独立した2回の試験ではない。",
+      "evidence": [
+        "browser-checks.md",
+        "browser-observations.json",
+        "wsl-keyboard.json",
+        "wsl-answer-visible.jpg",
+        "environment/browser-source-provenance.json"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "Tab4回→回答入力→Tab→Return。送信後フォーム消失に伴いfocusはBODY。Q-sseの回答とkeyboardは同じ試行を2セルに記録。独立した2回の試験ではない。"
+      }
+    },
+    {
+      "case_id": "project-desktop-wsl-sse-draft",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "wsl",
+      "tested_at": "2026-10-08T06:55:13.194Z",
+      "environment": {
+        "os": "WSL Ubuntu 24.04.4 LTS Linux x86_64 server / Windows browser",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport (client 1265x720)"
+      },
+      "command": "WSL Ubuntu: node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop",
+      "reason": "logによる更新後も日本語2行とTEXTAREA focusを保持。POST0、feedback0。",
+      "evidence": [
+        "browser-checks.md",
+        "browser-observations.json",
+        "wsl-unsent.json",
+        "wsl-sse.jpg",
+        "environment/browser-source-provenance.json"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": true,
+        "detail": "logによる更新後も日本語2行とTEXTAREA focusを保持。POST0、feedback0。"
+      }
+    },
+    {
+      "case_id": "project-desktop-wsl-reload",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "wsl",
+      "tested_at": "2026-10-08T06:55:13.340Z",
+      "environment": {
+        "os": "WSL Ubuntu 24.04.4 LTS Linux x86_64 server / Windows browser",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport (client 1265x720)"
+      },
+      "command": "WSL Ubuntu: node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop",
+      "reason": "再読込後、未送信の日本語2行を復元。POST0、feedback0。",
+      "evidence": [
+        "browser-checks.md",
+        "browser-observations.json",
+        "wsl-unsent.json",
+        "wsl-back.jpg",
+        "environment/browser-source-provenance.json"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": null,
+        "detail": "再読込後、未送信の日本語2行を復元。POST0、feedback0。"
+      }
+    },
+    {
+      "case_id": "project-desktop-wsl-back",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "wsl",
+      "tested_at": "2026-10-08T06:55:13.432Z",
+      "environment": {
+        "os": "WSL Ubuntu 24.04.4 LTS Linux x86_64 server / Windows browser",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport (client 1265x720)"
+      },
+      "command": "WSL Ubuntu: node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop",
+      "reason": "about:blankへ移動し戻る。接続済み表示と未送信本文を復元。POST0、feedback0。",
+      "evidence": [
+        "browser-checks.md",
+        "browser-observations.json",
+        "wsl-unsent.json",
+        "wsl-back.jpg",
+        "environment/browser-source-provenance.json"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": null,
+        "detail": "about:blankへ移動し戻る。接続済み表示と未送信本文を復元。POST0、feedback0。"
+      }
+    },
+    {
+      "case_id": "project-desktop-wsl-cancel",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "wsl",
+      "tested_at": "2026-10-08T06:55:13.276Z",
+      "environment": {
+        "os": "WSL Ubuntu 24.04.4 LTS Linux x86_64 server / Windows browser",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport (client 1265x720)"
+      },
+      "command": "WSL Ubuntu: node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop",
+      "reason": "Ctrl+Kでコマンドパレットを開きEscapeで閉じる。元の送信ボタンへfocus復帰、本文保持。質問取消/送信取消ではない。",
+      "evidence": [
+        "browser-checks.md",
+        "browser-observations.json",
+        "wsl-unsent.json",
+        "wsl-back.jpg",
+        "environment/browser-source-provenance.json"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": true,
+        "detail": "Ctrl+Kでコマンドパレットを開きEscapeで閉じる。元の送信ボタンへfocus復帰、本文保持。質問取消/送信取消ではない。"
+      }
+    },
+    {
+      "case_id": "project-desktop-wsl-double-submit",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "wsl",
+      "tested_at": "2026-10-08T06:57:33.795Z",
+      "environment": {
+        "os": "WSL Ubuntu 24.04.4 LTS Linux x86_64 server / Windows browser",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport (client 1265x720)"
+      },
+      "command": "WSL Ubuntu: node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop",
+      "reason": "hold中の二度押し後もPOST1。log/SSE後も本文readonlyと送信disabledを確認。release後feedback1。disabled要素へのツール操作は送出されない。",
+      "evidence": [
+        "browser-checks.md",
+        "browser-observations.json",
+        "wsl-double.json",
+        "wsl-double-sse.jpg",
+        "environment/browser-source-provenance.json",
+        "wsl-held.json",
+        "wsl-double-sse.jpg"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "hold中の二度押し後もPOST1。log/SSE後も本文readonlyと送信disabledを確認。release後feedback1。disabled要素へのツール操作は送出されない。"
+      }
+    },
+    {
+      "case_id": "project-desktop-wsl-disconnect-before",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "wsl",
+      "tested_at": "2026-10-08T07:01:58.460Z",
+      "environment": {
+        "os": "WSL Ubuntu 24.04.4 LTS Linux x86_64 server / Windows browser",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport (client 1265x720)"
+      },
+      "command": "WSL Ubuntu: node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop",
+      "reason": "drop-before時の本文保持、feedback0を確認。resume後の手動再送でfeedback1。POST2のうち保存1。",
+      "evidence": [
+        "browser-checks.md",
+        "browser-observations.json",
+        "wsl-before-final.json",
+        "wsl-before-saved.jpg",
+        "environment/browser-source-provenance.json",
+        "wsl-before-offline.json",
+        "wsl-before-offline.jpg"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 2,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "drop-before時の本文保持、feedback0を確認。resume後の手動再送でfeedback1。POST2のうち保存1。"
+      }
+    },
+    {
+      "case_id": "project-desktop-wsl-disconnect-after",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "wsl",
+      "tested_at": "2026-10-08T07:02:50.703Z",
+      "environment": {
+        "os": "WSL Ubuntu 24.04.4 LTS Linux x86_64 server / Windows browser",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport (client 1265x720)"
+      },
+      "command": "WSL Ubuntu: node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop",
+      "reason": "drop-after時に本文保持とfeedback1、resume後の回答表示を確認。自動/手動再送なし、POST1/feedback1。",
+      "evidence": [
+        "browser-checks.md",
+        "browser-observations.json",
+        "wsl-final.json",
+        "wsl-after-saved.jpg",
+        "environment/browser-source-provenance.json",
+        "wsl-after-offline.json",
+        "wsl-after-offline.jpg"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "drop-after時に本文保持とfeedback1、resume後の回答表示を確認。自動/手動再送なし、POST1/feedback1。"
+      }
+    },
+    {
+      "case_id": "project-mobile-local-answer",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T07:08:31.436Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "mobile viewport 390x844 (client 375x844); desktop pointer/keyboard, not physical-phone"
+      },
+      "command": "Windows: node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop",
+      "reason": "保存済み本文が入力と一致。Q-sseの回答とkeyboardは同じ試行を2セルに記録。独立した2回の試験ではない。",
+      "evidence": [
+        "browser-checks.md",
+        "browser-observations.json",
+        "mobile390-keyboard.json",
+        "mobile390-answer-visible.jpg",
+        "environment/browser-source-provenance.json"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "保存済み本文が入力と一致。Q-sseの回答とkeyboardは同じ試行を2セルに記録。独立した2回の試験ではない。"
+      }
+    },
+    {
+      "case_id": "project-mobile-local-keyboard",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T07:08:31.436Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "mobile viewport 390x844 (client 375x844); desktop pointer/keyboard, not physical-phone"
+      },
+      "command": "Windows: node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop",
+      "reason": "Tab4回→回答入力→Tab→Return。送信後フォーム消失に伴いfocusはBODY。Q-sseの回答とkeyboardは同じ試行を2セルに記録。独立した2回の試験ではない。",
+      "evidence": [
+        "browser-checks.md",
+        "browser-observations.json",
+        "mobile390-keyboard.json",
+        "mobile390-answer-visible.jpg",
+        "environment/browser-source-provenance.json"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "Tab4回→回答入力→Tab→Return。送信後フォーム消失に伴いfocusはBODY。Q-sseの回答とkeyboardは同じ試行を2セルに記録。独立した2回の試験ではない。"
+      }
+    },
+    {
+      "case_id": "project-mobile-local-sse-draft",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T07:08:18.446Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "mobile viewport 390x844 (client 375x844); desktop pointer/keyboard, not physical-phone"
+      },
+      "command": "Windows: node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop",
+      "reason": "logによる更新後も日本語2行とTEXTAREA focusを保持。POST0、feedback0。",
+      "evidence": [
+        "browser-checks.md",
+        "browser-observations.json",
+        "mobile390-unsent.json",
+        "mobile390-sse.jpg",
+        "environment/browser-source-provenance.json"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": true,
+        "detail": "logによる更新後も日本語2行とTEXTAREA focusを保持。POST0、feedback0。"
+      }
+    },
+    {
+      "case_id": "project-mobile-local-reload",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T07:08:18.587Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "mobile viewport 390x844 (client 375x844); desktop pointer/keyboard, not physical-phone"
+      },
+      "command": "Windows: node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop",
+      "reason": "再読込後、未送信の日本語2行を復元。POST0、feedback0。",
+      "evidence": [
+        "browser-checks.md",
+        "browser-observations.json",
+        "mobile390-unsent.json",
+        "mobile390-reload.jpg",
+        "environment/browser-source-provenance.json"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": null,
+        "detail": "再読込後、未送信の日本語2行を復元。POST0、feedback0。"
+      }
+    },
+    {
+      "case_id": "project-mobile-local-back",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T07:08:18.675Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "mobile viewport 390x844 (client 375x844); desktop pointer/keyboard, not physical-phone"
+      },
+      "command": "Windows: node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop",
+      "reason": "about:blankへ移動し戻る。接続済み表示と未送信本文を復元。POST0、feedback0。",
+      "evidence": [
+        "browser-checks.md",
+        "browser-observations.json",
+        "mobile390-unsent.json",
+        "mobile390-back.jpg",
+        "environment/browser-source-provenance.json"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": null,
+        "detail": "about:blankへ移動し戻る。接続済み表示と未送信本文を復元。POST0、feedback0。"
+      }
+    },
+    {
+      "case_id": "project-mobile-local-cancel",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T07:08:18.519Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "mobile viewport 390x844 (client 375x844); desktop pointer/keyboard, not physical-phone"
+      },
+      "command": "Windows: node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop",
+      "reason": "Ctrl+Kでコマンドパレットを開きEscapeで閉じる。元の送信ボタンへfocus復帰、本文保持。質問取消/送信取消ではない。",
+      "evidence": [
+        "browser-checks.md",
+        "browser-observations.json",
+        "mobile390-unsent.json",
+        "mobile390-cancel.jpg",
+        "environment/browser-source-provenance.json"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": true,
+        "detail": "Ctrl+Kでコマンドパレットを開きEscapeで閉じる。元の送信ボタンへfocus復帰、本文保持。質問取消/送信取消ではない。"
+      }
+    },
+    {
+      "case_id": "project-mobile-local-double-submit",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T07:09:19.517Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "mobile viewport 390x844 (client 375x844); desktop pointer/keyboard, not physical-phone"
+      },
+      "command": "Windows: node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop",
+      "reason": "hold中の二度押し後もPOST1。log/SSE後も本文readonlyと送信disabledを確認。release後feedback1。disabled要素へのツール操作は送出されない。",
+      "evidence": [
+        "browser-checks.md",
+        "browser-observations.json",
+        "mobile390-double.json",
+        "mobile390-double-saved.jpg",
+        "environment/browser-source-provenance.json",
+        "mobile390-held.json",
+        "mobile390-double-sse.jpg"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "hold中の二度押し後もPOST1。log/SSE後も本文readonlyと送信disabledを確認。release後feedback1。disabled要素へのツール操作は送出されない。"
+      }
+    },
+    {
+      "case_id": "project-mobile-local-disconnect-before",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T07:09:32.340Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "mobile viewport 390x844 (client 375x844); desktop pointer/keyboard, not physical-phone"
+      },
+      "command": "Windows: node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop",
+      "reason": "drop-before時の本文保持、feedback0を確認。resume後の手動再送でfeedback1。POST2のうち保存1。",
+      "evidence": [
+        "browser-checks.md",
+        "browser-observations.json",
+        "mobile390-before-final.json",
+        "mobile390-before-saved.jpg",
+        "environment/browser-source-provenance.json",
+        "mobile390-before-offline.json",
+        "mobile390-before-offline.jpg"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 2,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "drop-before時の本文保持、feedback0を確認。resume後の手動再送でfeedback1。POST2のうち保存1。"
+      }
+    },
+    {
+      "case_id": "project-mobile-local-disconnect-after",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T07:10:55.857Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "mobile viewport 390x844 (client 375x844); desktop pointer/keyboard, not physical-phone"
+      },
+      "command": "Windows: node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUA browser操作; stdin: log, hold, release, drop-before, drop-after, resume, stop",
+      "reason": "drop-after時に本文保持とfeedback1、resume後の回答表示を確認。自動/手動再送なし、POST1/feedback1。Q-navigationの再確認を採用。初回Q-afterの末尾文字差異は原因未確定のためこのセルの証拠に使わない。",
+      "evidence": [
+        "browser-checks.md",
+        "browser-observations.json",
+        "mobile390-final.json",
+        "mobile390-after-recheck-saved.jpg",
+        "environment/browser-source-provenance.json",
+        "mobile390-after-recheck-offline.json",
+        "mobile390-after-recheck-offline.jpg"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "drop-after時に本文保持とfeedback1、resume後の回答表示を確認。自動/手動再送なし、POST1/feedback1。Q-navigationの再確認を採用。初回Q-afterの末尾文字差異は原因未確定のためこのセルの証拠に使わない。"
+      }
+    },
+    {
+      "case_id": "project-api-fixture",
+      "status": "pass",
+      "level": "fixture",
+      "observed_route": "fixture",
+      "tested_at": "2026-10-08T06:57:27.476Z",
+      "environment": {
+        "os": "Windows / WSL Ubuntu 24.04.4 LTS (native Linux FS)",
+        "node": "22.23.3",
+        "browser": "none",
+        "device": "none"
+      },
+      "command": "cwd dashboard; Node v22.23.3: node --test test/*.test.mjs (各OSで実施)",
+      "reason": "Windows/Linuxそれぞれ45/45成功、skip0。2環境の自動テストをAPI回帰1セルの証拠とする。",
+      "evidence": [
+        "environment/windows-node22-tests.txt",
+        "environment/linux-native-node22-tests.txt",
+        "environment/node22-verification-summary.json"
+      ],
+      "observations": {
+        "detail": "API/MCP/イベント/回答UI単体/QA記録を自動検証。実ブラウザー操作と実機接続の代用ではない。"
+      }
+    },
+    {
+      "case_id": "project-mobile-wsl-answer",
+      "status": "not-run",
+      "reason": "実機スマホからWSLへの接続は未実施。PCブラウザーの狭い画面では代用しない。"
+    },
+    {
+      "case_id": "project-mobile-wsl-keyboard",
+      "status": "not-run",
+      "reason": "実機スマホからWSLへの接続は未実施。PCブラウザーの狭い画面では代用しない。"
+    },
+    {
+      "case_id": "project-mobile-wsl-sse-draft",
+      "status": "not-run",
+      "reason": "実機スマホからWSLへの接続は未実施。PCブラウザーの狭い画面では代用しない。"
+    },
+    {
+      "case_id": "project-mobile-wsl-reload",
+      "status": "not-run",
+      "reason": "実機スマホからWSLへの接続は未実施。PCブラウザーの狭い画面では代用しない。"
+    },
+    {
+      "case_id": "project-mobile-wsl-back",
+      "status": "not-run",
+      "reason": "実機スマホからWSLへの接続は未実施。PCブラウザーの狭い画面では代用しない。"
+    },
+    {
+      "case_id": "project-mobile-wsl-cancel",
+      "status": "not-run",
+      "reason": "実機スマホからWSLへの接続は未実施。PCブラウザーの狭い画面では代用しない。"
+    },
+    {
+      "case_id": "project-mobile-wsl-double-submit",
+      "status": "not-run",
+      "reason": "実機スマホからWSLへの接続は未実施。PCブラウザーの狭い画面では代用しない。"
+    },
+    {
+      "case_id": "project-mobile-wsl-disconnect-before",
+      "status": "not-run",
+      "reason": "実機スマホからWSLへの接続は未実施。PCブラウザーの狭い画面では代用しない。"
+    },
+    {
+      "case_id": "project-mobile-wsl-disconnect-after",
+      "status": "not-run",
+      "reason": "実機スマホからWSLへの接続は未実施。PCブラウザーの狭い画面では代用しない。"
+    },
+    {
+      "case_id": "project-desktop-tailscale-answer",
+      "status": "not-run",
+      "reason": "認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。"
+    },
+    {
+      "case_id": "project-desktop-tailscale-keyboard",
+      "status": "not-run",
+      "reason": "認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。"
+    },
+    {
+      "case_id": "project-desktop-tailscale-sse-draft",
+      "status": "not-run",
+      "reason": "認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。"
+    },
+    {
+      "case_id": "project-desktop-tailscale-reload",
+      "status": "not-run",
+      "reason": "認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。"
+    },
+    {
+      "case_id": "project-desktop-tailscale-back",
+      "status": "not-run",
+      "reason": "認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。"
+    },
+    {
+      "case_id": "project-desktop-tailscale-cancel",
+      "status": "not-run",
+      "reason": "認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。"
+    },
+    {
+      "case_id": "project-desktop-tailscale-double-submit",
+      "status": "not-run",
+      "reason": "認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。"
+    },
+    {
+      "case_id": "project-desktop-tailscale-disconnect-before",
+      "status": "not-run",
+      "reason": "認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。"
+    },
+    {
+      "case_id": "project-desktop-tailscale-disconnect-after",
+      "status": "not-run",
+      "reason": "認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。"
+    },
+    {
+      "case_id": "project-mobile-tailscale-answer",
+      "status": "not-run",
+      "reason": "認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。"
+    },
+    {
+      "case_id": "project-mobile-tailscale-keyboard",
+      "status": "not-run",
+      "reason": "認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。"
+    },
+    {
+      "case_id": "project-mobile-tailscale-sse-draft",
+      "status": "not-run",
+      "reason": "認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。"
+    },
+    {
+      "case_id": "project-mobile-tailscale-reload",
+      "status": "not-run",
+      "reason": "認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。"
+    },
+    {
+      "case_id": "project-mobile-tailscale-back",
+      "status": "not-run",
+      "reason": "認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。"
+    },
+    {
+      "case_id": "project-mobile-tailscale-cancel",
+      "status": "not-run",
+      "reason": "認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。"
+    },
+    {
+      "case_id": "project-mobile-tailscale-double-submit",
+      "status": "not-run",
+      "reason": "認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。"
+    },
+    {
+      "case_id": "project-mobile-tailscale-disconnect-before",
+      "status": "not-run",
+      "reason": "認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。"
+    },
+    {
+      "case_id": "project-mobile-tailscale-disconnect-after",
+      "status": "not-run",
+      "reason": "認証済みTailscale Serveの実接続試験は未実施。local/WSL loopbackでは代用しない。"
+    },
+    {
+      "case_id": "harness-desktop-wsl-tailscale",
+      "status": "not-run",
+      "reason": "既存DSH/WSL/Tailscaleの実接続は未実施。Project fixture結果は転記しない。"
+    },
+    {
+      "case_id": "harness-mobile-wsl-tailscale",
+      "status": "not-run",
+      "reason": "既存DSH/WSL/Tailscaleの実接続は未実施。Project fixture結果は転記しない。"
+    }
+  ]
+}

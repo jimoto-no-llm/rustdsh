@@ -1,0 +1,9 @@
+
+> test:updates
+> node update-banner.mjs
+
+{
+  "result": "PASS",
+  "flows": 5,
+  "output": "<workspace>\\outputs\\issue-52-submission\\integrated-update-e2e"
+}

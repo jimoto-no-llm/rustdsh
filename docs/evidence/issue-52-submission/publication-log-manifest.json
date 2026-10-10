@@ -1,0 +1,105 @@
+{
+  "schema": 1,
+  "source_base": "96dbcbbd6e1295b2e92ba31e9cf9037770107b24",
+  "files": [
+    {
+      "source_label": "outputs/issue-52-submission/main-baseline-windows.txt",
+      "public_path": "logs/main-baseline-windows.txt",
+      "source_phase": "unchanged-main-96dbcbb",
+      "original_sha256": "460eabd9ed1fe5cd6a77609551a7ff4804999166f2c60ac061a63461876513d7",
+      "public_sha256": "460eabd9ed1fe5cd6a77609551a7ff4804999166f2c60ac061a63461876513d7"
+    },
+    {
+      "source_label": "outputs/issue-52-submission/main-clippy-release.txt",
+      "public_path": "logs/main-clippy-release.txt",
+      "source_phase": "unchanged-main-96dbcbb",
+      "original_sha256": "5993c69ac3eaaaa5c7ba15ed15a2bc32b965cac78940214d40079067c1150234",
+      "public_sha256": "c9027a03631ffad1f6a7940e1ab193979c84b0977ddd80435c8046733554bed4"
+    },
+    {
+      "source_label": "outputs/issue-52-submission/main-e2e-windows.txt",
+      "public_path": "logs/main-e2e-windows.txt",
+      "source_phase": "unchanged-main-96dbcbb",
+      "original_sha256": "146288710e003b3539eb74ed73567c476b517685f063bbdf7ad39703031c3f26",
+      "public_sha256": "c63166493bd2bc09deb38b73e9eae13cc97b3056216d651b81d0f19ed016de8b"
+    },
+    {
+      "source_label": "outputs/issue-52-submission/main-wsl-build.txt",
+      "public_path": "logs/main-wsl-build.txt",
+      "source_phase": "unchanged-main-96dbcbb",
+      "original_sha256": "caaa1492909fb4741477dc91006056e0d305a6cc2e7aad69aaafcd85251dbb42",
+      "public_sha256": "416586806ae4d2e024bc410592bee4d7e7275215a4ef20afb7fb1bb595b0a151"
+    },
+    {
+      "source_label": "outputs/issue-52-submission/main-wsl-fence.txt",
+      "public_path": "logs/main-wsl-fence.txt",
+      "source_phase": "unchanged-main-96dbcbb",
+      "original_sha256": "d23b368c395197d3a8b20a0a8a3b11146449f95fdf233abaeb4941140273a9d3",
+      "public_sha256": "d23b368c395197d3a8b20a0a8a3b11146449f95fdf233abaeb4941140273a9d3"
+    },
+    {
+      "source_label": "outputs/issue-52-submission/main-wsl-regress.txt",
+      "public_path": "logs/main-wsl-regress.txt",
+      "source_phase": "unchanged-main-96dbcbb",
+      "original_sha256": "23b0396daf6828d8d4dfeb5b4fa77d67d44d82aa0a5251b26a8e5032cea15fc1",
+      "public_sha256": "23b0396daf6828d8d4dfeb5b4fa77d67d44d82aa0a5251b26a8e5032cea15fc1"
+    },
+    {
+      "source_label": "outputs/issue-52-submission/integrated-windows-tests.txt",
+      "public_path": "logs/integrated-windows-tests.txt",
+      "source_phase": "integration-see-current-integration-md",
+      "original_sha256": "fa40cf552c099f66511e29f8a6cf52d2da65eb57ca05a2ee6bb4ce2d2ea22ec0",
+      "public_sha256": "fa40cf552c099f66511e29f8a6cf52d2da65eb57ca05a2ee6bb4ce2d2ea22ec0"
+    },
+    {
+      "source_label": "outputs/issue-52-submission/integrated-recovery-final.txt",
+      "public_path": "logs/integrated-recovery-final.txt",
+      "source_phase": "integration-see-current-integration-md",
+      "original_sha256": "547e7449695e0dc394e443be3c6550e99b88777a6d25c7cd459f5329d67a1462",
+      "public_sha256": "547e7449695e0dc394e443be3c6550e99b88777a6d25c7cd459f5329d67a1462"
+    },
+    {
+      "source_label": "outputs/issue-52-submission/integrated-windows-final-tests.txt",
+      "public_path": "logs/integrated-windows-final-tests.txt",
+      "source_phase": "integration-see-current-integration-md",
+      "original_sha256": "ca7ca78d30344e0a459735e83a51528c908186576a4bfa640aabe5371e875330",
+      "public_sha256": "ca7ca78d30344e0a459735e83a51528c908186576a4bfa640aabe5371e875330"
+    },
+    {
+      "source_label": "outputs/issue-52-submission/integrated-wsl-tests.txt",
+      "public_path": "logs/integrated-wsl-tests.txt",
+      "source_phase": "integration-see-current-integration-md",
+      "original_sha256": "6db267fe7b7b73d385f53e09f032d996b8231ad7b60ef96db2b15ea93bbc3dd1",
+      "public_sha256": "94fe17ae4d71dfce1ab53f487cc8945fe8b9bc29dbe602592ab3e32312e7fde6"
+    },
+    {
+      "source_label": "outputs/issue-52-submission/integrated-wsl-delegated-tests.txt",
+      "public_path": "logs/integrated-wsl-delegated-tests.txt",
+      "source_phase": "integration-see-current-integration-md",
+      "original_sha256": "2f752c7df33046a3b9f4318c791441583b5bece83fbf7404ec05b29baf277213",
+      "public_sha256": "2f752c7df33046a3b9f4318c791441583b5bece83fbf7404ec05b29baf277213"
+    },
+    {
+      "source_label": "outputs/issue-52-submission/integrated-e2e-windows.txt",
+      "public_path": "logs/integrated-e2e-windows.txt",
+      "source_phase": "integration-see-current-integration-md",
+      "original_sha256": "85198b1b24f246d34df095fda2c7338e55cc1efb37928c5edd890afbe85e0057",
+      "public_sha256": "472fa3c7b432c49c3dd680cc861e760caedc9bf39d47c669f2a55c67f68e25d7"
+    },
+    {
+      "source_label": "outputs/issue-52-submission/integrated-updates-windows.txt",
+      "public_path": "logs/integrated-updates-windows.txt",
+      "source_phase": "integration-see-current-integration-md",
+      "original_sha256": "c6cae096b3f1c00b6b28e11c132185436fae29ce216f4683a9ae2c6a5c2bf77c",
+      "public_sha256": "24c3c44ecbe7157ab0a895ae5680c0e38da3637cfb0f7cb993af13806a24875e"
+    },
+    {
+      "source_label": "outputs/issue-52-submission/integrated-secscan-final.txt",
+      "public_path": "logs/integrated-secscan-final.txt",
+      "source_phase": "integration-see-current-integration-md",
+      "original_sha256": "3b830e1de14051e6b2eb2b6375e0f08a4d7b02237eafbf26403e5993ee044a0a",
+      "public_sha256": "3b830e1de14051e6b2eb2b6375e0f08a4d7b02237eafbf26403e5993ee044a0a"
+    }
+  ],
+  "note": "source_phase separates the unchanged main baseline from integration checks. The initial integrated Windows 262-test run preceded the key-length fix. The final 38-test Windows subset, Windows 263-test full run, and delegated WSL 263-test full run followed it. Read current-integration.md for the applicability and failures. Workspace and personal-home prefixes were generalized and trailing spaces/tabs were removed from public copies. Original logs are retained outside the repository."
+}

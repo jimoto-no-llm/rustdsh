@@ -1,0 +1,14 @@
+[
+  {
+    "artifact": "node-v22.23.3-win-x64.zip",
+    "url": "https://nodejs.org/dist/v22.23.3/node-v22.23.3-win-x64.zip",
+    "sha256": "2b0ff57b049cda1bbcea2240eec20467018713c1efe1f7360c2681859b90ed71",
+    "checksum_verified": true
+  },
+  {
+    "artifact": "node-v22.23.3-linux-x64.tar.xz",
+    "url": "https://nodejs.org/dist/v22.23.3/node-v22.23.3-linux-x64.tar.xz",
+    "sha256": "df450af89261115ef9f9e3830c3eeb2cc9213b63c720b1af623cb5dcbe2e02de",
+    "checksum_verified": true
+  }
+]

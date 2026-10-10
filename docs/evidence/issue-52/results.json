@@ -1,0 +1,328 @@
+{
+  "schema": 1,
+  "target": {
+    "sha": "f2a7dc6b2850a6f0c0e1ea1b53494b12cd2e1221",
+    "dirty": true,
+    "note": "Projectアプリ本体は記載SHAと同一。QAツール・記録のみ未コミット追加。初回とoffline集計修正後の2runをbrowser-checks.mdに区別。差分とQAソースは本PRを参照。実ブラウザーの最小経路のみ実施し、実機/WSL/Tailscale/DSH接続は未実施。"
+  },
+  "results": [
+    {
+      "case_id": "project-desktop-local-answer",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T04:07:04Z",
+      "environment": {
+        "os": "Windows",
+        "node": "24.13.0",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport 1280x900"
+      },
+      "command": "node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUAの実画面操作、障害はstdinから実行",
+      "reason": "キーボード回答セルと同じQ-sseの結果。保存済み本文keyboard52_回答を確認。独立した別試験ではない。",
+      "evidence": [
+        "browser-checks.md",
+        "run-1.json"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "キーボード回答セルと同じQ-sseの結果。保存済み本文keyboard52_回答を確認。独立した別試験ではない。"
+      }
+    },
+    {
+      "case_id": "project-desktop-local-keyboard",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T04:07:04Z",
+      "environment": {
+        "os": "Windows",
+        "node": "24.13.0",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport 1280x900"
+      },
+      "command": "node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUAの実画面操作、障害はstdinから実行",
+      "reason": "Tab4回で入力欄、入力→Tab→Returnで送信。フォーム消失後focusは文書へ。保存本文一致。",
+      "evidence": [
+        "browser-checks.md",
+        "run-1.json"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "Tab4回で入力欄、入力→Tab→Returnで送信。フォーム消失後focusは文書へ。保存本文一致。"
+      }
+    },
+    {
+      "case_id": "project-desktop-local-sse-draft",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T04:03:54Z",
+      "environment": {
+        "os": "Windows",
+        "node": "24.13.0",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport 1280x900"
+      },
+      "command": "node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUAの実画面操作、障害はstdinから実行",
+      "reason": "Q-sseの日本語2行を保持。log 1出現後も本文とfocusが一致。",
+      "evidence": [
+        "browser-checks.md",
+        "run-1.json"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": true,
+        "detail": "Q-sseの日本語2行を保持。log 1出現後も本文とfocusが一致。"
+      }
+    },
+    {
+      "case_id": "project-desktop-local-reload",
+      "status": "fail",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T04:07:04Z",
+      "environment": {
+        "os": "Windows",
+        "node": "24.13.0",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport 1280x900"
+      },
+      "command": "node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUAの実画面操作、障害はstdinから実行",
+      "reason": "未送信下書きが再読込で空になる。認証は接続済み。時刻は同一ナビゲーション試験バッチ終了時点。",
+      "evidence": [
+        "browser-checks.md",
+        "run-1.json"
+      ],
+      "observations": {
+        "input_lost": true,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": null,
+        "detail": "未送信下書きが再読込で空になる。認証は接続済み。時刻は同一ナビゲーション試験バッチ終了時点。"
+      }
+    },
+    {
+      "case_id": "project-desktop-local-back",
+      "status": "fail",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T04:07:04Z",
+      "environment": {
+        "os": "Windows",
+        "node": "24.13.0",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport 1280x900"
+      },
+      "command": "node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUAの実画面操作、障害はstdinから実行",
+      "reason": "about:blankへ移動してback後、認証は復帰するがback52_戻る下書きは空。時刻は同一バッチ終了時点。",
+      "evidence": [
+        "browser-checks.md",
+        "run-1.json"
+      ],
+      "observations": {
+        "input_lost": true,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": null,
+        "detail": "about:blankへ移動してback後、認証は復帰するがback52_戻る下書きは空。時刻は同一バッチ終了時点。"
+      }
+    },
+    {
+      "case_id": "project-desktop-local-cancel",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T04:04:31Z",
+      "environment": {
+        "os": "Windows",
+        "node": "24.13.0",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport 1280x900"
+      },
+      "command": "node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUAの実画面操作、障害はstdinから実行",
+      "reason": "回答下書き→Tabで送信ボタン→Ctrl+K→Escape。元ボタンfocus・下書き・未送信を維持。時刻は次の障害準備の記録時点。",
+      "evidence": [
+        "browser-checks.md",
+        "run-1.json"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": true,
+        "detail": "回答下書き→Tabで送信ボタン→Ctrl+K→Escape。元ボタンfocus・下書き・未送信を維持。時刻は次の障害準備の記録時点。"
+      }
+    },
+    {
+      "case_id": "project-desktop-local-double-submit",
+      "status": "fail",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T04:04:56Z",
+      "environment": {
+        "os": "Windows",
+        "node": "24.13.0",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport 1280x900"
+      },
+      "command": "node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUAの実画面操作、障害はstdinから実行",
+      "reason": "hold中のdouble-clickはPOST1。logによるSSEで再度enabledとなりEnterでPOST2。release後もfeedback1で耐久回答重複は0。failは送信待ち中のPOST抑止が解除されたため。",
+      "evidence": [
+        "browser-checks.md",
+        "run-1.json"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 2,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "hold中のdouble-clickはPOST1。logによるSSEで再度enabledとなりEnterでPOST2。release後もfeedback1で耐久回答重複は0。failは送信待ち中のPOST抑止が解除されたため。"
+      }
+    },
+    {
+      "case_id": "project-desktop-local-disconnect-before",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T04:08:51Z",
+      "environment": {
+        "os": "Windows",
+        "node": "24.13.0",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport 1280x900"
+      },
+      "command": "node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUAの実画面操作、障害はstdinから実行",
+      "reason": "修正後fixtureで再試験。切断時POST1/転送0/feedback0・下書き維持。resume後の再送でPOST2/転送1/feedback1。未帰属0。run-2.json参照。",
+      "evidence": [
+        "browser-checks.md",
+        "run-2.json"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 2,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "修正後fixtureで再試験。切断時POST1/転送0/feedback0・下書き維持。resume後の再送でPOST2/転送1/feedback1。未帰属0。run-2.json参照。"
+      }
+    },
+    {
+      "case_id": "project-desktop-local-disconnect-after",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T04:06:13Z",
+      "environment": {
+        "os": "Windows",
+        "node": "24.13.0",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport 1280x900"
+      },
+      "command": "node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUAの実画面操作、障害はstdinから実行",
+      "reason": "保存後の応答とSSEを破棄。下書き維持・feedback1、resume後に回答済み本文一致。追加回答なし。",
+      "evidence": [
+        "browser-checks.md",
+        "run-1.json"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "保存後の応答とSSEを破棄。下書き維持・feedback1、resume後に回答済み本文一致。追加回答なし。"
+      }
+    },
+    {
+      "case_id": "project-mobile-local-sse-draft",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T04:07:09Z",
+      "environment": {
+        "os": "Windows",
+        "node": "24.13.0",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop-mobile-viewport 390x844"
+      },
+      "command": "node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUAの実画面操作、障害はstdinから実行",
+      "reason": "390x844 viewport（clientWidth375）でQ-navigationの日本語本文・focusをlog3後も保持。PC上の表示幅確認。",
+      "evidence": [
+        "browser-checks.md",
+        "run-1.json"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": true,
+        "detail": "390x844 viewport（clientWidth375）でQ-navigationの日本語本文・focusをlog3後も保持。PC上の表示幅確認。"
+      }
+    },
+    {
+      "case_id": "project-mobile-local-answer",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T04:07:30Z",
+      "environment": {
+        "os": "Windows",
+        "node": "24.13.0",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop-mobile-viewport 390x844"
+      },
+      "command": "node dashboard/qa/fixture.mjs --directory <isolated-parent>; CUAの実画面操作、障害はstdinから実行",
+      "reason": "390x844 viewportで送信し、未回答0と回答済み本文mobile52_日本語を確認。実機・タッチは未確認。",
+      "evidence": [
+        "browser-checks.md",
+        "run-1.json"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "390x844 viewportで送信し、未回答0と回答済み本文mobile52_日本語を確認。実機・タッチは未確認。"
+      }
+    },
+    {
+      "case_id": "project-api-fixture",
+      "status": "pass",
+      "level": "fixture",
+      "observed_route": "fixture",
+      "tested_at": "2026-10-08T04:21:53Z",
+      "environment": {
+        "os": "Windows",
+        "node": "24.13.0",
+        "browser": "使用なし（Node test）",
+        "device": "none"
+      },
+      "command": "npm test --prefix dashboard",
+      "reason": "既存8件と追加10件が成功。ブラウザー・実接続の結果へは流用しない。",
+      "evidence": [
+        "node-tests.txt"
+      ],
+      "observations": {
+        "detail": "HTTP/MCP既存回帰とQA schema/CLI/proxyを検証。ブラウザーの入力保持は別行。"
+      }
+    }
+  ]
+}

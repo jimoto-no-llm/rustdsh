@@ -1,0 +1,132 @@
+{
+  "schema": 1,
+  "recorded_at": "2026-10-08T13:05:26.123Z",
+  "images": [
+    {
+      "path": "images/desktop-reference-collapsed.jpg",
+      "sha256": "59343aa57ca4d919cac7352dad84e75ef087af4409b6fd41ebe2ba69cb600409",
+      "bytes": 21360,
+      "file_modified_at": "2026-10-08T12:40:03.230Z",
+      "source_phase": "historical-see-visual-evidence-md"
+    },
+    {
+      "path": "images/integrated-auth-notice.jpg",
+      "sha256": "429fe93bf00c30776184377a1ccc33d5b839b65acb02756899ea092f4c6b82e2",
+      "bytes": 40970,
+      "file_modified_at": "2026-10-08T12:56:32.447Z",
+      "source_phase": "integrated-source",
+      "source_snapshot_sha256": "c8efb1a8321fb4aa74b743984b4d079ced5a6edaae5dff60fd62b5f9658ca16c"
+    },
+    {
+      "path": "images/integrated-desktop-reference.jpg",
+      "sha256": "40eca6c7727c1819eb0d1440c42fd3a4c73ec75d3bfd13a807de9af8e350a476",
+      "bytes": 63756,
+      "file_modified_at": "2026-10-08T12:49:04.564Z",
+      "source_phase": "integrated-source",
+      "source_snapshot_sha256": "c8efb1a8321fb4aa74b743984b4d079ced5a6edaae5dff60fd62b5f9658ca16c"
+    },
+    {
+      "path": "images/integrated-desktop-reference.png",
+      "sha256": "82fbd811dae6d528b497a3b525e6ef53aa81acddeec7232e4f7dd398129ad983",
+      "bytes": 235607,
+      "file_modified_at": "2026-10-08T12:57:43.655Z",
+      "source_phase": "integrated-source",
+      "source_snapshot_sha256": "c8efb1a8321fb4aa74b743984b4d079ced5a6edaae5dff60fd62b5f9658ca16c"
+    },
+    {
+      "path": "images/integrated-interrupted.jpg",
+      "sha256": "05a9c0bb290a7fb957b18f6e8f43a62243c306ac86df0855ac0ab7281d77052e",
+      "bytes": 26560,
+      "file_modified_at": "2026-10-08T12:54:25.129Z",
+      "source_phase": "integrated-source",
+      "source_snapshot_sha256": "c8efb1a8321fb4aa74b743984b4d079ced5a6edaae5dff60fd62b5f9658ca16c"
+    },
+    {
+      "path": "images/integrated-mobile-palette.jpg",
+      "sha256": "aa9e779fb08a733d9b45209a566fba48b54289d14d027a51114296c42d6e4aa4",
+      "bytes": 37791,
+      "file_modified_at": "2026-10-08T12:55:39.338Z",
+      "source_phase": "integrated-source",
+      "source_snapshot_sha256": "c8efb1a8321fb4aa74b743984b4d079ced5a6edaae5dff60fd62b5f9658ca16c"
+    },
+    {
+      "path": "images/integrated-mobile-reference.jpg",
+      "sha256": "4aa06c5a21d83faf94759f6f45ce32a1c88c058f473f4562e67706b5d79aca18",
+      "bytes": 28622,
+      "file_modified_at": "2026-10-08T12:50:03.942Z",
+      "source_phase": "integrated-source",
+      "source_snapshot_sha256": "c8efb1a8321fb4aa74b743984b4d079ced5a6edaae5dff60fd62b5f9658ca16c"
+    },
+    {
+      "path": "images/integrated-mobile-reference.png",
+      "sha256": "009ae9cddb51d6ee96ea338af1513dae26e9fad25339d89bf05cddf781f24168",
+      "bytes": 117505,
+      "file_modified_at": "2026-10-08T12:57:43.642Z",
+      "source_phase": "integrated-source",
+      "source_snapshot_sha256": "c8efb1a8321fb4aa74b743984b4d079ced5a6edaae5dff60fd62b5f9658ca16c"
+    },
+    {
+      "path": "images/integrated-palette.gif",
+      "sha256": "21866416102f1b6d787f7363beaebd1f4fb2454426b625cc893f7d6e0b410d90",
+      "bytes": 294729,
+      "file_modified_at": "2026-10-08T12:57:43.726Z",
+      "source_phase": "integrated-source",
+      "source_snapshot_sha256": "c8efb1a8321fb4aa74b743984b4d079ced5a6edaae5dff60fd62b5f9658ca16c"
+    },
+    {
+      "path": "images/main-mobile-before.jpg",
+      "sha256": "88a6330746fa2f7664c37d71f1469f0dda1cf8606b5ccc99962584522c94debb",
+      "bytes": 28849,
+      "file_modified_at": "2026-10-08T12:56:44.419Z",
+      "source_phase": "unchanged-main-96dbcbb",
+      "source_commit": "96dbcbbd6e1295b2e92ba31e9cf9037770107b24"
+    },
+    {
+      "path": "images/main-mobile-before.png",
+      "sha256": "c0c00e2a5a8bddf861cd783d5e2a08ee2646bdef8b9398df66f971804c5d63e5",
+      "bytes": 133405,
+      "file_modified_at": "2026-10-08T12:57:43.636Z",
+      "source_phase": "unchanged-main-96dbcbb",
+      "source_commit": "96dbcbbd6e1295b2e92ba31e9cf9037770107b24"
+    },
+    {
+      "path": "images/mobile-reference-collapsed.jpg",
+      "sha256": "f25d24076b98fc37156927a0ddef12ce5cb31b0e8e90666f01df1da1d424f4a8",
+      "bytes": 14235,
+      "file_modified_at": "2026-10-08T12:40:03.232Z",
+      "source_phase": "historical-see-visual-evidence-md"
+    },
+    {
+      "path": "images/palette-step-1.jpg",
+      "sha256": "b6a651daabf93424541755ae7252c01b052ff4602198c387122e7f2954358580",
+      "bytes": 34931,
+      "file_modified_at": "2026-10-08T12:57:10.845Z",
+      "source_phase": "integrated-source",
+      "source_snapshot_sha256": "c8efb1a8321fb4aa74b743984b4d079ced5a6edaae5dff60fd62b5f9658ca16c"
+    },
+    {
+      "path": "images/palette-step-2.jpg",
+      "sha256": "fbf99339a726b9be85961968d38b6b4d99057e5822e40e5ae231f59dd962cf81",
+      "bytes": 37850,
+      "file_modified_at": "2026-10-08T12:57:11.131Z",
+      "source_phase": "integrated-source",
+      "source_snapshot_sha256": "c8efb1a8321fb4aa74b743984b4d079ced5a6edaae5dff60fd62b5f9658ca16c"
+    },
+    {
+      "path": "images/palette-step-3.jpg",
+      "sha256": "b6a651daabf93424541755ae7252c01b052ff4602198c387122e7f2954358580",
+      "bytes": 34931,
+      "file_modified_at": "2026-10-08T12:57:11.418Z",
+      "source_phase": "integrated-source",
+      "source_snapshot_sha256": "c8efb1a8321fb4aa74b743984b4d079ced5a6edaae5dff60fd62b5f9658ca16c"
+    },
+    {
+      "path": "images/question-card-390.png",
+      "sha256": "55dcaba47f6c6da9f5144678352e4a5669ea631aacd937cc45c7c1d4ceec55ba",
+      "bytes": 33695,
+      "file_modified_at": "2026-10-08T12:40:03.233Z",
+      "source_phase": "historical-see-visual-evidence-md"
+    }
+  ],
+  "note": "file_modified_at is the saved artifact timestamp, not an exact capture time. PNG copies of integrated-desktop-reference and integrated-mobile-reference were re-encoded from the corresponding JPEG without pixel edits. integrated-palette.gif contains the three captured palette-step JPEG frames. Historical images retain the source caveats in visual-evidence.md."
+}

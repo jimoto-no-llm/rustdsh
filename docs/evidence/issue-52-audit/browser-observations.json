@@ -1,0 +1,4660 @@
+[
+  {
+    "label": "desktop-input",
+    "observed_at": "2026-10-08T06:50:36.831Z",
+    "active": {
+      "id": "Q-sse",
+      "tag": "TEXTAREA",
+      "text": null
+    },
+    "answers": "",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 5 件 · タスク 0 / 1 · 最終更新 2026/10/8 15:48:44",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-sse\tnormal\t承認依頼\n入力中の回答を維持したまま、log による更新を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-sse",
+        "readOnly": false,
+        "value": "desktop22_日本語の下書き\n更新中も保持"
+      },
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "desktop-sse",
+    "observed_at": "2026-10-08T06:52:28.397Z",
+    "active": {
+      "id": "Q-sse",
+      "tag": "TEXTAREA",
+      "text": null
+    },
+    "answers": "",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 5 件 · タスク 0 / 1 · 最終更新 2026/10/8 15:52:00",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-sse\tnormal\t承認依頼\n入力中の回答を維持したまま、log による更新を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-sse",
+        "readOnly": false,
+        "value": "desktop22_日本語の下書き\n更新中も保持"
+      },
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "desktop-palette",
+    "observed_at": "2026-10-08T06:52:28.454Z",
+    "active": {
+      "tag": "INPUT",
+      "text": null
+    },
+    "answers": "",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 5 件 · タスク 0 / 1 · 最終更新 2026/10/8 15:52:00",
+    "paletteOpen": true,
+    "questions": [
+      {
+        "body": "Q-sse\tnormal\t承認依頼\n入力中の回答を維持したまま、log による更新を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-sse",
+        "readOnly": false,
+        "value": "desktop22_日本語の下書き\n更新中も保持"
+      },
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "desktop-cancel",
+    "observed_at": "2026-10-08T06:52:28.474Z",
+    "active": {
+      "tag": "BUTTON",
+      "text": "回答を返す"
+    },
+    "answers": "",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 5 件 · タスク 0 / 1 · 最終更新 2026/10/8 15:52:00",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-sse\tnormal\t承認依頼\n入力中の回答を維持したまま、log による更新を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-sse",
+        "readOnly": false,
+        "value": "desktop22_日本語の下書き\n更新中も保持"
+      },
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "desktop-reload",
+    "observed_at": "2026-10-08T06:52:28.525Z",
+    "active": {
+      "tag": "BODY",
+      "text": null
+    },
+    "answers": "",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 5 件 · タスク 0 / 1 · 最終更新 2026/10/8 15:52:00",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-sse\tnormal\t承認依頼\n入力中の回答を維持したまま、log による更新を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-sse",
+        "readOnly": false,
+        "value": "desktop22_日本語の下書き\n更新中も保持"
+      },
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "desktop-back",
+    "observed_at": "2026-10-08T06:52:28.598Z",
+    "active": {
+      "tag": "BODY",
+      "text": null
+    },
+    "answers": "",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 5 件 · タスク 0 / 1 · 最終更新 2026/10/8 15:52:00",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-sse\tnormal\t承認依頼\n入力中の回答を維持したまま、log による更新を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-sse",
+        "readOnly": false,
+        "value": "desktop22_日本語の下書き\n更新中も保持"
+      },
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "desktop-keyboard-focus",
+    "observed_at": "2026-10-08T06:52:56.943Z",
+    "active": {
+      "id": "Q-sse",
+      "tag": "TEXTAREA",
+      "text": null
+    },
+    "answers": "",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 5 件 · タスク 0 / 1 · 最終更新 2026/10/8 15:52:00",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-sse\tnormal\t承認依頼\n入力中の回答を維持したまま、log による更新を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-sse",
+        "readOnly": false,
+        "value": "desktop22_日本語の下書き\n更新中も保持"
+      },
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "desktop-keyboard-ready",
+    "observed_at": "2026-10-08T06:53:04.084Z",
+    "active": {
+      "tag": "BUTTON",
+      "text": "回答を返す"
+    },
+    "answers": "",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 5 件 · タスク 0 / 1 · 最終更新 2026/10/8 15:52:00",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-sse\tnormal\t承認依頼\n入力中の回答を維持したまま、log による更新を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-sse",
+        "readOnly": false,
+        "value": "desktop22_キーボード回答"
+      },
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "desktop-keyboard-saved",
+    "observed_at": "2026-10-08T06:53:04.111Z",
+    "active": {
+      "tag": "BODY",
+      "text": null
+    },
+    "answers": "",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 4 件 · タスク 0 / 1 · 最終更新 2026/10/8 15:53:04",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "desktop-answer-visible",
+    "observed_at": "2026-10-08T06:53:04.384Z",
+    "active": {
+      "tag": "SUMMARY",
+      "text": null
+    },
+    "answers": "入力中の回答を維持したまま、log による更新を確認してください。\n\ndesktop22_キーボード回答",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 4 件 · タスク 0 / 1 · 最終更新 2026/10/8 15:53:04",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "desktop-double-held",
+    "observed_at": "2026-10-08T06:53:59.247Z",
+    "active": {
+      "tag": "DIV",
+      "text": null
+    },
+    "answers": "入力中の回答を維持したまま、log による更新を確認してください。\n\ndesktop22_キーボード回答",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 4 件 · タスク 0 / 1 · 最終更新 2026/10/8 15:53:04",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n送信中…下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": true,
+            "label": "送信中…"
+          },
+          {
+            "disabled": true,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": true,
+        "value": "desktop22_連打と更新"
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "wsl-input",
+    "observed_at": "2026-10-08T06:53:59.280Z",
+    "active": {
+      "id": "Q-sse",
+      "tag": "TEXTAREA",
+      "text": null
+    },
+    "answers": "",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 5 件 · タスク 0 / 1 · 最終更新 2026/10/8 15:53:30",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-sse\tnormal\t承認依頼\n入力中の回答を維持したまま、log による更新を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-sse",
+        "readOnly": false,
+        "value": "wsl22_日本語の下書き\n更新中も保持"
+      },
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "desktop-double-sse",
+    "observed_at": "2026-10-08T06:54:52.922Z",
+    "active": {
+      "tag": "DIV",
+      "text": null
+    },
+    "answers": "入力中の回答を維持したまま、log による更新を確認してください。\n\ndesktop22_キーボード回答",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 4 件 · タスク 0 / 1 · 最終更新 2026/10/8 15:54:36",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n送信中…下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": true,
+            "label": "送信中…"
+          },
+          {
+            "disabled": true,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": true,
+        "value": "desktop22_連打と更新"
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "wsl-sse",
+    "observed_at": "2026-10-08T06:55:13.194Z",
+    "active": {
+      "id": "Q-sse",
+      "tag": "TEXTAREA",
+      "text": null
+    },
+    "answers": "",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 5 件 · タスク 0 / 1 · 最終更新 2026/10/8 15:54:37",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-sse\tnormal\t承認依頼\n入力中の回答を維持したまま、log による更新を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-sse",
+        "readOnly": false,
+        "value": "wsl22_日本語の下書き\n更新中も保持"
+      },
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "wsl-palette",
+    "observed_at": "2026-10-08T06:55:13.254Z",
+    "active": {
+      "tag": "INPUT",
+      "text": null
+    },
+    "answers": "",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 5 件 · タスク 0 / 1 · 最終更新 2026/10/8 15:54:37",
+    "paletteOpen": true,
+    "questions": [
+      {
+        "body": "Q-sse\tnormal\t承認依頼\n入力中の回答を維持したまま、log による更新を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-sse",
+        "readOnly": false,
+        "value": "wsl22_日本語の下書き\n更新中も保持"
+      },
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "wsl-cancel",
+    "observed_at": "2026-10-08T06:55:13.276Z",
+    "active": {
+      "tag": "BUTTON",
+      "text": "回答を返す"
+    },
+    "answers": "",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 5 件 · タスク 0 / 1 · 最終更新 2026/10/8 15:54:37",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-sse\tnormal\t承認依頼\n入力中の回答を維持したまま、log による更新を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-sse",
+        "readOnly": false,
+        "value": "wsl22_日本語の下書き\n更新中も保持"
+      },
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "wsl-reload",
+    "observed_at": "2026-10-08T06:55:13.340Z",
+    "active": {
+      "tag": "BODY",
+      "text": null
+    },
+    "answers": "",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 5 件 · タスク 0 / 1 · 最終更新 2026/10/8 15:54:37",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-sse\tnormal\t承認依頼\n入力中の回答を維持したまま、log による更新を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-sse",
+        "readOnly": false,
+        "value": "wsl22_日本語の下書き\n更新中も保持"
+      },
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "wsl-back",
+    "observed_at": "2026-10-08T06:55:13.432Z",
+    "active": {
+      "tag": "BODY",
+      "text": null
+    },
+    "answers": "",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 5 件 · タスク 0 / 1 · 最終更新 2026/10/8 15:54:37",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-sse\tnormal\t承認依頼\n入力中の回答を維持したまま、log による更新を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-sse",
+        "readOnly": false,
+        "value": "wsl22_日本語の下書き\n更新中も保持"
+      },
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "wsl-keyboard-focus",
+    "observed_at": "2026-10-08T06:55:13.508Z",
+    "active": {
+      "id": "Q-sse",
+      "tag": "TEXTAREA",
+      "text": null
+    },
+    "answers": "",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 5 件 · タスク 0 / 1 · 最終更新 2026/10/8 15:54:37",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-sse\tnormal\t承認依頼\n入力中の回答を維持したまま、log による更新を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-sse",
+        "readOnly": false,
+        "value": "wsl22_日本語の下書き\n更新中も保持"
+      },
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "desktop-double-saved",
+    "observed_at": "2026-10-08T06:55:35.991Z",
+    "active": {
+      "tag": "DIV",
+      "text": null
+    },
+    "answers": "hold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n\ndesktop22_連打と更新\n\n入力中の回答を維持したまま、log による更新を確認してください。\n\ndesktop22_キーボード回答",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 3 件 · タスク 0 / 1 · 最終更新 2026/10/8 15:55:21",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "desktop-before-offline",
+    "observed_at": "2026-10-08T06:55:36.280Z",
+    "active": {
+      "tag": "BODY",
+      "text": null
+    },
+    "answers": "hold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n\ndesktop22_連打と更新\n\n入力中の回答を維持したまま、log による更新を確認してください。\n\ndesktop22_キーボード回答",
+    "connection": "Failed to fetch",
+    "overview": "未回答の質問 3 件 · タスク 0 / 1 · 最終更新 2026/10/8 15:55:21",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n結果確認待ち…送信結果を確認下書きを破棄\n送信結果がまだ分かりません。接続後に保存状態を確認してください。\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": true,
+            "label": "結果確認待ち…"
+          },
+          {
+            "disabled": false,
+            "label": "送信結果を確認"
+          },
+          {
+            "disabled": true,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": true,
+        "value": "desktop22_受理前切断"
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "wsl-keyboard-ready",
+    "observed_at": "2026-10-08T06:55:36.358Z",
+    "active": {
+      "tag": "BUTTON",
+      "text": "回答を返す"
+    },
+    "answers": "",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 5 件 · タスク 0 / 1 · 最終更新 2026/10/8 15:54:37",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-sse\tnormal\t承認依頼\n入力中の回答を維持したまま、log による更新を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-sse",
+        "readOnly": false,
+        "value": "wsl22_キーボード回答"
+      },
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "wsl-keyboard-saved",
+    "observed_at": "2026-10-08T06:55:36.385Z",
+    "active": {
+      "tag": "BODY",
+      "text": null
+    },
+    "answers": "",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 5 件 · タスク 0 / 1 · 最終更新 2026/10/8 15:54:37",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-sse\tnormal\t承認依頼\n入力中の回答を維持したまま、log による更新を確認してください。\n送信中…下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": true,
+            "label": "送信中…"
+          },
+          {
+            "disabled": true,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-sse",
+        "readOnly": true,
+        "value": "wsl22_キーボード回答"
+      },
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "wsl-answer-visible",
+    "observed_at": "2026-10-08T06:55:36.668Z",
+    "active": {
+      "tag": "SUMMARY",
+      "text": null
+    },
+    "answers": "入力中の回答を維持したまま、log による更新を確認してください。\n\nwsl22_キーボード回答",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 4 件 · タスク 0 / 1 · 最終更新 2026/10/8 15:55:36",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "desktop-before-reconnected",
+    "observed_at": "2026-10-08T06:56:21.617Z",
+    "active": {
+      "tag": "BODY",
+      "text": null
+    },
+    "answers": "hold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n\ndesktop22_連打と更新\n\n入力中の回答を維持したまま、log による更新を確認してください。\n\ndesktop22_キーボード回答",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 3 件 · タスク 0 / 1 · 最終更新 2026/10/8 15:55:21",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n内容を確認して再送下書きを破棄\n保存済みの回答は見つかりませんでした。内容を確認して再送できます。\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "内容を確認して再送"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": "desktop22_受理前切断"
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "desktop-before-saved",
+    "observed_at": "2026-10-08T06:56:21.890Z",
+    "active": {
+      "tag": "BODY",
+      "text": null
+    },
+    "answers": "drop-before による保存前の通信断と再送を確認してください。\n\ndesktop22_受理前切断\n\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n\ndesktop22_連打と更新\n\n入力中の回答を維持したまま、log による更新を確認してください。\n\ndesktop22_キーボード回答",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 2 件 · タスク 0 / 1 · 最終更新 2026/10/8 15:56:21",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "wsl-double-held",
+    "observed_at": "2026-10-08T06:56:22.176Z",
+    "active": {
+      "tag": "DIV",
+      "text": null
+    },
+    "answers": "入力中の回答を維持したまま、log による更新を確認してください。\n\nwsl22_キーボード回答",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 4 件 · タスク 0 / 1 · 最終更新 2026/10/8 15:55:36",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n送信中…下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": true,
+            "label": "送信中…"
+          },
+          {
+            "disabled": true,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": true,
+        "value": "wsl22_連打と更新"
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "wsl-double-sse",
+    "observed_at": "2026-10-08T06:56:42.102Z",
+    "active": {
+      "tag": "DIV",
+      "text": null
+    },
+    "answers": "入力中の回答を維持したまま、log による更新を確認してください。\n\nwsl22_キーボード回答",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 4 件 · タスク 0 / 1 · 最終更新 2026/10/8 15:56:33",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n送信中…下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": true,
+            "label": "送信中…"
+          },
+          {
+            "disabled": true,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": true,
+        "value": "wsl22_連打と更新"
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "desktop-after-offline",
+    "observed_at": "2026-10-08T06:56:42.410Z",
+    "active": {
+      "tag": "BODY",
+      "text": null
+    },
+    "answers": "drop-before による保存前の通信断と再送を確認してください。\n\ndesktop22_受理前切断\n\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n\ndesktop22_連打と更新\n\n入力中の回答を維持したまま、log による更新を確認してください。\n\ndesktop22_キーボード回答",
+    "connection": "Failed to fetch",
+    "overview": "未回答の質問 2 件 · タスク 0 / 1 · 最終更新 2026/10/8 15:56:21",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n結果確認待ち…送信結果を確認下書きを破棄\n送信結果がまだ分かりません。接続後に保存状態を確認してください。\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": true,
+            "label": "結果確認待ち…"
+          },
+          {
+            "disabled": false,
+            "label": "送信結果を確認"
+          },
+          {
+            "disabled": true,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": true,
+        "value": "desktop22_保存後の応答消失"
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "desktop-after-saved",
+    "observed_at": "2026-10-08T06:57:33.759Z",
+    "active": {
+      "tag": "BODY",
+      "text": null
+    },
+    "answers": "drop-after による保存後の応答消失と再接続を確認してください。\n\ndesktop22_保存後の応答消失\n\ndrop-before による保存前の通信断と再送を確認してください。\n\ndesktop22_受理前切断\n\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n\ndesktop22_連打と更新\n\n入力中の回答を維持したまま、log による更新を確認してください。\n\ndesktop22_キーボード回答",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 1 件 · タスク 0 / 1 · 最終更新 2026/10/8 15:56:42",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "wsl-double-saved",
+    "observed_at": "2026-10-08T06:57:33.795Z",
+    "active": {
+      "tag": "DIV",
+      "text": null
+    },
+    "answers": "hold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n\nwsl22_連打と更新\n\n入力中の回答を維持したまま、log による更新を確認してください。\n\nwsl22_キーボード回答",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 3 件 · タスク 0 / 1 · 最終更新 2026/10/8 15:57:10",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "wsl-before-offline",
+    "observed_at": "2026-10-08T06:57:34.077Z",
+    "active": {
+      "tag": "BODY",
+      "text": null
+    },
+    "answers": "hold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n\nwsl22_連打と更新\n\n入力中の回答を維持したまま、log による更新を確認してください。\n\nwsl22_キーボード回答",
+    "connection": "Failed to fetch",
+    "overview": "未回答の質問 3 件 · タスク 0 / 1 · 最終更新 2026/10/8 15:57:10",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n結果確認待ち…送信結果を確認下書きを破棄\n送信結果がまだ分かりません。接続後に保存状態を確認してください。\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": true,
+            "label": "結果確認待ち…"
+          },
+          {
+            "disabled": false,
+            "label": "送信結果を確認"
+          },
+          {
+            "disabled": true,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": true,
+        "value": "wsl22_受理前切断"
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "wsl-before-retry",
+    "observed_at": "2026-10-08T07:01:58.178Z",
+    "active": {
+      "tag": "BODY",
+      "text": null
+    },
+    "answers": "hold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n\nwsl22_連打と更新\n\n入力中の回答を維持したまま、log による更新を確認してください。\n\nwsl22_キーボード回答",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 3 件 · タスク 0 / 1 · 最終更新 2026/10/8 15:57:10",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n内容を確認して再送下書きを破棄\n保存済みの回答は見つかりませんでした。内容を確認して再送できます。\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "内容を確認して再送"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": "wsl22_受理前切断"
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "wsl-before-saved",
+    "observed_at": "2026-10-08T07:01:58.460Z",
+    "active": {
+      "tag": "BODY",
+      "text": null
+    },
+    "answers": "drop-before による保存前の通信断と再送を確認してください。\n\nwsl22_受理前切断\n\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n\nwsl22_連打と更新\n\n入力中の回答を維持したまま、log による更新を確認してください。\n\nwsl22_キーボード回答",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 2 件 · タスク 0 / 1 · 最終更新 2026/10/8 16:01:57",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "wsl-after-offline",
+    "observed_at": "2026-10-08T07:02:17.736Z",
+    "active": {
+      "tag": "BODY",
+      "text": null
+    },
+    "answers": "drop-before による保存前の通信断と再送を確認してください。\n\nwsl22_受理前切断\n\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n\nwsl22_連打と更新\n\n入力中の回答を維持したまま、log による更新を確認してください。\n\nwsl22_キーボード回答",
+    "connection": "Failed to fetch",
+    "overview": "未回答の質問 2 件 · タスク 0 / 1 · 最終更新 2026/10/8 16:01:57",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n結果確認待ち…送信結果を確認下書きを破棄\n送信結果がまだ分かりません。接続後に保存状態を確認してください。\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": true,
+            "label": "結果確認待ち…"
+          },
+          {
+            "disabled": false,
+            "label": "送信結果を確認"
+          },
+          {
+            "disabled": true,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": true,
+        "value": "wsl22_保存後の応答消失"
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "wsl-after-saved",
+    "observed_at": "2026-10-08T07:02:50.703Z",
+    "active": {
+      "tag": "BODY",
+      "text": null
+    },
+    "answers": "drop-after による保存後の応答消失と再接続を確認してください。\n\nwsl22_保存後の応答消失\n\ndrop-before による保存前の通信断と再送を確認してください。\n\nwsl22_受理前切断\n\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n\nwsl22_連打と更新\n\n入力中の回答を維持したまま、log による更新を確認してください。\n\nwsl22_キーボード回答",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 1 件 · タスク 0 / 1 · 最終更新 2026/10/8 16:02:16",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 720,
+      "width": 1265
+    }
+  },
+  {
+    "label": "mobile390-ready",
+    "observed_at": "2026-10-08T07:08:05.228Z",
+    "active": {
+      "id": "Q-sse",
+      "tag": "TEXTAREA",
+      "text": null
+    },
+    "answers": "",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 5 件 · タスク 0 / 1 · 最終更新 2026/10/8 16:07:17",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-sse\tnormal\t承認依頼\n入力中の回答を維持したまま、log による更新を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-sse",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 844,
+      "width": 375
+    }
+  },
+  {
+    "label": "mobile390-input",
+    "observed_at": "2026-10-08T07:08:05.552Z",
+    "active": {
+      "id": "Q-sse",
+      "tag": "TEXTAREA",
+      "text": null
+    },
+    "answers": "",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 5 件 · タスク 0 / 1 · 最終更新 2026/10/8 16:07:17",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-sse\tnormal\t承認依頼\n入力中の回答を維持したまま、log による更新を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-sse",
+        "readOnly": false,
+        "value": "mobile390_日本語の下書き\n更新中も保持"
+      },
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 844,
+      "width": 375
+    }
+  },
+  {
+    "label": "mobile390-sse",
+    "observed_at": "2026-10-08T07:08:18.446Z",
+    "active": {
+      "id": "Q-sse",
+      "tag": "TEXTAREA",
+      "text": null
+    },
+    "answers": "",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 5 件 · タスク 0 / 1 · 最終更新 2026/10/8 16:08:11",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-sse\tnormal\t承認依頼\n入力中の回答を維持したまま、log による更新を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-sse",
+        "readOnly": false,
+        "value": "mobile390_日本語の下書き\n更新中も保持"
+      },
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 844,
+      "width": 375
+    }
+  },
+  {
+    "label": "mobile390-palette",
+    "observed_at": "2026-10-08T07:08:18.499Z",
+    "active": {
+      "tag": "INPUT",
+      "text": null
+    },
+    "answers": "",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 5 件 · タスク 0 / 1 · 最終更新 2026/10/8 16:08:11",
+    "paletteOpen": true,
+    "questions": [
+      {
+        "body": "Q-sse\tnormal\t承認依頼\n入力中の回答を維持したまま、log による更新を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-sse",
+        "readOnly": false,
+        "value": "mobile390_日本語の下書き\n更新中も保持"
+      },
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 844,
+      "width": 375
+    }
+  },
+  {
+    "label": "mobile390-cancel",
+    "observed_at": "2026-10-08T07:08:18.519Z",
+    "active": {
+      "tag": "BUTTON",
+      "text": "回答を返す"
+    },
+    "answers": "",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 5 件 · タスク 0 / 1 · 最終更新 2026/10/8 16:08:11",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-sse\tnormal\t承認依頼\n入力中の回答を維持したまま、log による更新を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-sse",
+        "readOnly": false,
+        "value": "mobile390_日本語の下書き\n更新中も保持"
+      },
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 844,
+      "width": 375
+    }
+  },
+  {
+    "label": "mobile390-reload",
+    "observed_at": "2026-10-08T07:08:18.587Z",
+    "active": {
+      "tag": "BODY",
+      "text": null
+    },
+    "answers": "",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 5 件 · タスク 0 / 1 · 最終更新 2026/10/8 16:08:11",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-sse\tnormal\t承認依頼\n入力中の回答を維持したまま、log による更新を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-sse",
+        "readOnly": false,
+        "value": "mobile390_日本語の下書き\n更新中も保持"
+      },
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 844,
+      "width": 375
+    }
+  },
+  {
+    "label": "mobile390-back",
+    "observed_at": "2026-10-08T07:08:18.675Z",
+    "active": {
+      "tag": "BODY",
+      "text": null
+    },
+    "answers": "",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 5 件 · タスク 0 / 1 · 最終更新 2026/10/8 16:08:11",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-sse\tnormal\t承認依頼\n入力中の回答を維持したまま、log による更新を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-sse",
+        "readOnly": false,
+        "value": "mobile390_日本語の下書き\n更新中も保持"
+      },
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 844,
+      "width": 375
+    }
+  },
+  {
+    "label": "mobile390-keyboard-focus",
+    "observed_at": "2026-10-08T07:08:31.070Z",
+    "active": {
+      "id": "Q-sse",
+      "tag": "TEXTAREA",
+      "text": null
+    },
+    "answers": "",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 5 件 · タスク 0 / 1 · 最終更新 2026/10/8 16:08:11",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-sse\tnormal\t承認依頼\n入力中の回答を維持したまま、log による更新を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-sse",
+        "readOnly": false,
+        "value": "mobile390_日本語の下書き\n更新中も保持"
+      },
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 844,
+      "width": 375
+    }
+  },
+  {
+    "label": "mobile390-keyboard-ready",
+    "observed_at": "2026-10-08T07:08:31.132Z",
+    "active": {
+      "tag": "BUTTON",
+      "text": "回答を返す"
+    },
+    "answers": "",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 5 件 · タスク 0 / 1 · 最終更新 2026/10/8 16:08:11",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-sse\tnormal\t承認依頼\n入力中の回答を維持したまま、log による更新を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-sse",
+        "readOnly": false,
+        "value": "mobile390_キーボード回答"
+      },
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 844,
+      "width": 375
+    }
+  },
+  {
+    "label": "mobile390-keyboard-saved",
+    "observed_at": "2026-10-08T07:08:31.160Z",
+    "active": {
+      "tag": "BODY",
+      "text": null
+    },
+    "answers": "",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 4 件 · タスク 0 / 1 · 最終更新 2026/10/8 16:08:31",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 844,
+      "width": 375
+    }
+  },
+  {
+    "label": "mobile390-answer-visible",
+    "observed_at": "2026-10-08T07:08:31.436Z",
+    "active": {
+      "tag": "SUMMARY",
+      "text": null
+    },
+    "answers": "入力中の回答を維持したまま、log による更新を確認してください。\n\nmobile390_キーボード回答",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 4 件 · タスク 0 / 1 · 最終更新 2026/10/8 16:08:31",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 844,
+      "width": 375
+    }
+  },
+  {
+    "label": "mobile390-double-held",
+    "observed_at": "2026-10-08T07:08:46.380Z",
+    "active": {
+      "tag": "DIV",
+      "text": null
+    },
+    "answers": "入力中の回答を維持したまま、log による更新を確認してください。\n\nmobile390_キーボード回答",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 4 件 · タスク 0 / 1 · 最終更新 2026/10/8 16:08:31",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n送信中…下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": true,
+            "label": "送信中…"
+          },
+          {
+            "disabled": true,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": true,
+        "value": "mobile390_連打と更新"
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 844,
+      "width": 375
+    }
+  },
+  {
+    "label": "mobile390-double-sse",
+    "observed_at": "2026-10-08T07:09:03.517Z",
+    "active": {
+      "tag": "DIV",
+      "text": null
+    },
+    "answers": "入力中の回答を維持したまま、log による更新を確認してください。\n\nmobile390_キーボード回答",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 4 件 · タスク 0 / 1 · 最終更新 2026/10/8 16:08:52",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n送信中…下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": true,
+            "label": "送信中…"
+          },
+          {
+            "disabled": true,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": true,
+        "value": "mobile390_連打と更新"
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 844,
+      "width": 375
+    }
+  },
+  {
+    "label": "mobile390-double-blocked",
+    "observed_at": "2026-10-08T07:09:04.367Z",
+    "active": {
+      "tag": "DIV",
+      "text": null
+    },
+    "answers": "入力中の回答を維持したまま、log による更新を確認してください。\n\nmobile390_キーボード回答",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 4 件 · タスク 0 / 1 · 最終更新 2026/10/8 16:08:52",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-double\tnormal\t承認依頼\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n送信中…下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": true,
+            "label": "送信中…"
+          },
+          {
+            "disabled": true,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-double",
+        "readOnly": true,
+        "value": "mobile390_連打と更新"
+      },
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 844,
+      "width": 375
+    }
+  },
+  {
+    "label": "mobile390-double-saved",
+    "observed_at": "2026-10-08T07:09:19.517Z",
+    "active": {
+      "tag": "DIV",
+      "text": null
+    },
+    "answers": "hold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n\nmobile390_連打と更新\n\n入力中の回答を維持したまま、log による更新を確認してください。\n\nmobile390_キーボード回答",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 3 件 · タスク 0 / 1 · 最終更新 2026/10/8 16:09:10",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 844,
+      "width": 375
+    }
+  },
+  {
+    "label": "mobile390-before-offline",
+    "observed_at": "2026-10-08T07:09:19.822Z",
+    "active": {
+      "tag": "BODY",
+      "text": null
+    },
+    "answers": "hold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n\nmobile390_連打と更新\n\n入力中の回答を維持したまま、log による更新を確認してください。\n\nmobile390_キーボード回答",
+    "connection": "Failed to fetch",
+    "overview": "未回答の質問 3 件 · タスク 0 / 1 · 最終更新 2026/10/8 16:09:10",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n結果確認待ち…送信結果を確認下書きを破棄\n送信結果がまだ分かりません。接続後に保存状態を確認してください。\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": true,
+            "label": "結果確認待ち…"
+          },
+          {
+            "disabled": false,
+            "label": "送信結果を確認"
+          },
+          {
+            "disabled": true,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": true,
+        "value": "mobile390_受理前切断"
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 844,
+      "width": 375
+    }
+  },
+  {
+    "label": "mobile390-before-retry",
+    "observed_at": "2026-10-08T07:09:32.060Z",
+    "active": {
+      "tag": "BODY",
+      "text": null
+    },
+    "answers": "hold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n\nmobile390_連打と更新\n\n入力中の回答を維持したまま、log による更新を確認してください。\n\nmobile390_キーボード回答",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 3 件 · タスク 0 / 1 · 最終更新 2026/10/8 16:09:10",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-before\tnormal\t承認依頼\ndrop-before による保存前の通信断と再送を確認してください。\n内容を確認して再送下書きを破棄\n保存済みの回答は見つかりませんでした。内容を確認して再送できます。\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "内容を確認して再送"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-before",
+        "readOnly": false,
+        "value": "mobile390_受理前切断"
+      },
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 844,
+      "width": 375
+    }
+  },
+  {
+    "label": "mobile390-before-saved",
+    "observed_at": "2026-10-08T07:09:32.340Z",
+    "active": {
+      "tag": "BODY",
+      "text": null
+    },
+    "answers": "drop-before による保存前の通信断と再送を確認してください。\n\nmobile390_受理前切断\n\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n\nmobile390_連打と更新\n\n入力中の回答を維持したまま、log による更新を確認してください。\n\nmobile390_キーボード回答",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 2 件 · タスク 0 / 1 · 最終更新 2026/10/8 16:09:32",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": false,
+        "value": ""
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 844,
+      "width": 375
+    }
+  },
+  {
+    "label": "mobile390-after-offline",
+    "observed_at": "2026-10-08T07:09:49.284Z",
+    "active": {
+      "tag": "BODY",
+      "text": null
+    },
+    "answers": "drop-before による保存前の通信断と再送を確認してください。\n\nmobile390_受理前切断\n\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n\nmobile390_連打と更新\n\n入力中の回答を維持したまま、log による更新を確認してください。\n\nmobile390_キーボード回答",
+    "connection": "Failed to fetch",
+    "overview": "未回答の質問 2 件 · タスク 0 / 1 · 最終更新 2026/10/8 16:09:32",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-after\tnormal\t承認依頼\ndrop-after による保存後の応答消失と再接続を確認してください。\n結果確認待ち…送信結果を確認下書きを破棄\n送信結果がまだ分かりません。接続後に保存状態を確認してください。\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": true,
+            "label": "結果確認待ち…"
+          },
+          {
+            "disabled": false,
+            "label": "送信結果を確認"
+          },
+          {
+            "disabled": true,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-after",
+        "readOnly": true,
+        "value": "mobile390_保存後の応答消失ｋ"
+      },
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 844,
+      "width": 375
+    }
+  },
+  {
+    "label": "mobile390-after-saved",
+    "observed_at": "2026-10-08T07:10:29.617Z",
+    "active": {
+      "tag": "BODY",
+      "text": null
+    },
+    "answers": "drop-after による保存後の応答消失と再接続を確認してください。\n\nmobile390_保存後の応答消失ｋ\n\ndrop-before による保存前の通信断と再送を確認してください。\n\nmobile390_受理前切断\n\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n\nmobile390_連打と更新\n\n入力中の回答を維持したまま、log による更新を確認してください。\n\nmobile390_キーボード回答",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 1 件 · タスク 0 / 1 · 最終更新 2026/10/8 16:09:49",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": ""
+      }
+    ],
+    "viewport": {
+      "height": 844,
+      "width": 375
+    }
+  },
+  {
+    "label": "mobile390-after-recheck-ready",
+    "observed_at": "2026-10-08T07:10:29.655Z",
+    "active": {
+      "id": "Q-navigation",
+      "tag": "TEXTAREA",
+      "text": null
+    },
+    "answers": "drop-after による保存後の応答消失と再接続を確認してください。\n\nmobile390_保存後の応答消失ｋ\n\ndrop-before による保存前の通信断と再送を確認してください。\n\nmobile390_受理前切断\n\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n\nmobile390_連打と更新\n\n入力中の回答を維持したまま、log による更新を確認してください。\n\nmobile390_キーボード回答",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 1 件 · タスク 0 / 1 · 最終更新 2026/10/8 16:09:49",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n回答を返す下書きを破棄\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": false,
+            "label": "回答を返す"
+          },
+          {
+            "disabled": false,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": false,
+        "value": "mobile390_再確認_保存後の応答消失"
+      }
+    ],
+    "viewport": {
+      "height": 844,
+      "width": 375
+    }
+  },
+  {
+    "label": "mobile390-after-recheck-offline",
+    "observed_at": "2026-10-08T07:10:41.398Z",
+    "active": {
+      "tag": "BODY",
+      "text": null
+    },
+    "answers": "drop-after による保存後の応答消失と再接続を確認してください。\n\nmobile390_保存後の応答消失ｋ\n\ndrop-before による保存前の通信断と再送を確認してください。\n\nmobile390_受理前切断\n\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n\nmobile390_連打と更新\n\n入力中の回答を維持したまま、log による更新を確認してください。\n\nmobile390_キーボード回答",
+    "connection": "Failed to fetch",
+    "overview": "未回答の質問 1 件 · タスク 0 / 1 · 最終更新 2026/10/8 16:09:49",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "Q-navigation\tnormal\t承認依頼\nキーボード・狭い画面・ページ内移動を確認してください。\n結果確認待ち…送信結果を確認下書きを破棄\n送信結果がまだ分かりません。接続後に保存状態を確認してください。\n\t\n試験用。外部の操作は実行しません。\n参考表示（回答しても自動実行されません）",
+        "buttons": [
+          {
+            "disabled": true,
+            "label": "結果確認待ち…"
+          },
+          {
+            "disabled": false,
+            "label": "送信結果を確認"
+          },
+          {
+            "disabled": true,
+            "label": "下書きを破棄"
+          }
+        ],
+        "id": "question-Q-navigation",
+        "readOnly": true,
+        "value": "mobile390_再確認_保存後の応答消失"
+      }
+    ],
+    "viewport": {
+      "height": 844,
+      "width": 375
+    }
+  },
+  {
+    "label": "mobile390-after-recheck-saved",
+    "observed_at": "2026-10-08T07:10:55.857Z",
+    "active": {
+      "tag": "BODY",
+      "text": null
+    },
+    "answers": "キーボード・狭い画面・ページ内移動を確認してください。\n\nmobile390_再確認_保存後の応答消失\n\ndrop-after による保存後の応答消失と再接続を確認してください。\n\nmobile390_保存後の応答消失ｋ\n\ndrop-before による保存前の通信断と再送を確認してください。\n\nmobile390_受理前切断\n\nhold 中の連打と Enter 操作で回答が重複しないことを確認してください。\n\nmobile390_連打と更新\n\n入力中の回答を維持したまま、log による更新を確認してください。\n\nmobile390_キーボード回答",
+    "connection": "接続済み · プロジェクト専用",
+    "overview": "未回答の質問 0 件 · タスク 0 / 1 · 最終更新 2026/10/8 16:10:41",
+    "paletteOpen": false,
+    "questions": [
+      {
+        "body": "なし",
+        "buttons": [],
+        "id": ""
+      }
+    ],
+    "viewport": {
+      "height": 844,
+      "width": 375
+    }
+  }
+]

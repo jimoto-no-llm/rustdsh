@@ -39,9 +39,11 @@
         max-width: 1480px;
         margin: auto;
         padding: 32px 32px 120px;
+        padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px));
       }
       header {
         display: flex;
+        flex-wrap: wrap;
         justify-content: space-between;
         align-items: center;
         gap: 16px;
@@ -75,6 +77,19 @@
         display: flex;
         flex-wrap: wrap;
         gap: 8px;
+      }
+      .header-actions button {
+        min-height: 44px;
+        padding: 6px 10px;
+        color: #2857ad;
+        border-color: #d4dff5;
+        background: #edf2fd;
+        font-size: 13px;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .header-actions button:hover {
+        background: #dfe9fc;
       }
       .summary-card {
         margin: 16px 0 24px;
@@ -210,6 +225,8 @@
       }
       button:focus-visible,
       a:focus-visible,
+      summary:focus-visible,
+      input:focus-visible,
       textarea:focus-visible {
         outline: 3px solid #85aaff;
         outline-offset: 3px;
@@ -440,6 +457,65 @@
       .decision-card button {
         margin: 4px 8px 4px 0;
       }
+      .question-meta {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px 12px;
+      }
+      .question-id {
+        padding: 2px 6px;
+        border-radius: 5px;
+        background: #f0f2ec;
+        font-size: 14px;
+        overflow-wrap: anywhere;
+      }
+      .question-urgency {
+        color: var(--mut);
+        font-size: 13px;
+      }
+      .question-text {
+        margin: 12px 0;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      .question-reference {
+        margin: 12px 0;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        color: var(--mut);
+        font-size: 14px;
+      }
+      .question-reference > summary {
+        min-height: 44px;
+        padding: 10px 12px;
+        cursor: pointer;
+      }
+      .question-reference > p {
+        margin: 0;
+        padding: 0 12px 12px;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      .answer-form {
+        margin-top: 16px;
+      }
+      .answer-form > label {
+        font-weight: 600;
+      }
+      .answer-form textarea {
+        margin-top: 6px;
+        min-height: 112px;
+      }
+      .answer-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 8px 0;
+      }
+      .answer-actions button {
+        min-height: 44px;
+      }
       textarea {
         display: block;
         margin-top: 12px;
@@ -450,6 +526,7 @@
         border-radius: 8px;
         padding: 10px;
         font: inherit;
+        font-size: 16px;
       }
       #instruction-panel form {
         margin-bottom: 20px;
@@ -514,6 +591,25 @@
         display: grid;
         gap: 10px;
       }
+      #answered {
+        margin-top: 24px;
+        scroll-margin-block: 24px;
+      }
+      #answered > summary {
+        min-height: 48px;
+        padding: 12px 16px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--card);
+        font-weight: 600;
+        cursor: pointer;
+      }
+      #answered > summary:hover {
+        background: #f0f2ec;
+      }
+      #answered[open] > summary {
+        margin-bottom: 10px;
+      }
       .event {
         background: white;
         border: 1px solid var(--line);
@@ -538,6 +634,12 @@
         padding: 13px 16px;
         background: #edf1f7;
         border-radius: 8px;
+      }
+      .auth-notice h2 {
+        margin: 0 0 12px;
+      }
+      .auth-notice p:last-child {
+        margin-bottom: 0;
       }
       /* Stable anchors and the existing command palette remain usable. */
       .skip {
@@ -565,10 +667,14 @@
         color: var(--red);
       }
       #palette {
+        position: fixed;
         border: 1px solid var(--line);
         border-radius: 14px;
         padding: 18px 20px;
         width: min(560px, calc(100vw - 40px));
+        max-height: calc(100vh - 40px);
+        max-height: calc(100dvh - 40px);
+        overflow-y: auto;
       }
       #managed-stop-dialog {
         max-width: min(560px, calc(100vw - 28px));
@@ -590,6 +696,16 @@
       #palette h2 {
         margin: 0 0 4px;
       }
+      .palette-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      #palette-close {
+        min-height: 44px;
+        flex-shrink: 0;
+      }
       #palette-search {
         width: 100%;
         margin-top: 8px;
@@ -597,6 +713,7 @@
         border-radius: 8px;
         padding: 10px;
         font: inherit;
+        font-size: 16px;
       }
       #palette-list {
         list-style: none;
@@ -620,6 +737,7 @@
         }
         main {
           padding: 18px 14px 120px;
+          padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px));
         }
         header {
           align-items: flex-start;
@@ -720,13 +838,14 @@
             コマンド
           </button>
           <button id="share-toggle" aria-expanded="false" aria-controls="share">
-            スマホで開く
+            接続・共有
           </button>
         </div>
       </header>
       <div id="connection" class="sub" role="status" aria-live="polite">
         接続中…
       </div>
+      <section id="auth-notice" class="notice auth-notice" role="alert" hidden></section>
       <section class="share" id="share" hidden>
         <div>
           <img
@@ -734,10 +853,10 @@
             alt="Tailscale経由でこのダッシュボードを開くQRコード"
             hidden
           />
-          <div class="qr-placeholder" id="qr-placeholder">接続準備中</div>
+          <div class="qr-placeholder" id="qr-placeholder">QRコード未発行</div>
         </div>
         <div>
-          <h2>QRコードで開く</h2>
+          <h2>別の端末で開く</h2>
           <p id="share-message"></p>
           <code id="share-url"></code
           ><button id="share-refresh">接続を更新</button>
@@ -745,7 +864,7 @@
             >利用設定を開く</a
           >
           <p class="sub">
-            同じTailscaleネットワークに接続した端末から開けます。このPCでダッシュボードを起動しておいてください。タスク・質問の各行には
+            同じTailscaleネットワークに接続した端末から開けます。起動元のPCでダッシュボードを起動しておいてください。タスク・質問の各項目には
             #task-&lt;id&gt;・#question-&lt;id&gt;
             の目印があり、端末を替えても同じ対象へ戻れます。対象の表示と端末の認証は別の役割で、未認証の端末は認証を終えるまで内容・操作へ進めません。
           </p>
@@ -820,17 +939,24 @@
         <p class="sub" id="pending-note">
           プロジェクト全体の質問です。回答はこの質問への返答のみです。対象・条件が変わった場合は回答前に内容を再確認してください。回答しただけで実行権限は生まれません。
         </p>
+        <p class="sub" id="draft-storage-note" role="status"></p>
         <div
           id="questions"
           class="decision-grid"
           aria-labelledby="pending-heading"
           aria-describedby="pending-note"
         ></div>
+        <section id="retained-drafts" hidden>
+          <h2>以前の質問の下書き</h2>
+          <p class="sub">質問の変更・削除、または別の回答を確認したため、下書きを分けて保管しています。必要な内容をコピーして使ってください。</p>
+          <div class="feed" id="retained-draft-list"></div>
+        </section>
         <section id="budget-admission" aria-label="予算制御"></section>
         <details class="fold" id="metrics-detail">
           <summary>プロジェクト全体の数値</summary>
           <h2 id="metrics-heading" tabindex="-1">数値の詳細</h2>
           <div class="cards" id="cards"></div>
+          <p class="sub">未報告の数値は、報告が届くと表示されます。0件・0%とは区別しています。</p>
           <h2>費用の明細と出所</h2>
           <section id="cost-ledger" aria-label="費用台帳"></section>
         </details>
@@ -881,11 +1007,13 @@
         </details>
         <details class="fold" id="progress-detail">
           <summary>進捗・成果物の報告</summary>
+          <h2>進捗・成果物</h2>
+          <p class="sub">受け取った報告を新しい順に表示します。</p>
           <h2>進捗・成果物の報告履歴</h2>
           <div class="feed" id="events"></div>
         </details>
         <details id="answered">
-          <summary>回答済みの質問</summary>
+          <summary id="answered-summary">回答済みの質問（0件）</summary>
           <div class="feed" id="answers"></div>
         </details>
       </div>
@@ -900,9 +1028,12 @@
       </nav>
       <!-- #61: 主要操作をキーボードで呼ぶ小さな一覧。既存ボタンの操作を再利用し、権限・状態チェックは各操作側で行います。 -->
       <dialog id="palette" aria-labelledby="palette-title">
-        <h2 id="palette-title">コマンド</h2>
+        <div class="palette-heading">
+          <h2 id="palette-title">コマンド</h2>
+          <button id="palette-close" type="button" autofocus>閉じる</button>
+        </div>
         <p class="sub">
-          日本語・英語で絞り込めます。Escで閉じて元の位置に戻ります。
+          日本語・英語で絞り込めます。「閉じる」またはEscで元の位置に戻ります。
         </p>
         <input
           id="palette-search"
@@ -923,7 +1054,7 @@
         <button id="managed-stop-confirm">確認した対象を停止</button>
       </dialog>
       <footer id="updated">
-        未取得の指標はMCPから報告されたときに表示されます。費用は報告元のAPI換算値で、請求額とは別です。
+        未報告の指標は、報告が届くと表示されます。費用は報告元のAPI換算値で、請求額とは別です。
       </footer>
     </main>
     <script type="module" src="./app.mjs"></script>

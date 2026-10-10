@@ -1,0 +1,35 @@
+
+> test
+> node browser.mjs && node update-banner.mjs
+
+node:internal/modules/run_main:123
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+
++ [
++   {
++     path: '/api/live',
++     text: 'Failed to load resource: net::ERR_CONNECTION_RESET'
++   }
++ ]
+- []
+
+    at file:///<workspace>/work/rustdsh-issue52-current/tests/e2e/browser.mjs:83:49
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: [
+    {
+      text: 'Failed to load resource: net::ERR_CONNECTION_RESET',
+      path: '/api/live'
+    }
+  ],
+  expected: [],
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}
+
+Node.js v22.23.3

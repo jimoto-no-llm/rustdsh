@@ -1,0 +1,1515 @@
+{
+  "schema": 1,
+  "target": {
+    "sha": "6040075f5ca339adafceeb81d39458c7c7bd64ae",
+    "dirty": true,
+    "note": "main 96dbcbbへの統合前の履歴。このレポートのpassは統合後の実機・WSL/Tailscale再試験を示さない。統合後の検証は親ディレクトリのcurrent-integration.mdを参照。 提出用の履歴集約。53 pass / 4 blocked / 0 not-run、全57セル。SHA6040075は集約の基点で、最新版で57セルを再実施した記録ではない。local18セルはec5fbf7、その他の旧セルは各原記録を維持。戻る2セルのみ6040075+スマホUI修正時の同じiPhone/WSL/Tailscale試行で更新。最新の認証案内修正は全自動テストWindows/WSL各74件と表示・復旧の追試で別記。WSL/Tailscale、answer/keyboardで同じ試行を共有し、53回の独立試験を意味しない。実機とPC mobile viewportを区別。4 blockedは外付けキーボード不足。証拠は個人情報を除いた公開用要約で、原画像・原ログの再公開や独立再検証ではない。実行版・制約・原資料対応はevidence/provenance.md参照。"
+  },
+  "results": [
+    {
+      "case_id": "project-desktop-local-answer",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T06:53:04.384Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport (client 1265x720)"
+      },
+      "command": "Windows Node22: node dashboard/qa/fixture.mjs --directory <isolated-parent>; 実ブラウザー手動操作、stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "【旧版引継ぎ】ec5fbf7で実施（日時は原記録）。6040075での再実行ではない。 保存済み本文が入力と一致。Q-sseの回答とkeyboardは同じ試行を2セルに記録。独立した2回の試験ではない。",
+      "evidence": [
+        "evidence/local-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "旧版ec5fbf7の実測を引継ぎ。 保存済み本文が入力と一致。Q-sseの回答とkeyboardは同じ試行を2セルに記録。独立した2回の試験ではない。"
+      }
+    },
+    {
+      "case_id": "project-desktop-local-keyboard",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T06:53:04.384Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport (client 1265x720)"
+      },
+      "command": "Windows Node22: node dashboard/qa/fixture.mjs --directory <isolated-parent>; 実ブラウザー手動操作、stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "【旧版引継ぎ】ec5fbf7で実施（日時は原記録）。6040075での再実行ではない。 Tab4回→回答入力→Tab→Return。送信後フォーム消失に伴いfocusはBODY。Q-sseの回答とkeyboardは同じ試行を2セルに記録。独立した2回の試験ではない。",
+      "evidence": [
+        "evidence/local-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "旧版ec5fbf7の実測を引継ぎ。 Tab4回→回答入力→Tab→Return。送信後フォーム消失に伴いfocusはBODY。Q-sseの回答とkeyboardは同じ試行を2セルに記録。独立した2回の試験ではない。"
+      }
+    },
+    {
+      "case_id": "project-desktop-local-sse-draft",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T06:52:28.397Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport (client 1265x720)"
+      },
+      "command": "Windows Node22: node dashboard/qa/fixture.mjs --directory <isolated-parent>; 実ブラウザー手動操作、stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "【旧版引継ぎ】ec5fbf7で実施（日時は原記録）。6040075での再実行ではない。 logによる更新後も日本語2行とTEXTAREA focusを保持。POST0、feedback0。",
+      "evidence": [
+        "evidence/local-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": true,
+        "detail": "旧版ec5fbf7の実測を引継ぎ。 logによる更新後も日本語2行とTEXTAREA focusを保持。POST0、feedback0。"
+      }
+    },
+    {
+      "case_id": "project-desktop-local-reload",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T06:52:28.525Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport (client 1265x720)"
+      },
+      "command": "Windows Node22: node dashboard/qa/fixture.mjs --directory <isolated-parent>; 実ブラウザー手動操作、stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "【旧版引継ぎ】ec5fbf7で実施（日時は原記録）。6040075での再実行ではない。 再読込後、未送信の日本語2行を復元。POST0、feedback0。",
+      "evidence": [
+        "evidence/local-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": null,
+        "detail": "旧版ec5fbf7の実測を引継ぎ。 再読込後、未送信の日本語2行を復元。POST0、feedback0。"
+      }
+    },
+    {
+      "case_id": "project-desktop-local-back",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T06:52:28.598Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport (client 1265x720)"
+      },
+      "command": "Windows Node22: node dashboard/qa/fixture.mjs --directory <isolated-parent>; 実ブラウザー手動操作、stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "【旧版引継ぎ】ec5fbf7で実施（日時は原記録）。6040075での再実行ではない。 about:blankへ移動し戻る。接続済み表示と未送信本文を復元。POST0、feedback0。",
+      "evidence": [
+        "evidence/local-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": null,
+        "detail": "旧版ec5fbf7の実測を引継ぎ。 about:blankへ移動し戻る。接続済み表示と未送信本文を復元。POST0、feedback0。"
+      }
+    },
+    {
+      "case_id": "project-desktop-local-cancel",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T06:52:28.474Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport (client 1265x720)"
+      },
+      "command": "Windows Node22: node dashboard/qa/fixture.mjs --directory <isolated-parent>; 実ブラウザー手動操作、stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "【旧版引継ぎ】ec5fbf7で実施（日時は原記録）。6040075での再実行ではない。 Ctrl+Kでコマンドパレットを開きEscapeで閉じる。元の送信ボタンへfocus復帰、本文保持。質問取消/送信取消ではない。",
+      "evidence": [
+        "evidence/local-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": true,
+        "detail": "旧版ec5fbf7の実測を引継ぎ。 Ctrl+Kでコマンドパレットを開きEscapeで閉じる。元の送信ボタンへfocus復帰、本文保持。質問取消/送信取消ではない。"
+      }
+    },
+    {
+      "case_id": "project-desktop-local-double-submit",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T06:55:35.991Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport (client 1265x720)"
+      },
+      "command": "Windows Node22: node dashboard/qa/fixture.mjs --directory <isolated-parent>; 実ブラウザー手動操作、stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "【旧版引継ぎ】ec5fbf7で実施（日時は原記録）。6040075での再実行ではない。 hold中の二度押し後もPOST1。log/SSE後も本文readonlyと送信disabledを確認。release後feedback1。disabled要素へのツール操作は送出されない。",
+      "evidence": [
+        "evidence/local-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "旧版ec5fbf7の実測を引継ぎ。 hold中の二度押し後もPOST1。log/SSE後も本文readonlyと送信disabledを確認。release後feedback1。disabled要素へのツール操作は送出されない。"
+      }
+    },
+    {
+      "case_id": "project-desktop-local-disconnect-before",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T06:56:21.890Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport (client 1265x720)"
+      },
+      "command": "Windows Node22: node dashboard/qa/fixture.mjs --directory <isolated-parent>; 実ブラウザー手動操作、stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "【旧版引継ぎ】ec5fbf7で実施（日時は原記録）。6040075での再実行ではない。 drop-before時の本文保持、feedback0を確認。resume後の手動再送でfeedback1。POST2のうち保存1。",
+      "evidence": [
+        "evidence/local-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 2,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "旧版ec5fbf7の実測を引継ぎ。 drop-before時の本文保持、feedback0を確認。resume後の手動再送でfeedback1。POST2のうち保存1。"
+      }
+    },
+    {
+      "case_id": "project-desktop-local-disconnect-after",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T06:57:33.759Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "desktop viewport (client 1265x720)"
+      },
+      "command": "Windows Node22: node dashboard/qa/fixture.mjs --directory <isolated-parent>; 実ブラウザー手動操作、stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "【旧版引継ぎ】ec5fbf7で実施（日時は原記録）。6040075での再実行ではない。 drop-after時に本文保持とfeedback1、resume後の回答表示を確認。自動/手動再送なし、POST1/feedback1。",
+      "evidence": [
+        "evidence/local-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "旧版ec5fbf7の実測を引継ぎ。 drop-after時に本文保持とfeedback1、resume後の回答表示を確認。自動/手動再送なし、POST1/feedback1。"
+      }
+    },
+    {
+      "case_id": "project-desktop-wsl-answer",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "wsl",
+      "tested_at": "2026-10-08T08:23:47.728Z",
+      "environment": {
+        "os": "Windows PC → Tailscale Serve → WSL Ubuntu 24.04のProjectサーバー",
+        "node": "22.23.3（WSL Linux）",
+        "browser": "Codex in-app browser（Chromium系、版番号未取得）",
+        "device": "desktop PC（disconnect-afterのみviewport390×844。実機phoneではない）"
+      },
+      "command": "WSL Node22で合成fixtureを実行し、Windows Tailscale Serve経由でPC実ブラウザー操作。stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "Tab移動・typeText・Enterによる回答。保存本文WSL_PC_日本語の下書きと画面本文が一致。keyboardと同じ1送信。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。",
+      "evidence": [
+        "evidence/desktop-connections.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "Tab移動・typeText・Enterによる回答。保存本文WSL_PC_日本語の下書きと画面本文が一致。keyboardと同じ1送信。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。"
+      }
+    },
+    {
+      "case_id": "project-desktop-wsl-keyboard",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "wsl",
+      "tested_at": "2026-10-08T08:23:47.728Z",
+      "environment": {
+        "os": "Windows PC → Tailscale Serve → WSL Ubuntu 24.04のProjectサーバー",
+        "node": "22.23.3（WSL Linux）",
+        "browser": "Codex in-app browser（Chromium系、版番号未取得）",
+        "device": "desktop PC（disconnect-afterのみviewport390×844。実機phoneではない）"
+      },
+      "command": "WSL Node22で合成fixtureを実行し、Windows Tailscale Serve経由でPC実ブラウザー操作。stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "BODYからTab4回で回答欄へ移動・入力、回答ボタンでEnter送信。送信後BODYへfocus、画面と保存本文一致。answerと同じ1送信。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。",
+      "evidence": [
+        "evidence/desktop-connections.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "BODYからTab4回で回答欄へ移動・入力、回答ボタンでEnter送信。送信後BODYへfocus、画面と保存本文一致。answerと同じ1送信。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。"
+      }
+    },
+    {
+      "case_id": "project-desktop-wsl-sse-draft",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "wsl",
+      "tested_at": "2026-10-08T08:23:00.081Z",
+      "environment": {
+        "os": "Windows PC → Tailscale Serve → WSL Ubuntu 24.04のProjectサーバー",
+        "node": "22.23.3（WSL Linux）",
+        "browser": "Codex in-app browser（Chromium系、版番号未取得）",
+        "device": "desktop PC（disconnect-afterのみviewport390×844。実機phoneではない）"
+      },
+      "command": "WSL Node22で合成fixtureを実行し、Windows Tailscale Serve経由でPC実ブラウザー操作。stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "log1後も全文WSL_PC_日本語の下書きとTEXTAREA focusを保持。未送信POST0/feedback0。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。",
+      "evidence": [
+        "evidence/desktop-connections.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": true,
+        "detail": "log1後も全文WSL_PC_日本語の下書きとTEXTAREA focusを保持。未送信POST0/feedback0。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。"
+      }
+    },
+    {
+      "case_id": "project-desktop-wsl-reload",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "wsl",
+      "tested_at": "2026-10-08T08:23:00.234Z",
+      "environment": {
+        "os": "Windows PC → Tailscale Serve → WSL Ubuntu 24.04のProjectサーバー",
+        "node": "22.23.3（WSL Linux）",
+        "browser": "Codex in-app browser（Chromium系、版番号未取得）",
+        "device": "desktop PC（disconnect-afterのみviewport390×844。実機phoneではない）"
+      },
+      "command": "WSL Node22で合成fixtureを実行し、Windows Tailscale Serve経由でPC実ブラウザー操作。stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "同じタブを再読込し、全文と認証済み表示を復元。未送信POST0/feedback0。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。",
+      "evidence": [
+        "evidence/desktop-connections.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": null,
+        "detail": "同じタブを再読込し、全文と認証済み表示を復元。未送信POST0/feedback0。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。"
+      }
+    },
+    {
+      "case_id": "project-desktop-wsl-back",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "wsl",
+      "tested_at": "2026-10-08T08:23:00.455Z",
+      "environment": {
+        "os": "Windows PC → Tailscale Serve → WSL Ubuntu 24.04のProjectサーバー",
+        "node": "22.23.3（WSL Linux）",
+        "browser": "Codex in-app browser（Chromium系、版番号未取得）",
+        "device": "desktop PC（disconnect-afterのみviewport390×844。実機phoneではない）"
+      },
+      "command": "WSL Node22で合成fixtureを実行し、Windows Tailscale Serve経由でPC実ブラウザー操作。stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "同じタブでabout:blankへ移動して戻り、全文と認証済み表示を復元。未送信POST0/feedback0。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。",
+      "evidence": [
+        "evidence/desktop-connections.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": null,
+        "detail": "同じタブでabout:blankへ移動して戻り、全文と認証済み表示を復元。未送信POST0/feedback0。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。"
+      }
+    },
+    {
+      "case_id": "project-desktop-wsl-cancel",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "wsl",
+      "tested_at": "2026-10-08T08:23:26.318Z",
+      "environment": {
+        "os": "Windows PC → Tailscale Serve → WSL Ubuntu 24.04のProjectサーバー",
+        "node": "22.23.3（WSL Linux）",
+        "browser": "Codex in-app browser（Chromium系、版番号未取得）",
+        "device": "desktop PC（disconnect-afterのみviewport390×844。実機phoneではない）"
+      },
+      "command": "WSL Node22で合成fixtureを実行し、Windows Tailscale Serve経由でPC実ブラウザー操作。stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "回答ボタンからCtrl+K→Escapeでパレットを閉じ、回答ボタンへfocus復帰。本文保持、未送信。textarea上のCtrl+Kは対象外。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。",
+      "evidence": [
+        "evidence/desktop-connections.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": true,
+        "detail": "回答ボタンからCtrl+K→Escapeでパレットを閉じ、回答ボタンへfocus復帰。本文保持、未送信。textarea上のCtrl+Kは対象外。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。"
+      }
+    },
+    {
+      "case_id": "project-desktop-wsl-double-submit",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "wsl",
+      "tested_at": "2026-10-08T08:25:43.663Z",
+      "environment": {
+        "os": "Windows PC → Tailscale Serve → WSL Ubuntu 24.04のProjectサーバー",
+        "node": "22.23.3（WSL Linux）",
+        "browser": "Codex in-app browser（Chromium系、版番号未取得）",
+        "device": "desktop PC（disconnect-afterのみviewport390×844。実機phoneではない）"
+      },
+      "command": "WSL Node22で合成fixtureを実行し、Windows Tailscale Serve経由でPC実ブラウザー操作。stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "hold中dblclick→log2のSSE→再クリックとEnterを試す。入力/送信/破棄が無効のまま追加POSTなし。release後同一本文1件。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。",
+      "evidence": [
+        "evidence/desktop-connections.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "hold中dblclick→log2のSSE→再クリックとEnterを試す。入力/送信/破棄が無効のまま追加POSTなし。release後同一本文1件。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。"
+      }
+    },
+    {
+      "case_id": "project-desktop-wsl-disconnect-before",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "wsl",
+      "tested_at": "2026-10-08T08:26:13.501Z",
+      "environment": {
+        "os": "Windows PC → Tailscale Serve → WSL Ubuntu 24.04のProjectサーバー",
+        "node": "22.23.3（WSL Linux）",
+        "browser": "Codex in-app browser（Chromium系、版番号未取得）",
+        "device": "desktop PC（disconnect-afterのみviewport390×844。実機phoneではない）"
+      },
+      "command": "WSL Node22で合成fixtureを実行し、Windows Tailscale Serve経由でPC実ブラウザー操作。stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "drop-before中に本文保持、POST1/forward0/feedback0。resume後「送信結果を確認」→明示再送し、同一本文1件。自動復帰とはしない。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。",
+      "evidence": [
+        "evidence/desktop-connections.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 2,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "drop-before中に本文保持、POST1/forward0/feedback0。resume後「送信結果を確認」→明示再送し、同一本文1件。自動復帰とはしない。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。"
+      }
+    },
+    {
+      "case_id": "project-desktop-wsl-disconnect-after",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "wsl",
+      "tested_at": "2026-10-08T08:27:11.716Z",
+      "environment": {
+        "os": "Windows PC → Tailscale Serve → WSL Ubuntu 24.04のProjectサーバー",
+        "node": "22.23.3（WSL Linux）",
+        "browser": "Codex in-app browser（Chromium系、版番号未取得）",
+        "device": "desktop PC（disconnect-afterのみviewport390×844。実機phoneではない）"
+      },
+      "command": "WSL Node22で合成fixtureを実行し、Windows Tailscale Serve経由でPC実ブラウザー操作。stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "PCのviewport390×844で送信前から全文を記録。drop-after後もロック本文保持、POST1/forward1/feedback1。resume後の手動状態確認で保存済み表示、追加POSTなし。全角ｋなし。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。",
+      "evidence": [
+        "evidence/desktop-connections.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "PCのviewport390×844で送信前から全文を記録。drop-after後もロック本文保持、POST1/forward1/feedback1。resume後の手動状態確認で保存済み表示、追加POSTなし。全角ｋなし。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。"
+      }
+    },
+    {
+      "case_id": "project-mobile-local-answer",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T07:08:31.436Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "mobile viewport 390x844 (client 375x844); desktop pointer/keyboard, not physical-phone"
+      },
+      "command": "Windows Node22: node dashboard/qa/fixture.mjs --directory <isolated-parent>; 実ブラウザー手動操作、stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "【旧版引継ぎ】ec5fbf7で実施（日時は原記録）。6040075での再実行ではない。 保存済み本文が入力と一致。Q-sseの回答とkeyboardは同じ試行を2セルに記録。独立した2回の試験ではない。",
+      "evidence": [
+        "evidence/local-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "旧版ec5fbf7の実測を引継ぎ。 保存済み本文が入力と一致。Q-sseの回答とkeyboardは同じ試行を2セルに記録。独立した2回の試験ではない。"
+      }
+    },
+    {
+      "case_id": "project-mobile-local-keyboard",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T07:08:31.436Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "mobile viewport 390x844 (client 375x844); desktop pointer/keyboard, not physical-phone"
+      },
+      "command": "Windows Node22: node dashboard/qa/fixture.mjs --directory <isolated-parent>; 実ブラウザー手動操作、stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "【旧版引継ぎ】ec5fbf7で実施（日時は原記録）。6040075での再実行ではない。 Tab4回→回答入力→Tab→Return。送信後フォーム消失に伴いfocusはBODY。Q-sseの回答とkeyboardは同じ試行を2セルに記録。独立した2回の試験ではない。",
+      "evidence": [
+        "evidence/local-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "旧版ec5fbf7の実測を引継ぎ。 Tab4回→回答入力→Tab→Return。送信後フォーム消失に伴いfocusはBODY。Q-sseの回答とkeyboardは同じ試行を2セルに記録。独立した2回の試験ではない。"
+      }
+    },
+    {
+      "case_id": "project-mobile-local-sse-draft",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T07:08:18.446Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "mobile viewport 390x844 (client 375x844); desktop pointer/keyboard, not physical-phone"
+      },
+      "command": "Windows Node22: node dashboard/qa/fixture.mjs --directory <isolated-parent>; 実ブラウザー手動操作、stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "【旧版引継ぎ】ec5fbf7で実施（日時は原記録）。6040075での再実行ではない。 logによる更新後も日本語2行とTEXTAREA focusを保持。POST0、feedback0。",
+      "evidence": [
+        "evidence/local-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": true,
+        "detail": "旧版ec5fbf7の実測を引継ぎ。 logによる更新後も日本語2行とTEXTAREA focusを保持。POST0、feedback0。"
+      }
+    },
+    {
+      "case_id": "project-mobile-local-reload",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T07:08:18.587Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "mobile viewport 390x844 (client 375x844); desktop pointer/keyboard, not physical-phone"
+      },
+      "command": "Windows Node22: node dashboard/qa/fixture.mjs --directory <isolated-parent>; 実ブラウザー手動操作、stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "【旧版引継ぎ】ec5fbf7で実施（日時は原記録）。6040075での再実行ではない。 再読込後、未送信の日本語2行を復元。POST0、feedback0。",
+      "evidence": [
+        "evidence/local-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": null,
+        "detail": "旧版ec5fbf7の実測を引継ぎ。 再読込後、未送信の日本語2行を復元。POST0、feedback0。"
+      }
+    },
+    {
+      "case_id": "project-mobile-local-back",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T07:08:18.675Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "mobile viewport 390x844 (client 375x844); desktop pointer/keyboard, not physical-phone"
+      },
+      "command": "Windows Node22: node dashboard/qa/fixture.mjs --directory <isolated-parent>; 実ブラウザー手動操作、stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "【旧版引継ぎ】ec5fbf7で実施（日時は原記録）。6040075での再実行ではない。 about:blankへ移動し戻る。接続済み表示と未送信本文を復元。POST0、feedback0。",
+      "evidence": [
+        "evidence/local-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": null,
+        "detail": "旧版ec5fbf7の実測を引継ぎ。 about:blankへ移動し戻る。接続済み表示と未送信本文を復元。POST0、feedback0。"
+      }
+    },
+    {
+      "case_id": "project-mobile-local-cancel",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T07:08:18.519Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "mobile viewport 390x844 (client 375x844); desktop pointer/keyboard, not physical-phone"
+      },
+      "command": "Windows Node22: node dashboard/qa/fixture.mjs --directory <isolated-parent>; 実ブラウザー手動操作、stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "【旧版引継ぎ】ec5fbf7で実施（日時は原記録）。6040075での再実行ではない。 Ctrl+Kでコマンドパレットを開きEscapeで閉じる。元の送信ボタンへfocus復帰、本文保持。質問取消/送信取消ではない。",
+      "evidence": [
+        "evidence/local-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": true,
+        "detail": "旧版ec5fbf7の実測を引継ぎ。 Ctrl+Kでコマンドパレットを開きEscapeで閉じる。元の送信ボタンへfocus復帰、本文保持。質問取消/送信取消ではない。"
+      }
+    },
+    {
+      "case_id": "project-mobile-local-double-submit",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T07:09:19.517Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "mobile viewport 390x844 (client 375x844); desktop pointer/keyboard, not physical-phone"
+      },
+      "command": "Windows Node22: node dashboard/qa/fixture.mjs --directory <isolated-parent>; 実ブラウザー手動操作、stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "【旧版引継ぎ】ec5fbf7で実施（日時は原記録）。6040075での再実行ではない。 hold中の二度押し後もPOST1。log/SSE後も本文readonlyと送信disabledを確認。release後feedback1。disabled要素へのツール操作は送出されない。",
+      "evidence": [
+        "evidence/local-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "旧版ec5fbf7の実測を引継ぎ。 hold中の二度押し後もPOST1。log/SSE後も本文readonlyと送信disabledを確認。release後feedback1。disabled要素へのツール操作は送出されない。"
+      }
+    },
+    {
+      "case_id": "project-mobile-local-disconnect-before",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T07:09:32.340Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "mobile viewport 390x844 (client 375x844); desktop pointer/keyboard, not physical-phone"
+      },
+      "command": "Windows Node22: node dashboard/qa/fixture.mjs --directory <isolated-parent>; 実ブラウザー手動操作、stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "【旧版引継ぎ】ec5fbf7で実施（日時は原記録）。6040075での再実行ではない。 drop-before時の本文保持、feedback0を確認。resume後の手動再送でfeedback1。POST2のうち保存1。",
+      "evidence": [
+        "evidence/local-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 2,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "旧版ec5fbf7の実測を引継ぎ。 drop-before時の本文保持、feedback0を確認。resume後の手動再送でfeedback1。POST2のうち保存1。"
+      }
+    },
+    {
+      "case_id": "project-mobile-local-disconnect-after",
+      "status": "pass",
+      "level": "browser",
+      "observed_route": "local",
+      "tested_at": "2026-10-08T07:10:55.857Z",
+      "environment": {
+        "os": "Windows",
+        "node": "22.23.3",
+        "browser": "Codex in-app browser (Chromium系、版番号未取得)",
+        "device": "mobile viewport 390x844 (client 375x844); desktop pointer/keyboard, not physical-phone"
+      },
+      "command": "Windows Node22: node dashboard/qa/fixture.mjs --directory <isolated-parent>; 実ブラウザー手動操作、stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "【旧版引継ぎ】ec5fbf7で実施（日時は原記録）。6040075での再実行ではない。 drop-after時に本文保持とfeedback1、resume後の回答表示を確認。自動/手動再送なし、POST1/feedback1。Q-navigationの再確認を採用。初回Q-afterの末尾文字差異は原因未確定のためこのセルの証拠に使わない。",
+      "evidence": [
+        "evidence/local-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "旧版ec5fbf7の実測を引継ぎ。 drop-after時に本文保持とfeedback1、resume後の回答表示を確認。自動/手動再送なし、POST1/feedback1。Q-navigationの再確認を採用。初回Q-afterの末尾文字差異は原因未確定のためこのセルの証拠に使わない。"
+      }
+    },
+    {
+      "case_id": "project-api-fixture",
+      "status": "pass",
+      "level": "fixture",
+      "observed_route": "fixture",
+      "tested_at": "2026-10-08T08:14:04.429Z",
+      "environment": {
+        "os": "Windows / WSL Ubuntu Linux",
+        "node": "22.23.3（両OS）",
+        "browser": "使用なし（自動テスト）",
+        "device": "none"
+      },
+      "command": "Windows: npm test --prefix dashboard（Node22）。WSL: dashboardをcwdにNode22で --test test/*.test.mjs。実パスを一般化。",
+      "reason": "Windowsの実npm testログは50/50。WSL Node22直接実行も50/50。試験ソース29ファイルと6040075の一致をsource-provenance.jsonで照合。tested_atはWindowsログ保存mtime。自動テストをブラウザー操作の代用にはしない。",
+      "evidence": [
+        "evidence/api-history.md",
+        "evidence/provenance.md",
+        "evidence/followup-verification.md"
+      ],
+      "observations": {
+        "detail": "50 tests / 50 pass / 0 fail / 0 skipped（各OS）。Windowsはnpm script経由、WSLは同じtest本体をNode直接実行。"
+      }
+    },
+    {
+      "case_id": "project-mobile-wsl-answer",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "wsl",
+      "tested_at": "2026-10-08T09:00:14.048Z",
+      "environment": {
+        "os": "iPhone 15（iOS版未取得）→ Windows Tailscale Serve → WSL Ubuntu内Projectサーバー",
+        "node": "22.23.3（WSL Linux）",
+        "browser": "Safari（利用者への同一タブ案内と本人報告。版未取得）",
+        "device": "physical-phone"
+      },
+      "command": "WSL Node22・メタデータobserver付き合成fixture → Windows Tailscale Serve → iPhone手動操作。 stdin障害操作と件数を照合。公開用に配置パスを一般化。",
+      "reason": "本人が入力した文章1件の表示を確認。実保存本文はwsl_日本語の下書き\\n続けて入力。例文の大文字とは異なるが、追加入力を含む本人入力が保存された。tested_atは耐久保存時刻。 WSL実体+Tailscaleの同じ実機試行。経路別セルは独立2試行を意味しない。 診断observer付きrun NyTthQ。",
+      "evidence": [
+        "evidence/phone-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "本人が入力した文章1件の表示を確認。実保存本文はwsl_日本語の下書き\\n続けて入力。例文の大文字とは異なるが、追加入力を含む本人入力が保存された。tested_atは耐久保存時刻。 WSL実体+Tailscaleの同じ実機試行。経路別セルは独立2試行を意味しない。"
+      }
+    },
+    {
+      "case_id": "project-mobile-wsl-keyboard",
+      "status": "blocked",
+      "level": "real-connection",
+      "observed_route": "wsl",
+      "tested_at": "2026-10-08T09:06:39.945Z",
+      "environment": {
+        "os": "iPhone 15（iOS版未取得）→ Windows Tailscale Serve → WSL Ubuntu内Projectサーバー",
+        "node": "22.23.3（WSL Linux）",
+        "browser": "Safari（利用者への同一タブ案内と本人報告。版未取得）",
+        "device": "physical-phone"
+      },
+      "command": "WSL Node22・メタデータobserver付き合成fixture → Windows Tailscale Serve → iPhone手動操作。 stdin障害操作と件数を照合。公開用に配置パスを一般化。",
+      "reason": "iPhone15に外付けキーボードがなく、Tab/EnterまたはEscapeを含むカタログ操作を実施できない。PCやタッチ操作の結果で代用しない。tested_atは今回のセッションのカウンター記録時刻。",
+      "evidence": [
+        "evidence/phone-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "detail": "iPhone15に外付けキーボードがなく、Tab/EnterまたはEscapeを含むカタログ操作を実施できない。PCやタッチ操作の結果で代用しない。tested_atは今回のセッションのカウンター記録時刻。"
+      }
+    },
+    {
+      "case_id": "project-mobile-wsl-sse-draft",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "wsl",
+      "tested_at": "2026-10-08T08:58:18.658Z",
+      "environment": {
+        "os": "iPhone 15（iOS版未取得）→ Windows Tailscale Serve → WSL Ubuntu内Projectサーバー",
+        "node": "22.23.3（WSL Linux）",
+        "browser": "Safari（利用者への同一タブ案内と本人報告。版未取得）",
+        "device": "physical-phone"
+      },
+      "command": "WSL Node22・メタデータobserver付き合成fixture → Windows Tailscale Serve → iPhone手動操作。 stdin障害操作と件数を照合。公開用に配置パスを一般化。",
+      "reason": "log1による更新後、本人が「全文が残り、そのまま入力できる」と確認。全文・focusは本人報告による測定で、DOM activeElementは未取得。送信前POST0/feedback0。tested_atはlog直後のカウンター記録時刻。 WSL実体+Tailscaleの同じ実機試行。経路別セルは独立2試行を意味しない。 診断observer付きrun NyTthQ。",
+      "evidence": [
+        "evidence/phone-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": true,
+        "detail": "log1による更新後、本人が「全文が残り、そのまま入力できる」と確認。全文・focusは本人報告による測定で、DOM activeElementは未取得。送信前POST0/feedback0。tested_atはlog直後のカウンター記録時刻。 WSL実体+Tailscaleの同じ実機試行。経路別セルは独立2試行を意味しない。"
+      }
+    },
+    {
+      "case_id": "project-mobile-wsl-reload",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "wsl",
+      "tested_at": "2026-10-08T08:58:18.658Z",
+      "environment": {
+        "os": "iPhone 15（iOS版未取得）→ Windows Tailscale Serve → WSL Ubuntu内Projectサーバー",
+        "node": "22.23.3（WSL Linux）",
+        "browser": "Safari（利用者への同一タブ案内と本人報告。版未取得）",
+        "device": "physical-phone"
+      },
+      "command": "WSL Node22・メタデータobserver付き合成fixture → Windows Tailscale Serve → iPhone手動操作。 stdin障害操作と件数を照合。公開用に配置パスを一般化。",
+      "reason": "同じSafariタブの再読込後、本人が未送信本文の全文保持を確認。Q-sseを送信する前の試行。tested_atは直前の未送信カウンター記録時刻をセッション基準として使用し、再読込の正確な秒は未取得。後の送信は1回のみ。 WSL実体+Tailscaleの同じ実機試行。経路別セルは独立2試行を意味しない。 診断observer付きrun NyTthQ。",
+      "evidence": [
+        "evidence/phone-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": null,
+        "detail": "同じSafariタブの再読込後、本人が未送信本文の全文保持を確認。Q-sseを送信する前の試行。tested_atは直前の未送信カウンター記録時刻をセッション基準として使用し、再読込の正確な秒は未取得。後の送信は1回のみ。 WSL実体+Tailscaleの同じ実機試行。経路別セルは独立2試行を意味しない。"
+      }
+    },
+    {
+      "case_id": "project-mobile-wsl-back",
+      "status": "pass",
+      "reason": "後続実機試験で更新。本人が同じSafariタブでabout:blankから戻り、未送信下書き保持を確認。戻る後のconfig/stateは200、POST0/feedback0。tested_atは戻る後のAPI観測時刻で、タップの厳密な秒ではない。WSL実体+Tailscaleを通る1回の試行を2セルから参照し、独立2試行ではない。最終認証案内修正より前のUI版での観測。",
+      "level": "real-connection",
+      "observed_route": "wsl",
+      "tested_at": "2026-10-08T11:19:53Z",
+      "environment": {
+        "os": "iPhone 15 / iOS 26.5 → Windows Tailscale Serve → WSL Ubuntu Projectサーバー",
+        "node": "22.23.3（WSL Linux）",
+        "browser": "Safari（本人申告。ブラウザー固有の版番号は未取得）",
+        "device": "physical-phone"
+      },
+      "command": "WSL Node22で同じ合成fixtureと認証情報を保持。iPhoneの同一Safariタブで未送信下書きを入力 → about:blank → 履歴の戻る。診断proxyでAPI状態、fixtureでPOST/保存件数を照合。配置パスは一般化。",
+      "evidence": [
+        "evidence/navigation-auth.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": null,
+        "detail": "同一タブの戻る後の下書き保持は本人確認。focus位置の実測は行っていない。最終fixtureでも全5問未回答、回答POST0・保存0。"
+      }
+    },
+    {
+      "case_id": "project-mobile-wsl-cancel",
+      "status": "blocked",
+      "level": "real-connection",
+      "observed_route": "wsl",
+      "tested_at": "2026-10-08T09:06:39.945Z",
+      "environment": {
+        "os": "iPhone 15（iOS版未取得）→ Windows Tailscale Serve → WSL Ubuntu内Projectサーバー",
+        "node": "22.23.3（WSL Linux）",
+        "browser": "Safari（利用者への同一タブ案内と本人報告。版未取得）",
+        "device": "physical-phone"
+      },
+      "command": "WSL Node22・メタデータobserver付き合成fixture → Windows Tailscale Serve → iPhone手動操作。 stdin障害操作と件数を照合。公開用に配置パスを一般化。",
+      "reason": "iPhone15に外付けキーボードがなく、Tab/EnterまたはEscapeを含むカタログ操作を実施できない。PCやタッチ操作の結果で代用しない。tested_atは今回のセッションのカウンター記録時刻。",
+      "evidence": [
+        "evidence/phone-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "detail": "iPhone15に外付けキーボードがなく、Tab/EnterまたはEscapeを含むカタログ操作を実施できない。PCやタッチ操作の結果で代用しない。tested_atは今回のセッションのカウンター記録時刻。"
+      }
+    },
+    {
+      "case_id": "project-mobile-wsl-double-submit",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "wsl",
+      "tested_at": "2026-10-08T09:06:39.945Z",
+      "environment": {
+        "os": "iPhone 15（iOS版未取得）→ Windows Tailscale Serve → WSL Ubuntu内Projectサーバー",
+        "node": "22.23.3（WSL Linux）",
+        "browser": "Safari（利用者への同一タブ案内と本人報告。版未取得）",
+        "device": "physical-phone"
+      },
+      "command": "WSL Node22・メタデータobserver付き合成fixture → Windows Tailscale Serve → iPhone手動操作。 stdin障害操作と件数を照合。公開用に配置パスを一般化。",
+      "reason": "hold中に連打→log2のSSE後も再タップ不可・本文保持。ユーザー追加の再読込で保留POSTを中断し、本人が全文保持と明示再送後の1件表示を確認。実本文wsl_連打確認。POST2/forward1/feedback1は中断1回+明示再送1回で重複保存0。releaseは未実施。このvariationでカタログの保留連打・SSE後再試行・POST/耐久回答別記録を満たす。tested_atは最終カウンター記録時刻。 WSL実体+Tailscaleの同じ実機試行。経路別セルは独立2試行を意味しない。 診断observer付きrun NyTthQ。",
+      "evidence": [
+        "evidence/phone-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 2,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "hold中に連打→log2のSSE後も再タップ不可・本文保持。ユーザー追加の再読込で保留POSTを中断し、本人が全文保持と明示再送後の1件表示を確認。実本文wsl_連打確認。POST2/forward1/feedback1は中断1回+明示再送1回で重複保存0。releaseは未実施。このvariationでカタログの保留連打・SSE後再試行・POST/耐久回答別記録を満たす。tested_atは最終カウンター記録時刻。 WSL実体+Tailscaleの同じ実機試行。経路別セルは独立2試行を意味しない。"
+      }
+    },
+    {
+      "case_id": "project-mobile-wsl-disconnect-before",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "wsl",
+      "tested_at": "2026-10-08T09:10:19.877Z",
+      "environment": {
+        "os": "iPhone 15（iOS版未取得）→ Windows Tailscale Serve → WSL Ubuntu内Projectサーバー",
+        "node": "22.23.3（WSL Linux）",
+        "browser": "Safari（利用者への同一タブ案内と本人報告。版未取得）",
+        "device": "physical-phone"
+      },
+      "command": "WSL Node22・メタデータobserver付き合成fixture → Windows Tailscale Serve → iPhone手動操作。 stdin障害操作と件数を照合。公開用に配置パスを一般化。",
+      "reason": "drop-before後、本人が全文保持・結果確認待ちを確認。offline時POST1/forward0/feedback0。resume後に送信結果を確認→本文を確認して手動再送し、本人が同文1件の表示を確認。実本文wsl_保存前の切断。最終POST2/forward1/feedback1。無操作の自動復帰ではない。tested_atは最終カウンター記録時刻。 WSL実体+Tailscaleの同じ実機試行。経路別セルは独立2試行を意味しない。 診断observer付きrun NyTthQ。",
+      "evidence": [
+        "evidence/phone-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 2,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "drop-before後、本人が全文保持・結果確認待ちを確認。offline時POST1/forward0/feedback0。resume後に送信結果を確認→本文を確認して手動再送し、本人が同文1件の表示を確認。実本文wsl_保存前の切断。最終POST2/forward1/feedback1。無操作の自動復帰ではない。tested_atは最終カウンター記録時刻。 WSL実体+Tailscaleの同じ実機試行。経路別セルは独立2試行を意味しない。"
+      }
+    },
+    {
+      "case_id": "project-mobile-wsl-disconnect-after",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "wsl",
+      "tested_at": "2026-10-08T09:13:20.237Z",
+      "environment": {
+        "os": "iPhone 15（iOS版未取得）→ Windows Tailscale Serve → WSL Ubuntu内Projectサーバー",
+        "node": "22.23.3（WSL Linux）",
+        "browser": "Safari（利用者への同一タブ案内と本人報告。版未取得）",
+        "device": "physical-phone"
+      },
+      "command": "WSL Node22・メタデータobserver付き合成fixture → Windows Tailscale Serve → iPhone手動操作。 stdin障害操作と件数を照合。公開用に配置パスを一般化。",
+      "reason": "drop-after後、本人が全文保持・結果確認待ちを確認。offline時に既にPOST1/forward1/feedback1。resume後は送信結果を確認だけを押し、再送せず同文1件の表示を本人が確認。POST1のまま増加なし。実本文wsl_保存の確認は案内例文と異なるが、本人入力を根拠にする。無操作の自動復帰ではない。tested_atは最終カウンター記録時刻。 WSL実体+Tailscaleの同じ実機試行。経路別セルは独立2試行を意味しない。 診断observer付きrun NyTthQ。",
+      "evidence": [
+        "evidence/phone-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "drop-after後、本人が全文保持・結果確認待ちを確認。offline時に既にPOST1/forward1/feedback1。resume後は送信結果を確認だけを押し、再送せず同文1件の表示を本人が確認。POST1のまま増加なし。実本文wsl_保存の確認は案内例文と異なるが、本人入力を根拠にする。無操作の自動復帰ではない。tested_atは最終カウンター記録時刻。 WSL実体+Tailscaleの同じ実機試行。経路別セルは独立2試行を意味しない。"
+      }
+    },
+    {
+      "case_id": "project-desktop-tailscale-answer",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "tailscale",
+      "tested_at": "2026-10-08T08:23:47.728Z",
+      "environment": {
+        "os": "Windows PC → Tailscale Serve → WSL Ubuntu 24.04のProjectサーバー",
+        "node": "22.23.3（WSL Linux）",
+        "browser": "Codex in-app browser（Chromium系、版番号未取得）",
+        "device": "desktop PC（disconnect-afterのみviewport390×844。実機phoneではない）"
+      },
+      "command": "WSL Node22で合成fixtureを実行し、Windows Tailscale Serve経由でPC実ブラウザー操作。stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "Tab移動・typeText・Enterによる回答。保存本文WSL_PC_日本語の下書きと画面本文が一致。keyboardと同じ1送信。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。",
+      "evidence": [
+        "evidence/desktop-connections.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "Tab移動・typeText・Enterによる回答。保存本文WSL_PC_日本語の下書きと画面本文が一致。keyboardと同じ1送信。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。"
+      }
+    },
+    {
+      "case_id": "project-desktop-tailscale-keyboard",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "tailscale",
+      "tested_at": "2026-10-08T08:23:47.728Z",
+      "environment": {
+        "os": "Windows PC → Tailscale Serve → WSL Ubuntu 24.04のProjectサーバー",
+        "node": "22.23.3（WSL Linux）",
+        "browser": "Codex in-app browser（Chromium系、版番号未取得）",
+        "device": "desktop PC（disconnect-afterのみviewport390×844。実機phoneではない）"
+      },
+      "command": "WSL Node22で合成fixtureを実行し、Windows Tailscale Serve経由でPC実ブラウザー操作。stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "BODYからTab4回で回答欄へ移動・入力、回答ボタンでEnter送信。送信後BODYへfocus、画面と保存本文一致。answerと同じ1送信。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。",
+      "evidence": [
+        "evidence/desktop-connections.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "BODYからTab4回で回答欄へ移動・入力、回答ボタンでEnter送信。送信後BODYへfocus、画面と保存本文一致。answerと同じ1送信。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。"
+      }
+    },
+    {
+      "case_id": "project-desktop-tailscale-sse-draft",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "tailscale",
+      "tested_at": "2026-10-08T08:23:00.081Z",
+      "environment": {
+        "os": "Windows PC → Tailscale Serve → WSL Ubuntu 24.04のProjectサーバー",
+        "node": "22.23.3（WSL Linux）",
+        "browser": "Codex in-app browser（Chromium系、版番号未取得）",
+        "device": "desktop PC（disconnect-afterのみviewport390×844。実機phoneではない）"
+      },
+      "command": "WSL Node22で合成fixtureを実行し、Windows Tailscale Serve経由でPC実ブラウザー操作。stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "log1後も全文WSL_PC_日本語の下書きとTEXTAREA focusを保持。未送信POST0/feedback0。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。",
+      "evidence": [
+        "evidence/desktop-connections.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": true,
+        "detail": "log1後も全文WSL_PC_日本語の下書きとTEXTAREA focusを保持。未送信POST0/feedback0。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。"
+      }
+    },
+    {
+      "case_id": "project-desktop-tailscale-reload",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "tailscale",
+      "tested_at": "2026-10-08T08:23:00.234Z",
+      "environment": {
+        "os": "Windows PC → Tailscale Serve → WSL Ubuntu 24.04のProjectサーバー",
+        "node": "22.23.3（WSL Linux）",
+        "browser": "Codex in-app browser（Chromium系、版番号未取得）",
+        "device": "desktop PC（disconnect-afterのみviewport390×844。実機phoneではない）"
+      },
+      "command": "WSL Node22で合成fixtureを実行し、Windows Tailscale Serve経由でPC実ブラウザー操作。stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "同じタブを再読込し、全文と認証済み表示を復元。未送信POST0/feedback0。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。",
+      "evidence": [
+        "evidence/desktop-connections.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": null,
+        "detail": "同じタブを再読込し、全文と認証済み表示を復元。未送信POST0/feedback0。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。"
+      }
+    },
+    {
+      "case_id": "project-desktop-tailscale-back",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "tailscale",
+      "tested_at": "2026-10-08T08:23:00.455Z",
+      "environment": {
+        "os": "Windows PC → Tailscale Serve → WSL Ubuntu 24.04のProjectサーバー",
+        "node": "22.23.3（WSL Linux）",
+        "browser": "Codex in-app browser（Chromium系、版番号未取得）",
+        "device": "desktop PC（disconnect-afterのみviewport390×844。実機phoneではない）"
+      },
+      "command": "WSL Node22で合成fixtureを実行し、Windows Tailscale Serve経由でPC実ブラウザー操作。stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "同じタブでabout:blankへ移動して戻り、全文と認証済み表示を復元。未送信POST0/feedback0。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。",
+      "evidence": [
+        "evidence/desktop-connections.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": null,
+        "detail": "同じタブでabout:blankへ移動して戻り、全文と認証済み表示を復元。未送信POST0/feedback0。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。"
+      }
+    },
+    {
+      "case_id": "project-desktop-tailscale-cancel",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "tailscale",
+      "tested_at": "2026-10-08T08:23:26.318Z",
+      "environment": {
+        "os": "Windows PC → Tailscale Serve → WSL Ubuntu 24.04のProjectサーバー",
+        "node": "22.23.3（WSL Linux）",
+        "browser": "Codex in-app browser（Chromium系、版番号未取得）",
+        "device": "desktop PC（disconnect-afterのみviewport390×844。実機phoneではない）"
+      },
+      "command": "WSL Node22で合成fixtureを実行し、Windows Tailscale Serve経由でPC実ブラウザー操作。stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "回答ボタンからCtrl+K→Escapeでパレットを閉じ、回答ボタンへfocus復帰。本文保持、未送信。textarea上のCtrl+Kは対象外。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。",
+      "evidence": [
+        "evidence/desktop-connections.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": true,
+        "detail": "回答ボタンからCtrl+K→Escapeでパレットを閉じ、回答ボタンへfocus復帰。本文保持、未送信。textarea上のCtrl+Kは対象外。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。"
+      }
+    },
+    {
+      "case_id": "project-desktop-tailscale-double-submit",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "tailscale",
+      "tested_at": "2026-10-08T08:25:43.663Z",
+      "environment": {
+        "os": "Windows PC → Tailscale Serve → WSL Ubuntu 24.04のProjectサーバー",
+        "node": "22.23.3（WSL Linux）",
+        "browser": "Codex in-app browser（Chromium系、版番号未取得）",
+        "device": "desktop PC（disconnect-afterのみviewport390×844。実機phoneではない）"
+      },
+      "command": "WSL Node22で合成fixtureを実行し、Windows Tailscale Serve経由でPC実ブラウザー操作。stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "hold中dblclick→log2のSSE→再クリックとEnterを試す。入力/送信/破棄が無効のまま追加POSTなし。release後同一本文1件。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。",
+      "evidence": [
+        "evidence/desktop-connections.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "hold中dblclick→log2のSSE→再クリックとEnterを試す。入力/送信/破棄が無効のまま追加POSTなし。release後同一本文1件。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。"
+      }
+    },
+    {
+      "case_id": "project-desktop-tailscale-disconnect-before",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "tailscale",
+      "tested_at": "2026-10-08T08:26:13.501Z",
+      "environment": {
+        "os": "Windows PC → Tailscale Serve → WSL Ubuntu 24.04のProjectサーバー",
+        "node": "22.23.3（WSL Linux）",
+        "browser": "Codex in-app browser（Chromium系、版番号未取得）",
+        "device": "desktop PC（disconnect-afterのみviewport390×844。実機phoneではない）"
+      },
+      "command": "WSL Node22で合成fixtureを実行し、Windows Tailscale Serve経由でPC実ブラウザー操作。stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "drop-before中に本文保持、POST1/forward0/feedback0。resume後「送信結果を確認」→明示再送し、同一本文1件。自動復帰とはしない。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。",
+      "evidence": [
+        "evidence/desktop-connections.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 2,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "drop-before中に本文保持、POST1/forward0/feedback0。resume後「送信結果を確認」→明示再送し、同一本文1件。自動復帰とはしない。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。"
+      }
+    },
+    {
+      "case_id": "project-desktop-tailscale-disconnect-after",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "tailscale",
+      "tested_at": "2026-10-08T08:27:11.716Z",
+      "environment": {
+        "os": "Windows PC → Tailscale Serve → WSL Ubuntu 24.04のProjectサーバー",
+        "node": "22.23.3（WSL Linux）",
+        "browser": "Codex in-app browser（Chromium系、版番号未取得）",
+        "device": "desktop PC（disconnect-afterのみviewport390×844。実機phoneではない）"
+      },
+      "command": "WSL Node22で合成fixtureを実行し、Windows Tailscale Serve経由でPC実ブラウザー操作。stdin log/hold/release/drop-before/drop-after/resume/stop。公開用に配置パスを一般化。",
+      "reason": "PCのviewport390×844で送信前から全文を記録。drop-after後もロック本文保持、POST1/forward1/feedback1。resume後の手動状態確認で保存済み表示、追加POSTなし。全角ｋなし。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。",
+      "evidence": [
+        "evidence/desktop-connections.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "PCのviewport390×844で送信前から全文を記録。drop-after後もロック本文保持、POST1/forward1/feedback1。resume後の手動状態確認で保存済み表示、追加POSTなし。全角ｋなし。 WSL実体+Tailscaleの共通試行を経路別2セルで参照し、独立2試行とは数えない。"
+      }
+    },
+    {
+      "case_id": "project-mobile-tailscale-answer",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "tailscale",
+      "tested_at": "2026-10-08T07:47:27.837Z",
+      "environment": {
+        "os": "iPhone 15 / iOS版未取得。ProjectサーバーはWindows",
+        "node": "22.23.3（Windowsサーバー）",
+        "browser": "ユーザー呼称Safari。Projectの各段階が独立Safariかアプリ内表示かは未確定、版未取得",
+        "device": "physical-phone"
+      },
+      "command": "Windows Node22: node dashboard/qa/fixture.mjs --directory <isolated-runs> --port 59131 --tailscale; iPhone手動操作。 stdin障害操作と件数を照合。公開用に配置パスを一般化。",
+      "reason": "ユーザーが回答済みの同一本文1件を確認。実保存本文は「あああ\\nいいい」で、案内例文は期待値に使わない。tested_atは耐久保存時刻。",
+      "evidence": [
+        "evidence/phone-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "ユーザーが回答済みの同一本文1件を確認。実保存本文は「あああ\\nいいい」で、案内例文は期待値に使わない。tested_atは耐久保存時刻。"
+      }
+    },
+    {
+      "case_id": "project-mobile-tailscale-keyboard",
+      "status": "blocked",
+      "level": "real-connection",
+      "observed_route": "tailscale",
+      "tested_at": "2026-10-08T09:06:39.945Z",
+      "environment": {
+        "os": "iPhone 15（iOS版未取得）→ Windows Tailscale Serve → WSL Ubuntu内Projectサーバー",
+        "node": "22.23.3（WSL Linux）",
+        "browser": "Safari（利用者への同一タブ案内と本人報告。版未取得）",
+        "device": "physical-phone"
+      },
+      "command": "WSL Node22・メタデータobserver付き合成fixture → Windows Tailscale Serve → iPhone手動操作。 stdin障害操作と件数を照合。公開用に配置パスを一般化。",
+      "reason": "iPhone15に外付けキーボードがなく、Tab/EnterまたはEscapeを含むカタログ操作を実施できない。PCやタッチ操作の結果で代用しない。tested_atは今回のセッションのカウンター記録時刻。",
+      "evidence": [
+        "evidence/phone-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "detail": "iPhone15に外付けキーボードがなく、Tab/EnterまたはEscapeを含むカタログ操作を実施できない。PCやタッチ操作の結果で代用しない。tested_atは今回のセッションのカウンター記録時刻。"
+      }
+    },
+    {
+      "case_id": "project-mobile-tailscale-sse-draft",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "tailscale",
+      "tested_at": "2026-10-08T07:43:41.124Z",
+      "environment": {
+        "os": "iPhone 15 / iOS版未取得。ProjectサーバーはWindows",
+        "node": "22.23.3（Windowsサーバー）",
+        "browser": "ユーザー呼称Safari。Projectの各段階が独立Safariかアプリ内表示かは未確定、版未取得",
+        "device": "physical-phone"
+      },
+      "command": "Windows Node22: node dashboard/qa/fixture.mjs --directory <isolated-runs> --port 59131 --tailscale; iPhone手動操作。 stdin障害操作と件数を照合。公開用に配置パスを一般化。",
+      "reason": "log1後も全文保持し、そのまま入力継続できるとユーザー確認。focus保持はこの自己申告による。DOMのactiveElementは未取得。送信前POST0/feedback0。tested_atはlog時刻。",
+      "evidence": [
+        "evidence/phone-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": true,
+        "detail": "log1後も全文保持し、そのまま入力継続できるとユーザー確認。focus保持はこの自己申告による。DOMのactiveElementは未取得。送信前POST0/feedback0。tested_atはlog時刻。"
+      }
+    },
+    {
+      "case_id": "project-mobile-tailscale-reload",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "tailscale",
+      "tested_at": "2026-10-08T08:02:25.236Z",
+      "environment": {
+        "os": "iPhone 15 / iOS版未取得。ProjectサーバーはWindows",
+        "node": "22.23.3（Windowsサーバー）",
+        "browser": "ユーザー呼称Safari。Projectの各段階が独立Safariかアプリ内表示かは未確定、版未取得",
+        "device": "physical-phone"
+      },
+      "command": "Windows Node22: node dashboard/qa/fixture.mjs --directory <isolated-runs> --port 59131 --tailscale; iPhone手動操作。 stdin障害操作と件数を照合。公開用に配置パスを一般化。",
+      "reason": "Q-sseの未送信本文が再読込後も残ることをユーザー確認。送信前POST0/feedback0。tested_atは当該セッションの最終カウンター記録時刻であり、再読込操作の正確な秒は未取得。",
+      "evidence": [
+        "evidence/phone-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": null,
+        "detail": "Q-sseの未送信本文が再読込後も残ることをユーザー確認。送信前POST0/feedback0。tested_atは当該セッションの最終カウンター記録時刻であり、再読込操作の正確な秒は未取得。"
+      }
+    },
+    {
+      "case_id": "project-mobile-tailscale-back",
+      "status": "pass",
+      "reason": "後続実機試験で更新。本人が同じSafariタブでabout:blankから戻り、未送信下書き保持を確認。戻る後のconfig/stateは200、POST0/feedback0。tested_atは戻る後のAPI観測時刻で、タップの厳密な秒ではない。WSL実体+Tailscaleを通る1回の試行を2セルから参照し、独立2試行ではない。最終認証案内修正より前のUI版での観測。",
+      "level": "real-connection",
+      "observed_route": "tailscale",
+      "tested_at": "2026-10-08T11:19:53Z",
+      "environment": {
+        "os": "iPhone 15 / iOS 26.5 → Windows Tailscale Serve → WSL Ubuntu Projectサーバー",
+        "node": "22.23.3（WSL Linux）",
+        "browser": "Safari（本人申告。ブラウザー固有の版番号は未取得）",
+        "device": "physical-phone"
+      },
+      "command": "WSL Node22で同じ合成fixtureと認証情報を保持。iPhoneの同一Safariタブで未送信下書きを入力 → about:blank → 履歴の戻る。診断proxyでAPI状態、fixtureでPOST/保存件数を照合。配置パスは一般化。",
+      "evidence": [
+        "evidence/navigation-auth.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 0,
+        "feedback_count": 0,
+        "focus_preserved": null,
+        "detail": "同一タブの戻る後の下書き保持は本人確認。focus位置の実測は行っていない。最終fixtureでも全5問未回答、回答POST0・保存0。"
+      }
+    },
+    {
+      "case_id": "project-mobile-tailscale-cancel",
+      "status": "blocked",
+      "level": "real-connection",
+      "observed_route": "tailscale",
+      "tested_at": "2026-10-08T09:06:39.945Z",
+      "environment": {
+        "os": "iPhone 15（iOS版未取得）→ Windows Tailscale Serve → WSL Ubuntu内Projectサーバー",
+        "node": "22.23.3（WSL Linux）",
+        "browser": "Safari（利用者への同一タブ案内と本人報告。版未取得）",
+        "device": "physical-phone"
+      },
+      "command": "WSL Node22・メタデータobserver付き合成fixture → Windows Tailscale Serve → iPhone手動操作。 stdin障害操作と件数を照合。公開用に配置パスを一般化。",
+      "reason": "iPhone15に外付けキーボードがなく、Tab/EnterまたはEscapeを含むカタログ操作を実施できない。PCやタッチ操作の結果で代用しない。tested_atは今回のセッションのカウンター記録時刻。",
+      "evidence": [
+        "evidence/phone-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "detail": "iPhone15に外付けキーボードがなく、Tab/EnterまたはEscapeを含むカタログ操作を実施できない。PCやタッチ操作の結果で代用しない。tested_atは今回のセッションのカウンター記録時刻。"
+      }
+    },
+    {
+      "case_id": "project-mobile-tailscale-double-submit",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "tailscale",
+      "tested_at": "2026-10-08T09:06:39.945Z",
+      "environment": {
+        "os": "iPhone 15（iOS版未取得）→ Windows Tailscale Serve → WSL Ubuntu内Projectサーバー",
+        "node": "22.23.3（WSL Linux）",
+        "browser": "Safari（利用者への同一タブ案内と本人報告。版未取得）",
+        "device": "physical-phone"
+      },
+      "command": "WSL Node22・メタデータobserver付き合成fixture → Windows Tailscale Serve → iPhone手動操作。 stdin障害操作と件数を照合。公開用に配置パスを一般化。",
+      "reason": "hold中に連打→log2のSSE後も再タップ不可・本文保持。ユーザー追加の再読込で保留POSTを中断し、本人が全文保持と明示再送後の1件表示を確認。実本文wsl_連打確認。POST2/forward1/feedback1は中断1回+明示再送1回で重複保存0。releaseは未実施。このvariationでカタログの保留連打・SSE後再試行・POST/耐久回答別記録を満たす。tested_atは最終カウンター記録時刻。 WSL実体+Tailscaleの同じ実機試行。経路別セルは独立2試行を意味しない。 診断observer付きrun NyTthQ。",
+      "evidence": [
+        "evidence/phone-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 2,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "hold中に連打→log2のSSE後も再タップ不可・本文保持。ユーザー追加の再読込で保留POSTを中断し、本人が全文保持と明示再送後の1件表示を確認。実本文wsl_連打確認。POST2/forward1/feedback1は中断1回+明示再送1回で重複保存0。releaseは未実施。このvariationでカタログの保留連打・SSE後再試行・POST/耐久回答別記録を満たす。tested_atは最終カウンター記録時刻。 WSL実体+Tailscaleの同じ実機試行。経路別セルは独立2試行を意味しない。"
+      }
+    },
+    {
+      "case_id": "project-mobile-tailscale-disconnect-before",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "tailscale",
+      "tested_at": "2026-10-08T07:59:44.196Z",
+      "environment": {
+        "os": "iPhone 15 / iOS版未取得。ProjectサーバーはWindows",
+        "node": "22.23.3（Windowsサーバー）",
+        "browser": "ユーザー呼称Safari。Projectの各段階が独立Safariかアプリ内表示かは未確定、版未取得",
+        "device": "physical-phone"
+      },
+      "command": "Windows Node22: node dashboard/qa/fixture.mjs --directory <isolated-runs> --port 59131 --tailscale; iPhone手動操作。 stdin障害操作と件数を照合。公開用に配置パスを一般化。",
+      "reason": "実際の障害設定drop-beforeをQ-afterで実施。通信断中の再読込は白画面。復旧後同じSafariとユーザーが報告した画面で本文「テスト」と再送待ちを確認し、明示再送で1件保存。最初のQ-before試行は保持不明で採用しない。tested_atは再送の耐久保存時刻。",
+      "evidence": [
+        "evidence/phone-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 2,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "実際の障害設定drop-beforeをQ-afterで実施。通信断中の再読込は白画面。復旧後同じSafariとユーザーが報告した画面で本文「テスト」と再送待ちを確認し、明示再送で1件保存。最初のQ-before試行は保持不明で採用しない。tested_atは再送の耐久保存時刻。"
+      }
+    },
+    {
+      "case_id": "project-mobile-tailscale-disconnect-after",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "tailscale",
+      "tested_at": "2026-10-08T08:02:25.236Z",
+      "environment": {
+        "os": "iPhone 15 / iOS版未取得。ProjectサーバーはWindows",
+        "node": "22.23.3（Windowsサーバー）",
+        "browser": "ユーザー呼称Safari。Projectの各段階が独立Safariかアプリ内表示かは未確定、版未取得",
+        "device": "physical-phone"
+      },
+      "command": "Windows Node22: node dashboard/qa/fixture.mjs --directory <isolated-runs> --port 59131 --tailscale; iPhone手動操作。 stdin障害操作と件数を照合。公開用に配置パスを一般化。",
+      "reason": "実際のdrop-afterをQ-navigationで実施。「保存後の確認」がPOST1/forward1/feedback1。復旧後ユーザーの明示再読込で回答済み、追加POSTなし。再読込なし自動復帰は未確認。tested_atは最終カウンター記録時刻であり、画面確認の正確な秒は未取得。",
+      "evidence": [
+        "evidence/phone-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "input_lost": false,
+        "duplicate_answers": 0,
+        "answer_requests": 1,
+        "feedback_count": 1,
+        "focus_preserved": null,
+        "detail": "実際のdrop-afterをQ-navigationで実施。「保存後の確認」がPOST1/forward1/feedback1。復旧後ユーザーの明示再読込で回答済み、追加POSTなし。再読込なし自動復帰は未確認。tested_atは最終カウンター記録時刻であり、画面確認の正確な秒は未取得。"
+      }
+    },
+    {
+      "case_id": "harness-desktop-wsl-tailscale",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "wsl-tailscale",
+      "tested_at": "2026-10-08T08:19:27.763Z",
+      "environment": {
+        "os": "Windows PC → Tailscale Serve → WSL Ubuntu DSH",
+        "node": "22.23.3 / DSH 0.2.0-rc.2",
+        "browser": "Codex in-app browser（版未取得）",
+        "device": "desktop PC"
+      },
+      "command": "通常の rdsh-dashboard harness 起動経路からWSL上の公式DSH Web UIへTailscaleで接続。隔離環境のXDG Documents設定を補正し、実画面を確認。公開用に配置パスを一般化。",
+      "reason": "実Tailscale経由の通常Harness入口からWSL上の公式DSH 0.2.0-rc.2へ接続。隔離XDG修正後、Default workspace・入力欄を実ブラウザー確認。 モデル実行・会話送信・作業完了の検証ではない。",
+      "evidence": [
+        "evidence/harness-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "detail": "実Tailscale経由の通常Harness入口からWSL上の公式DSH 0.2.0-rc.2へ接続。隔離XDG修正後、Default workspace・入力欄を実ブラウザー確認。 初期default workspaceエラーは隔離HOMEのXDG Documents定義不足で、専用設定後に解消。製品コードは変更していない。別ブラウザーの認証引継ぎは対象外。"
+      }
+    },
+    {
+      "case_id": "harness-mobile-wsl-tailscale",
+      "status": "pass",
+      "level": "real-connection",
+      "observed_route": "wsl-tailscale",
+      "tested_at": "2026-10-08T08:20:43.173Z",
+      "environment": {
+        "os": "iPhone15 / iOS版未取得 → Windows Serve → WSL Ubuntu DSH",
+        "node": "22.23.3 / DSH 0.2.0-rc.2",
+        "browser": "ChatGPTアプリ内ブラウザー表示（画像確認）、Safari版未取得",
+        "device": "physical-phone"
+      },
+      "command": "通常の rdsh-dashboard harness 起動経路からWSL上の公式DSH Web UIへTailscaleで接続。隔離環境のXDG Documents設定を補正し、実画面を確認。公開用に配置パスを一般化。",
+      "reason": "iPhone15のChatGPTアプリ内ブラウザー表示から元DSH画面のDefault workspace・入力欄を実画像で確認。外部Safariへの切替成功とはしない。tested_atは修正後画像の保存mtimeで、撮影秒は未取得。 モデル実行・会話送信・作業完了の検証ではない。",
+      "evidence": [
+        "evidence/harness-history.md",
+        "evidence/provenance.md"
+      ],
+      "observations": {
+        "detail": "iPhone15のChatGPTアプリ内ブラウザー表示から元DSH画面のDefault workspace・入力欄を実画像で確認。外部Safariへの切替成功とはしない。tested_atは修正後画像の保存mtimeで、撮影秒は未取得。 初期default workspaceエラーは隔離HOMEのXDG Documents定義不足で、専用設定後に解消。製品コードは変更していない。別ブラウザーの認証引継ぎは対象外。"
+      }
+    }
+  ]
+}
