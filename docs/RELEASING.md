@@ -63,13 +63,20 @@ Generation failure stops publication.
    git push origin vX.Y.Z
    ```
 
-   Tag push starts publication automatically. Never tag an unreviewed commit.
+   Tag push starts the release workflow and the normal `ci.yml` push workflow.
+   The release workflow verifies that the tag resolves to the exact pushed SHA,
+   that SHA is an ancestor of `main`, and the `ci.yml` run triggered by that
+   exact tag push completed successfully. It waits up to 15 minutes for that
+   run; missing, queued, in-progress, failed, or cancelled CI blocks release
+   builds and publication. `publish` waits for both this validation and all
+   release matrix builds. Never tag an unreviewed commit.
 
 ## Build and publish
 
-The `cd` workflow first refuses malformed or lightweight tags, mismatched
+The `cd` workflow first refuses malformed or lightweight tags, tags outside
+`main`, tags whose exact-SHA tag-push CI is missing or unsuccessful, mismatched
 versions, missing CHANGELOG entries and incomplete release notes. It builds
-five targets with `cargo build --locked --release`:
+five targets with `cargo build --locked --release` only after those gates pass:
 
 | Platform | Archive |
 | --- | --- |
