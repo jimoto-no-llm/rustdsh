@@ -37,9 +37,9 @@ test("all four external origins remain data through summaries/forwarding and can
 test("valid human approval still cannot override missing enforcement, replay bindings or stopped guard", async (t) => {
   const host = hostFixture(), f = await guardFixture(t, host.ctx);
   await f.grant();
-  assert.equal((await f.controller.ready()).reason, "enforcement_adapter_unavailable");
+  assert.equal((await f.controller.ready()).reason, "direct_dsh_tool_execution_disabled");
   f.controller.bindCall("call-1", f.binding());
-  assert.equal(await host.check(f.exec()), "rdsh:enforcement_adapter_unavailable");
+  assert.equal(await host.check(f.exec()), "rdsh:direct_dsh_tool_execution_disabled");
   assert.equal(f.reports[0].approval.decision, "approval_valid");
   assert.equal(f.reports[0].worker.effective_permissions, null);
   assert.equal(f.reports[0].reservation, "not_reserved");

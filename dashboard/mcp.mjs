@@ -20,7 +20,8 @@ import { costScopeSchema, costReportSchema } from "./cost-ledger.mjs";
 // diagnostics (#78), and binary resource handling (#79) live in the outer
 // MCP layers, not in this dashboard server. Changes here stay limited to
 // diagnostic wording and comments so callers can tell which name/URI failed,
-// what exists, and what to do next. No large feature additions.
+// what exists, and what to do next. Security-sensitive execution stays behind
+// the separate approval and sandbox adapters below.
 
 const string = { type: "string", minLength: 1, maxLength: 8000 };
 const object = (properties, required = []) => ({
@@ -37,7 +38,8 @@ const operationSchema = object({
 const boundOperation = { task_id: string, contract_version: { type: "integer", minimum: 1 }, repository: string, operation: operationSchema };
 const approvalUseSchema = object({
   ...boundOperation, id: string, request_version: { type: "integer", minimum: 1 },
-  run_id: string, command_id: string, attempt: { type: "integer", minimum: 1 },
+  run_id: string, command_id: string, worker_role: { enum: ["review", "implementation"] },
+  attempt: { type: "integer", minimum: 1 },
   cost_usd: { type: "number", minimum: 0, maximum: 1000000 },
 }, ["id", "request_version", "task_id", "contract_version", "repository", "run_id", "command_id", "operation", "attempt", "cost_usd"]);
 const decision = object(
@@ -82,7 +84,7 @@ const decision = object(
 export const tools = [
   {
     name: "dashboard_check_worker_start",
-    description: "Resolve the task's requested review/implementation worker permissions. No enforcing OS adapter is registered: startup stays held, effective permissions are null, and fallback is disabled. Reported capabilities or approval cannot start a worker.",
+    description: "Check the live Linux sandbox profile for a review/implementation worker. This does not start an LLM worker or authorize direct DSH filesystem tools; approved operations must use dashboard_execute_approved_operation. Unsupported environments stay on hold with no fallback.",
     inputSchema: object({ task_id: string, contract_version: { type: "integer", minimum: 1 },
       repository: string, run_id: string, worker_role: { enum: ["review", "implementation"] } },
     ["task_id", "contract_version", "repository", "run_id", "worker_role"]),
@@ -180,7 +182,7 @@ export const tools = [
   {
     name: "dashboard_check_operation",
     description:
-      "Parse and audit a declared rdsh.operation.v1 tool operation against the task contract. Supported schemas: file.read, file.write, process.exec with direct argv, network.request. Unknown tools, fields and shell syntax are unparsed. within_policy is only structural preflight; execution remains on hold without approval and an enforcing adapter.",
+      "Parse and audit a declared rdsh.operation.v1 tool operation against the task contract. Supported schemas: file.read, file.write, process.exec with direct argv, network.request. Unknown tools, fields and shell syntax are unparsed. within_policy is only structural preflight; execution requires a human approval and the sandbox executor.",
     inputSchema: object({
       task_id: string, contract_version: { type: "integer", minimum: 1 }, repository: string,
       operation: object({
@@ -192,10 +194,11 @@ export const tools = [
   },
   {
     name: "dashboard_request_approval",
-    description: "Create a pending versioned approval request bound to the current parsed operation, run, command, cost/retry limits and expiry. This cannot grant human approval. Raw bodies, URL queries and argv values are represented by digests.",
+    description: "Create a pending versioned approval request bound to the current parsed operation, worker role, run, command, cost/retry limits and expiry. worker_role defaults to review, which permits file.read only. This cannot grant human approval. Raw bodies, URL queries and argv values are represented by digests.",
     inputSchema: object({
       ...boundOperation, id: string, expected_version: { type: "integer", minimum: 0 },
-      run_id: string, command_id: string, source_ref: string, expires_at: string,
+      run_id: string, command_id: string, worker_role: { enum: ["review", "implementation"] },
+      source_ref: string, expires_at: string,
       limits: object({ max_cost_usd: { type: "number", minimum: 0, maximum: 1000000 }, max_attempts: { type: "integer", minimum: 1, maximum: 10 } }, ["max_cost_usd", "max_attempts"]),
     }, ["id", "expected_version", "task_id", "contract_version", "repository", "run_id", "command_id", "source_ref", "expires_at", "limits", "operation"]),
   },
@@ -207,6 +210,11 @@ export const tools = [
   {
     name: "dashboard_claim_approval",
     description: "Atomically reserve one approved attempt and declared cost. Prevents duplicate/replayed reservations. It does not execute the operation or prove billing/enforcement; execution remains on hold.",
+    inputSchema: approvalUseSchema,
+  },
+  {
+    name: "dashboard_execute_approved_operation",
+    description: "Atomically consume the approved attempt before executing its exact operation in the probed OS sandbox. Review permits only file.read; implementation rights remain bounded by the contract roots, origin, and exact executable arguments. Output is returned to this call, but sensitive body, query, and stdout/stderr contents are not stored in the approval ledger. Direct DSH tools and unsupported platforms remain denied.",
     inputSchema: approvalUseSchema,
   },
 ];
@@ -240,6 +248,7 @@ export async function executeTool(api, name, args = {}) {
   if (name === "dashboard_request_approval") return await api.requestApproval(args);
   if (name === "dashboard_check_approval") return await api.checkApproval(args);
   if (name === "dashboard_claim_approval") return await api.claimApproval(args);
+  if (name === "dashboard_execute_approved_operation") return await api.executeApproval(args);
   if (name === "dashboard_get_feedback")
     return feedbackSince(await api.getState(), args.after ?? 0);
   if (routes[name]) {
@@ -372,10 +381,10 @@ export async function runStdio(project) {
         "content-type": "application/json",
       },
       body: input ? JSON.stringify(input) : undefined,
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(route === "api/approvals/execute" ? 6 * 60 * 1000 : 10000),
     });
     const result = await response.json();
-    if (!response.ok && !(["api/contracts/check", "api/policy/check", "api/approvals/check", "api/approvals/claim", "api/workers/check"].includes(route) && response.status === 409))
+    if (!response.ok && !(["api/contracts/check", "api/policy/check", "api/approvals/check", "api/approvals/claim", "api/approvals/execute", "api/workers/check"].includes(route) && response.status === 409))
       throw new Error(result.error || `HTTP ${response.status}`);
     return result;
   }
@@ -387,6 +396,7 @@ export async function runStdio(project) {
     requestApproval: (input) => request("api/approvals/request", input),
     checkApproval: (input) => request("api/approvals/check", input),
     claimApproval: (input) => request("api/approvals/claim", input),
+    executeApproval: (input) => request("api/approvals/execute", input),
     checkWorkerStart: (input) => request("api/workers/check", input),
   });
   await mcp.server.connect(new StdioServerTransport());

@@ -22,7 +22,7 @@ test("unsupported workers show distinct requested permissions without starting o
   await store.mutate("task", { id: "T1", title: "Fixture", status: "todo" });
   await store.mutate("contract", { task_id: "T1", expected_version: 0, purpose: "Local test", repository: project.root,
     allowed_scope: "Only fixture", write_roots: [project.root], forbidden_actions: ["No execution"],
-    completion_conditions: ["Test passes"], change_reason: "Initial scope",
+    completion_conditions: ["Test passes"], change_reason: "Initial scope", worker_roles: ["review", "implementation"],
     operation_policy: { schema: 1, read_roots: [project.root], executables: [{ file: beforeFile, args: [] }], network_origins: ["https://allowed.example"] },
   }, "local_administrator");
   const input = { task_id: "T1", contract_version: 1, repository: project.root, run_id: "fixture-run", worker_role: "review" };
@@ -31,17 +31,18 @@ test("unsupported workers show distinct requested permissions without starting o
   // that preflight limitation; the worker gate must still refuse to start.
   assert.equal((await checkContract(store.value, { task_id: "T1", contract_version: 1,
     repository: project.root, cwd: project.root, write_paths: ["hardlink-alias.txt"] })).decision, "within_scope");
-  const review = await checkWorkerStart(store.value, input);
+  const noSandbox = async () => ({ supported: false, reason: "sandbox_runner_unavailable" });
+  const review = await checkWorkerStart(store.value, input, { probe: noSandbox });
   assert.equal(review.decision, "hold");
-  assert.equal(review.reason, "enforcement_adapter_unavailable");
+  assert.equal(review.reason, "sandbox_runner_unavailable");
   assert.deepEqual(review.requested_permissions.write_roots, []);
   assert.deepEqual(review.requested_permissions.executables, []);
   assert.deepEqual(review.requested_permissions.network_origins, []);
-  const implementation = await checkWorkerStart(store.value, { ...input, worker_role: "implementation" });
+  const implementation = await checkWorkerStart(store.value, { ...input, worker_role: "implementation" }, { probe: noSandbox });
   assert.deepEqual(implementation.requested_permissions.write_roots, [project.root]);
   assert.deepEqual(implementation.requested_permissions.network_origins, ["https://allowed.example"]);
   assert.ok(implementation.required_enforcement.includes("child_process_inheritance"));
-  assert.ok(implementation.required_enforcement.includes("race_safe_access"));
+  assert.ok(implementation.required_enforcement.includes("symlink_and_hardlink_escape"));
   for (const request of [
     { ...input, capabilities: { filesystem_read: true, network: true, child_process_inheritance: true } },
     { ...input, sandbox: "verified", approval: "granted" },
@@ -60,4 +61,15 @@ test("unsupported workers show distinct requested permissions without starting o
   assert.deepEqual(store.value, beforeState);
   assert.equal(await fs.readFile(beforeFile, "utf8"), "unchanged isolated fixture");
   assert.equal(await fs.readFile(outsideFile, "utf8"), "outside fixture");
+
+  const tampered = structuredClone(store.value);
+  tampered.contracts[0].versions.at(-1).write_roots = [temp];
+  let probes = 0;
+  const escaped = await checkWorkerStart(tampered, { ...input, worker_role: "implementation" }, {
+    probe: async () => { probes++; return { supported: true, backend: "fixture" }; },
+  });
+  assert.equal(escaped.decision, "block");
+  assert.equal(escaped.reason, "sandbox_root_outside_contract");
+  assert.equal(escaped.effective_permissions, null);
+  assert.equal(probes, 0);
 });

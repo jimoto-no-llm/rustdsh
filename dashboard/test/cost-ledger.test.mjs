@@ -367,7 +367,7 @@ test("existing MCP metrics tool records ledger reports; old metrics remain compa
     3,
   );
   assert.equal(group(store).amount, "0.1");
-  assert.equal(tools.length, 12);
+  assert.equal(tools.length, 13);
   assert.ok(
     tools.find((tool) => tool.name === "dashboard_update_metrics").inputSchema
       .properties.cost_report,

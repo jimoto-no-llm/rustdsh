@@ -498,36 +498,50 @@ fail closed. Use a new request version and obtain a new grant for changed limits
 or operation data. Latest checks and all request versions survive restart.
 
 HTTP check/claim returns 200 for `approval_valid`, otherwise 409; MCP returns the
-same structured result. A valid reservation **still returns `execution: hold`**
-and `enforcement: not_applied`; its use record is `execution: not_started`.
-There is no operation execution, automatic refund, billing integration or DSH
-tool interception. An enforcing execution adapter must perform a fresh check and
-bind actual effects/cost before this ledger can grant effective permissions.
+same structured result. A valid claim **still returns `execution: hold`** and
+`enforcement: not_applied`; its use record is `execution: not_started`. Claims
+reserve an attempt and declared cost but do not run operations. The separate
+`dashboard_execute_approved_operation` tool rechecks and consumes the approval,
+then executes the exact operation through the sandbox below. A crash after the
+durable start consumes that attempt and cannot be replayed. Declared cost remains
+an approval limit, not measured billing.
 
-### Unsupported execution environments (Issue #33 foundation)
+### Sandboxed approved operations (Issue #33)
 
 `dashboard_check_worker_start` (`POST /api/workers/check`) accepts `task_id`,
 `contract_version`, `repository`, `run_id`, `worker_role` (`review` or
-`implementation`). It resolves the current contract into **requested**
-permissions. Review workers request read roots with no writes, executables or
-network. Implementation workers request only the contract's declared roots,
-exact command/argv rules and network origins. Callers cannot supply wider roots,
-capability flags, a sandbox identity or an approval to bypass this check.
+`implementation`). It verifies the current contract and runs a real sandbox
+probe. A ready response means the Linux x64 Bubblewrap plus seccomp profile is
+available; it does not start an LLM worker or grant an operation approval.
+Unsupported platforms and failed probes return a hold with no fallback.
 
-There is currently **no registered OS/container enforcing adapter**. Every valid
-request returns `decision: hold`, `reason: enforcement_adapter_unavailable`,
-`execution: not_started`, `effective_permissions: null` and `fallback: disabled`.
-HTTP returns 409; MCP returns the same structured hold. This function starts no
-worker and changes no ACL, credential, firewall, container or system setting.
-Unparsed inputs and stale/outside contracts cannot start a worker either.
+`dashboard_execute_approved_operation` is the only operation execution path in
+this dashboard. It requires a fresh human grant for the exact task, role,
+operation, run, command, attempt and declared cost. The attempt is durably marked
+started before side effects; if the result cannot be recorded, it remains spent.
+Review workers can only use `file.read`. Implementation workers are confined to
+the contract's read/write roots, exact executable-and-argv digest, or exact
+HTTPS origin. They cannot widen roots or provide their own sandbox settings.
 
-An adapter must prove filesystem read/write restrictions, network and exact
-command limits, child-process inheritance, link escape protection and race-safe
-access before effective permissions can be reported. Realpath preflight cannot
-detect hardlink aliases or mounted filesystems, and can race with filesystem
-changes. The original DSH launcher remains independent and does not call this
-gate. Real OS refusal tests and launcher interception are still required; the
-isolated source tests establish the unsupported-environment hold only.
+Filesystem and process operations run in a Bubblewrap mount, PID, user and
+network namespace with dropped capabilities, resource limits and a seccomp
+filter. Only declared roots are mounted; read roots are read-only and write roots
+are writable. Pinned directory and executable descriptors are passed with
+Bubblewrap's fd mount options, which close the source descriptors after mounting.
+Nested mount points, symlinks, hardlinks and special files already present in
+operation roots are rejected.
+Child processes inherit the same namespace, limits and seccomp filter. Network
+requests go through a separate HTTPS broker that pins a resolved public IPv4,
+rejects private/reserved or mixed DNS results, and does not follow redirects.
+Operation output is returned to the caller but not stored in the approval ledger.
+
+This executor applies only to operations explicitly routed through the dashboard
+MCP/API. It does not start a worker, intercept arbitrary DSH tools, or protect
+against another host process concurrently modifying a declared root or changing
+its mount table.
+Direct DSH tool dispatch remains denied by the guard described below. On Windows
+and other unsupported environments, execution stays on hold; there is no
+unsandboxed fallback.
 
 ### DSH operation boundary (Issues #29/#30/#32/#33, partial)
 
@@ -559,12 +573,13 @@ escalation flags, offsets, editors, shell tools, PTC transports and unknown tool
 are unsupported. A later policy returning `allow`, skipping asynchronous checks,
 or DSH's own one-time approval cannot force this guard to allow execution.
 
-There is deliberately no execution/claim path: even a valid human grant returns
-`enforcement_adapter_unavailable`, with no effective permissions or reservation.
-No complete OS adapter is registered. This connects the hold to actual DSH tool
-dispatch; it does not prove filesystem/network/child-process containment. Mapping
-uses the contract repository as the declared cwd; actual backend resolution must
-also be verified before a future adapter can enable execution. The legacy
+Direct DSH dispatch is deliberately held even when a human grant exists. The
+dashboard's separate MCP operation tool is the only route that can execute an
+approved operation through the OS sandbox. The guard connects denial to actual
+DSH tool dispatch but does not itself prove filesystem/network/child-process
+containment. Mapping uses the contract repository as the declared cwd; actual
+backend resolution must also be verified before the guard could allow direct
+execution. The legacy
 `rdsh`/`dsh` passthrough, initial context loading, direct backend access, plugin
 unloading and LLM requests remain outside this protected tool boundary.
 

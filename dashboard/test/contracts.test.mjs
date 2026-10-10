@@ -118,6 +118,18 @@ test("invalid contract updates never change durable state", async (t) => {
   assert.deepEqual((await ProjectStore.open(project)).value, before);
 });
 
+test("implementation workers require an explicit versioned contract role", async (t) => {
+  const { store, input } = await fixture(t);
+  await store.mutate("contract", input, "local_administrator");
+  assert.deepEqual(activeContract(store.value, "T1").worker_roles, ["review"]);
+  await store.mutate("contract", { ...input, expected_version: 1,
+    worker_roles: ["review", "implementation"], change_reason: "Enable scoped implementation" }, "local_administrator");
+  assert.deepEqual(activeContract(store.value, "T1").worker_roles, ["review", "implementation"]);
+  for (const roles of [[], ["admin"], ["implementation", "admin"]])
+    await assert.rejects(() => store.mutate("contract", { ...input, expected_version: 2,
+      worker_roles: roles, change_reason: "Invalid role update" }, "local_administrator"), /worker role|worker_roles/i);
+});
+
 test("symlink or junction writes cannot escape saved scope, including a retargeted root", async (t) => {
   const { store, input, check, src, outside } = await fixture(t);
   await store.mutate("contract", input, "local_administrator");

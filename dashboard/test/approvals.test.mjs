@@ -20,10 +20,12 @@ async function fixture(t) {
     task_id: "T1", expected_version: 0, purpose: "Isolated approvals", repository: project.root,
     allowed_scope: "Only fixture writes", write_roots: [project.root], forbidden_actions: ["No actual execution"],
     completion_conditions: ["Tests pass"], change_reason: "Initial scope",
+    worker_roles: ["review", "implementation"],
   };
   await store.mutate("contract", contract, "local_administrator");
   const bound = {
     task_id: "T1", contract_version: 1, repository: project.root, run_id: "run-1", command_id: "command-1",
+    worker_role: "implementation",
     operation: { schema: "rdsh.operation.v1", tool_name: "file.write", tool_input: { cwd: project.root, path: "new.txt", content: "dummy-secret-body" } },
   };
   const request = { ...bound, id: "R1", expected_version: 0,
@@ -97,6 +99,108 @@ test("version changes invalidate old grants; retry reservations bind exact scope
   assert.deepEqual((await ProjectStore.open(project)).value.approval_requests, store.value.approval_requests);
 });
 
+test("review approvals cannot authorize writes and the role is bound to the human grant", async (t) => {
+  const { store, request, use } = await fixture(t);
+  await assert.rejects(() => store.mutate("approval_request", { ...request, worker_role: "review" }), /read-only/i);
+  await store.mutate("approval_request", request);
+  await store.mutate("approval_decision", { id: "R1", request_version: 1, decision: "grant" }, "human_browser");
+  assert.equal((await checkApproval(store.value, { ...use, worker_role: "review" })).reason,
+    "approval_worker_role_changed");
+  assert.equal((await checkApproval(store.value, use)).decision, "approval_valid");
+});
+
+test("execution start is durable before side effects and started attempts cannot replay", async (t) => {
+  const { store, request, use, project } = await fixture(t);
+  await store.mutate("approval_request", request);
+  await store.mutate("approval_decision", { id: "R1", request_version: 1, decision: "grant" }, "human_browser");
+  await store.mutate("approval_start", use);
+  const started = currentRequest(store.value, "R1").uses[0];
+  assert.equal(started.execution, "started");
+  assert.ok(started.started_at);
+  assert.equal((await checkApproval(store.value, use)).reason, "approval_retry_limit_or_replay");
+  await store.mutate("approval_start", use);
+  assert.equal(currentRequest(store.value, "R1").uses.length, 1);
+  await store.mutate("approval_finish", { id: "R1", request_version: 1, attempt: 1,
+    execution: "completed", reason: null, exit_code: 0 });
+  assert.equal(currentRequest(store.value, "R1").uses[0].execution, "completed");
+  const disk = await fs.readFile(path.join(project.directory, "state.json"), "utf8");
+  assert.ok(!disk.includes("dummy-secret-body"));
+});
+
+test("HTTP sandbox execution requires MCP authority, persists start, and runs a replay once", async (t) => {
+  const { project, request, use } = await fixture(t);
+  const listener = net.createServer();
+  await new Promise((resolve) => listener.listen(0, "127.0.0.1", resolve));
+  const port = listener.address().port;
+  await new Promise((resolve) => listener.close(resolve));
+  let executed = 0;
+  let dashboard;
+  try {
+    dashboard = await startDashboard({ project, port, tailscale: false,
+      sandboxProbe: async () => ({ supported: true, backend: "test-only" }),
+      sandboxExecutor: async ({ contract, workerRole, input }) => {
+        executed++;
+        assert.ok(contract.worker_roles.includes(workerRole));
+        assert.equal(input.tool_name, "file.write");
+        assert.equal(currentRequest(dashboard.store.value, "R1").uses[0].execution, "started");
+        return { execution: "completed", exit_code: 0, stdout: "fixture result" };
+      },
+    });
+  } catch (error) {
+    throw error;
+  }
+  t.after(() => dashboard.close());
+  const runtime = JSON.parse(await fs.readFile(path.join(project.directory, "runtime.json"), "utf8"));
+  const agent = { authorization: `Bearer ${runtime.mcp_token}` };
+  const admin = { authorization: `Bearer ${runtime.token}` };
+  const human = { "x-rdsh-browser-token": new URL(runtime.browser_url).hash.slice(5) };
+  const post = (route, input, headers) => fetch(dashboard.localUrl + "api/" + route, {
+    method: "POST", headers: { ...headers, "content-type": "application/json" }, body: JSON.stringify(input),
+  });
+  assert.equal((await post("approvals/request", request, agent)).status, 200);
+  assert.equal((await post("approvals/decide", { id: "R1", request_version: 1, decision: "grant" }, human)).status, 200);
+  for (const headers of [admin, human])
+    assert.equal((await post("approvals/execute", use, headers)).status, 403);
+  const response = await post("approvals/execute", use, agent);
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  assert.equal(result.execution, "completed");
+  assert.equal(result.result.stdout, "fixture result");
+  const replay = await post("approvals/execute", use, agent);
+  assert.equal(replay.status, 409);
+  assert.equal((await replay.json()).reason, "approval_retry_limit_or_replay");
+  assert.equal(executed, 1);
+  assert.equal(currentRequest(dashboard.store.value, "R1").uses[0].execution, "completed");
+  const disk = await fs.readFile(path.join(project.directory, "state.json"), "utf8");
+  assert.ok(!disk.includes("dummy-secret-body"));
+  assert.ok(!disk.includes("fixture result"));
+});
+
+test("unsupported sandbox leaves the approved attempt unconsumed and held", async (t) => {
+  const { project, request, use } = await fixture(t);
+  const listener = net.createServer();
+  await new Promise((resolve) => listener.listen(0, "127.0.0.1", resolve));
+  const port = listener.address().port;
+  await new Promise((resolve) => listener.close(resolve));
+  const dashboard = await startDashboard({ project, port, tailscale: false,
+    sandboxProbe: async () => ({ supported: false, reason: "unsupported_platform" }),
+    sandboxExecutor: async () => { throw new Error("must_not_execute"); },
+  });
+  t.after(() => dashboard.close());
+  const runtime = JSON.parse(await fs.readFile(path.join(project.directory, "runtime.json"), "utf8"));
+  const agent = { authorization: `Bearer ${runtime.mcp_token}` };
+  const human = { "x-rdsh-browser-token": new URL(runtime.browser_url).hash.slice(5) };
+  const post = (route, input, headers) => fetch(dashboard.localUrl + "api/" + route, {
+    method: "POST", headers: { ...headers, "content-type": "application/json" }, body: JSON.stringify(input),
+  });
+  await post("approvals/request", request, agent);
+  await post("approvals/decide", { id: "R1", request_version: 1, decision: "grant" }, human);
+  const response = await post("approvals/execute", use, agent);
+  assert.equal(response.status, 409);
+  assert.equal((await response.json()).reason, "unsupported_platform");
+  assert.equal(currentRequest(dashboard.store.value, "R1").uses.length, 0);
+});
+
 test("HTTP credentials cannot impersonate a human and concurrent claims cannot replay an attempt", async (t) => {
   const { project, request, use } = await fixture(t);
   const listener = net.createServer();
@@ -119,6 +223,11 @@ test("HTTP credentials cannot impersonate a human and concurrent claims cannot r
   assert.equal((await post("approvals/decide", grant, agent)).status, 401);
   assert.equal((await post("approvals/decide", grant, admin)).status, 403);
   assert.equal((await post("update/approval_decision", grant, admin)).status, 403);
+  assert.equal((await post("update/approval_start", use, admin)).status, 403);
+  assert.equal((await post("update/approval_finish", {
+    id: use.id, request_version: use.request_version, attempt: use.attempt,
+    execution: "completed", reason: null, exit_code: 0,
+  }, admin)).status, 403);
   assert.equal((await post("approvals/check", use, agent)).status, 409);
   assert.equal((await post("approvals/decide", grant, human)).status, 200);
   for (const headers of [admin, agent, human])

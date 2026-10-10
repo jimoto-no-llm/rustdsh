@@ -18,6 +18,7 @@ export async function guardFixture(t, ctx) {
     purpose: "Guard actual tool dispatch", repository, allowed_scope: "Fixture directory",
     write_roots: [repository], forbidden_actions: ["No real tool execution"],
     completion_conditions: ["No dummy tool dispatched"], change_reason: "Initial scope",
+    worker_roles: ["review", "implementation"],
     operation_policy: { schema: 1, read_roots: [repository], executables: [], network_origins: [] },
   }, "local_administrator");
   const task = { task_id: "T1", contract_version: 1, repository, run_id: "run-1", worker_role: "implementation" };
@@ -25,7 +26,7 @@ export async function guardFixture(t, ctx) {
     tool_input: { cwd: repository, path: "fixture.txt", content: "dummy-sensitive-body" } };
   await store.mutate("approval_request", {
     id: "R1", expected_version: 0, task_id: task.task_id, contract_version: 1,
-    repository, run_id: "run-1", command_id: "call-1", operation,
+    repository, run_id: "run-1", command_id: "call-1", worker_role: "implementation", operation,
     limits: { max_cost_usd: 0, max_attempts: 1 },
     expires_at: new Date(Date.now() + 60000).toISOString(), source_ref: "fixture:request" });
   const reports = [];

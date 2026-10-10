@@ -30,6 +30,8 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: dashboard/package-lock.json
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y bubblewrap
       - run: npm ci
       - if: runner.os == 'Windows'
         # Native GUI startup must not compete with every process-heavy fixture.
