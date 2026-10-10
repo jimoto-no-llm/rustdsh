@@ -1433,13 +1433,15 @@ mod tests {
     #[test]
     fn query_terms_split_identifiers_and_recall_cjk_bigrams() {
         assert_eq!(
-            query_terms("fooBar2日本語 and a"),
+            query_terms("fooBar2日本語検索 and a"),
             vec![
                 "foo".to_string(),
                 "bar".to_string(),
-                "日本語".to_string(),
+                "日本語検索".to_string(),
                 "日本".to_string(),
                 "本語".to_string(),
+                "語検".to_string(),
+                "検索".to_string(),
             ]
         );
     }
