@@ -140,27 +140,73 @@ rdsh doctor                        # 本家 dsh・DSH_HOME・slim 設定の確�
 rdsh bench --n 5                   # rdsh と dsh の起動比較です
 ```
 
-### 認証情報は明示的に取り込みます（`rdsh auth`）
+### 選択した認証情報だけを共有する（rdsh auth）
 
-他のツールで済ませたログインを、dsh が読む `$DSH_HOME/.credentials.yaml` へ写します。
-`rdsh auth --import --provider openai-codex` を使います：
-
-- Codex CLI（`~/.codex/auth.json`、ChatGPT OAuth）
-- opencode（`$XDG_DATA_HOME/opencode/auth.json`、`openai` OAuth は `openai-codex` になります）
+Codex / OpenCode / 環境変数の認証情報を、秘密値なしで一覧にします。
+共有元とcredentialを選ぶまでコピーしません。取込先はDSH本来の
+$DSH_HOME/.credentials.yamlです。選択は秘密値を含まない
+$DSH_HOME/rdsh-auth-sharing.jsonに保存します。
 
 ```sh
-rdsh auth            # 状態確認です。見つかったログインと認識済みの一覧を出します
-rdsh auth --import --provider openai-codex   # 不足・古い分だけ書きます（0600、他は不変）
-rdsh auth --json     # 機械可読の状態出力です
-rdsh setup           # 初回ウィザードです。取り込み、キー貼付、--login/--open に対応します
-rdsh setup --web     # localhost の設定画面です（ブラウザが自動で開き、起動ごとの #key=... が必要）
+rdsh auth                                      # 共有元・保存先・選択状態・解除手順
+rdsh auth --json                               # 秘密値を含まない機械可読の一覧
+rdsh --dry-run auth --select codex:openai-codex --import # previewのみ、ファイル変更なし
+rdsh auth --select codex:openai-codex --import    # CodexのOAuthだけ共有
+rdsh auth --select opencode:openai-codex --import # OpenCodeのopenaiログインだけ共有
+rdsh auth --select codex:OPENAI_API_KEY --import  # CodexのAPIキーは別に選択
+rdsh auth --select env:DEEPSEEK_API_KEY --import  # この環境変数だけ永続保存
+rdsh auth --unselect codex:openai-codex          # 将来の取込停止、既存コピーは保持
+rdsh setup                                    # 選択済みの同期と初回案内
+rdsh setup --web                              # 共有元・選択コマンド・個別キー保存
 ```
 
-起動・診断・setup は他のアプリの認証情報を勝手に写しません。
-OAuth は `rdsh auth --import --provider openai-codex --source codex` のように
-対象を選んで取り込み、API キーは `--ref OPENAI_API_KEY` で指定します。
-一括取り込みと `RDSH_AUTH_AUTOSYNC` は使えません。`setup --yes` は環境変数の
-既知キーの保存だけを許可し、外部ログインは取り込みません。
+--select / --unselectは必要なものだけ個別に繰り返せます。選択すると
+boot・dump-config・plugin・dsh名での委譲・setupでも、その共有元から
+同期します。--importはすぐに取り込みます。別CLIの未選択トークンが
+新しくても採用しません。DSH側の新しいgrantや既存API-key記録・ref、
+他のエントリ、コメント、改行形式は保持します。Unixの認証ファイルと
+選択ファイルは0600で保存します。
+
+対象はCodexの ~/.codex/auth.json、OpenCodeの
+$XDG_DATA_HOME/opencode/auth.json（未設定時はOSのdataディレクトリ）と
+旧 ~/.config/opencode/auth.jsonです。OpenCodeのopenaiログインはDSHの
+openai-codexへ写すので、選択名はopencode:openai-codexです。
+環境変数の保存対象はDEEPSEEK_API_KEY、OPENAI_API_KEY、ANTHROPIC_API_KEYです。
+一覧は形式・存在の確認であり、実際の認証成功を意味しません。
+
+すでに渡した環境変数は、DSHとその子プロセスに引き継がれます。
+この経路ではrdshはファイルを書かず、JSONにpersistent=false、
+共有先、停止・失効手順を表示します。保存するなら別途選択してください。
+setup --yesだけでは全環境キーを保存しません。対話setupやWeb画面での
+個別の保存は引き続き可能です。
+
+**利用範囲と解除:** 保存した内容は同じDSH_HOMEの全プロファイルで
+使えます。選択解除は将来のrdshによる取込を止め、保存済みコピーと
+実行中プロセスは残します。コピーの利用を止めるにはDSHを停止して
+認証ファイル内の該当record/refを削除します。credential自体の失効は
+providerでOAuth grantを取り消すかAPIキーを更新してください。
+共有元CLIも使えなくなる場合があります。rdshによるコピーの制御であり、
+DSH自身の更新・環境変数の継承・OS sandboxを制御するものではありません。
+
+**従来版からの移行:** 既存のDSH認証情報は残します。選択ファイルが
+なければ何も選択せず、従来のauth --importも選択を要求します。
+RDSH_AUTH_AUTOSYNC=1で全取込へ戻ることはありません。一覧とpreviewで
+確認して必要な共有元を選んでください。RDSH_AUTH_AUTOSYNC=0では
+選択を残して自動同期だけを止めます。明示したauth --importは実行できます。
+壊れた・読めない選択ファイルでは同期を停止します。
+
+選択変更とrdshの認証書込は共通lockで直列化し、解除完了後に古い選択で
+取り込むことを防ぎます。writerの異常終了でlockが残った場合は、
+rdsh auth/setupの書込が動いていないことを確認してから
+$DSH_HOME/.rdsh-auth-sharing.lockを除去してください。lock中は
+launcherが取込をスキップします。
+
+setup --webは毎回アクセス鍵を発行し、#key=...付きURLを表示します。
+読み取り・キー保存・終了に同じ鍵が必要です。URLを他人に共有しないでください。
+画面では保存前に保存先・利用範囲と、選択解除・コピー削除・provider失効の
+違いを確認できます。
+
+一度だけ取り込む場合は `rdsh auth --import --provider openai-codex --source codex` または `rdsh auth --import --ref OPENAI_API_KEY --source codex` を使えます。この指定は継続コピーの選択に保存されず、既存の共有方針を変更しません。継続する場合は別途 `--select` で指定します。
 
 ### 追加機能（初期状態では OFF）
 

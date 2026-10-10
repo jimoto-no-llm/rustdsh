@@ -1,5 +1,6 @@
 use clap::{CommandFactory, Parser, Subcommand};
 mod auth;
+mod auth_sharing;
 mod compact;
 mod context;
 mod dsh_args;
@@ -135,22 +136,10 @@ enum Commands {
         #[arg(long = "port")]
         port: Option<u16>,
     },
-    /// OAuth auto-recognition: external logins (codex/opencode) mirrored
-    /// into $DSH_HOME/.credentials.yaml ("drop in and recognized")
-    Auth {
-        #[arg(long = "import")]
-        import: bool,
-        #[arg(long)]
-        provider: Option<String>,
-        #[arg(long)]
-        source: Option<String>,
-        #[arg(long = "ref")]
-        key_ref: Option<String>,
-        #[arg(long = "json")]
-        json: bool,
-    },
-    /// First-run connect: import what exists, persist env keys, optionally
-    /// run the provider login flow or reveal settings dirs, else show next step
+    /// Inventory, select and import only explicitly shared credentials
+    Auth(auth_sharing::AuthArgs),
+    /// First-run connect: sync selected credentials, optionally run login
+    /// or reveal settings dirs, else show the next step
     Setup {
         #[arg(long = "open")]
         open: bool,
@@ -546,13 +535,7 @@ fn main() {
                 ContextAction::Explain { query, budget } => context::cmd_explain(query, budget),
             }
         }
-        Some(Commands::Auth {
-            import,
-            json,
-            provider,
-            source,
-            key_ref,
-        }) => auth::cmd_auth(import, json, provider, source, key_ref),
+        Some(Commands::Auth(args)) => auth::cmd_auth(args, dry),
         Some(Commands::Setup {
             open,
             login,
@@ -561,10 +544,10 @@ fn main() {
             web,
             port,
         }) => {
-            if web {
+            if web && !dry {
                 setup_web::cmd_setup_web(port.unwrap_or(cfg.setup.web_port))
             } else {
-                auth::cmd_setup(open, login, json, yes)
+                auth::cmd_setup(open, login, json, yes, dry)
             }
         }
         Some(Commands::DumpConfig { profile, native }) => {

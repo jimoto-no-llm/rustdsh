@@ -47,7 +47,7 @@ input[type=password]:focus { border-color: rgba(10,132,255,.7); }
 button.primary { border: 0; border-radius: 10px; padding: 9px 18px; font-size: 13px; font-weight: 600; color: #fff; background: #0a84ff; cursor: pointer; }
 button.primary:active { transform: scale(.98); }
 button.ghost { background: none; border: 1px solid rgba(255,255,255,.16); border-radius: 10px; padding: 8px 16px; font-size: 13px; color: #f5f5f7; cursor: pointer; }
-.hint { font-size: 12px; color: rgba(235,235,245,.5); margin: 10px 0 0; }
+.hint { font-size: 12px; color: rgba(235,235,245,.5); margin: 10px 0 0; overflow-wrap: anywhere; }
 .foot { display: flex; gap: 10px; margin-top: 28px; }
 @media (prefers-color-scheme: light) {
   body { color: #1d1d1f; }
@@ -68,11 +68,14 @@ button.ghost { background: none; border: 1px solid rgba(255,255,255,.16); border
 <div class="card">
 <img src="/icon.png" width="44" height="44" alt="rdsh">
 <h1 id="t">モデル接続</h1>
-<p class="sub" id="s">Codex / opencode のログインをdshに接続します</p>
+<p class="sub" id="s">Codex / opencode のログインから、共有する認証情報を選びます</p>
 <div class="okbar" id="okbar"></div>
 <div id="list"></div>
 <h3 id="h0">dshが使うモデル</h3>
 <div id="defs"></div>
+<h3 id="hs">共有する認証情報を選ぶ</h3>
+<div id="sharing"></div>
+<p class="hint" id="sharehint"></p>
 <h3 id="hx">追加機能（任意）</h3>
 <div id="extras"></div>
 <p class="hint" id="khx">普段は不要です。必要になったものだけ有効にできます</p>
@@ -81,7 +84,7 @@ button.ghost { background: none; border: 1px solid rgba(255,255,255,.16); border
 <div class="cmd"><code>codex login</code><button class="link" onclick="cp(this)">コピー</button></div>
 <h3 id="h2">DeepSeekキーを使う</h3>
 <div class="field"><input type="password" id="key" placeholder="DEEPSEEK_API_KEY"><button class="primary" onclick="save()">保存</button></div>
-<p class="hint" id="kh">platform.deepseek.com で発行したキーを貼り付け（0600で保存）</p>
+<p class="hint" id="kh">保存すると、表示した認証ファイルから全DSHプロファイルで利用できます。利用を止めるにはDSHを停止して該当refを削除し、キーの失効は発行元で行います。</p>
 <div><button class="ghost" id="issue" onclick="window.open('https://platform.deepseek.com','_blank','noopener')">キーを発行する</button></div>
 <div class="foot"><button class="ghost" onclick="load()">更新</button><button class="ghost" id="done" onclick="bye()" style="display:none">閉じる</button></div>
 </div>
@@ -90,9 +93,40 @@ var setupToken = new URLSearchParams(location.hash.slice(1)).get("key") || sessi
 if (setupToken) sessionStorage.setItem("rdsh_setup_token", setupToken);
 history.replaceState(null, "", location.pathname);
 var JA = (navigator.language || "en").indexOf("ja") === 0;
-if (!JA) { document.getElementById("t").textContent = "Connect a model"; document.getElementById("s").textContent = "Link Codex / opencode logins to dsh"; document.getElementById("h1").textContent = "Subscription — no API key needed"; document.getElementById("h2").textContent = "Use a DeepSeek key"; document.getElementById("kh").textContent = "Paste a key from platform.deepseek.com (stored 0600)"; document.getElementById("h0").textContent = "Models dsh will use"; document.getElementById("hx").textContent = "Extras (optional)"; document.getElementById("khx").textContent = "Usually unnecessary. Enable only what you need."; document.getElementById("issue").textContent = "Get a key"; }
+if (!JA) { document.getElementById("t").textContent = "Connect a model"; document.getElementById("s").textContent = "Choose which Codex / opencode credentials to share"; document.getElementById("h1").textContent = "Subscription — no API key needed"; document.getElementById("h2").textContent = "Use a DeepSeek key"; document.getElementById("kh").textContent = "Saving persists this key for every DSH profile. Stop DSH and remove the ref to stop using the copy; revoke the key at its provider."; document.getElementById("hs").textContent = "Choose credentials to share"; document.getElementById("hx").textContent = "Extras (optional)"; document.getElementById("khx").textContent = "Usually unnecessary. Enable only what you need."; document.getElementById("h0").textContent = "Models dsh will use"; document.getElementById("issue").textContent = "Get a key"; }
 function cp(b){ var t = b.parentNode.querySelector("code").textContent; function ok(){ b.textContent = JA ? "済" : "done"; setTimeout(function(){ b.textContent = JA ? "コピー" : "copy"; }, 1200); } if (navigator.clipboard) { navigator.clipboard.writeText(t).then(ok, function(){ prompt("copy:", t); }); } else { prompt("copy:", t); } }
-async function load(){ var response = await fetch("/api/status", {headers: {"X-RDSH-Token": setupToken}}); if (!response.ok) { var warning = document.getElementById("okbar"); warning.style.display = "block"; warning.textContent = JA ? "起動時に表示されたURLを開いてください" : "Open the URL printed when setup started"; return; } var r = await response.json(); var el = document.getElementById("list"); el.innerHTML = ""; (r.records || []).forEach(function(x){ var d = document.createElement("div"); d.className = "row"; var good = x.action === "ok"; var dot = document.createElement("span"); dot.className = "dot " + (good ? "on" : "off"); var nm = document.createElement("span"); nm.textContent = x.provider; var sm = document.createElement("small"); sm.textContent = x.from + " / " + x.action; d.appendChild(dot); d.appendChild(nm); d.appendChild(sm); el.appendChild(d); }); var df = document.getElementById("defs"); df.innerHTML = ""; (r.defaults || []).forEach(function(x){ var d = document.createElement("div"); d.className = "row"; var good = x.state === "ok"; var dot = document.createElement("span"); dot.className = "dot " + (good ? "on" : "off"); var nm = document.createElement("span"); nm.textContent = x.profile + " " + x.provider + "/" + x.model; var sm = document.createElement("small"); sm.textContent = x.via + " / " + x.state; d.appendChild(dot); d.appendChild(nm); d.appendChild(sm); df.appendChild(d); }); var bar = document.getElementById("okbar"); if (!r.needed) { bar.style.display = "block"; bar.textContent = JA ? "接続OK — この画面は閉じてOKです" : "Connected — you can close this page"; document.getElementById("done").style.display = ""; } else { bar.style.display = "none"; document.getElementById("done").style.display = "none"; } }
+async function load(){ var response = await fetch("/api/status", {headers: {"X-RDSH-Token": setupToken}}); if (!response.ok) { var warning = document.getElementById("okbar"); warning.style.display = "block"; warning.textContent = JA ? "起動時に表示されたURLを開いてください" : "Open the URL printed when setup started"; return; } var r = await response.json(); var el = document.getElementById("list"); el.innerHTML = ""; (r.records || []).forEach(function(x){ var d = document.createElement("div"); d.className = "row"; var good = x.action === "ok"; var dot = document.createElement("span"); dot.className = "dot " + (good ? "on" : "off"); var nm = document.createElement("span"); nm.textContent = x.provider; var sm = document.createElement("small"); sm.textContent = x.from + " / " + x.action; d.appendChild(dot); d.appendChild(nm); d.appendChild(sm); el.appendChild(d); }); showSharing(r.sharing || {}); var df = document.getElementById("defs"); df.innerHTML = ""; (r.defaults || []).forEach(function(x){ var d = document.createElement("div"); d.className = "row"; var good = x.state === "ok"; var dot = document.createElement("span"); dot.className = "dot " + (good ? "on" : "off"); var nm = document.createElement("span"); nm.textContent = x.profile + " " + x.provider + "/" + x.model; var sm = document.createElement("small"); sm.textContent = x.via + " / " + x.state; d.appendChild(dot); d.appendChild(nm); d.appendChild(sm); df.appendChild(d); }); var bar = document.getElementById("okbar"); if (!r.needed) { bar.style.display = "block"; bar.textContent = JA ? "認証情報あり — 接続の有効性は未確認です" : "Credentials present — authentication has not been verified"; document.getElementById("done").style.display = ""; } else { bar.style.display = "none"; document.getElementById("done").style.display = "none"; } }
+function showSharing(sharing) {
+  var list = document.getElementById("sharing");
+  list.replaceChildren();
+  var hint = document.getElementById("sharehint");
+  hint.textContent = (JA ? "永続保存先: " : "Persistent destination: ") + (sharing.persistent_destination || "") + (JA ? "。保存内容は同じDSH_HOMEの全プロファイルで利用できます。選択解除は将来の取込を止め、保存済みのコピーは残します。コピーの利用を止めるにはDSHを停止して該当record/refを削除します。provider側の失効は別途行ってください。" : ". Copies are available to every profile in this DSH_HOME. Unselect stops future imports and retains existing copies. Stop DSH and remove the named record/ref to stop using a copy. Provider revocation is separate.");
+  if (sharing.policy_error) {
+    hint.textContent += " " + sharing.policy_error;
+    return;
+  }
+  var seen = new Set();
+  (sharing.inventory || []).forEach(function(item) {
+    if (seen.has(item.selector)) return;
+    seen.add(item.selector);
+    var row = document.createElement("div");
+    row.className = "cmd";
+    var code = document.createElement("code");
+    code.textContent = "rdsh auth --" + (item.selected ? "unselect " : "select ") + item.selector + (item.selected ? "" : " --import");
+    var button = document.createElement("button");
+    button.className = "link";
+    button.textContent = JA ? "コピー" : "copy";
+    button.onclick = function() { cp(button); };
+    row.append(code, button);
+    list.appendChild(row);
+  });
+  (sharing.environment_references || []).forEach(function(item) {
+    var note = document.createElement("p");
+    note.className = "hint";
+    note.textContent = item.name + (JA ? ": 環境変数として利用中。ファイル保存なし。DSHを停止し、次回起動前に環境変数を解除すると共有が止まります。" : ": inherited environment reference; no file write. Stop DSH and unset it before the next launch to stop sharing.");
+    list.appendChild(note);
+  });
+}
 var EXTRAS = [{id: "serve", ja: "ダッシュボード（rdsh serve）", en: "dashboard (rdsh serve)"}, {id: "search-web", ja: "Web検索（rdsh search-web）", en: "web search (rdsh search-web)"}];
 async function loadExtras(){ var r = await (await fetch("/api/extras", {headers: {"X-RDSH-Token": setupToken}})).json(); var on = (r && r.enable) || []; var el = document.getElementById("extras"); el.innerHTML = ""; EXTRAS.forEach(function(x){ var d = document.createElement("div"); d.className = "row"; var good = on.indexOf(x.id) >= 0; var dot = document.createElement("span"); dot.className = "dot " + (good ? "on" : "off"); var nm = document.createElement("span"); nm.textContent = JA ? x.ja : x.en; var sm = document.createElement("small"); sm.textContent = good ? (JA ? "有効" : "on") : (JA ? "無効" : "off"); d.appendChild(dot); d.appendChild(nm); d.appendChild(sm); d.style.cursor = "pointer"; d.onclick = function(){ toggleExtra(x.id, !good); }; el.appendChild(d); }); }
 async function toggleExtra(id, want){ var r = await (await fetch("/api/extras", {headers: {"X-RDSH-Token": setupToken}})).json(); var on = (r && r.enable) || []; if (want && on.indexOf(id) < 0) on.push(id); if (!want) on = on.filter(function(y){ return y !== id; }); await fetch("/api/extras", {method: "POST", headers: {"Content-Type": "application/json", "X-RDSH-Token": setupToken}, body: JSON.stringify({enable: on})}); loadExtras(); }

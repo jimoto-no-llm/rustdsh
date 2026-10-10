@@ -1,0 +1,29 @@
+{
+  "scenario": "Identical isolated Codex/OpenCode credentials; no initial DSH credentials or sharing policy",
+  "before": {
+    "command": "rdsh auth --import --json",
+    "exit": 0,
+    "wrote": [
+      "import llm-pi-ai/anthropic from opencode",
+      "import llm-pi-ai/openai-codex from opencode",
+      "import ref OPENAI_API_KEY from codex"
+    ]
+  },
+  "after_without_selection": {
+    "command": "rdsh auth --import --json",
+    "exit": 1,
+    "message": "[rdsh] error: no credential sharing selected; preview rdsh auth, then use --select SOURCE:CREDENTIAL --import",
+    "wrote": []
+  },
+  "after_explicit_selection": {
+    "command": "rdsh auth --select opencode:openai-codex --import --json",
+    "exit": 0,
+    "wrote": [
+      "import llm-pi-ai/openai-codex from opencode"
+    ],
+    "selected": [
+      "opencode:openai-codex"
+    ],
+    "authentication": "not_verified"
+  }
+}
