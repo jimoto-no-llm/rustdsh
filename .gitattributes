@@ -2,8 +2,9 @@
 *.sh text eol=lf
 # PowerShell prefers CRLF on Windows.
 *.ps1 text eol=crlf
-# Preserve the checksummed upstream patch byte-for-byte on every platform.
+# Preserve checksummed upstream source patches byte-for-byte on every platform.
 plugins/workflow-board/workflow-board.patch -text -whitespace
+plugins/mcp-resource-artifacts/mcp-resource-artifacts.patch -text -whitespace
 
 # Rust sources always LF.
 *.rs text eol=lf

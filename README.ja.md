@@ -230,6 +230,10 @@ rdsh --profile web                             # プラグイン付きで起動
 Linux x86_64 環境での測定値です：
 
 | 項目 | rdsh | 本家 dsh / 従来処理 | 差・倍率 |
+DSHの会話GUIに読み取り専用のworkflow進捗ボードを追加する場合は、[対応sourceへの適用・診断ツール](plugins/workflow-board/README.ja.md)を隔離した対応checkoutに使います。boardと共通表示projectionを変更する18ファイルのpatch・fixtureテストを同梱し、patched DSHのbuild・採用は別工程です。
+
+MCP resourceを安全な添付成果物として開き、resource linkを明示操作で読む場合は、[対応sourceへの適用・診断ツール](plugins/mcp-resource-artifacts/README.ja.md)を指定revisionの隔離checkoutに使います。リンクは自動取得せず、binaryをモデル向けテキストに展開しません。patched DSHのbuild・採用は別工程です。
+
 | --- | --- | --- | --- |
 | `--version` 起動時間 | **約0.90 ms** | 約88 ms | **約98倍高速** |
 | `--version` メモリ消費（最大RSS） | **約2.9 MB** | 約66 MB | **約1/23に削減** |

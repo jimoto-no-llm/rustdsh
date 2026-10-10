@@ -1,0 +1,915 @@
+From 3b7c71fc79c4fe438e1c08f6d0e98680c83d17b2 Mon Sep 17 00:00:00 2001
+From: Codex Patch <codex-patch@local.invalid>
+Date: Sat, 10 Oct 2026 17:19:40 +0900
+Subject: [PATCH] feat(mcp): safely project resource artifacts
+
+---
+ docs/tool-catalog.md                          |  30 +-
+ packages/mcp/mcp-client/src/tools.ts          |  25 +-
+ .../mcp/mcp-client/tests/mcp-client.spec.ts   |  27 +-
+ packages/mcp/mcp-resources/README.md          |  16 +-
+ packages/mcp/mcp-resources/package.json       |   5 +
+ packages/mcp/mcp-resources/src/index.ts       |   5 +-
+ packages/mcp/mcp-resources/src/render.ts      |   6 +
+ packages/mcp/mcp-resources/src/tools.ts       | 303 +++++++++++++++++-
+ .../mcp/mcp-resources/tests/resources.spec.ts | 150 ++++++++-
+ pnpm-lock.yaml                                |   3 +
+ 10 files changed, 527 insertions(+), 43 deletions(-)
+
+diff --git a/docs/tool-catalog.md b/docs/tool-catalog.md
+index d2c16e3..12dd9e6 100644
+--- a/docs/tool-catalog.md
++++ b/docs/tool-catalog.md
+@@ -16,7 +16,7 @@ This table connects model-visible tool names to the plugin package and service s
+ | Tool package | Model-visible names | Requires | Writes / affects | Shipped aliases | Deployment note |
+ | --- | --- | --- | --- | --- | --- |
+ | `@deepseek-ai/dsh-plugin-manager` | `plugin_manager` | `ctx.tools`, `ctx.pluginManager`, `ctx.sandboxPolicy` | `tool/call`, `tool/result`, `user/message` | - | - |
+-| `@deepseek-ai/dsh-mcp-resources` | `list_mcp_resource_templates`, `list_mcp_resources`, `read_mcp_resource` | `ctx.tools`, `ctx.mcpResources` | `tool/call`, `tool/result` | - | - |
++| `@deepseek-ai/dsh-mcp-resources` | `list_mcp_resource_templates`, `list_mcp_resources`, `open_mcp_resource_link`, `read_mcp_resource` | `ctx.tools`, `ctx.mcpResources` | `tool/call`, `tool/result` | - | - |
+ | `@deepseek-ai/dsh-experimental-browser-use-stagehand-native` | `stagehand_act`, `stagehand_extract`, `stagehand_navigate`, `stagehand_observe`, `stagehand_screenshot`, `stagehand_tabs` | `ctx.browserUse`, `ctx.agents`, `ctx.tools`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | - |
+ | `@deepseek-ai/dsh-tool-ask-user` | `ask_user_question` | `ctx.tools`, `ctx.userQuestions` | `tool/call`, `tool/result after a UI/provider answers the question` | - | ask_user_question pauses the tool call until the active UI provider returns a human answer. |
+ | `@deepseek-ai/dsh-tools` | `run_code` | `ctx.tools`, `ctx.ptcRuntime (execution time)`, `ctx.systemPrompt` | `tool/call`, `one tool/ptc-dispatch-start + tool/ptc-dispatch pair per bridged sub-call`, `tool/result` | - | Owned by the tool registry as a reserved transport outside filterable capability layers under `mode: ptc` / `mode: both` (see the PTC mode Agent Note). Under `ptc` it is the registry's only wire contribution; the other visible capabilities are declared in a generated SDK section in the loaded runtime's language, and a program calls them through bindings scheduled under the native concurrency contract (submission-ordered starts and policy; concurrency-safe bodies overlap up to `maxParallelSubCalls`) that re-enter the complete guarded tool pipeline and link each nested execution to this outer result. |
+@@ -170,9 +170,35 @@ List resources available from an MCP server.
+ 
+ Source: [`packages/mcp/mcp-resources/src/tools.ts`](../packages/mcp/mcp-resources/src/tools.ts)
+ 
++### `open_mcp_resource_link`
++
++Explicitly open a listed MCP resource link from this server after the user asks to read or inspect it. Pass the exact server and URI; links are never fetched automatically.
++
++```json
++{
++  "type": "object",
++  "properties": {
++    "server": {
++      "type": "string",
++      "description": "Configured MCP server name."
++    },
++    "uri": {
++      "type": "string",
++      "description": "Exact resource URI supplied by the named server."
++    }
++  },
++  "required": [
++    "server",
++    "uri"
++  ]
++}
++```
++
++Source: [`packages/mcp/mcp-resources/src/tools.ts`](../packages/mcp/mcp-resources/src/tools.ts)
++
+ ### `read_mcp_resource`
+ 
+-Read an MCP resource by URI from the named server. Use a listed URI or an expanded resource template.
++Read an MCP resource by URI from the named server. Use a listed URI or an expanded resource template. Binary results are size- and MIME-checked before becoming inert attachments.
+ 
+ ```json
+ {
+diff --git a/packages/mcp/mcp-client/src/tools.ts b/packages/mcp/mcp-client/src/tools.ts
+index 9e7b5c0..d1d8622 100644
+--- a/packages/mcp/mcp-client/src/tools.ts
++++ b/packages/mcp/mcp-client/src/tools.ts
+@@ -132,6 +132,7 @@ export async function syncTools(
+       name: publicName,
+       rawName: tool.name,
+       description: tool.description ?? '',
++      serverName: opts.serverName,
+       inputSchema: tool.inputSchema,
+       outputSchema: tool.outputSchema,
+       taskRequired: tool.execution?.taskSupport === 'required',
+@@ -198,6 +199,8 @@ export interface McpToolDefinitionOptions {
+   name: string
+   /** Upstream name used in result diagnostics. */
+   rawName: string
++  /** Stable MCP server identity preserved when projecting resource links. */
++  serverName?: string
+   /** Upstream model-facing description. */
+   description: string
+   /** Upstream JSON input schema. */
+@@ -226,13 +229,13 @@ export function createMcpToolDefinition(
+   ctx: Context,
+   options: McpToolDefinitionOptions,
+ ): ToolDefinition {
+-  const { name, rawName, description, inputSchema } = options
++  const { name, rawName, description, inputSchema, serverName } = options
+   const projections = new WeakMap<ToolExecution, PreparedProjection>()
+   return {
+     name,
+     description,
+     parameters: inputSchema,
+-    output: createOutput(rawName, supportedOutputSchema(options.outputSchema)),
++    output: createOutput(rawName, serverName, supportedOutputSchema(options.outputSchema)),
+     execute: createExecutor(ctx, options, projections),
+     projectContent(exec: Readonly<ToolExecution>, result: Readonly<ToolExecutionResult>) {
+       const projection = projections.get(exec)
+@@ -247,7 +250,11 @@ export function createMcpToolDefinition(
+ }
+ 
+ /** Build the canonical result schema and existing Native text projection. */
+-function createOutput(rawName: string, structuredSchema: JsonSchemaNode | undefined): ToolDefinition['output'] {
++function createOutput(
++  rawName: string,
++  serverName: string | undefined,
++  structuredSchema: JsonSchemaNode | undefined,
++): ToolDefinition['output'] {
+   return {
+     schema: {
+       type: 'object',
+@@ -260,7 +267,7 @@ function createOutput(rawName: string, structuredSchema: JsonSchemaNode | undefi
+     },
+     render(_args: unknown, value: JsonValue) {
+       const result = value as McpResult
+-      return [{ type: 'text', text: extractText(result.content, rawName) }]
++      return [{ type: 'text', text: extractText(result.content, rawName, serverName) }]
+     },
+   }
+ }
+@@ -291,7 +298,7 @@ function createExecutor(
+     const result = parsed.value
+ 
+     const content = result.content as unknown as JsonValue[]
+-    const text = extractText(content, rawName)
++    const text = extractText(content, rawName, options.serverName)
+ 
+     // MCP isError → throw so ToolRuntime produces an isError result for the model.
+     if (result.isError === true) {
+@@ -446,8 +453,8 @@ async function prepareImageProjection(
+  *
+  * Policy-owned canonical-value replacements may omit fields required on the MCP wire.
+  */
+-function extractText(mcpContent: JsonValue[], toolName: string): string {
+-  const content = projectContent(mcpContent, toolName)
++function extractText(mcpContent: JsonValue[], toolName: string, serverName?: string): string {
++  const content = projectContent(mcpContent, toolName, undefined, serverName)
+   // The default image projector below also returns text, so this local call
+   // cannot produce a core image block.
+   return content.map(block => (block as Extract<ContentBlock, { type: 'text' }>).text).join('\n')
+@@ -465,6 +472,7 @@ function projectContent(
+     type: 'text',
+     text: imageDiagnostic(block, 'this result was not admitted to durable model context'),
+   }),
++  serverName?: string,
+ ): ContentBlock[] {
+   const projected: ContentBlock[] = []
+   const text: string[] = []
+@@ -491,7 +499,8 @@ function projectContent(
+         if (block.name === undefined || block.uri === undefined) {
+           text.push('[resource link unavailable: the MCP block is missing its name or URI]')
+         } else {
+-          text.push(`Resource link: ${block.name} (${block.uri})`)
++          const server = serverName === undefined ? 'the named MCP server' : `MCP server ${serverName}`
++          text.push(`Resource link on ${server}: ${block.name} (${block.uri}). It has not been fetched. To read it, call open_mcp_resource_link with the exact server and URI only when the user asks to open or inspect it.`)
+         }
+         break
+       case 'audio':
+diff --git a/packages/mcp/mcp-client/tests/mcp-client.spec.ts b/packages/mcp/mcp-client/tests/mcp-client.spec.ts
+index 4a33085..9b713b4 100644
+--- a/packages/mcp/mcp-client/tests/mcp-client.spec.ts
++++ b/packages/mcp/mcp-client/tests/mcp-client.spec.ts
+@@ -389,6 +389,27 @@ describe('tool execution', () => {
+     )
+   })
+ 
++  it('preserves server identity and exact URI on resource links without fetching them', async () => {
++    const uri = 'docs://manuals/start?lang=ja'
++    const client = createMockClient(
++      [{ name: 'find_docs', inputSchema: { type: 'object' } }],
++      { content: [{ type: 'resource_link', name: 'Start guide', uri }] },
++    )
++
++    await syncTools(client as never, ctx, defaultOpts, new Map())
++    const result = await ctx.tools.execute({
++      signal: testToolSignal, callId: ToolCallId('resource-link'),
++      name: 'mcp__srv__find_docs', arguments: {},
++    })
++
++    expect(result.isError).toBe(false)
++    expect(result.content).toEqual([{
++      type: 'text',
++      text: `Resource link on MCP server srv: Start guide (${uri}). It has not been fetched. To read it, call open_mcp_resource_link with the exact server and URI only when the user asks to open or inspect it.`,
++    }])
++    expect(client.callTool).toHaveBeenCalledOnce()
++  })
++
+   it('sends the raw name for normalized public names', async () => {
+     const client = createMockClient(
+       [{ name: 'admin.reset', inputSchema: { type: 'object' } }],
+@@ -955,7 +976,11 @@ describe('tool execution', () => {
+     await syncTools(client as never, ctx, defaultOpts, new Map())
+     const result = await ctx.tools.execute({ signal: testToolSignal, callId: ToolCallId('c1'), name: 'mcp__srv__link_tool', arguments: {} })
+ 
+-    expect(result.content[0]).toEqual({ type: 'text', text: 'Resource link: Design (https://example.test/design)' })
++    expect(result.content[0]).toEqual({
++      type: 'text',
++      text: 'Resource link on MCP server srv: Design (https://example.test/design). It has not been fetched. '
++        + 'To read it, call open_mcp_resource_link with the exact server and URI only when the user asks to open or inspect it.',
++    })
+   })
+ 
+   it('diagnoses an incomplete resource link from canonical-value replacement', async () => {
+diff --git a/packages/mcp/mcp-resources/README.md b/packages/mcp/mcp-resources/README.md
+index 050cce6..c882fd9 100644
+--- a/packages/mcp/mcp-resources/README.md
++++ b/packages/mcp/mcp-resources/README.md
+@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
+ 
+ ## Summary
+ 
+-`dsh-mcp-resources` lets the model discover and read documents from configured MCP servers. Shipped profiles make its three shared tools available automatically when a server is configured in the caller's scope. Each tool requires an explicit server name and reads content only when called. Resource text enters conversation history; binary payloads remain available to programmatic callers and appear as descriptions to the model.
++`dsh-mcp-resources` lets the model discover and read documents from configured MCP servers. Shipped profiles make its four shared tools available automatically when a server is configured in the caller's scope. Each tool requires an explicit server name. Resource links are not fetched automatically; `open_mcp_resource_link` reads the exact server and URI only after an explicit tool call, and rejects `ui://` URIs. Small plain text enters conversation history. Bounded binary resources become durable image or inert file attachments; base64 never enters model-visible text.
+ 
+ ## Table of Contents
+ 
+@@ -31,13 +31,15 @@ Shipped profiles already mount this package once. Configure only the [MCP client
+ 
+ Use the [client configuration](../mcp-client/README.md#use-this-package) to add a server in the intended scope. This package has no configuration fields.
+ 
+-A caller with no configured MCP server sees no MCP prompt text or resource tools in native or PTC mode. A configured server enables the three shared resource tools, including when another provider mounts its client or the server has no tools or instructions. Connection failures do not remove the shared tools while the client entry remains active; resource calls report the connection error.
++A caller with no configured MCP server sees no MCP prompt text or resource tools in native or PTC mode. A configured server enables the four shared resource tools, including when another provider mounts its client or the server has no tools or instructions. Connection failures do not remove the shared tools while the client entry remains active; resource calls report the connection error.
+ 
+ ### Discover and read
+ 
+ When system-prompt assembly is mounted, the prompt lists server names visible to the calling agent. Call `list_mcp_resources` or `list_mcp_resource_templates` with one of those names as `server`. Without a cursor, the MCP SDK collects the server’s pages. An explicit `cursor` requests that page; pass a returned `nextCursor` unchanged. Read a listed URI or an expanded template with `read_mcp_resource`, using the same `server` name and an explicit `uri`.
+ 
+-Every operation resolves the server in the calling agent's scope. A missing server argument or unavailable server fails before dispatch. The connection owner handles request cancellation, timeouts, and recovery; a failed request remains a failed tool call.
++Every operation resolves the server in the calling agent's scope. A missing server argument or unavailable server fails before dispatch. The connection owner handles request cancellation, timeouts, and recovery; a failed request remains a failed tool call. Pass a listed resource link to `open_mcp_resource_link` only when asked to open or inspect it. It preserves the exact URI and server identity, rejects `ui://`, and never fetches a link during listing.
++
++Resource payloads are capped at 8 MiB per item, 16 MiB per read, and 16 content parts. Supported raster images may become image attachments when the current model route accepts images; otherwise they remain inert file attachments. Other binary content and active formats such as HTML, JavaScript, and SVG are saved as `.bin` files. Large or active text is saved as a `.txt` attachment. Nothing is executed in a browser or shell. A missing attachment store, invalid MIME or encoding, size cap, or storage refusal is shown as an unreadable reason. Attachments follow the configured backend's retention policy; this path does not provide automatic expiry.
+ 
+ -----
+ 
+@@ -54,9 +56,9 @@ The [base](../../bundle/base/README.md) and standalone [sdk-minimal](../../bundl
+   name: '@deepseek-ai/dsh-mcp-resources'
+ ```
+ 
+-The first provider in a scope registers its shared tools; removing the last removes those local registrations, while inherited providers and tools remain visible. The resource service owns the shared tool effects independently of the first provider's plugin, so unloading that provider cannot remove tools needed by another server. Provider selection and the server-name prompt use the same scoped registry. Each call resolves its server before dispatch.
++The first provider in a scope registers its shared tools; removing the last removes those local registrations, while inherited providers and tools remain visible. The resource service owns the shared tool effects independently of the first provider's plugin, so unloading that provider cannot remove tools needed by another server. Provider selection and the server-name prompt use the same scoped registry. Each call resolves its server before dispatch. Opening a link performs one `resources/read` request against the named live connection generation; it does not follow arbitrary URLs or retain a cross-connection cache.
+ 
+-Canonical results retain the complete JSON for programmatic callers. The pure text renderer adds server attribution and replaces string-valued `blob` fields with a description of their base64 length; URI, MIME type, and text fields remain in the rendered JSON. The tool pipeline owns recorded results. Server instructions belong to the MCP client and its logged system-prompt section.
++Canonical results retain the complete JSON for programmatic callers. The text renderer adds server attribution, masks string-valued `blob` fields, and caps long text previews. The read tools preflight MIME, canonical base64, per-item bytes, aggregate bytes, and content-part count before storing supported images or files. HTML and scripts have no executable renderer. The rich projector records attached image/file blocks in conversation history without exposing base64 in model text. Server instructions belong to the MCP client and its logged system-prompt section.
+ 
+ | Source | Responsibility |
+ |---|---|
+@@ -89,11 +91,11 @@ These pages cover server configuration, execution, and the decisions behind reso
+ 
+ #### What the model sees
+ 
+-The [generated tool schemas](../../../docs/tool-catalog.md#deepseek-aidsh-mcp-resources) define three tools shared by all caller-visible configured servers. With none, native schemas, PTC declarations and bindings, and the server-name prompt are absent. Connecting, disconnecting, or retrying an active client leaves these shared tool definitions unchanged. When system-prompt assembly is mounted and providers are visible, the `MCP resource servers` section says `Use list_mcp_resources, list_mcp_resource_templates, or read_mcp_resource with one of these names as the server argument: <JSON array>.` The names come from the same scoped registry, including servers with neither tools nor instructions. An empty registry contributes no section.
++The [generated tool schemas](../../../docs/tool-catalog.md#deepseek-aidsh-mcp-resources) define four tools shared by all caller-visible configured servers. With none, native schemas, PTC declarations and bindings, and the server-name prompt are absent. Connecting, disconnecting, or retrying an active client leaves these shared tool definitions unchanged. When system-prompt assembly is mounted and providers are visible, the `MCP resource servers` section lists the four resource tools and visible names. The names come from the same scoped registry, including servers with neither tools nor instructions. An empty registry contributes no section.
+ 
+ #### Token effect
+ 
+-With no caller-visible configured servers, this package adds no tool or prompt tokens. Otherwise, three shared definitions contribute a fixed schema cost and the server-name section adds a sorted JSON list of visible names. Resource listings and documents add content only when an operation returns them.
++With no caller-visible configured servers, this package adds no tool or prompt tokens. Otherwise, four shared definitions contribute a fixed schema cost and the server-name section adds a sorted JSON list of visible names. Resource listings and documents add content only when an operation returns them.
+ 
+ #### KV Cache effect
+ 
+diff --git a/packages/mcp/mcp-resources/package.json b/packages/mcp/mcp-resources/package.json
+index 59a2c1a..be3ee7a 100644
+--- a/packages/mcp/mcp-resources/package.json
++++ b/packages/mcp/mcp-resources/package.json
+@@ -28,6 +28,7 @@
+   "license": "MIT",
+   "peerDependencies": {
+     "@deepseek-ai/cordis": "workspace:~",
++    "@deepseek-ai/dsh-attachment": "workspace:*",
+     "@deepseek-ai/dsh-llm": "workspace:*",
+     "@deepseek-ai/dsh-scope": "workspace:*",
+     "@deepseek-ai/dsh-system-prompt": "workspace:*",
+@@ -35,6 +36,7 @@
+   },
+   "devDependencies": {
+     "@deepseek-ai/cordis": "workspace:~",
++    "@deepseek-ai/dsh-attachment": "workspace:*",
+     "@deepseek-ai/dsh-llm": "workspace:*",
+     "@deepseek-ai/dsh-ptc-runtime": "workspace:*",
+     "@deepseek-ai/dsh-scope": "workspace:*",
+@@ -46,6 +48,9 @@
+     "@deepseek-ai/dsh-util-values": "workspace:*"
+   },
+   "peerDependenciesMeta": {
++    "@deepseek-ai/dsh-attachment": {
++      "optional": true
++    },
+     "@deepseek-ai/dsh-system-prompt": {
+       "optional": true
+     }
+diff --git a/packages/mcp/mcp-resources/src/index.ts b/packages/mcp/mcp-resources/src/index.ts
+index 0ecaaa5..d8b9b37 100644
+--- a/packages/mcp/mcp-resources/src/index.ts
++++ b/packages/mcp/mcp-resources/src/index.ts
+@@ -43,7 +43,7 @@ class ResourceLayer implements ScopeLayer {
+   }
+ }
+ 
+-/** Scoped resource access plus three tools shared by configured MCP servers. */
++/** Scoped resource access plus four tools shared by configured MCP servers. */
+ export class McpResourceRuntime extends Service {
+   /** Tool registry required by the resource consumer. */
+   static inject = ['tools']
+@@ -64,7 +64,8 @@ export class McpResourceRuntime extends Service {
+         text: ({ scope }) => {
+           const names = [...this.layers.merge(scope, layer => layer.servers).keys()].sort()
+           return names.length === 0 ? '' : '## MCP resource servers\n\n'
+-            + 'Use list_mcp_resources, list_mcp_resource_templates, or read_mcp_resource with one of these names '
++            + 'Use list_mcp_resources, list_mcp_resource_templates, read_mcp_resource, or open_mcp_resource_link '
++            + 'with one of these names '
+             + `as the server argument: ${JSON.stringify(names)}.`
+         },
+       })
+diff --git a/packages/mcp/mcp-resources/src/render.ts b/packages/mcp/mcp-resources/src/render.ts
+index d79c597..0d604dd 100644
+--- a/packages/mcp/mcp-resources/src/render.ts
++++ b/packages/mcp/mcp-resources/src/render.ts
+@@ -4,9 +4,12 @@
+  * @module @deepseek-ai/dsh-mcp-resources
+  */
+ 
++import { Buffer } from 'node:buffer'
+ import type { ContentBlock } from '@deepseek-ai/dsh-llm'
+ import type { JsonValue } from '@deepseek-ai/dsh-util-values'
+ 
++const MAX_RENDERED_RESOURCE_TEXT_BYTES = 64 * 1024
++
+ /**
+  * Render resource JSON while retaining raw binary data only for programmatic callers.
+  * @param server - configured server attribution.
+@@ -18,6 +21,9 @@ export function renderResourceResult(server: string, value: JsonValue): ContentB
+     if (key === 'blob' && typeof item === 'string') {
+       return `[binary resource: ${item.length} base64 characters; available to programmatic callers]`
+     }
++    if (key === 'text' && typeof item === 'string' && Buffer.byteLength(item, 'utf8') > MAX_RENDERED_RESOURCE_TEXT_BYTES) {
++      return `[resource text: ${Buffer.byteLength(item, 'utf8')} bytes; use the explicit resource action to open it as an attachment]`
++    }
+     return item
+   })
+   return [{ type: 'text', text: `MCP server: ${server}\n${rendered}` }]
+diff --git a/packages/mcp/mcp-resources/src/tools.ts b/packages/mcp/mcp-resources/src/tools.ts
+index 5e03887..dac1680 100644
+--- a/packages/mcp/mcp-resources/src/tools.ts
++++ b/packages/mcp/mcp-resources/src/tools.ts
+@@ -1,17 +1,35 @@
+ /**
+- * Three shared tools adapt model arguments to scoped resource operations.
++ * Four shared tools adapt model arguments to scoped resource operations.
++ * Binary content is preflighted before it reaches durable attachment storage.
+  *
+  * @module @deepseek-ai/dsh-mcp-resources
+  */
+ 
++import { Buffer } from 'node:buffer'
++import { isDeepStrictEqual } from 'node:util'
+ import type { Context } from '@deepseek-ai/cordis'
+-import { defineTool, type ToolExecution } from '@deepseek-ai/dsh-tools'
++import type { AttachmentStore, FileAttachmentRef, ImageAttachmentRef, ImageMediaType, SaveImageAttachment } from '@deepseek-ai/dsh-attachment'
++import type { ContentBlock } from '@deepseek-ai/dsh-llm'
++import { defineTool, type ToolExecution, type ToolExecutionResult } from '@deepseek-ai/dsh-tools'
+ import type { JsonValue } from '@deepseek-ai/dsh-util-values'
+ import type { McpResourceRequest } from './index.ts'
+ import { renderResourceResult } from './render.ts'
+ 
+ type RequestResource = (server: string, request: McpResourceRequest, exec: ToolExecution) => Promise<JsonValue>
+ 
++const MAX_RESOURCE_ITEMS = 16
++const MAX_RESOURCE_ITEM_BYTES = 8 * 1024 * 1024
++const MAX_RESOURCE_BATCH_BYTES = 16 * 1024 * 1024
++const MAX_INLINE_TEXT_BYTES = 64 * 1024
++const MAX_BASE64_CHARS = Math.ceil(MAX_RESOURCE_ITEM_BYTES / 3) * 4
++const CANONICAL_BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/
++const MIME_TYPE = /^[a-z0-9][a-z0-9!#$&^_.+-]{0,126}\/[a-z0-9][a-z0-9!#$&^_.+-]{0,126}$/i
++const IMAGE_MEDIA_TYPES: readonly ImageMediaType[] = ['image/png', 'image/jpeg', 'image/webp', 'image/gif']
++const ACTIVE_TEXT_TYPES = new Set([
++  'application/javascript', 'application/x-javascript', 'application/xhtml+xml',
++  'image/svg+xml', 'text/html', 'text/javascript', 'text/xml', 'application/xml',
++])
++
+ const listParameters = {
+   server: { type: 'string', required: true, description: 'Configured MCP server name.' },
+   cursor: { type: 'string', description: 'Continuation cursor returned by this server.' },
+@@ -22,17 +40,277 @@ const output = {
+   render: (args: { server: string }, value: JsonValue) => renderResourceResult(args.server, value),
+ }
+ 
++interface ResourceContent {
++  uri?: string
++  mimeType?: string
++  text?: string
++  blob?: string
++}
++
++interface PendingProjection {
++  value: JsonValue
++  fallback: ContentBlock[]
++  content: ContentBlock[]
++}
++
++interface PreparedItem {
++  index: number
++  uri: string
++  mimeType: string
++  kind: 'text' | 'blob'
++  requiresAttachment?: boolean
++  text?: string
++  bytes?: Uint8Array
++  imageType?: ImageMediaType
++  failure?: string
++  attachment?: ImageAttachmentRef | FileAttachmentRef
++}
++
++const utf8Bytes = (text: string): number => Buffer.byteLength(text, 'utf8')
++const isRecord = (value: JsonValue): value is { [key: string]: JsonValue } =>
++  typeof value === 'object' && value !== null && !Array.isArray(value)
++
++function validMime(value: unknown): value is string {
++  return typeof value === 'string' && MIME_TYPE.test(value)
++}
++
++function isImageMime(value: string): value is ImageMediaType {
++  return IMAGE_MEDIA_TYPES.includes(value as ImageMediaType)
++}
++
++function isActiveText(mimeType: string): boolean {
++  return ACTIVE_TEXT_TYPES.has(mimeType.toLowerCase())
++}
++
++function safeFileName(index: number, extension: 'bin' | 'txt'): string {
++  return `mcp-resource-${index + 1}.${extension}`
++}
++
++function safeImageName(index: number, mediaType: ImageMediaType): string {
++  const extension = mediaType === 'image/jpeg' ? 'jpg' : mediaType.slice('image/'.length)
++  return `mcp-resource-${index + 1}.${extension}`
++}
++
++function decodedBase64Bytes(value: string): number {
++  if (value.length === 0) return 0
++  const padding = value.endsWith('==') ? 2 : value.endsWith('=') ? 1 : 0
++  return value.length / 4 * 3 - padding
++}
++
++function resourceHeader(server: string, item: PreparedItem): string {
++  return `MCP resource from server ${JSON.stringify(server)}, URI ${JSON.stringify(item.uri)} (${item.mimeType})`
++}
++
++async function imageRouteSupports(ctx: Context, exec: ToolExecution): Promise<boolean> {
++  const routed = exec.agent?.session.requestHeader()?.config
++  const provider = routed?.provider ?? exec.agent?.options.provider
++  const model = routed?.model ?? exec.agent?.options.model
++  const llm = ctx.get('llm')
++  if (provider === undefined || model === undefined || llm === undefined) return false
++  try {
++    const info = await llm.resolveModelInfo(provider, model, exec.signal)
++    return info.inputModalities?.includes('image') === true
++  } catch {
++    return false
++  }
++}
++
++function readContents(value: JsonValue): ResourceContent[] | undefined {
++  if (!isRecord(value) || !Array.isArray(value.contents)) return undefined
++  return value.contents.map((item) => {
++    if (!isRecord(item)) return {}
++    return {
++      ...typeof item.uri === 'string' ? { uri: item.uri } : {},
++      ...typeof item.mimeType === 'string' ? { mimeType: item.mimeType } : {},
++      ...typeof item.text === 'string' ? { text: item.text } : {},
++      ...typeof item.blob === 'string' ? { blob: item.blob } : {},
++    }
++  })
++}
++
++/**
++ * Preflight the complete resource batch, then persist admitted content as safe
++ * attachments. No base64 value is ever copied into model-visible text.
++ */
++async function prepareResourceProjection(
++  ctx: Context,
++  exec: ToolExecution,
++  server: string,
++  value: JsonValue,
++): Promise<ContentBlock[] | undefined> {
++  const contents = readContents(value)
++  if (contents === undefined || contents.length === 0) return undefined
++  const wantsProjection = contents.some(item => item.blob !== undefined
++    || (item.text !== undefined && (utf8Bytes(item.text) > MAX_INLINE_TEXT_BYTES
++      || (validMime(item.mimeType) && isActiveText(item.mimeType)))))
++  if (!wantsProjection) return undefined
++
++  const items: PreparedItem[] = []
++  if (contents.length > MAX_RESOURCE_ITEMS) {
++    return [{ type: 'text', text: `MCP resource from ${server}: refused ${contents.length} content parts; the limit is ${MAX_RESOURCE_ITEMS}.` }]
++  }
++  let totalBytes = 0
++  for (const [index, raw] of contents.entries()) {
++    const uri = raw.uri ?? '(resource URI missing)'
++    const mimeType = raw.mimeType ?? (raw.text === undefined ? 'unknown' : 'text/plain')
++    const item: PreparedItem = { index, uri, mimeType, kind: raw.blob === undefined ? 'text' : 'blob' }
++    if (raw.blob !== undefined) {
++      item.requiresAttachment = true
++      if (!validMime(raw.mimeType)) item.failure = 'declared MIME type is missing or invalid'
++      else if (raw.blob.length > MAX_BASE64_CHARS || !CANONICAL_BASE64.test(raw.blob)) {
++        item.failure = 'binary encoding is invalid or exceeds the per-item size cap'
++      } else {
++        const encodedBytes = decodedBase64Bytes(raw.blob)
++        if (encodedBytes > MAX_RESOURCE_ITEM_BYTES) item.failure = 'binary exceeds the per-item size cap'
++        else if (totalBytes + encodedBytes > MAX_RESOURCE_BATCH_BYTES) {
++          totalBytes = MAX_RESOURCE_BATCH_BYTES + 1
++          item.failure = 'resource exceeds the aggregate size cap'
++        } else {
++          totalBytes += encodedBytes
++          const decoded = Buffer.from(raw.blob, 'base64')
++          if (decoded.toString('base64') !== raw.blob) item.failure = 'binary encoding is not canonical base64'
++          else {
++            item.bytes = decoded
++            const imageType = isImageMime(raw.mimeType.toLowerCase()) ? raw.mimeType.toLowerCase() as ImageMediaType : undefined
++            if (imageType !== undefined) item.imageType = imageType
++          }
++        }
++      }
++    } else if (raw.text !== undefined) {
++      const byteLength = utf8Bytes(raw.text)
++      if (byteLength > MAX_RESOURCE_ITEM_BYTES) item.failure = 'text exceeds the per-item size cap'
++      else if (totalBytes + byteLength > MAX_RESOURCE_BATCH_BYTES) {
++        totalBytes = MAX_RESOURCE_BATCH_BYTES + 1
++        item.failure = 'resource exceeds the aggregate size cap'
++      } else {
++        totalBytes += byteLength
++        item.requiresAttachment = byteLength > MAX_INLINE_TEXT_BYTES || isActiveText(mimeType)
++        item.text = raw.text
++        if (item.requiresAttachment) item.bytes = Buffer.from(raw.text, 'utf8')
++      }
++    } else {
++      item.failure = 'resource content has no readable text or binary payload'
++    }
++    items.push(item)
++  }
++  if (totalBytes > MAX_RESOURCE_BATCH_BYTES) {
++    for (const item of items) {
++      if (item.failure === undefined) item.failure = 'resource exceeds the aggregate size cap'
++    }
++  }
++
++  const attachments = ctx.get('attachments') as AttachmentStore | undefined
++  if (attachments === undefined) {
++    for (const item of items) {
++      if (item.failure === undefined && item.requiresAttachment) item.failure = 'no attachment store is mounted'
++    }
++  }
++
++  const imageItems = items.filter(item => item.failure === undefined && item.requiresAttachment
++    && item.imageType !== undefined && item.bytes !== undefined)
++  const useImages = attachments !== undefined && imageItems.length > 0 && await imageRouteSupports(ctx, exec)
++  if (useImages && attachments !== undefined) {
++    const imageInputs: SaveImageAttachment[] = imageItems.map(item => ({
++      data: item.bytes as Uint8Array,
++      mediaType: item.imageType as ImageMediaType,
++      name: safeImageName(item.index, item.imageType as ImageMediaType),
++    }))
++    try {
++      const refs = await attachments.saveImages(imageInputs)
++      imageItems.forEach((item, index) => { item.attachment = refs[index] as ImageAttachmentRef })
++    } catch {
++      for (const item of imageItems) item.failure = 'image validation or attachment storage rejected the content'
++    }
++  }
++
++  for (const item of items) {
++    if (item.failure !== undefined || !item.requiresAttachment || item.attachment !== undefined
++      || item.bytes === undefined || attachments === undefined) continue
++    if (item.imageType !== undefined && useImages === false) {
++      try {
++        await attachments.validateImage({ data: item.bytes, mediaType: item.imageType })
++      } catch {
++        item.failure = 'image bytes did not pass attachment validation'
++        continue
++      }
++    }
++    const extension = item.kind === 'text' && !isActiveText(item.mimeType) ? 'txt' : 'bin'
++    try {
++      exec.signal.throwIfAborted()
++      item.attachment = await attachments.saveFile({ data: item.bytes, name: safeFileName(item.index, extension) })
++    } catch {
++      item.failure = 'attachment storage rejected the content'
++    }
++  }
++
++  const projected: ContentBlock[] = []
++  for (const item of items) {
++    const header = resourceHeader(server, item)
++    if (item.failure !== undefined) {
++      projected.push({ type: 'text', text: `${header}\nResource unavailable: ${item.failure}.` })
++    } else if (item.attachment !== undefined && 'width' in item.attachment) {
++      projected.push({ type: 'text', text: `${header}\nSaved as a durable image attachment. The attachment backend controls retention; automatic expiry is not provided.` })
++      projected.push({ type: 'image', attachment: item.attachment })
++    } else if (item.attachment !== undefined) {
++      projected.push({ type: 'text', text: `${header}\nSaved as an inert file attachment (${item.attachment.bytes} bytes). HTML and scripts are never executed. The attachment backend controls retention; automatic expiry is not provided.` })
++      projected.push({ type: 'file', attachment: item.attachment })
++    } else if (item.text !== undefined) {
++      projected.push({ type: 'text', text: `${header}\n${item.text}` })
++    }
++  }
++  return projected.length === 0
++    ? [{ type: 'text', text: `MCP resource from ${server}: no readable content.` }]
++    : projected
++}
++
++function createReadTool(
++  ctx: Context,
++  request: RequestResource,
++  name: 'read_mcp_resource' | 'open_mcp_resource_link',
++  description: string,
++): ReturnType<typeof defineTool> {
++  const projections = new WeakMap<ToolExecution, PendingProjection>()
++  const parameters = {
++    server: listParameters.server,
++    uri: { type: 'string', required: true, description: 'Exact resource URI supplied by the named server.' },
++  } as const
++  return defineTool({
++    name,
++    description,
++    parameters,
++    output,
++    execute: async (args, exec) => {
++      if (args.uri.toLowerCase().startsWith('ui://')) {
++        throw new Error('MCP ui:// resources are unsupported and will not be opened.')
++      }
++      const value = await request(args.server, { method: 'resources/read', uri: args.uri }, exec)
++      const fallback = renderResourceResult(args.server, value)
++      const content = await prepareResourceProjection(ctx, exec, args.server, value)
++      if (content !== undefined) projections.set(exec, { value, fallback, content })
++      return value
++    },
++    projectContent(exec: Readonly<ToolExecution>, result: Readonly<ToolExecutionResult>) {
++      const prepared = projections.get(exec as ToolExecution)
++      if (prepared === undefined) return undefined
++      projections.delete(exec as ToolExecution)
++      if (result.isError || !isDeepStrictEqual(result.value, prepared.value)
++        || !isDeepStrictEqual(result.content, prepared.fallback)) return undefined
++      return prepared.content
++    },
++  })
++}
++
+ /**
+  * Register resource operations in the consumer's tool scope.
+  * @param ctx - context owning the tool registrations.
+  * @param request - caller-aware resource operation.
+- * @returns the effect disposer that removes all three tools synchronously.
++ * @returns the effect disposer that removes all four tools synchronously.
+  */
+ export function registerResourceTools(ctx: Context, request: RequestResource): () => void {
+   const dispose = ctx.effect(function* () {
+     yield ctx.tools.register(defineTool({
+       name: 'list_mcp_resources',
+-      description: 'List resources available from an MCP server.',
++      description: 'List resources available from an MCP server. Listing does not open or execute resource links.',
+       parameters: listParameters,
+       output,
+       execute: (args, exec) => request(args.server, {
+@@ -48,16 +326,13 @@ export function registerResourceTools(ctx: Context, request: RequestResource): (
+         method: 'resources/templates/list', ...args.cursor === undefined ? {} : { cursor: args.cursor },
+       }, exec),
+     }))
+-    yield ctx.tools.register(defineTool({
+-      name: 'read_mcp_resource',
+-      description: 'Read an MCP resource by URI from the named server. Use a listed URI or an expanded resource template.',
+-      parameters: {
+-        server: listParameters.server,
+-        uri: { type: 'string', required: true, description: 'Resource URI to read.' },
+-      },
+-      output,
+-      execute: (args, exec) => request(args.server, { method: 'resources/read', uri: args.uri }, exec),
+-    }))
++    yield ctx.tools.register(createReadTool(
++      ctx, request, 'read_mcp_resource', 'Read one resource by its exact URI. Binary results are size- and MIME-checked before becoming inert attachments.',
++    ))
++    yield ctx.tools.register(createReadTool(
++      ctx, request, 'open_mcp_resource_link',
++      'Explicitly open a listed MCP resource link from this server after the user asks to read or inspect it. Pass the exact server and URI; links are never fetched automatically.',
++    ))
+   }, 'mcpResources.resourceTools')
+   // oxlint-disable-next-line typescript/no-misused-promises -- all collected tool disposers are synchronous
+   return dispose
+diff --git a/packages/mcp/mcp-resources/tests/resources.spec.ts b/packages/mcp/mcp-resources/tests/resources.spec.ts
+index fec9331..874ab93 100644
+--- a/packages/mcp/mcp-resources/tests/resources.spec.ts
++++ b/packages/mcp/mcp-resources/tests/resources.spec.ts
+@@ -3,13 +3,67 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
+ import { Context } from '@deepseek-ai/cordis'
+ import SystemPrompt, { renderPrompt } from '@deepseek-ai/dsh-system-prompt'
+ import ToolRuntime, { defineTool, type Config as ToolConfig } from '@deepseek-ai/dsh-tools'
+-import { ToolCallId } from '@deepseek-ai/dsh-llm'
++import { LlmAdapter, LlmRuntime, ToolCallId } from '@deepseek-ai/dsh-llm'
++import type { GenerateOptions, LlmResolvedModelInfo, StreamChunk } from '@deepseek-ai/dsh-llm'
+ import type { Agent } from '@deepseek-ai/dsh-agent'
+ import { bindScopeParent, createScope, type Scope } from '@deepseek-ai/dsh-scope'
+ import { PtcRuntime, type PtcRunRequest, type PtcRunResult, type PtcRunSpec } from '@deepseek-ai/dsh-ptc-runtime'
++import AttachmentStore, { AttachmentId } from '@deepseek-ai/dsh-attachment'
++import type { FileAttachmentRef, ImageAttachmentLimits, ImageAttachmentRef, SaveFileAttachment, SaveImageAttachment, StoredImageAttachment } from '@deepseek-ai/dsh-attachment'
+ import McpResources, { type McpResourceProvider } from '../src/index.ts'
+ 
+-const resourceToolNames = ['list_mcp_resources', 'list_mcp_resource_templates', 'read_mcp_resource']
++const resourceToolNames = ['list_mcp_resources', 'list_mcp_resource_templates', 'read_mcp_resource', 'open_mcp_resource_link']
++
++const IMAGE_LIMITS: ImageAttachmentLimits = {
++  maxImageBytes: 1024,
++  maxImagesPerMessage: 4,
++  maxMessageImageBytes: 2048,
++  maxImagePixels: 1024,
++  maxImageDimension: 2000,
++  mediaTypes: ['image/png', 'image/jpeg', 'image/webp', 'image/gif'],
++}
++
++class RecordingAttachmentStore extends AttachmentStore {
++  readonly imageLimits = IMAGE_LIMITS
++  readonly savedFiles: SaveFileAttachment[] = []
++  readonly savedImages: SaveImageAttachment[] = []
++
++  validateImage(_input: SaveImageAttachment): Promise<void> { return Promise.resolve() }
++
++  saveImage(input: SaveImageAttachment): Promise<ImageAttachmentRef> {
++    this.savedImages.push(input)
++    return Promise.resolve({
++      attachmentId: AttachmentId(`sha256:${String(this.savedImages.length).padStart(64, '0')}`),
++      mediaType: input.mediaType, bytes: input.data.byteLength, width: 1, height: 1,
++      ...(input.name === undefined ? {} : { name: input.name }),
++    })
++  }
++
++  readImage(_ref: ImageAttachmentRef): Promise<StoredImageAttachment> {
++    throw new Error('not used')
++  }
++
++  override saveFile(input: SaveFileAttachment): Promise<FileAttachmentRef> {
++    this.savedFiles.push(input)
++    return Promise.resolve({
++      attachmentId: AttachmentId(`sha256:${String(this.savedFiles.length).padStart(64, '0')}`),
++      name: input.name ?? 'resource.bin', bytes: input.data.byteLength,
++    })
++  }
++}
++
++class ImageCatalogAdapter extends LlmAdapter {
++  override resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
++    return Promise.resolve({
++      provider, id: model, name: model,
++      inputModalities: model === 'vision' ? ['text', 'image'] : ['text'],
++    })
++  }
++
++  stream(_options: GenerateOptions): AsyncIterable<StreamChunk> {
++    throw new Error('resource attachment tests never stream')
++  }
++}
+ 
+ class BindingProbe extends PtcRuntime {
+   readonly language = 'typescript'
+@@ -32,11 +86,12 @@ afterEach(async () => {
+   await Promise.all(roots.splice(0).map(ctx => ctx.fiber.dispose()))
+ })
+ 
+-async function setup(mode: ToolConfig['mode'] = 'native') {
++async function setup(mode: ToolConfig['mode'] = 'native', withAttachments = false) {
+   const ctx = new Context()
+   roots.push(ctx)
+   await ctx.plugin(SystemPrompt)
+   await ctx.plugin(ToolRuntime, { mode })
++  if (withAttachments) await ctx.plugin(RecordingAttachmentStore)
+   if (mode !== 'native') await ctx.plugin(BindingProbe)
+   await ctx.plugin(McpResources)
+   return ctx
+@@ -226,6 +281,84 @@ describe('MCP resource tools', () => {
+     expect(renderPrompt(await ctx.systemPrompt.assemble())).toContain('server argument: ["docs"]')
+   })
+ 
++  it('opens a listed resource only through an explicit scoped action and stores binary as an inert attachment', async () => {
++    const ctx = await setup('native', true)
++    const uri = 'docs://manuals/install.bin?version=7'
++    const request = vi.fn<McpResourceProvider['request']>().mockResolvedValue({
++      contents: [{ uri, mimeType: 'application/octet-stream', blob: 'AQI=' }],
++    })
++    const attachments = ctx.attachments as RecordingAttachmentStore
++    ctx.mcpResources.register('docs', { request })
++
++    expect(request).not.toHaveBeenCalled()
++    const result = await call(ctx, 'open_mcp_resource_link', { server: 'docs', uri })
++    expect(result.isError).toBe(false)
++    expect(request).toHaveBeenCalledOnce()
++    expect(request.mock.calls[0]?.[0]).toEqual({ method: 'resources/read', uri })
++    expect(attachments.savedFiles.map(file => [...file.data])).toEqual([[1, 2]])
++    expect(attachments.savedFiles[0]?.name).toBe('mcp-resource-1.bin')
++    expect(result.content.some(block => block.type === 'file')).toBe(true)
++    const summary = result.content.find(block => block.type === 'text')
++    expect(summary?.type === 'text' && summary.text).toContain('MCP resource from server "docs", URI "docs://manuals/install.bin?version=7"')
++    expect(JSON.stringify(result.content)).toContain('HTML and scripts are never executed')
++    expect(JSON.stringify(result.content)).not.toContain('AQI=')
++  })
++
++  it('uses a supported raster image attachment only when the caller route accepts images', async () => {
++    const ctx = await setup('native', true)
++    await ctx.plugin(LlmRuntime)
++    ctx.llm.registerAdapter(['visual'], new ImageCatalogAdapter())
++    const request = vi.fn<McpResourceProvider['request']>().mockResolvedValue({
++      contents: [{ uri: 'docs://cover', mimeType: 'image/png', blob: 'AQ==' }],
++    })
++    ctx.mcpResources.register('docs', { request })
++
++    const result = await call(ctx, 'read_mcp_resource', { server: 'docs', uri: 'docs://cover' }, {
++      options: { provider: 'visual', model: 'vision' },
++      session: { requestHeader: () => undefined },
++    } as Agent)
++    expect(result.isError).toBe(false)
++    expect(result.content.some(block => block.type === 'image')).toBe(true)
++    expect((ctx.attachments as RecordingAttachmentStore).savedImages[0]).toMatchObject({
++      mediaType: 'image/png', name: 'mcp-resource-1.png',
++    })
++    expect(JSON.stringify(result.content)).not.toContain('AQ==')
++  })
++
++  it('rejects ui:// links before dispatch and gives a reason for invalid binary MIME or encoding', async () => {
++    const ctx = await setup('native', true)
++    const request = vi.fn<McpResourceProvider['request']>().mockResolvedValue({
++      contents: [{ uri: 'docs://unsafe', mimeType: 'text/html', blob: 'not base64' }],
++    })
++    const attachments = ctx.attachments as RecordingAttachmentStore
++    ctx.mcpResources.register('docs', { request })
++
++    const unsupported = await call(ctx, 'open_mcp_resource_link', { server: 'docs', uri: 'ui://panel/7' })
++    expect(unsupported.isError).toBe(true)
++    expect(request).not.toHaveBeenCalled()
++
++    const invalid = await call(ctx, 'read_mcp_resource', { server: 'docs', uri: 'docs://unsafe' })
++    expect(invalid.isError).toBe(false)
++    expect(attachments.savedFiles).toEqual([])
++    expect(JSON.stringify(invalid.content)).toContain('binary encoding is invalid')
++    expect(JSON.stringify(invalid.content)).not.toContain('not base64')
++  })
++
++  it('refuses an over-limit resource batch before persisting any part', async () => {
++    const ctx = await setup('native', true)
++    const blob = 'A'.repeat(3_355_444)
++    const contents = Array.from({ length: 7 }, (_, index) => ({
++      uri: `docs://large/${index}`, mimeType: 'application/octet-stream', blob,
++    }))
++    ctx.mcpResources.register('docs', { request: async () => ({ contents }) })
++    const result = await call(ctx, 'read_mcp_resource', { server: 'docs', uri: 'docs://large' })
++
++    expect(result.isError).toBe(false)
++    expect((ctx.attachments as RecordingAttachmentStore).savedFiles).toEqual([])
++    expect(JSON.stringify(result.content)).toContain('resource exceeds the aggregate size cap')
++    expect(JSON.stringify(result.content)).not.toContain(blob)
++  })
++
+   it.each([false, true])('rolls back a partial shared-tool registration (scoped: %s)', async (scoped) => {
+     const ctx = await setup()
+     const owner = {} as Agent
+@@ -294,7 +427,7 @@ describe('MCP resource tools', () => {
+     expect(renderPrompt(await ctx.systemPrompt.assemble())).not.toContain('MCP resource servers')
+   })
+ 
+-  it('routes all three operations with the explicit server and opaque parameters', async () => {
++  it('routes all four operations with the explicit server and opaque parameters', async () => {
+     const ctx = await setup()
+     const request = vi.fn<McpResourceProvider['request']>().mockResolvedValue({ resources: [], nextCursor: 'next-page' })
+     ctx.mcpResources.register('docs', { request })
+@@ -312,7 +445,7 @@ describe('MCP resource tools', () => {
+   })
+ 
+   it('keeps binary bytes programmatic while projecting text, URI and server attribution', async () => {
+-    const ctx = await setup()
++    const ctx = await setup('native', true)
+     const value = { contents: [
+       { uri: 'docs://text', mimeType: 'text/plain', text: 'Read this guide.' },
+       { uri: 'docs://binary', mimeType: 'application/octet-stream', blob: 'AQIDBA==' },
+@@ -321,10 +454,9 @@ describe('MCP resource tools', () => {
+     const result = await call(ctx, 'read_mcp_resource', { server: 'docs', uri: 'docs://text' })
+     expect(result.isError).toBe(false)
+     expect('value' in result && result.value).toEqual(value)
+-    expect(result.content).toEqual([{ type: 'text', text: 'MCP server: docs\n'
+-      + '{"contents":[{"uri":"docs://text","mimeType":"text/plain","text":"Read this guide."},'
+-      + '{"uri":"docs://binary","mimeType":"application/octet-stream","blob":'
+-      + '"[binary resource: 8 base64 characters; available to programmatic callers]"}]}' }])
++    expect(result.content).toContainEqual({ type: 'text', text: 'MCP resource from server "docs", URI "docs://text" (text/plain)\nRead this guide.' })
++    expect(result.content.some(block => block.type === 'file')).toBe(true)
++    expect((ctx.attachments as RecordingAttachmentStore).savedFiles.map(file => [...file.data])).toEqual([[1, 2, 3, 4]])
+     expect(JSON.stringify(result.content)).not.toContain('AQIDBA==')
+   })
+ 
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index 36dc050..0c6fedd 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -8419,6 +8419,9 @@ importers:
+       '@deepseek-ai/dsh-agent':
+         specifier: workspace:*
+         version: link:../../core/agent
++      '@deepseek-ai/dsh-attachment':
++        specifier: workspace:*
++        version: link:../../attachment/attachment
+       '@deepseek-ai/dsh-llm':
+         specifier: workspace:*
+         version: link:../../llm/llm
+-- 
+2.43.0
+

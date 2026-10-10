@@ -1,0 +1,30 @@
+{
+  "base_commit": "f97c0438fb1608bbc4c08c88a27344249795ea22",
+  "patch_commit": "3b7c71fc79c4fe438e1c08f6d0e98680c83d17b2",
+  "source_package_version": "0.1.7-rc.2",
+  "patch_sha256": "0731654b271187e4b2410cb2d1c9810eecdc09c679540965dc865f774664ba30",
+  "files": [
+    "docs/tool-catalog.md",
+    "packages/mcp/mcp-client/src/tools.ts",
+    "packages/mcp/mcp-client/tests/mcp-client.spec.ts",
+    "packages/mcp/mcp-resources/README.md",
+    "packages/mcp/mcp-resources/package.json",
+    "packages/mcp/mcp-resources/src/index.ts",
+    "packages/mcp/mcp-resources/src/render.ts",
+    "packages/mcp/mcp-resources/src/tools.ts",
+    "packages/mcp/mcp-resources/tests/resources.spec.ts",
+    "pnpm-lock.yaml"
+  ],
+  "file_blobs": {
+    "docs/tool-catalog.md": "12dd9e6778b383ef6cd0e1bc1d05ac0d145d6cfe",
+    "packages/mcp/mcp-client/src/tools.ts": "d1d8622938b3c58ddf2095e91ac0af76e6d09f33",
+    "packages/mcp/mcp-client/tests/mcp-client.spec.ts": "9b713b46189242df52f88feaedf10cfdbf65fdc5",
+    "packages/mcp/mcp-resources/README.md": "c882fd917c9db02d4bd3bd1427a9dd6abd73a95f",
+    "packages/mcp/mcp-resources/package.json": "be3ee7a09f6e34b39fe2394195e61b2813b81755",
+    "packages/mcp/mcp-resources/src/index.ts": "d8b9b370461c69e4fa0e500e6e9bd8b1a2cfdcbc",
+    "packages/mcp/mcp-resources/src/render.ts": "0d604dd16ed291efb704e4eab5105f5a2582d2e4",
+    "packages/mcp/mcp-resources/src/tools.ts": "dac16809c3a6ad79701689c70ad88aeff856c4d3",
+    "packages/mcp/mcp-resources/tests/resources.spec.ts": "874ab93854b30330c89bad596b9061187e366d1a",
+    "pnpm-lock.yaml": "0c6feddd4ee3ff0f0eefb03163682deff2d9bb8f"
+  }
+}

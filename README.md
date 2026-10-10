@@ -229,6 +229,48 @@ rdsh --profile web                             # boot web with plugins enabled
 ```
 
 Ports never collide (DSH Web: `3080`, rdsh serve: `38080`).
+Ports never collide (dsh web GUI :3080, `rdsh serve` :38080). With
+`install.sh --as-dsh`, point Smart-DSH helper scripts at `dsh-orig` or
+export `DSH_PACKAGE_DIR`.
+
+## Web dashboard
+
+For the read-only workflow member board in DSH's conversation GUI, use the [verified source-patch preparation tool](plugins/workflow-board/README.md) with an isolated compatible source checkout. It includes the 18-file board/UI projection patch, compatibility diagnostics and fixture tests; building and adopting the patched DSH are separate steps.
+
+For bounded MCP resource artifacts and explicit resource-link reads, use the [verified source-patch preparation tool](plugins/mcp-resource-artifacts/README.md) with an isolated checkout at its pinned DSH revision. Resource links are never fetched automatically, binary payloads stay out of model text, and building or adopting the patched DSH are separate steps.
+
+```sh
+rdsh settings set extras.enable serve  # replaces the enabled-extra list
+rdsh serve
+# open the URL containing #key=... printed by rdsh (localhost only)
+```
+
+| API | Purpose |
+| --- | --- |
+| `GET /api/version` | version (requires key) |
+| `GET /api/doctor` | health check |
+| `POST /api/tokens` | token estimate for `{"text"}` |
+| `POST /api/prune` | prune `{"text","max_tokens"}` to budget |
+| `GET /api/bench?n=3` | startup measurement |
+| `GET /api/sessions?limit=20` | recent sessions |
+| `GET /api/skills`, `/api/profiles` | name lists |
+
+All APIs require the per-launch key in the `X-RDSH-Token` header (the
+browser UI reads it from its URL). No CDN is used; the page works offline.
+
+`rdsh serve` is the quick local status page. For project metrics, human
+Q&A, and phone access, use the optional [Node.js dashboard](dashboard/README.md)
+(needs Node.js 22+): `rdsh-dashboard project --project <directory>` or
+`rdsh-dashboard harness` for the original Harness Web UI. On native Windows
+the launcher can live in the tray (right-click Open / Exit,
+double-click opens; `--no-tray` stays in the terminal).
+
+The original Harness update banner appears right after an update is recorded,
+every two hours from its update time, and on every full page reload.
+Dismiss / X or a successful updater check closes the current occurrence; the
+two-hour schedule continues. Unchanged release checks do not record a new update. Switching projects keeps it closed until the next slot, and close
+events reach other GUI ports of the same OS user. Activating new code needs one
+normal GUI restart/reload; see [browser verification](docs/evidence/update-notice-repeat/README.md).
 
 ## Benchmarks
 
