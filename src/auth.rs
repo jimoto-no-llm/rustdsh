@@ -608,18 +608,40 @@ fn scan() -> Scan {
     scan_selected(None, None, None)
 }
 
+fn filter_external_credentials(
+    grants: &mut Vec<OauthGrant>,
+    keys: &mut Vec<ApiKey>,
+    provider: Option<&str>,
+    source: Option<&str>,
+    key_ref: Option<&str>,
+) {
+    if provider.is_none() && source.is_none() && key_ref.is_none() {
+        return;
+    }
+
+    // `--source` by itself selects both kinds of external login. Provider and
+    // ref selectors keep their existing type-specific behavior.
+    let include_grants = provider.is_some() || (source.is_some() && key_ref.is_none());
+    let include_keys = key_ref.is_some() || (source.is_some() && provider.is_none());
+    grants.retain(|g| {
+        include_grants
+            && provider.is_none_or(|v| v == g.provider)
+            && source.is_none_or(|v| v == g.from)
+    });
+    keys.retain(|k| {
+        include_keys
+            && key_ref.is_none_or(|v| v == k.name)
+            && source.is_none_or(|v| v == k.from)
+    });
+}
+
 fn scan_selected(provider: Option<&str>, source: Option<&str>, key_ref: Option<&str>) -> Scan {
     let mut grants: Vec<OauthGrant> = Vec::new();
     let mut keys: Vec<ApiKey> = Vec::new();
     let mut notes: Vec<String> = Vec::new();
     scan_codex(&mut grants, &mut keys);
     scan_opencode(&mut grants, &mut notes);
-    if provider.is_some() || source.is_some() || key_ref.is_some() {
-        grants.retain(|g| {
-            provider == Some(g.provider.as_str()) && source.is_none_or(|v| v == g.from)
-        });
-        keys.retain(|k| key_ref == Some(k.name.as_str()) && source.is_none_or(|v| v == k.from));
-    }
+    filter_external_credentials(&mut grants, &mut keys, provider, source, key_ref);
     let path = creds_path();
     let doc = load_doc(&path);
     let creds_mtime = mtime_ms(&path);
@@ -1504,6 +1526,75 @@ mod tests {
         let tok = "eyJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3OTE3MDg4MDJ9.sig";
         assert_eq!(jwt_exp_ms(tok), Some(1791708802000));
         assert!(jwt_exp_ms("not-a-jwt").is_none());
+    }
+
+    fn test_grant(provider: &str, from: &str) -> OauthGrant {
+        OauthGrant {
+            provider: provider.to_string(),
+            access: "fixture-access".to_string(),
+            refresh: "fixture-refresh".to_string(),
+            expires: None,
+            account_id: None,
+            from: from.to_string(),
+            src_mtime_ms: 0,
+        }
+    }
+
+    fn test_key(name: &str, from: &str) -> ApiKey {
+        ApiKey {
+            name: name.to_string(),
+            value: "fixture-key".to_string(),
+            from: from.to_string(),
+        }
+    }
+
+    #[test]
+    fn source_only_filter_includes_matching_grants_and_keys() {
+        let mut grants = vec![
+            test_grant("openai-codex", "codex"),
+            test_grant("anthropic", "opencode"),
+        ];
+        let mut keys = vec![
+            test_key("OPENAI_API_KEY", "codex"),
+            test_key("ANTHROPIC_API_KEY", "opencode"),
+        ];
+
+        filter_external_credentials(&mut grants, &mut keys, None, Some("codex"), None);
+
+        assert_eq!(grants.len(), 1);
+        assert_eq!(grants[0].provider, "openai-codex");
+        assert_eq!(keys.len(), 1);
+        assert_eq!(keys[0].name, "OPENAI_API_KEY");
+    }
+
+    #[test]
+    fn provider_and_ref_selectors_keep_credentials_typed() {
+        let mut grants = vec![
+            test_grant("openai-codex", "codex"),
+            test_grant("anthropic", "opencode"),
+        ];
+        let mut keys = vec![
+            test_key("OPENAI_API_KEY", "codex"),
+            test_key("ANTHROPIC_API_KEY", "opencode"),
+        ];
+
+        filter_external_credentials(&mut grants, &mut keys, None, None, Some("OPENAI_API_KEY"));
+        assert!(grants.is_empty(), "--ref must not include OAuth grants");
+        assert_eq!(keys.len(), 1);
+        assert_eq!(keys[0].name, "OPENAI_API_KEY");
+
+        let mut grants = vec![
+            test_grant("openai-codex", "codex"),
+            test_grant("anthropic", "opencode"),
+        ];
+        let mut keys = vec![
+            test_key("OPENAI_API_KEY", "codex"),
+            test_key("ANTHROPIC_API_KEY", "opencode"),
+        ];
+        filter_external_credentials(&mut grants, &mut keys, Some("openai-codex"), None, None);
+        assert_eq!(grants.len(), 1);
+        assert_eq!(grants[0].provider, "openai-codex");
+        assert!(keys.is_empty(), "--provider must not include API keys");
     }
 
     #[test]
