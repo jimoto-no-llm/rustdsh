@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
 import { spawnOwnedProcess } from "../process-scope.mjs";
@@ -13,6 +14,12 @@ import { startDashboard } from "../server.mjs";
 import net from "node:net";
 const fixture = fileURLToPath(
   new URL("./fixtures/owned-tree.mjs", import.meta.url),
+);
+const supervisor = fileURLToPath(
+  new URL("../process-scope-supervisor.mjs", import.meta.url),
+);
+const largeOutputFixture = fileURLToPath(
+  new URL("./fixtures/supervisor-stdout.mjs", import.meta.url),
 );
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 test("a Windows job cannot be confirmed empty when membership and accounting disagree", () => {
@@ -76,6 +83,131 @@ async function setup(t) {
   };
   return { root, rows, tree, own: (p) => owned.push(p) };
 }
+test(
+  "framed supervisor drains queued child output before input-close exit",
+  { skip: process.platform !== "linux" },
+  async (t) => {
+    const root = await fs.mkdtemp(
+        path.join(os.tmpdir(), "rdsh-framed-output-"),
+      ),
+      written = path.join(root, "written"),
+      exited = path.join(root, "exited"),
+      expected = Buffer.alloc(4 * 1024 * 1024, 0x61),
+      child = spawn(process.execPath, [supervisor], {
+        cwd: root,
+        stdio: ["pipe", "pipe", "ignore"],
+      });
+    let buffer = "",
+      readyFrame = null,
+      monitorError = null;
+    const frames = [];
+    child.stdout.on("data", (chunk) => {
+      buffer += chunk.toString("utf8");
+      let newline;
+      while ((newline = buffer.indexOf("\n")) >= 0) {
+        const line = buffer.slice(0, newline);
+        buffer = buffer.slice(newline + 1);
+        const frame = JSON.parse(line);
+        frames.push(frame);
+        if (frame.type === "ready") {
+          readyFrame = frame;
+          child.stdout.pause();
+        } else if (frame.type === "monitor_error") monitorError = frame;
+      }
+    });
+    child.once("error", (error) => {
+      monitorError = error;
+    });
+    const closed = new Promise((resolve) =>
+      child.once("close", (code, signal) => resolve({ code, signal })),
+    );
+    t.after(async () => {
+      if (child.exitCode === null && child.signalCode === null) {
+        child.stdout.resume();
+        child.stdin.end();
+        let timer;
+        await Promise.race([
+          closed,
+          new Promise((resolve) => {
+            timer = setTimeout(resolve, 5000);
+          }),
+        ]);
+        clearTimeout(timer);
+        if (child.exitCode === null && child.signalCode === null)
+          child.kill("SIGKILL");
+      }
+      await fs.rm(root, { recursive: true, force: true });
+    });
+    const send = (frame) => child.stdin.write(JSON.stringify(frame) + "\n"),
+      exists = async (file) =>
+        fs
+          .access(file)
+          .then(() => true)
+          .catch(() => false);
+    send({
+      op: "start",
+      owner_id: "owner_" + randomUUID(),
+      command: [process.execPath, largeOutputFixture, written, exited],
+      cwd: root,
+      env: { PATH: process.env.PATH },
+      framed: true,
+    });
+    await waitFor(() => Promise.resolve(readyFrame || monitorError));
+    assert(readyFrame, "Framed supervisor did not become ready");
+    send({ id: 1, op: "release" });
+    await waitFor(() => exists(written));
+    await waitFor(() => exists(exited));
+    child.stdin.end();
+    await pause(500);
+    const exitedBeforeDrain = child.exitCode !== null;
+    child.stdout.resume();
+    let closeTimer;
+    let result;
+    try {
+      result = await Promise.race([
+        closed,
+        new Promise((_, reject) => {
+          closeTimer = setTimeout(
+            () =>
+              reject(
+                new Error(
+                  "Framed supervisor did not exit after output drain",
+                ),
+              ),
+            15000,
+          );
+        }),
+      ]);
+    } finally {
+      clearTimeout(closeTimer);
+    }
+    assert.equal(buffer, "");
+    const output = Buffer.concat(
+      frames
+        .filter((frame) => frame.type === "stdout")
+        .map((frame) => Buffer.from(frame.data, "base64")),
+    );
+    assert.equal(exitedBeforeDrain, false);
+    assert.equal(result.code, 0);
+    assert.deepEqual(output, expected);
+    t.diagnostic(
+      JSON.stringify({
+        expected_bytes: expected.length,
+        received_bytes: output.length,
+        exited_before_drain: exitedBeforeDrain,
+        exit_code: result.code,
+      }),
+    );
+    assert(
+      frames.some(
+        (frame) =>
+          frame.type === "response" &&
+          frame.id === 1 &&
+          frame.result?.released === true,
+      ),
+    );
+  },
+);
 test("owned children and detached grandchildren stop in order after a bounded graceful deadline, with duplicate requests sharing one result", async (t) => {
   const { tree, rows } = await setup(t),
     { p, trace, stages } = await tree("detached");

@@ -1,0 +1,4 @@
+Scenario: the Linux framed supervisor receives 4 MiB of child stdout while its parent pauses the control-output reader through input-close cleanup.
+
+- Before: immediate process.exit(0) could discard queued frames before the parent resumed reading.
++ After: received_bytes=4194304, exited_before_drain=false, exit_code=0; the regression test asserts byte-for-byte equality.
