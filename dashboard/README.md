@@ -21,6 +21,9 @@ explicit interruption with native proof, and honest unsupported-steer fallback.
 [Task preflight](../docs/TASK-PREFLIGHT.md) checks the required CLI, cwd, disk,
 port, dependencies, GPU/WSL and selected authentication before an ACP session.
 
+[Resource admission](../docs/RESOURCE-ADMISSION.md) reserves local CPU, memory,
+heavy-build slots and ports before a managed build or test command starts.
+
 [Durable run recovery](../docs/RUN-RECOVERY.md) records control request/ack IDs
 and separates recorded run state, root-process observations and UI connectivity.
 

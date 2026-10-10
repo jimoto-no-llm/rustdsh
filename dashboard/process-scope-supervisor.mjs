@@ -36,7 +36,7 @@ input.on("line", (line) => {
         scope = await (process.platform === "linux"
           ? linuxScope(frame, stdio)
           : process.platform === "win32" && !frame.framed
-            ? windowsScope(frame)
+            ? windowsScope(frame, frame.defer_start === true)
             : Promise.reject(new Error()));
         scope.child.on("exit", (code, signal) =>
           send({ type: "root_exit", code, signal }),
@@ -57,6 +57,7 @@ input.on("line", (line) => {
             observation.status === "observed" ? observation.identity : null,
           kind: scope.kind,
           kernel_id: scope.kernel_id,
+          scope_path: scope.scope_path ?? null,
         });
         return;
       }
@@ -71,8 +72,15 @@ input.on("line", (line) => {
       }
       let result;
       if (frame.op === "release") {
-        await scope.release();
-        result = { released: true };
+        const released = await scope.release();
+        const observation = await readProcessIdentity(scope.child.pid);
+        result = {
+          released: true,
+          ...(released && typeof released === "object" ? released : {}),
+          root_pid: scope.child.pid,
+          root_identity:
+            observation.status === "observed" ? observation.identity : null,
+        };
       } else if (frame.op === "snapshot") result = await scope.snapshot();
       else if (frame.op === "term") result = await scope.term();
       else if (frame.op === "kill") result = await scope.kill();
