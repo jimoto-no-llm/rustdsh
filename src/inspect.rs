@@ -963,18 +963,12 @@ fn open_session_file(
     }
     #[cfg(windows)]
     {
-        use std::os::windows::fs::{MetadataExt, OpenOptionsExt};
-        const FILE_FLAG_OPEN_REPARSE_POINT: u32 = 0x0020_0000;
-        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0000_0400;
-        let file = std::fs::OpenOptions::new()
-            .read(true)
-            .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT)
-            .open(&path)
-            .ok()?;
-        let metadata = file.metadata().ok()?;
-        (metadata.is_file()
-            && metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT == 0)
-        .then_some(file)
+        // FILE_FLAG_OPEN_REPARSE_POINT protects only the leaf. Opening the
+        // absolute path can still follow a parent junction swapped after
+        // enumeration, so refuse Windows session measurements until every
+        // component can be opened beneath a trusted directory handle.
+        let _ = (root, path);
+        None
     }
     #[cfg(not(any(unix, windows)))]
     {
@@ -1603,7 +1597,9 @@ mod tests {
         // buffered `zstd -dc` byte count (covered by the old-vs-new diff).
         // A CLI-compressed file (seekable input carries FCS) proves the
         // header path against a real encoder. Skips without fixtures/CLI.
-        if !zstd_available() {
+        // Windows session reads fail closed until the path can be opened
+        // beneath trusted directory handles without following parent junctions.
+        if cfg!(windows) || !zstd_available() {
             return;
         }
         let dir = std::env::temp_dir();
@@ -1664,6 +1660,59 @@ mod tests {
             }
         }
         assert!(checked > 0, "expected real session fixtures");
+    }
+}
+
+#[cfg(all(test, windows))]
+mod measurement_gate_windows_tests {
+    use super::open_session_file;
+    use std::path::Path;
+
+    fn create_junction(link: &Path, target: &Path) {
+        let link = link.to_string_lossy().replace('\'', "''");
+        let target = target.to_string_lossy().replace('\'', "''");
+        let command = format!(
+            "New-Item -ItemType Junction -Path '{link}' -Target '{target}' | Out-Null"
+        );
+        let result = std::process::Command::new("powershell.exe")
+            .arg("-NoProfile")
+            .arg("-NonInteractive")
+            .arg("-Command")
+            .arg(command)
+            .output()
+            .expect("start PowerShell to create junction race fixture");
+        assert!(
+            result.status.success(),
+            "New-Item Junction failed: {}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+    }
+
+    #[test]
+    fn parent_junction_replaced_after_enumeration_is_never_opened() {
+        let dir = std::env::temp_dir().join(format!(
+            "rdsh-measure-junction-race-{}",
+            crate::local_http::random_token().unwrap()
+        ));
+        let sessions = dir.join("sessions");
+        let project = sessions.join("project");
+        let session = project.join("session");
+        let enumerated_path = session.join("history.zstd");
+        let outside = dir.join("outside-session");
+        std::fs::create_dir_all(&session).unwrap();
+        std::fs::create_dir_all(&outside).unwrap();
+        std::fs::write(&enumerated_path, b"enumerated in trusted session").unwrap();
+        std::fs::write(outside.join("history.zstd"), b"outside data").unwrap();
+        let trusted_root = std::fs::canonicalize(&sessions).unwrap();
+
+        // Keep the path returned by enumeration, then replace its parent with
+        // a junction before the no-follow open is attempted.
+        std::fs::rename(&session, project.join("session-before-swap")).unwrap();
+        create_junction(&session, &outside);
+        assert!(open_session_file(&trusted_root, &enumerated_path).is_none());
+
+        std::fs::remove_dir(&session).unwrap();
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }
 
