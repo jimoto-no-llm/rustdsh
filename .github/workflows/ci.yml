@@ -129,6 +129,9 @@ jobs:
           $setup = ./target/debug/rdsh.exe setup --json | Out-String
           if ($setup -notmatch '"needed":true') { throw 'setup should report needed on first run' }
           ./target/debug/rdsh.exe doctor
+      - if: '! matrix.regress'
+        shell: bash
+        run: BIN=./target/debug/rdsh.exe bash tests/regress.sh --windows-installer-delegation
 
   browser-e2e:
     runs-on: ubuntu-latest
