@@ -111,6 +111,7 @@ jobs:
         run: |
           printf '#!/bin/sh\necho stub-dsh $@' > /tmp/stub-dsh && chmod +x /tmp/stub-dsh
           BIN=./target/debug/rdsh DSH_ORIG_BIN=/tmp/stub-dsh sh tests/regress.sh
+          BIN=./target/debug/rdsh sh tests/context_prototype.sh
       - if: '! matrix.regress'
         shell: pwsh
         run: |
