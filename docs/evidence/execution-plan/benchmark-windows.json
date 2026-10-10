@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "platform": "win32",
+  "node": "v24.18.0",
+  "scope": "20 original Workflow start/result/disposal operations; synthetic provider with 5ms delay; no dependencies/acceptance criteria; Node boot excluded, guest parsing and durable local audit included; no network/inference claim",
+  "before": {
+    "count": 20,
+    "median_ms": 6.480700000000013,
+    "p95_ms": 8.761099999999999,
+    "total_ms": 137.2535000000001
+  },
+  "after": {
+    "count": 20,
+    "median_ms": 34.70190000000002,
+    "p95_ms": 37.45399999999995,
+    "total_ms": 692.8824000000002
+  },
+  "added_median_ms": 28.22120000000001,
+  "source_head": "b9059072dc8117c940e333917397e2c17c7e6bbb",
+  "base_head": "7a7435b292497bd9992e63bf900bd20ffa97f999"
+}

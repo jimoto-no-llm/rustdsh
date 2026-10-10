@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node browser.mjs && node update-banner.mjs",
+    "test": "node browser.mjs && node update-banner.mjs && node execution-plan.mjs",
+    "test:plans": "node execution-plan.mjs",
     "test:harness": "node harness-settings.mjs",
     "test:updates": "node update-banner.mjs"
   },

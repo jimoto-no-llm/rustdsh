@@ -1,0 +1,82 @@
+TAP version 13
+# Subtest: audited source rejects changed bytes and leaves original packages intact
+ok 1 - audited source rejects changed bytes and leaves original packages intact
+  ---
+  duration_ms: 690.0658
+  type: 'test'
+  ...
+# Subtest: native Workflow result and task done alone do not start a dependent child
+ok 2 - native Workflow result and task done alone do not start a dependent child
+  ---
+  duration_ms: 745.2751
+  type: 'test'
+  ...
+# Subtest: native parallel children cannot exceed durable concurrency
+ok 3 - native parallel children cannot exceed durable concurrency
+  ---
+  duration_ms: 598.8329
+  type: 'test'
+  ...
+# Subtest: native duplicate and undeclared task starts are refused before provider
+ok 4 - native duplicate and undeclared task starts are refused before provider
+  ---
+  duration_ms: 838.5666
+  type: 'test'
+  ...
+# Subtest: missing metadata, direct subagent and continuable entry points fail closed
+ok 5 - missing metadata, direct subagent and continuable entry points fail closed
+  ---
+  duration_ms: 1187.3955
+  type: 'test'
+  ...
+# Subtest: providers outside the audited in-process spawn seam are rejected before factory
+ok 6 - providers outside the audited in-process spawn seam are rejected before factory
+  ---
+  duration_ms: 506.6604
+  type: 'test'
+  ...
+# Subtest: persisted native delegation depth and parent identity are checked before start
+ok 7 - persisted native delegation depth and parent identity are checked before start
+  ---
+  duration_ms: 830.9216
+  type: 'test'
+  ...
+# Subtest: native failure stops further starts and failed disposal keeps a held claim
+ok 8 - native failure stops further starts and failed disposal keeps a held claim
+  ---
+  duration_ms: 1122.5016
+  type: 'test'
+  ...
+# Subtest: deadline is checked after guest body begins and before native provider dispatch
+ok 9 - deadline is checked after guest body begins and before native provider dispatch
+  ---
+  duration_ms: 2166.9472
+  type: 'test'
+  ...
+# Subtest: native cancellation preserves the Workflow disposal lifecycle
+ok 10 - native cancellation preserves the Workflow disposal lifecycle
+  ---
+  duration_ms: 534.0542
+  type: 'test'
+  ...
+# Subtest: tracked ACP resume attaches the guard before send and leaves default process behavior unchanged
+ok 11 - tracked ACP resume attaches the guard before send and leaves default process behavior unchanged
+  ---
+  duration_ms: 1957.1884
+  type: 'test'
+  ...
+# Subtest: losing the bound index blocks attachment rather than resuming without enforcement
+ok 12 - losing the bound index blocks attachment rather than resuming without enforcement
+  ---
+  duration_ms: 264.8499
+  type: 'test'
+  ...
+1..12
+# tests 12
+# suites 0
+# pass 12
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 11623.5238

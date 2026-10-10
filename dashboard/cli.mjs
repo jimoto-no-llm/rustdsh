@@ -15,6 +15,7 @@ import { RetryHistory } from "./retry.mjs";
 import { probeCliWithRetry } from "./retry-probe.mjs";
 import { Checkpoints } from "./checkpoints.mjs";
 import { AcceptanceStore } from "./acceptance.mjs";
+import { ExecutionPlans } from "./execution-plan.mjs";
 import { ModelRouting } from "./model-routing.mjs";
 import { requestedSelection, validSelection } from "./model-selection.mjs";
 import { ReplyConsumer } from "./reply-consumer.mjs";
@@ -55,6 +56,9 @@ rdsh-dashboard run-history list|inspect|events --project <directory> [--run-id <
 rdsh-dashboard retry-history list|inspect --project <directory> [--operation-id <id>]
 rdsh-dashboard checkpoint record|list|inspect|resume|start-new --project <directory> [--run-id <id>] [--checkpoint-id <id>] [--executable <original-dsh>] [--entrypoint <bin.js>] [--verify-native] [--retry-operation-id <id>] [--summary-file <file> --accept-context-loss]
 rdsh-dashboard acceptance define|run|report|inspect --project <directory> --task-id <id> [--criterion-id <id>] [--criteria-file <json>] [--argv-file <json>] [--result-file <json>] [--scope full|partial] [--timeout-ms <ms>] [--image <relative-path>]
+rdsh-dashboard plan define --project <directory> --input-file <json>
+rdsh-dashboard plan enforce --project <directory> --plan-id <id> --run-id <confirmed-run>
+rdsh-dashboard plan inspect|stop --project <directory> [--plan-id <id>]
 rdsh-dashboard routing bind|inspect|probe|allow-change --project <directory> --run-id <id> [--route-file <json>] [--authorization-file <json>] [--executable <original-dsh>] [--entrypoint <bin.js>]
 rdsh-dashboard session-ledger list|record|resolve|start|resume --project <directory> [--run-id <run_id>] [--task-id <id>] [--session-id <id>] [--label <name>] [--provider <name>] [--cwd <directory>] [--cli <name>] [--executable <original-dsh>] [--entrypoint <bin.js>]
 rdsh-dashboard reply-consumer inspect|once|serve --project <directory> [--run-id <run_id>] [--command-id <reply_id>] [--executable <original-dsh>] [--entrypoint <bin.js>]
@@ -104,6 +108,7 @@ const { values, positionals } = parseArgs({
     executable: { type: "string" },
     entrypoint: { type: "string" },
     "run-id": { type: "string" },
+    "plan-id": { type: "string" },
     "task-id": { type: "string" },
     "session-id": { type: "string" },
     label: { type: "string" },
@@ -368,8 +373,50 @@ try {
     )
   )
     throw new Error("Model route options require routing");
+  if (command !== "plan" && values["plan-id"] !== undefined)
+    throw new Error("Plan options require plan");
   if (values.help || !command) {
     console.log(help);
+  } else if (command === "plan") {
+    const action = positionals[1],
+      allowed = new Set(["project", "plan-id", "run-id", "input-file", "help"]);
+    if (
+      positionals.length !== 2 ||
+      !["define", "enforce", "inspect", "stop"].includes(action) ||
+      Object.keys(values).some((key) => !allowed.has(key))
+    )
+      throw new Error(
+        "Specify plan define, enforce, inspect or stop with supported options",
+      );
+    const project = await identity(values.project || process.cwd()),
+      plans = ExecutionPlans.open(project);
+    let result;
+    if (action === "define") {
+      if (!values["input-file"] || values["run-id"] || values["plan-id"])
+        throw new Error("plan define requires only --input-file");
+      result = await plans.define(await localJson(values["input-file"]));
+    } else if (action === "enforce") {
+      if (!values["plan-id"] || !values["run-id"] || values["input-file"])
+        throw new Error("plan enforce requires --plan-id and --run-id");
+      result = await plans.enforce(
+        values["plan-id"],
+        await (await SessionLedger.open(project)).resolve(values["run-id"]),
+      );
+    } else {
+      if (
+        values["input-file"] ||
+        values["run-id"] ||
+        (action === "stop" && !values["plan-id"])
+      )
+        throw new Error(
+          "plan inspect/stop accepts an exact --plan-id; stop requires it",
+        );
+      result =
+        action === "stop"
+          ? await plans.stop(values["plan-id"])
+          : await plans.inspect(values["plan-id"] ?? null);
+    }
+    console.log(JSON.stringify(result, null, 2));
   } else if (command === "release") {
     const action = positionals[1];
     const allowed = new Set([

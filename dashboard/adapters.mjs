@@ -205,6 +205,19 @@ class CliAdapter extends EventEmitter {
         boundary:
           "opt_in_native_llm_stream_and_attachment_launch; not_unwrapped_CLIs",
       },
+      plan_enforcement: {
+        supported: Boolean(
+          ready &&
+            this.nativePlanGuard?.status === "native_workflow_admission_loaded",
+        ),
+        status:
+          ready &&
+          this.nativePlanGuard?.status === "native_workflow_admission_loaded"
+            ? "native_workflow_admission_loaded"
+            : "not_attested",
+        boundary:
+          "opt_in_original_workflow_and_subagent_start; not_unwrapped_CLIs",
+      },
       interrupt_ack:
         "notification sent; confirmed only by cancelled prompt result",
       stop_scope: this.ownedScope?.state ?? null,
@@ -236,7 +249,7 @@ class CliAdapter extends EventEmitter {
         kill: {
           supported: Boolean(
             this.ownedScope &&
-            ["running", "stopping"].includes(this.ownedScope.state.status),
+              ["running", "stopping"].includes(this.ownedScope.state.status),
           ),
           method: this.ownedScope?.descriptor.kind ?? null,
           deadline_ms: this.stopTimeout,

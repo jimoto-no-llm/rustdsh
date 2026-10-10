@@ -1,0 +1,30 @@
+{
+  "result": "PASS",
+  "scope": "actual project HTTP+browser+current-source acceptance checks; native engine/provider admission is tested separately; no model/profile/credentials/Tailscale",
+  "page_errors": [],
+  "flows": [
+    "cycle/unknown-node blockers and dependency buttons navigate to exact node or missing-node explanation",
+    "real full local acceptance changes dependent task from waiting to candidate; graph page and expanded state survive independent refresh",
+    "120-node graph stays collapsed until requested and renders at most 50 rows per page",
+    "browser stop persists server state without cancelling native children",
+    "390px mobile viewport has no horizontal overflow"
+  ],
+  "measurements": {
+    "blocker_navigation_ms": 29.89969999999994,
+    "total_nodes": 120,
+    "maximum_rendered_rows": 50,
+    "independent_plan_refresh_ms": 4595.337799999999
+  },
+  "screenshots": [
+    "before-main-task-table.png",
+    "after-collapsed.png",
+    "after-dependency-wait.png",
+    "after-last-page.png",
+    "after-verified-prerequisite.png",
+    "after-stop.png",
+    "after-mobile.png"
+  ],
+  "baseline": "actual previous main HTML/app modules over the same isolated current backend; frontend comparison only",
+  "source_head": "b9059072dc8117c940e333917397e2c17c7e6bbb",
+  "base_head": "7a7435b292497bd9992e63bf900bd20ffa97f999"
+}

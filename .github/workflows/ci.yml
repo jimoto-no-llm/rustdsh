@@ -10,6 +10,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  plan-runtime-native:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: [22, 24]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm ci --prefix dashboard
+      - name: Install only public native test dependencies
+        run: npm install --prefix "${{ runner.temp }}/rdsh-plan-native" --ignore-scripts --no-audit --no-fund @deepseek-ai/dsh-workflow-ptc@0.2.0-rc.2 @deepseek-ai/dsh-subagent@0.2.0-rc.2 @deepseek-ai/dsh-subagent-spawn-in-process@0.2.0-rc.2 @deepseek-ai/cordis@4.0.4
+      - if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo systemd-run --unit="rdsh-plan-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --wait --pipe --collect --property=Delegate=yes \
+            --property=DelegateSubgroup=supervisor --uid="$(id -u)" \
+            --working-directory="$PWD" /usr/bin/env HOME="$HOME" PATH="$PATH" \
+            RDSH_TEST_PLAN_PACKAGE="$RUNNER_TEMP/rdsh-plan-native/package.json" \
+            node --test tests/plan-runtime-native.test.mjs
+      - if: runner.os == 'Windows'
+        run: node --test tests/plan-runtime-native.test.mjs
+        env:
+          RDSH_TEST_PLAN_PACKAGE: ${{ runner.temp }}/rdsh-plan-native/package.json
+
   msrv:
     runs-on: ubuntu-latest
     steps:
@@ -111,7 +140,7 @@ jobs:
         run: |
           printf '#!/bin/sh\necho stub-dsh $@' > /tmp/stub-dsh && chmod +x /tmp/stub-dsh
           BIN=./target/debug/rdsh DSH_ORIG_BIN=/tmp/stub-dsh sh tests/regress.sh
-      - if: '! matrix.regress'
+      - if: "! matrix.regress"
         shell: pwsh
         run: |
           ./tests/installer-security.ps1

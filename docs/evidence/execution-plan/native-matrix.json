@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "result": "PASS",
+  "source_head": "b9059072dc8117c940e333917397e2c17c7e6bbb",
+  "native_test_head": "e1d3405242a12e222be738b1eb978e07e36b5b60",
+  "scope": "runtime unchanged; three native test/fixture files corrected after timing-dependent CI failures",
+  "windows_node22": {
+    "node": "v22.23.3",
+    "tests": 12,
+    "pass": 12,
+    "fail": 0,
+    "skipped": 0
+  },
+  "windows_node24": {
+    "node": "v24.18.0",
+    "tests": 12,
+    "pass": 12,
+    "fail": 0,
+    "skipped": 0
+  },
+  "linux_node22": {
+    "node": "v22.23.3",
+    "tests": 12,
+    "pass": 12,
+    "fail": 0,
+    "skipped": 0
+  },
+  "linux_node24": {
+    "node": "v24.21.0",
+    "tests": 12,
+    "pass": 12,
+    "fail": 0,
+    "skipped": 0
+  },
+  "initial_ci": {
+    "head": "79056915359dc763f8121ddf22cf13a577404c9b",
+    "linux_node22": "cancellation timer could fire before child factory",
+    "windows_node22": "cumulative starts were incorrectly asserted as concurrency; a completed/disposed child correctly releases a slot"
+  },
+  "correction": [
+    "keep concurrent synthetic children pending until original Workflow disposal, record actual maximum active handles and assert exactly two while third is refused",
+    "cancel after original host childResult subscribes to a published child; remove 100ms timer"
+  ],
+  "outputs": [
+    {
+      "path": "native-windows-node22.txt",
+      "sha256": "978cef0ce43cfba8ef8e1bd72a664621dc366b45e954cb293f8b61d512729450"
+    },
+    {
+      "path": "native-linux-node22.txt",
+      "sha256": "3fa6ab0a5bdaf845b101f288be8d508d69f949aa698142079108f9757b92ea03"
+    },
+    {
+      "path": "native-linux-node24.txt",
+      "sha256": "13019179c9ca4374de752785bc8d2bc11a63bb28f90af033166db3afd3319220"
+    }
+  ],
+  "full_runtime_qa": "verification.json"
+}

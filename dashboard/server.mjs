@@ -16,6 +16,7 @@ import { AnswerApplicationServer } from "./answer-application-server.mjs";
 import { BudgetAdmissionServer } from "./budget-server.mjs";
 import { createHistoryBackup, backupMaximum } from "./history-backup.mjs";
 import { AcceptanceStore } from "./acceptance.mjs";
+import { ExecutionPlans } from "./execution-plan.mjs";
 import {
   ConnectionObservations,
   connectionReport,
@@ -438,6 +439,7 @@ export async function startDashboard(options) {
           route === "/instruction-queue-ui.mjs" ||
           route === "/cost-ledger-ui.mjs" ||
           route === "/budget-ui.mjs" ||
+          route === "/execution-plan-ui.mjs" ||
           route === "/favicon.ico" ||
           route === "/icon.png" ||
           route === "/icon.svg");
@@ -535,6 +537,7 @@ export async function startDashboard(options) {
           "/instruction-queue-ui.mjs",
           "/cost-ledger-ui.mjs",
           "/budget-ui.mjs",
+          "/execution-plan-ui.mjs",
         ].includes(route)
       ) {
         res.writeHead(200, {
@@ -575,6 +578,23 @@ export async function startDashboard(options) {
         return res.end(svg);
       }
       if (kind === "project") {
+        if (req.method === "GET" && route === "/api/plans")
+          return json(res, 200, await ExecutionPlans.open(project).inspect());
+        if (req.method === "POST" && route === "/api/plans/stop") {
+          if (!adminAuthorized && !humanAuthorized)
+            return json(res, 403, {
+              error: "Human browser or administrator required",
+            });
+          const input = await readBody(req);
+          if (
+            !input ||
+            Object.keys(input).length !== 1 ||
+            typeof input.plan_id !== "string"
+          )
+            return json(res, 400, { error: "An exact plan_id is required" });
+          await ExecutionPlans.open(project).stop(input.plan_id);
+          return json(res, 200, await ExecutionPlans.open(project).inspect());
+        }
         if (req.method === "POST" && route?.startsWith("/api/backup/")) {
           if (
             !adminAuthorized ||

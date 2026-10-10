@@ -1,0 +1,41 @@
+{
+  "result": "PASS",
+  "scope": "original nested Workflow and SubagentRuntime; synthetic spawn factory/transport; no actual models or profile boot",
+  "native_depths": [
+    1,
+    2
+  ],
+  "phases": [
+    "finished",
+    "finished"
+  ],
+  "parent_correlations_match": true,
+  "native_result": {
+    "outcome": {
+      "value": "",
+      "stopReason": "completed",
+      "agentsStarted": 1
+    },
+    "nestedOutcome": {
+      "value": "nested fixture",
+      "stopReason": "completed",
+      "agentsStarted": 1
+    },
+    "dispatches": [
+      {
+        "id": "native-branch-1",
+        "parent_id": "native-root"
+      },
+      {
+        "id": "native-branch-2",
+        "parent_id": "native-branch-1"
+      }
+    ],
+    "disposals": [
+      "native-branch-2",
+      "native-branch-1"
+    ]
+  },
+  "source_head": "b9059072dc8117c940e333917397e2c17c7e6bbb",
+  "base_head": "7a7435b292497bd9992e63bf900bd20ffa97f999"
+}

@@ -1,0 +1,151 @@
+{
+  "schema": 1,
+  "result": "PASS",
+  "source_head": "b9059072dc8117c940e333917397e2c17c7e6bbb",
+  "scope": "same original native Workflow/SubagentRuntime services, guard absent versus explicitly bound; synthetic provider and PTC transport, no actual models",
+  "duplicate": {
+    "before": {
+      "workflow_script": "return await parallel([() => agent(\"same\", {}), () => agent(\"same\", {})]);",
+      "parent_result": null,
+      "native_output": {
+        "scenario": "concurrent",
+        "dispatches": [
+          {
+            "id": "native-cf5afe30-2bb3-4870-8f2b-1f6d7f17ab70",
+            "parent_id": "native-root"
+          },
+          {
+            "id": "native-bb663584-7003-4d08-a0e4-63800cf8dd2e",
+            "parent_id": "native-root"
+          }
+        ],
+        "disposals": [
+          "native-cf5afe30-2bb3-4870-8f2b-1f6d7f17ab70",
+          "native-bb663584-7003-4d08-a0e4-63800cf8dd2e"
+        ],
+        "outcome": {
+          "value": [
+            "fixture output",
+            "fixture output"
+          ],
+          "stopReason": "completed",
+          "agentsStarted": 2
+        },
+        "error": null,
+        "timings_ms": [
+          86.66609999999999
+        ]
+      },
+      "claims": []
+    },
+    "after": {
+      "workflow_script": "return await parallel([() => agent(\"same\", {rdshTaskId:\"a\"}), () => agent(\"same\", {rdshTaskId:\"a\"})]);",
+      "parent_result": null,
+      "native_output": {
+        "scenario": "concurrent",
+        "dispatches": [
+          {
+            "id": "native-49c541cc-6c66-48b4-919e-23b7fe0f2add",
+            "parent_id": "native-root"
+          }
+        ],
+        "disposals": [
+          "native-49c541cc-6c66-48b4-919e-23b7fe0f2add"
+        ],
+        "outcome": {
+          "value": null,
+          "stopReason": "error",
+          "agentsStarted": 2,
+          "error": "WorkflowError: agent() could not start a child: Error: Execution plan: task_already_claimed\n    at ExecutionPlans.admit (file:///M:/Codex/home/worktrees/rereview-auth-sharing/rustdsh/dashboard/execution-plan.mjs:629:32)\n    at async Object.subagent (file:///M:/Codex/home/worktrees/rereview-auth-sharing/rustdsh/dashboard/plan-runtime.mjs:51:21)\n    at async PtcWorkflowRun.startChild (file:///M:/Codex/home/visualizations/2026/10/05/01a10bb7-51d5-7e63-8aa9-7076c293270f/issue15-native-runtime/node_modules/@deepseek-ai/dsh-workflow-ptc/lib/index.js:330:15)\n    at WorkflowExecution.agent (dsh-workflow-guest.js:821:11)"
+        },
+        "error": null,
+        "timings_ms": [
+          115.58379999999997
+        ]
+      },
+      "claims": [
+        {
+          "task_id": "a",
+          "phase": "finished",
+          "outcome": "completed",
+          "native_depth": 1
+        }
+      ]
+    }
+  },
+  "dependency": {
+    "before": {
+      "workflow_script": "return await agent(\"dependent\", {});",
+      "parent_result": null,
+      "native_output": {
+        "scenario": "match",
+        "dispatches": [
+          {
+            "id": "native-46bf9c30-04a0-4ce1-bb82-eead81781f81",
+            "parent_id": "native-root"
+          }
+        ],
+        "disposals": [
+          "native-46bf9c30-04a0-4ce1-bb82-eead81781f81"
+        ],
+        "outcome": {
+          "value": "fixture output",
+          "stopReason": "completed",
+          "agentsStarted": 1
+        },
+        "error": null,
+        "timings_ms": [
+          12.7671
+        ]
+      },
+      "claims": []
+    },
+    "after": {
+      "workflow_script": "return await agent(\"dependent\", {rdshTaskId:\"b\"});",
+      "parent_result": {
+        "scenario": "match",
+        "dispatches": [
+          {
+            "id": "native-0cfe4437-d17b-4105-9622-6494a9cc484c",
+            "parent_id": "native-root"
+          }
+        ],
+        "disposals": [
+          "native-0cfe4437-d17b-4105-9622-6494a9cc484c"
+        ],
+        "outcome": {
+          "value": "fixture output",
+          "stopReason": "completed",
+          "agentsStarted": 1
+        },
+        "error": null,
+        "timings_ms": [
+          39.398300000000006
+        ]
+      },
+      "native_output": {
+        "scenario": "match",
+        "dispatches": [],
+        "disposals": [],
+        "outcome": {
+          "value": null,
+          "stopReason": "error",
+          "agentsStarted": 1,
+          "error": "WorkflowError: agent() could not start a child: Error: Execution plan: prerequisite_unverified\n    at ExecutionPlans.admit (file:///M:/Codex/home/worktrees/rereview-auth-sharing/rustdsh/dashboard/execution-plan.mjs:629:32)\n    at async Object.subagent (file:///M:/Codex/home/worktrees/rereview-auth-sharing/rustdsh/dashboard/plan-runtime.mjs:51:21)\n    at async PtcWorkflowRun.startChild (file:///M:/Codex/home/visualizations/2026/10/05/01a10bb7-51d5-7e63-8aa9-7076c293270f/issue15-native-runtime/node_modules/@deepseek-ai/dsh-workflow-ptc/lib/index.js:330:15)\n    at WorkflowExecution.agent (dsh-workflow-guest.js:821:11)"
+        },
+        "error": null,
+        "timings_ms": [
+          16.6276
+        ]
+      },
+      "claims": [
+        {
+          "task_id": "a",
+          "phase": "finished",
+          "outcome": "completed",
+          "native_depth": 1
+        }
+      ]
+    }
+  }
+}

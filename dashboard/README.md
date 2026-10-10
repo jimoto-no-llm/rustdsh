@@ -408,6 +408,16 @@ selection revisions, native qualification and recovery. This controls local
 managed runs; global updates, external user plugins and provider/billing adoption
 are separate.
 
+## Bounded dependency plans
+
+`plan define|inspect|enforce|stop` connects an explicit graph to a confirmed native
+run. Bound attachments enforce dependency checks, atomic task claims, concurrent
+and native branch-depth limits, total starts and stop conditions at the original
+Workflow/subagent boundary. The human dashboard shows blockers and expands large
+graphs on demand. See the [plan contract](../docs/BOUNDED-EXECUTION-PLANS.md) for
+task IDs, native spawn scope and recovery; task schema 1 and six MCP tools stay
+compatible.
+
 ## Validation
 
 ```sh

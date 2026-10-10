@@ -13,6 +13,7 @@ import { readProcessIdentity } from "./process-identity.mjs";
 import { trackAdapter } from "./tracked-adapter.mjs";
 import { ModelRouting } from "./model-routing.mjs";
 import { prepareBudgetAttachment } from "./budget-client.mjs";
+import { preparePlanAttachment } from "./plan-runtime.mjs";
 
 const exec = promisify(execFile);
 const scopeKeys = [
@@ -530,6 +531,22 @@ export async function attachRecordedSession({
           env,
         );
   if (budgetGuard) env = budgetGuard.env;
+  let planGuard;
+  try {
+    planGuard = await preparePlanAttachment(ledger.project, record, env);
+    if (planGuard) env = planGuard.env;
+  } catch (error) {
+    await budgetGuard?.close();
+    throw error;
+  }
+  const closeGuards = async () => {
+    const results = await Promise.allSettled([
+      budgetGuard?.close(),
+      planGuard?.close(),
+    ]);
+    const failure = results.find((result) => result.status === "rejected");
+    if (failure) throw failure.reason;
+  };
   let commandId;
   try {
     await history.register(record.run_id, record.cli_session_id);
@@ -540,7 +557,7 @@ export async function attachRecordedSession({
     await history.transition(record.run_id, "starting", "request_recorded");
     await history.commandPhase(commandId, "dispatched");
   } catch (error) {
-    await budgetGuard?.close();
+    await closeGuards();
     throw error;
   }
   let processBound = false;
@@ -584,23 +601,23 @@ export async function attachRecordedSession({
       },
     });
   } catch (error) {
-    await budgetGuard?.close();
+    await closeGuards();
     throw error;
   }
-  if (budgetGuard) {
+  if (budgetGuard || planGuard) {
     const originalStop = adapter.stop.bind(adapter);
     adapter.stop = async () => {
       try {
         return await originalStop();
       } finally {
-        await budgetGuard.close();
+        await closeGuards();
       }
     };
   }
   adapter.on("event", (event) => {
-    if (event.type === "process_exit" && budgetGuard)
+    if (event.type === "process_exit" && (budgetGuard || planGuard))
       exitWrites.pending.push(
-        budgetGuard.close().catch((error) => {
+        closeGuards().catch((error) => {
           exitWrites.error ||= error;
         }),
       );
@@ -625,6 +642,7 @@ export async function attachRecordedSession({
         : await adapter.resume(record.cli_session_id);
     await history.bindSession(record.run_id, attached.session_id);
     if (budgetGuard) adapter.nativeBudgetGuard = await budgetGuard.ready();
+    if (planGuard) adapter.nativePlanGuard = await planGuard.ready(adapter);
     await history.commandPhase(commandId, "acknowledged", "session_attached");
     const confirmed = await ledger.confirm(
       record.run_id,
@@ -648,6 +666,7 @@ export async function attachRecordedSession({
           if (sessionId !== confirmed.cli_session_id)
             throw new LedgerError("native_session_changed");
           if (budgetGuard) await budgetGuard.ready();
+          if (planGuard) await planGuard.ready(adapter);
           return ModelRouting.open(ledger.project).guard(confirmed, adapter);
         },
       ),

@@ -478,9 +478,8 @@ export function applyOperation(state, operation, input) {
       };
       state.events.push(event);
       // Full state and all feedback are durable; retain the latest 1000 display events.
-      // #15 dependencies (display-only): no DAG/claim fields in schema 1 by
-      // design. The UI collapses large graphs and shows only runnable items;
-      // concurrency/depth/stop limits are enforced by the caller's plan.
+    // #15 keeps DAG/claims in execution-plan.mjs beside task schema 1. Its
+    // opt-in native Workflow admission, rather than task reports, owns limits.
       state.events = state.events.slice(-1000);
       break;
     }
