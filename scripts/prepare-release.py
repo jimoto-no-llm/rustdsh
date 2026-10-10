@@ -132,6 +132,13 @@ def command_pipelines(code, powershell=False):
     quote = None
     index = 0
 
+    def line_continuation_end(position):
+        if position + 1 >= len(code) or code[position + 1] not in "\r\n":
+            return None
+        if code[position + 1] == "\r" and position + 2 < len(code) and code[position + 2] == "\n":
+            return position + 3
+        return position + 2
+
     def finish_word():
         if word:
             command.append("".join(word))
@@ -160,8 +167,12 @@ def command_pipelines(code, powershell=False):
                 index += 1
             elif ((powershell and quote == '"' and char == "`")
                   or (not powershell and quote == '"' and char == "\\")) and index + 1 < len(code):
-                word.append(code[index + 1])
-                index += 2
+                continuation_end = line_continuation_end(index)
+                if continuation_end is not None:
+                    index = continuation_end
+                else:
+                    word.append(code[index + 1])
+                    index += 2
             else:
                 word.append(char)
                 index += 1
@@ -170,8 +181,21 @@ def command_pipelines(code, powershell=False):
             quote = char
             index += 1
         elif ((powershell and char == "`") or (not powershell and char == "\\")) and index + 1 < len(code):
-            word.append(code[index + 1])
-            index += 2
+            continuation_end = line_continuation_end(index)
+            if continuation_end is not None:
+                index = continuation_end
+            else:
+                word.append(code[index + 1])
+                index += 2
+        elif char in "\r\n":
+            finish_word()
+            # A physical newline terminates a command, except after a pipeline
+            # operator where both shells allow the next pipeline stage to continue.
+            if command:
+                finish_pipeline()
+            index += 1
+            if char == "\r" and index < len(code) and code[index] == "\n":
+                index += 1
         elif char.isspace():
             finish_word()
             index += 1

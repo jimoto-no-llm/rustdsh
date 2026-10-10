@@ -289,6 +289,34 @@ class ReleaseMetadataTests(unittest.TestCase):
             with self.subTest(separator=separator):
                 release.validate(self.root, "v1.2.3-rc.1")
 
+    def test_candidate_installer_calls_on_new_lines_are_checked_independently(self):
+        extras = (
+            "```sh\n./install.sh --from-release --version=v1.2.3-rc.1\n"
+            "./install.sh --from-release\n```",
+            "```powershell\n./install.ps1 -FromRelease -Version v1.2.3-rc.1\n"
+            "./install.ps1 -FromRelease\n```",
+        )
+        for extra in extras:
+            notes = self.fixture("1.2.3-rc.1")
+            notes.write_text(notes.read_text(encoding="utf-8") + "\n" + extra + "\n", encoding="utf-8")
+            with self.subTest(extra=extra), self.assertRaisesRegex(ValueError, "matching this tag"):
+                release.validate(self.root, "v1.2.3-rc.1")
+
+    def test_candidate_installer_calls_on_new_lines_accept_pinned_calls(self):
+        extras = (
+            "```sh\n./install.sh --from-release --version=v1.2.3-rc.1\n"
+            "./install.sh --from-release --version=v1.2.3-rc.1\n```",
+            "```sh\ncurl https://github.com/org/repo/releases/download/v1.2.3-rc.1/install.sh |\n"
+            "  bash -s -- --from-release --version=v1.2.3-rc.1\n```",
+            "```powershell\n./install.ps1 -FromRelease -Version v1.2.3-rc.1\n"
+            "./install.ps1 -FromRelease -Version v1.2.3-rc.1\n```",
+        )
+        for extra in extras:
+            notes = self.fixture("1.2.3-rc.1")
+            notes.write_text(notes.read_text(encoding="utf-8") + "\n" + extra + "\n", encoding="utf-8")
+            with self.subTest(extra=extra):
+                release.validate(self.root, "v1.2.3-rc.1")
+
     def test_candidate_installer_commands_accept_line_continuations(self):
         notes = self.fixture("1.2.3-rc.1")
         text = notes.read_text(encoding="utf-8")
