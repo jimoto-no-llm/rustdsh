@@ -44,7 +44,8 @@ import {
   validateHistoryConflicts,
 } from "./history-backup.mjs";
 
-// Bucket D display notes (no schema change; schema stays 1):
+// Bucket D display notes preserve schema 1; explicit state migrations can move
+// legacy projects to schema 2 without changing nested extension schemas.
 // #12 task contract, #13 review inbox, #14 outcome cards, #15 dependencies.
 // Legacy field shapes remain unchanged. Optional question_contracts metadata
 // has its own schema and explicit revision contract (#40).
@@ -109,6 +110,12 @@ export class ProjectStore {
     return next;
   }
   static async open(project) {
+    try {
+      await fs.access(path.join(project.directory, "state-migration.lock"));
+      throw new Error("Dashboard state migration is in progress");
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
     let value;
     try {
       value = JSON.parse(
@@ -128,7 +135,11 @@ export class ProjectStore {
         feedback: [],
       };
     }
-    if (value.project.id !== project.id || value.schema !== 1)
+    if (
+      value.project.id !== project.id ||
+      ![1, 2].includes(value.schema) ||
+      (value.schema === 2 && !Array.isArray(value.changes))
+    )
       throw new Error(
         "Dashboard state belongs to a different project or version",
       );
@@ -162,6 +173,12 @@ export class ProjectStore {
     return structuredClone(result);
   }
   async commit(next, operation = null, input = {}) {
+    try {
+      await fs.access(path.join(this.project.directory, "state-migration.lock"));
+      throw new Error("Dashboard state migration is in progress");
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
     const historyChanged = next.history_backups !== this.protectedHistory;
     const historyIds = historyChanged
       ? validateRestoredHistory(next)
