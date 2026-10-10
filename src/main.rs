@@ -874,7 +874,7 @@ fn shadowing_original() -> bool {
     if invoked_as_dsh() {
         return true;
     }
-    let Ok(me) = std::env::current_exe().and_then(|path| std::fs::canonicalize(path)) else {
+    let Ok(me) = std::env::current_exe().and_then(std::fs::canonicalize) else {
         return false;
     };
     std::env::var_os("PATH").is_some_and(|path| path_shadows_current(&path, &me))
