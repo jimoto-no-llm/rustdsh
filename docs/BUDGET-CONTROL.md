@@ -134,7 +134,10 @@ No automatic model/provider downgrade occurs.
 MCP/browser keys can read public state but cannot change policy, issue jobs or
 settle fees. Per-job producer keys can register a hook, admit calls and finish
 their job's calls; they cannot weaken limits or settle money. Control and producer
-routes require loopback. No prompt/messages, API keys or raw model responses are
+routes require direct loopback; requests carrying `Forwarded`, `X-Forwarded-For`
+or `X-Forwarded-Host` are rejected. Tailscale Serve and other HTTP reverse
+proxies therefore cannot use these routes. Run budget control on the dashboard
+host. No prompt/messages, API keys or raw model responses are
 journaled. The original six project MCP tools remain unchanged.
 
 All admissions/writes use the dashboard's single project update queue. Lost

@@ -99,7 +99,10 @@ node dashboard/cli.mjs backup history --project /path/to/target
 ```
 
 Preview/export/history/restore require the target/source's **local administrator**
-credential and loopback access. MCP, browser, budget-producer and reply-consumer
+credential and direct loopback access. Requests carrying `Forwarded`,
+`X-Forwarded-For` or `X-Forwarded-Host` are rejected, so Tailscale Serve and
+other HTTP reverse proxies cannot use these routes. Run the backup commands on
+the dashboard host. MCP, browser, budget-producer and reply-consumer
 keys cannot import archives or grant themselves backup access. Offline inspection
 requires no runtime. Native sessions and credential configuration are never read
 or changed. Existing target runtime keys and subscriptions keep their own identity;

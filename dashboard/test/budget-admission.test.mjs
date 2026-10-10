@@ -75,6 +75,18 @@ async function setup(t, server = false) {
   };
   return { root, project, store, dashboard, runtime, post, launch };
 }
+test("budget control rejects proxy-forwarded requests even when the peer is loopback", async (t) => {
+  const { post, runtime } = await setup(t, true);
+  assert.equal((await post("inspect", {})).status, 200);
+  for (const name of ["forwarded", "x-forwarded-for", "x-forwarded-host"]) {
+    const { status, result } = await post("inspect", {}, {
+      authorization: `Bearer ${runtime.token}`,
+      [name]: "198.51.100.7",
+    });
+    assert.equal(status, 403, `${name} must mark a proxied request`);
+    assert.match(result.error, /direct loopback/);
+  }
+});
 const view = (store) => publicState(store.value).budget_admission;
 function localJob(state, jobId = "job-1", runId = "run-1") {
   assert.equal(

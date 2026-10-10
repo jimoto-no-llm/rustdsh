@@ -28,6 +28,8 @@ const equal = (a, b) =>
   typeof b === "string" &&
   Buffer.byteLength(a) === Buffer.byteLength(b) &&
   timingSafeEqual(Buffer.from(a), Buffer.from(b));
+const loopbackAddresses = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
+const forwardingHeaders = ["forwarded", "x-forwarded-for", "x-forwarded-host"];
 function json(res, status, value) {
   res.writeHead(status, { "content-type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(value));
@@ -173,6 +175,12 @@ export async function startDashboard(options) {
     return (
       allowed.hosts.has(host) &&
       (!req.headers.origin || allowed.origins.has(req.headers.origin))
+    );
+  }
+  function directLoopback(req) {
+    return (
+      loopbackAddresses.has(req.socket.remoteAddress) &&
+      forwardingHeaders.every((name) => req.headers[name] === undefined)
     );
   }
   function browserUrl(base, root = false) {
@@ -576,14 +584,10 @@ export async function startDashboard(options) {
       }
       if (kind === "project") {
         if (req.method === "POST" && route?.startsWith("/api/backup/")) {
-          if (
-            !adminAuthorized ||
-            !["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(
-              req.socket.remoteAddress,
-            )
-          )
+          if (!adminAuthorized || !directLoopback(req))
             return json(res, 403, {
-              error: "Backup requires the local administrator credential",
+              error:
+                "Backup requires a local administrator credential and direct loopback access",
             });
           const action = route.slice("/api/backup/".length);
           if (!["preview", "restore", "history"].includes(action))
@@ -598,13 +602,9 @@ export async function startDashboard(options) {
           );
         }
         if (req.method === "POST" && route?.startsWith("/api/budget/")) {
-          if (
-            !["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(
-              req.socket.remoteAddress,
-            )
-          )
+          if (!directLoopback(req))
             return json(res, 403, {
-              error: "Budget control requires loopback access",
+              error: "Budget control requires direct loopback access",
             });
           const action = route.slice("/api/budget/".length);
           const input = await readBody(req);
