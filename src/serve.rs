@@ -177,9 +177,7 @@ fn handle(mut s: std::net::TcpStream, token: &str, port: u16) -> anyhow::Result<
 fn doctor_json() -> String {
     let orig = crate::passthrough::find_original_dsh();
     let home = crate::inspect::dsh_home();
-    let profiles = std::fs::read_dir(format!("{home}/profiles"))
-        .map(|d| d.count())
-        .unwrap_or(0);
+    let profiles = std::fs::read_dir(format!("{home}/profiles")).map_or(0, |d| d.count());
     serde_json::json!({
         "original_dsh": orig,
         "dsh_home": home,
