@@ -5,22 +5,22 @@
     {
       "check": "fmt",
       "exit_code": 0,
-      "seconds": 0.18
+      "seconds": 0.25
     },
     {
       "check": "clippy",
       "exit_code": 0,
-      "seconds": 0.61
+      "seconds": 0.84
     },
     {
       "check": "rust-tests",
       "exit_code": 0,
-      "seconds": 19.05
+      "seconds": 19.45
     },
     {
       "check": "extended-tests",
       "exit_code": 0,
-      "seconds": 0.07
+      "seconds": 0.08
     },
     {
       "check": "model-tests",
@@ -30,7 +30,7 @@
     {
       "check": "regress",
       "exit_code": 0,
-      "seconds": 6.15
+      "seconds": 6.2
     }
   ],
   "counts": {
@@ -75,5 +75,14 @@
     "release_metadata_tests_passed": 21,
     "windows_line_endings": "CRLF preserved"
   },
-  "msrv": "Rust 1.85: PASS"
+  "msrv": "Rust 1.85: PASS",
+  "dashboard_followup": {
+    "source": "muse-followup.json",
+    "delegated_cgroup": true,
+    "umask": "0077",
+    "pass": 223,
+    "fail": 0,
+    "skip": 6,
+    "artifact_verification": "Strict checks preserved; restored fixtures use their original mode."
+  }
 }

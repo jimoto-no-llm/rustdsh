@@ -58,3 +58,10 @@ lifecycle; it does not measure ordinary page latency or full DSH memory.
 Real setup captures: [desktop](setup-desktop.png), [mobile](setup-mobile.png),
 [API section desktop](setup-api-desktop.png) and [API section mobile](setup-api-mobile.png).
 The previous single-provider UI remains in the [dated evidence](../ux-performance-20261010/after/setup-desktop.png).
+
+[MuseSpark handoff and reproduction](muse-followup.json) records two artifact-fixture
+failures. At umask 0077, file creation requested as 0444 becomes 0400. The fixture
+now restores its original mode explicitly; all five releases tests pass at 0077,
+including rollback and linked-directory rejection. The complete Dashboard suite
+also passes with 223 successes and 6 Windows skips at 0077. Artifact verification
+stays strict.
