@@ -1664,9 +1664,8 @@ mod measurement_gate_windows_tests {
     fn create_junction(link: &Path, target: &Path) {
         let link = link.to_string_lossy().replace('\'', "''");
         let target = target.to_string_lossy().replace('\'', "''");
-        let command = format!(
-            "New-Item -ItemType Junction -Path '{link}' -Target '{target}' | Out-Null"
-        );
+        let command =
+            format!("New-Item -ItemType Junction -Path '{link}' -Target '{target}' | Out-Null");
         let result = std::process::Command::new("powershell.exe")
             .arg("-NoProfile")
             .arg("-NonInteractive")
