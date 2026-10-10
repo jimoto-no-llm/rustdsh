@@ -555,6 +555,105 @@ fn cli_tokens_prune_compact_search_logs_guard_and_settings_work_together() {
         Some(2)
     );
     assert!(f.run(&["guard"], b"safe operation").status.success());
+
+    let allowed = f.0.join("policy-project");
+    let outside = f.0.join("policy-outside");
+    fs::create_dir_all(&allowed).unwrap();
+    fs::create_dir_all(&outside).unwrap();
+    fs::write(allowed.join("same.txt"), "same operation text").unwrap();
+    fs::write(outside.join("same.txt"), "same operation text").unwrap();
+    let policy_path = f.0.join("hook-policy.json");
+    fs::write(
+        &policy_path,
+        json!({
+            "schema": 1,
+            "rules": [{
+                "id": "project-read",
+                "tool": "Read",
+                "access": "read",
+                "roots": [allowed.to_string_lossy()]
+            }]
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let policy_path = policy_path.to_str().unwrap();
+    let hook = |cwd: &std::path::Path, tool: &str, file: &str| {
+        let tool_input = if tool == "Write" {
+            json!({ "file_path": file, "content": "same operation text" })
+        } else {
+            json!({ "file_path": file })
+        };
+        json!({
+            "cwd": cwd.to_string_lossy(),
+            "description": "same operation text",
+            "tool_name": tool,
+            "tool_input": tool_input
+        })
+        .to_string()
+    };
+    let classify = |input: String| {
+        let result = f.run(
+            &["guard", "--policy-file", policy_path, "--json"],
+            input.as_bytes(),
+        );
+        assert!(
+            result.status.success(),
+            "structured JSON decision should use stdout: {}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+        serde_json::from_slice::<Value>(&result.stdout).unwrap()
+    };
+    let permitted = classify(hook(&allowed, "Read", "same.txt"));
+    assert_eq!(permitted["classification"], "allow");
+    assert!(permitted.get("decision").is_none());
+    assert_eq!(permitted["rule_id"], "project-read");
+    let paged_read = classify(
+        json!({
+            "cwd": allowed.to_string_lossy(),
+            "description": "same operation text",
+            "tool_name": "Read",
+            "tool_input": { "file_path": "same.txt", "offset": 2, "limit": 8 }
+        })
+        .to_string(),
+    );
+    assert_eq!(paged_read["classification"], "allow");
+    let outside_file = classify(hook(&outside, "Read", "same.txt"));
+    assert_eq!(outside_file["classification"], "deny");
+    assert_eq!(outside_file["reason"], "path_outside_allowed_root");
+    let changed_tool = classify(hook(&allowed, "Write", "same.txt"));
+    assert_eq!(changed_tool["classification"], "deny");
+    assert_eq!(changed_tool["reason"], "tool_not_allowed");
+    let unsupported_shell = classify(
+        json!({
+            "cwd": allowed.to_string_lossy(),
+            "tool_name": "Bash",
+            "tool_input": { "command": "cat same.txt" }
+        })
+        .to_string(),
+    );
+    assert_eq!(unsupported_shell["classification"], "unknown");
+    assert_eq!(
+        unsupported_shell["reason"],
+        "shell_command_parse_unsupported"
+    );
+    let unsupported_argument = classify(
+        json!({
+            "cwd": allowed.to_string_lossy(),
+            "tool_name": "Read",
+            "tool_input": { "file_path": "same.txt", "command": "cat same.txt" }
+        })
+        .to_string(),
+    );
+    assert_eq!(unsupported_argument["classification"], "unknown");
+    assert_eq!(unsupported_argument["reason"], "tool_schema_unsupported");
+    let malformed = classify("{broken".to_owned());
+    assert_eq!(malformed["classification"], "unknown");
+    assert_eq!(malformed["reason"], "invalid_json");
+    assert!(!outside_file
+        .to_string()
+        .contains(outside.to_string_lossy().as_ref()));
+
     f.ok(&["settings", "set", "search.max", "42"], b"");
     assert!(!f
         .run(&["settings", "set", "search.max", "bad"], b"")
