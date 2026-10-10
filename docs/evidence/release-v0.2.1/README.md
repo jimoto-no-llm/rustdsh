@@ -15,6 +15,9 @@ GitHub CI and verification of published archives are separate release steps.
   [Update banner verification](update-banner.json) passed all 13 flows.
 - Locked Cargo check, release-note validation, Markdown lint and issue-form YAML
   parsing passed.
+- Installer follow-up text directs local-tool users to the no-DSH entry point.
+  Bash syntax and the 55 regression checks passed after this wording change;
+  the Windows script retains its CRLF line endings.
 
 [Onboarding verification](onboarding.json) started the documented project CLI
 without DSH and connected its stdio bridge using the real MCP SDK. All six tools

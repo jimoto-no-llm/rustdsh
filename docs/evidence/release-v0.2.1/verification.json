@@ -66,5 +66,12 @@
     "official Claude Code executable registration (local claude command is a different wrapper)",
     "Codex/Claude GUI registration",
     "live provider, Discord or Tailscale services"
-  ]
+  ],
+  "installer_followup": {
+    "scope": "comments and follow-up wording only",
+    "bash_syntax": "PASS",
+    "regression_checks_passed": 55,
+    "release_metadata_tests_passed": 21,
+    "windows_line_endings": "CRLF preserved"
+  }
 }
