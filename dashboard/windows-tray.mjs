@@ -151,7 +151,7 @@ export async function startWindowsTray({
           record("ready");
           resolve();
         } else if (
-          /^phase:(powershell-start|forms-loaded|stdin-reader-started)(?::[0-9A-Za-z.+-]{1,32})?$/.test(
+          /^phase:(powershell-start|forms-loaded|drawing-loaded|stdin-reader-started)(?::[0-9A-Za-z.+-]{1,32})?$/.test(
             line,
           )
         ) {
