@@ -1,0 +1,4 @@
+Input: a complete one-entry ICO directory declares a 4-byte payload at offset 24 in a 26-byte file.
+
+- Before: the slice returned 2 bytes and the rebuild continued with a truncated image payload.
++ After: ValueError: Invalid ICO entry 0 payload bounds; generation stops before rebuilding outputs.
