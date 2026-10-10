@@ -887,12 +887,9 @@ fn path_shadows_current(path: &std::ffi::OsStr, me: &std::path::Path) -> bool {
     const NAMES: &[&str] = &["dsh"];
 
     std::env::split_paths(path).any(|dir| {
-        NAMES
-            .iter()
-            .any(|name| {
-                std::fs::canonicalize(dir.join(name))
-                    .is_ok_and(|candidate| candidate.as_path() == me)
-            })
+        NAMES.iter().any(|name| {
+            std::fs::canonicalize(dir.join(name)).is_ok_and(|candidate| candidate.as_path() == me)
+        })
     })
 }
 
@@ -992,10 +989,8 @@ mod shadowing_original_tests {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let root = std::env::temp_dir().join(format!(
-            "rdsh-shadow-path-{}-{nonce}",
-            std::process::id()
-        ));
+        let root =
+            std::env::temp_dir().join(format!("rdsh-shadow-path-{}-{nonce}", std::process::id()));
         let decoy = root.join("first");
         let binary_dir = root.join("second");
         fs::create_dir_all(&decoy).unwrap();
