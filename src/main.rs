@@ -493,7 +493,7 @@ fn main() {
                             } else {
                                 match serde_json::to_string(&v) {
                                     Ok(text) => {
-                                        println!("{}={}", key.trim(), text);
+                                        println!("{}={text}", key.trim());
                                         Ok(())
                                     }
                                     Err(e) => Err(anyhow::anyhow!(e)),
