@@ -162,6 +162,44 @@ class ReleaseMetadataTests(unittest.TestCase):
                 with self.subTest(option=option, hint=hint), self.assertRaisesRegex(ValueError, "matching this tag"):
                     release.validate(self.root, "v1.2.3-rc.1")
 
+    def test_candidate_selector_must_be_a_standalone_argument(self):
+        replacements = (
+            ("--version=v1.2.3-rc.1", "--prefix=/tmp/--version=v1.2.3-rc.1"),
+            ("-Version v1.2.3-rc.1", "-Prefix 'C:\\rdsh -Version v1.2.3-rc.1'"),
+        )
+        for old, new in replacements:
+            notes = self.fixture("1.2.3-rc.1")
+            text = notes.read_text(encoding="utf-8").replace(old, new)
+            notes.write_text(text, encoding="utf-8")
+            with self.subTest(replacement=new), self.assertRaisesRegex(ValueError, "matching this tag"):
+                release.validate(self.root, "v1.2.3-rc.1")
+
+    def test_sudo_wrapped_installers_are_validated_as_commands(self):
+        notes = self.fixture("1.2.3-rc.1")
+        text = notes.read_text(encoding="utf-8")
+        notes.write_text(text + "\n```sh\nsudo ./install.sh --from-release\n```\n", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "matching this tag"):
+            release.validate(self.root, "v1.2.3-rc.1")
+
+        notes = self.fixture("1.2.3-rc.1")
+        text = notes.read_text(encoding="utf-8")
+        notes.write_text(text + "\n```sh\nsudo -E sh ./install.sh --from-release --version=v1.2.3-rc.1\n```\n",
+                         encoding="utf-8")
+        release.validate(self.root, "v1.2.3-rc.1")
+
+    def test_unknown_installer_wrappers_fail_closed(self):
+        for command in (
+            "env RD_VERSION=v1.2.3-rc.1 ./install.sh --from-release --version=v1.2.3-rc.1",
+            "bash -c './install.sh --from-release --version=v1.2.3-rc.1'",
+            "bash -c './install.sh' --version=v1.2.3-rc.1",
+            "Start-Process ./install.ps1 -ArgumentList '-FromRelease -Version v1.2.3-rc.1'",
+        ):
+            notes = self.fixture("1.2.3-rc.1")
+            notes.write_text(notes.read_text(encoding="utf-8") + f"\n```sh\n{command}\n```\n",
+                             encoding="utf-8")
+            with self.subTest(command=command), self.assertRaisesRegex(ValueError, "unsupported prerelease installer"):
+                release.validate(self.root, "v1.2.3-rc.1")
+
     def test_each_candidate_installer_invocation_must_select_the_tag(self):
         for extra in ("```sh\ncurl https://github.com/org/repo/releases/download/v1.2.3-rc.1/install.sh | bash -s -- --from-release\n```",
                       "`./install.ps1 -FromRelease`",
