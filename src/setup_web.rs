@@ -99,6 +99,9 @@ fn handle(
         )?;
         return Ok(());
     }
+    let finish_after_response = req.method.as_str() == "POST"
+        && req.target.as_str() == "/api/done"
+        && req.authorized(token);
     if req.method.as_str() == "GET" {
         let asset = match req.target.as_str() {
             "/icon.png" => Some((
@@ -187,10 +190,7 @@ fn handle(
                 "application/json",
                 Cow::Borrowed("{\"error\":\"unauthorized\"}"),
             ),
-            ("POST", "/api/done") => {
-                done.store(true, Ordering::Relaxed);
-                (200, "application/json", Cow::Borrowed("{\"ok\":true}"))
-            }
+            ("POST", "/api/done") => (200, "application/json", Cow::Borrowed("{\"ok\":true}")),
             _ => (
                 404,
                 "application/json",
@@ -198,6 +198,9 @@ fn handle(
             ),
         };
     crate::local_http::respond(&mut s, status, ctype, payload.as_bytes())?;
+    if finish_after_response {
+        done.store(true, Ordering::Relaxed);
+    }
     Ok(())
 }
 

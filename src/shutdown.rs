@@ -16,7 +16,9 @@ pub fn install() -> anyhow::Result<()> {
 
     unsafe {
         for signal in [libc::SIGINT, libc::SIGTERM] {
-            if libc::signal(signal, request_shutdown as libc::sighandler_t) == libc::SIG_ERR {
+            if libc::signal(signal, request_shutdown as *const () as libc::sighandler_t)
+                == libc::SIG_ERR
+            {
                 anyhow::bail!("could not install server shutdown signal handler");
             }
         }

@@ -334,7 +334,10 @@ impl Server {
                 }
             };
         assert!(!logged_token, "server must not print the bearer token");
-        assert!(!has_key_fragment, "server must not print a token-bearing URL");
+        assert!(
+            !has_key_fragment,
+            "server must not print a token-bearing URL"
+        );
         let token = std::fs::read_to_string(&handoff_path)
             .expect("server should create its protected token handoff file");
         let address = url.trim_start_matches("http://127.0.0.1:");
