@@ -689,11 +689,11 @@ impl RdshSettings {
             "sessions.with_tokens" => self.sessions.with_tokens = parse_bool(raw)?,
             "sessions.stale_secs" => self.sessions.stale_secs = parse_usize(raw, 60)? as u64,
             "logs.tail" => self.logs.tail = parse_usize(raw, 50)? as usize,
-            "serve.port" => self.serve.port = parse_usize(raw, 38080)? as u16,
+            "serve.port" => self.serve.port = parse_u16(raw, "serve.port")?,
             "guard.deny" => self.guard.deny = parse_list(raw, TEXT_CHARS),
             "guard.reason" => self.guard.reason = parse_string(raw, TEXT_CHARS),
-            "bench.n" => self.bench.n = parse_usize(raw, 5)? as u32,
-            "setup.web_port" => self.setup.web_port = parse_usize(raw, 0)? as u16,
+            "bench.n" => self.bench.n = parse_u32(raw, "bench.n")?,
+            "setup.web_port" => self.setup.web_port = parse_u16(raw, "setup.web_port")?,
             "beta.context_engine" => self.beta.context_engine = parse_bool(raw)?,
             "extras.enable" => self.extras.enable = parse_list(raw, TEXT_CHARS),
             "context.token_budget" => self.context.token_budget = parse_usize(raw, 4000)? as usize,
@@ -960,6 +960,16 @@ fn parse_bool(raw: &str) -> anyhow::Result<bool> {
             Err(anyhow::anyhow!("bool ではありません: {raw} (true/false)"))
         }
     }
+}
+
+fn parse_u16(raw: &str, key: &str) -> anyhow::Result<u16> {
+    let value = parse_usize(raw, 0)?;
+    u16::try_from(value).map_err(|_| anyhow::anyhow!("{key} is out of range for u16: {raw}"))
+}
+
+fn parse_u32(raw: &str, key: &str) -> anyhow::Result<u32> {
+    let value = parse_usize(raw, 0)?;
+    u32::try_from(value).map_err(|_| anyhow::anyhow!("{key} is out of range for u32: {raw}"))
 }
 
 fn parse_usize(raw: &str, _fallback: u64) -> anyhow::Result<u64> {
