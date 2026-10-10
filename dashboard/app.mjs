@@ -48,6 +48,50 @@ let renderedRevision = -1;
 let latestState = null;
 let selectedTask = "";
 let selectionKey = "";
+let workspaceLayoutStorageKey = null;
+const workspaceLayouts = ["1", "2", "3"];
+function setWorkspaceLayout(value, { persist = true, announce = true } = {}) {
+  if (!workspaceLayouts.includes(value)) return false;
+  $("workspace-grid").dataset.layout = value;
+  document
+    .querySelectorAll('input[name="workspace-layout"]')
+    .forEach((input) => {
+      input.checked = input.value === value;
+    });
+  let saved = false;
+  if (persist && workspaceLayoutStorageKey) {
+    try {
+      localStorage.setItem(workspaceLayoutStorageKey, value);
+      saved = true;
+    } catch {}
+  }
+  if (announce) {
+    $("workspace-layout-status").textContent = saved
+      ? `PC表示の最大列数を${value}列に設定し、このブラウザーにprojectごとに保存しました。`
+      : "表示を変更しましたが、このブラウザーには保存できませんでした。";
+  }
+  return true;
+}
+function restoreWorkspaceLayout(projectId) {
+  let layout = "3";
+  if (typeof projectId === "string" && projectId.trim()) {
+    workspaceLayoutStorageKey =
+      `rdsh:workspace-layout:v1:${encodeURIComponent(projectId)}`;
+    try {
+      const saved = localStorage.getItem(workspaceLayoutStorageKey);
+      if (workspaceLayouts.includes(saved)) layout = saved;
+    } catch {}
+  }
+  setWorkspaceLayout(layout, { persist: false, announce: false });
+  $("workspace-layout-controls").disabled = false;
+}
+document
+  .querySelectorAll('input[name="workspace-layout"]')
+  .forEach((input) =>
+    input.addEventListener("change", () => {
+      if (input.checked) setWorkspaceLayout(input.value);
+    }),
+  );
 function navigateTo(id) {
   const target = $(id);
   if (!target) return;
@@ -338,6 +382,7 @@ document.addEventListener("keydown", (event) => {
 });
 try {
   const config = await api("config");
+  restoreWorkspaceLayout(config.project_id);
   await renderShare(config);
   if (config.kind === "harness") {
     $("connection-detail").hidden = true;

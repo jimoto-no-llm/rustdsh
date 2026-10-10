@@ -539,6 +539,85 @@
         background: #edf1f7;
         border-radius: 8px;
       }
+      .workspace-settings {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+        margin: 16px 0;
+      }
+      .workspace-settings fieldset {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+        margin: 0;
+        padding: 8px 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+      .workspace-settings legend {
+        padding: 0 5px;
+      }
+      .workspace-settings label {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .workspace-settings input {
+        width: auto;
+        min-height: 0;
+      }
+      .workspace-pane-nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 12px 0;
+      }
+      .workspace-pane-nav a {
+        display: inline-block;
+        min-height: 40px;
+        padding: 8px 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+      .workspace-grid {
+        display: grid;
+        align-items: start;
+        gap: 16px;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .workspace-grid[data-layout="1"] {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      .workspace-grid[data-layout="2"] {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .workspace-grid[data-layout="3"] {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .workspace-pane {
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
+      .workspace-pane:focus {
+        outline: 2px solid var(--blue);
+        outline-offset: 3px;
+      }
+      @media (max-width: 1100px) {
+        .workspace-grid[data-layout="2"],
+        .workspace-grid[data-layout="3"] {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+      @media (max-width: 700px) {
+        .workspace-grid,
+        .workspace-grid[data-layout="1"],
+        .workspace-grid[data-layout="2"],
+        .workspace-grid[data-layout="3"] {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
       /* Stable anchors and the existing command palette remain usable. */
       .skip {
         position: absolute;
@@ -784,110 +863,163 @@
         </section>
       </section>
       <div id="project-content" tabindex="-1">
-        <section
-          id="project-overview"
-          class="summary-card"
-          aria-labelledby="overview-heading"
-        >
-          <h2 id="overview-heading" tabindex="-1">いまの状況</h2>
-          <label for="overview-task">確認する範囲</label
-          ><select id="overview-task"></select>
-          <p id="overview-context"></p>
-          <dl class="summary-facts">
-            <dt>状態</dt>
-            <dd>
-              <div id="overview-state">実行状態は未取得</div>
-              <p class="sub" id="overview-task-report"></p>
-            </dd>
-            <dt>観測</dt>
-            <dd>
-              <div id="overview-observed">実行の観測記録なし</div>
-              <p class="sub" id="overview-report-updated"></p>
-            </dd>
-            <dt>最後の結果</dt>
-            <dd>
-              <div id="overview-result">未取得</div>
-              <p class="sub" id="overview-result-detail"></p>
-            </dd>
-            <dt>判断</dt>
-            <dd id="overview-decision">確認中…</dd>
-            <dt>停止</dt>
-            <dd id="overview-stop">この画面からの停止は非対応</dd>
-          </dl>
-          <ul id="overview-pending"></ul>
-        </section>
-        <h2 id="pending-heading" tabindex="-1">未回答の質問</h2>
-        <p class="sub" id="pending-note">
-          プロジェクト全体の質問です。回答はこの質問への返答のみです。対象・条件が変わった場合は回答前に内容を再確認してください。回答しただけで実行権限は生まれません。
-        </p>
-        <div
-          id="questions"
-          class="decision-grid"
-          aria-labelledby="pending-heading"
-          aria-describedby="pending-note"
-        ></div>
-        <section id="budget-admission" aria-label="予算制御"></section>
-        <details class="fold" id="metrics-detail">
-          <summary>プロジェクト全体の数値</summary>
-          <h2 id="metrics-heading" tabindex="-1">数値の詳細</h2>
-          <div class="cards" id="cards"></div>
-          <h2>費用の明細と出所</h2>
-          <section id="cost-ledger" aria-label="費用台帳"></section>
-        </details>
-        <details class="fold" id="tasks-detail">
-          <summary>タスク一覧</summary>
-          <h2 id="tasks-heading" tabindex="-1">
-            タスク <span class="sub" id="task-milestones"></span>
-          </h2>
-          <div class="table-box">
-            <!-- #57: 各行に task-<id> の目印を付け、端末を替えても同じ行へ戻れるようにします。 -->
-            <table aria-labelledby="tasks-heading">
-              <thead>
-                <tr>
-                  <th scope="col">ID</th>
-                  <th scope="col">状態</th>
-                  <th scope="col">題名</th>
-                  <th scope="col">ブロック要因</th>
-                </tr>
-              </thead>
-              <tbody id="tasks"></tbody>
-            </table>
-          </div>
-        </details>
-        <details class="fold" id="instruction-detail">
-          <summary>同じsessionへ追指示を送る</summary>
-          <h2>追指示と適用タイミング</h2>
-          <p class="sub">
-            下書きはこの端末で保持します。入力は順番に配送し、結果不明の入力がある場合は保留します。指示の保存で新しい実行権限は発行されません。
-          </p>
-          <section
-            id="instruction-panel"
-            aria-label="追指示の投稿と確認"
-          ></section>
-        </details>
-        <details class="fold" id="reply-detail">
-          <summary>回答の保存・適用を確認</summary>
-          <section
-            id="reply-applications"
-            hidden
-            aria-labelledby="reply-heading"
+        <div class="workspace-settings">
+          <fieldset
+            id="workspace-layout-controls"
+            disabled
+            aria-describedby="workspace-layout-help"
           >
-            <h2 id="reply-heading">回答の適用状況</h2>
-            <p class="sub">
-              保存・通知配送・対象consumerの読取・入力処理の結果を分けて確認します。完了表示はこの回答入力へのACP応答です。作業の完了は受入検証で確認します。
+            <legend>PCの最大列数</legend>
+            <label>
+              <input type="radio" name="workspace-layout" value="1" />1列
+            </label>
+            <label>
+              <input type="radio" name="workspace-layout" value="2" />2列
+            </label>
+            <label>
+              <input type="radio" name="workspace-layout" value="3" checked />3列
+            </label>
+          </fieldset>
+          <p class="sub" id="workspace-layout-help">
+            選んだ列数をPCでの上限としてprojectごとにこのブラウザーへ保存します。画面幅1100px以下では最大2列、700px以下では1列になります。
+          </p>
+        </div>
+        <p id="workspace-layout-status" role="status" aria-live="polite"></p>
+        <nav class="workspace-pane-nav" aria-label="ワークスペースのペインへ移動">
+          <a href="#workspace-decisions">判断と質問</a>
+          <a href="#workspace-work">タスクと作業</a>
+          <a href="#workspace-history">履歴と成果</a>
+        </nav>
+        <div class="workspace-grid" id="workspace-grid" data-layout="3">
+          <section
+            id="workspace-decisions"
+            class="workspace-pane"
+            tabindex="-1"
+            aria-labelledby="workspace-decisions-heading"
+          >
+            <h2 id="workspace-decisions-heading">判断と質問</h2>
+            <section
+              id="project-overview"
+              class="summary-card"
+              aria-labelledby="overview-heading"
+            >
+              <h3 id="overview-heading" tabindex="-1">いまの状況</h3>
+              <label for="overview-task">確認する範囲</label
+              ><select id="overview-task"></select>
+              <p id="overview-context"></p>
+              <dl class="summary-facts">
+                <dt>状態</dt>
+                <dd>
+                  <div id="overview-state">実行状態は未取得</div>
+                  <p class="sub" id="overview-task-report"></p>
+                </dd>
+                <dt>観測</dt>
+                <dd>
+                  <div id="overview-observed">実行の観測記録なし</div>
+                  <p class="sub" id="overview-report-updated"></p>
+                </dd>
+                <dt>最後の結果</dt>
+                <dd>
+                  <div id="overview-result">未取得</div>
+                  <p class="sub" id="overview-result-detail"></p>
+                </dd>
+                <dt>判断</dt>
+                <dd id="overview-decision">確認中…</dd>
+                <dt>停止</dt>
+                <dd id="overview-stop">この画面からの停止は非対応</dd>
+              </dl>
+              <ul id="overview-pending"></ul>
+            </section>
+            <h3 id="pending-heading" tabindex="-1">未回答の質問</h3>
+            <p class="sub" id="pending-note">
+              プロジェクト全体の質問です。回答はこの質問への返答のみです。対象・条件が変わった場合は回答前に内容を再確認してください。回答しただけで実行権限は生まれません。
             </p>
-            <div id="reply-status" class="decision-grid"></div>
+            <div
+              id="questions"
+              class="decision-grid"
+              aria-labelledby="pending-heading"
+              aria-describedby="pending-note"
+            ></div>
+            <section id="budget-admission" aria-label="予算制御"></section>
           </section>
-        </details>
-        <details class="fold" id="progress-detail">
-          <summary>進捗・成果物の報告</summary>
-          <h2>進捗・成果物の報告履歴</h2>
-          <div class="feed" id="events"></div>
-        </details>
-        <details id="answered">
-          <summary>回答済みの質問</summary>
-          <div class="feed" id="answers"></div>
-        </details>
+          <section
+            id="workspace-work"
+            class="workspace-pane"
+            tabindex="-1"
+            aria-labelledby="workspace-work-heading"
+          >
+            <h2 id="workspace-work-heading">タスクと作業</h2>
+            <details class="fold" id="metrics-detail">
+              <summary>プロジェクト全体の数値</summary>
+              <h3 id="metrics-heading" tabindex="-1">数値の詳細</h3>
+              <div class="cards" id="cards"></div>
+              <h3>費用の明細と出所</h3>
+              <section id="cost-ledger" aria-label="費用台帳"></section>
+            </details>
+            <details class="fold" id="tasks-detail">
+              <summary>タスク一覧</summary>
+              <h3 id="tasks-heading" tabindex="-1">
+                タスク <span class="sub" id="task-milestones"></span>
+              </h3>
+              <div class="table-box">
+                <!-- #57: 各行に task-<id> の目印を付け、端末を替えても同じ行へ戻れるようにします。 -->
+                <table aria-labelledby="tasks-heading">
+                  <thead>
+                    <tr>
+                      <th scope="col">ID</th>
+                      <th scope="col">状態</th>
+                      <th scope="col">題名</th>
+                      <th scope="col">ブロック要因</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tasks"></tbody>
+                </table>
+              </div>
+            </details>
+            <details class="fold" id="instruction-detail">
+              <summary>同じsessionへ追指示を送る</summary>
+              <h3>追指示と適用タイミング</h3>
+              <p class="sub">
+                下書きはこの端末で保持します。入力は順番に配送し、結果不明の入力がある場合は保留します。指示の保存で新しい実行権限は発行されません。
+              </p>
+              <section
+                id="instruction-panel"
+                aria-label="追指示の投稿と確認"
+              ></section>
+            </details>
+            <details class="fold" id="reply-detail">
+              <summary>回答の保存・適用を確認</summary>
+              <section
+                id="reply-applications"
+                hidden
+                aria-labelledby="reply-heading"
+              >
+                <h3 id="reply-heading">回答の適用状況</h3>
+                <p class="sub">
+                  保存・通知配送・対象consumerの読取・入力処理の結果を分けて確認します。完了表示はこの回答入力へのACP応答です。作業の完了は受入検証で確認します。
+                </p>
+                <div id="reply-status" class="decision-grid"></div>
+              </section>
+            </details>
+          </section>
+          <section
+            id="workspace-history"
+            class="workspace-pane"
+            tabindex="-1"
+            aria-labelledby="workspace-history-heading"
+          >
+            <h2 id="workspace-history-heading">履歴と成果</h2>
+            <details class="fold" id="progress-detail">
+              <summary>進捗・成果物の報告</summary>
+              <h3>進捗・成果物の報告履歴</h3>
+              <div class="feed" id="events"></div>
+            </details>
+            <details id="answered">
+              <summary>回答済みの質問</summary>
+              <div class="feed" id="answers"></div>
+            </details>
+          </section>
+        </div>
       </div>
       <nav id="quick-actions" aria-label="プロジェクトの操作" hidden>
         <p id="quick-context" class="sub"></p>
