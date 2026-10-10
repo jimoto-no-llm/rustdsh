@@ -21,7 +21,7 @@ pub enum Launcher {
 }
 
 pub fn split_launcher_args(profile_flag: Option<String>, extra: Vec<String>) -> Launcher {
-    if extra.first().map(|s| s.as_str()) == Some("plugin") {
+    if extra.first().is_some_and(|s| s.as_str() == "plugin") {
         let mut profile = profile_flag;
         let mut pnpm: Vec<String> = vec![];
         let mut it = extra.into_iter().skip(1);
@@ -129,7 +129,7 @@ pub fn split_launcher_args(profile_flag: Option<String>, extra: Vec<String>) -> 
         }
         return Launcher::Dump { profile, patches };
     }
-    if app_args.first().map(|s| s.as_str()) == Some("--") {
+    if app_args.first().is_some_and(|s| s.as_str() == "--") {
         app_args.remove(0);
     }
     Launcher::Boot {
