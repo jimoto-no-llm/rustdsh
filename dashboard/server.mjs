@@ -133,6 +133,7 @@ export async function startDashboard(options) {
   let updateQueue = Promise.resolve();
   let refreshPromise = null;
   let closing = false;
+  let closePromise = null;
   // Parsed once per share change; the old code rebuilt the Set and parsed
   // the share URL on every request (twice per request via trusted()).
   let originsCache = null;
@@ -808,21 +809,30 @@ export async function startDashboard(options) {
     }
     upgradeHarness(req, socket, head, harness.port, cookieName, token);
   });
-  async function close() {
-    if (closing) return;
-    if (harness && !(await harness.stop()).confirmed)
-      throw new Error(
-        "Owned Harness exit unverified; dashboard remains available",
-      );
-    closing = true;
-    if (deliveryTimer) clearInterval(deliveryTimer);
-    for (const response of live) response.end();
-    for (const { mcp } of sessions.values()) await mcp.server.close();
-    await updateQueue;
-    await eventsHub?.queue;
-    for (const socket of sockets) socket.destroy();
-    await new Promise((resolve) => server.close(resolve));
-    await fs.unlink(lockFile).catch(() => {});
+  function close() {
+    if (closePromise) return closePromise;
+    if (closing) return Promise.resolve();
+    const attempt = Promise.resolve().then(async () => {
+      if (harness && !(await harness.stop()).confirmed)
+        throw new Error(
+          "Owned Harness exit unverified; dashboard remains available",
+        );
+      closing = true;
+      if (deliveryTimer) clearInterval(deliveryTimer);
+      for (const response of live) response.end();
+      for (const { mcp } of sessions.values()) await mcp.server.close();
+      await updateQueue;
+      await eventsHub?.queue;
+      for (const socket of sockets) socket.destroy();
+      await new Promise((resolve) => server.close(resolve));
+      await fs.unlink(lockFile).catch(() => {});
+    });
+    closePromise = attempt;
+    // A failed preflight leaves the dashboard available, so let a later caller retry.
+    void attempt.then(undefined, () => {
+      if (!closing && closePromise === attempt) closePromise = null;
+    });
+    return attempt;
   }
   try {
     await new Promise((resolve, reject) => {
