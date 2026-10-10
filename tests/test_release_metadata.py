@@ -186,6 +186,32 @@ class ReleaseMetadataTests(unittest.TestCase):
             with self.subTest(extra=extra), self.assertRaisesRegex(ValueError, "matching this tag"):
                 release.validate(self.root, "v1.2.3-rc.1")
 
+    def test_candidate_tags_in_powershell_block_comments_are_not_arguments(self):
+        extras = (
+            "`./install.ps1 -FromRelease <# -Version v1.2.3-rc.1 #>`",
+            "```powershell\n./install.ps1 -FromRelease <# -Version v1.2.3-rc.1 #>\n```",
+            "```powershell\n./install.ps1 -FromRelease <# note\n-Version v1.2.3-rc.1\n#>\n```",
+        )
+        for extra in extras:
+            notes = self.fixture("1.2.3-rc.1")
+            notes.write_text(notes.read_text(encoding="utf-8") + "\n" + extra + "\n", encoding="utf-8")
+            with self.subTest(extra=extra), self.assertRaisesRegex(ValueError, "matching this tag"):
+                release.validate(self.root, "v1.2.3-rc.1")
+
+    def test_powershell_comment_markers_inside_strings_are_literal(self):
+        notes = self.fixture("1.2.3-rc.1")
+        extra = ("\n```powershell\nWrite-Output '<# -Version v1.2.3-rc.1 #>'; "
+                 "./install.ps1 -FromRelease -Version v1.2.3-rc.1\n```\n")
+        notes.write_text(notes.read_text(encoding="utf-8") + extra, encoding="utf-8")
+        release.validate(self.root, "v1.2.3-rc.1")
+
+        notes = self.fixture("1.2.3-rc.1")
+        extra = ("\n```powershell\nWrite-Output '<# -Version v1.2.3-rc.1 #>'; "
+                 "./install.ps1 -FromRelease\n```\n")
+        notes.write_text(notes.read_text(encoding="utf-8") + extra, encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "matching this tag"):
+            release.validate(self.root, "v1.2.3-rc.1")
+
     def test_comment_markers_inside_quotes_are_not_treated_as_comments(self):
         notes = self.fixture("1.2.3-rc.1")
         text = notes.read_text(encoding="utf-8")

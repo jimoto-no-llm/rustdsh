@@ -61,6 +61,68 @@ def without_shell_comment(command):
     return command
 
 
+def without_powershell_comments(code):
+    """Remove PowerShell comments without interpreting comment markers in strings."""
+    output = []
+    quote = None
+    in_block_comment = False
+    index = 0
+    while index < len(code):
+        char = code[index]
+        if in_block_comment:
+            if code.startswith("#>", index):
+                in_block_comment = False
+                output.append(" ")
+                index += 2
+            else:
+                if char in "\r\n":
+                    output.append(char)
+                index += 1
+            continue
+        if quote == "'":
+            output.append(char)
+            if char == "'":
+                if index + 1 < len(code) and code[index + 1] == "'":
+                    output.append(code[index + 1])
+                    index += 2
+                    continue
+                quote = None
+            index += 1
+            continue
+        if quote == '"':
+            output.append(char)
+            if char == "`" and index + 1 < len(code):
+                output.append(code[index + 1])
+                index += 2
+                continue
+            if char == '"':
+                quote = None
+            index += 1
+            continue
+        if char in "'\"":
+            quote = char
+            output.append(char)
+            index += 1
+            continue
+        previous_is_boundary = (
+            index == 0
+            or code[index - 1].isspace()
+            or code[index - 1] in ";|&(),{}[]"
+        )
+        if code.startswith("<#", index) and previous_is_boundary:
+            in_block_comment = True
+            output.append(" ")
+            index += 2
+            continue
+        if char == "#" and previous_is_boundary:
+            while index < len(code) and code[index] not in "\r\n":
+                index += 1
+            continue
+        output.append(char)
+        index += 1
+    return "".join(output)
+
+
 def validate(root, tag):
     if not TAG.fullmatch(tag):
         raise ValueError("tag must be vX.Y.Z or vX.Y.Z-{alpha,beta,rc}.N")
@@ -96,10 +158,18 @@ def validate(root, tag):
                 or any(channel != f"download/{tag}" for channel, _ in installers)):
             raise ValueError("prerelease installer URLs must use this exact tag URL")
         instructions = re.sub(r"<!--.*?-->", "", authored, flags=re.S)
-        snippets = re.findall(r"```[^\n]*\n(.*?)\n```|`([^`\n]+)`", instructions, re.S)
+        snippets = re.findall(r"```([^\n]*)\n(.*?)\n```|`([^`\n]+)`", instructions, re.S)
         unix_commands, windows_commands = [], []
-        for block, inline in snippets:
+        for language, block, inline in snippets:
             code = re.sub(r"[\\`]\r?\n", " ", block or inline)
+            language = language.strip().lower().split(maxsplit=1)[0] if language.strip() else ""
+            is_powershell = language in ("powershell", "pwsh", "ps1")
+            if not is_powershell:
+                is_powershell = re.search(
+                    r"(?i)(?:^|[\s;&|])(?:&\s+)?(?:\S*[/\\])?install\.ps1(?:\s|$)", code
+                ) is not None
+            if is_powershell:
+                code = without_powershell_comments(code)
             for line in code.splitlines():
                 line = without_shell_comment(line)
                 # Validate every simple command in a shell chain. A candidate
