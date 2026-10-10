@@ -155,6 +155,97 @@ export class HistoryError extends Error {
 function check(condition, code = "invalid_history") {
   if (!condition) throw new HistoryError(code);
 }
+function observationRecord(record) {
+  return (
+    exact(record, ["run_id", "last_activity", "resource_observation"]) &&
+    uuid(record.run_id, "run") &&
+    (record.last_activity === null ||
+      (exact(record.last_activity, ["kind", "observed_at"]) &&
+        activityKinds.has(record.last_activity.kind) &&
+        time(record.last_activity.observed_at))) &&
+    (record.resource_observation === null ||
+      (exact(record.resource_observation, [
+        "kind",
+        "status",
+        "observed_at",
+      ]) &&
+        ["cpu", "memory", "gpu", "port", "unknown"].includes(
+          record.resource_observation.kind,
+        ) &&
+        ["waiting", "available"].includes(
+          record.resource_observation.status,
+        ) &&
+        time(record.resource_observation.observed_at)))
+  );
+}
+async function readObservationFile(file, projectId) {
+  let handle;
+  try {
+    handle = await fs.open(file, "r");
+    check((await handle.stat()).size <= maxBytes, "observations_too_large");
+    const bytes = await handle.readFile();
+    check(bytes.length <= maxBytes, "observations_too_large");
+    const decoded = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    const value = JSON.parse(decoded);
+    check(
+      exact(value, ["schema", "project_id", "records"]) &&
+        value.schema === 1 &&
+        value.project_id === projectId &&
+        Array.isArray(value.records) &&
+        value.records.length <= maxEvents &&
+        value.records.every(observationRecord) &&
+        new Set(value.records.map((record) => record.run_id)).size ===
+          value.records.length,
+      "invalid_observations",
+    );
+    return new Map(value.records.map((record) => [record.run_id, record]));
+  } catch (error) {
+    if (error.code === "ENOENT") return new Map();
+    if (error instanceof HistoryError) throw error;
+    throw new HistoryError("invalid_observations");
+  } finally {
+    await handle?.close();
+  }
+}
+async function writeObservationFile(file, projectId, records) {
+  const value = {
+    schema: 1,
+    project_id: projectId,
+    records: [...records.values()],
+  };
+  check(
+    value.records.length <= maxEvents && value.records.every(observationRecord),
+    "invalid_observations",
+  );
+  const bytes = Buffer.from(JSON.stringify(value) + "\n");
+  check(bytes.length <= maxBytes, "observations_too_large");
+  const temporary = file + "." + randomUUID() + ".tmp";
+  let output;
+  try {
+    output = await fs.open(temporary, "wx", 0o600);
+    await output.writeFile(bytes);
+    await output.sync();
+    await output.close();
+    output = null;
+    await fs.rename(temporary, file);
+    if (process.platform !== "win32") {
+      const parent = await fs.open(path.dirname(file), "r");
+      try {
+        await parent.sync();
+      } finally {
+        await parent.close();
+      }
+    }
+  } catch (error) {
+    if (error instanceof HistoryError) throw error;
+    throw new HistoryError("observations_write_unconfirmed");
+  } finally {
+    await output?.close();
+    await fs.unlink(temporary).catch((error) => {
+      if (error.code !== "ENOENT") throw error;
+    });
+  }
+}
 function validateData(type, data) {
   if (type === "registered")
     check(
@@ -267,17 +358,6 @@ function validateData(type, data) {
         validProcessIdentity(data.identity) &&
         ["gone", "pid_reused"].includes(data.observation),
     );
-  else if (type === "activity_observed")
-    check(
-      exact(data, ["kind"]) &&
-        activityKinds.has(data.kind),
-    );
-  else if (type === "resource_observed")
-    check(
-      exact(data, ["kind", "status"]) &&
-        ["cpu", "memory", "gpu", "port", "unknown"].includes(data.kind) &&
-        ["waiting", "available"].includes(data.status),
-    );
   else if (type === "command")
     check(
       (exact(data, ["command_id", "operation", "phase", "ack_id", "outcome"]) ||
@@ -316,8 +396,6 @@ function apply(state, event) {
       reason: "registered",
       process: null,
       scope: null,
-      last_activity: null,
-      resource_observation: null,
       commands: [],
       rejected_transitions: [],
       revision: event.sequence,
@@ -391,12 +469,6 @@ function apply(state, event) {
       );
       run.process.status = "absence_observed";
       run.process.observed_at = event.observed_at;
-    } else if (type === "activity_observed") {
-      run.last_activity = { ...data, observed_at: event.observed_at };
-      run.last_observed_at = event.observed_at;
-    } else if (type === "resource_observed") {
-      run.resource_observation = { ...data, observed_at: event.observed_at };
-      run.last_observed_at = event.observed_at;
     } else if (type === "command") {
       const existing = state.commands.get(data.command_id);
       if (!existing) {
@@ -492,6 +564,10 @@ export class RunHistory {
   constructor(project) {
     this.project = { ...project };
     this.file = path.join(project.directory, "run-history.jsonl");
+    this.observationsFile = path.join(
+      project.directory,
+      "run-observations.json",
+    );
     this.lock = path.join(project.directory, "run-history.lock");
     this.owner_id = "owner_" + randomUUID();
     this.queue = Promise.resolve();
@@ -527,6 +603,19 @@ export class RunHistory {
       throw new HistoryError("invalid_history");
     } finally {
       await handle?.close();
+    }
+  }
+  async observationSnapshot() {
+    try {
+      return {
+        records: await readObservationFile(
+          this.observationsFile,
+          this.project.id,
+        ),
+        status: "available",
+      };
+    } catch {
+      return { records: new Map(), status: "unavailable" };
     }
   }
   async mutate(operation) {
@@ -570,7 +659,28 @@ export class RunHistory {
           added.push(JSON.stringify(event) + "\n");
           return event;
         };
-        output = await operation(state, append);
+        const recordObservation = async (id, field, data) => {
+          check(state.runs.has(id), "run_not_found");
+          const records = await readObservationFile(
+            this.observationsFile,
+            this.project.id,
+          );
+          const current = records.get(id) || {
+            run_id: id,
+            last_activity: null,
+            resource_observation: null,
+          };
+          records.set(id, {
+            ...current,
+            [field]: { ...data, observed_at: new Date().toISOString() },
+          });
+          await writeObservationFile(
+            this.observationsFile,
+            this.project.id,
+            records,
+          );
+        };
+        output = await operation(state, append, recordObservation);
         if (added.length) {
           const bytes = Buffer.from(added.join(""));
           check(
@@ -766,9 +876,8 @@ export class RunHistory {
   }
   async recordActivity(id, kind) {
     check(activityKinds.has(kind), "invalid_activity_kind");
-    return this.mutate((state, append) => {
-      check(state.runs.has(id), "run_not_found");
-      append(id, "activity_observed", { kind });
+    return this.mutate((_state, _append, recordObservation) => {
+      return recordObservation(id, "last_activity", { kind });
     });
   }
   async recordResourceObservation(id, kind, status) {
@@ -777,9 +886,8 @@ export class RunHistory {
         ["waiting", "available"].includes(status),
       "invalid_resource_observation",
     );
-    return this.mutate((state, append) => {
-      check(state.runs.has(id), "run_not_found");
-      append(id, "resource_observed", { kind, status });
+    return this.mutate((_state, _append, recordObservation) => {
+      return recordObservation(id, "resource_observation", { kind, status });
     });
   }
   async commandPhase(command_id, phase, outcome = null) {
@@ -812,9 +920,16 @@ export class RunHistory {
     const loaded = await this.read();
     const run = loaded.runs.get(id);
     check(run, "run_not_found");
-    return this.inspectRecord(run, loaded, ui_connection, observe);
+    const observations = await this.observationSnapshot();
+    return this.inspectRecord(run, loaded, ui_connection, observe, observations);
   }
-  async inspectRecord(run, loaded, ui_connection, observe) {
+  async inspectRecord(
+    run,
+    loaded,
+    ui_connection,
+    observe,
+    observations = { records: new Map(), status: "available" },
+  ) {
     let status = ["exit_confirmed", "absence_observed"].includes(
       run.process?.status,
     )
@@ -851,8 +966,13 @@ export class RunHistory {
           : run.state;
     if (loaded.tail_bytes && !terminal(state)) state = "unknown";
     const lock = await this.lockObservation();
+    const observed = observations.records.get(run.run_id) || null;
+    const diagnosticRun = observed ? { ...run, ...observed } : run;
     return {
       ...structuredClone(run),
+      last_activity: observed?.last_activity ?? null,
+      resource_observation: observed?.resource_observation ?? null,
+      observation_store_status: observations.status,
       scope_observation: run.scope
         ? {
             status:
@@ -887,7 +1007,7 @@ export class RunHistory {
         scope: "owned_root_process_only; descendants_unverified",
       },
       stall_diagnosis: diagnoseRun({
-        run,
+        run: diagnosticRun,
         processObservation: { status, observed_at: new Date().toISOString() },
         uiConnection: ui_connection,
       }),
@@ -960,11 +1080,18 @@ export class RunHistory {
       "invalid_cursor",
     );
     const loaded = await this.read(),
+      observations = await this.observationSnapshot(),
       runs = [];
     const records = [...loaded.runs.values()];
     for (const run of records.slice(after, after + limit))
       runs.push(
-        await this.inspectRecord(run, loaded, "unknown", readProcessIdentity),
+        await this.inspectRecord(
+          run,
+          loaded,
+          "unknown",
+          readProcessIdentity,
+          observations,
+        ),
       );
     return {
       schema: 1,
@@ -986,6 +1113,7 @@ export class RunHistory {
       "invalid_ui_connection",
     );
     const loaded = await this.read();
+    const observations = await this.observationSnapshot();
     const records = [...loaded.runs.values()].slice(-limit).reverse();
     const observed_at = new Date().toISOString();
     const runs = await Promise.all(
@@ -1028,13 +1156,15 @@ export class RunHistory {
             state = "unknown";
         }
         if (loaded.tail_bytes && !terminal(state)) state = "unknown";
+        const observation = observations.records.get(run.run_id);
         return {
           run_id: run.run_id,
           recorded_state: run.state,
           state,
           updated_at: run.updated_at,
+          observation_store_status: observations.status,
           stall_diagnosis: diagnoseRun({
-            run,
+            run: observation ? { ...run, ...observation } : run,
             processObservation: { status, observed_at },
             uiConnection,
             now: observed_at,
@@ -1045,6 +1175,7 @@ export class RunHistory {
     return {
       schema: 1,
       observed_at,
+      observation_store_status: observations.status,
       runs,
       recovery_required: loaded.tail_bytes > 0,
     };

@@ -186,22 +186,34 @@ test("run activity and resource metadata persist without free text", async (t) =
     "gpu",
   );
   const historyEvents = (await reopened.events(id)).events;
-  assert.deepEqual(
-    historyEvents
-      .filter((event) => event.type === "activity_observed")
-      .map((event) => event.data),
-    [{ kind: "agent_message" }],
+  assert.ok(
+    historyEvents.every(
+      (event) =>
+        !["activity_observed", "resource_observed"].includes(event.type),
+    ),
   );
-  assert.deepEqual(
-    historyEvents
-      .filter((event) => event.type === "resource_observed")
-      .map((event) => event.data),
-    [{ kind: "gpu", status: "waiting" }],
+  const observationFile = path.join(
+    project.directory,
+    "run-observations.json",
+  );
+  const observations = JSON.parse(await fs.readFile(observationFile, "utf8"));
+  assert.equal(observations.schema, 1);
+  assert.equal(observations.project_id, project.id);
+  assert.equal(observations.records[0].last_activity.kind, "agent_message");
+  assert.equal(
+    observations.records[0].resource_observation.kind,
+    "gpu",
   );
   await assert.rejects(
     history.recordActivity(id, "raw user prompt"),
     error("invalid_activity_kind"),
   );
+
+  await fs.writeFile(observationFile, "{invalid", "utf8");
+  const unavailable = await reopened.inspect(id);
+  assert.equal(unavailable.observation_store_status, "unavailable");
+  assert.equal(unavailable.last_activity, null);
+  assert.equal((await reopened.events(id)).events.length, historyEvents.length);
 });
 
 test("alive, gone, PID reuse and unavailable process facts have distinct conservative results", async (t) => {

@@ -277,10 +277,18 @@ $("run-diagnostics-refresh").onclick = async () => {
   try {
     const report = await api("run-diagnostics");
     renderRunDiagnostics(report);
+    const statusDetails = [
+      report.recovery_required ? "履歴の末尾が未確定" : null,
+      report.observation_store_status === "unavailable"
+        ? "活動観測の保存内容を確認できません"
+        : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
     $("run-diagnostics-status").textContent =
       `直近 ${report.runs.length} run · 観測 ${new Date(
         report.observed_at,
-      ).toLocaleString("ja-JP")}${report.recovery_required ? " · 履歴の末尾が未確定" : ""}`;
+      ).toLocaleString("ja-JP")}${statusDetails ? ` · ${statusDetails}` : ""}`;
   } catch (error) {
     $("run-diagnostics-status").textContent =
       `診断を取得できません: ${error.message}`;

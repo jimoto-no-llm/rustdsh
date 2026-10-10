@@ -64,10 +64,14 @@ An invalid transition is refused and its reason/event ID remain in the journal.
 owned-process observations, the recorded run state, an in-flight `send` command,
 and metadata-only ACP activity heartbeats. ACP update names are allowlisted and
 coalesced to at most one observation per minute; message, tool, and prompt
-contents are never copied into the run journal. A heartbeat is considered
-recent for 90 seconds to allow for that sampling interval. Resource providers
-may record a resource kind and wait state; a resource kind is shown only when a
-provider explicitly reported it.
+contents are never copied into storage. The latest activity and resource
+observations live in a bounded companion file, written atomically under the run
+history writer lock, so the schema-1 event journal remains readable by older
+builds. A corrupt companion file makes these signals unavailable without
+blocking run-history reads. A heartbeat is considered recent for 90 seconds to
+allow for that sampling interval. Resource providers may record a resource
+kind and wait state; a resource kind is shown only when a provider explicitly
+reported it.
 
 Recent ACP activity is measured from its recorded timestamp. A dispatched send
 with a live process and no recent heartbeat is labeled `api_wait_possible`; after
