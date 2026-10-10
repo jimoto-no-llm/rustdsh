@@ -120,6 +120,20 @@ test("profiles reject unknown and credential-like fields before state changes", 
       }),
     /credential-like/,
   );
+  for (const argument of [
+    "--token secret-value",
+    "https://alice:secret-value@example.com/api",
+  ]) {
+    assert.throws(
+      () =>
+        createProjectProfile(state, {
+          id: "unsafe",
+          name: "Unsafe",
+          values: completeProfile({ verification_commands: [["tool", argument]] }),
+        }),
+      /credential-like/,
+    );
+  }
   assert.deepEqual(state, {});
 });
 

@@ -39,9 +39,10 @@ Supported fields are:
 - `max_parallel`: an integer from 1 to 64.
 - `notifications`: `all`, `actionable` or `none`.
 
-Unknown fields are rejected. Credential-named fields and common credential-like
-`key=value` strings are rejected; credentials should never be placed in profile
-values. The preview reads only these explicit environment names:
+Unknown fields are rejected. Credential-named fields, common credential-like
+`key=value` strings, credential command-line flags, and URLs containing user
+information are rejected; credentials should never be placed in profile values.
+The preview reads only these explicit environment names:
 
 - `RDSH_PROFILE_MODEL_ROUTE`
 - `RDSH_PROFILE_MAX_PARALLEL`
