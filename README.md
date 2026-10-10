@@ -42,7 +42,7 @@ Delegated conversations need the original DSH runtime.
 | Item | Detail |
 | --- | --- |
 | OS | Linux, macOS, WSL, Windows (native). Agent isolation needs Linux x86_64 + bubblewrap + prlimit. |
-| DSH runtime | Original `dsh` for conversations. Audited versions: 0.2.0-rc.2, 0.2.1-alpha.1. |
+| DSH runtime | Original `dsh` for conversations. The execution adapter supports audited versions 0.2.0-rc.2 and 0.2.1-alpha.1. |
 | Rust | 1.85+ (source builds only). Prebuilt binaries need no Rust. |
 | Optional | Node.js 22+ for the [Node.js dashboard](dashboard/README.md); SearXNG for `search-web`; `zstd` CLI for exact compressed token sizes. |
 
@@ -270,7 +270,8 @@ double-click opens; `--no-tray` stays in the terminal).
 The original Harness update banner appears right after an update is recorded,
 every two hours from its update time, and on every full page reload.
 Dismiss / X or a successful updater check closes the current occurrence; the
-two-hour schedule continues. Unchanged release checks do not record a new update. Switching projects keeps it closed until the next slot, and close
+two-hour schedule continues. Unchanged release checks do not record a new update.
+Switching projects keeps it closed until the next slot, and close
 events reach other GUI ports of the same OS user. Activating new code needs one
 normal GUI restart/reload; see [browser verification](docs/evidence/update-notice-repeat/README.md).
 
@@ -339,7 +340,7 @@ before/after output checks are in [BENCHMARKS.md](docs/BENCHMARKS.md).
 DeepSeek Harness provides the upstream runtime; without it, rustdsh would not exist.
 Thanks to the upstream developers and everyone contributing code, reviews, tests, and ideas.
 
-- Icon by [PENTACoXIAN](https://x.com/PENTACoXIAN)
+Icon by [PENTACoXIAN](https://x.com/PENTACoXIAN).
 
 - [GrEarl](https://github.com/GrEarl) and [PENTACoXIAN](https://x.com/PENTACoXIAN): security reports and review.
 - [StudioYebisu](https://github.com/yebisu0529-ship-it), [RNA4219](https://github.com/RNA4219), and [eightman999](https://github.com/eightman999): contributions and improvement reports.

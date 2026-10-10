@@ -57,7 +57,7 @@ rdsh tui                        # 会話を始め、選んだモデルの返答�
 | 項目 | 内容 |
 | --- | --- |
 | OS | Linux、macOS、WSL、Windows（ネイティブ）。エージェントの隔離には Linux x86_64 + bubblewrap + prlimit が必要です。 |
-| DSH 本体 | 会話には本家の `dsh` が必要です。監査済みは 0.2.0-rc.2 と 0.2.1-alpha.1 です。 |
+| DSH 本体 | 会話には本家の `dsh` が必要です。実行アダプターが対応する監査済み版は 0.2.0-rc.2 と 0.2.1-alpha.1 です。 |
 | Rust | ソースから作る場合のみ 1.85 以上が必要です。ビルド済みバイナリには Rust はいりません。 |
 | 任意 | [Node.js ダッシュボード](dashboard/README.md)には Node.js 22 以上、`search-web` には SearXNG、正確な圧縮見積りには `zstd` CLI が必要です。 |
 
@@ -362,6 +362,8 @@ v0.2.0 公開後のソース修正は、その公開済みバイナリには含�
 ## 謝辞
 
 本家 DeepSeek Harness の開発者・貢献者の皆さんに感謝します。本家のランタイムが rustdsh の基盤です。
+
+アイコン制作：[PENTACoXIAN](https://x.com/PENTACoXIAN)。
 
 - [GrEarl](https://github.com/GrEarl)、[PENTACoXIAN](https://x.com/PENTACoXIAN)：脆弱性の報告・セキュリティレビューです。
 - [StudioYebisu](https://github.com/yebisu0529-ship-it)、[RNA4219](https://github.com/RNA4219)、[eightman999](https://github.com/eightman999)：実装・改善・問題の報告です。
