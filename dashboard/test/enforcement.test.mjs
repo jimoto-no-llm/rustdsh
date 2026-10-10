@@ -63,7 +63,7 @@ test("unsupported workers show distinct requested permissions without starting o
   assert.equal(await fs.readFile(outsideFile, "utf8"), "outside fixture");
 
   const tampered = structuredClone(store.value);
-  tampered.contracts[0].versions.at(-1).write_roots = [temp];
+  tampered.contracts[0].versions.at(-1).write_roots = [await fs.realpath(temp)];
   let probes = 0;
   const escaped = await checkWorkerStart(tampered, { ...input, worker_role: "implementation" }, {
     probe: async () => { probes++; return { supported: true, backend: "fixture" }; },

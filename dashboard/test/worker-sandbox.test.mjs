@@ -31,8 +31,9 @@ test("unsupported platforms hold without starting a sandbox operation", async ()
 
 test("Linux workers use the real bwrap and seccomp boundary for reads, writes, commands and child processes", async (t) => {
   if (process.platform !== "linux") { t.skip("Bubblewrap backend is Linux-only"); return; }
-  const capability = await probeSandbox();
-  assert.equal(capability.supported, true, `sandbox probe failed: ${capability.reason || "unknown"}`);
+  const capability = await probeSandbox(undefined, { diagnostics: true });
+  assert.equal(capability.supported, true,
+    `sandbox probe failed: ${JSON.stringify(capability)}`);
   assert.equal(capability.backend, "bubblewrap+seccomp");
 
   const temp = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-worker-sandbox-test-")));
@@ -121,16 +122,16 @@ test("Linux workers use the real bwrap and seccomp boundary for reads, writes, c
   const processContract = contractFor(args);
   const child = await executeSandboxedOperation({ repository: root,
     contract: processContract, workerRole: "implementation",
-    input: input("process.exec", { executable: python, args }),
-    evaluated: { cwd: root, executable: python }, capability });
+    input: input("process.exec", { cwd: readRoot, executable: python, args }),
+    evaluated: { cwd: readRoot, executable: python }, capability });
   assert.equal(child.execution, "completed", child.stderr);
   assert.equal(child.stdout.trim(), "blocked:blocked");
   assert.equal(await fs.readFile(outsideFile, "utf8"), "hidden fixture");
   const otherArgs = ["-c", "print('unapproved')"];
   const unapproved = await executeSandboxedOperation({ repository: root,
     contract: processContract, workerRole: "implementation",
-    input: input("process.exec", { executable: python, args: otherArgs }),
-    evaluated: { cwd: root, executable: python }, capability });
+    input: input("process.exec", { cwd: readRoot, executable: python, args: otherArgs }),
+    evaluated: { cwd: readRoot, executable: python }, capability });
   assert.equal(unapproved.reason, "executable_or_arguments_outside_policy");
 
   const unapprovedNetwork = await executeSandboxedOperation({ repository: root,

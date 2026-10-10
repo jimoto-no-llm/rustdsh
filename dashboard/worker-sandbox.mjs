@@ -454,7 +454,7 @@ export async function executeSandboxedOperation({ repository, contract, workerRo
   return { execution: "not_started", reason: "operation_unsupported" };
 }
 
-export async function probeSandbox(capability = sandboxCapability()) {
+export async function probeSandbox(capability = sandboxCapability(), { diagnostics = false } = {}) {
   const available = await capability;
   if (!available.supported) return available;
   let root;
@@ -468,11 +468,21 @@ export async function probeSandbox(capability = sandboxCapability()) {
       readRoots: [root], writeRoots: [], bwrap: available.bwrap,
       prlimit: available.prlimit, timeoutMs: 5000,
     });
-    if (result.execution !== "completed" || result.stdout !== "rdsh-sandbox-ready\n")
-      return { supported: false, reason: "sandbox_probe_failed" };
+    if (result.execution !== "completed" || result.stdout !== "rdsh-sandbox-ready\n") {
+      const detail = diagnostics ? {
+        execution: result.execution,
+        exit_code: result.exit_code ?? null,
+        reason: result.reason ?? null,
+        stderr: result.stderr?.split(/\r?\n/, 1)[0]
+          .replace(/\/tmp\/[^\s]*/g, "<temp>").slice(0, 180) || null,
+      } : null;
+      return { supported: false, reason: "sandbox_probe_failed",
+        ...(detail ? { diagnostic: detail } : {}) };
+    }
     return { ...available, probed: true };
-  } catch {
-    return { supported: false, reason: "sandbox_probe_failed" };
+  } catch (error) {
+    return { supported: false, reason: "sandbox_probe_failed",
+      ...(diagnostics ? { diagnostic: safeReason(error, "sandbox_runner_failed") } : {}) };
   } finally {
     if (root) await fs.rm(root, { recursive: true, force: true });
   }
