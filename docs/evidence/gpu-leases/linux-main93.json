@@ -1,0 +1,112 @@
+{
+  "schema": 1,
+  "platform": "linux",
+  "node": "v24.21.0",
+  "at": "2026-10-08T23:28:02.996Z",
+  "runtime_source_sha256": "333834197bf53aa40cd49a2524e8d5d265229b6df830f8037d366e12e161e012",
+  "source_files": [
+    "package.json",
+    "package-lock.json",
+    "process-scope.mjs",
+    "process-scope-backends.mjs",
+    "tracked-adapter.mjs",
+    "gpu-telemetry.mjs",
+    "gpu-lock.mjs",
+    "gpu-leases.mjs",
+    "gpu-attachment.mjs",
+    "session-ledger.mjs",
+    "run-history.mjs",
+    "releases.mjs",
+    "cli.mjs",
+    "state.mjs",
+    "test/gpu-evidence.mjs",
+    "test/fixtures/acp-cli.mjs",
+    "test/fixtures/gpu-acp-cli.mjs"
+  ],
+  "scope": "fixed_driver_inventory_and_original_ACP_peer; actual_kernel_process_ownership; no_GPU_workload_or_model",
+  "marker_miss_200": {
+    "median_ms": 0.20111099999999738,
+    "p95_ms": 0.2606049999999982
+  },
+  "transport_samples": {
+    "attach_per_mode": 3,
+    "send_per_mode": 24,
+    "stop_per_mode": 3
+  },
+  "timings": {
+    "disabled": {
+      "attach_ms": [276.69242099999997, 265.7097879999999, 279.4236840000003],
+      "send_ms": [
+        44.6259, 48.96559100000002, 44.137940999999955, 46.17953800000009,
+        57.05119100000002, 45.593706, 46.218524, 48.35468100000003,
+        52.678233999999975, 50.96012900000005, 49.987791000000016,
+        48.71264700000029, 51.377330000000256, 50.391286000000036,
+        50.603721999999834, 48.58844100000033, 58.1730520000001,
+        55.28820600000017, 50.47605999999996, 53.173989999999776,
+        53.50477899999987, 54.288420999999744, 55.79957999999988,
+        53.79529199999979
+      ],
+      "stop_ms": [134.6007659999999, 137.20595400000002, 149.48163400000067]
+    },
+    "leased": {
+      "attach_ms": [318.6851640000001, 305.7513259999996, 345.1246030000002],
+      "send_ms": [
+        55.39728799999989, 51.487397999999985, 51.443719999999985,
+        52.69098699999995, 51.42520300000001, 51.65040799999997,
+        51.258886000000075, 50.41018400000007, 55.61372500000016,
+        53.69596500000034, 54.61333300000024, 56.04901800000016,
+        57.35296000000017, 57.94994799999995, 55.63686999999982,
+        56.1326039999999, 63.2312350000002, 340.89219799999955,
+        63.770001000000775, 64.39085299999988, 67.9256519999999,
+        59.476160000000164, 59.922583000000486, 61.752308000000085
+      ],
+      "stop_ms": [134.63604800000007, 149.20216000000028, 157.20093600000018]
+    }
+  },
+  "medians": {
+    "disabled": {
+      "attach_ms": 276.69242099999997,
+      "send_ms": 50.603721999999834,
+      "stop_ms": 137.20595400000002
+    },
+    "leased": {
+      "attach_ms": 318.6851640000001,
+      "send_ms": 56.04901800000016,
+      "stop_ms": 149.20216000000028
+    }
+  },
+  "before_after_low_capacity": {
+    "before": {
+      "opt_in": false,
+      "native_process_started": true,
+      "process_stop": "owned_group_exit_confirmed",
+      "reservation_mib": 0
+    },
+    "after": {
+      "opt_in": true,
+      "status": "waiting-resource",
+      "reason": "gpu_capacity_insufficient",
+      "device_id": "GPU-00000000-0000-0000-0000-000000000001",
+      "requested_vram_mib": 4096,
+      "driver_free_mib": 1024,
+      "reserved_mib": 0,
+      "native_process_started": false
+    }
+  },
+  "final_active_reservations": 0,
+  "recently_released": [
+    {
+      "reason": "held_kernel_group_empty",
+      "requested_vram_mib": 4096
+    },
+    {
+      "reason": "held_kernel_group_empty",
+      "requested_vram_mib": 4096
+    },
+    {
+      "reason": "held_kernel_group_empty",
+      "requested_vram_mib": 4096
+    }
+  ],
+  "physical_GPU_workload_tested": false
+}

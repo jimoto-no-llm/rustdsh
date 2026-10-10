@@ -21,6 +21,10 @@ explicit interruption with native proof, and honest unsupported-steer fallback.
 [Task preflight](../docs/TASK-PREFLIGHT.md) checks the required CLI, cwd, disk,
 port, dependencies, GPU/WSL and selected authentication before an ACP session.
 
+[Optional GPU leases](../docs/GPU-LEASES.md) reserve a requested UUID/VRAM amount
+before original ACP attachment, report capacity waits separately from failures,
+and retain uncertain ownership until actual process/group exit is confirmed.
+
 [Durable run recovery](../docs/RUN-RECOVERY.md) records control request/ack IDs
 and separates recorded run state, root-process observations and UI connectivity.
 

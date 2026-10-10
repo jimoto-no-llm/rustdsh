@@ -1,0 +1,134 @@
+{
+  "schema": 1,
+  "source_commit": "04f363f9ea5d5a5ea6d887c4264aac6c556c0414",
+  "merged_main": "93b3bcaa7759fb27461b02f1dd0b0012e946b329",
+  "runtime_source_sha256": "96b4ba739a0e4db97d6a38a92b34489bd0aeb31c483364be35719e0f7ff837b4",
+  "scope": "fixed_driver_inventory_and_original_ACP_peer; actual_kernel_process_ownership; no_GPU_workload_or_model",
+  "platforms": {
+    "windows": {
+      "platform": "win32",
+      "node": "v22.23.3",
+      "before_after_low_capacity": {
+        "before": {
+          "opt_in": false,
+          "native_process_started": true,
+          "process_stop": "owned_group_exit_confirmed",
+          "reservation_mib": 0
+        },
+        "after": {
+          "opt_in": true,
+          "status": "waiting-resource",
+          "reason": "gpu_capacity_insufficient",
+          "device_id": "GPU-00000000-0000-0000-0000-000000000001",
+          "requested_vram_mib": 4096,
+          "driver_free_mib": 1024,
+          "reserved_mib": 0,
+          "native_process_started": false
+        }
+      },
+      "medians": {
+        "disabled": {
+          "attach_ms": 1193.5612999999994,
+          "send_ms": 41.41160000000036,
+          "stop_ms": 165.20790000000034
+        },
+        "leased": {
+          "attach_ms": 1256.8760999999995,
+          "send_ms": 43.123099999999795,
+          "stop_ms": 479.7992999999997
+        }
+      },
+      "transport_samples": {
+        "attach_per_mode": 3,
+        "send_per_mode": 24,
+        "stop_per_mode": 3
+      },
+      "marker_miss_200": {
+        "median_ms": 0.24220000000002528,
+        "p95_ms": 0.29700000000002547
+      },
+      "final_active_reservations": 0
+    },
+    "linux": {
+      "platform": "linux",
+      "node": "v24.21.0",
+      "before_after_low_capacity": {
+        "before": {
+          "opt_in": false,
+          "native_process_started": true,
+          "process_stop": "owned_group_exit_confirmed",
+          "reservation_mib": 0
+        },
+        "after": {
+          "opt_in": true,
+          "status": "waiting-resource",
+          "reason": "gpu_capacity_insufficient",
+          "device_id": "GPU-00000000-0000-0000-0000-000000000001",
+          "requested_vram_mib": 4096,
+          "driver_free_mib": 1024,
+          "reserved_mib": 0,
+          "native_process_started": false
+        }
+      },
+      "medians": {
+        "disabled": {
+          "attach_ms": 261.333176,
+          "send_ms": 48.105139000000236,
+          "stop_ms": 139.3467559999999
+        },
+        "leased": {
+          "attach_ms": 325.83575999999994,
+          "send_ms": 54.892005000000154,
+          "stop_ms": 138.62116500000002
+        }
+      },
+      "transport_samples": {
+        "attach_per_mode": 3,
+        "send_per_mode": 24,
+        "stop_per_mode": 3
+      },
+      "marker_miss_200": {
+        "median_ms": 0.20621999999997342,
+        "p95_ms": 0.29064900000000193
+      },
+      "final_active_reservations": 0
+    }
+  },
+  "validation": {
+    "windows_dashboard": {
+      "tests": 220,
+      "pass": 220,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    "linux_dashboard": {
+      "tests": 220,
+      "pass": 213,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 7
+    },
+    "windows_real_short_temp": {
+      "tests": 23,
+      "pass": 23,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    "real_short_project_before": "matching receipt incorrectly retained",
+    "real_short_project_after": "matching receipt released; missing/link/corrupt receipt retained",
+    "rust_release_tests": 103,
+    "benchmark_example_tests": 7,
+    "fence_tests": 2,
+    "cli_checks": 53,
+    "security_boundary_tests": 11,
+    "fmt": "pass",
+    "release_clippy_zero_warnings": "pass"
+  },
+  "limitations": [
+    "fixed inventory, no physical GPU allocations or model/provider calls",
+    "local samples, not provider throughput",
+    "one OS/state home; Windows/WSL and network-filesystem sharing unsupported"
+  ]
+}

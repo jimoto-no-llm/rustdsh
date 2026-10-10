@@ -2,6 +2,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID, createHash } from "node:crypto";
+import { gpuRequest } from "./gpu-telemetry.mjs";
 import {
   readProcessIdentity,
   validProcessIdentity,
@@ -59,10 +60,11 @@ const transitions = {
     "unknown",
     "failed",
   ],
-  disconnected: ["starting", "unknown"],
+  disconnected: ["starting", "waiting-resource", "unknown"],
   stopping: ["disconnected", "unknown", "failed"],
   unknown: [
     "starting",
+    "waiting-resource",
     "running",
     "waiting-human",
     "stopping",
@@ -156,7 +158,12 @@ function validateData(type, data) {
         data.native_session_id !== null &&
         nativeId(data.native_session_id),
     );
-  else if (type === "transition" || type === "transition_rejected")
+  else if (type === "gpu_requirement") {
+    check(exact(data, ["request"]));
+    check(
+      JSON.stringify(gpuRequest(data.request)) === JSON.stringify(data.request),
+    );
+  } else if (type === "transition" || type === "transition_rejected")
     check(
       exact(data, ["from", "to", "reason"]) &&
         runStates.includes(data.from) &&
@@ -322,6 +329,9 @@ function apply(state, event) {
           run.native_session_id === data.native_session_id,
       );
       run.native_session_id = data.native_session_id;
+    } else if (type === "gpu_requirement") {
+      check(!run.gpu_request);
+      run.gpu_request = structuredClone(data.request);
     } else if (type === "scope_intent") {
       check(!run.scope || run.scope.status === "exit_confirmed");
       run.scope = {
@@ -600,6 +610,19 @@ export class RunHistory {
       return structuredClone(state.runs.get(id));
     });
   }
+  async gpuRequirement(id, request) {
+    request = gpuRequest(request);
+    return this.mutate((state, append) => {
+      const run = state.runs.get(id);
+      check(run, "run_not_found");
+      if (run.gpu_request) {
+        check(
+          JSON.stringify(run.gpu_request) === JSON.stringify(request),
+          "gpu_run_request_changed",
+        );
+      } else append(id, "gpu_requirement", { request });
+    });
+  }
   async transition(id, to, reason) {
     check(
       runStates.includes(to) && reasons.includes(reason),
@@ -792,16 +815,20 @@ export class RunHistory {
       "gone",
       "pid_reused",
     ].includes(status);
+    const resourceWait =
+      run.state === "waiting-resource" && (!run.process || knownExit);
     let state = terminal(run.state)
       ? run.state
-      : knownExit
-        ? "disconnected"
-        : run.process ||
-            ["starting", "running", "waiting-human", "stopping"].includes(
-              run.state,
-            )
-          ? "unknown"
-          : run.state;
+      : resourceWait
+        ? "waiting-resource"
+        : knownExit
+          ? "disconnected"
+          : run.process ||
+              ["starting", "running", "waiting-human", "stopping"].includes(
+                run.state,
+              )
+            ? "unknown"
+            : run.state;
     if (loaded.tail_bytes && !terminal(state)) state = "unknown";
     const lock = await this.lockObservation();
     return {
@@ -825,13 +852,15 @@ export class RunHistory {
       state,
       state_basis: terminal(run.state)
         ? "recorded_terminal_result"
-        : knownExit
-          ? "process_exit_observed; native_session_can_still_exist"
-          : status === "alive"
-            ? "process_alive; native_run_state_unobservable"
-            : state === "unknown"
-              ? "run_state_unverified"
-              : "recorded_control_state",
+        : resourceWait
+          ? "recorded_resource_wait; native_process_not_running"
+          : knownExit
+            ? "process_exit_observed; native_session_can_still_exist"
+            : status === "alive"
+              ? "process_alive; native_run_state_unobservable"
+              : state === "unknown"
+                ? "run_state_unverified"
+                : "recorded_control_state",
       observed_at: new Date().toISOString(),
       ui_connection,
       process_observation: {
