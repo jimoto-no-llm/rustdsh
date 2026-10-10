@@ -140,6 +140,9 @@ rdsh doctor                        # 本家 dsh・DSH_HOME・slim 設定の確�
 rdsh bench --n 5                   # rdsh と dsh の起動比較です
 ```
 
+Windows では親junctionを安全に拒否する読込みを用意できるまで圧縮履歴を開きません。
+そのため `sessions --tokens` の合計には一部の履歴が含まれず、正確な値ではありません。
+
 ### 認証情報は明示的に取り込みます（`rdsh auth`）
 
 他のツールで済ませたログインを、dsh が読む `$DSH_HOME/.credentials.yaml` へ写します。

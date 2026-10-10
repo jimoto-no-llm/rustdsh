@@ -623,6 +623,13 @@ fn session_decompressed_bytes(
     (r, exact)
 }
 
+struct DeferredZstdFile {
+    name: String,
+    file: std::fs::File,
+    mtime: u64,
+    bytes: u64,
+}
+
 fn session_decompressed_bytes_uncached(
     root: &str,
     project: &str,
@@ -639,7 +646,8 @@ fn session_decompressed_bytes_uncached(
     let mut total = 0u64;
     let mut any = false;
     let mut estimated = false;
-    let mut deferred = vec![];
+    let mut deferred: Vec<DeferredZstdFile> = vec![];
+    let session_root = std::path::Path::new(root);
     for e in entries.filter_map(|e| e.ok()) {
         let p = e.path();
         let Some(name) = p.file_name().map(|s| s.to_string_lossy().into_owned()) else {
@@ -648,18 +656,32 @@ fn session_decompressed_bytes_uncached(
         if !name.ends_with(".zstd") {
             continue;
         }
-        // Never measure through a link, and never label the remaining partial
-        // sum exact when a compressed entry was deliberately omitted.
-        if !e.file_type().is_ok_and(|t| t.is_file()) {
+        // Open beneath the sessions root with no-follow semantics. Keep that
+        // handle through metadata, header parsing, cache identity and zstd.
+        let Some(mut file) = open_session_file(session_root, &p) else {
+            estimated = true;
+            continue;
+        };
+        let Some((mtime, bytes)) = file_metadata(&file) else {
+            estimated = true;
+            continue;
+        };
+        let header_size = zstd_frame_content_size_file(&mut file);
+        if file_metadata(&file) != Some((mtime, bytes)) {
             estimated = true;
             continue;
         }
-        match zstd_frame_content_size(&p) {
+        match header_size {
             Some(n) => {
                 total += n;
                 any = true;
             }
-            None => deferred.push(p),
+            None => deferred.push(DeferredZstdFile {
+                name,
+                file,
+                mtime,
+                bytes,
+            }),
         }
     }
     if !deferred.is_empty() {
@@ -667,17 +689,10 @@ fn session_decompressed_bytes_uncached(
             return (None, false);
         }
         // Per-file cache: only grown/added files pay for re-expansion.
-        let mut todo: Vec<std::path::PathBuf> = vec![];
-        for p in &deferred {
-            let Some(name) = p.file_name().map(|s| s.to_string_lossy().into_owned()) else {
-                continue;
-            };
-            let Some((mtime, bytes)) = file_meta(p) else {
-                estimated = true;
-                continue;
-            };
-            let fkey = TokensCache::file_key(root, project, id, &name);
-            match cache.get(&fkey, mtime, bytes, zstd_cli) {
+        let mut todo: Vec<DeferredZstdFile> = vec![];
+        for file in deferred {
+            let fkey = TokensCache::file_key(root, project, id, &file.name);
+            match cache.get(&fkey, file.mtime, file.bytes, zstd_cli) {
                 Some(hit) => {
                     if let Some(n) = hit {
                         total += n;
@@ -686,24 +701,20 @@ fn session_decompressed_bytes_uncached(
                         estimated = true;
                     }
                 }
-                None => todo.push(p.clone()),
+                None => todo.push(file),
             }
         }
         // Stale reuse: grown files with a recent exact value skip expansion
         // (marked inexact by the caller via the returned flag).
         let stale_window = stale_secs;
-        let mut todo2: Vec<std::path::PathBuf> = vec![];
-        for p in &todo {
+        let mut todo2: Vec<DeferredZstdFile> = vec![];
+        for file in todo {
             let stale_hit = (stale_window > 0)
                 .then(|| {
-                    p.file_name()
-                        .map(|s| s.to_string_lossy().into_owned())
-                        .and_then(|name| {
-                            cache.stale(
-                                &TokensCache::file_key(root, project, id, &name),
-                                stale_window,
-                            )
-                        })
+                    cache.stale(
+                        &TokensCache::file_key(root, project, id, &file.name),
+                        stale_window,
+                    )
                 })
                 .flatten();
             match stale_hit {
@@ -712,45 +723,47 @@ fn session_decompressed_bytes_uncached(
                     any = true;
                     estimated = true;
                 }
-                None => todo2.push(p.clone()),
+                None => todo2.push(file),
             }
         }
         let todo = todo2;
         if todo.len() == 1 {
-            let p = &todo[0];
-            if let Some(name) = p.file_name().map(|s| s.to_string_lossy().into_owned()) {
-                if let Some((mtime, bytes)) = file_meta(p) {
-                    let n = stream_decompressed_bytes(p);
-                    cache.put(
-                        &TokensCache::file_key(root, project, id, &name),
-                        mtime,
-                        bytes,
-                        n,
-                        zstd_cli,
-                    );
-                    if let Some(n) = n {
-                        total += n;
-                        any = true;
-                    } else {
-                        estimated = true;
-                    }
-                } else {
-                    estimated = true;
-                }
+            let mut file = todo.into_iter().next().unwrap();
+            let n = stream_decompressed_file_for_identity(
+                &mut file.file,
+                (file.mtime, file.bytes),
+                std::ffi::OsStr::new("zstd"),
+            );
+            cache.put(
+                &TokensCache::file_key(root, project, id, &file.name),
+                file.mtime,
+                file.bytes,
+                n,
+                zstd_cli,
+            );
+            if let Some(n) = n {
+                total += n;
+                any = true;
+            } else {
+                estimated = true;
             }
         } else if !todo.is_empty() {
             // Several misses: one spawn for all (sums are order-independent).
             // Per-file attribution is impossible here, so only the session
             // entry (saved by the caller) covers this round.
-            let refs: Vec<&std::path::PathBuf> = todo.iter().collect();
-            match stream_many_decompressed_bytes(&refs) {
+            let mut todo = todo;
+            match stream_many_decompressed_files(&mut todo) {
                 Some(n) => {
                     total += n;
                     any = true;
                 }
                 None => {
-                    for p in &todo {
-                        if let Some(n) = stream_decompressed_bytes(p) {
+                    for file in &mut todo {
+                        if let Some(n) = stream_decompressed_file_for_identity(
+                            &mut file.file,
+                            (file.mtime, file.bytes),
+                            std::ffi::OsStr::new("zstd"),
+                        ) {
                             total += n;
                             any = true;
                         } else {
@@ -775,15 +788,25 @@ fn session_decompressed_bytes_uncached(
 /// Sum of zstd frame content sizes (RFC 8878 §3.1) without decompressing.
 /// Returns None when any frame omits its size or the stream is not a plain
 /// sequence of frames — the caller then streams `zstd -dc` instead.
+#[cfg(test)]
 fn zstd_frame_content_size(path: &std::path::Path) -> Option<u64> {
+    let root = path.parent()?;
+    let mut file = open_session_file(root, path)?;
+    zstd_frame_content_size_file(&mut file)
+}
+
+fn zstd_frame_content_size_file(file: &mut std::fs::File) -> Option<u64> {
+    use std::io::{Read, Seek, SeekFrom};
     const MAGIC: u32 = 0xFD2F_B528;
     // Prefix sniff first: session logs are streaming-written with the size
     // omitted, so most files are decided from the first frame header alone
     // instead of reading megabytes just to discard them.
-    if first_frame_denies_size(path) {
+    if first_frame_denies_size(file) {
         return None;
     }
-    let bytes = std::fs::read(path).ok()?;
+    file.seek(SeekFrom::Start(0)).ok()?;
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes).ok()?;
     let mut pos = 0usize;
     let mut total = 0u64;
     let mut frames = 0u32;
@@ -908,24 +931,72 @@ fn zstd_frame_content_size(path: &std::path::Path) -> Option<u64> {
 /// or an omitted frame content size. Anything indecisive (short/truncated
 /// prefix, skippable first frame) returns false so the full walk decides.
 /// Output-identical by construction: it only shortcuts definite rejections.
-fn first_frame_denies_size(path: &std::path::Path) -> bool {
+#[cfg(test)]
+fn plain_file_no_follow(path: &std::path::Path) -> bool {
+    path.parent()
+        .and_then(|root| open_session_file(root, path))
+        .is_some()
+}
+
+/// Open one session file without following the final link/reparse point.
+/// Unix also opens every component beneath the sessions root by directory
+/// handle, so replacing a parent after enumeration cannot redirect the read.
+fn open_session_file(root: &std::path::Path, path: &std::path::Path) -> Option<std::fs::File> {
+    let relative = path.strip_prefix(root).ok()?;
+    if relative.as_os_str().is_empty()
+        || relative
+            .components()
+            .any(|component| !matches!(component, std::path::Component::Normal(_)))
+    {
+        return None;
+    }
+    // Canonicalize the trusted root only; keep the enumerated descendants
+    // lexical so links below it remain visible to the no-follow open.
+    let root = std::fs::canonicalize(root).ok()?;
+    let path = root.join(relative);
+    #[cfg(unix)]
+    {
+        crate::file_security::open_beneath(&root, &path)
+    }
+    #[cfg(windows)]
+    {
+        // FILE_FLAG_OPEN_REPARSE_POINT protects only the leaf. Opening the
+        // absolute path can still follow a parent junction swapped after
+        // enumeration, so refuse Windows session measurements until every
+        // component can be opened beneath a trusted directory handle.
+        let _ = (root, path);
+        None
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        // Do not weaken the no-follow contract on platforms without a
+        // descriptor/reparse-aware open implementation.
+        let _ = (root, path);
+        None
+    }
+}
+
+fn first_frame_denies_size(file: &mut std::fs::File) -> bool {
+    use std::io::{Read, Seek, SeekFrom};
     const MAGIC: u32 = 0xFD2F_B528;
-    let prefix: Vec<u8> = match std::fs::File::open(path) {
-        Ok(mut f) => {
-            use std::io::Read;
-            let mut buf = [0u8; 32];
-            let mut n = 0usize;
-            while n < buf.len() {
-                match f.read(&mut buf[n..]) {
-                    Ok(0) => break,
-                    Ok(k) => n += k,
-                    Err(_) => return false,
-                }
+    if file.seek(SeekFrom::Start(0)).is_err() {
+        return false;
+    }
+    let prefix: Vec<u8> = {
+        let mut buf = [0u8; 32];
+        let mut n = 0usize;
+        while n < buf.len() {
+            match file.read(&mut buf[n..]) {
+                Ok(0) => break,
+                Ok(k) => n += k,
+                Err(_) => return false,
             }
-            buf[..n].to_vec()
         }
-        Err(_) => return false,
+        buf[..n].to_vec()
     };
+    if file.seek(SeekFrom::Start(0)).is_err() {
+        return false;
+    }
     if prefix.len() < 5 {
         return false; // tiny file: full walk decides (cheap anyway)
     }
@@ -975,8 +1046,18 @@ fn now_secs() -> u64 {
 }
 
 /// (mtime_ms, bytes) for cache identity; None when the file is unreadable.
+#[cfg(test)]
 fn file_meta(path: &std::path::Path) -> Option<(u64, u64)> {
-    let md = std::fs::metadata(path).ok()?;
+    let root = path.parent()?;
+    let file = open_session_file(root, path)?;
+    file_metadata(&file)
+}
+
+fn file_metadata(file: &std::fs::File) -> Option<(u64, u64)> {
+    let md = file.metadata().ok()?;
+    if !md.is_file() {
+        return None;
+    }
     let mtime = md
         .modified()
         .ok()?
@@ -986,12 +1067,43 @@ fn file_meta(path: &std::path::Path) -> Option<(u64, u64)> {
     Some((mtime, md.len()))
 }
 
+#[cfg(test)]
 fn stream_decompressed_bytes(path: &std::path::Path) -> Option<u64> {
-    use std::io::Read;
-    let mut child = std::process::Command::new("zstd")
+    let root = path.parent()?;
+    let mut file = open_session_file(root, path)?;
+    stream_decompressed_file(&mut file)
+}
+
+#[cfg(test)]
+fn stream_decompressed_file(file: &mut std::fs::File) -> Option<u64> {
+    let identity = file_metadata(file)?;
+    stream_decompressed_file_for_identity(file, identity, std::ffi::OsStr::new("zstd"))
+}
+
+#[cfg(test)]
+fn stream_decompressed_file_with(
+    file: &mut std::fs::File,
+    program: &std::ffi::OsStr,
+) -> Option<u64> {
+    let identity = file_metadata(file)?;
+    stream_decompressed_file_for_identity(file, identity, program)
+}
+
+fn stream_decompressed_file_for_identity(
+    file: &mut std::fs::File,
+    identity: (u64, u64),
+    program: &std::ffi::OsStr,
+) -> Option<u64> {
+    use std::io::{Read, Seek, SeekFrom};
+    let before = file_metadata(file)?;
+    if before != identity {
+        return None;
+    }
+    file.seek(SeekFrom::Start(0)).ok()?;
+    let input = file.try_clone().ok()?;
+    let mut child = std::process::Command::new(program)
         .arg("-dc")
-        .arg("--")
-        .arg(path)
+        .stdin(std::process::Stdio::from(input))
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null())
         .spawn()
@@ -1010,45 +1122,71 @@ fn stream_decompressed_bytes(path: &std::path::Path) -> Option<u64> {
             }
         }
     }
-    if child.wait().ok()?.success() {
+    let success = child.wait().ok()?.success();
+    let after = file_metadata(file)?;
+    if success && before == after && after == identity {
         Some(total)
     } else {
         None
     }
 }
 
-/// Batched `zstd -dc` over several files: one spawn, concatenated output.
-/// Byte sums are order-independent, so the total matches looping
-/// `stream_decompressed_bytes` per file. `None` on empty input, spawn
-/// failure, or nonzero exit (caller falls back to the per-file loop).
-fn stream_many_decompressed_bytes(paths: &[&std::path::PathBuf]) -> Option<u64> {
-    use std::io::Read;
-    if paths.is_empty() {
+/// Feed the already-open files to one zstd process through stdin. The child
+/// never resolves session paths; metadata is checked again after streaming.
+fn stream_many_decompressed_files(files: &mut [DeferredZstdFile]) -> Option<u64> {
+    use std::io::{Read, Seek, SeekFrom};
+    if files.is_empty() {
         return None;
+    }
+    let before: Vec<_> = files
+        .iter()
+        .map(|entry| file_metadata(&entry.file))
+        .collect::<Option<_>>()?;
+    if files
+        .iter()
+        .zip(&before)
+        .any(|(entry, identity)| *identity != (entry.mtime, entry.bytes))
+    {
+        return None;
+    }
+    for entry in files.iter_mut() {
+        entry.file.seek(SeekFrom::Start(0)).ok()?;
     }
     let mut child = std::process::Command::new("zstd")
         .arg("-dc")
-        .arg("--")
-        .args(paths.iter().map(|p| p.as_path()))
+        .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null())
         .spawn()
         .ok()?;
-    let mut total = 0u64;
-    let mut buf = [0u8; 65536];
-    if let Some(mut out) = child.stdout.take() {
+    let mut input = child.stdin.take()?;
+    let mut output = child.stdout.take()?;
+    let reader = std::thread::spawn(move || {
+        let mut total = 0u64;
+        let mut buf = [0u8; 65536];
         loop {
-            match out.read(&mut buf) {
+            match output.read(&mut buf) {
                 Ok(0) => break,
                 Ok(n) => total += n as u64,
-                Err(_) => {
-                    let _ = child.wait();
-                    return None;
-                }
+                Err(_) => return None,
             }
         }
+        Some(total)
+    });
+    let mut input_ok = true;
+    for entry in files.iter_mut() {
+        if std::io::copy(&mut entry.file, &mut input).is_err() {
+            input_ok = false;
+            break;
+        }
     }
-    if child.wait().ok()?.success() {
+    drop(input);
+    let total = reader.join().ok()??;
+    let success = child.wait().ok()?.success();
+    let stable = files.iter().zip(before).all(|(entry, identity)| {
+        file_metadata(&entry.file) == Some(identity) && identity == (entry.mtime, entry.bytes)
+    });
+    if input_ok && success && stable {
         Some(total)
     } else {
         None
@@ -1295,6 +1433,7 @@ mod tests {
         p
     }
 
+    #[cfg(unix)]
     #[test]
     fn frame_header_sizes() {
         // 1-byte FCS (single segment): exact size.
@@ -1322,6 +1461,7 @@ mod tests {
         }
     }
 
+    #[cfg(unix)]
     #[test]
     fn frame_header_fallback_cases() {
         // Multi-frame streams sum.
@@ -1364,6 +1504,7 @@ mod tests {
         }
     }
 
+    #[cfg(unix)]
     #[test]
     fn tokens_cache_skips_none_without_cli() {
         // A FCS-less frame is `?` without the zstd CLI; that `None` must not
@@ -1452,7 +1593,9 @@ mod tests {
         // buffered `zstd -dc` byte count (covered by the old-vs-new diff).
         // A CLI-compressed file (seekable input carries FCS) proves the
         // header path against a real encoder. Skips without fixtures/CLI.
-        if !zstd_available() {
+        // Windows session reads fail closed until the path can be opened
+        // beneath trusted directory handles without following parent junctions.
+        if cfg!(windows) || !zstd_available() {
             return;
         }
         let dir = std::env::temp_dir();
@@ -1513,5 +1656,129 @@ mod tests {
             }
         }
         assert!(checked > 0, "expected real session fixtures");
+    }
+}
+
+#[cfg(all(test, windows))]
+mod measurement_gate_windows_tests {
+    use super::open_session_file;
+    use std::path::Path;
+
+    fn create_junction(link: &Path, target: &Path) {
+        let link = link.to_string_lossy().replace('\'', "''");
+        let target = target.to_string_lossy().replace('\'', "''");
+        let command =
+            format!("New-Item -ItemType Junction -Path '{link}' -Target '{target}' | Out-Null");
+        let result = std::process::Command::new("powershell.exe")
+            .arg("-NoProfile")
+            .arg("-NonInteractive")
+            .arg("-Command")
+            .arg(command)
+            .output()
+            .expect("start PowerShell to create junction race fixture");
+        assert!(
+            result.status.success(),
+            "New-Item Junction failed: {}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+    }
+
+    #[test]
+    fn parent_junction_replaced_after_enumeration_is_never_opened() {
+        let dir = std::env::temp_dir().join(format!(
+            "rdsh-measure-junction-race-{}",
+            crate::local_http::random_token().unwrap()
+        ));
+        let sessions = dir.join("sessions");
+        let project = sessions.join("project");
+        let session = project.join("session");
+        let enumerated_path = session.join("history.zstd");
+        let outside = dir.join("outside-session");
+        std::fs::create_dir_all(&session).unwrap();
+        std::fs::create_dir_all(&outside).unwrap();
+        std::fs::write(&enumerated_path, b"enumerated in trusted session").unwrap();
+        std::fs::write(outside.join("history.zstd"), b"outside data").unwrap();
+        let trusted_root = std::fs::canonicalize(&sessions).unwrap();
+
+        // Keep the path returned by enumeration, then replace its parent with
+        // a junction before the no-follow open is attempted.
+        std::fs::rename(&session, project.join("session-before-swap")).unwrap();
+        create_junction(&session, &outside);
+        assert!(open_session_file(&trusted_root, &enumerated_path).is_none());
+
+        std::fs::remove_dir(&session).unwrap();
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+}
+
+#[cfg(all(test, unix))]
+mod measurement_gate_tests {
+    use super::{
+        file_meta, open_session_file, plain_file_no_follow, stream_decompressed_bytes,
+        stream_decompressed_file_with,
+    };
+
+    #[test]
+    fn links_swapped_in_after_collection_are_not_measured() {
+        let dir = std::env::temp_dir().join(format!(
+            "rdsh-measure-gate-{}",
+            crate::local_http::random_token().unwrap()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let real = dir.join("real.txt");
+        std::fs::write(&real, b"hello").unwrap();
+        assert!(plain_file_no_follow(&real));
+        assert!(file_meta(&real).is_some());
+        let link = dir.join("link.txt");
+        std::os::unix::fs::symlink("/dev/null", &link).unwrap();
+        assert!(!plain_file_no_follow(&link));
+        assert!(file_meta(&link).is_none());
+        // /dev/null would stream zero bytes successfully; the gate must stop it.
+        assert!(stream_decompressed_bytes(&link).is_none());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn opened_session_file_stays_bound_when_path_is_replaced_before_streaming() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = std::env::temp_dir().join(format!(
+            "rdsh-measure-race-{}",
+            crate::local_http::random_token().unwrap()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let session_root = std::fs::canonicalize(&dir).unwrap();
+        let path = session_root.join("history.zstd");
+        let outside = dir.join("outside-secret");
+        let original = b"the opened session handle remains the source";
+        std::fs::write(&path, original).unwrap();
+        std::fs::write(&outside, b"outside data must never be read").unwrap();
+
+        // Open first, then deterministically swap the pathname before the
+        // decompressor starts consuming input. The child receives stdin from
+        // this descriptor and never resolves `path` again.
+        let mut opened = open_session_file(&session_root, &path).unwrap();
+        let identity = file_meta(&path).unwrap();
+        std::fs::rename(&path, session_root.join("opened-file.zstd")).unwrap();
+        std::os::unix::fs::symlink(&outside, &path).unwrap();
+
+        let passthrough = session_root.join("zstd-passthrough.sh");
+        std::fs::write(
+            &passthrough,
+            b"#!/bin/sh\n[ \"$1\" = \"-dc\" ] || exit 2\ncat\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(&passthrough, std::fs::Permissions::from_mode(0o700)).unwrap();
+        assert_eq!(
+            stream_decompressed_file_with(&mut opened, passthrough.as_os_str()),
+            Some(original.len() as u64)
+        );
+        assert_eq!(file_meta(&path), None);
+        assert_eq!(
+            file_meta(&session_root.join("opened-file.zstd")),
+            Some(identity)
+        );
+
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

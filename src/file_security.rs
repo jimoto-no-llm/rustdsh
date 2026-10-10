@@ -196,3 +196,62 @@ mod secure_open_tests {
         std::fs::remove_dir_all(root.parent().unwrap()).unwrap();
     }
 }
+
+/// Lenient pre-check for `--share-file` entries before they reach the tool
+/// boundary: the JS snapshot remains the enforcer (dotfiles, key names,
+/// sizes), so Rust only rejects what is definitely unusable — empty,
+/// absolute, parent-escaping, or over-count selections — with a clear error
+/// instead of a late sandbox failure.
+pub(crate) fn validate_share_files(files: &[String]) -> Result<(), String> {
+    if files.len() > 256 {
+        return Err(format!("too many --share-file entries ({})", files.len()));
+    }
+    for f in files {
+        if f.is_empty() || f.len() > 1024 {
+            return Err(format!("invalid --share-file entry {f:?}"));
+        }
+        let path_bytes = f.as_bytes();
+        let has_windows_drive_root = path_bytes.len() >= 3
+            && path_bytes[0].is_ascii_alphabetic()
+            && path_bytes[1] == b':'
+            && matches!(path_bytes[2], b'/' | b'\\');
+        if f.starts_with('/') || f.starts_with('\\') || has_windows_drive_root {
+            return Err(format!("--share-file must be workspace-relative: {f:?}"));
+        }
+        if f.split(['/', '\\']).any(|part| part == "..") {
+            return Err(format!("--share-file must not escape: {f:?}"));
+        }
+        if f.bytes().any(|b| b == 0) {
+            return Err(format!("invalid --share-file entry {f:?}"));
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod share_validation_tests {
+    use super::validate_share_files;
+
+    #[test]
+    fn accepts_plain_relative_paths() {
+        assert!(validate_share_files(&["AGENTS.md".into(), "docs/a b.txt".into()]).is_ok());
+        assert!(validate_share_files(&[]).is_ok());
+    }
+
+    #[test]
+    fn rejects_absolute_parent_and_overflow() {
+        for bad in [
+            "",
+            "/etc/passwd",
+            "C:\\Windows\\win.ini",
+            "C:/Windows/win.ini",
+            "a/../../b",
+            "..\\x",
+            "a\0b",
+        ] {
+            assert!(validate_share_files(&[bad.into()]).is_err(), "{bad:?}");
+        }
+        let many = vec!["a".to_string(); 257];
+        assert!(validate_share_files(&many).is_err());
+    }
+}

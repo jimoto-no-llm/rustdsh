@@ -21,18 +21,51 @@ fn origin_file() -> Option<String> {
     }
 }
 
+/// Warn when an explicitly selected original (env var or origin file) looks
+/// risky: not a regular file, not owned by us, or group/world-writable.
+/// Advisory only — the selection still wins so existing setups keep working.
+#[cfg(unix)]
+fn warn_if_risky_origin(path: &str, via: &str) {
+    use std::os::unix::fs::MetadataExt;
+    let Ok(md) = std::fs::metadata(path) else {
+        return;
+    };
+    let mut why: Vec<&str> = vec![];
+    if !md.is_file() {
+        why.push("not a regular file");
+    }
+    // SAFETY: getuid takes no arguments and always succeeds.
+    if md.uid() != unsafe { libc::getuid() } {
+        why.push("not owned by you");
+    }
+    if md.mode() & 0o022 != 0 {
+        why.push("group/world-writable");
+    }
+    if !why.is_empty() {
+        eprintln!(
+            "[rdsh] warning: original dsh from {via} ({path}) is {} — check it before delegating",
+            why.join(" and ")
+        );
+    }
+}
+
+#[cfg(not(unix))]
+fn warn_if_risky_origin(_path: &str, _via: &str) {}
+
 /// Locate the original Node-based dsh (never ourselves).
 pub fn find_original_dsh() -> Option<String> {
     // Canonical name first, legacy DSH_ORIG_BIN kept as fallback.
     for key in ["RDSH_ORIG_BIN", "DSH_ORIG_BIN"] {
         if let Ok(p) = std::env::var(key) {
             if !p.is_empty() {
+                warn_if_risky_origin(&p, key);
                 return Some(p);
             }
         }
     }
     if let Some(p) = origin_file() {
         if std::fs::metadata(&p).is_ok() {
+            warn_if_risky_origin(&p, "origin file");
             return Some(p);
         }
     }
