@@ -1,0 +1,56 @@
+{
+  "functional_result": "PASS",
+  "mobile_accepted": true,
+  "scope": "original DSH Web profile settings flow, not Electron Desktop GUI or model response",
+  "viewports": [
+    {
+      "width": 1280,
+      "height": 900
+    },
+    {
+      "width": 390,
+      "height": 844
+    }
+  ],
+  "page_errors": [],
+  "console_errors": [
+    "Failed to load resource: the server responded with a status of 400 (Bad Request)"
+  ],
+  "settings_requests": [
+    {
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "status": 400
+    },
+    {
+      "method": "GET",
+      "status": 200
+    }
+  ],
+  "original_version": "0.2.0-rc.2",
+  "mobile_content_width": 318,
+  "mobile_overflow": false,
+  "mobile_readability": "PASS: navigation above content, no horizontal overflow",
+  "flow": "Settings -> rdsh -> edit -> save -> file readback -> reload -> corrupt -> API400/error -> repair -> retry",
+  "port_verified": 38080,
+  "extras_retained": true
+}

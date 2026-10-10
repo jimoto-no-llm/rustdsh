@@ -1,5 +1,5 @@
-//! `rdsh setup --web`: floating first-run connect UI on localhost.
-//! One-shot local server (127.0.0.1 only): Apple-style glass page showing
+//! `rdsh setup --web`: first-run model setup on localhost.
+//! One-shot local server (127.0.0.1 only): accessible setup page showing
 //! OAuth/API-key status. Writes only on explicit key submit (allowlisted
 //! ref names); browser auto-opens on interactive terminals.
 
@@ -16,7 +16,7 @@ pub fn cmd_setup_web(port: u16) -> anyhow::Result<()> {
     let token = Arc::new(crate::local_http::random_token()?);
     // The fragment never leaves the browser as part of an HTTP request.
     let url = format!("http://127.0.0.1:{port}/#key={token}");
-    eprintln!("[rdsh setup] floating UI: {url}  (localhost only, Ctrl-C to stop; this URL is a credential — do not share it)");
+    eprintln!("[rdsh setup] setup page: {url}  (localhost only, Ctrl-C to stop; this URL is a credential — do not share it)");
     use std::io::IsTerminal as _;
     if std::io::stdin().is_terminal() {
         // argv is visible to other local users via ps, so the token

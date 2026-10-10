@@ -52,19 +52,25 @@ def main():
     parser.add_argument("--baseline", type=Path, help="before-change rdsh binary")
     parser.add_argument("--dsh", type=Path, help="optional original dsh; runs --version only")
     parser.add_argument("--n", type=int, default=15)
+    parser.add_argument("--cpus", type=int, help="Linux CPU affinity width")
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
     if args.n < 5:
         parser.error("--n must be at least 5")
+    if args.cpus is not None:
+        if args.cpus < 1 or not hasattr(os, "sched_setaffinity"):
+            parser.error("--cpus requires Linux and a positive CPU count")
+        os.sched_setaffinity(0, sorted(os.sched_getaffinity(0))[:args.cpus])
     binaries = {"candidate": str(args.bin.resolve())}
     if args.baseline:
         binaries["baseline"] = str(args.baseline.resolve())
     report = {
         "measured_at_utc": datetime.now(timezone.utc).isoformat(),
         "system": platform.platform(), "machine": platform.machine(), "cpu_count": os.cpu_count(),
+        "affinity_cpus": sorted(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else None,
         "n": args.n, "warmups": 3, "timing": "parent wall clock, includes process launch",
         "scope": "synthetic CLI workloads; no Desktop startup or model calls",
-        "binaries": {}, "cases": {},
+        "binaries": {}, "cases": {}, "prune_compatibility": [],
     }
     for label, binary in binaries.items():
         report["binaries"][label] = {"sha256": hashlib.sha256(Path(binary).read_bytes()).hexdigest()}
@@ -97,6 +103,8 @@ def main():
             "tokens_cjk": (["tokens", str(cjk_file)], {"bytes": cjk_file.stat().st_size}),
             "search": (["search", "needle", "--dir", str(search_dir), "--max", "100"],
                        {"files": 300, "lines": 600000, "hit_limit": 100}),
+            "prune_ascii": (["prune", "--max-tokens", "4000", str(ascii_file)],
+                            {"bytes": ascii_file.stat().st_size, "budget": 4000}),
             "prune": (["prune", "--max-tokens", "4000", str(cjk_file)],
                       {"bytes": cjk_file.stat().st_size, "budget": 4000}),
         }
@@ -142,6 +150,23 @@ def main():
                 "results": {label: {**describe(values), "peak_rss_bytes": rss([binaries[label]] + arguments, env)}
                             for label, values in samples.items()},
             }
+        # Pin small-budget and UTF-8 boundaries against the actual base binary,
+        # rather than relying only on the optimized implementation's own tests.
+        for text_label, text in [
+            ("empty", ""), ("short_ascii", "abcde"),
+            ("ascii", "START\r\n" + "ASCII line\n" * 4000 + "END"),
+            ("cjk", "先頭\n" + "日本語abc\n" * 1000 + "末尾"),
+            ("emoji", "😀éhello\n" * 1000), ("nul_ascii", "a\0b\r\n" * 1000),
+        ]:
+            for budget in [0, 1, 2, 4, 8, 10, 11, 12, 13, 16, 32, 99, 100, 101, 500, 4000, 200000]:
+                values = [subprocess.run([binary, "prune", "--max-tokens", str(budget)],
+                          input=text.encode(), env=env, capture_output=True, check=True, timeout=30)
+                          for binary in binaries.values()]
+                equal = len({(value.stdout, value.stderr) for value in values}) == 1
+                if not equal:
+                    raise RuntimeError(f"prune output differs for {text_label}/{budget}")
+                report["prune_compatibility"].append({"fixture": text_label, "budget": budget,
+                    "stdout_stderr_equal": equal, "stdout_sha256": hashlib.sha256(values[0].stdout).hexdigest()})
         if args.dsh:
             command = [str(args.dsh.resolve()), "--version"]
             for _ in range(3):

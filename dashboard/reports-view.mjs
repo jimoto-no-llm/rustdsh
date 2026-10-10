@@ -74,7 +74,7 @@ function provenance(view, label, format = String, id = "") {
   details.append(
     summary,
     node("div", "報告元：" + (o?.source || "未申告")),
-    node("div", "報告session：" + (o?.session_id || "未申告")),
+    node("div", "報告セッション：" + (o?.session_id || "未申告")),
     node("div", "参照対象：" + (o?.reference || "未申告")),
     node("div", "受信：" + date(o?.recorded_at)),
   );
@@ -109,7 +109,22 @@ function rateText(state, a, b, now) {
   if (views.some((view) => view.freshness === "unknown")) return "鮮度未確認";
   return "未取得";
 }
+let reportSignature = "";
+let cardsSignature = "", tasksSignature = "", eventsSignature = "";
+const taskLabels = { todo: "未着手", doing: "進行中", blocked: "保留", done: "完了の報告" };
 export function renderReports(state, now = Date.now()) {
+  const events = state.events.slice(-30);
+  const signature = JSON.stringify([
+    state.metrics, state.metric_observations, state.tasks, state.questions, state.question_contracts, events,
+    state.questions.map(question => {
+      const deadline = state.question_contracts?.cards[question.id]?.snapshot.decision.expires_at;
+      return Boolean(deadline && Date.parse(deadline) <= now);
+    }),
+    Object.keys(state.metrics).map(key => metricView(state, key, now).freshness),
+    state.tasks.map(task => observationView(task.status, task.observation, now).freshness),
+    events.map(event => observationView(event.title, event.observation, now).freshness),
+  ]);
+  if (signature === reportSignature) return;
   openObservations = new Set(
     [...document.querySelectorAll("details.observation-details[open]")]
       .map((element) => element.dataset.observationId),
@@ -125,15 +140,25 @@ export function renderReports(state, now = Date.now()) {
     return task.status === "done" && view.current && view.kind !== "estimated";
   }).length;
   const pending = state.questions.filter((question) => question.answer === null &&
-    (!state.question_contracts?.cards[question.id] || state.question_contracts.cards[question.id].status === "open"));
+    (!state.question_contracts?.cards[question.id] ||
+      (state.question_contracts.cards[question.id].status === "open" &&
+       (!state.question_contracts.cards[question.id].snapshot.decision.expires_at ||
+        Date.parse(state.question_contracts.cards[question.id].snapshot.decision.expires_at) > now))));
   const answered = state.questions.filter((question) => question.answer !== null).length;
   const counts = ["done", "doing", "todo", "blocked"]
     .map(
       (status) =>
-        `${status} ${state.tasks.filter((task) => task.status === status).length}`,
+        `${taskLabels[status]} ${state.tasks.filter((task) => task.status === status).length}`,
     )
     .join(" · ");
-  $("cards").replaceChildren(
+  const nextCards = JSON.stringify([state.metrics, state.metric_observations,
+    Object.keys(state.metrics).map(key => metricView(state, key, now).freshness),
+    currentDone, state.tasks.length, counts, pending.length, answered]);
+  const nextTasks = JSON.stringify([state.tasks,
+    state.tasks.map(task => observationView(task.status, task.observation, now).freshness)]);
+  const nextEvents = JSON.stringify([events,
+    events.map(event => observationView(event.title, event.observation, now).freshness)]);
+  if (nextCards !== cardsSignature) $("cards").replaceChildren(
     metricCard(state, now,
       "従来の累計報告（API換算）",
       metric("total_cost_usd", money),
@@ -177,46 +202,52 @@ export function renderReports(state, now = Date.now()) {
     card("鮮度内の完了報告", `${currentDone} / ${state.tasks.length}`, "全報告の内訳：" + counts),
     card("未回答の質問", String(pending.length), `回答済み ${answered}`),
   );
-  $("task-milestones").textContent = [
-    ...new Set(state.tasks.map((task) => task.milestone).filter(Boolean)),
-  ].join(" / ");
-  $("tasks").replaceChildren(
-    ...state.tasks.map((task) => {
-      // #57: 端末を替えても同じ行へ戻れる安定アンカー。
-      const tr = node("tr");
-      tr.id = "task-" + task.id;
-      const status = node("td");
-      const view = observationView(task.status, task.observation, now);
-      const statusLabel = (view.kind === "estimated" ? "推定 " : "") +
-        task.status + (view.current ? "" : "（" + freshnessLabels[view.freshness] + "）");
-      status.append(node(
-        "span", statusLabel,
-        "status " + (view.current && view.kind !== "estimated" ? task.status : ""),
-      ));
-      const title = node("td", task.title);
-      title.append(provenance(view, undefined, String, "task:" + task.id));
-      tr.append(
-        node("td", task.id, "id"),
-        status,
-        title,
-        node("td", task.blocker),
-      );
-      const taskLink = node("a", task.id);
-      taskLink.href = "#task-" + encodeURIComponent(task.id);
-      taskLink.dataset.taskId = task.id;
-      tr.children[0].replaceChildren(taskLink);
-      [...tr.children].forEach((cell, index) => {
-        cell.dataset.label = ["ID", "状態", "題名", "ブロック要因"][index];
-      });
-      return tr;
-    }),
-  );
-  if (!state.tasks.length)
-    $("tasks").append(emptyRow("タスクはまだ登録されていません", 4));
-  renderEvents(state, now);
+  if (nextTasks !== tasksSignature) {
+    $("task-milestones").textContent = [
+      ...new Set(state.tasks.map((task) => task.milestone).filter(Boolean)),
+    ].join(" / ");
+    $("tasks").replaceChildren(
+      ...state.tasks.map((task) => {
+        // #57: 端末を替えても同じ行へ戻れる安定アンカー。
+        const tr = node("tr");
+        tr.id = "task-" + task.id;
+        const status = node("td");
+        const view = observationView(task.status, task.observation, now);
+        const statusLabel = (view.kind === "estimated" ? "推定 " : "") +
+          (taskLabels[task.status] || task.status) + (view.current ? "" : "（" + freshnessLabels[view.freshness] + "）");
+        status.append(node(
+          "span", statusLabel,
+          "status " + (view.current && view.kind !== "estimated" ? task.status : ""),
+        ));
+        const title = node("td", task.title);
+        title.append(provenance(view, undefined, String, "task:" + task.id));
+        tr.append(
+          node("td", task.id, "id"),
+          status,
+          title,
+          node("td", task.blocker),
+        );
+        const taskLink = node("a", task.id);
+        taskLink.href = "#task-" + encodeURIComponent(task.id);
+        taskLink.dataset.taskId = task.id;
+        tr.children[0].replaceChildren(taskLink);
+        [...tr.children].forEach((cell, index) => {
+          cell.dataset.label = ["ID", "状態", "題名", "進められない理由"][index];
+        });
+        return tr;
+      }),
+    );
+    if (!state.tasks.length)
+      $("tasks").append(emptyRow("タスクはまだ登録されていません", 4));
+  }
+  if (nextEvents !== eventsSignature) renderEvents(state, now);
   if (activeDisclosure)
     [...document.querySelectorAll("summary[data-observation-id]")]
       .find((summary) => summary.dataset.observationId === activeDisclosure)?.focus();
+  reportSignature = signature;
+  cardsSignature = nextCards;
+  tasksSignature = nextTasks;
+  eventsSignature = nextEvents;
 }
 function renderEvents(state, now) {
   $("events").replaceChildren(

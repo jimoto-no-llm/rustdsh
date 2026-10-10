@@ -5,7 +5,7 @@ import vm from 'node:vm';
 
 // Minimal host for the existing plugin boundary; exercise its async loading
 // behavior without adding React or browser packages to the shipped component.
-async function host(fetch) {
+async function host(fetch, { confirm = () => true } = {}) {
   const state = [];
   let cursor = 0, component;
   const mountedEffects = new Set();
@@ -32,7 +32,7 @@ async function host(fetch) {
     fetch,
     TextEncoder, URL,
     setInterval: () => 1, clearInterval: () => {},
-    window: { __ModuleLoader__: { load(module) {
+    window: { confirm, __ModuleLoader__: { load(module) {
       module.factory(() => React).apply({ slots: {
         inject: (_name, install) => install(),
         register: (_options, section) => { component = section; },
@@ -50,6 +50,73 @@ function find(node, predicate) {
   if (predicate(node)) return node;
   return node.children.map((child) => find(child, predicate)).find(Boolean);
 }
+
+function field(ui, label, tag = 'textarea') {
+  const row = find(ui, node => node.tag === 'label' &&
+    node.children.some(child => child === label || child?.children?.includes(label)));
+  assert.ok(row, label);
+  return find(row, node => node.tag === tag);
+}
+
+test('multiline drafts keep newlines while typing and save every list as an array', async () => {
+  let saved;
+  const config = { context: {}, guard: {}, discord: {}, sessions: { stale_secs: 120 } };
+  const fixture = await host(async (route, options) => {
+    if (route === '/api/rdsh-discord') return { ok: true, json: async () => ({ ok: true, state: 'disabled' }) };
+    if (options.method === 'POST') saved = JSON.parse(options.body).config;
+    return { ok: true, json: async () => ({ ok: true, config: saved ?? config }) };
+  });
+  fixture.render(); await fixture.settle();
+  const labels = ['作業中ファイル (1行1件)', '未解決タスク (1行1件)', '決定事項 (1行1件)', '制約 (1行1件)', '拒否する入力パターン（1行1件）'];
+  for (const label of labels) {
+    field(fixture.render(), label).props.onChange({ target: { value: 'first\n' } });
+    assert.equal(field(fixture.render(), label).props.value, 'first\n', 'Enter must remain editable');
+    field(fixture.render(), label).props.onChange({ target: { value: ' first \n\n second😀\n' } });
+  }
+  let ui = fixture.render();
+  assert.match(JSON.stringify(ui), /未保存の変更があります/);
+  await find(ui, node => node.tag === 'button' && node.children.includes('保存する')).props.onClick();
+  for (const key of ['working_files', 'open_tasks', 'decisions', 'constraints'])
+    assert.deepEqual(saved.context[key], ['first', 'second😀']);
+  assert.deepEqual(saved.guard.deny, ['first', 'second😀']);
+  assert.equal(saved.sessions.stale_secs, 120);
+  ui = fixture.render();
+  assert.equal(field(ui, labels[1]).props.value, 'first\nsecond😀');
+});
+
+test('cancelled reload and failed save preserve drafts; Discord-only save keeps them dirty', async () => {
+  let posts = 0, loads = 0, rejectSave = false, confirmations = 0;
+  let stored = { context: { goal: 'stored' }, discord: { enabled: false, details: 'before' } };
+  const fixture = await host(async (route, options) => {
+    if (route === '/api/rdsh-discord') return { ok: true, json: async () => ({ ok: true, state: 'disabled' }) };
+    if (options.method === 'POST') {
+      posts++;
+      if (rejectSave) return { ok: false, json: async () => ({ error: 'save-failed' }) };
+      stored = { ...stored, ...JSON.parse(options.body).config };
+    } else loads++;
+    return { ok: true, json: async () => ({ ok: true, config: stored }) };
+  }, { confirm: () => { confirmations++; return false; } });
+  fixture.render(); await fixture.settle();
+  field(fixture.render(), 'ゴール', 'input').props.onChange({ target: { value: 'unsaved goal' } });
+  field(fixture.render(), '未解決タスク (1行1件)').props.onChange({ target: { value: 'draft one\ndraft two\n' } });
+  field(fixture.render(), '表示文', 'input').props.onChange({ target: { value: 'changed presence' } });
+  let ui = fixture.render();
+  await find(ui, node => node.tag === 'button' && node.children.includes('Discord設定を保存')).props.onClick();
+  assert.equal(posts, 1);
+  assert.equal(stored.context.goal, 'stored');
+  assert.equal(stored.context.open_tasks, undefined);
+  assert.equal(field(fixture.render(), '未解決タスク (1行1件)').props.value, 'draft one\ndraft two\n');
+  ui = fixture.render();
+  assert.match(JSON.stringify(ui), /未保存の変更があります/);
+  await find(ui, node => node.tag === 'button' && node.children.includes('再読み込み')).props.onClick();
+  assert.equal(confirmations, 1);
+  assert.equal(loads, 1);
+  assert.equal(field(fixture.render(), 'ゴール', 'input').props.value, 'unsaved goal');
+  rejectSave = true;
+  await find(fixture.render(), node => node.tag === 'button' && node.children.includes('保存する')).props.onClick();
+  assert.equal(field(fixture.render(), 'ゴール', 'input').props.value, 'unsaved goal');
+  assert.match(JSON.stringify(fixture.render()), /入力内容は残っています/);
+});
 
 test('failed settings load offers an error and retry instead of permanent loading', async () => {
   let ok = false;

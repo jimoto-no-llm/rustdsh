@@ -236,15 +236,39 @@ test('plugin security boundary and settings preservation', async (t) => {
     });
   }
 
+  await t.test('Unicode limits and session cache interval agree with native settings', async () => {
+    const text = n => '😀'.repeat(n);
+    await writeFile(settingsFile, JSON.stringify({
+      ...original,
+      general: { default_profile: text(201) },
+      sessions: { limit: 20, with_tokens: false, stale_secs: 120 },
+      search: { searxng_url: text(2001) },
+      guard: { deny: [text(501)] },
+      context: { goal: text(2001), decisions: [text(501)], working_files: [text(301)], open_tasks: [text(501)] },
+    }));
+    const loaded = (await request('/api/rdsh-settings')).body.config;
+    assert.equal(loaded.general.default_profile, text(200));
+    assert.equal(loaded.search.searxng_url, text(2000));
+    assert.deepEqual(loaded.guard.deny, [text(500)]);
+    assert.equal(loaded.context.goal, text(2000));
+    assert.deepEqual(loaded.context.working_files, [text(300)]);
+    assert.deepEqual(loaded.context.open_tasks, [text(500)]);
+    assert.equal(loaded.sessions.stale_secs, 120);
+    const saved = await request('/api/rdsh-settings/save', { method: 'POST', body: JSON.stringify({ config: loaded }) });
+    assert.equal(saved.status, 200);
+    assert.deepEqual(saved.body.config, loaded);
+    assert.equal(JSON.parse(await readFile(settingsFile, 'utf8')).sessions.stale_secs, 120);
+  });
+
   await t.test('all supported form fields fit within the bounded save body', async () => {
     // JSON escapes cost six bytes per character, exceeding multibyte UTF-8 paths.
     const text = (n) => '\u0001'.repeat(n);
     const rows = (n) => Array(50).fill(text(n));
     const document = {
       ...original,
-      general: { default_profile: text(500) },
-      search: { dir: text(300), searxng_url: text(500) },
-      guard: { deny: rows(300), reason: text(500) },
+      general: { default_profile: text(200) },
+      search: { dir: text(300), searxng_url: text(2000) },
+      guard: { deny: rows(500), reason: text(500) },
       context: { goal: text(2000), decisions: rows(500), constraints: rows(500), working_files: rows(300), open_tasks: rows(500) },
     };
     await writeFile(settingsFile, JSON.stringify(document));
