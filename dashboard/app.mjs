@@ -38,6 +38,68 @@ async function api(route, body) {
   if (!response.ok) throw new Error(result.error || "接続できません");
   return result;
 }
+function formatObservedAt(value) {
+  const parsed = value ? Date.parse(value) : NaN;
+  return Number.isFinite(parsed)
+    ? new Date(parsed).toLocaleString("ja-JP")
+    : "観測履歴なし";
+}
+async function refreshProjectCrossOverview() {
+  const list = $("cross-project-rows");
+  try {
+    const value = await api("projects/overview");
+    list.replaceChildren(
+      ...value.projects.map((project) => {
+        const item = node("li", undefined, "event");
+        item.append(node("strong", project.name));
+        if (project.status === "observed" && project.counts) {
+          item.append(
+            node(
+              "p",
+              `稼働 ${project.counts.active} · 待ち ${project.counts.waiting} · 要確認 ${project.counts.needs_attention}`,
+            ),
+            node(
+              "p",
+              `最終観測: ${formatObservedAt(project.last_observed_at)}`,
+              "sub",
+            ),
+          );
+        } else {
+          item.append(
+            node("p", "稼働・待ち・要確認: 不明"),
+            node(
+              "p",
+              `最終観測: ${formatObservedAt(project.last_observed_at)}`,
+              "sub",
+            ),
+          );
+        }
+        if (project.detail_url) {
+          const link = node("a", "元projectの詳細を開く");
+          link.href = project.detail_url;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          item.append(link);
+        } else if (project.status === "observed") {
+          item.append(
+            node(
+              "p",
+              "詳細画面は停止中です。元projectのdashboard起動後に開けます。",
+              "sub",
+            ),
+          );
+        }
+        return item;
+      }),
+    );
+    $("cross-project-observed").textContent =
+      `この一覧の最終取得: ${formatObservedAt(value.observed_at)}`;
+  } catch {
+    list.replaceChildren();
+    $("cross-project-observed").textContent =
+      "横断情報を取得できません · 状態は不明です";
+  }
+}
 function node(tag, text, className) {
   const result = document.createElement(tag);
   if (text !== undefined) result.textContent = text;
@@ -481,6 +543,11 @@ try {
       } catch {}
     }
     $("quick-actions").hidden = false;
+    $("cross-project-overview").hidden = !config.project_overview_enabled;
+    if (config.project_overview_enabled) {
+      await refreshProjectCrossOverview();
+      setInterval(refreshProjectCrossOverview, 15000);
+    }
     await refreshState();
     const source = new EventSource(
       base + "api/live?key=" + encodeURIComponent(browserToken),

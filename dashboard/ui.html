@@ -381,6 +381,11 @@
         grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr));
         gap: 16px;
       }
+      .project-cross-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
       .decision-card {
         border: 1px solid var(--line);
         border-radius: 12px;
@@ -815,6 +820,24 @@
             <dd id="overview-stop">この画面からの停止は非対応</dd>
           </dl>
           <ul id="overview-pending"></ul>
+        </section>
+        <section
+          id="cross-project-overview"
+          class="summary-card"
+          aria-labelledby="cross-project-heading"
+          hidden
+        >
+          <h2 id="cross-project-heading">プロジェクト横断の状況</h2>
+          <p class="sub">
+            起動時に明示指定したprojectだけを集約します。詳細は各projectのdashboardで確認してください。
+          </p>
+          <p id="cross-project-observed" role="status" aria-live="polite">
+            横断情報を取得中…
+          </p>
+          <ul
+            id="cross-project-rows"
+            class="decision-grid project-cross-list"
+          ></ul>
         </section>
         <h2 id="pending-heading" tabindex="-1">未回答の質問</h2>
         <p class="sub" id="pending-note">
