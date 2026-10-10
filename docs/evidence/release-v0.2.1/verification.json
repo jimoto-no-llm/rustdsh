@@ -1,0 +1,70 @@
+{
+  "version": "0.2.1",
+  "scope": "Local Linux/WSL release candidate after rebase onto 0f6b284 and version bump. Published platform archives and GitHub CI are separate later checks.",
+  "rust": [
+    {
+      "check": "fmt",
+      "exit_code": 0,
+      "seconds": 0.27
+    },
+    {
+      "check": "clippy",
+      "exit_code": 0,
+      "seconds": 3.69
+    },
+    {
+      "check": "rust-tests",
+      "exit_code": 0,
+      "seconds": 29.47
+    },
+    {
+      "check": "extended-tests",
+      "exit_code": 0,
+      "seconds": 6.69
+    },
+    {
+      "check": "model-tests",
+      "exit_code": 0,
+      "seconds": 6.48
+    },
+    {
+      "check": "regress",
+      "exit_code": 0,
+      "seconds": 6.16
+    }
+  ],
+  "counts": {
+    "rust_tests_passed": 109,
+    "extended_tests_passed": 2,
+    "model_tests_passed": 5,
+    "regression_checks_passed": 55,
+    "node_tests_passed": 82,
+    "node_tests_skipped": 1,
+    "dashboard": {
+      "tests": 229,
+      "pass": 223,
+      "fail": 0,
+      "skipped": 6
+    },
+    "security_tests_passed": 15,
+    "release_metadata_tests_passed": 21,
+    "browser_flows": 5,
+    "update_banner_flows": 13
+  },
+  "metadata": "prepare-release.py v0.2.1; cargo check; cargo check --locked; YAML parsed; Markdown lint: PASS",
+  "onboarding": "stdio end-to-end plus actual Codex CLI 0.161.0 add/get/remove; no model calls; see onboarding.json",
+  "benchmark": "Retained original before/after measurements and source hashes at ../ux-performance-20261010; not relabelled as new measurements of version-bumped binaries.",
+  "review": {
+    "correctness": 3,
+    "style": 3,
+    "tests": 3,
+    "scale": "0-3",
+    "blocking_findings": []
+  },
+  "not_exercised_locally": [
+    "native Windows and macOS",
+    "official Claude Code executable registration (local claude command is a different wrapper)",
+    "Codex/Claude GUI registration",
+    "live provider, Discord or Tailscale services"
+  ]
+}

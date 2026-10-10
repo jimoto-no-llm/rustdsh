@@ -1,6 +1,6 @@
 <img src="assets/icon.png" width="96" alt="rdsh icon">
 
-# rdsh — a fast, safe Rust launcher for `dsh`
+# rdsh — local tools for AI coding, plus a fast DSH launcher
 
 [![ci](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/ci.yml/badge.svg)](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/ci.yml)
 [![dashboard](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/dashboard.yml/badge.svg)](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/dashboard.yml)
@@ -13,7 +13,13 @@
 
 An independent community project; not an official DeepSeek or DeepSeek Harness project.
 
-`rdsh` is a drop-in fast path for [dsh](https://github.com/deepseek-ai/deepseek-harness)
+Already using **Claude Code or Codex**? Keep using them. `rdsh` estimates tokens,
+searches local files and fits long text into a budget without a model request.
+The optional MCP dashboard lets your agent share progress and ask you questions.
+**The local tools and project dashboard do not require DSH.**
+Start with the [Claude Code / Codex guide](docs/CODING-AGENTS.md).
+
+For DSH users, `rdsh` is a drop-in fast path for [dsh](https://github.com/deepseek-ai/deepseek-harness)
 (the DeepSeek Harness CLI). Instead of rewriting everything, it ports only
 the hot paths to Rust and delegates conversations and model runs to the
 original `dsh` binary. Arguments you already use keep working as-is.
@@ -26,6 +32,25 @@ original `dsh` binary. Arguments you already use keep working as-is.
 - Safe by default. Read paths never write, server features stay off until enabled, and agent tools run under mandatory isolation on supported Linux.
 
 ## Getting started
+
+Install using the commands below, then try the local tools:
+
+```sh
+rdsh --version
+printf 'hello rdsh\n' | rdsh tokens
+```
+
+In PowerShell, use `"hello rdsh" | rdsh tokens`. No login or original DSH is
+needed for these commands. Run `rdsh tokens AGENTS.md` or `rdsh tokens CLAUDE.md`
+to estimate an existing instructions file; the estimate is heuristic, not billing.
+
+| What you want | Entry point | Requires |
+| --- | --- | --- |
+| Prepare text for Claude Code / Codex | `tokens`, `prune`, `compact`; `search` on Unix | rdsh binary |
+| See progress and answer agent questions | [Project MCP dashboard](docs/CODING-AGENTS.md#share-progress-and-questions-through-mcp) | Node.js 22+ and a source checkout |
+| Start a DSH conversation | Commands below | Original DSH and a model connection |
+
+For DSH conversations:
 
 ```sh
 rdsh --version && rdsh doctor   # verify install and original dsh
@@ -42,7 +67,7 @@ Delegated conversations need the original DSH runtime.
 | Item | Detail |
 | --- | --- |
 | OS | Linux, macOS, WSL, Windows (native). Agent isolation needs Linux x86_64 + bubblewrap + prlimit. |
-| DSH runtime | Original `dsh` for conversations. Audited versions: 0.2.0-rc.2, 0.2.1-alpha.1. |
+| DSH runtime | Required only for DSH conversations, not local text tools or the project MCP dashboard. Audited versions: 0.2.0-rc.2, 0.2.1-alpha.1. |
 | Rust | 1.85+ (source builds only). Prebuilt binaries need no Rust. |
 | Optional | Node.js 22+ for the [Node.js dashboard](dashboard/README.md); SearXNG for `search-web`; `zstd` CLI for bounded decompression of sessions whose frame headers omit content size. |
 
@@ -300,7 +325,7 @@ rendering with synthetic data, not network latency, model execution or INP.
 CLI outputs and visible browser data/drafts were checked for equality. Other
 commands show small gains or slowdowns: the full table, raw samples, environment,
 screenshots and reproduction are in the [dated evidence](docs/evidence/ux-performance-20261010/README.md).
-These source changes are unreleased; published v0.2.0 binaries do not include them.
+These changes are included in v0.2.1; earlier v0.2.0 binaries do not include them.
 
 ### Historical Linux measurements
 
@@ -341,6 +366,7 @@ before/after output checks are in [BENCHMARKS.md](docs/BENCHMARKS.md).
 | Doc | What it covers |
 | --- | --- |
 | [docs/USER-FLOW.md](docs/USER-FLOW.md) | Install to setup to use to recover. |
+| [docs/CODING-AGENTS.md](docs/CODING-AGENTS.md) | Claude Code / Codex: local tools, exact MCP setup and removal. |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Delegation, settings ownership, crate layout. |
 | [docs/BENCHMARKS.md](docs/BENCHMARKS.md) | Reproducible measurements. |
 | [docs/RDSH-SETTINGS.md](docs/RDSH-SETTINGS.md) | Settings UI and CLI keys. |

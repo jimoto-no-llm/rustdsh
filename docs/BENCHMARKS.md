@@ -19,7 +19,8 @@ startup and use four allowed CPUs. Outputs, visible data, drafts and caret posit
 are checked. Some other cases are slightly slower; see the **complete tables**, raw
 samples, environment, source/binary hashes, regression matrix, real PNGs and GIF in
 [the dated evidence](evidence/ux-performance-20261010/README.md).
-The current binary is 1,968,752 bytes (~1.97 MB); source changes are unreleased.
+The measured candidate binary was 1,968,752 bytes (~1.97 MB). These optimizations
+are included in v0.2.1; the recorded hashes describe the builds at measurement time.
 
 The dated page includes commands for `scripts/benchmark.py`,
 `scripts/benchmark-search.py`, the Rust extended runner and

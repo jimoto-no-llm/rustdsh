@@ -1,0 +1,14 @@
+{
+  "version": "0.2.1",
+  "result": "PASS",
+  "checks": [
+    "documented project/stdio commands connect and advertise six tools",
+    "task, event, question and browser answer round trip with feedback cursor",
+    "same stdio client survives dashboard restart with rotated credentials and saved reports",
+    "actual Codex CLI add/get/remove in isolated settings without changing user configuration"
+  ],
+  "model_calls": 0,
+  "tailscale": false,
+  "claude_cli": "official documented syntax; local executable is a different wrapper, not used",
+  "scope": "Linux stdio and Codex registration; native Windows/GUI client registration not exercised locally"
+}

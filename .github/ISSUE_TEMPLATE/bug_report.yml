@@ -8,7 +8,7 @@ body:
     attributes:
       label: Version
       description: Output of `rdsh --version` (or tag/commit).
-      placeholder: "v0.1.2"
+      placeholder: "v0.2.1"
     validations:
       required: true
   - type: input
@@ -23,10 +23,23 @@ body:
     id: repro
     attributes:
       label: Reproduction steps
-      description: Minimal commands. Include `rdsh doctor` output.
+      description: Minimal commands. Include `rdsh doctor` output for DSH delegation bugs. Remove keys, credentials and private paths.
       placeholder: |
         1. ...
         2. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: client
+    attributes:
+      label: How are you using rdsh?
+      description: DSH is optional for local tools and project MCP.
+      options:
+        - Local CLI tools only
+        - Codex with project MCP
+        - Claude Code with project MCP
+        - DSH launcher or settings
+        - Other MCP client
     validations:
       required: true
   - type: textarea
