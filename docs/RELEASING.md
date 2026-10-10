@@ -33,7 +33,22 @@ Generation failure stops publication.
 2. Copy `docs/releases/TEMPLATE.md` to the version's filename and fill in every
    placeholder. Keep Japanese user-facing notes, platform limits and installation
    commands accurate. For candidates, replace `/releases/latest/download/` with
-   `/releases/download/vX.Y.Z-rc.N/`.
+   `/releases/download/vX.Y.Z-rc.N/` and pass `--version=vX.Y.Z-rc.N` to the
+   Unix installer or `-Version vX.Y.Z-rc.N` to the Windows installer. Downloading
+   a candidate's installer alone does not select its binary: both installers
+   otherwise fetch `latest`. Keep the selectors on the actual commands in code
+   blocks or inline code, rather than only in explanatory prose. Candidate examples:
+
+   ```sh
+   curl -fsSL https://github.com/jimoto-no-llm/rustdsh/releases/download/vX.Y.Z-rc.N/install.sh | bash -s -- --from-release --version=vX.Y.Z-rc.N
+   ```
+
+   Download `install.ps1` from the same candidate release, then run:
+
+   ```powershell
+   ./install.ps1 -FromRelease -Version vX.Y.Z-rc.N
+   ```
+
 3. Run the metadata and packaging checks (Python 3.11+):
 
    ```sh

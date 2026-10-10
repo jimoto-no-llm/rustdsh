@@ -26,8 +26,8 @@ class ReleaseMetadataTests(unittest.TestCase):
         (self.root / "Cargo.lock").write_text(f'[[package]]\nname = "rdsh"\nversion = "{version}"\n', encoding="utf-8")
         (self.root / "CHANGELOG.md").write_text(f"## [{version}] - 2026-10-08\n", encoding="utf-8")
         notes = (f"## {version} — Example\n\n- Fixed an issue.\n\n## 更新前に確認\n\n"
-                 f"- Restart processes.\n\nInstall/update:\n\n```sh\ncurl https://github.com/org/repo/releases/download/v{version}/install.sh\n```\n\n"
-                 "Windows: `install.ps1 -FromRelease`.\n")
+                 f"- Restart processes.\n\nInstall/update:\n\n```sh\ncurl https://github.com/org/repo/releases/download/v{version}/install.sh | bash -s -- --from-release --version=v{version}\n```\n\n"
+                 f"Windows: `install.ps1 -FromRelease -Version v{version}`.\n")
         path = self.root / "docs" / "releases" / f"v{version}.md"
         path.write_text(notes, encoding="utf-8")
         return path
@@ -122,6 +122,209 @@ class ReleaseMetadataTests(unittest.TestCase):
         notes.write_text(notes.read_text(encoding="utf-8") + "<!-- previous-tag: v1.2.3 -->\n", encoding="utf-8")
         with self.assertRaisesRegex(ValueError, "must differ"):
             release.validate(self.root, "v1.2.3")
+
+    def test_candidate_installer_download_alone_does_not_select_candidate_binaries(self):
+        for option in ("--version=v1.2.3-rc.1", "-Version v1.2.3-rc.1"):
+            for replacement in ("", option.replace("v1.2.3-rc.1", "latest"),
+                                option.replace("v1.2.3-rc.1", "v1.2.3-rc.0"),
+                                option + " " + option.replace("v1.2.3-rc.1", "v1.2.2")):
+                notes = self.fixture("1.2.3-rc.1")
+                notes.write_text(notes.read_text(encoding="utf-8").replace(option, replacement), encoding="utf-8")
+                with self.subTest(option=option, replacement=replacement), self.assertRaisesRegex(ValueError, "matching this tag"):
+                    release.validate(self.root, "v1.2.3-rc.1")
+
+    def test_candidate_installer_versions_can_be_quoted(self):
+        for quote in ("'", '"'):
+            notes = self.fixture("1.2.3-rc.1")
+            text = notes.read_text(encoding="utf-8")
+            text = text.replace("--version=v1.2.3-rc.1", f"--version={quote}v1.2.3-rc.1{quote}")
+            text = text.replace("-Version v1.2.3-rc.1", f"-Version {quote}v1.2.3-rc.1{quote}")
+            notes.write_text(text, encoding="utf-8")
+            release.validate(self.root, "v1.2.3-rc.1")
+
+    def test_candidate_version_hints_in_comments_do_not_replace_instructions(self):
+        notes = self.fixture("1.2.3-rc.1")
+        text = notes.read_text(encoding="utf-8")
+        hint = "<!-- --version=vX.Y.Z-rc.N and -Version vX.Y.Z-rc.N -->\n"
+        notes.write_text(text + hint, encoding="utf-8")
+        release.validate(self.root, "v1.2.3-rc.1")
+        text = text.replace("--version=v1.2.3-rc.1", "")
+        notes.write_text(text + "<!-- --version=v1.2.3-rc.1 -->\n", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "matching this tag"):
+            release.validate(self.root, "v1.2.3-rc.1")
+
+    def test_candidate_flags_in_prose_do_not_replace_installer_arguments(self):
+        for option in ("--version=v1.2.3-rc.1", "-Version v1.2.3-rc.1"):
+            for hint in (option, f"`{option}`"):
+                notes = self.fixture("1.2.3-rc.1")
+                text = notes.read_text(encoding="utf-8").replace(option, "")
+                notes.write_text(text + f"\n- Remember to use {hint}.\n", encoding="utf-8")
+                with self.subTest(option=option, hint=hint), self.assertRaisesRegex(ValueError, "matching this tag"):
+                    release.validate(self.root, "v1.2.3-rc.1")
+
+    def test_candidate_selector_must_be_a_standalone_argument(self):
+        replacements = (
+            ("--version=v1.2.3-rc.1", "--prefix=/tmp/--version=v1.2.3-rc.1"),
+            ("-Version v1.2.3-rc.1", "-Prefix 'C:\\rdsh -Version v1.2.3-rc.1'"),
+        )
+        for old, new in replacements:
+            notes = self.fixture("1.2.3-rc.1")
+            text = notes.read_text(encoding="utf-8").replace(old, new)
+            notes.write_text(text, encoding="utf-8")
+            with self.subTest(replacement=new), self.assertRaisesRegex(ValueError, "matching this tag"):
+                release.validate(self.root, "v1.2.3-rc.1")
+
+    def test_sudo_wrapped_installers_are_validated_as_commands(self):
+        notes = self.fixture("1.2.3-rc.1")
+        text = notes.read_text(encoding="utf-8")
+        notes.write_text(text + "\n```sh\nsudo ./install.sh --from-release\n```\n", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "matching this tag"):
+            release.validate(self.root, "v1.2.3-rc.1")
+
+        notes = self.fixture("1.2.3-rc.1")
+        text = notes.read_text(encoding="utf-8")
+        notes.write_text(text + "\n```sh\nsudo -E sh ./install.sh --from-release --version=v1.2.3-rc.1\n```\n",
+                         encoding="utf-8")
+        release.validate(self.root, "v1.2.3-rc.1")
+
+    def test_unknown_installer_wrappers_fail_closed(self):
+        for command in (
+            "env RD_VERSION=v1.2.3-rc.1 ./install.sh --from-release --version=v1.2.3-rc.1",
+            "bash -c './install.sh --from-release --version=v1.2.3-rc.1'",
+            "bash -c './install.sh' --version=v1.2.3-rc.1",
+            "Start-Process ./install.ps1 -ArgumentList '-FromRelease -Version v1.2.3-rc.1'",
+        ):
+            notes = self.fixture("1.2.3-rc.1")
+            notes.write_text(notes.read_text(encoding="utf-8") + f"\n```sh\n{command}\n```\n",
+                             encoding="utf-8")
+            with self.subTest(command=command), self.assertRaisesRegex(ValueError, "unsupported prerelease installer"):
+                release.validate(self.root, "v1.2.3-rc.1")
+
+    def test_each_candidate_installer_invocation_must_select_the_tag(self):
+        for extra in ("```sh\ncurl https://github.com/org/repo/releases/download/v1.2.3-rc.1/install.sh | bash -s -- --from-release\n```",
+                      "`./install.ps1 -FromRelease`",
+                      "`./install.ps1 -FromRelease; Write-Output -Version v1.2.3-rc.1`",
+                      "```sh\ncurl https://github.com/org/repo/releases/download/v1.2.3-rc.1/install.sh | bash -s -- --from-release; echo --version=v1.2.3-rc.1\n```",
+                      "```sh\ncurl https://github.com/org/repo/releases/download/v1.2.3-rc.1/install.sh | bash -s -- --from-release --version=v1.2.3-rc.1 && curl https://github.com/org/repo/releases/download/v1.2.3-rc.1/install.sh | bash -s -- --from-release\n```",
+                      "```sh\ncurl https://github.com/org/repo/releases/download/v1.2.3-rc.1/install.sh | bash -s -- --from-release --version=v1.2.3-rc.1 || curl https://github.com/org/repo/releases/download/v1.2.3-rc.1/install.sh | bash -s -- --from-release\n```"):
+            notes = self.fixture("1.2.3-rc.1")
+            notes.write_text(notes.read_text(encoding="utf-8") + "\n" + extra + "\n", encoding="utf-8")
+            with self.subTest(extra=extra), self.assertRaisesRegex(ValueError, "matching this tag"):
+                release.validate(self.root, "v1.2.3-rc.1")
+
+    def test_candidate_tags_in_shell_comments_are_not_installer_arguments(self):
+        extras = (
+            "```sh\ncurl https://github.com/org/repo/releases/download/v1.2.3-rc.1/install.sh "
+            "| bash -s -- --from-release # --version=v1.2.3-rc.1\n```",
+            "```powershell\n./install.ps1 -FromRelease # -Version v1.2.3-rc.1\n```",
+        )
+        for extra in extras:
+            notes = self.fixture("1.2.3-rc.1")
+            notes.write_text(notes.read_text(encoding="utf-8") + "\n" + extra + "\n", encoding="utf-8")
+            with self.subTest(extra=extra), self.assertRaisesRegex(ValueError, "matching this tag"):
+                release.validate(self.root, "v1.2.3-rc.1")
+
+    def test_candidate_tags_in_powershell_block_comments_are_not_arguments(self):
+        extras = (
+            "`./install.ps1 -FromRelease <# -Version v1.2.3-rc.1 #>`",
+            "```powershell\n./install.ps1 -FromRelease <# -Version v1.2.3-rc.1 #>\n```",
+            "```powershell\n./install.ps1 -FromRelease <# note\n-Version v1.2.3-rc.1\n#>\n```",
+        )
+        for extra in extras:
+            notes = self.fixture("1.2.3-rc.1")
+            notes.write_text(notes.read_text(encoding="utf-8") + "\n" + extra + "\n", encoding="utf-8")
+            with self.subTest(extra=extra), self.assertRaisesRegex(ValueError, "matching this tag"):
+                release.validate(self.root, "v1.2.3-rc.1")
+
+    def test_powershell_comment_markers_inside_strings_are_literal(self):
+        notes = self.fixture("1.2.3-rc.1")
+        extra = ("\n```powershell\nWrite-Output '<# -Version v1.2.3-rc.1 #>'; "
+                 "./install.ps1 -FromRelease -Version v1.2.3-rc.1\n```\n")
+        notes.write_text(notes.read_text(encoding="utf-8") + extra, encoding="utf-8")
+        release.validate(self.root, "v1.2.3-rc.1")
+
+        notes = self.fixture("1.2.3-rc.1")
+        extra = ("\n```powershell\nWrite-Output '<# -Version v1.2.3-rc.1 #>'; "
+                 "./install.ps1 -FromRelease\n```\n")
+        notes.write_text(notes.read_text(encoding="utf-8") + extra, encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "matching this tag"):
+            release.validate(self.root, "v1.2.3-rc.1")
+
+    def test_comment_markers_inside_quotes_are_not_treated_as_comments(self):
+        notes = self.fixture("1.2.3-rc.1")
+        text = notes.read_text(encoding="utf-8")
+        text = text.replace(
+            "--version=v1.2.3-rc.1",
+            "--version=v1.2.3-rc.1 # '--version=v1.2.4'",
+        )
+        text = text.replace(
+            "-Version v1.2.3-rc.1",
+            "-Version v1.2.3-rc.1 # '-Version v1.2.4'",
+        )
+        notes.write_text(text, encoding="utf-8")
+        release.validate(self.root, "v1.2.3-rc.1")
+
+    def test_quoted_comment_markers_do_not_hide_later_unpinned_installers(self):
+        extras = (
+            "```sh\nprintf '%s' '# keep' && curl "
+            "https://github.com/org/repo/releases/download/v1.2.3-rc.1/install.sh "
+            "| bash -s -- --from-release\n```",
+            "```powershell\nWrite-Output '# keep'; ./install.ps1 -FromRelease\n```",
+        )
+        for extra in extras:
+            notes = self.fixture("1.2.3-rc.1")
+            notes.write_text(notes.read_text(encoding="utf-8") + "\n" + extra + "\n", encoding="utf-8")
+            with self.subTest(extra=extra), self.assertRaisesRegex(ValueError, "matching this tag"):
+                release.validate(self.root, "v1.2.3-rc.1")
+
+    def test_candidate_installer_chains_accept_each_invocation_pinned_to_the_tag(self):
+        for separator in ("&&", "||"):
+            notes = self.fixture("1.2.3-rc.1")
+            text = notes.read_text(encoding="utf-8")
+            extra = ("\n```sh\ncurl https://github.com/org/repo/releases/download/v1.2.3-rc.1/install.sh "
+                     "| bash -s -- --from-release --version=v1.2.3-rc.1 " + separator + " "
+                     "curl https://github.com/org/repo/releases/download/v1.2.3-rc.1/install.sh "
+                     "| bash -s -- --from-release --version=v1.2.3-rc.1\n```\n")
+            notes.write_text(text + extra, encoding="utf-8")
+            with self.subTest(separator=separator):
+                release.validate(self.root, "v1.2.3-rc.1")
+
+    def test_candidate_installer_calls_on_new_lines_are_checked_independently(self):
+        extras = (
+            "```sh\n./install.sh --from-release --version=v1.2.3-rc.1\n"
+            "./install.sh --from-release\n```",
+            "```powershell\n./install.ps1 -FromRelease -Version v1.2.3-rc.1\n"
+            "./install.ps1 -FromRelease\n```",
+        )
+        for extra in extras:
+            notes = self.fixture("1.2.3-rc.1")
+            notes.write_text(notes.read_text(encoding="utf-8") + "\n" + extra + "\n", encoding="utf-8")
+            with self.subTest(extra=extra), self.assertRaisesRegex(ValueError, "matching this tag"):
+                release.validate(self.root, "v1.2.3-rc.1")
+
+    def test_candidate_installer_calls_on_new_lines_accept_pinned_calls(self):
+        extras = (
+            "```sh\n./install.sh --from-release --version=v1.2.3-rc.1\n"
+            "./install.sh --from-release --version=v1.2.3-rc.1\n```",
+            "```sh\ncurl https://github.com/org/repo/releases/download/v1.2.3-rc.1/install.sh |\n"
+            "  bash -s -- --from-release --version=v1.2.3-rc.1\n```",
+            "```powershell\n./install.ps1 -FromRelease -Version v1.2.3-rc.1\n"
+            "./install.ps1 -FromRelease -Version v1.2.3-rc.1\n```",
+        )
+        for extra in extras:
+            notes = self.fixture("1.2.3-rc.1")
+            notes.write_text(notes.read_text(encoding="utf-8") + "\n" + extra + "\n", encoding="utf-8")
+            with self.subTest(extra=extra):
+                release.validate(self.root, "v1.2.3-rc.1")
+
+    def test_candidate_installer_commands_accept_line_continuations(self):
+        notes = self.fixture("1.2.3-rc.1")
+        text = notes.read_text(encoding="utf-8")
+        text = text.replace("--from-release --version", "--from-release \\\n  --version")
+        text = text.replace("`install.ps1 -FromRelease -Version v1.2.3-rc.1`",
+                            "```powershell\n& ./install.ps1 -FromRelease `\n  -Version v1.2.3-rc.1\n```")
+        notes.write_text(text, encoding="utf-8")
+        release.validate(self.root, "v1.2.3-rc.1")
 
     def test_publication_reads_the_persisted_previous_tag_without_cli_override(self):
         notes = self.fixture()

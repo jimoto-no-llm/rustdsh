@@ -115,6 +115,7 @@ jobs:
         shell: pwsh
         run: |
           ./tests/installer-security.ps1
+          ./tests/installer-security.ps1 -Version v0.0.0-rc.1
           ./tests/icon-assets.ps1
           $tmp = Join-Path $env:RUNNER_TEMP 'rdsh-smoke'
           $h = Join-Path $tmp 'home'
