@@ -629,9 +629,7 @@ fn filter_external_credentials(
             && source.is_none_or(|v| v == g.from)
     });
     keys.retain(|k| {
-        include_keys
-            && key_ref.is_none_or(|v| v == k.name)
-            && source.is_none_or(|v| v == k.from)
+        include_keys && key_ref.is_none_or(|v| v == k.name) && source.is_none_or(|v| v == k.from)
     });
 }
 
