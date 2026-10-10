@@ -7,6 +7,7 @@ on:
     tags: ['v*']
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
@@ -16,6 +17,7 @@ concurrency:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
         with:
@@ -23,9 +25,23 @@ jobs:
       - name: Require an annotated version tag and matching release metadata
         env:
           RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_SHA: ${{ github.sha }}
         run: |
           test "$(git cat-file -t "refs/tags/$RELEASE_TAG")" = tag
+          tag_sha="$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
+          test "$tag_sha" = "$RELEASE_SHA"
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "$RELEASE_SHA" refs/remotes/origin/main; then
+            echo "Release tag $RELEASE_TAG does not point to a commit on main" >&2
+            exit 1
+          fi
           python3 scripts/prepare-release.py "$RELEASE_TAG"
+      - name: Wait for successful CI on this exact tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: python3 scripts/verify-release-ci.py "$RELEASE_SHA" "$RELEASE_TAG" --timeout-seconds 900
       - run: python3 -m unittest discover -s tests -p 'test_release_*.py'
 
   release:
