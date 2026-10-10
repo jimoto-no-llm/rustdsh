@@ -514,6 +514,46 @@
         display: grid;
         gap: 10px;
       }
+      #device-create-form > label {
+        display: block;
+        margin: 10px 0 6px;
+      }
+      #device-name {
+        width: 100%;
+        max-width: 520px;
+        min-height: 42px;
+        padding: 8px;
+        font: inherit;
+      }
+      #device-create-form fieldset {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 18px;
+        margin: 16px 0;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+      #device-create-form fieldset label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      #device-create-form fieldset input[type="checkbox"] {
+        width: auto;
+      }
+      .device-list-header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .device-list-header h2 {
+        margin: 20px 0 10px;
+      }
+      #device-list h3 {
+        overflow-wrap: anywhere;
+      }
       .event {
         background: white;
         border: 1px solid var(--line);
@@ -752,6 +792,42 @@
           <div id="mcp-info" class="sub"></div>
         </div>
       </section>
+      <div
+        class="notice"
+        id="device-access-notice"
+        role="status"
+        aria-live="polite"
+        hidden
+      ></div>
+      <details class="fold" id="device-detail" hidden>
+        <summary>端末ごとの権限</summary>
+        <p class="sub">
+          追加端末には別々の鍵を発行します。鍵は作成時だけ表示し、保存先にはハッシュだけを残します。端末を失くした場合はその端末だけ失効でき、接続中の画面も切断します。
+        </p>
+        <form id="device-create-form">
+          <label for="device-name">端末名</label>
+          <input id="device-name" name="name" maxlength="64" required />
+          <fieldset>
+            <legend>付与する権限</legend>
+            <label><input type="checkbox" checked disabled /> 閲覧</label>
+            <label id="device-reply-option"><input type="checkbox" id="device-reply" /> <span>質問への回答</span></label>
+            <label><input type="checkbox" id="device-control" /> <span id="device-control-label">追指示・質問取消し</span></label>
+          </fieldset>
+          <button id="device-create" type="submit">端末鍵を発行</button>
+        </form>
+        <p id="device-status" role="status" aria-live="polite"></p>
+        <section id="device-credential" hidden aria-label="一度だけ表示する端末リンク">
+          <p>このリンクを対象端末で開いてください。閉じると鍵は再表示できません。</p>
+          <textarea id="device-link" rows="3" readonly></textarea>
+          <button id="device-copy" type="button">リンクをコピー</button>
+          <button id="device-clear-link" type="button">表示を閉じる</button>
+        </section>
+        <div class="device-list-header">
+          <h2>登録済み端末</h2>
+          <button id="device-refresh" type="button">一覧を更新</button>
+        </div>
+        <div id="device-list" class="feed" aria-live="polite"></div>
+      </details>
       <details class="fold" id="connection-detail">
         <summary>接続診断</summary>
         <p class="sub">

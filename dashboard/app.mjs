@@ -6,34 +6,46 @@ import { renderConnectionDiagnostics } from "./connection-diagnostics-ui.mjs";
 import { createInstructionPanel } from "./instruction-queue-ui.mjs";
 import { createCostPanel } from "./cost-ledger-ui.mjs";
 import { renderBudget } from "./budget-ui.mjs";
+import { setupDeviceAccess } from "./devices-ui.mjs";
 
 const $ = (id) => document.getElementById(id);
 const base = location.pathname.startsWith("/_rdsh") ? "/_rdsh/" : "/";
-const suppliedBrowserToken =
-  base === "/" ? new URLSearchParams(location.hash.slice(1)).get("key") : null;
+let deviceAccess = null;
+const suppliedBrowserToken = new URLSearchParams(location.hash.slice(1)).get("key");
+const browserTokenKey =
+  base === "/" ? "rdsh_project_browser_token" : "rdsh_harness_browser_token";
 const browserToken =
-  base === "/"
-    ? suppliedBrowserToken ||
-      sessionStorage.getItem("rdsh_project_browser_token") ||
-      ""
-    : "";
+  suppliedBrowserToken || sessionStorage.getItem(browserTokenKey) || "";
 if (browserToken) {
-  sessionStorage.setItem("rdsh_project_browser_token", browserToken);
+  sessionStorage.setItem(browserTokenKey, browserToken);
   if (suppliedBrowserToken !== null)
     history.replaceState(null, "", location.pathname + location.search);
 }
-async function api(route, body) {
-  const headers = browserToken ? { "x-rdsh-browser-token": browserToken } : {};
-  const response = await fetch(
-    base + "api/" + route,
-    body === undefined
-      ? { headers }
-      : {
-          method: "POST",
-          headers: { ...headers, "content-type": "application/json" },
-          body: JSON.stringify(body),
-        },
+function deviceMayCall(route, method) {
+  if (deviceAccess?.role !== "device" || method === "GET") return true;
+  const capabilities = new Set(deviceAccess.capabilities);
+  if (
+    ["update/answer", "instructions/resolve"].includes(route) &&
+    capabilities.has("reply")
+  )
+    return true;
+  return (
+    ["decision/cancel", "instructions/submit", "managed-stop"].includes(
+      route,
+    ) && capabilities.has("control")
   );
+}
+async function api(route, body, method) {
+  const headers = browserToken ? { "x-rdsh-browser-token": browserToken } : {};
+  const requestMethod = method || (body === undefined ? "GET" : "POST");
+  if (!deviceMayCall(route, requestMethod))
+    throw new Error("この端末にはその操作権限がありません");
+  const options = { method: requestMethod, headers };
+  if (body !== undefined) {
+    options.headers = { ...headers, "content-type": "application/json" };
+    options.body = JSON.stringify(body);
+  }
+  const response = await fetch(base + "api/" + route, options);
   const result = await response.json();
   if (!response.ok) throw new Error(result.error || "接続できません");
   return result;
@@ -153,10 +165,15 @@ function render(state) {
   updateOverview(state);
   renderReports(state);
   const unanswered = state.questions.filter((question) => question.answer === null);
+  const deviceCapabilities = new Set(deviceAccess?.capabilities || []);
   renderQuestionCards($("questions"), unanswered, state.question_contracts, {
     node,
     api,
     refreshState,
+    canReply:
+      deviceAccess?.role !== "device" || deviceCapabilities.has("reply"),
+    canControl:
+      deviceAccess?.role !== "device" || deviceCapabilities.has("control"),
   });
   renderAnswerApplications($("reply-status"), state, node);
   $("answers").replaceChildren(
@@ -197,6 +214,11 @@ async function refreshState() {
 }
 let qrObjectUrl = null;
 async function renderShare(config) {
+  if (config.device_access?.role === "device") {
+    $("share-toggle").hidden = true;
+    $("share").hidden = true;
+    return;
+  }
   const share = config.share;
   $("share-message").textContent = share.message;
   $("share-url").textContent = share.url || "";
@@ -338,7 +360,9 @@ document.addEventListener("keydown", (event) => {
 });
 try {
   const config = await api("config");
-  await renderShare(config);
+  deviceAccess = config.device_access;
+  await setupDeviceAccess({ api, config, base });
+  if (deviceAccess?.role !== "device") await renderShare(config);
   if (config.kind === "harness") {
     $("connection-detail").hidden = true;
     $("kind").textContent = "DEEPSEEK HARNESS";
@@ -346,10 +370,13 @@ try {
     $("location").textContent = "会話・ツール実行のWeb画面";
     $("project-content").hidden = true;
     $("harness").hidden = false;
-    $("harness-open").href = config.harness_url;
+    $("harness-open").href = config.harness_url || "#";
+    $("harness-open").hidden = deviceAccess?.role === "device";
     $("connection").textContent = "接続済み · Harness専用の入口";
-    $("share").hidden = false;
-    $("share-toggle").setAttribute("aria-expanded", "true");
+    if (deviceAccess?.role !== "device") {
+      $("share").hidden = false;
+      $("share-toggle").setAttribute("aria-expanded", "true");
+    }
     let stopRequested = false;
     let pendingStop = null;
     const refreshManaged = async () => {
@@ -399,7 +426,8 @@ try {
         );
         $("managed-stop").disabled =
           stopRequested || scope?.status !== "running";
-        $("harness-open").hidden = scope?.status === "exit_confirmed";
+        $("harness-open").hidden =
+          deviceAccess?.role === "device" || scope?.status === "exit_confirmed";
       } catch {
         $("managed-status").textContent =
           "監視に接続できません · 終了は未確認です";

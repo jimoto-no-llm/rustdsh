@@ -25,7 +25,7 @@ export function renderQuestionCards(
   container,
   questions,
   contracts,
-  { node, api, refreshState },
+  { node, api, refreshState, canReply = true, canControl = true },
 ) {
   const drafts = new Map(
     [...container.querySelectorAll("form")].map((form) => {
@@ -181,7 +181,7 @@ export function renderQuestionCards(
           radio.value = choice.id;
           radio.dataset.question = question.id;
           radio.dataset.field = `choice-${choice.id}`;
-          radio.disabled = !editable;
+          radio.disabled = !editable || !canReply;
           radio.checked = !reviewRequired && draft?.choice === choice.id;
           label.append(radio, node("span", choice.label));
           if (choice.detail)
@@ -196,12 +196,12 @@ export function renderQuestionCards(
       textarea.setAttribute("aria-label", `質問 ${question.id} への回答`);
       textarea.required = choices.length === 0;
       textarea.maxLength = 8000;
-      textarea.disabled = !editable;
+      textarea.disabled = !editable || !canReply;
       textarea.value = draft?.text || "";
       form.append(textarea);
       const button = node("button", "回答を返す", "primary");
       button.type = "submit";
-      button.disabled = !editable || reviewRequired;
+      button.disabled = !editable || reviewRequired || !canReply;
       if (changedDraft) {
         form.append(
           node(
@@ -216,7 +216,7 @@ export function renderQuestionCards(
         review.dataset.question = question.id;
         review.dataset.field = "review";
         review.checked = !reviewRequired;
-        review.disabled = !editable;
+        review.disabled = !editable || !canReply;
         review.addEventListener("change", () => {
           form.dataset.reviewedFingerprint = review.checked
             ? contract.fingerprint
@@ -224,7 +224,7 @@ export function renderQuestionCards(
           form.dataset.reviewedRevision = review.checked
             ? contract.revision
             : "";
-          button.disabled = !editable || !review.checked;
+          button.disabled = !editable || !review.checked || !canReply;
         });
         label.append(review, node("span", "更新後の対象と条件を確認した"));
         form.append(label);
@@ -263,7 +263,7 @@ export function renderQuestionCards(
           await refreshState();
         }
       });
-      if (contract && editable) {
+      if (contract && editable && canControl) {
         const cancel = node("button", "この質問を取消す");
         cancel.type = "button";
         cancel.addEventListener("click", async () => {

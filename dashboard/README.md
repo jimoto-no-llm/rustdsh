@@ -63,6 +63,8 @@ Project 画面の QR 鍵はブラウザー専用です。画面は鍵を URL fra
 中継時には Harness 側へ渡しません。同じホスト上の別ポートにも Harness Cookie
 が届くため、そのホスト上で信頼できない Web サービスを開かないでください。
 
+追加端末には画面の「端末ごとの権限」から個別鍵を発行できます。閲覧のみが既定で、プロジェクト画面では質問への回答と追指示・質問取消しを個別に付与します。Harness入口では閲覧または管理中の実行停止を付与でき、端末鍵から本体のHarness画面には入れません。プロジェクトごとの鍵とHarness入口の鍵はそれぞれの `devices.json` に分けて保存します。どちらも鍵は発行時だけ表示し、保存先にはハッシュと端末名・権限・利用時刻・失効状態を記録します。失効はその端末にだけ適用され、既存のイベント接続を閉じたうえで以後のAPI要求と再接続も拒否します。既存の「スマホで開く」QRは所有者用の全権鍵なので、追加端末には個別発行リンクを使ってください。共有URLが未設定のとき、発行リンクはこのPCからのみ利用できます。端末の回答は質問への返答であり、回答によって実行権限は発行されません。
+
 This optional Node.js component is separate from the Rust launcher's `rdsh serve`
 status page. It does not replace the original Harness agent loop.
 
