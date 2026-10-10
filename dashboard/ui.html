@@ -514,6 +514,30 @@
         display: grid;
         gap: 10px;
       }
+      #observed-cli-form {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        align-items: end;
+        gap: 10px;
+        margin: 12px 0;
+      }
+      #observed-cli-form label {
+        display: grid;
+        gap: 6px;
+      }
+      #observed-cli-form input,
+      #observed-cli-form select {
+        width: 100%;
+        min-height: 42px;
+        padding: 8px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: white;
+        font: inherit;
+      }
+      #observed-cli-form button {
+        min-height: 42px;
+      }
       .event {
         background: white;
         border: 1px solid var(--line);
@@ -816,6 +840,34 @@
           </dl>
           <ul id="overview-pending"></ul>
         </section>
+        <details class="fold" id="observed-cli-panel">
+          <summary>別terminalのCLIを読取専用で観測</summary>
+          <p class="sub">
+            Dashboardと同じhost・OSから見えるCLI processをPIDで登録します。プロセスの生存、PID再利用、登録時からの所有者変更だけを表示します。入力・停止・signal送信は行いません。CLI内部の会話やログは読み取りません。
+          </p>
+          <form id="observed-cli-form">
+            <label for="observed-cli-pid">
+              PID
+              <input id="observed-cli-pid" type="number" min="1" max="2147483647" step="1" required />
+            </label>
+            <label for="observed-cli-kind">
+              CLI種別
+              <select id="observed-cli-kind">
+                <option value="dsh">DSH</option>
+                <option value="rdsh">rdsh</option>
+                <option value="other">その他</option>
+              </select>
+            </label>
+            <label for="observed-cli-task">
+              関連task（任意）
+              <select id="observed-cli-task"></select>
+            </label>
+            <button id="observed-cli-submit" type="submit">読取専用で登録</button>
+          </form>
+          <p id="observed-cli-status" role="status" aria-live="polite"></p>
+          <div class="feed" id="observed-cli-list" aria-live="polite"></div>
+          <button id="observed-cli-refresh" type="button">識別状態を再確認</button>
+        </details>
         <h2 id="pending-heading" tabindex="-1">未回答の質問</h2>
         <p class="sub" id="pending-note">
           プロジェクト全体の質問です。回答はこの質問への返答のみです。対象・条件が変わった場合は回答前に内容を再確認してください。回答しただけで実行権限は生まれません。
