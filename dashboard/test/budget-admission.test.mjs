@@ -11,6 +11,7 @@ import { randomUUID } from "node:crypto";
 import { identity, ProjectStore, publicState } from "../state.mjs";
 import {
   applyBudgetOperation,
+  publicBudgetAdmission,
   validateBudgetAdmission,
 } from "../budget-admission.mjs";
 import { startDashboard } from "../server.mjs";
@@ -238,6 +239,83 @@ test("project and run policies reserve once each; decimal values, period and sou
     }).reason,
     "budget_period_closed",
   );
+});
+
+test("incremental replay totals stay exact across reservations, finishes and settlements", () => {
+  const state = { project: { id: "budget-cache" } },
+    period = {
+      period_start: new Date(Date.now() - 86400000).toISOString(),
+      period_end: new Date(Date.now() + 86400000).toISOString(),
+    };
+  applyBudgetOperation(
+    state,
+    "policy",
+    budgetPolicy({
+      ...period,
+      baseline: "0.1",
+      soft_limit: "10",
+      hard_limit: "20",
+    }),
+  );
+  applyBudgetOperation(
+    state,
+    "policy",
+    budgetPolicy({
+      ...period,
+      policy_id: "run-budget",
+      run_id: "run-1",
+      baseline: "0.2",
+      call_reservation: "0.2",
+      soft_limit: "10",
+      hard_limit: "20",
+    }),
+  );
+  localJob(state);
+  applyBudgetOperation(state, "call", call("job-1", "c1"));
+  applyBudgetOperation(state, "finish", finish("job-1", "c1"));
+  applyBudgetOperation(state, "usage", receipt("c1", "0.4"));
+  applyBudgetOperation(state, "call", call("job-1", "c2"));
+  applyBudgetOperation(state, "call", call("job-1", "c3"));
+
+  const policies = publicBudgetAdmission(state).policies;
+  assert.deepEqual(
+    policies.map(
+      ({
+        policy_id,
+        spent,
+        reserved,
+        effective,
+        executing,
+        awaiting_usage,
+      }) => ({
+        policy_id,
+        spent,
+        reserved,
+        effective,
+        executing,
+        awaiting_usage,
+      }),
+    ),
+    [
+      {
+        policy_id: "project-budget",
+        spent: "0.5",
+        reserved: "0.6",
+        effective: "1.1",
+        executing: 2,
+        awaiting_usage: 0,
+      },
+      {
+        policy_id: "run-budget",
+        spent: "0.6",
+        reserved: "0.6",
+        effective: "1.2",
+        executing: 2,
+        awaiting_usage: 0,
+      },
+    ],
+  );
+  assert.doesNotThrow(() => validateBudgetAdmission(state));
 });
 
 test("two workers atomically reserve the remaining budget; late usage can exceed hard and never changes routes", async (t) => {
