@@ -1,0 +1,6 @@
+Baseline: dashboard/cli.mjs at ab9cf1d9c6d61d87a4546b638469c98b91943194
+Candidate: workflow recipe implementation in this worktree
+Command: rdsh-dashboard recipe list --project <isolated empty project>
+
+- [rdsh-dashboard] Unknown command; use --help
++ []
