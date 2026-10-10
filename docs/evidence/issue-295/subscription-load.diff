@@ -1,0 +1,4 @@
+Input: events.json contains a derived-id subscription with an active expiry and an invalid signing secret.
+
+- Before: {"open":"accepted","active":1,"diagnosticActive":1}
++ After:  {"open":"rejected","error":"Invalid event subscription state"}
