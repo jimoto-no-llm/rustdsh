@@ -32,7 +32,13 @@ async function setup(t, mode = "normal", extra = {}) {
   adapter.on("event", (event) => events.push(event));
   t.after(async () => {
     await adapter.stop().catch(() => {});
-    await fs.rm(root, { recursive: true, force: true });
+    // Windows may briefly retain directory handles after the owned process exits.
+    await fs.rm(root, {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 100,
+    });
   });
   return {
     adapter,
