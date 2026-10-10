@@ -204,7 +204,7 @@ test("project state, HTTP/stdio MCP, subscriptions, answers, and auth work toget
       },
     }),
   );
-  assert.equal((await client.listTools()).tools.length, 6);
+  assert.equal((await client.listTools()).tools.length, 8);
   let notified;
   const notification = new Promise((resolve) => {
     notified = resolve;
@@ -258,6 +258,57 @@ test("project state, HTTP/stdio MCP, subscriptions, answers, and auth work toget
     type: "artifact",
     artifact: "reference-only.png",
   });
+  const handoff = await call("dashboard_create_handoff", { task_id: "M3.6" });
+  assert.deepEqual(Object.keys(handoff.sections), [
+    "purpose",
+    "remaining",
+    "constraints",
+    "decisions",
+    "deliverables",
+    "verification",
+    "next_step",
+  ]);
+  assert.equal(
+    handoff.sections.purpose.items[0].reported_task_title,
+    "A test task",
+  );
+  assert.equal(handoff.sections.verification.status, "unverified");
+  assert.equal(
+    handoff.sections.verification.items[0].reason,
+    "acceptance_criteria_not_defined",
+  );
+  assert.equal(handoff.sections.deliverables.items[0].contents, "not_opened");
+  assert.equal(handoff.freshness.status, "current");
+  const durableHandoff = JSON.parse(
+    await fs.readFile(path.join(alpha.directory, "handoff.json"), "utf8"),
+  );
+  assert.equal(durableHandoff.packet_id, handoff.packet_id);
+  const handoffResource = await client.readResource({
+    uri: "dashboard://handoff",
+  });
+  assert.equal(
+    JSON.parse(handoffResource.contents[0].text).packet_id,
+    handoff.packet_id,
+  );
+  const acceptanceResource = await client.readResource({
+    uri: "dashboard://acceptance",
+  });
+  assert.equal(
+    JSON.parse(acceptanceResource.contents[0].text).acceptance_defined,
+    false,
+  );
+  await call("dashboard_upsert_task", {
+    id: "M3.6",
+    title: "Changed after handoff",
+    status: "doing",
+  });
+  const staleHandoff = await call("dashboard_get_handoff", {});
+  assert.equal(staleHandoff.freshness.status, "stale");
+  assert.ok(
+    staleHandoff.freshness.stale_references.some(
+      (source) => source.id === "task:M3.6" && source.state === "changed",
+    ),
+  );
   const forgedAnswer = await fetch(dashboard.localUrl + "api/update/answer", {
     method: "POST",
     headers: { ...headers, authorization: `Bearer ${runtime.mcp_token}` },

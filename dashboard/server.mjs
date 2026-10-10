@@ -17,6 +17,13 @@ import { BudgetAdmissionServer } from "./budget-server.mjs";
 import { createHistoryBackup, backupMaximum } from "./history-backup.mjs";
 import { AcceptanceStore } from "./acceptance.mjs";
 import {
+  acceptanceHandoffView,
+  buildHandoff,
+  handoffFreshness,
+  handoffResource,
+  isHandoffPacket,
+} from "./handoffs.mjs";
+import {
   ConnectionObservations,
   connectionReport,
   inspectTunnel,
@@ -113,7 +120,13 @@ export async function startDashboard(options) {
   const budgets = store ? new BudgetAdmissionServer(mutateBudget) : null;
   const modern = store
     ? modernMcpHandler(
-        { getState: visibleState, mutate },
+        {
+          getState: visibleState,
+          mutate,
+          createHandoff,
+          getHandoff,
+          getAcceptance,
+        },
         eventsHub,
         connections,
       )
@@ -285,6 +298,72 @@ export async function startDashboard(options) {
     updateQueue = task.catch(() => {});
     return task;
   }
+  async function inspectAcceptance(taskId) {
+    if (!project || !store)
+      throw new Error("Acceptance inspection is unavailable in Harness mode");
+    return (await AcceptanceStore.open(project)).inspect(taskId);
+  }
+  async function loadHandoff() {
+    if (!project || !store)
+      throw new Error("Handoff packets are unavailable in Harness mode");
+    const file = path.join(project.directory, "handoff.json");
+    let bytes;
+    try {
+      bytes = await fs.readFile(file);
+    } catch (error) {
+      if (error.code === "ENOENT") return null;
+      throw error;
+    }
+    if (bytes.length > 1024 * 1024)
+      throw new Error("Stored handoff packet exceeds the size limit");
+    const packet = JSON.parse(bytes.toString("utf8"));
+    if (!isHandoffPacket(packet))
+      throw new Error("Stored handoff packet is invalid; create a new packet");
+    return packet;
+  }
+  async function getHandoff() {
+    const packet = await loadHandoff();
+    if (!packet) return handoffResource(null);
+    const [state, acceptance] = await Promise.all([
+      visibleState(),
+      inspectAcceptance(packet.task_id),
+    ]);
+    return handoffResource(packet, handoffFreshness(packet, state, acceptance));
+  }
+  async function getAcceptance() {
+    const packet = await loadHandoff();
+    if (!packet)
+      return {
+        schema: 1,
+        status: "unknown",
+        reason: "handoff_packet_not_created",
+      };
+    return acceptanceHandoffView(await inspectAcceptance(packet.task_id));
+  }
+  async function createHandoff(taskId) {
+    if (!store || !project)
+      throw new Error("Handoff packets are unavailable in Harness mode");
+    const task = updateQueue.then(async () => {
+      const state = await visibleState();
+      const acceptance = await inspectAcceptance(taskId);
+      const packet = buildHandoff(state, taskId, acceptance);
+      const committed = await store.recordHandoff();
+      packet.snapshot_revision = committed.revision;
+      await writeJson(path.join(project.directory, "handoff.json"), packet);
+      for (const response of live)
+        response.write(`event: changed\ndata: ${store.value.revision}\n\n`);
+      for (const { mcp } of sessions.values()) void mcp.notify();
+      void eventsHub.flush().catch(() => {});
+      const currentState = await visibleState();
+      const currentAcceptance = await inspectAcceptance(taskId);
+      return handoffResource(
+        packet,
+        handoffFreshness(packet, currentState, currentAcceptance),
+      );
+    });
+    updateQueue = task.catch(() => {});
+    return task;
+  }
   async function mutateReply(operation, input, context) {
     const task = updateQueue.then(async () => {
       const result = await store.mutateReply(operation, input, context);
@@ -383,6 +462,9 @@ export async function startDashboard(options) {
       const agentRoute =
         route === "/mcp" ||
         route === "/api/state" ||
+        (req.method === "GET" &&
+          ["/api/handoff", "/api/acceptance"].includes(route)) ||
+        (req.method === "POST" && route === "/api/handoff/create") ||
         route === "/api/instructions/context" ||
         (req.method === "POST" && route === "/api/instructions/submit") ||
         (req.method === "POST" &&
@@ -716,6 +798,30 @@ export async function startDashboard(options) {
         }
         if (req.method === "GET" && route === "/api/state")
           return json(res, 200, await visibleState());
+        if (req.method === "GET" && route === "/api/handoff") {
+          if (!mcpAuthorized)
+            return json(res, 403, { error: "MCP bearer credential required" });
+          return json(res, 200, await getHandoff());
+        }
+        if (req.method === "GET" && route === "/api/acceptance") {
+          if (!mcpAuthorized)
+            return json(res, 403, { error: "MCP bearer credential required" });
+          return json(res, 200, await getAcceptance());
+        }
+        if (req.method === "POST" && route === "/api/handoff/create") {
+          if (!mcpAuthorized)
+            return json(res, 403, { error: "MCP bearer credential required" });
+          const input = await readBody(req);
+          if (
+            !input ||
+            typeof input !== "object" ||
+            Array.isArray(input) ||
+            Object.keys(input).length !== 1 ||
+            typeof input.task_id !== "string"
+          )
+            return json(res, 400, { error: "Expected only a task_id field" });
+          return json(res, 200, await createHandoff(input.task_id));
+        }
         if (req.method === "POST" && route?.startsWith("/api/update/")) {
           const operation = route.slice("/api/update/".length);
           if (
@@ -765,6 +871,9 @@ export async function startDashboard(options) {
             const mcp = createMcpServer({
               getState: visibleState,
               mutate,
+              createHandoff,
+              getHandoff,
+              getAcceptance,
             });
             const transport = new StreamableHTTPServerTransport({
               sessionIdGenerator: randomUUID,

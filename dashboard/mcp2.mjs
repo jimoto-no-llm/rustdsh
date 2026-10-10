@@ -6,12 +6,14 @@ import {
 import { toNodeHandler, toWebRequest } from "@modelcontextprotocol/node";
 import { isLegacyRequest } from "@modelcontextprotocol/server";
 import * as z from "zod";
-import { tools, executeTool } from "./mcp.mjs";
-// Bucket E (MCP) diagnostics — Issues #76-#79: tool-call errors surface via
-// executeTool diagnostics in mcp.mjs (exact-name precedence, known names,
-// permission guard intact). Legacy clients are rejected, never silently
-// downgraded; OAuth, single-screen server state, and binary safety stay in
-// the outer layers. No large feature additions here.
+import {
+  tools,
+  executeTool,
+  readResource,
+  resourceDefinitions,
+} from "./mcp.mjs";
+// Tool calls and source-backed resources use the shared MCP contract in
+// mcp.mjs; OAuth, server diagnostics, and binary handling stay in outer layers.
 import { eventDefinitions } from "./webhooks.mjs";
 
 export function modernMcpHandler(api, hub, observations) {
@@ -19,9 +21,15 @@ export function modernMcpHandler(api, hub, observations) {
     () => {
       const server = new Server(
         { name: "rdsh-project-dashboard", version: "0.1.0" },
-        { capabilities: { tools: {}, events: {} } },
+        { capabilities: { tools: {}, resources: {}, events: {} } },
       );
       server.setRequestHandler("tools/list", async () => ({ tools }));
+      server.setRequestHandler("resources/list", async () => ({
+        resources: resourceDefinitions,
+      }));
+      server.setRequestHandler("resources/read", async (request) =>
+        readResource(api, request.params.uri),
+      );
       server.setRequestHandler("tools/call", async (request) => {
         try {
           const result = await executeTool(
