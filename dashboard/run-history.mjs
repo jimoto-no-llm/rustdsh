@@ -7,6 +7,7 @@ import {
   validProcessIdentity,
   matchProcessIdentity,
 } from "./process-identity.mjs";
+import { diagnoseRun } from "./stall-diagnostics.mjs";
 
 export const runStates = Object.freeze([
   "queued",
@@ -86,6 +87,15 @@ const reasons = [
   "failure_confirmed",
 ];
 const operations = ["start", "resume", "send", "interrupt", "stop"];
+const activityKinds = new Set([
+  "agent_message",
+  "tool_call",
+  "tool_update",
+  "usage",
+  "plan",
+  "mode",
+  "other",
+]);
 const outcomes = [
   null,
   "session_attached",
@@ -257,6 +267,17 @@ function validateData(type, data) {
         validProcessIdentity(data.identity) &&
         ["gone", "pid_reused"].includes(data.observation),
     );
+  else if (type === "activity_observed")
+    check(
+      exact(data, ["kind"]) &&
+        activityKinds.has(data.kind),
+    );
+  else if (type === "resource_observed")
+    check(
+      exact(data, ["kind", "status"]) &&
+        ["cpu", "memory", "gpu", "port", "unknown"].includes(data.kind) &&
+        ["waiting", "available"].includes(data.status),
+    );
   else if (type === "command")
     check(
       (exact(data, ["command_id", "operation", "phase", "ack_id", "outcome"]) ||
@@ -295,6 +316,8 @@ function apply(state, event) {
       reason: "registered",
       process: null,
       scope: null,
+      last_activity: null,
+      resource_observation: null,
       commands: [],
       rejected_transitions: [],
       revision: event.sequence,
@@ -368,6 +391,12 @@ function apply(state, event) {
       );
       run.process.status = "absence_observed";
       run.process.observed_at = event.observed_at;
+    } else if (type === "activity_observed") {
+      run.last_activity = { ...data, observed_at: event.observed_at };
+      run.last_observed_at = event.observed_at;
+    } else if (type === "resource_observed") {
+      run.resource_observation = { ...data, observed_at: event.observed_at };
+      run.last_observed_at = event.observed_at;
     } else if (type === "command") {
       const existing = state.commands.get(data.command_id);
       if (!existing) {
@@ -735,6 +764,24 @@ export class RunHistory {
       return command_id;
     });
   }
+  async recordActivity(id, kind) {
+    check(activityKinds.has(kind), "invalid_activity_kind");
+    return this.mutate((state, append) => {
+      check(state.runs.has(id), "run_not_found");
+      append(id, "activity_observed", { kind });
+    });
+  }
+  async recordResourceObservation(id, kind, status) {
+    check(
+      ["cpu", "memory", "gpu", "port", "unknown"].includes(kind) &&
+        ["waiting", "available"].includes(status),
+      "invalid_resource_observation",
+    );
+    return this.mutate((state, append) => {
+      check(state.runs.has(id), "run_not_found");
+      append(id, "resource_observed", { kind, status });
+    });
+  }
   async commandPhase(command_id, phase, outcome = null) {
     check(
       phases.includes(phase) &&
@@ -839,6 +886,11 @@ export class RunHistory {
         pid: run.process?.pid ?? null,
         scope: "owned_root_process_only; descendants_unverified",
       },
+      stall_diagnosis: diagnoseRun({
+        run,
+        processObservation: { status, observed_at: new Date().toISOString() },
+        uiConnection: ui_connection,
+      }),
       commands: run.commands.slice(-100).map((command) => ({
         ...structuredClone(command),
         recovery_outcome:
@@ -921,6 +973,79 @@ export class RunHistory {
       runs,
       next_cursor:
         after + runs.length < records.length ? after + runs.length : null,
+      recovery_required: loaded.tail_bytes > 0,
+    };
+  }
+  async diagnoseRecent({ limit = 5, uiConnection = "unknown" } = {}) {
+    check(
+      Number.isSafeInteger(limit) && limit >= 1 && limit <= 20,
+      "invalid_limit",
+    );
+    check(
+      ["unknown", "connected", "disconnected"].includes(uiConnection),
+      "invalid_ui_connection",
+    );
+    const loaded = await this.read();
+    const records = [...loaded.runs.values()].slice(-limit).reverse();
+    const observed_at = new Date().toISOString();
+    const runs = await Promise.all(
+      records.map(async (run) => {
+        let status = ["exit_confirmed", "absence_observed"].includes(
+          run.process?.status,
+        )
+          ? run.process.status
+          : "unknown";
+        if (
+          run.process &&
+          validProcessIdentity(run.process.identity) &&
+          !terminal(run.state) &&
+          !["exit_confirmed", "absence_observed"].includes(status)
+        ) {
+          try {
+            status = matchProcessIdentity(
+              run.process.identity,
+              await readProcessIdentity(run.process.pid),
+            );
+          } catch {
+            status = "unknown";
+          }
+        }
+        const knownExit = [
+          "exit_confirmed",
+          "absence_observed",
+          "gone",
+          "pid_reused",
+        ].includes(status);
+        let state = run.state;
+        if (!terminal(run.state)) {
+          if (knownExit) state = "disconnected";
+          else if (
+            run.process ||
+            ["starting", "running", "waiting-human", "stopping"].includes(
+              run.state,
+            )
+          )
+            state = "unknown";
+        }
+        if (loaded.tail_bytes && !terminal(state)) state = "unknown";
+        return {
+          run_id: run.run_id,
+          recorded_state: run.state,
+          state,
+          updated_at: run.updated_at,
+          stall_diagnosis: diagnoseRun({
+            run,
+            processObservation: { status, observed_at },
+            uiConnection,
+            now: observed_at,
+          }),
+        };
+      }),
+    );
+    return {
+      schema: 1,
+      observed_at,
+      runs,
       recovery_required: loaded.tail_bytes > 0,
     };
   }

@@ -166,6 +166,44 @@ test("run FSM persists rejected transitions and separates browser connection fro
   );
 });
 
+test("run activity and resource metadata persist without free text", async (t) => {
+  const { history, project } = await setup(t);
+  const id = runId();
+  await ready(history, id);
+  await history.transition(id, "waiting-resource", "external_wait");
+  await history.recordActivity(id, "agent_message");
+  await history.recordResourceObservation(id, "gpu", "waiting");
+
+  const reopened = await RunHistory.open(project);
+  const inspected = await reopened.inspect(id);
+  assert.equal(inspected.last_activity.kind, "agent_message");
+  assert.equal(inspected.resource_observation.kind, "gpu");
+  assert.equal(inspected.stall_diagnosis.classification, "resource_wait");
+  assert.equal(
+    inspected.stall_diagnosis.signals.find(
+      (item) => item.name === "resource_wait",
+    ).resource_kind,
+    "gpu",
+  );
+  const historyEvents = (await reopened.events(id)).events;
+  assert.deepEqual(
+    historyEvents
+      .filter((event) => event.type === "activity_observed")
+      .map((event) => event.data),
+    [{ kind: "agent_message" }],
+  );
+  assert.deepEqual(
+    historyEvents
+      .filter((event) => event.type === "resource_observed")
+      .map((event) => event.data),
+    [{ kind: "gpu", status: "waiting" }],
+  );
+  await assert.rejects(
+    history.recordActivity(id, "raw user prompt"),
+    error("invalid_activity_kind"),
+  );
+});
+
 test("alive, gone, PID reuse and unavailable process facts have distinct conservative results", async (t) => {
   const { history } = await setup(t),
     id = runId();
