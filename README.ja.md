@@ -31,6 +31,7 @@
 - [インストール](#インストール)
 - [使い方](#使い方)
 - [`dsh` として使う](#dsh-として使う)
+- [低スペック環境向け](#低スペック環境向け)
 - [Smart-DSH との併用](#smart-dsh-との併用)
 - [Web UI](#web-ui)
 - [実測](#実測)
@@ -235,9 +236,30 @@ Windows では安全な実装が入るまで、ネイティブ search を拒否�
 （`dsh --version`・`dsh --profile tui`・`dsh --help` は完全互換）。探索順の詳しくは[構成図](docs/ARCHITECTURE.md)を見てください。
 
 - 一時退避： `RDSH_PASSTHROUGH=1 dsh ...`（slim なし）、`RDSH_DRY_RUN=1 dsh ...`（実行内容のみ表示）
-- 既定プロファイル： `RDSH_DEFAULT_PROFILE`、次にローカルの `tui`、なければ案内付きエラーです
+- 既定プロファイル： `RDSH_DEFAULT_PROFILE`、rdsh設定の `general.default_profile`、ローカルの `tui`、案内付きエラーの順です。保存する既定値は `rdsh settings set general.default_profile web` で設定できます
 - 注意： `dsh tokens` のようにプロファイル名が予約語と重なるときは `dsh --profile tokens` で起動してください
 - `node "$(... dsh ...)"` 形式のスクリプトは置換中に壊れます。`dsh`・`rdsh` を直接実行してください。対象は `rdsh doctor` が一覧表示します
+
+## 低スペック環境向け
+
+古いx86-64 CPU、古いLinuxディストリビューション、Node.jsを入れていない環境でも使えることを目指しています。
+
+- **Nodeの起動を高速化**：rdshがdshを起動するとき、`NODE_COMPILE_CACHE` に
+  `~/.cache/rdsh-node-compile-cache` を設定し、起動をまたいでNodeにコンパイル結果を再利用させます
+  （Node 22.1以上。古い版は無視します）。既存の `NODE_COMPILE_CACHE` は尊重します。
+  `RDSH_NODE_COMPILE_CACHE=0`、`--passthrough`、`RDSH_PASSTHROUGH=1` で無効にできます。
+- **幅広いCPUに対応**：ビルド済みx86-64バイナリはAVX/BMIを必要としません。静的musl版は古いglibcの環境でも使えます。
+- **セッションのトークン見積り**：`sessions --tokens` は、サイズが記録されたzstdフレームならヘッダーから展開後サイズを読みます。
+  多くのストリーミングフレームでは `zstd -dc` が必要です。結果は
+  `~/.cache/rdsh/sessions-tokens.json` に保存し（`$XDG_CACHE_HOME` を優先）、
+  `RDSH_TOKENS_CACHE=0` でキャッシュを無効化できます。サイズを読めない場合は `?` を付けます。
+- **並列処理を制限**：検索・セッション走査のワーカーは最大8スレッドです。zstd CLIへのフォールバックは8〜32プロセスを並列で使います。
+- **Nodeなしでも使えるネイティブコマンド**：`tokens`・`search`・`sessions` などは使えます。会話を委譲するには
+  `@deepseek-ai/dsh` を導入するか、`DSH_ORIG_BIN`（または `RDSH_ORIG_BIN`）を指定してください。
+- **低優先度の自動更新**：`sync-dsh.sh` はdshとrdshを更新し、リリースのチェックサムを検証して、失敗時は元に戻します。
+  既定ではGitHubの最新タグ付きリリースを使います。`RDSH_SYNC_FROM_SOURCE=1` を指定すると、
+  `nice -n 19` と（利用可能なら）`ionice -c3` の下で `main` からビルドします。
+  systemdユニットも低優先度で実行します。`ExecStart` は各自のcheckoutに合わせてください。
 
 ## Smart-DSH との併用
 
@@ -356,6 +378,7 @@ v0.2.0 公開後のソース修正は、その公開済みバイナリには含�
 
 - ポートが使用中と言われる：dsh Web GUI は 3080、`rdsh serve` は既定 38080 です。`--port 0` で空きポートを使えます
 - プロファイル名がサブコマンドと重なる：`dsh --profile <name>` 形式で起動してください
+- プロファイルを指定しない `rdsh boot` が失敗する：`general.default_profile` または `RDSH_DEFAULT_PROFILE` を設定するか、`--profile <name>` を付けてください
 - 元に戻したい：`./install.sh --restore`（退避した本家を復元します）
 - `--tokens` の `?` 付き表示：zstd CLI がない環境では圧縮サイズからの概算である印です
 

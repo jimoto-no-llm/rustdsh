@@ -4,7 +4,12 @@ Description=rdsh dsh auto-update (check upstream, update, verify, roll back)
 [Service]
 Type=oneshot
 # Low-spec hosts (issue #85 item 5): never steal the machine during auto-update.
+# Adjust to where sync-dsh.sh lives on your host (e.g. %h/rustdsh/sync-dsh.sh).
 Nice=19
 IOSchedulingClass=idle
 CPUWeight=10
 ExecStart=%h/File/Prog/rustdsh/sync-dsh.sh
+# Default: rdsh follows GitHub release tags (prebuilt binary, no cargo build;
+# untagged commits on main are NOT picked up). To follow the main branch with
+# a local source build instead, uncomment:
+#Environment=RDSH_SYNC_FROM_SOURCE=1
