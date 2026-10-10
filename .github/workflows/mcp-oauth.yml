@@ -1,0 +1,28 @@
+name: optional MCP OAuth
+on: [push, pull_request]
+permissions:
+  contents: read
+concurrency:
+  group: mcp-oauth-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  test:
+    name: MCP OAuth (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: plugins/rdsh-mcp-oauth
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: plugins/rdsh-mcp-oauth/package-lock.json
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm test
+      - run: node test/probe.mjs
