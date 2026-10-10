@@ -265,6 +265,14 @@ fn is_word_char(c: char) -> bool {
 
 // ---- file helpers ----
 
+fn truncate_utf8_to_bytes(text: &str, cap: usize) -> &str {
+    let mut end = cap.min(text.len());
+    while !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    &text[..end]
+}
+
 fn read_bounded(path: &str, cap: usize) -> Option<String> {
     use std::io::Read;
     let root = std::fs::canonicalize(".").ok()?;
@@ -281,17 +289,7 @@ fn read_bounded(path: &str, cap: usize) -> Option<String> {
         return None; // binary
     }
     let text = String::from_utf8_lossy(&bytes).into_owned();
-    if text.len() > cap {
-        let end = text
-            .char_indices()
-            .take(cap)
-            .last()
-            .map(|(i, _)| i)
-            .unwrap_or(0);
-        Some(text[..end].to_string())
-    } else {
-        Some(text)
-    }
+    Some(truncate_utf8_to_bytes(&text, cap).to_string())
 }
 
 /// working_files 1件分の読み結果。失敗理由を区別して検証メモに回す。
@@ -1411,4 +1409,31 @@ pub fn cmd_explain(query: Option<String>, budget: Option<usize>) -> anyhow::Resu
     }
     out.flush()?;
     Ok(())
+}
+
+#[cfg(test)]
+mod bounded_read_tests {
+    use super::truncate_utf8_to_bytes;
+
+    #[test]
+    fn lossy_replacements_stay_within_the_byte_cap() {
+        let bytes = [0xff; 4];
+        let text = String::from_utf8_lossy(&bytes);
+        let truncated = truncate_utf8_to_bytes(&text, 4);
+
+        assert_eq!(truncated.len(), 3);
+        assert_eq!(truncated.chars().count(), 1);
+        assert!(truncated.len() <= 4);
+    }
+
+    #[test]
+    fn truncation_drops_a_partial_multibyte_scalar() {
+        assert_eq!(truncate_utf8_to_bytes("ab🦀z", 4), "ab");
+    }
+
+    #[test]
+    fn empty_input_and_zero_cap_are_safe() {
+        assert_eq!(truncate_utf8_to_bytes("", 0), "");
+        assert_eq!(truncate_utf8_to_bytes("abc", 0), "");
+    }
 }
