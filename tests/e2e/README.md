@@ -22,7 +22,10 @@ and removes its own processes and fixtures. It never connects a provider or enab
 Tailscale. It checks persisted settings, tokens/prune, session display, actual MCP
 questions and browser answers, draft retention across SSE, process restart, and
 revocation of the previous browser key. Linux CI installs Chromium and retains PNGs
-and JSON even when the job fails.
+and JSON even when the job fails. It also emits SHA-bound `qa-matrix.json` and a
+filterable `qa-matrix.html`; missing, stale, or mismatched-mode evidence stays
+`not-run`. The loopback browser job leaves real-phone, WSL, and Tailscale paths
+unverified.
 
 The default command also runs `update-banner.mjs` with the real React component
 and two independent authenticated plugin hosts. Dummy HOME and loopback ports
@@ -51,8 +54,9 @@ means the settings flow passed, not that mobile UX was accepted.
 For an existing browser installation, set `RDSH_CHROME_PATH`; an environment with
 bundled Playwright can set `RDSH_PLAYWRIGHT_MODULE` to its module path.
 
-See [the verification matrix](../../docs/evidence/e2e-20261008.md) for observed
-coverage and remaining environment-specific checks.
+See [the route-matrix contract](../../docs/evidence/qa-route-matrix.md) for
+coverage rules and [historical E2E evidence](../../docs/evidence/e2e-20261008.md)
+for earlier runs and environment-specific checks.
 
 ## Discord integration
 

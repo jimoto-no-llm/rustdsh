@@ -146,6 +146,7 @@ jobs:
       - run: npm test --prefix tests/e2e
         env:
           RDSH_E2E_BIN: ./target/release/rdsh
+          RDSH_E2E_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/upload-artifact@v7
         if: always()
         with:
