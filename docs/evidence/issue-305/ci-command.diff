@@ -1,0 +1,8 @@
+Before (plugin-security job):
+node --test tests/plugin-security.test.mjs tests/settings-client.test.mjs tests/update-banner.test.mjs tests/model_benchmark/fence.test.mjs
+
+After:
+node --test tests/plugin-security.test.mjs tests/settings-client.test.mjs tests/update-banner.test.mjs tests/discord-presence.test.mjs tests/model_benchmark/fence.test.mjs
+
+The Discord presence suite uses a fake local IPC server and injected HTTP fetches;
+it does not connect to Discord or require credentials.
