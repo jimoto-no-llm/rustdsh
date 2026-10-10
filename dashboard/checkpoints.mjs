@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import {
+  LedgerError,
   SessionLedger,
   attachRecordedSession,
   verifyRecordedContext,
@@ -177,21 +178,26 @@ function validateCheckpoint(value, project, id) {
   return value;
 }
 function validateAction(value, id) {
+  const fields = [
+    "schema",
+    "checkpoint_id",
+    "action_id",
+    "mode",
+    "status",
+    "run_id",
+    "cli_session_id",
+    "summary_digest",
+    "summary_bytes",
+    "summary_status",
+    "created_at",
+    "updated_at",
+  ];
   check(
-    exact(value, [
-      "schema",
-      "checkpoint_id",
-      "action_id",
-      "mode",
-      "status",
-      "run_id",
-      "cli_session_id",
-      "summary_digest",
-      "summary_bytes",
-      "summary_status",
-      "created_at",
-      "updated_at",
-    ]) &&
+    (exact(value, fields) || exact(value, [...fields, "error_code"])) &&
+      (!Object.hasOwn(value, "error_code") ||
+        (value.status === "unknown" &&
+          typeof value.error_code === "string" &&
+          /^[a-z][a-z0-9_]{0,63}$/.test(value.error_code))) &&
       value.schema === 1 &&
       value.checkpoint_id === id &&
       uuid(value.action_id, "recover") &&
@@ -716,7 +722,7 @@ export class Checkpoints {
           replayed_operations: 0,
           owned_root_exit_confirmed: true,
         };
-      } catch {
+      } catch (error) {
         if (attached) {
           try {
             await attached.adapter.stop();
@@ -725,6 +731,13 @@ export class Checkpoints {
           }
         }
         action.status = "unknown";
+        const preservedErrorCode =
+          (error instanceof CheckpointError || error instanceof LedgerError) &&
+          typeof error?.code === "string" &&
+          /^[a-z][a-z0-9_]{0,63}$/.test(error.code)
+            ? error.code
+            : null;
+        action.error_code = preservedErrorCode ?? "recovery_result_unknown";
         if (summary !== null && action.summary_status === "pending")
           action.summary_status = "unknown";
         action.updated_at = new Date().toISOString();
@@ -733,7 +746,9 @@ export class Checkpoints {
         } catch {
           /* The flushed intent still prevents replay. */
         }
-        throw new CheckpointError("recovery_result_unknown");
+        if (preservedErrorCode === null)
+          throw new CheckpointError("recovery_result_unknown");
+        throw error;
       }
     });
   }
