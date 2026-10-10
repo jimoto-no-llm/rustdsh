@@ -225,6 +225,7 @@ function renderEvents(state, now) {
       .reverse()
       .map((event) => {
         const element = node("article", undefined, "event");
+        element.id = "event-" + event.sequence;
         element.append(
           node("strong", event.title),
           node(

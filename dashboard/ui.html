@@ -101,6 +101,28 @@
         background: white;
         font: inherit;
       }
+      .cross-search-controls {
+        display: grid;
+        grid-template-columns: minmax(220px, 2fr) repeat(4, minmax(120px, 1fr));
+        align-items: end;
+        gap: 12px;
+        margin: 16px 0;
+      }
+      .cross-search-controls input,
+      .cross-search-controls select {
+        display: block;
+        width: 100%;
+        min-height: 44px;
+        margin: 6px 0;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 8px;
+        background: white;
+        font: inherit;
+      }
+      .cross-search-controls button {
+        min-height: 44px;
+      }
       .summary-facts {
         display: grid;
         grid-template-columns: 100px minmax(0, 1fr);
@@ -385,6 +407,14 @@
         list-style: none;
         margin: 0;
         padding: 0;
+      }
+      @media (max-width: 760px) {
+        .cross-search-controls {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .cross-search-query {
+          grid-column: 1 / -1;
+        }
       }
       .decision-card {
         border: 1px solid var(--line);
@@ -838,6 +868,59 @@
             id="cross-project-rows"
             class="decision-grid project-cross-list"
           ></ul>
+        </section>
+        <section
+          id="cross-project-search"
+          class="summary-card"
+          aria-labelledby="cross-project-search-heading"
+          hidden
+        >
+          <h2 id="cross-project-search-heading">プロジェクト横断検索</h2>
+          <p class="sub">
+            起動時に明示指定したprojectのtask・判断・log・artifact参照を検索します。artifactの実ファイルや既存Session全文検索のindexは読みません。Session本文は元の検索機能から確認してください。
+          </p>
+          <form id="cross-project-search-form">
+            <div class="cross-search-controls">
+              <label class="cross-search-query" for="cross-project-search-query">
+                検索語（最大10語）
+                <input
+                  id="cross-project-search-query"
+                  name="query"
+                  type="search"
+                  maxlength="160"
+                  required
+                  autocomplete="off"
+                />
+              </label>
+              <label for="cross-project-search-project">
+                project
+                <select id="cross-project-search-project" name="project"></select>
+              </label>
+              <label for="cross-project-search-kind">
+                資料種別
+                <select id="cross-project-search-kind" name="kind">
+                  <option value="all">すべて</option>
+                  <option value="task">task</option>
+                  <option value="decision">判断</option>
+                  <option value="log">log</option>
+                  <option value="artifact">artifact参照</option>
+                </select>
+              </label>
+              <label for="cross-project-search-since">
+                期間（開始）
+                <input id="cross-project-search-since" name="since" type="date" />
+              </label>
+              <label for="cross-project-search-until">
+                期間（終了）
+                <input id="cross-project-search-until" name="until" type="date" />
+              </label>
+              <button class="primary" type="submit">検索</button>
+            </div>
+          </form>
+          <p id="cross-project-search-status" role="status" aria-live="polite">
+            検索語を入力してください
+          </p>
+          <ul id="cross-project-search-results" class="project-cross-list"></ul>
         </section>
         <h2 id="pending-heading" tabindex="-1">未回答の質問</h2>
         <p class="sub" id="pending-note">

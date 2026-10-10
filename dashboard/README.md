@@ -121,6 +121,24 @@ link appears only while the owning project dashboard is running. It carries no
 browser key, so the owning dashboard still requires its own human session.
 Projects not named with `--include-project` are not enumerated or exposed.
 
+The same explicit project list also enables **project cross-search** for task,
+decision, log, and artifact-reference records. Search requires the current
+dashboard's human browser credential, supports all-terms text queries, one
+project or all included projects, record kind, date range, and a bounded result
+limit. Results show a short matching excerpt, project/source, record time, and
+a link to its source record when that project's dashboard is running. The link
+contains no browser key and still needs that project's own human session.
+Unreadable project state is reported as unknown and contributes no results.
+
+Task, decision, and log records search their stored dashboard text. Artifact
+search is reference-only: it searches the report title and sanitized path/URL,
+never reads the artifact file, follows a symlink, or fetches an external URL.
+Local references are checked with metadata-only `realpath`/`stat` calls inside
+the owning project; a missing path is labeled stale, while external or unsafe
+references remain unverified. The existing DSH Session full-text search is
+unchanged and remains the place to search Session bodies; project cross-search
+does not index Sessions or add semantic search.
+
 ```powershell
 # Keep terminal output and Ctrl-C behavior for scripts or troubleshooting.
 rdsh-dashboard project --project C:\Projects\MyProject --no-tray
