@@ -412,6 +412,7 @@ pub(crate) fn initialize(force: bool) -> anyhow::Result<bool> {
 
 impl RdshSettings {
     /// `mkdir -p` した上で mode 600 相当で保存する。
+    #[cfg(test)]
     pub fn save(&self) -> anyhow::Result<()> {
         let path = settings_path();
         let _lock = crate::file_lock::FileLock::exclusive_for(std::path::Path::new(&path))?;
