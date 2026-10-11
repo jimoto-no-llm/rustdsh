@@ -35,8 +35,18 @@ function Ensure-Cargo {
       winget install -e --id Rustlang.Rustup --silent --accept-package-agreements --accept-source-agreements
     } else {
       $init = Join-Path $env:TEMP 'rustup-init.exe'
-      Invoke-WebRequest -Uri 'https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe' -OutFile $init
-      & $init -y --profile minimal --default-toolchain stable
+      # Keep this fixed archive version and digest paired; do not fetch the digest beside the binary.
+      $rustupVersion = '1.29.1'
+      $expectedHash = '6f4bef66261261fcb43131be8720bab817d403a09edec7455c371974b90bdb7e'
+      $url = "https://static.rust-lang.org/rustup/archive/$rustupVersion/x86_64-pc-windows-msvc/rustup-init.exe"
+      try {
+        Invoke-WebRequest -Uri $url -OutFile $init
+        $actualHash = (Get-FileHash -LiteralPath $init -Algorithm SHA256).Hash
+        if ($actualHash -ne $expectedHash) { throw 'rustup-init SHA-256 mismatch; refusing to run' }
+        & $init -y --profile minimal --default-toolchain stable
+      } finally {
+        Remove-Item -LiteralPath $init -Force -ErrorAction SilentlyContinue
+      }
     }
   }
   $env:PATH = "$env:USERPROFILE/.cargo/bin;$env:PATH"
