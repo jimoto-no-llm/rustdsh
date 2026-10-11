@@ -953,129 +953,6 @@
         </section>
       </section>
       <div id="project-content" tabindex="-1">
-        <section
-          id="project-overview"
-          class="summary-card"
-          aria-labelledby="overview-heading"
-        >
-          <h2 id="overview-heading" tabindex="-1">いまの状況</h2>
-          <label for="overview-task">確認する範囲</label
-          ><select id="overview-task"></select>
-          <p id="overview-context"></p>
-          <dl class="summary-facts">
-            <dt>状態</dt>
-            <dd>
-              <div id="overview-state">実行状態は未取得</div>
-              <p class="sub" id="overview-task-report"></p>
-            </dd>
-            <dt>観測</dt>
-            <dd>
-              <div id="overview-observed">実行の観測記録なし</div>
-              <p class="sub" id="overview-report-updated"></p>
-            </dd>
-            <dt>最後の結果</dt>
-            <dd>
-              <div id="overview-result">未取得</div>
-              <p class="sub" id="overview-result-detail"></p>
-            </dd>
-            <dt>判断</dt>
-            <dd id="overview-decision">確認中…</dd>
-            <dt>停止</dt>
-            <dd id="overview-stop">この画面からの停止は非対応</dd>
-          </dl>
-          <ul id="overview-pending"></ul>
-        </section>
-        <details class="fold" id="observed-cli-panel">
-          <summary>別terminalのCLIを読取専用で観測</summary>
-          <p class="sub">
-            Dashboardと同じhost・OSから見えるCLI processをPIDで登録します。プロセスの生存、PID再利用、登録時からの所有者変更だけを表示します。入力・停止・signal送信は行いません。CLI内部の会話やログは読み取りません。
-          </p>
-          <form id="observed-cli-form">
-            <label for="observed-cli-pid">
-              PID
-              <input id="observed-cli-pid" type="number" min="1" max="2147483647" step="1" required />
-            </label>
-            <label for="observed-cli-kind">
-              CLI種別
-              <select id="observed-cli-kind">
-                <option value="dsh">DSH</option>
-                <option value="rdsh">rdsh</option>
-                <option value="other">その他</option>
-              </select>
-            </label>
-            <label for="observed-cli-task">
-              関連task（任意）
-              <select id="observed-cli-task"></select>
-            </label>
-            <button id="observed-cli-submit" type="submit">読取専用で登録</button>
-          </form>
-          <p id="observed-cli-status" role="status" aria-live="polite"></p>
-          <div class="feed" id="observed-cli-list" aria-live="polite"></div>
-          <button id="observed-cli-refresh" type="button">識別状態を再確認</button>
-        </details>
-        <h2 id="pending-heading" tabindex="-1">未回答の質問</h2>
-        <p class="sub" id="pending-note">
-          プロジェクト全体の質問です。回答はこの質問への返答のみです。対象・条件が変わった場合は回答前に内容を再確認してください。回答しただけで実行権限は生まれません。
-        </p>
-        <div
-          id="questions"
-          class="decision-grid"
-          aria-labelledby="pending-heading"
-          aria-describedby="pending-note"
-        ></div>
-        <section id="budget-admission" aria-label="予算制御"></section>
-        <details class="fold" id="metrics-detail">
-          <summary>プロジェクト全体の数値</summary>
-          <h2 id="metrics-heading" tabindex="-1">数値の詳細</h2>
-          <div class="cards" id="cards"></div>
-          <h2>費用の明細と出所</h2>
-          <section id="cost-ledger" aria-label="費用台帳"></section>
-        </details>
-        <details class="fold" id="tasks-detail">
-          <summary>タスク一覧</summary>
-          <h2 id="tasks-heading" tabindex="-1">
-            タスク <span class="sub" id="task-milestones"></span>
-          </h2>
-          <div class="table-box">
-            <!-- #57: 各行に task-<id> の目印を付け、端末を替えても同じ行へ戻れるようにします。 -->
-            <table aria-labelledby="tasks-heading">
-              <thead>
-                <tr>
-                  <th scope="col">ID</th>
-                  <th scope="col">状態</th>
-                  <th scope="col">題名</th>
-                  <th scope="col">ブロック要因</th>
-                </tr>
-              </thead>
-              <tbody id="tasks"></tbody>
-            </table>
-          </div>
-        </details>
-        <details class="fold" id="human-annotation-detail">
-          <summary>人間のブックマーク・注釈</summary>
-          <h2>人間のブックマーク</h2>
-          <p class="sub">
-            AI要約と別ファイルに保存します。ログ・決定内容・Git差分の参照先は固定され、変更や削除を検出した場合は状態を表示します。
-          </p>
-          <section id="human-annotations-panel" aria-label="人間のブックマーク管理"></section>
-        </details>
-        <details class="fold" id="instruction-detail">
-          <summary>同じsessionへ追指示を送る</summary>
-          <h2>追指示と適用タイミング</h2>
-          <p class="sub">
-            下書きはこの端末で保持します。入力は順番に配送し、結果不明の入力がある場合は保留します。指示の保存で新しい実行権限は発行されません。
-          </p>
-          <section
-            id="instruction-panel"
-            aria-label="追指示の投稿と確認"
-          ></section>
-        </details>
-        <details class="fold" id="reply-detail">
-          <summary>回答の保存・適用を確認</summary>
-          <section
-            id="reply-applications"
-            hidden
-            aria-labelledby="reply-heading"
         <div class="workspace-settings">
           <fieldset
             id="workspace-layout-controls"
@@ -1222,6 +1099,14 @@
             aria-labelledby="workspace-history-heading"
           >
             <h2 id="workspace-history-heading">履歴と成果</h2>
+            <details class="fold" id="human-annotation-detail">
+              <summary>人間のブックマーク・注釈</summary>
+              <h3>人間のブックマーク</h3>
+              <p class="sub">
+                AI要約と別ファイルに保存します。ログ・決定内容・Git差分の参照先は固定され、変更や削除を検出した場合は状態を表示します。
+              </p>
+              <section id="human-annotations-panel" aria-label="人間のブックマーク管理"></section>
+            </details>
             <details class="fold" id="progress-detail">
               <summary>進捗・成果物の報告</summary>
               <h3>進捗・成果物の報告履歴</h3>
