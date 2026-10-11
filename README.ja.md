@@ -46,7 +46,7 @@
 ```sh
 rdsh --version && rdsh doctor   # 導入と本家 dsh の確認
 rdsh setup --web                # 表示される #key=... 付き URL を開き、モデルに接続します
-rdsh tui                        # 会話を始め、選んだモデルの返答まで確かめます
+rdsh tui                        # 初回は docs/TUI-SETUP.md でTUIを導入します
 ```
 
 詳しい [導入・利用・復旧の流れ](docs/USER-FLOW.md)、[設定画面](docs/RDSH-SETTINGS.md)、
@@ -114,6 +114,9 @@ OAuth をその場で開きます）。直接作る場合は `cargo build --rele
 ## 使い方
 
 ### dsh 互換（委譲）
+
+`tui` はdsh標準のプロファイルではなく、TUIプラグインの導入が必要です。
+未導入の場合は先に[TUIの設定手順](docs/TUI-SETUP.md)を実行してください。
 
 ```sh
 rdsh tui                          # dsh --profile tui と同じです（slim 環境変数付き）

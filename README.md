@@ -30,7 +30,7 @@ original `dsh` binary. Arguments you already use keep working as-is.
 ```sh
 rdsh --version && rdsh doctor   # verify install and original dsh
 rdsh setup --web                # open the printed #key=... URL, connect a model
-rdsh tui                        # start a conversation, confirm a model reply
+rdsh tui                        # requires a TUI profile; see docs/TUI-SETUP.md
 ```
 
 See the [usage and recovery flow](docs/USER-FLOW.md),
@@ -99,6 +99,9 @@ start the Codex/opencode OAuth flow right away). Direct builds use
 ## Usage
 
 ### dsh-compatible delegation
+
+`tui` requires an installed terminal plugin; it is not a shipped dsh profile.
+Follow [TUI profile setup](docs/TUI-SETUP.md) before using the TUI examples.
 
 ```sh
 rdsh tui                          # same as: dsh --profile tui (with slim env)
