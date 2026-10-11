@@ -14,7 +14,7 @@
 
 ## 構成
 
-```
+```text
 Web GUI → DSH Host/Plugin → plugins/rdsh-compute → stdio → rdsh compute
                          ↘ (失敗・無効時は元の実装)
 ```
