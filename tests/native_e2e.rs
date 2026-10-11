@@ -633,7 +633,12 @@ fn http_truncated_and_oversized_requests_do_not_damage_serve() {
                 Err(_) => std::thread::sleep(Duration::from_millis(500)),
             }
         }
-        let mut stream = stream.expect("server should accept connections");
+        let mut stream = stream.unwrap_or_else(|| {
+            panic!(
+                "server should accept connections (port {}, child status unknown)",
+                server.port
+            )
+        });
         stream
             .set_read_timeout(Some(Duration::from_secs(60)))
             .unwrap();
