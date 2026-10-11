@@ -7,11 +7,18 @@ import {
 } from "./process-scope-backends.mjs";
 import { readProcessIdentity } from "./process-identity.mjs";
 
-const send = (frame) => process.stdout.write(JSON.stringify(frame) + "\n");
+const send = (frame, callback) =>
+  process.stdout.write(JSON.stringify(frame) + "\n", callback);
 let scope = null,
   starting = false,
-  closing = false;
+  closing = false,
+  exitRequested = false;
 let queue = Promise.resolve();
+const exitAfterStdout = () => {
+  if (exitRequested) return;
+  exitRequested = true;
+  process.stdout.end(() => process.exit(0));
+};
 const input = readline.createInterface({ input: process.stdin });
 input.on("line", (line) => {
   if (line.length > 1024 * 1024) {
@@ -80,8 +87,10 @@ input.on("line", (line) => {
         result = { closed: await scope.close() };
         if (result.closed) closing = true;
       } else throw new Error();
-      send({ type: "response", id: frame.id, result });
-      if (closing) process.exit(0);
+      send(
+        { type: "response", id: frame.id, result },
+        closing ? exitAfterStdout : undefined,
+      );
     } catch {
       send(
         frame?.id
@@ -94,6 +103,6 @@ input.on("line", (line) => {
 input.on("close", () => {
   void queue.finally(async () => {
     if (!closing && scope) await cleanupScope(scope);
-    process.exit(0);
+    exitAfterStdout();
   });
 });

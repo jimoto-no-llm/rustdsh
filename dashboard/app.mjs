@@ -7,6 +7,7 @@ import { renderConnectionDiagnostics } from "./connection-diagnostics-ui.mjs";
 import { createInstructionPanel } from "./instruction-queue-ui.mjs";
 import { createCostPanel } from "./cost-ledger-ui.mjs";
 import { renderBudget } from "./budget-ui.mjs";
+import { createHumanAnnotationPanel } from "./human-annotations-ui.mjs";
 
 const $ = (id) => document.getElementById(id);
 const base = location.pathname.startsWith("/_rdsh") ? "/_rdsh/" : "/";
@@ -144,6 +145,10 @@ const renderInstructions = createInstructionPanel($("instruction-panel"), {
   refreshState,
 });
 const renderCosts = createCostPanel($("cost-ledger"), node);
+const renderHumanAnnotations = createHumanAnnotationPanel(
+  $("human-annotations-panel"),
+  { api, node, navigateTo },
+);
 function render(state) {
   if (state.revision < renderedRevision) return;
   renderedRevision = state.revision;
@@ -152,6 +157,7 @@ function render(state) {
   renderCosts(state);
   renderBudget($("budget-admission"), state, node);
   updateOverview(state);
+  renderHumanAnnotations(state);
   renderReports(state);
   for (const task of state.tasks) {
     const title = document.getElementById("task-" + task.id)?.children[2];
@@ -176,6 +182,7 @@ function render(state) {
       .reverse()
       .map((question) => {
         const element = node("article", undefined, "event");
+        element.id = "decision-" + encodeURIComponent(question.id);
         element.append(
           node("strong", question.question),
           node("p", question.answer),
