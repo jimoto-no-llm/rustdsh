@@ -21,7 +21,7 @@ It ports frequently used CLI operations (token calculation, code search, session
 - ⚡ **Sub-millisecond startup & low memory**: `--version` launches in ~0.90 ms with ~2.9 MB peak memory, compared to ~88 ms and ~66 MB for Node.js-based `dsh`.
 - 🔄 **100% Drop-in Compatible**: Subcommands that are not rdsh-native are passed straight to upstream `dsh`. Existing scripts and workflows keep running unchanged.
 - 🛠 **Fast Native Utilities**: Estimate tokens, search code, list sessions, and run health diagnostics (`rdsh doctor`) instantly without starting Node.js.
-- 🛡 **Safe by Default**: Read-only commands never mutate files, credentials are never automatically synced or exported, and tool execution can be sandboxed on Linux.
+- 🛡 **Safe by Default**: Read-only commands never mutate files, credentials are never automatically synced or exported, and agent tools can be confined to explicitly shared files on Linux.
 
 ## Table of Contents
 
@@ -164,13 +164,18 @@ rdsh setup --web                           # browser-based setup interface
 
 ### Agent Tool Isolation
 
-On Linux (with bubblewrap and prlimit), agent tools can be securely sandboxed:
+Delegated agent tools keep normal file access by default: the model reads and
+writes the project like any other tool. On Linux (with bubblewrap and prlimit)
+you can instead confine them to files you explicitly share:
 
 ```sh
 rdsh --share-file README.md --share-file src/main.rs --profile tui
 ```
 
-Only explicitly shared files are mounted read-only, protecting host files and preventing unauthorized network access from the model.
+Only the shared files are mounted read-only, host files stay out of reach and
+the sandbox has no network. Turn the same boundary on for every run with
+`rdsh features on agent_tool_sandbox` (off again with
+`rdsh features off agent_tool_sandbox`, or force it with `RDSH_SECURITY=1`).
 
 ### Hook Guard (`rdsh guard`)
 
@@ -246,7 +251,7 @@ Measurements conducted on Linux x86_64:
 1. **Upstream Fidelity**: Never reimplements conversation loops or agent logic; delegates directly to upstream `dsh`.
 2. **Non-Destructive**: Read operations (tokens, search, session listing, compacting) never modify source files.
 3. **Explicit Auth**: Credentials are never sent externally or synced automatically; only user-approved items are imported.
-4. **Tool Sandboxing**: On Linux, only explicitly shared files are mounted read-only, preventing unintended modifications to the host.
+4. **Tool Sandboxing** (opt-in): On Linux, `--share-file` mounts only the files you share, read-only and without network, so the model never touches the rest of the host.
 
 ## FAQ
 

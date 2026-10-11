@@ -202,6 +202,22 @@ enum Commands {
         #[command(subcommand)]
         action: SettingsAction,
     },
+    /// Feature switches: list every optional capability, or turn one on/off
+    Features {
+        #[command(subcommand)]
+        action: Option<FeaturesAction>,
+        /// Machine-readable list
+        #[arg(long = "json")]
+        json: bool,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum FeaturesAction {
+    /// Enable one feature: rdsh features on discord
+    On { id: String },
+    /// Disable one feature: rdsh features off discord
+    Off { id: String },
 }
 
 #[derive(Subcommand, Debug)]
@@ -290,6 +306,7 @@ const NATIVE_FIRST: &[&str] = &[
     "search-web",
     "context",
     "settings",
+    "features",
 ];
 
 fn invoked_as_dsh() -> bool {
@@ -313,6 +330,8 @@ fn main() {
             let slim =
                 !passthrough::env_passthrough() && !scfg.general.passthrough && scfg.general.slim;
             let dry = passthrough::env_dry() || scfg.general.dry_run;
+            crate::slim::configure(&scfg);
+            crate::tool_security::configure(agent_tool_sandbox(&scfg, false));
             if let Err(e) = passthrough::exec_raw(&raw, dry, slim) {
                 eprintln!("[rdsh] error: {e:#}");
                 std::process::exit(1);
@@ -345,6 +364,15 @@ fn main() {
     } else {
         rdsh_config::load()
     };
+    // Feature switches (rdsh features) steer the delegated-run env and the
+    // native session caches; an explicit environment variable still wins.
+    crate::slim::configure(&cfg);
+    crate::tool_security::configure(agent_tool_sandbox(&cfg, !cli.share_file.is_empty()));
+    if !rdsh_config::feature_enabled(&cfg, "sessions_token_cache")
+        && std::env::var_os("RDSH_TOKENS_CACHE").is_none()
+    {
+        std::env::set_var("RDSH_TOKENS_CACHE", "0");
+    }
     let pass = cli.passthrough || passthrough::env_passthrough() || cfg.general.passthrough;
     let slim = !cli.no_slim && !pass && (cli.slim || cfg.general.slim);
     let dry = cli.dry_run || passthrough::env_dry() || cfg.general.dry_run;
@@ -358,7 +386,7 @@ fn main() {
             search::cmd_search(&pattern, &dir, max.unwrap_or(cfg.search.max))
         }
         Some(Commands::SearchWeb { query, limit, json }) => {
-            if !crate::rdsh_config::extra_enabled(&cfg, "search-web") {
+            if !rdsh_config::feature_enabled(&cfg, "search-web") {
                 extra_disabled("search-web")
             } else {
                 websearch::cmd_search_web(&query, limit.unwrap_or(cfg.search.web_limit), json)
@@ -386,7 +414,7 @@ fn main() {
             inspect::cmd_logs(tail.unwrap_or(cfg.logs.tail), grep, file)
         }
         Some(Commands::Serve { port }) => {
-            if !crate::rdsh_config::extra_enabled(&cfg, "serve") {
+            if !rdsh_config::feature_enabled(&cfg, "serve") {
                 extra_disabled("serve")
             } else {
                 serve::cmd_serve(port.unwrap_or(cfg.serve.port))
@@ -437,9 +465,9 @@ fn main() {
                     for annotated in rdsh_config::RdshSettings::keys() {
                         let key = annotated.split('(').next().unwrap_or(annotated);
                         let value = cfg.get_dotted(key).unwrap_or_default();
-                        let rendered = match &value {
-                            serde_json::Value::String(s) => s.clone(),
-                            _ => serde_json::to_string(&value).unwrap_or_else(|_| "-".to_string()),
+                        let rendered = match value {
+                            serde_json::Value::String(s) => s,
+                            v => serde_json::to_string(&v).unwrap_or_else(|_| "-".to_string()),
                         };
                         let source = if settings_key_in_file(&raw, key) {
                             "config"
@@ -447,6 +475,22 @@ fn main() {
                             "default"
                         };
                         println!("{key}  {rendered}  {source}");
+                    }
+                    // Features show their effective state, not just what is written.
+                    for annotated in rdsh_config::RdshSettings::feature_keys() {
+                        let key = annotated.split('(').next().unwrap_or(annotated.as_str());
+                        let id = key.strip_prefix("features.").unwrap_or(key);
+                        let state = if rdsh_config::feature_enabled(&cfg, id) {
+                            "true"
+                        } else {
+                            "false"
+                        };
+                        let source = if rdsh_config::feature_is_explicit(&cfg, id) {
+                            "config"
+                        } else {
+                            "default"
+                        };
+                        println!("{key}  {state}  {source}");
                     }
                     Ok(())
                 }
@@ -532,13 +576,21 @@ fn main() {
                 for k in rdsh_config::RdshSettings::keys() {
                     println!("{k}");
                 }
+                for k in rdsh_config::RdshSettings::feature_keys() {
+                    println!("{k}");
+                }
                 Ok(())
             }
         },
+        Some(Commands::Features { action, json }) => match action {
+            None => features_list(&cfg, json),
+            Some(FeaturesAction::On { id }) => features_toggle(&id, true),
+            Some(FeaturesAction::Off { id }) => features_toggle(&id, false),
+        },
         Some(Commands::Context { action }) => {
-            if !cfg.beta.context_engine {
+            if !rdsh_config::feature_enabled(&cfg, "context_engine") {
                 eprintln!(
-                    "[rdsh] context engine is OFF by default (experimental) — enable with: rdsh settings set beta.context_engine true"
+                    "[rdsh] context engine is OFF by default (experimental) — enable with: rdsh features on context_engine"
                 );
                 std::process::exit(2);
             }
@@ -571,7 +623,13 @@ fn main() {
             port,
         }) => {
             if web {
-                setup_web::cmd_setup_web(port.unwrap_or(cfg.setup.web_port))
+                if rdsh_config::feature_enabled(&cfg, "setup_web") {
+                    setup_web::cmd_setup_web(port.unwrap_or(cfg.setup.web_port))
+                } else {
+                    Err(anyhow::anyhow!(
+                        "rdsh setup --web is off; enable with: rdsh features on setup_web"
+                    ))
+                }
             } else {
                 auth::cmd_setup(open, login, json, yes)
             }
@@ -730,11 +788,79 @@ fn native_dump_config_json(profile: &str, home: &str, patches: &[String]) -> Str
     .to_string()
 }
 
+/// Delegated agent tools: normal file access by default. The strict boundary
+/// applies when the setting is explicit, when `--share-file` is used, or when
+/// `RDSH_SECURITY=1` forces it.
+fn agent_tool_sandbox(cfg: &rdsh_config::RdshSettings, share_files_requested: bool) -> bool {
+    if rdsh_config::feature_is_explicit(cfg, "agent_tool_sandbox") {
+        return rdsh_config::feature_enabled(cfg, "agent_tool_sandbox");
+    }
+    share_files_requested
+}
+
+/// `rdsh features`: every optional capability with its effective state.
+fn features_list(cfg: &rdsh_config::RdshSettings, json: bool) -> anyhow::Result<()> {
+    use std::io::Write;
+    // `let _` on purpose: piping to `head` closes early (EPIPE) and must not
+    // abort the listing with a panic.
+    let stdout = std::io::stdout();
+    let mut out = stdout.lock();
+    if json {
+        let payload = serde_json::json!({
+            "config": rdsh_config::settings_path(),
+            "features": rdsh_config::RdshSettings::feature_state(cfg),
+        });
+        let _ = writeln!(out, "{}", serde_json::to_string_pretty(&payload)?);
+        return Ok(());
+    }
+    let _ = writeln!(out, "config: {}", rdsh_config::settings_path());
+    let _ = writeln!(
+        out,
+        "{:<24} {:<5} {:<7} what it does",
+        "feature", "state", "default"
+    );
+    for def in rdsh_config::FEATURES {
+        let _ = writeln!(
+            out,
+            "{:<24} {:<5} {:<7} {}",
+            def.id,
+            if rdsh_config::feature_enabled(cfg, def.id) {
+                "on"
+            } else {
+                "off"
+            },
+            if def.default { "on" } else { "off" },
+            def.summary
+        );
+    }
+    let _ = writeln!(
+        out,
+        "change one: rdsh features on <id> | rdsh features off <id> | rdsh settings set features.<id> true|false"
+    );
+    Ok(())
+}
+
+/// `rdsh features on|off <id>`: writes features.<id> through the shared lock.
+fn features_toggle(id: &str, on: bool) -> anyhow::Result<()> {
+    let id = id.trim();
+    let def = rdsh_config::feature_def(id)
+        .ok_or_else(|| anyhow::anyhow!("unknown feature id: {id} (try: rdsh features)"))?;
+    rdsh_config::update(|cfg| {
+        cfg.set_dotted(&format!("features.{id}"), if on { "true" } else { "false" })
+    })?;
+    println!(
+        "features.{id} = {} ({})",
+        if on { "true" } else { "false" },
+        def.summary
+    );
+    Ok(())
+}
+
 /// Server-type extras are off by default: refuse with enable guidance.
 /// Setup itself is never gated (it hosts the switches).
 fn extra_disabled(id: &str) -> anyhow::Result<()> {
     Err(anyhow::anyhow!(
-        "extra '{id}' is disabled by default; enable with: rdsh settings set extras.enable {id}"
+        "extra '{id}' is disabled by default; enable with: rdsh features on {id} (or rdsh settings set extras.enable {id})"
     ))
 }
 

@@ -240,3 +240,124 @@ fn settings_set_preserves_valid_port_boundaries_and_random_web_port() {
         assert_eq!(settings[section][field], serde_json::json!(expected));
     }
 }
+fn feature_state(fixture: &Fixture, id: &str) -> (bool, bool) {
+    let output = fixture.run(&["features", "--json"]);
+    assert!(
+        output.status.success(),
+        "features --json failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let document: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let entry = document["features"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|entry| entry["id"] == id)
+        .unwrap_or_else(|| panic!("missing feature {id}"));
+    (
+        entry["enabled"].as_bool().unwrap(),
+        entry["explicit"].as_bool().unwrap(),
+    )
+}
+
+#[test]
+fn feature_switches_list_defaults_and_round_trip_through_the_cli() {
+    let fixture = Fixture::new("{}");
+    // Defaults mirror the behavior that existed before the switches.
+    assert_eq!(feature_state(&fixture, "discord"), (true, false));
+    assert_eq!(feature_state(&fixture, "serve"), (false, false));
+    // Delegated agent tools keep normal file access unless the boundary is on.
+    assert_eq!(
+        feature_state(&fixture, "agent_tool_sandbox"),
+        (false, false)
+    );
+    assert!(fixture
+        .run(&["features", "on", "agent_tool_sandbox"])
+        .status
+        .success());
+    assert_eq!(feature_state(&fixture, "agent_tool_sandbox"), (true, true));
+
+    assert!(fixture
+        .run(&["features", "off", "discord"])
+        .status
+        .success());
+    assert_eq!(feature_state(&fixture, "discord"), (false, true));
+    let written: serde_json::Value = serde_json::from_str(&fixture.read()).unwrap();
+    assert_eq!(written["features"]["discord"], serde_json::json!(false));
+
+    // Unset drops the explicit key and returns to the default.
+    assert!(fixture
+        .run(&["settings", "unset", "features.discord"])
+        .status
+        .success());
+    assert_eq!(feature_state(&fixture, "discord"), (true, false));
+
+    // settings keys advertises the switches.
+    let keys = fixture.run(&["settings", "keys"]);
+    let keys = String::from_utf8_lossy(&keys.stdout);
+    assert!(
+        keys.contains("features.discord(bool, default ON)"),
+        "{keys}"
+    );
+    assert!(keys.contains("features.sound(bool, default OFF)"), "{keys}");
+}
+
+#[test]
+fn feature_switches_follow_legacy_keys_and_explicit_values_win() {
+    let fixture = Fixture::new("{}");
+    assert!(fixture
+        .run(&["settings", "set", "extras.enable", r#"["serve"]"#])
+        .status
+        .success());
+    assert!(fixture
+        .run(&["settings", "set", "beta.context_engine", "true"])
+        .status
+        .success());
+    assert!(fixture
+        .run(&["settings", "set", "discord.enabled", "false"])
+        .status
+        .success());
+
+    assert_eq!(feature_state(&fixture, "serve"), (true, false));
+    assert_eq!(feature_state(&fixture, "context_engine"), (true, false));
+    assert_eq!(feature_state(&fixture, "discord"), (false, false));
+
+    // features.<id> is the kill switch and beats a legacy key either way.
+    assert!(fixture.run(&["features", "off", "serve"]).status.success());
+    assert_eq!(feature_state(&fixture, "serve"), (false, true));
+    assert!(fixture.run(&["features", "on", "discord"]).status.success());
+    assert_eq!(feature_state(&fixture, "discord"), (true, true));
+}
+
+#[test]
+fn unknown_feature_ids_are_rejected_without_touching_settings() {
+    let fixture = Fixture::new("{}");
+    let before = fixture.read();
+    for args in [
+        vec!["features", "off", "nope"],
+        vec!["features", "on", "nope"],
+        vec!["settings", "set", "features.nope", "true"],
+    ] {
+        let output = fixture.run(&args);
+        assert!(!output.status.success(), "accepted {args:?}");
+        assert_eq!(fixture.read(), before, "{args:?} changed settings");
+    }
+}
+
+#[test]
+fn disabled_features_refuse_their_commands_and_point_at_the_switch() {
+    let fixture = Fixture::new("{}");
+    for (args, feature) in [
+        (vec!["serve"], "serve"),
+        (vec!["search-web", "query"], "search-web"),
+        (vec!["context", "status"], "context_engine"),
+    ] {
+        let output = fixture.run(&args);
+        assert!(!output.status.success(), "ran disabled {args:?}");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            stderr.contains(feature),
+            "{args:?} did not name {feature}: {stderr}"
+        );
+    }
+}

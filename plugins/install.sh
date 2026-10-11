@@ -10,6 +10,22 @@ set -u
 PROFILE="${PROFILE:-headless}"
 DRY_RUN="${DRY_RUN:-0}"
 SOUND="${SOUND:-0}"
+
+# SOUND=1 is this installer's own opt-in; features.sound=false in rdsh.json is
+# the veto. A missing/corrupt file, an absent id, or no node keeps the previous
+# behavior, so the feature switch never removes an offer by surprise.
+sound_enabled() {
+  [ "$SOUND" = "1" ] || return 1
+  command -v node >/dev/null 2>&1 || return 0
+  settings="${DSH_HOME:-${HOME:-}/.dsh}/rdsh.json"
+  node -e '
+    const fs = require("node:fs");
+    try {
+      const doc = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+      process.exit(doc && doc.features && doc.features.sound === false ? 1 : 0);
+    } catch { process.exit(0); }
+  ' "$settings" 2>/dev/null
+}
 PKGS="
 @deepseek-ai/dsh-tool-present
 @deepseek-ai/dsh-tool-ask-user
@@ -50,7 +66,7 @@ for p in rdsh-settings; do
     fi
   fi
 done
-if [ "$SOUND" = "1" ]; then
+if sound_enabled; then
   p="github:cwd514/dsh-sound-notifications"
   if [ "$DRY_RUN" = "1" ]; then
     echo "dsh plugin --profile $PROFILE add $p"

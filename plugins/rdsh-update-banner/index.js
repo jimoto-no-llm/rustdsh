@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { realpathSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { readFile, writeFile, mkdir, lstat, rename, unlink } from "node:fs/promises";
 import { watch } from "node:fs";
 import { randomUUID } from "node:crypto";
@@ -19,6 +19,19 @@ const validTarget = (s) => typeof s?.to === "string" && s.to.length > 0 && s.to.
   typeof s.kind === "string" && s.kind.length > 0 && s.kind.length <= 64;
 const validClose = (s) => validTarget(s) && typeof s.id === "string" && /^[a-f0-9-]{36}$/.test(s.id) &&
   Number.isFinite(s.at) && s.at > 0 && Number.isSafeInteger(s.cycle) && s.cycle >= 0 && s.cycle <= 1000000;
+
+// Feature switches live in $DSH_HOME/rdsh.json. An absent id (or a missing,
+// unreadable or corrupt file) keeps the fallback; an explicit false removes the
+// capability without throwing.
+function featureEnabled(id, fallback, env = process.env) {
+  try {
+    const path = join(env.DSH_HOME || join(homedir(), ".dsh"), "rdsh.json");
+    const value = JSON.parse(readFileSync(path, "utf8"))?.features?.[id];
+    return typeof value === "boolean" ? value : fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 async function readClose() {
   try {
@@ -174,12 +187,15 @@ async function runSync(syncScript) {
 }
 
 export function apply(ctx, config) {
+  const updateCheck = featureEnabled("update_check", true);
+  const updateNotifications = featureEnabled("update_notifications", true);
   const demo = config && config.demo === true;
   const configuredSyncScript = typeof config?.syncScript === "string" && config.syncScript.trim()
     ? resolve(PLUGIN_DIRECTORY, config.syncScript.trim())
     : DEFAULT_SYNC_SCRIPT;
   return ctx.effect(() => {
     if (!ctx.webServer) return;
+    if (!updateCheck) return;
     const demoState = { ok: true, updated: true, kind: "demo", from: "0.2.0-rc.2", to: "0.2.1-rc.1", at: Date.now(), demo: true };
     const getState = () => demo ? Promise.resolve(demoState) : readState();
     const stream = notificationStream(getState);
@@ -267,7 +283,8 @@ export function apply(ctx, config) {
         } catch (error) { json(res, 500, { ok: false, error: "dismiss-failed" }); }
       },
     });
-    const off4 = ctx.webServer.register({
+    // Without notifications the client keeps polling /api/rdsh-update.
+    const off4 = updateNotifications ? ctx.webServer.register({
       kind: "exact", path: "/api/rdsh-update/events",
       handler: async (req, res) => {
         if (!authorize(ctx, req, res)) return;
@@ -278,7 +295,7 @@ export function apply(ctx, config) {
         res.flushHeaders?.();
         await stream.subscribe(res);
       },
-    });
+    }) : undefined;
     return () => {
       stream.dispose();
       try {

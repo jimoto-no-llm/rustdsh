@@ -1,6 +1,6 @@
 [package]
 name = "rdsh"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 rust-version = "1.85"
 description = "Rust port/shim for dsh: fast launcher, token saver, zero behavior breakage via passthrough"

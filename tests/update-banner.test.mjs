@@ -307,6 +307,51 @@ test('authenticated occurrence-close API keeps updater state intact and streams 
   });
 });
 
+test('feature switches gate every update route and keep polling when notifications are off', async (t) => {
+  const home = await mkdtemp(path.join(os.tmpdir(), 'rdsh-update-features-'));
+  const previousHome = process.env.DSH_HOME;
+  process.env.DSH_HOME = home;
+  t.after(async () => {
+    if (previousHome === undefined) delete process.env.DSH_HOME;
+    else process.env.DSH_HOME = previousHome;
+    await rm(home, { recursive: true, force: true });
+  });
+  const { apply } = await import('../plugins/rdsh-update-banner/index.js');
+  const server = () => {
+    const routes = new Map();
+    const ctx = { effect: (f) => f(), connection: { requestRejection: (req) => req.rejection },
+      webServer: { register(route) { routes.set(route.path, route.handler); return () => routes.delete(route.path); } } };
+    return { routes, ctx };
+  };
+  const get = async (routes) => {
+    const req = Readable.from([Buffer.from('')]); Object.assign(req, { method: 'GET' });
+    let status, data;
+    await routes.get('/api/rdsh-update')(req, { writeHead(value) { status = value; }, end(value) { data = JSON.parse(value); } });
+    return { status, data };
+  };
+  // update_check=false: no routes at all, even while the demo state says an update exists.
+  await writeFile(path.join(home, 'rdsh.json'), JSON.stringify({ features: { update_check: false } }));
+  const off = server();
+  apply(off.ctx, { demo: true });
+  assert.equal(off.routes.size, 0);
+  // A corrupt rdsh.json falls back to defaults: all four routes return.
+  await writeFile(path.join(home, 'rdsh.json'), '{not json');
+  const broken = server();
+  const disposeBroken = apply(broken.ctx, { demo: true });
+  assert.deepEqual([...broken.routes.keys()].sort(), ['/api/rdsh-update', '/api/rdsh-update/dismiss', '/api/rdsh-update/events', '/api/rdsh-update/run']);
+  const demo = await get(broken.routes);
+  assert.equal(demo.status, 200); assert.equal(demo.data.updated, true);
+  disposeBroken?.();
+  // update_notifications=false: /events is gone but /api/rdsh-update still reports the update.
+  await writeFile(path.join(home, 'rdsh.json'), JSON.stringify({ features: { update_notifications: false } }));
+  const polling = server();
+  const disposePolling = apply(polling.ctx, { demo: true });
+  assert.deepEqual([...polling.routes.keys()].sort(), ['/api/rdsh-update', '/api/rdsh-update/dismiss', '/api/rdsh-update/run']);
+  const state = await get(polling.routes);
+  assert.equal(state.status, 200); assert.equal(state.data.updated, true);
+  disposePolling?.();
+});
+
 test('updater resolves from its installed plugin and refuses missing or unsafe scripts', async (t) => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'rdsh-update-script-'));
   t.after(() => rm(root, { recursive: true, force: true }));

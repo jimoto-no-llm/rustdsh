@@ -61,12 +61,35 @@ for (const command of ["serve", "setup"]) {
       await delay(25);
     }
     const base = output.match(/http:\/\/127\.0\.0\.1:\d+/)[0];
+    // The listener is bound before the URL is printed, but Windows CI has shown
+    // the first connection racing the accept loop. Retry briefly and surface
+    // the child state when the server really is unreachable.
+    const get = async (url, init) => {
+      const deadline = Date.now() + 15000;
+      for (;;) {
+        try {
+          return await fetch(url, init);
+        } catch (error) {
+          if (Date.now() >= deadline) {
+            throw new Error(
+              `fetch ${url} failed (exit=${child.exitCode}, stderr=${JSON.stringify(output.slice(-400))}): ${error.message}`,
+            );
+          }
+          assert.equal(
+            child.exitCode,
+            null,
+            "owned icon fixture exited before serving requests",
+          );
+          await delay(100);
+        }
+      }
+    };
     for (const [route, file, type] of [
       ["/icon.png", "icon-256.png", "image/png"],
       ["/favicon.ico", "icon.ico", "image/x-icon"],
       ["/icon.svg", "icon.svg", "image/svg+xml"],
     ]) {
-      const response = await fetch(base + route);
+      const response = await get(base + route);
       assert.equal(response.status, 200);
       assert.equal(response.headers.get("content-type"), type);
       assert.equal(response.headers.get("x-content-type-options"), "nosniff");
@@ -81,7 +104,7 @@ for (const command of ["serve", "setup"]) {
       );
       assert.equal(
         (
-          await fetch(base + route, {
+          await get(base + route, {
             headers: { origin: "https://evil.example" },
           })
         ).status,
@@ -89,9 +112,9 @@ for (const command of ["serve", "setup"]) {
       );
     }
     const api = command === "setup" ? "/api/status" : "/api/doctor";
-    assert.equal((await fetch(base + api)).status, 401);
-    assert.equal((await fetch(base + "/assets/../Cargo.toml")).status, 404);
-    const html = await (await fetch(base)).text();
+    assert.equal((await get(base + api)).status, 401);
+    assert.equal((await get(base + "/assets/../Cargo.toml")).status, 404);
+    const html = await (await get(base)).text();
     assert.match(html, /rel="icon" type="image\/png" href="\/icon.png"/);
   });
 }
