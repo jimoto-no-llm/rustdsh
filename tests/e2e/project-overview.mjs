@@ -40,8 +40,44 @@ try {
   );
   const includedStore = await ProjectStore.open(included);
   includedStore.value.tasks = [
-    { id: "T1", title: "Active fixture", status: "doing" },
+    {
+      id: "T1",
+      title: "Starlight cross-project task",
+      status: "doing",
+      updated_at: "2026-10-07T12:00:00Z",
+    },
   ];
+  includedStore.value.questions = [
+    {
+      id: "Q1",
+      question: "Starlight cross-project decision",
+      answer: "Keep the project grant explicit",
+      created_at: "2026-10-06T12:00:00Z",
+      answered_at: "2026-10-07T13:00:00Z",
+    },
+  ];
+  includedStore.value.events = [
+    {
+      sequence: 1,
+      type: "progress",
+      title: "Starlight cross-project log",
+      detail: "browser search fixture",
+      created_at: "2026-10-07T14:00:00Z",
+    },
+    {
+      sequence: 2,
+      type: "artifact",
+      title: "Starlight cross-project artifact",
+      detail: "artifact body must not be indexed",
+      artifact: "reports/release.md",
+      created_at: "2026-10-07T15:00:00Z",
+    },
+  ];
+  await fs.mkdir(path.join(included.root, "reports"));
+  await fs.writeFile(
+    path.join(included.root, "reports", "release.md"),
+    "artifact body must not be indexed",
+  );
   await fs.mkdir(included.directory, { recursive: true });
   await fs.writeFile(
     path.join(included.directory, "state.json"),
@@ -99,9 +135,30 @@ try {
   await page.goto(primaryDashboard.browserUrl);
   await page.locator("#cross-project-overview").waitFor();
   await page.locator("#cross-project-rows li").nth(1).waitFor();
+  assert.equal(await page.locator("#cross-project-overview").isVisible(), true);
+  assert.equal(await page.locator("#cross-project-search").isVisible(), true);
+  assert.equal(await page.locator("#cross-project-rows li").count(), 2);
+  const includedRow = page
+    .locator("#cross-project-rows li")
+    .filter({ hasText: "included" });
+  await includedRow.getByText("稼働 1 · 待ち 0 · 要確認 0").waitFor();
+  assert.equal(await page.getByText("not-included").count(), 0);
+
+  await page.locator("#cross-project-search-query").fill("Starlight");
+  await page.locator('#cross-project-search-form button[type="submit"]').click();
+  await page.locator("#cross-project-search-results li").nth(3).waitFor();
+  assert.equal(await page.locator("#cross-project-search-results li").count(), 4);
+  assert.equal(
+    await page.locator("#cross-project-search-results").getByText("not-included").count(),
+    0,
+  );
+  assert.equal(
+    await page.locator("#cross-project-search-results").getByText("artifact body must not be indexed").count(),
+    0,
+  );
   if (screenshotDirectory) {
     await page.evaluate(() => {
-      const section = document.querySelector("#cross-project-overview");
+      const section = document.querySelector("#cross-project-search");
       window.scrollTo(0, section.getBoundingClientRect().top + window.scrollY);
     });
     await page.screenshot({
@@ -109,14 +166,29 @@ try {
       fullPage: false,
     });
   }
+  await page.locator("#cross-project-search-kind").selectOption("decision");
+  await page.locator('#cross-project-search-form button[type="submit"]').click();
+  const decisionResult = page.locator("#cross-project-search-results li");
+  await decisionResult
+    .locator("strong")
+    .getByText("Starlight cross-project decision", { exact: false })
+    .waitFor();
+  const decisionUrl = await decisionResult.getByRole("link").getAttribute("href");
+  assert.equal(new URL(decisionUrl).hash, "#question-Q1");
+  assert.equal(new URL(decisionUrl).hash.includes("key="), false);
+  await page.locator("#cross-project-search-kind").selectOption("all");
+  await page.locator("#cross-project-search-query").fill("artifact body must not be indexed");
+  await page.locator('#cross-project-search-form button[type="submit"]').click();
+  await page.getByText("一致 0件", { exact: false }).waitFor();
+  assert.equal(await page.locator("#cross-project-search-results li").count(), 0);
 
-  assert.equal(await page.locator("#cross-project-overview").isVisible(), true);
-  assert.equal(await page.locator("#cross-project-rows li").count(), 2);
-  const includedRow = page
-    .locator("#cross-project-rows li")
-    .filter({ hasText: "included" });
-  await includedRow.getByText("稼働 1 · 待ち 0 · 要確認 0").waitFor();
-  assert.equal(await page.getByText("not-included").count(), 0);
+  const sourcePage = await context.newPage();
+  await sourcePage.goto(includedDashboard.browserUrl);
+  await sourcePage.locator("#overview-state").waitFor();
+  await sourcePage.goto(decisionUrl);
+  await sourcePage.locator("#question-Q1").waitFor();
+  assert.equal(await sourcePage.locator("#answered").evaluate((node) => node.open), true);
+  await sourcePage.close();
 
   const detailLink = includedRow.getByRole("link");
   const href = await detailLink.getAttribute("href");
@@ -146,6 +218,8 @@ try {
       projects: 2,
       unlistedProjectShown: false,
       detailCredentialShared: false,
+      crossProjectSearch: true,
+      sourceDeepLink: true,
       mobileOverflow: false,
     }),
   );
