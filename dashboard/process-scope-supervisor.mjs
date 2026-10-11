@@ -42,7 +42,9 @@ input.on("line", (line) => {
         scope.child.on("exit", (code, signal) =>
           send({ type: "root_exit", code, signal }),
         );
-        scope.child.on("error", () => send({ type: "monitor_error" }));
+        scope.child.on("error", () => {
+          if (!closing) send({ type: "monitor_error" });
+        });
         if (frame.framed) {
           for (const name of ["stdout", "stderr"])
             scope.child[name].on("data", (buf) =>
