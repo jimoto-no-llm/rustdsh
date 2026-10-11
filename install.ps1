@@ -35,19 +35,17 @@ function Ensure-Cargo {
       winget install -e --id Rustlang.Rustup --silent --accept-package-agreements --accept-source-agreements
     } else {
       $init = Join-Path $env:TEMP 'rustup-init.exe'
-      $checksum = "$init.sha256"
-      $url = 'https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe'
+      # Keep this fixed archive version and digest paired; do not fetch the digest beside the binary.
+      $rustupVersion = '1.29.1'
+      $expectedHash = '6f4bef66261261fcb43131be8720bab817d403a09edec7455c371974b90bdb7e'
+      $url = "https://static.rust-lang.org/rustup/archive/$rustupVersion/x86_64-pc-windows-msvc/rustup-init.exe"
       try {
         Invoke-WebRequest -Uri $url -OutFile $init
-        Invoke-WebRequest -Uri "$url.sha256" -OutFile $checksum
-        $checksumText = (Get-Content -LiteralPath $checksum -Raw).Trim()
-        $expectedHash = ($checksumText -split '\s+')[0]
-        if ($expectedHash -notmatch '^[a-fA-F0-9]{64}$') { throw 'invalid rustup-init checksum; refusing to run' }
         $actualHash = (Get-FileHash -LiteralPath $init -Algorithm SHA256).Hash
-        if ($actualHash -ne $expectedHash) { throw 'rustup-init checksum mismatch; refusing to run' }
+        if ($actualHash -ne $expectedHash) { throw 'rustup-init SHA-256 mismatch; refusing to run' }
         & $init -y --profile minimal --default-toolchain stable
       } finally {
-        Remove-Item -LiteralPath $init, $checksum -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $init -Force -ErrorAction SilentlyContinue
       }
     }
   }
