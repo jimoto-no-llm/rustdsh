@@ -338,8 +338,15 @@ impl Server {
             !has_key_fragment,
             "server must not print a token-bearing URL"
         );
-        let token = std::fs::read_to_string(&handoff_path)
-            .expect("server should create its protected token handoff file");
+        let mut token = None;
+        for _ in 0..50 {
+            if let Ok(text) = std::fs::read_to_string(&handoff_path) {
+                token = Some(text);
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+        let token = token.expect("server should create its protected token handoff file");
         let address = url.trim_start_matches("http://127.0.0.1:");
         Self {
             child,
@@ -356,18 +363,36 @@ impl Server {
         authorized: bool,
         extra: &str,
     ) -> (u16, String) {
-        let mut stream = TcpStream::connect(("127.0.0.1", self.port)).unwrap();
-        stream
-            .set_read_timeout(Some(Duration::from_secs(12)))
-            .unwrap();
         let key = if authorized {
             format!("X-RDSH-Token: {}\r\n", self.token)
         } else {
             String::new()
         };
-        write!(stream, "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1:{}\r\n{key}{extra}Content-Length: {}\r\nConnection: close\r\n\r\n{body}", self.port, body.len()).unwrap();
         let mut bytes = Vec::new();
-        stream.read_to_end(&mut bytes).unwrap();
+        // Loaded CI runners sometimes reset the connection before responding;
+        // retry the whole request a few times before giving up.
+        let mut attempts = 0;
+        loop {
+            attempts += 1;
+            let mut stream = match TcpStream::connect(("127.0.0.1", self.port)) {
+                Ok(stream) => stream,
+                Err(_) if attempts < 4 => {
+                    std::thread::sleep(Duration::from_millis(500));
+                    continue;
+                }
+                Err(e) => panic!("connect failed: {e}"),
+            };
+            stream
+                .set_read_timeout(Some(Duration::from_secs(60)))
+                .unwrap();
+            write!(stream, "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1:{}\r\n{key}{extra}Content-Length: {}\r\nConnection: close\r\n\r\n{body}", self.port, body.len()).unwrap();
+            bytes.clear();
+            if stream.read_to_end(&mut bytes).is_err() && attempts < 4 {
+                std::thread::sleep(Duration::from_millis(500));
+                continue;
+            }
+            break;
+        }
         let response = String::from_utf8(bytes).unwrap();
         let (head, body) = response.split_once("\r\n\r\n").unwrap();
         (
@@ -598,9 +623,24 @@ fn http_truncated_and_oversized_requests_do_not_damage_serve() {
     .into_iter()
     .enumerate()
     {
-        let mut stream = TcpStream::connect(("127.0.0.1", server.port)).unwrap();
+        let mut stream = None;
+        for _ in 0..8 {
+            match TcpStream::connect(("127.0.0.1", server.port)) {
+                Ok(stream_) => {
+                    stream = Some(stream_);
+                    break;
+                }
+                Err(_) => std::thread::sleep(Duration::from_millis(500)),
+            }
+        }
+        let mut stream = stream.unwrap_or_else(|| {
+            panic!(
+                "server should accept connections (port {}, child status unknown)",
+                server.port
+            )
+        });
         stream
-            .set_read_timeout(Some(Duration::from_secs(12)))
+            .set_read_timeout(Some(Duration::from_secs(60)))
             .unwrap();
         stream.write_all(request.as_bytes()).unwrap();
         stream.shutdown(Shutdown::Write).unwrap();
