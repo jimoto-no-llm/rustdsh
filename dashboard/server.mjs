@@ -402,7 +402,7 @@ export async function startDashboard(options) {
     let executed;
     try {
       executed = await (options.sandboxExecutor || executeSandboxedOperation)({
-        repository: request.repository, contract, workerRole: request.worker_role,
+        repository: contract?.repository, contract, workerRole: request.worker_role,
         input: input.operation, evaluated: started.attributes, capability: sandbox,
       });
     } catch {

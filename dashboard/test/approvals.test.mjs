@@ -138,8 +138,10 @@ test("HTTP sandbox execution requires MCP authority, persists start, and runs a 
   try {
     dashboard = await startDashboard({ project, port, tailscale: false,
       sandboxProbe: async () => ({ supported: true, backend: "test-only" }),
-      sandboxExecutor: async ({ contract, workerRole, input }) => {
+      sandboxExecutor: async ({ repository, contract, workerRole, input }) => {
         executed++;
+        assert.equal(repository, contract.repository);
+        assert.equal(repository, project.root);
         assert.ok(contract.worker_roles.includes(workerRole));
         assert.equal(input.tool_name, "file.write");
         assert.equal(currentRequest(dashboard.store.value, "R1").uses[0].execution, "started");
