@@ -391,14 +391,24 @@ impl Server {
                 std::thread::sleep(Duration::from_millis(500));
                 continue;
             }
-            break;
+            // A reset can truncate the response, so only accept a complete
+            // status line; anything else retries until the attempt budget ends.
+            let response = String::from_utf8_lossy(&bytes).into_owned();
+            if let Some((head, body)) = response.split_once("\r\n\r\n") {
+                if let Some(status) = head
+                    .split_whitespace()
+                    .nth(1)
+                    .and_then(|value| value.parse().ok())
+                {
+                    return (status, body.to_owned());
+                }
+            }
+            assert!(
+                attempts < 4,
+                "no complete HTTP response after {attempts} attempts"
+            );
+            std::thread::sleep(Duration::from_millis(500));
         }
-        let response = String::from_utf8(bytes).unwrap();
-        let (head, body) = response.split_once("\r\n\r\n").unwrap();
-        (
-            head.split_whitespace().nth(1).unwrap().parse().unwrap(),
-            body.to_owned(),
-        )
     }
     fn stopped(&mut self) {
         let deadline = Instant::now() + Duration::from_secs(5);
