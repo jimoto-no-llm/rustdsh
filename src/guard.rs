@@ -111,7 +111,7 @@ pub fn cmd_guard(deny: Vec<String>, reason: Option<String>, json_out: bool) -> a
     match hit {
         Some(p) => {
             let msg = reason.unwrap_or_else(|| "blocked by rdsh guard".to_owned());
-            eprintln!("[rdsh guard] pattern hit: {}", p);
+            eprintln!("[rdsh guard] pattern hit: {p}");
             block(&msg, json_out);
             Ok(())
         }
