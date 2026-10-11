@@ -334,6 +334,8 @@ v0.2.0 公開後のソース修正は、その公開済みバイナリには含�
 
 ## 資料
 
+- [LinuxでWebサービスを自動再起動する](docs/WEB-AUTO-RESTART.md)
+
 | 資料 | 内容 |
 | --- | --- |
 | [docs/USER-FLOW.md](docs/USER-FLOW.md) | 導入から設定・利用・復旧までの流れです。 |

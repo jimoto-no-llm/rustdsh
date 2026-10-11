@@ -309,6 +309,8 @@ before/after output checks are in [BENCHMARKS.md](docs/BENCHMARKS.md).
 
 ## Documentation
 
+- [Automatic Web service recovery on Linux](docs/WEB-AUTO-RESTART.md)
+
 | Doc | What it covers |
 | --- | --- |
 | [docs/USER-FLOW.md](docs/USER-FLOW.md) | Install to setup to use to recover. |
