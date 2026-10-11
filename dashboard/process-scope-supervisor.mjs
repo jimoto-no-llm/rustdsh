@@ -7,7 +7,8 @@ import {
 } from "./process-scope-backends.mjs";
 import { readProcessIdentity } from "./process-identity.mjs";
 
-const send = (frame) => process.stdout.write(JSON.stringify(frame) + "\n");
+const send = (frame, callback) =>
+  process.stdout.write(JSON.stringify(frame) + "\n", callback);
 let scope = null,
   starting = false,
   closing = false;
@@ -41,7 +42,9 @@ input.on("line", (line) => {
         scope.child.on("exit", (code, signal) =>
           send({ type: "root_exit", code, signal }),
         );
-        scope.child.on("error", () => send({ type: "monitor_error" }));
+        scope.child.on("error", () => {
+          if (!closing) send({ type: "monitor_error" });
+        });
         if (frame.framed) {
           for (const name of ["stdout", "stderr"])
             scope.child[name].on("data", (buf) =>
@@ -80,8 +83,10 @@ input.on("line", (line) => {
         result = { closed: await scope.close() };
         if (result.closed) closing = true;
       } else throw new Error();
-      send({ type: "response", id: frame.id, result });
-      if (closing) process.exit(0);
+      send(
+        { type: "response", id: frame.id, result },
+        closing ? () => process.exit(0) : undefined,
+      );
     } catch {
       send(
         frame?.id

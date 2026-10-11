@@ -143,7 +143,12 @@ jobs:
       - run: npm ci --prefix tests/e2e
       - run: npx playwright install --with-deps chromium
         working-directory: tests/e2e
-      - run: npm test --prefix tests/e2e
+      - run: |
+          sudo systemd-run --unit="rdsh-browser-e2e-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --wait --pipe --collect --property=Delegate=yes \
+            --property=DelegateSubgroup=supervisor --uid="$(id -u)" \
+            --working-directory="$PWD" /usr/bin/env HOME="$HOME" PATH="$PATH" \
+            RDSH_E2E_BIN="$RDSH_E2E_BIN" npm test --prefix tests/e2e
         env:
           RDSH_E2E_BIN: ./target/release/rdsh
       - uses: actions/upload-artifact@v7

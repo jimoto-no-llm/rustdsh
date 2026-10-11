@@ -101,6 +101,17 @@ test("owned children and detached grandchildren stop in order after a bounded gr
   await pause(180);
   assert.equal((await rows(trace)).length, stopped);
 });
+test("intentional monitor disposal drains its response before close without reporting ownership loss", async (t) => {
+  const { tree } = await setup(t),
+    { p } = await tree("cooperative"),
+    errors = [];
+  p.child.on("error", (error) => errors.push(error.code));
+  const result = await p.stop({ gracefulTimeout: 400, killTimeout: 1000 });
+  assert.equal(result.confirmed, true);
+  assert.equal(result.resources_released, true);
+  await pause(20);
+  assert.deepEqual(errors, []);
+});
 test("cooperative EOF/TERM exits require no forced kill on Linux and retain truthful Windows graceful capability", async (t) => {
   const { tree } = await setup(t),
     { p, stages } = await tree("cooperative");
@@ -268,10 +279,16 @@ test("authenticated Harness API separates stopping from verified empty descendan
     fetch(url + "managed-stop", { method: "POST", headers }),
   ]);
   assert(responses.every((r) => r.status === 202));
+  const stoppingState = await (
+    await fetch(url + "managed-process", { headers })
+  ).json();
+  assert.equal(stoppingState.scope.status, "stopping");
+  assert.equal(stoppingState.diagnostic.state, "stopping");
+  assert.equal(stoppingState.diagnostic.stop_action, "manual_only");
   assert.equal(
-    (await (await fetch(url + "managed-process", { headers })).json()).scope
+    stoppingState.diagnostic.observations.find((item) => item.key === "api_wait")
       .status,
-    "stopping",
+    "unavailable",
   );
   let state;
   await waitFor(async () => {
@@ -303,6 +320,59 @@ test("authenticated Harness API separates stopping from verified empty descendan
     (await fetch(url + "stop", { method: "POST", headers: admin })).status,
     200,
   );
+});
+
+test("a dashboard poll gap remains separate from the verified live process scope", async (t) => {
+  const { root, own } = await setup(t),
+    previous = process.env.RDSH_DASHBOARD_HOME;
+  process.env.RDSH_DASHBOARD_HOME = path.join(root, "gap-home");
+  t.after(() => {
+    if (previous === undefined) delete process.env.RDSH_DASHBOARD_HOME;
+    else process.env.RDSH_DASHBOARD_HOME = previous;
+  });
+  const probe = net.createServer();
+  await new Promise((r) => probe.listen(0, "127.0.0.1", r));
+  const port = probe.address().port;
+  await new Promise((r) => probe.close(r));
+  const d = await startDashboard({
+    kind: "harness",
+    port,
+    tailscale: false,
+    harnessOptions: {
+      cwd: root,
+      command: [
+        process.execPath,
+        fixture,
+        "root",
+        "stubborn",
+        path.join(root, "gap-tree.jsonl"),
+      ],
+    },
+  });
+  own({ stop: () => d.close() });
+  const entry = new URL(d.browserUrl);
+  const bootstrap = await fetch(entry, { redirect: "manual" });
+  const headers = { cookie: bootstrap.headers.get("set-cookie").split(";", 1)[0] };
+  const url = d.localUrl + "_rdsh/api/managed-process";
+  const anonymous = await fetch(url);
+  assert.equal(anonymous.status, 401);
+  const first = await (await fetch(url, { headers })).json();
+  assert.equal(first.scope.status, "running");
+  assert.equal(first.diagnostic.state, "process_running");
+  assert.equal(
+    first.diagnostic.observations.find((item) => item.key === "dashboard_browser_poll")
+      .status,
+    "initial_observation",
+  );
+  await pause(5_100);
+  const resumed = await (await fetch(url, { headers })).json();
+  assert.equal(resumed.scope.status, "running");
+  assert.equal(resumed.diagnostic.state, "process_running");
+  const browserObservation = resumed.diagnostic.observations.find(
+    (item) => item.key === "dashboard_browser_poll",
+  );
+  assert.equal(browserObservation.status, "reconnected_after_gap");
+  assert(browserObservation.value >= 5_000);
 });
 
 test("lost Harness monitor remains unverifiable in HTTP responses and administrator shutdown refuses to hide the uncertain result", async (t) => {

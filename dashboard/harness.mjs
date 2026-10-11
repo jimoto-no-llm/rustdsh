@@ -3,6 +3,7 @@ import net from "node:net";
 import { randomUUID } from "node:crypto";
 import { spawnOwnedProcess } from "./process-scope.mjs";
 import { RunHistory } from "./run-history.mjs";
+import { diagnoseManagedRun } from "./run-health.mjs";
 
 export async function startHarness(port, frontPort, options = {}) {
   // A managed instance keeps the original Harness process token and its browser fence intact.
@@ -51,6 +52,8 @@ export async function startHarness(port, frontPort, options = {}) {
     },
   });
   const child = owned.child;
+  let processExit = null;
+  let lastOutputAt = null;
   try {
     await history.bindScope(run_id, owned.descriptor);
     await history.bindProcess(
@@ -62,7 +65,12 @@ export async function startHarness(port, frontPort, options = {}) {
     await owned.stop();
     throw error;
   }
-  child.on("exit", () => {
+  child.on("exit", (code, signal) => {
+    processExit = {
+      code: Number.isInteger(code) ? code : null,
+      signal: typeof signal === "string" ? signal : null,
+      observed_at: new Date().toISOString(),
+    };
     void history.processExited(run_id).catch(() => {
       historyError = "history_write_failed";
     });
@@ -123,6 +131,7 @@ export async function startHarness(port, frontPort, options = {}) {
       45000,
     );
     const capture = (chunk) => {
+      lastOutputAt = new Date().toISOString();
       output = (output + chunk.toString()).slice(-32000);
       const match = output.match(
         /dsh web: (http:\/\/127\.0\.0\.1:\d+\/[^\s]*)/,
@@ -157,15 +166,25 @@ export async function startHarness(port, frontPort, options = {}) {
       port,
       stop,
       run_id,
-      inspect: async () => ({
-        run_id,
-        scope:
+      inspect: async ({ browser_poll_gap_ms = null } = {}) => {
+        const scope =
           final ??
           (stopping
             ? { ...owned.state, status: "stopping", confirmed: false }
-            : await owned.inspect()),
-        stages: structuredClone(stages),
-      }),
+            : await owned.inspect());
+        return {
+          run_id,
+          scope,
+          stages: structuredClone(stages),
+          diagnostic: diagnoseManagedRun({
+            run_id,
+            scope,
+            process_exit: processExit,
+            last_output_at: lastOutputAt,
+            browser_poll_gap_ms,
+          }),
+        };
+      },
       disconnectMonitor: () => owned.disconnectMonitor(),
     };
   } catch (error) {

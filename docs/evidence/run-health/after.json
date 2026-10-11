@@ -1,0 +1,7 @@
+{
+  "source_commit": "525fa97aa875c0a96bb45e7890391b4521b7703b",
+  "fixture": "local managed process; no DSH provider, model, credentials, or network access",
+  "capture_only": false,
+  "screenshot": "after.png",
+  "verified_diagnostics": true
+}
