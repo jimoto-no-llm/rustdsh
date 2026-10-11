@@ -5,7 +5,7 @@ The fixture starts an isolated local child process and uses loopback only.
 
 - `before.png` is a capture-only run on main `4f63db1c815cf9f969558f4ba0e3f20f2f7c943f`.
 - `after.png` is the verified flow on source commit
-  `f4774c5bad8fda5116bd438f0c392b6c22cb2c06`. It shows the owned-process
+  `525fa97aa875c0a96bb45e7890391b4521b7703b`. It shows the owned-process
   state, last-output time, root-process exit observation, authenticated
   dashboard-poll interval, unavailable upstream signals, and guidance that
   separates the DSH service process from task state.
