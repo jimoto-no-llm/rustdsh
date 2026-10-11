@@ -286,7 +286,9 @@ test("native cancellation preserves the Workflow disposal lifecycle", async (t) 
   assert.equal(result.dispatches.length, 1);
   assert.equal(result.disposals.length, 1);
   assert.equal(result.outcome.stopReason, "cancelled");
-  assert.equal((await f.plans.read()).claims[0].phase, "finished");
+  const claim = (await f.plans.read()).claims[0];
+  assert.equal(claim.phase, "finished");
+  assert.equal(claim.outcome, "cancelled");
 });
 test("tracked ACP resume attaches the guard before send and leaves default process behavior unchanged", async (t) => {
   const acp = fileURLToPath(

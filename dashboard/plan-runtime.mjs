@@ -87,11 +87,13 @@ export function nativePlanBoundary(plans, binding) {
       let settled = false;
       const result = Promise.resolve(run.result).then(
         async (value) => {
-          const outcome = ["completed", "error", "cancelled"].includes(
-            value?.stopReason,
-          )
-            ? value.stopReason
-            : "unknown";
+          // The pinned in-process driver reports disposal cancellation as "aborted";
+          // persist it using the ledger's canonical terminal outcome.
+          const outcome = value?.stopReason === "aborted"
+            ? "cancelled"
+            : ["completed", "error", "cancelled"].includes(value?.stopReason)
+              ? value.stopReason
+              : "unknown";
           await plans.update(claim.claim_id, "outcome", outcome);
           settled = true;
           return value;

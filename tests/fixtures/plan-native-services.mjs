@@ -73,7 +73,7 @@ export function fixtureWorkflow(scenario = "match") {
           ),
         async dispose() {
           disposals.push(id);
-          result?.resolve({ output: [], stopReason: "cancelled" });
+          result?.resolve({ output: [], stopReason: "aborted" });
           if (scenario === "dispose-error")
             throw new Error("fixture disposal unconfirmed");
           active.delete(id);
