@@ -312,6 +312,7 @@ before/after output checks are in [BENCHMARKS.md](docs/BENCHMARKS.md).
 
 ## Documentation
 
+- [OpenCode models in Web and TUI](docs/OPENCODE-MODELS.md)
 - [Automatic Web service recovery on Linux](docs/WEB-AUTO-RESTART.md)
 
 | Doc | What it covers |

@@ -337,6 +337,7 @@ v0.2.0 公開後のソース修正は、その公開済みバイナリには含�
 
 ## 資料
 
+- [Web・TUIからOpenCodeのモデルを使う](docs/OPENCODE-MODELS.md)
 - [LinuxでWebサービスを自動再起動する](docs/WEB-AUTO-RESTART.md)
 
 | 資料 | 内容 |
