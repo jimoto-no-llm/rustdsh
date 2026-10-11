@@ -3,15 +3,79 @@
 All notable changes to this project are documented here.
 Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
-## [Unreleased]
+## [0.3.0] - 2026-10-12
+
+### Security
+
+- Release tagging is fail-closed: the tag must be annotated, its commit must be
+  on `main`, and every required CI check on that exact commit must have
+  succeeded before any platform build starts. Candidates keep using exact-tag
+  installer URLs and never replace the stable `latest` channel.
+- The installer verifies the pinned rustup bootstrap checksum before running it,
+  and release metadata is read and written as UTF-8 on every host.
+- Credentials and settings use atomic writes that keep unmodeled fields, reject
+  integer narrowing, escape values as JSON, refuse overflowing JWT expiry, and
+  keep local dashboard tokens out of logs.
+- Browser-context POSTs to the dashboard require an `Origin` header, and
+  proxied backup and budget requests are refused. Webhook subscriptions and
+  reply consumer ownership are validated before use.
+- Web search advances its UTF-8 attribute scan safely, and context rebuilding
+  enforces its UTF-8 byte cap.
+
+### Added
+
+- Agent tools keep **normal file access by default**: the model can read and
+  write the project like any other tool. The strict bubblewrap boundary is now
+  opt-in through `--share-file`, `features.agent_tool_sandbox=true`, or
+  `RDSH_SECURITY=1`.
+- Feature switches: `rdsh features` lists all optional capabilities with their
+  effective state, and `rdsh features on|off <id>` (or
+  `rdsh settings set features.<id> true|false`) turns one off. Bundled plugins
+  honor the same switches, so Discord Rich Presence, update checks and
+  notifications, the sound-notification offer, the compute bridge, the budget
+  guard and the release probe can be disabled from one place. Existing keys
+  (`discord.enabled`, `extras.enable`, `beta.context_engine`) keep working,
+  and `features.<id>` wins when both are set.
+- `rdsh compute`: opt-in resident pure-compute worker (`rdsh-compute/1`) that
+  answers token and batch estimates without filesystem, credential or session
+  access; its Web proof of concept stays opt-in.
+- The plugin installer offers opt-in DSH sound notifications.
+- Dashboard: report sources and observation freshness, human bookmarks and
+  annotations, saved project workspace layouts, and read-only observation of
+  external CLI processes.
+- Reproducible offline control-plane fault simulator, and retained worker
+  worktrees with declared scopes.
+- Windows: scoped dashboard tray, unified rushDSH artwork across web and
+  Windows, and DSH 0.2.1-alpha.1 support alongside 0.2.0-rc.2.
+
+### Fixed
+
+- **Installer:** a Linux x86_64 install now selects the static musl build on
+  musl hosts and on glibc older than 2.39, runs the downloaded binary before
+  installing it, and retries with the musl build when the glibc build cannot
+  start. Ubuntu 22.04, Debian 12 and RHEL 9 clones install cleanly instead of
+  failing with `GLIBC_2.39 not found`.
+- Update checks close completed runs without generating false updates, keep
+  dismissals across projects and GUI instances, and preserve the two-hour
+  reminder cadence.
+- `rdsh logs` streams only the requested tail and keeps cwd-relative paths
+  inside the confined root.
+- Windows tray startup and cleanup are validated, budgeted before the launcher
+  timeout, and timed-out helpers are confirmed to exit.
+- WSL keeps a co-installed native package on the active Koffi version, and
+  interpreter and update selection stay compatible.
 
 ### Changed
 
-- Standardize future release notes on the v0.2.0 format, validate annotated tags
-  and version metadata, stage all five builds before publishing, and keep
-  prereleases out of the stable installer channel.
-- Align project metadata, installer and documentation URLs with the canonical
-  `jimoto-no-llm/rustdsh` repository; record label and repository settings.
+- Performance: `rdsh serve` cuts idle accept latency and answers estimates in
+  batches, dashboard budget totals replay incrementally, native search work is
+  bounded, and compressed session logs are no longer re-read in full.
+- Release process: notes follow the v0.2.0 format, all five platform builds are
+  staged and verified before publication, and project metadata, installers and
+  documentation point at the canonical `jimoto-no-llm/rustdsh` repository.
+- Adds `tests/install-isolated.sh`: the built or published artifacts are
+  installed inside clean containers with no network, covering the distro matrix,
+  the musl fallback and the fail-closed paths. It runs in CI and gates releases.
 
 ## [0.2.0] - 2026-10-08
 
@@ -116,7 +180,7 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 - Floating setup UI, dsh-default detection, SearXNG search.
 - Installers: install.sh (Linux/macOS/WSL), install.ps1 (Windows).
 
-[Unreleased]: #unreleased
+[0.3.0]: docs/releases/v0.3.0.md
 [0.2.0]: docs/releases/v0.2.0.md
 [0.1.5]: https://github.com/jimoto-no-llm/rustdsh/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/jimoto-no-llm/rustdsh/compare/v0.1.3...v0.1.4

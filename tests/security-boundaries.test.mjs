@@ -43,9 +43,11 @@ test('unsupported runtime is refused without copying external login credentials'
   writeFileSync(path.join(pkg, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh', version: '0.2.0-rc.2' }));
   writeFileSync(path.join(pkg, 'node_modules', '@deepseek-ai', 'dsh-tools', 'lib', 'index.js'), '');
   env.RDSH_ORIG_BIN = path.join(pkg, 'lib', 'bin.js');
-  const boot = spawnSync(bin, ['--profile', 'tui'], { env, encoding: 'utf8' });
-  assert.notEqual(boot.status, 0);
-  assert.match(boot.stderr, /RDSH_SECURITY/);
+  // The strict boundary is opt-in now, so refuse-as-unsupported is asserted
+  // with RDSH_SECURITY=1; the default run is covered by the next test.
+  const strict = spawnSync(bin, ['--profile', 'tui'], { env: { ...env, RDSH_SECURITY: '1' }, encoding: 'utf8' });
+  assert.notEqual(strict.status, 0);
+  assert.match(strict.stderr, /RDSH_SECURITY/);
   assert.equal(existsSync(path.join(env.DSH_HOME, '.credentials.yaml')), false);
   const autoStatus = spawnSync(bin, ['setup', '--json'], { env: { ...env, RDSH_AUTH_AUTOSYNC: '1' }, encoding: 'utf8' });
   assert.equal(autoStatus.status, 0);
@@ -58,6 +60,16 @@ test('unsupported runtime is refused without copying external login credentials'
   assert.equal(spawnSync(bin, ['auth', '--import', '--provider', 'openai-codex'], { env }).status, 0);
   assert.match(readFileSync(path.join(env.DSH_HOME, '.credentials.yaml'), 'utf8'), /DUMMY_ACCESS/);
   assert.equal(JSON.parse(spawnSync(bin, ['setup', '--json'], { env, encoding: 'utf8' }).stdout).needed, false);
+});
+test('agent tools default to normal file access', t => {
+  const { dir, env } = isolated(t);
+  const pkg = path.join(dir, 'pkg');
+  mkdirSync(path.join(pkg, 'lib'), { recursive: true });
+  writeFileSync(path.join(pkg, 'lib', 'bin.js'), '#!/usr/bin/env node\nprocess.exit(0);\n', { mode: 0o700 });
+  env.RDSH_ORIG_BIN = path.join(pkg, 'lib', 'bin.js');
+  const boot = spawnSync(bin, ['--profile', 'tui'], { env, encoding: 'utf8' });
+  assert.equal(boot.status, 0, boot.stderr);
+  assert.doesNotMatch(boot.stderr, /RDSH_SECURITY/);
 });
 test('context working files cannot read credentials outside the current repository', t => {
   const { dir, env } = isolated(t);

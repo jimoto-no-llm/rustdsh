@@ -106,7 +106,10 @@ if HOME="$AB/home" DSH_HOME="$AB/dsh" $BIN setup --json 2>/dev/null | grep -q "\
 SB2="$RR_SANDBOX/setup"
 mkdir -p $SB2/home $SB2/dsh
 if env -u DEEPSEEK_API_KEY -u OPENAI_API_KEY -u ANTHROPIC_API_KEY HOME="$SB2/home" DSH_HOME="$SB2/dsh" $BIN setup --json 2>/dev/null | grep -q "\"needed\":true"; then ok "setup needed on first run"; else echo "FAIL(output): setup needed on first run"; exit 1; fi
-if env -u DEEPSEEK_API_KEY -u OPENAI_API_KEY -u ANTHROPIC_API_KEY HOME="$SB2/home" DSH_HOME="$SB2/dsh" DSH_ORIG_BIN="$SB/orig/dsh" $SB/bin/dsh --profile tui 2>&1 | grep -q "RDSH_SECURITY"; then ok "unsupported runtime refused"; else echo "FAIL(output): unsupported runtime refused"; exit 1; fi
+# Delegated agent tools default to normal file access; the strict boundary is
+# opt-in (--share-file, features.agent_tool_sandbox, or RDSH_SECURITY=1).
+if env -u DEEPSEEK_API_KEY -u OPENAI_API_KEY -u ANTHROPIC_API_KEY HOME="$SB2/home" DSH_HOME="$SB2/dsh" DSH_ORIG_BIN="$SB/orig/dsh" $SB/bin/dsh --profile tui 2>&1 | grep -q "RDSH_SECURITY"; then echo "FAIL(output): default delegation must not be refused"; exit 1; else ok "agent tools default to normal file access"; fi
+if env -u DEEPSEEK_API_KEY -u OPENAI_API_KEY -u ANTHROPIC_API_KEY HOME="$SB2/home" DSH_HOME="$SB2/dsh" RDSH_SECURITY=1 DSH_ORIG_BIN="$SB/orig/dsh" $SB/bin/dsh --profile tui 2>&1 | grep -q "RDSH_SECURITY"; then ok "strict mode refuses unsupported runtime"; else echo "FAIL(output): strict mode refuses unsupported runtime"; exit 1; fi
 rm -rf $SB2
 FR="$RR_SANDBOX/release"
 mkdir -p $FR/pkg $FR/bin $FR/latest/download
