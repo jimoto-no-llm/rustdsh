@@ -23,6 +23,24 @@ GIFはこの3状態の実際のPNGを各2秒表示し、白い余白で高さを
 [マイルストーン](after-mobile-milestone.png) です。横方向のはみ出しはありません。
 分割タスク追加後の状態改訂では古いカード結果を破棄し、再確認ボタンを表示します。
 
+## 成果報告の鮮度と出典（Issue #14 follow-up）
+
+`done` のカードへ付いた報告は、推定・観測時刻・報告元・参照対象・鮮度期限を表示します。
+期限が切れると、状態更新イベントが届かなくても `done（古い情報・作業の申告）` へ切り替わり、
+緑の完了表示にはしません。既存の [未検証カード](after-unchecked.png) と同じ隔離プロジェクトに
+期限付きの推定報告を追加した実画面を、[期限前](freshness-current.png) と
+[期限後](freshness-stale.png) で比較できます。テスト中はプロジェクト状態の再取得を保留し、
+最大鮮度4秒の設定と経過タイマーだけで表示が変化することを確認しました。
+
+この追加フローは 2026-10-12 の Chromium 実行です。source head は
+`7f6108cc575d67d93e82d550c8f768df8bf8e30b`、ブラウザーエラー0件、画面横あふれなし。
+実行記録と対象ファイルのSHA256は
+[freshness-browser-observations.json](freshness-browser-observations.json) にあります。
+同じheadでdashboard suiteは252件成功・1件skip、Rust fmt/release Clippy/release tests、
+examples 7件、fence 2件、CLI regression 56 checks が成功しました。Linux Chromiumの
+browser 3 flows・update-banner 13 flows・task-outcomes 6 tests も全て成功しました。
+モデル実行、プロバイダー認証、Tailscale、Production採用は含みません。
+
 ## ソースと検証
 
 実装 `e3cbbf1a88b862407d842be2ecd1dc7f04b6fc7a` のdashboard全体は、
