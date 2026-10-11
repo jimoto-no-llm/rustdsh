@@ -24,6 +24,11 @@ port, dependencies, GPU/WSL and selected authentication before an ACP session.
 [Durable run recovery](../docs/RUN-RECOVERY.md) records control request/ack IDs
 and separates recorded run state, root-process observations and UI connectivity.
 
+[Managed Harness process observations](../docs/RUN-HEALTH.md) show owned process
+state, stdout/stderr timestamps and aggregate dashboard reconnect gaps separately
+from task completion. Missing upstream heartbeat, API-wait and CPU/GPU signals
+stay unavailable; silence never triggers an automatic stop.
+
 [Bounded retry](../docs/SAFE-RETRY.md) preserves original permission and reconciles
 uncertain writes. Public retry is opt-in for original CLI version queries only.
 

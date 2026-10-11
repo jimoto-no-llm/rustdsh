@@ -24,6 +24,14 @@ questions and browser answers, draft retention across SSE, process restart, and
 revocation of the previous browser key. Linux CI installs Chromium and retains PNGs
 and JSON even when the job fails.
 
+The default browser suite also runs `run-health.mjs` against a local managed-child
+fixture. It verifies the dashboard-owned Harness service process card's
+process/output evidence, unavailable upstream signals, and that an authenticated
+dashboard polling gap does not change the reported process state.
+This uses no provider, model, credentials, or external network. The screenshot is
+an actual browser capture of the local dashboard, not a mockup; it does not prove
+that DSH exposes the unavailable task/API/GPU telemetry.
+
 The default command also runs `update-banner.mjs` with the real React component
 and two independent authenticated plugin hosts. Dummy HOME and loopback ports
 cover live update push, cross-tab/port close events, two-hour boundaries, reload

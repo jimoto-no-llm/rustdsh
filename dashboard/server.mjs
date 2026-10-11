@@ -126,6 +126,7 @@ export async function startDashboard(options) {
     : null;
   deliveryTimer?.unref();
   let harness = null;
+  let lastManagedPollAt = null;
   let share = {
     state: "disabled",
     message: "ローカル接続のみ。Tailscale共有は起動時に有効にできます。",
@@ -439,6 +440,7 @@ export async function startDashboard(options) {
           route === "/instruction-queue-ui.mjs" ||
           route === "/cost-ledger-ui.mjs" ||
           route === "/budget-ui.mjs" ||
+          route === "/run-health-ui.mjs" ||
           route === "/favicon.ico" ||
           route === "/icon.png" ||
           route === "/icon.svg");
@@ -472,14 +474,20 @@ export async function startDashboard(options) {
         });
         return res.end(bytes);
       }
-      if (req.method === "GET" && route === "/api/managed-process")
+      if (req.method === "GET" && route === "/api/managed-process") {
+        if (!harness)
+          return json(res, 200, { run_id: null, scope: null, stages: [] });
+        const now = Date.now();
+        const browserPollGapMs = !humanAuthorized || lastManagedPollAt === null
+          ? null
+          : Math.max(0, now - lastManagedPollAt);
+        if (humanAuthorized) lastManagedPollAt = now;
         return json(
           res,
           200,
-          harness
-            ? await harness.inspect()
-            : { run_id: null, scope: null, stages: [] },
+          await harness.inspect({ browser_poll_gap_ms: browserPollGapMs }),
         );
+      }
       if (req.method === "POST" && route === "/api/managed-stop") {
         if (!harness)
           return json(res, 409, { error: "No owned Harness process" });
@@ -536,6 +544,7 @@ export async function startDashboard(options) {
           "/instruction-queue-ui.mjs",
           "/cost-ledger-ui.mjs",
           "/budget-ui.mjs",
+          "/run-health-ui.mjs",
         ].includes(route)
       ) {
         res.writeHead(200, {

@@ -6,6 +6,7 @@ import { renderConnectionDiagnostics } from "./connection-diagnostics-ui.mjs";
 import { createInstructionPanel } from "./instruction-queue-ui.mjs";
 import { createCostPanel } from "./cost-ledger-ui.mjs";
 import { renderBudget } from "./budget-ui.mjs";
+import { renderManagedRunHealth } from "./run-health-ui.mjs";
 
 const $ = (id) => document.getElementById(id);
 const base = location.pathname.startsWith("/_rdsh") ? "/_rdsh/" : "/";
@@ -516,6 +517,7 @@ try {
       try {
         const value = await api("managed-process"),
           scope = value.scope;
+        renderManagedRunHealth($("managed-health"), value.diagnostic, node);
         const labels = {
           running: "実行中",
           stopping: "停止要求中 · 子孫の終了を確認しています",
@@ -563,6 +565,7 @@ try {
       } catch {
         $("managed-status").textContent =
           "監視に接続できません · 終了は未確認です";
+        renderManagedRunHealth($("managed-health"), null, node);
         $("managed-stop").disabled = true;
       }
     };
