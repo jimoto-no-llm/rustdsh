@@ -127,6 +127,14 @@ rerun only failed jobs while the original staged artifacts remain available
 (seven days) rather than rebuilding the successful jobs. Concurrent
 runs for the same tag are serialized and never cancel an upload in progress.
 
+`install.sh` verifies Unix archives against `release-digests.tsv` fetched from
+the fixed canonical `raw.githubusercontent.com/jimoto-no-llm/rustdsh/main`
+URL. It does not trust a checksum served by `RDSH_RELEASE_BASE`. After verifying
+a published release, update the `latest` row and add each supported `.tar.gz`
+asset's GitHub-reported SHA-256 in a reviewed follow-up PR before announcing or
+directing users to install that release. Keep older rows for explicit
+`--version` installs. Do not derive pins from release `.sha256` sidecars.
+
 After publication, confirm the body, 12 assets and correct channel in GitHub.
 Download and verify the actual published assets:
 
@@ -134,6 +142,10 @@ Download and verify the actual published assets:
 gh release download vX.Y.Z --repo jimoto-no-llm/rustdsh --dir /tmp/rdsh-vX.Y.Z-assets
 python3 scripts/verify-release-assets.py /tmp/rdsh-vX.Y.Z-assets
 ```
+
+For the installer registry, use the asset `digest` values returned by
+`gh release view vX.Y.Z --json assets`, then review the updated
+`release-digests.tsv` before announcing the new stable channel.
 
 Test README installation commands in a clean environment. Announcements use the
 published notes. Failed builds leave staged artifacts; failed uploads or verification
