@@ -65,6 +65,17 @@ const decision = object(
     ),
     expires_at: { type: "string", format: "date-time" },
     consumer_id: string,
+    causal_source_evidence_ids: {
+      type: "array",
+      minItems: 1,
+      maxItems: 20,
+      uniqueItems: true,
+      items: {
+        type: "string",
+        pattern:
+          "^evi_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      },
+    },
   },
   ["kind"],
 );
@@ -105,7 +116,7 @@ export const tools = [
   {
     name: "dashboard_ask_question",
     description:
-      "Place a legacy consultation or a typed decision card for a human. Typed approval requires a versioned action, choices, diff, impact, conditions and explicit USD limit (null means unknown). Use action revise/cancel with expected_revision for an existing typed question; cancellation needs cancel_reason. No reply grants execution authority. default_action is informational. Read answers and their current validity with dashboard_get_feedback.",
+      "Place a legacy consultation or a typed decision card for a human. Typed approval requires a versioned action, choices, diff, impact, conditions and explicit USD limit (null means unknown). causal_source_evidence_ids records explicit references to acceptance evidence; it does not prove the evidence caused the question. Use action revise/cancel with expected_revision for an existing typed question; cancellation needs cancel_reason. No reply grants execution authority. default_action is informational. Read answers and their current validity with dashboard_get_feedback.",
     inputSchema: object(
       {
         id: string,

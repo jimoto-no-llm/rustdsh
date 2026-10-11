@@ -30,6 +30,10 @@ const bases = {
   exact_input_command_id: "同じ入力command ID",
   exact_question_revision_and_feedback: "同じ質問revision・回答ID",
   exact_answer_event_id: "保存済み回答event ID",
+  declared_acceptance_source_command_id:
+    "受入記録に明示された入力command IDの参照",
+  declared_question_source_evidence_id:
+    "質問revisionに明示された受入evidence IDの参照",
   verified_native_owner_session_input_hash:
     "native owner・session・入力hashの照合済み",
 };
@@ -65,7 +69,10 @@ export function createTimelinePanel(element, { api, node }) {
       : "";
     view.counts.textContent = stageText(trace);
     view.problems.textContent = `未確認・問題 ${trace.issues.length}件`;
-    view.open.hidden = !trace.issues.length;
+    view.open.textContent = trace.issues.length
+      ? "未確認区間と原記録を調べる"
+      : "全記録とID相関を調べる";
+    view.open.hidden = false;
   };
   async function detail(traceId, view) {
     selected = traceId;
@@ -96,7 +103,7 @@ export function createTimelinePanel(element, { api, node }) {
       for (const issue of trace.issues)
         problems.append(node("li", issue.message));
       target.append(problems);
-      target.append(node("h4", "確認できたID相関"));
+      target.append(node("h4", "記録済みID相関・明示参照"));
       const correlations = node("ul");
       for (const link of trace.links) {
         const from = trace.nodes.find((item) => item.id === link.from),
@@ -105,7 +112,7 @@ export function createTimelinePanel(element, { api, node }) {
         correlations.append(
           node(
             "li",
-            `${labels[from.stage]} ${JSON.stringify(from.source_id)} → ${labels[to.stage]} ${JSON.stringify(to.source_id)}（${bases[link.basis] || link.basis}）`,
+            `${labels[from.stage]} ${JSON.stringify(from.source_id)} → ${labels[to.stage]} ${JSON.stringify(to.source_id)}（${bases[link.basis] || link.basis}${link.reference_id ? ` · 参照ID ${JSON.stringify(link.reference_id)}` : ""}）`,
           ),
         );
       }

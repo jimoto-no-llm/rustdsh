@@ -54,7 +54,7 @@ rdsh-dashboard preflight --project <directory> [--requirements <json>] [--execut
 rdsh-dashboard run-history list|inspect|events --project <directory> [--run-id <run_id>] [--cursor <number>] [--limit <number>]
 rdsh-dashboard retry-history list|inspect --project <directory> [--operation-id <id>]
 rdsh-dashboard checkpoint record|list|inspect|resume|start-new --project <directory> [--run-id <id>] [--checkpoint-id <id>] [--executable <original-dsh>] [--entrypoint <bin.js>] [--verify-native] [--retry-operation-id <id>] [--summary-file <file> --accept-context-loss]
-rdsh-dashboard acceptance define|run|report|inspect --project <directory> --task-id <id> [--criterion-id <id>] [--criteria-file <json>] [--argv-file <json>] [--result-file <json>] [--scope full|partial] [--timeout-ms <ms>] [--image <relative-path>]
+rdsh-dashboard acceptance define|run|report|inspect --project <directory> --task-id <id> [--criterion-id <id>] [--criteria-file <json>] [--argv-file <json>] [--result-file <json>] [--scope full|partial] [--timeout-ms <ms>] [--image <relative-path>] [--causal-source-command-id <command_id> ...]
 rdsh-dashboard routing bind|inspect|probe|allow-change --project <directory> --run-id <id> [--route-file <json>] [--authorization-file <json>] [--executable <original-dsh>] [--entrypoint <bin.js>]
 rdsh-dashboard session-ledger list|record|resolve|start|resume --project <directory> [--run-id <run_id>] [--task-id <id>] [--session-id <id>] [--label <name>] [--provider <name>] [--cwd <directory>] [--cli <name>] [--executable <original-dsh>] [--entrypoint <bin.js>]
 rdsh-dashboard reply-consumer inspect|once|serve --project <directory> [--run-id <run_id>] [--command-id <reply_id>] [--executable <original-dsh>] [--entrypoint <bin.js>]
@@ -129,6 +129,7 @@ const { values, positionals } = parseArgs({
     scope: { type: "string" },
     "timeout-ms": { type: "string" },
     image: { type: "string", multiple: true },
+    "causal-source-command-id": { type: "string", multiple: true },
     "route-file": { type: "string" },
     "authorization-file": { type: "string" },
     "command-id": { type: "string" },
@@ -831,6 +832,7 @@ try {
       "scope",
       "timeout-ms",
       "image",
+      "causal-source-command-id",
       "help",
     ]);
     if (Object.keys(values).some((key) => !acceptanceOptions.has(key)))
@@ -849,7 +851,12 @@ try {
       throw new Error("Input options must match the acceptance action");
     if (
       ["define", "inspect"].includes(action) &&
-      [values["criterion-id"], values.scope, values.image].some(
+      [
+        values["criterion-id"],
+        values.scope,
+        values.image,
+        values["causal-source-command-id"],
+      ].some(
         (value) => value !== undefined,
       )
     )
@@ -869,6 +876,7 @@ try {
         criterion_id: values["criterion-id"],
         scope: values.scope || "full",
         images: values.image || [],
+        causal_source_command_ids: values["causal-source-command-id"] || [],
         ...(action === "run"
           ? {
               argv: await localJson(values["argv-file"]),

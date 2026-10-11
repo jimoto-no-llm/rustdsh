@@ -65,8 +65,14 @@ export function timelineProjection(state, consumer, sources = {}) {
       });
     return id;
   };
-  const link = (from, to, basis) => {
-    links.push({ id: stable(from, to, basis), from, to, basis });
+  const link = (from, to, basis, reference_id = null) => {
+    links.push({
+      id: stable(from, to, basis),
+      from,
+      to,
+      basis,
+      ...(reference_id ? { reference_id } : {}),
+    });
     const a = nodes.find((node) => node.id === from),
       b = nodes.find((node) => node.id === to);
     if (a?.at && b?.at && Date.parse(a.at) > Date.parse(b.at))
@@ -121,6 +127,10 @@ export function timelineProjection(state, consumer, sources = {}) {
       "相関IDのない報告・質問です。近い時刻や似た文章から実行へ結び付けていません。",
     );
   } else {
+    const commandExecutionNodes = new Map(),
+      acceptanceEvidenceNodes = new Map(),
+      questionEvidenceReferences = [];
+    let crossStageMissing = false;
     const requests = values(state.instructions?.requests).filter(
       (request) => request.consumer_id === consumer.consumer_id,
     );
@@ -212,6 +222,10 @@ export function timelineProjection(state, consumer, sources = {}) {
             },
             "保存された回答が参照する質問revisionです。質問の観測時刻はこの回答から補っていません。",
           );
+          questionEvidenceReferences.push({
+            node_id: questionId,
+            evidence_ids: message.decision?.causal_source_evidence_ids || [],
+          });
           const validity = feedbackValidity(state, message).contract_validity;
           input = add(
             "answer",
@@ -312,6 +326,7 @@ export function timelineProjection(state, consumer, sources = {}) {
             ? "相関・owner・入力hashを照合したACP入力処理の結果です。taskや受入検証の完了とは別です。"
             : "beginは送信前の永続intentです。native結果の完全な証拠がなく、実行成功は未確認です。",
         );
+        commandExecutionNodes.set(command.command_id, execution);
         if (proof) {
           link(input, execution, "verified_native_owner_session_input_hash");
           if (proof.phase === "failed")
@@ -336,16 +351,22 @@ export function timelineProjection(state, consumer, sources = {}) {
     for (const { question, card } of latest(
       [...includedQuestions.values()],
       100,
-    ))
-      add(
+    )) {
+      const questionId = add(
         "question",
         "current_question",
         [question.id, card.revision, card.fingerprint],
-        question.created_at,
+        card.updated_at || question.created_at,
         card.status,
         { question, contract: card },
-        "同じconsumerを明示した質問です。どの指示・試験が原因かは未記録です。",
       );
+      questionEvidenceReferences.push({
+        node_id: questionId,
+        evidence_ids:
+          card.snapshot.decision?.causal_source_evidence_ids || [],
+      });
+    }
+    const testNodes = [];
     if (sources.acceptance) {
       for (const condition of sources.acceptance.conditions) {
         if (condition.evidence.length > 20)
@@ -354,8 +375,8 @@ export function timelineProjection(state, consumer, sources = {}) {
             null,
             "受入条件ごとの最新20試験記録を表示しています。省略区間は未確認です。",
           );
-        for (const record of latest(condition.evidence, 20))
-          add(
+        for (const record of latest(condition.evidence, 20)) {
+          const testId = add(
             "test",
             "acceptance_evidence",
             record.evidence_id,
@@ -374,11 +395,45 @@ export function timelineProjection(state, consumer, sources = {}) {
               freshness: record.freshness,
               command_integrity: record.command_integrity,
               eligible_pass: record.eligible_pass,
+              causal_source_command_ids:
+                record.causal_source_command_ids || [],
               started_at: record.started_at,
               finished_at: record.finished_at,
             },
-            "task IDが同じ試験記録です。個々の指示/native入力との因果は未記録です。",
+            (record.causal_source_command_ids || []).length
+              ? "受入記録に保存された入力command IDの明示参照です。native結果、試験の鮮度、因果の独立検証とは別です。"
+              : "task IDが同じ試験記録です。個々の指示/native入力との参照は未記録です。",
           );
+          testNodes.push(testId);
+          acceptanceEvidenceNodes.set(record.evidence_id, testId);
+          const commandIds = record.causal_source_command_ids || [];
+          if (!commandIds.length) {
+            crossStageMissing = true;
+            unknown(
+              "test_execution_source_unknown",
+              testId,
+              "受入記録に入力command IDの参照がありません。task IDだけで実行を結び付けていません。",
+            );
+          }
+          for (const commandId of commandIds) {
+            const executionId = commandExecutionNodes.get(commandId);
+            if (executionId)
+              link(
+                executionId,
+                testId,
+                "declared_acceptance_source_command_id",
+                commandId,
+              );
+            else {
+              crossStageMissing = true;
+              unknown(
+                "test_execution_source_unconfirmed",
+                testId,
+                "受入記録の入力command IDを、このtraceの実行記録へ照合できません。",
+              );
+            }
+          }
+        }
       }
       if (!sources.acceptance.verification?.all_declared_full_checks_pass)
         unknown(
@@ -392,11 +447,42 @@ export function timelineProjection(state, consumer, sources = {}) {
         null,
         "対象taskの試験記録を取得できません。",
       );
-    unknown(
-      "cross_stage_causality_unknown",
-      null,
-      "実行→試験→質問の因果IDは未記録です。同じtask/runや時刻の近さから矢印を作っていません。",
-    );
+    if (!testNodes.length) crossStageMissing = true;
+    if (!questionEvidenceReferences.length) crossStageMissing = true;
+    for (const reference of questionEvidenceReferences) {
+      if (!reference.evidence_ids.length) {
+        crossStageMissing = true;
+        unknown(
+          "question_test_source_unknown",
+          reference.node_id,
+          "質問revisionに受入evidence IDの参照がありません。consumerやtaskの一致だけで因果を補っていません。",
+        );
+      }
+      for (const evidenceId of reference.evidence_ids) {
+        const testId = acceptanceEvidenceNodes.get(evidenceId);
+        if (testId)
+          link(
+            testId,
+            reference.node_id,
+            "declared_question_source_evidence_id",
+            evidenceId,
+          );
+        else {
+          crossStageMissing = true;
+          unknown(
+            "question_test_source_unconfirmed",
+            reference.node_id,
+            "質問revisionの受入evidence IDを、このtraceの読取範囲で照合できません。",
+          );
+        }
+      }
+    }
+    if (crossStageMissing)
+      unknown(
+        "cross_stage_causality_unknown",
+        null,
+        "実行→試験→質問の未記録区間があります。明示された参照IDだけを結び、task/runや時刻の近さから因果を補っていません。",
+      );
     if (sources.historyError)
       unknown(
         "native_history_unavailable",

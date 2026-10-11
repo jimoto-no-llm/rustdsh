@@ -170,6 +170,46 @@ test("legacy consultations retain their field shapes and a default action grants
   assert.equal(tools.length, 6);
 });
 
+test("question revisions retain explicit causal evidence references and the MCP schema documents them", async (t) => {
+  const f = await setup(t),
+    firstId = "evi_11111111-1111-1111-1111-111111111111",
+    secondId = "evi_22222222-2222-2222-2222-222222222222",
+    schema = tools.find(
+      (tool) => tool.name === "dashboard_ask_question",
+    ).inputSchema.properties.decision.properties.causal_source_evidence_ids;
+  assert.equal(schema.minItems, 1);
+  assert.equal(schema.maxItems, 20);
+  assert.equal(schema.uniqueItems, true);
+  await f.store.mutate(
+    "question",
+    ask({ ...approval(), causal_source_evidence_ids: [firstId] }),
+  );
+  const original = structuredClone(f.card());
+  assert.deepEqual(
+    original.snapshot.decision.causal_source_evidence_ids,
+    [firstId],
+  );
+  await f.store.mutate(
+    "question",
+    ask(
+      { ...approval(), causal_source_evidence_ids: [secondId] },
+      { action: "revise", expected_revision: 1 },
+    ),
+  );
+  assert.notEqual(f.card().fingerprint, original.fingerprint);
+  assert.deepEqual(
+    f.card().history[0].snapshot.decision.causal_source_evidence_ids,
+    [firstId],
+  );
+  await assert.rejects(
+    f.store.mutate(
+      "question",
+      ask({ ...approval(), causal_source_evidence_ids: ["not-an-evidence-id"] }),
+    ),
+    /Invalid causal_source_evidence_ids/,
+  );
+});
+
 test("typed choices, fixed target and a human answer persist atomically without creating execution authority", async (t) => {
   const f = await setup(t);
   await executeTool(

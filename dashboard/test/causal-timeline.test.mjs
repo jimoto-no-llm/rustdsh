@@ -260,6 +260,80 @@ test("partial passes and same-task tests cannot create an instruction/test/quest
   );
 });
 
+test("explicit command and evidence IDs link execution, acceptance and question while preserving unknown results", async (t) => {
+  const f = await fixture(t),
+    acceptance = await AcceptanceStore.open(f.project);
+  await f.intent();
+  await acceptance.define("work", [
+    { id: "check", description: "local fixture", inputs: ["check.mjs"] },
+  ]);
+  await assert.rejects(
+    acceptance.perform({
+      task_id: "work",
+      criterion_id: "check",
+      reported: { status: "pass", reason: "fixture report" },
+      causal_source_command_ids: ["input_missing"],
+    }),
+    (error) =>
+      error.code === "causal_source_command_unavailable_or_task_mismatch",
+  );
+  assert.equal(
+    (await acceptance.inspect("work")).conditions[0].evidence.length,
+    0,
+  );
+  const result = await acceptance.perform({
+    task_id: "work",
+    criterion_id: "check",
+    reported: { status: "pass", reason: "fixture report" },
+    causal_source_command_ids: [f.id],
+  });
+  await f.store.mutate("question", {
+    id: "question-with-evidence",
+    question: "Which result should be reviewed?",
+    decision: {
+      kind: "consultation",
+      consumer_id: f.consumer.consumer_id,
+      target: {
+        task_id: "work",
+        run_id: f.consumer.run_id,
+        session_id: f.consumer.session_id,
+        revision: "review-v1",
+      },
+      causal_source_evidence_ids: [result.evidence_id],
+    },
+  });
+  const trace = await f.detail(),
+    execution = trace.nodes.find((node) => node.stage === "execution"),
+    check = trace.nodes.find((node) => node.stage === "test"),
+    question = trace.nodes.find(
+      (node) => node.kind === "current_question",
+    ),
+    executionCheck = trace.links.find(
+      (link) =>
+        link.basis === "declared_acceptance_source_command_id" &&
+        link.to === check.id,
+    ),
+    checkQuestion = trace.links.find(
+      (link) =>
+        link.basis === "declared_question_source_evidence_id" &&
+        link.to === question.id,
+    );
+  assert.equal(execution.status, "unknown");
+  assert.equal(check.status, "unverified");
+  assert.equal(executionCheck.from, execution.id);
+  assert.equal(executionCheck.reference_id, f.id);
+  assert.equal(checkQuestion.from, check.id);
+  assert.equal(checkQuestion.reference_id, result.evidence_id);
+  assert.ok(
+    trace.issues.some((issue) => issue.code === "native_result_unconfirmed"),
+  );
+  assert.ok(
+    !trace.issues.some(
+      (issue) => issue.code === "cross_stage_causality_unknown",
+    ),
+  );
+});
+
 test("missing instruction and out-of-order read evidence stay unknown rather than becoming inferred edges", async (t) => {
   const f = await fixture(t);
   await f.intent();

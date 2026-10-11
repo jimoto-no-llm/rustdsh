@@ -7,6 +7,7 @@ import net from "node:net";
 import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { fileURLToPath } from "node:url";
 import { identity, ProjectStore } from "../../dashboard/state.mjs";
 import { startDashboard } from "../../dashboard/server.mjs";
 import { RunHistory } from "../../dashboard/run-history.mjs";
@@ -18,7 +19,12 @@ const { chromium } = await import(
   process.env.RDSH_PLAYWRIGHT_MODULE || "playwright"
 );
 const exec = promisify(execFile);
+const repository = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../..",
+);
 const output = path.resolve(
+  repository,
   process.env.RDSH_TIMELINE_E2E_OUTPUT || "target/e2e/causal-timeline",
 );
 await fs.mkdir(output, { recursive: true });
@@ -172,6 +178,12 @@ try {
   const page = await context.newPage();
   page.on("pageerror", (error) => errors.push(error.message));
   let detailRequests = 0;
+  const openDetails = () =>
+    panel
+      .getByRole("button", {
+        name: /未確認区間と原記録を調べる|全記録とID相関を調べる/,
+      })
+      .first();
   page.on("request", (request) => {
     if (request.url().includes("api/timeline?trace_id=")) detailRequests++;
   });
@@ -278,6 +290,17 @@ try {
   );
   await observe("receipt_and_durable_intent_without_native_result");
   await finish(inputId, nativeId);
+  const acceptance = await AcceptanceStore.open(project);
+  await acceptance.define("work", [
+    { id: "check", description: "local fixture", inputs: ["check.mjs"] },
+  ]);
+  const result = await acceptance.perform({
+    task_id: "work",
+    criterion_id: "check",
+    argv: [process.execPath, "check.mjs"],
+    causal_source_command_ids: [inputId],
+  });
+  assert.equal(result.status, "pass");
   await store.mutate("question", {
     id: "question-1",
     question: "Which test should change?",
@@ -290,6 +313,7 @@ try {
         session_id: sessionId,
         revision: "input-v1",
       },
+      causal_source_evidence_ids: [result.evidence_id],
     },
   });
   const card = store.value.question_contracts.cards["question-1"];
@@ -301,16 +325,6 @@ try {
   });
   const replyId = store.value.feedback.at(-1).reply_command_id;
   await finish(replyId, await begin(replyId));
-  const acceptance = await AcceptanceStore.open(project);
-  await acceptance.define("work", [
-    { id: "check", description: "local fixture", inputs: ["check.mjs"] },
-  ]);
-  const result = await acceptance.perform({
-    task_id: "work",
-    criterion_id: "check",
-    argv: [process.execPath, "check.mjs"],
-  });
-  assert.equal(result.status, "pass");
   await panel
     .getByRole("button", { name: "未確認区間と原記録を調べる" })
     .first()
@@ -335,11 +349,21 @@ try {
   await observe("exact_native_receipts_and_current_local_qa");
   await screenshot(page, "after-correlated-records.png");
   await panel
-    .getByText("確認できたID相関", { exact: true })
+    .getByText("記録済みID相関・明示参照", { exact: true })
     .scrollIntoViewIfNeeded();
+  await panel
+    .getByText("受入記録に明示された入力command IDの参照", {
+      exact: false,
+    })
+    .waitFor();
+  const questionReferences = panel.getByText(
+    "質問revisionに明示された受入evidence IDの参照",
+    { exact: false },
+  );
+  assert.equal(await questionReferences.count(), 2);
   await screenshot(page, "after-exact-links.png");
   flows.push(
-    "begin cannot imply execution; exact synthetic journal receipts link instruction and answer processing; actual local full QA stays a separate task association",
+    "begin cannot imply execution; exact synthetic journal receipts and operator-recorded source IDs link execution, local full QA, question and answer records",
   );
   const beforeReport = await readCausalTimeline(project, store.value);
   const stableIds = (
@@ -348,10 +372,7 @@ try {
     })
   ).traces[0].nodes.map((node) => node.id);
   await page.reload();
-  await panel
-    .getByRole("button", { name: "未確認区間と原記録を調べる" })
-    .first()
-    .waitFor();
+  await openDetails().waitFor();
   const afterReport = await readCausalTimeline(project, store.value, {
     trace_id: beforeReport.traces[0].trace_id,
   });
@@ -360,10 +381,7 @@ try {
     stableIds,
   );
   await fs.appendFile(path.join(cwd, "check.mjs"), "// source changed\n");
-  await panel
-    .getByRole("button", { name: "未確認区間と原記録を調べる" })
-    .first()
-    .click();
+  await openDetails().click();
   await panel
     .getByText("現在のコードに対する全体試験の成功は未確認です。", {
       exact: true,
@@ -445,5 +463,5 @@ try {
   await server?.close();
   assert.equal(path.dirname(path.resolve(root)), path.resolve(os.tmpdir()));
   assert.ok(path.basename(root).startsWith("rdsh-timeline-browser-"));
-  await fs.rm(root, { recursive: true });
+  await fs.rm(root, { recursive: true, maxRetries: 8, retryDelay: 100 });
 }

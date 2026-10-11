@@ -2,8 +2,8 @@
 
 プロジェクト画面の「詳細」にある「指示・回答の相関」で、同じconsumerの
 指示、受領、ACP入力結果、試験、質問、回答、回答適用を確認できます。
-通常は記録数と未確認箇所の要約です。「未確認区間と原記録を調べる」から、
-確認できたID相関、各区間の記録、折りたたまれた原記録を開きます。
+通常は記録数と未確認箇所の要約です。未確認がある場合は「未確認区間と原記録を調べる」から、
+すべて確認できた場合は「全記録とID相関を調べる」から、各区間の記録と原記録を開けます。
 相関のある回答revisionと現行の質問は別の記録として数えます。
 この表示は [Issue #25](https://github.com/jimoto-no-llm/rustdsh/issues/25) の実装です。
 
@@ -14,8 +14,8 @@
 | 指示 | immutable instruction command ID | 人が投稿した入力の保存 |
 | 受領 | 同じcommand IDとconsumer/run/session | 対象consumerによる読取 |
 | 入力実行 | native command ID、owner、session、入力hash | 既存台帳で照合できたACP入力処理の結果 |
-| 試験 | 同じtaskのacceptance evidence ID | integrityとfreshnessを確認した受入検証 |
-| 質問 | question ID、revision、fingerprint | 対象consumerを明示した現行の質問、または回答時のrevision |
+| 試験 | acceptance evidence ID、記録時に明示した入力command ID | integrityとfreshnessを確認した受入検証。入力command IDは利用者が保存した参照 |
+| 質問 | question ID、revision、fingerprint、`causal_source_evidence_ids` | 対象consumerを明示した現行の質問、回答時のrevision、および利用者が保存した受入記録参照 |
 | 回答 | reply command ID、feedback sequence、answer event ID | その質問revisionへの保存済み回答 |
 | 回答適用 | replyからnative commandへの同じ照合 | ACPによる回答入力の処理結果 |
 
@@ -25,10 +25,16 @@
 full/current/intactなローカル結果だけを区別し、部分試験、報告だけのpass、
 変更前のコードでのpassを全体試験の成功へ昇格させません。
 
-個々の入力実行→試験→質問の因果IDは、既存の保存契約にはありません。
-同じtaskの試験、同じconsumer/run/sessionを明示した質問は関連記録として表示し、
-その間の因果は未確認と示します。時刻の近さ、文章の類似、受信順から矢印を作りません。
-表示される矢印は実際に照合できたID相関だけです。
+入力実行→試験の関係は、受入検証時に `--causal-source-command-id <command_id>` を
+1件以上指定すると保存されます。指定したIDは同じtaskのconsumerに属し、native入力intentが
+記録されたcommandに限ります。質問→試験の関係は、MCPの
+`dashboard_ask_question` の `decision.causal_source_evidence_ids` に受入evidence IDを
+明示して保存します。どちらも安定した参照IDですが、利用者が記録した参照であり、因果の
+独立検証ではありません。native結果、試験のfreshness、質問revisionは個別に判定します。
+
+参照IDが省略・欠落・読取範囲外の場合、その区間は未確認のままです。同じtaskの試験、
+同じconsumer/run/sessionを明示した質問、時刻の近さ、文章の類似、受信順から矢印を作りません。
+明示参照を追加した後も、元のnative receiptや現在の試験結果を別途照合します。
 
 旧質問revisionへの回答は旧revisionのまま残ります。元の回答eventが失われた場合は
 欠落を示し、保存済み回答からeventを作り直しません。相関IDのない旧報告・質問や
