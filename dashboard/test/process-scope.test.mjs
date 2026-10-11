@@ -101,6 +101,17 @@ test("owned children and detached grandchildren stop in order after a bounded gr
   await pause(180);
   assert.equal((await rows(trace)).length, stopped);
 });
+test("intentional monitor disposal drains its response before close without reporting ownership loss", async (t) => {
+  const { tree } = await setup(t),
+    { p } = await tree("cooperative"),
+    errors = [];
+  p.child.on("error", (error) => errors.push(error.code));
+  const result = await p.stop({ gracefulTimeout: 400, killTimeout: 1000 });
+  assert.equal(result.confirmed, true);
+  assert.equal(result.resources_released, true);
+  await pause(20);
+  assert.deepEqual(errors, []);
+});
 test("cooperative EOF/TERM exits require no forced kill on Linux and retain truthful Windows graceful capability", async (t) => {
   const { tree } = await setup(t),
     { p, stages } = await tree("cooperative");

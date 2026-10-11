@@ -7,7 +7,8 @@ import {
 } from "./process-scope-backends.mjs";
 import { readProcessIdentity } from "./process-identity.mjs";
 
-const send = (frame) => process.stdout.write(JSON.stringify(frame) + "\n");
+const send = (frame, callback) =>
+  process.stdout.write(JSON.stringify(frame) + "\n", callback);
 let scope = null,
   starting = false,
   closing = false;
@@ -80,8 +81,10 @@ input.on("line", (line) => {
         result = { closed: await scope.close() };
         if (result.closed) closing = true;
       } else throw new Error();
-      send({ type: "response", id: frame.id, result });
-      if (closing) process.exit(0);
+      send(
+        { type: "response", id: frame.id, result },
+        closing ? () => process.exit(0) : undefined,
+      );
     } catch {
       send(
         frame?.id

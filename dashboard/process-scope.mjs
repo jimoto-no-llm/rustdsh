@@ -64,7 +64,7 @@ export async function spawnOwnedProcess({
       : ["pipe", "pipe", "pipe", "pipe", "pipe", "pipe"],
   });
   const monitorExit = new Promise((resolve) => {
-    monitor.once("exit", resolve);
+    monitor.once("close", resolve);
     monitor.once("error", resolve);
   });
   monitor.stderr.resume(); // Transport diagnostics can contain environment information.
@@ -98,6 +98,7 @@ export async function spawnOwnedProcess({
     disposed = false,
     resourcesReleased = false,
     sequence = 0,
+    disposalRequestId = null,
     buffer = "",
     stopping = null,
     initial;
@@ -117,7 +118,9 @@ export async function spawnOwnedProcess({
     child.emit("error", new ScopeError("monitor_lost"));
   };
   monitor.on("error", lose);
-  monitor.on("exit", lose);
+  // Wait until stdout is drained before treating an intentional dispose exit
+  // as ownership loss; the final response can arrive after ChildProcess 'exit'.
+  monitor.on("close", lose);
   monitor.stdin.on("error", lose);
   monitor.stdout.on("data", (chunk) => {
     if (lost || disposed) return;
@@ -144,6 +147,12 @@ export async function spawnOwnedProcess({
         else if (frame.type === "response" && pending.has(frame.id)) {
           const p = pending.get(frame.id);
           pending.delete(frame.id);
+          if (
+            frame.id === disposalRequestId &&
+            !frame.error &&
+            frame.result?.closed === true
+          )
+            disposed = true;
           if (frame.error) p.reject(new ScopeError("ownership_unverifiable"));
           else p.resolve(frame.result);
         } else if (frame.type === "monitor_error") lose();
@@ -156,6 +165,7 @@ export async function spawnOwnedProcess({
   const request = async (op, timeout = 5000) => {
     if (lost || disposed) throw new ScopeError("monitor_lost");
     const id = ++sequence;
+    if (op === "dispose") disposalRequestId = id;
     let timer;
     try {
       return await new Promise((resolve, reject) => {
