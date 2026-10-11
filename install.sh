@@ -6,9 +6,14 @@
 # 5) refresh live install via ./install.sh --as-dsh and verify `dsh --version`
 # delegation, 6) confirm sync-dsh.sh picks up the new version on its next run.
 set -euo pipefail
-# Release-download scratch dir (set by fetch_release); cleaned at exit.
-FETCH_TMPD=""
-trap '[ -n "${FETCH_TMPD:-}" ] && rm -rf "$FETCH_TMPD"' EXIT
+# Installer download scratch dir; cleaned at exit.
+DOWNLOAD_TMPD=""
+# Update this version and the per-target hashes together from rustup's official archive.
+RUSTUP_INIT_VERSION="1.29.0"
+cleanup_downloads() {
+  if [ -n "${DOWNLOAD_TMPD:-}" ]; then rm -rf "$DOWNLOAD_TMPD"; fi
+}
+trap cleanup_downloads EXIT
 PREFIX="${PREFIX:-$HOME/.local/bin}"
 MODE="rdsh"
 NO_RUSTUP=0
@@ -104,6 +109,87 @@ verify_sha256() {
   return 1
 }
 
+rustup_init_target() {
+  case "$OS/$ARCH" in
+    Linux/x86_64)
+      if [ -e /lib/ld-musl-x86_64.so.1 ] || { command -v ldd >/dev/null 2>&1 && ldd --version 2>&1 | grep -qi musl; }; then
+        printf '%s' "x86_64-unknown-linux-musl"
+      else
+        printf '%s' "x86_64-unknown-linux-gnu"
+      fi
+      ;;
+    Linux/aarch64)
+      if [ -e /lib/ld-musl-aarch64.so.1 ] || { command -v ldd >/dev/null 2>&1 && ldd --version 2>&1 | grep -qi musl; }; then
+        printf '%s' "aarch64-unknown-linux-musl"
+      else
+        printf '%s' "aarch64-unknown-linux-gnu"
+      fi
+      ;;
+    Darwin/arm64) printf '%s' "aarch64-apple-darwin" ;;
+    Darwin/x86_64) printf '%s' "x86_64-apple-darwin" ;;
+    *)
+      echo "no pinned rustup-init binary for $OS/$ARCH; install Rust manually or use --no-rustup" >&2
+      return 1
+      ;;
+  esac
+}
+
+rustup_init_sha256() {
+  case "$1" in
+    x86_64-unknown-linux-gnu) printf '%s' "4acc9acc76d5079515b46346a485974457b5a79893cfb01112423c89aeb5aa10" ;;
+    aarch64-unknown-linux-gnu) printf '%s' "9732d6c5e2a098d3521fca8145d826ae0aaa067ef2385ead08e6feac88fa5792" ;;
+    x86_64-unknown-linux-musl) printf '%s' "9cd3fda5fd293890e36ab271af6a786ee22084b5f6c2b83fd8323cec6f0992c1" ;;
+    aarch64-unknown-linux-musl) printf '%s' "88761caacddb92cd79b0b1f939f3990ba1997d701a38b3e8dd6746a562f2a759" ;;
+    x86_64-apple-darwin) printf '%s' "33cf85df9142bc6d29cbc62fa5ca1d4c29622cddb55213a4c1a43c457fb9b2d7" ;;
+    aarch64-apple-darwin) printf '%s' "aeb4105778ca1bd3c6b0e75768f581c656633cd51368fa61289b6a71696ac7e1" ;;
+    *) return 1 ;;
+  esac
+}
+
+sha256_file() {
+  local file="$1" out
+  if command -v sha256sum >/dev/null 2>&1; then
+    out="$(sha256sum "$file")"
+  elif command -v shasum >/dev/null 2>&1; then
+    out="$(shasum -a 256 "$file")"
+  else
+    echo "no sha256sum or shasum available" >&2
+    return 1
+  fi
+  printf '%s' "${out%% *}" | tr 'A-F' 'a-f'
+}
+
+verify_pinned_sha256() {
+  local file="$1" expected="$2" actual
+  actual="$(sha256_file "$file")" || return 1
+  if [ "$actual" = "$expected" ]; then
+    echo "rustup-init checksum ok" >&2
+    return 0
+  fi
+  echo "rustup-init SHA-256 mismatch (expected $expected, got $actual)" >&2
+  return 1
+}
+
+install_pinned_rustup() {
+  local target expected url binary
+  target="$(rustup_init_target)" || return 1
+  expected="$(rustup_init_sha256 "$target")" || {
+    echo "no pinned rustup-init checksum for $target" >&2
+    return 1
+  }
+  url="https://static.rust-lang.org/rustup/archive/${RUSTUP_INIT_VERSION}/${target}/rustup-init"
+  DOWNLOAD_TMPD="$(mktemp -d)"
+  binary="$DOWNLOAD_TMPD/rustup-init"
+  echo "downloading pinned rustup-init $RUSTUP_INIT_VERSION for $target..." >&2
+  curl --proto "=https" --proto-redir "=https" --tlsv1.2 --fail --silent --show-error --location --output "$binary" "$url" || {
+    echo "rustup-init download failed: $url" >&2
+    return 1
+  }
+  verify_pinned_sha256 "$binary" "$expected" || return 1
+  chmod 700 "$binary"
+  "$binary" -y --profile minimal --default-toolchain stable
+}
+
 fetch_release() {
   # Print the path of the extracted prebuilt rdsh binary.
   # Overridable for tests: RDSH_RELEASE_BASE=file:///path/to/dir.
@@ -126,20 +212,20 @@ fetch_release() {
     *) echo "no prebuilt binary for $OS/$ARCH (build from source instead)" >&2; exit 1 ;;
   esac
   if [ "$VER" = "latest" ]; then url="$base/latest/download/$asset"; else url="$base/download/$VER/$asset"; fi
-  FETCH_TMPD="$(mktemp -d)"
+  DOWNLOAD_TMPD="$(mktemp -d)"
   echo "fetching $url" >&2
-  curl -fsSL -o "$FETCH_TMPD/pkg.tgz" "$url" || { echo "download failed: $url" >&2; exit 1; }
+  curl -fsSL -o "$DOWNLOAD_TMPD/pkg.tgz" "$url" || { echo "download failed: $url" >&2; exit 1; }
   if [ "${RDSH_NO_CHECKSUM:-0}" = 1 ]; then
     echo "WARNING: checksum verification skipped (RDSH_NO_CHECKSUM=1); only use this with a trusted release base" >&2
-  elif curl -fsSL -o "$FETCH_TMPD/pkg.tgz.sha256" "$url.sha256" 2>/dev/null; then
-    verify_sha256 "$FETCH_TMPD/pkg.tgz" "$FETCH_TMPD/pkg.tgz.sha256" || exit 1
+  elif curl -fsSL -o "$DOWNLOAD_TMPD/pkg.tgz.sha256" "$url.sha256" 2>/dev/null; then
+    verify_sha256 "$DOWNLOAD_TMPD/pkg.tgz" "$DOWNLOAD_TMPD/pkg.tgz.sha256" || exit 1
   else
     echo "no checksum sidecar: refusing release install (set RDSH_NO_CHECKSUM=1 to override)" >&2
     exit 1
   fi
-  tar -xzf "$FETCH_TMPD/pkg.tgz" -C "$FETCH_TMPD"
-  if [ ! -x "$FETCH_TMPD/rdsh" ]; then echo "release archive has no rdsh binary" >&2; exit 1; fi
-  echo "$FETCH_TMPD/rdsh"
+  tar -xzf "$DOWNLOAD_TMPD/pkg.tgz" -C "$DOWNLOAD_TMPD"
+  if [ ! -x "$DOWNLOAD_TMPD/rdsh" ]; then echo "release archive has no rdsh binary" >&2; exit 1; fi
+  echo "$DOWNLOAD_TMPD/rdsh"
 }
 BIN_SRC="target/release/rdsh"
 if [ "$FROM_RELEASE" = 1 ]; then
@@ -149,8 +235,8 @@ else
   if ! command -v cargo >/dev/null 2>&1; then
     if [ "$NO_RUSTUP" = 1 ]; then echo "cargo not found (drop --no-rustup to auto-install Rust)" >&2; exit 1; fi
     if ! command -v curl >/dev/null 2>&1; then echo "cargo not found and no curl to fetch rustup" >&2; exit 1; fi
-    echo "cargo not found: installing Rust via rustup (minimal profile)..."
-    curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable
+    echo "cargo not found: installing Rust via pinned rustup-init (minimal profile)..."
+    install_pinned_rustup
     export PATH="$HOME/.cargo/bin:$PATH"
   fi
   cargo build --release

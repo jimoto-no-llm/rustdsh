@@ -24,6 +24,21 @@ export class ScopeError extends Error {
   }
 }
 
+export function handleSupervisorResponse(frame, pending) {
+  if (
+    frame?.type !== "response" ||
+    !Number.isSafeInteger(frame.id) ||
+    frame.id < 1
+  )
+    return false;
+  const request = pending.get(frame.id);
+  if (!request) return true; // The request timed out; discard its late reply.
+  pending.delete(frame.id);
+  if (frame.error) request.reject(new ScopeError("ownership_unverifiable"));
+  else request.resolve(frame.result);
+  return true;
+}
+
 export async function spawnOwnedProcess({
   command,
   cwd,
@@ -141,13 +156,8 @@ export async function spawnOwnedProcess({
           child.emit("exit", frame.code, frame.signal);
         } else if (["stdout", "stderr"].includes(frame.type) && framed)
           child[frame.type].write(Buffer.from(frame.data, "base64"));
-        else if (frame.type === "response" && pending.has(frame.id)) {
-          const p = pending.get(frame.id);
-          pending.delete(frame.id);
-          if (frame.error) p.reject(new ScopeError("ownership_unverifiable"));
-          else p.resolve(frame.result);
-        } else if (frame.type === "monitor_error") lose();
-        else throw new Error();
+        else if (frame.type === "monitor_error") lose();
+        else if (!handleSupervisorResponse(frame, pending)) throw new Error();
       } catch {
         lose();
       }

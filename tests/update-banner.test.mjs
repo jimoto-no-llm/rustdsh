@@ -6,6 +6,7 @@ import path from 'node:path';
 import { Readable } from 'node:stream';
 import { EventEmitter } from 'node:events';
 import { syncBuiltinESMExports } from 'node:module';
+import { pathToFileURL } from 'node:url';
 import vm from 'node:vm';
 
 const source = await readFile(new URL('../plugins/rdsh-update-banner/client.js', import.meta.url), 'utf8');
@@ -262,12 +263,17 @@ test('authenticated occurrence-close API keeps updater state intact and streams 
     assert.equal((await get()).data.at, legacy.at);
     await setState(update());
   });
-  if (process.platform !== 'win32') await t.test('planted close links cannot modify outside files; linked directories are refused', async () => {
+  if (process.platform !== 'win32') await t.test('planted state and close links cannot read or modify outside files', async () => {
     const outside = path.join(root, 'DUMMY-outside'); await writeFile(outside, 'DUMMY_UNCHANGED');
     await rm(closePath); await symlink(outside, closePath);
     assert.equal((await dismiss(update())).status, 500); assert.equal(await readFile(outside, 'utf8'), 'DUMMY_UNCHANGED');
     await rm(closePath); await link(outside, closePath); assert.equal((await dismiss(update())).status, 500);
     assert.equal(await readFile(outside, 'utf8'), 'DUMMY_UNCHANGED'); await rm(closePath);
+    const outsideState = path.join(root, 'DUMMY-update-state-outside'); await writeFile(outsideState, initialRaw);
+    await rm(statePath); await symlink(outsideState, statePath);
+    assert.deepEqual((await get()).data, { ok: false });
+    assert.equal(await readFile(outsideState, 'utf8'), initialRaw);
+    await rm(statePath); await setState(update());
     const real = path.join(root, 'real'); await mkdir(real); await writeFile(path.join(real, 'update-state.json'), initialRaw);
     await rm(directory, { recursive: true }); await symlink(real, directory);
     assert.equal((await dismiss(update())).status, 500); assert.deepEqual(await readdir(real), ['update-state.json']);
@@ -299,4 +305,44 @@ test('authenticated occurrence-close API keeps updater state intact and streams 
     assert.equal((await dismiss({ ...demo, cycle: 0 })).status, 200);
     assert.deepEqual(await readdir(directory), before); disposeDemo();
   });
+});
+
+test('updater resolves from its installed plugin and refuses missing or unsafe scripts', async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'rdsh-update-script-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const pluginDirectory = path.join(root, 'plugins', 'rdsh-update-banner');
+  await mkdir(pluginDirectory, { recursive: true });
+  const modulePath = path.join(pluginDirectory, 'index.mjs');
+  await writeFile(modulePath, await readFile(new URL('../plugins/rdsh-update-banner/index.js', import.meta.url), 'utf8'));
+  const { apply } = await import(pathToFileURL(modulePath).href);
+  const routes = new Map();
+  const ctx = { effect: (f) => f(), connection: { requestRejection: (req) => req.rejection },
+    webServer: { register(route) { routes.set(route.path, route.handler); return () => routes.delete(route.path); } } };
+  async function runWith() {
+    const dispose = apply(ctx, {});
+    const req = Readable.from([Buffer.from('{}')]); Object.assign(req, { method: 'POST' });
+    let data;
+    await routes.get('/api/rdsh-update/run')(req, { writeHead() {}, end(raw) { data = JSON.parse(raw); } });
+    dispose();
+    return data;
+  }
+
+  const syncScript = path.join(root, 'sync-dsh.sh');
+  const missing = await runWith();
+  assert.equal(missing.ok, false); assert.match(missing.message, /updater not found/);
+  const target = path.join(root, 'DUMMY-sync-target.sh');
+  await writeFile(target, "printf '%s\\n' 'DUMMY updater ran'\n", { mode: 0o700 });
+  if (typeof process.getuid === 'function') {
+    await symlink(target, syncScript);
+    const unsafe = await runWith();
+    assert.equal(unsafe.ok, false); assert.match(unsafe.message, /regular file owned by the current user/);
+    await rm(syncScript);
+    await writeFile(syncScript, await readFile(target, 'utf8'), { mode: 0o700 });
+    const result = await runWith();
+    assert.equal(result.ok, true); assert.match(result.message, /DUMMY updater ran/);
+  } else {
+    await writeFile(syncScript, await readFile(target, 'utf8'), { mode: 0o700 });
+    const unverified = await runWith();
+    assert.equal(unverified.ok, false); assert.match(unverified.message, /owned by the current user/);
+  }
 });

@@ -43,7 +43,10 @@ Generation failure stops publication.
 
 4. Run the [full verification matrix](../CONTRIBUTING.md), including Rust fmt,
    clippy, release tests, regression checks, dashboard tests and browser E2E.
-   Merge the reviewed preparation PR only after the required checks pass.
+   Merge the reviewed preparation PR only after the required checks pass. Wait
+   for all required checks on the exact resulting `main` commit to complete
+   successfully before tagging it; the release workflow rechecks that commit's
+   main ancestry and CI status before it starts the platform builds.
 5. Preview the exact release body with an authenticated `gh` CLI:
 
    ```sh
@@ -63,13 +66,18 @@ Generation failure stops publication.
    git push origin vX.Y.Z
    ```
 
-   Tag push starts publication automatically. Never tag an unreviewed commit.
+   Tag push starts the `cd` workflow automatically. Its validation job must pass
+   before builds start, and publication waits for every build and asset check.
+   Never tag an unreviewed or untested commit.
 
 ## Build and publish
 
 The `cd` workflow first refuses malformed or lightweight tags, mismatched
-versions, missing CHANGELOG entries and incomplete release notes. It builds
-five targets with `cargo build --locked --release`:
+versions, missing CHANGELOG entries, incomplete release notes, commits outside
+`main`, and commits whose latest required checks are missing, pending or failed.
+It builds five targets with `cargo build --locked --release` only after those
+checks pass. The exact required check names live in `scripts/release_ci.py`; CI
+workflow job-name changes must update that list and its tests:
 
 | Platform | Archive |
 | --- | --- |

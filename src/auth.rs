@@ -199,7 +199,7 @@ fn jwt_exp_ms(token: &str) -> Option<i64> {
     let payload = parts.nth(1)?;
     let raw = b64url_decode(payload)?;
     let v: serde_json::Value = serde_json::from_slice(&raw).ok()?;
-    v.get("exp")?.as_i64().map(|s| s * 1000)
+    v.get("exp")?.as_i64()?.checked_mul(1000)
 }
 
 // --- external stores --------------------------------------------------------
@@ -434,18 +434,7 @@ fn load_doc(path: &str) -> CredsDoc {
 }
 
 fn quote(s: &str) -> String {
-    let plain_ok = !s.is_empty()
-        && s.bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b"._-+/= ".contains(&b))
-        && !s.starts_with(' ')
-        && !s.ends_with(' ')
-        && !s.contains(": ")
-        && !s.contains(" #");
-    if plain_ok {
-        s.to_string()
-    } else {
-        format!("'{}'", s.replace('\'', "''"))
-    }
+    format!("'{}'", s.replace('\'', "''"))
 }
 
 fn safe_scalar(s: &str) -> anyhow::Result<()> {
@@ -548,6 +537,7 @@ pub(crate) fn write_creds(path: &str, text: &str) -> anyhow::Result<()> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::OpenOptionsExt;
+        // Set the mode on the new inode before it becomes visible at `path`.
         options.mode(0o600);
     }
     let result = (|| -> anyhow::Result<()> {
@@ -562,11 +552,6 @@ pub(crate) fn write_creds(path: &str, text: &str) -> anyhow::Result<()> {
         let _ = std::fs::remove_file(&tmp);
     }
     result?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
-    }
     Ok(())
 }
 
@@ -579,6 +564,70 @@ struct Decision {
     action: &'static str,
     detail: String,
     grant: Option<OauthGrant>,
+}
+
+fn decisions_for(grants: &[OauthGrant], doc: &CredsDoc, creds_mtime: u64) -> Vec<Decision> {
+    let mut best: HashMap<String, OauthGrant> = HashMap::new();
+    for g in grants {
+        match best.get(&g.provider) {
+            Some(cur) if g.expires.unwrap_or(0) > cur.expires.unwrap_or(0) => {
+                best.insert(g.provider.clone(), g.clone());
+            }
+            Some(_) => {}
+            None => {
+                best.insert(g.provider.clone(), g.clone());
+            }
+        }
+    }
+    let mut providers: Vec<String> = best.keys().cloned().collect();
+    providers.sort();
+    let mut decisions = Vec::new();
+    for p in providers {
+        let g = best.remove(&p).unwrap();
+        let key = format!("{RECORD_SCOPE}/{p}");
+        match doc.grants.get(&key) {
+            Some(stored) if stored.kind != "grant" => decisions.push(Decision {
+                provider: p,
+                from: g.from.clone(),
+                action: "ok",
+                detail: format!("record {key} is {}, left alone", stored.kind),
+                grant: None,
+            }),
+            None => decisions.push(Decision {
+                provider: p,
+                from: g.from.clone(),
+                action: "import",
+                detail: format!("no record {key}: would import from {}", g.from),
+                grant: Some(g),
+            }),
+            Some(stored) if stored.access.as_deref() == Some(g.access.as_str()) => {
+                decisions.push(Decision {
+                    provider: p,
+                    from: g.from.clone(),
+                    action: "ok",
+                    detail: format!("record {key} already matches {}", g.from),
+                    grant: None,
+                });
+            }
+            Some(stored) if fresher_than(&g, stored, creds_mtime) => {
+                decisions.push(Decision {
+                    provider: p,
+                    from: g.from.clone(),
+                    action: "refresh",
+                    detail: format!("record {key} is older: would refresh from {}", g.from),
+                    grant: Some(g),
+                });
+            }
+            Some(_) => decisions.push(Decision {
+                provider: p,
+                from: g.from.clone(),
+                action: "ok",
+                detail: format!("record {key} kept: dsh-side token is newer than {}", g.from),
+                grant: None,
+            }),
+        }
+    }
+    decisions
 }
 
 fn fresher_than(source: &OauthGrant, stored: &StoredGrant, creds_mtime: u64) -> bool {
@@ -608,88 +657,43 @@ fn scan() -> Scan {
     scan_selected(None, None, None)
 }
 
+fn filter_external_credentials(
+    grants: &mut Vec<OauthGrant>,
+    keys: &mut Vec<ApiKey>,
+    provider: Option<&str>,
+    source: Option<&str>,
+    key_ref: Option<&str>,
+) {
+    if provider.is_none() && source.is_none() && key_ref.is_none() {
+        return;
+    }
+
+    // `--source` by itself selects both kinds of external login. Provider and
+    // ref selectors keep their existing type-specific behavior.
+    let include_grants = provider.is_some() || (source.is_some() && key_ref.is_none());
+    let include_keys = key_ref.is_some() || (source.is_some() && provider.is_none());
+    grants.retain(|g| {
+        include_grants
+            && provider.is_none_or(|v| v == g.provider)
+            && source.is_none_or(|v| v == g.from)
+    });
+    keys.retain(|k| {
+        include_keys && key_ref.is_none_or(|v| v == k.name) && source.is_none_or(|v| v == k.from)
+    });
+}
+
 fn scan_selected(provider: Option<&str>, source: Option<&str>, key_ref: Option<&str>) -> Scan {
     let mut grants: Vec<OauthGrant> = Vec::new();
     let mut keys: Vec<ApiKey> = Vec::new();
     let mut notes: Vec<String> = Vec::new();
     scan_codex(&mut grants, &mut keys);
     scan_opencode(&mut grants, &mut notes);
-    if provider.is_some() || source.is_some() || key_ref.is_some() {
-        grants.retain(|g| {
-            provider == Some(g.provider.as_str()) && source.is_none_or(|v| v == g.from)
-        });
-        keys.retain(|k| key_ref == Some(k.name.as_str()) && source.is_none_or(|v| v == k.from));
-    }
+    filter_external_credentials(&mut grants, &mut keys, provider, source, key_ref);
     let path = creds_path();
     let doc = load_doc(&path);
     let creds_mtime = mtime_ms(&path);
 
-    let mut best: HashMap<String, OauthGrant> = HashMap::new();
-    for g in &grants {
-        match best.get(&g.provider) {
-            Some(cur) => {
-                if g.expires.unwrap_or(0) > cur.expires.unwrap_or(0) {
-                    best.insert(g.provider.clone(), g.clone());
-                }
-            }
-            None => {
-                best.insert(g.provider.clone(), g.clone());
-            }
-        }
-    }
-    let mut providers: Vec<String> = best.keys().cloned().collect();
-    providers.sort();
-    let mut decisions = Vec::new();
-    for p in providers {
-        let g = best.remove(&p).unwrap();
-        let key = format!("{RECORD_SCOPE}/{p}");
-        match doc.grants.get(&key) {
-            Some(stored) if stored.kind != "grant" => decisions.push(Decision {
-                provider: p,
-                from: g.from.clone(),
-                action: "ok",
-                detail: format!("record {key} is {}, left alone", stored.kind),
-                grant: None,
-            }),
-            None => decisions.push(Decision {
-                provider: p,
-                from: g.from.clone(),
-                action: "import",
-                detail: format!("no record {key}: would import from {}", g.from),
-                grant: Some(g),
-            }),
-            Some(stored) => {
-                if stored.access.as_deref() == Some(g.access.as_str()) {
-                    decisions.push(Decision {
-                        provider: p,
-                        from: g.from.clone(),
-                        action: "ok",
-                        detail: format!("record {key} already matches {}", g.from),
-                        grant: None,
-                    });
-                } else if fresher_than(&g, stored, creds_mtime) {
-                    decisions.push(Decision {
-                        provider: p,
-                        from: g.from.clone(),
-                        action: "refresh",
-                        detail: format!("record {key} is older: would refresh from {}", g.from),
-                        grant: Some(g),
-                    });
-                } else {
-                    decisions.push(Decision {
-                        provider: p,
-                        from: g.from.clone(),
-                        action: "ok",
-                        detail: format!(
-                            "record {key} kept: dsh-side token is newer than {}",
-                            g.from
-                        ),
-                        grant: None,
-                    });
-                }
-            }
-        }
-    }
+    let decisions = decisions_for(&grants, &doc, creds_mtime);
     Scan {
         grants,
         keys,
@@ -725,7 +729,17 @@ pub fn pre_boot(banner: bool) {
 /// Import missing-or-older grants/refs from a pre-computed scan. Quiet mode
 /// stays silent unless it actually writes (used by pre_boot before boot).
 fn apply_imports(s: &Scan, quiet: bool) -> anyhow::Result<Vec<String>> {
-    let (keys, doc, decisions, path) = (&s.keys, &s.doc, &s.decisions, &s.path);
+    let has_candidate = s.decisions.iter().any(|d| d.action != "ok")
+        || s.keys.iter().any(|key| !s.doc.refs.contains_key(&key.name));
+    if !has_candidate {
+        return Ok(Vec::new());
+    }
+    let path = &s.path;
+    let _lock = crate::file_lock::FileLock::exclusive_for(std::path::Path::new(path))?;
+    // `Scan` may have been produced before another rdsh process committed an
+    // import. Re-read and re-evaluate while holding the lock so the atomic
+    // rename is based on the latest document rather than a stale snapshot.
+    let doc = load_doc(path);
     if !doc.text.is_empty() && !doc.version_ok {
         if !quiet {
             eprintln!("[rdsh auth] refuse: {path} uses the pre-release flat layout; add `version: 1` first");
@@ -737,6 +751,7 @@ fn apply_imports(s: &Scan, quiet: bool) -> anyhow::Result<Vec<String>> {
     } else {
         doc.text.clone()
     };
+    let decisions = decisions_for(&s.grants, &doc, mtime_ms(path));
     let mut done = Vec::new();
     for d in decisions.iter().filter(|d| d.action != "ok") {
         if let Some(g) = &d.grant {
@@ -759,7 +774,7 @@ fn apply_imports(s: &Scan, quiet: bool) -> anyhow::Result<Vec<String>> {
             }
         }
     }
-    for k in keys {
+    for k in &s.keys {
         if doc.refs.contains_key(&k.name) {
             continue;
         }
@@ -1046,9 +1061,13 @@ fn prompt_yes(prompt: &str) -> bool {
 /// Store one `refs:` entry (0600, other entries untouched). Returns true
 /// when the file changed.
 fn store_ref(name: &str, value: &str) -> anyhow::Result<bool> {
+    store_ref_at(&creds_path(), name, value)
+}
+
+fn store_ref_at(path: &str, name: &str, value: &str) -> anyhow::Result<bool> {
     safe_scalar(value)?;
-    let path = creds_path();
-    let doc = load_doc(&path);
+    let _lock = crate::file_lock::FileLock::exclusive_for(std::path::Path::new(path))?;
+    let doc = load_doc(path);
     if !doc.text.is_empty() && !doc.version_ok {
         anyhow::bail!("refuse: {path} uses the pre-release flat layout");
     }
@@ -1065,7 +1084,7 @@ fn store_ref(name: &str, value: &str) -> anyhow::Result<bool> {
         Some(t) => text = t,
         None => anyhow::bail!("section error writing ref {name}"),
     }
-    write_creds(&path, &text)?;
+    write_creds(path, &text)?;
     eprintln!("[rdsh setup] stored ref {name} -> {path}");
     Ok(true)
 }
@@ -1254,7 +1273,10 @@ fn provider_needs(s: &Scan) -> Vec<ProviderNeed> {
 
 /// Ref/env name for well-known API-key routes (mirrors profile `apiKeyEnv`).
 fn key_name(provider: &str) -> String {
-    provider.to_uppercase().replace('-', "_") + "_API_KEY"
+    match provider {
+        "openai-codex" => "OPENAI_API_KEY".to_string(),
+        _ => provider.to_uppercase().replace('-', "_") + "_API_KEY",
+    }
 }
 
 fn via_name(api_key_env: &Option<String>) -> String {
@@ -1500,10 +1522,97 @@ mod tests {
     }
 
     #[test]
+    fn api_key_names_follow_provider_routes() {
+        assert_eq!(key_name("openai-codex"), "OPENAI_API_KEY");
+        assert_eq!(key_name("anthropic"), "ANTHROPIC_API_KEY");
+    }
+
+    #[test]
     fn jwt_exp_decode() {
         let tok = "eyJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3OTE3MDg4MDJ9.sig";
         assert_eq!(jwt_exp_ms(tok), Some(1791708802000));
         assert!(jwt_exp_ms("not-a-jwt").is_none());
+    }
+
+    fn test_grant(provider: &str, from: &str) -> OauthGrant {
+        OauthGrant {
+            provider: provider.to_string(),
+            access: "fixture-access".to_string(),
+            refresh: "fixture-refresh".to_string(),
+            expires: None,
+            account_id: None,
+            from: from.to_string(),
+            src_mtime_ms: 0,
+        }
+    }
+
+    fn test_key(name: &str, from: &str) -> ApiKey {
+        ApiKey {
+            name: name.to_string(),
+            value: "fixture-key".to_string(),
+            from: from.to_string(),
+        }
+    }
+
+    #[test]
+    fn source_only_filter_includes_matching_grants_and_keys() {
+        let mut grants = vec![
+            test_grant("openai-codex", "codex"),
+            test_grant("anthropic", "opencode"),
+        ];
+        let mut keys = vec![
+            test_key("OPENAI_API_KEY", "codex"),
+            test_key("ANTHROPIC_API_KEY", "opencode"),
+        ];
+
+        filter_external_credentials(&mut grants, &mut keys, None, Some("codex"), None);
+
+        assert_eq!(grants.len(), 1);
+        assert_eq!(grants[0].provider, "openai-codex");
+        assert_eq!(keys.len(), 1);
+        assert_eq!(keys[0].name, "OPENAI_API_KEY");
+    }
+
+    #[test]
+    fn provider_and_ref_selectors_keep_credentials_typed() {
+        let mut grants = vec![
+            test_grant("openai-codex", "codex"),
+            test_grant("anthropic", "opencode"),
+        ];
+        let mut keys = vec![
+            test_key("OPENAI_API_KEY", "codex"),
+            test_key("ANTHROPIC_API_KEY", "opencode"),
+        ];
+
+        filter_external_credentials(&mut grants, &mut keys, None, None, Some("OPENAI_API_KEY"));
+        assert!(grants.is_empty(), "--ref must not include OAuth grants");
+        assert_eq!(keys.len(), 1);
+        assert_eq!(keys[0].name, "OPENAI_API_KEY");
+
+        let mut grants = vec![
+            test_grant("openai-codex", "codex"),
+            test_grant("anthropic", "opencode"),
+        ];
+        let mut keys = vec![
+            test_key("OPENAI_API_KEY", "codex"),
+            test_key("ANTHROPIC_API_KEY", "opencode"),
+        ];
+        filter_external_credentials(&mut grants, &mut keys, Some("openai-codex"), None, None);
+        assert_eq!(grants.len(), 1);
+        assert_eq!(grants[0].provider, "openai-codex");
+        assert!(keys.is_empty(), "--provider must not include API keys");
+    }
+
+    #[test]
+    fn jwt_exp_overflow_is_rejected() {
+        let too_far_future = "header.eyJleHAiOjkyMjMzNzIwMzY4NTQ3NzZ9.sig";
+        let too_far_past = "header.eyJleHAiOi05MjIzMzcyMDM2ODU0Nzc2fQ.sig";
+        let largest_millisecond_value = "header.eyJleHAiOjkyMjMzNzIwMzY4NTQ3NzV9.sig";
+
+        assert_eq!(jwt_exp_ms(too_far_future), None);
+        assert_eq!(jwt_exp_ms(too_far_past), None);
+        let expected = 9_223_372_036_854_775_000;
+        assert_eq!(jwt_exp_ms(largest_millisecond_value), Some(expected));
     }
 
     #[test]
@@ -1589,6 +1698,63 @@ mod tests {
         assert!(safe_scalar("key\u{2028}records:").is_err());
     }
 
+    #[test]
+    fn credential_values_are_always_single_quoted_yaml_strings() {
+        for value in [
+            "null",
+            "true",
+            "false",
+            "123",
+            "1.5",
+            "0x1f",
+            ".inf",
+            "~",
+            "ordinary-value",
+            "value with spaces",
+            "O'Connor",
+        ] {
+            let encoded = quote(value);
+            assert!(encoded.starts_with('\'') && encoded.ends_with('\''));
+            assert_eq!(unquote(&encoded), value);
+        }
+    }
+
+    #[test]
+    fn quoted_ref_write_preserves_existing_refs_and_records() {
+        let dir = std::env::temp_dir().join(format!(
+            "rdsh-auth-yaml-test-{}",
+            crate::local_http::random_token().unwrap()
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        let path = dir.join(".credentials.yaml");
+        let original = "version: 1\nrefs:\n  EXISTING_KEY: 'existing-value'\nrecords:\n  llm-pi-ai/existing:\n    kind: grant\n    payload:\n      access: 'saved-token'\n";
+        let updated = splice_entry(
+            original,
+            "refs",
+            "DEEPSEEK_API_KEY",
+            &[format!("  DEEPSEEK_API_KEY: {}", quote("true"))],
+        )
+        .unwrap();
+        std::fs::write(&path, updated).unwrap();
+
+        let doc = load_doc(path.to_str().unwrap());
+        assert!(doc.version_ok);
+        assert_eq!(
+            doc.refs.get("EXISTING_KEY").map(String::as_str),
+            Some("existing-value")
+        );
+        assert_eq!(
+            doc.refs.get("DEEPSEEK_API_KEY").map(String::as_str),
+            Some("true")
+        );
+        let record = doc.grants.get("llm-pi-ai/existing").unwrap();
+        assert_eq!(record.kind, "grant");
+        assert_eq!(record.access.as_deref(), Some("saved-token"));
+
+        std::fs::remove_file(&path).unwrap();
+        std::fs::remove_dir(&dir).unwrap();
+    }
+
     #[cfg(unix)]
     #[test]
     fn credential_file_is_private_when_created() {
@@ -1606,6 +1772,47 @@ mod tests {
         );
         std::fs::remove_file(&path).unwrap();
         std::fs::remove_dir(&dir).unwrap();
+    }
+
+    #[test]
+    fn concurrent_imports_keep_both_credential_updates() {
+        let dir = std::env::temp_dir().join(format!(
+            "rdsh-auth-rmw-{}-{}",
+            std::process::id(),
+            crate::local_http::random_token().unwrap()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join(".credentials.yaml").to_string_lossy().into_owned();
+        let barrier = std::sync::Arc::new(std::sync::Barrier::new(3));
+        let mut joins = Vec::new();
+        for (name, value) in [("FIRST_KEY", "one"), ("SECOND_KEY", "two")] {
+            let path = path.clone();
+            let barrier = std::sync::Arc::clone(&barrier);
+            joins.push(std::thread::spawn(move || {
+                let scan = Scan {
+                    grants: Vec::new(),
+                    keys: vec![ApiKey {
+                        name: name.to_string(),
+                        value: value.to_string(),
+                        from: "test".to_string(),
+                    }],
+                    notes: Vec::new(),
+                    doc: CredsDoc::default(),
+                    decisions: Vec::new(),
+                    path,
+                };
+                barrier.wait();
+                apply_imports(&scan, true).unwrap();
+            }));
+        }
+        barrier.wait();
+        for join in joins {
+            join.join().unwrap();
+        }
+        let doc = load_doc(&path);
+        assert_eq!(doc.refs.get("FIRST_KEY").map(String::as_str), Some("one"));
+        assert_eq!(doc.refs.get("SECOND_KEY").map(String::as_str), Some("two"));
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]
