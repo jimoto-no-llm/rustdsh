@@ -265,6 +265,14 @@ fn is_word_char(c: char) -> bool {
 
 // ---- file helpers ----
 
+fn truncate_utf8_to_bytes(text: &str, cap: usize) -> &str {
+    let mut end = cap.min(text.len());
+    while !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    &text[..end]
+}
+
 fn read_bounded(path: &str, cap: usize) -> Option<String> {
     use std::io::Read;
     let root = std::fs::canonicalize(".").ok()?;
@@ -281,17 +289,7 @@ fn read_bounded(path: &str, cap: usize) -> Option<String> {
         return None; // binary
     }
     let text = String::from_utf8_lossy(&bytes).into_owned();
-    if text.len() > cap {
-        let end = text
-            .char_indices()
-            .take(cap)
-            .last()
-            .map(|(i, _)| i)
-            .unwrap_or(0);
-        Some(text[..end].to_string())
-    } else {
-        Some(text)
-    }
+    Some(truncate_utf8_to_bytes(&text, cap).to_string())
 }
 
 /// working_files 1件分の読み結果。失敗理由を区別して検証メモに回す。
@@ -1411,4 +1409,95 @@ pub fn cmd_explain(query: Option<String>, budget: Option<usize>) -> anyhow::Resu
     }
     out.flush()?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn defaults_keep_retrieval_bounded_and_git_diff_enabled() {
+        let cfg = ContextConfig::default();
+
+        assert_eq!(cfg.token_budget, DEFAULT_BUDGET);
+        assert_eq!(cfg.max_code_hits, DEFAULT_CODE_HITS);
+        assert_eq!(cfg.max_sessions, DEFAULT_SESSIONS);
+        assert!(cfg.enable_retriever);
+        assert!(cfg.enable_packer);
+        assert!(cfg.enable_verifier);
+        assert!(cfg.include_git_diff);
+    }
+
+    #[test]
+    fn query_terms_split_identifiers_and_recall_cjk_bigrams() {
+        assert_eq!(
+            query_terms("fooBar2日本語検索 and a"),
+            vec![
+                "foo".to_string(),
+                "bar".to_string(),
+                "日本語検索".to_string(),
+                "日本".to_string(),
+                "本語".to_string(),
+                "語検".to_string(),
+                "検索".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn head_tail_truncates_by_unicode_characters() {
+        let (text, truncated) = head_tail("あいうえおABCDE", 2, 3);
+
+        assert!(truncated);
+        assert_eq!(text, "あい\n...[rdsh truncated 5 chars]...\nCDE");
+        assert_eq!(head_tail("short", 2, 3), ("short".to_string(), false));
+    }
+
+    #[test]
+    fn truncate_list_obeys_character_and_item_limits() {
+        let items = vec![
+            "alpha".to_string(),
+            "bravo".to_string(),
+            "charlie".to_string(),
+        ];
+
+        assert_eq!(
+            truncate_list(&items, 3, 10),
+            ("alpha\n...[rdsh 2 more omitted]...".to_string(), 2)
+        );
+        assert_eq!(truncate_list(&items, 2, 100).1, 1);
+    }
+
+    #[test]
+    fn shrinking_a_nonempty_section_keeps_at_least_one_line() {
+        assert_eq!(shrink_lines("first\nsecond\nthird", 0.1), "first");
+        assert_eq!(shrink_lines("first\nsecond", 1.0), "first\nsecond");
+    }
+}
+
+#[cfg(test)]
+mod bounded_read_tests {
+    use super::truncate_utf8_to_bytes;
+
+    #[test]
+    fn lossy_replacements_stay_within_the_byte_cap() {
+        let bytes = [0xff; 4];
+        let text = String::from_utf8_lossy(&bytes);
+        let truncated = truncate_utf8_to_bytes(&text, 4);
+
+        assert_eq!(truncated.len(), 3);
+        assert_eq!(truncated.chars().count(), 1);
+        assert!(truncated.len() <= 4);
+    }
+
+    #[test]
+    fn truncation_drops_a_partial_multibyte_scalar() {
+        assert_eq!(truncate_utf8_to_bytes("ab🦀z", 4), "ab");
+    }
+
+    #[test]
+    fn empty_input_and_zero_cap_are_safe() {
+        assert_eq!(truncate_utf8_to_bytes("", 0), "");
+        assert_eq!(truncate_utf8_to_bytes("abc", 0), "");
+    }
 }

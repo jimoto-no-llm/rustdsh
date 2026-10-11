@@ -432,6 +432,72 @@
       .choice-detail {
         grid-column: 2;
       }
+      #human-annotations-panel form {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+        gap: 12px;
+        align-items: end;
+        margin: 16px 0 24px;
+      }
+      .human-annotation-field {
+        display: grid;
+        gap: 6px;
+        min-width: 0;
+      }
+      .human-annotation-field input,
+      .human-annotation-field select {
+        width: 100%;
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px;
+        font: inherit;
+      }
+      .human-annotation-field textarea {
+        margin: 0;
+        min-height: 76px;
+      }
+      .human-annotation-target {
+        display: contents;
+      }
+      .human-annotation-target[hidden] {
+        display: none;
+      }
+      .human-annotation-target h3 {
+        grid-column: 1 / -1;
+        margin: 8px 0 0;
+        font-size: 15px;
+      }
+      .human-annotation-card {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px;
+        margin: 12px 0;
+        overflow-wrap: anywhere;
+      }
+      .human-annotation-card pre {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        background: var(--card);
+        border-radius: 8px;
+        padding: 10px;
+      }
+      .human-annotation-status {
+        font-weight: 600;
+      }
+      .human-annotation-status.current {
+        color: var(--green);
+      }
+      .human-annotation-status.changed,
+      .human-annotation-status.missing,
+      .human-annotation-status.unknown {
+        color: var(--red);
+      }
+      .human-annotation-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
       .decision-card textarea {
         width: 100%;
         min-height: 90px;
@@ -853,6 +919,14 @@
               <tbody id="tasks"></tbody>
             </table>
           </div>
+        </details>
+        <details class="fold" id="human-annotation-detail">
+          <summary>人間のブックマーク・注釈</summary>
+          <h2>人間のブックマーク</h2>
+          <p class="sub">
+            AI要約と別ファイルに保存します。ログ・決定内容・Git差分の参照先は固定され、変更や削除を検出した場合は状態を表示します。
+          </p>
+          <section id="human-annotations-panel" aria-label="人間のブックマーク管理"></section>
         </details>
         <details class="fold" id="instruction-detail">
           <summary>同じsessionへ追指示を送る</summary>
