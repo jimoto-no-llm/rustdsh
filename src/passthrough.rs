@@ -256,6 +256,17 @@ fn base_cmd(orig: &str, dry: bool, metadata_only: bool) -> anyhow::Result<std::p
     }
     let bin = selected_node()
         .ok_or_else(|| anyhow::anyhow!("RDSH_SECURITY: compatible Node runtime is required"))?;
+    if !crate::tool_security::sandbox_enabled() {
+        // Default: hand the run to DSH with its normal tools and normal file
+        // access. The strict boundary stays available through --share-file,
+        // features.agent_tool_sandbox, or RDSH_SECURITY=1.
+        if orig.ends_with(".js") {
+            let mut command = std::process::Command::new(&bin);
+            command.arg(orig);
+            return Ok(command);
+        }
+        return Ok(std::process::Command::new(orig));
+    }
     crate::tool_security::command(orig, &bin)
 }
 
@@ -263,8 +274,12 @@ fn apply_slim(cmd: &mut std::process::Command, slim: bool) {
     if !slim {
         return;
     }
-    for &(k, v) in crate::slim::slim_env() {
+    for (k, v) in crate::slim::slim_env() {
         cmd.env(k, v);
+    }
+    // features.node_compile_cache=false leaves NODE_COMPILE_CACHE untouched.
+    if !crate::slim::features().node_compile_cache {
+        return;
     }
     // V8 code cache for the delegated Node process. Set unconditionally:
     // Node < 22.1 ignores the variable, and a version probe would cost a

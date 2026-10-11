@@ -462,7 +462,7 @@ fn session_files_sorted(limit_dirs: usize) -> Vec<std::path::PathBuf> {
     let projs: Vec<std::path::PathBuf> = match std::fs::read_dir(&root) {
         Ok(e) => {
             let mut v: Vec<(u64, std::path::PathBuf)> = e
-                .filter_map(|e| e.ok())
+                .filter_map(Result::ok)
                 .filter(|e| e.metadata().is_ok_and(|m| m.is_dir()))
                 .map(|e| {
                     let p = e.path();
@@ -478,14 +478,14 @@ fn session_files_sorted(limit_dirs: usize) -> Vec<std::path::PathBuf> {
     let mut files: Vec<(u64, std::path::PathBuf)> = vec![];
     for proj in projs {
         let mut sessions = std::fs::read_dir(&proj)
-            .map(|e| e.filter_map(|e| e.ok()).collect::<Vec<_>>())
+            .map(|e| e.filter_map(Result::ok).collect::<Vec<_>>())
             .unwrap_or_default();
         // セッションも新しい順に上限まで
         sessions.sort_by_key(|e| std::cmp::Reverse(mtime_secs(&e.path())));
         for s in sessions.into_iter().take(limit_dirs.max(1)) {
             let sdir = s.path();
             let mut inner = std::fs::read_dir(&sdir)
-                .map(|e| e.filter_map(|e| e.ok()).collect::<Vec<_>>())
+                .map(|e| e.filter_map(Result::ok).collect::<Vec<_>>())
                 .unwrap_or_default();
             inner.sort_by_key(|e| std::cmp::Reverse(mtime_secs(&e.path())));
             for f in inner.into_iter().take(6) {
@@ -781,11 +781,11 @@ fn simple_glob_match(pat: &str, s: &str) -> bool {
 }
 
 fn is_code_file(p: &std::path::Path) -> bool {
-    if let Some(name) = p.file_name().and_then(|s| s.to_str()) {
-        let lower = name.to_lowercase();
-        if CODE_FILENAMES.contains(&lower.as_str()) {
-            return true;
-        }
+    if p.file_name()
+        .and_then(|s| s.to_str())
+        .is_some_and(|name| CODE_FILENAMES.contains(&name.to_lowercase().as_str()))
+    {
+        return true;
     }
     p.extension()
         .and_then(|s| s.to_str())
@@ -808,7 +808,7 @@ fn code_hits(query: &str, max: usize) -> Vec<String> {
     // 決定的な走査順にするためディレクトリ・ファイルとも名前順に処理する。
     while let Some(dir) = stack.pop() {
         let mut entries = std::fs::read_dir(&dir)
-            .map(|e| e.filter_map(|e| e.ok()).collect::<Vec<_>>())
+            .map(|e| e.filter_map(Result::ok).collect::<Vec<_>>())
             .unwrap_or_default();
         entries.sort_by_key(|e| e.file_name());
         let mut subdirs: Vec<std::path::PathBuf> = vec![];

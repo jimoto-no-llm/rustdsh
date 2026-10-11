@@ -44,7 +44,10 @@ pub fn cmd_serve(port: u16) -> anyhow::Result<()> {
                 });
             }
             Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                std::thread::sleep(std::time::Duration::from_millis(100));
+                // Idle poll quantum: 5 ms keeps shutdown responsive while
+                // capping added accept latency (measured ~93 ms at 100 ms).
+                // Cost is ~200 trivial wakeups/s when fully idle.
+                std::thread::sleep(std::time::Duration::from_millis(5));
             }
             Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
             Err(e) => eprintln!("[rdsh serve] accept: {e}"),

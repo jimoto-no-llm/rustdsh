@@ -41,6 +41,19 @@ Generation failure stops publication.
    python3 -m unittest discover -s tests -p 'test_release_*.py'
    ```
 
+   On a machine with podman or docker, also install the built artifacts inside
+   clean containers. This is the check that keeps a fresh-machine install
+   working on older glibc distros and musl hosts, so run it before tagging:
+
+   ```sh
+   tests/install-isolated.sh --source local --require-musl
+   ```
+
+   The same harness with `--source published --installer published` checks the
+   installer users actually download; `.github/workflows/install-live.yml` runs
+   it weekly. A failure there means the published channel is broken and needs a
+   new release, not a tag move.
+
 4. Run the [full verification matrix](../CONTRIBUTING.md), including Rust fmt,
    clippy, release tests, regression checks, dashboard tests and browser E2E.
    Merge the reviewed preparation PR only after the required checks pass. Wait

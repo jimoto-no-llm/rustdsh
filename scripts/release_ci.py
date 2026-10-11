@@ -23,6 +23,8 @@ REQUIRED_CHECKS = (
     "plugin-security",
     "msrv",
     "update-banner-windows",
+    # A broken installer is a broken launch: require the isolated install test.
+    "Isolated install",
 )
 
 

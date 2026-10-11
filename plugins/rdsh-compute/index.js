@@ -14,10 +14,26 @@
 
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 export const PROTOCOL_VERSION = 1;
 export const MAX_TEXT_BYTES = 1_048_576;
 const DEFAULT_TIMEOUT_MS = 5000;
+
+// Feature switches live in $DSH_HOME/rdsh.json. An id that is absent (or a
+// missing, unreadable or corrupt file) keeps the caller's fallback; an explicit
+// false disables the capability and must never throw.
+function featureEnabled(id, fallback, env = process.env) {
+  try {
+    const path = join(env.DSH_HOME || join(homedir(), ".dsh"), "rdsh.json");
+    const value = JSON.parse(readFileSync(path, "utf8"))?.features?.[id];
+    return typeof value === "boolean" ? value : fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 function jsEstimate(text) {
   // Same heuristic as src/tokens.rs: ASCII 4 bytes = 1 token,
@@ -44,7 +60,9 @@ function jsEstimate(text) {
 }
 
 export function isEnabled(env = process.env) {
-  return env.RDSH_COMPUTE === "1";
+  // features.compute wins in both directions; without the key the historical
+  // RDSH_COMPUTE=1 opt-in still decides.
+  return featureEnabled("compute", env.RDSH_COMPUTE === "1", env);
 }
 
 export function createComputeBridge({ bin = "rdsh", timeoutMs = DEFAULT_TIMEOUT_MS, spawnImpl = spawn } = {}) {
@@ -143,6 +161,31 @@ export function createComputeBridge({ bin = "rdsh", timeoutMs = DEFAULT_TIMEOUT_
     }
   }
 
+  async function estimateBatch(texts) {
+    const fallback = () => ({
+      tokens: texts.map(jsEstimate),
+      chars: texts.map((t) => Buffer.byteLength(t, "utf8")),
+      total: texts.map(jsEstimate).reduce((a, b) => a + b, 0),
+    });
+    if (!isEnabled()) return { result: fallback(), usedRust: false, timings: null };
+    const t0 = process.hrtime.bigint();
+    try {
+      const msg = await request("tokens.estimate_batch", { texts });
+      const timings = {
+        total_us: Number(process.hrtime.bigint() - t0) / 1000,
+        rust_us: msg.elapsed_us ?? null,
+      };
+      if (msg.ok !== true || !Array.isArray(msg.tokens)) throw new Error(msg.error ?? "bad response");
+      return {
+        result: { tokens: msg.tokens, chars: msg.chars, total: msg.total },
+        usedRust: true,
+        timings,
+      };
+    } catch {
+      return { result: fallback(), usedRust: false, timings: null };
+    }
+  }
+
   async function prune(text, maxTokens = 4000) {
     const fallback = () => ({ pruned: text, before: jsEstimate(text), after: jsEstimate(text), budget: maxTokens });
     if (!isEnabled()) return { result: fallback(), usedRust: false, timings: null };
@@ -172,7 +215,7 @@ export function createComputeBridge({ bin = "rdsh", timeoutMs = DEFAULT_TIMEOUT_
     child = null;
   }
 
-  return { estimate, prune, close, jsEstimate, isEnabled };
+  return { estimate, estimateBatch, prune, close, jsEstimate, isEnabled };
 }
 
 // Cordis plugin entry: registers nothing by default; exposes the bridge on

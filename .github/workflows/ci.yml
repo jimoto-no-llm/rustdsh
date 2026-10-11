@@ -44,7 +44,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-      - run: node --test tests/plugin-security.test.mjs tests/settings-client.test.mjs tests/update-banner.test.mjs tests/model_benchmark/fence.test.mjs
+      - run: node --test tests/plugin-security.test.mjs tests/settings-client.test.mjs tests/update-banner.test.mjs tests/feature-switches.test.mjs tests/model_benchmark/fence.test.mjs
 
   security-boundaries:
     runs-on: ubuntu-latest
@@ -152,3 +152,20 @@ jobs:
         with:
           name: browser-e2e
           path: target/e2e
+
+  # Installs the built artifacts with install.sh inside clean containers
+  # (--network=none, file:// release base). This is the check that keeps a
+  # fresh-machine install working on older glibc distros and musl hosts; see
+  # tests/install-isolated/ and docs/RELEASING.md.
+  install-isolated:
+    name: Isolated install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
+      - run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - run: cargo build --locked --release
+      - run: cargo build --locked --release --target x86_64-unknown-linux-musl
+      - run: tests/install-isolated.sh --source local --no-build --require-musl
