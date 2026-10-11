@@ -161,6 +161,71 @@ test("webhooks verify, persist, deduplicate subscriptions, retain event ids, and
   await hub.revoke();
   assert.equal(hub.status().active, 0);
 });
+test(
+  "persisted webhook subscriptions are validated before the hub opens",
+  async (t) => {
+    const directory = await fs.mkdtemp(
+      path.join(os.tmpdir(), "rdsh-events-validation-test-"),
+    );
+    t.after(() => fs.rm(directory, { recursive: true, force: true }));
+    const project = { id: "validation-project", directory },
+      state = { revision: 0, changes: [] },
+      secret = "whsec_" + randomBytes(32).toString("base64"),
+      post = async (_url, _headers, body) => ({
+        status: 200,
+        body: JSON.stringify({ challenge: JSON.parse(body).challenge }),
+      });
+    const hub = await EventsHub.open(project, () => state, post);
+    await hub.subscribe({
+      name: "dashboard.answer.created",
+      arguments: { project_id: project.id },
+      delivery: {
+        mode: "webhook",
+        url: "https://receiver.example/events",
+        secret,
+      },
+    });
+    await hub.subscribe({
+      name: "dashboard.answer.created",
+      arguments: { project_id: project.id },
+      delivery: {
+        mode: "webhook",
+        url: "https://receiver.example/events",
+        secret: "whsec_" + randomBytes(32).toString("base64"),
+      },
+    });
+    const savedPath = path.join(directory, "events.json"),
+      saved = JSON.parse(await fs.readFile(savedPath, "utf8")),
+      valid = saved.subscriptions[0];
+    const restored = await EventsHub.open(project, () => state, post);
+    assert.equal(restored.subscriptions.length, 1);
+    assert.equal(restored.subscriptions[0].old_secret, secret);
+    assert.equal(
+      Number.isSafeInteger(restored.subscriptions[0].rotation_until),
+      true,
+    );
+
+    const malformed = [
+      { ...valid, secret: "invalid" },
+      { ...valid, expires_at: "tomorrow" },
+      { ...valid, last_revision: -1 },
+      { ...valid, arguments: { project_id: "another-project" } },
+      { ...valid, id: "0".repeat(32) },
+      { ...valid, old_secret: "invalid" },
+      { ...valid, persisted_extra: true },
+    ];
+    for (const subscription of malformed) {
+      await fs.writeFile(
+        savedPath,
+        JSON.stringify({ ...saved, subscriptions: [subscription] }),
+      );
+      await assert.rejects(
+        () => EventsHub.open(project, () => state, post),
+        /Invalid event subscription state/,
+      );
+    }
+  },
+);
 test("MCP 2.0 discovers events and serves the same tools on an authenticated endpoint", async (t) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-mcp2-test-")),
     previous = process.env.RDSH_DASHBOARD_HOME;

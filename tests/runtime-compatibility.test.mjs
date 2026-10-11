@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
-import {mkdtempSync, mkdirSync, writeFileSync, copyFileSync, rmSync, symlinkSync, realpathSync} from 'node:fs';
+import {mkdtempSync, mkdirSync, writeFileSync, readFileSync, copyFileSync, rmSync, symlinkSync, realpathSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -114,4 +114,37 @@ test('sync --check-only follows SemVer precedence and never upgrades to a lower 
   const invalidChannel=spawnSync('sh',['sync-dsh.sh','--check-only','--channel=typo'],{env,encoding:'utf8',timeout:15000});
   assert.equal(invalidChannel.status,2,invalidChannel.stdout+invalidChannel.stderr);
   assert.match(invalidChannel.stderr,/unsupported channel/);
+});
+
+test('sync update state JSON safely encodes version output', {skip:process.platform==='win32'?'sync-dsh.sh is Unix-only':false},t=>{
+  const {root}=fixture(t);
+  const stateDir=path.join(root,'state');mkdirSync(stateDir);
+  const source=readFileSync('sync-dsh.sh','utf8');
+  const start=source.indexOf('write_state() {');
+  const end=source.indexOf('\nFROM_SOURCE=',start);
+  assert.ok(start>=0&&end>start,'write_state function is present');
+  const writeState=source.slice(start,end).trimEnd();
+  const from='0.2.0","injected":true,"value":"';
+  const to='rdsh 0.1.0\n{"updated":false}';
+  const env={...process.env,LOGDIR:stateDir,KIND:'rdsh-release',FROM:from,TO:to};
+  const vulnerable=spawnSync('sh',['-c',`printf '{"updated":true,"kind":"%s","from":"%s","to":"%s","at":%s}\\n' "$KIND" "$FROM" "$TO" "$(date +%s)000"`],{
+    env,encoding:'utf8',timeout:15000,
+  });
+  assert.equal(vulnerable.status,0,vulnerable.stderr);
+  assert.match(vulnerable.stdout,/"injected":true/);
+  assert.throws(()=>JSON.parse(vulnerable.stdout),SyntaxError);
+  const result=spawnSync('sh',['-c',`${writeState}\nwrite_state "$KIND" "$FROM" "$TO"`],{
+    env,
+    encoding:'utf8',timeout:15000,
+  });
+  assert.equal(result.status,0,result.stderr);
+  const contents=readFileSync(path.join(stateDir,'update-state.json'),'utf8');
+  const state=JSON.parse(contents);
+  assert.equal(contents.trimEnd().split('\n').length,1);
+  assert.equal(state.updated,true);
+  assert.equal(state.kind,'rdsh-release');
+  assert.equal(state.from,from);
+  assert.equal(state.to,to);
+  assert.equal(state.injected,undefined);
+  assert.equal(typeof state.at,'number');
 });

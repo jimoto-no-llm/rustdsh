@@ -243,7 +243,8 @@ fn attr(tag_head: &str, name: &str) -> Option<String> {
         let after = &rest[i + name.len()..];
         let b = after.as_bytes();
         if b.len() < 2 || b[0] != b'=' || (b[1] != b'"' && b[1] != SQ) {
-            rest = &after[1.min(after.len())..];
+            let step = after.chars().next().map_or(0, char::len_utf8);
+            rest = &after[step..];
             continue;
         }
         let v = &after[2..];
@@ -495,6 +496,32 @@ mod tests {
         assert_eq!(hits[0].title, "A B");
         assert_eq!(hits[0].url, "https://e.com/x?a=1&b=2");
         assert_eq!(hits[0].content, "one <two>");
+    }
+
+    #[test]
+    fn html_parsing_skips_utf8_attribute_name_candidates() {
+        for character in ["é", "→", "🦀"] {
+            let url = format!("https://example.invalid/{character}");
+            let title = format!("結果 {character}");
+            let html = format!(
+                "<article class=\"result\"><a title=\"href{character}\" href=\"{url}\">{title}</a></article>"
+            );
+
+            assert_eq!(
+                parse_html(&html, 1),
+                vec![Hit {
+                    title,
+                    url,
+                    content: String::new(),
+                }],
+                "failed to skip a {character:?} candidate"
+            );
+        }
+    }
+
+    #[test]
+    fn attribute_name_at_end_does_not_panic() {
+        assert_eq!(attr("href", "href"), None);
     }
 
     #[test]

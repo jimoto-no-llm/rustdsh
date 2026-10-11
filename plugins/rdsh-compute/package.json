@@ -1,0 +1,11 @@
+{
+  "name": "rdsh-compute",
+  "version": "0.1.0",
+  "description": "Opt-in Node to resident rdsh compute worker (pure token ops only, fallback first)",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "license": "MIT"
+}

@@ -20,7 +20,26 @@ absent from the `dsh-base` bundle, so each one adds real capability.
 ./plugins/install.sh                    # PROFILE=headless (default)
 PROFILE=web ./plugins/install.sh       # install into the web profile instead
 DRY_RUN=1 ./plugins/install.sh         # print the pnpm commands only
+PROFILE=web SOUND=1 ./plugins/install.sh  # also add Web sound/desktop notifications (below)
 ```
+
+## Optional Web UI plugins (third-party, opt-in)
+
+Installed only when `SOUND=1` is set. Kept out of the default set so the
+base install stays first-party and dependency-free.
+
+| Package | Why |
+| --- | --- |
+| `github:cwd514/dsh-sound-notifications` (MIT, (c) 2026 cwd514) | Effect sounds (Web Audio synthesis, no audio files) and desktop notifications for reply-done / approval-waiting / questions / errors / re-login. Zero dependencies, no build step. Verified by upstream on DSH `0.2.0-rc.2` Web UI. |
+
+Notes:
+
+- Browser client plugin: use `PROFILE=web`. Desktop notifications additionally
+  need a secure context (`127.0.0.1`/`localhost`/`https`) and the browser's
+  notification permission; otherwise only the sounds play (see upstream README).
+- Installed from upstream GitHub at install time, not vendored here, so fixes
+  arrive without a rustdsh release. Upstream repo:
+  <https://github.com/cwd514/dsh-sound-notifications>
 
 ## Bundled rdsh plugins (this repo)
 
