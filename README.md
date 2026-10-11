@@ -742,6 +742,8 @@ For startup, run `rdsh bench --n 5`. See
 
 ## Documentation
 
+- [OpenCode models in Web and TUI](docs/OPENCODE-MODELS.md)
+
 - [TUI profile setup](docs/TUI-SETUP.md)
 
 - [Automatic Web service recovery on Linux](docs/WEB-AUTO-RESTART.md)
