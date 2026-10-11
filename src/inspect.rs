@@ -274,7 +274,7 @@ fn scan_project(pdir: &std::path::Path, proj: &str) -> Vec<Session> {
         Ok(e) => e,
         Err(_) => return v,
     };
-    for e in entries.filter_map(|e| e.ok()) {
+    for e in entries.filter_map(Result::ok) {
         // file_type does not traverse symlinks: a planted link never
         // pulls an outside directory into the walk.
         if !e.file_type().is_ok_and(|t| t.is_dir()) {
@@ -298,7 +298,7 @@ fn dir_size_mtime(dir: &std::path::Path) -> (u64, u64, String) {
     let mut mtime = 0u64;
     let mut best: Option<std::time::SystemTime> = None;
     if let Ok(entries) = std::fs::read_dir(dir) {
-        for e in entries.filter_map(|e| e.ok()) {
+        for e in entries.filter_map(Result::ok) {
             // Skip links before statting: sizes must describe files inside.
             if !e.file_type().is_ok_and(|t| t.is_file()) {
                 continue;
@@ -640,7 +640,7 @@ fn session_decompressed_bytes_uncached(
     let mut any = false;
     let mut estimated = false;
     let mut deferred = vec![];
-    for e in entries.filter_map(|e| e.ok()) {
+    for e in entries.filter_map(Result::ok) {
         let p = e.path();
         let Some(name) = p.file_name().map(|s| s.to_string_lossy().into_owned()) else {
             continue;
