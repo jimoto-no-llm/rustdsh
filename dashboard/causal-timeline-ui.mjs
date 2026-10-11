@@ -49,9 +49,8 @@ export function createTimelinePanel(element, { api, node }) {
   element.style.overflowWrap = "anywhere";
   let after = 0,
     loading = false,
-    signature = "",
-    selected = null,
-    detailSequence = 0;
+    signature = "";
+  const detailSequences = new WeakMap();
   let views = new Map();
   const message = node("p", "相関記録を確認中…", "sub");
   const body = node("div");
@@ -75,14 +74,15 @@ export function createTimelinePanel(element, { api, node }) {
     view.open.hidden = false;
   };
   async function detail(traceId, view) {
-    selected = traceId;
     const target = view.target,
-      sequence = ++detailSequence,
+      sequence = (detailSequences.get(view) || 0) + 1,
       expanded = new Set(
         [...target.querySelectorAll("details[open]")].map(
           (details) => details.dataset.timelineRaw,
         ),
       );
+    detailSequences.set(view, sequence);
+    view.detailOpen = true;
     if (!target.childElementCount)
       target.replaceChildren(node("p", "原記録を確認中…", "sub"));
     try {
@@ -90,8 +90,7 @@ export function createTimelinePanel(element, { api, node }) {
         "timeline?trace_id=" + encodeURIComponent(traceId),
       );
       if (
-        selected !== traceId ||
-        sequence !== detailSequence ||
+        detailSequences.get(view) !== sequence ||
         !target.isConnected
       )
         return;
@@ -155,8 +154,7 @@ export function createTimelinePanel(element, { api, node }) {
       target.append(links);
     } catch {
       if (
-        selected !== traceId ||
-        sequence !== detailSequence ||
+        detailSequences.get(view) !== sequence ||
         !target.isConnected
       )
         return;
@@ -191,13 +189,11 @@ export function createTimelinePanel(element, { api, node }) {
       const pagination = node("p");
       const previous = button("前の10件", () => {
         after = Math.max(0, after - 10);
-        selected = null;
         void refresh();
       });
       previous.disabled = after === 0;
       const next = button("次の10件", () => {
         after = report.next;
-        selected = null;
         void refresh();
       });
       next.disabled = report.next === null;
@@ -221,6 +217,7 @@ export function createTimelinePanel(element, { api, node }) {
             counts: node("p"),
             problems: node("p", "", "sub"),
             target: node("div"),
+            detailOpen: false,
           };
           view.article.dataset.timelineTrace = trace.trace_id;
           view.counts.dataset.timelineCounts = "";
@@ -242,8 +239,8 @@ export function createTimelinePanel(element, { api, node }) {
       }
       views = nextViews;
       body.replaceChildren(pagination, ...cards);
-      if (selected && views.has(selected))
-        void detail(selected, views.get(selected));
+      for (const [traceId, view] of views)
+        if (view.detailOpen) void detail(traceId, view);
     } catch {
       message.textContent =
         "相関記録を取得できません。受信だけで実行成功と扱っていません。";
