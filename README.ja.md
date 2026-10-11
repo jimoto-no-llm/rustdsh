@@ -612,6 +612,8 @@ python3 scripts/benchmark-node-vs-rust.py --bin ./target/release/rdsh \
 
 ## 資料
 
+- [TUIの設定手順](docs/TUI-SETUP.md)
+
 - [LinuxでWebサービスを自動再起動する](docs/WEB-AUTO-RESTART.md)
 
 | 資料 | 内容 |

@@ -742,6 +742,8 @@ For startup, run `rdsh bench --n 5`. See
 
 ## Documentation
 
+- [TUI profile setup](docs/TUI-SETUP.md)
+
 - [Automatic Web service recovery on Linux](docs/WEB-AUTO-RESTART.md)
 
 | Document | Description |
