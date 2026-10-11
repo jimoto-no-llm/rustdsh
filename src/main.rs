@@ -1,8 +1,10 @@
 use clap::{CommandFactory, Parser, Subcommand};
 mod auth;
 mod compact;
+mod compute;
 mod context;
 mod dsh_args;
+mod file_lock;
 mod file_security;
 mod guard;
 mod inspect;
@@ -12,7 +14,9 @@ mod rdsh_config;
 mod search;
 mod serve;
 mod setup_web;
+mod shutdown;
 mod slim;
+mod token_handoff;
 mod tokens;
 mod tool_security;
 mod websearch;
@@ -22,7 +26,7 @@ mod websearch;
     name = "rdsh",
     version,
     about = "Rust fast launcher for dsh (safe: native fast-paths + passthrough)",
-    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|dump-config|boot)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh --passthrough tui          no slim env; mandatory tool isolation remains\n  rdsh --dry-run tui -- --resume abc   show what would exec"
+    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|dump-config|boot)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh --passthrough tui          no slim env; mandatory tool isolation remains\n  rdsh --dry-run tui -- --resume abc   show what would exec"
 )]
 struct Cli {
     /// Explicitly share a project file with isolated model tools (repeatable).
@@ -177,6 +181,13 @@ enum Commands {
         #[command(subcommand)]
         action: ContextAction,
     },
+    /// Resident pure-compute worker (stdio NDJSON, opt-in Web PoC).
+    /// No filesystem/auth/session access; DSH keeps the original path.
+    Compute {
+        /// Handle one request line then exit (for IPC cost comparison).
+        #[arg(long = "once")]
+        once: bool,
+    },
     /// Hook helper for hooks.json: block stdin text matching --deny (exit 2)
     Guard {
         #[arg(long = "deny")]
@@ -273,6 +284,7 @@ const NATIVE_FIRST: &[&str] = &[
     "skills",
     "logs",
     "guard",
+    "compute",
     "auth",
     "setup",
     "search-web",
@@ -381,6 +393,7 @@ fn main() {
             }
         }
         Some(Commands::Bench { n }) => bench(n.unwrap_or(cfg.bench.n)),
+        Some(Commands::Compute { once }) => compute::cmd_compute(once),
         Some(Commands::Guard { deny, reason, json }) => {
             let mut merged = cfg.guard.deny.clone();
             merged.extend(deny);
@@ -440,14 +453,16 @@ fn main() {
             }
             SettingsAction::Init { force } => {
                 let path = rdsh_config::settings_path();
-                if std::path::Path::new(&path).exists() && !force {
-                    eprintln!("[rdsh] settings already exist at {path} (use --force to overwrite)");
-                    std::process::exit(2);
-                }
-                match rdsh_config::RdshSettings::default().save() {
-                    Ok(()) => {
+                match rdsh_config::initialize(force) {
+                    Ok(true) => {
                         println!("{path}");
                         Ok(())
+                    }
+                    Ok(false) => {
+                        eprintln!(
+                            "[rdsh] settings already exist at {path} (use --force to overwrite)"
+                        );
+                        std::process::exit(2);
                     }
                     Err(e) => Err(e),
                 }
@@ -479,13 +494,9 @@ fn main() {
                 }
             }
             SettingsAction::Set { key, value } => {
-                let mut cfg = rdsh_config::load();
-                if let Err(e) = cfg.set_dotted(&key, &value) {
-                    Err(e)
-                } else if let Err(e) = cfg.save() {
-                    Err(e)
-                } else {
-                    match cfg.get_dotted(&key) {
+                match rdsh_config::update(|cfg| cfg.set_dotted(&key, &value)) {
+                    Err(e) => Err(e),
+                    Ok((cfg, ())) => match cfg.get_dotted(&key) {
                         Some(v) => {
                             if v.is_string() {
                                 println!("{}={}", key.trim(), v.as_str().unwrap_or_default());
@@ -493,7 +504,7 @@ fn main() {
                             } else {
                                 match serde_json::to_string(&v) {
                                     Ok(text) => {
-                                        println!("{}={}", key.trim(), text);
+                                        println!("{}={text}", key.trim());
                                         Ok(())
                                     }
                                     Err(e) => Err(anyhow::anyhow!(e)),
@@ -501,22 +512,20 @@ fn main() {
                             }
                         }
                         None => Err(anyhow::anyhow!("set failed: {key}")),
-                    }
+                    },
                 }
             }
             SettingsAction::Unset { key } => {
-                let mut cfg = rdsh_config::load();
-                if let Err(e) = cfg.reset_dotted(&key) {
-                    Err(e)
-                } else if let Err(e) = cfg.save() {
-                    Err(e)
-                } else {
-                    println!(
-                        "reset {} (saved to {})",
-                        key.trim(),
-                        rdsh_config::settings_path()
-                    );
-                    Ok(())
+                match rdsh_config::update(|cfg| cfg.reset_dotted(&key)) {
+                    Err(e) => Err(e),
+                    Ok(_) => {
+                        println!(
+                            "reset {} (saved to {})",
+                            key.trim(),
+                            rdsh_config::settings_path()
+                        );
+                        Ok(())
+                    }
                 }
             }
             SettingsAction::Keys => {
@@ -691,12 +700,7 @@ fn settings_key_in_file(raw: &serde_json::Value, dotted: &str) -> bool {
 
 fn dump_config_native(profile: &str, patches: &[String]) -> anyhow::Result<()> {
     let home = crate::inspect::dsh_home();
-    // Debug-format {:?} prints like JSON here but doesn't escape the same
-    // way; emit a real JSON array so consumers can actually parse it.
-    let patches_json = serde_json::json!(patches);
-    println!(
-        "{{\"profile\": \"{profile}\", \"dsh_home\": \"{home}\", \"patches\": {patches_json}}}"
-    );
+    println!("{}", native_dump_config_json(profile, &home, patches));
     let root = format!("{home}/profiles/{profile}");
     match std::fs::read_dir(&root) {
         Ok(entries) => {
@@ -715,6 +719,15 @@ fn dump_config_native(profile: &str, patches: &[String]) -> anyhow::Result<()> {
         }
     }
     Ok(())
+}
+
+fn native_dump_config_json(profile: &str, home: &str, patches: &[String]) -> String {
+    serde_json::json!({
+        "profile": profile,
+        "dsh_home": home,
+        "patches": patches,
+    })
+    .to_string()
 }
 
 /// Server-type extras are off by default: refuse with enable guidance.
@@ -874,11 +887,21 @@ fn shadowing_original() -> bool {
     if invoked_as_dsh() {
         return true;
     }
-    let me = std::fs::canonicalize(std::env::current_exe().unwrap_or_default()).unwrap_or_default();
-    std::env::var("PATH").ok().is_some_and(|p| {
-        p.split(':').any(|dir| {
-            let cand = format!("{dir}/dsh");
-            std::fs::canonicalize(&cand).is_ok_and(|c| c == me)
+    let Ok(me) = std::env::current_exe().and_then(std::fs::canonicalize) else {
+        return false;
+    };
+    std::env::var_os("PATH").is_some_and(|path| path_shadows_current(&path, &me))
+}
+
+fn path_shadows_current(path: &std::ffi::OsStr, me: &std::path::Path) -> bool {
+    #[cfg(windows)]
+    const NAMES: &[&str] = &["dsh", "dsh.exe"];
+    #[cfg(not(windows))]
+    const NAMES: &[&str] = &["dsh"];
+
+    std::env::split_paths(path).any(|dir| {
+        NAMES.iter().any(|name| {
+            std::fs::canonicalize(dir.join(name)).is_ok_and(|candidate| candidate.as_path() == me)
         })
     })
 }
@@ -964,5 +987,65 @@ mod default_profile_tests {
                 );
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod native_dump_tests {
+    use super::native_dump_config_json;
+
+    #[test]
+    fn native_dump_escapes_untrusted_profile_and_home_strings() {
+        let profile = "profile \"quoted\"\\name\nnext";
+        let home = "C:\\Users\\a \"quoted\"\\folder";
+        let patches = vec!["patch \"one\"\\overlay.yml".to_string()];
+
+        let encoded = native_dump_config_json(profile, home, &patches);
+        let decoded: serde_json::Value = serde_json::from_str(&encoded).unwrap();
+
+        assert_eq!(decoded["profile"], profile);
+        assert_eq!(decoded["dsh_home"], home);
+        assert_eq!(decoded["patches"], serde_json::json!(patches));
+    }
+}
+
+#[cfg(test)]
+mod shadowing_original_tests {
+    use super::path_shadows_current;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn searches_os_path_components_for_platform_binary_name() {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root =
+            std::env::temp_dir().join(format!("rdsh-shadow-path-{}-{nonce}", std::process::id()));
+        let decoy = root.join("first");
+        let binary_dir = root.join("second");
+        fs::create_dir_all(&decoy).unwrap();
+        fs::create_dir_all(&binary_dir).unwrap();
+
+        #[cfg(windows)]
+        const TEST_NAMES: &[&str] = &["dsh", "dsh.exe"];
+        #[cfg(not(windows))]
+        const TEST_NAMES: &[&str] = &["dsh"];
+
+        for binary_name in TEST_NAMES {
+            let candidate = binary_dir.join(*binary_name);
+            fs::write(&candidate, b"test executable path").unwrap();
+        }
+        let current = fs::canonicalize(binary_dir.join(TEST_NAMES[0])).unwrap();
+        let path = std::env::join_paths([decoy.as_os_str(), binary_dir.as_os_str()]).unwrap();
+        for binary_name in TEST_NAMES {
+            let candidate = fs::canonicalize(binary_dir.join(*binary_name)).unwrap();
+            assert!(path_shadows_current(&path, &candidate), "{binary_name}");
+        }
+
+        let path_without_candidate = std::env::join_paths([decoy.as_os_str()]).unwrap();
+        assert!(!path_shadows_current(&path_without_candidate, &current));
+        fs::remove_dir_all(root).unwrap();
     }
 }
