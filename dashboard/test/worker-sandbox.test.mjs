@@ -139,6 +139,14 @@ test("Linux workers use the real bwrap and seccomp boundary for reads, writes, c
     input: input("network.request", { url: "https://blocked.example/", method: "GET", body: "" }),
     capability, networkOptions: { request: () => { throw new Error("must_not_request"); } } });
   assert.equal(unapprovedNetwork.reason, "network_origin_outside_policy");
+  const unresolvedNetwork = await executeSandboxedOperation({ repository: root,
+    contract: contractFor(), workerRole: "implementation",
+    input: input("network.request", { url: "https://allowed.example/operation",
+      method: "POST", body: "send once" }), capability,
+    networkOptions: { resolve: async () => { throw new Error("network_destination_not_public"); } },
+  });
+  assert.equal(unresolvedNetwork.execution, "not_started");
+  assert.equal(unresolvedNetwork.reason, "network_destination_not_public");
   const network = await executeSandboxedOperation({ repository: root,
     contract: contractFor(), workerRole: "implementation",
     input: input("network.request", { url: "https://allowed.example/data", method: "GET", body: "" }),
@@ -171,4 +179,52 @@ test("Linux workers use the real bwrap and seccomp boundary for reads, writes, c
   });
   assert.equal(network.execution, "completed");
   assert.equal(network.body, "approved origin");
+
+  let wroteBody = false;
+  const interruptedNetwork = await executeSandboxedOperation({ repository: root,
+    contract: contractFor(), workerRole: "implementation",
+    input: input("network.request", {
+      url: "https://allowed.example/operation", method: "POST", body: "send once",
+    }), capability,
+    networkOptions: {
+      resolve: async () => [{ address: "93.184.216.34", family: 4 }],
+      request: () => {
+        const request = new EventEmitter();
+        request.setTimeout = () => {};
+        request.write = () => { wroteBody = true; };
+        request.end = () => queueMicrotask(() => request.emit("error", new Error("ECONNRESET")));
+        request.destroy = (error) => request.emit("error", error);
+        return request;
+      },
+    },
+  });
+  assert.equal(wroteBody, true);
+  assert.equal(interruptedNetwork.execution, "unknown");
+  assert.equal(interruptedNetwork.reason, "network_request_failed");
+
+  const oversizedNetwork = await executeSandboxedOperation({ repository: root,
+    contract: contractFor(), workerRole: "implementation",
+    input: input("network.request", { url: "https://allowed.example/large",
+      method: "GET", body: "" }), capability,
+    networkOptions: {
+      resolve: async () => [{ address: "93.184.216.34", family: 4 }],
+      request: (_options, callback) => {
+        const request = new EventEmitter();
+        request.setTimeout = () => {};
+        request.end = () => {
+          const response = new EventEmitter();
+          response.statusCode = 200;
+          response.headers = { "content-type": "text/plain" };
+          queueMicrotask(() => {
+            callback(response);
+            response.emit("data", Buffer.alloc(64 * 1024 + 1));
+          });
+        };
+        request.destroy = (error) => queueMicrotask(() => request.emit("error", error));
+        return request;
+      },
+    },
+  });
+  assert.equal(oversizedNetwork.execution, "unknown");
+  assert.equal(oversizedNetwork.reason, "network_response_too_large");
 });

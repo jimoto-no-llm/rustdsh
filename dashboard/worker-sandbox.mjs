@@ -316,7 +316,13 @@ async function runNetworkRequest(operation, allowedOrigins, { resolve = lookup, 
   const address = ipv4[0].address;
   return new Promise((resolveResult, reject) => {
     let responseBytes = 0;
+    let requestStarted = false;
     const chunks = [];
+    const fail = (error) => {
+      const failure = new Error(safeReason(error, "network_request_failed"));
+      failure.requestStarted = requestStarted;
+      reject(failure);
+    };
     const options = {
       hostname: url.hostname,
       port: Number(url.port || 443),
@@ -330,6 +336,7 @@ async function runNetworkRequest(operation, allowedOrigins, { resolve = lookup, 
       maxHeaderSize: 16 * 1024,
     };
     const req = request(options, (res) => {
+      res.on("error", fail);
       res.on("data", (chunk) => {
         responseBytes += chunk.length;
         if (responseBytes > MAX_OUTPUT) {
@@ -346,8 +353,12 @@ async function runNetworkRequest(operation, allowedOrigins, { resolve = lookup, 
       }));
     });
     req.setTimeout(timeoutMs, () => req.destroy(new Error("network_request_timed_out")));
-    req.on("error", (error) => reject(new Error(safeReason(error, "network_request_failed"))));
-    if (operation.body) req.write(operation.body);
+    req.on("error", fail);
+    if (operation.body) {
+      requestStarted = true;
+      req.write(operation.body);
+    }
+    requestStarted = true;
     req.end();
   });
 }
@@ -448,7 +459,10 @@ export async function executeSandboxedOperation({ repository, contract, workerRo
     try {
       return await runNetworkRequest(operation, policy.network_origins || [], networkOptions);
     } catch (error) {
-      return { execution: "not_started", reason: safeReason(error, "network_request_failed") };
+      return {
+        execution: error?.requestStarted ? "unknown" : "not_started",
+        reason: safeReason(error, "network_request_failed"),
+      };
     }
   }
   return { execution: "not_started", reason: "operation_unsupported" };
