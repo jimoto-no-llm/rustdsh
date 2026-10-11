@@ -46,6 +46,34 @@ A service may rotate its authentication token on restart. Use its existing
 browser opener or private launch URL mechanism to reconnect. Automatic restart
 restores availability; it does not replay an interrupted model request.
 
+## Restarting from inside the Web GUI
+
+A tool running inside dsh must not run `systemctl stop` on its own service
+followed by an install and `systemctl start`. Stopping the service also stops
+its tools, so the remaining commands never run. `Restart=always` deliberately
+does not undo that explicit stop.
+
+Complete any package installation first, then hand off the restart to an
+independent transient systemd service:
+
+```sh
+sh scripts/restart-web-service.sh dsh-web.service
+```
+
+For use outside this checkout, install the helper:
+
+```sh
+mkdir -p ~/.local/bin
+install -m 755 scripts/restart-web-service.sh ~/.local/bin/rdsh-web-restart
+rdsh-web-restart dsh-web.service
+```
+
+The helper returns after the restart job is accepted, without waiting for the
+Web GUI to become ready. Reconnect using the service's existing browser opener
+or private launch URL mechanism and verify the service state. If an installation
+requires the Web service to be stopped, run the entire maintenance operation
+from an external terminal instead of a tool inside that service.
+
 ## 日本語
 
 既存の `dsh-web.service`（rdsh経由の起動も含みます）に上記の設定を追加すると、
@@ -56,3 +84,8 @@ restores availability; it does not replay an interrupted model request.
 
 再起動で認証トークンが変わる場合は、既存のブラウザー起動機能などで再接続します。
 処理中だったモデルへの依頼は自動で再送しません。
+
+dsh内のツールから自分のサービスを停止すると、そのツールも終了するため、
+後続の起動コマンドには到達しません。パッケージの導入を先に終えてから、
+`rdsh-web-restart dsh-web.service` で独立したサービスへ再起動を引き渡します。
+停止中に導入作業が必要な場合は、外部の端末で作業してください。
