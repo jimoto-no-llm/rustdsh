@@ -274,7 +274,7 @@ fn scan_project(pdir: &std::path::Path, proj: &str) -> Vec<Session> {
         Ok(e) => e,
         Err(_) => return v,
     };
-    for e in entries.filter_map(|e| e.ok()) {
+    for e in entries.filter_map(Result::ok) {
         // file_type does not traverse symlinks: a planted link never
         // pulls an outside directory into the walk.
         if !e.file_type().is_ok_and(|t| t.is_dir()) {
@@ -298,7 +298,7 @@ fn dir_size_mtime(dir: &std::path::Path) -> (u64, u64, String) {
     let mut mtime = 0u64;
     let mut best: Option<std::time::SystemTime> = None;
     if let Ok(entries) = std::fs::read_dir(dir) {
-        for e in entries.filter_map(|e| e.ok()) {
+        for e in entries.filter_map(Result::ok) {
             // Skip links before statting: sizes must describe files inside.
             if !e.file_type().is_ok_and(|t| t.is_file()) {
                 continue;
@@ -640,7 +640,7 @@ fn session_decompressed_bytes_uncached(
     let mut any = false;
     let mut estimated = false;
     let mut deferred = vec![];
-    for e in entries.filter_map(|e| e.ok()) {
+    for e in entries.filter_map(Result::ok) {
         let p = e.path();
         let Some(name) = p.file_name().map(|s| s.to_string_lossy().into_owned()) else {
             continue;
@@ -1105,7 +1105,7 @@ fn confine_log_path(
 
 pub fn cmd_logs(tail: usize, grep: Option<String>, file: Option<String>) -> anyhow::Result<()> {
     let dir = format!("{}/logs", dsh_home());
-    let (display, mut handle) = match file {
+    let (display, handle) = match file {
         Some(f) => {
             // Confine explicit selections to the logs dir (fail closed):
             // without this `--file /etc/passwd` or `../../.credentials.yaml`
@@ -1140,16 +1140,14 @@ pub fn cmd_logs(tail: usize, grep: Option<String>, file: Option<String>) -> anyh
         },
     };
     eprintln!("[rdsh] reading {}", display.display());
-    use std::io::Read as _;
-    let mut text = String::new();
-    handle.read_to_string(&mut text)?;
-    // Single pass: count matches while keeping only the last `tail` lines.
-    // (Old code collected every line, then filtered in a second pass.)
+    use std::io::BufRead as _;
+    // Stream the log; only the requested tail remains resident.
     let pat = grep.as_deref();
     let mut n = 0usize;
-    let mut kept: std::collections::VecDeque<&str> =
+    let mut kept: std::collections::VecDeque<String> =
         std::collections::VecDeque::with_capacity(tail.min(512));
-    for line in text.lines() {
+    for line in std::io::BufReader::new(handle).lines() {
+        let line = line?;
         if pat.map(|p| line.contains(p)).unwrap_or(true) {
             n += 1;
             if tail > 0 {
@@ -1218,7 +1216,7 @@ fn dir_names(dir: &str) -> Vec<String> {
 }
 
 pub fn names_json(kind: &str) -> String {
-    let dir = format!("{}/{}", dsh_home(), kind);
+    let dir = format!("{}/{kind}", dsh_home());
     serde_json::json!({"kind": kind, "names": dir_names(&dir)}).to_string()
 }
 

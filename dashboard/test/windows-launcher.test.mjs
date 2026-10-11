@@ -112,6 +112,7 @@ test(
     });
     assert.equal(code, 0, output);
     assert.match(output, /Project mode:/);
+    assert.doesNotMatch(output, /System\.Threading\.Tasks\.VoidTaskResult/);
   },
 );
 

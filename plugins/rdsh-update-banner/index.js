@@ -1,13 +1,16 @@
 import { homedir } from "node:os";
-import { join } from "node:path";
-import { readFile, writeFile, mkdir, lstat, stat, rename, unlink } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
+import { realpathSync } from "node:fs";
+import { readFile, writeFile, mkdir, lstat, rename, unlink } from "node:fs/promises";
 import { watch } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 export const inject = ["webServer", "connection"];
 
-const SYNC_SCRIPT = "/home/sahen/File/Prog/rustdsh/sync-dsh.sh";
+const PLUGIN_DIRECTORY = dirname(realpathSync(fileURLToPath(import.meta.url)));
+const DEFAULT_SYNC_SCRIPT = resolve(PLUGIN_DIRECTORY, "../../sync-dsh.sh");
 const RUN_TIMEOUT_MS = 5 * 60 * 1000;
 const updateDirectory = () => join(homedir(), ".local", "share", "rdsh");
 const closePath = () => join(updateDirectory(), "update-notice-close.json");
@@ -135,13 +138,26 @@ function authorize(ctx, req, res) {
   return false;
 }
 
-function runSync() {
+async function runSync(syncScript) {
+  let file;
+  try {
+    file = await lstat(syncScript);
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      return { ok: false, message: "updater not found; install from a local rustdsh checkout or set syncScript" };
+    }
+    return { ok: false, message: "could not inspect updater; check the local rustdsh installation" };
+  }
+  const uid = typeof process.getuid === "function" ? process.getuid() : undefined;
+  if (!file.isFile() || file.isSymbolicLink() || file.nlink !== 1 || uid === undefined || file.uid !== uid) {
+    return { ok: false, message: "updater must be a regular file owned by the current user" };
+  }
   return new Promise((resolve) => {
     let child;
     try {
       child = execFile(
         "/bin/sh",
-        [SYNC_SCRIPT],
+        [syncScript],
         { timeout: RUN_TIMEOUT_MS, maxBuffer: 256 * 1024 },
         (err, stdout, stderr) => {
           const tail = String(stdout || "").split("\n").slice(-6).join("\n");
@@ -159,6 +175,9 @@ function runSync() {
 
 export function apply(ctx, config) {
   const demo = config && config.demo === true;
+  const configuredSyncScript = typeof config?.syncScript === "string" && config.syncScript.trim()
+    ? resolve(PLUGIN_DIRECTORY, config.syncScript.trim())
+    : DEFAULT_SYNC_SCRIPT;
   return ctx.effect(() => {
     if (!ctx.webServer) return;
     const demoState = { ok: true, updated: true, kind: "demo", from: "0.2.0-rc.2", to: "0.2.1-rc.1", at: Date.now(), demo: true };
@@ -175,7 +194,7 @@ export function apply(ctx, config) {
           return;
         }
         try {
-          const out = await runSync();
+          const out = await runSync(configuredSyncScript);
           const body = JSON.stringify(out);
           res.writeHead(200, {
             "content-type": "application/json; charset=utf-8",
@@ -277,8 +296,8 @@ export function apply(ctx, config) {
 async function readState() {
   try {
     const path = join(updateDirectory(), "update-state.json");
-    const file = await stat(path);
-    if (!file.isFile() || file.size > 4096) return { ok: false };
+    const file = await lstat(path);
+    if (!file.isFile() || file.isSymbolicLink() || file.nlink !== 1 || file.size > 4096) return { ok: false };
     const raw = await readFile(path, "utf8");
     const s = JSON.parse(raw);
     if (!s?.updated) return { ok: true, updated: false };
