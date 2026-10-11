@@ -91,7 +91,7 @@ fn list_dir(dir: &str, kind: &str) -> anyhow::Result<()> {
         let _ = writeln!(out, "{n}");
     }
     let _ = out.flush();
-    eprintln!("[rdsh] {} {kind}(s)", names.len());
+    eprintln!("[rdsh] {len} {kind}(s)", len = names.len());
     Ok(())
 }
 
