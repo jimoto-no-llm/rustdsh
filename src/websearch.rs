@@ -142,7 +142,7 @@ fn decode_entities(s: &str) -> String {
         let num = &rest[..end];
         let ch = if num.len() > 8 || num.contains('&') {
             None
-        } else if let Some(hex) = num.strip_prefix('x').or_else(|| num.strip_prefix('X')) {
+        } else if let Some(hex) = num.strip_prefix(['x', 'X']) {
             u32::from_str_radix(hex, 16).ok().and_then(char::from_u32)
         } else {
             num.parse::<u32>().ok().and_then(char::from_u32)
