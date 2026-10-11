@@ -429,6 +429,100 @@ fn setup_save_extras_restart_serve_and_use_real_http_api() {
 }
 
 #[test]
+fn http_browser_origin_guard_preserves_authenticated_native_clients() {
+    let f = Fixture::new();
+    f.settings(json!({"extras":{"enable":[]}}));
+    let saved = fs::read(f.0.join("dsh/rdsh.json")).unwrap();
+    let mut setup = Server::start(&f, &["setup", "--web", "--port", "0"]);
+    for metadata in [
+        "Sec-Fetch-Site: same-origin\r\n",
+        "Sec-Fetch-Dest: empty\r\n",
+        "Sec-Fetch-User: ?1\r\n",
+        "sEc-FeTcH-sItE: \r\n",
+    ] {
+        for (path, body) in [
+            ("/api/extras", r#"{"enable":["serve"]}"#),
+            ("/api/done", "{}"),
+        ] {
+            assert_eq!(
+                setup.request("POST", path, body, true, metadata).0,
+                403,
+                "{path}: {metadata}"
+            );
+        }
+        assert_eq!(fs::read(f.0.join("dsh/rdsh.json")).unwrap(), saved);
+        assert_eq!(
+            setup.request("GET", "/api/status", "", true, metadata).0,
+            200
+        );
+    }
+    let origin = format!(
+        "Origin: http://127.0.0.1:{}\r\nSec-Fetch-Site: same-origin\r\nSec-Fetch-Dest: empty\r\n",
+        setup.port
+    );
+    assert_eq!(
+        setup
+            .request(
+                "POST",
+                "/api/extras",
+                r#"{"enable":["serve"]}"#,
+                false,
+                &origin
+            )
+            .0,
+        401
+    );
+    assert_eq!(fs::read(f.0.join("dsh/rdsh.json")).unwrap(), saved);
+    assert_eq!(
+        setup
+            .request(
+                "POST",
+                "/api/extras",
+                r#"{"enable":["serve"]}"#,
+                true,
+                &origin
+            )
+            .0,
+        200
+    );
+    assert_eq!(
+        setup.request("POST", "/api/done", "{}", true, &origin).0,
+        200
+    );
+    setup.stopped();
+
+    let serve = Server::start(&f, &["serve", "--port", "0"]);
+    for metadata in [
+        "Sec-Fetch-Site: cross-site\r\n",
+        "Sec-Fetch-Dest: empty\r\n",
+        "Sec-Fetch-User: ?1\r\n",
+    ] {
+        assert_eq!(
+            serve
+                .request("POST", "/api/tokens", r#"{"text":"abcd"}"#, true, metadata)
+                .0,
+            403
+        );
+    }
+    let origin = format!(
+        "Origin: http://localhost:{}\r\nSec-Fetch-Site: same-origin\r\n",
+        serve.port
+    );
+    for headers in ["", "Sec-Fetch-Mode: cors\r\n", origin.as_str()] {
+        assert_eq!(
+            serve
+                .request("POST", "/api/tokens", r#"{"text":"abcd"}"#, false, headers)
+                .0,
+            401
+        );
+        let (status, body) =
+            serve.request("POST", "/api/tokens", r#"{"text":"abcd"}"#, true, headers);
+        assert_eq!(status, 200);
+        assert_eq!(serde_json::from_str::<Value>(&body).unwrap()["tokens"], 1);
+    }
+}
+
+#[test]
 fn http_truncated_and_oversized_requests_do_not_damage_serve() {
     let f = Fixture::new();
     f.settings(json!({"extras":{"enable":["serve"]}}));

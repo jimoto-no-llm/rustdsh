@@ -260,6 +260,14 @@ rdsh serve
 All APIs require the per-launch key in the `X-RDSH-Token` header (the
 browser UI reads it from its URL). No CDN is used; the page works offline.
 
+Both native servers (`serve` and `setup --web`) require a loopback Host and,
+when supplied, a matching loopback Origin. POST requests carrying browser context
+headers (`Sec-Fetch-Site`, `Sec-Fetch-Dest`, or `Sec-Fetch-User`) also require
+Origin; missing Origin returns 403. Origin-less authenticated CLI clients remain
+supported, including Node fetch, which sends `Sec-Fetch-Mode` alone. This is an
+additional browser check, not client authentication: clients without those
+context headers still rely on Host validation and the per-launch key.
+
 `rdsh serve` is the quick local status page. For project metrics, human
 Q&A, and phone access, use the optional [Node.js dashboard](dashboard/README.md)
 (needs Node.js 22+): `rdsh-dashboard project --project <directory>` or

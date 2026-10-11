@@ -1,0 +1,14 @@
+--- before
++++ after
+@@ -1,8 +1,8 @@
+-setup POST extras / browser metadata, no Origin: 200; setting changed=True
++setup POST extras / browser metadata, no Origin: 403; setting changed=False
+ setup POST extras / matching Origin: 200
+ setup POST extras / matching Origin, no token: 401
+-setup POST done / browser metadata, no Origin: 200
+-serve POST tokens / browser metadata, no Origin: 200
++setup POST done / browser metadata, no Origin: 403
++serve POST tokens / browser metadata, no Origin: 403
+ serve POST tokens / matching Origin: 200
+ serve POST tokens / native client, no Origin: 200
+ serve POST tokens / Node-style Mode only, no Origin: 200
