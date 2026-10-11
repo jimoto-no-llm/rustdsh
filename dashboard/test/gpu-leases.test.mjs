@@ -691,6 +691,55 @@ test("expired heartbeat cannot release an alive owner or an unbound launch with 
   assert.equal((await leases.read()).leases.length, 1);
 });
 
+test("reconciliation rotates retained leases so later reclaimable owners can recover capacity", async (t) => {
+  const { project, leases } = await setup(t);
+  const sharedOneMiB = { ...request, requested_vram_mib: 1, mode: "shared" };
+  leases.observe = async () => parseGpuInventory(`${device}, 16384, 16368, 16\n`);
+  const created = [];
+  for (let index = 0; index < 9; index++) {
+    const acquired = await leases.acquire({
+      project,
+      run_id: run(),
+      owner_id: owner(),
+      request: sharedOneMiB,
+    });
+    assert.equal(acquired.status, "reserved");
+    created.push(acquired.lease);
+    if (index < 8) await leases.beginLaunch(acquired.lease.lease_id);
+  }
+  const actual = created[0].controller_identity;
+  leases.now = () => Date.now() + 31000;
+  leases.observeProcess = async () => ({
+    status: "gone",
+    platform: actual.platform,
+    scope: actual.scope,
+  });
+  const waitingRun = run();
+  const waitingOwner = owner();
+  const largeShared = { ...request, requested_vram_mib: 8, mode: "shared" };
+  const first = await leases.acquire({
+    project, run_id: waitingRun, owner_id: waitingOwner, request: largeShared,
+  });
+  assert.equal(first.status, "waiting-resource");
+  assert.equal(first.reason, "gpu_capacity_insufficient");
+  assert.equal(first.admission_available_mib, 7);
+  const afterFirstAttempt = await leases.read();
+  assert.ok(afterFirstAttempt.leases.some(
+    (lease) => lease.lease_id === created[8].lease_id,
+  ));
+
+  const recovered = await leases.acquire({
+    project, run_id: waitingRun, owner_id: waitingOwner, request: largeShared,
+  });
+  assert.equal(recovered.status, "reserved");
+  const state = await leases.read();
+  assert.equal(state.leases.length, 9);
+  assert.ok(!state.leases.some(
+    (lease) => lease.lease_id === created[8].lease_id,
+  ));
+  assert.equal(state.leases.filter((lease) => lease.phase === "launching").length, 8);
+  assert.equal(recovered.lease.request.requested_vram_mib, 8);
+});
 async function durableReceipt(t, options) {
   const {
     root: fixtureRoot,

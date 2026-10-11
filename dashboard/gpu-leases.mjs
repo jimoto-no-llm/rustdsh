@@ -509,7 +509,19 @@ export class GpuLeases {
           });
       }
     }
-    return { checked, unchecked: Math.max(0, candidates.length - limit) };
+    // Persist a round-robin position by moving retained leases behind unchecked
+    // candidates. Repeated bounded reconciliations must not starve later leases.
+    const inspected = new Set(
+      checked
+        .filter((item) => item.status === "retained")
+        .map((item) => item.lease_id),
+    );
+    if (inspected.size) {
+      const retained = state.leases.filter((lease) => inspected.has(lease.lease_id));
+      state.leases = state.leases.filter((lease) => !inspected.has(lease.lease_id));
+      state.leases.push(...retained);
+    }
+    return { checked, unchecked: Math.max(0, candidates.length - checked.length) };
   }
   async reconcile() {
     return this.mutate((state) => this.reconcileState(state));
