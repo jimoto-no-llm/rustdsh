@@ -111,6 +111,25 @@ test("real SDK PKCE login rejects callback substitution, duplicates, state, issu
   f.advance(600001);
   await assert.rejects(a.finishLogin(good), /login_expired_or_absent/);
 });
+test("pathless issuer metadata stays bound through discovery and token exchange", async (t) => {
+  const f = await setup(t);
+  f.state.pathlessIssuer = true;
+  const config = { ...f.config(), issuer: f.base };
+  const a = f.make(config);
+  const authorization = await a.beginLogin();
+
+  await a.finishLogin(f.callback(authorization.authorizationUrl));
+
+  assert.equal(f.state.tokens, 1);
+  assert.equal((await a.inspect()).configured, true);
+  assert.equal(
+    f.state.requests.some(
+      (request) =>
+        request.path === "/.well-known/oauth-authorization-server",
+    ),
+    true,
+  );
+});
 test("untrusted metadata, issuer echo, and token redirects are refused without credential forwarding", async (t) => {
   const f = await setup(t);
   await assert.rejects(

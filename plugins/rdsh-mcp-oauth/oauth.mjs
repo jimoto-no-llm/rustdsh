@@ -128,6 +128,13 @@ export function createOAuthManager({
 }) {
   const config = configuration(input);
   const binding = { serverName: config.serverName, url: config.url };
+  const matchesIssuer = (value) => {
+    try {
+      return secureURL(value).href === config.issuer;
+    } catch {
+      return false;
+    }
+  };
   const key = `rdsh-mcp-oauth/mcp-${hash(JSON.stringify(binding))}`;
   const fingerprint = hash(JSON.stringify(config));
   const secrets = new Set();
@@ -209,9 +216,7 @@ export function createOAuthManager({
     if (
       !resource ||
       !Array.isArray(resource.authorization_servers) ||
-      !resource.authorization_servers.some(
-        (u) => secureURL(u).href === config.issuer,
-      )
+      !resource.authorization_servers.some(matchesIssuer)
     )
       fail("untrusted_issuer");
     // The resource audience is explicitly bound to this registered endpoint.
@@ -222,7 +227,7 @@ export function createOAuthManager({
       config.issuer,
       { fetchFn: checkedFetch },
     );
-    if (!metadata || secureURL(metadata.issuer).href !== config.issuer)
+    if (!metadata || !matchesIssuer(metadata.issuer))
       fail("issuer_mismatch");
     for (const field of ["authorization_endpoint", "token_endpoint"]) {
       if (!metadata[field]) fail("missing_authorization_metadata");
@@ -396,7 +401,7 @@ export function createOAuthManager({
         if (!equal(challengeHash(pending.verifier), pending.challenge))
           fail("pkce_mismatch");
         if (
-          pending.metadata?.issuer !== config.issuer ||
+          !matchesIssuer(pending.metadata?.issuer) ||
           pending.resource !== config.url
         )
           fail("credential_binding_mismatch");

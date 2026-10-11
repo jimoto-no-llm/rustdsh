@@ -11,6 +11,7 @@ export async function oauthFixture() {
     codes: new Map(),
     grants: new Map(),
     requiredScope: "read",
+    pathlessIssuer: false,
     wrongIssuer: false,
     wrongResource: false,
     redirectToken: false,
@@ -40,13 +41,21 @@ export async function oauthFixture() {
     ) {
       return respond(200, {
         resource: state.wrongResource ? base + "/other" : base + "/mcp",
-        authorization_servers: [base + "/issuer"],
+        authorization_servers: [state.pathlessIssuer ? base : base + "/issuer"],
         scopes_supported: ["read"],
       });
     }
-    if (url.pathname === "/.well-known/oauth-authorization-server/issuer") {
+    if (
+      url.pathname === "/.well-known/oauth-authorization-server/issuer" ||
+      (state.pathlessIssuer &&
+        url.pathname === "/.well-known/oauth-authorization-server")
+    ) {
       return respond(200, {
-        issuer: state.wrongIssuer ? base + "/alien" : base + "/issuer",
+        issuer: state.wrongIssuer
+          ? base + "/alien"
+          : state.pathlessIssuer
+            ? base
+            : base + "/issuer",
         authorization_endpoint: base + "/authorize",
         token_endpoint: base + "/token",
         registration_endpoint: base + "/register",
@@ -214,7 +223,10 @@ export async function oauthFixture() {
       });
       url.searchParams.set("code", code);
       url.searchParams.set("state", auth.searchParams.get("state"));
-      url.searchParams.set("iss", base + "/issuer");
+      url.searchParams.set(
+        "iss",
+        state.pathlessIssuer ? base : base + "/issuer",
+      );
       return url.href;
     },
     close: async () => {
