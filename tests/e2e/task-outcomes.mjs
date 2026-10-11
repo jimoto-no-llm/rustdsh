@@ -32,6 +32,7 @@ const browser = await chromium.launch({
 const contexts = [],
   servers = [],
   errors = [];
+const expectedRefreshFailurePages = new WeakSet();
 const manifest = {
   scope:
     "real local project server and Chromium; fixture checks only; no models, provider authentication, Tailscale or production adoption",
@@ -71,9 +72,25 @@ async function open(server) {
   contexts.push(context);
   const page = await context.newPage();
   page.on("pageerror", (error) => errors.push(error.message));
+  page.on("console", (message) => {
+    if (
+      message.type() === "error" &&
+      !(
+        expectedRefreshFailurePages.has(page) &&
+        message.text().includes("503 (Service Unavailable)")
+      )
+    )
+      errors.push(message.text());
+  });
   const started = performance.now();
   await page.goto(runtime.browser_url);
-  await page.locator("#task-goal").waitFor({ state: "attached" });
+  try {
+    await page.locator("#task-goal").waitFor({ state: "attached", timeout: 15000 });
+  } catch (error) {
+    console.error("Browser errors:", JSON.stringify(errors));
+    console.error("Page body:", await page.locator("body").innerText());
+    throw error;
+  }
   await page.locator("#tasks-detail").evaluate((element) => {
     element.open = true;
   });
@@ -147,7 +164,7 @@ try {
     "修正を提出しました",
     "受入条件を確認する",
     "レビューを待っています",
-    "done（作業の申告）",
+    "done（鮮度未確認・作業の申告）",
   ])
     assert.ok((await task.innerText()).includes(value), value);
   await capture(page, "after-unchecked");
@@ -183,6 +200,75 @@ try {
     });
     assert.equal(response.status, 200, await response.text());
   };
+  await upsert({
+    id: "freshness-expiry",
+    title: "鮮度期限の確認",
+    status: "done",
+    observation: {
+      kind: "estimated",
+      observed_at: new Date(Date.now() - 1000).toISOString(),
+      source: "隔離ブラウザーfixture",
+      reference: "fixture://freshness-expiry",
+      max_age_seconds: 4,
+    },
+  });
+  const freshnessTask = page.locator("#task-freshness-expiry");
+  const freshnessPanel = freshnessTask.locator(".task-observation-details");
+  await freshnessPanel.waitFor({ state: "attached" });
+  await freshnessTask
+    .getByText("推定", { exact: true })
+    .waitFor();
+  await freshnessTask
+    .getByText("done（推定・作業の申告）", { exact: true })
+    .waitFor();
+  assert.equal(await freshnessPanel.getAttribute("data-freshness"), "fresh");
+  assert.equal(
+    await freshnessTask.locator(".decision-heading .status").getAttribute("class"),
+    "status",
+  );
+  assert.ok((await freshnessPanel.innerText()).includes("報告元：隔離ブラウザーfixture"));
+  assert.ok((await freshnessPanel.innerText()).includes("参照対象：fixture://freshness-expiry"));
+  await capture(page, "after-freshness-current");
+  let blockedRefreshes = 0;
+  expectedRefreshFailurePages.add(page);
+  await page.route("**/api/state", async (route) => {
+    blockedRefreshes++;
+    await route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "Synthetic refresh hold" }),
+    });
+  });
+  const refreshHoldStatus = await page.evaluate(async () => {
+    const browserToken = sessionStorage.getItem("rdsh_project_browser_token");
+    const response = await fetch("/api/state", {
+      headers: { "x-rdsh-browser-token": browserToken },
+    });
+    return response.status;
+  });
+  assert.equal(refreshHoldStatus, 503);
+  await page.waitForFunction(
+    () =>
+      document.querySelector("#task-freshness-expiry .task-observation-details")
+        ?.dataset.freshness === "stale",
+    null,
+    { timeout: 8000 },
+  );
+  await freshnessTask
+    .getByText("done（古い情報・作業の申告）", { exact: true })
+    .waitFor();
+  assert.equal(
+    await freshnessTask.locator(".decision-heading .status").getAttribute("class"),
+    "status stale",
+  );
+  assert.ok(blockedRefreshes > 0);
+  await capture(page, "after-freshness-stale");
+  await page.unroute("**/api/state");
+  expectedRefreshFailurePages.delete(page);
+  manifest.state_refreshes_blocked = blockedRefreshes;
+  manifest.flows.push(
+    "reported estimated status shows source, observed time, reference and automatically becomes stale at expiry while project state refreshes are blocked",
+  );
   for (const id of ["split-a", "split-b"])
     await upsert({
       id,

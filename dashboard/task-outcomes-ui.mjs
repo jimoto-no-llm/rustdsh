@@ -1,3 +1,5 @@
+import { observationView } from "./observations.mjs";
+
 const statusNames = {
   pass: "成功",
   fail: "失敗",
@@ -7,6 +9,65 @@ const statusNames = {
   definition_changed: "条件が変更されています",
   unknown: "未確認",
 };
+const freshnessLabels = {
+  fresh: "",
+  stale: "古い情報",
+  unknown: "鮮度未確認",
+  unavailable: "未取得",
+};
+const date = (value) =>
+  value ? new Date(value).toLocaleString("ja-JP") : "未申告";
+
+function renderTaskObservation(node, status, details, task, now) {
+  const view = observationView(task.status, task.observation, now);
+  const statusQualifier = view.current
+    ? view.kind === "estimated"
+      ? "推定・"
+      : ""
+    : (freshnessLabels[view.freshness] || "鮮度未確認") + "・";
+  status.textContent = `${task.status}（${statusQualifier}作業の申告）`;
+  const tone =
+    view.current && view.kind !== "estimated"
+      ? task.status
+      : view.freshness === "stale"
+        ? "stale"
+        : "";
+  status.className = tone ? `status ${tone}` : "status";
+  status.dataset.freshness = view.freshness;
+
+  const observation = view.observation;
+  const panel = node("div", undefined, "observation task-observation-details");
+  panel.dataset.freshness = view.freshness;
+  panel.dataset.kind = view.kind || "unknown";
+  const heading = node("div", undefined, "observation-heading");
+  heading.append(
+    node("span", view.label, "provenance-badge " + (view.kind || "unknown")),
+  );
+  if (view.freshness !== "fresh")
+    heading.append(
+      node(
+        "span",
+        freshnessLabels[view.freshness] || "鮮度未確認",
+        "provenance-badge " + view.freshness,
+      ),
+    );
+  panel.append(heading);
+  if (view.value != null && !view.current)
+    panel.append(node("div", "前回の報告状態：" + view.value, "sub"));
+  panel.append(
+    node("div", "観測：" + date(observation?.observed_at), "sub"),
+    node("div", "報告元：" + (observation?.source || "未申告"), "sub"),
+    node("div", "参照対象：" + (observation?.reference || "未申告"), "sub"),
+  );
+  if (observation?.observed_at && observation.max_age_seconds) {
+    const expiresAt = new Date(
+      Date.parse(observation.observed_at) + observation.max_age_seconds * 1000,
+    );
+    panel.append(node("div", "鮮度期限：" + date(expiresAt.toISOString()), "sub"));
+  }
+  details.replaceChildren(panel);
+}
+
 function checkLabel(condition) {
   if (condition.verified) return "確認時点で検証済み";
   if (condition.freshness === "stale") return "対象が変わったため再検証が必要";
@@ -18,7 +79,37 @@ function checkLabel(condition) {
 export function createTaskOutcomesPanel(tasks, milestones, { node, api }) {
   let generation = 0;
   let renderedRevision = -1;
+  let observationTimer = null;
+  const observationRows = new Map();
   const cached = new Map();
+
+  function refreshTaskObservations(now = Date.now()) {
+    for (const { status, details, task } of observationRows.values())
+      renderTaskObservation(node, status, details, task, now);
+  }
+
+  function scheduleObservationRefresh() {
+    if (observationTimer !== null) clearTimeout(observationTimer);
+    observationTimer = null;
+    const now = Date.now();
+    let nextExpiry = Infinity;
+    for (const { task } of observationRows.values()) {
+      const view = observationView(task.status, task.observation, now);
+      const observed = Date.parse(task.observation?.observed_at);
+      const maxAge = task.observation?.max_age_seconds;
+      if (view.current && Number.isFinite(observed) && Number.isInteger(maxAge))
+        nextExpiry = Math.min(nextExpiry, observed + maxAge * 1000);
+    }
+    if (Number.isFinite(nextExpiry)) {
+      observationTimer = setTimeout(() => {
+        observationTimer = null;
+        refreshTaskObservations();
+        scheduleObservationRefresh();
+      }, Math.max(0, nextExpiry - now));
+      observationTimer.unref?.();
+    }
+  }
+
   function evidencePanel(kind, id, revision, epoch, initial) {
     const panel = node("div", undefined, "outcome-checks");
     const status = node("p", "現在の検証結果は未取得です", "sub");
@@ -104,9 +195,16 @@ export function createTaskOutcomesPanel(tasks, milestones, { node, api }) {
     return panel;
   }
   return (state) => {
-    if (state.revision === renderedRevision) return;
+    if (state.revision === renderedRevision) {
+      refreshTaskObservations();
+      scheduleObservationRefresh();
+      return;
+    }
+    if (observationTimer !== null) clearTimeout(observationTimer);
+    observationTimer = null;
     renderedRevision = state.revision;
     const epoch = ++generation;
+    observationRows.clear();
     const reports = state.task_outcomes?.tasks || [];
     tasks.replaceChildren(
       ...state.tasks.map((task) => {
@@ -116,12 +214,17 @@ export function createTaskOutcomesPanel(tasks, milestones, { node, api }) {
         const link = node("a", task.id, "id");
         link.href = "#task-" + encodeURIComponent(task.id);
         link.dataset.taskId = task.id;
+        const status = node("span");
         const header = node("div", undefined, "decision-heading");
-        header.append(
-          link,
-          node("span", `${task.status}（作業の申告）`, "status " + task.status),
-        );
-        card.append(header, node("h3", task.title));
+        header.append(link, status);
+        const observationDetails = node("div");
+        renderTaskObservation(node, status, observationDetails, task, Date.now());
+        observationRows.set(task.id, {
+          status,
+          details: observationDetails,
+          task,
+        });
+        card.append(header, node("h3", task.title), observationDetails);
         const facts = node("dl", undefined, "decision-details");
         for (const [label, value] of [
           ["目的", report.purpose],
@@ -183,5 +286,6 @@ export function createTaskOutcomesPanel(tasks, milestones, { node, api }) {
       milestones.append(
         node("p", "マイルストーンはまだ登録されていません", "empty"),
       );
+    scheduleObservationRefresh();
   };
 }
