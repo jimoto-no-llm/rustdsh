@@ -1,0 +1,594 @@
+{
+  "result": "PASS",
+  "scope": "actual isolated project HTTP/browser/domain writes and local acceptance; native input receipts are explicit stored fixtures, no actual provider/model/profile/credentials",
+  "source_head": "8131026b9ead463882dcb62b17f0abdeccb954b8",
+  "screenshots": [
+    "after-summary.png",
+    "after-missing-receipt.png",
+    "after-intent.png",
+    "after-correlated-records.png",
+    "after-exact-links.png",
+    "after-stale-check.png",
+    "after-mobile.png"
+  ],
+  "flows": [
+    "summary requests no raw detail; problem entry opens stable source IDs and renders producer text without executing scripts",
+    "begin cannot imply execution; exact synthetic journal receipts and operator-recorded source IDs link execution, local full QA, question and answer records",
+    "IDs survive reload; actual QA input changes stale the earlier pass without replay; opened source record survives refresh"
+  ],
+  "projections": [
+    {
+      "label": "saved_instruction_without_receipt",
+      "state_revision": 3,
+      "history_revision": 0,
+      "trace_id": "tl_792e100f916ae217c48465b754bef34e",
+      "stages": [
+        {
+          "stage": "instruction",
+          "count": 1,
+          "unknown": 0
+        },
+        {
+          "stage": "receipt",
+          "count": 0,
+          "unknown": 0
+        },
+        {
+          "stage": "execution",
+          "count": 0,
+          "unknown": 0
+        },
+        {
+          "stage": "test",
+          "count": 0,
+          "unknown": 0
+        },
+        {
+          "stage": "question",
+          "count": 0,
+          "unknown": 0
+        },
+        {
+          "stage": "answer",
+          "count": 0,
+          "unknown": 0
+        },
+        {
+          "stage": "application",
+          "count": 0,
+          "unknown": 0
+        }
+      ],
+      "nodes": [
+        {
+          "id": "tl_b29c40fbdb93abfaad3164dcd07d049f",
+          "stage": "instruction",
+          "source_id": "input_984e2612-25e8-42a5-946b-91a3dfee1fdc",
+          "status": "accepted"
+        }
+      ],
+      "links": [],
+      "issues": [
+        {
+          "code": "receipt_unknown",
+          "node_id": "tl_b29c40fbdb93abfaad3164dcd07d049f",
+          "message": "対象consumerの受領は未確認です。"
+        },
+        {
+          "code": "execution_unknown",
+          "node_id": "tl_b29c40fbdb93abfaad3164dcd07d049f",
+          "message": "nativeへの送信・処理結果は未確認です。"
+        },
+        {
+          "code": "current_full_test_unknown",
+          "node_id": null,
+          "message": "現在のコードに対する全体試験の成功は未確認です。"
+        },
+        {
+          "code": "cross_stage_causality_unknown",
+          "node_id": null,
+          "message": "実行→試験→質問の未記録区間があります。明示された参照IDだけを結び、task/runや時刻の近さから因果を補っていません。"
+        },
+        {
+          "code": "stage_unknown",
+          "node_id": null,
+          "message": "受領: この区間の相関記録がありません。"
+        },
+        {
+          "code": "stage_unknown",
+          "node_id": null,
+          "message": "入力実行: この区間の相関記録がありません。"
+        },
+        {
+          "code": "stage_unknown",
+          "node_id": null,
+          "message": "試験: この区間の相関記録がありません。"
+        },
+        {
+          "code": "stage_unknown",
+          "node_id": null,
+          "message": "質問: この区間の相関記録がありません。"
+        },
+        {
+          "code": "stage_unknown",
+          "node_id": null,
+          "message": "回答: この区間の相関記録がありません。"
+        },
+        {
+          "code": "stage_unknown",
+          "node_id": null,
+          "message": "回答適用: この区間の相関記録がありません。"
+        }
+      ],
+      "replayed_commands": 0
+    },
+    {
+      "label": "receipt_and_durable_intent_without_native_result",
+      "state_revision": 5,
+      "history_revision": 3,
+      "trace_id": "tl_792e100f916ae217c48465b754bef34e",
+      "stages": [
+        {
+          "stage": "instruction",
+          "count": 1,
+          "unknown": 0
+        },
+        {
+          "stage": "receipt",
+          "count": 1,
+          "unknown": 0
+        },
+        {
+          "stage": "execution",
+          "count": 1,
+          "unknown": 1
+        },
+        {
+          "stage": "test",
+          "count": 0,
+          "unknown": 0
+        },
+        {
+          "stage": "question",
+          "count": 0,
+          "unknown": 0
+        },
+        {
+          "stage": "answer",
+          "count": 0,
+          "unknown": 0
+        },
+        {
+          "stage": "application",
+          "count": 0,
+          "unknown": 0
+        }
+      ],
+      "nodes": [
+        {
+          "id": "tl_b29c40fbdb93abfaad3164dcd07d049f",
+          "stage": "instruction",
+          "source_id": "input_984e2612-25e8-42a5-946b-91a3dfee1fdc",
+          "status": "accepted"
+        },
+        {
+          "id": "tl_504956e9a9153a76d4b88b033c7dddd7",
+          "stage": "receipt",
+          "source_id": "input_984e2612-25e8-42a5-946b-91a3dfee1fdc",
+          "status": "recorded"
+        },
+        {
+          "id": "tl_72cd76b2ca3d647547188a6bc4fd821c",
+          "stage": "execution",
+          "source_id": "cmd_d1e26ac8-2ccc-4c1a-b0f4-e05ac39aeac2",
+          "status": "unknown"
+        }
+      ],
+      "links": [
+        {
+          "id": "tl_47b02a464bf1f763f07d4dfe2df71c75",
+          "from": "tl_b29c40fbdb93abfaad3164dcd07d049f",
+          "to": "tl_504956e9a9153a76d4b88b033c7dddd7",
+          "basis": "exact_input_command_id"
+        }
+      ],
+      "issues": [
+        {
+          "code": "native_result_unconfirmed",
+          "node_id": "tl_72cd76b2ca3d647547188a6bc4fd821c",
+          "message": "native commandのIDだけでは実行成功を確定できません。"
+        },
+        {
+          "code": "current_full_test_unknown",
+          "node_id": null,
+          "message": "現在のコードに対する全体試験の成功は未確認です。"
+        },
+        {
+          "code": "cross_stage_causality_unknown",
+          "node_id": null,
+          "message": "実行→試験→質問の未記録区間があります。明示された参照IDだけを結び、task/runや時刻の近さから因果を補っていません。"
+        },
+        {
+          "code": "stage_unknown",
+          "node_id": null,
+          "message": "試験: この区間の相関記録がありません。"
+        },
+        {
+          "code": "stage_unknown",
+          "node_id": null,
+          "message": "質問: この区間の相関記録がありません。"
+        },
+        {
+          "code": "stage_unknown",
+          "node_id": null,
+          "message": "回答: この区間の相関記録がありません。"
+        },
+        {
+          "code": "stage_unknown",
+          "node_id": null,
+          "message": "回答適用: この区間の相関記録がありません。"
+        }
+      ],
+      "replayed_commands": 0
+    },
+    {
+      "label": "exact_native_receipts_and_current_local_qa",
+      "state_revision": 11,
+      "history_revision": 9,
+      "trace_id": "tl_792e100f916ae217c48465b754bef34e",
+      "stages": [
+        {
+          "stage": "instruction",
+          "count": 1,
+          "unknown": 0
+        },
+        {
+          "stage": "receipt",
+          "count": 2,
+          "unknown": 0
+        },
+        {
+          "stage": "execution",
+          "count": 1,
+          "unknown": 0
+        },
+        {
+          "stage": "test",
+          "count": 1,
+          "unknown": 0
+        },
+        {
+          "stage": "question",
+          "count": 2,
+          "unknown": 0
+        },
+        {
+          "stage": "answer",
+          "count": 2,
+          "unknown": 0
+        },
+        {
+          "stage": "application",
+          "count": 1,
+          "unknown": 0
+        }
+      ],
+      "nodes": [
+        {
+          "id": "tl_b29c40fbdb93abfaad3164dcd07d049f",
+          "stage": "instruction",
+          "source_id": "input_984e2612-25e8-42a5-946b-91a3dfee1fdc",
+          "status": "accepted"
+        },
+        {
+          "id": "tl_504956e9a9153a76d4b88b033c7dddd7",
+          "stage": "receipt",
+          "source_id": "input_984e2612-25e8-42a5-946b-91a3dfee1fdc",
+          "status": "recorded"
+        },
+        {
+          "id": "tl_72cd76b2ca3d647547188a6bc4fd821c",
+          "stage": "execution",
+          "source_id": "cmd_d1e26ac8-2ccc-4c1a-b0f4-e05ac39aeac2",
+          "status": "succeeded"
+        },
+        {
+          "id": "tl_a309e8fcea086afb23993a94a55b524d",
+          "stage": "question",
+          "source_id": [
+            "question-1",
+            1,
+            "4d8bbe0116202e3918a70d60092c6828e77f9859a303cf2da52806e24f2e58bf"
+          ],
+          "status": "recorded_revision"
+        },
+        {
+          "id": "tl_82417c7a39b46126c8f0623be240c7e8",
+          "stage": "answer",
+          "source_id": "reply_cdf49c91-45ef-43d8-887c-0cabb6f96d54",
+          "status": "current"
+        },
+        {
+          "id": "tl_740c92c1adceacf0228cea6e76f4a797",
+          "stage": "answer",
+          "source_id": "evt_9686ac97826f97a5_8",
+          "status": "recorded"
+        },
+        {
+          "id": "tl_48764327c8abcea830375a87a603193b",
+          "stage": "receipt",
+          "source_id": "reply_cdf49c91-45ef-43d8-887c-0cabb6f96d54",
+          "status": "recorded"
+        },
+        {
+          "id": "tl_f3a0b1d076f61b2b7a3e535a0baa5334",
+          "stage": "application",
+          "source_id": "cmd_8300f50e-ed19-4fe2-aa6e-a6e51fe9af3c",
+          "status": "succeeded"
+        },
+        {
+          "id": "tl_38e5355b382c255580fbed68f53d0ebf",
+          "stage": "question",
+          "source_id": [
+            "question-1",
+            1,
+            "4d8bbe0116202e3918a70d60092c6828e77f9859a303cf2da52806e24f2e58bf"
+          ],
+          "status": "answered"
+        },
+        {
+          "id": "tl_67ae3616623d49eeff3588e327f2bad9",
+          "stage": "test",
+          "source_id": "evi_fdcb5b73-1150-4520-bf5d-bcbfd271992a",
+          "status": "current_full_pass"
+        }
+      ],
+      "links": [
+        {
+          "id": "tl_47b02a464bf1f763f07d4dfe2df71c75",
+          "from": "tl_b29c40fbdb93abfaad3164dcd07d049f",
+          "to": "tl_504956e9a9153a76d4b88b033c7dddd7",
+          "basis": "exact_input_command_id"
+        },
+        {
+          "id": "tl_1620866117a54ca5ab1b5adcf4cf82c5",
+          "from": "tl_b29c40fbdb93abfaad3164dcd07d049f",
+          "to": "tl_72cd76b2ca3d647547188a6bc4fd821c",
+          "basis": "verified_native_owner_session_input_hash"
+        },
+        {
+          "id": "tl_bc9eefbb74e0b7a0116e2aab715f15fb",
+          "from": "tl_a309e8fcea086afb23993a94a55b524d",
+          "to": "tl_82417c7a39b46126c8f0623be240c7e8",
+          "basis": "exact_question_revision_and_feedback"
+        },
+        {
+          "id": "tl_5bc3815f07e98746a27ce0bfbb91bbf4",
+          "from": "tl_82417c7a39b46126c8f0623be240c7e8",
+          "to": "tl_740c92c1adceacf0228cea6e76f4a797",
+          "basis": "exact_answer_event_id"
+        },
+        {
+          "id": "tl_d2c97b2627354a548bad7d81c3a49477",
+          "from": "tl_82417c7a39b46126c8f0623be240c7e8",
+          "to": "tl_48764327c8abcea830375a87a603193b",
+          "basis": "exact_input_command_id"
+        },
+        {
+          "id": "tl_e5476f40175f8cd10b767d1f3cbf6254",
+          "from": "tl_82417c7a39b46126c8f0623be240c7e8",
+          "to": "tl_f3a0b1d076f61b2b7a3e535a0baa5334",
+          "basis": "verified_native_owner_session_input_hash"
+        },
+        {
+          "id": "tl_e58e629209ab10693e43421a67b3584c",
+          "from": "tl_72cd76b2ca3d647547188a6bc4fd821c",
+          "to": "tl_67ae3616623d49eeff3588e327f2bad9",
+          "basis": "declared_acceptance_source_command_id",
+          "reference_id": "input_984e2612-25e8-42a5-946b-91a3dfee1fdc"
+        },
+        {
+          "id": "tl_158eb95cc8006101277ee253dc8882b0",
+          "from": "tl_67ae3616623d49eeff3588e327f2bad9",
+          "to": "tl_a309e8fcea086afb23993a94a55b524d",
+          "basis": "declared_question_source_evidence_id",
+          "reference_id": "evi_fdcb5b73-1150-4520-bf5d-bcbfd271992a"
+        },
+        {
+          "id": "tl_7802149f33448372d380ccb81dbf6545",
+          "from": "tl_67ae3616623d49eeff3588e327f2bad9",
+          "to": "tl_38e5355b382c255580fbed68f53d0ebf",
+          "basis": "declared_question_source_evidence_id",
+          "reference_id": "evi_fdcb5b73-1150-4520-bf5d-bcbfd271992a"
+        }
+      ],
+      "issues": [],
+      "replayed_commands": 0
+    },
+    {
+      "label": "source_change_stales_local_qa",
+      "state_revision": 11,
+      "history_revision": 9,
+      "trace_id": "tl_792e100f916ae217c48465b754bef34e",
+      "stages": [
+        {
+          "stage": "instruction",
+          "count": 1,
+          "unknown": 0
+        },
+        {
+          "stage": "receipt",
+          "count": 2,
+          "unknown": 0
+        },
+        {
+          "stage": "execution",
+          "count": 1,
+          "unknown": 0
+        },
+        {
+          "stage": "test",
+          "count": 1,
+          "unknown": 1
+        },
+        {
+          "stage": "question",
+          "count": 2,
+          "unknown": 0
+        },
+        {
+          "stage": "answer",
+          "count": 2,
+          "unknown": 0
+        },
+        {
+          "stage": "application",
+          "count": 1,
+          "unknown": 0
+        }
+      ],
+      "nodes": [
+        {
+          "id": "tl_b29c40fbdb93abfaad3164dcd07d049f",
+          "stage": "instruction",
+          "source_id": "input_984e2612-25e8-42a5-946b-91a3dfee1fdc",
+          "status": "accepted"
+        },
+        {
+          "id": "tl_504956e9a9153a76d4b88b033c7dddd7",
+          "stage": "receipt",
+          "source_id": "input_984e2612-25e8-42a5-946b-91a3dfee1fdc",
+          "status": "recorded"
+        },
+        {
+          "id": "tl_72cd76b2ca3d647547188a6bc4fd821c",
+          "stage": "execution",
+          "source_id": "cmd_d1e26ac8-2ccc-4c1a-b0f4-e05ac39aeac2",
+          "status": "succeeded"
+        },
+        {
+          "id": "tl_a309e8fcea086afb23993a94a55b524d",
+          "stage": "question",
+          "source_id": [
+            "question-1",
+            1,
+            "4d8bbe0116202e3918a70d60092c6828e77f9859a303cf2da52806e24f2e58bf"
+          ],
+          "status": "recorded_revision"
+        },
+        {
+          "id": "tl_82417c7a39b46126c8f0623be240c7e8",
+          "stage": "answer",
+          "source_id": "reply_cdf49c91-45ef-43d8-887c-0cabb6f96d54",
+          "status": "current"
+        },
+        {
+          "id": "tl_740c92c1adceacf0228cea6e76f4a797",
+          "stage": "answer",
+          "source_id": "evt_9686ac97826f97a5_8",
+          "status": "recorded"
+        },
+        {
+          "id": "tl_48764327c8abcea830375a87a603193b",
+          "stage": "receipt",
+          "source_id": "reply_cdf49c91-45ef-43d8-887c-0cabb6f96d54",
+          "status": "recorded"
+        },
+        {
+          "id": "tl_f3a0b1d076f61b2b7a3e535a0baa5334",
+          "stage": "application",
+          "source_id": "cmd_8300f50e-ed19-4fe2-aa6e-a6e51fe9af3c",
+          "status": "succeeded"
+        },
+        {
+          "id": "tl_38e5355b382c255580fbed68f53d0ebf",
+          "stage": "question",
+          "source_id": [
+            "question-1",
+            1,
+            "4d8bbe0116202e3918a70d60092c6828e77f9859a303cf2da52806e24f2e58bf"
+          ],
+          "status": "answered"
+        },
+        {
+          "id": "tl_67ae3616623d49eeff3588e327f2bad9",
+          "stage": "test",
+          "source_id": "evi_fdcb5b73-1150-4520-bf5d-bcbfd271992a",
+          "status": "unverified"
+        }
+      ],
+      "links": [
+        {
+          "id": "tl_47b02a464bf1f763f07d4dfe2df71c75",
+          "from": "tl_b29c40fbdb93abfaad3164dcd07d049f",
+          "to": "tl_504956e9a9153a76d4b88b033c7dddd7",
+          "basis": "exact_input_command_id"
+        },
+        {
+          "id": "tl_1620866117a54ca5ab1b5adcf4cf82c5",
+          "from": "tl_b29c40fbdb93abfaad3164dcd07d049f",
+          "to": "tl_72cd76b2ca3d647547188a6bc4fd821c",
+          "basis": "verified_native_owner_session_input_hash"
+        },
+        {
+          "id": "tl_bc9eefbb74e0b7a0116e2aab715f15fb",
+          "from": "tl_a309e8fcea086afb23993a94a55b524d",
+          "to": "tl_82417c7a39b46126c8f0623be240c7e8",
+          "basis": "exact_question_revision_and_feedback"
+        },
+        {
+          "id": "tl_5bc3815f07e98746a27ce0bfbb91bbf4",
+          "from": "tl_82417c7a39b46126c8f0623be240c7e8",
+          "to": "tl_740c92c1adceacf0228cea6e76f4a797",
+          "basis": "exact_answer_event_id"
+        },
+        {
+          "id": "tl_d2c97b2627354a548bad7d81c3a49477",
+          "from": "tl_82417c7a39b46126c8f0623be240c7e8",
+          "to": "tl_48764327c8abcea830375a87a603193b",
+          "basis": "exact_input_command_id"
+        },
+        {
+          "id": "tl_e5476f40175f8cd10b767d1f3cbf6254",
+          "from": "tl_82417c7a39b46126c8f0623be240c7e8",
+          "to": "tl_f3a0b1d076f61b2b7a3e535a0baa5334",
+          "basis": "verified_native_owner_session_input_hash"
+        },
+        {
+          "id": "tl_e58e629209ab10693e43421a67b3584c",
+          "from": "tl_72cd76b2ca3d647547188a6bc4fd821c",
+          "to": "tl_67ae3616623d49eeff3588e327f2bad9",
+          "basis": "declared_acceptance_source_command_id",
+          "reference_id": "input_984e2612-25e8-42a5-946b-91a3dfee1fdc"
+        },
+        {
+          "id": "tl_158eb95cc8006101277ee253dc8882b0",
+          "from": "tl_67ae3616623d49eeff3588e327f2bad9",
+          "to": "tl_a309e8fcea086afb23993a94a55b524d",
+          "basis": "declared_question_source_evidence_id",
+          "reference_id": "evi_fdcb5b73-1150-4520-bf5d-bcbfd271992a"
+        },
+        {
+          "id": "tl_7802149f33448372d380ccb81dbf6545",
+          "from": "tl_67ae3616623d49eeff3588e327f2bad9",
+          "to": "tl_38e5355b382c255580fbed68f53d0ebf",
+          "basis": "declared_question_source_evidence_id",
+          "reference_id": "evi_fdcb5b73-1150-4520-bf5d-bcbfd271992a"
+        }
+      ],
+      "issues": [
+        {
+          "code": "current_full_test_unknown",
+          "node_id": null,
+          "message": "現在のコードに対する全体試験の成功は未確認です。"
+        }
+      ],
+      "replayed_commands": 0
+    }
+  ],
+  "page_errors": [],
+  "measurements": {
+    "problem_detail_ms": 61.74260000000004
+  },
+  "baseline": null
+}

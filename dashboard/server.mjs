@@ -16,6 +16,7 @@ import { AnswerApplicationServer } from "./answer-application-server.mjs";
 import { BudgetAdmissionServer } from "./budget-server.mjs";
 import { createHistoryBackup, backupMaximum } from "./history-backup.mjs";
 import { AcceptanceStore } from "./acceptance.mjs";
+import { readCausalTimeline } from "./causal-timeline.mjs";
 import {
   ConnectionObservations,
   connectionReport,
@@ -436,6 +437,7 @@ export async function startDashboard(options) {
           route === "/connection-diagnostics-ui.mjs" ||
           route === "/answer-applications-ui.mjs" ||
           route === "/instruction-queue-ui.mjs" ||
+          route === "/causal-timeline-ui.mjs" ||
           route === "/cost-ledger-ui.mjs" ||
           route === "/budget-ui.mjs" ||
           route === "/favicon.ico" ||
@@ -533,6 +535,7 @@ export async function startDashboard(options) {
           "/connection-diagnostics-ui.mjs",
           "/answer-applications-ui.mjs",
           "/instruction-queue-ui.mjs",
+          "/causal-timeline-ui.mjs",
           "/cost-ledger-ui.mjs",
           "/budget-ui.mjs",
         ].includes(route)
@@ -716,6 +719,31 @@ export async function startDashboard(options) {
         }
         if (req.method === "GET" && route === "/api/state")
           return json(res, 200, await visibleState());
+        if (req.method === "GET" && route === "/api/timeline") {
+          if (!humanAuthorized && !adminAuthorized)
+            return json(res, 403, {
+              error: "Human or administrator credential required",
+            });
+          if (
+            [...url.searchParams.keys()].some(
+              (key) => !["after", "limit", "trace_id"].includes(key),
+            )
+          )
+            return json(res, 400, { error: "Unknown timeline parameter" });
+          try {
+            return json(
+              res,
+              200,
+              await readCausalTimeline(project, store.clone(), {
+                after: Number(url.searchParams.get("after") || 0),
+                limit: Number(url.searchParams.get("limit") || 10),
+                trace_id: url.searchParams.get("trace_id"),
+              }),
+            );
+          } catch (error) {
+            return json(res, error.status || 400, { error: error.message });
+          }
+        }
         if (req.method === "POST" && route?.startsWith("/api/update/")) {
           const operation = route.slice("/api/update/".length);
           if (

@@ -33,6 +33,11 @@ const identifier = (value, label) => {
 };
 const digest = (value) =>
   createHash("sha256").update(JSON.stringify(value)).digest("hex");
+const evidenceId = (value) =>
+  typeof value === "string" &&
+  /^evi_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(
+    value,
+  );
 function timestamp(value) {
   if (value == null) return null;
   check(
@@ -57,6 +62,7 @@ export function normalizeDecision(input) {
     "cost",
     "expires_at",
     "consumer_id",
+    "causal_source_evidence_ids",
   ]);
   check(
     ["consultation", "approval"].includes(input.kind),
@@ -152,6 +158,18 @@ export function normalizeDecision(input) {
       target?.run_id && target?.session_id,
       "An answer consumer requires exact run/session IDs",
     );
+  }
+  if (input.causal_source_evidence_ids !== undefined) {
+    const ids = input.causal_source_evidence_ids;
+    check(
+      Array.isArray(ids) &&
+        ids.length > 0 &&
+        ids.length <= 20 &&
+        ids.every(evidenceId) &&
+        new Set(ids).size === ids.length,
+      "Invalid causal_source_evidence_ids",
+    );
+    result.causal_source_evidence_ids = [...ids];
   }
   if (result.kind === "approval") {
     check(

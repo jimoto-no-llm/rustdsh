@@ -3,9 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node browser.mjs && node update-banner.mjs",
+    "test": "node browser.mjs && node update-banner.mjs && node causal-timeline.mjs",
     "test:harness": "node harness-settings.mjs",
-    "test:updates": "node update-banner.mjs"
+    "test:updates": "node update-banner.mjs",
+    "test:timeline": "node causal-timeline.mjs"
   },
   "devDependencies": {
     "esbuild": "0.27.0",

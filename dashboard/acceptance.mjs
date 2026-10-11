@@ -26,6 +26,9 @@ const text = (value, max = 1000) =>
   !/[\x00-\x1f\x7f]/.test(value);
 const id = (value) =>
   typeof value === "string" && /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/.test(value);
+const causalCommandId = (value) =>
+  typeof value === "string" &&
+  /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,159}$/.test(value);
 const evidenceId = (value) =>
   typeof value === "string" &&
   /^evi_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(
@@ -188,29 +191,33 @@ function target(value) {
   );
 }
 function evidence(value, project, reference) {
+  const fields = [
+    "schema",
+    "project_id",
+    "evidence_id",
+    "sequence",
+    "task_id",
+    "criterion_id",
+    "criterion_hash",
+    "scope",
+    "source",
+    "status",
+    "phase",
+    "reason",
+    "command",
+    "exit_code",
+    "target",
+    "stable_target",
+    "artifacts",
+    "started_at",
+    "finished_at",
+    "record_hash",
+  ];
+  const hasCausalSources = Object.hasOwn(value || {}, "causal_source_command_ids");
   check(
-    exact(value, [
-      "schema",
-      "project_id",
-      "evidence_id",
-      "sequence",
-      "task_id",
-      "criterion_id",
-      "criterion_hash",
-      "scope",
-      "source",
-      "status",
-      "phase",
-      "reason",
-      "command",
-      "exit_code",
-      "target",
-      "stable_target",
-      "artifacts",
-      "started_at",
-      "finished_at",
-      "record_hash",
-    ]) &&
+    (hasCausalSources
+      ? exact(value, [...fields, "causal_source_command_ids"])
+      : exact(value, fields)) &&
       value.schema === 1 &&
       value.project_id === project.id &&
       reference.evidence_id === value.evidence_id &&
@@ -228,6 +235,14 @@ function evidence(value, project, reference) {
       time(value.started_at) &&
       (value.finished_at === null || time(value.finished_at)) &&
       digest(value.record_hash),
+    "invalid_acceptance_evidence",
+  );
+  const causalSources = value.causal_source_command_ids ?? [];
+  check(
+    Array.isArray(causalSources) &&
+      causalSources.length <= 10 &&
+      causalSources.every(causalCommandId) &&
+      new Set(causalSources).size === causalSources.length,
     "invalid_acceptance_evidence",
   );
   target(value.target);
@@ -455,6 +470,7 @@ export class AcceptanceStore {
     timeout_ms = 60000,
     reported = null,
     images = [],
+    causal_source_command_ids = [],
   } = {}) {
     check(
       text(task_id, 160) && id(criterion_id),
@@ -466,6 +482,33 @@ export class AcceptanceStore {
         images.every(relativeInput),
       "invalid_image_references",
     );
+    check(
+      Array.isArray(causal_source_command_ids) &&
+        causal_source_command_ids.length <= 10 &&
+        causal_source_command_ids.every(causalCommandId) &&
+        new Set(causal_source_command_ids).size ===
+          causal_source_command_ids.length,
+      "invalid_causal_source_command_ids",
+    );
+    if (causal_source_command_ids.length) {
+      const state = (await ProjectStore.open(this.project)).value;
+      for (const commandId of causal_source_command_ids) {
+        const command =
+            state.instructions?.commands?.[commandId] ||
+            state.answer_applications?.commands?.[commandId],
+          consumer = command
+            ? state.answer_applications?.consumers?.[command.consumer_id]
+            : null;
+        check(
+          command?.project_id === this.project.id &&
+            command.native_command_id &&
+            consumer?.task_id === task_id &&
+            command.run_id === consumer.run_id &&
+            command.session_id === consumer.session_id,
+          "causal_source_command_unavailable_or_task_mismatch",
+        );
+      }
+    }
     if (argv !== null)
       check(
         Array.isArray(argv) &&
@@ -519,6 +562,7 @@ export class AcceptanceStore {
       target: observed,
       stable_target: false,
       artifacts: [],
+      causal_source_command_ids: [...causal_source_command_ids],
       started_at: new Date().toISOString(),
       finished_at: null,
       record_hash: "0".repeat(64),
@@ -667,6 +711,7 @@ export class AcceptanceStore {
       exit_code: record.exit_code,
       reason: record.reason,
       target: record.target,
+      causal_source_command_ids: record.causal_source_command_ids,
       private_record_directory: directory,
       permission_expanded: false,
     };

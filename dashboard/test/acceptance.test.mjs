@@ -6,8 +6,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { randomUUID } from "node:crypto";
 import { ProjectStore, identity } from "../state.mjs";
 import { AcceptanceStore } from "../acceptance.mjs";
+import { queueRevision } from "../instruction-queue.mjs";
+import { RunHistory } from "../run-history.mjs";
 
 const exec = promisify(execFile),
   cli = fileURLToPath(new URL("../cli.mjs", import.meta.url));
@@ -157,6 +160,77 @@ test("a reported pass and a partial observed pass cannot turn an unexecuted full
   assert.equal(view.verification.all_declared_full_checks_pass, false);
   assert.equal(view.conditions[0].full_result.source, "operator_reported");
   assert.equal(view.conditions[0].partial_result.status, "pass");
+});
+
+test("acceptance CLI records only task-matched native input command references", async (t) => {
+  const f = await setup(t),
+    history = await RunHistory.open(f.project),
+    run_id = "run_" + randomUUID(),
+    session_id = "native-acceptance-fixture",
+    consumer = await f.state.mutateReply("register", {
+      run_id,
+      cli_session_id: session_id,
+      task_id: "task-qa",
+    }),
+    command_id = "input_" + randomUUID(),
+    context = { consumer, available: true, owner_id: history.owner_id };
+  await f.state.mutateReply(
+    "instruction_submit",
+    {
+      command_id,
+      consumer_id: consumer.consumer_id,
+      run_id,
+      session_id,
+      text: "fixture source input",
+      mode: "next_turn",
+      expected_queue_revision: queueRevision(f.state.value),
+    },
+    { actor: "human", available: false },
+  );
+  await f.state.mutateReply("ack", { command_id, phase: "read" }, context);
+  await f.state.mutateReply(
+    "ack",
+    {
+      command_id,
+      phase: "begin",
+      attempt_id: "attempt_" + randomUUID(),
+      native_command_id: "cmd_" + randomUUID(),
+    },
+    context,
+  );
+  await f.store.define("task-qa", f.definition);
+  const resultFile = path.join(f.root, "reported-result.json");
+  await fs.writeFile(
+    resultFile,
+    JSON.stringify({ status: "pass", reason: "operator fixture report" }),
+  );
+  const { stdout } = await exec(
+    process.execPath,
+    [
+      cli,
+      "acceptance",
+      "report",
+      "--project",
+      f.cwd,
+      "--task-id",
+      "task-qa",
+      "--criterion-id",
+      "correct-result",
+      "--result-file",
+      resultFile,
+      "--causal-source-command-id",
+      command_id,
+    ],
+    { cwd: f.cwd, env: f.env },
+  );
+  const result = JSON.parse(stdout);
+  assert.deepEqual(result.causal_source_command_ids, [command_id]);
+  assert.equal(result.source, "operator_reported");
+  assert.equal(
+    (await f.store.inspect("task-qa")).conditions[0].full_result
+      .causal_source_command_ids[0],
+    command_id,
+  );
 });
 
 test("related code changes stale a pass and only a new successful check restores current verification", async (t) => {

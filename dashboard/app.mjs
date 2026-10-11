@@ -6,6 +6,7 @@ import { renderConnectionDiagnostics } from "./connection-diagnostics-ui.mjs";
 import { createInstructionPanel } from "./instruction-queue-ui.mjs";
 import { createCostPanel } from "./cost-ledger-ui.mjs";
 import { renderBudget } from "./budget-ui.mjs";
+import { createTimelinePanel } from "./causal-timeline-ui.mjs";
 
 const $ = (id) => document.getElementById(id);
 const base = location.pathname.startsWith("/_rdsh") ? "/_rdsh/" : "/";
@@ -46,6 +47,10 @@ function node(tag, text, className) {
 }
 let renderedRevision = -1;
 let latestState = null;
+const timeline = createTimelinePanel($("causal-timeline"), { api, node });
+setInterval(() => {
+  if (latestState?.project) void timeline.refresh();
+}, 5000);
 let selectedTask = "";
 let selectionKey = "";
 function navigateTo(id) {
@@ -147,6 +152,7 @@ function render(state) {
   if (state.revision < renderedRevision) return;
   renderedRevision = state.revision;
   latestState = state;
+  void timeline.refresh();
   renderInstructions(state);
   renderCosts(state);
   renderBudget($("budget-admission"), state, node);
