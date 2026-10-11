@@ -300,6 +300,7 @@ export class HumanMetricsStore {
   constructor(project) {
     this.file = path.join(project.directory, "human-metrics.json");
     this.value = null;
+    this.mutationQueue = Promise.resolve();
   }
 
   static async open(project) {
@@ -328,11 +329,11 @@ export class HumanMetricsStore {
     return store;
   }
 
-  async save() {
+  async save(value = this.value) {
     await fs.mkdir(path.dirname(this.file), { recursive: true });
     const temporary = `${this.file}.${process.pid}.${randomBytes(4).toString("hex")}.tmp`;
     try {
-      await fs.writeFile(temporary, JSON.stringify(this.value, null, 2) + "\n", {
+      await fs.writeFile(temporary, JSON.stringify(value, null, 2) + "\n", {
         mode: 0o600,
       });
       await fs.rename(temporary, this.file);
@@ -346,14 +347,29 @@ export class HumanMetricsStore {
     return summarizeHumanMetrics(this.value, now);
   }
 
-  requireEnabled() {
-    if (!this.value.enabled)
+  requireEnabled(value) {
+    if (!value.enabled)
       throw new Error("Local human metrics are disabled");
   }
 
-  append(kind, at, fields = {}) {
-    this.value.events.push({ kind, at, ...fields });
-    trimEvents(this.value, Date.parse(at));
+  append(value, kind, at, fields = {}) {
+    value.events.push({ kind, at, ...fields });
+    trimEvents(value, Date.parse(at));
+  }
+
+  async mutate(operation) {
+    const queued = this.mutationQueue.then(async () => {
+      const draft = structuredClone(this.value);
+      const result = await operation(draft);
+      if (result.persist !== false) {
+        validateState(draft);
+        await this.save(draft);
+        this.value = draft;
+      }
+      return result.value;
+    });
+    this.mutationQueue = queued.catch(() => {});
+    return queued;
   }
 
   async handle(input, state, now = Date.now()) {
@@ -377,123 +393,131 @@ export class HumanMetricsStore {
     if (Object.keys(input).some((key) => !allowedFields[action].includes(key)))
       throw new Error("Unknown local human metrics field");
 
-    if (action === "configure") {
-      if (typeof input.enabled !== "boolean")
-        throw new Error("enabled must be a boolean");
-      if (!retentionChoices.includes(input.retention_days))
-        throw new Error("retention_days must be 7, 30, or 90");
-      this.value.retention_days = input.retention_days;
-      if (input.enabled && !this.value.enabled) {
-        this.value.enabled = true;
-        this.value.coverage_sessions.push({ from: at, to: null });
-      } else if (!input.enabled && this.value.enabled) {
-        this.value.enabled = false;
-        this.value.coverage_sessions.at(-1).to = at;
-        if (this.value.active_timer) {
-          const kind = this.value.active_timer.kind;
-          this.value.active_timer = null;
+    if (action !== "configure" && action !== "clear")
+      await this.mutate((value) => {
+        this.requireEnabled(value);
+        if (
+          value.active_timer &&
+          Date.parse(value.active_timer.started_at) <
+            now - value.retention_days * dayMs
+        ) {
+          trimEvents(value, now);
+          return { value: null };
+        }
+        return { persist: false, value: null };
+      });
+
+    return this.mutate((value) => {
+      if (action === "configure") {
+        if (typeof input.enabled !== "boolean")
+          throw new Error("enabled must be a boolean");
+        if (!retentionChoices.includes(input.retention_days))
+          throw new Error("retention_days must be 7, 30, or 90");
+        value.retention_days = input.retention_days;
+        if (input.enabled && !value.enabled) {
+          value.enabled = true;
+          value.coverage_sessions.push({ from: at, to: null });
+        } else if (!input.enabled && value.enabled) {
+          value.enabled = false;
+          value.coverage_sessions.at(-1).to = at;
+          if (value.active_timer) {
+            const kind = value.active_timer.kind;
+            value.active_timer = null;
+            this.append(
+              value,
+              kind === "decision"
+                ? "abandoned_decision_timer"
+                : "abandoned_recovery_timer",
+              at,
+            );
+          }
+        }
+      } else if (action === "clear") {
+        const { enabled, retention_days } = value;
+        const cleared = emptyState();
+        cleared.enabled = enabled;
+        cleared.retention_days = retention_days;
+        if (enabled) cleared.coverage_sessions.push({ from: at, to: null });
+        Object.assign(value, cleared);
+      } else {
+        this.requireEnabled(value);
+        if (action === "start_decision_timer") {
+          if (
+            !state.questions?.some(
+              (question) => question.id === input.question_id && question.answer === null,
+            )
+          )
+            throw new Error("Choose an unanswered question for decision timing");
+          if (value.active_timer) throw new Error("A timer is already running");
+          value.active_timer = {
+            kind: "decision",
+            state: "running",
+            started_at: at,
+            resumed_at: at,
+            elapsed_ms: 0,
+          };
+        } else if (action === "start_recovery_timer") {
+          if (
+            !state.tasks?.some(
+              (task) => task.id === input.task_id && task.status === "blocked",
+            )
+          )
+            throw new Error("Choose a currently blocked task for recovery timing");
+          if (value.active_timer) throw new Error("A timer is already running");
+          value.active_timer = {
+            kind: "recovery",
+            state: "running",
+            started_at: at,
+            resumed_at: at,
+            elapsed_ms: 0,
+          };
+        } else if (action === "pause_timer") {
+          const timer = value.active_timer;
+          if (!timer || timer.kind !== "decision" || timer.state !== "running")
+            throw new Error("Only a running decision timer can be paused");
+          timer.elapsed_ms += Math.max(0, now - Date.parse(timer.resumed_at));
+          timer.state = "paused";
+          timer.resumed_at = null;
+        } else if (action === "resume_timer") {
+          const timer = value.active_timer;
+          if (!timer || timer.kind !== "decision" || timer.state !== "paused")
+            throw new Error("Only a paused decision timer can be resumed");
+          timer.state = "running";
+          timer.resumed_at = at;
+        } else if (action === "finish_timer") {
+          const timer = value.active_timer;
+          if (!timer) throw new Error("There is no active timer");
+          const duration =
+            timer.elapsed_ms +
+            (timer.state === "running" ? Math.max(0, now - Date.parse(timer.resumed_at)) : 0);
           this.append(
-            kind === "decision"
-              ? "abandoned_decision_timer"
-              : "abandoned_recovery_timer",
+            value,
+            timer.kind === "decision" ? "decision_time" : "recovery_time",
             at,
+            { started_at: timer.started_at, duration_ms: Math.round(duration) },
           );
+          value.active_timer = null;
+        } else if (action === "mark_question_recurrence") {
+          if (!state.questions?.some((question) => question.id === input.question_id))
+            throw new Error("Choose a recorded question");
+          this.append(value, "question_recurrence", at);
+        } else if (action === "mark_instruction_resend") {
+          if (!state.instructions?.requests?.[input.command_id])
+            throw new Error("Choose a recorded instruction");
+          this.append(value, "instruction_resend", at);
         }
       }
-    } else if (action === "clear") {
-      const { enabled, retention_days } = this.value;
-      this.value = emptyState();
-      this.value.enabled = enabled;
-      this.value.retention_days = retention_days;
-      if (enabled) this.value.coverage_sessions.push({ from: at, to: null });
-    } else {
-      this.requireEnabled();
-      if (
-        this.value.active_timer &&
-        Date.parse(this.value.active_timer.started_at) <
-          now - this.value.retention_days * dayMs
-      ) {
-        trimEvents(this.value, now);
-        validateState(this.value);
-        await this.save();
-      }
-      if (action === "start_decision_timer") {
-        if (
-          !state.questions?.some(
-            (question) => question.id === input.question_id && question.answer === null,
-          )
-        )
-          throw new Error("Choose an unanswered question for decision timing");
-        if (this.value.active_timer) throw new Error("A timer is already running");
-        this.value.active_timer = {
-          kind: "decision",
-          state: "running",
-          started_at: at,
-          resumed_at: at,
-          elapsed_ms: 0,
-        };
-      } else if (action === "start_recovery_timer") {
-        if (
-          !state.tasks?.some(
-            (task) => task.id === input.task_id && task.status === "blocked",
-          )
-        )
-          throw new Error("Choose a currently blocked task for recovery timing");
-        if (this.value.active_timer) throw new Error("A timer is already running");
-        this.value.active_timer = {
-          kind: "recovery",
-          state: "running",
-          started_at: at,
-          resumed_at: at,
-          elapsed_ms: 0,
-        };
-      } else if (action === "pause_timer") {
-        const timer = this.value.active_timer;
-        if (!timer || timer.kind !== "decision" || timer.state !== "running")
-          throw new Error("Only a running decision timer can be paused");
-        timer.elapsed_ms += Math.max(0, now - Date.parse(timer.resumed_at));
-        timer.state = "paused";
-        timer.resumed_at = null;
-      } else if (action === "resume_timer") {
-        const timer = this.value.active_timer;
-        if (!timer || timer.kind !== "decision" || timer.state !== "paused")
-          throw new Error("Only a paused decision timer can be resumed");
-        timer.state = "running";
-        timer.resumed_at = at;
-      } else if (action === "finish_timer") {
-        const timer = this.value.active_timer;
-        if (!timer) throw new Error("There is no active timer");
-        const duration =
-          timer.elapsed_ms +
-          (timer.state === "running" ? Math.max(0, now - Date.parse(timer.resumed_at)) : 0);
-        this.append(
-          timer.kind === "decision" ? "decision_time" : "recovery_time",
-          at,
-          { started_at: timer.started_at, duration_ms: Math.round(duration) },
-        );
-        this.value.active_timer = null;
-      } else if (action === "mark_question_recurrence") {
-        if (!state.questions?.some((question) => question.id === input.question_id))
-          throw new Error("Choose a recorded question");
-        this.append("question_recurrence", at);
-      } else if (action === "mark_instruction_resend") {
-        if (!state.instructions?.requests?.[input.command_id])
-          throw new Error("Choose a recorded instruction");
-        this.append("instruction_resend", at);
-      }
-    }
-    trimEvents(this.value, now);
-    validateState(this.value);
-    await this.save();
-    return this.snapshot(now);
+      trimEvents(value, now);
+      return { value: summarizeHumanMetrics(value, now) };
+    });
   }
 
   async recordQueueRevisionConflict(now = Date.now()) {
-    if (!this.value.enabled) return false;
     const at = new Date(now).toISOString();
-    this.append("queue_revision_conflict", at);
-    validateState(this.value);
-    await this.save();
-    return true;
+    return this.mutate((value) => {
+      if (!value.enabled) return { persist: false, value: false };
+      this.append(value, "queue_revision_conflict", at);
+      return { value: true };
+    });
   }
 }

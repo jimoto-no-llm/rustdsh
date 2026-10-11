@@ -62,6 +62,35 @@ try{
  await call('dashboard_upsert_task',{id:'T1',title:'E2E task',status:'doing'});
  await call('dashboard_ask_question',{id:'Q1',question:'E2E: choose an answer',urgency:'high'});
  const projectPage=await pageFor(browser,runtime.browser_url);await projectPage.locator('#question-Q1 textarea').waitFor();await check(projectPage,/dashboard/i);
+ await projectPage.evaluate(async()=>{
+  const {createHumanMetricsPanel}=await import(new URL('/human-metrics-ui.mjs',location.href).href);
+  const root=document.createElement('section');root.id='human-metrics-ui-regression';document.body.append(root);
+  const calls=[];
+  const metrics={enabled:true,retention_days:30,warning:null,coverage:{status:'observed',from:null,to:null,partial:false},decision_time:{status:'observed',sample_count:0,pending_count:0,unpaired_count:0,median_ms:null,total_ms:0},recovery_time:{status:'observed',sample_count:0,pending_count:0,unpaired_count:0,median_ms:null,total_ms:0},question_recurrence:{status:'observed',count:0},instruction_resend:{status:'observed',count:0},queue_revision_conflicts:{status:'observed',count:0},active_timer:null};
+  const panel=createHumanMetricsPanel(root,{api:async(_route,input)=>{if(input)calls.push(input);return structuredClone(metrics);},node:(tag,text,className)=>{const element=document.createElement(tag);if(text!==undefined)element.textContent=text;if(className)element.className=className;return element;},confirm:()=>true});
+  await panel.reload();panel.render({questions:[{id:'Q1',question:'Synthetic question',answer:null}],tasks:[{id:'T1',title:'Synthetic blocked task',status:'blocked'}],instructions:{requests:{C1:{command_id:'C1',text:'Synthetic instruction',mode:'normal',created_at:'2026-10-11T00:00:00.000Z'}}}});
+  window.__humanMetricsRegression={calls};
+ });
+ const metricsPanel=projectPage.locator('#human-metrics-ui-regression');const metricSelects=metricsPanel.locator('select');
+ for(const step of [
+  {select:1,value:'Q1',button:'判断時間を計測開始',action:'start_decision_timer'},
+  {select:2,value:'T1',button:'ブロック復旧の計測開始',action:'start_recovery_timer'},
+  {select:3,value:'Q1',button:'質問の再発として記録',action:'mark_question_recurrence'},
+  {select:4,value:'C1',button:'指示の再送として記録',action:'mark_instruction_resend'},
+ ]){
+  await metricSelects.nth(step.select).selectOption(step.value);
+  const button=metricsPanel.getByRole('button',{name:step.button});assert.equal(await button.isEnabled(),true,`${step.button} should enable after selection`);
+  await metricSelects.nth(step.select).selectOption('');assert.equal(await button.isDisabled(),true,`${step.button} should disable after clearing selection`);
+  await metricSelects.nth(step.select).selectOption(step.value);assert.equal(await button.isEnabled(),true,`${step.button} should enable again after reselection`);
+  await button.click();await projectPage.waitForFunction(action=>window.__humanMetricsRegression.calls.some(call=>call.action===action),step.action);
+ }
+ assert.deepEqual(await projectPage.evaluate(()=>window.__humanMetricsRegression.calls),[
+  {action:'start_decision_timer',question_id:'Q1'},
+  {action:'start_recovery_timer',task_id:'T1'},
+  {action:'mark_question_recurrence',question_id:'Q1'},
+  {action:'mark_instruction_resend',command_id:'C1'},
+ ]);
+ await metricsPanel.evaluate(element=>element.remove());report.flows.push('human metrics UI: selecting each action target enables its button and submits the selected id');
  await projectPage.locator('#question-Q1 textarea').fill('Keep this draft');
  const stateUpdate=projectPage.waitForResponse(r=>r.url().endsWith('/api/state')&&r.status()===200);
  await call('dashboard_update_metrics',{input_tokens:1000,cached_input_tokens:500,tool_calls:10,tool_errors:0});await stateUpdate;

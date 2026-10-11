@@ -285,6 +285,13 @@ export function createHumanMetricsPanel(root, { api, node, confirm }) {
     );
   enabled.addEventListener("change", saveSettings);
   retention.addEventListener("change", saveSettings);
+  for (const select of [
+    questionForTimer,
+    taskForTimer,
+    questionForRepeat,
+    commandForResend,
+  ])
+    select.addEventListener("change", setDisabled);
   startDecision.addEventListener("click", () =>
     act(
       { action: "start_decision_timer", question_id: questionForTimer.value },

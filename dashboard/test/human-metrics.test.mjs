@@ -38,6 +38,19 @@ async function freePort() {
   await new Promise((resolve) => server.close(resolve));
   return port;
 }
+function failNextSave(store) {
+  const save = store.save.bind(store);
+  let shouldFail = true;
+  store.save = async (value) => {
+    if (shouldFail) {
+      shouldFail = false;
+      throw Object.assign(new Error("injected metrics write failure"), {
+        code: "EIO",
+      });
+    }
+    return save(value);
+  };
+}
 
 test("known-time records calculate five distinct metrics and retain no source identifiers", async (t) => {
   const { project } = await temporaryProject(t, "rdsh-human-metrics-");
@@ -121,6 +134,76 @@ test("known-time records calculate five distinct metrics and retain no source id
   const exported = JSON.stringify(summary);
   assert.equal(exported.includes("question-id-secret"), false);
   assert.equal(exported.includes("PRIVATE QUESTION BODY"), false);
+});
+
+test("failed saves preserve committed metrics and allow safe retries", async (t) => {
+  const { project } = await temporaryProject(t, "rdsh-human-metrics-save-failure-");
+  const store = await HumanMetricsStore.open(project);
+  const state = {
+    questions: [{ id: "Q1", question: "Question", answer: null }],
+    tasks: [],
+    instructions: { requests: {} },
+  };
+  const start = Date.parse("2026-04-01T00:00:00.000Z");
+  await store.handle(
+    { action: "configure", enabled: true, retention_days: 30 },
+    state,
+    start,
+  );
+  await store.handle(
+    { action: "start_decision_timer", question_id: "Q1" },
+    state,
+    start + 1_000,
+  );
+
+  let diskBefore = await fs.readFile(store.file, "utf8");
+  failNextSave(store);
+  await assert.rejects(
+    store.handle({ action: "finish_timer" }, state, start + 10_000),
+    { code: "EIO" },
+  );
+  assert.equal(store.snapshot(start + 10_000).active_timer.kind, "decision");
+  assert.equal(store.snapshot(start + 10_000).decision_time.sample_count, 0);
+  assert.equal(await fs.readFile(store.file, "utf8"), diskBefore);
+
+  await store.handle({ action: "finish_timer" }, state, start + 10_000);
+  assert.equal(store.snapshot(start + 10_000).active_timer, null);
+  assert.equal(store.snapshot(start + 10_000).decision_time.sample_count, 1);
+  assert.equal(store.snapshot(start + 10_000).decision_time.total_ms, 9_000);
+
+  diskBefore = await fs.readFile(store.file, "utf8");
+  failNextSave(store);
+  await assert.rejects(
+    store.handle(
+      { action: "mark_question_recurrence", question_id: "Q1" },
+      state,
+      start + 11_000,
+    ),
+    { code: "EIO" },
+  );
+  assert.equal(store.snapshot(start + 11_000).question_recurrence.count, 0);
+  assert.equal(await fs.readFile(store.file, "utf8"), diskBefore);
+  await store.handle(
+    { action: "mark_question_recurrence", question_id: "Q1" },
+    state,
+    start + 11_000,
+  );
+  assert.equal(store.snapshot(start + 11_000).question_recurrence.count, 1);
+
+  diskBefore = await fs.readFile(store.file, "utf8");
+  failNextSave(store);
+  await assert.rejects(store.recordQueueRevisionConflict(start + 12_000), {
+    code: "EIO",
+  });
+  assert.equal(store.snapshot(start + 12_000).queue_revision_conflicts.count, 0);
+  assert.equal(await fs.readFile(store.file, "utf8"), diskBefore);
+  assert.equal(await store.recordQueueRevisionConflict(start + 12_000), true);
+
+  await Promise.all([
+    store.recordQueueRevisionConflict(start + 13_000),
+    store.recordQueueRevisionConflict(start + 14_000),
+  ]);
+  assert.equal(store.snapshot(start + 14_000).queue_revision_conflicts.count, 3);
 });
 
 test("missing observations stay unavailable, and abandoned timers are separate from zero", async (t) => {
