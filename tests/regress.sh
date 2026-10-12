@@ -1,5 +1,9 @@
 #!/bin/sh
 # rdsh CLI regression. Fails on first mismatch (set -e + explicit checks).
+if [ "${1:-}" = "--windows-installer-delegation" ]; then
+  shift
+  exec bash "$(dirname "$0")/regress-windows.sh" "$@"
+fi
 BIN="${BIN:-./target/release/rdsh}"
 pass=0
 ok() { pass=$((pass+1)); echo "ok: $1"; }
