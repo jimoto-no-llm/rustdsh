@@ -27,6 +27,15 @@ export TMPDIR="$TEST_ROOT/with space"
 mkdir -p "$TMPDIR" "$TEST_ROOT/with" "$TEST_ROOT/space"
 printf 'keep\n' > "$TEST_ROOT/with/keep.txt"
 printf 'keep\n' > "$TEST_ROOT/space/keep.txt"
+# GNU and BSD mktemp differ in their no-template default. Make the helper's
+# output deterministic so this test exercises cleanup of a path with spaces.
+mktemp() {
+  if [[ "$#" -ne 1 || "$1" != "-d" ]]; then
+    echo "unexpected mktemp arguments: $*" >&2
+    return 2
+  fi
+  command mktemp -d "$TMPDIR/rdsh.XXXXXXXXXX"
+}
 
 cd "$TEST_ROOT"
 new_download_tmpd
