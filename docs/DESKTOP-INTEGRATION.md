@@ -82,6 +82,27 @@ URLs, or an absolute path into a rustdsh checkout) while the app is running;
 this needs no `dsh` command and no `rdsh`. Use it when the app lives in a
 non-standard location or when you prefer the UI.
 
+### Testing on Linux (Fedora)
+
+Linux is **not a published Desktop release target**, so there is no installer to
+point at. `rdsh desktop` still finds an unpacked application:
+
+```sh
+# AppImage: extract it, then point at the extracted tree
+./DeepSeek-Harness-<version>.AppImage --appimage-extract
+DSH_DESKTOP_APP_DIR=$PWD/squashfs-root rdsh desktop status
+
+# Development / unpacked build
+DSH_DESKTOP_CLI=<app>/resources/runtime/cli/bin/dsh rdsh desktop status
+```
+
+Detection already covers `$APPDIR` (exported by a running AppImage),
+`~/squashfs-root`, `./squashfs-root`, `/opt/DeepSeek Harness`, and
+`~/.local/{share,opt}/DeepSeek Harness`. Everything after detection is
+identical to macOS and Windows: the same reserved profile, the same lock, the
+same **Plugins** page. Fedora needs no extra package beyond the app's own
+runtime; `zenity` or `kdialog` only affects the app's native folder dialog.
+
 ### All profiles in one command
 
 ```sh
@@ -128,6 +149,7 @@ See [WEB-COMPUTE.md](WEB-COMPUTE.md).
 | --- | --- |
 | `DSH_DESKTOP_APP_DIR` | where the application directory lives (non-standard install) |
 | `DSH_DESKTOP_CLI` | the Desktop-installed command to forward to; wins over detection |
+| `APPDIR` | the mount point a running AppImage exports; used as an application directory on Linux |
 | `DSH_DESKTOP_USER_DATA_DIR` | Electron userData override (development launches) |
 | `RDSH_PLUGINS_DIR` | rustdsh checkout (or `plugins/`) for `rdsh desktop install` |
 | `RDSH_BIN` | rdsh executable the plugins use for `--version` and the compute worker |

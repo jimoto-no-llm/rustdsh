@@ -119,6 +119,23 @@ test('status reports the Desktop command and enabled plugins', async (t) => {
   assert.deepEqual([settings.installed, settings.enabled], [true, true], 'scoped bundle alias counts as enabled');
 });
 
+test('an extracted AppImage is detected through APPDIR', {
+  skip: process.platform === 'darwin' || process.platform === 'win32'
+    ? 'APPDIR is a Linux AppImage variable'
+    : false,
+}, async (t) => {
+  const { box, env } = await baseEnv(t);
+  const app = join(box.root, 'squashfs-root');
+  const launcher = await stubCommand(box, join(app, 'resources', 'runtime', 'cli', 'bin'));
+  await initProfile(box, { name: 'dsh-profile-desktop' });
+  const status = await run(['desktop', 'status', '--json'], { ...env, APPDIR: app });
+  assert.equal(status.code, 0, status.stderr);
+  const report = JSON.parse(status.stdout);
+  assert.equal(report.app.path, app);
+  assert.equal(report.command.source, 'detected');
+  assert.equal(report.command.path, launcher);
+});
+
 test('install --dry-run prints the forwarded command and changes nothing', async (t) => {
   const { box, env } = await baseEnv(t);
   const command = await stubCommand(box);

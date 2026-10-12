@@ -74,6 +74,8 @@ pub struct OsEnv {
     pub desktop_user_data: Option<PathBuf>,
     /// `RDSH_PLUGINS_DIR`: rustdsh checkout (or its plugins directory).
     pub plugins_dir: Option<PathBuf>,
+    /// `APPDIR`: the mount point an AppImage runtime exports while it runs.
+    pub appimage_dir: Option<PathBuf>,
 }
 
 impl OsEnv {
@@ -99,6 +101,7 @@ impl OsEnv {
             desktop_cli: var("DSH_DESKTOP_CLI"),
             desktop_user_data: var("DSH_DESKTOP_USER_DATA_DIR"),
             plugins_dir: var("RDSH_PLUGINS_DIR"),
+            appimage_dir: var("APPDIR"),
         }
     }
 
@@ -194,9 +197,17 @@ pub fn app_candidates(env: &OsEnv) -> Vec<PathBuf> {
             }
         }
         _ => {
+            // Linux has no published Desktop release, so these cover what a
+            // Fedora test actually has: an extracted AppImage, a development
+            // build, or an unpacked copy under a user directory.
+            if let Some(dir) = &env.appimage_dir {
+                out.push(dir.clone());
+            }
             out.push(PathBuf::from("/opt").join(APP_NAME));
             out.push(env.home.join(".local").join("share").join(APP_NAME));
             out.push(env.home.join(".local").join("opt").join(APP_NAME));
+            out.push(env.home.join("squashfs-root"));
+            out.push(PathBuf::from("squashfs-root"));
         }
     }
     out
@@ -634,6 +645,19 @@ pub fn cmd_status(json_out: bool) -> Result<()> {
             out!(
                 "[rdsh] desktop app: set DSH_DESKTOP_APP_DIR or DSH_DESKTOP_CLI if it lives elsewhere"
             );
+            if env.platform != "macos" && env.platform != "windows" {
+                // Linux has no published Desktop build, so name the two ways a
+                // Fedora test can still have one.
+                out!(
+                    "[rdsh] desktop app: Linux is not a published Desktop target; for an AppImage run"
+                );
+                out!(
+                    "[rdsh] desktop app:   ./<file>.AppImage --appimage-extract  then  DSH_DESKTOP_APP_DIR=$PWD/squashfs-root"
+                );
+                out!(
+                    "[rdsh] desktop app: for a development build set DSH_DESKTOP_CLI=<app>/resources/runtime/cli/bin/dsh"
+                );
+            }
         }
     }
     match &command {
@@ -984,6 +1008,7 @@ mod tests {
             desktop_cli: None,
             desktop_user_data: None,
             plugins_dir: None,
+            appimage_dir: None,
         }
     }
 
@@ -1001,6 +1026,20 @@ mod tests {
             == &PathBuf::from("/Applications/DeepSeek Harness.app/resources/runtime/cli/bin/dsh")));
         let win = cli_paths(&PathBuf::from("C:/Apps/DeepSeek Harness"), "windows");
         assert!(win[0].ends_with("resources/runtime/cli/bin/dsh.cmd"));
+    }
+
+    #[test]
+    fn linux_candidates_cover_appimage_and_extracted_layouts() {
+        let root = temp_root("linux");
+        let mut env = base_env(&root);
+        let extracted = root.join("squashfs-root");
+        let candidates = app_candidates(&env);
+        assert!(candidates.contains(&root.join("home/squashfs-root")));
+        assert!(candidates.contains(&PathBuf::from("squashfs-root")));
+        // An AppImage runtime exports APPDIR; it must win over the guesses.
+        env.appimage_dir = Some(extracted.clone());
+        assert_eq!(app_candidates(&env)[0], extracted);
+        std::fs::remove_dir_all(&root).unwrap();
     }
 
     #[test]
