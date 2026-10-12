@@ -277,6 +277,29 @@ fn concurrent_session_writers_leave_parseable_correct_cache() {
     }
 }
 
+/// Tests run in parallel and each one spawns a server on loopback; on loaded
+/// CI runners several simultaneous startups were refused for the whole 15s
+/// readiness window. Serializing the startup (not the serving) keeps the
+/// fixture deterministic without changing what is tested.
+static SERVER_STARTUP: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// Connect to a fixture port, waiting up to 15s for a loaded runner to accept.
+fn connect_within(port: u16) -> TcpStream {
+    let deadline = Instant::now() + Duration::from_secs(15);
+    loop {
+        match TcpStream::connect(("127.0.0.1", port)) {
+            Ok(stream) => return stream,
+            Err(error) => {
+                assert!(
+                    Instant::now() < deadline,
+                    "server did not accept within 15s (port {port}): {error}"
+                );
+                std::thread::sleep(Duration::from_millis(250));
+            }
+        }
+    }
+}
+
 struct Server {
     child: Child,
     port: u16,
@@ -285,6 +308,9 @@ struct Server {
 }
 impl Server {
     fn start(f: &Fixture, args: &[&str]) -> Self {
+        let _startup_guard = SERVER_STARTUP
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let mut child = f
             .command(args)
             .stdin(Stdio::null())
@@ -369,30 +395,20 @@ impl Server {
             String::new()
         };
         let mut bytes = Vec::new();
-        // Loaded CI runners sometimes reset the connection before responding;
-        // retry the whole request a few times before giving up.
-        let mut attempts = 0;
+        // Loaded CI runners refuse or reset the loopback connection while the
+        // server is still coming up, so retry against a wall-clock deadline
+        // instead of a fixed attempt count.
+        let deadline = Instant::now() + Duration::from_secs(15);
         loop {
-            attempts += 1;
-            let mut stream = match TcpStream::connect(("127.0.0.1", self.port)) {
-                Ok(stream) => stream,
-                Err(_) if attempts < 4 => {
-                    std::thread::sleep(Duration::from_millis(500));
-                    continue;
-                }
-                Err(e) => panic!("connect failed: {e}"),
-            };
+            let mut stream = connect_within(self.port);
             stream
                 .set_read_timeout(Some(Duration::from_secs(60)))
                 .unwrap();
             write!(stream, "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1:{}\r\n{key}{extra}Content-Length: {}\r\nConnection: close\r\n\r\n{body}", self.port, body.len()).unwrap();
             bytes.clear();
-            if stream.read_to_end(&mut bytes).is_err() && attempts < 4 {
-                std::thread::sleep(Duration::from_millis(500));
-                continue;
-            }
+            let read_failed = stream.read_to_end(&mut bytes).is_err();
             // A reset can truncate the response, so only accept a complete
-            // status line; anything else retries until the attempt budget ends.
+            // status line; anything else retries until the deadline.
             let response = String::from_utf8_lossy(&bytes).into_owned();
             if let Some((head, body)) = response.split_once("\r\n\r\n") {
                 if let Some(status) = head
@@ -404,10 +420,10 @@ impl Server {
                 }
             }
             assert!(
-                attempts < 4,
-                "no complete HTTP response after {attempts} attempts"
+                Instant::now() < deadline,
+                "no complete HTTP response within 15s (read failed: {read_failed})"
             );
-            std::thread::sleep(Duration::from_millis(500));
+            std::thread::sleep(Duration::from_millis(250));
         }
     }
     fn stopped(&mut self) {
@@ -425,6 +441,30 @@ impl Drop for Server {
         let _ = self.child.wait();
         let _ = std::fs::remove_file(&self.handoff_path);
     }
+}
+
+#[test]
+fn setup_extras_follow_explicit_feature_switches() {
+    // Issue #384: an explicit features.<id> must drive both the value the setup
+    // UI shows and the value its switches write.
+    let f = Fixture::new();
+    f.settings(serde_json::json!({"features": {"serve": false}}));
+    let setup = Server::start(&f, &["setup", "--web", "--port", "0"]);
+    let (status, body) = setup.request("GET", "/api/extras", "", true, "");
+    assert_eq!(status, 200);
+    let listed: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(listed["enable"], serde_json::json!([]));
+    assert_eq!(
+        setup
+            .request("POST", "/api/extras", r#"{"enable":["serve"]}"#, true, "")
+            .0,
+        200
+    );
+    let saved: serde_json::Value =
+        serde_json::from_slice(&fs::read(f.0.join("dsh/rdsh.json")).unwrap()).unwrap();
+    assert_eq!(saved["features"]["serve"], serde_json::json!(true));
+    assert_eq!(saved["extras"]["enable"], serde_json::json!(["serve"]));
+    setup.request("POST", "/api/done", "{}", true, "");
 }
 
 #[test]
@@ -633,22 +673,7 @@ fn http_truncated_and_oversized_requests_do_not_damage_serve() {
     .into_iter()
     .enumerate()
     {
-        let mut stream = None;
-        for _ in 0..8 {
-            match TcpStream::connect(("127.0.0.1", server.port)) {
-                Ok(stream_) => {
-                    stream = Some(stream_);
-                    break;
-                }
-                Err(_) => std::thread::sleep(Duration::from_millis(500)),
-            }
-        }
-        let mut stream = stream.unwrap_or_else(|| {
-            panic!(
-                "server should accept connections (port {}, child status unknown)",
-                server.port
-            )
-        });
+        let mut stream = connect_within(server.port);
         stream
             .set_read_timeout(Some(Duration::from_secs(60)))
             .unwrap();

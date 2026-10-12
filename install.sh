@@ -8,17 +8,24 @@
 set -euo pipefail
 # Installer download scratch dirs; all cleaned at exit.
 DOWNLOAD_TMPD=""
-DOWNLOAD_TMPD_ALL=""
+# Downloads also run inside command substitutions, whose variable changes never
+# reach this shell, so the dirs are listed in a file the EXIT trap can read.
+DOWNLOAD_LIST=""
 # Update this version and the per-target hashes together from rustup's official archive.
 RUSTUP_INIT_VERSION="1.29.0"
 cleanup_downloads() {
-  # shellcheck disable=SC2086
-  for d in ${DOWNLOAD_TMPD_ALL:-}; do rm -rf "$d"; done
+  if [ -n "$DOWNLOAD_LIST" ] && [ -f "$DOWNLOAD_LIST" ]; then
+    while IFS= read -r d; do
+      [ -n "$d" ] && rm -rf "$d"
+    done < "$DOWNLOAD_LIST"
+    rm -f "$DOWNLOAD_LIST"
+  fi
 }
 new_download_tmpd() {
   DOWNLOAD_TMPD="$(mktemp -d)"
-  DOWNLOAD_TMPD_ALL="${DOWNLOAD_TMPD_ALL:+${DOWNLOAD_TMPD_ALL} }${DOWNLOAD_TMPD}"
+  printf '%s\n' "$DOWNLOAD_TMPD" >> "$DOWNLOAD_LIST"
 }
+DOWNLOAD_LIST="$(mktemp "${TMPDIR:-/tmp}/rdsh-download-list.XXXXXX")"
 trap cleanup_downloads EXIT
 PREFIX="${PREFIX:-$HOME/.local/bin}"
 MODE="rdsh"
