@@ -3,10 +3,24 @@
 All notable changes to this project are documented here.
 Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
-## [Unreleased]
+## [0.3.1] - 2026-10-12
+
+### Fixed
+
+- Dashboard: the model catalog module is authorized and served again, so project
+  pages render instead of failing with 401/404 and a blank screen.
+- `rdsh serve` no longer panics when its stderr is closed (for example
+  `rdsh serve 2>&1 | head -1`): log writes now ignore write errors.
+- `install.sh --from-release` removes every download directory at exit, so no
+  archive, sidecar or extracted binary is left behind in TMPDIR.
+- The setup web UI writes the canonical `features.<id>` switches and reports
+  their effective state, so its toggles match `rdsh features`.
+- Desktop: bundled plugin specs stay slash-separated on Windows.
+- Docs: the desktop integration table no longer trips the markdown linter.
 
 ### Added
 
+- The DSH web UI's rdsh section shows the running `rdsh` and `dsh` versions.
 - `rdsh desktop status|install|verify` detects the DeepSeek Harness Desktop
   (Electron) application, its reserved `$DSH_HOME/profiles/desktop` profile and
   its bundled command runtime, then attaches the rdsh plugins through that
@@ -205,6 +219,7 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 - Floating setup UI, dsh-default detection, SearXNG search.
 - Installers: install.sh (Linux/macOS/WSL), install.ps1 (Windows).
 
+[0.3.1]: docs/releases/v0.3.1.md
 [0.3.0]: docs/releases/v0.3.0.md
 [0.2.0]: docs/releases/v0.2.0.md
 [0.1.5]: https://github.com/jimoto-no-llm/rustdsh/compare/v0.1.4...v0.1.5

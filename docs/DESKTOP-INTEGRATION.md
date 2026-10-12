@@ -34,7 +34,7 @@ unit tests and a stub-command integration test; see
 | CLI (`dsh`) | `./install.sh --as-dsh` / `.\install.ps1 -AsDsh`; native fast paths answer, everything else delegates byte-identically | supported |
 | TUI profile | `rdsh tui` delegation plus `rdsh tokens/search/sessions/compact` | supported |
 | Web profile | `rdsh web`, the bundled plugins (`rdsh-settings`), `rdsh serve` dashboard | supported |
-| Desktop app | `rdsh desktop status|install|verify` attaches the plugins to the reserved profile through the app's own command runtime | supported (this document) |
+| Desktop app | `rdsh desktop status` / `install` / `verify` attach the plugins to the reserved profile through the app's own command runtime | supported (this document) |
 | Agent loop, profile boot, Electron shell | not reimplemented; rdsh never boots the `desktop` profile | out of scope |
 | In-app token/search/session delegation | pure compute (token estimate/prune) is the only in-app bridge, opt-in and fail-open | partial by design |
 
