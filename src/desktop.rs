@@ -739,18 +739,33 @@ fn desktop_targets(
     Ok((targets, root))
 }
 
+/// Everything `rdsh desktop install` needs, in one place: the CLI grows a
+/// flag now and then, and a struct keeps that growth out of the call site.
+#[derive(Debug, Clone, Default)]
+pub struct InstallOptions {
+    pub plugins_dir: Option<String>,
+    pub packages: Vec<String>,
+    pub no_bundled: bool,
+    pub dry_run: bool,
+    pub compute: bool,
+    pub no_sound: bool,
+    pub no_gitview: bool,
+    pub json: bool,
+}
+
 /// `rdsh desktop install` - forward `plugin --profile desktop add` to the
 /// Desktop-installed command runtime.
-pub fn cmd_install(
-    plugins_dir: Option<&str>,
-    packages: &[String],
-    no_bundled: bool,
-    dry_run: bool,
-    compute: bool,
-    no_sound: bool,
-    no_gitview: bool,
-    json_out: bool,
-) -> Result<()> {
+pub fn cmd_install(options: InstallOptions) -> Result<()> {
+    let InstallOptions {
+        plugins_dir,
+        packages,
+        no_bundled,
+        dry_run,
+        compute,
+        no_sound,
+        no_gitview,
+        json: json_out,
+    } = options;
     let env = OsEnv::from_process();
     let profile_dir = env.profile_dir();
     let profile = read_profile(&profile_dir);
@@ -769,8 +784,8 @@ pub fn cmd_install(
         );
     };
     let (targets, plugins_root) = desktop_targets(
-        plugins_dir,
-        packages,
+        plugins_dir.as_deref(),
+        &packages,
         no_bundled,
         compute,
         no_sound,

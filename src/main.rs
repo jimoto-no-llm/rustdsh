@@ -654,16 +654,16 @@ fn main() {
                 package,
                 no_bundled,
                 json: inner,
-            }) => desktop::cmd_install(
-                plugins_dir.as_deref(),
-                &package,
+            }) => desktop::cmd_install(desktop::InstallOptions {
+                plugins_dir,
+                packages: package,
                 no_bundled,
                 dry_run,
                 compute,
                 no_sound,
                 no_gitview,
-                json || inner,
-            ),
+                json: json || inner,
+            }),
             Some(DesktopAction::Verify {
                 require,
                 json: inner,
