@@ -142,7 +142,7 @@ fn decode_entities(s: &str) -> String {
         let num = &rest[..end];
         let ch = if num.len() > 8 || num.contains('&') {
             None
-        } else if let Some(hex) = num.strip_prefix('x').or_else(|| num.strip_prefix('X')) {
+        } else if let Some(hex) = num.strip_prefix(['x', 'X']) {
             u32::from_str_radix(hex, 16).ok().and_then(char::from_u32)
         } else {
             num.parse::<u32>().ok().and_then(char::from_u32)
@@ -162,7 +162,9 @@ fn clean(s: &str) -> String {
     decode_entities(&strip_tags(s))
 }
 
-/// First `href` + link text inside an `<article class="...result...">` block.
+/// First `href` + link text inside an `<article>` block whose `class`
+/// attribute marks it as a result. Only the start tag's class tokens decide:
+/// body text (title/URL/snippet) must never affect classification.
 fn parse_html(h: &str, limit: usize) -> Vec<Hit> {
     let mut hits = Vec::new();
     let mut rest = h;
@@ -174,7 +176,19 @@ fn parse_html(h: &str, limit: usize) -> Vec<Hit> {
             .unwrap_or(block.len());
         let blk = &block[..end];
         rest = &block[end.min(block.len())..];
-        if !blk.contains("result") || blk.contains("correction") {
+        // Classify by the article start tag's class tokens only: title, URL
+        // and snippet text must never affect the decision (#382).
+        let head = &blk[..blk
+            .find('>')
+            .map(|i| i + 1)
+            .unwrap_or(blk.len())
+            .min(blk.len())];
+        let class = attr(head, "class").unwrap_or_default();
+        let tokens: Vec<&str> = class.split_whitespace().collect();
+        if !tokens.iter().any(|t| t.contains("result")) {
+            continue;
+        }
+        if tokens.iter().any(|t| t.contains("correction")) {
             continue;
         }
         let href = match find_href(blk) {
@@ -207,10 +221,8 @@ fn find_href(blk: &str) -> Option<String> {
         let tag = &rest[a..];
         let close = tag.find('>')?;
         let head = &tag[..close];
-        if let Some(u) = attr(head, "href") {
-            if !u.is_empty() && !u.starts_with('#') {
-                return Some(decode_entities(&u));
-            }
+        if let Some(u) = attr(head, "href").filter(|u| !u.is_empty() && !u.starts_with('#')) {
+            return Some(decode_entities(&u));
         }
         rest = &tag[close + 1..];
     }
@@ -243,7 +255,8 @@ fn attr(tag_head: &str, name: &str) -> Option<String> {
         let after = &rest[i + name.len()..];
         let b = after.as_bytes();
         if b.len() < 2 || b[0] != b'=' || (b[1] != b'"' && b[1] != SQ) {
-            rest = &after[1.min(after.len())..];
+            let step = after.chars().next().map_or(0, char::len_utf8);
+            rest = &after[step..];
             continue;
         }
         let v = &after[2..];
@@ -495,6 +508,54 @@ mod tests {
         assert_eq!(hits[0].title, "A B");
         assert_eq!(hits[0].url, "https://e.com/x?a=1&b=2");
         assert_eq!(hits[0].content, "one <two>");
+    }
+
+    #[test]
+    fn html_parsing_keeps_correction_words_in_title_url_snippet() {
+        // Regression test for #382: the word "correction" in body text must
+        // not exclude a normal result; only the start tag's class tokens decide.
+        let h = concat!(
+            "<article class=\"result\"><h3><a href=\"https://example.invalid/a\">",
+            "Quantum error correction</a></h3><p class=\"content\">Useful paper</p></article>",
+            "<article class=\"result\"><h3><a href=\"https://example.invalid/correction-notes\">",
+            "Quantum paper</a></h3><p class=\"content\">Useful paper</p></article>",
+            "<article class=\"result\"><h3><a href=\"https://example.invalid/b\">",
+            "Quantum paper</a></h3><p class=\"content\">About error correction</p></article>",
+            "<article class=\"result result-correction\"><h3><a href=\"https://example.invalid/d\">",
+            "Did you mean?</a></h3></article>",
+        );
+        let hits = parse_html(h, 10);
+        assert_eq!(hits.len(), 3);
+        assert_eq!(hits[0].title, "Quantum error correction");
+        assert_eq!(hits[0].url, "https://example.invalid/a");
+        assert_eq!(hits[1].url, "https://example.invalid/correction-notes");
+        assert_eq!(hits[2].content, "About error correction");
+    }
+
+    #[test]
+    fn html_parsing_skips_utf8_attribute_name_candidates() {
+        for character in ["é", "→", "🦀"] {
+            let url = format!("https://example.invalid/{character}");
+            let title = format!("結果 {character}");
+            let html = format!(
+                "<article class=\"result\"><a title=\"href{character}\" href=\"{url}\">{title}</a></article>"
+            );
+
+            assert_eq!(
+                parse_html(&html, 1),
+                vec![Hit {
+                    title,
+                    url,
+                    content: String::new(),
+                }],
+                "failed to skip a {character:?} candidate"
+            );
+        }
+    }
+
+    #[test]
+    fn attribute_name_at_end_does_not_panic() {
+        assert_eq!(attr("href", "href"), None);
     }
 
     #[test]

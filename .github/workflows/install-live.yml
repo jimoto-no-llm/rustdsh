@@ -1,0 +1,22 @@
+name: install-live
+
+# Checks the installer a new user actually gets from the published channel:
+# the release's own install.sh plus its release assets, in clean containers.
+# A failure here means the published install path is broken for some supported
+# distro and needs a re-release; open the log to see which case failed.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 22 * * 0'
+
+permissions:
+  contents: read
+
+jobs:
+  published-install:
+    name: Published channel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install from the published release in clean containers
+        run: tests/install-isolated.sh --source published --installer published

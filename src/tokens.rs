@@ -167,7 +167,7 @@ pub fn cmd_tokens(files: Vec<String>, preview: usize) -> anyhow::Result<()> {
             out,
             "{{\"tokens\": {}, \"chars\": {}}}",
             estimate_tokens(&text),
-            text.len()
+            text.chars().count()
         )?;
         out.flush()?;
         return Ok(());
