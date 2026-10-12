@@ -844,6 +844,32 @@ fn api_key_action(key: &ApiKey, doc: &CredsDoc) -> &'static str {
     }
 }
 
+/// Collapse identical selected values for one ref and reject ambiguous updates.
+fn selected_api_keys<'a>(
+    scan: &'a Scan,
+    policy: &SharingPolicy,
+) -> anyhow::Result<Vec<&'a ApiKey>> {
+    let mut selected: Vec<&ApiKey> = Vec::new();
+    for key in scan
+        .keys
+        .iter()
+        .filter(|key| policy.allows(&key.from, &key.name))
+    {
+        if let Some(existing) = selected
+            .iter()
+            .copied()
+            .find(|existing| existing.name.as_str() == key.name.as_str())
+        {
+            if existing.value.as_str() != key.value.as_str() {
+                anyhow::bail!("conflicting selected sources provide different values for the same credential ref; no credentials were copied");
+            }
+        } else {
+            selected.push(key);
+        }
+    }
+    Ok(selected)
+}
+
 /// Import only entries whose source and credential were explicitly selected.
 fn apply_imports(policy: &SharingPolicy, quiet: bool) -> anyhow::Result<Vec<String>> {
     let scan = scan();
@@ -872,6 +898,9 @@ fn apply_imports_from_scan(
         return Ok(Vec::new());
     }
     ensure_writable_doc(&doc)?;
+    // Validate all selected ref values before mutating OAuth records or key refs.
+    // Multiple selected sources may expose the same destination ref.
+    let selected_keys = selected_api_keys(scan, policy)?;
     let selected: Vec<_> = scan
         .grants
         .iter()
@@ -906,11 +935,7 @@ fn apply_imports_from_scan(
             }
         }
     }
-    for key in scan
-        .keys
-        .iter()
-        .filter(|key| policy.allows(&key.from, &key.name))
-    {
+    for key in selected_keys {
         let action = api_key_action(key, &doc);
         if action == "ok" {
             continue;

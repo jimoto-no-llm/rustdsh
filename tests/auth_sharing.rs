@@ -148,6 +148,103 @@ fn selected_api_key_refresh_replaces_a_changed_existing_ref_and_reports_it() {
 }
 
 #[test]
+fn identical_selected_sources_for_one_ref_are_imported_once() {
+    let fixture = Fixture::new();
+    fixture.seed();
+    fixture.write(
+        "home/.codex/auth.json",
+        &serde_json::json!({ "OPENAI_API_KEY": ENV_OPENAI }).to_string(),
+    );
+
+    let mut selection = fixture.command();
+    let selected = selection
+        .env("OPENAI_API_KEY", ENV_OPENAI)
+        .args([
+            "auth",
+            "--select",
+            "codex:OPENAI_API_KEY",
+            "--select",
+            "env:OPENAI_API_KEY",
+            "--json",
+        ])
+        .output()
+        .unwrap();
+    assert!(selected.status.success(), "{}", public_output(&selected));
+
+    let mut import = fixture.command();
+    let output = import
+        .env("OPENAI_API_KEY", ENV_OPENAI)
+        .args(["auth", "--import", "--json"])
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "{}", public_output(&output));
+    let imported: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(
+        imported["wrote"],
+        serde_json::json!(["import ref OPENAI_API_KEY from codex"])
+    );
+    assert!(!public_output(&output).contains(ENV_OPENAI));
+    let stored = fixture.read("dsh/.credentials.yaml");
+    assert!(stored.contains(ENV_OPENAI));
+
+    let mut repeat = fixture.command();
+    let repeated = repeat
+        .env("OPENAI_API_KEY", ENV_OPENAI)
+        .args(["auth", "--import", "--json"])
+        .output()
+        .unwrap();
+    assert!(repeated.status.success(), "{}", public_output(&repeated));
+    let repeated: serde_json::Value = serde_json::from_slice(&repeated.stdout).unwrap();
+    assert_eq!(repeated["wrote"], serde_json::json!([]));
+    assert_eq!(fixture.read("dsh/.credentials.yaml"), stored);
+}
+
+#[test]
+fn conflicting_selected_sources_for_one_ref_fail_closed_without_writes() {
+    let fixture = Fixture::new();
+    fixture.seed();
+    let existing = format!(
+        "version: 1\nrefs:\n  OPENAI_API_KEY: '{}'\n  MANUAL_KEY: 'keep-this-entry'\n",
+        ENV_OPENAI
+    );
+    fixture.write("dsh/.credentials.yaml", &existing);
+
+    let mut selection = fixture.command();
+    let selected = selection
+        .env("OPENAI_API_KEY", ENV_OPENAI)
+        .args([
+            "auth",
+            "--select",
+            "codex:OPENAI_API_KEY",
+            "--select",
+            "env:OPENAI_API_KEY",
+            "--json",
+        ])
+        .output()
+        .unwrap();
+    assert!(selected.status.success(), "{}", public_output(&selected));
+
+    let original = fixture.read("dsh/.credentials.yaml");
+    for _ in 0..5 {
+        let mut import = fixture.command();
+        let output = import
+            .env("OPENAI_API_KEY", ENV_OPENAI)
+            .args(["auth", "--import", "--json"])
+            .output()
+            .unwrap();
+        assert!(
+            !output.status.success(),
+            "conflicting sources unexpectedly imported"
+        );
+        let text = public_output(&output);
+        assert!(text.contains("conflicting selected sources"), "{text}");
+        assert!(!text.contains(CODEX_KEY));
+        assert!(!text.contains(ENV_OPENAI));
+        assert_eq!(fixture.read("dsh/.credentials.yaml"), original);
+    }
+}
+
+#[test]
 fn one_time_key_reference_rejects_unlisted_names_without_writing() {
     let fixture = Fixture::new();
     fixture.seed();
