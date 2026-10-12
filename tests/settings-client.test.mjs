@@ -36,7 +36,7 @@ async function host(fetch) {
       module.factory(() => React).apply({ slots: {
         inject: (_name, install) => install(),
         register: (_options, section) => { component = section; },
-      } });
+      }, locale: {} });
     } } },
   });
   return {

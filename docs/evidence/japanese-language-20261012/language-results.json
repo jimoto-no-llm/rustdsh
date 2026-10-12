@@ -1,0 +1,24 @@
+{
+  "result": "PASS",
+  "scope": "Installed DSH Web UI, real rdsh plugin and Host locale preference; isolated homes; no credentials or model calls",
+  "page_errors": [],
+  "preference_writes": [
+    "ja",
+    "zh",
+    "en",
+    "ja"
+  ],
+  "dsh_version": "0.2.1-alpha.1",
+  "before_options": [
+    "中文",
+    "English"
+  ],
+  "after_options": [
+    "中文",
+    "English",
+    "日本語"
+  ],
+  "english_fallback": "Models",
+  "restart_preference": "ja",
+  "flow": "English menu -> Japanese -> Chinese -> English -> Japanese -> reload -> process restart with fresh English browser"
+}

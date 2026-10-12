@@ -51,6 +51,14 @@ means the settings flow passed, not that mobile UX was accepted.
 For an existing browser installation, set `RDSH_CHROME_PATH`; an environment with
 bundled Playwright can set `RDSH_PLAYWRIGHT_MODULE` to its module path.
 
+`npm run test:language` uses the same `RDSH_HARNESS_BIN` with a DSH version that
+supports `locale.addLanguage`. It checks the actual Language menu, Japanese
+General settings, English fallback, Chinese/English switching, reload, and a
+process restart in a fresh English browser. It isolates all profiles and disables
+Discord presence. Set `RDSH_LANGUAGE_BASELINE_CLIENT` to the previous
+`rdsh-settings/client.js` for real before/after PNGs. Results go to
+`target/harness-language-e2e` (or `RDSH_E2E_OUTPUT`).
+
 See [the verification matrix](../../docs/evidence/e2e-20261008.md) for observed
 coverage and remaining environment-specific checks.
 

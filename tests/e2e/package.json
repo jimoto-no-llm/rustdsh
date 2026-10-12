@@ -5,6 +5,7 @@
   "scripts": {
     "test": "node browser.mjs && node update-banner.mjs",
     "test:harness": "node harness-settings.mjs",
+    "test:language": "node harness-language.mjs",
     "test:updates": "node update-banner.mjs"
   },
   "devDependencies": {

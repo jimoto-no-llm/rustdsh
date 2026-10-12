@@ -6,6 +6,114 @@ window.__ModuleLoader__.load({
     const useState = React.useState;
     const useEffect = React.useEffect;
     const useCallback = React.useCallback;
+    // DSH language packs contribute to the existing selector and preference store.
+    // Keys outside this settings pack use the locale service's English fallback.
+    const japaneseDictionaries = {
+      common: {
+        'ok': 'OK', 'cancel': 'キャンセル', 'close': '閉じる',
+        'copy': 'コピー', 'copied': 'コピーしました',
+        'codeBlock.title': 'コードブロック', 'codeBlock.wrap': '行を折り返す',
+        'codeBlock.unwrap': '行を折り返さない', 'copy.failed': 'コピーに失敗しました',
+        'copy.value': '値をコピー', 'copy.json': 'JSONをコピー',
+        'copy.path': 'プロパティのパスをコピー', 'copy.prettyJson': '整形したJSONをコピー',
+        'copy.compactJson': '圧縮したJSONをコピー',
+        'copy.optionsHint': '{action}（右クリックでコピー方法を選択）',
+        'retry': '再試行', 'loading': '読み込み中…', 'load.failed': '読み込みに失敗しました',
+        'submit': '送信', 'submitting': '送信中…', 'next': '次へ',
+        'previous': '前へ', 'skip': 'スキップ', 'delete': '削除', 'edit': '編集',
+        'save': '保存', 'search': '検索', 'more': 'その他', 'collapse': '折りたたむ',
+        'expand': '展開', 'back': '戻る', 'brand.localBuild': 'DSH ローカルビルド',
+        'workspace.defaultName': '既定のワークスペース', 'unknown': '不明',
+        'none': 'なし', 'truncated': '省略あり', 'json.label': 'JSON',
+        'markdown.footnotes': '脚注', 'markdown.truncatedCharacters': '… {total}文字で省略',
+        'number.thousand': '{value}K', 'number.million': '{value}M',
+      },
+      'settings.locale': { 'language.title': '言語' },
+      settings: {
+        'trigger': '設定', 'shortcut.open': '設定を開く', 'title': '設定', 'close': '閉じる',
+        'openDocument': '設定ファイルを開く', 'openDocument.error': '設定ファイルを開けませんでした',
+        'general.nav': '一般', 'general.currentVersion': '現在のバージョン: {version}',
+        'developerTools.title': 'コーディング表示',
+        'developerTools.error': '保存できませんでした。再試行してください',
+        'developerTools.description': '作業の履歴、コード差分、すべてのエージェントプリセットを表示します',
+        'connection.error': '接続が切れました', 'connection.connecting': '再接続中',
+        'connection.connected': '接続しました', 'connection.reconnect': '接続が切れました。クリックで再接続',
+        'connection.restart': '再接続中です。クリックですぐに再接続',
+        'desktop.update.available': '更新', 'desktop.update.checking': '更新を確認中…',
+        'desktop.update.progress': '{percent}%', 'desktop.update.verifying': '更新ファイルを検証中…',
+        'desktop.update.installing': '再起動の準備中…', 'desktop.update.ready': 'インストールして再起動',
+        'desktop.update.retry': '更新を再試行', 'desktop.update.versionDetail': '{label}: {version}',
+        'desktop.update.downloadDetail': '更新をダウンロード中: {percent}%\n対象バージョン: {version}',
+        'desktop.update.checkFailed': '更新を確認できませんでした。しばらくしてから再試行してください。',
+        'desktop.update.downloadFailed': '更新をダウンロードできませんでした。再試行してください。',
+        'desktop.update.installFailed': '更新をインストールできませんでした。しばらくしてから再試行してください。',
+        'desktop.update.checkNetworkFailed': '更新を確認できませんでした。ネットワーク接続を確認して再試行してください。',
+        'desktop.update.downloadNetworkFailed': '更新をダウンロードできませんでした。ネットワーク接続を確認して再試行してください。',
+        'desktop.update.installNetworkFailed': '更新をインストールできませんでした。ネットワーク接続を確認して再試行してください。',
+        'desktop.update.stopFailed': 'タスクを安全に停止できなかったため、更新していません。しばらくしてから再試行してください。',
+        'desktop.update.tasksChanged': '新しいタスクが始まりました。停止して更新するか、もう一度確認してください。',
+        'desktop.update.tasksUnavailable': 'タスクの状態を確認できません。ワークスペースの準備ができてから再試行してください。',
+      },
+      'settings.theme': {
+        'appearance.title': '外観', 'appearance.light': 'ライト',
+        'appearance.dark': 'ダーク', 'appearance.system': 'システム',
+        // Font-size keys used by DSH 0.2.1-alpha.1 before per-role fonts.
+        'fontSize.title': '文字サイズ', 'fontSize.description': '会話の内容にのみ適用されます',
+        'fontSize.increase': '文字を大きくする', 'fontSize.decrease': '文字を小さくする',
+        'fontSize.text.title': '文字サイズ', 'fontSize.text.description': '会話の内容にのみ適用されます',
+        'fontSize.text.increase': '文字を大きくする', 'fontSize.text.decrease': '文字を小さくする',
+        'fontSize.code.title': 'コードの文字サイズ',
+        'fontSize.code.description': 'コードブロック、インラインコード、ツール出力に適用されます',
+        'fontSize.code.increase': 'コードの文字を大きくする', 'fontSize.code.decrease': 'コードの文字を小さくする',
+        'fontSize.terminal.title': 'ターミナルの文字サイズ',
+        'fontSize.terminal.description': 'サイドバーのターミナルに適用されます',
+        'fontSize.terminal.increase': 'ターミナルの文字を大きくする',
+        'fontSize.terminal.decrease': 'ターミナルの文字を小さくする', 'fontSize.unit': 'px',
+        'fontFamily.text.title': 'テキストのフォント',
+        'fontFamily.text.description': '画面と会話の文章に適用されます。複数のフォントはカンマで区切り、既定に戻すには空欄にします',
+        'fontFamily.code.title': 'コードのフォント',
+        'fontFamily.code.description': 'コードブロック、インラインコード、ツール出力に適用されます。複数のフォントはカンマで区切り、既定に戻すには空欄にします',
+        'fontFamily.terminal.title': 'ターミナルのフォント',
+        'fontFamily.terminal.description': 'サイドバーのターミナルに適用されます。複数のフォントはカンマで区切り、既定に戻すには空欄にします',
+        'fontFamily.placeholder': '既定', 'fontSize.more': 'その他のフォント設定',
+      },
+      'settings.permission': {
+        'title': '権限', 'description': '新しいセッションの既定の権限を選びます',
+        'loading': '読み込み中', 'unavailable': '利用できません',
+        'preset.readOnly': '読み取りのみ', 'preset.workspaceWrite': 'ワークスペース内の書き込み',
+        'preset.fullAccess': '完全なアクセス', 'confirm.title': '完全なアクセスを有効にしますか？',
+        'confirm.description': '完全なアクセスでは、新しいセッションの確認手順が減り、機密性の高い操作、ファイル変更、外部コマンドなどを直接実行できます。これから行うタスクを信頼できる場合にのみ使用してください。',
+        'confirm.acknowledge': 'リスクを理解したうえで続けます',
+        'confirm.cancel': 'キャンセル', 'confirm.enable': '完全なアクセスを有効にする',
+      },
+      chat: {
+        'settings.transcript.title': '作業の詳細',
+        'settings.transcript.description': 'ツール呼び出しの詳細をどこまで表示するか選びます',
+        'settings.transcript.compact': '簡潔', 'settings.transcript.standard': '標準',
+        'settings.transcript.detailed': '詳細', 'settings.transcript.verbose': 'すべて表示',
+      },
+      conversation: {
+        'settings.enter.title': '実行中の送信方法',
+        'settings.enter.description': 'エージェントの実行中にEnterキーと送信ボタンが行う操作です。Cmd/Ctrl+Enterではもう一方の操作になります',
+        'settings.enter.queue': '順番待ちに追加', 'settings.enter.steer': '実行中の作業に指示',
+      },
+      shortcuts: {
+        'title': 'キーボードショートカット', 'open': 'キーボードショートカットを開く',
+        'settings': 'キーボードショートカット', 'view': 'ショートカットを編集',
+        'description': 'ショートカットと入力操作の確認・編集ができます',
+        'search': 'ショートカットを検索', 'close': 'キーボードショートカットを閉じる',
+      },
+    };
+    function registerJapaneseLocale(ctx) {
+      // Older DSH clients still have locale, but predate language-pack registration.
+      if (typeof ctx.locale.addLanguage !== 'function') return;
+      // Another Japanese pack owns its dictionaries and language definition.
+      if (ctx.locale.getSnapshot().locales.some(({ id }) => id.toLowerCase() === 'ja')) return;
+      for (const [namespace, dictionary] of Object.entries(japaneseDictionaries)) {
+        ctx.effect(() => ctx.locale.register(namespace, 'ja', dictionary), `rdsh-settings: Japanese ${namespace}`);
+      }
+      ctx.effect(() => ctx.locale.addLanguage({ id: 'ja', label: '日本語', fallback: 'en' }), 'rdsh-settings: Japanese language');
+    }
     // 単一設定源: rdsh.json のみ。旧 rdsh-context.json はサーバ側の
     // 読み替え専用で、UIからは触らない。
     const GET_ALL = '/api/rdsh-settings';
@@ -252,8 +360,9 @@ window.__ModuleLoader__.load({
       );
     }
     return {
-      inject: ['slots'],
+      inject: ['slots', 'locale'],
       apply(ctx) {
+        registerJapaneseLocale(ctx);
         ctx.slots.inject('settings.section', () => ctx.slots.register({
           name: 'settings.section',
           id: 'rdsh',
