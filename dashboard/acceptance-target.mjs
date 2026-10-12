@@ -150,12 +150,22 @@ export async function observeTarget(project, inputs) {
       ),
     ].sort();
     requireValue(names.length <= 5000, "worktree_too_large");
+    requireValue(
+      Array.isArray(inputs) &&
+        inputs.length > 0 &&
+        inputs.every(relativeInput),
+      "invalid_input_path",
+    );
     const data = new Map();
     let total = 0;
     for (const name of names) {
       const file = path.resolve(root, name);
       // Acceptance storage cannot influence its own code snapshot.
       if (within(project.directory, file)) continue;
+      // Unrelated worktree files must not fail the whole observation.
+      // Explicit criterion inputs are validated above; forbidden paths such
+      // as secret-adjacent names stay out of the snapshot without being read.
+      if (!relativeInput(name)) continue;
       const observed = await observedFile(root, name);
       total += observed.bytes;
       requireValue(total <= 256 * 1024 * 1024, "worktree_too_large");

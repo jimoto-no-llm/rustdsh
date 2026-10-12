@@ -8,6 +8,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { ProjectStore, identity } from "../state.mjs";
 import { AcceptanceStore } from "../acceptance.mjs";
+import { observeTarget } from "../acceptance-target.mjs";
 
 const exec = promisify(execFile),
   cli = fileURLToPath(new URL("../cli.mjs", import.meta.url));
@@ -473,3 +474,45 @@ test("a successful command that changes its observed code target remains blocked
   assert.equal(view.reported_done_with_verified_checks, false);
   assert.equal(view.conditions[0].full_result.stable_target, false);
 });
+
+test("unrelated .env.example does not block observation of normal criterion inputs", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-env-example-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const repo = path.join(root, "repo");
+  await fs.mkdir(repo, { recursive: true });
+  const git = (...args) => exec("git", ["-C", repo, ...args]);
+  await git("init", "--quiet");
+  await fs.writeFile(path.join(repo, "app.mjs"), "export const answer = 42;\n");
+  await git("add", "app.mjs");
+  await exec("git", [
+    "-C",
+    repo,
+    "-c",
+    "user.name=Acceptance Fixture",
+    "-c",
+    "user.email=acceptance@example.invalid",
+    "-c",
+    "commit.gpgsign=false",
+    "commit",
+    "--quiet",
+    "-m",
+    "fixture",
+  ]);
+  const project = { root: repo, directory: path.join(root, "state") };
+  const before = await observeTarget(project, ["app.mjs"]);
+  assert.equal(before.status, "observed");
+  await fs.writeFile(
+    path.join(repo, ".env.example"),
+    "PUBLIC_OPTION=placeholder\n",
+  );
+  const untracked = await observeTarget(project, ["app.mjs"]);
+  assert.equal(untracked.status, "observed");
+  await git("add", ".env.example");
+  const tracked = await observeTarget(project, ["app.mjs"]);
+  assert.equal(tracked.status, "observed");
+  // Direct forbidden inputs stay rejected.
+  const direct = await observeTarget(project, [".env.example"]);
+  assert.equal(direct.status, "unknown");
+  assert.equal(direct.reason, "invalid_input_path");
+});
+
