@@ -128,9 +128,13 @@ test('install --dry-run prints the forwarded command and changes nothing', async
   assert.equal(code, 0);
   const report = JSON.parse(stdout);
   assert.equal(report.dry_run, true);
-  assert.equal(report.actions.length, 1);
+  assert.equal(report.actions.length, 3);
   assert.equal(report.actions[0].plugin, 'rdsh-settings');
   assert.deepEqual(report.actions[0].args, ['plugin', '--profile', 'desktop', 'add', join(box.checkout, 'plugins', 'rdsh-settings')]);
+  assert.equal(report.actions[1].plugin, 'dsh-sound-notifications');
+  assert.deepEqual(report.actions[1].args, ['plugin', '--profile', 'desktop', 'add', 'github:cwd514/dsh-sound-notifications']);
+  assert.equal(report.actions[2].plugin, 'dsh-gitview');
+  assert.deepEqual(report.actions[2].args, ['plugin', '--profile', 'desktop', 'add', 'github:yugapor/dsh-gitview']);
   assert.equal(existsSync(box.log), false, 'the Desktop command must not run on --dry-run');
   assert.equal(await readFile(box.profile, 'utf8'), before);
 });
@@ -143,9 +147,12 @@ test('install forwards to the Desktop command and verify then passes', async (t)
     ...env, DSH_DESKTOP_CLI: command, STUB_LOG: box.log, STUB_PROFILE: box.profile,
   });
   assert.equal(code, 0, stdout);
-  assert.deepEqual(JSON.parse(await readFile(box.log, 'utf8')), [
+  const calls = (await readFile(box.log, 'utf8')).trim().split('\n').map((line) => JSON.parse(line));
+  assert.deepEqual(calls[0], [
     'plugin', '--profile', 'desktop', 'add', join(box.checkout, 'plugins', 'rdsh-settings'),
   ]);
+  assert.deepEqual(calls[1], ['plugin', '--profile', 'desktop', 'add', 'github:cwd514/dsh-sound-notifications']);
+  assert.deepEqual(calls[2], ['plugin', '--profile', 'desktop', 'add', 'github:yugapor/dsh-gitview']);
   const verify = await run(['desktop', 'verify', '--json'], { ...env, DSH_DESKTOP_CLI: command });
   assert.equal(verify.code, 0, verify.stderr);
   assert.deepEqual(JSON.parse(verify.stdout).missing, []);
@@ -161,6 +168,27 @@ test('install --compute also attaches the compute bridge', async (t) => {
   assert.equal(code, 0);
   const verify = await run(['desktop', 'verify', '--require', 'rdsh-compute', '--json'], { ...env, DSH_DESKTOP_CLI: command });
   assert.equal(verify.code, 0, verify.stderr);
+});
+
+test('install --no-sound --no-gitview skips the default third-party plugins', async (t) => {
+  const { box, env } = await baseEnv(t);
+  const command = await stubCommand(box);
+  await initProfile(box, { name: 'dsh-profile-desktop' });
+  const { code, stdout } = await run(['desktop', 'install', '--dry-run', '--json', '--plugins-dir', box.checkout, '--no-sound', '--no-gitview'], { ...env, DSH_DESKTOP_CLI: command });
+  assert.equal(code, 0, stdout);
+  const report = JSON.parse(stdout);
+  assert.equal(report.actions.length, 1);
+  assert.equal(report.actions[0].plugin, 'rdsh-settings');
+});
+
+test('install --no-sound keeps gitview and vice versa', async (t) => {
+  const { box, env } = await baseEnv(t);
+  const command = await stubCommand(box);
+  await initProfile(box, { name: 'dsh-profile-desktop' });
+  const onlyGit = await run(['desktop', 'install', '--dry-run', '--json', '--plugins-dir', box.checkout, '--no-sound'], { ...env, DSH_DESKTOP_CLI: command });
+  assert.deepEqual(JSON.parse(onlyGit.stdout).actions.map((a) => a.plugin), ['rdsh-settings', 'dsh-gitview']);
+  const onlySound = await run(['desktop', 'install', '--dry-run', '--json', '--plugins-dir', box.checkout, '--no-gitview'], { ...env, DSH_DESKTOP_CLI: command });
+  assert.deepEqual(JSON.parse(onlySound.stdout).actions.map((a) => a.plugin), ['rdsh-settings', 'dsh-sound-notifications']);
 });
 
 test('install and verify refuse an uninitialized Desktop profile', async (t) => {
@@ -210,7 +238,7 @@ test('the packaged app layout is discovered without DSH_DESKTOP_CLI', async (t) 
     ...appEnv, STUB_LOG: box.log, STUB_PROFILE: box.profile,
   });
   assert.equal(install.code, 0, install.stderr);
-  assert.equal(JSON.parse(await readFile(box.log, 'utf8'))[0], 'plugin');
+  assert.equal(JSON.parse((await readFile(box.log, 'utf8')).trim().split('\n')[0])[0], 'plugin');
 });
 
 test('the stub launcher matches the host platform', async (t) => {

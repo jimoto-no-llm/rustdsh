@@ -60,7 +60,8 @@ rdsh context status   # 有効化後に記憶の状態を見る
 | discord | on | Discord Rich Presence（DSH Web が動いているときだけ表示） |
 | update_check | on | 更新確認と更新バナーの表示 |
 | update_notifications | on | 更新が見つかったときの通知 |
-| sound | off | DSH サウンド通知の導入（インストーラの SOUND=1） |
+| sound | on | DSH サウンド通知の導入（不要ならインストーラの SOUND=0／`features.sound=false`） |
+| gitview | on | DSH Git パネルの導入（不要ならインストーラの GITVIEW=0／`features.gitview=false`） |
 | serve | off | ローカル閲覧画面（rdsh serve） |
 | search-web | off | SearXNG 経由の Web 検索 |
 | context_engine | off | 実験的なコンテキストエンジン |
@@ -81,7 +82,7 @@ rdsh context status   # 有効化後に記憶の状態を見る
 
 - ネイティブ側（`serve` / `search-web` / `context_engine` / `setup_web`）は、無効なコマンドを実行すると理由と有効化方法を表示して終了します。
 - slim のヒント（`slim_lazy_plugins` / `slim_disable_voice` / `slim_disable_auto_review`）と `node_compile_cache` は、委譲して起動する DSH プロセスの環境変数に反映されます。
-- プラグイン側（`discord` / `sound` / `compute` / `budget_guard` / `release_probe` / `update_check` / `update_notifications`）は `rdsh.json` を読み込んで動作を停止します。DSH を再起動すると反映されます。
+- プラグイン側（`discord` / `sound` / `gitview` / `compute` / `budget_guard` / `release_probe` / `update_check` / `update_notifications`）は `rdsh.json` を読み込んで動作を停止します。DSH を再起動すると反映されます。
 
 ## context engine（実験的、既定OFF）
 

@@ -241,6 +241,12 @@ enum DesktopAction {
         /// Also install rdsh-compute (resident compute bridge)
         #[arg(long = "compute")]
         compute: bool,
+        /// Skip the default sound notifications (github:cwd514/dsh-sound-notifications)
+        #[arg(long = "no-sound")]
+        no_sound: bool,
+        /// Skip the default Git panel (github:yugapor/dsh-gitview)
+        #[arg(long = "no-gitview")]
+        no_gitview: bool,
         /// Extra package spec to add (name, git URL, or path; repeatable)
         #[arg(long = "package")]
         package: Vec<String>,
@@ -643,6 +649,8 @@ fn main() {
                 dry_run,
                 plugins_dir,
                 compute,
+                no_sound,
+                no_gitview,
                 package,
                 no_bundled,
                 json: inner,
@@ -652,6 +660,8 @@ fn main() {
                 no_bundled,
                 dry_run,
                 compute,
+                no_sound,
+                no_gitview,
                 json || inner,
             ),
             Some(DesktopAction::Verify {

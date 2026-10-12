@@ -52,7 +52,7 @@ for a in "$@"; do
       echo "  --no-rustup  do not auto-install Rust when cargo is missing"
       echo "  --from-release  install a prebuilt binary from GitHub Releases (no Rust needed)"
       echo "  --musl  use the static musl build (rdsh-linux-x64-musl.tar.gz; also via RDSH_MUSL=1)"
-      echo "  --desktop  also attach the bundled plugins to the DeepSeek Harness Desktop profile"
+      echo "  --desktop  also attach the bundled + default third-party (sound, gitview) plugins to the Desktop profile"
       echo "  --version=VER  release to fetch with --from-release (default: latest)"
       echo "  native Windows: use install.ps1 instead (it can also side-install into WSL via -Wsl)"
       exit 0 ;;

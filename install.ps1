@@ -13,7 +13,7 @@
 #   .\install.ps1 -Wsl             # also install inside WSL via install.sh
 #   .\install.ps1 -FromRelease      # prebuilt binary from GitHub Releases (no Rust needed)
 #   .\install.ps1 -FromRelease -Version v0.1.2  # pinned release
-#   .\install.ps1 -Desktop         # also attach the rdsh plugins to DeepSeek Harness Desktop
+#   .\install.ps1 -Desktop         # also attach the rdsh + default third-party (sound, gitview) plugins to Desktop
 param(
   [switch]$AsDsh,
   [switch]$Restore,

@@ -230,8 +230,9 @@ rewrites the profile:
 
 ```sh
 rdsh desktop status                 # app, command runtime, profile, plugin state (read-only)
-rdsh desktop install --plugins-dir .   # attach rdsh-settings to the desktop profile
+rdsh desktop install --plugins-dir .   # rdsh-settings + default third-party (sound, gitview)
 rdsh desktop install --plugins-dir . --compute   # + the resident compute bridge
+rdsh desktop install --plugins-dir . --no-sound --no-gitview  # skip third-party
 rdsh desktop verify                 # exit nonzero when the profile has no rdsh plugin
 ```
 
@@ -326,6 +327,7 @@ Thanks to the upstream developers and everyone contributing code, reviews, tests
 - Security reports & review: [GrEarl](https://github.com/GrEarl), [PENTACoXIAN](https://x.com/PENTACoXIAN)
 - Contributions & validation: [StudioYebisu](https://github.com/yebisu0529-ship-it), [RNA4219](https://github.com/RNA4219), [eightman999](https://github.com/eightman999)
 - Ideas & feedback: [@remydre8](https://x.com/remydre8)
+- Default Web UI plugins (used with upstream permission, MIT): [dsh-sound-notifications](https://github.com/cwd514/dsh-sound-notifications) by [cwd514](https://github.com/cwd514) ((c) 2026) — synthesized tones and desktop notifications; [dsh-gitview](https://github.com/yugapor/dsh-gitview) by [yugapor](https://github.com/yugapor) ((c) 2026) — Git panel with diffs, history, and CI status. Both are fetched from upstream GitHub at install time (see `plugins/recommended.md`).
 
 ## License
 

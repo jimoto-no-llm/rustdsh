@@ -2,24 +2,29 @@
 # Install recommended dsh plugins into a profile (idempotent per package).
 # Also installs the bundled rdsh plugins (rdsh settings UI) so they are
 # available by default.
-# Usage: [PROFILE=headless] [DRY_RUN=1] [SOUND=1] [COMPUTE=1] ./plugins/install.sh
+# Usage: [PROFILE=headless] [DRY_RUN=1] [SOUND=0] [GITVIEW=0] [COMPUTE=1] ./plugins/install.sh
 # PROFILE=desktop targets the Electron application's reserved profile: the npm
 # dsh CLI refuses it, so the work is forwarded to the Desktop-installed command
 # through `rdsh desktop install` (or you install the packages from the app's
 # own Plugins page).
-# SOUND=1 also installs the third-party Web UI sound/desktop notifications
-# (MIT, cwd514/dsh-sound-notifications, zero dependencies). It is a browser
-# client plugin, so PROFILE=web is the intended target.
+# Third-party Web UI plugins are installed by default (both MIT, used with
+# upstream permission; see Credits in README.md and plugins/recommended.md):
+# - sound/desktop notifications (cwd514/dsh-sound-notifications, zero deps)
+# - Git panel (yugapor/dsh-gitview).
+# They are browser client plugins, so PROFILE=web is the intended target.
+# Set SOUND=0 or GITVIEW=0 to skip one of them.
 set -u
 PROFILE="${PROFILE:-headless}"
 DRY_RUN="${DRY_RUN:-0}"
-SOUND="${SOUND:-0}"
+SOUND="${SOUND:-1}"
+GITVIEW="${GITVIEW:-1}"
 COMPUTE="${COMPUTE:-0}"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-# SOUND=1 is this installer's own opt-in; features.sound=false in rdsh.json is
-# the veto. A missing/corrupt file, an absent id, or no node keeps the previous
-# behavior, so the feature switch never removes an offer by surprise.
+# SOUND/GITVIEW default to 1 (opt-out with =0); features.sound=false and
+# features.gitview=false in rdsh.json are the vetoes. A missing/corrupt file,
+# an absent id, or no node keeps the previous behavior, so the feature switch
+# never removes an offer by surprise.
 sound_enabled() {
   [ "$SOUND" = "1" ] || return 1
   command -v node >/dev/null 2>&1 || return 0
@@ -29,6 +34,18 @@ sound_enabled() {
     try {
       const doc = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
       process.exit(doc && doc.features && doc.features.sound === false ? 1 : 0);
+    } catch { process.exit(0); }
+  ' "$settings" 2>/dev/null
+}
+gitview_enabled() {
+  [ "$GITVIEW" = "1" ] || return 1
+  command -v node >/dev/null 2>&1 || return 0
+  settings="${DSH_HOME:-${HOME:-}/.dsh}/rdsh.json"
+  node -e '
+    const fs = require("node:fs");
+    try {
+      const doc = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+      process.exit(doc && doc.features && doc.features.gitview === false ? 1 : 0);
     } catch { process.exit(0); }
   ' "$settings" 2>/dev/null
 }
@@ -53,6 +70,8 @@ if [ "$PROFILE" = "desktop" ]; then
     echo "packages on the app's Plugins page:" >&2
     for p in $PKGS; do echo "  $p" >&2; done
     echo "  $REPO_ROOT/plugins/rdsh-settings" >&2
+    echo "  github:cwd514/dsh-sound-notifications (default; SOUND=0 to skip)" >&2
+    echo "  github:yugapor/dsh-gitview (default; GITVIEW=0 to skip)" >&2
     exit 1
   fi
   ARGS="--no-bundled"
@@ -60,6 +79,7 @@ if [ "$PROFILE" = "desktop" ]; then
   ARGS="$ARGS --package $REPO_ROOT/plugins/rdsh-settings"
   [ "$COMPUTE" = "1" ] && ARGS="$ARGS --package $REPO_ROOT/plugins/rdsh-compute"
   if sound_enabled; then ARGS="$ARGS --package github:cwd514/dsh-sound-notifications"; fi
+  if gitview_enabled; then ARGS="$ARGS --package github:yugapor/dsh-gitview"; fi
   if [ "$DRY_RUN" = "1" ]; then
     echo "$RDSH desktop install $ARGS"
     exit 0
@@ -111,6 +131,21 @@ if sound_enabled; then
   else
     if dsh plugin --profile "$PROFILE" add "$p"; then
       echo "installed: $p (third-party sound notifications)"
+      ok=$((ok + 1))
+    else
+      echo "FAILED: $p" >&2
+      fail=$((fail + 1))
+    fi
+  fi
+fi
+if gitview_enabled; then
+  p="github:yugapor/dsh-gitview"
+  if [ "$DRY_RUN" = "1" ]; then
+    echo "dsh plugin --profile $PROFILE add $p"
+    ok=$((ok + 1))
+  else
+    if dsh plugin --profile "$PROFILE" add "$p"; then
+      echo "installed: $p (third-party git panel)"
       ok=$((ok + 1))
     else
       echo "FAILED: $p" >&2

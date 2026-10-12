@@ -51,8 +51,9 @@ not attempt to boot a profile the app owns.
 
    ```sh
    rdsh desktop status                     # read-only: app, command, profile, plugins
-   rdsh desktop install --plugins-dir .    # installs rdsh-settings
+   rdsh desktop install --plugins-dir .    # rdsh-settings + default third-party (sound, gitview)
    rdsh desktop install --plugins-dir . --compute   # also rdsh-compute
+   rdsh desktop install --plugins-dir . --no-sound --no-gitview  # skip third-party
    ```
 
    `rdsh desktop install` resolves the Desktop command — `DSH_DESKTOP_CLI`,
@@ -84,10 +85,11 @@ non-standard location or when you prefer the UI.
 ### All profiles in one command
 
 ```sh
-PROFILE=web      ./plugins/install.sh    # recommended plugins, web profile
+PROFILE=web      ./plugins/install.sh    # recommended plugins, web profile (+ default third-party)
 PROFILE=tui      ./plugins/install.sh    # tui profile
 PROFILE=desktop  ./plugins/install.sh    # forwarded through `rdsh desktop install`
 PROFILE=desktop COMPUTE=1 ./plugins/install.sh   # plus the compute bridge
+PROFILE=web SOUND=0 GITVIEW=0 ./plugins/install.sh  # skip the default third-party plugins
 ```
 
 `PROFILE=desktop` never calls `dsh plugin` directly (the npm CLI refuses the
@@ -96,9 +98,10 @@ reserved profile); it forwards every package to `rdsh desktop install
 Plugins-page steps instead.
 
 The installers can do this inline: `./install.sh --desktop` and
-`.\install.ps1 -Desktop` attach `rdsh-settings` and `rdsh-compute` after
-installing the launcher. Both are no-ops when no initialized Desktop profile is
-detected, and neither fails the installation.
+`.\install.ps1 -Desktop` attach `rdsh-settings`, `rdsh-compute`, and the default
+third-party plugins (sound, gitview) after installing the launcher. Both are
+no-ops when no initialized Desktop profile is detected, and neither fails the
+installation.
 
 `--plugins-dir` must name a directory whose `rdsh-settings/package.json` is
 valid JSON with `"name": "rdsh-settings"`; anything else is skipped rather than
@@ -110,6 +113,8 @@ forwarded. On Unix a non-executable `DSH_DESKTOP_CLI` is run through `sh`.
 | --- | --- | --- |
 | `rdsh-settings` | rdsh settings section in the app's settings, Discord Rich Presence, context-engine switches, `rdsh.json` editing | none (default) |
 | `rdsh-compute` | resident `rdsh compute` worker for token estimate/batch/prune through the Web plugin bridge | `rdsh features on compute` (off by default) |
+| `github:cwd514/dsh-sound-notifications` (MIT, (c) 2026 cwd514) | effect sounds and desktop notifications for reply-done / approval / questions / errors | default on; `rdsh desktop install --no-sound`, `SOUND=0`, or `features.sound=false` to skip |
+| `github:yugapor/dsh-gitview` (MIT, (c) 2026 yugapor) | Git panel: changes, diffs, history, branches, blame, CI status | default on; `rdsh desktop install --no-gitview`, `GITVIEW=0`, or `features.gitview=false` to skip |
 | recommended upstream packages | `dsh-tool-present`, `dsh-tool-ask-user`, `dsh-skill-office`, `dsh-mcp-client`, and the rest of `plugins/recommended.md` | `PROFILE=desktop ./plugins/install.sh` (forwards the same command), or the Plugins page |
 
 The compute bridge keeps its documented contract: pure string operations only,

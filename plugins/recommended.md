@@ -20,7 +20,7 @@ absent from the `dsh-base` bundle, so each one adds real capability.
 ./plugins/install.sh                    # PROFILE=headless (default)
 PROFILE=web ./plugins/install.sh       # install into the web profile instead
 DRY_RUN=1 ./plugins/install.sh         # print the pnpm commands only
-PROFILE=web SOUND=1 ./plugins/install.sh  # also add Web sound/desktop notifications (below)
+PROFILE=web SOUND=0 GITVIEW=0 ./plugins/install.sh  # skip the default third-party Web UI plugins (below)
 ```
 
 ### Desktop app (Electron) profile
@@ -30,8 +30,9 @@ bundled command runtime, and the npm `dsh` CLI refuses to manage it. Use the
 profile installer, which forwards every package to the app's own command:
 
 ```sh
-PROFILE=desktop ./plugins/install.sh              # recommended + bundled plugins
+PROFILE=desktop ./plugins/install.sh              # recommended + bundled + default third-party plugins
 PROFILE=desktop COMPUTE=1 ./plugins/install.sh    # plus the compute bridge
+PROFILE=desktop SOUND=0 GITVIEW=0 ./plugins/install.sh  # skip the default third-party plugins
 ```
 
 It runs `rdsh desktop install --no-bundled --package <spec>`, which invokes
@@ -41,23 +42,29 @@ install the same packages without a command runtime. The installers do the same
 inline with `./install.sh --desktop` or `.\install.ps1 -Desktop`. See
 [docs/DESKTOP-INTEGRATION.md](../docs/DESKTOP-INTEGRATION.md).
 
-## Optional Web UI plugins (third-party, opt-in)
+## Default Web UI plugins (third-party, MIT, used with permission)
 
-Installed only when `SOUND=1` is set. Kept out of the default set so the
-base install stays first-party and dependency-free.
+Installed by default. Set `SOUND=0` or `GITVIEW=0` to skip one of them, or
+`features.sound=false` / `features.gitview=false` in `rdsh.json` to veto them.
+`rdsh desktop install` includes both by default as well (`--no-sound` /
+`--no-gitview` to skip).
 
 | Package | Why |
 | --- | --- |
 | `github:cwd514/dsh-sound-notifications` (MIT, (c) 2026 cwd514) | Effect sounds (Web Audio synthesis, no audio files) and desktop notifications for reply-done / approval-waiting / questions / errors / re-login. Zero dependencies, no build step. Verified by upstream on DSH `0.2.0-rc.2` Web UI. |
+| `github:yugapor/dsh-gitview` (MIT, (c) 2026 yugapor) | Git panel in the Web sidebar: working-tree changes, staging and commits, unified/side-by-side diffs, commit graph, branches, blame, reflog, and CI status. Verified by upstream on DSH `0.2.0-rc.2` Web UI. |
 
 Notes:
 
-- Browser client plugin: use `PROFILE=web`. Desktop notifications additionally
+- Browser client plugins: use `PROFILE=web`. Desktop notifications additionally
   need a secure context (`127.0.0.1`/`localhost`/`https`) and the browser's
   notification permission; otherwise only the sounds play (see upstream README).
 - Installed from upstream GitHub at install time, not vendored here, so fixes
-  arrive without a rustdsh release. Upstream repo:
-  <https://github.com/cwd514/dsh-sound-notifications>
+  arrive without a rustdsh release. Upstream repos:
+  <https://github.com/cwd514/dsh-sound-notifications> and
+  <https://github.com/yugapor/dsh-gitview>.
+- Credits: see [Credits](../README.md#credits). Both plugins are used with
+  upstream permission under their MIT licenses.
 
 ## Bundled rdsh plugins (this repo)
 
