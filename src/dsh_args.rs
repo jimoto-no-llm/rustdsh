@@ -1,6 +1,23 @@
 /// dsh-compatible launcher arg splitter (mirrors lib/bin.js semantics, read-only).
 /// Launcher flags come first; first unrecognized token starts inner app-args.
 /// `dsh <name>` abbreviates `dsh --profile <name>`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DumpKind {
+    Config,
+    DefaultConfig,
+    Schema,
+}
+
+impl DumpKind {
+    pub fn as_arg(self) -> &'static str {
+        match self {
+            Self::Config => "--dump-config",
+            Self::DefaultConfig => "--dump-default-config",
+            Self::Schema => "--dump-config-schema",
+        }
+    }
+}
+
 pub enum Launcher {
     Help,
     Boot {
@@ -11,7 +28,9 @@ pub enum Launcher {
     },
     Dump {
         profile: String,
+        from_default: Option<String>,
         patches: Vec<String>,
+        kind: DumpKind,
     },
     Plugin {
         profile: String,
@@ -127,7 +146,19 @@ pub fn split_launcher_args(profile_flag: Option<String>, extra: Vec<String>) -> 
                 "error: --dump-default-config prints the bundle layers and takes no --patch".into(),
             );
         }
-        return Launcher::Dump { profile, patches };
+        let kind = if dump {
+            DumpKind::Config
+        } else if dump_default {
+            DumpKind::DefaultConfig
+        } else {
+            DumpKind::Schema
+        };
+        return Launcher::Dump {
+            profile,
+            from_default,
+            patches,
+            kind,
+        };
     }
     if app_args.first().is_some_and(|s| s.as_str() == "--") {
         app_args.remove(0);
@@ -203,6 +234,46 @@ mod tests {
         match split_launcher_args(Some("tui".into()), sv(&["plugin"])) {
             Launcher::Error(_) => {}
             _ => panic!("expected error"),
+        }
+    }
+    #[test]
+    fn dump_launcher_preserves_kind_and_default_profile() {
+        let cases = [
+            ("--dump-config", DumpKind::Config),
+            ("--dump-default-config", DumpKind::DefaultConfig),
+            ("--dump-config-schema", DumpKind::Schema),
+        ];
+        for (flag, expected_kind) in cases {
+            match split_launcher_args(None, sv(&["--profile", "web", flag])) {
+                Launcher::Dump {
+                    profile,
+                    from_default,
+                    kind,
+                    ..
+                } => {
+                    assert_eq!(profile, "web");
+                    assert_eq!(from_default, None);
+                    assert_eq!(kind, expected_kind);
+                }
+                _ => panic!("expected dump"),
+            }
+        }
+
+        match split_launcher_args(
+            None,
+            sv(&["rescue", "--from-default-profile", "web", "--dump-config"]),
+        ) {
+            Launcher::Dump {
+                profile,
+                from_default,
+                kind,
+                ..
+            } => {
+                assert_eq!(profile, "rescue");
+                assert_eq!(from_default.as_deref(), Some("web"));
+                assert_eq!(kind, DumpKind::Config);
+            }
+            _ => panic!("expected dump"),
         }
     }
 }

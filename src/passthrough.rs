@@ -352,7 +352,9 @@ pub fn exec_boot(
 
 pub fn exec_dump_config(
     profile: &str,
+    from_default: Option<&str>,
     patches: &[String],
+    kind: crate::dsh_args::DumpKind,
     dry: bool,
     slim: bool,
 ) -> anyhow::Result<()> {
@@ -363,10 +365,13 @@ pub fn exec_dump_config(
         crate::auth::pre_boot(false);
     }
     cmd.arg("--profile").arg(profile);
+    if let Some(f) = from_default {
+        cmd.arg("--from-default-profile").arg(f);
+    }
     for p in patches {
         cmd.arg("--patch").arg(p);
     }
-    cmd.arg("--dump-config");
+    cmd.arg(kind.as_arg());
     apply_slim(&mut cmd, slim);
     exec_or_spawn(cmd, dry)
 }

@@ -640,7 +640,14 @@ fn main() {
                     if native {
                         dump_config_native(&p, &cli.patch)
                     } else {
-                        passthrough::exec_dump_config(&p, &cli.patch, dry, slim)
+                        passthrough::exec_dump_config(
+                            &p,
+                            None,
+                            &cli.patch,
+                            dsh_args::DumpKind::Config,
+                            dry,
+                            slim,
+                        )
                     }
                 },
             )
@@ -691,10 +698,22 @@ fn main() {
                         slim,
                     )
                 }
-                dsh_args::Launcher::Dump { profile, patches } => {
+                dsh_args::Launcher::Dump {
+                    profile,
+                    from_default,
+                    patches,
+                    kind,
+                } => {
                     let mut all = cli.patch;
                     all.extend(patches);
-                    passthrough::exec_dump_config(&profile, &all, dry, slim)
+                    passthrough::exec_dump_config(
+                        &profile,
+                        from_default.as_deref(),
+                        &all,
+                        kind,
+                        dry,
+                        slim,
+                    )
                 }
                 dsh_args::Launcher::Error(msg) => {
                     eprintln!("{msg}");
