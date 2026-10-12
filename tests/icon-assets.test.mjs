@@ -68,7 +68,12 @@ for (const command of ["serve", "setup"]) {
       const deadline = Date.now() + 15000;
       for (;;) {
         try {
-          return await fetch(url, init);
+          const response = await fetch(url, init);
+          // A loaded CI runner can stall the single-threaded fixture
+          // server past its 10s read deadline (408). Retry those like
+          // refused connections; any other status is the answer under test.
+          if (response.status !== 408 || Date.now() >= deadline)
+            return response;
         } catch (error) {
           if (Date.now() >= deadline) {
             throw new Error(
