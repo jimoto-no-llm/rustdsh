@@ -455,4 +455,44 @@ mod tests {
         );
         assert_eq!(pick_latest_node_tree(&names, "win", "arm64"), None);
     }
+
+    /// eightman999 asked for a test that exercises the delegated argv itself
+    /// rather than only the embedded patch source.
+    #[test]
+    fn delegated_js_boots_receive_the_preload_as_a_file_url() {
+        if crate::tool_security::sandbox_enabled() {
+            return; // the strict boundary path does not inject this preload
+        }
+        let dir = std::env::temp_dir().join(format!(
+            "rdsh-base-cmd-{}-{}",
+            std::process::id(),
+            crate::local_http::random_token().unwrap()
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        let fixture = dir.join("dsh.js");
+        std::fs::write(&fixture, "// fixture\n").unwrap();
+        let orig = fixture.to_string_lossy().into_owned();
+
+        let command = base_cmd(&orig, false, false);
+        std::fs::remove_dir_all(&dir).unwrap();
+        let Ok(command) = command else {
+            return; // no compatible Node runtime in this environment
+        };
+        let args: Vec<String> = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect();
+        if crate::opencode_header::import_specifier().is_none() {
+            assert_eq!(args, vec![orig]); // RDSH_OPENCODE_SESSION_HEADER=0
+            return;
+        }
+        assert_eq!(args.len(), 3, "unexpected delegated argv: {args:?}");
+        assert_eq!(args[0], "--import");
+        assert!(
+            args[1].starts_with("file:///") && args[1].ends_with("opencode-session-header.mjs"),
+            "the preload must be a file: URL, got {}",
+            args[1]
+        );
+        assert_eq!(args[2], orig);
+    }
 }
