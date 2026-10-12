@@ -1,5 +1,5 @@
 import { homedir } from 'node:os';
-import { join, dirname } from 'node:path';
+import { join, dirname, posix, win32 } from 'node:path';
 import { existsSync } from 'node:fs';
 import { readFile, writeFile, mkdir, access, rename, unlink } from 'node:fs/promises';
 import { randomBytes } from 'node:crypto';
@@ -24,8 +24,11 @@ function defaultExists(path) {
 // start without the login shell PATH, so RDSH_BIN wins, then PATH, then the
 // well-known install locations. Unresolved keeps the historical bare name;
 // execFile failure still resolves to ''.
-function resolveRdshBin(env = process.env, platform = process.platform, exists = defaultExists) {
+export function resolveRdshBin(env = process.env, platform = process.platform, exists = defaultExists) {
   if (typeof env.RDSH_BIN === 'string' && env.RDSH_BIN.trim() !== '') return env.RDSH_BIN;
+  // Join with the target platform's separators, not the host's: the resolver
+  // takes an explicit platform and must answer for it.
+  const join = platform === 'win32' ? win32.join : posix.join;
   const name = platform === 'win32' ? 'rdsh.exe' : 'rdsh';
   const pathSep = platform === 'win32' ? ';' : ':';
   for (const dir of (env.PATH || env.Path || '').split(pathSep)) {

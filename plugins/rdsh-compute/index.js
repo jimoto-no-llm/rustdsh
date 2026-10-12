@@ -16,7 +16,7 @@ import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, posix, win32 } from "node:path";
 
 export const PROTOCOL_VERSION = 1;
 export const MAX_TEXT_BYTES = 1_048_576;
@@ -74,6 +74,9 @@ function defaultExists(path) {
 }
 
 function wellKnownBins(env, platform, name) {
+  // Join with the target platform's separators, not the host's: the resolver
+  // takes an explicit platform and must answer for it.
+  const join = platform === "win32" ? win32.join : posix.join;
   const home = platform === "win32" ? env.USERPROFILE || env.HOME || homedir() : env.HOME || homedir();
   if (platform === "win32") {
     const localAppData = env.LOCALAPPDATA || join(home, "AppData", "Local");
@@ -95,6 +98,7 @@ function wellKnownBins(env, platform, name) {
 export function resolveRdshBin(env = process.env, platform = process.platform, exists = defaultExists) {
   if (typeof env.RDSH_BIN === "string" && env.RDSH_BIN.trim() !== "") return env.RDSH_BIN;
   const name = platform === "win32" ? "rdsh.exe" : "rdsh";
+  const join = platform === "win32" ? win32.join : posix.join;
   const pathSep = platform === "win32" ? ";" : ":";
   for (const dir of (env.PATH || env.Path || "").split(pathSep)) {
     if (dir && exists(join(dir, name))) return "rdsh"; // PATH hit: the bare name spawns as before

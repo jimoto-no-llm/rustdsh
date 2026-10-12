@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveRdshBin } from "../index.js";
 
@@ -48,17 +48,19 @@ test("win32 searches PATH, LOCALAPPDATA, USERPROFILE and CARGO_HOME", () => {
     LOCALAPPDATA: "C:\\Users\\u\\AppData\\Local",
     CARGO_HOME: "C:\\cargo",
   };
-  const exe = join("C:\\Users\\u\\AppData\\Local", "rdsh", "bin", "rdsh.exe");
-  const cargo = join("C:\\cargo", "bin", "rdsh.exe");
-  const home = join("C:\\Users\\u", ".local", "bin", "rdsh.exe");
-  const onPath = join("C:\\bin", "rdsh.exe");
+  // The resolver answers for the requested platform, so fixtures use the
+  // Windows join even when the test itself runs on a POSIX host.
+  const exe = win32.join("C:\\Users\\u\\AppData\\Local", "rdsh", "bin", "rdsh.exe");
+  const cargo = win32.join("C:\\cargo", "bin", "rdsh.exe");
+  const home = win32.join("C:\\Users\\u", ".local", "bin", "rdsh.exe");
+  const onPath = win32.join("C:\\bin", "rdsh.exe");
   assert.equal(resolveRdshBin(env, "win32", found(onPath)), "rdsh"); // spawn() resolves .exe via PATHEXT
   assert.equal(resolveRdshBin(env, "win32", found(exe, cargo, home)), exe);
   assert.equal(resolveRdshBin(env, "win32", found(home, cargo)), home);
   assert.equal(resolveRdshBin(env, "win32", found(cargo)), cargo);
   // Without CARGO_HOME the Cargo bin falls back to %USERPROFILE%\.cargo.
   const noCargoHome = { ...env, CARGO_HOME: "" };
-  const fallbackCargo = join("C:\\Users\\u", ".cargo", "bin", "rdsh.exe");
+  const fallbackCargo = win32.join("C:\\Users\\u", ".cargo", "bin", "rdsh.exe");
   assert.equal(resolveRdshBin(noCargoHome, "win32", found(fallbackCargo)), fallbackCargo);
 });
 

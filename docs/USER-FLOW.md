@@ -47,6 +47,11 @@ Web検索には別途SearXNGが必要です。DSH内のrdsh設定プラグイン
 | 手元の状態を確認 | `rdsh serve --port 0` | `serve` をExtrasで有効化 |
 | プロジェクト指標・人への質問と回答 | `node dashboard/cli.mjs project --project <path> --no-tailscale --open` | Node.js 22+、dashboard依存の導入 |
 | Windows/WSL上の本家Web画面の中継 | `rdsh-dashboard harness` | 対応するWindows/WSL環境 |
+| デスクトップアプリの確認とプラグイン組み込み | `rdsh desktop status` / `rdsh desktop install --plugins-dir <rustdsh>` | 本家デスクトップアプリ（初回起動でプロファイル作成済み）、macOSまたはWindows |
+
+デスクトップアプリは本体が専用のプロファイル（`$DSH_HOME/profiles/desktop`）を持つため、
+プラグインの組み込みはアプリを終了した状態で行い、終了後に再度開いて反映します。
+詳細は [DESKTOP-INTEGRATION.md](DESKTOP-INTEGRATION.md) を確認してください。
 
 `rdsh serve` のURLも起動ごとの鍵を含みます。既定ポートは38080で、
 DSH webの既定3080とは異なります。スマホ向けの接続は

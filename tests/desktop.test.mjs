@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 const exec = promisify(execFile);
 const repo = fileURLToPath(new URL('..', import.meta.url));
 const bin = join(repo, 'target', process.platform === 'win32' ? 'debug/rdsh.exe' : 'debug/rdsh');
-const posixOnly = process.platform === 'win32' ? 'Desktop command stub is POSIX-only' : false;
+const windows = process.platform === 'win32';
 
 // Desktop (Electron) owns the reserved `desktop` profile; the npm dsh CLI
 // cannot manage it, so `rdsh desktop install` only forwards
@@ -19,7 +19,10 @@ const posixOnly = process.platform === 'win32' ? 'Desktop command stub is POSIX-
 // drive that forwarding against a stub command and a hermetic DSH_HOME: no
 // Electron, no real DSH profile, no model calls.
 async function sandbox(t) {
-  const root = await mkdtemp(join(tmpdir(), 'rdsh-desktop-'));
+  // The directory names contain a space on purpose: the packaged Windows path
+  // (\u2026\Programs\DeepSeek Harness\resources\...) does too, and the stub launch has
+  // to survive cmd.exe quoting.
+  const root = await mkdtemp(join(tmpdir(), 'rdsh desktop '));
   const home = join(root, 'dsh');
   const checkout = join(root, 'rustdsh');
   for (const name of ['rdsh-settings', 'rdsh-compute']) {
@@ -33,12 +36,11 @@ async function sandbox(t) {
 
 // Stub for resources/runtime/cli/bin/dsh. It records argv and, for `add`,
 // enables the package the way the shared plugin manager does (dependency plus
-// an appended dsh.profile.bundles entry).
-async function stubCommand(box) {
-  const path = join(box.root, 'desktop-cli', 'dsh');
-  await mkdir(join(box.root, 'desktop-cli'), { recursive: true });
+// an appended dsh.profile.bundles entry). Windows gets a .cmd launcher (which
+// rdsh must start through cmd /C) next to the same program body.
+async function stubCommand(box, dir = join(box.root, 'desktop cli')) {
+  await mkdir(dir, { recursive: true });
   const lines = [
-    '#!/usr/bin/env node',
     "const fs = require('node:fs');",
     "const path = require('node:path');",
     'const args = process.argv.slice(2);',
@@ -57,7 +59,14 @@ async function stubCommand(box) {
     "  fs.writeFileSync(profile, JSON.stringify(doc, null, 2) + '\\n');",
     '}',
   ];
-  await writeFile(path, lines.join('\n') + '\n');
+  await writeFile(join(dir, 'stub.cjs'), lines.join('\n') + '\n');
+  if (windows) {
+    const path = join(dir, 'dsh.cmd');
+    await writeFile(path, '@echo off\r\nnode "%~dp0stub.cjs" %*\r\n');
+    return path;
+  }
+  const path = join(dir, 'dsh');
+  await writeFile(path, "#!/usr/bin/env node\nrequire('./stub.cjs');\n");
   await chmod(path, 0o755);
   return path;
 }
@@ -181,6 +190,32 @@ test('a --plugins-dir without the plugins is skipped for a real checkout', async
   assert.equal(existsSync(join(resolved, 'rdsh-settings', 'package.json')), true);
 });
 
-test('POSIX stub coverage is skipped on Windows', { skip: posixOnly }, async () => {
-  assert.equal(posixOnly, false);
+test('the packaged app layout is discovered without DSH_DESKTOP_CLI', async (t) => {
+  const { box, env } = await baseEnv(t);
+  // <app>/resources/runtime/cli/bin/dsh[.cmd] is the installed layout the
+  // detection must find, so the stub is written exactly there.
+  const app = join(box.root, 'DeepSeek Harness');
+  const launcher = await stubCommand(box, join(app, 'resources', 'runtime', 'cli', 'bin'));
+  await initProfile(box, { name: 'dsh-profile-desktop' });
+  const appEnv = { ...env, DSH_DESKTOP_APP_DIR: app };
+
+  const status = await run(['desktop', 'status', '--json'], appEnv);
+  assert.equal(status.code, 0, status.stderr);
+  const report = JSON.parse(status.stdout);
+  assert.equal(report.app.path, app);
+  assert.equal(report.command.source, 'detected');
+  assert.equal(report.command.path, launcher);
+
+  const install = await run(['desktop', 'install', '--json', '--plugins-dir', box.checkout], {
+    ...appEnv, STUB_LOG: box.log, STUB_PROFILE: box.profile,
+  });
+  assert.equal(install.code, 0, install.stderr);
+  assert.equal(JSON.parse(await readFile(box.log, 'utf8'))[0], 'plugin');
+});
+
+test('the stub launcher matches the host platform', async (t) => {
+  const { box } = await baseEnv(t);
+  const command = await stubCommand(box);
+  assert.equal(command.endsWith(windows ? 'dsh.cmd' : 'dsh'), true);
+  assert.equal(existsSync(join(box.root, 'desktop cli', 'stub.cjs')), true);
 });

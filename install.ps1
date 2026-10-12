@@ -131,6 +131,7 @@ if ($Wsl) {
   $wargs = @()
   if ($AsDsh) { $wargs += '--as-dsh' }
   if ($NoRustup) { $wargs += '--no-rustup' }
+  if ($Desktop) { $wargs += '--desktop' }
   & wsl bash "$nix/install.sh" @wargs
 }
 

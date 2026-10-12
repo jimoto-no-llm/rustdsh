@@ -65,6 +65,8 @@ pub struct OsEnv {
     pub desktop_cli: Option<PathBuf>,
     /// `DSH_DESKTOP_USER_DATA_DIR`: Electron userData override (development).
     pub desktop_user_data: Option<PathBuf>,
+    /// `RDSH_PLUGINS_DIR`: rustdsh checkout (or its plugins directory).
+    pub plugins_dir: Option<PathBuf>,
 }
 
 impl OsEnv {
@@ -89,6 +91,7 @@ impl OsEnv {
             desktop_app_dir: var("DSH_DESKTOP_APP_DIR"),
             desktop_cli: var("DSH_DESKTOP_CLI"),
             desktop_user_data: var("DSH_DESKTOP_USER_DATA_DIR"),
+            plugins_dir: var("RDSH_PLUGINS_DIR"),
         }
     }
 
@@ -197,13 +200,55 @@ pub fn find_app(env: &OsEnv) -> Option<PathBuf> {
     app_candidates(env).into_iter().find(|dir| dir.is_dir())
 }
 
+/// Resolve a possibly relative path against the current directory.
+fn absolute(path: &Path) -> PathBuf {
+    if path.is_absolute() {
+        return path.to_path_buf();
+    }
+    std::env::current_dir()
+        .map(|cwd| cwd.join(path))
+        .unwrap_or_else(|_| path.to_path_buf())
+}
+
+/// True when a path looks like `<app>/resources/runtime/cli/bin/<dsh>`.
+/// macOS uses `Contents/Resources`, so the check is case-insensitive.
+fn is_desktop_runtime_path(path: &Path) -> bool {
+    let text = path.to_string_lossy().to_ascii_lowercase();
+    text.contains("/resources/runtime/cli/bin/")
+        || text.contains("\\resources\\runtime\\cli\\bin\\")
+}
+
+/// Scan PATH-like directories for the Desktop-installed command. The app's
+/// "Manage dsh Command..." can put exactly that command on PATH even when the
+/// application lives outside the standard location.
+fn scan_paths(dirs: impl Iterator<Item = PathBuf>) -> Option<PathBuf> {
+    for dir in dirs {
+        for name in ["dsh", "dsh.cmd", "dsh.exe"] {
+            let candidate = dir.join(name);
+            if candidate.is_file() && is_desktop_runtime_path(&candidate) {
+                return Some(candidate);
+            }
+        }
+    }
+    None
+}
+
+fn desktop_command_on_path() -> Option<PathBuf> {
+    let path = std::env::var_os("PATH")?;
+    scan_paths(std::env::split_paths(&path))
+}
+
 /// Locate the Desktop-installed command: explicit env first, then every
-/// candidate application directory.
+/// candidate application directory, then a `dsh` on PATH that clearly lives
+/// inside the application's runtime.
 pub fn find_command(env: &OsEnv) -> Option<CommandRuntime> {
     if let Some(path) = &env.desktop_cli {
-        if path.is_file() {
+        // Install runs the command from the plugin directory, so a relative
+        // override has to be pinned to the working directory first.
+        let candidate = absolute(path);
+        if candidate.is_file() {
             return Some(CommandRuntime {
-                path: path.clone(),
+                path: candidate,
                 source: "DSH_DESKTOP_CLI",
                 app: None,
             });
@@ -223,7 +268,11 @@ pub fn find_command(env: &OsEnv) -> Option<CommandRuntime> {
             }
         }
     }
-    None
+    desktop_command_on_path().map(|path| CommandRuntime {
+        path,
+        source: "desktop-runtime-on-path",
+        app: None,
+    })
 }
 
 /// Electron's userData directory (the app's own settings, not `$DSH_HOME`).
@@ -257,10 +306,15 @@ pub fn running_hint(env: &OsEnv) -> Option<PathBuf> {
     lock.exists().then_some(lock)
 }
 
-/// Parse the pieces of a profile manifest this module reads.
-pub fn parse_profile(text: &str) -> (BTreeSet<String>, Vec<String>) {
+/// Parse the pieces of a profile manifest this module reads. A manifest that
+/// exists but does not parse yields a reason instead of a silent empty state.
+pub fn parse_profile(text: &str) -> (BTreeSet<String>, Vec<String>, Option<String>) {
     let Ok(value) = serde_json::from_str::<serde_json::Value>(text) else {
-        return (BTreeSet::new(), Vec::new());
+        return (
+            BTreeSet::new(),
+            Vec::new(),
+            Some("package.json is not valid JSON".to_string()),
+        );
     };
     let dependencies = value
         .get("dependencies")
@@ -278,7 +332,7 @@ pub fn parse_profile(text: &str) -> (BTreeSet<String>, Vec<String>) {
                 .collect()
         })
         .unwrap_or_default();
-    (dependencies, bundles)
+    (dependencies, bundles, None)
 }
 
 pub fn read_profile(dir: &Path) -> ProfileState {
@@ -290,9 +344,10 @@ pub fn read_profile(dir: &Path) -> ProfileState {
     match std::fs::read_to_string(&path) {
         Ok(text) => {
             state.initialized = true;
-            let (dependencies, bundles) = parse_profile(&text);
+            let (dependencies, bundles, error) = parse_profile(&text);
             state.dependencies = dependencies;
             state.bundles = bundles;
+            state.error = error;
         }
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
         Err(err) => state.error = Some(err.to_string()),
@@ -300,14 +355,27 @@ pub fn read_profile(dir: &Path) -> ProfileState {
     state
 }
 
-/// A directory that directly contains the bundled plugin packages.
+/// A directory that directly contains the bundled plugin packages. The probe
+/// reads the manifest so a stray or broken file is not mistaken for a checkout.
 fn is_plugins_dir(dir: &Path) -> bool {
-    dir.join("rdsh-settings").join("package.json").is_file()
+    let manifest = dir.join("rdsh-settings").join("package.json");
+    let Ok(text) = std::fs::read_to_string(&manifest) else {
+        return false;
+    };
+    serde_json::from_str::<serde_json::Value>(&text)
+        .ok()
+        .and_then(|value| {
+            value
+                .get("name")
+                .and_then(|name| name.as_str())
+                .map(str::to_string)
+        })
+        .is_some_and(|name| name == "rdsh-settings")
 }
 
 /// Resolve the rustdsh checkout (or its `plugins/` directory) that carries the
 /// bundled plugins. Both `<checkout>` and `<checkout>/plugins` are accepted.
-pub fn resolve_plugins_dir(explicit: Option<&str>, _env: &OsEnv) -> Result<PathBuf> {
+pub fn resolve_plugins_dir(explicit: Option<&str>, env: &OsEnv) -> Result<PathBuf> {
     let mut candidates: Vec<PathBuf> = Vec::new();
     let mut push = |dir: PathBuf| {
         if !candidates.contains(&dir) {
@@ -317,10 +385,8 @@ pub fn resolve_plugins_dir(explicit: Option<&str>, _env: &OsEnv) -> Result<PathB
     if let Some(dir) = explicit {
         push(PathBuf::from(dir));
     }
-    if let Some(dir) = std::env::var_os("RDSH_PLUGINS_DIR") {
-        if !dir.is_empty() {
-            push(PathBuf::from(dir));
-        }
+    if let Some(dir) = &env.plugins_dir {
+        push(dir.clone());
     }
     if let Ok(cwd) = std::env::current_dir() {
         push(cwd);
@@ -371,19 +437,74 @@ fn is_executable(path: &Path) -> bool {
 /// Build the invocation for the Desktop command runtime. Windows `.cmd`
 /// launchers go through `cmd /C`; a non-executable shell script goes through
 /// `sh`, so a checkout-permission surprise cannot hide the real error.
-fn command_for(cli: &Path) -> Command {
+/// How one Desktop command must be executed.
+#[derive(Debug, PartialEq, Eq)]
+enum Invocation {
+    /// Execute the file itself.
+    Direct,
+    /// Run it through `sh` (a shell script without the execute bit).
+    ViaSh,
+    /// Windows `.cmd`/`.bat` launchers cannot be created as a process
+    /// directly, so they go through `cmd /C`.
+    ViaCmd,
+}
+
+fn invocation_for(cli: &Path, windows: bool, executable: bool) -> Invocation {
     let text = cli.to_string_lossy().to_ascii_lowercase();
     if text.ends_with(".cmd") || text.ends_with(".bat") {
-        let mut command = Command::new("cmd");
-        command.arg("/C").arg(cli);
-        return command;
+        return Invocation::ViaCmd;
     }
-    if !cfg!(windows) && !is_executable(cli) {
-        let mut command = Command::new("sh");
-        command.arg(cli);
-        return command;
+    if !windows && !executable {
+        return Invocation::ViaSh;
     }
-    Command::new(cli)
+    Invocation::Direct
+}
+
+/// Quote one token for a `cmd.exe` command line.
+fn quote_for_cmd(token: &str) -> String {
+    let mut out = String::with_capacity(token.len() + 2);
+    out.push('"');
+    for ch in token.chars() {
+        if ch == '"' {
+            out.push('"');
+        }
+        out.push(ch);
+    }
+    out.push('"');
+    out
+}
+
+/// `cmd /C` receives a single command line. It is wrapped in one quoting pair
+/// so the packaged path survives its space
+/// (`...\Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd`).
+fn windows_command(cli: &Path, args: &[String]) -> Command {
+    let mut line = String::from("\"");
+    line.push_str(&quote_for_cmd(&cli.to_string_lossy()));
+    for arg in args {
+        line.push(' ');
+        line.push_str(&quote_for_cmd(arg));
+    }
+    line.push('"');
+    let mut command = Command::new("cmd");
+    command.arg("/C").arg(line);
+    command
+}
+
+/// Build the full invocation for the Desktop command runtime.
+fn command_for(cli: &Path, args: &[String]) -> Command {
+    match invocation_for(cli, cfg!(windows), is_executable(cli)) {
+        Invocation::ViaCmd => windows_command(cli, args),
+        Invocation::ViaSh => {
+            let mut command = Command::new("sh");
+            command.arg(cli).args(args);
+            command
+        }
+        Invocation::Direct => {
+            let mut command = Command::new(cli);
+            command.args(args);
+            command
+        }
+    }
 }
 
 fn plugin_selection(compute: bool) -> Vec<&'static str> {
@@ -643,8 +764,7 @@ pub fn cmd_install(
         if !json_out {
             out!("[rdsh] installing {name} into the desktop profile...");
         }
-        let mut command = command_for(&runtime.path);
-        command.args(&args);
+        let mut command = command_for(&runtime.path, &args);
         if let Some(root) = &plugins_root {
             command.current_dir(root);
         }
@@ -687,6 +807,9 @@ pub fn cmd_install(
                 "profile": profile_dir.display().to_string(),
                 "command": runtime.path.display().to_string(),
                 "plugins_dir": plugins_root.as_ref().map(|p| p.display().to_string()),
+                "running": {
+                    "hint": running.as_ref().map(|p| p.display().to_string()),
+                },
                 "actions": actions,
                 "failed": failures,
             }))?
@@ -785,6 +908,7 @@ mod tests {
             desktop_app_dir: None,
             desktop_cli: None,
             desktop_user_data: None,
+            plugins_dir: None,
         }
     }
 
@@ -847,6 +971,106 @@ mod tests {
     }
 
     #[test]
+    fn malformed_profile_is_reported_not_silently_empty() {
+        let root = temp_root("malformed");
+        let dir = root.join("profiles/desktop");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("package.json"), b"THIS IS NOT JSON").unwrap();
+        let state = read_profile(&dir);
+        assert!(
+            state.initialized,
+            "existence is what the profile manager checks"
+        );
+        assert!(state.bundles.is_empty());
+        assert_eq!(
+            state.error.as_deref(),
+            Some("package.json is not valid JSON")
+        );
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn relative_paths_are_pinned_to_the_working_directory() {
+        // The override is relative to the process working directory, not to the
+        // plugin directory install later switches into.
+        let cwd = std::env::current_dir().unwrap();
+        assert_eq!(absolute(Path::new("dsh")), cwd.join("dsh"));
+        assert_eq!(
+            absolute(Path::new("/usr/local/bin/dsh")),
+            PathBuf::from("/usr/local/bin/dsh")
+        );
+    }
+
+    #[test]
+    fn invocation_choices_follow_the_platform() {
+        assert_eq!(
+            invocation_for(Path::new("C:\\x\\dsh.cmd"), true, true),
+            Invocation::ViaCmd
+        );
+        assert_eq!(
+            invocation_for(Path::new("C:\\x\\dsh.cmd"), false, true),
+            Invocation::ViaCmd
+        );
+        assert_eq!(
+            invocation_for(Path::new("C:\\x\\dsh.exe"), true, false),
+            Invocation::Direct
+        );
+        assert_eq!(
+            invocation_for(Path::new("/x/dsh"), false, false),
+            Invocation::ViaSh
+        );
+        assert_eq!(
+            invocation_for(Path::new("/x/dsh"), false, true),
+            Invocation::Direct
+        );
+    }
+
+    #[test]
+    fn windows_launchers_are_quoted_as_one_command_line() {
+        // The packaged path contains a space, so the whole line is wrapped in
+        // one quoting pair that cmd.exe strips before executing.
+        let cli = r"C:\Program Files\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd";
+        let spec = r"C:\Program Files\plugins\rdsh-settings";
+        let args: Vec<String> = ["plugin", "--profile", "desktop", "add", spec]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        let command = windows_command(Path::new(cli), &args);
+        assert_eq!(command.get_program(), "cmd");
+        let got: Vec<String> = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().to_string())
+            .collect();
+        assert_eq!(got[0], "/C");
+        assert_eq!(
+            got[1],
+            format!("\"\"{cli}\" \"plugin\" \"--profile\" \"desktop\" \"add\" \"{spec}\"\"")
+        );
+    }
+
+    #[test]
+    fn plugins_dir_rejects_a_broken_manifest() {
+        let root = temp_root("brokenmanifest");
+        let plugins = root.join("plugins");
+        std::fs::create_dir_all(plugins.join("rdsh-settings")).unwrap();
+        std::fs::write(plugins.join("rdsh-settings/package.json"), b"not json {{{").unwrap();
+        assert!(!is_plugins_dir(&plugins));
+        std::fs::write(
+            plugins.join("rdsh-settings/package.json"),
+            b"{\"name\":\"something-else\"}",
+        )
+        .unwrap();
+        assert!(!is_plugins_dir(&plugins));
+        std::fs::write(
+            plugins.join("rdsh-settings/package.json"),
+            b"{\"name\":\"rdsh-settings\"}",
+        )
+        .unwrap();
+        assert!(is_plugins_dir(&plugins));
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
     fn missing_profile_is_reported_not_created() {
         let root = temp_root("missing");
         let state = read_profile(&root.join("profiles/desktop"));
@@ -881,6 +1105,31 @@ mod tests {
 
         env.desktop_cli = Some(root.join("missing-dsh"));
         assert_eq!(find_command(&env).unwrap().path, cli);
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn desktop_runtime_paths_and_path_scan() {
+        assert!(is_desktop_runtime_path(Path::new(
+            "/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh"
+        )));
+        assert!(is_desktop_runtime_path(Path::new(
+            r"C:\Users\u\AppData\Local\Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd"
+        )));
+        assert!(!is_desktop_runtime_path(Path::new("/usr/local/bin/dsh")));
+
+        let root = temp_root("pathscan");
+        let plain = root.join("usr/local/bin");
+        std::fs::create_dir_all(&plain).unwrap();
+        std::fs::write(plain.join("dsh"), b"#!/bin/sh\n").unwrap();
+        let app_bin = root.join("app/resources/runtime/cli/bin");
+        std::fs::create_dir_all(&app_bin).unwrap();
+        std::fs::write(app_bin.join("dsh"), b"#!/bin/sh\n").unwrap();
+        assert_eq!(scan_paths([plain.clone()].into_iter()), None);
+        assert_eq!(
+            scan_paths([plain.clone(), app_bin.clone()].into_iter()),
+            Some(app_bin.join("dsh"))
+        );
         std::fs::remove_dir_all(&root).unwrap();
     }
 
@@ -929,6 +1178,12 @@ mod tests {
             resolve_plugins_dir(Some(plugins.to_str().unwrap()), &env).unwrap(),
             plugins
         );
+
+        // RDSH_PLUGINS_DIR (OsEnv::plugins_dir) is the second source, before the
+        // working directory.
+        let mut with_env = base_env(&root);
+        with_env.plugins_dir = Some(plugins.clone());
+        assert_eq!(resolve_plugins_dir(None, &with_env).unwrap(), plugins);
         std::fs::remove_dir_all(&root).unwrap();
     }
 

@@ -34,7 +34,7 @@ unit tests and a stub-command integration test; see
 | CLI (`dsh`) | `./install.sh --as-dsh` / `.\install.ps1 -AsDsh`; native fast paths answer, everything else delegates byte-identically | supported |
 | TUI profile | `rdsh tui` delegation plus `rdsh tokens/search/sessions/compact` | supported |
 | Web profile | `rdsh web`, the bundled plugins (`rdsh-settings`), `rdsh serve` dashboard | supported |
-| Desktop app | `rdsh desktop status|install|verify` attaches the plugins to the reserved profile through the app's own command runtime | supported (this document) |
+| Desktop app | `rdsh desktop status` / `install` / `verify` attach the plugins to the reserved profile through the app's own command runtime | supported (this document) |
 | Agent loop, profile boot, Electron shell | not reimplemented; rdsh never boots the `desktop` profile | out of scope |
 | In-app token/search/session delegation | pure compute (token estimate/prune) is the only in-app bridge, opt-in and fail-open | partial by design |
 
@@ -55,8 +55,10 @@ not attempt to boot a profile the app owns.
    rdsh desktop install --plugins-dir . --compute   # also rdsh-compute
    ```
 
-   `rdsh desktop install` resolves the Desktop command, then runs, once per
-   package:
+   `rdsh desktop install` resolves the Desktop command — `DSH_DESKTOP_CLI`,
+   a standard application directory, or a `dsh` on PATH that lives inside the
+   app's runtime (`resources/runtime/cli/bin/`, which **Manage dsh Command...
+   -> Install** creates) — then runs, once per package:
 
    ```sh
    <app>/resources/runtime/cli/bin/dsh plugin --profile desktop add <package>
@@ -98,13 +100,17 @@ The installers can do this inline: `./install.sh --desktop` and
 installing the launcher. Both are no-ops when no initialized Desktop profile is
 detected, and neither fails the installation.
 
+`--plugins-dir` must name a directory whose `rdsh-settings/package.json` is
+valid JSON with `"name": "rdsh-settings"`; anything else is skipped rather than
+forwarded. On Unix a non-executable `DSH_DESKTOP_CLI` is run through `sh`.
+
 ## What the plugins give the app
 
 | Plugin | Effect in the app | Gate |
 | --- | --- | --- |
 | `rdsh-settings` | rdsh settings section in the app's settings, Discord Rich Presence, context-engine switches, `rdsh.json` editing | none (default) |
 | `rdsh-compute` | resident `rdsh compute` worker for token estimate/batch/prune through the Web plugin bridge | `rdsh features on compute` (off by default) |
-| recommended upstream packages | `dsh-tool-present`, `dsh-tool-ask-user`, `dsh-skill-office`, `dsh-mcp-client`, and the rest of `plugins/recommended.md` | installed by the same command or the Plugins page |
+| recommended upstream packages | `dsh-tool-present`, `dsh-tool-ask-user`, `dsh-skill-office`, `dsh-mcp-client`, and the rest of `plugins/recommended.md` | `PROFILE=desktop ./plugins/install.sh` (forwards the same command), or the Plugins page |
 
 The compute bridge keeps its documented contract: pure string operations only,
 1 MiB input cap, 5 s timeout, and a fallback to the JavaScript implementation on
@@ -121,7 +127,11 @@ See [WEB-COMPUTE.md](WEB-COMPUTE.md).
 | `RDSH_PLUGINS_DIR` | rustdsh checkout (or `plugins/`) for `rdsh desktop install` |
 | `RDSH_BIN` | rdsh executable the plugins use for `--version` and the compute worker |
 
-`rdsh desktop status` reports which of these are in effect.
+`rdsh desktop status` shows the application, command and profile it resolved
+(and reports a `DSH_DESKTOP_CLI` that points at a missing file). A `dsh` or
+`dsh.cmd` found on `PATH` inside `<app>/resources/runtime/cli/bin/` is also
+accepted as the Desktop command, which covers a non-standard install directory
+once the app's **Manage dsh Command... -> Install** has run.
 
 ## Safety and design rules
 
@@ -131,8 +141,9 @@ See [WEB-COMPUTE.md](WEB-COMPUTE.md).
 - **No runtime replacement**: the Electron shell, the bundled runtime and the
   signing/notarization chain are untouched. rdsh adds a plugin, not a boot path.
 - **Quit the app first**: plugin changes take the profile lock while the Host is
-  stopped. `rdsh desktop install` warns when Electron's `SingletonLock` is
-  present (a hint, not a guarantee: it survives a crash).
+  stopped. `rdsh desktop install` reports Electron's `SingletonLock` when it is
+  present: on stderr in human output, as `running.hint` with `--json` (a hint,
+  not a guarantee: the lock survives a crash).
 - **Fail-open plugins**: a missing or failing bridge never blocks the app.
 - **No credential traffic**: the bridge carries text and options only.
 
@@ -144,28 +155,54 @@ See [WEB-COMPUTE.md](WEB-COMPUTE.md).
 | `Desktop command runtime not found` | app never opened, unusual location, or command not installed | set `DSH_DESKTOP_CLI`, use **Manage dsh Command... -> Install** in the app, or install from the Plugins page |
 | `plugin command failed` with a lock error | the app is still running | quit the app fully (tray on Windows, Cmd-Q on macOS) and retry |
 | plugins listed as `absent` after installing | the app has not recomposed the profile | reopen the app, then `rdsh desktop verify` |
+| `desktop status` reports `initialized` **and** `package.json is not valid JSON` | the reserved manifest is corrupt | let the app rewrite it (open it once) or remove the file, then retry |
 | `rdsh --profile desktop` prints the Electron message | by design | use `rdsh desktop ...` instead |
 | plugin has no effect in the app | feature gate off | `rdsh features on compute` for the bridge; check `rdsh features` |
 
 ## Verification status
 
+There is no Desktop application to run on the development host, and the app
+ships for macOS and Windows x64 only, so the feature is verified against the
+documented command contract instead: a stub command that records its argv and
+updates the profile the way the shared plugin manager does. The CI matrix
+(`ubuntu-latest`, `macos-latest`, `windows-latest`) runs the same test file,
+which means the Windows runner starts the stub as a `dsh.cmd` through
+`cmd /C` from a directory whose name contains a space - the packaged layout.
+The Windows runner additionally parses `install.ps1` with the PowerShell
+language parser.
+
 Verified on this repository's Linux host:
 
 - `cargo test` unit tests for detection (app/command candidates per platform,
   profile parsing, plugin state, Electron lock hint, plugins-directory
-  resolution, target selection) - 12 desktop tests.
+  resolution, target selection, PATH-runtime scan, malformed/relative/broken
+  inputs).
 - `node --test tests/desktop.test.mjs`: status JSON, `--dry-run` (no command
   execution, no manifest change), forwarding argv, plugin activation through the
   stub command, `verify` pass/fail, uninitialized-profile refusal.
 - `sh tests/regress.sh`: `rdsh --profile desktop` still exits 2;
   `desktop status|status --json|install|verify` behave as documented.
+- `node --test tests/plugin-security.test.mjs tests/settings-client.test.mjs
+  tests/update-banner.test.mjs tests/feature-switches.test.mjs
+  tests/model_benchmark/fence.test.mjs` and the compute plugin's own `npm test`
+  cover both copies of the `rdsh` binary resolver used inside the app.
+- One manual end-to-end run with a stub Desktop command
+  (`plugins/install.sh` with `PROFILE=desktop`): 8 packages forwarded as
+  `plugin --profile desktop add <spec>`, `rdsh-settings` activated in the
+  fixture profile, `rdsh desktop verify` passes.
 
 Not verified here:
 
-- No end-to-end run against a real Desktop installation (none exists on Linux;
-  the app ships for macOS and Windows x64).
-- `.\install.ps1 -Desktop` was syntax-reviewed but not executed (no PowerShell
-  on this host).
+- No real Electron process was started anywhere, on this host or in CI: the
+  Desktop command is a stub that implements the documented contract, so real
+  pnpm installation, profile locking and bundle activation still need one run
+  on a machine with the app.
+- `.\install.ps1 -Desktop` is not executed end to end (that needs a release and
+  a real app); CI parses it and the POSIX tail is exercised with a stub.
+- A Windows install directory chosen by something other than the default
+  (`%LOCALAPPDATA%\Programs\DeepSeek Harness`, recorded in the uninstall
+  registry key) is not detected automatically; `DSH_DESKTOP_APP_DIR`,
+  `DSH_DESKTOP_CLI`, or the app's **Manage dsh Command...** entry cover it.
 - Whether the bundled Node honors `NODE_COMPILE_CACHE`, and Desktop cold/warm
   startup timings (see [DESKTOP-SPEEDUP.md](DESKTOP-SPEEDUP.md)).
 
