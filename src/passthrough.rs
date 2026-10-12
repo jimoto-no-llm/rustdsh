@@ -262,6 +262,12 @@ fn base_cmd(orig: &str, dry: bool, metadata_only: bool) -> anyhow::Result<std::p
         // features.agent_tool_sandbox, or RDSH_SECURITY=1.
         if orig.ends_with(".js") {
             let mut command = std::process::Command::new(&bin);
+            // Always-on compat: let custom OpenCode zen routes get the
+            // x-opencode-session header (DSH's own custom-route provider
+            // builder omits it). RDSH_OPENCODE_SESSION_HEADER=0 opts out.
+            if let Some(preload) = crate::opencode_header::preload_path() {
+                command.arg("--import").arg(preload);
+            }
             command.arg(orig);
             return Ok(command);
         }
