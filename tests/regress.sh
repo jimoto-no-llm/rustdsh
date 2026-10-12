@@ -37,6 +37,33 @@ need_ok "skills" $BIN skills
 need_ok "logs" $BIN logs --tail 3
 need_ok "sessions" $BIN sessions --limit 2
 need_ok "dump-native" $BIN dump-config --profile tui --native
+need_grep 'would exec: "/bin/echo" "--profile" "web" "--dump-config"' "launcher dump-config mode" env RDSH_ORIG_BIN=/bin/echo $BIN --dry-run --no-slim --profile web --dump-config
+need_grep 'would exec: "/bin/echo" "--profile" "web" "--dump-default-config"' "launcher dump-default-config mode" env RDSH_ORIG_BIN=/bin/echo $BIN --dry-run --no-slim --profile web --dump-default-config
+need_grep 'would exec: "/bin/echo" "--profile" "web" "--dump-config-schema"' "launcher dump-config-schema mode" env RDSH_ORIG_BIN=/bin/echo $BIN --dry-run --no-slim --profile web --dump-config-schema
+need_grep 'would exec: "/bin/echo" "--profile" "rescue" "--from-default-profile" "web" "--dump-config"' "launcher dump preserves from-default profile" env RDSH_ORIG_BIN=/bin/echo $BIN --dry-run --no-slim rescue --from-default-profile web --dump-config
+DUMP_DSH="$RR_SANDBOX/dump-dsh"
+cat > "$DUMP_DSH" <<'EOF'
+#!/bin/sh
+mode=missing
+profile=default
+from_default=none
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --profile) shift; profile="$1" ;;
+    --from-default-profile) shift; from_default="$1" ;;
+    --dump-config) mode=config ;;
+    --dump-default-config) mode=default ;;
+    --dump-config-schema) mode=schema ;;
+  esac
+  shift
+done
+printf '%s|%s|%s\n' "$mode" "$profile" "$from_default"
+EOF
+chmod +x "$DUMP_DSH"
+need_grep 'config|web|none' "fixture dsh receives config dump" env RDSH_ORIG_BIN="$DUMP_DSH" $BIN --no-slim --profile web --dump-config
+need_grep 'default|web|none' "fixture dsh receives default dump" env RDSH_ORIG_BIN="$DUMP_DSH" $BIN --no-slim --profile web --dump-default-config
+need_grep 'schema|web|none' "fixture dsh receives schema dump" env RDSH_ORIG_BIN="$DUMP_DSH" $BIN --no-slim --profile web --dump-config-schema
+need_grep 'config|rescue|web' "fixture dsh receives from-default profile" env RDSH_ORIG_BIN="$DUMP_DSH" $BIN --no-slim rescue --from-default-profile web --dump-config
 need_ok "boot dry-run" $BIN --dry-run tui
 printf "ls /tmp" | $BIN guard --deny "zzz-no-match" > /dev/null
 if [ $? -eq 0 ]; then ok "guard allow"; else echo "FAIL: guard allow"; exit 1; fi
