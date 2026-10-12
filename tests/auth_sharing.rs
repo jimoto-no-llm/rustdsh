@@ -98,6 +98,51 @@ fn one_time_key_reference_does_not_enable_automatic_copying() {
 }
 
 #[test]
+fn selected_api_key_refresh_replaces_a_changed_existing_ref_and_reports_it() {
+    let fixture = Fixture::new();
+    fixture.seed();
+    let old_key = "fixture-existing-openai-api-key-must-not-print";
+    fixture.write(
+        "dsh/.credentials.yaml",
+        &format!(
+            "version: 1\nrefs:\n  OPENAI_API_KEY: '{}'\n  MANUAL_KEY: 'keep-this-entry'\n",
+            old_key
+        ),
+    );
+
+    fixture.json(&["auth", "--select", "codex:OPENAI_API_KEY", "--json"]);
+    let status = fixture.json(&["auth", "--json"]);
+    let item = status["sharing"]["inventory"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| item["selector"] == "codex:OPENAI_API_KEY")
+        .unwrap();
+    assert_eq!(item["action"], "refresh");
+    assert!(!public_output(&fixture.run(&["auth", "--json"])).contains(CODEX_KEY));
+
+    let imported = fixture.json(&["auth", "--import", "--json"]);
+    assert!(imported["wrote"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|entry| entry == "refresh ref OPENAI_API_KEY from codex"));
+    let stored = fixture.read("dsh/.credentials.yaml");
+    assert!(stored.contains(CODEX_KEY));
+    assert!(!stored.contains(old_key));
+    assert!(stored.contains("MANUAL_KEY: 'keep-this-entry'"));
+
+    let refreshed = fixture.json(&["auth", "--json"]);
+    let item = refreshed["sharing"]["inventory"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| item["selector"] == "codex:OPENAI_API_KEY")
+        .unwrap();
+    assert_eq!(item["action"], "ok");
+}
+
+#[test]
 fn one_time_key_reference_rejects_unlisted_names_without_writing() {
     let fixture = Fixture::new();
     fixture.seed();
@@ -536,7 +581,12 @@ fn delegation_enforcement_precedes_copying_and_metadata_obeys_consent() {
         }
         for args in args.iter().copied() {
             fixture.write("dsh/.credentials.yaml", "version: 1\n");
-            let output = fixture.run(args);
+            let output = fixture
+                .command()
+                .env("RDSH_SECURITY", "1")
+                .args(args)
+                .output()
+                .unwrap();
             assert!(!output.status.success(), "{}", public_output(&output));
             assert!(public_output(&output).contains("RDSH_SECURITY"));
             let stored = fixture.read("dsh/.credentials.yaml");
@@ -546,6 +596,7 @@ fn delegation_enforcement_precedes_copying_and_metadata_obeys_consent() {
         fixture.write("dsh/.credentials.yaml", "version: 1\n");
         let output = fixture
             .command_for(&proxy)
+            .env("RDSH_SECURITY", "1")
             .args(["--profile", "tui"])
             .output()
             .unwrap();
@@ -555,6 +606,7 @@ fn delegation_enforcement_precedes_copying_and_metadata_obeys_consent() {
         // The trusted metadata path executes the stub without starting an agent.
         let output = fixture
             .command_for(&proxy)
+            .env("RDSH_SECURITY", "1")
             .args(["--version"])
             .output()
             .unwrap();

@@ -1,9 +1,40 @@
-//! Mandatory tool boundary for delegated agent execution. Unknown runtimes
-//! and unsupported hosts are refused rather than delegated unprotected.
+//! Optional tool boundary for delegated agent execution.
+//!
+//! Default: delegated runs keep the normal DSH tools and normal file access.
+//! The strict boundary (only `--share-file` files, no network, no host writes)
+//! is opt-in through `features.agent_tool_sandbox`, an explicit
+//! `--share-file`, or `RDSH_SECURITY=1`. Unknown runtimes and unsupported
+//! hosts are still refused when the boundary is active.
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU8, Ordering};
 
 const PRELOAD: &str = include_str!("../security/preload.mjs");
 const ISOLATION: &str = include_str!("../security/tool-isolation.mjs");
+
+/// 0 = follow settings, 1 = boundary on, 2 = boundary off.
+static SANDBOX: AtomicU8 = AtomicU8::new(0);
+
+/// Record the settings-derived boundary decision for this process.
+pub fn configure(sandbox: bool) {
+    SANDBOX.store(if sandbox { 1 } else { 2 }, Ordering::Relaxed);
+}
+
+/// `RDSH_SECURITY=1` forces the boundary on, `RDSH_SECURITY=0` forces it off.
+pub fn env_override() -> Option<bool> {
+    match std::env::var("RDSH_SECURITY").ok().as_deref() {
+        Some("1") => Some(true),
+        Some("0") => Some(false),
+        _ => None,
+    }
+}
+
+/// True when delegated agent tools must stay inside the strict boundary.
+pub fn sandbox_enabled() -> bool {
+    if let Some(forced) = env_override() {
+        return forced;
+    }
+    matches!(SANDBOX.load(Ordering::Relaxed), 1)
+}
 
 fn private_directory() -> anyhow::Result<PathBuf> {
     let mut nonce = [0u8; 24];
@@ -78,4 +109,19 @@ pub fn command(orig: &str, node: &str) -> anyhow::Result<std::process::Command> 
     command.env("RDSH_SECURE_WORKSPACE", std::fs::canonicalize(".")?);
     eprintln!("[rdsh security] tools: explicitly shared files only; network and writes denied");
     Ok(command)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn boundary_is_opt_in() {
+        configure(false);
+        assert!(!sandbox_enabled());
+        configure(true);
+        assert!(sandbox_enabled());
+        configure(false);
+        assert!(!sandbox_enabled());
+    }
 }

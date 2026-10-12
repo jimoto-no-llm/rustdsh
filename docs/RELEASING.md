@@ -41,9 +41,25 @@ Generation failure stops publication.
    python3 -m unittest discover -s tests -p 'test_release_*.py'
    ```
 
+   On a machine with podman or docker, also install the built artifacts inside
+   clean containers. This is the check that keeps a fresh-machine install
+   working on older glibc distros and musl hosts, so run it before tagging:
+
+   ```sh
+   tests/install-isolated.sh --source local --require-musl
+   ```
+
+   The same harness with `--source published --installer published` checks the
+   installer users actually download; `.github/workflows/install-live.yml` runs
+   it weekly. A failure there means the published channel is broken and needs a
+   new release, not a tag move.
+
 4. Run the [full verification matrix](../CONTRIBUTING.md), including Rust fmt,
    clippy, release tests, regression checks, dashboard tests and browser E2E.
-   Merge the reviewed preparation PR only after the required checks pass.
+   Merge the reviewed preparation PR only after the required checks pass. Wait
+   for all required checks on the exact resulting `main` commit to complete
+   successfully before tagging it; the release workflow rechecks that commit's
+   main ancestry and CI status before it starts the platform builds.
 5. Preview the exact release body with an authenticated `gh` CLI:
 
    ```sh
@@ -63,13 +79,29 @@ Generation failure stops publication.
    git push origin vX.Y.Z
    ```
 
-   Tag push starts publication automatically. Never tag an unreviewed commit.
+   Tag push starts the `cd` workflow automatically. Its validation job must pass
+   before builds start, and publication waits for every build and asset check.
+   Never tag an unreviewed or untested commit.
+   The tag push also re-triggers `ci` on the same commit, so a validation job
+   that reads check runs right away can see those new runs as pending and fail
+   even though the commit is green. Wait for the tag's required checks to
+   finish, then re-run only the failed jobs; the staged artifacts are reused:
+
+   ```sh
+   gh run rerun <cd-run-id> --failed
+   ```
+
+   Confirmed again on v0.3.2. Tightening the gate so it ignores the
+   tag-triggered run is tracked in #361.
 
 ## Build and publish
 
 The `cd` workflow first refuses malformed or lightweight tags, mismatched
-versions, missing CHANGELOG entries and incomplete release notes. It builds
-five targets with `cargo build --locked --release`:
+versions, missing CHANGELOG entries, incomplete release notes, commits outside
+`main`, and commits whose latest required checks are missing, pending or failed.
+It builds five targets with `cargo build --locked --release` only after those
+checks pass. The exact required check names live in `scripts/release_ci.py`; CI
+workflow job-name changes must update that list and its tests:
 
 | Platform | Archive |
 | --- | --- |

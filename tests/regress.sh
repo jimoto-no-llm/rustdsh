@@ -1,5 +1,9 @@
 #!/bin/sh
 # rdsh CLI regression. Fails on first mismatch (set -e + explicit checks).
+if [ "${1:-}" = "--windows-installer-delegation" ]; then
+  shift
+  exec bash "$(dirname "$0")/regress-windows.sh" "$@"
+fi
 BIN="${BIN:-./target/release/rdsh}"
 pass=0
 ok() { pass=$((pass+1)); echo "ok: $1"; }
@@ -42,7 +46,12 @@ printf "ls /tmp" | $BIN guard --deny "zzz-no-match" > /dev/null
 if [ $? -eq 0 ]; then ok "guard allow"; else echo "FAIL: guard allow"; exit 1; fi
 printf "run this" | $BIN guard --deny "run*" > /dev/null 2>&1
 if [ $? -eq 2 ]; then ok "guard block"; else echo "FAIL: guard block"; exit 1; fi
-need_exit 2 "reject desktop" $BIN desktop
+need_exit 2 "reject desktop profile" $BIN --profile desktop
+need_ok "desktop status" $BIN desktop status
+need_grep "desktop profile" "desktop status reports the profile" $BIN desktop
+need_grep "\"schema\": 1" "desktop status json" $BIN desktop status --json
+need_exit 1 "desktop install refuses an uninitialized profile" $BIN desktop install --dry-run --plugins-dir .
+need_exit 1 "desktop verify fails without a profile" $BIN desktop verify
 need_exit 2 "reject double profile" $BIN --profile a --profile b
 need_exit 2 "reject dump with args" $BIN --profile tui --dump-config --foo
 need_exit 2 "reject plugin w/o args" $BIN plugin --profile tui
@@ -108,7 +117,10 @@ if HOME="$AB/home" DSH_HOME="$AB/dsh" $BIN setup --json 2>/dev/null | grep -q "\
 SB2="$RR_SANDBOX/setup"
 mkdir -p $SB2/home $SB2/dsh
 if env -u DEEPSEEK_API_KEY -u OPENAI_API_KEY -u ANTHROPIC_API_KEY HOME="$SB2/home" DSH_HOME="$SB2/dsh" $BIN setup --json 2>/dev/null | grep -q "\"needed\":true"; then ok "setup needed on first run"; else echo "FAIL(output): setup needed on first run"; exit 1; fi
-if env -u DEEPSEEK_API_KEY -u OPENAI_API_KEY -u ANTHROPIC_API_KEY HOME="$SB2/home" DSH_HOME="$SB2/dsh" DSH_ORIG_BIN="$SB/orig/dsh" $SB/bin/dsh --profile tui 2>&1 | grep -q "RDSH_SECURITY"; then ok "unsupported runtime refused"; else echo "FAIL(output): unsupported runtime refused"; exit 1; fi
+# Delegated agent tools default to normal file access; the strict boundary is
+# opt-in (--share-file, features.agent_tool_sandbox, or RDSH_SECURITY=1).
+if env -u DEEPSEEK_API_KEY -u OPENAI_API_KEY -u ANTHROPIC_API_KEY HOME="$SB2/home" DSH_HOME="$SB2/dsh" DSH_ORIG_BIN="$SB/orig/dsh" $SB/bin/dsh --profile tui 2>&1 | grep -q "RDSH_SECURITY"; then echo "FAIL(output): default delegation must not be refused"; exit 1; else ok "agent tools default to normal file access"; fi
+if env -u DEEPSEEK_API_KEY -u OPENAI_API_KEY -u ANTHROPIC_API_KEY HOME="$SB2/home" DSH_HOME="$SB2/dsh" RDSH_SECURITY=1 DSH_ORIG_BIN="$SB/orig/dsh" $SB/bin/dsh --profile tui 2>&1 | grep -q "RDSH_SECURITY"; then ok "strict mode refuses unsupported runtime"; else echo "FAIL(output): strict mode refuses unsupported runtime"; exit 1; fi
 rm -rf $SB2
 FR="$RR_SANDBOX/release"
 mkdir -p $FR/pkg $FR/bin $FR/latest/download
@@ -118,6 +130,7 @@ if command -v sha256sum >/dev/null 2>&1; then SUM="sha256sum"; else SUM="shasum 
 for a in rdsh-linux-x64 rdsh-macos-arm64 rdsh-macos-x64; do (cd "$FR/latest/download" && $SUM "$a.tar.gz" > "$a.tar.gz.sha256"); done
 # NOTE: install.sh needs bash (pipefail); `sh` is dash on Ubuntu CI.
 if RDSH_RELEASE_BASE="file://$FR" DSH_HOME="$FR/dsh" bash ./install.sh --from-release --prefix="$FR/bin" >$FR/install.log 2>&1 && "$FR/bin/rdsh" --version 2>/dev/null | grep -q "rdsh"; then ok "from-release install"; else echo "FAIL(output): from-release install"; tail -n 8 $FR/install.log; exit 1; fi
+if bash tests/rustup-init-pin.sh; then ok "rustup-init pinned checksum"; else echo "FAIL(output): rustup-init pinned checksum"; exit 1; fi
 tar -czf "$FR/latest/download/rdsh-linux-x64-musl.tar.gz" -C $FR/pkg rdsh
 (cd "$FR/latest/download" && $SUM "rdsh-linux-x64-musl.tar.gz" > "rdsh-linux-x64-musl.tar.gz.sha256")
 if RDSH_RELEASE_BASE="file://$FR" DSH_HOME="$FR/dsh" bash ./install.sh --from-release --musl --prefix="$FR/bin-musl" >$FR/install-musl.log 2>&1 && "$FR/bin-musl/rdsh" --version 2>/dev/null | grep -q "rdsh"; then ok "from-release musl install"; else echo "FAIL(output): from-release musl install"; tail -n 8 $FR/install-musl.log; exit 1; fi
@@ -169,19 +182,34 @@ SW="$RR_SANDBOX/setupweb"
 mkdir -p $SW/home $SW/dsh
 HOME="$SW/home" DSH_HOME="$SW/dsh" $BIN setup --web --port 38082 >/dev/null 2>"$SW/setup.log" & SRV=$!
 SETUP_TOKEN=""
+SETUP_TOKEN_FILE=""
 i=0
 while [ -z "$SETUP_TOKEN" ] && [ "$i" -lt 10 ]; do
   sleep 1
-  SETUP_TOKEN=$(sed -n 's/.*#key=\([0-9a-f]*\).*/\1/p' "$SW/setup.log" | head -n 1)
+  SETUP_TOKEN_FILE=$(sed -n 's/^\[rdsh setup\] token handoff file: //p' "$SW/setup.log" | head -n 1)
+  if [ -n "$SETUP_TOKEN_FILE" ] && [ -f "$SETUP_TOKEN_FILE" ]; then SETUP_TOKEN=$(cat "$SETUP_TOKEN_FILE"); fi
   kill -0 "$SRV" 2>/dev/null || break
   i=$((i+1))
 done
-if [ -z "$SETUP_TOKEN" ]; then echo "FAIL(output): setup --web URL"; kill $SRV 2>/dev/null; exit 1; fi
+if [ -z "$SETUP_TOKEN" ] || grep -q '#key=' "$SW/setup.log"; then echo "FAIL(output): setup --web token handoff"; kill $SRV 2>/dev/null; exit 1; fi
+HANDOFF_MODE=$(stat -c '%a' "$SETUP_TOKEN_FILE" 2>/dev/null || stat -f '%Lp' "$SETUP_TOKEN_FILE")
+if [ "$HANDOFF_MODE" != "600" ]; then echo "FAIL(mode): setup token handoff file is not 0600"; kill $SRV 2>/dev/null; exit 1; fi
 if [ "$(curl -sS --max-time 5 -o /dev/null -w '%{http_code}' http://127.0.0.1:38082/api/status)" = "401" ]; then ok "setup --web status requires key"; else echo "FAIL(output): setup --web unauthed status"; kill $SRV 2>/dev/null; exit 1; fi
 if curl -fsS --max-time 5 -H "X-RDSH-Token: $SETUP_TOKEN" http://127.0.0.1:38082/api/status 2>/dev/null | grep -q "\"needed\":true"; then ok "setup --web status"; else echo "FAIL(output): setup --web status"; kill $SRV 2>/dev/null; exit 1; fi
-if printf "%s" "{\"name\":\"DEEPSEEK_API_KEY\",\"value\":\"smoke-only-key\"}" | curl -fsS --max-time 5 -X POST -H "Content-Type: application/json" -H "X-RDSH-Token: $SETUP_TOKEN" --data-binary "@-" http://127.0.0.1:38082/api/key 2>/dev/null | grep -q "\"stored\":true"; then ok "setup --web key store"; else echo "FAIL(output): setup --web key store"; kill $SRV 2>/dev/null; exit 1; fi
+cat > "$SW/dsh/.credentials.yaml" <<'YAML'
+version: 1
+refs:
+  EXISTING_KEY: 'existing-value'
+records:
+  llm-pi-ai/existing:
+    kind: grant
+    payload:
+      access: 'saved-token'
+YAML
+if printf "%s" "{\"name\":\"DEEPSEEK_API_KEY\",\"value\":\"true\"}" | curl -fsS --max-time 5 -X POST -H "Content-Type: application/json" -H "X-RDSH-Token: $SETUP_TOKEN" --data-binary "@-" http://127.0.0.1:38082/api/key 2>/dev/null | grep -q "\"stored\":true" && grep -q "^  DEEPSEEK_API_KEY: 'true'$" "$SW/dsh/.credentials.yaml" && grep -q "EXISTING_KEY: 'existing-value'" "$SW/dsh/.credentials.yaml" && grep -q "access: 'saved-token'" "$SW/dsh/.credentials.yaml"; then ok "setup --web stores YAML string and preserves existing credentials"; else echo "FAIL(output): setup --web key store"; kill $SRV 2>/dev/null; exit 1; fi
 curl -fsS --max-time 5 -X POST -H "X-RDSH-Token: $SETUP_TOKEN" --data-binary '{}' http://127.0.0.1:38082/api/done >/dev/null 2>&1
 wait $SRV 2>/dev/null || true
+if [ -e "$SETUP_TOKEN_FILE" ]; then echo "FAIL(cleanup): setup token handoff file remains after server exit"; exit 1; fi
 rm -rf $SW
 SWB="$RR_SANDBOX/searchweb"
 mkdir -p $SWB

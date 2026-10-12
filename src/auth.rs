@@ -202,7 +202,7 @@ fn jwt_exp_ms(token: &str) -> Option<i64> {
     let payload = parts.nth(1)?;
     let raw = b64url_decode(payload)?;
     let v: serde_json::Value = serde_json::from_slice(&raw).ok()?;
-    v.get("exp")?.as_i64().map(|s| s * 1000)
+    v.get("exp")?.as_i64()?.checked_mul(1000)
 }
 
 // --- external stores --------------------------------------------------------
@@ -441,18 +441,7 @@ fn load_doc(path: &str) -> CredsDoc {
 }
 
 fn quote(s: &str) -> String {
-    let plain_ok = !s.is_empty()
-        && s.bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b"._-+/= ".contains(&b))
-        && !s.starts_with(' ')
-        && !s.ends_with(' ')
-        && !s.contains(": ")
-        && !s.contains(" #");
-    if plain_ok {
-        s.to_string()
-    } else {
-        format!("'{}'", s.replace('\'', "''"))
-    }
+    format!("'{}'", s.replace('\'', "''"))
 }
 
 fn safe_scalar(s: &str) -> anyhow::Result<()> {
@@ -549,32 +538,62 @@ fn splice_entry(text: &str, section: &str, key: &str, block: &[String]) -> Optio
             lines.len() - 1
         }
     };
-    let entry_prefix = format!("  {key}:");
-    if let Some(pos) = lines
-        .iter()
-        .enumerate()
-        .skip(sec_line + 1)
-        .take_while(|(_, l)| indent_of(l) != 0 || l.trim().is_empty())
-        .find(|(_, l)| bare(l) == entry_prefix)
-        .map(|(i, _)| i)
-    {
-        let mut end = pos + 1;
-        while end < lines.len() {
-            let l = &lines[end];
-            if l.trim().is_empty() {
+    let is_target = |line: &String| -> bool {
+        if indent_of(line) != 2 {
+            return false;
+        }
+        let t = line.trim();
+        if t.is_empty() {
+            return false;
+        }
+        if t.starts_with(35 as char) {
+            return false;
+        }
+        match t.find(58 as char) {
+            Some(i) => t[..i].trim() == key,
+            None => false,
+        }
+    };
+    let mut sec_end = lines.len();
+    let mut k = sec_line + 1;
+    while k < lines.len() {
+        let l = &lines[k];
+        if indent_of(l) == 0 && !l.trim().is_empty() {
+            sec_end = k;
+            break;
+        }
+        k += 1;
+    }
+    let mut hits: Vec<usize> = Vec::new();
+    let mut j = sec_line + 1;
+    while j < sec_end {
+        if is_target(&lines[j]) {
+            hits.push(j);
+        }
+        j += 1;
+    }
+    if !hits.is_empty() {
+        let first = hits[0];
+        let mut r = hits.len();
+        while r > 0 {
+            r -= 1;
+            let pos = hits[r];
+            let mut end = pos + 1;
+            while end < lines.len() {
+                let l = &lines[end];
+                if l.trim().is_empty() {
+                    end += 1;
+                    continue;
+                }
+                if indent_of(l) <= 2 {
+                    break;
+                }
                 end += 1;
-                continue;
             }
-            if indent_of(l) <= 2 {
-                break;
-            }
-            end += 1;
+            lines.drain(pos..end);
         }
-        // Blank separators belong to the following entry, not the replaced one.
-        while end > pos + 1 && lines[end - 1].trim().is_empty() {
-            end -= 1;
-        }
-        lines.splice(pos..end, replacement);
+        let at = first.min(lines.len());
+        lines.splice(at..at, replacement);
     } else {
         let mut ins = sec_line + 1;
         while ins < lines.len() {
@@ -603,6 +622,7 @@ pub(crate) fn write_creds(path: &str, text: &str) -> anyhow::Result<()> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::OpenOptionsExt;
+        // Set the mode on the new inode before it becomes visible at `path`.
         options.mode(0o600);
     }
     let result = (|| -> anyhow::Result<()> {
@@ -617,11 +637,6 @@ pub(crate) fn write_creds(path: &str, text: &str) -> anyhow::Result<()> {
         let _ = std::fs::remove_file(&tmp);
     }
     result?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
-    }
     Ok(())
 }
 
@@ -636,78 +651,14 @@ struct Decision {
     grant: Option<OauthGrant>,
 }
 
-fn fresher_than(source: &OauthGrant, stored: &StoredGrant, creds_mtime: u64) -> bool {
-    if stored.access.as_deref() == Some(source.access.as_str()) {
-        return false;
-    }
-    match (source.expires, stored.expires) {
-        (Some(s), Some(t)) => s > t,
-        _ => source.src_mtime_ms > creds_mtime && creds_mtime > 0,
-    }
-}
-
-/// A command-local snapshot; external login stores are scanned once.
-struct Scan {
-    grants: Vec<OauthGrant>,
-    keys: Vec<ApiKey>,
-    notes: Vec<String>,
-    doc: CredsDoc,
-    decisions: Vec<Decision>,
-    path: String,
-}
-
-fn scan() -> Scan {
-    scan_selected(None, None, None)
-}
-
-fn scan_selected(provider: Option<&str>, source: Option<&str>, key_ref: Option<&str>) -> Scan {
-    let mut grants: Vec<OauthGrant> = Vec::new();
-    let mut keys: Vec<ApiKey> = Vec::new();
-    let mut notes: Vec<String> = Vec::new();
-    scan_codex(&mut grants, &mut keys);
-    scan_opencode(&mut grants, &mut notes);
-    for name in KNOWN_ENV_KEYS {
-        if let Ok(value) = std::env::var(name) {
-            if !value.trim().is_empty() {
-                keys.push(ApiKey {
-                    name: name.to_string(),
-                    value,
-                    from: "env".to_string(),
-                    source_path: format!("environment:{name}"),
-                });
-            }
-        }
-    }
-    if provider.is_some() || source.is_some() || key_ref.is_some() {
-        grants.retain(|g| {
-            provider == Some(g.provider.as_str()) && source.is_none_or(|v| v == g.from)
-        });
-        keys.retain(|k| key_ref == Some(k.name.as_str()) && source.is_none_or(|v| v == k.from));
-    }
-    let path = creds_path();
-    let doc = load_doc(&path);
-    let creds_mtime = mtime_ms(&path);
-
-    let decisions = decisions_for(&grants, &doc, creds_mtime);
-    Scan {
-        grants,
-        keys,
-        notes,
-        doc,
-        decisions,
-        path,
-    }
-}
-
 fn decisions_for(grants: &[OauthGrant], doc: &CredsDoc, creds_mtime: u64) -> Vec<Decision> {
     let mut best: HashMap<String, OauthGrant> = HashMap::new();
     for g in grants {
         match best.get(&g.provider) {
-            Some(cur) => {
-                if g.expires.unwrap_or(0) > cur.expires.unwrap_or(0) {
-                    best.insert(g.provider.clone(), g.clone());
-                }
+            Some(cur) if g.expires.unwrap_or(0) > cur.expires.unwrap_or(0) => {
+                best.insert(g.provider.clone(), g.clone());
             }
+            Some(_) => {}
             None => {
                 best.insert(g.provider.clone(), g.clone());
             }
@@ -734,39 +685,119 @@ fn decisions_for(grants: &[OauthGrant], doc: &CredsDoc, creds_mtime: u64) -> Vec
                 detail: format!("no record {key}: would import from {}", g.from),
                 grant: Some(g),
             }),
-            Some(stored) => {
-                if stored.access.as_deref() == Some(g.access.as_str()) {
-                    decisions.push(Decision {
-                        provider: p,
-                        from: g.from.clone(),
-                        action: "ok",
-                        detail: format!("record {key} already matches {}", g.from),
-                        grant: None,
-                    });
-                } else if fresher_than(&g, stored, creds_mtime) {
-                    decisions.push(Decision {
-                        provider: p,
-                        from: g.from.clone(),
-                        action: "refresh",
-                        detail: format!("record {key} is older: would refresh from {}", g.from),
-                        grant: Some(g),
-                    });
-                } else {
-                    decisions.push(Decision {
-                        provider: p,
-                        from: g.from.clone(),
-                        action: "ok",
-                        detail: format!(
-                            "record {key} kept: dsh-side token is newer than {}",
-                            g.from
-                        ),
-                        grant: None,
-                    });
-                }
+            Some(stored) if stored.access.as_deref() == Some(g.access.as_str()) => {
+                decisions.push(Decision {
+                    provider: p,
+                    from: g.from.clone(),
+                    action: "ok",
+                    detail: format!("record {key} already matches {}", g.from),
+                    grant: None,
+                });
             }
+            Some(stored) if fresher_than(&g, stored, creds_mtime) => {
+                decisions.push(Decision {
+                    provider: p,
+                    from: g.from.clone(),
+                    action: "refresh",
+                    detail: format!("record {key} is older: would refresh from {}", g.from),
+                    grant: Some(g),
+                });
+            }
+            Some(_) => decisions.push(Decision {
+                provider: p,
+                from: g.from.clone(),
+                action: "ok",
+                detail: format!("record {key} kept: dsh-side token is newer than {}", g.from),
+                grant: None,
+            }),
         }
     }
     decisions
+}
+
+fn fresher_than(source: &OauthGrant, stored: &StoredGrant, creds_mtime: u64) -> bool {
+    if stored.access.as_deref() == Some(source.access.as_str()) {
+        return false;
+    }
+    match (source.expires, stored.expires) {
+        (Some(s), Some(t)) => s > t,
+        _ => source.src_mtime_ms > creds_mtime && creds_mtime > 0,
+    }
+}
+
+/// A command-local snapshot; external login stores are scanned once.
+struct Scan {
+    grants: Vec<OauthGrant>,
+    keys: Vec<ApiKey>,
+    notes: Vec<String>,
+    doc: CredsDoc,
+    decisions: Vec<Decision>,
+    path: String,
+}
+
+fn scan() -> Scan {
+    scan_selected(None, None, None)
+}
+
+fn filter_external_credentials(
+    grants: &mut Vec<OauthGrant>,
+    keys: &mut Vec<ApiKey>,
+    provider: Option<&str>,
+    source: Option<&str>,
+    key_ref: Option<&str>,
+) {
+    if provider.is_none() && source.is_none() && key_ref.is_none() {
+        return;
+    }
+
+    // `--source` by itself selects both kinds of external login. Provider and
+    // ref selectors keep their existing type-specific behavior.
+    let include_grants = provider.is_some() || (source.is_some() && key_ref.is_none());
+    let include_keys = key_ref.is_some() || (source.is_some() && provider.is_none());
+    grants.retain(|g| {
+        include_grants
+            && provider.is_none_or(|v| v == g.provider)
+            && source.is_none_or(|v| v == g.from)
+    });
+    keys.retain(|k| {
+        include_keys && key_ref.is_none_or(|v| v == k.name) && source.is_none_or(|v| v == k.from)
+    });
+}
+
+fn scan_selected(provider: Option<&str>, source: Option<&str>, key_ref: Option<&str>) -> Scan {
+    let mut grants: Vec<OauthGrant> = Vec::new();
+    let mut keys: Vec<ApiKey> = Vec::new();
+    let mut notes: Vec<String> = Vec::new();
+    scan_codex(&mut grants, &mut keys);
+    scan_opencode(&mut grants, &mut notes);
+    // Environment credentials are references only; importing one requires an
+    // explicit selector just like a key found in a source CLI store.
+    for name in KNOWN_ENV_KEYS {
+        if let Ok(value) = std::env::var(name) {
+            if !value.trim().is_empty() {
+                keys.push(ApiKey {
+                    name: name.to_string(),
+                    value,
+                    from: "env".to_string(),
+                    source_path: format!("environment:{name}"),
+                });
+            }
+        }
+    }
+    filter_external_credentials(&mut grants, &mut keys, provider, source, key_ref);
+    let path = creds_path();
+    let doc = load_doc(&path);
+    let creds_mtime = mtime_ms(&path);
+
+    let decisions = decisions_for(&grants, &doc, creds_mtime);
+    Scan {
+        grants,
+        keys,
+        notes,
+        doc,
+        decisions,
+        path,
+    }
 }
 
 fn autosync_enabled() -> bool {
@@ -805,49 +836,67 @@ pub fn auto_sync() {
     }
 }
 
-/// Import missing-or-older grants/refs. Quiet mode stays silent unless it
-/// actually writes (used by auto_sync before boot).
-// Caller holds SharingLock for the full policy-check/write operation.
+fn api_key_action(key: &ApiKey, doc: &CredsDoc) -> &'static str {
+    match doc.refs.get(&key.name) {
+        Some(value) if value == &key.value => "ok",
+        Some(_) => "refresh",
+        None => "import",
+    }
+}
+
+/// Import only entries whose source and credential were explicitly selected.
 fn apply_imports(policy: &SharingPolicy, quiet: bool) -> anyhow::Result<Vec<String>> {
-    let Scan {
-        grants,
-        keys,
-        notes: _notes,
-        doc,
-        decisions: _decisions,
-        path,
-    } = scan();
-    // Do not turn an unreadable or invalid UTF-8 store into an empty document.
-    match std::fs::read_to_string(&path) {
+    let scan = scan();
+    apply_imports_from_scan(policy, &scan, quiet)
+}
+
+/// Caller holds SharingLock; this lock serializes credential writes with DSH.
+fn apply_imports_from_scan(
+    policy: &SharingPolicy,
+    scan: &Scan,
+    quiet: bool,
+) -> anyhow::Result<Vec<String>> {
+    let path = &scan.path;
+    let _credential_lock =
+        crate::file_lock::CredentialFileLock::exclusive_for(std::path::Path::new(path))?;
+    match std::fs::read_to_string(path) {
         Ok(_) => {}
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
         Err(_) => anyhow::bail!("credential store is unreadable; no credentials were copied"),
     }
+    let doc = load_doc(path);
+    if !doc.text.is_empty() && !doc.version_ok {
+        if !quiet {
+            eprintln!("[rdsh auth] refuse: {path} uses the pre-release flat layout; add `version: 1` first");
+        }
+        return Ok(Vec::new());
+    }
     ensure_writable_doc(&doc)?;
-    let selected: Vec<_> = grants
-        .into_iter()
-        .filter(|g| policy.allows(&g.from, &g.provider))
+    let selected: Vec<_> = scan
+        .grants
+        .iter()
+        .filter(|grant| policy.allows(&grant.from, &grant.provider))
+        .cloned()
         .collect();
-    // Select the freshest source only AFTER filtering by consent.
-    let decisions = decisions_for(&selected, &doc, mtime_ms(&path));
+    let decisions = decisions_for(&selected, &doc, mtime_ms(path));
     let mut text = if doc.text.is_empty() {
         "version: 1\n".to_string()
     } else {
         doc.text.clone()
     };
     let mut done = Vec::new();
-    for d in decisions.iter().filter(|d| d.action != "ok") {
-        if let Some(g) = &d.grant {
-            safe_scalar(&g.access)?;
-            safe_scalar(&g.refresh)?;
-            if let Some(account) = &g.account_id {
+    for decision in decisions.iter().filter(|decision| decision.action != "ok") {
+        if let Some(grant) = &decision.grant {
+            safe_scalar(&grant.access)?;
+            safe_scalar(&grant.refresh)?;
+            if let Some(account) = &grant.account_id {
                 safe_scalar(account)?;
             }
-            let key = format!("{RECORD_SCOPE}/{}", d.provider);
-            match splice_entry(&text, "records", &key, &grant_block(&key, g)) {
-                Some(t) => {
-                    text = t;
-                    done.push(format!("{} {} from {}", d.action, key, g.from));
+            let key = format!("{RECORD_SCOPE}/{}", decision.provider);
+            match splice_entry(&text, "records", &key, &grant_block(&key, grant)) {
+                Some(updated) => {
+                    text = updated;
+                    done.push(format!("{} {} from {}", decision.action, key, grant.from));
                 }
                 None => {
                     if !quiet {
@@ -857,20 +906,25 @@ fn apply_imports(policy: &SharingPolicy, quiet: bool) -> anyhow::Result<Vec<Stri
             }
         }
     }
-    for k in keys.iter().filter(|k| policy.allows(&k.from, &k.name)) {
-        if doc.refs.contains_key(&k.name) {
+    for key in scan
+        .keys
+        .iter()
+        .filter(|key| policy.allows(&key.from, &key.name))
+    {
+        let action = api_key_action(key, &doc);
+        if action == "ok" {
             continue;
         }
-        safe_scalar(&k.value)?;
-        let block = vec![format!("  {}: {}", k.name, quote(&k.value))];
-        match splice_entry(&text, "refs", &k.name, &block) {
-            Some(t) => {
-                text = t;
-                done.push(format!("import ref {} from {}", k.name, k.from));
+        safe_scalar(&key.value)?;
+        let block = vec![format!("  {}: {}", key.name, quote(&key.value))];
+        match splice_entry(&text, "refs", &key.name, &block) {
+            Some(updated) => {
+                text = updated;
+                done.push(format!("{action} ref {} from {}", key.name, key.from));
             }
             None => {
                 if !quiet {
-                    eprintln!("[rdsh auth] skip ref {}: section error", k.name);
+                    eprintln!("[rdsh auth] skip ref {}: section error", key.name);
                 }
             }
         }
@@ -878,9 +932,9 @@ fn apply_imports(policy: &SharingPolicy, quiet: bool) -> anyhow::Result<Vec<Stri
     if done.is_empty() {
         return Ok(done);
     }
-    write_creds(&path, &text)?;
-    for d in &done {
-        eprintln!("[rdsh auth] {d} -> {path}");
+    write_creds(path, &text)?;
+    for item in &done {
+        eprintln!("[rdsh auth] {item} -> {path}");
     }
     Ok(done)
 }
@@ -918,12 +972,10 @@ fn sharing_document(
     }
     for key in keys {
         let selected = policy.allows(&key.from, &key.name);
-        let action = if !selected {
-            "not_selected"
-        } else if doc.refs.contains_key(&key.name) {
-            "ok"
+        let action = if selected {
+            api_key_action(key, doc)
         } else {
-            "import"
+            "not_selected"
         };
         inventory.push(serde_json::json!({
             "selector": format!("{}:{}", key.from, key.name),
@@ -1176,10 +1228,16 @@ pub fn summary_line() -> String {
         parts.push(format!(
             "{}={}",
             k.name,
-            if doc.refs.contains_key(&k.name) {
+            if policy.allows(&k.from, &k.name) {
+                match api_key_action(k, &doc) {
+                    "ok" => "stored",
+                    "refresh" => "source-changed",
+                    _ => "pending-import",
+                }
+            } else if doc.refs.contains_key(&k.name) {
                 "stored"
             } else {
-                "pending-import"
+                "not-selected"
             }
         ));
     }
@@ -1292,15 +1350,20 @@ fn prompt_yes(prompt: &str) -> bool {
 /// Store one `refs:` entry (0600, other entries untouched). Returns true
 /// when the file changed.
 fn store_ref(name: &str, value: &str) -> anyhow::Result<bool> {
+    store_ref_at(&creds_path(), name, value)
+}
+
+fn store_ref_at(path: &str, name: &str, value: &str) -> anyhow::Result<bool> {
     safe_scalar(value)?;
-    let _lock = SharingLock::acquire(&crate::inspect::dsh_home())?;
-    let path = creds_path();
-    match std::fs::read_to_string(&path) {
+    let _sharing_lock = SharingLock::acquire(&crate::inspect::dsh_home())?;
+    let _credential_lock =
+        crate::file_lock::CredentialFileLock::exclusive_for(std::path::Path::new(path))?;
+    match std::fs::read_to_string(path) {
         Ok(_) => {}
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
         Err(_) => anyhow::bail!("credential store is unreadable; no credentials were copied"),
     }
-    let doc = load_doc(&path);
+    let doc = load_doc(path);
     ensure_writable_doc(&doc)?;
     if !doc.text.is_empty() && !doc.version_ok {
         anyhow::bail!("refuse: {path} uses the pre-release flat layout");
@@ -1318,7 +1381,7 @@ fn store_ref(name: &str, value: &str) -> anyhow::Result<bool> {
         Some(t) => text = t,
         None => anyhow::bail!("section error writing ref {name}"),
     }
-    write_creds(&path, &text)?;
+    write_creds(path, &text)?;
     eprintln!("[rdsh setup] stored ref {name} -> {path}");
     Ok(true)
 }
@@ -1509,7 +1572,10 @@ fn provider_needs_in(grants: &[OauthGrant], doc: &CredsDoc) -> Vec<ProviderNeed>
 
 /// Ref/env name for well-known API-key routes (mirrors profile `apiKeyEnv`).
 fn key_name(provider: &str) -> String {
-    provider.to_uppercase().replace('-', "_") + "_API_KEY"
+    match provider {
+        "openai-codex" => "OPENAI_API_KEY".to_string(),
+        _ => provider.to_uppercase().replace('-', "_") + "_API_KEY",
+    }
 }
 
 fn via_name(api_key_env: &Option<String>) -> String {
@@ -1777,10 +1843,99 @@ mod tests {
     }
 
     #[test]
+    fn api_key_names_follow_provider_routes() {
+        assert_eq!(key_name("openai-codex"), "OPENAI_API_KEY");
+        assert_eq!(key_name("anthropic"), "ANTHROPIC_API_KEY");
+    }
+
+    #[test]
     fn jwt_exp_decode() {
         let tok = "eyJhbGciOiJIUzI1NiJ9.eyJleHAiOjE3OTE3MDg4MDJ9.sig";
         assert_eq!(jwt_exp_ms(tok), Some(1791708802000));
         assert!(jwt_exp_ms("not-a-jwt").is_none());
+    }
+
+    fn test_grant(provider: &str, from: &str) -> OauthGrant {
+        OauthGrant {
+            provider: provider.to_string(),
+            access: "fixture-access".to_string(),
+            refresh: "fixture-refresh".to_string(),
+            expires: None,
+            account_id: None,
+            from: from.to_string(),
+            source_path: format!("fixture/{from}/auth.json"),
+            src_mtime_ms: 0,
+        }
+    }
+
+    fn test_key(name: &str, from: &str) -> ApiKey {
+        ApiKey {
+            name: name.to_string(),
+            value: "fixture-key".to_string(),
+            from: from.to_string(),
+            source_path: format!("fixture/{from}/auth.json"),
+        }
+    }
+
+    #[test]
+    fn source_only_filter_includes_matching_grants_and_keys() {
+        let mut grants = vec![
+            test_grant("openai-codex", "codex"),
+            test_grant("anthropic", "opencode"),
+        ];
+        let mut keys = vec![
+            test_key("OPENAI_API_KEY", "codex"),
+            test_key("ANTHROPIC_API_KEY", "opencode"),
+        ];
+
+        filter_external_credentials(&mut grants, &mut keys, None, Some("codex"), None);
+
+        assert_eq!(grants.len(), 1);
+        assert_eq!(grants[0].provider, "openai-codex");
+        assert_eq!(keys.len(), 1);
+        assert_eq!(keys[0].name, "OPENAI_API_KEY");
+    }
+
+    #[test]
+    fn provider_and_ref_selectors_keep_credentials_typed() {
+        let mut grants = vec![
+            test_grant("openai-codex", "codex"),
+            test_grant("anthropic", "opencode"),
+        ];
+        let mut keys = vec![
+            test_key("OPENAI_API_KEY", "codex"),
+            test_key("ANTHROPIC_API_KEY", "opencode"),
+        ];
+
+        filter_external_credentials(&mut grants, &mut keys, None, None, Some("OPENAI_API_KEY"));
+        assert!(grants.is_empty(), "--ref must not include OAuth grants");
+        assert_eq!(keys.len(), 1);
+        assert_eq!(keys[0].name, "OPENAI_API_KEY");
+
+        let mut grants = vec![
+            test_grant("openai-codex", "codex"),
+            test_grant("anthropic", "opencode"),
+        ];
+        let mut keys = vec![
+            test_key("OPENAI_API_KEY", "codex"),
+            test_key("ANTHROPIC_API_KEY", "opencode"),
+        ];
+        filter_external_credentials(&mut grants, &mut keys, Some("openai-codex"), None, None);
+        assert_eq!(grants.len(), 1);
+        assert_eq!(grants[0].provider, "openai-codex");
+        assert!(keys.is_empty(), "--provider must not include API keys");
+    }
+
+    #[test]
+    fn jwt_exp_overflow_is_rejected() {
+        let too_far_future = "header.eyJleHAiOjkyMjMzNzIwMzY4NTQ3NzZ9.sig";
+        let too_far_past = "header.eyJleHAiOi05MjIzMzcyMDM2ODU0Nzc2fQ.sig";
+        let largest_millisecond_value = "header.eyJleHAiOjkyMjMzNzIwMzY4NTQ3NzV9.sig";
+
+        assert_eq!(jwt_exp_ms(too_far_future), None);
+        assert_eq!(jwt_exp_ms(too_far_past), None);
+        let expected = 9_223_372_036_854_775_000;
+        assert_eq!(jwt_exp_ms(largest_millisecond_value), Some(expected));
     }
 
     #[test]
@@ -1876,6 +2031,121 @@ mod tests {
         assert!(!error.to_string().contains("fixture-secret"));
     }
 
+    #[test]
+    fn credential_values_are_always_single_quoted_yaml_strings() {
+        for value in [
+            "null",
+            "true",
+            "false",
+            "123",
+            "1.5",
+            "0x1f",
+            ".inf",
+            "~",
+            "ordinary-value",
+            "value with spaces",
+            "O'Connor",
+        ] {
+            let encoded = quote(value);
+            assert!(encoded.starts_with('\'') && encoded.ends_with('\''));
+            assert_eq!(unquote(&encoded), value);
+        }
+    }
+
+    #[test]
+    fn quoted_ref_write_preserves_existing_refs_and_records() {
+        let dir = std::env::temp_dir().join(format!(
+            "rdsh-auth-yaml-test-{}",
+            crate::local_http::random_token().unwrap()
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        let path = dir.join(".credentials.yaml");
+        let original = "version: 1\nrefs:\n  EXISTING_KEY: 'existing-value'\nrecords:\n  llm-pi-ai/existing:\n    kind: grant\n    payload:\n      access: 'saved-token'\n";
+        let updated = splice_entry(
+            original,
+            "refs",
+            "DEEPSEEK_API_KEY",
+            &[format!("  DEEPSEEK_API_KEY: {}", quote("true"))],
+        )
+        .unwrap();
+        std::fs::write(&path, updated).unwrap();
+
+        let doc = load_doc(path.to_str().unwrap());
+        assert!(doc.version_ok);
+        assert_eq!(
+            doc.refs.get("EXISTING_KEY").map(String::as_str),
+            Some("existing-value")
+        );
+        assert_eq!(
+            doc.refs.get("DEEPSEEK_API_KEY").map(String::as_str),
+            Some("true")
+        );
+        let record = doc.grants.get("llm-pi-ai/existing").unwrap();
+        assert_eq!(record.kind, "grant");
+        assert_eq!(record.access.as_deref(), Some("saved-token"));
+
+        std::fs::remove_file(&path).unwrap();
+        std::fs::remove_dir(&dir).unwrap();
+    }
+
+    #[test]
+    fn refs_update_replaces_inline_value_without_duplicates() {
+        let original = format!(
+            "version: 1\nrefs:\n  DEEPSEEK_API_KEY: {}\n  OTHER_KEY: {}\n",
+            quote("DUMMY_FIRST"),
+            quote("keep")
+        );
+        let updated = splice_entry(
+            original.as_str(),
+            "refs",
+            "DEEPSEEK_API_KEY",
+            &[format!("  DEEPSEEK_API_KEY: {}", quote("DUMMY_ROTATED"))],
+        )
+        .unwrap();
+        assert_eq!(updated.matches("  DEEPSEEK_API_KEY:").count(), 1);
+        assert!(updated.contains(quote("DUMMY_ROTATED").as_str()));
+        assert!(!updated.contains(quote("keep").as_str()) || updated.contains("  OTHER_KEY:"));
+        assert!(!updated.contains("DUMMY_FIRST"));
+        let updated2 = splice_entry(
+            updated.as_str(),
+            "refs",
+            "DEEPSEEK_API_KEY",
+            &[format!("  DEEPSEEK_API_KEY: {}", quote("DUMMY_THIRD"))],
+        )
+        .unwrap();
+        assert_eq!(updated2.matches("  DEEPSEEK_API_KEY:").count(), 1);
+        assert!(updated2.contains(quote("DUMMY_THIRD").as_str()));
+        let with_prefix = format!(
+            "version: 1\nrefs:\n  MY_KEY: {}\n  MY_KEY2: {}\n",
+            quote("a"),
+            quote("b")
+        );
+        let updated3 = splice_entry(
+            with_prefix.as_str(),
+            "refs",
+            "MY_KEY",
+            &[format!("  MY_KEY: {}", quote("c"))],
+        )
+        .unwrap();
+        assert!(updated3.contains(quote("c").as_str()));
+        assert!(updated3.contains("  MY_KEY2:"));
+        assert_eq!(updated3.matches("  MY_KEY:").count(), 1);
+        let duplicated = format!(
+            "version: 1\nrefs:\n  DEEPSEEK_API_KEY: {}\n  DEEPSEEK_API_KEY: {}\n",
+            quote("DUMMY_FIRST"),
+            quote("DUMMY_ROTATED")
+        );
+        let healed = splice_entry(
+            duplicated.as_str(),
+            "refs",
+            "DEEPSEEK_API_KEY",
+            &[format!("  DEEPSEEK_API_KEY: {}", quote("DUMMY_NEW"))],
+        )
+        .unwrap();
+        assert_eq!(healed.matches("  DEEPSEEK_API_KEY:").count(), 1);
+        assert!(healed.contains(quote("DUMMY_NEW").as_str()));
+    }
+
     #[cfg(unix)]
     #[test]
     fn credential_file_is_private_when_created() {
@@ -1893,6 +2163,51 @@ mod tests {
         );
         std::fs::remove_file(&path).unwrap();
         std::fs::remove_dir(&dir).unwrap();
+    }
+
+    #[test]
+    fn concurrent_imports_keep_both_credential_updates() {
+        let dir = std::env::temp_dir().join(format!(
+            "rdsh-auth-rmw-{}-{}",
+            std::process::id(),
+            crate::local_http::random_token().unwrap()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join(".credentials.yaml").to_string_lossy().into_owned();
+        let barrier = std::sync::Arc::new(std::sync::Barrier::new(3));
+        let mut joins = Vec::new();
+        for (name, value) in [("FIRST_KEY", "one"), ("SECOND_KEY", "two")] {
+            let path = path.clone();
+            let barrier = std::sync::Arc::clone(&barrier);
+            joins.push(std::thread::spawn(move || {
+                let scan = Scan {
+                    grants: Vec::new(),
+                    keys: vec![ApiKey {
+                        name: name.to_string(),
+                        value: value.to_string(),
+                        from: "test".to_string(),
+                        source_path: "fixture/test-auth.json".to_string(),
+                    }],
+                    notes: Vec::new(),
+                    doc: CredsDoc::default(),
+                    decisions: Vec::new(),
+                    path,
+                };
+                barrier.wait();
+                let policy = SharingPolicy {
+                    selected: [format!("test:{name}")].into_iter().collect(),
+                };
+                apply_imports_from_scan(&policy, &scan, true).unwrap();
+            }));
+        }
+        barrier.wait();
+        for join in joins {
+            join.join().unwrap();
+        }
+        let doc = load_doc(&path);
+        assert_eq!(doc.refs.get("FIRST_KEY").map(String::as_str), Some("one"));
+        assert_eq!(doc.refs.get("SECOND_KEY").map(String::as_str), Some("two"));
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]
