@@ -2,8 +2,10 @@
 [Console]::Out.WriteLine('phase:powershell-start:' + $PSVersionTable.PSVersion.ToString())
 [Console]::Out.Flush()
 Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName System.Drawing
 [Console]::Out.WriteLine('phase:forms-loaded')
+[Console]::Out.Flush()
+Add-Type -AssemblyName System.Drawing
+[Console]::Out.WriteLine('phase:drawing-loaded')
 [Console]::Out.Flush()
 # A CLR delegate can read stdin on the thread pool without a PowerShell runspace
 # or compiling a new C# type during every cold notification-area startup.
