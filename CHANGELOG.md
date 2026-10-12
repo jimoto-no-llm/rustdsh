@@ -3,6 +3,33 @@
 All notable changes to this project are documented here.
 Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
+## [0.3.2] - 2026-10-12
+
+### Fixed
+
+- `rdsh compute` and the resident compute bridge contain a worker that closes
+  its stdin mid-write: the resulting EPIPE no longer takes down the Node host,
+  and the request falls back instead of exiting.
+- `tokens`, `compute` and `serve` report `chars` as a Unicode scalar count
+  instead of a UTF-8 byte count, so 日本語 is `3` chars rather than `9`.
+- `context search` accepts two-character ASCII terms (`CI`, `UI`, `Go`)
+  instead of silently returning no sessions; Japanese bigrams keep their weak
+  score.
+- `search-web` keeps valid results whose title, URL or snippet contains the
+  correction word.
+- Dashboard acceptance ignores unrelated forbidden files such as
+  `.env.example` instead of stopping with `invalid_input_path`.
+- Delegation skips `dsh` and Node candidates on `PATH` that cannot be
+  executed, instead of failing with `Permission denied`.
+- `rdsh headless "run the tests"` forwards the positional prompt the same way
+  an explicit `--profile` does.
+- `--dump-default-config` and `--dump-config-schema` reach upstream `dsh`
+  as themselves instead of degrading to `--dump-config`.
+- `rdsh compact` counts newlines in its token budget and no longer appends an
+  extra trailing newline.
+- Credential rotation replaces the `refs` entry instead of duplicating it, and
+  already-duplicated files are healed back to a single entry.
+
 ## [0.3.1] - 2026-10-12
 
 ### Fixed
