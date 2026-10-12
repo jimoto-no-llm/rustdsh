@@ -483,28 +483,62 @@ fn splice_entry(text: &str, section: &str, key: &str, block: &[String]) -> Optio
             lines.len() - 1
         }
     };
-    let entry_prefix = format!("  {key}:");
-    if let Some(pos) = lines
-        .iter()
-        .enumerate()
-        .skip(sec_line + 1)
-        .take_while(|(_, l)| indent_of(l) != 0 || l.trim().is_empty())
-        .find(|(_, l)| *l == &entry_prefix)
-        .map(|(i, _)| i)
-    {
-        let mut end = pos + 1;
-        while end < lines.len() {
-            let l = &lines[end];
-            if l.trim().is_empty() {
-                end += 1;
-                continue;
-            }
-            if indent_of(l) <= 2 {
-                break;
-            }
-            end += 1;
+    let is_target = |line: &String| -> bool {
+        if indent_of(line) != 2 {
+            return false;
         }
-        lines.splice(pos..end, block.iter().cloned());
+        let t = line.trim();
+        if t.is_empty() {
+            return false;
+        }
+        if t.starts_with(35 as char) {
+            return false;
+        }
+        match t.find(58 as char) {
+            Some(i) => t[..i].trim() == key,
+            None => false,
+        }
+    };
+    let mut sec_end = lines.len();
+    let mut k = sec_line + 1;
+    while k < lines.len() {
+        let l = &lines[k];
+        if indent_of(l) == 0 && !l.trim().is_empty() {
+            sec_end = k;
+            break;
+        }
+        k += 1;
+    }
+    let mut hits: Vec<usize> = Vec::new();
+    let mut j = sec_line + 1;
+    while j < sec_end {
+        if is_target(&lines[j]) {
+            hits.push(j);
+        }
+        j += 1;
+    }
+    if !hits.is_empty() {
+        let first = hits[0];
+        let mut r = hits.len();
+        while r > 0 {
+            r -= 1;
+            let pos = hits[r];
+            let mut end = pos + 1;
+            while end < lines.len() {
+                let l = &lines[end];
+                if l.trim().is_empty() {
+                    end += 1;
+                    continue;
+                }
+                if indent_of(l) <= 2 {
+                    break;
+                }
+                end += 1;
+            }
+            lines.drain(pos..end);
+        }
+        let at = first.min(lines.len());
+        lines.splice(at..at, block.iter().cloned());
     } else {
         let mut ins = sec_line + 1;
         while ins < lines.len() {
@@ -1753,6 +1787,64 @@ mod tests {
 
         std::fs::remove_file(&path).unwrap();
         std::fs::remove_dir(&dir).unwrap();
+    }
+
+    #[test]
+    fn refs_update_replaces_inline_value_without_duplicates() {
+        let original = format!(
+            "version: 1\nrefs:\n  DEEPSEEK_API_KEY: {}\n  OTHER_KEY: {}\n",
+            quote("DUMMY_FIRST"),
+            quote("keep")
+        );
+        let updated = splice_entry(
+            original.as_str(),
+            "refs",
+            "DEEPSEEK_API_KEY",
+            &[format!("  DEEPSEEK_API_KEY: {}", quote("DUMMY_ROTATED"))],
+        )
+        .unwrap();
+        assert_eq!(updated.matches("  DEEPSEEK_API_KEY:").count(), 1);
+        assert!(updated.contains(quote("DUMMY_ROTATED").as_str()));
+        assert!(!updated.contains(quote("keep").as_str()) || updated.contains("  OTHER_KEY:"));
+        assert!(!updated.contains("DUMMY_FIRST"));
+        let updated2 = splice_entry(
+            updated.as_str(),
+            "refs",
+            "DEEPSEEK_API_KEY",
+            &[format!("  DEEPSEEK_API_KEY: {}", quote("DUMMY_THIRD"))],
+        )
+        .unwrap();
+        assert_eq!(updated2.matches("  DEEPSEEK_API_KEY:").count(), 1);
+        assert!(updated2.contains(quote("DUMMY_THIRD").as_str()));
+        let with_prefix = format!(
+            "version: 1\nrefs:\n  MY_KEY: {}\n  MY_KEY2: {}\n",
+            quote("a"),
+            quote("b")
+        );
+        let updated3 = splice_entry(
+            with_prefix.as_str(),
+            "refs",
+            "MY_KEY",
+            &[format!("  MY_KEY: {}", quote("c"))],
+        )
+        .unwrap();
+        assert!(updated3.contains(quote("c").as_str()));
+        assert!(updated3.contains("  MY_KEY2:"));
+        assert_eq!(updated3.matches("  MY_KEY:").count(), 1);
+        let duplicated = format!(
+            "version: 1\nrefs:\n  DEEPSEEK_API_KEY: {}\n  DEEPSEEK_API_KEY: {}\n",
+            quote("DUMMY_FIRST"),
+            quote("DUMMY_ROTATED")
+        );
+        let healed = splice_entry(
+            duplicated.as_str(),
+            "refs",
+            "DEEPSEEK_API_KEY",
+            &[format!("  DEEPSEEK_API_KEY: {}", quote("DUMMY_NEW"))],
+        )
+        .unwrap();
+        assert_eq!(healed.matches("  DEEPSEEK_API_KEY:").count(), 1);
+        assert!(healed.contains(quote("DUMMY_NEW").as_str()));
     }
 
     #[cfg(unix)]
