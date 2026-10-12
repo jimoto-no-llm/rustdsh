@@ -57,7 +57,7 @@ jobs:
       - run: cargo build --locked
       - run: sudo apt-get update && sudo apt-get install -y bubblewrap
       - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-      - run: node --test tests/security-boundaries.test.mjs tests/tool-isolation.test.mjs
+      - run: node --test tests/security-boundaries.test.mjs tests/tool-isolation.test.mjs tests/desktop.test.mjs
       - run: python3 -m unittest discover -s tests -p 'test_release_assets.py'
       - name: Verify the audited dispatcher and late middleware changes
         run: |

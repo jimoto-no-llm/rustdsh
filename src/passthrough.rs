@@ -21,6 +21,26 @@ fn origin_file() -> Option<String> {
     }
 }
 
+/// Check PATH candidates without spawning them. On Unix, `metadata()` alone
+/// accepts directories and files that cannot be executed by `Command`.
+fn is_executable_file(path: &std::path::Path) -> bool {
+    let Ok(metadata) = std::fs::metadata(path) else {
+        return false;
+    };
+    if !metadata.is_file() {
+        return false;
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        metadata.permissions().mode() & 0o111 != 0
+    }
+    #[cfg(not(unix))]
+    {
+        true
+    }
+}
+
 /// Locate the original Node-based dsh (never ourselves).
 pub fn find_original_dsh() -> Option<String> {
     // Canonical name first, legacy DSH_ORIG_BIN kept as fallback.
@@ -58,7 +78,7 @@ pub fn find_original_dsh() -> Option<String> {
             let names = ["dsh"];
             for n in names {
                 let cand = dir.join(n);
-                if std::fs::metadata(&cand).is_ok() {
+                if is_executable_file(&cand) {
                     let mut skip = false;
                     if let (Some(m), Ok(c)) = (&me, std::fs::canonicalize(&cand)) {
                         if let Ok(m) = std::fs::canonicalize(m) {
@@ -178,9 +198,9 @@ pub fn latest_node_tree() -> Option<String> {
     latest_node_tree_for(&format!("{home}/.local/opt"))
 }
 
-// Node binary to run .js delegations: PATH lookup is metadata-only (a
-// `node --version` spawn costs ~14ms per delegation), else the newest
-// matching tree under ~/.local/opt.
+// Node binary to run .js delegations: PATH lookup checks file type and Unix
+// execute bits without spawning (`node --version` costs ~14ms per delegation),
+// else the newest matching tree under ~/.local/opt.
 pub fn find_node_bin() -> Option<String> {
     #[cfg(target_os = "windows")]
     const NAMES: &[&str] = &["node.exe", "node.cmd", "node.bat", "node"];
@@ -190,7 +210,7 @@ pub fn find_node_bin() -> Option<String> {
         for dir in std::env::split_paths(&path) {
             for n in NAMES {
                 let cand = dir.join(n);
-                if cand.is_file() {
+                if is_executable_file(&cand) {
                     return Some(cand.to_string_lossy().into_owned());
                 }
             }
@@ -260,14 +280,20 @@ fn base_cmd(orig: &str, dry: bool, metadata_only: bool) -> anyhow::Result<std::p
         // Default: hand the run to DSH with its normal tools and normal file
         // access. The strict boundary stays available through --share-file,
         // features.agent_tool_sandbox, or RDSH_SECURITY=1.
-        if orig.ends_with(".js") {
+        let mut command = if orig.ends_with(".js") {
             let mut command = std::process::Command::new(&bin);
             command.arg(orig);
-            return Ok(command);
-        }
-        return Ok(std::process::Command::new(orig));
+            command
+        } else {
+            std::process::Command::new(orig)
+        };
+        // The rdsh settings card reports this without spawning a second binary.
+        command.env("RDSH_VERSION", env!("CARGO_PKG_VERSION"));
+        return Ok(command);
     }
-    crate::tool_security::command(orig, &bin)
+    let mut command = crate::tool_security::command(orig, &bin)?;
+    command.env("RDSH_VERSION", env!("CARGO_PKG_VERSION"));
+    Ok(command)
 }
 
 fn apply_slim(cmd: &mut std::process::Command, slim: bool) {
@@ -352,6 +378,8 @@ pub fn exec_boot(
 
 pub fn exec_dump_config(
     profile: &str,
+    from_default: Option<&str>,
+    kind: crate::dsh_args::DumpKind,
     patches: &[String],
     dry: bool,
     slim: bool,
@@ -363,10 +391,17 @@ pub fn exec_dump_config(
         crate::auth::pre_boot(false);
     }
     cmd.arg("--profile").arg(profile);
+    if let Some(f) = from_default {
+        cmd.arg("--from-default-profile").arg(f);
+    }
     for p in patches {
         cmd.arg("--patch").arg(p);
     }
-    cmd.arg("--dump-config");
+    match kind {
+        crate::dsh_args::DumpKind::Config => cmd.arg("--dump-config"),
+        crate::dsh_args::DumpKind::DefaultConfig => cmd.arg("--dump-default-config"),
+        crate::dsh_args::DumpKind::Schema => cmd.arg("--dump-config-schema"),
+    };
     apply_slim(&mut cmd, slim);
     exec_or_spawn(cmd, dry)
 }

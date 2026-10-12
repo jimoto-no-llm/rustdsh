@@ -14,7 +14,7 @@
 
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -65,18 +65,75 @@ export function isEnabled(env = process.env) {
   return featureEnabled("compute", env.RDSH_COMPUTE === "1", env);
 }
 
+function defaultExists(path) {
+  try {
+    return existsSync(path);
+  } catch {
+    return false;
+  }
+}
+
+function wellKnownBins(env, platform, name) {
+  const home = platform === "win32" ? env.USERPROFILE || env.HOME || homedir() : env.HOME || homedir();
+  if (platform === "win32") {
+    const localAppData = env.LOCALAPPDATA || join(home, "AppData", "Local");
+    const cargoHome = env.CARGO_HOME || join(home, ".cargo");
+    return [
+      join(localAppData, "rdsh", "bin", name),
+      join(home, ".local", "bin", name),
+      join(cargoHome, "bin", name),
+    ];
+  }
+  return [join(home, ".local", "bin", name), join("/usr/local/bin", name), join(home, ".cargo", "bin", name)];
+}
+
+// Desktop ships its own runtime and is not guaranteed to inherit the login
+// shell PATH (~/.local/bin can be missing), so a bare "rdsh" is not enough:
+// an explicit RDSH_BIN wins, then PATH, then the well-known install locations.
+// Nothing resolved returns the historical "rdsh" default, so a later spawn
+// failure still falls back to the JS implementation exactly as before.
+export function resolveRdshBin(env = process.env, platform = process.platform, exists = defaultExists) {
+  if (typeof env.RDSH_BIN === "string" && env.RDSH_BIN.trim() !== "") return env.RDSH_BIN;
+  const name = platform === "win32" ? "rdsh.exe" : "rdsh";
+  const pathSep = platform === "win32" ? ";" : ":";
+  for (const dir of (env.PATH || env.Path || "").split(pathSep)) {
+    if (dir && exists(join(dir, name))) return "rdsh"; // PATH hit: the bare name spawns as before
+  }
+  for (const candidate of wellKnownBins(env, platform, name)) {
+    if (exists(candidate)) return candidate;
+  }
+  return "rdsh";
+}
+
 export function createComputeBridge({ bin = "rdsh", timeoutMs = DEFAULT_TIMEOUT_MS, spawnImpl = spawn } = {}) {
   let child = null;
-  let ready = false;
   let seq = 0;
   const pending = new Map();
-  let buffer = "";
+  const failedWorkers = new WeakSet();
+
+  function failWorker(worker, err) {
+    if (failedWorkers.has(worker)) return;
+    failedWorkers.add(worker);
+    for (const [id, slot] of pending) {
+      if (slot.worker !== worker) continue;
+      pending.delete(id);
+      clearTimeout(slot.timer);
+      slot.reject(err);
+    }
+    if (child === worker) child = null;
+    try {
+      worker.kill();
+    } catch {}
+  }
 
   function ensureChild() {
     if (child) return child;
-    child = spawnImpl(bin, ["compute"], { stdio: ["pipe", "pipe", "inherit"] });
-    child.stdout.setEncoding("utf8");
-    child.stdout.on("data", (chunk) => {
+    const worker = spawnImpl(bin, ["compute"], { stdio: ["pipe", "pipe", "inherit"] });
+    child = worker;
+    let buffer = "";
+    worker.stdout.setEncoding("utf8");
+    worker.stdout.on("data", (chunk) => {
+      if (child !== worker) return;
       buffer += chunk;
       let idx;
       while ((idx = buffer.indexOf("\n")) >= 0) {
@@ -90,26 +147,18 @@ export function createComputeBridge({ bin = "rdsh", timeoutMs = DEFAULT_TIMEOUT_
           continue; // one bad line never resolves pending calls
         }
         const slot = pending.get(msg.id);
-        if (slot) {
+        if (slot?.worker === worker) {
           pending.delete(msg.id);
           clearTimeout(slot.timer);
           slot.resolve(msg);
         }
       }
     });
-    const failAll = (err) => {
-      for (const [, slot] of pending) {
-        clearTimeout(slot.timer);
-        slot.reject(err);
-      }
-      pending.clear();
-      child = null;
-      ready = false;
-    };
-    child.on("exit", () => failAll(new Error("rdsh compute exited")));
-    child.on("error", failAll);
-    ready = true;
-    return child;
+    worker.stdin.on("error", (err) => failWorker(worker, err));
+    worker.stdout.on("error", (err) => failWorker(worker, err));
+    worker.on("exit", () => failWorker(worker, new Error("rdsh compute exited")));
+    worker.on("error", (err) => failWorker(worker, err));
+    return worker;
   }
 
   function request(op, payload) {
@@ -128,13 +177,19 @@ export function createComputeBridge({ bin = "rdsh", timeoutMs = DEFAULT_TIMEOUT_
         pending.delete(id);
         reject(new Error(`rdsh compute timeout after ${timeoutMs}ms`));
       }, timeoutMs);
-      pending.set(id, { resolve, reject, timer, started });
+      const slot = { resolve, reject, timer, started, worker: null };
+      pending.set(id, slot);
       try {
-        ensureChild().stdin.write(JSON.stringify({ v: PROTOCOL_VERSION, id, op, ...payload }) + "\n");
+        slot.worker = ensureChild();
+        slot.worker.stdin.write(JSON.stringify({ v: PROTOCOL_VERSION, id, op, ...payload }) + "\n");
       } catch (err) {
-        pending.delete(id);
-        clearTimeout(timer);
-        reject(err);
+        if (slot.worker) {
+          failWorker(slot.worker, err);
+        } else if (pending.get(id) === slot) {
+          pending.delete(id);
+          clearTimeout(timer);
+          reject(err);
+        }
       }
     }).then((msg) => ({
       ...msg,
@@ -145,7 +200,8 @@ export function createComputeBridge({ bin = "rdsh", timeoutMs = DEFAULT_TIMEOUT_
   // High-level helpers: return { result, usedRust, timings }.
   // On any worker error the JS fallback runs and usedRust=false.
   async function estimate(text) {
-    const fallback = () => ({ tokens: jsEstimate(text), chars: Buffer.byteLength(text, "utf8") });
+    // chars counts Unicode scalars, matching Rust str::chars().count().
+    const fallback = () => ({ tokens: jsEstimate(text), chars: [...text].length });
     if (!isEnabled()) return { result: fallback(), usedRust: false, timings: null };
     const t0 = process.hrtime.bigint();
     try {
@@ -164,7 +220,7 @@ export function createComputeBridge({ bin = "rdsh", timeoutMs = DEFAULT_TIMEOUT_
   async function estimateBatch(texts) {
     const fallback = () => ({
       tokens: texts.map(jsEstimate),
-      chars: texts.map((t) => Buffer.byteLength(t, "utf8")),
+      chars: texts.map((t) => [...t].length),
       total: texts.map(jsEstimate).reduce((a, b) => a + b, 0),
     });
     if (!isEnabled()) return { result: fallback(), usedRust: false, timings: null };
@@ -222,7 +278,7 @@ export function createComputeBridge({ bin = "rdsh", timeoutMs = DEFAULT_TIMEOUT_
 // ctx for an explicit opt-in call site. No event subscription, so existing
 // Web/API behavior is unchanged while disabled.
 export function apply(ctx) {
-  const bridge = createComputeBridge({ bin: process.env.RDSH_BIN ?? "rdsh" });
+  const bridge = createComputeBridge({ bin: resolveRdshBin() });
   ctx.rdshCompute = bridge;
   ctx.on?.("dispose", () => bridge.close());
 }
