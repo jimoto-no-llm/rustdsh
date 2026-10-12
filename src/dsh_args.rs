@@ -91,8 +91,13 @@ pub fn split_launcher_args(profile_flag: Option<String>, extra: Vec<String>) -> 
         }
     }
     if profile.is_none() {
-        if let Some(p) = positional.into_iter().next() {
+        let mut pos = positional.into_iter();
+        if let Some(p) = pos.next() {
             profile = Some(p);
+            let rest: Vec<String> = pos.collect();
+            if !rest.is_empty() {
+                app_args = [rest, app_args].concat();
+            }
         }
     } else if !positional.is_empty() {
         app_args = [positional, app_args].concat();
@@ -195,6 +200,52 @@ mod tests {
         match split_launcher_args(Some("tui".into()), sv(&["--dump-config", "--foo"])) {
             Launcher::Error(_) => {}
             _ => panic!("expected error"),
+        }
+    }
+
+    #[test]
+    fn abbreviated_profile_keeps_positional_args() {
+        // `rdsh headless "run the tests"` must match explicit --profile.
+        match split_launcher_args(None, sv(&["headless", "run the tests"])) {
+            Launcher::Boot {
+                profile, app_args, ..
+            } => {
+                assert_eq!(profile, "headless");
+                assert_eq!(app_args, sv(&["run the tests"]));
+            }
+            _ => panic!("expected boot"),
+        }
+        match split_launcher_args(Some("headless".into()), sv(&["run the tests"])) {
+            Launcher::Boot {
+                profile, app_args, ..
+            } => {
+                assert_eq!(profile, "headless");
+                assert_eq!(app_args, sv(&["run the tests"]));
+            }
+            _ => panic!("expected boot"),
+        }
+    }
+
+    #[test]
+    fn abbreviated_profile_keeps_many_positional_args_in_order() {
+        match split_launcher_args(None, sv(&["web", "hello", "world"])) {
+            Launcher::Boot {
+                profile, app_args, ..
+            } => {
+                assert_eq!(profile, "web");
+                assert_eq!(app_args, sv(&["hello", "world"]));
+            }
+            _ => panic!("expected boot"),
+        }
+        // Empty-string and flag-like app args keep order after the profile.
+        match split_launcher_args(None, sv(&["web", "", "--foo", "bar"])) {
+            Launcher::Boot {
+                profile, app_args, ..
+            } => {
+                assert_eq!(profile, "web");
+                assert_eq!(app_args, sv(&["", "--foo", "bar"]));
+            }
+            _ => panic!("expected boot"),
         }
     }
 
