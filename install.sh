@@ -300,6 +300,33 @@ extract_release_archive() {
   tar -xzf "$archive" -C "$destination" --no-same-owner --no-same-permissions rdsh
 }
 
+fetch_release_digests() {
+  # $1: destination. Normally the fixed canonical registry. A file:// release
+  # base -- which only the tests use -- may instead point RDSH_RELEASE_DIGESTS
+  # at a local copy so the offline installer tests never need the network.
+  # A remote base never consults it: the release origin must not choose the
+  # digests that verify its own artifact.
+  local dest="$1" source="${RDSH_RELEASE_DIGESTS:-}"
+  if [ -n "$source" ]; then
+    case "${RDSH_RELEASE_BASE:-}" in
+      file://*) ;;
+      *) echo "warning: ignoring RDSH_RELEASE_DIGESTS (needs a file:// RDSH_RELEASE_BASE)" >&2; source="" ;;
+    esac
+  fi
+  case "$source" in
+    "") ;;
+    /*) ;;
+    *) echo "warning: ignoring RDSH_RELEASE_DIGESTS=$source (needs an absolute path)" >&2; source="" ;;
+  esac
+  if [ -n "$source" ]; then
+    if [ ! -f "$source" ]; then echo "no local digest registry at $source" >&2; return 1; fi
+    echo "warning: using local digest registry $source (file:// release base)" >&2
+    cp "$source" "$dest"
+    return
+  fi
+  curl --proto '=https' --tlsv1.2 -fsSL -o "$dest" "$RELEASE_DIGESTS_URL"
+}
+
 choose_release_asset() {
   # Print the release asset for this host; the reason goes to stderr.
   case "$OS/$ARCH" in
@@ -339,7 +366,9 @@ install_release_binary() {
   local asset candidate
   asset="$(choose_release_asset)" || exit 1
   [ -n "$asset" ] || { echo "no prebuilt binary for $OS/$ARCH (build from source instead)" >&2; exit 1; }
-  candidate="$(fetch_release "$asset")"
+  # fetch_release runs in a command substitution, where a refusal that only
+  # exits its subshell would leave an empty candidate and turn into a retry.
+  candidate="$(fetch_release "$asset")" || exit 1
   if verify_installed_binary "$candidate"; then
     echo "$candidate"
     return 0
@@ -349,7 +378,7 @@ install_release_binary() {
     exit 1
   fi
   echo "warning: $asset cannot run on this host; retrying with the static musl build" >&2
-  candidate="$(fetch_release "rdsh-linux-x64-musl.tar.gz")"
+  candidate="$(fetch_release "rdsh-linux-x64-musl.tar.gz")" || exit 1
   if verify_installed_binary "$candidate"; then
     echo "$candidate"
     return 0
@@ -369,7 +398,7 @@ fetch_release() {
   expected=""
   if [ "$VER" = "latest" ] || [ "${RDSH_NO_CHECKSUM:-0}" != 1 ]; then
     manifest="$DOWNLOAD_TMPD/release-digests.tsv"
-    curl --proto '=https' --tlsv1.2 -fsSL -o "$manifest" "$RELEASE_DIGESTS_URL" || {
+    fetch_release_digests "$manifest" || {
       echo "could not fetch the trusted release digest registry; refusing release install" >&2
       exit 1
     }
