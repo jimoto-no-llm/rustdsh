@@ -412,6 +412,16 @@ fetch_release() {
   else
     version="$(release_version "$VER")"
   fi
+  # Reject anything outside the version alphabet first. The anchored match below
+  # is applied line by line, so on its own it accepts a value such as
+  # $'v0.3.2\n../../x' by matching its first line; the version must be one value
+  # because it is interpolated into the download URL.
+  case "$version" in
+    "" | *[!0-9A-Za-z.-]*)
+      echo "invalid release version: $version" >&2
+      exit 1
+      ;;
+  esac
   if ! printf '%s\n' "$version" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$'; then
     echo "invalid release version: $version" >&2
     exit 1

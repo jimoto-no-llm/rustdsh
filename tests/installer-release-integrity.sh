@@ -117,9 +117,11 @@ if [ "$(uname -s)" = "Linux" ] && [ "$(uname -m)" = "x86_64" ]; then
 fi
 
 # A matching same-origin .sha256 cannot authorize a different archive.
+# The payload is recognisably rdsh so that the run reaches the checksum branch
+# instead of tripping the weaker "did not fetch a sidecar" assertion first.
 cat >"$TEST_ROOT/pkg/rdsh" <<'EVIL_EOF'
 #!/bin/sh
-echo "unexpected release payload"
+echo "rdsh unexpected release payload"
 EVIL_EOF
 chmod +x "$TEST_ROOT/pkg/rdsh"
 EVIL_ARCHIVE="$RELEASE_ROOT/download/v9.9.9/evil.tar.gz"
@@ -263,3 +265,62 @@ RDSH_TEST_ANSWER=YES python3 "$TEST_ROOT/run-with-tty.py" "$ROOT/install.sh" "$T
 grep -q "release archive must contain only the rdsh binary" "$TEST_ROOT/traversal.log" || fail "traversal archive was not rejected"
 if [ -e "$TMP_ROOT/escaped-from-release" ]; then fail "tar archive wrote outside its temp directory"; fi
 ok "archive traversal entry is refused before extraction"
+
+# The local digest registry is a test-only hook: it may only be honoured for a
+# file:// release base, because a remote origin that could name the registry
+# would be choosing the digests that verify its own archive -- exactly #302.
+# This gate is the whole reason RDSH_RELEASE_DIGESTS is not a new hole, so it is
+# asserted directly; every other check in this file stays green without it.
+HOSTILE_MANIFEST="$TEST_ROOT/hostile-digests.tsv"
+HOSTILE_SHA="$(printf '%064d' 0)"
+{
+  printf '# attacker supplied\nlatest v9.9.9\n'
+  printf 'v9.9.9 rdsh-linux-x64.tar.gz %s\n' "$HOSTILE_SHA"
+  printf 'v9.9.9 rdsh-linux-x64-musl.tar.gz %s\n' "$HOSTILE_SHA"
+  printf 'v9.9.9 rdsh-macos-arm64.tar.gz %s\n' "$HOSTILE_SHA"
+  printf 'v9.9.9 rdsh-macos-x64.tar.gz %s\n' "$HOSTILE_SHA"
+} >"$HOSTILE_MANIFEST"
+
+: >"$CURL_LOG"
+if RDSH_RELEASE_BASE="https://evil.invalid/releases" RDSH_RELEASE_DIGESTS="$HOSTILE_MANIFEST" \
+  bash "$ROOT/install.sh" --from-release --prefix="$TEST_ROOT/remote-registry-bin" \
+  >"$TEST_ROOT/remote-registry.log" 2>&1; then
+  fail "a remote release base was allowed to supply its own digest registry"
+fi
+grep -q "ignoring RDSH_RELEASE_DIGESTS (needs a file:// RDSH_RELEASE_BASE)" "$TEST_ROOT/remote-registry.log" || {
+  cat "$TEST_ROOT/remote-registry.log" >&2
+  fail "a remote release base did not refuse the local digest registry"
+}
+grep -q "raw.githubusercontent.com/jimoto-no-llm/rustdsh/main/release-digests.tsv" "$CURL_LOG" || {
+  cat "$TEST_ROOT/remote-registry.log" >&2
+  fail "a remote release base did not fall back to the canonical registry"
+}
+ok "a remote release base cannot supply its own digest registry"
+
+# Control: the very same override is honoured for a file:// base, so the check
+# above fails for the gate and not because the hook never works at all.
+: >"$CURL_LOG"
+RDSH_RELEASE_DIGESTS="$HOSTILE_MANIFEST" \
+  bash "$ROOT/install.sh" --from-release --prefix="$TEST_ROOT/local-registry-bin" \
+  >"$TEST_ROOT/local-registry.log" 2>&1 || true
+grep -q "using local digest registry" "$TEST_ROOT/local-registry.log" || {
+  cat "$TEST_ROOT/local-registry.log" >&2
+  fail "a file:// release base did not honour the local digest registry"
+}
+if grep -q "raw.githubusercontent.com" "$CURL_LOG"; then
+  fail "a file:// release base still fetched the canonical registry"
+fi
+ok "a file:// release base honours the local digest registry (control)"
+
+# The version is interpolated into the download URL, so it has to be a single
+# value: an anchored match applied line by line would accept the first line of
+# a two-line value and let the rest reach the URL.
+if bash "$ROOT/install.sh" --from-release --prefix="$TEST_ROOT/version-bin" \
+  --version="$(printf 'v9.9.9\n../../etc')" >"$TEST_ROOT/version.log" 2>&1; then
+  fail "a multi-line release version was accepted"
+fi
+grep -q "invalid release version" "$TEST_ROOT/version.log" || {
+  cat "$TEST_ROOT/version.log" >&2
+  fail "a multi-line release version was not rejected before the URL was built"
+}
+ok "a multi-line release version is refused before it reaches the URL"
