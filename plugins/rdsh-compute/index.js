@@ -145,7 +145,8 @@ export function createComputeBridge({ bin = "rdsh", timeoutMs = DEFAULT_TIMEOUT_
   // High-level helpers: return { result, usedRust, timings }.
   // On any worker error the JS fallback runs and usedRust=false.
   async function estimate(text) {
-    const fallback = () => ({ tokens: jsEstimate(text), chars: Buffer.byteLength(text, "utf8") });
+    // chars counts Unicode scalars, matching Rust str::chars().count().
+    const fallback = () => ({ tokens: jsEstimate(text), chars: [...text].length });
     if (!isEnabled()) return { result: fallback(), usedRust: false, timings: null };
     const t0 = process.hrtime.bigint();
     try {
@@ -164,7 +165,7 @@ export function createComputeBridge({ bin = "rdsh", timeoutMs = DEFAULT_TIMEOUT_
   async function estimateBatch(texts) {
     const fallback = () => ({
       tokens: texts.map(jsEstimate),
-      chars: texts.map((t) => Buffer.byteLength(t, "utf8")),
+      chars: texts.map((t) => [...t].length),
       total: texts.map(jsEstimate).reduce((a, b) => a + b, 0),
     });
     if (!isEnabled()) return { result: fallback(), usedRust: false, timings: null };

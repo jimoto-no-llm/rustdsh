@@ -22,6 +22,15 @@ test("jsEstimate matches Rust heuristic on mixed input", async () => {
   b.close();
 });
 
+test("fallback chars counts Unicode scalars, not UTF-8 bytes", async () => {
+  delete process.env.RDSH_COMPUTE;
+  const b = createComputeBridge();
+  assert.equal((await b.estimate("日本語")).result.chars, 3);
+  assert.equal((await b.estimate("é")).result.chars, 1);
+  assert.deepEqual((await b.estimateBatch(["日本語", "é", "abc"])).result.chars, [3, 1, 3]);
+  b.close();
+});
+
 test("batch fallback matches per-item estimates", async () => {
   delete process.env.RDSH_COMPUTE;
   const b = createComputeBridge();
