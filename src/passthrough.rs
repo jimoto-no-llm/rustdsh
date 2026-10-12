@@ -537,7 +537,13 @@ mod tests {
     #[test]
     fn path_lookup_skips_non_executable_dsh_and_node() {
         let _guard = env_lock();
-        let _env = EnvGuard::set(&["PATH", "RDSH_ORIG_BIN", "DSH_ORIG_BIN", "HOME", "USERPROFILE"]);
+        let _env = EnvGuard::set(&[
+            "PATH",
+            "RDSH_ORIG_BIN",
+            "DSH_ORIG_BIN",
+            "HOME",
+            "USERPROFILE",
+        ]);
         let root = std::env::temp_dir().join(format!(
             "rdsh-passthrough-path-{}-{}",
             std::process::id(),
