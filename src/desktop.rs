@@ -544,7 +544,13 @@ fn desktop_targets(
         for name in plugin_selection(compute) {
             targets.push(Target {
                 label: name.to_string(),
-                spec: plugins_root.join(name).display().to_string(),
+                // Plugin specs stay slash-separated: Windows path separators
+                // would leak into a spec that is handed to the desktop CLI.
+                spec: plugins_root
+                    .join(name)
+                    .display()
+                    .to_string()
+                    .replace('\\', "/"),
             });
         }
         root = Some(plugins_root);
