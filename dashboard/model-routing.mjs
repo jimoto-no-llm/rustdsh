@@ -336,6 +336,9 @@ export class ModelRouting {
       await handle.writeFile(owner);
       await handle.sync();
       const prior = await this.read(record),
+        // operation() mutates prior in place and hands the same object back as
+        // value, so the pre-mutation event count has to be taken first.
+        priorEventCount = prior?.events.length ?? 0,
         { value, result } = await operation(prior);
       const { record_hash: ignored, ...body } = value;
       value.record_hash = routeHash(body);
@@ -353,7 +356,7 @@ export class ModelRouting {
       // Replacing the policy file is the commit point of this mutation.
       await fs.rename(temporary, file);
       committed = true;
-      for (const event of value.events.slice(prior?.events.length ?? 0))
+      for (const event of value.events.slice(priorEventCount))
         committedEventIds.push(event.event_id);
       output = result;
     } catch (error) {

@@ -625,6 +625,64 @@ test("a committed route change survives a lock cleanup failure without reporting
   );
 });
 
+// The assertion above runs on the first mutation, where prior is null and the
+// whole event list is the delta. This one mutates an existing policy, which is
+// where reading the pre-mutation event count too late used to yield an empty
+// event_ids for a write that really did add an event.
+test("a committed route change onto an existing policy reports only the events it added", async (t) => {
+  const f = await setup(t),
+    record = declaredRun(f),
+    lock = f.store.file(record) + ".lock",
+    originalUnlink = fs.unlink;
+  await f.store.bind(record, requestedSelection(first));
+  const before = (await f.store.inspect(record)).events.map(
+    (event) => event.event_id,
+  );
+  let failure;
+  t.mock.method(fs, "unlink", async (file, ...args) => {
+    if (path.resolve(String(file)) === path.resolve(lock)) {
+      const error = new Error("fixture lock cleanup failure");
+      error.code = "EACCES";
+      throw error;
+    }
+    return originalUnlink(file, ...args);
+  });
+
+  await assert.rejects(
+    f.store.mutate(record, (value) => {
+      f.store.event(value, "native_selection_observed", {
+        status: "observed",
+        selection: first,
+        reason: null,
+        source: "acp_config_update",
+        cli_version: null,
+        observed_at: new Date().toISOString(),
+        actual_execution_verified: false,
+      });
+      value.revision++;
+      return { value, result: null };
+    }),
+    (error) => {
+      failure = error;
+      return error.code === "route_lock_cleanup_unconfirmed";
+    },
+  );
+  const after = (await f.store.inspect(record)).events.map(
+    (event) => event.event_id,
+  );
+  assert.ok(
+    after.length > before.length,
+    "the mutation under test did not add an event",
+  );
+  assert.equal(failure.committed, true);
+  assert.equal(failure.lock_cleanup_unconfirmed, true);
+  assert.deepEqual(failure.event_ids, after.slice(before.length));
+  assert.ok(
+    failure.event_ids.length > 0,
+    "a committed addition was reported with no event_ids",
+  );
+});
+
 test("a route mutation failure keeps its own code when the lock cleanup also fails", async (t) => {
   const f = await setup(t),
     record = declaredRun(f),
