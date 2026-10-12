@@ -84,24 +84,33 @@ non-standard location or when you prefer the UI.
 
 ### Testing on Linux (Fedora)
 
-Linux is **not a published Desktop release target**, so there is no installer to
-point at. `rdsh desktop` still finds an unpacked application:
+Upstream builds and launches the Desktop shell only for `mac-arm64`, `mac-x64`
+and `win-x64`: `resolveDesktopBuildTarget` rejects every other target, so on
+Fedora both `pnpm run dev:desktop` and the `package:*` scripts stop with
+`desktop build paths: unsupported target linux-x64` (the AppImage block in the
+electron-builder config is not reachable from those targets). The equivalent
+surface on Fedora is the **Web profile** — `rdsh web` serves the same
+application the Desktop shell wraps, with the same plugins.
+
+`rdsh desktop` is still ready for a Linux tree obtained another way (a build from
+a machine that has one, a locally extended target list, or an extracted
+AppImage), and the app's own Plugins page manages the same profile:
 
 ```sh
-# AppImage: extract it, then point at the extracted tree
+# Extracted AppImage
 ./DeepSeek-Harness-<version>.AppImage --appimage-extract
 DSH_DESKTOP_APP_DIR=$PWD/squashfs-root rdsh desktop status
 
-# Development / unpacked build
+# Any unpacked tree
 DSH_DESKTOP_CLI=<app>/resources/runtime/cli/bin/dsh rdsh desktop status
 ```
 
-Detection already covers `$APPDIR` (exported by a running AppImage),
-`~/squashfs-root`, `./squashfs-root`, `/opt/DeepSeek Harness`, and
-`~/.local/{share,opt}/DeepSeek Harness`. Everything after detection is
-identical to macOS and Windows: the same reserved profile, the same lock, the
-same **Plugins** page. Fedora needs no extra package beyond the app's own
-runtime; `zenity` or `kdialog` only affects the app's native folder dialog.
+Detection covers `$APPDIR` (exported by a running AppImage), `~/squashfs-root`,
+`./squashfs-root`, `/opt/DeepSeek Harness` and
+`~/.local/{share,opt}/DeepSeek Harness`. Everything after detection is identical
+to macOS and Windows: the same reserved profile, the same lock, the same
+**Plugins** page. Fedora needs no extra package; `zenity` or `kdialog` only
+affects the app's native folder dialog.
 
 ### All profiles in one command
 
