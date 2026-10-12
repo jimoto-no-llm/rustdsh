@@ -29,10 +29,17 @@ impl Request {
         let localhost = format!("localhost:{port}");
         let host = self.header("host");
         let origin = self.header("origin");
+        // Browser-context POSTs must carry Origin. Keep authenticated native
+        // clients working: Node fetch sends Sec-Fetch-Mode without Origin, so
+        // Mode alone is not a browser signal. These hints never replace token auth.
+        let browser_post = self.method == "POST"
+            && ["sec-fetch-site", "sec-fetch-dest", "sec-fetch-user"]
+                .iter()
+                .any(|name| self.header(name).is_some());
         matches!(host, Some(h) if h == local || h == localhost)
             && origin
                 .map(|o| o == format!("http://{local}") || o == format!("http://{localhost}"))
-                .unwrap_or(true)
+                .unwrap_or(!browser_post)
     }
 
     pub fn authorized(&self, token: &str) -> bool {
@@ -230,6 +237,87 @@ impl Drop for ConnectionSlot {
 mod tests {
     use super::*;
     use std::net::TcpListener;
+
+    fn request(method: &str, headers: &[(&str, &str)]) -> Request {
+        Request {
+            method: method.into(),
+            target: "/api/tokens".into(),
+            body: String::new(),
+            headers: headers
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn browser_posts_require_origin_but_native_clients_and_navigation_still_work() {
+        for name in ["sec-fetch-site", "sec-fetch-dest", "sec-fetch-user"] {
+            for value in [
+                "same-origin",
+                "cross-site",
+                "none",
+                "empty",
+                "?1",
+                "",
+                "unknown",
+            ] {
+                let mut req = request("POST", &[("host", "127.0.0.1:8080"), (name, value)]);
+                assert!(!req.trusted(8080), "missing Origin with {name}: {value}");
+                req.headers
+                    .push(("origin".into(), "http://127.0.0.1:8080".into()));
+                assert!(req.trusted(8080));
+                req.method = "GET".into();
+                req.headers.pop();
+                assert!(req.trusted(8080), "GET navigation with {name}: {value}");
+            }
+        }
+        // Node's fetch adds Sec-Fetch-Mode alone, without browser context headers.
+        for headers in [
+            vec![("host", "localhost:8080")],
+            vec![("host", "localhost:8080"), ("sec-fetch-mode", "cors")],
+        ] {
+            let req = request("POST", &headers);
+            assert!(req.trusted(8080));
+            assert!(!req.authorized("test-token"));
+        }
+    }
+
+    #[test]
+    fn explicit_origin_and_host_are_always_checked() {
+        for method in ["GET", "POST"] {
+            for origin in [
+                "",
+                "null",
+                "https://evil.example",
+                "http://127.0.0.1:8081",
+                "http://localhost:8080.evil.example",
+                "https://localhost:8080",
+            ] {
+                assert!(
+                    !request(method, &[("host", "localhost:8080"), ("origin", origin)])
+                        .trusted(8080)
+                );
+            }
+            for host in ["127.0.0.1:8080", "localhost:8080"] {
+                for origin in ["http://127.0.0.1:8080", "http://localhost:8080"] {
+                    assert!(request(method, &[("host", host), ("origin", origin)]).trusted(8080));
+                }
+            }
+            assert!(!request(method, &[("origin", "http://localhost:8080")]).trusted(8080));
+            for host in [
+                "evil.example:8080",
+                "localhost:8081",
+                "localhost:8080.evil.example",
+            ] {
+                assert!(!request(
+                    method,
+                    &[("host", host), ("origin", "http://localhost:8080")]
+                )
+                .trusted(8080));
+            }
+        }
+    }
 
     #[test]
     fn waits_for_a_split_body_and_rejects_ambiguous_framing() {

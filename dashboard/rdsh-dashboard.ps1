@@ -13,7 +13,7 @@ try {
     $taskOutput = $taskProcess.StandardOutput.BaseStream.CopyToAsync([Console]::OpenStandardOutput())
     $taskError = $taskProcess.StandardError.BaseStream.CopyToAsync([Console]::OpenStandardError())
     $taskProcess.WaitForExit()
-    $taskOutput.GetAwaiter().GetResult()
-    $taskError.GetAwaiter().GetResult()
+    $null = $taskOutput.GetAwaiter().GetResult()
+    $null = $taskError.GetAwaiter().GetResult()
     exit $taskProcess.ExitCode
 } finally { $taskProcess.Dispose() }
