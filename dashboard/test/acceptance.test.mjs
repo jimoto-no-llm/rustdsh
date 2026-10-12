@@ -11,6 +11,7 @@ import { ProjectStore, identity } from "../state.mjs";
 import { AcceptanceStore } from "../acceptance.mjs";
 import { queueRevision } from "../instruction-queue.mjs";
 import { RunHistory } from "../run-history.mjs";
+import { observeTarget, relativeInput } from "../acceptance-target.mjs";
 
 const exec = promisify(execFile),
   cli = fileURLToPath(new URL("../cli.mjs", import.meta.url));
@@ -547,3 +548,57 @@ test("a successful command that changes its observed code target remains blocked
   assert.equal(view.reported_done_with_verified_checks, false);
   assert.equal(view.conditions[0].full_result.stable_target, false);
 });
+
+test("dotenv-like worktree paths allow execution but keep verification scope unknown", async (t) => {
+  for (const tracked of [false, true]) {
+    const f = await setup(t);
+    const before = await observeTarget(f.project, f.definition[0].inputs);
+    assert.equal(before.status, "observed", before.reason);
+    assert.equal(before.worktree_complete, true);
+
+    const names = [".env.example", ".env.local", ".envrc", ".environment"],
+      placeholder = "PRIVATE_VALUE=synthetic-test-fixture\n";
+    for (const name of names)
+      await fs.writeFile(path.join(f.cwd, name), placeholder);
+    if (tracked)
+      await exec("git", ["-C", f.cwd, "add", "--", ...names], {
+        env: f.env,
+      });
+
+    await f.store.define("task-qa", f.definition);
+    const result = await f.run();
+    assert.equal(result.status, "pass");
+    assert.equal(result.reason, "impact_scope_unknown");
+    assert.equal(result.exit_code, 0);
+    assert.equal(result.target.worktree_complete, false);
+    assert.notEqual(result.target.worktree_hash, before.worktree_hash);
+    assert.doesNotMatch(JSON.stringify(result.target), /PRIVATE_VALUE=/);
+
+    const view = await f.store.inspect("task-qa"),
+      after = await observeTarget(f.project, f.definition[0].inputs);
+    assert.equal(after.status, "observed", after.reason);
+    assert.equal(after.worktree_complete, false);
+    assert.deepEqual(view.conditions[0].full_result.freshness, {
+      state: "unknown",
+      reason: "impact_scope_unknown",
+    });
+    assert.equal(view.conditions[0].verified_full_check, false);
+    assert.equal(view.reported_done_with_verified_checks, false);
+    assert.doesNotMatch(JSON.stringify(view), /PRIVATE_VALUE=/);
+
+    await fs.writeFile(
+      path.join(f.cwd, ".env.example"),
+      "PRIVATE_VALUE=changed-test-fixture\n",
+    );
+    const changed = await observeTarget(f.project, f.definition[0].inputs);
+    assert.equal(changed.worktree_hash, after.worktree_hash);
+    assert.deepEqual(
+      (await f.store.inspect("task-qa")).conditions[0].full_result.freshness,
+      { state: "unknown", reason: "impact_scope_unknown" },
+    );
+  }
+  for (const name of [".env", ".env.example", ".env.local", ".envrc"])
+    assert.equal(relativeInput(name), false);
+  assert.equal(relativeInput(".environment"), false);
+});
+

@@ -159,18 +159,22 @@ function database(value, project) {
   return value;
 }
 function target(value) {
+  const legacyKeys = [
+    "observed_at",
+    "head_sha",
+    "branch",
+    "inputs_hash",
+    "worktree_hash",
+    "environment",
+    "environment_hash",
+    "status",
+    "reason",
+  ];
   check(
-    exact(value, [
-      "observed_at",
-      "head_sha",
-      "branch",
-      "inputs_hash",
-      "worktree_hash",
-      "environment",
-      "environment_hash",
-      "status",
-      "reason",
-    ]) &&
+    (exact(value, legacyKeys) ||
+      exact(value, [...legacyKeys, "worktree_complete"])) &&
+      (value.worktree_complete === undefined ||
+        typeof value.worktree_complete === "boolean") &&
       time(value.observed_at) &&
       (value.head_sha === null || /^[0-9a-f]{40,64}$/.test(value.head_sha)) &&
       (value.branch === null || text(value.branch, 256)) &&
@@ -312,6 +316,8 @@ async function savedArtifact(directory, name, bytes, mime, source) {
 const stable = (before, after) =>
   before.status === "observed" &&
   after.status === "observed" &&
+  (before.worktree_complete !== false) ===
+    (after.worktree_complete !== false) &&
   [
     "head_sha",
     "branch",
@@ -688,17 +694,27 @@ export class AcceptanceStore {
         ),
       );
     }
-    record.stable_target = stable(
-      observed,
-      await observeTarget(this.project, criterion.inputs),
-    );
+    const finalTarget = await observeTarget(this.project, criterion.inputs),
+      stableObservation = stable(observed, finalTarget),
+      completeScope =
+        observed.worktree_complete !== false &&
+        finalTarget.worktree_complete !== false;
+    record.stable_target = stableObservation && completeScope;
     if (
-      !record.stable_target &&
+      !stableObservation &&
       record.source === "local_runner" &&
       record.status === "pass"
     ) {
       record.status = "blocked";
       record.reason = "target_changed_or_unobservable_during_test";
+    } else if (
+      !completeScope &&
+      record.source === "local_runner" &&
+      record.status === "pass"
+    ) {
+      // The command ran, but its result cannot be certified current while an
+      // unobserved dotenv-like worktree file may influence the outcome.
+      record.reason = "impact_scope_unknown";
     }
     record.phase = "finished";
     record.finished_at = new Date().toISOString();
