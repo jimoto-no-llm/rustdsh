@@ -105,6 +105,13 @@ fn is_cjk(c: char) -> bool {
         | '\u{f900}'..='\u{faff}' | '\u{ff00}'..='\u{ffef}' | '\u{20000}'..='\u{2ebef}')
 }
 
+/// CJK bigram（2文字ともCJK）か。ノイズ抑制の弱加点・除外判定に使う。
+/// バイト数ではなく文字数とis_cjkで判定する（CJK2文字はUTF-8で6bytesのため）。
+/// ASCIIの2文字語（CI/UI/Goなど）は含まない。
+fn is_cjk_bigram(term: &str) -> bool {
+    term.chars().count() == 2 && term.chars().all(is_cjk)
+}
+
 fn push_term(terms: &mut Vec<String>, t: &str) {
     if t.is_empty() || terms.len() >= 16 {
         return;
@@ -207,7 +214,7 @@ fn score_line(line_lower: &str, terms: &[String]) -> usize {
     let mut matched = 0usize;
     let line_chars: Vec<char> = line_lower.chars().collect();
     for t in terms {
-        if t.len() == 2 && t.chars().count() == 2 && t.chars().all(is_cjk) {
+        if is_cjk_bigram(t) {
             // CJK bigramは弱めに加点（ノイズ抑制）
             if line_lower.contains(t) {
                 score += 3;
@@ -549,11 +556,14 @@ fn recent_sessions(query: &str, limit: usize) -> Vec<String> {
         let mut snippet = String::new();
         let mut best_snippet_score = 0usize;
         for t in &terms {
-            if t.len() == 2 && t.chars().count() == 2 {
-                continue;
-            }
+            // CJK bigramは弱めに加点（ノイズ抑制）。ASCIIの2文字語は通常加点する。
+            let weak = is_cjk_bigram(t);
             if lower.contains(t) {
-                score += 3 + t.chars().count().min(12);
+                if weak {
+                    score += 3;
+                } else {
+                    score += 3 + t.chars().count().min(12);
+                }
                 matched += 1;
                 // その語を含む最良行をスニペットにする
                 for line in text.lines().take(400) {
@@ -863,7 +873,9 @@ fn code_hits(query: &str, max: usize) -> Vec<String> {
             let path_lower = p.display().to_string().to_lowercase();
             let mut file_bonus = 0usize;
             for t in &terms {
-                if t.len() == 2 && t.chars().count() == 2 {
+                // CJK bigramはファイル名加点の対象外（ノイズ抑制）。
+                // ASCIIの2文字語は通常どおり加点する。
+                if is_cjk_bigram(t) {
                     continue;
                 }
                 if path_lower.contains(t) {
@@ -1442,6 +1454,23 @@ mod tests {
                 "検索".to_string(),
             ]
         );
+    }
+
+    // #388: 2文字ASCII語（CI/UI/Go）を検索語として捨てない。
+    #[test]
+    fn two_char_ascii_terms_are_searchable() {
+        assert_eq!(query_terms("CI"), vec!["ci".to_string()]);
+        assert_eq!(query_terms("Go"), vec!["go".to_string()]);
+        assert!(!is_cjk_bigram("ci"));
+        assert!(!is_cjk_bigram("go"));
+        assert!(is_cjk_bigram("日本"));
+        // ASCIIの2文字語は通常加点される。
+        assert!(score_line("ci pipeline", &["ci".to_string()]) > 0);
+        // CJK bigramは弱い加点になり、通常語と区別される。
+        let weak = score_line("日本語のテスト", &["日本".to_string()]);
+        let normal = score_line("pipeline のテスト", &["pipeline".to_string()]);
+        assert!(weak > 0);
+        assert!(weak < normal);
     }
 
     #[test]

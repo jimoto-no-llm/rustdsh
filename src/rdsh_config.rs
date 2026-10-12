@@ -56,6 +56,16 @@ pub fn extra_enabled(cfg: &RdshSettings, id: &str) -> bool {
     KNOWN_EXTRAS.contains(&id) && cfg.extras.enable.iter().any(|e| e == id)
 }
 
+/// Extra ids that are actually enabled, honoring an explicit `features.<id>`.
+/// The setup UI reads this so its switches show the effective state.
+pub fn enabled_extras(cfg: &RdshSettings) -> Vec<String> {
+    KNOWN_EXTRAS
+        .iter()
+        .filter(|id| feature_enabled(cfg, id))
+        .map(|id| (*id).to_string())
+        .collect()
+}
+
 /// One switchable capability. `default` reproduces the behavior that existed
 /// before the switch was introduced, so an older rdsh.json keeps working and
 /// an id that is absent from the file never changes anything.

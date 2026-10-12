@@ -88,7 +88,7 @@ fn run_request(line: &str) -> Result<serde_json::Value, (String, &'static str, S
                 "ok": true,
                 "op": op,
                 "tokens": tokens,
-                "chars": text.len(),
+                "chars": text.chars().count(),
             }))
         }
         "tokens.prune" => {
@@ -151,7 +151,7 @@ fn run_request(line: &str) -> Result<serde_json::Value, (String, &'static str, S
                 .iter()
                 .map(|s| crate::tokens::estimate_tokens(s))
                 .collect();
-            let chars: Vec<usize> = texts.iter().map(|s| s.len()).collect();
+            let chars: Vec<usize> = texts.iter().map(|s| s.chars().count()).collect();
             let total_tokens: usize = tokens.iter().sum();
             Ok(serde_json::json!({
                 "v": PROTOCOL_VERSION,
@@ -236,8 +236,24 @@ mod tests {
             serde_json::from_str(&handle_line(&req("a1", "tokens.estimate", text, None))).unwrap();
         assert_eq!(resp["ok"], true);
         assert_eq!(resp["tokens"], crate::tokens::estimate_tokens(text));
-        assert_eq!(resp["chars"], text.len());
+        assert_eq!(resp["chars"], text.chars().count());
         assert!(resp["elapsed_us"].as_u64().is_some());
+    }
+
+    // #389: chars は文字数（Unicode scalar 数）であってバイト数ではない。
+    #[test]
+    fn estimate_reports_char_count_not_byte_count() {
+        for (text, want) in [("\u{65e5}\u{672c}\u{8a9e}", 3), ("\u{e9}", 1), ("abc", 3)] {
+            let resp: serde_json::Value =
+                serde_json::from_str(&handle_line(&req("c1", "tokens.estimate", text, None)))
+                    .unwrap();
+            assert_eq!(resp["chars"], want, "text {text:?}");
+        }
+        let line = serde_json::json!({"v": 1, "id": "c2", "op": "tokens.estimate_batch",
+            "texts": ["\u{65e5}\u{672c}\u{8a9e}", "\u{e9}", "abc"]})
+        .to_string();
+        let resp: serde_json::Value = serde_json::from_str(&handle_line(&line)).unwrap();
+        assert_eq!(resp["chars"], serde_json::json!([3, 1, 3]));
     }
 
     #[test]
