@@ -160,17 +160,17 @@ rdsh setup                                 # 対話型セットアップウィ�
 rdsh setup --web                           # ブラウザから行える Web 設定画面
 ```
 
-※ 他ツールの認証情報を勝手に外部へ送信したり、無断で同期したりしません。明示的に指定したログイン情報のみをローカルで安全に管理します。
+※ 他ツールの認証情報を無断で外部へ送信したり、同期したりしません。明示的に指定したログイン情報のみをローカルで安全に管理します。
 
 ### エージェント実行の安全な隔離
 
-委譲したエージェントツールは既定で通常のファイル読み書きができます。Linux（bubblewrap と prlimit がある環境）では `--share-file` で明示的に共有したファイルだけに閉じ込められます：
+委譲したエージェントツールは既定で通常のファイル読み書きができます。Linux（bubblewrap と prlimit がある環境）では `--share-file` で明示的に共有したファイルだけに限定されます：
 
 ```sh
 rdsh --share-file README.md --share-file src/main.rs --profile tui
 ```
 
-共有ファイルは読み取り専用でマウントされ、ネットワークもありません。`rdsh features on agent_tool_sandbox` で常時有効、`rdsh features off agent_tool_sandbox` で解除、`RDSH_SECURITY=1` で強制できます。
+共有ファイルは読み取り専用でマウントされ、ネットワークアクセスもありません。`rdsh features on agent_tool_sandbox` で常時有効化、`rdsh features off agent_tool_sandbox` で無効化、`RDSH_SECURITY=1` で強制できます。
 
 ### フック監視 (`rdsh guard`)
 
