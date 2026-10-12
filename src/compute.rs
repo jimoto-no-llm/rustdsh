@@ -57,7 +57,7 @@ fn run_request(line: &str) -> Result<serde_json::Value, (String, &'static str, S
     let id = v
         .get("id")
         .and_then(|x| x.as_str())
-        .unwrap_or("")
+        .unwrap_or_default()
         .to_string();
     let fail = |code: &'static str, msg: String| -> (String, &'static str, String) {
         (id.clone(), code, msg)
@@ -71,8 +71,8 @@ fn run_request(line: &str) -> Result<serde_json::Value, (String, &'static str, S
     if id.is_empty() || id.len() > MAX_ID_LEN {
         return Err(fail("bad_id", "id must be 1..=128 chars".to_string()));
     }
-    let op = v.get("op").and_then(|x| x.as_str()).unwrap_or("");
-    let text = v.get("text").and_then(|x| x.as_str()).unwrap_or("");
+    let op = v.get("op").and_then(|x| x.as_str()).unwrap_or_default();
+    let text = v.get("text").and_then(|x| x.as_str()).unwrap_or_default();
     if text.len() > MAX_TEXT_BYTES {
         return Err(fail(
             "too_large",
