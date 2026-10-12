@@ -119,6 +119,8 @@ register_cases() {
     "CASE OK: fallback-unrunnable-glibc" "" 1 ""
   add_case "release/pinned-version" "ubuntu-24.04" "pinned-version.sh" ok \
     "CASE OK: pinned-version" "" 0 "RDSH_RELEASE_VERSION=__TAG__"
+  add_case "release/download-cleanup" "ubuntu-24.04" "download-cleanup.sh" ok \
+    "CASE OK: download-cleanup" "" 0 ""
   # Fail-closed guards.
   add_case "guard/checksum-mismatch" "ubuntu-24.04" "checksum-mismatch.sh" ok \
     "CASE OK: checksum-mismatch" "" 0 ""
