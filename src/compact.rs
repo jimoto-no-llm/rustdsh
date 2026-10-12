@@ -90,17 +90,17 @@ fn split_lines_with_tokens(text: &str) -> (Vec<&str>, Vec<usize>, usize) {
 /// within budget. Never deletes source; prints to stdout.
 pub fn cmd_compact(file: &str, max_tokens: usize) -> anyhow::Result<()> {
     let text = std::fs::read_to_string(file)?;
-    let (lines, toks, total) = split_lines_with_tokens(&text);
+    let (lines, toks, _total) = split_lines_with_tokens(&text);
+    let full = estimate_tokens(&text);
     // One lock + big buffer: the old println! flushed at every newline
     // inside large outputs (stdout is line-buffered). Same bytes, far
     // fewer syscalls.
     let stdout = std::io::stdout();
     let mut out = std::io::BufWriter::with_capacity(256 * 1024, stdout.lock());
-    if total <= max_tokens {
+    if full <= max_tokens {
         out.write_all(text.as_bytes())?;
-        out.write_all(b"\n")?;
         out.flush()?;
-        eprintln!("[rdsh] no compaction needed ({total} <= {max_tokens} tokens)");
+        eprintln!("[rdsh] no compaction needed ({full} <= {max_tokens} tokens)");
         return Ok(());
     }
     let first = lines.first().copied().unwrap_or_default();
@@ -116,7 +116,7 @@ pub fn cmd_compact(file: &str, max_tokens: usize) -> anyhow::Result<()> {
     kept.reverse();
     let dropped = lines.len().saturating_sub(kept.len());
     let summary =
-        format!("...[rdsh compact: dropped ~{dropped} turn(s), {total}-><={max_tokens} tokens]...");
+        format!("...[rdsh compact: dropped ~{dropped} turn(s), {full}-><={max_tokens} tokens]...");
     let mut body = String::new();
     body.reserve(first.len() + summary.len() + kept.iter().map(|l| l.len() + 1).sum::<usize>() + 2);
     body.push_str(first);
@@ -135,13 +135,89 @@ pub fn cmd_compact(file: &str, max_tokens: usize) -> anyhow::Result<()> {
     }
     let body = prune_to_budget(&body, max_tokens);
     out.write_all(body.as_bytes())?;
-    out.write_all(b"\n")?;
     out.flush()?;
     eprintln!(
-        "[rdsh] compacted {total} -> ~{} tokens ({} lines kept of {})",
+        "[rdsh] compacted {full} -> ~{} tokens ({} lines kept of {})",
         estimate_tokens(&body),
         kept.len(),
         lines.len()
     );
     Ok(())
+}
+
+#[cfg(test)]
+fn compact_output(text: &str, max_tokens: usize) -> String {
+    let (lines, toks, _total) = split_lines_with_tokens(text);
+    let full = estimate_tokens(text);
+    if full <= max_tokens {
+        return text.to_string();
+    }
+    let first = lines.first().copied().unwrap_or_default();
+    let mut kept: Vec<&str> = vec![];
+    let mut used = toks.first().copied().unwrap_or_default() + 200;
+    for (l, t) in lines.iter().zip(toks.iter()).rev() {
+        if used + *t > max_tokens {
+            break;
+        }
+        used += *t;
+        kept.push(l);
+    }
+    kept.reverse();
+    let dropped = lines.len().saturating_sub(kept.len());
+    let summary =
+        format!("...[rdsh compact: dropped ~{dropped} turn(s), {full}-><={max_tokens} tokens]...");
+    let mut body = String::new();
+    body.reserve(first.len() + summary.len() + kept.iter().map(|l| l.len() + 1).sum::<usize>() + 2);
+    body.push_str(first);
+    body.push(10 as char);
+    body.push_str(&summary);
+    body.push(10 as char);
+    for l in &kept {
+        if std::ptr::eq(*l, first) {
+            continue;
+        }
+        body.push_str(l);
+        body.push(10 as char);
+    }
+    prune_to_budget(&body, max_tokens)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn newlines_count_toward_noop_budget() {
+        let line = r#"{"a":10}"#;
+        let mut text = String::new();
+        for _ in 0..4000 {
+            text.push_str(line);
+            text.push(10 as char);
+        }
+        let (_lines, _toks, split_total) = split_lines_with_tokens(&text);
+        assert_eq!(split_total, 8000);
+        let full = estimate_tokens(&text);
+        assert_eq!(full, 9000);
+        assert!(full > 8000);
+        let out = compact_output(&text, 8000);
+        assert!(estimate_tokens(&out) <= 8000);
+    }
+    #[test]
+    fn tiny_budgets_never_exceed_budget() {
+        let mut source = String::new();
+        for _ in 0..100 {
+            source.push_str(r#"1234567890"#);
+        }
+        for budget in [0, 1] {
+            let out = compact_output(&source, budget);
+            assert!(estimate_tokens(&out) <= budget);
+        }
+        assert_eq!(estimate_tokens(&compact_output(&source, 0)), 0);
+    }
+    #[test]
+    fn noop_returns_source_verbatim_within_budget() {
+        let text = r#"hello"#.to_string();
+        let out = compact_output(&text, 8000);
+        assert_eq!(out, text);
+        assert!(estimate_tokens(&out) <= 8000);
+    }
 }
