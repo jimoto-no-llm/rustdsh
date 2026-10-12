@@ -7,6 +7,20 @@ trap 'rm -rf "$TMPD"' EXIT
 FAKE_BIN="$TMPD/fake-bin"
 mkdir -p "$FAKE_BIN"
 
+# The installer decides whether Rust is already available with
+# `command -v cargo`. This fixture must reach the rustup-init path even on a
+# host with a system-wide toolchain (Fedora ships /usr/bin/cargo), so the fake
+# bin directory becomes the whole PATH: only the utilities this path needs are
+# linked in, and no host cargo/rustc/rustup can short-circuit it into building
+# the empty fixture project with the real toolchain.
+# curl and sha256sum are written by this fixture below, so they are skipped.
+for tool in awk bash cat chmod cp cut date dirname env expr find getconf \
+  grep gzip head install ldd ln ls mkdir mktemp mv printf rm rmdir sed sh \
+  shasum sort tail tar tee touch tr true uname uniq wc; do
+  found="$(command -v "$tool" 2>/dev/null || true)"
+  [ -n "$found" ] && ln -sf "$found" "$FAKE_BIN/$tool"
+done
+
 RUSTUP_INIT_VERSION="1.29.0"
 case "$(uname -s)/$(uname -m)" in
   Linux/x86_64)
@@ -102,7 +116,7 @@ run_installer() {
   (
     cd "$work/project"
     export HOME="$home" PREFIX="$prefix"
-    export PATH="$FAKE_BIN:/usr/bin:/bin:/usr/sbin:/sbin"
+    export PATH="$FAKE_BIN"
     export RDSH_TEST_URL="$RUSTUP_INIT_URL" RDSH_TEST_SHA256="$RUSTUP_INIT_SHA256"
     export RDSH_TEST_CHECKSUM_MODE="$mode"
     bash "$REPO_ROOT/install.sh"
