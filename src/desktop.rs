@@ -995,10 +995,9 @@ mod tests {
         // plugin directory install later switches into.
         let cwd = std::env::current_dir().unwrap();
         assert_eq!(absolute(Path::new("dsh")), cwd.join("dsh"));
-        assert_eq!(
-            absolute(Path::new("/usr/local/bin/dsh")),
-            PathBuf::from("/usr/local/bin/dsh")
-        );
+        // An already absolute path is returned unchanged on every platform.
+        let already_absolute = cwd.join("sub").join("dsh");
+        assert_eq!(absolute(&already_absolute), already_absolute);
     }
 
     #[test]
@@ -1122,7 +1121,13 @@ mod tests {
         let plain = root.join("usr/local/bin");
         std::fs::create_dir_all(&plain).unwrap();
         std::fs::write(plain.join("dsh"), b"#!/bin/sh\n").unwrap();
-        let app_bin = root.join("app/resources/runtime/cli/bin");
+        // Built component-wise so the fixture uses native separators.
+        let app_bin = root
+            .join("app")
+            .join("resources")
+            .join("runtime")
+            .join("cli")
+            .join("bin");
         std::fs::create_dir_all(&app_bin).unwrap();
         std::fs::write(app_bin.join("dsh"), b"#!/bin/sh\n").unwrap();
         assert_eq!(scan_paths([plain.clone()].into_iter()), None);
@@ -1203,7 +1208,10 @@ mod tests {
             desktop_targets(Some(checkout.to_str().unwrap()), &[], false, false, &env).unwrap();
         assert_eq!(targets.len(), 1);
         assert_eq!(targets[0].label, "rdsh-settings");
-        assert!(targets[0].spec.ends_with("plugins/rdsh-settings"));
+        assert_eq!(
+            Path::new(&targets[0].spec),
+            checkout.join("plugins").join("rdsh-settings")
+        );
         assert!(dir.unwrap().ends_with("plugins"));
 
         let packages = vec![
