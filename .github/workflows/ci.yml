@@ -48,6 +48,21 @@ jobs:
           node-version: 22
       - run: node --test tests/plugin-security.test.mjs tests/settings-client.test.mjs tests/update-banner.test.mjs tests/feature-switches.test.mjs tests/model_benchmark/fence.test.mjs
 
+  muse-subscription:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: plugins/rdsh-llm-muse-code-subscription
+      - run: npm test
+        working-directory: plugins/rdsh-llm-muse-code-subscription
+
   security-boundaries:
     runs-on: ubuntu-latest
     steps:
