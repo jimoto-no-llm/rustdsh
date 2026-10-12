@@ -11,6 +11,8 @@ const OPENCODE_REFRESH: &str = "fixture-opencode-refresh-must-not-print";
 const ACCOUNT: &str = "fixture-account-id-must-not-print";
 const ENV_OPENAI: &str = "fixture-env-openai-must-not-print";
 const ENV_DEEPSEEK: &str = "fixture-env-deepseek-must-not-print";
+const OPENCODE_UNTYPED_ACCESS: &str = "fixture-opencode-untyped-access-must-not-print";
+const OPENCODE_UNTYPED_REFRESH: &str = "fixture-opencode-untyped-refresh-must-not-print";
 const EXISTING: &str = "# preserve CRLF and manual entries\r\nversion: 1\r\nrecords:\r\n  llm-pi-ai/anthropic:\r\n    kind: grant\r\n    payload:\r\n      access: fixture-existing-anthropic\r\n      refresh: fixture-existing-refresh\r\n      expires: 9000000000000\r\n      type: oauth\r\nrefs:\r\n  MANUAL_KEY: fixture-existing-manual";
 
 #[test]
@@ -45,6 +47,9 @@ fn one_time_provider_import_does_not_persist_consent_or_copy_other_secrets() {
     assert!(credentials.contains(CODEX_ACCESS));
     assert!(!credentials.contains(CODEX_KEY));
     assert!(!credentials.contains(OPENCODE_ACCESS));
+    assert!(!credentials.contains("llm-pi-ai/gitlab"));
+    assert!(!credentials.contains(OPENCODE_UNTYPED_ACCESS));
+    assert!(!credentials.contains(OPENCODE_UNTYPED_REFRESH));
     assert!(!credentials.contains("fixture-other-provider"));
     assert_eq!(fixture.read("dsh/rdsh-auth-sharing.json"), policy);
     assert_eq!(
@@ -196,6 +201,7 @@ impl Fixture {
         self.write("data/opencode/auth.json", &serde_json::json!({
             "openai": {"type": "oauth", "access": OPENCODE_ACCESS, "refresh": OPENCODE_REFRESH, "expires": 8000000000000i64, "accountId": ACCOUNT},
             "anthropic": {"type": "oauth", "access": "fixture-other-provider", "refresh": "fixture-other-refresh", "expires": 9500000000000i64},
+            "gitlab": {"access": OPENCODE_UNTYPED_ACCESS, "refresh": OPENCODE_UNTYPED_REFRESH},
             "invalid fixture-provider-must-not-print": {"access": "ignored", "refresh": "ignored"}
         }).to_string());
     }
@@ -268,6 +274,8 @@ fn public_output(output: &Output) -> String {
         CODEX_KEY,
         OPENCODE_ACCESS,
         OPENCODE_REFRESH,
+        OPENCODE_UNTYPED_ACCESS,
+        OPENCODE_UNTYPED_REFRESH,
         ACCOUNT,
         ENV_OPENAI,
         ENV_DEEPSEEK,
