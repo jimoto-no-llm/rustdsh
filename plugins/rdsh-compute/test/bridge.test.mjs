@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createComputeBridge } from "../index.js";
+import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { apply, createComputeBridge, isEnabled } from "../index.js";
 
 test("disabled by default: fallback estimate matches len/4 rule", async () => {
   delete process.env.RDSH_COMPUTE;
@@ -19,6 +22,73 @@ test("jsEstimate matches Rust heuristic on mixed input", async () => {
   b.close();
 });
 
+test("batch fallback matches per-item estimates", async () => {
+  delete process.env.RDSH_COMPUTE;
+  const b = createComputeBridge();
+  const { result, usedRust } = await b.estimateBatch(["abcd1234", "あ"]);
+  assert.equal(usedRust, false);
+  assert.deepEqual(result.tokens, [2, 1]);
+  assert.equal(result.total, 3);
+  b.close();
+});
+
+// Feature switches are read from $DSH_HOME/rdsh.json. Every switch test uses a
+// hermetic temp home so the real ~/.dsh/rdsh.json never changes the result.
+async function featureHome(t, contents) {
+  const home = await mkdtemp(join(tmpdir(), "rdsh-compute-home-"));
+  const previous = process.env.DSH_HOME;
+  process.env.DSH_HOME = home;
+  t.after(async () => {
+    if (previous === undefined) delete process.env.DSH_HOME;
+    else process.env.DSH_HOME = previous;
+    await rm(home, { recursive: true, force: true });
+  });
+  if (contents !== undefined) await writeFile(join(home, "rdsh.json"), contents);
+  return home;
+}
+
+test("features.compute=false keeps the bridge off even with RDSH_COMPUTE=1", async (t) => {
+  await featureHome(t, JSON.stringify({ features: { compute: false } }));
+  process.env.RDSH_COMPUTE = "1";
+  t.after(() => { delete process.env.RDSH_COMPUTE; });
+  assert.equal(isEnabled(), false);
+  let spawned = false;
+  const b = createComputeBridge({ spawnImpl: () => { spawned = true; throw new Error("must not spawn"); } });
+  const { result, usedRust } = await b.estimate("abcd1234");
+  assert.equal(spawned, false);
+  assert.equal(usedRust, false);
+  assert.equal(result.tokens, 2);
+  b.close();
+});
+
+test("features.compute=true with RDSH_COMPUTE=1 reaches spawn and still falls back", async (t) => {
+  await featureHome(t, JSON.stringify({ features: { compute: true } }));
+  process.env.RDSH_COMPUTE = "1";
+  t.after(() => { delete process.env.RDSH_COMPUTE; });
+  assert.equal(isEnabled(), true);
+  let spawned = false;
+  const b = createComputeBridge({ spawnImpl: () => { spawned = true; throw new Error("worker unavailable"); } });
+  const { result, usedRust } = await b.estimate("abcd1234");
+  assert.equal(spawned, true);
+  assert.equal(usedRust, false);
+  assert.equal(result.tokens, 2);
+  b.close();
+});
+
+test("absent or unreadable rdsh.json follows the RDSH_COMPUTE opt-in", async (t) => {
+  await featureHome(t, undefined); // no rdsh.json at all
+  process.env.RDSH_COMPUTE = "1";
+  t.after(() => { delete process.env.RDSH_COMPUTE; });
+  // The feature switch is a veto: without the key the historical env opt-in wins.
+  assert.equal(isEnabled(), true);
+  await writeFile(join(process.env.DSH_HOME, "rdsh.json"), "{ not json");
+  assert.equal(isEnabled(), true);
+  await writeFile(join(process.env.DSH_HOME, "rdsh.json"), JSON.stringify({ features: { compute: "yes" } }));
+  assert.equal(isEnabled(), true);
+  delete process.env.RDSH_COMPUTE;
+  assert.equal(isEnabled(), false); // no env opt-in and no explicit true: off
+});
+
 test("oversize input is rejected before spawn", async () => {
   process.env.RDSH_COMPUTE = "1";
   let spawned = false;
@@ -33,4 +103,29 @@ test("oversize input is rejected before spawn", async () => {
   assert.equal(typeof result.pruned, "string");
   b.close();
   delete process.env.RDSH_COMPUTE;
+});
+
+test("cordis entry exposes ctx.rdshCompute and closes it on dispose", async (t) => {
+  // Hermetic home: compute stays off, so the resolved bin is never spawned.
+  await featureHome(t, JSON.stringify({ features: { compute: false } }));
+  const previousBin = process.env.RDSH_BIN;
+  process.env.RDSH_BIN = "/nonexistent/rdsh-for-test";
+  t.after(() => {
+    if (previousBin === undefined) delete process.env.RDSH_BIN;
+    else process.env.RDSH_BIN = previousBin;
+  });
+
+  const handlers = [];
+  const ctx = { on: (event, fn) => handlers.push([event, fn]) };
+  apply(ctx);
+  const bridge = ctx.rdshCompute;
+  assert.equal(typeof bridge.estimate, "function");
+  assert.equal(typeof bridge.prune, "function");
+  const { usedRust } = await bridge.estimate("abcd1234");
+  assert.equal(usedRust, false); // disabled: fallback, no spawn
+
+  let closed = false;
+  bridge.close = () => { closed = true; };
+  for (const [event, fn] of handlers) if (event === "dispose") fn();
+  assert.equal(closed, true);
 });

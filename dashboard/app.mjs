@@ -5,9 +5,11 @@ import { renderOverview } from "./project-overview.mjs";
 import { renderConnectionDiagnostics } from "./connection-diagnostics-ui.mjs";
 import { createInstructionPanel } from "./instruction-queue-ui.mjs";
 import { createCostPanel } from "./cost-ledger-ui.mjs";
+import { createModelCatalogPanel } from "./model-catalog-ui.mjs";
 import { renderBudget } from "./budget-ui.mjs";
 import { createTaskOutcomesPanel } from "./task-outcomes-ui.mjs";
 import { createHumanAnnotationPanel } from "./human-annotations-ui.mjs";
+import { setupObservedCli } from "./observed-cli-ui.mjs";
 
 const $ = (id) => document.getElementById(id);
 const base = location.pathname.startsWith("/_rdsh") ? "/_rdsh/" : "/";
@@ -24,18 +26,15 @@ if (browserToken) {
   if (suppliedBrowserToken !== null)
     history.replaceState(null, "", location.pathname + location.search);
 }
-async function api(route, body) {
+async function api(route, body, method) {
   const headers = browserToken ? { "x-rdsh-browser-token": browserToken } : {};
-  const response = await fetch(
-    base + "api/" + route,
-    body === undefined
-      ? { headers }
-      : {
-          method: "POST",
-          headers: { ...headers, "content-type": "application/json" },
-          body: JSON.stringify(body),
-        },
-  );
+  const requestMethod = method || (body === undefined ? "GET" : "POST");
+  const options = { method: requestMethod, headers };
+  if (body !== undefined) {
+    options.headers = { ...headers, "content-type": "application/json" };
+    options.body = JSON.stringify(body);
+  }
+  const response = await fetch(base + "api/" + route, options);
   const result = await response.json();
   if (!response.ok) throw new Error(result.error || "接続できません");
   return result;
@@ -50,6 +49,7 @@ let renderedRevision = -1;
 let latestState = null;
 let selectedTask = "";
 let selectionKey = "";
+let observedCli = null;
 function navigateTo(id) {
   const target = $(id);
   if (!target) return;
@@ -150,6 +150,7 @@ const renderTaskOutcomes = createTaskOutcomesPanel(
   $("task-milestones"),
   { node, api },
 );
+const renderCatalog = createModelCatalogPanel($("model-catalog"), node);
 const renderHumanAnnotations = createHumanAnnotationPanel(
   $("human-annotations-panel"),
   { api, node, navigateTo },
@@ -158,8 +159,10 @@ function render(state) {
   if (state.revision < renderedRevision) return;
   renderedRevision = state.revision;
   latestState = state;
+  observedCli?.render(state);
   renderInstructions(state);
   renderCosts(state);
+  renderCatalog();
   renderBudget($("budget-admission"), state, node);
   updateOverview(state);
   renderHumanAnnotations(state);
@@ -352,6 +355,7 @@ document.addEventListener("keydown", (event) => {
 });
 try {
   const config = await api("config");
+  if (config.kind === "project") observedCli = setupObservedCli({ api });
   await renderShare(config);
   if (config.kind === "harness") {
     $("connection-detail").hidden = true;

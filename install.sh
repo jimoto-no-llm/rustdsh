@@ -6,13 +6,26 @@
 # 5) refresh live install via ./install.sh --as-dsh and verify `dsh --version`
 # delegation, 6) confirm sync-dsh.sh picks up the new version on its next run.
 set -euo pipefail
-# Installer download scratch dir; cleaned at exit.
+# Installer download scratch dirs; all cleaned at exit.
 DOWNLOAD_TMPD=""
+# Downloads also run inside command substitutions, whose variable changes never
+# reach this shell, so the dirs are listed in a file the EXIT trap can read.
+DOWNLOAD_LIST=""
 # Update this version and the per-target hashes together from rustup's official archive.
 RUSTUP_INIT_VERSION="1.29.0"
 cleanup_downloads() {
-  if [ -n "${DOWNLOAD_TMPD:-}" ]; then rm -rf "$DOWNLOAD_TMPD"; fi
+  if [ -n "$DOWNLOAD_LIST" ] && [ -f "$DOWNLOAD_LIST" ]; then
+    while IFS= read -r d; do
+      [ -n "$d" ] && rm -rf "$d"
+    done < "$DOWNLOAD_LIST"
+    rm -f "$DOWNLOAD_LIST"
+  fi
 }
+new_download_tmpd() {
+  DOWNLOAD_TMPD="$(mktemp -d)"
+  printf '%s\n' "$DOWNLOAD_TMPD" >> "$DOWNLOAD_LIST"
+}
+DOWNLOAD_LIST="$(mktemp "${TMPDIR:-/tmp}/rdsh-download-list.XXXXXX")"
 trap cleanup_downloads EXIT
 PREFIX="${PREFIX:-$HOME/.local/bin}"
 MODE="rdsh"
@@ -20,6 +33,7 @@ NO_RUSTUP=0
 FROM_RELEASE=0
 VER="latest"
 USE_MUSL="${RDSH_MUSL:-0}"
+DESKTOP=0
 for a in "$@"; do
   case "$a" in
     --as-dsh) MODE="as-dsh" ;;
@@ -28,15 +42,17 @@ for a in "$@"; do
     --no-rustup) NO_RUSTUP=1 ;;
     --from-release) FROM_RELEASE=1 ;;
     --musl) USE_MUSL=1 ;;
+    --desktop) DESKTOP=1 ;;
     --version=*) VER="${a#--version=}" ;;
     -h|--help)
-      echo "usage: ./install.sh [--as-dsh] [--restore] [--prefix=DIR] [--no-rustup] [--from-release] [--musl] [--version=VER]"
+      echo "usage: ./install.sh [--as-dsh] [--restore] [--prefix=DIR] [--no-rustup] [--from-release] [--musl] [--desktop] [--version=VER]"
       echo "  (default)  build + install rdsh to PREFIX/rdsh (Linux, macOS, WSL)"
       echo "  --as-dsh   also install rdsh as PREFIX/dsh (backs up original to PREFIX/dsh-orig)"
       echo "  --restore  restore PREFIX/dsh from PREFIX/dsh-orig"
       echo "  --no-rustup  do not auto-install Rust when cargo is missing"
       echo "  --from-release  install a prebuilt binary from GitHub Releases (no Rust needed)"
       echo "  --musl  use the static musl build (rdsh-linux-x64-musl.tar.gz; also via RDSH_MUSL=1)"
+      echo "  --desktop  also attach the bundled plugins to the DeepSeek Harness Desktop profile"
       echo "  --version=VER  release to fetch with --from-release (default: latest)"
       echo "  native Windows: use install.ps1 instead (it can also side-install into WSL via -Wsl)"
       exit 0 ;;
@@ -71,14 +87,28 @@ ver_lt() {
   # ver_lt A B: true when dotted version A < B.
   awk -v a="$1" -v b="$2" 'BEGIN { n=split(a,aa,"."); m=split(b,bb,"."); k=(n>m?n:m); for(i=1;i<=k;i++){x=(aa[i]==""?0:aa[i]); y=(bb[i]==""?0:bb[i]); if(x<y) exit 0; if(x>y) exit 1;} exit 1; }'
 }
-want_musl() {
-  # Explicit --musl / RDSH_MUSL=1 wins; otherwise auto-select musl when the
-  # glibc passed in $1 (computed once by fetch_release) is older than 2.34.
-  if [ "${USE_MUSL:-0}" = 1 ]; then return 0; fi
-  if [ "$OS/$ARCH" = "Linux/x86_64" ]; then
-    gv="${1:-}"
-    if [ -n "$gv" ] && ver_lt "$gv" "2.34"; then return 0; fi
+is_musl_host() {
+  # Musl-based Linux (Alpine, ...) cannot run the glibc build at all.
+  if [ -e /lib/ld-musl-x86_64.so.1 ] || [ -e /lib/ld-musl-aarch64.so.1 ]; then
+    return 0
   fi
+  if command -v ldd >/dev/null 2>&1 && ldd --version 2>&1 | grep -qi musl; then
+    return 0
+  fi
+  return 1
+}
+# The published glibc build is produced on ubuntu-latest (glibc 2.39 today).
+# Older hosts use the static musl build. This floor is only a hint:
+# install_release_binary also runs the downloaded binary and falls back to
+# musl when the glibc build cannot start, so a newer floor stays safe.
+RELEASE_GLIBC_FLOOR="2.39"
+want_musl() {
+  # Explicit --musl / RDSH_MUSL=1 wins; $1 is the detected glibc version.
+  if [ "${USE_MUSL:-0}" = 1 ]; then return 0; fi
+  if [ "$OS/$ARCH" != "Linux/x86_64" ]; then return 1; fi
+  if is_musl_host; then return 0; fi
+  gv="${1:-}"
+  if [ -n "$gv" ] && ver_lt "$gv" "$RELEASE_GLIBC_FLOOR"; then return 0; fi
   return 1
 }
 verify_sha256() {
@@ -178,7 +208,7 @@ install_pinned_rustup() {
     return 1
   }
   url="https://static.rust-lang.org/rustup/archive/${RUSTUP_INIT_VERSION}/${target}/rustup-init"
-  DOWNLOAD_TMPD="$(mktemp -d)"
+  new_download_tmpd
   binary="$DOWNLOAD_TMPD/rustup-init"
   echo "downloading pinned rustup-init $RUSTUP_INIT_VERSION for $target..." >&2
   curl --proto "=https" --proto-redir "=https" --tlsv1.2 --fail --silent --show-error --location --output "$binary" "$url" || {
@@ -190,29 +220,73 @@ install_pinned_rustup() {
   "$binary" -y --profile minimal --default-toolchain stable
 }
 
+choose_release_asset() {
+  # Print the release asset for this host; the reason goes to stderr.
+  case "$OS/$ARCH" in
+    Linux/x86_64)
+      gv="$(glibc_version)"
+      if want_musl "$gv"; then
+        if [ "${USE_MUSL:-0}" = 1 ]; then
+          echo "selecting static musl build (--musl / RDSH_MUSL=1)" >&2
+        elif is_musl_host; then
+          echo "musl host detected: selecting static musl build" >&2
+        else
+          echo "glibc $gv < $RELEASE_GLIBC_FLOOR: selecting static musl build" >&2
+        fi
+        printf '%s' "rdsh-linux-x64-musl.tar.gz"
+      else
+        printf '%s' "rdsh-linux-x64.tar.gz"
+      fi
+      ;;
+    Darwin/arm64) printf '%s' "rdsh-macos-arm64.tar.gz" ;;
+    Darwin/x86_64) printf '%s' "rdsh-macos-x64.tar.gz" ;;
+    *) echo "no prebuilt binary for $OS/$ARCH (build from source instead)" >&2; return 1 ;;
+  esac
+}
+verify_installed_binary() {
+  # $1: candidate binary; print its output when it cannot run.
+  local out=""
+  if out="$("$1" --version 2>&1)"; then
+    case "$out" in *rdsh*) return 0 ;; esac
+  fi
+  printf '%s\n' "$out" >&2
+  return 1
+}
+install_release_binary() {
+  # Print a release binary that provably runs on this host, or exit non-zero.
+  # Never installs a binary that failed to start: the glibc build falls back
+  # to the static musl build when the host glibc is too old.
+  local asset candidate
+  asset="$(choose_release_asset)" || exit 1
+  [ -n "$asset" ] || { echo "no prebuilt binary for $OS/$ARCH (build from source instead)" >&2; exit 1; }
+  candidate="$(fetch_release "$asset")"
+  if verify_installed_binary "$candidate"; then
+    echo "$candidate"
+    return 0
+  fi
+  if [ "$asset" = "rdsh-linux-x64-musl.tar.gz" ]; then
+    echo "error: the downloaded $asset cannot run on this host (see above)" >&2
+    exit 1
+  fi
+  echo "warning: $asset cannot run on this host; retrying with the static musl build" >&2
+  candidate="$(fetch_release "rdsh-linux-x64-musl.tar.gz")"
+  if verify_installed_binary "$candidate"; then
+    echo "$candidate"
+    return 0
+  fi
+  echo "error: neither the glibc nor the static musl rdsh build runs on this host" >&2
+  exit 1
+}
 fetch_release() {
-  # Print the path of the extracted prebuilt rdsh binary.
+  # $1: asset name. Print the path of the extracted prebuilt rdsh binary.
   # Overridable for tests: RDSH_RELEASE_BASE=file:///path/to/dir.
+  local asset="$1"
   base="${RDSH_RELEASE_BASE:-https://github.com/jimoto-no-llm/rustdsh/releases}"
   if [ -n "${RDSH_RELEASE_BASE:-}" ]; then
     echo "warning: custom release base in use (RDSH_RELEASE_BASE=$base); checksum verification stays mandatory" >&2
   fi
-  case "$OS/$ARCH" in
-    Linux/x86_64)
-      gv="$(glibc_version)"
-      if want_musl "$gv"; then asset="rdsh-linux-x64-musl.tar.gz"; else asset="rdsh-linux-x64.tar.gz"; fi
-      if [ "${USE_MUSL:-0}" != 1 ]; then
-        if [ -n "$gv" ] && ver_lt "$gv" "2.34"; then echo "glibc $gv < 2.34: selecting static musl build" >&2; fi
-      else
-        echo "selecting static musl build (--musl / RDSH_MUSL=1)" >&2
-      fi
-      ;;
-    Darwin/arm64) asset="rdsh-macos-arm64.tar.gz" ;;
-    Darwin/x86_64) asset="rdsh-macos-x64.tar.gz" ;;
-    *) echo "no prebuilt binary for $OS/$ARCH (build from source instead)" >&2; exit 1 ;;
-  esac
   if [ "$VER" = "latest" ]; then url="$base/latest/download/$asset"; else url="$base/download/$VER/$asset"; fi
-  DOWNLOAD_TMPD="$(mktemp -d)"
+  new_download_tmpd
   echo "fetching $url" >&2
   curl -fsSL -o "$DOWNLOAD_TMPD/pkg.tgz" "$url" || { echo "download failed: $url" >&2; exit 1; }
   if [ "${RDSH_NO_CHECKSUM:-0}" = 1 ]; then
@@ -229,7 +303,7 @@ fetch_release() {
 }
 BIN_SRC="target/release/rdsh"
 if [ "$FROM_RELEASE" = 1 ]; then
-  BIN_SRC="$(fetch_release)"
+  BIN_SRC="$(install_release_binary)"
 else
   export PATH="$HOME/.cargo/bin:$PATH"
   if ! command -v cargo >/dev/null 2>&1; then
@@ -270,4 +344,20 @@ echo "--- rdsh doctor ---"
 echo "next: run '$PREFIX/rdsh setup' to connect a model (GPT subscription via OAuth needs no API key)"
 if [ -f "./plugins/install.sh" ]; then
   echo "next: PROFILE=web ./plugins/install.sh adds recommended plugins, including the rdsh settings UI"
+fi
+# Desktop (Electron) keeps its own reserved profile next to the CLI profiles.
+# Detection is read-only and never fails the install.
+REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
+desktop_status="$("$PREFIX/rdsh" desktop status 2>/dev/null || true)"
+if printf '%s' "$desktop_status" | grep -q "desktop profile: .*(initialized)"; then
+  if [ "$DESKTOP" = 1 ]; then
+    echo "--- DeepSeek Harness Desktop ---"
+    if "$PREFIX/rdsh" desktop install --plugins-dir "$REPO_ROOT/plugins" --compute; then
+      echo "note: quit and reopen DeepSeek Harness to load the plugins"
+    else
+      echo "note: Desktop plugin attach failed; rerun 'rdsh desktop status' for the next step" >&2
+    fi
+  else
+    echo "next: rdsh desktop install --plugins-dir . attaches the rdsh plugins to the Desktop app"
+  fi
 fi

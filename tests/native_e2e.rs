@@ -277,6 +277,29 @@ fn concurrent_session_writers_leave_parseable_correct_cache() {
     }
 }
 
+/// Tests run in parallel and each one spawns a server on loopback; on loaded
+/// CI runners several simultaneous startups were refused for the whole 15s
+/// readiness window. Serializing the startup (not the serving) keeps the
+/// fixture deterministic without changing what is tested.
+static SERVER_STARTUP: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// Connect to a fixture port, waiting up to 15s for a loaded runner to accept.
+fn connect_within(port: u16) -> TcpStream {
+    let deadline = Instant::now() + Duration::from_secs(15);
+    loop {
+        match TcpStream::connect(("127.0.0.1", port)) {
+            Ok(stream) => return stream,
+            Err(error) => {
+                assert!(
+                    Instant::now() < deadline,
+                    "server did not accept within 15s (port {port}): {error}"
+                );
+                std::thread::sleep(Duration::from_millis(250));
+            }
+        }
+    }
+}
+
 struct Server {
     child: Child,
     port: u16,
@@ -285,6 +308,9 @@ struct Server {
 }
 impl Server {
     fn start(f: &Fixture, args: &[&str]) -> Self {
+        let _startup_guard = SERVER_STARTUP
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let mut child = f
             .command(args)
             .stdin(Stdio::null())
@@ -298,7 +324,11 @@ impl Server {
             let mut address = None;
             let mut handoff_path = None;
             let mut startup_lines = Vec::new();
+            let mut ready = false;
             for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+                if ready {
+                    continue;
+                }
                 startup_lines.push(line.clone());
                 if let Some(url) = line
                     .split_whitespace()
@@ -320,7 +350,10 @@ impl Server {
                         logged_token,
                         has_key_fragment,
                     ));
-                    break;
+                    // Keep draining until the child exits: closing the pipe here
+                    // would make the server's next log write fail.
+                    startup_lines.clear();
+                    ready = true;
                 }
             }
         });
@@ -338,8 +371,18 @@ impl Server {
             !has_key_fragment,
             "server must not print a token-bearing URL"
         );
-        let token = std::fs::read_to_string(&handoff_path)
-            .expect("server should create its protected token handoff file");
+        // The token handoff file is written right after the URL is printed, but
+        // a loaded runner can delay it; wait on a wall-clock deadline.
+        let token_deadline = Instant::now() + Duration::from_secs(15);
+        let mut token = None;
+        while Instant::now() < token_deadline {
+            if let Ok(text) = std::fs::read_to_string(&handoff_path) {
+                token = Some(text);
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        let token = token.expect("server should create its protected token handoff file");
         let address = url.trim_start_matches("http://127.0.0.1:");
         Self {
             child,
@@ -356,24 +399,42 @@ impl Server {
         authorized: bool,
         extra: &str,
     ) -> (u16, String) {
-        let mut stream = TcpStream::connect(("127.0.0.1", self.port)).unwrap();
-        stream
-            .set_read_timeout(Some(Duration::from_secs(12)))
-            .unwrap();
         let key = if authorized {
             format!("X-RDSH-Token: {}\r\n", self.token)
         } else {
             String::new()
         };
-        write!(stream, "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1:{}\r\n{key}{extra}Content-Length: {}\r\nConnection: close\r\n\r\n{body}", self.port, body.len()).unwrap();
         let mut bytes = Vec::new();
-        stream.read_to_end(&mut bytes).unwrap();
-        let response = String::from_utf8(bytes).unwrap();
-        let (head, body) = response.split_once("\r\n\r\n").unwrap();
-        (
-            head.split_whitespace().nth(1).unwrap().parse().unwrap(),
-            body.to_owned(),
-        )
+        // Loaded CI runners refuse or reset the loopback connection while the
+        // server is still coming up, so retry against a wall-clock deadline
+        // instead of a fixed attempt count.
+        let deadline = Instant::now() + Duration::from_secs(15);
+        loop {
+            let mut stream = connect_within(self.port);
+            stream
+                .set_read_timeout(Some(Duration::from_secs(60)))
+                .unwrap();
+            write!(stream, "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1:{}\r\n{key}{extra}Content-Length: {}\r\nConnection: close\r\n\r\n{body}", self.port, body.len()).unwrap();
+            bytes.clear();
+            let read_failed = stream.read_to_end(&mut bytes).is_err();
+            // A reset can truncate the response, so only accept a complete
+            // status line; anything else retries until the deadline.
+            let response = String::from_utf8_lossy(&bytes).into_owned();
+            if let Some((head, body)) = response.split_once("\r\n\r\n") {
+                if let Some(status) = head
+                    .split_whitespace()
+                    .nth(1)
+                    .and_then(|value| value.parse().ok())
+                {
+                    return (status, body.to_owned());
+                }
+            }
+            assert!(
+                Instant::now() < deadline,
+                "no complete HTTP response within 15s (read failed: {read_failed})"
+            );
+            std::thread::sleep(Duration::from_millis(250));
+        }
     }
     fn stopped(&mut self) {
         let deadline = Instant::now() + Duration::from_secs(5);
@@ -390,6 +451,30 @@ impl Drop for Server {
         let _ = self.child.wait();
         let _ = std::fs::remove_file(&self.handoff_path);
     }
+}
+
+#[test]
+fn setup_extras_follow_explicit_feature_switches() {
+    // Issue #384: an explicit features.<id> must drive both the value the setup
+    // UI shows and the value its switches write.
+    let f = Fixture::new();
+    f.settings(serde_json::json!({"features": {"serve": false}}));
+    let setup = Server::start(&f, &["setup", "--web", "--port", "0"]);
+    let (status, body) = setup.request("GET", "/api/extras", "", true, "");
+    assert_eq!(status, 200);
+    let listed: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(listed["enable"], serde_json::json!([]));
+    assert_eq!(
+        setup
+            .request("POST", "/api/extras", r#"{"enable":["serve"]}"#, true, "")
+            .0,
+        200
+    );
+    let saved: serde_json::Value =
+        serde_json::from_slice(&fs::read(f.0.join("dsh/rdsh.json")).unwrap()).unwrap();
+    assert_eq!(saved["features"]["serve"], serde_json::json!(true));
+    assert_eq!(saved["extras"]["enable"], serde_json::json!(["serve"]));
+    setup.request("POST", "/api/done", "{}", true, "");
 }
 
 #[test]
@@ -484,6 +569,92 @@ fn setup_save_extras_restart_serve_and_use_real_http_api() {
         400
     );
     assert_eq!(fs::read(f.0.join("dsh/rdsh.json")).unwrap(), saved);
+}
+
+#[cfg(unix)]
+#[test]
+fn path_search_skips_non_executable_dsh_and_node_candidates() {
+    use std::os::unix::fs::{symlink, PermissionsExt};
+
+    fn write_mode(path: &std::path::Path, contents: &str, mode: u32) {
+        fs::write(path, contents).unwrap();
+        fs::set_permissions(path, fs::Permissions::from_mode(mode)).unwrap();
+    }
+
+    let f = Fixture::new();
+    let first = f.0.join("first");
+    let second = f.0.join("second");
+    fs::create_dir_all(&first).unwrap();
+    fs::create_dir_all(&second).unwrap();
+    let search_path = format!("{}:{}", first.display(), second.display());
+    let second_dsh = second.join("dsh");
+    write_mode(&second_dsh, "#!/bin/sh\necho DUMMY_VALID_DSH\n", 0o755);
+    let second_node = second.join("node");
+    write_mode(
+        &second_node,
+        "#!/bin/sh\nprintf 'DUMMY_VALID_NODE\\n'\n",
+        0o755,
+    );
+
+    let run_stub = |original: Option<&std::path::Path>| {
+        let mut command = f.command(&["--no-slim", "--profile", "web"]);
+        command
+            .env("PATH", &search_path)
+            .env_remove("RDSH_ORIG_BIN")
+            .env_remove("DSH_ORIG_BIN");
+        if let Some(original) = original {
+            command.env("RDSH_ORIG_BIN", original);
+        }
+        command.output().unwrap()
+    };
+    let assert_marker = |output: Output, marker: &str| {
+        assert!(
+            output.status.success(),
+            "delegation failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let stdout = String::from_utf8(output.stdout).unwrap();
+        assert!(
+            stdout.contains(marker),
+            "expected {marker:?}, got {stdout:?}"
+        );
+    };
+
+    // A directory and a non-executable file must both be skipped in favor of
+    // the later usable DSH; a PATH entry resolving to rdsh itself stays skipped.
+    let first_dsh = first.join("dsh");
+    fs::create_dir(&first_dsh).unwrap();
+    let output = run_stub(None);
+    assert_marker(output, "DUMMY_VALID_DSH");
+
+    fs::remove_dir(&first_dsh).unwrap();
+    write_mode(&first_dsh, "not executable\n", 0o644);
+    let output = run_stub(None);
+    assert_marker(output, "DUMMY_VALID_DSH");
+
+    fs::remove_file(&first_dsh).unwrap();
+    symlink(env!("CARGO_BIN_EXE_rdsh"), &first_dsh).unwrap();
+    let output = run_stub(None);
+    assert_marker(output, "DUMMY_VALID_DSH");
+
+    // An explicit original path keeps priority even when it is outside PATH.
+    let explicit_dsh = f.0.join("explicit/dsh");
+    fs::create_dir_all(explicit_dsh.parent().unwrap()).unwrap();
+    write_mode(
+        &explicit_dsh,
+        "#!/bin/sh\nprintf 'EXPLICIT_DSH\\n'\n",
+        0o755,
+    );
+    let output = run_stub(Some(&explicit_dsh));
+    assert_marker(output, "EXPLICIT_DSH");
+
+    // A .js override still uses Node, but skips a non-executable earlier Node.
+    let first_node = first.join("node");
+    write_mode(&first_node, "not executable\n", 0o644);
+    let original_js = f.0.join("original.js");
+    fs::write(&original_js, "process.stdout.write('DUMMY_JS\\n')\n").unwrap();
+    let output = run_stub(Some(&original_js));
+    assert_marker(output, "DUMMY_VALID_NODE");
 }
 
 #[test]
@@ -598,9 +769,9 @@ fn http_truncated_and_oversized_requests_do_not_damage_serve() {
     .into_iter()
     .enumerate()
     {
-        let mut stream = TcpStream::connect(("127.0.0.1", server.port)).unwrap();
+        let mut stream = connect_within(server.port);
         stream
-            .set_read_timeout(Some(Duration::from_secs(12)))
+            .set_read_timeout(Some(Duration::from_secs(60)))
             .unwrap();
         stream.write_all(request.as_bytes()).unwrap();
         stream.shutdown(Shutdown::Write).unwrap();

@@ -21,7 +21,7 @@ It ports frequently used CLI operations (token calculation, code search, session
 - ⚡ **Sub-millisecond startup & low memory**: `--version` launches in ~0.90 ms with ~2.9 MB peak memory, compared to ~88 ms and ~66 MB for Node.js-based `dsh`.
 - 🔄 **100% Drop-in Compatible**: Subcommands that are not rdsh-native are passed straight to upstream `dsh`. Existing scripts and workflows keep running unchanged.
 - 🛠 **Fast Native Utilities**: Estimate tokens, search code, list sessions, and run health diagnostics (`rdsh doctor`) instantly without starting Node.js.
-- 🛡 **Safe by Default**: Read-only commands never mutate files, credentials are never automatically synced or exported, and tool execution can be sandboxed on Linux.
+- 🛡 **Safe by Default**: Read-only commands never mutate files, credentials are never automatically synced or exported, and agent tools can be confined to explicitly shared files on Linux.
 
 ## Table of Contents
 
@@ -146,6 +146,7 @@ rdsh sessions --limit 20 --tokens   # list sessions and unpacked token estimates
 rdsh compact ./s.jsonl              # compact session JSONL (source remains untouched)
 rdsh doctor                         # check health of dsh, environment, and paths
 rdsh profiles / rdsh skills         # list available profiles and skills
+rdsh desktop status                 # detect the DeepSeek Harness Desktop app and profile
 rdsh bench --n 5                    # benchmark startup speed between rdsh and dsh
 ```
 
@@ -164,13 +165,18 @@ rdsh setup --web                           # browser-based setup interface
 
 ### Agent Tool Isolation
 
-On Linux (with bubblewrap and prlimit), agent tools can be securely sandboxed:
+Delegated agent tools keep normal file access by default: the model reads and
+writes the project like any other tool. On Linux (with bubblewrap and prlimit)
+you can instead confine them to files you explicitly share:
 
 ```sh
 rdsh --share-file README.md --share-file src/main.rs --profile tui
 ```
 
-Only explicitly shared files are mounted read-only, protecting host files and preventing unauthorized network access from the model.
+Only the shared files are mounted read-only, host files stay out of reach and
+the sandbox has no network. Turn the same boundary on for every run with
+`rdsh features on agent_tool_sandbox` (off again with
+`rdsh features off agent_tool_sandbox`, or force it with `RDSH_SECURITY=1`).
 
 ### Hook Guard (`rdsh guard`)
 
@@ -213,6 +219,35 @@ rdsh-dashboard project --project <directory>
 
 *On native Windows, the dashboard runs in the system tray and can be opened or stopped from the taskbar (`--no-tray` keeps it in the terminal). See [dashboard/README.md](dashboard/README.md).*
 
+## Desktop App (Electron)
+
+DeepSeek Harness Desktop is an Electron shell around the complete Web
+application. It shares `$DSH_HOME` with the CLI but owns a **reserved profile**
+(`$DSH_HOME/profiles/desktop`) and its own bundled command runtime, so the npm
+`dsh` CLI cannot manage its plugins. `rdsh desktop` detects all of that and
+forwards plugin attachment to the app's own command — rdsh never boots or
+rewrites the profile:
+
+```sh
+rdsh desktop status                 # app, command runtime, profile, plugin state (read-only)
+rdsh desktop install --plugins-dir .   # attach rdsh-settings to the desktop profile
+rdsh desktop install --plugins-dir . --compute   # + the resident compute bridge
+rdsh desktop verify                 # exit nonzero when the profile has no rdsh plugin
+```
+
+The same is available through the profile installer and the installers:
+
+```sh
+PROFILE=desktop ./plugins/install.sh   # every recommended package, forwarded correctly
+./install.sh --desktop                 # attach the rdsh plugins during installation
+```
+
+*Quit the app before attaching plugins, reopen it afterwards. The app's own
+Plugins page installs the same packages without any command. The Electron
+runtime itself is never replaced: in-app delegation stays limited to the
+opt-in, fail-open compute bridge. See
+[DESKTOP-INTEGRATION.md](docs/DESKTOP-INTEGRATION.md).*
+
 ## Using with Smart-DSH
 
 [Smart-DSH](https://github.com/hikarioyama/Smart-DSH) (a web-profile plugin bundle) works smoothly alongside rdsh:
@@ -246,7 +281,7 @@ Measurements conducted on Linux x86_64:
 1. **Upstream Fidelity**: Never reimplements conversation loops or agent logic; delegates directly to upstream `dsh`.
 2. **Non-Destructive**: Read operations (tokens, search, session listing, compacting) never modify source files.
 3. **Explicit Auth**: Credentials are never sent externally or synced automatically; only user-approved items are imported.
-4. **Tool Sandboxing**: On Linux, only explicitly shared files are mounted read-only, preventing unintended modifications to the host.
+4. **Tool Sandboxing** (opt-in): On Linux, `--share-file` mounts only the files you share, read-only and without network, so the model never touches the rest of the host.
 
 ## FAQ
 
@@ -270,6 +305,7 @@ Measurements conducted on Linux x86_64:
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Architecture design and delegation model |
 | [docs/BENCHMARKS.md](docs/BENCHMARKS.md) | Benchmark methodology and reproduction steps |
 | [docs/RDSH-SETTINGS.md](docs/RDSH-SETTINGS.md) | Settings UI and CLI options |
+| [docs/DESKTOP-INTEGRATION.md](docs/DESKTOP-INTEGRATION.md) | DeepSeek Harness Desktop (Electron) integration |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Project roadmap and planned capabilities |
 | [docs/RELEASING.md](docs/RELEASING.md) | Release procedures |
 | [CHANGELOG.md](CHANGELOG.md) | Changes per version |

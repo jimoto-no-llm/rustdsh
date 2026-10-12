@@ -21,7 +21,7 @@
 - ⚡ **超高速・省メモリ起動**: 起動時間は約0.9ms、メモリ消費は約2.9MB。Node.js を立ち上げる本家 `dsh`（約88ms / 約66MB）と比較して圧倒的に軽量です。
 - 🔄 **完全な互換性（Drop-in Replacement）**: `rdsh` 独自のサブコマンド以外は本家 `dsh` にそのまま渡すため、既存のスクリプトや使い慣れたオプションがそのまま動作します。
 - 🛠 **便利な高速ネイティブコマンド**: トークン見積り、並列コード検索、セッション一覧・圧縮、環境診断（`doctor`）などを Node.js なしで瞬時に実行できます。
-- 🛡 **安全設計**: 読み取り系コマンドは元ファイルを一切書き換えず、認証情報の無断外部送信も行いません。Linux 環境ではツールの安全なサンドボックス隔離に対応しています。
+- 🛡 **安全設計**: 読み取り系コマンドは元ファイルを一切書き換えず、認証情報の無断外部送信も行いません。Linux 環境では、エージェントツールを明示的に共有したファイルだけに限定できます。
 
 ## 目次
 
@@ -146,6 +146,7 @@ rdsh sessions --limit 20 --tokens   # 過去セッション一覧と展開トー
 rdsh compact ./s.jsonl              # セッション JSONL を圧縮（元ファイルは不変）
 rdsh doctor                         # 本家 dsh、環境変数、パスなどの健全性診断
 rdsh profiles / rdsh skills         # 利用可能なプロファイル・スキル一覧
+rdsh desktop status                 # DeepSeek Harness Desktop アプリとプロファイルの検出
 rdsh bench --n 5                    # rdsh と本家 dsh の起動速度比較
 ```
 
@@ -160,17 +161,17 @@ rdsh setup                                 # 対話型セットアップウィ�
 rdsh setup --web                           # ブラウザから行える Web 設定画面
 ```
 
-※ 他ツールの認証情報を勝手に外部へ送信したり、無断で同期したりしません。明示的に指定したログイン情報のみをローカルで安全に管理します。
+※ 他ツールの認証情報を無断で外部へ送信したり、同期したりしません。明示的に指定したログイン情報のみをローカルで安全に管理します。
 
 ### エージェント実行の安全な隔離
 
-Linux 環境（bubblewrap・prlimit 対応環境）では、エージェントが操作できるツールを安全にサンドボックス化できます：
+委譲したエージェントツールは既定で通常のファイル読み書きができます。Linux（bubblewrap と prlimit がある環境）では `--share-file` で明示的に共有したファイルだけに限定されます：
 
 ```sh
 rdsh --share-file README.md --share-file src/main.rs --profile tui
 ```
 
-指定したファイルのみが読み取り専用で共有され、ホストシステムやプロジェクトの不要な書き換え・外部ネットワークアクセスを防ぎます。
+共有ファイルは読み取り専用でマウントされ、ネットワークアクセスもありません。`rdsh features on agent_tool_sandbox` で常時有効化、`rdsh features off agent_tool_sandbox` で無効化、`RDSH_SECURITY=1` で強制できます。
 
 ### フック監視 (`rdsh guard`)
 
@@ -213,6 +214,26 @@ rdsh-dashboard project --project <ディレクトリ>
 
 ※ Windows ネイティブではタスクトレイに常駐し、タスクバーから簡単に開閉できます（端末起動したい場合は `--no-tray` を指定）。詳細は [dashboard/README.md](dashboard/README.md) をご覧ください。
 
+## デスクトップアプリ (Electron)
+
+DeepSeek Harness Desktop は、Web アプリケーション全体を内包した Electron シェルです。CLI と `$DSH_HOME` を共有しますが、**予約済みプロファイル**（`$DSH_HOME/profiles/desktop`）と同梱の独自コマンドランタイムを持つため、npm の `dsh` CLI ではプラグインを管理できません。`rdsh desktop` はこれらを自動検出し、プラグインの組み込みをアプリ自身のコマンドへ転送します。rdsh 側でプロファイルを起動したり直接書き換えたりすることはありません：
+
+```sh
+rdsh desktop status                 # アプリ、コマンドランタイム、プロファイル、プラグインの状態（読み取り専用）
+rdsh desktop install --plugins-dir .   # desktop プロファイルに rdsh-settings を組み込み
+rdsh desktop install --plugins-dir . --compute   # 常駐 compute bridge もあわせて追加
+rdsh desktop verify                 # プロファイルに rdsh プラグインがない場合は 0 以外で終了
+```
+
+プロファイルインストーラーや各種インストーラーからも同様に利用できます：
+
+```sh
+PROFILE=desktop ./plugins/install.sh   # 推奨パッケージをすべて適切に転送して導入
+./install.sh --desktop                 # インストール時に rdsh プラグインを組み込み
+```
+
+※ プラグインを組み込む前にアプリを終了し、完了後に再起動してください。アプリ内の Plugins 画面からも、コマンドを使わずに同じパッケージをインストールできます。Electron ランタイム自体が置き換わることはなく、アプリ内の処理委譲はオプトインかつフェイルオープンな compute bridge に限定されます。詳細は [DESKTOP-INTEGRATION.md](docs/DESKTOP-INTEGRATION.md) をご覧ください。
+
 ## Smart-DSH との併用
 
 [Smart-DSH](https://github.com/hikarioyama/Smart-DSH)（Web プロファイル向けプラグイン集）と問題なく共存できます：
@@ -246,7 +267,7 @@ Linux x86_64 環境での測定値です：
 1. **本家挙動の透過性**: 会話ループやモデル推論は独自実装せず、すべて本家 `dsh` に委譲して互換性を担保します。
 2. **非破壊設計**: トークン計算、検索、ログ圧縮などの読み取り系コマンドは、既存のファイルを一切変更しません。
 3. **明示的な認証管理**: 他アプリの認証情報を無断で同期・送信せず、利用者が明示的に指定したものだけを取り込みます。
-4. **サンドボックス隔離**: Linux 環境では、明示的に共有したファイルのみを読み取り専用で渡し、ホスト環境を保護します。
+4. **サンドボックス隔離**（オプトイン）: Linux 環境では、`--share-file` で共有したファイルだけを読み取り専用・ネットワークなしで渡すため、ホストの他の領域には触れません。
 
 ## よくある質問
 
@@ -270,6 +291,7 @@ Linux x86_64 環境での測定値です：
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 委譲の仕組みとアーキテクチャ設計 |
 | [docs/BENCHMARKS.md](docs/BENCHMARKS.md) | ベンチマークの詳細と再現手順 |
 | [docs/RDSH-SETTINGS.md](docs/RDSH-SETTINGS.md) | 設定画面の機能と CLI キー一覧 |
+| [docs/DESKTOP-INTEGRATION.md](docs/DESKTOP-INTEGRATION.md) | デスクトップアプリ (Electron) との連携 |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 今後の開発ロードマップ |
 | [docs/RELEASING.md](docs/RELEASING.md) | リリース手順 |
 | [CHANGELOG.md](CHANGELOG.md) | バージョンごとの主な変更履歴 |

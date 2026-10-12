@@ -14,10 +14,26 @@
 
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 export const PROTOCOL_VERSION = 1;
 export const MAX_TEXT_BYTES = 1_048_576;
 const DEFAULT_TIMEOUT_MS = 5000;
+
+// Feature switches live in $DSH_HOME/rdsh.json. An id that is absent (or a
+// missing, unreadable or corrupt file) keeps the caller's fallback; an explicit
+// false disables the capability and must never throw.
+function featureEnabled(id, fallback, env = process.env) {
+  try {
+    const path = join(env.DSH_HOME || join(homedir(), ".dsh"), "rdsh.json");
+    const value = JSON.parse(readFileSync(path, "utf8"))?.features?.[id];
+    return typeof value === "boolean" ? value : fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 function jsEstimate(text) {
   // Same heuristic as src/tokens.rs: ASCII 4 bytes = 1 token,
@@ -44,7 +60,49 @@ function jsEstimate(text) {
 }
 
 export function isEnabled(env = process.env) {
-  return env.RDSH_COMPUTE === "1";
+  // features.compute wins in both directions; without the key the historical
+  // RDSH_COMPUTE=1 opt-in still decides.
+  return featureEnabled("compute", env.RDSH_COMPUTE === "1", env);
+}
+
+function defaultExists(path) {
+  try {
+    return existsSync(path);
+  } catch {
+    return false;
+  }
+}
+
+function wellKnownBins(env, platform, name) {
+  const home = platform === "win32" ? env.USERPROFILE || env.HOME || homedir() : env.HOME || homedir();
+  if (platform === "win32") {
+    const localAppData = env.LOCALAPPDATA || join(home, "AppData", "Local");
+    const cargoHome = env.CARGO_HOME || join(home, ".cargo");
+    return [
+      join(localAppData, "rdsh", "bin", name),
+      join(home, ".local", "bin", name),
+      join(cargoHome, "bin", name),
+    ];
+  }
+  return [join(home, ".local", "bin", name), join("/usr/local/bin", name), join(home, ".cargo", "bin", name)];
+}
+
+// Desktop ships its own runtime and is not guaranteed to inherit the login
+// shell PATH (~/.local/bin can be missing), so a bare "rdsh" is not enough:
+// an explicit RDSH_BIN wins, then PATH, then the well-known install locations.
+// Nothing resolved returns the historical "rdsh" default, so a later spawn
+// failure still falls back to the JS implementation exactly as before.
+export function resolveRdshBin(env = process.env, platform = process.platform, exists = defaultExists) {
+  if (typeof env.RDSH_BIN === "string" && env.RDSH_BIN.trim() !== "") return env.RDSH_BIN;
+  const name = platform === "win32" ? "rdsh.exe" : "rdsh";
+  const pathSep = platform === "win32" ? ";" : ":";
+  for (const dir of (env.PATH || env.Path || "").split(pathSep)) {
+    if (dir && exists(join(dir, name))) return "rdsh"; // PATH hit: the bare name spawns as before
+  }
+  for (const candidate of wellKnownBins(env, platform, name)) {
+    if (exists(candidate)) return candidate;
+  }
+  return "rdsh";
 }
 
 export function createComputeBridge({ bin = "rdsh", timeoutMs = DEFAULT_TIMEOUT_MS, spawnImpl = spawn } = {}) {
@@ -143,6 +201,31 @@ export function createComputeBridge({ bin = "rdsh", timeoutMs = DEFAULT_TIMEOUT_
     }
   }
 
+  async function estimateBatch(texts) {
+    const fallback = () => ({
+      tokens: texts.map(jsEstimate),
+      chars: texts.map((t) => Buffer.byteLength(t, "utf8")),
+      total: texts.map(jsEstimate).reduce((a, b) => a + b, 0),
+    });
+    if (!isEnabled()) return { result: fallback(), usedRust: false, timings: null };
+    const t0 = process.hrtime.bigint();
+    try {
+      const msg = await request("tokens.estimate_batch", { texts });
+      const timings = {
+        total_us: Number(process.hrtime.bigint() - t0) / 1000,
+        rust_us: msg.elapsed_us ?? null,
+      };
+      if (msg.ok !== true || !Array.isArray(msg.tokens)) throw new Error(msg.error ?? "bad response");
+      return {
+        result: { tokens: msg.tokens, chars: msg.chars, total: msg.total },
+        usedRust: true,
+        timings,
+      };
+    } catch {
+      return { result: fallback(), usedRust: false, timings: null };
+    }
+  }
+
   async function prune(text, maxTokens = 4000) {
     const fallback = () => ({ pruned: text, before: jsEstimate(text), after: jsEstimate(text), budget: maxTokens });
     if (!isEnabled()) return { result: fallback(), usedRust: false, timings: null };
@@ -172,14 +255,14 @@ export function createComputeBridge({ bin = "rdsh", timeoutMs = DEFAULT_TIMEOUT_
     child = null;
   }
 
-  return { estimate, prune, close, jsEstimate, isEnabled };
+  return { estimate, estimateBatch, prune, close, jsEstimate, isEnabled };
 }
 
 // Cordis plugin entry: registers nothing by default; exposes the bridge on
 // ctx for an explicit opt-in call site. No event subscription, so existing
 // Web/API behavior is unchanged while disabled.
 export function apply(ctx) {
-  const bridge = createComputeBridge({ bin: process.env.RDSH_BIN ?? "rdsh" });
+  const bridge = createComputeBridge({ bin: resolveRdshBin() });
   ctx.rdshCompute = bridge;
   ctx.on?.("dispose", () => bridge.close());
 }
