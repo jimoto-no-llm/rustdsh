@@ -769,7 +769,7 @@ fn apply_imports(s: &Scan, quiet: bool) -> anyhow::Result<Vec<String>> {
         return Ok(Vec::new());
     }
     let path = &s.path;
-    let _lock = crate::file_lock::FileLock::exclusive_for(std::path::Path::new(path))?;
+    let _lock = crate::file_lock::CredentialFileLock::exclusive_for(std::path::Path::new(path))?;
     // `Scan` may have been produced before another rdsh process committed an
     // import. Re-read and re-evaluate while holding the lock so the atomic
     // rename is based on the latest document rather than a stale snapshot.
@@ -1100,7 +1100,7 @@ fn store_ref(name: &str, value: &str) -> anyhow::Result<bool> {
 
 fn store_ref_at(path: &str, name: &str, value: &str) -> anyhow::Result<bool> {
     safe_scalar(value)?;
-    let _lock = crate::file_lock::FileLock::exclusive_for(std::path::Path::new(path))?;
+    let _lock = crate::file_lock::CredentialFileLock::exclusive_for(std::path::Path::new(path))?;
     let doc = load_doc(path);
     if !doc.text.is_empty() && !doc.version_ok {
         anyhow::bail!("refuse: {path} uses the pre-release flat layout");

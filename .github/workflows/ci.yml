@@ -23,6 +23,8 @@ jobs:
       - uses: actions/checkout@v7
       - name: Test release metadata and asset validation
         run: python3 -m unittest discover -s tests -p 'test_release_*.py'
+      - name: Test ICO directory validation
+        run: python3 -m unittest discover -s tests -p 'test_icon_generation.py'
       - name: Check the current version's release notes
         run: |
           version=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["package"]["version"])')
