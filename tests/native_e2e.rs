@@ -884,3 +884,25 @@ fn web_search_gate_and_real_http_results_and_failure() {
         }
     }
 }
+
+/// #388: 2文字ASCII語（CI/UI/Go）のセッション検索が0件にならない。
+#[test]
+fn context_search_finds_two_char_ascii_terms() {
+    let f = Fixture::new();
+    f.settings(json!({"features": {"context_engine": true}}));
+    let dir = f.0.join("dsh/sessions/p/s");
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(
+        dir.join("transcript.jsonl"),
+        "{\"content\":\"CI pipeline UI Go TypeScript \u{65e5}\u{672c}\u{8a9e}\u{691c}\u{7d22}\"}\n",
+    )
+    .unwrap();
+    for query in ["CI", "UI", "Go", "pipeline", "\u{65e5}\u{672c}\u{8a9e}\u{691c}\u{7d22}"] {
+        let out = f.ok(&["context", "search", query], b"");
+        let text = String::from_utf8_lossy(&out);
+        assert!(
+            text.contains("# sessions (1)") && text.contains("[session]"),
+            "query {query:?} should hit the fixture session, got:\n{text}"
+        );
+    }
+}
