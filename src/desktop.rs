@@ -43,6 +43,13 @@ macro_rules! err {
 pub const PROFILE: &str = "desktop";
 /// Bundled rdsh plugins that can be attached to a DSH profile.
 pub const BUNDLED_PLUGINS: &[&str] = &["rdsh-settings", "rdsh-compute"];
+/// Third-party Web UI plugins installed by default (both MIT, used with upstream
+/// permission; see Credits in README.md). They are fetched from GitHub at
+/// install time so fixes arrive without a rustdsh release.
+pub const SOUND_SPEC: &str = "github:cwd514/dsh-sound-notifications";
+pub const GITVIEW_SPEC: &str = "github:yugapor/dsh-gitview";
+/// Default third-party specs attached alongside the bundled plugins.
+pub const DEFAULT_THIRD_PARTY: &[&str] = &[SOUND_SPEC, GITVIEW_SPEC];
 /// Product name used by the macOS bundle and the Windows install directory.
 const APP_NAME: &str = "DeepSeek Harness";
 /// Upstream's own refusal text; keeping the intent verbatim keeps the fix obvious.
@@ -474,10 +481,11 @@ fn quote_for_cmd(token: &str) -> String {
     out
 }
 
-/// `cmd /C` receives a single command line. It is wrapped in one quoting pair
-/// so the packaged path survives its space
-/// (`...\Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd`).
-fn windows_command(cli: &Path, args: &[String]) -> Command {
+/// The exact command line to hand to `cmd.exe`. It is wrapped in one quoting
+/// pair so the packaged path survives its space
+/// (`...\Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd`), and
+/// `/S` makes cmd strip exactly that outer pair.
+fn windows_cmd_line(cli: &Path, args: &[String]) -> String {
     let mut line = String::from("\"");
     line.push_str(&quote_for_cmd(&cli.to_string_lossy()));
     for arg in args {
@@ -485,8 +493,34 @@ fn windows_command(cli: &Path, args: &[String]) -> Command {
         line.push_str(&quote_for_cmd(arg));
     }
     line.push('"');
+    line
+}
+
+/// Windows `.cmd`/`.bat` launchers are started through `cmd.exe`.
+///
+/// The line must be passed as a raw argument: `Command::arg` applies C-runtime
+/// quoting, which escapes the inner quotes as `\"` - cmd.exe does not understand
+/// that and reads the mangled path as a UNC path ("The network path was not
+/// found."). `/D` skips AutoRun commands for a reproducible launch.
+#[cfg(windows)]
+fn windows_command(cli: &Path, args: &[String]) -> Command {
+    use std::os::windows::process::CommandExt;
     let mut command = Command::new("cmd");
-    command.arg("/C").arg(line);
+    command.arg("/D").arg("/S").arg("/C");
+    command.raw_arg(windows_cmd_line(cli, args));
+    command
+}
+
+/// Non-Windows build of the same helper: never executed, but it keeps the
+/// command construction testable on every platform.
+#[cfg(not(windows))]
+fn windows_command(cli: &Path, args: &[String]) -> Command {
+    let mut command = Command::new("cmd");
+    command
+        .arg("/D")
+        .arg("/S")
+        .arg("/C")
+        .arg(windows_cmd_line(cli, args));
     command
 }
 
@@ -656,6 +690,8 @@ fn desktop_targets(
     packages: &[String],
     no_bundled: bool,
     compute: bool,
+    no_sound: bool,
+    no_gitview: bool,
     env: &OsEnv,
 ) -> Result<(Vec<Target>, Option<PathBuf>)> {
     let mut targets = Vec::new();
@@ -669,6 +705,21 @@ fn desktop_targets(
             });
         }
         root = Some(plugins_root);
+        for spec in DEFAULT_THIRD_PARTY {
+            if (*spec == SOUND_SPEC && no_sound) || (*spec == GITVIEW_SPEC && no_gitview) {
+                continue;
+            }
+            let label = spec
+                .trim_end_matches('/')
+                .rsplit('/')
+                .next()
+                .unwrap_or(spec)
+                .to_string();
+            targets.push(Target {
+                label,
+                spec: spec.to_string(),
+            });
+        }
     }
     for spec in packages {
         let label = spec
@@ -696,6 +747,8 @@ pub fn cmd_install(
     no_bundled: bool,
     dry_run: bool,
     compute: bool,
+    no_sound: bool,
+    no_gitview: bool,
     json_out: bool,
 ) -> Result<()> {
     let env = OsEnv::from_process();
@@ -715,8 +768,15 @@ pub fn cmd_install(
             "Desktop command runtime not found; open DeepSeek Harness once and use Manage dsh Command... -> Install, or set DSH_DESKTOP_CLI to resources/runtime/cli/bin/dsh (dsh.cmd on Windows). The app's own Plugins page can install the same packages without the command"
         );
     };
-    let (targets, plugins_root) =
-        desktop_targets(plugins_dir, packages, no_bundled, compute, &env)?;
+    let (targets, plugins_root) = desktop_targets(
+        plugins_dir,
+        packages,
+        no_bundled,
+        compute,
+        no_sound,
+        no_gitview,
+        &env,
+    )?;
     let running = running_hint(&env);
 
     if !json_out {
@@ -1034,17 +1094,26 @@ mod tests {
             .iter()
             .map(|s| s.to_string())
             .collect();
-        let command = windows_command(Path::new(cli), &args);
-        assert_eq!(command.get_program(), "cmd");
-        let got: Vec<String> = command
-            .get_args()
-            .map(|arg| arg.to_string_lossy().to_string())
-            .collect();
-        assert_eq!(got[0], "/C");
+        let line = windows_cmd_line(Path::new(cli), &args);
         assert_eq!(
-            got[1],
+            line,
             format!("\"\"{cli}\" \"plugin\" \"--profile\" \"desktop\" \"add\" \"{spec}\"\"")
         );
+        // One pair of outer quotes for cmd /S to strip.
+        assert!(line.starts_with("\"\"") && line.ends_with("\"\""));
+
+        let command = windows_command(Path::new(cli), &args);
+        assert_eq!(command.get_program(), "cmd");
+        // The raw argument form is Windows-only; the switches are checked there.
+        #[cfg(not(windows))]
+        {
+            let got: Vec<String> = command
+                .get_args()
+                .map(|arg| arg.to_string_lossy().to_string())
+                .collect();
+            assert_eq!(got[0..3], ["/D", "/S", "/C"]);
+            assert_eq!(got[3], line);
+        }
     }
 
     #[test]
@@ -1204,26 +1273,50 @@ mod tests {
         )
         .unwrap();
 
-        let (targets, dir) =
-            desktop_targets(Some(checkout.to_str().unwrap()), &[], false, false, &env).unwrap();
-        assert_eq!(targets.len(), 1);
+        let (targets, dir) = desktop_targets(
+            Some(checkout.to_str().unwrap()),
+            &[],
+            false,
+            false,
+            false,
+            false,
+            &env,
+        )
+        .unwrap();
+        assert_eq!(targets.len(), 3);
         assert_eq!(targets[0].label, "rdsh-settings");
         assert_eq!(
             Path::new(&targets[0].spec),
             checkout.join("plugins").join("rdsh-settings")
         );
+        assert_eq!(targets[1].label, "dsh-sound-notifications");
+        assert_eq!(targets[2].label, "dsh-gitview");
         assert!(dir.unwrap().ends_with("plugins"));
+
+        let (targets, _) = desktop_targets(
+            Some(checkout.to_str().unwrap()),
+            &[],
+            false,
+            false,
+            true,
+            true,
+            &env,
+        )
+        .unwrap();
+        assert_eq!(targets.len(), 1);
+        assert_eq!(targets[0].label, "rdsh-settings");
 
         let packages = vec![
             "@deepseek-ai/dsh-tool-present".to_string(),
             "github:owner/repo".to_string(),
         ];
-        let (targets, dir) = desktop_targets(None, &packages, true, false, &env).unwrap();
+        let (targets, dir) =
+            desktop_targets(None, &packages, true, false, false, false, &env).unwrap();
         assert_eq!(targets.len(), 2);
         assert_eq!(targets[0].label, "dsh-tool-present");
         assert_eq!(targets[1].label, "repo");
         assert!(dir.is_none());
-        assert!(desktop_targets(None, &[], true, false, &env).is_err());
+        assert!(desktop_targets(None, &[], true, false, false, false, &env).is_err());
         std::fs::remove_dir_all(&root).unwrap();
     }
 
