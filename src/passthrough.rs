@@ -265,7 +265,10 @@ fn base_cmd(orig: &str, dry: bool, metadata_only: bool) -> anyhow::Result<std::p
             // Always-on compat: let custom OpenCode zen routes get the
             // x-opencode-session header (DSH's own custom-route provider
             // builder omits it). RDSH_OPENCODE_SESSION_HEADER=0 opts out.
-            if let Some(preload) = crate::opencode_header::preload_path() {
+            // `--import` resolves as an ES-module specifier, so pass a `file:`
+            // URL rather than a raw path (Windows drive letters and Unix
+            // reserved characters both break the path form).
+            if let Some(preload) = crate::opencode_header::import_specifier() {
                 command.arg("--import").arg(preload);
             }
             command.arg(orig);
