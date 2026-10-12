@@ -257,7 +257,7 @@ test("CLI errors retain no peer secret and missing methods disable the affected 
 });
 
 test("timeouts and early exit are failures, never successful starts", async (t) => {
-  const a = await setup(t, "timeout", { requestTimeout: 200 });
+  const a = await setup(t, "timeout");
   await assert.rejects(a.adapter.start(), (e) =>
     ["timeout_result_unknown", "protocol_mismatch"].includes(e.code),
   );

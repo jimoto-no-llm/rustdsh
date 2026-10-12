@@ -91,7 +91,7 @@ fn list_dir(dir: &str, kind: &str) -> anyhow::Result<()> {
         let _ = writeln!(out, "{n}");
     }
     let _ = out.flush();
-    eprintln!("[rdsh] {} {kind}(s)", names.len());
+    eprintln!("[rdsh] {len} {kind}(s)", len = names.len());
     Ok(())
 }
 
@@ -1166,8 +1166,7 @@ pub fn cmd_logs(tail: usize, grep: Option<String>, file: Option<String>) -> anyh
     }
     let _ = out.flush();
     eprintln!(
-        "[rdsh] {} line(s){}",
-        n,
+        "[rdsh] {n} line(s){}",
         grep.map(|g| format!(" matching {g:?}")).unwrap_or_default()
     );
     Ok(())

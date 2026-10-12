@@ -105,6 +105,13 @@ fn is_cjk(c: char) -> bool {
         | '\u{f900}'..='\u{faff}' | '\u{ff00}'..='\u{ffef}' | '\u{20000}'..='\u{2ebef}')
 }
 
+/// CJK bigram（2文字ともCJK）か。ノイズ抑制の弱加点・除外判定に使う。
+/// バイト数ではなく文字数とis_cjkで判定する（CJK2文字はUTF-8で6bytesのため）。
+/// ASCIIの2文字語（CI/UI/Goなど）は含まない。
+fn is_cjk_bigram(term: &str) -> bool {
+    term.chars().count() == 2 && term.chars().all(is_cjk)
+}
+
 fn push_term(terms: &mut Vec<String>, t: &str) {
     if t.is_empty() || terms.len() >= 16 {
         return;
@@ -207,7 +214,7 @@ fn score_line(line_lower: &str, terms: &[String]) -> usize {
     let mut matched = 0usize;
     let line_chars: Vec<char> = line_lower.chars().collect();
     for t in terms {
-        if t.len() == 2 && t.chars().count() == 2 && t.chars().all(is_cjk) {
+        if is_cjk_bigram(t) {
             // CJK bigramは弱めに加点（ノイズ抑制）
             if line_lower.contains(t) {
                 score += 3;
@@ -462,7 +469,7 @@ fn session_files_sorted(limit_dirs: usize) -> Vec<std::path::PathBuf> {
     let projs: Vec<std::path::PathBuf> = match std::fs::read_dir(&root) {
         Ok(e) => {
             let mut v: Vec<(u64, std::path::PathBuf)> = e
-                .filter_map(|e| e.ok())
+                .filter_map(Result::ok)
                 .filter(|e| e.metadata().is_ok_and(|m| m.is_dir()))
                 .map(|e| {
                     let p = e.path();
@@ -478,14 +485,14 @@ fn session_files_sorted(limit_dirs: usize) -> Vec<std::path::PathBuf> {
     let mut files: Vec<(u64, std::path::PathBuf)> = vec![];
     for proj in projs {
         let mut sessions = std::fs::read_dir(&proj)
-            .map(|e| e.filter_map(|e| e.ok()).collect::<Vec<_>>())
+            .map(|e| e.filter_map(Result::ok).collect::<Vec<_>>())
             .unwrap_or_default();
         // セッションも新しい順に上限まで
         sessions.sort_by_key(|e| std::cmp::Reverse(mtime_secs(&e.path())));
         for s in sessions.into_iter().take(limit_dirs.max(1)) {
             let sdir = s.path();
             let mut inner = std::fs::read_dir(&sdir)
-                .map(|e| e.filter_map(|e| e.ok()).collect::<Vec<_>>())
+                .map(|e| e.filter_map(Result::ok).collect::<Vec<_>>())
                 .unwrap_or_default();
             inner.sort_by_key(|e| std::cmp::Reverse(mtime_secs(&e.path())));
             for f in inner.into_iter().take(6) {
@@ -549,11 +556,14 @@ fn recent_sessions(query: &str, limit: usize) -> Vec<String> {
         let mut snippet = String::new();
         let mut best_snippet_score = 0usize;
         for t in &terms {
-            if t.len() == 2 && t.chars().count() == 2 {
-                continue;
-            }
+            // CJK bigramは弱めに加点（ノイズ抑制）。ASCIIの2文字語は通常加点する。
+            let weak = is_cjk_bigram(t);
             if lower.contains(t) {
-                score += 3 + t.chars().count().min(12);
+                if weak {
+                    score += 3;
+                } else {
+                    score += 3 + t.chars().count().min(12);
+                }
                 matched += 1;
                 // その語を含む最良行をスニペットにする
                 for line in text.lines().take(400) {
@@ -781,11 +791,11 @@ fn simple_glob_match(pat: &str, s: &str) -> bool {
 }
 
 fn is_code_file(p: &std::path::Path) -> bool {
-    if let Some(name) = p.file_name().and_then(|s| s.to_str()) {
-        let lower = name.to_lowercase();
-        if CODE_FILENAMES.contains(&lower.as_str()) {
-            return true;
-        }
+    if p.file_name()
+        .and_then(|s| s.to_str())
+        .is_some_and(|name| CODE_FILENAMES.contains(&name.to_lowercase().as_str()))
+    {
+        return true;
     }
     p.extension()
         .and_then(|s| s.to_str())
@@ -808,7 +818,7 @@ fn code_hits(query: &str, max: usize) -> Vec<String> {
     // 決定的な走査順にするためディレクトリ・ファイルとも名前順に処理する。
     while let Some(dir) = stack.pop() {
         let mut entries = std::fs::read_dir(&dir)
-            .map(|e| e.filter_map(|e| e.ok()).collect::<Vec<_>>())
+            .map(|e| e.filter_map(Result::ok).collect::<Vec<_>>())
             .unwrap_or_default();
         entries.sort_by_key(|e| e.file_name());
         let mut subdirs: Vec<std::path::PathBuf> = vec![];
@@ -863,7 +873,9 @@ fn code_hits(query: &str, max: usize) -> Vec<String> {
             let path_lower = p.display().to_string().to_lowercase();
             let mut file_bonus = 0usize;
             for t in &terms {
-                if t.len() == 2 && t.chars().count() == 2 {
+                // CJK bigramはファイル名加点の対象外（ノイズ抑制）。
+                // ASCIIの2文字語は通常どおり加点する。
+                if is_cjk_bigram(t) {
                     continue;
                 }
                 if path_lower.contains(t) {
@@ -1442,6 +1454,23 @@ mod tests {
                 "検索".to_string(),
             ]
         );
+    }
+
+    // #388: 2文字ASCII語（CI/UI/Go）を検索語として捨てない。
+    #[test]
+    fn two_char_ascii_terms_are_searchable() {
+        assert_eq!(query_terms("CI"), vec!["ci".to_string()]);
+        assert_eq!(query_terms("Go"), vec!["go".to_string()]);
+        assert!(!is_cjk_bigram("ci"));
+        assert!(!is_cjk_bigram("go"));
+        assert!(is_cjk_bigram("日本"));
+        // ASCIIの2文字語は通常加点される。
+        assert!(score_line("ci pipeline", &["ci".to_string()]) > 0);
+        // CJK bigramは弱い加点になり、通常語と区別される。
+        let weak = score_line("日本語のテスト", &["日本".to_string()]);
+        let normal = score_line("pipeline のテスト", &["pipeline".to_string()]);
+        assert!(weak > 0);
+        assert!(weak < normal);
     }
 
     #[test]

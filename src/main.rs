@@ -3,6 +3,7 @@ mod auth;
 mod compact;
 mod compute;
 mod context;
+mod desktop;
 mod dsh_args;
 mod file_lock;
 mod file_security;
@@ -26,7 +27,7 @@ mod websearch;
     name = "rdsh",
     version,
     about = "Rust fast launcher for dsh (safe: native fast-paths + passthrough)",
-    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|dump-config|boot)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh --passthrough tui          no slim env; mandatory tool isolation remains\n  rdsh --dry-run tui -- --resume abc   show what would exec"
+    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|dump-config|boot)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh desktop status             detect the Desktop (Electron) app and its reserved profile\n  rdsh desktop install            attach the bundled rdsh plugins to that profile\n  rdsh --passthrough tui          no slim env; mandatory tool isolation remains\n  rdsh --dry-run tui -- --resume abc   show what would exec"
 )]
 struct Cli {
     /// Explicitly share a project file with isolated model tools (repeatable).
@@ -202,6 +203,69 @@ enum Commands {
         #[command(subcommand)]
         action: SettingsAction,
     },
+    /// Feature switches: list every optional capability, or turn one on/off
+    Features {
+        #[command(subcommand)]
+        action: Option<FeaturesAction>,
+        /// Machine-readable list
+        #[arg(long = "json")]
+        json: bool,
+    },
+    /// DeepSeek Harness Desktop (Electron): detect the app, its reserved
+    /// profile and its bundled command runtime, then attach rdsh plugins
+    #[command(name = "desktop")]
+    Desktop {
+        #[command(subcommand)]
+        action: Option<DesktopAction>,
+        /// Machine-readable output (same as the subcommand flag)
+        #[arg(long = "json")]
+        json: bool,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum DesktopAction {
+    /// Show the detected app, profile, command runtime, and plugin state
+    Status {
+        #[arg(long = "json")]
+        json: bool,
+    },
+    /// Attach plugins to the desktop profile through the Desktop command
+    Install {
+        /// Print the commands without running them
+        #[arg(long = "dry-run")]
+        dry_run: bool,
+        /// rustdsh checkout (or its plugins/) that carries the bundled plugins
+        #[arg(long = "plugins-dir")]
+        plugins_dir: Option<String>,
+        /// Also install rdsh-compute (resident compute bridge)
+        #[arg(long = "compute")]
+        compute: bool,
+        /// Extra package spec to add (name, git URL, or path; repeatable)
+        #[arg(long = "package")]
+        package: Vec<String>,
+        /// Install only the --package specs, without the bundled plugins
+        #[arg(long = "no-bundled")]
+        no_bundled: bool,
+        #[arg(long = "json")]
+        json: bool,
+    },
+    /// Exit nonzero unless the desktop profile has the required plugin enabled
+    Verify {
+        /// Plugin that must be enabled (repeatable; default: rdsh-settings)
+        #[arg(long = "require")]
+        require: Vec<String>,
+        #[arg(long = "json")]
+        json: bool,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum FeaturesAction {
+    /// Enable one feature: rdsh features on discord
+    On { id: String },
+    /// Disable one feature: rdsh features off discord
+    Off { id: String },
 }
 
 #[derive(Subcommand, Debug)]
@@ -285,11 +349,13 @@ const NATIVE_FIRST: &[&str] = &[
     "logs",
     "guard",
     "compute",
+    "desktop",
     "auth",
     "setup",
     "search-web",
     "context",
     "settings",
+    "features",
 ];
 
 fn invoked_as_dsh() -> bool {
@@ -313,6 +379,8 @@ fn main() {
             let slim =
                 !passthrough::env_passthrough() && !scfg.general.passthrough && scfg.general.slim;
             let dry = passthrough::env_dry() || scfg.general.dry_run;
+            crate::slim::configure(&scfg);
+            crate::tool_security::configure(agent_tool_sandbox(&scfg, false));
             if let Err(e) = passthrough::exec_raw(&raw, dry, slim) {
                 eprintln!("[rdsh] error: {e:#}");
                 std::process::exit(1);
@@ -345,6 +413,15 @@ fn main() {
     } else {
         rdsh_config::load()
     };
+    // Feature switches (rdsh features) steer the delegated-run env and the
+    // native session caches; an explicit environment variable still wins.
+    crate::slim::configure(&cfg);
+    crate::tool_security::configure(agent_tool_sandbox(&cfg, !cli.share_file.is_empty()));
+    if !rdsh_config::feature_enabled(&cfg, "sessions_token_cache")
+        && std::env::var_os("RDSH_TOKENS_CACHE").is_none()
+    {
+        std::env::set_var("RDSH_TOKENS_CACHE", "0");
+    }
     let pass = cli.passthrough || passthrough::env_passthrough() || cfg.general.passthrough;
     let slim = !cli.no_slim && !pass && (cli.slim || cfg.general.slim);
     let dry = cli.dry_run || passthrough::env_dry() || cfg.general.dry_run;
@@ -358,7 +435,7 @@ fn main() {
             search::cmd_search(&pattern, &dir, max.unwrap_or(cfg.search.max))
         }
         Some(Commands::SearchWeb { query, limit, json }) => {
-            if !crate::rdsh_config::extra_enabled(&cfg, "search-web") {
+            if !rdsh_config::feature_enabled(&cfg, "search-web") {
                 extra_disabled("search-web")
             } else {
                 websearch::cmd_search_web(&query, limit.unwrap_or(cfg.search.web_limit), json)
@@ -386,7 +463,7 @@ fn main() {
             inspect::cmd_logs(tail.unwrap_or(cfg.logs.tail), grep, file)
         }
         Some(Commands::Serve { port }) => {
-            if !crate::rdsh_config::extra_enabled(&cfg, "serve") {
+            if !rdsh_config::feature_enabled(&cfg, "serve") {
                 extra_disabled("serve")
             } else {
                 serve::cmd_serve(port.unwrap_or(cfg.serve.port))
@@ -437,9 +514,9 @@ fn main() {
                     for annotated in rdsh_config::RdshSettings::keys() {
                         let key = annotated.split('(').next().unwrap_or(annotated);
                         let value = cfg.get_dotted(key).unwrap_or_default();
-                        let rendered = match &value {
-                            serde_json::Value::String(s) => s.clone(),
-                            _ => serde_json::to_string(&value).unwrap_or_else(|_| "-".to_string()),
+                        let rendered = match value {
+                            serde_json::Value::String(s) => s,
+                            v => serde_json::to_string(&v).unwrap_or_else(|_| "-".to_string()),
                         };
                         let source = if settings_key_in_file(&raw, key) {
                             "config"
@@ -447,6 +524,22 @@ fn main() {
                             "default"
                         };
                         println!("{key}  {rendered}  {source}");
+                    }
+                    // Features show their effective state, not just what is written.
+                    for annotated in rdsh_config::RdshSettings::feature_keys() {
+                        let key = annotated.split('(').next().unwrap_or(annotated.as_str());
+                        let id = key.strip_prefix("features.").unwrap_or(key);
+                        let state = if rdsh_config::feature_enabled(&cfg, id) {
+                            "true"
+                        } else {
+                            "false"
+                        };
+                        let source = if rdsh_config::feature_is_explicit(&cfg, id) {
+                            "config"
+                        } else {
+                            "default"
+                        };
+                        println!("{key}  {state}  {source}");
                     }
                     Ok(())
                 }
@@ -532,13 +625,44 @@ fn main() {
                 for k in rdsh_config::RdshSettings::keys() {
                     println!("{k}");
                 }
+                for k in rdsh_config::RdshSettings::feature_keys() {
+                    println!("{k}");
+                }
                 Ok(())
             }
         },
+        Some(Commands::Features { action, json }) => match action {
+            None => features_list(&cfg, json),
+            Some(FeaturesAction::On { id }) => features_toggle(&id, true),
+            Some(FeaturesAction::Off { id }) => features_toggle(&id, false),
+        },
+        Some(Commands::Desktop { action, json }) => match action {
+            None => desktop::cmd_status(json),
+            Some(DesktopAction::Status { json: inner }) => desktop::cmd_status(json || inner),
+            Some(DesktopAction::Install {
+                dry_run,
+                plugins_dir,
+                compute,
+                package,
+                no_bundled,
+                json: inner,
+            }) => desktop::cmd_install(
+                plugins_dir.as_deref(),
+                &package,
+                no_bundled,
+                dry_run,
+                compute,
+                json || inner,
+            ),
+            Some(DesktopAction::Verify {
+                require,
+                json: inner,
+            }) => desktop::cmd_verify(&require, json || inner),
+        },
         Some(Commands::Context { action }) => {
-            if !cfg.beta.context_engine {
+            if !rdsh_config::feature_enabled(&cfg, "context_engine") {
                 eprintln!(
-                    "[rdsh] context engine is OFF by default (experimental) — enable with: rdsh settings set beta.context_engine true"
+                    "[rdsh] context engine is OFF by default (experimental) — enable with: rdsh features on context_engine"
                 );
                 std::process::exit(2);
             }
@@ -571,7 +695,13 @@ fn main() {
             port,
         }) => {
             if web {
-                setup_web::cmd_setup_web(port.unwrap_or(cfg.setup.web_port))
+                if rdsh_config::feature_enabled(&cfg, "setup_web") {
+                    setup_web::cmd_setup_web(port.unwrap_or(cfg.setup.web_port))
+                } else {
+                    Err(anyhow::anyhow!(
+                        "rdsh setup --web is off; enable with: rdsh features on setup_web"
+                    ))
+                }
             } else {
                 auth::cmd_setup(open, login, json, yes)
             }
@@ -582,7 +712,14 @@ fn main() {
                     if native {
                         dump_config_native(&p, &cli.patch)
                     } else {
-                        passthrough::exec_dump_config(&p, &cli.patch, dry, slim)
+                        passthrough::exec_dump_config(
+                            &p,
+                            None,
+                            dsh_args::DumpKind::Config,
+                            &cli.patch,
+                            dry,
+                            slim,
+                        )
                     }
                 },
             )
@@ -633,10 +770,22 @@ fn main() {
                         slim,
                     )
                 }
-                dsh_args::Launcher::Dump { profile, patches } => {
+                dsh_args::Launcher::Dump {
+                    profile,
+                    from_default,
+                    kind,
+                    patches,
+                } => {
                     let mut all = cli.patch;
                     all.extend(patches);
-                    passthrough::exec_dump_config(&profile, &all, dry, slim)
+                    passthrough::exec_dump_config(
+                        &profile,
+                        from_default.as_deref(),
+                        kind,
+                        &all,
+                        dry,
+                        slim,
+                    )
                 }
                 dsh_args::Launcher::Error(msg) => {
                     eprintln!("{msg}");
@@ -730,11 +879,79 @@ fn native_dump_config_json(profile: &str, home: &str, patches: &[String]) -> Str
     .to_string()
 }
 
+/// Delegated agent tools: normal file access by default. The strict boundary
+/// applies when the setting is explicit, when `--share-file` is used, or when
+/// `RDSH_SECURITY=1` forces it.
+fn agent_tool_sandbox(cfg: &rdsh_config::RdshSettings, share_files_requested: bool) -> bool {
+    if rdsh_config::feature_is_explicit(cfg, "agent_tool_sandbox") {
+        return rdsh_config::feature_enabled(cfg, "agent_tool_sandbox");
+    }
+    share_files_requested
+}
+
+/// `rdsh features`: every optional capability with its effective state.
+fn features_list(cfg: &rdsh_config::RdshSettings, json: bool) -> anyhow::Result<()> {
+    use std::io::Write;
+    // `let _` on purpose: piping to `head` closes early (EPIPE) and must not
+    // abort the listing with a panic.
+    let stdout = std::io::stdout();
+    let mut out = stdout.lock();
+    if json {
+        let payload = serde_json::json!({
+            "config": rdsh_config::settings_path(),
+            "features": rdsh_config::RdshSettings::feature_state(cfg),
+        });
+        let _ = writeln!(out, "{}", serde_json::to_string_pretty(&payload)?);
+        return Ok(());
+    }
+    let _ = writeln!(out, "config: {}", rdsh_config::settings_path());
+    let _ = writeln!(
+        out,
+        "{:<24} {:<5} {:<7} what it does",
+        "feature", "state", "default"
+    );
+    for def in rdsh_config::FEATURES {
+        let _ = writeln!(
+            out,
+            "{:<24} {:<5} {:<7} {}",
+            def.id,
+            if rdsh_config::feature_enabled(cfg, def.id) {
+                "on"
+            } else {
+                "off"
+            },
+            if def.default { "on" } else { "off" },
+            def.summary
+        );
+    }
+    let _ = writeln!(
+        out,
+        "change one: rdsh features on <id> | rdsh features off <id> | rdsh settings set features.<id> true|false"
+    );
+    Ok(())
+}
+
+/// `rdsh features on|off <id>`: writes features.<id> through the shared lock.
+fn features_toggle(id: &str, on: bool) -> anyhow::Result<()> {
+    let id = id.trim();
+    let def = rdsh_config::feature_def(id)
+        .ok_or_else(|| anyhow::anyhow!("unknown feature id: {id} (try: rdsh features)"))?;
+    rdsh_config::update(|cfg| {
+        cfg.set_dotted(&format!("features.{id}"), if on { "true" } else { "false" })
+    })?;
+    println!(
+        "features.{id} = {} ({})",
+        if on { "true" } else { "false" },
+        def.summary
+    );
+    Ok(())
+}
+
 /// Server-type extras are off by default: refuse with enable guidance.
 /// Setup itself is never gated (it hosts the switches).
 fn extra_disabled(id: &str) -> anyhow::Result<()> {
     Err(anyhow::anyhow!(
-        "extra '{id}' is disabled by default; enable with: rdsh settings set extras.enable {id}"
+        "extra '{id}' is disabled by default; enable with: rdsh features on {id} (or rdsh settings set extras.enable {id})"
     ))
 }
 
@@ -757,6 +974,38 @@ fn doctor() -> anyhow::Result<()> {
     match std::fs::read_dir(format!("{home}/profiles")) {
         Ok(d) => say(format!("[rdsh] profiles: {} local profile(s)", d.count())),
         Err(e) => say(format!("[rdsh] profiles: (unreadable: {e})")),
+    }
+    // Desktop (Electron) shares $DSH_HOME but keeps its own reserved profile;
+    // report both so a missing plugin attachment is visible in doctor.
+    let desktop_env = desktop::OsEnv::from_process();
+    let desktop_app = desktop::find_app(&desktop_env);
+    let desktop_profile = desktop::read_profile(&desktop_env.profile_dir());
+    say(format!(
+        "[rdsh] desktop: app {} | profile {}",
+        desktop_app
+            .as_deref()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|| "<not found>".to_string()),
+        if desktop_profile.initialized {
+            "initialized"
+        } else {
+            "not initialized"
+        }
+    ));
+    if desktop_profile.initialized {
+        let enabled: Vec<&str> = desktop::BUNDLED_PLUGINS
+            .iter()
+            .copied()
+            .filter(|name| desktop_profile.enabled(name))
+            .collect();
+        say(format!(
+            "[rdsh] desktop plugins: {}",
+            if enabled.is_empty() {
+                "none enabled (run: rdsh desktop install --plugins-dir <checkout>)".to_string()
+            } else {
+                enabled.join(", ")
+            }
+        ));
     }
     say(format!("[rdsh] slim env: {}", slim::describe()));
     say(format!("[rdsh] auth: {}", auth::summary_line()));
