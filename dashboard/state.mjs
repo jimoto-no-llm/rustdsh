@@ -462,12 +462,15 @@ export class ProjectStore {
     sealState(next, this.integrityKey);
     await persistStateIntegrityKey(this.project, this.integrityKey);
     await writeJson(path.join(this.project.directory, "state.json"), next);
-    await writeStateIntegrityMarker(this.project);
+    // The atomic state rename is the commit point. Keep this store aligned
+    // with durable state before writing the recoverable integrity marker, so
+    // a marker write failure cannot make a later mutation overwrite this one.
     if (historyChanged) {
       this.protectedHistory = freezeHistory(next.history_backups);
       this.historyIds = historyIds;
     }
     this.value = next;
+    await writeStateIntegrityMarker(this.project);
     return next;
   }
   async mutateBudget(operation, input) {
