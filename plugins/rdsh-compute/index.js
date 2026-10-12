@@ -115,8 +115,12 @@ export function createComputeBridge({ bin = "rdsh", timeoutMs = DEFAULT_TIMEOUT_
   function ensureChild() {
     if (child) return child;
     child = spawnImpl(bin, ["compute"], { stdio: ["pipe", "pipe", "inherit"] });
-    child.stdout.setEncoding("utf8");
-    child.stdout.on("data", (chunk) => {
+    const proc = child;
+    proc.stdout?.setEncoding?.("utf8");
+    proc.stdout?.on?.("data", (chunk) => {
+      // Ignore late data from a replaced worker so one bad line or a stale
+      // response never resolves a newer worker's pending calls.
+      if (child !== proc) return;
       buffer += chunk;
       let idx;
       while ((idx = buffer.indexOf("\n")) >= 0) {
@@ -130,26 +134,42 @@ export function createComputeBridge({ bin = "rdsh", timeoutMs = DEFAULT_TIMEOUT_
           continue; // one bad line never resolves pending calls
         }
         const slot = pending.get(msg.id);
-        if (slot) {
+        if (slot && slot.proc === proc) {
           pending.delete(msg.id);
           clearTimeout(slot.timer);
           slot.resolve(msg);
         }
       }
     });
-    const failAll = (err) => {
-      for (const [, slot] of pending) {
-        clearTimeout(slot.timer);
-        slot.reject(err);
+    const failForProc = (err) => {
+      // Only the owning worker may reject its own pending calls; a delayed
+      // event from a replaced worker must not touch newer requests.
+      for (const [id, slot] of pending) {
+        if (slot.proc === proc) {
+          clearTimeout(slot.timer);
+          slot.reject(err);
+          pending.delete(id);
+        }
       }
-      pending.clear();
-      child = null;
-      ready = false;
+      if (child === proc) {
+        // Reset so the next request spawns a fresh worker instead of
+        // reusing a dead one, even with no pending calls to reject.
+        child = null;
+        ready = false;
+        buffer = "";
+      }
     };
-    child.on("exit", () => failAll(new Error("rdsh compute exited")));
-    child.on("error", failAll);
+    const workerGone = () => failForProc(new Error("rdsh compute exited"));
+    proc.on?.("exit", workerGone);
+    proc.on?.("close", workerGone);
+    proc.on?.("error", failForProc);
+    // stdin/stdout are separate Sockets: without these listeners an EPIPE
+    // from a worker that exited early becomes an unhandled 'error' event and
+    // kills the whole Node host instead of falling back to JS compute.
+    proc.stdin?.on?.("error", failForProc);
+    proc.stdout?.on?.("error", failForProc);
     ready = true;
-    return child;
+    return proc;
   }
 
   function request(op, payload) {
@@ -168,9 +188,10 @@ export function createComputeBridge({ bin = "rdsh", timeoutMs = DEFAULT_TIMEOUT_
         pending.delete(id);
         reject(new Error(`rdsh compute timeout after ${timeoutMs}ms`));
       }, timeoutMs);
-      pending.set(id, { resolve, reject, timer, started });
+      const proc = ensureChild();
+      pending.set(id, { resolve, reject, timer, started, proc });
       try {
-        ensureChild().stdin.write(JSON.stringify({ v: PROTOCOL_VERSION, id, op, ...payload }) + "\n");
+        proc.stdin.write(JSON.stringify({ v: PROTOCOL_VERSION, id, op, ...payload }) + "\n");
       } catch (err) {
         pending.delete(id);
         clearTimeout(timer);
