@@ -136,20 +136,40 @@ rm -rf $FR
 # sync-dsh.sh release self-update against a file:// release with npm/node shims.
 # The script runs from a copy (no tests/regress.sh or target/ next to it), so it
 # does not recurse into this suite.
+# Issue #303: the expected digest comes from the pinned repository registry,
+# served here by a curl shim, and the release base holds no .sha256 at all.
+if bash ./tests/sync-release-integrity.sh; then ok "sync-dsh release integrity"; else echo "FAIL: sync-dsh release integrity"; exit 1; fi
 FS="$RR_SANDBOX/sync-release"
 rm -rf $FS
-mkdir -p $FS/pkg $FS/rel/latest/download $FS/repo $FS/home/.local/bin $FS/npmroot/@deepseek-ai/dsh $FS/bin
+mkdir -p $FS/pkg $FS/rel/download/v9.9.9 $FS/repo $FS/shim $FS/home/.local/bin $FS/npmroot/@deepseek-ai/dsh $FS/bin
 cp "$BIN" $FS/pkg/rdsh
 cp ./sync-dsh.sh $FS/repo/sync-dsh.sh
-for a in rdsh-linux-x64 rdsh-linux-x64-musl rdsh-macos-arm64 rdsh-macos-x64; do tar -czf "$FS/rel/latest/download/$a.tar.gz" -C $FS/pkg rdsh; (cd "$FS/rel/latest/download" && $SUM "$a.tar.gz" > "$a.tar.gz.sha256"); done
+for a in rdsh-linux-x64 rdsh-linux-x64-musl rdsh-macos-arm64 rdsh-macos-x64; do tar -czf "$FS/rel/download/v9.9.9/$a.tar.gz" -C $FS/pkg rdsh; done
 printf '{"version":"1.0.0"}\n' > $FS/npmroot/@deepseek-ai/dsh/package.json
 printf '#!/bin/sh\ncase "$1" in root) echo "%s" ;; view) echo "[\\"1.0.0\\"]" ;; *) exit 1 ;; esac\n' "$FS/npmroot" > $FS/npm
 ln -s "$(command -v node)" "$FS/home/.local/bin/rdsh-test-node"
 printf '#!/bin/sh\ncase "$1" in -p) echo 1.0.0 ;; *) exec "$(dirname "$0")/rdsh-test-node" "$@" ;; esac\n' > $FS/home/.local/bin/node
-chmod +x $FS/npm $FS/home/.local/bin/node
-fs_sync() { env -u RDSH_SYNC_FROM_SOURCE -u RDSH_SYNC_VERSION -u RDSH_MUSL HOME="$FS/home" NPM_BIN="$FS/npm" PREFIX_BIN="$1" RDSH_RELEASE_BASE="file://$FS/rel" sh $FS/repo/sync-dsh.sh > "$2" 2>&1; }
+CURL_BIN="$(command -v curl)"
+cat > $FS/shim/curl <<CURL_EOF
+#!/bin/sh
+out=""; prev=""; url=""
+for arg in "\$@"; do
+  [ "\$prev" = "-o" ] && out="\$arg"
+  prev="\$arg"; url="\$arg"
+done
+if [ -n "\$out" ] && [ "\$url" = "https://raw.githubusercontent.com/jimoto-no-llm/rustdsh/main/release-digests.tsv" ]; then
+  cp "$FS/release-digests.tsv" "\$out"; exit 0
+fi
+exec "$CURL_BIN" "\$@"
+CURL_EOF
+chmod +x $FS/shim/curl $FS/npm $FS/home/.local/bin/node
+manifest() {
+  { printf 'latest v9.9.9\n'; for a in rdsh-linux-x64 rdsh-linux-x64-musl rdsh-macos-arm64 rdsh-macos-x64; do printf 'v9.9.9 %s.tar.gz %s\n' "$a" "$1"; done; } > $FS/release-digests.tsv
+}
+manifest "$($SUM $FS/rel/download/v9.9.9/rdsh-linux-x64.tar.gz | awk '{print $1}')"
+fs_sync() { env -u RDSH_SYNC_FROM_SOURCE -u RDSH_MUSL HOME="$FS/home" NPM_BIN="$FS/npm" PREFIX_BIN="$1" RDSH_RELEASE_BASE="file://$FS/rel" RDSH_TEST_INSECURE_BASE=1 RDSH_SYNC_VERSION="${3:-latest}" PATH="$FS/shim:$PATH" sh $FS/repo/sync-dsh.sh > "$2" 2>&1; }
 fs_sync "$FS/bin" $FS/sync-ok.log
-if grep -q "checksum ok" $FS/sync-ok.log && grep -q "rdsh updated OK via release binary" $FS/sync-ok.log && "$FS/bin/rdsh" --version 2>/dev/null | grep -q "rdsh"; then ok "sync-dsh release update with valid sha256"; else echo "FAIL(output): sync-dsh release update with valid sha256"; tail -n 8 $FS/sync-ok.log; exit 1; fi
+if grep -q "checksum ok" $FS/sync-ok.log && grep -q "rdsh updated OK via release binary" $FS/sync-ok.log && "$FS/bin/rdsh" --version 2>/dev/null | grep -q "rdsh"; then ok "sync-dsh release update with pinned digest"; else echo "FAIL(output): sync-dsh release update with pinned digest"; tail -n 8 $FS/sync-ok.log; exit 1; fi
 # A no-op check must not masquerade as a new update and restart notification time.
 printf '{"updated":true,"kind":"DUMMY","to":"previous","at":1}\n' > "$FS/home/.local/share/rdsh/update-state.json"
 cp "$FS/home/.local/share/rdsh/update-state.json" "$FS/state-noop.json"
@@ -161,16 +181,19 @@ printf '#!/bin/sh\nprintf "%%s\\n" "%s"\n' "$SYNC_VERSION" > "$FS/bin/rdsh"
 chmod +x "$FS/bin/rdsh"
 fs_sync "$FS/bin" "$FS/sync-rebuilt.log"
 if grep -q "rdsh updated OK via release binary" "$FS/sync-rebuilt.log" && cmp -s "$FS/pkg/rdsh" "$FS/bin/rdsh" && ! cmp -s "$FS/state-noop.json" "$FS/home/.local/share/rdsh/update-state.json"; then ok "sync-dsh changed payload updates even with the same version label"; else echo "FAIL(output): rebuilt release was suppressed by its version label"; exit 1; fi
-for c in "$FS"/rel/latest/download/*.sha256; do printf '%064d  x.tar.gz\n' 0 > "$c"; done
+# A registry pin that does not match the bytes refuses the update.
+manifest "$(printf '%064d' 0)"
 printf 'old\n' > $FS/bin/rdsh
 fs_sync "$FS/bin" $FS/sync-bad.log
-if grep -q "CHECKSUM MISMATCH" $FS/sync-bad.log && grep -q "binaries untouched" $FS/sync-bad.log && [ "$(cat $FS/bin/rdsh)" = "old" ]; then ok "sync-dsh refuses bad sha256"; else echo "FAIL(output): sync-dsh refuses bad sha256"; tail -n 8 $FS/sync-bad.log; exit 1; fi
-rm -f "$FS"/rel/latest/download/*.sha256
-fs_sync "$FS/bin" $FS/sync-none.log
-if grep -q "no checksum sidecar" $FS/sync-none.log && grep -q "binaries untouched" $FS/sync-none.log && [ "$(cat $FS/bin/rdsh)" = "old" ]; then ok "sync-dsh refuses missing sha256"; else echo "FAIL(output): sync-dsh refuses missing sha256"; tail -n 8 $FS/sync-none.log; exit 1; fi
-for a in rdsh-linux-x64 rdsh-linux-x64-musl rdsh-macos-arm64 rdsh-macos-x64; do : > "$FS/rel/latest/download/$a.tar.gz.sha256"; done
+if grep -q "CHECKSUM MISMATCH" $FS/sync-bad.log && grep -q "binaries untouched" $FS/sync-bad.log && [ "$(cat $FS/bin/rdsh)" = "old" ]; then ok "sync-dsh refuses mismatched pinned digest"; else echo "FAIL(output): sync-dsh refuses mismatched pinned digest"; tail -n 8 $FS/sync-bad.log; exit 1; fi
+# A version without a registry row is refused; there is no sidecar fallback.
+manifest "$($SUM $FS/rel/download/v9.9.9/rdsh-linux-x64.tar.gz | awk '{print $1}')"
+fs_sync "$FS/bin" $FS/sync-none.log v9.9.8
+if grep -q "no pinned checksum for release v9.9.8" $FS/sync-none.log && grep -q "binaries untouched" $FS/sync-none.log && [ "$(cat $FS/bin/rdsh)" = "old" ]; then ok "sync-dsh refuses a release without a pinned digest"; else echo "FAIL(output): sync-dsh refuses a release without a pinned digest"; tail -n 8 $FS/sync-none.log; exit 1; fi
+# An unparsable registry refuses the update instead of falling back to the base.
+: > $FS/release-digests.tsv
 fs_sync "$FS/bin" $FS/sync-empty.log
-if grep -q "empty checksum sidecar" $FS/sync-empty.log && grep -q "binaries untouched" $FS/sync-empty.log && [ "$(cat $FS/bin/rdsh)" = "old" ]; then ok "sync-dsh refuses empty sha256"; else echo "FAIL(output): sync-dsh refuses empty sha256"; tail -n 8 $FS/sync-empty.log; exit 1; fi
+if grep -q "trusted release digest registry is invalid" $FS/sync-empty.log && grep -q "binaries untouched" $FS/sync-empty.log && [ "$(cat $FS/bin/rdsh)" = "old" ]; then ok "sync-dsh refuses an invalid digest registry"; else echo "FAIL(output): sync-dsh refuses an invalid digest registry"; tail -n 8 $FS/sync-empty.log; exit 1; fi
 rm -rf $FS
 SW="$RR_SANDBOX/setupweb"
 mkdir -p $SW/home $SW/dsh
