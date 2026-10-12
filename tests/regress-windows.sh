@@ -56,9 +56,12 @@ fi
 echo "ok: dsh.exe keeps native doctor dispatch"
 
 # Run the existing checksum-before-extraction installer cases from Git Bash.
-POWERSHELL="$(type -P powershell.exe || type -P powershell || true)"
+# Prefer pwsh: ci.yml runs the same fixture under `shell: pwsh`, and the
+# rustup-init cases added in #352 do not observe the Get-FileHash fixture under
+# Windows PowerShell 5.1, so they fail there for reasons unrelated to this step.
+POWERSHELL="$(type -P pwsh.exe || type -P pwsh || type -P powershell.exe || type -P powershell || true)"
 if [ -z "$POWERSHELL" ]; then
-  echo "FAIL: Windows PowerShell is unavailable" >&2
+  echo "FAIL: PowerShell is unavailable" >&2
   exit 1
 fi
 "$POWERSHELL" -NoProfile -NonInteractive -ExecutionPolicy Bypass \
