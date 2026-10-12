@@ -39,12 +39,49 @@ test("state edits and removed seals fail closed after the first signed write", a
 
 test("a missing integrity key cannot authenticate a previously signed state", async (t) => {
   const { project } = await fixture(t);
-  const file = path.join(project.directory, "state.json");
-  const state = JSON.parse(await fs.readFile(file, "utf8"));
-  delete state.state_auth;
-  await fs.writeFile(file, JSON.stringify(state));
   await fs.rm(path.join(project.directory, "state-integrity.key"));
   await assert.rejects(ProjectStore.open(project), /integrity key is missing/);
+});
+
+test("legacy state migration retries after the signed-state rename fails", async (t) => {
+  const { project } = await fixture(t);
+  const stateFile = path.join(project.directory, "state.json");
+  const legacy = JSON.parse(await fs.readFile(stateFile, "utf8"));
+  delete legacy.state_auth;
+  const legacyBytes = JSON.stringify(legacy);
+  await fs.writeFile(stateFile, legacyBytes);
+  await fs.rm(path.join(project.directory, "state-integrity.key"));
+  await fs.rm(path.join(project.directory, "state-integrity.enabled"));
+
+  const originalRename = fs.rename;
+  const renameMock = t.mock.method(fs, "rename", async (source, target) => {
+    if (path.resolve(String(target)) === path.resolve(stateFile)) {
+      throw Object.assign(new Error("simulated disk full"), { code: "ENOSPC" });
+    }
+    return originalRename(source, target);
+  });
+  await assert.rejects(ProjectStore.open(project), (error) => {
+    assert.equal(error.code, "ENOSPC");
+    return true;
+  });
+  renameMock.mock.restore();
+
+  assert.equal(await fs.readFile(stateFile, "utf8"), legacyBytes);
+  await fs.access(path.join(project.directory, "state-integrity.key"));
+  await fs.access(path.join(project.directory, "state-integrity.pending"));
+  await assert.rejects(
+    fs.access(path.join(project.directory, "state-integrity.enabled")),
+    { code: "ENOENT" },
+  );
+
+  const recovered = await ProjectStore.open(project);
+  assert.equal(recovered.value.tasks[0].title, "before");
+  assert.match(recovered.value.state_auth.mac, /^[a-f0-9]{64}$/);
+  await fs.access(path.join(project.directory, "state-integrity.enabled"));
+  await assert.rejects(
+    fs.access(path.join(project.directory, "state-integrity.pending")),
+    { code: "ENOENT" },
+  );
 });
 
 test("integrity key permissions are owner-only on POSIX", async (t) => {

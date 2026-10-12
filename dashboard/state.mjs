@@ -99,10 +99,15 @@ export async function identity(project) {
 export async function writeJson(file, value) {
   await fs.mkdir(path.dirname(file), { recursive: true });
   const temp = `${file}.${process.pid}.${randomBytes(4).toString("hex")}.tmp`;
-  await fs.writeFile(temp, JSON.stringify(value, null, 2) + "\n", {
-    mode: 0o600,
-  });
-  await fs.rename(temp, file);
+  try {
+    await fs.writeFile(temp, JSON.stringify(value, null, 2) + "\n", {
+      mode: 0o600,
+    });
+    await fs.rename(temp, file);
+  } catch (error) {
+    await fs.rm(temp, { force: true }).catch(() => {});
+    throw error;
+  }
 }
 
 function stateIntegrityKeyPath(project) {
@@ -111,6 +116,56 @@ function stateIntegrityKeyPath(project) {
 
 function stateIntegrityMarkerPath(project) {
   return path.join(project.directory, "state-integrity.enabled");
+}
+
+function stateIntegrityMigrationPath(project) {
+  return path.join(project.directory, "state-integrity.pending");
+}
+
+async function fileExists(file) {
+  try {
+    await fs.access(file);
+    return true;
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+    return false;
+  }
+}
+
+function statePayloadDigest(value) {
+  const { state_auth: _stateAuth, ...payload } = value;
+  return createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+}
+
+async function readIntegrityMigration(project) {
+  let value;
+  try {
+    value = JSON.parse(
+      await fs.readFile(stateIntegrityMigrationPath(project), "utf8"),
+    );
+  } catch (error) {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  }
+  const keys = Object.keys(value || {}).sort();
+  if (
+    keys.join(",") !== "project_id,schema,state_sha256" ||
+    value.schema !== 1 ||
+    value.project_id !== project.id ||
+    !/^[0-9a-f]{64}$/.test(value.state_sha256 || "")
+  )
+    throw new Error("Dashboard state integrity migration record is invalid");
+  return value;
+}
+
+async function writeIntegrityMigration(project, value) {
+  const record = {
+    schema: 1,
+    project_id: project.id,
+    state_sha256: statePayloadDigest(value),
+  };
+  await writeJson(stateIntegrityMigrationPath(project), record);
+  return record;
 }
 
 async function writeStateIntegrityMarker(project) {
@@ -122,39 +177,48 @@ async function writeStateIntegrityMarker(project) {
   }
 }
 
-async function loadStateIntegrityKey(project, hadStateSeal) {
+async function loadStateIntegrityKey(
+  project,
+  { hadStateSeal, stateExists, migrationPending },
+) {
   const file = stateIntegrityKeyPath(project);
-  let markerExists = true;
-  try {
-    await fs.access(stateIntegrityMarkerPath(project));
-  } catch (error) {
-    if (error.code !== "ENOENT") throw error;
-    markerExists = false;
-  }
   try {
     const key = await fs.readFile(file);
     if (key.byteLength !== 32)
       throw new Error("Dashboard state integrity key is invalid");
-    await writeStateIntegrityMarker(project);
     return { key, existed: true };
   } catch (error) {
     if (error.code !== "ENOENT") throw error;
-    if (hadStateSeal || markerExists)
+    if (hadStateSeal || (stateExists && !migrationPending))
       throw new Error("Dashboard state integrity key is missing; refusing state");
   }
   await fs.mkdir(project.directory, { recursive: true });
   const generated = randomBytes(32);
   try {
     await fs.writeFile(file, generated, { flag: "wx", mode: 0o600 });
-    await writeStateIntegrityMarker(project);
     return { key: generated, existed: false };
   } catch (error) {
     if (error.code !== "EEXIST") throw error;
     const key = await fs.readFile(file);
     if (key.byteLength !== 32)
       throw new Error("Dashboard state integrity key is invalid");
-    await writeStateIntegrityMarker(project);
     return { key, existed: true };
+  }
+}
+
+async function persistStateIntegrityKey(project, key) {
+  const file = stateIntegrityKeyPath(project);
+  await fs.mkdir(project.directory, { recursive: true });
+  try {
+    await fs.writeFile(file, key, { flag: "wx", mode: 0o600 });
+  } catch (error) {
+    if (error.code !== "EEXIST") throw error;
+    const existing = await fs.readFile(file);
+    if (
+      existing.byteLength !== key.byteLength ||
+      !timingSafeEqual(existing, key)
+    )
+      throw new Error("Dashboard state integrity key changed; refusing state");
   }
 }
 
@@ -177,6 +241,23 @@ function verifyStateSeal(value, key) {
   return timingSafeEqual(Buffer.from(actual, "hex"), Buffer.from(expected, "hex"));
 }
 
+function validateStoredState(value, project) {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    Array.isArray(value) ||
+    value.project?.id !== project.id ||
+    value.schema !== 1
+  )
+    throw new Error("Dashboard state belongs to a different project or version");
+  validateQuestionContracts(value);
+  validateAnswerApplications(value);
+  validateInstructions(value);
+  validateCostLedger(value);
+  validateBudgetAdmission(value);
+  validateRestoredHistory(value);
+}
+
 export class ProjectStore {
   constructor(project, value, integrityKey) {
     this.project = project;
@@ -193,11 +274,10 @@ export class ProjectStore {
   }
   static async open(project) {
     let value;
+    const stateFile = path.join(project.directory, "state.json");
     let stateExists = true;
     try {
-      value = JSON.parse(
-        await fs.readFile(path.join(project.directory, "state.json"), "utf8"),
-      );
+      value = JSON.parse(await fs.readFile(stateFile, "utf8"));
     } catch (e) {
       if (e.code !== "ENOENT") throw e;
       stateExists = false;
@@ -214,33 +294,62 @@ export class ProjectStore {
         feedback: [],
       };
     }
-    const keyState = await loadStateIntegrityKey(
-      project,
-      Boolean(value.state_auth),
-    );
-    let adoptLegacyState = false;
-    if (value.state_auth) {
+    const hadStateSeal = Boolean(value?.state_auth);
+    let migration = await readIntegrityMigration(project);
+    const markerExists = await fileExists(stateIntegrityMarkerPath(project));
+    const keyExists = await fileExists(stateIntegrityKeyPath(project));
+    if (!stateExists && (markerExists || migration))
+      throw new Error("Dashboard state is missing; refusing to recreate state");
+
+    if (hadStateSeal) {
+      const keyState = await loadStateIntegrityKey(project, {
+        hadStateSeal: true,
+        stateExists,
+        migrationPending: Boolean(migration),
+      });
       if (!keyState.existed || !verifyStateSeal(value, keyState.key))
         throw new Error("Dashboard state integrity check failed; refusing state");
-    } else if (stateExists && keyState.existed) {
-      throw new Error("Dashboard state integrity seal is missing; refusing state");
-    } else {
-      sealState(value, keyState.key);
-      adoptLegacyState = stateExists;
+      validateStoredState(value, project);
+      await writeStateIntegrityMarker(project);
+      if (migration)
+        await fs.rm(stateIntegrityMigrationPath(project), { force: true });
+      return new ProjectStore(project, value, keyState.key);
     }
-    if (value.project.id !== project.id || value.schema !== 1)
-      throw new Error(
-        "Dashboard state belongs to a different project or version",
-      );
-    validateQuestionContracts(value);
-    validateAnswerApplications(value);
-    validateInstructions(value);
-    validateCostLedger(value);
-    validateBudgetAdmission(value);
-    // Legacy state is adopted once after all schema checks pass. Subsequent
-    // edits require a valid seal.
-    if (adoptLegacyState)
-      await writeJson(path.join(project.directory, "state.json"), value);
+
+    if (stateExists) {
+      if (markerExists)
+        throw new Error("Dashboard state integrity seal is missing; refusing state");
+      if (migration) {
+        if (migration.state_sha256 !== statePayloadDigest(value))
+          throw new Error("Dashboard state migration check failed; refusing state");
+      } else {
+        if (keyExists)
+          throw new Error("Dashboard state integrity seal is missing; refusing state");
+        validateStoredState(value, project);
+        migration = await writeIntegrityMigration(project, value);
+      }
+      validateStoredState(value, project);
+      const keyState = await loadStateIntegrityKey(project, {
+        hadStateSeal: false,
+        stateExists: true,
+        migrationPending: true,
+      });
+      sealState(value, keyState.key);
+      await writeJson(stateFile, value);
+      await writeStateIntegrityMarker(project);
+      await fs.rm(stateIntegrityMigrationPath(project), { force: true });
+      return new ProjectStore(project, value, keyState.key);
+    }
+
+    if (migration)
+      throw new Error("Dashboard state migration record has no state to recover");
+    const keyState = await loadStateIntegrityKey(project, {
+      hadStateSeal: false,
+      stateExists: false,
+      migrationPending: false,
+    });
+    validateStoredState(value, project);
+    sealState(value, keyState.key);
     return new ProjectStore(project, value, keyState.key);
   }
   async mutate(operation, input, authority = "agent") {
@@ -351,7 +460,9 @@ export class ProjectStore {
       next.changes = next.changes.slice(-10000);
     }
     sealState(next, this.integrityKey);
+    await persistStateIntegrityKey(this.project, this.integrityKey);
     await writeJson(path.join(this.project.directory, "state.json"), next);
+    await writeStateIntegrityMarker(this.project);
     if (historyChanged) {
       this.protectedHistory = freezeHistory(next.history_backups);
       this.historyIds = historyIds;
