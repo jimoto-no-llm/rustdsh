@@ -61,12 +61,40 @@ for (const command of ["serve", "setup"]) {
       await delay(25);
     }
     const base = output.match(/http:\/\/127\.0\.0\.1:\d+/)[0];
+    // The listener is bound before the URL is printed, but Windows CI has shown
+    // the first connection racing the accept loop. Retry briefly and surface
+    // the child state when the server really is unreachable.
+    const get = async (url, init) => {
+      const deadline = Date.now() + 15000;
+      for (;;) {
+        try {
+          const response = await fetch(url, init);
+          // A loaded CI runner can stall the single-threaded fixture
+          // server past its 10s read deadline (408). Retry those like
+          // refused connections; any other status is the answer under test.
+          if (response.status !== 408 || Date.now() >= deadline)
+            return response;
+        } catch (error) {
+          if (Date.now() >= deadline) {
+            throw new Error(
+              `fetch ${url} failed (exit=${child.exitCode}, stderr=${JSON.stringify(output.slice(-400))}): ${error.message}`,
+            );
+          }
+          assert.equal(
+            child.exitCode,
+            null,
+            "owned icon fixture exited before serving requests",
+          );
+          await delay(100);
+        }
+      }
+    };
     for (const [route, file, type] of [
       ["/icon.png", "icon-256.png", "image/png"],
       ["/favicon.ico", "icon.ico", "image/x-icon"],
       ["/icon.svg", "icon.svg", "image/svg+xml"],
     ]) {
-      const response = await fetch(base + route);
+      const response = await get(base + route);
       assert.equal(response.status, 200);
       assert.equal(response.headers.get("content-type"), type);
       assert.equal(response.headers.get("x-content-type-options"), "nosniff");
@@ -79,19 +107,23 @@ for (const command of ["serve", "setup"]) {
         Number(response.headers.get("content-length")),
         bytes.length,
       );
-      assert.equal(
-        (
-          await fetch(base + route, {
-            headers: { origin: "https://evil.example" },
-          })
-        ).status,
-        403,
-      );
+      // A loaded runner can make the server answer 408 for its own read
+      // timeout; that is not the security decision, so retry it briefly and
+      // still require the cross-origin refusal.
+      let crossOrigin = { status: 0 };
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        crossOrigin = await get(base + route, {
+          headers: { origin: "https://evil.example" },
+        });
+        if (crossOrigin.status !== 408) break;
+        await delay(250);
+      }
+      assert.equal(crossOrigin.status, 403);
     }
     const api = command === "setup" ? "/api/status" : "/api/doctor";
-    assert.equal((await fetch(base + api)).status, 401);
-    assert.equal((await fetch(base + "/assets/../Cargo.toml")).status, 404);
-    const html = await (await fetch(base)).text();
+    assert.equal((await get(base + api)).status, 401);
+    assert.equal((await get(base + "/assets/../Cargo.toml")).status, 404);
+    const html = await (await get(base)).text();
     assert.match(html, /rel="icon" type="image\/png" href="\/icon.png"/);
   });
 }
