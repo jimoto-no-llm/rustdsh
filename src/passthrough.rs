@@ -21,25 +21,37 @@ fn origin_file() -> Option<String> {
     }
 }
 
-/// True when `path` is an executable PATH candidate: a regular file with an
-/// execute bit on Unix, a regular file on Windows (extension is already
-/// constrained by the caller). Directories and non-executable files are
-/// skipped so later executable candidates on PATH remain reachable.
+/// Check a PATH candidate without spawning it. On Unix, query whether the
+/// current effective user can execute this regular file; mode bits alone can
+/// accept a file whose only execute bit belongs to another permission class.
 fn is_executable_candidate(path: &std::path::Path) -> bool {
-    let Ok(md) = std::fs::metadata(path) else {
+    let Ok(metadata) = std::fs::metadata(path) else {
         return false;
     };
-    if !md.is_file() {
+    if !metadata.is_file() {
         return false;
     }
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
-        if md.permissions().mode() & 0o111 == 0 {
+        use std::ffi::CString;
+        use std::os::unix::ffi::OsStrExt;
+        let Ok(c_path) = CString::new(path.as_os_str().as_bytes()) else {
             return false;
+        };
+        // SAFETY: c_path is NUL-terminated and AT_FDCWD makes this a read-only query.
+        unsafe {
+            libc::faccessat(
+                libc::AT_FDCWD,
+                c_path.as_ptr(),
+                libc::X_OK,
+                libc::AT_EACCESS,
+            ) == 0
         }
     }
-    true
+    #[cfg(not(unix))]
+    {
+        true
+    }
 }
 
 /// True when `path` is runnable as the original DSH: an executable binary,
@@ -209,9 +221,9 @@ pub fn latest_node_tree() -> Option<String> {
     latest_node_tree_for(&format!("{home}/.local/opt"))
 }
 
-// Node binary to run .js delegations: PATH lookup checks for an executable
-// file (a `node --version` spawn costs ~14ms per delegation), else the newest
-// matching tree under ~/.local/opt.
+// Node binary to run .js delegations: PATH lookup checks effective execute
+// permission without spawning (`node --version` costs ~14ms per delegation),
+// else the newest matching tree under ~/.local/opt.
 pub fn find_node_bin() -> Option<String> {
     #[cfg(target_os = "windows")]
     const NAMES: &[&str] = &["node.exe", "node.cmd", "node.bat", "node"];
@@ -291,14 +303,20 @@ fn base_cmd(orig: &str, dry: bool, metadata_only: bool) -> anyhow::Result<std::p
         // Default: hand the run to DSH with its normal tools and normal file
         // access. The strict boundary stays available through --share-file,
         // features.agent_tool_sandbox, or RDSH_SECURITY=1.
-        if orig.ends_with(".js") {
+        let mut command = if orig.ends_with(".js") {
             let mut command = std::process::Command::new(&bin);
             command.arg(orig);
-            return Ok(command);
-        }
-        return Ok(std::process::Command::new(orig));
+            command
+        } else {
+            std::process::Command::new(orig)
+        };
+        // The rdsh settings card reports this without spawning a second binary.
+        command.env("RDSH_VERSION", env!("CARGO_PKG_VERSION"));
+        return Ok(command);
     }
-    crate::tool_security::command(orig, &bin)
+    let mut command = crate::tool_security::command(orig, &bin)?;
+    command.env("RDSH_VERSION", env!("CARGO_PKG_VERSION"));
+    Ok(command)
 }
 
 fn apply_slim(cmd: &mut std::process::Command, slim: bool) {
@@ -383,6 +401,8 @@ pub fn exec_boot(
 
 pub fn exec_dump_config(
     profile: &str,
+    from_default: Option<&str>,
+    kind: crate::dsh_args::DumpKind,
     patches: &[String],
     dry: bool,
     slim: bool,
@@ -394,10 +414,17 @@ pub fn exec_dump_config(
         crate::auth::pre_boot(false);
     }
     cmd.arg("--profile").arg(profile);
+    if let Some(f) = from_default {
+        cmd.arg("--from-default-profile").arg(f);
+    }
     for p in patches {
         cmd.arg("--patch").arg(p);
     }
-    cmd.arg("--dump-config");
+    match kind {
+        crate::dsh_args::DumpKind::Config => cmd.arg("--dump-config"),
+        crate::dsh_args::DumpKind::DefaultConfig => cmd.arg("--dump-default-config"),
+        crate::dsh_args::DumpKind::Schema => cmd.arg("--dump-config-schema"),
+    };
     apply_slim(&mut cmd, slim);
     exec_or_spawn(cmd, dry)
 }
@@ -503,6 +530,14 @@ mod tests {
         std::fs::set_permissions(path, p).unwrap();
     }
 
+    #[cfg(unix)]
+    fn make_other_exec_only(path: &std::path::Path) {
+        use std::os::unix::fs::PermissionsExt;
+        let mut p = std::fs::metadata(path).unwrap().permissions();
+        p.set_mode(0o001);
+        std::fs::set_permissions(path, p).unwrap();
+    }
+
     #[test]
     fn skips_directory_and_non_executable_candidates() {
         let root = std::env::temp_dir().join(format!(
@@ -526,6 +561,10 @@ mod tests {
             assert!(!is_executable_candidate(&file_cand));
             make_exec(&file_cand);
             assert!(is_executable_candidate(&file_cand));
+            if unsafe { libc::geteuid() } != 0 {
+                make_other_exec_only(&file_cand);
+                assert!(!is_executable_candidate(&file_cand));
+            }
         }
         #[cfg(not(unix))]
         {
@@ -606,6 +645,23 @@ mod tests {
                 find_node_bin(),
                 Some(valid_node.to_string_lossy().into_owned())
             );
+
+            // An execute bit for another permission class does not make this
+            // caller able to run the file (e.g. owner mode 0001).
+            if unsafe { libc::geteuid() } != 0 {
+                std::fs::write(first.join("dsh"), b"not executable for owner\n").unwrap();
+                make_other_exec_only(&first.join("dsh"));
+                std::fs::write(first.join("node"), b"not executable for owner\n").unwrap();
+                make_other_exec_only(&first.join("node"));
+                assert_eq!(
+                    find_original_dsh(),
+                    Some(valid_dsh.to_string_lossy().into_owned())
+                );
+                assert_eq!(
+                    find_node_bin(),
+                    Some(valid_node.to_string_lossy().into_owned())
+                );
+            }
         }
         // 3. Explicit RDSH_ORIG_BIN keeps priority even without exec bits.
         #[cfg(unix)]

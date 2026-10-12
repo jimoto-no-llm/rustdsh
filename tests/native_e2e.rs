@@ -324,7 +324,11 @@ impl Server {
             let mut address = None;
             let mut handoff_path = None;
             let mut startup_lines = Vec::new();
+            let mut ready = false;
             for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+                if ready {
+                    continue;
+                }
                 startup_lines.push(line.clone());
                 if let Some(url) = line
                     .split_whitespace()
@@ -346,7 +350,10 @@ impl Server {
                         logged_token,
                         has_key_fragment,
                     ));
-                    break;
+                    // Keep draining until the child exits: closing the pipe here
+                    // would make the server's next log write fail.
+                    startup_lines.clear();
+                    ready = true;
                 }
             }
         });
@@ -364,13 +371,16 @@ impl Server {
             !has_key_fragment,
             "server must not print a token-bearing URL"
         );
+        // The token handoff file is written right after the URL is printed, but
+        // a loaded runner can delay it; wait on a wall-clock deadline.
+        let token_deadline = Instant::now() + Duration::from_secs(15);
         let mut token = None;
-        for _ in 0..50 {
+        while Instant::now() < token_deadline {
             if let Ok(text) = std::fs::read_to_string(&handoff_path) {
                 token = Some(text);
                 break;
             }
-            std::thread::sleep(std::time::Duration::from_millis(100));
+            std::thread::sleep(Duration::from_millis(100));
         }
         let token = token.expect("server should create its protected token handoff file");
         let address = url.trim_start_matches("http://127.0.0.1:");
@@ -559,6 +569,92 @@ fn setup_save_extras_restart_serve_and_use_real_http_api() {
         400
     );
     assert_eq!(fs::read(f.0.join("dsh/rdsh.json")).unwrap(), saved);
+}
+
+#[cfg(unix)]
+#[test]
+fn path_search_skips_non_executable_dsh_and_node_candidates() {
+    use std::os::unix::fs::{symlink, PermissionsExt};
+
+    fn write_mode(path: &std::path::Path, contents: &str, mode: u32) {
+        fs::write(path, contents).unwrap();
+        fs::set_permissions(path, fs::Permissions::from_mode(mode)).unwrap();
+    }
+
+    let f = Fixture::new();
+    let first = f.0.join("first");
+    let second = f.0.join("second");
+    fs::create_dir_all(&first).unwrap();
+    fs::create_dir_all(&second).unwrap();
+    let search_path = format!("{}:{}", first.display(), second.display());
+    let second_dsh = second.join("dsh");
+    write_mode(&second_dsh, "#!/bin/sh\necho DUMMY_VALID_DSH\n", 0o755);
+    let second_node = second.join("node");
+    write_mode(
+        &second_node,
+        "#!/bin/sh\nprintf 'DUMMY_VALID_NODE\\n'\n",
+        0o755,
+    );
+
+    let run_stub = |original: Option<&std::path::Path>| {
+        let mut command = f.command(&["--no-slim", "--profile", "web"]);
+        command
+            .env("PATH", &search_path)
+            .env_remove("RDSH_ORIG_BIN")
+            .env_remove("DSH_ORIG_BIN");
+        if let Some(original) = original {
+            command.env("RDSH_ORIG_BIN", original);
+        }
+        command.output().unwrap()
+    };
+    let assert_marker = |output: Output, marker: &str| {
+        assert!(
+            output.status.success(),
+            "delegation failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let stdout = String::from_utf8(output.stdout).unwrap();
+        assert!(
+            stdout.contains(marker),
+            "expected {marker:?}, got {stdout:?}"
+        );
+    };
+
+    // A directory and a non-executable file must both be skipped in favor of
+    // the later usable DSH; a PATH entry resolving to rdsh itself stays skipped.
+    let first_dsh = first.join("dsh");
+    fs::create_dir(&first_dsh).unwrap();
+    let output = run_stub(None);
+    assert_marker(output, "DUMMY_VALID_DSH");
+
+    fs::remove_dir(&first_dsh).unwrap();
+    write_mode(&first_dsh, "not executable\n", 0o644);
+    let output = run_stub(None);
+    assert_marker(output, "DUMMY_VALID_DSH");
+
+    fs::remove_file(&first_dsh).unwrap();
+    symlink(env!("CARGO_BIN_EXE_rdsh"), &first_dsh).unwrap();
+    let output = run_stub(None);
+    assert_marker(output, "DUMMY_VALID_DSH");
+
+    // An explicit original path keeps priority even when it is outside PATH.
+    let explicit_dsh = f.0.join("explicit/dsh");
+    fs::create_dir_all(explicit_dsh.parent().unwrap()).unwrap();
+    write_mode(
+        &explicit_dsh,
+        "#!/bin/sh\nprintf 'EXPLICIT_DSH\\n'\n",
+        0o755,
+    );
+    let output = run_stub(Some(&explicit_dsh));
+    assert_marker(output, "EXPLICIT_DSH");
+
+    // A .js override still uses Node, but skips a non-executable earlier Node.
+    let first_node = first.join("node");
+    write_mode(&first_node, "not executable\n", 0o644);
+    let original_js = f.0.join("original.js");
+    fs::write(&original_js, "process.stdout.write('DUMMY_JS\\n')\n").unwrap();
+    let output = run_stub(Some(&original_js));
+    assert_marker(output, "DUMMY_VALID_NODE");
 }
 
 #[test]
@@ -883,4 +979,20 @@ fn web_search_gate_and_real_http_results_and_failure() {
             assert!(String::from_utf8_lossy(&result.stderr).contains("HTTP 503"));
         }
     }
+}
+
+/// #389: tokens/compute の chars は文字数（Unicode scalar 数）。
+#[test]
+fn tokens_chars_counts_characters_not_bytes() {
+    let f = Fixture::new();
+    let v: Value =
+        serde_json::from_slice(&f.ok(&["tokens"], "\u{65e5}\u{672c}\u{8a9e}".as_bytes())).unwrap();
+    assert_eq!(v["tokens"], 3);
+    assert_eq!(v["chars"], 3);
+    let line = "{\"v\":1,\"id\":\"review\",\"op\":\"tokens.estimate\",\"text\":\"\u{65e5}\u{672c}\u{8a9e}\"}\n";
+    let v: Value = serde_json::from_slice(&f.ok(&["compute", "--once"], line.as_bytes())).unwrap();
+    assert_eq!(v["chars"], 3);
+    let batch = "{\"v\":1,\"id\":\"review\",\"op\":\"tokens.estimate_batch\",\"texts\":[\"\u{65e5}\u{672c}\u{8a9e}\",\"\u{e9}\",\"abc\"]}\n";
+    let v: Value = serde_json::from_slice(&f.ok(&["compute", "--once"], batch.as_bytes())).unwrap();
+    assert_eq!(v["chars"], serde_json::json!([3, 1, 3]));
 }
