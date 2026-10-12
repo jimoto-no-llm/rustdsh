@@ -82,6 +82,17 @@ Generation failure stops publication.
    Tag push starts the `cd` workflow automatically. Its validation job must pass
    before builds start, and publication waits for every build and asset check.
    Never tag an unreviewed or untested commit.
+   The tag push also re-triggers `ci` on the same commit, so a validation job
+   that reads check runs right away can see those new runs as pending and fail
+   even though the commit is green. Wait for the tag's required checks to
+   finish, then re-run only the failed jobs; the staged artifacts are reused:
+
+   ```sh
+   gh run rerun <cd-run-id> --failed
+   ```
+
+   Confirmed again on v0.3.2. Tightening the gate so it ignores the
+   tag-triggered run is tracked in #361.
 
 ## Build and publish
 
