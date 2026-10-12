@@ -307,6 +307,7 @@ Measurements conducted on Linux x86_64:
 | [docs/BENCHMARKS.md](docs/BENCHMARKS.md) | Benchmark methodology and reproduction steps |
 | [docs/RDSH-SETTINGS.md](docs/RDSH-SETTINGS.md) | Settings UI and CLI options |
 | [docs/DESKTOP-INTEGRATION.md](docs/DESKTOP-INTEGRATION.md) | DeepSeek Harness Desktop (Electron) integration |
+| [docs/FEDORA.md](docs/FEDORA.md) | Fedora / RHEL packages, optional tools, and the Linux desktop reality |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Project roadmap and planned capabilities |
 | [docs/RELEASING.md](docs/RELEASING.md) | Release procedures |
 | [CHANGELOG.md](CHANGELOG.md) | Changes per version |

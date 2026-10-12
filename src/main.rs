@@ -4,6 +4,7 @@ mod compact;
 mod compute;
 mod context;
 mod desktop;
+mod distro;
 mod dsh_args;
 mod file_lock;
 mod file_security;
@@ -997,6 +998,10 @@ fn doctor() -> anyhow::Result<()> {
                 enabled.join(", ")
             }
         ));
+    }
+    // Host-specific optional dependencies (rpm-based hosts only).
+    for line in distro::doctor_notes() {
+        say(line);
     }
     say(format!("[rdsh] slim env: {}", slim::describe()));
     say(format!("[rdsh] auth: {}", auth::summary_line()));

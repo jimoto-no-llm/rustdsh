@@ -345,6 +345,19 @@ echo "next: run '$PREFIX/rdsh setup' to connect a model (GPT subscription via OA
 if [ -f "./plugins/install.sh" ]; then
   echo "next: PROFILE=web ./plugins/install.sh adds recommended plugins, including the rdsh settings UI"
 fi
+# rpm-based hosts (Fedora, RHEL, ...) ship everything rdsh needs to run, but two
+# optional tools unlock extra features. Naming the exact command here saves a
+# round trip to the docs; nothing here fails the install.
+if [ -r /etc/os-release ] && grep -qE '^ID=(fedora|rhel|centos|rocky|almalinux|oracle)' /etc/os-release; then
+  rpm_missing=""
+  command -v zstd >/dev/null 2>&1 || rpm_missing="$rpm_missing zstd"
+  if ! command -v bwrap >/dev/null 2>&1 && ! command -v bubblewrap >/dev/null 2>&1; then
+    rpm_missing="$rpm_missing bubblewrap"
+  fi
+  if [ -n "$rpm_missing" ]; then
+    echo "next: sudo dnf install -y$rpm_missing  # optional: token unpacking and the --share-file sandbox"
+  fi
+fi
 # Desktop (Electron) keeps its own reserved profile next to the CLI profiles.
 # Detection is read-only and never fails the install.
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"

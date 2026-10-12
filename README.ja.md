@@ -293,6 +293,7 @@ Linux x86_64 環境での測定値です：
 | [docs/BENCHMARKS.md](docs/BENCHMARKS.md) | ベンチマークの詳細と再現手順 |
 | [docs/RDSH-SETTINGS.md](docs/RDSH-SETTINGS.md) | 設定画面の機能と CLI キー一覧 |
 | [docs/DESKTOP-INTEGRATION.md](docs/DESKTOP-INTEGRATION.md) | デスクトップアプリ (Electron) との連携 |
+| [docs/FEDORA.md](docs/FEDORA.md) | Fedora / RHEL 向けパッケージ・任意ツール・Linux でのデスクトップ事情 |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 今後の開発ロードマップ |
 | [docs/RELEASING.md](docs/RELEASING.md) | リリース手順 |
 | [CHANGELOG.md](CHANGELOG.md) | バージョンごとの主な変更履歴 |

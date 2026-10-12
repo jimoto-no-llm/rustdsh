@@ -37,6 +37,26 @@ jobs:
           node-version: 22
       - run: node --test tests/update-banner.test.mjs
 
+  fedora:
+    name: Fedora packages
+    runs-on: ubuntu-latest
+    container: fedora:latest
+    timeout-minutes: 45
+    steps:
+      # The package names here are the ones docs/FEDORA.md documents; if Fedora
+      # renames one, this job fails before a user hits it.
+      - run: dnf install -y --setopt=install_weak_deps=False git gcc gcc-c++ make cargo zstd bubblewrap nodejs python3 tar gzip curl diffutils findutils
+      - uses: actions/checkout@v7
+      - run: cargo build --locked
+      - run: cargo test --locked
+      - name: doctor reports the Fedora dependency state
+        run: './target/debug/rdsh doctor | grep -F "[rdsh] fedora: optional tools present (zstd, bubblewrap)"'
+      - name: Regress with a stub dsh
+        shell: bash
+        run: |
+          printf '#!/bin/sh\necho stub-dsh $@' > /tmp/stub-dsh && chmod +x /tmp/stub-dsh
+          BIN=./target/debug/rdsh DSH_ORIG_BIN=/tmp/stub-dsh sh tests/regress.sh
+
   plugin-security:
     runs-on: ubuntu-latest
     steps:
