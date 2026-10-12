@@ -7,6 +7,7 @@ import QRCode from "qrcode";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { ProjectStore, writeJson, stateHome, publicState } from "./state.mjs";
+import { writeOwnerCredentials } from "./private-runtime.mjs";
 import { createMcpServer } from "./mcp.mjs";
 import { enableShare, inspectShare } from "./tailscale.mjs";
 import { startHarness, proxyHarness, upgradeHarness } from "./harness.mjs";
@@ -283,10 +284,17 @@ export async function startDashboard(options) {
       pid: process.pid,
       port,
       local_url: localUrl,
-      browser_url: browserUrl(localUrl),
-      token,
       mcp_token: mcpToken,
       share,
+    });
+    await writeOwnerCredentials(directory, {
+      schema: 1,
+      kind,
+      project_id: project?.id || null,
+      instance_id: instanceId,
+      browser_url: browserUrl(localUrl),
+      browser_token: browserToken,
+      admin_token: token,
     });
     if (kind === "project") {
       await writeJson(path.join(directory, "mcp-config.json"), {
@@ -604,7 +612,7 @@ export async function startDashboard(options) {
           return json(res, 409, { error: "No owned Harness process" });
         if (!adminAuthorized && !humanAuthorized)
           return json(res, 401, {
-            error: "Human browser or administrator required",
+            error: "Owner browser or administrator required",
           });
         void harness.stop().catch(() => {});
         return json(res, 202, { requested: true, run_id: harness.run_id });
@@ -763,8 +771,8 @@ export async function startDashboard(options) {
           return json(res, result.decision === "approval_valid" ? 200 : 409, result);
         }
         if (req.method === "POST" && route === "/api/approvals/decide") {
-          if (!humanAuthorized) return json(res, 403, { error: "Human browser credential required" });
-          return json(res, 200, await mutate("approval_decision", await readBody(req), "human_browser"));
+          if (!humanAuthorized) return json(res, 403, { error: "Owner browser credential required" });
+          return json(res, 200, await mutate("approval_decision", await readBody(req), "browser_owner"));
         }
         if (req.method === "POST" && route === "/api/workers/check")
           return json(res, 409, await workerStartCheck(await readBody(req)));
@@ -890,7 +898,7 @@ export async function startDashboard(options) {
         if (req.method === "POST" && route === "/api/decision/cancel") {
           if (!humanAuthorized)
             return json(res, 403, {
-              error: "Human browser credential required",
+              error: "Owner browser credential required",
             });
           const input = await readBody(req);
           return json(
@@ -903,7 +911,7 @@ export async function startDashboard(options) {
           if (!humanAnnotations)
             return json(res, 404, { error: "Project annotations are unavailable" });
           if (!humanAuthorized)
-            return json(res, 403, { error: "Human browser credential required" });
+            return json(res, 403, { error: "Owner browser credential required" });
           if (req.method === "GET")
             return json(res, 200, await humanAnnotations.inspect(store.value));
           if (req.method === "POST") {

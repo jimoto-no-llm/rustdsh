@@ -16,6 +16,7 @@ import {
   loopbackBase,
 } from "../connection-diagnostics.mjs";
 import { startDashboard } from "../server.mjs";
+import { readLocalRuntime } from "../private-runtime.mjs";
 import { identity, writeJson } from "../state.mjs";
 import { inspectShare } from "../tailscale.mjs";
 
@@ -186,9 +187,7 @@ test("browser success, MCP auth failure, absent Tunnel and stale restart credent
   const port = reserve.address().port;
   await new Promise((resolve) => reserve.close(resolve));
   dashboard = await startDashboard({ project, port, tailscale: false });
-  let runtime = JSON.parse(
-    await fs.readFile(path.join(project.directory, "runtime.json")),
-  );
+  let runtime = await readLocalRuntime(project.directory);
   const human = {
     "x-rdsh-browser-token": new URL(dashboard.browserUrl).hash.slice(5),
   };
@@ -244,9 +243,7 @@ test("browser success, MCP auth failure, absent Tunnel and stale restart credent
   const oldMcp = runtime.mcp_token;
   await dashboard.close();
   dashboard = await startDashboard({ project, port, tailscale: false });
-  runtime = JSON.parse(
-    await fs.readFile(path.join(project.directory, "runtime.json")),
-  );
+  runtime = await readLocalRuntime(project.directory);
   assert.notEqual(runtime.mcp_token, oldMcp);
   assert.equal(
     (
@@ -339,9 +336,7 @@ test("public Tunnel launcher records its actual child and retires only its own h
   const port = reserve.address().port;
   await new Promise((resolve) => reserve.close(resolve));
   dashboard = await startDashboard({ project, port, tailscale: false });
-  const runtime = JSON.parse(
-    await fs.readFile(path.join(project.directory, "runtime.json")),
-  );
+  const runtime = await readLocalRuntime(project.directory);
   await fs.copyFile(
     fileURLToPath(new URL("fixtures/tunnel-health.cjs", import.meta.url)),
     path.join(directory, "run"),

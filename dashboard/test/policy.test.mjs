@@ -66,6 +66,20 @@ test("structured policy distinguishes file, cwd, arguments and origins without e
     assert.equal(result.layers.pattern, "not_evaluated");
     assert.ok(!JSON.stringify(result).includes("dummy-secret"));
   }
+  const approved = await evaluateOperation(
+    store.value,
+    operation("file.write", { path: "src/new.txt", content: "alpha" }),
+  );
+  const changedBody = await evaluateOperation(
+    store.value,
+    operation("file.write", { path: "src/new.txt", content: "bravo" }),
+  );
+  assert.equal(approved.attributes.data_bytes, 5);
+  assert.equal(changedBody.attributes.data_bytes, 5);
+  assert.match(approved.attributes.data_digest, /^[a-f0-9]{64}$/);
+  assert.match(changedBody.attributes.data_digest, /^[a-f0-9]{64}$/);
+  assert.notEqual(approved.attributes.data_digest, changedBody.attributes.data_digest);
+  assert.notEqual(approved.operation_digest, changedBody.operation_digest);
 });
 
 test("deleted saved roots and executables are blocked as policy changes instead of unparsed caller input", async (t) => {

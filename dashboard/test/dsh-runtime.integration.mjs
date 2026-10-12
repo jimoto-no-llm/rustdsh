@@ -48,7 +48,7 @@ test(`real DSH ToolRuntime ${pkg.version} never dispatches held operations or la
   const changed = await tools.execute(f.exec("write", { file_path: "fixture.txt", content: "changed content" }));
   assert.match(JSON.stringify(changed), /approval_operation_changed/);
   assert.equal(dispatched, 0);
-  await f.store.mutate("approval_decision", { id: "R1", request_version: 1, decision: "revoke" }, "human_browser");
+  await f.store.mutate("approval_decision", { id: "R1", request_version: 1, decision: "revoke" }, "browser_owner");
   f.controller.bindCall("call-1", f.binding());
   const revoked = await tools.execute(f.exec());
   assert.match(JSON.stringify(revoked), /approval_revoked/);

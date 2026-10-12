@@ -187,7 +187,9 @@ test("legacy state remains readable without inventing provenance or observation 
   legacy.tasks.push({ id: "old", title: "Old success", status: "done", updated_at: legacy.updated_at });
   await writeJson(path.join(temporary, "state.json"), legacy);
   const store = await ProjectStore.open(project);
-  assert.deepEqual(store.value, legacy);
+  const { state_auth: integritySeal, ...migrated } = store.value;
+  assert.match(integritySeal.mac, /^[a-f0-9]{64}$/);
+  assert.deepEqual(migrated, legacy);
   assert.equal(metricView(store.value, "total_cost_usd").freshness, "unknown");
   assert.equal(observationView("done", store.value.tasks[0].observation).current, false);
   await store.mutate("event", { title: "New unrelated event" });

@@ -7,6 +7,7 @@ import http from "node:http";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { identity } from "../state.mjs";
+import { writeOwnerCredentials } from "../private-runtime.mjs";
 
 test("set-contract reports malformed or inconsistent server responses without echoing their contents", async (t) => {
   const temp = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-contract-cli-test-"));
@@ -23,10 +24,24 @@ test("set-contract reports malformed or inconsistent server responses without ec
   const server = http.createServer((req, res) => { req.resume(); res.end(responseBody); });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   t.after(() => new Promise((resolve) => server.close(resolve)));
+  const instanceId = "fixture-instance";
   await fs.writeFile(path.join(directory, "runtime.json"), JSON.stringify({
-    kind: "project", project_id: project.id, token: "dummy-secret-token",
+    schema: 1,
+    kind: "project",
+    project_id: project.id,
+    instance_id: instanceId,
     local_url: `http://127.0.0.1:${server.address().port}/`,
+    mcp_token: "c".repeat(64),
   }));
+  await writeOwnerCredentials(directory, {
+    schema: 1,
+    kind: "project",
+    project_id: project.id,
+    instance_id: instanceId,
+    admin_token: "a".repeat(64),
+    browser_token: "b".repeat(64),
+    browser_url: `http://127.0.0.1:${server.address().port}/#key=${"b".repeat(64)}`,
+  });
   const run = () => promisify(execFile)(process.execPath, [
     path.resolve("cli.mjs"), "set-contract", "--project", root, "--file", contractFile,
   ], { windowsHide: true, env: { ...process.env, RDSH_DASHBOARD_HOME: stateHome } });
@@ -40,7 +55,7 @@ test("set-contract reports malformed or inconsistent server responses without ec
     responseBody = body;
     await assert.rejects(run, (error) => {
       assert.equal(error.code, 1);
-      assert.ok(error.stderr.includes(message));
+      assert.ok(error.stderr.includes(message), error.stderr);
       assert.ok(error.stderr.includes("verify saved state before retrying"));
       assert.ok(!error.stderr.includes("dummy-secret"));
       assert.ok(!error.stdout.includes("saved:"));

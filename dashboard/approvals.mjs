@@ -48,7 +48,7 @@ export async function prepareApprovalRequest(state, input, now = Date.now()) {
   };
 }
 export function decideApproval(state, input, authority, now = Date.now()) {
-  if (authority !== "human_browser") throw new Error("Human browser credential required");
+  if (authority !== "browser_owner") throw new Error("Owner browser credential required");
   object(input, ["id", "request_version", "decision"]);
   text(input.id, "request id", 160);
   version(input.request_version, 1);
@@ -63,7 +63,7 @@ export function decideApproval(state, input, authority, now = Date.now()) {
   }
   request.status = { grant: "granted", reject: "rejected", revoke: "revoked" }[input.decision];
   request.approver = "dashboard_owner";
-  request.authenticated_by = "human_browser_credential";
+  request.authenticated_by = "browser_owner_credential";
   request.decided_at = new Date(now).toISOString();
   request.decisions ||= [];
   request.decisions.push({ decision: input.decision, approver: request.approver,

@@ -19,7 +19,7 @@ test("all four external origins remain data through summaries/forwarding and can
     assert.deepEqual(forwarded.origin, original.origin);
     assert.equal(forwarded.authority, "untrusted_data");
     assert.deepEqual(forwarded.lineage.map((item) => item.action), ["capture", "summary", "forward"]);
-    assert.throws(() => validateExternalSource({ ...forwarded, authority: "human_browser" }));
+    assert.throws(() => validateExternalSource({ ...forwarded, authority: "browser_owner" }));
     return forwarded;
   });
   f.controller.bindCall("call-1", f.binding(sources));

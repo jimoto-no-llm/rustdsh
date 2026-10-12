@@ -7,6 +7,7 @@ import net from "node:net";
 import { ProjectStore, publicState } from "../state.mjs";
 import { executeTool, feedbackSince, tools } from "../mcp.mjs";
 import { startDashboard } from "../server.mjs";
+import { readLocalRuntime } from "../private-runtime.mjs";
 import { draftReviewState } from "../question-cards-ui.mjs";
 
 function approval(max = 5, action = "publish-fixture", revision = "target-v1") {
@@ -340,11 +341,11 @@ test("incomplete approvals, duplicate choices, forged fields and corrupt persist
   state.question_contracts.cards.Q1.snapshot.decision.cost.max = 999;
   const corrupt = JSON.stringify(state);
   await fs.writeFile(f.file, corrupt);
-  await assert.rejects(ProjectStore.open(f.project), /corrupt/);
+  await assert.rejects(ProjectStore.open(f.project), /integrity check failed/);
   assert.equal(await fs.readFile(f.file, "utf8"), corrupt);
   state.question_contracts.schema = 2;
   await fs.writeFile(f.file, JSON.stringify(state));
-  await assert.rejects(ProjectStore.open(f.project), /Unsupported/);
+  await assert.rejects(ProjectStore.open(f.project), /integrity check failed/);
 });
 
 test("authenticated human HTTP answers bind the seen revision; MCP/admin cannot forge an answer or a human cancellation", async (t) => {
@@ -359,9 +360,7 @@ test("authenticated human HTTP answers bind the seen revision; MCP/admin cannot 
     tailscale: false,
   });
   t.after(() => dashboard.close());
-  const runtime = JSON.parse(
-    await fs.readFile(path.join(f.project.directory, "runtime.json"), "utf8"),
-  );
+  const runtime = await readLocalRuntime(f.project.directory);
   const human = {
     "x-rdsh-browser-token": new URL(runtime.browser_url).hash.slice(5),
   };

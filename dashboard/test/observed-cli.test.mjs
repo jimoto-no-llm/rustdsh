@@ -9,6 +9,7 @@ import { spawn } from "node:child_process";
 import { ObservedCliStore } from "../observed-cli.mjs";
 import { identity } from "../state.mjs";
 import { startDashboard } from "../server.mjs";
+import { readLocalRuntime } from "../private-runtime.mjs";
 import { observedCliStatus } from "../observed-cli.mjs";
 
 const originalIdentity = {
@@ -151,9 +152,7 @@ test("owner-only read-only CLI registration persists, rechecks identity, and nev
     title: "Manual CLI task",
     status: "doing",
   });
-  const runtime = JSON.parse(
-    await fs.readFile(path.join(project.directory, "runtime.json"), "utf8"),
-  );
+  const runtime = await readLocalRuntime(project.directory);
   assert.equal(
     (await fetch(instance.localUrl + "api/observed-cli")).status,
     401,

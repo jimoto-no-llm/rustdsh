@@ -177,8 +177,21 @@ appropriate configuration into your agent's MCP settings. The dashboard must be
 running before the stdio bridge is used. The stdio bridge reads the current
 runtime credential on each operation. HTTP clients must reload the generated
 configuration after a restart, because the bearer key rotates.
-`runtime.json` の `token` は管理用、`mcp_token` は MCP 用です。ブラウザー用の
-鍵は `browser_url` に含まれます。これらを別用途で使い回さないでください。
+`runtime.json` は MCP 用の `mcp_token` と接続情報を保持し、管理 token と
+ブラウザー鍵は `owner-credentials.json` に分けて保存します。stdio MCP は
+`runtime.json` だけを読み、管理コマンドとブラウザー起動だけが別ファイルを開きます。
+秘密を用途間で使い回しません。ブラウザー資格情報は所有者セッションの所持を示すだけで、
+特定の人の身元を証明しません。同じOSアカウントで任意コードを実行できるプロセスからの
+分離境界でもありません。POSIXでは秘密ファイルを0600で作成し、Windowsでは
+dashboard state directoryのACLを継承します。
+
+`state.json` にはHMAC sealを付け、状態変更のたびに検証情報を更新します。
+`state-integrity.key` は状態ファイルと分けて0600で保存し、`state-integrity.enabled` を
+初期化マーカーとして残します。起動時にsealの欠落・不一致や鍵の欠落を検出するとstateを
+拒否します。既存schema-1 stateは、構造検証後に初回sealを
+付けて移行します。これはstateへのMCP/API経由の未認可編集や、鍵を伴わない保存データの
+改変を検出します。同じOSアカウントの任意コードは鍵も読めるため、その脅威モデルへの
+改ざん防止や人間の身元確認を保証しません。
 
 | Tool                            | Effect                                                                      |
 | ------------------------------- | --------------------------------------------------------------------------- |
@@ -362,9 +375,9 @@ are also retained without automatic truncation; recent check logs are bounded.
 
 Only `POST /api/contracts/update` with the local administrator bearer credential
 can save a contract. Browser and MCP credentials cannot change it; there is no
-MCP contract mutation tool. This is the existing single-owner credential boundary,
-not proof of a particular human's identity. A process running as the same OS user
-may still read the private runtime file. Each change marks previous approvals as
+MCP contract mutation tool. This is the existing browser-owner credential boundary,
+not proof of a particular human's identity. The MCP server does not open the separate
+owner credential file, but a process running as the same OS user may read it. Each change marks previous approvals as
 requiring revalidation; no answer is converted to an execution approval. The
 approval ledger below implements declared scope/retry matching; execution adapter
 integration remains required.
@@ -487,11 +500,11 @@ ledger. Revisions require `expected_version` and always start pending; old versi
 remain readable and their grants cannot authorize the new version.
 
 Use the browser's dedicated approval buttons to grant, reject or revoke that
-request version. Only the human browser credential can call
+request version. Only the browser-owner credential can call
 `POST /api/approvals/decide` with `id`, `request_version`, `decision`.
 MCP and administrator credentials cannot grant approval; generic update routes
-cannot bypass this boundary. The approver is the authenticated `dashboard_owner`
-role, not a claim of a named person's identity. Decision history is retained.
+cannot bypass this API boundary. The approver is recorded as the `dashboard_owner`
+role with `browser_owner_credential`, not as a verified named person. Decision history is retained.
 The approval row shows current decisions/reservations and expandable past request
 versions, including their scopes, decisions and uses. Past versions have no action
 buttons and cannot authorize the current request.
@@ -538,6 +551,11 @@ gate. Real OS refusal tests and launcher interception are still required; the
 isolated source tests establish the unsupported-environment hold only.
 
 ### DSH operation boundary (Issues #29/#30/#32/#33, partial)
+
+This is a host-invoked plugin API, not an active product integration. The DSH
+launcher, MCP entrypoint and existing tool workflows do not attach it
+automatically; a host must add the plugin in its own code and keep the protected
+context dedicated.
 
 `dsh-guard.mjs` exposes a programmatic Cordis plugin (`apply`, `inject: ["tools"]`)
 and `attachDshGuard(ctx, config)`. Attach it to a dedicated DSH context with the

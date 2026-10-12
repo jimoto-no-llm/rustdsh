@@ -10,7 +10,8 @@ export const operationCheckKeys = ["task_id", "contract_version", "repository", 
 const shellFile = (file) => /^(?:ba|da|z|fi|k|a)?sh(?:\.exe)?$|^(?:cmd|powershell|pwsh)(?:\.exe)?$/i.test(path.basename(file));
 
 // This is an explicit rdsh schema, not an inference about any external CLI's
-// tool names. An adapter must translate and enforce the result at its boundary.
+// tool names. A host must attach and enforce the result at its boundary; the
+// parser does not connect itself to an external CLI or launcher.
 export function parseOperation(value) {
   object(value, ["schema", "tool_name", "tool_input"]);
   if (value.schema !== "rdsh.operation.v1" || !operationTools.includes(value.tool_name))

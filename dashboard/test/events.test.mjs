@@ -12,6 +12,7 @@ import {
   CLIENT_CAPABILITIES_META_KEY,
 } from "@modelcontextprotocol/server";
 import { startDashboard } from "../server.mjs";
+import { readLocalRuntime } from "../private-runtime.mjs";
 import { identity } from "../state.mjs";
 import net from "node:net";
 
@@ -262,9 +263,7 @@ test("MCP 2.0 discovers events and serves the same tools on an authenticated end
     tailscale: false,
     webhookPost,
   });
-  const runtime = JSON.parse(
-    await fs.readFile(path.join(project.directory, "runtime.json"), "utf8"),
-  );
+  const runtime = await readLocalRuntime(project.directory);
   async function request(method, params = {}, errorCode = null) {
     const _meta = {
       [PROTOCOL_VERSION_META_KEY]: "2026-07-28",
@@ -448,9 +447,7 @@ test("MCP 2.0 discovers events and serves the same tools on an authenticated end
     tailscale: false,
     webhookPost,
   });
-  runtime.mcp_token = JSON.parse(
-    await fs.readFile(path.join(project.directory, "runtime.json"), "utf8"),
-  ).mcp_token;
+  runtime.mcp_token = (await readLocalRuntime(project.directory)).mcp_token;
   const resumed = await request("tools/call", { name: "dashboard_check_task_contract", arguments: checkInput });
   assert.equal(JSON.parse(resumed.content[0].text).contract_version, 1);
   await request("events/unsubscribe", subscription);

@@ -34,7 +34,7 @@ export async function guardFixture(t, ctx) {
       reports.push(report);
       await fs.writeFile(path.join(project.directory, "guard-checks.json"), JSON.stringify(reports));
     } });
-  const grant = () => store.mutate("approval_decision", { id: "R1", request_version: 1, decision: "grant" }, "human_browser");
+  const grant = () => store.mutate("approval_decision", { id: "R1", request_version: 1, decision: "grant" }, "browser_owner");
   const binding = (sources = []) => ({ approval: { id: "R1", request_version: 1, attempt: 1, cost_usd: 0 }, sources });
   const exec = (name = "write", args = { file_path: "fixture.txt", content: "dummy-sensitive-body" }, callId = "call-1") =>
     ({ name, arguments: args, callId, signal: new AbortController().signal });

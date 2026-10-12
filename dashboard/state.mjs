@@ -1,4 +1,10 @@
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import {
+  createHash,
+  createHmac,
+  randomBytes,
+  randomUUID,
+  timingSafeEqual,
+} from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
@@ -98,10 +104,84 @@ export async function writeJson(file, value) {
   });
   await fs.rename(temp, file);
 }
+
+function stateIntegrityKeyPath(project) {
+  return path.join(project.directory, "state-integrity.key");
+}
+
+function stateIntegrityMarkerPath(project) {
+  return path.join(project.directory, "state-integrity.enabled");
+}
+
+async function writeStateIntegrityMarker(project) {
+  const file = stateIntegrityMarkerPath(project);
+  try {
+    await fs.writeFile(file, `${project.id}\n`, { flag: "wx", mode: 0o600 });
+  } catch (error) {
+    if (error.code !== "EEXIST") throw error;
+  }
+}
+
+async function loadStateIntegrityKey(project, hadStateSeal) {
+  const file = stateIntegrityKeyPath(project);
+  let markerExists = true;
+  try {
+    await fs.access(stateIntegrityMarkerPath(project));
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+    markerExists = false;
+  }
+  try {
+    const key = await fs.readFile(file);
+    if (key.byteLength !== 32)
+      throw new Error("Dashboard state integrity key is invalid");
+    await writeStateIntegrityMarker(project);
+    return { key, existed: true };
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+    if (hadStateSeal || markerExists)
+      throw new Error("Dashboard state integrity key is missing; refusing state");
+  }
+  await fs.mkdir(project.directory, { recursive: true });
+  const generated = randomBytes(32);
+  try {
+    await fs.writeFile(file, generated, { flag: "wx", mode: 0o600 });
+    await writeStateIntegrityMarker(project);
+    return { key: generated, existed: false };
+  } catch (error) {
+    if (error.code !== "EEXIST") throw error;
+    const key = await fs.readFile(file);
+    if (key.byteLength !== 32)
+      throw new Error("Dashboard state integrity key is invalid");
+    await writeStateIntegrityMarker(project);
+    return { key, existed: true };
+  }
+}
+
+function stateMac(value, key) {
+  const { state_auth: _stateAuth, ...payload } = value;
+  return createHmac("sha256", key).update(JSON.stringify(payload)).digest("hex");
+}
+
+function sealState(value, key) {
+  delete value.state_auth;
+  value.state_auth = { schema: 1, mac: stateMac(value, key) };
+  return value;
+}
+
+function verifyStateSeal(value, key) {
+  const actual = value.state_auth?.mac;
+  if (value.state_auth?.schema !== 1 || !/^[0-9a-f]{64}$/.test(actual || ""))
+    return false;
+  const expected = stateMac(value, key);
+  return timingSafeEqual(Buffer.from(actual, "hex"), Buffer.from(expected, "hex"));
+}
+
 export class ProjectStore {
-  constructor(project, value) {
+  constructor(project, value, integrityKey) {
     this.project = project;
     this.value = value;
+    this.integrityKey = integrityKey;
     this.historyIds = validateRestoredHistory(value);
     this.protectedHistory = freezeHistory(value.history_backups);
   }
@@ -113,12 +193,14 @@ export class ProjectStore {
   }
   static async open(project) {
     let value;
+    let stateExists = true;
     try {
       value = JSON.parse(
         await fs.readFile(path.join(project.directory, "state.json"), "utf8"),
       );
     } catch (e) {
       if (e.code !== "ENOENT") throw e;
+      stateExists = false;
       value = {
         schema: 1,
         project: { id: project.id, name: project.name, root: project.root },
@@ -132,6 +214,20 @@ export class ProjectStore {
         feedback: [],
       };
     }
+    const keyState = await loadStateIntegrityKey(
+      project,
+      Boolean(value.state_auth),
+    );
+    let adoptLegacyState = false;
+    if (value.state_auth) {
+      if (!keyState.existed || !verifyStateSeal(value, keyState.key))
+        throw new Error("Dashboard state integrity check failed; refusing state");
+    } else if (stateExists && keyState.existed) {
+      throw new Error("Dashboard state integrity seal is missing; refusing state");
+    } else {
+      sealState(value, keyState.key);
+      adoptLegacyState = stateExists;
+    }
     if (value.project.id !== project.id || value.schema !== 1)
       throw new Error(
         "Dashboard state belongs to a different project or version",
@@ -141,7 +237,11 @@ export class ProjectStore {
     validateInstructions(value);
     validateCostLedger(value);
     validateBudgetAdmission(value);
-    return new ProjectStore(project, value);
+    // Legacy state is adopted once after all schema checks pass. Subsequent
+    // edits require a valid seal.
+    if (adoptLegacyState)
+      await writeJson(path.join(project.directory, "state.json"), value);
+    return new ProjectStore(project, value, keyState.key);
   }
   async mutate(operation, input, authority = "agent") {
     const next = this.clone();
@@ -250,6 +350,7 @@ export class ProjectStore {
       });
       next.changes = next.changes.slice(-10000);
     }
+    sealState(next, this.integrityKey);
     await writeJson(path.join(this.project.directory, "state.json"), next);
     if (historyChanged) {
       this.protectedHistory = freezeHistory(next.history_backups);
@@ -284,7 +385,7 @@ function freezeHistory(value) {
   return value;
 }
 export function publicState(value, observations, deliveries, budgetJobs) {
-  const { changes, ...visible } = value;
+  const { changes, state_auth: _stateAuth, ...visible } = value;
   if (value.cost_ledger) visible.cost_ledger = publicCostLedger(value);
   if (value.budget_admission)
     visible.budget_admission = publicBudgetAdmission(value, budgetJobs);

@@ -59,16 +59,31 @@ test("contracts persist immutable versions; task reports and normal answers cann
   assert.equal(store.value.changes.at(-1).data.summary, "タスク契約を更新");
 });
 
-test("legacy schema-1 tasks gain a contract without rewriting state on read", async (t) => {
-  const { store, project, input, check } = await fixture(t);
-  const legacy = structuredClone(store.value);
+test("legacy schema-1 state is adopted with an integrity seal before mutation", async (t) => {
+  const { temp, project, input, check, store } = await fixture(t);
+  const legacyProject = { ...project, directory: path.join(temp, "legacy-state") };
+  await fs.mkdir(legacyProject.directory, { recursive: true });
+  const legacy = {
+    schema: 1,
+    project: { id: project.id, name: project.name, root: project.root },
+    revision: 0,
+    updated_at: null,
+    metrics: {},
+    tasks: structuredClone(store.value.tasks),
+    contracts: [],
+    questions: [],
+    events: [],
+    feedback: [],
+  };
   delete legacy.contracts;
-  const file = path.join(project.directory, "state.json");
+  const file = path.join(legacyProject.directory, "state.json");
   await writeJson(file, legacy);
-  const bytes = await fs.readFile(file, "utf8");
-  const reopened = await ProjectStore.open(project);
+  const reopened = await ProjectStore.open(legacyProject);
   assert.equal((await checkContract(reopened.value, check)).reason, "contract_missing");
-  assert.equal(await fs.readFile(file, "utf8"), bytes);
+  const adopted = JSON.parse(await fs.readFile(file, "utf8"));
+  assert.equal(adopted.revision, legacy.revision);
+  assert.match(adopted.state_auth.mac, /^[a-f0-9]{64}$/);
+  assert.equal((await fs.stat(path.join(legacyProject.directory, "state-integrity.key"))).isFile(), true);
   await reopened.mutate("contract", input, "local_administrator");
   assert.equal(activeContract(reopened.value, "T1").version, 1);
   assert.equal(reopened.value.schema, 1);

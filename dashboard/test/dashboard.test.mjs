@@ -13,6 +13,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { ResourceUpdatedNotificationSchema } from "@modelcontextprotocol/sdk/types.js";
 import { identity, applyOperation, ProjectStore } from "../state.mjs";
 import { startDashboard } from "../server.mjs";
+import { readLocalRuntime } from "../private-runtime.mjs";
 import { checkPortConfig } from "../tailscale.mjs";
 import { feedbackSince } from "../mcp.mjs";
 import { proxyHarness } from "../harness.mjs";
@@ -133,9 +134,7 @@ test("project state, HTTP/stdio MCP, subscriptions, answers, and auth work toget
     port: await freePort(),
     tailscale: false,
   });
-  const runtime = JSON.parse(
-    await fs.readFile(path.join(alpha.directory, "runtime.json"), "utf8"),
-  );
+  const runtime = await readLocalRuntime(alpha.directory);
   const headers = {
     authorization: `Bearer ${runtime.token}`,
     "content-type": "application/json",
@@ -489,9 +488,7 @@ test("failed state startup releases the instance lock and administrative stop cl
     tailscale: false,
   });
   t.after(() => dashboard.close());
-  const runtime = JSON.parse(
-    await fs.readFile(path.join(project.directory, "runtime.json"), "utf8"),
-  );
+  const runtime = await readLocalRuntime(project.directory);
   const stopped = new Promise((resolve) =>
     dashboard.server.once("close", resolve),
   );

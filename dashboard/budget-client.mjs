@@ -4,11 +4,10 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 import { loopbackBase } from "./connection-diagnostics.mjs";
 import { createCliAdapter } from "./adapters.mjs";
+import { readLocalRuntime } from "./private-runtime.mjs";
 
 async function runtimeFor(project) {
-  const runtime = JSON.parse(
-    await fs.readFile(path.join(project.directory, "runtime.json"), "utf8"),
-  );
+  const runtime = await readLocalRuntime(project.directory);
   if (
     runtime.schema !== 1 ||
     runtime.kind !== "project" ||
