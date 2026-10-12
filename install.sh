@@ -33,6 +33,7 @@ NO_RUSTUP=0
 FROM_RELEASE=0
 VER="latest"
 USE_MUSL="${RDSH_MUSL:-0}"
+DESKTOP=0
 for a in "$@"; do
   case "$a" in
     --as-dsh) MODE="as-dsh" ;;
@@ -41,15 +42,17 @@ for a in "$@"; do
     --no-rustup) NO_RUSTUP=1 ;;
     --from-release) FROM_RELEASE=1 ;;
     --musl) USE_MUSL=1 ;;
+    --desktop) DESKTOP=1 ;;
     --version=*) VER="${a#--version=}" ;;
     -h|--help)
-      echo "usage: ./install.sh [--as-dsh] [--restore] [--prefix=DIR] [--no-rustup] [--from-release] [--musl] [--version=VER]"
+      echo "usage: ./install.sh [--as-dsh] [--restore] [--prefix=DIR] [--no-rustup] [--from-release] [--musl] [--desktop] [--version=VER]"
       echo "  (default)  build + install rdsh to PREFIX/rdsh (Linux, macOS, WSL)"
       echo "  --as-dsh   also install rdsh as PREFIX/dsh (backs up original to PREFIX/dsh-orig)"
       echo "  --restore  restore PREFIX/dsh from PREFIX/dsh-orig"
       echo "  --no-rustup  do not auto-install Rust when cargo is missing"
       echo "  --from-release  install a prebuilt binary from GitHub Releases (no Rust needed)"
       echo "  --musl  use the static musl build (rdsh-linux-x64-musl.tar.gz; also via RDSH_MUSL=1)"
+      echo "  --desktop  also attach the bundled plugins to the DeepSeek Harness Desktop profile"
       echo "  --version=VER  release to fetch with --from-release (default: latest)"
       echo "  native Windows: use install.ps1 instead (it can also side-install into WSL via -Wsl)"
       exit 0 ;;
@@ -341,4 +344,20 @@ echo "--- rdsh doctor ---"
 echo "next: run '$PREFIX/rdsh setup' to connect a model (GPT subscription via OAuth needs no API key)"
 if [ -f "./plugins/install.sh" ]; then
   echo "next: PROFILE=web ./plugins/install.sh adds recommended plugins, including the rdsh settings UI"
+fi
+# Desktop (Electron) keeps its own reserved profile next to the CLI profiles.
+# Detection is read-only and never fails the install.
+REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
+desktop_status="$("$PREFIX/rdsh" desktop status 2>/dev/null || true)"
+if printf '%s' "$desktop_status" | grep -q "desktop profile: .*(initialized)"; then
+  if [ "$DESKTOP" = 1 ]; then
+    echo "--- DeepSeek Harness Desktop ---"
+    if "$PREFIX/rdsh" desktop install --plugins-dir "$REPO_ROOT/plugins" --compute; then
+      echo "note: quit and reopen DeepSeek Harness to load the plugins"
+    else
+      echo "note: Desktop plugin attach failed; rerun 'rdsh desktop status' for the next step" >&2
+    fi
+  else
+    echo "next: rdsh desktop install --plugins-dir . attaches the rdsh plugins to the Desktop app"
+  fi
 fi

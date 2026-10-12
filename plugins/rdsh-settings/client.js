@@ -47,12 +47,13 @@ window.__ModuleLoader__.load({
       const sd = useState(null); const savedDiscord = sd[0]; const setSavedDiscord = sd[1];
       const dm = useState(''); const discordMsg = dm[0]; const setDiscordMsg = dm[1];
       const ms = useState(''); const msg = ms[0]; const setMsg = ms[1];
+      const vr = useState({}); const versions = vr[0]; const setVersions = vr[1];
       const load = useCallback(async () => {
         setLoading(true); setMsg(''); setAll(null);
         try {
           const r2 = await fetch(GET_ALL, { cache: 'no-store' });
           const j2 = await r2.json();
-          if (r2.ok && j2 && j2.config) { setAll(j2.config); setSavedDiscord(j2.config.discord || {}); setDiscordMsg(''); setLegacy(!!j2.legacy_present); }
+          if (r2.ok && j2 && j2.config) { setAll(j2.config); setSavedDiscord(j2.config.discord || {}); setDiscordMsg(''); setLegacy(!!j2.legacy_present); setVersions(j2.versions && typeof j2.versions === 'object' ? j2.versions : {}); }
           else setMsg(j2?.error === 'invalid-settings'
             ? '設定ファイルを読み込めません。元の設定を確認してから再読み込みしてください。'
             : '読み込みに失敗しました。接続と権限を確認してから再読み込みしてください。');
@@ -133,8 +134,13 @@ window.__ModuleLoader__.load({
         const v = cx[k];
         return Array.isArray(v) ? v.length > 0 : (typeof v === 'string' ? v !== '' : false);
       });
+      const versionText = [
+        versions.rdsh ? `rdsh ${versions.rdsh}` : 'rdsh バージョン不明',
+        versions.dsh ? `dsh ${versions.dsh}` : '',
+      ].filter(Boolean).join(' ・ ');
       return h('div', { className: 'rdsh-settings', style: { maxWidth: 720, display: 'flex', flexDirection: 'column', gap: 12 } },
         h('style', null, cssText + discordCss + narrowCss),
+        h('p', { className: 'rdsh-version', style: { ...desc, fontSize: '12px' }, 'aria-label': 'バージョン' }, versionText),
         h('section', { className: 'rdsh-discord', style: card, 'aria-label': 'Discord Rich Presence' },
           h('div', { style: { ...row, justifyContent: 'space-between', flexWrap: 'wrap' } }, h('h3', { style: title }, 'Discord Rich Presence'), h('span', { className: 'rdsh-discord-pill' }, discordDirty ? '未保存' : dc.enabled ? '表示 ON' : '表示 OFF')),
           h('p', { style: discordDesc }, 'Discordで、dshの作業状態を共有します。変更は保存すると反映されます。'),

@@ -3,6 +3,7 @@ mod auth;
 mod compact;
 mod compute;
 mod context;
+mod desktop;
 mod dsh_args;
 mod file_lock;
 mod file_security;
@@ -26,7 +27,7 @@ mod websearch;
     name = "rdsh",
     version,
     about = "Rust fast launcher for dsh (safe: native fast-paths + passthrough)",
-    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|dump-config|boot)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh --passthrough tui          no slim env; mandatory tool isolation remains\n  rdsh --dry-run tui -- --resume abc   show what would exec"
+    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|dump-config|boot)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh desktop status             detect the Desktop (Electron) app and its reserved profile\n  rdsh desktop install            attach the bundled rdsh plugins to that profile\n  rdsh --passthrough tui          no slim env; mandatory tool isolation remains\n  rdsh --dry-run tui -- --resume abc   show what would exec"
 )]
 struct Cli {
     /// Explicitly share a project file with isolated model tools (repeatable).
@@ -210,6 +211,53 @@ enum Commands {
         #[arg(long = "json")]
         json: bool,
     },
+    /// DeepSeek Harness Desktop (Electron): detect the app, its reserved
+    /// profile and its bundled command runtime, then attach rdsh plugins
+    #[command(name = "desktop")]
+    Desktop {
+        #[command(subcommand)]
+        action: Option<DesktopAction>,
+        /// Machine-readable output (same as the subcommand flag)
+        #[arg(long = "json")]
+        json: bool,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum DesktopAction {
+    /// Show the detected app, profile, command runtime, and plugin state
+    Status {
+        #[arg(long = "json")]
+        json: bool,
+    },
+    /// Attach plugins to the desktop profile through the Desktop command
+    Install {
+        /// Print the commands without running them
+        #[arg(long = "dry-run")]
+        dry_run: bool,
+        /// rustdsh checkout (or its plugins/) that carries the bundled plugins
+        #[arg(long = "plugins-dir")]
+        plugins_dir: Option<String>,
+        /// Also install rdsh-compute (resident compute bridge)
+        #[arg(long = "compute")]
+        compute: bool,
+        /// Extra package spec to add (name, git URL, or path; repeatable)
+        #[arg(long = "package")]
+        package: Vec<String>,
+        /// Install only the --package specs, without the bundled plugins
+        #[arg(long = "no-bundled")]
+        no_bundled: bool,
+        #[arg(long = "json")]
+        json: bool,
+    },
+    /// Exit nonzero unless the desktop profile has the required plugin enabled
+    Verify {
+        /// Plugin that must be enabled (repeatable; default: rdsh-settings)
+        #[arg(long = "require")]
+        require: Vec<String>,
+        #[arg(long = "json")]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -301,6 +349,7 @@ const NATIVE_FIRST: &[&str] = &[
     "logs",
     "guard",
     "compute",
+    "desktop",
     "auth",
     "setup",
     "search-web",
@@ -586,6 +635,29 @@ fn main() {
             None => features_list(&cfg, json),
             Some(FeaturesAction::On { id }) => features_toggle(&id, true),
             Some(FeaturesAction::Off { id }) => features_toggle(&id, false),
+        },
+        Some(Commands::Desktop { action, json }) => match action {
+            None => desktop::cmd_status(json),
+            Some(DesktopAction::Status { json: inner }) => desktop::cmd_status(json || inner),
+            Some(DesktopAction::Install {
+                dry_run,
+                plugins_dir,
+                compute,
+                package,
+                no_bundled,
+                json: inner,
+            }) => desktop::cmd_install(
+                plugins_dir.as_deref(),
+                &package,
+                no_bundled,
+                dry_run,
+                compute,
+                json || inner,
+            ),
+            Some(DesktopAction::Verify {
+                require,
+                json: inner,
+            }) => desktop::cmd_verify(&require, json || inner),
         },
         Some(Commands::Context { action }) => {
             if !rdsh_config::feature_enabled(&cfg, "context_engine") {
@@ -883,6 +955,38 @@ fn doctor() -> anyhow::Result<()> {
     match std::fs::read_dir(format!("{home}/profiles")) {
         Ok(d) => say(format!("[rdsh] profiles: {} local profile(s)", d.count())),
         Err(e) => say(format!("[rdsh] profiles: (unreadable: {e})")),
+    }
+    // Desktop (Electron) shares $DSH_HOME but keeps its own reserved profile;
+    // report both so a missing plugin attachment is visible in doctor.
+    let desktop_env = desktop::OsEnv::from_process();
+    let desktop_app = desktop::find_app(&desktop_env);
+    let desktop_profile = desktop::read_profile(&desktop_env.profile_dir());
+    say(format!(
+        "[rdsh] desktop: app {} | profile {}",
+        desktop_app
+            .as_deref()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|| "<not found>".to_string()),
+        if desktop_profile.initialized {
+            "initialized"
+        } else {
+            "not initialized"
+        }
+    ));
+    if desktop_profile.initialized {
+        let enabled: Vec<&str> = desktop::BUNDLED_PLUGINS
+            .iter()
+            .copied()
+            .filter(|name| desktop_profile.enabled(name))
+            .collect();
+        say(format!(
+            "[rdsh] desktop plugins: {}",
+            if enabled.is_empty() {
+                "none enabled (run: rdsh desktop install --plugins-dir <checkout>)".to_string()
+            } else {
+                enabled.join(", ")
+            }
+        ));
     }
     say(format!("[rdsh] slim env: {}", slim::describe()));
     say(format!("[rdsh] auth: {}", auth::summary_line()));

@@ -109,7 +109,14 @@ export function createHumanAnnotationPanel(container, { api, node, navigateTo })
   container.replaceChildren(status, form, list);
 
   function showTargetFields() {
-    for (const [kind, section] of fields) section.hidden = kind !== kindSelect.value;
+    for (const [kind, section] of fields) {
+      const active = kind === kindSelect.value;
+      section.hidden = !active;
+      for (const control of section.querySelectorAll(
+        "input, select, textarea",
+      ))
+        control.disabled = !active;
+    }
   }
 
   function renderOptions(select, values, selected, emptyLabel) {

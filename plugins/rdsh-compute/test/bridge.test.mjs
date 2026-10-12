@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createComputeBridge, isEnabled } from "../index.js";
+import { apply, createComputeBridge, isEnabled } from "../index.js";
 
 test("disabled by default: fallback estimate matches len/4 rule", async () => {
   delete process.env.RDSH_COMPUTE;
@@ -103,4 +103,29 @@ test("oversize input is rejected before spawn", async () => {
   assert.equal(typeof result.pruned, "string");
   b.close();
   delete process.env.RDSH_COMPUTE;
+});
+
+test("cordis entry exposes ctx.rdshCompute and closes it on dispose", async (t) => {
+  // Hermetic home: compute stays off, so the resolved bin is never spawned.
+  await featureHome(t, JSON.stringify({ features: { compute: false } }));
+  const previousBin = process.env.RDSH_BIN;
+  process.env.RDSH_BIN = "/nonexistent/rdsh-for-test";
+  t.after(() => {
+    if (previousBin === undefined) delete process.env.RDSH_BIN;
+    else process.env.RDSH_BIN = previousBin;
+  });
+
+  const handlers = [];
+  const ctx = { on: (event, fn) => handlers.push([event, fn]) };
+  apply(ctx);
+  const bridge = ctx.rdshCompute;
+  assert.equal(typeof bridge.estimate, "function");
+  assert.equal(typeof bridge.prune, "function");
+  const { usedRust } = await bridge.estimate("abcd1234");
+  assert.equal(usedRust, false); // disabled: fallback, no spawn
+
+  let closed = false;
+  bridge.close = () => { closed = true; };
+  for (const [event, fn] of handlers) if (event === "dispose") fn();
+  assert.equal(closed, true);
 });

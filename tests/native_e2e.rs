@@ -324,7 +324,11 @@ impl Server {
             let mut address = None;
             let mut handoff_path = None;
             let mut startup_lines = Vec::new();
+            let mut ready = false;
             for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+                if ready {
+                    continue;
+                }
                 startup_lines.push(line.clone());
                 if let Some(url) = line
                     .split_whitespace()
@@ -346,7 +350,10 @@ impl Server {
                         logged_token,
                         has_key_fragment,
                     ));
-                    break;
+                    // Keep draining until the child exits: closing the pipe here
+                    // would make the server's next log write fail.
+                    startup_lines.clear();
+                    ready = true;
                 }
             }
         });
@@ -364,13 +371,16 @@ impl Server {
             !has_key_fragment,
             "server must not print a token-bearing URL"
         );
+        // The token handoff file is written right after the URL is printed, but
+        // a loaded runner can delay it; wait on a wall-clock deadline.
+        let token_deadline = Instant::now() + Duration::from_secs(15);
         let mut token = None;
-        for _ in 0..50 {
+        while Instant::now() < token_deadline {
             if let Ok(text) = std::fs::read_to_string(&handoff_path) {
                 token = Some(text);
                 break;
             }
-            std::thread::sleep(std::time::Duration::from_millis(100));
+            std::thread::sleep(Duration::from_millis(100));
         }
         let token = token.expect("server should create its protected token handoff file");
         let address = url.trim_start_matches("http://127.0.0.1:");

@@ -3,6 +3,31 @@
 All notable changes to this project are documented here.
 Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
+## [Unreleased]
+
+### Added
+
+- `rdsh desktop status|install|verify` detects the DeepSeek Harness Desktop
+  (Electron) application, its reserved `$DSH_HOME/profiles/desktop` profile and
+  its bundled command runtime, then attaches the rdsh plugins through that
+  command (`plugin --profile desktop add`). `--package` forwards extra specs,
+  `--dry-run` prints the exact argv, `--compute` adds the resident compute
+  bridge. Detection is read-only; the Electron runtime, the bundled Node and
+  profile boot stay untouched.
+- `PROFILE=desktop ./plugins/install.sh` plus the `--desktop` / `-Desktop`
+  installer flags attach the recommended plugins to the Desktop profile, and
+  `rdsh doctor` reports the Desktop app, profile and enabled plugins.
+- GUI-hosted plugin hardening: the compute bridge and the settings plugin
+  resolve `rdsh` from `RDSH_BIN`, then `PATH`, then the well-known install
+  locations, and `rdsh-compute` declares its DSH bundle so a profile can enable
+  it.
+
+### Documentation
+
+- `docs/DESKTOP-INTEGRATION.md`: what the Desktop application is, how to attach
+  the plugins, environment overrides, safety rules, troubleshooting and the
+  current verification status.
+
 ## [0.3.0] - 2026-10-12
 
 ### Security

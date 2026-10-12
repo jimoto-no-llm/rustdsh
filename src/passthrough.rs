@@ -260,14 +260,20 @@ fn base_cmd(orig: &str, dry: bool, metadata_only: bool) -> anyhow::Result<std::p
         // Default: hand the run to DSH with its normal tools and normal file
         // access. The strict boundary stays available through --share-file,
         // features.agent_tool_sandbox, or RDSH_SECURITY=1.
-        if orig.ends_with(".js") {
+        let mut command = if orig.ends_with(".js") {
             let mut command = std::process::Command::new(&bin);
             command.arg(orig);
-            return Ok(command);
-        }
-        return Ok(std::process::Command::new(orig));
+            command
+        } else {
+            std::process::Command::new(orig)
+        };
+        // The rdsh settings card reports this without spawning a second binary.
+        command.env("RDSH_VERSION", env!("CARGO_PKG_VERSION"));
+        return Ok(command);
     }
-    crate::tool_security::command(orig, &bin)
+    let mut command = crate::tool_security::command(orig, &bin)?;
+    command.env("RDSH_VERSION", env!("CARGO_PKG_VERSION"));
+    Ok(command)
 }
 
 fn apply_slim(cmd: &mut std::process::Command, slim: bool) {

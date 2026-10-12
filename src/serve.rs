@@ -7,6 +7,14 @@ const ICON: &str = include_str!("../assets/icon.svg");
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 
+/// Serve must survive a closed stderr: piping the output (for example
+/// `rdsh serve | head -1`) closes the pipe, and a panicking eprintln! would
+/// take the dashboard down with it.
+fn log_line(message: std::fmt::Arguments<'_>) {
+    use std::io::Write;
+    let _ = writeln!(std::io::stderr(), "{message}");
+}
+
 pub fn cmd_serve(port: u16) -> anyhow::Result<()> {
     let addr = format!("127.0.0.1:{port}");
     let listener = std::net::TcpListener::bind(&addr).map_err(|e| {
@@ -19,9 +27,16 @@ pub fn cmd_serve(port: u16) -> anyhow::Result<()> {
     let port = listener.local_addr()?.port();
     let token = Arc::new(crate::local_http::random_token()?);
     let handoff = crate::token_handoff::TokenHandoff::create(&token)?;
-    eprintln!("[rdsh] dashboard: http://127.0.0.1:{port}/ (Ctrl-C to stop, localhost only)");
-    eprintln!("[rdsh] token handoff file: {}", handoff.path().display());
-    eprintln!("[rdsh] enter the file contents in the dashboard; the token is never printed");
+    log_line(format_args!(
+        "[rdsh] dashboard: http://127.0.0.1:{port}/ (Ctrl-C to stop, localhost only)"
+    ));
+    log_line(format_args!(
+        "[rdsh] token handoff file: {}",
+        handoff.path().display()
+    ));
+    log_line(format_args!(
+        "[rdsh] enter the file contents in the dashboard; the token is never printed"
+    ));
     let connections = Arc::new(AtomicUsize::new(0));
     while !crate::shutdown::requested() {
         match listener.accept() {
@@ -39,7 +54,7 @@ pub fn cmd_serve(port: u16) -> anyhow::Result<()> {
                 std::thread::spawn(move || {
                     let _slot = slot;
                     if let Err(e) = handle(s, &token, port) {
-                        eprintln!("[rdsh serve] {e:#}");
+                        log_line(format_args!("[rdsh serve] {e:#}"));
                     }
                 });
             }
@@ -50,7 +65,7 @@ pub fn cmd_serve(port: u16) -> anyhow::Result<()> {
                 std::thread::sleep(std::time::Duration::from_millis(5));
             }
             Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
-            Err(e) => eprintln!("[rdsh serve] accept: {e}"),
+            Err(e) => log_line(format_args!("[rdsh serve] accept: {e}")),
         }
     }
     Ok(())
