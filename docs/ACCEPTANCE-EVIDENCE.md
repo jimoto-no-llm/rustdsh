@@ -99,7 +99,7 @@ are 5,000 files, 64 MiB per file, 256 MiB total and bounded Git subprocesses.
 | Same criterion, code target, environment and intact logs              | `current`                              |
 | Changed criterion, HEAD/branch, related input or environment          | `stale`                                |
 | Deleted or ignored required input                                     | `stale`; a new run is blocked          |
-| Changed worktree outside declared inputs or opaque `.env*` path        | `unknown`, `impact_scope_unknown`      |
+| Changed worktree outside declared inputs or opaque `.env*` path       | `unknown`, `impact_scope_unknown`      |
 | Unavailable Git/files, unstable execution target or incomplete record | `unknown`                              |
 | Missing/modified command or evidence artifact                         | Ineligible pass, with integrity reason |
 
