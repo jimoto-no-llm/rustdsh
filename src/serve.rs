@@ -150,7 +150,9 @@ fn handle(mut s: std::net::TcpStream, token: &str, port: u16) -> anyhow::Result<
             (
                 200,
                 "application/json",
-                Cow::Owned(serde_json::json!({"tokens": t, "chars": text.len()}).to_string()),
+                Cow::Owned(
+                    serde_json::json!({"tokens": t, "chars": text.chars().count()}).to_string(),
+                ),
             )
         }
         ("POST", "/api/prune") => {

@@ -980,3 +980,19 @@ fn web_search_gate_and_real_http_results_and_failure() {
         }
     }
 }
+
+/// #389: tokens/compute の chars は文字数（Unicode scalar 数）。
+#[test]
+fn tokens_chars_counts_characters_not_bytes() {
+    let f = Fixture::new();
+    let v: Value =
+        serde_json::from_slice(&f.ok(&["tokens"], "\u{65e5}\u{672c}\u{8a9e}".as_bytes())).unwrap();
+    assert_eq!(v["tokens"], 3);
+    assert_eq!(v["chars"], 3);
+    let line = "{\"v\":1,\"id\":\"review\",\"op\":\"tokens.estimate\",\"text\":\"\u{65e5}\u{672c}\u{8a9e}\"}\n";
+    let v: Value = serde_json::from_slice(&f.ok(&["compute", "--once"], line.as_bytes())).unwrap();
+    assert_eq!(v["chars"], 3);
+    let batch = "{\"v\":1,\"id\":\"review\",\"op\":\"tokens.estimate_batch\",\"texts\":[\"\u{65e5}\u{672c}\u{8a9e}\",\"\u{e9}\",\"abc\"]}\n";
+    let v: Value = serde_json::from_slice(&f.ok(&["compute", "--once"], batch.as_bytes())).unwrap();
+    assert_eq!(v["chars"], serde_json::json!([3, 1, 3]));
+}
