@@ -8,7 +8,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { ProjectStore, identity } from "../state.mjs";
 import { AcceptanceStore } from "../acceptance.mjs";
-import { observeTarget } from "../acceptance-target.mjs";
+import { observeTarget, relativeInput } from "../acceptance-target.mjs";
 
 const exec = promisify(execFile),
   cli = fileURLToPath(new URL("../cli.mjs", import.meta.url));
@@ -475,44 +475,56 @@ test("a successful command that changes its observed code target remains blocked
   assert.equal(view.conditions[0].full_result.stable_target, false);
 });
 
-test("unrelated .env.example does not block observation of normal criterion inputs", async (t) => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-env-example-"));
-  t.after(() => fs.rm(root, { recursive: true, force: true }));
-  const repo = path.join(root, "repo");
-  await fs.mkdir(repo, { recursive: true });
-  const git = (...args) => exec("git", ["-C", repo, ...args]);
-  await git("init", "--quiet");
-  await fs.writeFile(path.join(repo, "app.mjs"), "export const answer = 42;\n");
-  await git("add", "app.mjs");
-  await exec("git", [
-    "-C",
-    repo,
-    "-c",
-    "user.name=Acceptance Fixture",
-    "-c",
-    "user.email=acceptance@example.invalid",
-    "-c",
-    "commit.gpgsign=false",
-    "commit",
-    "--quiet",
-    "-m",
-    "fixture",
-  ]);
-  const project = { root: repo, directory: path.join(root, "state") };
-  const before = await observeTarget(project, ["app.mjs"]);
-  assert.equal(before.status, "observed");
-  await fs.writeFile(
-    path.join(repo, ".env.example"),
-    "PUBLIC_OPTION=placeholder\n",
-  );
-  const untracked = await observeTarget(project, ["app.mjs"]);
-  assert.equal(untracked.status, "observed");
-  await git("add", ".env.example");
-  const tracked = await observeTarget(project, ["app.mjs"]);
-  assert.equal(tracked.status, "observed");
-  // Direct forbidden inputs stay rejected.
-  const direct = await observeTarget(project, [".env.example"]);
-  assert.equal(direct.status, "unknown");
-  assert.equal(direct.reason, "invalid_input_path");
+test("dotenv-like worktree paths allow execution but keep verification scope unknown", async (t) => {
+  for (const tracked of [false, true]) {
+    const f = await setup(t);
+    const before = await observeTarget(f.project, f.definition[0].inputs);
+    assert.equal(before.status, "observed", before.reason);
+    assert.equal(before.worktree_complete, true);
+
+    const names = [".env.example", ".env.local", ".envrc", ".environment"],
+      placeholder = "PRIVATE_VALUE=synthetic-test-fixture\n";
+    for (const name of names)
+      await fs.writeFile(path.join(f.cwd, name), placeholder);
+    if (tracked)
+      await exec("git", ["-C", f.cwd, "add", "--", ...names], {
+        env: f.env,
+      });
+
+    await f.store.define("task-qa", f.definition);
+    const result = await f.run();
+    assert.equal(result.status, "pass");
+    assert.equal(result.reason, "impact_scope_unknown");
+    assert.equal(result.exit_code, 0);
+    assert.equal(result.target.worktree_complete, false);
+    assert.notEqual(result.target.worktree_hash, before.worktree_hash);
+    assert.doesNotMatch(JSON.stringify(result.target), /PRIVATE_VALUE=/);
+
+    const view = await f.store.inspect("task-qa"),
+      after = await observeTarget(f.project, f.definition[0].inputs);
+    assert.equal(after.status, "observed", after.reason);
+    assert.equal(after.worktree_complete, false);
+    assert.deepEqual(view.conditions[0].full_result.freshness, {
+      state: "unknown",
+      reason: "impact_scope_unknown",
+    });
+    assert.equal(view.conditions[0].verified_full_check, false);
+    assert.equal(view.reported_done_with_verified_checks, false);
+    assert.doesNotMatch(JSON.stringify(view), /PRIVATE_VALUE=/);
+
+    await fs.writeFile(
+      path.join(f.cwd, ".env.example"),
+      "PRIVATE_VALUE=changed-test-fixture\n",
+    );
+    const changed = await observeTarget(f.project, f.definition[0].inputs);
+    assert.equal(changed.worktree_hash, after.worktree_hash);
+    assert.deepEqual(
+      (await f.store.inspect("task-qa")).conditions[0].full_result.freshness,
+      { state: "unknown", reason: "impact_scope_unknown" },
+    );
+  }
+  for (const name of [".env", ".env.example", ".env.local", ".envrc"])
+    assert.equal(relativeInput(name), false);
+  assert.equal(relativeInput(".environment"), false);
 });
 

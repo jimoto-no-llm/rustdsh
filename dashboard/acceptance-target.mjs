@@ -25,7 +25,7 @@ export class AcceptanceError extends Error {
 export function requireValue(value, code) {
   if (!value) throw new AcceptanceError(code);
 }
-export function relativeInput(value) {
+function relativePath(value) {
   return (
     typeof value === "string" &&
     value.length > 0 &&
@@ -39,11 +39,21 @@ export function relativeInput(value) {
           !part ||
           part === "." ||
           part === ".." ||
-          part === ".git" ||
-          part.startsWith(".env"),
+          part === ".git",
       ) &&
     !value.includes(":")
   );
+}
+export function relativeInput(value) {
+  return (
+    relativePath(value) &&
+    value.split("/").every((part) => !part.toLowerCase().startsWith(".env"))
+  );
+}
+function protectedWorktreePath(value) {
+  return value
+    .split("/")
+    .some((part) => part.toLowerCase().startsWith(".env"));
 }
 const within = (root, file) => {
   const value = path.relative(root, file);
@@ -53,8 +63,13 @@ const within = (root, file) => {
     !path.isAbsolute(value)
   );
 };
-export async function observedFile(root, relative) {
-  requireValue(relativeInput(relative), "invalid_input_path");
+export async function observedFile(root, relative, { worktree = false } = {}) {
+  if (worktree && !relativePath(relative))
+    return { path: relative, sha256: null, bytes: 0, unobservable: true };
+  requireValue(
+    worktree ? relativePath(relative) : relativeInput(relative),
+    "invalid_input_path",
+  );
   let file;
   try {
     file = await fs.realpath(path.join(root, relative));
@@ -63,6 +78,12 @@ export async function observedFile(root, relative) {
     return { path: relative, sha256: null, bytes: 0, missing: true };
   }
   requireValue(within(root, file), "input_outside_project");
+  const resolvedRelative = path.relative(root, file).split(path.sep).join("/");
+  if (
+    worktree &&
+    (protectedWorktreePath(relative) || protectedWorktreePath(resolvedRelative))
+  )
+    return { path: relative, sha256: null, bytes: 0, unobservable: true };
   const stat = await fs.stat(file);
   requireValue(
     stat.isFile() && stat.size <= 64 * 1024 * 1024,
@@ -92,6 +113,7 @@ export async function observeTarget(project, inputs) {
       branch: null,
       inputs_hash: null,
       worktree_hash: null,
+      worktree_complete: true,
       environment,
       environment_hash: checksum(environment),
       status: "unknown",
@@ -162,11 +184,11 @@ export async function observeTarget(project, inputs) {
       const file = path.resolve(root, name);
       // Acceptance storage cannot influence its own code snapshot.
       if (within(project.directory, file)) continue;
-      // Unrelated worktree files must not fail the whole observation.
-      // Explicit criterion inputs are validated above; forbidden paths such
-      // as secret-adjacent names stay out of the snapshot without being read.
-      if (!relativeInput(name)) continue;
-      const observed = await observedFile(root, name);
+      // Never read dotenv-like worktree paths. Keep only an opaque path marker
+      // so a changed file set remains visible, and keep currentness unknown
+      // while any such unobserved input could affect the check.
+      const observed = await observedFile(root, name, { worktree: true });
+      if (observed.unobservable) result.worktree_complete = false;
       total += observed.bytes;
       requireValue(total <= 256 * 1024 * 1024, "worktree_too_large");
       data.set(name, observed);
@@ -203,6 +225,11 @@ export async function observeTarget(project, inputs) {
 export function freshness(record, current, criterionHash) {
   if (record.criterion_hash !== criterionHash)
     return { state: "stale", reason: "acceptance_definition_changed" };
+  if (
+    record.target.worktree_complete === false ||
+    current.worktree_complete === false
+  )
+    return { state: "unknown", reason: "impact_scope_unknown" };
   if (
     record.stable_target &&
     record.target.status === "observed" &&
