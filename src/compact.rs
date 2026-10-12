@@ -104,7 +104,7 @@ pub fn cmd_compact(file: &str, max_tokens: usize) -> anyhow::Result<()> {
         return Ok(());
     }
     let first = lines.first().copied().unwrap_or_default();
-    let mut kept: Vec<&str> = vec![];
+    let mut kept: Vec<&str> = Vec::new();
     let mut used = toks.first().copied().unwrap_or_default() + 200;
     for (l, t) in lines.iter().zip(toks.iter()).rev() {
         if used + *t > max_tokens {
@@ -153,7 +153,7 @@ fn compact_output(text: &str, max_tokens: usize) -> String {
         return text.to_string();
     }
     let first = lines.first().copied().unwrap_or_default();
-    let mut kept: Vec<&str> = vec![];
+    let mut kept: Vec<&str> = Vec::new();
     let mut used = toks.first().copied().unwrap_or_default() + 200;
     for (l, t) in lines.iter().zip(toks.iter()).rev() {
         if used + *t > max_tokens {
