@@ -1,0 +1,6 @@
+--- baseline: malformed registration reached session/owner observation
++++ candidate: validate the identifiers before reading session history
+-{"status":409,"error":"The attached ACP owner/run/session is not live or cannot be verified"}
++{"status":400,"error":"Invalid registered owner ID"}
+-{"status":409,"error":"A confirmed, exact native session is required"}
++{"status":400,"error":"Invalid native session ID"}
