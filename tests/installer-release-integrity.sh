@@ -103,6 +103,19 @@ else
   fail "pinned archive did not install"
 fi
 
+# --musl has to find its own registry row: a musl host installs that asset
+# without ever trying the glibc one. Only Linux/x86_64 selects it explicitly.
+if [ "$(uname -s)" = "Linux" ] && [ "$(uname -m)" = "x86_64" ]; then
+  if bash "$ROOT/install.sh" --from-release --musl --prefix="$TEST_ROOT/musl-bin" >"$TEST_ROOT/musl.log" 2>&1 \
+    && "$TEST_ROOT/musl-bin/rdsh" --version | grep -q "rdsh release fixture"; then
+    grep -Eq '/download/v9\.9\.9/rdsh-linux-x64-musl\.tar\.gz$' "$CURL_LOG" || fail "--musl did not fetch the musl archive"
+    ok "pinned musl release installs"
+  else
+    cat "$TEST_ROOT/musl.log" >&2
+    fail "pinned musl archive did not install"
+  fi
+fi
+
 # A matching same-origin .sha256 cannot authorize a different archive.
 cat >"$TEST_ROOT/pkg/rdsh" <<'EVIL_EOF'
 #!/bin/sh
@@ -199,14 +212,23 @@ grep -q "checksum bypass not confirmed" "$TEST_ROOT/declined.log" || fail "a dec
 ok "checksum bypass requires an exact YES response"
 
 mkdir -p "$RELEASE_ROOT/download/v8.8.8"
-for asset in "${ASSETS[@]}"; do cp "$EVIL_ARCHIVE" "$RELEASE_ROOT/download/v8.8.8/$asset"; done
+# A confirmed bypass installs bytes no registry pins, but the installer still
+# runs the result: a fixture that cannot start would only trigger the static
+# musl retry and a second prompt, which proves nothing about the bypass.
+cat >"$TEST_ROOT/pkg/rdsh" <<'UNPINNED_EOF'
+#!/bin/sh
+echo "rdsh unpinned v8.8.8"
+UNPINNED_EOF
+chmod +x "$TEST_ROOT/pkg/rdsh"
+tar -czf "$TEST_ROOT/unpinned.tar.gz" -C "$TEST_ROOT/pkg" rdsh
+for asset in "${ASSETS[@]}"; do cp "$TEST_ROOT/unpinned.tar.gz" "$RELEASE_ROOT/download/v8.8.8/$asset"; done
 : >"$CURL_LOG"
 RDSH_TEST_ANSWER=YES python3 "$TEST_ROOT/run-with-tty.py" "$ROOT/install.sh" "$TEST_ROOT/confirmed-bin" --version=v8.8.8 >"$TEST_ROOT/confirmed.log" 2>&1 || {
   cat "$TEST_ROOT/confirmed.log" >&2
   fail "confirmed interactive bypass failed"
 }
 if grep -q 'raw.githubusercontent.com' "$CURL_LOG"; then fail "explicit unpinned bypass fetched the registry"; fi
-if "$TEST_ROOT/confirmed-bin/rdsh" --version | grep -q "unexpected release payload"; then
+if "$TEST_ROOT/confirmed-bin/rdsh" --version | grep -q "rdsh unpinned v8.8.8"; then
   ok "confirmed interactive bypass works"
 else
   fail "confirmed interactive bypass did not install the fixture"
