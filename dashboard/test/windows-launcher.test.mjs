@@ -61,7 +61,15 @@ async function runtime(root, name) {
         const data = JSON.parse(
           await fs.readFile(path.join(projects, id, "runtime.json"), "utf8"),
         );
-        if (data.port === name) return data;
+        if (data.port === name) {
+          const owner = JSON.parse(
+            await fs.readFile(
+              path.join(projects, id, "owner-credentials.json"),
+              "utf8",
+            ),
+          );
+          return { ...data, token: owner.admin_token };
+        }
       }
     } catch {}
     await delay(100);

@@ -14,6 +14,7 @@ import { windowsJobObservation } from "../process-scope-backends.mjs";
 import { startHarness } from "../harness.mjs";
 import { RunHistory } from "../run-history.mjs";
 import { startDashboard } from "../server.mjs";
+import { readLocalRuntime } from "../private-runtime.mjs";
 import net from "node:net";
 const fixture = fileURLToPath(
   new URL("./fixtures/owned-tree.mjs", import.meta.url),
@@ -409,9 +410,7 @@ test("authenticated Harness API separates stopping from verified empty descendan
     },
   });
   own({ stop: () => d.close() });
-  const runtime = JSON.parse(
-    await fs.readFile(path.join(d.directory, "runtime.json"), "utf8"),
-  );
+  const runtime = await readLocalRuntime(d.directory);
   const url = d.localUrl + "_rdsh/api/",
     admin = { authorization: "Bearer " + runtime.token };
   assert.equal(
@@ -505,9 +504,7 @@ test("lost Harness monitor remains unverifiable in HTTP responses and administra
       stopTimeout: 150,
     },
   });
-  const runtime = JSON.parse(
-      await fs.readFile(path.join(d.directory, "runtime.json"), "utf8"),
-    ),
+  const runtime = await readLocalRuntime(d.directory),
     headers = { authorization: "Bearer " + runtime.token },
     url = d.localUrl + "_rdsh/api/";
   h.disconnectMonitor();

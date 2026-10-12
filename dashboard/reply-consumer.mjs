@@ -1,5 +1,3 @@
-import fs from "node:fs/promises";
-import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import {
@@ -7,14 +5,13 @@ import {
   finalReplyPhases,
   replyPrompt,
 } from "./answer-applications.mjs";
+import { readLocalRuntime } from "./private-runtime.mjs";
 
 // A transport consumer around the original ACP client, not an agent loop.
 // Native result history and the dashboard claim use a shared preallocated ID.
 export class ReplyConsumer {
   static async open({ project, attached, fetchImpl = fetch }) {
-    const runtime = JSON.parse(
-      await fs.readFile(path.join(project.directory, "runtime.json"), "utf8"),
-    );
+    const runtime = await readLocalRuntime(project.directory);
     const url = new URL(runtime.local_url);
     replyCheck(
       runtime.schema === 1 &&

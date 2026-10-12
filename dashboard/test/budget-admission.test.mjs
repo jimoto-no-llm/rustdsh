@@ -15,6 +15,7 @@ import {
   validateBudgetAdmission,
 } from "../budget-admission.mjs";
 import { startDashboard } from "../server.mjs";
+import { readLocalRuntime } from "../private-runtime.mjs";
 import { SessionLedger, attachRecordedSession } from "../session-ledger.mjs";
 import { createCliAdapter } from "../adapters.mjs";
 import { createBudgetHook } from "../../plugins/rdsh-budget-guard/index.js";
@@ -48,9 +49,7 @@ async function setup(t, server = false) {
     tailscale: false,
   });
   t.after(() => dashboard.close());
-  const runtime = JSON.parse(
-    await fs.readFile(path.join(project.directory, "runtime.json"), "utf8"),
-  );
+  const runtime = await readLocalRuntime(project.directory);
   const post = async (
     route,
     input,

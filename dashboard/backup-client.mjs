@@ -1,13 +1,10 @@
-import fs from "node:fs/promises";
-import path from "node:path";
 import { loopbackBase } from "./connection-diagnostics.mjs";
+import { readLocalRuntime } from "./private-runtime.mjs";
 
 export async function backupRequest(project, action, input = {}) {
   if (!["preview", "restore", "history"].includes(action))
     throw new Error("Unknown backup action");
-  const runtime = JSON.parse(
-    await fs.readFile(path.join(project.directory, "runtime.json"), "utf8"),
-  );
+  const runtime = await readLocalRuntime(project.directory);
   if (
     runtime.schema !== 1 ||
     runtime.kind !== "project" ||

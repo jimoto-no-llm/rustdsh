@@ -6,6 +6,7 @@ import path from "node:path";
 import net from "node:net";
 import { fileURLToPath } from "node:url";
 import { startDashboard } from "../server.mjs";
+import { readLocalRuntime } from "../private-runtime.mjs";
 
 const fixture = fileURLToPath(
   new URL("./fixtures/owned-tree.mjs", import.meta.url),
@@ -71,9 +72,7 @@ test("concurrent close shares one attempt and retries an unconfirmed stop", asyn
   await assert.rejects(first, /dashboard remains available/);
   assert.equal(stopCalls, 1);
   assert.equal(dashboard.server.listening, true);
-  const runtime = JSON.parse(
-    await fs.readFile(path.join(dashboard.directory, "runtime.json"), "utf8"),
-  );
+  const runtime = await readLocalRuntime(dashboard.directory);
   const response = await fetch(dashboard.localUrl + "_rdsh/api/managed-process", {
     headers: { authorization: `Bearer ${runtime.token}` },
   });

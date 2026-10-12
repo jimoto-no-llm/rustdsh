@@ -16,6 +16,7 @@ import {
   writeJson,
 } from "../state.mjs";
 import { startDashboard } from "../server.mjs";
+import { readLocalRuntime } from "../private-runtime.mjs";
 import { AcceptanceStore } from "../acceptance.mjs";
 import {
   createHistoryBackup,
@@ -152,12 +153,7 @@ async function setup(t, count = 1) {
 test("backup API rejects proxy-forwarded requests even when the peer is loopback", async (t) => {
   const f = await setup(t),
     dashboard = await f.start(f.projects[0]),
-    runtime = JSON.parse(
-      await fs.readFile(
-        path.join(f.projects[0].directory, "runtime.json"),
-        "utf8",
-      ),
-    );
+    runtime = await readLocalRuntime(f.projects[0].directory);
   const post = (extraHeaders = {}) =>
     fetch(`${dashboard.localUrl}api/backup/history`, {
       method: "POST",
@@ -401,12 +397,8 @@ test("empty target restores only historical data using fresh authentication; old
   assert.equal(hub.status().active, 1);
   const src = await f.start(source),
     dst = await f.start(target);
-  const oldRuntime = JSON.parse(
-    await fs.readFile(path.join(source.directory, "runtime.json"), "utf8"),
-  );
-  const newRuntime = JSON.parse(
-    await fs.readFile(path.join(target.directory, "runtime.json"), "utf8"),
-  );
+  const oldRuntime = await readLocalRuntime(source.directory);
+  const newRuntime = await readLocalRuntime(target.directory);
   const a = await backupRequest(source, "preview", { selection });
   for (const secret of [
     oldRuntime.token,
@@ -493,8 +485,11 @@ test("empty target restores only historical data using fresh authentication; old
     [
       "mcp-config.json",
       "mcp-http-config.json",
+      "owner-credentials.json",
       "runtime.json",
       "server.lock",
+      "state-integrity.enabled",
+      "state-integrity.key",
       "state.json",
     ].sort(),
   );
@@ -741,6 +736,6 @@ test("existing question and acceptance evidence IDs reject import before writing
   await writeJson(eFile, corrupt);
   await assert.rejects(
     ProjectStore.open(evidenceTarget),
-    /cannot_restore_authority/,
+    /integrity check failed/,
   );
 });

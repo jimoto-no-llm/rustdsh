@@ -9,6 +9,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { parseArgs } from "node:util";
 import { identity } from "./state.mjs";
+import { readLocalRuntime } from "./private-runtime.mjs";
 import { startDashboard } from "./server.mjs";
 import { budgetRequest } from "./budget-client.mjs";
 import { SessionLedger, attachRecordedSession } from "./session-ledger.mjs";
@@ -108,9 +109,7 @@ try {
     prompt_sent: false,
   };
   await attached.adapter.stop();
-  const runtime = JSON.parse(
-    await fs.readFile(path.join(project.directory, "runtime.json"), "utf8"),
-  );
+  const runtime = await readLocalRuntime(project.directory);
   const post = async (route, input) => {
     const response = await fetch(`${dashboard.localUrl}api/budget/${route}`, {
       method: "POST",

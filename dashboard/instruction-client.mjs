@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { replyCheck } from "./answer-applications.mjs";
 import { loopbackBase } from "./connection-diagnostics.mjs";
+import { readOwnerCredentials } from "./private-runtime.mjs";
 
 // Explicit submission only: no provider request, native launch or agent loop.
 export async function instructionRequest(
@@ -13,13 +14,19 @@ export async function instructionRequest(
   const runtime = JSON.parse(
     await fs.readFile(path.join(project.directory, "runtime.json"), "utf8"),
   );
+  const ownerCredentials = action === "resolve"
+    ? await readOwnerCredentials(project.directory)
+    : null;
   const base = loopbackBase(runtime.local_url);
   replyCheck(
     runtime.schema === 1 &&
       runtime.kind === "project" &&
       runtime.project_id === project.id &&
       /^[0-9a-f]{64}$/.test(runtime.mcp_token) &&
-      /^[0-9a-f]{64}$/.test(runtime.token),
+      (!ownerCredentials ||
+        (ownerCredentials.project_id === project.id &&
+          ownerCredentials.instance_id === runtime.instance_id &&
+          /^[0-9a-f]{64}$/.test(ownerCredentials.admin_token))),
     "Dashboard runtime does not match the instruction project",
     400,
   );
@@ -35,7 +42,7 @@ export async function instructionRequest(
   const response = await fetchImpl(`${base}api/instructions/${route}`, {
     method: action === "context" ? "GET" : "POST",
     headers: {
-      authorization: `Bearer ${action === "resolve" ? runtime.token : runtime.mcp_token}`,
+      authorization: `Bearer ${action === "resolve" ? ownerCredentials.admin_token : runtime.mcp_token}`,
       "content-type": "application/json",
     },
     body: action === "context" ? undefined : JSON.stringify(input),

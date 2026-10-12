@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { identity, stateHome } from "./state.mjs";
+import { readLocalRuntime } from "./private-runtime.mjs";
 import { startDashboard } from "./server.mjs";
 import { runStdio } from "./mcp.mjs";
 import { adapterCatalog, createCliAdapter } from "./adapters.mjs";
@@ -377,9 +378,7 @@ try {
     if (values.harness || !values.file)
       throw new Error("Provide --file <contract.json> in project mode");
     const project = await identity(values.project || process.cwd());
-    const runtime = JSON.parse(
-      await fs.readFile(path.join(project.directory, "runtime.json"), "utf8"),
-    );
+    const runtime = await readLocalRuntime(project.directory);
     if (runtime.kind !== "project" || runtime.project_id !== project.id)
       throw new Error("Dashboard runtime belongs to a different project");
     let input;
@@ -1209,9 +1208,7 @@ try {
     const directory = project
       ? project.directory
       : path.join(stateHome(), "harness");
-    const runtime = JSON.parse(
-      await fs.readFile(path.join(directory, "runtime.json"), "utf8"),
-    );
+    const runtime = await readLocalRuntime(directory);
     try {
       process.kill(runtime.pid, 0);
     } catch {
@@ -1245,9 +1242,7 @@ try {
     const project = await identity(values.project || process.cwd());
     let report;
     try {
-      const runtime = await localJson(
-        path.join(project.directory, "runtime.json"),
-      );
+      const runtime = await readLocalRuntime(project.directory);
       if (
         runtime.kind !== "project" ||
         runtime.project_id !== project.id ||
@@ -1300,9 +1295,7 @@ try {
         "Set CONTROL_PLANE_API_KEY locally before connecting; do not put keys in command arguments or chat",
       );
     const project = await identity(values.project || process.cwd());
-    const runtime = JSON.parse(
-      await fs.readFile(path.join(project.directory, "runtime.json"), "utf8"),
-    );
+    const runtime = await readLocalRuntime(project.directory);
     const base = loopbackBase(runtime.local_url);
     if (!/^[0-9a-f]{64}$/.test(runtime.mcp_token || ""))
       throw new Error(

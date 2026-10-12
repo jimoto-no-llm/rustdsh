@@ -9,6 +9,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { identity, ProjectStore, publicState } from "../state.mjs";
 import { startDashboard } from "../server.mjs";
+import { readLocalRuntime } from "../private-runtime.mjs";
 import { costRequest } from "../cost-client.mjs";
 import { executeTool, tools } from "../mcp.mjs";
 import { costScope, costReport } from "./fixtures/cost-report.mjs";
@@ -346,7 +347,7 @@ test("scope identity, source certainty, dates and malformed persisted ledger fai
   const file = path.join(project.directory, "state.json"),
     bytes = JSON.stringify(corrupted);
   await fs.writeFile(file, bytes);
-  await assert.rejects(ProjectStore.open(project), /Cost ledger/);
+  await assert.rejects(ProjectStore.open(project), /integrity check failed/);
   assert.equal(await fs.readFile(file, "utf8"), bytes);
 });
 
@@ -382,9 +383,7 @@ test("HTTP parallel worker reports, lost response retry, browser read-only and p
       tailscale: false,
     });
   t.after(() => dashboard.close());
-  const runtime = JSON.parse(
-    await fs.readFile(path.join(f.project.directory, "runtime.json"), "utf8"),
-  );
+  const runtime = await readLocalRuntime(f.project.directory);
   const human = {
     "x-rdsh-browser-token": new URL(runtime.browser_url).hash.slice(5),
   };

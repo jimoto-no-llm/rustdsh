@@ -7,6 +7,7 @@ import path from "node:path";
 import test from "node:test";
 import { HumanAnnotationStore, eventIdentifier } from "../human-annotations.mjs";
 import { startDashboard } from "../server.mjs";
+import { readLocalRuntime } from "../private-runtime.mjs";
 
 async function fixture(t) {
   const temporary = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-annotations-"));
@@ -167,9 +168,7 @@ test("annotation HTTP access is browser-only and survives dashboard restart", as
     title: "Deployment decision",
     detail: "first line\nsecond line",
   });
-  let runtime = JSON.parse(
-    await fs.readFile(path.join(f.project.directory, "runtime.json"), "utf8"),
-  );
+  let runtime = await readLocalRuntime(f.project.directory);
   const browser = {
     "x-rdsh-browser-token": new URL(runtime.browser_url).hash.slice(5),
   };
@@ -217,9 +216,7 @@ test("annotation HTTP access is browser-only and survives dashboard restart", as
     port: await freePort(),
     tailscale: false,
   });
-  runtime = JSON.parse(
-    await fs.readFile(path.join(f.project.directory, "runtime.json"), "utf8"),
-  );
+  runtime = await readLocalRuntime(f.project.directory);
   const browserAfterRestart = {
     "x-rdsh-browser-token": new URL(runtime.browser_url).hash.slice(5),
   };

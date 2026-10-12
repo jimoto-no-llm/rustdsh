@@ -12,6 +12,7 @@ import { identity, ProjectStore, publicState } from "../state.mjs";
 import { SessionLedger, attachRecordedSession } from "../session-ledger.mjs";
 import { ReplyConsumer } from "../reply-consumer.mjs";
 import { startDashboard } from "../server.mjs";
+import { readLocalRuntime } from "../private-runtime.mjs";
 import { feedbackSince } from "../mcp.mjs";
 import { EventsHub } from "../webhooks.mjs";
 import { Webhook } from "standardwebhooks";
@@ -90,9 +91,7 @@ async function setup(t, webhook = false) {
       ...(webhook ? { webhookPost } : {}),
     });
     servers.push(server);
-    runtime = JSON.parse(
-      await fs.readFile(path.join(project.directory, "runtime.json"), "utf8"),
-    );
+    runtime = await readLocalRuntime(project.directory);
     return server;
   };
   t.after(async () => {
