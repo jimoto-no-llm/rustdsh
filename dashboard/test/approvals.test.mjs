@@ -104,7 +104,7 @@ test("review approvals cannot authorize writes and the role is bound to the huma
   const { store, request, use } = await fixture(t);
   await assert.rejects(() => store.mutate("approval_request", { ...request, worker_role: "review" }), /read-only/i);
   await store.mutate("approval_request", request);
-  await store.mutate("approval_decision", { id: "R1", request_version: 1, decision: "grant" }, "human_browser");
+  await store.mutate("approval_decision", { id: "R1", request_version: 1, decision: "grant" }, "browser_owner");
   assert.equal((await checkApproval(store.value, { ...use, worker_role: "review" })).reason,
     "approval_worker_role_changed");
   assert.equal((await checkApproval(store.value, use)).decision, "approval_valid");
@@ -113,7 +113,7 @@ test("review approvals cannot authorize writes and the role is bound to the huma
 test("execution start is durable before side effects and started attempts cannot replay", async (t) => {
   const { store, request, use, project } = await fixture(t);
   await store.mutate("approval_request", request);
-  await store.mutate("approval_decision", { id: "R1", request_version: 1, decision: "grant" }, "human_browser");
+  await store.mutate("approval_decision", { id: "R1", request_version: 1, decision: "grant" }, "browser_owner");
   await store.mutate("approval_start", use);
   const started = currentRequest(store.value, "R1").uses[0];
   assert.equal(started.execution, "started");
@@ -153,7 +153,7 @@ test("HTTP sandbox execution requires MCP authority, persists start, and runs a 
     throw error;
   }
   t.after(() => dashboard.close());
-  const runtime = JSON.parse(await fs.readFile(path.join(project.directory, "runtime.json"), "utf8"));
+  const runtime = await readLocalRuntime(project.directory);
   const agent = { authorization: `Bearer ${runtime.mcp_token}` };
   const admin = { authorization: `Bearer ${runtime.token}` };
   const human = { "x-rdsh-browser-token": new URL(runtime.browser_url).hash.slice(5) };
@@ -190,7 +190,7 @@ test("unsupported sandbox leaves the approved attempt unconsumed and held", asyn
     sandboxExecutor: async () => { throw new Error("must_not_execute"); },
   });
   t.after(() => dashboard.close());
-  const runtime = JSON.parse(await fs.readFile(path.join(project.directory, "runtime.json"), "utf8"));
+  const runtime = await readLocalRuntime(project.directory);
   const agent = { authorization: `Bearer ${runtime.mcp_token}` };
   const human = { "x-rdsh-browser-token": new URL(runtime.browser_url).hash.slice(5) };
   const post = (route, input, headers) => fetch(dashboard.localUrl + "api/" + route, {
