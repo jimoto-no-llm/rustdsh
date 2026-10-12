@@ -949,7 +949,7 @@ fn apply_imports_from_scan(
             }
             None => {
                 if !quiet {
-                    eprintln!("[rdsh auth] skip ref {}: section error", key.name);
+                    eprintln!("[rdsh auth] skip credential ref: section error");
                 }
             }
         }
