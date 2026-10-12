@@ -8,16 +8,19 @@
 set -euo pipefail
 # Installer download scratch dirs; all cleaned at exit.
 DOWNLOAD_TMPD=""
-DOWNLOAD_TMPD_ALL=""
+DOWNLOAD_TMPD_ALL=("")
 # Update this version and the per-target hashes together from rustup's official archive.
 RUSTUP_INIT_VERSION="1.29.0"
 cleanup_downloads() {
-  # shellcheck disable=SC2086
-  for d in ${DOWNLOAD_TMPD_ALL:-}; do rm -rf "$d"; done
+  local d
+  for d in "${DOWNLOAD_TMPD_ALL[@]}"; do
+    [ -n "$d" ] || continue
+    rm -rf -- "$d"
+  done
 }
 new_download_tmpd() {
   DOWNLOAD_TMPD="$(mktemp -d)"
-  DOWNLOAD_TMPD_ALL="${DOWNLOAD_TMPD_ALL:+${DOWNLOAD_TMPD_ALL} }${DOWNLOAD_TMPD}"
+  DOWNLOAD_TMPD_ALL+=("$DOWNLOAD_TMPD")
 }
 trap cleanup_downloads EXIT
 PREFIX="${PREFIX:-$HOME/.local/bin}"
