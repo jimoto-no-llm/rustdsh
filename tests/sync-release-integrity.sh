@@ -359,6 +359,48 @@ scenario_unpinned() {
 
 # The trusted origin must stay a literal constant, and the archive URL must name
 # the pinned version instead of the redirecting latest/download path.
+scenario_downgrade() {
+  make_stub "$PKG/good" good
+  make_archive "$PKG/good" "$TEST_ROOT/good.tar.gz"
+  stage_release "$TEST_ROOT/good.tar.gz"
+  write_manifest "$(sum_file "$TEST_ROOT/good.tar.gz")"
+  BASE="file://$REL"
+  for installed in 10.0.0 9.10.0-rc.1 9.9.10 9.9.9 9.9.9-rc.1 9.9.9+fixture 9.9.8 unknown; do
+    reset_prefix
+    printf '#!/bin/sh\necho "rdsh %s"\n' "$installed" > "$OUT/bin/rdsh"
+    chmod +x "$OUT/bin/rdsh"
+    cp "$OUT/bin/rdsh" "$TEST_ROOT/before-rdsh"
+    mkdir -p "$HOME_DIR/.local/share/rdsh"
+    printf '{"fixture_notice":true}\n' > "$HOME_DIR/.local/share/rdsh/update-state.json"
+    run_sync "$LOGS/downgrade-$installed.log" fixture 1
+    case "$installed" in
+      10.0.0|9.10.0-rc.1|9.9.10|unknown)
+        if ! cmp -s "$OUT/bin/rdsh" "$TEST_ROOT/before-rdsh" || grep -q '/download/' "$CURL_LOG" \
+          || ! grep -qx '{"fixture_notice":true}' "$HOME_DIR/.local/share/rdsh/update-state.json"; then
+          fail "automatic sync replaced or fetched over $installed"
+        else
+          ok "automatic sync preserves $installed before archive download"
+        fi ;;
+      *)
+        if cmp -s "$OUT/bin/rdsh" "$PKG/good/rdsh"; then
+          ok "automatic sync allows stable target over $installed"
+        else
+          show "$LOGS/downgrade-$installed.log"
+          fail "automatic sync incorrectly refused $installed"
+        fi ;;
+    esac
+  done
+  reset_prefix
+  printf '#!/bin/sh\necho "rdsh 10.0.0"\n' > "$OUT/bin/rdsh"
+  chmod +x "$OUT/bin/rdsh"
+  run_sync "$LOGS/downgrade-explicit.log" fixture 1 v9.9.9
+  if cmp -s "$OUT/bin/rdsh" "$PKG/good/rdsh"; then
+    ok "an explicitly pinned older release remains an intentional rollback"
+  else
+    fail "explicit release pin could not roll back"
+  fi
+}
+
 scenario_static() {
   if ! grep -q "^RELEASE_DIGESTS_URL=\"$REGISTRY_URL\"\$" "$REPO/sync-dsh.sh"; then
     fail "digest registry URL is not the canonical literal"
@@ -375,7 +417,7 @@ scenario_static() {
   ok "digest registry origin is a fixed literal and archives are version-pinned"
 }
 
-for name in hostile pinned http redirect registry_unreachable registry_invalid unpinned static; do
+for name in hostile pinned http redirect registry_unreachable registry_invalid unpinned downgrade static; do
   case "$SCENARIOS" in
     all | *"$name"*) "scenario_$name" ;;
   esac

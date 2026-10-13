@@ -203,6 +203,31 @@ expected_release_sha256() {
     END { if (matches != 1) exit 1 }
   ' "$1"
 }
+# `latest` in the pinned registry can lag a published release. Compare the
+# stable target's numeric core with the installed version before downloading.
+# Node is already required for DSH synchronization; no SemVer package is needed.
+automatic_release_order() {
+  node - "$PREFIX_BIN/rdsh" "$1" <<'RDSH_ORDER'
+const {execFileSync} = require('node:child_process');
+try {
+  const [binary, target] = process.argv.slice(2);
+  const installed = execFileSync(binary, ['--version'], {
+    encoding: 'utf8', timeout: 2000, killSignal: 'SIGKILL', maxBuffer: 4096,
+    stdio: ['ignore', 'pipe', 'ignore'],
+  }).trim();
+  const current = /^rdsh (0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.exec(installed);
+  const next = /^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/.exec(target);
+  if (!current || !next) process.exit(1);
+  // The registry's latest row is stable, which is at least as new as a
+  // prerelease with the same core; build metadata never changes precedence.
+  for (let i = 1; i <= 3; i++) {
+    const a = BigInt(current[i]), b = BigInt(next[i]);
+    if (a !== b) { console.log(a > b ? 'older' : 'eligible'); process.exit(0); }
+  }
+  console.log('eligible');
+} catch { process.exit(1); }
+RDSH_ORDER
+}
 fetch_rdsh_release() {
   # Install the prebuilt release rdsh binary to $1 after checking it against the
   # digest registry pinned to the repository, never against an
@@ -241,6 +266,16 @@ fetch_rdsh_release() {
   if ! expected="$(expected_release_sha256 "$tmpd/release-digests.tsv" "$version" "$asset")"; then
     log "no pinned checksum for release $version asset $asset; refusing update"
     rm -rf "$tmpd"; return 1
+  fi
+  if [ "$ver" = "latest" ] && [ -e "$PREFIX_BIN/rdsh" ]; then
+    if ! order="$(automatic_release_order "$version")"; then
+      log "cannot compare the installed rdsh version; refusing automatic update"
+      rm -rf "$tmpd"; return 1
+    fi
+    if [ "$order" = "older" ]; then
+      log "refusing automatic rdsh downgrade to $version; installed binary and notice state preserved"
+      rm -rf "$tmpd"; return 1
+    fi
   fi
   url="$base/download/$version/$asset"
   log "fetching rdsh release: $version/$asset"

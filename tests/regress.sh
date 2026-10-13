@@ -199,7 +199,9 @@ if grep -q "rdsh updated OK via release binary" "$FS/sync-rebuilt.log" && cmp -s
 # A registry pin that does not match the bytes refuses the update.
 manifest "$(printf '%064d' 0)"
 printf 'old\n' > $FS/bin/rdsh
-fs_sync "$FS/bin" $FS/sync-bad.log
+# This scenario checks a selected pin independently of automatic version
+# comparison: the deliberately invalid installed marker has no SemVer.
+fs_sync "$FS/bin" $FS/sync-bad.log v9.9.9
 if grep -q "CHECKSUM MISMATCH" $FS/sync-bad.log && grep -q "binaries untouched" $FS/sync-bad.log && [ "$(cat $FS/bin/rdsh)" = "old" ]; then ok "sync-dsh refuses mismatched pinned digest"; else echo "FAIL(output): sync-dsh refuses mismatched pinned digest"; tail -n 8 $FS/sync-bad.log; exit 1; fi
 # A version without a registry row is refused; there is no sidecar fallback.
 manifest
