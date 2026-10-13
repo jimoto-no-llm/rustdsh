@@ -33,6 +33,13 @@ rdsh settings get search.max
 rdsh settings set search.max 50
 rdsh settings set context.goal "dsh互換性を維持する"
 rdsh settings set guard.deny '["rm -rf /*","*token*"]'
+```
+
+`rdsh guard` に `--policy-file` を付けると、既知のファイル操作スキーマを
+Read/Write/Edit に分類して判定します（未知のツールやシェルはブロック）。
+付けない場合は従来どおり deny パターン照合になります。
+
+```sh
 rdsh settings unset search.max   # 既定値に戻す
 rdsh settings set beta.context_engine true  # 実験機能を使う場合だけ
 rdsh context status   # 有効化後に記憶の状態を見る
