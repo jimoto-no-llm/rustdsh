@@ -10,7 +10,7 @@
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
-    "@agentclientprotocol/sdk": "1.7.0",
+    "@agentclientprotocol/sdk": "1.8.0",
     "@deepseek-ai/dsh-win32-process": "0.2.0-rc.2",
     "@modelcontextprotocol/node": "2.1.1",
     "@modelcontextprotocol/sdk": "1.32.1",
