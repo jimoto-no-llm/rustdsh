@@ -7,7 +7,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "test": "node --test test/*.test.mjs ../plugins/rdsh-agent-ui/test/*.test.mjs"
+    "test": "node --test test/*.test.mjs ../plugins/rdsh-agent-ui/test/*.test.mjs ../plugins/rdsh-subagent-optimizer/test/*.test.mjs ../plugins/rdsh-easy-work/test/*.test.mjs"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "1.8.0",

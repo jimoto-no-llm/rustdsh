@@ -2,7 +2,7 @@
 # Install recommended dsh plugins into a profile (idempotent per package).
 # Also installs the bundled rdsh plugins (rdsh settings UI) so they are
 # available by default.
-# Usage: [PROFILE=headless] [DRY_RUN=1] [SOUND=0] [GITVIEW=0] [COMPUTE=1] ./plugins/install.sh
+# Usage: [PROFILE=headless] [DRY_RUN=1] [SOUND=0] [GITVIEW=0] [COMPUTE=1] [EASY_WORK=1] [SUBAGENTS=1] ./plugins/install.sh
 # PROFILE=desktop targets the Electron application's reserved profile: the npm
 # dsh CLI refuses it, so the work is forwarded to the Desktop-installed command
 # through `rdsh desktop install` (or you install the packages from the app's
@@ -20,7 +20,13 @@ case "$PROFILE" in web|desktop) BROWSER_PLUGINS_DEFAULT=1 ;; *) BROWSER_PLUGINS_
 SOUND="${SOUND:-$BROWSER_PLUGINS_DEFAULT}"
 GITVIEW="${GITVIEW:-$BROWSER_PLUGINS_DEFAULT}"
 COMPUTE="${COMPUTE:-0}"
+EASY_WORK="${EASY_WORK:-0}"
+SUBAGENTS="${SUBAGENTS:-0}"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+BUNDLED="rdsh-settings"
+[ "$COMPUTE" = "1" ] && BUNDLED="$BUNDLED rdsh-compute"
+[ "$EASY_WORK" = "1" ] && BUNDLED="$BUNDLED rdsh-easy-work"
+[ "$SUBAGENTS" = "1" ] && BUNDLED="$BUNDLED rdsh-subagent-optimizer"
 
 # SOUND/GITVIEW follow the browser-profile default; features.sound=false and
 # features.gitview=false in rdsh.json are the vetoes. A missing/corrupt file,
@@ -70,23 +76,22 @@ if [ "$PROFILE" = "desktop" ]; then
     echo "manual path: open DeepSeek Harness once, quit it, then add these" >&2
     echo "packages on the app's Plugins page:" >&2
     for p in $PKGS; do echo "  $p" >&2; done
-    echo "  $REPO_ROOT/plugins/rdsh-settings" >&2
+    for p in $BUNDLED; do echo "  $REPO_ROOT/plugins/$p" >&2; done
     echo "  github:cwd514/dsh-sound-notifications (default; SOUND=0 to skip)" >&2
     echo "  github:yugapor/dsh-gitview (default; GITVIEW=0 to skip)" >&2
     exit 1
   fi
-  ARGS="--no-bundled"
-  for p in $PKGS; do ARGS="$ARGS --package $p"; done
-  ARGS="$ARGS --package $REPO_ROOT/plugins/rdsh-settings"
-  [ "$COMPUTE" = "1" ] && ARGS="$ARGS --package $REPO_ROOT/plugins/rdsh-compute"
-  if sound_enabled; then ARGS="$ARGS --package github:cwd514/dsh-sound-notifications"; fi
-  if gitview_enabled; then ARGS="$ARGS --package github:yugapor/dsh-gitview"; fi
+  set -- --no-bundled
+  for p in $PKGS; do set -- "$@" --package "$p"; done
+  for p in $BUNDLED; do set -- "$@" --package "$REPO_ROOT/plugins/$p"; done
+  if sound_enabled; then set -- "$@" --package github:cwd514/dsh-sound-notifications; fi
+  if gitview_enabled; then set -- "$@" --package github:yugapor/dsh-gitview; fi
   if [ "$DRY_RUN" = "1" ]; then
-    echo "$RDSH desktop install $ARGS"
+    printf '%s ' "$RDSH" desktop install "$@"
+    printf '\n'
     exit 0
   fi
-  # shellcheck disable=SC2086
-  if "$RDSH" desktop install $ARGS; then
+  if "$RDSH" desktop install "$@"; then
     echo "done: Desktop profile plugins attached; reopen DeepSeek Harness"
     exit 0
   fi
@@ -110,7 +115,7 @@ for p in $PKGS; do
     fi
   fi
 done
-for p in rdsh-settings; do
+for p in $BUNDLED; do
   if [ "$DRY_RUN" = "1" ]; then
     echo "dsh plugin --profile $PROFILE add $REPO_ROOT/plugins/$p"
     ok=$((ok + 1))

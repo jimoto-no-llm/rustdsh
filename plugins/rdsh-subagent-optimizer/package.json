@@ -1,0 +1,11 @@
+{
+  "name": "rdsh-subagent-optimizer",
+  "version": "0.1.0",
+  "description": "Bounded fresh-context exploration through native DSH subagents",
+  "type": "module",
+  "main": "index.js",
+  "scripts": { "test": "node --test test/*.test.mjs" },
+  "peerDependencies": { "@deepseek-ai/dsh-subagent": "0.2.0-rc.2", "@deepseek-ai/dsh-tool-subagent": "0.2.0-rc.2" },
+  "license": "MIT",
+  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } }
+}

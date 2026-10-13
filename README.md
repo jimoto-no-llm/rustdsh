@@ -282,6 +282,20 @@ runtime itself is never replaced: in-app delegation stays limited to the
 opt-in, fail-open compute bridge. See
 [DESKTOP-INTEGRATION.md](docs/DESKTOP-INTEGRATION.md).*
 
+Two optional plugins extend the existing Desktop/Web runtime:
+
+- [File organization](plugins/rdsh-easy-work/README.md): select a folder, preview
+  extension-based categories, copy after confirmation, and archive the copies
+  to undo. Originals stay in place. Execution currently requires Linux;
+  Windows and macOS support preview only. No AI connection is needed.
+- [Bounded exploration subagents](plugins/rdsh-subagent-optimizer/README.md):
+  fresh context, bounded concurrency and output, and active duplicate suppression
+  through the native DSH `spawn` provider (0.2.0-rc.2).
+
+Use the app's Plugins page to add the corresponding directory, or enable
+`EASY_WORK=1` / `SUBAGENTS=1` in `plugins/install.sh`. These are opt-in features
+being prepared for 0.4.0. See the [acceptance evidence](docs/reviews/2026-10-14-easy-work.md).
+
 ## Using with Smart-DSH
 
 [Smart-DSH](https://github.com/hikarioyama/Smart-DSH) (a web-profile plugin bundle) works smoothly alongside rdsh:

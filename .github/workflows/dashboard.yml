@@ -2,9 +2,9 @@ name: dashboard
 
 on:
   push:
-    paths: ["dashboard/**", "assets/**", ".github/workflows/dashboard.yml"]
+    paths: ["dashboard/**", "plugins/rdsh-agent-ui/**", "plugins/rdsh-subagent-optimizer/**", "plugins/rdsh-easy-work/**", "assets/**", ".github/workflows/dashboard.yml"]
   pull_request:
-    paths: ["dashboard/**", "assets/**", ".github/workflows/dashboard.yml"]
+    paths: ["dashboard/**", "plugins/rdsh-agent-ui/**", "plugins/rdsh-subagent-optimizer/**", "plugins/rdsh-easy-work/**", "assets/**", ".github/workflows/dashboard.yml"]
 
 permissions:
   contents: read
@@ -34,7 +34,7 @@ jobs:
       - if: runner.os == 'Windows'
         # Native GUI startup must not compete with every process-heavy fixture.
         # Run every test with the same assertions and startup deadlines.
-        run: node --test --test-concurrency=1 test/*.test.mjs ../plugins/rdsh-agent-ui/test/*.test.mjs
+        run: node --test --test-concurrency=1 test/*.test.mjs ../plugins/rdsh-agent-ui/test/*.test.mjs ../plugins/rdsh-subagent-optimizer/test/*.test.mjs ../plugins/rdsh-easy-work/test/*.test.mjs
       - if: runner.os == 'Linux'
         shell: bash
         run: |

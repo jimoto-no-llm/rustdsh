@@ -1,0 +1,13 @@
+{
+  "name": "rdsh-easy-work",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A folder-first, reversible file organization flow in DSH Desktop and Web",
+  "exports": { ".": "./index.js", "./client": "./client.js" },
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": { "platform": "web", "immediately": true, "inject": [] }
+  },
+  "meta": { "title": "ファイル整理", "description": "コピー先を確認して分類。元ファイルを残して取り消せます。" }
+}

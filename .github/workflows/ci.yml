@@ -69,6 +69,10 @@ jobs:
         with:
           node-version: 22
       - run: node --test tests/plugin-security.test.mjs tests/settings-client.test.mjs tests/update-banner.test.mjs tests/feature-switches.test.mjs tests/discord-presence.test.mjs tests/model_benchmark/fence.test.mjs
+      - name: Install pinned public DSH APIs for the optional plugins
+        run: npm install --prefix "$RUNNER_TEMP/rdsh-public-api" --ignore-scripts --no-audit --no-fund @deepseek-ai/dsh-subagent@0.2.0-rc.2 @deepseek-ai/dsh-tool-subagent@0.2.0-rc.2 @deepseek-ai/dsh-client-ui-slots@0.2.0-rc.2
+      - name: Check native API compatibility without model or authentication calls
+        run: RDSH_PUBLIC_DSH_MODULES="$RUNNER_TEMP/rdsh-public-api/node_modules" node --test plugins/rdsh-subagent-optimizer/test/*.test.mjs plugins/rdsh-easy-work/test/*.test.mjs
 
   security-boundaries:
     runs-on: ubuntu-latest

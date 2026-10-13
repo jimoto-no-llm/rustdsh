@@ -1,0 +1,15 @@
+- insert:
+    - id: rdsh-subagent-optimizer
+      name: rdsh-subagent-optimizer
+      config:
+        maxConcurrent: 2
+        maxQueued: 8
+        maxTokens: 4096
+        maxDepth: 1
+    - id: rdsh-explore-tool
+      name: '@deepseek-ai/dsh-tool-subagent'
+      config:
+        provider: rdsh-scout
+        toolName: rdsh_explore
+        enableRunInBackground: false
+        backgroundMode: one-shot
