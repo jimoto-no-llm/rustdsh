@@ -147,3 +147,39 @@ test('a synthetic burst of 20 identical tasks starts one native run instead of 2
   await burst.find(result => result.status === 'fulfilled').value.dispose();
   await f.optimizer.close();
 });
+
+test('a queued request refuses replacement of its selected backend before dispatch', async () => {
+  let selected;
+  const f = fixture({ maxConcurrent: 1 }); selected = f.backend;
+  const optimizer = createOptimizer({ getBackend: () => selected, snapshotContext: parent => ({ agentOptions: parent.options }), config: { maxConcurrent: 1 } });
+  const first = await optimizer.provider.start(f.request('first'));
+  const queued = assert.rejects(optimizer.provider.start(f.request('queued')), code('RDSH_SUBAGENT_CONTEXT_CHANGED'));
+  await tick(); selected = { ...f.backend };
+  await first.dispose(); await queued;
+  assert.equal(f.received.length, 1); assert.equal(optimizer.stats().active, 0);
+  await optimizer.close();
+});
+
+test('equal prompts with distinct model routes, schemas and tool scopes remain separate work', async () => {
+  const f = fixture({ maxConcurrent: 8 });
+  const variations = [{}, { agentOptions: { provider: 'other', model: 'other' } }, { outputSchema: { type: 'object' } },
+    { toolFilter: { allow: ['read-file'] } }, { persona: 'selected persona' }, { maxDepth: 0 }];
+  const runs = await Promise.all(variations.map(options => f.provider.start({ ...f.request('same prompt'), ...options })));
+  assert.equal(f.received.length, variations.length); assert.equal(f.optimizer.stats().duplicates, 0);
+  await Promise.all(runs.map(run => run.dispose())); await f.optimizer.close();
+});
+
+test('concurrent dispose calls share native cleanup and unloading rejects all queued work', async () => {
+  const f = fixture({ maxConcurrent: 1 }); let finish, disposals = 0;
+  f.backend.start = async () => ({ id: 'fixture', result: Promise.resolve({ output: [] }), dispose() {
+    disposals++; return new Promise(resolve => finish = resolve);
+  } });
+  const run = await f.provider.start(f.request('active'));
+  const queued = assert.rejects(f.provider.start(f.request('queued')), code('RDSH_SUBAGENT_CANCELLED'));
+  const first = run.dispose(), second = run.dispose(); assert.equal(first, second);
+  await tick(); assert.equal(disposals, 1);
+  const closed = f.optimizer.close(); await queued;
+  assert.equal(f.optimizer.stats().active, 1);
+  finish(); await first; await closed;
+  assert.deepEqual(f.optimizer.stats(), { active: 0, queued: 0, starts: 1, duplicates: 0 });
+});

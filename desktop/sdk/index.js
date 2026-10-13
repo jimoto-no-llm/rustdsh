@@ -17,7 +17,10 @@ export function createHarness({ sdkHome, dshBin, cwd, provider, model, env = {},
   if (!env || typeof env !== 'object' || Array.isArray(env) || Object.values(env).some(value => typeof value !== 'string')) throw new Error('Invalid child environment');
   // Explicit environment only: do not inherit the desktop process's credentials
   // or user Node hooks. Electron's Node mode is confined to this owned child.
-  const childEnv = Object.fromEntries(Object.entries(env).filter(([key]) => !['NODE_OPTIONS', 'NODE_PATH', 'DSH_HOME'].includes(key)));
+  // Windows treats environment names case-insensitively. Remove alternate
+  // spellings before adding our canonical home and Electron Node mode.
+  const reserved = new Set(['NODE_OPTIONS', 'NODE_PATH', 'DSH_HOME', 'ELECTRON_RUN_AS_NODE']);
+  const childEnv = Object.fromEntries(Object.entries(env).filter(([key]) => !reserved.has(key.toUpperCase())));
   return new DeepSeekHarness({ ...options, dshBin, dshHome: sdkHome, processCwd: cwd, cwd, provider, model,
     profile: 'sdk', env: { ...childEnv, DSH_HOME: sdkHome, ELECTRON_RUN_AS_NODE: '1' } });
 }

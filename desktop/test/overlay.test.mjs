@@ -4,19 +4,12 @@ import { mkdtempSync, writeFileSync, mkdirSync, readFileSync, rmSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { planOverlay, contentHash, PATCH_PATHS, FEED_URL } from '../overlay.mjs';
+import { source } from './fixtures/upstream-source.mjs';
 
 function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), 'rdsh-overlay-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
-  const source = {
-    [PATCH_PATHS[0]]: `const appId = resolveDesktopAppId(env)\nconst policy = packagesMacOS && unsigned ? undefined : resolveDesktopPolicyEnvironment(env)\nconst update = unsigned ? undefined : resolveDesktopAutoUpdateConfig(env, resolvedPlatform, resolvedArch)\nconst buildVersion = resolveDesktopBuildVersion(env, productVersion)\nprotocols: [{ name: 'DeepSeek Harness', schemes: ['dsh'] }]\ndshDesktopAppId: appId,\nproductName: 'DeepSeek Harness'\nartifactName: \`deepseek-harness-\n'lib/main.js',\nextraResources: [\nchannel: 'nightly'`,
-    [PATCH_PATHS[1]]: `if (updater === autoUpdater) {\nthis.updater.channel = 'nightly'\nthis.updater.allowPrerelease = true`,
-    [PATCH_PATHS[2]]: `app.setAsDefaultProtocolClient('dsh')\nurl === 'dsh://open' || url === 'dsh://open/'\napplicationName: 'DeepSeek Harness'`,
-    [PATCH_PATHS[3]]: `const CHANNEL = 'nightly'`,
-    [PATCH_PATHS[4]]: `export function validateDesktopBuildVersion(buildVersion, productVersion) {\n}\nexport function resolveDesktopBuildVersion(env, productVersion) {\n}\nexport function desktopBuildVersionPrefix(productVersion) {\n}`,
-    [PATCH_PATHS[5]]: `set -e\nexec "$resources/../MacOS/DeepSeek Harness"`,
-    [PATCH_PATHS[6]]: 'setlocal DisableDelayedExpansion\r\nDeepSeek Harness.exe',
-  };
+
   for (const [path, value] of Object.entries(source)) { mkdirSync(dirname(join(root, path)), { recursive: true }); writeFileSync(join(root, path), value); }
   return { root, source, lock: { revision: 'a'.repeat(40), harnessVersion: '0.2.1-alpha.2', patchInputs: Object.fromEntries(Object.entries(source).map(([path, value]) => [path, contentHash(value.replace(/\r\n/g, '\n'))])) } };
 }

@@ -7,6 +7,6 @@
   "engines": { "node": ">=24" },
   "exports": { ".": { "types": "./index.d.ts", "default": "./index.js" } },
   "files": ["index.js", "index.d.ts", "README.md"],
-  "scripts": { "test": "node --test test/*.test.mjs" },
+  "scripts": { "test": "node --test test/*.test.mjs", "test:packed": "node test/install-packed.mjs" },
   "dependencies": { "@deepseek-ai/dsh-sdk-client": "0.2.1-alpha.2" }
 }

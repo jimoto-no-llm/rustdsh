@@ -29,6 +29,17 @@ test('SDK refuses implicit model selection, relative paths and launch-option byp
   assert.throws(() => createHarness({ ...options, maxTokens: 0 }));
   assert.throws(() => createHarness({ ...options, env: null }));
 });
+test('child environment filters reserved names regardless of Windows casing and snapshots caller values', async () => {
+  const root = join(tmpdir(), 'rdsh-sdk-fixture');
+  const env = { node_options: '--synthetic-invalid-hook', Node_Path: '/synthetic-hook', dsh_home: '/synthetic-home',
+    electron_run_as_node: '0', RDSH_FIXTURE_VALUE: 'before' };
+  const harness = createHarness({ sdkHome: root, dshBin: join(root, 'bin.js'), cwd: root, provider: 'fixture', model: 'fixture', env });
+  env.RDSH_FIXTURE_VALUE = 'after';
+  const child = harness.client.options.env;
+  for (const key of ['node_options', 'Node_Path', 'dsh_home', 'electron_run_as_node']) assert.equal(child[key], undefined);
+  assert.equal(child.RDSH_FIXTURE_VALUE, 'before'); assert.equal(child.DSH_HOME, root); assert.equal(child.ELECTRON_RUN_AS_NODE, '1');
+  assert.equal(env.node_options, '--synthetic-invalid-hook'); await harness.close();
+});
 test('desktop paths use the fork home and bundled Rust executable', () => {
   const root = join(tmpdir(), 'rdsh-sdk-fixture');
   const paths = desktopPaths({ appData: root, resources: join(root, 'resources') });

@@ -1,13 +1,18 @@
 // Prepare an owned, pinned fork checkout. No reset/clean, force checkout or
 // credential reads. A later pin gets a fresh directory, preserving old builds.
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync, existsSync, mkdirSync, lstatSync, copyFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, lstatSync, copyFileSync } from 'node:fs';
 import { resolve, join, dirname, basename } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { planOverlay, contentHash, PATCH_PATHS } from './overlay.mjs';
 
 const repo = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const git = (root, args) => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trimEnd();
+// existsSync follows links and reports a dangling link as absent. Every
+// preflight must inspect the directory entry itself before any write.
+const entryStat = path => {
+  try { return lstatSync(path); } catch (error) { if (error.code === 'ENOENT') return undefined; throw error; }
+};
 export function prepare({ checkout, rdshBin, lockPath = join(repo, 'desktop/upstream.lock.json') }) {
   const root = resolve(checkout), binary = resolve(rdshBin);
   const lock = JSON.parse(readFileSync(lockPath, 'utf8'));
@@ -22,7 +27,9 @@ export function prepare({ checkout, rdshBin, lockPath = join(repo, 'desktop/upst
     && bytes.subarray(0, 2).toString('ascii') !== 'MZ') throw new Error('Rust launcher must be a native executable');
   const nativeHash = contentHash(bytes);
   const marker = join(root, '.rdsh-fork.json');
-  if (!existsSync(root)) {
+  const rootStat = entryStat(root);
+  if (rootStat?.isSymbolicLink()) throw new Error('Unexpected checkout symlink');
+  if (!rootStat) {
     mkdirSync(dirname(root), { recursive: true });
     execFileSync('git', ['clone', '--filter=blob:none', '--no-checkout', '--depth', '1', lock.repository, root], { stdio: 'pipe' });
     execFileSync('git', ['-C', root, 'fetch', '--depth', '1', 'origin', lock.revision], { stdio: 'pipe' });
@@ -34,10 +41,11 @@ export function prepare({ checkout, rdshBin, lockPath = join(repo, 'desktop/upst
   const generatorHash = contentHash(readFileSync(new URL('./overlay.mjs', import.meta.url)));
   const noLinks = path => {
     let current = root;
-    for (const part of path.split('/')) { current = join(current, part); if (existsSync(current) && lstatSync(current).isSymbolicLink()) throw new Error('Unexpected prepared-source symlink'); }
+    for (const part of path.split('/')) { current = join(current, part); if (entryStat(current)?.isSymbolicLink()) throw new Error('Unexpected prepared-source symlink'); }
   };
-  if (existsSync(marker)) {
-    if (lstatSync(marker).isSymbolicLink() || lstatSync(marker).size > 65536) throw new Error('Invalid prepared-source marker');
+  const markerStat = entryStat(marker);
+  if (markerStat) {
+    if (!markerStat.isFile() || markerStat.isSymbolicLink() || markerStat.size > 65536) throw new Error('Invalid prepared-source marker');
     const state = JSON.parse(readFileSync(marker, 'utf8'));
     if (state.revision !== lock.revision || state.rdshVersion !== version || state.nativeHash !== nativeHash || state.generatorHash !== generatorHash)
       throw new Error('Use a fresh checkout for a changed SDK, Rust binary or upstream pin');
@@ -56,6 +64,12 @@ export function prepare({ checkout, rdshBin, lockPath = join(repo, 'desktop/upst
     const expected = path.includes('/sdk/') ? lock.sdkVersion : lock.harnessVersion;
     if (JSON.parse(readFileSync(join(root, path), 'utf8')).version !== expected) throw new Error('Upstream package versions do not match the lock');
   }
+  // In-place patching a hard link would also modify its external alias even
+  // when Git considers the checkout clean. Refuse it before planning writes.
+  for (const path of PATCH_PATHS) {
+    const input = entryStat(join(root, path));
+    if (!input?.isFile() || input.nlink !== 1) throw new Error('Unexpected source file or hard link');
+  }
   const outputs = planOverlay(root, lock, version, basename(binary));
   const nativePath = `apps/desktop/rdsh-build-assets/${basename(binary)}`;
   const manifestPath = 'apps/desktop/rdsh-build.json';
@@ -63,11 +77,11 @@ export function prepare({ checkout, rdshBin, lockPath = join(repo, 'desktop/upst
     revision: lock.revision, nativeSha256: nativeHash }, null, 2) + '\n';
   for (const path of [...Object.keys(outputs), nativePath]) {
     noLinks(path);
-    if (!PATCH_PATHS.includes(path) && existsSync(join(root, path))) throw new Error('Generated destination already exists; it will not be overwritten');
+    if (!PATCH_PATHS.includes(path) && entryStat(join(root, path))) throw new Error('Generated destination already exists; it will not be overwritten');
   }
   // All source anchors and file identities were checked before the first write.
   for (const [path, contents] of Object.entries(outputs)) {
-    if (existsSync(join(root, path)) && lstatSync(join(root, path)).isSymbolicLink()) throw new Error('Unexpected source symlink');
+    if (entryStat(join(root, path))?.isSymbolicLink()) throw new Error('Unexpected source symlink');
     mkdirSync(dirname(join(root, path)), { recursive: true });
     writeFileSync(join(root, path), contents);
   }

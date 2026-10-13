@@ -3,7 +3,7 @@
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, rm, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createOrganizer } from '../../plugins/rdsh-easy-work/organizer.js';
@@ -72,8 +72,21 @@ try {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   await page.getByRole('button', { name: '確認した内容でコピーする' }).focus();
   assert.equal(await page.getByRole('button', { name: '確認した内容でコピーする' }).evaluate(el => el === document.activeElement), true);
+  const unsafeName = '<img src=x onerror=alert(1)>.txt';
+  let dialog = false; page.on('dialog', async event => { dialog = true; await event.dismiss(); });
+  await writeFile(join(folder, unsafeName), 'synthetic filename');
+  await page.getByRole('button', { name: '別のフォルダを選ぶ' }).click();
+  await page.getByRole('button', { name: 'フォルダを選ぶ', exact: true }).click();
+  await page.getByText(unsafeName, { exact: true }).waitFor();
+  assert.equal(await page.locator('tbody img').count(), 0); assert.equal(dialog, false);
+  const beforeRefusal = await readdir(folder);
+  await writeFile(join(folder, '旅行の写真.png'), 'synthetic later edit');
+  await page.getByRole('button', { name: '確認した内容でコピーする' }).click();
+  await page.getByRole('alert').getByText('確認後にファイルが変わりました。もう一度、整理内容を確認してください。').waitFor();
+  assert.deepEqual(await readdir(folder), beforeRefusal);
+  assert.equal(await readFile(join(folder, '旅行の写真.png'), 'utf8'), 'synthetic later edit');
   assert.deepEqual(errors, []);
-  console.log('PASS easy-work: preview -> copy -> archive undo; mobile layout; keyboard focus; synthetic originals preserved');
+  console.log('PASS easy-work: preview -> copy -> archive undo; mobile layout; keyboard focus; literal HTML filename; changed input refused; synthetic originals preserved');
 } finally {
   await browser?.close(); await dispose();
   await new Promise(resolve => server.close(resolve));
