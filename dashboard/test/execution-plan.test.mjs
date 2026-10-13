@@ -452,6 +452,44 @@ test("unknown schema and stale writer locks preserve state and never dispatch", 
     "other-owner",
   );
 });
+test("oversized plan index writes are rejected without damaging existing plans", async (t) => {
+  const f = await setup(t),
+    maxStateBytes = 4 * 1024 * 1024,
+    maxInputBytes = 256 * 1024,
+    dependencies = Array.from(
+      { length: 8 },
+      (_, index) => `dependency-${index}-` + "x".repeat(145 - 13),
+    ),
+    definition = (index) => ({
+      ...f.definition,
+      plan_id: `plan-large-${index}`,
+      run_id: `run-large-${index}`,
+      nodes: Array.from({ length: 200 }, (_, node) => ({
+        task_id: `node-${String(node).padStart(3, "0")}`,
+        depends_on: dependencies,
+        parent_task_id: null,
+      })),
+    });
+  const inputBytes = Buffer.byteLength(JSON.stringify(definition(0)));
+  assert.ok(inputBytes > 240_000 && inputBytes <= maxInputBytes);
+  for (let index = 0; index < 16; index++)
+    await f.plans.define(definition(index));
+  const before = await fs.readFile(f.plans.index);
+  assert.ok(before.byteLength < maxStateBytes);
+
+  await assert.rejects(
+    f.plans.define(definition(16)),
+    fail("plan_state_invalid"),
+  );
+  assert.deepEqual(await fs.readFile(f.plans.index), before);
+  assert.equal((await f.plans.read()).plans.length, 16);
+  assert.equal(
+    (await f.plans.stop("plan-large-0")).stop_reason,
+    "operator_stopped",
+  );
+  assert.equal((await f.plans.read()).plans.length, 16);
+  assert.ok((await fs.stat(f.plans.index)).size < maxStateBytes);
+});
 test("CLI defines and inspects drafts without starting a CLI or accepting misplaced options", async (t) => {
   const f = await setup(t),
     cli = fileURLToPath(new URL("../cli.mjs", import.meta.url)),

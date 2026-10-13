@@ -6,6 +6,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { ProjectStore, identity } from "./state.mjs";
 import { AcceptanceStore } from "./acceptance.mjs";
 
+const maxPlanStateBytes = 4 * 1024 * 1024;
 const object = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 const text = (v) =>
   typeof v === "string" &&
@@ -136,7 +137,7 @@ async function readJson(file) {
   try {
     h = await fs.open(file, "r");
     const s = await h.stat();
-    check(s.isFile() && s.size <= 4 * 1024 * 1024, "plan_state_invalid");
+    check(s.isFile() && s.size <= maxPlanStateBytes, "plan_state_invalid");
     return JSON.parse(
       new TextDecoder("utf-8", { fatal: true }).decode(await h.readFile()),
     );
@@ -149,11 +150,21 @@ async function readJson(file) {
   }
 }
 async function writeJson(file, value) {
+  let serialized;
+  try {
+    serialized = JSON.stringify(value) + "\n";
+  } catch {
+    throw new PlanError("plan_write_unconfirmed");
+  }
+  check(
+    Buffer.byteLength(serialized, "utf8") <= maxPlanStateBytes,
+    "plan_state_invalid",
+  );
   const temp = file + "." + randomUUID() + ".tmp";
   let h;
   try {
     h = await fs.open(temp, "wx", 0o600);
-    await h.writeFile(JSON.stringify(value) + "\n");
+    await h.writeFile(serialized);
     await h.sync();
     await h.close();
     h = null;
