@@ -172,7 +172,11 @@ fn json_uses_the_same_matching_node_tree_as_delegation() {
     assert!(output.status.success());
     let value = report(&output);
     assert_eq!(value["node"]["required"], true);
-    assert_eq!(value["node"]["path"], node.to_string_lossy().as_ref());
+    let reported = Path::new(value["node"]["path"].as_str().unwrap());
+    assert_eq!(
+        std::fs::canonicalize(reported).unwrap(),
+        std::fs::canonicalize(node).unwrap()
+    );
     assert!(!marker.exists());
 }
 
