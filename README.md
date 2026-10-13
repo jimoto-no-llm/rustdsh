@@ -20,7 +20,7 @@ It ports frequently used CLI operations (token calculation, code search, session
 
 - ⚡ **Sub-millisecond startup & low memory**: `--version` launches in ~0.90 ms with ~2.9 MB peak memory, compared to ~88 ms and ~66 MB for Node.js-based `dsh`.
 - 🔄 **100% Drop-in Compatible**: Subcommands that are not rdsh-native are passed straight to upstream `dsh`. Existing scripts and workflows keep running unchanged.
-- 🛠 **Fast Native Utilities**: Estimate tokens, search code, list sessions, and run health diagnostics (`rdsh doctor`) instantly without starting Node.js.
+- 🛠 **Fast Native Utilities**: Estimate tokens, search code, list sessions, and inspect local prerequisites (`rdsh doctor --json`) without starting Node.js.
 - 🛡 **Safe by Default**: Read-only commands never mutate files, credentials are never automatically synced or exported, and agent tools can be confined to explicitly shared files on Linux.
 
 ## Table of Contents
@@ -150,6 +150,7 @@ rdsh search TODO --dir . --max 100  # fast parallel text search
 rdsh sessions --limit 20 --tokens   # list sessions and unpacked token estimates
 rdsh compact ./s.jsonl              # compact session JSONL (source remains untouched)
 rdsh doctor                         # check health of dsh, environment, and paths
+rdsh doctor --json                  # read-only metadata for scripts; no DSH/Node launch
 rdsh profiles / rdsh skills         # list available profiles and skills
 rdsh desktop status                 # detect the DeepSeek Harness Desktop app and profile
 rdsh bench --n 5                    # benchmark startup speed between rdsh and dsh

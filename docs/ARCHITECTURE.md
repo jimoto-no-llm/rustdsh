@@ -105,6 +105,11 @@ value wins, `RDSH_NODE_COMPILE_CACHE=0` opts out).
 3. Every optimization ships with a before/after output diff.
 4. `doctor` must stay truthful: wrappers, shadowing, and auth state.
 
+`doctor --json` has a narrower metadata-only contract: it shares runtime discovery
+with delegation, reports the first effective PATH match, and neither reads
+credentials nor launches external programs. See [the JSON contract](DOCTOR.md).
+The plain-text command retains its auth summary and a bounded DSH version probe.
+
 ## Maintaining the diagrams
 
 Each `.mmd` source declares its purpose, source paths, update triggers, and

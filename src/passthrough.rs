@@ -255,18 +255,23 @@ fn node_for_dsh(orig: &str) -> Option<String> {
     None
 }
 
+/// Read-only runtime selection shared by delegation and doctor.
+pub(crate) fn selected_node(orig: &str) -> Option<String> {
+    node_for_dsh(orig).or_else(find_node_bin)
+}
+
 fn base_cmd(orig: &str, dry: bool, metadata_only: bool) -> anyhow::Result<std::process::Command> {
-    let selected_node = || node_for_dsh(orig).or_else(find_node_bin);
     if dry || metadata_only {
         if orig.ends_with(".js") {
-            let mut command =
-                std::process::Command::new(selected_node().unwrap_or_else(|| "node".to_string()));
+            let mut command = std::process::Command::new(
+                selected_node(orig).unwrap_or_else(|| "node".to_string()),
+            );
             command.arg(orig);
             return Ok(command);
         }
         return Ok(std::process::Command::new(orig));
     }
-    let bin = selected_node()
+    let bin = selected_node(orig)
         .ok_or_else(|| anyhow::anyhow!("RDSH_SECURITY: compatible Node runtime is required"))?;
     if !crate::tool_security::sandbox_enabled() {
         // Default: hand the run to DSH with its normal tools and normal file
