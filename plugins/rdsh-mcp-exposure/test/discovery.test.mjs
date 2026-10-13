@@ -55,6 +55,35 @@ test('hidden tools never register, search, bind or execute; direct and deferred 
   assert.deepEqual(value(await f.execute(owner, LOAD, { names: ['mcp__docs__missing'] })), { status: 'not_found' });
 });
 
+test('overlapping server names guard direct and PTC calls using the registered tool owner', async t => {
+  const name = 'mcp__docs__team__read';
+  const configurations = [
+    [
+      { connection: connection('docs'), exposure: 'hidden' },
+      { connection: connection('docs__team'), exposure: 'direct' },
+    ],
+    [
+      { connection: connection('docs__team'), exposure: 'direct' },
+      { connection: connection('docs'), exposure: 'hidden' },
+    ],
+  ];
+
+  for (const servers of configurations) {
+    const f = fixture({ config: { servers }, mode: 'both' }); t.after(() => f.close());
+    const policy = f.compiled.servers.find(server => server.serverName === 'docs__team');
+    let calls = 0;
+    f.discovery.bridge(policy, 'fixed-team-route').register(definition(name, 'Read the team fixture.', async () => {
+      calls++;
+      return { value: 'team' };
+    }));
+    const owner = f.agent();
+
+    assert.equal(value(await f.execute(owner, name)).value, 'team');
+    assert.equal(value(await f.ptc(owner, tools => tools[name]({}))).result.value, 'team');
+    assert.equal(calls, 2);
+  }
+});
+
 test('receipt schema fingerprints retain object and array identity while ignoring object property order', () => {
   assert.notEqual(digest({ enum: [{ key: 'fixed' }] }), digest({ enum: [[['key', 'fixed']]] }));
   assert.equal(digest({ type: 'object', properties: { z: { type: 'string' }, a: { type: 'number' } } }),

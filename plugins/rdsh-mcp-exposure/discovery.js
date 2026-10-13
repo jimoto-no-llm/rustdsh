@@ -144,13 +144,12 @@ export class Discovery {
     if (HELPER_NAMES.has(exec.name)) {
       return;
     }
-    const server = [...this.servers.values()].find(item => exec.name.startsWith(item.policy.prefix));
-    if (!server) return;
     const record = this.current(exec.name, exec.agent);
     // Scoped shadows belong to their own registration owner. Missing/withdrawn
     // names are already rejected by the original registry's resolver.
     if (!record) return;
-    if (!this.active || server.policy.resolve(exec.name).exposure === 'hidden') return 'MCP tool is unavailable';
+    const server = this.servers.get(record.server);
+    if (!this.active || !server || server.policy.resolve(exec.name).exposure === 'hidden') return 'MCP tool is unavailable';
     if (exec.parent !== undefined || record.exposure === 'direct') return;
     if (record.exposure === 'ptc-only') return 'MCP tool is available only through the existing PTC runtime';
     if (this.loads.loaded(exec.agent?.session).get(record.name) !== record.digest)
