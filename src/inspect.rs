@@ -132,7 +132,7 @@ fn scan_sessions(root: &str, project: Option<&str>) -> Vec<Session> {
             Err(_) => return vec![],
         },
     };
-    let mut out: Vec<Session> = vec![];
+    let mut out: Vec<Session> = Vec::new();
     if projs.len() >= 2 {
         // Bounded worker pool (issue #85-3): one batch at a time so a host
         // with hundreds of projects never spawns hundreds of threads.
@@ -544,7 +544,7 @@ fn batch_decompressed(
 ) -> Vec<(Option<u64>, bool)> {
     let mut out: Vec<(Option<u64>, bool)> = vec![(None, false); shown.len()];
     // Serial cache pass first: hits never touch threads or IO.
-    let mut pending: Vec<(usize, Session)> = vec![];
+    let mut pending: Vec<(usize, Session)> = Vec::new();
     for (i, sess) in shown.iter().enumerate() {
         let key = TokensCache::key(root, &sess.project, &sess.id);
         match cache.get(&key, sess.mtime, sess.bytes, zstd_cli) {
@@ -667,7 +667,7 @@ fn session_decompressed_bytes_uncached(
             return (None, false);
         }
         // Per-file cache: only grown/added files pay for re-expansion.
-        let mut todo: Vec<std::path::PathBuf> = vec![];
+        let mut todo: Vec<std::path::PathBuf> = Vec::new();
         for p in &deferred {
             let Some(name) = p.file_name().map(|s| s.to_string_lossy().into_owned()) else {
                 continue;
@@ -692,7 +692,7 @@ fn session_decompressed_bytes_uncached(
         // Stale reuse: grown files with a recent exact value skip expansion
         // (marked inexact by the caller via the returned flag).
         let stale_window = stale_secs;
-        let mut todo2: Vec<std::path::PathBuf> = vec![];
+        let mut todo2: Vec<std::path::PathBuf> = Vec::new();
         for p in &todo {
             let stale_hit = (stale_window > 0)
                 .then(|| {

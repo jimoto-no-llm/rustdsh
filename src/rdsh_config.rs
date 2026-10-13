@@ -1321,7 +1321,7 @@ mod rdsh_config_tests {
         static M: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
         M.get_or_init(|| std::sync::Mutex::new(()))
             .lock()
-            .unwrap_or_else(|e| e.into_inner())
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
     /// DSH_HOME を一時 dir に向けて f を実行する（復元・後片付けつき）。
