@@ -479,8 +479,11 @@ window.__ModuleLoader__.load({
         }
       }, [surface, busy, picks, send, sessionId, storageKey]);
 
-      // The host element always renders so the panel can find its own turn tail.
-      if (surface === undefined || !visible)
+      // Inline visibility controls only the fallback at the turn tail. Once an
+      // anchor is placed, the portal must still render while that fallback is
+      // hidden; otherwise the successful placement hides its own contents.
+      const portalReady = Boolean(surface && placement > 0 && portalHostRef.current && createPortal);
+      if (surface === undefined || (!visible && !portalReady))
         return h('div', { ref: hostRef, className: 'rdshui-host', hidden: true });
       if (!surface) {
         if (!error || error === 'surface-unreadable') return null;

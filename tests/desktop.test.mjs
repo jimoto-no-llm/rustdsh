@@ -301,6 +301,24 @@ test('Desktop install honors saved sound and gitview feature vetoes', async (t) 
   assert.equal(calls[0][4].endsWith('rdsh-settings'), true);
 });
 
+test('the Desktop installer script carries each saved feature veto into its package list', async (t) => {
+  for (const [disabled, enabled] of [['sound', 'gitview'], ['gitview', 'sound']]) {
+    const { box, env } = await baseEnv(t);
+    const off = await run(['features', 'off', disabled], env);
+    assert.equal(off.code, 0, off.stderr);
+    const { stdout, stderr } = await exec('sh', [join(repo, 'plugins/install.sh')], {
+      cwd: repo,
+      env: {
+        ...process.env, ...env, HOME: box.root, PROFILE: 'desktop', DRY_RUN: '1', RDSH_BIN: bin,
+      },
+    });
+    const vetoed = disabled === 'sound' ? 'dsh-sound-notifications' : 'dsh-gitview';
+    const retained = enabled === 'sound' ? 'dsh-sound-notifications' : 'dsh-gitview';
+    assert.doesNotMatch(stdout + stderr, new RegExp(vetoed));
+    assert.match(stdout, new RegExp(retained));
+  }
+});
+
 test('a relative extracted runtime survives the plugin working directory', {
   skip: process.platform !== 'linux',
 }, async (t) => {

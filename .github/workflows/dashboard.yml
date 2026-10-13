@@ -34,7 +34,7 @@ jobs:
       - if: runner.os == 'Windows'
         # Native GUI startup must not compete with every process-heavy fixture.
         # Run every test with the same assertions and startup deadlines.
-        run: node --test --test-concurrency=1 test/*.test.mjs
+        run: node --test --test-concurrency=1 test/*.test.mjs ../plugins/rdsh-agent-ui/test/*.test.mjs
       - if: runner.os == 'Linux'
         shell: bash
         run: |
