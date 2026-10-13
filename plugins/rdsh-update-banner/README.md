@@ -57,6 +57,10 @@ Reload the web GUI to pick it up.
 ## Config
 
 - `demo: true` shows a demo notification without touching any state file.
+- `syncScript` optionally sets an absolute or plugin-relative updater path. The
+  bundled checkout resolves `../../sync-dsh.sh` from the installed plugin; a
+  missing script reports how to configure or reinstall it. Before execution,
+  the plugin requires one regular file owned by the current OS user.
 - Without updates recorded, the banner stays hidden.
 - All four API routes require the DSH GUI session and its Host/Origin checks.
   DSH must provide `connection.requestRejection` (verified with 0.2.0-rc.2).

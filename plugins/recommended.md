@@ -20,7 +20,44 @@ absent from the `dsh-base` bundle, so each one adds real capability.
 ./plugins/install.sh                    # PROFILE=headless (default)
 PROFILE=web ./plugins/install.sh       # install into the web profile instead
 DRY_RUN=1 ./plugins/install.sh         # print the pnpm commands only
+PROFILE=web SOUND=1 ./plugins/install.sh  # also add Web sound/desktop notifications (below)
 ```
+
+### Desktop app (Electron) profile
+
+The Desktop application owns the reserved `desktop` profile and its own
+bundled command runtime, and the npm `dsh` CLI refuses to manage it. Use the
+profile installer, which forwards every package to the app's own command:
+
+```sh
+PROFILE=desktop ./plugins/install.sh              # recommended + bundled plugins
+PROFILE=desktop COMPUTE=1 ./plugins/install.sh    # plus the compute bridge
+```
+
+It runs `rdsh desktop install --no-bundled --package <spec>`, which invokes
+`resources/runtime/cli/bin/dsh plugin --profile desktop add ...`. Quit the app
+before attaching and reopen it afterwards; the app's own **Plugins** page can
+install the same packages without a command runtime. The installers do the same
+inline with `./install.sh --desktop` or `.\install.ps1 -Desktop`. See
+[docs/DESKTOP-INTEGRATION.md](../docs/DESKTOP-INTEGRATION.md).
+
+## Optional Web UI plugins (third-party, opt-in)
+
+Installed only when `SOUND=1` is set. Kept out of the default set so the
+base install stays first-party and dependency-free.
+
+| Package | Why |
+| --- | --- |
+| `github:cwd514/dsh-sound-notifications` (MIT, (c) 2026 cwd514) | Effect sounds (Web Audio synthesis, no audio files) and desktop notifications for reply-done / approval-waiting / questions / errors / re-login. Zero dependencies, no build step. Verified by upstream on DSH `0.2.0-rc.2` Web UI. |
+
+Notes:
+
+- Browser client plugin: use `PROFILE=web`. Desktop notifications additionally
+  need a secure context (`127.0.0.1`/`localhost`/`https`) and the browser's
+  notification permission; otherwise only the sounds play (see upstream README).
+- Installed from upstream GitHub at install time, not vendored here, so fixes
+  arrive without a rustdsh release. Upstream repo:
+  <https://github.com/cwd514/dsh-sound-notifications>
 
 ## Bundled rdsh plugins (this repo)
 
@@ -39,18 +76,24 @@ tooling, not an installable plugin, and `plugins/install.sh` does not install it
 It adds the board and shared workflow UI projection rules; build and adoption
 of the patched DSH remain separate operator decisions.
 
-## Filesystem skills (rtk + ponytail)
+## Filesystem skills (rdsh-docs + ponytail + rtk)
 
 Install with `./plugins/install-skills.sh` (defaults to `~/.dsh/skills`).
 
 | Skill | Source | Notes |
 | --- | --- | --- |
-| ponytail + 5 companions | `DietrichGebert/ponytail@main` | shallow clone, `FORCE=1` refreshes with timestamped backup |
+| rdsh-docs | `plugins/skills/rdsh-docs` in this source checkout | Documents the verified DSH/rdsh version scope and read-only inspection procedure |
+| ponytail + 5 companions | `DietrichGebert/ponytail@main` | shallow clone, `FORCE=1` refreshes with backup under `$DSH_HOME/skill-backups/` |
 | rtk | local `rtk` binary (want 0.46.0+) | verified by the script; its `SKILL.md` is kept as-is |
 
 ```sh
 ./plugins/install-skills.sh                  # into ~/.dsh/skills
 DSH_HOME=/tmp/test sh plugins/install-skills.sh  # sandbox trial
-FORCE=1 ./plugins/install-skills.sh          # refresh ponytail from upstream
+FORCE=1 ./plugins/install-skills.sh          # refresh installed skills; preserve old copies outside skills/
 DRY_RUN=1 ./plugins/install-skills.sh        # preview only
 ```
+
+The bundled `rdsh-docs` skill is installed only from a source checkout. It targets the `web` profile's `standard` and
+`cordis` presets and tells agents to check the installed DSH version before relying on its version-pinned references.
+Model selection and runtime skill loading require a separate DSH acceptance run; the installer and `rdsh skills` do not
+prove that a model loaded or followed the skill.

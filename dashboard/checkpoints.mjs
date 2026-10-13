@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import {
+  LedgerError,
   SessionLedger,
   attachRecordedSession,
   verifyRecordedContext,
@@ -44,9 +45,17 @@ const check = (value, code) => {
   if (!value) throw new CheckpointError(code);
 };
 export class CheckpointError extends Error {
-  constructor(code) {
+  // `committed` describes the leased operation: true when it returned (its own
+  // durable writes are in place by contract), null when it threw and the lease
+  // helper cannot observe how far it got. Never claims a caller's record ID.
+  constructor(code, details = null) {
     super("Checkpoint: " + code);
     this.code = code;
+    if (details !== null) {
+      this.committed = details.committed;
+      this.event_ids = [...details.event_ids];
+      this.lock_cleanup_unconfirmed = details.lock_cleanup_unconfirmed;
+    }
   }
 }
 const uncertain = (commands) =>
@@ -177,21 +186,26 @@ function validateCheckpoint(value, project, id) {
   return value;
 }
 function validateAction(value, id) {
+  const fields = [
+    "schema",
+    "checkpoint_id",
+    "action_id",
+    "mode",
+    "status",
+    "run_id",
+    "cli_session_id",
+    "summary_digest",
+    "summary_bytes",
+    "summary_status",
+    "created_at",
+    "updated_at",
+  ];
   check(
-    exact(value, [
-      "schema",
-      "checkpoint_id",
-      "action_id",
-      "mode",
-      "status",
-      "run_id",
-      "cli_session_id",
-      "summary_digest",
-      "summary_bytes",
-      "summary_status",
-      "created_at",
-      "updated_at",
-    ]) &&
+    (exact(value, fields) || exact(value, [...fields, "error_code"])) &&
+      (!Object.hasOwn(value, "error_code") ||
+        (value.status === "unknown" &&
+          typeof value.error_code === "string" &&
+          /^[a-z][a-z0-9_]{0,63}$/.test(value.error_code))) &&
       value.schema === 1 &&
       value.checkpoint_id === id &&
       uuid(value.action_id, "recover") &&
@@ -311,22 +325,46 @@ export class Checkpoints {
           : "checkpoint_lock_unavailable",
       );
     }
+    let output,
+      failure = null,
+      committed = null;
     try {
       await handle.writeFile(owner);
       await handle.sync();
-      return await operation(owner);
-    } finally {
-      await handle.close();
-      try {
-        check(
-          (await fs.readFile(file, "utf8")) === owner,
-          "checkpoint_lock_changed",
-        );
-        await fs.unlink(file);
-      } catch {
-        throw new CheckpointError("checkpoint_lock_cleanup_unconfirmed");
-      }
+      output = await operation(owner);
+      // The operation writes its own records before it returns. It is the only
+      // honest commit signal this helper can observe.
+      committed = true;
+    } catch (error) {
+      failure = error;
     }
+    // A cleanup failure must never replace the outcome the caller earned.
+    let lockCleanupUnconfirmed = false;
+    try {
+      await handle.close();
+      check(
+        (await fs.readFile(file, "utf8")) === owner,
+        "checkpoint_lock_changed",
+      );
+      await fs.unlink(file);
+    } catch {
+      lockCleanupUnconfirmed = true;
+    }
+    if (failure !== null) {
+      if (lockCleanupUnconfirmed) {
+        failure.committed = committed;
+        failure.event_ids = [];
+        failure.lock_cleanup_unconfirmed = true;
+      }
+      throw failure;
+    }
+    if (lockCleanupUnconfirmed)
+      throw new CheckpointError("checkpoint_lock_cleanup_unconfirmed", {
+        committed,
+        event_ids: [],
+        lock_cleanup_unconfirmed: true,
+      });
+    return output;
   }
   async record({
     run_id,
@@ -716,7 +754,7 @@ export class Checkpoints {
           replayed_operations: 0,
           owned_root_exit_confirmed: true,
         };
-      } catch {
+      } catch (error) {
         if (attached) {
           try {
             await attached.adapter.stop();
@@ -725,6 +763,13 @@ export class Checkpoints {
           }
         }
         action.status = "unknown";
+        const preservedErrorCode =
+          (error instanceof CheckpointError || error instanceof LedgerError) &&
+          typeof error?.code === "string" &&
+          /^[a-z][a-z0-9_]{0,63}$/.test(error.code)
+            ? error.code
+            : null;
+        action.error_code = preservedErrorCode ?? "recovery_result_unknown";
         if (summary !== null && action.summary_status === "pending")
           action.summary_status = "unknown";
         action.updated_at = new Date().toISOString();
@@ -733,7 +778,9 @@ export class Checkpoints {
         } catch {
           /* The flushed intent still prevents replay. */
         }
-        throw new CheckpointError("recovery_result_unknown");
+        if (preservedErrorCode === null)
+          throw new CheckpointError("recovery_result_unknown");
+        throw error;
       }
     });
   }

@@ -91,7 +91,7 @@ fn list_dir(dir: &str, kind: &str) -> anyhow::Result<()> {
         let _ = writeln!(out, "{n}");
     }
     let _ = out.flush();
-    eprintln!("[rdsh] {} {kind}(s)", names.len());
+    eprintln!("[rdsh] {len} {kind}(s)", len = names.len());
     Ok(())
 }
 
@@ -125,7 +125,7 @@ fn scan_sessions(root: &str, project: Option<&str>) -> Vec<Session> {
         Some(_) => return vec![],
         None => match std::fs::read_dir(root) {
             Ok(e) => e
-                .filter_map(|e| e.ok())
+                .filter_map(Result::ok)
                 .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
                 .map(|e| e.file_name().to_string_lossy().into_owned())
                 .collect(),
@@ -274,7 +274,7 @@ fn scan_project(pdir: &std::path::Path, proj: &str) -> Vec<Session> {
         Ok(e) => e,
         Err(_) => return v,
     };
-    for e in entries.filter_map(|e| e.ok()) {
+    for e in entries.filter_map(Result::ok) {
         // file_type does not traverse symlinks: a planted link never
         // pulls an outside directory into the walk.
         if !e.file_type().is_ok_and(|t| t.is_dir()) {
@@ -298,7 +298,7 @@ fn dir_size_mtime(dir: &std::path::Path) -> (u64, u64, String) {
     let mut mtime = 0u64;
     let mut best: Option<std::time::SystemTime> = None;
     if let Ok(entries) = std::fs::read_dir(dir) {
-        for e in entries.filter_map(|e| e.ok()) {
+        for e in entries.filter_map(Result::ok) {
             // Skip links before statting: sizes must describe files inside.
             if !e.file_type().is_ok_and(|t| t.is_file()) {
                 continue;
@@ -640,7 +640,7 @@ fn session_decompressed_bytes_uncached(
     let mut any = false;
     let mut estimated = false;
     let mut deferred = vec![];
-    for e in entries.filter_map(|e| e.ok()) {
+    for e in entries.filter_map(Result::ok) {
         let p = e.path();
         let Some(name) = p.file_name().map(|s| s.to_string_lossy().into_owned()) else {
             continue;
@@ -1105,7 +1105,7 @@ fn confine_log_path(
 
 pub fn cmd_logs(tail: usize, grep: Option<String>, file: Option<String>) -> anyhow::Result<()> {
     let dir = format!("{}/logs", dsh_home());
-    let (display, mut handle) = match file {
+    let (display, handle) = match file {
         Some(f) => {
             // Confine explicit selections to the logs dir (fail closed):
             // without this `--file /etc/passwd` or `../../.credentials.yaml`
@@ -1140,16 +1140,14 @@ pub fn cmd_logs(tail: usize, grep: Option<String>, file: Option<String>) -> anyh
         },
     };
     eprintln!("[rdsh] reading {}", display.display());
-    use std::io::Read as _;
-    let mut text = String::new();
-    handle.read_to_string(&mut text)?;
-    // Single pass: count matches while keeping only the last `tail` lines.
-    // (Old code collected every line, then filtered in a second pass.)
+    use std::io::BufRead as _;
+    // Stream the log; only the requested tail remains resident.
     let pat = grep.as_deref();
     let mut n = 0usize;
-    let mut kept: std::collections::VecDeque<&str> =
+    let mut kept: std::collections::VecDeque<String> =
         std::collections::VecDeque::with_capacity(tail.min(512));
-    for line in text.lines() {
+    for line in std::io::BufReader::new(handle).lines() {
+        let line = line?;
         if pat.map(|p| line.contains(p)).unwrap_or(true) {
             n += 1;
             if tail > 0 {
@@ -1168,8 +1166,7 @@ pub fn cmd_logs(tail: usize, grep: Option<String>, file: Option<String>) -> anyh
     }
     let _ = out.flush();
     eprintln!(
-        "[rdsh] {} line(s){}",
-        n,
+        "[rdsh] {n} line(s){}",
         grep.map(|g| format!(" matching {g:?}")).unwrap_or_default()
     );
     Ok(())
@@ -1177,7 +1174,7 @@ pub fn cmd_logs(tail: usize, grep: Option<String>, file: Option<String>) -> anyh
 
 fn latest_file(dir: &str) -> Option<std::path::PathBuf> {
     let mut best: Option<(u64, std::path::PathBuf)> = None;
-    for e in std::fs::read_dir(dir).ok()?.filter_map(|e| e.ok()) {
+    for e in std::fs::read_dir(dir).ok()?.filter_map(Result::ok) {
         // Never follow a planted link out of the logs dir (file_type does
         // not traverse symlinks, unlike metadata below).
         if !e.file_type().is_ok_and(|t| t.is_file()) {
@@ -1207,7 +1204,7 @@ fn latest_file(dir: &str) -> Option<std::path::PathBuf> {
 fn dir_names(dir: &str) -> Vec<String> {
     let mut names: Vec<String> = std::fs::read_dir(dir)
         .map(|e| {
-            e.filter_map(|e| e.ok())
+            e.filter_map(Result::ok)
                 .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
                 .map(|e| e.file_name().to_string_lossy().into_owned())
                 .collect()
@@ -1218,7 +1215,7 @@ fn dir_names(dir: &str) -> Vec<String> {
 }
 
 pub fn names_json(kind: &str) -> String {
-    let dir = format!("{}/{}", dsh_home(), kind);
+    let dir = format!("{}/{kind}", dsh_home());
     serde_json::json!({"kind": kind, "names": dir_names(&dir)}).to_string()
 }
 
@@ -1487,15 +1484,15 @@ mod tests {
             return;
         };
         let mut checked = 0;
-        'scan: for proj in projs.filter_map(|e| e.ok()) {
+        'scan: for proj in projs.filter_map(Result::ok) {
             let Ok(sess) = std::fs::read_dir(proj.path()) else {
                 continue;
             };
-            for s in sess.filter_map(|e| e.ok()) {
+            for s in sess.filter_map(Result::ok) {
                 let Ok(files) = std::fs::read_dir(s.path()) else {
                     continue;
                 };
-                for f in files.filter_map(|e| e.ok()) {
+                for f in files.filter_map(Result::ok) {
                     let p = f.path();
                     if p.extension().and_then(|e| e.to_str()) != Some("zstd") {
                         continue;
