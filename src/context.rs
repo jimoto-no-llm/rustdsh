@@ -885,7 +885,7 @@ fn code_hits(query: &str, max: usize) -> Vec<String> {
                 .and_then(|s| s.to_str())
                 .map(|x| x.to_lowercase())
             {
-                Some(ref e) if e == "md" => 0usize,
+                Some(e) if e == "md" => 0usize,
                 Some(_) => 1usize,
                 None => 1usize,
             };
