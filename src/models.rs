@@ -1114,7 +1114,9 @@ pub(crate) fn cmd_models_show(
             );
         }
     }
-    let _ = writeln!(std::io::stdout(), "[rdsh] apply with: rdsh models sync");
+    if reports.iter().any(ProviderReport::changed) {
+        let _ = writeln!(std::io::stdout(), "[rdsh] apply with: rdsh models sync");
+    }
     Ok(())
 }
 
