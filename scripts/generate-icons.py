@@ -4,6 +4,7 @@ import base64
 from pathlib import Path
 import struct
 import subprocess
+from ico_format import parse_ico
 
 assets = Path(__file__).resolve().parents[1] / 'assets'
 subprocess.run(['convert', str(assets / 'icon.png'), '-resize', '256x256',
@@ -13,18 +14,19 @@ subprocess.run(['convert', str(assets / 'icon.png'), '-define',
 
 # PNG-compress the 256px entry; retain smaller native DIB entries for Windows.
 icon = (assets / 'icon.ico').read_bytes()
-reserved, kind, count = struct.unpack_from('<HHH', icon)
-entries = []
-for i in range(count):
-    width, height, colors, padding, planes, bits, length, offset = struct.unpack_from('<BBBBHHII', icon, 6 + i * 16)
-    payload = (assets / 'icon-256.png').read_bytes() if width == height == 0 else icon[offset:offset + length]
-    entries.append((width, height, colors, padding, planes, bits, payload))
+reserved, kind, entries = parse_ico(icon)
+count = len(entries)
+result_entries = []
+for width, height, colors, padding, planes, bits, payload in entries:
+    if width == height == 0:
+        payload = (assets / 'icon-256.png').read_bytes()
+    result_entries.append((width, height, colors, padding, planes, bits, payload))
 result = bytearray(struct.pack('<HHH', reserved, kind, count))
 offset = 6 + count * 16
-for width, height, colors, padding, planes, bits, payload in entries:
+for width, height, colors, padding, planes, bits, payload in result_entries:
     result.extend(struct.pack('<BBBBHHII', width, height, colors, padding, planes, bits, len(payload), offset))
     offset += len(payload)
-for *_, payload in entries:
+for *_, payload in result_entries:
     result.extend(payload)
 (assets / 'icon.ico').write_bytes(result)
 image = base64.b64encode((assets / 'icon-256.png').read_bytes()).decode('ascii')
