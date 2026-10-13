@@ -62,6 +62,13 @@ try{
  await call('dashboard_upsert_task',{id:'T1',title:'E2E task',status:'doing'});
  await call('dashboard_ask_question',{id:'Q1',question:'E2E: choose an answer',urgency:'high'});
  const projectPage=await pageFor(browser,runtime.browser_url);await projectPage.locator('#question-Q1 textarea').waitFor();await check(projectPage,/dashboard/i);
+ const observedCli=projectPage.locator('#observed-cli-panel');
+ assert.equal(await observedCli.count(),1,'the read-only CLI observation panel should remain in a workspace pane');
+ assert.equal(await observedCli.locator('#observed-cli-form').count(),1,'the observation registration form should remain available');
+ assert.equal(await observedCli.locator('#observed-cli-refresh').count(),1,'the observation refresh action should remain available');
+ await observedCli.locator('summary').click();
+ await observedCli.locator('#observed-cli-list').getByText('登録済みのCLIはありません。',{exact:true}).waitFor();
+ assert.equal(await observedCli.locator('#observed-cli-task option[value="T1"]').count(),1,'the panel should retain its task selector integration');
  const config=await projectPage.evaluate(async()=>{const token=sessionStorage.getItem('rdsh_project_browser_token');const response=await fetch('/api/config',{headers:{'x-rdsh-browser-token':token}});return response.json();});
  assert.equal(typeof config.project?.id,'string');
  const layoutKey=`rdsh:workspace-layout:v1:${encodeURIComponent(config.project.id)}`;
@@ -97,7 +104,7 @@ try{
  assert.notEqual(fresh.browser_url,runtime.browser_url);
  const staleToken=new URL(runtime.browser_url).hash.slice('#key='.length);assert.equal((await fetch(fresh.local_url+'api/state',{headers:{'x-rdsh-browser-token':staleToken}})).status,401);
  const newPage=await pageFor(browser,fresh.browser_url);await newPage.locator('#tasks-detail').evaluate(e=>e.open=true);await newPage.locator('#task-T1').waitFor();await newPage.locator('#answered').evaluate(e=>e.open=true);await newPage.locator('#answers').filter({hasText:'E2E saved answer'}).waitFor();await check(newPage,/dashboard/i);await stop(restarted.child);
- report.flows.push('project CLI: real MCP task/question -> project-specific pane layout persistence, keyboard navigation and mobile one-column -> browser draft preserved on SSE -> browser answer -> MCP/file readback -> process restart retained answer and revoked old key');
+ report.flows.push('project CLI: real MCP task/question -> preserved read-only CLI observation panel -> project-specific pane layout persistence, keyboard navigation and mobile one-column -> browser draft preserved on SSE -> browser answer -> MCP/file readback -> process restart retained answer and revoked old key');
  }finally{await client.close();}
  assert.deepEqual(report.page_errors,[]);assert.deepEqual(report.console_errors,[]);
  report.result='PASS';
