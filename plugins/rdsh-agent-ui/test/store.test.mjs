@@ -87,6 +87,20 @@ test('malformed actions are refused', async (t) => {
   assert.equal((await readActions(dir)).length, 0);
 });
 
+test('an append failure preserves the existing action history', async (t) => {
+  const dir = await home(t);
+  await appendAction(dir, { request_id: 'saved', action_id: 'next:submit' });
+  const before = await readActions(dir);
+  const append = fs.appendFile;
+  fs.appendFile = async () => { throw Object.assign(new Error('fixture IO failure'), { code: 'EIO' }); };
+  try {
+    await assert.rejects(() => appendAction(dir, { request_id: 'failed', action_id: 'next:submit' }), { code: 'EIO' });
+  } finally {
+    fs.appendFile = append;
+  }
+  assert.deepEqual(await readActions(dir), before);
+});
+
 test('a surface stays anchored to the first turn that claimed it', async (t) => {
   const dir = await home(t);
   assert.equal((await anchorSurface(dir, { surface_id: 'srf_test', turn: 3 })).error, 'no-surface');

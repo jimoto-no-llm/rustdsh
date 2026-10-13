@@ -46,7 +46,8 @@
 
 ## クイックスタート
 
-**Claude Code／Codex を利用中の方へ**：今のエージェントを使いながら、
+**Claude Code／Codex／Cursor／VS Code Copilot／OpenCode／Gemini CLI を利用中の方へ**：
+今のエージェントを使いながら、
 [MCP でダッシュボードを追加](docs/MCP-CLIENTS.md)できます。
 タスク・質問・構造化 UI の共有には Node.js 22 以上が必要です。DSH 本体と Rust は任意です。
 

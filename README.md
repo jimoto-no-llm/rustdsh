@@ -46,7 +46,8 @@ It ports frequently used CLI operations (token calculation, code search, session
 
 ## Quick Start
 
-Already using **Claude Code or Codex**? [Connect the project dashboard through MCP](docs/MCP-CLIENTS.md)
+Already using **Claude Code, Codex, Cursor, VS Code Copilot, OpenCode or Gemini CLI**?
+[Connect the project dashboard through MCP](docs/MCP-CLIENTS.md)
 to share tasks, questions and structured UI while keeping your current coding agent.
 This entry point requires Node.js 22+; DSH and Rust are optional.
 

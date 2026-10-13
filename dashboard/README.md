@@ -1,6 +1,6 @@
 # Project dashboard and private Harness access
 
-[Claude Code / Codex MCP quickstart](../docs/MCP-CLIENTS.md): add tasks, questions
+[Coding agent MCP quickstart](../docs/MCP-CLIENTS.md): add tasks, questions
 and structured UI to your existing coding agent through the local stdio bridge.
 
 [Worker scopes and worktrees](../docs/WORKER-WORKSPACES.md): local CLI allocation,

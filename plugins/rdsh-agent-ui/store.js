@@ -135,11 +135,9 @@ export async function appendAction(home, input) {
   if (replay) return { ok: true, action: replay, sequence: existing.indexOf(replay) + 1, replayed: true };
   const file = actionsPath(home);
   const line = body + '\n';
-  try {
-    await fs.appendFile(file, line, { mode: 0o600 });
-  } catch {
-    await fs.writeFile(file, line, { mode: 0o600 });
-  }
+  // appendFile already creates a missing file. A write error must propagate;
+  // replacing the file here would destroy previously saved human actions.
+  await fs.appendFile(file, line, { mode: 0o600 });
   return { ok: true, action, sequence: existing.length + 1, replayed: false };
 }
 

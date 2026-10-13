@@ -497,7 +497,7 @@ export async function startDashboard(options) {
         route === "/api/instructions/context" ||
         (req.method === "POST" && route === "/api/instructions/submit") ||
         (req.method === "POST" &&
-          ["metrics", "task", "question", "event"].some(
+          ["metrics", "task", "question", "event", "ui_surface"].some(
             (operation) => route === `/api/update/${operation}`,
           ));
       const mcpAuthorized =

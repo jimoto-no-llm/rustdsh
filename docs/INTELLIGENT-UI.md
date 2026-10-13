@@ -15,7 +15,7 @@
 
 ## エージェントからの使い方
 
-```
+```text
 dashboard_present_ui({ message_id, blocks, session_id?, surface_id?, observation? })
   -> { surface_id, revision, block_count, actions[], fallback[] }
 
@@ -24,7 +24,8 @@ dashboard_get_feedback({ after })
 ```
 
 - `message_id` は1ターンごとに付ける。同じ `surface_id` を渡すと**同じ面を更新**し `revision` が増える。
-- `actions` はサーバーが発行する。モデルが任意の操作IDを決めることはできない。
+- `actions` にはサーバーが検証した操作IDを返す。既定の操作IDはブロックから補い、
+  明示したIDも検証する。操作の受付は現在の提示面・版・ブロック・操作IDに限定する。
 - `fallback` は検証に落ちたブロックの一覧。未知の種別・型不一致は文字表示へ退避し、実行はしない。
 - 値が未取得のときは `null` を使う。**0で埋めない**（0と未取得は別物）。
 
@@ -84,7 +85,6 @@ node --test dashboard/test/ui-registry.test.mjs dashboard/test/ui-blocks.test.mj
 `ui-roundtrip.test.mjs` は実サーバーを起動し、MCP で提示 → ブラウザ相当の HTTP で操作 →
 MCP の `dashboard_get_feedback` で返送を確認する往復試験です。
 
-
 ## 見た目の層
 
 提示面は dashboard と同じ世界（生成り紙・ヘアライン・意味ごとに1色）で描きます。
@@ -94,7 +94,9 @@ MCP の `dashboard_get_feedback` で返送を確認する往復試験です。
 
 - 入力中の下書きを壊さないため、再描画は surface_id と revision が変わったときだけ行います。
 - 動きは面の出現1回のみ。prefers-reduced-motion で停止します。
-- 実画面の記録: [desktop](evidence/agent-ui-desktop.png) / [mobile](evidence/agent-ui-mobile.png)
+- 実画面の記録: [desktop](evidence/ui-review-20261013/after-desktop.png) /
+  [mobile](evidence/ui-review-20261013/after-mobile.png) /
+  [操作の往復](evidence/ui-review-20261013/choice-flow.gif)
 
 ブラウザ確認で見つけた2件（SVG要素の名前空間と、viewBoxだけでは高さが決まらない件）は
 dashboard/test/ui-styles.test.mjs と dashboard/test/ui-assets.test.mjs で再発を防いでいます。
@@ -108,7 +110,8 @@ dashboard/test/ui-styles.test.mjs と dashboard/test/ui-assets.test.mjs で再�
 - 初回は保存済みの選択、なければOSの設定に従います。描画前に決めるのでちらつきません。
 - ヘッダーの「ダーク表示／ライト表示」で切り替え、選択は localStorage に残します。
 - OS設定の変更は、明示的な選択がないときだけ反映します。
-- 実画面の記録: docs/evidence/agent-ui-dark.png, agent-ui-dark-mobile.png, agent-ui-light.png
+- 実画面の記録: [dark mobile](evidence/ui-review-20261013/after-dark-mobile.png) /
+  [light desktop](evidence/ui-review-20261013/after-desktop.png)
 
 dashboard/test/ui-theme.test.mjs が、両テーマのトークン一致・未定義トークン0・
 トークン外の色リテラル0・起動スクリプトと切替の存在を検証します。
