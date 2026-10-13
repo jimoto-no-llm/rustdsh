@@ -35,11 +35,14 @@ export function prepare({ checkout, rdshBin, lockPath = join(repo, 'desktop/upst
     execFileSync('git', ['-C', root, 'fetch', '--depth', '1', 'origin', lock.revision], { stdio: 'pipe' });
     execFileSync('git', ['-C', root, 'checkout', '--detach', lock.revision], { stdio: 'pipe' });
   }
-  // Git uses forward slashes on Windows; macOS may report /private/var for
-  // /var. Compare canonical paths while still refusing a symlinked root.
-  if (lstatSync(root).isSymbolicLink() || realpathSync(git(root, ['rev-parse', '--show-toplevel'])) !== realpathSync(root)
-    || git(root, ['config', '--get', 'remote.origin.url']) !== lock.repository
-    || git(root, ['rev-parse', 'HEAD']) !== lock.revision) throw new Error('Checkout does not match the pinned official source');
+  // Git and Node can differ in slash, drive-letter case and system aliases.
+  // Compare directory identities; a nested checkout path must still fail.
+  const requestedRoot = lstatSync(root, { bigint: true });
+  const gitRoot = lstatSync(realpathSync(git(root, ['rev-parse', '--show-toplevel'])), { bigint: true });
+  if (!requestedRoot.isDirectory() || requestedRoot.isSymbolicLink() || requestedRoot.ino === 0n
+    || requestedRoot.dev !== gitRoot.dev || requestedRoot.ino !== gitRoot.ino) throw new Error('Checkout Git root does not match');
+  if (git(root, ['config', '--get', 'remote.origin.url']) !== lock.repository) throw new Error('Checkout repository does not match the pinned official source');
+  if (git(root, ['rev-parse', 'HEAD']) !== lock.revision) throw new Error('Checkout revision does not match the pinned official source');
   const generatorHash = contentHash(readFileSync(new URL('./overlay.mjs', import.meta.url)));
   const noLinks = path => {
     let current = root;

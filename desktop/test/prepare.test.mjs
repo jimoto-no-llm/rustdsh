@@ -36,6 +36,7 @@ function fixture(t) {
 
 test('real Git preparation is idempotent and preserves unrelated tracked and untracked edits', t => {
   const f = fixture(t); assert.equal(f.run().unchanged, false); assert.equal(f.run().unchanged, true);
+  assert.throws(() => prepare({ checkout: join(f.checkout, 'apps'), rdshBin: f.rdshBin, lockPath: f.lockPath }), /Git root/);
   if (process.platform !== 'win32') {
     // A parent alias exercises Git/OS canonicalization without relaxing the
     // separate prohibition on the checkout root itself being a symlink.
