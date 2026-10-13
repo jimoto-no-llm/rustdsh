@@ -1100,7 +1100,7 @@ fn node_wrapper_warnings(shadowed: bool) -> Vec<String> {
     };
     let dir = format!("{home}/.local/bin");
     let entries = std::fs::read_dir(&dir).ok();
-    let mut hits: Vec<String> = vec![];
+    let mut hits: Vec<String> = Vec::new();
     if let Some(entries) = entries {
         for entry in entries.flatten() {
             let path = entry.path();
