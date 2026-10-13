@@ -145,3 +145,47 @@ provider internals, child role executions, concurrent independent clients or an
 operator rewriting all private state. A UI and request-level execution evidence
 are still required to complete all of issue #20. See
 [local evidence](evidence/model-routing.md) for observed and unexercised paths.
+
+## Models the harness catalog does not carry yet
+
+DeepSeek Harness answers a catalog provider from the model catalog bundled in
+its `@earendil-works/pi-ai` dependency. That file is generated when the package
+is published, so a model released afterwards is absent from the model picker
+until the harness dependency is upgraded — Codex's `gpt-6.1-sol` shipped in the
+Codex CLI and the ChatGPT backend while the installed harness catalog still
+stopped at `gpt-6-sol`. A profile that lists `models:` for the route also
+*replaces* the bundled catalog, so the id has to be named there explicitly.
+
+`rdsh models` closes that gap from the CLI side. It reads the catalog the local
+Codex CLI already maintains (`codex debug models`, falling back to
+`~/.codex/models_cache.json`), keeps the models Codex marks as listable and
+API-servable, and appends the ids a profile does not carry yet:
+
+```sh
+rdsh models                              # read-only: what each profile is missing
+rdsh models sync                         # append the missing entries
+rdsh models sync --profile web --dry-run # preview one profile
+rdsh models --json                       # same report for a sidecar
+```
+
+The sync is additive by construction: existing entries, their comments and every
+other byte of the profile are preserved, an up-to-date profile is not rewritten,
+and a profile whose structure the command does not recognize (no `llm-pi-ai`
+entry, no provider block, or an inline `provider: {}`) is refused with the YAML
+it needs instead of being rewritten. The profile is replaced atomically under the
+same lock protocol DSH uses, so a live config edit and this sync cannot
+interleave. The harness picks the new entries up on the next config reload or
+restart.
+
+Each appended entry carries the context window, the input modalities and the
+reasoning levels the CLI advertises. `off` is deliberately left undeclared:
+the harness reads a declared `off: null` as "omit the level from pi-ai's
+`thinkingLevelMap`", and pi-ai then sends `reasoning.effort: "none"` for a model
+whose map has no `off` key, which the Codex backend rejects (`'none' is not
+supported with the 'gpt-6.1-sol' model`). Leaving `off` undeclared pins it to
+`null`, which is what pi-ai's own catalog entry does and what keeps a request
+free of a `reasoning` block when no effort is chosen.
+
+This command changes only the profile's own `models:` list; it does not upgrade
+the harness dependency, fetch a provider's live catalog over the network, or
+attest that the backend still serves an id the CLI advertises.
