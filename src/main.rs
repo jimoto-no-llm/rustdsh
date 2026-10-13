@@ -12,6 +12,7 @@ mod guard;
 mod inspect;
 mod local_http;
 mod models;
+mod models_auto;
 mod opencode_header;
 mod passthrough;
 mod providers;
@@ -33,6 +34,7 @@ mod websearch;
     version,
     about = "Rust fast launcher for dsh (safe: native fast-paths + passthrough)",
     after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|models|auth|setup|context|settings|features|provider|dump-config|boot)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh models                     list the models a profile is missing or names stale\n  rdsh models sync                add them and refresh stale names\n  rdsh desktop status             detect the Desktop (Electron) app and its reserved profile\n  rdsh desktop install            attach the bundled rdsh plugins to that profile\n  rdsh --passthrough tui          no slim env; mandatory tool isolation remains\n  rdsh --dry-run tui -- --resume abc   show what would exec"
+    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|models|dump-config|boot)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh models                     list the models a profile is missing or names stale\n  rdsh models sync                add them and refresh stale names\n  rdsh models auto                refresh them when the interval elapsed (background)\n  rdsh desktop status             detect the Desktop (Electron) app and its reserved profile\n  rdsh desktop install            attach the bundled rdsh plugins to that profile\n  rdsh --passthrough tui          no slim env; mandatory tool isolation remains\n  rdsh --dry-run tui -- --resume abc   show what would exec"
 )]
 struct Cli {
     /// Explicitly share a project file with isolated model tools (repeatable).
@@ -303,6 +305,23 @@ enum ModelsAction {
         /// Print what would change without writing the profile
         #[arg(long = "dry-run")]
         dry_run: bool,
+        #[arg(long = "json")]
+        json: bool,
+    },
+    /// Refresh every configured provider, but only when the interval elapsed
+    /// (the boot path runs this in the background)
+    Auto {
+        #[arg(long = "profile")]
+        profile: Option<String>,
+        /// Refresh even when the recorded interval has not elapsed
+        #[arg(long)]
+        force: bool,
+        /// Report the pending changes without writing a profile
+        #[arg(long = "dry-run")]
+        dry_run: bool,
+        /// Print nothing unless the refresh fails (used by the boot hook)
+        #[arg(long)]
+        quiet: bool,
         #[arg(long = "json")]
         json: bool,
     },
@@ -831,6 +850,21 @@ fn main() {
                 dry_run,
                 json,
             ),
+            Some(ModelsAction::Auto {
+                profile,
+                force,
+                dry_run,
+                quiet,
+                json,
+            }) => models_auto::cmd_models_auto(
+                &cfg,
+                profile.or(cli.profile).as_deref(),
+                provider.as_deref(),
+                force,
+                dry_run,
+                json,
+                quiet,
+            ),
         },
         Some(Commands::Auth(args)) => auth::cmd_auth(args, dry),
         Some(Commands::Provider { action }) => match action {
@@ -913,6 +947,7 @@ fn main() {
             args,
         }) => profile_or_default(profile.or(cli.profile), &cfg.general.default_profile).and_then(
             |p| {
+                models_auto::maybe_spawn(&cfg, dry);
                 passthrough::exec_boot(
                     &p,
                     from_default_profile.as_deref(),
@@ -944,6 +979,7 @@ fn main() {
                 } => {
                     let mut all = cli.patch;
                     all.extend(patches);
+                    models_auto::maybe_spawn(&cfg, dry);
                     passthrough::exec_boot(
                         &profile,
                         from_default.as_deref(),
