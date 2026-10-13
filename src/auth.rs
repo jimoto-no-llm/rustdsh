@@ -958,6 +958,18 @@ pub fn cmd_auth(
     for n in notes {
         println!("[rdsh auth] note: {n}");
     }
+    // A Codex grant only reaches the picker for models the profile lists: the
+    // harness serves a catalog generated when it was published, so a model the
+    // CLI already offers can still be missing from the profile's own list.
+    if grants
+        .iter()
+        .any(|g| g.provider == crate::models::CODEX_PROVIDER)
+        || decisions
+            .iter()
+            .any(|d| d.provider == crate::models::CODEX_PROVIDER)
+    {
+        println!("[rdsh auth] hint: `rdsh models` lists Codex models a profile has not listed yet; `rdsh models sync` adds them");
+    }
     if !doc.text.is_empty() && !doc.version_ok {
         println!("[rdsh auth] refuse: pre-release flat layout; add `version: 1` first");
     } else if import {
