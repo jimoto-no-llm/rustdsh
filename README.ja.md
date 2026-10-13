@@ -336,6 +336,7 @@ Linux x86_64 環境での測定値です：
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 委譲の仕組みとアーキテクチャ設計 |
 | [docs/BENCHMARKS.md](docs/BENCHMARKS.md) | ベンチマークの詳細と再現手順 |
 | [docs/RDSH-SETTINGS.md](docs/RDSH-SETTINGS.md) | 設定画面の機能と CLI キー一覧 |
+| [docs/MODEL-AUTO-SYNC.md](docs/MODEL-AUTO-SYNC.md) | プロバイダのモデル一覧の自動更新（`rdsh models auto`） |
 | [docs/DESKTOP-INTEGRATION.md](docs/DESKTOP-INTEGRATION.md) | デスクトップアプリ (Electron) との連携 |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 今後の開発ロードマップ |
 | [docs/RELEASING.md](docs/RELEASING.md) | リリース手順 |

@@ -355,6 +355,7 @@ Measurements conducted on Linux x86_64:
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Architecture design and delegation model |
 | [docs/BENCHMARKS.md](docs/BENCHMARKS.md) | Benchmark methodology and reproduction steps |
 | [docs/RDSH-SETTINGS.md](docs/RDSH-SETTINGS.md) | Settings UI and CLI options |
+| [docs/MODEL-AUTO-SYNC.md](docs/MODEL-AUTO-SYNC.md) | Automatic provider-model refresh (`rdsh models auto`) |
 | [docs/DESKTOP-INTEGRATION.md](docs/DESKTOP-INTEGRATION.md) | DeepSeek Harness Desktop (Electron) integration |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Project roadmap and planned capabilities |
 | [docs/RELEASING.md](docs/RELEASING.md) | Release procedures |

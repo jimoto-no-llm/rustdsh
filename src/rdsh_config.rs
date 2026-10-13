@@ -96,6 +96,11 @@ pub const FEATURES: &[FeatureDef] = &[
         summary: "push a notification when an update is found",
     },
     FeatureDef {
+        id: "models_auto",
+        default: true,
+        summary: "refresh provider model lists in the background (rdsh models auto)",
+    },
+    FeatureDef {
         id: "sound",
         default: false,
         summary: "allow the DSH sound notifications install (installer SOUND=1)",
