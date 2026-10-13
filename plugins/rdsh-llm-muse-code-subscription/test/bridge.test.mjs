@@ -2,24 +2,30 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+import { homedir } from 'node:os';
 import { stat } from 'node:fs/promises';
 import { runMuse } from '../muse.mjs';
 import { runWorker } from '../runner.mjs';
 import { MuseSubscriptionAdapter, apply } from '../index.js';
-import { BridgeError, parseReply, subscriptionEnvironment, tokenUsage, validateRequest } from '../protocol.mjs';
+import { BridgeError, normalizeCatalog, parseReply, subscriptionEnvironment, tokenUsage, validateRequest } from '../protocol.mjs';
+import { catalog } from './catalog.mjs';
 
 const tools = [{ name: 'Bash', description: 'Fixture tool', parameters: { type: 'object', properties: { command: { type: 'string' } } } }];
 const job = (system = 'text') => ({ model: 'muse-wonder-1.0', system, messages: [{ role: 'user', content: [{ type: 'text', text: '42を返して' }] }], tools });
 const config = { workerPath: fileURLToPath(new URL('./helper.mjs', import.meta.url)), timeoutMs: 3000, shutdownGraceMs: 200 };
 const activeAuth = JSON.stringify({ providers: { meta: { subs_active: true, mechanism: 'oauth', obtained_via: 'device_code', access_token: 'SECRET-AUTH' } } });
 
-function fakeSdk({ nativeTool = false, hanging = false, schemaChanged = false, usage, fail = false } = {}) {
-  const state = { spawned: 0, closed: 0, cancelled: 0, options: undefined, returned: 0 };
+function fakeSdk({ nativeTool = false, hanging = false, schemaChanged = false, usage, fail = false, models } = {}) {
+  const state = { spawned: 0, closed: 0, cancelled: 0, options: undefined, returned: 0, turns: 0, queries: 0 };
   let resolveExit;
   const exit = new Promise(resolve => { resolveExit = resolve; });
   const close = async () => { state.closed++; resolveExit({ kind: 'cleanShutdown' }); };
   const host = { close, initializeResult: {}, child: { exit }, fingerprintWarning: schemaChanged,
-    connection: { command: async () => { state.cancelled++; } } };
+    connection: { command: async () => { state.cancelled++; }, request: async (method, params) => {
+      assert.equal(method, 'model/list'); assert.deepEqual(params, {}); state.queries++;
+      return models ?? catalog(state.options.args[state.options.args.indexOf('--contributor-mode') + 1]);
+    } } };
   let pending;
   const iterator = {
     next: async () => {
@@ -32,6 +38,7 @@ function fakeSdk({ nativeTool = false, hanging = false, schemaChanged = false, u
   };
   const session = { sessionId: 'fixture', onApproval: callback => { state.approval = callback; },
     sendUserTurn: async input => {
+      state.turns++;
       state.prompt = input.input[0].text;
       if (fail) throw new Error('SECRET-AUTH');
       return { turnId: 'fixture-turn', items: () => iterator, completed: Promise.resolve({ kind: 'completed', params: { terminal: 'completed', usage } }) };
@@ -46,9 +53,9 @@ function fakeSdk({ nativeTool = false, hanging = false, schemaChanged = false, u
   };
 }
 
-test('rejects images and unknown model/effort before a model call', () => {
-  assert.throws(() => validateRequest({ ...job(), model: 'unknown' }), { code: 'MUSE_UNKNOWN_MODEL' });
-  assert.throws(() => validateRequest({ ...job(), reasoningEffort: 'unknown' }), { code: 'MUSE_UNKNOWN_MODEL' });
+test('rejects unsupported input and mode before any child is started', () => {
+  assert.throws(() => validateRequest({ ...job(), model: '' }), { code: 'MUSE_UNKNOWN_MODEL' });
+  assert.throws(() => validateRequest({ ...job(), contributorMode: 'maybe' }), { code: 'MUSE_INPUT_INVALID' });
   assert.throws(() => validateRequest({ ...job(), messages: [{ role: 'user', content: [{ type: 'image' }] }] }), { code: 'MUSE_INPUT_INVALID' });
 });
 
@@ -92,6 +99,9 @@ test('uses an empty temporary workspace, denies native approvals and confirms SD
   assert.ok(fixture.state.options.args.includes('--disable-shell'));
   assert.ok(fixture.state.options.args.includes('--disable-write'));
   assert.equal(fixture.state.options.args[fixture.state.options.args.indexOf('--contributor-mode') + 1], 'off');
+  assert.equal(fixture.state.options.env.HOME, homedir());
+  assert.equal(fixture.state.options.env.USERPROFILE, homedir());
+  assert.equal(fixture.state.options.env.XDG_CONFIG_HOME, join(homedir(), '.config'));
   assert.equal(fixture.state.sessionOptions.approvalMode, 'denyUnmatched');
   assert.match(fixture.state.prompt, /\/project/);
   assert.notEqual(fixture.state.options.cwd, '/project');
@@ -149,7 +159,7 @@ test('user cancellation, timeout and an unresponsive helper all settle', { timeo
 test('Harness adapter emits the native text/tool vocabulary and provider registration disposes', async () => {
   const ctx = { sessions: { get: () => ({ header: { cwd: '/fixture-project' } }) } };
   const adapter = new MuseSubscriptionAdapter(ctx, config);
-  assert.deepEqual((await adapter.listModels('muse-code')).map(model => model.id), ['muse-wonder-1.0', 'muse-wonder-full-1.0']);
+  assert.deepEqual((await adapter.listModels('muse-code')).map(model => model.id), catalog().models.map(model => model.modelId));
   await assert.rejects(adapter.resolveModel('muse-code', 'unknown'));
   const events = [];
   for await (const event of adapter.stream({ ...job('tool'), sessionId: 'fixture' })) events.push(event);
@@ -157,7 +167,7 @@ test('Harness adapter emits the native text/tool vocabulary and provider registr
   assert.equal(events.at(-1).reason.kind, 'tool-calls');
   let dispose, unregistered = false;
   apply({ ...ctx, llm: { registerAdapter: (providers, registered) => {
-    assert.deepEqual(providers, ['muse-code']); assert.ok(registered instanceof MuseSubscriptionAdapter); return () => { unregistered = true; };
+    assert.deepEqual(providers, ['muse-code', 'muse-code-contributor']); assert.ok(registered instanceof MuseSubscriptionAdapter); return () => { unregistered = true; };
   } }, on: (name, callback) => { assert.equal(name, 'dispose'); dispose = callback; } }, config);
   await dispose(); assert.equal(unregistered, true);
 });
@@ -177,4 +187,75 @@ test('disposal does not wait for a UI consumer paused at a buffered answer', { t
   assert.equal((await stream.next()).value.type, 'block-start');
   await adapter.dispose();
   await stream.return();
+  const controller = new AbortController(); controller.abort();
+  const aborted = adapter.stream({ ...job(), signal: controller.signal });
+  assert.equal((await aborted.next()).value.reason.kind, 'aborted');
+  await adapter.dispose(); await aborted.return();
+});
+
+test('discovers the full CLI catalog without reading credentials or starting a model turn', async () => {
+  const fixture = fakeSdk(); const events = [];
+  await runMuse({ operation: 'list-models' }, { sdk: fixture.sdk, readAuth: async () => { assert.fail('discovery must not need a login'); }, emit: event => events.push(event) });
+  assert.deepEqual(events.find(event => event.type === 'models').catalog.models.map(row => row.modelId), catalog().models.map(row => row.modelId));
+  assert.equal(fixture.state.queries, 1); assert.equal(fixture.state.turns, 0); assert.equal(fixture.state.closed, 1);
+});
+
+test('future catalog models work without editing a fixed model allowlist', async () => {
+  const models = catalog(); models.models.push({ ...models.models[0], modelId: 'muse-future-2.0', displayLabel: 'Future model' });
+  const fixture = fakeSdk({ models });
+  await runMuse({ ...job(), model: 'muse-future-2.0' }, { sdk: fixture.sdk, readAuth: async () => activeAuth });
+  assert.equal(fixture.state.sessionOptions.modelId, 'muse-future-2.0'); assert.equal(fixture.state.turns, 1);
+});
+
+test('absent model ids and model-specific unsupported efforts stop before inference', async () => {
+  for (const request of [{ ...job(), model: 'muse-not-in-catalog' }, { ...job(), model: 'muse-spark-1.2', reasoningEffort: 'max' }]) {
+    const fixture = fakeSdk();
+    await assert.rejects(runMuse(request, { sdk: fixture.sdk, readAuth: async () => activeAuth }), { code: 'MUSE_UNKNOWN_MODEL' });
+    assert.equal(fixture.state.turns, 0);
+  }
+});
+
+test('Contributor is an explicit per-request mode using the CLI catalog model id', async () => {
+  const fixture = fakeSdk();
+  await runMuse({ ...job(), model: 'muse-spark-1.3', contributorMode: 'on' }, { sdk: fixture.sdk, readAuth: async () => activeAuth });
+  assert.equal(fixture.state.options.args[fixture.state.options.args.indexOf('--contributor-mode') + 1], 'on');
+  assert.equal(fixture.state.sessionOptions.modelId, 'muse-spark-1.3');
+  const adapter = new MuseSubscriptionAdapter({ sessions: { get: () => null } }, config);
+  for (const [provider, expected] of [[undefined, 'off'], ['muse-code', 'off'], ['muse-code-contributor', 'on']]) {
+    const events = [];
+    for await (const event of adapter.stream({ ...job('inspect-mode'), provider })) events.push(event);
+    assert.equal(events.find(event => event.type === 'text-delta').text, expected);
+  }
+});
+
+test('guard and CLI auth roots match; unrelated authFile overrides cannot authorize a different account', async () => {
+  for (const authFile of [join(homedir(), 'another-account/auth.json'), join(homedir(), 'second-account/auth.json')]) {
+    const fixture = fakeSdk();
+    await assert.rejects(runMuse({ ...job(), runtime: { authFile } }, { sdk: fixture.sdk, readAuth: async () => { assert.fail('must reject mismatched root before reading'); } }), { code: 'MUSE_AUTH_STORE_MISMATCH' });
+    assert.equal(fixture.state.spawned, 0);
+  }
+  const fixture = fakeSdk(); let inspected;
+  await runMuse(job(), { sdk: fixture.sdk, readAuth: async file => { inspected = file; return activeAuth; }, env: { HOME: '/other-account', USERPROFILE: '/other-account', XDG_CONFIG_HOME: '/other-config' } });
+  assert.equal(inspected, join(fixture.state.options.env.HOME, '.config/muse/auth.json'));
+});
+
+test('catalog capabilities stay unknown when undeclared and reject wrong providers or fake catalogs', () => {
+  const empty = { ...catalog(), models: [] };
+  assert.deepEqual(normalizeCatalog(empty).models, []);
+  const models = catalog(); models.models[0] = { ...models.models[0], contextLimit: null, outputLimit: null, variants: 'unknown' };
+  assert.equal(normalizeCatalog(models).models[0].contextLimit, null);
+  assert.equal(normalizeCatalog(models).models[0].defaultReasoningEffort, undefined);
+  for (const invalid of [{ ...catalog(), providerId: 'fake' }, { ...catalog(), source: 'fakeCatalog' }]) assert.throws(() => normalizeCatalog(invalid), { code: 'MUSE_PROTOCOL_ERROR' });
+});
+
+test('picker caches discovery once per mode and uses the CLI context/output/effort metadata', async () => {
+  const adapter = new MuseSubscriptionAdapter({ sessions: { get: () => null } }, config);
+  const [first, second] = await Promise.all([adapter.listModels('muse-code'), adapter.listModels('muse-code')]);
+  assert.equal(first, second);
+  assert.equal((await adapter.resolveModel('muse-code', 'muse-spark-1.2')).reasoning.efforts.some(tier => tier.id === 'max'), false);
+  assert.equal(first[0].context.contextWindow, 1007997); assert.equal(first[0].defaultMaxTokens, 128000);
+  const contributor = await adapter.listModels('muse-code-contributor');
+  assert.match(contributor[0].name, /Contributor（学習利用）/);
+  assert.equal(contributor.find(model => model.id === 'muse-spark-1.3').reasoning.defaultEffort, 'max');
+  await adapter.dispose();
 });

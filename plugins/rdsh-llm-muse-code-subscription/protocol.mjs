@@ -1,15 +1,14 @@
 import { randomUUID } from 'node:crypto';
 
 export const MAX_BYTES = 32 * 1024 * 1024;
-export const MODELS = ['muse-wonder-1.0', 'muse-wonder-full-1.0'];
 const CONTENT = new Set(['text', 'reasoning', 'tool-call', 'tool-result', 'tool-addition', 'tool-removal']);
-const REASONING = new Set(['minimal', 'low', 'medium', 'high', 'xhigh', 'max']);
 
 const MESSAGES = {
   MUSE_INPUT_INVALID: 'Muse Code supports text and Harness tools in this adapter.',
   MUSE_INPUT_TOO_LARGE: 'The Muse Code compatibility request exceeds 32 MiB.',
   MUSE_UNKNOWN_MODEL: 'Unsupported Muse Code model or reasoning effort.',
   MUSE_SUBSCRIPTION_LOGIN_REQUIRED: 'Sign in to an active subscription with the Muse Code CLI.',
+  MUSE_AUTH_STORE_MISMATCH: 'The auth file must match the Muse Code helper home; alternate auth stores are unsupported.',
   MUSE_PROTOCOL_ERROR: 'The local Muse Code helper returned an invalid response.',
   MUSE_SCHEMA_CHANGED: 'Muse Code and SDK schemas differ; verify a compatible SDK before use.',
   MUSE_NATIVE_TOOL_USED: 'Muse Code used its own tool; the response was rejected.',
@@ -23,11 +22,30 @@ export class BridgeError extends Error {
 }
 
 export function validateRequest(job) {
-  if (!MODELS.includes(job?.model) || (job.reasoningEffort !== undefined && !REASONING.has(job.reasoningEffort))) throw new BridgeError('MUSE_UNKNOWN_MODEL');
+  if (!job || !['infer', 'list-models'].includes(job.operation ?? 'infer') || !['off', 'on'].includes(job.contributorMode ?? 'off')) throw new BridgeError('MUSE_INPUT_INVALID');
+  if (Buffer.byteLength(JSON.stringify(job)) > MAX_BYTES) throw new BridgeError('MUSE_INPUT_TOO_LARGE');
+  if (job.operation === 'list-models') return;
+  if (typeof job.model !== 'string' || !job.model || (job.reasoningEffort !== undefined && (typeof job.reasoningEffort !== 'string' || !job.reasoningEffort))) throw new BridgeError('MUSE_UNKNOWN_MODEL');
   if (!Array.isArray(job.messages) || !Array.isArray(job.tools) || job.messages.some(message =>
     !['system', 'developer', 'user', 'assistant', 'tool'].includes(message?.role) || !Array.isArray(message.content) ||
     message.content.some(block => !CONTENT.has(block?.type)))) throw new BridgeError('MUSE_INPUT_INVALID');
   if (job.tools.some(tool => typeof tool?.name !== 'string') || Buffer.byteLength(JSON.stringify(job)) > MAX_BYTES) throw new BridgeError('MUSE_INPUT_TOO_LARGE');
+}
+
+export function normalizeCatalog(catalog) {
+  if (catalog?.providerId !== 'meta' || typeof catalog.source !== 'string' || catalog.source === 'fakeCatalog' || !Array.isArray(catalog.models)) throw new BridgeError('MUSE_PROTOCOL_ERROR');
+  const ids = new Set();
+  const models = catalog.models.map(row => {
+    if (row?.providerId !== 'meta' || typeof row.modelId !== 'string' || !row.modelId || ids.has(row.modelId) || typeof row.displayLabel !== 'string') throw new BridgeError('MUSE_PROTOCOL_ERROR');
+    ids.add(row.modelId);
+    for (const key of ['contextLimit', 'outputLimit']) if (row[key] != null && (!Number.isSafeInteger(row[key]) || row[key] <= 0)) throw new BridgeError('MUSE_PROTOCOL_ERROR');
+    if (Array.isArray(row.variants) && row.variants.some(value => typeof value !== 'string' || !value)) throw new BridgeError('MUSE_PROTOCOL_ERROR');
+    return { providerId: 'meta', modelId: row.modelId, displayLabel: row.displayLabel, description: typeof row.description === 'string' ? row.description : null,
+      contextLimit: row.contextLimit ?? null, outputLimit: row.outputLimit ?? null,
+      variants: Array.isArray(row.variants) ? [...new Set(row.variants)] : 'unknown',
+      ...(Array.isArray(row.variants) && row.variants.includes(row.defaultReasoningEffort) ? { defaultReasoningEffort: row.defaultReasoningEffort } : {}) };
+  });
+  return { providerId: 'meta', source: catalog.source, models };
 }
 
 export function parseReply(text, tools, normalized = false) {

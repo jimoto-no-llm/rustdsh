@@ -7,6 +7,11 @@ import path from 'node:path';
 const { chromium } = await import(process.env.RDSH_PLAYWRIGHT_MODULE || 'playwright');
 const original = process.env.RDSH_HARNESS_BIN;
 assert.ok(original, 'Set RDSH_HARNESS_BIN to an installed original Harness CLI');
+const museConfig = Object.fromEntries([
+  ['nodeCommand', process.env.RDSH_MUSE_NODE_COMMAND],
+  ['workerPath', process.env.RDSH_MUSE_WORKER_PATH],
+  ['museCommand', process.env.RDSH_MUSE_COMMAND],
+].filter(([, value]) => value));
 const repo = path.resolve(import.meta.dirname, '../..');
 const output = path.resolve(process.env.RDSH_E2E_OUTPUT || path.join(repo, 'target/muse-subscription-ui'));
 const root = await mkdtemp(path.join(tmpdir(), 'rdsh-muse-ui-'));
@@ -14,7 +19,7 @@ const fixtureHome = path.join(root, 'dsh');
 await mkdir(path.join(root, 'Workspace')); await mkdir(output, { recursive: true });
 const env = Object.fromEntries(['PATH', 'SystemRoot', 'WINDIR', 'COMSPEC', 'TEMP', 'TMP'].filter(key => process.env[key]).map(key => [key, process.env[key]]));
 Object.assign(env, { HOME: root, USERPROFILE: root, DSH_HOME: fixtureHome, XDG_CACHE_HOME: path.join(root, 'cache'), XDG_CONFIG_HOME: path.join(root, 'config'), XDG_DATA_HOME: path.join(root, 'data') });
-const report = { scope: 'real Harness model picker in temporary Web profiles; no provider call', before_models: [], after_models: [], screenshots: ['before.png', 'after.png'], result: 'FAIL' };
+const report = { scope: 'real Harness model picker and real Muse Code catalog in temporary Web profiles; no generation', before_models: [], after_models: [], contributor_models: [], screenshots: ['before.png', 'after.png', 'contributor.png'], result: 'FAIL' };
 
 async function capture(after) {
   if (after) {
@@ -22,7 +27,7 @@ async function capture(after) {
     await mkdir(profile, { recursive: true });
     const patch = path.join(profile, 'cordis.patch.yml');
     const existing = await readFile(patch, 'utf8').catch(() => '');
-    await writeFile(patch, existing + '\n- insert:\n    - id: llm-muse-code-subscription\n      name: ' + JSON.stringify(path.join(repo, 'plugins/rdsh-llm-muse-code-subscription/index.js')) + '\n      config: {}\n');
+    await writeFile(patch, existing + '\n- insert:\n    - id: llm-muse-code-subscription\n      name: ' + JSON.stringify(path.join(repo, 'plugins/rdsh-llm-muse-code-subscription/index.js')) + '\n      config: ' + JSON.stringify(museConfig) + '\n');
   }
   let child, browser;
   try {
@@ -62,15 +67,26 @@ async function capture(after) {
     const provider = page.getByText('Muse Code · 定額契約', { exact: true });
     if (after) {
       await provider.waitFor();
-      await page.getByText('Muse Wonder · Muse Code 定額', { exact: true }).waitFor();
-      await page.getByText('Muse Wonder Full · Muse Code 定額', { exact: true }).waitFor();
-      report.after_models = ['muse-wonder-1.0', 'muse-wonder-full-1.0'];
+      for (const name of ['Muse Wonder 1.0', 'Muse Wonder Full 1.0', 'Muse Spark 1.3', 'Muse Spark 1.2']) {
+        await page.getByText(name + ' · Muse Code 定額', { exact: true }).waitFor();
+        await page.getByText(name + ' · Contributor（学習利用）', { exact: true }).waitFor();
+      }
+      await page.getByText('Muse Code · Contributor（学習利用）', { exact: true }).waitFor();
+      report.after_models = ['muse-wonder-1.0', 'muse-wonder-full-1.0', 'muse-spark-1.3', 'muse-spark-1.2'];
+      report.contributor_models = [...report.after_models];
     } else assert.equal(await provider.count(), 0);
-    await page.screenshot({ path: path.join(output, after ? 'after.png' : 'before.png'), clip: { x: 315, y: 270, width: 730, height: 285 } });
+    await page.screenshot({ path: path.join(output, after ? 'after.png' : 'before.png') });
     if (after) {
-      await page.getByText('Muse Wonder Full · Muse Code 定額', { exact: true }).click();
+      await page.getByText('Muse Spark 1.2 · Contributor（学習利用）', { exact: true }).scrollIntoViewIfNeeded();
+      await page.screenshot({ path: path.join(output, 'contributor.png') });
+      await page.getByText('Muse Wonder Full 1.0 · Muse Code 定額', { exact: true }).click();
       await page.getByRole('button', { name: /^Select model, current Muse Wonder Full/ }).waitFor();
       report.selected_model = 'muse-wonder-full-1.0';
+      await modelPicker.click(); await page.getByRole('menuitem', { name: /^Model/ }).click();
+      await page.getByText('Muse Spark 1.3 · Contributor（学習利用）', { exact: true }).click();
+      await page.getByRole('button', { name: /^Select model, current Muse Spark 1.3 · Contributor/ }).waitFor();
+      report.selected_contributor = 'muse-spark-1.3';
+      report.contributor_generation_requested = false;
     }
   } finally {
     await browser?.close();

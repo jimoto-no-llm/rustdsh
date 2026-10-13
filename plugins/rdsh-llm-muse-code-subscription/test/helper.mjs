@@ -1,4 +1,5 @@
 // Subprocess fixture: exercises stdio and shutdown without contacting a provider.
+import { catalog } from './catalog.mjs';
 let buffer = '', mode;
 const emit = event => process.stdout.write(JSON.stringify(event) + '\n');
 process.stdin.setEncoding('utf8');
@@ -12,6 +13,7 @@ process.stdin.on('data', chunk => {
       continue;
     }
     mode = value.system;
+    if (value.operation === 'list-models') { emit({ type: 'models', catalog: catalog(value.contributorMode) }); emit({ type: 'exit', kind: 'cleanShutdown' }); process.stdin.destroy(); continue; }
     if (['wait', 'wedged'].includes(mode)) { emit({ type: 'ready' }); continue; }
     if (mode === 'invalid') { process.stdout.write('not JSON\n'); process.stdin.destroy(); continue; }
     if (mode === 'secret-error') { emit({ type: 'error', code: 'unknown', message: 'SECRET-DIAGNOSTIC' }); process.stdin.destroy(); continue; }
@@ -20,7 +22,7 @@ process.stdin.on('data', chunk => {
       emit(response); emit(response); process.stdin.destroy(); continue;
     }
     const toolCalls = mode === 'tool' ? [{ id: 'fixture_1', name: 'Bash', arguments: JSON.stringify({ command: 'printf 42' }) }] : [];
-    emit({ type: 'response', response: { text: '日本語で42', toolCalls }, tokenUsage: mode === 'usage' ? { inputTokens: 10, outputTokens: 3 } : null });
+    emit({ type: 'response', response: { text: mode === 'inspect-mode' ? value.contributorMode : '日本語で42', toolCalls }, tokenUsage: mode === 'usage' ? { inputTokens: 10, outputTokens: 3 } : null });
     if (mode !== 'no-clean-exit') emit({ type: 'exit', kind: 'cleanShutdown' });
     process.stdin.destroy();
   }

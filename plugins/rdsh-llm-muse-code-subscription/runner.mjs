@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { StringDecoder } from 'node:string_decoder';
-import { BridgeError, MAX_BYTES, parseReply, subscriptionEnvironment, tokenUsage, validateRequest } from './protocol.mjs';
+import { BridgeError, MAX_BYTES, normalizeCatalog, parseReply, subscriptionEnvironment, tokenUsage, validateRequest } from './protocol.mjs';
 
 export function runWorker(job, config = {}, signal, spawnImpl = spawn) {
   validateRequest(job);
@@ -49,7 +49,8 @@ export function runWorker(job, config = {}, signal, spawnImpl = spawn) {
         try {
           const event = JSON.parse(line);
           if (event.type === 'ready') continue;
-          if (event.type === 'response' && !response && !exitKind) response = { response: parseReply(event.response, job.tools, true), tokenUsage: tokenUsage(event.tokenUsage) };
+          if (event.type === 'models' && job.operation === 'list-models' && !response && !exitKind) response = { catalog: normalizeCatalog(event.catalog) };
+          else if (event.type === 'response' && job.operation !== 'list-models' && !response && !exitKind) response = { response: parseReply(event.response, job.tools, true), tokenUsage: tokenUsage(event.tokenUsage) };
           else if (event.type === 'error') { failure ??= new BridgeError(event.code); }
           else if (event.type === 'exit' && !exitKind) exitKind = event.kind;
           else throw new BridgeError('MUSE_PROTOCOL_ERROR');

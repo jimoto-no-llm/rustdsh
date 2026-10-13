@@ -1,7 +1,7 @@
 import { readFile, mkdtemp, rm } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { BridgeError, formatPrompt, parseReply, subscriptionEnvironment, tokenUsage, validateRequest } from './protocol.mjs';
+import { join, resolve } from 'node:path';
+import { BridgeError, formatPrompt, normalizeCatalog, parseReply, subscriptionEnvironment, tokenUsage, validateRequest } from './protocol.mjs';
 
 // SDK injection is only for deterministic tests. Production loads the pinned SDK.
 export async function runMuse(job, { sdk, signal, emit = () => {}, readAuth = readFile, env = process.env } = {}) {
@@ -29,22 +29,39 @@ export async function runMuse(job, { sdk, signal, emit = () => {}, readAuth = re
   signal?.addEventListener('abort', cancel, { once: true });
   try {
     if (cancelled) throw new BridgeError('ABORTED');
-    let auth;
-    try { auth = JSON.parse(await readAuth(job.runtime?.authFile ?? join(homedir(), '.config/muse/auth.json'), 'utf8')); }
-    catch { throw new BridgeError('MUSE_SUBSCRIPTION_LOGIN_REQUIRED'); }
-    const metadata = auth?.providers?.meta;
-    if (metadata?.subs_active !== true || metadata.mechanism !== 'oauth' || metadata.obtained_via !== 'device_code') throw new BridgeError('MUSE_SUBSCRIPTION_LOGIN_REQUIRED');
-    // Credentials stay with Muse Code; auth fields are never emitted or copied.
-    auth = undefined;
+    // Bind the inspected store and the CLI to the same home/config root.
+    // An alternate authFile used only for the guard could authorize a different
+    // account from the one the CLI actually uses (PR #434 review).
+    const nativeHome = homedir();
+    const authFile = join(nativeHome, '.config/muse/auth.json');
+    const identity = value => process.platform === 'win32' ? resolve(value).toLowerCase() : resolve(value);
+    if (job.runtime?.authFile !== undefined && identity(job.runtime.authFile) !== identity(authFile)) throw new BridgeError('MUSE_AUTH_STORE_MISMATCH');
+    const cliEnv = { ...subscriptionEnvironment(env), HOME: nativeHome, USERPROFILE: nativeHome, XDG_CONFIG_HOME: join(nativeHome, '.config') };
+    if (job.operation !== 'list-models') {
+      let auth;
+      try { auth = JSON.parse(await readAuth(authFile, 'utf8')); }
+      catch { throw new BridgeError('MUSE_SUBSCRIPTION_LOGIN_REQUIRED'); }
+      const metadata = auth?.providers?.meta;
+      if (metadata?.subs_active !== true || metadata.mechanism !== 'oauth' || metadata.obtained_via !== 'device_code') throw new BridgeError('MUSE_SUBSCRIPTION_LOGIN_REQUIRED');
+      // Credentials stay with Muse Code; auth fields are never emitted or copied.
+      auth = undefined;
+    }
     workspace = await mkdtemp(join(tmpdir(), 'rdsh-muse-inference-'));
     if (cancelled) throw new BridgeError('ABORTED');
     handshake = sdk.spawnMspConnection({
       command: job.runtime?.museCommand ?? 'muse',
-      args: ['serve', '--no-session-log', '--provider', 'meta', '--model', job.model, '--contributor-mode', 'off', '--disable-shell', '--disable-write'],
-      cwd: workspace, env: subscriptionEnvironment(env), shutdownTimeoutMs: 3000,
+      args: ['serve', '--no-session-log', '--provider', 'meta', '--contributor-mode', job.contributorMode ?? 'off', '--disable-shell', '--disable-write'],
+      cwd: workspace, env: cliEnv, shutdownTimeoutMs: 3000,
     });
     host = await wait(handshake.initialize({ clientInfo: { name: 'rustdsh_muse_subscription', version: '0.1.0' } }));
     if (host.fingerprintWarning) throw new BridgeError('MUSE_SCHEMA_CHANGED');
+    const catalog = normalizeCatalog(await wait(host.connection.request('model/list', {})));
+    if (job.operation === 'list-models') { emit({ type: 'models', catalog }); return; }
+    // Recheck the current CLI catalog before every inference, even when the
+    // Harness picker has a cached snapshot. Never invent or silently substitute
+    // model ids or reasoning tiers.
+    const model = catalog.models.find(row => row.modelId === job.model);
+    if (!model || (job.reasoningEffort !== undefined && Array.isArray(model.variants) && !model.variants.includes(job.reasoningEffort))) throw new BridgeError('MUSE_UNKNOWN_MODEL');
     client = new sdk.MuseClient(host.connection, { host, durability: sdk.readSessionDurability(host.initializeResult) });
     session = await wait(client.startSession({ workspaceRoot: workspace, providerId: 'meta', modelId: job.model, approvalMode: 'denyUnmatched' }));
     session.onApproval(async pending => {
@@ -53,7 +70,7 @@ export async function runMuse(job, { sdk, signal, emit = () => {}, readAuth = re
       return { choiceId: denied.choiceId };
     });
     emit({ type: 'ready' });
-    turn = await wait(session.sendUserTurn({ input: [{ type: 'text', text: formatPrompt(job) }], reasoningEffort: job.reasoningEffort ?? 'high' }));
+    turn = await wait(session.sendUserTurn({ input: [{ type: 'text', text: formatPrompt(job) }], reasoningEffort: job.reasoningEffort ?? model.defaultReasoningEffort }));
     iterator = turn.items();
     let answer = '', nativeToolUsed = false;
     while (true) {
