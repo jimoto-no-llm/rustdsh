@@ -410,7 +410,7 @@ impl TokensCache {
                             let b = e.get("bytes").and_then(|x| x.as_u64()).unwrap_or(0);
                             let d = e.get("decomp").and_then(|x| x.as_u64());
                             let t = e.get("ts").and_then(|x| x.as_u64()).unwrap_or(0);
-                            let c = e.get("cli").and_then(|x| x.as_bool()).unwrap_or(false);
+                            let c = e.get("cli").is_some_and(|x| x.as_bool().unwrap_or(false));
                             map.insert(k.clone(), (m, b, d, t, c));
                         }
                     }
