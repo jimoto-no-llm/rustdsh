@@ -246,7 +246,7 @@ fn concurrent_session_writers_leave_parseable_correct_cache() {
     for _ in 0..8 {
         let cache = f.0.join("cache/rdsh/sessions-tokens.json");
         let _ = fs::remove_file(&cache);
-        let mut children = (0..4)
+        let children = (0..4)
             .map(|_| {
                 f.command(&["sessions", "--tokens", "--json"])
                     .stdout(Stdio::piped())
@@ -255,7 +255,7 @@ fn concurrent_session_writers_leave_parseable_correct_cache() {
                     .unwrap()
             })
             .collect::<Vec<_>>();
-        for child in children.drain(..) {
+        for child in children {
             let o = child.wait_with_output().unwrap();
             assert!(o.status.success());
             let v: Value = serde_json::from_slice(&o.stdout).unwrap();
@@ -310,7 +310,7 @@ impl Server {
     fn start(f: &Fixture, args: &[&str]) -> Self {
         let _startup_guard = SERVER_STARTUP
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut child = f
             .command(args)
             .stdin(Stdio::null())
