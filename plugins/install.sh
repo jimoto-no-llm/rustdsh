@@ -1,8 +1,8 @@
 #!/bin/sh
 # Install recommended dsh plugins into a profile (idempotent per package).
-# Also installs the bundled rdsh plugins (rdsh settings UI) so they are
-# available by default.
-# Usage: [PROFILE=headless] [DRY_RUN=1] [SOUND=0] [GITVIEW=0] [COMPUTE=1] ./plugins/install.sh
+# Also installs the bundled rdsh settings and one-click translation plugins so
+# they are available by default.
+# Usage: [PROFILE=headless] [DRY_RUN=1] [SOUND=1] [GITVIEW=1] [COMPUTE=1] ./plugins/install.sh
 # PROFILE=desktop targets the Electron application's reserved profile: the npm
 # dsh CLI refuses it, so the work is forwarded to the Desktop-installed command
 # through `rdsh desktop install` (or you install the packages from the app's
@@ -71,6 +71,7 @@ if [ "$PROFILE" = "desktop" ]; then
     echo "packages on the app's Plugins page:" >&2
     for p in $PKGS; do echo "  $p" >&2; done
     echo "  $REPO_ROOT/plugins/rdsh-settings" >&2
+    echo "  $REPO_ROOT/plugins/rdsh-translation" >&2
     echo "  github:cwd514/dsh-sound-notifications (default; SOUND=0 to skip)" >&2
     echo "  github:yugapor/dsh-gitview (default; GITVIEW=0 to skip)" >&2
     exit 1
@@ -78,6 +79,7 @@ if [ "$PROFILE" = "desktop" ]; then
   ARGS="--no-bundled"
   for p in $PKGS; do ARGS="$ARGS --package $p"; done
   ARGS="$ARGS --package $REPO_ROOT/plugins/rdsh-settings"
+  ARGS="$ARGS --package $REPO_ROOT/plugins/rdsh-translation"
   [ "$COMPUTE" = "1" ] && ARGS="$ARGS --package $REPO_ROOT/plugins/rdsh-compute"
   if sound_enabled; then ARGS="$ARGS --package github:cwd514/dsh-sound-notifications"; fi
   if gitview_enabled; then ARGS="$ARGS --package github:yugapor/dsh-gitview"; fi
@@ -110,7 +112,7 @@ for p in $PKGS; do
     fi
   fi
 done
-for p in rdsh-settings; do
+for p in rdsh-settings rdsh-translation; do
   if [ "$DRY_RUN" = "1" ]; then
     echo "dsh plugin --profile $PROFILE add $REPO_ROOT/plugins/$p"
     ok=$((ok + 1))

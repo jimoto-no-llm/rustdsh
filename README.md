@@ -262,10 +262,10 @@ rewrites the profile:
 
 ```sh
 rdsh desktop status                 # app, command runtime, profile, plugin state (read-only)
-rdsh desktop install --plugins-dir .   # rdsh-settings + default third-party (sound, gitview)
+rdsh desktop install --plugins-dir .   # rdsh-settings + one-click translation + default third-party (sound, gitview)
 rdsh desktop install --plugins-dir . --compute   # + the resident compute bridge
 rdsh desktop install --plugins-dir . --no-sound --no-gitview  # skip third-party
-rdsh desktop verify                 # exit nonzero when the profile has no rdsh plugin
+rdsh desktop verify                 # require the default rdsh-settings and translation plugins
 ```
 
 The same is available through the profile installer and the installers:

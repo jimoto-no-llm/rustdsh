@@ -70,11 +70,12 @@ Notes:
 ## Bundled rdsh plugins (this repo)
 
 `./plugins/install.sh` also installs these local plugins into the same
-profile, so the rdsh settings UI is available by default:
+profile, so the rdsh settings UI and one-click translation action are available by default:
 
 | Plugin | Why |
 | --- | --- |
 | `rdsh-settings` | rdsh section in DSH settings (budgets, retrieval, memory, beta flags) |
+| `rdsh-translation` | Web UI action to translate a settled answer and replace it on the history surface |
 
 ## Workflow board source preparation
 

@@ -33,7 +33,7 @@ unit tests and a stub-command integration test; see
 | --- | --- | --- |
 | CLI (`dsh`) | `./install.sh --as-dsh` / `.\install.ps1 -AsDsh`; native fast paths answer, everything else delegates byte-identically | supported |
 | TUI profile | `rdsh tui` delegation plus `rdsh tokens/search/sessions/compact` | supported |
-| Web profile | `rdsh web`, the bundled plugins (`rdsh-settings`), `rdsh serve` dashboard | supported |
+| Web profile | `rdsh web`, the bundled plugins (`rdsh-settings`, `rdsh-translation`), `rdsh serve` dashboard | supported |
 | Desktop app | `rdsh desktop status` / `install` / `verify` attach the plugins to the reserved profile through the app's own command runtime | supported (this document) |
 | Agent loop, profile boot, Electron shell | not reimplemented; rdsh never boots the `desktop` profile | out of scope |
 | In-app token/search/session delegation | pure compute (token estimate/prune) is the only in-app bridge, opt-in and fail-open | partial by design |
@@ -51,7 +51,7 @@ not attempt to boot a profile the app owns.
 
    ```sh
    rdsh desktop status                     # read-only: app, command, profile, plugins
-   rdsh desktop install --plugins-dir .    # rdsh-settings + default third-party (sound, gitview)
+   rdsh desktop install --plugins-dir .    # rdsh-settings + translation + default third-party (sound, gitview)
    rdsh desktop install --plugins-dir . --compute   # also rdsh-compute
    rdsh desktop install --plugins-dir . --no-sound --no-gitview  # skip third-party
    ```
@@ -71,7 +71,7 @@ not attempt to boot a profile the app owns.
 3. **Reopen the app** so the profile recomposes, then verify:
 
    ```sh
-   rdsh desktop verify                        # rdsh-settings enabled?
+   rdsh desktop verify                        # rdsh-settings and rdsh-translation enabled?
    rdsh desktop verify --require rdsh-compute # require a specific plugin
    ```
 
@@ -128,10 +128,10 @@ reserved profile); it forwards every package to `rdsh desktop install
 Plugins-page steps instead.
 
 The installers can do this inline: `./install.sh --desktop` and
-`.\install.ps1 -Desktop` attach `rdsh-settings`, `rdsh-compute`, and the default
-third-party plugins (sound, gitview) after installing the launcher. Both are
-no-ops when no initialized Desktop profile is detected, and neither fails the
-installation.
+`.\install.ps1 -Desktop` attach `rdsh-settings`, `rdsh-translation`,
+`rdsh-compute`, and the default third-party plugins (sound, gitview) after
+installing the launcher. Both are no-ops when no initialized Desktop profile is
+detected, and neither fails the installation.
 
 `--plugins-dir` must name a directory whose `rdsh-settings/package.json` is
 valid JSON with `"name": "rdsh-settings"`; anything else is skipped rather than
@@ -142,6 +142,7 @@ forwarded. On Unix a non-executable `DSH_DESKTOP_CLI` is run through `sh`.
 | Plugin | Effect in the app | Gate |
 | --- | --- | --- |
 | `rdsh-settings` | rdsh settings section in the app's settings, Discord Rich Presence, context-engine switches, `rdsh.json` editing | none (default) |
+| `rdsh-translation` | one-click Japanese translation and replacement for settled answers in the conversation view | text-only answer action; `/ja <message-id>` is also available |
 | `rdsh-compute` | resident `rdsh compute` worker for token estimate/batch/prune through the Web plugin bridge | `rdsh features on compute` (off by default) |
 | `github:cwd514/dsh-sound-notifications` (MIT, (c) 2026 cwd514) | effect sounds and desktop notifications for reply-done / approval / questions / errors | default on; `rdsh desktop install --no-sound`, `SOUND=0`, or `features.sound=false` to skip |
 | `github:yugapor/dsh-gitview` (MIT, (c) 2026 yugapor) | Git panel: changes, diffs, history, branches, blame, CI status | default on; `rdsh desktop install --no-gitview`, `GITVIEW=0`, or `features.gitview=false` to skip |

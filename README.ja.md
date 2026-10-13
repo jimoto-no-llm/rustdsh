@@ -248,10 +248,10 @@ DeepSeek Harness Desktop は、Web アプリケーション全体を内包した
 
 ```sh
 rdsh desktop status                 # アプリ、コマンドランタイム、プロファイル、プラグインの状態（読み取り専用）
-rdsh desktop install --plugins-dir .   # rdsh-settings＋標準サードパーティ（sound、gitview）を組み込み
+rdsh desktop install --plugins-dir .   # rdsh-settings、ワンクリック和訳、標準サードパーティ（sound、gitview）を組み込み
 rdsh desktop install --plugins-dir . --compute   # 常駐 compute bridge もあわせて追加
 rdsh desktop install --plugins-dir . --no-sound --no-gitview  # サードパーティを省く場合
-rdsh desktop verify                 # プロファイルに rdsh プラグインがない場合は 0 以外で終了
+rdsh desktop verify                 # 標準の設定・和訳プラグインが有効でない場合は 0 以外で終了
 ```
 
 プロファイルインストーラーや各種インストーラーからも同様に利用できます：

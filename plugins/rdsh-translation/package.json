@@ -1,0 +1,22 @@
+{
+  "name": "rdsh-translation",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Translate a settled non-Japanese DSH answer and replace it on the model-visible history surface",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js"
+  },
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": ["@deepseek-ai/dsh-client-ui-primitives"]
+    }
+  },
+  "meta": {
+    "title": "rdsh和訳置き換え",
+    "description": "確定した回答を別呼び出しで和訳し、追指示を増やさずに履歴上で置き換えます。"
+  }
+}

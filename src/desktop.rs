@@ -42,7 +42,7 @@ macro_rules! err {
 /// Reserved profile name owned by the Electron application.
 pub const PROFILE: &str = "desktop";
 /// Bundled rdsh plugins that can be attached to a DSH profile.
-pub const BUNDLED_PLUGINS: &[&str] = &["rdsh-settings", "rdsh-compute"];
+pub const BUNDLED_PLUGINS: &[&str] = &["rdsh-settings", "rdsh-translation", "rdsh-compute"];
 /// Third-party Web UI plugins installed by default (both MIT, used with upstream
 /// permission; see Credits in README.md). They are fetched from GitHub at
 /// install time so fixes arrive without a rustdsh release.
@@ -546,7 +546,7 @@ fn plugin_selection(compute: bool) -> Vec<&'static str> {
     if compute {
         BUNDLED_PLUGINS.to_vec()
     } else {
-        BUNDLED_PLUGINS[..1].to_vec()
+        BUNDLED_PLUGINS[..2].to_vec()
     }
 }
 
@@ -930,7 +930,10 @@ pub fn cmd_verify(require: &[String], json_out: bool) -> Result<()> {
     let env = OsEnv::from_process();
     let profile = read_profile(&env.profile_dir());
     let required: Vec<String> = if require.is_empty() {
-        vec!["rdsh-settings".to_string()]
+        plugin_selection(false)
+            .into_iter()
+            .map(str::to_string)
+            .collect()
     } else {
         require.to_vec()
     };
@@ -1331,9 +1334,15 @@ mod tests {
         let env = base_env(&root);
         let checkout = root.join("rustdsh");
         std::fs::create_dir_all(checkout.join("plugins/rdsh-settings")).unwrap();
+        std::fs::create_dir_all(checkout.join("plugins/rdsh-translation")).unwrap();
         std::fs::write(
             checkout.join("plugins/rdsh-settings/package.json"),
             b"{\"name\":\"rdsh-settings\"}",
+        )
+        .unwrap();
+        std::fs::write(
+            checkout.join("plugins/rdsh-translation/package.json"),
+            b"{\"name\":\"rdsh-translation\"}",
         )
         .unwrap();
 
@@ -1347,14 +1356,19 @@ mod tests {
             &env,
         )
         .unwrap();
-        assert_eq!(targets.len(), 3);
+        assert_eq!(targets.len(), 4);
         assert_eq!(targets[0].label, "rdsh-settings");
         assert_eq!(
             Path::new(&targets[0].spec),
             checkout.join("plugins").join("rdsh-settings")
         );
-        assert_eq!(targets[1].label, "dsh-sound-notifications");
-        assert_eq!(targets[2].label, "dsh-gitview");
+        assert_eq!(targets[1].label, "rdsh-translation");
+        assert_eq!(
+            Path::new(&targets[1].spec),
+            checkout.join("plugins").join("rdsh-translation")
+        );
+        assert_eq!(targets[2].label, "dsh-sound-notifications");
+        assert_eq!(targets[3].label, "dsh-gitview");
         assert!(dir.unwrap().ends_with("plugins"));
 
         let (targets, _) = desktop_targets(
@@ -1367,8 +1381,9 @@ mod tests {
             &env,
         )
         .unwrap();
-        assert_eq!(targets.len(), 1);
+        assert_eq!(targets.len(), 2);
         assert_eq!(targets[0].label, "rdsh-settings");
+        assert_eq!(targets[1].label, "rdsh-translation");
 
         let packages = vec![
             "@deepseek-ai/dsh-tool-present".to_string(),
@@ -1386,10 +1401,13 @@ mod tests {
 
     #[test]
     fn compute_is_opt_in() {
-        assert_eq!(plugin_selection(false), vec!["rdsh-settings"]);
+        assert_eq!(
+            plugin_selection(false),
+            vec!["rdsh-settings", "rdsh-translation"]
+        );
         assert_eq!(
             plugin_selection(true),
-            vec!["rdsh-settings", "rdsh-compute"]
+            vec!["rdsh-settings", "rdsh-translation", "rdsh-compute"]
         );
     }
 

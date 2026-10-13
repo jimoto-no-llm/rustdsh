@@ -263,7 +263,7 @@ enum DesktopAction {
     },
     /// Exit nonzero unless the desktop profile has the required plugin enabled
     Verify {
-        /// Plugin that must be enabled (repeatable; default: rdsh-settings)
+        /// Plugin that must be enabled (repeatable; default: rdsh-settings and rdsh-translation)
         #[arg(long = "require")]
         require: Vec<String>,
         #[arg(long = "json")]
