@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, readFile, rm, realpath } from 'node:fs/promises';
 import { createHarness, desktopPaths, configureUpdater } from '../index.js';
 
 test('official SDK uses explicit workspace, model and isolated child environment without starting a model', async () => {
@@ -67,7 +67,7 @@ for await (const line of createInterface({input:process.stdin})) {
   const home = join(root, 'private-home');
   const harness = createHarness({ sdkHome: home, dshBin: entry, cwd: root, provider: 'fixture-provider', model: 'fixture-model', maxTokens: 2048,
     env: { RDSH_SDK_TEST_TRACE: trace, NODE_OPTIONS: '--invalid-hook' } });
-  try { assert.equal(await harness.session('fixture-session').getWorkingDirectory(), root); }
+  try { assert.equal(await realpath(await harness.session('fixture-session').getWorkingDirectory()), await realpath(root)); }
   finally { await harness.close(); }
   const record = JSON.parse((await readFile(trace, 'utf8')).trim());
   assert.equal(record.route.provider, 'fixture-provider'); assert.equal(record.route.model, 'fixture-model');
