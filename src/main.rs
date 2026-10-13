@@ -49,6 +49,7 @@ mod file_security;
 mod guard;
 mod inspect;
 mod local_http;
+mod models;
 mod opencode_header;
 mod passthrough;
 mod providers;
@@ -72,7 +73,7 @@ mod websearch;
     name = "rdsh",
     version,
     about = "Rust fast launcher for dsh (safe: native fast-paths + passthrough)",
-    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|auth|setup|context|settings|features|subagents|provider|task-outcomes|update|dump-config|boot|serial-proxy)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh provider add hai --model deepseek-v4-flash   register HAI as a dsh route\n  rdsh provider add sarashina    register Sarashina (SARASHINA_API_KEY; mini and nano built in)\n  rdsh provider add local-openai --base-url http://host:8080/v1 --discover --no-key\n  rdsh provider list              presets and per-profile route/key status\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh desktop status             detect the Desktop (Electron) app and its reserved profile\n  rdsh desktop install            attach the bundled rdsh plugins to that profile\n  rdsh --passthrough tui          no slim env; mandatory tool isolation remains\n  rdsh --dry-run tui -- --resume abc   show what would exec"
+    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|auth|setup|context|settings|features|subagents|provider|task-outcomes|update|models|dump-config|boot|serial-proxy)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh provider add hai --model deepseek-v4-flash   register HAI as a dsh route\n  rdsh provider add sarashina    register Sarashina (SARASHINA_API_KEY; mini and nano built in)\n  rdsh provider add local-openai --base-url http://host:8080/v1 --discover --no-key\n  rdsh provider list              presets and per-profile route/key status\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh models                     list the Codex models a profile is missing\n  rdsh models sync                add them (only adds; never rewrites an existing entry)\n  rdsh desktop status             detect the Desktop (Electron) app and its reserved profile\n  rdsh desktop install            attach the bundled rdsh plugins to that profile\n  rdsh --passthrough tui          no slim env; mandatory tool isolation remains\n  rdsh --dry-run tui -- --resume abc   show what would exec"
 )]
 struct Cli {
     /// Explicitly share a project file with isolated model tools (repeatable).
@@ -358,6 +359,30 @@ enum Commands {
         #[arg(long = "json")]
         json: bool,
     },
+    /// Keep a CLI-backed provider's model list in step with the local CLI
+    /// catalog (Codex today), so a model released after the harness was built
+    /// still reaches the model picker
+    Models {
+        #[command(subcommand)]
+        action: Option<ModelsAction>,
+        /// Machine-readable output
+        #[arg(long = "json")]
+        json: bool,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum ModelsAction {
+    /// Append the models the local CLI advertises that the profile lacks
+    Sync {
+        #[arg(long = "profile")]
+        profile: Option<String>,
+        /// Print what would change without writing the profile
+        #[arg(long = "dry-run")]
+        dry_run: bool,
+        #[arg(long = "json")]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -539,6 +564,7 @@ const NATIVE_FIRST: &[&str] = &[
     "context",
     "settings",
     "features",
+    "models",
     "update",
     "serial-proxy",
     "subagents",
@@ -913,6 +939,14 @@ fn main() {
                 ContextAction::Explain { query, budget } => context::cmd_explain(query, budget),
             }
         }
+        Some(Commands::Models { action, json }) => match action {
+            None => models::cmd_models_show(cli.profile.as_deref(), json),
+            Some(ModelsAction::Sync {
+                profile,
+                dry_run,
+                json,
+            }) => models::cmd_models_sync(profile.or(cli.profile).as_deref(), dry_run, json),
+        },
         Some(Commands::Auth(args)) => auth::cmd_auth(args, dry),
         Some(Commands::Provider { action }) => match action {
             ProviderAction::List { json } => providers::cmd_list(json),
