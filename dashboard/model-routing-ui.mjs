@@ -54,6 +54,17 @@ export function renderModelRouting(container, runs, node) {
       container.append(card);
       continue;
     }
+    if (run.route_required === false) {
+      card.append(
+        node(
+          "p",
+          "モデル照合ルート未設定 · 要求値・実モデル・送信ガードは未確認です。",
+          "notice warn",
+        ),
+      );
+      container.append(card);
+      continue;
+    }
     const call = run.latest_native_call;
     const status = !run.native_dispatch_required
       ? "起動時の設定照合のみ · 呼出し直前のガードは未設定"

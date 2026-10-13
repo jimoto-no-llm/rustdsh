@@ -13,10 +13,21 @@ export async function modelRoutingViews(project) {
     runs.map(async (run) => {
       try {
         const view = await routing.inspect(run);
+        if (view.route_required !== true) {
+          return {
+            run_id: run.run_id,
+            task_id: run.task_id,
+            route_required: false,
+            native_dispatch_required: false,
+            error: null,
+            actual_model_execution_verified: false,
+          };
+        }
         const latest = view.native_calls?.at(-1) ?? null;
         return {
           run_id: run.run_id,
           task_id: run.task_id,
+          route_required: true,
           requested: view.requested ?? null,
           active_route: view.active_route ?? null,
           source: view.provenance?.source ?? null,

@@ -9,13 +9,14 @@ import { ModelRouting } from "../model-routing.mjs";
 import { requestedSelection } from "../model-selection.mjs";
 import { nativeModelBoundary } from "../model-runtime.mjs";
 import { modelRoutingViews } from "../model-routing-view.mjs";
+import { renderModelRouting } from "../model-routing-ui.mjs";
 import { startDashboard } from "../server.mjs";
 const selected = {
   provider: "fixture-provider",
   model: "model-A",
   effort: "high",
 };
-async function setup(t) {
+async function setup(t, { bind = true } = {}) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-model-store-"));
   const project = await identity(root);
   project.directory = path.join(root, "state", project.id);
@@ -27,7 +28,7 @@ async function setup(t) {
     "0.2.0-rc.2",
   );
   const routing = ModelRouting.open(ledger.project);
-  await routing.bind(record, requestedSelection(selected));
+  if (bind) await routing.bind(record, requestedSelection(selected));
   t.after(async () => {
     assert.equal(path.dirname(path.resolve(root)), path.resolve(os.tmpdir()));
     assert.ok(path.basename(root).startsWith("rdsh-model-store-"));
@@ -35,6 +36,40 @@ async function setup(t) {
   });
   return { root, project: ledger.project, record, routing };
 }
+test("confirmed runs without a model route are shown as unconfigured", async (t) => {
+  const f = await setup(t, { bind: false });
+  const runs = await modelRoutingViews(f.project);
+  assert.equal(runs.length, 1);
+  assert.equal(runs[0].run_id, f.record.run_id);
+  assert.equal(runs[0].route_required, false);
+  assert.equal(runs[0].native_dispatch_required, false);
+  assert.equal(runs[0].error, null);
+  assert.equal(runs[0].actual_model_execution_verified, false);
+  assert.equal(Object.hasOwn(runs[0], "requested"), false);
+
+  const makeNode = (tag, value = "", className = "") => ({
+    tag,
+    text: value,
+    className,
+    dataset: {},
+    children: [],
+    append(...children) {
+      this.children.push(...children);
+    },
+    replaceChildren(...children) {
+      this.children = children;
+    },
+    querySelectorAll() {
+      return [];
+    },
+  });
+  const container = makeNode("section");
+  renderModelRouting(container, runs, makeNode);
+  const rendered = JSON.stringify(container);
+  assert.match(rendered, /モデル照合ルート未設定/);
+  assert.match(rendered, /実モデル・送信ガードは未確認/);
+  assert.doesNotMatch(rendered, /起動時の設定照合のみ/);
+});
 test("legacy configuration-only records are distinct, enforcement is durable and cannot be downgraded by an older marker", async (t) => {
   const f = await setup(t);
   assert.equal(
