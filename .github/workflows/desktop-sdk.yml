@@ -31,6 +31,9 @@ jobs:
       - run: npm ci --prefix desktop/sdk --ignore-scripts
       - run: node --test desktop/test/*.test.mjs
       - run: npm test --prefix desktop/sdk
+      - run: node --test plugins/rdsh-subagent-optimizer/test/runtime.test.mjs
+        env:
+          RDSH_PUBLIC_DSH_MODULES: ${{ github.workspace }}/desktop/sdk/node_modules
       - run: npm pack --ignore-scripts --pack-destination ../..
         working-directory: desktop/sdk
       - run: npm run test:packed --prefix desktop/sdk -- ../../target/desktop-sdk-consumer ../..

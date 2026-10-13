@@ -1,7 +1,7 @@
 // Prepare an owned, pinned fork checkout. No reset/clean, force checkout or
 // credential reads. A later pin gets a fresh directory, preserving old builds.
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync, mkdirSync, lstatSync, copyFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, lstatSync, copyFileSync, realpathSync } from 'node:fs';
 import { resolve, join, dirname, basename } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { planOverlay, contentHash, PATCH_PATHS } from './overlay.mjs';
@@ -35,7 +35,9 @@ export function prepare({ checkout, rdshBin, lockPath = join(repo, 'desktop/upst
     execFileSync('git', ['-C', root, 'fetch', '--depth', '1', 'origin', lock.revision], { stdio: 'pipe' });
     execFileSync('git', ['-C', root, 'checkout', '--detach', lock.revision], { stdio: 'pipe' });
   }
-  if (lstatSync(root).isSymbolicLink() || git(root, ['rev-parse', '--show-toplevel']) !== root
+  // Git uses forward slashes on Windows; macOS may report /private/var for
+  // /var. Compare canonical paths while still refusing a symlinked root.
+  if (lstatSync(root).isSymbolicLink() || realpathSync(git(root, ['rev-parse', '--show-toplevel'])) !== realpathSync(root)
     || git(root, ['config', '--get', 'remote.origin.url']) !== lock.repository
     || git(root, ['rev-parse', 'HEAD']) !== lock.revision) throw new Error('Checkout does not match the pinned official source');
   const generatorHash = contentHash(readFileSync(new URL('./overlay.mjs', import.meta.url)));

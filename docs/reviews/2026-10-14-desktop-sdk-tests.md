@@ -15,6 +15,8 @@
 別途、配布用tgzを利用者用ディレクトリへインストールし、公開export・型宣言の同梱・
 固定依存・実際のstdio通信・子プロセスの終了・更新先を検証します。
 このテストをLinux/macOS/WindowsのSDK CIにも追加しました。
+同じ公式SDKの依存に含まれるDSH 0.2.1-alpha.2について、サブエージェントとUIスロットの
+実契約テストも3 OSで実行します。既存の0.2.0-rc.2との契約も維持します。
 
 ブラウザーでは、HTML風のファイル名が文字として表示されることと、
 確認後に変更された入力への実行拒否を追加検証しました。
@@ -28,8 +30,11 @@
   元ファイルが通常ファイルかつ単一リンクであることを全対象で事前検証します。
 - Windowsで予約環境変数の大文字・小文字違いがフィルターを抜ける。
   大文字へそろえて検査し、`DSH_HOME` と `ELECTRON_RUN_AS_NODE` も専用値へ固定します。
+- WindowsのGitとNode.jsでパスの区切りが異なり、正しいcheckoutを拒否する。
+  Windows CIで再現したため、実パスへ正規化してGitのルートと比較します。
 
-各不具合は修正前の失敗と修正後の成功を、合成データを使う回帰テストで確認しました。
+リンクと環境変数の不具合は修正前の失敗と修正後の成功を、合成データを使う回帰テストで確認しました。
+Windowsの取り込みは同じGitテストをネイティブCIで再実行して判定します。
 これはローカルの事前検査で、同じOSユーザーによる検査と書き込み間の競合まで隔離するものではありません。
 
 ## ローカルの結果
@@ -37,6 +42,7 @@
 - Desktop取り込み・SDK：19件成功。
 - Dashboard・プラグイン全体：380件中373件成功、7件はOS条件によるスキップ、失敗0。
   公開DSH 0.2.0-rc.2の実ヘルパー・ツール・SlotCoreとの契約テストも実行しました。
+- 公式SDK側の公開DSH 0.2.1-alpha.2でも、同じ契約テストとプラグインの29件に成功。
 - 配布用tgzの新規インストールとstdio通信：成功。
 - 実ブラウザーのファイル整理フロー：成功。
 - 固定した公式ソースの適用済みcheckout、二重の版管理、macOS更新ヘルパー、構文検査：成功。
@@ -49,8 +55,7 @@ Windows/macOSの実行結果はGitHub CIで確認し、Linuxの成功から推�
 
 ```sh
 node --test desktop/test/*.test.mjs desktop/sdk/test/*.test.mjs
-npm pack --ignore-scripts --pack-destination ../..
-# 上のpackはdesktop/sdkで実行し、次のコマンドはリポジトリのルートで実行する：
+(cd desktop/sdk && npm pack --ignore-scripts --pack-destination ../..)
 npm run test:packed --prefix desktop/sdk -- ../../target/desktop-sdk-consumer ../..
 node desktop/verify-prepared.mjs target/desktop-fork
 node tests/e2e/easy-work.mjs

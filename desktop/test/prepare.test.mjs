@@ -36,6 +36,12 @@ function fixture(t) {
 
 test('real Git preparation is idempotent and preserves unrelated tracked and untracked edits', t => {
   const f = fixture(t); assert.equal(f.run().unchanged, false); assert.equal(f.run().unchanged, true);
+  if (process.platform !== 'win32') {
+    // A parent alias exercises Git/OS canonicalization without relaxing the
+    // separate prohibition on the checkout root itself being a symlink.
+    const alias = join(f.base, 'parent-alias'); symlinkSync(f.base, alias);
+    assert.equal(prepare({ checkout: join(alias, 'checkout'), rdshBin: f.rdshBin, lockPath: f.lockPath }).unchanged, true);
+  }
   const bootstrap = join(f.checkout, 'apps/desktop/rdsh-bootstrap.cjs');
   const expected = readFileSync(bootstrap);
   f.put('package.json', '{"version":"local edit"}');
