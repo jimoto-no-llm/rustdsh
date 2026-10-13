@@ -1,0 +1,12 @@
+{
+  "name": "@jimoto-no-llm/rdsh-desktop-sdk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "engines": { "node": ">=24" },
+  "exports": { ".": { "types": "./index.d.ts", "default": "./index.js" } },
+  "files": ["index.js", "index.d.ts", "README.md"],
+  "scripts": { "test": "node --test test/*.test.mjs" },
+  "dependencies": { "@deepseek-ai/dsh-sdk-client": "0.2.1-alpha.2" }
+}

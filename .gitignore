@@ -1,6 +1,7 @@
 /target
 /dashboard/node_modules/
 /tests/e2e/node_modules/
+/desktop/sdk/node_modules/
 
 # Rust
 **/*.rs.bk

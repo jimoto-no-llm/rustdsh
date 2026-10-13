@@ -296,6 +296,11 @@ Use the app's Plugins page to add the corresponding directory, or enable
 `EASY_WORK=1` / `SUBAGENTS=1` in `plugins/install.sh`. These are opt-in features
 being prepared for 0.4.0. See the [acceptance evidence](docs/reviews/2026-10-14-easy-work.md).
 
+[Desktop SDK and upstream preparation](desktop/README.md) provide a pinned
+official SDK, an isolated fork home, bundled Rust launcher, and a dedicated
+rustdsh update channel. Source preparation and SDK transport are tested;
+signed Desktop installers and update acceptance still require platform builds.
+
 ## Using with Smart-DSH
 
 [Smart-DSH](https://github.com/hikarioyama/Smart-DSH) (a web-profile plugin bundle) works smoothly alongside rdsh:

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
+  "revision": "d743267388641bc76f17c45ce8b4c231aed1d32c",
+  "harnessVersion": "0.2.1-alpha.2",
+  "sdkVersion": "0.2.1-alpha.2",
+  "patchInputs": {
+    "apps/desktop/src/update-coordinator.ts": "25af5dccba70f312fa2154fb9a006c9d4820a1e8f5b844b7723a2cfbd74007fe",
+    "apps/desktop/scripts/electron-builder-config.mjs": "3f3b036aef8cff16b130b01c3512a2832473276b7cf9e79e59e648eac4e8c845",
+    "apps/desktop/src/main.ts": "19aae691feeb41e459f2de0c1000f02d6bea02a4b9f5d3c59f3b02b7a628edac",
+    "apps/desktop/scripts/macos-app-update-config.mjs": "7da99a0af1b180a4d94e35dea8cab53a77751bb4d77d328542f2cae2556e59be",
+    "apps/desktop/scripts/desktop-build-version.mjs": "d7c7223ad9ab8b790cdd4d4c6c14c494dfd919554a7c98ce2c2fdf367d326dfe",
+    "apps/desktop/cli/dsh": "61647349bd61a5cfff40c338c7d5af767a22f409ddce36feabfb2f693d1e66af",
+    "apps/desktop/cli/dsh.cmd": "5f017fef14b7b311414ecaffe272714ab470f9dabc9720687b5e676fcd5115b8"
+  }
+}

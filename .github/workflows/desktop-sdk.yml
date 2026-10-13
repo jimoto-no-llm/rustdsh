@@ -1,0 +1,54 @@
+name: desktop-sdk
+
+on:
+  push:
+    paths: ["desktop/**", ".github/workflows/desktop-sdk.yml"]
+  pull_request:
+    paths: ["desktop/**", ".github/workflows/desktop-sdk.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-sdk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sdk:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: desktop/sdk/package-lock.json
+      - run: npm ci --prefix desktop/sdk --ignore-scripts
+      - run: node --test desktop/test/*.test.mjs
+      - run: npm test --prefix desktop/sdk
+      - run: npm pack --ignore-scripts --pack-destination ../..
+        working-directory: desktop/sdk
+      - uses: actions/upload-artifact@v7
+        with:
+          name: rdsh-desktop-sdk-${{ matrix.os }}
+          path: jimoto-no-llm-rdsh-desktop-sdk-*.tgz
+          if-no-files-found: error
+
+  official-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --locked
+      - run: npm ci --prefix desktop/sdk --ignore-scripts
+      - run: npm ci --prefix tests/e2e
+      - run: node desktop/prepare.mjs --checkout target/desktop-fork --rdsh-bin target/debug/rdsh
+      - run: node desktop/verify-prepared.mjs target/desktop-fork
