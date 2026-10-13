@@ -1,5 +1,6 @@
 //! Read-only inspection of $DSH_HOME without Node: sessions, logs, skills, profiles.
-//! Never writes; missing dirs are reported, not errors (exit 0 with a note).
+//! $DSH_HOME is never modified; only the token-size cache outside it is written.
+//! Missing dirs are reported, not errors (exit 0 with a note).
 
 /// User home directory without a dirs/home crate: HOME, USERPROFILE, then
 /// HOMEDRIVE+HOMEPATH (native Windows). One resolver for the whole binary so

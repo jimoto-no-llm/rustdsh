@@ -1689,4 +1689,35 @@ mod rdsh_config_tests {
         assert_eq!(c, RdshSettings::default());
         assert!(c.reset_dotted("unknown.key").is_err());
     }
+
+    #[test]
+    fn feature_enabled_precedence_and_defaults() {
+        let mut c = RdshSettings::default();
+        // 既定値: discord は既定 on、sound は既定 off、未知 id は false。
+        assert!(feature_enabled(&c, "discord"));
+        assert!(!feature_enabled(&c, "sound"));
+        assert!(!feature_enabled(&c, "no-such-feature"));
+        assert!(!feature_is_explicit(&c, "discord"));
+
+        // features.<id> が未記載なら旧キーを見る。
+        c.discord.enabled = false;
+        assert!(!feature_enabled(&c, "discord"));
+        c.extras.enable = vec!["search-web".to_string()];
+        assert!(feature_enabled(&c, "search-web"));
+        c.beta.context_engine = true;
+        assert!(feature_enabled(&c, "context_engine"));
+        assert_eq!(enabled_extras(&c), vec!["search-web".to_string()]);
+
+        // 明示 features.<id> が最優先で、旧キーを上書きする。
+        c.features.values.insert("discord".to_string(), true);
+        c.features.values.insert("search-web".to_string(), false);
+        c.features
+            .values
+            .insert("context_engine".to_string(), false);
+        assert!(feature_enabled(&c, "discord"));
+        assert!(feature_is_explicit(&c, "discord"));
+        assert!(!feature_enabled(&c, "search-web"));
+        assert!(!feature_enabled(&c, "context_engine"));
+        assert!(enabled_extras(&c).is_empty());
+    }
 }
