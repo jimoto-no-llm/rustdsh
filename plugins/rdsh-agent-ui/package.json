@@ -1,0 +1,25 @@
+{
+  "name": "rdsh-agent-ui",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "In-conversation agent UI for the DSH Web chat",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": []
+    }
+  },
+  "meta": {
+    "title": "エージェントUI",
+    "description": "会話内にグラフ・表・選択肢を出し、選択を同じセッションへ返します"
+  }
+}

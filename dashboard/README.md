@@ -177,6 +177,9 @@ appropriate configuration into your agent's MCP settings. The dashboard must be
 running before the stdio bridge is used. The stdio bridge reads the current
 runtime credential on each operation. HTTP clients must reload the generated
 configuration after a restart, because the bearer key rotates.
+画面はライトとダークの2テーマです。初回はOSの設定に従い、ヘッダーの
+「ダーク表示／ライト表示」で切り替えると選択が保存されます。
+
 `runtime.json` の `token` は管理用、`mcp_token` は MCP 用です。ブラウザー用の
 鍵は `browser_url` に含まれます。これらを別用途で使い回さないでください。
 
@@ -187,6 +190,7 @@ configuration after a restart, because the bearer key rotates.
 | `dashboard_ask_question`   | Ask a human a question with a unique ID      |
 | `dashboard_publish_event`  | Report progress or an artifact reference     |
 | `dashboard_get_feedback`   | Read durable answers after a sequence cursor |
+| `dashboard_present_ui`     | Present structured UI a human can act on      |
 | `dashboard_get_state`      | Read this project's current state            |
 
 Example tool arguments:

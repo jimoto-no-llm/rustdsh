@@ -1,7 +1,7 @@
 # Reported cost ledger
 
 Issue #44 adds optional `cost_ledger.schema: 1` metadata to project state. The
-project schema stays 1. The six existing MCP tools remain the only tools; report
+project schema stays 1. The seven MCP tools remain the only tools; report
 ledger inputs through `dashboard_update_metrics`, authenticated
 `POST /api/update/metrics`, or the explicit `cost-ledger` CLI. Browser credentials
 can read costs but cannot report them. Reporting neither starts a native CLI nor

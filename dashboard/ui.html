@@ -4,6 +4,19 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Project dashboard</title>
+    <script>
+      // Theme is chosen before paint so a reload never flashes the wrong palette.
+      (() => {
+        let theme = "light";
+        try {
+          const stored = localStorage.getItem("rdsh_dashboard_theme");
+          theme = stored === "dark" || stored === "light"
+            ? stored
+            : window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        } catch {}
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
     <link rel="icon" type="image/png" href="./icon.png" />
     <link rel="apple-touch-icon" href="./icon.png" />
     <style>
@@ -11,12 +24,89 @@
         color-scheme: light;
         --bg: #f7f7f4;
         --card: #fff;
+        --raised: #fbfbf8;
+        --inset: #f4f4f0;
         --line: #deded8;
+        --line-soft: #e9e9e3;
+        --line-strong: #c6c6be;
         --fg: #22231f;
-        --mut: #74766d;
+        --mut: #6b6d64;
+        --ink-soft: #5c5e55;
         --blue: #386ed6;
         --red: #b34432;
         --green: #498460;
+        --focus: #85aaff;
+        --selection: #d8e4fa;
+        --link: #23407e;
+        --accent: #2c56a8;
+        --accent-hover: #234a92;
+        --accent-fg: #fff;
+        --choice-bg: #f2f6fd;
+        --ok-fg: #235a3c;
+        --ok-bg: #e5f1e8;
+        --info-fg: #315994;
+        --info-bg: #e8eef9;
+        --info-line: #d9e2f5;
+        --warn-fg: #765a18;
+        --warn-bg: #faf0d5;
+        --warn-line: #eddfb8;
+        --danger-fg: #8f3527;
+        --danger-bg: #fbece5;
+        --danger-line: #f0d3ca;
+        --neutral-bg: #f0f0eb;
+        --chart-ok: #498460;
+        --chart-warn: #c08a1e;
+        --chart-danger: #b34432;
+        --chart-info: #386ed6;
+        --chart-neutral: #b6b7ae;
+        --shadow-1: 0 1px 2px rgba(34, 35, 31, 0.04), 0 1px 1px rgba(34, 35, 31, 0.03);
+        --shadow-2: 0 8px 20px -10px rgba(34, 35, 31, 0.18), 0 2px 6px rgba(34, 35, 31, 0.05);
+        --scroll-thumb: #c6c6be;
+      }
+      /* Dark is its own palette, not an inversion: warm near-black paper,
+         brighter ink, and chart hues lifted so they stay legible. */
+      :root[data-theme="dark"] {
+        color-scheme: dark;
+        --bg: #141512;
+        --card: #1d1e1a;
+        --raised: #242520;
+        --inset: #131411;
+        --line: #34362e;
+        --line-soft: #2a2b25;
+        --line-strong: #4a4c41;
+        --fg: #ececea;
+        --mut: #a2a49a;
+        --ink-soft: #b9bbb0;
+        --blue: #6f9bff;
+        --red: #ff8f7a;
+        --green: #6fbb8b;
+        --focus: #85aaff;
+        --selection: #2c4a7d;
+        --link: #9dc0ff;
+        --accent: #3f6fd8;
+        --accent-hover: #4b7ce6;
+        --accent-fg: #fff;
+        --choice-bg: #1e2b45;
+        --ok-fg: #8fd0a8;
+        --ok-bg: #1d3126;
+        --info-fg: #9dc0ff;
+        --info-bg: #1b2a44;
+        --info-line: #2b3f63;
+        --warn-fg: #e6c270;
+        --warn-bg: #33290f;
+        --warn-line: #4a3a12;
+        --danger-fg: #ff9d8a;
+        --danger-bg: #3a201b;
+        --danger-line: #552b22;
+        --neutral-bg: #26271f;
+        --chart-ok: #6fbb8b;
+        --chart-warn: #d9a53c;
+        --chart-danger: #e8705a;
+        --chart-info: #6f9bff;
+        --chart-neutral: #6a6c63;
+        --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 1px rgba(0, 0, 0, 0.35);
+        --shadow-2: 0 10px 24px -12px rgba(0, 0, 0, 0.75), 0 2px 6px rgba(0, 0, 0, 0.45);
+        --scroll-thumb: #4a4c41;
       }
       * {
         box-sizing: border-box;
@@ -98,7 +188,7 @@
         border: 1px solid var(--line);
         border-radius: 8px;
         padding: 8px;
-        background: white;
+        background: var(--card);
         font: inherit;
       }
       .summary-facts {
@@ -134,7 +224,7 @@
         cursor: pointer;
         border: 1px solid var(--line);
         border-radius: 8px;
-        background: white;
+        background: var(--card);
       }
       #diagnostics-result {
         display: grid;
@@ -190,18 +280,18 @@
         color: var(--fg);
         border: 1px solid var(--line);
         border-radius: 8px;
-        background: white;
+        background: var(--card);
         font: inherit;
         cursor: pointer;
         text-decoration: none;
       }
       button:hover,
       a.button:hover {
-        background: #f0f2ec;
+        background: var(--neutral-bg);
       }
       button.primary {
         background: var(--blue);
-        color: #fff;
+        color: var(--accent-fg);
         border-color: var(--blue);
       }
       button:disabled {
@@ -211,7 +301,7 @@
       button:focus-visible,
       a:focus-visible,
       textarea:focus-visible {
-        outline: 3px solid #85aaff;
+        outline: 3px solid var(--focus);
         outline-offset: 3px;
       }
       .cards {
@@ -257,18 +347,18 @@
         display: inline-block;
         padding: 1px 6px;
         border-radius: 5px;
-        background: #eef0eb;
+        background: var(--neutral-bg);
       }
-      .provenance-badge.measured { color: #235a3c; background: #e5f1e8; }
-      .provenance-badge.agent_reported { color: #315994; background: #e8eef9; }
-      .provenance-badge.estimated { color: #765a18; background: #faf0d5; }
-      .provenance-badge.stale { color: var(--red); background: #fbece5; }
+      .provenance-badge.measured { color: var(--ok-fg); background: var(--ok-bg); }
+      .provenance-badge.agent_reported { color: var(--info-fg); background: var(--info-bg); }
+      .provenance-badge.estimated { color: var(--warn-fg); background: var(--warn-bg); }
+      .provenance-badge.stale { color: var(--red); background: var(--danger-bg); }
       .provenance-badge.unknown, .provenance-badge.unavailable { color: var(--mut); }
       .observation-details { color: var(--mut); margin-top: 3px; }
       .observation-details summary { cursor: pointer; }
       .bar {
         height: 9px;
-        background: #e1e3dd;
+        background: var(--line-strong);
         border-radius: 8px;
         margin-top: 14px;
         overflow: hidden;
@@ -313,10 +403,10 @@
         border-radius: 8px;
         padding: 10px;
         font: inherit;
-        background: white;
+        background: var(--card);
       }
       #cost-scope:focus-visible {
-        outline: 3px solid #85aaff;
+        outline: 3px solid var(--focus);
         outline-offset: 3px;
       }
       .cost-entry {
@@ -327,7 +417,7 @@
         overflow: auto;
         border: 1px solid var(--line);
         border-radius: 14px;
-        background: white;
+        background: var(--card);
       }
       table {
         border-collapse: collapse;
@@ -550,7 +640,7 @@
         border-radius: 14px;
         padding: 24px;
         margin-bottom: 24px;
-        background: white;
+        background: var(--card);
         align-items: center;
       }
       .share img {
@@ -598,14 +688,14 @@
         padding: 8px;
         border: 1px solid var(--line);
         border-radius: 8px;
-        background: white;
+        background: var(--card);
         font: inherit;
       }
       #observed-cli-form button {
         min-height: 42px;
       }
       .event {
-        background: white;
+        background: var(--card);
         border: 1px solid var(--line);
         border-radius: 12px;
         padding: 16px 20px;
@@ -626,7 +716,7 @@
       .notice {
         margin: 16px 0;
         padding: 13px 16px;
-        background: #edf1f7;
+        background: var(--info-bg);
         border-radius: 8px;
       }
       /* Stable anchors and the existing command palette remain usable. */
@@ -635,7 +725,7 @@
         left: 12px;
         top: -60px;
         z-index: 10;
-        background: white;
+        background: var(--card);
         border: 1px solid var(--line);
         border-radius: 8px;
         padding: 9px 15px;
@@ -784,6 +874,544 @@
           padding: 12px;
         }
       }
+      /* --- rdsh-ui/1 agent surface -------------------------------------
+         The agent presents composed blocks here. The world stays the
+         dashboard's: warm paper, hairline rules, one accent per meaning. */
+      #agent-ui-detail .ui-surface-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+        margin: 2px 0 10px;
+      }
+      #agent-ui-detail .ui-surface-meta span {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 2px 10px;
+        background: var(--card);
+        font-size: 12px;
+        color: var(--ink-soft);
+      }
+      #agent-ui-detail .ui-surface-meta .ui-surface-id {
+        font-family: ui-monospace, SFMono-Regular, "Cascadia Code", Menlo, monospace;
+        font-size: 11.5px;
+        letter-spacing: -0.01em;
+      }
+      #agent-ui-status {
+        min-height: 1.5em;
+        margin: 10px 0 0;
+        font-size: 13px;
+        color: var(--ink-soft);
+      }
+      #agent-ui-status.ok {
+        color: var(--ok-fg);
+      }
+      #agent-ui-status.error {
+        color: var(--red);
+      }
+      .ui-surface {
+        display: grid;
+        gap: 12px;
+      }
+      .ui-block {
+        padding: 14px 16px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--card);
+        box-shadow: var(--shadow-1);
+        animation: ui-rise 0.34s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+      }
+      .ui-surface > .ui-block:nth-child(2) {
+        animation-delay: 45ms;
+      }
+      .ui-surface > .ui-block:nth-child(3) {
+        animation-delay: 90ms;
+      }
+      .ui-surface > .ui-block:nth-child(4) {
+        animation-delay: 135ms;
+      }
+      .ui-surface > .ui-block:nth-child(n + 5) {
+        animation-delay: 170ms;
+      }
+      @keyframes ui-rise {
+        from {
+          opacity: 0;
+          transform: translateY(6px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      .ui-block-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 6px 12px;
+        margin-bottom: 10px;
+      }
+      .ui-block-head .provenance-badge {
+        margin-left: auto;
+      }
+      .ui-block-title {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 650;
+        letter-spacing: -0.01em;
+      }
+      .ui-block:not(:has(.ui-block-title)) .ui-block-head {
+        justify-content: flex-start;
+      }
+      .ui-observation {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        justify-content: flex-start;
+        gap: 8px;
+        margin: 10px 0 0;
+        font-size: 12px;
+        color: var(--ink-soft);
+      }
+      .ui-block > .ui-observation:only-child {
+        margin: 0;
+      }
+      .provenance-badge.unavailable {
+        color: var(--ink-soft);
+        background: var(--neutral-bg);
+      }
+      .ui-observation-detail {
+        font-variant-numeric: tabular-nums;
+      }
+      .ui-text,
+      .ui-prompt,
+      .caption {
+        margin: 0;
+      }
+      .caption {
+        color: var(--ink-soft);
+        font-size: 13px;
+      }
+      .ui-code {
+        margin: 0;
+        padding: 10px 12px;
+        border: 1px solid var(--line-soft);
+        border-radius: 8px;
+        background: var(--inset);
+        font:
+          12.5px/1.55 ui-monospace,
+          SFMono-Regular,
+          "Cascadia Code",
+          Menlo,
+          monospace;
+        overflow-x: auto;
+      }
+      .callout {
+        margin: 0;
+        padding: 10px 12px;
+        border: 1px solid var(--info-line);
+        border-radius: 8px;
+        background: var(--info-bg);
+        color: var(--info-fg);
+      }
+      .callout.warn {
+        border-color: var(--warn-line);
+        background: var(--warn-bg);
+        color: var(--warn-fg);
+      }
+      .callout.danger {
+        border-color: var(--danger-line);
+        background: var(--danger-bg);
+        color: var(--danger-fg);
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 2px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--ink-soft);
+        background: var(--neutral-bg);
+      }
+      .badge::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: currentColor;
+        opacity: 0.75;
+      }
+      .badge.ok {
+        color: var(--ok-fg);
+        background: var(--ok-bg);
+      }
+      .badge.warn {
+        color: var(--warn-fg);
+        background: var(--warn-bg);
+      }
+      .badge.danger {
+        color: var(--danger-fg);
+        background: var(--danger-bg);
+      }
+      .badge.info {
+        color: var(--info-fg);
+        background: var(--info-bg);
+      }
+      .key-value {
+        display: grid;
+        grid-template-columns: minmax(90px, max-content) minmax(0, 1fr);
+        gap: 6px 18px;
+        margin: 0;
+      }
+      .key-value dt {
+        color: var(--ink-soft);
+        font-size: 13px;
+      }
+      .key-value dd {
+        margin: 0;
+        font-variant-numeric: tabular-nums;
+        overflow-wrap: anywhere;
+      }
+      .ui-table-scroll {
+        overflow-x: auto;
+        margin: 0 -4px;
+        padding: 0 4px;
+      }
+      .ui-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+      }
+      .ui-table th,
+      .ui-table td {
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--line-soft);
+        text-align: left;
+        vertical-align: top;
+      }
+      .ui-table th {
+        font-size: 12px;
+        font-weight: 650;
+        color: var(--ink-soft);
+        letter-spacing: 0.02em;
+        border-bottom-color: var(--line);
+      }
+      .ui-table tbody tr:last-child td {
+        border-bottom: 0;
+      }
+      .ui-table tbody tr:hover td {
+        background: var(--raised);
+      }
+      .ui-table td {
+        font-variant-numeric: tabular-nums;
+        overflow-wrap: anywhere;
+      }
+      .ui-table tr {
+        padding: 0;
+      }
+      .ui-choice {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 11px 13px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--card);
+        cursor: pointer;
+        transition:
+          border-color 0.15s ease-out,
+          background 0.15s ease-out;
+      }
+      .ui-choice:hover {
+        border-color: var(--line-strong);
+        background: var(--raised);
+      }
+      .ui-choice:has(input:checked) {
+        border-color: var(--blue);
+        background: var(--choice-bg);
+      }
+      .ui-choice input {
+        margin: 3px 0 0;
+        accent-color: var(--blue);
+      }
+      .ui-choice:has(input:focus-visible) {
+        outline: 2px solid var(--blue);
+        outline-offset: 2px;
+      }
+      .ui-surface .detail {
+        overflow-wrap: anywhere;
+      }
+      .ui-form {
+        display: grid;
+        gap: 10px;
+      }
+      .ui-form label {
+        font-size: 13px;
+        color: var(--ink-soft);
+      }
+      .ui-form input,
+      .ui-form textarea {
+        display: block;
+        width: 100%;
+        min-height: 42px;
+        margin-top: 4px;
+        padding: 8px 10px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--card);
+        font: inherit;
+        color: var(--fg);
+      }
+      .ui-form textarea {
+        min-height: 88px;
+        resize: vertical;
+      }
+      .ui-form input:focus-visible,
+      .ui-form textarea:focus-visible {
+        outline: 2px solid var(--blue);
+        outline-offset: 1px;
+        border-color: var(--blue);
+      }
+      .ui-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 14px;
+        padding-top: 12px;
+        border-top: 1px solid var(--line-soft);
+      }
+      .ui-actions button {
+        min-height: 38px;
+        padding: 7px 15px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: var(--card);
+        color: var(--fg);
+        font: inherit;
+        font-size: 14px;
+        cursor: pointer;
+        transition:
+          background 0.15s ease-out,
+          border-color 0.15s ease-out;
+      }
+      .ui-actions button:hover:not([disabled]) {
+        border-color: var(--line-strong);
+        background: var(--raised);
+      }
+      .ui-actions button[data-action-kind="submit_choice"],
+      .ui-actions button[data-action-kind="submit_form"],
+      .ui-actions button[data-action-kind="approve"] {
+        border-color: var(--link);
+        background: var(--accent);
+        color: var(--accent-fg);
+      }
+      .ui-actions button[data-action-kind="submit_choice"]:hover:not([disabled]),
+      .ui-actions button[data-action-kind="submit_form"]:hover:not([disabled]),
+      .ui-actions button[data-action-kind="approve"]:hover:not([disabled]) {
+        background: var(--accent-hover);
+      }
+      .ui-actions button:focus-visible {
+        outline: 2px solid var(--blue);
+        outline-offset: 2px;
+      }
+      .ui-actions button[disabled] {
+        color: var(--mut);
+        background: var(--inset);
+        border-color: var(--line-soft);
+        cursor: not-allowed;
+      }
+      .ui-actions .detail {
+        flex-basis: 100%;
+        margin: 0;
+      }
+      .ui-panel {
+        padding: 12px 14px;
+        border: 1px solid var(--line-soft);
+        border-radius: 10px;
+        background: var(--raised);
+      }
+      .ui-panel > h4 {
+        margin: 0 0 8px;
+        font-size: 14px;
+        font-weight: 650;
+      }
+      .ui-panel .ui-block {
+        padding: 10px 0;
+        border: 0;
+        border-top: 1px solid var(--line-soft);
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+        animation: none;
+      }
+      .ui-panel .ui-block:first-of-type {
+        padding-top: 0;
+        border-top: 0;
+      }
+      .ui-panel .ui-block:last-child {
+        padding-bottom: 0;
+      }
+      .ui-diff-panes {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+      .ui-diff-pane {
+        border: 1px solid var(--line-soft);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .ui-diff-pane h5 {
+        margin: 0;
+        padding: 6px 10px;
+        background: var(--inset);
+        border-bottom: 1px solid var(--line-soft);
+        font-size: 12px;
+        font-weight: 650;
+        color: var(--ink-soft);
+      }
+      .ui-diff-pane pre {
+        margin: 0;
+        padding: 10px;
+        font:
+          12.5px/1.55 ui-monospace,
+          SFMono-Regular,
+          "Cascadia Code",
+          Menlo,
+          monospace;
+        overflow-x: auto;
+      }
+      .ui-chart {
+        display: block;
+        width: 100%;
+        height: auto;
+        max-width: 520px;
+        overflow: visible;
+      }
+      .ui-chart text {
+        font-size: 11px;
+        fill: var(--ink-soft);
+        font-variant-numeric: tabular-nums;
+      }
+      .ui-chart .ui-chart-label {
+        fill: var(--fg);
+        font-weight: 600;
+      }
+      .ui-chart .ui-chart-value {
+        fill: var(--fg);
+        font-weight: 650;
+      }
+      .ui-chart .bar-ok {
+        fill: var(--chart-ok);
+      }
+      .ui-chart .bar-warn {
+        fill: var(--chart-warn);
+      }
+      .ui-chart .bar-danger {
+        fill: var(--chart-danger);
+      }
+      .ui-chart .bar-info {
+        fill: var(--chart-info);
+      }
+      .ui-chart .bar-neutral {
+        fill: var(--chart-neutral);
+      }
+      .ui-chart polyline {
+        fill: none;
+        stroke: var(--blue);
+        stroke-width: 2;
+        stroke-linejoin: round;
+        stroke-linecap: round;
+      }
+      .ui-chart circle {
+        fill: var(--card);
+        stroke: var(--blue);
+        stroke-width: 2;
+      }
+      .ui-chart .ui-chart-axis {
+        stroke: var(--line);
+        stroke-width: 1;
+      }
+      .ui-test-summary {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .ui-heading {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 650;
+        letter-spacing: -0.01em;
+      }
+      .ui-button-label,
+      .ui-approval-facts {
+        margin: 0;
+        font-weight: 600;
+      }
+      .ui-approval-facts {
+        font-variant-numeric: tabular-nums;
+      }
+      .ui-empty {
+        padding: 22px;
+        border: 1px dashed var(--line);
+        border-radius: 12px;
+        background: var(--card);
+        color: var(--ink-soft);
+        text-align: center;
+      }
+      .ui-surface ::selection {
+        background: var(--selection);
+      }
+      .ui-surface {
+        caret-color: var(--blue);
+        scrollbar-width: thin;
+        scrollbar-color: var(--scroll-thumb) transparent;
+      }
+      .ui-surface a {
+        color: var(--link);
+        text-underline-offset: 2px;
+      }
+      @media (max-width: 720px) {
+        .ui-diff-panes {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .key-value {
+          grid-template-columns: minmax(76px, max-content) minmax(0, 1fr);
+          gap: 6px 12px;
+        }
+        .ui-block {
+          padding: 12px;
+        }
+      }
+      @media (max-width: 600px) {
+        .ui-table-scroll .ui-table,
+        .ui-table-scroll .ui-table tbody,
+        .ui-table-scroll .ui-table tr,
+        .ui-table-scroll .ui-table td {
+          display: revert;
+        }
+        .ui-table-scroll .ui-table thead {
+          display: table-header-group;
+        }
+        .ui-table-scroll .ui-table td::before {
+          content: none;
+        }
+        .ui-table-scroll .ui-table tr {
+          padding: 0;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .ui-block {
+          animation: none;
+        }
+        .ui-choice,
+        .ui-actions button {
+          transition: none;
+        }
+      }
     </style>
   </head>
   <body>
@@ -809,6 +1437,13 @@
           >
             コマンド
           </button>
+          <button
+            id="theme-toggle"
+            type="button"
+            aria-pressed="false"
+          >
+            ダーク表示
+          </button>
           <button id="share-toggle" aria-expanded="false" aria-controls="share">
             スマホで開く
           </button>
@@ -817,6 +1452,26 @@
       <div id="connection" class="sub" role="status" aria-live="polite">
         接続中…
       </div>
+      <section class="card" aria-labelledby="first-visit-heading">
+        <h2 id="first-visit-heading">はじめての方へ</h2>
+        <p>
+          この画面は、AIの作業の「いま」と「お願い」を見る場所です。
+          見るのは下の「いまの状況」と「未回答の質問」だけで大丈夫です。
+        </p>
+        <ol class="sub">
+          <li>「いまの状況」で進み具合を確認する</li>
+          <li>「未回答の質問」が0件なら、やることはありません</li>
+          <li>質問があるときだけ、選ぶ・書く・送るの順で答える</li>
+        </ol>
+        <details>
+          <summary class="sub">ことばの意味</summary>
+          <p class="sub">
+            「未取得」はまだ見ていない状態、「観測」は見た記録、
+            「判断待ち」はあなたの返事を待っている件数です。
+            ボタンを押しただけでは何も実行されません。
+          </p>
+        </details>
+      </section>
       <section class="share" id="share" hidden>
         <div>
           <img
@@ -883,6 +1538,9 @@
           <label for="overview-task">確認する範囲</label
           ><select id="overview-task"></select>
           <p id="overview-context"></p>
+          <p class="sub">
+            AIの作業メモです。「未取得」はまだ見ていないだけ。空欄があっても故障ではありません。
+          </p>
           <dl class="summary-facts">
             <dt>状態</dt>
             <dd>
@@ -904,6 +1562,9 @@
             <dt>停止</dt>
             <dd id="overview-stop">この画面からの停止は非対応</dd>
           </dl>
+          <p class="sub">
+            何もなければ読み飛ばして大丈夫です。用があるときは下の「未回答の質問」に出ます。
+          </p>
           <ul id="overview-pending"></ul>
         </section>
         <details class="fold" id="observed-cli-panel">
@@ -936,7 +1597,7 @@
         </details>
         <h2 id="pending-heading" tabindex="-1">未回答の質問</h2>
         <p class="sub" id="pending-note">
-          プロジェクト全体の質問です。回答はこの質問への返答のみです。対象・条件が変わった場合は回答前に内容を再確認してください。回答しただけで実行権限は生まれません。
+          AIからのお願いがここに出ます。あるときだけ選ぶ・書く・送るの順で答えます。0件なら何もいりません。答えるだけで実行は起きません。
         </p>
         <div
           id="questions"
@@ -958,6 +1619,15 @@
             手入力の報告値です。総・有効パラメータは出所確認用で、実測の断定ではありません。
           </p>
           <section id="model-catalog" aria-label="モデルカタログ"></section>
+        </details>
+        <details class="fold" id="agent-ui-detail" open>
+          <summary>エージェントからのUI</summary>
+          <p class="sub">
+            エージェントが提示した画面です。選択や入力は同じセッションへ返りますが、実行権限は発行しません。要求型の操作は記録のみで、実行は別の認可された経路で行います。
+          </p>
+          <p class="ui-surface-meta" id="agent-ui-meta" aria-live="polite"></p>
+          <section id="agent-ui" aria-label="エージェントが提示したUI"></section>
+          <p id="agent-ui-status" role="status" aria-live="polite"></p>
         </details>
         <details class="fold" id="tasks-detail">
           <summary>タスク一覧</summary>
