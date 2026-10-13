@@ -1,4 +1,5 @@
 import { metricView, observationView, ratioView } from "./observations.mjs";
+import { eventIdentifier, eventTargetId } from "./annotation-identifiers.mjs";
 
 const $ = (id) => document.getElementById(id);
 function node(tag, text, className) {
@@ -225,6 +226,7 @@ function renderEvents(state, now) {
       .reverse()
       .map((event) => {
         const element = node("article", undefined, "event");
+        element.id = eventTargetId(eventIdentifier(event));
         element.append(
           node("strong", event.title),
           node(

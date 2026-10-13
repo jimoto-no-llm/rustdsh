@@ -23,6 +23,8 @@ jobs:
       - uses: actions/checkout@v7
       - name: Test release metadata and asset validation
         run: python3 -m unittest discover -s tests -p 'test_release_*.py'
+      - name: Test ICO directory validation
+        run: python3 -m unittest discover -s tests -p 'test_icon_generation.py'
       - name: Check the current version's release notes
         run: |
           version=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["package"]["version"])')
@@ -44,7 +46,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-      - run: node --test tests/plugin-security.test.mjs tests/settings-client.test.mjs tests/update-banner.test.mjs tests/model_benchmark/fence.test.mjs
+      - run: node --test tests/plugin-security.test.mjs tests/settings-client.test.mjs tests/update-banner.test.mjs tests/feature-switches.test.mjs tests/discord-presence.test.mjs tests/model_benchmark/fence.test.mjs
 
   security-boundaries:
     runs-on: ubuntu-latest
@@ -57,7 +59,11 @@ jobs:
       - run: cargo build --locked
       - run: sudo apt-get update && sudo apt-get install -y bubblewrap
       - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-      - run: node --test tests/security-boundaries.test.mjs tests/tool-isolation.test.mjs
+      - run: node --test tests/security-boundaries.test.mjs tests/tool-isolation.test.mjs tests/desktop.test.mjs
+      - name: Install pinned upstream tool-bash for approval integrity test
+        run: npm install --prefix "$RUNNER_TEMP/rdsh-runtime" --ignore-scripts --no-audit --no-fund @deepseek-ai/dsh-tool-bash@0.2.0-rc.2
+      - name: Test approval integrity against pinned upstream source
+        run: DSH_TOOL_BASH_SOURCE="$RUNNER_TEMP/rdsh-runtime/node_modules/@deepseek-ai/dsh-tool-bash/lib/index.js" node --test tests/upstream-approval-integrity.test.mjs
       - run: python3 -m unittest discover -s tests -p 'test_release_assets.py'
       - name: Verify the audited dispatcher and late middleware changes
         run: |
@@ -111,6 +117,7 @@ jobs:
         run: |
           printf '#!/bin/sh\necho stub-dsh $@' > /tmp/stub-dsh && chmod +x /tmp/stub-dsh
           BIN=./target/debug/rdsh DSH_ORIG_BIN=/tmp/stub-dsh sh tests/regress.sh
+          BIN=./target/debug/rdsh sh tests/context_prototype.sh
       - if: '! matrix.regress'
         shell: pwsh
         run: |
@@ -129,6 +136,9 @@ jobs:
           $setup = ./target/debug/rdsh.exe setup --json | Out-String
           if ($setup -notmatch '"needed":true') { throw 'setup should report needed on first run' }
           ./target/debug/rdsh.exe doctor
+      - if: '! matrix.regress'
+        shell: bash
+        run: BIN=./target/debug/rdsh.exe bash tests/regress.sh --windows-installer-delegation
 
   browser-e2e:
     runs-on: ubuntu-latest
@@ -151,3 +161,20 @@ jobs:
         with:
           name: browser-e2e
           path: target/e2e
+
+  # Installs the built artifacts with install.sh inside clean containers
+  # (--network=none, file:// release base). This is the check that keeps a
+  # fresh-machine install working on older glibc distros and musl hosts; see
+  # tests/install-isolated/ and docs/RELEASING.md.
+  install-isolated:
+    name: Isolated install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
+      - run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - run: cargo build --locked --release
+      - run: cargo build --locked --release --target x86_64-unknown-linux-musl
+      - run: tests/install-isolated.sh --source local --no-build --require-musl

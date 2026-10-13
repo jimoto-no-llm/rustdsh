@@ -48,9 +48,10 @@ export async function linuxScope(config, stdio) {
   )
     throw new Error("ownership_unavailable");
   const directory = path.join(parentReal, "rdsh-" + config.owner_id);
-  let dir, kill, events;
+  let dir, kill, events, child, directoryCreated = false;
   try {
     await fs.mkdir(directory);
+    directoryCreated = true;
     dir = await fs.open(directory, "r");
     const held = "/proc/self/fd/" + dir.fd;
     // Held kernel descriptors cannot turn into a replacement cgroup by path reuse.
@@ -134,7 +135,7 @@ export async function linuxScope(config, stdio) {
       };
     };
     // Fixed launcher moves itself before exec; operator argv is positional data.
-    const child = spawn(
+    child = spawn(
       "/bin/sh",
       [
         "-c",
@@ -194,11 +195,47 @@ export async function linuxScope(config, stdio) {
     };
   } catch (error) {
     await kill?.write("1", 0, "utf8").catch(() => {});
-    await kill?.close();
-    await events?.close();
-    await dir?.close();
-    await fs.rmdir(directory).catch(() => {});
-    throw error;
+    let cleanupConfirmed = false;
+    if (events) {
+      for (let i = 0; i < 100; i++) {
+        try {
+          const buf = Buffer.alloc(1024);
+          const { bytesRead } = await events.read(buf, 0, buf.length, 0);
+          const populated = buf
+            .subarray(0, bytesRead)
+            .toString()
+            .match(/^populated ([01])$/m)?.[1];
+          if (populated === "0") {
+            cleanupConfirmed = true;
+            break;
+          }
+        } catch {}
+        await pause(20);
+      }
+    } else if (!child) {
+      // The child is only spawned after both cgroup event handles are held.
+      cleanupConfirmed = true;
+    }
+    for (const handle of [kill, events, dir]) {
+      if (!handle) continue;
+      try {
+        await handle.close();
+      } catch {
+        cleanupConfirmed = false;
+      }
+    }
+    if (cleanupConfirmed && directoryCreated) {
+      try {
+        await fs.rmdir(directory);
+      } catch {
+        cleanupConfirmed = false;
+      }
+    }
+    const failure = cleanupConfirmed
+      ? error
+      : new Error("cleanup_unconfirmed");
+    failure.cleanupConfirmed = cleanupConfirmed;
+    throw failure;
   }
 }
 
@@ -283,10 +320,10 @@ export async function cleanupScope(scope) {
       await scope.kill();
     for (let i = 0; i < 50; i++) {
       if ((await scope.snapshot()).status === "exit_confirmed") {
-        await scope.close();
-        return;
+        return (await scope.close()) === true;
       }
       await pause(20);
     }
   } catch {} // A lost monitor is never reported as confirmed to the client.
+  return false;
 }

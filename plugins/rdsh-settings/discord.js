@@ -235,9 +235,13 @@ export function createDiscordPresence({ loadSettings, connect = id => DiscordIpc
     previous.destroy();
   }
   async function update() {
-    try { settings = normalizeDiscord((await loadSettings()).discord); }
+    let document;
+    try { document = await loadSettings(); settings = normalizeDiscord(document.discord); }
     catch { state = 'invalid_settings'; await disconnect(); return; }
     if (stopped) return;
+    // features.discord === false is a kill switch: never connect and never send
+    // SET_ACTIVITY. An absent id keeps the legacy discord.enabled behavior.
+    if (document?.features?.discord === false) { state = 'disabled'; await disconnect(false); return; }
     if (!settings.enabled || !/^[1-9][0-9]{16,19}$/.test(settings.application_id)) {
       state = settings.enabled ? 'needs_application_id' : 'disabled'; await disconnect(); return;
     }
