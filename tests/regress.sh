@@ -16,6 +16,14 @@ if [ "${RDSH_REGRESS_SANDBOXED:-}" != 1 ]; then
   export HOME DSH_HOME RDSH_REGRESS_SANDBOXED RR_SANDBOX
   trap 'rm -rf "$RR_SANDBOX"' EXIT INT TERM
 fi
+# Keep the default diagnostic/delegation probe inside this test's sandbox.
+# A developer's primary override must not win over later legacy fixtures.
+unset RDSH_ORIG_BIN DSH_ORIG_BIN
+mkdir -p "$RR_SANDBOX/original"
+printf '#!/bin/sh\necho stub-dsh "$@"\n' > "$RR_SANDBOX/original/dsh"
+chmod +x "$RR_SANDBOX/original/dsh"
+DSH_ORIG_BIN="$RR_SANDBOX/original/dsh"
+export DSH_ORIG_BIN
 need_ok() {
   desc="$1"; shift
   if "$@" >"$RR_SANDBOX/rr-out" 2>"$RR_SANDBOX/rr-err"; then ok "$desc"; else echo "FAIL(exit): $desc"; cat "$RR_SANDBOX/rr-err"; exit 1; fi
@@ -136,7 +144,12 @@ rm -rf $FS
 mkdir -p $FS/pkg $FS/rel/download/v9.9.9 $FS/repo $FS/shim $FS/home/.local/bin $FS/npmroot/@deepseek-ai/dsh $FS/bin
 cp "$BIN" $FS/pkg/rdsh
 cp ./sync-dsh.sh $FS/repo/sync-dsh.sh
-for a in rdsh-linux-x64 rdsh-linux-x64-musl rdsh-macos-arm64 rdsh-macos-x64; do tar -czf "$FS/rel/download/v9.9.9/$a.tar.gz" -C $FS/pkg rdsh; done
+for a in rdsh-linux-x64 rdsh-linux-x64-musl rdsh-macos-arm64 rdsh-macos-x64; do
+  # Distinct payloads expose accidental reuse of one platform's checksum,
+  # including on GNU tar hosts where repeated archives can be identical.
+  printf '%s\n' "$a" > "$FS/pkg/fixture-platform.txt"
+  tar -czf "$FS/rel/download/v9.9.9/$a.tar.gz" -C "$FS/pkg" rdsh fixture-platform.txt
+done
 printf '{"version":"1.0.0"}\n' > $FS/npmroot/@deepseek-ai/dsh/package.json
 printf '#!/bin/sh\ncase "$1" in root) echo "%s" ;; view) echo "[\\"1.0.0\\"]" ;; *) exit 1 ;; esac\n' "$FS/npmroot" > $FS/npm
 ln -s "$(command -v node)" "$FS/home/.local/bin/rdsh-test-node"
@@ -156,9 +169,19 @@ exec "$CURL_BIN" "\$@"
 CURL_EOF
 chmod +x $FS/shim/curl $FS/npm $FS/home/.local/bin/node
 manifest() {
-  { printf 'latest v9.9.9\n'; for a in rdsh-linux-x64 rdsh-linux-x64-musl rdsh-macos-arm64 rdsh-macos-x64; do printf 'v9.9.9 %s.tar.gz %s\n' "$a" "$1"; done; } > $FS/release-digests.tsv
+  {
+    printf 'latest v9.9.9\n'
+    for a in rdsh-linux-x64 rdsh-linux-x64-musl rdsh-macos-arm64 rdsh-macos-x64; do
+      if [ "$#" -gt 0 ]; then
+        digest="$1"
+      else
+        digest="$($SUM "$FS/rel/download/v9.9.9/$a.tar.gz" | awk '{print $1}')"
+      fi
+      printf 'v9.9.9 %s.tar.gz %s\n' "$a" "$digest"
+    done
+  } > "$FS/release-digests.tsv"
 }
-manifest "$($SUM $FS/rel/download/v9.9.9/rdsh-linux-x64.tar.gz | awk '{print $1}')"
+manifest
 fs_sync() { env -u RDSH_SYNC_FROM_SOURCE -u RDSH_MUSL HOME="$FS/home" NPM_BIN="$FS/npm" PREFIX_BIN="$1" RDSH_RELEASE_BASE="file://$FS/rel" RDSH_TEST_INSECURE_BASE=1 RDSH_SYNC_VERSION="${3:-latest}" PATH="$FS/shim:$PATH" sh $FS/repo/sync-dsh.sh > "$2" 2>&1; }
 fs_sync "$FS/bin" $FS/sync-ok.log
 if grep -q "checksum ok" $FS/sync-ok.log && grep -q "rdsh updated OK via release binary" $FS/sync-ok.log && "$FS/bin/rdsh" --version 2>/dev/null | grep -q "rdsh"; then ok "sync-dsh release update with pinned digest"; else echo "FAIL(output): sync-dsh release update with pinned digest"; tail -n 8 $FS/sync-ok.log; exit 1; fi
@@ -179,7 +202,7 @@ printf 'old\n' > $FS/bin/rdsh
 fs_sync "$FS/bin" $FS/sync-bad.log
 if grep -q "CHECKSUM MISMATCH" $FS/sync-bad.log && grep -q "binaries untouched" $FS/sync-bad.log && [ "$(cat $FS/bin/rdsh)" = "old" ]; then ok "sync-dsh refuses mismatched pinned digest"; else echo "FAIL(output): sync-dsh refuses mismatched pinned digest"; tail -n 8 $FS/sync-bad.log; exit 1; fi
 # A version without a registry row is refused; there is no sidecar fallback.
-manifest "$($SUM $FS/rel/download/v9.9.9/rdsh-linux-x64.tar.gz | awk '{print $1}')"
+manifest
 fs_sync "$FS/bin" $FS/sync-none.log v9.9.8
 if grep -q "no pinned checksum for release v9.9.8" $FS/sync-none.log && grep -q "binaries untouched" $FS/sync-none.log && [ "$(cat $FS/bin/rdsh)" = "old" ]; then ok "sync-dsh refuses a release without a pinned digest"; else echo "FAIL(output): sync-dsh refuses a release without a pinned digest"; tail -n 8 $FS/sync-none.log; exit 1; fi
 # An unparsable registry refuses the update instead of falling back to the base.
