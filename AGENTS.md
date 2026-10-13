@@ -26,3 +26,16 @@ installer and badge links use that owner. Keep historical evidence intact.
 - `P0`–`P3` express priority; component/type labels describe the work. Preserve
   existing labels and issue assignments when adding definitions.
 - Keep release changes focused and preserve unrelated working-tree edits.
+
+## Branch and PR maintenance
+
+- Reuse the existing topic branch and PR for related work; combine trivial lint
+  edits instead of creating one branch and PR per substitution.
+- Before removing branches, fetch the current refs and inspect every open PR and
+  worktree. Never remove active, open-PR, unmerged, `release/`, or `archive/` branches.
+  Bundle existing refs before pruning stale remote-tracking references, and compare
+  live remote heads rather than treating cached refs as GitHub branches.
+- `scripts/prune-merged-branches.py` reports candidates by default. Applying a
+  plan requires an external backup directory and verifies a Git bundle first.
+- Preserve issue labels, assignments and unresolved acceptance requirements;
+  merged code alone does not prove that an entire feature issue is complete.
