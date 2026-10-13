@@ -121,7 +121,7 @@ export function installToolBoundary(tools, { workspace, sharedFiles = [] }) {
   const definition = {
     name: 'rdsh_inspect',
     description: 'Inspect this project in a kernel sandbox. Only files explicitly shared by the human are available, read-only. Disposable temporary storage is available. No network, host writes, escalation, plugins or background jobs.',
-    parameters: { command: { type: 'string', required: true, description: 'Inspection command, run in /workspace.' } },
+    parameters: { type: 'object', properties: { command: { type: 'string', description: 'Inspection command, run in /workspace.' } }, required: ['command'], additionalProperties: false },
     output: { schema: { type: 'object', properties: { exitCode: { type: 'integer' }, stdout: { type: 'string' }, stderr: { type: 'string' } }, required: ['exitCode', 'stdout', 'stderr'], additionalProperties: false }, render: (_args, value) => [{ type: 'text', text: JSON.stringify(value) }] },
     async execute(args) {
       if (!args || Object.keys(args).some(key => key !== 'command')) throw new Error('sandbox arguments do not permit permissions or environment overrides');

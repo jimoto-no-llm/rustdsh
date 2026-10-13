@@ -65,7 +65,7 @@ fn run_request(line: &str) -> Result<serde_json::Value, (String, &'static str, S
     if v.get("v").and_then(|x| x.as_u64()) != Some(PROTOCOL_VERSION as u64) {
         return Err(fail(
             "bad_version",
-            format!("unsupported protocol, want v{}", PROTOCOL_VERSION),
+            format!("unsupported protocol, want v{PROTOCOL_VERSION}"),
         ));
     }
     if id.is_empty() || id.len() > MAX_ID_LEN {

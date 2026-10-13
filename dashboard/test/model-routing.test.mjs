@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { randomUUID } from "node:crypto";
 import { identity } from "../state.mjs";
 import { SessionLedger, attachRecordedSession } from "../session-ledger.mjs";
 import { createCliAdapter } from "../adapters.mjs";
@@ -570,4 +571,145 @@ test("a checkpoint cannot drop a declared model assertion while starting a new c
     (await f.trace()).filter((item) => item.method === "session/prompt").length,
     0,
   );
+});
+
+// The next two tests use a confirmed run record directly: they exercise the
+// routing lock and policy file only, without an ACP session or owned scope.
+const declaredRun = (f) => ({
+  run_id: "run_" + randomUUID(),
+  project_id: f.project.id,
+  binding: "confirmed",
+  cli: "dsh",
+  cli_session_id: "fixture-routing-session",
+  cwd: f.cwd,
+  branch: "routing-qa",
+  launch: null,
+  scope: null,
+});
+
+test("a committed route change survives a lock cleanup failure without reporting the write as lost", async (t) => {
+  const f = await setup(t),
+    record = declaredRun(f),
+    lock = f.store.file(record) + ".lock",
+    originalUnlink = fs.unlink;
+  let failure;
+  t.mock.method(fs, "unlink", async (file, ...args) => {
+    if (path.resolve(String(file)) === path.resolve(lock)) {
+      const error = new Error("fixture lock cleanup failure");
+      error.code = "EACCES";
+      throw error;
+    }
+    return originalUnlink(file, ...args);
+  });
+
+  await assert.rejects(
+    f.store.bind(record, requestedSelection(first)),
+    (error) => {
+      failure = error;
+      return error.code === "route_lock_cleanup_unconfirmed";
+    },
+  );
+  assert.equal(failure.committed, true);
+  assert.equal(failure.lock_cleanup_unconfirmed, true);
+  const view = await f.store.inspect(record);
+  assert.equal(view.route_required, true);
+  assert.deepEqual(view.requested, first);
+  assert.equal(view.writer_lock, "present");
+  assert.deepEqual(
+    failure.event_ids,
+    view.events.map((event) => event.event_id),
+  );
+  await assert.rejects(
+    f.store.bind(record, requestedSelection(first)),
+    error("route_policy_busy"),
+  );
+});
+
+// The assertion above runs on the first mutation, where prior is null and the
+// whole event list is the delta. This one mutates an existing policy, which is
+// where reading the pre-mutation event count too late used to yield an empty
+// event_ids for a write that really did add an event.
+test("a committed route change onto an existing policy reports only the events it added", async (t) => {
+  const f = await setup(t),
+    record = declaredRun(f),
+    lock = f.store.file(record) + ".lock",
+    originalUnlink = fs.unlink;
+  await f.store.bind(record, requestedSelection(first));
+  const before = (await f.store.inspect(record)).events.map(
+    (event) => event.event_id,
+  );
+  let failure;
+  t.mock.method(fs, "unlink", async (file, ...args) => {
+    if (path.resolve(String(file)) === path.resolve(lock)) {
+      const error = new Error("fixture lock cleanup failure");
+      error.code = "EACCES";
+      throw error;
+    }
+    return originalUnlink(file, ...args);
+  });
+
+  await assert.rejects(
+    f.store.mutate(record, (value) => {
+      f.store.event(value, "native_selection_observed", {
+        status: "observed",
+        selection: first,
+        reason: null,
+        source: "acp_config_update",
+        cli_version: null,
+        observed_at: new Date().toISOString(),
+        actual_execution_verified: false,
+      });
+      value.revision++;
+      return { value, result: null };
+    }),
+    (error) => {
+      failure = error;
+      return error.code === "route_lock_cleanup_unconfirmed";
+    },
+  );
+  const after = (await f.store.inspect(record)).events.map(
+    (event) => event.event_id,
+  );
+  assert.ok(
+    after.length > before.length,
+    "the mutation under test did not add an event",
+  );
+  assert.equal(failure.committed, true);
+  assert.equal(failure.lock_cleanup_unconfirmed, true);
+  assert.deepEqual(failure.event_ids, after.slice(before.length));
+  assert.ok(
+    failure.event_ids.length > 0,
+    "a committed addition was reported with no event_ids",
+  );
+});
+
+test("a route mutation failure keeps its own code when the lock cleanup also fails", async (t) => {
+  const f = await setup(t),
+    record = declaredRun(f),
+    lock = f.store.file(record) + ".lock",
+    originalUnlink = fs.unlink;
+  await f.store.bind(record, requestedSelection(first));
+  const committed = await fs.readFile(f.store.file(record));
+  let failure;
+  t.mock.method(fs, "unlink", async (file, ...args) => {
+    if (path.resolve(String(file)) === path.resolve(lock)) {
+      const error = new Error("fixture lock cleanup failure");
+      error.code = "EACCES";
+      throw error;
+    }
+    return originalUnlink(file, ...args);
+  });
+
+  await assert.rejects(
+    f.store.bind(record, requestedSelection(second)),
+    (error) => {
+      failure = error;
+      return error.code === "route_request_immutable";
+    },
+  );
+  assert.equal(failure.committed, false);
+  assert.equal(failure.lock_cleanup_unconfirmed, true);
+  assert.deepEqual(failure.event_ids, []);
+  assert.deepEqual(await fs.readFile(f.store.file(record)), committed);
+  assert.equal((await f.store.inspect(record)).writer_lock, "present");
 });
