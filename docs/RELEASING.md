@@ -79,18 +79,30 @@ Generation failure stops publication.
    git push origin vX.Y.Z
    ```
 
-   Tag push starts the `cd` workflow automatically. Its validation job must pass
-   before builds start, and publication waits for every build and asset check.
-   Never tag an unreviewed or untested commit.
+   Tag push starts the release workflow and the normal `ci.yml` push workflow.
+   The release workflow verifies that the tag resolves to the exact pushed SHA,
+   that SHA is an ancestor of `main`, and the `ci.yml` run triggered by that
+   exact tag push completed successfully. It waits up to 15 minutes for that
+   run, then requires every required check on the tagged commit to be present
+   and successful. Missing, queued, in-progress, failed, or cancelled CI blocks
+   release builds and publication. `publish` waits for both this validation and
+   all release matrix builds. Never tag an unreviewed commit.
+   If the tag-push CI needs longer than the wait window, re-run only the failed
+   `cd` jobs once it finishes; the staged artifacts are reused:
+
+   ```sh
+   gh run rerun <cd-run-id> --failed
+   ```
 
 ## Build and publish
 
-The `cd` workflow first refuses malformed or lightweight tags, mismatched
-versions, missing CHANGELOG entries, incomplete release notes, commits outside
-`main`, and commits whose latest required checks are missing, pending or failed.
-It builds five targets with `cargo build --locked --release` only after those
-checks pass. The exact required check names live in `scripts/release_ci.py`; CI
-workflow job-name changes must update that list and its tests:
+The `cd` workflow first refuses malformed or lightweight tags, tags outside
+`main`, tags whose exact-SHA tag-push CI is missing or unsuccessful, mismatched
+versions, missing CHANGELOG entries and incomplete release notes. It also
+requires every required check on the tagged commit to be successful, then builds
+five targets with `cargo build --locked --release` only after those gates pass.
+The exact required check names live in `scripts/release_ci.py`; CI workflow
+job-name changes must update that list and its tests:
 
 | Platform | Archive |
 | --- | --- |

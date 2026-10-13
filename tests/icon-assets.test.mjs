@@ -68,7 +68,12 @@ for (const command of ["serve", "setup"]) {
       const deadline = Date.now() + 15000;
       for (;;) {
         try {
-          return await fetch(url, init);
+          const response = await fetch(url, init);
+          // A loaded CI runner can stall the single-threaded fixture
+          // server past its 10s read deadline (408). Retry those like
+          // refused connections; any other status is the answer under test.
+          if (response.status !== 408 || Date.now() >= deadline)
+            return response;
         } catch (error) {
           if (Date.now() >= deadline) {
             throw new Error(
@@ -102,14 +107,18 @@ for (const command of ["serve", "setup"]) {
         Number(response.headers.get("content-length")),
         bytes.length,
       );
-      assert.equal(
-        (
-          await get(base + route, {
-            headers: { origin: "https://evil.example" },
-          })
-        ).status,
-        403,
-      );
+      // A loaded runner can make the server answer 408 for its own read
+      // timeout; that is not the security decision, so retry it briefly and
+      // still require the cross-origin refusal.
+      let crossOrigin = { status: 0 };
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        crossOrigin = await get(base + route, {
+          headers: { origin: "https://evil.example" },
+        });
+        if (crossOrigin.status !== 408) break;
+        await delay(250);
+      }
+      assert.equal(crossOrigin.status, 403);
     }
     const api = command === "setup" ? "/api/status" : "/api/doctor";
     assert.equal((await get(base + api)).status, 401);

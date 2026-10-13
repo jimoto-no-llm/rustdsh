@@ -119,6 +119,8 @@ register_cases() {
     "CASE OK: fallback-unrunnable-glibc" "" 1 ""
   add_case "release/pinned-version" "ubuntu-24.04" "pinned-version.sh" ok \
     "CASE OK: pinned-version" "" 0 "RDSH_RELEASE_VERSION=__TAG__"
+  add_case "release/download-cleanup" "ubuntu-24.04" "download-cleanup.sh" ok \
+    "CASE OK: download-cleanup" "" 0 ""
   # Fail-closed guards.
   add_case "guard/checksum-mismatch" "ubuntu-24.04" "checksum-mismatch.sh" ok \
     "CASE OK: checksum-mismatch" "" 0 ""
@@ -166,6 +168,12 @@ prepare_workdir() {
   STAGE_DIR="$WORK_DIR/base"
   LOG_DIR="$WORK_DIR/logs"
   mkdir -p "$STAGE_DIR" "$LOG_DIR"
+  # The non-root scenario runs as uid 1000 inside the container, which cannot
+  # traverse a private repository directory (0700 on some hosts), so the cases
+  # are staged into a world-traversable copy.
+  chmod 755 "$WORK_DIR"
+  cp -R "$TESTS_DIR/cases" "$WORK_DIR/cases"
+  chmod -R a+rX "$WORK_DIR/cases"
   trap cleanup EXIT
 }
 
@@ -294,6 +302,9 @@ stage_assets() {
   if musl_asset_available "$dir"; then MUSL_AVAILABLE=1; fi
   stage_layout "$dir"
   stage_installer
+  # The non-root scenario reads the mounts as uid 1000; a 077 umask on the
+  # host would otherwise leave the staged tree unreadable.
+  chmod -R a+rX "$STAGE_DIR"
   if [ "$MUSL_AVAILABLE" = 0 ]; then
     if [ "$REQUIRE_MUSL" = 1 ]; then
       die "--require-musl is set but no static musl asset is available"
@@ -380,7 +391,7 @@ run_case() {
 
   local -a args=(run --rm --network=none --security-opt label=disable
     -v "$STAGE_DIR/install.sh:/install.sh:ro"
-    -v "$TESTS_DIR/cases:/cases:ro"
+    -v "$WORK_DIR/cases:/cases:ro"
     -v "$STAGE_DIR:/base:ro"
     -e HOME=/root
     -e "PREFIX=$PREFIX"

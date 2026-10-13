@@ -56,6 +56,16 @@ pub fn extra_enabled(cfg: &RdshSettings, id: &str) -> bool {
     KNOWN_EXTRAS.contains(&id) && cfg.extras.enable.iter().any(|e| e == id)
 }
 
+/// Extra ids that are actually enabled, honoring an explicit `features.<id>`.
+/// The setup UI reads this so its switches show the effective state.
+pub fn enabled_extras(cfg: &RdshSettings) -> Vec<String> {
+    KNOWN_EXTRAS
+        .iter()
+        .filter(|id| feature_enabled(cfg, id))
+        .map(|id| (*id).to_string())
+        .collect()
+}
+
 /// One switchable capability. `default` reproduces the behavior that existed
 /// before the switch was introduced, so an older rdsh.json keeps working and
 /// an id that is absent from the file never changes anything.
@@ -1317,7 +1327,8 @@ mod rdsh_config_tests {
     /// DSH_HOME を一時 dir に向けて f を実行する（復元・後片付けつき）。
     fn with_home(tag: &str, f: impl FnOnce(&str)) {
         let _guard = lock();
-        let dir = std::env::temp_dir().join(format!("rdsh-settings-{}-{tag}", std::process::id()));
+        let pid = std::process::id();
+        let dir = std::env::temp_dir().join(format!("rdsh-settings-{pid}-{tag}"));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let prev = std::env::var("DSH_HOME").ok();

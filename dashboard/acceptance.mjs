@@ -156,18 +156,22 @@ function database(value, project) {
   return value;
 }
 function target(value) {
+  const legacyKeys = [
+    "observed_at",
+    "head_sha",
+    "branch",
+    "inputs_hash",
+    "worktree_hash",
+    "environment",
+    "environment_hash",
+    "status",
+    "reason",
+  ];
   check(
-    exact(value, [
-      "observed_at",
-      "head_sha",
-      "branch",
-      "inputs_hash",
-      "worktree_hash",
-      "environment",
-      "environment_hash",
-      "status",
-      "reason",
-    ]) &&
+    (exact(value, legacyKeys) ||
+      exact(value, [...legacyKeys, "worktree_complete"])) &&
+      (value.worktree_complete === undefined ||
+        typeof value.worktree_complete === "boolean") &&
       time(value.observed_at) &&
       (value.head_sha === null || /^[0-9a-f]{40,64}$/.test(value.head_sha)) &&
       (value.branch === null || text(value.branch, 256)) &&
@@ -297,6 +301,8 @@ async function savedArtifact(directory, name, bytes, mime, source) {
 const stable = (before, after) =>
   before.status === "observed" &&
   after.status === "observed" &&
+  (before.worktree_complete !== false) ===
+    (after.worktree_complete !== false) &&
   [
     "head_sha",
     "branch",
@@ -350,27 +356,54 @@ export class AcceptanceStore {
           : "acceptance_lock_unavailable",
       );
     }
+    let output,
+      failure = null,
+      committed = false;
+    const committedEventIds = [];
     try {
       await handle.writeFile(owner);
       await handle.sync();
       const next = await this.read(),
+        priorEvidence = next.evidence.length,
         result = await operation(next);
       next.revision++;
       database(next, this.project);
+      // Replacing the index file is the commit point of this mutation.
       await writeJson(this.index, next);
-      return result;
-    } finally {
-      await handle.close();
-      try {
-        check(
-          (await fs.readFile(file, "utf8")) === owner,
-          "acceptance_lock_changed",
-        );
-        await fs.unlink(file);
-      } catch {
-        throw new AcceptanceError("acceptance_lock_cleanup_unconfirmed");
-      }
+      committed = true;
+      for (const reference of next.evidence.slice(priorEvidence))
+        committedEventIds.push(reference.evidence_id);
+      output = result;
+    } catch (error) {
+      failure = error;
     }
+    // A cleanup failure must never replace the outcome the caller earned.
+    let lockCleanupUnconfirmed = false;
+    try {
+      await handle.close();
+      check(
+        (await fs.readFile(file, "utf8")) === owner,
+        "acceptance_lock_changed",
+      );
+      await fs.unlink(file);
+    } catch {
+      lockCleanupUnconfirmed = true;
+    }
+    if (failure !== null) {
+      if (lockCleanupUnconfirmed) {
+        failure.committed = committed;
+        failure.event_ids = committed ? [...committedEventIds] : [];
+        failure.lock_cleanup_unconfirmed = true;
+      }
+      throw failure;
+    }
+    if (lockCleanupUnconfirmed)
+      throw new AcceptanceError("acceptance_lock_cleanup_unconfirmed", {
+        committed,
+        event_ids: committed ? committedEventIds : [],
+        lock_cleanup_unconfirmed: true,
+      });
+    return output;
   }
   async taskStatus(taskId) {
     const store = await ProjectStore.open(this.project);
@@ -644,17 +677,27 @@ export class AcceptanceStore {
         ),
       );
     }
-    record.stable_target = stable(
-      observed,
-      await observeTarget(this.project, criterion.inputs),
-    );
+    const finalTarget = await observeTarget(this.project, criterion.inputs),
+      stableObservation = stable(observed, finalTarget),
+      completeScope =
+        observed.worktree_complete !== false &&
+        finalTarget.worktree_complete !== false;
+    record.stable_target = stableObservation && completeScope;
     if (
-      !record.stable_target &&
+      !stableObservation &&
       record.source === "local_runner" &&
       record.status === "pass"
     ) {
       record.status = "blocked";
       record.reason = "target_changed_or_unobservable_during_test";
+    } else if (
+      !completeScope &&
+      record.source === "local_runner" &&
+      record.status === "pass"
+    ) {
+      // The command ran, but its result cannot be certified current while an
+      // unobserved dotenv-like worktree file may influence the outcome.
+      record.reason = "impact_scope_unknown";
     }
     record.phase = "finished";
     record.finished_at = new Date().toISOString();

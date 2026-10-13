@@ -1,5 +1,9 @@
 #!/bin/sh
 # rdsh CLI regression. Fails on first mismatch (set -e + explicit checks).
+if [ "${1:-}" = "--windows-installer-delegation" ]; then
+  shift
+  exec bash "$(dirname "$0")/regress-windows.sh" "$@"
+fi
 BIN="${BIN:-./target/release/rdsh}"
 pass=0
 ok() { pass=$((pass+1)); echo "ok: $1"; }
@@ -42,7 +46,12 @@ printf "ls /tmp" | $BIN guard --deny "zzz-no-match" > /dev/null
 if [ $? -eq 0 ]; then ok "guard allow"; else echo "FAIL: guard allow"; exit 1; fi
 printf "run this" | $BIN guard --deny "run*" > /dev/null 2>&1
 if [ $? -eq 2 ]; then ok "guard block"; else echo "FAIL: guard block"; exit 1; fi
-need_exit 2 "reject desktop" $BIN desktop
+need_exit 2 "reject desktop profile" $BIN --profile desktop
+need_ok "desktop status" $BIN desktop status
+need_grep "desktop profile" "desktop status reports the profile" $BIN desktop
+need_grep "\"schema\": 1" "desktop status json" $BIN desktop status --json
+need_exit 1 "desktop install refuses an uninitialized profile" $BIN desktop install --dry-run --plugins-dir .
+need_exit 1 "desktop verify fails without a profile" $BIN desktop verify
 need_exit 2 "reject double profile" $BIN --profile a --profile b
 need_exit 2 "reject dump with args" $BIN --profile tui --dump-config --foo
 need_exit 2 "reject plugin w/o args" $BIN plugin --profile tui
