@@ -5,8 +5,14 @@ import https from 'node:https';
 import { parseArgs } from 'node:util';
 import { fileURLToPath } from 'node:url';
 
+const DEFAULT_REQUEST_BODY_GRACE_MS = 300_000;
+const DEFAULT_REQUEST_HEADERS_TIMEOUT_MS = 60_000;
 const HOP_BY_HOP = new Set(['host', 'connection', 'keep-alive', 'transfer-encoding', 'upgrade', 'te', 'trailer', 'proxy-authorization', 'proxy-authenticate', 'proxy-connection']);
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
+
+export function pipeUpstreamResponse(upRes, res) {
+  upRes.pipe(res);
+}
 
 /** Map a client request path (with query) onto the upstream base path. */
 export function mapPath(base, urlPath) {
@@ -48,12 +54,16 @@ function jsonError(res, status, message) {
   res.end(body);
 }
 
-export function createProxy({ upstream, max = 1, queueTimeout = 600, maxQueue = 64, log = () => {} }) {
+export function createProxy({ upstream, max = 1, queueTimeout = 600, maxQueue = 64, log = () => {}, requestBodyGraceMs = DEFAULT_REQUEST_BODY_GRACE_MS, requestHeadersTimeoutMs = DEFAULT_REQUEST_HEADERS_TIMEOUT_MS }) {
   const up = new URL(upstream);
   const lib = up.protocol === 'https:' ? https : http;
   const sem = new Semaphore(max);
+  if (!Number.isFinite(queueTimeout) || queueTimeout <= 0) throw new TypeError('queueTimeout must be a positive number');
+  if (!Number.isSafeInteger(requestBodyGraceMs) || requestBodyGraceMs < 0) throw new TypeError('requestBodyGraceMs must be a non-negative integer');
+  if (!Number.isSafeInteger(requestHeadersTimeoutMs) || requestHeadersTimeoutMs <= 0) throw new TypeError('requestHeadersTimeoutMs must be a positive integer');
+  const requestTimeout = requestHeadersTimeoutMs + Math.ceil(queueTimeout * 1000) + requestBodyGraceMs;
 
-  const server = http.createServer((req, res) => {
+  const server = http.createServer({ headersTimeout: requestHeadersTimeoutMs, requestTimeout }, (req, res) => {
     const t0 = Date.now();
     const path = req.url.split('?')[0];
     if (req.method === 'GET' && path === '/__proxy/status') {
@@ -97,7 +107,7 @@ export function createProxy({ upstream, max = 1, queueTimeout = 600, maxQueue = 
       for (const [k, v] of Object.entries(req.headers)) if (!HOP_BY_HOP.has(k)) headers[k] = v;
       headers.host = up.host;
       upReq = lib.request({
-        protocol: up.protocol, hostname: up.hostname, port: up.port || undefined,
+        protocol: up.protocol, hostname: up.hostname.startsWith('[') && up.hostname.endsWith(']') ? up.hostname.slice(1, -1) : up.hostname, port: up.port || undefined,
         method: req.method, path: mapPath(up.pathname, req.url), headers,
       }, (upRes) => {
         status = upRes.statusCode;
@@ -105,10 +115,10 @@ export function createProxy({ upstream, max = 1, queueTimeout = 600, maxQueue = 
         for (const [k, v] of Object.entries(upRes.headers)) if (!HOP_BY_HOP.has(k)) rh[k] = v;
         res.writeHead(upRes.statusCode, upRes.statusMessage, rh);
         res.flushHeaders();
-        upRes.on('data', (c) => { res.write(c); });
-        upRes.on('end', () => { res.end(); cleanup(); done(); });
+        upRes.on('end', () => { cleanup(); done(); });
         upRes.on('error', () => { res.destroy(); cleanup(); done(502); });
         upRes.on('aborted', () => { res.destroy(); cleanup(); done(502); });
+        pipeUpstreamResponse(upRes, res);
       });
       upReq.on('error', (e) => {
         if (aborted) return;
