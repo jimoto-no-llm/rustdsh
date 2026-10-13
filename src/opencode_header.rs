@@ -127,17 +127,28 @@ fn file_url(path: &Path) -> String {
 #[cfg(not(unix))]
 fn file_url(path: &Path) -> String {
     let text = path.to_string_lossy().replace('\\', "/");
-    let text = text.strip_prefix("//?/").unwrap_or(text.as_str());
-    file_url_from_path_bytes(text.as_bytes())
+    // `\\?\UNC\server\share` is an extended UNC path: strip the verbatim prefix
+    // but keep the authority. Plain `\\?\C:\...` just drops the prefix.
+    let normalized = if let Some(rest) = text.strip_prefix("//?/UNC/") {
+        format!("//{rest}")
+    } else if let Some(rest) = text.strip_prefix("//?/") {
+        rest.to_string()
+    } else {
+        text.clone()
+    };
+    file_url_from_path_bytes(normalized.as_bytes())
 }
 
 /// Encode `/`-separated path bytes as a `file:` URL, percent-encoding every byte
-/// that a URL would otherwise interpret. `:` is kept so `C:/...` survives.
+/// that a URL would otherwise interpret. `:` is kept so `C:/...` survives, and a
+/// leading `//` is treated as a UNC authority (`//server/share` -> `file://server/share`)
+/// rather than a fourth slash.
 fn file_url_from_path_bytes(bytes: &[u8]) -> String {
     let mut url = String::with_capacity(bytes.len() + 8);
-    url.push_str("file://");
-    if bytes.first() != Some(&b'/') {
-        url.push('/');
+    match bytes {
+        [b'/', b'/', ..] => url.push_str("file:"),
+        [b'/', ..] => url.push_str("file://"),
+        _ => url.push_str("file:///"),
     }
     for &byte in bytes {
         match byte {
@@ -275,6 +286,29 @@ mod tests {
         assert_eq!(
             file_url_from_path_bytes(b"/tmp/100%/p.mjs"),
             "file:///tmp/100%25/p.mjs"
+        );
+    }
+
+    #[test]
+    fn file_urls_keep_unc_authorities_readable() {
+        // `\\server\share` becomes `//server/share`; it must not gain a fourth
+        // slash, which the Windows file-URL parser rejects.
+        assert_eq!(
+            file_url_from_path_bytes(b"//server/share/Temp/p.mjs"),
+            "file://server/share/Temp/p.mjs"
+        );
+    }
+
+    #[cfg(not(unix))]
+    #[test]
+    fn extended_unc_paths_map_to_a_plain_file_url() {
+        assert_eq!(
+            file_url(Path::new(r"\\?\UNC\server\share\Temp\p.mjs")),
+            "file://server/share/Temp/p.mjs"
+        );
+        assert_eq!(
+            file_url(Path::new(r"\\server\share\Temp\p.mjs")),
+            "file://server/share/Temp/p.mjs"
         );
     }
 }
