@@ -436,22 +436,6 @@ pub fn resolve_plugins_dir(explicit: Option<&str>, env: &OsEnv) -> Result<PathBu
     )
 }
 
-fn is_executable(path: &Path) -> bool {
-    let Ok(metadata) = std::fs::metadata(path) else {
-        return false;
-    };
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        metadata.permissions().mode() & 0o111 != 0
-    }
-    #[cfg(not(unix))]
-    {
-        let _ = metadata;
-        true
-    }
-}
-
 /// Build the invocation for the Desktop command runtime. Windows `.cmd`
 /// launchers go through `cmd /C`; a non-executable shell script goes through
 /// `sh`, so a checkout-permission surprise cannot hide the real error.
@@ -537,7 +521,7 @@ fn windows_command(cli: &Path, args: &[String]) -> Command {
 
 /// Build the full invocation for the Desktop command runtime.
 fn command_for(cli: &Path, args: &[String]) -> Command {
-    match invocation_for(cli, cfg!(windows), is_executable(cli)) {
+    match invocation_for(cli, cfg!(windows), crate::executable::is_executable(cli)) {
         Invocation::ViaCmd => windows_command(cli, args),
         Invocation::ViaSh => {
             let mut command = Command::new("sh");
@@ -989,6 +973,21 @@ pub fn cmd_verify(require: &[String], json_out: bool) -> Result<()> {
 mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[cfg(unix)]
+    #[test]
+    fn another_permission_class_uses_the_shell_launcher() {
+        use std::os::unix::fs::PermissionsExt;
+        if unsafe { libc::geteuid() } == 0 {
+            return;
+        }
+        let root = temp_root("effective-access");
+        let cli = root.join("dsh");
+        std::fs::write(&cli, b"#!/bin/sh\nexit 0\n").unwrap();
+        std::fs::set_permissions(&cli, std::fs::Permissions::from_mode(0o601)).unwrap();
+        assert_eq!(command_for(&cli, &[]).get_program(), "sh");
+        std::fs::remove_dir_all(root).unwrap();
+    }
 
     fn temp_root(tag: &str) -> PathBuf {
         let nonce = SystemTime::now()

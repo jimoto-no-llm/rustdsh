@@ -58,24 +58,7 @@ fn executable_on_path(name: &str, path: Option<&OsStr>) -> bool {
     let Some(path) = path else {
         return false;
     };
-    std::env::split_paths(path).any(|dir| {
-        let candidate = dir.join(name);
-        let Ok(metadata) = std::fs::metadata(&candidate) else {
-            return false;
-        };
-        if !metadata.is_file() {
-            return false;
-        }
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            metadata.permissions().mode() & 0o111 != 0
-        }
-        #[cfg(not(unix))]
-        {
-            true
-        }
-    })
+    std::env::split_paths(path).any(|dir| crate::executable::is_executable(&dir.join(name)))
 }
 
 /// Optional tools this host is missing, as (package, feature) pairs.
@@ -172,5 +155,27 @@ mod tests {
         );
         assert_eq!(missing_optional(None).len(), 2);
         std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn another_permission_class_cannot_hide_a_missing_tool() {
+        use std::os::unix::fs::PermissionsExt;
+        if unsafe { libc::geteuid() } == 0 {
+            return;
+        }
+        let root = temp_root("effective-access");
+        let zstd = root.join("zstd");
+        std::fs::write(&zstd, b"#!/bin/sh\n").unwrap();
+        std::fs::set_permissions(&zstd, std::fs::Permissions::from_mode(0o601)).unwrap();
+        let path = std::env::join_paths([root.as_os_str()]).unwrap();
+        assert_eq!(
+            missing_optional(Some(&path)),
+            vec![
+                ("zstd", "rdsh sessions --tokens"),
+                ("bubblewrap", "--share-file sandbox"),
+            ]
+        );
+        std::fs::remove_dir_all(root).unwrap();
     }
 }

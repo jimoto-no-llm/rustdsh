@@ -26,6 +26,9 @@ use std::time::Instant;
 
 pub const PROTOCOL_VERSION: u32 = 1;
 pub const MAX_TEXT_BYTES: usize = 1_048_576;
+// JSON can encode one text byte as six bytes (e.g. \u0000). Leave bounded
+// space for batch separators, identifiers and protocol fields as well.
+pub const MAX_FRAME_BYTES: usize = 6 * MAX_TEXT_BYTES + 65_536;
 pub const MAX_ID_LEN: usize = 128;
 pub const MAX_TOKENS: usize = 200_000;
 pub const MIN_TOKENS: usize = 1;
@@ -34,20 +37,37 @@ pub const MAX_BATCH_ITEM_BYTES: usize = 262_144;
 
 /// Single-shot helper used by tests: parse one request line, run it.
 pub fn handle_line(line: &str) -> String {
+    if line.len() > MAX_FRAME_BYTES {
+        return error_response("", "too_large", "request frame exceeds the byte limit");
+    }
     let started = Instant::now();
     match run_request(line) {
         Ok(mut v) => {
             v["elapsed_us"] = serde_json::json!(started.elapsed().as_micros() as u64);
             v.to_string()
         }
-        Err((id, code, error)) => serde_json::json!({
-            "v": PROTOCOL_VERSION,
-            "id": id,
-            "ok": false,
-            "code": code,
-            "error": error,
-        })
-        .to_string(),
+        Err((id, code, error)) => error_response(&id, code, &error),
+    }
+}
+
+fn error_response(id: &str, code: &str, error: &str) -> String {
+    serde_json::json!({"v": PROTOCOL_VERSION, "id": id, "ok": false,
+        "code": code, "error": error})
+    .to_string()
+}
+
+fn discard_line(input: &mut impl BufRead) -> std::io::Result<()> {
+    loop {
+        let available = input.fill_buf()?;
+        if available.is_empty() {
+            return Ok(());
+        }
+        let end = available.iter().position(|byte| *byte == b'\n');
+        let consumed = end.map_or(available.len(), |index| index + 1);
+        input.consume(consumed);
+        if end.is_some() {
+            return Ok(());
+        }
     }
 }
 
@@ -182,9 +202,25 @@ fn run_lines<R: BufRead, W: Write>(mut input: R, output: &mut W, once: bool) -> 
     let mut buf: Vec<u8> = Vec::with_capacity(64 * 1024);
     loop {
         buf.clear();
-        let n = input.read_until(b'\n', &mut buf)?;
+        let n = std::io::Read::take(&mut input, (MAX_FRAME_BYTES + 1) as u64)
+            .read_until(b'\n', &mut buf)?;
         if n == 0 {
             break; // EOF
+        }
+        if n > MAX_FRAME_BYTES {
+            if buf.last() != Some(&b'\n') {
+                discard_line(&mut input)?;
+            }
+            writeln!(
+                output,
+                "{}",
+                error_response("", "too_large", "request frame exceeds the byte limit")
+            )?;
+            output.flush()?;
+            if once {
+                break;
+            }
+            continue;
         }
         // Strip one trailing newline / CR for tolerance on Windows pipes.
         if buf.last() == Some(&b'\n') {
@@ -201,11 +237,7 @@ fn run_lines<R: BufRead, W: Write>(mut input: R, output: &mut W, once: bool) -> 
         }
         let resp = match std::str::from_utf8(&buf) {
             Ok(s) => handle_line(s),
-            Err(_) => serde_json::json!({
-                "v": PROTOCOL_VERSION, "id": "",
-                "ok": false, "code": "bad_utf8", "error": "request is not valid UTF-8",
-            })
-            .to_string(),
+            Err(_) => error_response("", "bad_utf8", "request is not valid UTF-8"),
         };
         writeln!(output, "{resp}")?;
         output.flush()?;
@@ -219,6 +251,38 @@ fn run_lines<R: BufRead, W: Write>(mut input: R, output: &mut W, once: bool) -> 
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn maximally_escaped_text_still_fits_the_frame_limit() {
+        let text = "\0".repeat(super::MAX_TEXT_BYTES);
+        let line =
+            serde_json::json!({"v": 1, "id": "escaped", "op": "tokens.estimate", "text": text})
+                .to_string();
+        let response: serde_json::Value = serde_json::from_str(&super::handle_line(&line)).unwrap();
+        assert_eq!(response["ok"], true);
+        assert_eq!(response["chars"], super::MAX_TEXT_BYTES);
+    }
+    #[test]
+    fn oversized_frames_are_rejected_and_the_next_request_survives() {
+        let large = "x".repeat(7 * super::MAX_TEXT_BYTES);
+        let first = serde_json::json!({"v": 1, "id": "oversized", "op": "tokens.estimate",
+            "text": "small", "padding": large})
+        .to_string();
+        let input = format!(
+            "{first}\n{{\"v\":1,\"id\":\"after\",\"op\":\"tokens.estimate\",\"text\":\"ok\"}}\n"
+        );
+        let mut output = Vec::new();
+        super::run_lines(std::io::Cursor::new(input), &mut output, false).unwrap();
+        let responses: Vec<serde_json::Value> = std::str::from_utf8(&output)
+            .unwrap()
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        assert_eq!(responses.len(), 2);
+        assert_eq!(responses[0]["ok"], false);
+        assert_eq!(responses[0]["code"], "too_large");
+        assert_eq!(responses[1]["id"], "after");
+        assert_eq!(responses[1]["ok"], true);
+    }
     use super::*;
 
     fn req(id: &str, op: &str, text: &str, max: Option<usize>) -> String {

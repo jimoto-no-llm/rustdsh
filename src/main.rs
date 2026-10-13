@@ -6,6 +6,7 @@ mod context;
 mod desktop;
 mod distro;
 mod dsh_args;
+mod executable;
 mod file_lock;
 mod file_security;
 mod guard;

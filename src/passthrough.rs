@@ -1,5 +1,7 @@
-/// Env overrides for drop-in `dsh` mode (see install.sh --as-dsh).
-/// RDSH_PASSTHROUGH=1 disables slim env; RDSH_DRY_RUN=1 only prints the exec.
+//! Env overrides for drop-in `dsh` mode (see install.sh --as-dsh).
+//! RDSH_PASSTHROUGH=1 disables slim env; RDSH_DRY_RUN=1 only prints the exec.
+use crate::executable::is_executable as is_executable_candidate;
+
 pub fn env_passthrough() -> bool {
     std::env::var("RDSH_PASSTHROUGH").is_ok_and(|v| v == "1")
 }
@@ -18,39 +20,6 @@ fn origin_file() -> Option<String> {
         None
     } else {
         Some(s)
-    }
-}
-
-/// Check a PATH candidate without spawning it. On Unix, query whether the
-/// current effective user can execute this regular file; mode bits alone can
-/// accept a file whose only execute bit belongs to another permission class.
-fn is_executable_candidate(path: &std::path::Path) -> bool {
-    let Ok(metadata) = std::fs::metadata(path) else {
-        return false;
-    };
-    if !metadata.is_file() {
-        return false;
-    }
-    #[cfg(unix)]
-    {
-        use std::ffi::CString;
-        use std::os::unix::ffi::OsStrExt;
-        let Ok(c_path) = CString::new(path.as_os_str().as_bytes()) else {
-            return false;
-        };
-        // SAFETY: c_path is NUL-terminated and AT_FDCWD makes this a read-only query.
-        unsafe {
-            libc::faccessat(
-                libc::AT_FDCWD,
-                c_path.as_ptr(),
-                libc::X_OK,
-                libc::AT_EACCESS,
-            ) == 0
-        }
-    }
-    #[cfg(not(unix))]
-    {
-        true
     }
 }
 
