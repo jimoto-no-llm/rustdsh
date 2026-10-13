@@ -23,6 +23,24 @@ DRY_RUN=1 ./plugins/install.sh         # print the pnpm commands only
 PROFILE=web SOUND=1 ./plugins/install.sh  # also add Web sound/desktop notifications (below)
 ```
 
+### Desktop app (Electron) profile
+
+The Desktop application owns the reserved `desktop` profile and its own
+bundled command runtime, and the npm `dsh` CLI refuses to manage it. Use the
+profile installer, which forwards every package to the app's own command:
+
+```sh
+PROFILE=desktop ./plugins/install.sh              # recommended + bundled plugins
+PROFILE=desktop COMPUTE=1 ./plugins/install.sh    # plus the compute bridge
+```
+
+It runs `rdsh desktop install --no-bundled --package <spec>`, which invokes
+`resources/runtime/cli/bin/dsh plugin --profile desktop add ...`. Quit the app
+before attaching and reopen it afterwards; the app's own **Plugins** page can
+install the same packages without a command runtime. The installers do the same
+inline with `./install.sh --desktop` or `.\install.ps1 -Desktop`. See
+[docs/DESKTOP-INTEGRATION.md](../docs/DESKTOP-INTEGRATION.md).
+
 ## Optional Web UI plugins (third-party, opt-in)
 
 Installed only when `SOUND=1` is set. Kept out of the default set so the
