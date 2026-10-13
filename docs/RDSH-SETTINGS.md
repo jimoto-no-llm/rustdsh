@@ -71,6 +71,7 @@ rdsh context status   # 有効化後に記憶の状態を見る
 | serve | off | ローカル閲覧画面（rdsh serve） |
 | search-web | off | SearXNG 経由の Web 検索 |
 | context_engine | off | 実験的なコンテキストエンジン |
+| models_auto | on | プロバイダのモデル一覧を背景で更新（`rdsh models auto`／[詳細](MODEL-AUTO-SYNC.md)） |
 | compute | off | 常駐 pure-compute worker 連携（RDSH_COMPUTE=1） |
 | budget_guard | on | 予算ガードフック |
 | agent_tool_sandbox | off | 委譲したエージェントツールを --share-file の範囲に限定（ネットワーク・ホスト書き込みなし） |
@@ -86,6 +87,7 @@ rdsh context status   # 有効化後に記憶の状態を見る
 
 ## 機能スイッチの効き方
 
+- `models_auto` は起動時に一度だけ確認し、前回から24時間以上経っていれば背後で `rdsh models sync` を走らせます（起動は待ちません）。
 - ネイティブ側（`serve` / `search-web` / `context_engine` / `setup_web`）は、無効なコマンドを実行すると理由と有効化方法を表示して終了します。
 - slim のヒント（`slim_lazy_plugins` / `slim_disable_voice` / `slim_disable_auto_review`）と `node_compile_cache` は、委譲して起動する DSH プロセスの環境変数に反映されます。
 - プラグイン側（`discord` / `sound` / `compute` / `budget_guard` / `release_probe` / `update_check` / `update_notifications`）は `rdsh.json` を読み込んで動作を停止します。DSH を再起動すると反映されます。
