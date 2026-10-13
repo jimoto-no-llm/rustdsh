@@ -248,22 +248,24 @@ Details: [docs/PROVIDERS.md](docs/PROVIDERS.md).
 
 DeepSeek Harness answers "which models can this provider serve?" from the
 catalog bundled in its `@earendil-works/pi-ai` dependency, which is generated
-when that package is published. A model released afterwards is absent from the
-picker until the harness dependency is upgraded, and a profile that lists
-`models:` explicitly replaces the bundled catalog for that route. `rdsh models`
-compares the profile with the catalog the local Codex CLI already maintains and
-appends only what is missing:
+when that package is published. Anything a provider changes afterwards is
+absent from the picker until that dependency is upgraded — and a profile that
+lists `models:` explicitly replaces the bundled catalog for the route anyway.
+`rdsh models` reads the provider's own catalog (the local Codex CLI, or Kimi
+Code's `/v1/models` endpoint with the profile's API key) and folds it into the
+profile:
 
 ```sh
-rdsh models                              # read-only: what each profile is missing
-rdsh models sync                         # append the missing entries
+rdsh models                              # read-only: missing ids and stale names
+rdsh models --provider kimi-coding       # one provider only
+rdsh models sync                         # add missing entries, refresh stale names
 rdsh models sync --profile web --dry-run # preview one profile
 ```
 
-The sync only adds: an existing entry, its comments, and every other byte of the
-profile are left alone, and a profile it does not recognize is refused instead
-of rewritten. The harness picks the new entries up on the next config reload or
-restart.
+Nothing is deleted, an existing entry keeps every other byte (a name the
+provider's current one already contains is left as written), and a profile the
+command does not recognize is refused instead of rewritten. The harness picks
+the changes up on the next config reload or restart.
 
 ### Agent Tool Isolation
 
