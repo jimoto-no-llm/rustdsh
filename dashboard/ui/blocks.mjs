@@ -44,11 +44,19 @@ function missing(node, text) {
 function textOf(value) {
   return value === null || value === undefined || value === "" ? "未取得" : String(value);
 }
+function fieldsFor(node, blockId) {
+  if (!node._fields || typeof node._fields !== "object")
+    node._fields = Object.create(null);
+  if (!Object.hasOwn(node._fields, blockId))
+    node._fields[blockId] = Object.create(null);
+  return node._fields[blockId];
+}
 function submitValue(block, node) {
   if (block.kind === "form") {
     const values = {};
+    const fields = node._fields && node._fields[block.id];
     for (const field of block.data.fields) {
-      const typed = node._fields ? node._fields[field.id] : undefined;
+      const typed = fields ? fields[field.id] : undefined;
       values[field.id] = typeof typed === "string" ? typed.slice(0, 4000) : "";
     }
     return values;
@@ -79,7 +87,13 @@ function actionRow(node, block, emit) {
         const value = submitValue(block, node);
         if (block.kind !== "choice" && block.kind !== "form") emit(action, block, null);
         else if (value) emit(action, block, value);
-        else note.textContent = "選択または入力の内容が未取得のため送信しません。";
+        else {
+          if (!note) {
+            note = node("p", undefined, "detail");
+            row.append(note);
+          }
+          note.textContent = "選択または入力の内容が未取得のため送信しません。";
+        }
       });
       row.append(pressed);
     } else {
@@ -147,7 +161,8 @@ function renderContainer(container, node, block, emit) {
 }
 function renderChoice(container, node, block, emit) {
   container.append(node("p", block.data.prompt, "ui-prompt"));
-  if (!node._choices) node._choices = {};
+  if (!node._choices || typeof node._choices !== "object")
+    node._choices = Object.create(null);
   for (const choice of block.data.choices) {
     const label = node("label", undefined, "ui-choice");
     const input = node("input");
@@ -163,7 +178,7 @@ function renderChoice(container, node, block, emit) {
     container.append(node("p", "未配線のため選択は送信されません。", "detail"));
 }
 function renderForm(container, node, block) {
-  if (!node._fields) node._fields = {};
+  const fields = fieldsFor(node, block.id);
   const form = node("form", undefined, "ui-form");
   for (const field of block.data.fields) {
     const label = node("label", field.label);
@@ -171,10 +186,11 @@ function renderForm(container, node, block) {
     const input = type === "textarea" ? node("textarea") : node("input");
     if (type !== "textarea") input.setAttribute("type", type === "number" ? "number" : "text");
     input.setAttribute("name", field.id);
+    if (typeof fields[field.id] !== "string") fields[field.id] = "";
+    input.value = fields[field.id];
     input.addEventListener("input", (event) => {
-      node._fields[field.id] = event && event.target ? event.target.value : input.value;
+      fields[field.id] = event && event.target ? event.target.value : input.value;
     });
-    node._fields[field.id] = "";
     label.append(input);
     form.append(label);
   }
@@ -417,10 +433,21 @@ export function renderEnvelope(container, envelope, node, emit) {
 }
 export function renderSurface(container, surface, node, emit) {
   if (!surface || !Array.isArray(surface.blocks) || surface.blocks.length === 0) {
+    if (node._surfaceDraftKey !== null) {
+      node._surfaceDraftKey = null;
+      node._fields = Object.create(null);
+      node._choices = Object.create(null);
+    }
     container.replaceChildren(
       node("p", "エージェントから提示されたUIはありません。提示されると、ここに操作できる画面が出ます。", "ui-empty"),
     );
     return [];
+  }
+  const draftKey = JSON.stringify([surface.surface_id || null, surface.revision ?? null]);
+  if (node._surfaceDraftKey !== draftKey) {
+    node._surfaceDraftKey = draftKey;
+    node._fields = Object.create(null);
+    node._choices = Object.create(null);
   }
   const surfaceRoot = node("div", undefined, "ui-surface");
   container.replaceChildren(surfaceRoot);

@@ -11,6 +11,8 @@ function makeNode() {
       tag,
       textContent: text === undefined ? "" : text,
       className: className === undefined ? "" : className,
+      value: "",
+      checked: false,
       attrs,
       children,
       handlers,
@@ -21,6 +23,7 @@ function makeNode() {
       dispatch(type, event) { for (const fn of handlers[type] || []) fn(event || { target: node }); },
       append(...nodes) { children.push(...nodes); return node; },
       appendChild(child) { children.push(child); return child; },
+      replaceChildren(...nodes) { children.length = 0; children.push(...nodes); },
     };
     return node;
   };
@@ -135,6 +138,51 @@ test("form returns typed values and refuses an empty submit", () => {
   const submit = findAll(container, (n) => n.tag === "button")[0];
   submit.dispatch("click");
   assert.deepEqual(seen, [["submit_form", { name: "sahen" }]]);
+});
+
+test("form values are isolated by block ID when field IDs repeat", () => {
+  const node = makeNode();
+  const container = makeContainer();
+  const seen = [];
+  const data = { fields: [{ id: "name", label: "名前" }] };
+  renderEnvelope(container, { protocol: "rdsh-ui/1", blocks: [
+    block("form", data, { id: "form-a" }),
+    block("form", data, { id: "form-b" }),
+  ] }, node, (action, submitted, value) => seen.push([submitted.id, value]));
+
+  const inputs = findAll(container, (entry) => entry.tag === "input");
+  inputs[0].dispatch("input", { target: { value: "Alice" } });
+  inputs[1].dispatch("input", { target: { value: "Bob" } });
+  const firstSubmit = findAll(container, (entry) => entry.tag === "button")
+    .find((entry) => entry.attrs["data-block-id"] === "form-a");
+  firstSubmit.dispatch("click");
+
+  assert.deepEqual(seen, [["form-a", { name: "Alice" }]]);
+});
+
+test("a new surface revision clears hidden choice state", () => {
+  const node = makeNode();
+  const container = makeContainer();
+  const seen = [];
+  const choiceBlock = (choices) => block("choice", { prompt: "選択", choices }, { id: "choice-a" });
+  const render = (revision, choices) => renderSurface(container, {
+    surface_id: "surface-a", revision, blocks: [choiceBlock(choices)],
+  }, node, (action, submitted, value) => seen.push([submitted.id, value]));
+
+  render(1, [{ id: "a", label: "A" }, { id: "b", label: "B" }]);
+  const firstRadios = findAll(container, (entry) => entry.tag === "input");
+  firstRadios[1].checked = true;
+  firstRadios[1].dispatch("change");
+  findAll(container, (entry) => entry.tag === "button")[0].dispatch("click");
+  assert.deepEqual(seen, [["choice-a", { choice_id: "b" }]]);
+
+  render(2, [{ id: "a", label: "A" }]);
+  const revisedRadios = findAll(container, (entry) => entry.tag === "input");
+  assert.equal(revisedRadios.length, 1);
+  assert.equal(revisedRadios[0].checked, false);
+  assert.doesNotThrow(() => findAll(container, (entry) => entry.tag === "button")[0].dispatch("click"));
+  assert.deepEqual(seen, [["choice-a", { choice_id: "b" }]]);
+  assert.match(container.dump(), /選択または入力の内容が未取得のため送信しません/);
 });
 
 test("without emit the browser-only kinds stay disabled", () => {
