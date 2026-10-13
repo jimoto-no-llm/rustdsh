@@ -244,6 +244,27 @@ rdsh provider list                                           # presets, per-prof
 
 Details: [docs/PROVIDERS.md](docs/PROVIDERS.md).
 
+### Model Catalog (`rdsh models`)
+
+DeepSeek Harness answers "which models can this provider serve?" from the
+catalog bundled in its `@earendil-works/pi-ai` dependency, which is generated
+when that package is published. A model released afterwards is absent from the
+picker until the harness dependency is upgraded, and a profile that lists
+`models:` explicitly replaces the bundled catalog for that route. `rdsh models`
+compares the profile with the catalog the local Codex CLI already maintains and
+appends only what is missing:
+
+```sh
+rdsh models                              # read-only: what each profile is missing
+rdsh models sync                         # append the missing entries
+rdsh models sync --profile web --dry-run # preview one profile
+```
+
+The sync only adds: an existing entry, its comments, and every other byte of the
+profile are left alone, and a profile it does not recognize is refused instead
+of rewritten. The harness picks the new entries up on the next config reload or
+restart.
+
 ### Agent Tool Isolation
 
 Delegated agent tools keep normal file access by default: the model reads and
