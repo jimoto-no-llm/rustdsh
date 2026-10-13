@@ -270,7 +270,12 @@ fn take_over_exited_lock(lock_path: &Path) -> anyhow::Result<bool> {
 }
 
 fn takeover_claim_path(lock_path: &Path, record: &[u8]) -> PathBuf {
-    let digest = format!("{:x}", Sha256::digest(record));
+    // sha2 0.11 returns a hybrid_array::Array without LowerHex; encode the
+    // bytes the same way {:x} did (lowercase, 64 characters).
+    let digest: String = Sha256::digest(record)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
     append_path_suffix(lock_path, &format!(".takeover-{}", &digest[..16]))
 }
 
