@@ -28,8 +28,10 @@ window.__ModuleLoader__={load(definition){window.plugin=definition.factory(()=>(
 const fetchNative=window.fetch; window.fetch=(url,options={})=>fetchNative(url,{...options,headers:{...options.headers,'x-rdsh-test-gui':'fixture'}});
 </script><script src="/client.js"></script><script>window.destroy=window.plugin.mount(document.querySelector('#panel'),{pick:async()=>${JSON.stringify(folder).replaceAll('<', '\\u003c')}});</script></html>`;
 const server = createServer((req, res) => {
-  const handler = handlers.get(req.url);
-  if (handler) return void handler(req, res);
+  for (const action of ['preview', 'execute', 'undo', 'recover', 'status', 'release']) {
+    const route = '/api/rdsh-easy-work/' + action;
+    if (req.url === route) return void handlers.get(route)(req, res);
+  }
   if (req.url === '/' || req.url === '/client.js') {
     res.setHeader('content-type', req.url === '/' ? 'text/html; charset=utf-8' : 'text/javascript; charset=utf-8');
     return res.end(req.url === '/' ? html : client);

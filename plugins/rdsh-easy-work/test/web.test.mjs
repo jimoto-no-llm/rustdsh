@@ -11,7 +11,11 @@ test('GUI routes authenticate, require JSON confirmation and suppress filesystem
     async execute(id, confirmed) { called++; return { id, confirmed }; },
     async close() { closed = true; },
   });
-  const server = createServer((req, res) => handlers.get(req.url)?.(req, res));
+  const routes = ['preview', 'execute', 'undo', 'recover', 'status', 'release'].map(action => '/api/rdsh-easy-work/' + action);
+  const server = createServer((req, res) => {
+    for (const route of routes) if (req.url === route) return handlers.get(route)(req, res);
+    res.writeHead(404).end();
+  });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   t.after(async () => { await dispose(); await new Promise(resolve => server.close(resolve)); });
   const url = `http://127.0.0.1:${server.address().port}/api/rdsh-easy-work/`;

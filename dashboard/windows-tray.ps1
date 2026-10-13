@@ -10,13 +10,21 @@ Add-Type -AssemblyName System.Drawing
 # A CLR delegate can read stdin on the thread pool without a PowerShell runspace
 # or compiling a new C# type during every cold notification-area startup.
 $taskReadLine = [System.Delegate]::CreateDelegate([Func[string]], [Console].GetMethod('ReadLine', [Type[]]@()))
+[Console]::Out.WriteLine('phase:stdin-delegate-created')
+[Console]::Out.Flush()
 [void][System.Windows.Forms.Application]::SetHighDpiMode([System.Windows.Forms.HighDpiMode]::PerMonitorV2)
 [System.Windows.Forms.Application]::EnableVisualStyles()
+[Console]::Out.WriteLine('phase:visual-styles-enabled')
+[Console]::Out.Flush()
 $taskMenu = New-Object System.Windows.Forms.ContextMenuStrip
 $taskOpen = $taskMenu.Items.Add('Open / 開く')
 $taskExit = $taskMenu.Items.Add('Exit / 終了')
+[Console]::Out.WriteLine('phase:menu-created')
+[Console]::Out.Flush()
 $taskIcon = New-Object System.Windows.Forms.NotifyIcon
 $taskBrandIcon = [System.Drawing.Icon]::new((Join-Path $PSScriptRoot '../assets/icon.ico'))
+[Console]::Out.WriteLine('phase:icon-loaded')
+[Console]::Out.Flush()
 $taskIcon.Icon = $taskBrandIcon
 $taskIcon.Text = if ($env:RDSH_TRAY_LABEL) { $env:RDSH_TRAY_LABEL } else { 'rdsh-dashboard' }
 $taskIcon.ContextMenuStrip = $taskMenu
@@ -26,6 +34,8 @@ $taskIcon.add_DoubleClick({ [Console]::Out.WriteLine('open'); [Console]::Out.Flu
 $taskContext = New-Object System.Windows.Forms.ApplicationContext
 $taskTimer = New-Object System.Windows.Forms.Timer
 $taskTimer.Interval = 100
+[Console]::Out.WriteLine('phase:stdin-reader-starting')
+[Console]::Out.Flush()
 $script:taskRead = [System.Threading.Tasks.Task]::Run($taskReadLine)
 [Console]::Out.WriteLine('phase:stdin-reader-started')
 [Console]::Out.Flush()
