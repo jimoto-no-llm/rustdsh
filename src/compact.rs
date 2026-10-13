@@ -104,7 +104,7 @@ pub fn cmd_compact(file: &str, max_tokens: usize) -> anyhow::Result<()> {
         return Ok(());
     }
     let first = lines.first().copied().unwrap_or_default();
-    let mut kept: Vec<&str> = vec![];
+    let mut kept: Vec<&str> = Vec::new();
     let mut used = toks.first().copied().unwrap_or_default() + 200;
     for (l, t) in lines.iter().zip(toks.iter()).rev() {
         if used + *t > max_tokens {
@@ -153,7 +153,7 @@ fn compact_output(text: &str, max_tokens: usize) -> String {
         return text.to_string();
     }
     let first = lines.first().copied().unwrap_or_default();
-    let mut kept: Vec<&str> = vec![];
+    let mut kept: Vec<&str> = Vec::new();
     let mut used = toks.first().copied().unwrap_or_default() + 200;
     for (l, t) in lines.iter().zip(toks.iter()).rev() {
         if used + *t > max_tokens {
@@ -169,15 +169,15 @@ fn compact_output(text: &str, max_tokens: usize) -> String {
     let mut body = String::new();
     body.reserve(first.len() + summary.len() + kept.iter().map(|l| l.len() + 1).sum::<usize>() + 2);
     body.push_str(first);
-    body.push(10 as char);
+    body.push('\n');
     body.push_str(&summary);
-    body.push(10 as char);
+    body.push('\n');
     for l in &kept {
         if std::ptr::eq(*l, first) {
             continue;
         }
         body.push_str(l);
-        body.push(10 as char);
+        body.push('\n');
     }
     prune_to_budget(&body, max_tokens)
 }
@@ -191,7 +191,7 @@ mod tests {
         let mut text = String::new();
         for _ in 0..4000 {
             text.push_str(line);
-            text.push(10 as char);
+            text.push('\n');
         }
         let (_lines, _toks, split_total) = split_lines_with_tokens(&text);
         assert_eq!(split_total, 8000);
