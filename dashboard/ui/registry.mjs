@@ -50,14 +50,16 @@ const TONES = ["neutral", "info", "ok", "warn", "danger"];
 const TEST_STATUS = ["pass", "fail", "hold"];
 
 export function observationLabel(observation) {
-  const label = observation ? OBSERVATION_LABELS[observation.kind] : undefined;
-  return label === undefined ? MISSING_LABEL : label;
+  return observation && typeof observation.kind === "string" &&
+    Object.hasOwn(OBSERVATION_LABELS, observation.kind)
+    ? OBSERVATION_LABELS[observation.kind] : MISSING_LABEL;
 }
 export function isKnownKind(kind) {
   return typeof kind === "string" && BLOCK_KINDS.includes(kind);
 }
 export function actionHandling(kind) {
-  return typeof kind === "string" ? ACTION_HANDLING[kind] || null : null;
+  return typeof kind === "string" && Object.hasOwn(ACTION_HANDLING, kind)
+    ? ACTION_HANDLING[kind] : null;
 }
 export function isClientAction(action) {
   return actionHandling(action && action.kind) === "client";
@@ -335,8 +337,12 @@ export function countBlocks(blocks) {
 export function collectActions(blocks) {
   const actions = [];
   const seen = new Set();
+  const blockIds = new Set();
   let duplicates = false;
+  let duplicateBlocks = false;
   walk(blocks, 1, (block) => {
+    if (blockIds.has(block.id)) duplicateBlocks = true;
+    blockIds.add(block.id);
     if (!Array.isArray(block.actions)) return;
     for (const action of block.actions) {
       if (!isPlainObject(action) || !isNonEmptyString(action.id)) continue;
@@ -348,7 +354,7 @@ export function collectActions(blocks) {
       });
     }
   });
-  return { actions, duplicates };
+  return { actions, duplicates, duplicateBlocks };
 }
 export function validateObservation(observation) {
   if (observation === undefined) return { ok: true, errors: [] };
@@ -417,13 +423,14 @@ function safeStringify(value) {
 export function fallbackBlock(block, reason) {
   const src = isPlainObject(block) ? block : {};
   const out = {
-    id: isNonEmptyString(src.id) ? src.id : "fallback",
+    id: isNonEmptyString(src.id) && src.id.length <= 128 ? src.id : "fallback",
     kind: "text",
     data: { text: "未対応のUIブロックを文字表示します（" + reason + "）。コードとしては実行しません。\n" + safeStringify(block) },
     _fallback: { from: String(src.kind), reason },
   };
   if (typeof src.title === "string") out.title = src.title;
-  if (isPlainObject(src.observation)) out.observation = src.observation;
+  if (src.observation !== undefined && validateObservation(src.observation).ok)
+    out.observation = src.observation;
   return out;
 }
 export function validateEnvelope(envelope) {

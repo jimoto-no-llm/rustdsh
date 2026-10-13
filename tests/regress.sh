@@ -1,5 +1,9 @@
 #!/bin/sh
 # rdsh CLI regression. Fails on first mismatch (set -e + explicit checks).
+if [ "${1:-}" = "--windows-installer-delegation" ]; then
+  shift
+  exec bash "$(dirname "$0")/regress-windows.sh" "$@"
+fi
 BIN="${BIN:-./target/release/rdsh}"
 pass=0
 ok() { pass=$((pass+1)); echo "ok: $1"; }
@@ -12,6 +16,9 @@ if [ "${RDSH_REGRESS_SANDBOXED:-}" != 1 ]; then
   export HOME DSH_HOME RDSH_REGRESS_SANDBOXED RR_SANDBOX
   trap 'rm -rf "$RR_SANDBOX"' EXIT INT TERM
 fi
+# Each delegation check supplies its own original binary. A developer's live
+# RDSH_ORIG_BIN would otherwise take precedence over the legacy fixture below.
+unset RDSH_ORIG_BIN DSH_ORIG_BIN
 need_ok() {
   desc="$1"; shift
   if "$@" >"$RR_SANDBOX/rr-out" 2>"$RR_SANDBOX/rr-err"; then ok "$desc"; else echo "FAIL(exit): $desc"; cat "$RR_SANDBOX/rr-err"; exit 1; fi
@@ -116,23 +123,11 @@ if env -u DEEPSEEK_API_KEY -u OPENAI_API_KEY -u ANTHROPIC_API_KEY HOME="$SB2/hom
 if env -u DEEPSEEK_API_KEY -u OPENAI_API_KEY -u ANTHROPIC_API_KEY HOME="$SB2/home" DSH_HOME="$SB2/dsh" DSH_ORIG_BIN="$SB/orig/dsh" $SB/bin/dsh --profile tui 2>&1 | grep -q "RDSH_SECURITY"; then echo "FAIL(output): default delegation must not be refused"; exit 1; else ok "agent tools default to normal file access"; fi
 if env -u DEEPSEEK_API_KEY -u OPENAI_API_KEY -u ANTHROPIC_API_KEY HOME="$SB2/home" DSH_HOME="$SB2/dsh" RDSH_SECURITY=1 DSH_ORIG_BIN="$SB/orig/dsh" $SB/bin/dsh --profile tui 2>&1 | grep -q "RDSH_SECURITY"; then ok "strict mode refuses unsupported runtime"; else echo "FAIL(output): strict mode refuses unsupported runtime"; exit 1; fi
 rm -rf $SB2
-FR="$RR_SANDBOX/release"
-mkdir -p $FR/pkg $FR/bin $FR/latest/download
-cp "$BIN" $FR/pkg/rdsh
-for a in rdsh-linux-x64 rdsh-macos-arm64 rdsh-macos-x64; do tar -czf "$FR/latest/download/$a.tar.gz" -C $FR/pkg rdsh; done
+if bash ./tests/installer-release-integrity.sh; then ok "installer release integrity"; else echo "FAIL: installer release integrity"; exit 1; fi
 if command -v sha256sum >/dev/null 2>&1; then SUM="sha256sum"; else SUM="shasum -a 256"; fi
-for a in rdsh-linux-x64 rdsh-macos-arm64 rdsh-macos-x64; do (cd "$FR/latest/download" && $SUM "$a.tar.gz" > "$a.tar.gz.sha256"); done
-# NOTE: install.sh needs bash (pipefail); `sh` is dash on Ubuntu CI.
-if RDSH_RELEASE_BASE="file://$FR" DSH_HOME="$FR/dsh" bash ./install.sh --from-release --prefix="$FR/bin" >$FR/install.log 2>&1 && "$FR/bin/rdsh" --version 2>/dev/null | grep -q "rdsh"; then ok "from-release install"; else echo "FAIL(output): from-release install"; tail -n 8 $FR/install.log; exit 1; fi
 if bash tests/rustup-init-pin.sh; then ok "rustup-init pinned checksum"; else echo "FAIL(output): rustup-init pinned checksum"; exit 1; fi
-tar -czf "$FR/latest/download/rdsh-linux-x64-musl.tar.gz" -C $FR/pkg rdsh
-(cd "$FR/latest/download" && $SUM "rdsh-linux-x64-musl.tar.gz" > "rdsh-linux-x64-musl.tar.gz.sha256")
-if RDSH_RELEASE_BASE="file://$FR" DSH_HOME="$FR/dsh" bash ./install.sh --from-release --musl --prefix="$FR/bin-musl" >$FR/install-musl.log 2>&1 && "$FR/bin-musl/rdsh" --version 2>/dev/null | grep -q "rdsh"; then ok "from-release musl install"; else echo "FAIL(output): from-release musl install"; tail -n 8 $FR/install-musl.log; exit 1; fi
 printf "version: 1\nrecords:\n  llm-pi-ai/openai-codex:\n    kind: api-key\n    key: sk-user-key\n" > "$AB/dsh/.credentials.yaml"
 if HOME="$AB/home" DSH_HOME="$AB/dsh" $BIN auth --import --provider openai-codex >/dev/null 2>&1 && grep -q "kind: api-key" "$AB/dsh/.credentials.yaml" && HOME="$AB/home" DSH_HOME="$AB/dsh" $BIN auth 2>/dev/null | grep -q "left alone"; then ok "auth keeps api-key records"; else echo "FAIL(output): auth keeps api-key records"; exit 1; fi
-for t in "$FR"/latest/download/*.tar.gz; do printf "tampered" >> "$t"; done
-if RDSH_RELEASE_BASE="file://$FR" DSH_HOME="$FR/dsh" bash ./install.sh --from-release --prefix="$FR/bin-evil" >$FR/install-evil.log 2>&1; then echo "FAIL(output): tampered release refused"; exit 1; else ok "tampered release refused"; fi
-rm -rf $FR
 # sync-dsh.sh release self-update against a file:// release with npm/node shims.
 # The script runs from a copy (no tests/regress.sh or target/ next to it), so it
 # does not recurse into this suite.

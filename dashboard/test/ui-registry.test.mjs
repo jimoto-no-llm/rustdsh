@@ -110,6 +110,14 @@ test("action handling separates client, session and request authority", () => {
   assert.equal(validateAction({ id: "a", kind: "teleport", label: "x" }).ok, false);
 });
 
+test("inherited object keys never become action kinds or observation labels", () => {
+  for (const kind of ["toString", "constructor", "__proto__"]) {
+    assert.equal(isWiredActionKind(kind), false, kind);
+    assert.equal(validateAction({ id: "a", kind, label: "x" }).ok, false, kind);
+    assert.equal(observationLabel({ kind }), "未取得", kind);
+  }
+});
+
 test("observation labels stay explicit and default to 未取得", () => {
   assert.equal(observationLabel({ kind: "measured" }), "実測");
   assert.equal(observationLabel({ kind: "agent_reported" }), "エージェント報告");

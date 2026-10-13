@@ -1,0 +1,16 @@
+{
+  "scope": "real project dashboards with synthetic fixture data; no provider or conversation data",
+  "before_revision": "cb6debb",
+  "after_revision": "reviewed working tree",
+  "captures": [
+    "before-desktop.png",
+    "before-mobile.png",
+    "after-desktop.png",
+    "after-mobile.png"
+  ],
+  "after_page_errors": [],
+  "before_failed_assets": [
+    "/model-catalog-ui.mjs"
+  ],
+  "human_action": "browser choice saved; execution authority not granted"
+}

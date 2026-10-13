@@ -125,7 +125,7 @@ fn scan_sessions(root: &str, project: Option<&str>) -> Vec<Session> {
         Some(_) => return vec![],
         None => match std::fs::read_dir(root) {
             Ok(e) => e
-                .filter_map(|e| e.ok())
+                .filter_map(Result::ok)
                 .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
                 .map(|e| e.file_name().to_string_lossy().into_owned())
                 .collect(),
@@ -410,7 +410,7 @@ impl TokensCache {
                             let b = e.get("bytes").and_then(|x| x.as_u64()).unwrap_or(0);
                             let d = e.get("decomp").and_then(|x| x.as_u64());
                             let t = e.get("ts").and_then(|x| x.as_u64()).unwrap_or(0);
-                            let c = e.get("cli").and_then(|x| x.as_bool()).unwrap_or(false);
+                            let c = e.get("cli").is_some_and(|x| x.as_bool().unwrap_or(false));
                             map.insert(k.clone(), (m, b, d, t, c));
                         }
                     }
@@ -1174,7 +1174,7 @@ pub fn cmd_logs(tail: usize, grep: Option<String>, file: Option<String>) -> anyh
 
 fn latest_file(dir: &str) -> Option<std::path::PathBuf> {
     let mut best: Option<(u64, std::path::PathBuf)> = None;
-    for e in std::fs::read_dir(dir).ok()?.filter_map(|e| e.ok()) {
+    for e in std::fs::read_dir(dir).ok()?.filter_map(Result::ok) {
         // Never follow a planted link out of the logs dir (file_type does
         // not traverse symlinks, unlike metadata below).
         if !e.file_type().is_ok_and(|t| t.is_file()) {
@@ -1204,7 +1204,7 @@ fn latest_file(dir: &str) -> Option<std::path::PathBuf> {
 fn dir_names(dir: &str) -> Vec<String> {
     let mut names: Vec<String> = std::fs::read_dir(dir)
         .map(|e| {
-            e.filter_map(|e| e.ok())
+            e.filter_map(Result::ok)
                 .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
                 .map(|e| e.file_name().to_string_lossy().into_owned())
                 .collect()
@@ -1484,15 +1484,15 @@ mod tests {
             return;
         };
         let mut checked = 0;
-        'scan: for proj in projs.filter_map(|e| e.ok()) {
+        'scan: for proj in projs.filter_map(Result::ok) {
             let Ok(sess) = std::fs::read_dir(proj.path()) else {
                 continue;
             };
-            for s in sess.filter_map(|e| e.ok()) {
+            for s in sess.filter_map(Result::ok) {
                 let Ok(files) = std::fs::read_dir(s.path()) else {
                     continue;
                 };
-                for f in files.filter_map(|e| e.ok()) {
+                for f in files.filter_map(Result::ok) {
                     let p = f.path();
                     if p.extension().and_then(|e| e.to_str()) != Some("zstd") {
                         continue;

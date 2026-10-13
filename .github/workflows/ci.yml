@@ -23,6 +23,10 @@ jobs:
       - uses: actions/checkout@v7
       - name: Test release metadata and asset validation
         run: python3 -m unittest discover -s tests -p 'test_release_*.py'
+      - name: Test ICO directory validation
+        run: python3 -m unittest discover -s tests -p 'test_icon_generation.py'
+      - name: Test branch cleanup safeguards
+        run: python3 -m unittest discover -s tests -p 'test_branch_cleanup.py'
       - name: Check the current version's release notes
         run: |
           version=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["package"]["version"])')
@@ -64,7 +68,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-      - run: node --test tests/plugin-security.test.mjs tests/settings-client.test.mjs tests/update-banner.test.mjs tests/feature-switches.test.mjs tests/model_benchmark/fence.test.mjs
+      - run: node --test tests/plugin-security.test.mjs tests/settings-client.test.mjs tests/update-banner.test.mjs tests/feature-switches.test.mjs tests/discord-presence.test.mjs tests/model_benchmark/fence.test.mjs
 
   security-boundaries:
     runs-on: ubuntu-latest
@@ -78,6 +82,10 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y bubblewrap
       - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - run: node --test tests/security-boundaries.test.mjs tests/tool-isolation.test.mjs tests/desktop.test.mjs
+      - name: Install pinned upstream tool-bash for approval integrity test
+        run: npm install --prefix "$RUNNER_TEMP/rdsh-runtime" --ignore-scripts --no-audit --no-fund @deepseek-ai/dsh-tool-bash@0.2.0-rc.2
+      - name: Test approval integrity against pinned upstream source
+        run: DSH_TOOL_BASH_SOURCE="$RUNNER_TEMP/rdsh-runtime/node_modules/@deepseek-ai/dsh-tool-bash/lib/index.js" node --test tests/upstream-approval-integrity.test.mjs
       - run: python3 -m unittest discover -s tests -p 'test_release_assets.py'
       - name: Verify the audited dispatcher and late middleware changes
         run: |
@@ -155,6 +163,9 @@ jobs:
           $setup = ./target/debug/rdsh.exe setup --json | Out-String
           if ($setup -notmatch '"needed":true') { throw 'setup should report needed on first run' }
           ./target/debug/rdsh.exe doctor
+      - if: '! matrix.regress'
+        shell: bash
+        run: BIN=./target/debug/rdsh.exe bash tests/regress.sh --windows-installer-delegation
 
   browser-e2e:
     runs-on: ubuntu-latest

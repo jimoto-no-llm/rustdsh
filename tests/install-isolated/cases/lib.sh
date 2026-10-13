@@ -36,16 +36,35 @@ copy_base() {
 
 use_base() {
   export RDSH_RELEASE_BASE="file://$1"
+  # The digest registry travels with the base it describes, so a tampered copy
+  # still verifies against its own pins. install.sh honours this only for a
+  # file:// base, which is why the cases can run with --network=none.
+  export RDSH_RELEASE_DIGESTS="$1/release-digests.tsv"
+}
+
+registry_version() {
+  # Print the tag the staged registry resolves `latest` to.
+  local base="${1:-$ASSET_BASE}"
+  awk '$1 == "latest" { print $2 }' "$base/release-digests.tsv"
 }
 
 base_download_dir() {
-  # Print the staged download directory for the tag under test.
+  # Print the directory install.sh downloads from. It is always the exact tag
+  # the registry resolves to, never latest/download: --version and the default
+  # alias both end up at /download/<tag>/<asset>.
   local base="${1:-$ASSET_BASE}"
-  if [ "${RDSH_RELEASE_VERSION:-latest}" = latest ]; then
-    printf '%s/latest/download' "$base"
-  else
-    printf '%s/download/%s' "$base" "$RDSH_RELEASE_VERSION"
-  fi
+  printf '%s/download/%s' "$base" "$(registry_version "$base")"
+}
+
+repin_asset() {
+  # repin_asset BASE ASSET: point the staged registry row at the archive the
+  # case just replaced, so the tamper reaches the code under test.
+  local base="$1" asset="$2" version sum
+  version="$(registry_version "$base")"
+  sum="$(cd "$base/download/$version" && sha256sum "$asset" | awk '{print $1}')"
+  awk -v v="$version" -v a="$asset" -v s="$sum" 'BEGIN { OFS = " " } $1 == v && $2 == a { $3 = s } { print }' \
+    "$base/release-digests.tsv" > "$base/release-digests.tsv.new"
+  mv "$base/release-digests.tsv.new" "$base/release-digests.tsv"
 }
 
 bare_box_smoke() {

@@ -64,6 +64,41 @@ test("invalid blocks degrade to text and are reported to the agent", () => {
   assert.match(current.ui_surfaces.current.blocks[1].data.text, /文字表示/);
 });
 
+test("fallback surfaces with invalid metadata survive persistence validation", () => {
+  const current = state();
+  const result = present(current, [
+    { id: "x".repeat(129), kind: "text", data: { text: "note" } },
+    { id: "unknown", kind: "text", data: { text: "note" }, observation: { kind: "guessed" } },
+    null,
+    { kind: "text", data: { text: "missing id" } },
+  ]);
+  assert.equal(result.fallback.length, 4);
+  assert.equal(new Set(current.ui_surfaces.current.blocks.map((block) => block.id)).size, 4);
+  assert.doesNotThrow(() => validateUiSurfaces(JSON.parse(JSON.stringify(current))));
+});
+
+test("duplicate block ids cannot hide an action, including nested blocks", () => {
+  for (const first of [
+    { id: "pick", kind: "text", data: { text: "first" } },
+    { id: "container", kind: "card", data: { blocks: [
+      { id: "pick", kind: "text", data: { text: "nested" } },
+    ] } },
+  ]) {
+    const current = state();
+    assert.throws(() => present(current, [first, choiceBlock()]), /ui_duplicate_block/);
+    assert.equal(current.ui_surfaces, undefined);
+    assert.equal(current.feedback.length, 0);
+  }
+  const current = state();
+  present(current, [chartBlock()]);
+  current.ui_surfaces.current.blocks.push(structuredClone(current.ui_surfaces.current.blocks[0]));
+  assert.throws(() => validateUiSurfaces(current), /ui_invalid_store/);
+});
+
+test("invalid entries still count toward the surface block limit", () => {
+  assert.throws(() => present(state(), Array(201).fill(null)), /ui_too_many_blocks/);
+});
+
 test("an action returns to the same session as feedback without authority", () => {
   const { current, result } = withState();
   const recorded = submit(result, result.actions[0], { choice_id: "fix" }, "req-1");

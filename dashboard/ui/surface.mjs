@@ -43,7 +43,8 @@ export function presentSurface(state, input, now) {
   const sessionId = input.session_id === undefined
     ? null : boundedText(input.session_id, 256, "ui_invalid_session_id");
   if (!Array.isArray(input.blocks) || input.blocks.length === 0) fail("ui_invalid_blocks");
-  if (countBlocks(input.blocks) > MAX_BLOCKS) fail("ui_too_many_blocks");
+  if (input.blocks.length > MAX_BLOCKS || countBlocks(input.blocks) > MAX_BLOCKS)
+    fail("ui_too_many_blocks");
   const blocks = [];
   const fallback = [];
   for (const raw of input.blocks) {
@@ -52,11 +53,15 @@ export function presentSurface(state, input, now) {
     if (checked.ok) blocks.push(candidate);
     else {
       const replaced = fallbackBlock(candidate, checked.errors.join(","));
+      if (!isPlainObject(candidate) || typeof candidate.id !== "string" ||
+          candidate.id.length === 0 || candidate.id.length > 128)
+        replaced.id = "fallback_" + randomUUID();
       fallback.push({ id: replaced.id, kind: String(raw && raw.kind), errors: checked.errors });
       blocks.push(replaced);
     }
   }
   const collected = collectActions(blocks);
+  if (collected.duplicateBlocks) fail("ui_duplicate_block");
   if (collected.duplicates) fail("ui_duplicate_action");
   const previous = state.ui_surfaces && state.ui_surfaces.current;
   const reuse = previous && (input.surface_id === undefined || input.surface_id === previous.surface_id);
@@ -201,12 +206,15 @@ export function validateUiSurfaces(state) {
   if (current === undefined) return;
   if (!isPlainObject(current) || typeof current.surface_id !== "string" ||
       !Number.isSafeInteger(current.revision) || current.revision < 1 ||
-      !Array.isArray(current.blocks) || current.blocks.length === 0)
+      !Array.isArray(current.blocks) || current.blocks.length === 0 ||
+      current.blocks.length > MAX_BLOCKS || countBlocks(current.blocks) > MAX_BLOCKS)
     fail("ui_invalid_store");
   for (const block of current.blocks) {
     const checked = validateBlock(block);
     if (!checked.ok) fail("ui_invalid_store");
   }
+  const collected = collectActions(current.blocks);
+  if (collected.duplicateBlocks || collected.duplicates) fail("ui_invalid_store");
 }
 
 export function publicUiSurfaces(state) {

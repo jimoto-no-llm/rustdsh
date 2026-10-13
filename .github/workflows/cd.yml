@@ -7,6 +7,7 @@ on:
     tags: ['v*']
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
@@ -16,7 +17,9 @@ concurrency:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
+      actions: read
       checks: read
       contents: read
     steps:
@@ -28,10 +31,31 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           test "$(git cat-file -t "refs/tags/$RELEASE_TAG")" = tag
+          tag_sha="$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
+          test "$tag_sha" = "$RELEASE_SHA"
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "$RELEASE_SHA" refs/remotes/origin/main; then
+            echo "Release tag $RELEASE_TAG does not point to a commit on main" >&2
+            exit 1
+          fi
           python3 scripts/prepare-release.py "$RELEASE_TAG"
+      - name: Wait for the tag-push ci workflow to succeed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: python3 scripts/verify-release-ci.py "$RELEASE_SHA" "$RELEASE_TAG" --timeout-seconds 900
+      - name: Require every required check on the tagged commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
           tag_sha="$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
           git fetch --no-tags origin main
           gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/commits/${tag_sha}/check-runs?per_page=100" > "$RUNNER_TEMP/release-check-runs.json"

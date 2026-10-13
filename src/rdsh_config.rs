@@ -1332,7 +1332,8 @@ mod rdsh_config_tests {
     /// DSH_HOME を一時 dir に向けて f を実行する（復元・後片付けつき）。
     fn with_home(tag: &str, f: impl FnOnce(&str)) {
         let _guard = lock();
-        let dir = std::env::temp_dir().join(format!("rdsh-settings-{}-{tag}", std::process::id()));
+        let pid = std::process::id();
+        let dir = std::env::temp_dir().join(format!("rdsh-settings-{pid}-{tag}"));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let prev = std::env::var("DSH_HOME").ok();
