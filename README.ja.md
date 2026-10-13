@@ -146,6 +146,7 @@ rdsh sessions --limit 20 --tokens   # 過去セッション一覧と展開トー
 rdsh compact ./s.jsonl              # セッション JSONL を圧縮（元ファイルは不変）
 rdsh doctor                         # 本家 dsh、環境変数、パスなどの健全性診断
 rdsh profiles / rdsh skills         # 利用可能なプロファイル・スキル一覧
+rdsh desktop status                 # DeepSeek Harness Desktop アプリとプロファイルの検出
 rdsh bench --n 5                    # rdsh と本家 dsh の起動速度比較
 ```
 
@@ -180,6 +181,29 @@ DSH の `hooks.json` と連携し、危険なコマンド実行を瞬時に検�
 echo "$input" | rdsh guard --deny "rm -rf /*" --deny "*token*"
 ```
 
+対応するファイル操作を構造で判定する場合は、任意でpolicy fileを指定できます。
+次の例は、既存のプロジェクトディレクトリ内の `Read` だけを分類上許可します。
+
+```json
+{
+  "schema": 1,
+  "rules": [
+    { "id": "project-read", "tool": "Read", "access": "read", "roots": ["/absolute/project/path"] }
+  ]
+}
+```
+
+```sh
+echo "$hook_json" | rdsh guard --policy-file ./hook-policy.json --json
+```
+
+構造判定が対応するのは `Read`・`Write`・`Edit` のファイルpath schemaです。
+作業ディレクトリと対象pathを正規化し、toolとread/write範囲を既存rootに照合して、
+秘密を含まない理由とともに `allow`・`deny`・`unknown` を返します。JSONの `allow` は分類結果だけで、
+ホストのpermission/approvalを意味しません。そのため `decision` は出力せず、最終的な権限判断はホストに残します。
+未知のtool、shell command、壊れた入力、未対応の引数はfail closedです。shell構文解析とnetwork先の判定は未対応です。
+path判定後にファイルシステムが変わる競合もあり、このhookはOS sandboxではありません。実際の強制には実行sandboxを使ってください。
+
 ```json
 {
   "hooks": {
@@ -212,6 +236,26 @@ rdsh-dashboard project --project <ディレクトリ>
 ```
 
 ※ Windows ネイティブではタスクトレイに常駐し、タスクバーから簡単に開閉できます（端末起動したい場合は `--no-tray` を指定）。詳細は [dashboard/README.md](dashboard/README.md) をご覧ください。
+
+## デスクトップアプリ (Electron)
+
+DeepSeek Harness Desktop は、Web アプリケーション全体を内包した Electron シェルです。CLI と `$DSH_HOME` を共有しますが、**予約済みプロファイル**（`$DSH_HOME/profiles/desktop`）と同梱の独自コマンドランタイムを持つため、npm の `dsh` CLI ではプラグインを管理できません。`rdsh desktop` はこれらを自動検出し、プラグインの組み込みをアプリ自身のコマンドへ転送します。rdsh 側でプロファイルを起動したり直接書き換えたりすることはありません：
+
+```sh
+rdsh desktop status                 # アプリ、コマンドランタイム、プロファイル、プラグインの状態（読み取り専用）
+rdsh desktop install --plugins-dir .   # desktop プロファイルに rdsh-settings を組み込み
+rdsh desktop install --plugins-dir . --compute   # 常駐 compute bridge もあわせて追加
+rdsh desktop verify                 # プロファイルに rdsh プラグインがない場合は 0 以外で終了
+```
+
+プロファイルインストーラーや各種インストーラーからも同様に利用できます：
+
+```sh
+PROFILE=desktop ./plugins/install.sh   # 推奨パッケージをすべて適切に転送して導入
+./install.sh --desktop                 # インストール時に rdsh プラグインを組み込み
+```
+
+※ プラグインを組み込む前にアプリを終了し、完了後に再起動してください。アプリ内の Plugins 画面からも、コマンドを使わずに同じパッケージをインストールできます。Electron ランタイム自体が置き換わることはなく、アプリ内の処理委譲はオプトインかつフェイルオープンな compute bridge に限定されます。詳細は [DESKTOP-INTEGRATION.md](docs/DESKTOP-INTEGRATION.md) をご覧ください。
 
 ## Smart-DSH との併用
 
@@ -270,6 +314,7 @@ Linux x86_64 環境での測定値です：
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 委譲の仕組みとアーキテクチャ設計 |
 | [docs/BENCHMARKS.md](docs/BENCHMARKS.md) | ベンチマークの詳細と再現手順 |
 | [docs/RDSH-SETTINGS.md](docs/RDSH-SETTINGS.md) | 設定画面の機能と CLI キー一覧 |
+| [docs/DESKTOP-INTEGRATION.md](docs/DESKTOP-INTEGRATION.md) | デスクトップアプリ (Electron) との連携 |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 今後の開発ロードマップ |
 | [docs/RELEASING.md](docs/RELEASING.md) | リリース手順 |
 | [CHANGELOG.md](CHANGELOG.md) | バージョンごとの主な変更履歴 |

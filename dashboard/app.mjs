@@ -5,6 +5,7 @@ import { renderOverview } from "./project-overview.mjs";
 import { renderConnectionDiagnostics } from "./connection-diagnostics-ui.mjs";
 import { createInstructionPanel } from "./instruction-queue-ui.mjs";
 import { createCostPanel } from "./cost-ledger-ui.mjs";
+import { createModelCatalogPanel } from "./model-catalog-ui.mjs";
 import { renderBudget } from "./budget-ui.mjs";
 import { createHumanAnnotationPanel } from "./human-annotations-ui.mjs";
 import { setupObservedCli } from "./observed-cli-ui.mjs";
@@ -143,6 +144,7 @@ const renderInstructions = createInstructionPanel($("instruction-panel"), {
   refreshState,
 });
 const renderCosts = createCostPanel($("cost-ledger"), node);
+const renderCatalog = createModelCatalogPanel($("model-catalog"), node);
 const renderHumanAnnotations = createHumanAnnotationPanel(
   $("human-annotations-panel"),
   { api, node, navigateTo },
@@ -154,6 +156,7 @@ function render(state) {
   observedCli?.render(state);
   renderInstructions(state);
   renderCosts(state);
+  renderCatalog();
   renderBudget($("budget-admission"), state, node);
   updateOverview(state);
   renderHumanAnnotations(state);

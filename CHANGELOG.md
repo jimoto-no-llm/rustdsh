@@ -3,6 +3,118 @@
 All notable changes to this project are documented here.
 Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
+## [0.3.3] - 2026-10-13
+
+### Security
+
+- `install.sh --from-release` verifies every archive against the digests pinned
+  in this repository's `release-digests.tsv` instead of trusting a checksum
+  served next to the archive, so a tampered release base can no longer install
+  its own payload. Unix only for now; `install.ps1` keeps using sidecars.
+- The Windows dashboard launches its PowerShell tray helper, browser URL handler
+  and installed CMD wrapper by absolute path. A `pwsh.exe` or `rundll32.exe`
+  placed in the working directory is no longer selected. Re-run the installer
+  to refresh an existing `rdsh-dashboard.cmd`.
+- The installer validates the ICO header and payload ranges before rebuilding
+  the Windows icon instead of trusting offsets in the image.
+
+### Fixed
+
+- Delegation skips `dsh` and Node candidates on `PATH` that the current
+  effective user cannot execute, so an unrunnable first candidate no longer
+  fails with `Permission denied`.
+- `rdsh` shares the upstream DSH credential lock protocol, so saving and
+  refreshing credentials after using rustdsh no longer times out.
+- Dashboard lock cleanup no longer masks a committed write: the original error
+  code is preserved and `lock_cleanup_unconfirmed` is attached.
+- `rdsh_inspect` declares its parameters as a valid JSON Schema, so strict
+  validators accept the tool definition.
+
+### Added
+
+- `rdsh guard --policy-file` classifies structured Read/Write/Edit operations
+  and enforces the allow/deny policy against the resolved target; without the
+  flag the previous text-matching behaviour is unchanged.
+- The `rdsh-docs` skill ships with the plugins so the DSH web profile can
+  check rustdsh behaviour against the verified source.
+- The dashboard integrates worker changes in a fixed commit order and requires
+  every check to pass before publishing.
+
+### Changed
+
+- Dependency updates: `sha2` 0.11 (digest output is encoded by an explicit
+  lowercase hex encoder), `embed-resource` 3.0.12, `koffi` 3.3.3 and
+  `@agentclientprotocol/sdk` 1.8.0.
+- CI covers the Windows installer and delegation through Git Bash, runs the
+  Discord presence suite, pins the upstream approval-integrity check, and the
+  release job waits for the tag-push CI before building.
+
+## [0.3.2] - 2026-10-12
+
+### Fixed
+
+- `rdsh compute` and the resident compute bridge contain a worker that closes
+  its stdin mid-write: the resulting EPIPE no longer takes down the Node host,
+  and the request falls back instead of exiting.
+- `tokens`, `compute` and `serve` report `chars` as a Unicode scalar count
+  instead of a UTF-8 byte count, so 日本語 is `3` chars rather than `9`.
+- `context search` accepts two-character ASCII terms (`CI`, `UI`, `Go`)
+  instead of silently returning no sessions; Japanese bigrams keep their weak
+  score.
+- `search-web` keeps valid results whose title, URL or snippet contains the
+  correction word.
+- Dashboard acceptance ignores unrelated forbidden files such as
+  `.env.example` instead of stopping with `invalid_input_path`.
+- Delegation skips `dsh` and Node candidates on `PATH` that cannot be
+  executed, instead of failing with `Permission denied`.
+- `rdsh headless "run the tests"` forwards the positional prompt the same way
+  an explicit `--profile` does.
+- `--dump-default-config` and `--dump-config-schema` reach upstream `dsh`
+  as themselves instead of degrading to `--dump-config`.
+- `rdsh compact` counts newlines in its token budget and no longer appends an
+  extra trailing newline.
+- Credential rotation replaces the `refs` entry instead of duplicating it, and
+  already-duplicated files are healed back to a single entry.
+
+## [0.3.1] - 2026-10-12
+
+### Fixed
+
+- Dashboard: the model catalog module is authorized and served again, so project
+  pages render instead of failing with 401/404 and a blank screen.
+- `rdsh serve` no longer panics when its stderr is closed (for example
+  `rdsh serve 2>&1 | head -1`): log writes now ignore write errors.
+- `install.sh --from-release` removes every download directory at exit, so no
+  archive, sidecar or extracted binary is left behind in TMPDIR.
+- The setup web UI writes the canonical `features.<id>` switches and reports
+  their effective state, so its toggles match `rdsh features`.
+- Desktop: bundled plugin specs stay slash-separated on Windows.
+- Docs: the desktop integration table no longer trips the markdown linter.
+
+### Added
+
+- The DSH web UI's rdsh section shows the running `rdsh` and `dsh` versions.
+- `rdsh desktop status|install|verify` detects the DeepSeek Harness Desktop
+  (Electron) application, its reserved `$DSH_HOME/profiles/desktop` profile and
+  its bundled command runtime, then attaches the rdsh plugins through that
+  command (`plugin --profile desktop add`). `--package` forwards extra specs,
+  `--dry-run` prints the exact argv, `--compute` adds the resident compute
+  bridge. Detection is read-only; the Electron runtime, the bundled Node and
+  profile boot stay untouched.
+- `PROFILE=desktop ./plugins/install.sh` plus the `--desktop` / `-Desktop`
+  installer flags attach the recommended plugins to the Desktop profile, and
+  `rdsh doctor` reports the Desktop app, profile and enabled plugins.
+- GUI-hosted plugin hardening: the compute bridge and the settings plugin
+  resolve `rdsh` from `RDSH_BIN`, then `PATH`, then the well-known install
+  locations, and `rdsh-compute` declares its DSH bundle so a profile can enable
+  it.
+
+### Documentation
+
+- `docs/DESKTOP-INTEGRATION.md`: what the Desktop application is, how to attach
+  the plugins, environment overrides, safety rules, troubleshooting and the
+  current verification status.
+
 ## [0.3.0] - 2026-10-12
 
 ### Security
@@ -180,6 +292,7 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 - Floating setup UI, dsh-default detection, SearXNG search.
 - Installers: install.sh (Linux/macOS/WSL), install.ps1 (Windows).
 
+[0.3.1]: docs/releases/v0.3.1.md
 [0.3.0]: docs/releases/v0.3.0.md
 [0.2.0]: docs/releases/v0.2.0.md
 [0.1.5]: https://github.com/jimoto-no-llm/rustdsh/compare/v0.1.4...v0.1.5

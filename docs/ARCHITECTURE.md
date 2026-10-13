@@ -42,7 +42,7 @@ operation that replaces the document with defaults.
 | `search.rs` | Fast multi-file search (`estimate_tokens`) |
 | `inspect.rs` | Config / session inspection |
 | `serve.rs` | Status page server |
-| `guard.rs` | Stdin command guard (`--deny` patterns) |
+| `guard.rs` | Stdin hook guard (`--deny` patterns and opt-in structured file policy) |
 | `auth.rs` | OAuth state detection (`provider_needs()`), credential import |
 | `setup_web.rs` + `setup.html` | First-run setup flow |
 | `websearch.rs` | SearXNG-backed web search |
