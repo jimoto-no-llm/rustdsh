@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
@@ -462,6 +462,7 @@ export function applyOperation(state, operation, input) {
     }
     case "event": {
       const event = {
+        event_id: randomUUID(),
         sequence: (state.events.at(-1)?.sequence || 0) + 1,
         type: oneOf(
           input.type || "progress",

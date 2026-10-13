@@ -7,6 +7,14 @@ const ICON: &str = include_str!("../assets/icon.svg");
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 
+/// Serve must survive a closed stderr: piping the output (for example
+/// `rdsh serve | head -1`) closes the pipe, and a panicking eprintln! would
+/// take the dashboard down with it.
+fn log_line(message: std::fmt::Arguments<'_>) {
+    use std::io::Write;
+    let _ = writeln!(std::io::stderr(), "{message}");
+}
+
 pub fn cmd_serve(port: u16) -> anyhow::Result<()> {
     let addr = format!("127.0.0.1:{port}");
     let listener = std::net::TcpListener::bind(&addr).map_err(|e| {
@@ -14,15 +22,25 @@ pub fn cmd_serve(port: u16) -> anyhow::Result<()> {
             "cannot listen on {addr}: {e} (dsh web GUI uses 3080; rdsh serve defaults to 38080, or try --port 0)"
         )
     })?;
+    listener.set_nonblocking(true)?;
+    crate::shutdown::install()?;
     let port = listener.local_addr()?.port();
     let token = Arc::new(crate::local_http::random_token()?);
-    eprintln!(
-        "[rdsh] dashboard: http://127.0.0.1:{port}/#key={token}  (Ctrl-C to stop, localhost only; this URL is a credential — do not share it)"
-    );
+    let handoff = crate::token_handoff::TokenHandoff::create(&token)?;
+    log_line(format_args!(
+        "[rdsh] dashboard: http://127.0.0.1:{port}/ (Ctrl-C to stop, localhost only)"
+    ));
+    log_line(format_args!(
+        "[rdsh] token handoff file: {}",
+        handoff.path().display()
+    ));
+    log_line(format_args!(
+        "[rdsh] enter the file contents in the dashboard; the token is never printed"
+    ));
     let connections = Arc::new(AtomicUsize::new(0));
-    for stream in listener.incoming() {
-        match stream {
-            Ok(mut s) => {
+    while !crate::shutdown::requested() {
+        match listener.accept() {
+            Ok((mut s, _)) => {
                 let Some(slot) = crate::local_http::ConnectionSlot::acquire(&connections) else {
                     let _ = crate::local_http::respond(
                         &mut s,
@@ -36,11 +54,18 @@ pub fn cmd_serve(port: u16) -> anyhow::Result<()> {
                 std::thread::spawn(move || {
                     let _slot = slot;
                     if let Err(e) = handle(s, &token, port) {
-                        eprintln!("[rdsh serve] {e:#}");
+                        log_line(format_args!("[rdsh serve] {e:#}"));
                     }
                 });
             }
-            Err(e) => eprintln!("[rdsh serve] accept: {e}"),
+            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                // Idle poll quantum: 5 ms keeps shutdown responsive while
+                // capping added accept latency (measured ~93 ms at 100 ms).
+                // Cost is ~200 trivial wakeups/s when fully idle.
+                std::thread::sleep(std::time::Duration::from_millis(5));
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
+            Err(e) => log_line(format_args!("[rdsh serve] accept: {e}")),
         }
     }
     Ok(())
@@ -125,7 +150,9 @@ fn handle(mut s: std::net::TcpStream, token: &str, port: u16) -> anyhow::Result<
             (
                 200,
                 "application/json",
-                Cow::Owned(serde_json::json!({"tokens": t, "chars": text.len()}).to_string()),
+                Cow::Owned(
+                    serde_json::json!({"tokens": t, "chars": text.chars().count()}).to_string(),
+                ),
             )
         }
         ("POST", "/api/prune") => {
@@ -177,9 +204,7 @@ fn handle(mut s: std::net::TcpStream, token: &str, port: u16) -> anyhow::Result<
 fn doctor_json() -> String {
     let orig = crate::passthrough::find_original_dsh();
     let home = crate::inspect::dsh_home();
-    let profiles = std::fs::read_dir(format!("{home}/profiles"))
-        .map(|d| d.count())
-        .unwrap_or(0);
+    let profiles = std::fs::read_dir(format!("{home}/profiles")).map_or(0, |d| d.count());
     serde_json::json!({
         "original_dsh": orig,
         "dsh_home": home,
