@@ -13,6 +13,8 @@ printf '#!/bin/sh\nexit 1\n' > /tmp/stub/rdsh
 chmod 755 /tmp/stub/rdsh
 tar -czf "$dir/rdsh-linux-x64.tar.gz" -C /tmp/stub rdsh
 (cd "$dir" && sha256sum rdsh-linux-x64.tar.gz > rdsh-linux-x64.tar.gz.sha256)
+# The registry, not the sidecar, is what the installer verifies against.
+repin_asset "$base" rdsh-linux-x64.tar.gz
 
 install_rdsh --from-release >"$HOME/install.log" 2>&1
 cat "$HOME/install.log"

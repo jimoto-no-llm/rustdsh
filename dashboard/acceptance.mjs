@@ -356,27 +356,54 @@ export class AcceptanceStore {
           : "acceptance_lock_unavailable",
       );
     }
+    let output,
+      failure = null,
+      committed = false;
+    const committedEventIds = [];
     try {
       await handle.writeFile(owner);
       await handle.sync();
       const next = await this.read(),
+        priorEvidence = next.evidence.length,
         result = await operation(next);
       next.revision++;
       database(next, this.project);
+      // Replacing the index file is the commit point of this mutation.
       await writeJson(this.index, next);
-      return result;
-    } finally {
-      await handle.close();
-      try {
-        check(
-          (await fs.readFile(file, "utf8")) === owner,
-          "acceptance_lock_changed",
-        );
-        await fs.unlink(file);
-      } catch {
-        throw new AcceptanceError("acceptance_lock_cleanup_unconfirmed");
-      }
+      committed = true;
+      for (const reference of next.evidence.slice(priorEvidence))
+        committedEventIds.push(reference.evidence_id);
+      output = result;
+    } catch (error) {
+      failure = error;
     }
+    // A cleanup failure must never replace the outcome the caller earned.
+    let lockCleanupUnconfirmed = false;
+    try {
+      await handle.close();
+      check(
+        (await fs.readFile(file, "utf8")) === owner,
+        "acceptance_lock_changed",
+      );
+      await fs.unlink(file);
+    } catch {
+      lockCleanupUnconfirmed = true;
+    }
+    if (failure !== null) {
+      if (lockCleanupUnconfirmed) {
+        failure.committed = committed;
+        failure.event_ids = committed ? [...committedEventIds] : [];
+        failure.lock_cleanup_unconfirmed = true;
+      }
+      throw failure;
+    }
+    if (lockCleanupUnconfirmed)
+      throw new AcceptanceError("acceptance_lock_cleanup_unconfirmed", {
+        committed,
+        event_ids: committed ? committedEventIds : [],
+        lock_cleanup_unconfirmed: true,
+      });
+    return output;
   }
   async taskStatus(taskId) {
     const store = await ProjectStore.open(this.project);

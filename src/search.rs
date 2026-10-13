@@ -146,8 +146,8 @@ fn collect_parallel(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
         Files(Vec<std::path::PathBuf>),
         Sub(std::path::PathBuf),
     }
-    let mut segs: Vec<Seg> = vec![];
-    let mut pending: Vec<std::path::PathBuf> = vec![];
+    let mut segs: Vec<Seg> = Vec::new();
+    let mut pending: Vec<std::path::PathBuf> = Vec::new();
     for e in &entries {
         match entry_kind(e) {
             EntryKind::Dir => {

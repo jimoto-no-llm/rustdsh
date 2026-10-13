@@ -17,9 +17,16 @@ export const localEnvironment = () => ({
   node_version: process.version,
 });
 export class AcceptanceError extends Error {
-  constructor(code) {
+  // `committed` is true only when the acceptance index was replaced durably;
+  // `event_ids` names the evidence references that replacement added.
+  constructor(code, details = null) {
     super("Acceptance: " + code);
     this.code = code;
+    if (details !== null) {
+      this.committed = details.committed;
+      this.event_ids = [...details.event_ids];
+      this.lock_cleanup_unconfirmed = details.lock_cleanup_unconfirmed;
+    }
   }
 }
 export function requireValue(value, code) {
