@@ -16,9 +16,15 @@ if [ "${RDSH_REGRESS_SANDBOXED:-}" != 1 ]; then
   export HOME DSH_HOME RDSH_REGRESS_SANDBOXED RR_SANDBOX
   trap 'rm -rf "$RR_SANDBOX"' EXIT INT TERM
 fi
-# Each delegation check supplies its own original binary. A developer's live
-# RDSH_ORIG_BIN would otherwise take precedence over the legacy fixture below.
+# Use our own default stub even on hosts with no installed DSH. Individual
+# delegation checks override the legacy variable; a developer's live primary
+# override must not take precedence over those fixtures.
 unset RDSH_ORIG_BIN DSH_ORIG_BIN
+mkdir -p "$RR_SANDBOX/original"
+printf '#!/bin/sh\necho stub-dsh "$@"\n' > "$RR_SANDBOX/original/dsh"
+chmod +x "$RR_SANDBOX/original/dsh"
+DSH_ORIG_BIN="$RR_SANDBOX/original/dsh"
+export DSH_ORIG_BIN
 need_ok() {
   desc="$1"; shift
   if "$@" >"$RR_SANDBOX/rr-out" 2>"$RR_SANDBOX/rr-err"; then ok "$desc"; else echo "FAIL(exit): $desc"; cat "$RR_SANDBOX/rr-err"; exit 1; fi
