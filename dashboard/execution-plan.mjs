@@ -27,6 +27,12 @@ const date = (v) =>
   Number.isFinite(Date.parse(v)) &&
   new Date(v).toISOString() === v;
 const active = (c) => ["reserved", "running", "unknown"].includes(c.phase);
+const reservedStopCount = (v) => {
+  const reserved = new Set(v.stop_reservations ?? []);
+  return v.plans.filter(
+    (plan) => !plan.stopped_at && reserved.has(plan.definition.plan_id),
+  ).length;
+};
 const hash = (v) =>
   createHash("sha256").update(JSON.stringify(v)).digest("hex");
 export class PlanError extends Error {
@@ -181,16 +187,15 @@ async function writeJson(file, value, reserveBytes = 0) {
   }
 }
 function database(v, project) {
+  const keys = ["schema", "project_id", "revision", "plans", "claims", "events"];
+  const legacy = v?.schema === 1 && exact(v, keys),
+    current =
+      v?.schema === 2 &&
+      exact(v, [...keys, "stop_reservations"]) &&
+      Array.isArray(v.stop_reservations) &&
+      v.stop_reservations.length <= 20;
   check(
-    exact(v, [
-      "schema",
-      "project_id",
-      "revision",
-      "plans",
-      "claims",
-      "events",
-    ]) &&
-      v.schema === 1 &&
+    (legacy || current) &&
       v.project_id === project.id &&
       integer(v.revision, 0, Number.MAX_SAFE_INTEGER - 1) &&
       Array.isArray(v.plans) &&
@@ -237,6 +242,13 @@ function database(v, project) {
       "plan_state_invalid",
     );
   }
+  const reservations = v.stop_reservations ?? [],
+    reservedIds = new Set(reservations);
+  check(
+    reservations.length === reservedIds.size &&
+      reservations.every((id) => text(id) && ids.has(id)),
+    "plan_state_invalid",
+  );
   const claims = new Set(),
     tasks = new Set(),
     children = new Set();
@@ -316,17 +328,24 @@ export class ExecutionPlans {
     return new ExecutionPlans(project);
   }
   async read() {
-    return database(
-      (await readJson(this.index)) ?? {
-        schema: 1,
-        project_id: this.project.id,
-        revision: 0,
-        plans: [],
-        claims: [],
-        events: [],
-      },
-      this.project,
-    );
+    const stored = await readJson(this.index);
+    if (stored === null)
+      return database(
+        {
+          schema: 2,
+          project_id: this.project.id,
+          revision: 0,
+          plans: [],
+          claims: [],
+          events: [],
+          stop_reservations: [],
+        },
+        this.project,
+      );
+    const checked = database(stored, this.project);
+    return checked.schema === 1
+      ? database({ ...checked, schema: 2, stop_reservations: [] }, this.project)
+      : checked;
   }
   async mutate(operation) {
     await fs.mkdir(this.directory, { recursive: true });
@@ -350,11 +369,10 @@ export class ExecutionPlans {
         result = await operation(v);
       v.revision++;
       database(v, this.project);
-      const unstoppedPlans = v.plans.filter((plan) => !plan.stopped_at).length;
       await writeJson(
         this.index,
         v,
-        unstoppedPlans * maxPlanStopReserveBytesPerPlan,
+        reservedStopCount(v) * maxPlanStopReserveBytesPerPlan,
       );
       return result;
     } finally {
@@ -369,9 +387,8 @@ export class ExecutionPlans {
     return p;
   }
   event(v, p, task_id, action, reason = null) {
-    const unstoppedPlans = v.plans.filter((plan) => !plan.stopped_at).length;
     check(
-      v.events.length < maxPlanStateEvents - unstoppedPlans,
+      v.events.length < maxPlanStateEvents - reservedStopCount(v),
       "plan_audit_full",
     );
     v.events.push({
@@ -400,6 +417,8 @@ export class ExecutionPlans {
         stopped_at: null,
         stop_reason: null,
       };
+      v.stop_reservations ??= [];
+      v.stop_reservations.push(definition.plan_id);
       v.plans.push(p);
       this.event(v, p, null, "defined");
       return p;

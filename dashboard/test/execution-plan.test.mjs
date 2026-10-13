@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
@@ -14,7 +15,9 @@ import { startDashboard } from "../server.mjs";
 import net from "node:net";
 
 const exec = promisify(execFile),
-  fail = (code) => (e) => e.code === code;
+  fail = (code) => (e) => e.code === code,
+  hash = (value) =>
+    createHash("sha256").update(JSON.stringify(value)).digest("hex");
 export async function setup(t) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-plan-test-")),
     cwd = path.join(root, "project");
@@ -482,19 +485,20 @@ test("plan index writes reserve stop capacity and reject oversized writes", asyn
   const before = await fs.readFile(f.plans.index);
   assert.ok(before.byteLength < maxStateBytes);
 
-  const nearLimitDefinition = definition(16, 104, 69),
+  const nearLimitDefinition = definition(16, 104, 39),
     projected = await f.plans.read(),
     fixedTimestamp = "2026-10-13T00:00:00.000Z";
   assert.ok(Buffer.byteLength(JSON.stringify(nearLimitDefinition)) <= maxInputBytes);
   projected.plans.push({
     definition: nearLimitDefinition,
     binding: null,
-    context_hash: "0".repeat(64),
+    context_hash: hash({ definition: nearLimitDefinition, binding: null }),
     created_at: fixedTimestamp,
     enabled_at: null,
     stopped_at: null,
     stop_reason: null,
   });
+  projected.stop_reservations.push(nearLimitDefinition.plan_id);
   projected.events.push({
     sequence: projected.events.length + 1,
     plan_id: nearLimitDefinition.plan_id,
@@ -541,6 +545,20 @@ test("plan index writes reserve stop capacity and reject oversized writes", asyn
   );
   assert.equal((await f.plans.read()).plans.length, 16);
   assert.ok((await fs.stat(f.plans.index)).size < maxStateBytes);
+
+  const legacy = structuredClone(projected);
+  delete legacy.stop_reservations;
+  legacy.schema = 1;
+  const legacyBytes = Buffer.byteLength(JSON.stringify(legacy) + "\n");
+  assert.ok(legacyBytes < maxStateBytes);
+  assert.ok(legacyBytes + legacy.plans.length * 1024 > maxStateBytes);
+  await fs.writeFile(f.plans.index, JSON.stringify(legacy) + "\n");
+  assert.equal(
+    (await f.plans.stop("plan-large-0")).stop_reason,
+    "operator_stopped",
+  );
+  assert.equal((await f.plans.read()).plans.length, 17);
+  assert.ok((await fs.stat(f.plans.index)).size < maxStateBytes);
 });
 test("plan audit events retain one stop record slot per unstopped plan", async (t) => {
   const f = await setup(t);
@@ -555,6 +573,7 @@ test("plan audit events retain one stop record slot per unstopped plan", async (
     reason: null,
     at: fixedTimestamp,
   }));
+  await fs.mkdir(f.plans.directory, { recursive: true });
   await fs.writeFile(f.plans.index, JSON.stringify(state) + "\n");
   const before = await fs.readFile(f.plans.index);
 
@@ -572,6 +591,48 @@ test("plan audit events retain one stop record slot per unstopped plan", async (
     "operator_stopped",
   );
   assert.equal((await f.plans.read()).events.length, 2000);
+});
+test("legacy plan indexes can stop without retroactive event reservations", async (t) => {
+  const f = await setup(t),
+    fixedTimestamp = "2026-10-13T00:00:00.000Z",
+    definitions = Array.from({ length: 20 }, (_, index) => ({
+      ...f.definition,
+      plan_id: `legacy-plan-${index}`,
+      run_id: `legacy-run-${index}`,
+    })),
+    state = await f.plans.read();
+  state.plans = definitions.map((definition) => ({
+    definition,
+    binding: null,
+    context_hash: hash({ definition, binding: null }),
+    created_at: fixedTimestamp,
+    enabled_at: null,
+    stopped_at: null,
+    stop_reason: null,
+  }));
+  state.revision = definitions.length;
+  state.schema = 1;
+  delete state.stop_reservations;
+  state.events = Array.from({ length: 1981 }, (_, index) => ({
+    sequence: index + 1,
+    plan_id: definitions[index % definitions.length].plan_id,
+    task_id: null,
+    action: "defined",
+    reason: null,
+    at: fixedTimestamp,
+  }));
+  await fs.mkdir(f.plans.directory, { recursive: true });
+  await fs.writeFile(f.plans.index, JSON.stringify(state) + "\n");
+  assert.ok((await fs.stat(f.plans.index)).size < 4 * 1024 * 1024);
+
+  assert.equal(
+    (await f.plans.stop("legacy-plan-0")).stop_reason,
+    "operator_stopped",
+  );
+  const stopped = await f.plans.read();
+  assert.equal(stopped.events.length, 1982);
+  assert.ok(stopped.plans[0].stopped_at);
+  assert.equal(JSON.parse(await fs.readFile(f.plans.index, "utf8")).schema, 2);
 });
 test("CLI defines and inspects drafts without starting a CLI or accepting misplaced options", async (t) => {
   const f = await setup(t),
