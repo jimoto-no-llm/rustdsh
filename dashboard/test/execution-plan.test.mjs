@@ -642,9 +642,10 @@ test("defining after legacy migration preserves stop capacity for every active p
       plan_id: `legacy-plan-${index}`,
       run_id: `legacy-run-${index}`,
     })),
-    installLegacyIndex = async (eventCount) => {
+    installLegacyIndex = async (eventCount, activePlanCount = 2) => {
+      const activeDefinitions = definitions.slice(0, activePlanCount);
       const state = await f.plans.read();
-      state.plans = definitions.map((definition) => ({
+      state.plans = activeDefinitions.map((definition) => ({
         definition,
         binding: null,
         context_hash: hash({ definition, binding: null }),
@@ -658,7 +659,7 @@ test("defining after legacy migration preserves stop capacity for every active p
       delete state.stop_reservations;
       state.events = Array.from({ length: eventCount }, (_, index) => ({
         sequence: index + 1,
-        plan_id: definitions[index % definitions.length].plan_id,
+        plan_id: activeDefinitions[index % activeDefinitions.length].plan_id,
         task_id: null,
         action: "defined",
         reason: null,
@@ -674,7 +675,7 @@ test("defining after legacy migration preserves stop capacity for every active p
     };
 
   // A rejected define must leave the only legacy stop event available.
-  await installLegacyIndex(1998);
+  await installLegacyIndex(1998, 1);
   const before = await fs.readFile(f.plans.index);
   await assert.rejects(
     f.plans.define(newDefinition),
