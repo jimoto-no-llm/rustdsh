@@ -64,7 +64,7 @@ impl Default for ContextConfig {
 impl From<crate::rdsh_config::ContextSection> for ContextConfig {
     fn from(c: crate::rdsh_config::ContextSection) -> Self {
         Self {
-            token_budget: c.token_budget.clamp(500, 200000),
+            token_budget: c.token_budget.clamp(500, 200_000),
             enable_retriever: c.enable_retriever,
             enable_packer: c.enable_packer,
             enable_verifier: c.enable_verifier,
@@ -1296,7 +1296,7 @@ pub fn cmd_build(
 ) -> anyhow::Result<()> {
     let cfg = load_config();
     let q = query.unwrap_or_default();
-    let budget = budget.unwrap_or(cfg.token_budget).clamp(500, 200000);
+    let budget = budget.unwrap_or(cfg.token_budget).clamp(500, 200_000);
     let sections = assemble(&q, &cfg);
     let full = render(&sections);
     let before = estimate(&full);
@@ -1373,7 +1373,7 @@ pub fn cmd_search(query: String, max: usize) -> anyhow::Result<()> {
 pub fn cmd_explain(query: Option<String>, budget: Option<usize>) -> anyhow::Result<()> {
     let cfg = load_config();
     let q = query.unwrap_or_default();
-    let budget = budget.unwrap_or(cfg.token_budget).clamp(500, 200000);
+    let budget = budget.unwrap_or(cfg.token_budget).clamp(500, 200_000);
     let sections = assemble(&q, &cfg);
     let stdout = std::io::stdout();
     let mut out = std::io::BufWriter::new(stdout.lock());
