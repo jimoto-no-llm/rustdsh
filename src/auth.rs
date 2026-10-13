@@ -1239,6 +1239,15 @@ pub fn cmd_auth(args: AuthArgs, dry: bool) -> anyhow::Result<()> {
     {
         println!("[rdsh auth] selected credentials already recognized");
     }
+    // A Codex grant only reaches the picker for models the profile lists: the
+    // harness serves a catalog generated when it was published, so a model the
+    // CLI already offers can still be missing from the profile's own list.
+    if grants
+        .iter()
+        .any(|g| g.provider == crate::models::CODEX_PROVIDER)
+    {
+        println!("[rdsh auth] hint: `rdsh models` lists Codex models a profile has not listed yet; `rdsh models sync` adds them");
+    }
     println!("[rdsh auth] preview: rdsh --dry-run auth --select SOURCE:CREDENTIAL --import");
     println!("[rdsh auth] share: rdsh auth --select SOURCE:CREDENTIAL --import; selected entries then auto-sync unless RDSH_AUTH_AUTOSYNC=0");
     println!("[rdsh auth] {}", sharing["stop"].as_str().unwrap());
