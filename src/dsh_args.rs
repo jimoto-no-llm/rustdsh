@@ -33,7 +33,7 @@ pub enum DumpKind {
 pub fn split_launcher_args(profile_flag: Option<String>, extra: Vec<String>) -> Launcher {
     if extra.first().is_some_and(|s| s.as_str() == "plugin") {
         let mut profile = profile_flag;
-        let mut pnpm: Vec<String> = vec![];
+        let mut pnpm: Vec<String> = Vec::new();
         let mut it = extra.into_iter().skip(1);
         while let Some(a) = it.next() {
             if a == "--profile" {
@@ -59,12 +59,12 @@ pub fn split_launcher_args(profile_flag: Option<String>, extra: Vec<String>) -> 
     }
     let mut profile = profile_flag;
     let mut from_default: Option<String> = None;
-    let mut patches: Vec<String> = vec![];
+    let mut patches: Vec<String> = Vec::new();
     let mut dump = false;
     let mut dump_default = false;
     let mut dump_schema = false;
-    let mut app_args: Vec<String> = vec![];
-    let mut positional: Vec<String> = vec![];
+    let mut app_args: Vec<String> = Vec::new();
+    let mut positional: Vec<String> = Vec::new();
     let mut it = extra.into_iter();
     while let Some(a) = it.next() {
         match a.as_str() {
@@ -128,7 +128,8 @@ pub fn split_launcher_args(profile_flag: Option<String>, extra: Vec<String>) -> 
     }
     let dumps = [dump, dump_default, dump_schema]
         .iter()
-        .filter(|&&x| x)
+        .copied()
+        .filter(|x| *x)
         .count();
     if dumps > 1 {
         return Launcher::Error("error: --dump-config, --dump-default-config, and --dump-config-schema are mutually exclusive".into());

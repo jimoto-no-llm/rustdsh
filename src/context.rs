@@ -155,9 +155,6 @@ fn query_terms(query: &str) -> Vec<String> {
         if !has_cjk && nchars < 2 {
             continue;
         }
-        if nchars < 1 {
-            continue;
-        }
         // よくある英単語・日本語助詞のノイズだけ落とす
         if matches!(
             t,
