@@ -335,6 +335,7 @@ Measurements conducted on Linux x86_64:
 | [docs/DESKTOP-INTEGRATION.md](docs/DESKTOP-INTEGRATION.md) | DeepSeek Harness Desktop (Electron) integration |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Project roadmap and planned capabilities |
 | [docs/RELEASING.md](docs/RELEASING.md) | Release procedures |
+| [docs/SERIAL-PROXY.md](docs/SERIAL-PROXY.md) | Concurrency-limiting proxy for single-slot providers |
 | [CHANGELOG.md](CHANGELOG.md) | Changes per version |
 
 ## Community
