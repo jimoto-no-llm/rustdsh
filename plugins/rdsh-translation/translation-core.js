@@ -112,26 +112,55 @@ function inlineCodeSpans(source) {
   return spans;
 }
 
-export function protectLiterals(input, nonce = randomBytes(8).toString('hex')) {
-  const source = String(input ?? '');
+function fencedAndInlineCodeSpans(source) {
   const spans = [];
   const lines = source.match(/[^\n]*(?:\n|$)/gu) ?? [];
   let offset = 0;
-  let open;
+  let openFence;
+  let paragraphStart = -1;
+  let paragraphEnd = -1;
+
+  const flushParagraph = () => {
+    if (paragraphStart < 0) return;
+    const paragraph = source.slice(paragraphStart, paragraphEnd);
+    for (const span of inlineCodeSpans(paragraph)) {
+      spans.push({ start: paragraphStart + span.start, end: paragraphStart + span.end });
+    }
+    paragraphStart = -1;
+    paragraphEnd = -1;
+  };
+
   for (const line of lines) {
-    const fence = line.match(/^[ \t]{0,3}(`{3,}|~{3,})/u)?.[1];
-    if (!open && fence) open = { start: offset, char: fence[0], length: fence.length };
-    else if (open) {
-      const close = line.match(/^[ \t]{0,3}(`{3,}|~{3,})[ \t]*(?:\n|$)/u)?.[1];
-      if (close && close[0] === open.char && close.length >= open.length) {
-        spans.push({ start: open.start, end: offset + line.length });
-        open = undefined;
+    const content = line.replace(/\r?\n$/u, '');
+    if (openFence) {
+      const close = content.match(/^[ \t]{0,3}(`{3,}|~{3,})[ \t]*$/u)?.[1];
+      if (close && close[0] === openFence.char && close.length >= openFence.length) {
+        spans.push({ start: openFence.start, end: offset + line.length });
+        openFence = undefined;
+      }
+    } else {
+      const fence = content.match(/^[ \t]{0,3}(`{3,}|~{3,})/u)?.[1];
+      if (fence) {
+        flushParagraph();
+        openFence = { start: offset, char: fence[0], length: fence.length };
+      } else if (/^[ \t]*$/u.test(content)) {
+        flushParagraph();
+      } else {
+        if (paragraphStart < 0) paragraphStart = offset;
+        paragraphEnd = offset + line.length;
       }
     }
     offset += line.length;
   }
-  if (open) spans.push({ start: open.start, end: source.length });
-  spans.push(...inlineCodeSpans(source));
+
+  flushParagraph();
+  if (openFence) spans.push({ start: openFence.start, end: source.length });
+  return spans;
+}
+
+export function protectLiterals(input, nonce = randomBytes(8).toString('hex')) {
+  const source = String(input ?? '');
+  const spans = fencedAndInlineCodeSpans(source);
   const patterns = [
     /https?:\/\/[^\s<>]+|(?<![\w./\\])--?[A-Za-z][\w-]*(?![\w./\\])|\b[A-Za-z_][A-Za-z0-9_]*(?:_[A-Za-z0-9_]+|[A-Z][A-Za-z0-9_]*)+\b/gu,
     /\b[A-Za-z]:[\\/][^\s<>"']+/gu,

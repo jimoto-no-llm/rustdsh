@@ -104,6 +104,38 @@ test('fenced code survives translation byte-for-byte and non-stop finishes do no
   await assert.rejects(streamTranslation(incomplete, { provider: 'p', model: 'm' }, 'English answer.'), /途中で切らず/u);
 });
 
+test('translation preserves inline code after fences and across paragraph boundaries', async () => {
+  const tick = String.fromCharCode(96);
+  const dateSpan = tick + 'date' + tick;
+  const fencedBlock = '~~~sh\n# unmatched ' + tick + ' in code\n~~~\n';
+  const original = 'Example:\n' + fencedBlock + 'Run ' + dateSpan + ' now.\n\nA stray ' + tick + ' in this paragraph.\n\nThen run ' + dateSpan + ' now.';
+  const state = fixture({ text: original });
+  const llm = {
+    async *stream(options) {
+      const prompt = options.messages[0].content[0].text;
+      const target = prompt.split('--- 翻訳対象 ---\n')[1];
+      assert.ok(target);
+      assert.equal(target.includes(dateSpan), false);
+      assert.equal([...target.matchAll(/__RDSH_KEEP_[a-f0-9]+_\d+__/gu)].length, 3);
+      const translated = target
+        .replace('Example:', '例:')
+        .replace('Run', '実行')
+        .replace('Then run', '次に実行')
+        .split(dateSpan).join(tick + '日付' + tick);
+      yield { type: 'text-delta', text: translated };
+      yield { type: 'finish', reason: { kind: 'stop' } };
+    },
+  };
+
+  const result = await translateAndReplace({ agent: state.agent, llm, messageId: 'answer-7', settings: { provider: '', model: '' } });
+  assert.deepEqual(result, { kind: 'success', text: '和訳に置き換えました', sourceEventSeq: 8 });
+  assert.equal(
+    state.appends[0].data.content[0].text,
+    original.replace('Example:', '例:').replace('Run', '実行').replace('Then run', '次に実行'),
+  );
+  assert.equal(state.appends[0].data.source.originalText, original);
+});
+
 test('an incomplete translation leaves the original surface untouched', async () => {
   const state = fixture();
   const llm = {

@@ -58,6 +58,34 @@ test('inline code spans with nested single backticks stay protected as one liter
   assert.equal(restoreLiterals('コマンド: ' + literals[0].token, literals), 'コマンド: ' + code);
 });
 
+test('inline code after a fenced block is protected independently of ticks inside the fence', () => {
+  const tick = String.fromCharCode(96);
+  const dateSpan = tick + 'date' + tick;
+  const fencedBlock = '~~~sh\n# unmatched ' + tick + ' in code\n~~~\n';
+  const original = 'Example:\n' + fencedBlock + 'Run ' + dateSpan + ' now.';
+  const { masked, literals } = protectLiterals(original, 'fence-inline');
+
+  assert.deepEqual(literals.map((literal) => literal.value), [fencedBlock, dateSpan]);
+  assert.equal(
+    restoreLiterals(masked.replace('Run', '実行'), literals),
+    original.replace('Run', '実行'),
+  );
+});
+
+test('inline code delimiters do not pair across paragraph boundaries', () => {
+  const tick = String.fromCharCode(96);
+  const dateSpan = tick + 'date' + tick;
+  const original = 'A stray ' + tick + ' in this paragraph.\n\nRun ' + dateSpan + ' now.';
+  const { masked, literals } = protectLiterals(original, 'paragraph-inline');
+
+  assert.deepEqual(literals.map((literal) => literal.value), [dateSpan]);
+  assert.ok(masked.includes('A stray ' + tick + ' in this paragraph.\n\n'));
+  assert.equal(
+    restoreLiterals(masked.replace('Run', '実行'), literals),
+    original.replace('Run', '実行'),
+  );
+});
+
 test('a changed or missing protected token fails without committing a replacement', () => {
   const { literals } = protectLiterals('Open `Cargo.toml`.', 'test');
   assert.throws(() => restoreLiterals('Open Cargo.toml.', literals), /保護情報/u);
