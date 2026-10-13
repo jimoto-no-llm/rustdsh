@@ -707,15 +707,14 @@ fn desktop_targets(
     if !no_bundled {
         let plugins_root = resolve_plugins_dir(plugins_dir, env)?;
         for name in plugin_selection(compute) {
+            let spec = plugins_root.join(name).display().to_string();
+            // Windows separators become CLI spec separators. On Unix a
+            // backslash is part of a filename and must remain unchanged.
+            #[cfg(windows)]
+            let spec = spec.replace('\\', "/");
             targets.push(Target {
                 label: name.to_string(),
-                // Plugin specs stay slash-separated: Windows path separators
-                // would leak into a spec that is handed to the desktop CLI.
-                spec: plugins_root
-                    .join(name)
-                    .display()
-                    .to_string()
-                    .replace('\\', "/"),
+                spec,
             });
         }
         root = Some(plugins_root);

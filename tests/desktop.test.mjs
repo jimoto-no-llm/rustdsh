@@ -147,7 +147,8 @@ test('install --dry-run prints the forwarded command and changes nothing', async
   assert.equal(report.dry_run, true);
   assert.equal(report.actions.length, 3);
   assert.equal(report.actions[0].plugin, 'rdsh-settings');
-  assert.deepEqual(report.actions[0].args, ['plugin', '--profile', 'desktop', 'add', join(box.checkout, 'plugins', 'rdsh-settings')]);
+  const source = join(box.checkout, 'plugins', 'rdsh-settings');
+  assert.deepEqual(report.actions[0].args, ['plugin', '--profile', 'desktop', 'add', windows ? source.replaceAll('\\', '/') : source]);
   assert.equal(report.actions[1].plugin, 'dsh-sound-notifications');
   assert.deepEqual(report.actions[1].args, ['plugin', '--profile', 'desktop', 'add', 'github:cwd514/dsh-sound-notifications']);
   assert.equal(report.actions[2].plugin, 'dsh-gitview');
@@ -165,14 +166,32 @@ test('install forwards to the Desktop command and verify then passes', async (t)
   });
   assert.equal(code, 0, stdout);
   const calls = (await readFile(box.log, 'utf8')).trim().split('\n').map((line) => JSON.parse(line));
+  const source = join(box.checkout, 'plugins', 'rdsh-settings');
   assert.deepEqual(calls[0], [
-    'plugin', '--profile', 'desktop', 'add', join(box.checkout, 'plugins', 'rdsh-settings'),
+    'plugin', '--profile', 'desktop', 'add', windows ? source.replaceAll('\\', '/') : source,
   ]);
   assert.deepEqual(calls[1], ['plugin', '--profile', 'desktop', 'add', 'github:cwd514/dsh-sound-notifications']);
   assert.deepEqual(calls[2], ['plugin', '--profile', 'desktop', 'add', 'github:yugapor/dsh-gitview']);
   const verify = await run(['desktop', 'verify', '--json'], { ...env, DSH_DESKTOP_CLI: command });
   assert.equal(verify.code, 0, verify.stderr);
   assert.deepEqual(JSON.parse(verify.stdout).missing, []);
+});
+
+test('Unix plugin source paths preserve literal backslashes', { skip: windows }, async (t) => {
+  const { box, env } = await baseEnv(t);
+  const checkout = join(box.root, 'checkout\\with-backslash');
+  const source = join(checkout, 'plugins', 'rdsh-settings');
+  await mkdir(source, { recursive: true });
+  await writeFile(join(source, 'package.json'), JSON.stringify({ name: 'rdsh-settings' }));
+  const command = await stubCommand(box);
+  await initProfile(box, { name: 'dsh-profile-desktop' });
+  const result = await run(['desktop', 'install', '--json', '--plugins-dir', checkout, '--no-sound', '--no-gitview'], {
+    ...env, DSH_DESKTOP_CLI: command, STUB_LOG: box.log, STUB_PROFILE: box.profile,
+  });
+  assert.equal(result.code, 0, result.stderr);
+  const [args] = (await readFile(box.log, 'utf8')).trim().split('\n').map((line) => JSON.parse(line));
+  assert.equal(args[4], source);
+  assert.equal(existsSync(join(args[4], 'package.json')), true);
 });
 
 test('install --compute also attaches the compute bridge', async (t) => {
