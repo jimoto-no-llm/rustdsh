@@ -452,21 +452,26 @@ test("unknown schema and stale writer locks preserve state and never dispatch", 
     "other-owner",
   );
 });
-test("oversized plan index writes are rejected without damaging existing plans", async (t) => {
+test("plan index writes reserve stop capacity and reject oversized writes", async (t) => {
   const f = await setup(t),
     maxStateBytes = 4 * 1024 * 1024,
     maxInputBytes = 256 * 1024,
     dependencies = Array.from(
       { length: 8 },
-      (_, index) => `dependency-${index}-` + "x".repeat(145 - 13),
+      (_, index) => `dependency-${index}-`,
     ),
-    definition = (index) => ({
+    definition = (index, dependencyPadding = 132, extraDependencyNodes = 0) => ({
       ...f.definition,
       plan_id: `plan-large-${index}`,
       run_id: `run-large-${index}`,
       nodes: Array.from({ length: 200 }, (_, node) => ({
         task_id: `node-${String(node).padStart(3, "0")}`,
-        depends_on: dependencies,
+        depends_on: [
+          ...dependencies.map((dependency) =>
+            dependency + "x".repeat(dependencyPadding),
+          ),
+          ...(node < extraDependencyNodes ? ["x-extra"] : []),
+        ],
         parent_task_id: null,
       })),
     });
@@ -476,6 +481,53 @@ test("oversized plan index writes are rejected without damaging existing plans",
     await f.plans.define(definition(index));
   const before = await fs.readFile(f.plans.index);
   assert.ok(before.byteLength < maxStateBytes);
+
+  const nearLimitDefinition = definition(16, 104, 69),
+    projected = await f.plans.read(),
+    fixedTimestamp = "2026-10-13T00:00:00.000Z";
+  assert.ok(Buffer.byteLength(JSON.stringify(nearLimitDefinition)) <= maxInputBytes);
+  projected.plans.push({
+    definition: nearLimitDefinition,
+    binding: null,
+    context_hash: "0".repeat(64),
+    created_at: fixedTimestamp,
+    enabled_at: null,
+    stopped_at: null,
+    stop_reason: null,
+  });
+  projected.events.push({
+    sequence: projected.events.length + 1,
+    plan_id: nearLimitDefinition.plan_id,
+    task_id: null,
+    action: "defined",
+    reason: null,
+    at: fixedTimestamp,
+  });
+  projected.revision++;
+  const nearLimitBytes = Buffer.byteLength(JSON.stringify(projected) + "\n");
+  assert.ok(nearLimitBytes < maxStateBytes);
+  assert.ok(nearLimitBytes > maxStateBytes - 1024);
+  const stoppedProjection = structuredClone(projected);
+  stoppedProjection.plans[0].stopped_at = fixedTimestamp;
+  stoppedProjection.plans[0].stop_reason = "operator_stopped";
+  stoppedProjection.events.push({
+    sequence: stoppedProjection.events.length + 1,
+    plan_id: "plan-large-0",
+    task_id: null,
+    action: "stopped",
+    reason: null,
+    at: fixedTimestamp,
+  });
+  stoppedProjection.revision++;
+  assert.ok(
+    Buffer.byteLength(JSON.stringify(stoppedProjection) + "\n") >
+      maxStateBytes,
+  );
+  await assert.rejects(
+    f.plans.define(nearLimitDefinition),
+    fail("plan_state_invalid"),
+  );
+  assert.deepEqual(await fs.readFile(f.plans.index), before);
 
   await assert.rejects(
     f.plans.define(definition(16)),
@@ -489,6 +541,37 @@ test("oversized plan index writes are rejected without damaging existing plans",
   );
   assert.equal((await f.plans.read()).plans.length, 16);
   assert.ok((await fs.stat(f.plans.index)).size < maxStateBytes);
+});
+test("plan audit events retain one stop record slot per unstopped plan", async (t) => {
+  const f = await setup(t);
+  await f.plans.define(f.definition);
+  const state = await f.plans.read(),
+    fixedTimestamp = "2026-10-13T00:00:00.000Z";
+  state.events = Array.from({ length: 1999 }, (_, index) => ({
+    sequence: index + 1,
+    plan_id: "plan-qa",
+    task_id: null,
+    action: "defined",
+    reason: null,
+    at: fixedTimestamp,
+  }));
+  await fs.writeFile(f.plans.index, JSON.stringify(state) + "\n");
+  const before = await fs.readFile(f.plans.index);
+
+  await assert.rejects(
+    f.plans.define({
+      ...f.definition,
+      plan_id: "plan-second",
+      run_id: "run-second",
+    }),
+    fail("plan_audit_full"),
+  );
+  assert.deepEqual(await fs.readFile(f.plans.index), before);
+  assert.equal(
+    (await f.plans.stop("plan-qa")).stop_reason,
+    "operator_stopped",
+  );
+  assert.equal((await f.plans.read()).events.length, 2000);
 });
 test("CLI defines and inspects drafts without starting a CLI or accepting misplaced options", async (t) => {
   const f = await setup(t),

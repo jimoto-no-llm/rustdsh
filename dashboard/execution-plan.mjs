@@ -7,6 +7,9 @@ import { ProjectStore, identity } from "./state.mjs";
 import { AcceptanceStore } from "./acceptance.mjs";
 
 const maxPlanStateBytes = 4 * 1024 * 1024;
+const maxPlanStateEvents = 2000;
+// Bound headroom for the stopped fields and audit event for each unstopped plan.
+const maxPlanStopReserveBytesPerPlan = 1024;
 const object = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 const text = (v) =>
   typeof v === "string" &&
@@ -149,7 +152,7 @@ async function readJson(file) {
     await h?.close();
   }
 }
-async function writeJson(file, value) {
+async function writeJson(file, value, reserveBytes = 0) {
   let serialized;
   try {
     serialized = JSON.stringify(value) + "\n";
@@ -157,7 +160,8 @@ async function writeJson(file, value) {
     throw new PlanError("plan_write_unconfirmed");
   }
   check(
-    Buffer.byteLength(serialized, "utf8") <= maxPlanStateBytes,
+    Buffer.byteLength(serialized, "utf8") + reserveBytes <=
+      maxPlanStateBytes,
     "plan_state_invalid",
   );
   const temp = file + "." + randomUUID() + ".tmp";
@@ -194,7 +198,7 @@ function database(v, project) {
       Array.isArray(v.claims) &&
       v.claims.length <= 1000 &&
       Array.isArray(v.events) &&
-      v.events.length <= 2000,
+      v.events.length <= maxPlanStateEvents,
     "plan_state_invalid",
   );
   const ids = new Set();
@@ -346,7 +350,12 @@ export class ExecutionPlans {
         result = await operation(v);
       v.revision++;
       database(v, this.project);
-      await writeJson(this.index, v);
+      const unstoppedPlans = v.plans.filter((plan) => !plan.stopped_at).length;
+      await writeJson(
+        this.index,
+        v,
+        unstoppedPlans * maxPlanStopReserveBytesPerPlan,
+      );
       return result;
     } finally {
       await h.close();
@@ -360,7 +369,11 @@ export class ExecutionPlans {
     return p;
   }
   event(v, p, task_id, action, reason = null) {
-    check(v.events.length < 2000, "plan_audit_full");
+    const unstoppedPlans = v.plans.filter((plan) => !plan.stopped_at).length;
+    check(
+      v.events.length < maxPlanStateEvents - unstoppedPlans,
+      "plan_audit_full",
+    );
     v.events.push({
       sequence: v.events.length + 1,
       plan_id: p.definition.plan_id,
