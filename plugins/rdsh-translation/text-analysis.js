@@ -13,7 +13,7 @@ export function normalizeKanaThreshold(value) {
 export function textBlocksContent(content) {
   if (!Array.isArray(content)) return '';
   return content
-    .filter((block) => block && block.type === 'text' && typeof block.text === 'string')
+    .filter((block) => block && (block.kind === 'text' || block.type === 'text') && typeof block.text === 'string')
     .map((block) => block.text)
     .join('\n');
 }

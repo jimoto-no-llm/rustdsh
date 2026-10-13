@@ -41,8 +41,8 @@ window.__ModuleLoader__.load({
       const finalNode = data?.finalNode;
       if (data?.status !== 'settled' || !finalNode || finalNode.messageId !== messageId || finalNode.interrupted === true) return false;
       const blocks = finalNode.blocks;
-      if (!Array.isArray(blocks) || blocks.length === 0 || blocks.some((block) => !block || !['text', 'reasoning'].includes(block.type))) return false;
-      const textBlocks = blocks.filter((block) => block.type === 'text' && typeof block.text === 'string');
+      if (!Array.isArray(blocks) || blocks.length === 0 || blocks.some((block) => !block || !['text', 'reasoning'].includes(block.kind))) return false;
+      const textBlocks = blocks.filter((block) => block.kind === 'text' && typeof block.text === 'string');
       if (textBlocks.length === 0) return false;
       let kana = 0;
       let lexical = 0;
@@ -180,7 +180,7 @@ window.__ModuleLoader__.load({
     };
 
     return {
-      inject: ['slots', 'remote', 'remote.commands'],
+      inject: ['slots', 'remote', 'remote.commands', 'uiConversation'],
       apply(ctx) {
         ctx.slots.inject('conversation.chat.assistant-actions', () => ctx.slots.register({
           name: 'conversation.chat.assistant-actions',

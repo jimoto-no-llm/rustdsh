@@ -16,7 +16,7 @@ export function normalizeKanaThreshold(value) {
 export function textBlocksContent(content) {
   if (!Array.isArray(content)) return '';
   return content
-    .filter((block) => block && block.type === 'text' && typeof block.text === 'string')
+    .filter((block) => block && (block.kind === 'text' || block.type === 'text') && typeof block.text === 'string')
     .map((block) => block.text)
     .join('\n');
 }
@@ -57,8 +57,59 @@ export function shouldOfferTranslation(content, threshold = DEFAULT_KANA_THRESHO
 export function isFinalTranslatableAssistant(data, messageId, threshold = DEFAULT_KANA_THRESHOLD) {
   const finalNode = data?.finalNode;
   if (data?.status !== 'settled' || !finalNode || finalNode.messageId !== messageId) return false;
-  if (finalNode.interrupted === true || finalNode.blocks?.some((block) => !['text', 'reasoning'].includes(block?.type))) return false;
+  if (finalNode.interrupted === true || finalNode.blocks?.some((block) => !['text', 'reasoning'].includes(block?.kind))) return false;
   return shouldOfferTranslation(finalNode.blocks, threshold);
+}
+
+function escapedBacktick(source, index) {
+  let slashes = 0;
+  for (let cursor = index - 1; cursor >= 0 && source[cursor] === '\\'; cursor -= 1) slashes += 1;
+  return slashes % 2 === 1;
+}
+
+function inlineCodeSpans(source) {
+  const spans = [];
+  const tick = String.fromCharCode(96);
+  let index = 0;
+
+  while (index < source.length) {
+    if (source.charCodeAt(index) !== 96) {
+      index += 1;
+      continue;
+    }
+
+    let runEnd = index + 1;
+    while (source.charCodeAt(runEnd) === 96) runEnd += 1;
+    const delimiterLength = runEnd - index;
+    if (escapedBacktick(source, index)) {
+      index = runEnd;
+      continue;
+    }
+
+    let candidate = runEnd;
+    let closeStart = -1;
+    while (candidate < source.length) {
+      const next = source.indexOf(tick, candidate);
+      if (next < 0) break;
+      let nextEnd = next + 1;
+      while (source.charCodeAt(nextEnd) === 96) nextEnd += 1;
+      if (nextEnd - next === delimiterLength) {
+        closeStart = next;
+        break;
+      }
+      candidate = nextEnd;
+    }
+
+    if (closeStart >= 0) {
+      const end = closeStart + delimiterLength;
+      spans.push({ start: index, end });
+      index = end;
+    } else {
+      index = runEnd;
+    }
+  }
+
+  return spans;
 }
 
 export function protectLiterals(input, nonce = randomBytes(8).toString('hex')) {
@@ -80,8 +131,9 @@ export function protectLiterals(input, nonce = randomBytes(8).toString('hex')) {
     offset += line.length;
   }
   if (open) spans.push({ start: open.start, end: source.length });
+  spans.push(...inlineCodeSpans(source));
   const patterns = [
-    /``[^`\n]+``|`[^`\n]+`|https?:\/\/[^\s<>]+|(?<![\w./\\])--?[A-Za-z][\w-]*(?![\w./\\])|\b[A-Za-z_][A-Za-z0-9_]*(?:_[A-Za-z0-9_]+|[A-Z][A-Za-z0-9_]*)+\b/gu,
+    /https?:\/\/[^\s<>]+|(?<![\w./\\])--?[A-Za-z][\w-]*(?![\w./\\])|\b[A-Za-z_][A-Za-z0-9_]*(?:_[A-Za-z0-9_]+|[A-Z][A-Za-z0-9_]*)+\b/gu,
     /\b[A-Za-z]:[\\/][^\s<>"']+/gu,
     /\\\\[\w.$-]+\\[\w.$-]+(?:\\[\w.$-]+)*/gu,
     /(?<![\w.])\/(?:[\w.$-]+\/)*[\w.$-]+/gu,

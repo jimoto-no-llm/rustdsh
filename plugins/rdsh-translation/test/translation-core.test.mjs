@@ -12,18 +12,19 @@ import {
 test('only a settled, matching, translatable text answer exposes the action', () => {
   const answer = {
     status: 'settled',
-    finalNode: { messageId: 'message-1', blocks: [{ type: 'text', text: 'A useful English answer.' }] },
+    finalNode: { messageId: 'message-1', blocks: [{ kind: 'text', text: 'A useful English answer.' }] },
   };
   assert.equal(isFinalTranslatableAssistant(answer, 'message-1'), true);
   assert.equal(isFinalTranslatableAssistant(answer, 'message-2'), false);
   assert.equal(isFinalTranslatableAssistant({ ...answer, status: 'interrupted' }, 'message-1'), false);
   assert.equal(isFinalTranslatableAssistant({ ...answer, finalNode: { ...answer.finalNode, interrupted: true } }, 'message-1'), false);
-  assert.equal(isFinalTranslatableAssistant({ ...answer, finalNode: { messageId: 'message-1', blocks: [{ type: 'text', text: '日本語の回答です。' }] } }, 'message-1'), false);
-  assert.equal(isFinalTranslatableAssistant({ ...answer, finalNode: { messageId: 'message-1', blocks: [{ type: 'text', text: 'English' }, { type: 'image' }] } }, 'message-1'), false);
+  assert.equal(isFinalTranslatableAssistant({ ...answer, finalNode: { messageId: 'message-1', blocks: [{ kind: 'text', text: '日本語の回答です。' }] } }, 'message-1'), false);
+  assert.equal(isFinalTranslatableAssistant({ ...answer, finalNode: { messageId: 'message-1', blocks: [{ kind: 'text', text: 'English' }, { kind: 'image' }] } }, 'message-1'), false);
+  assert.equal(isFinalTranslatableAssistant({ ...answer, finalNode: { messageId: 'message-1', blocks: [{ type: 'text', text: 'A useful English answer.' }] } }, 'message-1'), false);
 });
 
 test('configured threshold changes action eligibility', () => {
-  const data = { status: 'settled', finalNode: { messageId: 'm', blocks: [{ type: 'text', text: 'A aa あ' }] } };
+  const data = { status: 'settled', finalNode: { messageId: 'm', blocks: [{ kind: 'text', text: 'A aa あ' }] } };
   assert.equal(isFinalTranslatableAssistant(data, 'm', 0.2), false);
   assert.equal(isFinalTranslatableAssistant(data, 'm', 0.4), true);
 });
@@ -45,6 +46,16 @@ test('Unix, Windows, UNC, and relative path forms survive exactly', () => {
   for (const path of ['/var/tmp/rdsh/cache', 'src/session/store', './plugins/rdsh-translation', 'M:/Codex/home/worktrees', '\\\\server\\share\\folder']) {
     assert.ok(literals.some((literal) => literal.value === path || literal.value.startsWith(path)), `${path} should be protected as a single literal`);
   }
+});
+
+test('inline code spans with nested single backticks stay protected as one literal', () => {
+  const tick = String.fromCharCode(96);
+  const code = tick + tick + 'echo ' + tick + 'date' + tick + ' ' + tick + tick;
+  const original = 'Use ' + code + ' for the command.';
+  const { masked, literals } = protectLiterals(original, 'double-tick');
+  assert.deepEqual(literals.map((literal) => literal.value), [code]);
+  assert.equal(masked, 'Use ' + literals[0].token + ' for the command.');
+  assert.equal(restoreLiterals('コマンド: ' + literals[0].token, literals), 'コマンド: ' + code);
 });
 
 test('a changed or missing protected token fails without committing a replacement', () => {

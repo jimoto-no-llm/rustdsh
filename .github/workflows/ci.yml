@@ -178,6 +178,8 @@ jobs:
       - run: cargo build --release
       - run: npm ci --prefix dashboard
       - run: npm ci --prefix tests/e2e
+      - name: Test translation plugin against a real Cordis context
+        run: RDSH_CORDIS_MODULE="$GITHUB_WORKSPACE/tests/e2e/node_modules/cordis/lib/index.js" node --test plugins/rdsh-translation/test/*.test.mjs
       - run: npx playwright install --with-deps chromium
         working-directory: tests/e2e
       - run: npm test --prefix tests/e2e

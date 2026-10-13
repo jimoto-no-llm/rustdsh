@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { pathToFileURL } from 'node:url';
 
 let plugin;
 let configuredThreshold = 0.08;
@@ -27,6 +28,38 @@ globalThis.window = {
 };
 await import('../client.js?test=client-action');
 
+test('the client declares the conversation projection service as a Cordis dependency', () => {
+  assert.ok(plugin.inject.includes('uiConversation'));
+});
+
+test('the client projection starts under a Cordis context with uiConversation injected', {
+  skip: !process.env.RDSH_CORDIS_MODULE,
+}, async () => {
+  const { Context } = await import(pathToFileURL(process.env.RDSH_CORDIS_MODULE).href);
+  const context = new Context();
+  const eventDefinitions = [];
+  context.provide('slots', {
+    inject(_name, setup) { setup(); },
+    register(definition, component) { return { definition, component }; },
+  });
+  const remoteCommands = { execute() {} };
+  context.provide('remote', { commands: remoteCommands });
+  context.provide('remote.commands', remoteCommands);
+  context.provide('uiConversation', {
+    events: { register(definition) { eventDefinitions.push(definition); } },
+  });
+
+  let injected;
+  try {
+    injected = await context.inject(plugin.inject, (clientContext) => plugin.apply(clientContext));
+    assert.equal(eventDefinitions.length, 1);
+    assert.equal(eventDefinitions[0].kind, 'rdsh-ja-translation');
+  } finally {
+    await injected?.dispose?.();
+    await context.fiber.dispose();
+  }
+});
+
 const registrations = [];
 const slotRegistrations = [];
 const eventDefinitions = [];
@@ -45,7 +78,7 @@ plugin.apply({
 });
 const action = registrations.find((entry) => entry.name === 'conversation.chat.assistant-actions').setup().component;
 
-function renderAction({ status = 'settled', blocks = [{ type: 'text', text: 'A concise English answer.' }], interrupted = false, threshold = 0.08 } = {}) {
+function renderAction({ status = 'settled', blocks = [{ kind: 'text', text: 'A concise English answer.' }], interrupted = false, threshold = 0.08 } = {}) {
   configuredThreshold = threshold;
   const data = { status, finalNode: { messageId: 'message-1', blocks, ...(interrupted ? { interrupted: true } : {}) } };
   return action({
@@ -63,15 +96,17 @@ function hasButton(tree) {
 
 test('the Web action appears only for settled non-Japanese final answers', () => {
   assert.equal(hasButton(renderAction()), true);
-  assert.equal(hasButton(renderAction({ blocks: [{ type: 'text', text: '今日はいい天気です。' }] })), false);
+  assert.equal(hasButton(renderAction({ blocks: [{ kind: 'text', text: '今日はいい天気です。' }] })), false);
+  assert.equal(hasButton(renderAction({ blocks: [{ kind: 'text', text: '这是一个中文回答。' }] })), true);
   assert.equal(hasButton(renderAction({ status: 'running' })), false);
   assert.equal(hasButton(renderAction({ interrupted: true })), false);
-  assert.equal(hasButton(renderAction({ blocks: [{ type: 'text', text: 'English' }, { type: 'image' }] })), false);
-  assert.equal(hasButton(renderAction({ blocks: [{ type: 'reasoning', text: 'thinking' }, { type: 'text', text: 'English' }] })), true);
+  assert.equal(hasButton(renderAction({ blocks: [{ kind: 'text', text: 'English' }, { kind: 'image' }] })), false);
+  assert.equal(hasButton(renderAction({ blocks: [{ kind: 'reasoning', text: 'thinking' }, { kind: 'text', text: 'English' }] })), true);
+  assert.equal(hasButton(renderAction({ blocks: [{ type: 'text', text: 'A concise English answer.' }] })), false);
 });
 
 test('the configured kana threshold controls the actual action component', () => {
-  const mixed = [{ type: 'text', text: 'A aa あ' }];
+  const mixed = [{ kind: 'text', text: 'A aa あ' }];
   assert.equal(hasButton(renderAction({ blocks: mixed, threshold: 0.2 })), false);
   assert.equal(hasButton(renderAction({ blocks: mixed, threshold: 0.4 })), true);
 });
@@ -92,7 +127,7 @@ test('the action reads its configured threshold from the config endpoint', async
   };
   captureEffects = true;
   fetchedThreshold = null;
-  const mixed = [{ type: 'text', text: 'A aa あ' }];
+  const mixed = [{ kind: 'text', text: 'A aa あ' }];
   assert.equal(hasButton(renderAction({ blocks: mixed, threshold: 0.08 })), false);
   const load = effects.pop();
   const cleanup = load();

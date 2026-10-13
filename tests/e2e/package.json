@@ -8,6 +8,7 @@
     "test:updates": "node update-banner.mjs"
   },
   "devDependencies": {
+    "cordis": "4.0.0-rc.10",
     "esbuild": "0.27.0",
     "playwright": "1.62.1",
     "react": "19.3.0",

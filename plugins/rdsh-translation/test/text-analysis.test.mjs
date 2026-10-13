@@ -29,6 +29,7 @@ test('only visible text blocks are scored', () => {
   ];
   assert.equal(textBlocksContent(content), 'Good morning.\nHow can I help?');
   assert.equal(shouldOfferTranslation(content), true);
+  assert.equal(textBlocksContent([{ kind: 'text', text: 'A projected answer.' }]), 'A projected answer.');
 });
 
 test('fenced code does not affect kana detection', () => {
