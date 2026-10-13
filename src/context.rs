@@ -105,6 +105,13 @@ fn is_cjk(c: char) -> bool {
         | '\u{f900}'..='\u{faff}' | '\u{ff00}'..='\u{ffef}' | '\u{20000}'..='\u{2ebef}')
 }
 
+/// CJK bigram（2文字ともCJK）か。ノイズ抑制の弱加点・除外判定に使う。
+/// バイト数ではなく文字数とis_cjkで判定する（CJK2文字はUTF-8で6bytesのため）。
+/// ASCIIの2文字語（CI/UI/Goなど）は含まない。
+fn is_cjk_bigram(term: &str) -> bool {
+    term.chars().count() == 2 && term.chars().all(is_cjk)
+}
+
 fn push_term(terms: &mut Vec<String>, t: &str) {
     if t.is_empty() || terms.len() >= 16 {
         return;
@@ -146,9 +153,6 @@ fn query_terms(query: &str) -> Vec<String> {
         let has_cjk = t.chars().any(is_cjk);
         // ASCIIは2文字未満を落とす。CJKを含む語は1文字から残す。
         if !has_cjk && nchars < 2 {
-            continue;
-        }
-        if nchars < 1 {
             continue;
         }
         // よくある英単語・日本語助詞のノイズだけ落とす
@@ -207,7 +211,7 @@ fn score_line(line_lower: &str, terms: &[String]) -> usize {
     let mut matched = 0usize;
     let line_chars: Vec<char> = line_lower.chars().collect();
     for t in terms {
-        if t.len() == 2 && t.chars().count() == 2 && t.chars().all(is_cjk) {
+        if is_cjk_bigram(t) {
             // CJK bigramは弱めに加点（ノイズ抑制）
             if line_lower.contains(t) {
                 score += 3;
@@ -265,6 +269,14 @@ fn is_word_char(c: char) -> bool {
 
 // ---- file helpers ----
 
+fn truncate_utf8_to_bytes(text: &str, cap: usize) -> &str {
+    let mut end = cap.min(text.len());
+    while !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    &text[..end]
+}
+
 fn read_bounded(path: &str, cap: usize) -> Option<String> {
     use std::io::Read;
     let root = std::fs::canonicalize(".").ok()?;
@@ -281,17 +293,7 @@ fn read_bounded(path: &str, cap: usize) -> Option<String> {
         return None; // binary
     }
     let text = String::from_utf8_lossy(&bytes).into_owned();
-    if text.len() > cap {
-        let end = text
-            .char_indices()
-            .take(cap)
-            .last()
-            .map(|(i, _)| i)
-            .unwrap_or(0);
-        Some(text[..end].to_string())
-    } else {
-        Some(text)
-    }
+    Some(truncate_utf8_to_bytes(&text, cap).to_string())
 }
 
 /// working_files 1件分の読み結果。失敗理由を区別して検証メモに回す。
@@ -464,7 +466,7 @@ fn session_files_sorted(limit_dirs: usize) -> Vec<std::path::PathBuf> {
     let projs: Vec<std::path::PathBuf> = match std::fs::read_dir(&root) {
         Ok(e) => {
             let mut v: Vec<(u64, std::path::PathBuf)> = e
-                .filter_map(|e| e.ok())
+                .filter_map(Result::ok)
                 .filter(|e| e.metadata().is_ok_and(|m| m.is_dir()))
                 .map(|e| {
                     let p = e.path();
@@ -480,14 +482,14 @@ fn session_files_sorted(limit_dirs: usize) -> Vec<std::path::PathBuf> {
     let mut files: Vec<(u64, std::path::PathBuf)> = vec![];
     for proj in projs {
         let mut sessions = std::fs::read_dir(&proj)
-            .map(|e| e.filter_map(|e| e.ok()).collect::<Vec<_>>())
+            .map(|e| e.filter_map(Result::ok).collect::<Vec<_>>())
             .unwrap_or_default();
         // セッションも新しい順に上限まで
         sessions.sort_by_key(|e| std::cmp::Reverse(mtime_secs(&e.path())));
         for s in sessions.into_iter().take(limit_dirs.max(1)) {
             let sdir = s.path();
             let mut inner = std::fs::read_dir(&sdir)
-                .map(|e| e.filter_map(|e| e.ok()).collect::<Vec<_>>())
+                .map(|e| e.filter_map(Result::ok).collect::<Vec<_>>())
                 .unwrap_or_default();
             inner.sort_by_key(|e| std::cmp::Reverse(mtime_secs(&e.path())));
             for f in inner.into_iter().take(6) {
@@ -551,11 +553,14 @@ fn recent_sessions(query: &str, limit: usize) -> Vec<String> {
         let mut snippet = String::new();
         let mut best_snippet_score = 0usize;
         for t in &terms {
-            if t.len() == 2 && t.chars().count() == 2 {
-                continue;
-            }
+            // CJK bigramは弱めに加点（ノイズ抑制）。ASCIIの2文字語は通常加点する。
+            let weak = is_cjk_bigram(t);
             if lower.contains(t) {
-                score += 3 + t.chars().count().min(12);
+                if weak {
+                    score += 3;
+                } else {
+                    score += 3 + t.chars().count().min(12);
+                }
                 matched += 1;
                 // その語を含む最良行をスニペットにする
                 for line in text.lines().take(400) {
@@ -783,11 +788,11 @@ fn simple_glob_match(pat: &str, s: &str) -> bool {
 }
 
 fn is_code_file(p: &std::path::Path) -> bool {
-    if let Some(name) = p.file_name().and_then(|s| s.to_str()) {
-        let lower = name.to_lowercase();
-        if CODE_FILENAMES.contains(&lower.as_str()) {
-            return true;
-        }
+    if p.file_name()
+        .and_then(|s| s.to_str())
+        .is_some_and(|name| CODE_FILENAMES.contains(&name.to_lowercase().as_str()))
+    {
+        return true;
     }
     p.extension()
         .and_then(|s| s.to_str())
@@ -810,7 +815,7 @@ fn code_hits(query: &str, max: usize) -> Vec<String> {
     // 決定的な走査順にするためディレクトリ・ファイルとも名前順に処理する。
     while let Some(dir) = stack.pop() {
         let mut entries = std::fs::read_dir(&dir)
-            .map(|e| e.filter_map(|e| e.ok()).collect::<Vec<_>>())
+            .map(|e| e.filter_map(Result::ok).collect::<Vec<_>>())
             .unwrap_or_default();
         entries.sort_by_key(|e| e.file_name());
         let mut subdirs: Vec<std::path::PathBuf> = vec![];
@@ -865,7 +870,9 @@ fn code_hits(query: &str, max: usize) -> Vec<String> {
             let path_lower = p.display().to_string().to_lowercase();
             let mut file_bonus = 0usize;
             for t in &terms {
-                if t.len() == 2 && t.chars().count() == 2 {
+                // CJK bigramはファイル名加点の対象外（ノイズ抑制）。
+                // ASCIIの2文字語は通常どおり加点する。
+                if is_cjk_bigram(t) {
                     continue;
                 }
                 if path_lower.contains(t) {
@@ -1411,4 +1418,112 @@ pub fn cmd_explain(query: Option<String>, budget: Option<usize>) -> anyhow::Resu
     }
     out.flush()?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn defaults_keep_retrieval_bounded_and_git_diff_enabled() {
+        let cfg = ContextConfig::default();
+
+        assert_eq!(cfg.token_budget, DEFAULT_BUDGET);
+        assert_eq!(cfg.max_code_hits, DEFAULT_CODE_HITS);
+        assert_eq!(cfg.max_sessions, DEFAULT_SESSIONS);
+        assert!(cfg.enable_retriever);
+        assert!(cfg.enable_packer);
+        assert!(cfg.enable_verifier);
+        assert!(cfg.include_git_diff);
+    }
+
+    #[test]
+    fn query_terms_split_identifiers_and_recall_cjk_bigrams() {
+        assert_eq!(
+            query_terms("fooBar2日本語検索 and a"),
+            vec![
+                "foo".to_string(),
+                "bar".to_string(),
+                "日本語検索".to_string(),
+                "日本".to_string(),
+                "本語".to_string(),
+                "語検".to_string(),
+                "検索".to_string(),
+            ]
+        );
+    }
+
+    // #388: 2文字ASCII語（CI/UI/Go）を検索語として捨てない。
+    #[test]
+    fn two_char_ascii_terms_are_searchable() {
+        assert_eq!(query_terms("CI"), vec!["ci".to_string()]);
+        assert_eq!(query_terms("Go"), vec!["go".to_string()]);
+        assert!(!is_cjk_bigram("ci"));
+        assert!(!is_cjk_bigram("go"));
+        assert!(is_cjk_bigram("日本"));
+        // ASCIIの2文字語は通常加点される。
+        assert!(score_line("ci pipeline", &["ci".to_string()]) > 0);
+        // CJK bigramは弱い加点になり、通常語と区別される。
+        let weak = score_line("日本語のテスト", &["日本".to_string()]);
+        let normal = score_line("pipeline のテスト", &["pipeline".to_string()]);
+        assert!(weak > 0);
+        assert!(weak < normal);
+    }
+
+    #[test]
+    fn head_tail_truncates_by_unicode_characters() {
+        let (text, truncated) = head_tail("あいうえおABCDE", 2, 3);
+
+        assert!(truncated);
+        assert_eq!(text, "あい\n...[rdsh truncated 5 chars]...\nCDE");
+        assert_eq!(head_tail("short", 2, 3), ("short".to_string(), false));
+    }
+
+    #[test]
+    fn truncate_list_obeys_character_and_item_limits() {
+        let items = vec![
+            "alpha".to_string(),
+            "bravo".to_string(),
+            "charlie".to_string(),
+        ];
+
+        assert_eq!(
+            truncate_list(&items, 3, 10),
+            ("alpha\n...[rdsh 2 more omitted]...".to_string(), 2)
+        );
+        assert_eq!(truncate_list(&items, 2, 100).1, 1);
+    }
+
+    #[test]
+    fn shrinking_a_nonempty_section_keeps_at_least_one_line() {
+        assert_eq!(shrink_lines("first\nsecond\nthird", 0.1), "first");
+        assert_eq!(shrink_lines("first\nsecond", 1.0), "first\nsecond");
+    }
+}
+
+#[cfg(test)]
+mod bounded_read_tests {
+    use super::truncate_utf8_to_bytes;
+
+    #[test]
+    fn lossy_replacements_stay_within_the_byte_cap() {
+        let bytes = [0xff; 4];
+        let text = String::from_utf8_lossy(&bytes);
+        let truncated = truncate_utf8_to_bytes(&text, 4);
+
+        assert_eq!(truncated.len(), 3);
+        assert_eq!(truncated.chars().count(), 1);
+        assert!(truncated.len() <= 4);
+    }
+
+    #[test]
+    fn truncation_drops_a_partial_multibyte_scalar() {
+        assert_eq!(truncate_utf8_to_bytes("ab🦀z", 4), "ab");
+    }
+
+    #[test]
+    fn empty_input_and_zero_cap_are_safe() {
+        assert_eq!(truncate_utf8_to_bytes("", 0), "");
+        assert_eq!(truncate_utf8_to_bytes("abc", 0), "");
+    }
 }

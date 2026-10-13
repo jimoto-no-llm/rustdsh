@@ -41,9 +41,25 @@ Generation failure stops publication.
    python3 -m unittest discover -s tests -p 'test_release_*.py'
    ```
 
+   On a machine with podman or docker, also install the built artifacts inside
+   clean containers. This is the check that keeps a fresh-machine install
+   working on older glibc distros and musl hosts, so run it before tagging:
+
+   ```sh
+   tests/install-isolated.sh --source local --require-musl
+   ```
+
+   The same harness with `--source published --installer published` checks the
+   installer users actually download; `.github/workflows/install-live.yml` runs
+   it weekly. A failure there means the published channel is broken and needs a
+   new release, not a tag move.
+
 4. Run the [full verification matrix](../CONTRIBUTING.md), including Rust fmt,
    clippy, release tests, regression checks, dashboard tests and browser E2E.
-   Merge the reviewed preparation PR only after the required checks pass.
+   Merge the reviewed preparation PR only after the required checks pass. Wait
+   for all required checks on the exact resulting `main` commit to complete
+   successfully before tagging it; the release workflow rechecks that commit's
+   main ancestry and CI status before it starts the platform builds.
 5. Preview the exact release body with an authenticated `gh` CLI:
 
    ```sh
@@ -67,16 +83,26 @@ Generation failure stops publication.
    The release workflow verifies that the tag resolves to the exact pushed SHA,
    that SHA is an ancestor of `main`, and the `ci.yml` run triggered by that
    exact tag push completed successfully. It waits up to 15 minutes for that
-   run; missing, queued, in-progress, failed, or cancelled CI blocks release
-   builds and publication. `publish` waits for both this validation and all
-   release matrix builds. Never tag an unreviewed commit.
+   run, then requires every required check on the tagged commit to be present
+   and successful. Missing, queued, in-progress, failed, or cancelled CI blocks
+   release builds and publication. `publish` waits for both this validation and
+   all release matrix builds. Never tag an unreviewed commit.
+   If the tag-push CI needs longer than the wait window, re-run only the failed
+   `cd` jobs once it finishes; the staged artifacts are reused:
+
+   ```sh
+   gh run rerun <cd-run-id> --failed
+   ```
 
 ## Build and publish
 
 The `cd` workflow first refuses malformed or lightweight tags, tags outside
 `main`, tags whose exact-SHA tag-push CI is missing or unsuccessful, mismatched
-versions, missing CHANGELOG entries and incomplete release notes. It builds
-five targets with `cargo build --locked --release` only after those gates pass:
+versions, missing CHANGELOG entries and incomplete release notes. It also
+requires every required check on the tagged commit to be successful, then builds
+five targets with `cargo build --locked --release` only after those gates pass.
+The exact required check names live in `scripts/release_ci.py`; CI workflow
+job-name changes must update that list and its tests:
 
 | Platform | Archive |
 | --- | --- |

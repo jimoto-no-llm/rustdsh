@@ -1,0 +1,4 @@
+- insert:
+    - id: rdsh-compute
+      name: "rdsh-compute"
+      config: {}

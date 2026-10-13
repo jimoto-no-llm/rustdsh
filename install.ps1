@@ -13,6 +13,7 @@
 #   .\install.ps1 -Wsl             # also install inside WSL via install.sh
 #   .\install.ps1 -FromRelease      # prebuilt binary from GitHub Releases (no Rust needed)
 #   .\install.ps1 -FromRelease -Version v0.1.2  # pinned release
+#   .\install.ps1 -Desktop         # also attach the rdsh plugins to DeepSeek Harness Desktop
 param(
   [switch]$AsDsh,
   [switch]$Restore,
@@ -20,6 +21,7 @@ param(
   [switch]$NoRustup,
   [switch]$Wsl,
   [switch]$FromRelease,
+  [switch]$Desktop,
   [string]$Version = 'latest'
 )
 $ErrorActionPreference = 'Stop'
@@ -35,8 +37,18 @@ function Ensure-Cargo {
       winget install -e --id Rustlang.Rustup --silent --accept-package-agreements --accept-source-agreements
     } else {
       $init = Join-Path $env:TEMP 'rustup-init.exe'
-      Invoke-WebRequest -Uri 'https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe' -OutFile $init
-      & $init -y --profile minimal --default-toolchain stable
+      # Keep this fixed archive version and digest paired; do not fetch the digest beside the binary.
+      $rustupVersion = '1.29.1'
+      $expectedHash = '6f4bef66261261fcb43131be8720bab817d403a09edec7455c371974b90bdb7e'
+      $url = "https://static.rust-lang.org/rustup/archive/$rustupVersion/x86_64-pc-windows-msvc/rustup-init.exe"
+      try {
+        Invoke-WebRequest -Uri $url -OutFile $init
+        $actualHash = (Get-FileHash -LiteralPath $init -Algorithm SHA256).Hash
+        if ($actualHash -ne $expectedHash) { throw 'rustup-init SHA-256 mismatch; refusing to run' }
+        & $init -y --profile minimal --default-toolchain stable
+      } finally {
+        Remove-Item -LiteralPath $init -Force -ErrorAction SilentlyContinue
+      }
     }
   }
   $env:PATH = "$env:USERPROFILE/.cargo/bin;$env:PATH"
@@ -125,3 +137,22 @@ if ($Wsl) {
 Write-Host '--- rdsh doctor ---'
 & (Join-Path $Prefix 'rdsh.exe') doctor | Select-Object -First 12
 Write-Host "next: run 'rdsh setup' to connect a model (GPT subscription via OAuth needs no API key)"
+
+# DeepSeek Harness Desktop (Electron) keeps its own reserved profile; the npm
+# dsh CLI cannot manage it, so plugin attachment goes through the Desktop
+# command runtime. Detection is read-only and never fails the install.
+$rdshExe = Join-Path $Prefix 'rdsh.exe'
+$desktopStatus = & $rdshExe desktop status 2>$null
+if ($desktopStatus -match 'desktop profile: .*(initialized)') {
+  if ($Desktop) {
+    Write-Host '--- DeepSeek Harness Desktop ---'
+    & $rdshExe desktop install --plugins-dir (Join-Path $Repo 'plugins') --compute
+    if ($LASTEXITCODE -eq 0) {
+      Write-Host 'note: quit and reopen DeepSeek Harness to load the plugins'
+    } else {
+      Write-Host "note: Desktop plugin attach failed; run 'rdsh desktop status' for the next step"
+    }
+  } else {
+    Write-Host "next: rdsh desktop install --plugins-dir . attaches the rdsh plugins to the Desktop app"
+  }
+}

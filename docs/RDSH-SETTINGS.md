@@ -49,6 +49,40 @@ rdsh context status   # 有効化後に記憶の状態を見る
 場合だけ `rdsh settings init --force` を実行してください。
 [復旧後の確認と利用の流れ](USER-FLOW.md#4-設定が読めないとき)。
 
+## 機能スイッチ（on/off）
+
+`rdsh features` で機能一覧を確認でき、`rdsh features on <id>` または `rdsh features off <id>` で切り替えられます。
+
+設定に未記載の id は既定値のまま動作するため、既存の挙動が変わることはありません。また、旧キー（`discord.enabled` / `extras.enable` / `beta.context_engine`）も引き続き動作しますが、`features.<id>` が指定されている場合はそちらが優先されます。
+
+| id | 既定 | 内容 |
+| --- | --- | --- |
+| discord | on | Discord Rich Presence（DSH Web が動いているときだけ表示） |
+| update_check | on | 更新確認と更新バナーの表示 |
+| update_notifications | on | 更新が見つかったときの通知 |
+| sound | off | DSH サウンド通知の導入（インストーラの SOUND=1） |
+| serve | off | ローカル閲覧画面（rdsh serve） |
+| search-web | off | SearXNG 経由の Web 検索 |
+| context_engine | off | 実験的なコンテキストエンジン |
+| compute | off | 常駐 pure-compute worker 連携（RDSH_COMPUTE=1） |
+| budget_guard | on | 予算ガードフック |
+| agent_tool_sandbox | off | 委譲したエージェントツールを --share-file の範囲に限定（ネットワーク・ホスト書き込みなし） |
+| release_probe | off | リリース検証プローブ（環境変数があるときだけ実行） |
+| setup_web | on | rdsh setup --web |
+| sessions_token_cache | on | セッションの token サイズキャッシュ |
+| node_compile_cache | on | Node コンパイルキャッシュ |
+| slim_lazy_plugins | on | slim 時にプラグインを遅延読み込み |
+| slim_disable_voice | on | slim 時に DSH の音声機能を止める |
+| slim_disable_auto_review | on | slim 時に自動レビューを止める |
+
+なお、`rdsh settings set features.<id> true|false` でも同じように設定できます。
+
+## 機能スイッチの効き方
+
+- ネイティブ側（`serve` / `search-web` / `context_engine` / `setup_web`）は、無効なコマンドを実行すると理由と有効化方法を表示して終了します。
+- slim のヒント（`slim_lazy_plugins` / `slim_disable_voice` / `slim_disable_auto_review`）と `node_compile_cache` は、委譲して起動する DSH プロセスの環境変数に反映されます。
+- プラグイン側（`discord` / `sound` / `compute` / `budget_guard` / `release_probe` / `update_check` / `update_notifications`）は `rdsh.json` を読み込んで動作を停止します。DSH を再起動すると反映されます。
+
 ## context engine（実験的、既定OFF）
 
 ```sh

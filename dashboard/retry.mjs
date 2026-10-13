@@ -93,9 +93,17 @@ const time = (value) =>
 const sum = (value) =>
   createHash("sha256").update(JSON.stringify(value)).digest("hex");
 export class RetryError extends Error {
-  constructor(code) {
+  // `committed` describes the leased operation: true when it returned (its own
+  // durable record is in place by contract), null when it threw and the lease
+  // helper cannot observe how far it got. Never claims the caller's record IDs.
+  constructor(code, details = null) {
     super("Retry: " + code);
     this.code = code;
+    if (details !== null) {
+      this.committed = details.committed;
+      this.event_ids = [...details.event_ids];
+      this.lock_cleanup_unconfirmed = details.lock_cleanup_unconfirmed;
+    }
   }
 }
 export class RetryFailure extends Error {
@@ -348,22 +356,46 @@ export class RetryHistory {
       if (error.code === "EEXIST") throw new RetryError("operation_busy");
       throw new RetryError("retry_lock_unavailable");
     }
+    let output,
+      failure = null,
+      committed = null;
     try {
       await handle.writeFile(owner);
       await handle.sync();
-      return await operation();
-    } finally {
-      await handle.close();
-      try {
-        check(
-          (await fs.readFile(file, "utf8")) === owner,
-          "retry_lock_changed",
-        );
-        await fs.unlink(file);
-      } catch {
-        throw new RetryError("retry_lock_cleanup_unconfirmed");
-      }
+      output = await operation();
+      // runWithRetry persists its record before it returns. That return is the
+      // only commit signal this helper can honestly observe.
+      committed = true;
+    } catch (error) {
+      failure = error;
     }
+    // A cleanup failure must never replace the outcome the caller earned.
+    let lockCleanupUnconfirmed = false;
+    try {
+      await handle.close();
+      check(
+        (await fs.readFile(file, "utf8")) === owner,
+        "retry_lock_changed",
+      );
+      await fs.unlink(file);
+    } catch {
+      lockCleanupUnconfirmed = true;
+    }
+    if (failure !== null) {
+      if (lockCleanupUnconfirmed) {
+        failure.committed = committed;
+        failure.event_ids = [];
+        failure.lock_cleanup_unconfirmed = true;
+      }
+      throw failure;
+    }
+    if (lockCleanupUnconfirmed)
+      throw new RetryError("retry_lock_cleanup_unconfirmed", {
+        committed,
+        event_ids: [],
+        lock_cleanup_unconfirmed: true,
+      });
+    return output;
   }
 }
 async function bounded(callback, context, milliseconds) {
