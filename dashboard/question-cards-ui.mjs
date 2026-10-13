@@ -301,8 +301,12 @@ export function renderQuestionCards(
       return article;
     }),
   );
-  if (!questions.length)
+  if (!questions.length) {
     container.append(node("p", "未回答の質問はありません", "empty"));
+    container.append(
+      node("p", "今はあなたの番ではありません。そのまま閉じて大丈夫です。", "sub"),
+    );
+  }
   if (active) {
     const element = [...container.querySelectorAll("[data-question]")].find(
       (item) =>

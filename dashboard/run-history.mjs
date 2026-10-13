@@ -559,6 +559,7 @@ export class RunHistory {
             "history_full",
           );
           const journal = await fs.open(this.file, "a", 0o600);
+          let closeFailure = null;
           try {
             let written = 0;
             while (written < bytes.length) {
@@ -569,8 +570,21 @@ export class RunHistory {
             await journal.sync();
             committed = true;
           } finally {
-            await journal.close();
+            try {
+              await journal.close();
+            } catch (error) {
+              // A close failure never replaces a write failure with itself.
+              closeFailure = error;
+            }
           }
+          // The bytes are durable once sync returns; a failing handle close
+          // must not report that committed append as a bare write failure.
+          if (closeFailure !== null)
+            throw new HistoryError("history_journal_close_unconfirmed", null, {
+              committed,
+              event_ids: committed ? [...committedEventIds] : [],
+              lock_cleanup_unconfirmed: false,
+            });
         }
         if (output?.rejected)
           throw new HistoryError("invalid_transition", output.rejected);

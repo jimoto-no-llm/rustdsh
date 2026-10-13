@@ -571,6 +571,92 @@ fn setup_save_extras_restart_serve_and_use_real_http_api() {
     assert_eq!(fs::read(f.0.join("dsh/rdsh.json")).unwrap(), saved);
 }
 
+#[cfg(unix)]
+#[test]
+fn path_search_skips_non_executable_dsh_and_node_candidates() {
+    use std::os::unix::fs::{symlink, PermissionsExt};
+
+    fn write_mode(path: &std::path::Path, contents: &str, mode: u32) {
+        fs::write(path, contents).unwrap();
+        fs::set_permissions(path, fs::Permissions::from_mode(mode)).unwrap();
+    }
+
+    let f = Fixture::new();
+    let first = f.0.join("first");
+    let second = f.0.join("second");
+    fs::create_dir_all(&first).unwrap();
+    fs::create_dir_all(&second).unwrap();
+    let search_path = format!("{}:{}", first.display(), second.display());
+    let second_dsh = second.join("dsh");
+    write_mode(&second_dsh, "#!/bin/sh\necho DUMMY_VALID_DSH\n", 0o755);
+    let second_node = second.join("node");
+    write_mode(
+        &second_node,
+        "#!/bin/sh\nprintf 'DUMMY_VALID_NODE\\n'\n",
+        0o755,
+    );
+
+    let run_stub = |original: Option<&std::path::Path>| {
+        let mut command = f.command(&["--no-slim", "--profile", "web"]);
+        command
+            .env("PATH", &search_path)
+            .env_remove("RDSH_ORIG_BIN")
+            .env_remove("DSH_ORIG_BIN");
+        if let Some(original) = original {
+            command.env("RDSH_ORIG_BIN", original);
+        }
+        command.output().unwrap()
+    };
+    let assert_marker = |output: Output, marker: &str| {
+        assert!(
+            output.status.success(),
+            "delegation failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let stdout = String::from_utf8(output.stdout).unwrap();
+        assert!(
+            stdout.contains(marker),
+            "expected {marker:?}, got {stdout:?}"
+        );
+    };
+
+    // A directory and a non-executable file must both be skipped in favor of
+    // the later usable DSH; a PATH entry resolving to rdsh itself stays skipped.
+    let first_dsh = first.join("dsh");
+    fs::create_dir(&first_dsh).unwrap();
+    let output = run_stub(None);
+    assert_marker(output, "DUMMY_VALID_DSH");
+
+    fs::remove_dir(&first_dsh).unwrap();
+    write_mode(&first_dsh, "not executable\n", 0o644);
+    let output = run_stub(None);
+    assert_marker(output, "DUMMY_VALID_DSH");
+
+    fs::remove_file(&first_dsh).unwrap();
+    symlink(env!("CARGO_BIN_EXE_rdsh"), &first_dsh).unwrap();
+    let output = run_stub(None);
+    assert_marker(output, "DUMMY_VALID_DSH");
+
+    // An explicit original path keeps priority even when it is outside PATH.
+    let explicit_dsh = f.0.join("explicit/dsh");
+    fs::create_dir_all(explicit_dsh.parent().unwrap()).unwrap();
+    write_mode(
+        &explicit_dsh,
+        "#!/bin/sh\nprintf 'EXPLICIT_DSH\\n'\n",
+        0o755,
+    );
+    let output = run_stub(Some(&explicit_dsh));
+    assert_marker(output, "EXPLICIT_DSH");
+
+    // A .js override still uses Node, but skips a non-executable earlier Node.
+    let first_node = first.join("node");
+    write_mode(&first_node, "not executable\n", 0o644);
+    let original_js = f.0.join("original.js");
+    fs::write(&original_js, "process.stdout.write('DUMMY_JS\\n')\n").unwrap();
+    let output = run_stub(Some(&original_js));
+    assert_marker(output, "DUMMY_VALID_NODE");
+}
+
 #[test]
 fn http_browser_origin_guard_preserves_authenticated_native_clients() {
     let f = Fixture::new();
@@ -823,6 +909,105 @@ fn cli_tokens_prune_compact_search_logs_guard_and_settings_work_together() {
         Some(2)
     );
     assert!(f.run(&["guard"], b"safe operation").status.success());
+
+    let allowed = f.0.join("policy-project");
+    let outside = f.0.join("policy-outside");
+    fs::create_dir_all(&allowed).unwrap();
+    fs::create_dir_all(&outside).unwrap();
+    fs::write(allowed.join("same.txt"), "same operation text").unwrap();
+    fs::write(outside.join("same.txt"), "same operation text").unwrap();
+    let policy_path = f.0.join("hook-policy.json");
+    fs::write(
+        &policy_path,
+        json!({
+            "schema": 1,
+            "rules": [{
+                "id": "project-read",
+                "tool": "Read",
+                "access": "read",
+                "roots": [allowed.to_string_lossy()]
+            }]
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let policy_path = policy_path.to_str().unwrap();
+    let hook = |cwd: &std::path::Path, tool: &str, file: &str| {
+        let tool_input = if tool == "Write" {
+            json!({ "file_path": file, "content": "same operation text" })
+        } else {
+            json!({ "file_path": file })
+        };
+        json!({
+            "cwd": cwd.to_string_lossy(),
+            "description": "same operation text",
+            "tool_name": tool,
+            "tool_input": tool_input
+        })
+        .to_string()
+    };
+    let classify = |input: String| {
+        let result = f.run(
+            &["guard", "--policy-file", policy_path, "--json"],
+            input.as_bytes(),
+        );
+        assert!(
+            result.status.success(),
+            "structured JSON decision should use stdout: {}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+        serde_json::from_slice::<Value>(&result.stdout).unwrap()
+    };
+    let permitted = classify(hook(&allowed, "Read", "same.txt"));
+    assert_eq!(permitted["classification"], "allow");
+    assert!(permitted.get("decision").is_none());
+    assert_eq!(permitted["rule_id"], "project-read");
+    let paged_read = classify(
+        json!({
+            "cwd": allowed.to_string_lossy(),
+            "description": "same operation text",
+            "tool_name": "Read",
+            "tool_input": { "file_path": "same.txt", "offset": 2, "limit": 8 }
+        })
+        .to_string(),
+    );
+    assert_eq!(paged_read["classification"], "allow");
+    let outside_file = classify(hook(&outside, "Read", "same.txt"));
+    assert_eq!(outside_file["classification"], "deny");
+    assert_eq!(outside_file["reason"], "path_outside_allowed_root");
+    let changed_tool = classify(hook(&allowed, "Write", "same.txt"));
+    assert_eq!(changed_tool["classification"], "deny");
+    assert_eq!(changed_tool["reason"], "tool_not_allowed");
+    let unsupported_shell = classify(
+        json!({
+            "cwd": allowed.to_string_lossy(),
+            "tool_name": "Bash",
+            "tool_input": { "command": "cat same.txt" }
+        })
+        .to_string(),
+    );
+    assert_eq!(unsupported_shell["classification"], "unknown");
+    assert_eq!(
+        unsupported_shell["reason"],
+        "shell_command_parse_unsupported"
+    );
+    let unsupported_argument = classify(
+        json!({
+            "cwd": allowed.to_string_lossy(),
+            "tool_name": "Read",
+            "tool_input": { "file_path": "same.txt", "command": "cat same.txt" }
+        })
+        .to_string(),
+    );
+    assert_eq!(unsupported_argument["classification"], "unknown");
+    assert_eq!(unsupported_argument["reason"], "tool_schema_unsupported");
+    let malformed = classify("{broken".to_owned());
+    assert_eq!(malformed["classification"], "unknown");
+    assert_eq!(malformed["reason"], "invalid_json");
+    assert!(!outside_file
+        .to_string()
+        .contains(outside.to_string_lossy().as_ref()));
+
     f.ok(&["settings", "set", "search.max", "42"], b"");
     assert!(!f
         .run(&["settings", "set", "search.max", "bad"], b"")
@@ -893,4 +1078,59 @@ fn web_search_gate_and_real_http_results_and_failure() {
             assert!(String::from_utf8_lossy(&result.stderr).contains("HTTP 503"));
         }
     }
+}
+
+/// #388: 2文字ASCII語（CI/UI/Go）のセッション検索が0件にならない。
+///
+/// セッション本文は Unix 専用の no-follow open（`file_security::Root`）でしか
+/// 読めないため、Windows では元から `# sessions (0)` になる。そこでここでは
+/// 「検索語を受け付けて正常終了し、セッション節を必ず出す」ことだけを共通で見て、
+/// 実際のヒットは Unix でのみ検証する。語の採否そのものは src/context.rs の
+/// 単体テスト（two_char_ascii_terms_are_searchable）が全OSで担保する。
+#[test]
+fn context_search_finds_two_char_ascii_terms() {
+    let f = Fixture::new();
+    f.settings(json!({"features": {"context_engine": true}}));
+    let dir = f.0.join("dsh/sessions/p/s");
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(
+        dir.join("transcript.jsonl"),
+        "{\"content\":\"CI pipeline UI Go TypeScript \u{65e5}\u{672c}\u{8a9e}\u{691c}\u{7d22}\"}\n",
+    )
+    .unwrap();
+    for query in [
+        "CI",
+        "UI",
+        "Go",
+        "pipeline",
+        "\u{65e5}\u{672c}\u{8a9e}\u{691c}\u{7d22}",
+    ] {
+        let out = f.ok(&["context", "search", query], b"");
+        let text = String::from_utf8_lossy(&out);
+        assert!(
+            text.contains("# sessions ("),
+            "query {query:?} should report the session section, got:\n{text}"
+        );
+        #[cfg(unix)]
+        assert!(
+            text.contains("# sessions (1)") && text.contains("[session]"),
+            "query {query:?} should hit the fixture session, got:\n{text}"
+        );
+    }
+}
+
+/// #389: tokens/compute の chars は文字数（Unicode scalar 数）。
+#[test]
+fn tokens_chars_counts_characters_not_bytes() {
+    let f = Fixture::new();
+    let v: Value =
+        serde_json::from_slice(&f.ok(&["tokens"], "\u{65e5}\u{672c}\u{8a9e}".as_bytes())).unwrap();
+    assert_eq!(v["tokens"], 3);
+    assert_eq!(v["chars"], 3);
+    let line = "{\"v\":1,\"id\":\"review\",\"op\":\"tokens.estimate\",\"text\":\"\u{65e5}\u{672c}\u{8a9e}\"}\n";
+    let v: Value = serde_json::from_slice(&f.ok(&["compute", "--once"], line.as_bytes())).unwrap();
+    assert_eq!(v["chars"], 3);
+    let batch = "{\"v\":1,\"id\":\"review\",\"op\":\"tokens.estimate_batch\",\"texts\":[\"\u{65e5}\u{672c}\u{8a9e}\",\"\u{e9}\",\"abc\"]}\n";
+    let v: Value = serde_json::from_slice(&f.ok(&["compute", "--once"], batch.as_bytes())).unwrap();
+    assert_eq!(v["chars"], serde_json::json!([3, 1, 3]));
 }

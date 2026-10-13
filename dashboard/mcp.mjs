@@ -136,9 +136,29 @@ export const tools = [
     ),
   },
   {
+    name: "dashboard_present_ui",
+    description:
+      "Present structured UI (cards, tables, charts, choices, forms, diffs, approvals) in the project dashboard so a human can read and act on it. Send one message_id per turn and reuse surface_id to update the same surface. Blocks are validated against a fixed kind allow-list; unknown kinds and type mismatches degrade to text. A block may carry actions; the server issues their ids and a human click returns to this session as ui_action feedback readable with dashboard_get_feedback. Presenting UI and answering it never grant execution authority: request-type actions (request_tool, apply_patch, delete, publish, charge, interrupt) are recorded as requests, and the agent must still run its own gated flow. Values that are unknown must be null, never zero.",
+    inputSchema: object(
+      {
+        message_id: string,
+        session_id: string,
+        surface_id: string,
+        blocks: {
+          type: "array",
+          minItems: 1,
+          maxItems: 200,
+          items: { type: "object" },
+        },
+        observation: observationSchema,
+      },
+      ["message_id", "blocks"],
+    ),
+  },
+  {
     name: "dashboard_get_feedback",
     description:
-      "Read durable human answers after a sequence cursor. Pass next_cursor on the next call. Reads never consume, acknowledge or apply feedback. A consumer-bound reply has a stable reply_command_id; application acknowledgements require its separate run/session credential. Poll at appropriate workflow checkpoints if resource subscriptions are unavailable.",
+      "Read durable human answers after a sequence cursor. Pass next_cursor on the next call. Reads never consume, acknowledge or apply feedback. A consumer-bound reply has a stable reply_command_id; application acknowledgements require its separate run/session credential. Presented-UI actions arrive as type ui_action with the surface/block/action ids and execution_authorized false. Poll at appropriate workflow checkpoints if resource subscriptions are unavailable.",
     inputSchema: object({ after: { type: "integer", minimum: 0 } }),
   },
   {
@@ -172,6 +192,7 @@ export function diagnoseUnknownTool(name) {
 }
 export async function executeTool(api, name, args = {}) {
   if (name === "dashboard_get_state") return await api.getState();
+  if (name === "dashboard_present_ui") return await api.presentUi(args);
   if (name === "dashboard_get_feedback")
     return feedbackSince(await api.getState(), args.after ?? 0);
   if (routes[name]) {
@@ -313,6 +334,7 @@ export async function runStdio(project) {
   }
   const mcp = createMcpServer({
     getState: () => request("api/state"),
+    presentUi: (input) => request("api/update/ui_surface", input),
     mutate: (operation, input) => request(`api/update/${operation}`, input),
   });
   await mcp.server.connect(new StdioServerTransport());

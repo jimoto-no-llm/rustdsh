@@ -32,6 +32,91 @@ const equal = (a, b) =>
   timingSafeEqual(Buffer.from(a), Buffer.from(b));
 const loopbackAddresses = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
 const forwardingHeaders = ["forwarded", "x-forwarded-for", "x-forwarded-host"];
+// Exclusive live-instance lock: stale-lock reclamation is serialized
+// in-process, cross-process steals use an atomic rename, and cleanup only
+// removes a lock owned by this starter (`pid:token`).
+let dashboardLockQueue = Promise.resolve();
+function parseDashboardLock(content) {
+  const text = String(content ?? "").trim();
+  const sep = text.indexOf(":");
+  if (sep === -1) return { pid: Number(text), token: null };
+  return { pid: Number(text.slice(0, sep)), token: text.slice(sep + 1) };
+}
+function dashboardPidAlive(pid) {
+  if (!Number.isFinite(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error?.code === "EPERM";
+  }
+}
+export async function removeDashboardLockIfOwned(lockFile, ownedContent) {
+  let current = null;
+  try {
+    current = await fs.readFile(lockFile, "utf8");
+  } catch {
+    return false;
+  }
+  if (current !== ownedContent) return false;
+  try {
+    await fs.unlink(lockFile);
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+  return true;
+}
+export async function acquireDashboardLock(lockFile, ownedContent) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      await fs.writeFile(lockFile, ownedContent, { flag: "wx", mode: 0o600 });
+      return;
+    } catch (error) {
+      if (error?.code !== "EEXIST") throw error;
+    }
+    let existing = null;
+    try {
+      existing = await fs.readFile(lockFile, "utf8");
+    } catch (error) {
+      if (error?.code === "ENOENT") continue;
+      throw error;
+    }
+    if (dashboardPidAlive(parseDashboardLock(existing).pid)) {
+      throw new Error(
+        "This dashboard is already running; use rdsh-dashboard open with the same project",
+      );
+    }
+    const backup = `${lockFile}.stale.${process.pid}.${randomUUID()}`;
+    try {
+      await fs.rename(lockFile, backup);
+    } catch (error) {
+      if (error?.code === "ENOENT") continue;
+      throw error;
+    }
+    let stolen = null;
+    try {
+      stolen = await fs.readFile(backup, "utf8");
+    } catch {
+      stolen = null;
+    }
+    if (stolen !== existing) {
+      if (stolen !== null) {
+        try {
+          await fs.writeFile(lockFile, stolen, { flag: "wx", mode: 0o600 });
+          await fs.unlink(backup).catch(() => {});
+        } catch (restoreError) {
+          if (restoreError?.code !== "EEXIST") throw restoreError;
+          await fs.unlink(backup).catch(() => {});
+        }
+      } else {
+        await fs.unlink(backup).catch(() => {});
+      }
+      continue;
+    }
+    await fs.unlink(backup).catch(() => {});
+  }
+  throw new Error("Could not acquire dashboard lock");
+}
 function json(res, status, value) {
   res.writeHead(status, { "content-type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(value));
@@ -58,31 +143,13 @@ export async function startDashboard(options) {
   await fs.mkdir(directory, { recursive: true });
   // Exclusive live-instance lock: never launch two writers for the same project.
   const lockFile = path.join(directory, "server.lock");
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      await fs.writeFile(lockFile, String(process.pid), {
-        flag: "wx",
-        mode: 0o600,
-      });
-      break;
-    } catch (e) {
-      if (e.code !== "EEXIST") throw e;
-      const pid = Number(await fs.readFile(lockFile, "utf8"));
-      let alive = false;
-      try {
-        process.kill(pid, 0);
-        alive = true;
-      } catch (error) {
-        if (error.code === "EPERM") alive = true;
-      }
-      if (alive)
-        throw new Error(
-          "This dashboard is already running; use rdsh-dashboard open with the same project",
-        );
-      await fs.unlink(lockFile);
-      if (attempt === 1) throw new Error("Could not acquire dashboard lock");
-    }
-  }
+  const lockContent = `${process.pid}:${randomUUID()}`;
+  const acquisition = dashboardLockQueue.then(
+    () => acquireDashboardLock(lockFile, lockContent),
+    () => acquireDashboardLock(lockFile, lockContent),
+  );
+  dashboardLockQueue = acquisition.catch(() => {});
+  await acquisition;
   const token = randomBytes(32).toString("hex"); // local administrator
   const mcpToken = randomBytes(32).toString("hex");
   const browserToken = randomBytes(32).toString("hex");
@@ -104,7 +171,7 @@ export async function startDashboard(options) {
         })
       : null;
   } catch (error) {
-    await fs.unlink(lockFile);
+    await removeDashboardLockIfOwned(lockFile, lockContent).catch(() => {});
     throw error;
   }
   const live = new Set(),
@@ -123,7 +190,7 @@ export async function startDashboard(options) {
   const budgets = store ? new BudgetAdmissionServer(mutateBudget) : null;
   const modern = store
     ? modernMcpHandler(
-        { getState: visibleState, mutate },
+        { getState: visibleState, mutate, presentUi: mutateUiSurface },
         eventsHub,
         connections,
       )
@@ -229,6 +296,7 @@ export async function startDashboard(options) {
               "--project",
               project.root,
             ],
+            env: { RDSH_DASHBOARD_HOME: path.resolve(stateHome()) },
           },
         },
       });
@@ -319,6 +387,32 @@ export async function startDashboard(options) {
       for (const response of live)
         response.write(`event: changed\ndata: ${store.value.revision}\n\n`);
       for (const { mcp } of sessions.values()) void mcp.notify();
+      return result;
+    });
+    updateQueue = task.catch(() => {});
+    return task;
+  }
+  // rdsh-ui/1: the agent presents a surface through MCP, and a human action
+  // returns to the same session as feedback. Both go through updateQueue so
+  // live views and MCP subscribers see one ordered revision.
+  async function mutateUiSurface(input) {
+    const task = updateQueue.then(async () => {
+      const result = await store.mutateUiSurface(input);
+      for (const response of live)
+        response.write("event: changed\ndata: " + store.value.revision + "\n\n");
+      for (const { mcp } of sessions.values()) void mcp.notify();
+      return result;
+    });
+    updateQueue = task.catch(() => {});
+    return task;
+  }
+  async function mutateUiAction(input) {
+    const task = updateQueue.then(async () => {
+      const result = await store.mutateUiAction(input);
+      for (const response of live)
+        response.write("event: changed\ndata: " + store.value.revision + "\n\n");
+      for (const { mcp } of sessions.values()) void mcp.notify();
+      void eventsHub.flush().catch(() => {});
       return result;
     });
     updateQueue = task.catch(() => {});
@@ -451,6 +545,7 @@ export async function startDashboard(options) {
           route === "/observations.mjs" ||
           route === "/reports-view.mjs" ||
           route === "/question-cards-ui.mjs" ||
+          route === "/model-catalog-ui.mjs" ||
           route === "/project-overview.mjs" ||
           route === "/connection-diagnostics-ui.mjs" ||
           route === "/answer-applications-ui.mjs" ||
@@ -458,6 +553,10 @@ export async function startDashboard(options) {
           route === "/cost-ledger-ui.mjs" ||
           route === "/budget-ui.mjs" ||
           route === "/observed-cli-ui.mjs" ||
+          route === "/ui/registry.mjs" ||
+          route === "/ui/blocks.mjs" ||
+          route === "/ui/state-adapter.mjs" ||
+          route === "/model-catalog-ui.mjs" ||
           route === "/favicon.ico" ||
           route === "/icon.png" ||
           route === "/icon.svg");
@@ -551,6 +650,7 @@ export async function startDashboard(options) {
           "/observations.mjs",
           "/reports-view.mjs",
           "/question-cards-ui.mjs",
+          "/model-catalog-ui.mjs",
           "/project-overview.mjs",
           "/connection-diagnostics-ui.mjs",
           "/answer-applications-ui.mjs",
@@ -558,6 +658,10 @@ export async function startDashboard(options) {
           "/cost-ledger-ui.mjs",
           "/budget-ui.mjs",
           "/observed-cli-ui.mjs",
+          "/ui/registry.mjs",
+          "/ui/blocks.mjs",
+          "/ui/state-adapter.mjs",
+          "/model-catalog-ui.mjs",
         ].includes(route)
       ) {
         res.writeHead(200, {
@@ -794,9 +898,14 @@ export async function startDashboard(options) {
         if (req.method === "POST" && route?.startsWith("/api/update/")) {
           const operation = route.slice("/api/update/".length);
           if (
-            !["metrics", "task", "question", "answer", "event"].includes(
-              operation,
-            )
+            ![
+              "metrics",
+              "task",
+              "question",
+              "answer",
+              "event",
+              "ui_surface",
+            ].includes(operation)
           )
             return json(res, 404, { error: "Unknown project operation" });
           if (
@@ -807,7 +916,21 @@ export async function startDashboard(options) {
             return json(res, 403, {
               error: "This credential cannot perform that operation",
             });
-          return json(res, 200, await mutate(operation, await readBody(req)));
+          const body = await readBody(req);
+          if (operation === "ui_surface")
+            return json(res, 200, await mutateUiSurface(body));
+          return json(res, 200, await mutate(operation, body));
+        }
+        if (route === "/api/ui/actions") {
+          // The browser returns a human action to the same session. The action
+          // id came from the server, and no operation is executed here.
+          if (req.method !== "POST")
+            return json(res, 405, { error: "Method not allowed" });
+          if (!humanAuthorized)
+            return json(res, 403, {
+              error: "Dashboard owner browser required",
+            });
+          return json(res, 200, await mutateUiAction(await readBody(req, 65536)));
         }
         if (req.method === "GET" && route === "/api/live") {
           res.writeHead(200, {
@@ -840,6 +963,7 @@ export async function startDashboard(options) {
             const mcp = createMcpServer({
               getState: visibleState,
               mutate,
+              presentUi: mutateUiSurface,
             });
             const transport = new StreamableHTTPServerTransport({
               sessionIdGenerator: randomUUID,
@@ -899,7 +1023,7 @@ export async function startDashboard(options) {
       await eventsHub?.queue;
       for (const socket of sockets) socket.destroy();
       await new Promise((resolve) => server.close(resolve));
-      await fs.unlink(lockFile).catch(() => {});
+      await removeDashboardLockIfOwned(lockFile, lockContent).catch(() => {});
     });
     closePromise = attempt;
     // A failed preflight leaves the dashboard available, so let a later caller retry.

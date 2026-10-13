@@ -11,7 +11,7 @@ publish, or charge money. Permission decisions belong to the approval ledger
 Legacy `{id, question, urgency?, default_action?}` calls retain their existing
 question and feedback field shapes. `default_action` is informational and does
 not turn a consultation into an approval request. The state schema remains 1
-and both MCP transports still expose six tools. Optional `question_contracts`
+and both MCP transports still expose seven tools. Optional `question_contracts`
 metadata has its own schema 1 and is written atomically with questions/answers
 in the same project state file. Unsupported or inconsistent metadata prevents
 startup without overwriting the file.

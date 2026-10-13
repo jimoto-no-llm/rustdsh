@@ -86,16 +86,20 @@ screen capture and human visual acceptance require their own evidence.
 Before and after execution, the observer records Git HEAD/branch, hashes of the
 declared inputs and nonignored worktree files, and OS/architecture/Node versions.
 The acceptance storage itself is excluded. Observations require an exact Git
-root with a committed HEAD. Inputs cannot escape the project, contain `.git` or
-`.env` components, or be missing/ignored. Observation limits are 5,000 files,
-64 MiB per file, 256 MiB total and bounded Git subprocesses.
+root with a committed HEAD. Criterion inputs cannot escape the project,
+contain `.git` or `.env*` components, or be missing/ignored. Worktree scanning
+keeps only an opaque path marker for `.env*` files and never reads their
+contents. This lets a local check run, while marking the target scope
+incomplete: a passing command result remains ineligible for verified/current
+status and freshness stays `unknown`, `impact_scope_unknown`. Observation limits
+are 5,000 files, 64 MiB per file, 256 MiB total and bounded Git subprocesses.
 
 | Observation after a check                                             | Current validity                       |
 | --------------------------------------------------------------------- | -------------------------------------- |
 | Same criterion, code target, environment and intact logs              | `current`                              |
 | Changed criterion, HEAD/branch, related input or environment          | `stale`                                |
 | Deleted or ignored required input                                     | `stale`; a new run is blocked          |
-| Changed worktree outside declared inputs                              | `unknown`, `impact_scope_unknown`      |
+| Changed worktree outside declared inputs or opaque `.env*` path       | `unknown`, `impact_scope_unknown`      |
 | Unavailable Git/files, unstable execution target or incomplete record | `unknown`                              |
 | Missing/modified command or evidence artifact                         | Ineligible pass, with integrity reason |
 

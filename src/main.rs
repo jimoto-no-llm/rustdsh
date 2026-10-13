@@ -194,6 +194,9 @@ enum Commands {
     Guard {
         #[arg(long = "deny")]
         deny: Vec<String>,
+        /// Apply an opt-in structured hook policy; unknown tools are blocked.
+        #[arg(long = "policy-file")]
+        policy_file: Option<String>,
         #[arg(long = "reason")]
         reason: Option<String>,
         #[arg(long = "json")]
@@ -478,7 +481,12 @@ fn main() {
         }
         Some(Commands::Bench { n }) => bench(n.unwrap_or(cfg.bench.n)),
         Some(Commands::Compute { once }) => compute::cmd_compute(once),
-        Some(Commands::Guard { deny, reason, json }) => {
+        Some(Commands::Guard {
+            deny,
+            policy_file,
+            reason,
+            json,
+        }) => {
             let mut merged = cfg.guard.deny.clone();
             merged.extend(deny);
             let reason = reason.or_else(|| {
@@ -489,7 +497,7 @@ fn main() {
                     Some(r)
                 }
             });
-            guard::cmd_guard(merged, reason, json)
+            guard::cmd_guard(merged, reason, json, policy_file)
         }
         Some(Commands::Settings { action }) => match action {
             SettingsAction::Path => {
@@ -723,7 +731,14 @@ fn main() {
                     if native {
                         dump_config_native(&p, &cli.patch)
                     } else {
-                        passthrough::exec_dump_config(&p, &cli.patch, dry, slim)
+                        passthrough::exec_dump_config(
+                            &p,
+                            None,
+                            dsh_args::DumpKind::Config,
+                            &cli.patch,
+                            dry,
+                            slim,
+                        )
                     }
                 },
             )
@@ -774,10 +789,22 @@ fn main() {
                         slim,
                     )
                 }
-                dsh_args::Launcher::Dump { profile, patches } => {
+                dsh_args::Launcher::Dump {
+                    profile,
+                    from_default,
+                    kind,
+                    patches,
+                } => {
                     let mut all = cli.patch;
                     all.extend(patches);
-                    passthrough::exec_dump_config(&profile, &all, dry, slim)
+                    passthrough::exec_dump_config(
+                        &profile,
+                        from_default.as_deref(),
+                        kind,
+                        &all,
+                        dry,
+                        slim,
+                    )
                 }
                 dsh_args::Launcher::Error(msg) => {
                     eprintln!("{msg}");

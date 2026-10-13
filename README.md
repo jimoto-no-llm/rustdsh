@@ -46,6 +46,10 @@ It ports frequently used CLI operations (token calculation, code search, session
 
 ## Quick Start
 
+Already using **Claude Code or Codex**? [Connect the project dashboard through MCP](docs/MCP-CLIENTS.md)
+to share tasks, questions and structured UI while keeping your current coding agent.
+This entry point requires Node.js 22+; DSH and Rust are optional.
+
 ### 1. Install (Prebuilt Binary)
 
 **Linux / macOS / WSL**:
@@ -185,6 +189,33 @@ Integrates with DSH `hooks.json` to inspect and block dangerous commands before 
 ```sh
 echo "$input" | rdsh guard --deny "rm -rf /*" --deny "*token*"
 ```
+
+For an opt-in structured check of supported file tools, pass a policy file.
+This example permits `Read` only under one existing project directory:
+
+```json
+{
+  "schema": 1,
+  "rules": [
+    { "id": "project-read", "tool": "Read", "access": "read", "roots": ["/absolute/project/path"] }
+  ]
+}
+```
+
+```sh
+echo "$hook_json" | rdsh guard --policy-file ./hook-policy.json --json
+```
+
+The structured classifier supports the `Read`, `Write`, and `Edit` file-path
+schemas. It canonicalizes the working directory and target, checks the selected
+tool and read/write scope against existing policy roots, and reports
+`allow`, `deny`, or `unknown` with a non-sensitive reason. In JSON mode an
+`allow` is classification only and omits `decision`; the host still owns
+permission and approval. Unknown tools, shell commands, malformed input, and
+unsupported tool arguments fail closed. Shell parsing and network destinations
+are not implemented. Path checks are advisory and can race with later filesystem
+changes; this hook is not an OS sandbox. Use the actual execution sandbox for
+enforcement.
 
 ```json
 {
