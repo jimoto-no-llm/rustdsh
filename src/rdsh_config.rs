@@ -56,6 +56,16 @@ pub fn extra_enabled(cfg: &RdshSettings, id: &str) -> bool {
     KNOWN_EXTRAS.contains(&id) && cfg.extras.enable.iter().any(|e| e == id)
 }
 
+/// Extra ids that are actually enabled, honoring an explicit `features.<id>`.
+/// The setup UI reads this so its switches show the effective state.
+pub fn enabled_extras(cfg: &RdshSettings) -> Vec<String> {
+    KNOWN_EXTRAS
+        .iter()
+        .filter(|id| feature_enabled(cfg, id))
+        .map(|id| (*id).to_string())
+        .collect()
+}
+
 /// One switchable capability. `default` reproduces the behavior that existed
 /// before the switch was introduced, so an older rdsh.json keeps working and
 /// an id that is absent from the file never changes anything.
@@ -623,7 +633,7 @@ impl RdshSettings {
             },
             discord: DiscordSection::from_value(&sec("discord")),
             tokens: TokensSection {
-                default_budget: clamp_u64(num(&t, "default_budget"), 4000, 500, 200000) as usize,
+                default_budget: clamp_u64(num(&t, "default_budget"), 4000, 500, 200_000) as usize,
             },
             search: SearchSection {
                 dir: {
@@ -639,7 +649,7 @@ impl RdshSettings {
                 searxng_url: text(&s, "searxng_url", URL_CHARS),
             },
             compact: CompactSection {
-                max_tokens: clamp_u64(num(&c, "max_tokens"), 8000, 500, 200000) as usize,
+                max_tokens: clamp_u64(num(&c, "max_tokens"), 8000, 500, 200_000) as usize,
             },
             sessions: SessionsSection {
                 limit: clamp_u64(num(&ss, "limit"), 20, 1, 100) as usize,
@@ -670,7 +680,7 @@ impl RdshSettings {
                 context_engine: flag(&be, "context_engine", false),
             },
             context: ContextSection {
-                token_budget: clamp_u64(num(&cx, "token_budget"), 4000, 500, 200000) as usize,
+                token_budget: clamp_u64(num(&cx, "token_budget"), 4000, 500, 200_000) as usize,
                 enable_retriever: flag(&cx, "enable_retriever", true),
                 enable_packer: flag(&cx, "enable_packer", true),
                 enable_verifier: flag(&cx, "enable_verifier", true),
@@ -715,7 +725,7 @@ impl RdshSettings {
         out.discord = DiscordSection::from_value(&v["discord"]);
         let t = v.get("tokens").cloned().unwrap_or(serde_json::Value::Null);
         out.tokens.default_budget =
-            clamp_u64(num(&t, "default_budget"), 4000, 500, 200000) as usize;
+            clamp_u64(num(&t, "default_budget"), 4000, 500, 200_000) as usize;
         let s = v.get("search").cloned().unwrap_or(serde_json::Value::Null);
         out.search.dir = {
             let d = text(&s, "dir", PATH_CHARS);
@@ -729,7 +739,7 @@ impl RdshSettings {
         out.search.web_limit = clamp_u64(num(&s, "web_limit"), 10, 1, 100) as usize;
         out.search.searxng_url = text(&s, "searxng_url", URL_CHARS);
         let c = v.get("compact").cloned().unwrap_or(serde_json::Value::Null);
-        out.compact.max_tokens = clamp_u64(num(&c, "max_tokens"), 8000, 500, 200000) as usize;
+        out.compact.max_tokens = clamp_u64(num(&c, "max_tokens"), 8000, 500, 200_000) as usize;
         let ss = v
             .get("sessions")
             .cloned()
@@ -765,7 +775,7 @@ impl RdshSettings {
                 .unwrap_or(serde_json::Value::Null),
         );
         let cx = v.get("context").cloned().unwrap_or(serde_json::Value::Null);
-        out.context.token_budget = clamp_u64(num(&cx, "token_budget"), 4000, 500, 200000) as usize;
+        out.context.token_budget = clamp_u64(num(&cx, "token_budget"), 4000, 500, 200_000) as usize;
         out.context.enable_retriever = flag(&cx, "enable_retriever", true);
         out.context.enable_packer = flag(&cx, "enable_packer", true);
         out.context.enable_verifier = flag(&cx, "enable_verifier", true);
@@ -1117,7 +1127,7 @@ fn complement_from_legacy(cfg: &mut RdshSettings, has_context: bool) {
         return;
     }
     let c = &mut cfg.context;
-    let budget = clamp_u64(num(&v, "token_budget"), 4000, 500, 200000) as usize;
+    let budget = clamp_u64(num(&v, "token_budget"), 4000, 500, 200_000) as usize;
     if c.token_budget == ContextSection::default().token_budget && budget != c.token_budget {
         c.token_budget = budget;
     }
@@ -1311,13 +1321,14 @@ mod rdsh_config_tests {
         static M: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
         M.get_or_init(|| std::sync::Mutex::new(()))
             .lock()
-            .unwrap_or_else(|e| e.into_inner())
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
     /// DSH_HOME を一時 dir に向けて f を実行する（復元・後片付けつき）。
     fn with_home(tag: &str, f: impl FnOnce(&str)) {
         let _guard = lock();
-        let dir = std::env::temp_dir().join(format!("rdsh-settings-{}-{tag}", std::process::id()));
+        let pid = std::process::id();
+        let dir = std::env::temp_dir().join(format!("rdsh-settings-{pid}-{tag}"));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let prev = std::env::var("DSH_HOME").ok();
@@ -1444,7 +1455,7 @@ mod rdsh_config_tests {
             std::fs::write(
                 &p,
                 serde_json::json!({
-                    "tokens": { "default_budget": 9999999 },
+                    "tokens": { "default_budget": 9_999_999 },
                     "compact": { "max_tokens": 1 },
                     "context": { "token_budget": 10 },
                     "search": { "max": 500, "web_limit": 0 },
@@ -1458,7 +1469,7 @@ mod rdsh_config_tests {
             )
             .unwrap();
             let c = load();
-            assert_eq!(c.tokens.default_budget, 200000);
+            assert_eq!(c.tokens.default_budget, 200_000);
             assert_eq!(c.compact.max_tokens, 500);
             assert_eq!(c.context.token_budget, 500);
             assert_eq!(c.search.max, 100);

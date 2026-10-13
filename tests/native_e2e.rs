@@ -246,7 +246,7 @@ fn concurrent_session_writers_leave_parseable_correct_cache() {
     for _ in 0..8 {
         let cache = f.0.join("cache/rdsh/sessions-tokens.json");
         let _ = fs::remove_file(&cache);
-        let mut children = (0..4)
+        let children = (0..4)
             .map(|_| {
                 f.command(&["sessions", "--tokens", "--json"])
                     .stdout(Stdio::piped())
@@ -255,7 +255,7 @@ fn concurrent_session_writers_leave_parseable_correct_cache() {
                     .unwrap()
             })
             .collect::<Vec<_>>();
-        for child in children.drain(..) {
+        for child in children {
             let o = child.wait_with_output().unwrap();
             assert!(o.status.success());
             let v: Value = serde_json::from_slice(&o.stdout).unwrap();
@@ -277,6 +277,29 @@ fn concurrent_session_writers_leave_parseable_correct_cache() {
     }
 }
 
+/// Tests run in parallel and each one spawns a server on loopback; on loaded
+/// CI runners several simultaneous startups were refused for the whole 15s
+/// readiness window. Serializing the startup (not the serving) keeps the
+/// fixture deterministic without changing what is tested.
+static SERVER_STARTUP: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// Connect to a fixture port, waiting up to 15s for a loaded runner to accept.
+fn connect_within(port: u16) -> TcpStream {
+    let deadline = Instant::now() + Duration::from_secs(15);
+    loop {
+        match TcpStream::connect(("127.0.0.1", port)) {
+            Ok(stream) => return stream,
+            Err(error) => {
+                assert!(
+                    Instant::now() < deadline,
+                    "server did not accept within 15s (port {port}): {error}"
+                );
+                std::thread::sleep(Duration::from_millis(250));
+            }
+        }
+    }
+}
+
 struct Server {
     child: Child,
     port: u16,
@@ -285,6 +308,9 @@ struct Server {
 }
 impl Server {
     fn start(f: &Fixture, args: &[&str]) -> Self {
+        let _startup_guard = SERVER_STARTUP
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut child = f
             .command(args)
             .stdin(Stdio::null())
@@ -298,7 +324,11 @@ impl Server {
             let mut address = None;
             let mut handoff_path = None;
             let mut startup_lines = Vec::new();
+            let mut ready = false;
             for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+                if ready {
+                    continue;
+                }
                 startup_lines.push(line.clone());
                 if let Some(url) = line
                     .split_whitespace()
@@ -320,7 +350,10 @@ impl Server {
                         logged_token,
                         has_key_fragment,
                     ));
-                    break;
+                    // Keep draining until the child exits: closing the pipe here
+                    // would make the server's next log write fail.
+                    startup_lines.clear();
+                    ready = true;
                 }
             }
         });
@@ -338,13 +371,16 @@ impl Server {
             !has_key_fragment,
             "server must not print a token-bearing URL"
         );
+        // The token handoff file is written right after the URL is printed, but
+        // a loaded runner can delay it; wait on a wall-clock deadline.
+        let token_deadline = Instant::now() + Duration::from_secs(15);
         let mut token = None;
-        for _ in 0..50 {
+        while Instant::now() < token_deadline {
             if let Ok(text) = std::fs::read_to_string(&handoff_path) {
                 token = Some(text);
                 break;
             }
-            std::thread::sleep(std::time::Duration::from_millis(100));
+            std::thread::sleep(Duration::from_millis(100));
         }
         let token = token.expect("server should create its protected token handoff file");
         let address = url.trim_start_matches("http://127.0.0.1:");
@@ -369,36 +405,36 @@ impl Server {
             String::new()
         };
         let mut bytes = Vec::new();
-        // Loaded CI runners sometimes reset the connection before responding;
-        // retry the whole request a few times before giving up.
-        let mut attempts = 0;
+        // Loaded CI runners refuse or reset the loopback connection while the
+        // server is still coming up, so retry against a wall-clock deadline
+        // instead of a fixed attempt count.
+        let deadline = Instant::now() + Duration::from_secs(15);
         loop {
-            attempts += 1;
-            let mut stream = match TcpStream::connect(("127.0.0.1", self.port)) {
-                Ok(stream) => stream,
-                Err(_) if attempts < 4 => {
-                    std::thread::sleep(Duration::from_millis(500));
-                    continue;
-                }
-                Err(e) => panic!("connect failed: {e}"),
-            };
+            let mut stream = connect_within(self.port);
             stream
                 .set_read_timeout(Some(Duration::from_secs(60)))
                 .unwrap();
             write!(stream, "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1:{}\r\n{key}{extra}Content-Length: {}\r\nConnection: close\r\n\r\n{body}", self.port, body.len()).unwrap();
             bytes.clear();
-            if stream.read_to_end(&mut bytes).is_err() && attempts < 4 {
-                std::thread::sleep(Duration::from_millis(500));
-                continue;
+            let read_failed = stream.read_to_end(&mut bytes).is_err();
+            // A reset can truncate the response, so only accept a complete
+            // status line; anything else retries until the deadline.
+            let response = String::from_utf8_lossy(&bytes).into_owned();
+            if let Some((head, body)) = response.split_once("\r\n\r\n") {
+                if let Some(status) = head
+                    .split_whitespace()
+                    .nth(1)
+                    .and_then(|value| value.parse().ok())
+                {
+                    return (status, body.to_owned());
+                }
             }
-            break;
+            assert!(
+                Instant::now() < deadline,
+                "no complete HTTP response within 15s (read failed: {read_failed})"
+            );
+            std::thread::sleep(Duration::from_millis(250));
         }
-        let response = String::from_utf8(bytes).unwrap();
-        let (head, body) = response.split_once("\r\n\r\n").unwrap();
-        (
-            head.split_whitespace().nth(1).unwrap().parse().unwrap(),
-            body.to_owned(),
-        )
     }
     fn stopped(&mut self) {
         let deadline = Instant::now() + Duration::from_secs(5);
@@ -415,6 +451,30 @@ impl Drop for Server {
         let _ = self.child.wait();
         let _ = std::fs::remove_file(&self.handoff_path);
     }
+}
+
+#[test]
+fn setup_extras_follow_explicit_feature_switches() {
+    // Issue #384: an explicit features.<id> must drive both the value the setup
+    // UI shows and the value its switches write.
+    let f = Fixture::new();
+    f.settings(serde_json::json!({"features": {"serve": false}}));
+    let setup = Server::start(&f, &["setup", "--web", "--port", "0"]);
+    let (status, body) = setup.request("GET", "/api/extras", "", true, "");
+    assert_eq!(status, 200);
+    let listed: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(listed["enable"], serde_json::json!([]));
+    assert_eq!(
+        setup
+            .request("POST", "/api/extras", r#"{"enable":["serve"]}"#, true, "")
+            .0,
+        200
+    );
+    let saved: serde_json::Value =
+        serde_json::from_slice(&fs::read(f.0.join("dsh/rdsh.json")).unwrap()).unwrap();
+    assert_eq!(saved["features"]["serve"], serde_json::json!(true));
+    assert_eq!(saved["extras"]["enable"], serde_json::json!(["serve"]));
+    setup.request("POST", "/api/done", "{}", true, "");
 }
 
 #[test]
@@ -509,6 +569,92 @@ fn setup_save_extras_restart_serve_and_use_real_http_api() {
         400
     );
     assert_eq!(fs::read(f.0.join("dsh/rdsh.json")).unwrap(), saved);
+}
+
+#[cfg(unix)]
+#[test]
+fn path_search_skips_non_executable_dsh_and_node_candidates() {
+    use std::os::unix::fs::{symlink, PermissionsExt};
+
+    fn write_mode(path: &std::path::Path, contents: &str, mode: u32) {
+        fs::write(path, contents).unwrap();
+        fs::set_permissions(path, fs::Permissions::from_mode(mode)).unwrap();
+    }
+
+    let f = Fixture::new();
+    let first = f.0.join("first");
+    let second = f.0.join("second");
+    fs::create_dir_all(&first).unwrap();
+    fs::create_dir_all(&second).unwrap();
+    let search_path = format!("{}:{}", first.display(), second.display());
+    let second_dsh = second.join("dsh");
+    write_mode(&second_dsh, "#!/bin/sh\necho DUMMY_VALID_DSH\n", 0o755);
+    let second_node = second.join("node");
+    write_mode(
+        &second_node,
+        "#!/bin/sh\nprintf 'DUMMY_VALID_NODE\\n'\n",
+        0o755,
+    );
+
+    let run_stub = |original: Option<&std::path::Path>| {
+        let mut command = f.command(&["--no-slim", "--profile", "web"]);
+        command
+            .env("PATH", &search_path)
+            .env_remove("RDSH_ORIG_BIN")
+            .env_remove("DSH_ORIG_BIN");
+        if let Some(original) = original {
+            command.env("RDSH_ORIG_BIN", original);
+        }
+        command.output().unwrap()
+    };
+    let assert_marker = |output: Output, marker: &str| {
+        assert!(
+            output.status.success(),
+            "delegation failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let stdout = String::from_utf8(output.stdout).unwrap();
+        assert!(
+            stdout.contains(marker),
+            "expected {marker:?}, got {stdout:?}"
+        );
+    };
+
+    // A directory and a non-executable file must both be skipped in favor of
+    // the later usable DSH; a PATH entry resolving to rdsh itself stays skipped.
+    let first_dsh = first.join("dsh");
+    fs::create_dir(&first_dsh).unwrap();
+    let output = run_stub(None);
+    assert_marker(output, "DUMMY_VALID_DSH");
+
+    fs::remove_dir(&first_dsh).unwrap();
+    write_mode(&first_dsh, "not executable\n", 0o644);
+    let output = run_stub(None);
+    assert_marker(output, "DUMMY_VALID_DSH");
+
+    fs::remove_file(&first_dsh).unwrap();
+    symlink(env!("CARGO_BIN_EXE_rdsh"), &first_dsh).unwrap();
+    let output = run_stub(None);
+    assert_marker(output, "DUMMY_VALID_DSH");
+
+    // An explicit original path keeps priority even when it is outside PATH.
+    let explicit_dsh = f.0.join("explicit/dsh");
+    fs::create_dir_all(explicit_dsh.parent().unwrap()).unwrap();
+    write_mode(
+        &explicit_dsh,
+        "#!/bin/sh\nprintf 'EXPLICIT_DSH\\n'\n",
+        0o755,
+    );
+    let output = run_stub(Some(&explicit_dsh));
+    assert_marker(output, "EXPLICIT_DSH");
+
+    // A .js override still uses Node, but skips a non-executable earlier Node.
+    let first_node = first.join("node");
+    write_mode(&first_node, "not executable\n", 0o644);
+    let original_js = f.0.join("original.js");
+    fs::write(&original_js, "process.stdout.write('DUMMY_JS\\n')\n").unwrap();
+    let output = run_stub(Some(&original_js));
+    assert_marker(output, "DUMMY_VALID_NODE");
 }
 
 #[test]
@@ -623,22 +769,7 @@ fn http_truncated_and_oversized_requests_do_not_damage_serve() {
     .into_iter()
     .enumerate()
     {
-        let mut stream = None;
-        for _ in 0..8 {
-            match TcpStream::connect(("127.0.0.1", server.port)) {
-                Ok(stream_) => {
-                    stream = Some(stream_);
-                    break;
-                }
-                Err(_) => std::thread::sleep(Duration::from_millis(500)),
-            }
-        }
-        let mut stream = stream.unwrap_or_else(|| {
-            panic!(
-                "server should accept connections (port {}, child status unknown)",
-                server.port
-            )
-        });
+        let mut stream = connect_within(server.port);
         stream
             .set_read_timeout(Some(Duration::from_secs(60)))
             .unwrap();
@@ -778,6 +909,105 @@ fn cli_tokens_prune_compact_search_logs_guard_and_settings_work_together() {
         Some(2)
     );
     assert!(f.run(&["guard"], b"safe operation").status.success());
+
+    let allowed = f.0.join("policy-project");
+    let outside = f.0.join("policy-outside");
+    fs::create_dir_all(&allowed).unwrap();
+    fs::create_dir_all(&outside).unwrap();
+    fs::write(allowed.join("same.txt"), "same operation text").unwrap();
+    fs::write(outside.join("same.txt"), "same operation text").unwrap();
+    let policy_path = f.0.join("hook-policy.json");
+    fs::write(
+        &policy_path,
+        json!({
+            "schema": 1,
+            "rules": [{
+                "id": "project-read",
+                "tool": "Read",
+                "access": "read",
+                "roots": [allowed.to_string_lossy()]
+            }]
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let policy_path = policy_path.to_str().unwrap();
+    let hook = |cwd: &std::path::Path, tool: &str, file: &str| {
+        let tool_input = if tool == "Write" {
+            json!({ "file_path": file, "content": "same operation text" })
+        } else {
+            json!({ "file_path": file })
+        };
+        json!({
+            "cwd": cwd.to_string_lossy(),
+            "description": "same operation text",
+            "tool_name": tool,
+            "tool_input": tool_input
+        })
+        .to_string()
+    };
+    let classify = |input: String| {
+        let result = f.run(
+            &["guard", "--policy-file", policy_path, "--json"],
+            input.as_bytes(),
+        );
+        assert!(
+            result.status.success(),
+            "structured JSON decision should use stdout: {}",
+            String::from_utf8_lossy(&result.stderr)
+        );
+        serde_json::from_slice::<Value>(&result.stdout).unwrap()
+    };
+    let permitted = classify(hook(&allowed, "Read", "same.txt"));
+    assert_eq!(permitted["classification"], "allow");
+    assert!(permitted.get("decision").is_none());
+    assert_eq!(permitted["rule_id"], "project-read");
+    let paged_read = classify(
+        json!({
+            "cwd": allowed.to_string_lossy(),
+            "description": "same operation text",
+            "tool_name": "Read",
+            "tool_input": { "file_path": "same.txt", "offset": 2, "limit": 8 }
+        })
+        .to_string(),
+    );
+    assert_eq!(paged_read["classification"], "allow");
+    let outside_file = classify(hook(&outside, "Read", "same.txt"));
+    assert_eq!(outside_file["classification"], "deny");
+    assert_eq!(outside_file["reason"], "path_outside_allowed_root");
+    let changed_tool = classify(hook(&allowed, "Write", "same.txt"));
+    assert_eq!(changed_tool["classification"], "deny");
+    assert_eq!(changed_tool["reason"], "tool_not_allowed");
+    let unsupported_shell = classify(
+        json!({
+            "cwd": allowed.to_string_lossy(),
+            "tool_name": "Bash",
+            "tool_input": { "command": "cat same.txt" }
+        })
+        .to_string(),
+    );
+    assert_eq!(unsupported_shell["classification"], "unknown");
+    assert_eq!(
+        unsupported_shell["reason"],
+        "shell_command_parse_unsupported"
+    );
+    let unsupported_argument = classify(
+        json!({
+            "cwd": allowed.to_string_lossy(),
+            "tool_name": "Read",
+            "tool_input": { "file_path": "same.txt", "command": "cat same.txt" }
+        })
+        .to_string(),
+    );
+    assert_eq!(unsupported_argument["classification"], "unknown");
+    assert_eq!(unsupported_argument["reason"], "tool_schema_unsupported");
+    let malformed = classify("{broken".to_owned());
+    assert_eq!(malformed["classification"], "unknown");
+    assert_eq!(malformed["reason"], "invalid_json");
+    assert!(!outside_file
+        .to_string()
+        .contains(outside.to_string_lossy().as_ref()));
+
     f.ok(&["settings", "set", "search.max", "42"], b"");
     assert!(!f
         .run(&["settings", "set", "search.max", "bad"], b"")
@@ -848,4 +1078,59 @@ fn web_search_gate_and_real_http_results_and_failure() {
             assert!(String::from_utf8_lossy(&result.stderr).contains("HTTP 503"));
         }
     }
+}
+
+/// #388: 2文字ASCII語（CI/UI/Go）のセッション検索が0件にならない。
+///
+/// セッション本文は Unix 専用の no-follow open（`file_security::Root`）でしか
+/// 読めないため、Windows では元から `# sessions (0)` になる。そこでここでは
+/// 「検索語を受け付けて正常終了し、セッション節を必ず出す」ことだけを共通で見て、
+/// 実際のヒットは Unix でのみ検証する。語の採否そのものは src/context.rs の
+/// 単体テスト（two_char_ascii_terms_are_searchable）が全OSで担保する。
+#[test]
+fn context_search_finds_two_char_ascii_terms() {
+    let f = Fixture::new();
+    f.settings(json!({"features": {"context_engine": true}}));
+    let dir = f.0.join("dsh/sessions/p/s");
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(
+        dir.join("transcript.jsonl"),
+        "{\"content\":\"CI pipeline UI Go TypeScript \u{65e5}\u{672c}\u{8a9e}\u{691c}\u{7d22}\"}\n",
+    )
+    .unwrap();
+    for query in [
+        "CI",
+        "UI",
+        "Go",
+        "pipeline",
+        "\u{65e5}\u{672c}\u{8a9e}\u{691c}\u{7d22}",
+    ] {
+        let out = f.ok(&["context", "search", query], b"");
+        let text = String::from_utf8_lossy(&out);
+        assert!(
+            text.contains("# sessions ("),
+            "query {query:?} should report the session section, got:\n{text}"
+        );
+        #[cfg(unix)]
+        assert!(
+            text.contains("# sessions (1)") && text.contains("[session]"),
+            "query {query:?} should hit the fixture session, got:\n{text}"
+        );
+    }
+}
+
+/// #389: tokens/compute の chars は文字数（Unicode scalar 数）。
+#[test]
+fn tokens_chars_counts_characters_not_bytes() {
+    let f = Fixture::new();
+    let v: Value =
+        serde_json::from_slice(&f.ok(&["tokens"], "\u{65e5}\u{672c}\u{8a9e}".as_bytes())).unwrap();
+    assert_eq!(v["tokens"], 3);
+    assert_eq!(v["chars"], 3);
+    let line = "{\"v\":1,\"id\":\"review\",\"op\":\"tokens.estimate\",\"text\":\"\u{65e5}\u{672c}\u{8a9e}\"}\n";
+    let v: Value = serde_json::from_slice(&f.ok(&["compute", "--once"], line.as_bytes())).unwrap();
+    assert_eq!(v["chars"], 3);
+    let batch = "{\"v\":1,\"id\":\"review\",\"op\":\"tokens.estimate_batch\",\"texts\":[\"\u{65e5}\u{672c}\u{8a9e}\",\"\u{e9}\",\"abc\"]}\n";
+    let v: Value = serde_json::from_slice(&f.ok(&["compute", "--once"], batch.as_bytes())).unwrap();
+    assert_eq!(v["chars"], serde_json::json!([3, 1, 3]));
 }

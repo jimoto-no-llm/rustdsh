@@ -146,6 +146,7 @@ rdsh sessions --limit 20 --tokens   # list sessions and unpacked token estimates
 rdsh compact ./s.jsonl              # compact session JSONL (source remains untouched)
 rdsh doctor                         # check health of dsh, environment, and paths
 rdsh profiles / rdsh skills         # list available profiles and skills
+rdsh desktop status                 # detect the DeepSeek Harness Desktop app and profile
 rdsh bench --n 5                    # benchmark startup speed between rdsh and dsh
 ```
 
@@ -185,6 +186,33 @@ Integrates with DSH `hooks.json` to inspect and block dangerous commands before 
 echo "$input" | rdsh guard --deny "rm -rf /*" --deny "*token*"
 ```
 
+For an opt-in structured check of supported file tools, pass a policy file.
+This example permits `Read` only under one existing project directory:
+
+```json
+{
+  "schema": 1,
+  "rules": [
+    { "id": "project-read", "tool": "Read", "access": "read", "roots": ["/absolute/project/path"] }
+  ]
+}
+```
+
+```sh
+echo "$hook_json" | rdsh guard --policy-file ./hook-policy.json --json
+```
+
+The structured classifier supports the `Read`, `Write`, and `Edit` file-path
+schemas. It canonicalizes the working directory and target, checks the selected
+tool and read/write scope against existing policy roots, and reports
+`allow`, `deny`, or `unknown` with a non-sensitive reason. In JSON mode an
+`allow` is classification only and omits `decision`; the host still owns
+permission and approval. Unknown tools, shell commands, malformed input, and
+unsupported tool arguments fail closed. Shell parsing and network destinations
+are not implemented. Path checks are advisory and can race with later filesystem
+changes; this hook is not an OS sandbox. Use the actual execution sandbox for
+enforcement.
+
 ```json
 {
   "hooks": {
@@ -217,6 +245,35 @@ rdsh-dashboard project --project <directory>
 ```
 
 *On native Windows, the dashboard runs in the system tray and can be opened or stopped from the taskbar (`--no-tray` keeps it in the terminal). See [dashboard/README.md](dashboard/README.md).*
+
+## Desktop App (Electron)
+
+DeepSeek Harness Desktop is an Electron shell around the complete Web
+application. It shares `$DSH_HOME` with the CLI but owns a **reserved profile**
+(`$DSH_HOME/profiles/desktop`) and its own bundled command runtime, so the npm
+`dsh` CLI cannot manage its plugins. `rdsh desktop` detects all of that and
+forwards plugin attachment to the app's own command — rdsh never boots or
+rewrites the profile:
+
+```sh
+rdsh desktop status                 # app, command runtime, profile, plugin state (read-only)
+rdsh desktop install --plugins-dir .   # attach rdsh-settings to the desktop profile
+rdsh desktop install --plugins-dir . --compute   # + the resident compute bridge
+rdsh desktop verify                 # exit nonzero when the profile has no rdsh plugin
+```
+
+The same is available through the profile installer and the installers:
+
+```sh
+PROFILE=desktop ./plugins/install.sh   # every recommended package, forwarded correctly
+./install.sh --desktop                 # attach the rdsh plugins during installation
+```
+
+*Quit the app before attaching plugins, reopen it afterwards. The app's own
+Plugins page installs the same packages without any command. The Electron
+runtime itself is never replaced: in-app delegation stays limited to the
+opt-in, fail-open compute bridge. See
+[DESKTOP-INTEGRATION.md](docs/DESKTOP-INTEGRATION.md).*
 
 ## Using with Smart-DSH
 
@@ -275,6 +332,7 @@ Measurements conducted on Linux x86_64:
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Architecture design and delegation model |
 | [docs/BENCHMARKS.md](docs/BENCHMARKS.md) | Benchmark methodology and reproduction steps |
 | [docs/RDSH-SETTINGS.md](docs/RDSH-SETTINGS.md) | Settings UI and CLI options |
+| [docs/DESKTOP-INTEGRATION.md](docs/DESKTOP-INTEGRATION.md) | DeepSeek Harness Desktop (Electron) integration |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Project roadmap and planned capabilities |
 | [docs/RELEASING.md](docs/RELEASING.md) | Release procedures |
 | [CHANGELOG.md](CHANGELOG.md) | Changes per version |

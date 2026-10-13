@@ -146,8 +146,8 @@ fn collect_parallel(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
         Files(Vec<std::path::PathBuf>),
         Sub(std::path::PathBuf),
     }
-    let mut segs: Vec<Seg> = vec![];
-    let mut pending: Vec<std::path::PathBuf> = vec![];
+    let mut segs: Vec<Seg> = Vec::new();
+    let mut pending: Vec<std::path::PathBuf> = Vec::new();
     for e in &entries {
         match entry_kind(e) {
             EntryKind::Dir => {
@@ -169,7 +169,7 @@ fn collect_parallel(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
         .filter(|(_, s)| matches!(s, Seg::Sub(_)))
         .map(|(i, _)| i)
         .collect();
-    let mut resolved: Vec<Vec<std::path::PathBuf>> = vec![];
+    let mut resolved: Vec<Vec<std::path::PathBuf>> = Vec::new();
     resolved.resize_with(sub_idx.len(), Vec::new);
     let width = crate::inspect::parallelism().max(1);
     for (batch_no, batch) in sub_idx.chunks(width).enumerate() {
@@ -286,7 +286,7 @@ fn grep_parallel(
         return grep_chunk(pattern, files, root, max);
     }
     let chunk = files.len().div_ceil(threads);
-    let mut out: Vec<Vec<Vec<String>>> = vec![];
+    let mut out: Vec<Vec<Vec<String>>> = Vec::new();
     std::thread::scope(|s| {
         let mut handles = vec![];
         for c in files.chunks(chunk) {
