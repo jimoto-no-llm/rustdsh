@@ -628,7 +628,9 @@ pub(crate) fn apply_profile(
         .flat_map(|model| format_model(model, site.item_indent, site.step))
         .collect();
     if let Some(models_line) = site.models_line {
-        if lines[models_line].trim_end().ends_with("[]") {
+        if key_value(&lines[models_line], "models")
+            .is_some_and(|value| strip_comment(value) == "[]")
+        {
             // `models: []` is an inline empty sequence: give it a body.
             lines[models_line] = format!("{}models:", " ".repeat(site.models_indent));
             lines.splice(models_line + 1..models_line + 1, block);
@@ -706,8 +708,8 @@ fn locate_owned(lines: &[String], provider: &str) -> Result<Site> {
         )
     })?;
     let provider_indent = indent_of(&lines[provider_line]);
-    let trimmed = lines[provider_line].trim_end();
-    let provider_inline_empty = trimmed.ends_with("{}");
+    let provider_inline_empty = key_value(&lines[provider_line], provider)
+        .is_some_and(|value| strip_comment(value) == "{}");
     let provider_end = block_end(lines, provider_line);
     let step = step_after(lines, provider_line, provider_end).unwrap_or(2);
     match find_key(lines, provider_line + 1, provider_end, "models") {
@@ -836,7 +838,7 @@ fn item_line(lines: &[String], site: &Site, wanted: &str) -> Option<usize> {
     (models_line + 1..end).find(|i| {
         indent_of(&lines[*i]) == site.item_indent
             && lines[*i].trim_start().starts_with("- ")
-            && inline_id(&lines[*i]).as_deref() == Some(wanted)
+            && item_id(lines, *i, site.item_indent).as_deref() == Some(wanted)
     })
 }
 
@@ -856,7 +858,7 @@ fn existing_ids(lines: &[String], site: &Site) -> Vec<String> {
         .filter(|i| {
             indent_of(&lines[*i]) == site.item_indent && lines[*i].trim_start().starts_with("- ")
         })
-        .filter_map(|i| inline_id(&lines[i]))
+        .filter_map(|i| item_id(lines, i, site.item_indent))
         .collect()
 }
 
@@ -907,11 +909,68 @@ fn name_already_current(current: &str, live: &str) -> bool {
     !live.is_empty() && normalise(current).contains(&live)
 }
 
-/// The `id:` of one `- id: <value>` sequence item.
-fn inline_id(line: &str) -> Option<String> {
-    let body = line.trim_start().strip_prefix("- ")?;
-    let value = body.trim_start().strip_prefix("id:")?.trim();
-    Some(unquote(value))
+/// The raw value after `key:` on one line, when that line opens with `key:`.
+fn key_value<'a>(line: &'a str, key: &str) -> Option<&'a str> {
+    let body = line.trim_start().strip_prefix(key)?;
+    body.strip_prefix(':').map(str::trim)
+}
+
+/// A scalar with any trailing YAML comment removed. A `#` inside quotes is
+/// content, and a `#` that does not follow whitespace is content too.
+fn strip_comment(value: &str) -> &str {
+    let bytes = value.as_bytes();
+    let mut quote = None;
+    for (index, byte) in bytes.iter().enumerate() {
+        match quote {
+            Some(open) => {
+                if *byte == open {
+                    quote = None;
+                }
+            }
+            None if *byte == b'\'' || *byte == b'"' => quote = Some(*byte),
+            None if *byte == b'#'
+                && (index == 0 || bytes[index - 1] == b' ' || bytes[index - 1] == b'\t') =>
+            {
+                return value[..index].trim_end();
+            }
+            None => {}
+        }
+    }
+    value.trim_end()
+}
+
+/// The `id:` of one sequence item, whether it opens the item line, sits on a
+/// later line of the item, or is written in flow style. A comment after the
+/// value must not hide the id: a missed id would be appended a second time.
+fn item_id(lines: &[String], item: usize, item_indent: usize) -> Option<String> {
+    let head = lines[item].trim_start().strip_prefix("- ")?;
+    if let Some(value) = key_value(head, "id") {
+        return Some(unquote(strip_comment(value)));
+    }
+    if let Some(flow) = head
+        .trim()
+        .strip_prefix('{')
+        .and_then(|rest| rest.strip_suffix('}'))
+    {
+        for field in flow.split(',') {
+            if let Some(value) = key_value(field.trim(), "id") {
+                return Some(unquote(strip_comment(value)));
+            }
+        }
+    }
+    let end = block_end(lines, item);
+    let child_indent = (item + 1..end)
+        .find(|i| {
+            let trimmed = lines[*i].trim();
+            !trimmed.is_empty() && !trimmed.starts_with('#') && indent_of(&lines[*i]) > item_indent
+        })
+        .map(|i| indent_of(&lines[i]))?;
+    (item + 1..end).find_map(|i| {
+        if indent_of(&lines[i]) != child_indent {
+            return None;
+        }
+        key_value(lines[i].trim_start(), "id").map(|value| unquote(strip_comment(value)))
+    })
 }
 
 fn existing_max_tokens(lines: &[String], site: &Site) -> Option<u64> {
@@ -919,8 +978,8 @@ fn existing_max_tokens(lines: &[String], site: &Site) -> Option<u64> {
     let end = site.models_end.min(lines.len());
     (models_line + 1..end)
         .filter_map(|i| {
-            let value = lines[i].trim().strip_prefix("maxTokens:")?.trim();
-            unquote(value).parse::<u64>().ok()
+            let value = key_value(lines[i].trim_start(), "maxTokens")?;
+            unquote(strip_comment(value)).parse::<u64>().ok()
         })
         .max()
 }
@@ -1120,6 +1179,98 @@ pub(crate) fn cmd_models_show(
     Ok(())
 }
 
+/// One provider's already-fetched catalog, ready to fold into a profile.
+struct ProviderPlan {
+    provider: &'static str,
+    models: Vec<CatalogModel>,
+    refresh_names: bool,
+    source: String,
+}
+
+/// One provider's outcome for one profile: a fetched catalog, or why it could
+/// not be fetched.
+enum Planned {
+    Ready(ProviderPlan),
+    Skipped {
+        provider: &'static str,
+        reason: String,
+    },
+}
+
+fn planned_provider(entry: &Planned) -> &'static str {
+    match entry {
+        Planned::Ready(plan) => plan.provider,
+        Planned::Skipped { provider, .. } => provider,
+    }
+}
+
+/// Fold every planned catalog into one profile while holding the profile lock.
+///
+/// The document is read *inside* the lock: a snapshot taken before it would
+/// drop a concurrent editor's update when this write lands.
+fn sync_profile_locked(
+    name: &str,
+    path: &Path,
+    planned: &[Planned],
+    dry_run: bool,
+) -> Result<Vec<ProviderReport>> {
+    let _lock = CredentialFileLock::exclusive_for(path)?;
+    let mut text =
+        std::fs::read_to_string(path).with_context(|| format!("cannot read {}", path.display()))?;
+    let mut reports = Vec::new();
+    let mut dirty = false;
+    for entry in planned {
+        match entry {
+            Planned::Skipped { provider, reason } => {
+                let mut report = ProviderReport::pending(name, provider);
+                report.skipped = Some(reason.clone());
+                reports.push(report);
+            }
+            Planned::Ready(plan) => {
+                let mut report = ProviderReport::pending(name, plan.provider);
+                report.source = plan.source.clone();
+                match apply_profile(&text, plan.provider, &plan.models, plan.refresh_names) {
+                    Ok(applied) => {
+                        let Applied {
+                            text: updated,
+                            listed,
+                            added,
+                            renamed,
+                        } = applied;
+                        let changed = !added.is_empty() || !renamed.is_empty();
+                        report.listed = listed;
+                        report.added = added;
+                        report.renamed = renamed;
+                        if changed {
+                            text = updated;
+                            dirty = true;
+                        }
+                    }
+                    Err(error) => report.skipped = Some(format!("{error:#}")),
+                }
+                reports.push(report);
+            }
+        }
+    }
+    if dirty && !dry_run {
+        match crate::auth::write_creds(&path.display().to_string(), &text) {
+            Ok(()) => {
+                for report in &mut reports {
+                    report.written = report.changed();
+                }
+            }
+            Err(error) => {
+                for report in &mut reports {
+                    if report.changed() {
+                        report.error = Some(format!("{error:#}"));
+                    }
+                }
+            }
+        }
+    }
+    Ok(reports)
+}
+
 /// `rdsh models sync`: append missing entries and refresh stale names, or
 /// preview with `--dry-run`.
 pub(crate) fn cmd_models_sync(
@@ -1132,7 +1283,9 @@ pub(crate) fn cmd_models_sync(
     let profiles = profile_paths(profile)?;
     let mut reports = Vec::new();
     for (name, path) in &profiles {
-        let mut text = match std::fs::read_to_string(path) {
+        // The snapshot only resolves credentials and `baseURL`; the fold below
+        // re-reads the document under the lock.
+        let snapshot = match std::fs::read_to_string(path) {
             Ok(text) => text,
             Err(error) => {
                 // Which providers it names cannot be known without the file,
@@ -1145,58 +1298,37 @@ pub(crate) fn cmd_models_sync(
                 continue;
             }
         };
-        let mut dirty = false;
-        let mut pending: Vec<ProviderReport> = Vec::new();
+        let mut planned = Vec::new();
         for source in &sources {
-            if !configures(&text, source.provider) {
+            if !configures(&snapshot, source.provider) {
                 continue;
             }
-            let mut report = ProviderReport::pending(name, source.provider);
-            match fetch_catalog(source, &text) {
-                Ok(fetched) => {
-                    report.source = fetched.label;
-                    let refresh_names = matches!(source.kind, SourceKind::Live(_));
-                    match apply_profile(&text, source.provider, &fetched.models, refresh_names) {
-                        Ok(applied) => {
-                            let Applied {
-                                text: updated,
-                                listed,
-                                added,
-                                renamed,
-                            } = applied;
-                            let changed = !added.is_empty() || !renamed.is_empty();
-                            report.listed = listed;
-                            report.added = added;
-                            report.renamed = renamed;
-                            if changed {
-                                text = updated;
-                                dirty = true;
-                            }
-                        }
-                        Err(error) => report.skipped = Some(format!("{error:#}")),
-                    }
-                }
-                Err(error) => report.skipped = Some(format!("{error:#}")),
+            match fetch_catalog(source, &snapshot) {
+                Ok(fetched) => planned.push(Planned::Ready(ProviderPlan {
+                    provider: source.provider,
+                    models: fetched.models,
+                    refresh_names: matches!(source.kind, SourceKind::Live(_)),
+                    source: fetched.label,
+                })),
+                Err(error) => planned.push(Planned::Skipped {
+                    provider: source.provider,
+                    reason: format!("{error:#}"),
+                }),
             }
-            pending.push(report);
         }
-        if dirty && !dry_run {
-            match write_profile(path, &text) {
-                Ok(()) => {
-                    for report in &mut pending {
-                        report.written = report.changed();
-                    }
-                }
-                Err(error) => {
-                    for report in &mut pending {
-                        if report.changed() {
-                            report.error = Some(format!("{error:#}"));
-                        }
-                    }
+        if planned.is_empty() {
+            continue;
+        }
+        match sync_profile_locked(name, path, &planned, dry_run) {
+            Ok(mut done) => reports.append(&mut done),
+            Err(error) => {
+                for entry in &planned {
+                    let mut report = ProviderReport::pending(name, planned_provider(entry));
+                    report.error = Some(format!("{error:#}"));
+                    reports.push(report);
                 }
             }
         }
-        reports.extend(pending);
     }
     let failed = reports.iter().any(|report| report.error.is_some());
     if json {
@@ -1254,13 +1386,6 @@ pub(crate) fn cmd_models_sync(
         std::process::exit(1);
     }
     Ok(())
-}
-
-/// Replace one profile document atomically, under the harness's own lock
-/// protocol so a live config edit and this sync cannot interleave.
-fn write_profile(path: &Path, text: &str) -> Result<()> {
-    let _lock = CredentialFileLock::exclusive_for(path)?;
-    crate::auth::write_creds(&path.display().to_string(), text)
 }
 
 #[cfg(test)]
@@ -1698,5 +1823,93 @@ mod tests {
         assert!(configures(KIMI_PROFILE, KIMI_PROVIDER));
         assert!(!configures(KIMI_PROFILE, CODEX_PROVIDER));
         assert!(!configures(PROFILE, KIMI_PROVIDER));
+    }
+
+    #[test]
+    fn a_trailing_comment_does_not_hide_an_empty_flow_list() {
+        let profile = "\
+- id: llm-pi-ai
+  config:
+    providers:
+      openai-codex:
+        models: [] # filled by rdsh models sync
+";
+        let applied = apply_profile(profile, CODEX_PROVIDER, &catalog(), false).unwrap();
+        assert_eq!(applied.added.len(), 2);
+        assert!(applied
+            .text
+            .contains("        models:\n          - id: gpt-6.1-sol\n"));
+        assert!(!applied.text.contains("models: []"));
+    }
+
+    #[test]
+    fn a_trailing_comment_does_not_hide_an_inline_empty_provider() {
+        let profile = "\
+- id: llm-pi-ai
+  config:
+    providers:
+      openai-codex: {} # expanded later
+";
+        let error = apply_profile(profile, CODEX_PROVIDER, &catalog(), false).unwrap_err();
+        assert!(error.to_string().contains("expand it to a block"));
+    }
+
+    #[test]
+    fn existing_ids_survive_comments_later_keys_and_flow_style() {
+        let profile = "\
+- id: llm-pi-ai
+  config:
+    providers:
+      openai-codex:
+        models:
+          - id: gpt-6.1-sol # already listed
+            name: GPT-6.1-Sol
+          - name: Daybreak Blue
+            id: gpt-daybreak-blue-latest
+          - {id: gpt-5.6-sol, name: GPT-5.6 Sol}
+";
+        let applied = apply_profile(profile, CODEX_PROVIDER, &catalog(), false).unwrap();
+        assert_eq!(
+            applied.listed,
+            vec![
+                "gpt-6.1-sol".to_string(),
+                "gpt-daybreak-blue-latest".to_string(),
+                "gpt-5.6-sol".to_string(),
+            ]
+        );
+        assert!(applied.added.is_empty());
+    }
+
+    #[test]
+    fn a_concurrent_edit_between_fetch_and_lock_is_not_lost() {
+        let dir = std::env::temp_dir().join(format!(
+            "rdsh-models-lock-{}-{}",
+            std::process::id(),
+            crate::local_http::random_token().unwrap()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("cordis.patch.yml");
+        std::fs::write(&path, PROFILE).unwrap();
+        // The catalog was fetched from a snapshot; a live editor then writes.
+        std::fs::write(&path, format!("{PROFILE}# written while the fetch ran\n")).unwrap();
+        let planned = vec![Planned::Ready(ProviderPlan {
+            provider: CODEX_PROVIDER,
+            models: catalog(),
+            refresh_names: false,
+            source: "fixture".to_string(),
+        })];
+        let reports = sync_profile_locked("web", &path, &planned, false).unwrap();
+        let written = std::fs::read_to_string(&path).unwrap();
+        assert!(written.contains("# written while the fetch ran"));
+        assert!(written.contains("- id: gpt-6.1-sol"));
+        assert_eq!(
+            reports
+                .iter()
+                .map(|report| report.added.len())
+                .sum::<usize>(),
+            2
+        );
+        assert!(reports.iter().all(|report| report.written));
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }
