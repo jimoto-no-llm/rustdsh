@@ -6,6 +6,7 @@ import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { randomUUID } from "node:crypto";
 import { identity } from "../state.mjs";
 import { SessionLedger, attachRecordedSession } from "../session-ledger.mjs";
 import { Checkpoints } from "../checkpoints.mjs";
@@ -632,5 +633,106 @@ test("separate public CLI clients record, inspect, resume and reject unsafe summ
     call("start-new", "--checkpoint-id", checkpoint.checkpoint_id),
     (failure) =>
       /--summary-file and --accept-context-loss/.test(failure.stderr),
+  );
+});
+
+// These two tests exercise the lease helper directly. Every test above needs a
+// real owned process scope; a lease cleanup failure only needs its lock file.
+async function leaseFixture(t) {
+  const root = await fs.mkdtemp(
+    path.join(os.tmpdir(), "rdsh-checkpoint-lease-test-"),
+  );
+  const cwd = path.join(root, "project");
+  await fs.mkdir(cwd);
+  const project = await identity(cwd);
+  project.directory = path.join(root, "dashboard", "projects", project.id);
+  t.after(async () => {
+    assert.equal(path.dirname(path.resolve(root)), path.resolve(os.tmpdir()));
+    assert.ok(path.basename(root).startsWith("rdsh-checkpoint-lease-test-"));
+    await fs.rm(root, { recursive: true });
+  });
+  return { project, store: await Checkpoints.open(project) };
+}
+const recoveryAction = (id) => ({
+  schema: 1,
+  checkpoint_id: id,
+  action_id: "recover_" + randomUUID(),
+  mode: "resume",
+  status: "completed",
+  run_id: "run_" + randomUUID(),
+  cli_session_id: "fixture-checkpoint-session",
+  summary_digest: null,
+  summary_bytes: 0,
+  summary_status: "not_requested",
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+});
+const failLockCleanup = (t, lock) => {
+  const originalUnlink = fs.unlink;
+  t.mock.method(fs, "unlink", async (file, ...args) => {
+    if (path.resolve(String(file)) === path.resolve(lock)) {
+      const error = new Error("fixture lock cleanup failure");
+      error.code = "EACCES";
+      throw error;
+    }
+    return originalUnlink(file, ...args);
+  });
+};
+
+test("a lease cleanup failure keeps a completed operation's result and reports it committed", async (t) => {
+  const { store } = await leaseFixture(t),
+    id = "cp_" + randomUUID(),
+    lock = store.file(id, ".lock"),
+    action = recoveryAction(id);
+  failLockCleanup(t, lock);
+  let failure;
+  await assert.rejects(
+    store.lease(id, async () => {
+      await store.saveAction(action);
+      return "fixture-lease-result";
+    }),
+    (error) => {
+      failure = error;
+      return error.code === "checkpoint_lock_cleanup_unconfirmed";
+    },
+  );
+  assert.equal(failure.committed, true);
+  assert.equal(failure.lock_cleanup_unconfirmed, true);
+  assert.deepEqual(failure.event_ids, []);
+  assert.deepEqual(await store.action(id), action);
+  await assert.rejects(
+    store.lease(id, async () => {}),
+    error("checkpoint_busy"),
+  );
+});
+
+test("a leased operation failure keeps its own code when the lock cleanup also fails", async (t) => {
+  const { store } = await leaseFixture(t),
+    id = "cp_" + randomUUID(),
+    lock = store.file(id, ".lock"),
+    action = recoveryAction(id);
+  failLockCleanup(t, lock);
+  let failure;
+  await assert.rejects(
+    store.lease(id, async () => {
+      await store.saveAction(action);
+      await store.saveAction({
+        ...action,
+        summary_digest: "0".repeat(64),
+      });
+    }),
+    (error) => {
+      failure = error;
+      return error.code === "invalid_recovery_action";
+    },
+  );
+  // The helper cannot observe how far the caller's own writes got.
+  assert.equal(failure.committed, null);
+  assert.equal(failure.lock_cleanup_unconfirmed, true);
+  assert.deepEqual(failure.event_ids, []);
+  assert.deepEqual(await store.action(id), action);
+  await assert.rejects(
+    store.lease(id, async () => {}),
+    error("checkpoint_busy"),
   );
 });
