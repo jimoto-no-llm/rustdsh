@@ -86,7 +86,7 @@ value wins, `RDSH_NODE_COMPILE_CACHE=0` opts out).
 - Search: sequential walk fixes order, files are grepped in parallel, hits merge
   back in walk order. Trees under 32 files keep the sequential path.
 - `sessions --tokens`: parallel zstd expansion (same numbers, order kept).
-- Release profile: `opt-level=3`, LTO, `strip`, `panic=abort` (~806KB).
+- Release profile: `opt-level=3`, LTO, `strip`, `panic=abort` (~1.8-2.3MB per platform).
 
 ## Invariants for contributors
 
