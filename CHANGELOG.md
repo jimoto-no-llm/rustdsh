@@ -131,6 +131,13 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 - WSL keeps a co-installed native package on the active Koffi version, and
   interpreter and update selection stay compatible.
 
+### Security
+
+- The Windows dashboard launches its PowerShell tray helper, browser URL handler
+  and installed CMD wrapper by absolute path. A `pwsh.exe` or `rundll32.exe`
+  placed in the working directory is no longer selected. Re-run the installer
+  to refresh an existing `rdsh-dashboard.cmd`.
+
 ### Changed
 
 - Performance: `rdsh serve` cuts idle accept latency and answers estimates in
