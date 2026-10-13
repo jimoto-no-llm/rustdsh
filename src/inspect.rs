@@ -38,10 +38,10 @@ fn format_time(t: std::time::SystemTime) -> String {
         .unwrap_or(0) as i64;
     let days = secs.div_euclid(86400);
     let tod = secs.rem_euclid(86400);
-    let z = days + 719468;
-    let era = z.div_euclid(146097);
-    let doe = z.rem_euclid(146097);
-    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z.rem_euclid(146_097);
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365;
     let y = yoe + era * 400;
     let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
     let mp = (5 * doy + 2) / 153;
@@ -1459,7 +1459,7 @@ mod tests {
         let mut seed = 0x9E37_79B9u64;
         let mut body = vec![0u8; 100_000];
         for b in &mut body {
-            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+            seed = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
             *b = (seed >> 33) as u8;
         }
         std::fs::write(&src, &body).unwrap();
