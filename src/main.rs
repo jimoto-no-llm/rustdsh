@@ -670,8 +670,8 @@ fn main() {
                 no_bundled,
                 dry_run,
                 compute,
-                no_sound,
-                no_gitview,
+                no_sound: no_sound || !rdsh_config::feature_enabled(&cfg, "sound"),
+                no_gitview: no_gitview || !rdsh_config::feature_enabled(&cfg, "gitview"),
                 json: json || inner,
             }),
             Some(DesktopAction::Verify {

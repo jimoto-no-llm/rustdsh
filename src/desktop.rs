@@ -243,8 +243,14 @@ fn scan_paths(dirs: impl Iterator<Item = PathBuf>) -> Option<PathBuf> {
     for dir in dirs {
         for name in ["dsh", "dsh.cmd", "dsh.exe"] {
             let candidate = dir.join(name);
-            if candidate.is_file() && is_desktop_runtime_path(&candidate) {
-                return Some(candidate);
+            if !candidate.is_file() {
+                continue;
+            }
+            let Ok(resolved) = std::fs::canonicalize(&candidate) else {
+                continue;
+            };
+            if is_desktop_runtime_path(&resolved) {
+                return Some(absolute(&candidate));
             }
         }
     }
@@ -279,7 +285,7 @@ pub fn find_command(env: &OsEnv) -> Option<CommandRuntime> {
         for candidate in cli_paths(&app, &env.platform) {
             if candidate.is_file() {
                 return Some(CommandRuntime {
-                    path: candidate,
+                    path: absolute(&candidate),
                     source: "detected",
                     app: Some(app),
                 });

@@ -7,21 +7,22 @@
 # dsh CLI refuses it, so the work is forwarded to the Desktop-installed command
 # through `rdsh desktop install` (or you install the packages from the app's
 # own Plugins page).
-# Third-party Web UI plugins are installed by default (both MIT, used with
+# Third-party Web UI plugins default on for web/desktop (both MIT, used with
 # upstream permission; see Credits in README.md and plugins/recommended.md):
 # - sound/desktop notifications (cwd514/dsh-sound-notifications, zero deps)
 # - Git panel (yugapor/dsh-gitview).
 # They are browser client plugins, so PROFILE=web is the intended target.
-# Set SOUND=0 or GITVIEW=0 to skip one of them.
+# Set SOUND=0 or GITVIEW=0 to skip one. Other profiles can opt in with =1.
 set -u
 PROFILE="${PROFILE:-headless}"
 DRY_RUN="${DRY_RUN:-0}"
-SOUND="${SOUND:-1}"
-GITVIEW="${GITVIEW:-1}"
+case "$PROFILE" in web|desktop) BROWSER_PLUGINS_DEFAULT=1 ;; *) BROWSER_PLUGINS_DEFAULT=0 ;; esac
+SOUND="${SOUND:-$BROWSER_PLUGINS_DEFAULT}"
+GITVIEW="${GITVIEW:-$BROWSER_PLUGINS_DEFAULT}"
 COMPUTE="${COMPUTE:-0}"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-# SOUND/GITVIEW default to 1 (opt-out with =0); features.sound=false and
+# SOUND/GITVIEW follow the browser-profile default; features.sound=false and
 # features.gitview=false in rdsh.json are the vetoes. A missing/corrupt file,
 # an absent id, or no node keeps the previous behavior, so the feature switch
 # never removes an offer by surprise.

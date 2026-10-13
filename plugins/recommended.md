@@ -44,7 +44,8 @@ inline with `./install.sh --desktop` or `.\install.ps1 -Desktop`. See
 
 ## Default Web UI plugins (third-party, MIT, used with permission)
 
-Installed by default. Set `SOUND=0` or `GITVIEW=0` to skip one of them, or
+Installed by default for `PROFILE=web` / `PROFILE=desktop`. Other profiles
+can opt in with `SOUND=1` / `GITVIEW=1`. Set `SOUND=0` or `GITVIEW=0` to skip one, or
 `features.sound=false` / `features.gitview=false` in `rdsh.json` to veto them.
 `rdsh desktop install` includes both by default as well (`--no-sound` /
 `--no-gitview` to skip).

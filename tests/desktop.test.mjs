@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const exec = promisify(execFile);
@@ -71,8 +71,8 @@ async function stubCommand(box, dir = join(box.root, 'desktop cli')) {
   return path;
 }
 
-async function run(args, env) {
-  const options = { env: { ...process.env, ...env }, cwd: repo, maxBuffer: 4 * 1024 * 1024 };
+async function run(args, env, cwd = repo) {
+  const options = { env: { ...process.env, ...env }, cwd, maxBuffer: 4 * 1024 * 1024 };
   try {
     const { stdout, stderr } = await exec(bin, args, options);
     return { code: 0, stdout, stderr };
@@ -282,4 +282,67 @@ test('the stub launcher matches the host platform', async (t) => {
   const command = await stubCommand(box);
   assert.equal(command.endsWith(windows ? 'dsh.cmd' : 'dsh'), true);
   assert.equal(existsSync(join(box.root, 'desktop cli', 'stub.cjs')), true);
+});
+
+test('Desktop install honors saved sound and gitview feature vetoes', async (t) => {
+  const { box, env } = await baseEnv(t);
+  const command = await stubCommand(box);
+  await initProfile(box, { name: 'dsh-profile-desktop' });
+  for (const feature of ['sound', 'gitview']) {
+    const off = await run(['features', 'off', feature], env);
+    assert.equal(off.code, 0, off.stderr);
+  }
+  const result = await run(['desktop', 'install', '--json', '--plugins-dir', box.checkout], {
+    ...env, DSH_DESKTOP_CLI: command, STUB_LOG: box.log, STUB_PROFILE: box.profile,
+  });
+  assert.equal(result.code, 0, result.stderr);
+  const calls = (await readFile(box.log, 'utf8')).trim().split('\n').map((line) => JSON.parse(line));
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][4].endsWith('rdsh-settings'), true);
+});
+
+test('a relative extracted runtime survives the plugin working directory', {
+  skip: process.platform !== 'linux',
+}, async (t) => {
+  const { box, env } = await baseEnv(t);
+  await stubCommand(box, join(box.root, 'squashfs-root', 'resources', 'runtime', 'cli', 'bin'));
+  await initProfile(box, { name: 'dsh-profile-desktop' });
+  const result = await run(['desktop', 'install', '--json', '--plugins-dir', box.checkout], {
+    ...env, HOME: join(box.root, 'isolated-home'), DSH_DESKTOP_CLI: '', DSH_DESKTOP_APP_DIR: '', APPDIR: '',
+    STUB_LOG: box.log, STUB_PROFILE: box.profile,
+  }, box.root);
+  assert.equal(result.code, 0, result.stdout + result.stderr);
+  assert.equal((await readFile(box.log, 'utf8')).trim().split('\n').length, 3);
+});
+
+test('a PATH symlink discovers a Desktop runtime outside standard app locations', { skip: windows }, async (t) => {
+  const { box, env } = await baseEnv(t);
+  const command = await stubCommand(box, join(box.root, 'custom-app', 'resources', 'runtime', 'cli', 'bin'));
+  const alias = join(box.root, 'bin');
+  await mkdir(alias);
+  const launcher = join(alias, 'dsh');
+  await symlink(command, launcher);
+  await initProfile(box, { name: 'dsh-profile-desktop' });
+  const result = await run(['desktop', 'install', '--json', '--plugins-dir', box.checkout], {
+    ...env, HOME: join(box.root, 'isolated-home'), DSH_DESKTOP_CLI: '', DSH_DESKTOP_APP_DIR: '', APPDIR: '',
+    PATH: alias + delimiter + process.env.PATH, STUB_LOG: box.log, STUB_PROFILE: box.profile,
+  });
+  assert.equal(result.code, 0, result.stdout + result.stderr);
+  assert.equal((await readFile(box.log, 'utf8')).trim().split('\n').length, 3);
+});
+
+test('the plugin installer defaults browser packages only for web and desktop', { skip: windows }, async (t) => {
+  const { box, env } = await baseEnv(t);
+  for (const profile of ['', 'headless', 'tui', 'web', 'desktop']) {
+    const { stdout } = await exec('sh', [join(repo, 'plugins/install.sh')], {
+      cwd: repo, env: { ...process.env, ...env, HOME: box.root, PROFILE: profile, DRY_RUN: '1', SOUND: '', GITVIEW: '', RDSH_BIN: bin },
+    });
+    for (const name of ['dsh-sound-notifications', 'dsh-gitview'])
+      assert.equal(stdout.includes('github:' + (name === 'dsh-gitview' ? 'yugapor/' : 'cwd514/') + name), ['web', 'desktop'].includes(profile), profile || 'default');
+  }
+  const { stdout } = await exec('sh', [join(repo, 'plugins/install.sh')], {
+    cwd: repo, env: { ...process.env, ...env, HOME: box.root, PROFILE: 'tui', DRY_RUN: '1', SOUND: '1', GITVIEW: '1' },
+  });
+  assert.match(stdout, /github:cwd514\/dsh-sound-notifications/);
+  assert.match(stdout, /github:yugapor\/dsh-gitview/);
 });
