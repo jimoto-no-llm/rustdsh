@@ -634,6 +634,74 @@ test("legacy plan indexes can stop without retroactive event reservations", asyn
   assert.ok(stopped.plans[0].stopped_at);
   assert.equal(JSON.parse(await fs.readFile(f.plans.index, "utf8")).schema, 2);
 });
+test("defining after legacy migration preserves stop capacity for every active plan", async (t) => {
+  const f = await setup(t),
+    fixedTimestamp = "2026-10-13T00:00:00.000Z",
+    definitions = Array.from({ length: 2 }, (_, index) => ({
+      ...f.definition,
+      plan_id: `legacy-plan-${index}`,
+      run_id: `legacy-run-${index}`,
+    })),
+    installLegacyIndex = async (eventCount) => {
+      const state = await f.plans.read();
+      state.plans = definitions.map((definition) => ({
+        definition,
+        binding: null,
+        context_hash: hash({ definition, binding: null }),
+        created_at: fixedTimestamp,
+        enabled_at: null,
+        stopped_at: null,
+        stop_reason: null,
+      }));
+      state.revision = definitions.length;
+      state.schema = 1;
+      delete state.stop_reservations;
+      state.events = Array.from({ length: eventCount }, (_, index) => ({
+        sequence: index + 1,
+        plan_id: definitions[index % definitions.length].plan_id,
+        task_id: null,
+        action: "defined",
+        reason: null,
+        at: fixedTimestamp,
+      }));
+      await fs.mkdir(f.plans.directory, { recursive: true });
+      await fs.writeFile(f.plans.index, JSON.stringify(state) + "\n");
+    },
+    newDefinition = {
+      ...f.definition,
+      plan_id: "new-plan",
+      run_id: "new-run",
+    };
+
+  // A rejected define must leave the only legacy stop event available.
+  await installLegacyIndex(1998);
+  const before = await fs.readFile(f.plans.index);
+  await assert.rejects(
+    f.plans.define(newDefinition),
+    fail("plan_audit_full"),
+  );
+  assert.deepEqual(await fs.readFile(f.plans.index), before);
+  assert.equal(
+    (await f.plans.stop("legacy-plan-0")).stop_reason,
+    "operator_stopped",
+  );
+  assert.equal((await f.plans.read()).events.length, 1999);
+
+  // With enough headroom, the new plan reserves stop events for every legacy
+  // plan too, so all three can be stopped in sequence.
+  await installLegacyIndex(1996);
+  await f.plans.define(newDefinition);
+  const defined = await f.plans.read();
+  assert.deepEqual(
+    new Set(defined.stop_reservations),
+    new Set(["legacy-plan-0", "legacy-plan-1", "new-plan"]),
+  );
+  for (const id of ["legacy-plan-0", "legacy-plan-1", "new-plan"])
+    await f.plans.stop(id);
+  const stopped = await f.plans.read();
+  assert.equal(stopped.events.length, 2000);
+  assert.ok(stopped.plans.every((plan) => plan.stopped_at));
+});
 test("CLI defines and inspects drafts without starting a CLI or accepting misplaced options", async (t) => {
   const f = await setup(t),
     cli = fileURLToPath(new URL("../cli.mjs", import.meta.url)),

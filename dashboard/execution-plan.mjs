@@ -417,7 +417,11 @@ export class ExecutionPlans {
         stopped_at: null,
         stop_reason: null,
       };
-      v.stop_reservations ??= [];
+      // On the first write after a schema-1 migration, reserve stop capacity
+      // for every still-active legacy plan before accepting another plan.
+      v.stop_reservations = v.plans
+        .filter((existing) => !existing.stopped_at)
+        .map((existing) => existing.definition.plan_id);
       v.stop_reservations.push(definition.plan_id);
       v.plans.push(p);
       this.event(v, p, null, "defined");
