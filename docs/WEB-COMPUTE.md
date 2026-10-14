@@ -8,7 +8,7 @@
 - DSH が正本（セッション・権限・Agent Loop・イベント・認証）を保持します
 - Rust は純粋計算のみ（`tokens.estimate` / `tokens.prune`）。読み取り専用相当
 - 既定 OFF（`RDSH_COMPUTE=1` でのみ Rust 経路）。失敗時は元の Node 処理にフォールバック
-- `rdsh serve`（64 KiB 上限・100ms スリープ）は高速 RPC に使いません
+- `rdsh serve`（64 KiB 上限・5ms ポーリング）は高速 RPC に使いません
 - 毎回 CLI 起動はしません。常駐 `rdsh compute`（stdio NDJSON）を使います
 - 1 リクエスト 1 MiB 上限。大きな履歴は呼び出し側で分割します
 - `tokens.estimate_batch`（最大64件・件毎256 KiB・合計1 MiB）で複数テキストを1往復に集約。小テキスト200件の常駐比較で約1.4倍（1.76ms→1.29ms）。大テキストでは差なし

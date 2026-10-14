@@ -68,3 +68,18 @@ test('explicit sharing rejects hard links and hidden credentials', async t => {
   await fs.link(path.join(workspace, '.env'), path.join(workspace, 'public.txt'));
   for (const file of ['.env', 'public.txt']) await assert.rejects(executeIsolated({ workspace, sharedFiles: [file], command: 'cat *' }), /approved file/);
 });
+
+test('rdsh_inspect declares an OpenAI-compatible function parameter schema', () => {
+  let definition;
+  const tools = {
+    guard() { return () => {}; },
+    register(value) { definition = value; return () => {}; },
+    get() { return definition; },
+  };
+  installToolBoundary(tools, { workspace: '/dummy' });
+  const parameters = definition.parameters;
+  assert.equal(parameters.type, 'object');
+  assert.deepEqual(Object.keys(parameters.properties), ['command']);
+  assert.equal(parameters.properties.command.type, 'string');
+  assert.deepEqual(parameters.required, ['command']);
+});

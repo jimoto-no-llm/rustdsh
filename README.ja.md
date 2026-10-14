@@ -163,6 +163,17 @@ rdsh setup --web                           # ブラウザから行える Web 設
 
 ※ 他ツールの認証情報を無断で外部へ送信したり、同期したりしません。明示的に指定したログイン情報のみをローカルで安全に管理します。
 
+dsh が同梱していない OpenAI 互換エンドポイント（HAI、Sarashina、自宅の llama.cpp / vLLM / LM Studio / Ollama など）は、プロファイルのルートとして追加できます：
+
+```sh
+rdsh provider add hai --model deepseek-v4-flash              # 鍵は HAI_API_KEY か --key-stdin
+rdsh provider add sarashina                                  # 鍵は SARASHINA_API_KEY。mini と nano は組み込み
+rdsh provider add local-openai --base-url http://host:8080/v1 --discover --no-key
+rdsh provider list                                           # プリセットと各プロファイルの設定・鍵の状態
+```
+
+詳細は [docs/PROVIDERS.md](docs/PROVIDERS.md)（英語）を参照してください。
+
 ### エージェント実行の安全な隔離
 
 委譲したエージェントツールは既定で通常のファイル読み書きができます。Linux（bubblewrap と prlimit がある環境）では `--share-file` で明示的に共有したファイルだけに限定されます：
@@ -180,6 +191,29 @@ DSH の `hooks.json` と連携し、危険なコマンド実行を瞬時に検�
 ```sh
 echo "$input" | rdsh guard --deny "rm -rf /*" --deny "*token*"
 ```
+
+対応するファイル操作を構造で判定する場合は、任意でpolicy fileを指定できます。
+次の例は、既存のプロジェクトディレクトリ内の `Read` だけを分類上許可します。
+
+```json
+{
+  "schema": 1,
+  "rules": [
+    { "id": "project-read", "tool": "Read", "access": "read", "roots": ["/absolute/project/path"] }
+  ]
+}
+```
+
+```sh
+echo "$hook_json" | rdsh guard --policy-file ./hook-policy.json --json
+```
+
+構造判定が対応するのは `Read`・`Write`・`Edit` のファイルpath schemaです。
+作業ディレクトリと対象pathを正規化し、toolとread/write範囲を既存rootに照合して、
+秘密を含まない理由とともに `allow`・`deny`・`unknown` を返します。JSONの `allow` は分類結果だけで、
+ホストのpermission/approvalを意味しません。そのため `decision` は出力せず、最終的な権限判断はホストに残します。
+未知のtool、shell command、壊れた入力、未対応の引数はfail closedです。shell構文解析とnetwork先の判定は未対応です。
+path判定後にファイルシステムが変わる競合もあり、このhookはOS sandboxではありません。実際の強制には実行sandboxを使ってください。
 
 ```json
 {
@@ -294,6 +328,7 @@ Linux x86_64 環境での測定値です：
 | [docs/DESKTOP-INTEGRATION.md](docs/DESKTOP-INTEGRATION.md) | デスクトップアプリ (Electron) との連携 |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 今後の開発ロードマップ |
 | [docs/RELEASING.md](docs/RELEASING.md) | リリース手順 |
+| [docs/SERIAL-PROXY.md](docs/SERIAL-PROXY.md) | 同時リクエスト数制限プロキシ |
 | [CHANGELOG.md](CHANGELOG.md) | バージョンごとの主な変更履歴 |
 
 ## コミュニティ

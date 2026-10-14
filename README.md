@@ -21,7 +21,7 @@ It ports frequently used CLI operations (token calculation, code search, session
 - ⚡ **Sub-millisecond startup & low memory**: `--version` launches in ~0.90 ms with ~2.9 MB peak memory, compared to ~88 ms and ~66 MB for Node.js-based `dsh`.
 - 🔄 **100% Drop-in Compatible**: Subcommands that are not rdsh-native are passed straight to upstream `dsh`. Existing scripts and workflows keep running unchanged.
 - 🛠 **Fast Native Utilities**: Estimate tokens, search code, list sessions, and run health diagnostics (`rdsh doctor`) instantly without starting Node.js.
-- 🛡 **Safe by Default**: Read-only commands never mutate files, credentials are never automatically synced or exported, and agent tools can be confined to explicitly shared files on Linux.
+- 🛡 **Safe by Default**: Read-only commands never modify source files, credentials are never automatically synced or exported, and agent tools can be confined to explicitly shared files on Linux.
 
 ## Table of Contents
 
@@ -163,6 +163,17 @@ rdsh setup --web                           # browser-based setup interface
 
 *Note: rdsh never exports or syncs external credentials without explicit user command.*
 
+To connect an OpenAI-compatible endpoint that dsh does not ship (HAI, Sarashina, a home llama.cpp / vLLM / LM Studio / Ollama server), add it as a profile route:
+
+```sh
+rdsh provider add hai --model deepseek-v4-flash              # key from HAI_API_KEY or --key-stdin
+rdsh provider add sarashina                                  # key from SARASHINA_API_KEY; mini and nano built in
+rdsh provider add local-openai --base-url http://host:8080/v1 --discover --no-key
+rdsh provider list                                           # presets, per-profile route and key status
+```
+
+Details: [docs/PROVIDERS.md](docs/PROVIDERS.md).
+
 ### Agent Tool Isolation
 
 Delegated agent tools keep normal file access by default: the model reads and
@@ -185,6 +196,33 @@ Integrates with DSH `hooks.json` to inspect and block dangerous commands before 
 ```sh
 echo "$input" | rdsh guard --deny "rm -rf /*" --deny "*token*"
 ```
+
+For an opt-in structured check of supported file tools, pass a policy file.
+This example permits `Read` only under one existing project directory:
+
+```json
+{
+  "schema": 1,
+  "rules": [
+    { "id": "project-read", "tool": "Read", "access": "read", "roots": ["/absolute/project/path"] }
+  ]
+}
+```
+
+```sh
+echo "$hook_json" | rdsh guard --policy-file ./hook-policy.json --json
+```
+
+The structured classifier supports the `Read`, `Write`, and `Edit` file-path
+schemas. It canonicalizes the working directory and target, checks the selected
+tool and read/write scope against existing policy roots, and reports
+`allow`, `deny`, or `unknown` with a non-sensitive reason. In JSON mode an
+`allow` is classification only and omits `decision`; the host still owns
+permission and approval. Unknown tools, shell commands, malformed input, and
+unsupported tool arguments fail closed. Shell parsing and network destinations
+are not implemented. Path checks are advisory and can race with later filesystem
+changes; this hook is not an OS sandbox. Use the actual execution sandbox for
+enforcement.
 
 ```json
 {
@@ -305,9 +343,11 @@ Measurements conducted on Linux x86_64:
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Architecture design and delegation model |
 | [docs/BENCHMARKS.md](docs/BENCHMARKS.md) | Benchmark methodology and reproduction steps |
 | [docs/RDSH-SETTINGS.md](docs/RDSH-SETTINGS.md) | Settings UI and CLI options |
+| [docs/PROVIDERS.md](docs/PROVIDERS.md) | `rdsh provider`: HAI, Sarashina and home LLM server routes |
 | [docs/DESKTOP-INTEGRATION.md](docs/DESKTOP-INTEGRATION.md) | DeepSeek Harness Desktop (Electron) integration |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Project roadmap and planned capabilities |
 | [docs/RELEASING.md](docs/RELEASING.md) | Release procedures |
+| [docs/SERIAL-PROXY.md](docs/SERIAL-PROXY.md) | Concurrency-limiting proxy for single-slot providers |
 | [CHANGELOG.md](CHANGELOG.md) | Changes per version |
 
 ## Community

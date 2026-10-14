@@ -3,6 +3,110 @@
 All notable changes to this project are documented here.
 Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
+## [Unreleased]
+
+### Added
+
+- `rdsh provider add hai|sarashina|local-openai` writes an OpenAI-compatible route into a
+  profile's `llm-pi-ai` providers (models from `--model`, opencode's
+  `provider.<id>` or `GET /models`), keeping every other byte of
+  `cordis.patch.yml`; `rdsh provider list` shows presets and per-profile
+  route and key status. The `sarashina` preset writes the `compat` lines
+  (`supportsStore`, `supportsUsageInStreaming`) and `maxTokens: 8000` that the
+  API requires; its `tool_choice` default is a known open question for agent
+  use. `HAI_API_KEY`, `SARASHINA_API_KEY` and `LOCAL_OPENAI_API_KEY` can be
+  saved from the setup UI (`rdsh setup --yes` does not save them), but they count as a connection only when a profile's
+  default model uses a route that reads them. Existing `llm-pi-ai` entries
+  written with quotes, comments or any indent width are edited in place; a
+  layout that cannot be read safely (including any other mention of
+  `llm-pi-ai`, such as inside `- insert:`) is refused with the YAML to add by
+  hand. See `docs/PROVIDERS.md`.
+- `rdsh-dashboard subagents plan` turns a declared use case into a deterministic
+  dispatch plan for delegated subagents: role and model tier per item, bounded
+  items and weight per agent, waves limited by `max_parallel`, and explicit
+  warnings instead of guessed tiers. It starts no agent and writes nothing; the
+  existing `workers prepare` still owns the checkout allocation
+  (`docs/SUBAGENT-PLANNING.md`).
+- `scripts/serial-proxy.mjs` gains `--tool-choice-default <none|auto|required>`
+  (adds a default `tool_choice` to `chat/completions` requests that send `tools`
+  without one, all other requests are forwarded byte-identical; needed for
+  Sarashina, which otherwise forces tool calls) and `--rpm <n>` (fixed 60-second
+  window cap on upstream requests, waiting inside the existing queue and exposed
+  in `/__proxy/status`). See `docs/SERIAL-PROXY.md`.
+
+## [0.3.3] - 2026-10-13
+
+### Security
+
+- `install.sh --from-release` verifies every archive against the digests pinned
+  in this repository's `release-digests.tsv` instead of trusting a checksum
+  served next to the archive, so a tampered release base can no longer install
+  its own payload. Unix only for now; `install.ps1` keeps using sidecars.
+- The Windows dashboard launches its PowerShell tray helper, browser URL handler
+  and installed CMD wrapper by absolute path. A `pwsh.exe` or `rundll32.exe`
+  placed in the working directory is no longer selected. Re-run the installer
+  to refresh an existing `rdsh-dashboard.cmd`.
+- The installer validates the ICO header and payload ranges before rebuilding
+  the Windows icon instead of trusting offsets in the image.
+
+### Fixed
+
+- Delegation skips `dsh` and Node candidates on `PATH` that the current
+  effective user cannot execute, so an unrunnable first candidate no longer
+  fails with `Permission denied`.
+- `rdsh` shares the upstream DSH credential lock protocol, so saving and
+  refreshing credentials after using rustdsh no longer times out.
+- Dashboard lock cleanup no longer masks a committed write: the original error
+  code is preserved and `lock_cleanup_unconfirmed` is attached.
+- `rdsh_inspect` declares its parameters as a valid JSON Schema, so strict
+  validators accept the tool definition.
+
+### Added
+
+- `rdsh guard --policy-file` classifies structured Read/Write/Edit operations
+  and enforces the allow/deny policy against the resolved target; without the
+  flag the previous text-matching behaviour is unchanged.
+- The `rdsh-docs` skill ships with the plugins so the DSH web profile can
+  check rustdsh behaviour against the verified source.
+- The dashboard integrates worker changes in a fixed commit order and requires
+  every check to pass before publishing.
+
+### Changed
+
+- Dependency updates: `sha2` 0.11 (digest output is encoded by an explicit
+  lowercase hex encoder), `embed-resource` 3.0.12, `koffi` 3.3.3 and
+  `@agentclientprotocol/sdk` 1.8.0.
+- CI covers the Windows installer and delegation through Git Bash, runs the
+  Discord presence suite, pins the upstream approval-integrity check, and the
+  release job waits for the tag-push CI before building.
+
+## [0.3.2] - 2026-10-12
+
+### Fixed
+
+- `rdsh compute` and the resident compute bridge contain a worker that closes
+  its stdin mid-write: the resulting EPIPE no longer takes down the Node host,
+  and the request falls back instead of exiting.
+- `tokens`, `compute` and `serve` report `chars` as a Unicode scalar count
+  instead of a UTF-8 byte count, so 日本語 is `3` chars rather than `9`.
+- `context search` accepts two-character ASCII terms (`CI`, `UI`, `Go`)
+  instead of silently returning no sessions; Japanese bigrams keep their weak
+  score.
+- `search-web` keeps valid results whose title, URL or snippet contains the
+  correction word.
+- Dashboard acceptance ignores unrelated forbidden files such as
+  `.env.example` instead of stopping with `invalid_input_path`.
+- Delegation skips `dsh` and Node candidates on `PATH` that cannot be
+  executed, instead of failing with `Permission denied`.
+- `rdsh headless "run the tests"` forwards the positional prompt the same way
+  an explicit `--profile` does.
+- `--dump-default-config` and `--dump-config-schema` reach upstream `dsh`
+  as themselves instead of degrading to `--dump-config`.
+- `rdsh compact` counts newlines in its token budget and no longer appends an
+  extra trailing newline.
+- Credential rotation replaces the `refs` entry instead of duplicating it, and
+  already-duplicated files are healed back to a single entry.
+
 ## [0.3.1] - 2026-10-12
 
 ### Fixed

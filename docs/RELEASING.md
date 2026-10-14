@@ -79,18 +79,30 @@ Generation failure stops publication.
    git push origin vX.Y.Z
    ```
 
-   Tag push starts the `cd` workflow automatically. Its validation job must pass
-   before builds start, and publication waits for every build and asset check.
-   Never tag an unreviewed or untested commit.
+   Tag push starts the release workflow and the normal `ci.yml` push workflow.
+   The release workflow verifies that the tag resolves to the exact pushed SHA,
+   that SHA is an ancestor of `main`, and the `ci.yml` run triggered by that
+   exact tag push completed successfully. It waits up to 15 minutes for that
+   run, then requires every required check on the tagged commit to be present
+   and successful. Missing, queued, in-progress, failed, or cancelled CI blocks
+   release builds and publication. `publish` waits for both this validation and
+   all release matrix builds. Never tag an unreviewed commit.
+   If the tag-push CI needs longer than the wait window, re-run only the failed
+   `cd` jobs once it finishes; the staged artifacts are reused:
+
+   ```sh
+   gh run rerun <cd-run-id> --failed
+   ```
 
 ## Build and publish
 
-The `cd` workflow first refuses malformed or lightweight tags, mismatched
-versions, missing CHANGELOG entries, incomplete release notes, commits outside
-`main`, and commits whose latest required checks are missing, pending or failed.
-It builds five targets with `cargo build --locked --release` only after those
-checks pass. The exact required check names live in `scripts/release_ci.py`; CI
-workflow job-name changes must update that list and its tests:
+The `cd` workflow first refuses malformed or lightweight tags, tags outside
+`main`, tags whose exact-SHA tag-push CI is missing or unsuccessful, mismatched
+versions, missing CHANGELOG entries and incomplete release notes. It also
+requires every required check on the tagged commit to be successful, then builds
+five targets with `cargo build --locked --release` only after those gates pass.
+The exact required check names live in `scripts/release_ci.py`; CI workflow
+job-name changes must update that list and its tests:
 
 | Platform | Archive |
 | --- | --- |
@@ -116,6 +128,16 @@ rerun only failed jobs while the original staged artifacts remain available
 (seven days) rather than rebuilding the successful jobs. Concurrent
 runs for the same tag are serialized and never cancel an upload in progress.
 
+`install.sh` verifies Unix archives against `release-digests.tsv` fetched from
+the fixed canonical `raw.githubusercontent.com/jimoto-no-llm/rustdsh/main`
+URL. It does not trust a checksum served by `RDSH_RELEASE_BASE`; the only
+override is the test-only `RDSH_RELEASE_DIGESTS`, which a `file://` release base
+may use and a remote base never does. After verifying a published release,
+update the `latest` row and add each supported `.tar.gz` asset's GitHub-reported
+SHA-256 in a reviewed follow-up PR before announcing or directing users to
+install that release. Keep older rows for explicit `--version` installs. Do not
+derive pins from release `.sha256` sidecars.
+
 After publication, confirm the body, 12 assets and correct channel in GitHub.
 Download and verify the actual published assets:
 
@@ -123,6 +145,17 @@ Download and verify the actual published assets:
 gh release download vX.Y.Z --repo jimoto-no-llm/rustdsh --dir /tmp/rdsh-vX.Y.Z-assets
 python3 scripts/verify-release-assets.py /tmp/rdsh-vX.Y.Z-assets
 ```
+
+For the installer registry, read GitHub's own asset digests and strip the
+`sha256:` prefix; `gh release view --json assets` does not expose them:
+
+```sh
+gh api repos/jimoto-no-llm/rustdsh/releases/tags/vX.Y.Z \
+  --jq '.assets[]|"\(.name) \(.digest)"'
+```
+
+Review the updated `release-digests.tsv` before announcing the new stable
+channel. The `latest` row must name the release GitHub marks Latest.
 
 Test README installation commands in a clean environment. Announcements use the
 published notes. Failed builds leave staged artifacts; failed uploads or verification
