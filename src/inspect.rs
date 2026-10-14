@@ -1,5 +1,7 @@
 //! Read-only inspection of $DSH_HOME without Node: sessions, logs, skills, profiles.
-//! Never writes; missing dirs are reported, not errors (exit 0 with a note).
+//! Session/profile inputs are read-only. The token-size cache uses XDG_CACHE_HOME
+//! or the user's .cache directory, which can be inside $DSH_HOME by configuration.
+//! Missing dirs are reported, not errors (exit 0 with a note).
 
 /// User home directory without a dirs/home crate: HOME, USERPROFILE, then
 /// HOMEDRIVE+HOMEPATH (native Windows). One resolver for the whole binary so

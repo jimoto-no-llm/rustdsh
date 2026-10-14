@@ -426,18 +426,32 @@ fn fetch(base: &str, query: &str, locale: crate::locale::Locale) -> anyhow::Resu
             crate::locale::native_message(locale, crate::locale::NativeMessage::BadSearxResponse)
         ),
     };
-    if !body.contains("<article") {
-        anyhow::bail!(
-            "{} {base}{}",
-            crate::locale::native_message(locale, crate::locale::NativeMessage::NoSearxResultsPage),
-            match locale {
-                crate::locale::Locale::English => " (is SEARXNG_URL right?)",
-                crate::locale::Locale::Chinese => "（SEARXNG_URL 是否正确？）",
-                crate::locale::Locale::Japanese => "（SEARXNG_URL は正しいですか？）",
-            }
-        );
-    }
+    ensure_results_page(body, base, locale)?;
     Ok(parse_html(body, 50))
+}
+
+/// Accept recognizable empty SearXNG pages; preserve locale on invalid pages.
+fn ensure_results_page(
+    body: &str,
+    base: &str,
+    locale: crate::locale::Locale,
+) -> anyhow::Result<()> {
+    if body.contains("<article") || looks_like_searxng(body) {
+        return Ok(());
+    }
+    anyhow::bail!(
+        "{} {base}{}",
+        crate::locale::native_message(locale, crate::locale::NativeMessage::NoSearxResultsPage),
+        match locale {
+            crate::locale::Locale::English => " (is SEARXNG_URL right?)",
+            crate::locale::Locale::Chinese => "（SEARXNG_URL 是否正确？）",
+            crate::locale::Locale::Japanese => "（SEARXNG_URL は正しいですか？）",
+        }
+    );
+}
+
+fn looks_like_searxng(body: &str) -> bool {
+    body.contains("id=\"results\"") || body.contains("content=\"searxng")
 }
 
 pub fn cmd_search_web(
@@ -495,6 +509,42 @@ pub fn cmd_search_web(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // 0 件でも正しい SearXNG インスタンスなら成功扱いにする（設定ミスと誤診しない）。
+    #[test]
+    fn empty_searxng_page_is_not_a_configuration_error() {
+        let page =
+            "<html><body><div id=\"results\"><p>No results were found.</p></div></body></html>";
+        assert!(ensure_results_page(
+            page,
+            "http://127.0.0.1:8888",
+            crate::locale::Locale::English
+        )
+        .is_ok());
+        assert!(parse_html(page, 50).is_empty());
+    }
+
+    #[test]
+    fn searxng_generator_meta_is_accepted() {
+        let page = "<html><head><meta name=\"generator\" content=\"searxng/2026\"></head></html>";
+        assert!(ensure_results_page(
+            page,
+            "http://127.0.0.1:8888",
+            crate::locale::Locale::English
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn a_plain_page_is_still_reported_as_a_wrong_url() {
+        let page = "<html><body><h1>hello</h1></body></html>";
+        assert!(ensure_results_page(
+            page,
+            "http://127.0.0.1:8888",
+            crate::locale::Locale::English
+        )
+        .is_err());
+    }
 
     #[test]
     fn query_encoding() {
