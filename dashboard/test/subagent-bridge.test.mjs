@@ -49,3 +49,26 @@ process.exitCode = 7;
   ]);
   assert.equal(result.stderr, "native stderr\n");
 });
+
+test("legacy subagents command skips a non-executable PATH candidate", {
+  skip: process.platform === "win32",
+}, (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "rdsh-subagent-path-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const blocked = path.join(root, "blocked");
+  const usable = path.join(root, "usable");
+  fs.mkdirSync(blocked);
+  fs.mkdirSync(usable);
+  fs.writeFileSync(path.join(blocked, "rdsh"), "not executable\n", { mode: 0o644 });
+  fs.writeFileSync(path.join(usable, "rdsh"), `#!/usr/bin/env node
+console.log("usable rdsh");
+`);
+  fs.chmodSync(path.join(usable, "rdsh"), 0o755);
+
+  const result = run(["subagents", "plan", "--input-file", "request.json"], {
+    RDSH_BIN: "",
+    PATH: [blocked, usable, process.env.PATH || ""].join(path.delimiter),
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, "usable rdsh\n");
+});

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { parseArgs } from "node:util";
 import fs from "node:fs/promises";
+import { constants } from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { identity, stateHome } from "./state.mjs";
@@ -217,7 +218,9 @@ async function nativeRdsh() {
     if (!path.isAbsolute(directory)) continue;
     const candidate = path.join(directory, name);
     try {
-      if ((await fs.stat(candidate)).isFile()) return candidate;
+      if (!(await fs.stat(candidate)).isFile()) continue;
+      await fs.access(candidate, constants.X_OK);
+      return candidate;
     } catch {
       // Keep looking through PATH.
     }
