@@ -326,4 +326,66 @@ mod tests {
             serde_json::from_str(&handle_line(&req("", "tokens.estimate", "hi", None))).unwrap();
         assert_eq!(r["code"], "bad_id");
     }
+
+    // run_lines は NDJSON のフェイルセーフ境界: 壊れた行でも落ちずに応答を返し、
+    // 空行は飛ばし、once では最初の1件で止まる。
+    #[test]
+    fn run_lines_answers_each_request_in_order() {
+        let input = format!(
+            "{}\r\n\r\n{}\n",
+            req("a1", "tokens.estimate", "one", None),
+            req("a2", "tokens.estimate", "two", None)
+        );
+        let mut out: Vec<u8> = Vec::new();
+        run_lines(input.as_bytes(), &mut out, false).unwrap();
+        let text = String::from_utf8(out).unwrap();
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!(lines.len(), 2, "a blank line must not produce a response");
+        let first: serde_json::Value = serde_json::from_str(lines[0]).unwrap();
+        let second: serde_json::Value = serde_json::from_str(lines[1]).unwrap();
+        assert_eq!(first["id"], "a1");
+        assert_eq!(second["id"], "a2");
+    }
+
+    #[test]
+    fn run_lines_reports_bad_utf8_and_keeps_going() {
+        let mut input: Vec<u8> = vec![0xff, 0xfe, b'\n'];
+        input.extend_from_slice(req("a2", "tokens.estimate", "ok", None).as_bytes());
+        input.push(b'\n');
+        let mut out: Vec<u8> = Vec::new();
+        run_lines(&input[..], &mut out, false).unwrap();
+        let text = String::from_utf8(out).unwrap();
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!(lines.len(), 2);
+        let bad: serde_json::Value = serde_json::from_str(lines[0]).unwrap();
+        assert_eq!(bad["ok"], false);
+        assert_eq!(bad["code"], "bad_utf8");
+        let good: serde_json::Value = serde_json::from_str(lines[1]).unwrap();
+        assert_eq!(good["id"], "a2");
+    }
+
+    #[test]
+    fn run_lines_once_stops_after_the_first_request() {
+        let input = format!(
+            "{}\n{}\n",
+            req("a1", "tokens.estimate", "one", None),
+            req("a2", "tokens.estimate", "two", None)
+        );
+        let mut out: Vec<u8> = Vec::new();
+        run_lines(input.as_bytes(), &mut out, true).unwrap();
+        let text = String::from_utf8(out).unwrap();
+        assert_eq!(text.lines().count(), 1);
+    }
+
+    #[test]
+    fn run_lines_answers_without_a_trailing_newline() {
+        let input = req("a1", "tokens.estimate", "tail", None);
+        let mut out: Vec<u8> = Vec::new();
+        run_lines(input.as_bytes(), &mut out, false).unwrap();
+        let text = String::from_utf8(out).unwrap();
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!(lines.len(), 1);
+        let resp: serde_json::Value = serde_json::from_str(lines[0]).unwrap();
+        assert_eq!(resp["id"], "a1");
+    }
 }
