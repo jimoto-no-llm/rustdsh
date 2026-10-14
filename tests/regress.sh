@@ -100,7 +100,19 @@ done
 # Legacy cache (no `cli` field) holding null from an old zstd-less run: recomputed when zstd exists.
 rm -rf "$ZC/cache"; mkdir -p "$ZC/cache"
 zc "$ZC/bad" q
-sed 's/"cli":true,//g' "$ZC/cache/rdsh/sessions-tokens.json" > "$ZC/legacy" && mv "$ZC/legacy" "$ZC/cache/rdsh/sessions-tokens.json"
+# Strip `cli` without assuming its position: serde_json emits the cache in
+# insertion order, so `cli` may be the last field (no trailing comma) or sorted
+# first. A `sed 's/"cli":true,//'` only matches the latter.
+python3 - "$ZC/cache/rdsh/sessions-tokens.json" "$ZC/legacy" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as fh:
+    cache = json.load(fh)
+for entry in cache.values():
+    entry.pop("cli", None)
+with open(sys.argv[2], "w", encoding="utf-8") as fh:
+    json.dump(cache, fh, separators=(",", ":"))
+PY
+mv "$ZC/legacy" "$ZC/cache/rdsh/sessions-tokens.json"
 if grep -q '"decomp":null' "$ZC/cache/rdsh/sessions-tokens.json" && ! grep -q '"cli"' "$ZC/cache/rdsh/sessions-tokens.json"; then :; else echo "FAIL(setup): legacy null cache"; cat "$ZC/cache/rdsh/sessions-tokens.json"; exit 1; fi
 zc "$ZC/ok" q
 if grep "q/s2" "$ZC/out" | grep -q "~1tok " && ! grep "q/s2" "$ZC/out" | grep -q "?"; then ok "tokens cache: legacy null entry rechecked with zstd"; else echo "FAIL(output): legacy null entry stuck"; cat "$ZC/out"; exit 1; fi
