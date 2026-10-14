@@ -40,12 +40,12 @@
     "bytes": 16006
   },
   "en-help.txt": {
-    "sha256": "a04e733f93cf5d5a09a6babc64bf9694a07e13455cc18a3414e6b43f0006cea6",
-    "bytes": 3468
+    "sha256": "a51c0319276953d908faeeda33a6d2c54fa14fd21b67af5908a4cb549b5823fe",
+    "bytes": 3342
   },
   "native-final.txt": {
-    "sha256": "827fd107145d3b37817528a874ed7a6bd13df3ed2676da55ad31d6b564ebb0f7",
-    "bytes": 17432
+    "sha256": "2bb6b3959120674eed72fc8c4596468ba46e93e89dd716e6d81ef232c1d4af04",
+    "bytes": 17431
   },
   "en-browser-results.json": {
     "sha256": "5131d531249d02a25040e64bb601fa3a9e283818d242f8470e9e419f305c7be0",
@@ -88,8 +88,8 @@
     "bytes": 117208
   },
   "README.md": {
-    "sha256": "5c34dd97fe204c81b53b1a4e4f89b5f222b6c590dcd40f5050d68439b227febf",
-    "bytes": 7626
+    "sha256": "e4813314ba858bec7f989ba105ba3b87a00ad1fbfb880145731f1d1281940d92",
+    "bytes": 7694
   },
   "windows-retry.md": {
     "sha256": "9c7bcd492619558cc7e5c2961e05c70d883a5e571d6db74f32150fd044ef7923",
@@ -200,8 +200,8 @@
     "bytes": 44604
   },
   "before-help.txt": {
-    "sha256": "93cfc4fd7ee700ca9c4626f5991c3be1d4faee810d4581dfb20878ee36a13d76",
-    "bytes": 3332
+    "sha256": "f1dce6e6367a05ff32006ee7eb7b3f7259e8588cb3fb978441599b4545778f66",
+    "bytes": 3206
   },
   "zh-CN-setup-desktop.png": {
     "sha256": "16f5d4c9a529fbfa5e665b73bdbc93178c1d727bea6cfd4265d9cf444d6fd075",

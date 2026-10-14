@@ -21,7 +21,7 @@ The PNGs below are actual desktop/mobile browser captures against real Rust serv
 
 The original Harness settings flow additionally switches and persists en → zh-CN → ja, retains custom goal/Discord details, rejects corrupt settings without saving, keeps the last selected language on reload error, and recovers after repair. [English](harness-settings-en.png), [Chinese](harness-settings-zh-CN.png), [Japanese](harness-settings-ja.png), [corrupt-settings error](harness-settings-error.png), [390 px mobile](harness-settings-mobile.png), [observations](harness-results.json). The surrounding Harness shell deliberately stays English in this isolated plugin test.
 
-CLI before/after output: [before](before-help.txt), [en](en-help.txt), [zh-CN](zh-CN-help.txt), [ja](ja-help.txt). These are actual generated help outputs, not reconstructed examples.
+CLI before/after output: [before](before-help.txt), [en](en-help.txt), [zh-CN](zh-CN-help.txt), [ja](ja-help.txt). These are actual generated help outputs with trailing whitespace removed for repository text-file checks; no help text is reconstructed.
 
 ## Functional coverage
 
