@@ -956,7 +956,7 @@ fn features_toggle(id: &str, on: bool) -> anyhow::Result<()> {
 }
 
 /// Server-type extras are off by default: refuse with enable guidance.
-/// Setup itself is never gated (it hosts the switches).
+/// Setup is not an extra: `features.setup_web` (default on) gates it instead.
 fn extra_disabled(id: &str) -> anyhow::Result<()> {
     Err(anyhow::anyhow!(
         "extra '{id}' is disabled by default; enable with: rdsh features on {id} (or rdsh settings set extras.enable {id})"
