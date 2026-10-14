@@ -333,41 +333,25 @@ export async function terminateGroup(pgid, { termMs = 2000, killMs = 3000 } = {}
 }
 
 // Decides whether a recorded group number still belongs to the job, for
-// signals sent from outside the supervisor's own child handle. "owned" only
-// when the recorded leader identity matches, or (Linux) the leader is gone and
-// every live member provably started after it in the same boot/namespace. A
-// number alone never counts: it may have been reused by an unrelated group.
+// signals sent from outside the supervisor. "owned" only when the recorded
+// leader identity matches the live leader. A number alone never counts, and
+// neither does the state of the remaining members: once the leader is gone,
+// start times do not prove the group is the same one (the number may have been
+// recycled by a new group whose own leader has since exited). Leader gone,
+// unknown or no recorded identity is "unknown": nothing may be signalled.
+// The supervisor's own cleanup (terminateGroup right after the leader exits)
+// does not use this check; it has watched the group continuously.
 export async function establishOwnership(
   pgid,
   identity,
-  { procDir = "/proc", platform = process.platform, read = readProcessIdentity } = {},
+  { read = readProcessIdentity } = {},
 ) {
   if (!validProcessIdentity(identity) || !Number.isInteger(pgid) || pgid < 2)
     return "unknown";
   const verdict = matchProcessIdentity(identity, await read(pgid));
   if (verdict === "alive") return "owned";
   if (verdict === "pid_reused") return "pid_reused";
-  if (verdict !== "gone" || platform !== "linux" || identity.platform !== "linux")
-    return "unknown";
-  // Linux never hands out a PID that is still in use as a PGID, so while the
-  // group is non-empty its number was not recycled; scope and start times
-  // guard against a reboot or another PID namespace.
-  const scan = scanProcGroup(pgid, procDir);
-  if (!scan.available || scan.unknown || !scan.live.length) return "unknown";
-  let birth;
-  try {
-    birth = BigInt(identity.birth);
-  } catch {
-    return "unknown";
-  }
-  for (const member of scan.live) {
-    if (!/^[0-9]+$/.test(String(member.starttime))) return "unknown";
-    if (BigInt(member.starttime) < birth) return "unknown";
-  }
-  const current = await read(scan.live[0].pid);
-  if (current?.status !== "observed" || current.identity?.scope !== identity.scope)
-    return "unknown";
-  return "owned";
+  return "unknown";
 }
 
 async function resolveExecutable(runner, explicit) {
@@ -901,6 +885,11 @@ async function supervise(directory) {
   exitedAlready = true;
   clearInterval(watcher);
   await cancelling;
+  // Reap leftover descendants right away, by the supervisor's own pgid: this
+  // process saw the group non-empty up to the leader's exit, so the number
+  // cannot have been recycled yet. No waiting before this, and no external
+  // ownership check (that one is only for signals from outside).
+  const cleanup = await terminateGroup(job.agent_pgid);
   // Pipes held open by descendants must not stall the job.
   await Promise.race([
     Promise.all(closed),
@@ -908,7 +897,6 @@ async function supervise(directory) {
   ]);
   child.stdout.destroy();
   child.stderr.destroy();
-  const cleanup = await terminateGroup(job.agent_pgid);
   out.close();
   err.close();
 

@@ -192,15 +192,18 @@ and boot/namespace scope; `null` where unavailable, such as macOS) in
   - identity belongs to another incarnation (`pid_reused`): nothing is sent;
     the result becomes `cleanup: unconfirmed` with `cleanup_code: pgid_reused`
     and `cancel` returns that state;
-  - leader gone (Linux only): the remaining members are still the job's only
-    if they are readable, run in the same boot/PID-namespace scope, and every
-    live member started at or after the recorded leader (Linux does not give
-    out a PID that is still in use as a group ID, so a non-empty group has not
-    been recycled);
-  - anything else, including no recorded identity or no identity support: nothing
-    is sent; the result gets `cleanup: unconfirmed` with
-    `cleanup_code: ownership_unknown` and `cancel` fails with
-    `cancel_unconfirmed`.
+  - anything else, including leader gone (even if members remain), no recorded
+    identity or no identity support: nothing is sent; the result gets
+    `cleanup: unconfirmed` with `cleanup_code: ownership_unknown` and `cancel`
+    fails with `cancel_unconfirmed`.
+
+After the leader exits, leftover descendants are reaped only by the live
+supervisor, which stops the group (TERM, then KILL) immediately by its own
+group number; it has watched the group without a gap, so the number cannot have
+been recycled. If the supervisor is also gone, `cancel` never signals the
+group, because surviving members do not prove it is still the job's group.
+Stop them manually; the job's group number is recorded as `agent_pgid` in
+`job.json`.
 
 macOS limitation: no process identity is available there, so after the
 supervisor is lost (for example killed) its agent group can no longer be

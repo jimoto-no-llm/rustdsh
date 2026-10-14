@@ -712,36 +712,48 @@ test("cancel: a reused number (pid_reused) is not signalled and is recorded as p
   assert.ok(groupAlive(stranger.pid));
 });
 
-test("establishOwnership: identity states and the leader-gone rules", async (t) => {
+test("establishOwnership: only a matching live leader is owned", async () => {
   const scope = "a".repeat(64);
   const identity = { platform: "linux", pid: 500, birth: "1000", scope };
   const observed = (birth, pid = 500) => ({ status: "observed", identity: { platform: "linux", pid, birth, scope } });
   const gone = { status: "gone", identity: null, platform: "linux", scope };
-  const opts = (read, procDir = "/nonexistent", platform = "linux") => ({ read, procDir, platform });
-  assert.equal(await establishOwnership(500, identity, opts(async () => observed("1000"))), "owned");
-  assert.equal(await establishOwnership(500, identity, opts(async () => observed("2000"))), "pid_reused");
-  assert.equal(await establishOwnership(500, identity, opts(async () => ({ status: "unknown", identity: null }))), "unknown");
-  assert.equal(await establishOwnership(500, null, opts(async () => observed("1000"))), "unknown"); // nothing recorded
+  const check = (read, id = identity) => establishOwnership(500, id, { read });
+  assert.equal(await check(async () => observed("1000")), "owned");
+  assert.equal(await check(async () => observed("2000")), "pid_reused");
+  assert.equal(await check(async () => ({ status: "unknown", identity: null })), "unknown");
+  assert.equal(await check(async () => observed("1000"), null), "unknown"); // nothing recorded
+  // Leader gone is never owned, whatever the remaining members look like.
+  assert.equal(await check(async () => gone), "unknown");
+});
 
-  const proc = await fs.mkdtemp(path.join(root, "own-"));
-  t.after(() => fs.rm(proc, { recursive: true, force: true }));
-  const member = async (pid, starttime, state = "S") => {
-    await fs.mkdir(path.join(proc, String(pid)), { recursive: true });
-    // fields after ")": state ppid pgrp session tty tpgid flags minflt cminflt majflt cmajflt utime stime cutime cstime priority nice threads itrealvalue starttime
-    const tail = [state, 1, 500, 500, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 0, 1, 0, starttime];
-    await fs.writeFile(path.join(proc, String(pid), "stat"), `${pid} (worker) ${tail.join(" ")} 0\n`);
-  };
-  const read = async (pid) => (pid === 500 ? gone : observed("5000", pid));
-  await member(501, 1500);
-  assert.equal(await establishOwnership(500, identity, opts(read, proc)), "owned");
-  assert.equal(await establishOwnership(500, identity, opts(read, proc, "darwin")), "unknown"); // Linux only
-  await member(502, 999); // started before the leader: not its descendant
-  assert.equal(await establishOwnership(500, identity, opts(read, proc)), "unknown");
-  await fs.rm(path.join(proc, "502"), { recursive: true });
-  const foreignScope = async (pid) => (pid === 500 ? gone : { status: "observed", identity: { ...observed("5000", pid).identity, scope: "b".repeat(64) } });
-  assert.equal(await establishOwnership(500, identity, opts(foreignScope, proc)), "unknown");
-  await fs.writeFile(path.join(proc, "501", "stat"), "garbage");
-  assert.equal(await establishOwnership(500, identity, opts(read, proc)), "unknown"); // unreadable member
+test("cancel never revives ownership of a recycled group from its members (leader gone)", { skip: process.platform !== "linux" && "needs /proc process identity" }, async (t) => {
+  // A new group whose leader is alive, then whose leader exits leaving children.
+  const script = "const {spawn}=require('node:child_process');" +
+    "spawn(process.execPath,['-e','setTimeout(()=>{},30000)'],{stdio:'ignore'}).unref();" +
+    "process.stdout.write('ready\\n');setTimeout(()=>process.exit(0),1500);";
+  const leader = spawn(process.execPath, ["-e", script], { detached: true, stdio: ["ignore", "pipe", "ignore"] });
+  t.after(() => { try { process.kill(-leader.pid, "SIGKILL"); } catch {} });
+  await new Promise((resolve) => leader.stdout.once("data", resolve));
+  const real = (await readProcessIdentity(leader.pid)).identity;
+  // The old, lost job's recorded birth predates this group entirely.
+  const identity = { ...real, birth: "1" };
+  const id = "job_" + "e4".repeat(12);
+  await writeJob(id, { agent_pid: leader.pid, agent_pgid: leader.pid, agent_identity: identity }, { cleanup: "unconfirmed" });
+
+  // Leader alive: a different incarnation, no signal.
+  const reused = await cancel(id, { termMs: 300, killMs: 300 });
+  assert.equal(reused.cleanup_code, "pgid_reused");
+  assert.equal(leader.signalCode, null);
+
+  // Leader exited, children remain: still no signal, and they survive.
+  await new Promise((resolve) => leader.once("exit", resolve));
+  assert.ok(groupAlive(leader.pid), "children keep the group alive");
+  await assert.rejects(cancel(id, { termMs: 300, killMs: 300 }), { code: "cancel_unconfirmed" });
+  const info = await status(id);
+  assert.equal(info.cleanup, "unconfirmed");
+  assert.equal(info.cleanup_code, "ownership_unknown");
+  await sleep(300);
+  assert.ok(groupAlive(leader.pid), "the unrelated children were not signalled");
 });
 
 test("/proc scanner: only ENOENT is gone; EACCES and garbage are unknown", async (t) => {
