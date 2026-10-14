@@ -160,7 +160,10 @@ test("unconfirmed IDs and unavailable launch/provider facts stay explicitly unkn
   assert.equal((await ledger.list()).length, 1);
 });
 
-test("a Docker session without a local process record cannot resume until its durable scope is exit-confirmed", async (t) => {
+test(
+  "a Docker session without a local process record cannot resume until its durable scope is exit-confirmed",
+  { skip: process.platform === "win32" && "requires a POSIX executable fake Docker shim" },
+  async (t) => {
   const { ledger, project, env } = await setup(t, true);
   const entry = path.join(project.root, "docker-entry.mjs");
   await fs.writeFile(entry, "process.exit(0);\n");
@@ -196,7 +199,10 @@ test("a Docker session without a local process record cannot resume until its du
   );
 });
 
-test("resume refuses a changed Docker backend contract before launching a session", async (t) => {
+test(
+  "resume refuses a changed Docker backend contract before launching a session",
+  { skip: process.platform === "win32" && "requires a POSIX executable fake Docker shim" },
+  async (t) => {
   const { ledger, project, env } = await setup(t, true);
   const entry = path.join(project.root, "docker-entry.mjs");
   await fs.writeFile(entry, "process.exit(0);\n");
@@ -224,7 +230,10 @@ test("resume refuses a changed Docker backend contract before launching a sessio
   );
 });
 
-test("resume rejects a persisted Colima endpoint or Engine ID change before attachment", async (t) => {
+test(
+  "resume rejects a persisted Colima endpoint or Engine ID change before attachment",
+  { skip: process.platform === "win32" && "requires a POSIX executable fake Docker shim" },
+  async (t) => {
   const { ledger, project, env } = await setup(t, true);
   const entry = path.join(project.root, "docker-entry.mjs");
   await fs.writeFile(entry, "process.exit(0);\n");
