@@ -219,7 +219,6 @@ async function nativeRdsh() {
     if (!path.isAbsolute(directory)) continue;
     const candidate = path.join(directory, name);
     try {
-<<<<<<< HEAD
       if (!(await fs.stat(candidate)).isFile()) continue;
       await fs.access(candidate, constants.X_OK);
       return candidate;
@@ -241,14 +240,6 @@ async function runNativeSubagentPlan(inputFile) {
     child.once("close", (code) => resolve(code ?? 1));
   });
   process.exitCode = exitCode;
-||||||| parent of a9676f4 (refactor(cost-ledger): add a native Rust implementation)
-=======
-      if ((await fs.stat(candidate)).isFile()) return candidate;
-    } catch {
-      // Keep looking through PATH.
-    }
-  }
-  throw new Error("rdsh is not installed on PATH (or set RDSH_BIN)");
 }
 
 // The ledger logic also lives in Rust (`rdsh cost-ledger`). This command keeps
@@ -256,10 +247,18 @@ async function runNativeSubagentPlan(inputFile) {
 // `dashboard/state.mjs` keeps importing the JS module in-process.
 async function runNativeCostLedger(action, document) {
   const executable = await nativeRdsh();
-  const file = path.join(stateHome(), `cost-ledger-${process.pid}-${Date.now()}.json`);
+  const file = path.join(
+    stateHome(),
+    `cost-ledger-${process.pid}-${randomUUID()}.json`,
+  );
   await fs.mkdir(path.dirname(file), { recursive: true });
   try {
-    await fs.writeFile(file, JSON.stringify(document));
+    const handle = await fs.open(file, "wx", 0o600);
+    try {
+      await handle.writeFile(JSON.stringify(document));
+    } finally {
+      await handle.close();
+    }
     const exitCode = await new Promise((resolve, reject) => {
       const child = spawn(
         executable,
@@ -273,7 +272,6 @@ async function runNativeCostLedger(action, document) {
   } finally {
     await fs.rm(file, { force: true });
   }
->>>>>>> a9676f4 (refactor(cost-ledger): add a native Rust implementation)
 }
 async function inPinnedCli(artifact, selectionRevision) {
   if (process.env.NODE_OPTIONS || process.env.NODE_PATH)

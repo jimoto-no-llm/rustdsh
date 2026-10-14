@@ -25,7 +25,7 @@
 //! alongside it; the outputs are byte-identical, and `tests/cost_ledger_cli.rs`
 //! pins the same JSON the JS module produced.
 
-use std::io::Write;
+use std::io::{Read, Write};
 
 use anyhow::{anyhow, bail, Context, Result};
 use serde_json::{json, Map, Value};
@@ -159,6 +159,100 @@ fn has_own(object: &Map<String, Value>, key: &str) -> bool {
     object.contains_key(key)
 }
 
+/// ECMAScript enumeration visits array-index keys numerically, then other keys
+/// in insertion order.
+fn js_array_index(key: &str) -> Option<u32> {
+    let index = key.parse::<u32>().ok()?;
+    (index != u32::MAX && index.to_string() == key).then_some(index)
+}
+
+fn js_object_entries(object: &Map<String, Value>) -> Vec<(String, Value)> {
+    let mut indices = Vec::new();
+    let mut strings = Vec::new();
+    for (key, value) in object {
+        if let Some(index) = js_array_index(key) {
+            indices.push((index, key.clone(), value.clone()));
+        } else {
+            strings.push((key.clone(), value.clone()));
+        }
+    }
+    indices.sort_by_key(|(index, _, _)| *index);
+    indices
+        .into_iter()
+        .map(|(_, key, value)| (key, value))
+        .chain(strings)
+        .collect()
+}
+
+fn js_object_values(object: &Map<String, Value>) -> Vec<Value> {
+    js_object_entries(object)
+        .into_iter()
+        .map(|(_, value)| value)
+        .collect()
+}
+
+/// Match safe integer and property-order behavior of `JSON.parse` in JS.
+fn normalize_js_value(value: &mut Value) {
+    let integer = match value {
+        Value::Number(number) => number.as_f64().and_then(|number| {
+            (number.fract() == 0.0 && number.abs() <= MAX_SAFE_INTEGER).then_some(number as i64)
+        }),
+        _ => None,
+    };
+    if let Some(integer) = integer {
+        *value = json!(integer);
+        return;
+    }
+    match value {
+        Value::Array(items) => {
+            for item in items {
+                normalize_js_value(item);
+            }
+        }
+        Value::Object(object) => {
+            for item in object.values_mut() {
+                normalize_js_value(item);
+            }
+            let entries = js_object_entries(object);
+            object.clear();
+            for (key, item) in entries {
+                object.insert(key, item);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// IDs are ASCII by contract. Match the dashboard's default en-US
+/// `localeCompare` ordering for punctuation, digits, case and prefixes.
+fn js_locale_compare(left: &str, right: &str) -> std::cmp::Ordering {
+    if !left.is_ascii() || !right.is_ascii() {
+        return left.cmp(right);
+    }
+    let primary = |text: &str| {
+        text.bytes()
+            .map(|byte| match byte {
+                b'_' => 0,
+                b'-' => 1,
+                b':' => 2,
+                b'.' => 3,
+                b'0'..=b'9' => 4 + byte - b'0',
+                b'a'..=b'z' => 14 + byte - b'a',
+                b'A'..=b'Z' => 14 + byte - b'A',
+                _ => 255,
+            })
+            .collect::<Vec<_>>()
+    };
+    let case = |text: &str| {
+        text.bytes()
+            .map(|byte| u8::from(byte.is_ascii_uppercase()))
+            .collect::<Vec<_>>()
+    };
+    primary(left)
+        .cmp(&primary(right))
+        .then_with(|| case(left).cmp(&case(right)))
+}
+
 /// `shape(value, keys)`: an object with exactly those own keys.
 fn shape(value: &Value, keys: &[&str]) -> CostResult<()> {
     let ok = match as_object(value) {
@@ -168,6 +262,23 @@ fn shape(value: &Value, keys: &[&str]) -> CostResult<()> {
         None => false,
     };
     check(ok, "unexpected or missing fields")
+}
+
+fn is_js_trim_character(character: char) -> bool {
+    matches!(
+        character,
+        '\u{0009}'..='\u{000d}'
+            | '\u{0020}'
+            | '\u{00a0}'
+            | '\u{1680}'
+            | '\u{2000}'..='\u{200a}'
+            | '\u{2028}'
+            | '\u{2029}'
+            | '\u{202f}'
+            | '\u{205f}'
+            | '\u{3000}'
+            | '\u{feff}'
+    )
 }
 
 /// `/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}$/` plus the JS prototype-name refusal.
@@ -197,7 +308,7 @@ fn identifier(value: &Value) -> CostResult<String> {
 /// and DEL, and counts UTF-16 code units.
 fn text(value: &Value, max: usize) -> CostResult<String> {
     let ok = value.as_str().is_some_and(|text| {
-        !text.trim().is_empty()
+        !text.chars().all(is_js_trim_character)
             && text.encode_utf16().count() <= max
             && !text.chars().any(|ch| ch <= '\u{1f}' || ch == '\u{7f}')
     });
@@ -826,13 +937,16 @@ fn is_js_falsy(value: &Value) -> bool {
 
 /// `declareCostScope(state, input)`: declare one scope, idempotently.
 pub fn declare_cost_scope(state: &mut Value, input: &Value) -> CostResult<()> {
+    normalize_js_value(state);
+    let mut input = input.clone();
+    normalize_js_value(&mut input);
     let project_id = state
         .get("project")
         .and_then(|project| project.get("id"))
         .and_then(Value::as_str)
         .ok_or_else(|| CostLedgerError::new("invalid ledger identity"))?
         .to_string();
-    let scope = scope_input(input, &project_id)?;
+    let scope = scope_input(&input, &project_id)?;
     let scope_id = scope
         .get("scope_id")
         .and_then(Value::as_str)
@@ -849,7 +963,7 @@ pub fn declare_cost_scope(state: &mut Value, input: &Value) -> CostResult<()> {
         // their stored key order.
         let mut prior = prior.clone();
         if let Some(object) = prior.as_object_mut() {
-            object.remove("declared_at");
+            object.shift_remove("declared_at");
         }
         check_conflict(equal(&prior, &scope), "scope identity is immutable")?;
         return Ok(());
@@ -863,11 +977,15 @@ pub fn declare_cost_scope(state: &mut Value, input: &Value) -> CostResult<()> {
         .and_then(Value::as_object_mut)
         .expect("registry() built an object")
         .insert(scope_id, Value::Object(stored));
+    normalize_js_value(state);
     Ok(())
 }
 
 /// `recordCostReport(state, input)`: record one observation, idempotently.
 pub fn record_cost_report(state: &mut Value, input: &Value) -> CostResult<()> {
+    normalize_js_value(state);
+    let mut input = input.clone();
+    normalize_js_value(&mut input);
     let ledger = state.get("cost_ledger").cloned();
     let scope_id = input.get("scope_id").and_then(Value::as_str).unwrap_or("");
     let scope = ledger
@@ -879,12 +997,12 @@ pub fn record_cost_report(state: &mut Value, input: &Value) -> CostResult<()> {
         .and_then(|scopes| scopes.get(scope_id))
         .cloned();
     check(
-        as_object(input).is_some() && ledger.is_some() && scope.is_some(),
+        as_object(&input).is_some() && ledger.is_some() && scope.is_some(),
         "declare the exact scope before reporting",
     )?;
     let scope = scope.expect("the check accepted a scope");
     let scope_object = scope.as_object().expect("stored scopes are objects");
-    let report = report_input(input, scope_object)?;
+    let report = report_input(&input, scope_object)?;
     let event_id = report
         .get("event_id")
         .and_then(Value::as_str)
@@ -902,7 +1020,7 @@ pub fn record_cost_report(state: &mut Value, input: &Value) -> CostResult<()> {
     if let Some(prior) = stored_reports.get(&event_id) {
         let mut prior = prior.clone();
         if let Some(object) = prior.as_object_mut() {
-            object.remove("received_at");
+            object.shift_remove("received_at");
         }
         check_conflict(
             equal(&prior, &report),
@@ -916,23 +1034,25 @@ pub fn record_cost_report(state: &mut Value, input: &Value) -> CostResult<()> {
     )?;
     let mut stored = report.as_object().cloned().unwrap_or_default();
     stored.insert("received_at".into(), Value::String(now_iso()));
-    let combined: Vec<Value> = stored_reports
-        .values()
-        .cloned()
-        .chain(std::iter::once(Value::Object(stored.clone())))
-        .collect();
+    let mut combined_reports = stored_reports;
+    combined_reports.insert(event_id.clone(), Value::Object(stored.clone()));
+    let combined = js_object_values(&combined_reports);
     report_index(&combined)?;
     ledger
         .get_mut("reports")
         .and_then(Value::as_object_mut)
         .expect("registry() built an object")
         .insert(event_id, Value::Object(stored));
+    normalize_js_value(state);
     Ok(())
 }
 
 /// `validateCostLedger(state)`: a missing document is valid, a malformed one
 /// is refused with the JS message.
 pub fn validate_cost_ledger(state: &Value) -> CostResult<()> {
+    let mut normalized_state = state.clone();
+    normalize_js_value(&mut normalized_state);
+    let state = &normalized_state;
     // `state.cost_ledger === undefined` returns early. A stored `null` is NOT
     // undefined, so it falls through to `shape` and is refused exactly like any
     // other non-object: the key must be absent, not merely falsy.
@@ -971,12 +1091,19 @@ pub fn validate_cost_ledger(state: &Value) -> CostResult<()> {
         let mut input = scope.clone();
         let declared_at = input
             .as_object_mut()
-            .and_then(|object| object.remove("declared_at"))
+            .and_then(|object| object.shift_remove("declared_at"))
             .unwrap_or(Value::Null);
         check(
-            key == scope.get("scope_id").and_then(Value::as_str).unwrap_or("")
-                && time(&declared_at).is_ok_and(|time| time == declared_at.as_str().unwrap_or(""))
-                && equal(&input, &scope_input(&input, &project_id)?),
+            key == scope.get("scope_id").and_then(Value::as_str).unwrap_or(""),
+            "invalid stored scope",
+        )?;
+        let canonical_time = time(&declared_at)?;
+        check(
+            canonical_time == declared_at.as_str().unwrap_or(""),
+            "invalid stored scope",
+        )?;
+        check(
+            equal(&input, &scope_input(&input, &project_id)?),
             "invalid stored scope",
         )?;
     }
@@ -987,42 +1114,54 @@ pub fn validate_cost_ledger(state: &Value) -> CostResult<()> {
         let mut input = report.clone();
         let received_at = input
             .as_object_mut()
-            .and_then(|object| object.remove("received_at"))
+            .and_then(|object| object.shift_remove("received_at"))
             .unwrap_or(Value::Null);
         let scope_id = input.get("scope_id").and_then(Value::as_str).unwrap_or("");
         check(has_own(scopes, scope_id), "stored report scope missing")?;
         check(
-            key == report.get("event_id").and_then(Value::as_str).unwrap_or("")
-                && time(&received_at).is_ok_and(|time| time == received_at.as_str().unwrap_or(""))
-                && equal(
+            key == report.get("event_id").and_then(Value::as_str).unwrap_or(""),
+            "invalid stored report",
+        )?;
+        let canonical_time = time(&received_at)?;
+        check(
+            canonical_time == received_at.as_str().unwrap_or(""),
+            "invalid stored report",
+        )?;
+        check(
+            equal(
+                &input,
+                &report_input(
                     &input,
-                    &report_input(
-                        &input,
-                        scopes[scope_id]
-                            .as_object()
-                            .expect("the shape check accepted scopes"),
-                    )?,
-                ),
+                    scopes[scope_id]
+                        .as_object()
+                        .expect("the shape check accepted scopes"),
+                )?,
+            ),
             "invalid stored report",
         )?;
     }
-    let values: Vec<Value> = reports.values().cloned().collect();
+    let values = js_object_values(reports);
     report_index(&values)?;
     Ok(())
 }
 
 /// `publicCostLedger(state)`: the read-only projection, or `null`.
 pub fn public_cost_ledger(state: &Value) -> CostResult<Value> {
+    let mut normalized_state = state.clone();
+    normalize_js_value(&mut normalized_state);
+    let state = &normalized_state;
     let ledger = match state.get("cost_ledger") {
         Some(ledger) if !is_js_falsy(ledger) => ledger,
         _ => return Ok(Value::Null),
     };
-    let ledger_object = ledger.as_object().expect("stored ledgers are objects");
-    let reports: Vec<Value> = ledger_object
+    let ledger_object = ledger
+        .as_object()
+        .ok_or_else(|| CostLedgerError::new("invalid ledger identity"))?;
+    let reports_object = ledger_object
         .get("reports")
         .and_then(Value::as_object)
-        .map(|reports| reports.values().cloned().collect())
-        .unwrap_or_default();
+        .ok_or_else(|| CostLedgerError::new("invalid ledger identity"))?;
+    let reports = js_object_values(reports_object);
     let lanes = report_index(&reports)?;
     // `selected`: the latest cumulative snapshot, or every event report.
     let mut selected: Vec<String> = Vec::new();
@@ -1072,11 +1211,10 @@ pub fn public_cost_ledger(state: &Value) -> CostResult<Value> {
     let scopes_object = ledger_object
         .get("scopes")
         .and_then(Value::as_object)
-        .cloned()
-        .unwrap_or_default();
+        .ok_or_else(|| CostLedgerError::new("invalid ledger identity"))?;
     let mut scopes: Vec<Value> = Vec::with_capacity(scopes_object.len());
-    for scope in scopes_object.values() {
-        scopes.push(public_scope(scope, &by_scope)?);
+    for scope in js_object_values(scopes_object) {
+        scopes.push(public_scope(&scope, &by_scope)?);
     }
     // `(a, b) => b.period_start.localeCompare(a.period_start) || a.scope_id...`
     scopes.sort_by(|left, right| {
@@ -1089,10 +1227,10 @@ pub fn public_cost_ledger(state: &Value) -> CostResult<Value> {
             .and_then(Value::as_str)
             .unwrap_or("");
         right_start.cmp(left_start).then_with(|| {
-            left.get("scope_id")
-                .and_then(Value::as_str)
-                .unwrap_or("")
-                .cmp(right.get("scope_id").and_then(Value::as_str).unwrap_or(""))
+            js_locale_compare(
+                left.get("scope_id").and_then(Value::as_str).unwrap_or(""),
+                right.get("scope_id").and_then(Value::as_str).unwrap_or(""),
+            )
         })
     });
     let mut output = Map::new();
@@ -1134,10 +1272,10 @@ fn public_scope(scope: &Value, by_scope: &[(String, Vec<Value>)]) -> CostResult<
                 .partial_cmp(&left_sequence)
                 .unwrap_or(std::cmp::Ordering::Equal)
                 .then_with(|| {
-                    left.get("event_id")
-                        .and_then(Value::as_str)
-                        .unwrap_or("")
-                        .cmp(right.get("event_id").and_then(Value::as_str).unwrap_or(""))
+                    js_locale_compare(
+                        left.get("event_id").and_then(Value::as_str).unwrap_or(""),
+                        right.get("event_id").and_then(Value::as_str).unwrap_or(""),
+                    )
                 })
         })
     });
@@ -1518,13 +1656,26 @@ pub fn cost_report_schema() -> Value {
 /// Read one JSON file with the dashboard CLI's `localJson` rules: a regular
 /// file of at most 256 KiB with strict UTF-8 and valid JSON.
 fn read_json(input_file: &str) -> Result<Value> {
-    let metadata =
-        std::fs::metadata(input_file).with_context(|| format!("cannot read JSON {input_file}"))?;
+    let mut options = std::fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_NONBLOCK);
+    }
+    let file = options
+        .open(input_file)
+        .with_context(|| format!("cannot read JSON {input_file}"))?;
+    let metadata = file
+        .metadata()
+        .with_context(|| format!("cannot read JSON {input_file}"))?;
     if !metadata.is_file() || metadata.len() > 256 * 1024 {
         bail!("Input JSON must be a regular file of at most 256 KiB");
     }
-    let bytes =
-        std::fs::read(input_file).with_context(|| format!("cannot read JSON {input_file}"))?;
+    let mut bytes = Vec::with_capacity(metadata.len() as usize);
+    file.take(256 * 1024 + 1)
+        .read_to_end(&mut bytes)
+        .with_context(|| format!("cannot read JSON {input_file}"))?;
     if bytes.len() > 256 * 1024 {
         bail!("Input JSON exceeds 256 KiB");
     }
@@ -1533,7 +1684,9 @@ fn read_json(input_file: &str) -> Result<Value> {
     };
     // TextDecoder("utf-8") in the dashboard CLI removed a leading BOM.
     let text = text.strip_prefix('\u{feff}').unwrap_or(text);
-    serde_json::from_str(text).map_err(|_| anyhow!("Input JSON is invalid"))
+    let mut value = serde_json::from_str(text).map_err(|_| anyhow!("Input JSON is invalid"))?;
+    normalize_js_value(&mut value);
+    Ok(value)
 }
 
 /// The document shape both parity actions accept: `{ operation, state, input }`.
@@ -1605,7 +1758,9 @@ pub fn cmd_cost_ledger(action: &str, input_file: &str) -> Result<()> {
         }
         other => bail!("unknown cost-ledger action {other}"),
     }
-    let text = serde_json::to_string(&Value::Object(output)).context("serialize cost ledger")?;
+    let mut output = Value::Object(output);
+    normalize_js_value(&mut output);
+    let text = serde_json::to_string(&output).context("serialize cost ledger")?;
     let stdout = std::io::stdout();
     let mut handle = stdout.lock();
     writeln!(handle, "{text}")?;
@@ -1951,5 +2106,151 @@ mod tests {
         failing("invalid identifier", identifier(&json!("__proto__")));
         failing("invalid identifier", identifier(&json!("constructor")));
         failing("invalid identifier", identifier(&json!(1)));
+    }
+
+    #[test]
+    fn source_text_uses_ecmascript_trim_characters() {
+        failing("invalid source text", text(&json!("\u{feff}"), 10));
+        assert_eq!(text(&json!("\u{0085}"), 10).unwrap(), "\u{0085}");
+    }
+
+    #[test]
+    fn stored_timestamp_errors_are_preserved() {
+        let mut state = state();
+        declare_cost_scope(&mut state, &scope()).unwrap();
+        state["cost_ledger"]["scopes"]["october-workers"]["declared_at"] = json!("not-a-timestamp");
+        failing("UTC timestamp required", validate_cost_ledger(&state));
+    }
+
+    #[test]
+    fn validation_preserves_object_rest_key_order() {
+        let mut state = state();
+        declare_cost_scope(&mut state, &scope()).unwrap();
+        record_cost_report(&mut state, &report()).unwrap();
+
+        let stored_scope = state["cost_ledger"]["scopes"]["october-workers"]
+            .as_object()
+            .unwrap()
+            .clone();
+        let mut reordered_scope = Map::new();
+        for (key, value) in stored_scope {
+            if key == "period_start" {
+                reordered_scope.insert(key, value);
+                reordered_scope.insert(
+                    "declared_at".into(),
+                    state["cost_ledger"]["scopes"]["october-workers"]["declared_at"].clone(),
+                );
+            } else if key != "declared_at" {
+                reordered_scope.insert(key, value);
+            }
+        }
+        state["cost_ledger"]["scopes"]["october-workers"] = Value::Object(reordered_scope);
+
+        let stored_report = state["cost_ledger"]["reports"]["usage-1"]
+            .as_object()
+            .unwrap()
+            .clone();
+        let mut reordered_report = Map::new();
+        for (key, value) in stored_report {
+            if key == "observed_at" {
+                reordered_report.insert(key, value);
+                reordered_report.insert(
+                    "received_at".into(),
+                    state["cost_ledger"]["reports"]["usage-1"]["received_at"].clone(),
+                );
+            } else if key != "received_at" {
+                reordered_report.insert(key, value);
+            }
+        }
+        state["cost_ledger"]["reports"]["usage-1"] = Value::Object(reordered_report);
+        validate_cost_ledger(&state).unwrap();
+    }
+
+    #[test]
+    fn public_scope_tie_break_matches_javascript_locale_compare() {
+        let mut state = state();
+        for scope_id in ["B", "a", "a-b", "a_b"] {
+            let mut input = scope();
+            input["scope_id"] = json!(scope_id);
+            declare_cost_scope(&mut state, &input).unwrap();
+        }
+        let public = public_cost_ledger(&state).unwrap();
+        let ids: Vec<&str> = public["scopes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|scope| scope["scope_id"].as_str().unwrap())
+            .collect();
+        assert_eq!(ids, ["a", "a_b", "a-b", "B"]);
+    }
+
+    #[test]
+    fn public_event_tie_break_matches_javascript_locale_compare() {
+        let mut state = state();
+        declare_cost_scope(&mut state, &scope()).unwrap();
+        for (event_id, source_kind) in [("B", "cli_report"), ("a", "api_estimate")] {
+            let mut input = report();
+            input["event_id"] = json!(event_id);
+            input["source_kind"] = json!(source_kind);
+            input["mode"] = json!("event");
+            input["amount"] = Value::Null;
+            input["certainty"] = json!("unknown");
+            record_cost_report(&mut state, &input).unwrap();
+        }
+        let public = public_cost_ledger(&state).unwrap();
+        let ids: Vec<&str> = public["scopes"][0]["reports"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|report| report["event_id"].as_str().unwrap())
+            .collect();
+        assert_eq!(ids, ["a", "B"]);
+    }
+
+    #[test]
+    fn accepted_safe_integer_numbers_are_canonicalized_before_storage() {
+        let mut state = state();
+        declare_cost_scope(&mut state, &scope()).unwrap();
+        let mut floating = report();
+        floating["sequence"] = json!(1.0);
+        floating["tokens"]["input"] = json!(10.0);
+        floating["tokens"]["cached_input"] = json!(2.0);
+        floating["tokens"]["output"] = json!(5.0);
+        record_cost_report(&mut state, &floating).unwrap();
+
+        let stored = &state["cost_ledger"]["reports"]["usage-1"];
+        assert_eq!(serde_json::to_string(&stored["sequence"]).unwrap(), "1");
+        assert_eq!(
+            serde_json::to_string(&stored["tokens"]["input"]).unwrap(),
+            "10"
+        );
+        record_cost_report(&mut state, &report()).unwrap();
+
+        state["cost_ledger"]["schema"] = json!(1.0);
+        validate_cost_ledger(&state).unwrap();
+        let public = public_cost_ledger(&state).unwrap();
+        assert_eq!(
+            public["scopes"][0]["groups"][0]["tokens"]["input"]["value"],
+            "10"
+        );
+    }
+
+    #[test]
+    fn json_reader_matches_javascript_integer_keys_and_safe_integers() {
+        let path = std::env::temp_dir().join(format!(
+            "rdsh-cost-ledger-json-{}-{}.json",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::write(&path, r#"{"10":1.0,"2":2,"name":3e0}"#).unwrap();
+        let value = read_json(path.to_str().unwrap()).unwrap();
+        let _ = std::fs::remove_file(&path);
+        assert_eq!(
+            serde_json::to_string(&value).unwrap(),
+            r#"{"2":2,"10":1,"name":3}"#
+        );
     }
 }
