@@ -54,7 +54,22 @@ test('isolated inspection tool registers without globally denying DSH tools', ()
   installToolBoundary(tools, { workspace: '/dummy' });
   assert.equal(definition.name, 'rdsh_inspect');
   assert.equal(typeof definition.execute, 'function');
+  assert.match(definition.description, /read-only/);
+  // No global denial may be installed as a side effect: other DSH tools
+  // keep their configured permissions.
   assert.equal(guardCalls, 0);
+});
+
+test('missing registration API fails closed before exposing anything', () => {
+  let registered = 0;
+  for (const tools of [{}, { guard() {} }, null]) {
+    assert.throws(
+      () => installToolBoundary(tools, { workspace: '/dummy' }),
+      /registration API/,
+    );
+  }
+  installToolBoundary({ register() { registered++; } }, { workspace: '/dummy' });
+  assert.equal(registered, 1);
 });
 
 test('explicit sharing rejects hard links and hidden credentials', async t => {
