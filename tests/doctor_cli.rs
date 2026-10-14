@@ -99,5 +99,9 @@ fn doctor_scans_the_windows_installer_wrapper_directory() {
     let result = run_doctor(&root, &cwd, &path, &original.to_string_lossy());
     let output = String::from_utf8_lossy(&result.stdout);
     assert!(output.contains("dsh-broken.cmd needs"), "{output}");
+    assert!(
+        output.contains(&broken.display().to_string()),
+        "diagnostic must show the Windows installer wrapper directory: {output}"
+    );
     fs::remove_dir_all(root).unwrap();
 }

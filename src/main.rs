@@ -1399,7 +1399,12 @@ fn scan_local_wrappers(dir: &std::path::Path) -> WrapperScan {
 /// the native binary (Node tries to parse the ELF as JS). Point at the
 /// offending wrappers found by the shared scan. `skip` names the files the
 /// broken-wrapper check already reported, so one file never yields two lines.
-fn node_wrapper_warnings(scan: &WrapperScan, shadowed: bool, skip: &[&str]) -> Vec<String> {
+fn node_wrapper_warnings(
+    scan: &WrapperScan,
+    dir: &std::path::Path,
+    shadowed: bool,
+    skip: &[&str],
+) -> Vec<String> {
     let mut hits: Vec<String> = scan
         .texts
         .iter()
@@ -1422,10 +1427,11 @@ fn node_wrapper_warnings(scan: &WrapperScan, shadowed: bool, skip: &[&str]) -> V
     hits.truncate(WRAPPER_WARN_MAX);
     hits.into_iter()
         .map(|name| {
+            let wrapper = dir.join(&name).display().to_string();
             if shadowed {
-                format!("[rdsh] warn: ~/.local/bin/{name} calls `node` on a dsh path; while `dsh` is shadowed that path is a native binary — exec `dsh`/`rdsh` directly instead of via `node`")
+                format!("[rdsh] warn: {wrapper} calls `node` on a dsh path; while `dsh` is shadowed that path is a native binary — exec `dsh`/`rdsh` directly instead of via `node`")
             } else {
-                format!("[rdsh] note: ~/.local/bin/{name} calls `node` on a dsh path; it will break if `dsh` is later shadowed — exec `dsh`/`rdsh` directly instead of via `node`")
+                format!("[rdsh] note: {wrapper} calls `node` on a dsh path; it will break if `dsh` is later shadowed — exec `dsh`/`rdsh` directly instead of via `node`")
             }
         })
         .collect()
@@ -1697,12 +1703,13 @@ fn command_on_path_in(name: &str, path_var: &std::ffi::OsStr) -> Option<std::pat
 
 /// Why one wrapper in the local bin dir cannot run, if the scan can tell. Only
 /// the first problem is reported: one line per file.
-fn broken_wrapper_reason(name: &str, text: &str) -> Option<String> {
+fn broken_wrapper_reason(dir: &std::path::Path, name: &str, text: &str) -> Option<String> {
+    let wrapper = dir.join(name).display().to_string();
     if let Some(line) = text.lines().next().filter(|line| line.starts_with("#!")) {
         if let Some(interp) = shebang_interpreter(line) {
             if command_on_path(&interp).is_none() {
                 return Some(format!(
-                    "[rdsh] warn: ~/.local/bin/{name} needs '{interp}' on PATH, which is missing; the wrapper cannot run"
+                    "[rdsh] warn: {wrapper} needs '{interp}' on PATH, which is missing; the wrapper cannot run"
                 ));
             }
         }
@@ -1718,7 +1725,7 @@ fn broken_wrapper_reason(name: &str, text: &str) -> Option<String> {
             "does not exist"
         };
         return Some(format!(
-            "[rdsh] warn: ~/.local/bin/{name} references {p}, which {why}; fix the path or reinstall the wrapper"
+            "[rdsh] warn: {wrapper} references {p}, which {why}; fix the path or reinstall the wrapper"
         ));
     }
     None
@@ -1728,16 +1735,17 @@ fn broken_wrapper_reason(name: &str, text: &str) -> Option<String> {
 /// missing shebang interpreter, or an absolute node/dsh/rdsh path that is
 /// gone. Advisory only, one line per file, returned as (name, warning) so the
 /// node-on-dsh check can skip what is already reported.
-fn broken_wrapper_warnings(scan: &WrapperScan) -> Vec<(String, String)> {
+fn broken_wrapper_warnings(scan: &WrapperScan, dir: &std::path::Path) -> Vec<(String, String)> {
     let mut out: Vec<(String, String)> = Vec::new();
     for (name, target) in &scan.broken_links {
         if !name.contains("dsh") || out.len() >= WRAPPER_WARN_MAX {
             continue;
         }
+        let wrapper = dir.join(name).display().to_string();
         out.push((
             name.clone(),
             format!(
-                "[rdsh] warn: ~/.local/bin/{name} is a broken symlink -> {target}; recreate or remove it"
+                "[rdsh] warn: {wrapper} is a broken symlink -> {target}; recreate or remove it"
             ),
         ));
     }
@@ -1746,11 +1754,10 @@ fn broken_wrapper_warnings(scan: &WrapperScan) -> Vec<(String, String)> {
             break;
         }
         if name.contains("dsh") {
+            let wrapper = dir.join(name).display().to_string();
             out.push((
                 name.clone(),
-                format!(
-                    "[rdsh] warn: ~/.local/bin/{name} is not executable; the wrapper cannot run"
-                ),
+                format!("[rdsh] warn: {wrapper} is not executable; the wrapper cannot run"),
             ));
         }
     }
@@ -1761,7 +1768,7 @@ fn broken_wrapper_warnings(scan: &WrapperScan) -> Vec<(String, String)> {
         if scan.non_executable.contains(name) || !(name.contains("dsh") || text.contains("dsh")) {
             continue;
         }
-        if let Some(warning) = broken_wrapper_reason(name, text) {
+        if let Some(warning) = broken_wrapper_reason(dir, name, text) {
             out.push((name.clone(), warning));
         }
     }
@@ -1776,11 +1783,11 @@ fn wrapper_warnings(shadowed: bool) -> Vec<String> {
         return Vec::new();
     };
     let scan = scan_local_wrappers(&dir);
-    let broken = broken_wrapper_warnings(&scan);
+    let broken = broken_wrapper_warnings(&scan, &dir);
     let broken_names: Vec<String> = broken.iter().map(|(name, _)| name.clone()).collect();
     let mut out: Vec<String> = broken.into_iter().map(|(_, warning)| warning).collect();
     let skip: Vec<&str> = broken_names.iter().map(String::as_str).collect();
-    out.extend(node_wrapper_warnings(&scan, shadowed, &skip));
+    out.extend(node_wrapper_warnings(&scan, &dir, shadowed, &skip));
     out
 }
 
@@ -2293,7 +2300,7 @@ mod doctor_wrapper_tests {
         fs::write(&wrapper, "#!/bin/sh\nexec rdsh \"$@\"\n").unwrap();
 
         let scan = scan_local_wrappers(&root);
-        let broken = broken_wrapper_warnings(&scan);
+        let broken = broken_wrapper_warnings(&scan, &root);
         assert!(
             broken
                 .iter()
@@ -2313,7 +2320,7 @@ mod doctor_wrapper_tests {
             broken_links: Vec::new(),
             non_executable: Vec::new(),
         };
-        assert!(super::node_wrapper_warnings(&scan, true, &[]).is_empty());
+        assert!(super::node_wrapper_warnings(&scan, Path::new("unused"), true, &[]).is_empty());
     }
 
     #[test]
@@ -2343,7 +2350,7 @@ mod doctor_wrapper_tests {
         make_executable(&healthy);
 
         let scan = scan_local_wrappers(&bin);
-        let broken = broken_wrapper_warnings(&scan);
+        let broken = broken_wrapper_warnings(&scan, &bin);
         let lines: Vec<&str> = broken.iter().map(|(_, warning)| warning.as_str()).collect();
         #[cfg(unix)]
         assert!(
@@ -2359,6 +2366,10 @@ mod doctor_wrapper_tests {
         assert!(
             dead_warning.contains("/nonexistent-node/bin/node"),
             "{dead_warning}"
+        );
+        assert!(
+            dead_warning.contains(&dead.display().to_string()),
+            "diagnostic must show the directory scanned for wrappers: {dead_warning}"
         );
         assert!(!lines.iter().any(|w| w.contains("rdsh-ok")), "{lines:?}");
         fs::remove_dir_all(root).unwrap();
