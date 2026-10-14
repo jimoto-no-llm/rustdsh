@@ -205,7 +205,7 @@ mod tests {
     fn tiny_budgets_never_exceed_budget() {
         let mut source = String::new();
         for _ in 0..100 {
-            source.push_str(r#"1234567890"#);
+            source.push_str(r"1234567890");
         }
         for budget in [0, 1] {
             let out = compact_output(&source, budget);
@@ -215,7 +215,7 @@ mod tests {
     }
     #[test]
     fn noop_returns_source_verbatim_within_budget() {
-        let text = r#"hello"#.to_string();
+        let text = r"hello".to_string();
         let out = compact_output(&text, 8000);
         assert_eq!(out, text);
         assert!(estimate_tokens(&out) <= 8000);

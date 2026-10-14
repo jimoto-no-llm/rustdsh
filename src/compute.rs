@@ -53,7 +53,7 @@ pub fn handle_line(line: &str) -> String {
 
 fn run_request(line: &str) -> Result<serde_json::Value, (String, &'static str, String)> {
     let v: serde_json::Value = serde_json::from_str(line)
-        .map_err(|e| ("".to_string(), "bad_json", format!("invalid JSON: {e}")))?;
+        .map_err(|e| (String::new(), "bad_json", format!("invalid JSON: {e}")))?;
     let id = v
         .get("id")
         .and_then(|x| x.as_str())
