@@ -76,6 +76,10 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Fixed
 
+- `rdsh models sync`（`models auto` の背景更新を含む）はプロファイル
+  `cordis.patch.yml` の既存権限を保持し（0644 は 0644 のまま、新規作成時のみ
+  0600）、初回の書き換え前に context hook と同じ規則で `.bak-rdsh-models` を
+  作ります。2回目以降の更新はこのバックアップを上書きしません。
 - `sync-dsh.sh` discovers the `@deepseek-ai/dsh` tree by candidate instead of
   `npm root -g` alone (`DSH_PKG_ROOT`, npm's global root, the newest
   `~/.local/opt/*` tree, then the older per-user prefixes). A tree it cannot

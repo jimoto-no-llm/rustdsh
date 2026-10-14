@@ -611,11 +611,40 @@ fn splice_entry(text: &str, section: &str, key: &str, block: &[String]) -> Optio
     Some(lines.concat())
 }
 
+/// Atomic sibling-temp-and-rename write for owner-only documents.
+///
+/// The new inode is created 0600 before it becomes visible at `path`, which is
+/// the safe default for a credential file.
 pub(crate) fn write_creds(path: &str, text: &str) -> anyhow::Result<()> {
+    write_creds_with(path, text, false)
+}
+
+/// Like [`write_creds`], but a target that already exists keeps the permissions
+/// it has.
+///
+/// Config documents rdsh rewrites on its own — a profile's `cordis.patch.yml`
+/// during `rdsh models sync` and the `models_auto` refresh behind it — are not
+/// credentials: a file the user left at 0644 must not silently become 0600 on
+/// the first automatic write. A target that does not exist yet still starts at
+/// 0600, the same safe default as [`write_creds`].
+pub(crate) fn write_creds_keeping_mode(path: &str, text: &str) -> anyhow::Result<()> {
+    write_creds_with(path, text, true)
+}
+
+fn write_creds_with(path: &str, text: &str, keep_mode: bool) -> anyhow::Result<()> {
     use std::io::Write;
     if let Some(parent) = std::path::Path::new(path).parent() {
         std::fs::create_dir_all(parent)?;
     }
+    // Read the previous permissions before the rename: afterwards the old inode
+    // is gone and there is nothing left to copy them from.
+    let previous = if keep_mode {
+        std::fs::metadata(path)
+            .ok()
+            .map(|metadata| metadata.permissions())
+    } else {
+        None
+    };
     let tmp = format!("{path}.tmp.{}", crate::local_http::random_token()?);
     let mut options = std::fs::OpenOptions::new();
     options.write(true).create_new(true);
@@ -630,6 +659,11 @@ pub(crate) fn write_creds(path: &str, text: &str) -> anyhow::Result<()> {
         file.write_all(text.as_bytes())?;
         file.sync_all()?;
         drop(file);
+        // Apply the previous mode to the temp inode, so `path` is never visible
+        // with permissions the user did not choose.
+        if let Some(permissions) = previous {
+            std::fs::set_permissions(&tmp, permissions)?;
+        }
         std::fs::rename(&tmp, path)?;
         Ok(())
     })();
