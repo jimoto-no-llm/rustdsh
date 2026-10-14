@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { createDiscordPresence } from '../plugins/rdsh-settings/discord.js';
 import { apply as applyBudgetGuard } from '../plugins/rdsh-budget-guard/index.js';
 import { apply as applyReleaseProbe } from '../plugins/rdsh-release-probe/index.js';
+import { apply as applyAnswerGuard } from '../plugins/rdsh-answer-guard/index.js';
 
 const exec = promisify(execFile);
 const repo = fileURLToPath(new URL('..', import.meta.url));
@@ -163,6 +164,21 @@ test('release_probe=true keeps the loopback credential requirement', async (t) =
   await featureHome(t, { release_probe: true });
   withEnv(t, { RDSH_RELEASE_PROBE_BASE: 'http://127.0.0.1:45999/', RDSH_RELEASE_PROBE_KEY: undefined });
   assert.throws(() => applyReleaseProbe(), /scoped loopback callback/);
+});
+
+// ----------------------------------------------------------- answer guard
+test('answer_guard=false subscribes nothing', async (t) => {
+  await featureHome(t, { answer_guard: false });
+  let subscriptions = 0;
+  applyAnswerGuard({ on() { subscriptions += 1; } }, {});
+  assert.equal(subscriptions, 0);
+});
+
+test('absent answer_guard id keeps the guard installed', async (t) => {
+  await featureHome(t, undefined); // no rdsh.json at all
+  const events = [];
+  applyAnswerGuard({ on(event) { events.push(event); } }, {});
+  assert.deepEqual(events, ['session/event', 'agent/turn-stopping']);
 });
 
 // -------------------------------------------------------------- install.sh
