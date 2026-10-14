@@ -3254,7 +3254,10 @@ mod v3_tests {
         std::fs::write(broken.join("session.jsonl.zstd"), "invalid zstd").unwrap();
         let output = fixture.run("inject-sessions", false, "engine_score");
         let context = session_hook_context(&output);
-        assert!(context.contains("[session]"));
+        assert!(
+            context.contains("[session]"),
+            "no session line in: {context}"
+        );
         assert!(context.contains("engine_score inherited user speech"));
         assert!(!context.contains("ignored assistant speech"));
 
@@ -3625,7 +3628,13 @@ mod v3_tests {
             1
         );
         let output = run_distill_subprocess(&temporary.0, Some(&compressed), false);
-        assert!(output.status.success());
+        assert!(
+            output.status.success(),
+            "distill subprocess {} stderr={} stdout={}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr),
+            String::from_utf8_lossy(&output.stdout)
+        );
         assert!(String::from_utf8(output.stdout)
             .unwrap()
             .contains("[distill: dry-run] 1 candidate(s)"));
@@ -3665,13 +3674,25 @@ mod v3_tests {
         set_modified(&plain, 0);
         set_modified(&compressed, 100);
         let output = run_distill_subprocess(&temporary.0, None, false);
-        assert!(output.status.success());
+        assert!(
+            output.status.success(),
+            "latest(zstd) subprocess {} stderr={} stdout={}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr),
+            String::from_utf8_lossy(&output.stdout)
+        );
         assert!(String::from_utf8(output.stdout)
             .unwrap()
             .contains("[task] 次はzstd"));
         set_modified(&plain, 200);
         let output = run_distill_subprocess(&temporary.0, None, false);
-        assert!(output.status.success());
+        assert!(
+            output.status.success(),
+            "latest(plain) subprocess {} stderr={} stdout={}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr),
+            String::from_utf8_lossy(&output.stdout)
+        );
         assert!(String::from_utf8(output.stdout)
             .unwrap()
             .contains("[task] 次はplain"));
