@@ -36,6 +36,9 @@ struct Args {
     only_case: Option<String>,
     #[arg(long, value_parser = ["openai-codex", "anthropic"])]
     only_provider: Option<String>,
+    /// Use SSE without a WebSocket session cache in the isolated Codex profile.
+    #[arg(long)]
+    codex_sse: bool,
     /// Exact model ID from the supplied openai-codex catalog (no fallback).
     #[arg(long, default_value = "gpt-6.1-sol", value_parser = parse_model_id)]
     codex_model: String,
@@ -235,6 +238,10 @@ fn patch(args: &Args, run: &Path, selection: (&str, &str), config: &Value, case:
     };
     let mut providers = json!({});
     providers[provider] = config.clone();
+    if args.codex_sse && provider == "openai-codex" {
+        providers[provider]["transport"] = json!("sse");
+        providers[provider]["cacheRetention"] = json!("none");
+    }
     let mut entries = vec![
         json!({"id":"credentials", "config":{"path":args.credentials,"watch":false}}),
         json!({"id":"agent-default-model", "config":{"provider":provider,"model":model,"reasoningEffort":"high"}}),
@@ -719,6 +726,7 @@ fn main() -> Result<()> {
         "ordering":"sequential; alternate provider and launcher order every sample; no automatic retries",
         "catalog_sha256":fingerprint(&args.catalog)?,
         "catalog_resolution":"exact ID selected from supplied catalog; official installed catalog supplies model metadata without raw SDK compat overrides",
+        "codex_sse_enabled":args.codex_sse,
         "authentication":"existing official credential provider; normal OAuth refresh permitted; no credential export",
         "only_case":args.only_case,"only_provider":args.only_provider,
         "runs":[]});
@@ -839,6 +847,49 @@ mod tests {
         assert!(only.iter().all(|v| v["provider"] == "anthropic"));
         assert_eq!(only[1]["median_success_seconds"], 8.0);
         assert_eq!(only[1]["runtime_passed"], 0);
+    }
+
+    #[test]
+    fn codex_sse_is_opt_in_and_preserves_other_provider_options() {
+        let base = [
+            "benchmark_models",
+            "--bin",
+            "rdsh",
+            "--original",
+            "dsh",
+            "--credentials",
+            "credentials.yaml",
+            "--catalog",
+            "catalog.json",
+            "--out",
+            "run",
+        ];
+        let default = Args::try_parse_from(base).unwrap();
+        assert!(!default.codex_sse);
+        let selected = Args::try_parse_from(base.into_iter().chain(["--codex-sse"])).unwrap();
+        let supplied =
+            json!({"models":[{"id":"gpt-6-sol"}],"retryPolicy":{"mode":"normal","maxRetries":0}});
+        let profile = |args: &Args, provider| {
+            patch(
+                args,
+                Path::new("run"),
+                (provider, "gpt-6-sol"),
+                &supplied,
+                "response",
+            )
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|v| v["id"] == "llm-pi-ai")
+            .unwrap()["config"]["providers"][provider]
+                .clone()
+        };
+        assert_eq!(profile(&default, "openai-codex"), supplied);
+        let mut expected = supplied.clone();
+        expected["transport"] = json!("sse");
+        expected["cacheRetention"] = json!("none");
+        assert_eq!(profile(&selected, "openai-codex"), expected);
+        assert_eq!(profile(&selected, "anthropic"), supplied);
     }
 
     #[test]

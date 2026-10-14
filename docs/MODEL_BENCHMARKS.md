@@ -131,3 +131,9 @@ The JSON field `median_success_seconds` is nearest-rank p50 (the lower middle
 sample for an even successful sample count). Rust repairs additionally record
 `generated_source_allowed` and `cargo_oracle_passed`; `null` means the Cargo
 oracle was not executed, rather than passed.
+
+`--codex-sse` selects `transport: sse` and `cacheRetention: none` only for the
+benchmark's isolated `openai-codex` provider. All other provider options, exact
+model selection, request budgets, and the two-second normal-exit rule remain
+unchanged. The flag is off by default and recorded in `report.json`; compare
+SSE runs separately from earlier automatic-transport runs.
