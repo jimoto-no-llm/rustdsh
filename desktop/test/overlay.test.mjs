@@ -20,10 +20,12 @@ test('overlay prepares a Rust identity and dedicated feed without changing offic
   const builder = result[PATCH_PATHS[0]], updater = result[PATCH_PATHS[1]];
   assert.match(builder, /const buildVersion = '0.3.3'/);
   assert.match(builder, /rdshHarnessVersion: '0.2.1-alpha.2'/);
+  assert.ok(builder.includes("signIgnore: [...(unsigned ? ['/Contents/Resources/rdsh(?:/|$)'] : [])"));
   assert.ok(builder.includes(FEED_URL)); assert.ok(updater.includes(FEED_URL));
   assert.match(result[PATCH_PATHS[3]], /CHANNEL = 'rdsh-desktop'/);
   assert.match(result[PATCH_PATHS[2]], /setAsDefaultProtocolClient\('rdsh'\)/);
   assert.match(result[PATCH_PATHS[7]], /const environment = invocation.unsigned/);
+  assert.ok(result[PATCH_PATHS[7]].includes("environment.DSH_DESKTOP_TARGET_PLATFORM === 'darwin' ? { CSC_FOR_PULL_REQUEST: 'true' } : {}"));
   assert.match(result[PATCH_PATHS[8]], /rdsh Desktop\.exe/);
   assert.doesNotMatch(result[PATCH_PATHS[8]], /DeepSeek Harness/);
   assert.match(result[PATCH_PATHS[9]], /if \(!options.unsigned\) resolveDesktopPolicyEnvironment/);

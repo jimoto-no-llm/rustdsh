@@ -46,9 +46,12 @@ try {
     packaged: app.isPackaged }));
   assert.equal(metadata.name, 'rdsh Desktop'); assert.equal(metadata.version, build.rdshVersion);
   assert.equal(metadata.home, home); assert.equal(metadata.userData, userData); assert.equal(metadata.packaged, true);
-  const packagedRecord = await application.evaluate(async ({ app }) => {
-    const { readFile } = await import('node:fs/promises'); const { join } = await import('node:path');
-    return JSON.parse(await readFile(join(app.getAppPath(), 'rdsh-build.json'), 'utf8'));
+  const packagedRecord = await application.evaluate(({ app }) => {
+    // Playwright evaluates in an inspector realm without a dynamic-import
+    // callback. Electron's Node 24 builtins still use its ASAR-aware filesystem.
+    const { readFileSync } = process.getBuiltinModule('node:fs');
+    const { join } = process.getBuiltinModule('node:path');
+    return JSON.parse(readFileSync(join(app.getAppPath(), 'rdsh-build.json'), 'utf8'));
   });
   assert.deepEqual(packagedRecord, build);
   const window = await application.firstWindow({ timeout: 120000 });

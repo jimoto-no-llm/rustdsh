@@ -41,6 +41,9 @@ export function planOverlay(root, lock, rdshVersion, nativeName) {
   b = replace(b, 'artifactName: `deepseek-harness-', 'artifactName: `rdsh-desktop-');
   b = replace(b, "'lib/main.js',", "'lib/main.js',\n      'rdsh-bootstrap.cjs',\n      'rdsh-build.json',");
   b = replace(b, 'extraResources: [', "extraResources: [\n      { from: fileURLToPath(new URL('../rdsh-build-assets', import.meta.url)), to: 'rdsh' },");
+  // Ad-hoc signing otherwise rewrites this already-built payload and breaks
+  // the recorded native digest. Signed release builds retain their signing path.
+  b = replace(b, 'signIgnore: [', "signIgnore: [...(unsigned ? ['/Contents/Resources/rdsh(?:/|$)'] : []), ");
   b = replace(b, "channel: 'nightly'", "channel: 'rdsh-desktop'");
   outputs[builder] = b;
   const updater = 'apps/desktop/src/update-coordinator.ts';
@@ -72,6 +75,9 @@ export function planOverlay(root, lock, rdshVersion, nativeName) {
   const packageTarget = 'apps/desktop/scripts/package-target.ts';
   let p = outputs[packageTarget];
   p = replace(p, "const environment = target.platform === 'darwin' && invocation.unsigned", 'const environment = invocation.unsigned');
+  // PR runners must exercise ad-hoc signing too. This return path has already
+  // stripped certificate inputs and is reached only for unsigned packaging.
+  p = replace(p, "CSC_IDENTITY_AUTO_DISCOVERY: 'false',", "...(environment.DSH_DESKTOP_TARGET_PLATFORM === 'darwin' ? { CSC_FOR_PULL_REQUEST: 'true' } : {}),\n    CSC_IDENTITY_AUTO_DISCOVERY: 'false',");
   p = replace(p, 'const filename = `deepseek-harness-', 'const filename = `rdsh-desktop-');
   p = replace(p, "'DeepSeek Harness.app'", "'rdsh Desktop.app'");
   outputs[packageTarget] = p;

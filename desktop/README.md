@@ -59,6 +59,8 @@ node desktop/archive.mjs --checkout target/desktop-native-fork --output target/d
 ランタイム準備・Electronパッケージング・Host/Office検証を実行します。
 署名なしの検証はリリース設定ファイルを読みません。署名済みビルドの検査は保持します。
 公式バイナリと同梱パッケージの整合性検証も維持します。
+macOSではアドホック署名を実行し、Rustの元バイナリと記録したSHA256を保持します。
+ビルドの標準出力と保存する診断ログは、接続トークン・認証値・メールアドレスを伏せます。
 
 `smoke-packaged.mjs` は新規の一時ホームだけを使い、Rustの版・同梱公式CLIへの委譲・
 アプリ名・版・保存先・同梱記録・初期画面と正常な終了を確認します。

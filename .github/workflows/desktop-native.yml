@@ -49,6 +49,9 @@ jobs:
         run: node desktop/smoke-packaged.mjs --checkout target/desktop-native-fork --output target/desktop-native-evidence
       - name: Preserve the unsigned app as a zip with checksum
         run: node desktop/archive.mjs --checkout target/desktop-native-fork --output target/desktop-native-artifacts
+      - name: Copy redacted packaging diagnostics
+        if: always()
+        run: node desktop/evidence.mjs --source target/desktop-native-fork/apps/desktop/.desktop-build/packaging-runs --output target/desktop-native-evidence/packaging
       - uses: actions/upload-artifact@v7
         with:
           name: rdsh-desktop-unsigned-${{ matrix.os }}
@@ -59,9 +62,7 @@ jobs:
         if: always()
         with:
           name: rdsh-desktop-native-evidence-${{ matrix.os }}
-          path: |
-            target/desktop-native-evidence/
-            target/desktop-native-fork/apps/desktop/.desktop-build/packaging-runs/
+          path: target/desktop-native-evidence/
           include-hidden-files: true
           if-no-files-found: warn
           retention-days: 14
