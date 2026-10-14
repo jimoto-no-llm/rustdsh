@@ -148,10 +148,25 @@ fn required_path<'a>(object: &'a Map<String, Value>, key: &str) -> Result<&'a Pa
 }
 
 fn path_text(path: &Path) -> Result<String> {
-    Ok(path
+    Ok(normalize_windows_path(path)
         .to_str()
         .context("worker-git path is not valid UTF-8")?
         .to_string())
+}
+
+fn normalize_windows_path(path: &Path) -> PathBuf {
+    #[cfg(windows)]
+    {
+        if let Some(path) = path.to_str() {
+            if let Some(unc) = path.strip_prefix(r"\\?\UNC\") {
+                return PathBuf::from(format!(r"\\{unc}"));
+            }
+            if let Some(path) = path.strip_prefix(r"\\?\") {
+                return PathBuf::from(path);
+            }
+        }
+    }
+    path.to_path_buf()
 }
 
 fn canonical_future(path: &Path) -> Result<PathBuf> {
@@ -163,7 +178,8 @@ fn canonical_future(path: &Path) -> Result<PathBuf> {
     let mut suffix = Vec::new();
     loop {
         match fs::canonicalize(&current) {
-            Ok(mut canonical) => {
+            Ok(canonical) => {
+                let mut canonical = normalize_windows_path(&canonical);
                 for component in suffix.iter().rev() {
                     canonical.push(component);
                 }
@@ -196,7 +212,8 @@ struct RepositoryInfo {
 }
 
 fn repository_info(root: &Path) -> Result<RepositoryInfo> {
-    let canonical = fs::canonicalize(root).context("resolve worker repository")?;
+    let canonical =
+        normalize_windows_path(&fs::canonicalize(root).context("resolve worker repository")?);
     let metadata = git_text(
         &canonical,
         &[
@@ -209,8 +226,10 @@ fn repository_info(root: &Path) -> Result<RepositoryInfo> {
         ],
     )?;
     let mut lines = metadata.lines();
-    let top = fs::canonicalize(lines.next().context("Git project root is unavailable")?)
-        .context("resolve Git project root")?;
+    let top = normalize_windows_path(
+        &fs::canonicalize(lines.next().context("Git project root is unavailable")?)
+            .context("resolve Git project root")?,
+    );
     ensure!(
         same_path(&canonical, &top),
         "exact_git_project_root_required"
@@ -219,8 +238,10 @@ fn repository_info(root: &Path) -> Result<RepositoryInfo> {
     let common_raw = lines
         .next()
         .context("Git common directory is unavailable")?;
-    let common = fs::canonicalize(canonical.join(common_raw.trim()))
-        .context("resolve Git common directory")?;
+    let common = normalize_windows_path(
+        &fs::canonicalize(canonical.join(common_raw.trim()))
+            .context("resolve Git common directory")?,
+    );
     let head_sha = lines.next().context("Git HEAD is unavailable")?.to_string();
     ensure!(valid_head_sha(&head_sha), "git_head_unavailable");
 
@@ -384,7 +405,9 @@ fn add_worktree(
     ensure!(valid_head_sha(base), "invalid_git_comparison");
     ensure!(!branch.is_empty(), "invalid_worker_branch");
     let repo = repository_info(root)?;
-    let hooks = fs::canonicalize(hooks_path).context("resolve empty hooks directory")?;
+    let hooks = normalize_windows_path(
+        &fs::canonicalize(hooks_path).context("resolve empty hooks directory")?,
+    );
     ensure!(
         same_path(hooks_path, &hooks),
         "worker_hooks_directory_unavailable"
@@ -397,12 +420,13 @@ fn add_worktree(
     let target = canonical_future(path)?;
     ensure!(same_path(path, &target), "worker_worktree_path_changed");
     let hooks_arg = format!("core.hooksPath={}", path_text(&hooks)?);
+    let target_for_git = normalize_windows_path(&target);
     let output = git_raw_with(&repo.root, |command| {
         command
             .arg("-c")
             .arg(hooks_arg)
             .args(["worktree", "add", "--no-track", "-b", branch, "--"])
-            .arg(&target)
+            .arg(&target_for_git)
             .arg(base);
     })?;
     ensure!(output.status.success(), "{}", git_failure(&output));
@@ -419,9 +443,12 @@ fn valid_head_sha(value: &str) -> bool {
 fn same_path(left: &Path, right: &Path) -> bool {
     #[cfg(windows)]
     {
-        left.to_string_lossy()
+        normalize_windows_path(left)
+            .to_string_lossy()
             .to_lowercase()
-            .eq(&right.to_string_lossy().to_lowercase())
+            .eq(&normalize_windows_path(right)
+                .to_string_lossy()
+                .to_lowercase())
     }
     #[cfg(not(windows))]
     {
@@ -556,6 +583,27 @@ mod tests {
     fn nul_status_parsing_keeps_both_names_and_uses_utf16_sort_order() {
         let parsed = parse_dirty_paths("R  new name\0old name\0?? 🦀.txt\0").unwrap();
         assert_eq!(parsed, ["new name", "old name", "🦀.txt"]);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_verbatim_and_unc_paths_match_normal_paths() {
+        assert!(same_path(
+            Path::new(r"\\?\C:\Users\runner\repo"),
+            Path::new(r"C:\Users\runner\repo")
+        ));
+        assert!(same_path(
+            Path::new(r"\\?\UNC\server\share\repo"),
+            Path::new(r"\\server\share\repo")
+        ));
+        assert_eq!(
+            normalize_windows_path(Path::new(r"\\?\C:\Users\runner\repo")),
+            PathBuf::from(r"C:\Users\runner\repo")
+        );
+        assert_eq!(
+            normalize_windows_path(Path::new(r"\\?\UNC\server\share\repo")),
+            PathBuf::from(r"\\server\share\repo")
+        );
     }
 
     #[test]

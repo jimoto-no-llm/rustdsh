@@ -129,10 +129,11 @@ fn repository_and_git_path_operations_preserve_nul_framing() {
     );
 
     let repository = response(invoke(json!({"op":"repository","root":root})));
-    assert_eq!(
-        repository["root"],
-        root.canonicalize().unwrap().to_str().unwrap()
-    );
+    #[cfg(windows)]
+    let expected_root = root.clone();
+    #[cfg(not(windows))]
+    let expected_root = root.canonicalize().unwrap();
+    assert_eq!(repository["root"], expected_root.to_str().unwrap());
     assert_eq!(repository["head_sha"], head);
     assert!(repository["git_common_dir"].as_str().is_some());
     assert!(repository["branch"].is_string() || repository["branch"].is_null());
@@ -168,16 +169,23 @@ fn canonical_future_resolves_existing_parents_and_add_worktree_uses_isolated_hoo
     let base = git(&root, &["rev-parse", "HEAD"]);
 
     let future = root.join("future").join("child");
-    let expected = root.canonicalize().unwrap().join("future").join("child");
+    #[cfg(windows)]
+    let canonical_root = root.clone();
+    #[cfg(not(windows))]
+    let canonical_root = root.canonicalize().unwrap();
+    let expected = canonical_root.join("future").join("child");
     let resolved = response(invoke(json!({"op":"canonical-future","path":future})))
         .as_str()
         .unwrap()
         .to_string();
     assert_eq!(resolved, expected.to_str().unwrap());
 
-    let canonical_temp = temp.0.canonicalize().unwrap();
-    let hooks = canonical_temp.join("empty-hooks");
-    let worktree = canonical_temp.join("workers").join("worker-a");
+    #[cfg(windows)]
+    let worktree_parent = temp.0.clone();
+    #[cfg(not(windows))]
+    let worktree_parent = temp.0.canonicalize().unwrap();
+    let hooks = worktree_parent.join("empty-hooks");
+    let worktree = worktree_parent.join("workers").join("worker-a");
     fs::create_dir_all(&hooks).unwrap();
     fs::create_dir_all(worktree.parent().unwrap()).unwrap();
     response(invoke(json!({
