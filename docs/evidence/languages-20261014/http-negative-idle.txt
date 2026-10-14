@@ -1,0 +1,50 @@
+   Compiling rdsh v0.3.3 (<workspace>)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.55s
+     Running unittests src/main.rs (target/debug/deps/rdsh-f856b077addf0d0c)
+
+running 1 test
+test local_http::tests::idle_connections_are_silent_but_partial_requests_retain_http_failures ... FAILED
+
+failures:
+
+---- local_http::tests::idle_connections_are_silent_but_partial_requests_retain_http_failures stdout ----
+
+thread 'local_http::tests::idle_connections_are_silent_but_partial_requests_retain_http_failures' (5514927) panicked at src/local_http.rs:417:13:
+assertion `left == right` failed
+  left: Status(408)
+ right: Idle
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    local_http::tests::idle_connections_are_silent_but_partial_requests_retain_http_failures
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 165 filtered out; finished in 0.05s
+
+error: test failed, to rerun pass `--bin rdsh`
+     Running tests/cli_localization.rs (target/debug/deps/cli_localization-46444336038ef6c7)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 0.00s
+
+     Running tests/log_session_boundaries.rs (target/debug/deps/log_session_boundaries-36224cce57a153e6)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s
+
+     Running tests/native_e2e.rs (target/debug/deps/native_e2e-73d5907af3931008)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 19 filtered out; finished in 0.00s
+
+     Running tests/settings_cli.rs (target/debug/deps/settings_cli-d32aa3d18fb5e7bb)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.00s
+
+error: 1 target failed:
+    `--bin rdsh`

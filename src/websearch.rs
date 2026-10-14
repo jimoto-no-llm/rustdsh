@@ -547,6 +547,32 @@ mod tests {
     }
 
     #[test]
+    fn empty_results_and_invalid_pages_retain_the_requested_language() {
+        use crate::locale::Locale;
+        for (locale, expected) in [
+            (Locale::English, "no SearXNG results page"),
+            (Locale::Chinese, "以下地址没有 SearXNG 结果页"),
+            (Locale::Japanese, "SearXNG の結果ページがありません"),
+        ] {
+            assert!(ensure_results_page(
+                "<div id=\"results\"></div>",
+                "http://127.0.0.1:8888",
+                locale
+            )
+            .is_ok());
+            let error = ensure_results_page(
+                "<html>wrong service</html>",
+                "http://127.0.0.1:8888",
+                locale,
+            )
+            .unwrap_err()
+            .to_string();
+            assert!(error.contains(expected), "{error}");
+            assert!(error.contains("http://127.0.0.1:8888"));
+        }
+    }
+
+    #[test]
     fn query_encoding() {
         assert_eq!(encode_query("a b+c"), "a+b%2Bc");
         assert_eq!(encode_query("日本語"), "%E6%97%A5%E6%9C%AC%E8%AA%9E");

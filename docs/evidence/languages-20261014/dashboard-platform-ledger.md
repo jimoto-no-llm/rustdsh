@@ -46,7 +46,7 @@ The 94 skipped cases comprise 82 explicitly annotated kernel ownership positives
 
 ### Kernel ownership
 
-**adapters.test.mjs**
+#### adapters.test.mjs
 
 - start/send/usage use versioned ACP requests and measurements instead of shell input
 - resume attaches the exact session and rejects failed attachment
@@ -64,7 +64,7 @@ The 94 skipped cases comprise 82 explicitly annotated kernel ownership positives
 - public CLI smoke acquires and stops real native ownership
 - a failed cleanup after real ownership remains unconfirmed and cannot become a no-child stop
 
-**answer-applications.test.mjs**
+#### answer-applications.test.mjs
 
 - registration rejects malformed owner IDs and unbounded session IDs before enrollment
 - general inputs and human replies share exact-session order and immutable IDs, including unsupported steer
@@ -89,11 +89,11 @@ The 94 skipped cases comprise 82 explicitly annotated kernel ownership positives
 - an acknowledged native command with different input cannot confirm application of the saved answer
 - public CLI once resumes the exact session, applies once, and inspection never launches another prompt
 
-**budget-admission.test.mjs**
+#### budget-admission.test.mjs
 
 - guarded attachment verifies hook, scopes cleanup, and rejects hard job before native session starts
 
-**checkpoints.test.mjs**
+#### checkpoints.test.mjs
 
 - checkpoints bind the native ID, branch, durable event and timestamp without copying conversation or credentials
 - a fresh formal session-list observation enables a candidate without pretending a resume acknowledgement
@@ -111,12 +111,12 @@ The 94 skipped cases comprise 82 explicitly annotated kernel ownership positives
 - a surviving checkpoint writer lock remains visible and is never stolen to recover a session
 - separate public CLI clients record, inspect, resume and reject unsafe summary options
 
-**fault-simulator.test.mjs**
+#### fault-simulator.test.mjs
 
 - all six real control-plane scenarios expose effects, persistence and resource proof without inherited credentials
 - CLI replay retains the exact seed and fault point; ENOSPC before write dispatches nothing
 
-**model-routing.test.mjs**
+#### model-routing.test.mjs
 
 - a declared run persists requested and native configuration separately and guards an actual prompt without storing its body
 - mismatched, absent or malformed native routes block a tracked prompt before dispatch and never select another model
@@ -126,7 +126,7 @@ The 94 skipped cases comprise 82 explicitly annotated kernel ownership positives
 - separate public clients bind, probe and inspect a native configuration without sending a prompt or modifying DSH routing
 - a checkpoint cannot drop a declared model assertion while starting a new conversation with a summary
 
-**process-scope.test.mjs**
+#### process-scope.test.mjs
 
 - owned children and detached grandchildren stop in order after a bounded graceful deadline, with duplicate requests sharing one result
 - cooperative EOF/TERM exits require no forced kill on Linux and retain truthful Windows graceful capability
@@ -136,7 +136,7 @@ The 94 skipped cases comprise 82 explicitly annotated kernel ownership positives
 - authenticated Harness API separates stopping from verified empty descendants, duplicate human requests stop once, and MCP credentials cannot stop the owned run
 - lost Harness monitor remains unverifiable in HTTP responses and administrator shutdown refuses to hide the uncertain result
 
-**releases.test.mjs**
+#### releases.test.mjs
 
 - failed one-project canary retains observations and cannot alter or roll out to the other project
 - existing run keeps the original adapter/Node/DSH command and native ID through update and verified rollback
@@ -144,18 +144,18 @@ The 94 skipped cases comprise 82 explicitly annotated kernel ownership positives
 - tampered, missing, incompatible and unqualified bytes block dispatch; legacy records are not silently pinned
 - stale selection plans never start native work, while exclusive registry ownership preserves concurrent writers
 
-**run-history.test.mjs**
+#### run-history.test.mjs
 
 - tracked attachment persists command and native ack IDs and stops once despite duplicate stop requests
 - a live or unverifiable recorded process blocks duplicate resume before a second ACP session starts
 - cancel notifications remain unacknowledged while the actual cancelled prompt result is recorded
 - journal failures block new profile boot yet still allow cleanup of an already owned child
 
-**server-close.test.mjs**
+#### server-close.test.mjs
 
 - concurrent close shares one attempt and retries an unconfirmed stop
 
-**session-ledger.test.mjs**
+#### session-ledger.test.mjs
 
 - separate public CLI processes start, resolve and resume the same stored native session
 - resume rejects changed executable, home, branch and CLI version before claiming attachment
@@ -163,9 +163,15 @@ The 94 skipped cases comprise 82 explicitly annotated kernel ownership positives
 
 ### Native process identity
 
-**connection-diagnostics.test.mjs**
+#### connection-diagnostics.test.mjs
 
 - Tunnel readiness is read-only, scoped to its live generation and distinct from Dot response
 - Health diagnostics reject foreign projects, arbitrary URLs, redirects, oversized files and unknown processes
 - a recorded native Tunnel identity becomes stale after restart
 - public Tunnel launcher records its actual child and retires only its own health file
+
+## Final Windows validation
+
+The same 141 dashboard source files were verified by SHA-256 before the usual unfiltered `npm test` on Windows 11 x64 / Node 24.21.0. Final result: **330 tests, 324 pass, 0 fail, 6 platform skips**, exit 0; [output](dashboard-windows-final.txt). This executes the native ownership and process-identity positive cases excluded on macOS. The original Windows run had one existing 10-second retry-fixture failure; [the controlled investigation](windows-retry.md) distinguishes that original observation from the reproduced fingerprint-contention mechanism. The positive fixture now allows 30 seconds overall while retaining the 700 ms first-child timeout, exact two attempts and all deadline-negative assertions. The focused retry suite passes 14/14 on both macOS and Windows. Product limits are unchanged.
+
+[Machine-readable excluded-case inventory](platform-skips.json) lists every one of the 94 macOS and 6 Windows exclusions with its recorded reason. These are distinct OS denominators, not one combined test total.

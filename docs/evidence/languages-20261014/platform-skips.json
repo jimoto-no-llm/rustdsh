@@ -1,0 +1,418 @@
+{
+  "macOS": {
+    "total": 330,
+    "pass": 236,
+    "fail": 0,
+    "skip": 94,
+    "excluded_cases": [
+      {
+        "name": "start/send/usage use versioned ACP requests and measurements instead of shell input",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "resume attaches the exact session and rejects failed attachment",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "missing advertised resume is unsupported without writing a resume request",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "simultaneous prompts are refused and interrupt is a request until the cancelled result",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "client-side permission and filesystem requests do not gain execution authority",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "a changed executable version revokes capabilities on an already connected adapter",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "broken JSON, oversized frames, invalid UTF8, wrong protocol and invalid start fail closed",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "invalid usage cannot become a zero or fabricated measurement",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "CLI errors retain no peer secret and missing methods disable the affected operation",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "timeouts and early exit are failures, never successful starts",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "duplicate session identifiers disable the adapter",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "stop waits for the owned child to exit and escalates when EOF is ignored",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "isolated smoke covers restart/resume and accurately marks unexercised model work",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "public CLI smoke acquires and stops real native ownership",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "a failed cleanup after real ownership remains unconfirmed and cannot become a no-child stop",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "registration rejects malformed owner IDs and unbounded session IDs before enrollment",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "general inputs and human replies share exact-session order and immutable IDs, including unsupported steer",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "legacy unbound feedback cannot advance a consumer cursor past a newly submitted instruction",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "concurrent contradictory inputs retain both texts, require human comparison, and reject stale review decisions",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "human-approved interruption cancels only the currently awaited native prompt and confirms its correlated result before the follow-up",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "a cancel notification without a correlated prompt result cannot release the follow-up or be replayed after reconnect",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "a lost cancel claim response performs zero cancels and does not gain replay permission",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "general-input result loss remains an ordered unknown barrier after explicit exact-session reconnection",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "public instruction CLI and lost HTTP submission responses reuse an immutable ID without launching native sessions",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "late cursors and simultaneous callers cannot bypass earlier or uncertain inputs to the same native target",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "saved, webhook delivered, cursor GET, target read, begin and correlated ACP result stay separate",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "an invalidated input may reconcile its already-issued native result without replaying or changing the new question",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "concurrent readers, old cursor rereads and duplicate begin IDs cannot repeat a native effect",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "stopped consumer retains its answer; explicit same-session resume rotates credentials and applies once",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "effect followed by native result loss stays unknown after explicit reconnect and never replays",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "dashboard restart and missing application ack reconcile an existing native result without another send",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "lost begin response commits a claim but performs zero sends and remains blocked on reread",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "wrong consumer/run, forged success, project MCP/admin/browser and ended-session acks fail closed",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "revision changes, cancellation and expiry retain original replies but forbid current application",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "a correlated native refusal is shown as failed input processing, never successful application",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "an acknowledged native command with different input cannot confirm application of the saved answer",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "public CLI once resumes the exact session, applies once, and inspection never launches another prompt",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "guarded attachment verifies hook, scopes cleanup, and rejects hard job before native session starts",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "checkpoints bind the native ID, branch, durable event and timestamp without copying conversation or credentials",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "a fresh formal session-list observation enables a candidate without pretending a resume acknowledgement",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "formal checkpoint resume confirms the same native ID and repeated recovery never replays it",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "a checkpoint safety refusal keeps its specific error code and blocks replay",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "a context safety error is preserved in the uncertain recovery record and never retried",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "missing and expired-session fixtures require a new-session choice, while unsupported or malformed native evidence is distinct",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "explicit context-loss choice creates a new native ID and sends the operator summary once with a checkpoint reference",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "worktree moves, changed branch and changed HEAD block recovery before native profile boot",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "unconfirmed control commands block recovery and completed external effects are never replayed",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "referenced external outcomes must be known before resume, including an applied operation whose response was lost",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "corrupt checkpoint data and missing committed journal events refuse recovery without overwriting evidence",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "a lost summary response leaves the new session link uncertain and never dispatches the summary again",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "a flushed recovery intent blocks later clients if persistence fails before dispatch",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "a surviving checkpoint writer lock remains visible and is never stolen to recover a session",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "separate public CLI clients record, inspect, resume and reject unsafe summary options",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "Tunnel readiness is read-only, scoped to its live generation and distinct from Dot response",
+        "reason": "darwin has no process identity reader; positive Tunnel identity fixtures require Linux or Windows"
+      },
+      {
+        "name": "Health diagnostics reject foreign projects, arbitrary URLs, redirects, oversized files and unknown processes",
+        "reason": "darwin has no process identity reader; positive Tunnel identity fixtures require Linux or Windows"
+      },
+      {
+        "name": "a recorded native Tunnel identity becomes stale after restart",
+        "reason": "darwin has no process identity reader; positive Tunnel identity fixtures require Linux or Windows"
+      },
+      {
+        "name": "public Tunnel launcher records its actual child and retires only its own health file",
+        "reason": "darwin has no process identity reader; positive Tunnel identity fixtures require Linux or Windows"
+      },
+      {
+        "name": "all six real control-plane scenarios expose effects, persistence and resource proof without inherited credentials",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "CLI replay retains the exact seed and fault point; ENOSPC before write dispatches nothing",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "a declared run persists requested and native configuration separately and guards an actual prompt without storing its body",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "mismatched, absent or malformed native routes block a tracked prompt before dispatch and never select another model",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "only an exact unexpired operator authorization accepts a changed native route and its history retains before, after and source",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "the adapter repeats the assertion at its final send boundary after a native configuration update",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "corrupt route policies and surviving locks are preserved and block prompts instead of guessing an allowed route",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "separate public clients bind, probe and inspect a native configuration without sending a prompt or modifying DSH routing",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "a checkpoint cannot drop a declared model assertion while starting a new conversation with a summary",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "framed supervisor drains queued child output before input-close exit",
+        "reason": "SKIP"
+      },
+      {
+        "name": "owned children and detached grandchildren stop in order after a bounded graceful deadline, with duplicate requests sharing one result",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "cooperative EOF/TERM exits require no forced kill on Linux and retain truthful Windows graceful capability",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "root exit cannot confirm descendant exit and changing the exposed PID to an independent canary never redirects a kernel-handle stop",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "monitor disconnect is unverifiable, sends no guessed PID kill, and never produces a confirmed stop",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "managed Harness stores ownership before release and every stop stage including final empty-group proof; reloaded history cannot recreate signal authority",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "authenticated Harness API separates stopping from verified empty descendants, duplicate human requests stop once, and MCP credentials cannot stop the owned run",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "lost Harness monitor remains unverifiable in HTTP responses and administrator shutdown refuses to hide the uncertain result",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "failed one-project canary retains observations and cannot alter or roll out to the other project",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "existing run keeps the original adapter/Node/DSH command and native ID through update and verified rollback",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "public CLI re-execs the captured runtime and refuses overrides or changed pins",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "tampered, missing, incompatible and unqualified bytes block dispatch; legacy records are not silently pinned",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "stale selection plans never start native work, while exclusive registry ownership preserves concurrent writers",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "tracked attachment persists command and native ack IDs and stops once despite duplicate stop requests",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "a live or unverifiable recorded process blocks duplicate resume before a second ACP session starts",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "cancel notifications remain unacknowledged while the actual cancelled prompt result is recorded",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "journal failures block new profile boot yet still allow cleanup of an already owned child",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "concurrent close shares one attempt and retries an unconfirmed stop",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "separate public CLI processes start, resolve and resume the same stored native session",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "resume rejects changed executable, home, branch and CLI version before claiming attachment",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "failed starts retain an unknown ID; failed resumes retain only the reported identity",
+        "reason": "darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job"
+      },
+      {
+        "name": "native PowerShell wrapper forwards help in foreground",
+        "reason": "SKIP"
+      },
+      {
+        "name": "Windows tray launcher detaches only after ready; scoped stop preserves another project",
+        "reason": "SKIP"
+      },
+      {
+        "name": "native PowerShell foreground wrapper preserves MCP stdin/stdout",
+        "reason": "SKIP"
+      },
+      {
+        "name": "native Windows menu emits Open and Exit actions",
+        "reason": "SKIP"
+      },
+      {
+        "name": "native Windows creates a real NotifyIcon and disposes it on server close",
+        "reason": "SKIP"
+      },
+      {
+        "name": "native Windows runs real PowerShell despite a planted pwsh.exe in the working directory",
+        "reason": "SKIP"
+      },
+      {
+        "name": "native Windows timeout reports phases and observes its exact helper's exit",
+        "reason": "SKIP"
+      }
+    ]
+  },
+  "Windows": {
+    "total": 330,
+    "pass": 324,
+    "fail": 0,
+    "skip": 6,
+    "excluded_cases": [
+      {
+        "name": "unsupported ownership rejects before ACP execution and retains a confirmed no-child stop",
+        "reason": "Requires an OS without the kernel ownership backend; supported OS lifecycle cases run separately"
+      },
+      {
+        "name": "smoke retains a pre-ownership rejection and removes its isolated unused home",
+        "reason": "Requires an OS without the kernel ownership backend; supported OS lifecycle cases run separately"
+      },
+      {
+        "name": "missing native process identity keeps Tunnel readiness unconfirmed without probing its URL",
+        "reason": "Requires a platform without the native process identity reader"
+      },
+      {
+        "name": "framed supervisor drains queued child output before input-close exit",
+        "reason": "SKIP"
+      },
+      {
+        "name": "installer dry run previews rdsh-docs without creating a DSH home",
+        "reason": "the source skill installer is POSIX shell"
+      },
+      {
+        "name": "installer copies rdsh-docs and keeps forced-refresh backups outside skill discovery",
+        "reason": "the source skill installer is POSIX shell"
+      }
+    ]
+  }
+}

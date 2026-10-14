@@ -1,0 +1,88 @@
+[
+  {
+    "name": "fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--check"
+    ],
+    "exit": 0,
+    "seconds": 0.18
+  },
+  {
+    "name": "clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit": 0,
+    "seconds": 0.85
+  },
+  {
+    "name": "release",
+    "command": [
+      "cargo",
+      "test",
+      "--release"
+    ],
+    "exit": 0,
+    "seconds": 23.86
+  },
+  {
+    "name": "benchmark-extended-tests",
+    "command": [
+      "cargo",
+      "test",
+      "--release",
+      "--example",
+      "benchmark_extended"
+    ],
+    "exit": 0,
+    "seconds": 0.1
+  },
+  {
+    "name": "benchmark-models-tests",
+    "command": [
+      "cargo",
+      "test",
+      "--release",
+      "--example",
+      "benchmark_models"
+    ],
+    "exit": 0,
+    "seconds": 0.08
+  },
+  {
+    "name": "model-fence",
+    "command": [
+      "node",
+      "--test",
+      "tests/model_benchmark/fence.test.mjs"
+    ],
+    "exit": 0,
+    "seconds": 0.08
+  },
+  {
+    "name": "regress",
+    "command": [
+      "sh",
+      "tests/regress.sh"
+    ],
+    "exit": 0,
+    "seconds": 26.83
+  },
+  {
+    "name": "build",
+    "command": [
+      "cargo",
+      "build",
+      "--release"
+    ],
+    "exit": 0,
+    "seconds": 0.17
+  }
+]

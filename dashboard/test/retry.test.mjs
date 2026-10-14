@@ -585,14 +585,25 @@ test("original CLI version retry uses actual bounded children and persistent ins
     },
     budget: {
       max_attempts: 3,
-      total_ms: 10000,
+      // Authorization hashes the actual runtime repeatedly under parallel test load.
+      total_ms: 30000,
       base_ms: 10,
       max_delay_ms: 100,
     },
     requestTimeout: 700,
   });
-  assert.equal(report.retry.status, "completed");
+  assert.equal(
+    report.retry.status,
+    "completed",
+    JSON.stringify(report.retry),
+  );
   assert.equal(report.retry.attempts, 2);
+  assert.deepEqual(
+    report.retry.history
+      .filter((entry) => entry.step === "execute_failed")
+      .map(({ attempt, category }) => ({ attempt, category })),
+    [{ attempt: 1, category: "timeout" }],
+  );
   assert.equal(report.adapter.health, "version_matched");
   assert.equal(await fs.readFile(counter, "utf8"), "2");
   await assert.rejects(

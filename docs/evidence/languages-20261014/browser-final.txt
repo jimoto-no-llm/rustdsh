@@ -1,0 +1,37 @@
+
+> test
+> node languages.mjs && node update-banner.mjs
+
+{
+  "result": "PASS",
+  "flows": [
+    "setup: protected token handoff -> Extras enable -> file readback -> reload retained",
+    "native serve: protected token handoff -> tokens -> prune -> sessions -> reload retained",
+    "project CLI: real MCP task/question -> browser draft preserved on SSE -> browser answer -> MCP/file readback -> process restart retained answer and revoked old key"
+  ],
+  "output": "<evidence>/after/en"
+}
+{
+  "result": "PASS",
+  "flows": [
+    "setup: protected token handoff -> Extras enable -> file readback -> reload retained",
+    "native serve: protected token handoff -> tokens -> prune -> sessions -> reload retained",
+    "project CLI: real MCP task/question -> browser draft preserved on SSE -> browser answer -> MCP/file readback -> process restart retained answer and revoked old key"
+  ],
+  "output": "<evidence>/after/zh-CN"
+}
+{
+  "result": "PASS",
+  "flows": [
+    "setup: protected token handoff -> Extras enable -> file readback -> reload retained",
+    "native serve: protected token handoff -> tokens -> prune -> sessions -> reload retained",
+    "project CLI: real MCP task/question -> browser draft preserved on SSE -> browser answer -> MCP/file readback -> process restart retained answer and revoked old key"
+  ],
+  "output": "<evidence>/after/ja"
+}
+{
+  "result": "PASS",
+  "flows": 13,
+  "live_notification_ms": 78,
+  "output": "<workspace>/target/e2e/update-banner"
+}

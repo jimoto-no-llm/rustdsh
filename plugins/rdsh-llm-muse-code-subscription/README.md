@@ -24,6 +24,10 @@ npm ci --prefix /path/to/rustdsh/plugins/rdsh-llm-muse-code-subscription
 
 Harnessを再起動すると、**Muse Code · 定額契約** にCLIの全カタログが表示されます。2026-10-13の実機ではWonder、Wonder Full、Spark 1.3、Spark 1.2の4件を確認しました。一覧は60秒キャッシュし、推論開始前にも現在のカタログと推論段階を再確認します。利用できるモデルは契約プランに依存します。削除するときはこのinsert項目を外して再起動します。
 
+### 表示言語
+
+`rdsh.json` の `general.language` で `en`・`zh-CN`・`ja` を保存すると、プロバイダー名・rdshが追加するモデル名の接尾辞・説明・利用者向け診断を切り替えます。未指定・`auto` の場合は `RDSH_LANG`、`LC_ALL`、`LC_MESSAGES`、`LANG` の最初の空でない値を使い、それもなければNodeの実行環境ロケールに従います。外部カタログの独自表示名・説明、モデルID、プロバイダーID、モデル応答・外部の診断本文は原文のままです。一覧取得中に設定が変わっても、その取得を開始した言語で結果を返します。表示言語の変更はモデルの選択・Contributor設定・認証方法を変更しません。
+
 ### Contributor
 
 **Muse Code · Contributor（学習利用）** は、CLIのContributor modeをONにする独立した選択枠です。モデルIDはCLIから取得した実IDを使います。現在のMuse Codeでは同じ4件が両モードに表示され、直接Meta Model APIの `muse-spark-1.3-contributor` 等をこの接続へ架空のIDとして追加しません。

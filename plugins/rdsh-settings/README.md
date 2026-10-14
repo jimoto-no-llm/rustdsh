@@ -9,6 +9,12 @@ DSH設定サイドバーに rdsh セクションを追加するテスト用プ�
 - 順序は Models(10) / Built-in plugins(15) の次: order 20
 - クリックでトークン予算・retriever/packer/verifier・goal・作業ファイル・未解決タスクを調整できます
 
+## 表示言語
+
+「表示言語」で英語（`en`）・簡体字中国語（`zh-CN`）・日本語（`ja`）を選ぶと、設定画面とプレビューがその場で切り替わります。保存すると `general.language` に記録します。`auto` はこの画面ではブラウザーの言語を使います。読込エラーでも直前に選んだ表示言語を保ち、壊れた設定を保存で上書きしません。CLI・独立ダッシュボードの選択順は [設定リファレンス](../../docs/RDSH-SETTINGS.md) を参照してください。
+
+設定キー・プロファイル名・パス・goalなどの入力本文・明示したDiscord表示文は翻訳しません。Discordの既定表示文と稼働状態は選択言語に従います。空の `discord.details` は言語別の既定文を選ぶ指定で、以前に保存した日本語を含む明示的な表示文はそのまま維持します。
+
 ## 保存先
 
 - DSH_HOME/rdsh.json（単一設定源。context・beta・全体設定すべて）
@@ -42,7 +48,7 @@ dsh plugin --profile web add ./plugins/rdsh-settings
 
 ## Discord Rich Presence
 
-設定 → rdsh → **Discord Rich Presence** で変更します。既定ONです。
+設定 → rdsh → **Discordの作業状態**（英語では **Discord Rich Presence**）で変更します。既定ONです。
 
 新規設定やDiscord設定が未指定の場合は、そのまま作業状態を表示します。
 表示しない場合は「Discordに作業状態を表示する」をOFFにして保存します。
@@ -56,7 +62,7 @@ Discordデスクトップアプリを起動し、Discord側でも活動の表示
 Application IDが未設定・空欄のときや `rdsh settings unset discord.application_id` で
 リセットしたときは、共通のdshアプリに戻ります。
 
-既定の表示文は「dshで作業中」です。表示文、agentの状態・稼働数、経過時間を
+日本語の既定表示文は「dshで作業中」です。表示文、agentの状態・稼働数、経過時間を
 個別に変更できます。DSHの `agent/status` イベントから「agent稼働中 (2)」や
 「待機中」に更新し、終了したagentは集計から除きます。読み込み済みのagentも
 現在の状態から集計します。プロンプト、ファイル名、プロジェクトパスは送りません。

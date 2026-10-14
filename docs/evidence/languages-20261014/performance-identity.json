@@ -1,0 +1,10 @@
+{
+  "base_sha": "f3b836e34b871452a4b03723159d9a2821b3062b",
+  "merged_candidate_parent": "179dca6919b64e9b492307157cb51d900caaec8a",
+  "candidate_source_changes_after_merge": [
+    "src/websearch.rs: empty/invalid-page language regression test only"
+  ],
+  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "candidate_sha256": "7ab8cd8e4948686c6f723a7b7fd137633488d8a3a564ff46db74fcae5b8e07b7",
+  "baseline_sha256": "b051685914fe0cccd644b94e3eb9e3871fe146a4053e91f66561afbbd4c31ef3"
+}
