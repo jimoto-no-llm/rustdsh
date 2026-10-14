@@ -5,6 +5,14 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Security
+
+- The optional `rdsh-mcp-exposure` plugin pins its development
+  `@modelcontextprotocol/client` to the patched line (2.3.1, override) instead
+  of the 2.0.0 that the upstream `dsh-mcp-client` peer pulls in, clearing the
+  high-severity GHSA-6qxp-vccf-f47h alert. Runtime resolution is unchanged: the
+  plugin uses the host DSH's MCP client.
+
 ### Added
 
 - `plugins/rdsh-mobile-ui` is bundled and installed by `./plugins/install.sh`:
@@ -28,7 +36,7 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   layout that cannot be read safely (including any other mention of
   `llm-pi-ai`, such as inside `- insert:`) is refused with the YAML to add by
   hand. See `docs/PROVIDERS.md`.
-- `rdsh-dashboard subagents plan` turns a declared use case into a deterministic
+- `rdsh subagents plan` turns a declared use case into a deterministic
   dispatch plan for delegated subagents: role and model tier per item, bounded
   items and weight per agent, waves limited by `max_parallel`, and explicit
   warnings instead of guessed tiers. It starts no agent and writes nothing; the
@@ -62,6 +70,14 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   find, or one outside npm's global root, is reported and skipped while the
   rdsh release update still succeeds; npm-managed trees keep digest pinning,
   downgrade refusal, verification and rollback. See `docs/AUTO-UPDATE.md`.
+
+### Changed
+
+- `rdsh-dashboard subagents plan` forwards to `rdsh subagents plan`: the planner
+  is now the Rust implementation in `src/subagent_plan.rs`, the JavaScript
+  planning module is removed so there is a single source of truth, and the
+  request, plan and warning contract is unchanged
+  (`docs/SUBAGENT-PLANNING.md`).
 
 ## [0.3.3] - 2026-10-13
 
