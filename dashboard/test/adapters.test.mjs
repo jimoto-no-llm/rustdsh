@@ -3,9 +3,11 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { adapterCatalog, createCliAdapter, operations } from "../adapters.mjs";
 import { smokeAdapter } from "../adapter-smoke.mjs";
+import { dockerWorkerLaunch } from "../process-scope.mjs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
@@ -13,6 +15,29 @@ const fixture = fileURLToPath(
   new URL("./fixtures/acp-cli.mjs", import.meta.url),
 );
 const run = promisify(execFile);
+const fakeColimaEndpoint = "unix://" + path.join(os.homedir(), ".colima", "default", "docker.sock");
+async function setupDockerVersionProbe(t, source, { requestTimeout = 1000, dockerBin } = {}) {
+  const root = await fs.mkdtemp(path.join(process.cwd(), ".rdsh-docker-probe-"));
+  const entry = path.join(root, "version.mjs");
+  await fs.writeFile(entry, source);
+  const dockerWorker = { mountRoots: [root], ...(dockerBin ? { dockerBin } : {}) };
+  const launch = await dockerWorkerLaunch({
+    command: ["/usr/local/bin/node", entry], cwd: root, dockerWorker,
+  });
+  const adapter = createCliAdapter({
+    command: ["/usr/local/bin/node", entry],
+    cwd: root,
+    dockerWorker,
+    requestTimeout,
+    stopTimeout: 100,
+    owner_id: "owner_" + randomUUID(),
+  });
+  t.after(async () => {
+    await adapter.stop().catch(() => {});
+    await fs.rm(root, { recursive: true, force: true });
+  });
+  return { adapter, dockerBin: launch.dockerBin, ownerId: adapter.owner_id, root };
+}
 async function setup(t, mode = "normal", extra = {}) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-adapter-"));
   const trace = path.join(root, "trace.jsonl");
@@ -191,6 +216,54 @@ test("unknown CLI version or malformed version disables capabilities before prof
       ),
     );
   }
+});
+
+test("Docker version probe rejects a valid-looking version when the worker exits nonzero", { skip: process.platform !== "darwin" && "requires the macOS Colima Docker context" }, async (t) => {
+  const { adapter } = await setupDockerVersionProbe(
+    t,
+    'if (process.argv.includes("--version")) { console.log("0.2.0-rc.2"); process.exit(7); }',
+  );
+  assert.equal((await adapter.probe()).health, "cli_unavailable");
+  assert.equal(adapter.capabilities().operations.start.supported, false);
+});
+
+test("Docker version probe rejects output beyond the native 4096-byte limit", { skip: process.platform !== "darwin" && "requires the macOS Colima Docker context" }, async (t) => {
+  const { adapter } = await setupDockerVersionProbe(
+    t,
+    'if (process.argv.includes("--version")) { process.stdout.write("0".repeat(4097)); }',
+  );
+  assert.equal((await adapter.probe()).health, "cli_unavailable");
+  assert.equal(adapter.capabilities().operations.start.supported, false);
+});
+
+test("Docker version probe times out and releases its exact worker container", { skip: process.platform !== "darwin" && "requires the macOS Colima Docker context" }, async (t) => {
+  const { adapter } = await setupDockerVersionProbe(
+    t,
+    'if (process.argv.includes("--version")) setInterval(() => {}, 1000);',
+    { requestTimeout: 150 },
+  );
+  assert.equal((await adapter.probe()).health, "cli_unavailable");
+  assert.equal(adapter.capabilities().operations.start.supported, false);
+});
+
+test("Docker version probe exposes cleanup failure when exact container removal fails", { skip: process.platform === "win32" && "requires a POSIX executable fake Docker shim" }, async (t) => {
+  const root = await fs.mkdtemp(path.join(process.cwd(), ".rdsh-docker-rm-failure-"));
+  const dockerBin = path.join(root, "docker.cjs");
+  const id = "a".repeat(64);
+  await fs.writeFile(dockerBin, `#!/usr/bin/env node
+const readline=require('readline');let a=process.argv.slice(2);if(a[0]==='--context'||a[0]==='--host')a=a.slice(2);if(a[0]==='context'){console.log(a[1]==='inspect'?'${fakeColimaEndpoint}':'colima');process.exit()}if(a[0]==='info'){console.log('adapter-test-engine');process.exit()}if(a[0]==='version'){console.log('linux/arm64');process.exit()}if(a[0]==='create'){console.log('${id}');process.exit()}if(a[0]==='inspect'){if(a.at(-1).startsWith('rdsh-owner_'))console.log('${id}\\n'+a.at(-1).slice(5));else console.log('exited');process.exit()}if(a[0]==='rm')process.exit(9);if(a[0]==='start'){const input=readline.createInterface({input:process.stdin});input.on('line',line=>{const f=JSON.parse(line);if(f.op==='start')console.log(JSON.stringify({type:'ready',pid:null,identity:null,kind:'docker_linux_container',kernel_id:'${id}',execution_platform:'linux',transport:'colima_docker'}));else if(f.op==='release'){console.log(JSON.stringify({type:'response',id:f.id,result:{released:true}}));console.log(JSON.stringify({type:'stdout',data:Buffer.from('0.2.0-rc.2\\n').toString('base64')}));console.log(JSON.stringify({type:'root_exit',code:0,signal:null}));setTimeout(()=>process.exit(0),20);}});}`);
+  await fs.chmod(dockerBin, 0o755);
+  await run(process.execPath, ["--check", dockerBin]);
+  assert.equal((await run(dockerBin, ["--context", "colima", "context"])).stdout.trim(), "colima");
+  const { adapter } = await setupDockerVersionProbe(
+    t,
+    'process.exit(0);',
+    { dockerBin },
+  );
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const report = await adapter.probe();
+  assert.equal(report.health, "ownership_cleanup_unconfirmed");
+  assert.equal(adapter.capabilities().operations.start.supported, false);
 });
 
 test("a changed executable version revokes capabilities on an already connected adapter", async (t) => {

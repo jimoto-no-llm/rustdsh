@@ -3,6 +3,7 @@ import readline from "node:readline";
 import {
   linuxScope,
   windowsScope,
+  dockerWorkerScope,
   cleanupScope,
 } from "./process-scope-backends.mjs";
 import { readProcessIdentity } from "./process-identity.mjs";
@@ -48,13 +49,20 @@ input.on("line", (line) => {
         )
           throw new Error();
         const stdio = frame.framed ? ["pipe", "pipe", "pipe"] : [3, 4, 5];
-        scope = await (process.platform === "linux"
+        scope = await (frame.docker_worker === true
+          ? dockerWorkerScope(frame)
+          : process.platform === "linux"
           ? linuxScope(frame, stdio)
           : process.platform === "win32" && !frame.framed
             ? windowsScope(frame)
             : Promise.reject(new Error()));
         scope.child.on("exit", (code, signal) =>
-          send({ type: "root_exit", code, signal }),
+          send({ type: "root_exit", code, signal }, () => {
+            // The container is the remote ownership boundary. Once its only
+            // workload exits, end this PID 1 supervisor so Engine inspection
+            // can supply the exact exited proof.
+            if (frame.docker_worker === true) process.exit(0);
+          }),
         );
         scope.child.on("error", () => send({ type: "monitor_error" }));
         if (frame.framed) {
@@ -70,15 +78,19 @@ input.on("line", (line) => {
           );
           return;
         }
-        const observation = await readProcessIdentity(scope.child.pid);
+        const observation = frame.docker_worker === true
+          ? { status: "unavailable", identity: null }
+          : await readProcessIdentity(scope.child.pid);
         if (inputClosed) return;
         send({
           type: "ready",
-          pid: scope.child.pid,
+          pid: frame.docker_worker === true ? null : scope.child.pid,
           identity:
             observation.status === "observed" ? observation.identity : null,
           kind: scope.kind,
           kernel_id: scope.kernel_id,
+          execution_platform: scope.execution_platform ?? null,
+          transport: scope.transport ?? null,
         });
         return;
       }

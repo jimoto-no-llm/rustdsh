@@ -8,6 +8,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { identity } from "../state.mjs";
 import { SessionLedger, attachRecordedSession } from "../session-ledger.mjs";
+import { RunHistory } from "../run-history.mjs";
 
 const exec = promisify(execFile);
 const fixture = fileURLToPath(
@@ -15,6 +16,14 @@ const fixture = fileURLToPath(
 );
 const cli = fileURLToPath(new URL("../cli.mjs", import.meta.url));
 const error = (code) => (value) => value.code === code;
+async function dockerWorkerFixture(root) {
+  const bin = path.join(root, "docker");
+  const endpoint = "unix://" + path.join(os.homedir(), ".colima", "default", "docker.sock");
+  await fs.writeFile(bin, `#!/usr/bin/env node
+let a=process.argv.slice(2);if(a[0]==='--context'||a[0]==='--host')a=a.slice(2);if(a[0]==='context'){console.log('${endpoint}');process.exit()}if(a[0]==='info'){console.log('ledger-test-engine');process.exit()}if(a[0]==='version'){console.log('linux/arm64');process.exit()}`);
+  await fs.chmod(bin, 0o755);
+  return { dockerBin: bin, mountRoots: [root] };
+}
 async function setup(t, git = false) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-ledger-test-"));
   const cwd = path.join(root, "project");
@@ -149,6 +158,104 @@ test("unconfirmed IDs and unavailable launch/provider facts stay explicitly unkn
     error("invalid_record"),
   );
   assert.equal((await ledger.list()).length, 1);
+});
+
+test("a Docker session without a local process record cannot resume until its durable scope is exit-confirmed", async (t) => {
+  const { ledger, project, env } = await setup(t, true);
+  const entry = path.join(project.root, "docker-entry.mjs");
+  await fs.writeFile(entry, "process.exit(0);\n");
+  const command = ["/usr/local/bin/node", entry];
+  const dockerWorker = await dockerWorkerFixture(project.root);
+  const record = await ledger.record({
+    cli_session_id: "docker-session",
+    command,
+    env,
+    dockerWorker,
+  });
+  const history = await RunHistory.open(project);
+  await history.register(record.run_id, record.cli_session_id);
+  await history.scopeIntent(record.run_id);
+  await history.bindScope(record.run_id, {
+    owner_id: history.owner_id,
+    kind: "docker_linux_container",
+    kernel_id: "a".repeat(64),
+    root_identity: null,
+    root_pid: null,
+    execution_platform: "linux",
+    transport: "colima_docker",
+  });
+  await assert.rejects(
+    attachRecordedSession({
+      ledger,
+      run_id: record.run_id,
+      command,
+      env,
+      dockerWorker,
+    }),
+    error("run_descendants_unconfirmed"),
+  );
+});
+
+test("resume refuses a changed Docker backend contract before launching a session", async (t) => {
+  const { ledger, project, env } = await setup(t, true);
+  const entry = path.join(project.root, "docker-entry.mjs");
+  await fs.writeFile(entry, "process.exit(0);\n");
+  const command = ["/usr/local/bin/node", entry];
+  const dockerWorker = await dockerWorkerFixture(project.root);
+  const record = await ledger.record({
+    cli_session_id: "docker-session",
+    command,
+    env,
+    dockerWorker,
+  });
+  await assert.rejects(
+    attachRecordedSession({ ledger, run_id: record.run_id, command, env }),
+    error("execution_backend_changed"),
+  );
+  await assert.rejects(
+    attachRecordedSession({
+      ledger,
+      run_id: record.run_id,
+      command,
+      env,
+      dockerWorker: { ...dockerWorker, mountRoots: [project.root, project.directory] },
+    }),
+    error("execution_backend_changed"),
+  );
+});
+
+test("resume rejects a persisted Colima endpoint or Engine ID change before attachment", async (t) => {
+  const { ledger, project, env } = await setup(t, true);
+  const entry = path.join(project.root, "docker-entry.mjs");
+  await fs.writeFile(entry, "process.exit(0);\n");
+  const command = ["/usr/local/bin/node", entry];
+  const dockerWorker = await dockerWorkerFixture(project.root);
+  const record = await ledger.record({
+    cli_session_id: "docker-session",
+    command,
+    env,
+    dockerWorker,
+  });
+  const original = await fs.readFile(ledger.file, "utf8");
+  for (const [key, value] of [
+    ["endpoint", "unix:///tmp/other-colima.sock"],
+    ["engine_id", "other-engine"],
+  ]) {
+    const disk = JSON.parse(original);
+    disk.runs[0].scope.execution_backend[key] = value;
+    await fs.writeFile(ledger.file, JSON.stringify(disk));
+    const reopened = await SessionLedger.open(project);
+    await assert.rejects(
+      attachRecordedSession({
+        ledger: reopened,
+        run_id: record.run_id,
+        command,
+        env,
+        dockerWorker,
+      }),
+      error("execution_backend_changed"),
+    );
+  }
 });
 
 test("incompatible or malformed disk state is never overwritten or shown as a valid registry", async (t) => {

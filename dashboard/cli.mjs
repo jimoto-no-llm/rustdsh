@@ -59,7 +59,7 @@ rdsh-dashboard retry-history list|inspect --project <directory> [--operation-id 
 rdsh-dashboard checkpoint record|list|inspect|resume|start-new --project <directory> [--run-id <id>] [--checkpoint-id <id>] [--executable <original-dsh>] [--entrypoint <bin.js>] [--verify-native] [--retry-operation-id <id>] [--summary-file <file> --accept-context-loss]
 rdsh-dashboard acceptance define|run|report|inspect --project <directory> --task-id <id> [--criterion-id <id>] [--criteria-file <json>] [--argv-file <json>] [--result-file <json>] [--scope full|partial] [--timeout-ms <ms>] [--image <relative-path>]
 rdsh-dashboard routing bind|inspect|probe|allow-change --project <directory> --run-id <id> [--route-file <json>] [--authorization-file <json>] [--executable <original-dsh>] [--entrypoint <bin.js>]
-rdsh-dashboard session-ledger list|record|resolve|start|resume --project <directory> [--run-id <run_id>] [--task-id <id>] [--session-id <id>] [--label <name>] [--provider <name>] [--cwd <directory>] [--cli <name>] [--executable <original-dsh>] [--entrypoint <bin.js>]
+rdsh-dashboard session-ledger list|record|resolve|start|resume --project <directory> [--run-id <run_id>] [--task-id <id>] [--session-id <id>] [--label <name>] [--provider <name>] [--cwd <directory>] [--cli <name>] [--executable <original-dsh>] [--entrypoint <bin.js>] [--docker-linux-worker --docker-worker-mount-root <directory>]
 rdsh-dashboard reply-consumer inspect|once|serve --project <directory> [--run-id <run_id>] [--command-id <reply_id>] [--executable <original-dsh>] [--entrypoint <bin.js>]
 rdsh-dashboard instruction context --project <directory> --consumer-id <consumer_id>
 rdsh-dashboard instruction submit|resolve --project <directory> --input-file <json>
@@ -156,6 +156,8 @@ const { values, positionals } = parseArgs({
     "selection-revision": { type: "string" },
     "managed-release-id": { type: "string" },
     "managed-revision": { type: "string" },
+    "docker-linux-worker": { type: "boolean" },
+    "docker-worker-mount-root": { type: "string", multiple: true },
     help: { type: "boolean", short: "h" },
   },
 });
@@ -1111,7 +1113,15 @@ try {
       task_id: values["task-id"] || null,
       label: values.label || null,
       provider: values.provider || null,
+      dockerWorker: values["docker-linux-worker"]
+        ? { mountRoots: values["docker-worker-mount-root"] || [] }
+        : null,
     };
+    if (
+      !values["docker-linux-worker"] &&
+      values["docker-worker-mount-root"] !== undefined
+    )
+      throw new Error("--docker-worker-mount-root requires --docker-linux-worker");
     let result;
     if (action === "list") result = { runs: await ledger.list() };
     else if (action === "resolve")

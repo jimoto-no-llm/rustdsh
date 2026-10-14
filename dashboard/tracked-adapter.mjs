@@ -123,7 +123,11 @@ export function trackAdapter(
             "acknowledged",
             "process_exit_confirmed",
           );
-          await history.processExited(runId);
+          // Remote Docker scopes have a typed container identity and no local
+          // workload PID to bind or observe. Their verified scope stage above
+          // records the exit; never substitute the Docker transport PID.
+          if (adapter.ownedScope?.descriptor.root_pid !== null)
+            await history.processExited(runId);
         } catch (error) {
           writeError = error;
         }

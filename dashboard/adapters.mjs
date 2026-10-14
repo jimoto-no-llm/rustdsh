@@ -97,6 +97,7 @@ class CliAdapter extends EventEmitter {
     patch = null,
     owner_id,
     onStopStage = async () => {},
+    dockerWorker = null,
   } = {}) {
     super();
     if (!adapterCatalog().some((a) => a.id === cli))
@@ -123,6 +124,8 @@ class CliAdapter extends EventEmitter {
         throw new AdapterError("invalid_timeout");
     if (onOwnedSpawn !== null && typeof onOwnedSpawn !== "function")
       throw new AdapterError("invalid_spawn_observer");
+    if (dockerWorker !== null && (typeof dockerWorker !== "object" || Array.isArray(dockerWorker)))
+      throw new AdapterError("invalid_execution_backend");
     this.cli = cli;
     this.command = command === null ? null : [...command]; // Operator argv, never a shell.
     this.cwd = cwd;
@@ -134,6 +137,7 @@ class CliAdapter extends EventEmitter {
     this.onOwnedSpawn = onOwnedSpawn;
     this.owner_id = owner_id;
     this.onStopStage = onStopStage;
+    this.dockerWorker = dockerWorker === null ? null : { ...dockerWorker };
     this.version = null;
     this.processVersion = null;
     this.health = cli === "dsh" ? "unverified" : "unsupported";
@@ -284,19 +288,69 @@ class CliAdapter extends EventEmitter {
       return this.capabilities();
     }
     try {
-      const { stdout } = await run(
-        this.command[0],
-        [...this.command.slice(1), "--version"],
-        {
+      let stdout;
+      if (this.dockerWorker) {
+        const scope = await spawnOwnedProcess({
+          command: [...this.command, "--version"],
           cwd: this.cwd,
           env: this.env,
-          windowsHide: true,
-          shell: false,
-          timeout: Math.min(this.requestTimeout, 5000),
-          maxBuffer: 4096,
-          signal,
-        },
-      );
+          dockerWorker: this.dockerWorker,
+          startupTimeoutMs: Math.min(this.requestTimeout, 5000),
+        });
+        const output = [];
+        let outputBytes = 0, oversized = false;
+        scope.child.stdout.on("data", (chunk) => {
+          outputBytes += chunk.length;
+          if (outputBytes > 4096) oversized = true;
+          else output.push(chunk);
+        });
+        const exited = new Promise((resolve, reject) => {
+          scope.child.once("exit", (code, signal) => resolve({ code, signal }));
+          scope.child.once("error", reject);
+        });
+        try {
+          await scope.release();
+          let timer;
+          let outcome;
+          try {
+            outcome = await Promise.race([
+              exited,
+              new Promise((_, reject) => {
+                timer = setTimeout(
+                  () => reject(new Error("timeout")),
+                  Math.min(this.requestTimeout, 5000),
+                );
+              }),
+            ]);
+          } finally {
+            clearTimeout(timer);
+          }
+          if (oversized || outcome?.code !== 0 || outcome?.signal !== null)
+            throw new Error("invalid_probe_exit");
+          stdout = Buffer.concat(output).toString("utf8");
+        } finally {
+          const cleanup = await scope.stop({ gracefulTimeout: 50, killTimeout: 5000 });
+          if (!cleanup.confirmed || !cleanup.resources_released) {
+            const error = new AdapterError("probe_cleanup_unconfirmed");
+            error.code = "probe_cleanup_unconfirmed";
+            throw error;
+          }
+        }
+      } else {
+        ({ stdout } = await run(
+          this.command[0],
+          [...this.command.slice(1), "--version"],
+          {
+            cwd: this.cwd,
+            env: this.env,
+            windowsHide: true,
+            shell: false,
+            timeout: Math.min(this.requestTimeout, 5000),
+            maxBuffer: 4096,
+            signal,
+          },
+        ));
+      }
       const candidate = stdout.trim();
       this.version = /^[0-9]+\.[0-9]+\.[0-9]+(?:-[a-z0-9.-]+)?$/.test(candidate)
         ? candidate
@@ -307,7 +361,10 @@ class CliAdapter extends EventEmitter {
       }
       this.health = connected ? "compatible" : "version_matched";
     } catch (error) {
-      this.health = "cli_unavailable";
+      this.health = ["probe_cleanup_unconfirmed", "cleanup_unconfirmed"].includes(error?.code) ||
+        (this.dockerWorker !== null && error?.code === "monitor_lost")
+        ? "ownership_cleanup_unconfirmed"
+        : "cli_unavailable";
       this.probeFailureCategory =
         error.killed || ["ETIMEDOUT", "ABORT_ERR"].includes(error.code)
           ? "timeout"
@@ -362,6 +419,7 @@ class CliAdapter extends EventEmitter {
       env: this.env,
       owner_id: this.owner_id,
       onStage: this.onStopStage,
+      dockerWorker: this.dockerWorker,
     });
     this.child = this.ownedScope.child;
     // Never forward stderr or peer error strings; either can contain secrets.

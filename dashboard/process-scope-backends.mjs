@@ -24,6 +24,61 @@ export function windowsJobObservation(assigned, pids, accountingEmpty) {
   };
 }
 
+// The container, rather than this supervisor process, is the ownership
+// boundary. The macOS parent verifies exact-container exit through Docker
+// before it can report confirmed empty descendants.
+export async function dockerWorkerScope(config) {
+  if (
+    !/^[a-f0-9]{64}$/.test(config.docker_container_id ?? "") ||
+    !Array.isArray(config.command) ||
+    config.command[0] !== "/usr/local/bin/node" ||
+    config.cwd !== "/workspace"
+  )
+    throw new Error("ownership_unavailable");
+  const child = spawn(
+    "/bin/sh",
+    [
+      "-c",
+      'read -r gate || exit 125; test "$gate" = GO || exit 125; exec "$@"',
+      "rdsh-docker-worker",
+      ...config.command,
+    ],
+    {
+      cwd: config.cwd,
+      env: config.env ?? {},
+      stdio: ["pipe", "pipe", "pipe"],
+      shell: false,
+    },
+  );
+  return {
+    child,
+    release: async () => {
+      child.stdin.write("GO\n");
+    },
+    kind: "docker_linux_container",
+    kernel_id: config.docker_container_id,
+    execution_platform: "linux",
+    transport: "colima_docker",
+    // A running supervisor means the exact container is still live. Only the
+    // parent-side Engine query can prove the container namespace is empty.
+    snapshot: async () => ({
+      status: "running",
+      remaining_pids: [],
+      remaining_count: null,
+      members_truncated: true,
+    }),
+    term: async () => ({
+      status: "unsupported",
+      reason: "docker_worker_graceful_uses_protocol_and_stdin_eof",
+    }),
+    kill: async () => {
+      child.kill("SIGKILL");
+      return { status: "requested", reason: "docker_parent_kill_required" };
+    },
+    close: async () => false,
+  };
+}
+
 export async function linuxScope(config, stdio) {
   const { default: koffi } = await import("koffi");
   const libc = koffi.load("libc.so.6");

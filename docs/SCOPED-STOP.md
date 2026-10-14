@@ -27,6 +27,41 @@ native support blocks profile launch as ownership_unavailable; macOS has no
 backend here. History readers cannot recreate kernel handles. Root absence or
 PID reuse cannot permit resumed/checkpoint runs while descendants are unverified.
 
+### Explicit macOS Docker Linux worker
+
+macOS native execution remains unsupported. An operator may instead select the
+separate Linux worker for a command that is valid in the pinned Node image:
+
+```sh
+node dashboard/cli.mjs session-ledger start --project /absolute/project \
+  --cwd /absolute/project --executable /usr/local/bin/node \
+  --entrypoint /absolute/project/worker-entry.mjs \
+  --docker-linux-worker --docker-worker-mount-root /absolute/project
+```
+
+`--docker-linux-worker` is an explicit platform change, never a Darwin fallback.
+Each `--docker-worker-mount-root` is an operator-selected absolute root; the
+worker rejects a cwd or entrypoint outside it and never infers or mounts `HOME`.
+The worker accepts only `/usr/local/bin/node` from its pinned
+`node@sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392`
+image. A host Mach-O executable is therefore rejected rather than translated.
+
+The Dashboard creates one unprivileged, network-disabled container with an
+exact retained ID. It mounts the selected workspace and its fixed supervisor
+only, never a Docker socket or the host PID namespace. Workload argv and env
+travel through the attached framed stdin after container creation, so no
+workload environment is placed in Docker create arguments or metadata. The
+Docker client uses its own host environment; workload `DOCKER_*` values cannot
+redirect it.
+
+The history descriptor records `kind=docker_linux_container`,
+`execution_platform=linux`, `transport=colima_docker`, and the exact container
+ID. Its `root_pid` and `root_identity` are null: a macOS Docker-client PID is
+not a Linux workload identity. The stop result is confirmed only after Docker
+reports that this exact started container is stopped; it is then removed by its
+exact ID. Daemon/monitor ambiguity stays unverifiable. Native macOS results and
+selected Linux-worker results must be reported separately.
+
 Provision a delegated service for non-root Linux operation. CI runs tests in a
 unique transient service with Delegate=yes and DelegateSubgroup=supervisor under
 the existing runner account. It does not run test payloads as root or change other
