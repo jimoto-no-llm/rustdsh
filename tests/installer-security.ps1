@@ -9,9 +9,11 @@ $priorNoChecksum = $env:RDSH_NO_CHECKSUM
 $env:RDSH_RELEASE_BASE = 'https://fixture.invalid/releases'
 $env:RDSH_RELEASE_DIGESTS = $null
 $env:RDSH_NO_CHECKSUM = $null
-$registryUrl = 'https://raw.githubusercontent.com/jimoto-no-llm/rustdsh/main/release-digests.tsv'
+# install.ps1 reads the Windows-only ledger; the four Unix archives stay in
+# release-digests.tsv, which the published installers keep reading.
+$registryUrl = 'https://raw.githubusercontent.com/jimoto-no-llm/rustdsh/main/release-digests-windows.tsv'
 $asset = 'rdsh-windows-x64.zip'
-$unixAssets = @('rdsh-linux-x64.tar.gz', 'rdsh-linux-x64-musl.tar.gz', 'rdsh-macos-arm64.tar.gz', 'rdsh-macos-x64.tar.gz')
+$unixAsset = 'rdsh-macos-x64.tar.gz'
 
 # A real single-member zip: the installer lists the archive before extracting
 # it. The extraction stub below is what stops the fixture installing anything.
@@ -59,13 +61,13 @@ function Get-FileHash {
   Microsoft.PowerShell.Utility\Get-FileHash @PSBoundParameters
 }
 
-# Registry fixtures mirror the real release-digests.tsv shape: a latest row plus
-# one row per asset.
+# Registry fixtures mirror the real release-digests-windows.tsv shape: a latest
+# row plus the Windows archive row install.ps1 knows about.
 function New-Registry([string]$Latest, [string[]]$Rows) {
   return @('# fixture registry', "latest $Latest") + $Rows
 }
-function New-UnixRows([string]$Version, [string]$Digest) {
-  foreach ($name in $unixAssets) { "$Version $name $Digest" }
+function New-AssetRows([string]$Version, [string]$Digest) {
+  return @("$Version $asset $Digest")
 }
 function Test-AssetRequested {
   return (@($global:RdshInstallerSecurityFixture.requests | Where-Object { $_ -match 'rdsh-windows-x64\.zip$' }).Count -ne 0)
@@ -80,11 +82,13 @@ function Invoke-Installer([hashtable]$Extra) {
 }
 
 try {
-  # The Windows release path verifies the archive against the same trusted
-  # registry as install.sh, fetched from the canonical URL. The release
+  # The Windows release path verifies the archive against its own trusted
+  # ledger, fetched from the canonical URL. The four Unix archives stay in
+  # release-digests.tsv so the published installers keep reading a Unix-only
+  # file; this ledger names nothing but the Windows archive. The release
   # origin's .sha256 sidecar must never authorize a payload, and every refusal
   # happens before the archive is extracted.
-  $rows = @(New-UnixRows -Version 'v9.9.9' -Digest $goodDigest) + "v9.9.9 $asset $goodDigest"
+  $rows = New-AssetRows -Version 'v9.9.9' -Digest $goodDigest
   $global:RdshInstallerSecurityFixture.registry = New-Registry -Latest 'v9.9.9' -Rows $rows
   $before = $global:RdshInstallerSecurityFixture.extractions
   $caught = Invoke-Installer -Extra @{}
@@ -93,26 +97,48 @@ try {
   if ($requests.Count -ne 2 -or $requests[0] -cne $registryUrl) { throw "the canonical registry was not the first request: $($requests -join ', ')" }
   if ($requests[1] -cne 'https://fixture.invalid/releases/download/v9.9.9/rdsh-windows-x64.zip') { throw "latest did not resolve through the registry: $($requests -join ', ')" }
   if (@($requests | Where-Object { $_ -like '*.sha256' }).Count -ne 0) { throw 'a release sidecar was requested' }
-  Write-Output 'PASS: the registry pin resolves latest and reaches extraction'
+  Write-Output 'PASS: the Windows registry pin resolves latest and reaches extraction'
 
   # A registry row that pins different bytes cannot authorize the archive.
-  $rows = @(New-UnixRows -Version 'v9.9.9' -Digest $goodDigest) + "v9.9.9 $asset $zeroDigest"
+  $rows = New-AssetRows -Version 'v9.9.9' -Digest $zeroDigest
   $global:RdshInstallerSecurityFixture.registry = New-Registry -Latest 'v9.9.9' -Rows $rows
   $before = $global:RdshInstallerSecurityFixture.extractions
   $caught = Invoke-Installer -Extra @{}
   if ($global:RdshInstallerSecurityFixture.extractions -ne $before -or $caught -notmatch 'checksum mismatch') { throw "a registry checksum mismatch did not block before extraction: $caught" }
   Write-Output 'PASS: a registry checksum mismatch blocks before extraction'
 
-  # An archive the registry does not pin is refused before the download.
-  $global:RdshInstallerSecurityFixture.registry = New-Registry -Latest 'v9.9.9' -Rows (New-UnixRows -Version 'v9.9.9' -Digest $goodDigest)
+  # A ledger whose latest row does not pin the Windows archive is refused as a
+  # whole, before any download.
+  $global:RdshInstallerSecurityFixture.registry = New-Registry -Latest 'v9.9.9' -Rows @()
   $before = $global:RdshInstallerSecurityFixture.extractions
   $caught = Invoke-Installer -Extra @{}
-  if ($global:RdshInstallerSecurityFixture.extractions -ne $before -or $caught -notmatch 'no pinned checksum for release v9\.9\.9 asset') { throw "an unpinned Windows archive was not refused: $caught" }
+  if ($global:RdshInstallerSecurityFixture.extractions -ne $before -or $caught -notmatch 'digest registry is invalid') { throw "a ledger without a Windows pin was not refused: $caught" }
+  if (Test-AssetRequested) { throw 'a ledger without a Windows pin still downloaded the archive' }
+  Write-Output 'PASS: a ledger without a Windows pin is refused before download'
+
+  # The Windows ledger is Windows-only: a Unix row belongs to
+  # release-digests.tsv and makes this whole file invalid, so a stray copy of
+  # the old shared shape fails closed instead of widening the asset set.
+  $rows = New-AssetRows -Version 'v9.9.9' -Digest $goodDigest
+  $global:RdshInstallerSecurityFixture.registry = New-Registry -Latest 'v9.9.9' -Rows ($rows + "v9.9.9 $unixAsset $goodDigest")
+  $before = $global:RdshInstallerSecurityFixture.extractions
+  $caught = Invoke-Installer -Extra @{}
+  if ($global:RdshInstallerSecurityFixture.extractions -ne $before -or $caught -notmatch 'digest registry is invalid') { throw "a Unix row in the Windows ledger was not refused: $caught" }
+  if (Test-AssetRequested) { throw 'a ledger with a Unix row still downloaded the archive' }
+  Write-Output 'PASS: a Unix row in the Windows ledger is refused'
+
+  # An explicit -Version the ledger does not pin is refused before the
+  # download; the latest row only covers the release it names.
+  $rows = New-AssetRows -Version 'v9.9.9' -Digest $goodDigest
+  $global:RdshInstallerSecurityFixture.registry = New-Registry -Latest 'v9.9.9' -Rows $rows
+  $before = $global:RdshInstallerSecurityFixture.extractions
+  $caught = Invoke-Installer -Extra @{ Version = 'v9.9.8' }
+  if ($global:RdshInstallerSecurityFixture.extractions -ne $before -or $caught -notmatch 'no pinned checksum for release v9\.9\.8 asset') { throw "an unpinned Windows archive was not refused: $caught" }
   if (Test-AssetRequested) { throw 'an unpinned release asset was downloaded' }
   Write-Output 'PASS: an unpinned Windows archive is refused before download'
 
   # A malformed registry is refused as a whole, before any download.
-  $rows = @(New-UnixRows -Version 'v9.9.9' -Digest $goodDigest) + "v9.9.9 $asset $('a' * 63)"
+  $rows = New-AssetRows -Version 'v9.9.9' -Digest ('a' * 63)
   $global:RdshInstallerSecurityFixture.registry = New-Registry -Latest 'v9.9.9' -Rows $rows
   $before = $global:RdshInstallerSecurityFixture.extractions
   $caught = Invoke-Installer -Extra @{}
@@ -121,7 +147,7 @@ try {
   Write-Output 'PASS: a malformed registry is refused before download'
 
   # A repeated version/asset pair is malformed too.
-  $rows = @(New-UnixRows -Version 'v9.9.9' -Digest $goodDigest) + "v9.9.9 $asset $goodDigest" + "v9.9.9 $asset $goodDigest"
+  $rows = (New-AssetRows -Version 'v9.9.9' -Digest $goodDigest) + (New-AssetRows -Version 'v9.9.9' -Digest $goodDigest)
   $global:RdshInstallerSecurityFixture.registry = New-Registry -Latest 'v9.9.9' -Rows $rows
   $before = $global:RdshInstallerSecurityFixture.extractions
   $caught = Invoke-Installer -Extra @{}
@@ -131,10 +157,10 @@ try {
   # A remote release base can never name the registry: a hostile local copy is
   # ignored and the canonical URL is what gets fetched.
   $hostileRegistry = Join-Path $taskRoot 'hostile-digests.tsv'
-  $hostileRows = @(New-UnixRows -Version 'v9.9.9' -Digest $zeroDigest) + "v9.9.9 $asset $zeroDigest"
+  $hostileRows = New-AssetRows -Version 'v9.9.9' -Digest $zeroDigest
   Set-Content -LiteralPath $hostileRegistry -Value (New-Registry -Latest 'v9.9.9' -Rows $hostileRows)
   $env:RDSH_RELEASE_DIGESTS = $hostileRegistry
-  $rows = @(New-UnixRows -Version 'v9.9.9' -Digest $goodDigest) + "v9.9.9 $asset $goodDigest"
+  $rows = New-AssetRows -Version 'v9.9.9' -Digest $goodDigest
   $global:RdshInstallerSecurityFixture.registry = New-Registry -Latest 'v9.9.9' -Rows $rows
   $before = $global:RdshInstallerSecurityFixture.extractions
   $caught = Invoke-Installer -Extra @{}
@@ -145,7 +171,7 @@ try {
   # Control: the same override is honoured for a file:// base, so the gate
   # above fails for the gate and not because the hook never works.
   $env:RDSH_RELEASE_BASE = 'file://' + $taskRoot
-  $localRows = @(New-UnixRows -Version 'v9.9.9' -Digest $goodDigest) + "v9.9.9 $asset $goodDigest"
+  $localRows = New-AssetRows -Version 'v9.9.9' -Digest $goodDigest
   Set-Content -LiteralPath $hostileRegistry -Value (New-Registry -Latest 'v9.9.9' -Rows $localRows)
   $global:RdshInstallerSecurityFixture.registry = $null
   $before = $global:RdshInstallerSecurityFixture.extractions
@@ -159,7 +185,7 @@ try {
   # The version is interpolated into the download URL, so it has to be one
   # value: an anchored match applied line by line would accept the first line
   # of a two-line value and let the rest reach the URL.
-  $rows = @(New-UnixRows -Version 'v9.9.9' -Digest $goodDigest) + "v9.9.9 $asset $goodDigest"
+  $rows = New-AssetRows -Version 'v9.9.9' -Digest $goodDigest
   $global:RdshInstallerSecurityFixture.registry = New-Registry -Latest 'v9.9.9' -Rows $rows
   $brokenVersion = 'v9.9.9' + [Environment]::NewLine + '../../etc'
   $caught = Invoke-Installer -Extra @{ Version = $brokenVersion }

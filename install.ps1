@@ -16,9 +16,11 @@
 #   .\install.ps1 -FromRelease -NoChecksum      # skip SHA-256 only after typing YES at a terminal
 #   .\install.ps1 -Desktop         # also attach the rdsh plugins to DeepSeek Harness Desktop
 # -FromRelease verifies the Windows archive against this repository's
-# release-digests.tsv, fetched from its fixed canonical URL; the release
+# release-digests-windows.tsv, fetched from its fixed canonical URL; the release
 # origin's .sha256 sidecar is never trusted. RDSH_RELEASE_BASE only moves the
-# download, it never moves the registry.
+# download, it never moves the registry. The four Unix archives stay in
+# release-digests.tsv: the published installers reject that file once it names
+# any other asset, so the Windows pin lives in its own ledger.
 param(
   [switch]$AsDsh,
   [switch]$Restore,
@@ -37,7 +39,7 @@ $OriginFile = Join-Path $env:USERPROFILE '.config/rdsh/origin'
 # Trusted digest registry for the release archives. Never make it follow
 # RDSH_RELEASE_BASE or another environment value: the release origin must not
 # choose the digests that verify its own archive.
-$ReleaseDigestsUrl = 'https://raw.githubusercontent.com/jimoto-no-llm/rustdsh/main/release-digests.tsv'
+$ReleaseDigestsUrl = 'https://raw.githubusercontent.com/jimoto-no-llm/rustdsh/main/release-digests-windows.tsv'
 $ReleaseAsset = 'rdsh-windows-x64.zip'
 $ReleaseMember = 'rdsh.exe'
 
@@ -102,21 +104,20 @@ function Get-ReleaseDigestManifest([string]$Destination) {
 }
 
 function Read-ReleaseDigestManifest([string]$Path) {
-  # Parse the trusted registry the way install.sh's
-  # validate_release_digest_manifest does: comments and blank lines are ignored,
-  # exactly one 'latest' row names a stable release, every other row pins a
-  # known asset of a well-formed version with a 64-hex digest, a version/asset
-  # pair never repeats, and the latest release lists all four Unix archives.
-  # install.sh owns those four rows; the Windows asset is accepted on top of
-  # them so the shared registry can gain the Windows pin without editing here.
+  # Parse the trusted Windows registry the way install.sh's
+  # validate_release_digest_manifest parses the Unix one: comments and blank
+  # lines are ignored, exactly one 'latest' row names a stable release, every
+  # other row pins a known asset of a well-formed version with a 64-hex digest,
+  # a version/asset pair never repeats, and the latest release pins the Windows
+  # archive itself. Only $ReleaseAsset is known here: the Unix archives live in
+  # release-digests.tsv, which this file deliberately does not reuse.
   # Returns @{ Latest = 'vX.Y.Z'; Digests = @{ '<version> <asset>' = '<sha256>' } }
   # or $null when the registry must be refused.
   $versionPattern = '\Av[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?\z'
-  $unixAssets = @('rdsh-linux-x64.tar.gz', 'rdsh-linux-x64-musl.tar.gz', 'rdsh-macos-arm64.tar.gz', 'rdsh-macos-x64.tar.gz')
-  $knownAssets = $unixAssets + @($ReleaseAsset)
+  $knownAssets = @($ReleaseAsset)
   $latest = ''
   $latestRows = 0
-  $latestUnixAssets = 0
+  $latestAssets = 0
   $digests = @{}
   $versions = @{}
   foreach ($line in @(Get-Content -LiteralPath $Path)) {
@@ -133,9 +134,9 @@ function Read-ReleaseDigestManifest([string]$Path) {
     if ($digests.ContainsKey($key)) { return $null }
     $digests[$key] = $fields[2]
     $versions[$fields[0]] = $true
-    if ($fields[0] -ceq $latest -and $unixAssets -ccontains $fields[1]) { $latestUnixAssets++ }
+    if ($fields[0] -ceq $latest) { $latestAssets++ }
   }
-  if ($latestRows -ne 1 -or -not $versions.ContainsKey($latest) -or $latestUnixAssets -ne 4) { return $null }
+  if ($latestRows -ne 1 -or -not $versions.ContainsKey($latest) -or $latestAssets -ne 1) { return $null }
   return @{ Latest = $latest; Digests = $digests }
 }
 
@@ -198,7 +199,7 @@ if ($FromRelease) {
     # latest always resolves through the registry; a pinned -Version skips it
     # only under the explicit bypass, which still needs a typed YES below.
     if (-not $NoChecksum -or $Version -ceq 'latest') {
-      $manifestPath = Join-Path $tmpd 'release-digests.tsv'
+      $manifestPath = Join-Path $tmpd 'release-digests-windows.tsv'
       try { Get-ReleaseDigestManifest $manifestPath }
       catch { throw "could not fetch the trusted release digest registry; refusing release install ($($_.Exception.Message))" }
       $manifest = Read-ReleaseDigestManifest $manifestPath

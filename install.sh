@@ -232,14 +232,10 @@ validate_release_digest_manifest() {
     BEGIN { FS = "[ \t]+"; bad = 0; latest_count = 0 }
     /^[ \t]*#/ || NF == 0 { next }
     function valid_version(v) { return v ~ /^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$/ }
-    function unix_asset(a) {
+    function valid_asset(a) {
       return a == "rdsh-linux-x64.tar.gz" || a == "rdsh-linux-x64-musl.tar.gz" ||
         a == "rdsh-macos-arm64.tar.gz" || a == "rdsh-macos-x64.tar.gz"
     }
-    # The Windows archive rides in the same registry so install.ps1 can pin it
-    # too; the "latest" completeness rule below stays the four Unix archives
-    # install.sh installs, so a registry without the Windows row still works.
-    function valid_asset(a) { return unix_asset(a) || a == "rdsh-windows-x64.zip" }
     $1 == "latest" {
       if (NF != 2 || !valid_version($2) || $2 ~ /-/ || latest_count++) bad = 1
       latest = $2
@@ -253,7 +249,7 @@ validate_release_digest_manifest() {
       key = $1 SUBSEP $2
       if (seen[key]++) bad = 1
       versions[$1] = 1
-      if ($1 == latest && unix_asset($2)) latest_assets++
+      if ($1 == latest) latest_assets++
     }
     END {
       if (bad || latest_count != 1 || !versions[latest] || latest_assets != 4) exit 1
