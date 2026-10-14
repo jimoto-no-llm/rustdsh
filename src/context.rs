@@ -2740,6 +2740,26 @@ fn read_distill_session(source: &Path) -> anyhow::Result<(Vec<u8>, bool)> {
     read_zstd_session(source, DISTILL_SESSION_CAP, DISTILL_LINE_LIMIT, None)
 }
 
+/// Path to hand to the `zstd` child process.
+///
+/// `std::fs::canonicalize` returns verbatim paths (`\\?\C:\...`) on Windows, and
+/// the zstd builds shipped for Windows cannot open them: it reports
+/// "can't stat ... No such file or directory". Strip the prefix for the child
+/// while leaving the rest of the path untouched.
+fn zstd_child_path(path: &Path) -> std::borrow::Cow<'_, str> {
+    let text = path.to_string_lossy();
+    #[cfg(windows)]
+    {
+        if let Some(rest) = text.strip_prefix(r"\\?\UNC\") {
+            return std::borrow::Cow::Owned(format!(r"\\{rest}"));
+        }
+        if let Some(rest) = text.strip_prefix(r"\\?\") {
+            return std::borrow::Cow::Owned(rest.to_string());
+        }
+    }
+    text
+}
+
 fn read_zstd_session(
     source: &Path,
     cap: usize,
@@ -2753,7 +2773,7 @@ fn read_zstd_session(
     );
     let mut child = std::process::Command::new("zstd")
         .args(["-dc", "--"])
-        .arg(source)
+        .arg(zstd_child_path(source).as_ref())
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
@@ -2805,7 +2825,7 @@ fn read_zstd_session(
     // zstd writes short diagnostics; keep them for the error instead of
     // discarding the only explanation of a non-zero exit.
     let mut note = Vec::new();
-    if let Some(mut pipe) = zstd_stderr {
+    if let Some(pipe) = zstd_stderr {
         use std::io::Read;
         let _ = pipe.take(4096).read_to_end(&mut note);
     }
