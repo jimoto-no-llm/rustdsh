@@ -249,13 +249,15 @@ rdsh provider list                                           # プリセット�
 
 ### エージェント実行の安全な隔離
 
-委譲したエージェントツールは既定で通常のファイル読み書きができます。Linux（bubblewrap と prlimit がある環境）では `--share-file` で明示的に共有したファイルだけに限定されます：
+委譲したエージェントツールは既定で通常のファイル読み書きができます。`--share-file` で隔離されるのは **`rdsh_inspect` だけ**です。Linux（bubblewrap と prlimit がある環境）では、このツールから見えるのは明示的に共有したファイルだけになります：
 
 ```sh
 rdsh --share-file README.md --share-file src/main.rs --profile tui
 ```
 
-共有ファイルは読み取り専用でマウントされ、ネットワークアクセスもありません。`rdsh features on agent_tool_sandbox` で常時有効化、`rdsh features off agent_tool_sandbox` で無効化、`RDSH_SECURITY=1` で強制できます。
+`rdsh_inspect` から共有ファイルは読み取り専用で見え、ネットワークアクセスもありません。`rdsh features on agent_tool_sandbox` で常時有効化、`rdsh features off agent_tool_sandbox` で無効化、`RDSH_SECURITY=1` で強制できます。
+
+`bash`・`read`・`write`・`run_code` などその他の DSH ツールは隔離されず、**upstream DSH の権限と承認**に従います。起動時に `[rdsh security] rdsh_inspect is isolated; other DSH tools use upstream permissions` と表示されます。
 
 ### フック監視 (`rdsh guard`)
 
@@ -382,7 +384,7 @@ Linux x86_64 環境での測定値です：
 1. **本家挙動の透過性**: 会話ループやモデル推論は独自実装せず、すべて本家 `dsh` に委譲して互換性を担保します。
 2. **非破壊設計**: トークン計算、検索、ログ圧縮などの読み取り系コマンドは、既存のファイルを一切変更しません。
 3. **明示的な認証管理**: 他アプリの認証情報を無断で同期・送信せず、利用者が明示的に指定したものだけを取り込みます。
-4. **サンドボックス隔離**（オプトイン）: Linux 環境では、`--share-file` で共有したファイルだけを読み取り専用・ネットワークなしで渡すため、ホストの他の領域には触れません。
+4. **サンドボックス隔離**（オプトイン）: Linux 環境では、`--share-file` で共有したファイルだけを読み取り専用・ネットワークなしで `rdsh_inspect` に渡します。その他の DSH ツールは upstream の権限と承認に従います。
 
 ## よくある質問
 

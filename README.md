@@ -242,17 +242,22 @@ Details: [docs/PROVIDERS.md](docs/PROVIDERS.md).
 ### Agent Tool Isolation
 
 Delegated agent tools keep normal file access by default: the model reads and
-writes the project like any other tool. On Linux (with bubblewrap and prlimit)
-you can instead confine them to files you explicitly share:
+writes the project like any other tool. `--share-file` isolates **`rdsh_inspect`
+only**. On Linux (with bubblewrap and prlimit) that tool sees just the files you
+explicitly share:
 
 ```sh
 rdsh --share-file README.md --share-file src/main.rs --profile tui
 ```
 
-Only the shared files are mounted read-only, host files stay out of reach and
-the sandbox has no network. Turn the same boundary on for every run with
-`rdsh features on agent_tool_sandbox` (off again with
+From `rdsh_inspect`, only the shared files are mounted read-only, host files stay
+out of reach and the sandbox has no network. Turn the same boundary on for every
+run with `rdsh features on agent_tool_sandbox` (off again with
 `rdsh features off agent_tool_sandbox`, or force it with `RDSH_SECURITY=1`).
+
+Other DSH tools (`bash`, `read`, `write`, `run_code`, ...) are **not** isolated and
+follow upstream DSH permissions and approvals. Startup prints
+`[rdsh security] rdsh_inspect is isolated; other DSH tools use upstream permissions`.
 
 ### Hook Guard (`rdsh guard`)
 
@@ -391,7 +396,7 @@ Measurements conducted on Linux x86_64:
 1. **Upstream Fidelity**: Never reimplements conversation loops or agent logic; delegates directly to upstream `dsh`.
 2. **Non-Destructive**: Read operations (tokens, search, session listing, compacting) never modify source files.
 3. **Explicit Auth**: Credentials are never sent externally or synced automatically; only user-approved items are imported.
-4. **Tool Sandboxing** (opt-in): On Linux, `--share-file` mounts only the files you share, read-only and without network, so the model never touches the rest of the host.
+4. **Tool Sandboxing** (opt-in): On Linux, `--share-file` mounts only the files you share, read-only and without network, for the `rdsh_inspect` tool. Other DSH tools follow upstream permissions and approvals.
 
 ## FAQ
 
