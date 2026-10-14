@@ -12,6 +12,17 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   of the 2.0.0 that the upstream `dsh-mcp-client` peer pulls in, clearing the
   high-severity GHSA-6qxp-vccf-f47h alert. Runtime resolution is unchanged: the
   plugin uses the host DSH's MCP client.
+- `install.ps1 -FromRelease` verifies the Windows archive against the digests
+  pinned in `release-digests-windows.tsv` instead of the `.sha256` sidecar
+  served next to it, so a release base that serves its own archive can no
+  longer choose the checksum that admits it. The bypass needs `-NoChecksum`
+  plus a typed `YES` at a terminal.
+- The Windows pin lives in its own `release-digests-windows.tsv` ledger because
+  the published v0.3.3 `install.sh` and every `sync-dsh.sh` copy refuse
+  `release-digests.tsv` as a whole once one row names an asset outside the four
+  Unix archives. `release-digests.tsv` therefore stays Unix-only, so
+  `--from-release` and the automatic updater keep working for installs users
+  already have, and `scripts/pin-release-digests.py` updates both ledgers.
 
 ### Added
 

@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
-"""Pin a published release's Unix archive digests into release-digests.tsv.
+"""Pin a published release's archive digests into the two installer registries.
 
-The installer verifies downloads against the registry pinned on main, so a
-release that is never pinned is invisible to install.sh --from-release and to
-the automatic updater even though GitHub publishes it. This script turns that
-follow-up into one reviewed command instead of hand-editing rows.
+The installers verify downloads against the registries pinned on main, so a
+release that is never pinned is invisible to install.sh --from-release, to the
+automatic updater and to install.ps1 -FromRelease even though GitHub publishes
+it. This script turns that follow-up into one reviewed command instead of
+hand-editing rows.
+
+The ledgers are separate on purpose. release-digests.tsv stays Unix-only: the
+published installers (v0.3.1-v0.3.3) read it from the fixed canonical URL and
+refuse the whole file as soon as it names any other asset. The Windows archive
+is pinned in release-digests-windows.tsv, which only install.ps1 reads.
 
 Usage:
-    python3 scripts/pin-release-digests.py vX.Y.Z [--registry release-digests.tsv]
+    python3 scripts/pin-release-digests.py vX.Y.Z
     python3 scripts/pin-release-digests.py vX.Y.Z --from-json assets.json
     python3 scripts/pin-release-digests.py vX.Y.Z --dry-run
 """
@@ -22,15 +28,28 @@ import sys
 from pathlib import Path
 
 REPO = "jimoto-no-llm/rustdsh"
-ASSETS = (
+UNIX_REGISTRY = Path("release-digests.tsv")
+WINDOWS_REGISTRY = Path("release-digests-windows.tsv")
+UNIX_ASSETS = (
     "rdsh-linux-x64.tar.gz",
     "rdsh-linux-x64-musl.tar.gz",
     "rdsh-macos-arm64.tar.gz",
     "rdsh-macos-x64.tar.gz",
 )
-HEADER = (
+WINDOWS_ASSET = "rdsh-windows-x64.zip"
+ASSETS = UNIX_ASSETS + (WINDOWS_ASSET,)
+UNIX_HEADER = (
     "# Trusted SHA-256 registry for the exact release archives supported by install.sh.",
     "# Regenerate each entry from the published release asset digest; do not copy .sha256 sidecars.",
+)
+WINDOWS_HEADER = (
+    "# Trusted SHA-256 registry for the windows release archive (install.ps1).",
+    "# Regenerate each entry from the published release asset digest; do not copy .sha256 sidecars.",
+)
+# (path, header, assets) per ledger the installers read.
+LEDGERS = (
+    (UNIX_REGISTRY, UNIX_HEADER, UNIX_ASSETS),
+    (WINDOWS_REGISTRY, WINDOWS_HEADER, (WINDOWS_ASSET,)),
 )
 TAG_RE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$")
 DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -83,12 +102,12 @@ def load_assets_json(path: Path) -> dict:
     return digests
 
 
-def require_assets(tag: str, digests: dict) -> list:
-    missing = [name for name in ASSETS if name not in digests]
+def require_assets(tag: str, digests: dict, assets=UNIX_ASSETS) -> list:
+    missing = [name for name in assets if name not in digests]
     if missing:
         raise SystemExit(f"{tag}: release is missing required assets: {', '.join(missing)}")
     rows = []
-    for name in ASSETS:
+    for name in assets:
         digest = digests[name]
         if not DIGEST_RE.match(digest):
             raise SystemExit(f"{tag}: {name} has an unusable digest: {digest!r}")
@@ -120,9 +139,9 @@ def split_registry(text: str) -> tuple:
     return comments, latest, versions
 
 
-def render_registry(tag: str, versions: dict) -> str:
+def render_registry(tag: str, versions: dict, assets=UNIX_ASSETS, header=UNIX_HEADER) -> str:
     ordered = sorted(versions, key=parse_tag, reverse=True)
-    lines = list(HEADER)
+    lines = list(header)
     lines.append(f"latest {tag}")
     for version in ordered:
         rows = sorted(
@@ -150,31 +169,48 @@ def channel_for(latest, tag: str) -> str:
     return max(latest, tag, key=parse_tag)
 
 
-def pin(text: str, tag: str, digests: dict) -> str:
+def pin(text: str, tag: str, digests: dict, assets=UNIX_ASSETS, header=UNIX_HEADER) -> str:
     parse_tag(tag)
-    rows = require_assets(tag, digests)
+    rows = require_assets(tag, digests, assets)
     comments, latest, versions = split_registry(text)
-    if comments != list(HEADER):
-        raise SystemExit("registry header changed; update HEADER in this script first")
+    if comments != list(header):
+        raise SystemExit("registry header changed; update the header in this script first")
     versions[tag] = rows
-    return render_registry(channel_for(latest, tag), versions)
+    return render_registry(channel_for(latest, tag), versions, assets, header)
+
+
+def pin_all(tag: str, digests: dict, ledgers=LEDGERS) -> list:
+    """Render every ledger for one release before anything is written."""
+    updates = []
+    for path, header, assets in ledgers:
+        updated = pin(path.read_text(encoding="utf-8"), tag, digests, assets, header)
+        updates.append((path, updated, assets))
+    return updates
 
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("tag", help="published stable tag, e.g. v0.3.4")
-    parser.add_argument("--registry", type=Path, default=Path("release-digests.tsv"))
+    parser.add_argument("--registry", type=Path, default=UNIX_REGISTRY,
+                        help=f"Unix ledger to update (default: {UNIX_REGISTRY})")
+    parser.add_argument("--windows-registry", type=Path, default=WINDOWS_REGISTRY,
+                        help=f"Windows ledger to update (default: {WINDOWS_REGISTRY})")
     parser.add_argument("--from-json", type=Path, help="offline asset list instead of gh api")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
 
     digests = load_assets_json(args.from_json) if args.from_json else fetch_asset_digests(args.tag)
-    updated = pin(args.registry.read_text(encoding="utf-8"), args.tag, digests)
+    ledgers = ((args.registry, UNIX_HEADER, UNIX_ASSETS),
+               (args.windows_registry, WINDOWS_HEADER, (WINDOWS_ASSET,)))
+    updates = pin_all(args.tag, digests, ledgers)
     if args.dry_run:
-        sys.stdout.write(updated)
+        for path, updated, _assets in updates:
+            sys.stdout.write(f"# --- {path} (dry run) ---\n{updated}")
         return 0
-    args.registry.write_text(updated, encoding="utf-8")
-    print(f"pinned {args.tag} in {args.registry} ({len(ASSETS)} archives)")
+    for path, updated, _assets in updates:
+        path.write_text(updated, encoding="utf-8")
+    summary = ", ".join(f"{path} ({len(assets)} archives)" for path, _text, assets in updates)
+    print(f"pinned {args.tag} in {summary}")
     return 0
 
 

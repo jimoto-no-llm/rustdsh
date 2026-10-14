@@ -78,8 +78,25 @@ fn service_unit(script: &Path) -> String {
          IOSchedulingClass=idle\n\
          CPUWeight=10\n\
          ExecStart={}\n",
-        script.display()
+        exec_start_path(script)
     )
+}
+
+/// Quote for systemd's command-line syntax.
+fn exec_start_path(script: &Path) -> String {
+    let mut quoted = String::from("\"");
+    for character in script.display().to_string().chars() {
+        match character {
+            '"' | '\\' => {
+                quoted.push('\\');
+                quoted.push(character);
+            }
+            '%' => quoted.push_str("%%"),
+            _ => quoted.push(character),
+        }
+    }
+    quoted.push('"');
+    quoted
 }
 
 fn timer_unit() -> String {

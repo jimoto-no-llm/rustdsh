@@ -324,3 +324,53 @@ grep -q "invalid release version" "$TEST_ROOT/version.log" || {
   fail "a multi-line release version was not rejected before the URL was built"
 }
 ok "a multi-line release version is refused before it reaches the URL"
+
+# install.ps1 runs on Windows CI (tests/installer-security.ps1), so this
+# Linux/macOS job asserts the source-level invariants that keep the Windows
+# release path on its own trusted registry: a fixed canonical URL, the release
+# origin's sidecar never fetched, an unpinned asset refused, and a bypass that
+# needs a terminal.
+PS1="$ROOT/install.ps1"
+WINDOWS_LEDGER="$ROOT/release-digests-windows.tsv"
+UNIX_LEDGER="$ROOT/release-digests.tsv"
+grep -q 'https://raw.githubusercontent.com/jimoto-no-llm/rustdsh/main/release-digests-windows.tsv' "$PS1" ||
+  fail "install.ps1 does not name the canonical Windows digest registry"
+if grep -Eq "raw\.githubusercontent\.com[^']*/release-digests\.tsv" "$PS1"; then
+  fail "install.ps1 still reads the Unix ledger"
+fi
+grep -q 'RDSH_RELEASE_DIGESTS' "$PS1" || fail "install.ps1 has no local-registry hook for the offline fixture"
+grep -q 'needs a file:// RDSH_RELEASE_BASE' "$PS1" || fail "install.ps1 does not gate the local registry on a file:// base"
+grep -q 'no pinned checksum for release' "$PS1" || fail "install.ps1 does not refuse an unpinned release asset"
+grep -q 'requires a terminal for confirmation' "$PS1" || fail "install.ps1 does not require a terminal for the checksum bypass"
+if grep -q '\$url\.sha256' "$PS1"; then fail "install.ps1 still fetches a release sidecar"; fi
+ok "install.ps1 keeps the canonical Windows registry, refuses unpinned assets, and gates the bypass"
+
+# The published installers (v0.3.1-v0.3.3) fetch release-digests.tsv from the
+# fixed canonical URL and refuse the whole ledger as soon as a row names an
+# asset outside their four Unix archives, so the Windows pin must never return
+# to that file. sync-dsh.sh shares the same parser and the same URL.
+if grep -Eq '[ \t]rdsh-windows-x64\.zip[ \t]' "$UNIX_LEDGER"; then
+  fail "release-digests.tsv names the Windows archive; published installers reject such a ledger"
+fi
+grep -Eq '[ \t]rdsh-linux-x64\.tar\.gz[ \t]' "$UNIX_LEDGER" ||
+  fail "release-digests.tsv no longer pins the Unix archives"
+grep -q 'main/release-digests.tsv' "$ROOT/sync-dsh.sh" || fail "sync-dsh.sh no longer reads the Unix ledger"
+[ -f "$WINDOWS_LEDGER" ] || fail "release-digests-windows.tsv is missing"
+awk '
+  BEGIN { FS = "[ \t]+"; bad = 0; latest_count = 0 }
+  /^[ \t]*#/ || NF == 0 { next }
+  function valid_version(v) { return v ~ /^v[0-9]+\.[0-9]+\.[0-9]+$/ }
+  $1 == "latest" {
+    if (NF != 2 || !valid_version($2) || latest_count++) bad = 1
+    latest = $2
+    next
+  }
+  {
+    if (NF != 3 || !valid_version($1) || $2 != "rdsh-windows-x64.zip" || length($3) != 64 || $3 ~ /[^0-9a-fA-F]/) bad = 1
+    key = $1 SUBSEP $2
+    if (seen[key]++) bad = 1
+    if ($1 == latest) latest_assets++
+  }
+  END { if (bad || latest_count != 1 || latest_assets != 1) exit 1 }
+' "$WINDOWS_LEDGER" || fail "release-digests-windows.tsv does not pin the Windows archive for its latest row"
+ok "the Unix ledger stays Unix-only and the Windows ledger is Windows-only"
