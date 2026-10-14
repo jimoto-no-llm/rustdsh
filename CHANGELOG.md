@@ -3,6 +3,14 @@
 All notable changes to this project are documented here.
 Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
+## [Unreleased]
+
+### Added
+
+- `rdsh-dashboard agents list|submit|status|result|cancel` runs cursor-agent and
+  devin as detached, cancellable jobs with a read-only default permission and
+  untrusted-data results. See `docs/AGENT-RUNNERS.md`.
+
 ## [0.3.3] - 2026-10-13
 
 ### Security
