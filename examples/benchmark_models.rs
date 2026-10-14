@@ -250,6 +250,8 @@ fn patch(args: &Args, run: &Path, selection: (&str, &str), config: &Value, case:
         providers[provider]["transport"] = json!("sse");
         providers[provider]["cacheRetention"] = json!("none");
     }
+    let fence = json!({"id":"benchmark-fence", "name":Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/model_benchmark/fence.mjs"),
+      "config":{"cwd":cwd,"readable":readable,"writable":writable,"maxRequests":if case == "response" {1} else if case == "read" {2} else {4}}});
     let mut entries = vec![
         json!({"id":"credentials", "config":{"path":args.credentials,"watch":false}}),
         json!({"id":"agent-default-model", "config":{"provider":provider,"model":model,"reasoningEffort":"high"}}),
@@ -257,8 +259,7 @@ fn patch(args: &Args, run: &Path, selection: (&str, &str), config: &Value, case:
         json!({"id":"session-persistence-jsonl", "config":{"root":run.join("sessions")}}),
         json!({"id":"sandbox-policy", "config":{"mode":if case == "rust_fix" {"workspace-write"} else {"read-only"},"workspaceRoot":cwd}}),
         json!({"id":"tools", "config":{"mode":"native"}}),
-        json!({"id":"benchmark-fence", "name":Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/model_benchmark/fence.mjs"),
-          "config":{"cwd":cwd,"readable":readable,"writable":writable,"maxRequests":if case == "response" {1} else if case == "read" {2} else {4}}}),
+        json!({"insert":[fence]}),
     ];
     // Keep core Agent/Session/fs code official; remove unrelated capabilities.
     for id in [
@@ -911,6 +912,45 @@ mod tests {
         expected["cacheRetention"] = json!("none");
         assert_eq!(profile(&selected, "openai-codex"), expected);
         assert_eq!(profile(&selected, "anthropic"), supplied);
+    }
+
+    #[test]
+    fn benchmark_fence_is_inserted_as_a_loadable_plugin() {
+        let args = Args::try_parse_from([
+            "benchmark_models",
+            "--bin",
+            "rdsh",
+            "--original",
+            "dsh",
+            "--credentials",
+            "credentials.yaml",
+            "--catalog",
+            "catalog.json",
+            "--out",
+            "run",
+        ])
+        .unwrap();
+        let overlay = patch(
+            &args,
+            Path::new("run"),
+            ("openai-codex", "gpt-6-sol"),
+            &json!({"models":[{"id":"gpt-6-sol"}]}),
+            "read",
+        );
+        let inserts = overlay
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|entry| entry.get("insert").is_some())
+            .unwrap()["insert"]
+            .as_array()
+            .unwrap();
+        assert_eq!(inserts.len(), 1);
+        assert_eq!(inserts[0]["id"], "benchmark-fence");
+        assert!(inserts[0]["name"]
+            .as_str()
+            .unwrap()
+            .ends_with("tests/model_benchmark/fence.mjs"));
     }
 
     #[test]
