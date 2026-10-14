@@ -4,6 +4,10 @@
 # release base, and must refuse a non-https release base outside the explicit
 # RDSH_TEST_INSECURE_BASE=1 test mode.
 #
+# The DSH tree is discovered by candidate instead of `npm root -g` alone, a
+# missing tree leaves the rdsh release update a success, and a tree npm cannot
+# manage is reported instead of half-updated.
+#
 # SYNC_SCRIPT points the same harness at another revision of the script (used to
 # show that an older revision installs the hostile archive); SCENARIOS selects a
 # subset of the names below.
@@ -73,17 +77,14 @@ printf '{"version":"1.0.0"}\n' >"$NPMROOT/@deepseek-ai/dsh/package.json"
 cat >"$HOME_DIR/.local/bin/npm" <<NPM_EOF
 #!/bin/sh
 case "\$1" in
-  root) echo "$NPMROOT" ;;
+  root) echo "\${RDSH_TEST_NPM_ROOT:-$NPMROOT}" ;;
   view) echo '["1.0.0"]' ;;
   *) exit 1 ;;
 esac
 NPM_EOF
 cat >"$HOME_DIR/.local/bin/node" <<NODE_EOF
 #!/bin/sh
-case "\$1" in
-  -p) echo "1.0.0" ;;
-  *) exec "$REAL_NODE" "\$@" ;;
-esac
+exec "$REAL_NODE" "\$@"
 NODE_EOF
 chmod +x "$HOME_DIR/.local/bin/npm" "$HOME_DIR/.local/bin/node"
 
@@ -146,14 +147,18 @@ STUB_EOF
 
 reset_prefix() { rm -rf "$OUT/bin"; mkdir -p "$OUT/bin"; }
 
-run_sync() { # $1 = log, $2 = registry mode, $3 = RDSH_TEST_INSECURE_BASE, $4 = RDSH_SYNC_VERSION
+run_sync() { # $1 = log, $2 = registry mode, $3 = RDSH_TEST_INSECURE_BASE, $4 = RDSH_SYNC_VERSION, rest = extra VAR=VALUE
   log_file="$1"; registry="$2"; insecure="$3"; version="${4:-}"
+  if [ "$#" -gt 4 ]; then shift 4; else shift "$#"; fi
   : >"$CURL_LOG"
+  SYNC_RC=0
   if ! env -u RDSH_SYNC_FROM_SOURCE -u RDSH_MUSL \
     HOME="$HOME_DIR" NPM_BIN="$HOME_DIR/.local/bin/npm" PREFIX_BIN="$OUT/bin" \
     TMPDIR="$TEST_ROOT/tmp" RDSH_RELEASE_BASE="$BASE" RDSH_TEST_INSECURE_BASE="$insecure" \
     RDSH_TEST_REGISTRY="$registry" RDSH_SYNC_VERSION="${version:-latest}" \
+    "$@" \
     PATH="$SHIM:$PATH" sh "$REPO/sync-dsh.sh" >"$log_file" 2>&1; then
+    SYNC_RC=1
     echo "note: sync-dsh.sh exited non-zero for $log_file" >&2
   fi
 }
@@ -401,6 +406,140 @@ scenario_downgrade() {
   fi
 }
 
+# The DSH tree is not always the one `npm root -g` names: rdsh runs a tree
+# from $HOME/.local/opt. Discovery must find it there (newest tree first) and
+# still update rdsh from the release.
+reset_dsh_trees() { rm -rf "$HOME_DIR/.local/opt" "$HOME_DIR/.npm-global" "$HOME_DIR/.local/lib"; }
+
+scenario_tree_opt() {
+  make_stub "$PKG/good" good
+  make_archive "$PKG/good" "$TEST_ROOT/good.tar.gz"
+  stage_release "$TEST_ROOT/good.tar.gz"
+  write_manifest "$(sum_file "$TEST_ROOT/good.tar.gz")"
+  mkdir -p "$TEST_ROOT/npmroot-empty"
+  reset_dsh_trees
+  old_tree="$HOME_DIR/.local/opt/dsh-old/lib/node_modules/@deepseek-ai/dsh"
+  new_tree="$HOME_DIR/.local/opt/dsh-new/lib/node_modules/@deepseek-ai/dsh"
+  mkdir -p "$old_tree" "$new_tree"
+  printf '{"version":"1.0.0"}\n' >"$old_tree/package.json"
+  printf '{"version":"2.0.0"}\n' >"$new_tree/package.json"
+  touch -t 202001010000 "$old_tree"
+  touch -t 203001010000 "$new_tree"
+  reset_prefix
+  BASE="file://$REL"
+  run_sync "$LOGS/tree-opt.log" fixture 1 "" RDSH_TEST_NPM_ROOT="$TEST_ROOT/npmroot-empty"
+  reset_dsh_trees
+  if [ "$SYNC_RC" -ne 0 ]; then
+    show "$LOGS/tree-opt.log"
+    fail "a DSH tree under ~/.local/opt failed the sync"
+    return 0
+  fi
+  if ! grep -qF "using dsh tree: $new_tree" "$LOGS/tree-opt.log" || ! grep -q "installed=2.0.0" "$LOGS/tree-opt.log"; then
+    show "$LOGS/tree-opt.log"
+    fail "DSH tree discovery did not take the newest ~/.local/opt tree"
+    return 0
+  fi
+  if ! grep -q "rdsh updated OK via release binary" "$LOGS/tree-opt.log"; then
+    show "$LOGS/tree-opt.log"
+    fail "DSH tree discovery stopped the rdsh release update"
+    return 0
+  fi
+  ok "the newest ~/.local/opt DSH tree is discovered without npm root -g"
+}
+
+# DSH_PKG_ROOT is the explicit override and wins over the other candidates.
+scenario_tree_override() {
+  make_stub "$PKG/good" good
+  make_archive "$PKG/good" "$TEST_ROOT/good.tar.gz"
+  stage_release "$TEST_ROOT/good.tar.gz"
+  write_manifest "$(sum_file "$TEST_ROOT/good.tar.gz")"
+  reset_dsh_trees
+  override="$TEST_ROOT/dsh-override"
+  mkdir -p "$override"
+  printf '{"version":"3.0.0"}\n' >"$override/package.json"
+  reset_prefix
+  BASE="file://$REL"
+  run_sync "$LOGS/tree-override.log" fixture 1 "" DSH_PKG_ROOT="$override"
+  if [ "$SYNC_RC" -ne 0 ] || ! grep -qF "using dsh tree: $override" "$LOGS/tree-override.log" \
+    || ! grep -q "installed=3.0.0" "$LOGS/tree-override.log"; then
+    show "$LOGS/tree-override.log"
+    fail "DSH_PKG_ROOT did not select the override tree"
+    return 0
+  fi
+  ok "DSH_PKG_ROOT selects the tree to inspect"
+}
+
+# A tree outside npm's global root cannot be updated by `npm install -g`; the
+# sync must say so instead of installing somewhere else and failing the verify.
+scenario_tree_unmanaged() {
+  make_stub "$PKG/good" good
+  make_archive "$PKG/good" "$TEST_ROOT/good.tar.gz"
+  stage_release "$TEST_ROOT/good.tar.gz"
+  write_manifest "$(sum_file "$TEST_ROOT/good.tar.gz")"
+  mkdir -p "$TEST_ROOT/npmroot-empty"
+  reset_dsh_trees
+  tree="$HOME_DIR/.local/opt/dsh-manual/lib/node_modules/@deepseek-ai/dsh"
+  mkdir -p "$tree"
+  printf '{"version":"0.5.0"}\n' >"$tree/package.json"
+  reset_prefix
+  BASE="file://$REL"
+  run_sync "$LOGS/tree-unmanaged.log" fixture 1 "" RDSH_TEST_NPM_ROOT="$TEST_ROOT/npmroot-empty"
+  reset_dsh_trees
+  if [ "$SYNC_RC" -ne 0 ]; then
+    show "$LOGS/tree-unmanaged.log"
+    fail "an npm-unmanaged DSH tree failed the whole sync"
+    return 0
+  fi
+  if ! grep -q "outside npm's global root" "$LOGS/tree-unmanaged.log" \
+    || grep -q "npm install failed" "$LOGS/tree-unmanaged.log"; then
+    show "$LOGS/tree-unmanaged.log"
+    fail "an npm-unmanaged DSH tree was not reported as skipped"
+    return 0
+  fi
+  if [ ! -x "$OUT/bin/rdsh" ] || ! grep -q "rdsh updated OK via release binary" "$LOGS/tree-unmanaged.log"; then
+    show "$LOGS/tree-unmanaged.log"
+    fail "an npm-unmanaged DSH tree stopped the rdsh release update"
+    return 0
+  fi
+  ok "an npm-unmanaged DSH tree is reported, not installed into"
+}
+
+# No DSH tree anywhere: the release update is still the run's success, and the
+# script says what it skipped instead of failing (the reported banner failure).
+scenario_tree_missing() {
+  make_stub "$PKG/good" good
+  make_archive "$PKG/good" "$TEST_ROOT/good.tar.gz"
+  stage_release "$TEST_ROOT/good.tar.gz"
+  write_manifest "$(sum_file "$TEST_ROOT/good.tar.gz")"
+  mkdir -p "$TEST_ROOT/npmroot-empty"
+  reset_dsh_trees
+  reset_prefix
+  BASE="file://$REL"
+  run_sync "$LOGS/tree-missing.log" fixture 1 "" RDSH_TEST_NPM_ROOT="$TEST_ROOT/npmroot-empty"
+  if [ "$SYNC_RC" -ne 0 ]; then
+    show "$LOGS/tree-missing.log"
+    fail "a missing DSH tree failed the sync"
+    return 0
+  fi
+  if ! grep -q "dsh tree not found" "$LOGS/tree-missing.log" || ! grep -q "DSH skipped" "$LOGS/tree-missing.log"; then
+    show "$LOGS/tree-missing.log"
+    fail "a missing DSH tree was not reported as skipped"
+    return 0
+  fi
+  if grep -q "dsh package not found" "$LOGS/tree-missing.log"; then
+    show "$LOGS/tree-missing.log"
+    fail "a missing DSH tree still reported the old hard failure"
+    return 0
+  fi
+  if [ ! -x "$OUT/bin/rdsh" ] || ! cmp -s "$OUT/bin/rdsh" "$PKG/good/rdsh" \
+    || ! grep -q "rdsh updated OK via release binary" "$LOGS/tree-missing.log"; then
+    show "$LOGS/tree-missing.log"
+    fail "a missing DSH tree blocked the rdsh release update"
+    return 0
+  fi
+  ok "a missing DSH tree skips DSH and still installs the release"
+}
+
 scenario_static() {
   if ! grep -q "^RELEASE_DIGESTS_URL=\"$REGISTRY_URL\"\$" "$REPO/sync-dsh.sh"; then
     fail "digest registry URL is not the canonical literal"
@@ -417,7 +556,7 @@ scenario_static() {
   ok "digest registry origin is a fixed literal and archives are version-pinned"
 }
 
-for name in hostile pinned http redirect registry_unreachable registry_invalid unpinned downgrade static; do
+for name in hostile pinned http redirect registry_unreachable registry_invalid unpinned downgrade tree_opt tree_override tree_unmanaged tree_missing static; do
   case "$SCENARIOS" in
     all | *"$name"*) "scenario_$name" ;;
   esac
