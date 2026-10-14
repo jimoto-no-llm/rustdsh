@@ -14,6 +14,12 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   (<https://github.com/hikarioyama/Smart-DSH>, MIT) and ship only that responsive
   layout — not Smart-DSH's notifications, Esc handling or task hub. See
   [README](plugins/rdsh-mobile-ui/README.md).
+- `rdsh-dashboard subagents plan` turns a declared use case into a deterministic
+  dispatch plan for delegated subagents: role and model tier per item, bounded
+  items and weight per agent, waves limited by `max_parallel`, and explicit
+  warnings instead of guessed tiers. It starts no agent and writes nothing; the
+  existing `workers prepare` still owns the checkout allocation
+  (`docs/SUBAGENT-PLANNING.md`).
 
 ## [0.3.3] - 2026-10-13
 

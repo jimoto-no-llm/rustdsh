@@ -300,17 +300,33 @@ fn grep_parallel(
 }
 
 fn truncate(s: &str, n: usize) -> String {
-    if s.len() <= n {
-        return s.to_string();
+    let mut rest = s.chars();
+    let mut t: String = rest.by_ref().take(n).collect();
+    if rest.next().is_some() {
+        t.push('>');
     }
-    let mut t: String = s.chars().take(n).collect();
-    t.push('>');
     t
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 切り詰めは文字数基準。バイト長で判定すると、240文字以下の非ASCII行に
+    /// 偽のマーカーが付く（日本語81文字＝243バイト）。
+    #[test]
+    fn truncate_marks_only_when_chars_are_actually_cut() {
+        let cjk = "あ".repeat(81);
+        assert_eq!(truncate(&cjk, 240), cjk);
+        assert_eq!(
+            truncate(&"a".repeat(241), 240),
+            format!("{}>", "a".repeat(240))
+        );
+        assert_eq!(
+            truncate(&"あ".repeat(241), 240),
+            format!("{}>", "あ".repeat(240))
+        );
+    }
 
     #[test]
     fn worker_cap() {
