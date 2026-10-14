@@ -10,6 +10,7 @@ mod file_security;
 mod guard;
 mod inspect;
 mod local_http;
+mod opencode_header;
 mod passthrough;
 mod rdsh_config;
 mod search;
