@@ -59,6 +59,7 @@ mod serve;
 mod setup_web;
 mod shutdown;
 mod slim;
+mod subagent_plan;
 mod token_handoff;
 mod tokens;
 mod tool_security;
@@ -70,7 +71,7 @@ mod websearch;
     name = "rdsh",
     version,
     about = "Rust fast launcher for dsh (safe: native fast-paths + passthrough)",
-    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|auth|setup|context|settings|features|provider|update|dump-config|boot|serial-proxy)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh provider add hai --model deepseek-v4-flash   register HAI as a dsh route\n  rdsh provider add sarashina    register Sarashina (SARASHINA_API_KEY; mini and nano built in)\n  rdsh provider add local-openai --base-url http://host:8080/v1 --discover --no-key\n  rdsh provider list              presets and per-profile route/key status\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh desktop status             detect the Desktop (Electron) app and its reserved profile\n  rdsh desktop install            attach the bundled rdsh plugins to that profile\n  rdsh --passthrough tui          no slim env; mandatory tool isolation remains\n  rdsh --dry-run tui -- --resume abc   show what would exec"
+    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|auth|setup|context|settings|features|subagents|provider|update|dump-config|boot|serial-proxy)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh provider add hai --model deepseek-v4-flash   register HAI as a dsh route\n  rdsh provider add sarashina    register Sarashina (SARASHINA_API_KEY; mini and nano built in)\n  rdsh provider add local-openai --base-url http://host:8080/v1 --discover --no-key\n  rdsh provider list              presets and per-profile route/key status\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh desktop status             detect the Desktop (Electron) app and its reserved profile\n  rdsh desktop install            attach the bundled rdsh plugins to that profile\n  rdsh --passthrough tui          no slim env; mandatory tool isolation remains\n  rdsh --dry-run tui -- --resume abc   show what would exec"
 )]
 struct Cli {
     /// Explicitly share a project file with isolated model tools (repeatable).
@@ -329,6 +330,12 @@ enum Commands {
         #[arg(long = "json")]
         json: bool,
     },
+    /// Deterministic subagent dispatch planning: read one request file and
+    /// print the plan; starts no agent, calls no provider and writes nothing
+    Subagents {
+        #[command(subcommand)]
+        action: SubagentsAction,
+    },
     /// DeepSeek Harness Desktop (Electron): detect the app, its reserved
     /// profile and its bundled command runtime, then attach rdsh plugins
     #[command(name = "desktop")]
@@ -384,6 +391,19 @@ enum FeaturesAction {
     On { id: String },
     /// Disable one feature: rdsh features off discord
     Off { id: String },
+}
+
+#[derive(Subcommand, Debug)]
+enum SubagentsAction {
+    /// Build a dispatch plan from a request JSON file (docs/SUBAGENT-PLANNING.md)
+    Plan {
+        /// Request JSON file
+        #[arg(long = "input-file")]
+        input_file: String,
+        /// JSON output (the default; accepted for script compatibility)
+        #[arg(long = "json")]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -509,6 +529,7 @@ const NATIVE_FIRST: &[&str] = &[
     "features",
     "update",
     "serial-proxy",
+    "subagents",
 ];
 
 fn invoked_as_dsh() -> bool {
@@ -554,14 +575,15 @@ fn main() {
             serde_json::to_string(&cli.share_file).unwrap(),
         );
     }
-    // Explicit recovery must work even when the current settings cannot be read.
-    // Every other command still fails closed on a corrupt settings document.
+    // Recovery and the pure subagent planner do not depend on settings.
+    // Commands that use settings still fail closed on a corrupt document.
     let cfg = if matches!(
         &cli.command,
         Some(Commands::Settings {
             action: SettingsAction::Init { force: true }
         })
-    ) {
+    ) || matches!(&cli.command, Some(Commands::Subagents { .. }))
+    {
         rdsh_config::RdshSettings::default()
     } else {
         rdsh_config::load()
@@ -827,6 +849,9 @@ fn main() {
             None => features_list(&cfg, json),
             Some(FeaturesAction::On { id }) => features_toggle(&id, true),
             Some(FeaturesAction::Off { id }) => features_toggle(&id, false),
+        },
+        Some(Commands::Subagents { action }) => match action {
+            SubagentsAction::Plan { input_file, .. } => subagent_plan::cmd_plan(&input_file),
         },
         Some(Commands::Desktop { action, json }) => match action {
             None => desktop::cmd_status(json),

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { parseArgs } from "node:util";
 import fs from "node:fs/promises";
+import { constants } from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { identity, stateHome } from "./state.mjs";
@@ -36,7 +37,6 @@ import { fileURLToPath } from "node:url";
 import { Releases } from "./releases.mjs";
 import { IntegrationQueue } from "./integration.mjs";
 import { WorkerWorkspaces } from "./workers.mjs";
-import { planSubagents } from "./subagent-plan.mjs";
 import {
   loopbackBase,
   recordTunnel,
@@ -206,6 +206,39 @@ async function localJson(file) {
   } finally {
     await handle.close();
   }
+}
+async function nativeRdsh() {
+  const override = process.env.RDSH_BIN;
+  if (override) {
+    if (!path.isAbsolute(override)) throw new Error("RDSH_BIN must be an absolute path");
+    return override;
+  }
+  const name = process.platform === "win32" ? "rdsh.exe" : "rdsh";
+  for (const directory of (process.env.PATH || "").split(path.delimiter)) {
+    if (!path.isAbsolute(directory)) continue;
+    const candidate = path.join(directory, name);
+    try {
+      if (!(await fs.stat(candidate)).isFile()) continue;
+      await fs.access(candidate, constants.X_OK);
+      return candidate;
+    } catch {
+      // Keep looking through PATH.
+    }
+  }
+  throw new Error("rdsh is not installed on PATH (or set RDSH_BIN)");
+}
+
+async function runNativeSubagentPlan(inputFile) {
+  const executable = await nativeRdsh();
+  const exitCode = await new Promise((resolve, reject) => {
+    const child = spawn(executable, ["subagents", "plan", "--input-file", inputFile], {
+      stdio: "inherit",
+      windowsHide: true,
+    });
+    child.once("error", reject);
+    child.once("close", (code) => resolve(code ?? 1));
+  });
+  process.exitCode = exitCode;
 }
 async function inPinnedCli(artifact, selectionRevision) {
   if (process.env.NODE_OPTIONS || process.env.NODE_PATH)
@@ -585,15 +618,14 @@ try {
     )
       process.exitCode = 1;
   } else if (command === "subagents") {
-    // Pure planning: reads a local request, starts nothing and writes nothing.
-    const action = positionals[1];
     if (
       positionals.length !== 2 ||
-      action !== "plan" ||
-      Object.keys(values).some((k) => !["input-file"].includes(k))
+      positionals[1] !== "plan" ||
+      !values["input-file"] ||
+      Object.keys(values).some((key) => key !== "input-file")
     )
       throw new Error("Invalid subagents action/options");
-    console.log(JSON.stringify(planSubagents(await localJson(values["input-file"]))));
+    await runNativeSubagentPlan(values["input-file"]);
   } else if (command === "workers") {
     const action = positionals[1];
     const options = {
