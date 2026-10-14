@@ -38,6 +38,28 @@ than no timer. Point it at the checkout that holds `sync-dsh.sh`:
 RDSH_SYNC_SCRIPT=~/src/rustdsh/sync-dsh.sh rdsh update auto on
 ```
 
+## Finding the DSH tree
+
+The run updates two trees: the `rdsh` binary from the pinned release, and the
+`@deepseek-ai/dsh` package that `dsh` boots. That package is not necessarily
+under the npm first on `PATH`: `rdsh` is a passthrough launcher, so the live
+tree is often `$HOME/.local/opt/<dir>/lib/node_modules/@deepseek-ai/dsh` while
+`npm root -g` names another prefix. The script tries, in order:
+
+1. `DSH_PKG_ROOT`, the complete `.../@deepseek-ai/dsh` directory
+2. `NPM_BIN`'s `root -g`, else the npm it resolved itself
+3. the newest `$HOME/.local/opt/*/lib/node_modules/@deepseek-ai/dsh`
+4. `$HOME/.npm-global/lib/node_modules/@deepseek-ai/dsh`
+5. `$HOME/.local/lib/node_modules/@deepseek-ai/dsh`
+
+The first candidate with a readable `package.json` wins. When none matches,
+the run logs `dsh tree not found; DSH skipped` and continues, so the release
+update is still performed and the exit status stays 0: a moved layout must not
+fail the daily run (and its update banner) forever. A tree found outside npm's
+global root is reported the same way and left alone, because
+`npm install -g` cannot update it. npm-managed trees keep the full contract:
+pinned digests, no automatic downgrade, verification and rollback on failure.
+
 ## Containers and other init systems
 
 Set `RDSH_SYSTEMD_NO_RELOAD=1` to write the units without calling `systemctl`.
