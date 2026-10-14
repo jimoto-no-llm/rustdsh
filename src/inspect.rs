@@ -106,17 +106,6 @@ struct Session {
     mtime_s: String,
 }
 
-#[derive(serde::Serialize)]
-struct SessionJsonRow<'a> {
-    // Keep the legacy serde_json::Map key order when preserve_order is enabled.
-    bytes: u64,
-    id: &'a str,
-    mtime: &'a str,
-    project: &'a str,
-    tokens: Option<u64>,
-    tokens_exact: bool,
-}
-
 /// All sessions under `root` (or one project), newest first. Shared by the
 /// CLI table and the serve JSON view so the walk/stats live in one place.
 /// Missing root yields an empty vec.
@@ -216,16 +205,24 @@ pub fn cmd_sessions(
         eprintln!("[rdsh] note: zstd CLI not found; `?` rows show stored-bytes/4 estimate");
     }
     if json {
-        let items: Vec<SessionJsonRow<'_>> = shown
+        let items: Vec<serde_json::Value> = shown
             .iter()
             .zip(sizes.iter())
-            .map(|(s, (decomp, exact))| SessionJsonRow {
-                bytes: s.bytes,
-                id: &s.id,
-                mtime: &s.mtime_s,
-                project: &s.project,
-                tokens: tokens.then(|| decomp.map_or(s.bytes / 4, |b| b / 4)),
-                tokens_exact: tokens && *exact,
+            .map(|(s, (decomp, exact))| {
+                // serde_json::Map sorts these keys by default; when
+                // preserve_order is enabled, explicit insertion keeps the same
+                // legacy `sessions --json` byte order.
+                let mut row = serde_json::Map::new();
+                row.insert("bytes".into(), serde_json::json!(s.bytes));
+                row.insert("id".into(), serde_json::json!(s.id));
+                row.insert("mtime".into(), serde_json::json!(s.mtime_s));
+                row.insert("project".into(), serde_json::json!(s.project));
+                row.insert(
+                    "tokens".into(),
+                    serde_json::json!(tokens.then(|| decomp.map_or(s.bytes / 4, |b| b / 4))),
+                );
+                row.insert("tokens_exact".into(), serde_json::json!(tokens && *exact));
+                serde_json::Value::Object(row)
             })
             .collect();
         println!("{}", serde_json::json!({"sessions": items, "total": total}));
