@@ -342,8 +342,11 @@ rdsh context hook install              # merges $DSH_HOME/hooks.json (idempotent
 rdsh context hook status --json
 ```
 
-The hook is fail-open: any local error, a corrupt index, or a deadline overrun
-produces silence and exit 0, so a prompt is never blocked. Injection has its own
+The hook is fail-open: it never blocks a prompt and always exits 0. Only an
+unreadable settings document or an unparseable payload inject nothing at all; a
+corrupt index or a missed deadline drops just what depends on them — the graph
+or the code search — and still injects goal, constraints, and memory. Injection
+has its own
 budget (`context.inject_budget`, default 1200 tokens) and deadline
 (`context.inject_deadline_ms`, default 1200 ms); once the deadline passes the
 code search is skipped and only memory, goal, and constraints go out.

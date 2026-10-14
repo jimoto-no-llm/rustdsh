@@ -46,6 +46,8 @@ pub struct ContextConfig {
     pub inject_deadline_ms: usize,
     pub inject_sessions: bool,
     pub inject_session_count: usize,
+    /// `features.dep_graph`: when off, no index is read and no tree is walked.
+    pub dep_graph: bool,
 }
 
 impl Default for ContextConfig {
@@ -67,6 +69,7 @@ impl Default for ContextConfig {
             inject_deadline_ms: 1200,
             inject_sessions: true,
             inject_session_count: 2,
+            dep_graph: true,
         }
     }
 }
@@ -90,6 +93,9 @@ impl From<crate::rdsh_config::ContextSection> for ContextConfig {
             inject_deadline_ms: c.inject_deadline_ms.clamp(100, 10000),
             inject_sessions: c.inject_sessions,
             inject_session_count: c.inject_session_count.min(10),
+            // The switch lives outside the context section; callers that have
+            // the whole settings document set it explicitly.
+            dep_graph: true,
         }
     }
 }
@@ -104,7 +110,15 @@ pub fn legacy_path() -> String {
 }
 
 pub fn load_config() -> ContextConfig {
-    ContextConfig::from(crate::rdsh_config::load().context)
+    let settings = crate::rdsh_config::load();
+    config_from(&settings)
+}
+
+/// Context settings plus the feature switches that steer the engine.
+fn config_from(settings: &crate::rdsh_config::RdshSettings) -> ContextConfig {
+    let mut cfg = ContextConfig::from(settings.context.clone());
+    cfg.dep_graph = crate::rdsh_config::feature_enabled(settings, "dep_graph");
+    cfg
 }
 
 fn estimate(s: &str) -> usize {
@@ -1777,7 +1791,11 @@ fn assemble_sections(
             seeds.sort();
             seeds.dedup();
             if !seeds.is_empty() {
-                let mut neighbours = crate::deps::related_files(&seeds, 5);
+                let mut neighbours = if cfg.dep_graph {
+                    crate::deps::related_files(&seeds, 5)
+                } else {
+                    Vec::new()
+                };
                 neighbours.sort();
                 neighbours.dedup();
                 for f in neighbours.into_iter().take(5) {
@@ -1801,7 +1819,11 @@ fn assemble_sections(
             if parts.is_empty() && !q.is_empty() {
                 parts.push(format!("(no hits for query {q:?})"));
             }
-            if crate::deps::graph_summary().is_empty() {
+            // Cheap presence check: graph_summary() would walk the whole tree
+            // here, and this runs on the per-turn injection path.
+            if !cfg.dep_graph {
+                parts.push("(dependency graph: off via features.dep_graph)".to_string());
+            } else if !crate::deps::index_present() {
                 parts.push("(dependencies: unknown; run rdsh deps build)".to_string());
             }
         }
@@ -2527,7 +2549,7 @@ pub fn cmd_inject(
         if !crate::rdsh_config::feature_enabled(&settings, "context_engine") {
             return Ok(None);
         }
-        let cfg = ContextConfig::from(settings.context);
+        let cfg = config_from(&settings);
         let deadline =
             Instant::now() + std::time::Duration::from_millis(cfg.inject_deadline_ms as u64);
         let payload = hook_stdin(deadline)?;
@@ -2660,10 +2682,12 @@ fn read_distill_stream(reader: impl Read) -> std::io::Result<(Vec<u8>, bool)> {
 
 fn read_distill_session(source: &Path) -> anyhow::Result<(Vec<u8>, bool)> {
     if !source.extension().is_some_and(|e| e == "zstd") {
+        // Same budget as the compressed path: a plain transcript is not a
+        // second-class input, and the store cap (4MiB) is far too small for it.
         return read_small_regular(
             source,
             source.parent().unwrap_or(Path::new(".")),
-            MEMORY_CAP,
+            DISTILL_SESSION_CAP,
         )
         .map(|bytes| (bytes, false))
         .ok_or_else(|| anyhow::anyhow!("session unreadable or over limit: unknown"));

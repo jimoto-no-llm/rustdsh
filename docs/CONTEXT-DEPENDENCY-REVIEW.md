@@ -34,8 +34,9 @@
 `hookSpecificOutput.additionalContext` を次のリクエストの文脈として扱うため、
 rdsh 側の作業メモとモデルが見る文脈が同じ経路に乗ります。フックは **fail-open** です。
 
-- 設定ファイルが壊れている、索引が壊れている、stdin が壊れている、期限を超えた — いずれも
-  何も出さず exit 0。プロンプトを止めません。
+- どの失敗でもプロンプトは止めず exit 0 です。**何も出さない**のは設定ファイルが読めない場合と
+  stdin を解釈できない場合だけ。索引が壊れている場合は「(dependencies: unknown; run rdsh deps build)」を
+  付けて、期限超過の場合は検索節を落として、goal・constraints・記憶は出し続けます。
 - 期限（`context.inject_deadline_ms`、既定1200ms）を過ぎたらコード検索と依存閉包を省略し、
   goal・constraints・記憶だけを出します。
 - 予算は専用（`context.inject_budget`、既定1200トークン）で、通常のターン予算とは別です。

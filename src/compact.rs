@@ -204,6 +204,9 @@ fn compact_output(text: &str, max_tokens: usize) -> String {
         }
     }
     middle.sort_unstable();
+    // Lines kept from the dropped middle, including the ones the giveback loop
+    // below rescues; the digest counts both.
+    let mut preserved_important = middle.len();
     // Give unused middle capacity back to the tail, stopping before the
     // newest preserved middle line to keep all source lines in order.
     remaining += middle_remaining;
@@ -218,6 +221,12 @@ fn compact_output(text: &str, max_tokens: usize) -> String {
         remaining -= costs[i];
         seen.insert(lines[i]);
         tail.push(i);
+        if scores[i] > 0 {
+            preserved_important += 1;
+            for (category, count) in counts.iter_mut().enumerate() {
+                *count += usize::from(scores[i] & (8 >> category) != 0);
+            }
+        }
     }
     tail.reverse();
     let dropped = lines.len().saturating_sub(1 + middle.len() + tail.len());
@@ -227,7 +236,13 @@ fn compact_output(text: &str, max_tokens: usize) -> String {
         body.push_str(first);
         body.push('\n');
         if with_digest {
-            body.push_str(&compact_digest(dropped, full, after, middle.len(), counts));
+            body.push_str(&compact_digest(
+                dropped,
+                full,
+                after,
+                preserved_important,
+                counts,
+            ));
         }
         for &i in middle.iter().chain(tail.iter()) {
             body.push_str(lines[i]);
