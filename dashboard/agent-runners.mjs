@@ -316,10 +316,41 @@ function signalGroup(pgid, signal) {
     // Already gone.
   }
 }
+// Runs `taskkill /PID <pid> /T /F` and resolves true only when it succeeded.
+// Windows only; the tree is reachable through the leader PID while it lives.
+function taskkillTree(pid, timeout = 10000) {
+  return new Promise((resolve) => {
+    try {
+      execFile("taskkill", ["/pid", String(pid), "/T", "/F"], { timeout }, (error) =>
+        resolve(!error));
+    } catch {
+      resolve(false);
+    }
+  });
+}
+// Windows has no process groups and this runner has no Job Object support, so
+// only the leader PID can be observed. The tree can be killed only while the
+// leader is alive; once it has exited the descendants cannot be observed, so
+// the stop is never reported as confirmed.
+async function stopWindowsTree(pgid, { taskkill = taskkillTree, isAlive = alive } = {}) {
+  if (!isAlive(pgid)) return { cleanup: "unconfirmed", code: "windows_tree_unobservable" };
+  const ok = await taskkill(pgid);
+  return {
+    cleanup: "unconfirmed",
+    code: ok ? "windows_tree_unobservable" : "windows_taskkill_failed",
+  };
+}
 // The one stop routine, used by normal completion and by cancel: TERM the
-// group, wait, KILL, wait, then report whether it is really gone.
-export async function terminateGroup(pgid, { termMs = 2000, killMs = 3000 } = {}) {
-  if (!pgid || !groupAlive(pgid)) return "confirmed";
+// group, wait, KILL, wait, then report whether it is really gone. Resolves to
+// { cleanup, code } (code only set when the stop is unconfirmed on Windows).
+// `platform`, `taskkill` and `isAlive` are test seams for the win32 branch.
+export async function stopGroup(
+  pgid,
+  { termMs = 2000, killMs = 3000, platform = process.platform, taskkill, isAlive } = {},
+) {
+  if (!pgid) return { cleanup: "confirmed" };
+  if (platform === "win32") return stopWindowsTree(pgid, { taskkill, isAlive });
+  if (!groupAlive(pgid)) return { cleanup: "confirmed" };
   for (const [signal, limit] of [
     ["SIGTERM", termMs],
     ["SIGKILL", killMs],
@@ -327,9 +358,12 @@ export async function terminateGroup(pgid, { termMs = 2000, killMs = 3000 } = {}
     signalGroup(pgid, signal);
     const until = Date.now() + limit;
     while (Date.now() < until && groupAlive(pgid)) await pause(25);
-    if (!groupAlive(pgid)) return "confirmed";
+    if (!groupAlive(pgid)) return { cleanup: "confirmed" };
   }
-  return groupAlive(pgid) ? "unconfirmed" : "confirmed";
+  return { cleanup: groupAlive(pgid) ? "unconfirmed" : "confirmed" };
+}
+export async function terminateGroup(pgid, options) {
+  return (await stopGroup(pgid, options)).cleanup;
 }
 
 // Decides whether a recorded group number still belongs to the job, for
@@ -585,7 +619,8 @@ export async function status(id) {
     // "confirmed": the agent's process group was verified gone when the job
     // ended. "unconfirmed": it was not; cancel can still act on it.
     cleanup: final ? (final.cleanup ?? null) : null,
-    // Why a stop could not be confirmed: "pgid_reused" or "ownership_unknown".
+    // Why a stop could not be confirmed: "pgid_reused", "ownership_unknown",
+    // "windows_tree_unobservable" or "windows_taskkill_failed".
     cleanup_code: final?.cleanup_code ?? null,
     // A confirmed job is not probed again: its number may have been reused.
     agent_group_alive: !final || !job.agent_pgid
@@ -605,7 +640,11 @@ async function recordLost(directory) {
     finished_at: new Date().toISOString(),
     parsed: null,
     // The agent may have outlived its supervisor; keep agent_pgid in job.json.
-    cleanup: job?.agent_pgid && groupAlive(job.agent_pgid) ? "unconfirmed" : "confirmed",
+    ...(process.platform === "win32" && job?.agent_pgid
+      ? { cleanup: "unconfirmed", cleanup_code: "windows_tree_unobservable" }
+      : {
+          cleanup: job?.agent_pgid && groupAlive(job.agent_pgid) ? "unconfirmed" : "confirmed",
+        }),
   };
   await writeResult(directory, value);
   return value;
@@ -629,7 +668,11 @@ export async function result(id) {
 // cancelled through its supervisor (it holds the child handle); a signal is
 // sent by number only after the group's ownership is established. A terminal
 // job with a confirmed stop is a no-op and is not even probed.
-export async function cancel(id, { termMs = 5000, killMs = 5000 } = {}) {
+export async function cancel(
+  id,
+  { termMs = 5000, killMs = 5000, platform = process.platform, taskkill = taskkillTree } = {},
+) {
+  const win = platform === "win32";
   const { directory } = await load(id);
   const initial = await status(id);
   const first = await load(id);
@@ -669,7 +712,10 @@ export async function cancel(id, { termMs = 5000, killMs = 5000 } = {}) {
         verdict = owner;
         break;
       }
-      signalGroup(job.agent_pgid, signal);
+      // Windows: the tree is reachable only through the live leader, and the
+      // kill is awaited, not fired and forgotten.
+      if (win) await taskkill(job.agent_pgid);
+      else signalGroup(job.agent_pgid, signal);
       const until = Date.now() + limit;
       while (Date.now() < until && groupAlive(job.agent_pgid)) await pause(25);
     }
@@ -685,7 +731,17 @@ export async function cancel(id, { termMs = 5000, killMs = 5000 } = {}) {
     }
     if (verdict === "stuck") throw new RunnerError("cancel_unconfirmed");
   }
-  if (stored.cleanup !== "confirmed" || lost) {
+  if (win) {
+    // Descendants of an exited Windows leader cannot be observed, so the stop
+    // is never promoted to confirmed. The leader tree has been killed above
+    // while the leader was alive; a lost supervisor's job still ends cancelled.
+    if (lost || stored.cleanup === "confirmed" || !stored.cleanup_code)
+      await settle({
+        ...(lost ? { state: "cancelled", code: "cancelled" } : {}),
+        cleanup: "unconfirmed",
+        cleanup_code: stored.cleanup_code ?? "windows_tree_unobservable",
+      });
+  } else if (stored.cleanup !== "confirmed" || lost) {
     // The group is now verified gone. A job whose supervisor was lost never
     // reported an outcome, so the cancel is its outcome; other results stay.
     await settle({
@@ -875,7 +931,7 @@ async function supervise(directory) {
   const watcher = setInterval(async () => {
     if (exitedAlready || cancelling || !(await exists(cancelFile))) return;
     if (exitedAlready) return; // the child exited while the file was checked
-    cancelling = terminateGroup(job.agent_pgid);
+    cancelling = stopGroup(job.agent_pgid);
   }, 100);
   const forward = () => signalGroup(job.agent_pgid, "SIGTERM");
   process.on("SIGTERM", forward);
@@ -889,7 +945,8 @@ async function supervise(directory) {
   // process saw the group non-empty up to the leader's exit, so the number
   // cannot have been recycled yet. No waiting before this, and no external
   // ownership check (that one is only for signals from outside).
-  const cleanup = await terminateGroup(job.agent_pgid);
+  const stopped = await stopGroup(job.agent_pgid);
+  const cleanup = stopped.cleanup;
   // Pipes held open by descendants must not stall the job.
   await Promise.race([
     Promise.all(closed),
@@ -902,6 +959,7 @@ async function supervise(directory) {
 
   const base = {
     cleanup,
+    ...(stopped.code ? { cleanup_code: stopped.code } : {}),
     exit_code: exit.exit_code ?? null,
     signal: exit.signal ?? null,
     stdout_truncated: out.state.truncated,

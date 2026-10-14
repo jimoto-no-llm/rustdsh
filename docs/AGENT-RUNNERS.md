@@ -169,8 +169,17 @@ the answer "unknown", and unknown is treated as possibly alive: the check
 falls back to `kill(-pgid, 0)` and only `ESRCH` there proves absence. An
 unreadable `/proc` therefore ends as `cleanup: unconfirmed`, never as a
 confirmed stop. Elsewhere (macOS) the check is `kill(-pgid, 0)`; launchd
-normally reaps orphans there. On Windows only the leader PID is checked and
-the tree is stopped with `taskkill /T /F`.
+normally reaps orphans there.
+
+On Windows the runner cannot confirm that descendants stopped: there are no
+process groups and no Job Object support, so only the leader PID is
+observable. While the leader is alive, the stop runs `taskkill /PID <leader>
+/T /F` (awaited); once the leader has exited the remaining tree cannot be
+observed. Cleanup is therefore always reported `unconfirmed`, with
+`cleanup_code: windows_tree_unobservable` (or `windows_taskkill_failed` if
+`taskkill` itself failed). `cancel` on such a job kills the leader tree only
+while the leader is alive, never signals by number once the leader identity no
+longer matches, and does not promote the result to `confirmed`.
 
 ### Cancel and ownership of the group number
 
@@ -205,10 +214,11 @@ group, because surviving members do not prove it is still the job's group.
 Stop them manually; the job's group number is recorded as `agent_pgid` in
 `job.json`.
 
-On a platform without process identity, after the supervisor is lost (for
-example killed) its agent group can no longer be stopped by `cancel`. `status`
+macOS: the process identity is read through `libproc` (see
+`dashboard/darwin-process-identity.mjs`), so a lost supervisor's group can be
+stopped by `cancel` like on Linux. Where no identity can be read, `status`
 shows `supervisor_lost` with `cleanup_code: ownership_unknown` and the group
-has to be stopped by hand. While the supervisor lives, cancel works normally.
+has to be stopped by hand.
 
 When ownership holds and the group is gone, `cancel` returns only then,
 otherwise it fails with `cancel_unconfirmed`. A running job ends as

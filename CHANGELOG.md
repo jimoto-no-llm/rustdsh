@@ -37,7 +37,11 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   whether the stop was confirmed (`cleanup`); `cancel` also acts on jobs whose
   supervisor was lost or that finished with leftover processes, but only after
   proving the recorded group number still belongs to the job (a confirmed job
-  is a no-op; macOS cannot stop a group after its supervisor is lost).
+  is a no-op; where no process identity can be read, a group cannot be stopped
+  after its supervisor is lost). On
+  Windows descendants cannot be observed (no Job Object support): the leader
+  tree is killed with `taskkill /T /F` while the leader is alive and cleanup is
+  always reported `unconfirmed` (`windows_tree_unobservable`).
 - `scripts/serial-proxy.mjs` gains `--tool-choice-default <none|auto|required>`
   (adds a default `tool_choice` to `chat/completions` requests that send `tools`
   without one, all other requests are forwarded byte-identical; needed for

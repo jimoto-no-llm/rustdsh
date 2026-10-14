@@ -10,6 +10,7 @@ import {
   parseProcStat,
   procGroupHasLiveMember,
   terminateGroup,
+  stopGroup,
   groupAlive,
   scanProcGroup,
   establishOwnership,
@@ -183,6 +184,9 @@ test("cursor-agent: submit, status, result with parsed fields and clean metadata
   assert.equal(job.entrypoint, await fs.realpath(f.cursorBin));
   const final = await waitForJob(job.id, { timeoutMs: 30000 });
   assert.equal(final.state, "succeeded");
+  // Windows cannot observe descendants of an exited leader: never confirmed.
+  assert.equal(final.cleanup, expectedCleanup);
+  assert.equal(final.cleanup_code, expectedCleanupCode);
   const res = await result(job.id);
   assert.equal(res.provenance, "untrusted_data");
   assert.equal(res.result.text, "OKdone");
@@ -377,6 +381,8 @@ for (const [runner, bin] of [
     assert.ok(await gone(grandchild), "descendant is gone");
     assert.ok(await gone(agent_pid), "agent is gone");
     assert.equal((await status(job.id)).state, "cancelled");
+    assert.equal(info.cleanup, expectedCleanup);
+    assert.equal(info.cleanup_code, expectedCleanupCode);
     assert.equal((await cancel(job.id)).state, "cancelled"); // idempotent
   });
 }
@@ -398,7 +404,10 @@ test("a dead supervisor without a result is reported as supervisor_lost", async 
   assert.equal(info.code, "supervisor_lost");
 });
 
-const identityPlatform = ["linux", "win32", "darwin"].includes(process.platform);
+// POSIX verifies the process group gone; win32 can only see the leader PID.
+const expectedCleanup = process.platform === "win32" ? "unconfirmed" : "confirmed";
+const expectedCleanupCode = process.platform === "win32" ? "windows_tree_unobservable" : null;
+const identityPlatform = ["linux", "darwin", "win32"].includes(process.platform);
 const posixOnly = { skip: process.platform === "win32" && "process groups are POSIX only" };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function waitForFile(file) {
@@ -512,6 +521,47 @@ test("cancel acts on leftover processes of an already finished job", posixOnly, 
   assert.equal(info.cleanup, "confirmed");
   assert.equal(info.agent_group_alive, false);
   assert.ok(await gone(leftover.pid));
+});
+
+test("win32 stop: never confirmed; taskkill /T /F only while the leader is alive", async () => {
+  const calls = [];
+  const taskkill = async (pid) => { calls.push(pid); return true; };
+  // Leader exited: the tree cannot be observed, nothing is killed.
+  const gone = await stopGroup(4242, { platform: "win32", taskkill, isAlive: () => false });
+  assert.deepEqual(gone, { cleanup: "unconfirmed", code: "windows_tree_unobservable" });
+  assert.deepEqual(calls, []);
+  // Leader alive: the tree is killed (awaited), the result still unconfirmed.
+  const live = await stopGroup(4242, { platform: "win32", taskkill, isAlive: () => true });
+  assert.deepEqual(live, { cleanup: "unconfirmed", code: "windows_tree_unobservable" });
+  assert.deepEqual(calls, [4242]);
+  // taskkill itself failed: a distinct code.
+  const failed = await stopGroup(4242, { platform: "win32", taskkill: async () => false, isAlive: () => true });
+  assert.deepEqual(failed, { cleanup: "unconfirmed", code: "windows_taskkill_failed" });
+  assert.equal(await terminateGroup(4242, { platform: "win32", taskkill, isAlive: () => false }), "unconfirmed");
+  // No group recorded: nothing to stop.
+  assert.deepEqual(await stopGroup(null, { platform: "win32", taskkill }), { cleanup: "confirmed" });
+});
+
+test("win32 cancel: a terminal job with the leader gone stays unconfirmed and signals nothing", async () => {
+  const calls = [];
+  const taskkill = async (pid) => { calls.push(pid); return true; };
+  const id = "job_" + "f1".repeat(12);
+  await writeJob(id, { agent_pid: 2 ** 22 + 777, agent_pgid: 2 ** 22 + 777 }, { cleanup: "unconfirmed", cleanup_code: "windows_tree_unobservable" });
+  const info = await cancel(id, { termMs: 100, killMs: 100, platform: "win32", taskkill });
+  assert.equal(info.cleanup, "unconfirmed");
+  assert.equal(info.cleanup_code, "windows_tree_unobservable");
+  assert.deepEqual(calls, []);
+});
+
+test("win32 cancel: a lost supervisor with the leader gone is left unconfirmed, not promoted to confirmed", async () => {
+  const calls = [];
+  const taskkill = async (pid) => { calls.push(pid); return true; };
+  const id = "job_" + "f2".repeat(12);
+  await writeJob(id, { agent_pid: 2 ** 22 + 778, agent_pgid: 2 ** 22 + 778, state: "failed" }, { state: "failed", code: "supervisor_lost", cleanup: "unconfirmed" });
+  const info = await cancel(id, { termMs: 100, killMs: 100, platform: "win32", taskkill });
+  assert.equal(info.code, "supervisor_lost");
+  assert.equal(info.cleanup, "unconfirmed");
+  assert.deepEqual(calls, []);
 });
 
 test("terminateGroup treats a missing group as confirmed", async () => {
