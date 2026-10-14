@@ -31,7 +31,7 @@ It ports frequently used CLI operations (token calculation, code search, session
 - [Usage](#usage)
   - [Running with `dsh` Compatibility](#running-with-dsh-compatibility)
   - [Fast Native Commands](#fast-native-commands)
-  - [Credential Management](#credential-management-rdsh-auth)
+  - [Credential sharing with rdsh auth](#credential-sharing-with-rdsh-auth)
   - [Agent Tool Isolation](#agent-tool-isolation)
   - [Hook Guard](#hook-guard-rdsh-guard)
 - [Web UI & Dashboard](#web-ui--dashboard)
@@ -150,18 +150,88 @@ rdsh desktop status                 # detect the DeepSeek Harness Desktop app an
 rdsh bench --n 5                    # benchmark startup speed between rdsh and dsh
 ```
 
-### Credential Management (`rdsh auth`)
+### Credential sharing with rdsh auth
 
-Safely import credentials from other tools into `$DSH_HOME/.credentials.yaml`:
+External credentials are inventoried without showing their values. Nothing is
+copied until you select a source and credential. OAuth copies use DSH's existing
+version-1 store at $DSH_HOME/.credentials.yaml; API keys use its named refs.
+The selection policy contains only identifiers at $DSH_HOME/rdsh-auth-sharing.json.
 
 ```sh
-rdsh auth                                  # inspect recognized login status
-rdsh auth --import --provider openai-codex # import credentials from Codex CLI or opencode
-rdsh setup                                 # interactive setup wizard
-rdsh setup --web                           # browser-based setup interface
+rdsh auth                                      # sources, destinations, selection and undo steps
+rdsh auth --json                               # secret-free machine-readable inventory
+rdsh --dry-run auth --select codex:openai-codex --import  # preview; writes no files
+rdsh auth --select codex:openai-codex --import    # share only Codex OAuth
+rdsh auth --select opencode:openai-codex --import # OpenCode openai maps to openai-codex
+rdsh auth --select codex:OPENAI_API_KEY --import  # separate opt-in for Codex's API key
+rdsh auth --select env:DEEPSEEK_API_KEY --import  # explicitly persist this environment key
+rdsh auth --unselect codex:openai-codex          # stop future copies; retain the existing copy
+rdsh setup                                    # sync selected credentials, then guide setup
+rdsh setup --web                              # inventory, selection commands and explicit key save
 ```
 
-*Note: rdsh never exports or syncs external credentials without explicit user command.*
+For a one-time import, use `rdsh auth --import --provider openai-codex --source codex` or `rdsh auth --import --ref OPENAI_API_KEY --source codex`. These filters do not save or extend future-copy consent; `--select`/`--unselect` are separate persistent policy changes.
+
+Repeat --select/--unselect for individual credentials. Selecting enables future
+imports from that CLI/provider, including boot, dump-config, plugin, raw dsh
+delegation and setup. --import immediately applies the selection. Even a newer
+grant in another, unselected CLI cannot be chosen. Newer DSH grants and existing
+API-key refs/records remain in place. Other entries, comments and line endings
+are preserved. Unix credential and policy files use mode 0600.
+
+The inventory checks Codex's ~/.codex/auth.json and OpenCode's
+$XDG_DATA_HOME/opencode/auth.json (or its platform default data directory), plus
+the legacy ~/.config/opencode/auth.json fallback. Selectors for OpenCode use
+DSH provider IDs; opencode:openai-codex is the selector for its openai login.
+Environment-key persistence supports DEEPSEEK_API_KEY, OPENAI_API_KEY and
+ANTHROPIC_API_KEY. These are format/presence checks, not live authentication tests.
+
+An environment variable already supplied to rdsh is inherited by DSH and its
+child processes without rdsh writing a file. The JSON inventory marks this route
+persistent=false, lists its destination and explains how to stop/revoke it.
+Using the reference does not opt in to storing it. setup --yes no longer saves
+every environment key; choose each one with auth --select env:NAME --import.
+Interactive setup and the web form still allow an explicit, individual key save.
+
+**Scope and undo:** saved entries are available to every DSH profile using the
+same DSH_HOME. Unselect stops future rdsh imports; it does not delete a saved copy
+or invalidate a running process. Stop DSH and remove the named record/ref from
+the credential store to stop using a saved copy. To invalidate the credential
+itself, revoke the OAuth grant or rotate the API key at its provider. That may
+also disconnect the source CLI. This controls rdsh copying, not DSH's own
+refreshes, inherited environment access or an OS sandbox.
+
+**Migration:** existing DSH credentials are retained. A missing policy selects
+nothing, including for legacy auth --import. RDSH_AUTH_AUTOSYNC=1 does not restore
+the old import-all behavior. Inventory and preview first, then choose the sources
+you need. RDSH_AUTH_AUTOSYNC=0 disables automatic imports while keeping the
+selection; an explicit auth --import still works. Invalid/unreadable policies
+fail closed instead of falling back to legacy sync.
+
+Consent changes and rdsh credential writes share a lock, so a completed unselect
+cannot be bypassed by a queued rdsh import using an earlier policy. After a
+crashed writer, check that no rdsh auth/setup writer is active before removing
+$DSH_HOME/.rdsh-auth-sharing.lock; the launcher skips copying while it is locked.
+
+setup --web issues a new local access key at startup in its #key=... URL.
+The tab retains that key; status reads, key saves and closing require it.
+Keep the startup URL private. The page shows copy destinations and separate
+unselect, saved-copy removal and provider revocation steps before a key save.
+
+### Optional extras (off by default)
+
+Server-type features stay off until enabled, so a plain install remains
+a fast dsh:
+
+```sh
+rdsh settings set extras.enable serve,search-web
+rdsh settings get extras.enable
+```
+
+| Extra | Command | Notes |
+| --- | --- | --- |
+| `serve` | `rdsh serve` (default :38080) | Local status page, localhost only, per-launch key. |
+| `search-web` | `rdsh search-web "query" --limit 5` | Needs SearXNG. |
 
 To connect an OpenAI-compatible endpoint that dsh does not ship (HAI, Sarashina, a home llama.cpp / vLLM / LM Studio / Ollama server), add it as a profile route:
 
