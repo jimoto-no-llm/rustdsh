@@ -13,10 +13,15 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   warnings instead of guessed tiers. It starts no agent and writes nothing; the
   existing `workers prepare` still owns the checkout allocation
   (`docs/SUBAGENT-PLANNING.md`).
-
 - `rdsh-dashboard agents list|submit|status|result|cancel` runs cursor-agent and
-  devin as detached, cancellable jobs with a read-only default permission and
-  untrusted-data results. See `docs/AGENT-RUNNERS.md`.
+  devin as detached, cancellable jobs with untrusted-data results. The default
+  `--permission read-only` selects each CLI's most restrictive mode
+  (`--mode ask --sandbox enabled` for cursor-agent, `--permission-mode auto`
+  for devin); it is a flag mapping, not an OS sandbox, and the known gaps are
+  listed in `docs/AGENT-RUNNERS.md`. Every job end, and `cancel`, stops the
+  agent's process group with TERM, a grace period and KILL, and records
+  whether the stop was confirmed (`cleanup`); `cancel` also acts on jobs whose
+  supervisor was lost or that finished with leftover processes.
 
 ## [0.3.3] - 2026-10-13
 

@@ -1,5 +1,5 @@
 import fs from "node:fs/promises";
-import { openSync, writeSync, closeSync } from "node:fs";
+import { openSync, writeSync, closeSync, readdirSync, readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn, execFile } from "node:child_process";
@@ -51,8 +51,11 @@ const cursor = {
   version_command: ["--version"],
   login_command: ["status"],
   permissions: {
-    // `edit` has no flag: tools that need approval fail in -p mode.
-    "read-only": ["--mode", "ask"],
+    // Mappings onto the CLI's own flags, not an OS boundary. `ask` alone has
+    // been reported to run terminal commands in some versions, so the CLI
+    // sandbox is requested as well. `edit` has no flag: tools that need
+    // approval fail in -p mode.
+    "read-only": ["--mode", "ask", "--sandbox", "enabled"],
     edit: [],
     full: ["--force"],
   },
@@ -118,6 +121,9 @@ const devin = {
   version_command: ["--version"],
   login_command: ["auth", "status"],
   permissions: {
+    // Devin's `auto` mode asks before writes and shell commands, but allow
+    // rules in the user's own config still apply. Its `--sandbox` only limits
+    // writes to the workspace, so it is deliberately not added here.
     "read-only": ["--permission-mode", "auto"],
     edit: ["--permission-mode", "accept-edits"],
     full: ["--permission-mode", "dangerous"],
@@ -185,8 +191,10 @@ function runnerFor(id) {
   return runner;
 }
 
+// Absolute so the supervisor and the CLIs (which run in the project
+// directory) never depend on the working directory of the submitting process.
 function jobsRoot() {
-  return path.join(stateHome(), "agent-jobs");
+  return path.resolve(stateHome(), "agent-jobs");
 }
 function jobDirectory(id) {
   if (typeof id !== "string" || !JOB_ID.test(id))
@@ -215,9 +223,52 @@ function alive(pid) {
     return error.code === "EPERM";
   }
 }
-function groupAlive(pgid) {
+// Linux: /proc/<pid>/stat is "pid (comm) state ppid pgrp ...". The comm field
+// may contain spaces and parentheses, so parse after its last ")".
+export function parseProcStat(text) {
+  const end = String(text).lastIndexOf(")");
+  if (end < 0) return null;
+  const fields = String(text)
+    .slice(end + 1)
+    .trim()
+    .split(/\s+/);
+  const pgrp = Number(fields[2]);
+  if (!fields[0] || !Number.isInteger(pgrp)) return null;
+  return { state: fields[0], ppid: Number(fields[1]), pgrp };
+}
+// True when some non-zombie process is in the group. Zombies cannot run
+// anything; a container without a reaping PID 1 keeps them in the group
+// forever, so kill(-pgid, 0) alone would report such a group as alive.
+// `undefined` means /proc is not available.
+export function procGroupHasLiveMember(pgid, procDir = "/proc") {
+  let names;
+  try {
+    names = readdirSync(procDir);
+  } catch {
+    return undefined;
+  }
+  for (const name of names) {
+    if (!/^[0-9]+$/.test(name)) continue;
+    let stat;
+    try {
+      stat = parseProcStat(readFileSync(path.join(procDir, name, "stat"), "utf8"));
+    } catch {
+      continue; // exited while scanning
+    }
+    if (stat && stat.pgrp === pgid && stat.state !== "Z" && stat.state !== "X")
+      return true;
+  }
+  return false;
+}
+// macOS and other systems without /proc fall back to kill(-pgid, 0); there
+// launchd normally reaps orphans, so zombie-only groups are short lived.
+export function groupAlive(pgid) {
   if (process.platform === "win32") return alive(pgid);
   if (!Number.isInteger(pgid) || pgid < 2) return false;
+  if (process.platform === "linux") {
+    const live = procGroupHasLiveMember(pgid);
+    if (live !== undefined) return live;
+  }
   try {
     process.kill(-pgid, 0);
     return true;
@@ -234,6 +285,21 @@ function signalGroup(pgid, signal) {
   } catch {
     // Already gone.
   }
+}
+// The one stop routine, used by normal completion and by cancel: TERM the
+// group, wait, KILL, wait, then report whether it is really gone.
+export async function terminateGroup(pgid, { termMs = 2000, killMs = 3000 } = {}) {
+  if (!pgid || !groupAlive(pgid)) return "confirmed";
+  for (const [signal, limit] of [
+    ["SIGTERM", termMs],
+    ["SIGKILL", killMs],
+  ]) {
+    signalGroup(pgid, signal);
+    const until = Date.now() + limit;
+    while (Date.now() < until && groupAlive(pgid)) await pause(25);
+    if (!groupAlive(pgid)) return "confirmed";
+  }
+  return groupAlive(pgid) ? "unconfirmed" : "confirmed";
 }
 
 async function resolveExecutable(runner, explicit) {
@@ -464,9 +530,15 @@ export async function status(id) {
     started_at: job.started_at ?? null,
     finished_at: final?.finished_at ?? null,
     elapsed_ms: Math.max(0, finished - started),
+    // "confirmed": the agent's process group was verified gone when the job
+    // ended. "unconfirmed": it was not; cancel can still act on it.
+    cleanup: final ? (final.cleanup ?? null) : null,
+    agent_group_alive:
+      final && job.agent_pgid ? Boolean(groupAlive(job.agent_pgid)) : null,
   };
 }
 async function recordLost(directory) {
+  const job = await readJson(path.join(directory, "job.json"));
   const value = {
     state: "failed",
     code: "supervisor_lost",
@@ -474,6 +546,8 @@ async function recordLost(directory) {
     signal: null,
     finished_at: new Date().toISOString(),
     parsed: null,
+    // The agent may have outlived its supervisor; keep agent_pgid in job.json.
+    cleanup: job?.agent_pgid && groupAlive(job.agent_pgid) ? "unconfirmed" : "confirmed",
   };
   await writeResult(directory, value);
   return value;
@@ -493,22 +567,26 @@ export async function result(id) {
   };
 }
 
+// Acts on any job whose recorded agent group is still alive, whatever the
+// job state (running, supervisor_lost, succeeded with leftover descendants),
+// and returns only once the group is confirmed gone.
 export async function cancel(id, { termMs = 5000, killMs = 5000 } = {}) {
   const { directory } = await load(id);
   const initial = await status(id);
-  if (!["queued", "running"].includes(initial.state)) return initial;
-  await fs.writeFile(path.join(directory, "cancel"), "", { mode: 0o600 });
+  const first = await load(id);
+  const running = ["queued", "running"].includes(initial.state);
+  if (!running && !(first.job.agent_pgid && groupAlive(first.job.agent_pgid)))
+    return initial;
+  if (running) await fs.writeFile(path.join(directory, "cancel"), "", { mode: 0o600 });
   const started = Date.now();
   let termSent = false,
     killSent = false;
   while (Date.now() - started < termMs + killMs + 3000) {
     const { job, result: stored } = await load(id);
     const pgid = job.agent_pgid;
-    if (stored) {
-      // The supervisor reaps the agent; confirm nothing is left in its group.
-      if (!pgid || !groupAlive(pgid)) break;
-    }
-    if (pgid && groupAlive(pgid)) {
+    const live = Boolean(pgid) && groupAlive(pgid);
+    if (stored && !live) break;
+    if (live) {
       const elapsed = Date.now() - started;
       if (!termSent) {
         signalGroup(pgid, "SIGTERM");
@@ -525,6 +603,7 @@ export async function cancel(id, { termMs = 5000, killMs = 5000 } = {}) {
         signal: null,
         finished_at: new Date().toISOString(),
         parsed: null,
+        cleanup: "confirmed",
       });
       break;
     }
@@ -533,6 +612,16 @@ export async function cancel(id, { termMs = 5000, killMs = 5000 } = {}) {
   const { job, result: stored } = await load(id);
   if (!stored || (job.agent_pgid && groupAlive(job.agent_pgid)))
     throw new RunnerError("cancel_unconfirmed");
+  if (stored.cleanup !== "confirmed" || stored.code === "supervisor_lost") {
+    // The group is now verified gone. A job whose supervisor was lost never
+    // reported an outcome, so the cancel is its outcome; other results stay.
+    const lost = stored.code === "supervisor_lost";
+    await writeResult(directory, {
+      ...stored,
+      ...(lost ? { state: "cancelled", code: "cancelled" } : {}),
+      cleanup: "confirmed",
+    });
+  }
   return status(id);
 }
 
@@ -633,6 +722,7 @@ async function supervise(directory) {
   const finish = async (fields) => {
     const finished_at = new Date().toISOString();
     await writeResult(directory, {
+      cleanup: "confirmed", // no agent process was started
       exit_code: null,
       signal: null,
       stdout_truncated: false,
@@ -715,11 +805,12 @@ async function supervise(directory) {
   ]);
   child.stdout.destroy();
   child.stderr.destroy();
-  if (groupAlive(job.agent_pgid)) signalGroup(job.agent_pgid, "SIGTERM");
+  const cleanup = await terminateGroup(job.agent_pgid);
   out.close();
   err.close();
 
   const base = {
+    cleanup,
     exit_code: exit.exit_code ?? null,
     signal: exit.signal ?? null,
     stdout_truncated: out.state.truncated,

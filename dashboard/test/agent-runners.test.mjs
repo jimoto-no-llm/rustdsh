@@ -7,6 +7,10 @@ import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import {
+  parseProcStat,
+  procGroupHasLiveMember,
+  terminateGroup,
+  groupAlive,
   submit,
   status,
   result,
@@ -33,6 +37,15 @@ if (a[0] === "status") { console.log("Logged in as someone@example.invalid"); pr
 fs.writeFileSync(path.join(__dirname, "argv.json"), JSON.stringify({ argv: a, cwd: process.cwd() }));
 const mode = (a[a.length - 1].match(/MODE:(\\w+)/) || [])[1];
 const done = (o) => process.stdout.write(JSON.stringify(o));
+const stubborn = () => {
+  // A descendant in the same group that ignores SIGTERM; wait until it is armed.
+  const pidFile = path.join(__dirname, "stubborn.pid");
+  const c = cp.spawn(process.execPath, ["-e",
+    "process.on('SIGTERM',()=>{});require('fs').writeFileSync(" + JSON.stringify(pidFile) + ",String(process.pid));setTimeout(()=>process.exit(0),60000);setInterval(()=>{},1000)"], { stdio: "ignore" });
+  c.unref();
+  while (!fs.existsSync(pidFile)) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25);
+};
+if (mode === "stubborn") stubborn();
 if (mode === "slow") {
   const c = cp.spawn(process.execPath, ["-e", "setInterval(()=>{},1000)"], { stdio: "ignore" });
   fs.writeFileSync(path.join(__dirname, "grandchild.pid"), String(c.pid));
@@ -56,6 +69,15 @@ const arg = (n) => a[a.indexOf(n) + 1];
 const prompt = fs.readFileSync(arg("--prompt-file"), "utf8");
 const mode = (prompt.match(/MODE:(\\w+)/) || [])[1];
 const exp = arg("--export");
+const stubborn = () => {
+  // A descendant in the same group that ignores SIGTERM; wait until it is armed.
+  const pidFile = path.join(__dirname, "stubborn.pid");
+  const c = cp.spawn(process.execPath, ["-e",
+    "process.on('SIGTERM',()=>{});require('fs').writeFileSync(" + JSON.stringify(pidFile) + ",String(process.pid));setTimeout(()=>process.exit(0),60000);setInterval(()=>{},1000)"], { stdio: "ignore" });
+  c.unref();
+  while (!fs.existsSync(pidFile)) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25);
+};
+if (mode === "stubborn") stubborn();
 const good = { schema_version: "ATIF-v1.7", session_id: "feather-louse",
   agent: { name: "devin", version: "3000.11.3", model_name: "SWE-2 High" }, steps: [{}, {}, {}] };
 if (mode === "slow") {
@@ -173,7 +195,7 @@ test("cursor-agent: submit, status, result with parsed fields and clean metadata
   assert.deepEqual(seen.argv.slice(0, 7), [
     "-p", "--output-format", "json", "--trust", "--workspace", await fs.realpath(f.project), "--model",
   ]);
-  assert.ok(seen.argv.join(" ").includes("--mode ask"));
+  assert.ok(seen.argv.join(" ").includes("--mode ask --sandbox enabled"));
   assert.ok(!seen.argv.includes("--force"));
   assert.ok(seen.argv.at(-1).includes(SECRET)); // cursor only takes argv
   assert.equal(seen.cwd, await fs.realpath(f.project));
@@ -194,13 +216,13 @@ test("cursor-agent: submit, status, result with parsed fields and clean metadata
 test("cursor-agent permission mapping: --force only for full", async (t) => {
   const f = await fixture(t);
   for (const [permission, expected] of [
-    ["read-only", ["--mode", "ask"]],
+    ["read-only", ["--mode", "ask", "--sandbox", "enabled"]],
     ["edit", []],
     ["full", ["--force"]],
   ]) {
     await run(f, "cursor-agent", "ok", { permission });
     const { argv } = await f.argv();
-    const tail = argv.slice(0, -1).filter((x) => ["--mode", "ask", "--force"].includes(x));
+    const tail = argv.slice(0, -1).filter((x) => ["--mode", "ask", "--sandbox", "enabled", "--force"].includes(x));
     assert.deepEqual(tail, expected, permission);
   }
 });
@@ -366,6 +388,146 @@ test("a dead supervisor without a result is reported as supervisor_lost", async 
   const info = await status(id);
   assert.equal(info.state, "failed");
   assert.equal(info.code, "supervisor_lost");
+});
+
+const posixOnly = { skip: process.platform === "win32" && "process groups are POSIX only" };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function waitForFile(file) {
+  for (let i = 0; i < 200; i++) {
+    if (await fs.access(file).then(() => true, () => false)) return;
+    await sleep(50);
+  }
+  throw new Error("timeout waiting for " + file);
+}
+
+for (const [runner, bin] of [
+  ["cursor-agent", "cursorBin"],
+  ["devin", "devinBin"],
+]) {
+  test(`${runner}: a TERM-ignoring descendant after success is killed and the stop confirmed`, posixOnly, async (t) => {
+    const f = await fixture(t);
+    const job = await submit({
+      runner,
+      project: f.project,
+      promptFile: await f.prompt("stubborn"),
+      executable: process.execPath,
+      entrypoint: f[bin],
+    });
+    const final = await waitForJob(job.id, { timeoutMs: 30000 });
+    assert.equal(final.state, "succeeded");
+    assert.equal(final.cleanup, "confirmed");
+    assert.equal(final.agent_group_alive, false);
+    const pid = Number(await fs.readFile(path.join(f.dir, "stubborn.pid"), "utf8"));
+    assert.ok(await gone(pid), "TERM-ignoring descendant was escalated to KILL");
+    assert.equal((await result(job.id)).cleanup, "confirmed");
+  });
+}
+
+test("cancel after supervisor_lost kills the still-running agent group", posixOnly, async (t) => {
+  const f = await fixture(t);
+  const job = await submit({
+    runner: "cursor-agent",
+    project: f.project,
+    promptFile: await f.prompt("slow"),
+    executable: process.execPath,
+    entrypoint: f.cursorBin,
+  });
+  const pidFile = path.join(f.dir, "grandchild.pid");
+  await waitForFile(pidFile);
+  const grandchild = Number(await fs.readFile(pidFile, "utf8"));
+  const { supervisor_pid, agent_pid, agent_pgid } = JSON.parse((await jobFiles(job.id)).job);
+  assert.ok(agent_pgid);
+  process.kill(supervisor_pid, "SIGKILL");
+  assert.ok(await gone(supervisor_pid));
+  const lost = await status(job.id);
+  assert.equal(lost.state, "failed");
+  assert.equal(lost.code, "supervisor_lost");
+  assert.equal(lost.cleanup, "unconfirmed");
+  assert.equal(lost.agent_group_alive, true);
+  assert.ok(groupAlive(agent_pgid));
+  const info = await cancel(job.id, { termMs: 3000, killMs: 3000 });
+  assert.equal(info.state, "cancelled");
+  assert.equal(info.cleanup, "confirmed");
+  assert.equal(info.agent_group_alive, false);
+  assert.ok(await gone(agent_pid), "agent is gone");
+  assert.ok(await gone(grandchild), "descendant is gone");
+});
+
+test("cancel acts on leftover processes of an already finished job", posixOnly, async (t) => {
+  const f = await fixture(t);
+  const leftover = (await import("node:child_process")).spawn(
+    process.execPath,
+    ["-e", "process.on('SIGTERM',()=>{});setTimeout(()=>process.exit(0),30000)"],
+    { detached: true, stdio: "ignore" },
+  );
+  t.after(() => { try { process.kill(-leftover.pid, "SIGKILL"); } catch {} });
+  await sleep(300); // let the TERM handler arm
+  const id = "job_" + "cd".repeat(12);
+  const dir = path.join(process.env.RDSH_DASHBOARD_HOME, "agent-jobs", id);
+  await fs.mkdir(dir, { recursive: true, mode: 0o700 });
+  const now = new Date().toISOString();
+  await fs.writeFile(path.join(dir, "job.json"), JSON.stringify({
+    id, runner: "devin", project: f.project, permission: "read-only", created_at: now,
+    started_at: now, supervisor_pid: 1, agent_pid: leftover.pid, agent_pgid: leftover.pid, state: "succeeded",
+  }));
+  await fs.writeFile(path.join(dir, "result.json"), JSON.stringify({
+    state: "succeeded", code: null, finished_at: now, parsed: null, cleanup: "unconfirmed",
+  }));
+  assert.equal((await status(id)).agent_group_alive, true);
+  const info = await cancel(id, { termMs: 500, killMs: 3000 });
+  assert.equal(info.state, "succeeded"); // the recorded outcome is kept
+  assert.equal(info.cleanup, "confirmed");
+  assert.equal(info.agent_group_alive, false);
+  assert.ok(await gone(leftover.pid));
+});
+
+test("terminateGroup treats a missing group as confirmed", async () => {
+  assert.equal(await terminateGroup(null), "confirmed");
+  assert.equal(await terminateGroup(2 ** 22 + 12345), "confirmed");
+});
+
+test("/proc parser: zombie-only groups are not alive, comm may contain parentheses", async (t) => {
+  assert.deepEqual(parseProcStat("12 (a) b (c) S 1 50 50 0"), { state: "S", ppid: 1, pgrp: 50 });
+  assert.equal(parseProcStat("garbage"), null);
+  const proc = await fs.mkdtemp(path.join(root, "proc-"));
+  t.after(() => fs.rm(proc, { recursive: true, force: true }));
+  const entry = async (pid, line) => {
+    await fs.mkdir(path.join(proc, String(pid)));
+    await fs.writeFile(path.join(proc, String(pid), "stat"), line);
+  };
+  await entry(10, "10 (sh) Z 1 50 50 0 -1");
+  await entry(11, "11 (worker) S 1 60 60 0 -1");
+  await entry(12, "12 (my (odd) name) X 1 70 70 0 -1");
+  await fs.mkdir(path.join(proc, "13")); // vanished: no stat file
+  await fs.mkdir(path.join(proc, "self"));
+  assert.equal(procGroupHasLiveMember(50, proc), false); // zombie only
+  assert.equal(procGroupHasLiveMember(60, proc), true);
+  assert.equal(procGroupHasLiveMember(70, proc), false); // dead
+  assert.equal(procGroupHasLiveMember(99, proc), false);
+  await entry(14, "14 (live one) R 10 50 50 0 -1");
+  assert.equal(procGroupHasLiveMember(50, proc), true); // one live member among zombies
+  assert.equal(procGroupHasLiveMember(50, path.join(proc, "missing")), undefined); // no /proc
+});
+
+test("a relative state home still works for devin (job files are absolute)", async (t) => {
+  const f = await fixture(t);
+  const home = path.join(f.dir, "rel-state");
+  const relative = path.relative(process.cwd(), home);
+  if (path.isAbsolute(relative)) return t.skip("no relative path to the temp directory");
+  const before = process.env.RDSH_DASHBOARD_HOME;
+  process.env.RDSH_DASHBOARD_HOME = relative;
+  try {
+    const job = await run(f, "devin", "ok");
+    const res = await result(job.id);
+    assert.equal(res.state, "succeeded");
+    assert.equal(res.result.export, "available");
+    const { argv } = await f.argv();
+    assert.ok(path.isAbsolute(argv[argv.indexOf("--prompt-file") + 1]));
+    assert.ok(path.isAbsolute(argv[argv.indexOf("--export") + 1]));
+    assert.equal(argv[argv.indexOf("--prompt-file") + 1], path.join(path.resolve(home), "agent-jobs", job.id, "prompt.txt"));
+  } finally {
+    process.env.RDSH_DASHBOARD_HOME = before;
+  }
 });
 
 const noShebang = { skip: process.platform === "win32" && "shebang scripts are not executable on Windows" };
