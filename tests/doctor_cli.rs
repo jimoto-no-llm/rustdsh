@@ -81,6 +81,47 @@ fn doctor_resolves_bare_original_override_from_path_not_working_directory() {
     fs::remove_dir_all(root).unwrap();
 }
 
+#[cfg(unix)]
+#[test]
+fn doctor_accepts_bare_js_original_override_from_current_directory() {
+    let root = temp_dir("js-cwd-override");
+    let cwd = root.join("cwd");
+    let path_dir = root.join("path");
+    fs::create_dir_all(&cwd).unwrap();
+    fs::create_dir_all(&path_dir).unwrap();
+
+    let entry = cwd.join("entry.js");
+    fs::write(&entry, "process.exit(0);\n").unwrap();
+    let result = run_doctor(&root, &cwd, &path_dir, "entry.js");
+    let output = String::from_utf8_lossy(&result.stdout);
+    assert!(
+        !output.contains("RDSH_ORIG_BIN=entry.js is not a usable"),
+        "Node receives a bare JS entrypoint as a file argument resolved from CWD: {output}"
+    );
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn doctor_does_not_resolve_bare_js_original_override_from_path() {
+    let root = temp_dir("js-path-override");
+    let cwd = root.join("cwd");
+    let path_dir = root.join("path");
+    fs::create_dir_all(&cwd).unwrap();
+    fs::create_dir_all(&path_dir).unwrap();
+
+    let entry = path_dir.join("entry.js");
+    fs::write(&entry, "process.exit(0);\n").unwrap();
+    make_executable(&entry);
+    let result = run_doctor(&root, &cwd, &path_dir, "entry.js");
+    let output = String::from_utf8_lossy(&result.stdout);
+    assert!(
+        output.contains("RDSH_ORIG_BIN=entry.js is not a usable"),
+        "Node treats a bare JS argument as a CWD file, not a PATH command: {output}"
+    );
+    fs::remove_dir_all(root).unwrap();
+}
+
 #[cfg(windows)]
 #[test]
 fn doctor_scans_the_windows_installer_wrapper_directory() {

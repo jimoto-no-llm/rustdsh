@@ -1884,10 +1884,17 @@ fn original_override_warnings() -> Vec<String> {
             continue;
         }
         let path_var = std::env::var_os("PATH").unwrap_or_default();
-        if command_on_path_in(&value, &path_var).is_some()
-            || ((value.contains('/') || (cfg!(windows) && value.contains('\\')))
-                && usable_original(std::path::Path::new(&value)))
-        {
+        let path = std::path::Path::new(&value);
+        // `passthrough` sends `.js` overrides to Node as a file argument,
+        // which resolves relative to CWD and does not search PATH.
+        let node_entrypoint = path.extension().is_some_and(|ext| ext == "js");
+        let explicit_path = value.contains('/') || (cfg!(windows) && value.contains('\\'));
+        let usable = if node_entrypoint || explicit_path {
+            usable_original(path)
+        } else {
+            command_on_path_in(&value, &path_var).is_some()
+        };
+        if usable {
             return Vec::new();
         }
         return vec![format!(
