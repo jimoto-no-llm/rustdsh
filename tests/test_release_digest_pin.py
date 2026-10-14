@@ -68,6 +68,31 @@ class PinReleaseDigestsTest(unittest.TestCase):
         self.assertNotIn("1" * 64, updated)
         self.assertIn("a" * 64, updated)
 
+    def test_pinning_an_older_release_keeps_latest(self) -> None:
+        # R537-LATEST01: re-pinning an older release must only backfill rows.
+        pinned = pin_release_digests.pin(REGISTRY, "v0.3.3", DIGESTS)
+        backfilled = pin_release_digests.pin(pinned, "v0.3.2", {
+            "rdsh-linux-x64.tar.gz": "9" * 64,
+            "rdsh-linux-x64-musl.tar.gz": "8" * 64,
+            "rdsh-macos-arm64.tar.gz": "7" * 64,
+            "rdsh-macos-x64.tar.gz": "6" * 64,
+        })
+        lines = backfilled.splitlines()
+        self.assertIn("latest v0.3.3", lines)
+        self.assertNotIn("latest v0.3.2", lines)
+        self.assertIn(row("v0.3.2", "rdsh-linux-x64.tar.gz", "9" * 64), lines)
+        self.assertIn(row("v0.3.3", "rdsh-linux-x64.tar.gz", "a" * 64), lines)
+        self.assertEqual(backfilled.count("v0.3.2 "), 4)
+
+    def test_pinning_a_newer_release_advances_latest(self) -> None:
+        pinned = pin_release_digests.pin(REGISTRY, "v0.3.3", DIGESTS)
+        advanced = pin_release_digests.pin(pinned, "v0.4.0", DIGESTS)
+        lines = advanced.splitlines()
+        self.assertIn("latest v0.4.0", lines)
+        self.assertNotIn("latest v0.3.3", lines)
+        self.assertEqual(advanced.count("v0.4.0 "), 4)
+        self.assertIn(row("v0.3.3", "rdsh-linux-x64.tar.gz", "a" * 64), lines)
+
     def test_refuses_prerelease_tag(self) -> None:
         with self.assertRaises(ValueError):
             pin_release_digests.pin(REGISTRY, "v0.3.4-rc.1", DIGESTS)

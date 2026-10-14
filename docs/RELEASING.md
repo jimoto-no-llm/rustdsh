@@ -157,7 +157,9 @@ git diff release-digests.tsv                          # latest row + 4 archives
 The script reads GitHub's own asset digests (`gh release view --json assets`
 does not expose them), updates the `latest` row, keeps older rows for explicit
 `--version` installs, and refuses prerelease tags, missing archives or values
-that are not a SHA-256. Raw list:
+that are not a SHA-256. Pinning an older release only backfills its rows: the
+`latest` row moves forward only, so re-pinning a past version never moves the
+install and automatic-update channel backwards. Raw list:
 
 ```sh
 gh api repos/jimoto-no-llm/rustdsh/releases/tags/vX.Y.Z \
