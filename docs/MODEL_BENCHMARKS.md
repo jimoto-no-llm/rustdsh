@@ -137,3 +137,25 @@ benchmark's isolated `openai-codex` provider. All other provider options, exact
 model selection, request budgets, and the two-second normal-exit rule remain
 unchanged. The flag is off by default and recorded in `report.json`; compare
 SSE runs separately from earlier automatic-transport runs.
+
+### Local SSE acceptance on 2026-10-14
+
+On macOS with the installed DSH 0.2.0-rc.2 / pi-ai 0.87.1 runtime, the explicit
+Codex SSE option passed 24/24 model and normal-exit checks. Each model ran three
+rounds of original response, rdsh response, file read, and fenced Rust repair.
+The source was `18d0bf34ab65406491c7d127b49587134ca7588b`; request limits,
+high reasoning effort, retry 0, source allowlist, and the two-second exit limit
+were unchanged. All six Rust repairs passed the independent 0..=1000 oracle.
+
+| Model | Original response p50 (s) | rdsh response p50 (s) | Read p50 (s) | Rust repair p50 (s) | Accepted |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| gpt-6-astra | 5.329 | 4.988 | 7.826 | 10.120 | 12/12 |
+| gpt-6-sol | 4.087 | 4.787 | 5.813 | 9.521 | 12/12 |
+
+Each cell has only three samples. Model order alternated between rounds, but
+original preceded rdsh within a round. These timings include network/model work
+and do not establish model ranking or launcher speed. Earlier automatic-transport
+runs had 23/24 model checks and 0/24 normal exits; they remain separate results.
+An explicit provider profile patch replaces its options, so include transport
+and cache retention in that patch when testing SSE. This measurement covers
+Codex on macOS; Anthropic and other platforms were not live-tested here.
