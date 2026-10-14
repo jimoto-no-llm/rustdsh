@@ -170,8 +170,6 @@ impl Root {
     pub(crate) fn open(&self, target: &Path) -> Option<std::fs::File> {
         use std::os::windows::fs::MetadataExt;
 
-        use std::os::windows::fs::MetadataExt;
-
         // Reject symlinks, junctions and other reparse points before looking
         // at the file type, then directories and other non-regular files.
         // A hard-link count is not available on stable Rust (`number_of_links`
