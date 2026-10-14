@@ -45,6 +45,9 @@ node scripts/serial-proxy.mjs --upstream https://hai-api.hcloud.ltd/v1
   チャンクごとに流します。`Authorization` は変更せず、ヘッダ値・ボディはログに出しません。
 - スロットは上流リクエスト開始からレスポンス本文の終了・エラー・クライアント切断まで保持され、
   切断時は上流リクエストも中止します。待機中に切断したリクエストはキューから外れます。
+- Node の request-body 受信期限は既定のヘッダー期限60秒、キュー待ち上限、本文受信猶予5分を合計した値です。
+  待機中の本文をアプリケーション側へ無制限に蓄積せず、枠が空いた後も大きな本文をストリームで受信できます。
+- 上流レスポンスの読み取りは下流の backpressure に従い、遅いクライアント向けに本文を無制限にバッファしません。
 - `GET /__proxy/status` は転送せず `{active, queued, max, upstream}` を返します。
 - 1 リクエスト 1 行で stderr に `method path status wait dur` を出力します。
 - SIGINT / SIGTERM で終了します。
@@ -80,6 +83,6 @@ Settings → Models → Custom model API:
 ## 動作確認
 
 ```sh
-node --test tests/serial_proxy/
+node --test "tests/serial_proxy/*.test.mjs"
 curl -s http://127.0.0.1:18080/__proxy/status
 ```

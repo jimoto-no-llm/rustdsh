@@ -2,32 +2,41 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { spawn } from 'node:child_process';
+import { Readable, Writable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { createProxy, pipeUpstreamResponse } from '../../scripts/serial-proxy.mjs';
 
 const SCRIPT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../scripts/serial-proxy.mjs');
 const cleanups = [];
 after(async () => { for (const c of cleanups.reverse()) await c(); });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function fakeUpstream({ delay = 150 } = {}) {
-  const st = { inflight: 0, peak: 0, total: 0, seen: [], finished: 0 };
+async function fakeUpstream({ delay = 150, host = '127.0.0.1' } = {}) {
+  const st = { inflight: 0, peak: 0, total: 0, seen: [], finished: 0, receivedBytes: 0 };
   const server = http.createServer((req, res) => {
     st.inflight++; st.total++; st.peak = Math.max(st.peak, st.inflight);
     st.seen.push({ url: req.url, auth: req.headers.authorization });
+    req.on('data', (chunk) => { st.receivedBytes += chunk.length; });
     let ended = false;
     const end = () => { if (!ended) { ended = true; st.inflight--; } };
     res.on('close', end);
+    req.on('end', () => {
+      res.writeHead(200, { 'content-type': 'text/event-stream' });
+      res.write('data: 1\n\n');
+      const t1 = setTimeout(() => res.write('data: 2\n\n'), delay / 2);
+      const t2 = setTimeout(() => { res.end('data: 3\n\n'); st.finished++; }, delay);
+      res.on('close', () => { clearTimeout(t1); clearTimeout(t2); });
+    });
     req.resume();
-    res.writeHead(200, { 'content-type': 'text/event-stream' });
-    res.write('data: 1\n\n');
-    const t1 = setTimeout(() => res.write('data: 2\n\n'), delay / 2);
-    const t2 = setTimeout(() => { res.end('data: 3\n\n'); st.finished++; }, delay);
-    res.on('close', () => { clearTimeout(t1); clearTimeout(t2); });
   });
-  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, host, resolve);
+  });
   cleanups.push(() => new Promise((r) => { server.closeAllConnections(); server.close(r); }));
-  return { st, url: `http://127.0.0.1:${server.address().port}` };
+  const hostname = host.includes(':') ? `[${host}]` : host;
+  return { st, url: `http://${hostname}:${server.address().port}` };
 }
 
 async function startProxy(upstream, args = []) {
@@ -39,6 +48,38 @@ async function startProxy(upstream, args = []) {
   });
   cleanups.push(() => new Promise((r) => { if (child.exitCode !== null) return r(); child.once('exit', r); child.kill('SIGTERM'); }));
   return { url, child };
+}
+
+async function startProxyServer(upstream, options = {}) {
+  const server = createProxy({ upstream, ...options });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  cleanups.push(() => new Promise((resolve) => { server.closeAllConnections(); server.close(resolve); }));
+  return { server, url: `http://127.0.0.1:${server.address().port}` };
+}
+
+function postSlow(url, body, intervalMs = 100) {
+  return new Promise((resolve, reject) => {
+    let timer;
+    const req = http.request(url, { method: 'POST', headers: { 'content-length': body.length } }, (res) => {
+      if (timer) clearInterval(timer);
+      const chunks = [];
+      res.on('data', (chunk) => chunks.push(chunk));
+      res.on('end', () => resolve({ status: res.statusCode, text: Buffer.concat(chunks).toString() }));
+    });
+    req.on('error', (error) => { if (timer) clearInterval(timer); reject(error); });
+    let offset = 0;
+    timer = setInterval(() => {
+      if (offset >= body.length) {
+        clearInterval(timer);
+        timer = null;
+        req.end();
+        return;
+      }
+      const next = body.subarray(offset, Math.min(offset + 64 * 1024, body.length));
+      offset += next.length;
+      req.write(next);
+    }, intervalMs);
+  });
 }
 
 const get = async (url, init) => { const r = await fetch(url, init); return { status: r.status, text: await r.text(), json: null }; };
@@ -155,4 +196,70 @@ test('refuses non-loopback host without --allow-remote', async () => {
   const child = spawn(process.execPath, [SCRIPT, '--upstream', 'http://127.0.0.1:1', '--host', '0.0.0.0'], { stdio: 'ignore' });
   const code = await new Promise((r) => child.on('exit', r));
   assert.equal(code, 2);
+});
+
+test('(k) IPv6 upstream literals are passed to Node without brackets', async (t) => {
+  let up;
+  try {
+    up = await fakeUpstream({ delay: 20, host: '::1' });
+  } catch (error) {
+    if (['EADDRNOTAVAIL', 'EAFNOSUPPORT', 'EACCES'].includes(error.code)) {
+      t.skip(`IPv6 loopback is unavailable: ${error.code}`);
+      return;
+    }
+    throw error;
+  }
+  const p = await startProxy(up.url);
+  const r = await get(`${p.url}/ipv6`);
+  assert.equal(r.status, 200);
+  assert.deepEqual(up.st.seen.map((item) => item.url), ['/ipv6']);
+});
+
+test('(l) response piping pauses the upstream while the destination is backpressured', async () => {
+  const totalChunks = 100;
+  let produced = 0;
+  const source = new Readable({
+    highWaterMark: 1,
+    read() {
+      if (produced === totalChunks) { this.push(null); return; }
+      produced++;
+      this.push(Buffer.alloc(8));
+    },
+  });
+  let firstWriteResolve;
+  const firstWrite = new Promise((resolve) => { firstWriteResolve = resolve; });
+  let receivedChunks = 0;
+  const sink = new Writable({
+    highWaterMark: 1,
+    write(_chunk, _encoding, callback) {
+      receivedChunks++;
+      if (receivedChunks === 1) firstWriteResolve();
+      if (receivedChunks === 1) setTimeout(callback, 50);
+      else setImmediate(callback);
+    },
+  });
+  pipeUpstreamResponse(source, sink);
+  await firstWrite;
+  await sleep(5);
+  assert.equal(source.isPaused(), true);
+  assert.ok(produced < totalChunks);
+  await new Promise((resolve) => sink.once('finish', resolve));
+  assert.equal(receivedChunks, totalChunks);
+});
+
+test('(m) a large queued POST can finish within queue wait plus body grace', async () => {
+  const up = await fakeUpstream({ delay: 800 });
+  const p = await startProxyServer(up.url, { queueTimeout: 1.5, requestBodyGraceMs: 1000, requestHeadersTimeoutMs: 100 });
+  assert.equal(p.server.requestTimeout, 2600);
+  assert.equal(p.server.headersTimeout, 100);
+  const first = get(`${p.url}/first`);
+  await sleep(100);
+  const body = Buffer.alloc(1024 * 1024, 0x61);
+  const second = postSlow(`${p.url}/upload`, body);
+  const queuedAt = Date.now();
+  while (p.server.sem.queued !== 1 && Date.now() - queuedAt < 500) await sleep(10);
+  assert.equal(p.server.sem.queued, 1, 'large POST waits behind the active request');
+  assert.equal((await first).status, 200);
+  assert.equal((await second).status, 200);
+  assert.equal(up.st.receivedBytes, body.length);
 });
