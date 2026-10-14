@@ -128,8 +128,11 @@ rm -rf $BB
 SH="$RR_SANDBOX/shadow-noorig"
 mkdir -p $SH/bin $SH/home
 cp "$BIN" $SH/bin/dsh
+# doctor reports the resolved install dir, which is physical on macOS
+# (/var is /private/var there), so accept either spelling of the same dir.
+SH_PHYS="$(cd "$SH/bin" && pwd -P)"
 sout="$(PATH="$SH/bin:$RR_SANDBOX/original:$PATH" HOME="$SH/home" $SH/bin/dsh doctor 2>/dev/null)"
-case "$sout" in *"no dsh-orig backup in $SH/bin"*) ok "doctor flags shadowed dsh without a backup";; *) echo "FAIL(output): missing dsh-orig backup"; echo "$sout"; exit 1;; esac
+case "$sout" in *"no dsh-orig backup in $SH/bin"*|*"no dsh-orig backup in $SH_PHYS"*) ok "doctor flags shadowed dsh without a backup";; *) echo "FAIL(output): missing dsh-orig backup"; echo "$sout"; exit 1;; esac
 printf '#!/bin/sh\necho stub-dsh-orig\n' > $SH/bin/dsh-orig
 chmod +x $SH/bin/dsh-orig
 if PATH="$SH/bin:$RR_SANDBOX/original:$PATH" HOME="$SH/home" $SH/bin/dsh doctor 2>/dev/null | grep -q "no dsh-orig backup"; then echo "FAIL(output): an existing dsh-orig must not warn"; exit 1; else ok "doctor accepts an existing dsh-orig backup"; fi
