@@ -1,0 +1,156 @@
+{
+  "scope": "real local project server and Chromium; fixture checks only; no models, provider authentication, Tailscale or production adoption",
+  "node": "v24.21.0",
+  "source_files": {
+    "dashboard/app.mjs": "015890c25cf02b9307c18dbfe401cb630bb83a0e20e22b27ede5df8251b46248",
+    "dashboard/ui.html": "a9479ba1413940cc4fb6a5cba6283cc1de8780e28851452bf61b550b53c2cee3",
+    "dashboard/state.mjs": "3120db641575d4fae8e6d18ef18218339e5d01bc201e7a8688fbf8c40862d49c",
+    "dashboard/mcp.mjs": "7a480e6eb125230e58f0f849dfcbb1efc93129e27703f45b5f0b48b475a5be6c",
+    "dashboard/server.mjs": "1ab08f91a59ed2c0fb769b3c8f304ed35f3a9f8b7e2a27984eb94e6750e306cb",
+    "dashboard/task-outcomes.mjs": "153e2679551d105e693c8231645d0cad42b708010c777273e2debfa5ad682d8d",
+    "dashboard/task-outcomes-view.mjs": "889c7b89622dde9dcb2459759be845d99df5254edd9d1aaf156927e4750b6296",
+    "dashboard/task-outcomes-ui.mjs": "9f45fc29446ea1cc571f30119dead8cfac582d8f56261ba3925efd66bd9ddc23"
+  },
+  "captures": {
+    "after-unchecked": {
+      "selector": "#tasks-detail",
+      "viewport": {
+        "width": 1280,
+        "height": 1620
+      },
+      "interaction_viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    "after-unverified": {
+      "selector": "#tasks-detail",
+      "viewport": {
+        "width": 1280,
+        "height": 1745
+      },
+      "interaction_viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    "after-partial": {
+      "selector": "#tasks-detail",
+      "viewport": {
+        "width": 1280,
+        "height": 1748
+      },
+      "interaction_viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    "after": {
+      "selector": "#tasks-detail",
+      "viewport": {
+        "width": 1280,
+        "height": 1822
+      },
+      "interaction_viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    "after-freshness-current": {
+      "selector": "#tasks-detail",
+      "viewport": {
+        "width": 1280,
+        "height": 1620
+      },
+      "interaction_viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    "after-freshness-stale": {
+      "selector": "#tasks-detail",
+      "viewport": {
+        "width": 1280,
+        "height": 1641
+      },
+      "interaction_viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    "after-mobile": {
+      "selector": "#tasks-detail",
+      "viewport": {
+        "width": 390,
+        "height": 3677
+      },
+      "interaction_viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    "after-mobile-viewport": {
+      "selector": "viewport",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "focus": "#task-goal"
+    },
+    "after-mobile-milestone": {
+      "selector": "viewport",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "focus": "#task-milestones"
+    },
+    "after-stale": {
+      "selector": "#tasks-detail",
+      "viewport": {
+        "width": 390,
+        "height": 3928
+      },
+      "interaction_viewport": {
+        "width": 390,
+        "height": 844
+      }
+    }
+  },
+  "flows": [
+    "done remains unverified; all purpose/owner/outcome/next step/blocker fields reachable",
+    "only current observed full checks satisfy fixed criteria; 0/2 -> 1/2 -> 2/2",
+    "reported estimated status shows source, observed time, reference and automatically becomes stale at expiry while project state refreshes are blocked",
+    "adding two split tasks preserves the fixed criterion numerator and denominator",
+    "related code change invalidates earlier passes without changing reported done",
+    "late response from a previous state revision is ignored and recheck remains usable"
+  ],
+  "page_errors": [],
+  "head": "7f6108cc575d67d93e82d550c8f768df8bf8e30b",
+  "after_first_task_ready_ms": 162.2177899999997,
+  "chromium": "151.0.7922.34",
+  "state_refreshes_blocked": 2,
+  "mobile": {
+    "width": 390,
+    "height": 844,
+    "horizontal_overflow": false
+  },
+  "render_benchmark": [
+    {
+      "tasks": 40,
+      "samples": 5,
+      "median_ms": 17.299999997019768,
+      "max_ms": 20.399999998509884,
+      "includes_dom_and_layout": true,
+      "checks_executed": 0
+    },
+    {
+      "tasks": 200,
+      "samples": 5,
+      "median_ms": 78.10000000149012,
+      "max_ms": 99.10000000149012,
+      "includes_dom_and_layout": true,
+      "checks_executed": 0
+    }
+  ]
+}
