@@ -61,6 +61,118 @@ improved by 1.32–1.66x on this machine; the dense case benefits especially
 from stopping once each worker has enough results. These are fixture results,
 not a claim about every command or filesystem.
 
+## Regression harness (`benchmark_regression`)
+
+`examples/benchmark_regression.rs` is the CI-oriented runner. It measures the
+core CLI fast paths of the **real binary** by spawning it as a subprocess with an
+isolated temporary `HOME`, `DSH_HOME` and `XDG_*` environment, so no user
+sessions, settings or credentials are read. It records a trend by default and
+only becomes a gate when a baseline is supplied.
+
+```sh
+cargo build --release
+cargo run --release --example benchmark_regression -- \
+  --bin ./target/release/rdsh --n 15 --output /tmp/rdsh-perf.json
+```
+
+### What it measures
+
+| Case | Command | Notes |
+| ---- | ------- | ----- |
+| `version_startup` | `rdsh --version` | process spawn to exit, launch latency included |
+| `version_startup.peak_rss_bytes` | `rdsh --version` | `ps` sampling, `/usr/bin/time` fallback; `null` when unavailable |
+| `tokens_1mib` | `rdsh tokens <1 MiB file>` | generated synthetic text |
+| `tokens_10mib` | `rdsh tokens <10 MiB file>` | generated synthetic text |
+| `search_tree_200_files` | `rdsh search <needle> --dir <tree>` | 200 files in 10 subdirectories |
+
+Every case gets 3 warmup runs followed by `n` samples (`--n`, default 15,
+minimum 5). The report carries the raw `samples_ms` array plus `median_ms`,
+`p95_ms`, `min_ms` and `max_ms`. Percentiles use nearest rank, so `n=15` maps
+`p95` onto the largest sample; treat it as a spread indicator, not a precise
+quantile. `cpu_median_ms` is the CPU time the child consumed, reported next to
+the wall clock so a noisy shared runner is visible: a CPU figure well above the
+wall figure means the command is parallel, and one well below it means the
+process was waiting on the scheduler.
+
+### JSON schema
+
+`schema_version` is `1`; it is bumped on any incompatible layout change, and
+`--baseline-json` refuses to read a file recording a different version.
+
+| Field | Meaning |
+| ----- | ------- |
+| `schema_version` | report layout version (currently `1`) |
+| `tool` | always `benchmark_regression` |
+| `generated_at_utc` | Unix epoch seconds |
+| `platform` | `os`, `arch`, `family`, `cpu_count` |
+| `toolchain` | `rustc` and `cargo` version strings when obtainable |
+| `config` | `n`, `warmups`, `max_regression_percent`, `headline_cases`, fixture sizes, timing scope |
+| `binaries` | per label: `path`, `size_bytes`, `sha256` |
+| `cases` | per case: `samples_ms`, `median_ms`, `p95_ms`, `min_ms`, `max_ms`, `throughput_mib_s`, `input_bytes`, `cpu_median_ms`, `peak_rss_bytes`, `exit_code`, `argv`, `correct`, `evidence`, `headline`, `outcome`, `comparison` |
+| `failures` | correctness failures (different stdout than the baseline) |
+| `regressions` | cases over the threshold on a headline case |
+| `comparison` | `baseline_label`, `baseline_median_ms`, `ratio`, `delta_percent`, `stdout_equal`, `regressed`; `null` when no baseline was given |
+
+`outcome` is `recorded` (no baseline), `ok`, `regressed`, or `failed`.
+`evidence` records what the oracle actually verified, e.g. `tokens=2621453` or
+`hits=200`.
+
+### Correctness first
+
+Each case is checked against its own oracle before timing: `tokens` must equal
+the byte-derived token count for the generated ASCII fixture, `search` must
+return exactly one row per generated needle with no duplicates, and `--version`
+must produce non-empty output. The same stdout must appear in every warmup and
+every sample, or the run aborts. When a baseline binary is given, candidate and
+baseline stdout must match byte for byte. A mismatch marks the case `failed`,
+reports no speed ratio for it, and exits non-zero — a candidate is never
+described as a regression on the strength of a number it produced incorrectly.
+
+### Setting a baseline
+
+Compare against another binary (for example a build of the previous commit):
+
+```sh
+cargo run --release --example benchmark_regression -- \
+  --bin ./target/release/rdsh --baseline /path/to/base/target/release/rdsh \
+  --n 15 --output /tmp/rdsh-perf.json
+```
+
+Or against a previously recorded report, which is what a CI trend check uses
+when no older binary exists:
+
+```sh
+cargo run --release --example benchmark_regression -- \
+  --bin ./target/release/rdsh --baseline-json /tmp/rdsh-perf-previous.json \
+  --n 15 --output /tmp/rdsh-perf.json
+```
+
+`--baseline` and `--baseline-json` are mutually exclusive. Running with no
+baseline at all is not an error; it simply records the trend.
+
+### Regression threshold policy
+
+`--max-regression-percent` defaults to **10** and applies to the headline cases
+(`version_startup`, `tokens_1mib`, `tokens_10mib`, `search_tree_200_files`).
+The process exits non-zero when a headline case is slower than its baseline by
+more than that percentage, or when any case fails correctness. A faster result
+and a result exactly on the budget both pass.
+
+The threshold is deliberately generous because a shared CI runner is noisy;
+`version_startup` is sub-5 ms, where a single scheduler stall dominates the
+median. Compare the recorded `cpu_median_ms` and `samples_ms` before treating
+any single flagged run as a real regression. The threshold is a tripwire for
+large, sustained slowdowns, not a substitute for reading the samples.
+
+### CI job
+
+The `perf-regression` job in `.github/workflows/ci.yml` runs on
+`ubuntu-latest`, builds the release binary, executes the harness with `--n 15`,
+and uploads the JSON as the `perf-regression` artifact. It intentionally passes
+no `--baseline`: a fresh runner has no previous binary, and comparing against a
+stale artifact would fail spuriously. The job asserts that the report exists and
+that every case is marked correct; it does not fail on timing.
+
 ## Rules for benchmark PRs
 
 1. State machine, OS, and `n`.
