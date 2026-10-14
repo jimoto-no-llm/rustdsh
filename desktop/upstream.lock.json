@@ -11,6 +11,10 @@
     "apps/desktop/scripts/macos-app-update-config.mjs": "7da99a0af1b180a4d94e35dea8cab53a77751bb4d77d328542f2cae2556e59be",
     "apps/desktop/scripts/desktop-build-version.mjs": "d7c7223ad9ab8b790cdd4d4c6c14c494dfd919554a7c98ce2c2fdf367d326dfe",
     "apps/desktop/cli/dsh": "61647349bd61a5cfff40c338c7d5af767a22f409ddce36feabfb2f693d1e66af",
-    "apps/desktop/cli/dsh.cmd": "5f017fef14b7b311414ecaffe272714ab470f9dabc9720687b5e676fcd5115b8"
+    "apps/desktop/cli/dsh.cmd": "5f017fef14b7b311414ecaffe272714ab470f9dabc9720687b5e676fcd5115b8",
+    "apps/desktop/scripts/package-target.ts": "86b3b275809f9d0c9b6e124e3ca9d12080ed9af24cc946ef506f717907aa5783",
+    "apps/desktop/scripts/smoke-packaged-runtime.ts": "5abd0d91b689c6f4fc2a23f8bd98948b7a2e81f409f3b45bb586ea7fc882159c",
+    "apps/desktop/scripts/desktop-package-environment.mjs": "13cf364ba733e39ac765570b1c01450efd00e7c56f251086f102f9f703830c7d",
+    "apps/desktop/scripts/package-macos.ts": "464c565b3a7526843f9aa73bc148cf680674778b30986f161f964bdf39545635"
   }
 }

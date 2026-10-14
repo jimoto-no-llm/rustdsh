@@ -6,7 +6,9 @@ export const FEED_URL = 'https://github.com/jimoto-no-llm/rustdsh/releases/lates
 export const APP_ID = 'io.github.jimoto-no-llm.rdsh';
 export const PATCH_PATHS = Object.freeze(['apps/desktop/scripts/electron-builder-config.mjs',
   'apps/desktop/src/update-coordinator.ts', 'apps/desktop/src/main.ts', 'apps/desktop/scripts/macos-app-update-config.mjs',
-  'apps/desktop/scripts/desktop-build-version.mjs', 'apps/desktop/cli/dsh', 'apps/desktop/cli/dsh.cmd']);
+  'apps/desktop/scripts/desktop-build-version.mjs', 'apps/desktop/cli/dsh', 'apps/desktop/cli/dsh.cmd',
+  'apps/desktop/scripts/package-target.ts', 'apps/desktop/scripts/smoke-packaged-runtime.ts',
+  'apps/desktop/scripts/desktop-package-environment.mjs', 'apps/desktop/scripts/package-macos.ts']);
 const sha = value => createHash('sha256').update(value).digest('hex');
 const replace = (source, before, after) => {
   if (source.split(before).length !== 2) throw new Error('Upstream patch anchor changed; review the new source before preparing it');
@@ -67,7 +69,29 @@ export function planOverlay(root, lock, rdshVersion, nativeName) {
   const win = 'apps/desktop/cli/dsh.cmd';
   outputs[win] = replace(outputs[win], 'DeepSeek Harness.exe', 'rdsh Desktop.exe');
   outputs[win] = replace(outputs[win], 'setlocal DisableDelayedExpansion', 'setlocal EnableDelayedExpansion\r\nif defined RDSH_DESKTOP_HOME (set "DSH_HOME=!RDSH_DESKTOP_HOME!") else (set "DSH_HOME=!APPDATA!\\rdsh-desktop\\harness")\r\nsetlocal DisableDelayedExpansion');
-  outputs['apps/desktop/rdsh-bootstrap.cjs'] = `// Generated rdsh carrier; official main remains the application engine.\nconst { app } = require('electron');\nconst { join, isAbsolute } = require('node:path');\nconst { existsSync } = require('node:fs');\napp.setName('rdsh Desktop');\nconst home = process.env.RDSH_DESKTOP_HOME || join(app.getPath('appData'), 'rdsh-desktop', 'harness');\nif (!isAbsolute(home)) throw new Error('RDSH_DESKTOP_HOME must be absolute');\nprocess.env.DSH_HOME = home;\nconst binary = join(process.resourcesPath, 'rdsh', '${nativeName}');\nif (!existsSync(binary)) throw new Error('Bundled Rust launcher is missing');\nprocess.env.RDSH_BIN = binary;\nprocess.env.RDSH_ORIG_BIN = join(process.resourcesPath, 'runtime', 'cli', 'bin', process.platform === 'win32' ? 'dsh.cmd' : 'dsh');\nimport('./lib/main.js');\n`;
+  const packageTarget = 'apps/desktop/scripts/package-target.ts';
+  let p = outputs[packageTarget];
+  p = replace(p, "const environment = target.platform === 'darwin' && invocation.unsigned", 'const environment = invocation.unsigned');
+  p = replace(p, 'const filename = `deepseek-harness-', 'const filename = `rdsh-desktop-');
+  p = replace(p, "'DeepSeek Harness.app'", "'rdsh Desktop.app'");
+  outputs[packageTarget] = p;
+  const smoke = 'apps/desktop/scripts/smoke-packaged-runtime.ts';
+  let s = outputs[smoke];
+  s = replace(s, "'DeepSeek Harness.app'", "'rdsh Desktop.app'");
+  s = replace(s, "'DeepSeek Harness.exe'", "'rdsh Desktop.exe'");
+  s = replace(s, "'DeepSeek Harness'", "'rdsh Desktop'");
+  outputs[smoke] = s;
+  const packageEnvironment = 'apps/desktop/scripts/desktop-package-environment.mjs';
+  let e = outputs[packageEnvironment];
+  e = replace(e, "DSH_DESKTOP_APP_ID: 'com.deepseek.harness'", `DSH_DESKTOP_APP_ID: '${APP_ID}'`);
+  e = replace(e, "if (target.platform !== 'darwin' || !options.unsigned) resolveDesktopPolicyEnvironment(environment)", 'if (!options.unsigned) resolveDesktopPolicyEnvironment(environment)');
+  outputs[packageEnvironment] = e;
+  const packageMac = 'apps/desktop/scripts/package-macos.ts';
+  let a = outputs[packageMac];
+  a = replace(a, "'DeepSeek Harness.app'", "'rdsh Desktop.app'");
+  a = replace(a, 'const base = `deepseek-harness-', 'const base = `rdsh-desktop-');
+  outputs[packageMac] = a;
+  outputs['apps/desktop/rdsh-bootstrap.cjs'] = `// Generated rdsh carrier; official main remains the application engine.\nconst { app } = require('electron');\nconst { join, isAbsolute } = require('node:path');\nconst { existsSync, mkdirSync } = require('node:fs');\napp.setName('rdsh Desktop');\nconst home = process.env.RDSH_DESKTOP_HOME || join(app.getPath('appData'), 'rdsh-desktop', 'harness');\nconst userData = process.env.RDSH_DESKTOP_USER_DATA || join(app.getPath('appData'), 'rdsh-desktop', 'electron');\nif (!isAbsolute(home) || !isAbsolute(userData)) throw new Error('rdsh Desktop homes must be absolute');\nmkdirSync(userData, { recursive: true, mode: 0o700 });\napp.setPath('userData', userData);\nprocess.env.DSH_HOME = home;\nconst binary = join(process.resourcesPath, 'rdsh', '${nativeName}');\nif (!existsSync(binary)) throw new Error('Bundled Rust launcher is missing');\nprocess.env.RDSH_BIN = binary;\nprocess.env.RDSH_ORIG_BIN = join(process.resourcesPath, 'runtime', 'cli', 'bin', process.platform === 'win32' ? 'dsh.cmd' : 'dsh');\nimport('./lib/main.js');\n`;
   return outputs;
 }
 

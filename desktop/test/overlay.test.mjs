@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import vm from 'node:vm';
+import * as path from 'node:path';
 import { planOverlay, contentHash, PATCH_PATHS, FEED_URL } from '../overlay.mjs';
 import { source } from './fixtures/upstream-source.mjs';
 
@@ -21,6 +23,11 @@ test('overlay prepares a Rust identity and dedicated feed without changing offic
   assert.ok(builder.includes(FEED_URL)); assert.ok(updater.includes(FEED_URL));
   assert.match(result[PATCH_PATHS[3]], /CHANNEL = 'rdsh-desktop'/);
   assert.match(result[PATCH_PATHS[2]], /setAsDefaultProtocolClient\('rdsh'\)/);
+  assert.match(result[PATCH_PATHS[7]], /const environment = invocation.unsigned/);
+  assert.match(result[PATCH_PATHS[8]], /rdsh Desktop\.exe/);
+  assert.doesNotMatch(result[PATCH_PATHS[8]], /DeepSeek Harness/);
+  assert.match(result[PATCH_PATHS[9]], /if \(!options.unsigned\) resolveDesktopPolicyEnvironment/);
+  assert.match(result[PATCH_PATHS[10]], /const base = `rdsh-desktop-/);
   assert.match(result['apps/desktop/rdsh-bootstrap.cjs'], /process\.env\.DSH_HOME = home/);
   assert.match(result['apps/desktop/rdsh-bootstrap.cjs'], /Bundled Rust launcher is missing/);
   assert.equal(Object.hasOwn(result, 'package.json'), false);
@@ -45,4 +52,25 @@ test('source hashes tolerate Git checkout line endings while retaining all patch
     writeFileSync(join(f.root, path), canonical.replace(/\n/g, '\r\n'));
   }
   assert.ok(planOverlay(f.root, f.lock, '0.3.3', 'rdsh.exe')['apps/desktop/rdsh-bootstrap.cjs'].includes('rdsh.exe'));
+});
+
+test('generated carrier isolates Electron and Harness homes before importing the official engine', t => {
+  const f = fixture(t), generated = planOverlay(f.root, f.lock, '0.3.3', 'rdsh')['apps/desktop/rdsh-bootstrap.cjs'];
+  const script = generated.replace("import('./lib/main.js');", 'engineImported = true;');
+  const home = join(f.root, 'private-harness'), userData = join(f.root, 'private-electron');
+  const dirs = [], paths = {}, process = { platform: 'linux', resourcesPath: join(f.root, 'resources'),
+    env: { RDSH_DESKTOP_HOME: home, RDSH_DESKTOP_USER_DATA: userData, DSH_HOME: join(f.root, 'unrelated') } };
+  const context = { process, engineImported: false, require(name) {
+    if (name === 'electron') return { app: { setName(value) { paths.name = value; }, getPath() { return join(f.root, 'appData'); }, setPath(key, value) { paths[key] = value; } } };
+    if (name === 'node:path') return path;
+    if (name === 'node:fs') return { existsSync: () => true, mkdirSync(value) { dirs.push(value); } };
+    throw new Error('unexpected carrier import');
+  } };
+  vm.runInNewContext(script, context);
+  assert.equal(paths.name, 'rdsh Desktop'); assert.equal(paths.userData, userData);
+  assert.deepEqual(dirs, [userData]); assert.equal(process.env.DSH_HOME, home); assert.equal(context.engineImported, true);
+  process.env.RDSH_DESKTOP_USER_DATA = 'relative'; dirs.length = 0;
+  const invalidContext = { ...context, engineImported: false };
+  assert.throws(() => vm.runInNewContext(script, invalidContext), /absolute/);
+  assert.deepEqual(dirs, []); assert.equal(invalidContext.engineImported, false);
 });

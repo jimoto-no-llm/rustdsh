@@ -8,4 +8,8 @@ export const source = {
     [PATCH_PATHS[4]]: `export function validateDesktopBuildVersion(buildVersion, productVersion) {\n}\nexport function resolveDesktopBuildVersion(env, productVersion) {\n}\nexport function desktopBuildVersionPrefix(productVersion) {\n}`,
     [PATCH_PATHS[5]]: `set -e\nexec "$resources/../MacOS/DeepSeek Harness"`,
     [PATCH_PATHS[6]]: 'setlocal DisableDelayedExpansion\r\nDeepSeek Harness.exe',
+    [PATCH_PATHS[7]]: "const environment = target.platform === 'darwin' && invocation.unsigned\nconst filename = `deepseek-harness-${buildVersion}\n'DeepSeek Harness.app'",
+    [PATCH_PATHS[8]]: "'DeepSeek Harness.app'\n'DeepSeek Harness.exe'\n'DeepSeek Harness'",
+    [PATCH_PATHS[9]]: "DSH_DESKTOP_APP_ID: 'com.deepseek.harness'\nif (target.platform !== 'darwin' || !options.unsigned) resolveDesktopPolicyEnvironment(environment)",
+    [PATCH_PATHS[10]]: "'DeepSeek Harness.app'\nconst base = `deepseek-harness-${version}",
   };

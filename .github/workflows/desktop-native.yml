@@ -1,0 +1,67 @@
+name: desktop-native
+
+on:
+  pull_request:
+    paths: ["desktop/**", "Cargo.toml", "Cargo.lock", ".github/workflows/desktop-native.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-native-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unsigned-app:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            binary: target/release/rdsh.exe
+          - os: macos-latest
+            binary: target/release/rdsh
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    env:
+      CI: 'true'
+      DSH_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release --locked
+      - run: node desktop/prepare.mjs --checkout target/desktop-native-fork --rdsh-bin ${{ matrix.binary }}
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 11.28.5
+      - name: Install the pinned official dependency graph
+        run: pnpm --dir target/desktop-native-fork install --frozen-lockfile
+      - name: Build an unsigned directory and run official payload/Host/Office smokes
+        run: node desktop/build.mjs --checkout target/desktop-native-fork
+      - run: npm ci --prefix tests/e2e
+      - name: Launch the real Electron app with private fixture homes
+        run: node desktop/smoke-packaged.mjs --checkout target/desktop-native-fork --output target/desktop-native-evidence
+      - name: Preserve the unsigned app as a zip with checksum
+        run: node desktop/archive.mjs --checkout target/desktop-native-fork --output target/desktop-native-artifacts
+      - uses: actions/upload-artifact@v7
+        with:
+          name: rdsh-desktop-unsigned-${{ matrix.os }}
+          path: target/desktop-native-artifacts/
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: rdsh-desktop-native-evidence-${{ matrix.os }}
+          path: |
+            target/desktop-native-evidence/
+            target/desktop-native-fork/apps/desktop/.desktop-build/packaging-runs/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
