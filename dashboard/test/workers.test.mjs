@@ -291,12 +291,19 @@ test("path escape, globs, unknown fields and review writes are rejected", () => 
     "src\\file",
     "src/**",
     ".git/config",
+    "src/.git/config",
     "src//a",
   ])
     assert.throws(
       () => declaration(scope("bad", [file])),
       error("invalid_scope_path"),
     );
+  if (process.platform === "win32") {
+    assert.throws(
+      () => declaration(scope("bad", ["src/.GIT/config"])),
+      error("invalid_scope_path"),
+    );
+  }
   assert.throws(
     () => declaration(scope("review", ["src"], "review")),
     error("review_worker_is_read_only"),

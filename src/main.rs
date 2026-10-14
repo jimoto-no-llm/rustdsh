@@ -371,6 +371,8 @@ enum Commands {
 enum WorkerScopeAction {
     /// Read a JSON array of declarations and write JSON result records.
     Validate,
+    /// Evaluate write paths, scope intersections, and shared-file policy in one batch.
+    Policy,
 }
 
 #[derive(Subcommand, Debug)]
@@ -595,6 +597,7 @@ fn main() {
     if let Some(Commands::WorkerScope { action }) = &cli.command {
         let result = match action {
             WorkerScopeAction::Validate => worker_scopes::cmd_validate(),
+            WorkerScopeAction::Policy => worker_scopes::cmd_policy(),
         };
         if let Err(error) = result {
             eprintln!("[rdsh] error: {error:#}");

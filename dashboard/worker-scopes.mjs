@@ -25,6 +25,12 @@ export const covers = (scope, file) => {
   }
   return scope === "." || file === scope || file.startsWith(scope + "/");
 };
+const isGitMetadataPath = (file) =>
+  file.split("/").some((component) =>
+    process.platform === "win32"
+      ? component.toLowerCase() === ".git"
+      : component === ".git",
+  );
 export const samePath = (a, b) =>
   process.platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b;
 export const within = (root, file) => {
@@ -48,7 +54,7 @@ function relativeScope(value) {
   const normalized = value.endsWith("/") ? value.slice(0, -1) : value;
   requireWorker(
     normalized.split("/").every((p) => p && p !== "." && p !== "..") &&
-      !covers(".git", normalized),
+      !isGitMetadataPath(normalized),
     "invalid_scope_path",
   );
   return normalized;
@@ -173,6 +179,101 @@ function legacyDeclarationResults(inputs) {
   });
 }
 
+function legacyPolicyResults(input) {
+  return {
+    write_checks: (input.write_checks ?? []).map(({ scope, files }) =>
+      files.map((file) => mayWrite(scope, file)),
+    ),
+    intersections: (input.intersections ?? []).map(({ left, right }) =>
+      intersections(left, right),
+    ),
+    shared_files: (input.shared_files ?? []).map(sharedFile),
+  };
+}
+
+export function policyResults(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new WorkerError("invalid_scope_policy_batch");
+  }
+  const request = {
+    write_checks: input.write_checks ?? [],
+    intersections: input.intersections ?? [],
+    shared_files: input.shared_files ?? [],
+  };
+  if (
+    !Array.isArray(request.write_checks) ||
+    !Array.isArray(request.intersections) ||
+    !Array.isArray(request.shared_files)
+  ) {
+    throw new WorkerError("invalid_scope_policy_batch");
+  }
+  if (
+    request.write_checks.length === 0 &&
+    request.intersections.length === 0 &&
+    request.shared_files.length === 0
+  ) {
+    return { write_checks: [], intersections: [], shared_files: [] };
+  }
+
+  const binary = rdshExecutable();
+  if (!binary) return legacyPolicyResults(request);
+  const serialized = JSON.stringify(request);
+  if (Buffer.byteLength(serialized) > 2 * 1024 * 1024) {
+    return legacyPolicyResults(request);
+  }
+  const output = spawnSync(binary, ["worker-scope", "policy"], {
+    input: serialized,
+    encoding: "utf8",
+    windowsHide: true,
+    shell: false,
+    timeout: 10_000,
+    maxBuffer: 4 * 1024 * 1024,
+  });
+  if (output.error?.code === "ENOENT" && !process.env.RDSH_BIN) {
+    return legacyPolicyResults(request);
+  }
+  if (output.error || output.status !== 0) {
+    throw new WorkerError("native_worker_policy_unavailable");
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(output.stdout);
+  } catch {
+    throw new WorkerError("native_worker_policy_unavailable");
+  }
+  if (
+    !parsed ||
+    typeof parsed !== "object" ||
+    !Array.isArray(parsed.write_checks) ||
+    parsed.write_checks.length !== request.write_checks.length ||
+    !Array.isArray(parsed.intersections) ||
+    parsed.intersections.length !== request.intersections.length ||
+    !Array.isArray(parsed.shared_files) ||
+    parsed.shared_files.length !== request.shared_files.length
+  ) {
+    throw new WorkerError("native_worker_policy_unavailable");
+  }
+  const writeChecksValid = parsed.write_checks.every(
+    (results, index) =>
+      Array.isArray(results) &&
+      results.length === request.write_checks[index].files.length &&
+      results.every((value) => typeof value === "boolean"),
+  );
+  const intersectionsValid = parsed.intersections.every(
+    (paths) =>
+      Array.isArray(paths) && paths.every((value) => typeof value === "string"),
+  );
+  if (
+    !writeChecksValid ||
+    !intersectionsValid ||
+    !parsed.shared_files.every((value) => typeof value === "boolean")
+  ) {
+    throw new WorkerError("native_worker_policy_unavailable");
+  }
+  return parsed;
+}
+
 export function declarationResults(inputs) {
   requireWorker(Array.isArray(inputs), "invalid_scope_declarations");
   if (inputs.length === 0) return [];
@@ -224,7 +325,7 @@ export function declaration(input) {
 }
 export function mayWrite(scope, file) {
   return (
-    !covers(".git", file) &&
+    !isGitMetadataPath(file) &&
     scope.write_paths.some((p) => covers(p, file)) &&
     !scope.forbidden_paths.some((p) => covers(p, file))
   );

@@ -23,6 +23,25 @@ fn validate(values: Value) -> Value {
     serde_json::from_slice(&output.stdout).unwrap()
 }
 
+fn policy(values: Value) -> Value {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_rdsh"))
+        .args(["worker-scope", "policy"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn rdsh");
+    serde_json::to_writer(child.stdin.as_mut().unwrap(), &values).unwrap();
+    child.stdin.take();
+    let output = child.wait_with_output().unwrap();
+    assert!(
+        output.status.success(),
+        "rdsh failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    serde_json::from_slice(&output.stdout).unwrap()
+}
+
 #[test]
 fn native_worker_scope_validation_normalizes_paths_and_modules() {
     let output = validate(json!([{
@@ -110,6 +129,46 @@ fn native_worker_scope_validation_keeps_role_specific_write_defaults() {
     );
     assert_eq!(output[1]["ok"], true);
     assert_eq!(output[1]["value"]["write_paths"], json!([]));
+}
+
+#[test]
+fn native_worker_scope_policy_batches_write_intersection_and_shared_file_checks() {
+    let left = json!({
+        "worker_id": "editor-a",
+        "role": "edit",
+        "read_paths": ["."],
+        "write_paths": ["src", "Cargo.toml"],
+        "modules": ["editor"],
+        "forbidden_paths": ["src/private"],
+        "lease_seconds": 60
+    });
+    let right = json!({
+        "worker_id": "editor-b",
+        "role": "edit",
+        "read_paths": ["."],
+        "write_paths": ["src/lib.rs", "Cargo.toml"],
+        "modules": ["editor"],
+        "forbidden_paths": [],
+        "lease_seconds": 60
+    });
+
+    let output = policy(json!({
+        "write_checks": [{
+            "scope": left,
+            "files": ["src/lib.rs", "src/private/key", "Cargo.toml", ".git/config"]
+        }],
+        "intersections": [{ "left": left, "right": right }],
+        "shared_files": ["Cargo.lock", "src/file.json", ".github/workflows/ci.yml", "misc/package.json"]
+    }));
+
+    assert_eq!(
+        output,
+        json!({
+            "write_checks": [[true, false, true, false]],
+            "intersections": [["Cargo.toml", "src/lib.rs"]],
+            "shared_files": [true, false, true, true]
+        })
+    );
 }
 
 #[test]

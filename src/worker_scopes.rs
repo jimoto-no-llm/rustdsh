@@ -3,17 +3,10 @@ use serde_json::{Map, Value};
 use std::io::{self, Read, Write};
 
 const MAX_INPUT_BYTES: usize = 2 * 1024 * 1024;
+const MAX_POLICY_BATCH_ITEMS: usize = 4096;
 
 pub fn cmd_validate() -> Result<()> {
-    let mut input = Vec::new();
-    io::stdin()
-        .take((MAX_INPUT_BYTES + 1) as u64)
-        .read_to_end(&mut input)
-        .context("read worker scope declarations")?;
-    if input.len() > MAX_INPUT_BYTES {
-        anyhow::bail!("worker scope input exceeds 2 MiB");
-    }
-    let input: Value = serde_json::from_slice(&input).context("parse worker scope declarations")?;
+    let input = read_input("worker scope declarations")?;
     let values = input
         .as_array()
         .context("worker scope declarations must be a JSON array")?;
@@ -23,6 +16,116 @@ pub fn cmd_validate() -> Result<()> {
     serde_json::to_writer(&mut stdout, &output)?;
     writeln!(stdout)?;
     Ok(())
+}
+
+pub fn cmd_policy() -> Result<()> {
+    let input = read_input("worker scope policy batch")?;
+    let object = input
+        .as_object()
+        .context("worker scope policy batch must be a JSON object")?;
+    const ALLOWED: &[&str] = &["write_checks", "intersections", "shared_files"];
+    if object.keys().any(|key| !ALLOWED.contains(&key.as_str())) {
+        anyhow::bail!("unknown worker scope policy batch field");
+    }
+
+    let mut write_checks = Vec::new();
+    for check in optional_array(object, "write_checks")? {
+        let check = check
+            .as_object()
+            .context("write check must be a JSON object")?;
+        if check
+            .keys()
+            .any(|key| !matches!(key.as_str(), "scope" | "files"))
+        {
+            anyhow::bail!("unknown write check field");
+        }
+        let scope = declaration(check.get("scope").context("write check is missing scope")?)
+            .map_err(anyhow::Error::msg)
+            .context("invalid write check scope")?;
+        let files = check
+            .get("files")
+            .and_then(Value::as_array)
+            .context("write check files must be a JSON array")?;
+        let mut results = Vec::with_capacity(files.len());
+        for file in files {
+            let file = file.as_str().context("write check file must be a string")?;
+            results.push(may_write(&scope, file));
+        }
+        write_checks.push(results);
+        if write_checks.len() > MAX_POLICY_BATCH_ITEMS {
+            anyhow::bail!("too many worker scope write checks");
+        }
+    }
+
+    let mut intersections = Vec::new();
+    for pair in optional_array(object, "intersections")? {
+        let pair = pair
+            .as_object()
+            .context("scope intersection must be a JSON object")?;
+        if pair
+            .keys()
+            .any(|key| !matches!(key.as_str(), "left" | "right"))
+        {
+            anyhow::bail!("unknown scope intersection field");
+        }
+        let left = declaration(
+            pair.get("left")
+                .context("scope intersection is missing left")?,
+        )
+        .map_err(anyhow::Error::msg)
+        .context("invalid left scope")?;
+        let right = declaration(
+            pair.get("right")
+                .context("scope intersection is missing right")?,
+        )
+        .map_err(anyhow::Error::msg)
+        .context("invalid right scope")?;
+        intersections.push(scope_intersections(&left, &right));
+        if intersections.len() > MAX_POLICY_BATCH_ITEMS {
+            anyhow::bail!("too many worker scope intersections");
+        }
+    }
+
+    let mut shared_files = Vec::new();
+    for file in optional_array(object, "shared_files")? {
+        let file = file.as_str().context("shared file path must be a string")?;
+        shared_files.push(is_shared_file(file));
+        if shared_files.len() > MAX_POLICY_BATCH_ITEMS {
+            anyhow::bail!("too many shared file checks");
+        }
+    }
+
+    let output = serde_json::json!({
+        "write_checks": write_checks,
+        "intersections": intersections,
+        "shared_files": shared_files,
+    });
+    let stdout = io::stdout();
+    let mut stdout = stdout.lock();
+    serde_json::to_writer(&mut stdout, &output)?;
+    writeln!(stdout)?;
+    Ok(())
+}
+
+fn read_input(context: &str) -> Result<Value> {
+    let mut input = Vec::new();
+    io::stdin()
+        .take((MAX_INPUT_BYTES + 1) as u64)
+        .read_to_end(&mut input)
+        .with_context(|| format!("read {context}"))?;
+    if input.len() > MAX_INPUT_BYTES {
+        anyhow::bail!("worker scope input exceeds 2 MiB");
+    }
+    serde_json::from_slice(&input).with_context(|| format!("parse {context}"))
+}
+
+fn optional_array<'a>(object: &'a Map<String, Value>, key: &str) -> Result<&'a [Value]> {
+    match object.get(key) {
+        None | Some(Value::Null) => Ok(&[]),
+        Some(Value::Array(values)) if values.len() <= MAX_POLICY_BATCH_ITEMS => Ok(values),
+        Some(Value::Array(_)) => anyhow::bail!("too many values in {key}"),
+        Some(_) => anyhow::bail!("{key} must be a JSON array"),
+    }
 }
 
 fn declaration_result(input: &Value) -> Value {
@@ -162,7 +265,7 @@ fn relative_scope(value: &Value) -> std::result::Result<String, String> {
         || normalized
             .split('/')
             .any(|part| part.is_empty() || matches!(part, "." | ".."))
-        || covers(".git", normalized)
+        || is_git_metadata_path(normalized)
     {
         return Err("invalid_scope_path".into());
     }
@@ -176,6 +279,107 @@ fn covers(scope: &str, file: &str) -> bool {
         (scope.to_string(), file.to_string())
     };
     scope == "." || file == scope || file.starts_with(&(scope + "/"))
+}
+
+fn is_git_metadata_path(path: &str) -> bool {
+    path.split('/').any(|component| {
+        if cfg!(windows) {
+            component.eq_ignore_ascii_case(".git")
+        } else {
+            component == ".git"
+        }
+    })
+}
+
+fn may_write(scope: &Value, file: &str) -> bool {
+    if is_git_metadata_path(file) {
+        return false;
+    }
+    let includes = |key: &str| {
+        scope
+            .get(key)
+            .and_then(Value::as_array)
+            .is_some_and(|paths| {
+                paths
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .any(|path| covers(path, file))
+            })
+    };
+    includes("write_paths") && !includes("forbidden_paths")
+}
+
+fn scope_intersections(left: &Value, right: &Value) -> Vec<String> {
+    let left_paths = left
+        .get("write_paths")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str);
+    let right_paths: Vec<&str> = right
+        .get("write_paths")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .collect();
+    let mut overlaps = Vec::new();
+    for left_path in left_paths {
+        for right_path in &right_paths {
+            let narrow = if covers(left_path, right_path) {
+                Some(*right_path)
+            } else if covers(right_path, left_path) {
+                Some(left_path)
+            } else {
+                None
+            };
+            if let Some(narrow) = narrow {
+                if may_write(left, narrow) && may_write(right, narrow) {
+                    overlaps.push(narrow.to_string());
+                }
+            }
+        }
+    }
+    overlaps.sort_by(|left, right| js_string_cmp(left, right));
+    overlaps.dedup();
+    overlaps
+}
+
+fn is_shared_file(file: &str) -> bool {
+    let basename = file.rsplit('/').next().unwrap_or_default();
+    let basename = basename.to_ascii_lowercase();
+    const EXACT: &[&str] = &[
+        "cargo.lock",
+        "cargo.toml",
+        "package.json",
+        "package-lock.json",
+        "pnpm-lock.yaml",
+        "yarn.lock",
+        "bun.lockb",
+        "bun.lock",
+        "go.mod",
+        "go.sum",
+        "pyproject.toml",
+        "uv.lock",
+    ];
+    if EXACT.contains(&basename.as_str()) || file.starts_with(".github/workflows/") {
+        return true;
+    }
+    ["tsconfig", "config", "settings"].iter().any(|prefix| {
+        let Some(suffix) = basename.strip_prefix(prefix) else {
+            return false;
+        };
+        if suffix == ".json" {
+            return true;
+        }
+        let Some(suffix) = suffix
+            .strip_prefix('.')
+            .and_then(|suffix| suffix.strip_suffix(".json"))
+        else {
+            return false;
+        };
+        !suffix.is_empty() && !suffix.contains('.')
+    })
 }
 
 fn valid_worker_id(value: &str) -> bool {
@@ -257,7 +461,12 @@ mod tests {
 
     #[test]
     fn paths_reject_parent_and_git_metadata_segments() {
-        for invalid in ["../secret", "src/../secret", ".git/config"] {
+        for invalid in [
+            "../secret",
+            "src/../secret",
+            ".git/config",
+            "src/.git/config",
+        ] {
             assert_eq!(
                 relative_scope(&json!(invalid)),
                 Err("invalid_scope_path".into())
