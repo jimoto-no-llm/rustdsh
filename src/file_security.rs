@@ -5,8 +5,8 @@
 //! `openat`/`O_NOFOLLOW` under a held directory fd, so a link swapped in after
 //! validation cannot redirect the read. Windows has no `std` equivalent, so it
 //! validates the target (regular file, no reparse point, canonical path under
-//! the root) and only then opens it. Stable Rust cannot count hard links on
-//! Windows, so that part of the policy stays Unix-only. A reparse point
+//! the root) and only then opens it; opened-handle metadata enforces the
+//! one-link policy. A reparse point
 //! substituted for the target or one of its parents between those two steps can
 //! still win that race: the opened handle cannot reveal the substitution, so the
 //! read may leave the approved root.
@@ -168,14 +168,12 @@ impl Root {
 
     #[cfg(windows)]
     pub(crate) fn open(&self, target: &Path) -> Option<std::fs::File> {
-        use std::os::windows::fs::MetadataExt;
+        use std::os::windows::{fs::MetadataExt, io::AsRawHandle};
 
         // Reject symlinks, junctions and other reparse points before looking
         // at the file type, then directories and other non-regular files.
-        // A hard-link count is not available on stable Rust (`number_of_links`
-        // is behind the unstable `windows_by_handle` feature), so the Unix
-        // one-link policy has no stable Windows equivalent; that gap is
-        // documented in the module comment instead of being implied away.
+        // A hard link is a regular file with an in-root canonical name, so
+        // enforce the same one-link boundary using the opened handle metadata.
         const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
         let metadata = std::fs::symlink_metadata(target).ok()?;
         if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 || !metadata.is_file() {
@@ -190,13 +188,53 @@ impl Root {
         let file = std::fs::File::open(&canonical).ok()?;
         // Re-check the opened object, mirroring the Unix check on the fd; a
         // swap between the checks above and this open remains unobservable.
-        file.metadata().ok()?.is_file().then_some(file)
+        if !file.metadata().ok()?.is_file() {
+            return None;
+        }
+        let mut info = ByHandleFileInformation::default();
+        // SAFETY: the handle is owned by `file`, and `info` is a valid output
+        // buffer with the Win32 structure layout.
+        let ok = unsafe { GetFileInformationByHandle(file.as_raw_handle(), &mut info) };
+        (ok != 0 && info.number_of_links == 1).then_some(file)
     }
 
     #[cfg(not(any(unix, windows)))]
     pub(crate) fn open(&self, _target: &Path) -> Option<std::fs::File> {
         None
     }
+}
+
+#[cfg(windows)]
+#[repr(C)]
+#[derive(Default)]
+struct FileTime {
+    low: u32,
+    high: u32,
+}
+
+#[cfg(windows)]
+#[repr(C)]
+#[derive(Default)]
+struct ByHandleFileInformation {
+    attributes: u32,
+    creation_time: FileTime,
+    last_access_time: FileTime,
+    last_write_time: FileTime,
+    volume_serial_number: u32,
+    file_size_high: u32,
+    file_size_low: u32,
+    number_of_links: u32,
+    file_index_high: u32,
+    file_index_low: u32,
+}
+
+#[cfg(windows)]
+#[link(name = "kernel32")]
+unsafe extern "system" {
+    fn GetFileInformationByHandle(
+        file: *mut std::ffi::c_void,
+        information: *mut ByHandleFileInformation,
+    ) -> i32;
 }
 
 #[cfg(target_os = "macos")]
@@ -240,6 +278,30 @@ fn macos_nofollow_any_must_walk(relative: &Path) -> bool {
 
 pub(crate) fn open_beneath(root: &Path, target: &Path) -> Option<std::fs::File> {
     Root::new(root)?.open(target)
+}
+
+#[cfg(all(test, windows))]
+mod windows_secure_open_tests {
+    use super::Root;
+
+    #[test]
+    fn rejects_a_hard_link_to_an_outside_file() {
+        let temporary = std::env::temp_dir().join(format!(
+            "rdsh-hardlink-open-{}",
+            crate::local_http::random_token().unwrap()
+        ));
+        let project = temporary.join("project");
+        let outside = temporary.join("outside.txt");
+        std::fs::create_dir_all(&project).unwrap();
+        std::fs::write(&outside, "outside contents").unwrap();
+        let linked = project.join("linked.txt");
+        std::fs::hard_link(&outside, &linked).unwrap();
+
+        let root_path = std::fs::canonicalize(&project).unwrap();
+        let root = Root::new(&root_path).unwrap();
+        assert!(root.open(&linked).is_none());
+        std::fs::remove_dir_all(temporary).unwrap();
+    }
 }
 
 #[cfg(all(test, unix))]

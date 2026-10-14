@@ -321,12 +321,7 @@ fn summarize(report: &Value) -> Result<Summary> {
                 .get(key)
                 .is_some_and(|value| !value.is_null() && value.as_str() != Some(""))
         };
-        summary.listed += entry
-            .get("listed")
-            .and_then(Value::as_u64)
-            .unwrap_or(0)
-            .try_into()
-            .unwrap_or(0);
+        summary.listed += items("listed");
         summary.added += items("added");
         summary.renamed += items("renamed");
         summary.written += usize::from(entry.get("written").and_then(Value::as_bool) == Some(true));
@@ -445,6 +440,21 @@ pub(crate) fn cmd_models_auto(
                 "[rdsh] models auto: no profiles under {}",
                 profiles_root().display()
             ),
+        );
+    }
+    if crate::models::profile_paths(None)?.is_empty() {
+        return finish(
+            json_out,
+            quiet,
+            false,
+            json!({
+                "enabled": true,
+                "ran": false,
+                "reason": "no_profiles",
+                "detail": "no eligible profile carries a cordis.patch.yml",
+                "state_path": path.display().to_string(),
+            }),
+            "[rdsh] models auto: no eligible profile carries a cordis.patch.yml".to_string(),
         );
     }
 
@@ -661,15 +671,15 @@ mod tests {
         let report = serde_json::json!({
             "dry_run": false,
             "profiles": [
-                {"profile":"web","provider":"openai-codex","listed":10,"added":["gpt-6.1-sol"],"renamed":[],"written":true,"skipped":null,"error":null},
-                {"profile":"web","provider":"kimi-coding","listed":4,"added":[],"renamed":["kimi-for-coding"],"written":true,"skipped":null,"error":null},
-                {"profile":"tui","provider":"openai-codex","listed":8,"added":[],"renamed":[],"written":false,"skipped":"no apiKeyEnv","error":null},
-                {"profile":"tui","provider":"kimi-coding","listed":0,"added":[],"renamed":[],"written":false,"skipped":null,"error":"cannot write"}
+                {"profile":"web","provider":"openai-codex","listed":["gpt-5.6-sol","gpt-6.1-sol"],"added":["gpt-6.1-sol"],"renamed":[],"written":true,"skipped":null,"error":null},
+                {"profile":"web","provider":"kimi-coding","listed":["kimi-for-coding","kimi-k2"],"added":[],"renamed":["kimi-for-coding"],"written":true,"skipped":null,"error":null},
+                {"profile":"tui","provider":"openai-codex","listed":["gpt-5.6-sol"],"added":[],"renamed":[],"written":false,"skipped":"no apiKeyEnv","error":null},
+                {"profile":"tui","provider":"kimi-coding","listed":[],"added":[],"renamed":[],"written":false,"skipped":null,"error":"cannot write"}
             ]
         });
         let summary = summarize(&report).unwrap();
         assert_eq!(summary.profiles, 4);
-        assert_eq!(summary.listed, 22);
+        assert_eq!(summary.listed, 5);
         assert_eq!(summary.added, 1);
         assert_eq!(summary.renamed, 1);
         assert_eq!(summary.written, 2);
@@ -688,7 +698,7 @@ mod tests {
         assert_eq!(summary.line(), "no profile carries a provider block");
 
         let up_to_date = summarize(&serde_json::json!({
-            "profiles": [{"profile":"web","provider":"openai-codex","listed":10,"added":[],"renamed":[],"written":false}]
+            "profiles": [{"profile":"web","provider":"openai-codex","listed":["gpt-5.6-sol"],"added":[],"renamed":[],"written":false}]
         }))
         .unwrap();
         assert!(!up_to_date.changed());

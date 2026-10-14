@@ -16,6 +16,7 @@
 //! - richer git snapshot (branch + status + diff stat)
 //! - verifier warnings (missing files surface explicitly)
 
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -919,21 +920,38 @@ impl GitState {
             &["status", "--porcelain=v1", "-z", "--untracked-files=all"],
             deadline,
         )
-        .map(|s| {
+        .and_then(|s| {
+            const MAX_TOTAL_FINGERPRINT_BYTES: u64 = 256 * 1024 * 1024;
+            let root = std::fs::canonicalize(std::env::current_dir().ok()?).ok()?;
             let mut paths = BTreeMap::new();
+            let mut total_bytes = 0u64;
             let mut records = s.split('\0').filter(|r| !r.is_empty());
             while let Some(record) = records.next() {
+                if deadline.is_some_and(|deadline| Instant::now() >= deadline) {
+                    return None;
+                }
                 if let Some(path) = record.get(3..) {
                     let status = record.get(..2).unwrap_or("??").to_string();
-                    paths.insert(path.to_string(), status.clone());
+                    let (fingerprint, size) = dirty_path_fingerprint(&root, &root.join(path))?;
+                    total_bytes = total_bytes.checked_add(size)?;
+                    if total_bytes > MAX_TOTAL_FINGERPRINT_BYTES {
+                        return None;
+                    }
+                    paths.insert(path.to_string(), format!("{status}:{fingerprint}"));
                     if status.contains('R') || status.contains('C') {
                         if let Some(old) = records.next() {
-                            paths.insert(old.to_string(), status);
+                            let (fingerprint, size) =
+                                dirty_path_fingerprint(&root, &root.join(old))?;
+                            total_bytes = total_bytes.checked_add(size)?;
+                            if total_bytes > MAX_TOTAL_FINGERPRINT_BYTES {
+                                return None;
+                            }
+                            paths.insert(old.to_string(), format!("{status}:{fingerprint}"));
                         }
                     }
                 }
             }
-            paths
+            Some(paths)
         });
         Self {
             head,
@@ -941,6 +959,50 @@ impl GitState {
             dirty,
         }
     }
+}
+
+const MAX_DIRTY_FILE_FINGERPRINT_BYTES: u64 = 64 * 1024 * 1024;
+
+/// A missing dirty path is meaningful (for example, an unstaged deletion).
+/// Unreadable, oversized, special, or unsafe paths return None and make the
+/// snapshot unknown rather than falsely stable.
+fn dirty_path_fingerprint(root: &Path, path: &Path) -> Option<(String, u64)> {
+    let metadata = match std::fs::symlink_metadata(path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Some(("missing".to_string(), 0));
+        }
+        Err(_) => return None,
+    };
+    let bytes = if metadata.file_type().is_symlink() {
+        std::fs::read_link(path)
+            .ok()?
+            .to_string_lossy()
+            .as_bytes()
+            .to_vec()
+    } else {
+        if !metadata.is_file() || metadata.len() > MAX_DIRTY_FILE_FINGERPRINT_BYTES {
+            return None;
+        }
+        let target = std::fs::canonicalize(path).ok()?;
+        let file = open_beneath(root, &target)?;
+        let mut bytes = Vec::with_capacity(metadata.len() as usize);
+        file.take(MAX_DIRTY_FILE_FINGERPRINT_BYTES + 1)
+            .read_to_end(&mut bytes)
+            .ok()?;
+        if bytes.len() as u64 > MAX_DIRTY_FILE_FINGERPRINT_BYTES {
+            return None;
+        }
+        bytes
+    };
+    let mut hash = Sha256::new();
+    hash.update(&bytes);
+    let fingerprint = hash
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    Some((fingerprint, bytes.len() as u64))
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -2368,10 +2430,9 @@ pub fn cmd_explain(query: Option<String>, budget: Option<usize>) -> anyhow::Resu
 // ---- context v3 entry points ----
 
 // Serialize writers without replacing existing history after a failed read.
+// The OS releases this lock when a process exits, including after a crash.
 struct MemoryLock {
-    _file: std::fs::File,
-    #[cfg(not(unix))]
-    path: PathBuf,
+    _lock: crate::file_lock::FileLock,
 }
 
 impl MemoryLock {
@@ -2380,40 +2441,10 @@ impl MemoryLock {
             .parent()
             .ok_or_else(|| anyhow::anyhow!("memory parent: unknown"))?;
         std::fs::create_dir_all(parent)?;
-        let path = parent.join(".rdsh-context-memory.lock");
-        let mut opts = std::fs::OpenOptions::new();
-        opts.write(true);
-        #[cfg(unix)]
-        {
-            use std::os::fd::AsRawFd;
-            use std::os::unix::fs::OpenOptionsExt;
-            opts.create(true)
-                .truncate(false)
-                .mode(0o600)
-                .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
-            let file = opts.open(&path)?;
-            anyhow::ensure!(file.metadata()?.is_file(), "memory lock: unknown");
-            anyhow::ensure!(
-                unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
-                "memory writer busy: unknown"
-            );
-            Ok(Self { _file: file })
-        }
-        #[cfg(not(unix))]
-        {
-            opts.create_new(true);
-            Ok(Self {
-                _file: opts.open(&path)?,
-                path,
-            })
-        }
-    }
-}
-
-#[cfg(not(unix))]
-impl Drop for MemoryLock {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.path);
+        let target = parent.join(".rdsh-context-memory");
+        Ok(Self {
+            _lock: crate::file_lock::FileLock::exclusive_for(&target)?,
+        })
     }
 }
 
@@ -4009,6 +4040,28 @@ mod v3_tests {
         assert!(snapshot
             .line()
             .starts_with("[snapshot: CHANGED during build:"));
+    }
+
+    #[test]
+    fn dirty_file_fingerprint_changes_when_porcelain_status_does_not() {
+        let temporary = TempDir::new();
+        let root = std::fs::canonicalize(&temporary.0).unwrap();
+        let file = root.join("already-dirty.rs");
+        std::fs::write(&file, "first contents").unwrap();
+        let first = dirty_path_fingerprint(&root, &file).unwrap();
+        std::fs::write(&file, "other contents").unwrap();
+        let second = dirty_path_fingerprint(&root, &file).unwrap();
+        assert_ne!(first.0, second.0);
+        assert_eq!(first.1, second.1);
+    }
+
+    #[test]
+    fn memory_writer_lock_can_be_reacquired_after_release() {
+        let temporary = TempDir::new();
+        let memory = temporary.0.join("memory.json");
+        let first = MemoryLock::acquire(&memory).unwrap();
+        drop(first);
+        assert!(MemoryLock::acquire(&memory).is_ok());
     }
 
     #[test]

@@ -45,7 +45,11 @@ impl Fixture {
     }
 
     fn with_profile(self) -> Self {
-        std::fs::create_dir_all(self.root.join("profiles/web")).unwrap();
+        let profile = self.root.join("profiles/web");
+        std::fs::create_dir_all(&profile).unwrap();
+        // An empty but present patch is a usable profile; the sync has no
+        // provider blocks and performs no network request.
+        std::fs::write(profile.join("cordis.patch.yml"), "").unwrap();
         self
     }
 
@@ -55,9 +59,13 @@ impl Fixture {
     }
 
     fn run(&self, args: &[&str]) -> Output {
+        let empty = self.root.join("empty-path");
+        let _ = std::fs::create_dir_all(&empty);
         Command::new(env!("CARGO_BIN_EXE_rdsh"))
             .args(args)
             .env("DSH_HOME", &self.root)
+            .env("HOME", self.root.join("home"))
+            .env("PATH", empty)
             .env_remove("RDSH_NO_MODELS_AUTO")
             .env_remove("RDSH_MODELS_AUTO_INTERVAL_HOURS")
             .output()
@@ -172,6 +180,53 @@ fn a_home_without_profiles_is_left_alone() {
 }
 
 #[test]
+fn an_empty_profiles_directory_is_not_marked_as_an_attempt() {
+    let fixture = Fixture::new("empty-profiles");
+    std::fs::create_dir_all(fixture.root.join("profiles")).unwrap();
+    let report = fixture.report(&json(&["models", "auto"]));
+    assert_eq!(report["ran"], serde_json::json!(false));
+    assert_eq!(report["reason"], serde_json::json!("no_profiles"));
+    assert!(!fixture.state_path().exists());
+}
+
+#[test]
+fn provider_fetch_failure_is_not_recorded_as_success() {
+    let fixture = Fixture::new("provider-failure");
+    let profile = fixture.root.join("profiles/web");
+    std::fs::create_dir_all(&profile).unwrap();
+    std::fs::write(
+        profile.join("cordis.patch.yml"),
+        "- id: llm-pi-ai\n  config:\n    providers:\n      openai-codex:\n        models: []\n",
+    )
+    .unwrap();
+    let output = fixture.run(&["models", "auto", "--force", "--json"]);
+    assert!(!output.status.success());
+    let report: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(report["failed"], serde_json::json!(true));
+    assert_eq!(report["summary"]["failed"], serde_json::json!(1));
+    let state = fixture.state().expect("failed refresh state is recorded");
+    assert_eq!(state["outcome"], serde_json::json!("failed"));
+    assert_eq!(state["last_success_unix"], serde_json::Value::Null);
+}
+
+#[test]
+fn unsupported_profile_layout_is_reported_as_a_skip() {
+    let fixture = Fixture::new("unsupported-layout");
+    let profile = fixture.root.join("profiles/web");
+    std::fs::create_dir_all(&profile).unwrap();
+    std::fs::write(
+        profile.join("cordis.patch.yml"),
+        "- id: llm-pi-ai\n  config:\n    providers:\n      openai-codex:\n        models: [{id: gpt-5.6-sol}]\n",
+    )
+    .unwrap();
+    let report = fixture.report(&json(&["models", "auto", "--force"]));
+    assert_eq!(report["failed"], serde_json::json!(false));
+    assert_eq!(report["summary"]["skipped"], serde_json::json!(1));
+    assert_eq!(report["summary"]["failed"], serde_json::json!(0));
+    assert_eq!(fixture.state().unwrap()["outcome"], serde_json::json!("ok"));
+}
+
+#[test]
 fn a_missing_named_profile_fails_loudly() {
     let fixture = Fixture::new("missing-profile").with_profile();
     let output = fixture.run(&json(&["models", "auto", "--force", "--profile", "nope"]));
@@ -227,4 +282,39 @@ fn a_boot_without_dsh_still_schedules_the_refresh() {
     });
     assert_eq!(state["outcome"], serde_json::json!("ok"));
     assert_eq!(state["changed"], serde_json::json!(false));
+}
+
+#[test]
+fn an_as_dsh_profile_launch_schedules_the_background_refresh() {
+    let fixture = Fixture::new("shadow-launch").with_profile();
+    let binary_dir = fixture.root.join("shadow-bin");
+    std::fs::create_dir_all(&binary_dir).unwrap();
+    let binary = binary_dir.join(if cfg!(windows) { "dsh.exe" } else { "dsh" });
+    std::fs::copy(env!("CARGO_BIN_EXE_rdsh"), &binary).unwrap();
+    let empty = fixture.root.join("empty-path");
+    std::fs::create_dir_all(&empty).unwrap();
+    let output = Command::new(binary)
+        .arg("web")
+        .env("DSH_HOME", &fixture.root)
+        .env("HOME", fixture.root.join("home"))
+        .env("PATH", empty)
+        .env("DSH_ORIG_BIN", fixture.root.join("missing-dsh"))
+        .env_remove("RDSH_NO_MODELS_AUTO")
+        .output()
+        .unwrap();
+    assert!(
+        !output.status.success(),
+        "the original dsh is intentionally absent"
+    );
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while Instant::now() < deadline && fixture.state().is_none() {
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    let state = fixture.state().unwrap_or_else(|| {
+        panic!(
+            "the shadow launch schedules auto refresh: {}",
+            String::from_utf8_lossy(&output.stderr)
+        )
+    });
+    assert_eq!(state["outcome"], serde_json::json!("ok"));
 }

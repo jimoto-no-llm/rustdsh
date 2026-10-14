@@ -55,10 +55,11 @@ unreachable or logged out cannot stop the launch.
 
 ## Exit status and output
 
-`rdsh models auto` exits non-zero only when the refresh itself failed (a
-provider listing could not be read, or a profile could not be written); the
-failure is recorded in the state and the next attempt waits for the interval
-again. `--json` prints one report:
+`rdsh models auto` exits non-zero when a provider listing could not be read, a
+profile changed its endpoint or credential while fetching, or a profile could
+not be read or written. The failure is recorded in the state and the next
+attempt waits for the interval again. A profile layout that the safe rewriter
+does not support is reported as skipped. `--json` prints one report:
 
 ```json
 {
@@ -76,8 +77,9 @@ again. `--json` prints one report:
 ```
 
 `reason` is one of `due`, `dry_run`, `not_due`, `no_profiles` or
-`disabled`. The background hook only ever gets the last two when a home has no
-profiles at all.
+`disabled`. The background hook reports `no_profiles` when no eligible profile
+has a `cordis.patch.yml`, including an empty profiles directory or one that only
+contains the Desktop-owned profile.
 
 ## Scheduling it outside the launcher
 

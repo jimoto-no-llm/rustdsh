@@ -74,7 +74,7 @@ mod websearch;
     name = "rdsh",
     version,
     about = "Rust fast launcher for dsh (safe: native fast-paths + passthrough)",
-    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|models|auth|setup|context|settings|features|provider|dump-config|boot|serial-proxy)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh models                     list the models a profile is missing or names stale\n  rdsh models sync                add them and refresh stale names\n  rdsh desktop status             detect the Desktop (Electron) app and its reserved profile\n  rdsh desktop install            attach the bundled rdsh plugins to that profile\n  rdsh --passthrough tui          no slim env; mandatory tool isolation remains\n  rdsh --dry-run tui -- --resume abc   show what would exec"
+    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|deps|desktop|models|auth|setup|context|settings|features|provider|dump-config|boot|serial-proxy)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh models                     list the models a profile is missing or names stale\n  rdsh models sync                add them and refresh stale names\n  rdsh desktop status             detect the Desktop (Electron) app and its reserved profile\n  rdsh desktop install            attach the bundled rdsh plugins to that profile\n  rdsh --passthrough tui          no slim env; mandatory tool isolation remains\n  rdsh --dry-run tui -- --resume abc   show what would exec"
 )]
 struct Cli {
     /// Explicitly share a project file with isolated model tools (repeatable).
@@ -675,6 +675,7 @@ const NATIVE_FIRST: &[&str] = &[
     "logs",
     "guard",
     "compute",
+    "deps",
     "desktop",
     "auth",
     "provider",
@@ -710,6 +711,12 @@ fn main() {
             let dry = passthrough::env_dry() || scfg.general.dry_run;
             crate::slim::configure(&scfg);
             crate::tool_security::configure(agent_tool_sandbox(&scfg, false));
+            if matches!(
+                dsh_args::split_launcher_args(None, raw.clone()),
+                dsh_args::Launcher::Boot { .. }
+            ) {
+                models_auto::maybe_spawn(&scfg, dry);
+            }
             if let Err(e) = passthrough::exec_raw(&raw, dry, slim) {
                 eprintln!("[rdsh] error: {e:#}");
                 std::process::exit(1);
@@ -1146,12 +1153,12 @@ fn main() {
             None => models::cmd_models_show(cli.profile.as_deref(), provider.as_deref(), json),
             Some(ModelsAction::Sync {
                 profile,
-                provider,
+                provider: sync_provider,
                 dry_run,
                 json,
             }) => models::cmd_models_sync(
                 profile.or(cli.profile).as_deref(),
-                provider.as_deref(),
+                sync_provider.or(provider).as_deref(),
                 dry_run,
                 json,
             ),
@@ -1802,6 +1809,34 @@ mod default_profile_tests {
                 assert!(args.is_empty());
             }
             _ => panic!("expected boot"),
+        }
+    }
+
+    #[test]
+    fn models_sync_accepts_provider_before_or_after_the_action() {
+        let parent =
+            Cli::try_parse_from(["rdsh", "models", "--provider", "openai-codex", "sync"]).unwrap();
+        match parent.command {
+            Some(super::Commands::Models {
+                provider: Some(provider),
+                action: Some(super::ModelsAction::Sync { provider: None, .. }),
+                ..
+            }) => assert_eq!(provider, "openai-codex"),
+            _ => panic!("provider before sync belongs to the parent Models command"),
+        }
+
+        let inner =
+            Cli::try_parse_from(["rdsh", "models", "sync", "--provider", "kimi-coding"]).unwrap();
+        match inner.command {
+            Some(super::Commands::Models {
+                action:
+                    Some(super::ModelsAction::Sync {
+                        provider: Some(provider),
+                        ..
+                    }),
+                ..
+            }) => assert_eq!(provider, "kimi-coding"),
+            _ => panic!("provider after sync belongs to the sync action"),
         }
     }
 
