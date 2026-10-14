@@ -5,13 +5,63 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Security
+
+- The optional `rdsh-mcp-exposure` plugin pins its development
+  `@modelcontextprotocol/client` to the patched line (2.3.1, override) instead
+  of the 2.0.0 that the upstream `dsh-mcp-client` peer pulls in, clearing the
+  high-severity GHSA-6qxp-vccf-f47h alert. Runtime resolution is unchanged: the
+  plugin uses the host DSH's MCP client.
+
 ### Added
 
-- `rdsh-dashboard subagents plan` turns a declared use case into a deterministic
+- `plugins/rdsh-mobile-ui` is bundled and installed by `./plugins/install.sh`:
+  below 767px the Web chat and composer use the full viewport width, the collapsed
+  sidebar becomes a one-tap logo for the session list, and question cards fit the
+  phone. The rules are adapted from Smart-DSH
+  (<https://github.com/hikarioyama/Smart-DSH>, MIT) and ship only that responsive
+  layout — not Smart-DSH's notifications, Esc handling or task hub. See
+  [README](plugins/rdsh-mobile-ui/README.md).
+- `rdsh provider add hai|sarashina|local-openai` writes an OpenAI-compatible route into a
+  profile's `llm-pi-ai` providers (models from `--model`, opencode's
+  `provider.<id>` or `GET /models`), keeping every other byte of
+  `cordis.patch.yml`; `rdsh provider list` shows presets and per-profile
+  route and key status. The `sarashina` preset writes the `compat` lines
+  (`supportsStore`, `supportsUsageInStreaming`) and `maxTokens: 8000` that the
+  API requires; its `tool_choice` default is a known open question for agent
+  use. `HAI_API_KEY`, `SARASHINA_API_KEY` and `LOCAL_OPENAI_API_KEY` can be
+  saved from the setup UI (`rdsh setup --yes` does not save them), but they count as a connection only when a profile's
+  default model uses a route that reads them. Existing `llm-pi-ai` entries
+  written with quotes, comments or any indent width are edited in place; a
+  layout that cannot be read safely (including any other mention of
+  `llm-pi-ai`, such as inside `- insert:`) is refused with the YAML to add by
+  hand. See `docs/PROVIDERS.md`.
+- `rdsh subagents plan` turns a declared use case into a deterministic
   dispatch plan for delegated subagents: role and model tier per item, bounded
   items and weight per agent, waves limited by `max_parallel`, and explicit
   warnings instead of guessed tiers. It starts no agent and writes nothing; the
   existing `workers prepare` still owns the checkout allocation
+  (`docs/SUBAGENT-PLANNING.md`).
+- `rdsh serial-proxy` replaces the standalone Node.js proxy with a native Rust
+  command. It keeps the FIFO concurrency and rate limits, streams request and
+  response bodies, and supports `--tool-choice-default <none|auto|required>`
+  for Sarashina-compatible requests. See `docs/SERIAL-PROXY.md`.
+
+### Fixed
+
+- `sync-dsh.sh` discovers the `@deepseek-ai/dsh` tree by candidate instead of
+  `npm root -g` alone (`DSH_PKG_ROOT`, npm's global root, the newest
+  `~/.local/opt/*` tree, then the older per-user prefixes). A tree it cannot
+  find, or one outside npm's global root, is reported and skipped while the
+  rdsh release update still succeeds; npm-managed trees keep digest pinning,
+  downgrade refusal, verification and rollback. See `docs/AUTO-UPDATE.md`.
+
+### Changed
+
+- `rdsh-dashboard subagents plan` forwards to `rdsh subagents plan`: the planner
+  is now the Rust implementation in `src/subagent_plan.rs`, the JavaScript
+  planning module is removed so there is a single source of truth, and the
+  request, plan and warning contract is unchanged
   (`docs/SUBAGENT-PLANNING.md`).
 
 ## [0.3.3] - 2026-10-13

@@ -1,0 +1,21 @@
+# Example only: the existing DSH loader must already resolve this local bundle.
+# The current guarded rdsh launcher rejects its activation before connection.
+- insert:
+    - id: rdsh-mcp-exposure
+      name: "rdsh-mcp-exposure"
+      config:
+        servers:
+          - source: operator.mcp.docs
+            exposure: deferred
+            connection:
+              transport: streamable-http
+              serverName: docs
+              url: http://127.0.0.1:3000/mcp
+              failOnStartupError: true
+            toolExposure:
+              - match: mcp__docs__read
+                exposure: direct
+              - match: mcp__docs__delete
+                exposure: hidden
+        maxSearchResults: 20
+        maxLoadedTools: 512

@@ -1,0 +1,14 @@
+{
+  "source_commit": "cecba5ce715e0f320ce300b3492bf941aaa7d8df",
+  "scenario": "Node project CLI plus local HTTP MCP with synthetic task/question; Chromium 1280x900",
+  "provider_calls": 0,
+  "tailscale": false,
+  "desktop_shell": false,
+  "duplicate_ids": {},
+  "layout_controls": 1,
+  "visible_layout_controls": 1,
+  "visible_workspace_grids": 1,
+  "screenshot": "after.png",
+  "captured_at": "2026-10-11T19:20:46+09:00",
+  "duplicate_id_name_count": 0
+}
