@@ -566,7 +566,8 @@ test("win32 cancel: a lost supervisor with the leader gone is left unconfirmed, 
 
 test("terminateGroup treats a missing group as confirmed", async () => {
   assert.equal(await terminateGroup(null), "confirmed");
-  assert.equal(await terminateGroup(2 ** 22 + 12345), "confirmed");
+  // win32 sees only the leader PID, so a non-null group is never confirmed there.
+  assert.equal(await terminateGroup(2 ** 22 + 12345), expectedCleanup);
 });
 
 test("/proc parser: zombie-only groups are not alive, comm may contain parentheses", async (t) => {
