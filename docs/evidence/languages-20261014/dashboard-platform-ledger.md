@@ -9,7 +9,8 @@ Date: 2026-10-14; platform: darwin; Node: v24.21.0.
 | Baseline | `cd dashboard && npm test` | 1 | 322 | 229 | 85 | 8 |
 | After fix, attempt 1 | `cd dashboard && npm test` | 1 | 330 | 235 | 1 | 94 |
 | Functional retry case, original fixture | `node --test --test-name-pattern="a failed check cannot borrow" dashboard/test/integration.test.mjs` | 0 | 1 | 1 | 0 | 0 |
-| Final fresh run | `cd dashboard && npm test` | 0 | 330 | 236 | 0 | 94 |
+| Prior fresh run | `cd dashboard && npm test` | 0 | 330 | 236 | 0 | 94 |
+| PR review final | `cd dashboard && npm test` | 0 | 336 | 242 | 0 | 94 |
 
 Baseline: `/tmp/rdsh-dashboard-baseline-macos.log`. First post-fix attempt: `/tmp/rdsh-dashboard-macos-attempt1.log`. Final: `/tmp/rdsh-dashboard-final-macos.log`. RED/GREEN: `/tmp/rdsh-smoke-red.log`, `/tmp/rdsh-smoke-green.log`. Functional retry: `/tmp/rdsh-integration-recheck.log`.
 
@@ -172,6 +173,8 @@ The 94 skipped cases comprise 82 explicitly annotated kernel ownership positives
 
 ## Final Windows validation
 
-The same 141 dashboard source files were verified by SHA-256 before the usual unfiltered `npm test` on Windows 11 x64 / Node 24.21.0. Final result: **330 tests, 324 pass, 0 fail, 6 platform skips**, exit 0; [output](dashboard-windows-final.txt). This executes the native ownership and process-identity positive cases excluded on macOS. The original Windows run had one existing 10-second retry-fixture failure; [the controlled investigation](windows-retry.md) distinguishes that original observation from the reproduced fingerprint-contention mechanism. The positive fixture now allows 30 seconds overall while retaining the 700 ms first-child timeout, exact two attempts and all deadline-negative assertions. The focused retry suite passes 14/14 on both macOS and Windows. Product limits are unchanged.
+The same 142 dashboard source files were verified by SHA-256 before the usual unfiltered `npm test` on Windows 11 x64 / Node 24.21.0. Final result: **336 tests, 330 pass, 0 fail, 6 platform skips**, exit 0; [output](dashboard-windows-final.txt). This executes the native ownership and process-identity positive cases excluded on macOS. The original Windows run had one existing 10-second retry-fixture failure; [the controlled investigation](windows-retry.md) distinguishes that original observation from the reproduced fingerprint-contention mechanism. The positive fixture now allows 30 seconds overall while retaining the 700 ms first-child timeout, exact two attempts and all deadline-negative assertions. The focused retry suite passes 14/14 on both macOS and Windows. Product limits are unchanged.
 
 [Machine-readable excluded-case inventory](platform-skips.json) lists every one of the 94 macOS and 6 Windows exclusions with its recorded reason. These are distinct OS denominators, not one combined test total.
+
+PR review follow-up logs: [macOS](dashboard-macos-final.txt) and [Windows](dashboard-windows-final.txt). The six added tests execute on both platforms. The final Escape-key handler is separately covered by the three-language real-browser suite; it was added after the Windows full-suite source transfer. All Node CLI and test files match that Windows run.

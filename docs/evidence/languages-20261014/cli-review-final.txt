@@ -1,0 +1,20 @@
+   Compiling rdsh v0.3.3 (<workspace>)
+    Finished `release` profile [optimized] target(s) in 5.82s
+     Running tests/cli_localization.rs (target/release/deps/cli_localization-3d6be534282d4590)
+
+running 13 tests
+test help_does_not_hide_invalid_settings ... ok
+test invalid_option_keeps_the_raw_value_and_labels_the_clap_diagnostic ... ok
+test guard_json_parse_and_size_reasons_stay_canonical_english ... ok
+test localized_context_desktop_and_logs_errors_keep_raw_unicode_values ... ok
+test help_accepts_native_flags_without_required_positionals_in_every_language ... ok
+test main_native_labels_and_errors_are_localized_without_changing_json ... ok
+test english_native_presentations_match_the_default_locale ... ok
+test native_command_errors_keep_unicode_values_in_chinese_and_japanese ... ok
+test native_results_stay_identical_while_human_labels_change_language ... ok
+test settings_and_guard_errors_localize_without_changing_raw_values_or_json_reasons ... ok
+test version_like_values_after_double_dash_do_not_trigger_version_display ... ok
+test structured_compute_and_guard_json_stay_wire_compatible_across_languages ... ok
+test auth_and_doctor_errors_are_localized_and_keep_raw_configuration ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.88s

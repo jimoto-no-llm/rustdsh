@@ -73,6 +73,16 @@ try{
  await call('dashboard_upsert_task',{id:'T1',title:'未取得',status:'doing'});
  await call('dashboard_ask_question',{id:'Q1',question:'未取得 — 日本語の原文を保持',urgency:'high'});
  const projectPage=await pageFor(browser,runtime.browser_url);await projectPage.locator('#question-Q1 textarea').waitFor();assert.ok((await projectPage.locator('#question-Q1').innerText()).includes('未取得 — 日本語の原文を保持'));await check(projectPage,new RegExp(copy.projectTitle));
+ const {catalog}=await import(pathToFileURL(path.join(repo,'dashboard/locale.mjs')));
+ await projectPage.locator('#palette-toggle').focus();await projectPage.locator('#palette-toggle').press('Enter');
+ for(const [query, key, name] of [['手机','palette.toggleShare','zh-CN'],['切り替える','palette.toggleShare','ja'],['Toggle phone','palette.toggleShare','en'],['Refresh share connection','palette.refreshShare','refresh']]){
+  await projectPage.locator('#palette-search').fill(query);
+  assert.ok(await projectPage.locator('#palette-list').getByRole('button',{name:catalog[language][key],exact:true}).isVisible(),query);
+  await screenshot(projectPage,'palette-'+name);
+ }
+ await projectPage.keyboard.press('Escape');
+ await projectPage.waitForFunction(()=>document.querySelector('#palette-toggle')===document.activeElement);
+ report.flows.push('palette: Chinese, Japanese and English queries find localized commands; Escape restores focus');
  await projectPage.locator('#question-Q1 textarea').fill('Keep this draft');
  const stateUpdate=projectPage.waitForResponse(r=>r.url().endsWith('/api/state')&&r.status()===200);
  await call('dashboard_update_metrics',{input_tokens:1000,cached_input_tokens:500,tool_calls:10,tool_errors:0});await stateUpdate;
@@ -82,6 +92,13 @@ try{
  const feedback=await client.callTool({name:'dashboard_get_feedback',arguments:{}});assert.notEqual(feedback.isError,true);assert.ok(feedback.content[0].text.includes('E2E saved answer'));
  const state=await fetch(runtime.local_url+'api/state',{headers:{authorization:`Bearer ${runtime.token}`}});assert.equal((await state.json()).questions[0].answer,'E2E saved answer');
  const alphaState=await readFile(path.join(identityAlpha.directory,'state.json'),'utf8');assert.ok(alphaState.includes('E2E saved answer'));
+ await call('dashboard_ask_question',{id:'Q-cancel',question:'Original cancellation question 日本語',urgency:'high',decision:{kind:'consultation'}});
+ const cancellation=projectPage.locator('#question-Q-cancel');
+ await cancellation.getByRole('button',{name:catalog[language]['question.cancel'],exact:true}).click();
+ await projectPage.waitForFunction(reason=>document.querySelector('#question-Q-cancel')?.textContent.includes(reason),catalog[language]['question.humanCancelled']);
+ const cancelled=JSON.parse(await readFile(path.join(identityAlpha.directory,'state.json'),'utf8')).question_contracts.cards['Q-cancel'];
+ assert.equal(cancelled.status,'cancelled');assert.equal(cancelled.cancel_reason,catalog[language]['question.humanCancelled']);
+ report.flows.push('cancellation: selected-language owned reason persisted through real authenticated HTTP; original question unchanged');
  await screenshot(projectPage,'project-desktop');await projectPage.setViewportSize(report.viewports[1]);await check(projectPage,new RegExp(copy.projectTitle));await screenshot(projectPage,'project-mobile');
  await projectPage.close();await client.close();await stop(dashboard.child);
  const restarted=await launch(process.execPath,[path.join(repo,'dashboard/cli.mjs'),'project','--project',project,'--port',await freePort(),'--no-tailscale'],/(http:\/\/127\.0\.0\.1:\d+\/)/);

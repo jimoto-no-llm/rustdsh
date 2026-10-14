@@ -55,6 +55,16 @@ selection uses `--language`, nonblank `RDSH_LANG`, `general.language`, then the
 first nonblank `LC_ALL`/`LC_MESSAGES`/`LANG`, finally English. A malformed saved
 language stops startup without rewriting its file. The DSH settings plugin has
 its own live selector; its `auto` follows the browser language.
+The command palette searches all three translated labels regardless of the
+current display language; Escape closes it and returns focus. Known observed
+CLI states and newly generated cancellation reasons use the selected language.
+Received cancellation reasons and future status labels remain original values.
+
+Display-only `--language` options are removed when re-executing an immutable
+captured CLI, so older captures need no new option grammar. Other argument bytes,
+option terminators, locale environment variables and captured files are preserved.
+`preflight` validates the original arguments after removing its command token and
+display-language options, including unexpected positionals.
 
 | Mode      | Purpose                                                    | Data source                                      |
 | --------- | ---------------------------------------------------------- | ------------------------------------------------ |

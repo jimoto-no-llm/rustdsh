@@ -347,7 +347,7 @@ export function renderQuestionCards(
             await api("decision/cancel", {
               id: question.id,
               expected_revision: contract.revision,
-              cancel_reason: "人間が取消しました",
+              cancel_reason: text("question.humanCancelled"),
             });
             await refreshState();
           } catch (e) {

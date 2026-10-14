@@ -33,12 +33,12 @@ export function setupObservedCli({ api }) {
       for (const process of result.processes) {
         const item = element("article", undefined, "event");
         const task = process.task_id
-          ? ` · task ${process.task_id}${process.task_present ? "" : ` · ${text("observed.removed")}`}`
+          ? ` · ${text("observed.task", { id: process.task_id })}${process.task_present ? "" : ` · ${text("observed.removed")}`}`
           : ` · ${text("observed.project")}`;
         item.append(
           element(
             "h3",
-            `${process.cli_kind} · PID ${process.pid} · ${process.status_label}`,
+            `${process.cli_kind} · PID ${process.pid} · ${["alive", "gone", "pid_reused", "owner_mismatch", "unknown"].includes(process.status) ? text("observed.status." + process.status) : process.status_label}`,
           ),
           element("p", task),
           element(

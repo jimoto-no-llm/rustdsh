@@ -10,7 +10,7 @@ import { promisify } from "node:util";
 import { Releases } from "../releases.mjs";
 import { identity } from "../state.mjs";
 import { SessionLedger } from "../session-ledger.mjs";
-import { verifyRelease } from "../release-artifacts.mjs";
+import { verifyRelease, fileDigest } from "../release-artifacts.mjs";
 import { qualifyRelease } from "../release-qualification.mjs";
 
 const exec = promisify(execFile);
@@ -511,5 +511,112 @@ test("qualification rejects a changed pinned runtime before native ownership", a
   await assert.rejects(
     qualifyRelease({ manifest: { tuple: { node: "v23.0.0" } } }, {}),
     code("adapter_runtime_changed_use_pinned_cli"),
+  );
+});
+
+test("public CLI strips only display-language tokens before a captured CLI without language support", async (t) => {
+  const { root, releases, env } = await fixture(t);
+  const adapter = path.join(root, "legacy-adapter");
+  const dsh = path.join(root, "legacy-dsh");
+  await fs.mkdir(path.join(adapter, "dashboard/node_modules"), {
+    recursive: true,
+  });
+  await fs.mkdir(dsh);
+  for (const name of ["rdsh-budget-guard", "rdsh-release-probe"]) {
+    const directory = path.join(adapter, "plugins", name);
+    await fs.mkdir(directory, { recursive: true });
+    await fs.writeFile(path.join(directory, "index.js"), "export {};\n");
+  }
+  await fs.writeFile(
+    path.join(adapter, "dashboard/package.json"),
+    '{"version":"0.1.0","type":"module"}\n',
+  );
+  await fs.writeFile(
+    path.join(adapter, "dashboard/session-ledger.mjs"),
+    "export {};\n",
+  );
+  await fs.writeFile(
+    path.join(dsh, "package.json"),
+    '{"name":"@deepseek-ai/dsh","version":"0.2.0-rc.2"}\n',
+  );
+  await fs.writeFile(
+    path.join(dsh, "bin.mjs"),
+    'throw new Error("No native/model work in this fixture");\n',
+  );
+  const source = path.join(adapter, "dashboard/cli.mjs");
+  await fs.writeFile(
+    source,
+    `import { parseArgs } from 'node:util';
+const {values,positionals}=parseArgs({allowPositionals:true,options:{project:{type:'string'},'release-id':{type:'string'},'selection-revision':{type:'string'},'managed-release-id':{type:'string'},'managed-revision':{type:'string'}}});
+console.log(JSON.stringify({argv:process.argv.slice(2),values,positionals,executable:process.execPath,language:process.env.RDSH_LANG,lc:process.env.LC_ALL,lang:process.env.LANG}));\n`,
+  );
+  const sourceHash = await fileDigest(source);
+  const release = await releases.stage({
+    executable: process.execPath,
+    dsh_root: dsh,
+    entrypoint: "bin.mjs",
+    adapter_root: adapter,
+    changes: "Display-language compatibility fixture",
+    rollback: "Retain the immutable captured CLI",
+    provenance: "Isolated legacy parser fixture; no ACP or model request",
+  });
+  const artifact = await releases.verify(release.release_id);
+  const pinned = path.join(artifact.slot, "adapter/dashboard/cli.mjs");
+  const manifestBytes = await fs.readFile(
+    path.join(artifact.slot, "release.json"),
+  );
+  assert.equal(await fileDigest(pinned), sourceHash);
+  await fs.mkdir(path.join(root, "--language=ja"));
+  const forwarded = [
+    "release",
+    "canary",
+    "--project=--language=ja",
+    "--release-id",
+    release.release_id,
+    "--selection-revision",
+    "0",
+  ];
+  for (const args of [
+    ["--language", "ja", ...forwarded],
+    [...forwarded, "--language=zh-CN"],
+    ["--language=ja", ...forwarded, "--language", "en"],
+  ]) {
+    const result = await exec(process.execPath, [cli, ...args], {
+      cwd: root,
+      env: {
+        ...env,
+        RDSH_LANG: "en",
+        LC_ALL: "ja_JP.UTF-8",
+        LANG: "zh_CN.UTF-8",
+        NODE_OPTIONS: "",
+        NODE_PATH: "",
+      },
+      timeout: 15000,
+    });
+    assert.equal(result.stderr, "");
+    const report = JSON.parse(result.stdout);
+    assert.deepEqual(report.argv, [
+      ...forwarded,
+      "--managed-release-id",
+      release.release_id,
+      "--managed-revision",
+      "0",
+    ]);
+    assert.equal(report.executable, artifact.command[0]);
+    assert.equal(report.values.project, "--language=ja");
+    assert.equal(report.language, "en");
+    assert.equal(report.lc, "ja_JP.UTF-8");
+    assert.equal(report.lang, "zh_CN.UTF-8");
+    assert.deepEqual(report.positionals, ["release", "canary"]);
+  }
+  assert.equal(await fileDigest(source), sourceHash);
+  assert.equal(await fileDigest(pinned), sourceHash);
+  assert.deepEqual(
+    await fs.readFile(path.join(artifact.slot, "release.json")),
+    manifestBytes,
+  );
+  assert.equal(
+    (await releases.verify(release.release_id)).manifest.release_id,
+    release.release_id,
   );
 });

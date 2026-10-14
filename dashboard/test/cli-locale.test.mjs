@@ -274,6 +274,66 @@ test("CLI explicit language does not change delegated version-probe argv or loca
   });
 });
 
+test("preflight preserves inline values when removing display-language options", async (t) => {
+  const { root, run } = await fixture(t);
+  await mkdir(path.join(root, "--demo"));
+  await mkdir(path.join(root, "--language=ja"));
+  for (const args of [
+    ["preflight", "--project=--demo"],
+    ["--language", "ja", "preflight", "--project=--demo"],
+    ["preflight", "--project=--language=ja", "--language=zh-CN"],
+    [
+      "--language=ja",
+      "preflight",
+      "--project=--demo",
+      "--language",
+      "en",
+      "--",
+    ],
+  ]) {
+    const result = await run(args);
+    assert.equal(result.code, 0, JSON.stringify({ args, ...result }));
+    const report = JSON.parse(result.stdout);
+    assert.equal(report.ready, true);
+    assert.equal(report.execution_authority, false);
+    assert.equal(
+      report.checks.find((check) => check.id === "cwd").status,
+      "pass",
+    );
+    assert.equal(
+      report.checks.find((check) => check.id === "cli").status,
+      "not_required",
+    );
+    assert.equal(result.stderr, "");
+  }
+});
+
+test("preflight retains unexpected positionals and option terminators for strict validation", async (t) => {
+  const { root, run } = await fixture(t);
+  await mkdir(path.join(root, "demo"));
+  for (const args of [
+    ["preflight", "unexpected", "--project=demo"],
+    ["--language=ja", "preflight", "unexpected", "--project=demo"],
+    [
+      "preflight",
+      "--project=demo",
+      "--language=zh-CN",
+      "--",
+      "--language",
+      "ja",
+    ],
+    ["--", "preflight", "--project=demo"],
+  ]) {
+    const result = await run(args);
+    assert.equal(result.code, 1, JSON.stringify({ args, ...result }));
+    assert.equal(
+      result.stdout,
+      '{"ready":false,"error":"invalid_preflight_input","execution_authority":false}\n',
+    );
+    assert.equal(result.stderr, "");
+  }
+});
+
 async function freePort() {
   const server = net.createServer();
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));

@@ -25,7 +25,7 @@ Full-suite contention is consistent with the original failure, but original full
 - Windows pinned Node 24.21.0: node --check test/retry.test.mjs — exit 0.
 - Windows pinned Node 24.21.0: node --test test/retry.test.mjs — exit 0, 14 pass, 0 fail, 0 skip; 4797 ms. Logs /tmp/rdsh-retry-windows-final/retry-suite-final.{stdout,stderr}.log.
 - git diff --check -- dashboard/test/retry.test.mjs — exit 0.
-- Parent final normal Windows `npm test`, after source SHA-256 synchronization: 330 tests, 324 pass, 0 fail, 6 platform skips, exit 0. See [the final output](dashboard-windows-final.txt).
+- Parent final normal Windows `npm test`, after source SHA-256 synchronization: 336 tests, 330 pass, 0 fail, 6 platform skips, exit 0. See [the final output](dashboard-windows-final.txt).
 
 ## Evidence
 

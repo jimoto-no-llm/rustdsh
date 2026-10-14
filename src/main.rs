@@ -401,13 +401,13 @@ fn main() {
         }
         // else: fall through to the normal CLI (rdsh-native subcommand)
     }
-    // Preserve clap's generated version path without reading settings.
-    if std::env::args()
-        .skip(1)
-        .any(|arg| arg == "--version" || arg == "-V")
-    {
-        let _ = Cli::parse();
-        return;
+    // Avoid reading settings only when Clap itself recognizes a version
+    // display. Values after `--` and native positional arguments can use the
+    // same bytes, so scanning raw argv would exit before their command runs.
+    if let Err(error) = Cli::try_parse_from(std::env::args_os()) {
+        if error.kind() == clap::error::ErrorKind::DisplayVersion {
+            error.exit();
+        }
     }
     // Build the same derive-generated tree for parsing and help.  `dsh`
     // passthrough above never reaches this tree.

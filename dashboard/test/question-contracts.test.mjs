@@ -536,10 +536,11 @@ for (const language of ["en", "zh-CN", "ja"])
     assert.equal(form.querySelector('[role="alert"]').textContent, raw);
     fail = false;
     await form.querySelectorAll("button").at(-1).events.click();
-    assert.equal(calls.at(-1).payload.cancel_reason, "人間が取消しました");
+    assert.equal(calls.at(-1).payload.cancel_reason, ${JSON.stringify({ en: "Cancelled by a person", "zh-CN": "人工取消", ja: "人間が取消しました" }[language])});
     for (const status of ["answered", "expired", "cancelled", "superseded", "future-status"]) {
       const freshRoot = node("div");
-      renderQuestionCards(freshRoot, [question], { cards: { [question.id]: { ...card, status } } }, deps);
+      renderQuestionCards(freshRoot, [question], { cards: { [question.id]: { ...card, status, cancel_reason: raw } } }, deps);
+      assert.ok(freshRoot.textContent.includes(raw), "received cancellation reason stays unchanged");
       assert.ok(freshRoot.textContent.includes(status === "future-status" ? status : text("question.status." + status)));
       assert.equal(freshRoot.querySelector("textarea").disabled, true);
     }

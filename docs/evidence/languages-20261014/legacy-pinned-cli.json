@@ -1,0 +1,39 @@
+{
+  "root": "<temporary-home>",
+  "commit": "719beb09c8d3d631499ed295621f2606a6512784",
+  "source_hash": "e5f3adaf39e82bb943ead6a28976fb79aafa2a789e4f38970350cdd52327ab9a",
+  "pinned_hash": "e5f3adaf39e82bb943ead6a28976fb79aafa2a789e4f38970350cdd52327ab9a",
+  "source_unchanged": true,
+  "pin_unchanged": true,
+  "manifest_unchanged": true,
+  "verified_release": "rel_daa4b92a7ab221e1d3430ce18756009b35c11596a37a494dfca33a7155a2f268",
+  "results": [
+    {
+      "display": [],
+      "code": 1,
+      "status": "failed",
+      "error": "native_cleanup_unconfirmed",
+      "stdout_file": "invocation-0.json"
+    },
+    {
+      "display": [
+        "--language",
+        "ja"
+      ],
+      "code": 1,
+      "status": "failed",
+      "error": "native_cleanup_unconfirmed",
+      "stdout_file": "invocation-1.json"
+    },
+    {
+      "display": [
+        "--language=zh-CN"
+      ],
+      "code": 1,
+      "status": "failed",
+      "error": "native_cleanup_unconfirmed",
+      "stdout_file": "invocation-2.json"
+    }
+  ],
+  "environment": "Only child environment supplied; no global mutation; private homes"
+}

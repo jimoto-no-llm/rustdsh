@@ -17,11 +17,17 @@ test("locale catalog keeps dynamic chrome complete and preserves received text",
     },
   };
 
-  const { catalog, entries, formatDateTime, locale, text } = await import(
+  const { catalog, entries, formatDateTime, locale, searchText, text } = await import(
     `../locale.mjs?locale-test=${Date.now()}`
   );
 
   assert.equal(locale, "zh-CN");
+  for (const [key, queries] of [
+    ["palette.toggleShare", ["切り替える", "Toggle phone", "手机"]],
+    ["palette.refreshShare", ["接続を更新", "Refresh share connection", "刷新共享"]],
+    ["palette.toggleAnswered", ["回答済み", "answered questions", "已回答问题"]],
+  ]) for (const query of queries) assert.ok(searchText(key).toLowerCase().includes(query.toLowerCase()), `${key}: ${query}`);
+  assert.equal(searchText("future-key 日本語"), "future-key 日本語");
   assert.equal(text("connection.connected"), "已连接 · 仅限此项目");
   assert.equal(text("diagnostics.working"), "正在检查连接的每个阶段…");
   assert.match(formatDateTime("2026-10-14T01:02:03Z"), /2026/);

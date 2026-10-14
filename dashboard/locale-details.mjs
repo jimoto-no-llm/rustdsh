@@ -386,6 +386,7 @@ export const detailsEntries = [
     "推荐及理由",
   ],
   ["question.expires", "期限", "Deadline", "期限"],
+  ["question.humanCancelled", "人間が取消しました", "Cancelled by a person", "人工取消"],
   ["question.cancelReason", "取消し理由", "Cancellation reason", "取消原因"],
   [
     "question.choices",

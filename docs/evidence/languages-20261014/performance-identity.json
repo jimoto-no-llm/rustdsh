@@ -1,8 +1,8 @@
 {
   "base_sha": "f3b836e34b871452a4b03723159d9a2821b3062b",
-  "candidate_parent": "4961a5eb7b4d425cf5c93db993f9e17a52755c5e",
-  "candidate_changes_after_parent": "CLI/config/guard/auth diagnostics; source files identified below",
-  "candidate_sha256": "91c896d57fb424814018f3f91401f4b240493308626000e3dd6620d219702999",
+  "candidate_parent": "576680b81ab627390ab81222a89db18f8f8fc612",
+  "candidate_changes_after_parent": "PR review: Clap-recognized version display and canonical guard JSON reasons; Rust sources identified below",
+  "candidate_sha256": "a57253fa7238504267769b60299b0d031913406e4cd2e694e222b2ba470f4fa9",
   "baseline_sha256": "b051685914fe0cccd644b94e3eb9e3871fe146a4053e91f66561afbbd4c31ef3",
   "rust_source_sha256": [
     {
@@ -39,7 +39,7 @@
     },
     {
       "path": "src/guard.rs",
-      "sha256": "815b52b356a9b5a8fb25c607ac65a05383a2c3e9fadd595693f1805a6285f461"
+      "sha256": "665bc073d71407a23656de7410666430ab4c56d6d336a3ccad6e5f33dd40a7c5"
     },
     {
       "path": "src/inspect.rs",
@@ -59,7 +59,7 @@
     },
     {
       "path": "src/main.rs",
-      "sha256": "3277298c3e6cf5a8a9b55e18b8f590a888d8b86de7ad414e21661682cf88c0f4"
+      "sha256": "61d5df9557ab9cd284b310422f9432763bdb4fe4c22693b17fa57e1deeb2a619"
     },
     {
       "path": "src/passthrough.rs",
@@ -76,10 +76,6 @@
     {
       "path": "src/serve.rs",
       "sha256": "c0277eb0246da37f8b50437a8f2f7a906faf165b0922cea27ff90d195d469e7b"
-    },
-    {
-      "path": "src/setup.html",
-      "sha256": "bec44e0c7b389e28fd573c2b5cd33089b6bd92b5c569bad8e69facf29c152df4"
     },
     {
       "path": "src/setup_web.rs",
@@ -104,10 +100,6 @@
     {
       "path": "src/tool_security.rs",
       "sha256": "7c4a3361923a983663080ee6ed8ac3360beea8bed1a7a481031d7ceab99e6da4"
-    },
-    {
-      "path": "src/ui.html",
-      "sha256": "eb384dbe5c5fc037f514eb60e590d83abd2a01986875d1b9bde5de0281e6b75a"
     },
     {
       "path": "src/websearch.rs",

@@ -1,7 +1,7 @@
 {
   "macOS": {
-    "total": 330,
-    "pass": 236,
+    "total": 336,
+    "pass": 242,
     "fail": 0,
     "skip": 94,
     "excluded_cases": [
@@ -384,8 +384,8 @@
     ]
   },
   "Windows": {
-    "total": 330,
-    "pass": 324,
+    "total": 336,
+    "pass": 330,
     "fail": 0,
     "skip": 6,
     "excluded_cases": [

@@ -9,7 +9,7 @@ import { createModelCatalogPanel } from "./model-catalog-ui.mjs";
 import { renderBudget } from "./budget-ui.mjs";
 import { createHumanAnnotationPanel } from "./human-annotations-ui.mjs";
 import { setupObservedCli } from "./observed-cli-ui.mjs";
-import { formatDateTime, text } from "./locale.mjs";
+import { formatDateTime, searchText, text } from "./locale.mjs";
 
 const $ = (id) => document.getElementById(id);
 const base = location.pathname.startsWith("/_rdsh") ? "/_rdsh/" : "/";
@@ -305,7 +305,7 @@ function renderPalette(filter = "") {
   const matched = paletteCommands.filter(
     (command) =>
       !query ||
-      (text(command.label) + " " + command.keys)
+      (searchText(command.label) + " " + command.keys)
         .toLowerCase()
         .includes(query),
   );
@@ -337,6 +337,12 @@ $("palette-toggle").addEventListener("click", openPalette);
 $("palette-search").addEventListener("input", (event) =>
   renderPalette(event.target.value),
 );
+$("palette").addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    $("palette").close();
+  }
+});
 $("palette").addEventListener("close", () => {
   if (paletteReturnFocus?.focus) paletteReturnFocus.focus();
 });

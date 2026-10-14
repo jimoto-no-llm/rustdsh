@@ -121,5 +121,100 @@
       "tests/e2e/cli-tty.py"
     ],
     "exit": 0
+  },
+  {
+    "name": "PR review fmt",
+    "command": [
+      "cargo",
+      "fmt",
+      "--check"
+    ],
+    "exit": 0
+  },
+  {
+    "name": "PR review clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit": 0
+  },
+  {
+    "name": "PR review release",
+    "command": [
+      "cargo",
+      "test",
+      "--release"
+    ],
+    "exit": 0
+  },
+  {
+    "name": "PR review targeted CLI",
+    "command": [
+      "cargo",
+      "test",
+      "--release",
+      "--test",
+      "cli_localization"
+    ],
+    "exit": 0
+  },
+  {
+    "name": "PR review regress",
+    "command": [
+      "env",
+      "PATH=/opt/homebrew/bin:$PATH",
+      "sh",
+      "tests/regress.sh"
+    ],
+    "exit": 0
+  },
+  {
+    "name": "PR review PTY",
+    "command": [
+      "/opt/homebrew/bin/python3",
+      "tests/e2e/cli-tty.py"
+    ],
+    "exit": 0
+  },
+  {
+    "name": "PR review browser",
+    "command": [
+      "env",
+      "RDSH_E2E_BIN=./target/release/rdsh",
+      "RDSH_CHROME_PATH=/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      "npm",
+      "test",
+      "--prefix",
+      "tests/e2e"
+    ],
+    "exit": 0
+  },
+  {
+    "name": "PR review macOS dashboard",
+    "command": [
+      "npm",
+      "test"
+    ],
+    "exit": 0
+  },
+  {
+    "name": "PR review Windows dashboard",
+    "command": [
+      "npm",
+      "test"
+    ],
+    "cwd": "dashboard",
+    "exit": 0,
+    "tests": 336,
+    "pass": 330,
+    "fail": 0,
+    "skip": 6,
+    "source_record": "windows-suite-source.json",
+    "cleanup_record": "windows-final-audit.json"
   }
 ]

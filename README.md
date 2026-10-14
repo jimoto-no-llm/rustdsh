@@ -253,7 +253,9 @@ Precedence is `--language`, `RDSH_LANG`, `general.language`, then `LC_ALL`,
 command without rewriting the settings file. Delegated `dsh` arguments, model
 output, JSON fields, files, and protocol identifiers are not translated. Interactive setup prompts and settings/policy validation use the selected
 language too. Authentication decisions and skipped-provider notes localize only
-the CLI presentation; their existing JSON strings remain unchanged.
+the CLI presentation; their existing JSON strings remain unchanged, including
+malformed or oversized guard-input reasons. Native search continues to refuse
+unsupported non-Unix platforms before accessing the requested directory.
 
 ### Extended Dashboard (`rdsh-dashboard`)
 

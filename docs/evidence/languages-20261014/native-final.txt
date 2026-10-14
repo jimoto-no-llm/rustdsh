@@ -1,47 +1,47 @@
    Compiling rdsh v0.3.3 (<workspace>)
-    Finished `release` profile [optimized] target(s) in 21.14s
+    Finished `release` profile [optimized] target(s) in 22.63s
      Running unittests src/main.rs (target/release/deps/rdsh-1ac51afc7d0dc78f)
 
 running 180 tests
-test auth::tests::credential_scalars_cannot_create_new_yaml_lines ... ok
 test auth::tests::api_key_names_follow_provider_routes ... ok
-test auth::tests::freshness_rules ... ok
 test auth::tests::credential_values_are_always_single_quoted_yaml_strings ... ok
-test auth::tests::record_id_grammar ... ok
-test auth::tests::jwt_exp_decode ... ok
-test auth::tests::jwt_exp_overflow_is_rejected ... ok
-test auth::tests::source_only_filter_includes_matching_grants_and_keys ... ok
-test auth::tests::splice_creates_sections ... ok
-test auth::tests::provider_and_ref_selectors_keep_credentials_typed ... ok
-test auth::tests::refs_update_replaces_inline_value_without_duplicates ... ok
 test auth::tests::parse_patches ... ok
+test auth::tests::provider_and_ref_selectors_keep_credentials_typed ... ok
+test auth::tests::freshness_rules ... ok
+test auth::tests::jwt_exp_overflow_is_rejected ... ok
+test auth::tests::credential_scalars_cannot_create_new_yaml_lines ... ok
+test auth::tests::jwt_exp_decode ... ok
+test auth::tests::record_id_grammar ... ok
+test auth::tests::source_only_filter_includes_matching_grants_and_keys ... ok
 test auth::tests::splice_insert_and_replace ... ok
-test compact::tests::noop_returns_source_verbatim_within_budget ... ok
+test auth::tests::refs_update_replaces_inline_value_without_duplicates ... ok
+test auth::tests::splice_creates_sections ... ok
 test auth::tests::decision_copy_uses_owned_reasons_without_changing_wire_details ... ok
+test compact::tests::noop_returns_source_verbatim_within_budget ... ok
 test compact::tests::tiny_budgets_never_exceed_budget ... ok
 test compact::tests::newlines_count_toward_noop_budget ... ok
-test auth::tests::setup_status_shape ... ok
 test compute::tests::accepts_a_128_char_non_ascii_id ... ok
 test compute::tests::estimate_matches_direct ... ok
 test compute::tests::batch_matches_sum_of_direct ... ok
-test compute::tests::estimate_reports_char_count_not_byte_count ... ok
-test auth::tests::quoted_ref_write_preserves_existing_refs_and_records ... ok
-test compute::tests::prune_matches_direct_and_respects_budget ... ok
 test compute::tests::rejects_an_id_over_the_char_limit ... ok
-test auth::tests::credential_file_is_private_when_created ... ok
+test compute::tests::estimate_reports_char_count_not_byte_count ... ok
 test compute::tests::rejects_bad_json_and_id ... ok
+test compute::tests::prune_matches_direct_and_respects_budget ... ok
 test compute::tests::run_lines_answers_each_request_in_order ... ok
 test compute::tests::run_lines_answers_without_a_trailing_newline ... ok
 test compute::tests::run_lines_once_stops_after_the_first_request ... ok
+test auth::tests::quoted_ref_write_preserves_existing_refs_and_records ... ok
 test compute::tests::run_lines_reports_bad_utf8_and_keeps_going ... ok
+test compute::tests::rejects_unknown_op_version_and_size ... ok
+test auth::tests::setup_status_shape ... ok
 test context::bounded_read_tests::empty_input_and_zero_cap_are_safe ... ok
 test context::bounded_read_tests::lossy_replacements_stay_within_the_byte_cap ... ok
 test context::bounded_read_tests::truncation_drops_a_partial_multibyte_scalar ... ok
 test context::tests::defaults_keep_retrieval_bounded_and_git_diff_enabled ... ok
 test context::tests::head_tail_truncates_by_unicode_characters ... ok
-test context::tests::prune_keep_goal_starts_with_goal_within_budget ... ok
 test context::tests::pack_by_priority_keeps_goal_and_constraints_within_budget ... ok
-test compute::tests::rejects_unknown_op_version_and_size ... ok
+test context::tests::prune_keep_goal_starts_with_goal_within_budget ... ok
+test auth::tests::credential_file_is_private_when_created ... ok
 test context::tests::query_terms_split_identifiers_and_recall_cjk_bigrams ... ok
 test context::tests::shrinking_a_nonempty_section_keeps_at_least_one_line ... ok
 test context::tests::truncate_list_obeys_character_and_item_limits ... ok
@@ -50,82 +50,82 @@ test default_profile_tests::env_wins ... ok
 test default_profile_tests::guided_error_without_either ... ok
 test default_profile_tests::local_tui_fallback ... ok
 test desktop::tests::cli_paths_cover_macos_bundle_and_plain_install ... ok
+test desktop::tests::compute_is_opt_in ... ok
 test default_profile_tests::boot_rejects_empty_from_default_profile ... ok
 test default_profile_tests::boot_preserves_valid_from_default_profile ... ok
 test default_profile_tests::after_help_lists_every_native_subcommand ... ok
-test desktop::tests::compute_is_opt_in ... ok
-test desktop::tests::app_candidates_follow_the_platform ... ok
 test desktop::tests::tail_keeps_the_last_lines ... ok
 test dsh_args::tests::abbreviated_profile_keeps_many_positional_args_in_order ... ok
 test dsh_args::tests::abbreviated_profile_keeps_positional_args ... ok
 test dsh_args::tests::dump_flags_keep_their_kind ... ok
-test desktop::tests::missing_profile_is_reported_not_created ... ok
 test dsh_args::tests::dump_keeps_from_default_profile ... ok
+test desktop::tests::app_candidates_follow_the_platform ... ok
 test dsh_args::tests::from_default_profile_without_value_is_rejected ... ok
 test dsh_args::tests::plugin_needs_pnpm_args ... ok
 test dsh_args::tests::positional_is_profile ... ok
 test dsh_args::tests::rejects_desktop ... ok
+test desktop::tests::missing_profile_is_reported_not_created ... ok
 test dsh_args::tests::rejects_double_profile ... ok
-test default_profile_tests::native_first_matches_subcommands ... ok
 test dsh_args::tests::rejects_dump_with_args ... ok
 test dsh_args::tests::unknown_flag_starts_app_args ... ok
+test default_profile_tests::native_first_matches_subcommands ... ok
 test file_lock::tests::takeover_claim_name_matches_dsh_record_digest ... ok
 test file_security::secure_open_tests::macos_nofollow_any_falls_back_only_for_supported_open_errors ... ok
 test desktop::tests::profile_state_reads_dependencies_and_bundles ... ok
 test desktop::tests::desktop_targets_mix_bundled_plugins_and_packages ... ok
+test file_lock::tests::credential_lock_writes_dsh_pid_marker_and_removes_it_on_drop ... ok
 test guard::tests::anchored_pattern_matches_command_inside_hook_payload ... ok
 test guard::tests::collect_json_strings ... ok
-test file_lock::tests::credential_lock_writes_dsh_pid_marker_and_removes_it_on_drop ... ok
 test guard::tests::collect_nested_json_values_only ... ok
 test guard::tests::deny_credential_globs ... ok
+test desktop::tests::plugins_dir_accepts_a_checkout_or_its_plugins_directory ... ok
 test guard::tests::empty_patterns_never_match ... ok
 test guard::tests::invalid_policy_fields_and_roots_are_rejected ... ok
-test desktop::tests::plugins_dir_accepts_a_checkout_or_its_plugins_directory ... ok
 test desktop::tests::running_hint_uses_the_electron_singleton_lock ... ok
-test file_lock::tests::credential_lock_takes_over_dead_dsh_marker_using_shared_claim_name ... ok
+test guard::tests::unsupported_shell_and_malformed_hook_do_not_become_allows ... ok
 test guard::tests::wild_anchors ... ok
-test file_security::secure_open_tests::macos_nofollow_any_kernel_guard_rejects_every_symlink_component ... ok
 test guard::tests::wild_basic ... ok
+test file_lock::tests::credential_lock_takes_over_dead_dsh_marker_using_shared_claim_name ... ok
 test guard::tests::wild_middle ... ok
 test guard::tests::wild_multi_star_order ... ok
-test desktop::tests::command_detection_prefers_env_then_app ... ok
 test guard::tests::structured_policy_denies_relative_escape ... ok
-test guard::tests::unsupported_shell_and_malformed_hook_do_not_become_allows ... ok
-test file_security::secure_open_tests::macos_nofollow_any_preserves_non_directory_namedfork_rejection ... ok
-test inspect::tests::worker_cap ... ok
+test desktop::tests::command_detection_prefers_env_then_app ... ok
+test file_security::secure_open_tests::macos_nofollow_any_kernel_guard_rejects_every_symlink_component ... ok
+test guard::tests::structured_policy_uses_tool_path_and_cwd_not_matching_text ... ok
 test guard::tests::structured_policy_denies_symlinks_outside_root ... ok
+test inspect::tests::frame_header_sizes ... ok
+test inspect::tests::worker_cap ... ok
 test local_http::tests::browser_posts_require_origin_but_native_clients_and_navigation_still_work ... ok
 test local_http::tests::explicit_origin_and_host_are_always_checked ... ok
-test file_security::secure_open_tests::cached_root_keeps_approved_identity_when_path_is_replaced ... ok
-test guard::tests::structured_policy_uses_tool_path_and_cwd_not_matching_text ... ok
+test file_security::secure_open_tests::macos_nofollow_any_preserves_non_directory_namedfork_rejection ... ok
 test locale_test::an_explicit_unsupported_environment_locale_does_not_fall_through ... ok
+test file_security::secure_open_tests::cached_root_keeps_approved_identity_when_path_is_replaced ... ok
 test locale_test::chinese_log_path_diagnostic_uses_chinese_copy ... ok
-test locale_test::english_help_uses_the_derive_generated_tree_unchanged ... ok
 test locale_test::environment_override_precedes_the_persisted_setting ... ok
-test inspect::tests::frame_header_sizes ... ok
+test locale_test::english_help_uses_the_derive_generated_tree_unchanged ... ok
 test locale_test::every_generated_command_and_argument_id_has_a_localized_help_entry ... ok
 test locale_test::falls_back_to_english_for_an_unknown_locale ... ok
-test locale_test::native_message_catalog_has_text_for_every_supported_language ... ok
 test locale_test::native_ui_catalog_has_text_for_every_supported_language ... ok
+test locale_test::native_message_catalog_has_text_for_every_supported_language ... ok
 test locale_test::recognizes_windows_code_page_locale_names ... ok
 test locale_test::resolves_explicit_language_before_the_environment ... ok
 test locale_test::resolves_settings_before_the_operating_system_locale ... ok
 test locale_test::settings_default_to_automatic_language_selection ... ok
+test inspect::tests::frame_header_fallback_cases ... ok
 test native_dump_tests::native_dump_escapes_untrusted_profile_and_home_strings ... ok
 test passthrough::tests::parses_tree_names ... ok
-test inspect::tests::tokens_cache_legacy_null_rechecked_with_cli ... ok
 test passthrough::tests::skips_foreign_trees_and_picks_latest ... ok
+test inspect::tests::tokens_cache_legacy_null_rechecked_with_cli ... ok
 test file_security::secure_open_tests::macos_nofollow_any_falls_back_for_a_path_longer_than_path_max ... ok
 test file_security::secure_open_tests::rejects_symlink_swap_after_validation_and_hardlinked_outside_file ... ok
 test rdsh_config::rdsh_config_tests::defaults_match_spec ... ok
-test auth::tests::concurrent_imports_keep_both_credential_updates ... ok
 test rdsh_config::rdsh_config_tests::dotted_get_set_unset_cover_all_sections ... ok
 test rdsh_config::rdsh_config_tests::explicit_working_files_override_legacy_alias ... ok
+test auth::tests::concurrent_imports_keep_both_credential_updates ... ok
 test rdsh_config::rdsh_config_tests::feature_enabled_precedence_and_defaults ... ok
-test inspect::tests::frame_header_fallback_cases ... ok
-test passthrough::tests::skips_directory_and_non_executable_candidates ... ok
-test file_security::secure_open_tests::rejects_nested_parent_symlink_swap_after_a_successful_open ... ok
 test file_security::secure_open_tests::rejects_parent_symlink_swaps_and_fifo_without_waiting ... ok
+test file_security::secure_open_tests::rejects_nested_parent_symlink_swap_after_a_successful_open ... ok
+test passthrough::tests::skips_directory_and_non_executable_candidates ... ok
 test inspect::tests::tokens_cache_skips_none_without_cli ... ok
 test passthrough::tests::path_lookup_skips_non_executable_dsh_and_node ... ok
 test local_http::tests::accepted_nonblocking_socket_waits_for_delayed_header_fragments ... ok
@@ -161,12 +161,12 @@ test websearch::tests::empty_results_and_invalid_pages_retain_the_requested_lang
 test websearch::tests::empty_searxng_page_is_not_a_configuration_error ... ok
 test search::tests::bounded_workers_preserve_global_prefix_and_skip_reads_at_zero ... ok
 test websearch::tests::html_parsing ... ok
+test websearch::tests::fetch_encodes_query_and_preserves_configured_prefix ... ok
 test websearch::tests::html_parsing_keeps_correction_words_in_title_url_snippet ... ok
 test websearch::tests::html_parsing_skips_utf8_attribute_name_candidates ... ok
 test websearch::tests::malformed_numeric_entity_does_not_panic_or_hide_later_entities ... ok
 test websearch::tests::query_encoding ... ok
 test websearch::tests::searxng_generator_meta_is_accepted ... ok
-test websearch::tests::fetch_encodes_query_and_preserves_configured_prefix ... ok
 test file_lock::tests::exclusive_lock_serializes_threads_and_releases_on_drop ... ok
 test file_lock::tests::credential_lock_serializes_threads_using_one_marker ... ok
 test local_http::tests::idle_connections_are_silent_but_partial_requests_retain_http_failures ... ok
@@ -188,64 +188,66 @@ test result: ok. 180 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fi
 
      Running tests/cli_localization.rs (target/release/deps/cli_localization-3d6be534282d4590)
 
-running 11 tests
+running 13 tests
 test help_does_not_hide_invalid_settings ... ok
 test invalid_option_keeps_the_raw_value_and_labels_the_clap_diagnostic ... ok
 test localized_context_desktop_and_logs_errors_keep_raw_unicode_values ... ok
 test main_native_labels_and_errors_are_localized_without_changing_json ... ok
-test native_results_stay_identical_while_human_labels_change_language ... ok
-test english_native_presentations_match_the_default_locale ... ok
-test help_accepts_native_flags_without_required_positionals_in_every_language ... ok
+test guard_json_parse_and_size_reasons_stay_canonical_english ... ok
 test native_command_errors_keep_unicode_values_in_chinese_and_japanese ... ok
+test english_native_presentations_match_the_default_locale ... ok
 test settings_and_guard_errors_localize_without_changing_raw_values_or_json_reasons ... ok
-test auth_and_doctor_errors_are_localized_and_keep_raw_configuration ... ok
+test native_results_stay_identical_while_human_labels_change_language ... ok
+test help_accepts_native_flags_without_required_positionals_in_every_language ... ok
 test structured_compute_and_guard_json_stay_wire_compatible_across_languages ... ok
+test version_like_values_after_double_dash_do_not_trigger_version_display ... ok
+test auth_and_doctor_errors_are_localized_and_keep_raw_configuration ... ok
 
-test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.53s
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.75s
 
      Running tests/log_session_boundaries.rs (target/release/deps/log_session_boundaries-af268dcb736dd9bc)
 
 running 12 tests
-test logs_reads_legit_file ... ok
-test sessions_rejects_symlinked_project ... ok
-test logs_rejects_hardlink ... ok
 test token_sizes_ignore_linked_zstd ... ok
+test logs_reads_legit_file ... ok
 test logs_fifo_is_rejected_without_blocking ... ok
 test logs_rejects_outside_symlink ... ok
-test cache_file_is_0600 ... ok
 test cache_tmp_symlink_cannot_clobber ... ok
+test cache_file_is_0600 ... ok
+test sessions_rejects_symlinked_project ... ok
+test logs_rejects_hardlink ... ok
 test logs_tail_preserves_grep_zero_and_unterminated_final_line ... ok
+test logs_rejects_absolute_and_dotdot ... ok
 test logs_preserves_relative_home_latest_selection_and_tail_filter ... ok
 test sessions_rejects_project_traversal ... ok
-test logs_rejects_absolute_and_dotdot ... ok
 
 test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
 
      Running tests/native_e2e.rs (target/release/deps/native_e2e-bfab950c4866f495)
 
 running 20 tests
-test legacy_cache_cannot_promote_an_old_estimate_to_exact ... ok
-test http_truncated_and_oversized_requests_do_not_damage_serve ... ok
 test missing_compressed_file_never_reports_an_exact_partial_total ... ok
+test legacy_cache_cannot_promote_an_old_estimate_to_exact ... ok
 test dashboard_uses_the_persisted_product_language_without_changing_api_data ... ok
-test unreadable_session_is_inexact_on_first_and_cached_multi_session_views ... ok
-test web_search_gate_and_real_http_results_and_failure ... ok
+test http_truncated_and_oversized_requests_do_not_damage_serve ... ok
 test setup_page_uses_the_resolved_product_language ... ok
+test web_search_gate_and_real_http_results_and_failure ... ok
 test tokens_chars_counts_characters_not_bytes ... ok
-test context_search_finds_two_char_ascii_terms ... ok
-test partly_corrupt_session_never_reports_an_exact_partial_total ... ok
 test sessions_known_and_concatenated_frames_cache_and_growth ... ok
+test context_search_finds_two_char_ascii_terms ... ok
+test unreadable_session_is_inexact_on_first_and_cached_multi_session_views ... ok
+test partly_corrupt_session_never_reports_an_exact_partial_total ... ok
+test streaming_growth_stays_inexact_until_recomputed_single_and_parallel ... ok
+test cli_tokens_prune_compact_search_logs_guard_and_settings_work_together ... ok
+test empty_browser_connections_close_silently_and_fragmented_headers_are_accepted ... ok
 test dsh_alias_preserves_language_argument_bytes_for_delegation ... ok
 test setup_extras_follow_explicit_feature_switches ... ok
-test empty_browser_connections_close_silently_and_fragmented_headers_are_accepted ... ok
-test cli_tokens_prune_compact_search_logs_guard_and_settings_work_together ... ok
-test streaming_growth_stays_inexact_until_recomputed_single_and_parallel ... ok
 test concurrent_session_writers_leave_parseable_correct_cache ... ok
 test setup_save_extras_restart_serve_and_use_real_http_api ... ok
 test path_search_skips_non_executable_dsh_and_node_candidates ... ok
 test http_browser_origin_guard_preserves_authenticated_native_clients ... ok
 
-test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.86s
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.78s
 
      Running tests/settings_cli.rs (target/release/deps/settings_cli-c1f40741c780c024)
 
@@ -253,19 +255,19 @@ running 17 tests
 test init_without_force_preserves_existing_valid_settings ... ok
 test language_option_localizes_auth_and_setup_guidance ... ok
 test auth_renders_synthetic_source_without_copying_or_exposing_its_value ... ok
-test disabled_features_refuse_their_commands_and_point_at_the_switch ... ok
-test settings_set_rejects_values_that_do_not_fit_storage_types ... ok
 test language_option_localizes_rdsh_owned_settings_diagnostics ... ok
+test disabled_features_refuse_their_commands_and_point_at_the_switch ... ok
+test settings_set_preserves_valid_port_boundaries_and_random_web_port ... ok
+test settings_set_rejects_values_that_do_not_fit_storage_types ... ok
 test auth_localizes_owned_details_and_preserves_json_and_external_identifiers ... ok
 test unknown_feature_ids_are_rejected_without_touching_settings ... ok
-test settings_set_preserves_valid_port_boundaries_and_random_web_port ... ok
-test discord_defaults_on_and_preserves_explicit_off ... ok
 test language_setting_round_trips_and_invalid_persisted_value_fails_closed ... ok
 test feature_switches_follow_legacy_keys_and_explicit_values_win ... ok
+test discord_defaults_on_and_preserves_explicit_off ... ok
 test feature_switches_list_defaults_and_round_trip_through_the_cli ... ok
 test discord_uses_bundled_application_id_until_explicitly_overridden ... ok
 test discord_settings_round_trip_through_cli_and_section_reset ... ok
 test force_init_recovers_corrupt_settings_and_loads_defaults ... ok
 test ordinary_commands_do_not_overwrite_corrupt_settings ... ok
 
-test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s

@@ -26,7 +26,9 @@ and JSON even when the job fails.
 
 The default command repeats native setup, native Web and project-dashboard flows
 in `en`, `zh-CN`, and `ja`, including original Japanese task/question text that
-must not be translated. Individual `browser.mjs` runs use
+must not be translated. Each display language also checks Japanese, Chinese and
+English palette queries, one-key Escape/focus recovery, and a browser-generated
+cancellation reason persisted through the authenticated HTTP API. Individual `browser.mjs` runs use
 `RDSH_E2E_LANGUAGE` (default `ja`). It also runs `update-banner.mjs` with the real React component
 and two independent authenticated plugin hosts. Dummy HOME and loopback ports
 cover live update push, cross-tab/port close events, two-hour boundaries, reload

@@ -111,6 +111,45 @@ fn invalid_option_keeps_the_raw_value_and_labels_the_clap_diagnostic() {
 }
 
 #[test]
+fn version_like_values_after_double_dash_do_not_trigger_version_display() {
+    let fixture = Fixture::new();
+    for args in [
+        &["tokens", "--", "--version"][..],
+        &["settings", "--", "--version"],
+    ] {
+        let output = fixture.run(args);
+        assert!(
+            !output.status.success(),
+            "{args:?} unexpectedly exited through --version: {output:?}"
+        );
+        assert!(
+            !String::from_utf8_lossy(&output.stdout).starts_with("rdsh "),
+            "{args:?}: {output:?}"
+        );
+    }
+
+    fs::write(fixture.0.join("--version"), "abcd日本語").unwrap();
+    let tokens = fixture.run(&["tokens", "--", "--version"]);
+    assert!(tokens.status.success(), "{tokens:?}");
+    assert_eq!(
+        String::from_utf8_lossy(&tokens.stdout).trim(),
+        "4  --version"
+    );
+    let setting = fixture.run(&["settings", "set", "context.goal", "--", "--version"]);
+    assert!(setting.status.success(), "{setting:?}");
+    let saved: serde_json::Value =
+        serde_json::from_slice(&fs::read(fixture.0.join("dsh/rdsh.json")).unwrap()).unwrap();
+    assert_eq!(saved["context"]["goal"], "--version");
+
+    let delegated = fixture.run(&["web", "--", "--version"]);
+    assert!(delegated.status.success(), "{delegated:?}");
+    assert!(
+        !String::from_utf8_lossy(&delegated.stdout).starts_with("rdsh "),
+        "{delegated:?}"
+    );
+}
+
+#[test]
 fn help_does_not_hide_invalid_settings() {
     let fixture = Fixture::new();
     fs::write(fixture.0.join("dsh/rdsh.json"), "{").unwrap();
@@ -251,7 +290,6 @@ fn native_results_stay_identical_while_human_labels_change_language() {
             "--max-tokens",
             "64",
         ],
-        vec!["search", "needle", "--dir", search_dir.to_str().unwrap()],
     ] {
         let english = fixture.run(&args);
         assert!(english.status.success(), "{args:?}: {english:?}");
@@ -266,6 +304,50 @@ fn native_results_stay_identical_while_human_labels_change_language() {
             assert_eq!(localized.stdout, english.stdout, "{localized_args:?}");
         }
     }
+
+    let search = ["search", "needle", "--dir", search_dir.to_str().unwrap()];
+    if cfg!(unix) {
+        let english = fixture.run(&search);
+        assert!(english.status.success(), "{search:?}: {english:?}");
+        for language in ["zh-CN", "ja"] {
+            let localized = fixture.run(&[
+                "--language",
+                language,
+                "search",
+                "needle",
+                "--dir",
+                search_dir.to_str().unwrap(),
+            ]);
+            assert!(localized.status.success(), "{language}: {localized:?}");
+            assert_eq!(localized.stdout, english.stdout, "{language}");
+        }
+    } else {
+        for (language, unavailable) in [
+            (
+                "en",
+                "RDSH_SECURITY: secure native search is unavailable on this platform",
+            ),
+            ("zh-CN", "RDSH_SECURITY：此平台无法使用安全原生搜索"),
+            (
+                "ja",
+                "RDSH_SECURITY: このプラットフォームでは安全なネイティブ検索を利用できません",
+            ),
+        ] {
+            let output = fixture.run(&[
+                "--language",
+                language,
+                "search",
+                "needle",
+                "--dir",
+                search_dir.to_str().unwrap(),
+            ]);
+            assert_eq!(output.status.code(), Some(1), "{language}: {output:?}");
+            assert!(output.stdout.is_empty(), "{language}: {output:?}");
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            assert!(stderr.contains("RDSH_SECURITY"), "{language}: {stderr}");
+            assert!(stderr.contains(unavailable), "{language}: {stderr}");
+        }
+    }
 }
 
 #[test]
@@ -276,13 +358,14 @@ fn native_command_errors_keep_unicode_values_in_chinese_and_japanese() {
     fixture.settings(
         r#"{"extras":{"enable":["search-web"]},"search":{"searxng_url":"https://例.invalid/検索"}}"#,
     );
-    for (language, error_label, file_error, directory_error, web_error) in [
+    for (language, error_label, file_error, directory_error, web_error, unavailable) in [
         (
             "zh-CN",
             "错误",
             "无法读取文件",
             "无法访问搜索目录",
             "仅支持 http:// SearXNG URL",
+            "RDSH_SECURITY：此平台无法使用安全原生搜索",
         ),
         (
             "ja",
@@ -290,15 +373,18 @@ fn native_command_errors_keep_unicode_values_in_chinese_and_japanese() {
             "ファイルを読み込めません",
             "検索ディレクトリにアクセスできません",
             "http:// の SearXNG URL のみ対応です",
+            "RDSH_SECURITY: このプラットフォームでは安全なネイティブ検索を利用できません",
         ),
     ] {
-        let cases = [
+        let mut cases = vec![
             (vec!["tokens", missing], file_error),
             (vec!["prune", "--max-tokens", "8", missing], file_error),
             (vec!["compact", missing, "--max-tokens", "8"], file_error),
-            (vec!["search", "needle", "--dir", missing], directory_error),
             (vec!["search-web", "値_日本語"], web_error),
         ];
+        if cfg!(unix) {
+            cases.push((vec!["search", "needle", "--dir", missing], directory_error));
+        }
         for (command, localized_error) in cases {
             let mut args = vec!["--language", language];
             args.extend_from_slice(&command);
@@ -313,6 +399,16 @@ fn native_command_errors_keep_unicode_values_in_chinese_and_japanese() {
                 missing
             };
             assert!(stderr.contains(expected), "{args:?}: {stderr}");
+        }
+        if !cfg!(unix) {
+            let output =
+                fixture.run(&["--language", language, "search", "needle", "--dir", missing]);
+            assert_eq!(output.status.code(), Some(1), "{output:?}");
+            assert!(output.stdout.is_empty(), "{output:?}");
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            assert!(stderr.contains(error_label), "{stderr}");
+            assert!(stderr.contains("RDSH_SECURITY"), "{stderr}");
+            assert!(stderr.contains(unavailable), "{stderr}");
         }
     }
 }
@@ -366,6 +462,38 @@ fn structured_compute_and_guard_json_stay_wire_compatible_across_languages() {
 }
 
 #[test]
+fn guard_json_parse_and_size_reasons_stay_canonical_english() {
+    let fixture = Fixture::new();
+    let oversized = vec![b'x'; 1024 * 1024 + 1];
+    for (input, reason) in [
+        (&b"{"[..], "rdsh guard: invalid JSON input"),
+        (&oversized[..], "rdsh guard: unreadable or oversized input"),
+    ] {
+        let english = fixture.run_with_stdin(&["guard", "--json", "--deny", "needle"], input);
+        assert!(english.status.success(), "{english:?}");
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&english.stdout).unwrap(),
+            serde_json::json!({"decision": "block", "reason": reason})
+        );
+        for language in ["zh-CN", "ja"] {
+            let output = fixture.run_with_stdin(
+                &[
+                    "--language",
+                    language,
+                    "guard",
+                    "--json",
+                    "--deny",
+                    "needle",
+                ],
+                input,
+            );
+            assert!(output.status.success(), "{language}: {output:?}");
+            assert_eq!(output.stdout, english.stdout, "{language}");
+        }
+    }
+}
+
+#[test]
 fn localized_context_desktop_and_logs_errors_keep_raw_unicode_values() {
     let fixture = Fixture::new();
     let missing = fixture.0.join("存在しない_路径_日本語.log");
@@ -373,7 +501,7 @@ fn localized_context_desktop_and_logs_errors_keep_raw_unicode_values() {
     fixture.settings(r#"{"beta":{"context_engine":true}}"#);
     fs::write(
         fixture.0.join("dsh/rdsh-context.json"),
-        format!(r#"{{"working_files":["{}"]}}"#, missing.display()),
+        serde_json::json!({ "working_files": [missing] }).to_string(),
     )
     .unwrap();
 

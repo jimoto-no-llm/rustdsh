@@ -586,12 +586,17 @@ pub fn cmd_guard(
                 locale,
             );
         } else {
+            let message_locale = if json_out {
+                crate::locale::Locale::English
+            } else {
+                locale
+            };
             block(
                 &format!(
                     "{}: {}",
-                    crate::locale::ui_message(locale, crate::locale::UiMessage::Guard),
+                    crate::locale::ui_message(message_locale, crate::locale::UiMessage::Guard),
                     crate::locale::ui_message(
-                        locale,
+                        message_locale,
                         crate::locale::UiMessage::UnreadableOrOversizedInput
                     )
                 ),
@@ -607,11 +612,19 @@ pub fn cmd_guard(
             return Ok(());
         }
         Err(_) => {
+            let message_locale = if json_out {
+                crate::locale::Locale::English
+            } else {
+                locale
+            };
             block(
                 &format!(
                     "{}: {}",
-                    crate::locale::ui_message(locale, crate::locale::UiMessage::Guard),
-                    crate::locale::ui_message(locale, crate::locale::UiMessage::InvalidJsonInput)
+                    crate::locale::ui_message(message_locale, crate::locale::UiMessage::Guard),
+                    crate::locale::ui_message(
+                        message_locale,
+                        crate::locale::UiMessage::InvalidJsonInput
+                    )
                 ),
                 json_out,
             );

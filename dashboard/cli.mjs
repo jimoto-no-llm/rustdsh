@@ -110,7 +110,9 @@ ${cliText(language, "help.reply")}
 }
 let values = {},
   positionals = [],
+  tokens = [],
   argumentError;
+const rawArguments = process.argv.slice(2);
 let explicitLanguage;
 for (let index = 2; index < process.argv.length; index++) {
   const arg = process.argv[index];
@@ -121,8 +123,10 @@ for (let index = 2; index < process.argv.length; index++) {
 }
 let language = resolveProductLocale(explicitLanguage);
 try {
-  ({ values, positionals } = parseArgs({
+  ({ values, positionals, tokens } = parseArgs({
+    args: rawArguments,
     allowPositionals: true,
+    tokens: true,
     options: {
       language: { type: "string" },
       project: { type: "string" },
@@ -188,6 +192,21 @@ try {
   delete values.language;
 } catch (error) {
   argumentError = error;
+}
+// Preserve original spelling, values and terminators when delegating argv.
+function delegatedArguments(omitCommand = false) {
+  const omitted = new Set();
+  for (const token of tokens) {
+    if (token.kind === "option" && token.name === "language") {
+      omitted.add(token.index);
+      if (!token.inlineValue) omitted.add(token.index + 1);
+    }
+  }
+  if (omitCommand) {
+    const command = tokens.find((token) => token.kind === "positional");
+    if (command) omitted.add(command.index);
+  }
+  return rawArguments.filter((_, index) => !omitted.has(index));
 }
 function openUrl(url) {
   // Non-Windows shells can't hand a URL to a browser here; print it so
@@ -257,7 +276,7 @@ async function inPinnedCli(artifact, selectionRevision) {
     throw new CliDiagnosticError("error.pinnedChanged");
   const args = [
     pinnedCli,
-    ...process.argv.slice(2),
+    ...delegatedArguments(),
     "--managed-release-id",
     artifact.manifest.release_id,
     "--managed-revision",
@@ -974,11 +993,7 @@ try {
     )
       process.exitCode = 1;
   } else if (command === "preflight") {
-    await preflightCli(
-      Object.entries(values).flatMap(([key, value]) =>
-        value === true ? [`--${key}`] : [`--${key}`, String(value)],
-      ),
-    );
+    await preflightCli(delegatedArguments(true));
   } else if (command === "checkpoint") {
     const action = positionals[1];
     if (

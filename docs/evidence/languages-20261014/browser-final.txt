@@ -7,31 +7,37 @@
   "flows": [
     "setup: protected token handoff -> Extras enable -> file readback -> reload retained",
     "native serve: protected token handoff -> tokens -> prune -> sessions -> reload retained",
+    "palette: Chinese, Japanese and English queries find localized commands; Escape restores focus",
+    "cancellation: selected-language owned reason persisted through real authenticated HTTP; original question unchanged",
     "project CLI: real MCP task/question -> browser draft preserved on SSE -> browser answer -> MCP/file readback -> process restart retained answer and revoked old key"
   ],
-  "output": "<evidence>/after/en"
+  "output": "<workspace>/target/e2e/en"
 }
 {
   "result": "PASS",
   "flows": [
     "setup: protected token handoff -> Extras enable -> file readback -> reload retained",
     "native serve: protected token handoff -> tokens -> prune -> sessions -> reload retained",
+    "palette: Chinese, Japanese and English queries find localized commands; Escape restores focus",
+    "cancellation: selected-language owned reason persisted through real authenticated HTTP; original question unchanged",
     "project CLI: real MCP task/question -> browser draft preserved on SSE -> browser answer -> MCP/file readback -> process restart retained answer and revoked old key"
   ],
-  "output": "<evidence>/after/zh-CN"
+  "output": "<workspace>/target/e2e/zh-CN"
 }
 {
   "result": "PASS",
   "flows": [
     "setup: protected token handoff -> Extras enable -> file readback -> reload retained",
     "native serve: protected token handoff -> tokens -> prune -> sessions -> reload retained",
+    "palette: Chinese, Japanese and English queries find localized commands; Escape restores focus",
+    "cancellation: selected-language owned reason persisted through real authenticated HTTP; original question unchanged",
     "project CLI: real MCP task/question -> browser draft preserved on SSE -> browser answer -> MCP/file readback -> process restart retained answer and revoked old key"
   ],
-  "output": "<evidence>/after/ja"
+  "output": "<workspace>/target/e2e/ja"
 }
 {
   "result": "PASS",
   "flows": 13,
-  "live_notification_ms": 78,
+  "live_notification_ms": 82,
   "output": "<workspace>/target/e2e/update-banner"
 }
