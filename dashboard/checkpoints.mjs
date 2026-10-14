@@ -45,9 +45,17 @@ const check = (value, code) => {
   if (!value) throw new CheckpointError(code);
 };
 export class CheckpointError extends Error {
-  constructor(code) {
+  // `committed` describes the leased operation: true when it returned (its own
+  // durable writes are in place by contract), null when it threw and the lease
+  // helper cannot observe how far it got. Never claims a caller's record ID.
+  constructor(code, details = null) {
     super("Checkpoint: " + code);
     this.code = code;
+    if (details !== null) {
+      this.committed = details.committed;
+      this.event_ids = [...details.event_ids];
+      this.lock_cleanup_unconfirmed = details.lock_cleanup_unconfirmed;
+    }
   }
 }
 const uncertain = (commands) =>
@@ -317,22 +325,46 @@ export class Checkpoints {
           : "checkpoint_lock_unavailable",
       );
     }
+    let output,
+      failure = null,
+      committed = null;
     try {
       await handle.writeFile(owner);
       await handle.sync();
-      return await operation(owner);
-    } finally {
-      await handle.close();
-      try {
-        check(
-          (await fs.readFile(file, "utf8")) === owner,
-          "checkpoint_lock_changed",
-        );
-        await fs.unlink(file);
-      } catch {
-        throw new CheckpointError("checkpoint_lock_cleanup_unconfirmed");
-      }
+      output = await operation(owner);
+      // The operation writes its own records before it returns. It is the only
+      // honest commit signal this helper can observe.
+      committed = true;
+    } catch (error) {
+      failure = error;
     }
+    // A cleanup failure must never replace the outcome the caller earned.
+    let lockCleanupUnconfirmed = false;
+    try {
+      await handle.close();
+      check(
+        (await fs.readFile(file, "utf8")) === owner,
+        "checkpoint_lock_changed",
+      );
+      await fs.unlink(file);
+    } catch {
+      lockCleanupUnconfirmed = true;
+    }
+    if (failure !== null) {
+      if (lockCleanupUnconfirmed) {
+        failure.committed = committed;
+        failure.event_ids = [];
+        failure.lock_cleanup_unconfirmed = true;
+      }
+      throw failure;
+    }
+    if (lockCleanupUnconfirmed)
+      throw new CheckpointError("checkpoint_lock_cleanup_unconfirmed", {
+        committed,
+        event_ids: [],
+        lock_cleanup_unconfirmed: true,
+      });
+    return output;
   }
   async record({
     run_id,

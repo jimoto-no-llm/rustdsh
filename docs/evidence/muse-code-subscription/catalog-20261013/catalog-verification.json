@@ -1,0 +1,210 @@
+[
+  {
+    "mode": "off",
+    "providerId": "meta",
+    "profileId": "tbh",
+    "source": "providerCatalog",
+    "models": [
+      {
+        "modelId": "muse-wonder-1.0",
+        "displayLabel": "muse-wonder-1.0",
+        "providerId": "meta",
+        "profileId": "tbh",
+        "releaseDate": "2026-10-12",
+        "description": null,
+        "contextLimit": 1007997,
+        "outputLimit": 128000,
+        "cost": null,
+        "isActive": false,
+        "isDefault": true,
+        "variants": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "reasoningEffortVariants": [],
+        "defaultReasoningEffort": "high"
+      },
+      {
+        "modelId": "muse-wonder-full-1.0",
+        "displayLabel": "muse-wonder-full-1.0",
+        "providerId": "meta",
+        "profileId": "tbh",
+        "releaseDate": "2026-10-12",
+        "description": null,
+        "contextLimit": 1007997,
+        "outputLimit": 128000,
+        "cost": null,
+        "isActive": false,
+        "isDefault": false,
+        "variants": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "reasoningEffortVariants": [],
+        "defaultReasoningEffort": "high"
+      },
+      {
+        "modelId": "muse-spark-1.3",
+        "displayLabel": "muse-spark-1.3",
+        "providerId": "meta",
+        "profileId": "tbh",
+        "releaseDate": "2026-09-02",
+        "description": null,
+        "contextLimit": 1007997,
+        "outputLimit": 128000,
+        "cost": null,
+        "isActive": false,
+        "isDefault": false,
+        "variants": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "reasoningEffortVariants": [],
+        "defaultReasoningEffort": "high"
+      },
+      {
+        "modelId": "muse-spark-1.2",
+        "displayLabel": "muse-spark-1.2",
+        "providerId": "meta",
+        "profileId": "tbh",
+        "releaseDate": "2026-08-05",
+        "description": null,
+        "contextLimit": 1007997,
+        "outputLimit": 128000,
+        "cost": null,
+        "isActive": false,
+        "isDefault": false,
+        "variants": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "reasoningEffortVariants": [
+          {
+            "tier": "xhigh",
+            "description": "Use this for deepest analysis and complex fixes."
+          }
+        ],
+        "defaultReasoningEffort": "high"
+      }
+    ]
+  },
+  {
+    "mode": "on",
+    "providerId": "meta",
+    "profileId": "tbh",
+    "source": "providerCatalog",
+    "models": [
+      {
+        "modelId": "muse-wonder-1.0",
+        "displayLabel": "muse-wonder-1.0",
+        "providerId": "meta",
+        "profileId": "tbh",
+        "releaseDate": "2026-10-12",
+        "description": null,
+        "contextLimit": 1007997,
+        "outputLimit": 128000,
+        "cost": null,
+        "isActive": false,
+        "isDefault": true,
+        "variants": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "reasoningEffortVariants": [],
+        "defaultReasoningEffort": "high"
+      },
+      {
+        "modelId": "muse-wonder-full-1.0",
+        "displayLabel": "muse-wonder-full-1.0",
+        "providerId": "meta",
+        "profileId": "tbh",
+        "releaseDate": "2026-10-12",
+        "description": null,
+        "contextLimit": 1007997,
+        "outputLimit": 128000,
+        "cost": null,
+        "isActive": false,
+        "isDefault": false,
+        "variants": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "reasoningEffortVariants": [],
+        "defaultReasoningEffort": "high"
+      },
+      {
+        "modelId": "muse-spark-1.3",
+        "displayLabel": "muse-spark-1.3",
+        "providerId": "meta",
+        "profileId": "tbh",
+        "releaseDate": "2026-09-02",
+        "description": null,
+        "contextLimit": 1007997,
+        "outputLimit": 128000,
+        "cost": null,
+        "isActive": false,
+        "isDefault": false,
+        "variants": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "reasoningEffortVariants": [],
+        "defaultReasoningEffort": "max"
+      },
+      {
+        "modelId": "muse-spark-1.2",
+        "displayLabel": "muse-spark-1.2",
+        "providerId": "meta",
+        "profileId": "tbh",
+        "releaseDate": "2026-08-05",
+        "description": null,
+        "contextLimit": 1007997,
+        "outputLimit": 128000,
+        "cost": null,
+        "isActive": false,
+        "isDefault": false,
+        "variants": [
+          "minimal",
+          "low",
+          "medium",
+          "high",
+          "xhigh"
+        ],
+        "reasoningEffortVariants": [
+          {
+            "tier": "xhigh",
+            "description": "Use this for deepest analysis and complex fixes."
+          }
+        ],
+        "defaultReasoningEffort": "high"
+      }
+    ]
+  }
+]

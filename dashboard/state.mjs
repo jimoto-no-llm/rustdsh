@@ -11,6 +11,7 @@ import os from "node:os";
 import { prepareContract } from "./contracts.mjs";
 import { evaluateOperation } from "./policy.mjs";
 import { prepareApprovalRequest, decideApproval, claimApproval, checkApproval } from "./approvals.mjs";
+import { applyTaskOutcomes, validateTaskOutcomes } from "./task-outcomes.mjs";
 import { normalizeObservation } from "./observations.mjs";
 import {
   changeQuestionContract,
@@ -255,6 +256,7 @@ function validateStoredState(value, project) {
   validateInstructions(value);
   validateCostLedger(value);
   validateBudgetAdmission(value);
+  validateTaskOutcomes(value);
   validateRestoredHistory(value);
 }
 
@@ -393,6 +395,7 @@ export class ProjectStore {
     }
     validateInstructions(next);
     validateCostLedger(next);
+    validateTaskOutcomes(next);
     return this.commit(next, operation, input);
   }
   async mutateReply(operation, input, context) {
@@ -643,8 +646,6 @@ export function applyOperation(state, operation, input) {
       // root/id holds the target repo, and status/milestone/blocker hold the
       // exit conditions. This store never grants action approval; callers
       // must check the active revision before starting work. Schema frozen.
-      // #14 outcome card: keep title/status/milestone/blocker/updated_at on
-      // one card; "done" is not "verified" until a check result is recorded.
       const task = {
         id: text(input.id, "id", 160),
         title: text(input.title, "title", 1000),
@@ -663,6 +664,7 @@ export function applyOperation(state, operation, input) {
         }),
       };
       const index = state.tasks.findIndex((item) => item.id === task.id);
+      applyTaskOutcomes(state, input);
       if (index < 0) state.tasks.push(task);
       else state.tasks[index] = task;
       break;

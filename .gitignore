@@ -1,6 +1,7 @@
 /target
 /dashboard/node_modules/
 /tests/e2e/node_modules/
+/plugins/rdsh-mcp-exposure/node_modules/
 
 # Rust
 **/*.rs.bk

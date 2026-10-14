@@ -19,6 +19,7 @@ import { AnswerApplicationServer } from "./answer-application-server.mjs";
 import { BudgetAdmissionServer } from "./budget-server.mjs";
 import { createHistoryBackup, backupMaximum } from "./history-backup.mjs";
 import { AcceptanceStore } from "./acceptance.mjs";
+import { inspectTaskOutcomes } from "./task-outcomes-view.mjs";
 import { ObservedCliStore } from "./observed-cli.mjs";
 import {
   ConnectionObservations,
@@ -506,6 +507,7 @@ export async function startDashboard(options) {
         ["/api/contracts/check", "/api/policy/check", "/api/workers/check", "/api/approvals/request", "/api/approvals/check", "/api/approvals/claim"].includes(route) ||
         route === "/mcp" ||
         route === "/api/state" ||
+        (req.method === "GET" && route === "/api/task-outcomes") ||
         route === "/api/instructions/context" ||
         (req.method === "POST" && route === "/api/instructions/submit") ||
         (req.method === "POST" &&
@@ -565,6 +567,7 @@ export async function startDashboard(options) {
           route === "/instruction-queue-ui.mjs" ||
           route === "/cost-ledger-ui.mjs" ||
           route === "/budget-ui.mjs" ||
+          route === "/task-outcomes-ui.mjs" ||
           route === "/observed-cli-ui.mjs" ||
           route === "/favicon.ico" ||
           route === "/icon.png" ||
@@ -667,6 +670,7 @@ export async function startDashboard(options) {
           "/instruction-queue-ui.mjs",
           "/cost-ledger-ui.mjs",
           "/budget-ui.mjs",
+          "/task-outcomes-ui.mjs",
           "/observed-cli-ui.mjs",
         ].includes(route)
       ) {
@@ -932,6 +936,24 @@ export async function startDashboard(options) {
         }
         if (req.method === "GET" && route === "/api/state")
           return json(res, 200, await visibleState());
+        if (req.method === "GET" && route === "/api/task-outcomes") {
+          const entries = [...url.searchParams.entries()];
+          if (entries.length !== 1)
+            return json(res, 400, {
+              error: "Select exactly one task_id or milestone_id",
+            });
+          const state = store.clone();
+          const result = await inspectTaskOutcomes(
+            project,
+            state,
+            Object.fromEntries(entries),
+          );
+          if (store.value.revision !== state.revision)
+            return json(res, 409, {
+              error: "Project state changed; refresh and inspect again",
+            });
+          return json(res, 200, result);
+        }
         if (req.method === "POST" && route?.startsWith("/api/update/")) {
           const operation = route.slice("/api/update/".length);
           if (["contract", "policy", "approval_request", "approval_decision", "approval_check", "approval_claim"].includes(operation))

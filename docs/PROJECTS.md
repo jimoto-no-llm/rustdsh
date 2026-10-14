@@ -12,7 +12,7 @@ GitHub Projects (board) is an optional view over the same data.
   Component/type labels (`bug`, `enhancement`, `performance`, `docs`,
   `dashboard`, `installer`, `security`, `ci`, `release`) describe the work.
   Definitions live in [.github/labels.yml](../.github/labels.yml).
-- Order: milestones `v0.3.0` (Now), `v0.4.0` (Next), none (Later).
+- Order: milestones `v0.3.3` (Now, shipped), `v0.4.0` (Next), none (Later).
   `ROADMAP.md` changes only at minor releases.
 - Admin settings: [PROJECT-SETUP.md](PROJECT-SETUP.md) and
   [issue #11](https://github.com/jimoto-no-llm/rustdsh/issues/11).
@@ -24,7 +24,7 @@ Live board: [rustdsh roadmap](https://github.com/orgs/jimoto-no-llm/projects/1)
 
 - Columns: `Todo` / `In Progress` / `Done` (built-in Status field).
 - Slice by priority via the `Labels` field (`P0`-`P3`),
-  by release via the `Milestone` field (`roadmap`, `v0.3.0`, `v0.4.0`).
+  by release via the `Milestone` field (`roadmap`, `v0.3.3`, `v0.4.0`).
 - Seeded with #74 (backlog index), 6 `P0` and 14 `P1` issues, all `Todo`.
 - Done means merged to `main` and closed by the PR, not just reviewed.
 
@@ -35,7 +35,7 @@ so the work survives even if the board is rebuilt.
 
 1. Every new issue needs one priority (`P0`-`P3`) and one area label.
    No priority means it stays in `Inbox`.
-2. `P0`-`P1` need a milestone (`v0.3.0` or `v0.4.0`); `P2`-`P3` do not.
+2. `P0`-`P1` need a milestone (`v0.4.0` or the `roadmap` bucket); `P2`-`P3` do not.
 3. Use the issue forms (bug / feature / performance / docs) with
    `rdsh --version`, `rdsh doctor`, OS/shell, repro steps.
 4. Weekly: empty `Inbox`, close stale `needs-repro` (>30 days, one ping),
@@ -45,11 +45,13 @@ so the work survives even if the board is rebuilt.
 ## Milestones
 
 - [`roadmap`](https://github.com/jimoto-no-llm/rustdsh/milestone/1):
-  triage bucket, 45 open at last check.
-- [`v0.3.0`](https://github.com/jimoto-no-llm/rustdsh/milestone/2):
-  Now (delegation parity, installers, dashboard hardening).
+  triage bucket, 40 open at last check.
+- [`v0.3.3`](https://github.com/jimoto-no-llm/rustdsh/milestone/2):
+  Now, shipped (delegation parity, installer digest registry, dashboard
+  hardening, credential lock compatibility).
 - [`v0.4.0`](https://github.com/jimoto-no-llm/rustdsh/milestone/3):
-  Next (routing experiments, doctor checks, release automation).
+  Next (one-click translation, pending security reviews, Windows flake,
+  routing experiments, doctor checks, `install.ps1` registry).
 
 ```sh
 # labels (managed file is the source of truth)
