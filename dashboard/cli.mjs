@@ -66,6 +66,7 @@ rdsh-dashboard instruction submit|resolve --project <directory> --input-file <js
 rdsh-dashboard cost-ledger declare|report --project <directory> --input-file <json>
 rdsh-dashboard cost-ledger inspect --project <directory>
 rdsh-dashboard task-outcomes apply|validate|schema --input-file <request-json>
+rdsh-dashboard budget-admission apply|validate|public --input-file <request-json>
 rdsh-dashboard budget policy|usage --project <directory> --input-file <json>
 rdsh-dashboard budget inspect --project <directory>
 rdsh-dashboard integration init --project <directory> --input-file <checks-json> --expected-revision 0 --expected-head <sha>
@@ -238,6 +239,23 @@ async function runNativeTaskOutcomes(action, inputFile) {
     const child = spawn(
       executable,
       ["task-outcomes", action, "--input-file", inputFile],
+      { stdio: "inherit", windowsHide: true },
+    );
+    child.once("error", reject);
+    child.once("close", (code) => resolve(code ?? 1));
+  });
+  process.exitCode = exitCode;
+}
+
+// Budget admission is a self-contained pure-logic module in Rust
+// (`rdsh budget-admission`); the dashboard keeps its own copy for the store
+// hot path, and this entry point exposes the native implementation.
+async function runNativeBudgetAdmission(action, inputFile) {
+  const executable = await nativeRdsh();
+  const exitCode = await new Promise((resolve, reject) => {
+    const child = spawn(
+      executable,
+      ["budget-admission", action, "--input-file", inputFile],
       { stdio: "inherit", windowsHide: true },
     );
     child.once("error", reject);
@@ -654,6 +672,16 @@ try {
     )
       throw new Error("Invalid task-outcomes action/options");
     await runNativeTaskOutcomes(action, values["input-file"]);
+  } else if (command === "budget-admission") {
+    const action = positionals[1];
+    if (
+      positionals.length !== 2 ||
+      !["apply", "validate", "public"].includes(action) ||
+      !values["input-file"] ||
+      Object.keys(values).some((key) => key !== "input-file")
+    )
+      throw new Error("Invalid budget-admission action/options");
+    await runNativeBudgetAdmission(action, values["input-file"]);
   } else if (command === "workers") {
     const action = positionals[1];
     const options = {
