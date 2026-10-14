@@ -19,7 +19,7 @@ Run these commands from the repository's dashboard directory:
 node cli.mjs agents list [--probe]
 node cli.mjs agents submit --agent cursor-agent|devin --project /path/to/repo \
   --prompt-file task.txt [--model <name>] [--permission read-only|edit|full] \
-  [--resume <id>] [--trust-workspace] [--executable <path>] [--wait]
+  [--resume <id>] [--trust-workspace] [--executable <path>] [--entrypoint <script>] [--wait]
 node cli.mjs agents status <job_id>
 node cli.mjs agents result <job_id>
 node cli.mjs agents cancel <job_id>
@@ -36,6 +36,13 @@ arrays; no shell is involved. The parent environment is passed through because
 the CLIs need `HOME` for their own login; the runner adds no secrets and never
 reads credential files. The login check uses only the exit code and the text
 `Logged in` (`cursor-agent status`, `devin auth status`) and stores a boolean.
+
+`--entrypoint <script>` (an existing regular file; its real path is recorded in
+the job) makes every launch run `<executable> <script> <args...>`: the version
+probe and the agent run itself. On Windows a Node-based CLI is launched with
+`--executable <node> --entrypoint <script>`, because shebang scripts and `.cmd`
+shims are not run directly. Real Windows CLIs are untested. `list --probe`
+takes no entrypoint.
 
 ## Job states and error codes
 
@@ -54,7 +61,7 @@ carries a `code`:
 
 `submit` rejects bad input before creating a job (`invalid_runner`,
 `invalid_permission`, `invalid_model`, `invalid_resume`, `invalid_project`,
-`prompt_too_large`, `invalid_prompt`, `executable_not_found`,
+`prompt_too_large`, `invalid_prompt`, `executable_not_found`, `invalid_entrypoint`,
 `version_probe_failed`, `trust_workspace_unsupported`).
 
 ## Permissions

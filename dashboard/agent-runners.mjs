@@ -283,17 +283,38 @@ function probe(executable, args) {
     );
   });
 }
-async function probeVersion(runner, executable) {
-  const result = await probe(executable, runner.version_command);
+async function probeVersion(runner, executable, entrypoint) {
+  const result = await probe(executable, [
+    ...(entrypoint ? [entrypoint] : []),
+    ...runner.version_command,
+  ]);
   const line = sanitizeText(result.stdout, 400).trim().split("\n")[0].slice(0, 200);
   if (!result.ok || !line) throw new RunnerError("version_probe_failed");
   return line;
 }
 // Exit code and a "Logged in" marker only; the output holds the account
 // e-mail address, so only a boolean leaves this function.
-async function probeLogin(runner, executable) {
-  const result = await probe(executable, runner.login_command);
+async function probeLogin(runner, executable, entrypoint) {
+  const result = await probe(executable, [
+    ...(entrypoint ? [entrypoint] : []),
+    ...runner.login_command,
+  ]);
   return result.ok && /Logged in/.test(result.stdout + result.stderr);
+}
+
+// Optional script run by `executable` (e.g. a Node-based CLI on Windows, where
+// shebang scripts cannot be executed directly).
+async function resolveEntrypoint(value) {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "string" || !value || value.includes("\0"))
+    throw new RunnerError("invalid_entrypoint");
+  try {
+    const real = await fs.realpath(path.resolve(value));
+    if (!(await fs.stat(real)).isFile()) throw new Error();
+    return real;
+  } catch {
+    throw new RunnerError("invalid_entrypoint");
+  }
 }
 
 function checkToken(value, code) {
@@ -312,6 +333,7 @@ export async function submit({
   resume,
   trustWorkspace = false,
   executable,
+  entrypoint,
 }) {
   const runner = runnerFor(runnerId);
   if (!PERMISSIONS.includes(permission))
@@ -346,7 +368,8 @@ export async function submit({
   if (!prompt.trim() || prompt.includes("\0"))
     throw new RunnerError("invalid_prompt");
   const resolved = await resolveExecutable(runner, executable);
-  const version = await probeVersion(runner, resolved);
+  const resolvedEntrypoint = await resolveEntrypoint(entrypoint);
+  const version = await probeVersion(runner, resolved, resolvedEntrypoint);
 
   const id = "job_" + randomBytes(12).toString("hex");
   const directory = jobDirectory(id);
@@ -363,6 +386,7 @@ export async function submit({
     trust_workspace: Boolean(trustWorkspace),
     created_at: new Date().toISOString(),
     executable: resolved,
+    entrypoint: resolvedEntrypoint,
     version,
     supervisor_pid: null,
     agent_pid: null,
@@ -393,6 +417,7 @@ function publicJob(job) {
     trust_workspace: job.trust_workspace,
     created_at: job.created_at,
     executable: job.executable,
+    entrypoint: job.entrypoint ?? null,
     version: job.version,
     state: job.state,
   };
@@ -645,7 +670,7 @@ async function supervise(directory) {
   const err = sink(path.join(directory, "stderr"), OUTPUT_CAP);
   let child;
   try {
-    child = spawn(job.executable, argv, {
+    child = spawn(job.executable, [...(job.entrypoint ? [job.entrypoint] : []), ...argv], {
       cwd: job.project,
       env: process.env,
       shell: false,

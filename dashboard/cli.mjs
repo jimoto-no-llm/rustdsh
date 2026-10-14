@@ -79,7 +79,7 @@ rdsh-dashboard workers inspect --project <directory>
 rdsh-dashboard workers renew --project <directory> --worker-id <id> --lease-seconds <n> --expected-revision <n>
 rdsh-dashboard workers release --project <directory> --worker-id <id> --expected-revision <n>
 rdsh-dashboard agents list [--probe]
-rdsh-dashboard agents submit --agent <cursor-agent|devin> --project <directory> --prompt-file <file> [--model <name>] [--permission read-only|edit|full] [--resume <id>] [--trust-workspace] [--executable <path>] [--wait]
+rdsh-dashboard agents submit --agent <cursor-agent|devin> --project <directory> --prompt-file <file> [--model <name>] [--permission read-only|edit|full] [--resume <id>] [--trust-workspace] [--executable <path>] [--entrypoint <script>] [--wait]
 rdsh-dashboard agents status|result|cancel <job_id>
 rdsh-dashboard backup preview|export --project <directory> --selection-file <json> [--review-file <json>] [--output-file <new-json>]
 rdsh-dashboard backup inspect --archive-file <json>
@@ -610,6 +610,7 @@ try {
         "resume",
         "trust-workspace",
         "executable",
+        "entrypoint",
         "wait",
       ],
       status: [],
@@ -637,6 +638,7 @@ try {
         resume: values.resume,
         trustWorkspace: Boolean(values["trust-workspace"]),
         executable: values.executable,
+        entrypoint: values.entrypoint,
       });
       if (values.wait) {
         await agentRunners.waitForJob(output.id);

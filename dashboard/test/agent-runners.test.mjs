@@ -26,8 +26,7 @@ test.after(() => fs.rm(root, { recursive: true, force: true }));
 
 // The fakes pick their behaviour from `MODE:<name>` in the prompt and never
 // echo the prompt, so tests can prove it is not stored in job metadata.
-const cursorFake = `#!/usr/bin/env node
-const fs = require("fs"), path = require("path"), cp = require("child_process");
+const cursorFake = `const fs = require("fs"), path = require("path"), cp = require("child_process");
 const a = process.argv.slice(2);
 if (a[0] === "--version") { console.log("2026.10.01-fake"); process.exit(0); }
 if (a[0] === "status") { console.log("Logged in as someone@example.invalid"); process.exit(0); }
@@ -35,7 +34,7 @@ fs.writeFileSync(path.join(__dirname, "argv.json"), JSON.stringify({ argv: a, cw
 const mode = (a[a.length - 1].match(/MODE:(\\w+)/) || [])[1];
 const done = (o) => process.stdout.write(JSON.stringify(o));
 if (mode === "slow") {
-  const c = cp.spawn("sleep", ["300"], { stdio: "ignore" });
+  const c = cp.spawn(process.execPath, ["-e", "setInterval(()=>{},1000)"], { stdio: "ignore" });
   fs.writeFileSync(path.join(__dirname, "grandchild.pid"), String(c.pid));
   setInterval(() => {}, 1000);
 } else if (mode === "iserror") {
@@ -48,8 +47,7 @@ else done({ type: "result", subtype: "success", is_error: false, duration_ms: 74
   result: "OK\\u001b[31m\\u0007done", session_id: "5b7c-session", request_id: "r",
   usage: { inputTokens: 11242, outputTokens: 30, cacheReadTokens: 5888, cacheWriteTokens: 0 } });
 `;
-const devinFake = `#!/usr/bin/env node
-const fs = require("fs"), path = require("path"), cp = require("child_process");
+const devinFake = `const fs = require("fs"), path = require("path"), cp = require("child_process");
 const a = process.argv.slice(2);
 if (a[0] === "--version") { console.log("devin 3000.11.3 (fake)"); process.exit(0); }
 if (a[0] === "auth") { console.log("Logged in as someone@example.invalid"); process.exit(0); }
@@ -61,7 +59,7 @@ const exp = arg("--export");
 const good = { schema_version: "ATIF-v1.7", session_id: "feather-louse",
   agent: { name: "devin", version: "3000.11.3", model_name: "SWE-2 High" }, steps: [{}, {}, {}] };
 if (mode === "slow") {
-  const c = cp.spawn("sleep", ["300"], { stdio: "ignore" });
+  const c = cp.spawn(process.execPath, ["-e", "setInterval(()=>{},1000)"], { stdio: "ignore" });
   fs.writeFileSync(path.join(__dirname, "grandchild.pid"), String(c.pid));
   setInterval(() => {}, 1000);
 } else if (mode === "untrusted") {
@@ -87,8 +85,12 @@ async function fixture(t) {
   const f = {
     dir,
     project,
-    cursorBin: await write("cursor-agent", cursorFake),
-    devinBin: await write("devin", devinFake),
+    // Run as `node <fake.cjs>` so the tests work on every OS.
+    cursorBin: await write("cursor-fake.cjs", cursorFake),
+    devinBin: await write("devin-fake.cjs", devinFake),
+    // Directly executable shebang scripts (not runnable on Windows).
+    cursorShebang: await write("cursor-agent", "#!/usr/bin/env node\n" + cursorFake),
+    devinShebang: await write("devin", "#!/usr/bin/env node\n" + devinFake),
     argv: async () => JSON.parse(await fs.readFile(path.join(dir, "argv.json"), "utf8")),
     prompt: async (mode, extra = "") => {
       const file = path.join(dir, `prompt-${Math.random().toString(16).slice(2)}.txt`);
@@ -104,7 +106,8 @@ async function run(f, runner, mode, options = {}) {
     runner,
     project: f.project,
     promptFile: await f.prompt(mode),
-    executable: runner === "devin" ? f.devinBin : f.cursorBin,
+    executable: process.execPath,
+    entrypoint: runner === "devin" ? f.devinBin : f.cursorBin,
     ...options,
   });
   await waitForJob(job.id, { timeoutMs: 30000 });
@@ -144,13 +147,15 @@ test("cursor-agent: submit, status, result with parsed fields and clean metadata
     runner: "cursor-agent",
     project: f.project,
     promptFile: await f.prompt("ok"),
-    executable: f.cursorBin,
+    executable: process.execPath,
+    entrypoint: f.cursorBin,
     model: "auto",
   });
   assert.match(job.id, /^job_[a-f0-9]{24}$/);
   assert.equal(job.permission, "read-only");
   assert.equal(job.version, "2026.10.01-fake");
-  assert.equal(job.executable, await fs.realpath(f.cursorBin));
+  assert.equal(job.executable, await fs.realpath(process.execPath));
+  assert.equal(job.entrypoint, await fs.realpath(f.cursorBin));
   const final = await waitForJob(job.id, { timeoutMs: 30000 });
   assert.equal(final.state, "succeeded");
   const res = await result(job.id);
@@ -176,9 +181,10 @@ test("cursor-agent: submit, status, result with parsed fields and clean metadata
   const files = await jobFiles(job.id);
   for (const name of ["job.json", "prompt.txt", "stdout", "stderr", "result.json"]) {
     const stat = await fs.stat(path.join(files.dir, name));
-    assert.equal(stat.mode & 0o777, 0o600, name);
+    if (process.platform !== "win32") assert.equal(stat.mode & 0o777, 0o600, name);
   }
-  assert.equal((await fs.stat(files.dir)).mode & 0o777, 0o700);
+  if (process.platform !== "win32")
+    assert.equal((await fs.stat(files.dir)).mode & 0o777, 0o700);
   const meta = files.job + (await fs.readFile(path.join(files.dir, "result.json"), "utf8"));
   assert.ok(!meta.includes(SECRET));
   assert.ok(!JSON.stringify([job, final, res]).includes(SECRET));
@@ -221,7 +227,7 @@ test("cursor-agent failures map to distinct codes", async (t) => {
 
 test("input validation uses error codes and prompt size is capped for cursor", async (t) => {
   const f = await fixture(t);
-  const base = { runner: "cursor-agent", project: f.project, executable: f.cursorBin };
+  const base = { runner: "cursor-agent", project: f.project, executable: process.execPath, entrypoint: f.cursorBin };
   const prompt = await f.prompt("ok");
   const big = path.join(f.dir, "big.txt");
   await fs.writeFile(big, "a".repeat(100 * 1024 + 1));
@@ -232,6 +238,8 @@ test("input validation uses error codes and prompt size is capped for cursor", a
   await assert.rejects(submit({ ...base, promptFile: prompt, runner: "gemini" }), rejects("invalid_runner"));
   await assert.rejects(submit({ ...base, promptFile: prompt, project: path.join(f.dir, "nope") }), rejects("invalid_project"));
   await assert.rejects(submit({ ...base, promptFile: prompt, executable: path.join(f.dir, "missing") }), rejects("executable_not_found"));
+  for (const entrypoint of [path.join(f.dir, "missing.cjs"), f.dir, "", 5])
+    await assert.rejects(submit({ ...base, promptFile: prompt, entrypoint }), rejects("invalid_entrypoint"));
   await assert.rejects(submit({ ...base, promptFile: prompt, trustWorkspace: true }), rejects("trust_workspace_unsupported"));
   await assert.rejects(status("../etc"), rejects("invalid_job_id"));
   await assert.rejects(status("job_" + "0".repeat(24)), rejects("job_not_found"));
@@ -241,7 +249,7 @@ test("cursor-agent prompt beginning with a dash is not parsed as an option", asy
   const f = await fixture(t);
   const file = path.join(f.dir, "dash.txt");
   await fs.writeFile(file, "--force MODE:ok");
-  const job = await submit({ runner: "cursor-agent", project: f.project, promptFile: file, executable: f.cursorBin });
+  const job = await submit({ runner: "cursor-agent", project: f.project, promptFile: file, executable: process.execPath, entrypoint: f.cursorBin });
   await waitForJob(job.id, { timeoutMs: 30000 });
   assert.ok(!(await f.argv()).argv.at(-1).startsWith("-"));
 });
@@ -257,7 +265,8 @@ test("devin: export parsed, argv mapping per permission, trust flag gated", asyn
   assert.equal(res.result.model_name, "SWE-2 High");
   assert.equal(res.result.steps, 3);
   const files = await jobFiles(job.id);
-  assert.equal((await fs.stat(path.join(files.dir, "export.json"))).mode & 0o777, 0o600);
+  if (process.platform !== "win32")
+    assert.equal((await fs.stat(path.join(files.dir, "export.json"))).mode & 0o777, 0o600);
   let seen = (await f.argv()).argv;
   assert.deepEqual(seen.slice(0, 2), ["-p", "--prompt-file"]);
   assert.equal(seen[2], path.join(files.dir, "prompt.txt"));
@@ -321,7 +330,8 @@ for (const [runner, bin] of [
       runner,
       project: f.project,
       promptFile: await f.prompt("slow"),
-      executable: f[bin],
+      executable: process.execPath,
+      entrypoint: f[bin],
     });
     const pidFile = path.join(f.dir, "grandchild.pid");
     for (let i = 0; i < 200; i++) {
@@ -358,7 +368,22 @@ test("a dead supervisor without a result is reported as supervisor_lost", async 
   assert.equal(info.code, "supervisor_lost");
 });
 
-test("list --probe reports version and a login boolean only", async (t) => {
+const noShebang = { skip: process.platform === "win32" && "shebang scripts are not executable on Windows" };
+
+test("a directly executable shebang script works without an entrypoint", noShebang, async (t) => {
+  const f = await fixture(t);
+  const job = await submit({
+    runner: "cursor-agent",
+    project: f.project,
+    promptFile: await f.prompt("ok"),
+    executable: f.cursorShebang,
+  });
+  assert.equal(job.entrypoint, null);
+  assert.equal(job.executable, await fs.realpath(f.cursorShebang));
+  assert.equal((await waitForJob(job.id, { timeoutMs: 30000 })).state, "succeeded");
+});
+
+test("list --probe reports version and a login boolean only", noShebang, async (t) => {
   const f = await fixture(t);
   const before = process.env.PATH;
   process.env.PATH = f.dir + path.delimiter + before;
@@ -398,7 +423,7 @@ test("CLI end-to-end with fake agents", async (t) => {
   const node = (...args) => exec(process.execPath, [cli, "agents", ...args], { env });
   const promptFile = await f.prompt("ok");
   const submitted = JSON.parse(
-    (await node("submit", "--agent", "devin", "--project", f.project, "--prompt-file", promptFile, "--executable", f.devinBin, "--permission", "edit")).stdout,
+    (await node("submit", "--agent", "devin", "--project", f.project, "--prompt-file", promptFile, "--executable", process.execPath, "--entrypoint", f.devinBin, "--permission", "edit")).stdout,
   );
   assert.match(submitted.id, /^job_/);
   assert.equal(submitted.permission, "edit");
@@ -413,11 +438,11 @@ test("CLI end-to-end with fake agents", async (t) => {
   assert.equal(res.result.session_id, "feather-louse");
   assert.equal(res.provenance, "untrusted_data");
 
-  const waited = await node("submit", "--agent", "cursor-agent", "--project", f.project, "--prompt-file", promptFile, "--executable", f.cursorBin, "--wait");
+  const waited = await node("submit", "--agent", "cursor-agent", "--project", f.project, "--prompt-file", promptFile, "--executable", process.execPath, "--entrypoint", f.cursorBin, "--wait");
   assert.ok(!waited.stdout.includes(SECRET));
   assert.equal(JSON.parse(waited.stdout).result.text, "OKdone");
 
-  const failing = await node("submit", "--agent", "cursor-agent", "--project", f.project, "--prompt-file", await f.prompt("exit3"), "--executable", f.cursorBin, "--wait").catch((e) => e);
+  const failing = await node("submit", "--agent", "cursor-agent", "--project", f.project, "--prompt-file", await f.prompt("exit3"), "--executable", process.execPath, "--entrypoint", f.cursorBin, "--wait").catch((e) => e);
   assert.equal(failing.code, 1);
   assert.equal(JSON.parse(failing.stdout).code, "nonzero_exit");
 
