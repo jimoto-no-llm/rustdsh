@@ -65,22 +65,24 @@ jobs:
       - if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force ../fault-simulator-results | Out-Null
-          node fault-simulator.mjs run --seed 1 --output ../fault-simulator-results/run
+          $outputRoot = "../fault-simulator-results/attempt-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          New-Item -ItemType Directory -Force $outputRoot | Out-Null
+          node fault-simulator.mjs run --seed 1 --output "$outputRoot/run"
           $faultRunCode = $LASTEXITCODE
-          node fault-simulator.mjs replay --manifest ../fault-simulator-results/run/input.json --output ../fault-simulator-results/replay
+          node fault-simulator.mjs replay --manifest "$outputRoot/run/input.json" --output "$outputRoot/replay"
           $faultReplayCode = $LASTEXITCODE
-          node fault-simulator.mjs run --scenario disk_full --seed 0 --output ../fault-simulator-results/write-full
+          node fault-simulator.mjs run --scenario disk_full --seed 0 --output "$outputRoot/write-full"
           if ($faultRunCode -ne 0 -or $faultReplayCode -ne 0 -or $LASTEXITCODE -ne 0) { exit 1 }
       - if: runner.os == 'Linux'
         shell: bash
         run: |
-          mkdir -p ../fault-simulator-results
+          output_root="../fault-simulator-results/attempt-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          mkdir -p "$output_root"
           sudo systemd-run --unit="rdsh-fault-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
             --wait --pipe --collect --property=Delegate=yes \
             --property=DelegateSubgroup=supervisor --uid="$(id -u)" \
-            --working-directory="$PWD" /usr/bin/env HOME="$HOME" PATH="$PATH" \
-            bash -c 'set -eu; node fault-simulator.mjs run --seed 1 --output ../fault-simulator-results/run; node fault-simulator.mjs replay --manifest ../fault-simulator-results/run/input.json --output ../fault-simulator-results/replay; node fault-simulator.mjs run --scenario disk_full --seed 0 --output ../fault-simulator-results/write-full'
+            --working-directory="$PWD" /usr/bin/env HOME="$HOME" PATH="$PATH" RDSH_FAULT_OUTPUT_ROOT="$output_root" \
+            bash -c 'set -eu; node fault-simulator.mjs run --seed 1 --output "$RDSH_FAULT_OUTPUT_ROOT/run"; node fault-simulator.mjs replay --manifest "$RDSH_FAULT_OUTPUT_ROOT/run/input.json" --output "$RDSH_FAULT_OUTPUT_ROOT/replay"; node fault-simulator.mjs run --scenario disk_full --seed 0 --output "$RDSH_FAULT_OUTPUT_ROOT/write-full"'
       - uses: actions/upload-artifact@v7
         if: always()
         with:
