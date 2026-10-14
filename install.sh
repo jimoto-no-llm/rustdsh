@@ -490,7 +490,7 @@ echo "--- rdsh doctor ---"
 "$PREFIX/rdsh" doctor 2>&1 | head -n 12 || true
 echo "next: run '$PREFIX/rdsh setup' to connect a model (GPT subscription via OAuth needs no API key)"
 if [ -f "./plugins/install.sh" ]; then
-  echo "next: PROFILE=web ./plugins/install.sh adds recommended plugins, including the rdsh settings UI"
+  echo "next: PROFILE=web ./plugins/install.sh adds recommended plugins, including the rdsh settings UI and the phone-width Web layout"
 fi
 # Desktop (Electron) keeps its own reserved profile next to the CLI profiles.
 # Detection is read-only and never fails the install.
