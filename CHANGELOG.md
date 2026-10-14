@@ -3,6 +3,48 @@
 All notable changes to this project are documented here.
 Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
+## [Unreleased]
+
+### Added
+
+- `rdsh context inject` runs as a DSH `UserPromptSubmit` hook and attaches the
+  turn context (goal, constraints, decisions, working set, git state, retrieved
+  code, memory) through `hookSpecificOutput.additionalContext`. It is fail-open:
+  a corrupt settings file, a damaged index, or a deadline overrun produces
+  silence and exit 0 instead of blocking the prompt.
+- `rdsh context hook install|status|remove` merges that hook into a DSH
+  `hooks.json` idempotently, keeps unrelated hooks untouched, and keeps a backup
+  beside the first file it rewrites.
+- The context memory store (`$DSH_HOME/rdsh-context-memory.json`, 0600, atomic
+  write): `rdsh context remember|memory|distill|forget`. `distill` reads user
+  turns from session logs (including `.jsonl.zstd` through the `zstd` CLI) and
+  supersedes overlapping or retracted entries by deterministic rule, keeping the
+  superseded record instead of overwriting it.
+- `rdsh context build --sessions N` carries past sessions into one build, and
+  `--require-stable` exits 3 unless the snapshot is provably stable: a git state
+  or read file that changed during assembly counts, and so does a git state it
+  cannot read.
+- `rdsh deps build|query|impact`: a static dependency graph for Rust,
+  JavaScript/TypeScript, Python and Go with a persistent incremental index
+  (`$DSH_HOME/rdsh-index`, reused on unchanged size+mtime), symbol lookup, and
+  direct/transitive dependents plus affected tests.
+- `rdsh compact` now preserves high-value lines from the dropped middle
+  (constraints, decisions, errors, diffs, commands) under a bounded reserve and
+  reports a per-category digest, instead of keeping only the head and the newest
+  turns.
+
+### Changed
+
+- Context retrieval expands its search hits with dependency-graph neighbours when
+  the index exists, so an excerpt arrives with the files it depends on; without
+  an index it degrades to the previous behaviour.
+- `rdsh context status --json` also reports memory counts, the dependency-index
+  summary, and the injection budget/deadline; `rdsh context build --json` adds a
+  `snapshot` object describing whether the repository stayed stable.
+- `rdsh compact` emits an identical line once. Repeats are counted in the
+  dropped-line digest instead of being printed again, so a repeated command or
+  error no longer consumes budget twice.
+
 ## [0.3.3] - 2026-10-13
 
 ### Security
