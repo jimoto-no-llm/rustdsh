@@ -256,7 +256,8 @@ expect_rc 0 "full list" sh scripts/check.sh full --list
 has "tests/regress.sh" "full list"
 has "release policy unittest" "full list"
 has "(not run) tests/security-boundaries.test.mjs" "CI-only suites reported"
-has "(not run) tests/install-isolated.sh" "installer isolation reported"
+# Runs on Linux with Docker, otherwise listed as not run; selected either way.
+has "tests/install-isolated.sh --source local" "installer isolation selected"
 ok "check.sh selects checks per mode"
 
 echo "dev-tooling: $pass passed"
