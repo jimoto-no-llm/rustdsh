@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { parseArgs } from "node:util";
 import fs from "node:fs/promises";
-import { constants as fsConstants } from "node:fs";
+import { constants } from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { identity, stateHome } from "./state.mjs";
@@ -37,7 +37,6 @@ import { fileURLToPath } from "node:url";
 import { Releases } from "./releases.mjs";
 import { IntegrationQueue } from "./integration.mjs";
 import { WorkerWorkspaces } from "./workers.mjs";
-import { planSubagents } from "./subagent-plan.mjs";
 import {
   loopbackBase,
   recordTunnel,
@@ -222,7 +221,7 @@ async function nativeRdsh() {
     try {
       if (!(await fs.stat(candidate)).isFile()) continue;
       if (process.platform !== "win32")
-        await fs.access(candidate, fsConstants.X_OK);
+        await fs.access(candidate, constants.X_OK);
       return candidate;
     } catch {
       // Keep looking through PATH.
@@ -241,6 +240,19 @@ async function runNativeTaskOutcomes(action, inputFile) {
       ["task-outcomes", action, "--input-file", inputFile],
       { stdio: "inherit", windowsHide: true },
     );
+    child.once("error", reject);
+    child.once("close", (code) => resolve(code ?? 1));
+  });
+  process.exitCode = exitCode;
+}
+
+async function runNativeSubagentPlan(inputFile) {
+  const executable = await nativeRdsh();
+  const exitCode = await new Promise((resolve, reject) => {
+    const child = spawn(executable, ["subagents", "plan", "--input-file", inputFile], {
+      stdio: "inherit",
+      windowsHide: true,
+    });
     child.once("error", reject);
     child.once("close", (code) => resolve(code ?? 1));
   });
@@ -624,15 +636,14 @@ try {
     )
       process.exitCode = 1;
   } else if (command === "subagents") {
-    // Pure planning: reads a local request, starts nothing and writes nothing.
-    const action = positionals[1];
     if (
       positionals.length !== 2 ||
-      action !== "plan" ||
-      Object.keys(values).some((k) => !["input-file"].includes(k))
+      positionals[1] !== "plan" ||
+      !values["input-file"] ||
+      Object.keys(values).some((key) => key !== "input-file")
     )
       throw new Error("Invalid subagents action/options");
-    console.log(JSON.stringify(planSubagents(await localJson(values["input-file"]))));
+    await runNativeSubagentPlan(values["input-file"]);
   } else if (command === "task-outcomes") {
     const action = positionals[1];
     if (
