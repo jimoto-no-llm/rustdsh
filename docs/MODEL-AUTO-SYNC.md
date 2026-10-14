@@ -53,6 +53,16 @@ unreachable or logged out cannot stop the launch.
 - The sibling lock (`rdsh-models-auto.json.lock`) serializes concurrent
   launches: the second one waits, sees the fresh state and exits.
 
+## Profile writes
+
+The refresh goes through the same safe rewriter as `rdsh models sync`: the
+profile is replaced atomically and keeps the permissions it already had (a new
+file starts at 0600). The first rewrite also copies the profile aside as
+`cordis.patch.yml.bak-rdsh-models`, the same rule the context hook uses for
+`hooks.json`; later rewrites never overwrite that copy, so the pre-rdsh file
+stays recoverable. A backup that cannot be taken stops the write instead of
+leaving the profile rewritten without one.
+
 ## Exit status and output
 
 `rdsh models auto` exits non-zero when a provider listing could not be read, a

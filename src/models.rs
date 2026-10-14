@@ -24,6 +24,10 @@
 //! In both cases nothing is ever deleted, every other byte of the profile is
 //! preserved, an up-to-date profile is not rewritten, and a profile whose
 //! structure this module does not recognize is refused instead of rewritten.
+//! The first rewrite also copies the file aside
+//! (`cordis.patch.yml.bak-rdsh-models`, the same rule the context hook uses)
+//! and keeps the permissions the profile already had, so an automatic refresh
+//! changes nothing the user did not ask for.
 //!
 //! Upstream reference: `packages/llm/llm-pi-ai` in deepseek-ai/deepseek-harness
 //! (`resolveRouteModels` replaces the catalog with a configured `models` list;
@@ -1461,6 +1465,26 @@ fn planned_provider(entry: &Planned) -> &'static str {
     }
 }
 
+/// Sibling backup taken before the first rewrite. Same rule as the context
+/// hook's (`src/context_hook.rs`): `<file>.bak-rdsh-<feature>`.
+const BACKUP_SUFFIX: &str = ".bak-rdsh-models";
+
+/// Copy the profile aside before the first rewrite.
+///
+/// Same rule as the context hook's `write_atomic`: the copy lives beside the
+/// file, is only taken while the original exists, and is never overwritten, so
+/// repeated syncs keep the oldest pre-rdsh content. A failure keeps the write
+/// from happening at all rather than leaving an unrecoverable file behind.
+fn back_up_before_write(path: &Path) -> Result<()> {
+    let backup = PathBuf::from(format!("{}{BACKUP_SUFFIX}", path.display()));
+    if path.exists() && !backup.exists() {
+        std::fs::copy(path, &backup).with_context(|| {
+            format!("cannot back up {} to {}", path.display(), backup.display())
+        })?;
+    }
+    Ok(())
+}
+
 /// Fold every planned catalog into one profile while holding the profile lock.
 ///
 /// The document is read *inside* the lock: a snapshot taken before it would
@@ -1533,7 +1557,8 @@ fn sync_profile_locked(
         }
     }
     if dirty && !dry_run {
-        match crate::auth::write_creds(&path.display().to_string(), &text) {
+        back_up_before_write(path)?;
+        match crate::auth::write_creds_keeping_mode(&path.display().to_string(), &text) {
             Ok(()) => {
                 for report in &mut reports {
                     report.written = report.changed();

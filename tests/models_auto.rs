@@ -1,8 +1,8 @@
 //! `rdsh models auto`: the schedule around `rdsh models sync`.
 //!
-//! Every case runs the real binary against a hermetic `DSH_HOME` that holds no
-//! provider block, so `models sync` has nothing to fetch: no network, no model
-//! credentials and no harness are needed.
+//! Every case runs the real binary against a hermetic `DSH_HOME`. The cases
+//! that need a catalog install the local Codex one instead of reaching the
+//! network, so no credentials and no harness are needed.
 
 use std::path::PathBuf;
 use std::process::{Command, Output};
@@ -53,6 +53,25 @@ impl Fixture {
         self
     }
 
+    /// A profile that lists one `openai-codex` model; the catalog the
+    /// `with_codex_catalog` fixture installs carries a second, so the sync has
+    /// exactly one entry to add.
+    fn with_codex_profile(self) -> Self {
+        let profile = self.root.join("profiles/web");
+        std::fs::create_dir_all(&profile).unwrap();
+        std::fs::write(profile.join("cordis.patch.yml"), CODEX_PROFILE).unwrap();
+        self
+    }
+
+    /// The local Codex catalog, where the sync falls back when no `codex` is
+    /// on PATH: `~/.codex/models_cache.json` under the fixture's own HOME.
+    fn with_codex_catalog(self) -> Self {
+        let dir = self.root.join("home/.codex");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("models_cache.json"), CODEX_CATALOG).unwrap();
+        self
+    }
+
     fn with_settings(self, raw: &str) -> Self {
         std::fs::write(self.root.join("rdsh.json"), raw).unwrap();
         self
@@ -81,6 +100,16 @@ impl Fixture {
         self.root.join("cache/rdsh-models-auto.json")
     }
 
+    fn profile_path(&self) -> PathBuf {
+        self.root.join("profiles/web/cordis.patch.yml")
+    }
+
+    /// Where the first rewrite keeps its copy (`src/models.rs`, BACKUP_SUFFIX).
+    fn backup_path(&self) -> PathBuf {
+        self.root
+            .join("profiles/web/cordis.patch.yml.bak-rdsh-models")
+    }
+
     fn report(&self, args: &[&str]) -> serde_json::Value {
         let output = self.run(args);
         assert!(
@@ -104,6 +133,28 @@ fn json<'a>(args: &[&'a str]) -> Vec<&'a str> {
     all.push("--json");
     all
 }
+
+/// A profile whose `openai-codex` block is one model behind [`CODEX_CATALOG`].
+const CODEX_PROFILE: &str = "\
+- id: llm-pi-ai
+  config:
+    providers:
+      openai-codex:
+        models:
+          - id: gpt-5.6-sol
+            name: GPT-5.6 Sol
+            contextWindow: 272000
+            maxTokens: 128000
+            input:
+              - text
+";
+
+/// The shape `codex debug models` prints, carrying one model the profile does
+/// not list yet.
+const CODEX_CATALOG: &str = r#"{"models":[
+  {"slug":"gpt-5.6-sol","display_name":"GPT-5.6 Sol","context_window":272000},
+  {"slug":"gpt-6.1-sol","display_name":"GPT-6.1 Sol","context_window":272000}
+]}"#;
 
 #[test]
 fn a_first_run_refreshes_and_records_the_attempt() {
@@ -317,4 +368,76 @@ fn an_as_dsh_profile_launch_schedules_the_background_refresh() {
         )
     });
     assert_eq!(state["outcome"], serde_json::json!("ok"));
+}
+
+/// The profile is replaced through a sibling temp file and a rename, so the
+/// mode the user gave it is the one thing an automatic rewrite cannot take
+/// from the old inode unless it copies it across.
+#[cfg(unix)]
+#[test]
+fn an_automatic_refresh_keeps_the_profile_permissions() {
+    use std::os::unix::fs::PermissionsExt;
+    let fixture = Fixture::new("keep-mode")
+        .with_codex_profile()
+        .with_codex_catalog();
+    std::fs::set_permissions(
+        fixture.profile_path(),
+        std::fs::Permissions::from_mode(0o644),
+    )
+    .unwrap();
+
+    let report = fixture.report(&json(&["models", "auto", "--force"]));
+    assert_eq!(report["summary"]["added"], serde_json::json!(1));
+    assert!(std::fs::read_to_string(fixture.profile_path())
+        .unwrap()
+        .contains("gpt-6.1-sol"));
+    assert_eq!(
+        std::fs::metadata(fixture.profile_path())
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777,
+        0o644,
+        "the automatic rewrite must keep the mode the profile had"
+    );
+}
+
+/// The first rewrite copies the profile aside, and later rewrites leave that
+/// copy alone (`src/models.rs`, BACKUP_SUFFIX).
+#[test]
+fn the_first_automatic_rewrite_keeps_one_backup() {
+    let fixture = Fixture::new("backup")
+        .with_codex_profile()
+        .with_codex_catalog();
+    let original = std::fs::read_to_string(fixture.profile_path()).unwrap();
+    assert!(
+        !fixture.backup_path().exists(),
+        "nothing is copied before the first rewrite"
+    );
+
+    let first = fixture.report(&json(&["models", "auto", "--force"]));
+    assert_eq!(first["summary"]["written"], serde_json::json!(1));
+    assert_eq!(
+        std::fs::read_to_string(fixture.backup_path()).unwrap(),
+        original,
+        "the backup holds the file as it was before rdsh touched it"
+    );
+
+    // A second rewrite has to happen for the check to mean anything: put the
+    // profile back one model behind, with a marker only the live file gets.
+    std::fs::write(
+        fixture.profile_path(),
+        format!("{original}# edited between runs\n"),
+    )
+    .unwrap();
+    let second = fixture.report(&json(&["models", "auto", "--force"]));
+    assert_eq!(second["summary"]["written"], serde_json::json!(1));
+    assert!(std::fs::read_to_string(fixture.profile_path())
+        .unwrap()
+        .contains("# edited between runs"));
+    assert_eq!(
+        std::fs::read_to_string(fixture.backup_path()).unwrap(),
+        original,
+        "a later rewrite must not refresh or overwrite the first backup"
+    );
 }
