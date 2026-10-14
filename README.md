@@ -163,10 +163,11 @@ rdsh setup --web                           # browser-based setup interface
 
 *Note: rdsh never exports or syncs external credentials without explicit user command.*
 
-To connect an OpenAI-compatible endpoint that dsh does not ship (HAI, a home llama.cpp / vLLM / LM Studio / Ollama server), add it as a profile route:
+To connect an OpenAI-compatible endpoint that dsh does not ship (HAI, Sarashina, a home llama.cpp / vLLM / LM Studio / Ollama server), add it as a profile route:
 
 ```sh
 rdsh provider add hai --model deepseek-v4-flash              # key from HAI_API_KEY or --key-stdin
+rdsh provider add sarashina                                  # key from SARASHINA_API_KEY; mini and nano built in
 rdsh provider add local-openai --base-url http://host:8080/v1 --discover --no-key
 rdsh provider list                                           # presets, per-profile route and key status
 ```
@@ -342,7 +343,7 @@ Measurements conducted on Linux x86_64:
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Architecture design and delegation model |
 | [docs/BENCHMARKS.md](docs/BENCHMARKS.md) | Benchmark methodology and reproduction steps |
 | [docs/RDSH-SETTINGS.md](docs/RDSH-SETTINGS.md) | Settings UI and CLI options |
-| [docs/PROVIDERS.md](docs/PROVIDERS.md) | `rdsh provider`: HAI and home LLM server routes |
+| [docs/PROVIDERS.md](docs/PROVIDERS.md) | `rdsh provider`: HAI, Sarashina and home LLM server routes |
 | [docs/DESKTOP-INTEGRATION.md](docs/DESKTOP-INTEGRATION.md) | DeepSeek Harness Desktop (Electron) integration |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Project roadmap and planned capabilities |
 | [docs/RELEASING.md](docs/RELEASING.md) | Release procedures |

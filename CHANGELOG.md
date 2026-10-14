@@ -7,11 +7,14 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Added
 
-- `rdsh provider add hai|local-openai` writes an OpenAI-compatible route into a
+- `rdsh provider add hai|sarashina|local-openai` writes an OpenAI-compatible route into a
   profile's `llm-pi-ai` providers (models from `--model`, opencode's
   `provider.<id>` or `GET /models`), keeping every other byte of
   `cordis.patch.yml`; `rdsh provider list` shows presets and per-profile
-  route and key status. `HAI_API_KEY` and `LOCAL_OPENAI_API_KEY` are now
+  route and key status. The `sarashina` preset writes the `compat` lines
+  (`supportsStore`, `supportsUsageInStreaming`) and `maxTokens: 8000` that the
+  API requires; its `tool_choice` default is a known open question for agent
+  use. `HAI_API_KEY`, `SARASHINA_API_KEY` and `LOCAL_OPENAI_API_KEY` are now
   recognized and can be saved from `rdsh setup`. See `docs/PROVIDERS.md`.
 
 ## [0.3.3] - 2026-10-13

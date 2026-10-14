@@ -46,11 +46,29 @@ const MAX_BODY_BYTES: usize = 8 * 1024 * 1024;
 const MAX_MODELS: usize = 500;
 const HTTP_TIMEOUT_SECONDS: u64 = 30;
 
+/// A model a preset ships with: used when no other source names one, and to
+/// fill the fields of a matching `--model` id.
+struct PresetModel {
+    id: &'static str,
+    name: &'static str,
+    context_window: u64,
+    max_tokens: u64,
+}
+
 struct Preset {
     id: &'static str,
     display_name: &'static str,
     /// Fixed endpoint; `None` when the user must supply one.
     base_url: Option<&'static str>,
+    /// Models used when the user gives no `--model` and no other source does.
+    default_models: &'static [PresetModel],
+    /// Route-level `compat` lines (`key: value`), written beside `models:`.
+    compat: &'static [&'static str],
+    /// Hard upper bound for `maxTokens` (the API rejects more); applied to
+    /// every model of the route, including ones the user names.
+    max_tokens_cap: Option<u64>,
+    /// `false` when the endpoint has no `GET /models`.
+    supports_discovery: bool,
 }
 
 const PRESETS: &[Preset] = &[
@@ -58,11 +76,44 @@ const PRESETS: &[Preset] = &[
         id: "hai",
         display_name: "HAI",
         base_url: Some("https://hai-api.hcloud.ltd/v1"),
+        default_models: &[],
+        compat: &[],
+        max_tokens_cap: None,
+        supports_discovery: true,
     },
     Preset {
         id: "local-openai",
         display_name: "Local OpenAI-compatible",
         base_url: None,
+        default_models: &[],
+        compat: &[],
+        max_tokens_cap: None,
+        supports_discovery: true,
+    },
+    // Chat Completions rejects fields it does not document (`store`,
+    // `stream_options`) and a `max_completion_tokens` above 8000; the compat
+    // lines and the maxTokens cap keep dsh from sending them.
+    Preset {
+        id: "sarashina",
+        display_name: "Sarashina",
+        base_url: Some("https://api.sarashina.ai/v1"),
+        default_models: &[
+            PresetModel {
+                id: "sarashina3-mini",
+                name: "Sarashina3 mini",
+                context_window: 128000,
+                max_tokens: 8000,
+            },
+            PresetModel {
+                id: "sarashina3-nano",
+                name: "Sarashina3 nano",
+                context_window: 128000,
+                max_tokens: 8000,
+            },
+        ],
+        compat: &["supportsStore: false", "supportsUsageInStreaming: false"],
+        max_tokens_cap: Some(8000),
+        supports_discovery: false,
     },
 ];
 
@@ -95,7 +146,47 @@ struct Route {
     display_name: String,
     base_url: String,
     api_key_env: String,
+    /// `key: value` lines written under `compat:`; empty writes no block.
+    compat: Vec<String>,
     models: Vec<Model>,
+}
+
+/// Apply a preset's built-in knowledge to the merged models: fill the fields
+/// of its known ids and clamp `maxTokens` to its cap. Returns a note for each
+/// id the preset does not know.
+fn apply_preset_models(preset: &Preset, models: &mut [Model]) -> Vec<String> {
+    let mut notes = Vec::new();
+    if preset.default_models.is_empty() && preset.max_tokens_cap.is_none() {
+        return notes;
+    }
+    for model in models.iter_mut() {
+        match preset.default_models.iter().find(|d| d.id == model.id) {
+            Some(known) => {
+                model.name.get_or_insert_with(|| known.name.to_string());
+                model.context_window.get_or_insert(known.context_window);
+                model.max_tokens.get_or_insert(known.max_tokens);
+                if model.input.is_empty() {
+                    model.input = vec!["text".to_string()];
+                }
+            }
+            None if !preset.default_models.is_empty() => notes.push(format!(
+                "{}: {} is not one of the documented chat models ({}); contextWindow is left to dsh's default",
+                preset.id,
+                model.id,
+                preset
+                    .default_models
+                    .iter()
+                    .map(|d| d.id)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )),
+            None => {}
+        }
+        if let Some(cap) = preset.max_tokens_cap {
+            model.max_tokens = Some(model.max_tokens.map_or(cap, |m| m.min(cap)));
+        }
+    }
+    notes
 }
 
 fn valid_model_id(id: &str) -> bool {
@@ -164,8 +255,14 @@ fn render_route(route: &Route, indent: usize, step: usize) -> Vec<String> {
         format!("{}apiKeyEnv: {}", at(1), yaml_scalar(&route.api_key_env)),
         format!("{}api: {API}", at(1)),
         format!("{}baseURL: {}", at(1), yaml_scalar(&route.base_url)),
-        format!("{}models:", at(1)),
     ];
+    if !route.compat.is_empty() {
+        out.push(format!("{}compat:", at(1)));
+        for line in &route.compat {
+            out.push(format!("{}{line}", at(2)));
+        }
+    }
+    out.push(format!("{}models:", at(1)));
     // Only what a source stated is written: an omitted field falls back to
     // the route defaults dsh documents (defaultContextWindow,
     // defaultMaxTokens, defaultInput), never to a number guessed here.
@@ -1110,6 +1207,7 @@ pub(crate) fn sample_patch_for_tests(id: &str, default_model: &str) -> String {
         display_name: "Sample".to_string(),
         base_url: "http://127.0.0.1:1/v1".to_string(),
         api_key_env: route_key_env(id),
+        compat: Vec::new(),
         models: vec![Model {
             id: default_model.to_string(),
             ..Model::default()
@@ -1210,10 +1308,27 @@ pub(crate) fn cmd_add(args: AddArgs, configured_default_profile: &str) -> Result
             PRESETS.iter().map(|p| p.id).collect::<Vec<_>>().join(", ")
         )
     })?;
-    let is_hai = preset.id == "hai";
-    if is_hai && (args.id.is_some() || args.name.is_some() || args.no_key) {
+    // Presets with a fixed endpoint are a fixed route: only local-openai is
+    // free-form.
+    if preset.base_url.is_some() && (args.id.is_some() || args.name.is_some() || args.no_key) {
         bail!(
-            "--id, --name and --no-key are for local-openai; hai has a fixed route and needs a key"
+            "--id, --name and --no-key are for local-openai; {} has a fixed route and needs a key",
+            preset.id
+        );
+    }
+    if args.discover && !preset.supports_discovery {
+        bail!(
+            "{}",
+            t(
+                &format!(
+                    "{} には GET /models がない（404）ため --discover は使えません。--model <id> を指定するか、省略して既定のモデルを使ってください",
+                    preset.id
+                ),
+                &format!(
+                    "--discover is not supported for {}: its API has no GET /models (it answers 404). Pass --model <id>, or omit it to use the built-in models",
+                    preset.id
+                )
+            )
         );
     }
     if args.key_stdin && args.no_key {
@@ -1294,6 +1409,7 @@ pub(crate) fn cmd_add(args: AddArgs, configured_default_profile: &str) -> Result
             .unwrap_or_else(|| preset.display_name.to_string()),
         base_url: base.url.clone(),
         api_key_env: key_env.clone(),
+        compat: preset.compat.iter().map(|l| l.to_string()).collect(),
         models,
     };
 
@@ -1326,7 +1442,18 @@ pub(crate) fn cmd_add(args: AddArgs, configured_default_profile: &str) -> Result
         }
         groups.push(found);
     }
-    let models = merge_models(groups);
+    let mut models = merge_models(groups);
+    if models.is_empty() {
+        models = preset
+            .default_models
+            .iter()
+            .map(|d| Model {
+                id: d.id.to_string(),
+                ..Model::default()
+            })
+            .collect();
+    }
+    notes.extend(apply_preset_models(preset, &mut models));
     if models.is_empty() && !skip_existing {
         bail!("no models: pass --model <id>, or use --from-opencode / --discover");
     }
@@ -1591,6 +1718,7 @@ mod tests {
             display_name: "HAI".to_string(),
             base_url: "https://hai-api.hcloud.ltd/v1".to_string(),
             api_key_env: route_key_env(id),
+            compat: Vec::new(),
             models: models
                 .iter()
                 .map(|m| Model {
@@ -1873,6 +2001,141 @@ mod tests {
         );
         assert_eq!(merged[0].name.as_deref(), Some("X"));
         assert_eq!(merged[0].context_window, Some(10));
+    }
+
+    fn sarashina_route(models: Vec<Model>) -> Route {
+        let p = preset("sarashina").unwrap();
+        Route {
+            id: p.id.to_string(),
+            display_name: p.display_name.to_string(),
+            base_url: p.base_url.unwrap().to_string(),
+            api_key_env: route_key_env(p.id),
+            compat: p.compat.iter().map(|l| l.to_string()).collect(),
+            models,
+        }
+    }
+
+    fn model_ids(ids: &[&str]) -> Vec<Model> {
+        ids.iter()
+            .map(|id| Model {
+                id: id.to_string(),
+                ..Model::default()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn compat_sits_beside_models_and_is_replaced_with_the_block() {
+        let p = preset("sarashina").unwrap();
+        let mut models = model_ids(&["sarashina3-mini", "sarashina3-nano"]);
+        assert!(apply_preset_models(p, &mut models).is_empty());
+        let lines = render_route(&sarashina_route(models.clone()), 6, 2);
+        let compat = lines.iter().position(|l| l.ends_with("compat:")).unwrap();
+        let models_at = lines.iter().position(|l| l.ends_with("models:")).unwrap();
+        assert_eq!(lines[compat], "        compat:");
+        assert_eq!(lines[models_at], "        models:");
+        assert_eq!(lines[compat + 1], "          supportsStore: false");
+        assert_eq!(
+            lines[compat + 2],
+            "          supportsUsageInStreaming: false"
+        );
+        assert!(compat < models_at);
+        let snippet = manual_snippet(&sarashina_route(models.clone()));
+        assert!(snippet.contains("        compat:\n          supportsStore: false\n"));
+        // hai renders no compat block at all.
+        assert!(!render_route(&route("hai", &["m"]), 6, 2)
+            .iter()
+            .any(|l| l.contains("compat")));
+
+        let once = apply_route(WITH_OTHER, &sarashina_route(models.clone()), false)
+            .unwrap()
+            .text;
+        assert_eq!(routes_in(&once)[1].models, 2);
+        // A stale hand-edited compat is dropped by --replace.
+        let stale = once.replace(
+            "supportsStore: false",
+            "supportsStore: true\n          extra: 1",
+        );
+        let fixed = apply_route(&stale, &sarashina_route(models), true).unwrap();
+        assert_eq!(fixed.change, Change::Replaced);
+        assert_eq!(fixed.text, once);
+    }
+
+    #[test]
+    fn preset_models_fill_known_ids_and_clamp_max_tokens() {
+        let p = preset("sarashina").unwrap();
+        let mut models = vec![
+            Model {
+                id: "sarashina3-mini".into(),
+                max_tokens: Some(32768),
+                ..Model::default()
+            },
+            Model {
+                id: "other".into(),
+                context_window: Some(10),
+                ..Model::default()
+            },
+        ];
+        let notes = apply_preset_models(p, &mut models);
+        assert_eq!(models[0].max_tokens, Some(8000));
+        assert_eq!(models[0].context_window, Some(128000));
+        assert_eq!(models[0].name.as_deref(), Some("Sarashina3 mini"));
+        assert_eq!(models[1].max_tokens, Some(8000));
+        assert_eq!(models[1].context_window, Some(10));
+        assert_eq!(models[1].name, None);
+        assert_eq!(notes.len(), 1);
+        assert!(notes[0].contains("other") && notes[0].contains("sarashina3-nano"));
+        // A smaller explicit limit is kept.
+        let mut small = vec![Model {
+            id: "sarashina3-nano".into(),
+            max_tokens: Some(1000),
+            ..Model::default()
+        }];
+        apply_preset_models(p, &mut small);
+        assert_eq!(small[0].max_tokens, Some(1000));
+        // Presets without knowledge leave models alone.
+        let mut hai = model_ids(&["m"]);
+        assert!(apply_preset_models(preset("hai").unwrap(), &mut hai).is_empty());
+        assert_eq!(hai, model_ids(&["m"]));
+    }
+
+    #[test]
+    fn sarashina_preset_facts() {
+        let p = preset("sarashina").unwrap();
+        assert_eq!(p.base_url, Some("https://api.sarashina.ai/v1"));
+        assert_eq!(route_key_env(p.id), "SARASHINA_API_KEY");
+        assert!(!p.supports_discovery);
+        assert_eq!(p.default_models.len(), 2);
+        assert!(preset("hai").unwrap().supports_discovery);
+    }
+
+    #[test]
+    fn discover_is_refused_for_sarashina_before_any_profile_access() {
+        let err = cmd_add(
+            AddArgs {
+                preset: "sarashina".into(),
+                profile: Some("does-not-exist".into()),
+                models: Vec::new(),
+                from_opencode: false,
+                discover: true,
+                base_url: None,
+                id: None,
+                name: None,
+                key_stdin: false,
+                no_key: false,
+                replace: false,
+                dry_run: true,
+                json: false,
+            },
+            "tui",
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(
+            err.contains("GET /models") || err.contains("/models"),
+            "{err}"
+        );
+        assert!(!err.contains("no profile"), "{err}");
     }
 
     #[test]

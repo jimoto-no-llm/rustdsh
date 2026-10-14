@@ -1015,6 +1015,7 @@ const KNOWN_ENV_KEYS: &[&str] = &[
     "ANTHROPIC_API_KEY",
     "HAI_API_KEY",
     "LOCAL_OPENAI_API_KEY",
+    "SARASHINA_API_KEY",
 ];
 
 fn user_lang() -> String {
@@ -1546,6 +1547,7 @@ const SETUP_KEY_ALLOWLIST: &[&str] = &[
     "ANTHROPIC_API_KEY",
     "HAI_API_KEY",
     "LOCAL_OPENAI_API_KEY",
+    "SARASHINA_API_KEY",
 ];
 
 /// Store a pasted API key submitted from the floating setup UI.
@@ -1940,6 +1942,7 @@ mod tests {
         for (route, key) in [
             ("hai", "HAI_API_KEY"),
             ("local-openai", "LOCAL_OPENAI_API_KEY"),
+            ("sarashina", "SARASHINA_API_KEY"),
             ("home-gpu", "HOME_GPU_API_KEY"),
         ] {
             let text = crate::providers::sample_patch_for_tests(route, "m1");
@@ -1961,6 +1964,8 @@ mod tests {
         assert!(SETUP_KEY_ALLOWLIST.contains(&"LOCAL_OPENAI_API_KEY"));
         assert!(KNOWN_ENV_KEYS.contains(&"HAI_API_KEY"));
         assert!(KNOWN_ENV_KEYS.contains(&"LOCAL_OPENAI_API_KEY"));
+        assert!(SETUP_KEY_ALLOWLIST.contains(&"SARASHINA_API_KEY"));
+        assert!(KNOWN_ENV_KEYS.contains(&"SARASHINA_API_KEY"));
         assert!(setup_store_key("NOT_ALLOWED_API_KEY", "x").is_err());
     }
 

@@ -548,3 +548,111 @@ fn auth_reports_the_new_routes_as_ok_or_missing_with_the_key_name() {
         "{s}"
     );
 }
+
+const SARASHINA_BLOCK: &str = "      sarashina:\n        displayName: Sarashina\n        apiKeyEnv: SARASHINA_API_KEY\n        api: openai-completions\n        baseURL: https://api.sarashina.ai/v1\n        compat:\n          supportsStore: false\n          supportsUsageInStreaming: false\n        models:\n          - id: sarashina3-mini\n            name: Sarashina3 mini\n            contextWindow: 128000\n            maxTokens: 8000\n            input: [text]\n          - id: sarashina3-nano\n            name: Sarashina3 nano\n            contextWindow: 128000\n            maxTokens: 8000\n            input: [text]\n";
+
+#[test]
+fn sarashina_writes_compat_and_both_models_and_is_idempotent() {
+    let f = Fixture::new();
+    f.set_patch(PATCH);
+    let args = ["provider", "add", "sarashina", "--profile", "tui"];
+    let first = f.run(&args);
+    ok(&first);
+    let want = PATCH.replacen(
+        "          - id: x\n",
+        &format!("          - id: x\n{SARASHINA_BLOCK}"),
+        1,
+    );
+    assert_eq!(f.patch(), want);
+    let second = f.run(&args);
+    ok(&second);
+    assert_eq!(f.patch(), want);
+    assert!(text(&second).contains("already configured"));
+    // --replace on identical content is a no-op too.
+    let again = f.run(&[
+        "provider",
+        "add",
+        "sarashina",
+        "--profile",
+        "tui",
+        "--replace",
+    ]);
+    ok(&again);
+    assert_eq!(f.patch(), want);
+    let list = f.run(&["provider", "list"]);
+    ok(&list);
+    assert!(text(&list).contains("sarashina"));
+}
+
+#[test]
+fn sarashina_model_flag_clamps_max_tokens_and_notes_unknown_ids() {
+    let f = Fixture::new();
+    let out = f.run(&[
+        "provider",
+        "add",
+        "sarashina",
+        "--profile",
+        "tui",
+        "--model",
+        "sarashina3-guard",
+    ]);
+    ok(&out);
+    assert!(text(&out).contains("sarashina3-mini"));
+    let patch = f.patch();
+    assert!(patch.contains("          - id: sarashina3-guard\n            maxTokens: 8000\n"));
+    assert!(!patch.contains("sarashina3-nano"));
+    assert!(!patch.contains("contextWindow"));
+    assert!(patch.contains("        compat:\n          supportsStore: false\n"));
+}
+
+#[test]
+fn sarashina_refuses_discover_before_writing() {
+    let f = Fixture::new();
+    f.set_patch(PATCH);
+    let out = f.run(&[
+        "provider",
+        "add",
+        "sarashina",
+        "--profile",
+        "tui",
+        "--discover",
+    ]);
+    assert!(!out.status.success());
+    assert!(text(&out).contains("GET /models"));
+    assert_eq!(f.patch(), PATCH);
+    assert!(f.creds().is_empty());
+}
+
+#[test]
+fn sarashina_key_from_env_is_stored_but_never_printed() {
+    let f = Fixture::new();
+    let secret = "sk-sarashina-test-0123456789";
+    let envs = [("SARASHINA_API_KEY", secret)];
+    let json = f.run_with(
+        &["provider", "add", "sarashina", "--profile", "tui", "--json"],
+        &envs,
+        b"",
+    );
+    ok(&json);
+    assert!(!text(&json).contains(secret));
+    assert!(!f.patch().contains(secret));
+    assert!(f.creds().contains("SARASHINA_API_KEY"));
+    let v: Value = serde_json::from_slice(&json.stdout).unwrap();
+    assert_eq!(v["key"], "stored");
+    assert_eq!(v["apiKeyEnv"], "SARASHINA_API_KEY");
+    assert_eq!(v["models"][0], "sarashina3-mini");
+    let plain = f.run_with(
+        &[
+            "provider",
+            "add",
+            "sarashina",
+            "--profile",
+            "tui",
+            "--replace",
+        ],
+        &envs,
+        b"",
+    );
+    ok(&plain);
+    assert!(!text(&plain).contains(secret));
+}
