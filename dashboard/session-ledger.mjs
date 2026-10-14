@@ -535,7 +535,7 @@ export async function attachRecordedSession({
     } catch (error) {
       if (error.code !== "run_not_found") throw error;
     }
-    if (previous?.scope && previous.scope_observation.status !== "exit_confirmed")
+    if (previous?.scope && !previous.process && previous.scope_observation.status !== "exit_confirmed")
       throw new HistoryError("run_descendants_unconfirmed");
     if (previous?.process) {
       const status = previous.process_observation.status;

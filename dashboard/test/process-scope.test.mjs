@@ -159,15 +159,19 @@ const fs=require('fs'),f=process.env.RDSH_DOCKER_ATTACH_STATE,s=JSON.parse(fs.re
   assert.deepEqual(after.removed, ["c".repeat(64)]);
   assert.equal(after.foreign, "f".repeat(64));
 });
-test("Docker Linux worker requires an explicit pinned image, Linux runtime, and mapped workspace paths", async (t) => {
+test("Docker Linux worker requires an explicit pinned image, Linux runtime, and mapped workspace paths", { skip: process.platform === "win32" && "requires a POSIX executable fake Docker shim" }, async (t) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-docker-worker-"));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const bin = path.join(root, "docker");
+  await fs.writeFile(bin, `#!/usr/bin/env node
+let a=process.argv.slice(2);if(a[0]==='--context'||a[0]==='--host')a=a.slice(2);if(a[0]==='context'){console.log('${fakeColimaEndpoint}');process.exit()}if(a[0]==='info'){console.log('mapping-test-engine');process.exit()}if(a[0]==='version'){console.log('linux/arm64');process.exit()}`);
+  await fs.chmod(bin, 0o755);
   const entry = path.join(root, "entry.mjs");
   await fs.writeFile(entry, "process.exit(0);\n");
   const launch = await dockerWorkerLaunch({
     command: ["/usr/local/bin/node", entry],
     cwd: root,
-    dockerWorker: { mountRoots: [root] },
+    dockerWorker: { dockerBin: bin, mountRoots: [root] },
   });
   assert.equal(launch.execution_platform, "linux");
   assert.equal(launch.transport, "colima_docker");
@@ -177,7 +181,7 @@ test("Docker Linux worker requires an explicit pinned image, Linux runtime, and 
     dockerWorkerLaunch({
       command: [process.execPath, entry],
       cwd: root,
-      dockerWorker: { mountRoots: [root] },
+      dockerWorker: { dockerBin: bin, mountRoots: [root] },
     }),
     (error) => error.code === "ownership_unavailable",
   );
@@ -185,7 +189,7 @@ test("Docker Linux worker requires an explicit pinned image, Linux runtime, and 
     dockerWorkerLaunch({
       command: ["/usr/local/bin/node", "/etc/passwd"],
       cwd: root,
-      dockerWorker: { mountRoots: [root] },
+      dockerWorker: { dockerBin: bin, mountRoots: [root] },
     }),
     (error) => error.code === "ownership_unavailable",
   );
