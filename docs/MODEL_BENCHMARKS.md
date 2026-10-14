@@ -26,8 +26,11 @@ flowchart LR
 Prerequisites: a clean committed checkout, Rust/Cargo, `zstd`, `shasum`, an
 installed DSH with `headless --json`, and an existing authenticated credential
 store. The provider catalog is a non-secret JSON object keyed by `openai-codex`
-and `anthropic`, each with a `models` array. It must include `gpt-6.1-sol` and
-`claude-sonnet-5-5`, including their official compatibility metadata.
+and `anthropic`, each with a `models` array. Each selected provider must contain
+the exact requested model and its official compatibility metadata. The defaults
+remain `gpt-6.1-sol` and `claude-sonnet-5-5`; `--codex-model` and
+`--anthropic-model` select other catalog IDs without fallback. With
+`--only-provider`, the other provider's catalog is not required.
 
 ```sh
 cargo build --release --example benchmark_models --bin rdsh
@@ -45,6 +48,12 @@ path. The report fingerprints the Rust binary, original launcher and optional
 runtime bundle with SHA-256, and records both versions and the source commit.
 The live runner is verified on macOS; offline Rust tests also run in the repository's
 Linux/macOS/Windows matrix. A new run directory is required each time.
+
+For a catalog containing `gpt-6-astra` but no Anthropic models, use
+`--only-provider openai-codex --codex-model gpt-6-astra`. Model IDs must begin
+with an ASCII letter or digit, contain only letters, digits, dots, hyphens or
+underscores, and fit in 128 bytes; they are also used in private run-directory
+names. An unavailable ID fails before creating the run or sending a request.
 
 Use `--only-case rust_fix` and optionally `--only-provider anthropic` for a
 bounded follow-up. Follow-up results remain separate from the original benchmark.
