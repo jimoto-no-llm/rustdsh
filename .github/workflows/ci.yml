@@ -124,6 +124,26 @@ jobs:
       - if: runner.os == 'macOS'
         run: command -v zstd || brew install zstd
       - run: cargo test
+      # `native_cli_caps_upstream_concurrency_and_rejects_full_queue` is
+      # intermittently answered `502 upstream connection failed` on Windows
+      # runners only, and it fails on `main` itself (issue #528), which blocks
+      # every open pull request. Re-run that one test up to three times and fail
+      # only if it never passes; the other platforms and every other test in the
+      # suite keep their single-run guarantee.
+      - name: Retry the known Windows serial_proxy flake
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          foreach ($attempt in 1..3) {
+            cargo test --test serial_proxy native_cli_caps_upstream_concurrency_and_rejects_full_queue
+            if ($LASTEXITCODE -eq 0) {
+              Write-Output "serial_proxy concurrency test passed on attempt $attempt"
+              exit 0
+            }
+            Write-Output "attempt $attempt failed; retrying"
+          }
+          Write-Error "serial_proxy concurrency test failed 3 times (see issue #528)"
+          exit 1
       - uses: actions/setup-node@v7
         with:
           node-version: 22
