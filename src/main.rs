@@ -16,6 +16,7 @@ mod passthrough;
 mod providers;
 mod rdsh_config;
 mod search;
+mod serial_proxy;
 mod serve;
 mod setup_web;
 mod shutdown;
@@ -190,6 +191,31 @@ enum Commands {
         /// Listen port (default: settings serve.port).
         #[arg(long = "port")]
         port: Option<u16>,
+    },
+    /// Local reverse proxy with upstream concurrency and rate limits
+    #[command(name = "serial-proxy")]
+    SerialProxy {
+        /// Upstream HTTP(S) base URL
+        #[arg(long)]
+        upstream: String,
+        #[arg(long, default_value_t = 18080)]
+        port: u16,
+        #[arg(long, default_value = "127.0.0.1")]
+        host: String,
+        #[arg(long = "allow-remote")]
+        allow_remote: bool,
+        #[arg(long, default_value_t = 1)]
+        max: usize,
+        #[arg(long = "queue-timeout", default_value = "600")]
+        queue_timeout: f64,
+        #[arg(long = "max-queue", default_value_t = 64)]
+        max_queue: usize,
+        #[arg(long = "tool-choice-default")]
+        tool_choice_default: Option<String>,
+        #[arg(long = "max-body-bytes", default_value_t = 8 * 1024 * 1024)]
+        max_body_bytes: usize,
+        #[arg(long)]
+        rpm: Option<usize>,
     },
     /// Inventory, select and import only explicitly shared credentials
     Auth(auth_sharing::AuthArgs),
@@ -556,6 +582,29 @@ fn main() {
                 serve::cmd_serve(port.unwrap_or(cfg.serve.port))
             }
         }
+        Some(Commands::SerialProxy {
+            upstream,
+            port,
+            host,
+            allow_remote,
+            max,
+            queue_timeout,
+            max_queue,
+            tool_choice_default,
+            max_body_bytes,
+            rpm,
+        }) => serial_proxy::cmd_serial_proxy(serial_proxy::SerialProxyOptions {
+            upstream,
+            port,
+            host,
+            allow_remote,
+            max,
+            queue_timeout,
+            max_queue,
+            tool_choice_default,
+            max_body_bytes,
+            rpm,
+        }),
         Some(Commands::Bench { n }) => bench(n.unwrap_or(cfg.bench.n)),
         Some(Commands::Compute { once }) => compute::cmd_compute(once),
         Some(Commands::Guard {
