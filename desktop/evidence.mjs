@@ -10,7 +10,7 @@ export function redactOutput(value) {
     .replace(/(https?:\/\/)[^/\s@]+@/giu, '$1[redacted]@')
     .replace(/([?&](?:token|api_key|access_token|refresh_token|password|secret)=)[^&\s"'<>\\]+/giu, '$1[redacted]')
     .replace(/\b(Bearer|Basic)[ \t]+[A-Za-z0-9._~+/=-]+/giu, '$1 [redacted]')
-    .replace(/("(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret)"\s*:\s*")(?:\\.|[^"\\])*(")/giu, '$1[redacted]$2')
+    .replace(/("(?:api[_-]?key|token|access[_-]?token|refresh[_-]?token|password|secret)"\s*:\s*")(?:\\.|[^"\\])*(")/giu, '$1[redacted]$2')
     .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/giu, '[redacted-email]');
 }
 
