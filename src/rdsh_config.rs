@@ -48,7 +48,7 @@ pub struct ExtrasSection {
 
 /// Extra feature ids that can be enabled via `extras.enable`.
 /// `serve` = `rdsh serve` dashboard, `search-web` = `rdsh search-web`.
-/// Setup itself (`rdsh setup --web`) always runs: it hosts the switches.
+/// Setup is not an extra; `features.setup_web` (default on) gates it instead.
 pub const KNOWN_EXTRAS: &[&str] = &["serve", "search-web"];
 
 /// True when the named extra is enabled in settings (unknown ids never match).
