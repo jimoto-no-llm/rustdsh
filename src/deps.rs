@@ -1,11 +1,12 @@
 //! Deterministic, offline static dependency approximation. Dynamic dispatch,
 //! indirect calls, macros and generated code are unresolved, never inferred.
 
+use crate::file_security::Root;
 use anyhow::{Context, Result};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -13,6 +14,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 const MAX_FILES: usize = 20_000;
 const MAX_BYTES: u64 = 512 * 1024;
+/// Maximum serialized index size (64 MiB), shared by reads/parsing and writes.
+const MAX_INDEX_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_CALLS: usize = 200;
 const NOTE: &str = "静的近似 (static approximation): dynamic dispatch・間接呼び出し・マクロ生成・生成コードは unresolved / unknown。外部パッケージ、曖昧な名前、lexer で確定できない参照も unresolved。名前一致による潜在的な影響を含み、字句スコープ・型の binding は unknown。";
 const SKIP_DIRS: &[&str] = &[
@@ -197,14 +200,39 @@ fn wildcard(pattern: &[u8], text: &[u8]) -> bool {
     row[text.len()]
 }
 
-fn ignore_rules(root: &Path, dir: &Path) -> Vec<IgnoreRule> {
-    let Ok(file) = File::open(dir.join(".gitignore")) else {
+fn read_config(
+    root: &Path,
+    reader: Option<&Root>,
+    path: &Path,
+    unknown: &mut Vec<String>,
+) -> Option<String> {
+    if fs::symlink_metadata(path).is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound) {
+        return None;
+    }
+    let mut source = String::new();
+    if reader
+        .and_then(|r| r.open(path))
+        .is_some_and(|file| file.take(MAX_BYTES).read_to_string(&mut source).is_ok())
+    {
+        Some(source)
+    } else {
+        unknown.push(format!(
+            "unknown: {} read failed",
+            relative(path.strip_prefix(root).unwrap_or(path))
+        ));
+        None
+    }
+}
+
+fn ignore_rules(
+    root: &Path,
+    dir: &Path,
+    reader: Option<&Root>,
+    unknown: &mut Vec<String>,
+) -> Vec<IgnoreRule> {
+    let Some(source) = read_config(root, reader, &dir.join(".gitignore"), unknown) else {
         return Vec::new();
     };
-    let mut source = String::new();
-    if file.take(MAX_BYTES).read_to_string(&mut source).is_err() {
-        return Vec::new();
-    }
     source
         .lines()
         .filter_map(|line| {
@@ -270,10 +298,16 @@ fn language(path: &Path) -> Option<&'static str> {
     }
 }
 
-fn scan(root: &Path) -> Scan {
-    fn visit(root: &Path, dir: &Path, rules: &[IgnoreRule], result: &mut Scan) {
+fn scan(root: &Path, reader: Option<&Root>) -> Scan {
+    fn visit(
+        root: &Path,
+        dir: &Path,
+        reader: Option<&Root>,
+        rules: &[IgnoreRule],
+        result: &mut Scan,
+    ) {
         let mut rules = rules.to_vec();
-        rules.extend(ignore_rules(root, dir));
+        rules.extend(ignore_rules(root, dir, reader, &mut result.unknown));
         let Ok(read) = fs::read_dir(dir) else {
             result.unknown.push(format!(
                 "unknown: unreadable directory {}",
@@ -319,7 +353,7 @@ fn scan(root: &Path) -> Scan {
                 {
                     continue;
                 }
-                visit(root, &path, &rules, result);
+                visit(root, &path, reader, &rules, result);
             } else if kind.is_file() && language(&path).is_some() && !ignored(&rel, false, &rules) {
                 if result.files.len() == MAX_FILES {
                     result
@@ -347,7 +381,7 @@ fn scan(root: &Path) -> Scan {
         }
     }
     let mut result = Scan::default();
-    visit(root, root, &[], &mut result);
+    visit(root, root, reader, &[], &mut result);
     result.unknown = sorted(result.unknown);
     result
 }
@@ -1331,14 +1365,10 @@ fn resolve(
     }
 }
 
-fn read_go_module(root: &Path) -> String {
-    let Ok(file) = File::open(root.join("go.mod")) else {
+fn read_go_module(root: &Path, reader: Option<&Root>, unknown: &mut Vec<String>) -> String {
+    let Some(source) = read_config(root, reader, &root.join("go.mod"), unknown) else {
         return String::new();
     };
-    let mut source = String::new();
-    if file.take(MAX_BYTES).read_to_string(&mut source).is_err() {
-        return String::new();
-    }
     source
         .lines()
         .find_map(|line| {
@@ -1542,13 +1572,47 @@ impl Index {
 }
 
 fn load_index(root: &Path, home: &Path) -> Option<Index> {
-    let file = File::open(index_path(root, home)).ok()?;
-    // Bound corrupt/hostile index reads as well as source reads.
-    let value = serde_json::from_reader(file.take(128 * 1024 * 1024)).ok()?;
-    Index::from_value(&value, root)
+    load_index_with_mtime(root, home).map(|(index, _)| index)
+}
+
+fn load_index_with_mtime(root: &Path, home: &Path) -> Option<(Index, SystemTime)> {
+    let path = index_path(root, home);
+    let metadata = fs::symlink_metadata(&path).ok()?;
+    if !metadata.is_file() || metadata.len() > MAX_INDEX_BYTES {
+        return None;
+    }
+    let mut options = OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        // Also reject a symlink/FIFO substituted after the metadata check.
+        options.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
+    }
+    let file = options.open(path).ok()?;
+    let metadata = file.metadata().ok()?;
+    if !metadata.is_file() || metadata.len() > MAX_INDEX_BYTES {
+        return None;
+    }
+    // Detect growth past the shared limit before parsing even a valid prefix.
+    let mut bytes = Vec::new();
+    file.take(MAX_INDEX_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .ok()?;
+    if bytes.len() as u64 > MAX_INDEX_BYTES {
+        return None;
+    }
+    let value = serde_json::from_slice(&bytes).ok()?;
+    Some((Index::from_value(&value, root)?, metadata.modified().ok()?))
 }
 
 fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
+    anyhow::ensure!(
+        bytes.len() as u64 <= MAX_INDEX_BYTES,
+        "index too large ({} bytes > {} byte limit): unknown",
+        bytes.len(),
+        MAX_INDEX_BYTES
+    );
     static SEQUENCE: AtomicU64 = AtomicU64::new(0);
     let parent = path.parent().context("unknown: index parent")?;
     fs::create_dir_all(parent)?;
@@ -1593,17 +1657,20 @@ fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
 
 fn build_index(root: &Path, home: &Path, force: bool) -> Result<(Index, usize)> {
     let previous = load_index(root, home);
-    let scanned = scan(root);
+    let reader = Root::new(root);
+    let mut scanned = scan(root, reader.as_ref());
+    let go_module = read_go_module(root, reader.as_ref(), &mut scanned.unknown);
     let mut index = Index {
         root: root.to_str().context("unknown: root encoding")?.into(),
         built_at_unix: 0,
-        go_module: read_go_module(root),
+        go_module,
         files: BTreeMap::new(),
-        unknown: scanned.unknown,
+        unknown: sorted(scanned.unknown),
     };
     let mut parsed = 0;
     for (path, (size, modified)) in scanned.files {
-        if !force && modified != 0 {
+        let file = reader.as_ref().and_then(|r| r.open(&root.join(&path)));
+        if file.is_some() && !force && modified != 0 {
             if let Some(old) = previous
                 .as_ref()
                 .and_then(|p| p.files.get(&path))
@@ -1622,8 +1689,7 @@ fn build_index(root: &Path, home: &Path, force: bool) -> Result<(Index, usize)> 
         }
         let lang = language(Path::new(&path)).unwrap_or("unknown");
         let mut bytes = Vec::new();
-        let read = File::open(root.join(&path))
-            .and_then(|file| file.take(MAX_BYTES).read_to_end(&mut bytes));
+        let read = file.is_some_and(|file| file.take(MAX_BYTES).read_to_end(&mut bytes).is_ok());
         parsed += 1;
         let source = String::from_utf8_lossy(&bytes);
         let mut entry = extract(&source, &path, lang);
@@ -1636,13 +1702,13 @@ fn build_index(root: &Path, home: &Path, force: bool) -> Result<(Index, usize)> 
                 .unknown
                 .push("unknown: truncated source (hash covers first 512KiB)".into());
         }
-        if read.is_err() {
+        if !read {
             entry.unknown.push("unknown: source read failed".into());
         }
         if std::str::from_utf8(&bytes).is_err() {
             entry.unknown.push("unknown: non-UTF-8 source".into());
         }
-        if fs::metadata(root.join(&path))
+        if fs::symlink_metadata(root.join(&path))
             .ok()
             .is_none_or(|m| m.len() != size || mtime(&m) != Some(modified))
         {
@@ -1696,10 +1762,12 @@ fn build_index(root: &Path, home: &Path, force: bool) -> Result<(Index, usize)> 
 }
 
 fn stale(index: &Index, root: &Path) -> bool {
-    let scanned = scan(root);
+    let reader = Root::new(root);
+    let mut scanned = scan(root, reader.as_ref());
+    let go_module = read_go_module(root, reader.as_ref(), &mut scanned.unknown);
     !scanned.unknown.is_empty()
         || scanned.unknown != index.unknown
-        || read_go_module(root) != index.go_module
+        || go_module != index.go_module
         || scanned.files.len() != index.files.len()
         || scanned.files.iter().any(|(p, (size, modified))| {
             index
@@ -1757,47 +1825,75 @@ fn neighbours(index: &Index, seeds: &[String], max: usize) -> Vec<String> {
 }
 
 fn related_at(root: &Path, home: &Path, seeds: &[String], max: usize) -> Vec<String> {
-    load_index(root, home).map_or_else(Vec::new, |index| neighbours(&index, seeds, max))
+    let Some((index, indexed_at)) = load_index_with_mtime(root, home) else {
+        return Vec::new();
+    };
+    // Stat only the seeds; a full freshness walk does not belong in injection.
+    if seeds.iter().any(|seed| {
+        let Some(path) = normal_path(Path::new(seed)) else {
+            return true;
+        };
+        fs::symlink_metadata(root.join(path))
+            .ok()
+            .filter(|m| m.is_file())
+            .and_then(|m| m.modified().ok())
+            .is_none_or(|modified| modified > indexed_at)
+    }) {
+        return Vec::new();
+    }
+    neighbours(&index, seeds, max)
 }
 
-/// Import targets + importers, sorted repo-relative paths; absent index is empty.
+/// Import targets + importers, sorted cwd-relative paths, without walking the tree.
+/// Missing/invalid indexes or seeds newer than the index yield no neighbours.
 pub fn related_files(seeds: &[String], max: usize) -> Vec<String> {
     if max == 0 {
         return Vec::new();
     }
-    repository_root(None).map_or_else(
-        |_| Vec::new(),
-        |root| related_at(&root, Path::new(&crate::inspect::dsh_home()), seeds, max),
+    let (Ok(root), Ok(cwd)) = (repository_root(None), std::env::current_dir()) else {
+        return Vec::new();
+    };
+    let Ok(prefix) = cwd.strip_prefix(&root) else {
+        return Vec::new();
+    };
+    let Some(seeds) = seeds
+        .iter()
+        .map(|seed| normal_path(&prefix.join(seed)).map(|p| relative(&p)))
+        .collect::<Option<Vec<_>>>()
+    else {
+        return Vec::new();
+    };
+    sorted(
+        related_at(&root, Path::new(&crate::inspect::dsh_home()), &seeds, max)
+            .into_iter()
+            .map(|path| {
+                let path = Path::new(&path);
+                let common = prefix
+                    .components()
+                    .zip(path.components())
+                    .take_while(|(a, b)| a == b)
+                    .count();
+                let mut relative = PathBuf::new();
+                for _ in common..prefix.components().count() {
+                    relative.push("..");
+                }
+                for part in path.components().skip(common) {
+                    relative.push(part.as_os_str());
+                }
+                relative.to_string_lossy().into_owned()
+            }),
     )
 }
 
-/// True when an index exists for the current repository.
+/// True when a valid, parseable index exists for the current repository.
 ///
-/// Cheap on purpose: it stats one file and never parses the index or walks the
-/// tree, so a hook path running under a deadline can use it. Use
-/// [`graph_summary`] when the caller wants the full picture and can pay for it.
+/// Parses at most `MAX_INDEX_BYTES` of a regular file; never walks the tree.
+/// Use [`graph_summary`] when the caller also needs a full freshness walk.
 pub fn index_present() -> bool {
     let Ok(root) = repository_root(None) else {
         return false;
     };
-    let path = index_path(&root, Path::new(&crate::inspect::dsh_home()));
-    // A regular file only (no symlink target, no FIFO that could block the
-    // hook), and a plausible JSON start — parsing it fully is the caller's
-    // business, and walking the tree here is exactly what we are avoiding.
-    let Ok(metadata) = std::fs::symlink_metadata(&path) else {
-        return false;
-    };
-    if !metadata.is_file() {
-        return false;
-    }
-    let Ok(mut file) = File::open(&path) else {
-        return false;
-    };
-    let mut head = [0u8; 64];
-    let Ok(read) = file.read(&mut head) else {
-        return false;
-    };
-    head[..read].iter().find(|byte| !byte.is_ascii_whitespace()) == Some(&b'{')
+    load_index(&root, Path::new(&crate::inspect::dsh_home())).is_some()
 }
 
 /// Empty when unknown; otherwise a one-line static-approximation summary.
@@ -2056,6 +2152,267 @@ mod tests {
 
     fn contains(items: &[String], name: &str) -> bool {
         items.iter().any(|item| item == name)
+    }
+
+    fn dependency_subprocess(temp: &Temp, cwd: &str, action: &str) {
+        // Cwd and DSH_HOME must not change in the parallel parent test process.
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--quiet",
+                "--exact",
+                "deps::tests::dependency_subprocess_checks",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .current_dir(temp.path.join(cwd))
+            .env("DSH_HOME", temp.home())
+            .env("RDSH_DEPS_TEST_ACTION", action)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "dependency subprocess failed:\n{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    #[test]
+    fn dependency_subprocess_checks() {
+        let Ok(action) = std::env::var("RDSH_DEPS_TEST_ACTION") else {
+            return;
+        };
+        match action.as_str() {
+            "index-present" => assert!(index_present()),
+            "index-absent" => assert!(!index_present()),
+            "related-cwd" | "related-deeper" | "related-newer" => {
+                let deeper = action == "related-deeper";
+                let seed = if deeper { "../main.js" } else { "main.js" };
+                let expected = if deeper {
+                    vec!["../../shared.js", "../nearby.js"]
+                } else {
+                    vec!["../shared.js", "nearby.js"]
+                };
+                let paths = related_files(&[seed.into()], 5);
+                assert_eq!(paths, expected);
+                for path in paths {
+                    assert!(fs::read_to_string(path).is_ok());
+                }
+                assert_eq!(
+                    related_files(
+                        &[if deeper {
+                            "../../main.js"
+                        } else {
+                            "../main.js"
+                        }
+                        .into()],
+                        5
+                    ),
+                    vec![if deeper {
+                        "../../decoy.js"
+                    } else {
+                        "../decoy.js"
+                    }]
+                );
+                if action == "related-newer" {
+                    let root = repository_root(None).unwrap();
+                    let indexed_at =
+                        fs::metadata(index_path(&root, Path::new(&crate::inspect::dsh_home())))
+                            .unwrap()
+                            .modified()
+                            .unwrap();
+                    let file = OpenOptions::new().write(true).open(seed).unwrap();
+                    file.set_times(
+                        fs::FileTimes::new()
+                            .set_modified(indexed_at + std::time::Duration::from_secs(2)),
+                    )
+                    .unwrap();
+                    assert!(fs::metadata(seed).unwrap().modified().unwrap() > indexed_at);
+                    assert!(related_files(&[seed.into()], 5).is_empty());
+                    assert!(related_files(&["nearby.js".into(), seed.into()], 5).is_empty());
+                    // Presence means parseable, even if seed stats are stale.
+                    assert!(index_present());
+                }
+            }
+            _ => panic!("unknown dependency test action"),
+        }
+    }
+
+    fn cwd_repo(temp: &Temp) {
+        fs::create_dir(temp.path.join(".git")).unwrap();
+        fs::create_dir_all(temp.path.join("src/deep")).unwrap();
+        temp.write("src/main.js", "import './nearby'; import '../shared';");
+        temp.write("src/nearby.js", "export function nearby() {}");
+        temp.write("shared.js", "export function shared() {}");
+        temp.write("main.js", "import './decoy';");
+        temp.write("decoy.js", "export function decoy() {}");
+        temp.build();
+    }
+
+    #[test]
+    fn related_files_from_subdirectories_are_openable_and_do_not_mix_same_names() {
+        let temp = Temp::new();
+        cwd_repo(&temp);
+        dependency_subprocess(&temp, "src", "related-cwd");
+        dependency_subprocess(&temp, "src/deep", "related-deeper");
+    }
+
+    #[test]
+    fn related_files_reject_any_seed_touched_after_indexing() {
+        let temp = Temp::new();
+        cwd_repo(&temp);
+        dependency_subprocess(&temp, "src", "related-newer");
+    }
+
+    #[test]
+    fn index_presence_requires_a_valid_parse_but_does_not_check_the_tree() {
+        let temp = Temp::new();
+        temp.write("main.rs", "fn main() {}");
+        let (index, _) = temp.build();
+        temp.write(".gitignore", "main.rs\n");
+        dependency_subprocess(&temp, "", "index-present");
+        let path = index_path(&temp.path, &temp.home());
+        for invalid in ["{}", "{", "not json"] {
+            fs::write(&path, invalid).unwrap();
+            dependency_subprocess(&temp, "", "index-absent");
+        }
+        let mut corrupt = index.value();
+        corrupt["stats"]["files"] = json!(500);
+        fs::write(&path, corrupt.to_string()).unwrap();
+        dependency_subprocess(&temp, "", "index-absent");
+    }
+
+    #[test]
+    fn index_reads_and_writes_share_the_exact_size_limit() {
+        let temp = Temp::new();
+        temp.write("main.rs", "fn main() {}");
+        temp.build();
+        let path = index_path(&temp.path, &temp.home());
+        let original = fs::read(&path).unwrap();
+        let mut bytes = vec![b' '; (MAX_INDEX_BYTES + 1) as usize];
+        bytes[..original.len()].copy_from_slice(&original);
+        let error = atomic_write(&path, &bytes).unwrap_err().to_string();
+        assert!(error.contains("index too large"));
+        assert!(error.contains(&(MAX_INDEX_BYTES + 1).to_string()));
+        assert!(error.contains("unknown"));
+        assert_eq!(fs::read(&path).unwrap(), original);
+        let absent = temp.path.join("absent/index.json");
+        assert!(atomic_write(&absent, &bytes).is_err());
+        assert!(!absent.parent().unwrap().exists());
+
+        atomic_write(&path, &bytes[..MAX_INDEX_BYTES as usize]).unwrap();
+        assert!(load_index(&temp.path, &temp.home()).is_some());
+        OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .unwrap()
+            .write_all(b" ")
+            .unwrap();
+        assert!(load_index(&temp.path, &temp.home()).is_none());
+        dependency_subprocess(&temp, "", "index-absent");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn index_reads_reject_symlinks_directories_and_fifos() {
+        use std::os::unix::ffi::OsStrExt;
+        let temp = Temp::new();
+        temp.build();
+        let path = index_path(&temp.path, &temp.home());
+        let saved = temp.path.join("saved.json");
+        fs::rename(&path, &saved).unwrap();
+        std::os::unix::fs::symlink(&saved, &path).unwrap();
+        assert!(load_index(&temp.path, &temp.home()).is_none());
+        dependency_subprocess(&temp, "", "index-absent");
+        fs::remove_file(&path).unwrap();
+        fs::create_dir(&path).unwrap();
+        assert!(load_index(&temp.path, &temp.home()).is_none());
+        fs::remove_dir(&path).unwrap();
+        let name = std::ffi::CString::new(path.as_os_str().as_bytes()).unwrap();
+        assert_eq!(unsafe { libc::mkfifo(name.as_ptr(), 0o600) }, 0);
+        assert!(load_index(&temp.path, &temp.home()).is_none());
+        dependency_subprocess(&temp, "", "index-absent");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn source_and_config_links_are_unknown_without_reading_outside_content() {
+        let outside = Temp::new();
+        outside.write("ignore", "kept.js\n");
+        outside.write("module", "module example.com/outside\n");
+        outside.write("source", "function outside_only() {}");
+        for symlink in [false, true] {
+            let temp = Temp::new();
+            temp.write("kept.js", "function kept() {}");
+            temp.write("src/kept.js", "function nested() {}");
+            temp.write(
+                "main.go",
+                "package main\nimport \"example.com/outside/core\"\n",
+            );
+            temp.write("core/core.go", "package core\nfunc Work() {}\n");
+            for (from, to) in [
+                ("ignore", ".gitignore"),
+                ("ignore", "src/.gitignore"),
+                ("module", "go.mod"),
+                ("source", "linked.js"),
+            ] {
+                let from = outside.path.join(from);
+                let to = temp.path.join(to);
+                if symlink {
+                    std::os::unix::fs::symlink(from, to).unwrap();
+                } else {
+                    fs::hard_link(from, to).unwrap();
+                }
+            }
+            let (index, _) = temp.build();
+            for name in [".gitignore", "src/.gitignore", "go.mod"] {
+                assert!(contains(
+                    &index.unknown,
+                    &format!("unknown: {name} read failed")
+                ));
+            }
+            assert!(index.go_module.is_empty());
+            assert!(index.files.contains_key("kept.js"));
+            assert!(index.files.contains_key("src/kept.js"));
+            assert_eq!(
+                index.files["main.go"].imports,
+                vec!["raw:example.com/outside/core"]
+            );
+            assert!(index
+                .files
+                .values()
+                .all(|e| !contains(&e.symbols, "outside_only")));
+            if symlink {
+                assert!(contains(
+                    &index.unknown,
+                    "unknown: symlink skipped linked.js"
+                ));
+            } else {
+                assert!(contains(
+                    &index.files["linked.js"].unknown,
+                    "unknown: source read failed"
+                ));
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn incremental_reuse_rejects_new_hardlinks_with_unchanged_size_and_mtime() {
+        let temp = Temp::new();
+        let outside = Temp::new();
+        temp.write("main.js", "function previous() {}");
+        let (first, _) = temp.build();
+        fs::hard_link(temp.path.join("main.js"), outside.path.join("linked")).unwrap();
+        let (next, parsed) = temp.build();
+        assert_eq!(parsed, 1);
+        assert_eq!(first.files["main.js"].size, next.files["main.js"].size);
+        assert_eq!(first.files["main.js"].mtime, next.files["main.js"].mtime);
+        assert!(next.files["main.js"].symbols.is_empty());
+        assert!(contains(
+            &next.files["main.js"].unknown,
+            "unknown: source read failed"
+        ));
     }
 
     #[test]
