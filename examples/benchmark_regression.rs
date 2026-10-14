@@ -369,6 +369,35 @@ impl Case {
                 if unique.len() != *hits {
                     bail!("{}: duplicate search hits", self.name);
                 }
+                // A row count plus a uniqueness check is not enough: 200 rows
+                // all ending in `regression-needle-0` satisfy both while 199
+                // needles are missing, and with no baseline in CI that
+                // truncated output would be recorded as correct. Require the
+                // needle ids to be exactly `0..hits`.
+                let mut seen = std::collections::BTreeSet::new();
+                for line in &lines {
+                    let id = line
+                        .rsplit_once("regression-needle-")
+                        .map(|(_, id)| id.trim())
+                        .and_then(|id| id.parse::<usize>().ok())
+                        .ok_or_else(|| {
+                            anyhow!(
+                                "{}: search hit has no readable needle id: {line}",
+                                self.name
+                            )
+                        })?;
+                    if !seen.insert(id) {
+                        bail!("{}: needle {id} was reported more than once", self.name);
+                    }
+                }
+                let expected: std::collections::BTreeSet<usize> = (0..*hits).collect();
+                if seen != expected {
+                    let missing: Vec<usize> = expected.difference(&seen).copied().collect();
+                    bail!(
+                        "{}: search output is missing needle(s) {missing:?}",
+                        self.name
+                    );
+                }
                 Ok(format!("hits={hits}"))
             }
         }
@@ -1273,6 +1302,24 @@ mod tests {
         assert!(case
             .validate(b"/tmp/t/d00/f000.txt:no-marker\n/tmp/t/d01/f001.txt:no-marker\n")
             .is_err());
+        // The row count and uniqueness can both hold while a needle is
+        // missing: two distinct rows, both for needle 0, never report needle
+        // 1. Counting rows alone would record this as correct.
+        assert!(
+            case.validate(
+                b"/tmp/t/d00/f000.txt:regression-needle-0\n/tmp/t/d01/f001.txt:regression-needle-0\n"
+            )
+            .is_err(),
+            "a missing needle must fail even when the row count matches"
+        );
+        // Conversely, an out-of-range id is not one of the generated needles.
+        assert!(
+            case.validate(
+                b"/tmp/t/d00/f000.txt:regression-needle-0\n/tmp/t/d01/f001.txt:regression-needle-9\n"
+            )
+            .is_err(),
+            "an unexpected needle id must fail"
+        );
     }
 
     #[test]
