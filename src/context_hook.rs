@@ -50,9 +50,28 @@ fn command_is_ours(command: &str) -> bool {
     if !rdsh_named(program) {
         return false;
     }
-    tokens
-        .windows(2)
-        .any(|pair| pair[0] == "context" && pair[1] == "inject")
+    let mut index = 1;
+    while index < tokens.len() {
+        match tokens[index].as_str() {
+            "context" => return tokens.get(index + 1).is_some_and(|arg| arg == "inject"),
+            "--passthrough" | "--dry-run" | "--slim" | "--no-slim" => index += 1,
+            "--profile" | "--patch" | "--share-file" => {
+                if tokens.get(index + 1).is_none() {
+                    return false;
+                }
+                index += 2;
+            }
+            value
+                if value.starts_with("--profile=")
+                    || value.starts_with("--patch=")
+                    || value.starts_with("--share-file=") =>
+            {
+                index += 1
+            }
+            _ => return false,
+        }
+    }
+    false
 }
 
 fn rdsh_named(program: &str) -> bool {
@@ -450,7 +469,8 @@ mod tests {
     fn ownership_requires_exact_binary_name_and_adjacent_subcommands() {
         for command in [
             "rdsh context inject",
-            "/opt/bin/rdsh.exe --flag context inject",
+            "/opt/bin/rdsh.exe --profile web context inject",
+            "rdsh --patch=profile.yml context inject",
             "\"/opt/program files/rdsh\" context inject",
             "'C:\\Program Files\\rdsh.exe' context inject",
         ] {
@@ -461,6 +481,8 @@ mod tests {
             "/opt/dsh-native context inject",
             "rdsh context other inject",
             "rdsh context inject-log",
+            "rdsh tokens context inject",
+            "rdsh --unknown context inject",
             "rdsh audit; echo context inject",
             "'rdsh context inject",
         ] {

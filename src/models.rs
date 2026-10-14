@@ -33,6 +33,7 @@
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
 
 use anyhow::{bail, Context, Result};
 use serde_json::{json, Value};
@@ -55,6 +56,8 @@ const HARNESS_LEVELS: &[&str] = &["off", "minimal", "low", "medium", "high", "xh
 const HARNESS_MODALITIES: &[&str] = &["text", "image"];
 /// A catalog larger than this is refused rather than buffered.
 const MAX_CATALOG_BYTES: usize = 8 * 1024 * 1024;
+/// `codex debug models` is a local helper, not a reason to wedge model sync.
+const CODEX_CLI_TIMEOUT: Duration = Duration::from_secs(10);
 /// Wall-clock bound handed to curl for one listing request.
 const LISTING_TIMEOUT_SECONDS: u64 = 30;
 
@@ -308,6 +311,9 @@ fn modalities_from(named: Option<Vec<&str>>, supports_image: Option<bool>) -> Ve
 struct Fetched {
     models: Vec<CatalogModel>,
     label: String,
+    /// Hash of the endpoint and credential selection used for a live fetch.
+    /// Never contains the credential itself.
+    source_fingerprint: String,
 }
 
 /// Read one provider's catalog for one profile. A live listing needs the
@@ -316,24 +322,8 @@ fn fetch_catalog(source: &CatalogSource, profile_text: &str) -> Result<Fetched> 
     match &source.kind {
         SourceKind::CodexCli => codex_catalog(DEFAULT_MAX_TOKENS),
         SourceKind::Live(endpoint) => {
-            let lines: Vec<String> = profile_text.lines().map(str::to_string).collect();
-            let site = locate_owned(&lines, source.provider)?;
-            let key_env = scalar_in(&lines, &site, "apiKeyEnv").ok_or_else(|| {
-                anyhow::anyhow!(
-                    "the {} block has no apiKeyEnv: entry, so its listing cannot be read (the subscription login is not used to list)",
-                    source.provider
-                )
-            })?;
-            let key = credential_ref(&key_env)
-                .or_else(|| std::env::var(&key_env).ok().filter(|v| !v.trim().is_empty()))
-                .ok_or_else(|| {
-                    anyhow::anyhow!(
-                        "no credential for {key_env}: store it (`rdsh auth --import --ref {key_env}`) or export it"
-                    )
-                })?;
-            let base = scalar_in(&lines, &site, "baseURL")
-                .unwrap_or_else(|| endpoint.base_url.to_string());
-            let url = format!("{}{}", base.trim_end_matches('/'), endpoint.path);
+            let (url, key, source_fingerprint) =
+                live_request_details(endpoint, source.provider, profile_text)?;
             let body = curl_json(endpoint, &url, &key)?;
             let doc: Value = serde_json::from_str(&body)
                 .with_context(|| format!("{url} did not answer with a JSON model listing"))?;
@@ -341,8 +331,49 @@ fn fetch_catalog(source: &CatalogSource, profile_text: &str) -> Result<Fetched> 
             if models.is_empty() {
                 bail!("{url} lists no selectable {} model", source.provider);
             }
-            Ok(Fetched { models, label: url })
+            Ok(Fetched {
+                models,
+                label: url,
+                source_fingerprint,
+            })
         }
+    }
+}
+
+fn live_request_details(
+    endpoint: &LiveEndpoint,
+    provider: &str,
+    profile_text: &str,
+) -> Result<(String, String, String)> {
+    let lines: Vec<String> = profile_text.lines().map(str::to_string).collect();
+    let site = locate_owned(&lines, provider)?;
+    let key_env = scalar_in(&lines, &site, "apiKeyEnv").ok_or_else(|| {
+        anyhow::anyhow!(
+            "the {provider} block has no apiKeyEnv: entry, so its listing cannot be read (the subscription login is not used to list)"
+        )
+    })?;
+    let key = credential_ref(&key_env)
+        .or_else(|| std::env::var(&key_env).ok().filter(|v| !v.trim().is_empty()))
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "no credential for {key_env}: store it (`rdsh auth --import --ref {key_env}`) or export it"
+            )
+        })?;
+    let base = scalar_in(&lines, &site, "baseURL").unwrap_or_else(|| endpoint.base_url.to_string());
+    let url = format!("{}{}", base.trim_end_matches('/'), endpoint.path);
+    let fingerprint = live_source_fingerprint(&url, &key_env, &key);
+    Ok((url, key, fingerprint))
+}
+
+fn current_source_fingerprint(provider: &str, profile_text: &str) -> Result<String> {
+    let source = SOURCES
+        .iter()
+        .find(|source| source.provider == provider)
+        .ok_or_else(|| anyhow::anyhow!("unknown catalog source {provider}"))?;
+    match &source.kind {
+        SourceKind::CodexCli => Ok("codex".to_string()),
+        SourceKind::Live(endpoint) => live_request_details(endpoint, provider, profile_text)
+            .map(|(_, _, fingerprint)| fingerprint),
     }
 }
 
@@ -358,12 +389,13 @@ fn codex_catalog(max_tokens: u64) -> Result<Fetched> {
                 return Ok(Fetched {
                     models,
                     label: "codex debug models".to_string(),
+                    source_fingerprint: "codex".to_string(),
                 });
             }
         }
     }
     let path = codex_cache_path().context("HOME is not set")?;
-    let text = std::fs::read_to_string(&path).with_context(|| {
+    let text = read_catalog_file(Path::new(&path)).with_context(|| {
         format!("neither `codex debug models` nor {path} yielded a model catalog")
     })?;
     let doc: Value = serde_json::from_str(&text)
@@ -375,18 +407,96 @@ fn codex_catalog(max_tokens: u64) -> Result<Fetched> {
     Ok(Fetched {
         models,
         label: path,
+        source_fingerprint: "codex".to_string(),
     })
 }
 
 fn codex_cli_catalog() -> Option<String> {
-    let output = Command::new("codex")
-        .args(["debug", "models"])
-        .output()
+    let mut command = Command::new("codex");
+    command.args(["debug", "models"]);
+    let bytes = bounded_command_stdout(command, CODEX_CLI_TIMEOUT)?;
+    String::from_utf8(bytes).ok()
+}
+
+fn bounded_command_stdout(mut command: Command, timeout: Duration) -> Option<Vec<u8>> {
+    let mut child = command
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
         .ok()?;
-    if !output.status.success() || output.stdout.len() > MAX_CATALOG_BYTES {
+    let Some(stdout) = child.stdout.take() else {
+        let _ = child.kill();
+        let _ = child.wait();
+        return None;
+    };
+    let reader = std::thread::spawn(move || {
+        let mut stdout = stdout;
+        let mut output = Vec::new();
+        let mut buffer = [0u8; 8192];
+        let mut oversized = false;
+        loop {
+            match stdout.read(&mut buffer) {
+                Ok(0) => break,
+                Ok(read) => {
+                    let keep = MAX_CATALOG_BYTES.saturating_sub(output.len()).min(read);
+                    output.extend_from_slice(&buffer[..keep]);
+                    oversized |= keep != read;
+                }
+                Err(_) => return None,
+            }
+        }
+        Some((output, oversized))
+    });
+    let deadline = Instant::now() + timeout;
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) if Instant::now() < deadline => {
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            Ok(None) | Err(_) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                let _ = reader.join();
+                return None;
+            }
+        }
+    };
+    let (bytes, oversized) = reader.join().ok()??;
+    if !status.success() || oversized {
         return None;
     }
-    String::from_utf8(output.stdout).ok()
+    Some(bytes)
+}
+
+fn read_catalog_file(path: &Path) -> Result<String> {
+    let metadata = std::fs::metadata(path)?;
+    anyhow::ensure!(metadata.is_file(), "catalog is not a regular file");
+    anyhow::ensure!(
+        metadata.len() <= MAX_CATALOG_BYTES as u64,
+        "catalog exceeds {MAX_CATALOG_BYTES} bytes"
+    );
+    let file = std::fs::File::open(path)?;
+    let mut bytes = Vec::with_capacity(metadata.len() as usize);
+    file.take(MAX_CATALOG_BYTES as u64 + 1)
+        .read_to_end(&mut bytes)?;
+    anyhow::ensure!(
+        bytes.len() <= MAX_CATALOG_BYTES,
+        "catalog exceeds {MAX_CATALOG_BYTES} bytes"
+    );
+    String::from_utf8(bytes).context("catalog is not UTF-8")
+}
+
+fn live_source_fingerprint(url: &str, key_env: &str, key: &str) -> String {
+    use sha2::{Digest, Sha256};
+    let mut digest = Sha256::new();
+    digest.update(key.as_bytes());
+    let digest = digest
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    format!("{url}\n{key_env}\n{digest}")
 }
 
 fn codex_cache_path() -> Option<String> {
@@ -478,9 +588,14 @@ fn curl_quote(value: &str) -> String {
 
 /// The value of one scalar key inside a provider block.
 fn scalar_in(lines: &[String], site: &Site, key: &str) -> Option<String> {
-    let index = find_key(lines, site.provider_line + 1, site.provider_end, key)?;
+    let provider_child_indent = indent_of(&lines[site.provider_line]) + site.step;
+    let index = (site.provider_line + 1..site.provider_end).find(|index| {
+        indent_of(&lines[*index]) == provider_child_indent
+            && key_value(lines[*index].trim_start(), key).is_some()
+    })?;
     let value = lines[index].trim_start().strip_prefix(key)?.trim_start();
     let value = value.strip_prefix(':')?.trim();
+    let value = strip_comment(value).trim();
     (!value.is_empty()).then(|| unquote(value))
 }
 
@@ -505,7 +620,7 @@ fn credential_ref(name: &str) -> Option<String> {
             continue;
         };
         if key == name {
-            let value = unquote(value);
+            let value = unquote(strip_comment(value));
             if !value.is_empty() {
                 return Some(value);
             }
@@ -520,15 +635,32 @@ fn credential_ref(name: &str) -> Option<String> {
 /// profile; otherwise every profile with a `cordis.patch.yml` is considered.
 pub(crate) fn profile_paths(only: Option<&str>) -> Result<Vec<(String, PathBuf)>> {
     let root = PathBuf::from(dsh_home()).join("profiles");
+    let canonical_root = std::fs::canonicalize(&root)
+        .with_context(|| format!("cannot resolve profiles root {}", root.display()))?;
+    let canonical_home = std::fs::canonicalize(dsh_home())
+        .with_context(|| format!("cannot resolve DSH_HOME {}", dsh_home()))?;
+    anyhow::ensure!(
+        canonical_root.starts_with(&canonical_home),
+        "profiles root resolves outside DSH_HOME"
+    );
     if let Some(name) = only {
-        let dir = root.join(name);
-        let patch = dir.join("cordis.patch.yml");
-        if !patch.is_file() {
+        validate_profile_name(name)?;
+        if is_desktop_profile(name) {
+            bail!("the desktop profile is owned by the Electron app and is not synchronized");
+        }
+        let canonical_dir = checked_profile_dir(&canonical_root, name).map_err(|_| {
+            anyhow::anyhow!(
+                "no profile {name} with a cordis.patch.yml under {}",
+                root.display()
+            )
+        })?;
+        if !canonical_dir.starts_with(&canonical_root) {
             bail!(
                 "no profile {name} with a cordis.patch.yml under {}",
                 root.display()
             );
         }
+        let patch = checked_profile_patch(&canonical_root, &canonical_dir)?;
         return Ok(vec![(name.to_string(), patch)]);
     }
     let mut out = Vec::new();
@@ -538,14 +670,75 @@ pub(crate) fn profile_paths(only: Option<&str>) -> Result<Vec<(String, PathBuf)>
         if !entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
             continue;
         }
-        let patch = entry.path().join("cordis.patch.yml");
-        if !patch.is_file() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if is_desktop_profile(&name) {
             continue;
         }
-        out.push((entry.file_name().to_string_lossy().into_owned(), patch));
+        let Ok(canonical_dir) = std::fs::canonicalize(entry.path()) else {
+            continue;
+        };
+        if !canonical_dir.starts_with(&canonical_root) {
+            continue;
+        }
+        let Ok(patch) = checked_profile_patch(&canonical_root, &canonical_dir) else {
+            continue;
+        };
+        out.push((name, patch));
     }
     out.sort_by(|a, b| a.0.cmp(&b.0));
     Ok(out)
+}
+
+fn validate_profile_name(name: &str) -> Result<()> {
+    anyhow::ensure!(
+        !name.is_empty()
+            && name != "."
+            && name != ".."
+            && !name.contains('/')
+            && !name.contains('\\')
+            && Path::new(name).components().count() == 1
+            && matches!(
+                Path::new(name).components().next(),
+                Some(std::path::Component::Normal(_))
+            ),
+        "profile must be a single directory name"
+    );
+    Ok(())
+}
+
+fn checked_profile_dir(root: &Path, name: &str) -> Result<PathBuf> {
+    validate_profile_name(name)?;
+    let dir = root.join(name);
+    let metadata = std::fs::symlink_metadata(&dir)?;
+    anyhow::ensure!(
+        metadata.is_dir() && !metadata.file_type().is_symlink(),
+        "profile directory is not a regular directory"
+    );
+    let canonical = std::fs::canonicalize(dir)?;
+    anyhow::ensure!(
+        canonical.starts_with(root),
+        "profile resolves outside profiles root"
+    );
+    Ok(canonical)
+}
+
+fn is_desktop_profile(name: &str) -> bool {
+    name.eq_ignore_ascii_case("desktop")
+}
+
+fn checked_profile_patch(root: &Path, dir: &Path) -> Result<PathBuf> {
+    let patch = dir.join("cordis.patch.yml");
+    let metadata = std::fs::symlink_metadata(&patch)?;
+    anyhow::ensure!(
+        metadata.is_file() && !metadata.file_type().is_symlink(),
+        "profile patch is not a regular file"
+    );
+    let canonical = std::fs::canonicalize(&patch)?;
+    anyhow::ensure!(
+        canonical.starts_with(root),
+        "profile patch resolves outside profiles root"
+    );
+    Ok(patch)
 }
 
 /// The providers named by `--provider`, or every known source.
@@ -615,10 +808,12 @@ pub(crate) fn apply_profile(
 
     for rename in &renamed {
         if let Some(index) = name_line(&lines, &site, &rename.id) {
+            let indent = " ".repeat(indent_of(&lines[index]));
+            let sequence = lines[index].trim_start().starts_with("- ");
             lines[index] = format!(
-                "{}name: {}",
-                " ".repeat(indent_of(&lines[index])),
-                yaml_scalar(&rename.to)
+                "{indent}{}{value}",
+                if sequence { "- name: " } else { "name: " },
+                value = yaml_scalar(&rename.to)
             );
         }
     }
@@ -668,9 +863,14 @@ pub(crate) fn apply_profile(
 }
 
 fn join(lines: Vec<String>, original: &str) -> String {
-    let mut text = lines.join("\n");
+    let newline = if original.contains("\r\n") {
+        "\r\n"
+    } else {
+        "\n"
+    };
+    let mut text = lines.join(newline);
     if original.ends_with('\n') {
-        text.push('\n');
+        text.push_str(newline);
     }
     text
 }
@@ -715,7 +915,22 @@ fn locate_owned(lines: &[String], provider: &str) -> Result<Site> {
     match find_key(lines, provider_line + 1, provider_end, "models") {
         Some(models_line) => {
             let models_indent = indent_of(&lines[models_line]);
-            let models_end = block_end(lines, models_line);
+            let value = key_value(&lines[models_line], "models")
+                .map(strip_comment)
+                .unwrap_or("")
+                .trim();
+            if !value.is_empty() && value != "[]" {
+                bail!("the {provider} models list uses an inline YAML layout this sync cannot safely rewrite");
+            }
+            let models_end = models_sequence_end(lines, models_line, provider_end);
+            if let Some(first) = (models_line + 1..models_end).find(|index| {
+                let trimmed = lines[*index].trim();
+                !trimmed.is_empty() && !trimmed.starts_with('#')
+            }) {
+                if !lines[first].trim_start().starts_with("- ") {
+                    bail!("the {provider} models block is not a YAML sequence this sync can safely rewrite");
+                }
+            }
             let item_indent = first_item_indent(lines, models_line + 1, models_end)
                 .unwrap_or(models_indent + step);
             Ok(Site {
@@ -745,6 +960,26 @@ fn locate_owned(lines: &[String], provider: &str) -> Result<Site> {
             })
         }
     }
+}
+
+/// Unlike mapping blocks, YAML permits a sequence to be indented at the same
+/// column as its key (`models:` followed by `- id: ...`).
+fn models_sequence_end(lines: &[String], start: usize, limit: usize) -> usize {
+    let depth = indent_of(&lines[start]);
+    let mut index = start + 1;
+    while index < limit {
+        let trimmed = lines[index].trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            index += 1;
+            continue;
+        }
+        let indent = indent_of(&lines[index]);
+        if indent < depth || (indent == depth && !trimmed.starts_with("- ")) {
+            break;
+        }
+        index += 1;
+    }
+    index
 }
 
 /// The index of the `- id: llm-pi-ai` (or matching `name:`) patch entry. The
@@ -845,8 +1080,22 @@ fn item_line(lines: &[String], site: &Site, wanted: &str) -> Option<usize> {
 /// The `name:` line inside one model item.
 fn name_line(lines: &[String], site: &Site, wanted: &str) -> Option<usize> {
     let item = item_line(lines, site, wanted)?;
+    if key_value(lines[item].trim_start().strip_prefix("- ")?, "name").is_some() {
+        return Some(item);
+    }
     let end = block_end(lines, item);
-    find_key(lines, item + 1, end, "name")
+    let child_indent = (item + 1..end)
+        .find(|index| {
+            let trimmed = lines[*index].trim();
+            !trimmed.is_empty()
+                && !trimmed.starts_with('#')
+                && indent_of(&lines[*index]) > site.item_indent
+        })
+        .map(|index| indent_of(&lines[index]))?;
+    (item + 1..end).find(|index| {
+        indent_of(&lines[*index]) == child_indent
+            && key_value(lines[*index].trim_start(), "name").is_some()
+    })
 }
 
 fn existing_ids(lines: &[String], site: &Site) -> Vec<String> {
@@ -872,14 +1121,16 @@ fn plan_renames(lines: &[String], site: &Site, catalog: &[CatalogModel]) -> Vec<
         let Some(index) = name_line(lines, site, &id) else {
             continue;
         };
-        let current = unquote(
-            lines[index]
-                .trim_start()
-                .strip_prefix("name")
+        let raw = lines[index]
+            .trim_start()
+            .strip_prefix("- ")
+            .unwrap_or(lines[index].trim_start());
+        let current = unquote(strip_comment(
+            raw.strip_prefix("name")
                 .and_then(|rest| rest.strip_prefix(':'))
                 .unwrap_or("")
                 .trim(),
-        );
+        ));
         if current != model.name && !name_already_current(&current, &model.name) {
             out.push(Rename {
                 id,
@@ -1001,8 +1252,8 @@ fn indent_of(line: &str) -> usize {
 
 fn format_model(model: &CatalogModel, item_indent: usize, step: usize) -> Vec<String> {
     let item = " ".repeat(item_indent);
-    let key = " ".repeat(item_indent + step);
-    let nested = " ".repeat(item_indent + step * 2);
+    let key = " ".repeat(item_indent + 2);
+    let nested = " ".repeat(item_indent + 2 + step);
     let mut out = vec![
         format!("{item}- id: {}", yaml_scalar(&model.id)),
         format!("{key}name: {}", yaml_scalar(&model.name)),
@@ -1185,6 +1436,7 @@ struct ProviderPlan {
     models: Vec<CatalogModel>,
     refresh_names: bool,
     source: String,
+    source_fingerprint: String,
 }
 
 /// One provider's outcome for one profile: a fetched catalog, or why it could
@@ -1195,12 +1447,17 @@ enum Planned {
         provider: &'static str,
         reason: String,
     },
+    Failed {
+        provider: &'static str,
+        reason: String,
+    },
 }
 
 fn planned_provider(entry: &Planned) -> &'static str {
     match entry {
         Planned::Ready(plan) => plan.provider,
         Planned::Skipped { provider, .. } => provider,
+        Planned::Failed { provider, .. } => provider,
     }
 }
 
@@ -1226,9 +1483,32 @@ fn sync_profile_locked(
                 report.skipped = Some(reason.clone());
                 reports.push(report);
             }
+            Planned::Failed { provider, reason } => {
+                let mut report = ProviderReport::pending(name, provider);
+                report.error = Some(reason.clone());
+                reports.push(report);
+            }
             Planned::Ready(plan) => {
                 let mut report = ProviderReport::pending(name, plan.provider);
                 report.source = plan.source.clone();
+                let current_fingerprint = current_source_fingerprint(plan.provider, &text);
+                let source_matches = matches!(
+                    &current_fingerprint,
+                    Ok(fingerprint) if fingerprint == &plan.source_fingerprint
+                );
+                if !source_matches {
+                    report.error = Some(match current_fingerprint {
+                        Ok(_) => {
+                            "provider endpoint or credential changed while fetching; retry sync"
+                                .to_string()
+                        }
+                        Err(error) => {
+                            format!("cannot verify provider source before writing: {error:#}")
+                        }
+                    });
+                    reports.push(report);
+                    continue;
+                }
                 match apply_profile(&text, plan.provider, &plan.models, plan.refresh_names) {
                     Ok(applied) => {
                         let Applied {
@@ -1292,7 +1572,7 @@ pub(crate) fn cmd_models_sync(
                 // so every selected source reports the read failure.
                 for source in &sources {
                     let mut report = ProviderReport::pending(name, source.provider);
-                    report.skipped = Some(format!("cannot read {}: {error}", path.display()));
+                    report.error = Some(format!("cannot read {}: {error}", path.display()));
                     reports.push(report);
                 }
                 continue;
@@ -1303,14 +1583,22 @@ pub(crate) fn cmd_models_sync(
             if !configures(&snapshot, source.provider) {
                 continue;
             }
+            if let Err(error) = validate_profile_layout(&snapshot, source.provider) {
+                planned.push(Planned::Skipped {
+                    provider: source.provider,
+                    reason: format!("{error:#}"),
+                });
+                continue;
+            }
             match fetch_catalog(source, &snapshot) {
                 Ok(fetched) => planned.push(Planned::Ready(ProviderPlan {
                     provider: source.provider,
                     models: fetched.models,
                     refresh_names: matches!(source.kind, SourceKind::Live(_)),
                     source: fetched.label,
+                    source_fingerprint: fetched.source_fingerprint,
                 })),
-                Err(error) => planned.push(Planned::Skipped {
+                Err(error) => planned.push(Planned::Failed {
                     provider: source.provider,
                     reason: format!("{error:#}"),
                 }),
@@ -1386,6 +1674,11 @@ pub(crate) fn cmd_models_sync(
         std::process::exit(1);
     }
     Ok(())
+}
+
+fn validate_profile_layout(profile_text: &str, provider: &str) -> Result<()> {
+    let lines: Vec<String> = profile_text.lines().map(str::to_string).collect();
+    locate_owned(&lines, provider).map(|_| ())
 }
 
 #[cfg(test)]
@@ -1649,6 +1942,154 @@ mod tests {
     }
 
     #[test]
+    fn sync_refuses_nonempty_inline_models_before_editing() {
+        let profile = "- id: llm-pi-ai\n  config:\n    providers:\n      openai-codex:\n        models: [{id: gpt-5.6-sol}]\n";
+        let error = apply_profile(profile, CODEX_PROVIDER, &catalog(), false).unwrap_err();
+        assert!(error.to_string().contains("inline YAML layout"));
+    }
+
+    #[test]
+    fn sync_reads_and_appends_an_indentless_models_sequence() {
+        let profile = "- id: llm-pi-ai\n  config:\n    providers:\n      openai-codex:\n        models:\n        - id: gpt-5.6-sol\n          name: GPT-5.6 Sol\n          contextWindow: 272000\n          maxTokens: 64000\n          input:\n          - text\n";
+        let applied = apply_profile(profile, CODEX_PROVIDER, &catalog(), false).unwrap();
+        assert_eq!(applied.listed, ["gpt-5.6-sol"]);
+        assert_eq!(applied.added.len(), 2);
+        assert!(applied
+            .text
+            .contains("        models:\n        - id: gpt-5.6-sol\n          name: GPT-5.6 Sol"));
+        assert!(applied.text.contains("        - id: gpt-6.1-sol\n"));
+    }
+
+    #[test]
+    fn new_model_mapping_keys_use_the_fixed_sequence_dash_offset() {
+        let profile = "- id: llm-pi-ai\n  config:\n      providers:\n          openai-codex:\n              models:\n                  - id: gpt-5.6-sol\n                    name: GPT-5.6 Sol\n                    contextWindow: 272000\n                    maxTokens: 64000\n                    input:\n                        - text\n";
+        let applied = apply_profile(profile, CODEX_PROVIDER, &catalog(), false).unwrap();
+        assert!(applied.text.contains(
+            "                  - id: gpt-6.1-sol\n                    name: GPT-6.1-Sol\n                    contextWindow: 272000\n                    maxTokens: 64000\n                    input:\n                        - text"
+        ));
+    }
+
+    #[test]
+    fn sync_preserves_crlf_line_endings() {
+        let profile = PROFILE.replace('\n', "\r\n");
+        let applied = apply_profile(&profile, CODEX_PROVIDER, &catalog(), false).unwrap();
+        assert!(applied.text.contains("\r\n"));
+        assert!(!applied
+            .text
+            .as_bytes()
+            .windows(2)
+            .any(|pair| pair[1] == b'\n' && pair[0] != b'\r'));
+    }
+
+    #[test]
+    fn live_rename_updates_a_name_on_the_sequence_line() {
+        let profile = KIMI_PROFILE.replace(
+            "          - id: kimi-for-coding\n            name: kimi-for-coding",
+            "          - name: kimi-for-coding\n            id: kimi-for-coding",
+        );
+        let models = catalog_from_listing(&kimi_listing(), DEFAULT_MAX_TOKENS);
+        let applied = apply_profile(&profile, KIMI_PROVIDER, &models, true).unwrap();
+        assert!(applied
+            .text
+            .contains("          - name: K2.8 Preview\n            id: kimi-for-coding"));
+        assert_eq!(applied.renamed.len(), 1);
+    }
+
+    #[test]
+    fn provider_scalars_ignore_trailing_yaml_comments() {
+        let profile = KIMI_PROFILE
+            .replace(
+                "apiKeyEnv: KIMI_CODING_API_KEY",
+                "apiKeyEnv: KIMI_CODING_API_KEY # subscription key",
+            )
+            .replace(
+                "        apiKeyEnv:",
+                "        baseURL: https://example.test # endpoint note\n        apiKeyEnv:",
+            );
+        let lines: Vec<String> = profile.lines().map(str::to_string).collect();
+        let site = locate_owned(&lines, KIMI_PROVIDER).unwrap();
+        assert_eq!(
+            scalar_in(&lines, &site, "apiKeyEnv").as_deref(),
+            Some("KIMI_CODING_API_KEY")
+        );
+        assert_eq!(
+            scalar_in(&lines, &site, "baseURL").as_deref(),
+            Some("https://example.test")
+        );
+    }
+
+    #[test]
+    fn live_fingerprint_tracks_endpoint_and_credential_without_exposing_secret() {
+        let first =
+            live_source_fingerprint("https://example.test/v1/models", "API_KEY", "secret-one");
+        let changed_endpoint =
+            live_source_fingerprint("https://other.test/v1/models", "API_KEY", "secret-one");
+        let changed_key =
+            live_source_fingerprint("https://example.test/v1/models", "API_KEY", "secret-two");
+        assert_ne!(first, changed_endpoint);
+        assert_ne!(first, changed_key);
+        assert!(!first.contains("secret-one"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn stalled_catalog_subprocess_is_killed_within_its_deadline() {
+        let started = Instant::now();
+        let mut command = Command::new("sh");
+        command.args(["-c", "exec sleep 5"]);
+        assert!(bounded_command_stdout(command, Duration::from_millis(50)).is_none());
+        assert!(started.elapsed() < Duration::from_secs(2));
+    }
+
+    #[test]
+    fn oversized_codex_cache_is_rejected_from_its_metadata() {
+        let path = std::env::temp_dir().join(format!(
+            "rdsh-codex-cache-{}-{}",
+            std::process::id(),
+            crate::local_http::random_token().unwrap()
+        ));
+        let file = std::fs::File::create(&path).unwrap();
+        file.set_len(MAX_CATALOG_BYTES as u64 + 1).unwrap();
+        let error = read_catalog_file(&path).unwrap_err();
+        assert!(error.to_string().contains("exceeds"));
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn profile_names_reject_path_components_and_desktop_is_special() {
+        assert!(validate_profile_name("web").is_ok());
+        assert!(validate_profile_name("../outside").is_err());
+        assert!(validate_profile_name("a\\..\\outside").is_err());
+        assert!(validate_profile_name("..").is_err());
+        assert!(is_desktop_profile("desktop"));
+        assert!(is_desktop_profile("Desktop"));
+        assert!(!is_desktop_profile("web"));
+    }
+
+    #[test]
+    fn profile_directories_and_patch_files_must_stay_inside_the_root() {
+        let temporary = std::env::temp_dir().join(format!(
+            "rdsh-model-profile-path-{}",
+            crate::local_http::random_token().unwrap()
+        ));
+        let root = temporary.join("profiles");
+        let outside = temporary.join("outside");
+        std::fs::create_dir_all(root.join("web")).unwrap();
+        std::fs::create_dir_all(&outside).unwrap();
+        std::fs::write(root.join("web/cordis.patch.yml"), "").unwrap();
+        std::fs::write(outside.join("cordis.patch.yml"), "outside").unwrap();
+        let root = std::fs::canonicalize(root).unwrap();
+        let canonical_web = checked_profile_dir(&root, "web").unwrap();
+        assert!(checked_profile_patch(&root, &canonical_web).is_ok());
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(&outside, root.join("escape")).unwrap();
+            assert!(checked_profile_dir(&root, "escape").is_err());
+        }
+        std::fs::remove_dir_all(temporary).unwrap();
+    }
+
+    #[test]
     fn a_sibling_list_under_the_provider_is_not_read_as_models() {
         // `headers:` sits at the same indentation as `models:`, so its items
         // share the models item indentation. The scan must stop at the key.
@@ -1897,6 +2338,7 @@ mod tests {
             models: catalog(),
             refresh_names: false,
             source: "fixture".to_string(),
+            source_fingerprint: "codex".to_string(),
         })];
         let reports = sync_profile_locked("web", &path, &planned, false).unwrap();
         let written = std::fs::read_to_string(&path).unwrap();
