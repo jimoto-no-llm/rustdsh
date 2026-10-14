@@ -17,8 +17,12 @@ on:
 permissions:
   contents: read
 
+# Key on the branch, not `github.ref`: a branch push uses `refs/heads/<branch>`
+# while its pull request uses `refs/pull/<n>/merge`, so a ref-keyed group lets
+# both run for the same commit. `head_ref` is empty on a push to a branch in
+# this repository, so fall back to `ref_name`.
 concurrency:
-  group: docs-${{ github.ref }}
+  group: docs-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
