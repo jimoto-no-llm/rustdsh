@@ -677,7 +677,7 @@ fn measure_all(sandbox: &Sandbox, bin: &Path, cases: &[Case], n: usize) -> Resul
 /// and macOS), then from `/usr/bin/time` as a fallback. `None` means the
 /// platform could not report it; the run continues.
 fn measure_peak_rss(sandbox: &Sandbox, bin: &Path, case: &Case) -> Result<Option<u64>> {
-    if let Some(bytes) = sample_peak_rss(bin, case)? {
+    if let Some(bytes) = sample_peak_rss(sandbox, bin, case)? {
         return Ok(Some(bytes));
     }
     time_peak_rss(sandbox, bin, &case.argv)
@@ -685,16 +685,22 @@ fn measure_peak_rss(sandbox: &Sandbox, bin: &Path, case: &Case) -> Result<Option
 
 /// Poll `ps -o rss=` while the child runs; a tighter sampling interval catches
 /// a short-lived process better than a single post-exit read.
-fn sample_peak_rss(bin: &Path, case: &Case) -> Result<Option<u64>> {
+///
+/// The child goes through [`Sandbox::command`] like every other measurement so
+/// it sees the same isolated HOME/DSH_HOME/XDG environment. Spawning it
+/// directly would let the probe read the real user's settings and credentials,
+/// which is exactly what the harness promises not to do.
+fn sample_peak_rss(sandbox: &Sandbox, bin: &Path, case: &Case) -> Result<Option<u64>> {
     if !cfg!(unix) {
         return Ok(None);
     }
-    let mut child = Command::new(bin)
-        .args(&case.argv)
+    let mut command = sandbox.command(bin, &case.argv);
+    let mut child = command
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()?;
+    let _ = sandbox.meter.record();
     let pid = child.id().to_string();
     let mut peak = 0u64;
     loop {
