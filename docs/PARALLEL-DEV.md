@@ -73,7 +73,8 @@ not change which slug gets which offset.
 Create a worktree at `<parent>/.worktrees/rustdsh-<slug>` on a new branch
 `parallel/<slug>`, based on the latest `origin/main`. The remote is fetched
 first; the mirror and the object store are created on the first run. The slug
-uses lowercase letters, digits and single dashes.
+uses lowercase letters, digits and single dashes: it must not start with a
+dash, and consecutive dashes (`--`) are rejected.
 
 ```sh
 scripts/parallel-dev.sh new dashboard-fix

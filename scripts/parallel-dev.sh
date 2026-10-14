@@ -95,7 +95,7 @@ validate_slug() {
     *[!a-z0-9-]*|[-]*) die "invalid slug '$slug': use [a-z0-9-], not starting with '-'" ;;
   esac
   case "$slug" in
-    *-*-*) die "invalid slug '$slug': use single dashes as separators" ;;
+    *--*) die "invalid slug '$slug': consecutive dashes are not allowed" ;;
   esac
 }
 

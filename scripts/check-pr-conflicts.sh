@@ -88,7 +88,7 @@ if [ -z "$repo" ] && ! git rev-parse --git-dir >/dev/null 2>&1; then
 fi
 
 if ! prs="$(gh pr list --state open --limit "$limit" \
-  --json number,title,headRefName,baseRefName,mergeable "${repo_args[@]}" 2>&1)"; then
+  --json number,title,headRefName,baseRefName,mergeable ${repo_args[@]+"${repo_args[@]}"} 2>&1)"; then
   printf 'error: gh pr list failed:\n%s\n' "$prs" >&2
   exit 2
 fi
