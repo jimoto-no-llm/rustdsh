@@ -110,6 +110,36 @@ mkdir -p $WB/.local/bin
 printf '#!/bin/sh\nexec node "$(readlink -f "$(command -v dsh)")" --profile web\n' > $WB/.local/bin/dsh-web-local
 if HOME="$WB" $BIN doctor 2>/dev/null | grep -q "dsh-web-local"; then ok "doctor flags node-on-dsh wrapper"; else echo "FAIL(output): doctor flags node-on-dsh wrapper"; exit 1; fi
 rm -rf $WB
+# Broken wrappers: a dangling dsh symlink or a wrapper pointing at a removed
+# node/dsh path must be reported by doctor, and the warnings must not change
+# doctor's exit status.
+BB="$RR_SANDBOX/broken-bin"
+mkdir -p $BB/.local/bin
+ln -s "$BB/gone/dsh.js" $BB/.local/bin/dsh-broken
+printf '#!/bin/sh\nexec /nonexistent-node/bin/node /nonexistent-dsh/lib/bin.js "$@"\n' > $BB/.local/bin/dsh-dead-node
+chmod +x $BB/.local/bin/dsh-dead-node
+bout="$(HOME="$BB" $BIN doctor 2>/dev/null)"
+case "$bout" in *"dsh-broken is a broken symlink"*) ok "doctor flags broken dsh symlink";; *) echo "FAIL(output): broken dsh symlink"; echo "$bout"; exit 1;; esac
+case "$bout" in *"dsh-dead-node references /nonexistent-node/bin/node"*) ok "doctor flags wrapper with a removed node/dsh path";; *) echo "FAIL(output): removed node/dsh path"; echo "$bout"; exit 1;; esac
+if HOME="$BB" $BIN doctor >/dev/null 2>&1; then ok "broken wrapper warnings keep doctor exit 0"; else echo "FAIL(exit): broken wrapper warnings must not fail doctor"; exit 1; fi
+rm -rf $BB
+# Shadowed dsh without the dsh-orig backup install.sh --restore needs: warn once,
+# and stay quiet as soon as the backup exists.
+SH="$RR_SANDBOX/shadow-noorig"
+mkdir -p $SH/bin $SH/home
+cp "$BIN" $SH/bin/dsh
+sout="$(PATH="$SH/bin:$RR_SANDBOX/original:$PATH" HOME="$SH/home" $SH/bin/dsh doctor 2>/dev/null)"
+case "$sout" in *"no dsh-orig backup in $SH/bin"*) ok "doctor flags shadowed dsh without a backup";; *) echo "FAIL(output): missing dsh-orig backup"; echo "$sout"; exit 1;; esac
+printf '#!/bin/sh\necho stub-dsh-orig\n' > $SH/bin/dsh-orig
+chmod +x $SH/bin/dsh-orig
+if PATH="$SH/bin:$RR_SANDBOX/original:$PATH" HOME="$SH/home" $SH/bin/dsh doctor 2>/dev/null | grep -q "no dsh-orig backup"; then echo "FAIL(output): an existing dsh-orig must not warn"; exit 1; else ok "doctor accepts an existing dsh-orig backup"; fi
+rm -rf $SH
+# Install ledger drift: ~/.config/rdsh/origin pointing at a removed backup.
+LG="$RR_SANDBOX/ledger"
+mkdir -p $LG/home/.config/rdsh
+printf '%s\n' "$LG/gone-dsh-orig" > $LG/home/.config/rdsh/origin
+if HOME="$LG/home" $BIN doctor 2>/dev/null | grep -q "install ledger.*no longer exists"; then ok "doctor flags a stale origin ledger"; else echo "FAIL(output): stale origin ledger"; exit 1; fi
+rm -rf $LG
 AB="$RR_SANDBOX/auth"
 mkdir -p $AB/home/.codex $AB/home/.local/share/opencode $AB/dsh
 printf '%s' '{"tokens":{"access_token":"a","refresh_token":"r","account_id":"1"}}' > $AB/home/.codex/auth.json
