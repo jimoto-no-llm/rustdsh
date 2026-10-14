@@ -324,3 +324,18 @@ grep -q "invalid release version" "$TEST_ROOT/version.log" || {
   fail "a multi-line release version was not rejected before the URL was built"
 }
 ok "a multi-line release version is refused before it reaches the URL"
+
+# install.ps1 runs on Windows CI (tests/installer-security.ps1), so this
+# Linux/macOS job asserts the source-level invariants that keep the Windows
+# release path on the same trusted registry as install.sh: a fixed canonical
+# URL, the release origin's sidecar never fetched, an unpinned asset refused,
+# and a bypass that needs a terminal.
+PS1="$ROOT/install.ps1"
+grep -q 'https://raw.githubusercontent.com/jimoto-no-llm/rustdsh/main/release-digests.tsv' "$PS1" ||
+  fail "install.ps1 does not name the canonical digest registry"
+grep -q 'RDSH_RELEASE_DIGESTS' "$PS1" || fail "install.ps1 has no local-registry hook for the offline fixture"
+grep -q 'needs a file:// RDSH_RELEASE_BASE' "$PS1" || fail "install.ps1 does not gate the local registry on a file:// base"
+grep -q 'no pinned checksum for release' "$PS1" || fail "install.ps1 does not refuse an unpinned release asset"
+grep -q 'requires a terminal for confirmation' "$PS1" || fail "install.ps1 does not require a terminal for the checksum bypass"
+if grep -q '\$url\.sha256' "$PS1"; then fail "install.ps1 still fetches a release sidecar"; fi
+ok "install.ps1 keeps the canonical registry, refuses unpinned assets, and gates the bypass"

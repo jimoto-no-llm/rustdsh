@@ -47,6 +47,16 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   response bodies, and supports `--tool-choice-default <none|auto|required>`
   for Sarashina-compatible requests. See `docs/SERIAL-PROXY.md`.
 
+### Security
+
+- `install.ps1 -FromRelease` verifies the Windows archive against the digests
+  pinned in `release-digests.tsv` instead of the `.sha256` sidecar served next
+  to it, so a release base that serves its own archive can no longer choose the
+  checksum that admits it. `release-digests.tsv` now pins
+  `rdsh-windows-x64.zip` for every release it already lists, and `install.sh`
+  accepts that row while its "latest" completeness rule stays the four Unix
+  archives. The bypass needs `-NoChecksum` plus a typed `YES` at a terminal.
+
 ### Fixed
 
 - `sync-dsh.sh` discovers the `@deepseek-ai/dsh` tree by candidate instead of

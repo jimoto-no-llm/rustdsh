@@ -112,7 +112,10 @@ job-name changes must update that list and its tests:
 | macOS x86_64 | `rdsh-macos-x64.tar.gz` |
 | Windows x86_64 | `rdsh-windows-x64.zip` |
 
-Each archive has its own `.sha256` sidecar. `install.sh` and `install.ps1`
+Each archive has its own `.sha256` sidecar, but neither installer trusts it:
+both verify the archive against the reviewed `release-digests.tsv` pins above
+(`install.ps1 -FromRelease` does the same for `rdsh-windows-x64.zip`).
+`install.sh` and `install.ps1`
 are added once, for **12 release assets** total. Builds stage Actions artifacts;
 only the final job has permission to write a release. It validates the complete
 local set, creates or reuses a draft, uploads once, downloads the actual uploaded
@@ -128,15 +131,18 @@ rerun only failed jobs while the original staged artifacts remain available
 (seven days) rather than rebuilding the successful jobs. Concurrent
 runs for the same tag are serialized and never cancel an upload in progress.
 
-`install.sh` verifies Unix archives against `release-digests.tsv` fetched from
-the fixed canonical `raw.githubusercontent.com/jimoto-no-llm/rustdsh/main`
-URL. It does not trust a checksum served by `RDSH_RELEASE_BASE`; the only
-override is the test-only `RDSH_RELEASE_DIGESTS`, which a `file://` release base
-may use and a remote base never does. After verifying a published release,
-update the `latest` row and add each supported `.tar.gz` asset's GitHub-reported
-SHA-256 in a reviewed follow-up PR before announcing or directing users to
-install that release. Keep older rows for explicit `--version` installs. Do not
-derive pins from release `.sha256` sidecars.
+`install.sh` verifies Unix archives and `install.ps1` verifies
+`rdsh-windows-x64.zip` against `release-digests.tsv` fetched from the fixed
+canonical `raw.githubusercontent.com/jimoto-no-llm/rustdsh/main` URL. Neither
+trusts a checksum served by `RDSH_RELEASE_BASE`; the only override is the
+test-only `RDSH_RELEASE_DIGESTS`, which a `file://` release base may use and a
+remote base never does (`install.ps1` gates it the same way). After verifying a
+published release, update the `latest` row and add each supported archive's
+GitHub-reported SHA-256, the Windows zip included, in a reviewed follow-up PR
+before announcing or directing users to install that release. The `latest`
+completeness rule stays the four Unix archives; a missing Windows row fails
+`install.ps1` closed for that version. Keep older rows for explicit `--version`
+installs. Do not derive pins from release `.sha256` sidecars.
 
 After publication, confirm the body, 12 assets and correct channel in GitHub.
 Download and verify the actual published assets:
