@@ -317,6 +317,7 @@ Linux x86_64 環境での測定値です：
 | [docs/DESKTOP-INTEGRATION.md](docs/DESKTOP-INTEGRATION.md) | デスクトップアプリ (Electron) との連携 |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 今後の開発ロードマップ |
 | [docs/RELEASING.md](docs/RELEASING.md) | リリース手順 |
+| [docs/SERIAL-PROXY.md](docs/SERIAL-PROXY.md) | 同時リクエスト数制限プロキシ |
 | [CHANGELOG.md](CHANGELOG.md) | バージョンごとの主な変更履歴 |
 
 ## コミュニティ
