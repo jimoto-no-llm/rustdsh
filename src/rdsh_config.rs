@@ -853,6 +853,12 @@ impl RdshSettings {
         if key.is_empty() || key == "all" {
             return Some(v);
         }
+        // set_dotted が受理する旧別名は読み出しでも解決する。解決しないと
+        // 保存に成功した直後の読み戻しが失敗し、成功した set が exit 1 になる。
+        let key = match key {
+            "context.files" => "context.working_files",
+            other => other,
+        };
         let mut cur = &v;
         for part in key.split('.') {
             cur = cur.get(part)?;
@@ -1680,6 +1686,13 @@ mod rdsh_config_tests {
         c.set_dotted("context.working_files", "src/a.rs, src/b.rs")
             .unwrap();
         assert_eq!(c.context.working_files.len(), 2);
+        // 旧別名 context.files は set が受理するので get でも解決できること
+        // （解決しないと main.rs の読み戻しが失敗し、保存済みなのに exit 1 になる）。
+        c.set_dotted("context.files", "src/c.rs").unwrap();
+        assert_eq!(
+            c.get_dotted("context.files").unwrap(),
+            serde_json::json!(["src/c.rs"])
+        );
         c.set_dotted("serve.port", "38080").unwrap();
         assert_eq!(c.serve.port, 38080);
         assert!(c.set_dotted("unknown.key", "1").is_err());

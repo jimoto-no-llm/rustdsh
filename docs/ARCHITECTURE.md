@@ -67,6 +67,12 @@ See `dashboard/README.md`.
 - `sync-dsh.sh` + `systemd/rdsh-sync.*`: keep the upstream Harness in sync.
 - `plugins/`: Smart-DSH compat bundle, update banner, skill installer.
 
+The optional [MCP exposure bundle](../plugins/rdsh-mcp-exposure/README.md)
+adapts registration and prompt declarations in an authorized original DSH
+composition. Connections and execution remain owned by the original MCP client
+and ToolRuntime. The current guarded launcher rejects this bundle before any
+registration or connection; its audited Native boundary is unchanged.
+
 ## Original-binary discovery (`dsh` name)
 
 When invoked as `dsh`, the lookup order is: `RDSH_ORIG_BIN` (legacy
