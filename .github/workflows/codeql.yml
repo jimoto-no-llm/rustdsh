@@ -9,6 +9,7 @@ on:
       - '**/*.js'
       - '**/*.ts'
       - '**/*.tsx'
+      - '**/*.html'
       - 'Cargo.toml'
       - 'Cargo.lock'
       - 'dashboard/package.json'
@@ -24,6 +25,7 @@ on:
       - '**/*.js'
       - '**/*.ts'
       - '**/*.tsx'
+      - '**/*.html'
       - 'Cargo.toml'
       - 'Cargo.lock'
       - 'dashboard/package.json'
@@ -39,10 +41,11 @@ permissions:
 
 # Key on the branch, not `github.ref`: a branch push uses `refs/heads/<branch>`
 # while its pull request uses `refs/pull/<n>/merge`, so a ref-keyed group lets
-# both run for the same commit. `head_ref` is empty on a push to a branch in
-# this repository, so fall back to `ref_name`.
+# both run for the same commit. The repository is part of the key, so a branch
+# in a fork cannot cancel a same-named branch here. `head_ref` is empty on a
+# push, so fall back to `ref_name`.
 concurrency:
-  group: codeql-${{ github.event.pull_request.head.ref || github.ref_name }}
+  group: codeql-${{ github.event.pull_request.head.repo.full_name || github.repository }}-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
