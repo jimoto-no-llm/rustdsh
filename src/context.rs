@@ -2756,7 +2756,7 @@ fn read_zstd_session(
         .arg(source)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::null())
+        .stderr(std::process::Stdio::piped())
         .spawn()
         .map_err(|error| {
             if error.kind() == std::io::ErrorKind::NotFound {
@@ -2767,6 +2767,7 @@ fn read_zstd_session(
         })?;
     // Drain concurrently so a stalled decompressor cannot block the hook.
     let stdout = child.stdout.take().expect("piped zstd stdout");
+    let zstd_stderr = child.stderr.take();
     let (sender, receiver) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
         let _ = sender.send(read_session_stream(stdout, cap, line_limit));
@@ -2801,9 +2802,18 @@ fn read_zstd_session(
     };
     let (bytes, limited) = result?;
     anyhow::ensure!(!expired(deadline), "session deadline exceeded");
+    // zstd writes short diagnostics; keep them for the error instead of
+    // discarding the only explanation of a non-zero exit.
+    let mut note = Vec::new();
+    if let Some(mut pipe) = zstd_stderr {
+        use std::io::Read;
+        let _ = pipe.take(4096).read_to_end(&mut note);
+    }
     anyhow::ensure!(
         limited || status.success(),
-        "zstd session decompression failed"
+        "zstd session decompression failed (status {status}, source {}): {}",
+        source.display(),
+        String::from_utf8_lossy(&note).trim()
     );
     Ok((bytes, limited))
 }
