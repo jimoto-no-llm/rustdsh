@@ -2,9 +2,12 @@ name: dashboard
 
 on:
   push:
+    branches: [main]
+    tags: ['v*']
     paths: ["dashboard/**", "assets/**", ".github/workflows/dashboard.yml"]
   pull_request:
     paths: ["dashboard/**", "assets/**", ".github/workflows/dashboard.yml"]
+  workflow_dispatch:
 
 permissions:
   contents: read
