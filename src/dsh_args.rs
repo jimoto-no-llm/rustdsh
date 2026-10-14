@@ -33,7 +33,7 @@ pub enum DumpKind {
 pub fn split_launcher_args(profile_flag: Option<String>, extra: Vec<String>) -> Launcher {
     if extra.first().is_some_and(|s| s.as_str() == "plugin") {
         let mut profile = profile_flag;
-        let mut pnpm: Vec<String> = vec![];
+        let mut pnpm: Vec<String> = Vec::new();
         let mut it = extra.into_iter().skip(1);
         while let Some(a) = it.next() {
             if a == "--profile" {
@@ -59,12 +59,12 @@ pub fn split_launcher_args(profile_flag: Option<String>, extra: Vec<String>) -> 
     }
     let mut profile = profile_flag;
     let mut from_default: Option<String> = None;
-    let mut patches: Vec<String> = vec![];
+    let mut patches: Vec<String> = Vec::new();
     let mut dump = false;
     let mut dump_default = false;
     let mut dump_schema = false;
-    let mut app_args: Vec<String> = vec![];
-    let mut positional: Vec<String> = vec![];
+    let mut app_args: Vec<String> = Vec::new();
+    let mut positional: Vec<String> = Vec::new();
     let mut it = extra.into_iter();
     while let Some(a) = it.next() {
         match a.as_str() {
@@ -78,7 +78,12 @@ pub fn split_launcher_args(profile_flag: Option<String>, extra: Vec<String>) -> 
                     return Launcher::Error("error: --profile needs a name".into());
                 }
             }
-            "--from-default-profile" => from_default = it.next(),
+            "--from-default-profile" => match it.next() {
+                Some(p) if !p.is_empty() => from_default = Some(p),
+                _ => {
+                    return Launcher::Error("error: --from-default-profile needs a name".into());
+                }
+            },
             "--patch" => match it.next() {
                 Some(p) if !p.is_empty() => patches.push(p),
                 _ => return Launcher::Error("error: --patch needs a path".into()),
@@ -128,7 +133,8 @@ pub fn split_launcher_args(profile_flag: Option<String>, extra: Vec<String>) -> 
     }
     let dumps = [dump, dump_default, dump_schema]
         .iter()
-        .filter(|&&x| x)
+        .copied()
+        .filter(|x| *x)
         .count();
     if dumps > 1 {
         return Launcher::Error("error: --dump-config, --dump-default-config, and --dump-config-schema are mutually exclusive".into());
@@ -172,7 +178,7 @@ mod tests {
     use super::*;
 
     fn sv(v: &[&str]) -> Vec<String> {
-        v.iter().map(|s| s.to_string()).collect()
+        v.iter().map(ToString::to_string).collect()
     }
 
     #[test]
@@ -302,6 +308,16 @@ mod tests {
                 assert_eq!(kind, DumpKind::Config);
             }
             _ => panic!("expected dump"),
+        }
+    }
+
+    /// `--profile` と `--patch` は値欠落をエラーにするので、この旗も揃える。
+    /// 黙って落とすと「テンプレート初期化なしの boot」に化ける。
+    #[test]
+    fn from_default_profile_without_value_is_rejected() {
+        match split_launcher_args(None, sv(&["rescue", "--from-default-profile"])) {
+            Launcher::Error(msg) => assert!(msg.contains("--from-default-profile"), "{msg}"),
+            _ => panic!("expected an error for a value-less --from-default-profile"),
         }
     }
 

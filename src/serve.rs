@@ -1,6 +1,7 @@
 //! `rdsh serve`: bounded local dashboard (127.0.0.1 only).
-//! Serves the embedded UI plus a tiny JSON API. Read-only operations only:
-//! no boot, no file writes, no command execution from HTTP.
+//! Serves the embedded UI plus a tiny JSON API. HTTP never boots dsh and never
+//! runs caller-supplied commands; its own side effects are limited to the local
+//! token-handoff file and the self-benchmark spawn behind `GET /api/bench`.
 
 const UI: &str = include_str!("ui.html");
 const ICON: &str = include_str!("../assets/icon.svg");

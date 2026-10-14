@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { parseArgs, isDeepStrictEqual } from "node:util";
 import { setTimeout as delay } from "node:timers/promises";
-import { readProcessIdentity, matchProcessIdentity } from "./process-identity.mjs";
+import { readProcessIdentity, matchProcessIdentity, validProcessIdentity } from "./process-identity.mjs";
 
 export const faultScenarios = Object.freeze([
   "duplicate_events", "out_of_order", "network_disconnect", "restart", "disk_full", "gpu_loss",
@@ -56,6 +56,19 @@ function isolatedEnv(root) {
     HOME: root, USERPROFILE: root, RDSH_FAULT_ISOLATED: "1",
   };
 }
+// Windows process observations can time out under runner load. The mock stays
+// paused before its ack; retry observations before killing its owning worker.
+// Unknown observations never become process identity or proof of an exit.
+export async function restartCheckpointIdentity(pid, initial, observe = readProcessIdentity) {
+  if (validProcessIdentity(initial) && initial.pid === pid) return initial;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const result = await observe(pid);
+    if (result.status === "observed" && validProcessIdentity(result.identity) && result.identity.pid === pid)
+      return result.identity;
+    if (result.status === "gone") break;
+  }
+  return null;
+}
 async function childRun(config) {
   const child = spawn(process.execPath, ["--import", networkGuard, worker, JSON.stringify(config)], {
     cwd: config.root, env: isolatedEnv(config.root), windowsHide: true,
@@ -66,6 +79,7 @@ async function childRun(config) {
     if (Buffer.byteLength(diagnostic) < 16 * 1024) diagnostic += part.toString("utf8");
   });
   let result = null, checkpoint = null, checkpointFailure = null;
+  let checkpointProbe = Promise.resolve();
   const outcome = await new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       // The captured ChildProcess belongs to this exact scenario; no PID search.
@@ -73,15 +87,19 @@ async function childRun(config) {
       checkpointFailure = "scenario_deadline_exceeded";
     }, 120000);
     child.on("error", (failure) => { clearTimeout(timer); reject(failure); });
-    child.on("message", async (message) => {
+    child.on("message", (message) => {
       if (message?.type === "result") result = message.result;
       else if (message?.type === "restart_checkpoint" && config.scenario === "restart" && !config.recovery && !checkpoint) {
         checkpoint = message;
-        if (!checkpoint.root_identity) {
-          const observed = await readProcessIdentity(checkpoint.root_pid);
-          checkpoint.root_identity = observed.identity;
-        }
-        child.kill("SIGKILL");
+        checkpointProbe = (async () => {
+          try {
+            checkpoint.root_identity = await restartCheckpointIdentity(checkpoint.root_pid, checkpoint.root_identity);
+          } catch {
+            checkpointFailure = "fixture_process_identity_unavailable";
+          } finally {
+            child.kill("SIGKILL");
+          }
+        })();
       }
     });
     child.on("close", (code, signal) => {
@@ -89,6 +107,9 @@ async function childRun(config) {
       resolve({ code, signal });
     });
   });
+  // `close` can arrive while the observation is pending (e.g. deadline expiry).
+  // Finish it before interpreting the checkpoint, never fabricate an identity.
+  await checkpointProbe;
   if (diagnostic)
     await fs.writeFile(path.join(config.root, config.recovery ? "recovery-stderr.log" : "worker-stderr.log"),
       diagnostic.slice(0, 16 * 1024), { flag: "wx", mode: 0o600 });

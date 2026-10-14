@@ -6,6 +6,13 @@ TMPD="$(mktemp -d)"
 trap 'rm -rf "$TMPD"' EXIT
 FAKE_BIN="$TMPD/fake-bin"
 mkdir -p "$FAKE_BIN"
+# Do not let a system /usr/bin/cargo bypass the rustup branch under test.
+# Supply the installer's utilities explicitly, then add only the generated
+# Cargo stub through this fixture's HOME/.cargo/bin.
+for utility in bash env uname tr awk sed grep head tail cut dirname basename mktemp mkdir rm chmod install cp mv tar stat ldd sleep date tee sort cat readlink realpath gzip touch wc; do
+  tool="$(command -v "$utility" 2>/dev/null || true)"
+  [ -z "$tool" ] || ln -s "$tool" "$FAKE_BIN/$utility"
+done
 
 RUSTUP_INIT_VERSION="1.29.0"
 case "$(uname -s)/$(uname -m)" in
@@ -102,7 +109,7 @@ run_installer() {
   (
     cd "$work/project"
     export HOME="$home" PREFIX="$prefix"
-    export PATH="$FAKE_BIN:/usr/bin:/bin:/usr/sbin:/sbin"
+    export PATH="$FAKE_BIN"
     export RDSH_TEST_URL="$RUSTUP_INIT_URL" RDSH_TEST_SHA256="$RUSTUP_INIT_SHA256"
     export RDSH_TEST_CHECKSUM_MODE="$mode"
     bash "$REPO_ROOT/install.sh"

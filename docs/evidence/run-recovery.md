@@ -1,6 +1,6 @@
 # Run recovery evidence
 
-Issue: [#34](https://github.com/sahenjp/rustdsh/issues/34).
+Issue: [#34](https://github.com/jimoto-no-llm/rustdsh/issues/34).
 Captured on 2026-10-06 JST from prerequisite diagnostics
 [#123](https://github.com/sahenjp/rustdsh/pull/123), base commit
 `4ac7e95577ca92e886779d35e39749de5c8db0bb`.

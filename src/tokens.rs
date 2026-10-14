@@ -199,7 +199,7 @@ pub fn cmd_prune(max_tokens: usize, file: Option<String>) -> anyhow::Result<()> 
     // The old code cloned the whole input here on the common path.
     // Fast path: plain text never parses; skip failed parse (same fallback).
     let parsed: Option<serde_json::Value> = match text.trim_start().as_bytes().first() {
-        Some(b'{') | Some(b'[') | Some(b'"') => serde_json::from_str(&text).ok(),
+        Some(b'{' | b'[' | b'"') => serde_json::from_str(&text).ok(),
         _ => None,
     };
     let raw: &str = parsed

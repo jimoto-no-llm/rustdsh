@@ -53,7 +53,7 @@ pub fn handle_line(line: &str) -> String {
 
 fn run_request(line: &str) -> Result<serde_json::Value, (String, &'static str, String)> {
     let v: serde_json::Value = serde_json::from_str(line)
-        .map_err(|e| ("".to_string(), "bad_json", format!("invalid JSON: {e}")))?;
+        .map_err(|e| (String::new(), "bad_json", format!("invalid JSON: {e}")))?;
     let id = v
         .get("id")
         .and_then(|x| x.as_str())
@@ -65,10 +65,10 @@ fn run_request(line: &str) -> Result<serde_json::Value, (String, &'static str, S
     if v.get("v").and_then(|x| x.as_u64()) != Some(PROTOCOL_VERSION as u64) {
         return Err(fail(
             "bad_version",
-            format!("unsupported protocol, want v{}", PROTOCOL_VERSION),
+            format!("unsupported protocol, want v{PROTOCOL_VERSION}"),
         ));
     }
-    if id.is_empty() || id.len() > MAX_ID_LEN {
+    if id.is_empty() || id.chars().count() > MAX_ID_LEN {
         return Err(fail("bad_id", "id must be 1..=128 chars".to_string()));
     }
     let op = v.get("op").and_then(|x| x.as_str()).unwrap_or_default();
@@ -325,5 +325,87 @@ mod tests {
         let r: serde_json::Value =
             serde_json::from_str(&handle_line(&req("", "tokens.estimate", "hi", None))).unwrap();
         assert_eq!(r["code"], "bad_id");
+    }
+
+    // run_lines は NDJSON のフェイルセーフ境界: 壊れた行でも落ちずに応答を返し、
+    // 空行は飛ばし、once では最初の1件で止まる。
+    #[test]
+    fn run_lines_answers_each_request_in_order() {
+        let input = format!(
+            "{}\r\n\r\n{}\n",
+            req("a1", "tokens.estimate", "one", None),
+            req("a2", "tokens.estimate", "two", None)
+        );
+        let mut out: Vec<u8> = Vec::new();
+        run_lines(input.as_bytes(), &mut out, false).unwrap();
+        let text = String::from_utf8(out).unwrap();
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!(lines.len(), 2, "a blank line must not produce a response");
+        let first: serde_json::Value = serde_json::from_str(lines[0]).unwrap();
+        let second: serde_json::Value = serde_json::from_str(lines[1]).unwrap();
+        assert_eq!(first["id"], "a1");
+        assert_eq!(second["id"], "a2");
+    }
+
+    #[test]
+    fn run_lines_reports_bad_utf8_and_keeps_going() {
+        let mut input: Vec<u8> = vec![0xff, 0xfe, b'\n'];
+        input.extend_from_slice(req("a2", "tokens.estimate", "ok", None).as_bytes());
+        input.push(b'\n');
+        let mut out: Vec<u8> = Vec::new();
+        run_lines(&input[..], &mut out, false).unwrap();
+        let text = String::from_utf8(out).unwrap();
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!(lines.len(), 2);
+        let bad: serde_json::Value = serde_json::from_str(lines[0]).unwrap();
+        assert_eq!(bad["ok"], false);
+        assert_eq!(bad["code"], "bad_utf8");
+        let good: serde_json::Value = serde_json::from_str(lines[1]).unwrap();
+        assert_eq!(good["id"], "a2");
+    }
+
+    #[test]
+    fn run_lines_once_stops_after_the_first_request() {
+        let input = format!(
+            "{}\n{}\n",
+            req("a1", "tokens.estimate", "one", None),
+            req("a2", "tokens.estimate", "two", None)
+        );
+        let mut out: Vec<u8> = Vec::new();
+        run_lines(input.as_bytes(), &mut out, true).unwrap();
+        let text = String::from_utf8(out).unwrap();
+        assert_eq!(text.lines().count(), 1);
+    }
+
+    #[test]
+    fn run_lines_answers_without_a_trailing_newline() {
+        let input = req("a1", "tokens.estimate", "tail", None);
+        let mut out: Vec<u8> = Vec::new();
+        run_lines(input.as_bytes(), &mut out, false).unwrap();
+        let text = String::from_utf8(out).unwrap();
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!(lines.len(), 1);
+        let resp: serde_json::Value = serde_json::from_str(lines[0]).unwrap();
+        assert_eq!(resp["id"], "a1");
+    }
+
+    // id の上限は仕様・エラー文どおり「文字数」。バイト数で判定すると
+    // 非ASCII の id が 128 文字でも拒否される。
+    #[test]
+    fn accepts_a_128_char_non_ascii_id() {
+        let id = "\u{3042}".repeat(MAX_ID_LEN);
+        let resp: serde_json::Value =
+            serde_json::from_str(&handle_line(&req(&id, "tokens.estimate", "hi", None))).unwrap();
+        assert_eq!(resp["ok"], true);
+        assert_eq!(resp["id"], id);
+    }
+
+    #[test]
+    fn rejects_an_id_over_the_char_limit() {
+        let id = "\u{3042}".repeat(MAX_ID_LEN + 1);
+        let resp: serde_json::Value =
+            serde_json::from_str(&handle_line(&req(&id, "tokens.estimate", "hi", None))).unwrap();
+        assert_eq!(resp["ok"], false);
+        assert_eq!(resp["code"], "bad_id");
     }
 }

@@ -31,6 +31,8 @@ PREFIX="${PREFIX:-$HOME/.local/bin}"
 MODE="rdsh"
 NO_RUSTUP=0
 FROM_RELEASE=0
+# Never make the digest registry follow RDSH_RELEASE_BASE or another environment value.
+RELEASE_DIGESTS_URL="https://raw.githubusercontent.com/jimoto-no-llm/rustdsh/main/release-digests.tsv"
 VER="latest"
 USE_MUSL="${RDSH_MUSL:-0}"
 DESKTOP=0
@@ -53,7 +55,8 @@ for a in "$@"; do
       echo "  --from-release  install a prebuilt binary from GitHub Releases (no Rust needed)"
       echo "  --musl  use the static musl build (rdsh-linux-x64-musl.tar.gz; also via RDSH_MUSL=1)"
       echo "  --desktop  also attach the bundled plugins to the DeepSeek Harness Desktop profile"
-      echo "  --version=VER  release to fetch with --from-release (default: latest)"
+      echo "  --version=VER  release to fetch with --from-release (default: latest, resolved from repository pins)"
+      echo "  RDSH_NO_CHECKSUM=1  skip SHA-256 verification only after typing YES at a terminal"
       echo "  native Windows: use install.ps1 instead (it can also side-install into WSL via -Wsl)"
       exit 0 ;;
     *) echo "unknown arg: $a" >&2; exit 2 ;;
@@ -113,13 +116,11 @@ want_musl() {
 }
 verify_sha256() {
   file="$1"
-  sidecar="$2"
-  line="$(cat "$sidecar" 2>/dev/null)"
-  want="${line%% *}"
-  if [ -z "$want" ]; then
-    echo "empty checksum sidecar" >&2
-    return 1
-  fi
+  want="$2"
+  case "$want" in
+    ''|*[!0123456789abcdefABCDEF]*) echo "invalid pinned SHA-256" >&2; return 1 ;;
+  esac
+  if [ "${#want}" -ne 64 ]; then echo "invalid pinned SHA-256 length" >&2; return 1; fi
   if command -v sha256sum >/dev/null 2>&1; then
     out="$(sha256sum "$file")"
   elif command -v shasum >/dev/null 2>&1; then
@@ -219,6 +220,112 @@ install_pinned_rustup() {
   chmod 700 "$binary"
   "$binary" -y --profile minimal --default-toolchain stable
 }
+release_version() {
+  case "$1" in
+    v*) printf '%s' "$1" ;;
+    *) printf 'v%s' "$1" ;;
+  esac
+}
+
+validate_release_digest_manifest() {
+  awk '
+    BEGIN { FS = "[ \t]+"; bad = 0; latest_count = 0 }
+    /^[ \t]*#/ || NF == 0 { next }
+    function valid_version(v) { return v ~ /^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$/ }
+    function valid_asset(a) {
+      return a == "rdsh-linux-x64.tar.gz" || a == "rdsh-linux-x64-musl.tar.gz" ||
+        a == "rdsh-macos-arm64.tar.gz" || a == "rdsh-macos-x64.tar.gz"
+    }
+    $1 == "latest" {
+      if (NF != 2 || !valid_version($2) || $2 ~ /-/ || latest_count++) bad = 1
+      latest = $2
+      next
+    }
+    {
+      if (NF != 3 || !valid_version($1) || !valid_asset($2) || length($3) != 64 || $3 ~ /[^0-9a-fA-F]/) {
+        bad = 1
+        next
+      }
+      key = $1 SUBSEP $2
+      if (seen[key]++) bad = 1
+      versions[$1] = 1
+      if ($1 == latest) latest_assets++
+    }
+    END {
+      if (bad || latest_count != 1 || !versions[latest] || latest_assets != 4) exit 1
+    }
+  ' "$1"
+}
+
+latest_release_version() {
+  awk '$1 == "latest" { print $2 }' "$1"
+}
+
+expected_release_sha256() {
+  awk -v wanted_version="$2" -v wanted_asset="$3" '
+    $1 == wanted_version && $2 == wanted_asset { print $3; matches++ }
+    END { if (matches != 1) exit 1 }
+  ' "$1"
+}
+
+confirm_checksum_bypass() {
+  version="$1"
+  asset="$2"
+  answer=""
+  if ! printf 'RDSH_NO_CHECKSUM=1 skips SHA-256 verification for %s/%s. Type YES to continue: ' "$version" "$asset" >/dev/tty 2>/dev/null; then
+    echo "RDSH_NO_CHECKSUM=1 requires a terminal for confirmation; refusing" >&2
+    return 1
+  fi
+  if ! IFS= read -r answer </dev/tty; then
+    echo "could not read checksum-bypass confirmation; refusing" >&2
+    return 1
+  fi
+  if [ "$answer" != "YES" ]; then
+    echo "checksum bypass not confirmed; refusing" >&2
+    return 1
+  fi
+  echo "checksum bypass confirmed interactively" >&2
+}
+
+extract_release_archive() {
+  archive="$1"
+  destination="$2"
+  entries="$(tar -tzf "$archive")" || { echo "could not list release archive" >&2; return 1; }
+  if [ "$entries" != "rdsh" ]; then
+    echo "release archive must contain only the rdsh binary" >&2
+    return 1
+  fi
+  # Both GNU tar and bsdtar reject traversal by default; keep that default by
+  # never passing their unsafe absolute-path option, and extract only rdsh.
+  tar -xzf "$archive" -C "$destination" --no-same-owner --no-same-permissions rdsh
+}
+
+fetch_release_digests() {
+  # $1: destination. Normally the fixed canonical registry. A file:// release
+  # base -- which only the tests use -- may instead point RDSH_RELEASE_DIGESTS
+  # at a local copy so the offline installer tests never need the network.
+  # A remote base never consults it: the release origin must not choose the
+  # digests that verify its own artifact.
+  local dest="$1" source="${RDSH_RELEASE_DIGESTS:-}"
+  if [ -n "$source" ]; then
+    case "${RDSH_RELEASE_BASE:-}" in
+      file://*) ;;
+      *) echo "warning: ignoring RDSH_RELEASE_DIGESTS (needs a file:// RDSH_RELEASE_BASE)" >&2; source="" ;;
+    esac
+  fi
+  case "$source" in
+    "") ;;
+    /*) ;;
+    *) echo "warning: ignoring RDSH_RELEASE_DIGESTS=$source (needs an absolute path)" >&2; source="" ;;
+  esac
+  if [ -n "$source" ]; then
+    if [ ! -f "$source" ]; then echo "no local digest registry at $source" >&2; return 1; fi
+    echo "warning: using local digest registry $source (file:// release base)" >&2
+    cp "$source" "$dest"
+    return
+  fi
+  curl --proto '=https' --tlsv1.2 -fsSL -o "$dest" "$RELEASE_DIGESTS_URL"
+}
 
 choose_release_asset() {
   # Print the release asset for this host; the reason goes to stderr.
@@ -259,7 +366,9 @@ install_release_binary() {
   local asset candidate
   asset="$(choose_release_asset)" || exit 1
   [ -n "$asset" ] || { echo "no prebuilt binary for $OS/$ARCH (build from source instead)" >&2; exit 1; }
-  candidate="$(fetch_release "$asset")"
+  # fetch_release runs in a command substitution, where a refusal that only
+  # exits its subshell would leave an empty candidate and turn into a retry.
+  candidate="$(fetch_release "$asset")" || exit 1
   if verify_installed_binary "$candidate"; then
     echo "$candidate"
     return 0
@@ -269,7 +378,7 @@ install_release_binary() {
     exit 1
   fi
   echo "warning: $asset cannot run on this host; retrying with the static musl build" >&2
-  candidate="$(fetch_release "rdsh-linux-x64-musl.tar.gz")"
+  candidate="$(fetch_release "rdsh-linux-x64-musl.tar.gz")" || exit 1
   if verify_installed_binary "$candidate"; then
     echo "$candidate"
     return 0
@@ -283,22 +392,60 @@ fetch_release() {
   local asset="$1"
   base="${RDSH_RELEASE_BASE:-https://github.com/jimoto-no-llm/rustdsh/releases}"
   if [ -n "${RDSH_RELEASE_BASE:-}" ]; then
-    echo "warning: custom release base in use (RDSH_RELEASE_BASE=$base); checksum verification stays mandatory" >&2
+    echo "warning: custom RDSH_RELEASE_BASE in use; the trusted digest registry remains canonical" >&2
   fi
-  if [ "$VER" = "latest" ]; then url="$base/latest/download/$asset"; else url="$base/download/$VER/$asset"; fi
   new_download_tmpd
-  echo "fetching $url" >&2
-  curl -fsSL -o "$DOWNLOAD_TMPD/pkg.tgz" "$url" || { echo "download failed: $url" >&2; exit 1; }
-  if [ "${RDSH_NO_CHECKSUM:-0}" = 1 ]; then
-    echo "WARNING: checksum verification skipped (RDSH_NO_CHECKSUM=1); only use this with a trusted release base" >&2
-  elif curl -fsSL -o "$DOWNLOAD_TMPD/pkg.tgz.sha256" "$url.sha256" 2>/dev/null; then
-    verify_sha256 "$DOWNLOAD_TMPD/pkg.tgz" "$DOWNLOAD_TMPD/pkg.tgz.sha256" || exit 1
+  expected=""
+  if [ "$VER" = "latest" ] || [ "${RDSH_NO_CHECKSUM:-0}" != 1 ]; then
+    manifest="$DOWNLOAD_TMPD/release-digests.tsv"
+    fetch_release_digests "$manifest" || {
+      echo "could not fetch the trusted release digest registry; refusing release install" >&2
+      exit 1
+    }
+    validate_release_digest_manifest "$manifest" || {
+      echo "trusted release digest registry is invalid; refusing release install" >&2
+      exit 1
+    }
+  fi
+  if [ "$VER" = "latest" ]; then
+    version="$(latest_release_version "$manifest")"
   else
-    echo "no checksum sidecar: refusing release install (set RDSH_NO_CHECKSUM=1 to override)" >&2
+    version="$(release_version "$VER")"
+  fi
+  # Reject anything outside the version alphabet first. The anchored match below
+  # is applied line by line, so on its own it accepts a value such as
+  # $'v0.3.2\n../../x' by matching its first line; the version must be one value
+  # because it is interpolated into the download URL.
+  case "$version" in
+    "" | *[!0-9A-Za-z.-]*)
+      echo "invalid release version: $version" >&2
+      exit 1
+      ;;
+  esac
+  if ! printf '%s\n' "$version" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$'; then
+    echo "invalid release version: $version" >&2
     exit 1
   fi
-  tar -xzf "$DOWNLOAD_TMPD/pkg.tgz" -C "$DOWNLOAD_TMPD"
-  if [ ! -x "$DOWNLOAD_TMPD/rdsh" ]; then echo "release archive has no rdsh binary" >&2; exit 1; fi
+  if [ -n "${manifest:-}" ]; then
+    if ! expected="$(expected_release_sha256 "$manifest" "$version" "$asset")"; then
+      if [ "${RDSH_NO_CHECKSUM:-0}" != 1 ]; then
+        echo "no pinned checksum for release $version asset $asset; refusing release install" >&2
+        exit 1
+      fi
+    fi
+  fi
+  url="$base/download/$version/$asset"
+  echo "fetching release asset $version/$asset" >&2
+  if [ "${RDSH_NO_CHECKSUM:-0}" = 1 ]; then confirm_checksum_bypass "$version" "$asset" || exit 1; fi
+  curl -fsSL -o "$DOWNLOAD_TMPD/pkg.tgz" "$url" || { echo "download failed for release asset $version/$asset" >&2; exit 1; }
+  if [ "${RDSH_NO_CHECKSUM:-0}" != 1 ]; then
+    verify_sha256 "$DOWNLOAD_TMPD/pkg.tgz" "$expected" || exit 1
+  fi
+  extract_release_archive "$DOWNLOAD_TMPD/pkg.tgz" "$DOWNLOAD_TMPD" || exit 1
+  if [ ! -f "$DOWNLOAD_TMPD/rdsh" ] || [ -L "$DOWNLOAD_TMPD/rdsh" ] || [ ! -x "$DOWNLOAD_TMPD/rdsh" ]; then
+    echo "release archive has no regular executable rdsh binary" >&2
+    exit 1
+  fi
   echo "$DOWNLOAD_TMPD/rdsh"
 }
 BIN_SRC="target/release/rdsh"

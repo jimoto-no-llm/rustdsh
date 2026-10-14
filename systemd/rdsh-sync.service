@@ -7,4 +7,11 @@ Type=oneshot
 Nice=19
 IOSchedulingClass=idle
 CPUWeight=10
+# Path to the checkout that holds sync-dsh.sh; %h/File/Prog/rustdsh is the layout
+# this unit was written on, so adjust it for yours. systemd cannot take the
+# program from a variable, so override the whole line with a drop-in instead:
+#   systemctl --user edit rdsh-sync.service
+#   [Service]
+#   ExecStart=
+#   ExecStart=%h/path/to/rustdsh/sync-dsh.sh
 ExecStart=%h/File/Prog/rustdsh/sync-dsh.sh

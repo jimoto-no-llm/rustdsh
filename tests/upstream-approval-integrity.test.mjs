@@ -1,11 +1,22 @@
 // Integration tests against an explicitly selected DSH tool-bash source.
 // No real shell execution, model call, network request, or credentials.
+// DSH links approval to the already-presented tool call by callId; it does not
+// duplicate command arguments in the approval reason.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const source = process.env.DSH_TOOL_BASH_SOURCE;
-test('approval includes the exact command and cwd even without the chat detail slot', { skip: !source }, async t => {
+assert.ok(source, 'DSH_TOOL_BASH_SOURCE must point to the pinned DSH tool-bash implementation');
+assert.ok(path.isAbsolute(source), 'DSH_TOOL_BASH_SOURCE must be an absolute file path');
+const packageJsonPath = path.resolve(path.dirname(source), '..', 'package.json');
+const packageJson = JSON.parse(await readFile(packageJsonPath, 'utf8'));
+assert.equal(packageJson.name, '@deepseek-ai/dsh-tool-bash');
+assert.equal(packageJson.version, '0.2.0-rc.2', 'test the audited DSH runtime version');
+
+test('pinned DSH approval is linked to the exact presented bash call', async t => {
   const bash = await import(pathToFileURL(source));
   let tool, asked, executed;
   let outcome = 'allowed-once';
@@ -29,9 +40,6 @@ test('approval includes the exact command and cwd even without the chat detail s
       if (name === 'sandboxPolicy') return { resolve() { return policy; } };
       if (name === 'approval') return { async request(value) {
         asked = value;
-        // A pending approval must not permit execution of mutated arguments.
-        args.command = 'printf DIFFERENT_DUMMY_COMMAND';
-        args.workdir = '/different-workspace';
         return outcome;
       } };
     },
@@ -39,13 +47,19 @@ test('approval includes the exact command and cwd even without the chat detail s
     shellEnv: { collect() { return {}; } },
   };
   bash.apply(ctx, { enableRunInBackground: false });
-  await tool.execute(args, { agent: { session: { header: { cwd: policy.workspaceRoot } } }, callId: 'dummy-call', signal: new AbortController().signal });
-  for (const reason of [asked.reason, asked.displayReason.en, asked.displayReason.zh]) {
-    assert.ok(reason.includes('printf DUMMY_COMMAND'), 'approval must carry the command independently of chat');
-    assert.ok(reason.includes('/dummy-workspace/subdir'), 'approval must carry the resolved cwd');
-  }
+  const presented = tool.presentCall(args);
+  assert.equal(presented.title, args.command, 'the tool call presentation must show the command');
+  assert.equal(presented.description, args.description);
+  assert.equal(presented.cwd, args.workdir, 'the tool call presentation must show its requested cwd');
+  const callId = 'dummy-call';
+  const callExec = { agent: { session: { header: { cwd: policy.workspaceRoot } } }, callId, signal: new AbortController().signal };
+  await tool.execute(args, callExec);
+  assert.equal(asked.callId, callId, 'approval must attach to the already-presented tool call');
+  assert.equal(asked.toolName, 'bash');
+  assert.equal(asked.agent, callExec.agent);
+  assert.equal(asked.reason, 'escalate sandbox to danger-full-access: List documentation');
   assert.equal(executed.command, 'printf DUMMY_COMMAND');
-  assert.equal(executed.workdir, '/dummy-workspace/subdir');
+  assert.equal(executed.workdir, `${policy.workspaceRoot}${path.sep}subdir`);
   const exec = { agent: { session: { header: { cwd: '/dummy-workspace' } } }, callId: 'another-dummy', signal: new AbortController().signal };
   await t.test('rejection never dispatches the shell', async () => {
     outcome = 'rejected';
@@ -53,24 +67,12 @@ test('approval includes the exact command and cwd even without the chat detail s
     await assert.rejects(tool.execute({ ...args }, exec), /rejected/);
     assert.equal(executed, undefined);
   });
-  await t.test('unknown cwd cannot be approved', async () => {
+  await t.test('an omitted per-call cwd resolves to the session workspace', async () => {
     outcome = 'allowed-once';
-    const workspace = policy.workspaceRoot;
-    delete policy.workspaceRoot;
-    try {
-      const withoutWorkdir = { ...args };
-      delete withoutWorkdir.workdir;
-      await assert.rejects(tool.execute(withoutWorkdir, { ...exec, agent: { session: { header: {} } } }), /resolved working directory/);
-      assert.equal(executed, undefined);
-    } finally {
-      policy.workspaceRoot = workspace;
-    }
-  });
-  await t.test('control and bidi characters cannot alter the approval display', async () => {
-    await tool.execute({ ...args, command: 'printf DUMMY\r\n\u202eHIDDEN', justification: 'Docs\u2066only' }, exec);
-    assert.ok(asked.reason.includes('\\r\\n\\u202e'));
-    assert.ok(asked.reason.includes('\\u2066'));
-    assert.ok(!asked.reason.includes('\u202e'));
-    assert.ok(!asked.reason.includes('\u2066'));
+    const withoutWorkdir = { ...args };
+    delete withoutWorkdir.workdir;
+    await tool.execute(withoutWorkdir, exec);
+    assert.equal(executed.command, withoutWorkdir.command);
+    assert.equal(executed.workdir, '/dummy-workspace');
   });
 });

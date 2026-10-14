@@ -32,7 +32,7 @@ use std::collections::HashMap;
 
 const RECORD_SCOPE: &str = "llm-pi-ai";
 
-fn home() -> Option<String> {
+pub(crate) fn home() -> Option<String> {
     crate::inspect::home_dir()
 }
 
@@ -60,7 +60,7 @@ fn data_dir() -> Option<String> {
 
 /// Where `opencode.json` (the OpenCode settings file) lives. Shown by
 /// `rdsh setup` so first-run users can find the settings screen.
-fn config_dir() -> Option<String> {
+pub(crate) fn config_dir() -> Option<String> {
     if let Ok(x) = std::env::var("XDG_CONFIG_HOME") {
         if !x.is_empty() {
             return Some(x);
@@ -94,7 +94,7 @@ fn provider_id(opencode_key: &str) -> Option<String> {
     None
 }
 
-fn is_record_id(s: &str) -> bool {
+pub(crate) fn is_record_id(s: &str) -> bool {
     let mut c = s.chars();
     match c.next() {
         Some(f) if f.is_ascii_lowercase() => {}
@@ -806,11 +806,26 @@ fn autosync_enabled() -> bool {
 
 /// Apply only previously selected sharing, then optionally print first-run guidance.
 /// With no selected sources, the sync path does not scan external login stores.
+/// Best-effort mirror before delegating to dsh (boot/dump/plugin/raw).
+/// Never fails: a broken store must not break launching. When `banner` is
+/// set, a no-connection state also prints the first-run guidance once.
+/// Fast path: banner decision needs only env + credentials doc (same result
+/// as setup_needed_in), so external codex/opencode scans are skipped here.
+/// Same stderr bytes out, 3 file reads + parses saved per boot.
 pub fn pre_boot(banner: bool) {
     auto_sync();
-    if banner {
-        first_boot_banner();
+    if !banner {
+        return;
     }
+    let doc = load_doc(&creds_path());
+    if general_connection(&doc) {
+        return;
+    }
+    // Rare: only a provider route key exists; let the profiles decide.
+    if route_key_present(&doc) && !setup_needed_in(&scan()) {
+        return;
+    }
+    first_boot_banner();
 }
 
 /// Best-effort mirror before delegating to dsh (boot/dump/plugin/raw).
@@ -1197,9 +1212,14 @@ pub fn cmd_auth(args: AuthArgs, dry: bool) -> anyhow::Result<()> {
         );
     }
     for need in provider_needs_in(&grants, &doc) {
+        let mark = match need.state {
+            "ok" => "credential ok",
+            "importable" => "credential importable: run `rdsh auth --import --provider <id>`",
+            _ => "credential missing: run `rdsh setup`",
+        };
         println!(
-            "[rdsh auth] dsh default: {} {}/{} ({}, {}: presence only, authentication not verified)",
-            need.profile, need.provider, need.model, need.via, need.state
+            "[rdsh auth] dsh default: {} {}/{} ({}, {}; presence only, authentication not verified)",
+            need.profile, need.provider, need.model, need.via, mark
         );
     }
     for note in notes {
@@ -1285,6 +1305,12 @@ pub fn summary_line() -> String {
 /// API-key env vars that count as "already connected".
 const KNOWN_ENV_KEYS: &[&str] = &["DEEPSEEK_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"];
 
+/// Keys of routes that `rdsh provider add` registers. dsh does not ship these
+/// routes, so the key alone is not a connection: it counts only once a
+/// profile's default model resolves to a route that uses it
+/// ([`provider_needs_in`] state `ok`).
+const PROVIDER_ROUTE_KEYS: &[&str] = &["HAI_API_KEY", "LOCAL_OPENAI_API_KEY", "SARASHINA_API_KEY"];
+
 fn user_lang() -> String {
     for k in ["LANGUAGE", "LC_ALL", "LANG"] {
         if let Ok(v) = std::env::var(k) {
@@ -1301,7 +1327,7 @@ fn lang_is_japanese(lang: &str) -> bool {
     base.replace('-', "_").starts_with("ja")
 }
 
-fn is_japanese() -> bool {
+pub(crate) fn is_japanese() -> bool {
     lang_is_japanese(&user_lang())
 }
 
@@ -1318,18 +1344,68 @@ pub fn setup_needed() -> bool {
     // Only the DSH store and inherited environment can make DSH ready.
     // Do not crawl unrelated external login stores a second time after import.
     let doc = load_doc(&creds_path());
-    if !doc.grants.is_empty() || !doc.refs.is_empty() {
+    if general_connection(&doc) {
         return false;
     }
-    !KNOWN_ENV_KEYS.iter().any(|k| env_key_set(k))
+    // A provider route key (HAI, local, Sarashina) alone is not a connection:
+    // it counts once a profile's default model resolves a route that uses it.
+    // External stores are scanned only for this rare case.
+    if route_key_present(&doc) {
+        return setup_needed_in(&scan());
+    }
+    true
+}
+
+/// A connection that needs no route lookup: a stored grant, a stored ref or
+/// env key of a well-known provider.
+fn general_connection(doc: &CredsDoc) -> bool {
+    !doc.grants.is_empty()
+        || doc
+            .refs
+            .keys()
+            .any(|k| !PROVIDER_ROUTE_KEYS.contains(&k.as_str()))
+        || KNOWN_ENV_KEYS.iter().any(|k| env_key_set(k))
+}
+
+/// A route key (stored or exported) exists, so the profiles decide.
+fn route_key_present(doc: &CredsDoc) -> bool {
+    PROVIDER_ROUTE_KEYS
+        .iter()
+        .any(|k| doc.refs.contains_key(*k) || env_key_set(k))
+}
+
+/// External stores are only candidates for import. A connection requires a
+/// credential already stored for DSH or a usable API-key environment variable.
+/// A provider route key (HAI, local, Sarashina) counts only when a profile's
+/// default model uses a route that resolves it, which keeps `needed` in line
+/// with `defaults[].state`.
+fn setup_needed_in(s: &Scan) -> bool {
+    let doc = &s.doc;
+    if general_connection(doc) {
+        return false;
+    }
+    if route_key_present(doc) {
+        // Only a registered default whose route declares a route key that is
+        // actually present connects; an unrelated default being `ok` (say via
+        // an un-imported external candidate) must not. The route-key branch
+        // only reads `api_key_env`, so the scan-based `provider_needs` view is
+        // equivalent to `provider_needs_in` here.
+        return !provider_needs_in(&s.grants, &s.doc).iter().any(|n| {
+            n.state == "ok"
+                && n.api_key_env.as_deref().is_some_and(|k| {
+                    PROVIDER_ROUTE_KEYS.contains(&k)
+                        && (doc.refs.get(k).is_some_and(|v| !v.is_empty()) || env_key_set(k))
+                })
+        });
+    }
+    true
 }
 
 /// Short first-boot banner printed to stderr before delegation (never fails,
-/// never blocks: the boot continues into dsh either way).
+/// never blocks: the boot continues into dsh either way). The decision to show
+/// it is made by `pre_boot` from the same scan, so the stores are not crawled
+/// twice and `first_boot_banner` itself never re-checks the connection state.
 pub fn first_boot_banner() {
-    if !setup_needed() {
-        return;
-    }
     if is_japanese() {
         eprintln!("[rdsh] モデル接続がまだありません（初回セットアップが必要です）");
         eprintln!(
@@ -1372,9 +1448,25 @@ fn prompt_yes(prompt: &str) -> bool {
     }
 }
 
+/// Names of the non-empty refs stored in `.credentials.yaml`, with their
+/// values. Used by `rdsh provider` to report key presence and to authenticate
+/// a model listing; callers must never print the values.
+pub(crate) fn stored_refs() -> HashMap<String, String> {
+    load_doc(&creds_path())
+        .refs
+        .into_iter()
+        .filter(|(_, v)| !v.is_empty())
+        .collect()
+}
+
+/// True when the env var is set to a non-empty value.
+pub(crate) fn env_key_present(name: &str) -> bool {
+    env_key_set(name)
+}
+
 /// Store one `refs:` entry (0600, other entries untouched). Returns true
 /// when the file changed.
-fn store_ref(name: &str, value: &str) -> anyhow::Result<bool> {
+pub(crate) fn store_ref(name: &str, value: &str) -> anyhow::Result<bool> {
     store_ref_at(&creds_path(), name, value)
 }
 
@@ -1533,6 +1625,8 @@ pub struct ProviderNeed {
     pub model: String,
     pub via: String,
     pub state: &'static str,
+    /// `apiKeyEnv` declared on the provider block, if any.
+    pub api_key_env: Option<String>,
 }
 
 /// Read every profile's `agent-default-model` entry (what the dsh GUI
@@ -1590,13 +1684,14 @@ fn provider_needs_in(grants: &[OauthGrant], doc: &CredsDoc) -> Vec<ProviderNeed>
             model,
             via,
             state,
+            api_key_env,
         });
     }
     out
 }
 
 /// Ref/env name for well-known API-key routes (mirrors profile `apiKeyEnv`).
-fn key_name(provider: &str) -> String {
+pub(crate) fn key_name(provider: &str) -> String {
     match provider {
         "openai-codex" => "OPENAI_API_KEY".to_string(),
         _ => provider.to_uppercase().replace('-', "_") + "_API_KEY",
@@ -1830,7 +1925,14 @@ pub fn setup_status_json() -> String {
 }
 
 /// Ref names the setup UI is allowed to store (allowlist: never arbitrary keys).
-const SETUP_KEY_ALLOWLIST: &[&str] = &["DEEPSEEK_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"];
+const SETUP_KEY_ALLOWLIST: &[&str] = &[
+    "DEEPSEEK_API_KEY",
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "HAI_API_KEY",
+    "LOCAL_OPENAI_API_KEY",
+    "SARASHINA_API_KEY",
+];
 
 /// Store a pasted API key submitted from the floating setup UI.
 /// Same 0600 line-surgery path as the terminal wizard.
@@ -2233,6 +2335,35 @@ mod tests {
         assert_eq!(doc.refs.get("FIRST_KEY").map(String::as_str), Some("one"));
         assert_eq!(doc.refs.get("SECOND_KEY").map(String::as_str), Some("two"));
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn provider_routes_are_connected_by_their_declared_key_name() {
+        for (route, key) in [
+            ("hai", "HAI_API_KEY"),
+            ("local-openai", "LOCAL_OPENAI_API_KEY"),
+            ("sarashina", "SARASHINA_API_KEY"),
+            ("home-gpu", "HOME_GPU_API_KEY"),
+        ] {
+            let text = crate::providers::sample_patch_for_tests(route, "m1");
+            assert_eq!(
+                parse_default_model(&text),
+                Some((route.to_string(), "m1".to_string()))
+            );
+            assert_eq!(parse_api_key_env(&text, route).as_deref(), Some(key));
+            assert_eq!(
+                via_name(&parse_api_key_env(&text, route)),
+                format!("key {key}")
+            );
+        }
+    }
+
+    #[test]
+    fn provider_keys_can_be_saved_from_setup() {
+        assert!(SETUP_KEY_ALLOWLIST.contains(&"HAI_API_KEY"));
+        assert!(SETUP_KEY_ALLOWLIST.contains(&"LOCAL_OPENAI_API_KEY"));
+        assert!(SETUP_KEY_ALLOWLIST.contains(&"SARASHINA_API_KEY"));
+        assert!(setup_store_key("NOT_ALLOWED_API_KEY", "x").is_err());
     }
 
     #[test]
