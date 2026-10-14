@@ -37,7 +37,11 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 - Context retrieval expands its search hits with dependency-graph neighbours when
   the index exists, so an excerpt arrives with the files it depends on; without
-  an index it degrades to the previous behaviour.
+  an index it degrades to the previous behaviour, and `features.dep_graph=false`
+  keeps the index out of the context path entirely.
+- Plain `rdsh context build` output starts with one `[snapshot: ...]` line (JSON
+  already carried the object), so an assembled context is never mistaken for one
+  that was verified later.
 - `rdsh context status --json` also reports memory counts, the dependency-index
   summary, and the injection budget/deadline; `rdsh context build --json` adds a
   `snapshot` object describing whether the repository stayed stable.

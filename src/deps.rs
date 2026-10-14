@@ -1559,11 +1559,16 @@ fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
             std::process::id(),
             SEQUENCE.fetch_add(1, Ordering::Relaxed)
         ));
-        match OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&candidate)
+        let mut options = OpenOptions::new();
+        options.write(true).create_new(true);
+        #[cfg(unix)]
         {
+            use std::os::unix::fs::OpenOptionsExt;
+            // The index lists repository paths and symbol names; keep it owner
+            // only like the memory store and the hook config.
+            options.mode(0o600);
+        }
+        match options.open(&candidate) {
             Ok(file) => {
                 temporary = Some((candidate, file));
                 break;
@@ -1766,7 +1771,39 @@ pub fn related_files(seeds: &[String], max: usize) -> Vec<String> {
     )
 }
 
+/// True when an index exists for the current repository.
+///
+/// Cheap on purpose: it stats one file and never parses the index or walks the
+/// tree, so a hook path running under a deadline can use it. Use
+/// [`graph_summary`] when the caller wants the full picture and can pay for it.
+pub fn index_present() -> bool {
+    let Ok(root) = repository_root(None) else {
+        return false;
+    };
+    let path = index_path(&root, Path::new(&crate::inspect::dsh_home()));
+    // A regular file only (no symlink target, no FIFO that could block the
+    // hook), and a plausible JSON start — parsing it fully is the caller's
+    // business, and walking the tree here is exactly what we are avoiding.
+    let Ok(metadata) = std::fs::symlink_metadata(&path) else {
+        return false;
+    };
+    if !metadata.is_file() {
+        return false;
+    }
+    let Ok(mut file) = File::open(&path) else {
+        return false;
+    };
+    let mut head = [0u8; 64];
+    let Ok(read) = file.read(&mut head) else {
+        return false;
+    };
+    head[..read].iter().find(|byte| !byte.is_ascii_whitespace()) == Some(&b'{')
+}
+
 /// Empty when unknown; otherwise a one-line static-approximation summary.
+///
+/// This walks the repository to report staleness, so it is for user-invoked
+/// commands, not for the per-turn injection path.
 pub fn graph_summary() -> String {
     current_index().map_or_else(String::new, |(root, index)| {
         let graph = Graph::new(&index);

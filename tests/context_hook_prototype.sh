@@ -197,6 +197,12 @@ grep -q '# sessions' "$SB/out" && bad "--sessions 0 must not carry sessions" || 
 run context build --query "SENTINEL_SESSION_NOTE"
 grep -q '# sessions' "$SB/out" && bad "default build must not carry sessions" || ok "default build carries nothing"
 rm -rf "$DSH_HOME/sessions"
+# The dependency switch steers the context path too, not only `rdsh deps`.
+printf '%s' '{"beta":{"context_engine":true},"features":{"dep_graph":false},"context":{"goal":"配列の互換性を保つ","include_git_diff":false}}' > "$DSH_HOME/rdsh.json"
+run context build --query "engine_score"
+grep -q 'dependency graph: off' "$SB/out" && ok "dep_graph off keeps the graph out of context" || { bad "dep_graph off still consulted the graph"; cat "$SB/out"; }
+grep -q '(dep: related' "$SB/out" && bad "dep_graph off must not add graph neighbours" || ok "dep_graph off adds no neighbours"
+printf '%s' '{"beta":{"context_engine":true},"context":{"goal":"配列の互換性を保つ"}}' > "$DSH_HOME/rdsh.json"
 echo "---"
 echo "context-hook: $pass ok, $fail failed"
 [ "$fail" -eq 0 ]

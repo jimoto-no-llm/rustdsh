@@ -109,7 +109,11 @@ fn merge(doc: &mut serde_json::Value, command: &str) -> bool {
     true
 }
 
-/// Remove every group that runs this command, returning true when removed.
+/// Remove this command without touching anyone else's hooks, returning true
+/// when something was removed.
+///
+/// Removal works per command, not per group: a group that also hosts other
+/// hooks keeps them, and only a group left empty is dropped.
 fn unmerge(doc: &mut serde_json::Value) -> bool {
     let Some(hooks) = doc.get_mut("hooks").and_then(|h| h.as_object_mut()) else {
         return false;
@@ -117,10 +121,23 @@ fn unmerge(doc: &mut serde_json::Value) -> bool {
     let Some(list) = hooks.get_mut(EVENT).and_then(|l| l.as_array_mut()) else {
         return false;
     };
-    let before = list.len();
-    list.retain(|group| !group_is_ours(group));
-    let removed = list.len() != before;
-    if list.is_empty() {
+    let mut removed = false;
+    let mut kept: Vec<serde_json::Value> = Vec::with_capacity(list.len());
+    for mut group in std::mem::take(list) {
+        let mut empty = false;
+        if let Some(commands) = group.get_mut("hooks").and_then(|h| h.as_array_mut()) {
+            let before = commands.len();
+            commands.retain(|command| !is_ours(command));
+            removed |= commands.len() != before;
+            empty = commands.is_empty();
+        }
+        if !empty {
+            kept.push(group);
+        }
+    }
+    *list = kept;
+    let event_empty = list.is_empty();
+    if event_empty {
         hooks.remove(EVENT);
     }
     removed
@@ -236,6 +253,15 @@ pub fn cmd_hook(
                     path.display()
                 );
             }
+            if json {
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "path": path.display().to_string(),
+                        "changed": changed,
+                    })
+                );
+            }
             Ok(())
         }
         "status" => {
@@ -312,6 +338,22 @@ mod tests {
         assert_eq!(left.len(), 1);
         assert_eq!(left[0]["hooks"][0]["command"], "other-hook");
         assert!(!unmerge(&mut doc));
+    }
+
+    #[test]
+    fn removal_keeps_other_commands_in_the_same_group() {
+        let mut doc = serde_json::json!({"hooks": {"UserPromptSubmit": [
+            {"hooks": [
+                {"type": "command", "command": "other-tool audit"},
+                {"type": "command", "command": "rdsh context inject --event user-prompt-submit"}
+            ]}
+        ]}});
+        assert!(unmerge(&mut doc));
+        let groups = doc["hooks"]["UserPromptSubmit"].as_array().expect("array");
+        assert_eq!(groups.len(), 1, "the group still holds another hook");
+        let commands = groups[0]["hooks"].as_array().expect("commands");
+        assert_eq!(commands.len(), 1);
+        assert_eq!(commands[0]["command"], "other-tool audit");
     }
 
     #[test]
