@@ -51,7 +51,9 @@ project; this metadata is an observation, not authority to stop any process.
 A new dashboard creates a new instance and bearer. If the previously recorded
 Tunnel process is still observed with the same birth identity, its old instance
 is reported as `stale_credentials`; no old health port is probed. A gone or
-reused PID is reported stopped. Missing/unsupported process identity remains
+reused PID is reported stopped. macOS reads PID start time and owner only
+through `libproc`; this remains read-only and does not enable managed-process
+containment or confirmed cleanup. Missing/unsupported process identity remains
 unconfirmed. Uninstrumented older launchers remain unconfirmed until explicitly
 restarted with this version.
 
