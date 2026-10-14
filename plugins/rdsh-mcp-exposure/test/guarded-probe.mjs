@@ -12,11 +12,17 @@ new SessionStore(ctx);
 const tools = new ToolRuntime(ctx, { mode: 'both' });
 const before = tools.schemas().map(tool => tool.name);
 assert.ok(tools.get('rdsh_inspect'));
-assert.equal(tools.get('run_code'), undefined);
+// rdsh no longer forces ToolRuntime into `native` mode or rejects every tool
+// except its own inspector: DSH's configured permission and approval behaviour
+// applies to ordinary tools such as `run_code`, which must therefore be
+// registered. The isolation guarantee that remains is that the MCP exposure
+// plugin never registers its own tools and that `rdsh_inspect` cannot be
+// dispatched by the model (asserted in tests/guarded-runtime-probe.mjs).
+assert.ok(tools.get('run_code'), 'upstream DSH tools are no longer globally denied');
 await assert.rejects(apply(ctx, { servers: [{ connection: { transport: 'streamable-http', serverName: 'refused',
   url: 'http://127.0.0.1:1/not-connected', reconnect: { enabled: false } }, exposure: 'deferred' }] }),
 { code: 'RDSH_MCP_GUARDED_NATIVE' });
 assert.deepEqual(tools.schemas().map(tool => tool.name), before);
 for (const name of [LOAD, SEARCH, STATUS]) assert.equal(tools.get(name), undefined);
 await ctx.fiber.dispose();
-console.log(JSON.stringify({ guardedNativeRefusedBeforeRegistration: true, nativeInspectionRetained: true, runCodeAbsent: true }));
+console.log(JSON.stringify({ guardedNativeRefusedBeforeRegistration: true, nativeInspectionRetained: true, upstreamToolsRestored: true }));

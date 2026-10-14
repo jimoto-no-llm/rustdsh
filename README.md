@@ -18,7 +18,6 @@ It ports frequently used CLI operations (token calculation, code search, session
 
 ## Why rdsh?
 
-
 ## Table of Contents
 
 - [Quick Start](#quick-start)
@@ -245,6 +244,7 @@ Details: [docs/PROVIDERS.md](docs/PROVIDERS.md).
 Delegated agent tools keep normal file access by default: the model reads and
 writes the project like any other tool. On Linux (with bubblewrap and prlimit)
 you can instead confine them to files you explicitly share:
+
 ```sh
 rdsh --share-file README.md --share-file src/main.rs --profile tui
 ```

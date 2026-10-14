@@ -14,6 +14,6 @@ test('the actual mandatory rdsh preload refuses the bundle without opening PTC o
   const { stdout } = await execute(process.execPath, ['--import', new URL('../../../security/preload.mjs', import.meta.url).href,
     fileURLToPath(new URL('./guarded-probe.mjs', import.meta.url))], { cwd: root, env, timeout: 20000, maxBuffer: 1024 * 1024 });
   const result = JSON.parse(stdout.trim());
-  assert.deepEqual(result, { guardedNativeRefusedBeforeRegistration: true, nativeInspectionRetained: true, runCodeAbsent: true });
+  assert.deepEqual(result, { guardedNativeRefusedBeforeRegistration: true, nativeInspectionRetained: true, upstreamToolsRestored: true });
   t.diagnostic(JSON.stringify(result));
 });
