@@ -1,7 +1,7 @@
 #!/bin/sh
 # Install recommended dsh plugins into a profile (idempotent per package).
-# Also installs the bundled rdsh plugins (settings UI, and the Web update
-# banner) so they are available by default.
+# Also installs the bundled settings UI, phone-width layout adapted from
+# Smart-DSH (MIT), and the Web-only update banner.
 # Usage: [PROFILE=headless] [DRY_RUN=1] [SOUND=1] [COMPUTE=1] ./plugins/install.sh
 # PROFILE=desktop targets the Electron application's reserved profile: the npm
 # dsh CLI refuses it, so the work is forwarded to the Desktop-installed command
@@ -94,7 +94,7 @@ done
 # insert fails to import on every boot and no release notification appears
 # (issue #5). pnpm also prunes links it does not manage, so the banner has to be
 # installed through the same path as the settings UI.
-BUNDLED="rdsh-settings"
+BUNDLED="rdsh-settings rdsh-mobile-ui"
 if [ "$PROFILE" = "web" ]; then
   BUNDLED="$BUNDLED rdsh-update-banner"
 fi

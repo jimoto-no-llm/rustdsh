@@ -7,6 +7,7 @@ import { createInstructionPanel } from "./instruction-queue-ui.mjs";
 import { createCostPanel } from "./cost-ledger-ui.mjs";
 import { createModelCatalogPanel } from "./model-catalog-ui.mjs";
 import { renderBudget } from "./budget-ui.mjs";
+import { createTaskOutcomesPanel } from "./task-outcomes-ui.mjs";
 import { createHumanAnnotationPanel } from "./human-annotations-ui.mjs";
 import { setupObservedCli } from "./observed-cli-ui.mjs";
 
@@ -188,6 +189,11 @@ const renderInstructions = createInstructionPanel($("instruction-panel"), {
   refreshState,
 });
 const renderCosts = createCostPanel($("cost-ledger"), node);
+const renderTaskOutcomes = createTaskOutcomesPanel(
+  $("tasks"),
+  $("task-milestones"),
+  { node, api },
+);
 const renderCatalog = createModelCatalogPanel($("model-catalog"), node);
 const renderHumanAnnotations = createHumanAnnotationPanel(
   $("human-annotations-panel"),
@@ -206,6 +212,7 @@ function render(state) {
   renderHumanAnnotations(state);
   renderReports(state);
   const unanswered = state.questions.filter((question) => question.answer === null);
+  renderTaskOutcomes(state);
   renderQuestionCards($("questions"), unanswered, state.question_contracts, {
     node,
     api,

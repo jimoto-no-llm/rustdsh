@@ -26,7 +26,7 @@ test("empty RDSH_BIN is ignored", () => {
 test("PATH hit returns the bare name before any well-known location", () => {
   const env = { PATH: "/opt/bin:/usr/bin", HOME: "/home/u" };
   // Both exist; the PATH hit must win, so the bare name is returned.
-  assert.equal(resolveRdshBin(env, "linux", found(join("/opt/bin", "rdsh"), "/usr/local/bin/rdsh")), "rdsh");
+  assert.equal(resolveRdshBin(env, "linux", found("/opt/bin/rdsh", "/usr/local/bin/rdsh")), "rdsh");
 });
 
 test("well-known install locations are searched in order", () => {
@@ -48,17 +48,17 @@ test("win32 searches PATH, LOCALAPPDATA, USERPROFILE and CARGO_HOME", () => {
     LOCALAPPDATA: "C:\\Users\\u\\AppData\\Local",
     CARGO_HOME: "C:\\cargo",
   };
-  const exe = join("C:\\Users\\u\\AppData\\Local", "rdsh", "bin", "rdsh.exe");
-  const cargo = join("C:\\cargo", "bin", "rdsh.exe");
-  const home = join("C:\\Users\\u", ".local", "bin", "rdsh.exe");
-  const onPath = join("C:\\bin", "rdsh.exe");
+  const exe = "C:\\Users\\u\\AppData\\Local\\rdsh\\bin\\rdsh.exe";
+  const cargo = "C:\\cargo\\bin\\rdsh.exe";
+  const home = "C:\\Users\\u\\.local\\bin\\rdsh.exe";
+  const onPath = "C:\\bin\\rdsh.exe";
   assert.equal(resolveRdshBin(env, "win32", found(onPath)), "rdsh"); // spawn() resolves .exe via PATHEXT
   assert.equal(resolveRdshBin(env, "win32", found(exe, cargo, home)), exe);
   assert.equal(resolveRdshBin(env, "win32", found(home, cargo)), home);
   assert.equal(resolveRdshBin(env, "win32", found(cargo)), cargo);
   // Without CARGO_HOME the Cargo bin falls back to %USERPROFILE%\.cargo.
   const noCargoHome = { ...env, CARGO_HOME: "" };
-  const fallbackCargo = join("C:\\Users\\u", ".cargo", "bin", "rdsh.exe");
+  const fallbackCargo = "C:\\Users\\u\\.cargo\\bin\\rdsh.exe";
   assert.equal(resolveRdshBin(noCargoHome, "win32", found(fallbackCargo)), fallbackCargo);
 });
 
