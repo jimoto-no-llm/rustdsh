@@ -145,6 +145,7 @@ jobs:
       - run: cargo test --example benchmark_extended
       - run: cargo test --example benchmark_models
       - run: cargo build
+      - run: node --test dashboard/test/worker-scopes-compat.test.mjs
       - run: npm ci --ignore-scripts --no-audit --no-fund
         working-directory: plugins/rdsh-compute
       - run: npm test

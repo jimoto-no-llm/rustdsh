@@ -4,6 +4,9 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+const MAX_NATIVE_POLICY_BATCH_ITEMS = 4096;
+const workerScopeCapabilities = new Map();
+
 export class WorkerError extends Error {
   constructor(code, details = null) {
     super("Worker workspaces: " + code);
@@ -139,6 +142,33 @@ function executable(file) {
   }
 }
 
+function supportsWorkerScope(file) {
+  let stat;
+  try {
+    stat = fs.statSync(file);
+  } catch {
+    return false;
+  }
+  const cacheKey = [file, stat.dev, stat.ino, stat.size, stat.mtimeMs].join(":");
+  const cached = workerScopeCapabilities.get(cacheKey);
+  if (cached !== undefined) return cached;
+
+  const result = spawnSync(file, ["--help"], {
+    encoding: "utf8",
+    windowsHide: true,
+    shell: false,
+    timeout: 2_000,
+    maxBuffer: 64 * 1024,
+  });
+  const help = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+  const supported =
+    !result.error &&
+    result.status === 0 &&
+    /(?:^|\r?\n)\s*worker-scope\s{2,}\S/.test(help);
+  workerScopeCapabilities.set(cacheKey, supported);
+  return supported;
+}
+
 function rdshExecutable() {
   if (process.env.RDSH_BIN) return path.resolve(process.env.RDSH_BIN);
   const executableName = process.platform === "win32" ? "rdsh.exe" : "rdsh";
@@ -150,7 +180,9 @@ function rdshExecutable() {
       path.join(directory, executableName),
     ),
   ];
-  return candidates.find(executable) ?? null;
+  return candidates.find((candidate) =>
+    executable(candidate) && supportsWorkerScope(candidate),
+  ) ?? null;
 }
 
 function normalizedDeclaration(value) {
@@ -213,6 +245,14 @@ export function policyResults(input) {
     request.shared_files.length === 0
   ) {
     return { write_checks: [], intersections: [], shared_files: [] };
+  }
+
+  if (
+    request.write_checks.length > MAX_NATIVE_POLICY_BATCH_ITEMS ||
+    request.intersections.length > MAX_NATIVE_POLICY_BATCH_ITEMS ||
+    request.shared_files.length > MAX_NATIVE_POLICY_BATCH_ITEMS
+  ) {
+    return legacyPolicyResults(request);
   }
 
   const binary = rdshExecutable();
