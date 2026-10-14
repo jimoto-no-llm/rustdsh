@@ -31,7 +31,7 @@ use std::collections::HashMap;
 
 const RECORD_SCOPE: &str = "llm-pi-ai";
 
-fn home() -> Option<String> {
+pub(crate) fn home() -> Option<String> {
     crate::inspect::home_dir()
 }
 
@@ -59,7 +59,7 @@ fn data_dir() -> Option<String> {
 
 /// Where `opencode.json` (the OpenCode settings file) lives. Shown by
 /// `rdsh setup` so first-run users can find the settings screen.
-fn config_dir() -> Option<String> {
+pub(crate) fn config_dir() -> Option<String> {
     if let Ok(x) = std::env::var("XDG_CONFIG_HOME") {
         if !x.is_empty() {
             return Some(x);
@@ -93,7 +93,7 @@ fn provider_id(opencode_key: &str) -> Option<String> {
     None
 }
 
-fn is_record_id(s: &str) -> bool {
+pub(crate) fn is_record_id(s: &str) -> bool {
     let mut c = s.chars();
     match c.next() {
         Some(f) if f.is_ascii_lowercase() => {}
@@ -1009,7 +1009,13 @@ pub fn summary_line() -> String {
 // step instead of a bare credential prompt.
 
 /// API-key env vars that count as "already connected".
-const KNOWN_ENV_KEYS: &[&str] = &["DEEPSEEK_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"];
+const KNOWN_ENV_KEYS: &[&str] = &[
+    "DEEPSEEK_API_KEY",
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "HAI_API_KEY",
+    "LOCAL_OPENAI_API_KEY",
+];
 
 fn user_lang() -> String {
     for k in ["LANGUAGE", "LC_ALL", "LANG"] {
@@ -1027,7 +1033,7 @@ fn lang_is_japanese(lang: &str) -> bool {
     base.replace('-', "_").starts_with("ja")
 }
 
-fn is_japanese() -> bool {
+pub(crate) fn is_japanese() -> bool {
     lang_is_japanese(&user_lang())
 }
 
@@ -1092,9 +1098,25 @@ fn prompt_yes(prompt: &str) -> bool {
     }
 }
 
+/// Names of the non-empty refs stored in `.credentials.yaml`, with their
+/// values. Used by `rdsh provider` to report key presence and to authenticate
+/// a model listing; callers must never print the values.
+pub(crate) fn stored_refs() -> HashMap<String, String> {
+    load_doc(&creds_path())
+        .refs
+        .into_iter()
+        .filter(|(_, v)| !v.is_empty())
+        .collect()
+}
+
+/// True when the env var is set to a non-empty value.
+pub(crate) fn env_key_present(name: &str) -> bool {
+    env_key_set(name)
+}
+
 /// Store one `refs:` entry (0600, other entries untouched). Returns true
 /// when the file changed.
-fn store_ref(name: &str, value: &str) -> anyhow::Result<bool> {
+pub(crate) fn store_ref(name: &str, value: &str) -> anyhow::Result<bool> {
     store_ref_at(&creds_path(), name, value)
 }
 
@@ -1306,7 +1328,7 @@ fn provider_needs(s: &Scan) -> Vec<ProviderNeed> {
 }
 
 /// Ref/env name for well-known API-key routes (mirrors profile `apiKeyEnv`).
-fn key_name(provider: &str) -> String {
+pub(crate) fn key_name(provider: &str) -> String {
     match provider {
         "openai-codex" => "OPENAI_API_KEY".to_string(),
         _ => provider.to_uppercase().replace('-', "_") + "_API_KEY",
@@ -1518,7 +1540,13 @@ pub fn setup_status_json() -> String {
 }
 
 /// Ref names the setup UI is allowed to store (allowlist: never arbitrary keys).
-const SETUP_KEY_ALLOWLIST: &[&str] = &["DEEPSEEK_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"];
+const SETUP_KEY_ALLOWLIST: &[&str] = &[
+    "DEEPSEEK_API_KEY",
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "HAI_API_KEY",
+    "LOCAL_OPENAI_API_KEY",
+];
 
 /// Store a pasted API key submitted from the floating setup UI.
 /// Same 0600 line-surgery path as the terminal wizard.
@@ -1905,6 +1933,35 @@ mod tests {
         assert_eq!(doc.refs.get("FIRST_KEY").map(String::as_str), Some("one"));
         assert_eq!(doc.refs.get("SECOND_KEY").map(String::as_str), Some("two"));
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn provider_routes_are_connected_by_their_declared_key_name() {
+        for (route, key) in [
+            ("hai", "HAI_API_KEY"),
+            ("local-openai", "LOCAL_OPENAI_API_KEY"),
+            ("home-gpu", "HOME_GPU_API_KEY"),
+        ] {
+            let text = crate::providers::sample_patch_for_tests(route, "m1");
+            assert_eq!(
+                parse_default_model(&text),
+                Some((route.to_string(), "m1".to_string()))
+            );
+            assert_eq!(parse_api_key_env(&text, route).as_deref(), Some(key));
+            assert_eq!(
+                via_name(&parse_api_key_env(&text, route)),
+                format!("key {key}")
+            );
+        }
+    }
+
+    #[test]
+    fn provider_keys_can_be_saved_from_setup() {
+        assert!(SETUP_KEY_ALLOWLIST.contains(&"HAI_API_KEY"));
+        assert!(SETUP_KEY_ALLOWLIST.contains(&"LOCAL_OPENAI_API_KEY"));
+        assert!(KNOWN_ENV_KEYS.contains(&"HAI_API_KEY"));
+        assert!(KNOWN_ENV_KEYS.contains(&"LOCAL_OPENAI_API_KEY"));
+        assert!(setup_store_key("NOT_ALLOWED_API_KEY", "x").is_err());
     }
 
     #[test]

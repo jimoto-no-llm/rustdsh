@@ -3,6 +3,17 @@
 All notable changes to this project are documented here.
 Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
+## [Unreleased]
+
+### Added
+
+- `rdsh provider add hai|local-openai` writes an OpenAI-compatible route into a
+  profile's `llm-pi-ai` providers (models from `--model`, opencode's
+  `provider.<id>` or `GET /models`), keeping every other byte of
+  `cordis.patch.yml`; `rdsh provider list` shows presets and per-profile
+  route and key status. `HAI_API_KEY` and `LOCAL_OPENAI_API_KEY` are now
+  recognized and can be saved from `rdsh setup`. See `docs/PROVIDERS.md`.
+
 ## [0.3.3] - 2026-10-13
 
 ### Security
