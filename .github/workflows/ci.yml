@@ -124,6 +124,13 @@ jobs:
       - if: runner.os == 'macOS'
         run: command -v zstd || brew install zstd
       - run: cargo test
+      # The serial-proxy suite starts a real proxy plus a mock upstream per
+      # test. Run concurrently they contend for loopback connections and the
+      # mock upstream's accept loop (5ms poll) can refuse one, which surfaces
+      # as `502 upstream connection failed` rather than a product failure.
+      # This has failed on `main` itself. Re-running the suite serially is the
+      # same assertions without the loopback contention.
+      - run: cargo test --test serial_proxy -- --test-threads=1
       - uses: actions/setup-node@v7
         with:
           node-version: 22

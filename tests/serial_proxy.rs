@@ -18,6 +18,23 @@ use tokio::{
     net::TcpStream as AsyncTcpStream,
 };
 
+/// How long a `wait_*` helper polls for observable proxy state before giving
+/// up. These waits only ever observe state that a healthy proxy reaches in
+/// well under a second locally, so the deadline exists to fail a genuinely
+/// stuck proxy rather than to bound normal work. A shared Windows CI runner
+/// starting the child process and completing the first HTTP round-trip can
+/// exceed 5s under load, which made this a spurious failure on `main` itself
+/// (`native_cli_caps_upstream_concurrency_and_rejects_full_queue`). The
+/// default is therefore generous, and `RDSH_TEST_WAIT_SECS` overrides it.
+fn wait_deadline() -> Duration {
+    let secs = std::env::var("RDSH_TEST_WAIT_SECS")
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(30);
+    Duration::from_secs(secs)
+}
+
 #[derive(Clone, Debug)]
 struct SeenRequest {
     method: String,
@@ -250,11 +267,56 @@ impl ProxyProcess {
             .unwrap_or_else(|error| panic!("serial-proxy did not start: {error}"));
         let start = line.find("http://").unwrap();
         let address = line[start..].split(" -> ").next().unwrap();
-        Self {
+        let proxy = Self {
             child,
             url: address.to_string(),
             logs,
             binary_dir: None,
+        };
+        proxy.wait_ready_blocking();
+        proxy
+    }
+
+    /// Block until the proxy actually answers on its status endpoint.
+    ///
+    /// `start_binary` returns as soon as the "listening on" line is printed,
+    /// which happens when the socket binds — the upstream client may not be
+    /// usable yet, and a request sent in that window is answered with 502.
+    /// This sends a raw HTTP/1.1 request and waits for a real response, which
+    /// closes that race instead of assuming that "listening" means "serving".
+    /// The tests are `#[tokio::test]`, so this polls with a blocking socket
+    /// rather than a runtime timer.
+    fn wait_ready_blocking(&self) {
+        let hostport = self.url.trim_start_matches("http://");
+        let deadline = std::time::Instant::now() + wait_deadline();
+        loop {
+            if let Ok(mut sock) = TcpStream::connect(hostport) {
+                let _ = sock.set_read_timeout(Some(Duration::from_millis(500)));
+                let request = format!(
+                    "GET /__proxy/status HTTP/1.1\r\nHost: {hostport}\r\nConnection: close\r\n\r\n"
+                );
+                if sock.write_all(request.as_bytes()).is_ok() {
+                    let mut response = Vec::new();
+                    let mut buf = [0u8; 256];
+                    while let Ok(read) = sock.read(&mut buf) {
+                        if read == 0 {
+                            break;
+                        }
+                        response.extend_from_slice(&buf[..read]);
+                        if response.windows(4).any(|w| w == b"\r\n\r\n") {
+                            break;
+                        }
+                    }
+                    let head = String::from_utf8_lossy(&response);
+                    if head.starts_with("HTTP/1.1 200") || head.starts_with("HTTP/1.0 200") {
+                        return;
+                    }
+                }
+            }
+            if std::time::Instant::now() >= deadline {
+                panic!("serial-proxy never served /__proxy/status: {:?}", self.logs);
+            }
+            thread::sleep(Duration::from_millis(5));
         }
     }
 }
@@ -270,7 +332,7 @@ impl Drop for ProxyProcess {
 }
 
 async fn wait_until(mut condition: impl FnMut() -> bool) {
-    tokio::time::timeout(Duration::from_secs(5), async {
+    tokio::time::timeout(wait_deadline(), async {
         loop {
             if condition() {
                 return;
@@ -283,7 +345,7 @@ async fn wait_until(mut condition: impl FnMut() -> bool) {
 }
 
 async fn wait_for_queued(client: &Client, proxy_url: &str, queued: usize) {
-    tokio::time::timeout(Duration::from_secs(5), async {
+    tokio::time::timeout(wait_deadline(), async {
         loop {
             if let Ok(response) = client
                 .get(format!("{proxy_url}/__proxy/status"))
@@ -306,7 +368,7 @@ async fn wait_for_queued(client: &Client, proxy_url: &str, queued: usize) {
 }
 
 async fn wait_for_active(client: &Client, proxy_url: &str, active: usize) {
-    tokio::time::timeout(Duration::from_secs(5), async {
+    tokio::time::timeout(wait_deadline(), async {
         loop {
             if let Ok(response) = client
                 .get(format!("{proxy_url}/__proxy/status"))
@@ -424,10 +486,16 @@ async fn native_cli_rewrites_tool_choice_and_streams_sse() {
 
 #[tokio::test]
 async fn native_cli_caps_upstream_concurrency_and_rejects_full_queue() {
-    let upstream = MockUpstream::start(Duration::from_millis(250));
+    // The upstream hold has to outlast process startup plus two HTTP
+    // round-trips, otherwise the first request completes before the second is
+    // observed as queued and `wait_for_queued(.., 1)` polls a state that has
+    // already passed. A 250ms hold with a 0.5s queue timeout was too tight for
+    // a shared Windows runner and failed on `main` itself; both are widened
+    // together so the queued window stays comfortably observable.
+    let upstream = MockUpstream::start(Duration::from_millis(3000));
     let proxy = ProxyProcess::start(
         &format!("http://{}", upstream.addr),
-        &["--max", "1", "--max-queue", "1", "--queue-timeout", "0.5"],
+        &["--max", "1", "--max-queue", "1", "--queue-timeout", "10"],
     );
     let client = Client::new();
     let first_client = client.clone();
@@ -533,10 +601,15 @@ async fn native_cli_rpm_window_is_reported_and_waiter_times_out() {
 
 #[tokio::test]
 async fn disconnect_while_queued_removes_waiter_before_slot_opens() {
-    let upstream = MockUpstream::start(Duration::from_millis(400));
+    // The upstream must stay busy long enough for the second request to be
+    // observed as queued. With a 400ms hold the first request could finish
+    // before `wait_for_queued(.., 1)` ever saw the waiter, so the wait polled
+    // for a state that had already passed and timed out. The queue-timeout
+    // below is raised with it so the second request cannot expire mid-test.
+    let upstream = MockUpstream::start(Duration::from_millis(3000));
     let proxy = ProxyProcess::start(
         &format!("http://{}", upstream.addr),
-        &["--max", "1", "--queue-timeout", "2"],
+        &["--max", "1", "--queue-timeout", "10"],
     );
     let client = Client::new();
     let first_client = client.clone();
