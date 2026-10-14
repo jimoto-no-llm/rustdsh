@@ -65,6 +65,7 @@ rdsh-dashboard instruction context --project <directory> --consumer-id <consumer
 rdsh-dashboard instruction submit|resolve --project <directory> --input-file <json>
 rdsh-dashboard cost-ledger declare|report --project <directory> --input-file <json>
 rdsh-dashboard cost-ledger inspect --project <directory>
+rdsh-dashboard task-outcomes apply|validate|schema --input-file <request-json>
 rdsh-dashboard budget policy|usage --project <directory> --input-file <json>
 rdsh-dashboard budget inspect --project <directory>
 rdsh-dashboard integration init --project <directory> --input-file <checks-json> --expected-revision 0 --expected-head <sha>
@@ -206,6 +207,40 @@ async function localJson(file) {
   } finally {
     await handle.close();
   }
+}
+async function nativeRdsh() {
+  const override = process.env.RDSH_BIN;
+  if (override) {
+    if (!path.isAbsolute(override)) throw new Error("RDSH_BIN must be an absolute path");
+    return override;
+  }
+  const name = process.platform === "win32" ? "rdsh.exe" : "rdsh";
+  for (const directory of (process.env.PATH || "").split(path.delimiter)) {
+    if (!path.isAbsolute(directory)) continue;
+    const candidate = path.join(directory, name);
+    try {
+      if ((await fs.stat(candidate)).isFile()) return candidate;
+    } catch {
+      // Keep looking through PATH.
+    }
+  }
+  throw new Error("rdsh is not installed on PATH (or set RDSH_BIN)");
+}
+
+// The outcome logic moved to Rust (`rdsh task-outcomes`); this command keeps
+// the dashboard entry point working without importing the removed module.
+async function runNativeTaskOutcomes(action, inputFile) {
+  const executable = await nativeRdsh();
+  const exitCode = await new Promise((resolve, reject) => {
+    const child = spawn(
+      executable,
+      ["task-outcomes", action, "--input-file", inputFile],
+      { stdio: "inherit", windowsHide: true },
+    );
+    child.once("error", reject);
+    child.once("close", (code) => resolve(code ?? 1));
+  });
+  process.exitCode = exitCode;
 }
 async function inPinnedCli(artifact, selectionRevision) {
   if (process.env.NODE_OPTIONS || process.env.NODE_PATH)
@@ -594,6 +629,16 @@ try {
     )
       throw new Error("Invalid subagents action/options");
     console.log(JSON.stringify(planSubagents(await localJson(values["input-file"]))));
+  } else if (command === "task-outcomes") {
+    const action = positionals[1];
+    if (
+      positionals.length !== 2 ||
+      !["apply", "validate", "schema"].includes(action) ||
+      !values["input-file"] ||
+      Object.keys(values).some((key) => key !== "input-file")
+    )
+      throw new Error("Invalid task-outcomes action/options");
+    await runNativeTaskOutcomes(action, values["input-file"]);
   } else if (command === "workers") {
     const action = positionals[1];
     const options = {

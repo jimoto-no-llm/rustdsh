@@ -59,6 +59,7 @@ mod serve;
 mod setup_web;
 mod shutdown;
 mod slim;
+mod task_outcomes;
 mod token_handoff;
 mod tokens;
 mod tool_security;
@@ -70,7 +71,7 @@ mod websearch;
     name = "rdsh",
     version,
     about = "Rust fast launcher for dsh (safe: native fast-paths + passthrough)",
-    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|auth|setup|context|settings|features|provider|dump-config|boot|serial-proxy)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh provider add hai --model deepseek-v4-flash   register HAI as a dsh route\n  rdsh provider add sarashina    register Sarashina (SARASHINA_API_KEY; mini and nano built in)\n  rdsh provider add local-openai --base-url http://host:8080/v1 --discover --no-key\n  rdsh provider list              presets and per-profile route/key status\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh desktop status             detect the Desktop (Electron) app and its reserved profile\n  rdsh desktop install            attach the bundled rdsh plugins to that profile\n  rdsh --passthrough tui          no slim env; mandatory tool isolation remains\n  rdsh --dry-run tui -- --resume abc   show what would exec"
+    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|auth|setup|context|settings|features|provider|task-outcomes|dump-config|boot|serial-proxy)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh provider add hai --model deepseek-v4-flash   register HAI as a dsh route\n  rdsh provider add sarashina    register Sarashina (SARASHINA_API_KEY; mini and nano built in)\n  rdsh provider add local-openai --base-url http://host:8080/v1 --discover --no-key\n  rdsh provider list              presets and per-profile route/key status\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh desktop status             detect the Desktop (Electron) app and its reserved profile\n  rdsh desktop install            attach the bundled rdsh plugins to that profile\n  rdsh <native-subcommand> ...   (tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|auth|setup|context|settings|features|task-outcomes|provider|dump-config|boot)\n  rdsh --passthrough tui          no slim env; mandatory tool isolation remains\n  rdsh --dry-run tui -- --resume abc   show what would exec"
 )]
 struct Cli {
     /// Explicitly share a project file with isolated model tools (repeatable).
@@ -321,6 +322,17 @@ enum Commands {
         #[command(subcommand)]
         action: SettingsAction,
     },
+    /// Task outcome reports and fixed milestone contracts: merge one optional
+    /// report into a project state, validate a stored document, or print the
+    /// two JSON schemas the dashboard MCP tool advertises
+    #[command(name = "task-outcomes")]
+    TaskOutcomes {
+        /// apply | validate | schema
+        action: String,
+        /// Request JSON file holding { operation, state, input }
+        #[arg(long = "input-file")]
+        input_file: String,
+    },
     /// Feature switches: list every optional capability, or turn one on/off
     Features {
         #[command(subcommand)]
@@ -508,6 +520,7 @@ const NATIVE_FIRST: &[&str] = &[
     "settings",
     "features",
     "serial-proxy",
+    "task-outcomes",
 ];
 
 fn invoked_as_dsh() -> bool {
@@ -553,13 +566,13 @@ fn main() {
             serde_json::to_string(&cli.share_file).unwrap(),
         );
     }
-    // Explicit recovery must work even when the current settings cannot be read.
-    // Every other command still fails closed on a corrupt settings document.
+    // Recovery and the pure task-outcome validator do not depend on settings.
+    // Commands that use settings still fail closed on a corrupt document.
     let cfg = if matches!(
         &cli.command,
         Some(Commands::Settings {
             action: SettingsAction::Init { force: true }
-        })
+        }) | Some(Commands::TaskOutcomes { .. })
     ) {
         rdsh_config::RdshSettings::default()
     } else {
@@ -822,6 +835,9 @@ fn main() {
                 Ok(())
             }
         },
+        Some(Commands::TaskOutcomes { action, input_file }) => {
+            task_outcomes::cmd_task_outcomes(&action, &input_file)
+        }
         Some(Commands::Features { action, json }) => match action {
             None => features_list(&cfg, json),
             Some(FeaturesAction::On { id }) => features_toggle(&id, true),
