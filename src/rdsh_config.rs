@@ -1140,6 +1140,9 @@ fn complement_from_legacy(cfg: &mut RdshSettings, has_context: bool) {
     if c.enable_verifier && !flag(&v, "enable_verifier", true) {
         c.enable_verifier = false;
     }
+    if c.include_git_diff && !flag(&v, "include_git_diff", true) {
+        c.include_git_diff = false;
+    }
     if c.goal.is_empty() {
         c.goal = text(&v, "goal", GOAL_CHARS);
     }
@@ -1622,6 +1625,7 @@ mod rdsh_config_tests {
                     "goal": "旧ファイルのgoal",
                     "files": ["src/tokens.rs"],
                     "open_tasks": ["packing評価"],
+                    "include_git_diff": false,
                 })
                 .to_string(),
             )
@@ -1634,6 +1638,8 @@ mod rdsh_config_tests {
             assert_eq!(c.context.goal, "旧ファイルのgoal");
             assert_eq!(c.context.working_files, vec!["src/tokens.rs".to_string()]);
             assert_eq!(c.context.open_tasks, vec!["packing評価".to_string()]);
+            // 旧ファイルの opt-out を無言で無視しない（既定 true のときだけ補完する）。
+            assert!(!c.context.include_git_diff);
             assert!(!std::path::Path::new(&settings_path()).exists());
 
             std::fs::write(
