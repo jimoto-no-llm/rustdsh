@@ -50,9 +50,9 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Changed
 
-- `rdsh-dashboard subagents plan` moved to `rdsh subagents plan`: the planner
+- `rdsh-dashboard subagents plan` forwards to `rdsh subagents plan`: the planner
   is now the Rust implementation in `src/subagent_plan.rs`, the JavaScript
-  module and its tests are removed so there is a single source of truth, and the
+  planning module is removed so there is a single source of truth, and the
   request, plan and warning contract is unchanged
   (`docs/SUBAGENT-PLANNING.md`).
 

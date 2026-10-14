@@ -57,6 +57,10 @@ that cannot produce a plan exits 1 with the error code on stderr, for example
 `Subagent plan: duplicate-item:pr-460`. The input must be a regular JSON file
 of at most 256 KiB.
 
+Existing `rdsh-dashboard subagents plan --input-file subagents.json` calls
+forward to the same Rust command. The dashboard CLI finds `rdsh` on `PATH`, or
+uses an absolute executable path from `RDSH_BIN`.
+
 ## Plan
 
 The output groups items by tier so one agent always runs one model, packs each

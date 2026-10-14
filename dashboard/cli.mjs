@@ -70,6 +70,7 @@ rdsh-dashboard integration init --project <directory> --input-file <checks-json>
 rdsh-dashboard integration enqueue|reject --project <directory> --input-file <json> --expected-revision <n>
 rdsh-dashboard integration inspect --project <directory>
 rdsh-dashboard integration apply|validate|retarget --project <directory> --expected-revision <n> --expected-head <sha>
+rdsh-dashboard subagents plan --input-file <request-json>
 rdsh-dashboard workers plan --project <directory> --input-file <worker-json>
 rdsh-dashboard workers prepare --project <directory> --input-file <worker-json> --expected-revision <n> --expected-head <sha>
 rdsh-dashboard workers inspect --project <directory>
@@ -204,6 +205,37 @@ async function localJson(file) {
   } finally {
     await handle.close();
   }
+}
+async function nativeRdsh() {
+  const override = process.env.RDSH_BIN;
+  if (override) {
+    if (!path.isAbsolute(override)) throw new Error("RDSH_BIN must be an absolute path");
+    return override;
+  }
+  const name = process.platform === "win32" ? "rdsh.exe" : "rdsh";
+  for (const directory of (process.env.PATH || "").split(path.delimiter)) {
+    if (!path.isAbsolute(directory)) continue;
+    const candidate = path.join(directory, name);
+    try {
+      if ((await fs.stat(candidate)).isFile()) return candidate;
+    } catch {
+      // Keep looking through PATH.
+    }
+  }
+  throw new Error("rdsh is not installed on PATH (or set RDSH_BIN)");
+}
+
+async function runNativeSubagentPlan(inputFile) {
+  const executable = await nativeRdsh();
+  const exitCode = await new Promise((resolve, reject) => {
+    const child = spawn(executable, ["subagents", "plan", "--input-file", inputFile], {
+      stdio: "inherit",
+      windowsHide: true,
+    });
+    child.once("error", reject);
+    child.once("close", (code) => resolve(code ?? 1));
+  });
+  process.exitCode = exitCode;
 }
 async function inPinnedCli(artifact, selectionRevision) {
   if (process.env.NODE_OPTIONS || process.env.NODE_PATH)
@@ -582,6 +614,15 @@ try {
       (action === "validate" && !result.validation.verified)
     )
       process.exitCode = 1;
+  } else if (command === "subagents") {
+    if (
+      positionals.length !== 2 ||
+      positionals[1] !== "plan" ||
+      !values["input-file"] ||
+      Object.keys(values).some((key) => key !== "input-file")
+    )
+      throw new Error("Invalid subagents action/options");
+    await runNativeSubagentPlan(values["input-file"]);
   } else if (command === "workers") {
     const action = positionals[1];
     const options = {
