@@ -18,6 +18,24 @@ use tokio::{
     net::TcpStream as AsyncTcpStream,
 };
 
+/// How long a `wait_*` helper polls for observable proxy state before giving up.
+///
+/// These waits only observe state a healthy proxy reaches in well under a
+/// second locally, so the deadline exists to fail a genuinely stuck proxy, not
+/// to bound normal work. A shared runner starting the child process and
+/// completing the first HTTP round-trip can exceed 5s under load, which
+/// surfaced in CI as `condition timed out`
+/// (tests/serial_proxy.rs:282 on the macOS job). The default is generous, and
+/// `RDSH_TEST_WAIT_SECS` overrides it.
+fn wait_deadline() -> Duration {
+    let secs = std::env::var("RDSH_TEST_WAIT_SECS")
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(30);
+    Duration::from_secs(secs)
+}
+
 #[derive(Clone, Debug)]
 struct SeenRequest {
     method: String,
@@ -340,7 +358,7 @@ impl Drop for ProxyProcess {
 }
 
 async fn wait_until(mut condition: impl FnMut() -> bool) {
-    tokio::time::timeout(Duration::from_secs(5), async {
+    tokio::time::timeout(wait_deadline(), async {
         loop {
             if condition() {
                 return;
@@ -353,7 +371,7 @@ async fn wait_until(mut condition: impl FnMut() -> bool) {
 }
 
 async fn wait_for_queued(client: &Client, proxy_url: &str, queued: usize) {
-    tokio::time::timeout(Duration::from_secs(5), async {
+    tokio::time::timeout(wait_deadline(), async {
         loop {
             if let Ok(response) = client
                 .get(format!("{proxy_url}/__proxy/status"))
@@ -376,7 +394,7 @@ async fn wait_for_queued(client: &Client, proxy_url: &str, queued: usize) {
 }
 
 async fn wait_for_active(client: &Client, proxy_url: &str, active: usize) {
-    tokio::time::timeout(Duration::from_secs(5), async {
+    tokio::time::timeout(wait_deadline(), async {
         loop {
             if let Ok(response) = client
                 .get(format!("{proxy_url}/__proxy/status"))
