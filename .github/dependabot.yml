@@ -23,3 +23,8 @@ updates:
       day: monday
     commit-message:
       prefix: chore(ci)
+    ignore:
+      # dtolnay/rust-toolchain's ref is the Rust version under test, not an
+      # action release: dependabot tried to raise the MSRV pin from 1.85.0 to a
+      # nonexistent 1.120.0 (#442). Keep that pin under manual review.
+      - dependency-name: "dtolnay/rust-toolchain"

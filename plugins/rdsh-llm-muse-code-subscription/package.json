@@ -1,0 +1,13 @@
+{
+  "name": "rdsh-llm-muse-code-subscription",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "description": "Opt-in Muse Code subscription compatibility adapter for DeepSeek Harness",
+  "license": "MIT",
+  "engines": { "node": ">=22" },
+  "scripts": { "test": "node --test test/*.test.mjs" },
+  "dependencies": { "@muse-code/sdk": "1.4.6" },
+  "peerDependencies": { "@deepseek-ai/dsh-llm": "0.2.1-alpha.1" }
+}

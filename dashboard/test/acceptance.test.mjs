@@ -528,3 +528,67 @@ test("dotenv-like worktree paths allow execution but keep verification scope unk
   assert.equal(relativeInput(".environment"), false);
 });
 
+const failLockCleanup = (t, lock) => {
+  const originalUnlink = fs.unlink;
+  t.mock.method(fs, "unlink", async (file, ...args) => {
+    if (path.resolve(String(file)) === path.resolve(lock)) {
+      const error = new Error("fixture lock cleanup failure");
+      error.code = "EACCES";
+      throw error;
+    }
+    return originalUnlink(file, ...args);
+  });
+};
+
+test("a committed acceptance reservation survives a lock cleanup failure without reporting the write as lost", async (t) => {
+  const f = await setup(t);
+  await f.store.define("task-qa", f.definition);
+  const lock = path.join(f.store.directory, "index.lock"),
+    criterion = await f.store.criterion("task-qa", "correct-result"),
+    before = await f.store.read();
+  failLockCleanup(t, lock);
+  let failure;
+  await assert.rejects(
+    f.store.reserve("task-qa", criterion, "full"),
+    (error) => {
+      failure = error;
+      return error.code === "acceptance_lock_cleanup_unconfirmed";
+    },
+  );
+  assert.equal(failure.committed, true);
+  assert.equal(failure.lock_cleanup_unconfirmed, true);
+  const after = await f.store.read();
+  assert.equal(after.revision, before.revision + 1);
+  assert.equal(after.evidence.length, 1);
+  assert.deepEqual(failure.event_ids, [after.evidence[0].evidence_id]);
+  await assert.rejects(
+    f.store.define("task-qa", f.definition),
+    error("acceptance_busy"),
+  );
+});
+
+test("an acceptance mutation failure keeps its own code when the lock cleanup also fails", async (t) => {
+  const f = await setup(t);
+  await f.store.define("task-qa", f.definition);
+  const lock = path.join(f.store.directory, "index.lock"),
+    criterion = await f.store.criterion("task-qa", "correct-result"),
+    committed = await fs.readFile(f.store.index);
+  failLockCleanup(t, lock);
+  let failure;
+  await assert.rejects(
+    f.store.reserve(
+      "task-qa",
+      { ...criterion, description: "Changed requirement" },
+      "full",
+    ),
+    (error) => {
+      failure = error;
+      return error.code === "acceptance_definition_changed";
+    },
+  );
+  assert.equal(failure.committed, false);
+  assert.equal(failure.lock_cleanup_unconfirmed, true);
+  assert.deepEqual(failure.event_ids, []);
+  assert.deepEqual(await fs.readFile(f.store.index), committed);
+  assert.equal((await f.store.read()).evidence.length, 0);
+});

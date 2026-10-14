@@ -6,14 +6,16 @@ import path from "node:path";
 import net from "node:net";
 import { once } from "node:events";
 import { spawn } from "node:child_process";
-import { ObservedCliStore } from "../observed-cli.mjs";
+import { ObservedCliStore, observeExternalProcess } from "../observed-cli.mjs";
 import { identity } from "../state.mjs";
 import { startDashboard } from "../server.mjs";
 import { readLocalRuntime } from "../private-runtime.mjs";
 import { observedCliStatus } from "../observed-cli.mjs";
 
 const originalIdentity = {
-  platform: process.platform === "win32" ? "win32" : "linux",
+  platform: ["win32", "linux", "darwin"].includes(process.platform)
+    ? process.platform
+    : "linux",
   pid: 42424,
   birth: "123456",
   scope: "a".repeat(64),
@@ -55,6 +57,31 @@ test("observed CLI status rejects PID reuse, owner changes, and uncertain identi
     "unknown",
   );
 });
+
+test(
+  "Darwin observes an external fixture with a rechecked owner without signalling it",
+  { skip: process.platform !== "darwin" },
+  async (t) => {
+    const child = spawn(
+      process.execPath,
+      ["-e", "setInterval(() => {}, 1000)"],
+      { stdio: "ignore", windowsHide: true, shell: false },
+    );
+    t.after(async () => {
+      if (child.exitCode === null && child.signalCode === null) {
+        const ended = once(child, "exit");
+        child.kill();
+        await ended;
+      }
+    });
+    await once(child, "spawn");
+    const observed = await observeExternalProcess(child.pid);
+    assert.equal(observed.status, "observed");
+    assert.equal(observed.identity.platform, "darwin");
+    assert.match(observed.owner_fingerprint, /^[a-f0-9]{64}$/);
+    assert.equal(child.exitCode, null);
+  },
+);
 
 test("project-wide registrations persist without task metadata or exposing identity fingerprints", async (t) => {
   const directory = await fs.mkdtemp(

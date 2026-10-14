@@ -14,9 +14,17 @@ const label = (value, max = 256) =>
   value.length <= max &&
   /^[A-Za-z0-9][A-Za-z0-9._/:+-]*$/.test(value);
 export class RoutingError extends Error {
-  constructor(code) {
+  // `committed` is true only when the routing file was replaced durably;
+  // `event_ids` names the routing events that replacement added. Both are
+  // attached only when a lock cleanup failure would otherwise hide them.
+  constructor(code, details = null) {
     super("Model routing: " + code);
     this.code = code;
+    if (details !== null) {
+      this.committed = details.committed;
+      this.event_ids = [...details.event_ids];
+      this.lock_cleanup_unconfirmed = details.lock_cleanup_unconfirmed;
+    }
   }
 }
 export function routeCheck(value, code) {
