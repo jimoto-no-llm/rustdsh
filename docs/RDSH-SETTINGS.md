@@ -100,3 +100,50 @@ rdsh context build --query "認証" --json
 
 優先度は goal > constraints > related_files > git_diff > decisions >
 open_tasks > retrieved の順で、予算超過時は retrieved から削ります。
+
+## context の自動注入（inject）
+
+`rdsh context inject` は DSH の `UserPromptSubmit` フックとして毎ターンの文脈を注入します。
+組み立てに失敗してもプロンプトを止めない fail-open です。
+
+```sh
+rdsh context hook install          # $DSH_HOME/hooks.json に追記（冪等、バックアップ自動作成）
+rdsh context hook status --json
+rdsh context hook remove           # 追加した1件だけを消す
+```
+
+| 設定キー | 既定 | 範囲 | 意味 |
+| --- | --- | --- | --- |
+| `context.inject_budget` | 1200 | 200-8000 | 1回の注入に使うトークン予算 |
+| `context.inject_deadline_ms` | 1200 | 100-10000 | 組み立ての期限。超えたら検索と依存閉包を省略 |
+| `context.inject_sessions` | true | | 直近セッションの継承を含める |
+| `context.inject_session_count` | 2 | 0-10 | 継承するセッション数 |
+
+`rdsh context build --sessions N` と `--require-stable` は1回だけ既定を上書きします。
+`--require-stable` は、リポジトリが変化した場合に加えて、git 状態を読めない場合も exit 3 で終了します
+（安定性を証明できないときに成功とは言わないため）。
+
+## 記憶（memory）
+
+```sh
+rdsh context remember "APIの互換性を必ず保つ" --kind constraint
+rdsh context memory --json
+rdsh context distill --session <transcript> --json     # 既定は dry-run
+rdsh context distill --session <transcript> --apply
+rdsh context forget <id>
+```
+
+保存先は `$DSH_HOME/rdsh-context-memory.json`（schema 1）。撤回と重複は決定的な規則で
+`superseded_by` を付け、context には active な項目だけが `[mem]` 付きで入ります。
+
+## 依存グラフ（deps）
+
+`dep_graph` は既定 ON です（読み取り専用の解析コマンドのため）。
+
+```sh
+rdsh deps build --json
+rdsh deps query engine_score --json
+rdsh deps impact src/core.rs --depth 3 --json
+```
+
+索引は `$DSH_HOME/rdsh-index/<root-key>.json`。size+mtime が同じファイルは再解析しません。

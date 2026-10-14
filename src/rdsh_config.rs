@@ -116,6 +116,11 @@ pub const FEATURES: &[FeatureDef] = &[
         summary: "experimental per-turn context engine (rdsh context)",
     },
     FeatureDef {
+        id: "dep_graph",
+        default: true,
+        summary: "static code-dependency graph and change impact (rdsh deps)",
+    },
+    FeatureDef {
         id: "compute",
         default: false,
         summary: "allow the resident compute bridge (RDSH_COMPUTE=1)",
@@ -378,6 +383,13 @@ pub struct ContextSection {
     pub max_code_hits: usize,
     pub max_sessions: usize,
     pub include_git_diff: bool,
+    /// Token budget for the context injection hook payload (not a turn budget).
+    pub inject_budget: usize,
+    /// Wall-clock deadline for one injection; retrieval is skipped past it.
+    pub inject_deadline_ms: usize,
+    /// Carry the newest matching sessions into an injection.
+    pub inject_sessions: bool,
+    pub inject_session_count: usize,
 }
 
 impl Default for GeneralSection {
@@ -459,6 +471,10 @@ impl Default for ContextSection {
             max_code_hits: 20,
             max_sessions: 0,
             include_git_diff: true,
+            inject_budget: 1200,
+            inject_deadline_ms: 1200,
+            inject_sessions: true,
+            inject_session_count: 2,
         }
     }
 }
@@ -518,14 +534,41 @@ pub fn try_load() -> anyhow::Result<RdshSettings> {
     try_load_at(&path)
 }
 
-fn try_load_at(path: &str) -> anyhow::Result<RdshSettings> {
-    let raw: Option<String> = match std::fs::read_to_string(path) {
-        Ok(raw) => Some(raw),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
-        Err(e) => {
-            return Err(anyhow::anyhow!("cannot read settings file at {path}: {e}"));
-        }
+/// Settings documents are small. The cap and the regular-file check keep a FIFO
+/// or a runaway file from stalling a reader — `context inject` loads settings on
+/// the hook path, where a blocked read would hold up a prompt.
+const SETTINGS_MAX_BYTES: u64 = 4 * 1024 * 1024;
+
+/// Read a settings document under the size cap, or `None` when it is absent.
+pub(crate) fn read_small_config(path: &str) -> anyhow::Result<Option<String>> {
+    use std::io::Read;
+    // `metadata` follows symlinks on purpose: a symlinked settings file is a
+    // normal dotfiles setup, a FIFO or a device is not a settings file.
+    let meta = match std::fs::metadata(path) {
+        Ok(meta) => meta,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(anyhow::anyhow!("cannot read settings file at {path}: {e}")),
     };
+    if !meta.is_file() {
+        anyhow::bail!("settings file at {path} is not a regular file");
+    }
+    if meta.len() > SETTINGS_MAX_BYTES {
+        anyhow::bail!(
+            "settings file at {path} is {} bytes (limit {SETTINGS_MAX_BYTES})",
+            meta.len()
+        );
+    }
+    let file = std::fs::File::open(path)
+        .map_err(|e| anyhow::anyhow!("cannot read settings file at {path}: {e}"))?;
+    let mut raw = String::new();
+    file.take(SETTINGS_MAX_BYTES)
+        .read_to_string(&mut raw)
+        .map_err(|e| anyhow::anyhow!("cannot read settings file at {path}: {e}"))?;
+    Ok(Some(raw))
+}
+
+fn try_load_at(path: &str) -> anyhow::Result<RdshSettings> {
+    let raw: Option<String> = read_small_config(path)?;
     // Missing file: defaults + legacy complement without a failed JSON parse.
     // Same result as before (Null branch), one error allocation saved.
     let Some(raw) = raw else {
@@ -692,6 +735,12 @@ impl RdshSettings {
                 max_code_hits: clamp_u64(num(&cx, "max_code_hits"), 20, 1, 100) as usize,
                 max_sessions: clamp_u64(num(&cx, "max_sessions"), 0, 0, 100) as usize,
                 include_git_diff: flag(&cx, "include_git_diff", true),
+                inject_budget: clamp_u64(num(&cx, "inject_budget"), 1200, 200, 8000) as usize,
+                inject_deadline_ms: clamp_u64(num(&cx, "inject_deadline_ms"), 1200, 100, 10_000)
+                    as usize,
+                inject_sessions: flag(&cx, "inject_sessions", true),
+                inject_session_count: clamp_u64(num(&cx, "inject_session_count"), 2, 0, 10)
+                    as usize,
             },
             extras: ExtrasSection {
                 enable: list(&sec("extras"), "enable", TEXT_CHARS)
@@ -787,6 +836,12 @@ impl RdshSettings {
         out.context.max_code_hits = clamp_u64(num(&cx, "max_code_hits"), 20, 1, 100) as usize;
         out.context.max_sessions = clamp_u64(num(&cx, "max_sessions"), 0, 0, 100) as usize;
         out.context.include_git_diff = flag(&cx, "include_git_diff", true);
+        out.context.inject_budget = clamp_u64(num(&cx, "inject_budget"), 1200, 200, 8000) as usize;
+        out.context.inject_deadline_ms =
+            clamp_u64(num(&cx, "inject_deadline_ms"), 1200, 100, 10_000) as usize;
+        out.context.inject_sessions = flag(&cx, "inject_sessions", true);
+        out.context.inject_session_count =
+            clamp_u64(num(&cx, "inject_session_count"), 2, 0, 10) as usize;
         out
     }
 
@@ -842,6 +897,10 @@ impl RdshSettings {
                 "max_code_hits": self.context.max_code_hits,
                 "max_sessions": self.context.max_sessions,
                 "include_git_diff": self.context.include_git_diff,
+                "inject_budget": self.context.inject_budget,
+                "inject_deadline_ms": self.context.inject_deadline_ms,
+                "inject_sessions": self.context.inject_sessions,
+                "inject_session_count": self.context.inject_session_count,
             },
         })
     }
@@ -933,6 +992,16 @@ impl RdshSettings {
             "context.max_code_hits" => self.context.max_code_hits = parse_usize(raw, 20)? as usize,
             "context.max_sessions" => self.context.max_sessions = parse_usize(raw, 0)? as usize,
             "context.include_git_diff" => self.context.include_git_diff = parse_bool(raw)?,
+            "context.inject_budget" => {
+                self.context.inject_budget = parse_usize(raw, 1200)? as usize
+            }
+            "context.inject_deadline_ms" => {
+                self.context.inject_deadline_ms = parse_usize(raw, 1200)? as usize
+            }
+            "context.inject_sessions" => self.context.inject_sessions = parse_bool(raw)?,
+            "context.inject_session_count" => {
+                self.context.inject_session_count = parse_usize(raw, 2)? as usize
+            }
             k if k.starts_with("features.") => {
                 let id = &k["features.".len()..];
                 if feature_def(id).is_none() {
@@ -1075,6 +1144,10 @@ impl RdshSettings {
             "context.max_code_hits(1-100)",
             "context.max_sessions(0-100)",
             "context.include_git_diff(bool)",
+            "context.inject_budget(200-8000)",
+            "context.inject_deadline_ms(100-10000)",
+            "context.inject_sessions(bool)",
+            "context.inject_session_count(0-10)",
         ]
     }
 
@@ -1121,7 +1194,10 @@ fn complement_from_legacy(cfg: &mut RdshSettings, has_context: bool) {
     if has_context {
         return;
     }
-    let raw = std::fs::read_to_string(legacy_context_path()).unwrap_or_default();
+    let raw = read_small_config(&legacy_context_path())
+        .ok()
+        .flatten()
+        .unwrap_or_default();
     if raw.trim().is_empty() {
         return;
     }
@@ -1172,6 +1248,26 @@ fn complement_from_legacy(cfg: &mut RdshSettings, has_context: bool) {
     if c.max_sessions == ContextSection::default().max_sessions {
         if let Some(n) = num(&v, "max_sessions") {
             c.max_sessions = n.clamp(0, 100) as usize;
+        }
+    }
+    if c.inject_budget == ContextSection::default().inject_budget {
+        if let Some(n) = num(&v, "inject_budget") {
+            c.inject_budget = n.clamp(200, 8000) as usize;
+        }
+    }
+    if c.inject_deadline_ms == ContextSection::default().inject_deadline_ms {
+        if let Some(n) = num(&v, "inject_deadline_ms") {
+            c.inject_deadline_ms = n.clamp(100, 10_000) as usize;
+        }
+    }
+    if c.inject_sessions == ContextSection::default().inject_sessions {
+        if let Some(b) = v.get("inject_sessions").and_then(|x| x.as_bool()) {
+            c.inject_sessions = b;
+        }
+    }
+    if c.inject_session_count == ContextSection::default().inject_session_count {
+        if let Some(n) = num(&v, "inject_session_count") {
+            c.inject_session_count = n.clamp(0, 10) as usize;
         }
     }
 }

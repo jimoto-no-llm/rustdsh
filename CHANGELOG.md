@@ -58,6 +58,33 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   response bodies, and supports `--tool-choice-default <none|auto|required>`
   for Sarashina-compatible requests. See `docs/SERIAL-PROXY.md`.
 
+- `rdsh context inject` runs as a DSH `UserPromptSubmit` hook and attaches the
+  turn context (goal, constraints, decisions, working set, git state, retrieved
+  code, memory) through `hookSpecificOutput.additionalContext`. It is fail-open
+  and always exits 0: an unreadable settings document or an unparseable payload
+  inject nothing, while a damaged index or a deadline overrun drops only what
+  depends on them and still injects goal, constraints, and memory.
+- `rdsh context hook install|status|remove` merges that hook into a DSH
+  `hooks.json` idempotently, keeps unrelated hooks untouched, and keeps a backup
+  beside the first file it rewrites.
+- The context memory store (`$DSH_HOME/rdsh-context-memory.json`, 0600, atomic
+  write): `rdsh context remember|memory|distill|forget`. `distill` reads user
+  turns from session logs (including `.jsonl.zstd` through the `zstd` CLI) and
+  supersedes overlapping or retracted entries by deterministic rule, keeping the
+  superseded record instead of overwriting it.
+- `rdsh context build --sessions N` carries past sessions into one build, and
+  `--require-stable` exits 3 unless the snapshot is provably stable: a git state
+  or read file that changed during assembly counts, and so does a git state it
+  cannot read.
+- `rdsh deps build|query|impact`: a static dependency graph for Rust,
+  JavaScript/TypeScript, Python and Go with a persistent incremental index
+  (`$DSH_HOME/rdsh-index`, reused on unchanged size+mtime), symbol lookup, and
+  direct/transitive dependents plus affected tests.
+- `rdsh compact` now preserves high-value lines from the dropped middle
+  (constraints, decisions, errors, diffs, commands) under a bounded reserve and
+  reports a per-category digest, instead of keeping only the head and the newest
+  turns.
+
 ### Fixed
 
 - `sync-dsh.sh` discovers the `@deepseek-ai/dsh` tree by candidate instead of
@@ -79,6 +106,19 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   planning module is removed so there is a single source of truth, and the
   request, plan and warning contract is unchanged
   (`docs/SUBAGENT-PLANNING.md`).
+- Context retrieval expands its search hits with dependency-graph neighbours when
+  the index exists, so an excerpt arrives with the files it depends on; without
+  an index it degrades to the previous behaviour, and `features.dep_graph=false`
+  keeps the index out of the context path entirely.
+- Plain `rdsh context build` output starts with one `[snapshot: ...]` line (JSON
+  already carried the object), so an assembled context is never mistaken for one
+  that was verified later.
+- `rdsh context status --json` also reports memory counts, the dependency-index
+  summary, and the injection budget/deadline; `rdsh context build --json` adds a
+  `snapshot` object describing whether the repository stayed stable.
+- `rdsh compact` emits an identical line once. Repeats are counted in the
+  dropped-line digest instead of being printed again, so a repeated command or
+  error no longer consumes budget twice.
 
 ## [0.3.3] - 2026-10-13
 

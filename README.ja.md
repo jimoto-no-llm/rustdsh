@@ -34,6 +34,8 @@
   - [選択した認証情報だけを共有する](#選択した認証情報だけを共有するrdsh-auth)
   - [エージェント実行の安全な隔離](#エージェント実行の安全な隔離)
   - [フック監視](#フック監視-rdsh-guard)
+  - [コンテキスト注入](#コンテキスト注入rdsh-context)
+  - [依存グラフと変更影響](#依存グラフと変更影響rdsh-deps)
 - [Web UI とダッシュボード](#web-ui-とダッシュボード)
 - [Smart-DSH との併用](#smart-dsh-との併用)
 - [実測ベンチマーク](#実測ベンチマーク)
@@ -298,6 +300,55 @@ path判定後にファイルシステムが変わる競合もあり、このhook
 }
 ```
 
+### コンテキスト注入（`rdsh context`）
+
+`rdsh context inject` は、そのターンの文脈（goal・constraints・decisions・作業対象ファイル・
+Git 状態・検索結果・管理された記憶）を組み立て、DSH の `UserPromptSubmit` フック契約で
+出力します。コピペなしでモデルに届きます。
+
+```sh
+rdsh features on context_engine        # コンテキストエンジンはオプトイン
+rdsh context hook install              # $DSH_HOME/hooks.json に追記（冪等）
+rdsh context hook status --json
+```
+
+フックは fail-open で、プロンプトを止めず常に exit 0 です。無出力になるのは設定ファイルが読めない場合と
+stdin を解釈できない場合だけで、壊れた索引や期限超過では依存グラフやコード検索だけを落として
+goal・constraints・記憶は出し続けます。注入には専用の予算（`context.inject_budget`、既定1200トークン）と
+期限（`context.inject_deadline_ms`、既定1200ms）があり、期限を過ぎたらコード検索を省略して
+記憶・goal・constraints だけを出します。
+
+記憶は会話ログの丸写しではなく、管理された項目です。
+
+```sh
+rdsh context remember "APIの互換性を必ず保つ" --kind constraint
+rdsh context distill --session ~/.dsh/sessions/<project>/<session>/session.v4.jsonl.zstd --apply
+rdsh context memory --json      # active と superseded を区別して表示
+rdsh context forget mem_ab12cd34ef56
+```
+
+`distill` はユーザー発話だけを読み（zstd 圧縮セッションにも対応）、決定・制約・撤回を
+決定的なマーカーで抽出します。重なる古い項目は推測ではなく `superseded_by` で無効化されます。
+`rdsh context build --require-stable` は、スナップショットが安定していると証明できないとき
+（組み立て中にファイルや git 状態が変わった、または git 状態を読めない）に exit 3 で終了し、
+古い・不明なスナップショットを新しいものと誤認させません。
+
+### 依存グラフと変更影響（`rdsh deps`）
+
+```sh
+rdsh deps build                    # $DSH_HOME/rdsh-index に増分索引を作る
+rdsh deps query engine_score       # シンボルの定義元と参照元
+rdsh deps impact src/context.rs    # 直接・推移的な依存元と影響するテスト
+```
+
+抽出は Rust・JavaScript/TypeScript・Python・Go に対応し、ファイルごとに import・定義・
+静的な呼び出し箇所を記録します。size と mtime が同じファイルは再解析しないため、
+繰り返し実行しても速いままです。これは静的近似です。動的 dispatch・間接呼び出し・マクロ・
+生成コードは `unknown` として明示し、未解決件数として報告します（推測で埋めません）。
+索引が無い場合は「情報が無い」であり「依存が無い」ではありません。
+
+索引があるときは `rdsh context build` と `rdsh context inject` も、検索で当たったファイルの
+依存近傍を取り込みます。抜粋が、実際に依存しているファイルと一緒に届きます。
 Rust ネイティブ処理のため、呼び出しごとのオーバーヘッドは約1msと非常に軽量です。
 
 <a id="web-ui"></a>

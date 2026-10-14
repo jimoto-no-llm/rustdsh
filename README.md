@@ -34,6 +34,8 @@ It ports frequently used CLI operations (token calculation, code search, session
   - [Credential sharing with rdsh auth](#credential-sharing-with-rdsh-auth)
   - [Agent Tool Isolation](#agent-tool-isolation)
   - [Hook Guard](#hook-guard-rdsh-guard)
+  - [Context Injection](#context-injection-rdsh-context)
+  - [Dependency Graph and Change Impact](#dependency-graph-and-change-impact-rdsh-deps)
 - [Web UI & Dashboard](#web-ui--dashboard)
 - [Using with Smart-DSH](#using-with-smart-dsh)
 - [Benchmarks](#benchmarks)
@@ -304,6 +306,62 @@ enforcement.
 }
 ```
 
+### Context Injection (`rdsh context`)
+
+`rdsh context inject` assembles this turn's context — goal, constraints,
+decisions, working set, git state, retrieved code, and curated memory — and
+emits it in the DSH `UserPromptSubmit` hook contract, so the model sees it
+without any copy-paste:
+
+```sh
+rdsh features on context_engine        # the engine is opt-in
+rdsh context hook install              # merges $DSH_HOME/hooks.json (idempotent)
+rdsh context hook status --json
+```
+
+The hook is fail-open: it never blocks a prompt and always exits 0. Only an
+unreadable settings document or an unparseable payload inject nothing at all; a
+corrupt index or a missed deadline drops just what depends on them — the graph
+or the code search — and still injects goal, constraints, and memory. Injection
+has its own
+budget (`context.inject_budget`, default 1200 tokens) and deadline
+(`context.inject_deadline_ms`, default 1200 ms); once the deadline passes the
+code search is skipped and only memory, goal, and constraints go out.
+
+Memory holds curated items, not a transcript dump:
+
+```sh
+rdsh context remember "Keep the API compatible" --kind constraint
+rdsh context distill --session ~/.dsh/sessions/<project>/<session>/session.v4.jsonl.zstd --apply
+rdsh context memory --json      # active and superseded entries
+rdsh context forget mem_ab12cd34ef56
+```
+
+`distill` reads user turns only (zstd session logs included) and extracts
+decisions, constraints, and retractions with deterministic markers, superseding
+an older overlapping entry instead of guessing. `rdsh context build
+--require-stable` exits 3 unless the snapshot is provably stable: a file or git
+state that changed during assembly counts, and so does a git state it cannot
+read, so a stale or unknown snapshot is never reported as fresh.
+
+### Dependency Graph and Change Impact (`rdsh deps`)
+
+```sh
+rdsh deps build                    # incremental index under $DSH_HOME/rdsh-index
+rdsh deps query engine_score       # where a symbol is defined and referenced
+rdsh deps impact src/context.rs    # direct/transitive dependents + affected tests
+```
+
+The extractor covers Rust, JavaScript/TypeScript, Python, and Go and records
+imports, definitions, and static call sites per file. Unchanged files (same size
+and mtime) are reused, so repeated runs stay fast. It is a static approximation:
+dynamic dispatch, indirect calls, macros, and generated code remain explicitly
+`unknown` and are reported as unresolved counts rather than guessed, and a
+missing index means "no information", never "no dependencies".
+
+When the index exists, `rdsh context build` and `rdsh context inject` also pull
+in the graph neighbours of the files their search matched, so a retrieved
+excerpt arrives with the files it actually depends on.
 Native execution overhead is ~1 ms per invocation.
 
 ## Web UI & Dashboard

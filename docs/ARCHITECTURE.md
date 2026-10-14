@@ -49,7 +49,9 @@ operation that replaces the document with defaults.
 | `ui.html` | Native status dashboard UI |
 | `rdsh_config.rs` | Unified settings, defaults, validation, legacy fallback |
 | `local_http.rs` | Local HTTP framing, trust checks, and per-launch token |
-| `context.rs` | Experimental context engine, disabled by default |
+| `deps.rs` | Static code-dependency graph, persistent index, change impact |
+| `context_hook.rs` | Hook-config wiring for `rdsh context inject` (idempotent) |
+| `context.rs` | Context engine: assembly, memory store, injection, freshness snapshot |
 
 ## Optional Node dashboard (`dashboard/`)
 
