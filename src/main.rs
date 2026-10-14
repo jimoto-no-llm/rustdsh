@@ -12,6 +12,7 @@ mod inspect;
 mod local_http;
 mod opencode_header;
 mod passthrough;
+mod providers;
 mod rdsh_config;
 mod search;
 mod serve;
@@ -28,7 +29,7 @@ mod websearch;
     name = "rdsh",
     version,
     about = "Rust fast launcher for dsh (safe: native fast-paths + passthrough)",
-    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|auth|setup|context|settings|features|dump-config|boot)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh desktop status             detect the Desktop (Electron) app and its reserved profile\n  rdsh desktop install            attach the bundled rdsh plugins to that profile\n  rdsh --passthrough tui          no slim env; mandatory tool isolation remains\n  rdsh --dry-run tui -- --resume abc   show what would exec"
+    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|auth|setup|context|settings|features|provider|dump-config|boot)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh provider add hai --model deepseek-v4-flash   register HAI as a dsh route\n  rdsh provider add sarashina    register Sarashina (SARASHINA_API_KEY; mini and nano built in)\n  rdsh provider add local-openai --base-url http://host:8080/v1 --discover --no-key\n  rdsh provider list              presets and per-profile route/key status\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh desktop status             detect the Desktop (Electron) app and its reserved profile\n  rdsh desktop install            attach the bundled rdsh plugins to that profile\n  rdsh --passthrough tui          no slim env; mandatory tool isolation remains\n  rdsh --dry-run tui -- --resume abc   show what would exec"
 )]
 struct Cli {
     /// Explicitly share a project file with isolated model tools (repeatable).
@@ -51,6 +52,50 @@ struct Cli {
     command: Option<Commands>,
     #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
     extra: Vec<String>,
+}
+
+#[derive(Subcommand, Debug)]
+enum ProviderAction {
+    /// Built-in presets and, per profile, whether each route and its key exist
+    List {
+        #[arg(long = "json")]
+        json: bool,
+    },
+    /// Add a route to a profile's cordis.patch.yml (llm-pi-ai providers)
+    Add {
+        /// Preset: hai, sarashina or local-openai
+        preset: String,
+        #[arg(long = "profile")]
+        profile: Option<String>,
+        /// Model id to declare (repeatable)
+        #[arg(long = "model")]
+        model: Vec<String>,
+        /// Take baseURL and models from opencode's provider.<id> entry
+        #[arg(long = "from-opencode")]
+        from_opencode: bool,
+        /// Read the model ids from GET {baseURL}/models
+        #[arg(long = "discover")]
+        discover: bool,
+        #[arg(long = "base-url")]
+        base_url: Option<String>,
+        /// Route id (local-openai only; default local-openai)
+        #[arg(long = "id")]
+        id: Option<String>,
+        /// Display name (local-openai only)
+        #[arg(long = "name")]
+        name: Option<String>,
+        /// Read the API key from one stdin line and store it as a ref
+        #[arg(long = "key-stdin")]
+        key_stdin: bool,
+        /// Server needs no key: store a placeholder (local-openai only)
+        #[arg(long = "no-key")]
+        no_key: bool,
+        /// Rewrite the route block when it already exists
+        #[arg(long = "replace")]
+        replace: bool,
+        #[arg(long = "json")]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -157,6 +202,12 @@ enum Commands {
         key_ref: Option<String>,
         #[arg(long = "json")]
         json: bool,
+    },
+    /// Register an OpenAI-compatible endpoint (HAI, a home LLM server) as a
+    /// dsh route in a profile: `provider list`, `provider add hai|sarashina|local-openai`
+    Provider {
+        #[command(subcommand)]
+        action: ProviderAction,
     },
     /// First-run connect: import what exists, persist env keys, optionally
     /// run the provider login flow or reveal settings dirs, else show next step
@@ -358,6 +409,7 @@ const NATIVE_FIRST: &[&str] = &[
     "compute",
     "desktop",
     "auth",
+    "provider",
     "setup",
     "search-web",
     "context",
@@ -698,6 +750,42 @@ fn main() {
             source,
             key_ref,
         }) => auth::cmd_auth(import, json, provider, source, key_ref),
+        Some(Commands::Provider { action }) => match action {
+            ProviderAction::List { json } => providers::cmd_list(json),
+            ProviderAction::Add {
+                preset,
+                profile,
+                model,
+                from_opencode,
+                discover,
+                base_url,
+                id,
+                name,
+                key_stdin,
+                no_key,
+                replace,
+                json,
+            } => providers::cmd_add(
+                providers::AddArgs {
+                    preset,
+                    profile: profile.or(cli.profile),
+                    models: model,
+                    from_opencode,
+                    discover,
+                    base_url,
+                    id,
+                    name,
+                    key_stdin,
+                    no_key,
+                    replace,
+                    // The global flag only: general.dry_run in settings is
+                    // about delegated launches, not about file edits.
+                    dry_run: cli.dry_run,
+                    json,
+                },
+                &cfg.general.default_profile,
+            ),
+        },
         Some(Commands::Setup {
             open,
             login,
