@@ -103,3 +103,7 @@ raw errors, private roots, command lines and environment values.
 [Technical evidence](evidence/connection-diagnostics.md) covers the independent
 failure fixtures and restart/redaction checks. Real Dot and phone validation
 remain outstanding, so the PR references issue #43 without closing it.
+
+macOSで改善するのは、外部CLIの開始識別子・所有者と接続状態の読み取り専用確認です。
+管理対象の子孫プロセスをすべて終了したと証明する機能は含みません。
+残る管理境界の対応と受入条件は [Issue #485](https://github.com/jimoto-no-llm/rustdsh/issues/485) で追跡します。
