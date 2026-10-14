@@ -309,53 +309,222 @@ fn indent_of(line: &str) -> usize {
     line.len() - line.trim_start().len()
 }
 
-/// A scalar with any trailing YAML comment removed.
-fn strip_comment(value: &str) -> &str {
-    let bytes = value.as_bytes();
-    let mut quote = None;
-    for (index, byte) in bytes.iter().enumerate() {
-        match quote {
-            Some(open) => {
-                if *byte == open {
-                    quote = None;
-                }
-            }
-            None if *byte == b'\'' || *byte == b'"' => quote = Some(*byte),
-            None if *byte == b'#' && (index == 0 || matches!(bytes[index - 1], b' ' | b'\t')) => {
-                return value[..index].trim_end();
-            }
-            None => {}
-        }
-    }
-    value.trim_end()
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Kind {
+    Plain,
+    Single,
+    Double,
 }
 
-fn unquote(value: &str) -> String {
-    let v = value.trim();
-    if v.len() >= 2 && v.starts_with('\'') && v.ends_with('\'') {
-        return v[1..v.len() - 1].replace("''", "'");
-    }
-    if v.len() >= 2 && v.starts_with('"') && v.ends_with('"') {
-        return v[1..v.len() - 1].to_string();
-    }
-    v.to_string()
+/// A run of one line: plain text, or the inside of a quoted scalar.
+#[derive(Debug, Clone, Copy)]
+struct Piece<'a> {
+    kind: Kind,
+    text: &'a str,
 }
 
-/// For a line that opens with `key:` (plain or quoted), the value after the
-/// colon without a trailing comment; `Some("")` for a block or empty value.
-fn key_rest<'a>(line: &'a str, key: &str) -> Option<&'a str> {
-    let trimmed = line.trim_start();
-    for form in [key.to_string(), format!("\"{key}\""), format!("'{key}'")] {
-        if let Some(rest) = trimmed.strip_prefix(form.as_str()) {
-            // YAML allows blanks between the key and its colon.
-            if let Some(after) = rest.trim_start_matches([' ', '\t']).strip_prefix(':') {
-                if after.is_empty() || after.starts_with([' ', '\t', '\r']) {
-                    return Some(strip_comment(after.trim()));
-                }
-            }
+struct Scan<'a> {
+    pieces: Vec<Piece<'a>>,
+    /// Byte offset where a trailing comment starts (or the line length).
+    end: usize,
+    /// A quote opened on this line and never closed (a multi-line scalar).
+    open: bool,
+}
+
+/// Offset of the closing `"` of a double-quoted scalar that starts `s`.
+fn double_end(s: &str) -> Option<usize> {
+    let b = s.as_bytes();
+    let mut i = 1;
+    while i < b.len() {
+        match b[i] {
+            b'\\' => i += 2,
+            b'"' => return Some(i),
+            _ => i += 1,
         }
     }
     None
+}
+
+/// Offset of the closing `'` of a single-quoted scalar that starts `s`.
+fn single_end(s: &str) -> Option<usize> {
+    let b = s.as_bytes();
+    let mut i = 1;
+    while i < b.len() {
+        if b[i] == b'\'' {
+            if b.get(i + 1) == Some(&b'\'') {
+                i += 2;
+                continue;
+            }
+            return Some(i);
+        }
+        i += 1;
+    }
+    None
+}
+
+/// Split one line into plain and quoted runs. A quote only opens a scalar at
+/// the start of a token; `#` only starts a comment after a blank.
+fn scan_line(line: &str) -> Scan<'_> {
+    let b = line.as_bytes();
+    let mut pieces = Vec::new();
+    let (mut from, mut i) = (0, 0);
+    fn plain<'a>(pieces: &mut Vec<Piece<'a>>, line: &'a str, a: usize, z: usize) {
+        if a < z {
+            pieces.push(Piece {
+                kind: Kind::Plain,
+                text: &line[a..z],
+            });
+        }
+    }
+    while i < b.len() {
+        let token_start = i == 0 || matches!(b[i - 1], b' ' | b'\t' | b'[' | b'{' | b',');
+        match b[i] {
+            q @ (b'"' | b'\'') if token_start => {
+                let rest = &line[i..];
+                let close = if q == b'"' {
+                    double_end(rest)
+                } else {
+                    single_end(rest)
+                };
+                let Some(close) = close else {
+                    plain(&mut pieces, line, from, line.len());
+                    return Scan {
+                        pieces,
+                        end: line.len(),
+                        open: true,
+                    };
+                };
+                plain(&mut pieces, line, from, i);
+                pieces.push(Piece {
+                    kind: if q == b'"' {
+                        Kind::Double
+                    } else {
+                        Kind::Single
+                    },
+                    text: &line[i + 1..i + close],
+                });
+                i += close + 1;
+                from = i;
+            }
+            b'#' if i == 0 || matches!(b[i - 1], b' ' | b'\t') => {
+                plain(&mut pieces, line, from, i);
+                return Scan {
+                    pieces,
+                    end: i,
+                    open: false,
+                };
+            }
+            _ => i += 1,
+        }
+    }
+    plain(&mut pieces, line, from, line.len());
+    Scan {
+        pieces,
+        end: line.len(),
+        open: false,
+    }
+}
+
+/// A scalar with any trailing YAML comment removed.
+fn strip_comment(value: &str) -> &str {
+    value[..scan_line(value).end].trim_end()
+}
+
+/// Decode the inside of a single-line YAML 1.2 double-quoted scalar.
+fn decode_double(inner: &str) -> std::result::Result<String, String> {
+    let mut out = String::new();
+    let mut chars = inner.chars();
+    while let Some(c) = chars.next() {
+        if c != '\\' {
+            out.push(c);
+            continue;
+        }
+        let Some(e) = chars.next() else {
+            return Err("a double-quoted scalar continues on the next line".to_string());
+        };
+        let hex = |chars: &mut std::str::Chars<'_>, n: usize| -> Option<char> {
+            let digits: String = chars.by_ref().take(n).collect();
+            if digits.len() != n || !digits.chars().all(|d| d.is_ascii_hexdigit()) {
+                return None;
+            }
+            char::from_u32(u32::from_str_radix(&digits, 16).ok()?)
+        };
+        let decoded = match e {
+            '0' => Some('\0'),
+            'a' => Some('\u{7}'),
+            'b' => Some('\u{8}'),
+            't' | '\t' => Some('\t'),
+            'n' => Some('\n'),
+            'v' => Some('\u{b}'),
+            'f' => Some('\u{c}'),
+            'r' => Some('\r'),
+            'e' => Some('\u{1b}'),
+            ' ' => Some(' '),
+            '"' => Some('"'),
+            '/' => Some('/'),
+            '\\' => Some('\\'),
+            'N' => Some('\u{85}'),
+            '_' => Some('\u{a0}'),
+            'L' => Some('\u{2028}'),
+            'P' => Some('\u{2029}'),
+            'x' => hex(&mut chars, 2),
+            'u' => hex(&mut chars, 4),
+            'U' => hex(&mut chars, 8),
+            _ => None,
+        };
+        match decoded {
+            Some(d) => out.push(d),
+            None => {
+                return Err(format!(
+                    "an invalid escape `\\{e}` in a double-quoted scalar"
+                ))
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// A whole scalar value (comment already removed) read as YAML. `Err` when it
+/// is quoted but not exactly one readable quoted scalar.
+fn try_unquote(value: &str) -> std::result::Result<String, String> {
+    let v = value.trim();
+    if v.starts_with('"') {
+        return match double_end(v) {
+            Some(end) if end == v.len() - 1 => decode_double(&v[1..end]),
+            _ => Err("a double-quoted scalar is not closed cleanly".to_string()),
+        };
+    }
+    if v.starts_with('\'') {
+        return match single_end(v) {
+            Some(end) if end == v.len() - 1 => Ok(v[1..end].replace("''", "'")),
+            _ => Err("a single-quoted scalar is not closed cleanly".to_string()),
+        };
+    }
+    Ok(v.to_string())
+}
+
+/// `try_unquote`, falling back to the raw text (display only).
+fn unquote(value: &str) -> String {
+    try_unquote(value).unwrap_or_else(|_| value.trim().to_string())
+}
+
+/// For a line that opens with `key:` (plain or quoted, escapes decoded), the
+/// value after the colon without a trailing comment; `Some("")` for a block or
+/// empty value.
+fn key_rest<'a>(line: &'a str, key: &str) -> Option<&'a str> {
+    let trimmed = line.trim_start();
+    let rest = if trimmed.starts_with('"') {
+        let end = double_end(trimmed)?;
+        (decode_double(&trimmed[1..end]).ok()? == key).then_some(&trimmed[end + 1..])?
+    } else if trimmed.starts_with('\'') {
+        let end = single_end(trimmed)?;
+        (trimmed[1..end].replace("''", "'") == key).then_some(&trimmed[end + 1..])?
+    } else {
+        trimmed.strip_prefix(key)?
+    };
+    // YAML allows blanks between the key and its colon.
+    let after = rest.trim_start_matches([' ', '\t']).strip_prefix(':')?;
+    (after.is_empty() || after.starts_with([' ', '\t', '\r'])).then(|| strip_comment(after.trim()))
 }
 
 /// The first line after `start` that is indented no deeper than `start`.
@@ -406,13 +575,14 @@ fn scalar_key(line: &str, key: &str) -> std::result::Result<Option<String>, Stri
     };
     let unsafe_start =
         rest.is_empty() || rest.starts_with(['|', '>', '[', '{', '&', '*', '!', '?']);
-    let escaped = rest.starts_with('"') && rest.contains('\\');
-    if unsafe_start || escaped {
+    if unsafe_start {
         return Err(format!(
             "a top-level `{key}:` value is written in a form rdsh will not interpret"
         ));
     }
-    Ok(Some(unquote(rest)))
+    try_unquote(rest)
+        .map(Some)
+        .map_err(|why| format!("a top-level `{key}:` value cannot be read: {why}"))
 }
 
 /// The `- id: llm-pi-ai` patch entry (by `id`, or by the plugin `name`). Only
@@ -466,12 +636,106 @@ fn llm_pi_ai_entry(lines: &[String]) -> std::result::Result<Option<usize>, Strin
     Ok(found.first().copied())
 }
 
-/// Whether a line (comment removed) holds `llm-pi-ai` or the plugin name as a
-/// whole scalar token, at any depth and in any position.
-fn mentions_pi_ai(line: &str) -> bool {
-    let body = strip_comment(line);
-    body.split(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '_' | '@' | '/' | '.' | '-')))
+fn has_pi_ai_token(text: &str) -> bool {
+    text.split(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '_' | '@' | '/' | '.' | '-')))
         .any(|tok| tok == PI_AI_ID || tok == PI_AI_NAME)
+}
+
+/// Whether a line (comment removed) holds `llm-pi-ai` or the plugin name as a
+/// whole scalar token, at any depth and in any position, also inside quoted
+/// scalars (double-quoted ones with their escapes decoded).
+fn mentions_pi_ai(line: &str) -> bool {
+    scan_line(line).pieces.iter().any(|piece| match piece.kind {
+        Kind::Double => {
+            has_pi_ai_token(&decode_double(piece.text).unwrap_or_else(|_| piece.text.to_string()))
+        }
+        _ => has_pi_ai_token(piece.text),
+    })
+}
+
+/// Refuse constructs the line scanner cannot resolve: a quoted scalar that
+/// continues on another line, an invalid escape, anchors, aliases, tags and
+/// flow collections (any of which can carry or rename an `id`). Comments and
+/// block scalar bodies are not looked at.
+fn check_document(lines: &[String]) -> std::result::Result<(), String> {
+    let mut block: Option<usize> = None;
+    for line in lines {
+        if let Some(depth) = block {
+            if line.trim().is_empty() || indent_of(line) > depth {
+                continue;
+            }
+            block = None;
+        }
+        if skippable(line) {
+            continue;
+        }
+        let scan = scan_line(line);
+        if scan.open {
+            return Err("a quoted scalar continues on the next line".to_string());
+        }
+        let mut flat = String::new();
+        for piece in &scan.pieces {
+            match piece.kind {
+                Kind::Double => {
+                    decode_double(piece.text)?;
+                    flat.push('Q');
+                }
+                Kind::Single => flat.push('Q'),
+                Kind::Plain => flat.push_str(piece.text),
+            }
+        }
+        let chars: Vec<char> = flat.chars().collect();
+        let starts = |i: usize| i == 0 || matches!(chars[i - 1], ' ' | '\t' | '[' | '{' | ',');
+        for (i, c) in chars.iter().enumerate() {
+            let next = chars.get(i + 1).copied();
+            match c {
+                '&' | '*' | '!' if starts(i) && next.is_some_and(|n| !n.is_whitespace()) => {
+                    return Err("the file uses YAML anchors, aliases or tags".to_string());
+                }
+                '{' if starts(i) => {
+                    let inside: String = chars[i + 1..].iter().collect();
+                    if !inside.trim_start().starts_with('}') {
+                        return Err("the file uses a flow mapping".to_string());
+                    }
+                }
+                '[' if starts(i) => {
+                    let tail: Vec<char> = chars[i + 1..].to_vec();
+                    let carries = tail.iter().enumerate().any(|(j, t)| {
+                        matches!(t, '{' | '&' | '*' | '!')
+                            || (*t == ':'
+                                && tail
+                                    .get(j + 1)
+                                    .is_none_or(|n| n.is_whitespace() || *n == 'Q'))
+                    });
+                    if !tail.contains(&']') || carries {
+                        return Err("the file uses a flow sequence that may hold keys".to_string());
+                    }
+                }
+                _ => {}
+            }
+        }
+        // A block scalar's body is free text.
+        let body = line[..scan.end].trim_end();
+        let last = body.rsplit([' ', '\t']).next().unwrap_or("");
+        let before = body[..body.len() - last.len()].trim_end();
+        let indicator = last.starts_with(['|', '>'])
+            && last[1..]
+                .chars()
+                .all(|c| matches!(c, '+' | '-' | '0'..='9'))
+            && scan.pieces.last().is_some_and(|p| p.kind == Kind::Plain)
+            && (before.is_empty() || before.ends_with(':') || before.ends_with('-'));
+        if indicator {
+            let mut col = indent_of(line);
+            let mut rest = &line[col..];
+            while let Some(r) = rest.strip_prefix("- ") {
+                let blanks = r.len() - r.trim_start().len();
+                col += 2 + blanks;
+                rest = r.trim_start();
+            }
+            block = Some(col);
+        }
+    }
+    Ok(())
 }
 
 /// `llm_pi_ai_entry`, plus: the document defines llm-pi-ai in exactly one
@@ -481,6 +745,7 @@ fn mentions_pi_ai(line: &str) -> bool {
 /// outside the entry's own top-level keys (another entry, a nested `insert`,
 /// a deeper key) is therefore refused.
 fn sole_pi_ai_entry(lines: &[String]) -> std::result::Result<Option<usize>, String> {
+    check_document(lines)?;
     let entry = llm_pi_ai_entry(lines)?;
     let (own, col) = match entry {
         Some(start) => (start..block_end(lines, start), dash_key_col(&lines[start])),
@@ -2277,7 +2542,7 @@ mod tests {
             "- {id: llm-pi-ai, config: {providers: {}}}\n",
             "- id: [llm-pi-ai]\n",
             "-\n  id: llm-pi-ai\n",
-            "- id: \"llm\\x2dpi-ai\"\n  config:\n    providers:\n      a:\n        baseURL: http://x\n",
+            "- id: \"llm\\x2gpi-ai\"\n  config:\n    providers:\n      a:\n        baseURL: http://x\n",
             "- id: llm-pi-ai\n  config:\n    providers:\n      a:\n        baseURL: http://x\n- id: llm-pi-ai\n  config:\n    providers:\n      b:\n        baseURL: http://y\n",
             "- id: [broken\n- id: llm-pi-ai\n",
         ] {
@@ -2316,6 +2581,100 @@ mod tests {
         // Comments do not count as a mention.
         let commented = "# llm-pi-ai goes here\n- id: x\n";
         assert!(apply_route(commented, &route("hai", &["m1"]), false).is_ok());
+    }
+
+    #[test]
+    fn escaped_nested_ids_are_refused_with_the_file_unchanged() {
+        let route = route("hai", &["m1"]);
+        for id in [
+            r#""llm\u002dpi-ai""#,
+            r#""llm\x2dpi-ai""#,
+            r#""llm\U0000002dpi-ai""#,
+            r#""\x6c\x6cm-pi-ai""#,
+            r#""llm-pi-ai""#,
+        ] {
+            let text = format!(
+                "- insert:\n    - id: {id}\n      config:\n        providers:\n          other:\n            baseURL: http://o\n  config:\n    unrelated: 1\n"
+            );
+            let err = apply_route(&text, &route, false).unwrap_err().to_string();
+            assert!(err.contains("by hand"), "{id}: {err}");
+        }
+    }
+
+    #[test]
+    fn an_escaped_top_level_id_is_the_existing_entry() {
+        let route = route("hai", &["m1"]);
+        for id in [
+            r#""llm\u002dpi-ai""#,
+            r#""llm\x2dpi-ai""#,
+            r#""llm\U0000002dpi-ai""#,
+        ] {
+            let text = format!(
+                "- id: {id}\n  config:\n    providers:\n      other:\n        baseURL: http://o\n"
+            );
+            let out = apply_route(&text, &route, false).unwrap().text;
+            assert!(
+                out.contains("other:") && out.contains("hai:"),
+                "{id}\n{out}"
+            );
+            assert_eq!(
+                out.lines().filter(|l| l.starts_with("- id:")).count(),
+                1,
+                "{id}\n{out}"
+            );
+        }
+        let escaped_key = "- \"i\\x64\": llm-pi-ai\n  config:\n    providers:\n      other:\n        baseURL: http://o\n";
+        let out = apply_route(escaped_key, &route, false).unwrap().text;
+        assert!(out.contains("other:") && out.contains("hai:"), "{out}");
+        assert_eq!(out.matches("llm-pi-ai").count(), 1, "{out}");
+    }
+
+    #[test]
+    fn anchors_aliases_tags_and_flow_collections_are_refused() {
+        let route = route("hai", &["m1"]);
+        for text in [
+            "- id: &x llm-pi-ai\n  config:\n    providers:\n      a:\n        baseURL: http://a\n",
+            "- insert:\n    - id: *x\n      config:\n        providers:\n          other:\n            baseURL: http://o\n",
+            "- id: x\n  name: !!str y\n",
+            "- id: x\n  anchor: &x\n    id: y\n",
+            "- id: x\n  items: [{id: y}]\n",
+            "- id: x\n  items: {id: y}\n",
+            "- id: x\n  items: [a: b]\n",
+            "- id: x\n  items: [a,\n    b]\n",
+        ] {
+            let err = apply_route(text, &route, false).unwrap_err().to_string();
+            assert!(err.contains("by hand"), "{text:?}: {err}");
+        }
+        // Plain scalars with these characters inside, comments, block bodies and
+        // flow sequences of plain scalars are fine.
+        let fine = "- id: x\n  url: http://h/?a=1&b=2\n  mark: a*b # *x &y !z\n  list: [a, b]\n  empty: {}\n  text: |\n    *x &y !z [{\n  other: 'it''s'\n";
+        assert!(apply_route(fine, &route, false).is_ok());
+    }
+
+    #[test]
+    fn invalid_escapes_and_multiline_quotes_are_refused() {
+        let route = route("hai", &["m1"]);
+        for text in [
+            "- id: llm-pi-ai\n  config:\n    providers:\n      a:\n        baseURL: http://a\n  note: \"bad \\q\"\n",
+            "- id: \"llm\\u00zzpi-ai\"\n",
+            "- id: \"llm\\x2\"\n",
+            "- id: x\n  note: \"folded\n    text\"\n",
+            "- id: x\n  note: \"ends with \\\n    escape\"\n",
+        ] {
+            let err = apply_route(text, &route, false).unwrap_err().to_string();
+            assert!(err.contains("by hand"), "{text:?}: {err}");
+        }
+    }
+
+    #[test]
+    fn yaml_double_quoted_escapes_decode() {
+        assert_eq!(
+            decode_double(r#"\0\a\b\t\n\v\f\r\e\ \"\/\\\N\_\L\P\x41\u0042\U00000043"#).unwrap(),
+            "\0\u{7}\u{8}\t\n\u{b}\u{c}\r\u{1b} \"/\\\u{85}\u{a0}\u{2028}\u{2029}ABC"
+        );
+        for bad in [r"\q", r"\x4", r"\uD800", r"\U00110000", "\\"] {
+            assert!(decode_double(bad).is_err(), "{bad}");
+        }
     }
 
     #[test]
