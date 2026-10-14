@@ -123,7 +123,14 @@ jobs:
         run: command -v zstd || (sudo apt-get update && sudo apt-get install -y zstd)
       - if: runner.os == 'macOS'
         run: command -v zstd || brew install zstd
-      - run: cargo test
+      # On Windows the full suite runs first, so a failure there ends the job
+      # before the retry below could execute. Exclude the flaky test from that
+      # run and let the retry step own it; otherwise the retry is dead code on
+      # exactly the path it exists to cover.
+      - if: runner.os != 'Windows'
+        run: cargo test
+      - if: runner.os == 'Windows'
+        run: cargo test -- --skip native_cli_caps_upstream_concurrency_and_rejects_full_queue
       # `native_cli_caps_upstream_concurrency_and_rejects_full_queue` is
       # intermittently answered `502 upstream connection failed` on Windows
       # runners only, and it fails on `main` itself (issue #528), which blocks
