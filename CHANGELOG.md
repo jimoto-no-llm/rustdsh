@@ -3,6 +3,18 @@
 All notable changes to this project are documented here.
 Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
+## [Unreleased]
+
+### Added
+
+- `plugins/rdsh-mobile-ui` is bundled and installed by `./plugins/install.sh`:
+  below 767px the Web chat and composer use the full viewport width, the collapsed
+  sidebar becomes a one-tap logo for the session list, and question cards fit the
+  phone. The rules are adapted from Smart-DSH
+  (<https://github.com/hikarioyama/Smart-DSH>, MIT) and ship only that responsive
+  layout — not Smart-DSH's notifications, Esc handling or task hub. See
+  [README](plugins/rdsh-mobile-ui/README.md).
+
 ## [0.3.3] - 2026-10-13
 
 ### Security

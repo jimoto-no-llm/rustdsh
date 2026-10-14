@@ -269,6 +269,12 @@ rdsh --profile web                             # プラグイン付きで起動
 
 ポート番号（DSH Web: `3080`、rdsh serve: `38080`）も競合しません。
 
+rdsh が同梱するのは Smart-DSH のスマホ幅レイアウトだけです
+（[`plugins/rdsh-mobile-ui`](plugins/rdsh-mobile-ui/README.md)、MIT・Smart-DSH 由来）。
+767px 以下でチャットと入力欄が全幅になり、ロゴを1タップするとセッション一覧が開きます。
+Smart-DSH の通知・Esc 停止・タスクハブ・HMR 回避策は上流バンドルのままなので、必要な場合は
+上流のバンドルを導入してください。
+
 ## 実測ベンチマーク
 
 Linux x86_64 環境での測定値です：
@@ -334,6 +340,14 @@ Linux x86_64 環境での測定値です：
 - セキュリティレビュー・脆弱性報告: [GrEarl](https://github.com/GrEarl)、[PENTACoXIAN](https://x.com/PENTACoXIAN)
 - 実装・改善・検証協力: [StudioYebisu](https://github.com/yebisu0529-ship-it)、[RNA4219](https://github.com/RNA4219)、[eightman999](https://github.com/eightman999)
 - アイディア・製品提案: [@remydre8](https://x.com/remydre8)
+
+rdsh が利用・改変・推薦している第三者製 DSH プラグインです（いずれも MIT、著作権は各作者に帰属します）:
+
+- [Smart-DSH](https://github.com/hikarioyama/Smart-DSH)（hikarioyama）—
+  [`rdsh-mobile-ui`](plugins/rdsh-mobile-ui/README.md) として同梱するスマホ幅レイアウト
+- [dsh-sound-notifications](https://github.com/cwd514/dsh-sound-notifications)（cwd514）—
+  オプトインの効果音とデスクトップ通知（`SOUND=1`）
+- [dsh-gitview](https://github.com/yugapor/dsh-gitview)（yugapor）— 任意のサイドバー Git パネル
 
 ## ライセンス
 

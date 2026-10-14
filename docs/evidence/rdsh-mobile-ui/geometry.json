@@ -1,0 +1,57 @@
+{
+  "scope": "Real DSH 0.2.0-rc.2 Web server on 127.0.0.1:3080, Chromium 390x844 (deviceScaleFactor 2) and 1280x900; no physical phone, no Tailscale.",
+  "captured": "2026-10-14",
+  "plugin": "plugins/rdsh-mobile-ui",
+  "phone_390x844": {
+    "before": {
+      "rail_attribute": null,
+      "center_col_px": 334,
+      "center_col_left_px": 56,
+      "chat_root_px": 334,
+      "composer_stack_px": 327,
+      "composer_left_px": 56,
+      "document_scroll_width_px": 390
+    },
+    "after": {
+      "rail_attribute": "closed",
+      "center_col_px": 390,
+      "center_col_left_px": 0,
+      "chat_root_px": 390,
+      "composer_stack_px": 383,
+      "composer_left_px": 0,
+      "document_scroll_width_px": 390,
+      "plugin_style_elements": 1,
+      "logo_px": "36x36",
+      "hidden_rail_items": [
+        "hHd-Xa_newSession",
+        "hHd-Xa_regionArea",
+        "hHd-Xa_footArea"
+      ]
+    }
+  },
+  "session_open_390x844": {
+    "before": {
+      "scroll_body_client_width_px": 327,
+      "chat_body_px": 334,
+      "composer_px": 327
+    },
+    "after": {
+      "scroll_body_client_width_px": 383,
+      "chat_body_px": 390,
+      "composer_px": 383,
+      "chat_user_width": "100%",
+      "chat_content_width": "100%"
+    }
+  },
+  "desktop_1280x900": {
+    "rail_attribute": null,
+    "sidebar_px": 280,
+    "center_col_px": 1000,
+    "new_session_display": "flex"
+  },
+  "notes": [
+    "before/after geometry was measured with the shipped CSS injected into the live page; the installed plugin reproduced the same 390px layout (docs/evidence/rdsh-mobile-ui/phone-after.png hashes equal the installed-plugin capture).",
+    "The screenshots are the empty state so no conversation content is recorded.",
+    "A viewport check is a layout check, not physical-phone, Tailscale or acceptance testing."
+  ]
+}
