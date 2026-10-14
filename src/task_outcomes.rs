@@ -25,7 +25,7 @@
 //! `tests/task_outcomes_cli.rs` pins the same JSON the JS module produced.
 
 use std::collections::HashSet;
-use std::io::Write;
+use std::io::{Read, Write};
 
 use anyhow::{anyhow, bail, Context, Result};
 use serde_json::{json, Map, Value};
@@ -94,11 +94,22 @@ fn fields(value: &Value, keys: &[&str]) -> bool {
     }
 }
 
-/// `String.prototype.trim()`: ECMAScript white space plus the line
-/// terminators. Rust's `char::is_whitespace` already covers U+FEFF, the one
-/// code point where a naive `trim()` would disagree.
+/// `String.prototype.trim()`: ECMAScript WhiteSpace plus its line terminators.
 fn is_js_space(ch: char) -> bool {
-    ch.is_whitespace() || matches!(ch, '\u{2028}' | '\u{2029}')
+    matches!(
+        ch,
+        '\u{0009}'..='\u{000d}'
+            | '\u{0020}'
+            | '\u{00a0}'
+            | '\u{1680}'
+            | '\u{2000}'..='\u{200a}'
+            | '\u{2028}'
+            | '\u{2029}'
+            | '\u{202f}'
+            | '\u{205f}'
+            | '\u{3000}'
+            | '\u{feff}'
+    )
 }
 
 /// `text(value, maximum)`: a string whose trimmed length is non-empty and
@@ -106,7 +117,7 @@ fn is_js_space(ch: char) -> bool {
 fn text(value: &Value, maximum: usize) -> bool {
     match value.as_str() {
         Some(text) => {
-            text.trim_matches(is_js_space).chars().count() > 0 && text.chars().count() <= maximum
+            !text.trim_matches(is_js_space).is_empty() && text.encode_utf16().count() <= maximum
         }
         None => false,
     }
@@ -194,6 +205,24 @@ fn require(condition: bool, message: &str) -> OutcomeResult<()> {
     }
 }
 
+/// JavaScript's `value || fallback` treats these JSON values as falsy.
+fn is_js_falsy(value: &Value) -> bool {
+    value.is_null()
+        || value.as_bool() == Some(false)
+        || value.as_str() == Some("")
+        || value.as_i64() == Some(0)
+        || value.as_u64() == Some(0)
+        || value.as_f64().is_some_and(|number| number == 0.0)
+}
+
+/// Match `JSON.stringify(left) === JSON.stringify(right)`, including key order.
+fn same_json_stringify(left: &Value, right: &Value) -> bool {
+    match (serde_json::to_string(left), serde_json::to_string(right)) {
+        (Ok(left), Ok(right)) => left == right,
+        _ => false,
+    }
+}
+
 /// `report(input)`: five allowed fields, each `null` or a limited string,
 /// returned as a copy that keeps the caller's own key order.
 fn report(input: &Value) -> OutcomeResult<Value> {
@@ -276,23 +305,27 @@ fn empty_outcomes() -> Value {
 /// milestone contract into a copy of `state.task_outcomes`. Returns `None`
 /// when the request carries neither key, exactly like the JS early return.
 pub fn apply_task_outcomes(state: &Value, input: &Value) -> OutcomeResult<Option<Value>> {
-    let input_object = as_object(input).expect("the CLI checks the request object");
+    let input_object =
+        as_object(input).ok_or_else(|| OutcomeError::new("Invalid task outcomes"))?;
     if !input_object.contains_key("outcome") && !input_object.contains_key("milestone_contract") {
         return Ok(None);
     }
-    let state_object = as_object(state).expect("the CLI checks the state object");
+    let state_object =
+        as_object(state).ok_or_else(|| OutcomeError::new("Invalid task outcomes"))?;
     let mut next = match state_object.get("task_outcomes") {
-        Some(value) if !value.is_null() => value.clone(),
+        Some(value) if !is_js_falsy(value) => value.clone(),
         _ => empty_outcomes(),
     };
-    let next_object = next.as_object_mut().expect("task_outcomes is an object");
+    let next_object = next
+        .as_object_mut()
+        .ok_or_else(|| OutcomeError::new("Invalid task outcomes"))?;
     if let Some(outcome) = input_object.get("outcome") {
         let update = report(outcome)?;
         let id = input_object.get("id").cloned().unwrap_or(Value::Null);
         let tasks = next_object
             .get_mut("tasks")
             .and_then(Value::as_array_mut)
-            .expect("task_outcomes.tasks is an array");
+            .ok_or_else(|| OutcomeError::new("Invalid task outcomes"))?;
         let index = tasks
             .iter()
             .position(|item| as_object(item).is_some_and(|item| item.get("task_id") == Some(&id)));
@@ -301,7 +334,7 @@ pub fn apply_task_outcomes(state: &Value, input: &Value) -> OutcomeResult<Option
         let value = match index {
             Some(index) => {
                 let mut merged = as_object(&tasks[index])
-                    .expect("stored tasks are objects")
+                    .ok_or_else(|| OutcomeError::new("Invalid task outcomes"))?
                     .clone();
                 let patch = as_object(&update).expect("report() returned an object");
                 for (key, value) in patch {
@@ -336,17 +369,15 @@ pub fn apply_task_outcomes(state: &Value, input: &Value) -> OutcomeResult<Option
         let milestones = next_object
             .get_mut("milestones")
             .and_then(Value::as_array_mut)
-            .expect("task_outcomes.milestones is an array");
+            .ok_or_else(|| OutcomeError::new("Invalid task outcomes"))?;
         let stored = value.to_value();
         let index = milestones
             .iter()
             .position(|item| as_object(item).is_some_and(|item| item.get("id") == Some(&value.id)));
         match index {
             Some(index) => {
-                // Stored milestones keep the canonical key order, so comparing
-                // the serialized text matches the JS stringify comparison.
                 require(
-                    milestones[index] == stored,
+                    same_json_stringify(&milestones[index], &stored),
                     "Milestone criteria are fixed; declare changed criteria with a new milestone ID",
                 )?;
             }
@@ -363,7 +394,8 @@ pub fn apply_task_outcomes(state: &Value, input: &Value) -> OutcomeResult<Option
 /// malformed one. Tasks must name a declared task, every report field must
 /// hold its limit, milestones must re-validate and stay unique.
 pub fn validate_task_outcomes(state: &Value) -> OutcomeResult<()> {
-    let state_object = as_object(state).expect("the CLI checks the state object");
+    let state_object =
+        as_object(state).ok_or_else(|| OutcomeError::new("Invalid task outcomes"))?;
     let Some(value) = state_object.get("task_outcomes") else {
         return Ok(());
     };
@@ -380,10 +412,10 @@ pub fn validate_task_outcomes(state: &Value) -> OutcomeResult<()> {
                     .is_some_and(|milestones| milestones.len() <= MAX_ENTRIES)
         });
     require(valid, "Invalid task outcomes")?;
-    let object = as_object(value).expect("fields() accepted an object");
+    let object = as_object(value).ok_or_else(|| OutcomeError::new("Invalid task outcomes"))?;
     let tasks = object["tasks"]
         .as_array()
-        .expect("the shape check accepted tasks");
+        .ok_or_else(|| OutcomeError::new("Invalid task outcomes"))?;
     let declared = state_object
         .get("tasks")
         .and_then(Value::as_array)
@@ -428,7 +460,7 @@ pub fn validate_task_outcomes(state: &Value) -> OutcomeResult<()> {
     keys.clear();
     let milestones = object["milestones"]
         .as_array()
-        .expect("the shape check accepted milestones");
+        .ok_or_else(|| OutcomeError::new("Invalid task outcomes"))?;
     let mut milestone_ids: HashSet<String> = HashSet::new();
     for item in milestones {
         let normalized = milestone(item)?;
@@ -514,14 +546,24 @@ pub fn milestone_schema() -> Value {
 /// Read one JSON file with the dashboard CLI's `localJson` rules: a regular
 /// file of at most 256 KiB with strict UTF-8 and valid JSON.
 fn read_json(input_file: &str) -> Result<Value> {
-    let metadata =
-        std::fs::metadata(input_file).with_context(|| format!("cannot read JSON {input_file}"))?;
-    if !metadata.is_file() || metadata.len() > 256 * 1024 {
+    let file =
+        open_json_input(input_file).with_context(|| format!("cannot read JSON {input_file}"))?;
+    read_json_file(file, input_file)
+}
+
+fn read_json_file(file: std::fs::File, input_file: &str) -> Result<Value> {
+    const MAX_INPUT_BYTES: usize = 256 * 1024;
+    let metadata = file
+        .metadata()
+        .with_context(|| format!("cannot read JSON {input_file}"))?;
+    if !metadata.is_file() || metadata.len() > MAX_INPUT_BYTES as u64 {
         bail!("Input JSON must be a regular file of at most 256 KiB");
     }
-    let bytes =
-        std::fs::read(input_file).with_context(|| format!("cannot read JSON {input_file}"))?;
-    if bytes.len() > 256 * 1024 {
+    let mut bytes = Vec::with_capacity(metadata.len() as usize);
+    file.take((MAX_INPUT_BYTES + 1) as u64)
+        .read_to_end(&mut bytes)
+        .with_context(|| format!("cannot read JSON {input_file}"))?;
+    if bytes.len() > MAX_INPUT_BYTES {
         bail!("Input JSON exceeds 256 KiB");
     }
     let Ok(text) = std::str::from_utf8(&bytes) else {
@@ -530,6 +572,21 @@ fn read_json(input_file: &str) -> Result<Value> {
     // TextDecoder("utf-8") in the dashboard CLI removed a leading BOM.
     let text = text.strip_prefix('\u{feff}').unwrap_or(text);
     serde_json::from_str(text).map_err(|_| anyhow!("Input JSON is invalid"))
+}
+
+#[cfg(unix)]
+fn open_json_input(input_file: &str) -> std::io::Result<std::fs::File> {
+    use std::os::unix::fs::OpenOptionsExt;
+
+    std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_CLOEXEC | libc::O_NONBLOCK)
+        .open(input_file)
+}
+
+#[cfg(not(unix))]
+fn open_json_input(input_file: &str) -> std::io::Result<std::fs::File> {
+    std::fs::File::open(input_file)
 }
 
 /// `rdsh task-outcomes <apply|validate|schema> --input-file <json>`.
@@ -634,6 +691,38 @@ mod tests {
             "expected {prefix}, got {}",
             error.message
         );
+    }
+
+    #[test]
+    fn text_matches_ecmascript_trim_and_utf16_length() {
+        assert!(!text(&json!("\u{feff}"), 10));
+        assert!(text(&json!("\u{0085}"), 10));
+        assert!(text(&json!("😀".repeat(80)), 160));
+        assert!(!text(&json!("😀".repeat(81)), 160));
+    }
+
+    #[test]
+    fn input_json_uses_the_open_file_if_its_path_is_replaced() {
+        let root = std::env::temp_dir().join(format!(
+            "rdsh-outcomes-read-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos(),
+        ));
+        std::fs::create_dir(&root).unwrap();
+        let path = root.join("input.json");
+        let original = r#"{"operation":"schema","state":{"schema":1,"tasks":[]}}"#;
+        std::fs::write(&path, original).unwrap();
+        let file = open_json_input(path.to_str().unwrap()).unwrap();
+        std::fs::rename(&path, root.join("opened.json")).unwrap();
+        std::fs::write(&path, "not the validated input").unwrap();
+
+        let parsed = read_json_file(file, path.to_str().unwrap()).unwrap();
+        assert_eq!(parsed["operation"], "schema");
+        assert_eq!(parsed["state"]["tasks"], json!([]));
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
@@ -771,6 +860,49 @@ mod tests {
                 &json!({ "id": "goal", "milestone": "M2", "milestone_contract": contract() }),
             ),
         );
+    }
+
+    #[test]
+    fn apply_rejects_stored_milestone_with_different_json_key_order() {
+        let stored: Value = serde_json::from_str(
+            r#"{"schema":1,"tasks":[],"milestones":[{"title":"Milestone","id":"M1","criteria":[{"task_id":"goal","criterion_id":"value","description":"value is right"}]}]}"#,
+        )
+        .unwrap();
+        failing(
+            "Milestone criteria are fixed",
+            apply_task_outcomes(
+                &state_with(&stored),
+                &json!({
+                    "id": "goal",
+                    "milestone": "M1",
+                    "milestone_contract": contract(),
+                }),
+            ),
+        );
+    }
+
+    #[test]
+    fn apply_returns_an_error_for_malformed_stored_outcomes() {
+        failing(
+            "Invalid task outcomes",
+            apply_task_outcomes(
+                &state_with(&json!({ "schema": 1, "tasks": "not an array", "milestones": [] })),
+                &json!({ "id": "goal", "outcome": { "purpose": "ship" } }),
+            ),
+        );
+    }
+
+    #[test]
+    fn apply_uses_the_js_falsy_fallback_for_stored_outcomes() {
+        for falsy in [json!(false), json!(0), json!("")] {
+            let next = apply_task_outcomes(
+                &state_with(&falsy),
+                &json!({ "id": "goal", "outcome": { "purpose": "ship" } }),
+            )
+            .unwrap()
+            .unwrap();
+            assert_eq!(next["tasks"][0]["purpose"], "ship");
+        }
     }
 
     #[test]
