@@ -80,7 +80,15 @@ default:
 | Plugin | Why |
 | --- | --- |
 | `rdsh-settings` | rdsh section in DSH settings (budgets, retrieval, memory, beta flags) |
+| `rdsh-update-banner` | release banner and notifications in the Web UI (`PROFILE=web` only). Installing it keeps the profile's own insert block from failing to import on every boot (issue #5) |
 | `rdsh-mobile-ui` | Phone-width layout for the DSH Web chat: full-width chat and composer, one-tap logo to the session list. Adapted from Smart-DSH (MIT) — see [its README](rdsh-mobile-ui/README.md). |
+
+The banner's package supplies a bundle patch. A Web profile previously wired
+with `install-banner.sh` may also have a manual insert with the same ID. DSH
+`0.2.0-rc.2` combines entries by ID and applies the profile's entry after the
+bundle entry, retaining the manual configuration. This installer leaves that
+profile patch untouched. After upgrading to a different DSH loader version,
+check its duplicate-ID behavior before migrating existing profiles.
 
 ## Workflow board source preparation
 

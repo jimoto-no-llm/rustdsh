@@ -2,6 +2,8 @@ name: dashboard
 
 on:
   push:
+    branches: [main]
+    tags: ['v*']
     paths:
       [
         "dashboard/**",
@@ -23,6 +25,7 @@ on:
         "Cargo.lock",
         ".github/workflows/dashboard.yml",
       ]
+  workflow_dispatch:
 
 permissions:
   contents: read
