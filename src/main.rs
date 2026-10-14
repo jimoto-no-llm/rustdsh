@@ -27,7 +27,7 @@ mod websearch;
     name = "rdsh",
     version,
     about = "Rust fast launcher for dsh (safe: native fast-paths + passthrough)",
-    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|dump-config|boot)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh desktop status             detect the Desktop (Electron) app and its reserved profile\n  rdsh desktop install            attach the bundled rdsh plugins to that profile\n  rdsh --passthrough tui          no slim env; mandatory tool isolation remains\n  rdsh --dry-run tui -- --resume abc   show what would exec"
+    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|auth|setup|context|settings|features|dump-config|boot)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh desktop status             detect the Desktop (Electron) app and its reserved profile\n  rdsh desktop install            attach the bundled rdsh plugins to that profile\n  rdsh --passthrough tui          no slim env; mandatory tool isolation remains\n  rdsh --dry-run tui -- --resume abc   show what would exec"
 )]
 struct Cli {
     /// Explicitly share a project file with isolated model tools (repeatable).
@@ -956,7 +956,7 @@ fn features_toggle(id: &str, on: bool) -> anyhow::Result<()> {
 }
 
 /// Server-type extras are off by default: refuse with enable guidance.
-/// Setup itself is never gated (it hosts the switches).
+/// Setup is not an extra: `features.setup_web` (default on) gates it instead.
 fn extra_disabled(id: &str) -> anyhow::Result<()> {
     Err(anyhow::anyhow!(
         "extra '{id}' is disabled by default; enable with: rdsh features on {id} (or rdsh settings set extras.enable {id})"
@@ -1100,7 +1100,7 @@ fn node_wrapper_warnings(shadowed: bool) -> Vec<String> {
     };
     let dir = format!("{home}/.local/bin");
     let entries = std::fs::read_dir(&dir).ok();
-    let mut hits: Vec<String> = vec![];
+    let mut hits: Vec<String> = Vec::new();
     if let Some(entries) = entries {
         for entry in entries.flatten() {
             let path = entry.path();
@@ -1243,6 +1243,30 @@ mod default_profile_tests {
                     "NATIVE_FIRST entry {name:?} has no matching subcommand"
                 );
             }
+        }
+    }
+
+    /// The `--help` USAGE line must list every native subcommand: a missing
+    /// name makes the documented surface smaller than the real one.
+    #[test]
+    fn after_help_lists_every_native_subcommand() {
+        use clap::CommandFactory;
+        let mut cmd = Cli::command();
+        // 折り返しで改行が入るため、空白を畳んでから USAGE 行の一覧を読む。
+        let flat = cmd
+            .render_help()
+            .to_string()
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
+        let listed: Vec<&str> = flat
+            .split('(')
+            .find_map(|part| part.split(')').next().filter(|l| l.contains("|prune|")))
+            .expect("USAGE line should list native subcommands")
+            .split('|')
+            .collect();
+        for name in crate::NATIVE_FIRST {
+            assert!(listed.contains(name), "after_help is missing {name:?}");
         }
     }
 }
