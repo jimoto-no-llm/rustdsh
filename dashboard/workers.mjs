@@ -7,6 +7,7 @@ import {
   WorkerError,
   requireWorker,
   declaration,
+  declarationResults,
   leaseSeconds,
   workerId,
   headSha,
@@ -101,9 +102,12 @@ export class WorkerWorkspaces {
         state.workers.length <= 256,
       "invalid_worker_registry",
     );
+    const scopeResults = declarationResults(
+      state.workers.map((row) => row?.declaration),
+    );
     const ids = new Set(),
       branches = new Set();
-    for (const row of state.workers) {
+    for (const [index, row] of state.workers.entries()) {
       requireWorker(
         exact(row, [
           "worker_id",
@@ -142,9 +146,10 @@ export class WorkerWorkspaces {
         "invalid_worker_record",
       );
       requireWorker(
-        JSON.stringify(declaration(row.declaration)) ===
+        scopeResults[index]?.ok === true &&
+          JSON.stringify(scopeResults[index].value) ===
           JSON.stringify(row.declaration) &&
-          row.declaration.worker_id === row.worker_id,
+          row.declaration?.worker_id === row.worker_id,
         "invalid_worker_scope",
       );
       requireWorker(

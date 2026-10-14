@@ -8,7 +8,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { identity } from "../state.mjs";
 import { WorkerWorkspaces } from "../workers.mjs";
-import { declaration } from "../worker-scopes.mjs";
+import { declaration, declarationResults } from "../worker-scopes.mjs";
 
 const exec = promisify(execFile);
 const cli = fileURLToPath(new URL("../cli.mjs", import.meta.url));
@@ -309,6 +309,17 @@ test("path escape, globs, unknown fields and review writes are rejected", () => 
     () => declaration({ ...scope("bad"), read_paths: ["tests"] }),
     error("write_scope_must_be_readable"),
   );
+});
+
+test("empty scope batches do not launch or require the native helper", () => {
+  const previous = process.env.RDSH_BIN;
+  process.env.RDSH_BIN = path.join(os.tmpdir(), "missing-rdsh-worker-scope");
+  try {
+    assert.deepEqual(declarationResults([]), []);
+  } finally {
+    if (previous === undefined) delete process.env.RDSH_BIN;
+    else process.env.RDSH_BIN = previous;
+  }
 });
 
 test("renamed/deleted paths and forbidden paths remain visible in scope diagnostics", async (t) => {

@@ -1,5 +1,8 @@
 // Declarations and observed changes. Runtime tool/sandbox policy remains in DSH.
+import fs from "node:fs";
+import { spawnSync } from "node:child_process";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 export class WorkerError extends Error {
   constructor(code, details = null) {
@@ -64,7 +67,7 @@ export function leaseSeconds(value) {
   );
   return value;
 }
-export function declaration(input) {
+function legacyDeclaration(input) {
   const allowed = [
     "worker_id",
     "role",
@@ -118,6 +121,106 @@ export function declaration(input) {
     forbidden_paths: forbidden,
     lease_seconds: leaseSeconds(input.lease_seconds),
   };
+}
+
+function executable(file) {
+  try {
+    if (!fs.statSync(file).isFile()) return false;
+    if (process.platform !== "win32") fs.accessSync(file, fs.constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function rdshExecutable() {
+  if (process.env.RDSH_BIN) return path.resolve(process.env.RDSH_BIN);
+  const executableName = process.platform === "win32" ? "rdsh.exe" : "rdsh";
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const candidates = [
+    path.join(root, "target", "debug", executableName),
+    path.join(root, "target", "release", executableName),
+    ...(process.env.PATH || "").split(path.delimiter).map((directory) =>
+      path.join(directory, executableName),
+    ),
+  ];
+  return candidates.find(executable) ?? null;
+}
+
+function normalizedDeclaration(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new WorkerError("native_worker_policy_unavailable");
+  }
+  return {
+    worker_id: value.worker_id,
+    role: value.role,
+    read_paths: value.read_paths,
+    write_paths: value.write_paths,
+    modules: value.modules,
+    forbidden_paths: value.forbidden_paths,
+    lease_seconds: value.lease_seconds,
+  };
+}
+
+function legacyDeclarationResults(inputs) {
+  return inputs.map((input) => {
+    try {
+      return { ok: true, value: legacyDeclaration(input) };
+    } catch (error) {
+      if (error instanceof WorkerError) return { ok: false, code: error.code };
+      throw error;
+    }
+  });
+}
+
+export function declarationResults(inputs) {
+  requireWorker(Array.isArray(inputs), "invalid_scope_declarations");
+  if (inputs.length === 0) return [];
+  const binary = rdshExecutable();
+  if (!binary) return legacyDeclarationResults(inputs);
+
+  const output = spawnSync(binary, ["worker-scope", "validate"], {
+    input: JSON.stringify(inputs),
+    encoding: "utf8",
+    windowsHide: true,
+    shell: false,
+    timeout: 10_000,
+    maxBuffer: 4 * 1024 * 1024,
+  });
+  if (output.error?.code === "ENOENT" && !process.env.RDSH_BIN) {
+    return legacyDeclarationResults(inputs);
+  }
+  if (output.error || output.status !== 0) {
+    throw new WorkerError("native_worker_policy_unavailable");
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(output.stdout);
+  } catch {
+    throw new WorkerError("native_worker_policy_unavailable");
+  }
+  if (!Array.isArray(parsed) || parsed.length !== inputs.length) {
+    throw new WorkerError("native_worker_policy_unavailable");
+  }
+  return parsed.map((result) => {
+    if (result?.ok === true) {
+      return { ok: true, value: normalizedDeclaration(result.value) };
+    }
+    if (
+      result?.ok === false &&
+      typeof result.code === "string" &&
+      /^[a-z0-9_]+$/.test(result.code)
+    ) {
+      return { ok: false, code: result.code };
+    }
+    throw new WorkerError("native_worker_policy_unavailable");
+  });
+}
+
+export function declaration(input) {
+  const result = declarationResults([input])[0];
+  if (!result.ok) throw new WorkerError(result.code);
+  return result.value;
 }
 export function mayWrite(scope, file) {
   return (
