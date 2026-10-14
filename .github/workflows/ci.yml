@@ -176,6 +176,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --locked --example benchmark_regression
       - run: cargo build --release
       - name: Measure the CLI fast paths
         run: |

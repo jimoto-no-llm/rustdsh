@@ -86,7 +86,9 @@ cargo run --release --example benchmark_regression -- \
 | `search_tree_200_files` | `rdsh search <needle> --dir <tree>` | 200 files in 10 subdirectories |
 
 Every case gets 3 warmup runs followed by `n` samples (`--n`, default 15,
-minimum 5). The report carries the raw `samples_ms` array plus `median_ms`,
+minimum 5). With a live `--baseline` binary, both builds run in alternating
+order on the same fixtures. Their HOME, DSH_HOME, XDG directories and working
+directories are separate. The report carries the raw `samples_ms` array plus `median_ms`,
 `p95_ms`, `min_ms` and `max_ms`. Percentiles use nearest rank, so `n=15` maps
 `p95` onto the largest sample; treat it as a spread indicator, not a precise
 quantile. `cpu_median_ms` is the CPU time the child consumed, reported next to
@@ -96,12 +98,15 @@ process was waiting on the scheduler.
 
 ### JSON schema
 
-`schema_version` is `1`; it is bumped on any incompatible layout change, and
-`--baseline-json` refuses to read a file recording a different version.
+`schema_version` is `2`; it is bumped on any incompatible layout change.
+`--baseline-json` also requires matching OS, architecture, CPU count, warmup,
+timing/scope settings and exact fixture sizes. Every headline case must have a
+finite positive median and a successful correctness outcome. The sample count
+may differ; it affects measurement precision, not the fixture being compared.
 
 | Field | Meaning |
 | ----- | ------- |
-| `schema_version` | report layout version (currently `1`) |
+| `schema_version` | report layout version (currently `2`) |
 | `tool` | always `benchmark_regression` |
 | `generated_at_utc` | Unix epoch seconds |
 | `platform` | `os`, `arch`, `family`, `cpu_count` |
@@ -109,24 +114,29 @@ process was waiting on the scheduler.
 | `config` | `n`, `warmups`, `max_regression_percent`, `headline_cases`, fixture sizes, timing scope |
 | `binaries` | per label: `path`, `size_bytes`, `sha256` |
 | `cases` | per case: `samples_ms`, `median_ms`, `p95_ms`, `min_ms`, `max_ms`, `throughput_mib_s`, `input_bytes`, `cpu_median_ms`, `peak_rss_bytes`, `exit_code`, `argv`, `correct`, `evidence`, `headline`, `outcome`, `comparison` |
-| `failures` | correctness failures (different stdout than the baseline) |
+| `failures` | correctness failures or invalid comparison timing values |
 | `regressions` | cases over the threshold on a headline case |
-| `comparison` | `baseline_label`, `baseline_median_ms`, `ratio`, `delta_percent`, `stdout_equal`, `regressed`; `null` when no baseline was given |
+| `comparison` | `baseline_label`, `baseline_median_ms`, `ratio`, `delta_percent`, `stdout_equal`, `output_compatible`, `regressed`; `null` when no baseline was given |
 
 `outcome` is `recorded` (no baseline), `ok`, `regressed`, or `failed`.
-`evidence` records what the oracle actually verified, e.g. `tokens=2621453` or
-`hits=200`.
+`evidence` records what the oracle actually verified, e.g. `version=0.3.3`,
+`tokens=2621453` or `hits=200`.
 
 ### Correctness first
 
 Each case is checked against its own oracle before timing: `tokens` must equal
 the byte-derived token count for the generated ASCII fixture, `search` must
 return exactly one row per generated needle with no duplicates, and `--version`
-must produce non-empty output. The same stdout must appear in every warmup and
-every sample, or the run aborts. When a baseline binary is given, candidate and
-baseline stdout must match byte for byte. A mismatch marks the case `failed`,
-reports no speed ratio for it, and exits non-zero — a candidate is never
-described as a regression on the strength of a number it produced incorrectly.
+must produce a valid `rdsh` semantic version. The same stdout must appear in
+every warmup and sample for that build, or the run aborts. With a live baseline,
+candidate and baseline output must match byte for byte except for
+`version_startup`, where each build's version is validated independently. A
+mismatch marks the case `failed`, reports no speed ratio for it, and exits
+non-zero — a candidate is never described as a regression on an invalid result.
+For a JSON baseline, `stdout_equal` is `null` because the report contains no
+stdout; `output_compatible` reflects the candidate's oracle result. For a live
+baseline with different valid versions, `stdout_equal` is false while
+`output_compatible` remains true.
 
 ### Setting a baseline
 
@@ -138,8 +148,8 @@ cargo run --release --example benchmark_regression -- \
   --n 15 --output /tmp/rdsh-perf.json
 ```
 
-Or against a previously recorded report, which is what a CI trend check uses
-when no older binary exists:
+Or against a previously recorded report from the same platform and fixture
+configuration:
 
 ```sh
 cargo run --release --example benchmark_regression -- \
@@ -166,12 +176,12 @@ large, sustained slowdowns, not a substitute for reading the samples.
 
 ### CI job
 
-The `perf-regression` job in `.github/workflows/ci.yml` runs on
-`ubuntu-latest`, builds the release binary, executes the harness with `--n 15`,
-and uploads the JSON as the `perf-regression` artifact. It intentionally passes
-no `--baseline`: a fresh runner has no previous binary, and comparing against a
-stale artifact would fail spuriously. The job asserts that the report exists and
-that every case is marked correct; it does not fail on timing.
+The `perf-regression` job in `.github/workflows/ci.yml` runs the example's unit
+tests, builds the release binary, executes the harness with `--n 15`, and
+uploads the JSON as the `perf-regression` artifact. It intentionally passes no
+`--baseline`: a fresh runner has no previous binary, and comparing against a
+stale artifact would fail spuriously. The job asserts that the report exists
+and that every case is marked correct; it does not fail on timing.
 
 ## Rules for benchmark PRs
 

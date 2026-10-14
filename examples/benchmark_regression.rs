@@ -24,13 +24,17 @@ use std::process::{Command, Stdio};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 /// Bumped whenever the report layout changes incompatibly.
-const SCHEMA_VERSION: u32 = 1;
+const SCHEMA_VERSION: u32 = 2;
 /// Warmup iterations before sampling; never counted.
 const WARMUPS: usize = 3;
 /// `--n` lower bound, matching the other runners in this repository.
 const MIN_SAMPLES: usize = 5;
 /// Default regression budget in percent.
 const DEFAULT_MAX_REGRESSION_PERCENT: f64 = 10.0;
+const TIMING_DESCRIPTION: &str =
+    "parent wall clock from spawn to last stdout byte; process launch included";
+const SCOPE_DESCRIPTION: &str =
+    "real rdsh subprocess with per-build isolated HOME/DSH_HOME/XDG and working directories; no model calls and no credentials";
 /// Case names that participate in the hard regression gate.
 const HEADLINE_CASES: [&str; 4] = [
     "version_startup",
@@ -308,7 +312,7 @@ fn generate_tree(root: &Path, files: usize, per_file: usize, rng: &mut Rng) -> R
 /// How a case decides whether the produced stdout was correct.
 enum Oracle {
     /// stdout must be byte-identical to the baseline (or the record run).
-    Stable,
+    Version,
     /// `rdsh tokens` on a file of `bytes` bytes; value checked arithmetically.
     Tokens { bytes: u64 },
     /// `rdsh search` over a tree of `hits` needles.
@@ -329,11 +333,34 @@ impl Case {
     /// baseline. Returns the evidence string stored in the report.
     fn validate(&self, stdout: &[u8]) -> Result<String> {
         match &self.oracle {
-            Oracle::Stable => {
-                if stdout.is_empty() {
-                    bail!("{} produced empty stdout", self.name);
+            Oracle::Version => {
+                let output = String::from_utf8_lossy(stdout);
+                let version = output
+                    .trim()
+                    .strip_prefix("rdsh ")
+                    .filter(|version| {
+                        !version.is_empty() && !version.chars().any(char::is_whitespace)
+                    })
+                    .ok_or_else(|| anyhow!("{} produced invalid version output", self.name))?;
+                let mut core = version;
+                if let Some((prefix, _)) = core.split_once('-') {
+                    core = prefix;
                 }
-                Ok(format!("bytes={}", stdout.len()))
+                if let Some((prefix, _)) = core.split_once('+') {
+                    core = prefix;
+                }
+                let parts: Vec<&str> = core.split('.').collect();
+                if parts.len() != 3
+                    || parts
+                        .iter()
+                        .any(|part| part.is_empty() || !part.chars().all(|c| c.is_ascii_digit()))
+                    || !version
+                        .chars()
+                        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '+'))
+                {
+                    bail!("{} produced invalid version output", self.name);
+                }
+                Ok(format!("version={version}"))
             }
             Oracle::Tokens { bytes } => {
                 let text = String::from_utf8_lossy(stdout);
@@ -404,13 +431,19 @@ impl Case {
     }
 }
 
+/// Version strings may differ between two valid builds; all other case output
+/// remains an exact compatibility check.
+fn baseline_output_compatible(case: &Case, candidate: &[u8], baseline: &[u8]) -> bool {
+    matches!(case.oracle, Oracle::Version) || candidate == baseline
+}
+
 fn cases(fixtures: &Path, small: &Path, large: &Path, tree: &Path, hits: usize) -> Vec<Case> {
     let mut list = vec![
         Case {
             name: "version_startup",
             argv: vec!["--version".into()],
             input_bytes: 0,
-            oracle: Oracle::Stable,
+            oracle: Oracle::Version,
             throughput_bytes: 0,
         },
         Case {
@@ -475,6 +508,15 @@ fn directory_bytes(root: &Path) -> Result<u64> {
         }
     }
     Ok(total)
+}
+
+fn fixture_config(small: &Path, large: &Path, tree: &Path, tree_files: usize) -> Result<Value> {
+    Ok(json!({
+        "tokens_1mib_bytes": std::fs::metadata(small)?.len(),
+        "tokens_10mib_bytes": std::fs::metadata(large)?.len(),
+        "search_tree_files": tree_files,
+        "search_tree_bytes": directory_bytes(tree)?,
+    }))
 }
 
 // ---------------------------------------------------------------------------
@@ -607,7 +649,7 @@ struct BaselineMedians {
 }
 
 impl BaselineMedians {
-    fn from_json(path: &Path) -> Result<Self> {
+    fn from_json(path: &Path, expected_fixtures: &Value) -> Result<Self> {
         let raw = std::fs::read_to_string(path)
             .with_context(|| format!("failed to read {}", path.display()))?;
         let report: Value = serde_json::from_str(&raw)
@@ -620,11 +662,60 @@ impl BaselineMedians {
                 schema
             );
         }
+        if report["tool"].as_str() != Some("benchmark_regression") {
+            bail!(
+                "{} was not produced by benchmark_regression",
+                path.display()
+            );
+        }
+        for (field, expected) in [
+            ("os", std::env::consts::OS),
+            ("arch", std::env::consts::ARCH),
+            ("family", std::env::consts::FAMILY),
+        ] {
+            if report["platform"][field].as_str() != Some(expected) {
+                bail!(
+                    "{} platform {field} does not match this run ({expected})",
+                    path.display()
+                );
+            }
+        }
+        let cpu_count = std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(0);
+        if report["platform"]["cpu_count"].as_u64() != Some(cpu_count as u64) {
+            bail!(
+                "{} platform cpu_count does not match this run ({cpu_count})",
+                path.display()
+            );
+        }
+        let config = &report["config"];
+        if config["warmups"].as_u64() != Some(WARMUPS as u64)
+            || config["headline_cases"] != json!(HEADLINE_CASES)
+            || config["timing"].as_str() != Some(TIMING_DESCRIPTION)
+            || config["scope"].as_str() != Some(SCOPE_DESCRIPTION)
+            || &config["fixtures"] != expected_fixtures
+        {
+            bail!(
+                "{} benchmark configuration or fixtures do not match this run",
+                path.display()
+            );
+        }
         let cases = report["cases"]
             .as_object()
             .ok_or_else(|| anyhow!("{} has no cases object", path.display()))?;
         let mut medians = std::collections::BTreeMap::new();
         for (name, case) in cases {
+            let valid_outcome = matches!(
+                case["outcome"].as_str(),
+                Some("recorded" | "ok" | "regressed")
+            );
+            if case["correct"].as_bool() != Some(true) || !valid_outcome {
+                bail!(
+                    "{} case {name:?} is incomplete or failed correctness; refusing this baseline",
+                    path.display()
+                );
+            }
             // Fail closed. Skipping an unusable entry would silently remove
             // that case from the comparison, so a truncated or hand-edited
             // baseline would make the gate report success while checking
@@ -650,6 +741,14 @@ impl BaselineMedians {
                 path.display()
             );
         }
+        for name in HEADLINE_CASES {
+            if !medians.contains_key(name) {
+                bail!(
+                    "{} is missing headline case {name:?}; refusing an incomplete baseline",
+                    path.display()
+                );
+            }
+        }
         Ok(Self {
             label: format!("json:{}", path.display()),
             medians,
@@ -671,56 +770,119 @@ struct Measured {
     exit_code: Option<i32>,
 }
 
-/// Run every case for one binary; returns measurements in case order.
-fn measure_all(sandbox: &Sandbox, bin: &Path, cases: &[Case], n: usize) -> Result<Vec<Measured>> {
-    let mut measured = Vec::with_capacity(cases.len());
-    for case in cases {
-        let mut reference: Option<Vec<u8>> = None;
-        let mut evidence = String::new();
-        let mut exit_code = None;
-        for _ in 0..WARMUPS {
-            let run = invoke(sandbox, bin, &case.argv)?;
-            let current = case.validate(&run.stdout)?;
-            exit_code = run.exit_code;
-            match &reference {
-                Some(previous) if previous != &run.stdout => {
-                    bail!("{}: stdout is not stable across warmups", case.name)
-                }
-                _ => {
-                    reference = Some(run.stdout);
-                    evidence = current;
-                }
+#[derive(Default)]
+struct MeasurementBuilder {
+    samples: Vec<f64>,
+    cpu_samples: Vec<f64>,
+    reference: Option<Vec<u8>>,
+    evidence: String,
+    exit_code: Option<i32>,
+}
+
+impl MeasurementBuilder {
+    fn observe(&mut self, case: &Case, run: Run, sample: bool) -> Result<()> {
+        self.evidence = case.validate(&run.stdout)?;
+        if let Some(reference) = &self.reference {
+            if reference != &run.stdout {
+                bail!("{}: stdout changed between runs", case.name);
             }
+        } else {
+            self.reference = Some(run.stdout);
         }
-        let mut samples = Vec::with_capacity(n);
-        let mut cpu_samples = Vec::with_capacity(n);
-        for _ in 0..n {
-            let run = invoke(sandbox, bin, &case.argv)?;
-            case.validate(&run.stdout)?;
-            if reference.as_deref() != Some(run.stdout.as_slice()) {
-                bail!("{}: stdout changed between samples", case.name);
-            }
-            samples.push(run.elapsed_ms);
-            exit_code = run.exit_code;
+        self.exit_code = run.exit_code;
+        if sample {
+            self.samples.push(run.elapsed_ms);
             if let Some(cpu) = run.elapsed_cpu_ms {
-                cpu_samples.push(cpu);
+                self.cpu_samples.push(cpu);
             }
         }
-        let peak_rss_bytes = if case.name == "version_startup" {
+        Ok(())
+    }
+
+    fn finish(
+        self,
+        sandbox: &Sandbox,
+        bin: &Path,
+        case: &Case,
+        measure_rss: bool,
+    ) -> Result<Measured> {
+        let peak_rss_bytes = if measure_rss && case.name == "version_startup" {
             measure_peak_rss(sandbox, bin, case)?
         } else {
             None
         };
-        measured.push(Measured {
-            samples,
-            cpu_samples,
+        Ok(Measured {
+            samples: self.samples,
+            cpu_samples: self.cpu_samples,
             peak_rss_bytes,
-            stdout: reference.unwrap_or_default(),
-            evidence,
-            exit_code,
-        });
+            stdout: self.reference.unwrap_or_default(),
+            evidence: self.evidence,
+            exit_code: self.exit_code,
+        })
+    }
+}
+
+/// Run every case for one binary; returns measurements in case order.
+fn measure_all(sandbox: &Sandbox, bin: &Path, cases: &[Case], n: usize) -> Result<Vec<Measured>> {
+    let mut measured = Vec::with_capacity(cases.len());
+    for case in cases {
+        let mut builder = MeasurementBuilder::default();
+        for _ in 0..WARMUPS {
+            builder.observe(case, invoke(sandbox, bin, &case.argv)?, false)?;
+        }
+        for _ in 0..n {
+            builder.observe(case, invoke(sandbox, bin, &case.argv)?, true)?;
+        }
+        measured.push(builder.finish(sandbox, bin, case, true)?);
     }
     Ok(measured)
+}
+
+/// Measure two live binaries on the same fixtures while alternating their
+/// execution order, with a separate state sandbox for each binary.
+fn measure_pair(
+    candidate_sandbox: &Sandbox,
+    candidate_bin: &Path,
+    baseline_sandbox: &Sandbox,
+    baseline_bin: &Path,
+    cases: &[Case],
+    n: usize,
+) -> Result<(Vec<Measured>, Vec<Measured>)> {
+    let mut candidate_runs = Vec::with_capacity(cases.len());
+    let mut baseline_runs = Vec::with_capacity(cases.len());
+    for case in cases {
+        let mut candidate = MeasurementBuilder::default();
+        let mut baseline = MeasurementBuilder::default();
+        for iteration in 0..(WARMUPS + n) {
+            let sample = iteration >= WARMUPS;
+            if iteration % 2 == 0 {
+                candidate.observe(
+                    case,
+                    invoke(candidate_sandbox, candidate_bin, &case.argv)?,
+                    sample,
+                )?;
+                baseline.observe(
+                    case,
+                    invoke(baseline_sandbox, baseline_bin, &case.argv)?,
+                    sample,
+                )?;
+            } else {
+                baseline.observe(
+                    case,
+                    invoke(baseline_sandbox, baseline_bin, &case.argv)?,
+                    sample,
+                )?;
+                candidate.observe(
+                    case,
+                    invoke(candidate_sandbox, candidate_bin, &case.argv)?,
+                    sample,
+                )?;
+            }
+        }
+        candidate_runs.push(candidate.finish(candidate_sandbox, candidate_bin, case, true)?);
+        baseline_runs.push(baseline.finish(baseline_sandbox, baseline_bin, case, false)?);
+    }
+    Ok((candidate_runs, baseline_runs))
 }
 
 /// Peak RSS for `--version`, taken from the process table (portable on Linux
@@ -808,24 +970,33 @@ fn time_peak_rss(sandbox: &Sandbox, bin: &Path, argv: &[String]) -> Result<Optio
 // Comparison
 // ---------------------------------------------------------------------------
 
+#[derive(Clone, Copy)]
 struct Comparison {
-    ratio: f64,
-    delta_percent: f64,
+    ratio: Option<f64>,
+    delta_percent: Option<f64>,
     regressed: bool,
+}
+
+struct SummaryComparison {
+    baseline_median_ms: Option<f64>,
+    comparison: Option<Comparison>,
+    correct: bool,
 }
 
 fn compare(
     candidate_ms: f64,
     baseline_ms: f64,
-    stdout_equal: bool,
+    output_compatible: bool,
     max_regression_percent: f64,
 ) -> Comparison {
-    let ratio = if baseline_ms > 0.0 {
-        candidate_ms / baseline_ms
-    } else {
-        f64::NAN
-    };
-    let delta_percent = (ratio - 1.0) * 100.0;
+    let ratio = (output_compatible
+        && candidate_ms.is_finite()
+        && candidate_ms > 0.0
+        && baseline_ms.is_finite()
+        && baseline_ms > 0.0)
+        .then(|| candidate_ms / baseline_ms)
+        .filter(|ratio| ratio.is_finite());
+    let delta_percent = ratio.map(|ratio| (ratio - 1.0) * 100.0);
     // Ratios are binary floats, so a run sitting exactly on the budget can land
     // a few ULPs above it. Compare with a small tolerance instead of letting
     // representation error decide the gate.
@@ -835,9 +1006,9 @@ fn compare(
         delta_percent,
         // A candidate that already failed correctness never reports a speed
         // ratio as a regression; it is reported as `failed` instead.
-        regressed: stdout_equal
-            && delta_percent.is_finite()
-            && delta_percent > max_regression_percent + SLACK_PERCENT,
+        regressed: delta_percent.is_some_and(|delta| {
+            delta.is_finite() && delta > max_regression_percent + SLACK_PERCENT
+        }),
     }
 }
 
@@ -893,14 +1064,6 @@ fn main() -> Result<()> {
         })
         .transpose()?;
 
-    // A recorded JSON baseline is read up front and compared without a second
-    // binary; otherwise the live baseline is measured after the candidate.
-    let recorded_baseline = args
-        .baseline_json
-        .as_deref()
-        .map(BaselineMedians::from_json)
-        .transpose()?;
-
     let temp = TempDir::new()?;
     let root = temp.path();
     let mut rng = Rng::new(0x5eed_1234_abcd_0001);
@@ -913,22 +1076,30 @@ fn main() -> Result<()> {
     generate_tree(&tree, TREE_FILES, 200, &mut rng)?;
 
     let cases = cases(root, &small, &large, &tree, TREE_FILES);
+    let fixtures = fixture_config(&small, &large, &tree, TREE_FILES)?;
+    let recorded_baseline = args
+        .baseline_json
+        .as_deref()
+        .map(|path| BaselineMedians::from_json(path, &fixtures))
+        .transpose()?;
 
-    let meter = Meter::new();
-    let sandbox = Sandbox::new(root, meter);
-    let measured = measure_all(&sandbox, &bin, &cases, args.n)?;
-
-    // A live baseline binary runs in its own sandbox and with its own meter, so
-    // neither its isolated HOME nor its RSS accounting can mix with the
-    // candidate's.
-    let baseline_runs = match &baseline_bin {
-        Some(path) => Some(measure_all(
-            &Sandbox::new(root, Meter::new()),
-            path,
-            &cases,
-            args.n,
-        )?),
-        None => None,
+    let candidate_state = TempDir::new()?;
+    let candidate_sandbox = Sandbox::new(candidate_state.path(), Meter::new());
+    let (measured, baseline_runs) = match &baseline_bin {
+        Some(path) => {
+            let baseline_state = TempDir::new()?;
+            let baseline_sandbox = Sandbox::new(baseline_state.path(), Meter::new());
+            let (candidate, baseline) = measure_pair(
+                &candidate_sandbox,
+                &bin,
+                &baseline_sandbox,
+                path,
+                &cases,
+                args.n,
+            )?;
+            (candidate, Some(baseline))
+        }
+        None => (measure_all(&candidate_sandbox, &bin, &cases, args.n)?, None),
     };
     let medians = match (recorded_baseline, &baseline_runs, &baseline_bin) {
         (Some(recorded), _, _) => Some(recorded),
@@ -946,7 +1117,7 @@ fn main() -> Result<()> {
     let mut report_cases = Map::new();
     let mut failures: Vec<String> = Vec::new();
     let mut regressions: Vec<String> = Vec::new();
-    let mut comparison_rows: Vec<(String, Comparison, f64, f64)> = Vec::new();
+    let mut comparison_rows: Vec<SummaryComparison> = Vec::with_capacity(cases.len());
 
     for (index, case) in cases.iter().enumerate() {
         let run = &measured[index];
@@ -967,46 +1138,65 @@ fn main() -> Result<()> {
             .and_then(|m| m.medians.get(case.name).copied())
         {
             Some(baseline_median) => {
-                let stdout_equal = match &baseline_runs {
-                    Some(runs) => runs[index].stdout == run.stdout,
-                    // A recorded JSON carries no stdout, so equality is only
-                    // claimed when the candidate passed its own oracle.
-                    None => true,
+                let (stdout_equal, output_compatible) = match &baseline_runs {
+                    Some(runs) => (
+                        Some(run.stdout == runs[index].stdout),
+                        baseline_output_compatible(case, &run.stdout, &runs[index].stdout),
+                    ),
+                    // A recorded JSON carries no stdout. The candidate's own
+                    // oracle is the available correctness evidence.
+                    None => (None, true),
                 };
                 let comparison = compare(
                     candidate_median,
                     baseline_median,
-                    stdout_equal,
+                    output_compatible,
                     args.max_regression_percent,
                 );
-                entry["correct"] = Value::Bool(stdout_equal);
+                entry["correct"] = Value::Bool(output_compatible);
                 entry["comparison"] = json!({
                     "baseline_label": medians.as_ref().map(|m| m.label.clone()),
                     "baseline_median_ms": round3(baseline_median),
-                    "ratio": round3(comparison.ratio),
-                    "delta_percent": round3(comparison.delta_percent),
+                    "ratio": comparison.ratio.map(round3),
+                    "delta_percent": comparison.delta_percent.map(round3),
                     "stdout_equal": stdout_equal,
+                    "output_compatible": output_compatible,
                     "regressed": comparison.regressed,
                 });
-                entry["outcome"] = json!(outcome(!stdout_equal, comparison.regressed));
-                if !stdout_equal {
+                let invalid_comparison = comparison.delta_percent.is_none();
+                entry["outcome"] = json!(outcome(
+                    !output_compatible || invalid_comparison,
+                    comparison.regressed
+                ));
+                if !output_compatible {
                     failures.push(format!("{}: stdout differs from the baseline", case.name));
+                } else if invalid_comparison {
+                    failures.push(format!(
+                        "{}: comparison produced invalid timing values",
+                        case.name
+                    ));
                 } else if comparison.regressed {
                     regressions.push(format!(
                         "{}: {:.1}% slower than the baseline (limit {:.1}%)",
-                        case.name, comparison.delta_percent, args.max_regression_percent
+                        case.name,
+                        comparison.delta_percent.unwrap_or_default(),
+                        args.max_regression_percent
                     ));
                 }
-                comparison_rows.push((
-                    case.name.to_string(),
-                    comparison,
-                    candidate_median,
-                    baseline_median,
-                ));
+                comparison_rows.push(SummaryComparison {
+                    baseline_median_ms: Some(baseline_median),
+                    comparison: Some(comparison),
+                    correct: output_compatible,
+                });
             }
             None => {
                 entry["comparison"] = Value::Null;
                 entry["outcome"] = json!("recorded");
+                comparison_rows.push(SummaryComparison {
+                    baseline_median_ms: None,
+                    comparison: None,
+                    correct: true,
+                });
             }
         }
         entry["headline"] = Value::Bool(HEADLINE_CASES.contains(&case.name));
@@ -1039,14 +1229,9 @@ fn main() -> Result<()> {
             "warmups": WARMUPS,
             "max_regression_percent": args.max_regression_percent,
             "headline_cases": HEADLINE_CASES,
-            "timing": "parent wall clock from spawn to last stdout byte; process launch included",
-            "scope": "real rdsh binary as a subprocess with an isolated HOME/DSH_HOME/XDG environment; no model calls and no credentials",
-            "fixtures": {
-                "tokens_1mib_bytes": std::fs::metadata(&small)?.len(),
-                "tokens_10mib_bytes": std::fs::metadata(&large)?.len(),
-                "search_tree_files": TREE_FILES,
-                "search_tree_bytes": directory_bytes(&tree)?,
-            },
+            "timing": TIMING_DESCRIPTION,
+            "scope": SCOPE_DESCRIPTION,
+            "fixtures": fixtures,
         },
         "binaries": Value::Object(binaries),
         "cases": Value::Object(report_cases),
@@ -1062,12 +1247,7 @@ fn main() -> Result<()> {
     std::fs::write(&args.output, serde_json::to_vec_pretty(&report)?)
         .with_context(|| format!("failed to write {}", args.output.display()))?;
 
-    print_summary(
-        &cases,
-        &measured,
-        medians.as_ref(),
-        args.max_regression_percent,
-    );
+    print_summary(&cases, &measured, &comparison_rows);
 
     if !failures.is_empty() {
         eprintln!("\nFAILED correctness:");
@@ -1096,38 +1276,15 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn print_summary(
-    cases: &[Case],
-    measured: &[Measured],
-    baseline: Option<&BaselineMedians>,
-    limit: f64,
-) {
+fn print_summary(cases: &[Case], measured: &[Measured], comparisons: &[SummaryComparison]) {
     println!(
         "{:<26} {:>10} {:>10} {:>10} {:>12} {:>9}  outcome",
         "case", "median_ms", "p95_ms", "min_ms", "baseline_ms", "ratio"
     );
-    for (case, run) in cases.iter().zip(measured) {
+    for ((case, run), result) in cases.iter().zip(measured).zip(comparisons) {
         let median_ms = median(&run.samples);
-        let baseline_ms = baseline.and_then(|b| b.medians.get(case.name).copied());
-        let (ratio, outcome) = match baseline_ms {
-            Some(value) => {
-                let ratio = if value > 0.0 {
-                    median_ms / value
-                } else {
-                    f64::NAN
-                };
-                let delta = (ratio - 1.0) * 100.0;
-                (
-                    format!("{ratio:.3}"),
-                    if delta > limit {
-                        format!("REGRESSED +{delta:.1}%")
-                    } else {
-                        format!("ok {delta:+.1}%")
-                    },
-                )
-            }
-            None => ("-".to_string(), "recorded".to_string()),
-        };
+        let baseline_ms = result.baseline_median_ms;
+        let (ratio, outcome) = summary_status(result);
         println!(
             "{:<26} {:>10.3} {:>10.3} {:>10.3} {:>12} {:>9}  {}",
             case.name,
@@ -1151,6 +1308,26 @@ fn print_summary(
     }
 }
 
+fn summary_status(result: &SummaryComparison) -> (String, String) {
+    if !result.correct {
+        return ("-".to_string(), "failed".to_string());
+    }
+    let Some(comparison) = result.comparison else {
+        return ("-".to_string(), "recorded".to_string());
+    };
+    let Some(ratio) = comparison.ratio else {
+        return ("-".to_string(), "failed".to_string());
+    };
+    let Some(delta) = comparison.delta_percent else {
+        return ("-".to_string(), "failed".to_string());
+    };
+    if comparison.regressed {
+        (format!("{ratio:.3}"), format!("REGRESSED +{delta:.1}%"))
+    } else {
+        (format!("{ratio:.3}"), format!("ok {delta:+.1}%"))
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Tests (cargo test --example benchmark_regression)
 // ---------------------------------------------------------------------------
@@ -1161,6 +1338,45 @@ mod tests {
 
     fn args_of(argv: &[&str]) -> Result<Args> {
         parse_args(argv.iter().copied())
+    }
+
+    fn baseline_fixtures() -> Value {
+        json!({
+            "tokens_1mib_bytes": 1_048_700,
+            "tokens_10mib_bytes": 10_486_000,
+            "search_tree_files": 200,
+            "search_tree_bytes": 4_200_000,
+        })
+    }
+
+    fn valid_baseline_report(fixtures: &Value) -> Value {
+        let cases: Map<String, Value> = HEADLINE_CASES
+            .iter()
+            .map(|name| {
+                (
+                    (*name).to_string(),
+                    json!({"median_ms": 1.5, "correct": true, "outcome": "recorded"}),
+                )
+            })
+            .collect();
+        json!({
+            "schema_version": SCHEMA_VERSION,
+            "tool": "benchmark_regression",
+            "platform": {
+                "os": std::env::consts::OS,
+                "arch": std::env::consts::ARCH,
+                "family": std::env::consts::FAMILY,
+                "cpu_count": std::thread::available_parallelism().map(|n| n.get()).unwrap_or(0),
+            },
+            "config": {
+                "warmups": WARMUPS,
+                "headline_cases": HEADLINE_CASES,
+                "timing": TIMING_DESCRIPTION,
+                "scope": SCOPE_DESCRIPTION,
+                "fixtures": fixtures,
+            },
+            "cases": cases,
+        })
     }
 
     #[test]
@@ -1248,24 +1464,126 @@ mod tests {
             !within.regressed,
             "exactly at the limit is not a regression"
         );
-        assert!((within.delta_percent - 10.0).abs() < 1e-9);
+        assert!((within.delta_percent.unwrap() - 10.0).abs() < 1e-9);
 
         let over = compare(121.0, 100.0, true, 10.0);
         assert!(over.regressed);
-        assert!(over.delta_percent > 20.9 && over.delta_percent < 21.1);
+        let delta = over.delta_percent.unwrap();
+        assert!(delta > 20.9 && delta < 21.1);
 
         let faster = compare(80.0, 100.0, true, 10.0);
         assert!(!faster.regressed);
-        assert!((faster.ratio - 0.8).abs() < 1e-9);
+        assert!((faster.ratio.unwrap() - 0.8).abs() < 1e-9);
 
         let incorrect = compare(500.0, 100.0, false, 10.0);
         assert!(
             !incorrect.regressed,
             "an incorrect candidate must not be reported as a speed regression"
         );
+        assert_eq!(incorrect.ratio, None);
+        assert_eq!(incorrect.delta_percent, None);
+        let invalid_timing = compare(f64::MAX, f64::MIN_POSITIVE, true, 10.0);
+        assert_eq!(invalid_timing.ratio, None);
+        assert_eq!(invalid_timing.delta_percent, None);
         assert_eq!(outcome(true, incorrect.regressed), "failed");
         assert_eq!(outcome(false, over.regressed), "regressed");
         assert_eq!(outcome(false, within.regressed), "ok");
+    }
+
+    #[test]
+    fn failed_summary_suppresses_ratio_and_uses_failed_outcome() {
+        let comparison = compare(500.0, 100.0, false, 10.0);
+        let result = SummaryComparison {
+            baseline_median_ms: Some(100.0),
+            comparison: Some(comparison),
+            correct: false,
+        };
+        assert_eq!(summary_status(&result), ("-".into(), "failed".into()));
+    }
+
+    #[test]
+    fn version_output_can_differ_between_valid_builds() {
+        let case = Case {
+            name: "version_startup",
+            argv: vec!["--version".into()],
+            input_bytes: 0,
+            oracle: Oracle::Version,
+            throughput_bytes: 0,
+        };
+        let candidate = b"rdsh 0.3.4\n";
+        let baseline = b"rdsh 0.3.3\n";
+        assert!(case.validate(candidate).is_ok());
+        assert!(case.validate(baseline).is_ok());
+        assert_ne!(candidate, baseline);
+        assert!(baseline_output_compatible(&case, candidate, baseline));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn live_baseline_samples_interleave_with_isolated_state() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let tmp = TempDir::new().unwrap();
+        let log = tmp.path().join("order.log");
+        let candidate_bin = tmp.path().join("candidate.sh");
+        let baseline_bin = tmp.path().join("baseline.sh");
+        for (path, label, version) in [
+            (&candidate_bin, "candidate", "rdsh 1.2.3"),
+            (&baseline_bin, "baseline", "rdsh 1.2.2"),
+        ] {
+            let script = format!(
+                "#!/bin/sh\nprintf '%s\\n' '{label}' >> '{}'\nprintf '%s\\n' '{version}'\n",
+                log.display()
+            );
+            std::fs::write(path, script).unwrap();
+            std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        let candidate_state = TempDir::new().unwrap();
+        let baseline_state = TempDir::new().unwrap();
+        let candidate_sandbox = Sandbox::new(candidate_state.path(), Meter::new());
+        let baseline_sandbox = Sandbox::new(baseline_state.path(), Meter::new());
+        assert_ne!(candidate_sandbox.root, baseline_sandbox.root);
+        let case = Case {
+            name: "interleaved_test",
+            argv: vec!["--version".into()],
+            input_bytes: 0,
+            oracle: Oracle::Version,
+            throughput_bytes: 0,
+        };
+        let (candidate, baseline) = measure_pair(
+            &candidate_sandbox,
+            &candidate_bin,
+            &baseline_sandbox,
+            &baseline_bin,
+            std::slice::from_ref(&case),
+            MIN_SAMPLES,
+        )
+        .unwrap();
+        assert!(baseline_output_compatible(
+            &case,
+            &candidate[0].stdout,
+            &baseline[0].stdout
+        ));
+
+        let lines: Vec<_> = std::fs::read_to_string(log)
+            .unwrap()
+            .lines()
+            .map(str::to_string)
+            .collect();
+        assert_eq!(lines.len(), 2 * (WARMUPS + MIN_SAMPLES));
+        for (iteration, pair) in lines.chunks_exact(2).enumerate() {
+            let expected_first = if iteration % 2 == 0 {
+                "candidate"
+            } else {
+                "baseline"
+            };
+            let expected_second = if expected_first == "candidate" {
+                "baseline"
+            } else {
+                "candidate"
+            };
+            assert_eq!(pair, [expected_first, expected_second]);
+        }
     }
 
     #[test]
@@ -1331,15 +1649,16 @@ mod tests {
     }
 
     #[test]
-    fn stable_oracle_rejects_empty_output() {
+    fn version_oracle_rejects_invalid_output() {
         let case = Case {
             name: "version_startup",
             argv: vec![],
             input_bytes: 0,
-            oracle: Oracle::Stable,
+            oracle: Oracle::Version,
             throughput_bytes: 0,
         };
-        assert_eq!(case.validate(b"rdsh 0.3.3\n").unwrap(), "bytes=11");
+        assert_eq!(case.validate(b"rdsh 0.3.3\n").unwrap(), "version=0.3.3");
+        assert!(case.validate(b"this is not a version\n").is_err());
         assert!(case.validate(b"").is_err());
     }
 
@@ -1376,23 +1695,25 @@ mod tests {
     fn baseline_json_of_another_schema_is_rejected() {
         let tmp = TempDir::new().unwrap();
         let path = tmp.path().join("baseline.json");
+        let fixtures = baseline_fixtures();
         std::fs::write(
             &path,
             br#"{"schema_version":999,"cases":{"version_startup":{"median_ms":1.0}}}"#,
         )
         .unwrap();
-        assert!(BaselineMedians::from_json(&path).is_err());
+        assert!(BaselineMedians::from_json(&path, &fixtures).is_err());
 
         std::fs::write(
             &path,
-            br#"{"schema_version":1,"cases":{"version_startup":{"median_ms":1.5}}}"#,
+            serde_json::to_vec(&valid_baseline_report(&fixtures)).unwrap(),
         )
         .unwrap();
-        let loaded = BaselineMedians::from_json(&path).unwrap();
+        let loaded = BaselineMedians::from_json(&path, &fixtures).unwrap();
+        assert_eq!(loaded.medians.len(), HEADLINE_CASES.len());
         assert_eq!(loaded.medians.get("version_startup"), Some(&1.5));
 
         std::fs::write(&path, b"not json").unwrap();
-        assert!(BaselineMedians::from_json(&path).is_err());
+        assert!(BaselineMedians::from_json(&path, &fixtures).is_err());
     }
 
     /// A baseline missing a usable median must be refused rather than quietly
@@ -1402,39 +1723,79 @@ mod tests {
     fn baseline_json_without_a_usable_median_is_rejected() {
         let tmp = TempDir::new().unwrap();
         let path = tmp.path().join("baseline.json");
-        for (label, json) in [
+        let fixtures = baseline_fixtures();
+        for (label, invalid_case) in [
             (
                 "missing median_ms",
-                br#"{"schema_version":1,"cases":{"version_startup":{}}}"#.as_slice(),
+                json!({"correct": true, "outcome": "recorded"}),
             ),
             (
                 "null median_ms",
-                br#"{"schema_version":1,"cases":{"version_startup":{"median_ms":null}}}"#
-                    .as_slice(),
+                json!({"median_ms": null, "correct": true, "outcome": "recorded"}),
             ),
             (
                 "string median_ms",
-                br#"{"schema_version":1,"cases":{"version_startup":{"median_ms":"1.0"}}}"#
-                    .as_slice(),
+                json!({"median_ms": "1.0", "correct": true, "outcome": "recorded"}),
             ),
             (
                 "zero median_ms",
-                br#"{"schema_version":1,"cases":{"version_startup":{"median_ms":0.0}}}"#.as_slice(),
+                json!({"median_ms": 0.0, "correct": true, "outcome": "recorded"}),
             ),
             (
                 "negative median_ms",
-                br#"{"schema_version":1,"cases":{"version_startup":{"median_ms":-1.0}}}"#
-                    .as_slice(),
-            ),
-            (
-                "empty cases",
-                br#"{"schema_version":1,"cases":{}}"#.as_slice(),
+                json!({"median_ms": -1.0, "correct": true, "outcome": "recorded"}),
             ),
         ] {
-            std::fs::write(&path, json).unwrap();
+            let mut report = valid_baseline_report(&fixtures);
+            report["cases"]["version_startup"] = invalid_case;
+            std::fs::write(&path, serde_json::to_vec(&report).unwrap()).unwrap();
             assert!(
-                BaselineMedians::from_json(&path).is_err(),
+                BaselineMedians::from_json(&path, &fixtures).is_err(),
                 "{label} should be refused"
+            );
+        }
+    }
+
+    #[test]
+    fn baseline_json_requires_complete_correct_same_platform_fixtures() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("baseline.json");
+        let fixtures = baseline_fixtures();
+        let mut report = valid_baseline_report(&fixtures);
+        report["cases"]
+            .as_object_mut()
+            .unwrap()
+            .remove("tokens_1mib");
+        std::fs::write(&path, serde_json::to_vec(&report).unwrap()).unwrap();
+        assert!(BaselineMedians::from_json(&path, &fixtures).is_err());
+
+        for (label, mutate) in [
+            (
+                "failed correctness",
+                Box::new(|report: &mut Value| {
+                    report["cases"]["version_startup"]["correct"] = json!(false);
+                    report["cases"]["version_startup"]["outcome"] = json!("failed");
+                }) as Box<dyn Fn(&mut Value)>,
+            ),
+            (
+                "different platform",
+                Box::new(|report: &mut Value| {
+                    report["platform"]["arch"] = json!("other-arch");
+                }),
+            ),
+            (
+                "different fixtures",
+                Box::new(|report: &mut Value| {
+                    report["config"]["fixtures"]["search_tree_files"] = json!(199);
+                }),
+            ),
+        ] {
+            let mut report = valid_baseline_report(&fixtures);
+            mutate(&mut report);
+            std::fs::write(&path, serde_json::to_vec(&report).unwrap()).unwrap();
+            assert!(
+                BaselineMedians::from_json(&path, &fixtures).is_err(),
+                "{label} baseline should be refused"
             );
         }
     }
@@ -1470,19 +1831,21 @@ mod tests {
         std::env::remove_var("RDSH_LEAK_CANARY");
     }
 
+    #[cfg(unix)]
     #[test]
     fn meter_tracks_spawned_children() {
+        let tmp = TempDir::new().unwrap();
         let meter = Meter::new();
-        let sandbox = Sandbox::new(&std::env::temp_dir(), meter.clone());
-        let argv = vec!["-n".to_string(), "1".to_string(), "1".to_string()];
-        if let Ok(run) = invoke(&sandbox, Path::new("/bin/sleep"), &argv) {
-            assert!(run.elapsed_ms > 0.0);
-            if cfg!(unix) {
-                assert!(
-                    run.elapsed_cpu_ms.is_some(),
-                    "getrusage(RUSAGE_CHILDREN) should account for the child"
-                );
-            }
+        let sandbox = Sandbox::new(tmp.path(), meter.clone());
+        let argv = vec!["0.01".to_string()];
+        let run = invoke(&sandbox, Path::new("/bin/sleep"), &argv).unwrap();
+        assert!(run.elapsed_ms > 0.0);
+        assert_eq!(meter.0.lock().unwrap().children, 1);
+        if cfg!(unix) {
+            assert!(
+                run.elapsed_cpu_ms.is_some(),
+                "getrusage(RUSAGE_CHILDREN) should account for the child"
+            );
         }
     }
 }
