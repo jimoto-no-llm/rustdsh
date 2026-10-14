@@ -79,9 +79,19 @@ discovery over https passes it to `curl` through a config on stdin, not argv.
 - If no key is given and none is stored, the route is still written and the
   command says the key is missing.
 - `rdsh auth` reports a profile's default model route as `credential ok` or
-  `credential missing` together with the key name. `rdsh setup --yes` saves
-  `HAI_API_KEY` / `SARASHINA_API_KEY` / `LOCAL_OPENAI_API_KEY` from the environment, like the other
-  known keys, and the setup UI's key endpoint accepts both names.
+  `credential missing` together with the key name. `rdsh setup --yes` does
+  not save these three keys from the environment (it still saves the
+  well-known `DEEPSEEK_API_KEY`, `OPENAI_API_KEY` and `ANTHROPIC_API_KEY`);
+  store a route key with `rdsh provider add` as above, or with the setup UI's
+  key endpoint, which accepts these names.
+- An exported route key (`HAI_API_KEY`, `LOCAL_OPENAI_API_KEY`,
+  `SARASHINA_API_KEY`) alone does not count as a connection in `rdsh setup`
+  or the first-run banner: it counts only when a profile's default model uses
+  a registered route that declares exactly that key.
+- If `llm-pi-ai` is mentioned anywhere other than one plain top-level entry
+  (for example inside `- insert:`), `provider add` refuses and prints the YAML
+  to add by hand, because appending a second entry would replace the nested
+  definition's config.
 
 ## HAI
 

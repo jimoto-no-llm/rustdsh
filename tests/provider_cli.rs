@@ -781,6 +781,72 @@ fn a_route_key_counts_once_the_default_route_uses_it() {
 }
 
 #[test]
+fn an_unrelated_ok_default_does_not_let_an_unregistered_route_key_skip_setup() {
+    let fixture = Fixture::new();
+    // The default is openai-codex without apiKeyEnv; its only credential is
+    // an un-imported key in the external Codex store (state `ok`).
+    fixture.set_patch(
+        "- id: llm-pi-ai\n  config:\n    providers:\n      other:\n        apiKeyEnv: OTHER_API_KEY\n        models:\n          - id: x\n- id: agent-default-model\n  config:\n    provider: openai-codex\n    model: gpt-5\n",
+    );
+    fs::create_dir_all(fixture.0.join("home/.codex")).unwrap();
+    fs::write(
+        fixture.0.join("home/.codex/auth.json"),
+        "{\"OPENAI_API_KEY\": \"sk-not-real\"}",
+    )
+    .unwrap();
+    for key in ["HAI_API_KEY", "LOCAL_OPENAI_API_KEY", "SARASHINA_API_KEY"] {
+        let without = setup_json(&fixture, &[], &[]);
+        let with = setup_json(&fixture, &[(key, "sk-not-real")], &[]);
+        assert_eq!(without["needed"], with["needed"], "{key}: {with}");
+        assert_eq!(without["needed"], true, "{key}: {without}");
+    }
+}
+
+#[test]
+fn nested_and_blank_before_colon_definitions_are_handled_safely() {
+    // A nested definition: refused, file unchanged.
+    let fixture = Fixture::new();
+    let nested = "- insert:\n    - id: llm-pi-ai\n      config:\n        providers:\n          other:\n            baseURL: http://o\n  config:\n    unrelated: 1\n";
+    fixture.set_patch(nested);
+    let out = fixture.run_with(
+        &[
+            "provider",
+            "add",
+            "hai",
+            "--profile",
+            "tui",
+            "--model",
+            "m1",
+        ],
+        &[("HAI_API_KEY", "sk-not-real")],
+        b"",
+    );
+    assert_eq!(out.status.code(), Some(1), "{}", text(&out));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("by hand"));
+    assert_eq!(fixture.patch(), nested);
+    // Blanks before the colon: the edit goes into the existing entry.
+    let spaced = PATCH.replace("- id: llm-pi-ai", "- id : llm-pi-ai");
+    fixture.set_patch(&spaced);
+    let out = fixture.run_with(
+        &[
+            "provider",
+            "add",
+            "hai",
+            "--profile",
+            "tui",
+            "--model",
+            "m1",
+        ],
+        &[("HAI_API_KEY", "sk-not-real")],
+        b"",
+    );
+    ok(&out);
+    let after = fixture.patch();
+    assert_eq!(after.matches("llm-pi-ai").count(), 1, "{after}");
+    assert!(after.contains("apiKeyEnv: OTHER_API_KEY") && after.contains("      hai:\n"));
+}
+
+#[test]
 fn quoted_and_commented_ids_and_wide_indents_keep_every_route() {
     for (head, width) in [
         ("- id: llm-pi-ai # custom routes", 2usize),

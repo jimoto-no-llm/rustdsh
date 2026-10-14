@@ -347,7 +347,8 @@ fn key_rest<'a>(line: &'a str, key: &str) -> Option<&'a str> {
     let trimmed = line.trim_start();
     for form in [key.to_string(), format!("\"{key}\""), format!("'{key}'")] {
         if let Some(rest) = trimmed.strip_prefix(form.as_str()) {
-            if let Some(after) = rest.strip_prefix(':') {
+            // YAML allows blanks between the key and its colon.
+            if let Some(after) = rest.trim_start_matches([' ', '\t']).strip_prefix(':') {
                 if after.is_empty() || after.starts_with([' ', '\t', '\r']) {
                     return Some(strip_comment(after.trim()));
                 }
@@ -463,6 +464,41 @@ fn llm_pi_ai_entry(lines: &[String]) -> std::result::Result<Option<usize>, Strin
         return Err("llm-pi-ai is declared by more than one patch entry".to_string());
     }
     Ok(found.first().copied())
+}
+
+/// Whether a line (comment removed) holds `llm-pi-ai` or the plugin name as a
+/// whole scalar token, at any depth and in any position.
+fn mentions_pi_ai(line: &str) -> bool {
+    let body = strip_comment(line);
+    body.split(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '_' | '@' | '/' | '.' | '-')))
+        .any(|tok| tok == PI_AI_ID || tok == PI_AI_NAME)
+}
+
+/// `llm_pi_ai_entry`, plus: the document defines llm-pi-ai in exactly one
+/// place. Cordis lets a later top-level patch target an entry inserted
+/// earlier, so appending a top-level `- id: llm-pi-ai` next to a nested
+/// definition would replace that definition's whole config. Any mention
+/// outside the entry's own top-level keys (another entry, a nested `insert`,
+/// a deeper key) is therefore refused.
+fn sole_pi_ai_entry(lines: &[String]) -> std::result::Result<Option<usize>, String> {
+    let entry = llm_pi_ai_entry(lines)?;
+    let (own, col) = match entry {
+        Some(start) => (start..block_end(lines, start), dash_key_col(&lines[start])),
+        None => (0..0, 0),
+    };
+    for (i, line) in lines.iter().enumerate() {
+        if !mentions_pi_ai(line) {
+            continue;
+        }
+        let top_key = entry.is_some_and(|s| i == s || indent_of(line) == col);
+        if !(own.contains(&i) && top_key) {
+            return Err(
+                "llm-pi-ai is also mentioned elsewhere in the file (a nested or second definition)"
+                    .to_string(),
+            );
+        }
+    }
+    Ok(entry)
 }
 
 /// Column of the first key on a `- key: v` line.
@@ -625,7 +661,7 @@ fn verify_written(
     route: &Route,
 ) -> std::result::Result<(), String> {
     let lines = split_lines(after);
-    llm_pi_ai_entry(&lines)?.ok_or("the llm-pi-ai entry is not found after the edit")?;
+    sole_pi_ai_entry(&lines)?.ok_or("the llm-pi-ai entry is not found after the edit")?;
     let provs = locate_providers(&lines)
         .map_err(|e| e.to_string())?
         .ok_or("the providers block is not found after the edit")?;
@@ -734,7 +770,7 @@ fn apply_route(text: &str, route: &Route, replace: bool) -> Result<Applied> {
     };
 
     let has_content = lines.iter().any(|l| !skippable(l));
-    let entry = llm_pi_ai_entry(&lines).map_err(|e| refuse(&e, route))?;
+    let entry = sole_pi_ai_entry(&lines).map_err(|e| refuse(&e, route))?;
     let Some(entry) = entry else {
         if has_content {
             let top_ok = lines
@@ -2265,16 +2301,41 @@ mod tests {
     }
 
     #[test]
-    fn a_nested_llm_pi_ai_inside_insert_is_not_the_entry() {
-        let text = "- insert:\n    - id: llm-pi-ai\n      name: \"@deepseek-ai/dsh-llm-pi-ai\"\n      config:\n        providers:\n          other:\n            baseURL: http://o\n  config:\n    unrelated: 1\n";
-        let out = apply_route(text, &route("hai", &["m1"]), false)
-            .unwrap()
-            .text;
-        // Nothing inside the insert is touched; a top-level entry is appended.
-        assert!(out.starts_with(text));
-        assert!(out.ends_with("\n- id: llm-pi-ai\n  config:\n    providers:\n      hai:\n        displayName: HAI\n        apiKeyEnv: HAI_API_KEY\n        api: openai-completions\n        baseURL: https://hai-api.hcloud.ltd/v1\n        models:\n          - id: m1\n"), "{out}");
-        let ids: Vec<String> = routes_in(&out).into_iter().map(|r| r.id).collect();
-        assert_eq!(ids, ["hai"]);
+    fn a_nested_llm_pi_ai_is_refused_never_shadowed_by_an_appended_entry() {
+        let nested = "- insert:\n    - id: llm-pi-ai\n      name: \"@deepseek-ai/dsh-llm-pi-ai\"\n      config:\n        providers:\n          other:\n            baseURL: http://o\n  config:\n    unrelated: 1\n";
+        // A top-level entry that exists, plus a second definition nested elsewhere.
+        let with_entry = "- id: llm-pi-ai\n  config:\n    providers:\n      a:\n        baseURL: http://a\n- insert:\n    - id: llm-pi-ai\n      config: {}\n";
+        let deeper = "- id: llm-pi-ai\n  config:\n    providers:\n      a:\n        baseURL: http://a\n    note: llm-pi-ai\n";
+        let other_entry = "- id: x\n  config:\n    use: llm-pi-ai\n";
+        for text in [nested, with_entry, deeper, other_entry] {
+            let err = apply_route(text, &route("hai", &["m1"]), false)
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("by hand"), "{text:?}: {err}");
+        }
+        // Comments do not count as a mention.
+        let commented = "# llm-pi-ai goes here\n- id: x\n";
+        assert!(apply_route(commented, &route("hai", &["m1"]), false).is_ok());
+    }
+
+    #[test]
+    fn blanks_before_the_colon_are_still_the_same_key() {
+        for head in [
+            "- id : llm-pi-ai",
+            "- \"id\" : llm-pi-ai",
+            "- 'id'  :  llm-pi-ai",
+            "- id\t: llm-pi-ai",
+        ] {
+            let text = format!(
+                "{head}\n  config :\n    providers :\n      other :\n        baseURL : http://o\n        models:\n          - id: o1\n"
+            );
+            let out = apply_route(&text, &route("hai", &["m1"]), false)
+                .unwrap_or_else(|e| panic!("{head}: {e}"))
+                .text;
+            assert_eq!(out.matches("llm-pi-ai").count(), 1, "{head}\n{out}");
+            let ids: Vec<String> = routes_in(&out).into_iter().map(|r| r.id).collect();
+            assert_eq!(ids, ["other", "hai"], "{head}\n{out}");
+        }
     }
 
     #[test]

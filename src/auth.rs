@@ -1071,7 +1071,16 @@ fn setup_needed_in(s: &Scan) -> bool {
         return false;
     }
     if route_key_present(doc) {
-        return !provider_needs(s).iter().any(|n| n.state == "ok");
+        // Only a registered default whose route declares a route key that is
+        // actually present connects; an unrelated default being `ok` (say via
+        // an un-imported external candidate) must not.
+        return !provider_needs(s).iter().any(|n| {
+            n.state == "ok"
+                && n.api_key_env.as_deref().is_some_and(|k| {
+                    PROVIDER_ROUTE_KEYS.contains(&k)
+                        && (doc.refs.get(k).is_some_and(|v| !v.is_empty()) || env_key_set(k))
+                })
+        });
     }
     true
 }
@@ -1290,6 +1299,8 @@ pub struct ProviderNeed {
     pub model: String,
     pub via: String,
     pub state: &'static str,
+    /// `apiKeyEnv` declared on the provider block, if any.
+    pub api_key_env: Option<String>,
 }
 
 /// Read every profile's `agent-default-model` entry (what the dsh GUI
@@ -1345,6 +1356,7 @@ fn provider_needs(s: &Scan) -> Vec<ProviderNeed> {
             model,
             via,
             state,
+            api_key_env,
         });
     }
     out
