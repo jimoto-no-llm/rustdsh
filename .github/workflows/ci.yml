@@ -131,9 +131,12 @@ jobs:
       - run: cargo test --example benchmark_extended
       - run: cargo test --example benchmark_models
       - run: cargo build
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: plugins/rdsh-compute
+      - run: npm test
+        working-directory: plugins/rdsh-compute
+        env:
+          RDSH_BIN: ${{ runner.os == 'Windows' && format('{0}/target/debug/rdsh.exe', github.workspace) || format('{0}/target/debug/rdsh', github.workspace) }}
       - run: node --test tests/runtime-compatibility.test.mjs tests/icon-assets.test.mjs
       - if: matrix.regress
         shell: bash

@@ -6,12 +6,51 @@ import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { Context } from "@deepseek-ai/cordis";
+import { apply } from "../index.js";
 
 const harness = "/Applications/DeepSeek Harness.app/Contents/MacOS/DeepSeek Harness";
 const cordis = "/Applications/DeepSeek Harness.app/Contents/Resources/app.asar/dsh/node_modules/@deepseek-ai/cordis";
 const plugin = pathToFileURL(join(process.cwd(), "index.js")).href;
 
-test("real Cordis provides rdshCompute and releases its worker on plugin disposal", async (t) => {
+async function enableCompute(t) {
+  const home = await mkdtemp(join(tmpdir(), "rdsh-compute-cordis-"));
+  const previousHome = process.env.DSH_HOME;
+  const previousCompute = process.env.RDSH_COMPUTE;
+  process.env.DSH_HOME = home;
+  process.env.RDSH_COMPUTE = "1";
+  t.after(async () => {
+    if (previousHome === undefined) delete process.env.DSH_HOME;
+    else process.env.DSH_HOME = previousHome;
+    if (previousCompute === undefined) delete process.env.RDSH_COMPUTE;
+    else process.env.RDSH_COMPUTE = previousCompute;
+    await rm(home, { recursive: true, force: true });
+  });
+  await writeFile(join(home, "rdsh.json"), JSON.stringify({ features: { compute: true } }));
+  return home;
+}
+
+test("pinned Cordis provides rdshCompute and disposes the actual worker", async (t) => {
+  await enableCompute(t);
+  assert.ok(process.env.RDSH_BIN, "RDSH_BIN must point to the built rdsh binary");
+  assert.equal(existsSync(process.env.RDSH_BIN), true, "RDSH_BIN must exist");
+
+  const ctx = new Context();
+  const fiber = ctx.plugin({ apply });
+  try {
+    await fiber.await();
+    const bridge = ctx.get("rdshCompute");
+    assert.ok(bridge, "rdshCompute service was not provided");
+    const result = await bridge.estimate("abcd1234");
+    assert.equal(result.usedRust, true);
+    assert.equal(result.result.tokens, 2);
+  } finally {
+    await fiber.dispose();
+  }
+  assert.equal(ctx.get("rdshCompute"), undefined);
+});
+
+test("installed Cordis integration provides rdshCompute and releases its worker", async (t) => {
   if (!existsSync(harness) || !existsSync("/Applications/DeepSeek Harness.app/Contents/Resources/app.asar")) {
     t.skip("DeepSeek Harness SDK is unavailable on this host");
     return;

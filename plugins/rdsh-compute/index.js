@@ -21,6 +21,8 @@ import { join } from "node:path";
 export const PROTOCOL_VERSION = 1;
 export const MAX_TEXT_BYTES = 1_048_576;
 const DEFAULT_TIMEOUT_MS = 5000;
+const DEFAULT_SHUTDOWN_GRACE_MS = 250;
+const DEFAULT_SHUTDOWN_TIMEOUT_MS = 1000;
 
 // Feature switches live in $DSH_HOME/rdsh.json. An id that is absent (or a
 // missing, unreadable or corrupt file) keeps the caller's fallback; an explicit
@@ -105,8 +107,16 @@ export function resolveRdshBin(env = process.env, platform = process.platform, e
   return "rdsh";
 }
 
-export function createComputeBridge({ bin = "rdsh", timeoutMs = DEFAULT_TIMEOUT_MS, spawnImpl = spawn } = {}) {
+export function createComputeBridge({
+  bin = "rdsh",
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  shutdownGraceMs = DEFAULT_SHUTDOWN_GRACE_MS,
+  shutdownTimeoutMs = DEFAULT_SHUTDOWN_TIMEOUT_MS,
+  spawnImpl = spawn,
+} = {}) {
   let child = null;
+  let closed = false;
+  let closing = null;
   let seq = 0;
   const pending = new Map();
   const failedWorkers = new WeakSet();
@@ -121,9 +131,11 @@ export function createComputeBridge({ bin = "rdsh", timeoutMs = DEFAULT_TIMEOUT_
       slot.reject(err);
     }
     if (child === worker) child = null;
-    try {
-      worker.kill();
-    } catch {}
+    if (worker.exitCode === null && worker.signalCode === null) {
+      try {
+        worker.kill();
+      } catch {}
+    }
   }
 
   function ensureChild() {
@@ -202,7 +214,7 @@ export function createComputeBridge({ bin = "rdsh", timeoutMs = DEFAULT_TIMEOUT_
   async function estimate(text) {
     // chars counts Unicode scalars, matching Rust str::chars().count().
     const fallback = () => ({ tokens: jsEstimate(text), chars: [...text].length });
-    if (!isEnabled()) return { result: fallback(), usedRust: false, timings: null };
+    if (closed || !isEnabled()) return { result: fallback(), usedRust: false, timings: null };
     const t0 = process.hrtime.bigint();
     try {
       const msg = await request("tokens.estimate", { text });
@@ -223,7 +235,7 @@ export function createComputeBridge({ bin = "rdsh", timeoutMs = DEFAULT_TIMEOUT_
       chars: texts.map((t) => [...t].length),
       total: texts.map(jsEstimate).reduce((a, b) => a + b, 0),
     });
-    if (!isEnabled()) return { result: fallback(), usedRust: false, timings: null };
+    if (closed || !isEnabled()) return { result: fallback(), usedRust: false, timings: null };
     const t0 = process.hrtime.bigint();
     try {
       const msg = await request("tokens.estimate_batch", { texts });
@@ -244,7 +256,7 @@ export function createComputeBridge({ bin = "rdsh", timeoutMs = DEFAULT_TIMEOUT_
 
   async function prune(text, maxTokens = 4000) {
     const fallback = () => ({ pruned: text, before: jsEstimate(text), after: jsEstimate(text), budget: maxTokens });
-    if (!isEnabled()) return { result: fallback(), usedRust: false, timings: null };
+    if (closed || !isEnabled()) return { result: fallback(), usedRust: false, timings: null };
     const t0 = process.hrtime.bigint();
     try {
       const msg = await request("tokens.prune", { text, max_tokens: maxTokens });
@@ -264,30 +276,53 @@ export function createComputeBridge({ bin = "rdsh", timeoutMs = DEFAULT_TIMEOUT_
   }
 
   function close() {
+    if (closing) return closing;
+    closed = true;
     const worker = child;
     child = null;
-    if (!worker) return;
-    return new Promise((resolve) => {
-      let closed = false;
+    if (!worker) return closing = Promise.resolve();
+    closing = new Promise((resolve, reject) => {
+      let settled = false;
+      let graceTimer;
+      let finalTimer;
+      const cleanup = () => {
+        clearTimeout(graceTimer);
+        clearTimeout(finalTimer);
+        worker.removeListener?.("exit", finish);
+        worker.removeListener?.("close", finish);
+      };
       const finish = () => {
-        if (closed) return;
-        closed = true;
+        if (settled) return;
+        settled = true;
+        cleanup();
         resolve();
       };
-      if (worker.exitCode !== null || worker.signalCode !== null) {
-        finish();
-        return;
-      }
-      worker.once?.("close", finish);
+      const fail = () => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(new Error("rdsh compute worker did not exit after SIGTERM and SIGKILL"));
+      };
+      const signal = (name) => {
+        try {
+          worker.kill(name);
+        } catch {}
+      };
+      worker.once("exit", finish);
+      worker.once("close", finish);
       try {
         worker.stdin?.end();
       } catch {}
-      try {
-        if (worker.kill() === false && (worker.exitCode !== null || worker.signalCode !== null)) finish();
-      } catch {
-        if (worker.exitCode !== null || worker.signalCode !== null) finish();
-      }
+      signal("SIGTERM");
+      if (settled) return;
+      graceTimer = setTimeout(() => {
+        if (settled) return;
+        if (worker.exitCode === null && worker.signalCode === null) signal("SIGKILL");
+        if (settled) return;
+        finalTimer = setTimeout(fail, shutdownTimeoutMs);
+      }, shutdownGraceMs);
     });
+    return closing;
   }
 
   return { estimate, estimateBatch, prune, close, jsEstimate, isEnabled };
