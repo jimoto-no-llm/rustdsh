@@ -92,10 +92,14 @@ try {
   // A focusable, disabled placeholder is not an input-ready workspace. Pick
   // the fresh profile's own workspace through the shipped controls on both OSes.
   const workspacePicker = workspace.getByRole('button', { name: 'Choose workspace', exact: true });
+  const composer = workspace.locator('[data-composer-input][contenteditable="true"]').first();
+  // Boot chrome disappears before the default session's asynchronous selection
+  // completes. Opening its menu during that handoff can close it again.
+  await workspacePicker.filter({ hasText: 'Default workspace' }).waitFor({ state: 'visible', timeout: 120000 });
+  await composer.waitFor({ state: 'visible', timeout: 120000 });
   await workspacePicker.click();
   await workspace.getByRole('menuitem', { name: 'Default workspace', exact: true }).click();
   await workspacePicker.filter({ hasText: 'Default workspace' }).waitFor({ state: 'visible' });
-  const composer = workspace.locator('[data-composer-input][contenteditable="true"]').first();
   await composer.waitFor({ state: 'visible', timeout: 120000 });
   await composer.click();
   assert.equal(await composer.evaluate(element => element === document.activeElement || element.contains(document.activeElement)), true);
