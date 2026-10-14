@@ -27,7 +27,10 @@ Prerequisites: a clean committed checkout, Rust/Cargo, `zstd`, `shasum`, an
 installed DSH with `headless --json`, and an existing authenticated credential
 store. The provider catalog is a non-secret JSON object keyed by `openai-codex`
 and `anthropic`, each with a `models` array. Each selected provider must contain
-the exact requested model and its official compatibility metadata. The defaults
+the exact requested installed model ID. The official installed catalog supplies
+its model metadata: raw SDK `compat` fields are not profile overrides and must
+not be copied into DSH configuration. The catalog and runtime artifact are
+fingerprinted in the report. The defaults
 remain `gpt-6.1-sol` and `claude-sonnet-5-5`; `--codex-model` and
 `--anthropic-model` select other catalog IDs without fallback. With
 `--only-provider`, the other provider's catalog is not required.
@@ -53,7 +56,9 @@ For a catalog containing `gpt-6-astra` but no Anthropic models, use
 `--only-provider openai-codex --codex-model gpt-6-astra`. Model IDs must begin
 with an ASCII letter or digit, contain only letters, digits, dots, hyphens or
 underscores, and fit in 128 bytes; they are also used in private run-directory
-names. An unavailable ID fails before creating the run or sending a request.
+names. An ID absent from the supplied catalog fails before creating the run or sending
+a request. The installed runtime must also recognize the selected ID; its
+configuration failures count as failed runs, with no alternate model fallback.
 
 Use `--only-case rust_fix` and optionally `--only-provider anthropic` for a
 bounded follow-up. Follow-up results remain separate from the original benchmark.

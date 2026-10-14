@@ -70,14 +70,14 @@ fn provider_configs(
             if only.is_some_and(|selected| selected != provider) {
                 return Ok(None);
             }
-            let spec = catalog[provider]["models"]
+            catalog[provider]["models"]
                 .as_array()
                 .context("catalog models missing")?
                 .iter()
                 .find(|v| v["id"] == model)
                 .context("requested model missing from catalog")?;
             Ok(Some(
-                json!({"models":[spec],"retryPolicy":{"mode":"normal","maxRetries":0}}),
+                json!({"models":[{"id":model}],"retryPolicy":{"mode":"normal","maxRetries":0}}),
             ))
         })
         .collect()
@@ -717,6 +717,8 @@ fn main() -> Result<()> {
         "runtime_artifact_sha256":args.runtime_artifact.as_deref().map(fingerprint).transpose()?,
         "measurement":"response from spawn to committed turn_end; process lifetime and normal exit tracked separately; first text is not first token",
         "ordering":"sequential; alternate provider and launcher order every sample; no automatic retries",
+        "catalog_sha256":fingerprint(&args.catalog)?,
+        "catalog_resolution":"exact ID selected from supplied catalog; official installed catalog supplies model metadata without raw SDK compat overrides",
         "authentication":"existing official credential provider; normal OAuth refresh permitted; no credential export",
         "only_case":args.only_case,"only_provider":args.only_provider,
         "runs":[]});
@@ -909,7 +911,7 @@ mod tests {
         assert!(result[1].is_none());
         assert_eq!(
             result[0].as_ref().unwrap()["models"][0],
-            catalog["openai-codex"]["models"][0]
+            json!({"id":"gpt-6-astra"})
         );
         assert_eq!(result[0].as_ref().unwrap()["retryPolicy"]["maxRetries"], 0);
         assert!(provider_configs(&catalog, &selections, None).is_err());
