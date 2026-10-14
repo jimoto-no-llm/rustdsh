@@ -170,15 +170,17 @@ function supportsWorkerScope(file) {
 }
 
 function rdshExecutable() {
-  if (process.env.RDSH_BIN) return path.resolve(process.env.RDSH_BIN);
+  if (process.env.RDSH_BIN) {
+    if (!path.isAbsolute(process.env.RDSH_BIN)) {
+      throw new WorkerError("invalid_rdsh_bin");
+    }
+    return path.resolve(process.env.RDSH_BIN);
+  }
   const executableName = process.platform === "win32" ? "rdsh.exe" : "rdsh";
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
   const candidates = [
     path.join(root, "target", "debug", executableName),
     path.join(root, "target", "release", executableName),
-    ...(process.env.PATH || "").split(path.delimiter).map((directory) =>
-      path.join(directory, executableName),
-    ),
   ];
   return candidates.find((candidate) =>
     executable(candidate) && supportsWorkerScope(candidate),
