@@ -867,19 +867,21 @@ fn extract(source: &str, path: &str, lang: &str) -> Entry {
                     let mut nested = 0usize;
                     let mut j = next;
                     while j < tokens.len()
-                        && token(&tokens, j) != ";"
+                        && !(tokens[j].kind == Kind::Punct && token(&tokens, j) == ";")
                         && tokens[j].kind != Kind::Newline
                     {
-                        match token(&tokens, j) {
-                            "(" | "[" | "{" => nested += 1,
-                            ")" | "]" | "}" => nested = nested.saturating_sub(1),
-                            "," if nested == 0 => definition(
-                                &tokens,
-                                next_code(&tokens, j + 1),
-                                &mut symbols,
-                                &mut declarations,
-                            ),
-                            _ => (),
+                        if tokens[j].kind == Kind::Punct {
+                            match token(&tokens, j) {
+                                "(" | "[" | "{" => nested += 1,
+                                ")" | "]" | "}" => nested = nested.saturating_sub(1),
+                                "," if nested == 0 => definition(
+                                    &tokens,
+                                    next_code(&tokens, j + 1),
+                                    &mut symbols,
+                                    &mut declarations,
+                                ),
+                                _ => (),
+                            }
                         }
                         j += 1;
                     }
@@ -1336,18 +1338,18 @@ fn resolve(
         }
         "go" => {
             let directory = if let Some(local) = spec.strip_prefix("./") {
-                local
+                parent.join(local)
             } else if !go_module.is_empty() && spec == go_module {
-                ""
+                PathBuf::new()
             } else if !go_module.is_empty() {
                 match spec.strip_prefix(&format!("{go_module}/")) {
-                    Some(p) => p,
+                    Some(p) => PathBuf::from(p),
                     None => return Vec::new(),
                 }
             } else {
                 return Vec::new();
             };
-            let Some(dir) = normal_path(Path::new(directory)) else {
+            let Some(dir) = normal_path(&directory) else {
                 return Vec::new();
             };
             let dir = relative(&dir);
@@ -1435,13 +1437,26 @@ struct Graph {
     unresolved: usize,
 }
 
+fn symbol_language(lang: &str) -> &str {
+    if matches!(lang, "js" | "ts") {
+        "js-ts"
+    } else {
+        lang
+    }
+}
+
 impl Graph {
     fn new(index: &Index) -> Self {
         let mut symbols: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+        let mut symbols_by_lang: BTreeMap<(String, String), BTreeSet<String>> = BTreeMap::new();
         for (path, entry) in &index.files {
             for symbol in &entry.symbols {
                 symbols
                     .entry(symbol.clone())
+                    .or_default()
+                    .insert(path.clone());
+                symbols_by_lang
+                    .entry((symbol_language(&entry.lang).to_string(), symbol.clone()))
                     .or_default()
                     .insert(path.clone());
             }
@@ -1461,29 +1476,22 @@ impl Graph {
             }
             for called in &entry.static_calls {
                 // Resolve same-file and directly imported definitions first.
-                let mut definitions: BTreeSet<_> = symbols
-                    .get(called)
-                    .into_iter()
-                    .flatten()
-                    .filter(|p| *p == path || entry.imports.contains(p))
-                    .cloned()
-                    .collect();
+                let candidates = symbols_by_lang
+                    .get(&(symbol_language(&entry.lang).to_string(), called.clone()));
+                let mut definitions = BTreeSet::new();
+                if let Some(candidates) = candidates {
+                    for imported in std::iter::once(path).chain(entry.imports.iter()) {
+                        if candidates.contains(imported) {
+                            definitions.insert(imported.clone());
+                        }
+                    }
+                }
                 if definitions.is_empty() {
                     // Same-language name matches are potential edges, with
-                    // an unknown binding counted in unresolved.
-                    definitions = symbols
-                        .get(called)
-                        .into_iter()
-                        .flatten()
-                        .filter(|p| {
-                            index.files.get(*p).is_some_and(|other| {
-                                other.lang == entry.lang
-                                    || matches!(other.lang.as_str(), "js" | "ts")
-                                        && matches!(entry.lang.as_str(), "js" | "ts")
-                            })
-                        })
-                        .cloned()
-                        .collect();
+                    // an unknown binding counted in unresolved. Two paths are
+                    // enough to distinguish unique from ambiguous; avoid
+                    // walking every definition of common names such as `run`.
+                    definitions = candidates.into_iter().flatten().take(2).cloned().collect();
                     if definitions.len() == 1 {
                         unresolved += 1;
                     }
@@ -2505,6 +2513,18 @@ mod tests {
     }
 
     #[test]
+    fn js_declaration_scan_ignores_delimiters_inside_string_literals() {
+        let entry = extract(
+            r#"const before = "{", middle = ";", after = 1; const tail = "}";"#,
+            "app.js",
+            "js",
+        );
+        for symbol in ["before", "middle", "after", "tail"] {
+            assert!(contains(&entry.symbols, symbol), "{symbol}");
+        }
+    }
+
+    #[test]
     fn python_extracts_imports_classes_async_and_triple_quotes() {
         let source = "import os, package.module as alias\nfrom .helpers import (run, value as v)\nclass Worker:\n    async def launch(self):\n        run()\n        self.dynamic()\n# def fake(): hidden()\ntext = '''def invisible(): bogus()'''\n";
         let entry = extract(source, "test_worker.py", "py");
@@ -2598,6 +2618,8 @@ mod tests {
         temp.write("go.mod", "module example.com/demo\n");
         temp.write("core/core.go", "package core\nfunc Work() {}\n");
         temp.write("core/core_test.go", "package core\nfunc TestWork() {}\n");
+        temp.write("pkg/main.go", "package pkg\nimport \"./core\"\n");
+        temp.write("pkg/core/core.go", "package core\nfunc Local() {}\n");
         temp.write(
             "main.go",
             "package main\nimport (\"example.com/demo/core\"; \"fmt\")\n",
@@ -2615,6 +2637,7 @@ mod tests {
             index.files["main.go"].imports,
             vec!["core/core.go", "raw:fmt"]
         );
+        assert_eq!(index.files["pkg/main.go"].imports, vec!["pkg/core/core.go"]);
     }
 
     #[test]

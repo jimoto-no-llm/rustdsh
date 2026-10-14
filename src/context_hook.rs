@@ -10,6 +10,7 @@
 //! the first write.
 
 use anyhow::Result;
+use clap::Parser;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
@@ -50,9 +51,14 @@ fn command_is_ours(command: &str) -> bool {
     if !rdsh_named(program) {
         return false;
     }
-    tokens
-        .windows(2)
-        .any(|pair| pair[0] == "context" && pair[1] == "inject")
+    matches!(
+        crate::Cli::try_parse_from(tokens)
+            .ok()
+            .and_then(|cli| cli.command),
+        Some(crate::Commands::Context {
+            action: crate::ContextAction::Inject { .. }
+        })
+    )
 }
 
 fn rdsh_named(program: &str) -> bool {
@@ -450,7 +456,7 @@ mod tests {
     fn ownership_requires_exact_binary_name_and_adjacent_subcommands() {
         for command in [
             "rdsh context inject",
-            "/opt/bin/rdsh.exe --flag context inject",
+            "/opt/bin/rdsh.exe --profile web context inject",
             "\"/opt/program files/rdsh\" context inject",
             "'C:\\Program Files\\rdsh.exe' context inject",
         ] {
@@ -466,6 +472,14 @@ mod tests {
         ] {
             assert!(!command_is_ours(command), "{command}");
         }
+    }
+
+    #[test]
+    fn ownership_checks_the_parsed_command_not_nested_argument_values() {
+        for command in ["rdsh tokens context inject", "rdsh boot -- context inject"] {
+            assert!(!command_is_ours(command), "{command}");
+        }
+        assert!(command_is_ours("rdsh --profile web context inject"));
     }
 
     #[test]

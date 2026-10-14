@@ -542,13 +542,25 @@ const SETTINGS_MAX_BYTES: u64 = 4 * 1024 * 1024;
 /// Read a settings document under the size cap, or `None` when it is absent.
 pub(crate) fn read_small_config(path: &str) -> anyhow::Result<Option<String>> {
     use std::io::Read;
-    // `metadata` follows symlinks on purpose: a symlinked settings file is a
-    // normal dotfiles setup, a FIFO or a device is not a settings file.
-    let meta = match std::fs::metadata(path) {
-        Ok(meta) => meta,
+    // Open once, then validate and read that handle. `metadata(path)` followed
+    // by `File::open(path)` allowed a checked regular file to be replaced by a
+    // FIFO between the check and open. O_NONBLOCK makes even that replacement
+    // fail promptly; symlinked settings files remain supported.
+    let mut options = std::fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_NONBLOCK);
+    }
+    let file = match options.open(path) {
+        Ok(file) => file,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(e) => return Err(anyhow::anyhow!("cannot read settings file at {path}: {e}")),
     };
+    let meta = file
+        .metadata()
+        .map_err(|e| anyhow::anyhow!("cannot read settings file at {path}: {e}"))?;
     if !meta.is_file() {
         anyhow::bail!("settings file at {path} is not a regular file");
     }
@@ -558,12 +570,13 @@ pub(crate) fn read_small_config(path: &str) -> anyhow::Result<Option<String>> {
             meta.len()
         );
     }
-    let file = std::fs::File::open(path)
-        .map_err(|e| anyhow::anyhow!("cannot read settings file at {path}: {e}"))?;
     let mut raw = String::new();
-    file.take(SETTINGS_MAX_BYTES)
+    file.take(SETTINGS_MAX_BYTES + 1)
         .read_to_string(&mut raw)
         .map_err(|e| anyhow::anyhow!("cannot read settings file at {path}: {e}"))?;
+    if raw.len() as u64 > SETTINGS_MAX_BYTES {
+        anyhow::bail!("settings file at {path} exceeds {SETTINGS_MAX_BYTES} bytes");
+    }
     Ok(Some(raw))
 }
 
@@ -1421,6 +1434,47 @@ fn split_list(s: &str, max_chars: usize) -> Vec<String> {
 #[cfg(test)]
 mod rdsh_config_tests {
     use super::*;
+
+    #[test]
+    fn bounded_config_reader_accepts_regular_files_and_rejects_oversize() {
+        let dir = std::env::temp_dir().join(format!(
+            "rdsh-config-read-{}-{}",
+            std::process::id(),
+            crate::local_http::random_token().unwrap()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("settings.json");
+        std::fs::write(&path, "{\"schema\":1}").unwrap();
+        assert_eq!(
+            read_small_config(path.to_str().unwrap())
+                .unwrap()
+                .as_deref(),
+            Some("{\"schema\":1}")
+        );
+        std::fs::write(&path, vec![b'x'; SETTINGS_MAX_BYTES as usize + 1]).unwrap();
+        assert!(read_small_config(path.to_str().unwrap()).is_err());
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn bounded_config_reader_rejects_fifo_without_waiting_for_a_writer() {
+        use std::ffi::CString;
+        use std::os::unix::ffi::OsStrExt;
+
+        let dir = std::env::temp_dir().join(format!(
+            "rdsh-config-fifo-{}-{}",
+            std::process::id(),
+            crate::local_http::random_token().unwrap()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("settings.json");
+        let name = CString::new(path.as_os_str().as_bytes()).unwrap();
+        assert_eq!(unsafe { libc::mkfifo(name.as_ptr(), 0o600) }, 0);
+        let error = read_small_config(path.to_str().unwrap()).unwrap_err();
+        assert!(error.to_string().contains("not a regular file"));
+        let _ = std::fs::remove_dir_all(dir);
+    }
 
     fn lock() -> std::sync::MutexGuard<'static, ()> {
         static M: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();

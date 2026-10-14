@@ -58,10 +58,15 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-      - run: node --test tests/plugin-security.test.mjs tests/settings-client.test.mjs tests/update-banner.test.mjs tests/rdsh-mobile-ui.test.mjs tests/feature-switches.test.mjs tests/discord-presence.test.mjs tests/model_benchmark/fence.test.mjs tests/serial_proxy/serial-proxy.test.mjs tests/context_inject_contract.mjs
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --locked
       - name: Populate the pinned headless runtime cache
         run: npm ci --ignore-scripts --no-audit --no-fund
         working-directory: scripts/headless-runtime/runtime
+      - name: Test plugin and hook contracts
+        run: node --test tests/plugin-security.test.mjs tests/settings-client.test.mjs tests/update-banner.test.mjs tests/rdsh-mobile-ui.test.mjs tests/feature-switches.test.mjs tests/discord-presence.test.mjs tests/model_benchmark/fence.test.mjs tests/context_inject_contract.mjs
+        env:
+          DSH_HOOK_PROTOCOL: ${{ github.workspace }}/scripts/headless-runtime/runtime/node_modules/@deepseek-ai/dsh-hook-protocol/lib/index.js
       - name: Build and test the offline headless runtime
         run: |
           node scripts/headless-runtime/build-candidate.mjs --out "$RUNNER_TEMP/rdsh-headless-candidate"

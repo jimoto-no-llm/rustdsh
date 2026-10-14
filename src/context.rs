@@ -817,11 +817,19 @@ fn expired(deadline: Option<Instant>) -> bool {
 // Drain stdout concurrently, so a large git status cannot fill a pipe while
 // try_wait is enforcing the hook deadline. Git output itself is bounded.
 fn git_output(args: &[&str], deadline: Option<Instant>) -> Option<String> {
+    git_output_in(None, args, deadline)
+}
+
+fn git_output_in(cwd: Option<&Path>, args: &[&str], deadline: Option<Instant>) -> Option<String> {
     use std::process::{Command, Stdio};
     if expired(deadline) {
         return None;
     }
-    let mut child = Command::new("git")
+    let mut command = Command::new("git");
+    if let Some(cwd) = cwd {
+        command.current_dir(cwd);
+    }
+    let mut child = command
         .args(args)
         .env("GIT_OPTIONAL_LOCKS", "0")
         .stdout(Stdio::piped())
@@ -862,6 +870,83 @@ fn git_output(args: &[&str], deadline: Option<Instant>) -> Option<String> {
         .recv_timeout(limit.saturating_duration_since(Instant::now()))
         .ok()??;
     Some(String::from_utf8_lossy(&bytes).into_owned())
+}
+
+fn git_dirty_paths(status: &str) -> BTreeMap<String, String> {
+    let mut paths = BTreeMap::new();
+    let mut records = status.split('\0').filter(|record| !record.is_empty());
+    while let Some(record) = records.next() {
+        if let Some(path) = record.get(3..) {
+            let state = record.get(..2).unwrap_or("??").to_string();
+            paths.insert(path.to_string(), state.clone());
+            if state.contains('R') || state.contains('C') {
+                if let Some(old) = records.next() {
+                    paths.insert(old.to_string(), state);
+                }
+            }
+        }
+    }
+    paths
+}
+
+fn git_dirty_content_signature(
+    cwd: &Path,
+    dirty: Option<&BTreeMap<String, String>>,
+    deadline: Option<Instant>,
+) -> Option<String> {
+    use sha2::{Digest, Sha256};
+    use std::io::Read;
+
+    let diff = git_output_in(
+        Some(cwd),
+        &[
+            "diff",
+            "--binary",
+            "--no-ext-diff",
+            "--no-textconv",
+            "HEAD",
+            "--",
+        ],
+        deadline,
+    )?;
+    let mut hasher = Sha256::new();
+    hasher.update(b"tracked\0");
+    hasher.update(diff.as_bytes());
+
+    let dirty = dirty?;
+    let untracked: Vec<_> = dirty
+        .iter()
+        .filter(|(_, state)| state.as_str() == "??")
+        .collect();
+    if untracked.len() > 1000 {
+        return None;
+    }
+    let root = crate::file_security::Root::new(cwd)?;
+    let mut remaining = 4 * 1024 * 1024usize;
+    for (path, _) in untracked {
+        if expired(deadline) {
+            return None;
+        }
+        let file = root.open(&cwd.join(path))?;
+        let size = usize::try_from(file.metadata().ok()?.len()).ok()?;
+        if size > remaining {
+            return None;
+        }
+        let mut bytes = Vec::with_capacity(size);
+        file.take((remaining + 1) as u64)
+            .read_to_end(&mut bytes)
+            .ok()?;
+        if bytes.len() > remaining {
+            return None;
+        }
+        hasher.update(b"untracked\0");
+        hasher.update(path.as_bytes());
+        hasher.update(b"\0");
+        hasher.update(&bytes);
+        remaining -= bytes.len();
+    }
+    let digest = hasher.finalize();
+    Some(digest.iter().map(|byte| format!("{byte:02x}")).collect())
 }
 
 fn git_snapshot(deadline: Option<Instant>) -> String {
@@ -908,6 +993,7 @@ struct GitState {
     head: Option<String>,
     branch: Option<String>,
     dirty: Option<BTreeMap<String, String>>,
+    dirty_content: Option<String>,
 }
 
 impl GitState {
@@ -919,26 +1005,15 @@ impl GitState {
             &["status", "--porcelain=v1", "-z", "--untracked-files=all"],
             deadline,
         )
-        .map(|s| {
-            let mut paths = BTreeMap::new();
-            let mut records = s.split('\0').filter(|r| !r.is_empty());
-            while let Some(record) = records.next() {
-                if let Some(path) = record.get(3..) {
-                    let status = record.get(..2).unwrap_or("??").to_string();
-                    paths.insert(path.to_string(), status.clone());
-                    if status.contains('R') || status.contains('C') {
-                        if let Some(old) = records.next() {
-                            paths.insert(old.to_string(), status);
-                        }
-                    }
-                }
-            }
-            paths
-        });
+        .map(|s| git_dirty_paths(&s));
+        let dirty_content = std::env::current_dir()
+            .ok()
+            .and_then(|cwd| git_dirty_content_signature(&cwd, dirty.as_ref(), deadline));
         Self {
             head,
             branch,
             dirty,
+            dirty_content,
         }
     }
 }
@@ -1046,6 +1121,13 @@ impl SnapshotTracker {
                 }
             }
             _ => unknown.push("git dirty paths".to_string()),
+        }
+        match (&self.git.dirty_content, &after.dirty_content) {
+            (Some(before), Some(after)) if before != after => {
+                self.changed.insert("git dirty content".to_string());
+            }
+            (None, _) | (_, None) => unknown.push("git dirty content".to_string()),
+            _ => (),
         }
         for (path, before) in &self.files {
             if *before != file_stamp(path) {
@@ -1850,9 +1932,11 @@ fn read_inherited_session(path: &Path, root: &Path, deadline: Option<Instant>) -
     }
     let root = std::fs::canonicalize(root).ok()?;
     let source = std::fs::canonicalize(path).ok()?;
-    // Keep the regular-file/root checks used by the plain-session reader.
-    open_beneath(&root, &source)?;
-    let (bytes, limited) = read_zstd_session(&source, 256 * 1024, usize::MAX, deadline).ok()?;
+    // Pass the validated handle through to the decompressor. Reopening the
+    // canonical path here would allow it to be replaced after this check.
+    let file = open_beneath(&root, &source)?;
+    let (bytes, limited) =
+        read_zstd_session_from_file(&source, file, 256 * 1024, usize::MAX, deadline).ok()?;
     (!limited).then_some(bytes)
 }
 
@@ -2369,9 +2453,7 @@ pub fn cmd_explain(query: Option<String>, budget: Option<usize>) -> anyhow::Resu
 
 // Serialize writers without replacing existing history after a failed read.
 struct MemoryLock {
-    _file: std::fs::File,
-    #[cfg(not(unix))]
-    path: PathBuf,
+    _lock: crate::file_lock::FileLock,
 }
 
 impl MemoryLock {
@@ -2380,40 +2462,10 @@ impl MemoryLock {
             .parent()
             .ok_or_else(|| anyhow::anyhow!("memory parent: unknown"))?;
         std::fs::create_dir_all(parent)?;
-        let path = parent.join(".rdsh-context-memory.lock");
-        let mut opts = std::fs::OpenOptions::new();
-        opts.write(true);
-        #[cfg(unix)]
-        {
-            use std::os::fd::AsRawFd;
-            use std::os::unix::fs::OpenOptionsExt;
-            opts.create(true)
-                .truncate(false)
-                .mode(0o600)
-                .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
-            let file = opts.open(&path)?;
-            anyhow::ensure!(file.metadata()?.is_file(), "memory lock: unknown");
-            anyhow::ensure!(
-                unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0,
-                "memory writer busy: unknown"
-            );
-            Ok(Self { _file: file })
-        }
-        #[cfg(not(unix))]
-        {
-            opts.create_new(true);
-            Ok(Self {
-                _file: opts.open(&path)?,
-                path,
-            })
-        }
-    }
-}
-
-#[cfg(not(unix))]
-impl Drop for MemoryLock {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.path);
+        let target = parent.join(".rdsh-context-memory");
+        Ok(Self {
+            _lock: crate::file_lock::FileLock::exclusive_for(&target)?,
+        })
     }
 }
 
@@ -2740,41 +2792,28 @@ fn read_distill_session(source: &Path) -> anyhow::Result<(Vec<u8>, bool)> {
     read_zstd_session(source, DISTILL_SESSION_CAP, DISTILL_LINE_LIMIT, None)
 }
 
-/// Path to hand to the `zstd` child process.
-///
-/// `std::fs::canonicalize` returns verbatim paths (`\\?\C:\...`) on Windows, and
-/// the zstd builds shipped for Windows cannot open them: it reports
-/// "can't stat ... No such file or directory". Strip the prefix for the child
-/// while leaving the rest of the path untouched.
-fn zstd_child_path(path: &Path) -> std::borrow::Cow<'_, str> {
-    let text = path.to_string_lossy();
-    #[cfg(windows)]
-    {
-        if let Some(rest) = text.strip_prefix(r"\\?\UNC\") {
-            return std::borrow::Cow::Owned(format!(r"\\{rest}"));
-        }
-        if let Some(rest) = text.strip_prefix(r"\\?\") {
-            return std::borrow::Cow::Owned(rest.to_string());
-        }
-    }
-    text
-}
-
 fn read_zstd_session(
     source: &Path,
     cap: usize,
     line_limit: usize,
     deadline: Option<Instant>,
 ) -> anyhow::Result<(Vec<u8>, bool)> {
+    let file = std::fs::File::open(source)?;
+    read_zstd_session_from_file(source, file, cap, line_limit, deadline)
+}
+
+fn read_zstd_session_from_file(
+    source: &Path,
+    file: std::fs::File,
+    cap: usize,
+    line_limit: usize,
+    deadline: Option<Instant>,
+) -> anyhow::Result<(Vec<u8>, bool)> {
     anyhow::ensure!(!expired(deadline), "session deadline exceeded");
-    anyhow::ensure!(
-        std::fs::metadata(source)?.is_file(),
-        "session must be a regular file"
-    );
+    anyhow::ensure!(file.metadata()?.is_file(), "session must be a regular file");
     let mut child = std::process::Command::new("zstd")
-        .args(["-dc", "--"])
-        .arg(zstd_child_path(source).as_ref())
-        .stdin(std::process::Stdio::null())
+        .args(["-dc"])
+        .stdin(std::process::Stdio::from(file))
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
@@ -3353,6 +3392,36 @@ mod v3_tests {
         assert!(!context.contains("[session]"));
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn inherited_zstd_reader_uses_the_validated_open_handle() {
+        if !zstd_available() {
+            return;
+        }
+        let temporary = TempDir::new();
+        let source = temporary.0.join("session.jsonl.zstd");
+        let replacement = temporary.0.join("replacement.zstd");
+        assert!(write_zstd_session(
+            &source,
+            "{\"role\":\"user\",\"content\":\"original\"}\n"
+        ));
+        assert!(write_zstd_session(
+            &replacement,
+            "{\"role\":\"user\",\"content\":\"replacement\"}\n"
+        ));
+        let root = std::fs::canonicalize(&temporary.0).unwrap();
+        let target = std::fs::canonicalize(&source).unwrap();
+        let opened = open_beneath(&root, &target).unwrap();
+        std::fs::rename(&replacement, &source).unwrap();
+
+        let (bytes, limited) =
+            read_zstd_session_from_file(&target, opened, 4096, usize::MAX, None).unwrap();
+        let text = String::from_utf8(bytes).unwrap();
+        assert!(!limited);
+        assert!(text.contains("original"));
+        assert!(!text.contains("replacement"));
+    }
+
     #[test]
     fn inherited_zstd_output_is_bounded_and_expired_reads_are_skipped() {
         // Requires a working zstd CLI; Windows CI has none, so skip there.
@@ -3548,6 +3617,35 @@ mod v3_tests {
         assert!(MemoryStore::parse(br#"{"schema":99}"#).is_err());
         // A failed read never silently overwrites corrupt historical evidence.
         assert_eq!(std::fs::read_to_string(path).unwrap(), "broken");
+    }
+
+    #[test]
+    fn memory_lock_releases_after_abnormal_process_exit() {
+        const TARGET: &str = "RDSH_CONTEXT_MEMORY_LOCK_CRASH_TARGET";
+        const HELD: &str = "RDSH_CONTEXT_MEMORY_LOCK_CRASH_HELD";
+
+        if let Some(target) = std::env::var_os(TARGET) {
+            let _lock = MemoryLock::acquire(&PathBuf::from(target)).unwrap();
+            std::fs::write(std::env::var_os(HELD).unwrap(), b"held").unwrap();
+            // Simulate a crash path that bypasses the Rust guard's Drop.
+            std::process::exit(0);
+        }
+
+        let temporary = TempDir::new();
+        let target = temporary.0.join("memory.json");
+        let held = temporary.0.join("lock-held");
+        let status = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "context::v3_tests::memory_lock_releases_after_abnormal_process_exit",
+            ])
+            .env(TARGET, &target)
+            .env(HELD, &held)
+            .status()
+            .unwrap();
+        assert!(status.success());
+        assert_eq!(std::fs::read(&held).unwrap(), b"held");
+        assert!(MemoryLock::acquire(&target).is_ok());
     }
 
     #[test]
@@ -4009,6 +4107,91 @@ mod v3_tests {
         assert!(snapshot
             .line()
             .starts_with("[snapshot: CHANGED during build:"));
+    }
+
+    #[test]
+    fn git_snapshot_detects_content_changes_with_unchanged_status() {
+        use std::process::Command;
+
+        let temporary = TempDir::new();
+        let run_git = |args: &[&str]| {
+            let output = Command::new("git")
+                .args(args)
+                .current_dir(&temporary.0)
+                .output()
+                .unwrap();
+            assert!(output.status.success(), "git {args:?}: {output:?}");
+            output
+        };
+        run_git(&["init", "--quiet"]);
+        run_git(&["config", "user.name", "rdsh test"]);
+        run_git(&["config", "user.email", "rdsh-test@example.invalid"]);
+        let file = temporary.0.join("tracked.rs");
+        std::fs::write(&file, "base").unwrap();
+        run_git(&["add", "tracked.rs"]);
+        run_git(&["commit", "--quiet", "-m", "base"]);
+        let cwd = std::fs::canonicalize(&temporary.0).unwrap();
+
+        std::fs::write(&file, "one!").unwrap();
+        let status_before = git_output_in(Some(&cwd), &["status", "--porcelain=v1"], None).unwrap();
+        let dirty_before = git_dirty_paths(&status_before);
+        let content_before = git_dirty_content_signature(&cwd, Some(&dirty_before), None).unwrap();
+        std::fs::write(&file, "two!").unwrap();
+        let status_after = git_output_in(Some(&cwd), &["status", "--porcelain=v1"], None).unwrap();
+        let dirty_after = git_dirty_paths(&status_after);
+        let content_after = git_dirty_content_signature(&cwd, Some(&dirty_after), None).unwrap();
+
+        assert_eq!(status_before, status_after);
+        assert_ne!(content_before, content_after);
+    }
+
+    #[test]
+    fn git_snapshot_hashes_untracked_file_contents() {
+        use std::process::Command;
+
+        let temporary = TempDir::new();
+        let init = Command::new("git")
+            .args(["init", "--quiet"])
+            .current_dir(&temporary.0)
+            .output()
+            .unwrap();
+        assert!(init.status.success());
+        let run_git = |args: &[&str]| {
+            let output = Command::new("git")
+                .args(args)
+                .current_dir(&temporary.0)
+                .output()
+                .unwrap();
+            assert!(output.status.success(), "git {args:?}: {output:?}");
+        };
+        run_git(&["config", "user.name", "rdsh test"]);
+        run_git(&["config", "user.email", "rdsh-test@example.invalid"]);
+        std::fs::write(temporary.0.join("tracked.rs"), "base").unwrap();
+        run_git(&["add", "tracked.rs"]);
+        run_git(&["commit", "--quiet", "-m", "base"]);
+        let cwd = std::fs::canonicalize(&temporary.0).unwrap();
+        let file = temporary.0.join("new.txt");
+        std::fs::write(&file, "one!").unwrap();
+        let status_before = git_output_in(
+            Some(&cwd),
+            &["status", "--porcelain=v1", "-z", "--untracked-files=all"],
+            None,
+        )
+        .unwrap();
+        let dirty_before = git_dirty_paths(&status_before);
+        let content_before = git_dirty_content_signature(&cwd, Some(&dirty_before), None).unwrap();
+        std::fs::write(&file, "two!").unwrap();
+        let status_after = git_output_in(
+            Some(&cwd),
+            &["status", "--porcelain=v1", "-z", "--untracked-files=all"],
+            None,
+        )
+        .unwrap();
+        let dirty_after = git_dirty_paths(&status_after);
+        let content_after = git_dirty_content_signature(&cwd, Some(&dirty_after), None).unwrap();
+
+        assert_eq!(status_before, status_after);
+        assert_ne!(content_before, content_after);
     }
 
     #[test]
