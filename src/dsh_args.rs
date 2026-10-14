@@ -78,7 +78,12 @@ pub fn split_launcher_args(profile_flag: Option<String>, extra: Vec<String>) -> 
                     return Launcher::Error("error: --profile needs a name".into());
                 }
             }
-            "--from-default-profile" => from_default = it.next(),
+            "--from-default-profile" => match it.next() {
+                Some(p) if !p.is_empty() => from_default = Some(p),
+                _ => {
+                    return Launcher::Error("error: --from-default-profile needs a name".into());
+                }
+            },
             "--patch" => match it.next() {
                 Some(p) if !p.is_empty() => patches.push(p),
                 _ => return Launcher::Error("error: --patch needs a path".into()),
@@ -303,6 +308,16 @@ mod tests {
                 assert_eq!(kind, DumpKind::Config);
             }
             _ => panic!("expected dump"),
+        }
+    }
+
+    /// `--profile` と `--patch` は値欠落をエラーにするので、この旗も揃える。
+    /// 黙って落とすと「テンプレート初期化なしの boot」に化ける。
+    #[test]
+    fn from_default_profile_without_value_is_rejected() {
+        match split_launcher_args(None, sv(&["rescue", "--from-default-profile"])) {
+            Launcher::Error(msg) => assert!(msg.contains("--from-default-profile"), "{msg}"),
+            _ => panic!("expected an error for a value-less --from-default-profile"),
         }
     }
 
