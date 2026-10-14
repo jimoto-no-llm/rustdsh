@@ -1499,6 +1499,57 @@ mod tests {
         assert_eq!(shrink_lines("first\nsecond\nthird", 0.1), "first");
         assert_eq!(shrink_lines("first\nsecond", 1.0), "first\nsecond");
     }
+
+    fn pack_fixture() -> Vec<Section> {
+        vec![
+            Section {
+                name: "goal",
+                body: "ship the release".to_string(),
+            },
+            Section {
+                name: "constraints",
+                body: "no breaking changes".to_string(),
+            },
+            Section {
+                name: "retrieved",
+                body: "hit\n".repeat(400),
+            },
+            Section {
+                name: "open_tasks",
+                body: "task\n".repeat(200),
+            },
+            Section {
+                name: "decisions",
+                body: "decision\n".repeat(200),
+            },
+            Section {
+                name: "git_diff",
+                body: "diff\n".repeat(400),
+            },
+        ]
+    }
+
+    /// goal と constraints は最後まで残し、最終的に予算内へ収める。
+    #[test]
+    fn pack_by_priority_keeps_goal_and_constraints_within_budget() {
+        for budget in [64, 128, 512, 4096] {
+            let packed = pack_by_priority(pack_fixture(), budget);
+            assert!(estimate(&packed) <= budget, "budget {budget} exceeded");
+            assert!(packed.contains("# goal"), "budget {budget} dropped goal");
+            assert!(
+                packed.contains("# constraints"),
+                "budget {budget} dropped constraints"
+            );
+        }
+    }
+
+    #[test]
+    fn prune_keep_goal_starts_with_goal_within_budget() {
+        let pruned = prune_keep_goal(&pack_fixture(), 200);
+        assert!(estimate(&pruned) <= 200, "budget exceeded");
+        assert!(pruned.starts_with("# goal"), "goal must come first");
+        assert!(pruned.contains("# constraints"), "constraints must be kept");
+    }
 }
 
 #[cfg(test)]
