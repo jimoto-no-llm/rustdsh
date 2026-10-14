@@ -70,7 +70,7 @@ mod websearch;
     name = "rdsh",
     version,
     about = "Rust fast launcher for dsh (safe: native fast-paths + passthrough)",
-    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|auth|setup|context|settings|features|provider|dump-config|boot|serial-proxy)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh provider add hai --model deepseek-v4-flash   register HAI as a dsh route\n  rdsh provider add sarashina    register Sarashina (SARASHINA_API_KEY; mini and nano built in)\n  rdsh provider add local-openai --base-url http://host:8080/v1 --discover --no-key\n  rdsh provider list              presets and per-profile route/key status\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh desktop status             detect the Desktop (Electron) app and its reserved profile\n  rdsh desktop install            attach the bundled rdsh plugins to that profile\n  rdsh --passthrough tui          no slim env; mandatory tool isolation remains\n  rdsh --dry-run tui -- --resume abc   show what would exec"
+    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|auth|setup|context|settings|features|provider|update|dump-config|boot|serial-proxy)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh provider add hai --model deepseek-v4-flash   register HAI as a dsh route\n  rdsh provider add sarashina    register Sarashina (SARASHINA_API_KEY; mini and nano built in)\n  rdsh provider add local-openai --base-url http://host:8080/v1 --discover --no-key\n  rdsh provider list              presets and per-profile route/key status\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh desktop status             detect the Desktop (Electron) app and its reserved profile\n  rdsh desktop install            attach the bundled rdsh plugins to that profile\n  rdsh --passthrough tui          no slim env; mandatory tool isolation remains\n  rdsh --dry-run tui -- --resume abc   show what would exec"
 )]
 struct Cli {
     /// Explicitly share a project file with isolated model tools (repeatable).
@@ -507,6 +507,7 @@ const NATIVE_FIRST: &[&str] = &[
     "context",
     "settings",
     "features",
+    "update",
     "serial-proxy",
 ];
 
@@ -1461,6 +1462,21 @@ mod default_profile_tests {
                     "NATIVE_FIRST entry {name:?} has no matching subcommand"
                 );
             }
+        }
+    }
+
+    /// 逆方向: Commands にある subcommand は必ず NATIVE_FIRST にも要る。
+    /// 抜けていると `dsh <name>` として起動されたとき元 dsh へ逐語委譲され、
+    /// ネイティブ実装が黙って動かなくなる。
+    #[test]
+    fn every_subcommand_is_native_first() {
+        use clap::CommandFactory;
+        for sub in Cli::command().get_subcommands() {
+            let name = sub.get_name();
+            assert!(
+                crate::NATIVE_FIRST.contains(&name),
+                "subcommand {name:?} is missing from NATIVE_FIRST"
+            );
         }
     }
 
