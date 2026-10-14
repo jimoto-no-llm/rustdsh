@@ -1108,11 +1108,10 @@ fn decode_chunked(mut body: &[u8]) -> Option<Vec<u8>> {
         if size == 0 {
             return Some(out);
         }
-        if body.len() < size + 2 {
-            return None;
-        }
-        out.extend_from_slice(&body[..size]);
-        body = &body[size + 2..];
+        let chunk_end = size.checked_add(2)?;
+        let next = body.get(chunk_end..)?;
+        out.extend_from_slice(body.get(..size)?);
+        body = next;
     }
 }
 
@@ -1798,6 +1797,46 @@ mod tests {
         assert_eq!(parse_http_response(raw, "u").unwrap(), "hello world");
         let raw = b"HTTP/1.1 404 Not Found\r\n\r\n";
         assert!(parse_http_response(raw, "u").is_err());
+    }
+
+    #[test]
+    fn chunked_bodies_reject_size_overflow() {
+        for size in [usize::MAX, usize::MAX - 1, usize::MAX - 2] {
+            let body = format!("{size:X}\r\nxx");
+            assert_eq!(decode_chunked(body.as_bytes()), None);
+            let raw = format!("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n{body}");
+            assert!(parse_http_response(raw.as_bytes(), "u").is_err());
+        }
+    }
+
+    #[test]
+    fn chunked_bodies_reject_truncated_frames() {
+        for body in [
+            "",
+            "1",
+            "1\r",
+            "1\r\n",
+            "1\r\nx",
+            "1\r\nx\r",
+            "1\r\nx\r\n",
+            "1\r\nx\r\n0",
+            "1\r\nx\r\n0\r",
+        ] {
+            assert_eq!(decode_chunked(body.as_bytes()), None, "{body:?}");
+        }
+    }
+
+    #[test]
+    fn chunked_bodies_keep_extensions_and_zero_termination() {
+        assert_eq!(decode_chunked(b"0\r\n\r\n"), Some(Vec::new()));
+        assert_eq!(
+            decode_chunked(b"1;name=value\r\nx\r\n0;end=value\r\n\r\n"),
+            Some(b"x".to_vec())
+        );
+        assert_eq!(
+            decode_chunked(b"1\r\nx\r\n0\r\nTrailer: value\r\n\r\n"),
+            Some(b"x".to_vec())
+        );
     }
 
     #[test]

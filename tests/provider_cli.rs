@@ -12,6 +12,50 @@ use std::thread;
 
 static NEXT: AtomicUsize = AtomicUsize::new(0);
 
+#[test]
+fn overflowing_chunk_size_is_a_cli_error_without_profile_writes() {
+    let fixture = Fixture::new();
+    fixture.set_patch(PATCH);
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let base = format!("http://{}/v1", listener.local_addr().unwrap());
+    let server = thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(10)))
+            .unwrap();
+        let mut head = Vec::new();
+        let mut byte = [0u8; 1];
+        while !head.ends_with(b"\r\n\r\n") {
+            assert!(head.len() < 64 * 1024);
+            assert_eq!(stream.read(&mut byte).unwrap(), 1);
+            head.push(byte[0]);
+        }
+        let response = format!(
+            "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n{:X}\r\nxx",
+            usize::MAX
+        );
+        stream.write_all(response.as_bytes()).unwrap();
+    });
+    let out = fixture.run(&[
+        "provider",
+        "add",
+        "local-openai",
+        "--profile",
+        "tui",
+        "--base-url",
+        &base,
+        "--discover",
+        "--no-key",
+        "--json",
+    ]);
+    server.join().unwrap();
+    assert_eq!(out.status.code(), Some(1), "{}", text(&out));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("bad chunked body"));
+    assert!(out.stdout.is_empty());
+    assert_eq!(fixture.patch(), PATCH);
+    assert!(fixture.creds().is_empty());
+}
+
 const PATCH: &str = "# my profile\n- id: llm-pi-ai\n  config:\n    # custom routes\n    providers:\n      other:\n        apiKeyEnv: OTHER_API_KEY\n        models:\n          - id: x\n- id: agent-default-model\n  config:\n    provider: other\n    model: x\n";
 
 struct Fixture(PathBuf);
