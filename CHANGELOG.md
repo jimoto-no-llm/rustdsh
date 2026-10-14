@@ -12,6 +12,17 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   of the 2.0.0 that the upstream `dsh-mcp-client` peer pulls in, clearing the
   high-severity GHSA-6qxp-vccf-f47h alert. Runtime resolution is unchanged: the
   plugin uses the host DSH's MCP client.
+- `install.ps1 -FromRelease` verifies the Windows archive against the digests
+  pinned in `release-digests-windows.tsv` instead of the `.sha256` sidecar
+  served next to it, so a release base that serves its own archive can no
+  longer choose the checksum that admits it. The bypass needs `-NoChecksum`
+  plus a typed `YES` at a terminal.
+- The Windows pin lives in its own `release-digests-windows.tsv` ledger because
+  the published v0.3.3 `install.sh` and every `sync-dsh.sh` copy refuse
+  `release-digests.tsv` as a whole once one row names an asset outside the four
+  Unix archives. `release-digests.tsv` therefore stays Unix-only, so
+  `--from-release` and the automatic updater keep working for installs users
+  already have, and `scripts/pin-release-digests.py` updates both ledgers.
 
 ### Added
 
@@ -55,6 +66,11 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   find, or one outside npm's global root, is reported and skipped while the
   rdsh release update still succeeds; npm-managed trees keep digest pinning,
   downgrade refusal, verification and rollback. See `docs/AUTO-UPDATE.md`.
+- `release-digests.tsv` pins v0.3.3. Its follow-up PR was missing, so
+  `install.sh --from-release` and the automatic updater stopped at v0.3.2 even
+  though GitHub marks v0.3.3 Latest. `scripts/pin-release-digests.py` turns the
+  follow-up into one reviewed command (refusing prerelease tags, missing
+  archives and non-SHA-256 values), and `docs/RELEASING.md` uses it.
 
 ### Changed
 
