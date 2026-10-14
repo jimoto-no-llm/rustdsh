@@ -379,7 +379,7 @@ export async function spawnOwnedProcess({
     if (wsl) throw new ScopeError("ownership_unavailable");
     dockerLaunch = await dockerWorkerLaunch({ command, cwd, dockerWorker });
     docker = await createDockerWorkerController(dockerLaunch, owner_id);
-    launcher = [dockerLaunch.dockerBin, "--context", dockerContext, "start", "-ai", docker.id];
+    launcher = [dockerLaunch.dockerBin, "--host", dockerLaunch.endpoint, "start", "-ai", docker.id];
     framed = true;
     docker.markStarted();
   }

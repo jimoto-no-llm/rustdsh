@@ -148,12 +148,14 @@ test("Docker transport start failure reports cleanup unconfirmed when exact remo
   const previous = process.env.RDSH_DOCKER_ATTACH_STATE;
   process.env.RDSH_DOCKER_ATTACH_STATE = state;
   t.after(() => { if (previous === undefined) delete process.env.RDSH_DOCKER_ATTACH_STATE; else process.env.RDSH_DOCKER_ATTACH_STATE = previous; });
-  await fs.writeFile(state, JSON.stringify({ state: "running", owner, removed: [], foreign: "f".repeat(64) }));
+  await fs.writeFile(state, JSON.stringify({ state: "running", owner, removed: [], endpoint: fakeColimaEndpoint, startArgs: null, foreign: "f".repeat(64) }));
   await fs.writeFile(bin, `#!/usr/bin/env node
-const fs=require('fs'),f=process.env.RDSH_DOCKER_ATTACH_STATE,s=JSON.parse(fs.readFileSync(f));let a=process.argv.slice(2);if(a[0]=='--context'||a[0]=='--host')a=a.slice(2);if(a[0]=='context'){console.log(a[1]==='inspect'?'${fakeColimaEndpoint}':'colima');process.exit()}if(a[0]=='info'){console.log('engine-test');process.exit()}if(a[0]=='version'){console.log('linux/arm64');process.exit()}if(a[0]=='create'){console.log('c'.repeat(64));process.exit()}if(a[0]=='start')process.exit(1);if(a[0]=='inspect'){if(a.at(-1)===('c'.repeat(64)))console.log(s.state);else {console.error('missing');process.exit(1)}process.exit()}if(a[0]=='kill')s.state='exited';if(a[0]=='rm'){s.removed.push(a.at(-1));fs.writeFileSync(f,JSON.stringify(s));process.exit(9)}fs.writeFileSync(f,JSON.stringify(s));`);
+const fs=require('fs'),f=process.env.RDSH_DOCKER_ATTACH_STATE,s=JSON.parse(fs.readFileSync(f));const raw=process.argv.slice(2);let a=raw;if(a[0]=='--context'||a[0]=='--host')a=a.slice(2);if(a[0]=='context'){console.log(a[1]==='inspect'?s.endpoint:'colima');process.exit()}if(a[0]=='info'){console.log('engine-test');process.exit()}if(a[0]=='version'){console.log('linux/arm64');process.exit()}if(a[0]=='create'){s.endpoint='unix:///tmp/changed-engine.sock';fs.writeFileSync(f,JSON.stringify(s));console.log('c'.repeat(64));process.exit()}if(a[0]=='start'){s.startArgs=raw;fs.writeFileSync(f,JSON.stringify(s));process.exit(1)}if(a[0]=='inspect'){if(a.at(-1)===('c'.repeat(64)))console.log(s.state);else {console.error('missing');process.exit(1)}process.exit()}if(a[0]=='kill')s.state='exited';if(a[0]=='rm'){s.removed.push(a.at(-1));fs.writeFileSync(f,JSON.stringify(s));process.exit(9)}fs.writeFileSync(f,JSON.stringify(s));`);
   await fs.chmod(bin, 0o755);
   await assert.rejects(spawnOwnedProcess({ command: ["/usr/local/bin/node", path.join(root, "entry.mjs")], cwd: root, dockerWorker: { dockerBin: bin, mountRoots: [root] }, owner_id: owner, startupTimeoutMs: 50 }), (error) => error.code === "cleanup_unconfirmed");
   const after = JSON.parse(await fs.readFile(state));
+  assert.equal(after.endpoint, "unix:///tmp/changed-engine.sock");
+  assert.deepEqual(after.startArgs, ["--host", fakeColimaEndpoint, "start", "-ai", "c".repeat(64)]);
   assert.deepEqual(after.removed, ["c".repeat(64)]);
   assert.equal(after.foreign, "f".repeat(64));
 });
