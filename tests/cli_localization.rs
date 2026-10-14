@@ -20,7 +20,7 @@ impl Fixture {
         Self(path)
     }
 
-    fn run(&self, args: &[&str]) -> Output {
+    fn command(&self, args: &[&str]) -> Command {
         let mut command = Command::new(env!("CARGO_BIN_EXE_rdsh"));
         command.env_clear();
         for key in ["PATH", "SystemRoot", "WINDIR", "COMSPEC", "TEMP", "TMP"] {
@@ -33,9 +33,12 @@ impl Fixture {
             .current_dir(&self.0)
             .env("HOME", &self.0)
             .env("USERPROFILE", &self.0)
-            .env("DSH_HOME", self.0.join("dsh"))
-            .output()
-            .unwrap()
+            .env("DSH_HOME", self.0.join("dsh"));
+        command
+    }
+
+    fn run(&self, args: &[&str]) -> Output {
+        self.command(args).output().unwrap()
     }
 
     fn run_with_stdin(&self, args: &[&str], stdin: &[u8]) -> Output {
@@ -141,11 +144,44 @@ fn version_like_values_after_double_dash_do_not_trigger_version_display() {
         serde_json::from_slice(&fs::read(fixture.0.join("dsh/rdsh.json")).unwrap()).unwrap();
     assert_eq!(saved["context"]["goal"], "--version");
 
-    let delegated = fixture.run(&["web", "--", "--version"]);
+    let source = fixture.0.join("original.rs");
+    fs::write(
+        &source,
+        r#"fn main() { println!("{:?}", std::env::args().skip(1).collect::<Vec<_>>()); }"#,
+    )
+    .unwrap();
+    let executable = fixture.0.join(if cfg!(windows) {
+        "original.exe"
+    } else {
+        "original"
+    });
+    let compile = Command::new("rustc")
+        .args(["--edition=2021", "--crate-name", "fixture_original"])
+        .arg(&source)
+        .arg("-o")
+        .arg(&executable)
+        .output()
+        .unwrap();
+    assert!(compile.status.success(), "{compile:?}");
+    // The native fixture is the only executable visible to the delegation.
+    // It also satisfies the runtime lookup without loading any Node/DSH code.
+    fs::copy(
+        &executable,
+        fixture
+            .0
+            .join(if cfg!(windows) { "node.exe" } else { "node" }),
+    )
+    .unwrap();
+    let delegated = fixture
+        .command(&["web", "--", "--version"])
+        .env("RDSH_ORIG_BIN", &executable)
+        .env("PATH", &fixture.0)
+        .output()
+        .unwrap();
     assert!(delegated.status.success(), "{delegated:?}");
-    assert!(
-        !String::from_utf8_lossy(&delegated.stdout).starts_with("rdsh "),
-        "{delegated:?}"
+    assert_eq!(
+        serde_json::from_slice::<Vec<String>>(&delegated.stdout).unwrap(),
+        ["--profile", "web", "--version"]
     );
 }
 

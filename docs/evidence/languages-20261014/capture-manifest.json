@@ -44,7 +44,7 @@
     "bytes": 2165
   },
   "cli-review-final.txt": {
-    "sha256": "e6ecd7e55d5ac89afadccaf681a49dd80d086a00f0bc53a134781e55c83c8052",
+    "sha256": "ad8aba276747eaf944add3ed0e25bf4947fc61cd1195c0988c41dc709cafefa1",
     "bytes": 1299
   },
   "cli-tty-results.json": {
@@ -200,8 +200,8 @@
     "bytes": 17925
   },
   "native-validation.json": {
-    "sha256": "d1209c0c3b6cd699849d480218a375df9736742a74a4d7841dd40724a2b18ecc",
-    "bytes": 3448
+    "sha256": "8940084cc59f84dbe77a19b7a348be2c934d98e338db86d2fbe9327865fd82b3",
+    "bytes": 3674
   },
   "palette-three-language-search.gif": {
     "sha256": "51ccd3f6086de989a07d196b57aab89179185244c8382ea5f82d87f1d69009b5",
@@ -244,8 +244,8 @@
     "bytes": 6552
   },
   "review-follow-up.md": {
-    "sha256": "193f64d1072e902f214607e80529f77e162bb3451f873effbd350d734e843edf",
-    "bytes": 4808
+    "sha256": "f9841ff26c44db75c53c9d11d8cb62bb0e70129b0a83a9fefc6cf8f3a9ee01a4",
+    "bytes": 5419
   },
   "windows-final-audit.json": {
     "sha256": "2ce966451e09e84b550d1000e2537c242e9f9c32c7d419488b4103c98d17ab9c",

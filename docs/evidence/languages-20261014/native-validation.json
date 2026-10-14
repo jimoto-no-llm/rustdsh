@@ -216,5 +216,19 @@
     "skip": 6,
     "source_record": "windows-suite-source.json",
     "cleanup_record": "windows-final-audit.json"
+  },
+  {
+    "name": "CI portability fixture CLI",
+    "command": [
+      "cargo",
+      "test",
+      "--release",
+      "--test",
+      "cli_localization"
+    ],
+    "exit": 0,
+    "tests": 13,
+    "pass": 13,
+    "fail": 0
   }
 ]
