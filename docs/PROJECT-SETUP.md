@@ -12,6 +12,9 @@ files; changing the JSON file alone does not change repository settings.
   and the local dashboard. Topics cover Rust, DSH, DeepSeek, CLI, dashboard,
   performance and agent tooling. The homepage points to the README.
 - Merged PR branches are automatically deleted; local checkouts are unaffected.
+- Parallel work uses one isolated worktree per topic, each with a deterministic
+  port and a conflict check that never touches a working tree. See
+  [PARALLEL-DEV.md](PARALLEL-DEV.md) and `scripts/parallel-dev.sh`.
 - Automatic merge is available after the required checks and other-person review
   succeed. It does not bypass branch protection.
 - [Managed labels](../.github/labels.yml) define type/component labels and
