@@ -91,6 +91,43 @@ impl Fixture {
             .unwrap()
     }
 
+    /// Run with `RLIMIT_FSIZE` set for the child (and its children), so a write
+    /// that grows a file past `limit` fails with EFBIG instead of killing the
+    /// process: the shape a full disk or an interrupted run leaves behind. Only
+    /// what such a run leaves on disk is worth asserting, never its status.
+    #[cfg(unix)]
+    fn run_with_file_size_limit(&self, args: &[&str], limit: u64) -> Output {
+        use std::os::unix::process::CommandExt;
+        let empty = self.root.join("empty-path");
+        let _ = std::fs::create_dir_all(&empty);
+        let mut command = Command::new(env!("CARGO_BIN_EXE_rdsh"));
+        command
+            .args(args)
+            .env("DSH_HOME", &self.root)
+            .env("HOME", self.root.join("home"))
+            .env("PATH", empty)
+            .env_remove("RDSH_NO_MODELS_AUTO")
+            .env_remove("RDSH_MODELS_AUTO_INTERVAL_HOURS");
+        // SAFETY: the child only ignores SIGXFSZ and sets its own rlimit between
+        // fork and exec, which touches no memory shared with this test.
+        unsafe {
+            command.pre_exec(move || {
+                if libc::signal(libc::SIGXFSZ, libc::SIG_IGN) == libc::SIG_ERR {
+                    return Err(std::io::Error::last_os_error());
+                }
+                let rlimit = libc::rlimit {
+                    rlim_cur: limit,
+                    rlim_max: limit,
+                };
+                if libc::setrlimit(libc::RLIMIT_FSIZE, &rlimit) != 0 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                Ok(())
+            });
+        }
+        command.output().unwrap()
+    }
+
     fn state(&self) -> Option<serde_json::Value> {
         let text = std::fs::read_to_string(self.state_path()).ok()?;
         serde_json::from_str(&text).ok()
@@ -439,5 +476,111 @@ fn the_first_automatic_rewrite_keeps_one_backup() {
         std::fs::read_to_string(fixture.backup_path()).unwrap(),
         original,
         "a later rewrite must not refresh or overwrite the first backup"
+    );
+}
+
+/// The first rewrite stages the copy at a sibling temp name and renames it
+/// into place, so a copy that dies partway cannot hold the backup name: the
+/// next sync only checks that name with `exists()` (`src/models.rs`,
+/// `back_up_before_write`).
+#[cfg(unix)]
+#[test]
+fn a_backup_copy_that_fails_partway_never_holds_the_final_name() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let fixture = Fixture::new("backup-partial")
+        .with_codex_profile()
+        .with_codex_catalog();
+    // Longer than the write limit below, so the copy itself cannot finish.
+    let original = format!("{CODEX_PROFILE}{}\n", "#".repeat(4096));
+    std::fs::write(fixture.profile_path(), &original).unwrap();
+    std::fs::set_permissions(
+        fixture.profile_path(),
+        std::fs::Permissions::from_mode(0o640),
+    )
+    .unwrap();
+
+    // 1 KiB: above the lock record the sync writes first, below the profile.
+    let failed = fixture.run_with_file_size_limit(&json(&["models", "sync"]), 1024);
+    assert!(
+        !fixture.backup_path().exists(),
+        "a partway copy must not hold the backup name (status {}, stderr {})",
+        failed.status,
+        String::from_utf8_lossy(&failed.stderr)
+    );
+
+    let report = fixture.report(&json(&["models", "auto", "--force"]));
+    assert_eq!(report["summary"]["added"], serde_json::json!(1));
+    assert!(
+        std::fs::read_to_string(fixture.profile_path())
+            .unwrap()
+            .contains("gpt-6.1-sol"),
+        "the profile is rewritten once the backup lands"
+    );
+    assert_eq!(
+        std::fs::read_to_string(fixture.backup_path()).unwrap(),
+        original,
+        "the next run takes the complete backup the failed one could not"
+    );
+    assert_eq!(
+        std::fs::metadata(fixture.backup_path())
+            .unwrap()
+            .permissions()
+            .mode()
+            & 0o777,
+        0o640,
+        "the backup keeps the mode of the profile it copies"
+    );
+
+    let mut names: Vec<String> = std::fs::read_dir(fixture.profile_path().parent().unwrap())
+        .unwrap()
+        .flatten()
+        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    assert_eq!(
+        names,
+        vec![
+            "cordis.patch.yml".to_string(),
+            "cordis.patch.yml.bak-rdsh-models".to_string()
+        ],
+        "the staged copy is renamed away, not left beside the profile"
+    );
+}
+
+/// A backup that is already there is the copy rdsh (or the user) took: neither
+/// a rewrite that fails partway nor a later one may replace or damage it.
+#[cfg(unix)]
+#[test]
+fn an_existing_backup_is_left_untouched_by_a_failing_and_a_later_rewrite() {
+    let fixture = Fixture::new("backup-kept")
+        .with_codex_profile()
+        .with_codex_catalog();
+    let planted = "# the copy that was already beside the profile\n";
+    std::fs::write(fixture.backup_path(), planted).unwrap();
+    // Longer than the write limit below, so the rewrite itself fails partway
+    // (the copy is skipped: the backup name is taken).
+    std::fs::write(
+        fixture.profile_path(),
+        format!("{CODEX_PROFILE}{}\n", "#".repeat(4096)),
+    )
+    .unwrap();
+
+    let _ = fixture.run_with_file_size_limit(&json(&["models", "sync"]), 1024);
+    assert_eq!(
+        std::fs::read_to_string(fixture.backup_path()).unwrap(),
+        planted,
+        "a rewrite that fails partway must not damage the existing backup"
+    );
+
+    let report = fixture.report(&json(&["models", "auto", "--force"]));
+    assert_eq!(report["summary"]["added"], serde_json::json!(1));
+    assert!(std::fs::read_to_string(fixture.profile_path())
+        .unwrap()
+        .contains("gpt-6.1-sol"));
+    assert_eq!(
+        std::fs::read_to_string(fixture.backup_path()).unwrap(),
+        planted,
+        "an existing backup is never refreshed by a later rewrite"
     );
 }

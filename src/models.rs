@@ -1475,10 +1475,48 @@ const BACKUP_SUFFIX: &str = ".bak-rdsh-models";
 /// file, is only taken while the original exists, and is never overwritten, so
 /// repeated syncs keep the oldest pre-rdsh content. A failure keeps the write
 /// from happening at all rather than leaving an unrecoverable file behind.
+///
+/// The bytes are staged at a sibling temp name and renamed into place, so a
+/// copy that dies partway (a full disk, an interrupted process) cannot leave a
+/// truncated file under the backup name. That name is only ever checked with
+/// `exists()`, so a broken file there would be kept as "the backup" forever.
 fn back_up_before_write(path: &Path) -> Result<()> {
     let backup = PathBuf::from(format!("{}{BACKUP_SUFFIX}", path.display()));
     if path.exists() && !backup.exists() {
-        std::fs::copy(path, &backup).with_context(|| {
+        let name = path
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        // Same staging as `providers::write_atomic`: a random sibling name, so
+        // the temp cannot be predicted and planted ahead of the copy.
+        let tmp = path.with_file_name(format!(
+            "{name}{BACKUP_SUFFIX}.tmp.{}",
+            crate::local_http::random_token()?
+        ));
+        // `fs::copy`'s permission rule, kept by hand: the copy carries the mode
+        // the profile had, so the backup is as readable as its source.
+        let mode = std::fs::metadata(path)
+            .ok()
+            .map(|metadata| metadata.permissions());
+        let result = (|| -> Result<()> {
+            let mut source = std::fs::File::open(path)?;
+            let mut file = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&tmp)?;
+            std::io::copy(&mut source, &mut file)?;
+            file.sync_all()?;
+            drop(file);
+            if let Some(mode) = mode {
+                std::fs::set_permissions(&tmp, mode)?;
+            }
+            std::fs::rename(&tmp, &backup)?;
+            Ok(())
+        })();
+        if result.is_err() {
+            let _ = std::fs::remove_file(&tmp);
+        }
+        result.with_context(|| {
             format!("cannot back up {} to {}", path.display(), backup.display())
         })?;
     }
