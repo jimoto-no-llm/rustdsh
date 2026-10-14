@@ -16,27 +16,59 @@ fn log_line(message: std::fmt::Arguments<'_>) {
     let _ = writeln!(std::io::stderr(), "{message}");
 }
 
-pub fn cmd_serve(port: u16) -> anyhow::Result<()> {
+pub fn cmd_serve(port: u16, locale: crate::locale::Locale) -> anyhow::Result<()> {
     let addr = format!("127.0.0.1:{port}");
     let listener = std::net::TcpListener::bind(&addr).map_err(|e| {
         anyhow::anyhow!(
-            "cannot listen on {addr}: {e} (dsh web GUI uses 3080; rdsh serve defaults to 38080, or try --port 0)"
+            "{} {addr}: {e} ({})",
+            match locale {
+                crate::locale::Locale::English => "cannot listen on",
+                crate::locale::Locale::Chinese => "无法监听",
+                crate::locale::Locale::Japanese => "待受できません",
+            },
+            match locale {
+                crate::locale::Locale::English => "dsh web GUI uses 3080; rdsh serve defaults to 38080, or try --port 0",
+                crate::locale::Locale::Chinese => "dsh Web GUI 使用 3080；rdsh serve 默认使用 38080，也可尝试 --port 0",
+                crate::locale::Locale::Japanese => "dsh Web GUI は 3080、rdsh serve は既定で 38080 を使います。--port 0 も試せます",
+            }
         )
     })?;
     listener.set_nonblocking(true)?;
-    crate::shutdown::install()?;
+    crate::shutdown::install(locale)?;
     let port = listener.local_addr()?.port();
     let token = Arc::new(crate::local_http::random_token()?);
-    let handoff = crate::token_handoff::TokenHandoff::create(&token)?;
+    let handoff = crate::token_handoff::TokenHandoff::create(&token, locale)?;
     log_line(format_args!(
-        "[rdsh] dashboard: http://127.0.0.1:{port}/ (Ctrl-C to stop, localhost only)"
+        "[rdsh] {}: http://127.0.0.1:{port}/ ({})",
+        match locale {
+            crate::locale::Locale::English => "dashboard",
+            crate::locale::Locale::Chinese => "仪表板",
+            crate::locale::Locale::Japanese => "ダッシュボード",
+        },
+        match locale {
+            crate::locale::Locale::English => "Ctrl-C to stop, localhost only",
+            crate::locale::Locale::Chinese => "按 Ctrl-C 停止，仅限 localhost",
+            crate::locale::Locale::Japanese => "Ctrl-C で停止、localhost のみ",
+        }
     ));
     log_line(format_args!(
-        "[rdsh] token handoff file: {}",
+        "[rdsh] {}: {}",
+        match locale {
+            crate::locale::Locale::English => "token handoff file",
+            crate::locale::Locale::Chinese => "令牌交接文件",
+            crate::locale::Locale::Japanese => "トークン引き渡しファイル",
+        },
         handoff.path().display()
     ));
     log_line(format_args!(
-        "[rdsh] enter the file contents in the dashboard; the token is never printed"
+        "[rdsh] {}",
+        match locale {
+            crate::locale::Locale::English =>
+                "enter the file contents in the dashboard; the token is never printed",
+            crate::locale::Locale::Chinese => "请在仪表板中输入文件内容；令牌绝不会打印",
+            crate::locale::Locale::Japanese =>
+                "ダッシュボードでファイル内容を入力してください。トークンは表示されません",
+        }
     ));
     let connections = Arc::new(AtomicUsize::new(0));
     while !crate::shutdown::requested() {
@@ -54,7 +86,7 @@ pub fn cmd_serve(port: u16) -> anyhow::Result<()> {
                 let token = token.clone();
                 std::thread::spawn(move || {
                     let _slot = slot;
-                    if let Err(e) = handle(s, &token, port) {
+                    if let Err(e) = handle(s, &token, port, locale) {
                         log_line(format_args!("[rdsh serve] {e:#}"));
                     }
                 });
@@ -72,12 +104,18 @@ pub fn cmd_serve(port: u16) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn handle(mut s: std::net::TcpStream, token: &str, port: u16) -> anyhow::Result<()> {
+fn handle(
+    mut s: std::net::TcpStream,
+    token: &str,
+    port: u16,
+    locale: crate::locale::Locale,
+) -> anyhow::Result<()> {
     use std::borrow::Cow;
     s.set_read_timeout(Some(std::time::Duration::from_secs(10)))?;
     let req = match crate::local_http::read_request(&mut s) {
         Ok(req) => req,
-        Err(status) => {
+        Err(crate::local_http::ReadRequestError::Idle) => return Ok(()),
+        Err(crate::local_http::ReadRequestError::Status(status)) => {
             crate::local_http::respond(
                 &mut s,
                 status,
@@ -138,7 +176,18 @@ fn handle(mut s: std::net::TcpStream, token: &str, port: u16) -> anyhow::Result<
         }
     }
     let (status, ctype, payload): (u16, &str, Cow<'_, str>) = match (method, path) {
-        ("GET", "/") => (200, "text/html; charset=utf-8", Cow::Borrowed(UI)),
+        ("GET", "/") => (
+            200,
+            "text/html; charset=utf-8",
+            Cow::Owned(UI.replace(
+                "__RDSH_LOCALE__",
+                match locale {
+                    crate::locale::Locale::English => "en",
+                    crate::locale::Locale::Chinese => "zh-CN",
+                    crate::locale::Locale::Japanese => "ja",
+                },
+            )),
+        ),
         ("GET", "/icon.svg") => (200, "image/svg+xml", Cow::Borrowed(ICON)),
         ("GET", "/api/version") => (200, "application/json", Cow::Borrowed(VERSION_JSON)),
         ("GET", "/api/doctor") => (200, "application/json", Cow::Owned(doctor_json())),

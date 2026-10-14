@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { overviewModel } from "../project-overview.mjs";
+const previousDocument = globalThis.document;
+globalThis.document = { documentElement: { dataset: { rdshLocale: "ja" } }, getElementById: () => null };
+const { overviewModel } = await import("../project-overview.mjs");
+globalThis.document = previousDocument;
 
 const state = () => ({
   project: { name: "Project A" },

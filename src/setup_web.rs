@@ -9,26 +9,72 @@ use std::sync::Arc;
 const HTML: &str = include_str!("setup.html");
 const ICON: &str = include_str!("../assets/icon.svg");
 
-pub fn cmd_setup_web(port: u16) -> anyhow::Result<()> {
-    let listener = std::net::TcpListener::bind(format!("127.0.0.1:{port}"))
-        .map_err(|e| anyhow::anyhow!("cannot listen on 127.0.0.1:{port}: {e}"))?;
+pub fn cmd_setup_web(port: u16, locale: crate::locale::Locale) -> anyhow::Result<()> {
+    let listener = std::net::TcpListener::bind(format!("127.0.0.1:{port}")).map_err(|e| {
+        anyhow::anyhow!(
+            "{} 127.0.0.1:{port}: {e}",
+            match locale {
+                crate::locale::Locale::English => "cannot listen on",
+                crate::locale::Locale::Chinese => "无法监听",
+                crate::locale::Locale::Japanese => "待受できません",
+            }
+        )
+    })?;
     listener.set_nonblocking(true)?;
-    crate::shutdown::install()?;
+    crate::shutdown::install(locale)?;
     let port = listener.local_addr()?.port();
     let token = Arc::new(crate::local_http::random_token()?);
-    let handoff = crate::token_handoff::TokenHandoff::create(&token)?;
+    let handoff = crate::token_handoff::TokenHandoff::create(&token, locale)?;
     let base = format!("http://127.0.0.1:{port}/");
-    eprintln!("[rdsh setup] floating UI: {base} (localhost only, Ctrl-C to stop)");
     eprintln!(
-        "[rdsh setup] token handoff file: {}",
+        "[rdsh setup] {}: {base} ({})",
+        match locale {
+            crate::locale::Locale::English => "floating UI",
+            crate::locale::Locale::Chinese => "浮动界面",
+            crate::locale::Locale::Japanese => "フローティングUI",
+        },
+        match locale {
+            crate::locale::Locale::English => "localhost only, Ctrl-C to stop",
+            crate::locale::Locale::Chinese => "仅限 localhost，按 Ctrl-C 停止",
+            crate::locale::Locale::Japanese => "localhost のみ、Ctrl-C で停止",
+        }
+    );
+    eprintln!(
+        "[rdsh setup] {}: {}",
+        match locale {
+            crate::locale::Locale::English => "token handoff file",
+            crate::locale::Locale::Chinese => "令牌交接文件",
+            crate::locale::Locale::Japanese => "トークン引き渡しファイル",
+        },
         handoff.path().display()
     );
-    eprintln!("[rdsh setup] enter the file contents in the setup page; the token is never printed");
+    eprintln!(
+        "[rdsh setup] {}",
+        match locale {
+            crate::locale::Locale::English =>
+                "enter the file contents in the setup page; the token is never printed",
+            crate::locale::Locale::Chinese => "请在设置页面中输入文件内容；令牌绝不会打印",
+            crate::locale::Locale::Japanese =>
+                "セットアップページでファイル内容を入力してください。トークンは表示されません",
+        }
+    );
     use std::io::IsTerminal as _;
     if std::io::stdin().is_terminal() {
         // Keep the bearer token out of the browser-launch argv.
-        if let Err(e) = crate::auth::open_browser(&base) {
-            eprintln!("[rdsh setup] could not open browser ({e:#}); open the URL manually");
+        if let Err(e) = crate::auth::open_browser(&base, locale) {
+            eprintln!(
+                "[rdsh setup] {} ({e:#}); {}",
+                match locale {
+                    crate::locale::Locale::English => "could not open browser",
+                    crate::locale::Locale::Chinese => "无法打开浏览器",
+                    crate::locale::Locale::Japanese => "ブラウザを開けませんでした",
+                },
+                match locale {
+                    crate::locale::Locale::English => "open the URL manually",
+                    crate::locale::Locale::Chinese => "请手动打开 URL",
+                    crate::locale::Locale::Japanese => "URL を手動で開いてください",
+                }
+            );
         }
     }
     let done = Arc::new(AtomicBool::new(false));
@@ -52,7 +98,7 @@ pub fn cmd_setup_web(port: u16) -> anyhow::Result<()> {
                 let token = token.clone();
                 std::thread::spawn(move || {
                     let _slot = slot;
-                    if let Err(e) = handle(s, &d, &token, port) {
+                    if let Err(e) = handle(s, &d, &token, port, locale) {
                         eprintln!("[rdsh setup] {e:#}");
                     }
                 });
@@ -75,12 +121,14 @@ fn handle(
     done: &AtomicBool,
     token: &str,
     port: u16,
+    locale: crate::locale::Locale,
 ) -> anyhow::Result<()> {
     use std::borrow::Cow;
     s.set_read_timeout(Some(std::time::Duration::from_secs(10)))?;
     let req = match crate::local_http::read_request(&mut s) {
         Ok(req) => req,
-        Err(status) => {
+        Err(crate::local_http::ReadRequestError::Idle) => return Ok(()),
+        Err(crate::local_http::ReadRequestError::Status(status)) => {
             crate::local_http::respond(
                 &mut s,
                 status,
@@ -121,7 +169,18 @@ fn handle(
     }
     let (status, ctype, payload): (u16, &str, Cow<str>) =
         match (req.method.as_str(), req.target.as_str()) {
-            ("GET", "/") => (200, "text/html; charset=utf-8", Cow::Borrowed(HTML)),
+            ("GET", "/") => (
+                200,
+                "text/html; charset=utf-8",
+                Cow::Owned(HTML.replace(
+                    "__RDSH_LOCALE__",
+                    match locale {
+                        crate::locale::Locale::English => "en",
+                        crate::locale::Locale::Chinese => "zh-CN",
+                        crate::locale::Locale::Japanese => "ja",
+                    },
+                )),
+            ),
             ("GET", "/icon.svg") => (200, "image/svg+xml", Cow::Borrowed(ICON)),
             ("GET", "/api/status") if !req.authorized(token) => (
                 401,
@@ -224,7 +283,7 @@ fn store_extras_body(body: &str) -> anyhow::Result<Vec<String>> {
         .map(|s| s.trim().to_string())
         .collect();
     let mut enable = Vec::new();
-    crate::rdsh_config::update(|cfg| {
+    crate::rdsh_config::update(crate::locale::Locale::English, |cfg| {
         // The setup switches are authoritative: write the canonical feature key
         // for every known extra and keep the legacy list in sync (issue #384).
         for id in crate::rdsh_config::KNOWN_EXTRAS {

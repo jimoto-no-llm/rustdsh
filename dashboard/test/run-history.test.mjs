@@ -1,3 +1,4 @@
+import { requiresOwnershipBackend } from "./ownership-support.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
@@ -567,7 +568,7 @@ test("command IDs are unique, simultaneous local writes serialize and no prompt 
   );
 });
 
-test("tracked attachment persists command and native ack IDs and stops once despite duplicate stop requests", async (t) => {
+test("tracked attachment persists command and native ack IDs and stops once despite duplicate stop requests", requiresOwnershipBackend, async (t) => {
   const f = await setup(t);
   const attached = await attachRecordedSession({
     ledger: f.ledger,
@@ -626,7 +627,7 @@ test("tracked attachment persists command and native ack IDs and stops once desp
   await resumed.adapter.stop();
 });
 
-test("a live or unverifiable recorded process blocks duplicate resume before a second ACP session starts", async (t) => {
+test("a live or unverifiable recorded process blocks duplicate resume before a second ACP session starts", requiresOwnershipBackend, async (t) => {
   const f = await setup(t);
   const first = await attachRecordedSession({
     ledger: f.ledger,
@@ -654,7 +655,7 @@ test("a live or unverifiable recorded process blocks duplicate resume before a s
   assert.equal(inspected.process_observation.status, "unknown");
 });
 
-test("cancel notifications remain unacknowledged while the actual cancelled prompt result is recorded", async (t) => {
+test("cancel notifications remain unacknowledged while the actual cancelled prompt result is recorded", requiresOwnershipBackend, async (t) => {
   const f = await setup(t);
   const attached = await attachRecordedSession({
     ledger: f.ledger,
@@ -692,7 +693,7 @@ test("cancel notifications remain unacknowledged while the actual cancelled prom
   assert.equal(prompt.outcome, "cancelled_result");
 });
 
-test("journal failures block new profile boot yet still allow cleanup of an already owned child", async (t) => {
+test("journal failures block new profile boot yet still allow cleanup of an already owned child", requiresOwnershipBackend, async (t) => {
   const f = await setup(t);
   await fs.mkdir(f.project.directory, { recursive: true });
   const foreign = '{"fixture":"foreign-lock-must-remain"}';

@@ -436,3 +436,134 @@ test("authenticated human HTTP answers bind the seen revision; MCP/admin cannot 
     "invalidated",
   );
 });
+
+import { execFileSync } from "node:child_process";
+
+function detailNode(tag, value = "", className = "") {
+  let ownText = value;
+  const el = {
+    tag,
+    tagName: tag.toUpperCase(),
+    className,
+    dataset: {},
+    attrs: {},
+    children: [],
+    events: {},
+    value: "",
+    append(...items) {
+      this.children.push(...items);
+    },
+    replaceChildren(...items) {
+      this.children = items;
+      ownText = "";
+    },
+    setAttribute(key, value) {
+      this.attrs[key] = value;
+    },
+    addEventListener(name, fn) {
+      this.events[name] = fn;
+    },
+    focus() {},
+    setSelectionRange() {},
+    querySelectorAll(selector) {
+      const matches = (item) =>
+        selector === "[data-question]"
+          ? Boolean(item.dataset.question)
+          : selector === '[role="alert"]'
+            ? item.attrs.role === "alert"
+            : selector === 'input[type="radio"]:checked'
+              ? item.tag === "input" && item.type === "radio" && item.checked
+              : item.tag === selector;
+      return this.children.flatMap((item) => [
+        ...(matches(item) ? [item] : []),
+        ...item.querySelectorAll(selector),
+      ]);
+    },
+    querySelector(selector) {
+      return this.querySelectorAll(selector)[0] || null;
+    },
+    get textContent() {
+      return ownText + this.children.map((item) => item.textContent).join(" ");
+    },
+    set textContent(value) {
+      ownText = value;
+      this.children = [];
+    },
+  };
+  return el;
+}
+
+for (const language of ["en", "zh-CN", "ja"])
+  test(`question cards renders ${language} while preserving received values`, () => {
+    const source = `
+    import assert from "node:assert/strict";
+    globalThis.document = { documentElement: { dataset: { rdshLocale: ${JSON.stringify(language)} } }, getElementById() { return null; }, activeElement: null };
+    ${detailNode.toString()}
+    const node = detailNode;
+    const { text, formatDateTime, catalog } = await import(${JSON.stringify(new URL("../locale.mjs", import.meta.url).href)});
+
+    const { renderQuestionCards } = await import(${JSON.stringify(new URL("../question-cards-ui.mjs", import.meta.url).href)});
+    const root = node("div");
+    const raw = " 原文 日本語 / 中文 · English {id} ";
+    const calls = [];
+    let fail = false;
+    const deps = { node, refreshState: async () => {}, api: async (route, payload) => { calls.push({ route, payload }); if (fail) throw new Error(raw); } };
+    const question = { id: "Q_日本語", urgency: "critical", question: raw, default_action: raw };
+    const decision = { kind: "approval", target: { task_id: "T_日本語", run_id: "R_中文", session_id: "S_日本語", action_id: "A_中文", revision: "V_日本語" }, consumer_id: "C_中文", diff: raw, impact: raw, conditions: raw, choices: [{ id: "choice_日本語", label: raw, detail: raw }], recommended_choice: "choice_日本語", recommendation_reason: raw, cost: { max: 5, description: raw }, expires_at: "2099-10-14T01:02:03Z" };
+    const card = { status: "open", revision: 2, fingerprint: "fingerprint", changed_fields: ["費用上限", "対象・版", "緊急度", "future-field"], snapshot: { decision }, history: [{ revision: 1, snapshot: { decision: { ...decision, cost: { max: 4 } } }, answer: { text: raw } }] };
+    const contracts = { cards: { [question.id]: card } };
+    renderQuestionCards(root, [question], contracts, deps);
+    for (const key of ["question.approval", "question.cost", "question.choices", "question.answer", "question.history", "question.urgency.critical"]) assert.ok(root.textContent.includes(text(key)), key);
+    assert.equal(root.querySelector("h3").textContent, raw);
+    assert.equal(root.querySelector("input").value, "choice_日本語");
+    assert.ok(root.textContent.includes(formatDateTime(decision.expires_at)));
+    assert.ok(root.textContent.includes("future-field"));
+    assert.ok(root.textContent.includes(raw));
+    const area = root.querySelector("textarea");
+    assert.equal(area.attrs["aria-label"], text("question.answerLabel", { id: question.id }));
+    const form = root.querySelector("form");
+    await form.events.submit({ preventDefault() {} });
+    assert.equal(form.querySelector('[role="alert"]').textContent, text("question.answerRequired"));
+    area.value = raw;
+    await form.events.submit({ preventDefault() {} });
+    assert.equal(calls[0].payload.answer, raw);
+    assert.equal(calls[0].payload.id, question.id);
+    assert.equal(calls[0].payload.expected_revision, 2);
+    assert.equal(calls[0].payload.contract_fingerprint, "fingerprint");
+    form.querySelectorAll("button")[0].disabled = false;
+    fail = true;
+    await form.events.submit({ preventDefault() {} });
+    assert.equal(form.querySelector('[role="alert"]').textContent, raw);
+    fail = false;
+    await form.querySelectorAll("button").at(-1).events.click();
+    assert.equal(calls.at(-1).payload.cancel_reason, "人間が取消しました");
+    for (const status of ["answered", "expired", "cancelled", "superseded", "future-status"]) {
+      const freshRoot = node("div");
+      renderQuestionCards(freshRoot, [question], { cards: { [question.id]: { ...card, status } } }, deps);
+      assert.ok(freshRoot.textContent.includes(status === "future-status" ? status : text("question.status." + status)));
+      assert.equal(freshRoot.querySelector("textarea").disabled, true);
+    }
+    const changedRoot = node("div");
+    renderQuestionCards(changedRoot, [question], contracts, deps);
+    changedRoot.querySelector("textarea").value = raw;
+    renderQuestionCards(changedRoot, [question], { cards: { [question.id]: { ...card, revision: 3, fingerprint: "updated" } } }, deps);
+    assert.equal(changedRoot.querySelector("textarea").value, raw);
+    assert.ok(changedRoot.textContent.includes(text("question.changedDraft")));
+    assert.equal(changedRoot.querySelectorAll("button")[0].disabled, true);
+    const review = changedRoot.querySelectorAll("input").find(input => input.type === "checkbox");
+    review.checked = true;
+    review.events.change();
+    assert.equal(changedRoot.querySelectorAll("button")[0].disabled, false);
+    const unknown = node("div");
+    renderQuestionCards(unknown, [{ ...question, urgency: "future-urgency" }], { cards: { [question.id]: { ...card, snapshot: { decision: { ...decision, kind: "future-kind" } } } } }, deps);
+    assert.ok(unknown.textContent.includes("future-urgency"));
+    assert.ok(unknown.textContent.includes("future-kind"));
+    const empty = node("div");
+    renderQuestionCards(empty, [], {}, deps);
+    assert.equal(empty.textContent, text("question.empty"));
+
+  `;
+    execFileSync(process.execPath, ["--input-type=module", "-e", source], {
+      encoding: "utf8",
+    });
+  });

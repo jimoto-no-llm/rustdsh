@@ -9,8 +9,8 @@ It does not replace native testing or reimplement the DSH agent loop.
 
 ```sh
 cargo build --release
-npm ci --prefix dashboard
-npm ci --prefix tests/e2e
+(cd dashboard && npm ci)
+(cd tests/e2e && npm ci)
 (cd tests/e2e && npx playwright install chromium)
 RDSH_E2E_BIN=./target/release/rdsh npm test --prefix tests/e2e
 ```
@@ -24,7 +24,10 @@ questions and browser answers, draft retention across SSE, process restart, and
 revocation of the previous browser key. Linux CI installs Chromium and retains PNGs
 and JSON even when the job fails.
 
-The default command also runs `update-banner.mjs` with the real React component
+The default command repeats native setup, native Web and project-dashboard flows
+in `en`, `zh-CN`, and `ja`, including original Japanese task/question text that
+must not be translated. Individual `browser.mjs` runs use
+`RDSH_E2E_LANGUAGE` (default `ja`). It also runs `update-banner.mjs` with the real React component
 and two independent authenticated plugin hosts. Dummy HOME and loopback ports
 cover live update push, cross-tab/port close events, two-hour boundaries, reload
 notification, project remounts, legacy records and unavailable browser storage.
@@ -42,7 +45,8 @@ RDSH_HARNESS_BIN=/path/to/original/dsh npm run test:harness --prefix tests/e2e
 ```
 
 This installs the local rdsh settings plugin into a temporary DSH Web profile and
-tests save/readback/reload/corruption/retry in its actual UI. It uses no credentials
+tests save/readback/reload/corruption/retry and live en/zh-CN/ja language
+switching in its actual UI. It uses no credentials
 or model calls, and does not start the Electron Desktop GUI. DSH must already be
 installed; the optional test is not part of CI. The report separates
 `functional_result` from `mobile_accepted` and `mobile_readability`; command success

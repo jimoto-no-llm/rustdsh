@@ -129,7 +129,7 @@ fn discord_settings_round_trip_through_cli_and_section_reset() {
         .success());
     let reset: serde_json::Value = serde_json::from_str(&fixture.read()).unwrap();
     assert_eq!(reset["discord"]["enabled"], true);
-    assert_eq!(reset["discord"]["details"], "dshで作業中");
+    assert_eq!(reset["discord"]["details"], "");
     assert_eq!(reset["discord"]["show_agent_status"], true);
     assert_eq!(reset["discord"]["show_image"], true);
 }
@@ -240,6 +240,74 @@ fn settings_set_preserves_valid_port_boundaries_and_random_web_port() {
         assert_eq!(settings[section][field], serde_json::json!(expected));
     }
 }
+
+#[test]
+fn language_setting_round_trips_and_invalid_persisted_value_fails_closed() {
+    let fixture = Fixture::new("{}");
+    for language in ["auto", "en", "zh-CN", "ja"] {
+        let output = fixture.run(&["settings", "set", "general.language", language]);
+        assert!(output.status.success(), "{language}: {output:?}");
+        let saved: serde_json::Value = serde_json::from_str(&fixture.read()).unwrap();
+        assert_eq!(saved["general"]["language"], language);
+    }
+    let before = fixture.read();
+    assert!(!fixture
+        .run(&["settings", "set", "general.language", "fr"])
+        .status
+        .success());
+    assert_eq!(fixture.read(), before);
+
+    let invalid = Fixture::new(r#"{"general":{"language":"fr"}}"#);
+    let output = invalid.run(&["settings", "show", "--json"]);
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("general.language"));
+    assert_eq!(invalid.read(), r#"{"general":{"language":"fr"}}"#);
+}
+
+#[test]
+fn language_option_localizes_rdsh_owned_settings_diagnostics() {
+    let fixture = Fixture::new("{}");
+    let japanese = fixture.run(&["--language", "ja", "settings", "get", "missing.key"]);
+    assert_eq!(japanese.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&japanese.stderr).contains("不明な設定キー"));
+
+    let rejected = fixture.run(&[
+        "--language",
+        "ja",
+        "settings",
+        "set",
+        "general.language",
+        "fr",
+    ]);
+    assert!(!rejected.status.success());
+    assert!(String::from_utf8_lossy(&rejected.stderr).contains("エラー"));
+
+    let chinese = fixture.run(&["--language", "zh-CN", "settings", "init"]);
+    assert_eq!(chinese.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&chinese.stderr).contains("设置已存在于"));
+}
+
+#[test]
+fn language_option_localizes_auth_and_setup_guidance() {
+    let fixture = Fixture::new("{}");
+    let auth = fixture.run(&["--language", "zh-CN", "auth"]);
+    assert!(auth.status.success());
+    let auth_stdout = String::from_utf8_lossy(&auth.stdout);
+    assert!(auth_stdout.contains("凭据"), "{auth_stdout}");
+    assert!(
+        auth_stdout.contains("来源") || auth_stdout.contains("提示"),
+        "{auth_stdout}"
+    );
+
+    let setup = fixture.run(&["--language", "zh-CN", "setup"]);
+    assert!(setup.status.success());
+    let setup_stdout = String::from_utf8_lossy(&setup.stdout);
+    assert!(
+        setup_stdout.contains("尚无可用模型") || setup_stdout.contains("已连接"),
+        "{setup_stdout}"
+    );
+}
+
 fn feature_state(fixture: &Fixture, id: &str) -> (bool, bool) {
     let output = fixture.run(&["features", "--json"]);
     assert!(

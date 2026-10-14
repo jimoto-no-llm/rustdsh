@@ -1,3 +1,4 @@
+import { requiresOwnershipBackend } from "./ownership-support.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
@@ -11,7 +12,7 @@ const fixture = fileURLToPath(
   new URL("./fixtures/owned-tree.mjs", import.meta.url),
 );
 
-test("concurrent close shares one attempt and retries an unconfirmed stop", async (t) => {
+test("concurrent close shares one attempt and retries an unconfirmed stop", requiresOwnershipBackend, async (t) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-close-"));
   const previousHome = process.env.RDSH_DASHBOARD_HOME;
   process.env.RDSH_DASHBOARD_HOME = path.join(root, "state");

@@ -1,113 +1,90 @@
-const labels = {
-  ready: "確認済み",
-  observed: "成功を観測",
-  failed: "失敗を観測",
-  unconfirmed: "未確認",
-  stopped: "停止を観測",
-  stale_credentials: "古い認証を保持",
-  unreachable: "到達できない",
-  not_ready: "準備未完了",
-  disabled: "共有無効",
-  not_installed: "未インストール",
-  login_required: "ログイン待ち",
-  dns_required: "DNS設定待ち",
-  route_missing: "共有経路なし",
-};
-const time = (value) =>
-  value ? new Date(value).toLocaleString("ja-JP") : "未取得";
+import { formatDateTime, text } from "./locale.mjs";
+
+const labels = Object.fromEntries(["ready", "observed", "failed", "unconfirmed", "stopped", "stale_credentials", "unreachable", "not_ready", "disabled", "not_installed", "login_required", "dns_required", "route_missing"].map((state) => [state, text(`diag.state.${state}`)]));
+const time = (value) => value ? formatDateTime(value) : text("date.unavailable");
 export function diagnosticRows(report) {
   const browser = report.browser,
     dot = report.dot;
   return [
     {
-      group: "スマホ閲覧",
+      group: "phone",
       label: "dashboard",
       value: { ...browser.dashboard, observed_at: report.observed_at },
-      recovery: "このPCのdashboardは応答しています。",
+      recovery: text("diag.dashboardRecovery"),
     },
     {
-      group: "スマホ閲覧",
-      label: "閲覧の認証",
+      group: "phone",
+      label: text("diag.auth"),
       value: browser.authentication,
       recovery:
         browser.authentication.state === "failed"
-          ? "最新のQRまたは rdsh-dashboard open から開き直してください。"
-          : "観測した端末の経路を表示します。端末の種類は判定しません。",
+          ? text("diag.authFailed") : text("diag.authObserved"),
     },
     {
-      group: "スマホ閲覧",
+      group: "phone",
       label: "Tailscale Serve",
       value: browser.tailscale,
       recovery:
         browser.tailscale.state === "ready"
-          ? "このPCの共有設定を確認済み。スマホ側のTailscale接続は別途確認してください。"
-          : "スマホとこのPCのTailscale接続を確認し、共有が必要なら「接続を更新」を使ってください。",
+          ? text("diag.tailscaleReady") : text("diag.tailscaleRecover"),
     },
     {
-      group: "スマホ閲覧",
-      label: "実際のスマホ到達",
+      group: "phone", label: text("diag.phone"),
       value: browser.phone,
-      recovery: "スマホでQRを開き、対象と最新の表示を確認してください。",
+      recovery: text("diag.phoneRecover"),
     },
     {
-      group: "Dot連携",
+      group: "dot",
       label: "Secure MCP Tunnel",
       value: dot.tunnel,
       recovery:
         dot.tunnel.state === "stale_credentials"
-          ? "dashboard再起動で認証が更新されています。実行中のTunnelを止め、同じ tunnel コマンドを再実行してください。"
+          ? text("diag.tunnelStale")
           : dot.tunnel.state === "ready"
-            ? "ローカルの /healthz と /readyz が200。Dotの応答はまだ確認できません。"
-            : "dashboardを先に起動し、Tunnelコマンドとローカルのヘルス状態を確認してください。",
+            ? text("diag.tunnelReady") : text("diag.tunnelRecover"),
     },
     {
-      group: "Dot連携",
-      label: "MCPの認証",
+      group: "dot", label: text("diag.mcpAuth"),
       value: dot.authentication,
       recovery:
         dot.authentication.state === "failed"
-          ? "Tunnelを再起動し、手動設定したMCPクライアントは最新の接続設定を読み直してください。"
-          : "認証成功はMCPクライアントの観測です。Dotかどうかは判定しません。",
+          ? text("diag.mcpAuthFailed") : text("diag.mcpAuthObserved"),
     },
     {
-      group: "Dot連携",
-      label: "MCPの発見",
+      group: "dot", label: text("diag.discovery"),
       value: dot.discovery,
-      recovery: "ChatGPTの接続からサーバーの発見を実行してください。",
+      recovery: text("diag.discoveryRecover"),
     },
     {
-      group: "Dot連携",
+      group: "dot",
       label: "tools/list",
       value: dot.tools,
       recovery:
-        "接続からツールを取得してください。既存の6ツールを維持しています。",
+        text("diag.toolsRecover"),
     },
     {
-      group: "Dot連携",
+      group: "dot",
       label: "events/list",
       value: dot.events,
-      recovery: "Events対応の接続からイベントを取得してください。",
+      recovery: text("diag.eventsRecover"),
     },
     {
-      group: "Dot連携",
-      label: "コールバックの検証",
+      group: "dot", label: text("diag.callback"),
       value: dot.verification,
       recovery:
-        "失敗時は受信先のHTTPS・署名検証・challenge応答を確認して購読し直してください。",
+        text("diag.callbackRecover"),
     },
     {
-      group: "Dot連携",
-      label: "署名付きイベントの配送",
+      group: "dot", label: text("diag.delivery"),
       value: dot.callback,
       recovery:
-        "2xxは受信先の受付です。失敗時は受信先、署名鍵、購読期限を確認してください。",
+        text("diag.deliveryRecover"),
     },
     {
-      group: "Dot連携",
-      label: "Dotの実際の応答",
+      group: "dot", label: text("diag.response"),
       value: dot.response,
       recovery:
-        "実際の質問→人の回答→署名付きイベント→Dotの応答を、対象の会話で確認してください。",
+        text("diag.responseRecover"),
     },
   ];
 }
@@ -116,23 +93,23 @@ export function renderConnectionDiagnostics(container, report, node) {
   container.append(
     node(
       "p",
-      `取得日時: ${time(report.observed_at)} · 接続全体: 未確認`,
+      text("diag.observed", { time: time(report.observed_at) }),
       "notice",
     ),
   );
-  for (const group of ["スマホ閲覧", "Dot連携"]) {
+  for (const group of ["phone", "dot"]) {
     const section = node("section", undefined, "card");
-    section.append(node("h3", group));
+    section.append(node("h3", text(`diag.group.${group}`)));
     for (const row of diagnosticRows(report).filter(
       (item) => item.group === group,
     )) {
       const block = node("div", undefined, "diagnostic-stage");
       block.append(
-        node("strong", `${row.label} · ${labels[row.value.state] || "未確認"}`),
+        node("strong", `${row.label} · ${labels[row.value.state] || text("diag.state.unconfirmed")}`),
         node("p", row.recovery, "sub"),
         node(
           "p",
-          `観測: ${time(row.value.observed_at)}${row.value.channel ? " · 経路: " + row.value.channel : ""}${row.value.reason ? " · " + row.value.reason : ""}`,
+          text("diag.observation", { time: time(row.value.observed_at), channel: row.value.channel ? text("diag.channel", { value: row.value.channel }) : "", reason: row.value.reason ? ` · ${row.value.reason}` : "" }),
           "sub",
         ),
       );
@@ -140,25 +117,25 @@ export function renderConnectionDiagnostics(container, report, node) {
         block.append(
           node(
             "p",
-            `最後の成功: ${time(row.value.last_success)} · 最後の失敗: ${time(row.value.last_failure)}`,
+            text("diag.last", { success: time(row.value.last_success), failure: time(row.value.last_failure) }),
             "sub",
           ),
         );
       section.append(block);
     }
-    if (group === "Dot連携") {
+    if (group === "dot") {
       const subscriptions = report.dot.subscriptions;
       section.append(
         node(
           "p",
-          `イベント購読: 有効 ${subscriptions.active}件 · 期限切れ ${subscriptions.expired}件（取得時点）`,
+          text("diag.subscriptions", { active: subscriptions.active, expired: subscriptions.expired }),
         ),
       );
       for (const item of subscriptions.items)
         section.append(
           node(
             "p",
-            `${item.event} · ${item.state === "active" ? "有効" : "期限切れ"} · 期限: ${time(item.expires_at)}`,
+            `${item.event} · ${item.state === "active" ? text("diag.active") : text("diag.expired")} · ${text("diag.expires", { time: time(item.expires_at) })}`,
             "sub",
           ),
         );

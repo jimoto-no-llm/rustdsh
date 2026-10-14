@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 import { realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
-import { spawnOwnedProcess } from "./process-scope.mjs";
+import { ScopeError, spawnOwnedProcess } from "./process-scope.mjs";
 import {
   nativeSelection,
   selected,
@@ -236,7 +236,7 @@ class CliAdapter extends EventEmitter {
         kill: {
           supported: Boolean(
             this.ownedScope &&
-            ["running", "stopping"].includes(this.ownedScope.state.status),
+              ["running", "stopping"].includes(this.ownedScope.state.status),
           ),
           method: this.ownedScope?.descriptor.kind ?? null,
           deadline_ms: this.stopTimeout,
@@ -351,18 +351,26 @@ class CliAdapter extends EventEmitter {
     this.processVersion = this.version;
     // ACP is a shipped DSH profile; --from-default-profile is for custom targets.
     this.launchAttempted = true;
-    this.ownedScope = await spawnOwnedProcess({
-      command: [
-        ...this.command,
-        "--profile",
-        this.profile,
-        ...(this.patch === null ? [] : ["--patch", this.patch]),
-      ],
-      cwd: this.cwd,
-      env: this.env,
-      owner_id: this.owner_id,
-      onStage: this.onStopStage,
-    });
+    try {
+      this.ownedScope = await spawnOwnedProcess({
+        command: [
+          ...this.command,
+          "--profile",
+          this.profile,
+          ...(this.patch === null ? [] : ["--patch", this.patch]),
+        ],
+        cwd: this.cwd,
+        env: this.env,
+        owner_id: this.owner_id,
+        onStage: this.onStopStage,
+      });
+    } catch (error) {
+      // This rejection includes a confirmed startup cleanup or no spawned monitor.
+      // Unknown cleanup still retains launchAttempted and blocks a confirmed stop.
+      if (error instanceof ScopeError && error.code === "ownership_unavailable")
+        this.launchAttempted = false;
+      throw error;
+    }
     this.child = this.ownedScope.child;
     // Never forward stderr or peer error strings; either can contain secrets.
     this.child.stderr.resume();

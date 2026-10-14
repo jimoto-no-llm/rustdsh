@@ -1,9 +1,43 @@
+import { text, formatDateTime } from "./locale.mjs";
+
+const targetFieldNames = Object.fromEntries(
+  ["task_id", "run_id", "session_id", "action_id", "revision"].map((value) => [
+    value,
+    text(`question.targetField.${value}`),
+  ]),
+);
+
+const changedFieldNames = {
+  費用上限: text("question.field.費用上限"),
+  "対象・版": text("question.field.対象・版"),
+  差分: text("question.field.差分"),
+  影響: text("question.field.影響"),
+  条件: text("question.field.条件"),
+  選択肢: text("question.field.選択肢"),
+  推奨: text("question.field.推奨"),
+  期限: text("question.field.期限"),
+  質問: text("question.field.質問"),
+  問い: text("question.field.問い"),
+  緊急度: text("question.field.緊急度"),
+  参考の行動: text("question.field.参考の行動"),
+  質問の型: text("question.field.質問の型"),
+  推奨理由: text("question.field.推奨理由"),
+  回答consumer: text("question.field.回答consumer"),
+};
+
+const urgencyNames = Object.fromEntries(
+  ["normal", "high", "critical"].map((value) => [
+    value,
+    text(`question.urgency.${value}`),
+  ]),
+);
+
 const statusNames = {
-  open: "回答待ち",
-  answered: "回答を保存済み",
-  expired: "期限切れ · 回答不可",
-  cancelled: "取消し · 回答不可",
-  superseded: "旧版 · 回答は無効",
+  open: text("question.status.open"),
+  answered: text("question.status.answered"),
+  expired: text("question.status.expired"),
+  cancelled: text("question.status.cancelled"),
+  superseded: text("question.status.superseded"),
 };
 
 export function draftReviewState(draft, contract) {
@@ -74,17 +108,28 @@ export function renderQuestionCards(
       heading.append(
         node(
           "span",
-          decision?.kind === "approval" ? "承認依頼" : "相談",
+          decision?.kind === "approval"
+            ? text("question.approval")
+            : decision?.kind && decision.kind !== "consultation"
+              ? decision.kind
+              : text("question.consultation"),
           "kind" + (decision?.kind === "approval" ? " kind-approval" : ""),
         ),
-        node("span", `${question.id} · ${question.urgency}`, "sub"),
+        node(
+          "span",
+          `${question.id} · ${urgencyNames[question.urgency] || question.urgency}`,
+          "sub",
+        ),
       );
       article.append(heading, node("h3", question.question));
       if (contract) {
         article.append(
           node(
             "p",
-            `版 ${contract.revision} · ${statusNames[contract.status]}`,
+            text("question.version", {
+              revision: contract.revision,
+              status: statusNames[contract.status] || contract.status,
+            }),
             "sub",
           ),
         );
@@ -92,7 +137,11 @@ export function renderQuestionCards(
           article.append(
             node(
               "p",
-              `変更: ${contract.changed_fields.join("、")}。旧版の回答は無効です。`,
+              text("question.changed", {
+                fields: contract.changed_fields
+                  .map((field) => changedFieldNames[field] || field)
+                  .join(text("question.separator")),
+              }),
               "warn",
             ),
           );
@@ -101,26 +150,40 @@ export function renderQuestionCards(
         const add = (label, value) =>
           detail.append(node("dt", label), node("dd", value));
         add(
-          "対象",
+          text("question.target"),
           target
             ? [
-                target.task_id && `task ${target.task_id}`,
-                target.run_id && `run ${target.run_id}`,
-                target.session_id && `session ${target.session_id}`,
-                target.action_id && `action ${target.action_id}`,
-                `対象の版 ${target.revision}`,
+                target.task_id &&
+                  text("question.target.task", { id: target.task_id }),
+                target.run_id &&
+                  text("question.target.run", { id: target.run_id }),
+                target.session_id &&
+                  text("question.target.session", { id: target.session_id }),
+                target.action_id &&
+                  text("question.target.action", { id: target.action_id }),
+                text("question.targetVersion", { revision: target.revision }),
               ]
                 .filter(Boolean)
                 .join(" · ")
-            : "指定なし",
+            : text("question.unspecified"),
         );
-        if (decision.consumer_id) add("回答consumer", decision.consumer_id);
+        if (decision.consumer_id)
+          add(text("question.consumer"), decision.consumer_id);
         const previous = contract.history.at(-1)?.snapshot.decision;
         if (previous && contract.changed_fields.includes("費用上限"))
           article.append(
             node(
               "p",
-              `費用上限の変更: ${previous.cost?.max == null ? "未確認" : "$" + previous.cost.max.toFixed(2)} → ${decision.cost?.max == null ? "未確認" : "$" + decision.cost.max.toFixed(2)} USD`,
+              text("question.costChanged", {
+                previous:
+                  previous.cost?.max == null
+                    ? text("question.unconfirmed")
+                    : "$" + previous.cost.max.toFixed(2),
+                current:
+                  decision.cost?.max == null
+                    ? text("question.unconfirmed")
+                    : "$" + decision.cost.max.toFixed(2),
+              }),
               "warn",
             ),
           );
@@ -128,37 +191,52 @@ export function renderQuestionCards(
           article.append(
             node(
               "p",
-              `以前の対象: ${Object.entries(previous.target)
-                .filter(([, value]) => value !== null)
-                .map(([key, value]) => `${key} ${value}`)
-                .join(" · ")}`,
+              text("question.previousTarget", {
+                target: Object.entries(previous.target)
+                  .filter(([, value]) => value !== null)
+                  .map(
+                    ([key, value]) =>
+                      `${targetFieldNames[key] || key} ${value}`,
+                  )
+                  .join(" · "),
+              }),
               "sub",
             ),
           );
-        add("差分", decision.diff || "指定なし");
-        add("影響", decision.impact || "指定なし");
-        add("条件", decision.conditions || "指定なし");
         add(
-          "費用上限",
+          text("question.diff"),
+          decision.diff || text("question.unspecified"),
+        );
+        add(
+          text("question.impact"),
+          decision.impact || text("question.unspecified"),
+        );
+        add(
+          text("question.conditions"),
+          decision.conditions || text("question.unspecified"),
+        );
+        add(
+          text("question.cost"),
           decision.cost
-            ? `${decision.cost.max === null ? "未確認" : "$" + decision.cost.max.toFixed(2)} USD${decision.cost.description ? " · " + decision.cost.description : ""}`
-            : "指定なし",
+            ? `${decision.cost.max === null ? text("question.unconfirmed") : "$" + decision.cost.max.toFixed(2)} USD${decision.cost.description ? " · " + decision.cost.description : ""}`
+            : text("question.unspecified"),
         );
         if (decision.recommended_choice)
           add(
-            "推奨と理由",
+            text("question.recommended"),
             `${decision.choices.find((choice) => choice.id === decision.recommended_choice).label} · ${decision.recommendation_reason}`,
           );
         if (decision.expires_at)
-          add("期限", new Date(decision.expires_at).toLocaleString("ja-JP"));
-        if (contract.cancel_reason) add("取消し理由", contract.cancel_reason);
+          add(text("question.expires"), formatDateTime(decision.expires_at));
+        if (contract.cancel_reason)
+          add(text("question.cancelReason"), contract.cancel_reason);
         article.append(detail);
       }
       if (question.default_action)
         article.append(
           node(
             "p",
-            `参考の行動: ${question.default_action}（自動実行しません）`,
+            text("question.defaultAction", { action: question.default_action }),
             "sub",
           ),
         );
@@ -172,7 +250,7 @@ export function renderQuestionCards(
       const choices = decision?.choices || [];
       if (choices.length) {
         const group = node("fieldset");
-        group.append(node("legend", "選択肢（自動選択しません）"));
+        group.append(node("legend", text("question.choices")));
         for (const choice of choices) {
           const label = node("label", undefined, "decision-choice");
           const radio = node("input");
@@ -193,23 +271,20 @@ export function renderQuestionCards(
       const textarea = node("textarea");
       textarea.dataset.question = question.id;
       textarea.dataset.field = "answer";
-      textarea.setAttribute("aria-label", `質問 ${question.id} への回答`);
+      textarea.setAttribute(
+        "aria-label",
+        text("question.answerLabel", { id: question.id }),
+      );
       textarea.required = choices.length === 0;
       textarea.maxLength = 8000;
       textarea.disabled = !editable;
       textarea.value = draft?.text || "";
       form.append(textarea);
-      const button = node("button", "回答を返す", "primary");
+      const button = node("button", text("question.answer"), "primary");
       button.type = "submit";
       button.disabled = !editable || reviewRequired;
       if (changedDraft) {
-        form.append(
-          node(
-            "p",
-            "質問が更新されました。下書きは保存しています。更新後の対象と条件を確認し、選択肢を選び直してください。",
-            "warn",
-          ),
-        );
+        form.append(node("p", text("question.changedDraft"), "warn"));
         const label = node("label", undefined, "decision-choice");
         const review = node("input");
         review.type = "checkbox";
@@ -226,7 +301,7 @@ export function renderQuestionCards(
             : "";
           button.disabled = !editable || !review.checked;
         });
-        label.append(review, node("span", "更新後の対象と条件を確認した"));
+        label.append(review, node("span", text("question.reviewed")));
         form.append(label);
       }
       const error = node("div", draft?.error || "", "error");
@@ -240,7 +315,7 @@ export function renderQuestionCards(
         const choice = choices.find((item) => item.id === choiceId);
         const answer = textarea.value.trim() ? textarea.value : choice?.label;
         if (!answer) {
-          error.textContent = "選択肢を選ぶか、回答を入力してください。";
+          error.textContent = text("question.answerRequired");
           return;
         }
         button.disabled = true;
@@ -264,7 +339,7 @@ export function renderQuestionCards(
         }
       });
       if (contract && editable) {
-        const cancel = node("button", "この質問を取消す");
+        const cancel = node("button", text("question.cancel"));
         cancel.type = "button";
         cancel.addEventListener("click", async () => {
           cancel.disabled = true;
@@ -282,18 +357,18 @@ export function renderQuestionCards(
         });
         form.append(cancel);
       }
-      article.append(
-        form,
-        node("p", "回答はこの版への返答です。実行権限は発行しません。", "sub"),
-      );
+      article.append(form, node("p", text("question.noAuthority"), "sub"));
       if (contract?.history.some((record) => record.answer)) {
         const history = node("details");
-        history.append(node("summary", "旧版の回答（無効）"));
+        history.append(node("summary", text("question.history")));
         for (const record of contract.history.filter((item) => item.answer))
           history.append(
             node(
               "p",
-              `版 ${record.revision}: ${record.answer.text} · 旧版の対象への回答です。`,
+              text("question.historyAnswer", {
+                revision: record.revision,
+                answer: record.answer.text,
+              }),
             ),
           );
         article.append(history);
@@ -302,7 +377,7 @@ export function renderQuestionCards(
     }),
   );
   if (!questions.length)
-    container.append(node("p", "未回答の質問はありません", "empty"));
+    container.append(node("p", text("question.empty"), "empty"));
   if (active) {
     const element = [...container.querySelectorAll("[data-question]")].find(
       (item) =>

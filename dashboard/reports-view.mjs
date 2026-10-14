@@ -1,3 +1,4 @@
+import { text, formatDateTime, formatNumber } from "./locale.mjs";
 import { metricView, observationView, ratioView } from "./observations.mjs";
 import { eventIdentifier, eventTargetId } from "./annotation-identifiers.mjs";
 
@@ -9,14 +10,14 @@ function node(tag, text, className) {
   return result;
 }
 const number = (value) =>
-  value == null ? "未取得" : value.toLocaleString("ja-JP");
-const money = (value) => (value == null ? "未取得" : "$" + value.toFixed(2));
+  value == null ? text("report.unavailable") : formatNumber(value);
+const money = (value) => (value == null ? text("report.unavailable") : "$" + value.toFixed(2));
 const ratio = (numerator, denominator) =>
   numerator == null || denominator == null || denominator === 0
     ? null
     : numerator / denominator;
 const percentage = (value) =>
-  value == null ? "未取得" : (value * 100).toFixed(1) + "%";
+  value == null ? text("report.unavailable") : (value * 100).toFixed(1) + "%";
 function card(label, value, detail, progress, warning = false) {
   const element = node("section", undefined, "card");
   element.append(
@@ -41,12 +42,12 @@ function emptyRow(text, columns) {
   return tr;
 }
 const date = (value) =>
-  value ? new Date(value).toLocaleString("ja-JP") : "未申告";
+  value ? formatDateTime(value) : text("report.unreported");
 const freshnessLabels = {
   fresh: "",
-  stale: "古い情報",
-  unknown: "鮮度未確認",
-  unavailable: "未取得",
+  stale: text("report.stale"),
+  unknown: text("report.unknown"),
+  unavailable: text("report.unavailable"),
 };
 let openObservations = new Set();
 function provenance(view, label, format = String, id = "") {
@@ -56,7 +57,7 @@ function provenance(view, label, format = String, id = "") {
   const heading = node("div", undefined, "observation-heading");
   if (label) heading.append(node("span", label + "："));
   heading.append(
-    node("span", view.label, "provenance-badge " + (view.kind || "unknown")),
+    node("span", text("observation.kind." + (view.kind || "unknown")), "provenance-badge " + (view.kind || "unknown")),
   );
   if (view.freshness === "stale" || view.freshness === "unknown")
     heading.append(
@@ -64,24 +65,24 @@ function provenance(view, label, format = String, id = "") {
     );
   element.append(heading);
   if (view.value != null && !view.current)
-    element.append(node("div", "前回の報告値：" + format(view.value), "sub"));
+    element.append(node("div", text("report.previous") + format(view.value), "sub"));
   const o = view.observation;
-  element.append(node("div", "観測：" + date(o?.observed_at), "sub"));
+  element.append(node("div", text("report.observed") + date(o?.observed_at), "sub"));
   const details = node("details", undefined, "observation-details");
   details.dataset.observationId = id;
   details.open = openObservations.has(id);
-  const summary = node("summary", "報告元・参照対象");
+  const summary = node("summary", text("report.sourceDetails"));
   summary.dataset.observationId = id;
   details.append(
     summary,
-    node("div", "報告元：" + (o?.source || "未申告")),
-    node("div", "報告session：" + (o?.session_id || "未申告")),
-    node("div", "参照対象：" + (o?.reference || "未申告")),
-    node("div", "受信：" + date(o?.recorded_at)),
+    node("div", text("report.source") + (o?.source || text("report.unreported"))),
+    node("div", text("report.session") + (o?.session_id || text("report.unreported"))),
+    node("div", text("report.reference") + (o?.reference || text("report.unreported"))),
+    node("div", text("report.received") + date(o?.recorded_at)),
   );
   if (o?.observed_at && o.max_age_seconds) {
     const expiresAt = new Date(Date.parse(o.observed_at) + o.max_age_seconds * 1000);
-    details.append(node("div", "鮮度期限：" + date(expiresAt.toISOString())));
+    details.append(node("div", text("report.expires") + date(expiresAt.toISOString())));
   }
   element.append(details);
   return element;
@@ -89,7 +90,7 @@ function provenance(view, label, format = String, id = "") {
 function metricText(state, key, format, now) {
   const view = metricView(state, key, now);
   return view.current
-    ? (view.kind === "estimated" ? "推定 " : "") + format(view.value)
+    ? (view.kind === "estimated" ? text("report.estimated") : "") + format(view.value)
     : freshnessLabels[view.freshness];
 }
 function metricCard(state, now, label, value, detail, fields, progress, warning) {
@@ -102,13 +103,13 @@ function metricCard(state, now, label, value, detail, fields, progress, warning)
 }
 function rateText(state, a, b, now) {
   const result = ratioView(state, a, b, now);
-  if (result.reason === "incompatible") return "比較不可";
+  if (result.reason === "incompatible") return text("report.incompatible");
   if (result.value !== null)
-    return (metricView(state, a, now).kind === "estimated" ? "推定 " : "") + percentage(result.value);
+    return (metricView(state, a, now).kind === "estimated" ? text("report.estimated") : "") + percentage(result.value);
   const views = [metricView(state, a, now), metricView(state, b, now)];
-  if (views.some((view) => view.freshness === "stale")) return "古い情報";
-  if (views.some((view) => view.freshness === "unknown")) return "鮮度未確認";
-  return "未取得";
+  if (views.some((view) => view.freshness === "stale")) return text("report.stale");
+  if (views.some((view) => view.freshness === "unknown")) return text("report.unknown");
+  return text("report.unavailable");
 }
 export function renderReports(state, now = Date.now()) {
   openObservations = new Set(
@@ -131,52 +132,52 @@ export function renderReports(state, now = Date.now()) {
   const counts = ["done", "doing", "todo", "blocked"]
     .map(
       (status) =>
-        `${status} ${state.tasks.filter((task) => task.status === status).length}`,
+        `${text("task.status."+status)} ${state.tasks.filter((task) => task.status === status).length}`,
     )
     .join(" · ");
   $("cards").replaceChildren(
     metricCard(state, now,
-      "従来の累計報告（API換算）",
+      text("report.total"),
       metric("total_cost_usd", money),
-      "台帳とは別の入力 · 上限 " + metric("total_budget_usd", money),
-      [["費用", "total_cost_usd", money], ["上限", "total_budget_usd", money]],
+      text("report.separate") + metric("total_budget_usd", money),
+      [[text("report.cost"), "total_cost_usd", money], [text("report.limit"), "total_budget_usd", money]],
       progress("total_cost_usd", "total_budget_usd"),
     ),
     metricCard(state, now,
-      "直近のセッション",
+      text("report.recent"),
       metric("session_cost_usd", money),
-      `${state.metrics.session_id || "session未申告"}　上限 ${metric("session_budget_usd", money)}`,
-      [["費用", "session_cost_usd", money], ["上限", "session_budget_usd", money]],
+      text("report.sessionLimit", {session:state.metrics.session_id || text("report.noSession"), limit:metric("session_budget_usd",money)}),
+      [[text("report.cost"), "session_cost_usd", money], [text("report.limit"), "session_budget_usd", money]],
       progress("session_cost_usd", "session_budget_usd"),
     ),
     metricCard(state, now,
-      "キャッシュ読み込み率",
+      text("report.cacheRate"),
       rateText(state, "cached_input_tokens", "input_tokens", now),
-      `${metric("model_calls")} 回の呼び出し（入力トークン加重）`,
-      [["キャッシュ", "cached_input_tokens"], ["入力", "input_tokens"], ["呼び出し", "model_calls"]],
+      text("report.modelCalls", {count:metric("model_calls")}),
+      [[text("report.cache"), "cached_input_tokens"], [text("report.input"), "input_tokens"], [text("report.calls"), "model_calls"]],
     ),
     metricCard(state, now,
-      "ツールのエラー率",
+      text("report.toolErrorRate"),
       rateText(state, "tool_errors", "tool_calls", now),
-      `${metric("tool_errors")} / ${metric("tool_calls")} 件`,
-      [["エラー", "tool_errors"], ["ツール", "tool_calls"]],
+      text("report.toolCalls", {errors:metric("tool_errors"),calls:metric("tool_calls")}),
+      [[text("report.errors"), "tool_errors"], [text("report.tools"), "tool_calls"]],
     ),
     metricCard(state, now,
-      "文脈の読み落とし",
+      text("report.contextMisses"),
       metric("context_misses"),
-      "報告元で検出した回数",
-      [["検出数", "context_misses"]],
+      text("report.detectedBySource"),
+      [[text("report.detected"), "context_misses"]],
       undefined,
       metricView(state, "context_misses", now).current && state.metrics.context_misses > 0,
     ),
     metricCard(state, now,
-      "自動続行",
+      text("report.autoContinue"),
       metric("auto_continues"),
-      `拒否 ${metric("refusals")} · APIエラー ${metric("api_errors")}`,
-      [["続行", "auto_continues"], ["拒否", "refusals"], ["APIエラー", "api_errors"]],
+      text("report.apiErrors", {refusals:metric("refusals"),errors:metric("api_errors")}),
+      [[text("report.continued"), "auto_continues"], [text("report.refused"), "refusals"], [text("report.apiError"), "api_errors"]],
     ),
-    card("鮮度内の完了報告", `${currentDone} / ${state.tasks.length}`, "全報告の内訳：" + counts),
-    card("未回答の質問", String(pending.length), `回答済み ${answered}`),
+    card(text("report.currentDone"), `${currentDone} / ${state.tasks.length}`, text("report.breakdown") + counts),
+    card(text("report.pending"), String(pending.length), text("report.answered", {count:answered})),
   );
   $("task-milestones").textContent = [
     ...new Set(state.tasks.map((task) => task.milestone).filter(Boolean)),
@@ -188,8 +189,8 @@ export function renderReports(state, now = Date.now()) {
       tr.id = "task-" + task.id;
       const status = node("td");
       const view = observationView(task.status, task.observation, now);
-      const statusLabel = (view.kind === "estimated" ? "推定 " : "") +
-        task.status + (view.current ? "" : "（" + freshnessLabels[view.freshness] + "）");
+      const statusLabel = (view.kind === "estimated" ? text("report.estimated") : "") +
+        text("task.status."+task.status) + (view.current ? "" : "（" + freshnessLabels[view.freshness] + "）");
       status.append(node(
         "span", statusLabel,
         "status " + (view.current && view.kind !== "estimated" ? task.status : ""),
@@ -207,13 +208,13 @@ export function renderReports(state, now = Date.now()) {
       taskLink.dataset.taskId = task.id;
       tr.children[0].replaceChildren(taskLink);
       [...tr.children].forEach((cell, index) => {
-        cell.dataset.label = ["ID", "状態", "題名", "ブロック要因"][index];
+        cell.dataset.label = ["ID", text("report.status"), text("report.title"), text("report.blocker")][index];
       });
       return tr;
     }),
   );
   if (!state.tasks.length)
-    $("tasks").append(emptyRow("タスクはまだ登録されていません", 4));
+    $("tasks").append(emptyRow(text("report.noTasks"), 4));
   renderEvents(state, now);
   if (activeDisclosure)
     [...document.querySelectorAll("summary[data-observation-id]")]
@@ -231,7 +232,7 @@ function renderEvents(state, now) {
           node("strong", event.title),
           node(
             "div",
-            `${event.type} · ${new Date(event.created_at).toLocaleString("ja-JP")}`,
+            `${event.type} · ${formatDateTime(event.created_at)}`,
             "sub",
           ),
         );
@@ -246,6 +247,6 @@ function renderEvents(state, now) {
   );
   if (!state.events.length)
     $("events").append(
-      node("div", "進捗・成果物の報告はまだありません", "empty"),
+      node("div", text("report.noEvents"), "empty"),
     );
 }

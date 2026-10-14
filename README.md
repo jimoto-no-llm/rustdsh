@@ -9,7 +9,7 @@
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org/)
 
-[Japanese version](README.ja.md)
+[日本語](README.ja.md) · [简体中文](README.zh-CN.md)
 
 An independent community project; not an official DeepSeek or DeepSeek Harness project.
 
@@ -235,6 +235,23 @@ A lightweight status and token estimation page running on localhost (default `:3
 rdsh settings set extras.enable serve  # enable the server feature
 rdsh serve                             # launch (bound to localhost, protected with a one-time token)
 ```
+
+### Product language
+
+rdsh-owned CLI diagnostics and the native local page support English, Simplified
+Chinese, and Japanese. Choose one run with `--language`, or persist it in
+`rdsh.json`; the default `auto` reads the first nonblank locale environment variable,
+falling back to English when it is absent or unsupported.
+
+```sh
+rdsh --language ja settings show
+rdsh settings set general.language zh-CN
+```
+
+Precedence is `--language`, `RDSH_LANG`, `general.language`, then `LC_ALL`,
+`LC_MESSAGES`, and `LANG`. An explicitly invalid `general.language` stops the
+command without rewriting the settings file. Delegated `dsh` arguments, model
+output, JSON fields, files, and protocol identifiers are not translated.
 
 ### Extended Dashboard (`rdsh-dashboard`)
 

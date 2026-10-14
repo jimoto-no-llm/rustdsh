@@ -1,0 +1,60 @@
+dsh のRust高速ランチャー（安全: ネイティブ高速パスと透過実行）
+使い方: rdsh [OPTIONS] [EXTRA]... [COMMAND]
+
+コマンド:
+  boot         dshプロファイルを起動
+  dump-config  有効な設定を出力
+  tokens       入力トークン数をネイティブで推定
+  prune        テキストをトークン予算まで切り詰め
+  search       高速ファイル検索
+  search-web   SearXNG によるWeb検索
+  compact      テキストファイルを圧縮
+  doctor       診断サマリーを表示
+  sessions     $DSH_HOME 配下のセッションを一覧（新しい順、Node不要）
+  profiles     ローカルプロファイルを一覧（Node不要）
+  skills       インストール済みスキルを一覧（Node不要）
+  logs         $DSH_HOME のログを表示
+  serve        ローカルダッシュボードを起動（127.0.0.1のみ、読み取り専用API）
+  auth         外部OAuthログインを検出してインポート
+  setup        初回のモデル接続
+  bench        起動ベンチマークを実行
+  context      コンテキストエンジン試作
+  compute      常駐の純粋計算ワーカー
+  guard        hooks.json用の入力ブロック補助
+  settings     統合rdsh設定
+  features     機能スイッチ
+  desktop      DeepSeek Harness Desktop連携
+  help         ヘルプを表示
+
+オプション:
+      --share-file <SHARE_FILE>  隔離されたモデルツールとプロジェクトファイルを共有（繰り返し可）
+      --passthrough              slim委譲を無効化
+      --dry-run                  実行せずに内容を表示
+      --slim                     slim委譲を強制
+      --no-slim                  slim委譲を無効化
+      --patch <PATCH>            設定オーバーレイを適用（繰り返し可）
+      --profile <PROFILE>        使用するプロファイル
+      --language <LANGUAGE>      rdsh自身の表示言語: en、zh-CN、ja
+  -h, --help                     ヘルプを表示
+  -V, --version                  バージョンを表示
+
+引数:
+  [EXTRA]...  dshへ渡すアプリ引数
+
+使い方：
+  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]
+  rdsh <native-subcommand> ...   (tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|auth|setup|context|settings|features|dump-config|boot)
+
+例：
+  rdsh tui                        tuiプロファイルを起動（slim環境ON、dshへ委譲）
+  rdsh --profile web --patch x.yml オーバーレイ付きでwebを起動
+  rdsh dump-config --profile tui  dshへ正確な設定出力を委譲
+  rdsh tokens ./AGENTS.md         入力トークン数をネイティブで推定
+  rdsh auth --import --provider openai-codex   選択したプロバイダーだけをインポート
+  rdsh setup                      初回接続: インポート、ログイン手順、次のステップ
+  rdsh search hello --dir .       Nodeなしの高速ファイル検索
+  rdsh search-web "rust async"      SearXNGによるWeb検索（APIキー不要）
+  rdsh desktop status             Desktop（Electron）アプリと専用プロファイルを検出
+  rdsh desktop install            同プロファイルに同梱rdshプラグインを追加
+  rdsh --passthrough tui          slim環境なし。必須のツール分離は維持
+  rdsh --dry-run tui -- --resume abc   実行するコマンドを表示

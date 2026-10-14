@@ -83,7 +83,9 @@ export async function smokeAdapter({
   } finally {
     const results = await Promise.allSettled(adapters.map((a) => a.stop()));
     // Keep the owned temp home when a process could still be using it.
-    if (results.some((r) => r.status === "rejected"))
+    if (
+      results.some((r) => r.status === "rejected" || r.value.confirmed !== true)
+    )
       throw new AdapterError("smoke_cleanup_unconfirmed");
     await fs.rm(root, { recursive: true, force: true });
   }

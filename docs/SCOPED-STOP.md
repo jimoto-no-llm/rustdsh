@@ -51,6 +51,16 @@ This installs the version-pinned Linux dependency in this checkout. Native Linux
 npm ci selects its own prebuilt automatically. Other architecture combinations
 are not exercised by the checked-in evidence.
 
+## Platform prerequisites
+
+| Platform | Owned profile launch | Native process identity | Test behavior |
+| --- | --- | --- | --- |
+| Windows | Retained unnamed Job handle | Process birth time and machine scope | Native lifecycle and Tunnel identity fixtures run. |
+| Linux | Delegated writable cgroup v2, cgroup.kill and pidfds | Process birth time and boot scope | Native lifecycle and Tunnel identity fixtures run; missing delegation or native support fails the test. |
+| macOS and other systems | No backend; rejects with ownership_unavailable | No reader; identity remains unknown | Portable validation and explicit rejection regressions run; individual positive fixtures state the missing prerequisite. |
+
+An ownership_unavailable startup rejection has no retained adapter-owned child or scope. It includes either no spawned supervisor or confirmed supervisor cleanup, so stopping that adapter reports not_running and an isolated smoke removes its unused private home while retaining the original diagnostic. Unknown startup cleanup and cleanup failures after ownership acquisition remain unconfirmed; smoke reports smoke_cleanup_unconfirmed and retains its private home.
+
 ## Stop stages and persistence
 
 The adapter retains its six operations. Its stop_stages capability describes
@@ -89,6 +99,10 @@ the dashboard and instance lock. Independent DSH instances and human terminals
 have no ownership handle in this run and receive no signals.
 
 ## Verification
+
+Run `cd dashboard && npm test` on every target platform. `test/ownership-support.mjs` marks individual tests that actually launch native ACP/Web children or require a process birth/scope identity. It does not skip version probes, malformed-input checks, portable state tests, HTTP authentication, or public CLI argument validation. Windows and Linux keep the original lifecycle assertions, including process exit and descendant verification; no runtime failure is converted into a platform skip.
+
+On platforms without a backend, `test/adapter-smoke.test.mjs` observes the actual ownership_unavailable error, absent ACP launch marker, absent child/scope, confirmed no-child stop and removal of the unused private smoke home. A separate cleanup-policy regression retains the private home for an unconfirmed cleanup result; a supported-platform fixture acquires real ownership before testing a failed stop and then cleans up through its retained handle. `test/connection-diagnostics.test.mjs` verifies that a missing native identity leaves Tunnel readiness unconfirmed and performs no HTTP health probe.
 
 See [scoped-stop evidence](evidence/scoped-stop.md) for actual captures,
 before/after fixture output, native Web startup and Windows-to-WSL byte preservation.

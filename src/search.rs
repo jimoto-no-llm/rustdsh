@@ -2,12 +2,27 @@
 // Two phases: sequential walk (fixed order) then parallel grep over files.
 // Stdout matches a sequential scan: per-file hits merge in walk order.
 
-pub fn cmd_search(pattern: &str, dir: &str, max: usize) -> anyhow::Result<()> {
+pub fn cmd_search(
+    pattern: &str,
+    dir: &str,
+    max: usize,
+    locale: crate::locale::Locale,
+) -> anyhow::Result<()> {
     anyhow::ensure!(
         cfg!(unix),
-        "RDSH_SECURITY: secure native search is unavailable on this platform"
+        "{}",
+        crate::locale::native_message(locale, crate::locale::NativeMessage::SearchUnavailable)
     );
-    let root = std::fs::canonicalize(dir)?;
+    let root = std::fs::canonicalize(dir).map_err(|error| match locale {
+        crate::locale::Locale::English => error.into(),
+        crate::locale::Locale::Chinese | crate::locale::Locale::Japanese => anyhow::anyhow!(
+            "{} {dir}: {error}",
+            crate::locale::native_message(
+                locale,
+                crate::locale::NativeMessage::CannotAccessSearchDirectory
+            )
+        ),
+    })?;
     let reader = crate::file_security::Root::new(&root);
     let files = collect_parallel(&root);
     let nfiles = files.len();
@@ -43,7 +58,15 @@ pub fn cmd_search(pattern: &str, dir: &str, max: usize) -> anyhow::Result<()> {
         }
     }
     let _ = out.flush();
-    eprintln!("[rdsh] {shown} hit(s) in {nfiles} file(s)");
+    match locale {
+        crate::locale::Locale::English => eprintln!("[rdsh] {shown} hit(s) in {nfiles} file(s)"),
+        crate::locale::Locale::Chinese => {
+            eprintln!("[rdsh] 在 {nfiles} 个文件中找到 {shown} 个匹配")
+        }
+        crate::locale::Locale::Japanese => {
+            eprintln!("[rdsh] {nfiles} 個のファイルで {shown} 件一致")
+        }
+    }
     Ok(())
 }
 const SKIP: &[&str] = &[

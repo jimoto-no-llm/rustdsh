@@ -1,22 +1,25 @@
+import { text } from "./locale.mjs";
+
 export const MODEL_CATALOG = [
   {
     id: "mistral-large-preview",
     name: "Mistral Large",
     architecture: "MoE",
-    status: "公開プレビュー",
-    weights: "10月末公開予定",
-    total_label: "約1兆",
-    active_label: "490億",
+    status: text("model.preview"),
+    weights: text("model.weightsPlan"),
+    total_label: text("model.trillion"),
+    active_label: text("model.billion"),
     // 表示用概数（報告値）。有効/総 = 49/100 = 0.49 の横棒用。
     total_value: 100,
     active_value: 49,
-    certainty: "報告値",
-    source_ref: "Mistral AI 公開情報（手入力カタログ）",
+    certainty: text("model.reported"),
+    source_ref: text("model.sourceBuiltin"),
   },
 ];
 
 export function catalogActiveRatio(entry) {
-  if (!entry || entry.active_value == null || entry.total_value == null) return null;
+  if (!entry || entry.active_value == null || entry.total_value == null)
+    return null;
   const active = Number(entry.active_value);
   const total = Number(entry.total_value);
   if (!Number.isFinite(active) || !Number.isFinite(total)) return null;
@@ -25,49 +28,77 @@ export function catalogActiveRatio(entry) {
 }
 
 function paramText(value, label) {
-  if (value == null || value === "") return "未取得";
+  if (value == null || value === "") return text("model.unavailable");
   return label || String(value);
 }
 
-export function createModelCatalogPanel(container, node, initialCatalog = MODEL_CATALOG) {
+export function createModelCatalogPanel(
+  container,
+  node,
+  initialCatalog = MODEL_CATALOG,
+) {
   function render(catalog) {
     const list = catalog === undefined ? initialCatalog : catalog;
     container.replaceChildren();
-    container.append(node("h2", "モデルカタログ（試作）"));
-    container.append(
-      node(
-        "p",
-        "手入力の報告値です。断定した実測ではありません。出所を確認してください。",
-        "sub",
-      ),
-    );
+    container.append(node("h2", text("model.heading")));
+    container.append(node("p", text("model.intro"), "sub"));
     if (!Array.isArray(list) || list.length === 0) {
-      container.append(node("p", "モデルカタログは未登録です。", "sub"));
+      container.append(node("p", text("model.empty"), "sub"));
       return;
     }
     for (const entry of list) {
       const card = node("section", undefined, "card");
-      card.append(node("h3", entry.name || "名称未取得"));
+      card.append(node("h3", entry.name || text("model.noName")));
       card.append(
         node(
           "p",
-          (entry.architecture || "構成未取得") +
-            " · " +
-            (entry.status || "状態未取得") +
-            " · 重み " +
-            (entry.weights || "未取得"),
+          text("model.summary", {
+            architecture: entry.architecture || text("model.noArchitecture"),
+            status: entry.status || text("model.noStatus"),
+            weights: entry.weights || text("model.unavailable"),
+          }),
           "detail",
         ),
       );
-      const totalText = paramText(entry.total_value, entry.total_label ? "総 " + entry.total_label : undefined);
-      const activeText = paramText(entry.active_value, entry.active_label ? "有効 " + entry.active_label : undefined);
-      card.append(node("p", "総パラメータ（報告値）: " + totalText, "detail"));
-      card.append(node("p", "有効パラメータ（報告値）: " + activeText, "detail"));
-      card.append(node("p", "確度: " + (entry.certainty || "未取得"), "detail"));
-      card.append(node("p", "出所: " + (entry.source_ref || "未取得"), "detail"));
+      const totalText = paramText(
+        entry.total_value,
+        entry.total_label
+          ? text("model.totalLabel", { value: entry.total_label })
+          : undefined,
+      );
+      const activeText = paramText(
+        entry.active_value,
+        entry.active_label
+          ? text("model.activeLabel", { value: entry.active_label })
+          : undefined,
+      );
+      card.append(
+        node("p", text("model.total", { value: totalText }), "detail"),
+      );
+      card.append(
+        node("p", text("model.active", { value: activeText }), "detail"),
+      );
+      card.append(
+        node(
+          "p",
+          text("model.certainty", {
+            value: entry.certainty || text("model.unavailable"),
+          }),
+          "detail",
+        ),
+      );
+      card.append(
+        node(
+          "p",
+          text("model.source", {
+            value: entry.source_ref || text("model.unavailable"),
+          }),
+          "detail",
+        ),
+      );
       const ratio = catalogActiveRatio(entry);
       if (ratio == null) {
-        card.append(node("p", "有効/総の比率は未取得です。0にはしません。", "detail"));
+        card.append(node("p", text("model.missingRatio"), "detail"));
       } else {
         const width = 200;
         const height = 14;
@@ -77,6 +108,10 @@ export function createModelCatalogPanel(container, node, initialCatalog = MODEL_
           svg.setAttribute("height", String(height));
           svg.setAttribute("viewBox", "0 0 " + width + " " + height);
           svg.setAttribute("role", "img");
+          svg.setAttribute(
+            "aria-label",
+            text("model.ratio", { value: ratio.toFixed(2) }),
+          );
         }
         const bg = node("rect");
         if (typeof bg.setAttribute === "function") {
@@ -108,7 +143,7 @@ export function createModelCatalogPanel(container, node, initialCatalog = MODEL_
         }
         card.append(svg);
         card.append(
-          node("p", "有効/総（報告値の表示用比率）: " + ratio.toFixed(2), "detail"),
+          node("p", text("model.ratio", { value: ratio.toFixed(2) }), "detail"),
         );
       }
       container.append(card);

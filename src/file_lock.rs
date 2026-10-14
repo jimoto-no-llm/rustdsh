@@ -26,14 +26,32 @@ pub(crate) struct CredentialFileLock {
 }
 
 impl CredentialFileLock {
-    pub(crate) fn exclusive_for(target: &Path) -> anyhow::Result<Self> {
-        Self::exclusive_for_timeout(target, CREDENTIAL_LOCK_WAIT)
+    pub(crate) fn exclusive_for(
+        target: &Path,
+        locale: crate::locale::Locale,
+    ) -> anyhow::Result<Self> {
+        Self::exclusive_for_timeout(target, CREDENTIAL_LOCK_WAIT, locale)
     }
 
-    fn exclusive_for_timeout(target: &Path, timeout: Duration) -> anyhow::Result<Self> {
+    fn exclusive_for_timeout(
+        target: &Path,
+        timeout: Duration,
+        locale: crate::locale::Locale,
+    ) -> anyhow::Result<Self> {
         if let Some(parent) = target.parent() {
             if !parent.as_os_str().is_empty() {
-                std::fs::create_dir_all(parent)?;
+                std::fs::create_dir_all(parent).map_err(|error| {
+                    anyhow::anyhow!(
+                        "{} {}: {error}",
+                        lock_text(
+                            locale,
+                            "cannot create credential lock directory",
+                            "无法创建凭据锁目录",
+                            "認証情報ロックディレクトリを作成できません"
+                        ),
+                        parent.display()
+                    )
+                })?;
             }
         }
 
@@ -47,7 +65,13 @@ impl CredentialFileLock {
                         drop(marker);
                         let _ = std::fs::remove_file(&lock_path);
                         return Err(anyhow::anyhow!(
-                            "cannot write credential lock file {}: {error}",
+                            "{} {}: {error}",
+                            lock_text(
+                                locale,
+                                "cannot write credential lock file",
+                                "无法写入凭据锁文件",
+                                "認証情報ロックファイルを書き込めません"
+                            ),
                             lock_path.display()
                         ));
                     }
@@ -55,13 +79,19 @@ impl CredentialFileLock {
                     return Ok(Self { lock_path });
                 }
                 Err(error) if lock_contention(&error, &lock_path) => {
-                    if take_over_exited_lock(&lock_path)? {
+                    if take_over_exited_lock(&lock_path, locale)? {
                         continue;
                     }
                 }
                 Err(error) => {
                     return Err(anyhow::anyhow!(
-                        "cannot create credential lock file {}: {error}",
+                        "{} {}: {error}",
+                        lock_text(
+                            locale,
+                            "cannot create credential lock file",
+                            "无法创建凭据锁文件",
+                            "認証情報ロックファイルを作成できません"
+                        ),
                         lock_path.display()
                     ));
                 }
@@ -71,12 +101,30 @@ impl CredentialFileLock {
             if elapsed >= timeout {
                 if marker_has_no_valid_owner(&lock_path) {
                     anyhow::bail!(
-                        "atomic-write: timed out waiting for the writer lock at {} (marker has no valid PID record and was left untouched)",
-                        lock_path.display()
+                        "{} {} ({})",
+                        lock_text(
+                            locale,
+                            "atomic-write: timed out waiting for the writer lock at",
+                            "原子写入：等待写入器锁超时，位置",
+                            "アトミック書き込み: 書き込みロックの待機がタイムアウトしました:"
+                        ),
+                        lock_path.display(),
+                        lock_text(
+                            locale,
+                            "marker has no valid PID record and was left untouched",
+                            "标记没有有效的 PID 记录，且未作修改",
+                            "マーカーに有効な PID レコードがないため変更しませんでした"
+                        )
                     );
                 }
                 anyhow::bail!(
-                    "atomic-write: timed out waiting for the writer lock at {}",
+                    "{} {}",
+                    lock_text(
+                        locale,
+                        "atomic-write: timed out waiting for the writer lock at",
+                        "原子写入：等待写入器锁超时，位置",
+                        "アトミック書き込み: 書き込みロックの待機がタイムアウトしました:"
+                    ),
                     lock_path.display()
                 );
             }
@@ -228,7 +276,7 @@ fn process_is_alive(_pid: u32) -> bool {
     true
 }
 
-fn take_over_exited_lock(lock_path: &Path) -> anyhow::Result<bool> {
+fn take_over_exited_lock(lock_path: &Path, locale: crate::locale::Locale) -> anyhow::Result<bool> {
     let Some(record) = read_lock_record(lock_path) else {
         return Ok(false);
     };
@@ -242,7 +290,13 @@ fn take_over_exited_lock(lock_path: &Path) -> anyhow::Result<bool> {
         Err(error) if lock_contention(&error, &claim_path) => return Ok(false),
         Err(error) => {
             return Err(anyhow::anyhow!(
-                "cannot create credential lock takeover claim {}: {error}",
+                "{} {}: {error}",
+                lock_text(
+                    locale,
+                    "cannot create credential lock takeover claim",
+                    "无法创建凭据锁接管声明",
+                    "認証情報ロック引き継ぎ要求を作成できません"
+                ),
                 claim_path.display()
             ));
         }
@@ -251,7 +305,13 @@ fn take_over_exited_lock(lock_path: &Path) -> anyhow::Result<bool> {
         drop(claim);
         let _ = std::fs::remove_file(&claim_path);
         return Err(anyhow::anyhow!(
-            "cannot write credential lock takeover claim {}: {error}",
+            "{} {}: {error}",
+            lock_text(
+                locale,
+                "cannot write credential lock takeover claim",
+                "无法写入凭据锁接管声明",
+                "認証情報ロック引き継ぎ要求を書き込めません"
+            ),
             claim_path.display()
         ));
     }
@@ -299,10 +359,24 @@ pub(crate) struct FileLock {
 }
 
 impl FileLock {
-    pub(crate) fn exclusive_for(target: &Path) -> anyhow::Result<Self> {
+    pub(crate) fn exclusive_for(
+        target: &Path,
+        locale: crate::locale::Locale,
+    ) -> anyhow::Result<Self> {
         if let Some(parent) = target.parent() {
             if !parent.as_os_str().is_empty() {
-                std::fs::create_dir_all(parent)?;
+                std::fs::create_dir_all(parent).map_err(|error| {
+                    anyhow::anyhow!(
+                        "{} {}: {error}",
+                        lock_text(
+                            locale,
+                            "cannot create lock directory",
+                            "无法创建锁目录",
+                            "ロックディレクトリを作成できません"
+                        ),
+                        parent.display()
+                    )
+                })?;
             }
         }
         let mut lock_name = target.as_os_str().to_os_string();
@@ -317,9 +391,18 @@ impl FileLock {
                 .mode(0o600)
                 .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW);
         }
-        let file = options
-            .open(&lock_path)
-            .map_err(|e| anyhow::anyhow!("cannot open lock file {}: {e}", lock_path.display()))?;
+        let file = options.open(&lock_path).map_err(|e| {
+            anyhow::anyhow!(
+                "{} {}: {e}",
+                lock_text(
+                    locale,
+                    "cannot open lock file",
+                    "无法打开锁文件",
+                    "ロックファイルを開けません"
+                ),
+                lock_path.display()
+            )
+        })?;
 
         #[cfg(unix)]
         {
@@ -333,7 +416,8 @@ impl FileLock {
                 let error = std::io::Error::last_os_error();
                 if error.kind() != std::io::ErrorKind::Interrupted {
                     return Err(anyhow::anyhow!(
-                        "cannot lock {}: {error}",
+                        "{} {}: {error}",
+                        lock_text(locale, "cannot lock", "无法锁定", "ロックできません"),
                         lock_path.display()
                     ));
                 }
@@ -359,13 +443,27 @@ impl FileLock {
             };
             if ok == 0 {
                 return Err(anyhow::anyhow!(
-                    "cannot lock {}: {}",
+                    "{} {}: {}",
+                    lock_text(locale, "cannot lock", "无法锁定", "ロックできません"),
                     lock_path.display(),
                     std::io::Error::last_os_error()
                 ));
             }
             Ok(Self { file, overlapped })
         }
+    }
+}
+
+fn lock_text(
+    locale: crate::locale::Locale,
+    english: &'static str,
+    chinese: &'static str,
+    japanese: &'static str,
+) -> &'static str {
+    match locale {
+        crate::locale::Locale::English => english,
+        crate::locale::Locale::Chinese => chinese,
+        crate::locale::Locale::Japanese => japanese,
     }
 }
 
@@ -496,7 +594,7 @@ mod tests {
             let maximum = Arc::clone(&maximum);
             joins.push(std::thread::spawn(move || {
                 barrier.wait();
-                let _lock = FileLock::exclusive_for(&path).unwrap();
+                let _lock = FileLock::exclusive_for(&path, crate::locale::Locale::English).unwrap();
                 let current = active.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
                 maximum.fetch_max(current, std::sync::atomic::Ordering::SeqCst);
                 std::thread::sleep(Duration::from_millis(40));
@@ -508,7 +606,7 @@ mod tests {
             join.join().unwrap();
         }
         assert_eq!(maximum.load(std::sync::atomic::Ordering::SeqCst), 1);
-        assert!(FileLock::exclusive_for(&path).is_ok());
+        assert!(FileLock::exclusive_for(&path, crate::locale::Locale::English).is_ok());
         std::fs::remove_dir_all(dir).unwrap();
     }
 
@@ -517,8 +615,12 @@ mod tests {
         let (target, dir) = temp_target(".credentials.yaml");
         let marker = lock_path(&target);
 
-        let lock =
-            CredentialFileLock::exclusive_for_timeout(&target, Duration::from_secs(1)).unwrap();
+        let lock = CredentialFileLock::exclusive_for_timeout(
+            &target,
+            Duration::from_secs(1),
+            crate::locale::Locale::English,
+        )
+        .unwrap();
         assert_eq!(
             std::fs::read(&marker).unwrap(),
             format!("{}\n", std::process::id()).as_bytes()
@@ -540,9 +642,12 @@ mod tests {
         let worker_target = target.clone();
         let worker = std::thread::spawn(move || {
             started_tx.send(()).unwrap();
-            let lock =
-                CredentialFileLock::exclusive_for_timeout(&worker_target, Duration::from_secs(2))
-                    .unwrap();
+            let lock = CredentialFileLock::exclusive_for_timeout(
+                &worker_target,
+                Duration::from_secs(2),
+                crate::locale::Locale::English,
+            )
+            .unwrap();
             acquired_tx.send(()).unwrap();
             drop(lock);
         });
@@ -570,8 +675,12 @@ mod tests {
         let marker = lock_path(&target);
         std::fs::write(&marker, format!("{}\n", unused_pid())).unwrap();
 
-        let lock =
-            CredentialFileLock::exclusive_for_timeout(&target, Duration::from_secs(1)).unwrap();
+        let lock = CredentialFileLock::exclusive_for_timeout(
+            &target,
+            Duration::from_secs(1),
+            crate::locale::Locale::English,
+        )
+        .unwrap();
         assert_eq!(
             std::fs::read(&marker).unwrap(),
             format!("{}\n", std::process::id()).as_bytes()
@@ -590,32 +699,49 @@ mod tests {
 
     #[test]
     fn credential_lock_does_not_reclaim_an_incomplete_pid_record() {
-        let (target, dir) = temp_target(".credentials.yaml");
-        let marker = lock_path(&target);
-        std::fs::write(&marker, b"").unwrap();
-
-        let error =
-            match CredentialFileLock::exclusive_for_timeout(&target, Duration::from_millis(60)) {
+        for (locale, timeout, invalid_marker) in [
+            (
+                crate::locale::Locale::English,
+                "timed out waiting for the writer lock",
+                "no valid PID record",
+            ),
+            (
+                crate::locale::Locale::Chinese,
+                "等待写入器锁超时",
+                "没有有效的 PID 记录",
+            ),
+            (
+                crate::locale::Locale::Japanese,
+                "書き込みロックの待機がタイムアウト",
+                "有効な PID レコードがない",
+            ),
+        ] {
+            let (target, dir) = temp_target(".credentials.yaml");
+            let marker = lock_path(&target);
+            std::fs::write(&marker, b"").unwrap();
+            let error = match CredentialFileLock::exclusive_for_timeout(
+                &target,
+                Duration::from_millis(60),
+                locale,
+            ) {
                 Ok(lock) => {
                     drop(lock);
                     panic!("an incomplete marker must not be reclaimed");
                 }
                 Err(error) => error,
             };
-        assert!(error
-            .to_string()
-            .contains("timed out waiting for the writer lock"));
-        assert!(error.to_string().contains("no valid PID record"));
-        assert_eq!(std::fs::read(&marker).unwrap(), b"");
-        assert!(!std::fs::read_dir(&dir).unwrap().any(|entry| {
-            entry
-                .unwrap()
-                .file_name()
-                .to_string_lossy()
-                .contains(".takeover-")
-        }));
-
-        std::fs::remove_dir_all(dir).unwrap();
+            assert!(error.to_string().contains(timeout), "{error:#}");
+            assert!(error.to_string().contains(invalid_marker), "{error:#}");
+            assert_eq!(std::fs::read(&marker).unwrap(), b"");
+            assert!(!std::fs::read_dir(&dir).unwrap().any(|entry| {
+                entry
+                    .unwrap()
+                    .file_name()
+                    .to_string_lossy()
+                    .contains(".takeover-")
+            }));
+            std::fs::remove_dir_all(dir).unwrap();
+        }
     }
 
     #[test]
@@ -632,9 +758,12 @@ mod tests {
             let maximum = Arc::clone(&maximum);
             joins.push(std::thread::spawn(move || {
                 barrier.wait();
-                let _lock =
-                    CredentialFileLock::exclusive_for_timeout(&target, Duration::from_secs(2))
-                        .unwrap();
+                let _lock = CredentialFileLock::exclusive_for_timeout(
+                    &target,
+                    Duration::from_secs(2),
+                    crate::locale::Locale::English,
+                )
+                .unwrap();
                 let current = active.fetch_add(1, Ordering::SeqCst) + 1;
                 maximum.fetch_max(current, Ordering::SeqCst);
                 std::thread::sleep(Duration::from_millis(40));

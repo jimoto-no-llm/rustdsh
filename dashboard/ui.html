@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="ja">
+<html lang="__RDSH_LOCALE__" data-rdsh-locale="__RDSH_LOCALE__">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Project dashboard</title>
+    <title data-i18n="chrome.project">Project dashboard</title>
     <link rel="icon" type="image/png" href="./icon.png" />
     <link rel="apple-touch-icon" href="./icon.png" />
     <style>
@@ -788,15 +788,15 @@
   </head>
   <body>
     <!-- #61: キーボード利用者が内容へ直接飛べる待避線。 -->
-    <a class="skip" href="#project-content">内容へ移動</a>
+    <a class="skip" href="#project-content"><span data-i18n="chrome.skip">内容へ移動</span></a>
     <main>
       <header>
         <div>
           <img src="./icon.png" width="40" height="40" alt="rdsh" />
-          <div class="eyebrow" id="kind">PROJECT DASHBOARD</div>
-          <h1 id="title">読み込み中…</h1>
+          <div class="eyebrow" id="kind"><span data-i18n="chrome.project">PROJECT DASHBOARD</span></div>
+          <h1 id="title"><span data-i18n="chrome.loading">読み込み中…</span></h1>
           <details>
-            <summary class="sub">場所・接続先</summary>
+            <summary class="sub"><span data-i18n="chrome.location">場所・接続先</span></summary>
             <div class="sub" id="location"></div>
           </details>
         </div>
@@ -807,70 +807,70 @@
             aria-haspopup="dialog"
             aria-controls="palette"
           >
-            コマンド
+            <span data-i18n="chrome.commands">コマンド</span>
           </button>
           <button id="share-toggle" aria-expanded="false" aria-controls="share">
-            スマホで開く
+            <span data-i18n="chrome.phone">スマホで開く</span>
           </button>
         </div>
       </header>
       <div id="connection" class="sub" role="status" aria-live="polite">
-        接続中…
+        <span data-i18n="chrome.connecting">接続中…</span>
       </div>
       <section class="share" id="share" hidden>
         <div>
           <img
             id="qr"
-            alt="Tailscale経由でこのダッシュボードを開くQRコード"
+            alt="Tailscale経由でこのダッシュボードを開くQRコード" data-i18n-alt="chrome.qrAlt"
             hidden
           />
-          <div class="qr-placeholder" id="qr-placeholder">接続準備中</div>
+          <div class="qr-placeholder" id="qr-placeholder"><span data-i18n="chrome.preparing">接続準備中</span></div>
         </div>
         <div>
-          <h2>QRコードで開く</h2>
+          <h2><span data-i18n="chrome.qrOpen">QRコードで開く</span></h2>
           <p id="share-message"></p>
           <code id="share-url"></code
-          ><button id="share-refresh">接続を更新</button>
+          ><button id="share-refresh"><span data-i18n="chrome.refresh">接続を更新</span></button>
           <a class="button" id="consent" hidden target="_blank" rel="noreferrer"
-            >利用設定を開く</a
+            ><span data-i18n="chrome.access">利用設定を開く</span></a
           >
           <p class="sub">
-            同じTailscaleネットワークに接続した端末から開けます。このPCでダッシュボードを起動しておいてください。タスク・質問の各行には
+            <span data-i18n="chrome.shareHelp">同じTailscaleネットワークに接続した端末から開けます。このPCでダッシュボードを起動しておいてください。タスク・質問の各行には
             #task-&lt;id&gt;・#question-&lt;id&gt;
-            の目印があり、端末を替えても同じ対象へ戻れます。対象の表示と端末の認証は別の役割で、未認証の端末は認証を終えるまで内容・操作へ進めません。
+            の目印があり、端末を替えても同じ対象へ戻れます。対象の表示と端末の認証は別の役割で、未認証の端末は認証を終えるまで内容・操作へ進めません。</span>
           </p>
           <div id="mcp-info" class="sub"></div>
         </div>
       </section>
       <details class="fold" id="connection-detail">
-        <summary>接続診断</summary>
+        <summary><span data-i18n="chrome.diagnostics">接続診断</span></summary>
         <p class="sub">
-          スマホ閲覧とDot連携の経路を個別に確認します。診断は読み取り専用です。
+          <span data-i18n="chrome.diagnosticsHelp">スマホ閲覧とDot連携の経路を個別に確認します。診断は読み取り専用です。</span>
         </p>
-        <button id="diagnostics-refresh">診断を取得</button>
+        <button id="diagnostics-refresh"><span data-i18n="chrome.diagnosticsLoad">診断を取得</span></button>
         <p id="diagnostics-status" role="status" aria-live="polite">
-          診断は未取得です。
+          <span data-i18n="chrome.diagnosticsPending">診断は未取得です。</span>
         </p>
         <div id="diagnostics-result"></div>
       </details>
       <section id="harness" hidden>
         <div class="notice">
-          DeepSeek
-          HarnessのWeb画面を起動しています。プロジェクト別の指標・質問は、専用ダッシュボードで扱います。
+          <span data-i18n="chrome.harnessHelp">DeepSeek
+          HarnessのWeb画面を起動しています。プロジェクト別の指標・質問は、専用ダッシュボードで扱います。</span>
         </div>
-        <a id="harness-open" class="button">Harnessを開く</a>
+        <a id="harness-open" class="button"><span data-i18n="chrome.harness">Harnessを開く</span></a>
         <section class="card" aria-labelledby="managed-heading">
-          <h2 id="managed-heading">管理中の実行</h2>
+          <h2 id="managed-heading"><span data-i18n="chrome.managed">管理中の実行</span></h2>
           <p id="managed-status" role="status" aria-live="polite">
-            所有範囲を確認中…
+            <span data-i18n="chrome.ownership">所有範囲を確認中…</span>
           </p>
           <p id="managed-remaining" class="sub"></p>
           <details>
-            <summary>実行IDと停止履歴</summary>
+            <summary><span data-i18n="chrome.runHistory">実行IDと停止履歴</span></summary>
             <code id="managed-run"></code>
             <ul id="managed-stages"></ul>
           </details>
-          <button id="managed-stop" disabled>この実行を停止</button>
+          <button id="managed-stop" disabled><span data-i18n="chrome.stopRun">この実行を停止</span></button>
         </section>
       </section>
       <div id="project-content" tabindex="-1">
@@ -879,37 +879,37 @@
           class="summary-card"
           aria-labelledby="overview-heading"
         >
-          <h2 id="overview-heading" tabindex="-1">いまの状況</h2>
-          <label for="overview-task">確認する範囲</label
+          <h2 id="overview-heading" tabindex="-1"><span data-i18n="chrome.overview">いまの状況</span></h2>
+          <label for="overview-task"><span data-i18n="chrome.scope">確認する範囲</span></label
           ><select id="overview-task"></select>
           <p id="overview-context"></p>
           <dl class="summary-facts">
-            <dt>状態</dt>
+            <dt><span data-i18n="chrome.status">状態</span></dt>
             <dd>
-              <div id="overview-state">実行状態は未取得</div>
+              <div id="overview-state"><span data-i18n="chrome.executionUnavailable">実行状態は未取得</span></div>
               <p class="sub" id="overview-task-report"></p>
             </dd>
-            <dt>観測</dt>
+            <dt><span data-i18n="chrome.observation">観測</span></dt>
             <dd>
-              <div id="overview-observed">実行の観測記録なし</div>
+              <div id="overview-observed"><span data-i18n="chrome.noObservation">実行の観測記録なし</span></div>
               <p class="sub" id="overview-report-updated"></p>
             </dd>
-            <dt>最後の結果</dt>
+            <dt><span data-i18n="chrome.lastResult">最後の結果</span></dt>
             <dd>
-              <div id="overview-result">未取得</div>
+              <div id="overview-result"><span data-i18n="chrome.unavailable">未取得</span></div>
               <p class="sub" id="overview-result-detail"></p>
             </dd>
-            <dt>判断</dt>
-            <dd id="overview-decision">確認中…</dd>
-            <dt>停止</dt>
-            <dd id="overview-stop">この画面からの停止は非対応</dd>
+            <dt><span data-i18n="chrome.decision">判断</span></dt>
+            <dd id="overview-decision"><span data-i18n="chrome.checking">確認中…</span></dd>
+            <dt><span data-i18n="chrome.stop">停止</span></dt>
+            <dd id="overview-stop"><span data-i18n="chrome.stopUnsupported">この画面からの停止は非対応</span></dd>
           </dl>
           <ul id="overview-pending"></ul>
         </section>
         <details class="fold" id="observed-cli-panel">
-          <summary>別terminalのCLIを読取専用で観測</summary>
+          <summary><span data-i18n="chrome.observeCli">別terminalのCLIを読取専用で観測</span></summary>
           <p class="sub">
-            Dashboardと同じhost・OSから見えるCLI processをPIDで登録します。プロセスの生存、PID再利用、登録時からの所有者変更だけを表示します。入力・停止・signal送信は行いません。CLI内部の会話やログは読み取りません。
+            <span data-i18n="chrome.observeHelp">Dashboardと同じhost・OSから見えるCLI processをPIDで登録します。プロセスの生存、PID再利用、登録時からの所有者変更だけを表示します。入力・停止・signal送信は行いません。CLI内部の会話やログは読み取りません。</span>
           </p>
           <form id="observed-cli-form">
             <label for="observed-cli-pid">
@@ -917,26 +917,26 @@
               <input id="observed-cli-pid" type="number" min="1" max="2147483647" step="1" required />
             </label>
             <label for="observed-cli-kind">
-              CLI種別
+              <span data-i18n="chrome.cliKind">CLI種別</span>
               <select id="observed-cli-kind">
                 <option value="dsh">DSH</option>
                 <option value="rdsh">rdsh</option>
-                <option value="other">その他</option>
+                <option value="other" data-i18n="chrome.other">その他</option>
               </select>
             </label>
             <label for="observed-cli-task">
-              関連task（任意）
+              <span data-i18n="chrome.relatedTask">関連task（任意）</span>
               <select id="observed-cli-task"></select>
             </label>
-            <button id="observed-cli-submit" type="submit">読取専用で登録</button>
+            <button id="observed-cli-submit" type="submit"><span data-i18n="chrome.register">読取専用で登録</span></button>
           </form>
           <p id="observed-cli-status" role="status" aria-live="polite"></p>
           <div class="feed" id="observed-cli-list" aria-live="polite"></div>
-          <button id="observed-cli-refresh" type="button">識別状態を再確認</button>
+          <button id="observed-cli-refresh" type="button"><span data-i18n="chrome.recheck">識別状態を再確認</span></button>
         </details>
-        <h2 id="pending-heading" tabindex="-1">未回答の質問</h2>
+        <h2 id="pending-heading" tabindex="-1"><span data-i18n="chrome.pending">未回答の質問</span></h2>
         <p class="sub" id="pending-note">
-          プロジェクト全体の質問です。回答はこの質問への返答のみです。対象・条件が変わった場合は回答前に内容を再確認してください。回答しただけで実行権限は生まれません。
+          <span data-i18n="chrome.pendingHelp">プロジェクト全体の質問です。回答はこの質問への返答のみです。対象・条件が変わった場合は回答前に内容を再確認してください。回答しただけで実行権限は生まれません。</span>
         </p>
         <div
           id="questions"
@@ -944,25 +944,25 @@
           aria-labelledby="pending-heading"
           aria-describedby="pending-note"
         ></div>
-        <section id="budget-admission" aria-label="予算制御"></section>
+        <section id="budget-admission" aria-label="予算制御" data-i18n-aria-label="chrome.budget"></section>
         <details class="fold" id="metrics-detail">
-          <summary>プロジェクト全体の数値</summary>
-          <h2 id="metrics-heading" tabindex="-1">数値の詳細</h2>
+          <summary><span data-i18n="chrome.metricsSummary">プロジェクト全体の数値</span></summary>
+          <h2 id="metrics-heading" tabindex="-1"><span data-i18n="chrome.metrics">数値の詳細</span></h2>
           <div class="cards" id="cards"></div>
-          <h2>費用の明細と出所</h2>
-          <section id="cost-ledger" aria-label="費用台帳"></section>
+          <h2><span data-i18n="chrome.costDetails">費用の明細と出所</span></h2>
+          <section id="cost-ledger" aria-label="費用台帳" data-i18n-aria-label="chrome.costLedger"></section>
         </details>
         <details class="fold" id="model-catalog-detail">
-          <summary>モデルカタログ（試作）</summary>
+          <summary><span data-i18n="chrome.modelPrototype">モデルカタログ（試作）</span></summary>
           <p class="sub">
-            手入力の報告値です。総・有効パラメータは出所確認用で、実測の断定ではありません。
+            <span data-i18n="chrome.modelHelp">手入力の報告値です。総・有効パラメータは出所確認用で、実測の断定ではありません。</span>
           </p>
-          <section id="model-catalog" aria-label="モデルカタログ"></section>
+          <section id="model-catalog" aria-label="モデルカタログ" data-i18n-aria-label="chrome.modelCatalog"></section>
         </details>
         <details class="fold" id="tasks-detail">
-          <summary>タスク一覧</summary>
+          <summary><span data-i18n="chrome.taskList">タスク一覧</span></summary>
           <h2 id="tasks-heading" tabindex="-1">
-            タスク <span class="sub" id="task-milestones"></span>
+            <span data-i18n="chrome.tasks">タスク</span> <span class="sub" id="task-milestones"></span>
           </h2>
           <div class="table-box">
             <!-- #57: 各行に task-<id> の目印を付け、端末を替えても同じ行へ戻れるようにします。 -->
@@ -970,9 +970,9 @@
               <thead>
                 <tr>
                   <th scope="col">ID</th>
-                  <th scope="col">状態</th>
-                  <th scope="col">題名</th>
-                  <th scope="col">ブロック要因</th>
+                  <th scope="col"><span data-i18n="chrome.status">状態</span></th>
+                  <th scope="col"><span data-i18n="chrome.title">題名</span></th>
+                  <th scope="col"><span data-i18n="chrome.blocker">ブロック要因</span></th>
                 </tr>
               </thead>
               <tbody id="tasks"></tbody>
@@ -980,85 +980,86 @@
           </div>
         </details>
         <details class="fold" id="human-annotation-detail">
-          <summary>人間のブックマーク・注釈</summary>
-          <h2>人間のブックマーク</h2>
+          <summary><span data-i18n="chrome.annotationSummary">人間のブックマーク・注釈</span></summary>
+          <h2><span data-i18n="chrome.annotations">人間のブックマーク</span></h2>
           <p class="sub">
-            AI要約と別ファイルに保存します。ログ・決定内容・Git差分の参照先は固定され、変更や削除を検出した場合は状態を表示します。
+            <span data-i18n="chrome.annotationHelp">AI要約と別ファイルに保存します。ログ・決定内容・Git差分の参照先は固定され、変更や削除を検出した場合は状態を表示します。</span>
           </p>
-          <section id="human-annotations-panel" aria-label="人間のブックマーク管理"></section>
+          <section id="human-annotations-panel" aria-label="人間のブックマーク管理" data-i18n-aria-label="chrome.annotationManage"></section>
         </details>
         <details class="fold" id="instruction-detail">
-          <summary>同じsessionへ追指示を送る</summary>
-          <h2>追指示と適用タイミング</h2>
+          <summary><span data-i18n="chrome.followUpSummary">同じsessionへ追指示を送る</span></summary>
+          <h2><span data-i18n="chrome.followUp">追指示と適用タイミング</span></h2>
           <p class="sub">
-            下書きはこの端末で保持します。入力は順番に配送し、結果不明の入力がある場合は保留します。指示の保存で新しい実行権限は発行されません。
+            <span data-i18n="chrome.followUpHelp">下書きはこの端末で保持します。入力は順番に配送し、結果不明の入力がある場合は保留します。指示の保存で新しい実行権限は発行されません。</span>
           </p>
           <section
             id="instruction-panel"
-            aria-label="追指示の投稿と確認"
+            aria-label="追指示の投稿と確認" data-i18n-aria-label="chrome.followUpManage"
           ></section>
         </details>
         <details class="fold" id="reply-detail">
-          <summary>回答の保存・適用を確認</summary>
+          <summary><span data-i18n="chrome.answerSummary">回答の保存・適用を確認</span></summary>
           <section
             id="reply-applications"
             hidden
             aria-labelledby="reply-heading"
           >
-            <h2 id="reply-heading">回答の適用状況</h2>
+            <h2 id="reply-heading"><span data-i18n="chrome.answers">回答の適用状況</span></h2>
             <p class="sub">
-              保存・通知配送・対象consumerの読取・入力処理の結果を分けて確認します。完了表示はこの回答入力へのACP応答です。作業の完了は受入検証で確認します。
+              <span data-i18n="chrome.answerHelp">保存・通知配送・対象consumerの読取・入力処理の結果を分けて確認します。完了表示はこの回答入力へのACP応答です。作業の完了は受入検証で確認します。</span>
             </p>
             <div id="reply-status" class="decision-grid"></div>
           </section>
         </details>
         <details class="fold" id="progress-detail">
-          <summary>進捗・成果物の報告</summary>
-          <h2>進捗・成果物の報告履歴</h2>
+          <summary><span data-i18n="chrome.progressSummary">進捗・成果物の報告</span></summary>
+          <h2><span data-i18n="chrome.progress">進捗・成果物の報告履歴</span></h2>
           <div class="feed" id="events"></div>
         </details>
         <details id="answered">
-          <summary>回答済みの質問</summary>
+          <summary><span data-i18n="chrome.answered">回答済みの質問</span></summary>
           <div class="feed" id="answers"></div>
         </details>
       </div>
-      <nav id="quick-actions" aria-label="プロジェクトの操作" hidden>
+      <nav id="quick-actions" aria-label="プロジェクトの操作" data-i18n-aria-label="chrome.actions" hidden>
         <p id="quick-context" class="sub"></p>
         <div class="quick-buttons">
-          <button id="quick-overview">概要</button
-          ><button id="quick-pending">判断</button
-          ><button id="quick-details">詳細</button
-          ><button id="quick-stop">停止案内</button>
+          <button id="quick-overview"><span data-i18n="chrome.quickOverview">概要</span></button
+          ><button id="quick-pending"><span data-i18n="chrome.decision">判断</span></button
+          ><button id="quick-details"><span data-i18n="chrome.quickDetails">詳細</span></button
+          ><button id="quick-stop"><span data-i18n="chrome.quickStop">停止案内</span></button>
         </div>
       </nav>
       <!-- #61: 主要操作をキーボードで呼ぶ小さな一覧。既存ボタンの操作を再利用し、権限・状態チェックは各操作側で行います。 -->
       <dialog id="palette" aria-labelledby="palette-title">
-        <h2 id="palette-title">コマンド</h2>
+        <h2 id="palette-title"><span data-i18n="chrome.commands">コマンド</span></h2>
         <p class="sub">
-          日本語・英語で絞り込めます。Escで閉じて元の位置に戻ります。
+          <span data-i18n="chrome.paletteHelp">日本語・中国語・英語で絞り込めます。Escで閉じて元の位置に戻ります。</span>
         </p>
         <input
           id="palette-search"
           type="search"
-          aria-label="コマンドを絞り込む"
-          placeholder="例: 共有 / share"
+          aria-label="コマンドを絞り込む" data-i18n-aria-label="chrome.paletteSearch"
+          placeholder="例: 共有 / share" data-i18n-placeholder="chrome.palettePlaceholder"
           autocomplete="off"
         />
         <p class="sub" id="palette-count" role="status"></p>
         <ul id="palette-list"></ul>
       </dialog>
       <dialog id="managed-stop-dialog" aria-labelledby="managed-stop-title">
-        <h2 id="managed-stop-title">停止する対象を確認</h2>
+        <h2 id="managed-stop-title"><span data-i18n="chrome.stopConfirm">停止する対象を確認</span></h2>
         <p id="managed-stop-target"></p>
         <p id="managed-stop-impact"></p>
         <p class="warn" id="managed-stop-error" role="alert"></p>
-        <button id="managed-stop-cancel">戻る</button>
-        <button id="managed-stop-confirm">確認した対象を停止</button>
+        <button id="managed-stop-cancel"><span data-i18n="chrome.back">戻る</span></button>
+        <button id="managed-stop-confirm"><span data-i18n="chrome.stopConfirmed">確認した対象を停止</span></button>
       </dialog>
       <footer id="updated">
-        未取得の指標はMCPから報告されたときに表示されます。費用は報告元のAPI換算値で、請求額とは別です。
+        <span data-i18n="chrome.footer">未取得の指標はMCPから報告されたときに表示されます。費用は報告元のAPI換算値で、請求額とは別です。</span>
       </footer>
     </main>
+    <script type="module" src="./locale.mjs"></script>
     <script type="module" src="./app.mjs"></script>
   </body>
 </html>

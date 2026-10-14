@@ -170,7 +170,7 @@ fn run_request(line: &str) -> Result<serde_json::Value, (String, &'static str, S
 /// Resident loop: read NDJSON from stdin, write NDJSON to stdout.
 /// EOF ends the loop (exit 0). A malformed line yields an error object,
 /// never a crash. `--once` handles a single line (for IPC cost comparison).
-pub fn cmd_compute(once: bool) -> anyhow::Result<()> {
+pub fn cmd_compute(once: bool, _locale: crate::locale::Locale) -> anyhow::Result<()> {
     let stdin = std::io::stdin();
     let mut out = std::io::BufWriter::with_capacity(256 * 1024, std::io::stdout().lock());
     run_lines(stdin.lock(), &mut out, once)

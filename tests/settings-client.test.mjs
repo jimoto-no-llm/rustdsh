@@ -1,22 +1,31 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-import vm from 'node:vm';
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import vm from "node:vm";
 
 // Minimal host for the existing plugin boundary; exercise its async loading
 // behavior without adding React or browser packages to the shipped component.
-async function host(fetch) {
+async function host(fetch, browserLanguage = "ja") {
   const state = [];
-  let cursor = 0, component;
+  let cursor = 0,
+    component;
   const mountedEffects = new Set();
   const React = {
-    createElement: (tag, props, ...children) => ({ tag, props: props ?? {}, children: children.flat() }),
+    createElement: (tag, props, ...children) => ({
+      tag,
+      props: props ?? {},
+      children: children.flat(),
+    }),
     useState(initial) {
       const index = cursor++;
       if (!(index in state)) state[index] = initial;
-      return [state[index], (value) => {
-        state[index] = typeof value === 'function' ? value(state[index]) : value;
-      }];
+      return [
+        state[index],
+        (value) => {
+          state[index] =
+            typeof value === "function" ? value(state[index]) : value;
+        },
+      ];
     },
     useCallback: (callback) => callback,
     useEffect(effect) {
@@ -27,168 +36,648 @@ async function host(fetch) {
       }
     },
   };
-  const source = await readFile(new URL('../plugins/rdsh-settings/client.js', import.meta.url), 'utf8');
-  vm.runInNewContext(source, {
+  const source = (
+    await readFile(
+      new URL("../plugins/rdsh-settings/client.js", import.meta.url),
+      "utf8",
+    )
+  ).replace(
+    "    // Scope the host",
+    "    globalThis.__settingsTest = { settingsCopy, settingText };\n    // Scope the host",
+  );
+  const context = {
+    navigator: { language: browserLanguage },
     fetch,
-    TextEncoder, URL,
-    setInterval: () => 1, clearInterval: () => {},
-    window: { __ModuleLoader__: { load(module) {
-      module.factory(() => React).apply({ slots: {
-        inject: (_name, install) => install(),
-        register: (_options, section) => { component = section; },
-      } });
-    } } },
-  });
+    TextEncoder,
+    URL,
+    setInterval: () => 1,
+    clearInterval: () => {},
+    window: {
+      __ModuleLoader__: {
+        load(module) {
+          module
+            .factory(() => React)
+            .apply({
+              slots: {
+                inject: (_name, install) => install(),
+                register: (_options, section) => {
+                  component = section;
+                },
+              },
+            });
+        },
+      },
+    },
+  };
+  vm.runInNewContext(source, context);
   return {
-    render() { cursor = 0; return component(); },
-    async settle() { await new Promise((resolve) => setImmediate(resolve)); },
+    copy: (language, key, values) =>
+      context.__settingsTest.settingText(language, key, values),
+    catalog: context.__settingsTest.settingsCopy,
+    render() {
+      cursor = 0;
+      return component();
+    },
+    async settle() {
+      await new Promise((resolve) => setImmediate(resolve));
+    },
   };
 }
 
 function find(node, predicate) {
-  if (!node || typeof node !== 'object') return undefined;
+  if (!node || typeof node !== "object") return undefined;
   if (predicate(node)) return node;
   return node.children.map((child) => find(child, predicate)).find(Boolean);
 }
 
-test('failed settings load offers an error and retry instead of permanent loading', async () => {
+test("failed settings load offers an error and retry instead of permanent loading", async () => {
   let ok = false;
   const fixture = await host(async () => ({
-    ok, status: ok ? 200 : 400,
-    json: async () => ok ? { ok: true, config: { context: {}, beta: {} } } : { ok: false, error: 'invalid-settings' },
+    ok,
+    status: ok ? 200 : 400,
+    json: async () =>
+      ok
+        ? { ok: true, config: { context: {}, beta: {} } }
+        : { ok: false, error: "invalid-settings" },
   }));
   fixture.render();
   await fixture.settle();
   const failed = fixture.render();
-  assert.ok(find(failed, (node) => node.props.role === 'alert'));
-  assert.ok(!JSON.stringify(failed).includes('読み込み中…'));
-  const retry = find(failed, (node) => node.tag === 'button' && node.children.includes('再読み込み'));
+  assert.ok(find(failed, (node) => node.props.role === "alert"));
+  assert.ok(!JSON.stringify(failed).includes("読み込み中…"));
+  const retry = find(
+    failed,
+    (node) => node.tag === "button" && node.children.includes("再読み込み"),
+  );
   assert.ok(retry);
   ok = true;
   await retry.props.onClick();
   const restored = fixture.render();
-  assert.ok(find(restored, (node) => node.tag === 'button' && node.children.includes('保存する')));
+  assert.ok(
+    find(
+      restored,
+      (node) => node.tag === "button" && node.children.includes("保存する"),
+    ),
+  );
 });
 
-test('a failed refresh discards stale editable settings even if an error response includes config', async () => {
+test("a failed refresh discards stale editable settings even if an error response includes config", async () => {
   let ok = true;
   const fixture = await host(async () => ({
-    ok, status: ok ? 200 : 403,
+    ok,
+    status: ok ? 200 : 403,
     json: async () => ({ config: { context: {}, beta: {} } }),
   }));
   fixture.render();
   await fixture.settle();
   const loaded = fixture.render();
-  const retry = find(loaded, (node) => node.tag === 'button' && node.children.includes('再読み込み'));
+  const retry = find(
+    loaded,
+    (node) => node.tag === "button" && node.children.includes("再読み込み"),
+  );
   assert.ok(retry);
   ok = false;
   await retry.props.onClick();
   const failed = fixture.render();
-  assert.ok(find(failed, (node) => node.props.role === 'alert'));
-  assert.equal(find(failed, (node) => node.tag === 'button' && node.children.includes('保存する')), undefined);
+  assert.ok(find(failed, (node) => node.props.role === "alert"));
+  assert.equal(
+    find(
+      failed,
+      (node) => node.tag === "button" && node.children.includes("保存する"),
+    ),
+    undefined,
+  );
 });
 
-test('clearing the dashboard port saves its default rather than privileged port one', async () => {
+test("clearing the dashboard port saves its default rather than privileged port one", async () => {
   let saved;
   const config = { context: {}, beta: {}, serve: { port: 38080 } };
   const fixture = await host(async (_path, options) => {
-    if (options.method === 'POST') saved = JSON.parse(options.body).config;
-    return { ok: true, status: 200, json: async () => ({ ok: true, config: saved ?? config }) };
+    if (options.method === "POST") saved = JSON.parse(options.body).config;
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ ok: true, config: saved ?? config }),
+    };
   });
   fixture.render();
   await fixture.settle();
   const loaded = fixture.render();
-  const port = find(loaded, (node) => node.tag === 'input' && node.props.value === 38080);
+  const port = find(
+    loaded,
+    (node) => node.tag === "input" && node.props.value === 38080,
+  );
   assert.ok(port);
-  port.props.onChange({ target: { value: '' } });
+  port.props.onChange({ target: { value: "" } });
   const updated = fixture.render();
-  await find(updated, (node) => node.tag === 'button' && node.children.includes('保存する')).props.onClick();
+  await find(
+    updated,
+    (node) => node.tag === "button" && node.children.includes("保存する"),
+  ).props.onClick();
   assert.equal(saved.serve.port, 38080);
 });
 
-test('Discord controls save changes without status polling overwriting edits', async () => {
+test("Discord controls save changes without status polling overwriting edits", async () => {
   let saved;
-  const config = { context: {}, beta: {}, discord: { enabled: false, application_id: '', details: 'dshで作業中', show_agent_status: true, show_elapsed: true } };
+  const config = {
+    context: {},
+    beta: {},
+    discord: {
+      enabled: false,
+      application_id: "",
+      details: "dshで作業中",
+      show_agent_status: true,
+      show_elapsed: true,
+    },
+  };
   const fixture = await host(async (path, options) => {
-    if (path === '/api/rdsh-discord') return { ok: true, json: async () => ({ ok: true, state: 'disabled' }) };
-    if (options.method === 'POST') saved = JSON.parse(options.body).config;
-    return { ok: true, json: async () => ({ ok: true, config: saved ?? config }) };
+    if (path === "/api/rdsh-discord")
+      return { ok: true, json: async () => ({ ok: true, state: "disabled" }) };
+    if (options.method === "POST") saved = JSON.parse(options.body).config;
+    return {
+      ok: true,
+      json: async () => ({ ok: true, config: saved ?? config }),
+    };
   });
-  fixture.render(); await fixture.settle();
+  fixture.render();
+  await fixture.settle();
   let ui = fixture.render();
-  const enable = find(ui, node => node.tag === 'label' && node.children.includes('Discordに作業状態を表示する'));
-  find(enable, node => node.tag === 'input').props.onChange({ target: { checked: true } });
-  find(ui, node => node.tag === 'input' && node.props.placeholder === 'Discord Application ID').props.onChange({ target: { value: '123456789012345678' } });
-  const agent = find(ui, node => node.tag === 'label' && node.children.includes('agentの稼働状態・稼働数を表示する'));
-  find(agent, node => node.tag === 'input').props.onChange({ target: { checked: false } });
+  const enable = find(
+    ui,
+    (node) =>
+      node.tag === "label" &&
+      node.children.includes("Discordに作業状態を表示する"),
+  );
+  find(enable, (node) => node.tag === "input").props.onChange({
+    target: { checked: true },
+  });
+  find(
+    ui,
+    (node) =>
+      node.tag === "input" &&
+      node.props.placeholder === fixture.copy("ja", "applicationPlaceholder"),
+  ).props.onChange({ target: { value: "123456789012345678" } });
+  const agent = find(
+    ui,
+    (node) =>
+      node.tag === "label" &&
+      node.children.includes("agentの稼働状態・稼働数を表示する"),
+  );
+  find(agent, (node) => node.tag === "input").props.onChange({
+    target: { checked: false },
+  });
   ui = fixture.render();
-  await find(ui, node => node.tag === 'button' && node.children.includes('保存する')).props.onClick();
-  assert.deepEqual(saved.discord, { enabled: true, application_id: '123456789012345678', details: 'dshで作業中', show_agent_status: false, show_elapsed: true });
+  await find(
+    ui,
+    (node) => node.tag === "button" && node.children.includes("保存する"),
+  ).props.onClick();
+  assert.deepEqual(saved.discord, {
+    enabled: true,
+    application_id: "123456789012345678",
+    details: "dshで作業中",
+    show_agent_status: false,
+    show_elapsed: true,
+  });
 });
 
-test('Discord preview and partial save preserve drafts in other sections', async () => {
+test("Discord preview and partial save preserve drafts in other sections", async () => {
   let submitted;
-  const config = { context: { goal: 'Saved goal' }, beta: {}, discord: { enabled: false, details: 'dshで作業中' } };
+  const config = {
+    context: { goal: "Saved goal" },
+    beta: {},
+    discord: { enabled: false, details: "dshで作業中" },
+  };
   const fixture = await host(async (path, options) => {
-    if (path === '/api/rdsh-discord') return { ok: true, json: async () => ({ ok: true, state: 'disabled', running_agents: 2 }) };
-    if (options.method === 'POST') {
+    if (path === "/api/rdsh-discord")
+      return {
+        ok: true,
+        json: async () => ({ ok: true, state: "disabled", running_agents: 2 }),
+      };
+    if (options.method === "POST") {
       submitted = JSON.parse(options.body).config;
-      return { ok: true, json: async () => ({ ok: true, config: { ...config, ...submitted } }) };
+      return {
+        ok: true,
+        json: async () => ({ ok: true, config: { ...config, ...submitted } }),
+      };
     }
     return { ok: true, json: async () => ({ ok: true, config }) };
   });
-  fixture.render(); await fixture.settle(); let ui = fixture.render();
-  find(ui, node => node.props.placeholder === '例: dsh互換性を維持する').props.onChange({ target: { value: 'Unsaved goal' } });
-  find(ui, node => node.props.placeholder === 'dshで作業中').props.onChange({ target: { value: 'あ'.repeat(100) } });
+  fixture.render();
+  await fixture.settle();
+  let ui = fixture.render();
+  find(
+    ui,
+    (node) => node.props.placeholder === "例: dsh互換性を維持する",
+  ).props.onChange({ target: { value: "Unsaved goal" } });
+  find(ui, (node) => node.props.placeholder === "dshで作業中").props.onChange({
+    target: { value: "あ".repeat(100) },
+  });
   ui = fixture.render();
-  const preview = find(ui, node => node.props['aria-label'] === 'Discord表示プレビュー');
-  assert.ok(JSON.stringify(preview).includes('agent稼働中 (2)'));
-  assert.ok(JSON.stringify(preview).includes('あ'.repeat(42)));
-  assert.ok(!JSON.stringify(preview).includes('あ'.repeat(43)));
-  await find(ui, node => node.tag === 'button' && node.children.includes('Discord設定を保存')).props.onClick();
-  assert.deepEqual(Object.keys(submitted), ['discord']);
+  const preview = find(
+    ui,
+    (node) => node.props["aria-label"] === "Discord表示プレビュー",
+  );
+  assert.ok(JSON.stringify(preview).includes("agent稼働中 (2)"));
+  assert.ok(JSON.stringify(preview).includes("あ".repeat(42)));
+  assert.ok(!JSON.stringify(preview).includes("あ".repeat(43)));
+  await find(
+    ui,
+    (node) =>
+      node.tag === "button" && node.children.includes("Discord設定を保存"),
+  ).props.onClick();
+  assert.deepEqual(Object.keys(submitted), ["discord"]);
   ui = fixture.render();
-  assert.equal(find(ui, node => node.props.placeholder === '例: dsh互換性を維持する').props.value, 'Unsaved goal');
-  assert.equal(find(ui, node => node.tag === 'button' && node.children.includes('Discord設定を保存')).props.disabled, true);
+  assert.equal(
+    find(ui, (node) => node.props.placeholder === "例: dsh互換性を維持する")
+      .props.value,
+    "Unsaved goal",
+  );
+  assert.equal(
+    find(
+      ui,
+      (node) =>
+        node.tag === "button" && node.children.includes("Discord設定を保存"),
+    ).props.disabled,
+    true,
+  );
 });
 
-test('invalid Discord URLs block saving with an actionable error, then recover', async () => {
-  const fixture = await host(async path => ({ ok: true, json: async () => path === '/api/rdsh-discord' ? { ok: true, state: 'disabled' } : { ok: true, config: { context: {}, discord: {} } } }));
-  fixture.render(); await fixture.settle(); let ui = fixture.render();
-  find(ui, node => node.props.placeholder === 'https://…').props.onChange({ target: { value: 'javascript:alert(1)' } });
+test("invalid Discord URLs block saving with an actionable error, then recover", async () => {
+  const fixture = await host(async (path) => ({
+    ok: true,
+    json: async () =>
+      path === "/api/rdsh-discord"
+        ? { ok: true, state: "disabled" }
+        : { ok: true, config: { context: {}, discord: {} } },
+  }));
+  fixture.render();
+  await fixture.settle();
+  let ui = fixture.render();
+  find(ui, (node) => node.props.placeholder === "https://…").props.onChange({
+    target: { value: "javascript:alert(1)" },
+  });
   ui = fixture.render();
-  assert.ok(find(ui, node => node.props.role === 'alert'));
-  assert.equal(find(ui, node => node.tag === 'button' && node.children.includes('Discord設定を保存')).props.disabled, true);
-  find(ui, node => node.props.placeholder === 'https://…').props.onChange({ target: { value: 'https://example.com' } });
-  find(ui, node => node.props.placeholder === '例: dshについて').props.onChange({ target: { value: '詳しく見る' } });
-  assert.equal(find(fixture.render(), node => node.tag === 'button' && node.children.includes('Discord設定を保存')).props.disabled, false);
+  assert.ok(find(ui, (node) => node.props.role === "alert"));
+  assert.equal(
+    find(
+      ui,
+      (node) =>
+        node.tag === "button" && node.children.includes("Discord設定を保存"),
+    ).props.disabled,
+    true,
+  );
+  find(ui, (node) => node.props.placeholder === "https://…").props.onChange({
+    target: { value: "https://example.com" },
+  });
+  find(
+    ui,
+    (node) => node.props.placeholder === "例: dshについて",
+  ).props.onChange({ target: { value: "詳しく見る" } });
+  assert.equal(
+    find(
+      fixture.render(),
+      (node) =>
+        node.tag === "button" && node.children.includes("Discord設定を保存"),
+    ).props.disabled,
+    false,
+  );
 });
 
-test('Discord save failures keep the draft and provide a working retry', async () => {
+test("Discord save failures keep the draft and provide a working retry", async () => {
   let failed = true;
-  const config = { context: {}, discord: { details: 'Saved' } };
+  const config = { context: {}, discord: { details: "Saved" } };
   const fixture = await host(async (path, options) => {
-    if (path === '/api/rdsh-discord') return { ok: true, json: async () => ({ ok: true, state: 'disabled' }) };
-    if (options.method === 'POST') return { ok: !failed, json: async () => failed ? { ok: false } : { ok: true, config: { ...config, ...JSON.parse(options.body).config } } };
+    if (path === "/api/rdsh-discord")
+      return { ok: true, json: async () => ({ ok: true, state: "disabled" }) };
+    if (options.method === "POST")
+      return {
+        ok: !failed,
+        json: async () =>
+          failed
+            ? { ok: false }
+            : {
+                ok: true,
+                config: { ...config, ...JSON.parse(options.body).config },
+              },
+      };
     return { ok: true, json: async () => ({ config }) };
   });
-  fixture.render(); await fixture.settle(); let ui = fixture.render();
-  find(ui, node => node.props.placeholder === 'dshで作業中').props.onChange({ target: { value: 'Draft' } });
-  const save = () => find(fixture.render(), node => node.tag === 'button' && node.children.includes('Discord設定を保存')).props.onClick();
-  await save(); ui = fixture.render();
-  assert.ok(find(ui, node => node.props.role === 'alert' && node.children.some(c => typeof c === 'string' && c.includes('保存できません'))));
-  assert.equal(find(ui, node => node.props.placeholder === 'dshで作業中').props.value, 'Draft');
-  failed = false; await save();
-  assert.equal(find(fixture.render(), node => node.tag === 'button' && node.children.includes('Discord設定を保存')).props.disabled, true);
+  fixture.render();
+  await fixture.settle();
+  let ui = fixture.render();
+  find(ui, (node) => node.props.placeholder === "dshで作業中").props.onChange({
+    target: { value: "Draft" },
+  });
+  const save = () =>
+    find(
+      fixture.render(),
+      (node) =>
+        node.tag === "button" && node.children.includes("Discord設定を保存"),
+    ).props.onClick();
+  await save();
+  ui = fixture.render();
+  assert.ok(
+    find(
+      ui,
+      (node) =>
+        node.props.role === "alert" &&
+        node.children.some(
+          (c) => typeof c === "string" && c.includes("保存できません"),
+        ),
+    ),
+  );
+  assert.equal(
+    find(ui, (node) => node.props.placeholder === "dshで作業中").props.value,
+    "Draft",
+  );
+  failed = false;
+  await save();
+  assert.equal(
+    find(
+      fixture.render(),
+      (node) =>
+        node.tag === "button" && node.children.includes("Discord設定を保存"),
+    ).props.disabled,
+    true,
+  );
 });
 
-test('connection alone is not reported as an acknowledged current preview', async () => {
-  for (const details of ['Old', 'Current']) {
-    const fixture = await host(async path => ({ ok: true, json: async () => path === '/api/rdsh-discord'
-      ? { ok: true, state: 'connected', running_agents: 0, published_activity: { details, status_display_type: 2, state: '待機中' } }
-      : { config: { context: {}, discord: { enabled: true, details: 'Current', show_elapsed: false, show_image: false } } } }));
-    fixture.render(); await fixture.settle();
-    const reflected = find(fixture.render(), node => node.props.role === 'status' && node.children.includes('Discordに反映しました'));
-    assert.equal(!!reflected, details === 'Current');
+test("connection alone is not reported as an acknowledged current preview", async () => {
+  for (const details of ["Old", "Current"]) {
+    const fixture = await host(async (path) => ({
+      ok: true,
+      json: async () =>
+        path === "/api/rdsh-discord"
+          ? {
+              ok: true,
+              state: "connected",
+              running_agents: 0,
+              published_activity: {
+                details,
+                status_display_type: 2,
+                state: "待機中",
+              },
+            }
+          : {
+              config: {
+                context: {},
+                discord: {
+                  enabled: true,
+                  details: "Current",
+                  show_elapsed: false,
+                  show_image: false,
+                },
+              },
+            },
+    }));
+    fixture.render();
+    await fixture.settle();
+    const reflected = find(
+      fixture.render(),
+      (node) =>
+        node.props.role === "status" &&
+        node.children.includes("Discordに反映しました"),
+    );
+    assert.equal(!!reflected, details === "Current");
   }
+});
+
+function allNodes(node) {
+  return node && typeof node === "object"
+    ? [node, ...node.children.flatMap(allNodes)]
+    : [];
+}
+
+for (const language of ["en", "zh-CN", "ja"])
+  test(`settings render, language changes and save feedback retain ${language} and raw data`, async () => {
+    let submitted, releaseSave;
+    let fail = false,
+      invalid = false;
+    const gate = () =>
+      new Promise((resolve) => {
+        releaseSave = resolve;
+      });
+    let saveGate;
+    const custom = "dshで作業中";
+    const config = {
+      schema: 1,
+      general: { language, default_profile: "保存する" },
+      context: {
+        goal: "Working Memory",
+        working_files: ["保存する", "C:\\日本語\\文件"],
+        decisions: ["显示语言"],
+        constraints: ["Display language"],
+        open_tasks: ["dshで作業中"],
+      },
+      guard: { reason: "保存できません" },
+      discord: {
+        enabled: true,
+        details: custom,
+        show_image: false,
+        show_elapsed: false,
+        show_agent_status: true,
+      },
+    };
+    const fixture = await host(async (path, options) => {
+      if (path === "/api/rdsh-discord")
+        return {
+          ok: true,
+          json: async () => ({
+            ok: true,
+            state: "connected",
+            running_agents: 2,
+            updated_at: 1791939723000,
+          }),
+        };
+      if (options.method === "POST") {
+        submitted = JSON.parse(options.body).config;
+        if (saveGate) await saveGate;
+        return {
+          ok: !fail,
+          json: async () =>
+            fail
+              ? { ok: false }
+              : { ok: true, config: { ...config, ...submitted } },
+        };
+      }
+      return {
+        ok: !invalid,
+        json: async () =>
+          invalid
+            ? { ok: false, error: "invalid-settings" }
+            : { ok: true, config },
+      };
+    }, "en-US");
+    assert.ok(JSON.stringify(fixture.render()).includes("Loading…"));
+    await fixture.settle();
+    let ui = fixture.render();
+    for (const key of [
+      "workingMemory",
+      "longMemory",
+      "language",
+      "contextTitle",
+      "allSettings",
+      "tokens",
+      "saveDiscord",
+    ]) {
+      assert.ok(JSON.stringify(ui).includes(fixture.copy(language, key)), key);
+    }
+    const languageSelect = () =>
+      find(
+        fixture.render(),
+        (node) =>
+          node.tag === "select" &&
+          node.children.some((child) => child?.props?.value === "auto"),
+      );
+    assert.ok(
+      JSON.stringify(ui).includes(
+        fixture.copy(language, "lastUpdated", {
+          time: new Date(1791939723000).toLocaleTimeString(language),
+        }),
+      ),
+    );
+    for (const next of ["ja", "zh-CN", "en", language]) {
+      languageSelect().props.onChange({ target: { value: next } });
+      ui = fixture.render();
+      assert.equal(languageSelect().props.value, next);
+      assert.ok(
+        allNodes(ui).some((node) =>
+          node.children.includes(fixture.copy(next, "workingMemory")),
+        ),
+      );
+      assert.equal(
+        find(
+          ui,
+          (node) =>
+            node.tag === "input" &&
+            node.props.placeholder === fixture.copy(next, "defaultDetails"),
+        ).props.value,
+        custom,
+      );
+      assert.ok(
+        JSON.stringify(
+          find(
+            ui,
+            (node) =>
+              node.props["aria-label"] === fixture.copy(next, "discordPreview"),
+          ),
+        ).includes(custom),
+      );
+      assert.equal(
+        find(
+          ui,
+          (node) =>
+            node.tag === "input" &&
+            node.props.placeholder === fixture.copy(next, "goalPlaceholder"),
+        ).props.value,
+        "Working Memory",
+      );
+    }
+    saveGate = gate();
+    const saving = find(
+      fixture.render(),
+      (node) =>
+        node.tag === "button" &&
+        node.children.includes(fixture.copy(language, "save")),
+    ).props.onClick();
+    assert.ok(
+      JSON.stringify(fixture.render()).includes(
+        fixture.copy(language, "saving"),
+      ),
+    );
+    assert.equal(languageSelect().props.disabled, true);
+    releaseSave();
+    await saving;
+    assert.equal(JSON.stringify(submitted), JSON.stringify(config));
+    assert.ok(
+      JSON.stringify(fixture.render()).includes(
+        fixture.copy(language, "savedAll"),
+      ),
+    );
+    saveGate = undefined;
+    fail = true;
+    ui = fixture.render();
+    find(
+      ui,
+      (node) =>
+        node.tag === "input" &&
+        node.props.placeholder === fixture.copy(language, "defaultDetails"),
+    ).props.onChange({ target: { value: "保存できません" } });
+    await find(
+      fixture.render(),
+      (node) =>
+        node.tag === "button" &&
+        node.children.includes(fixture.copy(language, "saveDiscord")),
+    ).props.onClick();
+    assert.ok(
+      find(
+        fixture.render(),
+        (node) =>
+          node.props.role === "alert" &&
+          node.children.includes(fixture.copy(language, "saveFailed")),
+      ),
+    );
+    assert.equal(submitted.discord.details, "保存できません");
+    assert.deepEqual(Object.keys(submitted), ["discord"]);
+    invalid = true;
+    await find(
+      fixture.render(),
+      (node) =>
+        node.tag === "button" &&
+        node.children.includes(fixture.copy(language, "reload")),
+    ).props.onClick();
+    ui = fixture.render();
+    assert.ok(
+      find(
+        ui,
+        (node) =>
+          node.props.role === "alert" &&
+          node.children.includes(fixture.copy(language, "invalidSettings")),
+      ),
+    );
+    assert.equal(
+      find(ui, (node) => node.tag === "input"),
+      undefined,
+    );
+    for (const [key, values] of Object.entries(fixture.catalog)) {
+      assert.equal(values.length, 3, key);
+      const placeholders = (value) =>
+        [...value.matchAll(/[{]([a-zA-Z0-9_]+)[}]/g)]
+          .map((match) => match[1])
+          .sort();
+      assert.ok(
+        values.every((value) => typeof value === "string" && value.length > 0),
+        key,
+      );
+      assert.deepEqual(placeholders(values[0]), placeholders(values[1]), key);
+      assert.deepEqual(placeholders(values[0]), placeholders(values[2]), key);
+    }
+  });
+
+test("invalid returned locale blocks editing while auto language uses the browser", async () => {
+  const fixture = await host(
+    async (path) => ({
+      ok: true,
+      json: async () =>
+        path === "/api/rdsh-discord"
+          ? { ok: true, state: "disabled" }
+          : { config: { general: { language: "fr" } } },
+    }),
+    "zh-CN",
+  );
+  assert.ok(JSON.stringify(fixture.render()).includes("正在加载…"));
+  await fixture.settle();
+  const ui = fixture.render();
+  assert.ok(
+    find(
+      ui,
+      (node) =>
+        node.props.role === "alert" &&
+        node.children.includes(fixture.copy("auto", "invalidSettings")),
+    ),
+  );
+  assert.equal(
+    find(ui, (node) => node.tag === "input"),
+    undefined,
+  );
 });

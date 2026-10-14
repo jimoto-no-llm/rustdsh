@@ -1,3 +1,4 @@
+import { text, formatDateTime } from "./locale.mjs";
 import {
   annotationSnapshotId,
   decisionTargetId,
@@ -6,7 +7,7 @@ import {
 } from "./annotation-identifiers.mjs";
 
 export function createHumanAnnotationPanel(container, { api, node, navigateTo }) {
-  const status = node("p", "人間の注釈をAI要約・event履歴と分けて保存します。", "sub");
+  const status = node("p", text("annotation.intro"), "sub");
   status.setAttribute("role", "status");
   status.setAttribute("aria-live", "polite");
   const form = node("form");
@@ -19,7 +20,7 @@ export function createHumanAnnotationPanel(container, { api, node, navigateTo })
   const pathInput = node("input");
   const diffLine = node("input");
   const noteInput = node("textarea");
-  const submit = node("button", "ブックマークを保存");
+  const submit = node("button", text("annotation.save"));
   const list = node("div", undefined, "human-annotation-list");
   const fields = new Map();
   let state = null;
@@ -47,63 +48,63 @@ export function createHumanAnnotationPanel(container, { api, node, navigateTo })
   };
 
   taskSelect.required = true;
-  taskSelect.setAttribute("aria-label", "関連タスク");
+  taskSelect.setAttribute("aria-label", text("annotation.task"));
   kindSelect.required = true;
   kindSelect.append(
-    option("event", "ログ・event"),
-    option("decision", "会話上の決定"),
-    option("diff", "Git差分"),
+    option("event", text("annotation.event")),
+    option("decision", text("annotation.decision")),
+    option("diff", text("annotation.diff")),
   );
-  kindSelect.setAttribute("aria-label", "参照の種類");
+  kindSelect.setAttribute("aria-label", text("annotation.kind"));
   eventSelect.required = true;
   eventLine.type = "number";
   eventLine.min = "1";
   eventLine.max = "1000000";
-  eventLine.placeholder = "任意の行番号";
-  eventLine.setAttribute("aria-label", "event detailの行番号");
+  eventLine.placeholder = text("annotation.optionalLine");
+  eventLine.setAttribute("aria-label", text("annotation.eventLine"));
   decisionSelect.required = true;
-  decisionSelect.setAttribute("aria-label", "回答済みの決定");
+  decisionSelect.setAttribute("aria-label", text("annotation.answered"));
   commitInput.type = "text";
   commitInput.maxLength = 64;
   commitInput.autocomplete = "off";
-  commitInput.placeholder = "現行HEADを自動入力";
-  commitInput.setAttribute("aria-label", "対象commitの完全なSHA");
+  commitInput.placeholder = text("annotation.head");
+  commitInput.setAttribute("aria-label", text("annotation.sha"));
   pathInput.type = "text";
   pathInput.maxLength = 1000;
   pathInput.placeholder = "src/example.rs";
-  pathInput.setAttribute("aria-label", "project-relative path");
+  pathInput.setAttribute("aria-label", text("annotation.path"));
   diffLine.type = "number";
   diffLine.min = "1";
   diffLine.max = "1000000";
   diffLine.required = true;
-  diffLine.placeholder = "行番号";
-  diffLine.setAttribute("aria-label", "対象行番号");
+  diffLine.placeholder = text("annotation.line");
+  diffLine.setAttribute("aria-label", text("annotation.targetLine"));
   noteInput.required = true;
   noteInput.maxLength = 1200;
-  noteInput.placeholder = "後から見返す理由や判断の要点";
-  noteInput.setAttribute("aria-label", "人間の注釈");
+  noteInput.placeholder = text("annotation.noteHint");
+  noteInput.setAttribute("aria-label", text("annotation.note"));
   submit.type = "submit";
 
-  const eventTarget = targetSection("event", "保存するログ参照");
+  const eventTarget = targetSection("event", text("annotation.eventTarget"));
   eventTarget.append(
     labeled("event", eventSelect),
-    labeled("detailの行", eventLine, "空欄ならevent全体を固定します。"),
+    labeled(text("annotation.detailLine"), eventLine, text("annotation.whole")),
   );
-  const decisionTarget = targetSection("decision", "保存する決定参照");
-  decisionTarget.append(labeled("回答済みの質問", decisionSelect));
-  const diffTarget = targetSection("diff", "保存するGit参照");
+  const decisionTarget = targetSection("decision", text("annotation.decisionTarget"));
+  decisionTarget.append(labeled(text("annotation.question"), decisionSelect));
+  const diffTarget = targetSection("diff", text("annotation.gitTarget"));
   diffTarget.append(
-    labeled("commit SHA", commitInput, "完全なcommit IDで版を固定します。"),
-    labeled("ファイルパス", pathInput, "project-relative pathを使います。"),
-    labeled("行番号", diffLine),
+    labeled("commit SHA", commitInput, text("annotation.pinCommit")),
+    labeled(text("annotation.file"), pathInput, text("annotation.relativeHint")),
+    labeled(text("annotation.line"), diffLine),
   );
   form.append(
-    labeled("関連タスク", taskSelect),
-    labeled("参照の種類", kindSelect),
+    labeled(text("annotation.task"), taskSelect),
+    labeled(text("annotation.kind"), kindSelect),
     eventTarget,
     decisionTarget,
     diffTarget,
-    labeled("人間の注釈", noteInput),
+    labeled(text("annotation.note"), noteInput),
     submit,
   );
   container.replaceChildren(status, form, list);
@@ -140,10 +141,10 @@ export function createHumanAnnotationPanel(container, { api, node, navigateTo })
       taskSelect,
       [
         ...existingTasks,
-        ...orphanedTaskIds.map((taskId) => option(taskId, `${taskId} · 一覧にないタスク`)),
+        ...orphanedTaskIds.map((taskId) => option(taskId, text("annotation.orphan", {id:taskId}))),
       ],
       selectedTask,
-      "関連タスクを選択",
+      text("annotation.selectTask"),
     );
     const selectedEvent = eventSelect.value;
     renderOptions(
@@ -153,7 +154,7 @@ export function createHumanAnnotationPanel(container, { api, node, navigateTo })
         return option(id, `${event.title} · ${id}`);
       }),
       selectedEvent,
-      "ログeventを選択",
+      text("annotation.selectEvent"),
     );
     const selectedDecision = decisionSelect.value;
     renderOptions(
@@ -163,7 +164,7 @@ export function createHumanAnnotationPanel(container, { api, node, navigateTo })
         .reverse()
         .map((question) => option(question.id, `${question.id} · ${question.question}`)),
       selectedDecision,
-      "回答済みの決定を選択",
+      text("annotation.selectDecision"),
     );
   }
 
@@ -174,17 +175,17 @@ export function createHumanAnnotationPanel(container, { api, node, navigateTo })
     article.append(
       node(
         "p",
-        record.reference_status?.label || "参照状態を確認できません",
+        record.reference_status?.label || text("annotation.unknown"),
         `human-annotation-status ${code}`,
       ),
     );
     let liveTargetId = null;
     let label = "";
     if (target.kind === "event") {
-      label = `${target.title} · ${target.event_id}${target.line ? ` · detail行 ${target.line}` : ""}`;
+      label = `${target.title} · ${target.event_id}${target.line ? text("annotation.detail", {line:target.line}) : ""}`;
       liveTargetId = eventTargetId(target.event_id);
     } else if (target.kind === "decision") {
-      label = `決定 ${target.question_id}${target.revision == null ? "" : ` · 版 ${target.revision}`}`;
+      label = text("annotation.decisionLabel", {id:target.question_id,revision:target.revision == null ? "" : text("annotation.revision", {revision:target.revision})});
       liveTargetId = decisionTargetId(target.question_id);
     } else {
       label = `${target.commit.slice(0, 12)} · ${target.path}:${target.line}`;
@@ -192,17 +193,17 @@ export function createHumanAnnotationPanel(container, { api, node, navigateTo })
     article.append(node("p", label, "sub"), node("p", record.note));
     const snapshot = node("details", undefined, "human-annotation-source");
     snapshot.id = annotationSnapshotId(record.id);
-    snapshot.append(node("summary", "保存時の参照内容（変更後の行へ付け替えません）"));
+    snapshot.append(node("summary", text("annotation.snapshot")));
     if (target.kind === "decision") {
       snapshot.append(
-        node("p", `質問: ${target.question_excerpt}`),
+        node("p", text("annotation.questionLabel", {question:target.question_excerpt})),
         node("pre", target.answer_excerpt),
       );
     } else snapshot.append(node("pre", target.excerpt));
     article.append(
       node(
         "p",
-        `作成者: 人間 · 出所: ブラウザ · ${new Date(record.created_at).toLocaleString("ja-JP")}`,
+        text("annotation.author", {time:formatDateTime(record.created_at)}),
         "sub",
       ),
     );
@@ -212,19 +213,19 @@ export function createHumanAnnotationPanel(container, { api, node, navigateTo })
       : annotationSnapshotId(record.id);
     const navigate = node(
       "button",
-      code === "current" && liveTargetId ? "参照先へ移動" : "保存した参照を見る",
+      code === "current" && liveTargetId ? text("annotation.navigate") : text("annotation.savedReference"),
     );
     navigate.type = "button";
     navigate.addEventListener("click", () => navigateTo(destination));
-    const remove = node("button", "削除");
+    const remove = node("button", text("annotation.delete"));
     remove.type = "button";
     remove.addEventListener("click", async () => {
-      if (!globalThis.confirm?.("この人間のブックマークを削除しますか？")) return;
+      if (!globalThis.confirm?.(text("annotation.confirmDelete"))) return;
       remove.disabled = true;
       try {
         await api("annotations", { action: "delete", id: record.id });
         await refresh();
-        status.textContent = "人間のブックマークを削除しました。";
+        status.textContent = text("annotation.deleted");
       } catch (error) {
         status.textContent = error.message;
         remove.disabled = false;
@@ -241,11 +242,11 @@ export function createHumanAnnotationPanel(container, { api, node, navigateTo })
       .slice()
       .reverse();
     if (!taskSelect.value) {
-      list.replaceChildren(node("p", "タスクを選ぶと、そのタスクのブックマークを表示します。", "empty"));
+      list.replaceChildren(node("p", text("annotation.chooseTask"), "empty"));
       return;
     }
     if (!records.length) {
-      list.replaceChildren(node("p", "このタスクの人間のブックマークはありません。", "empty"));
+      list.replaceChildren(node("p", text("annotation.empty"), "empty"));
       return;
     }
     list.replaceChildren(...records.map(renderRecord));
@@ -262,7 +263,7 @@ export function createHumanAnnotationPanel(container, { api, node, navigateTo })
       refreshSelects();
       renderList();
     } catch (error) {
-      status.textContent = `人間のブックマークを読み込めません: ${error.message}`;
+      status.textContent = text("annotation.loadFailed", {error:error.message});
     } finally {
       loading = false;
     }
@@ -292,10 +293,10 @@ export function createHumanAnnotationPanel(container, { api, node, navigateTo })
     try {
       await api("annotations", input);
       noteInput.value = "";
-      status.textContent = "人間のブックマークを別ファイルへ保存しました。";
+      status.textContent = text("annotation.saved");
       await refresh();
     } catch (error) {
-      status.textContent = `保存できません: ${error.message}`;
+      status.textContent = text("annotation.saveFailed", {error:error.message});
     } finally {
       submit.disabled = false;
     }

@@ -1,5 +1,7 @@
 <img src="assets/icon.png" width="96" alt="rdsh icon">
 
+[English](README.md) · [简体中文](README.zh-CN.md)
+
 # rdsh — `dsh` を速く・安全に起動する Rust 製ランチャー
 
 [![ci](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/ci.yml/badge.svg)](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/ci.yml)
@@ -226,6 +228,17 @@ Rust ネイティブ処理のため、呼び出しごとのオーバーヘッド
 rdsh settings set extras.enable serve  # 機能を有効化
 rdsh serve                             # 起動（ローカルホスト限定、一時トークンで保護）
 ```
+
+### 表示言語
+
+rdsh 自身が表示する CLI 診断と内蔵ローカル画面は、英語・簡体字中国語・日本語に対応します。1回だけ指定するには `--language`、保存するには `rdsh.json` を使います。既定の `auto` は最初の空でないロケール環境変数を使い、未設定・未対応なら英語になります。
+
+```sh
+rdsh --language ja settings show
+rdsh settings set general.language zh-CN
+```
+
+優先順は `--language`、`RDSH_LANG`、`general.language`、`LC_ALL`、`LC_MESSAGES`、`LANG` です。明示した `general.language` が不正なら設定を書き換えずに停止します。委譲する `dsh` 引数、モデル出力、JSON フィールド、ファイル、プロトコル識別子は翻訳しません。
 
 ### 拡張ダッシュボード (`rdsh-dashboard`)
 

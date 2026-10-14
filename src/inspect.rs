@@ -70,17 +70,21 @@ fn human_bytes(n: u64) -> String {
     }
 }
 
-pub fn cmd_profiles() -> anyhow::Result<()> {
-    list_dir(&format!("{}/profiles", dsh_home()), "profile")
+pub fn cmd_profiles(locale: crate::locale::Locale) -> anyhow::Result<()> {
+    list_dir(&format!("{}/profiles", dsh_home()), "profile", locale)
 }
 
-pub fn cmd_skills() -> anyhow::Result<()> {
-    list_dir(&format!("{}/skills", dsh_home()), "skill")
+pub fn cmd_skills(locale: crate::locale::Locale) -> anyhow::Result<()> {
+    list_dir(&format!("{}/skills", dsh_home()), "skill", locale)
 }
 
-fn list_dir(dir: &str, kind: &str) -> anyhow::Result<()> {
+fn list_dir(dir: &str, kind: &str, locale: crate::locale::Locale) -> anyhow::Result<()> {
     if std::fs::read_dir(dir).is_err() {
-        println!("# no {kind} dir at {dir}");
+        println!(
+            "# {} {dir}",
+            crate::locale::ui_message(locale, crate::locale::UiMessage::NoDirectory)
+                .replace("{kind}", kind)
+        );
         return Ok(());
     }
     let names = dir_names(dir);
@@ -91,7 +95,11 @@ fn list_dir(dir: &str, kind: &str) -> anyhow::Result<()> {
         let _ = writeln!(out, "{n}");
     }
     let _ = out.flush();
-    eprintln!("[rdsh] {len} {kind}(s)", len = names.len());
+    eprintln!(
+        "[rdsh] {} {}",
+        names.len(),
+        crate::locale::ui_message(locale, crate::locale::UiMessage::Items).replace("{kind}", kind)
+    );
     Ok(())
 }
 
@@ -164,13 +172,18 @@ pub fn cmd_sessions(
     tokens: bool,
     json: bool,
     stale_secs: u64,
+    locale: crate::locale::Locale,
 ) -> anyhow::Result<()> {
     let root = format!("{}/sessions", dsh_home());
     if project.is_none() && std::fs::read_dir(&root).is_err() {
         if json {
             println!("{}", serde_json::json!({"sessions": [], "total": 0}));
         } else {
-            println!("# no sessions dir at {root}");
+            println!(
+                "# {} {root}",
+                crate::locale::ui_message(locale, crate::locale::UiMessage::NoDirectory)
+                    .replace("{kind}", "sessions")
+            );
         }
         return Ok(());
     }
@@ -200,7 +213,10 @@ pub fn cmd_sessions(
         vec![(None, false); shown.len()]
     };
     if tokens && !zstd_cli && sizes.iter().any(|(s, _)| s.is_none()) {
-        eprintln!("[rdsh] note: zstd CLI not found; `?` rows show stored-bytes/4 estimate");
+        eprintln!(
+            "[rdsh] {}",
+            crate::locale::ui_message(locale, crate::locale::UiMessage::ZstdUnavailable)
+        );
     }
     if json {
         let items: Vec<serde_json::Value> = shown
@@ -233,7 +249,12 @@ pub fn cmd_sessions(
             })
             .collect();
         println!("{}", serde_json::json!({"sessions": items, "total": total}));
-        eprintln!("[rdsh] {total} session(s), showing up to {limit}");
+        eprintln!(
+            "[rdsh] {} {}, {} {limit}",
+            total,
+            crate::locale::ui_message(locale, crate::locale::UiMessage::Sessions),
+            crate::locale::ui_message(locale, crate::locale::UiMessage::ShowingUpTo),
+        );
         return Ok(());
     }
     use std::io::Write;
@@ -260,7 +281,12 @@ pub fn cmd_sessions(
         );
     }
     let _ = out.flush();
-    eprintln!("[rdsh] {total} session(s), showing up to {limit}");
+    eprintln!(
+        "[rdsh] {} {}, {} {limit}",
+        total,
+        crate::locale::ui_message(locale, crate::locale::UiMessage::Sessions),
+        crate::locale::ui_message(locale, crate::locale::UiMessage::ShowingUpTo),
+    );
     Ok(())
 }
 
@@ -1064,26 +1090,48 @@ fn stream_many_decompressed_bytes(paths: &[&std::path::PathBuf]) -> Option<u64> 
 fn open_log_file(
     root: &std::path::Path,
     resolved: &std::path::Path,
+    locale: crate::locale::Locale,
 ) -> anyhow::Result<std::fs::File> {
-    crate::file_security::open_beneath(root, resolved)
-        .ok_or_else(|| anyhow::anyhow!("cannot open log file"))
+    if locale == crate::locale::Locale::English {
+        return crate::file_security::open_beneath(root, resolved)
+            .ok_or_else(|| anyhow::anyhow!("cannot open log file"));
+    }
+    crate::file_security::open_beneath(root, resolved).ok_or_else(|| {
+        anyhow::anyhow!(
+            "{}: {}",
+            crate::locale::ui_message(locale, crate::locale::UiMessage::CannotOpenLogFile),
+            resolved.display()
+        )
+    })
 }
 
 #[cfg(not(unix))]
 fn open_log_file(
     root: &std::path::Path,
     resolved: &std::path::Path,
+    locale: crate::locale::Locale,
 ) -> anyhow::Result<std::fs::File> {
     // No no-follow directory-fd opens on this platform: keep the lexical
     // confinement check (done by the caller) and open normally.
     let _ = root;
-    std::fs::File::open(resolved).map_err(|e| anyhow::anyhow!("cannot open log file: {e}"))
+    if locale == crate::locale::Locale::English {
+        return std::fs::File::open(resolved)
+            .map_err(|e| anyhow::anyhow!("cannot open log file: {e}"));
+    }
+    std::fs::File::open(resolved).map_err(|e| {
+        anyhow::anyhow!(
+            "{}: {}: {e}",
+            crate::locale::ui_message(locale, crate::locale::UiMessage::CannotOpenLogFile),
+            resolved.display()
+        )
+    })
 }
 
 /// Resolve a logs candidate under the selected canonical logs dir.
 fn confine_log_path(
     root: &std::path::Path,
     cand: &std::path::Path,
+    locale: crate::locale::Locale,
 ) -> anyhow::Result<std::path::PathBuf> {
     // Preserve the existing CLI contract: bare names are logs-root-relative,
     // while paths with a separator are relative to the caller's working dir.
@@ -1095,26 +1143,47 @@ fn confine_log_path(
     } else {
         root.join(cand)
     };
-    let resolved =
-        std::fs::canonicalize(&joined).map_err(|e| anyhow::anyhow!("cannot read log file: {e}"))?;
+    let resolved = std::fs::canonicalize(&joined).map_err(|e| {
+        if locale == crate::locale::Locale::English {
+            return anyhow::anyhow!("cannot read log file: {e}");
+        }
+        anyhow::anyhow!(
+            "{}: {}: {e}",
+            crate::locale::ui_message(locale, crate::locale::UiMessage::CannotReadLogFile),
+            joined.display()
+        )
+    })?;
     if !resolved.starts_with(root) {
-        anyhow::bail!("log file must be inside {}", root.display());
+        anyhow::bail!(
+            "{} {}",
+            crate::locale::ui_message(locale, crate::locale::UiMessage::LogFileMustStayInside),
+            root.display()
+        );
     }
     Ok(resolved)
 }
 
-pub fn cmd_logs(tail: usize, grep: Option<String>, file: Option<String>) -> anyhow::Result<()> {
+pub fn cmd_logs(
+    tail: usize,
+    grep: Option<String>,
+    file: Option<String>,
+    locale: crate::locale::Locale,
+) -> anyhow::Result<()> {
     let dir = format!("{}/logs", dsh_home());
     let (display, handle) = match file {
         Some(f) => {
             // Confine explicit selections to the logs dir (fail closed):
             // without this `--file /etc/passwd` or `../../.credentials.yaml`
             // prints arbitrary files to stdout.
-            let root =
-                std::fs::canonicalize(&dir).map_err(|_| anyhow::anyhow!("no logs at {dir}"))?;
+            let root = std::fs::canonicalize(&dir).map_err(|_| {
+                anyhow::anyhow!(
+                    "{} {dir}",
+                    crate::locale::ui_message(locale, crate::locale::UiMessage::NoLogs)
+                )
+            })?;
             let candidate = std::path::Path::new(&f);
-            let resolved = confine_log_path(&root, candidate)?;
-            let handle = open_log_file(&root, &resolved)?;
+            let resolved = confine_log_path(&root, candidate, locale)?;
+            let handle = open_log_file(&root, &resolved, locale)?;
             let display = if candidate.is_absolute() {
                 candidate.to_path_buf()
             } else {
@@ -1124,22 +1193,34 @@ pub fn cmd_logs(tail: usize, grep: Option<String>, file: Option<String>) -> anyh
         }
         None => match latest_file(&dir) {
             Some(p) => {
-                let root =
-                    std::fs::canonicalize(&dir).map_err(|_| anyhow::anyhow!("no logs at {dir}"))?;
+                let root = std::fs::canonicalize(&dir).map_err(|_| {
+                    anyhow::anyhow!(
+                        "{} {dir}",
+                        crate::locale::ui_message(locale, crate::locale::UiMessage::NoLogs)
+                    )
+                })?;
                 // read_dir already returned a path including `dir`; resolve
                 // it directly even when DSH_HOME is relative.
                 let candidate = std::fs::canonicalize(&p)?;
-                let resolved = confine_log_path(&root, &candidate)?;
-                let handle = open_log_file(&root, &resolved)?;
+                let resolved = confine_log_path(&root, &candidate, locale)?;
+                let handle = open_log_file(&root, &resolved, locale)?;
                 (p, handle)
             }
             None => {
-                println!("# no logs at {dir}");
+                println!(
+                    "# {} {dir}",
+                    crate::locale::ui_message(locale, crate::locale::UiMessage::NoDirectory)
+                        .replace("{kind}", "logs")
+                );
                 return Ok(());
             }
         },
     };
-    eprintln!("[rdsh] reading {}", display.display());
+    eprintln!(
+        "[rdsh] {} {}",
+        crate::locale::ui_message(locale, crate::locale::UiMessage::Reading),
+        display.display()
+    );
     use std::io::BufRead as _;
     // Stream the log; only the requested tail remains resident.
     let pat = grep.as_deref();
@@ -1165,9 +1246,19 @@ pub fn cmd_logs(tail: usize, grep: Option<String>, file: Option<String>) -> anyh
         let _ = writeln!(out, "{l}");
     }
     let _ = out.flush();
+    let matching = grep
+        .map(|g| {
+            format!(
+                " {} {g:?}",
+                crate::locale::ui_message(locale, crate::locale::UiMessage::Matching)
+            )
+        })
+        .unwrap_or_default();
     eprintln!(
-        "[rdsh] {n} line(s){}",
-        grep.map(|g| format!(" matching {g:?}")).unwrap_or_default()
+        "[rdsh] {} {}{}",
+        n,
+        crate::locale::ui_message(locale, crate::locale::UiMessage::Lines),
+        matching
     );
     Ok(())
 }

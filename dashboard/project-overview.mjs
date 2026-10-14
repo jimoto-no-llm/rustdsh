@@ -1,15 +1,16 @@
+import { text, formatDateTime } from "./locale.mjs";
 // A display projection of existing public evidence, never an execution control.
 import { observationView } from "./observations.mjs";
 const taskLabels = {
-  todo: "未着手",
-  doing: "進行中",
-  blocked: "保留",
-  done: "完了の申告",
+  todo: text("overview.todo"),
+  doing: text("overview.doing"),
+  blocked: text("overview.blocked"),
+  done: text("overview.done"),
 };
 const times = (value) =>
   Number.isFinite(Date.parse(value)) ? Date.parse(value) : 0;
 const at = (value) =>
-  value ? new Date(value).toLocaleString("ja-JP") : "未取得";
+  value ? formatDateTime(value) : text("overview.unavailable");
 const questionTask = (state, id) =>
   state.question_contracts?.cards[id]?.snapshot.decision.target?.task_id;
 
@@ -62,37 +63,26 @@ export function overviewModel(state, taskId = "", now = Date.now()) {
   const observation = targets.sort(
     (a, b) => times(b.observed_at) - times(a.observed_at),
   )[0];
-  let execution = "実行状態は未取得";
+  let execution = text("overview.noExecution");
   if (targets.length)
-    execution = `${commands.some((c) => c.source_kind === "instruction") ? "入力対象" : "回答対象"}: 接続確認 ${live} · 終了観測 ${ended} · 不明 ${unknown}。作業の完了は未確認`;
+    execution = text("overview.execution", {target:commands.some(c=>c.source_kind === "instruction")?text("overview.inputTarget"):text("overview.answerTarget"),live,ended,unknown});
   const reportLabel = (item) => {
     const view = observationView(item.status, item.observation, now);
-    const freshness = view.freshness === "stale" ? "古い情報" : "鮮度未確認";
-    return `${view.kind === "estimated" ? "推定 " : ""}${taskLabels[item.status] || "未取得"}${view.current ? "" : `（${freshness}）`}`;
+    const freshness = view.freshness === "stale" ? text("overview.stale") : text("overview.unknown");
+    return `${view.kind === "estimated" ? text("overview.estimate") : ""}${taskLabels[item.status] || text("overview.unavailable")}${view.current ? "" : `（${freshness}）`}`;
   };
   const taskViews = state.tasks.map((item) => ({ item, view: observationView(item.status, item.observation, now) }));
   const currentTasks = taskViews.filter(({ view }) => view.current && view.kind !== "estimated");
   const taskReport = taskId
     ? task
       ? `${task.id}: ${reportLabel(task)}`
-      : "選択タスクは現在の一覧にありません"
-    : `鮮度内のタスク申告: 進行中 ${currentTasks.filter(({ item }) => item.status === "doing").length} · 保留 ${currentTasks.filter(({ item }) => item.status === "blocked").length} · 完了 ${currentTasks.filter(({ item }) => item.status === "done").length} · 古い情報 ${taskViews.filter(({ view }) => view.freshness === "stale").length} · 鮮度未確認 ${taskViews.filter(({ view }) => ["unknown", "unavailable"].includes(view.freshness)).length} · 推定 ${taskViews.filter(({ view }) => view.current && view.kind === "estimated").length}`;
-  const resultNames = {
-    succeeded: "回答入力の処理完了（ACP応答）",
-    failed: "回答入力が中断（ACP応答）",
-    unknown: "回答入力の結果は不明",
-    invalidated: "旧版の回答結果（現行版には使えません）",
-    unapplied: "回答は未適用（対象が終了）",
-  };
+      : text("overview.selectedMissingTask")
+    : text("overview.taskReports", {doing:currentTasks.filter(({item})=>item.status === "doing").length,blocked:currentTasks.filter(({item})=>item.status === "blocked").length,done:currentTasks.filter(({item})=>item.status === "done").length,stale:taskViews.filter(({view})=>view.freshness === "stale").length,unknown:taskViews.filter(({view})=>["unknown","unavailable"].includes(view.freshness)).length,estimated:taskViews.filter(({view})=>view.current && view.kind === "estimated").length});
+  const resultPhases = new Set(["succeeded", "failed", "unknown", "invalidated", "unapplied"]);
   const results = commands
-    .filter((command) => resultNames[command.display_phase])
+    .filter((command) => resultPhases.has(command.display_phase))
     .map((command) => ({
-      title:
-        command.source_kind === "instruction"
-          ? resultNames[command.display_phase]
-              .replace("回答入力", "追指示入力")
-              .replace("回答は", "追指示は")
-          : resultNames[command.display_phase],
+      title: text(`overview.result.${command.source_kind === "instruction" ? "instruction" : "answer"}.${command.display_phase}`),
       detail: `${command.question_id || command.command_id} · run ${command.run_id}`,
       at: command.completed_at || command.started_at || command.saved_at,
     }));
@@ -101,27 +91,27 @@ export function overviewModel(state, taskId = "", now = Date.now()) {
     for (const event of state.events) {
       const view = observationView(event.title, event.observation, now);
       results.push({
-        title: `${view.kind === "estimated" ? "推定 " : ""}報告: ${event.title}${view.current ? "" : view.freshness === "stale" ? "（古い情報）" : "（鮮度未確認）"}`,
-        detail: `プロジェクトへの申告（受入検証は別） · ${view.label} · 観測 ${at(event.observation?.observed_at)} · 報告元 ${event.observation?.source || "未申告"}`,
+        title: text("overview.eventTitle", {estimated:view.kind === "estimated" ? text("overview.estimate") : "",title:event.title,freshness:view.current ? "" : view.freshness === "stale" ? text("overview.staleSuffix") : text("overview.unknownSuffix")}),
+        detail: text("overview.eventDetail", {kind:text("observation.kind."+(view.kind||"unknown")),time:at(event.observation?.observed_at),source:event.observation?.source || text("overview.unreported")}),
         at: event.created_at,
       });
     }
   const lastResult =
     results.sort((a, b) => times(b.at) - times(a.at))[0] || null;
   return {
-    context: `${state.project.name} · ${taskId ? `${taskId} ${task?.title || "一覧にないタスク"}` : "プロジェクト全体"}`,
+    context: `${state.project.name} · ${taskId ? `${taskId} ${task?.title || text("overview.orphanTask")}` : text("overview.project")}`,
     execution,
     taskReport,
     observation: observation
-      ? `${at(observation.observed_at)} · 回答対象の観測`
-      : "実行の観測記録なし",
-    reportUpdated: `申告更新: ${at(state.updated_at)}`,
+      ? text("overview.observed", {time:at(observation.observed_at)})
+      : text("overview.noObservations"),
+    reportUpdated: text("overview.updated", {time:at(state.updated_at)}),
     lastResult,
     pending,
     reviews,
     unassigned,
-    decision: `${pending.length ? `判断待ち ${pending.length} 件` : "この範囲の質問の判断待ちは0件"}${reviews.length ? ` · 追指示の確認待ち ${reviews.length} 件` : ""}${unassigned ? ` · タスク未指定 ${unassigned} 件は全体で確認` : ""}`,
-    stop: "この画面からの停止は非対応。元のCLIで対象を確認してください",
+    decision: `${pending.length ? text("overview.pending", {count:pending.length}) : text("overview.noPending")}${reviews.length ? text("overview.review", {count:reviews.length}) : ""}${unassigned ? text("overview.unassigned", {count:unassigned}) : ""}`,
+    stop: text("overview.stop"),
   };
 }
 
@@ -135,9 +125,9 @@ export function renderOverview(container, state, taskId, node) {
   $("overview-report-updated").textContent = value.reportUpdated;
   $("overview-result").textContent = value.lastResult
     ? `${value.lastResult.title} · ${at(value.lastResult.at)}`
-    : "この範囲の結果は未取得";
+    : text("overview.noResult");
   $("overview-result-detail").textContent =
-    value.lastResult?.detail || "完了を確認した記録はありません";
+    value.lastResult?.detail || text("overview.noCompletion");
   $("overview-decision").textContent = value.decision;
   $("overview-stop").textContent = value.stop;
   $("overview-pending").replaceChildren(

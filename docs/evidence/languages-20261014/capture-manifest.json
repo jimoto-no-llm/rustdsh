@@ -1,0 +1,166 @@
+{
+  "ja-native-desktop.png": {
+    "sha256": "4b8bdebb7b531568e293dce8e379f60ae2e76c6fdf4b598f64394ebf74da8155",
+    "bytes": 120204
+  },
+  "before-setup-desktop.png": {
+    "sha256": "6e63b26bd28fc54312725b452c75a51bd145f1715b334402f13ba55acb1858f0",
+    "bytes": 94013
+  },
+  "before-project-desktop.png": {
+    "sha256": "35fd196e8d8dc64d72c8916a89173ed0c8b3815d86e7115bb04a01e2721351ac",
+    "bytes": 93145
+  },
+  "ja-project-mobile.png": {
+    "sha256": "de68d909217c8246fd554720a51630070e7886ce5d4e22b272bba32be9836d46",
+    "bytes": 70970
+  },
+  "performance-repeat.json": {
+    "sha256": "f3ec97b9adef796995bc3f98c2c89e3c7e3ebe906a1b3bb8db49aeb87db21c89",
+    "bytes": 8311
+  },
+  "ja-setup-mobile.png": {
+    "sha256": "ade1793b4ba3e4c129d7eb6aac40eb361105f4d5ccaa78a9b9147fea890a4f46",
+    "bytes": 68678
+  },
+  "performance-extended.json": {
+    "sha256": "dfbac368bef268736d2e60bb93f4681df6dc3386fd1e3dbc203d1f3c5889b95a",
+    "bytes": 16006
+  },
+  "en-help.txt": {
+    "sha256": "a04e733f93cf5d5a09a6babc64bf9694a07e13455cc18a3414e6b43f0006cea6",
+    "bytes": 3468
+  },
+  "en-browser-results.json": {
+    "sha256": "5131d531249d02a25040e64bb601fa3a9e283818d242f8470e9e419f305c7be0",
+    "bytes": 768
+  },
+  "zh-CN-project-mobile.png": {
+    "sha256": "6412b739b78823f2cb38dd23fe3e4df1e6593866d54f7f817558bd83a5d73681",
+    "bytes": 65052
+  },
+  "before-native-mobile.png": {
+    "sha256": "0f16d014ac1d95ac25884061c1380253f3bd54db48992065f9340bd5fec579d3",
+    "bytes": 44221
+  },
+  "before-project-mobile.png": {
+    "sha256": "42aacd7c4d499fb97fa152b456f763290df55238420584f2404e748efee9b3ad",
+    "bytes": 70912
+  },
+  "harness-results.json": {
+    "sha256": "2a45885865f8581505b6c6c36fe164d491f2eb3e10ee023757ad20a4fa748c41",
+    "bytes": 1368
+  },
+  "ja-help.txt": {
+    "sha256": "b147895037922ea3f7d66f8676d046773658e19e77fcb28ce248d7351d569b86",
+    "bytes": 3485
+  },
+  "zh-CN-native-desktop.png": {
+    "sha256": "3376b36d78a35979717768f0a6e1008b5f23c1126c385bd5d544560f2fa09942",
+    "bytes": 119471
+  },
+  "harness-settings-error.png": {
+    "sha256": "2f5e7f6e866fe810d08835463361a3ee47dc3c34e3046d404106e3de9cb1ceca",
+    "bytes": 45747
+  },
+  "before-native-desktop.png": {
+    "sha256": "1d2606963d6b7a74dd91245c5fe947c69a652cc7988d0ae9d1874ab2f4e28882",
+    "bytes": 117208
+  },
+  "en-project-mobile.png": {
+    "sha256": "296c103902dd96b4d1cd69bbfef98e742b85c2f93ffc4c025faf71301840ff86",
+    "bytes": 57186
+  },
+  "en-setup-mobile.png": {
+    "sha256": "bdd03bba828c5fa9b0b7eb43bfa2b38bc42f5048ec2f86e0bcf7dbd001ef07cf",
+    "bytes": 62469
+  },
+  "zh-CN-project-desktop.png": {
+    "sha256": "007e3e47a5aaeb409b4b7d228495098f0cb05cfc8cd9a16fb53595254ed23091",
+    "bytes": 80822
+  },
+  "ja-setup-desktop.png": {
+    "sha256": "eb8a4348bf78ad5fbf7589a54d3144c345182965705272eb86634ed54c3ebddf",
+    "bytes": 94671
+  },
+  "harness-settings-mobile.png": {
+    "sha256": "585ddda3fdd56d3696aa67bbfdcca2c2bcc2148b443675d1c95a2929205c2cbc",
+    "bytes": 75503
+  },
+  "ja-browser-results.json": {
+    "sha256": "dfe620c93aa28a01cd2e9bcf6180183a0547f33d9924f7fa537c86c7ad20ca02",
+    "bytes": 768
+  },
+  "zh-CN-native-mobile.png": {
+    "sha256": "51a47270d312d6f356888742b9393d1c175907d892f72f397ead2da39af6355b",
+    "bytes": 49655
+  },
+  "en-project-desktop.png": {
+    "sha256": "807f308b49e4a3c22d1d1d647c077c35a348e23de5053fe776eba7a5018df40d",
+    "bytes": 83516
+  },
+  "en-native-mobile.png": {
+    "sha256": "b8e7e34572d2c7655f10c713ad05e76225c4c1aa906f5a3c0ae78607d5d76b9f",
+    "bytes": 49728
+  },
+  "zh-CN-help.txt": {
+    "sha256": "a5af9285b0657573a90001c684ed9a9258f11856fbf066b29e93c7eb2c6a7594",
+    "bytes": 3003
+  },
+  "en-native-desktop.png": {
+    "sha256": "4b98588b13987c5055fac300ff1c07d585996453bfc3846ffc94d5dc15807f0e",
+    "bytes": 112802
+  },
+  "harness-settings-en.png": {
+    "sha256": "35994097e3e43cf66bc4f4bf05808d73ffbb6f425eb711bcb7f00d4acdb76801",
+    "bytes": 73397
+  },
+  "harness-settings-ja.png": {
+    "sha256": "1166374180604b5099f3dfc532634d11abb1afdd5a53692ae0472ed47cff6714",
+    "bytes": 78666
+  },
+  "zh-CN-setup-mobile.png": {
+    "sha256": "b4b3e937663d469684eaf9b092cf11da61fa7604136722e77c8869a6d05fc81a",
+    "bytes": 65324
+  },
+  "harness-settings-zh-CN.png": {
+    "sha256": "f30891daf7960bece80d8e8217791c3e85f2c946c62fed0c4a55d8fbf7bbc384",
+    "bytes": 73604
+  },
+  "dashboard-platform-ledger.md": {
+    "sha256": "c3ab5e1971330313d3fecc5e4742965fe379f941c23e2c61299d14147f360c6c",
+    "bytes": 12565
+  },
+  "performance-loaded.json": {
+    "sha256": "05c13b9e8cd4ca2e8d13c924288b64b267e31344347e92f1ce39c3948e505fe6",
+    "bytes": 8297
+  },
+  "ja-project-desktop.png": {
+    "sha256": "43b2c2c8b30561ea6ce98e96af67c024728310f45078b2f29a15a8291b80bed7",
+    "bytes": 93185
+  },
+  "ja-native-mobile.png": {
+    "sha256": "4d5fee6c1f75b1b7b338a4095b30c016b9c79748b4e09bd103e71ba634734bb1",
+    "bytes": 44652
+  },
+  "before-help.txt": {
+    "sha256": "93cfc4fd7ee700ca9c4626f5991c3be1d4faee810d4581dfb20878ee36a13d76",
+    "bytes": 3332
+  },
+  "zh-CN-setup-desktop.png": {
+    "sha256": "7d6dfc4bce56f78b80dbb8f6f2f92f8d35d8a99cb0faed47fbac686981e3fca9",
+    "bytes": 88824
+  },
+  "en-setup-desktop.png": {
+    "sha256": "9c97212d9b49e9bcd61461b5a6c45ff0714bde12bdaf2e1e52c1a795fb5c43d7",
+    "bytes": 86496
+  },
+  "zh-CN-browser-results.json": {
+    "sha256": "c89aa82c8ddb416979077ee4dc5307534337d18330ea09ce0ce93ecf904330bd",
+    "bytes": 771
+  },
+  "before-setup-mobile.png": {
+    "sha256": "ba4fc485e6e37aafb6a8d286e9b7f6208c02aa9d142489046dc839ad1e7d433b",
+    "bytes": 67302
+  }
+}

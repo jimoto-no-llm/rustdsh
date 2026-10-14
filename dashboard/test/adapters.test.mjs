@@ -1,3 +1,4 @@
+import { requiresOwnershipBackend } from "./ownership-support.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
@@ -74,104 +75,131 @@ test("capability catalog names all six operations and does not claim unimplement
   }
 });
 
-test("start/send/usage use versioned ACP requests and measurements instead of shell input", async (t) => {
-  const { adapter, root, events, trace } = await setup(t);
-  assert.equal(adapter.capabilities().health, "unverified");
-  const start = await adapter.start();
-  for (const op of operations)
-    assert.equal(adapter.capabilities().operations[op].supported, true);
-  assert.equal((await adapter.probe()).health, "compatible");
-  assert.equal(start.session_id, "fixture-session");
-  assert.equal(adapter.usage(start.session_id).status, "unavailable");
-  assert.equal(
-    (await adapter.send(start.session_id, 'literal $(echo nope) & " text'))
-      .stop_reason,
-    "end_turn",
-  );
-  const usage = adapter.usage(start.session_id);
-  assert.equal(usage.status, "observed");
-  assert.equal(usage.measurement.context_tokens, 135);
-  assert.equal(usage.measurement.context_capacity, 8192);
-  assert.equal(usage.measurement.billable_tokens, null);
-  assert.equal(usage.measurement.cost, null);
-  const wire = await trace();
-  assert.deepEqual(
-    wire.map((r) => r.method),
-    ["initialize", "session/new", "session/prompt"],
-  );
-  assert.deepEqual(wire[1].params, {
-    cwd: await fs.realpath(root),
-    mcpServers: [],
-  });
-  assert.deepEqual(wire[2].params.prompt, [
-    { type: "text", text: 'literal $(echo nope) & " text' },
-  ]);
-  assert(events.every((e) => e.provenance.trust === "untrusted_data"));
-  assert.deepEqual(
-    events.map((e) => e.sequence),
-    events.map((_, i) => i + 1),
-  );
-  assert.equal((await adapter.stop()).confirmed, true);
-  assert.equal(adapter.capabilities().operations.send.supported, false);
-});
+test(
+  "start/send/usage use versioned ACP requests and measurements instead of shell input",
+  requiresOwnershipBackend,
+  async (t) => {
+    const { adapter, root, events, trace } = await setup(t);
+    assert.equal(adapter.capabilities().health, "unverified");
+    const start = await adapter.start();
+    for (const op of operations)
+      assert.equal(adapter.capabilities().operations[op].supported, true);
+    assert.equal((await adapter.probe()).health, "compatible");
+    assert.equal(start.session_id, "fixture-session");
+    assert.equal(adapter.usage(start.session_id).status, "unavailable");
+    assert.equal(
+      (await adapter.send(start.session_id, 'literal $(echo nope) & " text'))
+        .stop_reason,
+      "end_turn",
+    );
+    const usage = adapter.usage(start.session_id);
+    assert.equal(usage.status, "observed");
+    assert.equal(usage.measurement.context_tokens, 135);
+    assert.equal(usage.measurement.context_capacity, 8192);
+    assert.equal(usage.measurement.billable_tokens, null);
+    assert.equal(usage.measurement.cost, null);
+    const wire = await trace();
+    assert.deepEqual(
+      wire.map((r) => r.method),
+      ["initialize", "session/new", "session/prompt"],
+    );
+    assert.deepEqual(wire[1].params, {
+      cwd: await fs.realpath(root),
+      mcpServers: [],
+    });
+    assert.deepEqual(wire[2].params.prompt, [
+      { type: "text", text: 'literal $(echo nope) & " text' },
+    ]);
+    assert(events.every((e) => e.provenance.trust === "untrusted_data"));
+    assert.deepEqual(
+      events.map((e) => e.sequence),
+      events.map((_, i) => i + 1),
+    );
+    assert.equal((await adapter.stop()).confirmed, true);
+    assert.equal(adapter.capabilities().operations.send.supported, false);
+  },
+);
 
-test("resume attaches the exact session and rejects failed attachment", async (t) => {
-  const { adapter, trace } = await setup(t);
-  await assert.rejects(adapter.resume("missing"), error("cli_error"));
-  assert.throws(() => adapter.usage("missing"), error("session_not_attached"));
-  const resumed = await adapter.resume("existing-session");
-  assert.equal(resumed.session_id, "existing-session");
-  await adapter.send("existing-session", "continue");
-  const requests = await trace();
-  const resumedRequests = requests.filter((r) => r.method === "session/resume");
-  assert.deepEqual(
-    resumedRequests.map((r) => r.params.sessionId),
-    ["missing", "existing-session"],
-  );
-  await assert.rejects(
-    adapter.resume("existing-session"),
-    error("already_attached"),
-  );
-});
+test(
+  "resume attaches the exact session and rejects failed attachment",
+  requiresOwnershipBackend,
+  async (t) => {
+    const { adapter, trace } = await setup(t);
+    await assert.rejects(adapter.resume("missing"), error("cli_error"));
+    assert.throws(
+      () => adapter.usage("missing"),
+      error("session_not_attached"),
+    );
+    const resumed = await adapter.resume("existing-session");
+    assert.equal(resumed.session_id, "existing-session");
+    await adapter.send("existing-session", "continue");
+    const requests = await trace();
+    const resumedRequests = requests.filter(
+      (r) => r.method === "session/resume",
+    );
+    assert.deepEqual(
+      resumedRequests.map((r) => r.params.sessionId),
+      ["missing", "existing-session"],
+    );
+    await assert.rejects(
+      adapter.resume("existing-session"),
+      error("already_attached"),
+    );
+  },
+);
 
-test("missing advertised resume is unsupported without writing a resume request", async (t) => {
-  const { adapter, trace } = await setup(t, "missing_resume");
-  await adapter.start();
-  assert.equal(
-    adapter.capabilities().operations.resume.reason,
-    "not_advertised",
-  );
-  await assert.rejects(adapter.resume("existing"), error("unsupported"));
-  assert(!(await trace()).some((r) => r.method === "session/resume"));
-});
+test(
+  "missing advertised resume is unsupported without writing a resume request",
+  requiresOwnershipBackend,
+  async (t) => {
+    const { adapter, trace } = await setup(t, "missing_resume");
+    await adapter.start();
+    assert.equal(
+      adapter.capabilities().operations.resume.reason,
+      "not_advertised",
+    );
+    await assert.rejects(adapter.resume("existing"), error("unsupported"));
+    assert(!(await trace()).some((r) => r.method === "session/resume"));
+  },
+);
 
-test("simultaneous prompts are refused and interrupt is a request until the cancelled result", async (t) => {
-  const { adapter, events } = await setup(t, "busy");
-  const { session_id: id } = await adapter.start();
-  const turn = adapter.send(id, "wait");
-  await assert.rejects(adapter.send(id, "duplicate"), error("busy"));
-  assert.equal((await adapter.interrupt(id)).acknowledged, false);
-  assert.equal((await turn).stop_reason, "cancelled");
-  assert(events.some((e) => e.type === "interrupt_requested"));
-  assert(
-    events.some(
-      (e) => e.type === "prompt_completed" && e.stop_reason === "cancelled",
-    ),
-  );
-});
-
-test("client-side permission and filesystem requests do not gain execution authority", async (t) => {
-  for (const mode of ["permission", "filesystem"]) {
-    const { adapter, trace } = await setup(t, mode);
+test(
+  "simultaneous prompts are refused and interrupt is a request until the cancelled result",
+  requiresOwnershipBackend,
+  async (t) => {
+    const { adapter, events } = await setup(t, "busy");
     const { session_id: id } = await adapter.start();
-    assert.equal((await adapter.send(id, "ask")).stop_reason, "cancelled");
-    const response = (await trace()).find((r) => r.id === mode && !r.method);
-    if (mode === "permission")
-      assert.deepEqual(response.result, { outcome: { outcome: "cancelled" } });
-    else assert.equal(response.error.code, -32601);
-    await adapter.stop();
-  }
-});
+    const turn = adapter.send(id, "wait");
+    await assert.rejects(adapter.send(id, "duplicate"), error("busy"));
+    assert.equal((await adapter.interrupt(id)).acknowledged, false);
+    assert.equal((await turn).stop_reason, "cancelled");
+    assert(events.some((e) => e.type === "interrupt_requested"));
+    assert(
+      events.some(
+        (e) => e.type === "prompt_completed" && e.stop_reason === "cancelled",
+      ),
+    );
+  },
+);
+
+test(
+  "client-side permission and filesystem requests do not gain execution authority",
+  requiresOwnershipBackend,
+  async (t) => {
+    for (const mode of ["permission", "filesystem"]) {
+      const { adapter, trace } = await setup(t, mode);
+      const { session_id: id } = await adapter.start();
+      assert.equal((await adapter.send(id, "ask")).stop_reason, "cancelled");
+      const response = (await trace()).find((r) => r.id === mode && !r.method);
+      if (mode === "permission")
+        assert.deepEqual(response.result, {
+          outcome: { outcome: "cancelled" },
+        });
+      else assert.equal(response.error.code, -32601);
+      await adapter.stop();
+    }
+  },
+);
 
 test("unknown CLI version or malformed version disables capabilities before profile boot", async (t) => {
   for (const mode of ["new_version", "secret_version"]) {
@@ -193,17 +221,23 @@ test("unknown CLI version or malformed version disables capabilities before prof
   }
 });
 
-test("a changed executable version revokes capabilities on an already connected adapter", async (t) => {
-  const { adapter } = await setup(t);
-  const { session_id: id } = await adapter.start();
-  adapter.env.RDSH_ADAPTER_FIXTURE_MODE = "new_version";
-  assert.equal((await adapter.probe()).health, "unverified_version");
-  assert(
-    operations.every((op) => !adapter.capabilities().operations[op].supported),
-  );
-  await assert.rejects(adapter.send(id, "no fallback"), error("unsupported"));
-  assert.equal((await adapter.stop()).confirmed, true);
-});
+test(
+  "a changed executable version revokes capabilities on an already connected adapter",
+  requiresOwnershipBackend,
+  async (t) => {
+    const { adapter } = await setup(t);
+    const { session_id: id } = await adapter.start();
+    adapter.env.RDSH_ADAPTER_FIXTURE_MODE = "new_version";
+    assert.equal((await adapter.probe()).health, "unverified_version");
+    assert(
+      operations.every(
+        (op) => !adapter.capabilities().operations[op].supported,
+      ),
+    );
+    await assert.rejects(adapter.send(id, "no fallback"), error("unsupported"));
+    assert.equal((await adapter.stop()).confirmed, true);
+  },
+);
 
 test("invalid cwd and missing executable are distinct from compatible CLI", async (t) => {
   const a = await setup(t, "normal", {
@@ -216,90 +250,123 @@ test("invalid cwd and missing executable are distinct from compatible CLI", asyn
   assert.equal((await b.adapter.probe()).health, "cli_unavailable");
 });
 
-test("broken JSON, oversized frames, invalid UTF8, wrong protocol and invalid start fail closed", async (t) => {
-  for (const mode of [
-    "bad_json",
-    "oversized",
-    "invalid_utf8",
-    "wrong_protocol",
-    "bad_new",
-  ]) {
-    const { adapter } = await setup(t, mode);
-    await assert.rejects(adapter.start(), error("protocol_mismatch"));
-    assert.equal(adapter.capabilities().health, "incompatible");
-    assert(
-      operations.every(
-        (op) => !adapter.capabilities().operations[op].supported,
-      ),
-    );
-    assert.equal((await adapter.stop()).confirmed, true);
-  }
-});
+test(
+  "broken JSON, oversized frames, invalid UTF8, wrong protocol and invalid start fail closed",
+  requiresOwnershipBackend,
+  async (t) => {
+    for (const mode of [
+      "bad_json",
+      "oversized",
+      "invalid_utf8",
+      "wrong_protocol",
+      "bad_new",
+    ]) {
+      const { adapter } = await setup(t, mode);
+      await assert.rejects(adapter.start(), error("protocol_mismatch"));
+      assert.equal(adapter.capabilities().health, "incompatible");
+      assert(
+        operations.every(
+          (op) => !adapter.capabilities().operations[op].supported,
+        ),
+      );
+      assert.equal((await adapter.stop()).confirmed, true);
+    }
+  },
+);
 
-test("invalid usage cannot become a zero or fabricated measurement", async (t) => {
-  const { adapter } = await setup(t, "invalid_usage");
-  const { session_id: id } = await adapter.start();
-  await assert.rejects(adapter.send(id, "report"), error("protocol_mismatch"));
-  assert.equal(adapter.capabilities().health, "incompatible");
-  assert.throws(() => adapter.usage(id), error("unsupported"));
-});
-
-test("CLI errors retain no peer secret and missing methods disable the affected operation", async (t) => {
-  for (const mode of ["cli_error", "unsupported_send"]) {
-    const { adapter } = await setup(t, mode);
+test(
+  "invalid usage cannot become a zero or fabricated measurement",
+  requiresOwnershipBackend,
+  async (t) => {
+    const { adapter } = await setup(t, "invalid_usage");
     const { session_id: id } = await adapter.start();
-    await assert.rejects(adapter.send(id, "text"), error("cli_error"));
-    assert.equal(
-      adapter.capabilities().operations.send.supported,
-      mode === "cli_error",
+    await assert.rejects(
+      adapter.send(id, "report"),
+      error("protocol_mismatch"),
     );
-  }
-});
+    assert.equal(adapter.capabilities().health, "incompatible");
+    assert.throws(() => adapter.usage(id), error("unsupported"));
+  },
+);
 
-test("timeouts and early exit are failures, never successful starts", async (t) => {
-  const a = await setup(t, "timeout", { requestTimeout: 200 });
-  await assert.rejects(a.adapter.start(), (e) =>
-    ["timeout_result_unknown", "protocol_mismatch"].includes(e.code),
-  );
-  assert.equal(a.adapter.capabilities().health, "incompatible");
-  const b = await setup(t, "early_exit");
-  await assert.rejects(b.adapter.start(), (e) =>
-    ["connection_closed", "process_exited"].includes(e.code),
-  );
-});
+test(
+  "CLI errors retain no peer secret and missing methods disable the affected operation",
+  requiresOwnershipBackend,
+  async (t) => {
+    for (const mode of ["cli_error", "unsupported_send"]) {
+      const { adapter } = await setup(t, mode);
+      const { session_id: id } = await adapter.start();
+      await assert.rejects(adapter.send(id, "text"), error("cli_error"));
+      assert.equal(
+        adapter.capabilities().operations.send.supported,
+        mode === "cli_error",
+      );
+    }
+  },
+);
 
-test("duplicate session identifiers disable the adapter", async (t) => {
-  const { adapter } = await setup(t);
-  await adapter.start();
-  await assert.rejects(adapter.start(), error("duplicate_session"));
-  assert.equal(adapter.capabilities().health, "incompatible");
-});
+test(
+  "timeouts and early exit are failures, never successful starts",
+  requiresOwnershipBackend,
+  async (t) => {
+    const a = await setup(t, "timeout", { requestTimeout: 200 });
+    await assert.rejects(a.adapter.start(), (e) =>
+      ["timeout_result_unknown", "protocol_mismatch"].includes(e.code),
+    );
+    assert.equal(a.adapter.capabilities().health, "incompatible");
+    const b = await setup(t, "early_exit");
+    await assert.rejects(b.adapter.start(), (e) =>
+      ["connection_closed", "process_exited"].includes(e.code),
+    );
+  },
+);
 
-test("stop waits for the owned child to exit and escalates when EOF is ignored", async (t) => {
-  const { adapter } = await setup(t, "ignore_eof");
-  await adapter.start();
-  const pid = adapter.child.pid;
-  const stopped = await adapter.stop();
-  assert.equal(stopped.confirmed, true);
-  assert.throws(() => process.kill(pid, 0));
-});
+test(
+  "duplicate session identifiers disable the adapter",
+  requiresOwnershipBackend,
+  async (t) => {
+    const { adapter } = await setup(t);
+    await adapter.start();
+    await assert.rejects(adapter.start(), error("duplicate_session"));
+    assert.equal(adapter.capabilities().health, "incompatible");
+  },
+);
 
-test("isolated smoke covers restart/resume and accurately marks unexercised model work", async (t) => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-smoke-project-"));
-  t.after(() => fs.rm(root, { recursive: true, force: true }));
-  const result = await smokeAdapter({
-    command: [process.execPath, fixture],
-    cwd: root,
-    requestTimeout: 1500,
-    stopTimeout: 150,
-  });
-  assert.equal(result.status, "passed");
-  assert.equal(result.checks.resume, "acknowledged");
-  assert.equal(result.checks.send, "not_exercised_no_model_request");
-  assert.equal(result.checks.stop, "exit_confirmed");
-  assert.equal(result.checks.usage, "unavailable");
-  assert.equal(result.authentication, "not_verified");
-});
+test(
+  "stop waits for the owned child to exit and escalates when EOF is ignored",
+  requiresOwnershipBackend,
+  async (t) => {
+    const { adapter } = await setup(t, "ignore_eof");
+    await adapter.start();
+    const pid = adapter.child.pid;
+    const stopped = await adapter.stop();
+    assert.equal(stopped.confirmed, true);
+    assert.throws(() => process.kill(pid, 0));
+  },
+);
+
+test(
+  "isolated smoke covers restart/resume and accurately marks unexercised model work",
+  requiresOwnershipBackend,
+  async (t) => {
+    const root = await fs.mkdtemp(
+      path.join(os.tmpdir(), "rdsh-smoke-project-"),
+    );
+    t.after(() => fs.rm(root, { recursive: true, force: true }));
+    const result = await smokeAdapter({
+      command: [process.execPath, fixture],
+      cwd: root,
+      requestTimeout: 1500,
+      stopTimeout: 150,
+    });
+    assert.equal(result.status, "passed");
+    assert.equal(result.checks.resume, "acknowledged");
+    assert.equal(result.checks.send, "not_exercised_no_model_request");
+    assert.equal(result.checks.stop, "exit_confirmed");
+    assert.equal(result.checks.usage, "unavailable");
+    assert.equal(result.authentication, "not_verified");
+  },
+);
 
 test("public CLI exposes catalog/probe/smoke and requires an explicit original executable", async (t) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-adapter-cli-"));
@@ -327,11 +394,61 @@ test("public CLI exposes catalog/probe/smoke and requires an explicit original e
   );
   assert.equal(probed.health, "version_matched");
   assert.equal(probed.operations.start.status, "requires_protocol_check");
-  const smoked = JSON.parse(
-    (await run(process.execPath, [cli, "adapter-smoke", ...args])).stdout,
+  await t.test(
+    "public CLI smoke acquires and stops real native ownership",
+    requiresOwnershipBackend,
+    async () => {
+      const smoked = JSON.parse(
+        (await run(process.execPath, [cli, "adapter-smoke", ...args])).stdout,
+      );
+      assert.equal(smoked.status, "passed");
+    },
   );
-  assert.equal(smoked.status, "passed");
   await assert.rejects(run(process.execPath, [cli, "adapter-smoke"]), (e) =>
     e.stderr.includes("Specify the original DSH executable"),
   );
 });
+
+test(
+  "a failed cleanup after real ownership remains unconfirmed and cannot become a no-child stop",
+  requiresOwnershipBackend,
+  async (t) => {
+    const root = await fs.mkdtemp(
+      path.join(os.tmpdir(), "rdsh-adapter-stop-failure-"),
+    );
+    t.after(() => fs.rm(root, { recursive: true, force: true }));
+    const adapter = createCliAdapter({
+      command: [process.execPath, fixture],
+      cwd: root,
+      env: {
+        ...process.env,
+        HOME: root,
+        USERPROFILE: root,
+        DSH_HOME: path.join(root, "dsh"),
+        RDSH_ADAPTER_FIXTURE_MODE: "normal",
+      },
+      requestTimeout: 1500,
+      stopTimeout: 150,
+    });
+    await adapter.start();
+    const scope = adapter.ownedScope;
+    assert.ok(scope);
+    assert.ok(adapter.child);
+    const originalStop = scope.stop.bind(scope);
+    scope.stop = async () => ({ confirmed: false });
+    try {
+      await assert.rejects(adapter.stop(), error("stop_unconfirmed"));
+      assert.equal(adapter.launchAttempted, true);
+      assert.equal(adapter.ownedScope, scope);
+    } finally {
+      scope.stop = originalStop;
+      // The failed adapter stop remains rejected. Cleanup uses the retained
+      // real scope directly and must confirm descendant exit before teardown.
+      const cleaned = await originalStop({
+        gracefulTimeout: 150,
+        killTimeout: 1000,
+      });
+      assert.equal(cleaned.confirmed, true);
+    }
+  },
+);

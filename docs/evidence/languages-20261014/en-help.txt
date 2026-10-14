@@ -1,0 +1,61 @@
+Rust fast launcher for dsh (safe: native fast-paths + passthrough)
+
+Usage: rdsh [OPTIONS] [EXTRA]... [COMMAND]
+
+Commands:
+  boot         
+  dump-config  
+  tokens       
+  prune        
+  search       
+  search-web   Web search through SearXNG (default http://127.0.0.1:8888, $SEARXNG_URL wins)
+  compact      
+  doctor       
+  sessions     List sessions under $DSH_HOME (newest first, Node-free)
+  profiles     List local profiles (Node-free)
+  skills       List installed skills (Node-free)
+  logs         Show $DSH_HOME logs: latest file tail + optional grep (Node-free)
+  serve        Start the local dashboard (127.0.0.1 only, read-only API)
+  auth         OAuth auto-recognition: external logins (codex/opencode) mirrored into $DSH_HOME/.credentials.yaml ("drop in and recognized")
+  setup        First-run connect: import what exists, persist env keys, optionally run the provider login flow or reveal settings dirs, else show next step
+  bench        
+  context      Context engine prototype (test): rebuild per-turn context from local files
+  compute      Resident pure-compute worker (stdio NDJSON, opt-in Web PoC). No filesystem/auth/session access; DSH keeps the original path
+  guard        Hook helper for hooks.json: block stdin text matching --deny (exit 2)
+  settings     Unified rdsh settings (rdsh.json): show values, path, or write defaults
+  features     Feature switches: list every optional capability, or turn one on/off
+  desktop      DeepSeek Harness Desktop (Electron): detect the app, its reserved profile and its bundled command runtime, then attach rdsh plugins
+  help         Print this message or the help of the given subcommand(s)
+
+Arguments:
+  [EXTRA]...  
+
+Options:
+      --share-file <SHARE_FILE>  Explicitly share a project file with isolated model tools (repeatable)
+      --passthrough              
+      --dry-run                  
+      --slim                     Force slim delegation (default follows settings general.slim)
+      --no-slim                  
+      --patch <PATCH>            
+      --profile <PROFILE>        
+      --language <LANGUAGE>      Product language for rdsh-owned human-readable output (en, zh-CN, ja) [possible values: en, zh-CN, ja]
+  -h, --help                     Print help
+  -V, --version                  Print version
+
+USAGE:
+  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]
+  rdsh <native-subcommand> ...   (tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|auth|setup|context|settings|features|dump-config|boot)
+
+EXAMPLES:
+  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)
+  rdsh --profile web --patch x.yml boot web with overlay
+  rdsh dump-config --profile tui  delegate exact dump to dsh
+  rdsh tokens ./AGENTS.md         estimate input tokens natively
+  rdsh auth --import --provider openai-codex   import only the selected provider
+  rdsh setup                      first-run connect: import, login flow, next steps
+  rdsh search hello --dir .       fast file search without Node
+  rdsh search-web "rust async"      web search via SearXNG (no API key)
+  rdsh desktop status             detect the Desktop (Electron) app and its reserved profile
+  rdsh desktop install            attach the bundled rdsh plugins to that profile
+  rdsh --passthrough tui          no slim env; mandatory tool isolation remains
+  rdsh --dry-run tui -- --resume abc   show what would exec

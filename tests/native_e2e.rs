@@ -82,6 +82,105 @@ impl Drop for Fixture {
     }
 }
 
+#[cfg(unix)]
+#[test]
+fn dsh_alias_preserves_language_argument_bytes_for_delegation() {
+    use std::os::unix::fs::{symlink, PermissionsExt};
+
+    let fixture = Fixture::new();
+    fs::remove_dir(fixture.0.join("dsh")).unwrap();
+    let alias = fixture.0.join("dsh");
+    symlink(env!("CARGO_BIN_EXE_rdsh"), &alias).unwrap();
+    let original = fixture.0.join("original-dsh");
+    fs::write(
+        &original,
+        "#!/bin/sh\nprintf 'ARGS:'\nprintf '<%s>' \"$@\"\nprintf '\\n'\nprintf 'original stderr 日本語\\n' >&2\nexit 23\n",
+    )
+    .unwrap();
+    fs::set_permissions(&original, fs::Permissions::from_mode(0o755)).unwrap();
+    let private_dsh = fixture.0.join("private-dsh");
+    fs::create_dir(&private_dsh).unwrap();
+    fs::write(
+        private_dsh.join(".credentials.yaml"),
+        "version: 1\nrefs:\n  TEST: 'yes'\n",
+    )
+    .unwrap();
+    let output = Command::new(&alias)
+        .args(["--language", "ja", "tui", "--resume", "日本語"])
+        .env("DSH_HOME", private_dsh)
+        .env("RDSH_ORIG_BIN", &original)
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(23), "{output:?}");
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "ARGS:<--language><ja><tui><--resume><日本語>\n"
+    );
+    assert_eq!(output.stderr, "original stderr 日本語\n".as_bytes());
+}
+
+#[test]
+fn dashboard_uses_the_persisted_product_language_without_changing_api_data() {
+    let fixture = Fixture::new();
+    fixture.settings(json!({
+        "extras": { "enable": ["serve"] },
+        "general": { "language": "zh-CN" }
+    }));
+    let server = Server::start(&fixture, &["serve", "--port", "0"]);
+    let (status, body) = server.request("GET", "/", "", false, "");
+    assert_eq!(status, 200);
+    assert!(
+        body.contains("<html lang=\"zh-CN\" data-rdsh-locale=\"zh-CN\">"),
+        "{body}"
+    );
+    assert!(body.contains("RDSH_UI_LOCALE"));
+}
+
+#[test]
+fn setup_page_uses_the_resolved_product_language() {
+    let fixture = Fixture::new();
+    fixture.settings(json!({ "general": { "language": "zh-CN" } }));
+    let server = Server::start(&fixture, &["setup", "--web", "--port", "0"]);
+    let (status, body) = server.request("GET", "/", "", false, "");
+    assert_eq!(status, 200);
+    assert!(body.contains("<html lang=\"zh-CN\" data-rdsh-locale=\"zh-CN\">"));
+    assert!(body.contains("连接模型"));
+}
+
+#[test]
+fn empty_browser_connections_close_silently_and_fragmented_headers_are_accepted() {
+    for args in [
+        vec!["serve", "--port", "0"],
+        vec!["setup", "--web", "--port", "0"],
+    ] {
+        let fixture = Fixture::new();
+        fixture.settings(json!({"extras":{"enable":["serve"]}}));
+        let server = Server::start(&fixture, &args);
+        let mut idle = connect_within(server.port);
+        idle.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
+        idle.shutdown(Shutdown::Write).unwrap();
+        let mut bytes = Vec::new();
+        idle.read_to_end(&mut bytes).unwrap();
+        assert!(
+            bytes.is_empty(),
+            "idle browser sockets must not cache an HTTP error"
+        );
+
+        let mut client = connect_within(server.port);
+        client
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
+        client.write_all(b"GET / HTTP/1.1\r\n").unwrap();
+        std::thread::sleep(Duration::from_millis(30));
+        client
+            .write_all(format!("Host: 127.0.0.1:{}\r\n\r\n", server.port).as_bytes())
+            .unwrap();
+        let mut response = String::new();
+        client.read_to_string(&mut response).unwrap();
+        assert!(response.starts_with("HTTP/1.1 200 OK"), "{response}");
+    }
+}
+
 // Valid RFC 8878 raw-block frames: independent of a compressor or token cache.
 fn raw_frame(body: &[u8], known_size: bool) -> Vec<u8> {
     let mut frame = vec![0x28, 0xb5, 0x2f, 0xfd];
@@ -277,12 +376,6 @@ fn concurrent_session_writers_leave_parseable_correct_cache() {
     }
 }
 
-/// Tests run in parallel and each one spawns a server on loopback; on loaded
-/// CI runners several simultaneous startups were refused for the whole 15s
-/// readiness window. Serializing the startup (not the serving) keeps the
-/// fixture deterministic without changing what is tested.
-static SERVER_STARTUP: std::sync::Mutex<()> = std::sync::Mutex::new(());
-
 /// Connect to a fixture port, waiting up to 15s for a loaded runner to accept.
 fn connect_within(port: u16) -> TcpStream {
     let deadline = Instant::now() + Duration::from_secs(15);
@@ -308,9 +401,6 @@ struct Server {
 }
 impl Server {
     fn start(f: &Fixture, args: &[&str]) -> Self {
-        let _startup_guard = SERVER_STARTUP
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut child = f
             .command(args)
             .stdin(Stdio::null())
@@ -336,8 +426,15 @@ impl Server {
                 {
                     address = Some(url.trim_end_matches('/').to_owned());
                 }
-                if let Some((_, path)) = line.split_once("token handoff file: ") {
-                    handoff_path = Some(std::path::PathBuf::from(path.trim()));
+                for label in [
+                    "token handoff file: ",
+                    "令牌交接文件: ",
+                    "トークン引き渡しファイル: ",
+                ] {
+                    if let Some((_, path)) = line.split_once(label) {
+                        handoff_path = Some(std::path::PathBuf::from(path.trim()));
+                        break;
+                    }
                 }
                 if let (Some(address), Some(path)) = (&address, &handoff_path) {
                     let token = std::fs::read_to_string(path).unwrap_or_default();

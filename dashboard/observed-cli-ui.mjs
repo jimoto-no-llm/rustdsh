@@ -1,3 +1,5 @@
+import { formatDateTime, text } from "./locale.mjs";
+
 function element(tag, text, className) {
   const node = document.createElement(tag);
   if (text !== undefined) node.textContent = text;
@@ -25,14 +27,14 @@ export function setupObservedCli({ api }) {
       const result = await api("observed-cli");
       list.replaceChildren();
       if (!result.processes.length) {
-        list.append(element("p", "登録済みのCLIはありません。"));
+        list.append(element("p", text("observed.empty")));
         return;
       }
       for (const process of result.processes) {
         const item = element("article", undefined, "event");
         const task = process.task_id
-          ? ` · task ${process.task_id}${process.task_present ? "" : " · 一覧から削除済み"}`
-          : " · プロジェクト全体";
+          ? ` · task ${process.task_id}${process.task_present ? "" : ` · ${text("observed.removed")}`}`
+          : ` · ${text("observed.project")}`;
         item.append(
           element(
             "h3",
@@ -41,23 +43,23 @@ export function setupObservedCli({ api }) {
           element("p", task),
           element(
             "p",
-            `登録 ${new Date(process.registered_at).toLocaleString("ja-JP")} · 再確認 ${new Date(process.observed_at).toLocaleString("ja-JP")}`,
+            text("observed.registered", { registered: formatDateTime(process.registered_at), observed: formatDateTime(process.observed_at) }),
             "sub",
           ),
         );
-        const unregister = element("button", "観測登録を解除");
+        const unregister = element("button", text("observed.unregister"));
         unregister.type = "button";
         unregister.addEventListener("click", async () => {
           if (
             !confirm(
-              `PID ${process.pid} のDashboard登録を解除します。外部CLIは停止しません。`,
+              text("observed.confirm", { pid: process.pid }),
             )
           )
             return;
           unregister.disabled = true;
           try {
             await api(`observed-cli/${encodeURIComponent(process.id)}`, undefined, "DELETE");
-            status.textContent = "登録を解除しました。外部CLIはそのまま動作しています。";
+            status.textContent = text("observed.unregistered");
             await refresh();
           } catch (error) {
             status.textContent = error.message;
@@ -67,7 +69,7 @@ export function setupObservedCli({ api }) {
         item.append(unregister);
         list.append(item);
       }
-      status.textContent = "登録済みCLIのプロセス識別を再確認しました。";
+      status.textContent = text("observed.refreshed");
     } catch (error) {
       status.textContent = error.message;
       list.replaceChildren();
@@ -84,7 +86,7 @@ export function setupObservedCli({ api }) {
     taskOptions = signature;
     const selected = taskSelect.value;
     const options = [
-      { id: "", title: "プロジェクト全体（taskなし）" },
+      { id: "", title: text("observed.projectOption") },
       ...(state.tasks || []),
     ];
     taskSelect.replaceChildren(
@@ -108,12 +110,12 @@ export function setupObservedCli({ api }) {
     event.preventDefault();
     const pid = Number(pidInput.value);
     if (!Number.isSafeInteger(pid) || pid <= 0) {
-      status.textContent = "有効なPIDを入力してください。";
+      status.textContent = text("observed.invalidPid");
       return;
     }
     const submit = document.getElementById("observed-cli-submit");
     submit.disabled = true;
-    status.textContent = "process identityと所有者を確認しています…";
+    status.textContent = text("observed.checking");
     try {
       await api("observed-cli", {
         pid,
@@ -121,7 +123,7 @@ export function setupObservedCli({ api }) {
         cli_kind: kindSelect.value,
       });
       pidInput.value = "";
-      status.textContent = "同一processの識別と所有者を確認して登録しました。";
+      status.textContent = text("observed.registeredStatus");
       await refresh();
     } catch (error) {
       status.textContent = error.message;

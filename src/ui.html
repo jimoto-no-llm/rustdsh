@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="__RDSH_LOCALE__" data-rdsh-locale="__RDSH_LOCALE__">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>rdsh dashboard</title>
+<title id="ui-page-title">rdsh dashboard</title>
 <link rel="icon" type="image/png" href="/icon.png">
 <link rel="apple-touch-icon" href="/icon.png">
 <style>
@@ -33,30 +33,61 @@ footer { padding: 0 24px 24px; color: var(--mut); font-size: 12px; }
 </style>
 </head>
 <body>
-<header><img src="/icon.png" width="40" height="40" alt="rdsh"><h1>rdsh dashboard</h1><span id="ver">…</span></header>
+<header><img src="/icon.png" width="40" height="40" alt="rdsh"><h1 id="ui-title">rdsh dashboard</h1><span id="ver">…</span></header>
 <section id="auth" class="card" style="margin:16px 24px 0" hidden>
-<h2>ダッシュボードに接続</h2><p>端末に表示された保護済みトークンファイルの内容を入力してください。トークンはアドレスバーに保存されません。</p>
+<h2 id="ui-connect-heading">ダッシュボードに接続</h2><p id="ui-connect-help">端末に表示された保護済みトークンファイルの内容を入力してください。トークンはアドレスバーに保存されません。</p>
 <input id="dashboard-token" type="password" autocomplete="off" spellcheck="false" aria-label="Dashboard token">
-<button onclick="connectDashboard()">接続</button><p id="auth-error" role="alert"></p></section>
+<button id="ui-connect" onclick="connectDashboard()">接続</button><p id="auth-error" role="alert"></p></section>
 <main>
-<section class="card"><h2>状態 (doctor)</h2><p>本家dsh・DSH_HOME・slim設定を確認</p>
-<button class="ghost" onclick="doctor()">更新</button><pre id="doctor">未取得</pre></section>
-<section class="card"><h2>トークン推定</h2><p>初期入力トークンの見積もり（約4文字=1トークン）</p>
+<section class="card"><h2 id="ui-doctor-heading">状態 (doctor)</h2><p id="ui-doctor-help">本家dsh・DSH_HOME・slim設定を確認</p>
+<button class="ghost" id="ui-refresh-doctor" onclick="doctor()">更新</button><pre id="doctor">未取得</pre></section>
+<section class="card"><h2 id="ui-tokens-heading">トークン推定</h2><p id="ui-tokens-help">初期入力トークンの見積もり（約4文字=1トークン）</p>
 <textarea id="ttext" placeholder="ここにテキストを貼り付け"></textarea>
-<button onclick="tokens()">推定する</button><pre id="tout">-</pre></section>
-<section class="card"><h2>prune（切り詰め）</h2><p>head+tailを残して予算内に収める</p>
+<button id="ui-estimate" onclick="tokens()">推定する</button><pre id="tout">-</pre></section>
+<section class="card"><h2 id="ui-prune-heading">prune（切り詰め）</h2><p id="ui-prune-help">head+tailを残して予算内に収める</p>
 <textarea id="ptext" placeholder="長いツール出力を貼り付け"></textarea>
-<div class="row"><label>予算</label><input id="pmax" type="number" value="4000" min="100"></div>
-<button onclick="prune()">prune実行</button> <button class="ghost" id="pcopy" onclick="copyPrune()">コピー</button><pre id="pout">-</pre></section>
-<section class="card"><h2>セッション</h2><p>最新のセッション一覧（Nodeなし）</p>
-<button class="ghost" onclick="sessions()">更新</button><pre id="sess">未取得</pre></section>
-<section class="card"><h2>スキル</h2><p>導入済みスキル一覧</p>
-<button class="ghost" onclick="skills()">更新</button><pre id="sk">未取得</pre></section>
-<section class="card"><h2>ベンチ</h2><p>rdsh vs dsh の起動速度を比較</p>
-<button class="ghost" onclick="bench()">計測 (n=3)</button><pre id="bench">未計測</pre></section>
+<div class="row"><label id="ui-budget">予算</label><input id="pmax" type="number" value="4000" min="100"></div>
+<button id="ui-prune" onclick="prune()">prune実行</button> <button class="ghost" id="pcopy" onclick="copyPrune()">コピー</button><pre id="pout">-</pre></section>
+<section class="card"><h2 id="ui-sessions-heading">セッション</h2><p id="ui-sessions-help">最新のセッション一覧（Nodeなし）</p>
+<button class="ghost" id="ui-refresh-sessions" onclick="sessions()">更新</button><pre id="sess">未取得</pre></section>
+<section class="card"><h2 id="ui-skills-heading">スキル</h2><p id="ui-skills-help">導入済みスキル一覧</p>
+<button class="ghost" id="ui-refresh-skills" onclick="skills()">更新</button><pre id="sk">未取得</pre></section>
+<section class="card"><h2 id="ui-bench-heading">ベンチ</h2><p id="ui-bench-help">rdsh vs dsh の起動速度を比較</p>
+<button class="ghost" id="ui-bench" onclick="bench()">計測 (n=3)</button><pre id="bench">未計測</pre></section>
 </main>
-<footer>rdsh は本家dshを壊さない安全なRustランチャーです。serveは127.0.0.1のみで待ち受けます。</footer>
+<footer id="ui-footer">rdsh は本家dshを壊さない安全なRustランチャーです。serveは127.0.0.1のみで待ち受けます。</footer>
 <script>
+const RDSH_UI_LOCALE = ["en", "zh-CN", "ja"].includes(document.documentElement.dataset.rdshLocale) ? document.documentElement.dataset.rdshLocale : "en";
+const RDSH_UI_CATALOG = {};
+for (const [key, ja, en, zh] of [
+  ["tokens.result", "トークン: {tokens} / 文字数: {chars}", "tokens: {tokens} / chars: {chars}", "令牌：{tokens} / 字符：{chars}"],
+  ["prune.result", "[処理前 {before} → 処理後 {after}]（{chars}文字）", "[before {before} -> after {after}] ({chars} chars)", "[处理前 {before} → 处理后 {after}]（{chars} 个字符）"],
+  ["sessions.projects", "（{count} プロジェクト）", "({count} projects)", "（{count} 个项目）"],
+  ["page.title", "rdsh ダッシュボード", "rdsh dashboard", "rdsh 仪表板"],
+  ["token.label", "ダッシュボードのトークン", "Dashboard token", "仪表板令牌"],
+  ["response.invalid", "応答の解析に失敗: サーバーから不正な応答が返されました。再試行してください。", "Could not parse the response: the server returned an invalid response. Retry.", "无法解析响应：服务器返回了无效响应。请重试。"],
+  ["connection.failed", "接続できません: rdsh serve が起動しているか確認し、再試行してください。", "Could not connect: check that rdsh serve is running and retry.", "无法连接：请确认 rdsh serve 正在运行，然后重试。"],
+
+  ["connect.heading", "ダッシュボードに接続", "Connect to dashboard", "连接到仪表板"], ["connect.help", "端末に表示された保護済みトークンファイルの内容を入力してください。トークンはアドレスバーに保存されません。", "Enter the protected token handoff file contents printed in the terminal. The token is not stored in the address bar.", "请输入终端显示的受保护令牌交接文件内容。令牌不会保存在地址栏中。"], ["connect.button", "接続", "Connect", "连接"],
+  ["doctor.heading", "状態 (doctor)", "Status (doctor)", "状态 (doctor)"], ["doctor.help", "本家dsh・DSH_HOME・slim設定を確認", "Check upstream dsh, DSH_HOME, and slim settings", "检查上游 dsh、DSH_HOME 和 slim 设置"], ["refresh", "更新", "Refresh", "刷新"], ["unavailable", "未取得", "Unavailable", "未获取"],
+  ["tokens.heading", "トークン推定", "Token estimate", "令牌估算"], ["tokens.help", "初期入力トークンの見積もり（約4文字=1トークン）", "Estimate initial input tokens (about 4 characters = 1 token)", "估算初始输入令牌（约 4 个字符 = 1 个令牌）"], ["tokens.placeholder", "ここにテキストを貼り付け", "Paste text here", "在此粘贴文本"], ["tokens.estimate", "推定する", "Estimate", "估算"],
+  ["prune.heading", "prune（切り詰め）", "Prune", "裁剪"], ["prune.help", "head+tailを残して予算内に収める", "Keep head and tail within the budget", "保留开头和结尾并控制在预算内"], ["prune.placeholder", "長いツール出力を貼り付け", "Paste long tool output", "粘贴较长的工具输出"], ["budget", "予算", "Budget", "预算"], ["prune.run", "prune実行", "Run prune", "执行裁剪"], ["copy", "コピー", "Copy", "复制"],
+  ["sessions.heading", "セッション", "Sessions", "会话"], ["sessions.help", "最新のセッション一覧（Nodeなし）", "Latest sessions (without Node)", "最新会话列表（无 Node）"], ["skills.heading", "スキル", "Skills", "技能"], ["skills.help", "導入済みスキル一覧", "Installed skills", "已安装的技能"], ["bench.heading", "ベンチ", "Benchmark", "基准测试"], ["bench.help", "rdsh vs dsh の起動速度を比較", "Compare rdsh and dsh startup speed", "比较 rdsh 与 dsh 的启动速度"], ["bench.measure", "計測 (n=3)", "Measure (n=3)", "测量 (n=3)"], ["bench.pending", "計測中…", "Measuring…", "正在测量…"], ["bench.none", "未計測", "Not measured", "未测量"], ["footer", "rdsh は本家dshを壊さない安全なRustランチャーです。serveは127.0.0.1のみで待ち受けます。", "rdsh is a safe Rust launcher that leaves upstream dsh intact. serve listens only on 127.0.0.1.", "rdsh 是不会破坏上游 dsh 的安全 Rust 启动器。serve 仅监听 127.0.0.1。"],
+  ["auth.rejected", "トークンを確認できません。ファイルの内容を確認してください。", "Token rejected. Check the handoff file contents.", "令牌被拒绝。请检查交接文件内容。"], ["error.prefix", "エラー: {message}", "Error: {message}", "错误：{message}"], ["retry", "再試行", "Retry", "重试"], ["copy.done", "コピー済み", "Copied", "已复制"], ["copy.none", "コピー対象がありません。先にprune実行してください。", "There is nothing to copy. Run prune first.", "没有可复制的内容。请先执行裁剪。"],
+  ["http.400", "不正なリクエスト (400): {path} への送信内容を確認してください。", "Bad request (400): check the data sent to {path}.", "请求无效 (400)：请检查发送到 {path} 的数据。"], ["http.401", "認証エラー (401): ダッシュボードのトークンが必要です。", "Authentication error (401): dashboard token required.", "认证错误 (401)：需要仪表板令牌。"], ["http.403", "アクセス拒否 (403): 信頼できないホスト/オリジンです。127.0.0.1 のダッシュボードURLから直接開いてください。", "Access denied (403): untrusted host/origin. Open directly from the 127.0.0.1 dashboard URL.", "访问被拒绝 (403)：主机或来源不受信任。请直接从 127.0.0.1 仪表板 URL 打开。"], ["http.404", "見つかりません (404): {path} は存在しません。", "Not found (404): {path} does not exist.", "未找到 (404)：{path} 不存在。"], ["http.413", "送信データが大きすぎます (413): テキストを短くして再試行してください。", "Request data is too large (413): shorten the text and retry.", "发送数据过大 (413)：请缩短文本后重试。"], ["http.429", "混雑しています (429): しばらく待って再試行してください。", "Busy (429): wait and retry.", "繁忙 (429)：请稍候重试。"], ["http.500", "サーバー内部エラー (500): 再試行してください。直らない場合は serve を再起動してください。", "Internal server error (500): retry. If it continues, restart serve.", "服务器内部错误 (500)：请重试。若持续发生，请重启 serve。"], ["http.503", "サーバーが混み合っています (503): しばらく待って再試行してください。", "Server is busy (503): wait and retry.", "服务器繁忙 (503)：请稍候重试。"], ["http.default", "リクエスト失敗 ({status}): {path}。再試行してください。", "Request failed ({status}): {path}. Retry.", "请求失败 ({status})：{path}。请重试。"],
+]) { (RDSH_UI_CATALOG[key] ||= {}) .ja = ja; RDSH_UI_CATALOG[key].en = en; RDSH_UI_CATALOG[key]["zh-CN"] = zh; }
+function t(key, values = {}) { return (RDSH_UI_CATALOG[key]?.[RDSH_UI_LOCALE] || key).replace(/\{(\w+)\}/g, (_, name) => String(values[name] ?? `{${name}}`)); }
+function formatNumber(value) { return new Intl.NumberFormat(RDSH_UI_LOCALE).format(value); }
+function formatSessionTime(value) {
+  if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(value)) return value;
+  // The sessions API supplies UTC minutes; keep its timezone and precision.
+  const date = new Date(value.replace(" ", "T") + ":00Z");
+  return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat(RDSH_UI_LOCALE, {timeZone:"UTC",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",timeZoneName:"short"}).format(date);
+}
+for (const [id, key] of Object.entries({ "ui-title":"page.title", "ui-page-title":"page.title", "doctor":"unavailable", "sess":"unavailable", "sk":"unavailable", "bench":"bench.none", "ui-connect-heading": "connect.heading", "ui-connect-help": "connect.help", "ui-connect": "connect.button", "ui-doctor-heading": "doctor.heading", "ui-doctor-help": "doctor.help", "ui-refresh-doctor": "refresh", "ui-tokens-heading": "tokens.heading", "ui-tokens-help": "tokens.help", "ui-estimate": "tokens.estimate", "ui-prune-heading": "prune.heading", "ui-prune-help": "prune.help", "ui-budget": "budget", "ui-prune": "prune.run", pcopy: "copy", "ui-sessions-heading": "sessions.heading", "ui-sessions-help": "sessions.help", "ui-refresh-sessions": "refresh", "ui-skills-heading": "skills.heading", "ui-skills-help": "skills.help", "ui-refresh-skills": "refresh", "ui-bench-heading": "bench.heading", "ui-bench-help": "bench.help", "ui-bench": "bench.measure", "ui-footer": "footer" })) document.getElementById(id).textContent = t(key);
+document.getElementById("dashboard-token").setAttribute("aria-label", t("token.label"));
+document.getElementById("ttext").placeholder = t("tokens.placeholder");
+document.getElementById("ptext").placeholder = t("prune.placeholder");
 let dashboardToken = new URLSearchParams(location.hash.slice(1)).get("key") || sessionStorage.getItem("rdsh_dashboard_token") || "";
 if (dashboardToken) sessionStorage.setItem("rdsh_dashboard_token", dashboardToken);
 history.replaceState(null, "", location.pathname);
@@ -71,7 +102,7 @@ async function connectDashboard(candidateInput){
   const error = document.getElementById("auth-error");
   try {
     const response = await fetch("/api/doctor", {headers:{"X-RDSH-Token":candidate}});
-    if (!response.ok) throw new Error("トークンを確認できません。ファイルの内容を確認してください。");
+    if (!response.ok) throw new Error(t("auth.rejected"));
     dashboardToken = candidate;
     sessionStorage.setItem("rdsh_dashboard_token", dashboardToken);
     document.getElementById("dashboard-token").value = "";
@@ -83,21 +114,21 @@ async function connectDashboard(candidateInput){
 }
 function statusMessage(status, path){
   switch (status){
-    case 400: return "不正なリクエスト (400): " + path + " への送信内容を確認してください。";
-    case 401: showAuth("トークンが無効か期限切れです。保護済みトークンファイルを確認してください。"); return "認証エラー (401): dashboard token required.";
-    case 403: return "アクセス拒否 (403): 信頼できないホスト/オリジンです。127.0.0.1 のダッシュボードURLから直接開いてください。";
-    case 404: return "見つかりません (404): " + path + " は存在しません。";
-    case 413: return "送信データが大きすぎます (413): テキストを短くして再試行してください。";
-    case 429: return "混雑しています (429): しばらく待って再試行してください。";
-    case 500: return "サーバー内部エラー (500): 再試行してください。直らない場合は serve を再起動してください。";
-    case 503: return "サーバーが混み合っています (503): しばらく待って再試行してください。";
-    default: return "リクエスト失敗 (" + status + "): " + path + "。再試行してください。";
+    case 400: return t("http.400", { path });
+    case 401: showAuth(t("auth.rejected")); return t("http.401");
+    case 403: return t("http.403");
+    case 404: return t("http.404", { path });
+    case 413: return t("http.413");
+    case 429: return t("http.429");
+    case 500: return t("http.500");
+    case 503: return t("http.503");
+    default: return t("http.default", { status, path });
   }
 }
 async function checkRes(r, path){
   if (r.ok){
     try { return await r.json(); }
-    catch(e){ throw new Error("応答の解析に失敗: サーバーから不正な応答が返されました。再試行してください。"); }
+    catch(e){ throw new Error(t("response.invalid")); }
   }
   let detail = "";
   try { const b = await r.json(); if (b && b.error) detail = "（" + b.error + "）"; } catch(e){}
@@ -106,24 +137,24 @@ async function checkRes(r, path){
 async function jget(p){
   let r;
   try { r = await fetch(p, {headers:{"X-RDSH-Token":dashboardToken}}); }
-  catch(e){ throw new Error("接続できません: rdsh serve が起動しているか確認し、再試行してください。"); }
+  catch(e){ throw new Error(t("connection.failed")); }
   return checkRes(r, p);
 }
 async function jpost(p, b){
   let r;
   try { r = await fetch(p, {method:"POST", headers:{"Content-Type":"application/json","X-RDSH-Token":dashboardToken}, body: JSON.stringify(b)}); }
-  catch(e){ throw new Error("接続できません: rdsh serve が起動しているか確認し、再試行してください。"); }
+  catch(e){ throw new Error(t("connection.failed")); }
   return checkRes(r, p);
 }
 function fail(outId, message, retry){
   const out = document.getElementById(outId);
-  out.textContent = "エラー: " + message;
+  out.textContent = t("error.prefix", { message });
   let btn = document.getElementById(outId + "-retry");
   if (!btn){
     btn = document.createElement("button");
     btn.id = outId + "-retry";
     btn.className = "ghost";
-    btn.textContent = "再試行";
+    btn.textContent = t("retry");
     out.after(btn);
   }
   btn.onclick = retry;
@@ -135,30 +166,30 @@ function clearRetry(outId){
 }
 if (dashboardToken) connectDashboard(dashboardToken); else showAuth("");
 async function doctor(){ try { clearRetry("doctor"); const d = await jget("/api/doctor"); document.getElementById("doctor").textContent = JSON.stringify(d, null, 2); } catch(e){ fail("doctor", e.message, doctor); } }
-async function tokens(){ try { clearRetry("tout"); const t = document.getElementById("ttext").value; const r = await jpost("/api/tokens", {text: t}); document.getElementById("tout").textContent = "tokens: " + r.tokens + " / chars: " + r.chars; } catch(e){ fail("tout", e.message, tokens); } }
+async function tokens(){ try { clearRetry("tout"); const text = document.getElementById("ttext").value; const r = await jpost("/api/tokens", {text}); document.getElementById("tout").textContent = t("tokens.result", { tokens: formatNumber(r.tokens), chars: formatNumber(r.chars) }); } catch(e){ fail("tout", e.message, tokens); } }
 let lastPruned = "";
 async function prune(){
   try {
     clearRetry("pout");
-    const t = document.getElementById("ptext").value;
+    const text = document.getElementById("ptext").value;
     const m = +document.getElementById("pmax").value || 4000;
-    const r = await jpost("/api/prune", {text: t, max_tokens: m});
+    const r = await jpost("/api/prune", {text, max_tokens: m});
     lastPruned = r.pruned;
-    document.getElementById("pout").textContent = "[before " + r.before + " -> after " + r.after + "] (" + r.pruned.length + " chars)\n" + r.pruned;
+    document.getElementById("pout").textContent = t("prune.result", {before:formatNumber(r.before),after:formatNumber(r.after),chars:formatNumber(r.pruned.length)}) + "\n" + r.pruned;
   } catch(e){ fail("pout", e.message, prune); }
 }
 async function copyPrune(){
   const btn = document.getElementById("pcopy");
   try {
-    if (!lastPruned) throw new Error("コピー対象がありません。先にprune実行してください。");
+    if (!lastPruned) throw new Error(t("copy.none"));
     await navigator.clipboard.writeText(lastPruned);
     const old = btn.textContent;
-    btn.textContent = "コピー済み";
+    btn.textContent = t("copy.done");
     setTimeout(() => { btn.textContent = old; }, 1500);
   } catch(e){ fail("pout", e.message, prune); }
 }
-async function bench(){ try { clearRetry("bench"); document.getElementById("bench").textContent = "計測中…"; const r = await jget("/api/bench?n=3"); document.getElementById("bench").textContent = JSON.stringify(r, null, 2); } catch(e){ fail("bench", e.message, bench); } }
-async function sessions(){ try { clearRetry("sess"); const r = await jget("/api/sessions?limit=10"); document.getElementById("sess").textContent = r.sessions.map(s => s.mtime + " " + s.project + "/" + s.id).join("\n") + "\n(" + r.projects + " projects)"; } catch(e){ fail("sess", e.message, sessions); } }
+async function bench(){ try { clearRetry("bench"); document.getElementById("bench").textContent = t("bench.pending"); const r = await jget("/api/bench?n=3"); document.getElementById("bench").textContent = JSON.stringify(r, null, 2); } catch(e){ fail("bench", e.message, bench); } }
+async function sessions(){ try { clearRetry("sess"); const r = await jget("/api/sessions?limit=10"); document.getElementById("sess").textContent = r.sessions.map(s => formatSessionTime(s.mtime) + " " + s.project + "/" + s.id).join("\n") + "\n" + t("sessions.projects", {count:formatNumber(r.projects)}); } catch(e){ fail("sess", e.message, sessions); } }
 async function skills(){ try { clearRetry("sk"); const r = await jget("/api/skills"); document.getElementById("sk").textContent = r.names.join("\n"); } catch(e){ fail("sk", e.message, skills); } }
 </script>
 </body>

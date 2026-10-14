@@ -9,7 +9,7 @@ pub fn requested() -> bool {
 }
 
 #[cfg(unix)]
-pub fn install() -> anyhow::Result<()> {
+pub fn install(locale: crate::locale::Locale) -> anyhow::Result<()> {
     extern "C" fn request_shutdown(_: libc::c_int) {
         REQUESTED.store(true, Ordering::Relaxed);
     }
@@ -19,7 +19,13 @@ pub fn install() -> anyhow::Result<()> {
             if libc::signal(signal, request_shutdown as *const () as libc::sighandler_t)
                 == libc::SIG_ERR
             {
-                anyhow::bail!("could not install server shutdown signal handler");
+                anyhow::bail!(match locale {
+                    crate::locale::Locale::English =>
+                        "could not install server shutdown signal handler",
+                    crate::locale::Locale::Chinese => "无法安装服务器关闭信号处理程序",
+                    crate::locale::Locale::Japanese =>
+                        "サーバー終了シグナルハンドラーを設定できませんでした",
+                });
             }
         }
     }
@@ -27,7 +33,7 @@ pub fn install() -> anyhow::Result<()> {
 }
 
 #[cfg(windows)]
-pub fn install() -> anyhow::Result<()> {
+pub fn install(locale: crate::locale::Locale) -> anyhow::Result<()> {
     unsafe extern "system" fn request_shutdown(event: u32) -> i32 {
         const CTRL_C_EVENT: u32 = 0;
         const CTRL_BREAK_EVENT: u32 = 1;
@@ -48,12 +54,17 @@ pub fn install() -> anyhow::Result<()> {
     }
 
     if unsafe { SetConsoleCtrlHandler(Some(request_shutdown), 1) } == 0 {
-        anyhow::bail!("could not install server shutdown signal handler");
+        anyhow::bail!(match locale {
+            crate::locale::Locale::English => "could not install server shutdown signal handler",
+            crate::locale::Locale::Chinese => "无法安装服务器关闭信号处理程序",
+            crate::locale::Locale::Japanese =>
+                "サーバー終了シグナルハンドラーを設定できませんでした",
+        });
     }
     Ok(())
 }
 
 #[cfg(not(any(unix, windows)))]
-pub fn install() -> anyhow::Result<()> {
+pub fn install(_locale: crate::locale::Locale) -> anyhow::Result<()> {
     Ok(())
 }

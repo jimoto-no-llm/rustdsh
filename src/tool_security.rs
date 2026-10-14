@@ -54,18 +54,35 @@ fn private_directory() -> anyhow::Result<PathBuf> {
     Ok(directory)
 }
 
-pub fn command(orig: &str, node: &str) -> anyhow::Result<std::process::Command> {
+pub fn command(
+    orig: &str,
+    node: &str,
+    locale: crate::locale::Locale,
+) -> anyhow::Result<std::process::Command> {
     anyhow::ensure!(cfg!(all(target_os = "linux", target_arch = "x86_64")),
-        "RDSH_SECURITY: protected agent tools currently require Linux x86_64; refusing unprotected delegation");
+        "{}",
+        match locale {
+            crate::locale::Locale::English => "RDSH_SECURITY: protected agent tools currently require Linux x86_64; refusing unprotected delegation",
+            crate::locale::Locale::Chinese => "RDSH_SECURITY：受保护的代理工具目前需要 Linux x86_64；拒绝未受保护的委派",
+            crate::locale::Locale::Japanese => "RDSH_SECURITY: 保護されたエージェントツールには現在 Linux x86_64 が必要です。保護されない委譲を拒否します",
+        });
     let executable = std::fs::canonicalize(orig)?;
     anyhow::ensure!(
         executable.file_name().is_some_and(|n| n == "bin.js"),
-        "RDSH_SECURITY: unsupported DSH executable; expected the audited DSH lib/bin.js"
+        "{}",
+        match locale {
+            crate::locale::Locale::English => "RDSH_SECURITY: unsupported DSH executable; expected the audited DSH lib/bin.js",
+            crate::locale::Locale::Chinese => "RDSH_SECURITY：不支持的 DSH 可执行文件；需要经过审计的 DSH lib/bin.js",
+            crate::locale::Locale::Japanese => "RDSH_SECURITY: 対応していない DSH 実行ファイルです。監査済みの DSH lib/bin.js が必要です",
+        }
     );
-    let package = executable
-        .parent()
-        .and_then(Path::parent)
-        .ok_or_else(|| anyhow::anyhow!("RDSH_SECURITY: invalid DSH package path"))?;
+    let package = executable.parent().and_then(Path::parent).ok_or_else(|| {
+        anyhow::anyhow!(match locale {
+            crate::locale::Locale::English => "RDSH_SECURITY: invalid DSH package path",
+            crate::locale::Locale::Chinese => "RDSH_SECURITY：DSH 包路径无效",
+            crate::locale::Locale::Japanese => "RDSH_SECURITY: DSH パッケージのパスが無効です",
+        })
+    })?;
     let manifest: serde_json::Value =
         serde_json::from_slice(&std::fs::read(package.join("package.json"))?)?;
     // Audited DSH releases: latest rc (0.2.0-rc.2) and 0.2.1-alpha.1 share the
@@ -77,16 +94,32 @@ pub fn command(orig: &str, node: &str) -> anyhow::Result<std::process::Command> 
             && manifest["version"]
                 .as_str()
                 .is_some_and(|v| AUDITED_DSH_VERSIONS.contains(&v)),
-        "RDSH_SECURITY: unsupported DSH version; an audited execution adapter is required"
+        "{}",
+        match locale {
+            crate::locale::Locale::English => "RDSH_SECURITY: unsupported DSH version; an audited execution adapter is required",
+            crate::locale::Locale::Chinese => "RDSH_SECURITY：不支持的 DSH 版本；需要经过审计的执行适配器",
+            crate::locale::Locale::Japanese => "RDSH_SECURITY: 対応していない DSH バージョンです。監査済みの実行アダプターが必要です",
+        }
     );
     let runtime = package.join("node_modules/@deepseek-ai/dsh-tools/lib/index.js");
     anyhow::ensure!(
         runtime.is_file(),
-        "RDSH_SECURITY: audited tool runtime is missing"
+        "{}",
+        match locale {
+            crate::locale::Locale::English => "RDSH_SECURITY: audited tool runtime is missing",
+            crate::locale::Locale::Chinese => "RDSH_SECURITY：缺少经过审计的工具运行时",
+            crate::locale::Locale::Japanese =>
+                "RDSH_SECURITY: 監査済みツールランタイムがありません",
+        }
     );
     anyhow::ensure!(
         Path::new("/usr/bin/bwrap").is_file() && Path::new("/usr/bin/prlimit").is_file(),
-        "RDSH_SECURITY: bubblewrap and prlimit are required; refusing unprotected delegation"
+        "{}",
+        match locale {
+            crate::locale::Locale::English => "RDSH_SECURITY: bubblewrap and prlimit are required; refusing unprotected delegation",
+            crate::locale::Locale::Chinese => "RDSH_SECURITY：需要 bubblewrap 和 prlimit；拒绝未受保护的委派",
+            crate::locale::Locale::Japanese => "RDSH_SECURITY: bubblewrap と prlimit が必要です。保護されない委譲を拒否します",
+        }
     );
     let directory = private_directory()?;
     // Files are embedded in rdsh: no working-tree plugin can replace the gate.
@@ -107,7 +140,16 @@ pub fn command(orig: &str, node: &str) -> anyhow::Result<std::process::Command> 
         std::env::var("RDSH_SHARED_FILES").unwrap_or_else(|_| "[]".into()),
     );
     command.env("RDSH_SECURE_WORKSPACE", std::fs::canonicalize(".")?);
-    eprintln!("[rdsh security] tools: explicitly shared files only; network and writes denied");
+    eprintln!(
+        "[rdsh security] {}",
+        match locale {
+            crate::locale::Locale::English =>
+                "tools: explicitly shared files only; network and writes denied",
+            crate::locale::Locale::Chinese => "工具：仅允许显式共享的文件；网络和写入已拒绝",
+            crate::locale::Locale::Japanese =>
+                "ツール: 明示的に共有したファイルのみ使用可。ネットワークと書き込みは拒否されます",
+        }
+    );
     Ok(command)
 }
 

@@ -71,28 +71,63 @@ pub fn random_token() -> anyhow::Result<String> {
     Ok(out)
 }
 
-pub fn read_request(stream: &mut TcpStream) -> Result<Request, u16> {
+/// A silent idle connection is distinct from an invalid HTTP request.
+#[derive(Debug, PartialEq, Eq)]
+pub enum ReadRequestError {
+    Idle,
+    Status(u16),
+}
+
+impl From<u16> for ReadRequestError {
+    fn from(status: u16) -> Self {
+        Self::Status(status)
+    }
+}
+
+pub fn read_request(stream: &mut TcpStream) -> Result<Request, ReadRequestError> {
+    read_request_until(
+        stream,
+        std::time::Instant::now() + std::time::Duration::from_secs(10),
+    )
+}
+
+fn read_request_until(
+    stream: &mut TcpStream,
+    deadline: std::time::Instant,
+) -> Result<Request, ReadRequestError> {
+    // BSD accepts inherit O_NONBLOCK from the listener. Deadline-based reads
+    // must wait for later HTTP fragments on every supported platform.
+    stream.set_nonblocking(false).map_err(|_| 400u16)?;
+    stream
+        .set_write_timeout(Some(std::time::Duration::from_secs(10)))
+        .map_err(|_| 400u16)?;
     let mut raw = Vec::with_capacity(4096);
     let mut chunk = [0u8; 4096];
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
     let header_end = loop {
         if let Some(pos) = raw.windows(4).position(|w| w == b"\r\n\r\n") {
             break pos + 4;
         }
         if raw.len() >= MAX_HEADER {
-            return Err(413);
+            return Err(413.into());
         }
-        let n = read_with_deadline(stream, &mut chunk, deadline)?;
+        let n = match read_with_deadline(stream, &mut chunk, deadline) {
+            Err(408) if raw.is_empty() => return Err(ReadRequestError::Idle),
+            result => result?,
+        };
         if n == 0 {
-            return Err(400);
+            return Err(if raw.is_empty() {
+                ReadRequestError::Idle
+            } else {
+                ReadRequestError::Status(400)
+            });
         }
         raw.extend_from_slice(&chunk[..n]);
         if raw.len() > MAX_HEADER + MAX_BODY {
-            return Err(413);
+            return Err(413.into());
         }
     };
     if header_end > MAX_HEADER {
-        return Err(413);
+        return Err(413.into());
     }
     let head = std::str::from_utf8(&raw[..header_end])
         .map_err(|_| 400u16)?
@@ -107,51 +142,51 @@ pub fn read_request(stream: &mut TcpStream) -> Result<Request, u16> {
         || parts.next() != Some("HTTP/1.1")
         || parts.next().is_some()
     {
-        return Err(400);
+        return Err(400.into());
     }
     let mut headers = Vec::new();
     let mut length = None;
     for line in lines {
         let (key, value) = line.split_once(':').ok_or(400u16)?;
         if key.is_empty() || !key.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-') {
-            return Err(400);
+            return Err(400.into());
         }
         let key = key.to_ascii_lowercase();
         let value = value.trim();
         if value.bytes().any(|b| b < 0x20 && b != b'\t') {
-            return Err(400);
+            return Err(400.into());
         }
         if key == "transfer-encoding" {
-            return Err(400);
+            return Err(400.into());
         }
         if key == "content-length" {
             if length.is_some() || value.is_empty() || !value.bytes().all(|b| b.is_ascii_digit()) {
-                return Err(400);
+                return Err(400.into());
             }
             length = Some(value.parse::<usize>().map_err(|_| 413u16)?);
         }
         if (key == "host" || key == "origin" || key == "x-rdsh-token")
             && headers.iter().any(|(k, _)| k == &key)
         {
-            return Err(400);
+            return Err(400.into());
         }
         headers.push((key, value.to_string()));
     }
     if method == "POST" && length.is_none() {
-        return Err(400);
+        return Err(400.into());
     }
     let length = length.unwrap_or(0);
     if length > MAX_BODY || raw.len() - header_end > length {
-        return Err(413);
+        return Err(413.into());
     }
     while raw.len() - header_end < length {
         let n = read_with_deadline(stream, &mut chunk, deadline)?;
         if n == 0 {
-            return Err(400);
+            return Err(400.into());
         }
         raw.extend_from_slice(&chunk[..n]);
         if raw.len() - header_end > length {
-            return Err(413);
+            return Err(413.into());
         }
     }
     let body = String::from_utf8(raw[header_end..].to_vec()).map_err(|_| 400u16)?;
@@ -345,5 +380,57 @@ mod tests {
         let mut client = TcpStream::connect(address).unwrap();
         client.write_all(format!("POST /api/key HTTP/1.1\r\nHost: {address}\r\nContent-Length: 2\r\nContent-Length: 2\r\n\r\n{{}}").as_bytes()).unwrap();
         worker.join().unwrap();
+    }
+    fn pair() -> (TcpStream, TcpStream) {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let client = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+        let (server, _) = listener.accept().unwrap();
+        // Exercise BSD's inherited accepted-socket mode on every platform.
+        server.set_nonblocking(true).unwrap();
+        (server, client)
+    }
+
+    #[test]
+    fn idle_connections_are_silent_but_partial_requests_retain_http_failures() {
+        use std::time::{Duration, Instant};
+        for (bytes, close, expected) in [
+            (b"".as_slice(), false, ReadRequestError::Idle),
+            (b"".as_slice(), true, ReadRequestError::Idle),
+            (
+                b"GET / HTTP/1.1\r\n".as_slice(),
+                false,
+                ReadRequestError::Status(408),
+            ),
+            (
+                b"GET / HTTP/1.1\r\n".as_slice(),
+                true,
+                ReadRequestError::Status(400),
+            ),
+        ] {
+            let (mut server, mut client) = pair();
+            client.write_all(bytes).unwrap();
+            if close {
+                client.shutdown(std::net::Shutdown::Write).unwrap();
+            }
+            let outcome =
+                read_request_until(&mut server, Instant::now() + Duration::from_millis(50));
+            assert_eq!(outcome.err().unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn accepted_nonblocking_socket_waits_for_delayed_header_fragments() {
+        use std::time::{Duration, Instant};
+        let (mut server, mut client) = pair();
+        client.write_all(b"GET /api/doctor HTTP/1.1\r\n").unwrap();
+        let writer = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(30));
+            client.write_all(b"Host: localhost:8080\r\n\r\n").unwrap();
+        });
+        let request =
+            read_request_until(&mut server, Instant::now() + Duration::from_secs(2)).unwrap();
+        assert_eq!(request.target, "/api/doctor");
+        assert!(request.trusted(8080));
+        writer.join().unwrap();
     }
 }

@@ -1,0 +1,60 @@
+dsh 的 Rust 快速启动器（安全：原生快速路径与透传）
+用法：rdsh [OPTIONS] [EXTRA]... [COMMAND]
+
+命令:
+  boot         启动 dsh 配置文件
+  dump-config  输出有效配置
+  tokens       原生估算输入令牌数
+  prune        将文本裁剪到令牌预算
+  search       高速文件搜索
+  search-web   通过 SearXNG 进行网页搜索
+  compact      压缩文本文件
+  doctor       显示诊断摘要
+  sessions     列出 $DSH_HOME 下的会话（最新优先，无 Node）
+  profiles     列出本地配置文件（无 Node）
+  skills       列出已安装技能（无 Node）
+  logs         显示 $DSH_HOME 日志
+  serve        启动本地仪表板（仅 127.0.0.1，只读 API）
+  auth         识别并导入外部 OAuth 登录
+  setup        首次连接模型
+  bench        运行启动基准测试
+  context      上下文引擎原型
+  compute      常驻纯计算工作进程
+  guard        hooks.json 的输入阻止辅助程序
+  settings     统一 rdsh 设置
+  features     功能开关
+  desktop      DeepSeek Harness Desktop 集成
+  help         显示帮助
+
+选项:
+      --share-file <SHARE_FILE>  与隔离模型工具共享项目文件（可重复）
+      --passthrough              关闭 slim 委托
+      --dry-run                  只显示将要执行的操作
+      --slim                     强制 slim 委托
+      --no-slim                  关闭 slim 委托
+      --patch <PATCH>            应用配置叠加层（可重复）
+      --profile <PROFILE>        要使用的配置文件
+      --language <LANGUAGE>      rdsh 自身的显示语言：en、zh-CN 或 ja
+  -h, --help                     显示帮助
+  -V, --version                  显示版本
+
+参数:
+  [EXTRA]...  传递给 dsh 的应用参数
+
+用法：
+  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]
+  rdsh <native-subcommand> ...   (tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|auth|setup|context|settings|features|dump-config|boot)
+
+示例：
+  rdsh tui                        启动 tui 配置文件（slim 环境开启，委托给 dsh）
+  rdsh --profile web --patch x.yml 使用叠加层启动 web
+  rdsh dump-config --profile tui  委托 dsh 输出准确配置
+  rdsh tokens ./AGENTS.md         原生估算输入令牌数
+  rdsh auth --import --provider openai-codex   只导入选定提供方
+  rdsh setup                      首次连接：导入、登录流程和后续步骤
+  rdsh search hello --dir .       无 Node 的快速文件搜索
+  rdsh search-web "rust async"      通过 SearXNG 网页搜索（无需 API 密钥）
+  rdsh desktop status             检测 Desktop（Electron）应用及其保留配置文件
+  rdsh desktop install            将捆绑 rdsh 插件附加到该配置文件
+  rdsh --passthrough tui          不使用 slim 环境；必需的工具隔离仍会启用
+  rdsh --dry-run tui -- --resume abc   显示将执行的命令

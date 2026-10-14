@@ -155,11 +155,27 @@ fn read_stdin() -> anyhow::Result<String> {
     Ok(buf)
 }
 
+/// Read a requested file while retaining its user-supplied path in localized
+/// diagnostics. English preserves the previous operating-system error bytes.
+fn read_file(path: &str, locale: crate::locale::Locale) -> anyhow::Result<String> {
+    std::fs::read_to_string(path).map_err(|error| match locale {
+        crate::locale::Locale::English => error.into(),
+        crate::locale::Locale::Chinese | crate::locale::Locale::Japanese => anyhow::anyhow!(
+            "{} {path}: {error}",
+            crate::locale::native_message(locale, crate::locale::NativeMessage::CannotReadFile)
+        ),
+    })
+}
+
 fn stdout_writer() -> std::io::BufWriter<std::io::StdoutLock<'static>> {
     std::io::BufWriter::with_capacity(256 * 1024, std::io::stdout().lock())
 }
 
-pub fn cmd_tokens(files: Vec<String>, preview: usize) -> anyhow::Result<()> {
+pub fn cmd_tokens(
+    files: Vec<String>,
+    preview: usize,
+    locale: crate::locale::Locale,
+) -> anyhow::Result<()> {
     let mut out = stdout_writer();
     if files.is_empty() {
         let text = read_stdin()?;
@@ -174,25 +190,37 @@ pub fn cmd_tokens(files: Vec<String>, preview: usize) -> anyhow::Result<()> {
     }
     let mut total = 0usize;
     for f in &files {
-        let text = std::fs::read_to_string(f)?;
+        let text = read_file(f, locale)?;
         let t = estimate_tokens(&text);
         total += t;
         writeln!(out, "{t:>8}  {f}")?;
         if preview > 0 {
             let pv = text[..head_byte_end(&text, preview)].replace('\n', "\\n");
-            writeln!(out, "  preview: {pv}")?;
+            writeln!(
+                out,
+                "  {}: {pv}",
+                crate::locale::native_message(locale, crate::locale::NativeMessage::Preview)
+            )?;
         }
     }
     if files.len() > 1 {
-        writeln!(out, "{total:>8}  (total)")?;
+        writeln!(
+            out,
+            "{total:>8}  ({})",
+            crate::locale::native_message(locale, crate::locale::NativeMessage::Total)
+        )?;
     }
     out.flush()?;
     Ok(())
 }
 
-pub fn cmd_prune(max_tokens: usize, file: Option<String>) -> anyhow::Result<()> {
+pub fn cmd_prune(
+    max_tokens: usize,
+    file: Option<String>,
+    locale: crate::locale::Locale,
+) -> anyhow::Result<()> {
     let text = match file {
-        Some(f) => std::fs::read_to_string(&f)?,
+        Some(f) => read_file(&f, locale)?,
         None => read_stdin()?,
     };
     // Borrow the content field when present; otherwise the raw text.
@@ -211,7 +239,17 @@ pub fn cmd_prune(max_tokens: usize, file: Option<String>) -> anyhow::Result<()> 
     let before = estimate_tokens(raw);
     let pruned = prune_with_total(raw, max_tokens, before);
     let after = estimate_tokens(&pruned);
-    eprintln!("[rdsh] tokens {before} -> {after} (budget {max_tokens})");
+    match locale {
+        crate::locale::Locale::English => {
+            eprintln!("[rdsh] tokens {before} -> {after} (budget {max_tokens})");
+        }
+        crate::locale::Locale::Chinese => {
+            eprintln!("[rdsh] 令牌数 {before} -> {after}（预算 {max_tokens}）");
+        }
+        crate::locale::Locale::Japanese => {
+            eprintln!("[rdsh] トークン数 {before} -> {after}（予算 {max_tokens}）");
+        }
+    }
     let mut out = stdout_writer();
     write!(out, "{pruned}")?;
     out.flush()?;

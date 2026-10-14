@@ -1,3 +1,7 @@
+import {
+  requiresProcessIdentity,
+  hasProcessIdentity,
+} from "./ownership-support.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
@@ -52,124 +56,140 @@ async function healthServer(t) {
     },
   };
 }
-test("Tunnel readiness is read-only, scoped to its live generation and distinct from Dot response", async (t) => {
-  const project = await temporary(t),
-    health = await healthServer(t),
-    instance = randomUUID();
-  const record = await recordTunnel(project, instance, process.pid);
-  assert.ok(
-    record.process,
-    "This platform must provide process identity for the positive fixture",
-  );
-  await fs.writeFile(
-    path.join(project.directory, record.health_file),
-    health.url,
-  );
-  const ready = await inspectTunnel(project, instance);
-  assert.equal(ready.state, "ready");
-  assert.equal(ready.readiness, 200);
-  assert.deepEqual(health.requests.map((item) => item.path).sort(), [
-    "/healthz",
-    "/readyz",
-  ]);
-  assert.ok(health.requests.every((item) => item.authorization === undefined));
-  assert.ok(!JSON.stringify(ready).includes("private-health-detail-secret"));
-  health.notReady();
-  assert.equal((await inspectTunnel(project, instance)).state, "not_ready");
-  const count = health.requests.length;
-  const stale = await inspectTunnel(project, randomUUID());
-  assert.equal(stale.state, "stale_credentials");
-  assert.equal(stale.reason, "dashboard_restarted");
-  assert.equal(
-    health.requests.length,
-    count,
-    "Never probe a stale generation's health port",
-  );
-  const reused = await inspectTunnel(project, instance, {
-    processReader: async () => ({
-      status: "observed",
-      identity: {
-        ...record.process,
-        birth: String(BigInt(record.process.birth) + 1n),
-      },
-    }),
-  });
-  assert.equal(reused.state, "stopped");
-  assert.equal(reused.reason, "pid_reused");
-  assert.equal(health.requests.length, count);
-  await finishTunnel(project, record);
-  assert.equal(
-    (await inspectTunnel(project, instance)).reason,
-    "launcher_exited",
-  );
-});
-test("Health diagnostics reject foreign projects, arbitrary URLs, redirects, oversized files and unknown processes", async (t) => {
-  const project = await temporary(t),
-    health = await healthServer(t),
-    instance = randomUUID();
-  assert.equal((await inspectTunnel(project, instance)).reason, "not_recorded");
-  const record = await recordTunnel(project, instance, process.pid);
-  for (const url of [
-    "https://example.com/",
-    "http://localhost:8080/",
-    "http://127.0.0.1:8080/?key=secret",
-    "http://user:pass@127.0.0.1:8080/",
-    "http://127.0.0.1:8080/private",
-    "http://2130706433:8080/",
-  ]) {
-    assert.throws(() => loopbackBase(url));
-    await fs.writeFile(path.join(project.directory, record.health_file), url);
+test(
+  "Tunnel readiness is read-only, scoped to its live generation and distinct from Dot response",
+  requiresProcessIdentity,
+  async (t) => {
+    const project = await temporary(t),
+      health = await healthServer(t),
+      instance = randomUUID();
+    const record = await recordTunnel(project, instance, process.pid);
+    assert.ok(
+      record.process,
+      "This platform must provide process identity for the positive fixture",
+    );
+    await fs.writeFile(
+      path.join(project.directory, record.health_file),
+      health.url,
+    );
+    const ready = await inspectTunnel(project, instance);
+    assert.equal(ready.state, "ready");
+    assert.equal(ready.readiness, 200);
+    assert.deepEqual(health.requests.map((item) => item.path).sort(), [
+      "/healthz",
+      "/readyz",
+    ]);
+    assert.ok(
+      health.requests.every((item) => item.authorization === undefined),
+    );
+    assert.ok(!JSON.stringify(ready).includes("private-health-detail-secret"));
+    health.notReady();
+    assert.equal((await inspectTunnel(project, instance)).state, "not_ready");
+    const count = health.requests.length;
+    const stale = await inspectTunnel(project, randomUUID());
+    assert.equal(stale.state, "stale_credentials");
+    assert.equal(stale.reason, "dashboard_restarted");
+    assert.equal(
+      health.requests.length,
+      count,
+      "Never probe a stale generation's health port",
+    );
+    const reused = await inspectTunnel(project, instance, {
+      processReader: async () => ({
+        status: "observed",
+        identity: {
+          ...record.process,
+          birth: String(BigInt(record.process.birth) + 1n),
+        },
+      }),
+    });
+    assert.equal(reused.state, "stopped");
+    assert.equal(reused.reason, "pid_reused");
+    assert.equal(health.requests.length, count);
+    await finishTunnel(project, record);
     assert.equal(
       (await inspectTunnel(project, instance)).reason,
-      "health_address_unavailable",
+      "launcher_exited",
     );
-  }
-  await fs.writeFile(
-    path.join(project.directory, record.health_file),
-    health.url,
-  );
-  assert.equal(
-    (
-      await inspectTunnel(project, instance, {
-        processReader: async () => ({ status: "unknown", identity: null }),
-      })
-    ).state,
-    "unconfirmed",
-  );
-  assert.equal(health.requests.length, 0);
-  health.redirect();
-  assert.equal((await inspectTunnel(project, instance)).state, "unreachable");
-  assert.ok(
-    health.requests.every((request) =>
-      ["/healthz", "/readyz"].includes(request.path),
-    ),
-  );
-  await writeJson(path.join(project.directory, "tunnel-runtime.json"), {
-    ...record,
-    project_id: "other-project",
-  });
-  assert.equal(
-    (await inspectTunnel(project, instance)).reason,
-    "invalid_metadata",
-  );
-  await fs.writeFile(
-    path.join(project.directory, "tunnel-runtime.json"),
-    " ".repeat(8193),
-  );
-  assert.equal(
-    (await inspectTunnel(project, instance)).reason,
-    "invalid_metadata",
-  );
-  await writeJson(path.join(project.directory, "tunnel-runtime.json"), record);
-  const newer = await recordTunnel(project, instance, process.pid);
-  await finishTunnel(project, record);
-  assert.equal(
-    JSON.parse(
-      await fs.readFile(path.join(project.directory, "tunnel-runtime.json")),
-    ).owner,
-    newer.owner,
-  );
-});
+  },
+);
+test(
+  "Health diagnostics reject foreign projects, arbitrary URLs, redirects, oversized files and unknown processes",
+  requiresProcessIdentity,
+  async (t) => {
+    const project = await temporary(t),
+      health = await healthServer(t),
+      instance = randomUUID();
+    assert.equal(
+      (await inspectTunnel(project, instance)).reason,
+      "not_recorded",
+    );
+    const record = await recordTunnel(project, instance, process.pid);
+    for (const url of [
+      "https://example.com/",
+      "http://localhost:8080/",
+      "http://127.0.0.1:8080/?key=secret",
+      "http://user:pass@127.0.0.1:8080/",
+      "http://127.0.0.1:8080/private",
+      "http://2130706433:8080/",
+    ]) {
+      assert.throws(() => loopbackBase(url));
+      await fs.writeFile(path.join(project.directory, record.health_file), url);
+      assert.equal(
+        (await inspectTunnel(project, instance)).reason,
+        "health_address_unavailable",
+      );
+    }
+    await fs.writeFile(
+      path.join(project.directory, record.health_file),
+      health.url,
+    );
+    assert.equal(
+      (
+        await inspectTunnel(project, instance, {
+          processReader: async () => ({ status: "unknown", identity: null }),
+        })
+      ).state,
+      "unconfirmed",
+    );
+    assert.equal(health.requests.length, 0);
+    health.redirect();
+    assert.equal((await inspectTunnel(project, instance)).state, "unreachable");
+    assert.ok(
+      health.requests.every((request) =>
+        ["/healthz", "/readyz"].includes(request.path),
+      ),
+    );
+    await writeJson(path.join(project.directory, "tunnel-runtime.json"), {
+      ...record,
+      project_id: "other-project",
+    });
+    assert.equal(
+      (await inspectTunnel(project, instance)).reason,
+      "invalid_metadata",
+    );
+    await fs.writeFile(
+      path.join(project.directory, "tunnel-runtime.json"),
+      " ".repeat(8193),
+    );
+    assert.equal(
+      (await inspectTunnel(project, instance)).reason,
+      "invalid_metadata",
+    );
+    await writeJson(
+      path.join(project.directory, "tunnel-runtime.json"),
+      record,
+    );
+    const newer = await recordTunnel(project, instance, process.pid);
+    await finishTunnel(project, record);
+    assert.equal(
+      JSON.parse(
+        await fs.readFile(path.join(project.directory, "tunnel-runtime.json")),
+      ).owner,
+      newer.owner,
+    );
+  },
+);
 test("browser success, MCP auth failure, absent Tunnel and stale restart credentials remain independent through the public CLI", async (t) => {
   const directory = (await temporary(t)).directory,
     previous = process.env.RDSH_DASHBOARD_HOME;
@@ -257,7 +277,13 @@ test("browser success, MCP auth failure, absent Tunnel and stale restart credent
     401,
   );
   const restarted = await read();
-  assert.equal(restarted.dot.tunnel.state, "stale_credentials");
+  await t.test(
+    "a recorded native Tunnel identity becomes stale after restart",
+    requiresProcessIdentity,
+    () => {
+      assert.equal(restarted.dot.tunnel.state, "stale_credentials");
+    },
+  );
   assert.equal(restarted.dot.authentication.state, "failed");
   assert.equal(restarted.browser.authentication.state, "unconfirmed");
   assert.equal(
@@ -322,102 +348,135 @@ test("Tailscale diagnostics inspect only status and never repair a missing or co
   );
 });
 
-test("public Tunnel launcher records its actual child and retires only its own health file", async (t) => {
-  const directory = (await temporary(t)).directory,
-    previous = process.env.RDSH_DASHBOARD_HOME;
-  process.env.RDSH_DASHBOARD_HOME = path.join(directory, "state");
-  let dashboard, child;
-  t.after(async () => {
-    child?.kill();
-    await dashboard?.close();
-    if (previous === undefined) delete process.env.RDSH_DASHBOARD_HOME;
-    else process.env.RDSH_DASHBOARD_HOME = previous;
-  });
-  const project = await identity(directory),
-    reserve = http.createServer();
-  await new Promise((resolve) => reserve.listen(0, "127.0.0.1", resolve));
-  const port = reserve.address().port;
-  await new Promise((resolve) => reserve.close(resolve));
-  dashboard = await startDashboard({ project, port, tailscale: false });
-  const runtime = JSON.parse(
-    await fs.readFile(path.join(project.directory, "runtime.json")),
-  );
-  await fs.copyFile(
-    fileURLToPath(new URL("fixtures/tunnel-health.cjs", import.meta.url)),
-    path.join(directory, "run"),
-  );
-  const cli = fileURLToPath(new URL("../cli.mjs", import.meta.url));
-  child = spawn(
-    process.execPath,
-    [
-      cli,
-      "tunnel",
-      "--project",
-      directory,
-      "--tunnel-id",
-      "tunnel_" + "a".repeat(32),
-    ],
-    {
-      cwd: directory,
-      windowsHide: true,
-      stdio: ["ignore", "pipe", "pipe"],
-      env: {
-        ...process.env,
-        RDSH_TUNNEL_CLIENT: process.execPath,
-        CONTROL_PLANE_API_KEY: "local-fixture-key-no-network",
+test(
+  "public Tunnel launcher records its actual child and retires only its own health file",
+  requiresProcessIdentity,
+  async (t) => {
+    const directory = (await temporary(t)).directory,
+      previous = process.env.RDSH_DASHBOARD_HOME;
+    process.env.RDSH_DASHBOARD_HOME = path.join(directory, "state");
+    let dashboard, child;
+    t.after(async () => {
+      child?.kill();
+      await dashboard?.close();
+      if (previous === undefined) delete process.env.RDSH_DASHBOARD_HOME;
+      else process.env.RDSH_DASHBOARD_HOME = previous;
+    });
+    const project = await identity(directory),
+      reserve = http.createServer();
+    await new Promise((resolve) => reserve.listen(0, "127.0.0.1", resolve));
+    const port = reserve.address().port;
+    await new Promise((resolve) => reserve.close(resolve));
+    dashboard = await startDashboard({ project, port, tailscale: false });
+    const runtime = JSON.parse(
+      await fs.readFile(path.join(project.directory, "runtime.json")),
+    );
+    await fs.copyFile(
+      fileURLToPath(new URL("fixtures/tunnel-health.cjs", import.meta.url)),
+      path.join(directory, "run"),
+    );
+    const cli = fileURLToPath(new URL("../cli.mjs", import.meta.url));
+    child = spawn(
+      process.execPath,
+      [
+        cli,
+        "tunnel",
+        "--project",
+        directory,
+        "--tunnel-id",
+        "tunnel_" + "a".repeat(32),
+      ],
+      {
+        cwd: directory,
+        windowsHide: true,
+        stdio: ["ignore", "pipe", "pipe"],
+        env: {
+          ...process.env,
+          RDSH_TUNNEL_CLIENT: process.execPath,
+          CONTROL_PLANE_API_KEY: "local-fixture-key-no-network",
+        },
       },
-    },
-  );
-  let output = "",
-    errors = "";
-  child.stdout.on("data", (chunk) => {
-    output += chunk;
-  });
-  child.stderr.on("data", (chunk) => {
-    errors += chunk;
-  });
-  const completion = new Promise((resolve, reject) => {
-    child.once("error", reject);
-    child.once("exit", resolve);
-  });
-  void completion.catch(() => {});
-  let report;
-  const deadline = Date.now() + 12000;
-  do {
-    await delay(50);
-    report = await (
-      await fetch(dashboard.localUrl + "api/diagnostics", {
-        headers: { authorization: `Bearer ${runtime.token}` },
-      })
-    ).json();
-  } while (
-    report.dot.tunnel.state !== "ready" &&
-    child.exitCode === null &&
-    Date.now() < deadline
-  );
-  assert.equal(report.dot.tunnel.state, "ready", errors);
-  assert.equal(report.dot.authentication.state, "observed");
-  assert.equal(report.dot.response.state, "unconfirmed");
-  assert.equal(report.end_to_end.state, "unconfirmed");
-  assert.equal(await completion, 0, errors);
-  assert.ok(output.includes("FIXTURE_READY"));
-  for (const secret of [
-    runtime.token,
-    runtime.mcp_token,
-    "local-fixture-key-no-network",
-  ])
-    assert.ok(!(output + errors).includes(secret));
-  const record = JSON.parse(
-    await fs.readFile(path.join(project.directory, "tunnel-runtime.json")),
-  );
-  assert.ok((await inspectTunnel(project, runtime.instance_id)).ended_at);
-  assert.notEqual(record.process.pid, child.pid);
-  await assert.rejects(
-    fs.stat(path.join(project.directory, record.health_file)),
-    { code: "ENOENT" },
-  );
-  assert.equal(
-    (await inspectTunnel(project, runtime.instance_id)).state,
-    "stopped",
-  );
-});
+    );
+    let output = "",
+      errors = "";
+    child.stdout.on("data", (chunk) => {
+      output += chunk;
+    });
+    child.stderr.on("data", (chunk) => {
+      errors += chunk;
+    });
+    const completion = new Promise((resolve, reject) => {
+      child.once("error", reject);
+      child.once("exit", resolve);
+    });
+    void completion.catch(() => {});
+    let report;
+    const deadline = Date.now() + 12000;
+    do {
+      await delay(50);
+      report = await (
+        await fetch(dashboard.localUrl + "api/diagnostics", {
+          headers: { authorization: `Bearer ${runtime.token}` },
+        })
+      ).json();
+    } while (
+      report.dot.tunnel.state !== "ready" &&
+      child.exitCode === null &&
+      Date.now() < deadline
+    );
+    assert.equal(report.dot.tunnel.state, "ready", errors);
+    assert.equal(report.dot.authentication.state, "observed");
+    assert.equal(report.dot.response.state, "unconfirmed");
+    assert.equal(report.end_to_end.state, "unconfirmed");
+    assert.equal(await completion, 0, errors);
+    assert.ok(output.includes("FIXTURE_READY"));
+    for (const secret of [
+      runtime.token,
+      runtime.mcp_token,
+      "local-fixture-key-no-network",
+    ])
+      assert.ok(!(output + errors).includes(secret));
+    const record = JSON.parse(
+      await fs.readFile(path.join(project.directory, "tunnel-runtime.json")),
+    );
+    assert.ok((await inspectTunnel(project, runtime.instance_id)).ended_at);
+    assert.notEqual(record.process.pid, child.pid);
+    await assert.rejects(
+      fs.stat(path.join(project.directory, record.health_file)),
+      { code: "ENOENT" },
+    );
+    assert.equal(
+      (await inspectTunnel(project, runtime.instance_id)).state,
+      "stopped",
+    );
+  },
+);
+
+test(
+  "missing native process identity keeps Tunnel readiness unconfirmed without probing its URL",
+  {
+    skip: hasProcessIdentity
+      ? "Requires a platform without the native process identity reader"
+      : false,
+  },
+  async (t) => {
+    const project = await temporary(t),
+      health = await healthServer(t),
+      instance = randomUUID();
+    const record = await recordTunnel(project, instance, process.pid);
+    assert.equal(record.process, null);
+    await fs.writeFile(
+      path.join(project.directory, record.health_file),
+      health.url,
+    );
+    const result = await inspectTunnel(project, instance);
+    assert.equal(result.state, "unconfirmed");
+    assert.equal(result.reason, "process_identity_unavailable");
+    assert.equal(health.requests.length, 0);
+    await finishTunnel(project, record);
+    assert.equal(
+      (await inspectTunnel(project, instance)).reason,
+      "launcher_exited",
+    );
+  },
+);

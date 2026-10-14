@@ -11,6 +11,8 @@ Design rule: **port only the hot paths, delegate everything else**.
 conversation and model execution remain in the original DSH runtime.
 The Node dashboard is a separate optional entry point. Its Harness launcher
 currently targets Windows/WSL; project mode is portable.
+Dashboard-owned browser chrome follows the resolved rdsh locale. It does not
+translate producer-supplied API values, task text, model output, paths, or IDs.
 
 For the end-user sequence, see [installation, setup, usage, and recovery](USER-FLOW.md).
 Open PRs for additional orchestration features are not part of this diagram.

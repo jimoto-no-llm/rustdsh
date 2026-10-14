@@ -234,6 +234,8 @@ pub struct GeneralSection {
     pub passthrough: bool,
     pub dry_run: bool,
     pub default_profile: String,
+    /// `auto` follows the process locale; otherwise one supported UI language.
+    pub language: String,
 }
 
 /// Shared public Discord application identifier (not a credential).
@@ -260,7 +262,7 @@ impl Default for DiscordSection {
         Self {
             enabled: true,
             application_id: DEFAULT_DISCORD_APPLICATION_ID.into(),
-            details: "dshで作業中".into(),
+            details: String::new(),
             show_agent_status: true,
             show_elapsed: true,
             show_image: true,
@@ -387,6 +389,7 @@ impl Default for GeneralSection {
             passthrough: false,
             dry_run: false,
             default_profile: String::new(),
+            language: "auto".to_string(),
         }
     }
 }
@@ -548,6 +551,7 @@ fn try_load_at(path: &str) -> anyhow::Result<RdshSettings> {
             "invalid settings file at {path}: expected a JSON object; run `rdsh settings init --force` to restore defaults"
         ));
     }
+    validate_language_setting(&parsed, path)?;
     let has_context = parsed.get("context").is_some_and(|c| !c.is_null());
     let mut cfg = if parsed.is_null() {
         RdshSettings::default()
@@ -562,10 +566,11 @@ fn try_load_at(path: &str) -> anyhow::Result<RdshSettings> {
 /// The lock spans load, caller mutation, and atomic rename so distinct updates
 /// cannot replace one another with snapshots read before either write.
 pub(crate) fn update<T>(
+    locale: crate::locale::Locale,
     mutate: impl FnOnce(&mut RdshSettings) -> anyhow::Result<T>,
 ) -> anyhow::Result<(RdshSettings, T)> {
     let path = settings_path();
-    let _lock = crate::file_lock::FileLock::exclusive_for(std::path::Path::new(&path))?;
+    let _lock = crate::file_lock::FileLock::exclusive_for(std::path::Path::new(&path), locale)?;
     let mut cfg = try_load_at(&path)?;
     let result = mutate(&mut cfg)?;
     cfg.save_locked(&path)?;
@@ -574,9 +579,9 @@ pub(crate) fn update<T>(
 
 /// Initialize settings only if absent, or replace them when `force` is true.
 /// The existence check and write share the same lock as settings mutations.
-pub(crate) fn initialize(force: bool) -> anyhow::Result<bool> {
+pub(crate) fn initialize(force: bool, locale: crate::locale::Locale) -> anyhow::Result<bool> {
     let path = settings_path();
-    let _lock = crate::file_lock::FileLock::exclusive_for(std::path::Path::new(&path))?;
+    let _lock = crate::file_lock::FileLock::exclusive_for(std::path::Path::new(&path), locale)?;
     if std::path::Path::new(&path).exists() && !force {
         return Ok(false);
     }
@@ -589,7 +594,10 @@ impl RdshSettings {
     #[cfg(test)]
     pub fn save(&self) -> anyhow::Result<()> {
         let path = settings_path();
-        let _lock = crate::file_lock::FileLock::exclusive_for(std::path::Path::new(&path))?;
+        let _lock = crate::file_lock::FileLock::exclusive_for(
+            std::path::Path::new(&path),
+            crate::locale::Locale::English,
+        )?;
         self.save_locked(&path)
     }
 
@@ -630,6 +638,7 @@ impl RdshSettings {
                 passthrough: flag(&g, "passthrough", false),
                 dry_run: flag(&g, "dry_run", false),
                 default_profile: text(&g, "default_profile", PROFILE_CHARS),
+                language: language(&g, "language"),
             },
             discord: DiscordSection::from_value(&sec("discord")),
             tokens: TokensSection {
@@ -722,6 +731,7 @@ impl RdshSettings {
         out.general.passthrough = flag(&g, "passthrough", false);
         out.general.dry_run = flag(&g, "dry_run", false);
         out.general.default_profile = text(&g, "default_profile", PROFILE_CHARS);
+        out.general.language = language(&g, "language");
         out.discord = DiscordSection::from_value(&v["discord"]);
         let t = v.get("tokens").cloned().unwrap_or(serde_json::Value::Null);
         out.tokens.default_budget =
@@ -798,6 +808,7 @@ impl RdshSettings {
                 "passthrough": self.general.passthrough,
                 "dry_run": self.general.dry_run,
                 "default_profile": self.general.default_profile,
+                "language": self.general.language,
             },
             "discord": {
                 "enabled": self.discord.enabled,
@@ -870,6 +881,9 @@ impl RdshSettings {
             "general.dry_run" => self.general.dry_run = parse_bool(raw)?,
             "general.default_profile" => {
                 self.general.default_profile = parse_string(raw, PROFILE_CHARS)
+            }
+            "general.language" => {
+                self.general.language = parse_language(raw)?;
             }
             "discord.enabled" => self.discord.enabled = parse_bool(raw)?,
             "discord.application_id" => self.discord.application_id = parse_string(raw, 20),
@@ -1029,6 +1043,7 @@ impl RdshSettings {
             "general.passthrough(bool)",
             "general.dry_run(bool)",
             "general.default_profile(string)",
+            "general.language(auto|en|zh-CN|ja)",
             "discord.enabled(bool, default ON)",
             "discord.application_id(string)",
             "discord.details(string, max 128 chars)",
@@ -1184,6 +1199,48 @@ fn text(v: &serde_json::Value, key: &str, max_chars: usize) -> String {
         .unwrap_or_default()
 }
 
+/// Missing persisted language settings use automatic OS selection.
+fn language(v: &serde_json::Value, key: &str) -> String {
+    v.get(key)
+        .and_then(|x| x.as_str())
+        .and_then(canonical_language)
+        .unwrap_or("auto")
+        .to_string()
+}
+
+/// Reject an explicitly invalid language before any sanitizing fallback runs.
+/// This keeps a broken user setting observable and preserves fail-closed
+/// settings loading for every native command.
+fn validate_language_setting(value: &serde_json::Value, path: &str) -> anyhow::Result<()> {
+    let Some(general) = value.get("general").and_then(serde_json::Value::as_object) else {
+        return Ok(());
+    };
+    let Some(language) = general.get("language") else {
+        return Ok(());
+    };
+    let Some(language) = language.as_str() else {
+        anyhow::bail!(
+            "invalid settings file at {path}: general.language must be auto, en, zh-CN, or ja"
+        );
+    };
+    if canonical_language(language).is_none() {
+        anyhow::bail!(
+            "invalid settings file at {path}: general.language must be auto, en, zh-CN, or ja"
+        );
+    }
+    Ok(())
+}
+
+fn canonical_language(raw: &str) -> Option<&'static str> {
+    match raw.trim() {
+        "auto" => Some("auto"),
+        "en" => Some("en"),
+        "zh-CN" => Some("zh-CN"),
+        "ja" => Some("ja"),
+        _ => None,
+    }
+}
+
 fn list(v: &serde_json::Value, key: &str, max_chars: usize) -> Vec<String> {
     match v.get(key).and_then(|x| x.as_array()) {
         Some(arr) => arr
@@ -1270,6 +1327,12 @@ fn parse_string(raw: &str, max_chars: usize) -> String {
         return truncate(&s[1..s.len() - 1], max_chars);
     }
     truncate(s, max_chars)
+}
+
+fn parse_language(raw: &str) -> anyhow::Result<String> {
+    canonical_language(&parse_string(raw, 16))
+        .map(str::to_string)
+        .ok_or_else(|| anyhow::anyhow!("general.language must be auto, en, zh-CN, or ja"))
 }
 
 fn parse_list(raw: &str, max_chars: usize) -> Vec<String> {
@@ -1553,7 +1616,7 @@ mod rdsh_config_tests {
                 let barrier = std::sync::Arc::clone(&barrier);
                 joins.push(std::thread::spawn(move || {
                     barrier.wait();
-                    update(|cfg| {
+                    update(crate::locale::Locale::English, |cfg| {
                         // Hold the transaction open so a competing process
                         // reaches the same read-modify-write window.
                         std::thread::sleep(std::time::Duration::from_millis(100));

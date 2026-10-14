@@ -42,29 +42,47 @@ fn encode_query(s: &str) -> String {
 }
 
 /// Split an `http://host[:port][/prefix]` base URL.
-fn split_base(base: &str) -> anyhow::Result<(String, u16, String)> {
+fn split_base(base: &str, locale: crate::locale::Locale) -> anyhow::Result<(String, u16, String)> {
     // The configured endpoint is a human-selected capability, not a URL from
     // search results. Preserve remote instances, but never interpolate request
     // separators, userinfo, queries, or fragments into the HTTP request.
     anyhow::ensure!(
         !base.chars().any(|c| c.is_control() || c.is_whitespace())
             && !base.contains(['@', '?', '#']),
-        "invalid SearXNG URL"
+        "{}",
+        crate::locale::native_message(locale, crate::locale::NativeMessage::InvalidSearxUrl)
     );
-    let rest = base
-        .strip_prefix("http://")
-        .ok_or_else(|| anyhow::anyhow!("only http:// SearXNG URLs are supported (for a remote instance use an SSH tunnel to localhost): {base}"))?;
+    let rest = base.strip_prefix("http://").ok_or_else(|| {
+        anyhow::anyhow!(
+            "{}: {base}",
+            crate::locale::native_message(locale, crate::locale::NativeMessage::OnlyHttpSearxUrl)
+        )
+    })?;
     let (hostport, prefix) = match rest.find('/') {
         Some(i) => (&rest[..i], rest[i..].to_string()),
         None => (rest, String::new()),
     };
     let (host, port_text) = if hostport.starts_with('[') {
-        let end = hostport
-            .find(']')
-            .ok_or_else(|| anyhow::anyhow!("invalid IPv6 SearXNG host"))?;
+        let end = hostport.find(']').ok_or_else(|| {
+            anyhow::anyhow!(
+                "{}",
+                crate::locale::native_message(
+                    locale,
+                    crate::locale::NativeMessage::InvalidIpv6SearxHost
+                )
+            )
+        })?;
         hostport[1..end]
             .parse::<std::net::Ipv6Addr>()
-            .map_err(|_| anyhow::anyhow!("invalid IPv6 SearXNG host"))?;
+            .map_err(|_| {
+                anyhow::anyhow!(
+                    "{}",
+                    crate::locale::native_message(
+                        locale,
+                        crate::locale::NativeMessage::InvalidIpv6SearxHost
+                    )
+                )
+            })?;
         (&hostport[..=end], &hostport[end + 1..])
     } else {
         let end = hostport.find(':').unwrap_or(hostport.len());
@@ -74,7 +92,8 @@ fn split_base(base: &str) -> anyhow::Result<(String, u16, String)> {
                 && host
                     .bytes()
                     .all(|b| b.is_ascii_alphanumeric() || b".-_".contains(&b)),
-            "invalid SearXNG host"
+            "{}",
+            crate::locale::native_message(locale, crate::locale::NativeMessage::InvalidSearxHost)
         );
         (host, &hostport[end..])
     };
@@ -85,7 +104,15 @@ fn split_base(base: &str) -> anyhow::Result<(String, u16, String)> {
             .strip_prefix(':')
             .and_then(|s| s.parse::<u16>().ok())
             .filter(|port| *port != 0)
-            .ok_or_else(|| anyhow::anyhow!("invalid SearXNG port"))?
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "{}",
+                    crate::locale::native_message(
+                        locale,
+                        crate::locale::NativeMessage::InvalidSearxPort
+                    )
+                )
+            })?
     };
     Ok((host.to_string(), port, prefix))
 }
@@ -281,10 +308,10 @@ fn find_snippet(blk: &str) -> Option<String> {
     None
 }
 
-fn fetch(base: &str, query: &str) -> anyhow::Result<Vec<Hit>> {
+fn fetch(base: &str, query: &str, locale: crate::locale::Locale) -> anyhow::Result<Vec<Hit>> {
     use std::io::{Read, Write};
     use std::net::ToSocketAddrs;
-    let (host, port, prefix) = split_base(base)?;
+    let (host, port, prefix) = split_base(base, locale)?;
     let target = format!("{prefix}/search?q={}", encode_query(query));
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
     let mut stream = None;
@@ -298,18 +325,37 @@ fn fetch(base: &str, query: &str) -> anyhow::Result<Vec<Hit>> {
             break;
         }
     }
-    let mut s = stream.ok_or_else(|| {
-        anyhow::anyhow!("cannot reach SearXNG at {base}; is it running? SEARXNG_URL overrides")
+    let mut s = stream.ok_or_else(|| match locale {
+        crate::locale::Locale::English => {
+            anyhow::anyhow!("cannot reach SearXNG at {base}; is it running? SEARXNG_URL overrides")
+        }
+        crate::locale::Locale::Chinese => {
+            anyhow::anyhow!("无法连接 {base} 的 SearXNG；它是否正在运行？SEARXNG_URL 会覆盖设置")
+        }
+        crate::locale::Locale::Japanese => {
+            anyhow::anyhow!("{base} の SearXNG に接続できません。起動していますか？SEARXNG_URL が設定を上書きします")
+        }
     })?;
     let ua = format!("rdsh/{}", env!("CARGO_PKG_VERSION"));
     let request = format!("GET {target} HTTP/1.0\r\nHost: {host}\r\nUser-Agent: {ua}\r\nAccept: text/html\r\nConnection: close\r\n\r\n");
     let mut pending = request.as_bytes();
     while !pending.is_empty() {
         let remaining = deadline.saturating_duration_since(std::time::Instant::now());
-        anyhow::ensure!(!remaining.is_zero(), "SearXNG request timed out");
+        anyhow::ensure!(
+            !remaining.is_zero(),
+            "{}",
+            crate::locale::native_message(
+                locale,
+                crate::locale::NativeMessage::SearxRequestTimedOut
+            )
+        );
         s.set_write_timeout(Some(remaining))?;
         let n = s.write(pending)?;
-        anyhow::ensure!(n != 0, "SearXNG request connection closed");
+        anyhow::ensure!(
+            n != 0,
+            "{}",
+            crate::locale::native_message(locale, crate::locale::NativeMessage::SearxRequestClosed)
+        );
         pending = &pending[n..];
     }
     let mut raw = Vec::new();
@@ -317,7 +363,13 @@ fn fetch(base: &str, query: &str) -> anyhow::Result<Vec<Hit>> {
     loop {
         let remaining = deadline.saturating_duration_since(std::time::Instant::now());
         if remaining.is_zero() {
-            anyhow::bail!("SearXNG response timed out");
+            anyhow::bail!(
+                "{}",
+                crate::locale::native_message(
+                    locale,
+                    crate::locale::NativeMessage::SearxResponseTimedOut
+                )
+            );
         }
         s.set_read_timeout(Some(remaining))?;
         let n = s.read(&mut chunk)?;
@@ -325,7 +377,13 @@ fn fetch(base: &str, query: &str) -> anyhow::Result<Vec<Hit>> {
             break;
         }
         if raw.len().saturating_add(n) > 2 * 1024 * 1024 {
-            anyhow::bail!("SearXNG response too large");
+            anyhow::bail!(
+                "{}",
+                crate::locale::native_message(
+                    locale,
+                    crate::locale::NativeMessage::SearxResponseTooLarge
+                )
+            );
         }
         raw.extend_from_slice(&chunk[..n]);
     }
@@ -341,23 +399,55 @@ fn fetch(base: &str, query: &str) -> anyhow::Result<Vec<Hit>> {
             }
             parts.next()?.parse::<u16>().ok()
         })
-        .ok_or_else(|| anyhow::anyhow!("bad HTTP response from {base}"))?;
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "{} {base}",
+                crate::locale::native_message(
+                    locale,
+                    crate::locale::NativeMessage::BadSearxResponse
+                )
+            )
+        })?;
     if !(200..300).contains(&status) {
-        anyhow::bail!("SearXNG returned HTTP {status} from {base}");
+        anyhow::bail!(
+            "{} {status} {} {base}",
+            crate::locale::native_message(locale, crate::locale::NativeMessage::SearxReturnedHttp),
+            match locale {
+                crate::locale::Locale::English => "from",
+                crate::locale::Locale::Chinese => "，来源",
+                crate::locale::Locale::Japanese => "、送信元",
+            }
+        );
     }
     let body = match text.find("\r\n\r\n") {
         Some(i) => &text[i + 4..],
-        None => anyhow::bail!("bad HTTP response from {base}"),
+        None => anyhow::bail!(
+            "{} {base}",
+            crate::locale::native_message(locale, crate::locale::NativeMessage::BadSearxResponse)
+        ),
     };
     if !body.contains("<article") {
-        anyhow::bail!("no SearXNG results page from {base} (is SEARXNG_URL right?)");
+        anyhow::bail!(
+            "{} {base}{}",
+            crate::locale::native_message(locale, crate::locale::NativeMessage::NoSearxResultsPage),
+            match locale {
+                crate::locale::Locale::English => " (is SEARXNG_URL right?)",
+                crate::locale::Locale::Chinese => "（SEARXNG_URL 是否正确？）",
+                crate::locale::Locale::Japanese => "（SEARXNG_URL は正しいですか？）",
+            }
+        );
     }
     Ok(parse_html(body, 50))
 }
 
-pub fn cmd_search_web(query: &str, limit: usize, json: bool) -> anyhow::Result<()> {
+pub fn cmd_search_web(
+    query: &str,
+    limit: usize,
+    json: bool,
+    locale: crate::locale::Locale,
+) -> anyhow::Result<()> {
     let base = default_base();
-    let hits = fetch(&base, query)?;
+    let hits = fetch(&base, query, locale)?;
     let shown: Vec<&Hit> = hits.iter().take(limit.max(1)).collect();
     if json {
         println!(
@@ -390,7 +480,15 @@ pub fn cmd_search_web(query: &str, limit: usize, json: bool) -> anyhow::Result<(
         }
     }
     let _ = out.flush();
-    eprintln!("[rdsh] {} web hit(s) via {base}", shown.len());
+    match locale {
+        crate::locale::Locale::English => eprintln!("[rdsh] {} web hit(s) via {base}", shown.len()),
+        crate::locale::Locale::Chinese => {
+            eprintln!("[rdsh] {} 个网页匹配，来源 {base}", shown.len())
+        }
+        crate::locale::Locale::Japanese => {
+            eprintln!("[rdsh] {} 件のWeb一致、経由 {base}", shown.len())
+        }
+    }
     Ok(())
 }
 
@@ -407,20 +505,24 @@ mod tests {
     #[test]
     fn base_splitting() {
         assert_eq!(
-            split_base("http://127.0.0.1:8888").unwrap(),
+            split_base("http://127.0.0.1:8888", crate::locale::Locale::English).unwrap(),
             ("127.0.0.1".to_string(), 8888, String::new())
         );
         assert_eq!(
-            split_base("http://h/searx").unwrap(),
+            split_base("http://h/searx", crate::locale::Locale::English).unwrap(),
             ("h".to_string(), 80, "/searx".to_string())
         );
-        assert!(split_base("https://h/").is_err());
+        assert!(split_base("https://h/", crate::locale::Locale::English).is_err());
         assert_eq!(
-            split_base("http://[::1]/searx").unwrap(),
+            split_base("http://[::1]/searx", crate::locale::Locale::English).unwrap(),
             ("[::1]".to_string(), 80, "/searx".to_string())
         );
         assert_eq!(
-            split_base("http://searx.example:8888/prefix").unwrap(),
+            split_base(
+                "http://searx.example:8888/prefix",
+                crate::locale::Locale::English
+            )
+            .unwrap(),
             ("searx.example".to_string(), 8888, "/prefix".to_string())
         );
     }
@@ -442,7 +544,10 @@ mod tests {
             "http://localhost:",
             "http:///path",
         ] {
-            assert!(split_base(base).is_err(), "{base:?}");
+            assert!(
+                split_base(base, crate::locale::Locale::English).is_err(),
+                "{base:?}"
+            );
         }
         // The query is encoded separately and cannot create a second request.
         assert_eq!(encode_query("\r\nInjected: yes"), "%0D%0AInjected%3A+yes");
@@ -493,6 +598,7 @@ mod tests {
         let hits = fetch(
             &format!("http://{address}/prefix"),
             "hello\r\nInjected: yes",
+            crate::locale::Locale::English,
         );
         let request = server.join().unwrap();
         assert_eq!(hits.unwrap()[0].title, "DUMMY_RESULT");

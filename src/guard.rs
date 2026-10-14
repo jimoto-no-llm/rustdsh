@@ -325,7 +325,7 @@ fn classify_operation(raw: &str, policy: &GuardPolicy) -> PolicyDecision {
     }
 }
 
-fn emit_policy_decision(decision: PolicyDecision, json_out: bool) {
+fn emit_policy_decision(decision: PolicyDecision, json_out: bool, locale: crate::locale::Locale) {
     match decision {
         PolicyDecision::Allow(rule_id) => {
             if json_out {
@@ -339,12 +339,17 @@ fn emit_policy_decision(decision: PolicyDecision, json_out: bool) {
                 );
             }
         }
-        PolicyDecision::Deny(reason) => emit_policy_block("deny", reason, json_out),
-        PolicyDecision::Unknown(reason) => emit_policy_block("unknown", reason, json_out),
+        PolicyDecision::Deny(reason) => emit_policy_block("deny", reason, json_out, locale),
+        PolicyDecision::Unknown(reason) => emit_policy_block("unknown", reason, json_out, locale),
     }
 }
 
-fn emit_policy_block(classification: &str, reason: &str, json_out: bool) {
+fn emit_policy_block(
+    classification: &str,
+    reason: &str,
+    json_out: bool,
+    locale: crate::locale::Locale,
+) {
     if json_out {
         println!(
             "{}",
@@ -355,8 +360,57 @@ fn emit_policy_block(classification: &str, reason: &str, json_out: bool) {
             })
         );
     } else {
-        eprintln!("rdsh guard: {reason}");
+        eprintln!(
+            "{}: {}",
+            crate::locale::ui_message(locale, crate::locale::UiMessage::Guard),
+            policy_reason(locale, reason)
+        );
         std::process::exit(2);
+    }
+}
+
+fn policy_reason(locale: crate::locale::Locale, reason: &str) -> &str {
+    if locale == crate::locale::Locale::English {
+        return reason;
+    }
+    match (locale, reason) {
+        (crate::locale::Locale::Chinese, "policy_unavailable") => "策略不可用",
+        (crate::locale::Locale::Japanese, "policy_unavailable") => "ポリシーを利用できません",
+        (crate::locale::Locale::Chinese, "input_unavailable_or_oversized") => "输入不可用或过大",
+        (crate::locale::Locale::Japanese, "input_unavailable_or_oversized") => {
+            "入力を利用できないか大きすぎます"
+        }
+        (crate::locale::Locale::Chinese, "invalid_json") => "无效的 JSON",
+        (crate::locale::Locale::Japanese, "invalid_json") => "無効な JSON",
+        (crate::locale::Locale::Chinese, "hook_schema_unsupported") => "不支持的 Hook 架构",
+        (crate::locale::Locale::Japanese, "hook_schema_unsupported") => {
+            "Hook スキーマに対応していません"
+        }
+        (crate::locale::Locale::Chinese, "shell_command_parse_unsupported") => {
+            "不支持的 shell 命令解析"
+        }
+        (crate::locale::Locale::Japanese, "shell_command_parse_unsupported") => {
+            "shell コマンド解析に対応していません"
+        }
+        (crate::locale::Locale::Chinese, "tool_schema_unsupported") => "不支持的工具架构",
+        (crate::locale::Locale::Japanese, "tool_schema_unsupported") => {
+            "ツールスキーマに対応していません"
+        }
+        (crate::locale::Locale::Chinese, "cwd_unavailable") => "当前目录不可用",
+        (crate::locale::Locale::Japanese, "cwd_unavailable") => {
+            "現在のディレクトリを利用できません"
+        }
+        (crate::locale::Locale::Chinese, "path_unresolved") => "无法解析路径",
+        (crate::locale::Locale::Japanese, "path_unresolved") => "パスを解決できません",
+        (crate::locale::Locale::Chinese, "path_unavailable") => "路径不可用",
+        (crate::locale::Locale::Japanese, "path_unavailable") => "パスを利用できません",
+        (crate::locale::Locale::Chinese, "tool_not_allowed") => "不允许该工具",
+        (crate::locale::Locale::Japanese, "tool_not_allowed") => "このツールは許可されていません",
+        (crate::locale::Locale::Chinese, "path_outside_allowed_root") => "路径不在允许的根目录内",
+        (crate::locale::Locale::Japanese, "path_outside_allowed_root") => {
+            "パスが許可されたルート外です"
+        }
+        _ => reason,
     }
 }
 
@@ -377,6 +431,7 @@ pub fn cmd_guard(
     reason: Option<String>,
     json_out: bool,
     policy_file: Option<String>,
+    locale: crate::locale::Locale,
 ) -> anyhow::Result<()> {
     use std::io::Read;
     const MAX_INPUT: u64 = 1024 * 1024;
@@ -384,7 +439,7 @@ pub fn cmd_guard(
         Some(path) => match read_policy(&path) {
             Ok(policy) => Some(policy),
             Err(_) => {
-                emit_policy_block("unknown", "policy_unavailable", json_out);
+                emit_policy_block("unknown", "policy_unavailable", json_out, locale);
                 return Ok(());
             }
         },
@@ -398,33 +453,59 @@ pub fn cmd_guard(
         || raw.len() as u64 > MAX_INPUT
     {
         if policy.is_some() {
-            emit_policy_block("unknown", "input_unavailable_or_oversized", json_out);
+            emit_policy_block(
+                "unknown",
+                "input_unavailable_or_oversized",
+                json_out,
+                locale,
+            );
         } else {
-            block("rdsh guard: unreadable or oversized input", json_out);
+            block(
+                &format!(
+                    "{}: {}",
+                    crate::locale::ui_message(locale, crate::locale::UiMessage::Guard),
+                    crate::locale::ui_message(
+                        locale,
+                        crate::locale::UiMessage::UnreadableOrOversizedInput
+                    )
+                ),
+                json_out,
+            );
         }
         return Ok(());
     }
     let hit = match denied_pattern(&raw, &deny) {
         Ok(hit) => hit,
         Err(_) if policy.is_some() => {
-            emit_policy_block("unknown", "invalid_json", json_out);
+            emit_policy_block("unknown", "invalid_json", json_out, locale);
             return Ok(());
         }
         Err(_) => {
-            block("rdsh guard: invalid JSON input", json_out);
+            block(
+                &format!(
+                    "{}: {}",
+                    crate::locale::ui_message(locale, crate::locale::UiMessage::Guard),
+                    crate::locale::ui_message(locale, crate::locale::UiMessage::InvalidJsonInput)
+                ),
+                json_out,
+            );
             return Ok(());
         }
     };
     match hit {
         Some(p) => {
             let msg = reason.unwrap_or_else(|| "blocked by rdsh guard".to_owned());
-            eprintln!("[rdsh guard] pattern hit: {p}");
+            eprintln!(
+                "[{}] {}: {p}",
+                crate::locale::ui_message(locale, crate::locale::UiMessage::Guard),
+                crate::locale::ui_message(locale, crate::locale::UiMessage::PatternHit)
+            );
             block(&msg, json_out);
             Ok(())
         }
         None => {
             if let Some(policy) = policy {
-                emit_policy_decision(classify_operation(&raw, &policy), json_out);
+                emit_policy_decision(classify_operation(&raw, &policy), json_out, locale);
             } else if json_out {
                 // A deny-list miss is not authority to bypass the host's approval policy.
                 println!("{{}}");

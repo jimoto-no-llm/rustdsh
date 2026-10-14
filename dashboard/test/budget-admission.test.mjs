@@ -1,3 +1,4 @@
+import { requiresOwnershipBackend } from "./ownership-support.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
@@ -604,7 +605,7 @@ test("real CLI input-file policy/inspect uses admin credential and rejects stray
   );
 });
 
-test("guarded attachment verifies hook, scopes cleanup, and rejects hard job before native session starts", async (t) => {
+test("guarded attachment verifies hook, scopes cleanup, and rejects hard job before native session starts", requiresOwnershipBackend, async (t) => {
   const f = await setup(t, true);
   await exec("git", ["-C", f.project.root, "init", "-b", "budget-fixture"]);
   await exec("git", [

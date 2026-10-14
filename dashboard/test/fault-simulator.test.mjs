@@ -1,3 +1,4 @@
+import { requiresOwnershipBackend } from "./ownership-support.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
@@ -40,7 +41,7 @@ test("restart waits for a truthful observation of the same mock process after a 
   assert.equal(goneReads, 1);
 });
 
-test("all six real control-plane scenarios expose effects, persistence and resource proof without inherited credentials", async (t) => {
+test("all six real control-plane scenarios expose effects, persistence and resource proof without inherited credentials", requiresOwnershipBackend, async (t) => {
   const root = await workspace(t);
   const previous = process.env.PROVIDER_API_KEY;
   process.env.PROVIDER_API_KEY = "fault-test-credential-must-not-be-inherited";
@@ -75,7 +76,7 @@ test("all six real control-plane scenarios expose effects, persistence and resou
   assert.deepEqual(JSON.parse(await fs.readFile(path.join(root, "all", "report.json"), "utf8")), report);
 });
 
-test("CLI replay retains the exact seed and fault point; ENOSPC before write dispatches nothing", async (t) => {
+test("CLI replay retains the exact seed and fault point; ENOSPC before write dispatches nothing", requiresOwnershipBackend, async (t) => {
   const root = await workspace(t);
   const first = await runFaultSimulation({ outputDirectory: path.join(root, "first"), scenario: "disk_full", seed: 0 });
   assert.equal(first.passed, true);

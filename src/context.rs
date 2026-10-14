@@ -965,10 +965,31 @@ fn priority_order() -> Vec<&'static str> {
     ]
 }
 
-fn assemble(query: &str, cfg: &ContextConfig) -> Vec<Section> {
+fn text(
+    locale: crate::locale::Locale,
+    english: &'static str,
+    chinese: &'static str,
+    japanese: &'static str,
+) -> &'static str {
+    match locale {
+        crate::locale::Locale::English => english,
+        crate::locale::Locale::Chinese => chinese,
+        crate::locale::Locale::Japanese => japanese,
+    }
+}
+
+fn assemble(query: &str, cfg: &ContextConfig, locale: crate::locale::Locale) -> Vec<Section> {
     let mut secs: Vec<Section> = Vec::new();
     let goal = if cfg.goal.trim().is_empty() {
-        "(unset — set with: rdsh settings set context.goal \"...\")".to_string()
+        match locale {
+            crate::locale::Locale::English => {
+                "(unset — set with: rdsh settings set context.goal \"...\")".to_string()
+            }
+            _ => format!(
+                "({})",
+                crate::locale::ui_message(locale, crate::locale::UiMessage::GoalUnset)
+            ),
+        }
     } else {
         cfg.goal.clone()
     };
@@ -998,11 +1019,34 @@ fn assemble(query: &str, cfg: &ContextConfig) -> Vec<Section> {
                 }
                 Err(reason) => {
                     let hint = match reason {
-                        "outside-root" => "outside repo root — not read",
-                        "not-a-file" => "not a regular file",
-                        _ => "missing or binary",
+                        "outside-root" => text(
+                            locale,
+                            "outside repo root — not read",
+                            "位于仓库根目录外 — 未读取",
+                            "リポジトリルート外です — 読み込みません",
+                        ),
+                        "not-a-file" => text(
+                            locale,
+                            "not a regular file",
+                            "不是常规文件",
+                            "通常ファイルではありません",
+                        ),
+                        _ => text(
+                            locale,
+                            "missing or binary",
+                            "缺失或二进制文件",
+                            "存在しないかバイナリです",
+                        ),
                     };
-                    parts.push(format!("## {f}\n({hint} — verify before trusting)"));
+                    parts.push(format!(
+                        "## {f}\n({hint} — {})",
+                        text(
+                            locale,
+                            "verify before trusting",
+                            "请先验证再信任",
+                            "信頼する前に検証してください"
+                        )
+                    ));
                 }
             }
         }
@@ -1048,7 +1092,15 @@ fn assemble(query: &str, cfg: &ContextConfig) -> Vec<Section> {
             // 空の沈黙より明示（pack対象外の小節なので予算への影響は微小）。
             secs.push(Section {
                 name: "retrieved",
-                body: format!("(no hits for query {q:?})"),
+                body: format!(
+                    "({} {q:?})",
+                    text(
+                        locale,
+                        "no hits for query",
+                        "查询没有结果：",
+                        "クエリの一致なし:"
+                    )
+                ),
             });
         }
     }
@@ -1208,7 +1260,7 @@ fn missing_files(cfg: &ContextConfig) -> Vec<String> {
     out
 }
 
-pub fn cmd_status(json: bool) -> anyhow::Result<()> {
+pub fn cmd_status(json: bool, locale: crate::locale::Locale) -> anyhow::Result<()> {
     let cfg = load_config();
     let wm = format!(
         "goal={} constraints={} decisions={} files={} tasks={}",
@@ -1251,38 +1303,92 @@ pub fn cmd_status(json: bool) -> anyhow::Result<()> {
     }
     let stdout = std::io::stdout();
     let mut out = std::io::BufWriter::new(stdout.lock());
-    writeln!(out, "[rdsh context: v{SCHEMA}]")?;
-    writeln!(out, "config: {} (legacy: {})", config_path(), legacy_path())?;
-    writeln!(out, "budget: {} tokens", cfg.token_budget)?;
     writeln!(
         out,
-        "retriever/packer/verifier: {}/{}/{}",
-        cfg.enable_retriever, cfg.enable_packer, cfg.enable_verifier
+        "[rdsh {}: v{SCHEMA}]",
+        crate::locale::ui_message(locale, crate::locale::UiMessage::ContextStatus)
     )?;
     writeln!(
         out,
-        "code_hits={} sessions={} git_diff={}",
+        "{}: {} ({}: {})",
+        text(locale, "config", "配置", "設定"),
+        config_path(),
+        text(locale, "legacy", "旧版", "旧形式"),
+        legacy_path()
+    )?;
+    writeln!(
+        out,
+        "{}: {} {}",
+        text(locale, "budget", "预算", "予算"),
+        cfg.token_budget,
+        text(locale, "tokens", "令牌", "トークン")
+    )?;
+    writeln!(
+        out,
+        "{}: {}/{}/{}",
+        text(
+            locale,
+            "retriever/packer/verifier",
+            "检索器/打包器/验证器",
+            "取得/パッカー/検証"
+        ),
+        cfg.enable_retriever,
+        cfg.enable_packer,
+        cfg.enable_verifier
+    )?;
+    writeln!(
+        out,
+        "{}={} {}={} {}={}",
+        text(locale, "code_hits", "代码命中", "コード一致"),
         cfg.max_code_hits,
+        text(locale, "sessions", "会话", "セッション"),
         cfg.max_sessions,
+        text(locale, "git_diff", "git 差异", "git 差分"),
         if cfg.include_git_diff { "on" } else { "off" }
     )?;
-    writeln!(out, "working memory: {wm} (~{wm_tokens} tokens)")?;
+    writeln!(
+        out,
+        "{}: {wm} (~{wm_tokens} {})",
+        text(locale, "working memory", "工作记忆", "作業メモリ"),
+        text(locale, "tokens", "令牌", "トークン")
+    )?;
     if cfg.goal.trim().is_empty() {
         writeln!(
             out,
-            "goal: (unset — rdsh settings set context.goal \"...\")"
+            "{}: ({})",
+            text(locale, "goal", "目标", "目標"),
+            crate::locale::ui_message(locale, crate::locale::UiMessage::GoalUnset)
         )?;
     } else {
-        writeln!(out, "goal: {}", cfg.goal)?;
+        writeln!(
+            out,
+            "{}: {}",
+            text(locale, "goal", "目标", "目標"),
+            cfg.goal
+        )?;
     }
     if !missing.is_empty() {
-        writeln!(out, "warn: missing files: {}", missing.join(", "))?;
+        writeln!(
+            out,
+            "{}: {}: {}",
+            text(locale, "warn", "警告", "警告"),
+            crate::locale::ui_message(locale, crate::locale::UiMessage::MissingFiles),
+            missing.join(", ")
+        )?;
     }
     if legacy_exists {
         writeln!(
             out,
-            "note: legacy {} exists (ignored when rdsh.json has context)",
-            legacy_path()
+            "{}: {} {} ({})",
+            text(locale, "note", "提示", "注"),
+            legacy_path(),
+            text(locale, "exists", "存在", "が存在"),
+            text(
+                locale,
+                "ignored when rdsh.json has context",
+                "rdsh.json 包含 context 时忽略",
+                "rdsh.json に context がある場合は無視されます"
+            )
         )?;
     }
     out.flush()?;
@@ -1293,11 +1399,17 @@ pub fn cmd_build(
     query: Option<String>,
     budget: Option<usize>,
     as_json: bool,
+    locale: crate::locale::Locale,
 ) -> anyhow::Result<()> {
     let cfg = load_config();
     let q = query.unwrap_or_default();
     let budget = budget.unwrap_or(cfg.token_budget).clamp(500, 200_000);
-    let sections = assemble(&q, &cfg);
+    let content_locale = if as_json {
+        crate::locale::Locale::English
+    } else {
+        locale
+    };
+    let sections = assemble(&q, &cfg, content_locale);
     let full = render(&sections);
     let before = estimate(&full);
     // JSON用の節内訳は pack 前に確保（pack が所有権を奪うため）
@@ -1338,83 +1450,166 @@ pub fn cmd_build(
         out.write_all(b"\n")?;
     }
     out.flush()?;
-    eprintln!("[rdsh context build] {before}->{after} tokens (budget {budget})");
+    eprintln!(
+        "[rdsh {}] {before}->{after} {} ({} {budget})",
+        crate::locale::ui_message(locale, crate::locale::UiMessage::ContextBuild),
+        text(locale, "tokens", "令牌", "トークン"),
+        text(locale, "budget", "预算", "予算")
+    );
     Ok(())
 }
 
-pub fn cmd_search(query: String, max: usize) -> anyhow::Result<()> {
+pub fn cmd_search(query: String, max: usize, locale: crate::locale::Locale) -> anyhow::Result<()> {
     let max = max.clamp(1, 100);
     let stdout = std::io::stdout();
     let mut out = std::io::BufWriter::new(stdout.lock());
     let code = code_hits(&query, max);
-    writeln!(out, "# code ({})", code.len())?;
+    writeln!(
+        out,
+        "# {} ({})",
+        text(locale, "code", "代码", "コード"),
+        code.len()
+    )?;
     if code.is_empty() {
-        writeln!(out, "(no hits)")?;
+        writeln!(
+            out,
+            "({})",
+            crate::locale::ui_message(locale, crate::locale::UiMessage::NoHits)
+        )?;
     }
     for (i, h) in code.iter().enumerate() {
         writeln!(out, "{}: {h}", i + 1)?;
     }
     let sess = recent_sessions(&query, max.min(20));
-    writeln!(out, "# sessions ({})", sess.len())?;
+    writeln!(
+        out,
+        "# {} ({})",
+        text(locale, "sessions", "会话", "セッション"),
+        sess.len()
+    )?;
     if sess.is_empty() {
-        writeln!(out, "(no hits)")?;
+        writeln!(
+            out,
+            "({})",
+            crate::locale::ui_message(locale, crate::locale::UiMessage::NoHits)
+        )?;
     }
     for (i, s) in sess.iter().enumerate() {
         writeln!(out, "{}: {s}", i + 1)?;
     }
     out.flush()?;
     eprintln!(
-        "[rdsh context search] query={query:?} terms={:?}",
+        "[rdsh {}] {}={query:?} {}={:?}",
+        crate::locale::ui_message(locale, crate::locale::UiMessage::ContextSearch),
+        text(locale, "query", "查询", "クエリ"),
+        text(locale, "terms", "词项", "語句"),
         query_terms(&query)
     );
     Ok(())
 }
 
-pub fn cmd_explain(query: Option<String>, budget: Option<usize>) -> anyhow::Result<()> {
+pub fn cmd_explain(
+    query: Option<String>,
+    budget: Option<usize>,
+    locale: crate::locale::Locale,
+) -> anyhow::Result<()> {
     let cfg = load_config();
     let q = query.unwrap_or_default();
     let budget = budget.unwrap_or(cfg.token_budget).clamp(500, 200_000);
-    let sections = assemble(&q, &cfg);
+    let sections = assemble(&q, &cfg, locale);
     let stdout = std::io::stdout();
     let mut out = std::io::BufWriter::new(stdout.lock());
-    writeln!(out, "[rdsh context explain: v{SCHEMA}]")?;
-    writeln!(out, "priority: {}", priority_order().join(" > "))?;
-    writeln!(out, "budget: {budget} tokens")?;
     writeln!(
         out,
-        "limits: code_hits={} sessions={} git_diff={}",
+        "[rdsh {}: v{SCHEMA}]",
+        crate::locale::ui_message(locale, crate::locale::UiMessage::ContextExplain)
+    )?;
+    writeln!(
+        out,
+        "{}: {}",
+        text(locale, "priority", "优先级", "優先順位"),
+        priority_order().join(" > ")
+    )?;
+    writeln!(
+        out,
+        "{}: {budget} {}",
+        text(locale, "budget", "预算", "予算"),
+        text(locale, "tokens", "令牌", "トークン")
+    )?;
+    writeln!(
+        out,
+        "{}: {}={} {}={} {}={}",
+        text(locale, "limits", "限制", "上限"),
+        text(locale, "code_hits", "代码命中", "コード一致"),
         cfg.max_code_hits,
+        text(locale, "sessions", "会话", "セッション"),
         cfg.max_sessions,
+        text(locale, "git_diff", "git 差异", "git 差分"),
         if cfg.include_git_diff { "on" } else { "off" }
     )?;
     if !q.trim().is_empty() {
-        writeln!(out, "terms: {:?}", query_terms(&q))?;
+        writeln!(
+            out,
+            "{}: {:?}",
+            text(locale, "terms", "词项", "語句"),
+            query_terms(&q)
+        )?;
     }
     for s in &sections {
         let t = estimate(&s.body);
         let why = match s.name {
-            "goal" => "always first: keeps long sessions on track (never dropped)",
-            "constraints" => "must-not-break rules (kept until the end)",
-            "related_files" => "working set from settings (missing files warn)",
-            "git_diff" => "branch + status + diff stat (fresh, not from memory)",
-            "decisions" => "reused past decisions (structured, not full history)",
-            "open_tasks" => "unresolved work only",
-            "retrieved" => "scored hits: coverage + boundary + filename bonus, CJK bigram recall, per-file top3, ranked (first to trim)",
+            "goal" => text(locale, "always first: keeps long sessions on track (never dropped)", "始终优先：让长会话保持方向（永不丢弃）", "常に最優先: 長いセッションを軌道に乗せます（削除しません）"),
+            "constraints" => text(locale, "must-not-break rules (kept until the end)", "不得破坏的规则（保留到最后）", "破ってはいけない規則（最後まで保持）"),
+            "related_files" => text(locale, "working set from settings (missing files warn)", "来自设置的工作集合（缺失文件会警告）", "設定からの作業セット（見つからないファイルは警告）"),
+            "git_diff" => text(locale, "branch + status + diff stat (fresh, not from memory)", "分支 + 状态 + 差异统计（最新数据，不来自记忆）", "ブランチ + 状態 + 差分統計（メモリではなく最新）"),
+            "decisions" => text(locale, "reused past decisions (structured, not full history)", "复用过去的决策（结构化，不含完整历史）", "過去の判断を再利用（構造化、完全な履歴ではない）"),
+            "open_tasks" => text(locale, "unresolved work only", "仅包含未解决工作", "未解決の作業のみ"),
+            "retrieved" => text(locale, "scored hits: coverage + boundary + filename bonus, CJK bigram recall, per-file top3, ranked (first to trim)", "评分结果：覆盖度 + 边界 + 文件名加分、CJK 双字召回、每文件前3、按排名（最先裁剪）", "スコア付き一致: カバレッジ + 境界 + ファイル名加点、CJK バイグラム再現、ファイルごと上位3、順位順（最初に削減）"),
             _ => "",
         };
-        writeln!(out, "- {}: ~{} tokens - {}", s.name, t, why)?;
+        writeln!(
+            out,
+            "- {}: ~{} {} - {}",
+            s.name,
+            t,
+            text(locale, "tokens", "令牌", "トークン"),
+            why
+        )?;
     }
     if !cfg.enable_verifier {
-        writeln!(out, "note: verifier is OFF (summaries are trusted as-is)")?;
+        writeln!(
+            out,
+            "{}: {}",
+            text(locale, "note", "提示", "注"),
+            text(
+                locale,
+                "verifier is OFF (summaries are trusted as-is)",
+                "验证器处于关闭状态（按原样信任摘要）",
+                "検証器はOFFです（要約をそのまま信頼します）"
+            )
+        )?;
     } else {
         writeln!(
             out,
-            "note: verifier is ON - re-open source file/git/session before acting"
+            "{}: {}",
+            text(locale, "note", "提示", "注"),
+            text(
+                locale,
+                "verifier is ON - re-open source file/git/session before acting",
+                "验证器处于开启状态：执行前请重新打开源文件/git/会话",
+                "検証器はONです。実行前にソースファイル/git/セッションを開き直してください"
+            )
         )?;
     }
     let missing = missing_files(&cfg);
     if !missing.is_empty() {
-        writeln!(out, "warn: missing files: {}", missing.join(", "))?;
+        writeln!(
+            out,
+            "{}: {}: {}",
+            text(locale, "warn", "警告", "警告"),
+            crate::locale::ui_message(locale, crate::locale::UiMessage::MissingFiles),
+            missing.join(", ")
+        )?;
     }
     out.flush()?;
     Ok(())

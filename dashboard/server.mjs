@@ -1,4 +1,5 @@
 import http from "node:http";
+import { loadProductLocale } from "./product-locale.mjs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -133,6 +134,7 @@ async function readBody(req, maximum = 131072) {
 }
 export async function startDashboard(options) {
   const { kind = "project", project, tailscale = true } = options;
+  const displayLocale = await loadProductLocale(options.language, options.environment ?? process.env);
   const port =
     options.port ||
     (kind === "harness"
@@ -513,6 +515,8 @@ export async function startDashboard(options) {
         req.method === "GET" &&
         (route === "/" ||
           route === "/app.mjs" ||
+          route === "/locale.mjs" ||
+          route === "/locale-details.mjs" ||
           route === "/human-annotations-ui.mjs" ||
           route === "/annotation-identifiers.mjs" ||
           route === "/observations.mjs" ||
@@ -608,12 +612,14 @@ export async function startDashboard(options) {
       }
       if (req.method === "GET" && route === "/") {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-        return res.end(await fs.readFile(path.join(here, "ui.html")));
+        return res.end((await fs.readFile(path.join(here, "ui.html"), "utf8")).replaceAll("__RDSH_LOCALE__", displayLocale));
       }
       if (
         req.method === "GET" &&
         [
           "/app.mjs",
+          "/locale.mjs",
+          "/locale-details.mjs",
           "/human-annotations-ui.mjs",
           "/annotation-identifiers.mjs",
           "/observations.mjs",

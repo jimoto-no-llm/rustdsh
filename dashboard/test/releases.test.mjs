@@ -1,3 +1,4 @@
+import { requiresOwnershipBackend } from "./ownership-support.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
@@ -102,7 +103,7 @@ async function fixture(t) {
   return { root, releases, projects, env, stage, attach };
 }
 
-test("failed one-project canary retains observations and cannot alter or roll out to the other project", async (t) => {
+test("failed one-project canary retains observations and cannot alter or roll out to the other project", requiresOwnershipBackend, async (t) => {
   const {
     releases,
     projects: [alpha, beta],
@@ -161,7 +162,7 @@ test("failed one-project canary retains observations and cannot alter or roll ou
   assert.deepEqual((await releases.inspect(beta)).selection, before);
 });
 
-test("existing run keeps the original adapter/Node/DSH command and native ID through update and verified rollback", async (t) => {
+test("existing run keeps the original adapter/Node/DSH command and native ID through update and verified rollback", requiresOwnershipBackend, async (t) => {
   const {
     releases,
     projects: [alpha, beta],
@@ -250,7 +251,7 @@ test("existing run keeps the original adapter/Node/DSH command and native ID thr
   assert.ok(!JSON.stringify(await releases.read()).includes(env.HOME));
 });
 
-test("public CLI re-execs the captured runtime and refuses overrides or changed pins", async (t) => {
+test("public CLI re-execs the captured runtime and refuses overrides or changed pins", requiresOwnershipBackend, async (t) => {
   const {
     releases,
     projects: [alpha],
@@ -357,11 +358,8 @@ test("public CLI re-execs the captured runtime and refuses overrides or changed 
   );
 });
 
-test("tampered, missing, incompatible and unqualified bytes block dispatch; legacy records are not silently pinned", async (t) => {
-  await assert.rejects(
-    qualifyRelease({ manifest: { tuple: { node: "v23.0.0" } } }, {}),
-    code("adapter_runtime_changed_use_pinned_cli"),
-  );
+test("tampered, missing, incompatible and unqualified bytes block dispatch; legacy records are not silently pinned", requiresOwnershipBackend, async (t) => {
+
   const {
     releases,
     projects: [alpha],
@@ -415,7 +413,7 @@ test("tampered, missing, incompatible and unqualified bytes block dispatch; lega
   assert.ok(!JSON.stringify(await releases.read()).includes(env.HOME));
 });
 
-test("stale selection plans never start native work, while exclusive registry ownership preserves concurrent writers", async (t) => {
+test("stale selection plans never start native work, while exclusive registry ownership preserves concurrent writers", requiresOwnershipBackend, async (t) => {
   const {
     releases,
     projects: [alpha, beta],
@@ -507,3 +505,11 @@ test("stale selection plans never start native work, while exclusive registry ow
 function rootFor(project) {
   return path.dirname(project.root);
 }
+
+
+test("qualification rejects a changed pinned runtime before native ownership", async () => {
+  await assert.rejects(
+    qualifyRelease({ manifest: { tuple: { node: "v23.0.0" } } }, {}),
+    code("adapter_runtime_changed_use_pinned_cli"),
+  );
+});

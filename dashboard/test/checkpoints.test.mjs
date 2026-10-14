@@ -1,3 +1,4 @@
+import { requiresOwnershipBackend } from "./ownership-support.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
@@ -87,7 +88,7 @@ async function setup(t, { subdirectory = false } = {}) {
   };
 }
 
-test("checkpoints bind the native ID, branch, durable event and timestamp without copying conversation or credentials", async (t) => {
+test("checkpoints bind the native ID, branch, durable event and timestamp without copying conversation or credentials", requiresOwnershipBackend, async (t) => {
   const f = await setup(t),
     checkpoint = await f.record();
   assert.equal(checkpoint.cli_session_id, f.attached.record.cli_session_id);
@@ -114,7 +115,7 @@ test("checkpoints bind the native ID, branch, durable event and timestamp withou
   );
 });
 
-test("a fresh formal session-list observation enables a candidate without pretending a resume acknowledgement", async (t) => {
+test("a fresh formal session-list observation enables a candidate without pretending a resume acknowledgement", requiresOwnershipBackend, async (t) => {
   const f = await setup(t),
     checkpoint = await f.record(),
     before = (await f.trace()).length;
@@ -130,7 +131,7 @@ test("a fresh formal session-list observation enables a candidate without preten
   assert.doesNotMatch(JSON.stringify(view), /fixture-title-secret/);
 });
 
-test("formal checkpoint resume confirms the same native ID and repeated recovery never replays it", async (t) => {
+test("formal checkpoint resume confirms the same native ID and repeated recovery never replays it", requiresOwnershipBackend, async (t) => {
   const f = await setup(t),
     checkpoint = await f.record();
   const result = await f.store.recover(checkpoint.checkpoint_id, {
@@ -169,7 +170,7 @@ test("formal checkpoint resume confirms the same native ID and repeated recovery
   );
 });
 
-test("a checkpoint safety refusal keeps its specific error code and blocks replay", async (t) => {
+test("a checkpoint safety refusal keeps its specific error code and blocks replay", requiresOwnershipBackend, async (t) => {
   const f = await setup(t),
     checkpoint = await f.record(),
     inspect = f.store.inspect.bind(f.store);
@@ -210,7 +211,7 @@ test("a checkpoint safety refusal keeps its specific error code and blocks repla
   assert.deepEqual(await f.trace(), trace);
 });
 
-test("a context safety error is preserved in the uncertain recovery record and never retried", async (t) => {
+test("a context safety error is preserved in the uncertain recovery record and never retried", requiresOwnershipBackend, async (t) => {
   const f = await setup(t),
     checkpoint = await f.record(),
     inspect = f.store.inspect.bind(f.store);
@@ -257,7 +258,7 @@ test("a context safety error is preserved in the uncertain recovery record and n
   assert.deepEqual(await f.trace(), trace);
 });
 
-test("missing and expired-session fixtures require a new-session choice, while unsupported or malformed native evidence is distinct", async (t) => {
+test("missing and expired-session fixtures require a new-session choice, while unsupported or malformed native evidence is distinct", requiresOwnershipBackend, async (t) => {
   const f = await setup(t),
     checkpoint = await f.record();
   for (const mode of [
@@ -289,7 +290,7 @@ test("missing and expired-session fixtures require a new-session choice, while u
   }
 });
 
-test("explicit context-loss choice creates a new native ID and sends the operator summary once with a checkpoint reference", async (t) => {
+test("explicit context-loss choice creates a new native ID and sends the operator summary once with a checkpoint reference", requiresOwnershipBackend, async (t) => {
   const f = await setup(t),
     checkpoint = await f.record();
   const options = {
@@ -336,7 +337,7 @@ test("explicit context-loss choice creates a new native ID and sends the operato
   assert.deepEqual(await f.trace(), trace);
 });
 
-test("worktree moves, changed branch and changed HEAD block recovery before native profile boot", async (t) => {
+test("worktree moves, changed branch and changed HEAD block recovery before native profile boot", requiresOwnershipBackend, async (t) => {
   const moved = await setup(t, { subdirectory: true }),
     checkpoint = await moved.record();
   await fs.rename(moved.cwd, path.join(moved.projectRoot, "relocated"));
@@ -394,7 +395,7 @@ test("worktree moves, changed branch and changed HEAD block recovery before nati
   }
 });
 
-test("unconfirmed control commands block recovery and completed external effects are never replayed", async (t) => {
+test("unconfirmed control commands block recovery and completed external effects are never replayed", requiresOwnershipBackend, async (t) => {
   const f = await setup(t);
   const id = await f.attached.history.recordCommand(
     f.attached.record.run_id,
@@ -420,7 +421,7 @@ test("unconfirmed control commands block recovery and completed external effects
   assert.deepEqual(await f.trace(), original);
 });
 
-test("referenced external outcomes must be known before resume, including an applied operation whose response was lost", async (t) => {
+test("referenced external outcomes must be known before resume, including an applied operation whose response was lost", requiresOwnershipBackend, async (t) => {
   for (const applied of [true, false]) {
     const f = await setup(t),
       retry = await RetryHistory.open(f.project),
@@ -469,7 +470,7 @@ test("referenced external outcomes must be known before resume, including an app
   }
 });
 
-test("corrupt checkpoint data and missing committed journal events refuse recovery without overwriting evidence", async (t) => {
+test("corrupt checkpoint data and missing committed journal events refuse recovery without overwriting evidence", requiresOwnershipBackend, async (t) => {
   const f = await setup(t),
     checkpoint = await f.record();
   const file = f.store.file(checkpoint.checkpoint_id),
@@ -502,7 +503,7 @@ test("corrupt checkpoint data and missing committed journal events refuse recove
   );
 });
 
-test("a lost summary response leaves the new session link uncertain and never dispatches the summary again", async (t) => {
+test("a lost summary response leaves the new session link uncertain and never dispatches the summary again", requiresOwnershipBackend, async (t) => {
   const f = await setup(t),
     checkpoint = await f.record(),
     counter = path.join(f.root, "summary-effects");
@@ -540,7 +541,7 @@ test("a lost summary response leaves the new session link uncertain and never di
   );
 });
 
-test("a flushed recovery intent blocks later clients if persistence fails before dispatch", async (t) => {
+test("a flushed recovery intent blocks later clients if persistence fails before dispatch", requiresOwnershipBackend, async (t) => {
   const f = await setup(t),
     checkpoint = await f.record(),
     save = f.store.saveAction.bind(f.store);
@@ -568,7 +569,7 @@ test("a flushed recovery intent blocks later clients if persistence fails before
   );
 });
 
-test("a surviving checkpoint writer lock remains visible and is never stolen to recover a session", async (t) => {
+test("a surviving checkpoint writer lock remains visible and is never stolen to recover a session", requiresOwnershipBackend, async (t) => {
   const f = await setup(t),
     checkpoint = await f.record(),
     lock = f.store.file(checkpoint.checkpoint_id, ".lock");
@@ -594,7 +595,7 @@ test("a surviving checkpoint writer lock remains visible and is never stolen to 
   assert.deepEqual(await f.trace(), trace);
 });
 
-test("separate public CLI clients record, inspect, resume and reject unsafe summary options", async (t) => {
+test("separate public CLI clients record, inspect, resume and reject unsafe summary options", requiresOwnershipBackend, async (t) => {
   const f = await setup(t);
   const base = [
     "--project",

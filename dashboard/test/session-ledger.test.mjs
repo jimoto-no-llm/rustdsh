@@ -1,3 +1,4 @@
+import { requiresOwnershipBackend } from "./ownership-support.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
@@ -200,7 +201,7 @@ test("separate writers share an exclusive lock and reload the last durable revis
   await fs.unlink(ledger.lock);
 });
 
-test("separate public CLI processes start, resolve and resume the same stored native session", async (t) => {
+test("separate public CLI processes start, resolve and resume the same stored native session", requiresOwnershipBackend, async (t) => {
   const { root, project, command, env, trace } = await setup(t, true);
   const args = [
     cli,
@@ -280,7 +281,7 @@ test("separate public CLI processes start, resolve and resume the same stored na
   assert.equal(saved.includes("fixture-secret-must-not-be-saved"), false);
 });
 
-test("resume rejects changed executable, home, branch and CLI version before claiming attachment", async (t) => {
+test("resume rejects changed executable, home, branch and CLI version before claiming attachment", requiresOwnershipBackend, async (t) => {
   const { ledger, command, env, project, adapters, trace } = await setup(
     t,
     true,
@@ -342,7 +343,7 @@ test("resume rejects changed executable, home, branch and CLI version before cla
   );
 });
 
-test("failed starts retain an unknown ID; failed resumes retain only the reported identity", async (t) => {
+test("failed starts retain an unknown ID; failed resumes retain only the reported identity", requiresOwnershipBackend, async (t) => {
   const { ledger, command, env } = await setup(t);
   await assert.rejects(
     attachRecordedSession({

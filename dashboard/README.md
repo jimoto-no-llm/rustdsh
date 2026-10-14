@@ -46,6 +46,16 @@ before stopping the live owned Harness run.
 
 `rdsh-dashboard` provides two separate entry points:
 
+The browser chrome follows the effective rdsh language (`en`, `zh-CN`, or
+`ja`). It localizes dashboard-owned labels, dates, numbers, and status text;
+task titles, questions, answers, model output, paths, identifiers, API fields,
+and server error details are shown exactly as received.
+Choose a single invocation with `rdsh-dashboard --language ja project ...`;
+selection uses `--language`, nonblank `RDSH_LANG`, `general.language`, then the
+first nonblank `LC_ALL`/`LC_MESSAGES`/`LANG`, finally English. A malformed saved
+language stops startup without rewriting its file. The DSH settings plugin has
+its own live selector; its `auto` follows the browser language.
+
 | Mode      | Purpose                                                    | Data source                                      |
 | --------- | ---------------------------------------------------------- | ------------------------------------------------ |
 | `project` | Project metrics, tasks, questions, human answers, progress | Six project-scoped MCP tools                     |

@@ -38,6 +38,8 @@ rdsh settings get extras.enable
 Web検索には別途SearXNGが必要です。DSH内のrdsh設定プラグインと、
 `setup --web` の初回設定画面は別の入口です。[設定画面の詳細](RDSH-SETTINGS.md)。
 
+表示言語は `--language` または `general.language` で英語・簡体字中国語・日本語を選べます。CLI の `auto` はロケール環境変数を使い、未設定・未対応なら英語になります。画面固有のラベル・日時・数値だけが切り替わり、モデル応答、会話、タスク本文、API JSON、ファイル名は原文のままです。
+
 ## 3. 目的に合う入口を選ぶ
 
 | 目的 | 入口 | 必要なもの |

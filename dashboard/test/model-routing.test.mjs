@@ -1,3 +1,4 @@
+import { requiresOwnershipBackend } from "./ownership-support.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
@@ -231,7 +232,7 @@ test("unsupported and malformed config options retain unknown values and never c
     "unknown",
   );
 });
-test("a declared run persists requested and native configuration separately and guards an actual prompt without storing its body", async (t) => {
+test("a declared run persists requested and native configuration separately and guards an actual prompt without storing its body", requiresOwnershipBackend, async (t) => {
   const f = await setup(t),
     attached = await f.attach();
   await f.store.bind(attached.record, requestedSelection(first));
@@ -262,7 +263,7 @@ test("a declared run persists requested and native configuration separately and 
     1,
   );
 });
-test("mismatched, absent or malformed native routes block a tracked prompt before dispatch and never select another model", async (t) => {
+test("mismatched, absent or malformed native routes block a tracked prompt before dispatch and never select another model", requiresOwnershipBackend, async (t) => {
   for (const mode of [
     "route_changed",
     "normal",
@@ -298,7 +299,7 @@ test("mismatched, absent or malformed native routes block a tracked prompt befor
     assert.equal(stopped.scope.resources_released, true);
   }
 });
-test("only an exact unexpired operator authorization accepts a changed native route and its history retains before, after and source", async (t) => {
+test("only an exact unexpired operator authorization accepts a changed native route and its history retains before, after and source", requiresOwnershipBackend, async (t) => {
   const f = await setup(t),
     original = await f.attach();
   await f.store.bind(original.record, requestedSelection(first));
@@ -375,7 +376,7 @@ test("only an exact unexpired operator authorization accepts a changed native ro
     0,
   );
 });
-test("the adapter repeats the assertion at its final send boundary after a native configuration update", async (t) => {
+test("the adapter repeats the assertion at its final send boundary after a native configuration update", requiresOwnershipBackend, async (t) => {
   const f = await setup(t, "route_drift"),
     adapter = createCliAdapter({
       command: f.command,
@@ -398,7 +399,7 @@ test("the adapter repeats the assertion at its final send boundary after a nativ
     1,
   );
 });
-test("corrupt route policies and surviving locks are preserved and block prompts instead of guessing an allowed route", async (t) => {
+test("corrupt route policies and surviving locks are preserved and block prompts instead of guessing an allowed route", requiresOwnershipBackend, async (t) => {
   const f = await setup(t),
     attached = await f.attach();
   await f.store.bind(attached.record, requestedSelection(first));
@@ -440,7 +441,7 @@ test("corrupt route policies and surviving locks are preserved and block prompts
     0,
   );
 });
-test("separate public clients bind, probe and inspect a native configuration without sending a prompt or modifying DSH routing", async (t) => {
+test("separate public clients bind, probe and inspect a native configuration without sending a prompt or modifying DSH routing", requiresOwnershipBackend, async (t) => {
   const f = await setup(t),
     attached = await f.attach();
   await attached.adapter.stop();
@@ -530,7 +531,7 @@ test("separate public clients bind, probe and inspect a native configuration wit
   );
 });
 
-test("a checkpoint cannot drop a declared model assertion while starting a new conversation with a summary", async (t) => {
+test("a checkpoint cannot drop a declared model assertion while starting a new conversation with a summary", requiresOwnershipBackend, async (t) => {
   const f = await setup(t),
     attached = await f.attach();
   await f.store.bind(attached.record, requestedSelection(first));

@@ -10,25 +10,31 @@ pub struct TokenHandoff {
 }
 
 impl TokenHandoff {
-    pub fn create(token: &str) -> Result<Self> {
+    pub fn create(token: &str, locale: crate::locale::Locale) -> Result<Self> {
         let dir = std::env::temp_dir();
         for _ in 0..8 {
             // The name is independently random; the bearer credential is only file content.
             let name = format!("rdsh-token-{}.txt", crate::local_http::random_token()?);
             let path = dir.join(name);
-            let mut file = match open_restricted(&path) {
+            let mut file = match open_restricted(&path, locale) {
                 Ok(file) => file,
                 Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
                 Err(error) => {
                     return Err(error).with_context(|| {
                         format!(
-                            "cannot create protected token handoff file {}",
+                            "{} {}",
+                            handoff_text(
+                                locale,
+                                "cannot create protected token handoff file",
+                                "无法创建受保护的令牌交接文件",
+                                "保護されたトークン引き渡しファイルを作成できません"
+                            ),
                             path.display()
                         )
                     });
                 }
             };
-            if let Err(error) = write_handoff(&mut file, &path, token) {
+            if let Err(error) = write_handoff(&mut file, &path, token, locale) {
                 drop(file);
                 let _ = fs::remove_file(&path);
                 return Err(error);
@@ -36,7 +42,13 @@ impl TokenHandoff {
             return Ok(Self { path });
         }
         bail!(
-            "could not create a unique token handoff file in {}",
+            "{} {}",
+            handoff_text(
+                locale,
+                "could not create a unique token handoff file in",
+                "无法在以下位置创建唯一的令牌交接文件：",
+                "一意なトークン引き渡しファイルを作成できません:"
+            ),
             dir.display()
         )
     }
@@ -52,7 +64,9 @@ impl Drop for TokenHandoff {
     }
 }
 
-fn open_restricted(path: &Path) -> std::io::Result<File> {
+fn open_restricted(path: &Path, locale: crate::locale::Locale) -> std::io::Result<File> {
+    #[cfg(unix)]
+    let _ = locale;
     let mut options = OpenOptions::new();
     options.write(true).create_new(true);
     #[cfg(unix)]
@@ -62,7 +76,7 @@ fn open_restricted(path: &Path) -> std::io::Result<File> {
     }
     let file = options.open(path)?;
     #[cfg(windows)]
-    if let Err(error) = restrict_windows_acl(path) {
+    if let Err(error) = restrict_windows_acl(path, locale) {
         drop(file);
         let _ = fs::remove_file(path);
         return Err(std::io::Error::other(error.to_string()));
@@ -73,40 +87,89 @@ fn open_restricted(path: &Path) -> std::io::Result<File> {
         let _ = fs::remove_file(path);
         return Err(std::io::Error::new(
             std::io::ErrorKind::Unsupported,
-            "secure token handoff is not supported on this platform",
+            handoff_text(
+                locale,
+                "secure token handoff is not supported on this platform",
+                "此平台不支持安全令牌交接",
+                "このプラットフォームでは安全なトークン引き渡しをサポートしていません",
+            ),
         ));
     }
     Ok(file)
 }
 
-fn write_handoff(file: &mut File, path: &Path, token: &str) -> Result<()> {
-    file.write_all(token.as_bytes())
-        .with_context(|| format!("cannot write token handoff file {}", path.display()))?;
-    file.sync_all()
-        .with_context(|| format!("cannot flush token handoff file {}", path.display()))
+fn write_handoff(
+    file: &mut File,
+    path: &Path,
+    token: &str,
+    locale: crate::locale::Locale,
+) -> Result<()> {
+    file.write_all(token.as_bytes()).with_context(|| {
+        format!(
+            "{} {}",
+            handoff_text(
+                locale,
+                "cannot write token handoff file",
+                "无法写入令牌交接文件",
+                "トークン引き渡しファイルを書き込めません"
+            ),
+            path.display()
+        )
+    })?;
+    file.sync_all().with_context(|| {
+        format!(
+            "{} {}",
+            handoff_text(
+                locale,
+                "cannot flush token handoff file",
+                "无法刷新令牌交接文件",
+                "トークン引き渡しファイルをフラッシュできません"
+            ),
+            path.display()
+        )
+    })
 }
 
 #[cfg(windows)]
-fn restrict_windows_acl(path: &Path) -> Result<()> {
+fn restrict_windows_acl(path: &Path, locale: crate::locale::Locale) -> Result<()> {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
-    let system_root = std::env::var_os("SystemRoot")
-        .context("SystemRoot is unavailable; cannot protect the token handoff file")?;
+    let system_root = std::env::var_os("SystemRoot").context(handoff_text(
+        locale,
+        "SystemRoot is unavailable; cannot protect the token handoff file",
+        "SystemRoot 不可用；无法保护令牌交接文件",
+        "SystemRoot を利用できないためトークン引き渡しファイルを保護できません",
+    ))?;
     let system32 = PathBuf::from(system_root).join("System32");
     let whoami = std::process::Command::new(system32.join("whoami.exe"))
         .args(["/user", "/fo", "csv", "/nh"])
         .creation_flags(CREATE_NO_WINDOW)
         .output()
-        .context("cannot determine the current Windows account SID")?;
+        .context(handoff_text(
+            locale,
+            "cannot determine the current Windows account SID",
+            "无法确定当前 Windows 帐户 SID",
+            "現在の Windows アカウント SID を取得できません",
+        ))?;
     if !whoami.status.success() {
-        bail!("cannot determine the current Windows account SID");
+        bail!(handoff_text(
+            locale,
+            "cannot determine the current Windows account SID",
+            "无法确定当前 Windows 帐户 SID",
+            "現在の Windows アカウント SID を取得できません"
+        ));
     }
     let output = String::from_utf8_lossy(&whoami.stdout);
     let sid = output
         .lines()
         .find_map(parse_whoami_sid)
-        .context("whoami did not return a valid current-account SID")?;
+        .context(handoff_text(
+            locale,
+            "whoami did not return a valid current-account SID",
+            "whoami 未返回有效的当前帐户 SID",
+            "whoami が有効な現在のアカウント SID を返しませんでした",
+        ))?;
 
     // Create the file empty, then remove inherited access before writing any secret bytes.
     // Keep SYSTEM access for normal Windows servicing; the current account gets full control.
@@ -120,17 +183,42 @@ fn restrict_windows_acl(path: &Path) -> Result<()> {
         .output()
         .with_context(|| {
             format!(
-                "cannot set permissions on token handoff file {}",
+                "{} {}",
+                handoff_text(
+                    locale,
+                    "cannot set permissions on token handoff file",
+                    "无法设置令牌交接文件的权限",
+                    "トークン引き渡しファイルの権限を設定できません"
+                ),
                 path.display()
             )
         })?;
     if !acl.status.success() {
         bail!(
-            "cannot set permissions on token handoff file {}",
+            "{} {}",
+            handoff_text(
+                locale,
+                "cannot set permissions on token handoff file",
+                "无法设置令牌交接文件的权限",
+                "トークン引き渡しファイルの権限を設定できません"
+            ),
             path.display()
         );
     }
     Ok(())
+}
+
+fn handoff_text(
+    locale: crate::locale::Locale,
+    english: &'static str,
+    chinese: &'static str,
+    japanese: &'static str,
+) -> &'static str {
+    match locale {
+        crate::locale::Locale::English => english,
+        crate::locale::Locale::Chinese => chinese,
+        crate::locale::Locale::Japanese => japanese,
+    }
 }
 
 #[cfg(windows)]
@@ -159,7 +247,7 @@ mod tests {
     #[test]
     fn handoff_contains_token_and_is_removed_on_drop() {
         let token = "credential-that-must-not-be-in-the-path";
-        let handoff = TokenHandoff::create(token).unwrap();
+        let handoff = TokenHandoff::create(token, crate::locale::Locale::English).unwrap();
         assert_ne!(handoff.path().file_name().unwrap().to_string_lossy(), token);
         assert_eq!(std::fs::read_to_string(handoff.path()).unwrap(), token);
         #[cfg(unix)]
