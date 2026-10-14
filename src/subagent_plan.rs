@@ -1422,6 +1422,17 @@ mod tests {
     }
 
     #[test]
+    fn invalid_tiers_report_the_first_error_in_source_order() {
+        let request: Value = serde_json::from_str(
+            r#"{"use_case":"review","tiers":{"zeta":{"provider":"p","model":"m","effort":null},"alpha":{"provider":"p","model":"m","effort":null}},"items":[{"id":"a"}]}"#,
+        )
+        .unwrap();
+
+        let error = plan_subagents(&request).expect_err("unknown tiers should be refused");
+        assert_eq!(error.code, "invalid-tier:zeta");
+    }
+
+    #[test]
     fn item_and_signal_defaults_match_the_request() {
         // kind is validated but never enters the plan; null passes in JS.
         plan(&json!({
