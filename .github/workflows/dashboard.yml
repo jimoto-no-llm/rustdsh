@@ -65,7 +65,7 @@ jobs:
       - if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory ../fault-simulator-results | Out-Null
+          New-Item -ItemType Directory -Force ../fault-simulator-results | Out-Null
           node fault-simulator.mjs run --seed 1 --output ../fault-simulator-results/run
           $faultRunCode = $LASTEXITCODE
           node fault-simulator.mjs replay --manifest ../fault-simulator-results/run/input.json --output ../fault-simulator-results/replay
@@ -75,7 +75,7 @@ jobs:
       - if: runner.os == 'Linux'
         shell: bash
         run: |
-          mkdir ../fault-simulator-results
+          mkdir -p ../fault-simulator-results
           sudo systemd-run --unit="rdsh-fault-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
             --wait --pipe --collect --property=Delegate=yes \
             --property=DelegateSubgroup=supervisor --uid="$(id -u)" \
