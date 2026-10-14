@@ -8,40 +8,46 @@ const exec = promisify(execFile);
 const procBsdInfoSize = 136;
 const procBsdInfo = 3;
 const esrch = 3;
+const szomb = 5;
 let nativeApi;
+const scopeCache = new WeakMap();
 
 const digest = (value) => createHash("sha256").update(value).digest("hex");
 
 async function scope() {
-  const [uuid, boottime] = await Promise.all([
-    exec("/usr/sbin/sysctl", ["-n", "kern.uuid"], {
-      shell: false,
-      timeout: 1000,
-      maxBuffer: 4096,
-    }),
-    exec("/usr/sbin/sysctl", ["-n", "kern.boottime"], {
-      shell: false,
-      timeout: 1000,
-      maxBuffer: 4096,
-    }),
-  ]);
+  const uuid = await exec("/usr/sbin/sysctl", ["-n", "kern.bootsessionuuid"], {
+    shell: false,
+    timeout: 1000,
+    maxBuffer: 4096,
+  });
   const host = os.hostname();
-  const boot = /^\{ sec = ([1-9][0-9]*), usec = ([0-9]{1,6}) \}/.exec(
-    boottime.stdout,
-  );
   if (
     typeof host !== "string" ||
     host.length === 0 ||
     !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\s*$/i.test(
       uuid.stdout,
-    ) ||
-    !boot ||
-    Number(boot[2]) >= 1_000_000
+    )
   )
     throw new Error("darwin scope unavailable");
-  return digest(
-    `${host}\n${uuid.stdout.trim().toLowerCase()}\n${boot[1]}\n${boot[2]}`,
-  );
+  return digest(`${host}\n${uuid.stdout.trim().toLowerCase()}`);
+}
+
+async function cachedScope(scopeReader) {
+  let pending = scopeCache.get(scopeReader);
+  if (!pending) {
+    pending = Promise.resolve().then(scopeReader).then((value) => {
+      if (!/^[0-9a-f]{64}$/.test(value))
+        throw new Error("darwin scope unavailable");
+      return value;
+    });
+    scopeCache.set(scopeReader, pending);
+  }
+  try {
+    return await pending;
+  } catch (error) {
+    if (scopeCache.get(scopeReader) === pending) scopeCache.delete(scopeReader);
+    throw error;
+  }
 }
 
 async function libproc() {
@@ -60,11 +66,6 @@ async function libproc() {
 }
 
 function identity(pid, buffer, processScope) {
-  if (
-    buffer.length !== procBsdInfoSize ||
-    buffer.readUInt32LE(12) !== pid
-  )
-    return null;
   const seconds = buffer.readBigUInt64LE(120);
   const microseconds = buffer.readBigUInt64LE(128);
   if (seconds === 0n || microseconds >= 1_000_000n) return null;
@@ -82,9 +83,7 @@ export async function readDarwinProcess(
 ) {
   let processScope;
   try {
-    processScope = await scopeReader();
-    if (!/^[0-9a-f]{64}$/.test(processScope))
-      throw new Error("darwin scope unavailable");
+    processScope = await cachedScope(scopeReader);
     const api = await nativeReader();
     const buffer = Buffer.alloc(procBsdInfoSize);
     const bytes = api.procPidInfo(pid, procBsdInfo, 0n, buffer, buffer.length);
@@ -99,6 +98,16 @@ export async function readDarwinProcess(
       return { status: "unknown", identity: null };
     }
     if (bytes !== procBsdInfoSize) return { status: "unknown", identity: null };
+    if (buffer.readUInt32LE(12) !== pid)
+      return { status: "unknown", identity: null };
+    // proc_bsdinfo.pbi_status is the kernel p_stat; SZOMB is no longer alive.
+    if (buffer.readUInt32LE(4) === szomb)
+      return {
+        status: "gone",
+        identity: null,
+        platform: "darwin",
+        scope: processScope,
+      };
     const observed = identity(pid, buffer, processScope);
     return observed
       ? { status: "observed", ...observed }
