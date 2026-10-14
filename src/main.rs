@@ -1,5 +1,6 @@
 use clap::{CommandFactory, Parser, Subcommand};
 mod auth;
+mod auth_sharing;
 mod compact;
 mod compute;
 mod context;
@@ -22,6 +23,7 @@ mod slim;
 mod token_handoff;
 mod tokens;
 mod tool_security;
+mod update_auto;
 mod websearch;
 
 #[derive(Parser, Debug)]
@@ -189,28 +191,16 @@ enum Commands {
         #[arg(long = "port")]
         port: Option<u16>,
     },
-    /// OAuth auto-recognition: external logins (codex/opencode) mirrored
-    /// into $DSH_HOME/.credentials.yaml ("drop in and recognized")
-    Auth {
-        #[arg(long = "import")]
-        import: bool,
-        #[arg(long)]
-        provider: Option<String>,
-        #[arg(long)]
-        source: Option<String>,
-        #[arg(long = "ref")]
-        key_ref: Option<String>,
-        #[arg(long = "json")]
-        json: bool,
-    },
+    /// Inventory, select and import only explicitly shared credentials
+    Auth(auth_sharing::AuthArgs),
     /// Register an OpenAI-compatible endpoint (HAI, a home LLM server) as a
     /// dsh route in a profile: `provider list`, `provider add hai|sarashina|local-openai`
     Provider {
         #[command(subcommand)]
         action: ProviderAction,
     },
-    /// First-run connect: import what exists, persist env keys, optionally
-    /// run the provider login flow or reveal settings dirs, else show next step
+    /// First-run connect: sync selected credentials, optionally run login
+    /// or reveal settings dirs, else show the next step
     Setup {
         #[arg(long = "open")]
         open: bool,
@@ -255,6 +245,12 @@ enum Commands {
         reason: Option<String>,
         #[arg(long = "json")]
         json: bool,
+    },
+    /// Auto-update timer: status, on, or off (daily systemd user timer)
+    #[command(name = "update")]
+    Update {
+        #[command(subcommand)]
+        action: UpdateAction,
     },
     /// Unified rdsh settings (rdsh.json): show values, path, or write defaults
     Settings {
@@ -324,6 +320,38 @@ enum FeaturesAction {
     On { id: String },
     /// Disable one feature: rdsh features off discord
     Off { id: String },
+}
+
+#[derive(Subcommand, Debug)]
+enum UpdateAction {
+    /// Daily auto-update timer for released rdsh/dsh versions
+    Auto {
+        #[command(subcommand)]
+        action: AutoAction,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum AutoAction {
+    /// Show the unit directory, updater script and timer state
+    Status {
+        #[arg(long = "json")]
+        json: bool,
+    },
+    /// Install and start the daily auto-update timer
+    On {
+        #[arg(long = "dry-run")]
+        dry_run: bool,
+        #[arg(long = "json")]
+        json: bool,
+    },
+    /// Stop and remove the auto-update timer
+    Off {
+        #[arg(long = "dry-run")]
+        dry_run: bool,
+        #[arg(long = "json")]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -548,6 +576,17 @@ fn main() {
             });
             guard::cmd_guard(merged, reason, json, policy_file)
         }
+        Some(Commands::Update { action }) => match action {
+            UpdateAction::Auto { action } => match action {
+                AutoAction::Status { json } => update_auto::cmd_update_auto("status", false, json),
+                AutoAction::On { dry_run, json } => {
+                    update_auto::cmd_update_auto("on", dry_run, json)
+                }
+                AutoAction::Off { dry_run, json } => {
+                    update_auto::cmd_update_auto("off", dry_run, json)
+                }
+            },
+        },
         Some(Commands::Settings { action }) => match action {
             SettingsAction::Path => {
                 println!("{}", rdsh_config::settings_path());
@@ -743,13 +782,7 @@ fn main() {
                 ContextAction::Explain { query, budget } => context::cmd_explain(query, budget),
             }
         }
-        Some(Commands::Auth {
-            import,
-            json,
-            provider,
-            source,
-            key_ref,
-        }) => auth::cmd_auth(import, json, provider, source, key_ref),
+        Some(Commands::Auth(args)) => auth::cmd_auth(args, dry),
         Some(Commands::Provider { action }) => match action {
             ProviderAction::List { json } => providers::cmd_list(json),
             ProviderAction::Add {
@@ -794,7 +827,7 @@ fn main() {
             web,
             port,
         }) => {
-            if web {
+            if web && !dry {
                 if rdsh_config::feature_enabled(&cfg, "setup_web") {
                     setup_web::cmd_setup_web(port.unwrap_or(cfg.setup.web_port))
                 } else {
@@ -803,7 +836,7 @@ fn main() {
                     ))
                 }
             } else {
-                auth::cmd_setup(open, login, json, yes)
+                auth::cmd_setup(open, login, json, yes, dry)
             }
         }
         Some(Commands::DumpConfig { profile, native }) => {
