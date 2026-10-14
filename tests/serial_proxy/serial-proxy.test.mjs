@@ -372,3 +372,288 @@ test('(o) five direct HTTP requests overlap while the proxy caps the same upstre
   assert.equal(total, 5);
   assert.equal(active, 0);
 });
+
+// ---- --tool-choice-default / --rpm (#489) ----
+
+function fakeClock(start = 1_000_000) {
+  let now = start, seq = 0;
+  const timers = new Map();
+  return {
+    now: () => now,
+    setTimeout: (fn, ms) => { const id = ++seq; timers.set(id, { at: now + ms, fn }); return id; },
+    clearTimeout: (id) => { timers.delete(id); },
+    advance(ms) {
+      const target = now + ms;
+      for (;;) {
+        let next = null;
+        for (const [id, t] of timers) if (t.at <= target && (!next || t.at < next.t.at)) next = { id, t };
+        if (!next) break;
+        timers.delete(next.id); now = Math.max(now, next.t.at); next.t.fn();
+      }
+      now = target;
+    },
+  };
+}
+
+async function until(cond, ms = 3000) {
+  const t0 = Date.now();
+  while (!cond()) { if (Date.now() - t0 > ms) throw new Error('until: timeout'); await sleep(5); }
+}
+
+/** Upstream that records raw request bodies. `sseDelay` > 0 streams a 2-event response with a pause between. */
+async function captureUpstream({ sseDelay = 0, now = () => Date.now() } = {}) {
+  const st = { seen: [], finished: 0 };
+  const server = http.createServer((req, res) => {
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
+    req.on('end', () => {
+      st.seen.push({ method: req.method, url: req.url, headers: req.headers, body: Buffer.concat(chunks), at: now() });
+      if (!sseDelay) { res.writeHead(200, { 'content-type': 'application/json' }); res.end('{"ok":true}'); st.finished++; return; }
+      res.writeHead(200, { 'content-type': 'text/event-stream' });
+      res.write('data: 1\n\n');
+      const t = setTimeout(() => { res.end('data: 2\n\n'); st.finished++; }, sseDelay);
+      res.on('close', () => clearTimeout(t));
+    });
+  });
+  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
+  cleanups.push(() => new Promise((r) => { server.closeAllConnections(); server.close(r); }));
+  return { st, url: `http://127.0.0.1:${server.address().port}` };
+}
+
+/** POST pieces one by one. Without content-length the request is sent chunked. */
+function rawPost(url, pieces, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const list = (Array.isArray(pieces) ? pieces : [pieces]).map((p) => Buffer.from(p));
+    const req = http.request(url, { method: 'POST', headers }, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => resolve({ status: res.statusCode, text: Buffer.concat(chunks).toString() }));
+    });
+    req.on('error', reject);
+    (async () => { for (const p of list) { req.write(p); await sleep(5); } req.end(); })();
+  });
+}
+
+const JSON_CT = { 'content-type': 'application/json' };
+const TOOLS = [{ type: 'function', function: { name: 'f', parameters: { type: 'object' } } }];
+const CHAT = '/v1/chat/completions';
+
+async function tcProxy(options = {}, upOptions = {}) {
+  const up = await captureUpstream(upOptions);
+  const logs = [];
+  const p = await startProxyServer(up.url, { toolChoiceDefault: 'auto', log: (l) => logs.push(l), ...options });
+  return { up, p, logs };
+}
+
+test('(tc-1) defaults tool_choice only for non-empty tools without tool_choice, with a correct content-length', async () => {
+  const { up, p, logs } = await tcProxy();
+  const original = JSON.stringify({ model: 'm', messages: [{ role: 'user', content: 'こんにちは' }], tools: TOOLS });
+  const r = await rawPost(`${p.url}${CHAT}`, original, { ...JSON_CT, 'content-length': Buffer.byteLength(original) });
+  assert.equal(r.status, 200);
+  const got = up.st.seen[0];
+  assert.deepEqual(JSON.parse(got.body), { ...JSON.parse(original), tool_choice: 'auto' });
+  assert.match(got.body.toString(), /"tool_choice":"auto"/);
+  assert.equal(Number(got.headers['content-length']), got.body.length);
+  assert.equal(got.headers['transfer-encoding'], undefined);
+  assert.ok(logs.some((l) => /^tool_choice defaulted id=\d+$/.test(l)));
+});
+
+test('(tc-1b) a chunked client request is rewritten with content-length and no transfer-encoding', async () => {
+  const { up, p } = await tcProxy({ toolChoiceDefault: 'none' });
+  const body = JSON.stringify({ model: 'm', tools: TOOLS });
+  await rawPost(`${p.url}/chat/completions`, [body.slice(0, 10), body.slice(10)], JSON_CT);
+  const got = up.st.seen[0];
+  assert.equal(got.url, '/chat/completions');
+  assert.equal(JSON.parse(got.body).tool_choice, 'none');
+  assert.equal(Number(got.headers['content-length']), got.body.length);
+  assert.equal(got.headers['transfer-encoding'], undefined);
+});
+
+test('(tc-2) every other request reaches the upstream byte-identical', async () => {
+  const { up, p, logs } = await tcProxy({ maxBodyBytes: 300 });
+  const odd = (o) => ` {  "model" : "m" ,\n "tools":${JSON.stringify(o.tools)}${o.extra ?? ''} } `;
+  const cases = [
+    ['existing tool_choice', CHAT, JSON_CT, odd({ tools: TOOLS, extra: ',"tool_choice":"required"' })],
+    ['existing tool_choice null', CHAT, JSON_CT, odd({ tools: TOOLS, extra: ',"tool_choice":null' })],
+    ['no tools', CHAT, JSON_CT, '{ "model" : "m", "messages":[] }'],
+    ['empty tools', CHAT, JSON_CT, odd({ tools: [] })],
+    ['tools not an array', CHAT, JSON_CT, '{"tools":{"a":1}}'],
+    ['top-level array', CHAT, JSON_CT, '[{"tools":[1]}]'],
+    ['embeddings path', '/v1/embeddings', JSON_CT, odd({ tools: TOOLS })],
+    ['non-json content-type', CHAT, { 'content-type': 'text/plain' }, odd({ tools: TOOLS })],
+    ['no content-type', CHAT, {}, odd({ tools: TOOLS })],
+    ['invalid json', CHAT, JSON_CT, '{"tools":[1,'],
+    ['invalid utf-8', CHAT, JSON_CT, Buffer.concat([Buffer.from('{"tools":[1],"x":"'), Buffer.from([0xff, 0xfe]), Buffer.from('"}')])],
+    ['utf-8 bom', CHAT, JSON_CT, Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from('{"tools":[1]}')])],
+    ['oversized (content-length)', CHAT, JSON_CT, odd({ tools: TOOLS }) + ' '.repeat(400)],
+  ];
+  for (const [name, url, headers, body] of cases) {
+    const buf = Buffer.from(body);
+    const r = await rawPost(`${p.url}${url}`, buf, { ...headers, 'content-length': buf.length });
+    assert.equal(r.status, 200, name);
+    assert.ok(up.st.seen.at(-1).body.equals(buf), `${name}: body must be unchanged`);
+  }
+  // oversized and chunked: the cap is exceeded mid-stream, everything must still arrive in order
+  const big = Buffer.from(odd({ tools: TOOLS }) + 'x'.repeat(2000));
+  const pieces = []; for (let i = 0; i < big.length; i += 100) pieces.push(big.subarray(i, i + 100));
+  await rawPost(`${p.url}${CHAT}`, pieces, JSON_CT);
+  assert.ok(up.st.seen.at(-1).body.equals(big), 'oversized chunked body must be unchanged');
+  // GET with a JSON content-type
+  const g = await fetch(`${p.url}${CHAT}`, { headers: JSON_CT });
+  assert.equal(g.status, 200);
+  assert.equal(up.st.seen.at(-1).method, 'GET');
+  assert.equal(up.st.seen.at(-1).body.length, 0);
+  assert.equal(logs.filter((l) => l.includes('defaulted')).length, 0);
+});
+
+test('(tc-3) without the option nothing is buffered or rewritten', async () => {
+  const up = await captureUpstream();
+  const p = await startProxyServer(up.url);
+  const body = Buffer.from(JSON.stringify({ model: 'm', tools: TOOLS }));
+  await rawPost(`${p.url}${CHAT}`, body, { ...JSON_CT, 'content-length': body.length });
+  assert.ok(up.st.seen[0].body.equals(body));
+  assert.equal((await (await fetch(`${p.url}/__proxy/status`)).json()).rpm, undefined, 'no rpm fields without --rpm');
+});
+
+test('(tc-4) the SSE response is still streamed incrementally after a rewritten request', async () => {
+  const { up, p } = await tcProxy({}, { sseDelay: 600 });
+  const body = JSON.stringify({ model: 'm', stream: true, tools: TOOLS });
+  const r = await fetch(`${p.url}${CHAT}`, { method: 'POST', headers: JSON_CT, body });
+  const reader = r.body.getReader();
+  const first = await reader.read();
+  assert.match(Buffer.from(first.value).toString(), /data: 1/);
+  assert.equal(up.st.finished, 0, 'upstream must still be running');
+  assert.match(up.st.seen[0].body.toString(), /"tool_choice":"auto"/);
+  while (!(await reader.read()).done);
+});
+
+test('(tc-5) the body is read only once a slot is held; a queued client disconnect leaves no trace', async () => {
+  const { up, p } = await tcProxy({ max: 1 }, { sseDelay: 500 });
+  const body = JSON.stringify({ tools: TOOLS });
+  const first = rawPost(`${p.url}${CHAT}`, body, JSON_CT);
+  await until(() => up.st.seen.length === 1);
+  const req = http.request(`${p.url}${CHAT}`, { method: 'POST', headers: JSON_CT });
+  req.on('error', () => {}); req.write(body.slice(0, 5));
+  await until(() => p.server.sem.queued === 1);
+  req.destroy();
+  await until(() => p.server.sem.queued === 0);
+  await first;
+  assert.equal(up.st.seen.length, 1);
+});
+
+test('(tc-6) logs, status and error bodies never contain request bodies or the Authorization value', async () => {
+  const clock = fakeClock();
+  const { up, p, logs } = await tcProxy({ clock, rpm: 1, queueTimeout: 5 });
+  const secret = 'SECRET-PROMPT-TEXT', key = 'sk-very-secret-key';
+  const body = JSON.stringify({ messages: [{ role: 'user', content: secret }], tools: TOOLS });
+  const headers = { ...JSON_CT, authorization: `Bearer ${key}` };
+  await rawPost(`${p.url}${CHAT}`, body, headers);
+  const second = rawPost(`${p.url}${CHAT}`, body, headers);
+  await until(() => p.server.sem.active === 1);
+  await sleep(30);
+  const status = await (await fetch(`${p.url}/__proxy/status`)).text();
+  clock.advance(5000);
+  const err = await second;
+  assert.equal(err.status, 503);
+  const all = [...logs, status, err.text].join('\n');
+  assert.ok(!all.includes(secret) && !all.includes(key), 'no body text or credentials in logs/status/errors');
+  assert.equal(up.st.seen[0].headers.authorization, `Bearer ${key}`);
+});
+
+test('(rpm-1) --rpm 2 with 5 requests: no 60s window holds more than 2 dispatches', async () => {
+  const clock = fakeClock();
+  const { up, p } = await tcProxy({ clock, rpm: 2, max: 5, toolChoiceDefault: null }, { now: clock.now });
+  const rs = Array.from({ length: 5 }, () => get(`${p.url}/x`));
+  await until(() => up.st.seen.length === 2);
+  await sleep(50);
+  assert.equal(up.st.seen.length, 2, 'the third request waits for the next window');
+  const s = await (await fetch(`${p.url}/__proxy/status`)).json();
+  assert.equal(s.rpm, 2);
+  assert.equal(s.window_count, 2);
+  assert.equal(s.next_slot_in, 60);
+  clock.advance(30_000);
+  assert.equal((await (await fetch(`${p.url}/__proxy/status`)).json()).next_slot_in, 30);
+  clock.advance(30_000);
+  await until(() => up.st.seen.length === 4);
+  await sleep(50);
+  assert.equal(up.st.seen.length, 4);
+  clock.advance(60_000);
+  await until(() => up.st.seen.length === 5);
+  const results = await Promise.all(rs);
+  assert.ok(results.every((r) => r.status === 200));
+  const perWindow = new Map();
+  for (const { at } of up.st.seen) { const w = Math.floor((at - up.st.seen[0].at) / 60_000); perWindow.set(w, (perWindow.get(w) ?? 0) + 1); }
+  assert.ok([...perWindow.values()].every((n) => n <= 2), JSON.stringify([...perWindow]));
+});
+
+test('(rpm-2) a waiting request that disconnects frees its slot and is never dispatched', async () => {
+  const clock = fakeClock();
+  const { up, p } = await tcProxy({ clock, rpm: 1, max: 5, toolChoiceDefault: null });
+  await get(`${p.url}/a`);
+  const ac = new AbortController();
+  const waiting = fetch(`${p.url}/b`, { signal: ac.signal }).catch(() => 'aborted');
+  await until(() => p.server.sem.active === 1);
+  ac.abort();
+  assert.equal(await waiting, 'aborted');
+  await until(() => p.server.sem.active === 0);
+  clock.advance(60_000);
+  await sleep(50);
+  assert.equal(up.st.seen.length, 1, 'the aborted request must not be dispatched');
+  assert.equal((await get(`${p.url}/c`)).status, 200);
+  assert.deepEqual(up.st.seen.map((s) => s.url), ['/a', '/c']);
+});
+
+test('(rpm-3) queue timeout while waiting for the window -> 503, nothing dispatched later', async () => {
+  const clock = fakeClock();
+  const { up, p } = await tcProxy({ clock, rpm: 1, max: 5, queueTimeout: 20, toolChoiceDefault: null });
+  await get(`${p.url}/a`);
+  const waiting = get(`${p.url}/b`);
+  await until(() => p.server.sem.active === 1);
+  clock.advance(20_000);
+  const r = await waiting;
+  assert.equal(r.status, 503);
+  assert.equal(JSON.parse(r.text).error.type, 'serial_proxy_error');
+  assert.equal(p.server.sem.active, 0);
+  clock.advance(60_000);
+  await sleep(50);
+  assert.equal(up.st.seen.length, 1);
+});
+
+test('(rpm-4) rpm waiters hold FIFO order and combine with --max 1', async () => {
+  const clock = fakeClock();
+  const { up, p } = await tcProxy({ clock, rpm: 1, max: 1, toolChoiceDefault: null });
+  const rs = ['/1', '/2', '/3'].map((u, i) => sleep(i * 20).then(() => get(`${p.url}${u}`)));
+  await until(() => up.st.seen.length === 1);
+  for (let i = 0; i < 2; i++) { await sleep(60); clock.advance(60_000); }
+  await Promise.all(rs);
+  assert.deepEqual(up.st.seen.map((s) => s.url), ['/1', '/2', '/3']);
+});
+
+test('(cli) bad values are usage errors; the CLI rewrites end to end', async () => {
+  const run = (args) => new Promise((resolve) => {
+    const child = spawn(process.execPath, [SCRIPT, '--upstream', 'http://127.0.0.1:1', '--port', '0', ...args], { stdio: ['ignore', 'ignore', 'pipe'] });
+    let err = ''; child.stderr.on('data', (d) => { err += d; });
+    child.on('exit', (code) => resolve({ code, err }));
+  });
+  for (const args of [['--tool-choice-default', 'any'], ['--tool-choice-default', ''], ['--rpm', '0'], ['--rpm', 'abc'], ['--rpm', '1.5'], ['--rpm=-1'], ['--max-body-bytes', '0'], ['--max-body-bytes', 'x']]) {
+    const r = await run(args);
+    assert.equal(r.code, 2, args.join(' '));
+    assert.match(r.err, /serial-proxy: /);
+  }
+  const up = await captureUpstream();
+  const p = await startProxy(up.url, ['--tool-choice-default', 'auto', '--rpm', '6']);
+  const body = JSON.stringify({ tools: TOOLS });
+  assert.equal((await rawPost(`${p.url}${CHAT}`, body, JSON_CT)).status, 200);
+  assert.equal(JSON.parse(up.st.seen[0].body).tool_choice, 'auto');
+  const s = await (await fetch(`${p.url}/__proxy/status`)).json();
+  assert.equal(s.rpm, 6);
+  assert.equal(s.window_count, 1);
+});
+
+test('createProxy validates the new options', () => {
+  const up = 'http://127.0.0.1:1';
+  assert.throws(() => createProxy({ upstream: up, toolChoiceDefault: 'any' }), TypeError);
+  assert.throws(() => createProxy({ upstream: up, maxBodyBytes: 0 }), TypeError);
+  assert.throws(() => createProxy({ upstream: up, rpm: 0 }), TypeError);
+  assert.throws(() => createProxy({ upstream: up, rpm: 1.5 }), TypeError);
+});
