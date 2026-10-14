@@ -10,7 +10,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Keep required PR/main/tag names stable; distinguish the fully executed branch-push run.
   msrv:
+    name: "msrv${{ github.event_name == 'push' && github.ref_type == 'branch' && github.event.repository.default_branch && github.ref_name != github.event.repository.default_branch && ' [branch push]' || '' }}"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -18,6 +20,7 @@ jobs:
       - run: cargo check --locked --all-targets
 
   release-policy:
+    name: "release-policy${{ github.event_name == 'push' && github.ref_type == 'branch' && github.event.repository.default_branch && github.ref_name != github.event.repository.default_branch && ' [branch push]' || '' }}"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -33,6 +36,7 @@ jobs:
           python3 scripts/prepare-release.py "v$version"
 
   update-banner-windows:
+    name: "update-banner-windows${{ github.event_name == 'push' && github.ref_type == 'branch' && github.event.repository.default_branch && github.ref_name != github.event.repository.default_branch && ' [branch push]' || '' }}"
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
@@ -62,19 +66,37 @@ jobs:
           BIN=./target/debug/rdsh DSH_ORIG_BIN=/tmp/stub-dsh sh tests/regress.sh
 
   plugin-security:
+    name: "plugin-security${{ github.event_name == 'push' && github.ref_type == 'branch' && github.event.repository.default_branch && github.ref_name != github.event.repository.default_branch && ' [branch push]' || '' }}"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-      - run: node --test tests/plugin-security.test.mjs tests/settings-client.test.mjs tests/update-banner.test.mjs tests/feature-switches.test.mjs tests/discord-presence.test.mjs tests/model_benchmark/fence.test.mjs
+      - run: node --test tests/plugin-security.test.mjs tests/settings-client.test.mjs tests/update-banner.test.mjs tests/feature-switches.test.mjs tests/discord-presence.test.mjs tests/model_benchmark/fence.test.mjs tests/serial_proxy/serial-proxy.test.mjs
       - name: Install pinned public DSH APIs for the optional plugins
         run: npm install --prefix "$RUNNER_TEMP/rdsh-public-api" --ignore-scripts --no-audit --no-fund @deepseek-ai/dsh-subagent@0.2.0-rc.2 @deepseek-ai/dsh-tool-subagent@0.2.0-rc.2 @deepseek-ai/dsh-client-ui-slots@0.2.0-rc.2
       - name: Check native API compatibility without model or authentication calls
         run: RDSH_PUBLIC_DSH_MODULES="$RUNNER_TEMP/rdsh-public-api/node_modules" node --test plugins/rdsh-subagent-optimizer/test/*.test.mjs plugins/rdsh-easy-work/test/*.test.mjs
 
+  muse-subscription:
+    name: "muse-subscription (${{ matrix.os }})${{ github.event_name == 'push' && github.ref_type == 'branch' && github.event.repository.default_branch && github.ref_name != github.event.repository.default_branch && ' [branch push]' || '' }}"
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: plugins/rdsh-llm-muse-code-subscription
+      - run: npm test
+        working-directory: plugins/rdsh-llm-muse-code-subscription
+
   security-boundaries:
+    name: "security-boundaries${{ github.event_name == 'push' && github.ref_type == 'branch' && github.event.repository.default_branch && github.ref_name != github.event.repository.default_branch && ' [branch push]' || '' }}"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -97,7 +119,7 @@ jobs:
           RDSH_TOOL_RUNTIME="$RUNNER_TEMP/rdsh-runtime/node_modules/@deepseek-ai/dsh-tools/lib/index.js" RDSH_SECURE_WORKSPACE="$GITHUB_WORKSPACE" RDSH_SHARED_FILES='[]' node --import ./security/preload.mjs tests/guarded-runtime-probe.mjs
 
   lint:
-    name: Rust lint
+    name: "Rust lint${{ github.event_name == 'push' && github.ref_type == 'branch' && github.event.repository.default_branch && github.ref_name != github.event.repository.default_branch && ' [branch push]' || '' }}"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -108,6 +130,7 @@ jobs:
       - run: cargo clippy --all-targets -- -D warnings
 
   test:
+    name: "test (${{ matrix.os }}, ${{ matrix.regress }})${{ github.event_name == 'push' && github.ref_type == 'branch' && github.event.repository.default_branch && github.ref_name != github.event.repository.default_branch && ' [branch push]' || '' }}"
     strategy:
       fail-fast: false
       matrix:
@@ -172,6 +195,7 @@ jobs:
         run: BIN=./target/debug/rdsh.exe bash tests/regress.sh --windows-installer-delegation
 
   browser-e2e:
+    name: "browser-e2e${{ github.event_name == 'push' && github.ref_type == 'branch' && github.event.repository.default_branch && github.ref_name != github.event.repository.default_branch && ' [branch push]' || '' }}"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -198,7 +222,7 @@ jobs:
   # fresh-machine install working on older glibc distros and musl hosts; see
   # tests/install-isolated/ and docs/RELEASING.md.
   install-isolated:
-    name: Isolated install
+    name: "Isolated install${{ github.event_name == 'push' && github.ref_type == 'branch' && github.event.repository.default_branch && github.ref_name != github.event.repository.default_branch && ' [branch push]' || '' }}"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

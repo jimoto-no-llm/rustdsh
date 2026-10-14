@@ -173,7 +173,7 @@ pub fn pick_latest_node_tree<'a>(
 pub fn latest_node_tree_for(opt_dir: &str) -> Option<String> {
     let (want_os, want_arch) = current_os_arch();
     let entries = std::fs::read_dir(opt_dir).ok()?;
-    let mut names: Vec<String> = vec![];
+    let mut names: Vec<String> = Vec::new();
     for e in entries.flatten() {
         if e.metadata().is_ok_and(|m| m.is_dir()) {
             if let Some(n) = e.file_name().to_str().map(str::to_owned) {
@@ -444,7 +444,7 @@ mod tests {
     use super::*;
 
     fn sv(v: &[&str]) -> Vec<String> {
-        v.iter().map(|s| s.to_string()).collect()
+        v.iter().map(ToString::to_string).collect()
     }
 
     #[test]
@@ -462,7 +462,7 @@ mod tests {
         static M: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
         M.get_or_init(|| std::sync::Mutex::new(()))
             .lock()
-            .unwrap_or_else(|e| e.into_inner())
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
     struct EnvGuard {
@@ -550,7 +550,7 @@ mod tests {
     #[test]
     fn path_lookup_skips_non_executable_dsh_and_node() {
         let _guard = env_lock();
-        let _env = EnvGuard::set(&[
+        let env = EnvGuard::set(&[
             "PATH",
             "RDSH_ORIG_BIN",
             "DSH_ORIG_BIN",
@@ -587,8 +587,8 @@ mod tests {
         }
         // PATH keeps working system dirs after our fixtures; fixtures come
         // first to prove they are skipped when non-executable.
-        let sys_path = _env.saved[0].1.clone().unwrap_or_default();
-        let mut parts = vec![first.clone(), second.clone()];
+        let sys_path = env.saved[0].1.clone().unwrap_or_default();
+        let mut parts = vec![first.clone(), second];
         parts.extend(std::env::split_paths(&sys_path));
         std::env::set_var("PATH", std::env::join_paths(&parts).unwrap());
         // 1. Leading directory with the target name is skipped.

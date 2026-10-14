@@ -21,7 +21,7 @@ It ports frequently used CLI operations (token calculation, code search, session
 - ⚡ **Sub-millisecond startup & low memory**: `--version` launches in ~0.90 ms with ~2.9 MB peak memory, compared to ~88 ms and ~66 MB for Node.js-based `dsh`.
 - 🔄 **100% Drop-in Compatible**: Subcommands that are not rdsh-native are passed straight to upstream `dsh`. Existing scripts and workflows keep running unchanged.
 - 🛠 **Fast Native Utilities**: Estimate tokens, search code, list sessions, and inspect local prerequisites (`rdsh doctor --json`) without starting Node.js.
-- 🛡 **Safe by Default**: Read-only commands never mutate files, credentials are never automatically synced or exported, and agent tools can be confined to explicitly shared files on Linux.
+- 🛡 **Safe by Default**: Read-only commands never modify source files, credentials are never automatically synced or exported, and agent tools can be confined to explicitly shared files on Linux.
 
 ## Table of Contents
 
@@ -362,6 +362,7 @@ Measurements conducted on Linux x86_64:
 | [docs/FEDORA.md](docs/FEDORA.md) | Fedora / RHEL packages, optional tools, and the Linux desktop reality |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Project roadmap and planned capabilities |
 | [docs/RELEASING.md](docs/RELEASING.md) | Release procedures |
+| [docs/SERIAL-PROXY.md](docs/SERIAL-PROXY.md) | Concurrency-limiting proxy for single-slot providers |
 | [CHANGELOG.md](CHANGELOG.md) | Changes per version |
 
 ## Community

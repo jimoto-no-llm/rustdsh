@@ -324,6 +324,7 @@ Linux x86_64 環境での測定値です：
 | [docs/FEDORA.md](docs/FEDORA.md) | Fedora / RHEL 向けパッケージ・任意ツール・Linux でのデスクトップ事情 |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 今後の開発ロードマップ |
 | [docs/RELEASING.md](docs/RELEASING.md) | リリース手順 |
+| [docs/SERIAL-PROXY.md](docs/SERIAL-PROXY.md) | 同時リクエスト数制限プロキシ |
 | [CHANGELOG.md](CHANGELOG.md) | バージョンごとの主な変更履歴 |
 
 ## コミュニティ
