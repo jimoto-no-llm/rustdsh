@@ -2,6 +2,8 @@ name: docs
 
 on:
   push:
+    branches: [main]
+    tags: ['v*']
     paths:
       - '**/*.md'
       - '.markdownlint.yml'
@@ -18,6 +20,7 @@ on:
       - '.markdownlint.yml'
       - '.lychee.toml'
       - '.github/workflows/**'
+  workflow_dispatch:
 
 permissions:
   contents: read
