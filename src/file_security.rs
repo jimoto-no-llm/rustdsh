@@ -64,9 +64,9 @@ impl Root {
         if relative.as_os_str().is_empty() {
             return None;
         }
-        let components: Vec<_> = relative.components().collect();
+        let mut components = relative.components().peekable();
         let mut current: Option<std::fs::File> = None;
-        for (index, component) in components.iter().copied().enumerate() {
+        while let Some(component) = components.next() {
             let name = match component {
                 std::path::Component::Normal(name) => CString::new(name.as_bytes()).ok()?,
                 _ => return None,
@@ -74,7 +74,7 @@ impl Root {
             let flags = libc::O_RDONLY
                 | libc::O_CLOEXEC
                 | libc::O_NOFOLLOW
-                | if index + 1 == components.len() {
+                | if components.peek().is_none() {
                     libc::O_NONBLOCK
                 } else {
                     libc::O_DIRECTORY
@@ -163,6 +163,41 @@ mod secure_open_tests {
         assert!(open_beneath(&root, &fifo).is_none());
         assert!(reader.open(&fifo).is_none());
         assert!(open_beneath(&root, &root).is_none());
+        std::fs::remove_dir_all(temporary).unwrap();
+    }
+
+    #[test]
+    fn rejects_nested_parent_symlink_swap_after_a_successful_open() {
+        use std::io::Read;
+
+        let temporary = std::env::temp_dir().join(format!(
+            "rdsh-nested-parent-open-{}",
+            crate::local_http::random_token().unwrap()
+        ));
+        let project = temporary.join("project");
+        let nested_parent = project.join("one/two");
+        let nested_file = nested_parent.join("three/four/file.txt");
+        let outside = temporary.join("outside");
+        std::fs::create_dir_all(nested_file.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(outside.join("three/four")).unwrap();
+        std::fs::write(&nested_file, "approved").unwrap();
+        std::fs::write(outside.join("three/four/file.txt"), "DUMMY_OUTSIDE_FILE").unwrap();
+
+        let root = std::fs::canonicalize(&project).unwrap();
+        let reader = Root::new(&root).unwrap();
+        let validated = std::fs::canonicalize(&nested_file).unwrap();
+        let mut text = String::new();
+        reader
+            .open(&validated)
+            .unwrap()
+            .read_to_string(&mut text)
+            .unwrap();
+        assert_eq!(text, "approved");
+
+        std::fs::rename(&nested_parent, project.join("one/original-two")).unwrap();
+        std::os::unix::fs::symlink(&outside, &nested_parent).unwrap();
+
+        assert!(reader.open(&validated).is_none());
         std::fs::remove_dir_all(temporary).unwrap();
     }
 
