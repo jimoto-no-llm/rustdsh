@@ -1,17 +1,19 @@
 name: ci
 
-on: [push, pull_request]
+# PRs validate the merge result. Do not duplicate their matrix on branch pushes;
+# main and version tags retain full validation, including the release CI gate.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
-# Key on the branch, not `github.ref`: a branch push uses `refs/heads/<branch>`
-# while its pull request uses `refs/pull/<n>/merge`, so a ref-keyed group lets
-# both run the full matrix for the same commit. With 60+ open pull requests that
-# doubled the queue for no extra coverage. `head_ref` is empty on a push to a
-# branch in this repository, so fall back to `ref_name`.
 concurrency:
-  group: ci-${{ github.event.pull_request.head.ref || github.ref_name }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
