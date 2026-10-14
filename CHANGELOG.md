@@ -5,6 +5,14 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Security
+
+- The optional `rdsh-mcp-exposure` plugin pins its development
+  `@modelcontextprotocol/client` to the patched line (2.3.1, override) instead
+  of the 2.0.0 that the upstream `dsh-mcp-client` peer pulls in, clearing the
+  high-severity GHSA-6qxp-vccf-f47h alert. Runtime resolution is unchanged: the
+  plugin uses the host DSH's MCP client.
+
 ### Added
 
 - `rdsh provider add hai|sarashina|local-openai` writes an OpenAI-compatible route into a
