@@ -1,0 +1,31 @@
+{
+  "name": "rdsh-mcp-exposure",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Optional scoped exposure and branch-local discovery for the original DSH MCP client",
+  "type": "module",
+  "exports": { ".": "./index.js", "./policy": "./policy.js" },
+  "files": ["index.js", "policy.js", "discovery.js", "tools.js", "README.md", "cordis.patch.yml"],
+  "scripts": { "test": "node --test test/*.test.mjs", "benchmark": "node benchmark.mjs" },
+  "engines": { "node": ">=22.22.0" },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.0.4",
+    "@deepseek-ai/dsh-mcp-client": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-session": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-system-prompt": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-tools": "0.2.0-rc.2"
+  },
+  "dependencies": { "@deepseek-ai/schemastery": "~3.18.4" },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "4.0.4",
+    "@deepseek-ai/dsh-llm": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-mcp-client": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-scope": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-session": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-system-prompt": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-tools": "0.2.0-rc.2",
+    "@modelcontextprotocol/server": "2.0.0",
+    "@modelcontextprotocol/node": "2.0.0",
+    "js-tiktoken": "1.0.21"
+  }
+}

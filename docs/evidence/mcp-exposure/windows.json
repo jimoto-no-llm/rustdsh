@@ -1,0 +1,213 @@
+{
+  "format": "rdsh-mcp-exposure-fixture-v1",
+  "measuredAt": "2026-10-08T20:39:36.627Z",
+  "platform": "win32",
+  "arch": "x64",
+  "node": "v22.23.3",
+  "source": {
+    "files": [
+      {
+        "path": "index.js",
+        "sha256": "6c70a84f2c072bf8f4810be15075c6b418138082ce747832ce44ed8fbd1bdb2e"
+      },
+      {
+        "path": "policy.js",
+        "sha256": "9991700570df47b74a0077c057ebe17177f5746594dfa813764ffc9a7c729542"
+      },
+      {
+        "path": "discovery.js",
+        "sha256": "064cdb4f23c19e647dac3774d054b3512bebc3e11f7238101dcf69a0eea67f18"
+      },
+      {
+        "path": "tools.js",
+        "sha256": "67cfb1deb1415d1ff5d3aa80a52e41baefab830b246b44c9abd943f86020ebb6"
+      },
+      {
+        "path": "package.json",
+        "sha256": "6d1e68091ba115539cb98fcb6f073d187b4399203342726ac00619a74a0f08a0"
+      },
+      {
+        "path": "package-lock.json",
+        "sha256": "4f64e90406b94b0f658aad77806d7658ba02ca1b0eb13cb86eb0797a24a070bd"
+      },
+      {
+        "path": "benchmark.mjs",
+        "sha256": "59adb71482e6b9de251b1f7abefe5280412d157c11cb9308e946a54a299d6d4f"
+      },
+      {
+        "path": "test/fixtures.mjs",
+        "sha256": "1b6f82e79dbf59ee29556e5c620fe144c1242cb1c884581dc298e86c6f53ee3c"
+      },
+      {
+        "path": "test/mcp-fixture.mjs",
+        "sha256": "560bdcedf467dfff1af1faabf632ad09033fba062c4c8e4e7216290a68cab5b6"
+      }
+    ],
+    "sha256": "ba8f1a1d6c91b068270e0c2bf7c96018d752100c494caae78bea9a99ffb11cf3"
+  },
+  "fixture": {
+    "tools": 1000,
+    "cases": 80,
+    "controlledListDelayMs": 250,
+    "transport": "real MCP SDK/client over loopback HTTP",
+    "tokenizer": "offline js-tiktoken 1.0.21 cl100k_base",
+    "dshVersion": "0.2.0-rc.2",
+    "baseline": "original MCP client and native ToolRuntime",
+    "candidate": "same original runtime plus deferred exposure bundle",
+    "realModel": false,
+    "externalMcpServer": false,
+    "credentials": false,
+    "billingApi": false
+  },
+  "baseline": {
+    "output": {
+      "firstDeclarations": [
+        "mcp__fixed__read_0000",
+        "mcp__fixed__read_0001",
+        "mcp__fixed__read_0002",
+        "mcp__fixed__read_0003",
+        "mcp__fixed__read_0004"
+      ],
+      "lastDeclarations": [
+        "mcp__fixed__read_0000",
+        "mcp__fixed__read_0001",
+        "mcp__fixed__read_0002",
+        "mcp__fixed__read_0003",
+        "mcp__fixed__read_0004"
+      ],
+      "exampleCall": {
+        "actualWireRequest": {
+          "name": "read_0007",
+          "arguments": {
+            "key": "case-000"
+          }
+        },
+        "actualStructuredContent": {
+          "value": "FIXTURE:read_0007:case-000"
+        }
+      }
+    },
+    "initial": {
+      "declaredMcpTools": 1000,
+      "totalDeclaredTools": 1000,
+      "schemaTokens": 59002,
+      "fullAssemblyTokens": 59048,
+      "schemaBytes": 265891,
+      "activationMs": 406.5265,
+      "firstPromptMs": 411.8268,
+      "firstPromptBeforeListRelease": false,
+      "assemblyMs": {
+        "samples": 5,
+        "median": 2.685200000000009,
+        "min": 2.4313000000000784,
+        "max": 2.9904999999999973
+      }
+    },
+    "after80Loads": {
+      "declaredMcpTools": 1000,
+      "totalDeclaredTools": 1000,
+      "schemaTokens": 59002,
+      "fullAssemblyTokens": 59048,
+      "assemblyMs": {
+        "samples": 5,
+        "median": 2.3876000000000204,
+        "min": 2.328399999999874,
+        "max": 3.0054000000000087
+      }
+    },
+    "correctness": {
+      "cases": 80,
+      "correctWireCalls": 80,
+      "wrongWireCalls": 0
+    },
+    "calls": {
+      "nativeMcpCalls": 80,
+      "helperCalls": 0,
+      "startupProbeSearchCalls": 0,
+      "nativeMcpCallMs": {
+        "samples": 80,
+        "median": 1.9266999999999825,
+        "min": 1.6374999999999318,
+        "max": 15.597599999999943
+      }
+    }
+  },
+  "candidate": {
+    "output": {
+      "firstDeclarations": [
+        "rdsh_mcp_load",
+        "rdsh_mcp_search",
+        "rdsh_mcp_status"
+      ],
+      "lastDeclarations": [
+        "mcp__fixed__read_0007",
+        "mcp__fixed__read_0008",
+        "mcp__fixed__read_0020",
+        "mcp__fixed__read_0021",
+        "mcp__fixed__read_0033"
+      ],
+      "exampleCall": {
+        "actualWireRequest": {
+          "name": "read_0007",
+          "arguments": {
+            "key": "case-000"
+          }
+        },
+        "actualStructuredContent": {
+          "value": "FIXTURE:read_0007:case-000"
+        }
+      }
+    },
+    "initial": {
+      "declaredMcpTools": 0,
+      "totalDeclaredTools": 3,
+      "schemaTokens": 239,
+      "fullAssemblyTokens": 372,
+      "schemaBytes": 1186,
+      "activationMs": 4.020100000000184,
+      "firstPromptMs": 15.498100000000022,
+      "firstPromptBeforeListRelease": true,
+      "assemblyMs": {
+        "samples": 5,
+        "median": 131.58550000000014,
+        "min": 126.53189999999995,
+        "max": 136.89980000000014
+      }
+    },
+    "after80Loads": {
+      "declaredMcpTools": 80,
+      "totalDeclaredTools": 83,
+      "schemaTokens": 4959,
+      "fullAssemblyTokens": 5092,
+      "assemblyMs": {
+        "samples": 5,
+        "median": 182.44590000000244,
+        "min": 159.39909999999873,
+        "max": 200.25599999999758
+      }
+    },
+    "correctness": {
+      "cases": 80,
+      "correctWireCalls": 80,
+      "wrongWireCalls": 0,
+      "exactLookupMatches": 80
+    },
+    "calls": {
+      "nativeMcpCalls": 80,
+      "helperCalls": 160,
+      "startupProbeSearchCalls": 1,
+      "nativeMcpCallMs": {
+        "samples": 80,
+        "median": 3.9406999999991967,
+        "min": 2.8277000000016415,
+        "max": 5.391700000000128
+      },
+      "searchAndLoadMs": {
+        "samples": 80,
+        "median": 347.6364999999987,
+        "min": 283.12429999999995,
+        "max": 421.2044999999998
+      }
+    }
+  }
+}

@@ -26,8 +26,14 @@ flowchart LR
 Prerequisites: a clean committed checkout, Rust/Cargo, `zstd`, `shasum`, an
 installed DSH with `headless --json`, and an existing authenticated credential
 store. The provider catalog is a non-secret JSON object keyed by `openai-codex`
-and `anthropic`, each with a `models` array. It must include `gpt-6.1-sol` and
-`claude-sonnet-5-5`, including their official compatibility metadata.
+and `anthropic`, each with a `models` array. Each selected provider must contain
+the exact requested installed model ID. The official installed catalog supplies
+its model metadata: raw SDK `compat` fields are not profile overrides and must
+not be copied into DSH configuration. The catalog and runtime artifact are
+fingerprinted in the report. The defaults
+remain `gpt-6.1-sol` and `claude-sonnet-5-5`; `--codex-model` and
+`--anthropic-model` select other catalog IDs without fallback. With
+`--only-provider`, the other provider's catalog is not required.
 
 ```sh
 cargo build --release --example benchmark_models --bin rdsh
@@ -45,6 +51,14 @@ path. The report fingerprints the Rust binary, original launcher and optional
 runtime bundle with SHA-256, and records both versions and the source commit.
 The live runner is verified on macOS; offline Rust tests also run in the repository's
 Linux/macOS/Windows matrix. A new run directory is required each time.
+
+For a catalog containing `gpt-6-astra` but no Anthropic models, use
+`--only-provider openai-codex --codex-model gpt-6-astra`. Model IDs must begin
+with an ASCII letter or digit, contain only letters, digits, dots, hyphens or
+underscores, and fit in 128 bytes; they are also used in private run-directory
+names. An ID absent from the supplied catalog fails before creating the run or sending
+a request. The installed runtime must also recognize the selected ID; its
+configuration failures count as failed runs, with no alternate model fallback.
 
 Use `--only-case rust_fix` and optionally `--only-provider anthropic` for a
 bounded follow-up. Follow-up results remain separate from the original benchmark.
@@ -117,3 +131,31 @@ The JSON field `median_success_seconds` is nearest-rank p50 (the lower middle
 sample for an even successful sample count). Rust repairs additionally record
 `generated_source_allowed` and `cargo_oracle_passed`; `null` means the Cargo
 oracle was not executed, rather than passed.
+
+`--codex-sse` selects `transport: sse` and `cacheRetention: none` only for the
+benchmark's isolated `openai-codex` provider. All other provider options, exact
+model selection, request budgets, and the two-second normal-exit rule remain
+unchanged. The flag is off by default and recorded in `report.json`; compare
+SSE runs separately from earlier automatic-transport runs.
+
+### Local SSE acceptance on 2026-10-14
+
+On macOS with the installed DSH 0.2.0-rc.2 / pi-ai 0.87.1 runtime, the explicit
+Codex SSE option passed 24/24 model and normal-exit checks. Each model ran three
+rounds of original response, rdsh response, file read, and fenced Rust repair.
+The source was `18d0bf34ab65406491c7d127b49587134ca7588b`; request limits,
+high reasoning effort, retry 0, source allowlist, and the two-second exit limit
+were unchanged. All six Rust repairs passed the independent 0..=1000 oracle.
+
+| Model | Original response p50 (s) | rdsh response p50 (s) | Read p50 (s) | Rust repair p50 (s) | Accepted |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| gpt-6-astra | 5.329 | 4.988 | 7.826 | 10.120 | 12/12 |
+| gpt-6-sol | 4.087 | 4.787 | 5.813 | 9.521 | 12/12 |
+
+Each cell has only three samples. Model order alternated between rounds, but
+original preceded rdsh within a round. These timings include network/model work
+and do not establish model ranking or launcher speed. Earlier automatic-transport
+runs had 23/24 model checks and 0/24 normal exits; they remain separate results.
+An explicit provider profile patch replaces its options, so include transport
+and cache retention in that patch when testing SSE. This measurement covers
+Codex on macOS; Anthropic and other platforms were not live-tested here.

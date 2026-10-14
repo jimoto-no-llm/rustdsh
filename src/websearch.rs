@@ -349,10 +349,21 @@ fn fetch(base: &str, query: &str) -> anyhow::Result<Vec<Hit>> {
         Some(i) => &text[i + 4..],
         None => anyhow::bail!("bad HTTP response from {base}"),
     };
-    if !body.contains("<article") {
-        anyhow::bail!("no SearXNG results page from {base} (is SEARXNG_URL right?)");
-    }
+    ensure_results_page(body, base)?;
     Ok(parse_html(body, 50))
+}
+
+/// SearXNG の 0 件応答は `<article` を含まないため、本文の見た目だけで
+/// URL 設定ミスと断定しない。SearXNG だと分かるマーカーがあれば 0 件として通す。
+fn ensure_results_page(body: &str, base: &str) -> anyhow::Result<()> {
+    if body.contains("<article") || looks_like_searxng(body) {
+        return Ok(());
+    }
+    anyhow::bail!("no SearXNG results page from {base} (is SEARXNG_URL right?)")
+}
+
+fn looks_like_searxng(body: &str) -> bool {
+    body.contains("id=\"results\"") || body.contains("content=\"searxng")
 }
 
 pub fn cmd_search_web(query: &str, limit: usize, json: bool) -> anyhow::Result<()> {
@@ -397,6 +408,27 @@ pub fn cmd_search_web(query: &str, limit: usize, json: bool) -> anyhow::Result<(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // 0 件でも正しい SearXNG インスタンスなら成功扱いにする（設定ミスと誤診しない）。
+    #[test]
+    fn empty_searxng_page_is_not_a_configuration_error() {
+        let page =
+            "<html><body><div id=\"results\"><p>No results were found.</p></div></body></html>";
+        assert!(ensure_results_page(page, "http://127.0.0.1:8888").is_ok());
+        assert!(parse_html(page, 50).is_empty());
+    }
+
+    #[test]
+    fn searxng_generator_meta_is_accepted() {
+        let page = "<html><head><meta name=\"generator\" content=\"searxng/2026\"></head></html>";
+        assert!(ensure_results_page(page, "http://127.0.0.1:8888").is_ok());
+    }
+
+    #[test]
+    fn a_plain_page_is_still_reported_as_a_wrong_url() {
+        let page = "<html><body><h1>hello</h1></body></html>";
+        assert!(ensure_results_page(page, "http://127.0.0.1:8888").is_err());
+    }
 
     #[test]
     fn query_encoding() {

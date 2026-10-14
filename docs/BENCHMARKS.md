@@ -20,7 +20,7 @@ and [2026-10-08 model runtime results](evidence/model-runtime-20261008.md).
 | search (`--max 10`, 160 files, 960k matching lines) | ~4.61ms | v0.2.0 ~197.77ms | ~42.9x |
 | tokens (9.6MB text) | ~12ms | before ~35ms | ~2.9x |
 | sessions --tokens (20 sessions) | ~0.41s | before ~1.65s | ~4.0x |
-| Distribution size | one ~806KB binary | ~508MB Node tree | -- |
+| Distribution size | one ~1.8-2.3MB binary (v0.3.3, per platform) | ~508MB Node tree | -- |
 
 ## How to reproduce
 

@@ -8,6 +8,7 @@ import {
   readProcessIdentity,
   validProcessIdentity,
 } from "./process-identity.mjs";
+import { readDarwinProcessOwner } from "./darwin-process-identity.mjs";
 
 const execFile = promisify(execFileCallback);
 const validPid = (pid) =>
@@ -41,6 +42,11 @@ async function ownerFingerprint(pid, scope) {
       if (result.status !== "observed" || typeof result.sid !== "string")
         return null;
       owner = `sid:${result.sid.toLowerCase()}`;
+    } else if (process.platform === "darwin") {
+      const result = await readDarwinProcessOwner(pid);
+      if (result.status !== "observed" || typeof result.owner !== "string")
+        return null;
+      owner = result.owner;
     } else return null;
   } catch {
     return null;
