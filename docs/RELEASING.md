@@ -175,7 +175,10 @@ The script reads GitHub's own asset digests (`gh release view --json assets`
 does not expose them), writes the four Unix archives to `release-digests.tsv`
 and `rdsh-windows-x64.zip` to `release-digests-windows.tsv`, updates both
 `latest` rows, keeps older rows for explicit `--version` installs, and refuses
-prerelease tags, missing archives or values that are not a SHA-256. Raw list:
+prerelease tags, missing archives or values that are not a SHA-256. Pinning an
+older release only backfills its rows: each `latest` row moves forward only, so
+re-pinning a past version never moves the install and automatic-update channel
+backwards. Raw list:
 
 ```sh
 gh api repos/jimoto-no-llm/rustdsh/releases/tags/vX.Y.Z \
