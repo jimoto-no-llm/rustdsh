@@ -94,3 +94,30 @@ console.log(JSON.stringify(process.argv.slice(2)));
     ]);
   }
 });
+
+test("legacy task-outcomes command skips non-executable rdsh candidates on Unix", {
+  skip: process.platform === "win32",
+}, (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "rdsh-outcome-path-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const blockedDir = path.join(root, "blocked");
+  const usableDir = path.join(root, "usable");
+  fs.mkdirSync(blockedDir);
+  fs.mkdirSync(usableDir);
+  const blocked = path.join(blockedDir, "rdsh");
+  const usable = path.join(usableDir, "rdsh");
+  fs.writeFileSync(blocked, "#!/bin/sh\necho wrong-candidate\n");
+  fs.chmodSync(blocked, 0o644);
+  fs.writeFileSync(usable, "#!/bin/sh\necho selected-candidate\n");
+  fs.chmodSync(usable, 0o755);
+
+  const result = run(
+    ["task-outcomes", "schema", "--input-file", "request.json"],
+    {
+      PATH: [blockedDir, usableDir, "/usr/bin", "/bin"].join(path.delimiter),
+    },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, "selected-candidate\n");
+  assert.equal(result.stderr, "");
+});
