@@ -7,6 +7,13 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Added
 
+- `plugins/rdsh-mobile-ui` is bundled and installed by `./plugins/install.sh`:
+  below 767px the Web chat and composer use the full viewport width, the collapsed
+  sidebar becomes a one-tap logo for the session list, and question cards fit the
+  phone. The rules are adapted from Smart-DSH
+  (<https://github.com/hikarioyama/Smart-DSH>, MIT) and ship only that responsive
+  layout — not Smart-DSH's notifications, Esc handling or task hub. See
+  [README](plugins/rdsh-mobile-ui/README.md).
 - `rdsh provider add hai|sarashina|local-openai` writes an OpenAI-compatible route into a
   profile's `llm-pi-ai` providers (models from `--model`, opencode's
   `provider.<id>` or `GET /models`), keeping every other byte of
@@ -42,12 +49,19 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   Windows descendants cannot be observed (no Job Object support): the leader
   tree is killed with `taskkill /T /F` while the leader is alive and cleanup is
   always reported `unconfirmed` (`windows_tree_unobservable`).
-- `scripts/serial-proxy.mjs` gains `--tool-choice-default <none|auto|required>`
-  (adds a default `tool_choice` to `chat/completions` requests that send `tools`
-  without one, all other requests are forwarded byte-identical; needed for
-  Sarashina, which otherwise forces tool calls) and `--rpm <n>` (fixed 60-second
-  window cap on upstream requests, waiting inside the existing queue and exposed
-  in `/__proxy/status`). See `docs/SERIAL-PROXY.md`.
+- `rdsh serial-proxy` replaces the standalone Node.js proxy with a native Rust
+  command. It keeps the FIFO concurrency and rate limits, streams request and
+  response bodies, and supports `--tool-choice-default <none|auto|required>`
+  for Sarashina-compatible requests. See `docs/SERIAL-PROXY.md`.
+
+### Fixed
+
+- `sync-dsh.sh` discovers the `@deepseek-ai/dsh` tree by candidate instead of
+  `npm root -g` alone (`DSH_PKG_ROOT`, npm's global root, the newest
+  `~/.local/opt/*` tree, then the older per-user prefixes). A tree it cannot
+  find, or one outside npm's global root, is reported and skipped while the
+  rdsh release update still succeeds; npm-managed trees keep digest pinning,
+  downgrade refusal, verification and rollback. See `docs/AUTO-UPDATE.md`.
 
 ## [0.3.3] - 2026-10-13
 

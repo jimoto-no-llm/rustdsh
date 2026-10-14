@@ -1,7 +1,7 @@
 #!/bin/sh
 # Install recommended dsh plugins into a profile (idempotent per package).
-# Also installs the bundled rdsh plugins (rdsh settings UI) so they are
-# available by default.
+# Also installs the bundled rdsh plugins (rdsh settings UI and the phone-width
+# layout adapted from Smart-DSH, MIT) so they are available by default.
 # Usage: [PROFILE=headless] [DRY_RUN=1] [SOUND=1] [COMPUTE=1] ./plugins/install.sh
 # PROFILE=desktop targets the Electron application's reserved profile: the npm
 # dsh CLI refuses it, so the work is forwarded to the Desktop-installed command
@@ -89,7 +89,7 @@ for p in $PKGS; do
     fi
   fi
 done
-for p in rdsh-settings; do
+for p in rdsh-settings rdsh-mobile-ui; do
   if [ "$DRY_RUN" = "1" ]; then
     echo "dsh plugin --profile $PROFILE add $REPO_ROOT/plugins/$p"
     ok=$((ok + 1))
