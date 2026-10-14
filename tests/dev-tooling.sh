@@ -158,7 +158,7 @@ sh scripts/dev-setup.sh >"$tmp/out" 2>&1 || true
 [ "$(git config --local --get core.hooksPath)" = .githooks ] || die "hooksPath not set"
 [ "$(git config --local --get rerere.enabled)" = false ] || die "existing rerere.enabled overwritten"
 [ "$(git config --local --get fetch.prune)" = true ] || die "fetch.prune not set"
-has "rerere.enabled=false (kept" "kept value reported"
+has "rerere.enabled='false' (kept" "kept value reported"
 ok "dev-setup sets only unset local git config; --check writes nothing"
 
 git config --local --unset core.hooksPath
@@ -171,6 +171,18 @@ has "repository hooks inactive" "inactive hooks reported"
 has "kept from global" "global scope reported"
 printf '[init]\n\tdefaultBranch = main\n' > "$GIT_CONFIG_GLOBAL"
 ok "dev-setup keeps settings from any scope and reports inactive repository hooks"
+
+git config --local --unset rerere.enabled
+printf '[rerere]\n\tenabled =\n' >> "$GIT_CONFIG_GLOBAL"   # explicit empty value = false
+sh scripts/dev-setup.sh >"$tmp/out" 2>&1 || true
+[ -z "$(git config --local --get rerere.enabled || true)" ] || die "empty global value overridden locally"
+has "rerere.enabled='' (kept from global" "empty value reported as set"
+printf '[broken\n' > "$GIT_CONFIG_GLOBAL"
+expect_rc 2 "unreadable config" sh scripts/dev-setup.sh
+has "git config cannot be read" "unreadable config"
+has "bad config line" "git's own diagnostic shown"
+printf '[init]\n\tdefaultBranch = main\n' > "$GIT_CONFIG_GLOBAL"
+ok "dev-setup treats empty values as set and fails on unreadable config"
 
 # --- label-conflicts.sh with a stub gh ------------------------------------------
 mkdir -p "$tmp/bin" "$tmp/gh"

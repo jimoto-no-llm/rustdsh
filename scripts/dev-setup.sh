@@ -21,7 +21,11 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-root=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "dev-setup: run inside the rustdsh checkout" >&2; exit 2; }
+root=$(git rev-parse --show-toplevel 2>/dev/null) || {
+  echo "dev-setup: not inside the rustdsh checkout, or the git config cannot be read:" >&2
+  git rev-parse --show-toplevel >/dev/null || true
+  exit 2
+}
 cd "$root"
 
 missing=0
@@ -78,12 +82,17 @@ if command -v shellcheck >/dev/null 2>&1; then ok "shellcheck"; else warn "shell
 echo "Git settings (written to this repository only)"
 # set_local KEY VALUE: write only when no scope (system, global, local, worktree)
 # sets KEY, so an effective personal or managed setting is never overridden.
+# Decided by git's exit status, not the value: 0 = set (an empty value counts,
+# e.g. "rerere.enabled =" is false), 1 = unset, anything else = unreadable config.
 set_local() {
-  current=$(git config --get "$1" 2>/dev/null || true)
-  if [ -n "$current" ]; then
+  rc=0
+  current=$(git config --get "$1" 2>/dev/null) || rc=$?
+  if [ "$rc" = 0 ]; then
     scope=$(git config --show-scope --get "$1" 2>/dev/null | cut -f1 || true)
     if [ "$current" = "$2" ]; then ok "$1=$2${scope:+ ($scope)}"
-    else ok "$1=$current (kept from ${scope:-config}; recommended $2)"; fi
+    else ok "$1='$current' (kept from ${scope:-config}; recommended $2)"; fi
+  elif [ "$rc" != 1 ]; then
+    fail "could not read $1 (git config exit $rc); fix the git config first"
   elif [ "$check_only" = 1 ]; then
     warn "$1 unset (recommended $2)"
   else
@@ -93,8 +102,7 @@ set_local() {
 }
 # Hooks: block conflict markers and unformatted Rust; warn on conflicts at push.
 set_local core.hooksPath .githooks
-hooks=$(git config --get core.hooksPath 2>/dev/null || true)
-if [ -n "$hooks" ] && [ "$hooks" != .githooks ]; then
+if hooks=$(git config --get core.hooksPath 2>/dev/null) && [ "$hooks" != .githooks ]; then
   warn "repository hooks inactive: core.hooksPath=$hooks. To opt in here: git config --local core.hooksPath .githooks"
   warn "  (or call .githooks/pre-commit and .githooks/pre-push from your own hooks)"
 fi
