@@ -39,7 +39,7 @@ operation that replaces the document with defaults.
 | `slim.rs` | Slim env for delegated boot (`NODE_COMPILE_CACHE`, node-tree lookup) |
 | `tokens.rs` | Fast token estimation |
 | `compact.rs` | Context compaction to a token budget |
-| `search.rs` | Fast multi-file search (`estimate_tokens`) |
+| `search.rs` | Fast multi-file recursive grep (hidden/vendor dirs skipped, 2 MB / 2,000,000-byte cap) |
 | `inspect.rs` | Config / session inspection |
 | `serve.rs` | Status page server |
 | `guard.rs` | Stdin hook guard (`--deny` patterns and opt-in structured file policy) |
@@ -86,7 +86,7 @@ value wins, `RDSH_NODE_COMPILE_CACHE=0` opts out).
 - Search: sequential walk fixes order, files are grepped in parallel, hits merge
   back in walk order. Trees under 32 files keep the sequential path.
 - `sessions --tokens`: parallel zstd expansion (same numbers, order kept).
-- Release profile: `opt-level=z`, LTO, `strip`, `panic=abort` (~806KB).
+- Release profile: `opt-level=3`, LTO, `strip`, `panic=abort` (~1.8-2.3MB per platform).
 
 ## Invariants for contributors
 
