@@ -62,9 +62,11 @@ for (const file of [
 
 async function open(server) {
   servers.push(server);
-  const runtime = JSON.parse(
-    await fs.readFile(path.join(f.project.directory, "runtime.json"), "utf8"),
+  // The public runtime.json carries no browser URL; the owner credentials do.
+  const { readLocalRuntime } = await import(
+    pathToFileURL(path.join(repo, "dashboard/private-runtime.mjs")),
   );
+  const runtime = await readLocalRuntime(f.project.directory);
   const context = await browser.newContext({
     viewport: { width: 1280, height: 900 },
     locale: "ja-JP",
