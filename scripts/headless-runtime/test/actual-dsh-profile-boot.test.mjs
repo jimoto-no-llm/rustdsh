@@ -113,21 +113,49 @@ test('actual headless CLI propagates node-ws through streamSimple and naturally 
       env: { PATH: process.env.PATH, HOME: path.join(run, 'home'), DSH_HOME: path.join(run, 'dsh-home'), TMPDIR: path.join(run, 'tmp'), NODE_COMPILE_CACHE: path.join(run, 'cache'), FAKE_API_KEY: fakeToken, RDSH_CANDIDATE: candidate, RDSH_CLEANUP_DIAGNOSTIC: evidence },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
-    let output = '';
-    child.stdout.on('data', chunk => { output += chunk; });
-    const started = performance.now();
-    const result = await Promise.race([
-      new Promise(resolve => child.once('exit', (code, signal) => resolve({ code, signal }))),
-      new Promise(resolve => setTimeout(() => resolve({ timeout: true }), 1_900)),
-    ]);
+    let output = '', buffered = '', turnEnded;
+    let shutdownTimer, resolveTimeout;
+    const watchdog = new Promise(resolve => { resolveTimeout = resolve; });
+    const startupTimer = setTimeout(() => resolveTimeout({ timeout: 'turn_completion' }), 10_000);
+    child.stdout.on('data', chunk => {
+      output += chunk;
+      buffered += chunk;
+      while (buffered.includes('\n')) {
+        const at = buffered.indexOf('\n');
+        const line = buffered.slice(0, at);
+        buffered = buffered.slice(at + 1);
+        let event;
+        try { event = JSON.parse(line); } catch { continue; }
+        if (turnEnded === undefined && event.type === 'status' && event.phase === 'turn_end' && event.reason?.kind === 'completed') {
+          turnEnded = performance.now();
+          clearTimeout(startupTimer);
+          shutdownTimer = setTimeout(() => resolveTimeout({ timeout: 'shutdown' }), 1_900);
+        }
+      }
+    });
+    let result;
+    try {
+      result = await Promise.race([
+        new Promise(resolve => child.once('close', (code, signal) => resolve({ code, signal }))),
+        watchdog,
+      ]);
+    } finally {
+      clearTimeout(startupTimer);
+      clearTimeout(shutdownTimer);
+    }
     if (result.timeout) {
-      child.kill('SIGTERM');
-      await new Promise(resolve => child.once('exit', resolve));
-      const details = await (await import('node:fs/promises')).readFile(evidence, 'utf8');
-      assert.fail(`headless child did not naturally exit within the two-second acceptance limit: ${details}`);
+      if (child.exitCode === null) {
+        child.kill('SIGTERM');
+        await new Promise(resolve => child.once('close', resolve));
+      }
+      const details = await (await import('node:fs/promises')).readFile(evidence, 'utf8').catch(() => 'diagnostic unavailable');
+      assert.fail(`headless child exceeded ${result.timeout === 'shutdown' ? 'the two-second shutdown limit after turn_end' : 'the startup/turn-completion limit'}: ${details}`);
     }
     assert.deepEqual(result, { code: 0, signal: null });
-    assert.ok(performance.now() - started < 2_000);
+    assert.equal(typeof turnEnded, 'number', 'a completed turn_end must precede natural exit');
+    assert.ok(performance.now() - turnEnded < 2_000, 'natural exit must occur within two seconds after turn_end');
+    const proof = JSON.parse(await (await import('node:fs/promises')).readFile(evidence, 'utf8'));
+    assert.equal(proof.naturalExitObserved, true, 'beforeExit must prove event-loop completion rather than forced exit 0');
     assert.equal(requests, 1, 'the isolated model turn must make exactly one SDK request');
     assert.match(output, /"phase":"turn_end"/);
     assert.match(output, /"type":"final"/);

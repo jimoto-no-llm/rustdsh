@@ -1,26 +1,14 @@
-import { writeFile } from 'node:fs/promises';
-import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { writeFileSync } from 'node:fs';
 
-const candidate = process.env.RDSH_CANDIDATE;
 const evidence = process.env.RDSH_CLEANUP_DIAGNOSTIC;
-if (!candidate || !evidence) throw new Error('cleanup diagnostic fixture requires RDSH_CANDIDATE and RDSH_CLEANUP_DIAGNOSTIC');
-
-const { cleanupSessionResourcesAsync } = await import(pathToFileURL(path.join(candidate, 'node_modules/@earendil-works/pi-ai/dist/index.js')).href);
+if (!evidence) throw new Error('cleanup diagnostic fixture requires RDSH_CLEANUP_DIAGNOSTIC');
 
 export const inject = ['agents', 'sessions', 'profileContext'];
 
 export function apply(ctx) {
   const owned = new Set();
-  const pending = new Set();
-  const record = { adopted: 0, cleanCalls: [], disposerOwned: -1, pendingSettled: -1, profile: ctx.get('profileContext')?.name };
-  const clean = id => {
-    if (typeof id !== 'string' || !owned.delete(id)) return;
-    record.cleanCalls.push(id);
-    const task = Promise.resolve(cleanupSessionResourcesAsync(id)).catch(() => {});
-    pending.add(task);
-    task.finally(() => pending.delete(task));
-  };
+  const record = { adopted: 0, disposedSessions: [], disposerOwned: -1, naturalExitObserved: false, profile: ctx.get('profileContext')?.name };
+  const save = () => writeFileSync(evidence, JSON.stringify(record), { mode: 0o600 });
   ctx.on('agent/created', ({ agent } = {}) => {
     const id = agent?.session?.id;
     if (typeof id === 'string' && id && agent.id === id) {
@@ -29,12 +17,15 @@ export function apply(ctx) {
       record.agentSessionEqual = true;
     }
   });
-  ctx.on('session/disposed', session => clean(session?.id));
-  ctx.effect(() => async () => {
+  ctx.on('session/disposed', session => {
+    if (owned.delete(session?.id)) record.disposedSessions.push(session.id);
+  });
+  process.once('beforeExit', () => {
+    record.naturalExitObserved = true;
+    save();
+  });
+  ctx.effect(() => () => {
     record.disposerOwned = owned.size;
-    for (const id of [...owned]) clean(id);
-    await Promise.all([...pending]);
-    record.pendingSettled = pending.size;
-    await writeFile(evidence, JSON.stringify(record));
-  }, 'safe exact-session cleanup diagnostic');
+    save();
+  }, 'observe exact-session disposal without performing cleanup');
 }
