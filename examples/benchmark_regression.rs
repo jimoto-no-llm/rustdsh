@@ -596,9 +596,30 @@ impl BaselineMedians {
             .ok_or_else(|| anyhow!("{} has no cases object", path.display()))?;
         let mut medians = std::collections::BTreeMap::new();
         for (name, case) in cases {
-            if let Some(median) = case["median_ms"].as_f64() {
-                medians.insert(name.clone(), median);
+            // Fail closed. Skipping an unusable entry would silently remove
+            // that case from the comparison, so a truncated or hand-edited
+            // baseline would make the gate report success while checking
+            // nothing. A non-finite or non-positive median is not a usable
+            // reference either: it would produce a NaN or inverted ratio.
+            let median = case["median_ms"].as_f64().ok_or_else(|| {
+                anyhow!(
+                    "{} case {name:?} has no numeric median_ms; refusing an incomplete baseline",
+                    path.display()
+                )
+            })?;
+            if !median.is_finite() || median <= 0.0 {
+                bail!(
+                    "{} case {name:?} has median_ms {median}; a baseline median must be finite and positive",
+                    path.display()
+                );
             }
+            medians.insert(name.clone(), median);
+        }
+        if medians.is_empty() {
+            bail!(
+                "{} records no cases; refusing an empty baseline",
+                path.display()
+            );
         }
         Ok(Self {
             label: format!("json:{}", path.display()),
@@ -1317,6 +1338,50 @@ mod tests {
 
         std::fs::write(&path, b"not json").unwrap();
         assert!(BaselineMedians::from_json(&path).is_err());
+    }
+
+    /// A baseline missing a usable median must be refused rather than quietly
+    /// dropping that case from the comparison, which would let the gate report
+    /// success while checking nothing.
+    #[test]
+    fn baseline_json_without_a_usable_median_is_rejected() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("baseline.json");
+        for (label, json) in [
+            (
+                "missing median_ms",
+                br#"{"schema_version":1,"cases":{"version_startup":{}}}"#.as_slice(),
+            ),
+            (
+                "null median_ms",
+                br#"{"schema_version":1,"cases":{"version_startup":{"median_ms":null}}}"#
+                    .as_slice(),
+            ),
+            (
+                "string median_ms",
+                br#"{"schema_version":1,"cases":{"version_startup":{"median_ms":"1.0"}}}"#
+                    .as_slice(),
+            ),
+            (
+                "zero median_ms",
+                br#"{"schema_version":1,"cases":{"version_startup":{"median_ms":0.0}}}"#.as_slice(),
+            ),
+            (
+                "negative median_ms",
+                br#"{"schema_version":1,"cases":{"version_startup":{"median_ms":-1.0}}}"#
+                    .as_slice(),
+            ),
+            (
+                "empty cases",
+                br#"{"schema_version":1,"cases":{}}"#.as_slice(),
+            ),
+        ] {
+            std::fs::write(&path, json).unwrap();
+            assert!(
+                BaselineMedians::from_json(&path).is_err(),
+                "{label} should be refused"
+            );
+        }
     }
 
     #[test]
