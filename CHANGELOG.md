@@ -28,7 +28,7 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   layout that cannot be read safely (including any other mention of
   `llm-pi-ai`, such as inside `- insert:`) is refused with the YAML to add by
   hand. See `docs/PROVIDERS.md`.
-- `rdsh-dashboard subagents plan` turns a declared use case into a deterministic
+- `rdsh subagents plan` turns a declared use case into a deterministic
   dispatch plan for delegated subagents: role and model tier per item, bounded
   items and weight per agent, waves limited by `max_parallel`, and explicit
   warnings instead of guessed tiers. It starts no agent and writes nothing; the
@@ -47,6 +47,14 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   find, or one outside npm's global root, is reported and skipped while the
   rdsh release update still succeeds; npm-managed trees keep digest pinning,
   downgrade refusal, verification and rollback. See `docs/AUTO-UPDATE.md`.
+
+### Changed
+
+- `rdsh-dashboard subagents plan` moved to `rdsh subagents plan`: the planner
+  is now the Rust implementation in `src/subagent_plan.rs`, the JavaScript
+  module and its tests are removed so there is a single source of truth, and the
+  request, plan and warning contract is unchanged
+  (`docs/SUBAGENT-PLANNING.md`).
 
 ## [0.3.3] - 2026-10-13
 

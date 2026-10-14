@@ -36,7 +36,6 @@ import { fileURLToPath } from "node:url";
 import { Releases } from "./releases.mjs";
 import { IntegrationQueue } from "./integration.mjs";
 import { WorkerWorkspaces } from "./workers.mjs";
-import { planSubagents } from "./subagent-plan.mjs";
 import {
   loopbackBase,
   recordTunnel,
@@ -71,7 +70,6 @@ rdsh-dashboard integration init --project <directory> --input-file <checks-json>
 rdsh-dashboard integration enqueue|reject --project <directory> --input-file <json> --expected-revision <n>
 rdsh-dashboard integration inspect --project <directory>
 rdsh-dashboard integration apply|validate|retarget --project <directory> --expected-revision <n> --expected-head <sha>
-rdsh-dashboard subagents plan --input-file <request-json>
 rdsh-dashboard workers plan --project <directory> --input-file <worker-json>
 rdsh-dashboard workers prepare --project <directory> --input-file <worker-json> --expected-revision <n> --expected-head <sha>
 rdsh-dashboard workers inspect --project <directory>
@@ -584,16 +582,6 @@ try {
       (action === "validate" && !result.validation.verified)
     )
       process.exitCode = 1;
-  } else if (command === "subagents") {
-    // Pure planning: reads a local request, starts nothing and writes nothing.
-    const action = positionals[1];
-    if (
-      positionals.length !== 2 ||
-      action !== "plan" ||
-      Object.keys(values).some((k) => !["input-file"].includes(k))
-    )
-      throw new Error("Invalid subagents action/options");
-    console.log(JSON.stringify(planSubagents(await localJson(values["input-file"]))));
   } else if (command === "workers") {
     const action = positionals[1];
     const options = {
