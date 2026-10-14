@@ -8,7 +8,7 @@
 
 ## Verification (検証)
 
-<!-- 1 line: commands + results, e.g. cargo test, regress.sh, npm test -->
+<!-- 1 line: commands + results, e.g. sh scripts/check.sh, cargo test, regress.sh, npm test -->
 <!-- UI change? attach before/after PNGs (and GIF for motion). Text only is not enough. -->
 
 ## Caveats (注意点)

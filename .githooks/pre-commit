@@ -1,0 +1,35 @@
+#!/bin/sh
+# rustdsh pre-commit: block leftover conflict markers and unformatted Rust.
+# Enabled by `sh scripts/dev-setup.sh` (core.hooksPath=.githooks).
+# Skip once with `git commit --no-verify`, or set RDSH_SKIP_HOOKS=1.
+set -eu
+[ "${RDSH_SKIP_HOOKS:-}" = 1 ] && exit 0
+
+# Conflict markers on added lines only; existing fixtures are left alone.
+markers=$(git diff --cached --no-color -U0 --diff-filter=ACMR \
+  | awk '/^\+\+\+ /{file=substr($0,7); next}
+         /^\+(<<<<<<<|>>>>>>>|\|\|\|\|\|\|\|) /{print "  " file ": " substr($0,2)}')
+if [ -n "$markers" ]; then
+  echo "pre-commit: unresolved conflict markers staged:" >&2
+  printf '%s\n' "$markers" >&2
+  exit 1
+fi
+
+staged_rs=$(git diff --cached --name-only --diff-filter=ACMR | grep '\.rs$' || true)
+if [ -n "$staged_rs" ]; then
+  if command -v cargo >/dev/null 2>&1; then
+    # Report only staged files, so unrelated unstaged edits never block a commit.
+    root=$(git rev-parse --show-toplevel)
+    diffs=$(cargo fmt --check 2>/dev/null | sed -n 's/^Diff in \(.*\):[0-9][0-9]*:.*$/\1/p' | sort -u)
+    bad=""
+    for f in $staged_rs; do
+      if printf '%s\n' "$diffs" | grep -Fxq "$root/$f"; then bad="$bad $f"; fi
+    done
+    if [ -n "$bad" ]; then
+      echo "pre-commit: not formatted:$bad. Run: cargo fmt" >&2
+      exit 1
+    fi
+  else
+    echo "pre-commit: warning: cargo not found; skipped cargo fmt --check" >&2
+  fi
+fi

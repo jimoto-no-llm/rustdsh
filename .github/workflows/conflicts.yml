@@ -1,0 +1,36 @@
+name: conflicts
+
+# Flag open PRs that no longer merge cleanly as soon as main moves, so authors
+# update early instead of discovering conflicts at merge time.
+on:
+  push:
+    branches: [main]
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: conflicts-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # Always the default branch: neither PR code nor a dispatched branch runs with write tokens.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      # Empty on push and workflow_dispatch: every open PR is checked.
+      - run: sh scripts/label-conflicts.sh ${PR_NUMBER:+"$PR_NUMBER"}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}

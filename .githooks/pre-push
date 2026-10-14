@@ -1,0 +1,26 @@
+#!/bin/sh
+# rustdsh pre-push: warn when the pushed branch conflicts with origin/main.
+# Warning only by default. RDSH_STRICT_PUSH=1 blocks the push on conflicts and
+# also when origin/main cannot be fetched or compared.
+# Skip with `git push --no-verify`, or set RDSH_SKIP_HOOKS=1.
+set -eu
+[ "${RDSH_SKIP_HOOKS:-}" = 1 ] && exit 0
+
+root=$(git rev-parse --show-toplevel)
+branch=$(git rev-parse --abbrev-ref HEAD)
+[ "$branch" = main ] && exit 0
+
+strict="${RDSH_STRICT_PUSH:-}"
+set --
+[ "$strict" = 1 ] && set -- --require-fetch
+if sh "$root/scripts/check-conflicts.sh" "$@" >&2; then
+  exit 0
+else
+  rc=$?
+fi
+if [ "$strict" = 1 ]; then
+  echo "pre-push: blocked by RDSH_STRICT_PUSH=1 (check-conflicts exit $rc)" >&2
+  exit 1
+fi
+echo "pre-push: continuing (conflict check is advisory)" >&2
+exit 0

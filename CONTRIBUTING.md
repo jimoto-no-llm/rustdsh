@@ -7,9 +7,12 @@ English summary first, 日本語の詳細は後に続きます.
 ```sh
 git clone https://github.com/jimoto-no-llm/rustdsh.git
 cd rustdsh
-cargo build
-cargo test
+sh scripts/dev-setup.sh   # toolchain check, git hooks, conflict-friendly git config
+sh scripts/check.sh       # CI-equivalent checks for the areas you changed
 ```
+
+See [DEVELOPMENT.md](docs/DEVELOPMENT.md) for the dev container, hooks and the
+conflict-avoidance workflow.
 
 Full test matrix before a PR:
 
@@ -35,6 +38,10 @@ RDSH_E2E_BIN=./target/release/rdsh npm test --prefix tests/e2e
 - Behavior changes need a before/after output diff attached.
 - Keep PRs small and single-topic; hot-path changes need benchmark numbers
   (see `docs/BENCHMARKS.md`).
+- Branch from a fresh `origin/main` and update early when `main` moves.
+  Before pushing, `sh scripts/check-conflicts.sh --open-prs` shows conflicts
+  with `main` and open PRs touching the same files. PRs that stop merging
+  cleanly get the `needs-rebase` label automatically.
 
 ## UI changes (required)
 
@@ -77,12 +84,22 @@ Current repository settings and label conventions are documented in
 [Issue #11](https://github.com/jimoto-no-llm/rustdsh/issues/11)を見てください。
 寄稿者は `main` へのPRとチェック通過だけ意識すれば十分です。
 
+### 開発環境
+
+最初に `sh scripts/dev-setup.sh` を実行し、検証は `sh scripts/check.sh` で
+まとめて行います。dev container と hooks の説明、コンフリクトを避ける進め方は
+[DEVELOPMENT.md](docs/DEVELOPMENT.md) にあります。
+
 ### Pull Request
 
 - 本文は4行で書きます（概要／変更／検証／注意点）。
 - `cargo fmt --check`、`cargo clippy --release --all-targets`（警告ゼロ）、
   `cargo test --release`、`tests/regress.sh` の全通過を確認してから出します。
 - 既存の動作を変えるときは、新旧の出力差分を添えてください。
+- 最新の `origin/main` から分岐し、`main` が進んだら早めに取り込みます。
+  push 前に `sh scripts/check-conflicts.sh --open-prs` で衝突と、
+  同じファイルを触る open PR を確認できます。衝突した PR には
+  `needs-rebase` ラベルが自動で付きます。
 
 ### UIを変えるときの約束
 

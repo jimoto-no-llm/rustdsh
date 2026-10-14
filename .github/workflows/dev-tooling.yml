@@ -1,0 +1,46 @@
+name: dev-tooling
+
+on:
+  push:
+    paths:
+      - 'scripts/check.sh'
+      - 'scripts/check-conflicts.sh'
+      - 'scripts/dev-setup.sh'
+      - 'scripts/label-conflicts.sh'
+      - '.githooks/**'
+      - 'tests/dev-tooling.sh'
+      - '.github/workflows/dev-tooling.yml'
+      - '.github/workflows/conflicts.yml'
+  pull_request:
+    paths:
+      - 'scripts/check.sh'
+      - 'scripts/check-conflicts.sh'
+      - 'scripts/dev-setup.sh'
+      - 'scripts/label-conflicts.sh'
+      - '.githooks/**'
+      - 'tests/dev-tooling.sh'
+      - '.github/workflows/dev-tooling.yml'
+      - '.github/workflows/conflicts.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dev-tooling-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - if: runner.os == 'Linux'
+        run: >-
+          shellcheck -s sh scripts/check.sh scripts/check-conflicts.sh scripts/dev-setup.sh
+          scripts/label-conflicts.sh .githooks/pre-commit .githooks/pre-push tests/dev-tooling.sh
+      - run: sh tests/dev-tooling.sh

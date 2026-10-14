@@ -36,6 +36,9 @@
 - name: ci
   color: 0052cc
   description: Builds, tests and GitHub Actions configuration
+- name: needs-rebase
+  color: e99695
+  description: Conflicts with the base branch; update the PR branch
 - name: P0
   color: b60205
   description: Critical security or release blocker
