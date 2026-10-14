@@ -5,6 +5,7 @@
   "scripts": {
     "test": "node browser.mjs && node update-banner.mjs && node task-outcomes.mjs",
     "test:harness": "node harness-settings.mjs",
+    "test:answer-guard": "node answer-guard-native.mjs",
     "test:muse": "node muse-subscription.mjs",
     "test:updates": "node update-banner.mjs"
   },
