@@ -64,6 +64,39 @@ fn plan_json_flag_keeps_the_same_output() {
 }
 
 #[test]
+fn plan_accepts_utf8_bom_like_the_dashboard_cli() {
+    let fixture = Fixture::new();
+    fixture.write("request.json", &format!("\u{feff}{REQUEST}"));
+    let output = fixture.run(&[
+        "subagents",
+        "plan",
+        "--input-file",
+        &fixture.path("request.json"),
+    ]);
+    assert!(output.status.success(), "{}", public_output(&output));
+    assert_eq!(stdout(&output), format!("{EXPECTED}\n"));
+}
+
+#[test]
+fn plan_ignores_unrelated_corrupt_settings_without_replacing_them() {
+    let fixture = Fixture::new();
+    fixture.write("request.json", REQUEST);
+    fixture.write("dsh/rdsh.json", "{broken");
+    let output = fixture.run(&[
+        "subagents",
+        "plan",
+        "--input-file",
+        &fixture.path("request.json"),
+    ]);
+    assert!(output.status.success(), "{}", public_output(&output));
+    assert_eq!(stdout(&output), format!("{EXPECTED}\n"));
+    assert_eq!(
+        std::fs::read_to_string(fixture.path("dsh/rdsh.json")).unwrap(),
+        "{broken"
+    );
+}
+
+#[test]
 fn plan_is_byte_identical_across_runs() {
     let fixture = Fixture::new();
     fixture.write("request.json", REQUEST);

@@ -14,7 +14,7 @@
 
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashSet};
-use std::io::Write;
+use std::io::{Read, Write};
 
 use anyhow::{anyhow, bail, Context, Result};
 use serde::Serialize;
@@ -745,12 +745,17 @@ pub fn plan_subagents(request: &Value) -> std::result::Result<Plan, PlanError> {
 /// Read one request file with the JS CLI's `localJson` rules: a regular file
 /// of at most 256 KiB with strict UTF-8 and valid JSON.
 fn read_request(input_file: &str) -> Result<Value> {
-    let metadata = std::fs::metadata(input_file)
+    let file = std::fs::File::open(input_file)
+        .with_context(|| format!("cannot read input JSON {input_file}"))?;
+    let metadata = file
+        .metadata()
         .with_context(|| format!("cannot read input JSON {input_file}"))?;
     if !metadata.is_file() || metadata.len() > 256 * 1024 {
         bail!("Input JSON must be a regular file of at most 256 KiB");
     }
-    let bytes = std::fs::read(input_file)
+    let mut bytes = Vec::with_capacity(metadata.len() as usize);
+    file.take(256 * 1024 + 1)
+        .read_to_end(&mut bytes)
         .with_context(|| format!("cannot read input JSON {input_file}"))?;
     if bytes.len() > 256 * 1024 {
         bail!("Input JSON exceeds 256 KiB");
@@ -758,6 +763,8 @@ fn read_request(input_file: &str) -> Result<Value> {
     let Ok(text) = std::str::from_utf8(&bytes) else {
         bail!("Input JSON is invalid");
     };
+    // TextDecoder("utf-8") in the former dashboard CLI removed a leading BOM.
+    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
     serde_json::from_str(text).map_err(|_| anyhow!("Input JSON is invalid"))
 }
 

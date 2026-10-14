@@ -574,14 +574,15 @@ fn main() {
             serde_json::to_string(&cli.share_file).unwrap(),
         );
     }
-    // Explicit recovery must work even when the current settings cannot be read.
-    // Every other command still fails closed on a corrupt settings document.
+    // Recovery and the pure subagent planner do not depend on settings.
+    // Commands that use settings still fail closed on a corrupt document.
     let cfg = if matches!(
         &cli.command,
         Some(Commands::Settings {
             action: SettingsAction::Init { force: true }
         })
-    ) {
+    ) || matches!(&cli.command, Some(Commands::Subagents { .. }))
+    {
         rdsh_config::RdshSettings::default()
     } else {
         rdsh_config::load()
