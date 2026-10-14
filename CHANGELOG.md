@@ -7,6 +7,13 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Added
 
+- `rdsh-dashboard subagents plan` turns a declared use case into a deterministic
+  dispatch plan for delegated subagents: role and model tier per item, bounded
+  items and weight per agent, waves limited by `max_parallel`, and explicit
+  warnings instead of guessed tiers. It starts no agent and writes nothing; the
+  existing `workers prepare` still owns the checkout allocation
+  (`docs/SUBAGENT-PLANNING.md`).
+
 - `rdsh-dashboard agents list|submit|status|result|cancel` runs cursor-agent and
   devin as detached, cancellable jobs with a read-only default permission and
   untrusted-data results. See `docs/AGENT-RUNNERS.md`.

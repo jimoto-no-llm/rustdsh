@@ -1,0 +1,14 @@
+{
+  "scope": "real Harness model picker in temporary Web profiles; no provider call",
+  "before_models": [],
+  "after_models": [
+    "muse-wonder-1.0",
+    "muse-wonder-full-1.0"
+  ],
+  "screenshots": [
+    "before.png",
+    "after.png"
+  ],
+  "result": "PASS",
+  "selected_model": "muse-wonder-full-1.0"
+}
