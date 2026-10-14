@@ -1224,6 +1224,7 @@ fn smart_dsh_status(home: &str) -> String {
 struct WrapperScan {
     texts: Vec<(String, String)>,
     broken_links: Vec<(String, String)>,
+    non_executable: Vec<String>,
 }
 
 /// Bounds for the wrapper-dir pass and the PATH probes below: `doctor` is a
@@ -1234,12 +1235,20 @@ const WRAPPER_TEXT_MAX_FILES: usize = 64;
 const WRAPPER_WARN_MAX: usize = 10;
 const PATH_SCAN_MAX_DIRS: usize = 64;
 
-/// Wrapper dir the broken-wrapper checks read: ~/.local/bin, where install.sh,
-/// install.ps1 and the docs put the dsh/rdsh shims. PATH is not scanned: a
-/// checkout target dir or /usr/bin would only add noise.
+/// Wrapper dir used by the installers: ~/.local/bin on Unix and
+/// %LOCALAPPDATA%\rdsh\bin on Windows. PATH is not scanned: a checkout
+/// target dir or /usr/bin would only add noise.
+#[cfg(not(windows))]
 fn local_bin_dir() -> Option<std::path::PathBuf> {
     let home = crate::inspect::home_dir()?;
     Some(std::path::Path::new(&home).join(".local").join("bin"))
+}
+
+#[cfg(windows)]
+fn local_bin_dir() -> Option<std::path::PathBuf> {
+    std::env::var_os("LOCALAPPDATA")
+        .map(std::path::PathBuf::from)
+        .map(|path| path.join("rdsh").join("bin"))
 }
 
 /// One bounded pass over the wrapper dir. Size-gate before reading: the dir can
@@ -1249,6 +1258,7 @@ fn scan_local_wrappers(dir: &std::path::Path) -> WrapperScan {
     let mut scan = WrapperScan {
         texts: Vec::new(),
         broken_links: Vec::new(),
+        non_executable: Vec::new(),
     };
     let Ok(entries) = std::fs::read_dir(dir) else {
         return scan;
@@ -1278,8 +1288,15 @@ fn scan_local_wrappers(dir: &std::path::Path) -> WrapperScan {
         if bytes.len() as u64 > WRAPPER_TEXT_MAX_BYTES || bytes.contains(&0) {
             continue;
         }
-        scan.texts
-            .push((name, String::from_utf8_lossy(&bytes).into_owned()));
+        let text = String::from_utf8_lossy(&bytes).into_owned();
+        #[cfg(unix)]
+        if name.contains("dsh")
+            && (text.starts_with("#!") || text.contains("exec "))
+            && !is_executable_file(&path)
+        {
+            scan.non_executable.push(name.clone());
+        }
+        scan.texts.push((name, text));
     }
     scan
 }
@@ -1293,7 +1310,17 @@ fn node_wrapper_warnings(scan: &WrapperScan, shadowed: bool, skip: &[&str]) -> V
         .texts
         .iter()
         .filter(|(name, text)| {
-            text.contains("node") && text.contains("dsh") && !skip.contains(&name.as_str())
+            let tokens = text.lines().filter_map(shell_words);
+            let mut has_node = false;
+            let mut has_dsh = false;
+            for line in tokens {
+                for token in line {
+                    let base = token.rsplit(['/', '\\']).next().unwrap_or_default();
+                    has_node |= base == "node" || base == "node.exe";
+                    has_dsh |= token.contains("dsh");
+                }
+            }
+            has_node && has_dsh && !skip.contains(&name.as_str())
         })
         .map(|(name, _)| name.clone())
         .collect();
@@ -1310,26 +1337,125 @@ fn node_wrapper_warnings(scan: &WrapperScan, shadowed: bool, skip: &[&str]) -> V
         .collect()
 }
 
-/// Interpreter a shebang needs at run time: #!/usr/bin/env -S node --x and
-/// #!/usr/bin/node both need node. The name is returned as written so the
-/// message names the missing program, not a rewritten one.
-fn shebang_interpreter(line: &str) -> Option<String> {
-    let tokens: Vec<&str> = line
-        .trim_start()
-        .strip_prefix("#!")?
-        .split_whitespace()
-        .collect();
-    let program = *tokens.first()?;
-    let arguments: Vec<&str> = tokens[1..]
-        .iter()
-        .copied()
-        .filter(|token| *token != "-S")
-        .collect();
-    if program == "env" || program.ends_with("/env") {
-        arguments.first().map(|token| (*token).to_string())
-    } else {
-        Some(program.to_string())
+/// Split the simple shell-like syntax used by wrapper lines while preserving
+/// quoted paths. An unmatched quote is unknown and is left undiagnosed.
+fn shell_words(line: &str) -> Option<Vec<String>> {
+    #[derive(Clone, Copy)]
+    enum Quote {
+        Single,
+        Double,
     }
+
+    let mut words = Vec::new();
+    let mut word = String::new();
+    let mut quote = None;
+    let mut escaped = false;
+    let mut active = false;
+    for character in line.chars() {
+        if escaped {
+            word.push(character);
+            active = true;
+            escaped = false;
+            continue;
+        }
+        match quote {
+            Some(Quote::Single) if character == char::from(39) => quote = None,
+            Some(Quote::Single) => word.push(character),
+            Some(Quote::Double) if character == '"' => quote = None,
+            Some(Quote::Double) if character == char::from(92) => escaped = true,
+            Some(Quote::Double) => word.push(character),
+            None if character == '#' && !active => break,
+            None if character == char::from(92) => {
+                escaped = true;
+                active = true;
+            }
+            None if character == char::from(39) => {
+                quote = Some(Quote::Single);
+                active = true;
+            }
+            None if character == '"' => {
+                quote = Some(Quote::Double);
+                active = true;
+            }
+            None if character.is_whitespace()
+                || matches!(
+                    character,
+                    ';' | '|' | '&' | '(' | ')' | '{' | '}' | '<' | '>'
+                ) =>
+            {
+                if active {
+                    words.push(std::mem::take(&mut word));
+                    active = false;
+                }
+            }
+            None => {
+                word.push(character);
+                active = true;
+            }
+        }
+    }
+    if escaped || quote.is_some() {
+        return None;
+    }
+    if active {
+        words.push(word);
+    }
+    Some(words)
+}
+
+fn env_assignment(token: &str) -> bool {
+    let Some((name, _)) = token.split_once('=') else {
+        return false;
+    };
+    let mut characters = name.chars();
+    characters
+        .next()
+        .is_some_and(|first| first == '_' || first.is_ascii_alphabetic())
+        && characters.all(|character| character == '_' || character.is_ascii_alphanumeric())
+}
+
+/// Interpreter a shebang needs at run time. env's split-string mode supports
+/// options and assignments before the command; unsupported forms are unknown,
+/// so doctor leaves them alone instead of reporting a false missing program.
+fn shebang_interpreter(line: &str) -> Option<String> {
+    let content = line.trim_start().strip_prefix("#!")?;
+    let tokens = shell_words(content)?;
+    let program = tokens.first()?;
+    if program != "env" && !program.ends_with("/env") {
+        return Some(program.clone());
+    }
+    let arguments = &tokens[1..];
+    let split = matches!(
+        arguments.first().map(String::as_str),
+        Some("-S" | "--split-string")
+    );
+    if !split {
+        let command = arguments.first()?;
+        return (!command.starts_with('-') && !env_assignment(command)).then(|| command.clone());
+    }
+
+    let mut index = 1;
+    while let Some(argument) = arguments.get(index) {
+        match argument.as_str() {
+            "--" => {
+                index += 1;
+                break;
+            }
+            "-i" | "--ignore-environment" => index += 1,
+            "-u" | "--unset" | "-C" | "--chdir" => {
+                arguments.get(index + 1)?;
+                index += 2;
+            }
+            value if value.starts_with("--unset=") || value.starts_with("--chdir=") => index += 1,
+            value if value.starts_with('-') => return None,
+            value if env_assignment(value) => index += 1,
+            value => return Some(value.to_string()),
+        }
+    }
+    arguments
+        .get(index)
+        .cloned()
+        .filter(|value| !value.starts_with('-'))
 }
 
 /// Absolute node/dsh/rdsh paths a wrapper passes around, e.g.
@@ -1350,45 +1476,25 @@ fn referenced_binary_paths(text: &str) -> Vec<String> {
         "dsh.real",
     ];
     let mut out: Vec<String> = Vec::new();
-    for raw in text
-        .lines()
-        .filter(|line| !line.trim_start().starts_with('#'))
-        .flat_map(|line| {
-            line.split(|c: char| {
-                c.is_whitespace()
-                    || matches!(
-                        c,
-                        '"' | '\''
-                            | '`'
-                            | '('
-                            | ')'
-                            | '{'
-                            | '}'
-                            | ';'
-                            | ','
-                            | '='
-                            | '<'
-                            | '>'
-                            | '|'
-                            | '&'
-                    )
-            })
-        })
-    {
-        let token = raw.trim_matches(|c: char| c == ':' || c == '\\');
-        // Unix absolute paths only: Windows path syntax is never parsed from
-        // wrapper text (the executability probe covers native installs).
-        if !token.starts_with('/') {
+    for line in text.lines() {
+        let Some(tokens) = shell_words(line) else {
             continue;
-        }
-        let base = token.rsplit('/').next().unwrap_or_default();
-        let program_like = PROGRAMS.contains(&base)
-            || (base.ends_with(".js") && token.split('/').any(|part| part == "dsh"));
-        if program_like && !out.iter().any(|seen| seen == token) {
-            out.push(token.to_string());
-        }
-        if out.len() >= 8 {
-            break;
+        };
+        for token in tokens {
+            // Unix absolute paths only: Windows path syntax is never parsed from
+            // wrapper text (the executability probe covers native installs).
+            if !token.starts_with('/') {
+                continue;
+            }
+            let base = token.rsplit('/').next().unwrap_or_default();
+            let program_like = PROGRAMS.contains(&base)
+                || (base.ends_with(".js") && token.split('/').any(|part| part == "dsh"));
+            if program_like && !out.iter().any(|seen| seen == &token) {
+                out.push(token);
+            }
+            if out.len() >= 8 {
+                return out;
+            }
         }
     }
     out
@@ -1439,18 +1545,59 @@ fn usable_original(path: &std::path::Path) -> bool {
 /// First executable name on PATH, bounded by PATH_SCAN_MAX_DIRS. An absolute
 /// name is checked directly, so a shebang like #!/bin/sh works too.
 fn command_on_path(name: &str) -> Option<std::path::PathBuf> {
-    if name.contains('/') {
-        let path = std::path::Path::new(name);
-        return if is_executable_file(path) {
-            Some(path.to_path_buf())
-        } else {
-            None
-        };
-    }
     let path_var = std::env::var_os("PATH")?;
-    std::env::split_paths(&path_var)
+    command_on_path_in(name, &path_var)
+}
+
+/// Resolve a command without running it. Match Command::new's PATH behavior
+/// closely enough for diagnostics, including the Windows .exe convention.
+fn command_on_path_in(name: &str, path_var: &std::ffi::OsStr) -> Option<std::path::PathBuf> {
+    let path = std::path::Path::new(name);
+    let has_separator = name.contains('/') || (cfg!(windows) && name.contains('\\'));
+    if path.is_absolute() || has_separator {
+        if is_executable_file(path) {
+            return Some(path.to_path_buf());
+        }
+        #[cfg(windows)]
+        if path.extension().is_none() {
+            let with_exe = path.with_extension("exe");
+            if is_executable_file(&with_exe) {
+                return Some(with_exe);
+            }
+        }
+        return None;
+    }
+
+    #[cfg(windows)]
+    let executable_name = if path.extension().is_none() {
+        format!("{name}.exe")
+    } else {
+        name.to_string()
+    };
+    #[cfg(not(windows))]
+    let executable_name = name.to_string();
+
+    let directories: Vec<std::path::PathBuf> = std::env::split_paths(path_var)
         .take(PATH_SCAN_MAX_DIRS)
-        .map(|dir| dir.join(name))
+        .collect();
+    #[cfg(windows)]
+    let directories = {
+        let mut directories = directories;
+        if let Ok(executable) = std::env::current_exe() {
+            if let Some(parent) = executable.parent() {
+                directories.push(parent.to_path_buf());
+            }
+        }
+        if let Some(root) = std::env::var_os("SystemRoot").map(std::path::PathBuf::from) {
+            directories.push(root.join("System32"));
+            directories.push(root);
+        }
+        directories
+    };
+    directories
+        .into_iter()
+        .take(PATH_SCAN_MAX_DIRS)
+        .map(|directory| directory.join(&executable_name))
         .find(|candidate| is_executable_file(candidate))
 }
 
@@ -1500,11 +1647,24 @@ fn broken_wrapper_warnings(scan: &WrapperScan) -> Vec<(String, String)> {
             ),
         ));
     }
+    for name in &scan.non_executable {
+        if out.len() >= WRAPPER_WARN_MAX {
+            break;
+        }
+        if name.contains("dsh") {
+            out.push((
+                name.clone(),
+                format!(
+                    "[rdsh] warn: ~/.local/bin/{name} is not executable; the wrapper cannot run"
+                ),
+            ));
+        }
+    }
     for (name, text) in &scan.texts {
         if out.len() >= WRAPPER_WARN_MAX {
             break;
         }
-        if !(name.contains("dsh") || text.contains("dsh")) {
+        if scan.non_executable.contains(name) || !(name.contains("dsh") || text.contains("dsh")) {
             continue;
         }
         if let Some(warning) = broken_wrapper_reason(name, text) {
@@ -1622,7 +1782,11 @@ fn original_override_warnings() -> Vec<String> {
         if value.is_empty() {
             continue;
         }
-        if usable_original(std::path::Path::new(&value)) {
+        let path_var = std::env::var_os("PATH").unwrap_or_default();
+        if command_on_path_in(&value, &path_var).is_some()
+            || ((value.contains('/') || (cfg!(windows) && value.contains('\\')))
+                && usable_original(std::path::Path::new(&value)))
+        {
             return Vec::new();
         }
         return vec![format!(
@@ -1987,19 +2151,60 @@ mod doctor_wrapper_tests {
         );
         assert_eq!(shebang_interpreter("#!/bin/sh").as_deref(), Some("/bin/sh"));
         assert_eq!(shebang_interpreter("#!/usr/bin/env"), None);
+        assert_eq!(
+            shebang_interpreter("#!/usr/bin/env -S NODE_NO_WARNINGS=1 node"),
+            Some("node".to_string())
+        );
+        assert_eq!(
+            shebang_interpreter("#!/usr/bin/env --unsupported node"),
+            None
+        );
         assert_eq!(shebang_interpreter("echo hi"), None);
 
-        // Comments (including stale old locations) must not become findings.
+        // Comments (including stale old locations) and quoted paths must not
+        // become false findings.
         let refs = referenced_binary_paths(
-            "exec /opt/node-v22/bin/node /opt/dsh/lib/bin.js\nPATH=/opt/bin:$PATH\n# old: /opt/dead/dsh/bin.js\n# /etc/hosts\n",
+            "exec /opt/node-v22/bin/node /opt/dsh/lib/bin.js\nPATH=/opt/bin:$PATH\nexec \"/opt/dsh stable/bin/rdsh\" \"$@\" # old: /opt/dead/dsh/bin.js\n# /etc/hosts\n",
         );
         assert_eq!(
             refs,
             vec![
                 "/opt/node-v22/bin/node".to_string(),
-                "/opt/dsh/lib/bin.js".to_string()
+                "/opt/dsh/lib/bin.js".to_string(),
+                "/opt/dsh stable/bin/rdsh".to_string()
             ]
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn non_executable_local_wrapper_is_reported() {
+        let root = temp_dir("non-executable");
+        let wrapper = root.join("dsh-disabled");
+        fs::write(&wrapper, "#!/bin/sh\nexec rdsh \"$@\"\n").unwrap();
+
+        let scan = scan_local_wrappers(&root);
+        let broken = broken_wrapper_warnings(&scan);
+        assert!(
+            broken
+                .iter()
+                .any(|(name, warning)| name == "dsh-disabled" && warning.contains("not executable")),
+            "{broken:?}"
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn node_wrapper_diagnostic_ignores_comments() {
+        let scan = super::WrapperScan {
+            texts: vec![(
+                "dsh-wrapper".to_string(),
+                "exec rdsh \"$@\" # old: node /opt/dsh/lib/bin.js\n".to_string(),
+            )],
+            broken_links: Vec::new(),
+            non_executable: Vec::new(),
+        };
+        assert!(super::node_wrapper_warnings(&scan, true, &[]).is_empty());
     }
 
     #[test]
