@@ -264,21 +264,41 @@ export function createComputeBridge({ bin = "rdsh", timeoutMs = DEFAULT_TIMEOUT_
   }
 
   function close() {
-    try {
-      child?.stdin?.end();
-      child?.kill();
-    } catch {}
+    const worker = child;
     child = null;
+    if (!worker) return;
+    return new Promise((resolve) => {
+      let closed = false;
+      const finish = () => {
+        if (closed) return;
+        closed = true;
+        resolve();
+      };
+      if (worker.exitCode !== null || worker.signalCode !== null) {
+        finish();
+        return;
+      }
+      worker.once?.("close", finish);
+      try {
+        worker.stdin?.end();
+      } catch {}
+      try {
+        if (worker.kill() === false && (worker.exitCode !== null || worker.signalCode !== null)) finish();
+      } catch {
+        if (worker.exitCode !== null || worker.signalCode !== null) finish();
+      }
+    });
   }
 
   return { estimate, estimateBatch, prune, close, jsEstimate, isEnabled };
 }
 
-// Cordis plugin entry: registers nothing by default; exposes the bridge on
-// ctx for an explicit opt-in call site. No event subscription, so existing
-// Web/API behavior is unchanged while disabled.
+// Cordis plugin entry: the bridge is a service owned by this plugin's fiber.
+// Its disposer unregisters the service before the bridge waits for its worker.
 export function apply(ctx) {
-  const bridge = createComputeBridge({ bin: resolveRdshBin() });
-  ctx.rdshCompute = bridge;
-  ctx.on?.("dispose", () => bridge.close());
+  return ctx.effect(() => {
+    const bridge = createComputeBridge({ bin: resolveRdshBin() });
+    ctx.provide("rdshCompute", bridge);
+    return () => bridge.close();
+  }, "rdsh-compute");
 }
