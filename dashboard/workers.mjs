@@ -20,9 +20,9 @@ import {
   canonicalFuture,
   repository,
   workerGit,
-  dirtyPaths,
-  changedPaths,
   trackedPaths,
+  sourceSnapshot,
+  observeWorktree,
 } from "./worker-git.mjs";
 
 const object = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
@@ -268,7 +268,7 @@ export class WorkerWorkspaces {
     }
   }
   async source() {
-    const info = await repository(this.git.root);
+    const info = await sourceSnapshot(this.git.root);
     requireWorker(
       samePath(info.git_common_dir, this.git.git_common_dir),
       "source_repository_identity_changed",
@@ -276,7 +276,7 @@ export class WorkerWorkspaces {
     return {
       head_sha: info.head_sha,
       branch: info.branch,
-      dirty_paths: await dirtyPaths(info.root),
+      dirty_paths: info.dirty_paths,
     };
   }
   async observe(row) {
@@ -311,38 +311,22 @@ export class WorkerWorkspaces {
         samePath(await fs.realpath(row.worktree), row.worktree),
         "worker_worktree_identity_changed",
       );
-      const current = await repository(row.worktree);
-      requireWorker(
-        samePath(current.git_common_dir, this.git.git_common_dir) &&
-          current.branch === row.branch,
-        "worker_worktree_identity_changed",
-      );
-      await workerGit(
-        row.worktree,
-        "merge-base",
-        "--is-ancestor",
-        row.base_sha,
-        current.head_sha,
-      );
-      const dirty = await dirtyPaths(row.worktree);
-      const committed = await changedPaths(
-        row.worktree,
-        row.base_sha,
-        current.head_sha,
-      );
-      const changed = [...new Set([...dirty, ...committed])].sort();
-      requireWorker(
-        (await repository(row.worktree)).head_sha === current.head_sha,
-        "worker_head_changed_during_scan",
-      );
+      const gitTree = await observeWorktree(row.worktree, {
+        git_common_dir: this.git.git_common_dir,
+        branch: row.branch,
+        base: row.base_sha,
+      });
+      const { dirty_paths: dirty, committed_paths: committed } = gitTree;
       result.tree = {
         status: "observed",
         dirty: dirty.length > 0,
-        head_sha: current.head_sha,
+        head_sha: gitTree.head_sha,
         dirty_paths: dirty,
         committed_paths: committed,
-        changed_paths: changed,
-        scope_violations: changed.filter((p) => !mayWrite(row.declaration, p)),
+        changed_paths: gitTree.changed_paths,
+        scope_violations: gitTree.changed_paths.filter((p) =>
+          !mayWrite(row.declaration, p),
+        ),
         reason: null,
       };
     } catch (error) {
