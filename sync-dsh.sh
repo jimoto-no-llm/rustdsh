@@ -20,7 +20,7 @@ for a in "$@"; do
   case "$a" in
     --check-only) CHECK_ONLY=1 ;;
     --channel=*) CHANNEL="${a#--channel=}" ;;
-    -h|--help) echo "usage: sync-dsh.sh [--check-only] [--channel rc|any]"; echo "  env: RDSH_SYNC_FROM_SOURCE=1 (rebuild rdsh from source instead of release binary)"; echo "       RDSH_MUSL=1 (prefer the static musl build), RDSH_SYNC_VERSION=VER (pin release)"; exit 0 ;;
+    -h|--help) echo "usage: sync-dsh.sh [--check-only] [--channel rc|any]"; echo "  env: RDSH_SYNC_FROM_SOURCE=1 (rebuild rdsh from source instead of release binary)"; echo "       RDSH_MUSL=1 (prefer the static musl build), RDSH_SYNC_VERSION=VER (pin release)"; echo "       DSH_PKG_ROOT=DIR (use DIR as the @deepseek-ai/dsh package root instead of discovering it), NPM_BIN=npm"; exit 0 ;;
     *) echo "unknown arg: $a" >&2; exit 2 ;;
   esac
 done
@@ -295,8 +295,38 @@ for cand in "${NPM_BIN:-}" "$HOME/.local/bin/npm" "$NODEBIN/npm" "$(command -v n
 done
 if [ -z "$NPM" ]; then log "npm not found; set NPM_BIN"; exit 1; fi
 log "using npm: $NPM"
-PKGROOT="$("$NPM" root -g 2>/dev/null)/@deepseek-ai/dsh"
-if [ ! -f "$PKGROOT/package.json" ]; then log "dsh package not found under $PKGROOT"; exit 1; fi
+# The npm that owns the running dsh is not necessarily the npm first on PATH:
+# rdsh is a passthrough launcher, so the tree can live under
+# $HOME/.local/opt/<dir>/lib/node_modules while `npm root -g` names a different
+# prefix. Try, in order: the DSH_PKG_ROOT override, npm's own global root, the
+# newest $HOME/.local/opt/* tree, then the older per-user prefixes. The first
+# candidate whose package.json is readable wins.
+NPM_ROOT="$("$NPM" root -g 2>/dev/null || true)"
+OPT_TREE=""
+for d in "$HOME"/.local/opt/*/lib/node_modules/@deepseek-ai/dsh; do
+  [ -f "$d/package.json" ] || continue
+  # -nt needs no GNU-only sort and keeps paths with spaces intact.
+  if [ -z "$OPT_TREE" ] || [ "$d" -nt "$OPT_TREE" ]; then OPT_TREE="$d"; fi
+done
+PKGROOT=""
+for cand in "${DSH_PKG_ROOT:-}" "${NPM_ROOT:+$NPM_ROOT/@deepseek-ai/dsh}" "$OPT_TREE" \
+  "$HOME/.npm-global/lib/node_modules/@deepseek-ai/dsh" "$HOME/.local/lib/node_modules/@deepseek-ai/dsh"; do
+  if [ -n "$cand" ] && [ -f "$cand/package.json" ]; then PKGROOT="$cand"; break; fi
+done
+# `npm install -g` writes into npm's own global root, so a tree found anywhere
+# else (the $HOME/.local/opt layout) cannot be updated that way; re-reading it
+# after an install there would only report a false verification failure.
+DSH_MANAGED=1
+if [ -n "$PKGROOT" ] && { [ -z "$NPM_ROOT" ] || [ "${PKGROOT#"$NPM_ROOT"/}" = "$PKGROOT" ]; }; then
+  DSH_MANAGED=0
+fi
+if [ -z "$PKGROOT" ]; then
+  # A tree we cannot locate is a reporting gap, not a failed sync: rdsh itself
+  # still updates from the release below, and a layout that keeps moving must
+  # not make the daily run and its notification fail forever.
+  log "dsh tree not found; DSH skipped, rdsh release update continues"
+else
+log "using dsh tree: $PKGROOT"
 INSTALLED="$(node -p "require(process.argv[1]).version" "$PKGROOT/package.json" 2>/dev/null)"
 if [ -z "$INSTALLED" ]; then log "cannot read installed version"; exit 1; fi
 ALL="$("$NPM" view @deepseek-ai/dsh versions --json 2>/dev/null || true)"
@@ -359,7 +389,10 @@ else
   DSH_CHANGED=1
   if [ "$CHECK_ONLY" = 1 ]; then log "dsh update available: $LATEST"; fi
 fi
-if [ "$DSH_CHANGED" = 1 ] && [ "$CHECK_ONLY" = 0 ]; then
+if [ "$DSH_CHANGED" = 1 ] && [ "$CHECK_ONLY" = 0 ] && [ "$DSH_MANAGED" = 0 ]; then
+  log "dsh tree $PKGROOT is outside npm's global root (${NPM_ROOT:-unknown}); DSH update skipped, tree left as is"
+fi
+if [ "$DSH_CHANGED" = 1 ] && [ "$CHECK_ONLY" = 0 ] && [ "$DSH_MANAGED" = 1 ]; then
 log "updating $INSTALLED -> $LATEST"
 if ! "$NPM" install -g "@deepseek-ai/dsh@$LATEST" >> "$LOGDIR/sync.log" 2>&1; then
   log "npm install failed; kept $INSTALLED"; exit 1
@@ -375,6 +408,8 @@ else
   log "rollback done"
   exit 1
 fi
+fi
+# Closes the dsh tree update; an empty PKGROOT skipped it above.
 fi
 REPO="$(cd "$(dirname "$0")" && pwd)"
 if [ "$CHECK_ONLY" = 0 ] && [ -x "$REPO/target/release/rdsh" ] && [ -f "$REPO/tests/regress.sh" ]; then
