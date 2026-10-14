@@ -14,8 +14,12 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   route and key status. The `sarashina` preset writes the `compat` lines
   (`supportsStore`, `supportsUsageInStreaming`) and `maxTokens: 8000` that the
   API requires; its `tool_choice` default is a known open question for agent
-  use. `HAI_API_KEY`, `SARASHINA_API_KEY` and `LOCAL_OPENAI_API_KEY` are now
-  recognized and can be saved from `rdsh setup`. See `docs/PROVIDERS.md`.
+  use. `HAI_API_KEY`, `SARASHINA_API_KEY` and `LOCAL_OPENAI_API_KEY` can be
+  saved from the setup UI, but they count as a connection only when a profile's
+  default model uses a route that reads them. Existing `llm-pi-ai` entries
+  written with quotes, comments or any indent width are edited in place; a
+  layout that cannot be read safely is refused with the YAML to add by hand.
+  See `docs/PROVIDERS.md`.
 - `rdsh-dashboard subagents plan` turns a declared use case into a deterministic
   dispatch plan for delegated subagents: role and model tier per item, bounded
   items and weight per agent, waves limited by `max_parallel`, and explicit

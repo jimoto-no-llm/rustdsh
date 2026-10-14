@@ -50,7 +50,7 @@ the profile lock. If there is no `llm-pi-ai` entry, one is appended.
 Common options:
 
 | Option | Meaning |
-|---|---|
+| --- | --- |
 | `--model <id>` | Declare a model (repeatable). |
 | `--discover` | Read ids from `GET {baseURL}/models` (`data[].id`, or Ollama-style `models[].name`). |
 | `--from-opencode` | Take `baseURL` and models from opencode's `provider.<id>` entry. |
@@ -115,7 +115,7 @@ rdsh provider add sarashina --profile web --model sarashina3-mini
 
 Preset: route `sarashina`, display name `Sarashina`, `api: openai-completions`,
 base URL `https://api.sarashina.ai/v1`, key `SARASHINA_API_KEY`. Issue a key at
-https://chat.sarashina.ai/dashboard/api-keys.
+<https://chat.sarashina.ai/dashboard/api-keys>.
 
 Without `--model` the two documented chat models are written, and `--model`
 replaces them:
@@ -171,8 +171,8 @@ Limits and terms (checked 2026-10-14):
   `sarashina3-nano` 60 RPM. A 429 carries no `Retry-After`.
 - During the free beta, inputs and outputs may be used to improve the models.
 
-Sources: https://docs.sarashina.ai/api-reference/chat-completions and
-https://docs.sarashina.ai/rate-limits
+Sources: <https://docs.sarashina.ai/api-reference/chat-completions> and
+<https://docs.sarashina.ai/rate-limits>
 
 ## Home servers (`local-openai`)
 
@@ -194,7 +194,7 @@ is not overwritten.
 Typical base URLs:
 
 | Server | Base URL |
-|---|---|
+| --- | --- |
 | llama.cpp `llama-server` | `http://host:8080/v1` |
 | vLLM | `http://host:8000/v1` |
 | LM Studio | `http://host:1234/v1` |

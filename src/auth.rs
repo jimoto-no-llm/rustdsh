@@ -748,13 +748,12 @@ pub fn pre_boot(banner: bool) {
     if !banner {
         return;
     }
-    for k in KNOWN_ENV_KEYS {
-        if env_key_set(k) {
-            return;
-        }
-    }
     let doc = load_doc(&creds_path());
-    if !doc.grants.is_empty() || !doc.refs.is_empty() {
+    if general_connection(&doc) {
+        return;
+    }
+    // Rare: only a provider route key exists; let the profiles decide.
+    if route_key_present(&doc) && !setup_needed_in(&scan()) {
         return;
     }
     print_first_boot_banner();
@@ -1009,14 +1008,13 @@ pub fn summary_line() -> String {
 // step instead of a bare credential prompt.
 
 /// API-key env vars that count as "already connected".
-const KNOWN_ENV_KEYS: &[&str] = &[
-    "DEEPSEEK_API_KEY",
-    "OPENAI_API_KEY",
-    "ANTHROPIC_API_KEY",
-    "HAI_API_KEY",
-    "LOCAL_OPENAI_API_KEY",
-    "SARASHINA_API_KEY",
-];
+const KNOWN_ENV_KEYS: &[&str] = &["DEEPSEEK_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"];
+
+/// Keys of routes that `rdsh provider add` registers. dsh does not ship these
+/// routes, so the key alone is not a connection: it counts only once a
+/// profile's default model resolves to a route that uses it
+/// ([`provider_needs`] state `ok`).
+const PROVIDER_ROUTE_KEYS: &[&str] = &["HAI_API_KEY", "LOCAL_OPENAI_API_KEY", "SARASHINA_API_KEY"];
 
 fn user_lang() -> String {
     for k in ["LANGUAGE", "LC_ALL", "LANG"] {
@@ -1044,14 +1042,38 @@ fn env_key_set(name: &str) -> bool {
         .unwrap_or(false)
 }
 
+/// A connection that needs no route lookup: a stored grant, a stored ref or
+/// env key of a well-known provider.
+fn general_connection(doc: &CredsDoc) -> bool {
+    !doc.grants.is_empty()
+        || doc
+            .refs
+            .keys()
+            .any(|k| !PROVIDER_ROUTE_KEYS.contains(&k.as_str()))
+        || KNOWN_ENV_KEYS.iter().any(|k| env_key_set(k))
+}
+
+/// A route key (stored or exported) exists, so the profiles decide.
+fn route_key_present(doc: &CredsDoc) -> bool {
+    PROVIDER_ROUTE_KEYS
+        .iter()
+        .any(|k| doc.refs.contains_key(*k) || env_key_set(k))
+}
+
 /// External stores are only candidates for import. A connection requires a
 /// credential already stored for DSH or a usable API-key environment variable.
+/// A provider route key (HAI, local, Sarashina) counts only when a profile's
+/// default model uses a route that resolves it, which keeps `needed` in line
+/// with `defaults[].state`.
 fn setup_needed_in(s: &Scan) -> bool {
     let doc = &s.doc;
-    if !doc.grants.is_empty() || !doc.refs.is_empty() {
+    if general_connection(doc) {
         return false;
     }
-    !KNOWN_ENV_KEYS.iter().any(|k| env_key_set(k))
+    if route_key_present(doc) {
+        return !provider_needs(s).iter().any(|n| n.state == "ok");
+    }
+    true
 }
 
 /// First-boot banner text printed to stderr (the decision to show it is made
@@ -1962,10 +1984,7 @@ mod tests {
     fn provider_keys_can_be_saved_from_setup() {
         assert!(SETUP_KEY_ALLOWLIST.contains(&"HAI_API_KEY"));
         assert!(SETUP_KEY_ALLOWLIST.contains(&"LOCAL_OPENAI_API_KEY"));
-        assert!(KNOWN_ENV_KEYS.contains(&"HAI_API_KEY"));
-        assert!(KNOWN_ENV_KEYS.contains(&"LOCAL_OPENAI_API_KEY"));
         assert!(SETUP_KEY_ALLOWLIST.contains(&"SARASHINA_API_KEY"));
-        assert!(KNOWN_ENV_KEYS.contains(&"SARASHINA_API_KEY"));
         assert!(setup_store_key("NOT_ALLOWED_API_KEY", "x").is_err());
     }
 

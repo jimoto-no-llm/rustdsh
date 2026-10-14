@@ -700,3 +700,144 @@ fn sarashina_key_from_env_is_stored_but_never_printed() {
     ok(&plain);
     assert!(!text(&plain).contains(secret));
 }
+
+fn setup_json(fixture: &Fixture, envs: &[(&str, &str)], extra: &[&str]) -> Value {
+    let mut args = vec!["setup", "--json"];
+    args.extend_from_slice(extra);
+    let out = fixture.run_with(&args, envs, b"");
+    ok(&out);
+    serde_json::from_slice(&out.stdout).unwrap()
+}
+
+/// What `rdsh auth` says about the profiles' default models.
+fn default_state(fixture: &Fixture, envs: &[(&str, &str)]) -> String {
+    let out = fixture.run_with(&["auth"], envs, b"");
+    ok(&out);
+    text(&out)
+}
+
+#[test]
+fn an_exported_route_key_without_a_route_is_not_a_connection() {
+    for key in ["HAI_API_KEY", "LOCAL_OPENAI_API_KEY", "SARASHINA_API_KEY"] {
+        let fixture = Fixture::new();
+        fixture.set_patch(PATCH);
+        let base = setup_json(&fixture, &[], &[]);
+        assert_eq!(base["needed"], true);
+        let v = setup_json(&fixture, &[(key, "sk-not-real")], &[]);
+        assert_eq!(v["needed"], true, "{key}: {v}");
+        let shown = default_state(&fixture, &[(key, "sk-not-real")]);
+        assert!(shown.contains("credential missing"), "{key}: {shown}");
+        // `--yes` does not save it, so nothing makes the profile look connected.
+        let v = setup_json(&fixture, &[(key, "sk-not-real")], &["--yes"]);
+        assert_eq!(v["needed"], true, "{key}: {v}");
+        assert!(v["persisted_env_keys"].as_array().unwrap().is_empty());
+        assert!(fixture.creds().is_empty());
+    }
+}
+
+#[test]
+fn a_stored_route_key_without_a_route_is_not_a_connection() {
+    let fixture = Fixture::new();
+    fixture.set_patch(PATCH);
+    fs::write(
+        fixture.0.join("dsh/.credentials.yaml"),
+        "version: 1\nrefs:\n  HAI_API_KEY: 'sk-not-real'\n",
+    )
+    .unwrap();
+    let v = setup_json(&fixture, &[], &[]);
+    assert_eq!(v["needed"], true, "{v}");
+    assert!(default_state(&fixture, &[]).contains("credential missing"));
+}
+
+#[cfg(unix)]
+#[test]
+fn the_first_run_banner_is_not_suppressed_by_a_route_key_alone() {
+    let fixture = Fixture::new();
+    fixture.set_patch(PATCH);
+    let banner = |envs: &[(&str, &str)]| {
+        let mut all = vec![("RDSH_ORIG_BIN", "/bin/true"), ("LANG", "en_US.UTF-8")];
+        all.extend_from_slice(envs);
+        let out = fixture.run_with(&["--profile", "tui", "boot"], &all, b"");
+        String::from_utf8_lossy(&out.stderr).contains("first-run setup needed")
+    };
+    assert!(banner(&[]));
+    assert!(banner(&[("HAI_API_KEY", "sk-not-real")]));
+    // A well-known key still counts.
+    assert!(!banner(&[("DEEPSEEK_API_KEY", "sk-not-real")]));
+}
+
+#[test]
+fn a_route_key_counts_once_the_default_route_uses_it() {
+    let fixture = Fixture::new();
+    fixture.set_patch(
+        "- id: llm-pi-ai\n  config:\n    providers:\n      hai:\n        apiKeyEnv: HAI_API_KEY\n        models:\n          - id: m1\n- id: agent-default-model\n  config:\n    provider: hai\n    model: m1\n",
+    );
+    let none = setup_json(&fixture, &[], &[]);
+    assert_eq!(none["needed"], true);
+    let v = setup_json(&fixture, &[("HAI_API_KEY", "sk-not-real")], &[]);
+    assert_eq!(v["needed"], false, "{v}");
+    let shown = default_state(&fixture, &[("HAI_API_KEY", "sk-not-real")]);
+    assert!(shown.contains("credential ok"), "{shown}");
+}
+
+#[test]
+fn quoted_and_commented_ids_and_wide_indents_keep_every_route() {
+    for (head, width) in [
+        ("- id: llm-pi-ai # custom routes", 2usize),
+        ("- id: \"llm-pi-ai\"", 4),
+        ("- id: 'llm-pi-ai'", 3),
+        ("- id:   llm-pi-ai", 1),
+    ] {
+        let pad = |n: usize| " ".repeat(n);
+        let text = format!(
+            "{head}\n  config:\n{}providers:\n{}other:\n{}apiKeyEnv: OTHER_API_KEY\n{}models:\n{}- id: x\n",
+            pad(2 + width),
+            pad(2 + 2 * width),
+            pad(2 + 3 * width),
+            pad(2 + 3 * width),
+            pad(2 + 4 * width),
+        );
+        let fixture = Fixture::new();
+        fixture.set_patch(&text);
+        let out = fixture.run_with(
+            &["provider", "add", "sarashina", "--profile", "tui"],
+            &[("SARASHINA_API_KEY", "sk-not-real")],
+            b"",
+        );
+        ok(&out);
+        let after = fixture.patch();
+        assert!(after.starts_with(&text), "{head}");
+        assert_eq!(after.matches("llm-pi-ai").count(), 1, "{head}\n{after}");
+        let list = fixture.run(&["provider", "list", "--profile", "tui", "--json"]);
+        ok(&list);
+        let s = String::from_utf8_lossy(&list.stdout).into_owned();
+        assert!(s.contains("\"configured\":true"), "{head}: {s}");
+    }
+}
+
+#[test]
+fn an_id_that_cannot_be_read_is_refused_without_writing() {
+    let fixture = Fixture::new();
+    let text = "- {id: llm-pi-ai, config: {providers: {}}}\n";
+    fixture.set_patch(text);
+    let out = fixture.run_with(
+        &[
+            "provider",
+            "add",
+            "hai",
+            "--profile",
+            "tui",
+            "--model",
+            "m1",
+        ],
+        &[("HAI_API_KEY", "sk-not-real")],
+        b"",
+    );
+    assert_eq!(out.status.code(), Some(1), "{}", text_of(&out));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("by hand"));
+    assert_eq!(fixture.patch(), text);
+}
+
+fn text_of(out: &Output) -> String {
+    text(out)
+}

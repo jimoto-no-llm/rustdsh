@@ -249,6 +249,9 @@ fn yaml_scalar(raw: &str) -> String {
 /// The route as YAML lines whose key sits at `indent`, nesting by `step`.
 fn render_route(route: &Route, indent: usize, step: usize) -> Vec<String> {
     let at = |depth: usize| " ".repeat(indent + step * depth);
+    // Keys after `- id:` line up with `id`, two columns right of the dash,
+    // whatever the file's own indentation step is.
+    let item_key = " ".repeat(indent + step * 2 + 2);
     let mut out = vec![
         format!("{}{}:", at(0), route.id),
         format!("{}displayName: {}", at(1), yaml_scalar(&route.display_name)),
@@ -269,16 +272,16 @@ fn render_route(route: &Route, indent: usize, step: usize) -> Vec<String> {
     for model in &route.models {
         out.push(format!("{}- id: {}", at(2), yaml_scalar(&model.id)));
         if let Some(name) = &model.name {
-            out.push(format!("{}name: {}", at(3), yaml_scalar(name)));
+            out.push(format!("{item_key}name: {}", yaml_scalar(name)));
         }
         if let Some(window) = model.context_window {
-            out.push(format!("{}contextWindow: {window}", at(3)));
+            out.push(format!("{item_key}contextWindow: {window}"));
         }
         if let Some(max) = model.max_tokens {
-            out.push(format!("{}maxTokens: {max}", at(3)));
+            out.push(format!("{item_key}maxTokens: {max}"));
         }
         if !model.input.is_empty() {
-            out.push(format!("{}input: [{}]", at(3), model.input.join(", ")));
+            out.push(format!("{item_key}input: [{}]", model.input.join(", ")));
         }
     }
     out
@@ -390,32 +393,76 @@ fn find_at(lines: &[String], from: usize, until: usize, indent: usize, key: &str
         .find(|i| indent_of(&lines[*i]) == indent && key_rest(&lines[*i], key).is_some())
 }
 
-fn identifies_llm_pi_ai(trimmed: &str) -> bool {
-    matches!(
-        trimmed,
-        "id: llm-pi-ai"
-            | "name: \"@deepseek-ai/dsh-llm-pi-ai\""
-            | "name: '@deepseek-ai/dsh-llm-pi-ai'"
-            | "name: @deepseek-ai/dsh-llm-pi-ai"
-    )
+const PI_AI_ID: &str = "llm-pi-ai";
+const PI_AI_NAME: &str = "@deepseek-ai/dsh-llm-pi-ai";
+
+/// The value of `key` on one entry line, read as a YAML scalar (comment
+/// stripped, quotes removed). `Ok(None)` when the line is another key,
+/// `Err` when the value is in a form this module will not interpret.
+fn scalar_key(line: &str, key: &str) -> std::result::Result<Option<String>, String> {
+    let Some(rest) = key_rest(line, key) else {
+        return Ok(None);
+    };
+    let unsafe_start =
+        rest.is_empty() || rest.starts_with(['|', '>', '[', '{', '&', '*', '!', '?']);
+    let escaped = rest.starts_with('"') && rest.contains('\\');
+    if unsafe_start || escaped {
+        return Err(format!(
+            "a top-level `{key}:` value is written in a form rdsh will not interpret"
+        ));
+    }
+    Ok(Some(unquote(rest)))
 }
 
-/// The `- id: llm-pi-ai` patch entry; the identifying key may share the `- `
-/// line or sit on a later line of the entry.
-fn llm_pi_ai_entry(lines: &[String]) -> Option<usize> {
+/// The `- id: llm-pi-ai` patch entry (by `id`, or by the plugin `name`). Only
+/// keys of the entry itself count: a nested `id:` (inside `insert`, say) does
+/// not. `Err` when an entry cannot be read safely or the plugin is declared
+/// twice (a later entry replaces the whole config in Cordis).
+fn llm_pi_ai_entry(lines: &[String]) -> std::result::Result<Option<usize>, String> {
     let starts: Vec<usize> = (0..lines.len())
-        .filter(|i| indent_of(&lines[*i]) == 0 && lines[*i].starts_with("- "))
+        .filter(|i| {
+            indent_of(&lines[*i]) == 0
+                && lines[*i].starts_with('-')
+                && !lines[*i].starts_with("---")
+        })
         .collect();
+    let mut found = Vec::new();
     for (position, start) in starts.iter().enumerate() {
         let end = starts.get(position + 1).copied().unwrap_or(lines.len());
-        let head = lines[*start].trim_start()[2..].trim();
-        if identifies_llm_pi_ai(head)
-            || (start + 1..end).any(|i| identifies_llm_pi_ai(lines[i].trim()))
-        {
-            return Some(*start);
+        if !lines[*start].starts_with("- ") {
+            return Err("a patch entry does not start with `- key:` on one line".to_string());
+        }
+        let col = dash_key_col(&lines[*start]);
+        let head = &lines[*start][col..];
+        if head.starts_with(['{', '[', '#']) || head.trim().is_empty() {
+            return Err(
+                "a patch entry is written in flow style or without a first key".to_string(),
+            );
+        }
+        let mut hit = false;
+        let candidates = std::iter::once(head).chain(
+            (start + 1..end)
+                .filter(|i| !skippable(&lines[*i]) && indent_of(&lines[*i]) == col)
+                .map(|i| lines[i].trim_start()),
+        );
+        for text in candidates {
+            if scalar_key(text, "id")?.is_some_and(|v| v == PI_AI_ID)
+                || scalar_key(text, "name")?.is_some_and(|v| v == PI_AI_NAME)
+            {
+                hit = true;
+            }
+        }
+        if hit {
+            if key_rest(head, "config").is_some() {
+                return Err("the llm-pi-ai entry starts with its config key".to_string());
+            }
+            found.push(*start);
         }
     }
-    None
+    if found.len() > 1 {
+        return Err("llm-pi-ai is declared by more than one patch entry".to_string());
+    }
+    Ok(found.first().copied())
 }
 
 /// Column of the first key on a `- key: v` line.
@@ -435,7 +482,7 @@ struct Providers {
 /// `Ok(None)` when any level is absent, `Err` when a level is written in a
 /// form this module will not edit.
 fn locate_providers(lines: &[String]) -> Result<Option<Providers>> {
-    let Some(entry) = llm_pi_ai_entry(lines) else {
+    let Some(entry) = llm_pi_ai_entry(lines).map_err(|e| anyhow::anyhow!(e))? else {
         return Ok(None);
     };
     let col = dash_key_col(&lines[entry]);
@@ -568,18 +615,109 @@ fn refuse(reason: &str, route: &Route) -> anyhow::Error {
     )
 }
 
+/// Read the edited text back: the llm-pi-ai entry is still unique, every
+/// route that was there is still found unchanged (except the one being
+/// replaced), the new route is found exactly once with what was asked, and its
+/// keys sit at consistent columns.
+fn verify_written(
+    before: &[RouteInfo],
+    after: &str,
+    route: &Route,
+) -> std::result::Result<(), String> {
+    let lines = split_lines(after);
+    llm_pi_ai_entry(&lines)?.ok_or("the llm-pi-ai entry is not found after the edit")?;
+    let provs = locate_providers(&lines)
+        .map_err(|e| e.to_string())?
+        .ok_or("the providers block is not found after the edit")?;
+    let found = routes_in(after);
+    if found.iter().filter(|r| r.id == route.id).count() != 1 {
+        return Err("the written route is not found exactly once on read-back".to_string());
+    }
+    for old in before.iter().filter(|r| r.id != route.id) {
+        if !found.contains(old) {
+            return Err(format!(
+                "the existing route `{}` did not survive the edit",
+                old.id
+            ));
+        }
+    }
+    let new = found
+        .iter()
+        .find(|r| r.id == route.id)
+        .expect("counted above");
+    if new.models != route.models.len()
+        || new.base_url.as_deref() != Some(route.base_url.as_str())
+        || new.api_key_env.as_deref() != Some(route.api_key_env.as_str())
+    {
+        return Err("the written route differs from the requested one on read-back".to_string());
+    }
+    // Layout: required keys share one column and model keys follow `- id`.
+    let start = (provs.line + 1..provs.end.min(lines.len()))
+        .find(|i| {
+            indent_of(&lines[*i]) == provs.child_indent && key_rest(&lines[*i], &route.id).is_some()
+        })
+        .ok_or("the written route is not at the providers child column")?;
+    let end = block_end(&lines, start);
+    let inner = child_indent(&lines, start, end).ok_or("the written route has no body")?;
+    let mut models_at = None;
+    for (i, line) in lines.iter().enumerate().take(end).skip(start + 1) {
+        if skippable(line) || indent_of(line) != inner {
+            continue;
+        }
+        let known = [
+            "displayName",
+            "apiKeyEnv",
+            "api",
+            "baseURL",
+            "compat",
+            "models",
+        ]
+        .iter()
+        .any(|k| key_rest(line, k).is_some());
+        if !known {
+            return Err("an unexpected key sits at the route's column".to_string());
+        }
+        if key_rest(line, "models").is_some() {
+            models_at = Some(i);
+        }
+    }
+    let models_at = models_at.ok_or("the written route has no models key")?;
+    let mend = block_end(&lines, models_at);
+    let mut item_col = None;
+    let mut items = 0;
+    for line in lines.iter().take(mend).skip(models_at + 1) {
+        if skippable(line) {
+            continue;
+        }
+        let col = indent_of(line);
+        if line.trim_start().starts_with("- ") {
+            if *item_col.get_or_insert(col) != col {
+                return Err("model items are at different columns".to_string());
+            }
+            items += 1;
+        } else if item_col.is_none_or(|c| col != c + 2) {
+            return Err("a model key is not aligned with its `- id`".to_string());
+        }
+    }
+    if items != route.models.len() {
+        return Err("the written models do not match the requested count".to_string());
+    }
+    Ok(())
+}
+
 /// Insert (or with `replace`, rewrite) `route` in the profile patch text.
 fn apply_route(text: &str, route: &Route, replace: bool) -> Result<Applied> {
     let crlf = text.contains("\r\n");
     let eol = if crlf { "\r" } else { "" };
     let mut lines = split_lines(text);
+    let before = routes_in(text);
     let finish = |lines: Vec<String>, change: Change| -> Result<Applied> {
         let out = Applied {
             text: lines.join("\n"),
             change,
         };
-        if change.writes() && !routes_in(&out.text).iter().any(|r| r.id == route.id) {
-            bail!("internal error: the written route could not be read back");
+        if change.writes() {
+            verify_written(&before, &out.text, route).map_err(|why| refuse(&why, route))?;
         }
         Ok(out)
     };
@@ -596,7 +734,7 @@ fn apply_route(text: &str, route: &Route, replace: bool) -> Result<Applied> {
     };
 
     let has_content = lines.iter().any(|l| !skippable(l));
-    let entry = llm_pi_ai_entry(&lines);
+    let entry = llm_pi_ai_entry(&lines).map_err(|e| refuse(&e, route))?;
     let Some(entry) = entry else {
         if has_content {
             let top_ok = lines
@@ -663,7 +801,8 @@ fn apply_route(text: &str, route: &Route, replace: bool) -> Result<Applied> {
     let Some(providers) = find_at(&lines, config + 1, config_end, ci, "providers") else {
         let at = content_end(&lines, config, config_end);
         let mut block = vec![format!("{}providers:", " ".repeat(ci))];
-        block.extend(render_route(route, ci + 2, 2));
+        let step = (ci - config_indent).max(1);
+        block.extend(render_route(route, ci + step, step));
         lines.splice(at..at, with_eol(block));
         return finish(lines, Change::Added);
     };
@@ -1278,6 +1417,9 @@ fn write_atomic(path: &Path, text: &str) -> Result<()> {
         file.write_all(text.as_bytes())?;
         file.sync_all()?;
         drop(file);
+        if std::fs::read(&tmp)? != text.as_bytes() {
+            bail!("the temporary file does not hold what was written");
+        }
         if let Some(perms) = perms {
             std::fs::set_permissions(&tmp, perms)?;
         }
@@ -2002,6 +2144,187 @@ mod tests {
                 "{err}"
             );
         }
+    }
+
+    fn detailed_route() -> Route {
+        let mut r = route("hai", &["m1", "m2"]);
+        r.models[0].name = Some("M One".to_string());
+        r.models[0].context_window = Some(128000);
+        r.models[0].max_tokens = Some(8000);
+        r.models[0].input = vec!["text".to_string()];
+        r.models[1].name = Some("M Two".to_string());
+        r
+    }
+
+    /// An existing profile whose nesting is `w` columns per level.
+    fn with_width(w: usize) -> String {
+        let pad = |n: usize| " ".repeat(n);
+        format!(
+            "- id: llm-pi-ai\n  config:\n{}providers:\n{}other:\n{}apiKeyEnv: OTHER_API_KEY\n{}models:\n{}- id: x\n{}name: X\n- id: next\n",
+            pad(2 + w),
+            pad(2 + 2 * w),
+            pad(2 + 3 * w),
+            pad(2 + 3 * w),
+            pad(2 + 4 * w),
+            pad(2 + 4 * w + 2),
+        )
+    }
+
+    #[test]
+    fn model_keys_align_with_id_for_every_indent_width() {
+        for w in [1, 2, 3, 4] {
+            let text = with_width(w);
+            let out = apply_route(&text, &detailed_route(), false).unwrap().text;
+            let lines: Vec<&str> = out.lines().collect();
+            let mut checked = 0;
+            for (i, line) in lines.iter().enumerate() {
+                let t = line.trim_start();
+                if !t.starts_with("- id: m") {
+                    continue;
+                }
+                let dash = line.len() - t.len();
+                for next in &lines[i + 1..] {
+                    let nt = next.trim_start();
+                    if nt.starts_with("- ") || !next.starts_with(' ') {
+                        break;
+                    }
+                    assert_eq!(next.len() - nt.len(), dash + 2, "width {w}: {next:?}");
+                    checked += 1;
+                }
+            }
+            assert_eq!(checked, 5, "width {w}\n{out}");
+            // Previous route and the new one are both found; the file is unchanged before.
+            let ids: Vec<String> = routes_in(&out).into_iter().map(|r| r.id).collect();
+            assert_eq!(ids, ["other", "hai"], "width {w}");
+            assert!(out.ends_with("- id: next\n"));
+            // Compat is beside models, in the same step.
+            let mut sarashina = detailed_route();
+            sarashina.compat = vec!["supportsStore: false".to_string()];
+            let out = apply_route(&text, &sarashina, false).unwrap().text;
+            let compat = out.lines().find(|l| l.trim() == "compat:").unwrap();
+            let models = out.lines().rev().find(|l| l.trim() == "models:").unwrap();
+            assert_eq!(
+                compat.len() - compat.trim_start().len(),
+                models.len() - models.trim_start().len()
+            );
+        }
+    }
+
+    #[test]
+    fn llm_pi_ai_id_spellings_are_one_entry() {
+        for head in [
+            "- id: llm-pi-ai # custom routes",
+            "- id: \"llm-pi-ai\"",
+            "- id: 'llm-pi-ai'",
+            "- id:   llm-pi-ai",
+            "- id: llm-pi-ai   # c",
+        ] {
+            let text = format!("{head}\n  config:\n    providers:\n      other:\n        apiKeyEnv: O\n        models:\n          - id: x\n");
+            let out = apply_route(&text, &route("hai", &["m1"]), false)
+                .unwrap()
+                .text;
+            assert!(out.starts_with(head), "{head}");
+            assert_eq!(out.matches("llm-pi-ai").count(), 1, "{head}\n{out}");
+            let ids: Vec<String> = routes_in(&out).into_iter().map(|r| r.id).collect();
+            assert_eq!(ids, ["other", "hai"], "{head}");
+        }
+        // The entry may also be named by the plugin and keep id elsewhere.
+        let named = "- config:\n    providers: {}\n  name: '@deepseek-ai/dsh-llm-pi-ai' # x\n";
+        assert!(apply_route(named, &route("hai", &["m1"]), false).is_err());
+    }
+
+    #[test]
+    fn ids_that_cannot_be_read_safely_are_refused_not_duplicated() {
+        let r = route("hai", &["m1"]);
+        for text in [
+            "- id: |\n    llm-pi-ai\n  config:\n    providers:\n      a:\n        baseURL: http://x\n",
+            "- {id: llm-pi-ai, config: {providers: {}}}\n",
+            "- id: [llm-pi-ai]\n",
+            "-\n  id: llm-pi-ai\n",
+            "- id: \"llm\\x2dpi-ai\"\n  config:\n    providers:\n      a:\n        baseURL: http://x\n",
+            "- id: llm-pi-ai\n  config:\n    providers:\n      a:\n        baseURL: http://x\n- id: llm-pi-ai\n  config:\n    providers:\n      b:\n        baseURL: http://y\n",
+            "- id: [broken\n- id: llm-pi-ai\n",
+        ] {
+            let err = apply_route(text, &r, false).unwrap_err().to_string();
+            assert!(err.contains("by hand"), "{text:?}: {err}");
+        }
+    }
+
+    #[test]
+    fn other_providers_survive_every_add() {
+        let text = "- id: llm-pi-ai # keep\n  config:\n    providers:\n      a:\n        baseURL: http://a\n        models:\n          - id: a1\n      b:\n        baseURL: http://b\n- id: z\n";
+        let once = apply_route(text, &route("hai", &["m1"]), false)
+            .unwrap()
+            .text;
+        let twice = apply_route(&once, &route("home", &["m2"]), false)
+            .unwrap()
+            .text;
+        let ids: Vec<String> = routes_in(&twice).into_iter().map(|r| r.id).collect();
+        assert_eq!(ids, ["a", "b", "hai", "home"]);
+        assert_eq!(twice.matches("llm-pi-ai").count(), 1);
+    }
+
+    #[test]
+    fn a_nested_llm_pi_ai_inside_insert_is_not_the_entry() {
+        let text = "- insert:\n    - id: llm-pi-ai\n      name: \"@deepseek-ai/dsh-llm-pi-ai\"\n      config:\n        providers:\n          other:\n            baseURL: http://o\n  config:\n    unrelated: 1\n";
+        let out = apply_route(text, &route("hai", &["m1"]), false)
+            .unwrap()
+            .text;
+        // Nothing inside the insert is touched; a top-level entry is appended.
+        assert!(out.starts_with(text));
+        assert!(out.ends_with("\n- id: llm-pi-ai\n  config:\n    providers:\n      hai:\n        displayName: HAI\n        apiKeyEnv: HAI_API_KEY\n        api: openai-completions\n        baseURL: https://hai-api.hcloud.ltd/v1\n        models:\n          - id: m1\n"), "{out}");
+        let ids: Vec<String> = routes_in(&out).into_iter().map(|r| r.id).collect();
+        assert_eq!(ids, ["hai"]);
+    }
+
+    #[test]
+    fn empty_levels_get_children_at_the_right_depth() {
+        for (text, _w) in [
+            ("- id: llm-pi-ai\n  config:\n", 2),
+            (
+                "- id: llm-pi-ai\n  config:\n    # nothing yet\n- id: next\n",
+                2,
+            ),
+            ("- id: llm-pi-ai\n  config:\n    providers:\n", 2),
+            (
+                "- id: llm-pi-ai\n  config:\n    providers:\n      # none\n- id: next\n",
+                2,
+            ),
+            ("-   id: llm-pi-ai\n    config:\n", 2),
+            ("- id: llm-pi-ai\n  config:\n   other: 1\n", 1),
+            ("- id: llm-pi-ai\n  config:\n    other: 1\n", 2),
+            ("- id: llm-pi-ai\n  config:\n      other: 1\n", 4),
+        ] {
+            let out = apply_route(text, &detailed_route(), false)
+                .unwrap_or_else(|e| panic!("{text:?}: {e}"))
+                .text;
+            let ids: Vec<String> = routes_in(&out).into_iter().map(|r| r.id).collect();
+            assert_eq!(ids, ["hai"], "{text:?}\n{out}");
+        }
+    }
+
+    #[test]
+    fn read_back_rejects_a_lost_route_or_misaligned_keys() {
+        let r = route("hai", &["m1"]);
+        let before = routes_in(WITH_OTHER);
+        let good = apply_route(WITH_OTHER, &r, false).unwrap().text;
+        assert!(verify_written(&before, &good, &r).is_ok());
+        // The existing route vanished.
+        let lost = good.replace("      other:", "      other_:");
+        assert!(verify_written(&before, &lost, &r)
+            .unwrap_err()
+            .contains("other"));
+        // A model key drifts out of line with its `- id`.
+        let drift = good.replace(
+            "          - id: m1\n",
+            "          - id: m1\n              name: M\n",
+        );
+        assert!(verify_written(&before, &drift, &r)
+            .unwrap_err()
+            .contains("aligned"));
+        // A second llm-pi-ai entry.
+        let dup = format!("{good}- id: llm-pi-ai\n  config: {{}}\n");
+        assert!(verify_written(&before, &dup, &r).is_err());
     }
 
     #[test]
