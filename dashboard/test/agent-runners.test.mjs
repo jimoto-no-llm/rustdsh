@@ -366,7 +366,12 @@ for (const [runner, bin] of [
     const grandchild = Number(await fs.readFile(pidFile, "utf8"));
     const running = await status(job.id);
     assert.equal(running.state, "running");
-    const { agent_pid } = JSON.parse((await jobFiles(job.id)).job);
+    let agent_pid;
+    for (let i = 0; i < 100 && !agent_pid; i++) {
+      agent_pid = JSON.parse((await jobFiles(job.id)).job).agent_pid;
+      if (!agent_pid) await new Promise((r) => setTimeout(r, 50));
+    }
+    assert.ok(agent_pid, "supervisor recorded the agent pid");
     const info = await cancel(job.id, { termMs: 3000, killMs: 3000 });
     assert.equal(info.state, "cancelled");
     assert.ok(await gone(grandchild), "descendant is gone");
