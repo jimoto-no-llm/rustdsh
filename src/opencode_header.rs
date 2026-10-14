@@ -121,7 +121,11 @@ fn write_new_private_file(path: &Path, contents: &str) -> std::io::Result<()> {
 #[cfg(unix)]
 fn file_url(path: &Path) -> String {
     use std::os::unix::ffi::OsStrExt;
-    file_url_from_path_bytes(path.as_os_str().as_bytes())
+    // A Unix path may legitimately begin with `//` (`TMPDIR=//tmp`): that is an
+    // ordinary path component, never a UNC authority, so the URL keeps an empty
+    // authority (`file:////tmp/...`). Reading it as an authority would send
+    // Node to the host `tmp` and fail with `ERR_INVALID_FILE_URL_HOST`.
+    file_url_from_path_bytes_with(path.as_os_str().as_bytes(), false)
 }
 
 #[cfg(not(unix))]
@@ -143,10 +147,22 @@ fn file_url(path: &Path) -> String {
 /// that a URL would otherwise interpret. `:` is kept so `C:/...` survives, and a
 /// leading `//` is treated as a UNC authority (`//server/share` -> `file://server/share`)
 /// rather than a fourth slash.
+/// Only Windows and the tests use the authority-capable default; Unix calls the
+/// explicit form with `false`.
+#[cfg(any(not(unix), test))]
 fn file_url_from_path_bytes(bytes: &[u8]) -> String {
+    file_url_from_path_bytes_with(bytes, true)
+}
+
+/// The same encoder with an explicit answer to "is a leading `//` an authority?".
+///
+/// Windows UNC paths need the authority form; Unix paths must keep an empty
+/// authority even when they start with two slashes, because those bytes are only
+/// a path there.
+fn file_url_from_path_bytes_with(bytes: &[u8], unc_authority: bool) -> String {
     let mut url = String::with_capacity(bytes.len() + 8);
     match bytes {
-        [b'/', b'/', ..] => url.push_str("file:"),
+        [b'/', b'/', ..] if unc_authority => url.push_str("file:"),
         [b'/', ..] => url.push_str("file://"),
         _ => url.push_str("file:///"),
     }
@@ -297,6 +313,48 @@ mod tests {
             file_url_from_path_bytes(b"//server/share/Temp/p.mjs"),
             "file://server/share/Temp/p.mjs"
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn unix_double_slash_paths_keep_an_empty_authority() {
+        // `TMPDIR=//tmp` is a valid Unix temp root. Reading the leading `//` as
+        // an authority would make Node dial the host `tmp`.
+        assert_eq!(
+            file_url(Path::new("//tmp/rdsh-preload/p.mjs")),
+            "file:////tmp/rdsh-preload/p.mjs"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn node_accepts_a_preload_url_under_a_double_slash_temp_root() {
+        // A real launch through a `//`-rooted path, the shape eightman999
+        // reproduced on Linux/Node 24.19.0.
+        let mut nonce = [0u8; 8];
+        getrandom::fill(&mut nonce).unwrap();
+        let directory = Path::new("//tmp").join(format!("rdsh-preload-{}", hex(&nonce)));
+        create_private_directory(&directory).unwrap();
+        let path = directory.join(FILE_NAME);
+        write_new_private_file(&path, "globalThis.__rdshPreloadRan = 'yes';\n").unwrap();
+
+        let run = std::process::Command::new("node")
+            .arg("--import")
+            .arg(file_url(&path))
+            .arg("--input-type=module")
+            .arg("-e")
+            .arg("if (globalThis.__rdshPreloadRan !== 'yes') process.exit(3);")
+            .output();
+        let Ok(output) = run else {
+            std::fs::remove_dir_all(&directory).unwrap();
+            return; // no Node runtime in this environment
+        };
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            output.status.success(),
+            "node rejected the double-slash preload URL: {stderr}"
+        );
+        std::fs::remove_dir_all(&directory).unwrap();
     }
 
     #[cfg(not(unix))]
