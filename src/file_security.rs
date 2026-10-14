@@ -1,7 +1,16 @@
 //! Read repository files through no-follow, directory-relative handles.
 //! Callers pass an absolute, canonical root and target; unavailable hosts fail closed.
+//!
+//! Unix closes the check/open race: every component is opened with
+//! `openat`/`O_NOFOLLOW` under a held directory fd, so a link swapped in after
+//! validation cannot redirect the read. Windows has no `std` equivalent, so it
+//! validates the target (regular file, no reparse point, one hard link,
+//! canonical path under the root) and only then opens it. A reparse point
+//! substituted for the target or one of its parents between those two steps can
+//! still win that race: the opened handle cannot reveal the substitution, so the
+//! read may leave the approved root.
 use std::path::Path;
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 use std::path::PathBuf;
 
 /// A command-scoped capability for the directory selected by the caller.
@@ -13,6 +22,8 @@ pub(crate) struct Root {
     directory: std::fs::File,
     #[cfg(target_os = "macos")]
     nofollow_any: bool,
+    #[cfg(windows)]
+    path: PathBuf,
 }
 
 impl Root {
@@ -52,7 +63,13 @@ impl Root {
         })
     }
 
-    #[cfg(not(unix))]
+    #[cfg(windows)]
+    pub(crate) fn new(root: &Path) -> Option<Self> {
+        let path = std::fs::canonicalize(root).ok()?;
+        path.is_dir().then_some(Self { path })
+    }
+
+    #[cfg(not(any(unix, windows)))]
     pub(crate) fn new(_root: &Path) -> Option<Self> {
         None
     }
@@ -148,7 +165,35 @@ impl Root {
         Ok((metadata.is_file() && metadata.nlink() == 1).then_some(file))
     }
 
-    #[cfg(not(unix))]
+    #[cfg(windows)]
+    pub(crate) fn open(&self, target: &Path) -> Option<std::fs::File> {
+        use std::os::windows::fs::MetadataExt;
+
+        // Reject symlinks, junctions and other reparse points before looking
+        // at the file type, then directories, other non-regular files and any
+        // file with more than one hard link.
+        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
+        let metadata = std::fs::symlink_metadata(target).ok()?;
+        if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
+            || !metadata.is_file()
+            || metadata.number_of_links() != Some(1)
+        {
+            return None;
+        }
+        // Resolving the ancestors rejects both `..` escapes and symlinked
+        // parents that leave the approved root.
+        let canonical = std::fs::canonicalize(target).ok()?;
+        if !canonical.starts_with(&self.path) {
+            return None;
+        }
+        let file = std::fs::File::open(&canonical).ok()?;
+        // Re-check the opened object, mirroring the Unix check on the fd; a
+        // swap between the checks above and this open remains unobservable.
+        let opened = file.metadata().ok()?;
+        (opened.is_file() && opened.number_of_links() == Some(1)).then_some(file)
+    }
+
+    #[cfg(not(any(unix, windows)))]
     pub(crate) fn open(&self, _target: &Path) -> Option<std::fs::File> {
         None
     }
