@@ -63,6 +63,26 @@ test('metadata delegation uses the selected DSH tree interpreter, resolves alias
   const standalone=path.join(root,'standalone.js');copyFileSync(entry,standalone);check(standalone,systemNode);
 });
 
+test('sync --check-only never launches post-update regression', {skip:process.platform==='win32'?'sync-dsh.sh is Unix-only':false},t=>{
+  const {root,home,env}=fixture(t);
+  const repo=path.join(root,'repo'), packages=path.join(root,'packages');
+  mkdirSync(path.join(repo,'target','release'),{recursive:true});
+  mkdirSync(path.join(repo,'tests'));
+  const packageDir=path.join(packages,'@deepseek-ai','dsh');mkdirSync(packageDir,{recursive:true});
+  writeFileSync(path.join(packageDir,'package.json'),JSON.stringify({version:'1.0.0'}));
+  copyFileSync('sync-dsh.sh',path.join(repo,'sync-dsh.sh'));
+  writeFileSync(path.join(repo,'target','release','rdsh'),'#!/bin/sh\nexit 0\n',{mode:0o700});
+  writeFileSync(path.join(repo,'tests','regress.sh'),'#!/bin/sh\nexit 91\n',{mode:0o700});
+  const npm=path.join(root,'npm');
+  writeFileSync(npm,'#!/bin/sh\ncase "$1" in root) printf "%s\\n" "$FIXTURE_PACKAGE_ROOT" ;; view) printf \'["1.0.0","2.0.0"]\\n\' ;; *) exit 91 ;; esac\n',{mode:0o700});
+  mkdirSync(path.join(home,'.local','bin'),{recursive:true});
+  symlinkSync(process.execPath,path.join(home,'.local','bin','node'));
+  const result=spawnSync('sh',[path.join(repo,'sync-dsh.sh'),'--check-only','--channel=any'],{env:{...env,NPM_BIN:npm,FIXTURE_PACKAGE_ROOT:packages},encoding:'utf8',timeout:15000});
+  assert.equal(result.status,0,result.stderr);
+  assert.match(result.stdout,/dsh update available: 2\.0\.0/);
+  assert.doesNotMatch(result.stdout,/post-update regress/);
+});
+
 test('sync --check-only follows SemVer precedence and never upgrades to a lower version', {skip:process.platform==='win32'?'sync-dsh.sh is Unix-only':false},t=>{
   const {root,home,env}=fixture(t);
   const pkgRoot=path.join(root,'packages'), pkg=path.join(pkgRoot,'@deepseek-ai','dsh');
