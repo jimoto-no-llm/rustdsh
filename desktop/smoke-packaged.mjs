@@ -89,10 +89,21 @@ try {
     const button = workspace.getByRole('button', { name: label, exact: true });
     if (await button.count() === 1 && await button.isVisible()) await button.click();
   }
-  const composer = workspace.locator('[data-composer-input]').first();
+  // A focusable, disabled placeholder is not an input-ready workspace. Pick
+  // the fresh profile's own workspace through the shipped controls on both OSes.
+  const workspacePicker = workspace.getByRole('button', { name: 'Choose workspace', exact: true });
+  await workspacePicker.click();
+  await workspace.getByRole('menuitem', { name: 'Default workspace', exact: true }).click();
+  await workspacePicker.filter({ hasText: 'Default workspace' }).waitFor({ state: 'visible' });
+  const composer = workspace.locator('[data-composer-input][contenteditable="true"]').first();
   await composer.waitFor({ state: 'visible', timeout: 120000 });
   await composer.click();
   assert.equal(await composer.evaluate(element => element === document.activeElement || element.contains(document.activeElement)), true);
+  const draft = 'rdsh native smoke draft';
+  await composer.fill(draft);
+  assert.equal((await composer.textContent()).trim(), draft);
+  await composer.fill('');
+  assert.equal((await composer.textContent()).trim(), '');
   await workspace.screenshot({ path: join(output, 'rdsh-desktop-workspace.png') });
   const child = application.process();
   await application.close(); application = undefined;
@@ -101,8 +112,9 @@ try {
   await writeFile(join(output, 'native-smoke.json'), JSON.stringify({ schemaVersion: 1, platform: process.platform,
     arch: process.arch, rdshVersion: build.rdshVersion, harnessVersion: build.harnessVersion, revision: build.revision,
     rustSha256: build.nativeSha256, electronExitCode: child.exitCode, checks: { nativeRust: true, delegatedCLI: true, appIdentity: true,
-      isolatedHomes: true, packagedRecord: true, renderer: true, welcomeReady: true, workspaceReady: true, composerFocused: true, electronExit: true } }, null, 2) + '\n');
-  console.log('PASS native Desktop: bundled Rust, exact CLI delegation, app identity, isolated homes, interactive welcome/workspace and successful exit');
+      isolatedHomes: true, packagedRecord: true, renderer: true, welcomeReady: true, workspaceReady: true, workspaceSelected: true,
+      composerEditable: true, composerDraft: true, composerFocused: true, electronExit: true } }, null, 2) + '\n');
+  console.log('PASS native Desktop: bundled Rust, exact CLI delegation, app identity, isolated homes, interactive welcome/workspace, editable draft and successful exit');
 } catch (error) {
   const page = application?.windows().findLast(page => /^(?:file|dsh-app):/.test(page.url()));
   await page?.screenshot({ path: join(output, 'rdsh-desktop-failure.png') }).catch(() => {});
