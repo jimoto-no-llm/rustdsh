@@ -12,6 +12,13 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   of the 2.0.0 that the upstream `dsh-mcp-client` peer pulls in, clearing the
   high-severity GHSA-6qxp-vccf-f47h alert. Runtime resolution is unchanged: the
   plugin uses the host DSH's MCP client.
+- `install.ps1 -FromRelease` verifies the Windows archive against the digests
+  pinned in `release-digests.tsv` instead of the `.sha256` sidecar served next
+  to it, so a release base that serves its own archive can no longer choose the
+  checksum that admits it. `release-digests.tsv` now pins
+  `rdsh-windows-x64.zip` for every release it already lists, and `install.sh`
+  accepts that row while its "latest" completeness rule stays the four Unix
+  archives. The bypass needs `-NoChecksum` plus a typed `YES` at a terminal.
 
 ### Added
 
@@ -46,16 +53,6 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   command. It keeps the FIFO concurrency and rate limits, streams request and
   response bodies, and supports `--tool-choice-default <none|auto|required>`
   for Sarashina-compatible requests. See `docs/SERIAL-PROXY.md`.
-
-### Security
-
-- `install.ps1 -FromRelease` verifies the Windows archive against the digests
-  pinned in `release-digests.tsv` instead of the `.sha256` sidecar served next
-  to it, so a release base that serves its own archive can no longer choose the
-  checksum that admits it. `release-digests.tsv` now pins
-  `rdsh-windows-x64.zip` for every release it already lists, and `install.sh`
-  accepts that row while its "latest" completeness rule stays the four Unix
-  archives. The bypass needs `-NoChecksum` plus a typed `YES` at a terminal.
 
 ### Fixed
 
