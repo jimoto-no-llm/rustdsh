@@ -2,6 +2,7 @@
 use anyhow::{bail, Context, Result};
 use clap::Parser;
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
@@ -73,12 +74,19 @@ fn provider_configs(
             if only.is_some_and(|selected| selected != provider) {
                 return Ok(None);
             }
-            catalog[provider]["models"]
+            let provider_catalog = catalog.get(provider).with_context(|| {
+                format!("catalog provider {provider} missing for model {model}")
+            })?;
+            provider_catalog["models"]
                 .as_array()
-                .context("catalog models missing")?
+                .with_context(|| {
+                    format!("catalog models missing for provider {provider} and model {model}")
+                })?
                 .iter()
                 .find(|v| v["id"] == model)
-                .context("requested model missing from catalog")?;
+                .with_context(|| {
+                    format!("requested model {model} missing from catalog provider {provider}")
+                })?;
             Ok(Some(
                 json!({"models":[{"id":model}],"retryPolicy":{"mode":"normal","maxRetries":0}}),
             ))
@@ -677,6 +685,19 @@ fn fingerprint(path: &Path) -> Result<String> {
     Ok(hash.to_owned())
 }
 
+fn fingerprint_bytes(bytes: &[u8]) -> String {
+    Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+fn load_catalog(path: &Path) -> Result<(Value, String)> {
+    let bytes = fs::read(path).context("catalog read failed")?;
+    let catalog = serde_json::from_slice(&bytes).context("catalog JSON parse failed")?;
+    Ok((catalog, fingerprint_bytes(&bytes)))
+}
+
 fn version(path: &Path) -> Result<String> {
     let output = Command::new(path).arg("--version").output()?;
     if !output.status.success() {
@@ -703,7 +724,7 @@ fn main() -> Result<()> {
     if args.out.exists() {
         bail!("output directory already exists; use a new directory");
     }
-    let catalog: Value = serde_json::from_slice(&fs::read(&args.catalog)?)?;
+    let (catalog, catalog_sha256) = load_catalog(&args.catalog)?;
     let selections = [
         ("openai-codex", args.codex_model.as_str()),
         ("anthropic", args.anthropic_model.as_str()),
@@ -724,7 +745,7 @@ fn main() -> Result<()> {
         "runtime_artifact_sha256":args.runtime_artifact.as_deref().map(fingerprint).transpose()?,
         "measurement":"response from spawn to committed turn_end; process lifetime and normal exit tracked separately; first text is not first token",
         "ordering":"sequential; alternate provider and launcher order every sample; no automatic retries",
-        "catalog_sha256":fingerprint(&args.catalog)?,
+        "catalog_sha256":catalog_sha256,
         "catalog_resolution":"exact ID selected from supplied catalog; official installed catalog supplies model metadata without raw SDK compat overrides",
         "codex_sse_enabled":args.codex_sse,
         "authentication":"existing official credential provider; normal OAuth refresh permitted; no credential export",
@@ -965,13 +986,51 @@ mod tests {
             json!({"id":"gpt-6-astra"})
         );
         assert_eq!(result[0].as_ref().unwrap()["retryPolicy"]["maxRetries"], 0);
-        assert!(provider_configs(&catalog, &selections, None).is_err());
-        assert!(provider_configs(
+        let missing_provider = provider_configs(&catalog, &selections, None).unwrap_err();
+        assert!(missing_provider
+            .to_string()
+            .contains("catalog provider anthropic missing for model missing"));
+        let missing_model = provider_configs(
             &catalog,
             &[("openai-codex", "absent")],
-            Some("openai-codex")
+            Some("openai-codex"),
         )
-        .is_err());
+        .unwrap_err();
+        assert!(missing_model
+            .to_string()
+            .contains("requested model absent missing from catalog provider openai-codex"));
+        let missing_models = provider_configs(
+            &json!({"openai-codex": {}}),
+            &[("openai-codex", "absent")],
+            Some("openai-codex"),
+        )
+        .unwrap_err();
+        assert!(missing_models
+            .to_string()
+            .contains("catalog models missing for provider openai-codex and model absent"));
+    }
+
+    #[test]
+    fn catalog_fingerprint_is_bound_to_the_same_bytes_that_were_parsed() {
+        let path = std::env::temp_dir().join(format!(
+            "rdsh-benchmark-catalog-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let first = br#"{"openai-codex":{"models":[{"id":"gpt-6-astra"}]}}"#;
+        let replacement = br#"{"openai-codex":{"models":[{"id":"changed"}]}}"#;
+        fs::write(&path, first).unwrap();
+        let (_, digest) = load_catalog(&path).unwrap();
+        fs::write(&path, replacement).unwrap();
+        assert_eq!(
+            digest,
+            "fc078d53d4da3d94215b1f6b4d1c4e82783adb305fc02c53611d3281b1b36a0b"
+        );
+        assert_ne!(digest, fingerprint(&path).unwrap());
+        fs::remove_file(path).unwrap();
     }
 
     #[test]
