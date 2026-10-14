@@ -25,7 +25,7 @@ CLI before/after output: [before](before-help.txt), [en](en-help.txt), [zh-CN](z
 
 ## Functional coverage
 
-- Mandatory Rust format, clippy, 236 release tests (179 unit + 57 integration), both benchmark example test suites, model fence and shell regressions pass after the upstream merge; [executed commands](native-validation.json) and [test output](native-final.txt) record the result.
+- Mandatory Rust format, clippy, 240 release tests (180 unit + 60 integration), both benchmark example test suites, model fence and shell regressions pass after the upstream merge; [executed commands](native-validation.json) and [test output](native-final.txt) record the result.
 - Browser tests repeat setup, native dashboard and project CLI/MCP/HTTP flows in all three languages, including original Japanese input, pruning, persisted answers, SSE drafts, server restart and old-token revocation. Thirteen existing update-banner flows also pass. [Final run output](browser-final.txt) records all three languages.
 - Optional original Harness settings integration uses no provider key and leaves Discord disabled. The real host confirms three language saves and safe corruption/retry. Both desktop and 390 px mobile are accepted by this test.
 - Plugin tests exercise settings, default Discord activity and Muse Code catalog/errors in all three languages; explicit custom details, model names, provider IDs and external error text are preserved.
@@ -58,3 +58,9 @@ LC_ALL=C LANG=C cargo run --release --example benchmark_extended -- --bin ./targ
 ```
 
 `RDSH_CHROME_PATH` can use an existing Chrome installation; no browser download is required. [Browser test documentation](../../../tests/e2e/README.md) explains isolated paths and cleanup. The baseline binary is an archived source build, not the user's installed `rdsh`.
+
+## CI first-run follow-up
+
+The first GitHub matrix exposed an environment-dependent assertion: a clean home correctly prints the Chinese first-use guidance, while the test expected a recognized external login or import hint. The settings fixture now clears inherited credentials and uses private HOME/USERPROFILE/XDG/APPDATA paths. Separate synthetic login tests verify the recognized-source branch without reading real accounts or exposing/copying any value. The empty-home case rejects the previous assertion locally, reproducing the CI failure.
+
+The same follow-up completes owned authentication dispositions, skipped-provider notes, unknown expiry, interactive setup and settings/policy-validation diagnostics. CLI language changes leave existing JSON detail/note strings, error reason codes, identifiers and raw OS/Serde details unchanged. The real POSIX terminal test [passes six cases](cli-tty-results.json) and runs in the existing Linux/macOS native CI jobs. It refuses credential persistence and enters no real key. Replacing the new auth implementation with the pre-fix source makes both [owned-display](auth-display-negative.txt) and [terminal-copy](auth-tty-negative.txt) regressions fail; the final source is restored and passes. Windows terminal interaction is not claimed by this POSIX test.

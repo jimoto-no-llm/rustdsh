@@ -112,3 +112,12 @@ Add `--extras` to publish a temporary project link alongside the bundled icon.
 The live report includes acknowledged assets, buttons, status display type and
 timestamps. Button acknowledgement does not mean it will appear on your own profile;
 Discord displays Rich Presence buttons to other users.
+
+## CLI terminal prompts
+
+On POSIX systems, `RDSH_E2E_BIN=./target/release/rdsh python3 tests/e2e/cli-tty.py`
+opens real private pseudo-terminals for English, Chinese and Japanese setup. It
+observes both the pasted-key prompt and environment-key confirmation, skips or
+refuses both, and verifies no credential is written. Only a synthetic placeholder
+is placed in the child environment; no secret is entered and no provider is called.
+The existing native CI matrix runs this test on Linux and macOS.

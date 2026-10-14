@@ -131,6 +131,11 @@ jobs:
       - run: cargo test --example benchmark_extended
       - run: cargo test --example benchmark_models
       - run: cargo build
+      - name: Test localized setup in a real terminal
+        if: runner.os != 'Windows'
+        run: python3 tests/e2e/cli-tty.py
+        env:
+          RDSH_E2E_BIN: ./target/debug/rdsh
       - uses: actions/setup-node@v7
         with:
           node-version: 22

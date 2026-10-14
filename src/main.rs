@@ -442,7 +442,7 @@ fn main() {
     ) {
         rdsh_config::RdshSettings::default()
     } else {
-        rdsh_config::load()
+        rdsh_config::load_with_locale(parse_locale)
     };
     let locale = locale::current(cli.language.as_deref(), &cfg.general.language);
     // Feature switches (rdsh features) steer the delegated-run env and the
@@ -635,42 +635,41 @@ fn main() {
                     Err(e) => Err(e),
                 }
             }
-            SettingsAction::Get { key, json } => {
-                let cfg = rdsh_config::load();
-                match cfg.get_dotted(&key) {
-                    Some(v) => {
-                        if json || v.is_object() || v.is_array() {
-                            match serde_json::to_string_pretty(&v) {
-                                Ok(text) => {
-                                    println!("{text}");
-                                    Ok(())
-                                }
-                                Err(e) => Err(anyhow::anyhow!(e)),
+            SettingsAction::Get { key, json } => match cfg.get_dotted(&key) {
+                Some(v) => {
+                    if json || v.is_object() || v.is_array() {
+                        match serde_json::to_string_pretty(&v) {
+                            Ok(text) => {
+                                println!("{text}");
+                                Ok(())
                             }
-                        } else if let Some(s) = v.as_str() {
-                            println!("{s}");
-                            Ok(())
-                        } else {
-                            println!("{v}");
-                            Ok(())
+                            Err(e) => Err(anyhow::anyhow!(e)),
                         }
-                    }
-                    None => {
-                        eprintln!(
-                            "[rdsh] {}: {key} ({})",
-                            locale::message(locale, locale::Message::UnknownSetting),
-                            match locale {
-                                locale::Locale::English => "try: rdsh settings keys",
-                                locale::Locale::Chinese => "请尝试: rdsh settings keys",
-                                locale::Locale::Japanese => "rdsh settings keys を実行してください",
-                            }
-                        );
-                        std::process::exit(2);
+                    } else if let Some(s) = v.as_str() {
+                        println!("{s}");
+                        Ok(())
+                    } else {
+                        println!("{v}");
+                        Ok(())
                     }
                 }
-            }
+                None => {
+                    eprintln!(
+                        "[rdsh] {}: {key} ({})",
+                        locale::message(locale, locale::Message::UnknownSetting),
+                        match locale {
+                            locale::Locale::English => "try: rdsh settings keys",
+                            locale::Locale::Chinese => "请尝试: rdsh settings keys",
+                            locale::Locale::Japanese => "rdsh settings keys を実行してください",
+                        }
+                    );
+                    std::process::exit(2);
+                }
+            },
             SettingsAction::Set { key, value } => {
-                match rdsh_config::update(locale, |cfg| cfg.set_dotted(&key, &value)) {
+                match rdsh_config::update(locale, |cfg| {
+                    cfg.set_dotted_with_locale(&key, &value, locale)
+                }) {
                     Err(e) => Err(e),
                     Ok((cfg, ())) => match cfg.get_dotted(&key) {
                         Some(v) => {
@@ -696,7 +695,8 @@ fn main() {
                 }
             }
             SettingsAction::Unset { key } => {
-                match rdsh_config::update(locale, |cfg| cfg.reset_dotted(&key)) {
+                match rdsh_config::update(locale, |cfg| cfg.reset_dotted_with_locale(&key, locale))
+                {
                     Err(e) => Err(e),
                     Ok(_) => {
                         println!(
@@ -990,7 +990,7 @@ fn requested_locale() -> Result<locale::Locale, (locale::Locale, anyhow::Error)>
     if forced_settings_init() {
         return Ok(early_locale);
     }
-    let setting = rdsh_config::try_load()
+    let setting = rdsh_config::try_load_with_locale(early_locale)
         .map_err(|error| (early_locale, error))?
         .general
         .language;
@@ -1599,7 +1599,11 @@ fn features_toggle(id: &str, on: bool, locale: locale::Locale) -> anyhow::Result
         )
     })?;
     rdsh_config::update(locale, |cfg| {
-        cfg.set_dotted(&format!("features.{id}"), if on { "true" } else { "false" })
+        cfg.set_dotted_with_locale(
+            &format!("features.{id}"),
+            if on { "true" } else { "false" },
+            locale,
+        )
     })?;
     println!(
         "features.{id} = {} ({})",

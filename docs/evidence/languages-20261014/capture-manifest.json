@@ -19,13 +19,17 @@
     "sha256": "35fd196e8d8dc64d72c8916a89173ed0c8b3815d86e7115bb04a01e2721351ac",
     "bytes": 93145
   },
+  "auth-tty-negative.txt": {
+    "sha256": "d968a504399e9711c047768abc13cd90ef76c3ff8509e56e1e87a2624a9ee900",
+    "bytes": 251
+  },
   "ja-project-mobile.png": {
     "sha256": "548209021f1c73d64ea3543918e8bf8ef5ca0460b2aed284156ca9a61be5b902",
     "bytes": 70950
   },
   "native-validation.json": {
-    "sha256": "cec67efdc3521ede649ab7db0b93c9634e7902b91b84db72a90270c8872d99e9",
-    "bytes": 1293
+    "sha256": "57c84f718f85ae3bd59ad44bd4ebc7bcad58960913b3bffff462de1e38d32be0",
+    "bytes": 1839
   },
   "performance-repeat.json": {
     "sha256": "f3ec97b9adef796995bc3f98c2c89e3c7e3ebe906a1b3bb8db49aeb87db21c89",
@@ -44,8 +48,8 @@
     "bytes": 3342
   },
   "native-final.txt": {
-    "sha256": "2bb6b3959120674eed72fc8c4596468ba46e93e89dd716e6d81ef232c1d4af04",
-    "bytes": 17431
+    "sha256": "19034dbe29273cec340245a2dcd8067e078cdb3d1d035090a3616085b8743479",
+    "bytes": 17775
   },
   "en-browser-results.json": {
     "sha256": "5131d531249d02a25040e64bb601fa3a9e283818d242f8470e9e419f305c7be0",
@@ -79,17 +83,25 @@
     "sha256": "2f5e7f6e866fe810d08835463361a3ee47dc3c34e3046d404106e3de9cb1ceca",
     "bytes": 45747
   },
+  "auth-display-negative.txt": {
+    "sha256": "c2229b2db2645a47e4aa07c724e54b1fbca03ada2fd8120c77bbe518f7029585",
+    "bytes": 1346
+  },
   "performance.md": {
-    "sha256": "e49643eab78a043d971f2a504967c55f196d037715f0f149fd5b5bad9ac49659",
-    "bytes": 3752
+    "sha256": "b0ca170716aca07f95caa6e59837353e1d75fca5d2e3b442812dd230f0b2f82c",
+    "bytes": 3659
   },
   "before-native-desktop.png": {
     "sha256": "1d2606963d6b7a74dd91245c5fe947c69a652cc7988d0ae9d1874ab2f4e28882",
     "bytes": 117208
   },
   "README.md": {
-    "sha256": "e4813314ba858bec7f989ba105ba3b87a00ad1fbfb880145731f1d1281940d92",
-    "bytes": 7694
+    "sha256": "6db8bb1d4ac616c9c8b8bfb1855905d3c599ce2da3048ea7a9e31b1d8ed1d78e",
+    "bytes": 9003
+  },
+  "cli-tty-results.json": {
+    "sha256": "54d4d6dcfe061921e76f76ff1f46fdffb16a4ed13ea8a1a9f1835cc486be94f9",
+    "bytes": 1187
   },
   "windows-retry.md": {
     "sha256": "9c7bcd492619558cc7e5c2961e05c70d883a5e571d6db74f32150fd044ef7923",
@@ -104,8 +116,8 @@
     "bytes": 1797
   },
   "performance-identity.json": {
-    "sha256": "20dd3d2bf1944ed965273c3dcb507a75729bd6e4d33f0a2eb9f2dc728c1e0470",
-    "bytes": 488
+    "sha256": "d45736f8d00affa619adccc1457dac02e3f5acf10a9437b586e3832c9789ec90",
+    "bytes": 3918
   },
   "en-setup-mobile.png": {
     "sha256": "9a9c25a63d51fc12134d033adc6df093a40602555e109a7d65fd70cb6dca2fc0",
@@ -128,12 +140,12 @@
     "bytes": 768
   },
   "performance-extended-final.json": {
-    "sha256": "b1b40a1d462a5d2bef68876a5e5c3bcc822198bf491614213bdf506e28343a15",
-    "bytes": 15975
+    "sha256": "c45d0e933fdf8b5bb616e2f32299766efb79822c7b26a4027ec61be3f95ebc02",
+    "bytes": 15998
   },
   "performance-final.json": {
-    "sha256": "42e3c4b9c56e4ca0461bd13406e13fb52508e0f7ac6fa57177e939d4c21b35df",
-    "bytes": 8161
+    "sha256": "b3e2bf470e13b7c90b69a4f79ebe4f82839ccb1858c75e207db526a5e43905ae",
+    "bytes": 8174
   },
   "platform-skips.json": {
     "sha256": "8b304a768a236b3c54aaa31f942631450d56a3362816446626fd8b642a316b4d",

@@ -241,7 +241,30 @@ fn scan_codex(grants: &mut Vec<OauthGrant>, keys: &mut Vec<ApiKey>) {
     }
 }
 
-fn scan_opencode(grants: &mut Vec<OauthGrant>, notes: &mut Vec<String>) {
+#[derive(Debug)]
+struct LoginNote {
+    provider: String,
+}
+
+impl LoginNote {
+    fn text(&self, locale: crate::locale::Locale) -> String {
+        let provider = &self.provider;
+        match locale {
+            crate::locale::Locale::English => format!("opencode login '{provider}' skipped: not a dsh record id"),
+            crate::locale::Locale::Chinese => format!("已跳过 opencode 登录 '{provider}'：不是 dsh 记录 ID"),
+            crate::locale::Locale::Japanese => format!("opencode のログイン '{provider}' をスキップしました：dsh のレコード ID ではありません"),
+        }
+    }
+}
+
+fn notes_json(notes: &[LoginNote]) -> Vec<String> {
+    notes
+        .iter()
+        .map(|note| note.text(crate::locale::Locale::English))
+        .collect()
+}
+
+fn scan_opencode(grants: &mut Vec<OauthGrant>, notes: &mut Vec<LoginNote>) {
     let mut paths = Vec::new();
     if let Some(d) = data_dir() {
         paths.push(format!("{d}/opencode/auth.json"));
@@ -278,9 +301,9 @@ fn scan_opencode(grants: &mut Vec<OauthGrant>, notes: &mut Vec<String>) {
                     from: "opencode".to_string(),
                     src_mtime_ms: mt,
                 }),
-                None => notes.push(format!(
-                    "opencode login '{key}' skipped: not a dsh record id"
-                )),
+                None => notes.push(LoginNote {
+                    provider: key.clone(),
+                }),
             }
         }
     }
@@ -597,11 +620,21 @@ pub(crate) fn write_creds(path: &str, text: &str) -> anyhow::Result<()> {
 // --- decisions ----------------------------------------------------------------
 
 #[derive(Debug)]
+enum DecisionReason {
+    OtherKind(String),
+    Missing,
+    Matches,
+    Refresh,
+    Newer,
+}
+
+#[derive(Debug)]
 struct Decision {
     provider: String,
     from: String,
     action: &'static str,
     detail: String,
+    reason: DecisionReason,
     grant: Option<OauthGrant>,
 }
 
@@ -630,6 +663,7 @@ fn decisions_for(grants: &[OauthGrant], doc: &CredsDoc, creds_mtime: u64) -> Vec
                 from: g.from.clone(),
                 action: "ok",
                 detail: format!("record {key} is {}, left alone", stored.kind),
+                reason: DecisionReason::OtherKind(stored.kind.clone()),
                 grant: None,
             }),
             None => decisions.push(Decision {
@@ -637,6 +671,7 @@ fn decisions_for(grants: &[OauthGrant], doc: &CredsDoc, creds_mtime: u64) -> Vec
                 from: g.from.clone(),
                 action: "import",
                 detail: format!("no record {key}: would import from {}", g.from),
+                reason: DecisionReason::Missing,
                 grant: Some(g),
             }),
             Some(stored) if stored.access.as_deref() == Some(g.access.as_str()) => {
@@ -645,6 +680,7 @@ fn decisions_for(grants: &[OauthGrant], doc: &CredsDoc, creds_mtime: u64) -> Vec
                     from: g.from.clone(),
                     action: "ok",
                     detail: format!("record {key} already matches {}", g.from),
+                    reason: DecisionReason::Matches,
                     grant: None,
                 });
             }
@@ -654,6 +690,7 @@ fn decisions_for(grants: &[OauthGrant], doc: &CredsDoc, creds_mtime: u64) -> Vec
                     from: g.from.clone(),
                     action: "refresh",
                     detail: format!("record {key} is older: would refresh from {}", g.from),
+                    reason: DecisionReason::Refresh,
                     grant: Some(g),
                 });
             }
@@ -662,11 +699,47 @@ fn decisions_for(grants: &[OauthGrant], doc: &CredsDoc, creds_mtime: u64) -> Vec
                 from: g.from.clone(),
                 action: "ok",
                 detail: format!("record {key} kept: dsh-side token is newer than {}", g.from),
+                reason: DecisionReason::Newer,
                 grant: None,
             }),
         }
     }
     decisions
+}
+
+fn decision_text(decision: &Decision, locale: crate::locale::Locale) -> String {
+    use crate::locale::Locale;
+    let key = format!("{RECORD_SCOPE}/{}", decision.provider);
+    let source = &decision.from;
+    match (&decision.reason, locale) {
+        (_, Locale::English) => decision.detail.clone(),
+        (DecisionReason::OtherKind(kind), Locale::Chinese) => {
+            format!("记录 {key} 的类型是 {kind}；保持不变")
+        }
+        (DecisionReason::OtherKind(kind), Locale::Japanese) => {
+            format!("レコード {key} は {kind} です。変更しません")
+        }
+        (DecisionReason::Missing, Locale::Chinese) => format!("没有记录 {key}：可从 {source} 导入"),
+        (DecisionReason::Missing, Locale::Japanese) => {
+            format!("レコード {key} がありません：{source} からインポートできます")
+        }
+        (DecisionReason::Matches, Locale::Chinese) => format!("记录 {key} 已与 {source} 一致"),
+        (DecisionReason::Matches, Locale::Japanese) => {
+            format!("レコード {key} は {source} と一致しています")
+        }
+        (DecisionReason::Refresh, Locale::Chinese) => {
+            format!("记录 {key} 较旧：可从 {source} 更新")
+        }
+        (DecisionReason::Refresh, Locale::Japanese) => {
+            format!("レコード {key} が古いため {source} から更新できます")
+        }
+        (DecisionReason::Newer, Locale::Chinese) => {
+            format!("保留记录 {key}：dsh 的令牌比 {source} 更新")
+        }
+        (DecisionReason::Newer, Locale::Japanese) => {
+            format!("レコード {key} を維持します：dsh 側のトークンが {source} より新しいためです")
+        }
+    }
 }
 
 fn fresher_than(source: &OauthGrant, stored: &StoredGrant, creds_mtime: u64) -> bool {
@@ -686,7 +759,7 @@ fn fresher_than(source: &OauthGrant, stored: &StoredGrant, creds_mtime: u64) -> 
 struct Scan {
     grants: Vec<OauthGrant>,
     keys: Vec<ApiKey>,
-    notes: Vec<String>,
+    notes: Vec<LoginNote>,
     doc: CredsDoc,
     decisions: Vec<Decision>,
     path: String,
@@ -724,7 +797,7 @@ fn filter_external_credentials(
 fn scan_selected(provider: Option<&str>, source: Option<&str>, key_ref: Option<&str>) -> Scan {
     let mut grants: Vec<OauthGrant> = Vec::new();
     let mut keys: Vec<ApiKey> = Vec::new();
-    let mut notes: Vec<String> = Vec::new();
+    let mut notes: Vec<LoginNote> = Vec::new();
     scan_codex(&mut grants, &mut keys);
     scan_opencode(&mut grants, &mut notes);
     filter_external_credentials(&mut grants, &mut keys, provider, source, key_ref);
@@ -982,7 +1055,7 @@ pub fn cmd_auth(
                 "sources": sources_json(&s),
                 "records": records_json(&s),
                 "refs_known": keys.iter().map(|k| &k.name).collect::<Vec<_>>(),
-                "notes": notes,
+                "notes": notes_json(notes),
                 "wrote": wrote,
             })
         );
@@ -1008,7 +1081,7 @@ pub fn cmd_auth(
         let exp = g
             .expires
             .map(|e| e.to_string())
-            .unwrap_or_else(|| "unknown".to_string());
+            .unwrap_or_else(|| localized(locale, "unknown", "未知", "不明").to_string());
         println!(
             "[rdsh auth] {} {}: {} oauth (expires_ms={})",
             localized(locale, "source", "来源", "ソース"),
@@ -1032,7 +1105,7 @@ pub fn cmd_auth(
         );
     }
     for d in decisions {
-        println!("[rdsh auth] {}: {}", d.provider, d.detail);
+        println!("[rdsh auth] {}: {}", d.provider, decision_text(d, locale));
     }
     // What the dsh GUI model picker boots by default, and whether its
     // credential is already here (auto-detected from profile patches).
@@ -1064,8 +1137,9 @@ pub fn cmd_auth(
     }
     for n in notes {
         println!(
-            "[rdsh auth] {}: {n}",
-            localized(locale, "note", "说明", "注記")
+            "[rdsh auth] {}: {}",
+            localized(locale, "note", "说明", "注記"),
+            n.text(locale)
         );
     }
     if !doc.text.is_empty() && !doc.version_ok {
@@ -1658,7 +1732,14 @@ pub fn cmd_setup(
         let take = yes
             || (!json
                 && prompt_yes(&format!(
-                    "[rdsh setup] save {k} from the environment into credentials? [y/N] "
+                    "[rdsh setup] {} [y/N] ",
+                    match locale {
+                        crate::locale::Locale::English =>
+                            format!("save {k} from the environment into credentials?"),
+                        crate::locale::Locale::Chinese => format!("将环境中的 {k} 保存到凭据中？"),
+                        crate::locale::Locale::Japanese =>
+                            format!("環境変数 {k} を認証情報に保存しますか？"),
+                    }
                 )));
         if take && store_ref(k, v.trim(), locale)? {
             known_refs.insert(k.to_string());
@@ -1668,9 +1749,11 @@ pub fn cmd_setup(
     {
         use std::io::IsTerminal as _;
         if !json && !yes && std::io::stdin().is_terminal() && setup_needed_in(&s) {
-            if let Some(pasted) = prompt_line(
+            if let Some(pasted) = prompt_line(localized(locale,
                 "[rdsh setup] paste DEEPSEEK_API_KEY here (Enter to skip, input is echoed): ",
-            ) {
+                "[rdsh setup] 在此粘贴 DEEPSEEK_API_KEY（按 Enter 跳过，输入会显示）：",
+                "[rdsh setup] DEEPSEEK_API_KEY を貼り付けてください（Enter でスキップ、入力内容は表示されます）：",
+            )) {
                 match store_ref("DEEPSEEK_API_KEY", &pasted, locale) {
                     Ok(true) => {
                         known_refs.insert("DEEPSEEK_API_KEY".to_string());
@@ -1742,7 +1825,7 @@ pub fn setup_status_json() -> String {
         "records": records_json(&s),
         "refs_known": keys.iter().map(|k| &k.name).collect::<Vec<_>>(),
         "refs_stored": doc.refs.keys().cloned().collect::<Vec<_>>(),
-        "notes": &s.notes,
+        "notes": notes_json(&s.notes),
         "needed": setup_needed_in(&s),
         "opencode_config": opencode_config_path(),
         "defaults": provider_needs(&s)
@@ -1815,6 +1898,73 @@ mod tests {
             account_id: None,
             from: from.to_string(),
             src_mtime_ms: 0,
+        }
+    }
+
+    #[test]
+    fn decision_copy_uses_owned_reasons_without_changing_wire_details() {
+        use crate::locale::Locale;
+        for (stored, action, chinese, japanese) in [
+            (None, "import", "没有记录", "ありません"),
+            (
+                Some(StoredGrant {
+                    kind: "custom-原文".into(),
+                    ..StoredGrant::default()
+                }),
+                "ok",
+                "类型是 custom-原文",
+                "custom-原文",
+            ),
+            (
+                Some(StoredGrant {
+                    kind: "grant".into(),
+                    access: Some("fixture-access".into()),
+                    expires: None,
+                }),
+                "ok",
+                "一致",
+                "一致しています",
+            ),
+            (
+                Some(StoredGrant {
+                    kind: "grant".into(),
+                    access: Some("older-access".into()),
+                    expires: Some(1),
+                }),
+                "refresh",
+                "较旧",
+                "古いため",
+            ),
+            (
+                Some(StoredGrant {
+                    kind: "grant".into(),
+                    access: Some("newer-access".into()),
+                    expires: Some(3),
+                }),
+                "ok",
+                "保留记录",
+                "維持します",
+            ),
+        ] {
+            let mut grant = test_grant("openai-codex", "codex");
+            grant.expires = Some(2);
+            let mut document = CredsDoc::default();
+            if let Some(stored) = stored {
+                document
+                    .grants
+                    .insert("llm-pi-ai/openai-codex".into(), stored);
+            }
+            let decisions = decisions_for(&[grant], &document, 0);
+            let decision = &decisions[0];
+            assert_eq!(decision.action, action);
+            let wire = decision.detail.clone();
+            assert_eq!(decision_text(decision, Locale::English), wire);
+            for (locale, expected) in [(Locale::Chinese, chinese), (Locale::Japanese, japanese)] {
+                let text = decision_text(decision, locale);
+                assert!(text.contains(expected), "{text}");
+                assert!(text.contains("llm-pi-ai/openai-codex"));
+                assert_eq!(decision.detail, wire);
+            }
         }
     }
 

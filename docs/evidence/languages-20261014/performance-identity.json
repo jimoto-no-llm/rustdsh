@@ -1,10 +1,117 @@
 {
   "base_sha": "f3b836e34b871452a4b03723159d9a2821b3062b",
-  "merged_candidate_parent": "179dca6919b64e9b492307157cb51d900caaec8a",
-  "candidate_source_changes_after_merge": [
-    "src/websearch.rs: empty/invalid-page language regression test only"
-  ],
-  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
-  "candidate_sha256": "7ab8cd8e4948686c6f723a7b7fd137633488d8a3a564ff46db74fcae5b8e07b7",
-  "baseline_sha256": "b051685914fe0cccd644b94e3eb9e3871fe146a4053e91f66561afbbd4c31ef3"
+  "candidate_parent": "4961a5eb7b4d425cf5c93db993f9e17a52755c5e",
+  "candidate_changes_after_parent": "CLI/config/guard/auth diagnostics; source files identified below",
+  "candidate_sha256": "91c896d57fb424814018f3f91401f4b240493308626000e3dd6620d219702999",
+  "baseline_sha256": "b051685914fe0cccd644b94e3eb9e3871fe146a4053e91f66561afbbd4c31ef3",
+  "rust_source_sha256": [
+    {
+      "path": "src/auth.rs",
+      "sha256": "691718edc3e56db5d163fc1b62216aa0a968219063ebcc974908abd5cb5089a7"
+    },
+    {
+      "path": "src/compact.rs",
+      "sha256": "77f85a371f6cc52a889402bedb50668c5ebecc5fe43603a362fa504c89ab5133"
+    },
+    {
+      "path": "src/compute.rs",
+      "sha256": "fd63a4438ef0a60b803f34f79088f6a4d839e3f0df608b64494ed89e79f5fb42"
+    },
+    {
+      "path": "src/context.rs",
+      "sha256": "04b00578e42e771db483b9d1fb25a058e14fa1c675ebf656b40367cf95e26f9c"
+    },
+    {
+      "path": "src/desktop.rs",
+      "sha256": "0221aab7029d4a28b006a85ba1a5c1e9ea7bf2e0c5d61d0ea72a4cba0384d96e"
+    },
+    {
+      "path": "src/dsh_args.rs",
+      "sha256": "56fbc37fb4d0d858bd9b135a28e66ac12dfeb1c54653bb99c07a6c1e2fb68d86"
+    },
+    {
+      "path": "src/file_lock.rs",
+      "sha256": "cb5d9997ce52d06cc626d77f3c71d9417cc00b750db66d58a88cf2da7714abc9"
+    },
+    {
+      "path": "src/file_security.rs",
+      "sha256": "cafcf12d2cad0918108e16ad2f2fcb5c990cf53ccae221deeffbe56e29627946"
+    },
+    {
+      "path": "src/guard.rs",
+      "sha256": "815b52b356a9b5a8fb25c607ac65a05383a2c3e9fadd595693f1805a6285f461"
+    },
+    {
+      "path": "src/inspect.rs",
+      "sha256": "9340412b7a52b8e8fef4814a256a92d7ef68f0a4b00dd9c635ca7ba788b0fe75"
+    },
+    {
+      "path": "src/local_http.rs",
+      "sha256": "60dc194f51b588c4e300629115f58a635419354c194699bcb855d0f8ee7fe243"
+    },
+    {
+      "path": "src/locale.rs",
+      "sha256": "091e5b0084b7086036f78272f89731a144a44fff4f07e3783e3b3fcfd99393a7"
+    },
+    {
+      "path": "src/locale_test.rs",
+      "sha256": "1685cb5d927daec4f846b6c516a9fbcef555ba3ad85b6266c7fdbb5fa22637f7"
+    },
+    {
+      "path": "src/main.rs",
+      "sha256": "3277298c3e6cf5a8a9b55e18b8f590a888d8b86de7ad414e21661682cf88c0f4"
+    },
+    {
+      "path": "src/passthrough.rs",
+      "sha256": "ece664c05bf39f38c2084386f9af36e237d7722fb091ca2dafea349689b45605"
+    },
+    {
+      "path": "src/rdsh_config.rs",
+      "sha256": "8486a0683a394b8081bb9eba24a94b06ca185ffcb339265d39b8629da314a9bb"
+    },
+    {
+      "path": "src/search.rs",
+      "sha256": "e33298b321a1177cb6a1f8ce453dedcde44e95e22f33be1a5724ff4bf681aeeb"
+    },
+    {
+      "path": "src/serve.rs",
+      "sha256": "c0277eb0246da37f8b50437a8f2f7a906faf165b0922cea27ff90d195d469e7b"
+    },
+    {
+      "path": "src/setup.html",
+      "sha256": "bec44e0c7b389e28fd573c2b5cd33089b6bd92b5c569bad8e69facf29c152df4"
+    },
+    {
+      "path": "src/setup_web.rs",
+      "sha256": "7f855906bd085c0504865abde84b0b8d13f45f26ca16d0d7066267fd87a70264"
+    },
+    {
+      "path": "src/shutdown.rs",
+      "sha256": "10fbda3f9077b7866bf409189913a1d9470a500d6c32d3a117ddf14156c23cd2"
+    },
+    {
+      "path": "src/slim.rs",
+      "sha256": "c796412248a41e1f34cc25294d7b157388f09742932194e144730c3e65b8b057"
+    },
+    {
+      "path": "src/token_handoff.rs",
+      "sha256": "e0c60e95d87ac403d68cbb24d84f190f95b9ea72efd4a4355f45a55a87326ed4"
+    },
+    {
+      "path": "src/tokens.rs",
+      "sha256": "2554360a28e9fa75b2cd882855f764184cdfc1ce4d5a98e92030330c309672aa"
+    },
+    {
+      "path": "src/tool_security.rs",
+      "sha256": "7c4a3361923a983663080ee6ed8ac3360beea8bed1a7a481031d7ceab99e6da4"
+    },
+    {
+      "path": "src/ui.html",
+      "sha256": "eb384dbe5c5fc037f514eb60e590d83abd2a01986875d1b9bde5de0281e6b75a"
+    },
+    {
+      "path": "src/websearch.rs",
+      "sha256": "b084fc5f36aeeabb913634e0b820621c7ef737491bce19c12be37f580be915b0"
+    }
+  ]
 }

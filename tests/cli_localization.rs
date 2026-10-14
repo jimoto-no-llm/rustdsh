@@ -124,6 +124,108 @@ fn help_does_not_hide_invalid_settings() {
 }
 
 #[test]
+fn settings_and_guard_errors_localize_without_changing_raw_values_or_json_reasons() {
+    let fixture = Fixture::new();
+    let malformed = "{\n  invalid\n";
+    fixture.settings(malformed);
+    let default = fixture.run(&["settings", "show"]);
+    let english = fixture.run(&["--language", "en", "settings", "show"]);
+    assert_eq!(english.status.code(), default.status.code());
+    assert_eq!(english.stderr, default.stderr);
+    for (language, invalid_settings) in [("zh-CN", "无效的设置文件"), ("ja", "無効な設定ファイル")]
+    {
+        let output = fixture.run(&["--language", language, "settings", "show"]);
+        assert_eq!(output.status.code(), Some(1), "{output:?}");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(stderr.contains(invalid_settings), "{stderr}");
+        assert!(stderr.contains("rdsh.json"), "{stderr}");
+        assert!(stderr.contains("line"), "{stderr}");
+        assert_eq!(
+            fs::read_to_string(fixture.0.join("dsh/rdsh.json")).unwrap(),
+            malformed
+        );
+    }
+
+    fixture.settings("{}");
+    for (language, range_error) in [
+        ("zh-CN", "serve.port 超出 u16 范围"),
+        ("ja", "serve.port は u16 の範囲外です"),
+    ] {
+        let output = fixture.run(&[
+            "--language",
+            language,
+            "settings",
+            "set",
+            "serve.port",
+            "70000",
+        ]);
+        assert_eq!(output.status.code(), Some(1), "{output:?}");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(stderr.contains(range_error), "{stderr}");
+        assert!(stderr.contains("70000"), "{stderr}");
+    }
+
+    for (language, unknown_key) in [("zh-CN", "未知的设置键"), ("ja", "不明な設定キー")]
+    {
+        for action in [
+            vec!["settings", "set", "未知_日本語", "raw_日本語"],
+            vec!["settings", "unset", "未知_日本語"],
+        ] {
+            let mut args = vec!["--language", language];
+            args.extend_from_slice(&action);
+            let output = fixture.run(&args);
+            assert_eq!(output.status.code(), Some(1), "{output:?}");
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            assert!(stderr.contains(unknown_key), "{stderr}");
+            assert!(stderr.contains("未知_日本語"), "{stderr}");
+        }
+    }
+
+    let policy = fixture.0.join("策略_日本語.json");
+    fs::write(&policy, br#"{"schema":2,"rules":[]}"#).unwrap();
+    let default =
+        fixture.run_with_stdin(&["guard", "--policy-file", policy.to_str().unwrap()], b"{}");
+    let english = fixture.run_with_stdin(
+        &[
+            "--language",
+            "en",
+            "guard",
+            "--policy-file",
+            policy.to_str().unwrap(),
+        ],
+        b"{}",
+    );
+    assert_eq!(english.status.code(), default.status.code());
+    assert_eq!(english.stderr, default.stderr);
+    for (language, invalid_policy) in [
+        ("zh-CN", "不支持的策略架构"),
+        ("ja", "未対応のポリシースキーマ"),
+    ] {
+        let args = [
+            "--language",
+            language,
+            "guard",
+            "--policy-file",
+            policy.to_str().unwrap(),
+        ];
+        let output = fixture.run_with_stdin(&args, b"{}");
+        assert_eq!(output.status.code(), Some(2), "{output:?}");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(stderr.contains(invalid_policy), "{stderr}");
+
+        let mut json_args = args.to_vec();
+        json_args.insert(3, "--json");
+        let json = fixture.run_with_stdin(&json_args, b"{}");
+        assert!(json.status.success(), "{json:?}");
+        assert_eq!(
+            json.stdout,
+            b"{\"classification\":\"unknown\",\"decision\":\"block\",\"reason\":\"policy_unavailable\"}\n",
+            "{language}"
+        );
+    }
+}
+
+#[test]
 fn native_results_stay_identical_while_human_labels_change_language() {
     let fixture = Fixture::new();
     let token_file = fixture.0.join("計算_日本語.txt");

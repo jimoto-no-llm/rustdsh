@@ -19,6 +19,28 @@ impl Fixture {
     fn run(&self, args: &[&str]) -> Output {
         Command::new(env!("CARGO_BIN_EXE_rdsh"))
             .args(args)
+            .env_clear()
+            .envs(std::env::vars_os().filter(|(name, _)| {
+                [
+                    "PATH",
+                    "SystemRoot",
+                    "WINDIR",
+                    "COMSPEC",
+                    "PATHEXT",
+                    "TEMP",
+                    "TMP",
+                ]
+                .iter()
+                .any(|allowed| name.to_string_lossy().eq_ignore_ascii_case(allowed))
+            }))
+            .env("HOME", &self.0)
+            .env("USERPROFILE", &self.0)
+            .env("XDG_CONFIG_HOME", self.0.join("config"))
+            .env("XDG_DATA_HOME", self.0.join("data"))
+            .env("XDG_CACHE_HOME", self.0.join("cache"))
+            .env("APPDATA", self.0.join("appdata"))
+            .env("LOCALAPPDATA", self.0.join("localappdata"))
+            .env("LANG", "C")
             .env("DSH_HOME", &self.0)
             .output()
             .unwrap()
@@ -294,10 +316,9 @@ fn language_option_localizes_auth_and_setup_guidance() {
     assert!(auth.status.success());
     let auth_stdout = String::from_utf8_lossy(&auth.stdout);
     assert!(auth_stdout.contains("凭据"), "{auth_stdout}");
-    assert!(
-        auth_stdout.contains("来源") || auth_stdout.contains("提示"),
-        "{auth_stdout}"
-    );
+    assert!(auth_stdout.contains("未找到外部登录"), "{auth_stdout}");
+    assert!(auth_stdout.contains("首次使用"), "{auth_stdout}");
+    assert!(!fixture.0.join(".credentials.yaml").exists());
 
     let setup = fixture.run(&["--language", "zh-CN", "setup"]);
     assert!(setup.status.success());
@@ -427,5 +448,88 @@ fn disabled_features_refuse_their_commands_and_point_at_the_switch() {
             stderr.contains(feature),
             "{args:?} did not name {feature}: {stderr}"
         );
+    }
+}
+
+#[test]
+fn auth_renders_synthetic_source_without_copying_or_exposing_its_value() {
+    let fixture = Fixture::new("{}");
+    let codex = fixture.0.join(".codex");
+    std::fs::create_dir(&codex).unwrap();
+    std::fs::write(
+        codex.join("auth.json"),
+        r#"{"OPENAI_API_KEY":"fixture-value"}"#,
+    )
+    .unwrap();
+    for (language, label) in [
+        ("en", "source codex"),
+        ("zh-CN", "来源 codex"),
+        ("ja", "ソース codex"),
+    ] {
+        let output = fixture.run(&["--language", language, "auth"]);
+        assert!(output.status.success());
+        let text = String::from_utf8_lossy(&output.stdout);
+        assert!(text.contains(label), "{text}");
+        assert!(!text.contains("fixture-value"));
+        assert!(!fixture.0.join(".credentials.yaml").exists());
+    }
+}
+
+#[test]
+fn auth_localizes_owned_details_and_preserves_json_and_external_identifiers() {
+    let fixture = Fixture::new("{}");
+    std::fs::create_dir(fixture.0.join(".codex")).unwrap();
+    std::fs::write(
+        fixture.0.join(".codex/auth.json"),
+        r#"{"tokens":{"access_token":"fixture-access","refresh_token":"fixture-refresh"}}"#,
+    )
+    .unwrap();
+    std::fs::create_dir_all(fixture.0.join("data/opencode")).unwrap();
+    std::fs::write(
+        fixture.0.join("data/opencode/auth.json"),
+        r#"{"独自の接続":{"access":"fixture-access","refresh":"fixture-refresh"}}"#,
+    )
+    .unwrap();
+    for (language, disposition, unknown, skipped) in [
+        (
+            "en",
+            "would import from codex",
+            "expires_ms=unknown",
+            "skipped",
+        ),
+        ("zh-CN", "可从 codex 导入", "expires_ms=未知", "已跳过"),
+        (
+            "ja",
+            "codex からインポートできます",
+            "expires_ms=不明",
+            "スキップしました",
+        ),
+    ] {
+        let output = fixture.run(&["--language", language, "auth"]);
+        assert!(output.status.success());
+        let text = String::from_utf8_lossy(&output.stdout);
+        for expected in [
+            disposition,
+            unknown,
+            skipped,
+            "独自の接続",
+            "llm-pi-ai/openai-codex",
+        ] {
+            assert!(text.contains(expected), "{text}");
+        }
+        assert!(!text.contains("fixture-access"));
+        assert!(!text.contains("fixture-refresh"));
+        let json = fixture.run(&["--language", language, "auth", "--json"]);
+        assert!(json.status.success());
+        let value: serde_json::Value = serde_json::from_slice(&json.stdout).unwrap();
+        assert_eq!(
+            value["notes"],
+            serde_json::json!(["opencode login '独自の接続' skipped: not a dsh record id"])
+        );
+        assert_eq!(
+            value["records"][0]["detail"],
+            "no record llm-pi-ai/openai-codex: would import from codex"
+        );
+        assert!(!fixture.0.join(".credentials.yaml").exists());
     }
 }

@@ -84,5 +84,42 @@
     ],
     "exit": 0,
     "seconds": 0.17
+  },
+  {
+    "name": "CLI follow-up clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit": 0
+  },
+  {
+    "name": "CLI follow-up release",
+    "command": [
+      "cargo",
+      "test",
+      "--release"
+    ],
+    "exit": 0
+  },
+  {
+    "name": "CLI follow-up regress",
+    "command": [
+      "sh",
+      "tests/regress.sh"
+    ],
+    "exit": 0
+  },
+  {
+    "name": "CLI PTY",
+    "command": [
+      "python3",
+      "tests/e2e/cli-tty.py"
+    ],
+    "exit": 0
   }
 ]

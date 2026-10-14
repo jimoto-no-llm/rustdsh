@@ -251,7 +251,9 @@ rdsh settings set general.language zh-CN
 Precedence is `--language`, `RDSH_LANG`, `general.language`, then `LC_ALL`,
 `LC_MESSAGES`, and `LANG`. An explicitly invalid `general.language` stops the
 command without rewriting the settings file. Delegated `dsh` arguments, model
-output, JSON fields, files, and protocol identifiers are not translated.
+output, JSON fields, files, and protocol identifiers are not translated. Interactive setup prompts and settings/policy validation use the selected
+language too. Authentication decisions and skipped-provider notes localize only
+the CLI presentation; their existing JSON strings remain unchanged.
 
 ### Extended Dashboard (`rdsh-dashboard`)
 

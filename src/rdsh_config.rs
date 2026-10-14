@@ -513,20 +513,50 @@ pub fn load() -> RdshSettings {
     }
 }
 
+/// Load settings and present rdsh-owned diagnostics in `locale`.
+///
+/// Callers serving non-CLI surfaces use [`load`] so their established English
+/// wire text is retained.
+pub fn load_with_locale(locale: crate::locale::Locale) -> RdshSettings {
+    match try_load_with_locale(locale) {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            eprintln!(
+                "[rdsh] {}: {e:#}",
+                crate::locale::message(locale, crate::locale::Message::Error)
+            );
+            std::process::exit(1);
+        }
+    }
+}
+
 /// `load` の実体。ファイル欠落は既定値 (Ok) を返し、有効な設定の
 /// 読み込み結果は従来と同一。存在するのに壊れた JSON はファイルパス・
 /// 行/列・復旧手順つきの Err を返す（guard 系設定の fail-open 禁止）。
 pub fn try_load() -> anyhow::Result<RdshSettings> {
-    let path = settings_path();
-    try_load_at(&path)
+    try_load_with_locale(crate::locale::Locale::English)
 }
 
-fn try_load_at(path: &str) -> anyhow::Result<RdshSettings> {
+/// Result-returning variant of [`load_with_locale`].
+pub fn try_load_with_locale(locale: crate::locale::Locale) -> anyhow::Result<RdshSettings> {
+    let path = settings_path();
+    try_load_at(&path, locale)
+}
+
+fn try_load_at(path: &str, locale: crate::locale::Locale) -> anyhow::Result<RdshSettings> {
     let raw: Option<String> = match std::fs::read_to_string(path) {
         Ok(raw) => Some(raw),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
         Err(e) => {
-            return Err(anyhow::anyhow!("cannot read settings file at {path}: {e}"));
+            return Err(anyhow::anyhow!(
+                "{} {path}: {e}",
+                settings_text(
+                    locale,
+                    "cannot read settings file at",
+                    "无法读取设置文件",
+                    "設定ファイルを読み込めません"
+                )
+            ));
         }
     };
     // Missing file: defaults + legacy complement without a failed JSON parse.
@@ -540,18 +570,47 @@ fn try_load_at(path: &str) -> anyhow::Result<RdshSettings> {
         Ok(v) => v,
         Err(e) => {
             return Err(anyhow::anyhow!(
-                "invalid settings file at {path}: {e} (line {}, column {}); run `rdsh settings init --force` to restore defaults",
-                e.line(),
-                e.column()
+                "{} {path}: {e} {}; {}",
+                settings_text(
+                    locale,
+                    "invalid settings file at",
+                    "无效的设置文件",
+                    "無効な設定ファイル"
+                ),
+                settings_location(locale, e.line(), e.column()),
+                settings_text(
+                    locale,
+                    "run `rdsh settings init --force` to restore defaults",
+                    "运行 `rdsh settings init --force` 恢复默认值",
+                    "`rdsh settings init --force` を実行して既定値を復元します"
+                )
             ));
         }
     };
     if !parsed.is_object() {
         return Err(anyhow::anyhow!(
-            "invalid settings file at {path}: expected a JSON object; run `rdsh settings init --force` to restore defaults"
+            "{} {path}: {}; {}",
+            settings_text(
+                locale,
+                "invalid settings file at",
+                "无效的设置文件",
+                "無効な設定ファイル"
+            ),
+            settings_text(
+                locale,
+                "expected a JSON object",
+                "应为 JSON 对象",
+                "JSON オブジェクトが必要です"
+            ),
+            settings_text(
+                locale,
+                "run `rdsh settings init --force` to restore defaults",
+                "运行 `rdsh settings init --force` 恢复默认值",
+                "`rdsh settings init --force` を実行して既定値を復元します"
+            )
         ));
     }
-    validate_language_setting(&parsed, path)?;
+    validate_language_setting(&parsed, path, locale)?;
     let has_context = parsed.get("context").is_some_and(|c| !c.is_null());
     let mut cfg = if parsed.is_null() {
         RdshSettings::default()
@@ -571,7 +630,7 @@ pub(crate) fn update<T>(
 ) -> anyhow::Result<(RdshSettings, T)> {
     let path = settings_path();
     let _lock = crate::file_lock::FileLock::exclusive_for(std::path::Path::new(&path), locale)?;
-    let mut cfg = try_load_at(&path)?;
+    let mut cfg = try_load_at(&path, locale)?;
     let result = mutate(&mut cfg)?;
     cfg.save_locked(&path)?;
     Ok((cfg, result))
@@ -873,27 +932,55 @@ impl RdshSettings {
 
     /// dotted keyへ値を設定する。不正キーはErr。保存は呼び出し側が行う。
     pub fn set_dotted(&mut self, key: &str, raw: &str) -> anyhow::Result<()> {
+        self.set_dotted_with_locale(key, raw, crate::locale::Locale::English)
+    }
+
+    /// Locale-aware variant used by the native CLI.
+    pub fn set_dotted_with_locale(
+        &mut self,
+        key: &str,
+        raw: &str,
+        locale: crate::locale::Locale,
+    ) -> anyhow::Result<()> {
         let key = key.trim().trim_matches('.').to_string();
-        let bad = || anyhow::anyhow!("unknown settings key: {key} (try: rdsh settings keys)");
+        let bad = || {
+            anyhow::anyhow!(
+                "{}: {key} ({})",
+                settings_text(
+                    locale,
+                    "unknown settings key",
+                    "未知的设置键",
+                    "不明な設定キー"
+                ),
+                settings_text(
+                    locale,
+                    "try: rdsh settings keys",
+                    "请尝试: rdsh settings keys",
+                    "rdsh settings keys を実行してください"
+                )
+            )
+        };
         match key.as_str() {
-            "general.slim" => self.general.slim = parse_bool(raw)?,
-            "general.passthrough" => self.general.passthrough = parse_bool(raw)?,
-            "general.dry_run" => self.general.dry_run = parse_bool(raw)?,
+            "general.slim" => self.general.slim = parse_bool(raw, locale)?,
+            "general.passthrough" => self.general.passthrough = parse_bool(raw, locale)?,
+            "general.dry_run" => self.general.dry_run = parse_bool(raw, locale)?,
             "general.default_profile" => {
                 self.general.default_profile = parse_string(raw, PROFILE_CHARS)
             }
             "general.language" => {
-                self.general.language = parse_language(raw)?;
+                self.general.language = parse_language(raw, locale)?;
             }
-            "discord.enabled" => self.discord.enabled = parse_bool(raw)?,
+            "discord.enabled" => self.discord.enabled = parse_bool(raw, locale)?,
             "discord.application_id" => self.discord.application_id = parse_string(raw, 20),
             "discord.details" => self.discord.details = parse_string(raw, 128),
-            "discord.show_agent_status" => self.discord.show_agent_status = parse_bool(raw)?,
-            "discord.show_elapsed" => self.discord.show_elapsed = parse_bool(raw)?,
-            "discord.show_image" => self.discord.show_image = parse_bool(raw)?,
+            "discord.show_agent_status" => {
+                self.discord.show_agent_status = parse_bool(raw, locale)?
+            }
+            "discord.show_elapsed" => self.discord.show_elapsed = parse_bool(raw, locale)?,
+            "discord.show_image" => self.discord.show_image = parse_bool(raw, locale)?,
             "discord.status_display" => {
                 if !matches!(raw, "name" | "state" | "details") {
-                    anyhow::bail!("discord.status_display must be name, state, or details");
+                    anyhow::bail!("{}", settings_text(locale, "discord.status_display must be name, state, or details", "discord.status_display 必须为 name、state 或 details", "discord.status_display は name、state、details のいずれかである必要があります"));
                 }
                 self.discord.status_display = raw.into();
             }
@@ -902,7 +989,7 @@ impl RdshSettings {
             "discord.button_label" => self.discord.button_label = parse_string(raw, 32),
             "discord.button_url" => self.discord.button_url = parse_string(raw, 512),
             "tokens.default_budget" => {
-                self.tokens.default_budget = parse_usize(raw, 4000)? as usize
+                self.tokens.default_budget = parse_usize(raw, 4000, locale)? as usize
             }
             "search.dir" => {
                 let d = parse_string(raw, PATH_CHARS);
@@ -912,25 +999,31 @@ impl RdshSettings {
                     d
                 };
             }
-            "search.max" => self.search.max = parse_usize(raw, 100)? as usize,
-            "search.web_limit" => self.search.web_limit = parse_usize(raw, 10)? as usize,
+            "search.max" => self.search.max = parse_usize(raw, 100, locale)? as usize,
+            "search.web_limit" => self.search.web_limit = parse_usize(raw, 10, locale)? as usize,
             "search.searxng_url" => self.search.searxng_url = parse_string(raw, URL_CHARS),
-            "compact.max_tokens" => self.compact.max_tokens = parse_usize(raw, 8000)? as usize,
-            "sessions.limit" => self.sessions.limit = parse_usize(raw, 20)? as usize,
-            "sessions.with_tokens" => self.sessions.with_tokens = parse_bool(raw)?,
-            "sessions.stale_secs" => self.sessions.stale_secs = parse_usize(raw, 60)? as u64,
-            "logs.tail" => self.logs.tail = parse_usize(raw, 50)? as usize,
-            "serve.port" => self.serve.port = parse_u16(raw, "serve.port")?,
+            "compact.max_tokens" => {
+                self.compact.max_tokens = parse_usize(raw, 8000, locale)? as usize
+            }
+            "sessions.limit" => self.sessions.limit = parse_usize(raw, 20, locale)? as usize,
+            "sessions.with_tokens" => self.sessions.with_tokens = parse_bool(raw, locale)?,
+            "sessions.stale_secs" => {
+                self.sessions.stale_secs = parse_usize(raw, 60, locale)? as u64
+            }
+            "logs.tail" => self.logs.tail = parse_usize(raw, 50, locale)? as usize,
+            "serve.port" => self.serve.port = parse_u16(raw, "serve.port", locale)?,
             "guard.deny" => self.guard.deny = parse_list(raw, TEXT_CHARS),
             "guard.reason" => self.guard.reason = parse_string(raw, TEXT_CHARS),
-            "bench.n" => self.bench.n = parse_u32(raw, "bench.n")?,
-            "setup.web_port" => self.setup.web_port = parse_u16(raw, "setup.web_port")?,
-            "beta.context_engine" => self.beta.context_engine = parse_bool(raw)?,
+            "bench.n" => self.bench.n = parse_u32(raw, "bench.n", locale)?,
+            "setup.web_port" => self.setup.web_port = parse_u16(raw, "setup.web_port", locale)?,
+            "beta.context_engine" => self.beta.context_engine = parse_bool(raw, locale)?,
             "extras.enable" => self.extras.enable = parse_list(raw, TEXT_CHARS),
-            "context.token_budget" => self.context.token_budget = parse_usize(raw, 4000)? as usize,
-            "context.enable_retriever" => self.context.enable_retriever = parse_bool(raw)?,
-            "context.enable_packer" => self.context.enable_packer = parse_bool(raw)?,
-            "context.enable_verifier" => self.context.enable_verifier = parse_bool(raw)?,
+            "context.token_budget" => {
+                self.context.token_budget = parse_usize(raw, 4000, locale)? as usize
+            }
+            "context.enable_retriever" => self.context.enable_retriever = parse_bool(raw, locale)?,
+            "context.enable_packer" => self.context.enable_packer = parse_bool(raw, locale)?,
+            "context.enable_verifier" => self.context.enable_verifier = parse_bool(raw, locale)?,
             "context.goal" => self.context.goal = parse_string(raw, GOAL_CHARS),
             "context.decisions" => self.context.decisions = parse_list(raw, TEXT_CHARS),
             "context.constraints" => self.context.constraints = parse_list(raw, TEXT_CHARS),
@@ -938,17 +1031,30 @@ impl RdshSettings {
                 self.context.working_files = parse_list(raw, PATH_CHARS)
             }
             "context.open_tasks" => self.context.open_tasks = parse_list(raw, TEXT_CHARS),
-            "context.max_code_hits" => self.context.max_code_hits = parse_usize(raw, 20)? as usize,
-            "context.max_sessions" => self.context.max_sessions = parse_usize(raw, 0)? as usize,
-            "context.include_git_diff" => self.context.include_git_diff = parse_bool(raw)?,
+            "context.max_code_hits" => {
+                self.context.max_code_hits = parse_usize(raw, 20, locale)? as usize
+            }
+            "context.max_sessions" => {
+                self.context.max_sessions = parse_usize(raw, 0, locale)? as usize
+            }
+            "context.include_git_diff" => self.context.include_git_diff = parse_bool(raw, locale)?,
             k if k.starts_with("features.") => {
                 let id = &k["features.".len()..];
                 if feature_def(id).is_none() {
-                    anyhow::bail!("unknown feature id: {id} (try: rdsh features)");
+                    anyhow::bail!(
+                        "{}: {id} ({})",
+                        settings_text(locale, "unknown feature id", "未知功能 ID", "不明な機能 ID"),
+                        settings_text(
+                            locale,
+                            "try: rdsh features",
+                            "请尝试: rdsh features",
+                            "rdsh features を実行してください"
+                        )
+                    );
                 }
                 self.features
                     .values
-                    .insert(id.to_string(), parse_bool(raw)?);
+                    .insert(id.to_string(), parse_bool(raw, locale)?);
             }
             _ => return Err(bad()),
         }
@@ -957,7 +1063,17 @@ impl RdshSettings {
     }
 
     /// dotted keyを既定値に戻す。section単体で節全体を初期化する。
+    #[allow(dead_code)] // Retains the English API for non-CLI consumers.
     pub fn reset_dotted(&mut self, key: &str) -> anyhow::Result<()> {
+        self.reset_dotted_with_locale(key, crate::locale::Locale::English)
+    }
+
+    /// Locale-aware variant used by the native CLI.
+    pub fn reset_dotted_with_locale(
+        &mut self,
+        key: &str,
+        locale: crate::locale::Locale,
+    ) -> anyhow::Result<()> {
         let key = key.trim().trim_matches('.').to_string();
         // 先に未知キー判定（d を動かす前に）
         let known_section = matches!(
@@ -985,7 +1101,19 @@ impl RdshSettings {
             .is_some_and(|id| feature_def(id).is_some());
         if !known_section && !known_feature && RdshSettings::default().get_dotted(&key).is_none() {
             return Err(anyhow::anyhow!(
-                "unknown settings key: {key} (try: rdsh settings keys)"
+                "{}: {key} ({})",
+                settings_text(
+                    locale,
+                    "unknown settings key",
+                    "未知的设置键",
+                    "不明な設定キー"
+                ),
+                settings_text(
+                    locale,
+                    "try: rdsh settings keys",
+                    "请尝试: rdsh settings keys",
+                    "rdsh settings keys を実行してください"
+                )
             ));
         }
         let d = RdshSettings::default();
@@ -1010,30 +1138,52 @@ impl RdshSettings {
                 // Feature switches have no default entry: unset removes the key.
                 let id = &k["features.".len()..];
                 if feature_def(id).is_none() {
-                    anyhow::bail!("unknown feature id: {id} (try: rdsh features)");
+                    anyhow::bail!(
+                        "{}: {id} ({})",
+                        settings_text(locale, "unknown feature id", "未知功能 ID", "不明な機能 ID"),
+                        settings_text(
+                            locale,
+                            "try: rdsh features",
+                            "请尝试: rdsh features",
+                            "rdsh features を実行してください"
+                        )
+                    );
                 }
                 self.features.values.remove(id);
             }
             _ => {
                 // 単項目は既定節から写す
-                self.set_dotted_fallback(&key, &d)?;
+                self.set_dotted_fallback(&key, &d, locale)?;
             }
         }
         self.sanitize();
         Ok(())
     }
 
-    fn set_dotted_fallback(&mut self, key: &str, src: &RdshSettings) -> anyhow::Result<()> {
-        let v = src
-            .get_dotted(key)
-            .ok_or_else(|| anyhow::anyhow!("unknown settings key: {key}"))?;
+    fn set_dotted_fallback(
+        &mut self,
+        key: &str,
+        src: &RdshSettings,
+        locale: crate::locale::Locale,
+    ) -> anyhow::Result<()> {
+        let v = src.get_dotted(key).ok_or_else(|| {
+            anyhow::anyhow!(
+                "{}: {key}",
+                settings_text(
+                    locale,
+                    "unknown settings key",
+                    "未知的设置键",
+                    "不明な設定キー"
+                )
+            )
+        })?;
         let raw = if v.is_string() {
             v.as_str().unwrap_or_default().to_string()
         } else {
             serde_json::to_string(&v).unwrap_or_default()
         };
         // 空文字の扱い: 文字列節はそのまま空に戻す
-        self.set_dotted(key, &raw)
+        self.set_dotted_with_locale(key, &raw, locale)
     }
 
     /// 設定キー一覧（help用）。
@@ -1211,7 +1361,11 @@ fn language(v: &serde_json::Value, key: &str) -> String {
 /// Reject an explicitly invalid language before any sanitizing fallback runs.
 /// This keeps a broken user setting observable and preserves fail-closed
 /// settings loading for every native command.
-fn validate_language_setting(value: &serde_json::Value, path: &str) -> anyhow::Result<()> {
+fn validate_language_setting(
+    value: &serde_json::Value,
+    path: &str,
+    locale: crate::locale::Locale,
+) -> anyhow::Result<()> {
     let Some(general) = value.get("general").and_then(serde_json::Value::as_object) else {
         return Ok(());
     };
@@ -1220,15 +1374,60 @@ fn validate_language_setting(value: &serde_json::Value, path: &str) -> anyhow::R
     };
     let Some(language) = language.as_str() else {
         anyhow::bail!(
-            "invalid settings file at {path}: general.language must be auto, en, zh-CN, or ja"
+            "{} {path}: {}",
+            settings_text(
+                locale,
+                "invalid settings file at",
+                "无效的设置文件",
+                "無効な設定ファイル"
+            ),
+            settings_text(
+                locale,
+                "general.language must be auto, en, zh-CN, or ja",
+                "general.language 必须为 auto、en、zh-CN 或 ja",
+                "general.language は auto、en、zh-CN、ja のいずれかである必要があります"
+            )
         );
     };
     if canonical_language(language).is_none() {
         anyhow::bail!(
-            "invalid settings file at {path}: general.language must be auto, en, zh-CN, or ja"
+            "{} {path}: {}",
+            settings_text(
+                locale,
+                "invalid settings file at",
+                "无效的设置文件",
+                "無効な設定ファイル"
+            ),
+            settings_text(
+                locale,
+                "general.language must be auto, en, zh-CN, or ja",
+                "general.language 必须为 auto、en、zh-CN 或 ja",
+                "general.language は auto、en、zh-CN、ja のいずれかである必要があります"
+            )
         );
     }
     Ok(())
+}
+
+fn settings_text(
+    locale: crate::locale::Locale,
+    english: &'static str,
+    chinese: &'static str,
+    japanese: &'static str,
+) -> &'static str {
+    match locale {
+        crate::locale::Locale::English => english,
+        crate::locale::Locale::Chinese => chinese,
+        crate::locale::Locale::Japanese => japanese,
+    }
+}
+
+fn settings_location(locale: crate::locale::Locale, line: usize, column: usize) -> String {
+    match locale {
+        crate::locale::Locale::English => format!("(line {line}, column {column})"),
+        crate::locale::Locale::Chinese => format!("（第 {line} 行，第 {column} 列）"),
+        crate::locale::Locale::Japanese => format!("（{line} 行、{column} 列）"),
+    }
 }
 
 fn canonical_language(raw: &str) -> Option<&'static str> {
@@ -1272,7 +1471,7 @@ fn clamp_u64(n: Option<u64>, default: u64, lo: u64, hi: u64) -> u64 {
     n.unwrap_or(default).clamp(lo, hi)
 }
 
-fn parse_bool(raw: &str) -> anyhow::Result<bool> {
+fn parse_bool(raw: &str, locale: crate::locale::Locale) -> anyhow::Result<bool> {
     let s = raw.trim().to_lowercase();
     match s.as_str() {
         "true" | "1" | "yes" | "on" | "enable" | "enabled" => Ok(true),
@@ -1283,22 +1482,48 @@ fn parse_bool(raw: &str) -> anyhow::Result<bool> {
                     return Ok(b);
                 }
             }
-            Err(anyhow::anyhow!("bool ではありません: {raw} (true/false)"))
+            Err(anyhow::anyhow!(
+                "{}: {raw} (true/false)",
+                settings_text(
+                    locale,
+                    "bool ではありません",
+                    "不是布尔值",
+                    "bool ではありません"
+                )
+            ))
         }
     }
 }
 
-fn parse_u16(raw: &str, key: &str) -> anyhow::Result<u16> {
-    let value = parse_usize(raw, 0)?;
-    u16::try_from(value).map_err(|_| anyhow::anyhow!("{key} is out of range for u16: {raw}"))
+fn parse_u16(raw: &str, key: &str, locale: crate::locale::Locale) -> anyhow::Result<u16> {
+    let value = parse_usize(raw, 0, locale)?;
+    u16::try_from(value).map_err(|_| {
+        anyhow::anyhow!(
+            "{}: {raw}",
+            match locale {
+                crate::locale::Locale::English => format!("{key} is out of range for u16"),
+                crate::locale::Locale::Chinese => format!("{key} 超出 u16 范围"),
+                crate::locale::Locale::Japanese => format!("{key} は u16 の範囲外です"),
+            }
+        )
+    })
 }
 
-fn parse_u32(raw: &str, key: &str) -> anyhow::Result<u32> {
-    let value = parse_usize(raw, 0)?;
-    u32::try_from(value).map_err(|_| anyhow::anyhow!("{key} is out of range for u32: {raw}"))
+fn parse_u32(raw: &str, key: &str, locale: crate::locale::Locale) -> anyhow::Result<u32> {
+    let value = parse_usize(raw, 0, locale)?;
+    u32::try_from(value).map_err(|_| {
+        anyhow::anyhow!(
+            "{}: {raw}",
+            match locale {
+                crate::locale::Locale::English => format!("{key} is out of range for u32"),
+                crate::locale::Locale::Chinese => format!("{key} 超出 u32 范围"),
+                crate::locale::Locale::Japanese => format!("{key} は u32 の範囲外です"),
+            }
+        )
+    })
 }
 
-fn parse_usize(raw: &str, _fallback: u64) -> anyhow::Result<u64> {
+fn parse_usize(raw: &str, _fallback: u64, locale: crate::locale::Locale) -> anyhow::Result<u64> {
     let s = raw.trim();
     if let Ok(v) = serde_json::from_str::<serde_json::Value>(s) {
         if let Some(n) = v.as_u64() {
@@ -1310,8 +1535,17 @@ fn parse_usize(raw: &str, _fallback: u64) -> anyhow::Result<u64> {
             }
         }
     }
-    s.parse::<u64>()
-        .map_err(|_| anyhow::anyhow!("数値ではありません: {raw}"))
+    s.parse::<u64>().map_err(|_| {
+        anyhow::anyhow!(
+            "{}: {raw}",
+            settings_text(
+                locale,
+                "数値ではありません",
+                "不是数值",
+                "数値ではありません"
+            )
+        )
+    })
 }
 
 fn parse_string(raw: &str, max_chars: usize) -> String {
@@ -1329,10 +1563,20 @@ fn parse_string(raw: &str, max_chars: usize) -> String {
     truncate(s, max_chars)
 }
 
-fn parse_language(raw: &str) -> anyhow::Result<String> {
+fn parse_language(raw: &str, locale: crate::locale::Locale) -> anyhow::Result<String> {
     canonical_language(&parse_string(raw, 16))
         .map(str::to_string)
-        .ok_or_else(|| anyhow::anyhow!("general.language must be auto, en, zh-CN, or ja"))
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "{}",
+                settings_text(
+                    locale,
+                    "general.language must be auto, en, zh-CN, or ja",
+                    "general.language 必须为 auto、en、zh-CN 或 ja",
+                    "general.language は auto、en、zh-CN、ja のいずれかである必要があります"
+                )
+            )
+        })
 }
 
 fn parse_list(raw: &str, max_chars: usize) -> Vec<String> {

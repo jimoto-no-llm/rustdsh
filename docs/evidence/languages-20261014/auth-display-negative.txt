@@ -1,0 +1,27 @@
+   Compiling rdsh v0.3.3 (<workspace>)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.98s
+     Running tests/settings_cli.rs (target/debug/deps/settings_cli-d32aa3d18fb5e7bb)
+
+running 1 test
+test auth_localizes_owned_details_and_preserves_json_and_external_identifiers ... FAILED
+
+failures:
+
+---- auth_localizes_owned_details_and_preserves_json_and_external_identifiers stdout ----
+
+thread 'auth_localizes_owned_details_and_preserves_json_and_external_identifiers' (9081969) panicked at tests/settings_cli.rs:518:13:
+[rdsh auth] 凭据: /var/folders/th/b4c841yj4vsfd0cp40pwkbnd_1cjj0/T/rdsh-settings-cli-28707-0/.credentials.yaml
+[rdsh auth] 来源 codex: openai-codex oauth (expires_ms=unknown)
+[rdsh auth] openai-codex: no record llm-pi-ai/openai-codex: would import from codex
+[rdsh auth] 说明: opencode login '独自の接続' skipped: not a dsh record id
+[rdsh auth] 提示：`rdsh auth --import --provider <id>` 可复制这些凭据；自动复制已禁用；请选择 --provider 或 --ref
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    auth_localizes_owned_details_and_preserves_json_and_external_identifiers
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 16 filtered out; finished in 0.51s
+
+error: test failed, to rerun pass `--test settings_cli`
