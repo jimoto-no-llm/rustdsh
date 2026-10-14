@@ -14,12 +14,32 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   (<https://github.com/hikarioyama/Smart-DSH>, MIT) and ship only that responsive
   layout — not Smart-DSH's notifications, Esc handling or task hub. See
   [README](plugins/rdsh-mobile-ui/README.md).
+- `rdsh provider add hai|sarashina|local-openai` writes an OpenAI-compatible route into a
+  profile's `llm-pi-ai` providers (models from `--model`, opencode's
+  `provider.<id>` or `GET /models`), keeping every other byte of
+  `cordis.patch.yml`; `rdsh provider list` shows presets and per-profile
+  route and key status. The `sarashina` preset writes the `compat` lines
+  (`supportsStore`, `supportsUsageInStreaming`) and `maxTokens: 8000` that the
+  API requires; its `tool_choice` default is a known open question for agent
+  use. `HAI_API_KEY`, `SARASHINA_API_KEY` and `LOCAL_OPENAI_API_KEY` can be
+  saved from the setup UI (`rdsh setup --yes` does not save them), but they count as a connection only when a profile's
+  default model uses a route that reads them. Existing `llm-pi-ai` entries
+  written with quotes, comments or any indent width are edited in place; a
+  layout that cannot be read safely (including any other mention of
+  `llm-pi-ai`, such as inside `- insert:`) is refused with the YAML to add by
+  hand. See `docs/PROVIDERS.md`.
 - `rdsh-dashboard subagents plan` turns a declared use case into a deterministic
   dispatch plan for delegated subagents: role and model tier per item, bounded
   items and weight per agent, waves limited by `max_parallel`, and explicit
   warnings instead of guessed tiers. It starts no agent and writes nothing; the
   existing `workers prepare` still owns the checkout allocation
   (`docs/SUBAGENT-PLANNING.md`).
+- `scripts/serial-proxy.mjs` gains `--tool-choice-default <none|auto|required>`
+  (adds a default `tool_choice` to `chat/completions` requests that send `tools`
+  without one, all other requests are forwarded byte-identical; needed for
+  Sarashina, which otherwise forces tool calls) and `--rpm <n>` (fixed 60-second
+  window cap on upstream requests, waiting inside the existing queue and exposed
+  in `/__proxy/status`). See `docs/SERIAL-PROXY.md`.
 
 ## [0.3.3] - 2026-10-13
 

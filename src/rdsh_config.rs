@@ -853,6 +853,12 @@ impl RdshSettings {
         if key.is_empty() || key == "all" {
             return Some(v);
         }
+        // set_dotted が受理する旧別名は読み出しでも解決する。解決しないと
+        // 保存に成功した直後の読み戻しが失敗し、成功した set が exit 1 になる。
+        let key = match key {
+            "context.files" => "context.working_files",
+            other => other,
+        };
         let mut cur = &v;
         for part in key.split('.') {
             cur = cur.get(part)?;
@@ -1674,6 +1680,13 @@ mod rdsh_config_tests {
         c.set_dotted("context.working_files", "src/a.rs, src/b.rs")
             .unwrap();
         assert_eq!(c.context.working_files.len(), 2);
+        // 旧別名 context.files は set が受理するので get でも解決できること
+        // （解決しないと main.rs の読み戻しが失敗し、保存済みなのに exit 1 になる）。
+        c.set_dotted("context.files", "src/c.rs").unwrap();
+        assert_eq!(
+            c.get_dotted("context.files").unwrap(),
+            serde_json::json!(["src/c.rs"])
+        );
         c.set_dotted("serve.port", "38080").unwrap();
         assert_eq!(c.serve.port, 38080);
         assert!(c.set_dotted("unknown.key", "1").is_err());
@@ -1688,5 +1701,36 @@ mod rdsh_config_tests {
         c.reset_dotted("all").unwrap();
         assert_eq!(c, RdshSettings::default());
         assert!(c.reset_dotted("unknown.key").is_err());
+    }
+
+    #[test]
+    fn feature_enabled_precedence_and_defaults() {
+        let mut c = RdshSettings::default();
+        // 既定値: discord は既定 on、sound は既定 off、未知 id は false。
+        assert!(feature_enabled(&c, "discord"));
+        assert!(!feature_enabled(&c, "sound"));
+        assert!(!feature_enabled(&c, "no-such-feature"));
+        assert!(!feature_is_explicit(&c, "discord"));
+
+        // features.<id> が未記載なら旧キーを見る。
+        c.discord.enabled = false;
+        assert!(!feature_enabled(&c, "discord"));
+        c.extras.enable = vec!["search-web".to_string()];
+        assert!(feature_enabled(&c, "search-web"));
+        c.beta.context_engine = true;
+        assert!(feature_enabled(&c, "context_engine"));
+        assert_eq!(enabled_extras(&c), vec!["search-web".to_string()]);
+
+        // 明示 features.<id> が最優先で、旧キーを上書きする。
+        c.features.values.insert("discord".to_string(), true);
+        c.features.values.insert("search-web".to_string(), false);
+        c.features
+            .values
+            .insert("context_engine".to_string(), false);
+        assert!(feature_enabled(&c, "discord"));
+        assert!(feature_is_explicit(&c, "discord"));
+        assert!(!feature_enabled(&c, "search-web"));
+        assert!(!feature_enabled(&c, "context_engine"));
+        assert!(enabled_extras(&c).is_empty());
     }
 }

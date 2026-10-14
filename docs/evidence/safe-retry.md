@@ -1,6 +1,6 @@
 # Retry evidence
 
-Issue: [#37](https://github.com/sahenjp/rustdsh/issues/37).
+Issue: [#37](https://github.com/jimoto-no-llm/rustdsh/issues/37).
 The comparison uses the baseline CLI entrypoint from commit
 `739d93a` with the same currently installed dashboard dependencies.
 It rejects `--retry`; the new entrypoint performs the bounded original CLI
