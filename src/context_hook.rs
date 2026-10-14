@@ -41,17 +41,85 @@ fn is_ours(command: &serde_json::Value) -> bool {
 }
 
 fn command_is_ours(command: &str) -> bool {
-    let tokens: Vec<&str> = command.split_whitespace().collect();
+    let Some(tokens) = shell_tokens(command) else {
+        return false;
+    };
     let Some(program) = tokens.first() else {
         return false;
     };
-    let program = program.rsplit(['/', '\\']).next().unwrap_or(program);
-    if !program.contains("rdsh") {
+    if !rdsh_named(program) {
         return false;
     }
     tokens
         .windows(2)
         .any(|pair| pair[0] == "context" && pair[1] == "inject")
+}
+
+fn rdsh_named(program: &str) -> bool {
+    let name = program.rsplit(['/', '\\']).next().unwrap_or(program);
+    name.strip_suffix(".exe").unwrap_or(name) == "rdsh"
+}
+
+// Recognize POSIX quoted words without executing expansions or shell syntax.
+// Malformed or compound commands are conservatively left to their owner.
+fn shell_tokens(command: &str) -> Option<Vec<String>> {
+    let mut chars = command.chars().peekable();
+    let mut tokens = Vec::new();
+    let mut word = String::new();
+    let mut quote = None;
+    let mut started = false;
+    while let Some(c) = chars.next() {
+        match (quote, c) {
+            (Some('\''), '\'') | (Some('"'), '"') => quote = None,
+            (Some('\''), _) => word.push(c),
+            (_, '\\') => {
+                let next = chars.next()?;
+                if quote == Some('"') && !matches!(next, '$' | '`' | '"' | '\\' | '\n') {
+                    word.push('\\');
+                }
+                if next != '\n' {
+                    word.push(next);
+                }
+                started = true;
+            }
+            (None, '\'' | '"') => {
+                quote = Some(c);
+                started = true;
+            }
+            (None, ';' | '&' | '|' | '(' | ')' | '<' | '>' | '\n')
+            | (None | Some('"'), '$' | '`') => return None,
+            (None, c) if c.is_whitespace() => {
+                if started {
+                    tokens.push(std::mem::take(&mut word));
+                    started = false;
+                }
+            }
+            _ => {
+                word.push(c);
+                started = true;
+            }
+        }
+    }
+    if quote.is_some() {
+        return None;
+    }
+    if started {
+        tokens.push(word);
+    }
+    Some(tokens)
+}
+
+fn inject_command(bin: &str) -> String {
+    let bin = if !bin.is_empty()
+        && bin
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"._-/:".contains(&b))
+    {
+        bin.to_string()
+    } else {
+        format!("'{}'", bin.replace('\'', "'\\''"))
+    };
+    format!("{bin} context inject --event user-prompt-submit")
 }
 
 fn group_is_ours(group: &serde_json::Value) -> bool {
@@ -188,10 +256,13 @@ pub fn cmd_hook(
 ) -> Result<()> {
     let path = PathBuf::from(path.unwrap_or_else(default_path));
     let bin = rdsh_bin.unwrap_or_else(|| "rdsh".to_string());
-    let command = format!("{bin} context inject --event user-prompt-submit");
+    let command = inject_command(&bin);
     let mut doc = read_config(&path)?;
     match action {
         "install" => {
+            if !rdsh_named(&bin) {
+                eprintln!("note: --rdsh should point at an rdsh-named binary so re-installs stay idempotent");
+            }
             let changed = merge(&mut doc, &command);
             if dry_run {
                 println!("{}", serde_json::to_string_pretty(&doc)?);
@@ -359,13 +430,95 @@ mod tests {
     #[test]
     fn unrelated_hooks_that_mention_the_phrase_are_kept() {
         let mut doc = serde_json::json!({"hooks": {"UserPromptSubmit": [
-            {"hooks": [{"type": "command", "command": "my-tool audit context inject-log"}]}
+            {"hooks": [
+                {"type": "command", "command": "my-tool audit context inject-log"},
+                {"type": "command", "command": "my-rdsh-auditor context inject"}
+            ]}
         ]}});
         assert!(!unmerge(&mut doc));
         assert_eq!(
             doc["hooks"]["UserPromptSubmit"][0]["hooks"][0]["command"],
             "my-tool audit context inject-log"
         );
+        assert_eq!(
+            doc["hooks"]["UserPromptSubmit"][0]["hooks"][1]["command"],
+            "my-rdsh-auditor context inject"
+        );
+    }
+
+    #[test]
+    fn ownership_requires_exact_binary_name_and_adjacent_subcommands() {
+        for command in [
+            "rdsh context inject",
+            "/opt/bin/rdsh.exe --flag context inject",
+            "\"/opt/program files/rdsh\" context inject",
+            "'C:\\Program Files\\rdsh.exe' context inject",
+        ] {
+            assert!(command_is_ours(command), "{command}");
+        }
+        for command in [
+            "my-rdsh-auditor context inject",
+            "/opt/dsh-native context inject",
+            "rdsh context other inject",
+            "rdsh context inject-log",
+            "rdsh audit; echo context inject",
+            "'rdsh context inject",
+        ] {
+            assert!(!command_is_ours(command), "{command}");
+        }
+    }
+
+    #[test]
+    fn quoted_binary_paths_remain_idempotent_and_removable() {
+        for bin in [
+            "/opt/program files/rdsh",
+            "/opt/user's tools/rdsh",
+            "/opt/$(echo x);tools/rdsh",
+        ] {
+            let command = inject_command(bin);
+            assert!(command.starts_with('\''));
+            assert_eq!(shell_tokens(&command).unwrap()[0], bin);
+            let mut doc = serde_json::json!({});
+            assert!(merge(&mut doc, &command));
+            assert!(is_ours(&doc["hooks"][EVENT][0]["hooks"][0]));
+            assert!(!merge(&mut doc, &command));
+            assert!(unmerge(&mut doc));
+        }
+        assert_eq!(
+            inject_command("/opt/user's tools/rdsh"),
+            "'/opt/user'\\''s tools/rdsh' context inject --event user-prompt-submit"
+        );
+        assert_eq!(
+            inject_command("/opt/bin/rdsh"),
+            "/opt/bin/rdsh context inject --event user-prompt-submit"
+        );
+    }
+
+    #[test]
+    fn install_quotes_the_rdsh_argument() {
+        let dir = std::env::temp_dir().join(format!(
+            "rdsh-context-hook-test-{}",
+            crate::local_http::random_token().unwrap()
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        let path = dir.join("hooks.json");
+        let bin = "/opt/program files/rdsh";
+        cmd_hook(
+            "install",
+            Some(path.to_string_lossy().into_owned()),
+            Some(bin.to_string()),
+            false,
+            false,
+        )
+        .unwrap();
+        let doc = read_config(&path).unwrap();
+        let hook = &doc["hooks"][EVENT][0]["hooks"][0];
+        assert_eq!(
+            hook["command"],
+            "'/opt/program files/rdsh' context inject --event user-prompt-submit"
+        );
+        assert!(is_ours(hook));
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]

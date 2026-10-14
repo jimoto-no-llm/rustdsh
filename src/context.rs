@@ -1841,6 +1841,21 @@ fn assemble_sections(
 
 // Carry one user utterance per recent session, at most 400 tokens in total.
 // Unknown project ownership is omitted: other projects are not inferred local.
+fn read_inherited_session(path: &Path, root: &Path, deadline: Option<Instant>) -> Option<Vec<u8>> {
+    if expired(deadline) {
+        return None;
+    }
+    if !path.extension().is_some_and(|e| e == "zstd") {
+        return read_small_regular(path, root, 256 * 1024);
+    }
+    let root = std::fs::canonicalize(root).ok()?;
+    let source = std::fs::canonicalize(path).ok()?;
+    // Keep the regular-file/root checks used by the plain-session reader.
+    open_beneath(&root, &source)?;
+    let (bytes, limited) = read_zstd_session(&source, 256 * 1024, usize::MAX, deadline).ok()?;
+    (!limited).then_some(bytes)
+}
+
 fn inherited_sessions(
     query: &str,
     limit: usize,
@@ -1861,7 +1876,7 @@ fn inherited_sessions(
             continue;
         }
         tracker.record(&p);
-        let Some(bytes) = read_small_regular(&p, &root, 256 * 1024) else {
+        let Some(bytes) = read_inherited_session(&p, &root, deadline) else {
             continue;
         };
         let mut best: Option<(usize, usize, String)> = None;
@@ -2078,7 +2093,11 @@ pub fn cmd_status(json: bool) -> anyhow::Result<()> {
     let missing = missing_files(&cfg);
     let legacy_exists = std::path::Path::new(&legacy_path()).exists();
     let memory = MemoryStore::load(&memory_path());
-    let summary = crate::deps::graph_summary();
+    let summary = if cfg.dep_graph {
+        crate::deps::graph_summary()
+    } else {
+        String::new()
+    };
     let memory_status = match &memory {
         Ok(m) => {
             serde_json::json!({"active": m.entries.iter().filter(|e| e.superseded_by.is_none()).count(),
@@ -2111,6 +2130,7 @@ pub fn cmd_status(json: bool) -> anyhow::Result<()> {
             "priority": priority_order(),
             "memory": memory_status,
             "deps": {"summary": summary, "index_present": !summary.is_empty()},
+            "dependency_graph": {"enabled": cfg.dep_graph},
             "inject": {"budget": cfg.inject_budget, "deadline_ms": cfg.inject_deadline_ms,
                 "sessions": if cfg.inject_sessions { cfg.inject_session_count } else { 0 }},
         });
@@ -2122,6 +2142,15 @@ pub fn cmd_status(json: bool) -> anyhow::Result<()> {
     writeln!(out, "[rdsh context: v{SCHEMA}]")?;
     writeln!(out, "config: {} (legacy: {})", config_path(), legacy_path())?;
     writeln!(out, "budget: {} tokens", cfg.token_budget)?;
+    writeln!(
+        out,
+        "dependency_graph: {}",
+        if cfg.dep_graph {
+            "enabled"
+        } else {
+            "disabled via features.dep_graph"
+        }
+    )?;
     writeln!(
         out,
         "retriever/packer/verifier: {}/{}/{}",
@@ -2304,7 +2333,11 @@ pub fn cmd_explain(query: Option<String>, budget: Option<usize>) -> anyhow::Resu
         "- snapshot: {} (git HEAD/branch/dirty and size+mtime of read files)",
         assembled.snapshot.line()
     )?;
-    writeln!(out, "- dependencies: retrieved seed importers/imports, at most 5 files; unresolved references stay unknown")?;
+    if cfg.dep_graph {
+        writeln!(out, "- dependencies: retrieved seed importers/imports, at most 5 files; unresolved references stay unknown")?;
+    } else {
+        writeln!(out, "- dependencies: disabled via features.dep_graph")?;
+    }
     writeln!(
         out,
         "- inject: budget={} deadline_ms={} sessions={} (retrieval skipped past deadline)",
@@ -2648,12 +2681,16 @@ impl std::fmt::Display for MissingZstd {
 
 impl std::error::Error for MissingZstd {}
 
-fn read_distill_stream(reader: impl Read) -> std::io::Result<(Vec<u8>, bool)> {
+fn read_session_stream(
+    reader: impl Read,
+    cap: usize,
+    line_limit: usize,
+) -> std::io::Result<(Vec<u8>, bool)> {
     use std::io::BufRead;
-    let mut reader = std::io::BufReader::new(reader.take(DISTILL_SESSION_CAP as u64));
+    let mut reader = std::io::BufReader::new(reader.take(cap as u64));
     let mut bytes = Vec::new();
     let mut lines = 0;
-    while bytes.len() < DISTILL_SESSION_CAP && lines < DISTILL_LINE_LIMIT {
+    while bytes.len() < cap && lines < line_limit {
         let available = reader.fill_buf()?;
         if available.is_empty() {
             break;
@@ -2662,7 +2699,7 @@ fn read_distill_stream(reader: impl Read) -> std::io::Result<(Vec<u8>, bool)> {
         for (i, byte) in available.iter().enumerate() {
             if *byte == b'\n' {
                 lines += 1;
-                if lines == DISTILL_LINE_LIMIT {
+                if lines == line_limit {
                     end = i + 1;
                     break;
                 }
@@ -2671,7 +2708,7 @@ fn read_distill_stream(reader: impl Read) -> std::io::Result<(Vec<u8>, bool)> {
         bytes.extend_from_slice(&available[..end]);
         reader.consume(end);
     }
-    let limited = bytes.len() == DISTILL_SESSION_CAP || lines == DISTILL_LINE_LIMIT;
+    let limited = bytes.len() == cap || lines == line_limit;
     // A byte limit can split a JSON record or UTF-8 scalar. Keep complete lines.
     if limited && bytes.last() != Some(&b'\n') {
         let end = bytes.iter().rposition(|b| *b == b'\n').map_or(0, |i| i + 1);
@@ -2692,6 +2729,16 @@ fn read_distill_session(source: &Path) -> anyhow::Result<(Vec<u8>, bool)> {
         .map(|bytes| (bytes, false))
         .ok_or_else(|| anyhow::anyhow!("session unreadable or over limit: unknown"));
     }
+    read_zstd_session(source, DISTILL_SESSION_CAP, DISTILL_LINE_LIMIT, None)
+}
+
+fn read_zstd_session(
+    source: &Path,
+    cap: usize,
+    line_limit: usize,
+    deadline: Option<Instant>,
+) -> anyhow::Result<(Vec<u8>, bool)> {
+    anyhow::ensure!(!expired(deadline), "session deadline exceeded");
     anyhow::ensure!(
         std::fs::metadata(source)?.is_file(),
         "session must be a regular file"
@@ -2699,6 +2746,7 @@ fn read_distill_session(source: &Path) -> anyhow::Result<(Vec<u8>, bool)> {
     let mut child = std::process::Command::new("zstd")
         .args(["-dc", "--"])
         .arg(source)
+        .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null())
         .spawn()
@@ -2709,13 +2757,42 @@ fn read_distill_session(source: &Path) -> anyhow::Result<(Vec<u8>, bool)> {
                 error.into()
             }
         })?;
-    let result = read_distill_stream(child.stdout.take().expect("piped zstd stdout"));
+    // Drain concurrently so a stalled decompressor cannot block the hook.
+    let stdout = child.stdout.take().expect("piped zstd stdout");
+    let (sender, receiver) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = sender.send(read_session_stream(stdout, cap, line_limit));
+    });
+    let result = match deadline {
+        Some(limit) => receiver
+            .recv_timeout(limit.saturating_duration_since(Instant::now()))
+            .map_err(anyhow::Error::from),
+        None => receiver.recv().map_err(anyhow::Error::from),
+    }
+    .and_then(|result| result.map_err(anyhow::Error::from));
     // Stop decompression at either limit or on read failure, then reap the child.
     if result.as_ref().map_or(true, |(_, limited)| *limited) {
         let _ = child.kill();
     }
-    let status = child.wait()?;
+    let status = if let Some(limit) = deadline {
+        loop {
+            match child.try_wait() {
+                Ok(Some(status)) => break status,
+                Ok(None) if Instant::now() < limit => {
+                    std::thread::sleep(std::time::Duration::from_millis(2));
+                }
+                _ => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    anyhow::bail!("session deadline exceeded or zstd wait failed");
+                }
+            }
+        }
+    } else {
+        child.wait()?
+    };
     let (bytes, limited) = result?;
+    anyhow::ensure!(!expired(deadline), "session deadline exceeded");
     anyhow::ensure!(
         limited || status.success(),
         "zstd session decompression failed"
@@ -3071,8 +3148,19 @@ mod v3_tests {
         }
 
         fn run(&self, action: &str, json: bool, prompt: &str) -> std::process::Output {
+            self.run_with_path(action, json, prompt, None)
+        }
+
+        fn run_with_path(
+            &self,
+            action: &str,
+            json: bool,
+            prompt: &str,
+            path: Option<&Path>,
+        ) -> std::process::Output {
             // Isolate cwd and DSH_HOME from all concurrently running unit tests.
-            let mut child = std::process::Command::new(std::env::current_exe().unwrap())
+            let mut command = std::process::Command::new(std::env::current_exe().unwrap());
+            command
                 .args([
                     "--quiet",
                     "--exact",
@@ -3086,9 +3174,11 @@ mod v3_tests {
                 .env("RDSH_CONTEXT_TEST_JSON", json.to_string())
                 .stdin(std::process::Stdio::piped())
                 .stdout(std::process::Stdio::piped())
-                .stderr(std::process::Stdio::piped())
-                .spawn()
-                .unwrap();
+                .stderr(std::process::Stdio::piped());
+            if let Some(path) = path {
+                command.env("PATH", path);
+            }
+            let mut child = command.spawn().unwrap();
             let payload = serde_json::json!({"cwd": self.root, "prompt": prompt});
             child
                 .stdin
@@ -3122,15 +3212,143 @@ mod v3_tests {
         };
         match action.as_str() {
             "build-index" => crate::deps::cmd_build(None, false, true).unwrap(),
-            "inject" => cmd_inject(
+            "status" => {
+                cmd_status(std::env::var("RDSH_CONTEXT_TEST_JSON").unwrap() == "true").unwrap()
+            }
+            "explain" => cmd_explain(None, None).unwrap(),
+            "inject" | "inject-sessions" => cmd_inject(
                 "user-prompt-submit",
                 None,
-                Some(0),
+                Some(if action == "inject-sessions" { 2 } else { 0 }),
                 std::env::var("RDSH_CONTEXT_TEST_JSON").unwrap() == "true",
             )
             .unwrap(),
             _ => panic!("unknown hook test action"),
         }
+    }
+
+    #[test]
+    fn status_and_explain_report_disabled_dependency_graph() {
+        let fixture = HookFixture::new();
+        std::fs::write(
+            fixture.home.join("rdsh.json"),
+            serde_json::json!({"features": {"dep_graph": false}, "context": {
+                "enable_retriever": false, "include_git_diff": false
+            }})
+            .to_string(),
+        )
+        .unwrap();
+        let output = fixture.run("status", true, "");
+        let text = std::str::from_utf8(&output.stdout).unwrap();
+        let value: serde_json::Value =
+            serde_json::from_str(&text[text.find('{').unwrap()..=text.rfind('}').unwrap()])
+                .unwrap();
+        assert_eq!(value["dependency_graph"]["enabled"], false);
+        assert_eq!(value["deps"]["summary"], "");
+        assert_eq!(value["deps"]["index_present"], false);
+        assert!(!fixture.home.join("rdsh-index").exists());
+        let output = fixture.run("status", false, "");
+        assert!(std::str::from_utf8(&output.stdout)
+            .unwrap()
+            .contains("dependency_graph: disabled via features.dep_graph"));
+        let output = fixture.run("explain", false, "");
+        assert!(std::str::from_utf8(&output.stdout)
+            .unwrap()
+            .contains("- dependencies: disabled via features.dep_graph"));
+    }
+
+    fn session_hook_context(output: &std::process::Output) -> String {
+        let value = std::str::from_utf8(&output.stdout)
+            .unwrap()
+            .lines()
+            .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+            .find(|value| value.get("hookSpecificOutput").is_some())
+            .unwrap();
+        value["hookSpecificOutput"]["additionalContext"]
+            .as_str()
+            .unwrap()
+            .to_string()
+    }
+
+    #[test]
+    fn injection_inherits_zstd_user_speech_and_skips_failed_sessions() {
+        let fixture = HookFixture::new();
+        let sessions = fixture.home.join("sessions/project/valid");
+        std::fs::create_dir_all(&sessions).unwrap();
+        let compressed = sessions.join("session.jsonl.zstd");
+        let transcript = format!(
+            "{}\n{}\n",
+            serde_json::json!({
+                "cwd": fixture.root, "type": "user/message", "data": {"content": [
+                    {"type": "text", "text": "engine_score inherited user speech"}
+                ]}
+            }),
+            serde_json::json!({"role": "assistant", "content": "engine_score ignored assistant speech"})
+        );
+        if !write_zstd_session(&compressed, &transcript) {
+            return;
+        }
+        let broken = fixture.home.join("sessions/project/broken");
+        std::fs::create_dir_all(&broken).unwrap();
+        std::fs::write(broken.join("session.jsonl.zstd"), "invalid zstd").unwrap();
+        let output = fixture.run("inject-sessions", false, "engine_score");
+        let context = session_hook_context(&output);
+        assert!(context.contains("[session]"));
+        assert!(context.contains("engine_score inherited user speech"));
+        assert!(!context.contains("ignored assistant speech"));
+
+        let missing = fixture.run_with_path(
+            "inject-sessions",
+            false,
+            "engine_score",
+            Some(Path::new("")),
+        );
+        let context = session_hook_context(&missing);
+        assert!(context.contains("keep the configured goal"));
+        assert!(!context.contains("[session]"));
+    }
+
+    #[test]
+    fn inherited_zstd_output_is_bounded_and_expired_reads_are_skipped() {
+        let temporary = TempDir::new();
+        let compressed = temporary.0.join("session.jsonl.zstd");
+        if !write_zstd_session(&compressed, &"\n".repeat(256 * 1024 + 1)) {
+            return;
+        }
+        let deadline = Some(Instant::now() + std::time::Duration::from_secs(10));
+        assert!(read_inherited_session(&compressed, &temporary.0, deadline).is_none());
+        assert!(read_inherited_session(&compressed, &temporary.0, Some(Instant::now())).is_none());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn stalled_zstd_does_not_block_injection_past_deadline() {
+        use std::os::unix::fs::PermissionsExt;
+        let fixture = HookFixture::new();
+        let sessions = fixture.home.join("sessions/project/session");
+        std::fs::create_dir_all(&sessions).unwrap();
+        std::fs::write(sessions.join("session.jsonl.zstd"), "placeholder").unwrap();
+        let bin = fixture.home.join("bin");
+        std::fs::create_dir(&bin).unwrap();
+        let zstd = bin.join("zstd");
+        std::fs::write(&zstd, "#!/bin/sh\nexec /bin/sleep 5\n").unwrap();
+        std::fs::set_permissions(zstd, std::fs::Permissions::from_mode(0o700)).unwrap();
+        std::fs::write(
+            fixture.home.join("rdsh.json"),
+            serde_json::json!({
+                "beta": {"context_engine": true}, "features": {"dep_graph": false},
+                "context": {"goal": "keep the configured goal", "enable_retriever": false,
+                    "include_git_diff": false, "inject_deadline_ms": 100}
+            })
+            .to_string(),
+        )
+        .unwrap();
+        let start = Instant::now();
+        let output = fixture.run_with_path("inject-sessions", false, "", Some(&bin));
+        assert!(start.elapsed() < std::time::Duration::from_secs(2));
+        let context = session_hook_context(&output);
+        assert!(context.contains("keep the configured goal"));
+        assert!(!context.contains("[session]"));
     }
 
     #[test]
@@ -3506,7 +3724,8 @@ mod v3_tests {
         let prefix = "\n".repeat(DISTILL_LINE_LIMIT);
         let suffix = "{\"role\":\"user\",\"content\":\"TODO outside limit\"}";
         let reader = std::io::Cursor::new(prefix.as_bytes()).chain(suffix.as_bytes());
-        let (bytes, limited) = read_distill_stream(reader).unwrap();
+        let (bytes, limited) =
+            read_session_stream(reader, DISTILL_SESSION_CAP, DISTILL_LINE_LIMIT).unwrap();
         assert!(limited);
         assert_eq!(bytes, prefix.as_bytes());
         assert!(distill_candidates(std::str::from_utf8(&bytes).unwrap()).is_empty());
@@ -3516,7 +3735,8 @@ mod v3_tests {
     fn distill_stream_stops_at_byte_limit_and_drops_partial_record() {
         let prefix = b"{\"role\":\"user\",\"content\":\"TODO within limit\"}\n";
         let reader = std::io::Cursor::new(prefix).chain(std::io::repeat(0xff));
-        let (bytes, limited) = read_distill_stream(reader).unwrap();
+        let (bytes, limited) =
+            read_session_stream(reader, DISTILL_SESSION_CAP, DISTILL_LINE_LIMIT).unwrap();
         assert!(limited);
         assert_eq!(bytes, prefix);
         assert_eq!(

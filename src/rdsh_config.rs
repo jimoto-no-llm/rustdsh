@@ -539,14 +539,41 @@ pub fn try_load() -> anyhow::Result<RdshSettings> {
     try_load_at(&path)
 }
 
-fn try_load_at(path: &str) -> anyhow::Result<RdshSettings> {
-    let raw: Option<String> = match std::fs::read_to_string(path) {
-        Ok(raw) => Some(raw),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
-        Err(e) => {
-            return Err(anyhow::anyhow!("cannot read settings file at {path}: {e}"));
-        }
+/// Settings documents are small. The cap and the regular-file check keep a FIFO
+/// or a runaway file from stalling a reader — `context inject` loads settings on
+/// the hook path, where a blocked read would hold up a prompt.
+const SETTINGS_MAX_BYTES: u64 = 4 * 1024 * 1024;
+
+/// Read a settings document under the size cap, or `None` when it is absent.
+pub(crate) fn read_small_config(path: &str) -> anyhow::Result<Option<String>> {
+    use std::io::Read;
+    // `metadata` follows symlinks on purpose: a symlinked settings file is a
+    // normal dotfiles setup, a FIFO or a device is not a settings file.
+    let meta = match std::fs::metadata(path) {
+        Ok(meta) => meta,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(anyhow::anyhow!("cannot read settings file at {path}: {e}")),
     };
+    if !meta.is_file() {
+        anyhow::bail!("settings file at {path} is not a regular file");
+    }
+    if meta.len() > SETTINGS_MAX_BYTES {
+        anyhow::bail!(
+            "settings file at {path} is {} bytes (limit {SETTINGS_MAX_BYTES})",
+            meta.len()
+        );
+    }
+    let file = std::fs::File::open(path)
+        .map_err(|e| anyhow::anyhow!("cannot read settings file at {path}: {e}"))?;
+    let mut raw = String::new();
+    file.take(SETTINGS_MAX_BYTES)
+        .read_to_string(&mut raw)
+        .map_err(|e| anyhow::anyhow!("cannot read settings file at {path}: {e}"))?;
+    Ok(Some(raw))
+}
+
+fn try_load_at(path: &str) -> anyhow::Result<RdshSettings> {
+    let raw: Option<String> = read_small_config(path)?;
     // Missing file: defaults + legacy complement without a failed JSON parse.
     // Same result as before (Null branch), one error allocation saved.
     let Some(raw) = raw else {
@@ -1172,7 +1199,10 @@ fn complement_from_legacy(cfg: &mut RdshSettings, has_context: bool) {
     if has_context {
         return;
     }
-    let raw = std::fs::read_to_string(legacy_context_path()).unwrap_or_default();
+    let raw = read_small_config(&legacy_context_path())
+        .ok()
+        .flatten()
+        .unwrap_or_default();
     if raw.trim().is_empty() {
         return;
     }

@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import test from "node:test";
 
 const DEFAULT_PROTOCOL =
@@ -28,7 +28,9 @@ const protocol = protocolPath();
 const mod = protocol ? await import(protocol) : undefined;
 
 test("inject output decodes as a UserPromptSubmit context hook", { skip: !mod && "hook protocol package not installed" }, () => {
-  const bin = process.env.BIN ?? "./target/debug/rdsh";
+  // Resolve before spawning: the run below uses the sandbox as its cwd, so a
+  // relative BIN would fail with ENOENT.
+  const bin = resolve(process.env.BIN ?? "./target/debug/rdsh");
   const sandbox = mkdtempSync(join(tmpdir(), "rdsh-inject-codec-"));
   try {
     const home = join(sandbox, "dsh");

@@ -43,9 +43,10 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 - `rdsh context inject` runs as a DSH `UserPromptSubmit` hook and attaches the
   turn context (goal, constraints, decisions, working set, git state, retrieved
-  code, memory) through `hookSpecificOutput.additionalContext`. It is fail-open:
-  a corrupt settings file, a damaged index, or a deadline overrun produces
-  silence and exit 0 instead of blocking the prompt.
+  code, memory) through `hookSpecificOutput.additionalContext`. It is fail-open
+  and always exits 0: an unreadable settings document or an unparseable payload
+  inject nothing, while a damaged index or a deadline overrun drops only what
+  depends on them and still injects goal, constraints, and memory.
 - `rdsh context hook install|status|remove` merges that hook into a DSH
   `hooks.json` idempotently, keeps unrelated hooks untouched, and keeps a backup
   beside the first file it rewrites.
