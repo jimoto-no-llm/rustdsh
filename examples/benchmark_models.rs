@@ -1029,7 +1029,7 @@ mod tests {
             digest,
             "fc078d53d4da3d94215b1f6b4d1c4e82783adb305fc02c53611d3281b1b36a0b"
         );
-        assert_ne!(digest, fingerprint(&path).unwrap());
+        assert_ne!(digest, fingerprint_bytes(&fs::read(&path).unwrap()));
         fs::remove_file(path).unwrap();
     }
 
