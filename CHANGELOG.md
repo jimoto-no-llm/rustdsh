@@ -21,7 +21,9 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   listed in `docs/AGENT-RUNNERS.md`. Every job end, and `cancel`, stops the
   agent's process group with TERM, a grace period and KILL, and records
   whether the stop was confirmed (`cleanup`); `cancel` also acts on jobs whose
-  supervisor was lost or that finished with leftover processes.
+  supervisor was lost or that finished with leftover processes, but only after
+  proving the recorded group number still belongs to the job (a confirmed job
+  is a no-op; macOS cannot stop a group after its supervisor is lost).
 
 ## [0.3.3] - 2026-10-13
 

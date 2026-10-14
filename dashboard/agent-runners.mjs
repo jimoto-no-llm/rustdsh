@@ -6,6 +6,11 @@ import { spawn, execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { stateHome, writeJson } from "./state.mjs";
+import {
+  readProcessIdentity,
+  matchProcessIdentity,
+  validProcessIdentity,
+} from "./process-identity.mjs";
 
 // External agent runners (cursor-agent, devin). Separate from the DSH ACP
 // adapter: each job is one non-interactive CLI run, supervised by a detached
@@ -234,46 +239,71 @@ export function parseProcStat(text) {
     .split(/\s+/);
   const pgrp = Number(fields[2]);
   if (!fields[0] || !Number.isInteger(pgrp)) return null;
-  return { state: fields[0], ppid: Number(fields[1]), pgrp };
+  return {
+    state: fields[0],
+    ppid: Number(fields[1]),
+    pgrp,
+    starttime: fields[19] ?? null, // field 22 of /proc/PID/stat
+  };
 }
-// True when some non-zombie process is in the group. Zombies cannot run
-// anything; a container without a reaping PID 1 keeps them in the group
-// forever, so kill(-pgid, 0) alone would report such a group as alive.
-// `undefined` means /proc is not available.
-export function procGroupHasLiveMember(pgid, procDir = "/proc") {
+// Scans /proc for the live (non-zombie) members of a group. Zombies cannot
+// run anything; a container without a reaping PID 1 keeps them in the group
+// forever, so kill(-pgid, 0) alone would report such a group as alive. Only
+// ENOENT/ESRCH (the process vanished) counts as "gone"; any other read error
+// or unparsable content sets `unknown`, because it hides a possible member.
+// `available: false` means /proc itself is not readable.
+export function scanProcGroup(pgid, procDir = "/proc") {
   let names;
   try {
     names = readdirSync(procDir);
   } catch {
-    return undefined;
+    return { available: false, live: [], unknown: false };
   }
+  const live = [];
+  let unknown = false;
   for (const name of names) {
     if (!/^[0-9]+$/.test(name)) continue;
-    let stat;
+    let text;
     try {
-      stat = parseProcStat(readFileSync(path.join(procDir, name, "stat"), "utf8"));
-    } catch {
-      continue; // exited while scanning
+      text = readFileSync(path.join(procDir, name, "stat"), "utf8");
+    } catch (error) {
+      if (error.code !== "ENOENT" && error.code !== "ESRCH") unknown = true;
+      continue;
     }
-    if (stat && stat.pgrp === pgid && stat.state !== "Z" && stat.state !== "X")
-      return true;
+    const stat = parseProcStat(text);
+    if (!stat) {
+      unknown = true;
+      continue;
+    }
+    if (stat.pgrp === pgid && stat.state !== "Z" && stat.state !== "X")
+      live.push({ pid: Number(name), starttime: stat.starttime });
   }
-  return false;
+  return { available: true, live, unknown };
+}
+// true: a live member exists. false: none. "unknown": none seen but some
+// /proc entry could not be read. undefined: /proc is not available.
+export function procGroupHasLiveMember(pgid, procDir = "/proc") {
+  const scan = scanProcGroup(pgid, procDir);
+  if (!scan.available) return undefined;
+  if (scan.live.length) return true;
+  return scan.unknown ? "unknown" : false;
 }
 // macOS and other systems without /proc fall back to kill(-pgid, 0); there
 // launchd normally reaps orphans, so zombie-only groups are short lived.
-export function groupAlive(pgid) {
+export function groupAlive(pgid, procDir) {
   if (process.platform === "win32") return alive(pgid);
   if (!Number.isInteger(pgid) || pgid < 2) return false;
-  if (process.platform === "linux") {
-    const live = procGroupHasLiveMember(pgid);
-    if (live !== undefined) return live;
+  if (process.platform === "linux" || procDir !== undefined) {
+    const live = procGroupHasLiveMember(pgid, procDir);
+    if (live === true || live === false) return live;
+    // "unknown" (unreadable /proc entry) and undefined (no /proc) fall back to
+    // kill(-pgid, 0); only ESRCH establishes that the group is absent.
   }
   try {
     process.kill(-pgid, 0);
     return true;
   } catch (error) {
-    return error.code === "EPERM";
+    return error.code !== "ESRCH";
   }
 }
 function signalGroup(pgid, signal) {
@@ -300,6 +330,44 @@ export async function terminateGroup(pgid, { termMs = 2000, killMs = 3000 } = {}
     if (!groupAlive(pgid)) return "confirmed";
   }
   return groupAlive(pgid) ? "unconfirmed" : "confirmed";
+}
+
+// Decides whether a recorded group number still belongs to the job, for
+// signals sent from outside the supervisor's own child handle. "owned" only
+// when the recorded leader identity matches, or (Linux) the leader is gone and
+// every live member provably started after it in the same boot/namespace. A
+// number alone never counts: it may have been reused by an unrelated group.
+export async function establishOwnership(
+  pgid,
+  identity,
+  { procDir = "/proc", platform = process.platform, read = readProcessIdentity } = {},
+) {
+  if (!validProcessIdentity(identity) || !Number.isInteger(pgid) || pgid < 2)
+    return "unknown";
+  const verdict = matchProcessIdentity(identity, await read(pgid));
+  if (verdict === "alive") return "owned";
+  if (verdict === "pid_reused") return "pid_reused";
+  if (verdict !== "gone" || platform !== "linux" || identity.platform !== "linux")
+    return "unknown";
+  // Linux never hands out a PID that is still in use as a PGID, so while the
+  // group is non-empty its number was not recycled; scope and start times
+  // guard against a reboot or another PID namespace.
+  const scan = scanProcGroup(pgid, procDir);
+  if (!scan.available || scan.unknown || !scan.live.length) return "unknown";
+  let birth;
+  try {
+    birth = BigInt(identity.birth);
+  } catch {
+    return "unknown";
+  }
+  for (const member of scan.live) {
+    if (!/^[0-9]+$/.test(String(member.starttime))) return "unknown";
+    if (BigInt(member.starttime) < birth) return "unknown";
+  }
+  const current = await read(scan.live[0].pid);
+  if (current?.status !== "observed" || current.identity?.scope !== identity.scope)
+    return "unknown";
+  return "owned";
 }
 
 async function resolveExecutable(runner, explicit) {
@@ -533,8 +601,14 @@ export async function status(id) {
     // "confirmed": the agent's process group was verified gone when the job
     // ended. "unconfirmed": it was not; cancel can still act on it.
     cleanup: final ? (final.cleanup ?? null) : null,
-    agent_group_alive:
-      final && job.agent_pgid ? Boolean(groupAlive(job.agent_pgid)) : null,
+    // Why a stop could not be confirmed: "pgid_reused" or "ownership_unknown".
+    cleanup_code: final?.cleanup_code ?? null,
+    // A confirmed job is not probed again: its number may have been reused.
+    agent_group_alive: !final || !job.agent_pgid
+      ? null
+      : final.cleanup === "confirmed"
+        ? false
+        : Boolean(groupAlive(job.agent_pgid)),
   };
 }
 async function recordLost(directory) {
@@ -567,57 +641,70 @@ export async function result(id) {
   };
 }
 
-// Acts on any job whose recorded agent group is still alive, whatever the
-// job state (running, supervisor_lost, succeeded with leftover descendants),
-// and returns only once the group is confirmed gone.
+// Stops the agent's group from outside the supervisor. A running job is
+// cancelled through its supervisor (it holds the child handle); a signal is
+// sent by number only after the group's ownership is established. A terminal
+// job with a confirmed stop is a no-op and is not even probed.
 export async function cancel(id, { termMs = 5000, killMs = 5000 } = {}) {
   const { directory } = await load(id);
   const initial = await status(id);
   const first = await load(id);
   const running = ["queued", "running"].includes(initial.state);
+  if (!running && first.result?.cleanup === "confirmed") return initial;
   if (!running && !(first.job.agent_pgid && groupAlive(first.job.agent_pgid)))
     return initial;
-  if (running) await fs.writeFile(path.join(directory, "cancel"), "", { mode: 0o600 });
-  const started = Date.now();
-  let termSent = false,
-    killSent = false;
-  while (Date.now() - started < termMs + killMs + 3000) {
-    const { job, result: stored } = await load(id);
-    const pgid = job.agent_pgid;
-    const live = Boolean(pgid) && groupAlive(pgid);
-    if (stored && !live) break;
-    if (live) {
-      const elapsed = Date.now() - started;
-      if (!termSent) {
-        signalGroup(pgid, "SIGTERM");
-        termSent = true;
-      } else if (elapsed >= termMs && !killSent) {
-        signalGroup(pgid, "SIGKILL");
-        killSent = true;
-      }
-    } else if (!stored && job.supervisor_pid && !alive(job.supervisor_pid)) {
-      await writeResult(directory, {
-        state: "cancelled",
-        code: "cancelled",
-        exit_code: null,
-        signal: null,
-        finished_at: new Date().toISOString(),
-        parsed: null,
-        cleanup: "confirmed",
-      });
-      break;
+  const deadline = Date.now() + termMs + killMs + 3000;
+  if (running) {
+    await fs.writeFile(path.join(directory, "cancel"), "", { mode: 0o600 });
+    // The supervisor stops the group itself; a lost one is recorded by status.
+    while ((await load(id)).result === null && Date.now() < deadline) {
+      await status(id);
+      await pause(50);
     }
-    await pause(50);
   }
-  const { job, result: stored } = await load(id);
-  if (!stored || (job.agent_pgid && groupAlive(job.agent_pgid)))
-    throw new RunnerError("cancel_unconfirmed");
-  if (stored.cleanup !== "confirmed" || stored.code === "supervisor_lost") {
+  let { job, result: stored } = await load(id);
+  if (!stored) throw new RunnerError("cancel_unconfirmed");
+  const lost = stored.code === "supervisor_lost";
+  const settle = async (extra) => {
+    const next = { ...stored, ...extra };
+    if (next.cleanup === "confirmed") delete next.cleanup_code;
+    await writeResult(directory, next);
+  };
+  if (job.agent_pgid && groupAlive(job.agent_pgid)) {
+    let verdict = "stuck";
+    for (const [signal, limit] of [
+      ["SIGTERM", termMs],
+      ["SIGKILL", killMs],
+    ]) {
+      if (!groupAlive(job.agent_pgid)) {
+        verdict = "stopped";
+        break;
+      }
+      const owner = await establishOwnership(job.agent_pgid, job.agent_identity);
+      if (owner !== "owned") {
+        verdict = owner;
+        break;
+      }
+      signalGroup(job.agent_pgid, signal);
+      const until = Date.now() + limit;
+      while (Date.now() < until && groupAlive(job.agent_pgid)) await pause(25);
+    }
+    if (verdict === "stuck" && !groupAlive(job.agent_pgid)) verdict = "stopped";
+    if (verdict === "pid_reused") {
+      // The number now names someone else's group; the job lost its handle.
+      await settle({ cleanup: "unconfirmed", cleanup_code: "pgid_reused" });
+      return status(id);
+    }
+    if (verdict === "unknown") {
+      await settle({ cleanup: "unconfirmed", cleanup_code: "ownership_unknown" });
+      throw new RunnerError("cancel_unconfirmed");
+    }
+    if (verdict === "stuck") throw new RunnerError("cancel_unconfirmed");
+  }
+  if (stored.cleanup !== "confirmed" || lost) {
     // The group is now verified gone. A job whose supervisor was lost never
     // reported an outcome, so the cancel is its outcome; other results stay.
-    const lost = stored.code === "supervisor_lost";
-    await writeResult(directory, {
-      ...stored,
+    await settle({
       ...(lost ? { state: "cancelled", code: "cancelled" } : {}),
       cleanup: "confirmed",
     });
@@ -790,14 +877,30 @@ async function supervise(directory) {
   child.stderr.on("data", (chunk) => err.write(chunk));
   job.agent_pid = child.pid;
   job.agent_pgid = child.pid;
+  job.agent_identity = null;
   await writeJson(jobFile, job);
+  // Lets cancel later prove the number still names this job's group.
+  job.agent_identity = (await readProcessIdentity(child.pid)).identity ?? null;
+  if (job.agent_identity) await writeJson(jobFile, job);
   // A cancel that arrived while the agent started.
   if (await exists(cancelFile)) signalGroup(job.agent_pgid, "SIGTERM");
+  // cancel() only writes the cancel file; this supervisor holds the child
+  // handle, so it is the one that stops the group.
+  let exitedAlready = false;
+  let cancelling = null;
+  const watcher = setInterval(async () => {
+    if (exitedAlready || cancelling || !(await exists(cancelFile))) return;
+    if (exitedAlready) return; // the child exited while the file was checked
+    cancelling = terminateGroup(job.agent_pgid);
+  }, 100);
   const forward = () => signalGroup(job.agent_pgid, "SIGTERM");
   process.on("SIGTERM", forward);
   process.on("SIGINT", forward);
 
   const exit = await exited;
+  exitedAlready = true;
+  clearInterval(watcher);
+  await cancelling;
   // Pipes held open by descendants must not stall the job.
   await Promise.race([
     Promise.all(closed),

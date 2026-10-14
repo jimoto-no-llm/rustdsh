@@ -163,17 +163,57 @@ is not a clean end; the leftover processes can still be stopped with `cancel`.
 
 On Linux a group counts as alive only if some member in `/proc/<pid>/stat` is
 not a zombie, so zombies that a container without a reaping PID 1 keeps around
-do not block a stop. Elsewhere (macOS) the check is `kill(-pgid, 0)`;
-launchd normally reaps orphans there. On Windows only the leader PID is
-checked and the tree is stopped with `taskkill /T /F`.
+do not block a stop. Only `ENOENT`/`ESRCH` (the process vanished) counts as
+gone while scanning; `EACCES`, other I/O errors and unparsable content make
+the answer "unknown", and unknown is treated as possibly alive: the check
+falls back to `kill(-pgid, 0)` and only `ESRCH` there proves absence. An
+unreadable `/proc` therefore ends as `cleanup: unconfirmed`, never as a
+confirmed stop. Elsewhere (macOS) the check is `kill(-pgid, 0)`; launchd
+normally reaps orphans there. On Windows only the leader PID is checked and
+the tree is stopped with `taskkill /T /F`.
 
-`cancel` acts on any job whose recorded `agent_pgid` is still alive, whatever
-its state: running, `supervisor_lost`, or finished with leftover descendants.
-It does not return until the group is gone, otherwise it fails with
-`cancel_unconfirmed`. A running job ends as `cancelled`; a `supervisor_lost`
-job (which never reported an outcome) also becomes `cancelled`; a job that had
-already succeeded or failed keeps that state and gets `cleanup: confirmed`. A
-descendant that left the group (for example with `setsid`) is not reached.
+### Cancel and ownership of the group number
+
+A process group number is only a number: once the group is gone it can be
+reused by an unrelated group (or after a reboot). The supervisor therefore
+records `agent_identity` (the leader's `process-identity` record: start time
+and boot/namespace scope; `null` where unavailable, such as macOS) in
+`job.json`, and `cancel` follows these rules:
+
+- A terminal job whose result has `cleanup: confirmed` is a pure no-op:
+  no signal, and the number is not even probed (`agent_group_alive` is
+  reported as `false`).
+- A running job is cancelled through its supervisor. `cancel` writes the
+  `cancel` file and the supervisor, which holds the child handle, stops the
+  group and writes the result. This works on every platform, including macOS.
+- Anything sent by number from outside the supervisor (`supervisor_lost`, or
+  leftover processes of a finished job) first needs ownership:
+  - leader identity matches: owned, the group is stopped (TERM, then KILL);
+  - identity belongs to another incarnation (`pid_reused`): nothing is sent;
+    the result becomes `cleanup: unconfirmed` with `cleanup_code: pgid_reused`
+    and `cancel` returns that state;
+  - leader gone (Linux only): the remaining members are still the job's only
+    if they are readable, run in the same boot/PID-namespace scope, and every
+    live member started at or after the recorded leader (Linux does not give
+    out a PID that is still in use as a group ID, so a non-empty group has not
+    been recycled);
+  - anything else, including no recorded identity or no identity support: nothing
+    is sent; the result gets `cleanup: unconfirmed` with
+    `cleanup_code: ownership_unknown` and `cancel` fails with
+    `cancel_unconfirmed`.
+
+macOS limitation: no process identity is available there, so after the
+supervisor is lost (for example killed) its agent group can no longer be
+stopped by `cancel`. `status` shows `supervisor_lost` with
+`cleanup_code: ownership_unknown` and the group has to be stopped by hand.
+While the supervisor lives, cancel works normally.
+
+When ownership holds and the group is gone, `cancel` returns only then,
+otherwise it fails with `cancel_unconfirmed`. A running job ends as
+`cancelled`; a `supervisor_lost` job (which never reported an outcome) also
+becomes `cancelled`; a job that had already succeeded or failed keeps that
+state and gets `cleanup: confirmed`. A descendant that left the group (for
+example with `setsid`) is not reached.
 
 ## Security notes
 

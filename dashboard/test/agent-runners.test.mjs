@@ -4,13 +4,15 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import {
   parseProcStat,
   procGroupHasLiveMember,
   terminateGroup,
   groupAlive,
+  scanProcGroup,
+  establishOwnership,
   submit,
   status,
   result,
@@ -20,6 +22,7 @@ import {
   runnerCatalog,
   sanitizeText,
 } from "../agent-runners.mjs";
+import { readProcessIdentity } from "../process-identity.mjs";
 
 const exec = promisify(execFile);
 const cli = fileURLToPath(new URL("../cli.mjs", import.meta.url));
@@ -390,6 +393,7 @@ test("a dead supervisor without a result is reported as supervisor_lost", async 
   assert.equal(info.code, "supervisor_lost");
 });
 
+const identityPlatform = ["linux", "win32"].includes(process.platform);
 const posixOnly = { skip: process.platform === "win32" && "process groups are POSIX only" };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function waitForFile(file) {
@@ -445,6 +449,16 @@ test("cancel after supervisor_lost kills the still-running agent group", posixOn
   assert.equal(lost.cleanup, "unconfirmed");
   assert.equal(lost.agent_group_alive, true);
   assert.ok(groupAlive(agent_pgid));
+  if (!identityPlatform) {
+    // No process identity here (macOS): a group is never signalled by number.
+    t.after(() => { try { process.kill(-agent_pgid, "SIGKILL"); } catch {} });
+    await assert.rejects(cancel(job.id, { termMs: 300, killMs: 300 }), { code: "cancel_unconfirmed" });
+    assert.ok(groupAlive(agent_pgid), "no signal was sent");
+    const after = await status(job.id);
+    assert.equal(after.cleanup, "unconfirmed");
+    assert.equal(after.cleanup_code, "ownership_unknown");
+    return;
+  }
   const info = await cancel(job.id, { termMs: 3000, killMs: 3000 });
   assert.equal(info.state, "cancelled");
   assert.equal(info.cleanup, "confirmed");
@@ -466,14 +480,22 @@ test("cancel acts on leftover processes of an already finished job", posixOnly, 
   const dir = path.join(process.env.RDSH_DASHBOARD_HOME, "agent-jobs", id);
   await fs.mkdir(dir, { recursive: true, mode: 0o700 });
   const now = new Date().toISOString();
+  const agent_identity = (await readProcessIdentity(leftover.pid)).identity;
   await fs.writeFile(path.join(dir, "job.json"), JSON.stringify({
     id, runner: "devin", project: f.project, permission: "read-only", created_at: now,
-    started_at: now, supervisor_pid: 1, agent_pid: leftover.pid, agent_pgid: leftover.pid, state: "succeeded",
+    started_at: now, supervisor_pid: 1, agent_pid: leftover.pid, agent_pgid: leftover.pid,
+    agent_identity, state: "succeeded",
   }));
   await fs.writeFile(path.join(dir, "result.json"), JSON.stringify({
     state: "succeeded", code: null, finished_at: now, parsed: null, cleanup: "unconfirmed",
   }));
   assert.equal((await status(id)).agent_group_alive, true);
+  if (!agent_identity) {
+    await assert.rejects(cancel(id, { termMs: 300, killMs: 300 }), { code: "cancel_unconfirmed" });
+    assert.ok(groupAlive(leftover.pid), "no signal without ownership");
+    assert.equal((await status(id)).cleanup_code, "ownership_unknown");
+    return;
+  }
   const info = await cancel(id, { termMs: 500, killMs: 3000 });
   assert.equal(info.state, "succeeded"); // the recorded outcome is kept
   assert.equal(info.cleanup, "confirmed");
@@ -487,7 +509,7 @@ test("terminateGroup treats a missing group as confirmed", async () => {
 });
 
 test("/proc parser: zombie-only groups are not alive, comm may contain parentheses", async (t) => {
-  assert.deepEqual(parseProcStat("12 (a) b (c) S 1 50 50 0"), { state: "S", ppid: 1, pgrp: 50 });
+  assert.deepEqual(parseProcStat("12 (a) b (c) S 1 50 50 0"), { state: "S", ppid: 1, pgrp: 50, starttime: null });
   assert.equal(parseProcStat("garbage"), null);
   const proc = await fs.mkdtemp(path.join(root, "proc-"));
   t.after(() => fs.rm(proc, { recursive: true, force: true }));
@@ -616,4 +638,143 @@ test("CLI end-to-end with fake agents", async (t) => {
   await assert.rejects(node("submit", "--agent", "gemini", "--project", f.project, "--prompt-file", promptFile), (e) => /invalid_runner/.test(e.stderr));
   await assert.rejects(node("frobnicate"), (e) => /Invalid agents action/.test(e.stderr));
   await assert.rejects(node("submit", "--agent", "devin"), (e) => /requires --agent/.test(e.stderr));
+});
+
+// --- ownership of a recorded process group number -------------------------
+
+async function writeJob(id, job, resultValue) {
+  const dir = path.join(process.env.RDSH_DASHBOARD_HOME, "agent-jobs", id);
+  await fs.mkdir(dir, { recursive: true, mode: 0o700 });
+  const now = new Date().toISOString();
+  await fs.writeFile(path.join(dir, "job.json"), JSON.stringify({
+    id, runner: "devin", project: root, permission: "read-only", created_at: now,
+    started_at: now, supervisor_pid: 1, state: "succeeded", ...job,
+  }));
+  await fs.writeFile(path.join(dir, "result.json"), JSON.stringify({
+    state: "succeeded", code: null, finished_at: now, parsed: null, ...resultValue,
+  }));
+}
+function unrelatedGroup(t) {
+  const child = spawn(process.execPath, ["-e", "setTimeout(()=>{},30000)"], {
+    detached: true,
+    stdio: "ignore",
+  });
+  t.after(() => { try { process.kill(-child.pid, "SIGKILL"); } catch {} });
+  return child;
+}
+
+test("cancel on a terminal, confirmed job sends nothing to a reused group number", posixOnly, async (t) => {
+  const stranger = unrelatedGroup(t);
+  await sleep(200);
+  const id = "job_" + "e1".repeat(12);
+  await writeJob(id, { agent_pid: stranger.pid, agent_pgid: stranger.pid, agent_identity: null }, { cleanup: "confirmed" });
+  const info = await cancel(id, { termMs: 300, killMs: 300 });
+  assert.equal(info.state, "succeeded");
+  assert.equal(info.cleanup, "confirmed");
+  assert.equal(info.agent_group_alive, false); // reported without probing the number
+  await sleep(400);
+  assert.ok(groupAlive(stranger.pid), "the unrelated group was not signalled");
+  assert.equal(stranger.exitCode, null);
+  assert.equal(stranger.signalCode, null);
+});
+
+test("an unconfirmed job without a recorded identity is never signalled by number", posixOnly, async (t) => {
+  const stranger = unrelatedGroup(t);
+  await sleep(200);
+  const id = "job_" + "e2".repeat(12);
+  await writeJob(id, { agent_pid: stranger.pid, agent_pgid: stranger.pid }, { cleanup: "unconfirmed" });
+  await assert.rejects(cancel(id, { termMs: 300, killMs: 300 }), { code: "cancel_unconfirmed" });
+  await sleep(300);
+  assert.equal(stranger.signalCode, null);
+  assert.ok(groupAlive(stranger.pid));
+  const info = await status(id);
+  assert.equal(info.cleanup, "unconfirmed");
+  assert.equal(info.cleanup_code, "ownership_unknown");
+});
+
+test("cancel: a reused number (pid_reused) is not signalled and is recorded as pgid_reused", { skip: process.platform !== "linux" && "needs /proc process identity" }, async (t) => {
+  const stranger = unrelatedGroup(t);
+  await sleep(200);
+  const real = (await readProcessIdentity(stranger.pid)).identity;
+  const identity = { ...real, birth: String(BigInt(real.birth) + 1000n) }; // another incarnation
+  const id = "job_" + "e3".repeat(12);
+  await writeJob(id, { agent_pid: stranger.pid, agent_pgid: stranger.pid, agent_identity: identity }, { cleanup: "unconfirmed" });
+  const info = await cancel(id, { termMs: 300, killMs: 300 });
+  assert.equal(info.cleanup, "unconfirmed");
+  assert.equal(info.cleanup_code, "pgid_reused");
+  await sleep(300);
+  assert.equal(stranger.signalCode, null);
+  assert.ok(groupAlive(stranger.pid));
+});
+
+test("establishOwnership: identity states and the leader-gone rules", async (t) => {
+  const scope = "a".repeat(64);
+  const identity = { platform: "linux", pid: 500, birth: "1000", scope };
+  const observed = (birth, pid = 500) => ({ status: "observed", identity: { platform: "linux", pid, birth, scope } });
+  const gone = { status: "gone", identity: null, platform: "linux", scope };
+  const opts = (read, procDir = "/nonexistent", platform = "linux") => ({ read, procDir, platform });
+  assert.equal(await establishOwnership(500, identity, opts(async () => observed("1000"))), "owned");
+  assert.equal(await establishOwnership(500, identity, opts(async () => observed("2000"))), "pid_reused");
+  assert.equal(await establishOwnership(500, identity, opts(async () => ({ status: "unknown", identity: null }))), "unknown");
+  assert.equal(await establishOwnership(500, null, opts(async () => observed("1000"))), "unknown"); // nothing recorded
+
+  const proc = await fs.mkdtemp(path.join(root, "own-"));
+  t.after(() => fs.rm(proc, { recursive: true, force: true }));
+  const member = async (pid, starttime, state = "S") => {
+    await fs.mkdir(path.join(proc, String(pid)), { recursive: true });
+    // fields after ")": state ppid pgrp session tty tpgid flags minflt cminflt majflt cmajflt utime stime cutime cstime priority nice threads itrealvalue starttime
+    const tail = [state, 1, 500, 500, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 0, 1, 0, starttime];
+    await fs.writeFile(path.join(proc, String(pid), "stat"), `${pid} (worker) ${tail.join(" ")} 0\n`);
+  };
+  const read = async (pid) => (pid === 500 ? gone : observed("5000", pid));
+  await member(501, 1500);
+  assert.equal(await establishOwnership(500, identity, opts(read, proc)), "owned");
+  assert.equal(await establishOwnership(500, identity, opts(read, proc, "darwin")), "unknown"); // Linux only
+  await member(502, 999); // started before the leader: not its descendant
+  assert.equal(await establishOwnership(500, identity, opts(read, proc)), "unknown");
+  await fs.rm(path.join(proc, "502"), { recursive: true });
+  const foreignScope = async (pid) => (pid === 500 ? gone : { status: "observed", identity: { ...observed("5000", pid).identity, scope: "b".repeat(64) } });
+  assert.equal(await establishOwnership(500, identity, opts(foreignScope, proc)), "unknown");
+  await fs.writeFile(path.join(proc, "501", "stat"), "garbage");
+  assert.equal(await establishOwnership(500, identity, opts(read, proc)), "unknown"); // unreadable member
+});
+
+test("/proc scanner: only ENOENT is gone; EACCES and garbage are unknown", async (t) => {
+  const proc = await fs.mkdtemp(path.join(root, "scan-"));
+  t.after(async () => {
+    await fs.chmod(path.join(proc, "20", "stat"), 0o600).catch(() => {});
+    await fs.rm(proc, { recursive: true, force: true });
+  });
+  await fs.mkdir(path.join(proc, "10")); // vanished: stat missing -> ENOENT
+  assert.equal(procGroupHasLiveMember(60, proc), false);
+  assert.equal(groupAlive(2 ** 22 + 777, proc), false);
+  await fs.mkdir(path.join(proc, "20"));
+  await fs.writeFile(path.join(proc, "20", "stat"), "20 (x) S 1 60 60 0 -1");
+  assert.equal(procGroupHasLiveMember(60, proc), true);
+  await fs.writeFile(path.join(proc, "20", "stat"), "garbage");
+  assert.equal(procGroupHasLiveMember(60, proc), "unknown");
+  assert.equal(scanProcGroup(60, proc).unknown, true);
+  const unreadable = process.platform === "win32" || (process.getuid && process.getuid() === 0);
+  if (unreadable) return t.diagnostic("EACCES case skipped (root or Windows)");
+  await fs.writeFile(path.join(proc, "20", "stat"), "20 (x) S 1 60 60 0 -1");
+  await fs.chmod(path.join(proc, "20", "stat"), 0o000);
+  assert.equal(procGroupHasLiveMember(60, proc), "unknown");
+  // A live member elsewhere still wins over an unreadable entry.
+  await fs.mkdir(path.join(proc, "21"));
+  await fs.writeFile(path.join(proc, "21", "stat"), "21 (y) S 1 60 60 0 -1");
+  assert.equal(procGroupHasLiveMember(60, proc), true);
+});
+
+test("groupAlive treats an unreadable /proc as possibly alive and falls back to kill(-pgid, 0)", posixOnly, async (t) => {
+  const proc = await fs.mkdtemp(path.join(root, "unk-"));
+  t.after(() => fs.rm(proc, { recursive: true, force: true }));
+  await fs.mkdir(path.join(proc, "30"));
+  await fs.writeFile(path.join(proc, "30", "stat"), "garbage"); // makes the scan "unknown"
+  const live = unrelatedGroup(t);
+  await sleep(200);
+  assert.equal(procGroupHasLiveMember(live.pid, proc), "unknown");
+  assert.equal(groupAlive(live.pid, proc), true); // kill(-pgid, 0) sees the group
+  process.kill(-live.pid, "SIGKILL");
+  await new Promise((r) => live.once("exit", r));
+  assert.equal(groupAlive(live.pid, proc), false); // ESRCH establishes absence
 });
