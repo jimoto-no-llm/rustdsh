@@ -1853,6 +1853,12 @@ pub fn related_files(seeds: &[String], max: usize) -> Vec<String> {
     let (Ok(root), Ok(cwd)) = (repository_root(None), std::env::current_dir()) else {
         return Vec::new();
     };
+    // The root is canonical, so compare an equally canonical cwd: a plain
+    // Windows current_dir() has no verbatim \\?\ prefix and never matches, and a
+    // symlinked ancestor would not match on any platform.
+    let Ok(cwd) = fs::canonicalize(&cwd) else {
+        return Vec::new();
+    };
     let Ok(prefix) = cwd.strip_prefix(&root) else {
         return Vec::new();
     };
@@ -1873,14 +1879,18 @@ pub fn related_files(seeds: &[String], max: usize) -> Vec<String> {
                     .zip(path.components())
                     .take_while(|(a, b)| a == b)
                     .count();
-                let mut relative = PathBuf::new();
+                // Index keys are "/"-joined on every platform, so build the
+                // cwd-relative result the same way; a plain PathBuf would
+                // stringify with backslash separators on Windows and stop
+                // matching the keys.
+                let mut parts: Vec<String> = Vec::new();
                 for _ in common..prefix.components().count() {
-                    relative.push("..");
+                    parts.push("..".to_string());
                 }
                 for part in path.components().skip(common) {
-                    relative.push(part.as_os_str());
+                    parts.push(part.as_os_str().to_string_lossy().into_owned());
                 }
-                relative.to_string_lossy().into_owned()
+                parts.join("/")
             }),
     )
 }
@@ -2155,8 +2165,13 @@ mod tests {
     }
 
     fn dependency_subprocess(temp: &Temp, cwd: &str, action: &str) {
-        // Cwd and DSH_HOME must not change in the parallel parent test process.
-        let output = std::process::Command::new(std::env::current_exe().unwrap())
+        // Re-enter this test binary as the worker; current_exe() already
+        // carries the platform suffix (`.exe` on Windows) and needs no PATH
+        // lookup. CARGO_BIN_EXE_* is not set for unit tests, and the rdsh CLI
+        // cannot run the worker action. Cwd and DSH_HOME must not change in the
+        // parallel parent test process, so pass both to the child only.
+        let worker = std::env::current_exe().unwrap();
+        let output = std::process::Command::new(&worker)
             .args([
                 "--quiet",
                 "--exact",
@@ -2171,7 +2186,9 @@ mod tests {
             .unwrap();
         assert!(
             output.status.success(),
-            "dependency subprocess failed:\n{}\n{}",
+            "dependency subprocess {action} failed in {} ({}):\n{}\n{}",
+            temp.path.display(),
+            worker.display(),
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr)
         );

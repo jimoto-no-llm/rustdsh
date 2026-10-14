@@ -3221,6 +3221,10 @@ mod v3_tests {
 
     #[test]
     fn injection_inherits_zstd_user_speech_and_skips_failed_sessions() {
+        // Requires a working zstd CLI; Windows CI has none, so skip there.
+        if !zstd_available() {
+            return;
+        }
         let fixture = HookFixture::new();
         let sessions = fixture.home.join("sessions/project/valid");
         std::fs::create_dir_all(&sessions).unwrap();
@@ -3259,6 +3263,10 @@ mod v3_tests {
 
     #[test]
     fn inherited_zstd_output_is_bounded_and_expired_reads_are_skipped() {
+        // Requires a working zstd CLI; Windows CI has none, so skip there.
+        if !zstd_available() {
+            return;
+        }
         let temporary = TempDir::new();
         let compressed = temporary.0.join("session.jsonl.zstd");
         if !write_zstd_session(&compressed, &"\n".repeat(256 * 1024 + 1)) {
@@ -3510,6 +3518,20 @@ mod v3_tests {
         assert!(distill_candidates(transcript).is_empty());
     }
 
+    /// True only when the `zstd` CLI is installed and actually runs. Windows
+    /// CI installs no zstd, so callers that assert decompressed content skip
+    /// instead of failing on the missing tool. Tests that assert *missing*-zstd
+    /// behaviour must not call this.
+    fn zstd_available() -> bool {
+        std::process::Command::new("zstd")
+            .arg("--version")
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .is_ok_and(|status| status.success())
+    }
+
     fn write_zstd_session(path: &Path, transcript: &str) -> bool {
         let child = std::process::Command::new("zstd")
             .args(["-q", "-c"])
@@ -3579,6 +3601,11 @@ mod v3_tests {
             read_distill_session(&plain).unwrap(),
             (transcript.as_bytes().to_vec(), false)
         );
+        // Requires a working zstd CLI; Windows CI has none, so skip the
+        // compressed half while still checking the plain read above.
+        if !zstd_available() {
+            return;
+        }
         if !write_zstd_session(&compressed, transcript) {
             return;
         }
@@ -3599,6 +3626,10 @@ mod v3_tests {
 
     #[test]
     fn distill_latest_selects_newest_plain_or_zstd_session() {
+        // Requires a working zstd CLI; Windows CI has none, so skip there.
+        if !zstd_available() {
+            return;
+        }
         let temporary = TempDir::new();
         let sessions = temporary.0.join("sessions/project/session");
         std::fs::create_dir_all(&sessions).unwrap();
