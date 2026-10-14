@@ -444,7 +444,13 @@ test("cancel after supervisor_lost kills the still-running agent group", posixOn
   const pidFile = path.join(f.dir, "grandchild.pid");
   await waitForFile(pidFile);
   const grandchild = Number(await fs.readFile(pidFile, "utf8"));
-  const { supervisor_pid, agent_pid, agent_pgid } = JSON.parse((await jobFiles(job.id)).job);
+  // The grandchild can start before the supervisor records the agent group.
+  let recorded = JSON.parse((await jobFiles(job.id)).job);
+  for (let i = 0; i < 100 && !(recorded.agent_pgid && (recorded.agent_identity || !identityPlatform)); i++) {
+    await sleep(50);
+    recorded = JSON.parse((await jobFiles(job.id)).job);
+  }
+  const { supervisor_pid, agent_pid, agent_pgid } = recorded;
   assert.ok(agent_pgid);
   process.kill(supervisor_pid, "SIGKILL");
   assert.ok(await gone(supervisor_pid));
