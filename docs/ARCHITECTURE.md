@@ -43,7 +43,7 @@ operation that replaces the document with defaults.
 | `tokens.rs` | Fast token estimation |
 | `compact.rs` | Context compaction to a token budget |
 | `compute.rs` | Opt-in bounded pure-compute worker over stdio NDJSON |
-| `search.rs` | Fast multi-file search (`estimate_tokens`) |
+| `search.rs` | Fast multi-file recursive grep (hidden/vendor dirs skipped, 2 MB / 2,000,000-byte cap) |
 | `inspect.rs` | Config / session inspection |
 | `serve.rs` | Status page server |
 | `guard.rs` | Stdin hook guard (`--deny` patterns and opt-in structured file policy) |

@@ -59,7 +59,10 @@ enum Commands {
     Boot {
         #[arg(long = "profile")]
         profile: Option<String>,
-        #[arg(long = "from-default-profile")]
+        #[arg(
+            long = "from-default-profile",
+            value_parser = clap::builder::NonEmptyStringValueParser::new()
+        )]
         from_default_profile: Option<String>,
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
@@ -1396,6 +1399,44 @@ mod default_profile_tests {
                     "NATIVE_FIRST entry {name:?} has no matching subcommand"
                 );
             }
+        }
+    }
+
+    #[test]
+    fn boot_rejects_empty_from_default_profile() {
+        assert!(Cli::try_parse_from([
+            "rdsh",
+            "boot",
+            "--profile",
+            "rescue",
+            "--from-default-profile",
+            "",
+        ])
+        .is_err());
+    }
+
+    #[test]
+    fn boot_preserves_valid_from_default_profile() {
+        let parsed = Cli::try_parse_from([
+            "rdsh",
+            "boot",
+            "--profile",
+            "rescue",
+            "--from-default-profile",
+            "web",
+        ])
+        .unwrap();
+        match parsed.command {
+            Some(super::Commands::Boot {
+                profile,
+                from_default_profile,
+                args,
+            }) => {
+                assert_eq!(profile.as_deref(), Some("rescue"));
+                assert_eq!(from_default_profile.as_deref(), Some("web"));
+                assert!(args.is_empty());
+            }
+            _ => panic!("expected boot"),
         }
     }
 

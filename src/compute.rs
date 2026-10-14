@@ -88,7 +88,7 @@ fn run_request(line: &str) -> Result<serde_json::Value, (String, &'static str, S
             format!("unsupported protocol, want v{PROTOCOL_VERSION}"),
         ));
     }
-    if id.is_empty() || id.len() > MAX_ID_LEN {
+    if id.is_empty() || id.chars().count() > MAX_ID_LEN {
         return Err(fail("bad_id", "id must be 1..=128 chars".to_string()));
     }
     let op = v.get("op").and_then(|x| x.as_str()).unwrap_or_default();
@@ -451,5 +451,25 @@ mod tests {
         assert_eq!(lines.len(), 1);
         let resp: serde_json::Value = serde_json::from_str(lines[0]).unwrap();
         assert_eq!(resp["id"], "a1");
+    }
+
+    // id の上限は仕様・エラー文どおり「文字数」。バイト数で判定すると
+    // 非ASCII の id が 128 文字でも拒否される。
+    #[test]
+    fn accepts_a_128_char_non_ascii_id() {
+        let id = "\u{3042}".repeat(MAX_ID_LEN);
+        let resp: serde_json::Value =
+            serde_json::from_str(&handle_line(&req(&id, "tokens.estimate", "hi", None))).unwrap();
+        assert_eq!(resp["ok"], true);
+        assert_eq!(resp["id"], id);
+    }
+
+    #[test]
+    fn rejects_an_id_over_the_char_limit() {
+        let id = "\u{3042}".repeat(MAX_ID_LEN + 1);
+        let resp: serde_json::Value =
+            serde_json::from_str(&handle_line(&req(&id, "tokens.estimate", "hi", None))).unwrap();
+        assert_eq!(resp["ok"], false);
+        assert_eq!(resp["code"], "bad_id");
     }
 }
