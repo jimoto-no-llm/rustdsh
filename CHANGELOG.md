@@ -55,6 +55,11 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   find, or one outside npm's global root, is reported and skipped while the
   rdsh release update still succeeds; npm-managed trees keep digest pinning,
   downgrade refusal, verification and rollback. See `docs/AUTO-UPDATE.md`.
+- `release-digests.tsv` pins v0.3.3. Its follow-up PR was missing, so
+  `install.sh --from-release` and the automatic updater stopped at v0.3.2 even
+  though GitHub marks v0.3.3 Latest. `scripts/pin-release-digests.py` turns the
+  follow-up into one reviewed command (refusing prerelease tags, missing
+  archives and non-SHA-256 values), and `docs/RELEASING.md` uses it.
 
 ### Changed
 

@@ -146,8 +146,18 @@ gh release download vX.Y.Z --repo jimoto-no-llm/rustdsh --dir /tmp/rdsh-vX.Y.Z-a
 python3 scripts/verify-release-assets.py /tmp/rdsh-vX.Y.Z-assets
 ```
 
-For the installer registry, read GitHub's own asset digests and strip the
-`sha256:` prefix; `gh release view --json assets` does not expose them:
+For the installer registry, pin the published digests in one reviewed commit:
+
+```sh
+python3 scripts/pin-release-digests.py vX.Y.Z          # --dry-run to preview
+python3 -m unittest discover -s tests -p 'test_release_digest_pin.py'
+git diff release-digests.tsv                          # latest row + 4 archives
+```
+
+The script reads GitHub's own asset digests (`gh release view --json assets`
+does not expose them), updates the `latest` row, keeps older rows for explicit
+`--version` installs, and refuses prerelease tags, missing archives or values
+that are not a SHA-256. Raw list:
 
 ```sh
 gh api repos/jimoto-no-llm/rustdsh/releases/tags/vX.Y.Z \
