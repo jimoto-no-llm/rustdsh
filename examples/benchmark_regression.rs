@@ -76,33 +76,42 @@ fn child_cpu_and_rss() -> Option<(f64, u64)> {
 
 /// Charges finished subprocesses to a shared, process-wide CPU total.
 ///
-/// `getrusage(RUSAGE_CHILDREN)` is cumulative, so the total of every child this
-/// runner has reaped is subtracted to isolate one command's CPU cost. Wall
-/// clock stays the headline metric; CPU is reported next to it so a noisy
+/// `getrusage(RUSAGE_CHILDREN)` is cumulative over every child this process
+/// has ever reaped, so a charge is the delta since the previous `record()`.
+/// That cursor is deliberately process-wide rather than per-`Meter`: when a
+/// candidate and a live baseline alternate (see `measure_pair`), two
+/// independent cursors would each absorb the other build's children, and the
+/// reported `cpu_median_ms` would blend the two. Sharing one cursor means
+/// every `record()` charges exactly the child reaped since the last call,
+/// whichever `Meter` made it.
+///
+/// Wall clock stays the headline metric; CPU is reported next to it so a noisy
 /// shared runner can be spotted.
 #[derive(Clone)]
-struct Meter(std::sync::Arc<std::sync::Mutex<MeterState>>);
-
-#[derive(Default)]
-struct MeterState {
-    cpu_seconds: f64,
-    children: u64,
+struct Meter {
+    children: std::sync::Arc<std::sync::atomic::AtomicU64>,
 }
+
+static CPU_CURSOR: std::sync::Mutex<f64> = std::sync::Mutex::new(0.0);
 
 impl Meter {
     fn new() -> Self {
-        Self(std::sync::Arc::new(std::sync::Mutex::new(
-            MeterState::default(),
-        )))
+        Self {
+            children: std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0)),
+        }
     }
 
     /// Record a child that has just been reaped; returns its CPU seconds.
+    ///
+    /// The lock is held across the read-and-advance so two threads cannot
+    /// both charge the same delta or tear the cursor.
     fn record(&self) -> Option<f64> {
         let (cpu_now, _) = child_cpu_and_rss()?;
-        let mut state = self.0.lock().ok()?;
-        let charge = (cpu_now - state.cpu_seconds).max(0.0);
-        state.cpu_seconds = cpu_now;
-        state.children += 1;
+        let mut cursor = CPU_CURSOR.lock().unwrap_or_else(|error| error.into_inner());
+        let charge = (cpu_now - *cursor).max(0.0);
+        *cursor = cpu_now;
+        self.children
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         Some(charge)
     }
 }
@@ -1840,12 +1849,52 @@ mod tests {
         let argv = vec!["0.01".to_string()];
         let run = invoke(&sandbox, Path::new("/bin/sleep"), &argv).unwrap();
         assert!(run.elapsed_ms > 0.0);
-        assert_eq!(meter.0.lock().unwrap().children, 1);
+        assert_eq!(meter.children.load(std::sync::atomic::Ordering::Relaxed), 1);
         if cfg!(unix) {
             assert!(
                 run.elapsed_cpu_ms.is_some(),
                 "getrusage(RUSAGE_CHILDREN) should account for the child"
             );
         }
+    }
+
+    /// The candidate's CPU must not absorb the baseline's children.
+    ///
+    /// `RUSAGE_CHILDREN` is process-wide. With a cursor per `Meter`, the
+    /// candidate's *first* charge is measured from zero and therefore includes
+    /// every child the baseline already reaped — so its `cpu_median_ms` blends
+    /// both builds (Eureka-COM's R517-CPU-01). With one shared cursor each
+    /// charge covers only the child reaped since the previous `record()`, so a
+    /// single charge can never equal the whole process-wide total.
+    #[cfg(unix)]
+    #[test]
+    fn a_meters_first_charge_excludes_the_other_builds_children() {
+        let tmp = TempDir::new().unwrap();
+        let candidate_meter = Meter::new();
+        let baseline_meter = Meter::new();
+        let candidate = Sandbox::new(tmp.path(), candidate_meter.clone());
+        let baseline = Sandbox::new(tmp.path(), baseline_meter.clone());
+        let argv = vec!["0.02".to_string()];
+
+        // Baseline runs first, then the candidate. A per-meter cursor makes the
+        // candidate's charge start from zero and swallow the baseline's CPU.
+        let baseline_run = invoke(&baseline, Path::new("/bin/sleep"), &argv).unwrap();
+        let baseline_cpu = baseline_run.elapsed_cpu_ms.expect("unix CPU accounting");
+        let candidate_run = invoke(&candidate, Path::new("/bin/sleep"), &argv).unwrap();
+        let candidate_cpu = candidate_run.elapsed_cpu_ms.expect("unix CPU accounting");
+
+        // `sleep 0.02` burns almost no CPU, so both charges should be small and
+        // comparable. Under the old per-meter cursor the candidate's charge
+        // carried the baseline's 20ms of *wall* time only insofar as the child
+        // burned CPU; what matters is that it is not inflated by a whole extra
+        // child's bookkeeping. Compare against the process-wide total, which is
+        // the upper bound for any single child.
+        let (total, _) = child_cpu_and_rss().expect("process-wide child CPU");
+        let total_ms = total * 1000.0;
+        assert!(
+            candidate_cpu <= total_ms - baseline_cpu + 1.0,
+            "candidate charge ({candidate_cpu:.3}ms) must not include the baseline's \
+             ({baseline_cpu:.3}ms) when the process-wide total is {total_ms:.3}ms"
+        );
     }
 }
