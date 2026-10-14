@@ -173,6 +173,61 @@ jobs:
         shell: bash
         run: BIN=./target/debug/rdsh.exe bash tests/regress.sh --windows-installer-delegation
 
+  # Records the CLI fast-path trend on every run. It deliberately passes no
+  # --baseline: a fresh runner has no previous binary, and comparing against a
+  # stale artifact would fail spuriously. The JSON is uploaded for trend review
+  # and the job only asserts that every case produced correct output.
+  perf-regression:
+    name: "perf-regression${{ github.event_name == 'push' && github.ref_type == 'branch' && github.event.repository.default_branch && github.ref_name != github.event.repository.default_branch && ' [branch push]' || '' }}"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --locked --example benchmark_regression
+      - run: cargo build --release
+      - name: Measure the CLI fast paths
+        run: |
+          cargo run --release --example benchmark_regression -- \
+            --bin ./target/release/rdsh --n 15 \
+            --output "$RUNNER_TEMP/rdsh-perf.json"
+      - name: Assert the report exists and every case is correct
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+
+          path = os.path.join(os.environ["RUNNER_TEMP"], "rdsh-perf.json")
+          if not os.path.exists(path):
+              sys.exit(f"perf report was not produced at {path}")
+
+          with open(path, encoding="utf-8") as handle:
+              report = json.load(handle)
+
+          cases = report.get("cases") or {}
+          if not cases:
+              sys.exit("perf report contains no cases")
+
+          bad = []
+          for name, case in cases.items():
+              if case.get("correct") is not True:
+                  bad.append(f"{name}: {case.get('outcome')}")
+              if case.get("outcome") == "failed":
+                  bad.append(f"{name}: marked failed")
+              if "median_ms" not in case or "p95_ms" not in case:
+                  bad.append(f"{name}: missing median/p95")
+              if not case.get("samples_ms"):
+                  bad.append(f"{name}: no samples")
+          if report.get("failures"):
+              bad.append(f"failures: {report['failures']}")
+          if bad:
+              sys.exit("perf regression report is not clean:\n  " + "\n  ".join(bad))
+          print(f"{len(cases)} cases correct")
+          PY
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: perf-regression
+          path: ${{ runner.temp }}/rdsh-perf.json
+
   browser-e2e:
     name: "browser-e2e${{ github.event_name == 'push' && github.ref_type == 'branch' && github.event.repository.default_branch && github.ref_name != github.event.repository.default_branch && ' [branch push]' || '' }}"
     runs-on: ubuntu-latest
