@@ -120,13 +120,54 @@ fn serve_mock_request(mut stream: TcpStream, state: Arc<MockState>) {
             headers.insert(name.trim().to_ascii_lowercase(), value.trim().to_string());
         }
     }
-    let length = headers
-        .get("content-length")
-        .and_then(|value| value.parse::<usize>().ok())
-        .unwrap_or_default();
-    let mut body = vec![0; length];
-    if reader.read_exact(&mut body).is_err() {
-        return;
+    let mut body = Vec::new();
+    if headers
+        .get("transfer-encoding")
+        .is_some_and(|value| value.eq_ignore_ascii_case("chunked"))
+    {
+        // Streaming requests may use chunked framing even with an empty body.
+        // Drain the terminal chunk and trailers before replying and closing;
+        // unread input can turn the close into a reset on Windows and macOS.
+        loop {
+            let mut line = String::new();
+            if reader.read_line(&mut line).is_err() || line.is_empty() {
+                return;
+            }
+            let Ok(length) = usize::from_str_radix(line.trim().split(';').next().unwrap_or(""), 16)
+            else {
+                return;
+            };
+            if length == 0 {
+                loop {
+                    line.clear();
+                    if reader.read_line(&mut line).is_err() || line.is_empty() {
+                        return;
+                    }
+                    if line == "\r\n" {
+                        break;
+                    }
+                }
+                break;
+            }
+            let start = body.len();
+            body.resize(start + length, 0);
+            let mut delimiter = [0; 2];
+            if reader.read_exact(&mut body[start..]).is_err()
+                || reader.read_exact(&mut delimiter).is_err()
+                || delimiter != *b"\r\n"
+            {
+                return;
+            }
+        }
+    } else {
+        let length = headers
+            .get("content-length")
+            .and_then(|value| value.parse::<usize>().ok())
+            .unwrap_or_default();
+        body.resize(length, 0);
+        if reader.read_exact(&mut body).is_err() {
+            return;
+        }
     }
     drop(reader);
 
@@ -178,6 +219,31 @@ struct ProxyProcess {
     url: String,
     logs: Arc<Mutex<Vec<String>>>,
     binary_dir: Option<PathBuf>,
+}
+
+#[test]
+fn mock_upstream_consumes_chunked_bodies_and_trailers_before_closing() {
+    for (method, chunks, expected) in [
+        ("GET", "0\r\n\r\n", ""),
+        (
+            "POST",
+            "2;fixture=yes\r\nhi\r\n1\r\n!\r\n0\r\nx-fixture: done\r\n\r\n",
+            "hi!",
+        ),
+    ] {
+        let upstream = MockUpstream::start(Duration::ZERO);
+        let mut stream = TcpStream::connect(upstream.addr).unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(3)))
+            .unwrap();
+        write!(stream, "{method} /chunked HTTP/1.1\r\nhost: {}\r\ntransfer-encoding: chunked\r\nconnection: close\r\n\r\n{chunks}", upstream.addr).unwrap();
+        let mut response = String::new();
+        stream.read_to_string(&mut response).unwrap();
+        assert!(response.starts_with("HTTP/1.1 200 OK\r\n"));
+        let seen = upstream.state.seen.lock().unwrap();
+        assert_eq!(seen.len(), 1);
+        assert_eq!(seen[0].body, expected.as_bytes());
+    }
 }
 
 impl ProxyProcess {
