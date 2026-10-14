@@ -1,8 +1,8 @@
 # Serial proxy (同時リクエスト数制限プロキシ)
 
-**English summary:** `scripts/serial-proxy.mjs` is a zero-dependency Node.js (>=22)
-reverse proxy that caps concurrent upstream requests (default 1) with a FIFO
-queue. Point every client (dsh, rdsh, opencode) at it when a provider such as
+**English summary:** `rdsh serial-proxy` is a native Rust reverse proxy that caps
+concurrent upstream requests (default 1) with a FIFO queue. Point every client
+(dsh, rdsh, opencode) at it when a provider such as
 HAI allows only one concurrent request per API key. Loopback only by default;
 only clients routed through the same proxy process are serialized.
 Optional extras: `--tool-choice-default` adds a default `tool_choice` to
@@ -22,7 +22,7 @@ baseURL をこのローカルプロキシに向けて直列化します。
 ## 使い方
 
 ```sh
-node scripts/serial-proxy.mjs --upstream https://hai-api.hcloud.ltd/v1
+rdsh serial-proxy --upstream https://hai-api.hcloud.ltd/v1
 ```
 
 | オプション | 既定値 | 説明 |
@@ -53,7 +53,7 @@ node scripts/serial-proxy.mjs --upstream https://hai-api.hcloud.ltd/v1
   チャンクごとに流します。`Authorization` は変更せず、ヘッダ値・ボディはログに出しません。
 - スロットは上流リクエスト開始からレスポンス本文の終了・エラー・クライアント切断まで保持され、
   切断時は上流リクエストも中止します。待機中に切断したリクエストはキューから外れます。
-- Node の request-body 受信期限は既定のヘッダー期限60秒、キュー待ち上限、本文受信猶予5分を合計した値です。
+- リクエスト本文の受信期限はキュー待ち上限と本文受信猶予5分を合計した値です。ヘッダーは別に60秒でタイムアウトします。
   待機中の本文をアプリケーション側へ無制限に蓄積せず、枠が空いた後も大きな本文をストリームで受信できます。
 - 上流レスポンスの読み取りは下流の backpressure に従い、遅いクライアント向けに本文を無制限にバッファしません。
 - `GET /__proxy/status` は転送せず `{active, queued, max, upstream}` を返します。
@@ -98,7 +98,7 @@ Sarashina は `tools` があって `tool_choice` が無いと `required` とし�
 
 ```sh
 # mini (6 RPM)
-node scripts/serial-proxy.mjs --upstream https://api.sarashina.ai/v1 --tool-choice-default auto --rpm 6 --port 18081
+rdsh serial-proxy --upstream https://api.sarashina.ai/v1 --tool-choice-default auto --rpm 6 --port 18081
 # nano (60 RPM) は別ポートで --rpm 60
 ```
 
@@ -138,6 +138,6 @@ Settings → Models → Custom model API:
 ## 動作確認
 
 ```sh
-node --test "tests/serial_proxy/*.test.mjs"
+cargo test --test serial_proxy
 curl -s http://127.0.0.1:18080/__proxy/status
 ```

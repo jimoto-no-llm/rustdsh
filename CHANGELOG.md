@@ -34,12 +34,10 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   warnings instead of guessed tiers. It starts no agent and writes nothing; the
   existing `workers prepare` still owns the checkout allocation
   (`docs/SUBAGENT-PLANNING.md`).
-- `scripts/serial-proxy.mjs` gains `--tool-choice-default <none|auto|required>`
-  (adds a default `tool_choice` to `chat/completions` requests that send `tools`
-  without one, all other requests are forwarded byte-identical; needed for
-  Sarashina, which otherwise forces tool calls) and `--rpm <n>` (fixed 60-second
-  window cap on upstream requests, waiting inside the existing queue and exposed
-  in `/__proxy/status`). See `docs/SERIAL-PROXY.md`.
+- `rdsh serial-proxy` replaces the standalone Node.js proxy with a native Rust
+  command. It keeps the FIFO concurrency and rate limits, streams request and
+  response bodies, and supports `--tool-choice-default <none|auto|required>`
+  for Sarashina-compatible requests. See `docs/SERIAL-PROXY.md`.
 
 ### Fixed
 
