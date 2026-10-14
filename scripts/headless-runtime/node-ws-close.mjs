@@ -31,6 +31,7 @@ export async function closeOwnedWebSocket(socket, { graceMs = 250, reason = 'hea
 }
 export function createExactSessionCloseRegistry(close = closeOwnedWebSocket) {
   const bySession = new Map();
+  const failures = new Map();
   const remove = (sessionId, entry) => {
     const entries = bySession.get(sessionId);
     entries?.delete(entry);
@@ -40,9 +41,21 @@ export function createExactSessionCloseRegistry(close = closeOwnedWebSocket) {
     if (entry.task) return entry.task;
     try { entry.task = Promise.resolve(close(entry.socket, options)); }
     catch (error) { entry.task = Promise.reject(error); }
-    entry.task.catch(() => {});
-    entry.task.finally(() => remove(entry.sessionId, entry)).catch(() => {});
+    entry.task.catch(error => {
+      let errors = failures.get(entry.sessionId);
+      if (!errors) failures.set(entry.sessionId, errors = new Set());
+      errors.add(error);
+    }).finally(() => remove(entry.sessionId, entry)).catch(() => {});
     return entry.task;
+  };
+  const throwFailures = sessionIds => {
+    const errors = [...new Set([...sessionIds].flatMap(sessionId => [...(failures.get(sessionId) ?? [])]))];
+    if (errors.length === 1) throw errors[0];
+    if (errors.length > 1) throw new AggregateError(errors, 'Failed to close exact-session WebSockets');
+  };
+  const closeEntries = async (sessionIds, entries, options) => {
+    await Promise.allSettled(entries.map(entry => begin(entry, options)));
+    throwFailures(sessionIds);
   };
   return {
     track(sessionId, socket) {
@@ -53,13 +66,15 @@ export function createExactSessionCloseRegistry(close = closeOwnedWebSocket) {
       entries.add(entry);
       return entry;
     },
+    start(entry, options) { return begin(entry, options); },
     close(entry, options) { return begin(entry, options); },
     async closeSession(sessionId, options) {
       if (typeof sessionId !== 'string' || !sessionId.trim()) return;
-      await Promise.all([...(bySession.get(sessionId) ?? [])].map(entry => begin(entry, options)));
+      await closeEntries([sessionId], [...(bySession.get(sessionId) ?? [])], options);
     },
     async closeAll(options) {
-      await Promise.all([...bySession.values()].flatMap(entries => [...entries]).map(entry => begin(entry, options)));
+      const sessionIds = new Set([...bySession.keys(), ...failures.keys()]);
+      await closeEntries(sessionIds, [...bySession.values()].flatMap(entries => [...entries]), options);
     },
   };
 }
@@ -70,7 +85,7 @@ export function trackNodeWebSocket(registry, webSocketFactory, resourceSessionId
 }
 export function closeTrackedOrSilent(registry, tracked, socket, reason = 'done') {
   if (tracked) {
-    void registry.close(tracked, { reason });
+    void registry.start(tracked, { reason });
     return;
   }
   try { socket.close(1000, reason); } catch {}
@@ -79,9 +94,11 @@ export async function closeExactSessionSockets({ sessionId, cachedEntries = [], 
   const cached = cachedEntries.map(entry => {
     if (entry.idleTimer) clearTimeout(entry.idleTimer);
     if (entry.trackedClose) return registry.close(entry.trackedClose, options);
-    try { entry.socket.close(1000, options?.reason ?? 'done'); } catch {}
+    try { entry.socket.close(1000, options?.reason ?? 'debug_close'); } catch {}
     return undefined;
   });
   const tracked = sessionId ? registry.closeSession(sessionId, options) : registry.closeAll(options);
-  await Promise.all([...cached, tracked]);
+  const outcomes = await Promise.allSettled([...cached, tracked]);
+  const failed = outcomes.find(outcome => outcome.status === 'rejected');
+  if (failed) throw failed.reason;
 }

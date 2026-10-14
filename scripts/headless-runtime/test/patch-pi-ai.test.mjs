@@ -113,6 +113,7 @@ test('fork selects node ws only when the provider opts in and preserves the runt
   assert.ok(runtime?.patchPiAiSources, 'must provide patchPiAiSources');
   const patched = runtime.patchPiAiSources({ sessionResources, codexResponses });
   assert.match(patched.sessionResources, /export async function cleanupSessionResourcesAsync/);
+  assert.match(patched.sessionResources, /__rdshAsyncCleanupBarrier: true/);
   assert.match(patched.codexResponses, /if \(webSocketFactory === "node-ws"\)/);
   assert.match(patched.codexResponses, /return HeadlessWebSocket/);
   assert.match(patched.codexResponses, /return globalThis\.WebSocket/);
@@ -122,6 +123,7 @@ test('fork selects node ws only when the provider opts in and preserves the runt
   assert.match(patched.codexResponses, /webSocketFactory: options\?\.webSocketFactory/);
   assert.match(patched.codexResponses, /closeExactSessionSockets/);
   assert.match(patched.codexResponses, /registerSessionResourceCleanup\(cleanupOpenAICodexWebSocketSessions\)/);
+  assert.match(patched.codexResponses, /headlessSessionCleanupTasks/);
 });
 
 test('fork patch refuses an unexpected pi-ai source shape', () => {

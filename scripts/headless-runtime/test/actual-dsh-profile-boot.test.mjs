@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { spawn } from 'node:child_process';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -98,8 +98,7 @@ test('actual headless CLI propagates node-ws through streamSimple and naturally 
     const cleanup = path.join(candidate, 'plugins/rdsh-session-cleanup/index.js');
     const diagnostic = path.join(run, 'cleanup-diagnostic.mjs');
     const evidence = path.join(run, 'cleanup-diagnostic.json');
-    const pi = pathToFileURL(path.join(candidate, 'node_modules/@earendil-works/pi-ai/dist/index.js')).href;
-    await writeFile(diagnostic, `import { writeFile } from 'node:fs/promises'; import { cleanupSessionResourcesAsync } from ${JSON.stringify(pi)}; export const inject = ['agents', 'sessions', 'profileContext']; export function apply(ctx) { const owned = new Set(); const pending = new Set(); const record = { adopted: 0, cleanCalls: [], disposerOwned: -1, pendingSettled: -1, profile: ctx.get('profileContext')?.name }; const clean = id => { if (typeof id !== 'string' || !owned.delete(id)) return; record.cleanCalls.push(id); const task = Promise.resolve(cleanupSessionResourcesAsync(id)).catch(() => {}); pending.add(task); task.finally(() => pending.delete(task)); }; ctx.on('agent/created', ({ agent } = {}) => { const id = agent?.session?.id; if (typeof id === 'string' && id && agent.id === id) { owned.add(id); record.adopted++; record.agentSessionEqual = true; } }); ctx.on('session/disposed', session => clean(session?.id)); ctx.effect(() => async () => { record.disposerOwned = owned.size; for (const id of [...owned]) clean(id); await Promise.all([...pending]); record.pendingSettled = pending.size; await writeFile(${JSON.stringify(evidence)}, JSON.stringify(record)); setImmediate(() => { record.postDisposeResources = process.getActiveResourcesInfo().sort(); void writeFile(${JSON.stringify(evidence)}, JSON.stringify(record)); }); }, 'safe exact-session cleanup diagnostic'); }`);
+    await copyFile(path.resolve('scripts/headless-runtime/test/fixtures/cleanup-diagnostic-plugin.mjs'), diagnostic);
     const fakeToken = `${Buffer.from(JSON.stringify({ alg: 'none' })).toString('base64url')}.${Buffer.from(JSON.stringify({ 'https://api.openai.com/auth': { chatgpt_account_id: 'fake-account' } })).toString('base64url')}.fake`;
     await writeFile(patch, JSON.stringify([
       { id: 'agent-default-model', config: { provider: 'openai-codex', model: 'gpt-6-sol', reasoningEffort: 'high' } },
@@ -111,7 +110,7 @@ test('actual headless CLI propagates node-ws through streamSimple and naturally 
     ]));
     child = spawn(path.join(candidate, 'node_modules/.bin/dsh'), ['headless', '--patch', patch, '--json', 'reply'], {
       cwd: path.join(run, 'workspace'),
-      env: { PATH: process.env.PATH, HOME: path.join(run, 'home'), DSH_HOME: path.join(run, 'dsh-home'), TMPDIR: path.join(run, 'tmp'), NODE_COMPILE_CACHE: path.join(run, 'cache'), FAKE_API_KEY: fakeToken },
+      env: { PATH: process.env.PATH, HOME: path.join(run, 'home'), DSH_HOME: path.join(run, 'dsh-home'), TMPDIR: path.join(run, 'tmp'), NODE_COMPILE_CACHE: path.join(run, 'cache'), FAKE_API_KEY: fakeToken, RDSH_CANDIDATE: candidate, RDSH_CLEANUP_DIAGNOSTIC: evidence },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let output = '';

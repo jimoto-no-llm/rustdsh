@@ -19,6 +19,7 @@ const sourceHashes = {
   sessionResources: '9228618eeaebc6b5a1746d28d1859b1e23f0f65e978dc9f6e20eb29d65b17e2a',
   codexResponses: '6e69310d77278231cfc87d7f03ee815d4a0f2ff273e6c43fcee6835e7df2b0c7',
 };
+const pluginFiles = ['cleanup.mjs', 'cordis.patch.yml', 'index.js', 'package.json'];
 
 function parseArgs(argv) {
   if (argv.length !== 2 || argv[0] !== '--out') throw new Error('usage: node build-candidate.mjs --out /absolute/private/candidate');
@@ -46,6 +47,14 @@ async function makeReadOnly(root) {
 async function exists(target) {
   try { await stat(target); return true; } catch (error) { if (error.code === 'ENOENT') return false; throw error; }
 }
+async function assertPluginSnapshot() {
+  const canonical = path.resolve(here, '../../plugins/rdsh-session-cleanup');
+  const snapshot = path.join(here, 'runtime/plugins/rdsh-session-cleanup');
+  for (const name of pluginFiles) {
+    const [source, copied] = await Promise.all([readFile(path.join(canonical, name)), readFile(path.join(snapshot, name))]);
+    if (!source.equals(copied)) throw new Error(`runtime plugin snapshot differs from plugins/rdsh-session-cleanup/${name}`);
+  }
+}
 async function build(out) {
   if (await exists(out)) throw new Error(`candidate already exists: ${out}`);
   const parent = path.dirname(out);
@@ -53,6 +62,7 @@ async function build(out) {
   const stage = await mkdtemp(path.join(parent, '.rdsh-headless-runtime-'));
   await chmod(stage, 0o700);
   const input = path.join(here, 'runtime');
+  await assertPluginSnapshot();
   await Promise.all([
     copyFile(path.join(input, 'package.json'), path.join(stage, 'package.json')),
     copyFile(path.join(input, 'package-lock.json'), path.join(stage, 'package-lock.json')),

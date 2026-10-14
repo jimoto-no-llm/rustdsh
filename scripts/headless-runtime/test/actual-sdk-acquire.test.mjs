@@ -111,7 +111,11 @@ test('actual standard WebSocket non-ACK stays silent and legacy sync-only cleanu
     resources.cleanupSessionResources('sync-session');
     await new Promise(resolve => setTimeout(resolve, 350));
     assert.equal(unhandled.length, 0, 'legacy sync cleanup must observe rejections');
-    await sdk.closeOpenAICodexWebSocketSessions('sync-session');
+    await assert.rejects(resources.cleanupSessionResourcesAsync('sync-session'), error => {
+      assert.equal(error?.message, 'Failed to cleanup session resources');
+      assert.ok(error?.errors?.some(cause => /does not support terminate/.test(cause?.message)));
+      return true;
+    });
     nodeWs.release({ keep: false });
   } finally {
     process.removeListener('unhandledRejection', onUnhandled);

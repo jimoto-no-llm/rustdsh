@@ -27,7 +27,7 @@ function patchSessionResources(source) {
   const addition = `export async function cleanupSessionResourcesAsync(sessionId, options) {
     const errors = [];
     for (const cleanup of sessionResourceCleanups) {
-        try { await cleanup(sessionId, options); }
+        try { await cleanup(sessionId, { ...options, __rdshAsyncCleanupBarrier: true }); }
         catch (error) { errors.push(error); }
     }
     if (errors.length > 0) throw new AggregateError(errors, "Failed to cleanup session resources");
@@ -52,9 +52,17 @@ function patchCodexResponses(source) {
     }
     await closeExactSessionSockets({ sessionId, cachedEntries: entries, registry: headlessSessionCloseRegistry, options });
 }`, 'openai-codex-responses');
-  patched = replaceOnce(patched, 'registerSessionResourceCleanup(closeOpenAICodexWebSocketSessions);', `function cleanupOpenAICodexWebSocketSessions(sessionId, options) {
-    const task = closeOpenAICodexWebSocketSessions(sessionId, options);
+  patched = replaceOnce(patched, 'registerSessionResourceCleanup(closeOpenAICodexWebSocketSessions);', `const headlessSessionCleanupTasks = new Map();
+function cleanupOpenAICodexWebSocketSessions(sessionId, options) {
+    const cleanupKey = sessionId || "__rdsh_all_sessions__";
+    let task = headlessSessionCleanupTasks.get(cleanupKey);
+    if (!task) {
+        task = closeOpenAICodexWebSocketSessions(sessionId, options);
+        headlessSessionCleanupTasks.set(cleanupKey, task);
+        task.then(() => headlessSessionCleanupTasks.delete(cleanupKey), () => {});
+    }
     task.catch(() => {});
+    if (options?.__rdshAsyncCleanupBarrier) return task.finally(() => headlessSessionCleanupTasks.delete(cleanupKey));
     return task;
 }
 registerSessionResourceCleanup(cleanupOpenAICodexWebSocketSessions);`, 'openai-codex-responses cleanup registration');
