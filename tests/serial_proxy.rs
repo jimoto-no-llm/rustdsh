@@ -98,6 +98,10 @@ impl Drop for MockUpstream {
 }
 
 fn serve_mock_request(mut stream: TcpStream, state: Arc<MockState>) {
+    // Accepted sockets may inherit the listener's nonblocking mode on macOS.
+    if stream.set_nonblocking(false).is_err() {
+        return;
+    }
     let _ = stream.set_read_timeout(Some(Duration::from_secs(3)));
     let Ok(reader_stream) = stream.try_clone() else {
         return;
