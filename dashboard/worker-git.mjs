@@ -178,14 +178,19 @@ async function supportsWorkerGit(file) {
 async function workerGitExecutable() {
   const name = process.platform === "win32" ? "rdsh.exe" : "rdsh";
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-  const candidates = process.env.RDSH_BIN
-    ? [path.resolve(process.env.RDSH_BIN)]
+  const override = process.env.RDSH_BIN;
+  if (override && !path.isAbsolute(override)) {
+    throw new Error("RDSH_BIN must be an absolute path");
+  }
+  const candidates = override
+    ? [override]
     : [
         path.join(root, "target", "debug", name),
         path.join(root, "target", "release", name),
-        ...(process.env.PATH || "").split(path.delimiter).map((directory) =>
-          path.join(directory, name),
-        ),
+        ...(process.env.PATH || "")
+          .split(path.delimiter)
+          .filter((directory) => path.isAbsolute(directory))
+          .map((directory) => path.join(directory, name)),
       ];
   for (const candidate of candidates) {
     if (executable(candidate) && (await supportsWorkerGit(candidate))) {

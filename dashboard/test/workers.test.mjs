@@ -9,6 +9,7 @@ import { promisify } from "node:util";
 import { identity } from "../state.mjs";
 import { WorkerWorkspaces } from "../workers.mjs";
 import { declaration } from "../worker-scopes.mjs";
+import { repository as workerGitRepository } from "../worker-git.mjs";
 
 const exec = promisify(execFile);
 const cli = fileURLToPath(new URL("../cli.mjs", import.meta.url));
@@ -22,6 +23,21 @@ const scope = (id, writes = ["src/a.txt"], role = "edit") => ({
   lease_seconds: 60,
 });
 const error = (code) => (e) => e.code === code;
+
+test("worker Git rejects a relative RDSH_BIN override", async () => {
+  const previous = process.env.RDSH_BIN;
+  process.env.RDSH_BIN = "./target/debug/rdsh";
+  try {
+    await assert.rejects(
+      workerGitRepository(process.cwd()),
+      /RDSH_BIN must be an absolute path/,
+    );
+  } finally {
+    if (previous === undefined) delete process.env.RDSH_BIN;
+    else process.env.RDSH_BIN = previous;
+  }
+});
+
 async function setup(t) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-workers-qa-"));
   const repo = path.join(root, "project");
