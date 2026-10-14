@@ -443,12 +443,20 @@ fn valid_head_sha(value: &str) -> bool {
 fn same_path(left: &Path, right: &Path) -> bool {
     #[cfg(windows)]
     {
-        normalize_windows_path(left)
+        let left = normalize_windows_path(left);
+        let right = normalize_windows_path(right);
+        if left
             .to_string_lossy()
-            .to_lowercase()
-            .eq(&normalize_windows_path(right)
+            .eq_ignore_ascii_case(&right.to_string_lossy())
+        {
+            return true;
+        }
+        match (canonical_future(&left), canonical_future(&right)) {
+            (Ok(left), Ok(right)) => left
                 .to_string_lossy()
-                .to_lowercase())
+                .eq_ignore_ascii_case(&right.to_string_lossy()),
+            _ => false,
+        }
     }
     #[cfg(not(windows))]
     {

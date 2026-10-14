@@ -1,4 +1,6 @@
 use serde_json::{json, Value};
+#[cfg(windows)]
+use std::ffi::OsString;
 use std::{
     fs,
     io::Write,
@@ -83,6 +85,31 @@ fn response(output: Output) -> Value {
     serde_json::from_slice(&output.stdout).expect("worker-git response is JSON")
 }
 
+#[cfg(windows)]
+fn canonical_existing_prefix(path: &Path) -> (PathBuf, Vec<OsString>) {
+    let mut current = path.to_path_buf();
+    let mut suffix = Vec::new();
+    while !current.exists() {
+        suffix.push(
+            current
+                .file_name()
+                .expect("future path component")
+                .to_os_string(),
+        );
+        current = current
+            .parent()
+            .expect("future path has an existing ancestor")
+            .to_path_buf();
+    }
+    suffix.reverse();
+    (
+        current
+            .canonicalize()
+            .expect("canonicalize existing prefix"),
+        suffix,
+    )
+}
+
 #[test]
 fn repository_and_git_path_operations_preserve_nul_framing() {
     let temp = TempDir::new();
@@ -130,10 +157,15 @@ fn repository_and_git_path_operations_preserve_nul_framing() {
 
     let repository = response(invoke(json!({"op":"repository","root":root})));
     #[cfg(windows)]
-    let expected_root = root.clone();
+    assert_eq!(
+        fs::canonicalize(repository["root"].as_str().unwrap()).unwrap(),
+        root.canonicalize().unwrap()
+    );
     #[cfg(not(windows))]
-    let expected_root = root.canonicalize().unwrap();
-    assert_eq!(repository["root"], expected_root.to_str().unwrap());
+    assert_eq!(
+        repository["root"],
+        root.canonicalize().unwrap().to_str().unwrap()
+    );
     assert_eq!(repository["head_sha"], head);
     assert!(repository["git_common_dir"].as_str().is_some());
     assert!(repository["branch"].is_string() || repository["branch"].is_null());
@@ -169,16 +201,26 @@ fn canonical_future_resolves_existing_parents_and_add_worktree_uses_isolated_hoo
     let base = git(&root, &["rev-parse", "HEAD"]);
 
     let future = root.join("future").join("child");
-    #[cfg(windows)]
-    let canonical_root = root.clone();
-    #[cfg(not(windows))]
-    let canonical_root = root.canonicalize().unwrap();
-    let expected = canonical_root.join("future").join("child");
     let resolved = response(invoke(json!({"op":"canonical-future","path":future})))
         .as_str()
         .unwrap()
         .to_string();
-    assert_eq!(resolved, expected.to_str().unwrap());
+    #[cfg(windows)]
+    {
+        let (resolved_root, suffix) = canonical_existing_prefix(Path::new(&resolved));
+        assert_eq!(resolved_root, root.canonicalize().unwrap());
+        assert_eq!(suffix, [OsString::from("future"), OsString::from("child")]);
+    }
+    #[cfg(not(windows))]
+    assert_eq!(
+        resolved,
+        root.canonicalize()
+            .unwrap()
+            .join("future")
+            .join("child")
+            .to_str()
+            .unwrap()
+    );
 
     #[cfg(windows)]
     let worktree_parent = temp.0.clone();
