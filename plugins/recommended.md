@@ -67,6 +67,7 @@ profile, so the rdsh settings UI is available by default:
 | Plugin | Why |
 | --- | --- |
 | `rdsh-settings` | rdsh section in DSH settings (budgets, retrieval, memory, beta flags) |
+| `rdsh-update-banner` | release banner and notifications in the Web UI (`PROFILE=web` only). Installing it keeps the profile's own insert block from failing to import on every boot (issue #5) |
 
 ## Workflow board source preparation
 
