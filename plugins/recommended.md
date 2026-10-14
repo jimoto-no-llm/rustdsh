@@ -59,14 +59,28 @@ Notes:
   arrive without a rustdsh release. Upstream repo:
   <https://github.com/cwd514/dsh-sound-notifications>
 
+## Third-party credits
+
+Third-party sources used by the installers and the bundled plugins. These
+projects are independent of rdsh; their licenses and copyrights stay with their
+authors.
+
+| Upstream | License | How rdsh uses it |
+| --- | --- | --- |
+| [Smart-DSH](https://github.com/hikarioyama/Smart-DSH) by hikarioyama | MIT | Source of the phone-width layout bundled as `rdsh-mobile-ui` (the mobile rail of its `dsh-notify-push` browser bundle). Its Web Push notifications, Esc-to-stop, task hub and shared-HMR workaround are not bundled. |
+| [dsh-sound-notifications](https://github.com/cwd514/dsh-sound-notifications) by cwd514 | MIT | Opt-in effect sounds and desktop notifications, installed only with `SOUND=1`. |
+| [dsh-gitview](https://github.com/yugapor/dsh-gitview) by yugapor | MIT | Optional sidebar Git panel. The installer does not offer it; add it with `dsh plugin --profile web add github:yugapor/dsh-gitview`. |
+
 ## Bundled rdsh plugins (this repo)
 
 `./plugins/install.sh` also installs these local plugins into the same
-profile, so the rdsh settings UI is available by default:
+profile, so the rdsh settings UI and the phone-width layout are available by
+default:
 
 | Plugin | Why |
 | --- | --- |
 | `rdsh-settings` | rdsh section in DSH settings (budgets, retrieval, memory, beta flags) |
+| `rdsh-mobile-ui` | Phone-width layout for the DSH Web chat: full-width chat and composer, one-tap logo to the session list. Adapted from Smart-DSH (MIT) — see [its README](rdsh-mobile-ui/README.md). |
 
 ## Workflow board source preparation
 
