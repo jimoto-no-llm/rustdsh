@@ -4,8 +4,9 @@
 //! Unix closes the check/open race: every component is opened with
 //! `openat`/`O_NOFOLLOW` under a held directory fd, so a link swapped in after
 //! validation cannot redirect the read. Windows has no `std` equivalent, so it
-//! validates the target (regular file, no reparse point, one hard link,
-//! canonical path under the root) and only then opens it. A reparse point
+//! validates the target (regular file, no reparse point, canonical path under
+//! the root) and only then opens it. Stable Rust cannot count hard links on
+//! Windows, so that part of the policy stays Unix-only. A reparse point
 //! substituted for the target or one of its parents between those two steps can
 //! still win that race: the opened handle cannot reveal the substitution, so the
 //! read may leave the approved root.
@@ -169,15 +170,17 @@ impl Root {
     pub(crate) fn open(&self, target: &Path) -> Option<std::fs::File> {
         use std::os::windows::fs::MetadataExt;
 
+        use std::os::windows::fs::MetadataExt;
+
         // Reject symlinks, junctions and other reparse points before looking
-        // at the file type, then directories, other non-regular files and any
-        // file with more than one hard link.
+        // at the file type, then directories and other non-regular files.
+        // A hard-link count is not available on stable Rust (`number_of_links`
+        // is behind the unstable `windows_by_handle` feature), so the Unix
+        // one-link policy has no stable Windows equivalent; that gap is
+        // documented in the module comment instead of being implied away.
         const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
         let metadata = std::fs::symlink_metadata(target).ok()?;
-        if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
-            || !metadata.is_file()
-            || metadata.number_of_links() != Some(1)
-        {
+        if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 || !metadata.is_file() {
             return None;
         }
         // Resolving the ancestors rejects both `..` escapes and symlinked
@@ -189,8 +192,7 @@ impl Root {
         let file = std::fs::File::open(&canonical).ok()?;
         // Re-check the opened object, mirroring the Unix check on the fd; a
         // swap between the checks above and this open remains unobservable.
-        let opened = file.metadata().ok()?;
-        (opened.is_file() && opened.number_of_links() == Some(1)).then_some(file)
+        file.metadata().ok()?.is_file().then_some(file)
     }
 
     #[cfg(not(any(unix, windows)))]

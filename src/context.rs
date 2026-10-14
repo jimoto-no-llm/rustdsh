@@ -2440,13 +2440,21 @@ fn hook_stdin(deadline: Instant) -> anyhow::Result<serde_json::Value> {
     }
     #[cfg(unix)]
     {
-        // Optional stdin must not wait for a writer that has supplied no data.
+        // The hook bridge writes the payload after spawning us, so a writer that
+        // has not reached its write yet must not be mistaken for "no payload":
+        // that silently drops the prompt and the whole retrieval. Wait a short,
+        // deadline-bounded grace before giving up on stdin.
+        let grace = deadline
+            .saturating_duration_since(Instant::now())
+            .min(std::time::Duration::from_millis(250))
+            .as_millis()
+            .min(i32::MAX as u128) as libc::c_int;
         let mut fd = libc::pollfd {
             fd: libc::STDIN_FILENO,
             events: libc::POLLIN,
             revents: 0,
         };
-        let ready = unsafe { libc::poll(&mut fd, 1, 0) };
+        let ready = unsafe { libc::poll(&mut fd, 1, grace) };
         anyhow::ensure!(ready >= 0, "hook stdin: unknown");
         if ready == 0 {
             return Ok(serde_json::json!({}));
