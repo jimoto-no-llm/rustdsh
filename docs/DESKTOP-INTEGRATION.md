@@ -153,7 +153,7 @@ Verified on this repository's Linux host:
 
 - `cargo test` unit tests for detection (app/command candidates per platform,
   profile parsing, plugin state, Electron lock hint, plugins-directory
-  resolution, target selection) - 12 desktop tests.
+  resolution, target selection) - 10 desktop tests.
 - `node --test tests/desktop.test.mjs`: status JSON, `--dry-run` (no command
   execution, no manifest change), forwarding argv, plugin activation through the
   stub command, `verify` pass/fail, uninitialized-profile refusal.

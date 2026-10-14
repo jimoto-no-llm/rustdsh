@@ -1,0 +1,28 @@
+[
+  {
+    "date": "2026-10-13",
+    "route": "portable_adapter_to_pinned_sdk_to_existing_muse_code_cli",
+    "sdk": "1.4.6",
+    "cli": "1.4.6-R6000.1",
+    "model": "muse-wonder-1.0",
+    "response": "Muse Code 定額接続 OK",
+    "elapsed_ms": 10660,
+    "usage": null,
+    "credentials_copied_to_harness": false,
+    "payg_fallback": false,
+    "real_provider_call": true
+  },
+  {
+    "date": "2026-10-13",
+    "route": "wsl_adapter_to_windows_worker_to_existing_cli",
+    "sdk": "1.4.6",
+    "cli": "1.4.6-R6000.1",
+    "model": "muse-wonder-1.0",
+    "response": "Muse Code 定額接続 OK",
+    "elapsed_ms": 7825,
+    "usage": null,
+    "credentials_copied_to_harness": false,
+    "payg_fallback": false,
+    "real_provider_call": true
+  }
+]

@@ -6,7 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { runFaultSimulation, faultScenarios } from "../fault-simulator.mjs";
+import { runFaultSimulation, faultScenarios, restartCheckpointIdentity } from "../fault-simulator.mjs";
 
 const exec = promisify(execFile);
 const entry = fileURLToPath(new URL("../fault-simulator.mjs", import.meta.url));
@@ -20,6 +20,25 @@ async function workspace(t) {
   });
   return root;
 }
+
+test("restart waits for a truthful observation of the same mock process after a transient unknown", async () => {
+  const identity = { platform: "win32", pid: 1234, birth: "12345", scope: "a".repeat(64) };
+  let observations = 0;
+  const found = await restartCheckpointIdentity(1234, null, async (pid) => {
+    assert.equal(pid, 1234);
+    return ++observations === 1 ? { status: "unknown", identity: null } : { status: "observed", identity };
+  });
+  assert.deepEqual(found, identity);
+  assert.equal(observations, 2);
+  assert.equal(await restartCheckpointIdentity(1234, null, async () => ({ status: "unknown", identity: null })), null);
+  assert.equal(await restartCheckpointIdentity(1234, null, async () => ({ status: "observed", identity: { ...identity, pid: 5678 } })), null);
+  let goneReads = 0;
+  assert.equal(await restartCheckpointIdentity(1234, null, async () => {
+    goneReads++;
+    return { status: "gone", identity: null };
+  }), null);
+  assert.equal(goneReads, 1);
+});
 
 test("all six real control-plane scenarios expose effects, persistence and resource proof without inherited credentials", async (t) => {
   const root = await workspace(t);

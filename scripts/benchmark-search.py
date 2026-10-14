@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import statistics
 import subprocess
 import tempfile
@@ -52,7 +53,8 @@ def main():
         def run(binary, command, rss=False):
             argv = [str(binary), "search", *command]
             if rss:
-                argv = ["/usr/bin/time", "-f", "%M", "-o", str(root / "rss"), *argv]
+                flags = ["-l"] if platform.system() == "Darwin" else ["-f", "%M"]
+                argv = ["/usr/bin/time", *flags, "-o", str(root / "rss"), *argv]
             start = time.perf_counter()
             result = subprocess.run(argv, cwd=root, env=env, capture_output=True, check=True, timeout=30)
             return result.stdout, result.stderr, (time.perf_counter() - start) * 1000
@@ -87,9 +89,14 @@ def main():
                       "stdout": expected[0].decode(), "stderr": expected[1].decode()}
             for name, binary in binaries.items():
                 assert run(binary, command, rss=True)[:2] == expected
+                rss_output = (root / "rss").read_text().strip()
+                if platform.system() == "Darwin":
+                    rss_kib = int(re.search(r"(\d+)\s+maximum resident set size", rss_output).group(1)) // 1024
+                else:
+                    rss_kib = int(rss_output)
                 result[name] = {"samples_ms": measurements[name],
                                 "median_ms": round(statistics.median(measurements[name]), 3),
-                                "peak_rss_kib": int((root / "rss").read_text().strip())}
+                                "peak_rss_kib": rss_kib}
             report["cases"][case] = result
 
         # Exercise both sides of the parallel threshold, limits, truncation,
