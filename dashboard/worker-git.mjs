@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import fsSync from "node:fs";
 import path from "node:path";
-import { execFile, spawnSync } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import {
@@ -130,6 +130,10 @@ async function legacyTrackedPaths(root) {
 
 const NATIVE_UNAVAILABLE = Symbol("native worker-git unavailable");
 const workerGitCapabilities = new Map();
+// Rust caps each Git stream at 2 MiB; JSON can escape control characters and
+// observe-worktree returns the same paths in multiple arrays.
+const MAX_NATIVE_STDOUT_BYTES = 64 * 1024 * 1024;
+const MAX_NATIVE_STDERR_BYTES = 2 * 1024 * 1024;
 
 function executable(file) {
   try {
@@ -141,7 +145,7 @@ function executable(file) {
   }
 }
 
-function supportsWorkerGit(file) {
+async function supportsWorkerGit(file) {
   let stat;
   try {
     stat = fsSync.statSync(file);
@@ -149,29 +153,29 @@ function supportsWorkerGit(file) {
     return false;
   }
   const key = [file, stat.dev, stat.ino, stat.size, stat.mtimeMs].join(":");
-  const cached = workerGitCapabilities.get(key);
-  if (cached !== undefined) return cached;
-
-  const result = spawnSync(file, ["worker-git", "--help"], {
-    env: environment(),
-    windowsHide: true,
-    shell: false,
-    timeout: 2_000,
-    maxBuffer: 64 * 1024,
-    encoding: "buffer",
-  });
-  const help = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
-  const supported =
-    !result.error &&
-    result.status === 0 &&
-    /Internal JSON bridge for dashboard Git observations/.test(
-      new TextDecoder("utf-8", { fatal: false }).decode(Buffer.from(help)),
-    );
-  workerGitCapabilities.set(key, supported);
-  return supported;
+  let pending = workerGitCapabilities.get(key);
+  if (!pending) {
+    pending = exec(file, ["worker-git", "--help"], {
+      env: environment(),
+      windowsHide: true,
+      shell: false,
+      timeout: 2_000,
+      maxBuffer: 64 * 1024,
+      encoding: "buffer",
+    })
+      .then(({ stdout, stderr }) => {
+        const help = new TextDecoder("utf-8", { fatal: false }).decode(
+          Buffer.concat([stdout, Buffer.from("\n"), stderr]),
+        );
+        return /Internal JSON bridge for dashboard Git observations/.test(help);
+      })
+      .catch(() => false);
+    workerGitCapabilities.set(key, pending);
+  }
+  return pending;
 }
 
-function workerGitExecutable() {
+async function workerGitExecutable() {
   const name = process.platform === "win32" ? "rdsh.exe" : "rdsh";
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
   const candidates = process.env.RDSH_BIN
@@ -183,26 +187,84 @@ function workerGitExecutable() {
           path.join(directory, name),
         ),
       ];
-  return candidates.find((candidate) =>
-    executable(candidate) && supportsWorkerGit(candidate),
-  ) ?? null;
+  for (const candidate of candidates) {
+    if (executable(candidate) && (await supportsWorkerGit(candidate))) {
+      return candidate;
+    }
+  }
+  return null;
 }
 
-function nativeRequest(request, executablePath = workerGitExecutable()) {
+async function nativeRequest(request, executablePath = null) {
+  executablePath ??= await workerGitExecutable();
   if (!executablePath) return NATIVE_UNAVAILABLE;
-  const result = spawnSync(executablePath, ["worker-git"], {
-    input: Buffer.from(JSON.stringify(request)),
-    env: environment(),
-    windowsHide: true,
-    shell: false,
-    timeout: 35_000,
-    maxBuffer: 2 * 1024 * 1024,
-    encoding: "buffer",
+  const result = await new Promise((resolve, reject) => {
+    const child = spawn(executablePath, ["worker-git"], {
+      env: environment(),
+      windowsHide: true,
+      shell: false,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    const stdout = [];
+    const stderr = [];
+    let stdoutBytes = 0;
+    let stderrBytes = 0;
+    let overflow = false;
+    let timedOut = false;
+    let stdinError = null;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill();
+    }, 35_000);
+
+    const capture = (chunks, chunk, current, limit) => {
+      if (current + chunk.length > limit) {
+        overflow = true;
+        child.kill();
+        return current;
+      }
+      chunks.push(chunk);
+      return current + chunk.length;
+    };
+    child.stdout.on("data", (chunk) => {
+      stdoutBytes = capture(stdout, chunk, stdoutBytes, MAX_NATIVE_STDOUT_BYTES);
+    });
+    child.stderr.on("data", (chunk) => {
+      stderrBytes = capture(stderr, chunk, stderrBytes, MAX_NATIVE_STDERR_BYTES);
+    });
+    child.stdin.on("error", (error) => {
+      stdinError = error;
+    });
+    child.once("error", (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.once("close", (status) => {
+      clearTimeout(timer);
+      if (timedOut) {
+        const error = new Error("rdsh worker-git timed out after 35 seconds");
+        error.code = "ETIMEDOUT";
+        reject(error);
+        return;
+      }
+      if (overflow) {
+        const error = new Error("rdsh worker-git output exceeds the safe limit");
+        error.code = "ENOBUFS";
+        reject(error);
+        return;
+      }
+      resolve({
+        status,
+        stdout: Buffer.concat(stdout, stdoutBytes),
+        stderr: Buffer.concat(stderr, stderrBytes),
+        stdinError,
+      });
+    });
+    child.stdin.end(Buffer.from(JSON.stringify(request)));
   });
-  if (result.error) throw result.error;
   if (result.status !== 0) {
     const detail = new TextDecoder("utf-8", { fatal: false })
-      .decode(result.stderr ?? Buffer.alloc(0))
+      .decode(result.stderr)
       .trim();
     const code = detail.match(/^\[rdsh\] error: ([a-z][a-z0-9_]+)$/)?.[1];
     if (code) throw new WorkerError(code);
@@ -210,9 +272,8 @@ function nativeRequest(request, executablePath = workerGitExecutable()) {
     error.code = result.status;
     throw error;
   }
-  const output = new TextDecoder("utf-8", { fatal: true }).decode(
-    result.stdout ?? Buffer.alloc(0),
-  );
+  if (result.stdinError) throw result.stdinError;
+  const output = new TextDecoder("utf-8", { fatal: true }).decode(result.stdout);
   return JSON.parse(output);
 }
 
@@ -252,45 +313,45 @@ function nativeRequestForGitCommand(root, args) {
 }
 
 export async function workerGit(root, ...args) {
-  const executablePath = workerGitExecutable();
+  const executablePath = await workerGitExecutable();
   if (executablePath) {
     const request = nativeRequestForGitCommand(root, args);
     if (!request) throw new Error("unsupported worker-git compatibility command");
-    nativeRequest(request, executablePath);
+    await nativeRequest(request, executablePath);
     return "";
   }
   return legacyWorkerGit(root, ...args);
 }
 
 export async function canonicalFuture(file) {
-  const native = nativeRequest({ op: "canonical-future", path: file });
+  const native = await nativeRequest({ op: "canonical-future", path: file });
   return native === NATIVE_UNAVAILABLE ? legacyCanonicalFuture(file) : native;
 }
 
 export async function repository(root) {
-  const native = nativeRequest({ op: "repository", root });
+  const native = await nativeRequest({ op: "repository", root });
   return native === NATIVE_UNAVAILABLE ? legacyRepository(root) : native;
 }
 
 export async function dirtyPaths(root) {
-  const native = nativeRequest({ op: "dirty-paths", root });
+  const native = await nativeRequest({ op: "dirty-paths", root });
   return native === NATIVE_UNAVAILABLE ? legacyDirtyPaths(root) : native;
 }
 
 export async function changedPaths(root, from, to) {
-  const native = nativeRequest({ op: "changed-paths", root, from, to });
+  const native = await nativeRequest({ op: "changed-paths", root, from, to });
   return native === NATIVE_UNAVAILABLE
     ? legacyChangedPaths(root, from, to)
     : native;
 }
 
 export async function trackedPaths(root) {
-  const native = nativeRequest({ op: "tracked-paths", root });
+  const native = await nativeRequest({ op: "tracked-paths", root });
   return native === NATIVE_UNAVAILABLE ? legacyTrackedPaths(root) : native;
 }
 
 export async function sourceSnapshot(root) {
-  const native = nativeRequest({ op: "source-snapshot", root });
+  const native = await nativeRequest({ op: "source-snapshot", root });
   if (native !== NATIVE_UNAVAILABLE) return native;
   const info = await legacyRepository(root);
   return {
@@ -300,7 +361,7 @@ export async function sourceSnapshot(root) {
 }
 
 export async function observeWorktree(root, { git_common_dir, branch, base }) {
-  const native = nativeRequest({
+  const native = await nativeRequest({
     op: "observe-worktree",
     root,
     git_common_dir,
