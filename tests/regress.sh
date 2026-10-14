@@ -152,7 +152,8 @@ for a in rdsh-linux-x64 rdsh-linux-x64-musl rdsh-macos-arm64 rdsh-macos-x64; do
 done
 printf '{"version":"1.0.0"}\n' > $FS/npmroot/@deepseek-ai/dsh/package.json
 printf '#!/bin/sh\ncase "$1" in root) echo "%s" ;; view) echo "[\\"1.0.0\\"]" ;; *) exit 1 ;; esac\n' "$FS/npmroot" > $FS/npm
-ln -s "$(command -v node)" "$FS/home/.local/bin/rdsh-test-node"
+NODE_REAL="$(node -p 'process.execPath')" || exit 1
+ln -s "$NODE_REAL" "$FS/home/.local/bin/rdsh-test-node"
 printf '#!/bin/sh\ncase "$1" in -p) echo 1.0.0 ;; *) exec "$(dirname "$0")/rdsh-test-node" "$@" ;; esac\n' > $FS/home/.local/bin/node
 CURL_BIN="$(command -v curl)"
 cat > $FS/shim/curl <<CURL_EOF
