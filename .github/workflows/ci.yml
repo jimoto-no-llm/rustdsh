@@ -1,6 +1,13 @@
 name: ci
 
-on: [push, pull_request]
+# PRs validate the merge result. Do not duplicate their matrix on branch pushes;
+# main and version tags retain full validation, including the release CI gate.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
