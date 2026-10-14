@@ -46,8 +46,13 @@ function node(tag, text, className) {
 }
 let artifactPreviewUrl = null;
 let artifactPreviewRequest = 0;
+let artifactPreviewRevision = -1;
 async function previewArtifact(sequence) {
   const request = ++artifactPreviewRequest;
+  // The state generation at click time: a newer render while the fetch is
+  // in flight leaves older text on screen, so the dialog says so.
+  const revision = latestState?.revision ?? -1;
+  artifactPreviewRevision = revision;
   const dialog = $("artifact-preview");
   const status = $("artifact-preview-status");
   const content = $("artifact-preview-content");
@@ -75,23 +80,30 @@ async function previewArtifact(sequence) {
     if (request !== artifactPreviewRequest) return;
     const redacted = response.headers.get("x-rdsh-preview-redacted") === "true";
     const truncated = response.headers.get("x-rdsh-preview-truncated") === "true";
+    const stale =
+      latestState != null &&
+      revision !== -1 &&
+      latestState.revision !== revision;
+    const staleNote = stale ? "（取得後に状態が更新されました）" : "";
     if (response.headers.get("x-rdsh-preview-kind") === "image") {
       artifactPreviewUrl = URL.createObjectURL(blob);
       const image = node("img", undefined, "artifact-preview-image");
       image.src = artifactPreviewUrl;
       image.alt = "成果物の画像プレビュー";
       content.append(image);
-      status.textContent = "画像を読み取り専用で表示しています。";
+      status.textContent =
+        "画像を読み取り専用で表示しています。" + staleNote;
     } else {
       content.append(node("pre", await blob.text(), "artifact-preview-text"));
-      status.textContent = [
-        redacted
-          ? "認証情報らしき値を伏せて表示しています。"
-          : "読み取り専用のテキスト表示です。",
-        truncated ? "先頭128 KiBまで表示しています。" : "",
-      ]
-        .filter(Boolean)
-        .join(" ");
+      status.textContent =
+        [
+          redacted
+            ? "認証情報らしき値を伏せて表示しています。"
+            : "読み取り専用のテキスト表示です。",
+          truncated ? "先頭128 KiBまで表示しています。" : "",
+        ]
+          .filter(Boolean)
+          .join(" ") + staleNote;
     }
   } catch (error) {
     if (request !== artifactPreviewRequest) return;

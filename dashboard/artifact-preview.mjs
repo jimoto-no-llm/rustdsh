@@ -160,7 +160,7 @@ async function resolveArtifact(root, reference) {
       return {
         error: fail(422, "許可されたproject rootの外はプレビューできません"),
       };
-    return { path: real };
+    return { path: real, root: rootReal };
   } catch {
     return { error: fail(404, "成果物が見つからないか、読み取りできません") };
   }
@@ -184,6 +184,35 @@ function classify(extension, bytes) {
   return null;
 }
 
+/// Re-verify an already-opened handle against the path it was resolved
+/// from: a parent directory swapped between resolution and open changes
+/// which file the name resolves to, so the handle's identity (device,
+/// inode, size) must still match a fresh lookup of that name. Boundary
+/// escapes always change the resolved file, which fails this comparison.
+/// On Linux the kernel-resolved `/proc/self/fd` path is checked against
+/// the approved root as well, closing the race without any timing window.
+export async function openedFileMatches(handle, stat, rootReal, resolvedPath) {
+  if (process.platform === "linux") {
+    try {
+      const actual = await fs.realpath(`/proc/self/fd/${handle.fd}`);
+      if (!inside(rootReal, actual)) return false;
+    } catch {
+      return false;
+    }
+  }
+  let current;
+  try {
+    current = await fs.stat(resolvedPath);
+  } catch {
+    return false;
+  }
+  return (
+    current.dev === stat.dev &&
+    current.ino === stat.ino &&
+    current.size === stat.size
+  );
+}
+
 export async function createArtifactPreview(project, events, sequence) {
   if (!Number.isSafeInteger(sequence) || sequence < 1)
     return fail(404, "成果物の記録が見つかりません");
@@ -204,6 +233,10 @@ export async function createArtifactPreview(project, events, sequence) {
     handle = await fs.open(resolved.path, constants.O_RDONLY | noFollow);
     const stat = await handle.stat();
     if (!stat.isFile()) return fail(415, "通常ファイルだけをプレビューできます");
+    // The name may have been re-pointed after resolution: serve the file
+    // only when the opened handle still is the resolved name's file.
+    if (!(await openedFileMatches(handle, stat, resolved.root, resolved.path)))
+      return fail(404, "成果物の参照先を確認できません");
     if (stat.size > maximumArtifactBytes)
       return fail(413, "成果物が1 MiBのプレビュー上限を超えています");
     const source = Buffer.alloc(maximumArtifactBytes + 1);

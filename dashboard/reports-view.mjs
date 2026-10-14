@@ -217,12 +217,14 @@ export function renderReports(
   );
   if (!state.tasks.length)
     $("tasks").append(emptyRow("タスクはまだ登録されていません", 4));
-  renderEvents(state, now);
+  renderEvents(state, now, onPreviewArtifact);
   if (activeDisclosure)
     [...document.querySelectorAll("summary[data-observation-id]")]
       .find((summary) => summary.dataset.observationId === activeDisclosure)?.focus();
 }
-function renderEvents(state, now) {
+// `onPreviewArtifact` arrives as an argument (not a module global) so the
+// preview button actually reaches the handler wired by the shell.
+function renderEvents(state, now, onPreviewArtifact = () => {}) {
   $("events").replaceChildren(
     ...state.events
       .slice(-30)

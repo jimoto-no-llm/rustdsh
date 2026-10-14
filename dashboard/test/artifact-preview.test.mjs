@@ -8,6 +8,7 @@ import {
   createArtifactPreview,
   maximumArtifactBytes,
   maximumTextPreviewBytes,
+  openedFileMatches,
 } from "../artifact-preview.mjs";
 import { identity } from "../state.mjs";
 import { startDashboard } from "../server.mjs";
@@ -210,3 +211,40 @@ test(
   assert.equal(html.status, 404);
   },
 );
+
+test("post-open verification rejects swapped and outside files", async (t) => {
+  const { temporary, project } = await fixture(t);
+  const rootReal = await fs.realpath(project.root);
+  const inside = path.join(project.root, "ok.log");
+  await fs.writeFile(inside, "inside");
+  const outside = path.join(temporary, "outside.log");
+  await fs.writeFile(outside, "outside");
+
+  const good = await fs.open(inside, "r");
+  t.after(() => good.close());
+  assert.equal(
+    await openedFileMatches(good, await good.stat(), rootReal, inside),
+    true,
+  );
+
+  const out = await fs.open(outside, "r");
+  t.after(() => out.close());
+  assert.equal(
+    await openedFileMatches(out, await out.stat(), rootReal, outside),
+    false,
+  );
+
+  // Deterministic parent-swap shape: the name now resolves to a different
+  // file than the opened handle, so the stale handle must be refused.
+  const swap = path.join(project.root, "swap.log");
+  await fs.writeFile(swap, "v1");
+  const handle = await fs.open(swap, "r");
+  t.after(() => handle.close());
+  const stat = await handle.stat();
+  await fs.rename(swap, path.join(project.root, "swap-orig.log"));
+  await fs.writeFile(swap, "v2-different");
+  assert.equal(
+    await openedFileMatches(handle, stat, rootReal, swap),
+    false,
+  );
+});
