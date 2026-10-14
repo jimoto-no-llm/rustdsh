@@ -1,6 +1,6 @@
 # Checkpoint evidence
 
-Issue: [#36](https://github.com/sahenjp/rustdsh/issues/36).
+Issue: [#36](https://github.com/jimoto-no-llm/rustdsh/issues/36).
 The before/after command uses the baseline CLI entrypoint from
 `f6dbd05e208be6721b6322e827e6b52ac49248ff` with the current common dependencies.
 The baseline rejects `checkpoint list`; the new CLI reads the immutable snapshot.

@@ -168,6 +168,17 @@ rdsh setup --web                           # ブラウザから行える Web 設
 
 ※ 他ツールの認証情報を無断で外部へ送信したり、同期したりしません。明示的に指定したログイン情報のみをローカルで安全に管理します。
 
+dsh が同梱していない OpenAI 互換エンドポイント（HAI、Sarashina、自宅の llama.cpp / vLLM / LM Studio / Ollama など）は、プロファイルのルートとして追加できます：
+
+```sh
+rdsh provider add hai --model deepseek-v4-flash              # 鍵は HAI_API_KEY か --key-stdin
+rdsh provider add sarashina                                  # 鍵は SARASHINA_API_KEY。mini と nano は組み込み
+rdsh provider add local-openai --base-url http://host:8080/v1 --discover --no-key
+rdsh provider list                                           # プリセットと各プロファイルの設定・鍵の状態
+```
+
+詳細は [docs/PROVIDERS.md](docs/PROVIDERS.md)（英語）を参照してください。
+
 ### エージェント実行の安全な隔離
 
 委譲したエージェントツールは既定で通常のファイル読み書きができます。Linux（bubblewrap と prlimit がある環境）では `--share-file` で明示的に共有したファイルだけに限定されます：
