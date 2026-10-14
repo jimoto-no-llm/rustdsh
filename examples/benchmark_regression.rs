@@ -1083,7 +1083,15 @@ fn main() -> Result<()> {
     }
     println!("wrote {}", args.output.display());
     if !failures.is_empty() || !regressions.is_empty() {
-        std::process::exit(1);
+        // Return rather than `process::exit`: exiting here would skip the
+        // `TempDir` destructor and strand the sandbox and every generated
+        // fixture on disk on each failing run. `main` maps this back to a
+        // non-zero status, so the gate still fails the build.
+        bail!(
+            "{} correctness failure(s) and {} regression(s)",
+            failures.len(),
+            regressions.len()
+        );
     }
     Ok(())
 }
