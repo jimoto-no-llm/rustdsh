@@ -49,6 +49,15 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   window cap on upstream requests, waiting inside the existing queue and exposed
   in `/__proxy/status`). See `docs/SERIAL-PROXY.md`.
 
+### Fixed
+
+- `sync-dsh.sh` discovers the `@deepseek-ai/dsh` tree by candidate instead of
+  `npm root -g` alone (`DSH_PKG_ROOT`, npm's global root, the newest
+  `~/.local/opt/*` tree, then the older per-user prefixes). A tree it cannot
+  find, or one outside npm's global root, is reported and skipped while the
+  rdsh release update still succeeds; npm-managed trees keep digest pinning,
+  downgrade refusal, verification and rollback. See `docs/AUTO-UPDATE.md`.
+
 ## [0.3.3] - 2026-10-13
 
 ### Security
