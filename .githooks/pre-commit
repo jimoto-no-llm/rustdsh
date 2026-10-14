@@ -15,21 +15,36 @@ if [ -n "$markers" ]; then
   exit 1
 fi
 
-staged_rs=$(git diff --cached --name-only --diff-filter=ACMR | grep '\.rs$' || true)
-if [ -n "$staged_rs" ]; then
-  if command -v cargo >/dev/null 2>&1; then
-    # Report only staged files, so unrelated unstaged edits never block a commit.
-    root=$(git rev-parse --show-toplevel)
-    diffs=$(cargo fmt --check 2>/dev/null | sed -n 's/^Diff in \(.*\):[0-9][0-9]*:.*$/\1/p' | sort -u)
-    bad=""
-    for f in $staged_rs; do
-      if printf '%s\n' "$diffs" | grep -Fxq "$root/$f"; then bad="$bad $f"; fi
-    done
-    if [ -n "$bad" ]; then
-      echo "pre-commit: not formatted:$bad. Run: cargo fmt" >&2
-      exit 1
-    fi
-  else
-    echo "pre-commit: warning: cargo not found; skipped cargo fmt --check" >&2
-  fi
+git diff --cached --quiet --diff-filter=ACMR -- '*.rs' && exit 0
+if ! command -v rustfmt >/dev/null 2>&1; then
+  echo "pre-commit: rustfmt not found (rustup component add rustfmt); or commit with --no-verify" >&2
+  exit 1
+fi
+
+# Format-check the staged content, not the working tree: export the index
+# copies of all Rust files (staged modules may load unstaged children).
+snap=$(mktemp -d 2>/dev/null || mktemp -d -t rdsh-precommit)
+trap 'rm -rf "$snap"' EXIT INT TERM
+snap=$(cd "$snap" && pwd -P)
+git ls-files -z -- '*.rs' rustfmt.toml .rustfmt.toml | git checkout-index -z --stdin --prefix="$snap/"
+edition=$(git show :Cargo.toml 2>/dev/null | sed -n 's/^edition *= *"\([0-9]*\)".*/\1/p' | head -n 1)
+git diff --cached --name-only -z --diff-filter=ACMR -- '*.rs' > "$snap/.staged"
+
+rc=0
+(cd "$snap" && xargs -0 rustfmt --check --edition "${edition:-2021}" < .staged) \
+  > "$snap/.out" 2> "$snap/.err" || rc=$?
+
+# Only the staged files decide; diffs in unstaged index copies are not this commit's.
+bad=$(tr '\0' '\n' < "$snap/.staged" | while IFS= read -r f; do
+  if grep -Fq "Diff in $snap/$f:" "$snap/.out"; then printf ' %s' "$f"; fi
+done)
+if [ -n "$bad" ]; then
+  echo "pre-commit: staged Rust is not formatted:$bad. Run: cargo fmt && git add" >&2
+  exit 1
+fi
+if [ "$rc" != 0 ] && { grep -q '^error' "$snap/.err" || ! grep -q '^Diff in ' "$snap/.out"; }; then
+  # rustfmt could not run or parse: never treat that as formatted.
+  echo "pre-commit: rustfmt failed on the staged files (exit $rc):" >&2
+  sed "s|$snap/||g" "$snap/.err" >&2
+  exit 1
 fi

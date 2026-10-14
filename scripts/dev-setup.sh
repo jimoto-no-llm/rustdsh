@@ -42,7 +42,7 @@ msrv=$(sed -n 's/^rust-version *= *"\([0-9.]*\)".*/\1/p' Cargo.toml)
 echo "Tools"
 if command -v git >/dev/null 2>&1; then
   v=$(git --version | awk '{print $3}')
-  if version_ge "$v" 2.38; then ok "git $v"; else warn "git $v (2.38+ needed by scripts/check-conflicts.sh)"; fi
+  if version_ge "$v" 2.38; then ok "git $v"; else fail "git $v is older than 2.38 (scripts/check-conflicts.sh and the pre-push hook need it)"; fi
 else
   fail "git not found"
 fi
@@ -75,12 +75,15 @@ if command -v zstd >/dev/null 2>&1; then ok "zstd"; else warn "zstd not found (s
 if command -v gh >/dev/null 2>&1; then ok "gh"; else warn "gh not found (optional: check-conflicts --open-prs, PRs)"; fi
 if command -v shellcheck >/dev/null 2>&1; then ok "shellcheck"; else warn "shellcheck not found (optional: lint shell scripts)"; fi
 
-echo "Git settings (this repository only)"
-# set_local KEY VALUE: set only when unset, so personal choices win.
+echo "Git settings (written to this repository only)"
+# set_local KEY VALUE: write only when no scope (system, global, local, worktree)
+# sets KEY, so an effective personal or managed setting is never overridden.
 set_local() {
-  current=$(git config --local --get "$1" 2>/dev/null || true)
+  current=$(git config --get "$1" 2>/dev/null || true)
   if [ -n "$current" ]; then
-    if [ "$current" = "$2" ]; then ok "$1=$2"; else ok "$1=$current (kept; recommended $2)"; fi
+    scope=$(git config --show-scope --get "$1" 2>/dev/null | cut -f1 || true)
+    if [ "$current" = "$2" ]; then ok "$1=$2${scope:+ ($scope)}"
+    else ok "$1=$current (kept from ${scope:-config}; recommended $2)"; fi
   elif [ "$check_only" = 1 ]; then
     warn "$1 unset (recommended $2)"
   else
@@ -90,6 +93,11 @@ set_local() {
 }
 # Hooks: block conflict markers and unformatted Rust; warn on conflicts at push.
 set_local core.hooksPath .githooks
+hooks=$(git config --get core.hooksPath 2>/dev/null || true)
+if [ -n "$hooks" ] && [ "$hooks" != .githooks ]; then
+  warn "repository hooks inactive: core.hooksPath=$hooks. To opt in here: git config --local core.hooksPath .githooks"
+  warn "  (or call .githooks/pre-commit and .githooks/pre-push from your own hooks)"
+fi
 # Reuse recorded resolutions when the same conflict appears again (main merged repeatedly).
 set_local rerere.enabled true
 set_local rerere.autoupdate true

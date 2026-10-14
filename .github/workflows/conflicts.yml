@@ -6,7 +6,8 @@ on:
   push:
     branches: [main]
   pull_request_target:
-    types: [opened, reopened, synchronize]
+    # edited: re-check when the base branch is changed (title/body edits are skipped below).
+    types: [opened, reopened, synchronize, edited]
   workflow_dispatch:
 
 permissions:
@@ -20,6 +21,7 @@ concurrency:
 
 jobs:
   label:
+    if: github.event.action != 'edited' || github.event.changes.base != null
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

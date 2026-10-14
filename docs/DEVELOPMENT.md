@@ -34,7 +34,10 @@ sh scripts/dev-setup.sh --check           # 確認のみ。何も変更しない
 ```
 
 `dev-setup.sh` がこのリポジトリの `git config --local` に設定する値は次のとおりです。
-すでに値がある項目は上書きせず、推奨値との違いだけを表示します。
+system・global・local・worktree のどこかで設定済みの項目は上書きせず、
+設定元と推奨値との違いだけを表示します。独自の `core.hooksPath` がある場合、
+このリポジトリの hooks は有効になりません。その旨と、有効にするときのコマンド
+（`git config --local core.hooksPath .githooks`）を表示します。
 
 | 設定 | 値 | 理由 |
 | --- | --- | --- |
@@ -56,25 +59,34 @@ sh scripts/check.sh full     # CONTRIBUTING.md の全項目（release ビルド�
 sh scripts/check.sh --list   # 実行せずに、選ばれる検証だけを表示
 ```
 
-既定モードでは、変更したファイルから対象を選びます。`src/` などを変えた場合は
-Rust 一式・`tests/regress.sh`・Node テスト、`dashboard/` を変えた場合は
-`npm test`、リリース関連を変えた場合は Python の試験と `prepare-release.py` を
-実行します。最後に `check-conflicts.sh` も実行します。失敗があっても残りの検証は
-続け、最後に一覧で表示します。`dashboard/` を変えたのに `node_modules` が
-ない場合は、検証していない状態を成功と取り違えないよう失敗として扱います。OS 固有のジョブ（Windows、bubblewrap を使う
-security-boundaries、browser-e2e）は CI で確認してください。
+既定モードでは、変更したファイルから対象を選びます。
+
+- `src/` など: Rust 一式、`tests/regress.sh`、CI と同じ Node テスト
+- `tests/*.test.mjs`、`plugins/`: CI の Node テスト、変更したテスト自体、
+  変更した plugin の `npm test`
+- `dashboard/`: `npm test`
+- リリース関連: Python の試験と `prepare-release.py`
+- installer: 構文チェック。Linux で Docker が使える場合は
+  `tests/install-isolated.sh --source local` も実行
+
+最後に `check-conflicts.sh` も実行します。失敗があっても残りの検証は続け、
+最後に一覧で表示します。依存（`node_modules`）がなく実行できないテストは、
+成功と取り違えないよう失敗として扱います。手元では実行できない CI 専用の検証
+（bubblewrap を使う security-boundaries、Windows、Isolated install、
+browser-e2e）は `todo` として一覧に残ります。CI で結果を確認してください。
 
 ## Git hooks
 
 | hook | 動作 | 回避 |
 | --- | --- | --- |
-| `pre-commit` | ステージした追加行に衝突マーカー（`<<<<<<<` など）があれば止める。`.rs` を含む場合は `cargo fmt --check` | `git commit --no-verify` |
-| `pre-push` | `check-conflicts.sh` で `origin/main` との衝突を警告する。既定では push を止めない | `git push --no-verify` |
+| `pre-commit` | ステージした追加行に衝突マーカー（`<<<<<<<` など）があれば止める。`.rs` を含む場合は、ステージした内容（index）に `rustfmt --check` をかける | `git commit --no-verify` |
+| `pre-push` | push する各ブランチを `origin/main` と比べ、衝突を警告する。既定では push を止めない | `git push --no-verify` |
 
 `RDSH_SKIP_HOOKS=1` で両方を無効にできます。`RDSH_STRICT_PUSH=1` を設定すると、
 衝突がある場合に加えて、`origin/main` を取得できず最新の状態と比べられない場合も
-push を止めます。`cargo fmt --check` が見るのはステージしたファイルだけです。
-ステージしていない編集で commit が止まることはありません。
+push を止めます。pre-commit の書式チェックはステージした内容だけを対象にします。
+ステージしていない編集で commit が止まることはありません。rustfmt を実行できない
+場合や構文エラーがある場合は、整形済みとはみなさずに止めます。
 
 ## コンフリクトを起こさない進め方
 
@@ -125,7 +137,7 @@ push を止めます。`cargo fmt --check` が見るのはステージしたフ�
 
 ## CI 上の衝突検知
 
-`.github/workflows/conflicts.yml` は、`main` への push と PR の更新のたびに
+`.github/workflows/conflicts.yml` は、`main` への push、PR の更新、PR の base 変更のたびに
 `scripts/label-conflicts.sh` を実行します。base と衝突している open PR には
 `needs-rebase` ラベルと案内のコメントを 1 度だけ付け、解消後にラベルを外します。
 `pull_request_target` で動きますが、チェックアウトするのは base ブランチだけで、

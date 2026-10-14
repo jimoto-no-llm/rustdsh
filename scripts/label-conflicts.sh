@@ -42,8 +42,9 @@ fi
 [ -n "${pending# }" ] || { echo "label-conflicts: no open PRs"; exit 0; }
 
 # The label is managed in .github/labels.yml; create it only if the sync has not run yet.
+# --force: the labels workflow may create it concurrently (same definition).
 if ! gh api "repos/$repo/labels/$label" >/dev/null 2>&1; then
-  act gh label create "$label" --repo "$repo" --color "e99695" \
+  act gh label create "$label" --repo "$repo" --color "e99695" --force \
     --description "Conflicts with the base branch; update the PR branch"
 fi
 
@@ -59,9 +60,11 @@ while [ -n "${pending# }" ] && [ "$round" -le "$rounds" ]; do
     base=$(printf '%s' "$info" | cut -f3)
     case "$state:$has" in
       CONFLICTING:false)
-        echo "#$n conflicts with $base: adding $label"
-        act gh pr edit "$n" --repo "$repo" --add-label "$label"
-        act gh pr comment "$n" --repo "$repo" --body "$(comment_body "$base")" ;;
+        # Comment first: the label is the "already notified" marker, so a failed or
+        # cancelled run leaves no label and the next run retries both.
+        echo "#$n conflicts with $base: commenting and adding $label"
+        act gh pr comment "$n" --repo "$repo" --body "$(comment_body "$base")"
+        act gh pr edit "$n" --repo "$repo" --add-label "$label" ;;
       CONFLICTING:true) echo "#$n still conflicts" ;;
       MERGEABLE:true)
         echo "#$n merges cleanly: removing $label"
