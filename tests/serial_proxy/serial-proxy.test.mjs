@@ -263,3 +263,112 @@ test('(m) a large queued POST can finish within queue wait plus body grace', asy
   assert.equal((await second).status, 200);
   assert.equal(up.st.receivedBytes, body.length);
 });
+
+test('(n) queued HTTP requests reach the upstream in FIFO order', async (t) => {
+  let releaseHold;
+  const hold = new Promise((resolve) => { releaseHold = resolve; });
+  t.after(() => releaseHold());
+  const served = [];
+  const upstream = http.createServer(async (req, res) => {
+    if (req.url === '/v1/hold') {
+      res.writeHead(200, { 'content-type': 'text/plain' });
+      res.write('ready');
+      await hold;
+      res.end('done');
+      return;
+    }
+    served.push(req.url);
+    res.end(req.url);
+  });
+  await new Promise((resolve, reject) => {
+    upstream.once('error', reject);
+    upstream.listen(0, '127.0.0.1', resolve);
+  });
+  cleanups.push(() => new Promise((resolve) => { upstream.closeAllConnections(); upstream.close(resolve); }));
+  const p = await startProxyServer(`http://127.0.0.1:${upstream.address().port}/v1`, { max: 1 });
+  const heldResponse = await fetch(`${p.url}/hold`);
+  const reader = heldResponse.body.getReader();
+  assert.equal(Buffer.from((await reader.read()).value).toString(), 'ready');
+
+  const waitForQueued = async (expected) => {
+    const deadline = Date.now() + 2000;
+    let status;
+    do {
+      status = await (await fetch(`${p.url}/__proxy/status`)).json();
+      if (status.queued === expected) return status;
+      await sleep(5);
+    } while (Date.now() < deadline);
+    assert.equal(status.queued, expected, 'requests must enter the queue before the held response completes');
+  };
+  const first = get(`${p.url}/first`);
+  assert.equal((await waitForQueued(1)).active, 1);
+  const second = get(`${p.url}/second`);
+  assert.equal((await waitForQueued(2)).active, 1);
+  assert.deepEqual(served, [], 'queued requests must not reach the upstream yet');
+
+  releaseHold();
+  while (!(await reader.read()).done);
+  const responses = await Promise.all([first, second]);
+  assert.deepEqual(responses.map((response) => response.status), [200, 200]);
+  assert.deepEqual(responses.map((response) => response.text), ['/v1/first', '/v1/second']);
+  assert.deepEqual(served, ['/v1/first', '/v1/second']);
+  const status = await (await fetch(`${p.url}/__proxy/status`)).json();
+  assert.equal(status.active, 0);
+  assert.equal(status.queued, 0);
+});
+
+test('(o) five direct HTTP requests overlap while the proxy caps the same upstream at one', async (t) => {
+  let active = 0, peak = 0, total = 0, directCount = 0;
+  let releaseDirect, markDirectReady;
+  const directReleased = new Promise((resolve) => { releaseDirect = resolve; });
+  const directReady = new Promise((resolve) => { markDirectReady = resolve; });
+  t.after(() => releaseDirect());
+  const upstream = http.createServer(async (req, res) => {
+    active++;
+    total++;
+    peak = Math.max(peak, active);
+    if (req.url.includes('direct=')) {
+      directCount++;
+      if (directCount === 5) markDirectReady();
+      await directReleased;
+    } else {
+      await sleep(20);
+    }
+    res.writeHead(200, { 'content-type': 'text/plain' });
+    res.end(req.url);
+    active--;
+  });
+  await new Promise((resolve, reject) => {
+    upstream.once('error', reject);
+    upstream.listen(0, '127.0.0.1', resolve);
+  });
+  cleanups.push(() => new Promise((resolve) => { upstream.closeAllConnections(); upstream.close(resolve); }));
+  const upstreamUrl = `http://127.0.0.1:${upstream.address().port}`;
+  const direct = Promise.all(Array.from({ length: 5 }, (_, index) => get(`${upstreamUrl}/v1/chat/completions?direct=${index}`)));
+  let timer;
+  try {
+    await Promise.race([
+      directReady,
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('five direct HTTP requests did not overlap')), 2000); }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+  assert.equal(active, 5);
+  assert.equal(peak, 5);
+  releaseDirect();
+  const directResponses = await direct;
+  assert.ok(directResponses.every((response) => response.status === 200));
+  assert.equal(total, 5);
+  assert.equal(active, 0);
+
+  peak = 0;
+  total = 0;
+  const p = await startProxyServer(`${upstreamUrl}/v1`, { max: 1 });
+  const proxiedResponses = await Promise.all(Array.from({ length: 5 }, (_, index) => get(`${p.url}/chat/completions?proxied=${index}`)));
+  assert.ok(proxiedResponses.every((response) => response.status === 200));
+  assert.deepEqual(proxiedResponses.map((response) => response.text), Array.from({ length: 5 }, (_, index) => `/v1/chat/completions?proxied=${index}`));
+  assert.equal(peak, 1);
+  assert.equal(total, 5);
+  assert.equal(active, 0);
+});
