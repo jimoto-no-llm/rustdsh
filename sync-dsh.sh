@@ -8,7 +8,12 @@
 # --check-only to preview without installing.
 # rdsh self-update prefers a prebuilt release binary; source builds run only with
 # RDSH_SYNC_FROM_SOURCE=1 (under nice/ionice). Regress always runs sandboxed.
+# Release integrity: the archive must match the digest pinned in the repository
+# release-digests.tsv (canonical origin), never an <asset>.sha256 from the base.
 set -u
+# Trusted digest registry for released archives. Keep this canonical origin
+# independent of RDSH_RELEASE_BASE and of every other environment value (#303).
+RELEASE_DIGESTS_URL="https://raw.githubusercontent.com/jimoto-no-llm/rustdsh/main/release-digests.tsv"
 CHANNEL="rc"
 CHECK_ONLY=0
 for a in "$@"; do
@@ -128,22 +133,18 @@ rdsh_release_asset() {
   esac
 }
 verify_sha256() {
-  # Same check as install.sh: the first field of sidecar $2 must equal the
-  # sha256 of $1 (case-insensitive). A missing or empty sidecar fails.
-  line="$(cat "$2" 2>/dev/null)"
-  want="${line%% *}"
-  if [ -z "$want" ]; then
-    log "empty checksum sidecar"
-    return 1
-  fi
-  if ! printf '%s\n' "$want" | grep -Eq '^[a-fA-F0-9]{64}$'; then
-    log "invalid release checksum; refusing update"
-    return 1
-  fi
+  # Same check as install.sh: $2 is the pinned sha256 of $1 (case-insensitive).
+  # A missing or malformed pin fails.
+  file="$1"
+  want="$2"
+  case "$want" in
+    ''|*[!0123456789abcdefABCDEF]*) log "invalid pinned SHA-256"; return 1 ;;
+  esac
+  if [ "${#want}" -ne 64 ]; then log "invalid pinned SHA-256 length"; return 1; fi
   if command -v sha256sum >/dev/null 2>&1; then
-    out="$(sha256sum "$1")"
+    out="$(sha256sum "$file")"
   elif command -v shasum >/dev/null 2>&1; then
-    out="$(shasum -a 256 "$1")"
+    out="$(shasum -a 256 "$file")"
   else
     log "no sha256sum or shasum available"
     return 1
@@ -158,22 +159,129 @@ verify_sha256() {
   log "CHECKSUM MISMATCH"
   return 1
 }
+release_version() {
+  case "$1" in
+    v*) printf '%s' "$1" ;;
+    *) printf 'v%s' "$1" ;;
+  esac
+}
+validate_release_digest_manifest() {
+  awk '
+    BEGIN { FS = "[ \t]+"; bad = 0; latest_count = 0 }
+    /^[ \t]*#/ || NF == 0 { next }
+    function valid_version(v) { return v ~ /^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$/ }
+    function valid_asset(a) {
+      return a == "rdsh-linux-x64.tar.gz" || a == "rdsh-linux-x64-musl.tar.gz" ||
+        a == "rdsh-macos-arm64.tar.gz" || a == "rdsh-macos-x64.tar.gz"
+    }
+    $1 == "latest" {
+      if (NF != 2 || !valid_version($2) || $2 ~ /-/ || latest_count++) bad = 1
+      latest = $2
+      next
+    }
+    {
+      if (NF != 3 || !valid_version($1) || !valid_asset($2) || length($3) != 64 || $3 ~ /[^0-9a-fA-F]/) {
+        bad = 1
+        next
+      }
+      key = $1 SUBSEP $2
+      if (seen[key]++) bad = 1
+      versions[$1] = 1
+      if ($1 == latest) latest_assets++
+    }
+    END {
+      if (bad || latest_count != 1 || !versions[latest] || latest_assets != 4) exit 1
+    }
+  ' "$1"
+}
+latest_release_version() {
+  awk '$1 == "latest" { print $2 }' "$1"
+}
+expected_release_sha256() {
+  awk -v wanted_version="$2" -v wanted_asset="$3" '
+    $1 == wanted_version && $2 == wanted_asset { print $3; matches++ }
+    END { if (matches != 1) exit 1 }
+  ' "$1"
+}
+# `latest` in the pinned registry can lag a published release. Compare the
+# stable target's numeric core with the installed version before downloading.
+# Node is already required for DSH synchronization; no SemVer package is needed.
+automatic_release_order() {
+  node - "$PREFIX_BIN/rdsh" "$1" <<'RDSH_ORDER'
+const {execFileSync} = require('node:child_process');
+try {
+  const [binary, target] = process.argv.slice(2);
+  const installed = execFileSync(binary, ['--version'], {
+    encoding: 'utf8', timeout: 2000, killSignal: 'SIGKILL', maxBuffer: 4096,
+    stdio: ['ignore', 'pipe', 'ignore'],
+  }).trim();
+  const current = /^rdsh (0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.exec(installed);
+  const next = /^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/.exec(target);
+  if (!current || !next) process.exit(1);
+  // The registry's latest row is stable, which is at least as new as a
+  // prerelease with the same core; build metadata never changes precedence.
+  for (let i = 1; i <= 3; i++) {
+    const a = BigInt(current[i]), b = BigInt(next[i]);
+    if (a !== b) { console.log(a > b ? 'older' : 'eligible'); process.exit(0); }
+  }
+  console.log('eligible');
+} catch { process.exit(1); }
+RDSH_ORDER
+}
 fetch_rdsh_release() {
-  # Install the prebuilt release rdsh binary to $1 after checking it against
-  # its <asset>.sha256 sidecar. Honors RDSH_RELEASE_BASE (tests: file:///path)
-  # and RDSH_SYNC_VERSION (default: latest).
+  # Install the prebuilt release rdsh binary to $1 after checking it against the
+  # digest registry pinned to the repository, never against an
+  # <asset>.sha256 fetched from the same origin as the artifact (issue #303).
+  # Honors RDSH_RELEASE_BASE (tests) and RDSH_SYNC_VERSION (default: latest).
+  # The registry URL above is deliberately not overridable from the environment.
   dest="$1"
   base="${RDSH_RELEASE_BASE:-https://github.com/jimoto-no-llm/rustdsh/releases}"
+  case "$base" in
+    https://*) ;;
+    *)
+      # A pinned digest still protects the payload, but a plain-http base can be
+      # made to serve an older pinned release (downgrade) or nothing at all.
+      if [ "${RDSH_TEST_INSECURE_BASE:-0}" != 1 ]; then
+        log "refusing non-https release base: $base (RDSH_TEST_INSECURE_BASE=1 is for local tests only)"
+        return 1
+      fi
+      log "RDSH_TEST_INSECURE_BASE=1: using non-https release base: $base"
+      ;;
+  esac
   ver="${RDSH_SYNC_VERSION:-latest}"
   asset="$(rdsh_release_asset)" || { log "no prebuilt rdsh binary for this host; set RDSH_SYNC_FROM_SOURCE=1 to build"; return 1; }
-  if [ "$ver" = "latest" ]; then url="$base/latest/download/$asset"; else url="$base/download/$ver/$asset"; fi
   tmpd="$(mktemp -d 2>/dev/null || mktemp -d -t rdsh-sync-fetch)"
-  log "fetching rdsh release: $url"
-  if ! curl -fsSL -o "$tmpd/pkg.tgz" "$url"; then rm -rf "$tmpd"; return 1; fi
-  if ! curl -fsSL -o "$tmpd/pkg.tgz.sha256" "$url.sha256" 2>/dev/null; then
-    log "no checksum sidecar: $url.sha256"; rm -rf "$tmpd"; return 1
+  if ! curl --proto '=https' --proto-redir '=https' --tlsv1.2 -fsSL -o "$tmpd/release-digests.tsv" "$RELEASE_DIGESTS_URL"; then
+    log "could not fetch the trusted release digest registry; refusing update"
+    rm -rf "$tmpd"; return 1
   fi
-  if ! verify_sha256 "$tmpd/pkg.tgz" "$tmpd/pkg.tgz.sha256"; then rm -rf "$tmpd"; return 1; fi
+  if ! validate_release_digest_manifest "$tmpd/release-digests.tsv"; then
+    log "trusted release digest registry is invalid; refusing update"
+    rm -rf "$tmpd"; return 1
+  fi
+  if [ "$ver" = "latest" ]; then version="$(latest_release_version "$tmpd/release-digests.tsv")"; else version="$(release_version "$ver")"; fi
+  if ! printf '%s\n' "$version" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$'; then
+    log "invalid release version: $version"; rm -rf "$tmpd"; return 1
+  fi
+  if ! expected="$(expected_release_sha256 "$tmpd/release-digests.tsv" "$version" "$asset")"; then
+    log "no pinned checksum for release $version asset $asset; refusing update"
+    rm -rf "$tmpd"; return 1
+  fi
+  if [ "$ver" = "latest" ] && [ -e "$PREFIX_BIN/rdsh" ]; then
+    if ! order="$(automatic_release_order "$version")"; then
+      log "cannot compare the installed rdsh version; refusing automatic update"
+      rm -rf "$tmpd"; return 1
+    fi
+    if [ "$order" = "older" ]; then
+      log "refusing automatic rdsh downgrade to $version; installed binary and notice state preserved"
+      rm -rf "$tmpd"; return 1
+    fi
+  fi
+  url="$base/download/$version/$asset"
+  log "fetching rdsh release: $version/$asset"
+  # A configured https base must not be bounced onto plain http either.
+  if ! curl --proto-redir '=https' -fsSL -o "$tmpd/pkg.tgz" "$url"; then rm -rf "$tmpd"; return 1; fi
+  if ! verify_sha256 "$tmpd/pkg.tgz" "$expected"; then rm -rf "$tmpd"; return 1; fi
   if ! tar -xzf "$tmpd/pkg.tgz" -C "$tmpd"; then rm -rf "$tmpd"; return 1; fi
   if [ ! -x "$tmpd/rdsh" ]; then rm -rf "$tmpd"; return 1; fi
   install -m755 "$tmpd/rdsh" "$dest"
