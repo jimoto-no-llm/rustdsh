@@ -22,6 +22,7 @@ mod slim;
 mod token_handoff;
 mod tokens;
 mod tool_security;
+mod update_auto;
 mod websearch;
 
 #[derive(Parser, Debug)]
@@ -256,6 +257,12 @@ enum Commands {
         #[arg(long = "json")]
         json: bool,
     },
+    /// Auto-update timer: status, on, or off (daily systemd user timer)
+    #[command(name = "update")]
+    Update {
+        #[command(subcommand)]
+        action: UpdateAction,
+    },
     /// Unified rdsh settings (rdsh.json): show values, path, or write defaults
     Settings {
         #[command(subcommand)]
@@ -324,6 +331,38 @@ enum FeaturesAction {
     On { id: String },
     /// Disable one feature: rdsh features off discord
     Off { id: String },
+}
+
+#[derive(Subcommand, Debug)]
+enum UpdateAction {
+    /// Daily auto-update timer for released rdsh/dsh versions
+    Auto {
+        #[command(subcommand)]
+        action: AutoAction,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum AutoAction {
+    /// Show the unit directory, updater script and timer state
+    Status {
+        #[arg(long = "json")]
+        json: bool,
+    },
+    /// Install and start the daily auto-update timer
+    On {
+        #[arg(long = "dry-run")]
+        dry_run: bool,
+        #[arg(long = "json")]
+        json: bool,
+    },
+    /// Stop and remove the auto-update timer
+    Off {
+        #[arg(long = "dry-run")]
+        dry_run: bool,
+        #[arg(long = "json")]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -548,6 +587,17 @@ fn main() {
             });
             guard::cmd_guard(merged, reason, json, policy_file)
         }
+        Some(Commands::Update { action }) => match action {
+            UpdateAction::Auto { action } => match action {
+                AutoAction::Status { json } => update_auto::cmd_update_auto("status", false, json),
+                AutoAction::On { dry_run, json } => {
+                    update_auto::cmd_update_auto("on", dry_run, json)
+                }
+                AutoAction::Off { dry_run, json } => {
+                    update_auto::cmd_update_auto("off", dry_run, json)
+                }
+            },
+        },
         Some(Commands::Settings { action }) => match action {
             SettingsAction::Path => {
                 println!("{}", rdsh_config::settings_path());
