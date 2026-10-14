@@ -103,8 +103,22 @@ esac
 
 release_flag=""
 [ "$mode" = full ] && release_flag="--release"
-bin=./target/debug/rdsh
-[ "$mode" = full ] && bin=./target/release/rdsh
+profile=debug
+[ "$mode" = full ] && profile=release
+exe=""
+case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) exe=.exe ;; esac
+bin=./target/$profile/rdsh$exe
+# Absolute: plugin tests run with the package directory as their cwd.
+abs_bin="$root/target/$profile/rdsh$exe"
+
+# Build the selected profile once per run, whichever check needs it first.
+built=0
+ensure_build() {
+  [ "$built" = 1 ] && return 0
+  built=1
+  # shellcheck disable=SC2086 # release_flag is empty or one word
+  step "cargo build${release_flag:+ $release_flag}${1:+ ($1)}" cargo build $release_flag
+}
 
 regress() {
   stub_dir=$(mktemp -d)
@@ -130,8 +144,7 @@ if [ "$rust" = 1 ]; then
     step "cargo test${release_flag:+ $release_flag} --example benchmark_extended" cargo test $release_flag --example benchmark_extended
     # shellcheck disable=SC2086
     step "cargo test${release_flag:+ $release_flag} --example benchmark_models" cargo test $release_flag --example benchmark_models
-    # shellcheck disable=SC2086
-    step "cargo build${release_flag:+ $release_flag}" cargo build $release_flag
+    ensure_build
     step "tests/regress.sh + context_prototype.sh" regress
   fi
 fi
@@ -139,13 +152,10 @@ fi
 if [ "$node" = 1 ] || { [ "$rust" = 1 ] && [ "$mode" != quick ]; }; then
   # shellcheck disable=SC2086 # word lists of repository paths
   step "node tests (CI plugin-security set)" node --test $node_base
-  if [ "$rust" != 1 ] || [ "$mode" = quick ]; then
-    # shellcheck disable=SC2086
-    step "cargo build${release_flag:+ $release_flag} (for binary-backed node tests)" cargo build $release_flag
-  fi
+  ensure_build "for binary-backed node tests"
   # shellcheck disable=SC2086
   # BIN: the binary this run built (release in full mode), not a stale debug build.
-  step "node tests (CI test job, BIN=$bin)" env BIN="$bin" node --test $node_built
+  step "node tests (CI test job, BIN=$bin)" env BIN="$abs_bin" node --test $node_built
   # shellcheck disable=SC2086
   [ -n "$extra_tests" ] && step "changed node tests" node --test $extra_tests
 fi
@@ -157,7 +167,9 @@ for d in $plugins; do
   if grep -q '"\(dev\)\{0,1\}[dD]ependencies"' "$d/package.json" && [ ! -d "$d/node_modules" ]; then
     step "$d npm test (node_modules missing: npm ci --ignore-scripts --prefix $d)" false
   else
-    step "$d npm test" npm test --prefix "$d"
+    ensure_build "for plugin tests"
+    # Same contract as CI: plugins locate the built binary through RDSH_BIN.
+    step "$d npm test (RDSH_BIN=$abs_bin)" env RDSH_BIN="$abs_bin" BIN="$abs_bin" npm test --prefix "$d"
   fi
 done
 

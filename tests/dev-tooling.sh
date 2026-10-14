@@ -277,6 +277,12 @@ expect_rc 0 "full list" sh scripts/check.sh full --list
 has "tests/regress.sh" "full list"
 has "release policy unittest" "full list"
 has "node tests (CI test job, BIN=./target/release/rdsh)" "full mode tests the release binary"
+if grep "npm test (RDSH_BIN=" "$tmp/out" | grep -v "(RDSH_BIN=$root/target/release/rdsh)" | grep -q .; then
+  die "plugin tests must get the absolute release binary in full mode"
+fi
+grep -q "plugins/rdsh-compute npm test (RDSH_BIN=$root/target/release/rdsh)\|plugins/rdsh-compute npm test (node_modules missing" "$tmp/out" \
+  || die "rdsh-compute plugin test not selected with RDSH_BIN"
+[ "$(grep -c "cargo build --release" "$tmp/out")" = 1 ] || die "release build must be selected exactly once"
 has "(not run) tests/security-boundaries.test.mjs" "CI-only suites reported"
 # Runs on Linux with Docker, otherwise listed as not run; selected either way.
 has "tests/install-isolated.sh --source local" "installer isolation selected"
