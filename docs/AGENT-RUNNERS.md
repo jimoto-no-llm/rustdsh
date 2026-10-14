@@ -177,7 +177,7 @@ the tree is stopped with `taskkill /T /F`.
 A process group number is only a number: once the group is gone it can be
 reused by an unrelated group (or after a reboot). The supervisor therefore
 records `agent_identity` (the leader's `process-identity` record: start time
-and boot/namespace scope; `null` where unavailable, such as macOS) in
+and boot/namespace scope on Linux, Windows and macOS; `null` where unavailable) in
 `job.json`, and `cancel` follows these rules:
 
 - A terminal job whose result has `cleanup: confirmed` is a pure no-op:
@@ -205,11 +205,10 @@ group, because surviving members do not prove it is still the job's group.
 Stop them manually; the job's group number is recorded as `agent_pgid` in
 `job.json`.
 
-macOS limitation: no process identity is available there, so after the
-supervisor is lost (for example killed) its agent group can no longer be
-stopped by `cancel`. `status` shows `supervisor_lost` with
-`cleanup_code: ownership_unknown` and the group has to be stopped by hand.
-While the supervisor lives, cancel works normally.
+On a platform without process identity, after the supervisor is lost (for
+example killed) its agent group can no longer be stopped by `cancel`. `status`
+shows `supervisor_lost` with `cleanup_code: ownership_unknown` and the group
+has to be stopped by hand. While the supervisor lives, cancel works normally.
 
 When ownership holds and the group is gone, `cancel` returns only then,
 otherwise it fails with `cancel_unconfirmed`. A running job ends as

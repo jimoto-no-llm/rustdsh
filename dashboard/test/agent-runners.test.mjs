@@ -398,7 +398,7 @@ test("a dead supervisor without a result is reported as supervisor_lost", async 
   assert.equal(info.code, "supervisor_lost");
 });
 
-const identityPlatform = ["linux", "win32"].includes(process.platform);
+const identityPlatform = ["linux", "win32", "darwin"].includes(process.platform);
 const posixOnly = { skip: process.platform === "win32" && "process groups are POSIX only" };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function waitForFile(file) {
@@ -461,7 +461,7 @@ test("cancel after supervisor_lost kills the still-running agent group", posixOn
   assert.equal(lost.agent_group_alive, true);
   assert.ok(groupAlive(agent_pgid));
   if (!identityPlatform) {
-    // No process identity here (macOS): a group is never signalled by number.
+    // No process identity on this platform: a group is never signalled by number.
     t.after(() => { try { process.kill(-agent_pgid, "SIGKILL"); } catch {} });
     await assert.rejects(cancel(job.id, { termMs: 300, killMs: 300 }), { code: "cancel_unconfirmed" });
     assert.ok(groupAlive(agent_pgid), "no signal was sent");
