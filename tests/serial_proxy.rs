@@ -4,6 +4,7 @@ use std::{
     collections::HashMap,
     io::{BufRead, BufReader, Read, Write},
     net::{SocketAddr, TcpListener, TcpStream},
+    path::{Path, PathBuf},
     process::{Child, Command, Stdio},
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -11,6 +12,10 @@ use std::{
     },
     thread,
     time::Duration,
+};
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::TcpStream as AsyncTcpStream,
 };
 
 #[derive(Clone, Debug)]
@@ -38,7 +43,15 @@ struct MockUpstream {
 
 impl MockUpstream {
     fn start(delay: Duration) -> Self {
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        Self::start_at("127.0.0.1:0", delay).unwrap()
+    }
+
+    fn start_ipv6(delay: Duration) -> std::io::Result<Self> {
+        Self::start_at("[::1]:0", delay)
+    }
+
+    fn start_at(address: &str, delay: Duration) -> std::io::Result<Self> {
+        let listener = TcpListener::bind(address)?;
         listener.set_nonblocking(true).unwrap();
         let addr = listener.local_addr().unwrap();
         let state = Arc::new(MockState {
@@ -65,12 +78,12 @@ impl MockUpstream {
                 }
             }
         });
-        Self {
+        Ok(Self {
             addr,
             state,
             stop,
             accept_thread: Some(accept_thread),
-        }
+        })
     }
 }
 
@@ -164,13 +177,52 @@ struct ProxyProcess {
     child: Child,
     url: String,
     logs: Arc<Mutex<Vec<String>>>,
+    binary_dir: Option<PathBuf>,
 }
 
 impl ProxyProcess {
     fn start(upstream: &str, options: &[&str]) -> Self {
-        let mut child = Command::new(env!("CARGO_BIN_EXE_rdsh"))
+        Self::start_binary(
+            Path::new(env!("CARGO_BIN_EXE_rdsh")),
+            upstream,
+            options,
+            None,
+        )
+    }
+
+    fn start_as_dsh(upstream: &str, options: &[&str]) -> Self {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let binary_dir = std::env::temp_dir().join(format!(
+            "rdsh-shadow-integration-{}-{nonce}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&binary_dir).unwrap();
+        let binary_name = if cfg!(windows) { "dsh.exe" } else { "dsh" };
+        let binary = binary_dir.join(binary_name);
+        std::fs::copy(env!("CARGO_BIN_EXE_rdsh"), &binary).unwrap();
+        let missing_original = binary_dir.join("no-original-dsh");
+        let mut proxy = Self::start_binary(&binary, upstream, options, Some(&missing_original));
+        proxy.binary_dir = Some(binary_dir);
+        proxy
+    }
+
+    fn start_binary(
+        binary: &Path,
+        upstream: &str,
+        options: &[&str],
+        original_dsh: Option<&Path>,
+    ) -> Self {
+        let mut command = Command::new(binary);
+        command
             .args(["serial-proxy", "--upstream", upstream, "--port", "0"])
-            .args(options)
+            .args(options);
+        if let Some(original_dsh) = original_dsh {
+            command.env("DSH_ORIG_BIN", original_dsh);
+        }
+        let mut child = command
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::piped())
@@ -202,6 +254,7 @@ impl ProxyProcess {
             child,
             url: address.to_string(),
             logs,
+            binary_dir: None,
         }
     }
 }
@@ -210,6 +263,9 @@ impl Drop for ProxyProcess {
     fn drop(&mut self) {
         let _ = self.child.kill();
         let _ = self.child.wait();
+        if let Some(binary_dir) = &self.binary_dir {
+            let _ = std::fs::remove_dir_all(binary_dir);
+        }
     }
 }
 
@@ -247,6 +303,39 @@ async fn wait_for_queued(client: &Client, proxy_url: &str, queued: usize) {
     })
     .await
     .expect("queue status timed out");
+}
+
+async fn wait_for_active(client: &Client, proxy_url: &str, active: usize) {
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            if let Ok(response) = client
+                .get(format!("{proxy_url}/__proxy/status"))
+                .send()
+                .await
+            {
+                if let Ok(body) = response.bytes().await {
+                    if serde_json::from_slice::<serde_json::Value>(&body)
+                        .is_ok_and(|value| value["active"] == active)
+                    {
+                        return;
+                    }
+                }
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .expect("active count status timed out");
+}
+
+async fn raw_request(proxy_url: &str, path: &str) -> AsyncTcpStream {
+    let authority = proxy_url.strip_prefix("http://").unwrap();
+    let mut stream = AsyncTcpStream::connect(authority).await.unwrap();
+    stream
+        .write_all(format!("GET {path} HTTP/1.1\r\nHost: {authority}\r\n\r\n").as_bytes())
+        .await
+        .unwrap();
+    stream
 }
 
 #[tokio::test]
@@ -440,4 +529,244 @@ async fn native_cli_rpm_window_is_reported_and_waiter_times_out() {
         .unwrap();
     assert_eq!(waiting.status(), reqwest::StatusCode::SERVICE_UNAVAILABLE);
     assert_eq!(upstream.state.seen.lock().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn disconnect_while_queued_removes_waiter_before_slot_opens() {
+    let upstream = MockUpstream::start(Duration::from_millis(400));
+    let proxy = ProxyProcess::start(
+        &format!("http://{}", upstream.addr),
+        &["--max", "1", "--queue-timeout", "2"],
+    );
+    let client = Client::new();
+    let first_client = client.clone();
+    let first_url = format!("{}/first", proxy.url);
+    let first = tokio::spawn(async move {
+        let response = first_client.get(first_url).send().await.unwrap();
+        response.bytes().await.unwrap();
+    });
+    wait_until(|| upstream.state.seen.lock().unwrap().len() == 1).await;
+
+    let abandoned = raw_request(&proxy.url, "/queued").await;
+    wait_for_queued(&client, &proxy.url, 1).await;
+    drop(abandoned);
+    wait_for_queued(&client, &proxy.url, 0).await;
+
+    first.await.unwrap();
+    assert_eq!(upstream.state.seen.lock().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn disconnect_during_sse_releases_slot_and_cancels_upstream_stream() {
+    let upstream = MockUpstream::start(Duration::from_millis(150));
+    let proxy = ProxyProcess::start(&format!("http://{}", upstream.addr), &[]);
+    let mut downstream = raw_request(&proxy.url, "/active-sse").await;
+    wait_until(|| upstream.state.seen.lock().unwrap().len() == 1).await;
+
+    let mut response = Vec::new();
+    tokio::time::timeout(Duration::from_secs(3), async {
+        let mut buffer = [0u8; 512];
+        loop {
+            let read = downstream.read(&mut buffer).await.unwrap();
+            assert_ne!(read, 0, "proxy closed before the first SSE event");
+            response.extend_from_slice(&buffer[..read]);
+            if String::from_utf8_lossy(&response).contains("data: first") {
+                return;
+            }
+        }
+    })
+    .await
+    .expect("first SSE event timed out");
+    drop(downstream);
+
+    wait_for_active(&Client::new(), &proxy.url, 0).await;
+    wait_until(|| upstream.state.finished.load(Ordering::SeqCst) == 1).await;
+    assert_eq!(upstream.state.active.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
+async fn disconnect_while_waiting_for_rpm_releases_slot_without_dispatch() {
+    let upstream = MockUpstream::start(Duration::from_millis(20));
+    let proxy = ProxyProcess::start(
+        &format!("http://{}", upstream.addr),
+        &["--rpm", "1", "--max", "5", "--queue-timeout", "5"],
+    );
+    let client = Client::new();
+    let first = client
+        .get(format!("{}/first", proxy.url))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(first.status(), reqwest::StatusCode::OK);
+    first.bytes().await.unwrap();
+    wait_for_active(&client, &proxy.url, 0).await;
+
+    let mut abandoned = raw_request(&proxy.url, "/rpm-waiter").await;
+    wait_for_active(&client, &proxy.url, 1).await;
+    let mut byte = [0u8; 1];
+    assert!(
+        tokio::time::timeout(Duration::from_millis(100), abandoned.read(&mut byte))
+            .await
+            .is_err()
+    );
+    drop(abandoned);
+
+    wait_for_active(&client, &proxy.url, 0).await;
+    assert_eq!(upstream.state.seen.lock().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn ipv6_upstream_host_header_keeps_exactly_one_pair_of_brackets() {
+    let upstream = match MockUpstream::start_ipv6(Duration::from_millis(10)) {
+        Ok(upstream) => upstream,
+        Err(error)
+            if matches!(
+                error.kind(),
+                std::io::ErrorKind::AddrNotAvailable | std::io::ErrorKind::PermissionDenied
+            ) =>
+        {
+            eprintln!("skipping IPv6 upstream test: {error}");
+            return;
+        }
+        Err(error) => panic!("failed to bind IPv6 loopback: {error}"),
+    };
+    let proxy = ProxyProcess::start(&format!("http://{}/v1", upstream.addr), &[]);
+    let response = Client::new()
+        .get(format!("{}/forward", proxy.url))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
+    response.bytes().await.unwrap();
+    wait_until(|| upstream.state.seen.lock().unwrap().len() == 1).await;
+
+    let expected = format!("[::1]:{}", upstream.addr.port());
+    assert_eq!(
+        upstream.state.seen.lock().unwrap()[0].headers["host"],
+        expected
+    );
+}
+
+#[tokio::test]
+async fn serial_proxy_runs_when_binary_is_invoked_as_dsh() {
+    let upstream = MockUpstream::start(Duration::from_millis(10));
+    let proxy = ProxyProcess::start_as_dsh(&format!("http://{}", upstream.addr), &[]);
+    let status = Client::new()
+        .get(format!("{}/__proxy/status", proxy.url))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(status.status(), reqwest::StatusCode::OK);
+}
+
+#[test]
+fn invalid_serial_proxy_options_exit_with_usage_status() {
+    let invalid_cases: &[(&str, &[&str])] = &[
+        ("invalid tool choice", &["--tool-choice-default", "any"]),
+        ("empty tool choice", &["--tool-choice-default", ""]),
+        ("zero rpm", &["--rpm", "0"]),
+        ("non-numeric rpm", &["--rpm", "abc"]),
+        ("fractional rpm", &["--rpm", "1.5"]),
+        ("negative rpm", &["--rpm=-1"]),
+        ("zero max", &["--max", "0"]),
+        ("zero body cap", &["--max-body-bytes", "0"]),
+        ("non-numeric body cap", &["--max-body-bytes", "x"]),
+        ("non-finite queue timeout", &["--queue-timeout", "NaN"]),
+        ("non-loopback host without opt-in", &["--host", "0.0.0.0"]),
+    ];
+    for invalid in invalid_cases {
+        let (name, invalid) = invalid;
+        let output = Command::new(env!("CARGO_BIN_EXE_rdsh"))
+            .args(["serial-proxy", "--upstream", "http://127.0.0.1:1"])
+            .args(*invalid)
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(2), "{name}: {invalid:?}");
+    }
+
+    let invalid_upstream = Command::new(env!("CARGO_BIN_EXE_rdsh"))
+        .args(["serial-proxy", "--upstream", "file:///tmp/upstream"])
+        .output()
+        .unwrap();
+    assert_eq!(invalid_upstream.status.code(), Some(2));
+}
+
+#[test]
+fn serial_proxy_runtime_startup_failure_keeps_runtime_status() {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port().to_string();
+    let output = Command::new(env!("CARGO_BIN_EXE_rdsh"))
+        .args([
+            "serial-proxy",
+            "--upstream",
+            "http://127.0.0.1:1",
+            "--port",
+            &port,
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(1));
+}
+
+#[tokio::test]
+async fn closed_stderr_does_not_abort_startup_or_tool_choice_streaming() {
+    let upstream = MockUpstream::start(Duration::from_millis(10));
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    drop(listener);
+    let mut child = Command::new(env!("CARGO_BIN_EXE_rdsh"))
+        .args([
+            "serial-proxy",
+            "--upstream",
+            &format!("http://{}", upstream.addr),
+            "--port",
+            &port.to_string(),
+            "--tool-choice-default",
+            "auto",
+        ])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    drop(child.stderr.take());
+    let proxy = ProxyProcess {
+        child,
+        url: format!("http://127.0.0.1:{port}"),
+        logs: Arc::new(Mutex::new(Vec::new())),
+        binary_dir: None,
+    };
+    let client = Client::new();
+    let status = tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            if let Ok(response) = client
+                .get(format!("{}/__proxy/status", proxy.url))
+                .send()
+                .await
+            {
+                if response.status().is_success() {
+                    return response;
+                }
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("proxy did not start with a closed stderr");
+    status.bytes().await.unwrap();
+
+    let body = br#"{"tools":[{"type":"function"}]}"#;
+    let response = client
+        .post(format!("{}/v1/chat/completions", proxy.url))
+        .header("content-type", "application/json")
+        .body(body.to_vec())
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(response.status(), reqwest::StatusCode::OK);
+    response.bytes().await.unwrap();
+    wait_until(|| upstream.state.seen.lock().unwrap().len() == 1).await;
+    let forwarded: serde_json::Value =
+        serde_json::from_slice(&upstream.state.seen.lock().unwrap()[0].body).unwrap();
+    assert_eq!(forwarded["tool_choice"], "auto");
 }

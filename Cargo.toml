@@ -34,6 +34,9 @@ tower = { version = "0.5", features = ["util"] }
 [build-dependencies]
 embed-resource = "=3.0.12"
 
+[dev-dependencies]
+tokio = { version = "1.48", features = ["test-util"] }
+
 [profile.release]
 # Speed-first: opt 3 + fat LTO beats opt-z for launcher + search/token loops.
 # Output/behavior unchanged; binary grows slightly (acceptable for absolute speed).

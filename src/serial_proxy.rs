@@ -1,6 +1,6 @@
 use std::{
     collections::VecDeque,
-    io,
+    io::{self, Write},
     net::{IpAddr, SocketAddr},
     pin::Pin,
     sync::{
@@ -23,10 +23,12 @@ use hyper::service::service_fn;
 use hyper_util::rt::{TokioIo, TokioTimer};
 use reqwest::{redirect::Policy, Url};
 use tokio::{
+    io::Interest,
     net::TcpListener,
-    sync::{OwnedSemaphorePermit, Semaphore},
+    net::TcpStream,
+    sync::{watch, OwnedSemaphorePermit, Semaphore},
     task::JoinSet,
-    time::{sleep_until, timeout, timeout_at},
+    time::{sleep_until, timeout, timeout_at, Instant as TokioInstant},
 };
 use tower::ServiceExt;
 
@@ -76,6 +78,34 @@ struct ProxyState {
     next_id: AtomicU64,
 }
 
+#[derive(Clone)]
+struct DisconnectSignal(watch::Sender<bool>);
+
+impl DisconnectSignal {
+    fn new() -> Self {
+        let (sender, _) = watch::channel(false);
+        Self(sender)
+    }
+
+    fn cancel(&self) {
+        self.0.send_replace(true);
+    }
+
+    async fn cancelled(&self) {
+        let mut receiver = self.0.subscribe();
+        if *receiver.borrow() {
+            return;
+        }
+        let _ = receiver.changed().await;
+    }
+}
+
+impl Default for DisconnectSignal {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 struct SlotPermit {
     _permit: OwnedSemaphorePermit,
     state: Arc<ProxyState>,
@@ -108,7 +138,13 @@ impl Drop for QueueCount {
 }
 
 impl ProxyState {
-    async fn acquire_slot(self: &Arc<Self>) -> Result<SlotPermit, SlotError> {
+    async fn acquire_slot(
+        self: &Arc<Self>,
+        disconnected: &DisconnectSignal,
+    ) -> Result<SlotPermit, SlotError> {
+        if *disconnected.0.borrow() {
+            return Err(SlotError::Canceled);
+        }
         if let Ok(permit) = self.semaphore.clone().try_acquire_owned() {
             self.active.fetch_add(1, Ordering::Relaxed);
             return Ok(SlotPermit {
@@ -126,7 +162,10 @@ impl ProxyState {
             state: self.clone(),
             counted: true,
         };
-        let acquired = timeout(self.queue_timeout, self.semaphore.clone().acquire_owned()).await;
+        let acquired = tokio::select! {
+            _ = disconnected.cancelled() => return Err(SlotError::Canceled),
+            acquired = timeout(self.queue_timeout, self.semaphore.clone().acquire_owned()) => acquired,
+        };
         queue_count.leave();
         let permit = match acquired {
             Err(_) => return Err(SlotError::Timeout),
@@ -146,17 +185,19 @@ enum SlotError {
     Full,
     Timeout,
     Closed,
+    Canceled,
 }
 
 struct RateState {
     next_ticket: u64,
     queue: VecDeque<u64>,
-    started: Option<Instant>,
+    started: Option<TokioInstant>,
     count: usize,
 }
 
 struct RateWindow {
     limit: usize,
+    window: Duration,
     state: Mutex<RateState>,
     changed: tokio::sync::Notify,
 }
@@ -182,8 +223,13 @@ impl Drop for RateTicket<'_> {
 
 impl RateWindow {
     fn new(limit: usize) -> Self {
+        Self::with_window(limit, RATE_WINDOW)
+    }
+
+    fn with_window(limit: usize, window: Duration) -> Self {
         Self {
             limit,
+            window,
             state: Mutex::new(RateState {
                 next_ticket: 0,
                 queue: VecDeque::new(),
@@ -195,13 +241,13 @@ impl RateWindow {
     }
 
     fn snapshot(&self) -> (usize, u64) {
-        let now = Instant::now();
+        let now = TokioInstant::now();
         let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
-        roll_window(&mut state, now);
+        roll_window(&mut state, now, self.window);
         let next = if state.count >= self.limit {
             state
                 .started
-                .map(|started| started + RATE_WINDOW)
+                .map(|started| started + self.window)
                 .unwrap_or(now)
                 .saturating_duration_since(now)
                 .as_secs_f64()
@@ -212,7 +258,7 @@ impl RateWindow {
         (state.count, next)
     }
 
-    async fn acquire(&self, wait: Duration) -> bool {
+    async fn acquire(&self, wait: Duration, disconnected: &DisconnectSignal) -> bool {
         let id = {
             let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
             let id = state.next_ticket;
@@ -225,17 +271,17 @@ impl RateWindow {
             id,
             queued: true,
         };
-        let deadline = Instant::now() + wait;
+        let deadline = TokioInstant::now() + wait;
 
         loop {
             let changed = self.changed.notified();
             tokio::pin!(changed);
             changed.as_mut().enable();
 
-            let now = Instant::now();
+            let now = TokioInstant::now();
             let next_window = {
                 let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
-                roll_window(&mut state, now);
+                roll_window(&mut state, now, self.window);
                 if state.queue.front() == Some(&id) && state.count < self.limit {
                     if state.count == 0 {
                         state.started = Some(now);
@@ -248,32 +294,35 @@ impl RateWindow {
                     return true;
                 }
                 if state.count >= self.limit {
-                    state.started.map(|started| started + RATE_WINDOW)
+                    state.started.map(|started| started + self.window)
                 } else {
                     None
                 }
             };
 
-            if Instant::now() >= deadline {
+            if TokioInstant::now() >= deadline {
                 return false;
             }
             match next_window {
                 Some(at) if at < deadline => {
                     tokio::select! {
-                        _ = sleep_until(at.into()) => {},
-                        _ = sleep_until(deadline.into()) => return false,
+                        _ = disconnected.cancelled() => return false,
+                        _ = sleep_until(at) => {},
+                        _ = sleep_until(deadline) => return false,
                         _ = &mut changed => {},
                     }
                 }
                 Some(_) => {
                     tokio::select! {
-                        _ = sleep_until(deadline.into()) => return false,
+                        _ = disconnected.cancelled() => return false,
+                        _ = sleep_until(deadline) => return false,
                         _ = &mut changed => {},
                     }
                 }
                 None => {
                     tokio::select! {
-                        _ = sleep_until(deadline.into()) => return false,
+                        _ = disconnected.cancelled() => return false,
+                        _ = sleep_until(deadline) => return false,
                         _ = &mut changed => {},
                     }
                 }
@@ -282,10 +331,10 @@ impl RateWindow {
     }
 }
 
-fn roll_window(state: &mut RateState, now: Instant) {
+fn roll_window(state: &mut RateState, now: TokioInstant, window: Duration) {
     if state
         .started
-        .is_some_and(|started| state.count > 0 && now >= started + RATE_WINDOW)
+        .is_some_and(|started| state.count > 0 && now >= started + window)
     {
         state.started = None;
         state.count = 0;
@@ -326,7 +375,10 @@ fn json_error(status: StatusCode, message: &str) -> Response {
 
 fn log_request(method: &Method, path: &str, status: u16, wait_ms: u128, started: Instant, id: u64) {
     let duration = started.elapsed().as_millis().saturating_sub(wait_ms);
-    eprintln!("{method} {path} {status} wait={wait_ms}ms dur={duration}ms id={id}");
+    let _ = writeln!(
+        io::stderr().lock(),
+        "{method} {path} {status} wait={wait_ms}ms dur={duration}ms id={id}"
+    );
 }
 
 fn is_json_content_type(value: Option<&HeaderValue>) -> bool {
@@ -465,8 +517,76 @@ async fn request_body(
     Ok((reqwest::Body::from(bytes), Some(len), modified))
 }
 
+async fn monitor_disconnect(
+    stream: TcpStream,
+    peek_stream: std::net::TcpStream,
+    signal: DisconnectSignal,
+) {
+    let mut probe = [0u8; 1];
+    loop {
+        let ready = match stream.ready(Interest::READABLE).await {
+            Ok(ready) => ready,
+            Err(_) => break,
+        };
+        if ready.is_read_closed() {
+            break;
+        }
+        let result = stream.try_io(Interest::READABLE, || {
+            match peek_stream.peek(&mut probe) {
+                Ok(0) => Ok(()),
+                // A duplicate socket must not consume a pipelined request. Clear this
+                // readiness edge and wait for new data or the peer's close event.
+                Ok(_) => Err(io::Error::from(io::ErrorKind::WouldBlock)),
+                Err(error) => Err(error),
+            }
+        });
+        match result {
+            Ok(()) => break,
+            Err(error) if error.kind() == io::ErrorKind::WouldBlock => continue,
+            Err(_) => break,
+        }
+    }
+    signal.cancel();
+}
+
+fn canceled_response() -> Response {
+    let mut response = Response::new(Body::empty());
+    *response.status_mut() = StatusCode::from_u16(499).expect("499 is a valid status");
+    response
+}
+
+fn upstream_authority(upstream: &Url) -> String {
+    let host = upstream.host_str().unwrap_or_default();
+    let unbracketed = host
+        .strip_prefix('[')
+        .and_then(|host| host.strip_suffix(']'))
+        .unwrap_or(host);
+    let host = if unbracketed.contains(':') {
+        format!("[{unbracketed}]")
+    } else {
+        unbracketed.to_string()
+    };
+    match upstream.port() {
+        Some(port) => format!("{host}:{port}"),
+        None => host,
+    }
+}
+
+fn usage_error(message: impl Into<String>) -> anyhow::Error {
+    clap::Error::raw(
+        clap::error::ErrorKind::ValueValidation,
+        format!("serial-proxy: {}", message.into()),
+    )
+    .into()
+}
+
 async fn proxy(State(state): State<Arc<ProxyState>>, request: Request<Body>) -> Response {
     let started = Instant::now();
+    let disconnected = request
+        .extensions()
+        .get::<DisconnectSignal>()
+        .cloned()
+        .unwrap_or_default();
     let method = request.method().clone();
     let path = request.uri().path().to_string();
     if method == Method::GET && path == "/__proxy/status" {
@@ -486,7 +606,7 @@ async fn proxy(State(state): State<Arc<ProxyState>>, request: Request<Body>) -> 
     }
 
     let id = state.next_id.fetch_add(1, Ordering::Relaxed) + 1;
-    let slot = match state.acquire_slot().await {
+    let slot = match state.acquire_slot(&disconnected).await {
         Ok(slot) => slot,
         Err(SlotError::Full) => {
             log_request(&method, &path, 429, 0, started, id);
@@ -499,6 +619,7 @@ async fn proxy(State(state): State<Arc<ProxyState>>, request: Request<Body>) -> 
                 "serial-proxy queue timeout",
             );
         }
+        Err(SlotError::Canceled) => return canceled_response(),
     };
     let mut wait_ms = started.elapsed().as_millis();
     let request_deadline = started + state.request_deadline;
@@ -523,16 +644,19 @@ async fn proxy(State(state): State<Arc<ProxyState>>, request: Request<Body>) -> 
         None
     };
 
-    let (upstream_body, buffered_length, modified) = match request_body(
+    let request_body = request_body(
         body,
         inspect,
         content_length,
         choice,
         state.max_body_bytes,
         request_deadline,
-    )
-    .await
-    {
+    );
+    let request_body = tokio::select! {
+        _ = disconnected.cancelled() => return canceled_response(),
+        result = request_body => result,
+    };
+    let (upstream_body, buffered_length, modified) = match request_body {
         Ok(body) => body,
         Err(()) => {
             log_request(&method, &path, 400, wait_ms, started, id);
@@ -542,7 +666,10 @@ async fn proxy(State(state): State<Arc<ProxyState>>, request: Request<Body>) -> 
 
     if let Some(rate) = &state.rate {
         let rpm_started = Instant::now();
-        if !rate.acquire(state.queue_timeout).await {
+        if !rate.acquire(state.queue_timeout, &disconnected).await {
+            if *disconnected.0.borrow() {
+                return canceled_response();
+            }
             log_request(&method, &path, 503, wait_ms, started, id);
             return json_error(
                 StatusCode::SERVICE_UNAVAILABLE,
@@ -558,18 +685,7 @@ async fn proxy(State(state): State<Arc<ProxyState>>, request: Request<Body>) -> 
             headers.append(name.clone(), value.clone());
         }
     }
-    let upstream_host = state.upstream.host_str().unwrap_or_default();
-    let authority = if upstream_host.contains(':') {
-        match state.upstream.port() {
-            Some(port) => format!("[{upstream_host}]:{port}"),
-            None => format!("[{upstream_host}]"),
-        }
-    } else {
-        match state.upstream.port() {
-            Some(port) => format!("{upstream_host}:{port}"),
-            None => upstream_host.to_string(),
-        }
-    };
+    let authority = upstream_authority(&state.upstream);
     if let Ok(host) = HeaderValue::from_str(&authority) {
         headers.insert(header::HOST, host);
     }
@@ -580,7 +696,7 @@ async fn proxy(State(state): State<Arc<ProxyState>>, request: Request<Body>) -> 
         }
     }
     if modified {
-        eprintln!("tool_choice defaulted id={id}");
+        let _ = writeln!(io::stderr().lock(), "tool_choice defaulted id={id}");
     }
     let url = format!(
         "{}{}",
@@ -592,8 +708,11 @@ async fn proxy(State(state): State<Arc<ProxyState>>, request: Request<Body>) -> 
         .request(method.clone(), url)
         .headers(headers)
         .body(upstream_body)
-        .send()
-        .await;
+        .send();
+    let outgoing = tokio::select! {
+        _ = disconnected.cancelled() => return canceled_response(),
+        result = outgoing => result,
+    };
     let upstream = match outgoing {
         Ok(response) => response,
         Err(error) => {
@@ -629,13 +748,32 @@ async fn proxy(State(state): State<Arc<ProxyState>>, request: Request<Body>) -> 
             wait_ms,
             started,
             id,
+            disconnected,
         )),
         |state| async move {
-            let (mut body, slot, method, path, status, wait_ms, started, id) = state?;
-            match body.next().await {
+            let (mut body, slot, method, path, status, wait_ms, started, id, disconnected) = state?;
+            let next = tokio::select! {
+                _ = disconnected.cancelled() => {
+                    log_request(&method, &path, 499, wait_ms, started, id);
+                    drop(slot);
+                    return None;
+                }
+                next = body.next() => next,
+            };
+            match next {
                 Some(Ok(bytes)) => Some((
                     Ok(bytes),
-                    Some((body, slot, method, path, status, wait_ms, started, id)),
+                    Some((
+                        body,
+                        slot,
+                        method,
+                        path,
+                        status,
+                        wait_ms,
+                        started,
+                        id,
+                        disconnected,
+                    )),
                 )),
                 Some(Err(_)) => {
                     log_request(&method, &path, 502, wait_ms, started, id);
@@ -655,42 +793,46 @@ async fn proxy(State(state): State<Arc<ProxyState>>, request: Request<Body>) -> 
 
 pub fn cmd_serial_proxy(options: SerialProxyOptions) -> anyhow::Result<()> {
     if options.max == 0 {
-        anyhow::bail!("invalid --max");
+        return Err(usage_error("invalid --max"));
     }
     if !options.queue_timeout.is_finite() || options.queue_timeout <= 0.0 {
-        anyhow::bail!("invalid --queue-timeout");
+        return Err(usage_error("invalid --queue-timeout"));
     }
     if options.max_body_bytes == 0 {
-        anyhow::bail!("invalid --max-body-bytes");
+        return Err(usage_error("invalid --max-body-bytes"));
     }
     if options.rpm == Some(0) {
-        anyhow::bail!("invalid --rpm");
+        return Err(usage_error("invalid --rpm"));
     }
     if options
         .tool_choice_default
         .as_deref()
         .is_some_and(|value| !["none", "auto", "required"].contains(&value))
     {
-        anyhow::bail!("invalid --tool-choice-default (none, auto or required)");
+        return Err(usage_error(
+            "invalid --tool-choice-default (none, auto or required)",
+        ));
     }
-    let upstream =
-        Url::parse(&options.upstream).map_err(|_| anyhow::anyhow!("invalid --upstream"))?;
+    let upstream = Url::parse(&options.upstream).map_err(|_| usage_error("invalid --upstream"))?;
     if !["http", "https"].contains(&upstream.scheme()) {
-        anyhow::bail!("--upstream must be http(s)");
+        return Err(usage_error("--upstream must be http(s)"));
     }
     if upstream.host_str().is_none() {
-        anyhow::bail!("invalid --upstream");
+        return Err(usage_error("invalid --upstream"));
     }
     if !is_loopback_host(&options.host) && !options.allow_remote {
-        anyhow::bail!("refusing non-loopback --host without --allow-remote");
+        return Err(usage_error(
+            "refusing non-loopback --host without --allow-remote",
+        ));
     }
-    let addr = socket_addr(&options.host, options.port)?;
+    let addr = socket_addr(&options.host, options.port)
+        .map_err(|_| usage_error("invalid --host or host name did not resolve"))?;
     let queue_timeout = Duration::try_from_secs_f64(options.queue_timeout)
-        .map_err(|_| anyhow::anyhow!("invalid --queue-timeout"))?;
+        .map_err(|_| usage_error("invalid --queue-timeout"))?;
     let request_deadline = queue_timeout
         .checked_mul(if options.rpm.is_some() { 2 } else { 1 })
         .and_then(|duration| duration.checked_add(DEFAULT_BODY_GRACE))
-        .ok_or_else(|| anyhow::anyhow!("invalid --queue-timeout"))?;
+        .ok_or_else(|| usage_error("invalid --queue-timeout"))?;
     let client = reqwest::Client::builder()
         .redirect(Policy::none())
         .http1_only()
@@ -718,7 +860,8 @@ pub fn cmd_serial_proxy(options: SerialProxyOptions) -> anyhow::Result<()> {
     runtime.block_on(async move {
         let listener = TcpListener::bind(addr).await?;
         let bound = listener.local_addr()?;
-        eprintln!(
+        let _ = writeln!(
+            io::stderr().lock(),
             "serial-proxy listening on http://{bound} -> {}{} (max={}{}{})",
             upstream_status.origin().ascii_serialization(),
             upstream_status.path(),
@@ -762,20 +905,50 @@ async fn serve(listener: TcpListener, app: Router) -> anyhow::Result<()> {
                 let (stream, _) = accepted?;
                 let app = app.clone();
                 connections.spawn(async move {
+                    let disconnected = DisconnectSignal::new();
+                    let service_disconnected = disconnected.clone();
                     let service = service_fn(move |request: hyper::Request<hyper::body::Incoming>| {
                         let app = app.clone();
+                        let disconnected = service_disconnected.clone();
                         async move {
                             let (parts, body) = request.into_parts();
-                            let request = Request::from_parts(parts, Body::new(body));
+                            let mut request = Request::from_parts(parts, Body::new(body));
+                            request.extensions_mut().insert(disconnected);
                             app.oneshot(request).await
                         }
                     });
+                    let std_stream = match stream.into_std() {
+                        Ok(stream) => stream,
+                        Err(_) => {
+                            disconnected.cancel();
+                            return;
+                        }
+                    };
+                    let peek_stream = std_stream.try_clone();
+                    let watcher = std_stream.try_clone().and_then(TcpStream::from_std);
+                    let stream = match TcpStream::from_std(std_stream) {
+                        Ok(stream) => stream,
+                        Err(_) => {
+                            disconnected.cancel();
+                            return;
+                        }
+                    };
                     let io = TokioIo::new(stream);
                     let mut builder = hyper::server::conn::http1::Builder::new();
                     builder
                         .timer(TokioTimer::new())
                         .header_read_timeout(DEFAULT_HEADER_TIMEOUT);
-                    let _ = builder.serve_connection(io, service).await;
+                    let connection = builder.serve_connection(io, service);
+                    tokio::pin!(connection);
+                    if let (Ok(watcher), Ok(peek_stream)) = (watcher, peek_stream) {
+                        tokio::select! {
+                            _ = &mut connection => disconnected.cancel(),
+                            _ = monitor_disconnect(watcher, peek_stream, disconnected.clone()) => {},
+                        }
+                    } else {
+                        let _ = connection.await;
+                        disconnected.cancel();
+                    }
                 });
             }
             Some(_) = connections.join_next(), if !connections.is_empty() => {}
@@ -866,14 +1039,99 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn rate_window_queues_in_fifo_order_and_rolls_after_sixty_seconds() {
+    async fn settle_rate_tasks() {
+        for _ in 0..8 {
+            tokio::task::yield_now().await;
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn rate_window_caps_each_window_and_releases_waiters_fifo_after_rollover() {
         let rate = Arc::new(RateWindow::new(2));
-        assert!(rate.acquire(Duration::from_secs(1)).await);
-        assert!(rate.acquire(Duration::from_secs(1)).await);
-        assert!(!rate.acquire(Duration::from_millis(10)).await);
-        let (count, wait) = rate.snapshot();
-        assert_eq!(count, 2);
-        assert!(wait > 0);
+        let disconnected = DisconnectSignal::new();
+        assert!(rate.acquire(Duration::from_secs(300), &disconnected).await);
+        assert!(rate.acquire(Duration::from_secs(300), &disconnected).await);
+
+        let dispatched = Arc::new(Mutex::new(Vec::new()));
+        let mut tasks = Vec::new();
+        for id in 0..5 {
+            let waiter_rate = rate.clone();
+            let disconnected = disconnected.clone();
+            let dispatched = dispatched.clone();
+            tasks.push(tokio::spawn(async move {
+                let acquired = waiter_rate
+                    .acquire(Duration::from_secs(300), &disconnected)
+                    .await;
+                if acquired {
+                    dispatched.lock().unwrap().push(id);
+                }
+                acquired
+            }));
+            while rate
+                .state
+                .lock()
+                .unwrap_or_else(|error| error.into_inner())
+                .queue
+                .len()
+                < id + 1
+            {
+                tokio::task::yield_now().await;
+            }
+        }
+
+        tokio::time::advance(Duration::from_secs(59)).await;
+        settle_rate_tasks().await;
+        assert!(dispatched.lock().unwrap().is_empty());
+
+        tokio::time::advance(Duration::from_secs(1)).await;
+        settle_rate_tasks().await;
+        assert_eq!(*dispatched.lock().unwrap(), vec![0, 1]);
+        assert_eq!(rate.snapshot().0, 2);
+
+        tokio::time::advance(RATE_WINDOW).await;
+        settle_rate_tasks().await;
+        assert_eq!(*dispatched.lock().unwrap(), vec![0, 1, 2, 3]);
+        assert_eq!(rate.snapshot().0, 2);
+
+        tokio::time::advance(RATE_WINDOW).await;
+        settle_rate_tasks().await;
+        assert_eq!(*dispatched.lock().unwrap(), vec![0, 1, 2, 3, 4]);
+        assert_eq!(rate.snapshot().0, 1);
+        for task in tasks {
+            assert!(task.await.unwrap());
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn canceling_first_rate_waiter_removes_its_ticket_and_releases_the_next() {
+        let rate = Arc::new(RateWindow::new(1));
+        let disconnected = DisconnectSignal::new();
+        assert!(rate.acquire(Duration::from_secs(120), &disconnected).await);
+
+        let first = {
+            let rate = rate.clone();
+            let disconnected = disconnected.clone();
+            tokio::spawn(async move { rate.acquire(Duration::from_secs(120), &disconnected).await })
+        };
+        while rate.state.lock().unwrap().queue.len() != 1 {
+            tokio::task::yield_now().await;
+        }
+        let second = {
+            let rate = rate.clone();
+            let disconnected = disconnected.clone();
+            tokio::spawn(async move { rate.acquire(Duration::from_secs(120), &disconnected).await })
+        };
+        while rate.state.lock().unwrap().queue.len() != 2 {
+            tokio::task::yield_now().await;
+        }
+
+        first.abort();
+        assert!(first.await.is_err());
+        settle_rate_tasks().await;
+        assert_eq!(rate.state.lock().unwrap().queue.len(), 1);
+
+        tokio::time::advance(RATE_WINDOW).await;
+        assert!(second.await.unwrap());
+        assert_eq!(rate.snapshot().0, 1);
     }
 }
