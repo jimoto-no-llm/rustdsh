@@ -35,12 +35,16 @@ impl Fixture {
     }
 
     fn run(&self, args: &[&str]) -> Output {
+        self.run_with_script(&self.script(), args)
+    }
+
+    fn run_with_script(&self, script: &Path, args: &[&str]) -> Output {
         Command::new(env!("CARGO_BIN_EXE_rdsh"))
             .args(args)
             .env("HOME", &self.0)
             .env("XDG_CONFIG_HOME", self.0.join("config"))
             .env("RDSH_SYSTEMD_DIR", self.units())
-            .env("RDSH_SYNC_SCRIPT", self.script())
+            .env("RDSH_SYNC_SCRIPT", script)
             // Never talk to the test runner's own systemd instance.
             .env("RDSH_SYSTEMD_NO_RELOAD", "1")
             .env("DSH_HOME", self.0.join("dsh"))
@@ -89,8 +93,9 @@ fn on_writes_units_for_this_machine_then_status_confirms_them() {
 
     // The unit must run the script we resolved, not a template path.
     let service = service_unit(&f.0);
+    let script = f.script().display().to_string().replace('\\', "\\\\");
     assert!(
-        service.contains(&format!("ExecStart={}", f.script().display())),
+        service.contains(&format!("ExecStart=\"{script}\"\n")),
         "{service}"
     );
     assert!(service.contains("Type=oneshot"));
@@ -100,6 +105,29 @@ fn on_writes_units_for_this_machine_then_status_confirms_them() {
 
     let status = f.json(&["update", "auto", "status", "--json"]);
     assert_eq!(status["installed"], true);
+}
+
+#[cfg(unix)]
+#[test]
+fn unit_quotes_a_script_path_with_whitespace_and_percent() {
+    let f = Fixture::new(false);
+    let script = f.0.join("with space/50%done/sync-dsh.sh");
+    fs::create_dir_all(script.parent().unwrap()).unwrap();
+    fs::write(&script, "#!/bin/sh\nexit 0\n").unwrap();
+    let out = f.run_with_script(&script, &["update", "auto", "on", "--json"]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    // Unquoted whitespace splits; `%` is a specifier.
+    let service = service_unit(&f.0);
+    let quoted = script.display().to_string().replace('%', "%%");
+    assert!(
+        service.contains(&format!("ExecStart=\"{quoted}\"\n")),
+        "{service}"
+    );
 }
 
 #[test]
