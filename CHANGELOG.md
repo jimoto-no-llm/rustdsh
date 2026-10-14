@@ -5,6 +5,8 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-15
+
 ### Security
 
 - The optional `rdsh-mcp-exposure` plugin pins its development
@@ -46,6 +48,20 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   command. It keeps the FIFO concurrency and rate limits, streams request and
   response bodies, and supports `--tool-choice-default <none|auto|required>`
   for Sarashina-compatible requests. See `docs/SERIAL-PROXY.md`.
+- `rdsh update auto status|on|off` turns the daily automatic update on with one
+  command: it writes a systemd user unit with the machine's own executable path
+  and runs `daemon-reload` and `enable --now`. The update itself stays with
+  `sync-dsh.sh` (digest pinning, downgrade refusal, verification, rollback) and
+  the timer runs daily with up to 30 minutes of jitter. See
+  `docs/AUTO-UPDATE.md`.
+- `rdsh doctor` warns about broken wrappers and shadowed executables: dangling
+  symlinks, a missing shebang, vanished `node`/`dsh` targets, duplicate `PATH`
+  entries, a missing `dsh-orig` and an inconsistent `origin` ledger, collected
+  in one bounded scan. It only warns; exit status and existing messages are
+  unchanged.
+- The `rdsh-update-banner` plugin is bundled again for the `web` profile, so
+  update notifications return. Install it through the installer because pnpm
+  prunes links it does not manage.
 
 ### Fixed
 
@@ -55,6 +71,12 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   find, or one outside npm's global root, is reported and skipped while the
   rdsh release update still succeeds; npm-managed trees keep digest pinning,
   downgrade refusal, verification and rollback. See `docs/AUTO-UPDATE.md`.
+- `rdsh update` stays native when rustdsh is invoked as `dsh`: it is back in
+  the native command list and in `--help`, instead of being delegated to
+  upstream `dsh`.
+- The auto-update systemd unit quotes and escapes `ExecStart`, so an executable
+  path containing spaces or `%` no longer breaks the timer.
+- The update banner's close button no longer overlaps the timestamp.
 
 ### Changed
 
