@@ -101,6 +101,15 @@ if command -v rustfmt >/dev/null 2>&1; then
   printf 'fn broken( {\n' > src/bad.rs && git add src/bad.rs
   expect_rc 1 "rustfmt error blocks" sh .githooks/pre-commit
   has "rustfmt failed" "rustfmt error blocks"
+  git rm -q --cached src/bad.rs && rm src/bad.rs
+  printf 'pub fn c(){}\n' > src/child.rs               # unformatted, committed, not staged
+  git add src/child.rs && git commit -qm child --no-verify
+  printf 'mod child;\npub fn a() {}\n' > src/a.rs
+  printf 'mod missing;\npub fn z() {}\n' > src/z.rs
+  git add src/a.rs src/z.rs
+  expect_rc 1 "rustfmt Error with child diff blocks" sh .githooks/pre-commit
+  has "failed to resolve mod" "rustfmt Error with child diff blocks"
+  git reset -q --hard HEAD~1
   git reset -q --hard HEAD~1
   ok "pre-commit checks the staged Rust snapshot and fails closed on rustfmt errors"
 fi
@@ -255,6 +264,7 @@ if grep -q "regress" "$tmp/out"; then die "quick mode must not run regress"; fi
 expect_rc 0 "full list" sh scripts/check.sh full --list
 has "tests/regress.sh" "full list"
 has "release policy unittest" "full list"
+has "node tests (CI test job, BIN=./target/release/rdsh)" "full mode tests the release binary"
 has "(not run) tests/security-boundaries.test.mjs" "CI-only suites reported"
 # Runs on Linux with Docker, otherwise listed as not run; selected either way.
 has "tests/install-isolated.sh --source local" "installer isolation selected"

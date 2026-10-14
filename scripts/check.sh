@@ -144,7 +144,8 @@ if [ "$node" = 1 ] || { [ "$rust" = 1 ] && [ "$mode" != quick ]; }; then
     step "cargo build${release_flag:+ $release_flag} (for binary-backed node tests)" cargo build $release_flag
   fi
   # shellcheck disable=SC2086
-  step "node tests (CI test job, built binary)" node --test $node_built
+  # BIN: the binary this run built (release in full mode), not a stale debug build.
+  step "node tests (CI test job, BIN=$bin)" env BIN="$bin" node --test $node_built
   # shellcheck disable=SC2086
   [ -n "$extra_tests" ] && step "changed node tests" node --test $extra_tests
 fi

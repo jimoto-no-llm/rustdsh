@@ -42,7 +42,9 @@ if [ -n "$bad" ]; then
   echo "pre-commit: staged Rust is not formatted:$bad. Run: cargo fmt && git add" >&2
   exit 1
 fi
-if [ "$rc" != 0 ] && { grep -q '^error' "$snap/.err" || ! grep -q '^Diff in ' "$snap/.out"; }; then
+# Any diagnostic on stderr (error:, Error writing files: ...) with a failing exit, or a
+# failing exit without diffs, means rustfmt did not check everything.
+if [ "$rc" != 0 ] && { [ -s "$snap/.err" ] || ! grep -q '^Diff in ' "$snap/.out"; }; then
   # rustfmt could not run or parse: never treat that as formatted.
   echo "pre-commit: rustfmt failed on the staged files (exit $rc):" >&2
   sed "s|$snap/||g" "$snap/.err" >&2
