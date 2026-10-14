@@ -377,7 +377,7 @@ else
 fi
 fi
 REPO="$(cd "$(dirname "$0")" && pwd)"
-if [ -x "$REPO/target/release/rdsh" ] && [ -f "$REPO/tests/regress.sh" ]; then
+if [ "$CHECK_ONLY" = 0 ] && [ -x "$REPO/target/release/rdsh" ] && [ -f "$REPO/tests/regress.sh" ]; then
   if sandboxed_regress "$REPO/target/release/rdsh"; then
     log "post-update regress: ALL PASS"
   else
