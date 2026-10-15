@@ -3,7 +3,7 @@
 # usage: ./scripts/demo-buzz.sh [--bin target/release/rdsh]
 set -euo pipefail
 BIN="${1:-target/release/rdsh}"
-if [[ "$1" == --bin ]]; then BIN="$2"; fi
+if [[ "${1:-}" == --bin ]]; then BIN="${2:?--bin needs a path}"; fi
 echo "== 1/3 起動比較 =="
 "$BIN" bench --n 5 || "$BIN" --version
 echo ""
