@@ -1,5 +1,5 @@
 #!/bin/sh
-# rdsh CLI regression. Fails on first mismatch (set -e + explicit checks).
+# rdsh CLI regression. Fails on first mismatch (explicit checks; set -e は無い).
 if [ "${1:-}" = "--windows-installer-delegation" ]; then
   shift
   exec bash "$(dirname "$0")/regress-windows.sh" "$@"
@@ -65,7 +65,10 @@ need_exit 2 "reject dump with args" $BIN --profile tui --dump-config --foo
 need_exit 2 "reject plugin w/o args" $BIN plugin --profile tui
 need_grep "plugin" "plugin delegation dry-run" $BIN --dry-run plugin --profile web add ./dsh-notify-push
 need_grep "smart-dsh" "doctor reports smart-dsh" $BIN doctor
-python3 -c "print(5791 * 4)" | $BIN tokens > /dev/null
+printf "%s" "$(python3 -c 'print(5791 * 4)')" | $BIN tokens > "$RR_SANDBOX/rr-out" 2>"$RR_SANDBOX/rr-err" \
+  || { echo "FAIL(exit): tokens numeric stdin"; cat "$RR_SANDBOX/rr-err"; exit 1; }
+# 23164 は5バイトのASCIIなので 2 トークン。値まで見て初めて検証になる。
+if grep -q '"tokens": 2' "$RR_SANDBOX/rr-out"; then ok "tokens numeric stdin"; else echo "FAIL(output): tokens numeric stdin"; cat "$RR_SANDBOX/rr-out"; exit 1; fi
 printf "FROMSTDIN" > "$RR_SANDBOX/rr-in.txt"
 need_ok "compact noop" $BIN compact "$RR_SANDBOX/rr-in.txt" --max-tokens 8000
 SB="$RR_SANDBOX/wrapper"
