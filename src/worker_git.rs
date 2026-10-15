@@ -218,31 +218,10 @@ struct RepositoryInfo {
 fn repository_info(root: &Path) -> Result<RepositoryInfo> {
     let canonical =
         normalize_windows_path(&fs::canonicalize(root).context("resolve worker repository")?);
-    let metadata = git_text(
-        &canonical,
-        &[
-            "rev-parse",
-            "--show-toplevel",
-            "--git-common-dir",
-            "HEAD",
-            "--abbrev-ref",
-            "HEAD",
-        ],
-    )?;
-    let metadata = metadata
+    let top_output = git_text(&canonical, &["rev-parse", "--show-toplevel"])?;
+    let top_raw = top_output
         .strip_suffix('\n')
-        .context("Git repository metadata is incomplete")?;
-    let mut fields = metadata.rsplitn(4, '\n');
-    let branch_field = fields.next().context("Git branch is unavailable")?;
-    let head_sha = fields
-        .next()
-        .context("Git HEAD is unavailable")?
-        .to_string();
-    let common_raw = fields
-        .next()
-        .context("Git common directory is unavailable")?;
-    let top_raw = fields.next().context("Git project root is unavailable")?;
-    ensure!(fields.next().is_none(), "unexpected Git metadata output");
+        .context("Git project root is unavailable")?;
     let top =
         normalize_windows_path(&fs::canonicalize(top_raw).context("resolve Git project root")?);
     ensure!(
@@ -250,10 +229,26 @@ fn repository_info(root: &Path) -> Result<RepositoryInfo> {
         "exact_git_project_root_required"
     );
 
+    let common_output = git_text(&canonical, &["rev-parse", "--git-common-dir"])?;
+    let common_raw = common_output
+        .strip_suffix('\n')
+        .context("Git common directory is unavailable")?;
     let common = normalize_windows_path(
-        &fs::canonicalize(canonical.join(common_raw.trim()))
-            .context("resolve Git common directory")?,
+        &fs::canonicalize(canonical.join(common_raw)).context("resolve Git common directory")?,
     );
+
+    let identity_output = git_text(&canonical, &["rev-parse", "HEAD", "--abbrev-ref", "HEAD"])?;
+    let identity = identity_output
+        .strip_suffix('\n')
+        .context("Git repository identity is incomplete")?;
+    let (head_sha, branch_field) = identity
+        .split_once('\n')
+        .context("Git branch is unavailable")?;
+    ensure!(
+        !branch_field.contains('\n'),
+        "unexpected Git repository identity output"
+    );
+    let head_sha = head_sha.to_string();
     ensure!(valid_head_sha(&head_sha), "git_head_unavailable");
 
     let branch = match branch_field {

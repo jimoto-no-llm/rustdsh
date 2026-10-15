@@ -209,6 +209,50 @@ fn repository_metadata_preserves_newlines_in_repository_paths() {
     );
 }
 
+#[cfg(unix)]
+#[test]
+fn linked_worktree_metadata_preserves_newlines_in_common_directory() {
+    let temp = TempDir::new();
+    let repository_root = temp.0.join("repo\nwith newline");
+    init_repo(&repository_root);
+    fs::write(repository_root.join("tracked.txt"), "base\n").unwrap();
+    git(&repository_root, &["add", "--all"]);
+    git(&repository_root, &["commit", "-qm", "initial"]);
+    let head = git(&repository_root, &["rev-parse", "HEAD"]);
+
+    let worktree = temp.0.join("worker");
+    git(
+        &repository_root,
+        &[
+            "worktree",
+            "add",
+            "-b",
+            "rdsh-worker",
+            worktree.to_str().unwrap(),
+            "HEAD",
+        ],
+    );
+
+    let repository = response(invoke(json!({"op":"repository","root":worktree})));
+    let common = repository_root.canonicalize().unwrap().join(".git");
+    assert_eq!(
+        repository["root"],
+        worktree.canonicalize().unwrap().to_str().unwrap()
+    );
+    assert_eq!(repository["git_common_dir"], common.to_str().unwrap());
+    assert_eq!(repository["head_sha"], head);
+    assert_eq!(repository["branch"], "rdsh-worker");
+
+    let observed = response(invoke(json!({
+        "op":"observe-worktree",
+        "root":worktree,
+        "git_common_dir":common,
+        "branch":"rdsh-worker",
+        "base":head
+    })));
+    assert_eq!(observed["head_sha"], head);
+}
+
 #[test]
 fn canonical_future_resolves_existing_parents_and_add_worktree_uses_isolated_hooks() {
     let temp = TempDir::new();
