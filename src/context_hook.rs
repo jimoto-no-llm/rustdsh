@@ -42,7 +42,7 @@ fn is_ours(command: &serde_json::Value) -> bool {
 }
 
 fn command_is_ours(command: &str) -> bool {
-    let Some(tokens) = shell_tokens(command) else {
+    let Some(tokens) = shell_tokens(command).or_else(|| powershell_tokens(command)) else {
         return false;
     };
     let Some(program) = tokens.first() else {
@@ -115,7 +115,71 @@ fn shell_tokens(command: &str) -> Option<Vec<String>> {
     Some(tokens)
 }
 
+fn powershell_tokens(command: &str) -> Option<Vec<String>> {
+    let mut chars = command.chars().peekable();
+    if chars.next()? != '&' || !chars.next()?.is_whitespace() {
+        return None;
+    }
+    while chars.peek().is_some_and(|c| c.is_whitespace()) {
+        chars.next();
+    }
+    if chars.next()? != '\'' {
+        return None;
+    }
+    let mut program = String::new();
+    let mut closed = false;
+    while let Some(c) = chars.next() {
+        if c == '\'' {
+            if chars.peek() == Some(&'\'') {
+                chars.next();
+                program.push('\'');
+            } else {
+                closed = true;
+                break;
+            }
+        } else {
+            program.push(c);
+        }
+    }
+    if !closed || !chars.next()?.is_whitespace() {
+        return None;
+    }
+    let mut tokens = vec![program];
+    let remainder: String = chars.collect();
+    for token in remainder.split_whitespace() {
+        if token
+            .chars()
+            .any(|c| matches!(c, ';' | '&' | '|' | '(' | ')' | '<' | '>' | '$' | '`'))
+        {
+            return None;
+        }
+        tokens.push(token.to_string());
+    }
+    Some(tokens)
+}
+
+#[derive(Clone, Copy)]
+enum ShellDialect {
+    Posix,
+    PowerShell,
+}
+
 fn inject_command(bin: &str) -> String {
+    let dialect = if cfg!(windows) {
+        ShellDialect::PowerShell
+    } else {
+        ShellDialect::Posix
+    };
+    inject_command_for(bin, dialect)
+}
+
+fn inject_command_for(bin: &str, dialect: ShellDialect) -> String {
+    if matches!(dialect, ShellDialect::PowerShell) {
+        return format!(
+            "& '{}' context inject --event user-prompt-submit",
+            bin.replace('\'', "''")
+        );
+    }
     let bin = if !bin.is_empty()
         && bin
             .bytes()
@@ -489,7 +553,7 @@ mod tests {
             "/opt/user's tools/rdsh",
             "/opt/$(echo x);tools/rdsh",
         ] {
-            let command = inject_command(bin);
+            let command = inject_command_for(bin, ShellDialect::Posix);
             assert!(command.starts_with('\''));
             assert_eq!(shell_tokens(&command).unwrap()[0], bin);
             let mut doc = serde_json::json!({});
@@ -499,13 +563,32 @@ mod tests {
             assert!(unmerge(&mut doc));
         }
         assert_eq!(
-            inject_command("/opt/user's tools/rdsh"),
+            inject_command_for("/opt/user's tools/rdsh", ShellDialect::Posix),
             "'/opt/user'\\''s tools/rdsh' context inject --event user-prompt-submit"
         );
         assert_eq!(
-            inject_command("/opt/bin/rdsh"),
+            inject_command_for("/opt/bin/rdsh", ShellDialect::Posix),
             "/opt/bin/rdsh context inject --event user-prompt-submit"
         );
+    }
+
+    #[test]
+    fn powershell_absolute_paths_with_spaces_are_owned_and_removable() {
+        let bin = r"C:\Users\O'Neil\Program Files\rdsh.exe";
+        let command = inject_command_for(bin, ShellDialect::PowerShell);
+        assert_eq!(
+            command,
+            "& 'C:\\Users\\O''Neil\\Program Files\\rdsh.exe' context inject --event user-prompt-submit"
+        );
+        assert_eq!(
+            powershell_tokens(&command).unwrap(),
+            vec![bin, "context", "inject", "--event", "user-prompt-submit"]
+        );
+        let mut doc = serde_json::json!({});
+        assert!(merge(&mut doc, &command));
+        assert!(is_ours(&doc["hooks"][EVENT][0]["hooks"][0]));
+        assert!(!merge(&mut doc, &command));
+        assert!(unmerge(&mut doc));
     }
 
     #[test]
@@ -527,10 +610,12 @@ mod tests {
         .unwrap();
         let doc = read_config(&path).unwrap();
         let hook = &doc["hooks"][EVENT][0]["hooks"][0];
-        assert_eq!(
-            hook["command"],
+        let expected = if cfg!(windows) {
+            "& '/opt/program files/rdsh' context inject --event user-prompt-submit"
+        } else {
             "'/opt/program files/rdsh' context inject --event user-prompt-submit"
-        );
+        };
+        assert_eq!(hook["command"], expected);
         assert!(is_ours(hook));
         std::fs::remove_dir_all(dir).unwrap();
     }

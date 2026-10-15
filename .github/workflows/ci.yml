@@ -157,6 +157,14 @@ jobs:
         env:
           RDSH_BIN: ${{ runner.os == 'Windows' && format('{0}/target/debug/rdsh.exe', github.workspace) || format('{0}/target/debug/rdsh', github.workspace) }}
       - run: node --test tests/runtime-compatibility.test.mjs tests/icon-assets.test.mjs
+      - if: runner.os == 'Windows'
+        run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: scripts/headless-runtime/runtime
+      - if: runner.os == 'Windows'
+        run: node --test tests/context_inject_contract.mjs
+        env:
+          BIN: ${{ github.workspace }}/target/debug/rdsh.exe
+          DSH_HOOK_PROTOCOL: ${{ github.workspace }}/scripts/headless-runtime/runtime/node_modules/@deepseek-ai/dsh-hook-protocol/lib/index.js
       - if: matrix.regress
         shell: bash
         run: |

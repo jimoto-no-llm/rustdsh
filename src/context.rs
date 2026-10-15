@@ -463,18 +463,33 @@ fn content_text(value: &serde_json::Value) -> Option<String> {
     (!parts.is_empty()).then(|| parts.join("\n"))
 }
 
+fn is_hook_generated(value: &serde_json::Value) -> bool {
+    value
+        .get("source")
+        .or_else(|| value.get("data").and_then(|data| data.get("source")))
+        .and_then(|source| source.get("kind"))
+        .and_then(serde_json::Value::as_str)
+        .is_some_and(|kind| kind.starts_with("hooks-"))
+}
+
 fn user_texts(value: &serde_json::Value) -> Vec<String> {
     if value["role"].as_str() == Some("assistant") {
         return Vec::new();
     }
     match value["type"].as_str() {
-        Some("user/message") => content_text(&value["data"]["content"])
-            .into_iter()
-            .collect(),
+        Some("user/message") => {
+            if is_hook_generated(value) {
+                return Vec::new();
+            }
+            content_text(&value["data"]["content"])
+                .into_iter()
+                .collect()
+        }
         Some("agent/inbox/spliced") => value["data"]["inserted"]
             .as_array()
             .into_iter()
             .flatten()
+            .filter(|message| !is_hook_generated(message))
             .filter(|message| message["role"].as_str() != Some("assistant"))
             .filter(|message| {
                 !message["type"]
@@ -889,6 +904,41 @@ fn git_dirty_paths(status: &str) -> BTreeMap<String, String> {
     paths
 }
 
+fn git_index_content_signature(path: &Path, deadline: Option<Instant>) -> Option<String> {
+    use sha2::{Digest, Sha256};
+    use std::io::Read;
+
+    const MAX_INDEX_BYTES: u64 = 64 * 1024 * 1024;
+    if expired(deadline) {
+        return None;
+    }
+    let file = std::fs::File::open(path).ok()?;
+    let metadata = file.metadata().ok()?;
+    if !metadata.is_file() || metadata.len() > MAX_INDEX_BYTES {
+        return None;
+    }
+    let mut input = file.take(MAX_INDEX_BYTES + 1);
+    let mut hasher = Sha256::new();
+    let mut total = 0u64;
+    let mut buffer = [0u8; 8192];
+    loop {
+        if expired(deadline) {
+            return None;
+        }
+        let read = input.read(&mut buffer).ok()?;
+        if read == 0 {
+            break;
+        }
+        total += read as u64;
+        if total > MAX_INDEX_BYTES {
+            return None;
+        }
+        hasher.update(&buffer[..read]);
+    }
+    let digest = hasher.finalize();
+    Some(digest.iter().map(|byte| format!("{byte:02x}")).collect())
+}
+
 fn git_dirty_content_signature(
     cwd: &Path,
     dirty: Option<&BTreeMap<String, String>>,
@@ -897,6 +947,19 @@ fn git_dirty_content_signature(
     use sha2::{Digest, Sha256};
     use std::io::Read;
 
+    let repo_paths = git_output_in(
+        Some(cwd),
+        &["rev-parse", "--absolute-git-dir", "--show-toplevel"],
+        deadline,
+    )?;
+    let mut repo_paths = repo_paths.lines();
+    let git_dir = PathBuf::from(repo_paths.next()?);
+    let worktree = repo_paths.next()?;
+    if !git_dir.is_absolute() || worktree.is_empty() {
+        return None;
+    }
+    let index_path = git_dir.join("index");
+    let index_before = git_index_content_signature(&index_path, deadline)?;
     let diff = git_output_in(
         Some(cwd),
         &[
@@ -921,9 +984,7 @@ fn git_dirty_content_signature(
     if untracked.len() > 1000 {
         return None;
     }
-    let worktree_output = git_output_in(Some(cwd), &["rev-parse", "--show-toplevel"], deadline)?;
-    let worktree = worktree_output.strip_suffix('\n')?;
-    if worktree.is_empty() || expired(deadline) {
+    if expired(deadline) {
         return None;
     }
     let worktree = std::fs::canonicalize(worktree).ok()?;
@@ -951,6 +1012,12 @@ fn git_dirty_content_signature(
         hasher.update(&bytes);
         remaining -= bytes.len();
     }
+    let index_after = git_index_content_signature(&index_path, deadline)?;
+    if index_before != index_after {
+        return None;
+    }
+    hasher.update(b"index\0");
+    hasher.update(index_after.as_bytes());
     let digest = hasher.finalize();
     Some(digest.iter().map(|byte| format!("{byte:02x}")).collect())
 }
@@ -3692,6 +3759,26 @@ mod v3_tests {
     }
 
     #[test]
+    fn distill_excludes_hook_generated_messages_but_keeps_source_less_users() {
+        let transcript = r#"{"type":"user/message","source":{"kind":"hooks-claude-code"},"data":{"content":[{"type":"text","text":"[mem] must not repeat generated context"}]}}
+{"type":"agent/inbox/spliced","data":{"inserted":[{"content":[{"type":"text","text":"[mem] never learn injected memory"}],"source":{"kind":"hooks-claude-code"}}]}}
+{"type":"user/message","data":{"content":[{"type":"text","text":"必ず旧形式のuser messageを残す"}]}}
+{"role":"user","content":"次はsourceなしの従来形式を保つ"}"#;
+
+        let candidates = distill_candidates(transcript);
+        assert_eq!(
+            candidates
+                .iter()
+                .map(|candidate| candidate.text.as_str())
+                .collect::<Vec<_>>(),
+            vec![
+                "必ず旧形式のuser messageを残す",
+                "次はsourceなしの従来形式を保つ"
+            ]
+        );
+    }
+
+    #[test]
     fn distill_reads_every_inbox_insert_and_only_text_blocks() {
         let event = serde_json::json!({"type": "agent/inbox/spliced", "data": {
         "inserted": [
@@ -4148,6 +4235,82 @@ mod v3_tests {
         let content_after = git_dirty_content_signature(&cwd, Some(&dirty_after), None).unwrap();
 
         assert_eq!(status_before, status_after);
+        assert_ne!(content_before, content_after);
+    }
+
+    #[test]
+    fn git_snapshot_detects_index_changes_with_unchanged_worktree_and_status() {
+        use std::io::Write;
+        use std::process::{Command, Stdio};
+
+        let temporary = TempDir::new();
+        let run_git = |args: &[&str]| {
+            let output = Command::new("git")
+                .args(args)
+                .current_dir(&temporary.0)
+                .output()
+                .unwrap();
+            assert!(output.status.success(), "git {args:?}: {output:?}");
+            output
+        };
+        run_git(&["init", "--quiet"]);
+        run_git(&["config", "user.name", "rdsh test"]);
+        run_git(&["config", "user.email", "rdsh-test@example.invalid"]);
+        let file = temporary.0.join("tracked.rs");
+        std::fs::write(&file, "base\n").unwrap();
+        run_git(&["add", "tracked.rs"]);
+        run_git(&["commit", "--quiet", "-m", "base"]);
+        let cwd = std::fs::canonicalize(&temporary.0).unwrap();
+        std::fs::write(&file, "working tree\n").unwrap();
+
+        let hash_blob = |text: &str| {
+            let mut child = Command::new("git")
+                .args(["hash-object", "-w", "--stdin"])
+                .current_dir(&cwd)
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .spawn()
+                .unwrap();
+            child
+                .stdin
+                .take()
+                .unwrap()
+                .write_all(text.as_bytes())
+                .unwrap();
+            let output = child.wait_with_output().unwrap();
+            assert!(output.status.success());
+            String::from_utf8(output.stdout).unwrap().trim().to_string()
+        };
+        let update_index = |blob: &str| {
+            let spec = format!("100644,{blob},tracked.rs");
+            run_git(&["update-index", "--cacheinfo", &spec]);
+        };
+        update_index(&hash_blob("index A\n"));
+        let status_before = git_output_in(
+            Some(&cwd),
+            &["status", "--porcelain=v1", "-z", "--untracked-files=all"],
+            None,
+        )
+        .unwrap();
+        let dirty_before = git_dirty_paths(&status_before);
+        assert_eq!(
+            dirty_before.get("tracked.rs").map(String::as_str),
+            Some("MM")
+        );
+        let content_before = git_dirty_content_signature(&cwd, Some(&dirty_before), None).unwrap();
+
+        update_index(&hash_blob("index B with different stats\n"));
+        let status_after = git_output_in(
+            Some(&cwd),
+            &["status", "--porcelain=v1", "-z", "--untracked-files=all"],
+            None,
+        )
+        .unwrap();
+        let dirty_after = git_dirty_paths(&status_after);
+        let content_after = git_dirty_content_signature(&cwd, Some(&dirty_after), None).unwrap();
+
+        assert_eq!(status_before, status_after);
+        assert_eq!(std::fs::read(&file).unwrap(), b"working tree\n");
         assert_ne!(content_before, content_after);
     }
 

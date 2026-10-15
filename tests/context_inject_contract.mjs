@@ -10,6 +10,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
+import { pathToFileURL } from "node:url";
 
 const DEFAULT_PROTOCOL =
   "~/.local/opt/dsh-original/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/dsh-hook-protocol/lib/index.js";
@@ -25,7 +26,7 @@ function protocolPath() {
 }
 
 const protocol = protocolPath();
-const mod = protocol ? await import(protocol) : undefined;
+const mod = protocol ? await import(pathToFileURL(resolve(protocol)).href) : undefined;
 
 test("inject output decodes as a UserPromptSubmit context hook", { skip: !mod && "hook protocol package not installed" }, () => {
   // Resolve before spawning: the run below uses the sandbox as its cwd, so a
