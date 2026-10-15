@@ -8,30 +8,43 @@ Backlog index: [issue #74](https://github.com/jimoto-no-llm/rustdsh/issues/74)
 (all 72 proposals mapped to feature issues, `P0`-`P3`).
 Update this file at each minor release; status churn stays in issues.
 
-## Now (`P0`-`P1`, milestone `v0.3.0`)
+## Now (`P0`-`P1`, milestone `v0.4.0`) — shipped
 
-- Keep delegation byte-identical while upstream `dsh` evolves
+- Delegation stays byte-identical while upstream `dsh` evolves
   (`--passthrough` is the reference; see `docs/ARCHITECTURE.md`).
-- Keep installers working on Linux / macOS / WSL / Windows
-  (`installer` label; `install.sh` / `install.ps1`).
-- Dashboard hardening: auth boundary, event subscriptions, QR flow
+- Installers verified on Linux / macOS / WSL / Windows
+  (`installer` label; `install.sh` / `install.ps1`; Unix archives pinned in
+  `release-digests.tsv`, Windows archives in `release-digests-windows.tsv`).
+- Dashboard auth boundary, event subscriptions, QR flow
   (`dashboard` + `security` labels).
-- Land the current `feat/context-engine-practical` work behind
-  `beta.context_engine` (default OFF).
+- Credentials use the upstream DSH lock protocol (#375), and only the selected
+  CLIs and providers are shared (#102).
+- Context engine ships behind `features.context_engine` (default OFF).
+- Release gate waits for the tag-push CI before building, and requires `main`
+  ancestry plus the exact-SHA run before tagging (see `docs/RELEASING.md`).
+- `rdsh doctor` warns about broken wrappers and shadowed executables (#510),
+  and `rdsh update auto` installs the daily update timer (#507).
+- Windows dashboard flake: the fault-simulator output collision, the proxy wait
+  deadlines and the Windows IPv6 CI failure are fixed (#526, #533, #540).
 
-## Next (`P1`-`P2`, milestone `v0.4.0`)
+## Next (`P1`-`P2`, milestone `v0.5.0`)
 
-- Routing experiments (see `docs/proposals/`): cheapest-route selection
-  across subscription providers, starting with a 2-provider manual table.
-- More `doctor` checks for broken wrappers and shadowed binaries.
-- Release automation: checksums, SBOM, musl builds for sync
-  (see `docs/RELEASING.md`).
+- One-click translation of non-Japanese answers with history replacement
+  (#448): spike, then the assistant-actions button, then replace via
+  `surfaceOp`. Never auto-translate; Web UI only.
+- Land the pending security reviews: Linux task sandbox (#254), external
+  source provenance chain (#236).
+- Windows dashboard flake: the remaining routing probe and tray timeouts
+  (#209).
+- Start routing experiments (#87): cheapest-route selection, one provider
+  at a time (see `docs/proposals/`).
 
 ## Later (`P2`-`P3`, no milestone yet)
 
 - Windows-native dashboard parity with the WSL flow.
 - Startup and memory regression tracking in CI (fail on >10 percent slip).
-- i18n: keep README.ja.md in sync with README.md (`ja` + `docs` labels).
+- Full i18n: keep README.ja.md in sync with README.md (`ja` + `docs` labels);
+  UI strings follow after #448.
 
 ## Non-goals
 

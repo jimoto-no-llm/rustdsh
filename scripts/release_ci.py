@@ -24,6 +24,8 @@ REQUIRED_WORKFLOWS = {
         "plugin-security",
         "msrv",
         "update-banner-windows",
+        # A broken installer is a broken launch: require the isolated install test.
+        "Isolated install",
     ),
     "codeql.yml": ("Analyze (rust)", "Analyze (javascript)"),
 }

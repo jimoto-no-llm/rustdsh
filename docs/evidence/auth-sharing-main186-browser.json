@@ -1,0 +1,33 @@
+{
+  "before_source": null,
+  "after_source": "921ba9105b0223556c6a3b1811e0c0dd6ecbca4a",
+  "scope": "real Rust setup server via a test-only Windows-to-WSL HTTP bridge, synthetic credentials only; no model requests or existing profiles",
+  "flows": [
+    {
+      "external_link_has_no_opener": true,
+      "mode": "after",
+      "locale": "ja-JP",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "extras_saved": true,
+      "sharing_preserved": true,
+      "reload_retained": true
+    },
+    {
+      "external_link_has_no_opener": true,
+      "mode": "after",
+      "locale": "en-US",
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "extras_saved": true,
+      "sharing_preserved": true,
+      "reload_retained": true
+    }
+  ],
+  "page_errors": [],
+  "result": "PASS"
+}

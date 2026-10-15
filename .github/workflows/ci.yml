@@ -1,6 +1,13 @@
 name: ci
 
-on: [push, pull_request]
+# PRs validate the merge result. Do not duplicate their matrix on branch pushes;
+# main and version tags retain full validation, including the release CI gate.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -10,7 +17,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Keep required PR/main/tag names stable; distinguish the fully executed branch-push run.
   msrv:
+    name: "msrv${{ github.event_name == 'push' && github.ref_type == 'branch' && github.event.repository.default_branch && github.ref_name != github.event.repository.default_branch && ' [branch push]' || '' }}"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -18,17 +27,21 @@ jobs:
       - run: cargo check --locked --all-targets
 
   release-policy:
+    name: "release-policy${{ github.event_name == 'push' && github.ref_type == 'branch' && github.event.repository.default_branch && github.ref_name != github.event.repository.default_branch && ' [branch push]' || '' }}"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - name: Test release metadata and asset validation
         run: python3 -m unittest discover -s tests -p 'test_release_*.py'
+      - name: Test ICO directory validation
+        run: python3 -m unittest discover -s tests -p 'test_icon_generation.py'
       - name: Check the current version's release notes
         run: |
           version=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["package"]["version"])')
           python3 scripts/prepare-release.py "v$version"
 
   update-banner-windows:
+    name: "update-banner-windows${{ github.event_name == 'push' && github.ref_type == 'branch' && github.event.repository.default_branch && github.ref_name != github.event.repository.default_branch && ' [branch push]' || '' }}"
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
@@ -38,15 +51,40 @@ jobs:
       - run: node --test tests/update-banner.test.mjs
 
   plugin-security:
+    name: "plugin-security${{ github.event_name == 'push' && github.ref_type == 'branch' && github.event.repository.default_branch && github.ref_name != github.event.repository.default_branch && ' [branch push]' || '' }}"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-      - run: node --test tests/plugin-security.test.mjs tests/settings-client.test.mjs tests/update-banner.test.mjs tests/model_benchmark/fence.test.mjs
+      - run: node --test tests/plugin-security.test.mjs tests/settings-client.test.mjs tests/update-banner.test.mjs tests/rdsh-mobile-ui.test.mjs tests/feature-switches.test.mjs tests/discord-presence.test.mjs tests/model_benchmark/fence.test.mjs
+      - name: Populate the pinned headless runtime cache
+        run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: scripts/headless-runtime/runtime
+      - name: Build and test the offline headless runtime
+        run: |
+          node scripts/headless-runtime/build-candidate.mjs --out "$RUNNER_TEMP/rdsh-headless-candidate"
+          RDSH_CANDIDATE="$RUNNER_TEMP/rdsh-headless-candidate" node --test scripts/headless-runtime/test/*.test.mjs plugins/rdsh-session-cleanup/test/*.test.mjs
+
+  muse-subscription:
+    name: "muse-subscription (${{ matrix.os }})${{ github.event_name == 'push' && github.ref_type == 'branch' && github.event.repository.default_branch && github.ref_name != github.event.repository.default_branch && ' [branch push]' || '' }}"
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: plugins/rdsh-llm-muse-code-subscription
+      - run: npm test
+        working-directory: plugins/rdsh-llm-muse-code-subscription
 
   security-boundaries:
+    name: "security-boundaries${{ github.event_name == 'push' && github.ref_type == 'branch' && github.event.repository.default_branch && github.ref_name != github.event.repository.default_branch && ' [branch push]' || '' }}"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -57,7 +95,11 @@ jobs:
       - run: cargo build --locked
       - run: sudo apt-get update && sudo apt-get install -y bubblewrap
       - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-      - run: node --test tests/security-boundaries.test.mjs tests/tool-isolation.test.mjs
+      - run: node --test tests/security-boundaries.test.mjs tests/tool-isolation.test.mjs tests/desktop.test.mjs tests/opencode-session-header.test.mjs
+      - name: Install pinned upstream tool-bash for approval integrity test
+        run: npm install --prefix "$RUNNER_TEMP/rdsh-runtime" --ignore-scripts --no-audit --no-fund @deepseek-ai/dsh-tool-bash@0.2.0-rc.2
+      - name: Test approval integrity against pinned upstream source
+        run: DSH_TOOL_BASH_SOURCE="$RUNNER_TEMP/rdsh-runtime/node_modules/@deepseek-ai/dsh-tool-bash/lib/index.js" node --test tests/upstream-approval-integrity.test.mjs
       - run: python3 -m unittest discover -s tests -p 'test_release_assets.py'
       - name: Verify the audited dispatcher and late middleware changes
         run: |
@@ -65,7 +107,7 @@ jobs:
           RDSH_TOOL_RUNTIME="$RUNNER_TEMP/rdsh-runtime/node_modules/@deepseek-ai/dsh-tools/lib/index.js" RDSH_SECURE_WORKSPACE="$GITHUB_WORKSPACE" RDSH_SHARED_FILES='[]' node --import ./security/preload.mjs tests/guarded-runtime-probe.mjs
 
   lint:
-    name: Rust lint
+    name: "Rust lint${{ github.event_name == 'push' && github.ref_type == 'branch' && github.event.repository.default_branch && github.ref_name != github.event.repository.default_branch && ' [branch push]' || '' }}"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -76,6 +118,7 @@ jobs:
       - run: cargo clippy --all-targets -- -D warnings
 
   test:
+    name: "test (${{ matrix.os }}, ${{ matrix.regress }})${{ github.event_name == 'push' && github.ref_type == 'branch' && github.event.repository.default_branch && github.ref_name != github.event.repository.default_branch && ' [branch push]' || '' }}"
     strategy:
       fail-fast: false
       matrix:
@@ -102,9 +145,12 @@ jobs:
       - run: cargo test --example benchmark_extended
       - run: cargo test --example benchmark_models
       - run: cargo build
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: plugins/rdsh-compute
+      - run: npm test
+        working-directory: plugins/rdsh-compute
+        env:
+          RDSH_BIN: ${{ runner.os == 'Windows' && format('{0}/target/debug/rdsh.exe', github.workspace) || format('{0}/target/debug/rdsh', github.workspace) }}
       - run: node --test tests/runtime-compatibility.test.mjs tests/icon-assets.test.mjs
       - if: matrix.regress
         shell: bash
@@ -130,8 +176,67 @@ jobs:
           $setup = ./target/debug/rdsh.exe setup --json | Out-String
           if ($setup -notmatch '"needed":true') { throw 'setup should report needed on first run' }
           ./target/debug/rdsh.exe doctor
+      - if: '! matrix.regress'
+        shell: bash
+        run: BIN=./target/debug/rdsh.exe bash tests/regress.sh --windows-installer-delegation
+
+  # Records the CLI fast-path trend on every run. It deliberately passes no
+  # --baseline: a fresh runner has no previous binary, and comparing against a
+  # stale artifact would fail spuriously. The JSON is uploaded for trend review
+  # and the job only asserts that every case produced correct output.
+  perf-regression:
+    name: "perf-regression${{ github.event_name == 'push' && github.ref_type == 'branch' && github.event.repository.default_branch && github.ref_name != github.event.repository.default_branch && ' [branch push]' || '' }}"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --locked --example benchmark_regression
+      - run: cargo build --release
+      - name: Measure the CLI fast paths
+        run: |
+          cargo run --release --example benchmark_regression -- \
+            --bin ./target/release/rdsh --n 15 \
+            --output "$RUNNER_TEMP/rdsh-perf.json"
+      - name: Assert the report exists and every case is correct
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+
+          path = os.path.join(os.environ["RUNNER_TEMP"], "rdsh-perf.json")
+          if not os.path.exists(path):
+              sys.exit(f"perf report was not produced at {path}")
+
+          with open(path, encoding="utf-8") as handle:
+              report = json.load(handle)
+
+          cases = report.get("cases") or {}
+          if not cases:
+              sys.exit("perf report contains no cases")
+
+          bad = []
+          for name, case in cases.items():
+              if case.get("correct") is not True:
+                  bad.append(f"{name}: {case.get('outcome')}")
+              if case.get("outcome") == "failed":
+                  bad.append(f"{name}: marked failed")
+              if "median_ms" not in case or "p95_ms" not in case:
+                  bad.append(f"{name}: missing median/p95")
+              if not case.get("samples_ms"):
+                  bad.append(f"{name}: no samples")
+          if report.get("failures"):
+              bad.append(f"failures: {report['failures']}")
+          if bad:
+              sys.exit("perf regression report is not clean:\n  " + "\n  ".join(bad))
+          print(f"{len(cases)} cases correct")
+          PY
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: perf-regression
+          path: ${{ runner.temp }}/rdsh-perf.json
 
   browser-e2e:
+    name: "browser-e2e${{ github.event_name == 'push' && github.ref_type == 'branch' && github.event.repository.default_branch && github.ref_name != github.event.repository.default_branch && ' [branch push]' || '' }}"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -152,3 +257,20 @@ jobs:
         with:
           name: browser-e2e
           path: target/e2e
+
+  # Installs the built artifacts with install.sh inside clean containers
+  # (--network=none, file:// release base). This is the check that keeps a
+  # fresh-machine install working on older glibc distros and musl hosts; see
+  # tests/install-isolated/ and docs/RELEASING.md.
+  install-isolated:
+    name: "Isolated install${{ github.event_name == 'push' && github.ref_type == 'branch' && github.event.repository.default_branch && github.ref_name != github.event.repository.default_branch && ' [branch push]' || '' }}"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
+      - run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - run: cargo build --locked --release
+      - run: cargo build --locked --release --target x86_64-unknown-linux-musl
+      - run: tests/install-isolated.sh --source local --no-build --require-musl

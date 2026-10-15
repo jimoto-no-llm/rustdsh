@@ -21,6 +21,105 @@ fn origin_file() -> Option<String> {
     }
 }
 
+/// Check a PATH candidate without spawning it. On Unix, query whether the
+/// current effective user can execute this regular file; mode bits alone can
+/// accept a file whose only execute bit belongs to another permission class.
+fn is_executable_candidate(path: &std::path::Path) -> bool {
+    let Ok(metadata) = std::fs::metadata(path) else {
+        return false;
+    };
+    if !metadata.is_file() {
+        return false;
+    }
+    #[cfg(unix)]
+    {
+        use std::ffi::CString;
+        use std::os::unix::ffi::OsStrExt;
+        let Ok(c_path) = CString::new(path.as_os_str().as_bytes()) else {
+            return false;
+        };
+        // SAFETY: c_path is NUL-terminated and AT_FDCWD makes this a read-only query.
+        unsafe {
+            libc::faccessat(
+                libc::AT_FDCWD,
+                c_path.as_ptr(),
+                libc::X_OK,
+                libc::AT_EACCESS,
+            ) == 0
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        true
+    }
+}
+
+/// True when `path` is runnable as the original DSH: an executable binary,
+/// or a `.js` entry launched via Node (regular file suffices there).
+fn is_runnable_original(path: &std::path::Path) -> bool {
+    if path.extension().is_some_and(|e| e == "js") {
+        return path.is_file();
+    }
+    is_executable_candidate(path)
+}
+
+/// True when the delegated entrypoint is a Node script, which must run through
+/// a Node runtime (that runtime is also what carries the always-on preload).
+///
+/// The name alone does not decide: `install.sh --as-dsh` backs the original up
+/// as the extension-less `dsh-orig`, which is still a Node script. Native
+/// executables and shell wrappers keep their direct exec either way.
+fn is_node_entrypoint(orig: &str) -> bool {
+    orig.ends_with(".js") || node_shebang(std::path::Path::new(orig))
+}
+
+/// True when `path` starts with a shebang that runs `node` with no arguments of
+/// its own (`#!/usr/bin/env node`, `#!/usr/bin/node`, `#!/usr/bin/env -S node`).
+/// A shebang that passes flags (`env -S node --x`) or a shell wrapper
+/// (`#!/bin/sh`) is left alone, so nothing that works today changes meaning.
+fn node_shebang(path: &std::path::Path) -> bool {
+    let Some(line) = shebang_line(path) else {
+        return false;
+    };
+    let tokens: Vec<&[u8]> = line
+        .split(|byte| *byte == b' ' || *byte == b'\t')
+        .filter(|token| !token.is_empty())
+        .collect();
+    let Some(program) = tokens.first().and_then(|token| token.strip_prefix(b"#!")) else {
+        return false;
+    };
+    let is_node = |token: &[u8]| token == b"node" || token.ends_with(b"/node");
+    let arguments: Vec<&[u8]> = tokens[1..]
+        .iter()
+        .copied()
+        .filter(|token| *token != b"-S")
+        .collect();
+    if is_node(program) {
+        arguments.is_empty()
+    } else if program == b"env" || program.ends_with(b"/env") {
+        matches!(arguments.as_slice(), [only] if is_node(only))
+    } else {
+        false
+    }
+}
+
+/// Read the first line of `path` (following symlinks) when it is a shebang.
+fn shebang_line(path: &std::path::Path) -> Option<Vec<u8>> {
+    use std::io::Read;
+    let mut head = [0u8; 256];
+    let mut file = std::fs::File::open(path).ok()?;
+    let read = file.read(&mut head).ok()?;
+    let head = &head[..read];
+    if !head.starts_with(b"#!") {
+        return None;
+    }
+    let end = head
+        .iter()
+        .position(|byte| *byte == b'\n' || *byte == b'\r')
+        .unwrap_or(head.len());
+    Some(head[..end].to_vec())
+}
+
 /// Locate the original Node-based dsh (never ourselves).
 pub fn find_original_dsh() -> Option<String> {
     // Canonical name first, legacy DSH_ORIG_BIN kept as fallback.
@@ -32,7 +131,7 @@ pub fn find_original_dsh() -> Option<String> {
         }
     }
     if let Some(p) = origin_file() {
-        if std::fs::metadata(&p).is_ok() {
+        if is_runnable_original(std::path::Path::new(&p)) {
             return Some(p);
         }
     }
@@ -43,7 +142,7 @@ pub fn find_original_dsh() -> Option<String> {
             // dsh-orig.exe covers native Windows installs (binary is dsh.exe there).
             for name in ["dsh-orig", "dsh.orig", "dsh.real", "dsh-orig.exe"] {
                 let cand = dir.join(name);
-                if std::fs::metadata(&cand).is_ok() {
+                if is_runnable_original(&cand) {
                     return Some(cand.to_string_lossy().into_owned());
                 }
             }
@@ -58,16 +157,17 @@ pub fn find_original_dsh() -> Option<String> {
             let names = ["dsh"];
             for n in names {
                 let cand = dir.join(n);
-                if std::fs::metadata(&cand).is_ok() {
-                    let mut skip = false;
-                    if let (Some(m), Ok(c)) = (&me, std::fs::canonicalize(&cand)) {
-                        if let Ok(m) = std::fs::canonicalize(m) {
-                            skip = m == c;
-                        }
+                if !is_executable_candidate(&cand) {
+                    continue;
+                }
+                let mut skip = false;
+                if let (Some(m), Ok(c)) = (&me, std::fs::canonicalize(&cand)) {
+                    if let Ok(m) = std::fs::canonicalize(m) {
+                        skip = m == c;
                     }
-                    if !skip {
-                        return Some(cand.to_string_lossy().into_owned());
-                    }
+                }
+                if !skip {
+                    return Some(cand.to_string_lossy().into_owned());
                 }
             }
         }
@@ -77,13 +177,13 @@ pub fn find_original_dsh() -> Option<String> {
             format!("{home}/.local/bin/dsh.orig"),
             format!("{home}/.local/bin/dsh-orig"),
         ] {
-            if std::fs::metadata(&cand).is_ok() {
+            if is_executable_candidate(std::path::Path::new(&cand)) {
                 return Some(cand);
             }
         }
         if let Some(tree) = latest_node_tree_for(&format!("{home}/.local/opt")) {
             let cand = format!("{tree}/lib/node_modules/@deepseek-ai/dsh/lib/bin.js");
-            if std::fs::metadata(&cand).is_ok() {
+            if is_runnable_original(std::path::Path::new(&cand)) {
                 return Some(cand);
             }
         }
@@ -161,7 +261,7 @@ pub fn pick_latest_node_tree<'a>(
 pub fn latest_node_tree_for(opt_dir: &str) -> Option<String> {
     let (want_os, want_arch) = current_os_arch();
     let entries = std::fs::read_dir(opt_dir).ok()?;
-    let mut names: Vec<String> = vec![];
+    let mut names: Vec<String> = Vec::new();
     for e in entries.flatten() {
         if e.metadata().is_ok_and(|m| m.is_dir()) {
             if let Some(n) = e.file_name().to_str().map(str::to_owned) {
@@ -178,9 +278,9 @@ pub fn latest_node_tree() -> Option<String> {
     latest_node_tree_for(&format!("{home}/.local/opt"))
 }
 
-// Node binary to run .js delegations: PATH lookup is metadata-only (a
-// `node --version` spawn costs ~14ms per delegation), else the newest
-// matching tree under ~/.local/opt.
+// Node binary to run .js delegations: PATH lookup checks effective execute
+// permission without spawning (`node --version` costs ~14ms per delegation),
+// else the newest matching tree under ~/.local/opt.
 pub fn find_node_bin() -> Option<String> {
     #[cfg(target_os = "windows")]
     const NAMES: &[&str] = &["node.exe", "node.cmd", "node.bat", "node"];
@@ -190,7 +290,7 @@ pub fn find_node_bin() -> Option<String> {
         for dir in std::env::split_paths(&path) {
             for n in NAMES {
                 let cand = dir.join(n);
-                if cand.is_file() {
+                if is_executable_candidate(&cand) {
                     return Some(cand.to_string_lossy().into_owned());
                 }
             }
@@ -201,7 +301,7 @@ pub fn find_node_bin() -> Option<String> {
     let cand = format!("{tree}/bin/node.exe");
     #[cfg(not(target_os = "windows"))]
     let cand = format!("{tree}/bin/node");
-    if std::fs::metadata(&cand).is_ok() {
+    if is_executable_candidate(std::path::Path::new(&cand)) {
         Some(cand)
     } else {
         None
@@ -228,14 +328,14 @@ fn node_for_dsh(orig: &str) -> Option<String> {
         let node = ancestor
             .join("bin")
             .join(if cfg!(windows) { "node.exe" } else { "node" });
-        if node.is_file() {
+        if is_executable_candidate(&node) {
             return Some(node.to_string_lossy().into_owned());
         }
         #[cfg(windows)]
         {
             // The official Windows archive keeps node.exe at the tree root.
             let node = ancestor.join("node.exe");
-            if node.is_file() {
+            if is_executable_candidate(&node) {
                 return Some(node.to_string_lossy().into_owned());
             }
         }
@@ -246,7 +346,7 @@ fn node_for_dsh(orig: &str) -> Option<String> {
 fn base_cmd(orig: &str, dry: bool, metadata_only: bool) -> anyhow::Result<std::process::Command> {
     let selected_node = || node_for_dsh(orig).or_else(find_node_bin);
     if dry || metadata_only {
-        if orig.ends_with(".js") {
+        if is_node_entrypoint(orig) {
             let mut command =
                 std::process::Command::new(selected_node().unwrap_or_else(|| "node".to_string()));
             command.arg(orig);
@@ -256,15 +356,45 @@ fn base_cmd(orig: &str, dry: bool, metadata_only: bool) -> anyhow::Result<std::p
     }
     let bin = selected_node()
         .ok_or_else(|| anyhow::anyhow!("RDSH_SECURITY: compatible Node runtime is required"))?;
-    crate::tool_security::command(orig, &bin)
+    if !crate::tool_security::sandbox_enabled() {
+        // Default: hand the run to DSH with its normal tools and normal file
+        // access. The strict boundary stays available through --share-file,
+        // features.agent_tool_sandbox, or RDSH_SECURITY=1.
+        let mut command = if is_node_entrypoint(orig) {
+            let mut command = std::process::Command::new(&bin);
+            // Always-on compat: let custom OpenCode zen routes get the
+            // x-opencode-session header (DSH's own custom-route provider
+            // builder omits it). RDSH_OPENCODE_SESSION_HEADER=0 opts out.
+            // `--import` resolves as an ES-module specifier, so pass a `file:`
+            // URL rather than a raw path (Windows drive letters and Unix
+            // reserved characters both break the path form).
+            if let Some(preload) = crate::opencode_header::import_specifier() {
+                command.arg("--import").arg(preload);
+            }
+            command.arg(orig);
+            command
+        } else {
+            std::process::Command::new(orig)
+        };
+        // The rdsh settings card reports this without spawning a second binary.
+        command.env("RDSH_VERSION", env!("CARGO_PKG_VERSION"));
+        return Ok(command);
+    }
+    let mut command = crate::tool_security::command(orig, &bin)?;
+    command.env("RDSH_VERSION", env!("CARGO_PKG_VERSION"));
+    Ok(command)
 }
 
 fn apply_slim(cmd: &mut std::process::Command, slim: bool) {
     if !slim {
         return;
     }
-    for &(k, v) in crate::slim::slim_env() {
+    for (k, v) in crate::slim::slim_env() {
         cmd.env(k, v);
+    }
+    // features.node_compile_cache=false leaves NODE_COMPILE_CACHE untouched.
+    if !crate::slim::features().node_compile_cache {
+        return;
     }
     // V8 code cache for the delegated Node process. Set unconditionally:
     // Node < 22.1 ignores the variable, and a version probe would cost a
@@ -337,6 +467,8 @@ pub fn exec_boot(
 
 pub fn exec_dump_config(
     profile: &str,
+    from_default: Option<&str>,
+    kind: crate::dsh_args::DumpKind,
     patches: &[String],
     dry: bool,
     slim: bool,
@@ -348,10 +480,17 @@ pub fn exec_dump_config(
         crate::auth::pre_boot(false);
     }
     cmd.arg("--profile").arg(profile);
+    if let Some(f) = from_default {
+        cmd.arg("--from-default-profile").arg(f);
+    }
     for p in patches {
         cmd.arg("--patch").arg(p);
     }
-    cmd.arg("--dump-config");
+    match kind {
+        crate::dsh_args::DumpKind::Config => cmd.arg("--dump-config"),
+        crate::dsh_args::DumpKind::DefaultConfig => cmd.arg("--dump-default-config"),
+        crate::dsh_args::DumpKind::Schema => cmd.arg("--dump-config-schema"),
+    };
     apply_slim(&mut cmd, slim);
     exec_or_spawn(cmd, dry)
 }
@@ -397,7 +536,7 @@ mod tests {
     use super::*;
 
     fn sv(v: &[&str]) -> Vec<String> {
-        v.iter().map(|s| s.to_string()).collect()
+        v.iter().map(ToString::to_string).collect()
     }
 
     #[test]
@@ -409,6 +548,198 @@ mod tests {
         assert!(parse_node_tree_version("node-v24.16.0").is_none());
         assert!(parse_node_tree_version("node-v24-linux-x64").is_none());
         assert!(parse_node_tree_version("other-v24.0.0-linux-x64").is_none());
+    }
+
+    fn env_lock() -> std::sync::MutexGuard<'static, ()> {
+        static M: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
+        M.get_or_init(|| std::sync::Mutex::new(()))
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
+    struct EnvGuard {
+        saved: Vec<(String, Option<String>)>,
+    }
+    impl EnvGuard {
+        fn set(keys: &[&str]) -> Self {
+            let saved = keys
+                .iter()
+                .map(|k| (k.to_string(), std::env::var(k).ok()))
+                .collect();
+            Self { saved }
+        }
+    }
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            for (k, v) in &self.saved {
+                match v {
+                    Some(v) => std::env::set_var(k, v),
+                    None => std::env::remove_var(k),
+                }
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    fn make_exec(path: &std::path::Path) {
+        use std::os::unix::fs::PermissionsExt;
+        let mut p = std::fs::metadata(path).unwrap().permissions();
+        p.set_mode(0o755);
+        std::fs::set_permissions(path, p).unwrap();
+    }
+
+    #[cfg(unix)]
+    fn make_non_exec(path: &std::path::Path) {
+        use std::os::unix::fs::PermissionsExt;
+        let mut p = std::fs::metadata(path).unwrap().permissions();
+        p.set_mode(0o644);
+        std::fs::set_permissions(path, p).unwrap();
+    }
+
+    #[cfg(unix)]
+    fn make_other_exec_only(path: &std::path::Path) {
+        use std::os::unix::fs::PermissionsExt;
+        let mut p = std::fs::metadata(path).unwrap().permissions();
+        p.set_mode(0o001);
+        std::fs::set_permissions(path, p).unwrap();
+    }
+
+    #[test]
+    fn skips_directory_and_non_executable_candidates() {
+        let root = std::env::temp_dir().join(format!(
+            "rdsh-passthrough-cand-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let dir_cand = root.join("dsh-dir");
+        std::fs::create_dir_all(&dir_cand).unwrap();
+        assert!(!is_executable_candidate(&dir_cand));
+        assert!(!is_executable_candidate(&root.join("missing")));
+        let file_cand = root.join("dsh-file");
+        std::fs::write(&file_cand, b"x").unwrap();
+        #[cfg(unix)]
+        {
+            make_non_exec(&file_cand);
+            assert!(!is_executable_candidate(&file_cand));
+            make_exec(&file_cand);
+            assert!(is_executable_candidate(&file_cand));
+            if unsafe { libc::geteuid() } != 0 {
+                make_other_exec_only(&file_cand);
+                assert!(!is_executable_candidate(&file_cand));
+            }
+        }
+        #[cfg(not(unix))]
+        {
+            assert!(is_executable_candidate(&file_cand));
+        }
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn path_lookup_skips_non_executable_dsh_and_node() {
+        let _guard = env_lock();
+        let env = EnvGuard::set(&[
+            "PATH",
+            "RDSH_ORIG_BIN",
+            "DSH_ORIG_BIN",
+            "HOME",
+            "USERPROFILE",
+        ]);
+        let root = std::env::temp_dir().join(format!(
+            "rdsh-passthrough-path-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let first = root.join("first");
+        let second = root.join("second");
+        let home = root.join("home");
+        std::fs::create_dir_all(&first).unwrap();
+        std::fs::create_dir_all(&second).unwrap();
+        std::fs::create_dir_all(&home).unwrap();
+        std::env::set_var("HOME", &home);
+        std::env::set_var("USERPROFILE", &home);
+        std::env::remove_var("RDSH_ORIG_BIN");
+        std::env::remove_var("DSH_ORIG_BIN");
+        // Valid fallback candidates so the lookup has somewhere to land.
+        let valid_dsh = second.join("dsh");
+        std::fs::write(&valid_dsh, b"#!/bin/sh\nexit 0\n").unwrap();
+        let valid_node = second.join("node");
+        std::fs::write(&valid_node, b"#!/bin/sh\nexit 0\n").unwrap();
+        #[cfg(unix)]
+        {
+            make_exec(&valid_dsh);
+            make_exec(&valid_node);
+        }
+        // PATH keeps working system dirs after our fixtures; fixtures come
+        // first to prove they are skipped when non-executable.
+        let sys_path = env.saved[0].1.clone().unwrap_or_default();
+        let mut parts = vec![first.clone(), second];
+        parts.extend(std::env::split_paths(&sys_path));
+        std::env::set_var("PATH", std::env::join_paths(&parts).unwrap());
+        // 1. Leading directory with the target name is skipped.
+        std::fs::create_dir_all(first.join("dsh")).unwrap();
+        std::fs::create_dir_all(first.join("node")).unwrap();
+        assert_eq!(
+            find_original_dsh(),
+            Some(valid_dsh.to_string_lossy().into_owned())
+        );
+        assert_eq!(
+            find_node_bin(),
+            Some(valid_node.to_string_lossy().into_owned())
+        );
+        std::fs::remove_dir_all(first.join("dsh")).unwrap();
+        std::fs::remove_dir_all(first.join("node")).unwrap();
+        // 2. Leading non-executable regular files are skipped (Unix exec bits).
+        #[cfg(unix)]
+        {
+            std::fs::write(first.join("dsh"), b"not executable\n").unwrap();
+            make_non_exec(&first.join("dsh"));
+            std::fs::write(first.join("node"), b"not executable\n").unwrap();
+            make_non_exec(&first.join("node"));
+            assert_eq!(
+                find_original_dsh(),
+                Some(valid_dsh.to_string_lossy().into_owned())
+            );
+            assert_eq!(
+                find_node_bin(),
+                Some(valid_node.to_string_lossy().into_owned())
+            );
+
+            // An execute bit for another permission class does not make this
+            // caller able to run the file (e.g. owner mode 0001).
+            if unsafe { libc::geteuid() } != 0 {
+                std::fs::write(first.join("dsh"), b"not executable for owner\n").unwrap();
+                make_other_exec_only(&first.join("dsh"));
+                std::fs::write(first.join("node"), b"not executable for owner\n").unwrap();
+                make_other_exec_only(&first.join("node"));
+                assert_eq!(
+                    find_original_dsh(),
+                    Some(valid_dsh.to_string_lossy().into_owned())
+                );
+                assert_eq!(
+                    find_node_bin(),
+                    Some(valid_node.to_string_lossy().into_owned())
+                );
+            }
+        }
+        // 3. Explicit RDSH_ORIG_BIN keeps priority even without exec bits.
+        #[cfg(unix)]
+        {
+            std::env::set_var("RDSH_ORIG_BIN", first.join("dsh"));
+            assert_eq!(
+                find_original_dsh(),
+                Some(first.join("dsh").to_string_lossy().into_owned())
+            );
+            std::env::remove_var("RDSH_ORIG_BIN");
+        }
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]
@@ -430,5 +761,180 @@ mod tests {
             Some("node-v24.16.0-darwin-arm64")
         );
         assert_eq!(pick_latest_node_tree(&names, "win", "arm64"), None);
+    }
+
+    /// eightman999 asked for a test that exercises the delegated argv itself
+    /// rather than only the embedded patch source.
+    #[test]
+    fn delegated_js_boots_receive_the_preload_as_a_file_url() {
+        if crate::tool_security::sandbox_enabled() {
+            return; // the strict boundary path does not inject this preload
+        }
+        let dir = std::env::temp_dir().join(format!(
+            "rdsh-base-cmd-{}-{}",
+            std::process::id(),
+            crate::local_http::random_token().unwrap()
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        let fixture = dir.join("dsh.js");
+        std::fs::write(&fixture, "// fixture\n").unwrap();
+        let orig = fixture.to_string_lossy().into_owned();
+
+        let command = base_cmd(&orig, false, false);
+        std::fs::remove_dir_all(&dir).unwrap();
+        let Ok(command) = command else {
+            return; // no compatible Node runtime in this environment
+        };
+        let args: Vec<String> = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect();
+        if crate::opencode_header::import_specifier().is_none() {
+            assert_eq!(args, vec![orig]); // RDSH_OPENCODE_SESSION_HEADER=0
+            return;
+        }
+        assert_eq!(args.len(), 3, "unexpected delegated argv: {args:?}");
+        assert_eq!(args[0], "--import");
+        assert!(
+            args[1].starts_with("file:///") && args[1].ends_with("opencode-session-header.mjs"),
+            "the preload must be a file: URL, got {}",
+            args[1]
+        );
+        assert_eq!(args[2], orig);
+    }
+
+    /// Eureka-COM's review: `install.sh --as-dsh` stores the original as the
+    /// extension-less `dsh-orig`, so the file name must not decide whether the
+    /// preload applies.
+    #[test]
+    fn node_entrypoints_are_detected_from_the_shebang_not_the_name() {
+        let dir = std::env::temp_dir().join(format!(
+            "rdsh-node-entrypoint-{}-{}",
+            std::process::id(),
+            crate::local_http::random_token().unwrap()
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        let cases = [
+            ("dsh-orig", "#!/usr/bin/env node\n", true),
+            ("node-bin", "#!/usr/bin/node\n", true),
+            ("env-s-node", "#!/usr/bin/env -S node\n", true),
+            (
+                "env-s-flags",
+                "#!/usr/bin/env -S node --no-warnings\n",
+                false,
+            ),
+            ("shell-wrapper", "#!/bin/sh\nexec node \"$@\"\n", false),
+            ("binary", "\u{7f}ELF\n", false),
+        ];
+        for (name, body, expected) in cases {
+            let path = dir.join(name);
+            std::fs::write(&path, body).unwrap();
+            assert_eq!(node_shebang(&path), expected, "shebang: {name}");
+            assert_eq!(
+                is_node_entrypoint(&path.to_string_lossy()),
+                expected || name.ends_with(".js"),
+                "entrypoint: {name}"
+            );
+        }
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// The real `--as-dsh` shape: a symlinked, extension-less backup must
+    /// still receive the preload argument.
+    #[cfg(unix)]
+    #[test]
+    fn a_symlinked_backup_is_still_a_node_entrypoint() {
+        use std::os::unix::fs::symlink;
+        let dir = std::env::temp_dir().join(format!(
+            "rdsh-node-entrypoint-link-{}-{}",
+            std::process::id(),
+            crate::local_http::random_token().unwrap()
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        let target = dir.join("bin.js");
+        std::fs::write(&target, "#!/usr/bin/env node\n// fixture\n").unwrap();
+        let link = dir.join("dsh-orig");
+        symlink(&target, &link).unwrap();
+
+        assert!(node_shebang(&link));
+        assert!(is_node_entrypoint(&link.to_string_lossy()));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// The delegated argv for that backup must be the same shape as for a
+    /// `.js` entry, and a shell wrapper must keep its direct exec.
+    #[test]
+    fn delegated_extensionless_node_backups_receive_the_preload() {
+        if crate::tool_security::sandbox_enabled() {
+            return; // the strict boundary path does not inject this preload
+        }
+        let dir = std::env::temp_dir().join(format!(
+            "rdsh-dsh-orig-{}-{}",
+            std::process::id(),
+            crate::local_http::random_token().unwrap()
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        let fixture = dir.join("dsh-orig");
+        std::fs::write(&fixture, "#!/usr/bin/env node\n// fixture\n").unwrap();
+        let orig = fixture.to_string_lossy().into_owned();
+
+        let command = base_cmd(&orig, false, false);
+        std::fs::remove_dir_all(&dir).unwrap();
+        let Ok(command) = command else {
+            return; // no compatible Node runtime in this environment
+        };
+        let args: Vec<String> = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect();
+        if crate::opencode_header::import_specifier().is_none() {
+            assert_eq!(args, vec![orig]); // RDSH_OPENCODE_SESSION_HEADER=0
+            return;
+        }
+        assert_eq!(args.len(), 3, "unexpected delegated argv: {args:?}");
+        assert_eq!(args[0], "--import");
+        assert!(
+            args[1].starts_with("file:///") && args[1].ends_with("opencode-session-header.mjs"),
+            "the preload must be a file: URL, got {}",
+            args[1]
+        );
+        assert_eq!(args[2], orig);
+    }
+
+    #[test]
+    fn delegated_shell_wrappers_keep_their_direct_exec() {
+        if crate::tool_security::sandbox_enabled() {
+            return; // the strict boundary path does not inject this preload
+        }
+        let dir = std::env::temp_dir().join(format!(
+            "rdsh-shell-wrapper-{}-{}",
+            std::process::id(),
+            crate::local_http::random_token().unwrap()
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        let fixture = dir.join("dsh-orig");
+        std::fs::write(&fixture, "#!/bin/sh\nexec node \"$@\"\n").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&fixture, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        let orig = fixture.to_string_lossy().into_owned();
+
+        let command = base_cmd(&orig, false, false);
+        std::fs::remove_dir_all(&dir).unwrap();
+        let Ok(command) = command else {
+            return; // no compatible Node runtime in this environment
+        };
+        assert_eq!(
+            command.get_program().to_string_lossy(),
+            orig.as_str(),
+            "a shell wrapper must keep its direct exec"
+        );
+        let args: Vec<String> = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect();
+        assert!(args.is_empty(), "unexpected delegated argv: {args:?}");
     }
 }

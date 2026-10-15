@@ -76,10 +76,25 @@ class FakeApi:
 class ReleaseCiTests(unittest.TestCase):
     def test_all_latest_workflow_jobs_succeed(self):
         api = FakeApi()
-        self.assertEqual(len(REQUIRED_CHECKS), 12)
+        self.assertEqual(len(REQUIRED_CHECKS), 13)
         result = verify_workflows(REPO, SHA, TAG, api)
         self.assertEqual(result["ci.yml"]["id"], 10)
         self.assertEqual(api.list_calls, {"ci.yml": 2, "codeql.yml": 2})
+
+    def test_isolated_install_must_be_present_and_successful(self):
+        self.assertIn("Isolated install", REQUIRED_WORKFLOWS["ci.yml"])
+        for conclusion in (None, "skipped", "failure"):
+            with self.subTest(conclusion=conclusion):
+                api = FakeApi()
+                entries = jobs(run())
+                installer = next(job for job in entries if job["name"] == "Isolated install")
+                if conclusion is None:
+                    entries.remove(installer)
+                else:
+                    installer["conclusion"] = conclusion
+                api.job_overrides[10] = entries
+                with self.assertRaisesRegex(ValueError, "Isolated install"):
+                    verify_workflows(REPO, SHA, TAG, api)
 
     def test_new_queued_run_overrides_old_success_without_start_timestamp(self):
         api = FakeApi()

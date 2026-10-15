@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { parseArgs } from "node:util";
 import fs from "node:fs/promises";
+import { constants } from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { identity, stateHome } from "./state.mjs";
@@ -34,6 +35,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { Releases } from "./releases.mjs";
+import { IntegrationQueue } from "./integration.mjs";
 import { WorkerWorkspaces } from "./workers.mjs";
 import {
   loopbackBase,
@@ -63,8 +65,15 @@ rdsh-dashboard instruction context --project <directory> --consumer-id <consumer
 rdsh-dashboard instruction submit|resolve --project <directory> --input-file <json>
 rdsh-dashboard cost-ledger declare|report --project <directory> --input-file <json>
 rdsh-dashboard cost-ledger inspect --project <directory>
+rdsh-dashboard cost-ledger validate|public|schema --input-file <request-json>   (native Rust)
+rdsh-dashboard task-outcomes apply|validate|schema --input-file <request-json>
 rdsh-dashboard budget policy|usage --project <directory> --input-file <json>
 rdsh-dashboard budget inspect --project <directory>
+rdsh-dashboard integration init --project <directory> --input-file <checks-json> --expected-revision 0 --expected-head <sha>
+rdsh-dashboard integration enqueue|reject --project <directory> --input-file <json> --expected-revision <n>
+rdsh-dashboard integration inspect --project <directory>
+rdsh-dashboard integration apply|validate|retarget --project <directory> --expected-revision <n> --expected-head <sha>
+rdsh-dashboard subagents plan --input-file <request-json>
 rdsh-dashboard workers plan --project <directory> --input-file <worker-json>
 rdsh-dashboard workers prepare --project <directory> --input-file <worker-json> --expected-revision <n> --expected-head <sha>
 rdsh-dashboard workers inspect --project <directory>
@@ -159,7 +168,13 @@ function openUrl(url) {
     console.log(url);
     return;
   }
-  const child = spawn("rundll32.exe", ["url.dll,FileProtocolHandler", url], {
+  // A bare name would be searched in the working directory first (CWE-427).
+  const rundll32 = path.join(
+    process.env.SystemRoot || "C:\\Windows",
+    "System32",
+    "rundll32.exe",
+  );
+  const child = spawn(rundll32, ["url.dll,FileProtocolHandler", url], {
     windowsHide: true,
     detached: true,
     stdio: "ignore",
@@ -192,6 +207,88 @@ async function localJson(file) {
     }
   } finally {
     await handle.close();
+  }
+}
+async function nativeRdsh() {
+  const override = process.env.RDSH_BIN;
+  if (override) {
+    if (!path.isAbsolute(override)) throw new Error("RDSH_BIN must be an absolute path");
+    return override;
+  }
+  const name = process.platform === "win32" ? "rdsh.exe" : "rdsh";
+  for (const directory of (process.env.PATH || "").split(path.delimiter)) {
+    if (!path.isAbsolute(directory)) continue;
+    const candidate = path.join(directory, name);
+    try {
+      if (!(await fs.stat(candidate)).isFile()) continue;
+      if (process.platform !== "win32")
+        await fs.access(candidate, constants.X_OK);
+      return candidate;
+    } catch {
+      // Keep looking through PATH.
+    }
+  }
+  throw new Error("rdsh is not installed on PATH (or set RDSH_BIN)");
+}
+
+// The outcome logic moved to Rust (`rdsh task-outcomes`); this command keeps
+// the dashboard entry point working without importing the removed module.
+async function runNativeTaskOutcomes(action, inputFile) {
+  const executable = await nativeRdsh();
+  const exitCode = await new Promise((resolve, reject) => {
+    const child = spawn(
+      executable,
+      ["task-outcomes", action, "--input-file", inputFile],
+      { stdio: "inherit", windowsHide: true },
+    );
+    child.once("error", reject);
+    child.once("close", (code) => resolve(code ?? 1));
+  });
+  process.exitCode = exitCode;
+}
+
+async function runNativeSubagentPlan(inputFile) {
+  const executable = await nativeRdsh();
+  const exitCode = await new Promise((resolve, reject) => {
+    const child = spawn(executable, ["subagents", "plan", "--input-file", inputFile], {
+      stdio: "inherit",
+      windowsHide: true,
+    });
+    child.once("error", reject);
+    child.once("close", (code) => resolve(code ?? 1));
+  });
+  process.exitCode = exitCode;
+}
+
+// The ledger logic also lives in Rust (`rdsh cost-ledger`). This command keeps
+// the dashboard entry point working through the native implementation, while
+// `dashboard/state.mjs` keeps importing the JS module in-process.
+async function runNativeCostLedger(action, document) {
+  const executable = await nativeRdsh();
+  const file = path.join(
+    stateHome(),
+    `cost-ledger-${process.pid}-${randomUUID()}.json`,
+  );
+  await fs.mkdir(path.dirname(file), { recursive: true });
+  try {
+    const handle = await fs.open(file, "wx", 0o600);
+    try {
+      await handle.writeFile(JSON.stringify(document));
+    } finally {
+      await handle.close();
+    }
+    const exitCode = await new Promise((resolve, reject) => {
+      const child = spawn(
+        executable,
+        ["cost-ledger", action, "--input-file", file],
+        { stdio: "inherit", windowsHide: true },
+      );
+      child.once("error", reject);
+      child.once("close", (code) => resolve(code ?? 1));
+    });
+    process.exitCode = exitCode;
+  } finally {
+    await fs.rm(file, { force: true });
   }
 }
 async function inPinnedCli(artifact, selectionRevision) {
@@ -306,12 +403,17 @@ try {
     throw new Error("Backup options require backup");
   if (
     values["expected-revision"] !== undefined &&
-    !["backup", "workers"].includes(command)
+    !["backup", "integration", "workers"].includes(command)
   )
     throw new Error("Backup options require backup");
   if (
-    command !== "workers" &&
-    ["expected-head", "lease-seconds"].some((k) => values[k] !== undefined)
+    values["expected-head"] !== undefined &&
+    !["integration", "workers"].includes(command)
+  )
+    throw new Error("Integration/worker options require their command");
+  if (
+    values["lease-seconds"] !== undefined &&
+    command !== "workers"
   )
     throw new Error("Worker workspace options require workers");
   if (
@@ -514,6 +616,77 @@ try {
       } else result = await backupRequest(project, "history");
     }
     console.log(JSON.stringify(result, null, 2));
+  } else if (command === "integration") {
+    const action = positionals[1];
+    const options = {
+      init: ["project", "input-file", "expected-revision", "expected-head"],
+      enqueue: ["project", "input-file", "expected-revision"],
+      reject: ["project", "input-file", "expected-revision"],
+      inspect: ["project"],
+      apply: ["project", "expected-revision", "expected-head"],
+      validate: ["project", "expected-revision", "expected-head"],
+      retarget: ["project", "expected-revision", "expected-head"],
+    };
+    if (
+      positionals.length !== 2 ||
+      !Object.hasOwn(options, action) ||
+      Object.keys(values).some((key) => !options[action].includes(key))
+    )
+      throw new Error("Invalid integration action/options");
+    const queue = await IntegrationQueue.open(
+      await identity(values.project || process.cwd()),
+    );
+    if (
+      action !== "inspect" &&
+      !/^\d+$/.test(values["expected-revision"] || "")
+    )
+      throw new Error("Specify --expected-revision");
+    const expected = {
+      expectedRevision: Number(values["expected-revision"]),
+      expectedHead: values["expected-head"],
+    };
+    let result;
+    if (action === "inspect") result = await queue.inspect();
+    else if (["enqueue", "reject"].includes(action))
+      result = await queue[action](
+        await localJson(values["input-file"]),
+        expected.expectedRevision,
+      );
+    else if (action === "init")
+      result = await queue.init(
+        await localJson(values["input-file"]),
+        expected,
+      );
+    else result = await queue[action](expected);
+    console.log(JSON.stringify(result));
+    if (
+      (action === "init" && result.queue.state !== "ready") ||
+      (action === "apply" &&
+        result.queue.entries.some((row) =>
+          ["conflict", "unconfirmed"].includes(row.state),
+        )) ||
+      (action === "validate" && !result.validation.verified)
+    )
+      process.exitCode = 1;
+  } else if (command === "subagents") {
+    if (
+      positionals.length !== 2 ||
+      positionals[1] !== "plan" ||
+      !values["input-file"] ||
+      Object.keys(values).some((key) => key !== "input-file")
+    )
+      throw new Error("Invalid subagents action/options");
+    await runNativeSubagentPlan(values["input-file"]);
+  } else if (command === "task-outcomes") {
+    const action = positionals[1];
+    if (
+      positionals.length !== 2 ||
+      !["apply", "validate", "schema"].includes(action) ||
+      !values["input-file"] ||
+      Object.keys(values).some((key) => key !== "input-file")
+    )
+      throw new Error("Invalid task-outcomes action/options");
+    await runNativeTaskOutcomes(action, values["input-file"]);
   } else if (command === "workers") {
     const action = positionals[1];
     const options = {
@@ -558,31 +731,49 @@ try {
   } else if (command === "cost-ledger") {
     const action = positionals[1],
       allowed = new Set(["project", "input-file", "help"]);
-    if (
-      positionals.length !== 2 ||
-      !["declare", "report", "inspect"].includes(action) ||
-      Object.keys(values).some((key) => !allowed.has(key)) ||
-      (action === "inspect"
-        ? values["input-file"] !== undefined
-        : !values["input-file"])
-    )
-      throw new Error(
-        "Cost ledger declare/report requires --input-file; inspect takes no input file",
-      );
-    const project = await identity(values.project || process.cwd());
-    console.log(
-      JSON.stringify(
-        await costRequest(
-          project,
-          action,
-          action === "inspect"
-            ? undefined
-            : await localJson(values["input-file"]),
+    // The pure projection and validation live in Rust (`rdsh cost-ledger`).
+    // They take no `--project`: the caller passes the whole state document, so
+    // no store is opened and no server is contacted.
+    if (["validate", "public", "schema"].includes(action)) {
+      if (
+        positionals.length !== 2 ||
+        !values["input-file"] ||
+        values.project !== undefined ||
+        Object.keys(values).some((key) => !allowed.has(key))
+      )
+        throw new Error(
+          "Cost ledger validate/public/schema requires --input-file and takes no project",
+        );
+      // Dispatch to the native command and leave the server path untouched;
+      // this is a module-level `try`, so the branch cannot `return`.
+      await runNativeCostLedger(action, await localJson(values["input-file"]));
+    } else {
+      if (
+        positionals.length !== 2 ||
+        !["declare", "report", "inspect"].includes(action) ||
+        Object.keys(values).some((key) => !allowed.has(key)) ||
+        (action === "inspect"
+          ? values["input-file"] !== undefined
+          : !values["input-file"])
+      )
+        throw new Error(
+          "Cost ledger declare/report requires --input-file; inspect takes no input file",
+        );
+      const project = await identity(values.project || process.cwd());
+      console.log(
+        JSON.stringify(
+          await costRequest(
+            project,
+            action,
+            action === "inspect"
+              ? undefined
+              : await localJson(values["input-file"]),
+          ),
+          null,
+          2,
         ),
-        null,
-        2,
-      ),
-    );
+      );
+    }
   } else if (command === "budget") {
     const action = positionals[1];
     const allowed = new Set(["project", "input-file", "help"]);

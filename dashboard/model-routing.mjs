@@ -328,10 +328,18 @@ export class ModelRouting {
           : "route_lock_unavailable",
       );
     }
+    let output,
+      failure = null,
+      committed = false;
+    const committedEventIds = [];
     try {
       await handle.writeFile(owner);
       await handle.sync();
-      const { value, result } = await operation(await this.read(record));
+      const prior = await this.read(record),
+        // operation() mutates prior in place and hands the same object back as
+        // value, so the pre-mutation event count has to be taken first.
+        priorEventCount = prior?.events.length ?? 0,
+        { value, result } = await operation(prior);
       const { record_hash: ignored, ...body } = value;
       value.record_hash = routeHash(body);
       validate(value, this.project, record);
@@ -345,23 +353,42 @@ export class ModelRouting {
       } finally {
         await writer.close();
       }
+      // Replacing the policy file is the commit point of this mutation.
       await fs.rename(temporary, file);
-      return result;
+      committed = true;
+      for (const event of value.events.slice(priorEventCount))
+        committedEventIds.push(event.event_id);
+      output = result;
     } catch (error) {
-      if (error instanceof RoutingError) throw error;
-      throw new RoutingError("route_write_unconfirmed");
-    } finally {
-      await handle.close();
-      try {
-        check(
-          (await fs.readFile(lock, "utf8")) === owner,
-          "route_lock_changed",
-        );
-        await fs.unlink(lock);
-      } catch {
-        throw new RoutingError("route_lock_cleanup_unconfirmed");
-      }
+      failure =
+        error instanceof RoutingError
+          ? error
+          : new RoutingError("route_write_unconfirmed");
     }
+    // A cleanup failure must never replace the outcome the caller earned.
+    let lockCleanupUnconfirmed = false;
+    try {
+      await handle.close();
+      check((await fs.readFile(lock, "utf8")) === owner, "route_lock_changed");
+      await fs.unlink(lock);
+    } catch {
+      lockCleanupUnconfirmed = true;
+    }
+    if (failure !== null) {
+      if (lockCleanupUnconfirmed) {
+        failure.committed = committed;
+        failure.event_ids = committed ? [...committedEventIds] : [];
+        failure.lock_cleanup_unconfirmed = true;
+      }
+      throw failure;
+    }
+    if (lockCleanupUnconfirmed)
+      throw new RoutingError("route_lock_cleanup_unconfirmed", {
+        committed,
+        event_ids: committed ? committedEventIds : [],
+        lock_cleanup_unconfirmed: true,
+      });
+    return output;
   }
   event(value, type, observation = null, authorization = null) {
     check(value.events.length < 500, "route_history_full");

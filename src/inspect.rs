@@ -1,5 +1,7 @@
 //! Read-only inspection of $DSH_HOME without Node: sessions, logs, skills, profiles.
-//! Never writes; missing dirs are reported, not errors (exit 0 with a note).
+//! Session/profile inputs are read-only. The token-size cache uses XDG_CACHE_HOME
+//! or the user's .cache directory, which can be inside $DSH_HOME by configuration.
+//! Missing dirs are reported, not errors (exit 0 with a note).
 
 /// User home directory without a dirs/home crate: HOME, USERPROFILE, then
 /// HOMEDRIVE+HOMEPATH (native Windows). One resolver for the whole binary so
@@ -38,10 +40,10 @@ fn format_time(t: std::time::SystemTime) -> String {
         .unwrap_or(0) as i64;
     let days = secs.div_euclid(86400);
     let tod = secs.rem_euclid(86400);
-    let z = days + 719468;
-    let era = z.div_euclid(146097);
-    let doe = z.rem_euclid(146097);
-    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z.rem_euclid(146_097);
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365;
     let y = yoe + era * 400;
     let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
     let mp = (5 * doy + 2) / 153;
@@ -91,7 +93,7 @@ fn list_dir(dir: &str, kind: &str) -> anyhow::Result<()> {
         let _ = writeln!(out, "{n}");
     }
     let _ = out.flush();
-    eprintln!("[rdsh] {} {kind}(s)", names.len());
+    eprintln!("[rdsh] {len} {kind}(s)", len = names.len());
     Ok(())
 }
 
@@ -125,14 +127,14 @@ fn scan_sessions(root: &str, project: Option<&str>) -> Vec<Session> {
         Some(_) => return vec![],
         None => match std::fs::read_dir(root) {
             Ok(e) => e
-                .filter_map(|e| e.ok())
+                .filter_map(Result::ok)
                 .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
                 .map(|e| e.file_name().to_string_lossy().into_owned())
                 .collect(),
             Err(_) => return vec![],
         },
     };
-    let mut out: Vec<Session> = vec![];
+    let mut out: Vec<Session> = Vec::new();
     if projs.len() >= 2 {
         // Bounded worker pool (issue #85-3): one batch at a time so a host
         // with hundreds of projects never spawns hundreds of threads.
@@ -207,29 +209,20 @@ pub fn cmd_sessions(
             .iter()
             .zip(sizes.iter())
             .map(|(s, (decomp, exact))| {
-                let tok = match decomp {
-                    Some(b) => Some(b / 4),
-                    None => Some(s.bytes / 4),
-                };
-                if tokens {
-                    serde_json::json!({
-                        "project": s.project,
-                        "id": s.id,
-                        "bytes": s.bytes,
-                        "mtime": s.mtime_s,
-                        "tokens": tok,
-                        "tokens_exact": exact,
-                    })
-                } else {
-                    serde_json::json!({
-                        "project": s.project,
-                        "id": s.id,
-                        "bytes": s.bytes,
-                        "mtime": s.mtime_s,
-                        "tokens": null,
-                        "tokens_exact": false,
-                    })
-                }
+                // serde_json::Map sorts these keys by default; when
+                // preserve_order is enabled, explicit insertion keeps the same
+                // legacy `sessions --json` byte order.
+                let mut row = serde_json::Map::new();
+                row.insert("bytes".into(), serde_json::json!(s.bytes));
+                row.insert("id".into(), serde_json::json!(s.id));
+                row.insert("mtime".into(), serde_json::json!(s.mtime_s));
+                row.insert("project".into(), serde_json::json!(s.project));
+                row.insert(
+                    "tokens".into(),
+                    serde_json::json!(tokens.then(|| decomp.map_or(s.bytes / 4, |b| b / 4))),
+                );
+                row.insert("tokens_exact".into(), serde_json::json!(tokens && *exact));
+                serde_json::Value::Object(row)
             })
             .collect();
         println!("{}", serde_json::json!({"sessions": items, "total": total}));
@@ -410,7 +403,7 @@ impl TokensCache {
                             let b = e.get("bytes").and_then(|x| x.as_u64()).unwrap_or(0);
                             let d = e.get("decomp").and_then(|x| x.as_u64());
                             let t = e.get("ts").and_then(|x| x.as_u64()).unwrap_or(0);
-                            let c = e.get("cli").and_then(|x| x.as_bool()).unwrap_or(false);
+                            let c = e.get("cli").is_some_and(|x| x.as_bool().unwrap_or(false));
                             map.insert(k.clone(), (m, b, d, t, c));
                         }
                     }
@@ -544,7 +537,7 @@ fn batch_decompressed(
 ) -> Vec<(Option<u64>, bool)> {
     let mut out: Vec<(Option<u64>, bool)> = vec![(None, false); shown.len()];
     // Serial cache pass first: hits never touch threads or IO.
-    let mut pending: Vec<(usize, Session)> = vec![];
+    let mut pending: Vec<(usize, Session)> = Vec::new();
     for (i, sess) in shown.iter().enumerate() {
         let key = TokensCache::key(root, &sess.project, &sess.id);
         match cache.get(&key, sess.mtime, sess.bytes, zstd_cli) {
@@ -667,7 +660,7 @@ fn session_decompressed_bytes_uncached(
             return (None, false);
         }
         // Per-file cache: only grown/added files pay for re-expansion.
-        let mut todo: Vec<std::path::PathBuf> = vec![];
+        let mut todo: Vec<std::path::PathBuf> = Vec::new();
         for p in &deferred {
             let Some(name) = p.file_name().map(|s| s.to_string_lossy().into_owned()) else {
                 continue;
@@ -692,7 +685,7 @@ fn session_decompressed_bytes_uncached(
         // Stale reuse: grown files with a recent exact value skip expansion
         // (marked inexact by the caller via the returned flag).
         let stale_window = stale_secs;
-        let mut todo2: Vec<std::path::PathBuf> = vec![];
+        let mut todo2: Vec<std::path::PathBuf> = Vec::new();
         for p in &todo {
             let stale_hit = (stale_window > 0)
                 .then(|| {
@@ -1166,8 +1159,7 @@ pub fn cmd_logs(tail: usize, grep: Option<String>, file: Option<String>) -> anyh
     }
     let _ = out.flush();
     eprintln!(
-        "[rdsh] {} line(s){}",
-        n,
+        "[rdsh] {n} line(s){}",
         grep.map(|g| format!(" matching {g:?}")).unwrap_or_default()
     );
     Ok(())
@@ -1175,7 +1167,7 @@ pub fn cmd_logs(tail: usize, grep: Option<String>, file: Option<String>) -> anyh
 
 fn latest_file(dir: &str) -> Option<std::path::PathBuf> {
     let mut best: Option<(u64, std::path::PathBuf)> = None;
-    for e in std::fs::read_dir(dir).ok()?.filter_map(|e| e.ok()) {
+    for e in std::fs::read_dir(dir).ok()?.filter_map(Result::ok) {
         // Never follow a planted link out of the logs dir (file_type does
         // not traverse symlinks, unlike metadata below).
         if !e.file_type().is_ok_and(|t| t.is_file()) {
@@ -1205,7 +1197,7 @@ fn latest_file(dir: &str) -> Option<std::path::PathBuf> {
 fn dir_names(dir: &str) -> Vec<String> {
     let mut names: Vec<String> = std::fs::read_dir(dir)
         .map(|e| {
-            e.filter_map(|e| e.ok())
+            e.filter_map(Result::ok)
                 .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
                 .map(|e| e.file_name().to_string_lossy().into_owned())
                 .collect()
@@ -1460,7 +1452,7 @@ mod tests {
         let mut seed = 0x9E37_79B9u64;
         let mut body = vec![0u8; 100_000];
         for b in &mut body {
-            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+            seed = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
             *b = (seed >> 33) as u8;
         }
         std::fs::write(&src, &body).unwrap();
@@ -1485,15 +1477,15 @@ mod tests {
             return;
         };
         let mut checked = 0;
-        'scan: for proj in projs.filter_map(|e| e.ok()) {
+        'scan: for proj in projs.filter_map(Result::ok) {
             let Ok(sess) = std::fs::read_dir(proj.path()) else {
                 continue;
             };
-            for s in sess.filter_map(|e| e.ok()) {
+            for s in sess.filter_map(Result::ok) {
                 let Ok(files) = std::fs::read_dir(s.path()) else {
                     continue;
                 };
-                for f in files.filter_map(|e| e.ok()) {
+                for f in files.filter_map(Result::ok) {
                     let p = f.path();
                     if p.extension().and_then(|e| e.to_str()) != Some("zstd") {
                         continue;
