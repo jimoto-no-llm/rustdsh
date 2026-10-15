@@ -366,9 +366,11 @@ release build of this project is not small.
 
 ## When CI is blocked
 
-- **Checks never start.** The branch is `BEHIND` and the branch protection rule
-  requires an up-to-date branch. Rebase on `origin/main`, push, and wait for
-  the new run.
+- **Checks still run while the branch is `BEHIND`.** Branch protection does
+  not require an up-to-date branch (`strict` is deliberately off), so the
+  required checks run on the merge commit. Rebase on `origin/main` and push to
+  re-verify against the latest `main` and to resolve conflicts — not to make CI
+  start.
 - **A required job is skipped.** Docs and dashboard workflows have path
   filters, so an unrelated PR legitimately shows them as skipped. Skipped is
   not failed; the required checks are the Rust ones.
