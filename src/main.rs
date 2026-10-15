@@ -51,6 +51,7 @@ mod file_security;
 mod guard;
 mod inspect;
 mod instruction_queue;
+mod js_json;
 mod local_http;
 mod opencode_header;
 mod passthrough;
