@@ -3,13 +3,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node browser.mjs && node update-banner.mjs",
+    "test": "node browser.mjs && node update-banner.mjs && node task-outcomes.mjs",
     "test:harness": "node harness-settings.mjs",
+    "test:muse": "node muse-subscription.mjs",
     "test:updates": "node update-banner.mjs"
   },
   "devDependencies": {
     "cordis": "4.0.0-rc.10",
-    "esbuild": "0.27.0",
+    "esbuild": "0.28.2",
     "playwright": "1.62.1",
     "react": "19.3.0",
     "react-dom": "19.3.0"

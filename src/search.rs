@@ -169,7 +169,7 @@ fn collect_parallel(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
         .filter(|(_, s)| matches!(s, Seg::Sub(_)))
         .map(|(i, _)| i)
         .collect();
-    let mut resolved: Vec<Vec<std::path::PathBuf>> = vec![];
+    let mut resolved: Vec<Vec<std::path::PathBuf>> = Vec::new();
     resolved.resize_with(sub_idx.len(), Vec::new);
     let width = crate::inspect::parallelism().max(1);
     for (batch_no, batch) in sub_idx.chunks(width).enumerate() {
@@ -286,7 +286,7 @@ fn grep_parallel(
         return grep_chunk(pattern, files, root, max);
     }
     let chunk = files.len().div_ceil(threads);
-    let mut out: Vec<Vec<Vec<String>>> = vec![];
+    let mut out: Vec<Vec<Vec<String>>> = Vec::new();
     std::thread::scope(|s| {
         let mut handles = vec![];
         for c in files.chunks(chunk) {
@@ -300,17 +300,33 @@ fn grep_parallel(
 }
 
 fn truncate(s: &str, n: usize) -> String {
-    if s.len() <= n {
-        return s.to_string();
+    let mut rest = s.chars();
+    let mut t: String = rest.by_ref().take(n).collect();
+    if rest.next().is_some() {
+        t.push('>');
     }
-    let mut t: String = s.chars().take(n).collect();
-    t.push('>');
     t
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 切り詰めは文字数基準。バイト長で判定すると、240文字以下の非ASCII行に
+    /// 偽のマーカーが付く（日本語81文字＝243バイト）。
+    #[test]
+    fn truncate_marks_only_when_chars_are_actually_cut() {
+        let cjk = "あ".repeat(81);
+        assert_eq!(truncate(&cjk, 240), cjk);
+        assert_eq!(
+            truncate(&"a".repeat(241), 240),
+            format!("{}>", "a".repeat(240))
+        );
+        assert_eq!(
+            truncate(&"あ".repeat(241), 240),
+            format!("{}>", "あ".repeat(240))
+        );
+    }
 
     #[test]
     fn worker_cap() {

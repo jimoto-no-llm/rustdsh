@@ -3,7 +3,7 @@
 The session ledger names the native CLI session. `run-history.jsonl`, beside
 that ledger, records control requests, native acknowledgements and owned root
 process observations. Neither file copies the native conversation or runs an
-agent loop. The existing dashboard task statuses and seven MCP tools are unchanged.
+agent loop. The existing dashboard task statuses and six MCP tools are unchanged.
 
 ## Inspect an exact run
 

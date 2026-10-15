@@ -20,7 +20,7 @@ absent from the `dsh-base` bundle, so each one adds real capability.
 ./plugins/install.sh                    # PROFILE=headless (default)
 PROFILE=web ./plugins/install.sh       # install into the web profile instead
 DRY_RUN=1 ./plugins/install.sh         # print the pnpm commands only
-PROFILE=web SOUND=0 GITVIEW=0 ./plugins/install.sh  # skip the default third-party Web UI plugins (below)
+PROFILE=web SOUND=1 ./plugins/install.sh  # also add Web sound/desktop notifications (below)
 ```
 
 ### Desktop app (Electron) profile
@@ -30,9 +30,8 @@ bundled command runtime, and the npm `dsh` CLI refuses to manage it. Use the
 profile installer, which forwards every package to the app's own command:
 
 ```sh
-PROFILE=desktop ./plugins/install.sh              # recommended + bundled + default third-party plugins
+PROFILE=desktop ./plugins/install.sh              # recommended + bundled plugins
 PROFILE=desktop COMPUTE=1 ./plugins/install.sh    # plus the compute bridge
-PROFILE=desktop SOUND=0 GITVIEW=0 ./plugins/install.sh  # skip the default third-party plugins
 ```
 
 It runs `rdsh desktop install --no-bundled --package <spec>`, which invokes
@@ -42,40 +41,55 @@ install the same packages without a command runtime. The installers do the same
 inline with `./install.sh --desktop` or `.\install.ps1 -Desktop`. See
 [docs/DESKTOP-INTEGRATION.md](../docs/DESKTOP-INTEGRATION.md).
 
-## Default Web UI plugins (third-party, MIT, used with permission)
+## Optional Web UI plugins (third-party, opt-in)
 
-Installed by default for `PROFILE=web` / `PROFILE=desktop`. Other profiles
-can opt in with `SOUND=1` / `GITVIEW=1`. Set `SOUND=0` or `GITVIEW=0` to skip one, or
-`features.sound=false` / `features.gitview=false` in `rdsh.json` to veto them.
-`rdsh desktop install` includes both by default as well (`--no-sound` /
-`--no-gitview` to skip).
+Installed only when `SOUND=1` is set. Kept out of the default set so the
+base install stays first-party and dependency-free.
 
 | Package | Why |
 | --- | --- |
 | `github:cwd514/dsh-sound-notifications` (MIT, (c) 2026 cwd514) | Effect sounds (Web Audio synthesis, no audio files) and desktop notifications for reply-done / approval-waiting / questions / errors / re-login. Zero dependencies, no build step. Verified by upstream on DSH `0.2.0-rc.2` Web UI. |
-| `github:yugapor/dsh-gitview` (MIT, (c) 2026 yugapor) | Git panel in the Web sidebar: working-tree changes, staging and commits, unified/side-by-side diffs, commit graph, branches, blame, reflog, and CI status. Verified by upstream on DSH `0.2.0-rc.2` Web UI. |
 
 Notes:
 
-- Browser client plugins: use `PROFILE=web`. Desktop notifications additionally
+- Browser client plugin: use `PROFILE=web`. Desktop notifications additionally
   need a secure context (`127.0.0.1`/`localhost`/`https`) and the browser's
   notification permission; otherwise only the sounds play (see upstream README).
 - Installed from upstream GitHub at install time, not vendored here, so fixes
-  arrive without a rustdsh release. Upstream repos:
-  <https://github.com/cwd514/dsh-sound-notifications> and
-  <https://github.com/yugapor/dsh-gitview>.
-- Credits: see [Credits](../README.md#credits). Both plugins are used with
-  upstream permission under their MIT licenses.
+  arrive without a rustdsh release. Upstream repo:
+  <https://github.com/cwd514/dsh-sound-notifications>
+
+## Third-party credits
+
+Third-party sources used by the installers and the bundled plugins. These
+projects are independent of rdsh; their licenses and copyrights stay with their
+authors.
+
+| Upstream | License | How rdsh uses it |
+| --- | --- | --- |
+| [Smart-DSH](https://github.com/hikarioyama/Smart-DSH) by hikarioyama | MIT | Source of the phone-width layout bundled as `rdsh-mobile-ui` (the mobile rail of its `dsh-notify-push` browser bundle). Its Web Push notifications, Esc-to-stop, task hub and shared-HMR workaround are not bundled. |
+| [dsh-sound-notifications](https://github.com/cwd514/dsh-sound-notifications) by cwd514 | MIT | Opt-in effect sounds and desktop notifications, installed only with `SOUND=1`. |
+| [dsh-gitview](https://github.com/yugapor/dsh-gitview) by yugapor | MIT | Optional sidebar Git panel. The installer does not offer it; add it with `dsh plugin --profile web add github:yugapor/dsh-gitview`. |
 
 ## Bundled rdsh plugins (this repo)
 
 `./plugins/install.sh` also installs these local plugins into the same
-profile, so the rdsh settings UI and one-click translation action are available by default:
+profile, so the rdsh settings UI, the one-click translation action and the
+phone-width layout are available by default:
 
 | Plugin | Why |
 | --- | --- |
 | `rdsh-settings` | rdsh section in DSH settings (budgets, retrieval, memory, beta flags) |
 | `rdsh-translation` | Web UI action to translate a settled answer and replace it on the history surface |
+| `rdsh-update-banner` | release banner and notifications in the Web UI (`PROFILE=web` only). Installing it keeps the profile's own insert block from failing to import on every boot (issue #5) |
+| `rdsh-mobile-ui` | Phone-width layout for the DSH Web chat: full-width chat and composer, one-tap logo to the session list. Adapted from Smart-DSH (MIT) — see [its README](rdsh-mobile-ui/README.md). |
+
+The banner's package supplies a bundle patch. A Web profile previously wired
+with `install-banner.sh` may also have a manual insert with the same ID. DSH
+`0.2.0-rc.2` combines entries by ID and applies the profile's entry after the
+bundle entry, retaining the manual configuration. This installer leaves that
+profile patch untouched. After upgrading to a different DSH loader version,
+check its duplicate-ID behavior before migrating existing profiles.
 
 ## Workflow board source preparation
 

@@ -281,7 +281,6 @@ export async function captureRelease(
         ["package.json", "package-lock.json"].includes(file)
       )
         inputs.push([path.join(dash, file), "adapter/dashboard/" + file]);
-    await tree(path.join(dash, "ui"), "adapter/dashboard/ui");
     await tree(
       path.join(dash, "node_modules"),
       "adapter/dashboard/node_modules",

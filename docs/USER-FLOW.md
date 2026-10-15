@@ -47,11 +47,6 @@ Web検索には別途SearXNGが必要です。DSH内のrdsh設定プラグイン
 | 手元の状態を確認 | `rdsh serve --port 0` | `serve` をExtrasで有効化 |
 | プロジェクト指標・人への質問と回答 | `node dashboard/cli.mjs project --project <path> --no-tailscale --open` | Node.js 22+、dashboard依存の導入 |
 | Windows/WSL上の本家Web画面の中継 | `rdsh-dashboard harness` | 対応するWindows/WSL環境 |
-| デスクトップアプリの確認とプラグイン組み込み | `rdsh desktop status` / `rdsh desktop install --plugins-dir <rustdsh>` | 本家デスクトップアプリ（初回起動でプロファイル作成済み）、macOSまたはWindows |
-
-デスクトップアプリは本体が専用のプロファイル（`$DSH_HOME/profiles/desktop`）を持つため、
-プラグインの組み込みはアプリを終了した状態で行い、終了後に再度開いて反映します。
-詳細は [DESKTOP-INTEGRATION.md](DESKTOP-INTEGRATION.md) を確認してください。
 
 `rdsh serve` のURLも起動ごとの鍵を含みます。既定ポートは38080で、
 DSH webの既定3080とは異なります。スマホ向けの接続は
@@ -83,6 +78,10 @@ rdsh settings show --json
 
 CLIとローカルHTTPはRustのE2Eテスト、設定・状態画面は実サーバーに接続する
 ブラウザテストで検証します。[検証一覧と残件](evidence/e2e-20261008.md)。
-本家DSH内のrdsh設定プラグインは保存から破損時の再読み込みまで確認済みですが、
-スマホ幅で本文が狭くなる問題が残っています。モデルの応答、Desktop全体の動作、
-Tailscale経由の実機接続は別途確認が必要です。
+本家DSH内のrdsh設定プラグインは保存から破損時の再読み込みまで確認済みです。
+スマホ幅で本文が狭くなる問題は、同梱の
+[`rdsh-mobile-ui`](../plugins/rdsh-mobile-ui/README.md)（Smart-DSH のモバイル表示を
+元にしたMITのレイアウト）が767px以下でチャットと入力欄を全幅にします。
+実サーバー（DSH 0.2.0-rc.2）の390px表示で、列幅390px・入力欄383px・横スクロールなしを
+確認済みです。物理スマホ、Tailscale経由の接続、モデルの応答、Desktop全体の動作は
+別途確認が必要です。

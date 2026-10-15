@@ -6,13 +6,12 @@ import { renderConnectionDiagnostics } from "./connection-diagnostics-ui.mjs";
 import { createInstructionPanel } from "./instruction-queue-ui.mjs";
 import { createCostPanel } from "./cost-ledger-ui.mjs";
 import { createModelCatalogPanel } from "./model-catalog-ui.mjs";
-import { renderSurface } from "./ui/blocks.mjs";
 import { renderBudget } from "./budget-ui.mjs";
+import { createTaskOutcomesPanel } from "./task-outcomes-ui.mjs";
 import { createHumanAnnotationPanel } from "./human-annotations-ui.mjs";
 import { setupObservedCli } from "./observed-cli-ui.mjs";
 
 const $ = (id) => document.getElementById(id);
-const SVG_NS = "http://www.w3.org/2000/svg";
 const base = location.pathname.startsWith("/_rdsh") ? "/_rdsh/" : "/";
 const suppliedBrowserToken =
   base === "/" ? new URLSearchParams(location.hash.slice(1)).get("key") : null;
@@ -46,51 +45,55 @@ function node(tag, text, className) {
   if (className) result.className = className;
   return result;
 }
-  // SVG shapes need the SVG namespace or they render as inert HTML nodes.
-  node.svg = (tag) => document.createElementNS(SVG_NS, tag);
-// Theme: the boot script picks the palette before paint; this keeps the
-// toggle label, aria state and storage in sync afterwards.
-const themeQuery = window.matchMedia("(prefers-color-scheme: dark)");
-const storedTheme = () => {
-  try {
-    return localStorage.getItem("rdsh_dashboard_theme");
-  } catch {
-    return null;
-  }
-};
-const currentTheme = () =>
-  document.documentElement.dataset.theme === "dark" ? "dark" : "light";
-function renderThemeToggle() {
-  const dark = currentTheme() === "dark";
-  const button = $("theme-toggle");
-  button.textContent = dark ? "ライト表示" : "ダーク表示";
-  button.setAttribute("aria-pressed", String(dark));
-}
-function setTheme(theme, persist) {
-  document.documentElement.dataset.theme = theme;
-  if (persist) {
-    try {
-      localStorage.setItem("rdsh_dashboard_theme", theme);
-    } catch {}
-  }
-  renderThemeToggle();
-}
-$("theme-toggle").addEventListener("click", () => {
-  setTheme(currentTheme() === "dark" ? "light" : "dark", true);
-});
-themeQuery.addEventListener("change", (event) => {
-  // An explicit operator choice outranks the system preference.
-  const stored = storedTheme();
-  if (stored === "dark" || stored === "light") return;
-  setTheme(event.matches ? "dark" : "light", false);
-});
-renderThemeToggle();
-
 let renderedRevision = -1;
 let latestState = null;
 let selectedTask = "";
 let selectionKey = "";
 let observedCli = null;
+let workspaceLayoutStorageKey = null;
+const workspaceLayouts = ["1", "2", "3"];
+function setWorkspaceLayout(value, { persist = true, announce = true } = {}) {
+  if (!workspaceLayouts.includes(value)) return false;
+  $("workspace-grid").dataset.layout = value;
+  document
+    .querySelectorAll('input[name="workspace-layout"]')
+    .forEach((input) => {
+      input.checked = input.value === value;
+    });
+  let saved = false;
+  if (persist && workspaceLayoutStorageKey) {
+    try {
+      localStorage.setItem(workspaceLayoutStorageKey, value);
+      saved = true;
+    } catch {}
+  }
+  if (announce) {
+    $("workspace-layout-status").textContent = saved
+      ? `PC表示の最大列数を${value}列に設定し、このブラウザーにprojectごとに保存しました。`
+      : "表示を変更しましたが、このブラウザーには保存できませんでした。";
+  }
+  return true;
+}
+function restoreWorkspaceLayout(projectId) {
+  let layout = "3";
+  if (typeof projectId === "string" && projectId.trim()) {
+    workspaceLayoutStorageKey =
+      `rdsh:workspace-layout:v1:${encodeURIComponent(projectId)}`;
+    try {
+      const saved = localStorage.getItem(workspaceLayoutStorageKey);
+      if (workspaceLayouts.includes(saved)) layout = saved;
+    } catch {}
+  }
+  setWorkspaceLayout(layout, { persist: false, announce: false });
+  $("workspace-layout-controls").disabled = false;
+}
+document
+  .querySelectorAll('input[name="workspace-layout"]')
+  .forEach((input) =>
+    input.addEventListener("change", () => {
+      if (input.checked) setWorkspaceLayout(input.value);
+    }),
+  );
 function navigateTo(id) {
   const target = $(id);
   if (!target) return;
@@ -186,63 +189,12 @@ const renderInstructions = createInstructionPanel($("instruction-panel"), {
   refreshState,
 });
 const renderCosts = createCostPanel($("cost-ledger"), node);
+const renderTaskOutcomes = createTaskOutcomesPanel(
+  $("tasks"),
+  $("task-milestones"),
+  { node, api },
+);
 const renderCatalog = createModelCatalogPanel($("model-catalog"), node);
-// rdsh-ui/1: the agent presents a surface, and a human action returns to the
-// same session. The rendered surface is skipped until its revision changes so
-// an update never wipes a draft, a selection or focus.
-let renderedSurfaceKey = "";
-let uiActionSequence = 0;
-async function submitUiAction(action, block, value) {
-  const surface = latestState?.ui_surfaces?.current;
-  const status = $("agent-ui-status");
-  if (!surface) {
-    status.textContent = "提示されたUIがありません。";
-    return;
-  }
-  uiActionSequence += 1;
-  const body = {
-    surface_id: surface.surface_id,
-    surface_revision: surface.revision,
-    block_id: block.id,
-    action_id: action.id,
-    action_request_id: "act_" + Date.now().toString(36) + "_" + uiActionSequence,
-  };
-  if (value !== null && value !== undefined) body.value = value;
-  try {
-    const result = await api("ui/actions", body);
-    status.className = result.followup_required ? "" : "ok";
-    status.textContent = result.followup_required
-      ? "要求として記録しました。実行は別の認可された経路で行われます。"
-      : "選択をセッションへ返しました（受付 " + result.sequence + "）。実行権限は発行していません。";
-  } catch (error) {
-    status.className = "error";
-    status.textContent = "送信できません: " + error.message;
-  }
-}
-function renderAgentUi(state) {
-  const surface = state.ui_surfaces?.current || null;
-  const key = surface ? surface.surface_id + "@" + surface.revision : "none";
-  if (key === renderedSurfaceKey) return;
-  renderedSurfaceKey = key;
-  renderSurface($("agent-ui"), surface, node, submitUiAction);
-  const meta = $("agent-ui-meta");
-  const status = $("agent-ui-status");
-  meta.replaceChildren();
-  status.className = "";
-  status.textContent = "";
-  if (!surface) {
-    meta.append(node("span", "提示待ち"));
-    return;
-  }
-  meta.append(
-    node("span", surface.surface_id, "ui-surface-id"),
-    node("span", "版 " + surface.revision),
-    node("span", "提示 " + (surface.presented_at
-      ? new Date(surface.presented_at).toLocaleString("ja-JP")
-      : "未取得")),
-    node("span", "ブロック " + surface.blocks.length),
-  );
-}
 const renderHumanAnnotations = createHumanAnnotationPanel(
   $("human-annotations-panel"),
   { api, node, navigateTo },
@@ -255,12 +207,12 @@ function render(state) {
   renderInstructions(state);
   renderCosts(state);
   renderCatalog();
-  renderAgentUi(state);
   renderBudget($("budget-admission"), state, node);
   updateOverview(state);
   renderHumanAnnotations(state);
   renderReports(state);
   const unanswered = state.questions.filter((question) => question.answer === null);
+  renderTaskOutcomes(state);
   renderQuestionCards($("questions"), unanswered, state.question_contracts, {
     node,
     api,
@@ -448,6 +400,7 @@ document.addEventListener("keydown", (event) => {
 try {
   const config = await api("config");
   if (config.kind === "project") observedCli = setupObservedCli({ api });
+  restoreWorkspaceLayout(config.project?.id);
   await renderShare(config);
   if (config.kind === "harness") {
     $("connection-detail").hidden = true;

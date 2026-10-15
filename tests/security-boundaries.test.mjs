@@ -151,29 +151,79 @@ test('context does not retrieve other projects sessions by default', t => {
   assert.equal(optedIn.status, 0, optedIn.stderr);
   assert.doesNotMatch(optedIn.stdout, /DUMMY_OTHER_PROJECT_SECRET/);
 });
-test('automatic updater refuses bad or missing checksums before installing', t => {
+test('automatic updater verifies against the pinned registry, not a same-origin sidecar', t => {
   const { dir, env } = isolated(t);
+  const version = 'v9.9.9';
+  const assets = ['rdsh-linux-x64.tar.gz', 'rdsh-linux-x64-musl.tar.gz', 'rdsh-macos-arm64.tar.gz', 'rdsh-macos-x64.tar.gz'];
+  const releaseRoot = path.join(dir, 'releases');
+  const download = path.join(releaseRoot, 'download', version);
   const pkg = path.join(dir, 'pkg');
-  const download = path.join(dir, 'releases', 'latest', 'download');
-  mkdirSync(pkg);
+  const shim = path.join(dir, 'shim');
   mkdirSync(download, { recursive: true });
-  writeFileSync(path.join(pkg, 'rdsh'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  mkdirSync(pkg);
+  mkdirSync(shim);
+  const payload = '#!/bin/sh\nexit 0\n';
+  writeFileSync(path.join(pkg, 'rdsh'), payload, { mode: 0o755 });
   const asset = path.join(download, 'rdsh-linux-x64.tar.gz');
   assert.equal(spawnSync('tar', ['-czf', asset, '-C', pkg, 'rdsh'], { env }).status, 0);
-  env.RDSH_RELEASE_BASE = 'file://' + path.join(dir, 'releases');
+  const digest = createHash('sha256').update(readFileSync(asset)).digest('hex');
+  for (const name of assets) if (name !== 'rdsh-linux-x64.tar.gz') writeFileSync(path.join(download, name), readFileSync(asset));
+  const manifest = path.join(dir, 'release-digests.tsv');
+  writeFileSync(manifest, ['# DUMMY fixture', `latest ${version}`, ...assets.map(name => `${version} ${name} ${digest}`)].join('\n') + '\n');
+  // The fixture curl answers only the canonical registry URL and file:// URLs, so
+  // a run that tries to fetch an <asset>.sha256 from the release base fails loudly.
+  const registry = 'https://raw.githubusercontent.com/jimoto-no-llm/rustdsh/main/release-digests.tsv';
+  const curlLog = path.join(dir, 'curl.log');
+  writeFileSync(path.join(shim, 'curl'), `#!/bin/sh
+out=""
+prev=""
+url=""
+for arg in "$@"; do
+  [ "$prev" = "-o" ] && out="$arg"
+  prev="$arg"
+  url="$arg"
+done
+[ -n "$out" ] || exit 2
+printf '%s\\n' "$url" >> "${curlLog}"
+if [ "$url" = "${registry}" ]; then cp "${manifest}" "$out"; exit 0; fi
+if [ "\${url#file://}" != "$url" ]; then cp "\${url#file://}" "$out"; exit 0; fi
+echo "unexpected URL: $url" >&2
+exit 22
+`, { mode: 0o755 });
+  env.RDSH_RELEASE_BASE = 'file://' + releaseRoot;
+  env.PATH = `${shim}${path.delimiter}${process.env.PATH}`;
   const dest = path.join(dir, 'installed');
   env.TEST_DEST = dest;
   const source = readFileSync('sync-dsh.sh', 'utf8').replaceAll('\r\n', '\n').split('\nNPM=""')[0];
   const run = () => spawnSync('/bin/sh', ['-c', source + '\nfetch_rdsh_release "$TEST_DEST"'], { env, encoding: 'utf8' });
-  assert.notEqual(run().status, 0);
+  // sync-dsh.sh logs through tee(1) on stdout, so both streams carry refusals.
+  const output = result => result.stdout + result.stderr;
+  const refused = run();
+  assert.notEqual(refused.status, 0);
+  assert.match(output(refused), /refusing non-https release base/);
+  assert.equal(existsSync(curlLog), false);
+  env.RDSH_TEST_INSECURE_BASE = '1';
+  // A same-origin sidecar that matches different bytes cannot authorize them.
+  const genuine = readFileSync(asset);
+  writeFileSync(asset, Buffer.concat([genuine, Buffer.from('DUMMY tampered payload')]));
+  const tampered = createHash('sha256').update(readFileSync(asset)).digest('hex');
+  for (const name of assets) writeFileSync(path.join(download, name + '.sha256'), `${tampered}  ${name}\n`);
+  const mismatch = run();
+  assert.notEqual(mismatch.status, 0);
+  assert.match(output(mismatch), /CHECKSUM MISMATCH/);
   assert.equal(existsSync(dest), false);
-  writeFileSync(asset + '.sha256', '0'.repeat(64) + '\n');
-  assert.notEqual(run().status, 0);
-  assert.equal(existsSync(dest), false);
-  writeFileSync(asset + '.sha256', createHash('sha256').update(readFileSync(asset)).digest('hex') + '\n');
+  // A version without a registry row is refused instead of trusted.
+  env.RDSH_SYNC_VERSION = 'v9.9.8';
+  const unpinned = run();
+  assert.notEqual(unpinned.status, 0);
+  assert.match(output(unpinned), /no pinned checksum for release v9\.9\.8/);
+  delete env.RDSH_SYNC_VERSION;
+  // Only the pinned bytes install, and no sidecar is ever requested.
+  writeFileSync(asset, genuine);
   const valid = run();
   assert.equal(valid.status, 0, valid.stderr + valid.stdout);
-  assert.equal(readFileSync(dest, 'utf8'), '#!/bin/sh\nexit 0\n');
+  assert.equal(readFileSync(dest, 'utf8'), payload);
+  assert.doesNotMatch(readFileSync(curlLog, 'utf8'), /\.sha256/);
 });
 
 test('imports require an explicit provider or ref and copy only the selected source', t => {

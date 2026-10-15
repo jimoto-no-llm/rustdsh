@@ -21,7 +21,7 @@ It ports frequently used CLI operations (token calculation, code search, session
 - ⚡ **Sub-millisecond startup & low memory**: `--version` launches in ~0.90 ms with ~2.9 MB peak memory, compared to ~88 ms and ~66 MB for Node.js-based `dsh`.
 - 🔄 **100% Drop-in Compatible**: Subcommands that are not rdsh-native are passed straight to upstream `dsh`. Existing scripts and workflows keep running unchanged.
 - 🛠 **Fast Native Utilities**: Estimate tokens, search code, list sessions, and run health diagnostics (`rdsh doctor`) instantly without starting Node.js.
-- 🛡 **Safe by Default**: Read-only commands never mutate files, credentials are never automatically synced or exported, and agent tools can be confined to explicitly shared files on Linux.
+- 🛡 **Safe by Default**: Read-only commands never modify source files, credentials are never automatically synced or exported, and agent tools can be confined to explicitly shared files on Linux.
 
 ## Table of Contents
 
@@ -31,7 +31,7 @@ It ports frequently used CLI operations (token calculation, code search, session
 - [Usage](#usage)
   - [Running with `dsh` Compatibility](#running-with-dsh-compatibility)
   - [Fast Native Commands](#fast-native-commands)
-  - [Credential Management](#credential-management-rdsh-auth)
+  - [Credential sharing with rdsh auth](#credential-sharing-with-rdsh-auth)
   - [Agent Tool Isolation](#agent-tool-isolation)
   - [Hook Guard](#hook-guard-rdsh-guard)
 - [Web UI & Dashboard](#web-ui--dashboard)
@@ -45,11 +45,6 @@ It ports frequently used CLI operations (token calculation, code search, session
 - [License](#license)
 
 ## Quick Start
-
-Already using **Claude Code, Codex, Cursor, VS Code Copilot, OpenCode or Gemini CLI**?
-[Connect the project dashboard through MCP](docs/MCP-CLIENTS.md)
-to share tasks, questions and structured UI while keeping your current coding agent.
-This entry point requires Node.js 22+; DSH and Rust are optional.
 
 ### 1. Install (Prebuilt Binary)
 
@@ -155,18 +150,99 @@ rdsh desktop status                 # detect the DeepSeek Harness Desktop app an
 rdsh bench --n 5                    # benchmark startup speed between rdsh and dsh
 ```
 
-### Credential Management (`rdsh auth`)
+### Credential sharing with rdsh auth
 
-Safely import credentials from other tools into `$DSH_HOME/.credentials.yaml`:
+External credentials are inventoried without showing their values. Nothing is
+copied until you select a source and credential. OAuth copies use DSH's existing
+version-1 store at $DSH_HOME/.credentials.yaml; API keys use its named refs.
+The selection policy contains only identifiers at $DSH_HOME/rdsh-auth-sharing.json.
 
 ```sh
-rdsh auth                                  # inspect recognized login status
-rdsh auth --import --provider openai-codex # import credentials from Codex CLI or opencode
-rdsh setup                                 # interactive setup wizard
-rdsh setup --web                           # browser-based setup interface
+rdsh auth                                      # sources, destinations, selection and undo steps
+rdsh auth --json                               # secret-free machine-readable inventory
+rdsh --dry-run auth --select codex:openai-codex --import  # preview; writes no files
+rdsh auth --select codex:openai-codex --import    # share only Codex OAuth
+rdsh auth --select opencode:openai-codex --import # OpenCode openai maps to openai-codex
+rdsh auth --select codex:OPENAI_API_KEY --import  # separate opt-in for Codex's API key
+rdsh auth --select env:DEEPSEEK_API_KEY --import  # explicitly persist this environment key
+rdsh auth --unselect codex:openai-codex          # stop future copies; retain the existing copy
+rdsh setup                                    # sync selected credentials, then guide setup
+rdsh setup --web                              # inventory, selection commands and explicit key save
 ```
 
-*Note: rdsh never exports or syncs external credentials without explicit user command.*
+For a one-time import, use `rdsh auth --import --provider openai-codex --source codex` or `rdsh auth --import --ref OPENAI_API_KEY --source codex`. These filters do not save or extend future-copy consent; `--select`/`--unselect` are separate persistent policy changes.
+
+Repeat --select/--unselect for individual credentials. Selecting enables future
+imports from that CLI/provider, including boot, dump-config, plugin, raw dsh
+delegation and setup. --import immediately applies the selection. Even a newer
+grant in another, unselected CLI cannot be chosen. Newer DSH grants and existing
+API-key refs/records remain in place. Other entries, comments and line endings
+are preserved. Unix credential and policy files use mode 0600.
+
+The inventory checks Codex's ~/.codex/auth.json and OpenCode's
+$XDG_DATA_HOME/opencode/auth.json (or its platform default data directory), plus
+the legacy ~/.config/opencode/auth.json fallback. Selectors for OpenCode use
+DSH provider IDs; opencode:openai-codex is the selector for its openai login.
+Environment-key persistence supports DEEPSEEK_API_KEY, OPENAI_API_KEY and
+ANTHROPIC_API_KEY. These are format/presence checks, not live authentication tests.
+
+An environment variable already supplied to rdsh is inherited by DSH and its
+child processes without rdsh writing a file. The JSON inventory marks this route
+persistent=false, lists its destination and explains how to stop/revoke it.
+Using the reference does not opt in to storing it. setup --yes no longer saves
+every environment key; choose each one with auth --select env:NAME --import.
+Interactive setup and the web form still allow an explicit, individual key save.
+
+**Scope and undo:** saved entries are available to every DSH profile using the
+same DSH_HOME. Unselect stops future rdsh imports; it does not delete a saved copy
+or invalidate a running process. Stop DSH and remove the named record/ref from
+the credential store to stop using a saved copy. To invalidate the credential
+itself, revoke the OAuth grant or rotate the API key at its provider. That may
+also disconnect the source CLI. This controls rdsh copying, not DSH's own
+refreshes, inherited environment access or an OS sandbox.
+
+**Migration:** existing DSH credentials are retained. A missing policy selects
+nothing, including for legacy auth --import. RDSH_AUTH_AUTOSYNC=1 does not restore
+the old import-all behavior. Inventory and preview first, then choose the sources
+you need. RDSH_AUTH_AUTOSYNC=0 disables automatic imports while keeping the
+selection; an explicit auth --import still works. Invalid/unreadable policies
+fail closed instead of falling back to legacy sync.
+
+Consent changes and rdsh credential writes share a lock, so a completed unselect
+cannot be bypassed by a queued rdsh import using an earlier policy. After a
+crashed writer, check that no rdsh auth/setup writer is active before removing
+$DSH_HOME/.rdsh-auth-sharing.lock; the launcher skips copying while it is locked.
+
+setup --web issues a new local access key at startup in its #key=... URL.
+The tab retains that key; status reads, key saves and closing require it.
+Keep the startup URL private. The page shows copy destinations and separate
+unselect, saved-copy removal and provider revocation steps before a key save.
+
+### Optional extras (off by default)
+
+Server-type features stay off until enabled, so a plain install remains
+a fast dsh:
+
+```sh
+rdsh settings set extras.enable serve,search-web
+rdsh settings get extras.enable
+```
+
+| Extra | Command | Notes |
+| --- | --- | --- |
+| `serve` | `rdsh serve` (default :38080) | Local status page, localhost only, per-launch key. |
+| `search-web` | `rdsh search-web "query" --limit 5` | Needs SearXNG. |
+
+To connect an OpenAI-compatible endpoint that dsh does not ship (HAI, Sarashina, a home llama.cpp / vLLM / LM Studio / Ollama server), add it as a profile route:
+
+```sh
+rdsh provider add hai --model deepseek-v4-flash              # key from HAI_API_KEY or --key-stdin
+rdsh provider add sarashina                                  # key from SARASHINA_API_KEY; mini and nano built in
+rdsh provider add local-openai --base-url http://host:8080/v1 --discover --no-key
+rdsh provider list                                           # presets, per-profile route and key status
+```
+
+Details: [docs/PROVIDERS.md](docs/PROVIDERS.md).
 
 ### Agent Tool Isolation
 
@@ -249,7 +325,7 @@ Optional Node.js dashboard for project metrics, human-in-the-loop Q&A, and mobil
 rdsh-dashboard project --project <directory>
 ```
 
-*On native Windows, the dashboard runs in the system tray and can be opened or stopped from the taskbar (`--no-tray` keeps it in the terminal). See [dashboard/README.md](dashboard/README.md).*
+*On native Windows, the dashboard runs in the system tray and can be opened or stopped from the taskbar (`--no-tray` keeps it in the terminal). See [dashboard/README.md](dashboard/README.md). External agent CLIs (cursor-agent, devin) can be run as supervised jobs: see [docs/AGENT-RUNNERS.md](docs/AGENT-RUNNERS.md).*
 
 ## Desktop App (Electron)
 
@@ -262,9 +338,8 @@ rewrites the profile:
 
 ```sh
 rdsh desktop status                 # app, command runtime, profile, plugin state (read-only)
-rdsh desktop install --plugins-dir .   # rdsh-settings + one-click translation + default third-party (sound, gitview)
+rdsh desktop install --plugins-dir .   # attach rdsh-settings and rdsh-translation
 rdsh desktop install --plugins-dir . --compute   # + the resident compute bridge
-rdsh desktop install --plugins-dir . --no-sound --no-gitview  # skip third-party
 rdsh desktop verify                 # require the default rdsh-settings and translation plugins
 ```
 
@@ -292,6 +367,13 @@ rdsh --profile web                             # boot web with plugins enabled
 ```
 
 Ports never collide (DSH Web: `3080`, rdsh serve: `38080`).
+
+rdsh bundles only Smart-DSH's phone-width layout, as
+[`plugins/rdsh-mobile-ui`](plugins/rdsh-mobile-ui/README.md) (MIT, adapted from
+Smart-DSH): at 767px and below the chat and composer use the full width and the
+logo opens the session list in one tap. Smart-DSH's notifications, Esc-to-stop,
+task hub and shared-HMR workaround stay upstream — install the upstream bundle
+when you want those.
 
 ## Benchmarks
 
@@ -338,15 +420,17 @@ Measurements conducted on Linux x86_64:
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Architecture design and delegation model |
 | [docs/BENCHMARKS.md](docs/BENCHMARKS.md) | Benchmark methodology and reproduction steps |
 | [docs/RDSH-SETTINGS.md](docs/RDSH-SETTINGS.md) | Settings UI and CLI options |
+| [docs/PROVIDERS.md](docs/PROVIDERS.md) | `rdsh provider`: HAI, Sarashina and home LLM server routes |
 | [docs/DESKTOP-INTEGRATION.md](docs/DESKTOP-INTEGRATION.md) | DeepSeek Harness Desktop (Electron) integration |
-| [docs/FEDORA.md](docs/FEDORA.md) | Fedora / RHEL packages, optional tools, and the Linux desktop reality |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Project roadmap and planned capabilities |
 | [docs/RELEASING.md](docs/RELEASING.md) | Release procedures |
+| [docs/SERIAL-PROXY.md](docs/SERIAL-PROXY.md) | Concurrency-limiting proxy for single-slot providers |
 | [CHANGELOG.md](CHANGELOG.md) | Changes per version |
 
 ## Community
 
 - Contributions: See [CONTRIBUTING.md](CONTRIBUTING.md).
+- Rust development setup: [Rust development guide](docs/RUST-DEVELOPMENT.md).
 - Issues & Ideas: [Issue tracker](https://github.com/jimoto-no-llm/rustdsh/issues/new/choose) (Japanese or English).
 - Security: Please report vulnerabilities privately according to [SECURITY.md](SECURITY.md).
 - Support: [SUPPORT.md](SUPPORT.md) / Code of Conduct: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
@@ -360,7 +444,17 @@ Thanks to the upstream developers and everyone contributing code, reviews, tests
 - Security reports & review: [GrEarl](https://github.com/GrEarl), [PENTACoXIAN](https://x.com/PENTACoXIAN)
 - Contributions & validation: [StudioYebisu](https://github.com/yebisu0529-ship-it), [RNA4219](https://github.com/RNA4219), [eightman999](https://github.com/eightman999)
 - Ideas & feedback: [@remydre8](https://x.com/remydre8)
-- Default Web UI plugins (used with upstream permission, MIT): [dsh-sound-notifications](https://github.com/cwd514/dsh-sound-notifications) by [cwd514](https://github.com/cwd514) ((c) 2026) — synthesized tones and desktop notifications; [dsh-gitview](https://github.com/yugapor/dsh-gitview) by [yugapor](https://github.com/yugapor) ((c) 2026) — Git panel with diffs, history, and CI status. Both are fetched from upstream GitHub at install time (see `plugins/recommended.md`).
+
+Third-party DSH plugins that rdsh uses, adapts or recommends (MIT, by their
+authors):
+
+- [Smart-DSH](https://github.com/hikarioyama/Smart-DSH) by hikarioyama — the
+  phone-width layout bundled as
+  [`rdsh-mobile-ui`](plugins/rdsh-mobile-ui/README.md)
+- [dsh-sound-notifications](https://github.com/cwd514/dsh-sound-notifications) by
+  cwd514 — opt-in effect sounds and desktop notifications (`SOUND=1`)
+- [dsh-gitview](https://github.com/yugapor/dsh-gitview) by yugapor — optional
+  sidebar Git panel
 
 ## License
 

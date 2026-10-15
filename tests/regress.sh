@@ -1,5 +1,5 @@
 #!/bin/sh
-# rdsh CLI regression. Fails on first mismatch (set -e + explicit checks).
+# rdsh CLI regression. Fails on first mismatch (explicit checks; set -e は無い).
 if [ "${1:-}" = "--windows-installer-delegation" ]; then
   shift
   exec bash "$(dirname "$0")/regress-windows.sh" "$@"
@@ -16,9 +16,8 @@ if [ "${RDSH_REGRESS_SANDBOXED:-}" != 1 ]; then
   export HOME DSH_HOME RDSH_REGRESS_SANDBOXED RR_SANDBOX
   trap 'rm -rf "$RR_SANDBOX"' EXIT INT TERM
 fi
-# Use our own default stub even on hosts with no installed DSH. Individual
-# delegation checks override the legacy variable; a developer's live primary
-# override must not take precedence over those fixtures.
+# Keep the default diagnostic/delegation probe inside this test's sandbox.
+# A developer's primary override must not win over later legacy fixtures.
 unset RDSH_ORIG_BIN DSH_ORIG_BIN
 mkdir -p "$RR_SANDBOX/original"
 printf '#!/bin/sh\necho stub-dsh "$@"\n' > "$RR_SANDBOX/original/dsh"
@@ -66,7 +65,10 @@ need_exit 2 "reject dump with args" $BIN --profile tui --dump-config --foo
 need_exit 2 "reject plugin w/o args" $BIN plugin --profile tui
 need_grep "plugin" "plugin delegation dry-run" $BIN --dry-run plugin --profile web add ./dsh-notify-push
 need_grep "smart-dsh" "doctor reports smart-dsh" $BIN doctor
-python3 -c "print(5791 * 4)" | $BIN tokens > /dev/null
+printf "%s" "$(python3 -c 'print(5791 * 4)')" | $BIN tokens > "$RR_SANDBOX/rr-out" 2>"$RR_SANDBOX/rr-err" \
+  || { echo "FAIL(exit): tokens numeric stdin"; cat "$RR_SANDBOX/rr-err"; exit 1; }
+# 23164 は5バイトのASCIIなので 2 トークン。値まで見て初めて検証になる。
+if grep -q '"tokens": 2' "$RR_SANDBOX/rr-out"; then ok "tokens numeric stdin"; else echo "FAIL(output): tokens numeric stdin"; cat "$RR_SANDBOX/rr-out"; exit 1; fi
 printf "FROMSTDIN" > "$RR_SANDBOX/rr-in.txt"
 need_ok "compact noop" $BIN compact "$RR_SANDBOX/rr-in.txt" --max-tokens 8000
 SB="$RR_SANDBOX/wrapper"
@@ -101,7 +103,19 @@ done
 # Legacy cache (no `cli` field) holding null from an old zstd-less run: recomputed when zstd exists.
 rm -rf "$ZC/cache"; mkdir -p "$ZC/cache"
 zc "$ZC/bad" q
-sed 's/"cli":true,//g' "$ZC/cache/rdsh/sessions-tokens.json" > "$ZC/legacy" && mv "$ZC/legacy" "$ZC/cache/rdsh/sessions-tokens.json"
+# Strip `cli` without assuming its position: serde_json emits the cache in
+# insertion order, so `cli` may be the last field (no trailing comma) or sorted
+# first. A `sed 's/"cli":true,//'` only matches the latter.
+python3 - "$ZC/cache/rdsh/sessions-tokens.json" "$ZC/legacy" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as fh:
+    cache = json.load(fh)
+for entry in cache.values():
+    entry.pop("cli", None)
+with open(sys.argv[2], "w", encoding="utf-8") as fh:
+    json.dump(cache, fh, separators=(",", ":"))
+PY
+mv "$ZC/legacy" "$ZC/cache/rdsh/sessions-tokens.json"
 if grep -q '"decomp":null' "$ZC/cache/rdsh/sessions-tokens.json" && ! grep -q '"cli"' "$ZC/cache/rdsh/sessions-tokens.json"; then :; else echo "FAIL(setup): legacy null cache"; cat "$ZC/cache/rdsh/sessions-tokens.json"; exit 1; fi
 zc "$ZC/ok" q
 if grep "q/s2" "$ZC/out" | grep -q "~1tok " && ! grep "q/s2" "$ZC/out" | grep -q "?"; then ok "tokens cache: legacy null entry rechecked with zstd"; else echo "FAIL(output): legacy null entry stuck"; cat "$ZC/out"; exit 1; fi
@@ -111,12 +125,47 @@ mkdir -p $WB/.local/bin
 printf '#!/bin/sh\nexec node "$(readlink -f "$(command -v dsh)")" --profile web\n' > $WB/.local/bin/dsh-web-local
 if HOME="$WB" $BIN doctor 2>/dev/null | grep -q "dsh-web-local"; then ok "doctor flags node-on-dsh wrapper"; else echo "FAIL(output): doctor flags node-on-dsh wrapper"; exit 1; fi
 rm -rf $WB
+# Broken wrappers: a dangling dsh symlink or a wrapper pointing at a removed
+# node/dsh path must be reported by doctor, and the warnings must not change
+# doctor's exit status.
+BB="$RR_SANDBOX/broken-bin"
+mkdir -p $BB/.local/bin
+ln -s "$BB/gone/dsh.js" $BB/.local/bin/dsh-broken
+printf '#!/bin/sh\nexec /nonexistent-node/bin/node /nonexistent-dsh/lib/bin.js "$@"\n' > $BB/.local/bin/dsh-dead-node
+chmod +x $BB/.local/bin/dsh-dead-node
+bout="$(HOME="$BB" $BIN doctor 2>/dev/null)"
+case "$bout" in *"dsh-broken is a broken symlink"*) ok "doctor flags broken dsh symlink";; *) echo "FAIL(output): broken dsh symlink"; echo "$bout"; exit 1;; esac
+case "$bout" in *"dsh-dead-node references /nonexistent-node/bin/node"*) ok "doctor flags wrapper with a removed node/dsh path";; *) echo "FAIL(output): removed node/dsh path"; echo "$bout"; exit 1;; esac
+if HOME="$BB" $BIN doctor >/dev/null 2>&1; then ok "broken wrapper warnings keep doctor exit 0"; else echo "FAIL(exit): broken wrapper warnings must not fail doctor"; exit 1; fi
+rm -rf $BB
+# Shadowed dsh without the dsh-orig backup install.sh --restore needs: warn once,
+# and stay quiet as soon as the backup exists.
+SH="$RR_SANDBOX/shadow-noorig"
+mkdir -p $SH/bin $SH/home
+cp "$BIN" $SH/bin/dsh
+# doctor reports the resolved install dir, which is physical on macOS
+# (/var is /private/var there), so accept either spelling of the same dir.
+SH_PHYS="$(cd "$SH/bin" && pwd -P)"
+sout="$(PATH="$SH/bin:$RR_SANDBOX/original:$PATH" HOME="$SH/home" $SH/bin/dsh doctor 2>/dev/null)"
+case "$sout" in *"no dsh-orig backup in $SH/bin"*|*"no dsh-orig backup in $SH_PHYS"*) ok "doctor flags shadowed dsh without a backup";; *) echo "FAIL(output): missing dsh-orig backup"; echo "$sout"; exit 1;; esac
+printf '#!/bin/sh\necho stub-dsh-orig\n' > $SH/bin/dsh-orig
+chmod +x $SH/bin/dsh-orig
+if PATH="$SH/bin:$RR_SANDBOX/original:$PATH" HOME="$SH/home" $SH/bin/dsh doctor 2>/dev/null | grep -q "no dsh-orig backup"; then echo "FAIL(output): an existing dsh-orig must not warn"; exit 1; else ok "doctor accepts an existing dsh-orig backup"; fi
+rm -rf $SH
+# Install ledger drift: ~/.config/rdsh/origin pointing at a removed backup.
+LG="$RR_SANDBOX/ledger"
+mkdir -p $LG/home/.config/rdsh
+printf '%s\n' "$LG/gone-dsh-orig" > $LG/home/.config/rdsh/origin
+if HOME="$LG/home" $BIN doctor 2>/dev/null | grep -q "install ledger.*no longer exists"; then ok "doctor flags a stale origin ledger"; else echo "FAIL(output): stale origin ledger"; exit 1; fi
+rm -rf $LG
 AB="$RR_SANDBOX/auth"
 mkdir -p $AB/home/.codex $AB/home/.local/share/opencode $AB/dsh
 printf '%s' '{"tokens":{"access_token":"a","refresh_token":"r","account_id":"1"}}' > $AB/home/.codex/auth.json
 printf '%s' '{"openai":{"type":"oauth","refresh":"r2","access":"a2","expires":1991708802841,"accountId":"9"}}' > $AB/home/.local/share/opencode/auth.json
 if HOME="$AB/home" DSH_HOME="$AB/dsh" $BIN auth 2>/dev/null | grep -q "openai-codex"; then ok "auth detects opencode login"; else echo "FAIL(output): auth detects opencode login"; exit 1; fi
-if HOME="$AB/home" DSH_HOME="$AB/dsh" $BIN auth --import --provider openai-codex >/dev/null 2>&1 && grep -q "llm-pi-ai/openai-codex" "$AB/dsh/.credentials.yaml"; then ok "auth import writes record"; else echo "FAIL(output): auth import writes record"; exit 1; fi
+if HOME="$AB/home" DSH_HOME="$AB/dsh" $BIN auth --import >/dev/null 2>&1; then echo "FAIL: auth import without selection"; exit 1; else ok "auth import requires selection"; fi
+if HOME="$AB/home" DSH_HOME="$AB/dsh" $BIN --dry-run auth --select opencode:openai-codex --import --json > "${RR_SANDBOX}/rr-out" 2>/dev/null && grep -q '"dry_run":true' "${RR_SANDBOX}/rr-out" && [ ! -f "$AB/dsh/.credentials.yaml" ] && [ ! -f "$AB/dsh/rdsh-auth-sharing.json" ]; then ok "auth sharing preview writes nothing"; else echo "FAIL(output): auth sharing preview"; exit 1; fi
+if HOME="$AB/home" DSH_HOME="$AB/dsh" $BIN auth --select opencode:openai-codex --import >/dev/null 2>&1 && grep -q "llm-pi-ai/openai-codex" "$AB/dsh/.credentials.yaml"; then ok "auth selected import writes record"; else echo "FAIL(output): auth selected import writes record"; exit 1; fi
 if HOME="$AB/home" DSH_HOME="$AB/dsh" $BIN auth 2>/dev/null | grep -q "already recognized"; then ok "auth import recognized"; else echo "FAIL(output): auth import recognized"; exit 1; fi
 fmode="$(stat -c %a "$AB/dsh/.credentials.yaml" 2>/dev/null || stat -f "%Lp" "$AB/dsh/.credentials.yaml")"
 if [ "$fmode" = "600" ]; then ok "auth file mode 600"; else echo "FAIL(mode): auth file mode"; exit 1; fi
@@ -137,20 +186,56 @@ if HOME="$AB/home" DSH_HOME="$AB/dsh" $BIN auth --import --provider openai-codex
 # sync-dsh.sh release self-update against a file:// release with npm/node shims.
 # The script runs from a copy (no tests/regress.sh or target/ next to it), so it
 # does not recurse into this suite.
+# Issue #303: the expected digest comes from the pinned repository registry,
+# served here by a curl shim, and the release base holds no .sha256 at all.
+if bash ./tests/sync-release-integrity.sh; then ok "sync-dsh release integrity"; else echo "FAIL: sync-dsh release integrity"; exit 1; fi
 FS="$RR_SANDBOX/sync-release"
 rm -rf $FS
-mkdir -p $FS/pkg $FS/rel/latest/download $FS/repo $FS/home/.local/bin $FS/npmroot/@deepseek-ai/dsh $FS/bin
+mkdir -p $FS/pkg $FS/rel/download/v9.9.9 $FS/repo $FS/shim $FS/home/.local/bin $FS/npmroot/@deepseek-ai/dsh $FS/bin
 cp "$BIN" $FS/pkg/rdsh
 cp ./sync-dsh.sh $FS/repo/sync-dsh.sh
-for a in rdsh-linux-x64 rdsh-linux-x64-musl rdsh-macos-arm64 rdsh-macos-x64; do tar -czf "$FS/rel/latest/download/$a.tar.gz" -C $FS/pkg rdsh; (cd "$FS/rel/latest/download" && $SUM "$a.tar.gz" > "$a.tar.gz.sha256"); done
+for a in rdsh-linux-x64 rdsh-linux-x64-musl rdsh-macos-arm64 rdsh-macos-x64; do
+  # Distinct payloads expose accidental reuse of one platform's checksum,
+  # including on GNU tar hosts where repeated archives can be identical.
+  printf '%s\n' "$a" > "$FS/pkg/fixture-platform.txt"
+  tar -czf "$FS/rel/download/v9.9.9/$a.tar.gz" -C "$FS/pkg" rdsh fixture-platform.txt
+done
 printf '{"version":"1.0.0"}\n' > $FS/npmroot/@deepseek-ai/dsh/package.json
 printf '#!/bin/sh\ncase "$1" in root) echo "%s" ;; view) echo "[\\"1.0.0\\"]" ;; *) exit 1 ;; esac\n' "$FS/npmroot" > $FS/npm
-ln -s "$(command -v node)" "$FS/home/.local/bin/rdsh-test-node"
+NODE_REAL="$(node -p 'process.execPath')" || exit 1
+ln -s "$NODE_REAL" "$FS/home/.local/bin/rdsh-test-node"
 printf '#!/bin/sh\ncase "$1" in -p) echo 1.0.0 ;; *) exec "$(dirname "$0")/rdsh-test-node" "$@" ;; esac\n' > $FS/home/.local/bin/node
-chmod +x $FS/npm $FS/home/.local/bin/node
-fs_sync() { env -u RDSH_SYNC_FROM_SOURCE -u RDSH_SYNC_VERSION -u RDSH_MUSL HOME="$FS/home" NPM_BIN="$FS/npm" PREFIX_BIN="$1" RDSH_RELEASE_BASE="file://$FS/rel" sh $FS/repo/sync-dsh.sh > "$2" 2>&1; }
+CURL_BIN="$(command -v curl)"
+cat > $FS/shim/curl <<CURL_EOF
+#!/bin/sh
+out=""; prev=""; url=""
+for arg in "\$@"; do
+  [ "\$prev" = "-o" ] && out="\$arg"
+  prev="\$arg"; url="\$arg"
+done
+if [ -n "\$out" ] && [ "\$url" = "https://raw.githubusercontent.com/jimoto-no-llm/rustdsh/main/release-digests.tsv" ]; then
+  cp "$FS/release-digests.tsv" "\$out"; exit 0
+fi
+exec "$CURL_BIN" "\$@"
+CURL_EOF
+chmod +x $FS/shim/curl $FS/npm $FS/home/.local/bin/node
+manifest() {
+  {
+    printf 'latest v9.9.9\n'
+    for a in rdsh-linux-x64 rdsh-linux-x64-musl rdsh-macos-arm64 rdsh-macos-x64; do
+      if [ "$#" -gt 0 ]; then
+        digest="$1"
+      else
+        digest="$($SUM "$FS/rel/download/v9.9.9/$a.tar.gz" | awk '{print $1}')"
+      fi
+      printf 'v9.9.9 %s.tar.gz %s\n' "$a" "$digest"
+    done
+  } > "$FS/release-digests.tsv"
+}
+manifest
+fs_sync() { env -u RDSH_SYNC_FROM_SOURCE -u RDSH_MUSL HOME="$FS/home" NPM_BIN="$FS/npm" PREFIX_BIN="$1" RDSH_RELEASE_BASE="file://$FS/rel" RDSH_TEST_INSECURE_BASE=1 RDSH_SYNC_VERSION="${3:-latest}" PATH="$FS/shim:$PATH" sh $FS/repo/sync-dsh.sh > "$2" 2>&1; }
 fs_sync "$FS/bin" $FS/sync-ok.log
-if grep -q "checksum ok" $FS/sync-ok.log && grep -q "rdsh updated OK via release binary" $FS/sync-ok.log && "$FS/bin/rdsh" --version 2>/dev/null | grep -q "rdsh"; then ok "sync-dsh release update with valid sha256"; else echo "FAIL(output): sync-dsh release update with valid sha256"; tail -n 8 $FS/sync-ok.log; exit 1; fi
+if grep -q "checksum ok" $FS/sync-ok.log && grep -q "rdsh updated OK via release binary" $FS/sync-ok.log && "$FS/bin/rdsh" --version 2>/dev/null | grep -q "rdsh"; then ok "sync-dsh release update with pinned digest"; else echo "FAIL(output): sync-dsh release update with pinned digest"; tail -n 8 $FS/sync-ok.log; exit 1; fi
 # A no-op check must not masquerade as a new update and restart notification time.
 printf '{"updated":true,"kind":"DUMMY","to":"previous","at":1}\n' > "$FS/home/.local/share/rdsh/update-state.json"
 cp "$FS/home/.local/share/rdsh/update-state.json" "$FS/state-noop.json"
@@ -162,16 +247,21 @@ printf '#!/bin/sh\nprintf "%%s\\n" "%s"\n' "$SYNC_VERSION" > "$FS/bin/rdsh"
 chmod +x "$FS/bin/rdsh"
 fs_sync "$FS/bin" "$FS/sync-rebuilt.log"
 if grep -q "rdsh updated OK via release binary" "$FS/sync-rebuilt.log" && cmp -s "$FS/pkg/rdsh" "$FS/bin/rdsh" && ! cmp -s "$FS/state-noop.json" "$FS/home/.local/share/rdsh/update-state.json"; then ok "sync-dsh changed payload updates even with the same version label"; else echo "FAIL(output): rebuilt release was suppressed by its version label"; exit 1; fi
-for c in "$FS"/rel/latest/download/*.sha256; do printf '%064d  x.tar.gz\n' 0 > "$c"; done
+# A registry pin that does not match the bytes refuses the update.
+manifest "$(printf '%064d' 0)"
 printf 'old\n' > $FS/bin/rdsh
-fs_sync "$FS/bin" $FS/sync-bad.log
-if grep -q "CHECKSUM MISMATCH" $FS/sync-bad.log && grep -q "binaries untouched" $FS/sync-bad.log && [ "$(cat $FS/bin/rdsh)" = "old" ]; then ok "sync-dsh refuses bad sha256"; else echo "FAIL(output): sync-dsh refuses bad sha256"; tail -n 8 $FS/sync-bad.log; exit 1; fi
-rm -f "$FS"/rel/latest/download/*.sha256
-fs_sync "$FS/bin" $FS/sync-none.log
-if grep -q "no checksum sidecar" $FS/sync-none.log && grep -q "binaries untouched" $FS/sync-none.log && [ "$(cat $FS/bin/rdsh)" = "old" ]; then ok "sync-dsh refuses missing sha256"; else echo "FAIL(output): sync-dsh refuses missing sha256"; tail -n 8 $FS/sync-none.log; exit 1; fi
-for a in rdsh-linux-x64 rdsh-linux-x64-musl rdsh-macos-arm64 rdsh-macos-x64; do : > "$FS/rel/latest/download/$a.tar.gz.sha256"; done
+# This scenario checks a selected pin independently of automatic version
+# comparison: the deliberately invalid installed marker has no SemVer.
+fs_sync "$FS/bin" $FS/sync-bad.log v9.9.9
+if grep -q "CHECKSUM MISMATCH" $FS/sync-bad.log && grep -q "binaries untouched" $FS/sync-bad.log && [ "$(cat $FS/bin/rdsh)" = "old" ]; then ok "sync-dsh refuses mismatched pinned digest"; else echo "FAIL(output): sync-dsh refuses mismatched pinned digest"; tail -n 8 $FS/sync-bad.log; exit 1; fi
+# A version without a registry row is refused; there is no sidecar fallback.
+manifest
+fs_sync "$FS/bin" $FS/sync-none.log v9.9.8
+if grep -q "no pinned checksum for release v9.9.8" $FS/sync-none.log && grep -q "binaries untouched" $FS/sync-none.log && [ "$(cat $FS/bin/rdsh)" = "old" ]; then ok "sync-dsh refuses a release without a pinned digest"; else echo "FAIL(output): sync-dsh refuses a release without a pinned digest"; tail -n 8 $FS/sync-none.log; exit 1; fi
+# An unparsable registry refuses the update instead of falling back to the base.
+: > $FS/release-digests.tsv
 fs_sync "$FS/bin" $FS/sync-empty.log
-if grep -q "empty checksum sidecar" $FS/sync-empty.log && grep -q "binaries untouched" $FS/sync-empty.log && [ "$(cat $FS/bin/rdsh)" = "old" ]; then ok "sync-dsh refuses empty sha256"; else echo "FAIL(output): sync-dsh refuses empty sha256"; tail -n 8 $FS/sync-empty.log; exit 1; fi
+if grep -q "trusted release digest registry is invalid" $FS/sync-empty.log && grep -q "binaries untouched" $FS/sync-empty.log && [ "$(cat $FS/bin/rdsh)" = "old" ]; then ok "sync-dsh refuses an invalid digest registry"; else echo "FAIL(output): sync-dsh refuses an invalid digest registry"; tail -n 8 $FS/sync-empty.log; exit 1; fi
 rm -rf $FS
 SW="$RR_SANDBOX/setupweb"
 mkdir -p $SW/home $SW/dsh

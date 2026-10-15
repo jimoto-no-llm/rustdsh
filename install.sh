@@ -54,7 +54,7 @@ for a in "$@"; do
       echo "  --no-rustup  do not auto-install Rust when cargo is missing"
       echo "  --from-release  install a prebuilt binary from GitHub Releases (no Rust needed)"
       echo "  --musl  use the static musl build (rdsh-linux-x64-musl.tar.gz; also via RDSH_MUSL=1)"
-      echo "  --desktop  also attach the bundled + default third-party (sound, gitview) plugins to the Desktop profile"
+      echo "  --desktop  also attach the bundled plugins to the DeepSeek Harness Desktop profile"
       echo "  --version=VER  release to fetch with --from-release (default: latest, resolved from repository pins)"
       echo "  RDSH_NO_CHECKSUM=1  skip SHA-256 verification only after typing YES at a terminal"
       echo "  native Windows: use install.ps1 instead (it can also side-install into WSL via -Wsl)"
@@ -481,7 +481,9 @@ if [ "$MODE" = as-dsh ]; then
   tmp="$PREFIX/.dsh.new.$$"
   install -m755 "$PREFIX/rdsh" "$tmp" && mv -f "$tmp" "$PREFIX/dsh"
   echo "installed rdsh as $PREFIX/dsh (atomic replace; revert: ./install.sh --restore)"
-  if grep -l "node" "$PREFIX"/* 2>/dev/null | xargs grep -l "dsh" 2>/dev/null | grep -q .; then
+  # -I: バイナリは走査しない。rdsh/dsh 自身が "node" と "dsh" の両方を含むため、
+  # テキストのラッパーが1つも無くても常に一致して誤検知になる。
+  if grep -Il "node" "$PREFIX"/* 2>/dev/null | xargs grep -Il "dsh" 2>/dev/null | grep -q .; then
     echo "note: wrappers calling 'node ...dsh...' break while dsh is shadowed (native binary, not JS)."
     echo "note: exec dsh/rdsh directly instead of via node; 'rdsh doctor' lists the offenders."
   fi
@@ -490,20 +492,7 @@ echo "--- rdsh doctor ---"
 "$PREFIX/rdsh" doctor 2>&1 | head -n 12 || true
 echo "next: run '$PREFIX/rdsh setup' to connect a model (GPT subscription via OAuth needs no API key)"
 if [ -f "./plugins/install.sh" ]; then
-  echo "next: PROFILE=web ./plugins/install.sh adds recommended plugins, including the rdsh settings UI"
-fi
-# rpm-based hosts (Fedora, RHEL, ...) ship everything rdsh needs to run, but two
-# optional tools unlock extra features. Naming the exact command here saves a
-# round trip to the docs; nothing here fails the install.
-if [ -r /etc/os-release ] && grep -qE '^ID=(fedora|rhel|centos|rocky|almalinux|oracle)' /etc/os-release; then
-  rpm_missing=""
-  command -v zstd >/dev/null 2>&1 || rpm_missing="$rpm_missing zstd"
-  if ! command -v bwrap >/dev/null 2>&1 && ! command -v bubblewrap >/dev/null 2>&1; then
-    rpm_missing="$rpm_missing bubblewrap"
-  fi
-  if [ -n "$rpm_missing" ]; then
-    echo "next: sudo dnf install -y$rpm_missing  # optional: token unpacking and the --share-file sandbox"
-  fi
+  echo "next: PROFILE=web ./plugins/install.sh adds recommended plugins, including the rdsh settings UI and the phone-width Web layout"
 fi
 # Desktop (Electron) keeps its own reserved profile next to the CLI profiles.
 # Detection is read-only and never fails the install.

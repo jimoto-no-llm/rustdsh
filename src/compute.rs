@@ -26,9 +26,6 @@ use std::time::Instant;
 
 pub const PROTOCOL_VERSION: u32 = 1;
 pub const MAX_TEXT_BYTES: usize = 1_048_576;
-// JSON can encode one text byte as six bytes (e.g. \u0000). Leave bounded
-// space for batch separators, identifiers and protocol fields as well.
-pub const MAX_FRAME_BYTES: usize = 6 * MAX_TEXT_BYTES + 65_536;
 pub const MAX_ID_LEN: usize = 128;
 pub const MAX_TOKENS: usize = 200_000;
 pub const MIN_TOKENS: usize = 1;
@@ -37,43 +34,26 @@ pub const MAX_BATCH_ITEM_BYTES: usize = 262_144;
 
 /// Single-shot helper used by tests: parse one request line, run it.
 pub fn handle_line(line: &str) -> String {
-    if line.len() > MAX_FRAME_BYTES {
-        return error_response("", "too_large", "request frame exceeds the byte limit");
-    }
     let started = Instant::now();
     match run_request(line) {
         Ok(mut v) => {
             v["elapsed_us"] = serde_json::json!(started.elapsed().as_micros() as u64);
             v.to_string()
         }
-        Err((id, code, error)) => error_response(&id, code, &error),
-    }
-}
-
-fn error_response(id: &str, code: &str, error: &str) -> String {
-    serde_json::json!({"v": PROTOCOL_VERSION, "id": id, "ok": false,
-        "code": code, "error": error})
-    .to_string()
-}
-
-fn discard_line(input: &mut impl BufRead) -> std::io::Result<()> {
-    loop {
-        let available = input.fill_buf()?;
-        if available.is_empty() {
-            return Ok(());
-        }
-        let end = available.iter().position(|byte| *byte == b'\n');
-        let consumed = end.map_or(available.len(), |index| index + 1);
-        input.consume(consumed);
-        if end.is_some() {
-            return Ok(());
-        }
+        Err((id, code, error)) => serde_json::json!({
+            "v": PROTOCOL_VERSION,
+            "id": id,
+            "ok": false,
+            "code": code,
+            "error": error,
+        })
+        .to_string(),
     }
 }
 
 fn run_request(line: &str) -> Result<serde_json::Value, (String, &'static str, String)> {
     let v: serde_json::Value = serde_json::from_str(line)
-        .map_err(|e| ("".to_string(), "bad_json", format!("invalid JSON: {e}")))?;
+        .map_err(|e| (String::new(), "bad_json", format!("invalid JSON: {e}")))?;
     let id = v
         .get("id")
         .and_then(|x| x.as_str())
@@ -88,7 +68,7 @@ fn run_request(line: &str) -> Result<serde_json::Value, (String, &'static str, S
             format!("unsupported protocol, want v{PROTOCOL_VERSION}"),
         ));
     }
-    if id.is_empty() || id.len() > MAX_ID_LEN {
+    if id.is_empty() || id.chars().count() > MAX_ID_LEN {
         return Err(fail("bad_id", "id must be 1..=128 chars".to_string()));
     }
     let op = v.get("op").and_then(|x| x.as_str()).unwrap_or_default();
@@ -202,25 +182,9 @@ fn run_lines<R: BufRead, W: Write>(mut input: R, output: &mut W, once: bool) -> 
     let mut buf: Vec<u8> = Vec::with_capacity(64 * 1024);
     loop {
         buf.clear();
-        let n = std::io::Read::take(&mut input, (MAX_FRAME_BYTES + 1) as u64)
-            .read_until(b'\n', &mut buf)?;
+        let n = input.read_until(b'\n', &mut buf)?;
         if n == 0 {
             break; // EOF
-        }
-        if n > MAX_FRAME_BYTES {
-            if buf.last() != Some(&b'\n') {
-                discard_line(&mut input)?;
-            }
-            writeln!(
-                output,
-                "{}",
-                error_response("", "too_large", "request frame exceeds the byte limit")
-            )?;
-            output.flush()?;
-            if once {
-                break;
-            }
-            continue;
         }
         // Strip one trailing newline / CR for tolerance on Windows pipes.
         if buf.last() == Some(&b'\n') {
@@ -237,7 +201,11 @@ fn run_lines<R: BufRead, W: Write>(mut input: R, output: &mut W, once: bool) -> 
         }
         let resp = match std::str::from_utf8(&buf) {
             Ok(s) => handle_line(s),
-            Err(_) => error_response("", "bad_utf8", "request is not valid UTF-8"),
+            Err(_) => serde_json::json!({
+                "v": PROTOCOL_VERSION, "id": "",
+                "ok": false, "code": "bad_utf8", "error": "request is not valid UTF-8",
+            })
+            .to_string(),
         };
         writeln!(output, "{resp}")?;
         output.flush()?;
@@ -251,38 +219,6 @@ fn run_lines<R: BufRead, W: Write>(mut input: R, output: &mut W, once: bool) -> 
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn maximally_escaped_text_still_fits_the_frame_limit() {
-        let text = "\0".repeat(super::MAX_TEXT_BYTES);
-        let line =
-            serde_json::json!({"v": 1, "id": "escaped", "op": "tokens.estimate", "text": text})
-                .to_string();
-        let response: serde_json::Value = serde_json::from_str(&super::handle_line(&line)).unwrap();
-        assert_eq!(response["ok"], true);
-        assert_eq!(response["chars"], super::MAX_TEXT_BYTES);
-    }
-    #[test]
-    fn oversized_frames_are_rejected_and_the_next_request_survives() {
-        let large = "x".repeat(7 * super::MAX_TEXT_BYTES);
-        let first = serde_json::json!({"v": 1, "id": "oversized", "op": "tokens.estimate",
-            "text": "small", "padding": large})
-        .to_string();
-        let input = format!(
-            "{first}\n{{\"v\":1,\"id\":\"after\",\"op\":\"tokens.estimate\",\"text\":\"ok\"}}\n"
-        );
-        let mut output = Vec::new();
-        super::run_lines(std::io::Cursor::new(input), &mut output, false).unwrap();
-        let responses: Vec<serde_json::Value> = std::str::from_utf8(&output)
-            .unwrap()
-            .lines()
-            .map(|line| serde_json::from_str(line).unwrap())
-            .collect();
-        assert_eq!(responses.len(), 2);
-        assert_eq!(responses[0]["ok"], false);
-        assert_eq!(responses[0]["code"], "too_large");
-        assert_eq!(responses[1]["id"], "after");
-        assert_eq!(responses[1]["ok"], true);
-    }
     use super::*;
 
     fn req(id: &str, op: &str, text: &str, max: Option<usize>) -> String {
@@ -389,5 +325,87 @@ mod tests {
         let r: serde_json::Value =
             serde_json::from_str(&handle_line(&req("", "tokens.estimate", "hi", None))).unwrap();
         assert_eq!(r["code"], "bad_id");
+    }
+
+    // run_lines は NDJSON のフェイルセーフ境界: 壊れた行でも落ちずに応答を返し、
+    // 空行は飛ばし、once では最初の1件で止まる。
+    #[test]
+    fn run_lines_answers_each_request_in_order() {
+        let input = format!(
+            "{}\r\n\r\n{}\n",
+            req("a1", "tokens.estimate", "one", None),
+            req("a2", "tokens.estimate", "two", None)
+        );
+        let mut out: Vec<u8> = Vec::new();
+        run_lines(input.as_bytes(), &mut out, false).unwrap();
+        let text = String::from_utf8(out).unwrap();
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!(lines.len(), 2, "a blank line must not produce a response");
+        let first: serde_json::Value = serde_json::from_str(lines[0]).unwrap();
+        let second: serde_json::Value = serde_json::from_str(lines[1]).unwrap();
+        assert_eq!(first["id"], "a1");
+        assert_eq!(second["id"], "a2");
+    }
+
+    #[test]
+    fn run_lines_reports_bad_utf8_and_keeps_going() {
+        let mut input: Vec<u8> = vec![0xff, 0xfe, b'\n'];
+        input.extend_from_slice(req("a2", "tokens.estimate", "ok", None).as_bytes());
+        input.push(b'\n');
+        let mut out: Vec<u8> = Vec::new();
+        run_lines(&input[..], &mut out, false).unwrap();
+        let text = String::from_utf8(out).unwrap();
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!(lines.len(), 2);
+        let bad: serde_json::Value = serde_json::from_str(lines[0]).unwrap();
+        assert_eq!(bad["ok"], false);
+        assert_eq!(bad["code"], "bad_utf8");
+        let good: serde_json::Value = serde_json::from_str(lines[1]).unwrap();
+        assert_eq!(good["id"], "a2");
+    }
+
+    #[test]
+    fn run_lines_once_stops_after_the_first_request() {
+        let input = format!(
+            "{}\n{}\n",
+            req("a1", "tokens.estimate", "one", None),
+            req("a2", "tokens.estimate", "two", None)
+        );
+        let mut out: Vec<u8> = Vec::new();
+        run_lines(input.as_bytes(), &mut out, true).unwrap();
+        let text = String::from_utf8(out).unwrap();
+        assert_eq!(text.lines().count(), 1);
+    }
+
+    #[test]
+    fn run_lines_answers_without_a_trailing_newline() {
+        let input = req("a1", "tokens.estimate", "tail", None);
+        let mut out: Vec<u8> = Vec::new();
+        run_lines(input.as_bytes(), &mut out, false).unwrap();
+        let text = String::from_utf8(out).unwrap();
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!(lines.len(), 1);
+        let resp: serde_json::Value = serde_json::from_str(lines[0]).unwrap();
+        assert_eq!(resp["id"], "a1");
+    }
+
+    // id の上限は仕様・エラー文どおり「文字数」。バイト数で判定すると
+    // 非ASCII の id が 128 文字でも拒否される。
+    #[test]
+    fn accepts_a_128_char_non_ascii_id() {
+        let id = "\u{3042}".repeat(MAX_ID_LEN);
+        let resp: serde_json::Value =
+            serde_json::from_str(&handle_line(&req(&id, "tokens.estimate", "hi", None))).unwrap();
+        assert_eq!(resp["ok"], true);
+        assert_eq!(resp["id"], id);
+    }
+
+    #[test]
+    fn rejects_an_id_over_the_char_limit() {
+        let id = "\u{3042}".repeat(MAX_ID_LEN + 1);
+        let resp: serde_json::Value =
+            serde_json::from_str(&handle_line(&req(&id, "tokens.estimate", "hi", None))).unwrap();
+        assert_eq!(resp["ok"], false);
+        assert_eq!(resp["code"], "bad_id");
     }
 }

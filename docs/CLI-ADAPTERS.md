@@ -3,12 +3,9 @@
 The dashboard's Node module provides a version-checked CLI client, without
 replacing DSH's agent loop, tools, persistence or profile boot.
 Related: [issue #17](https://github.com/jimoto-no-llm/rustdsh/issues/17).
+For one-shot external agents (cursor-agent, devin), see [AGENT-RUNNERS.md](AGENT-RUNNERS.md).
 
 ## Supported versions and operations
-
-Claude Code and Codex can use the dashboard as an MCP client;
-see [the MCP quickstart](MCP-CLIENTS.md). The table below describes native
-session control, which is a separate interface from calling dashboard tools.
 
 | CLI | Verified version | Transport | Operations |
 | ----------- | ---------------- | ----------------- | ------------------------------------------- |

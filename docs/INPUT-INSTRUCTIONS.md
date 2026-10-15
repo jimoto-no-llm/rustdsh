@@ -55,7 +55,7 @@ JSONのフィールド順は一致判定に影響しません。同じIDで別�
 
 ## 管理エージェントとローカルCLI
 
-既存MCP toolは変更せず、明示的なHTTP/CLI投稿を追加します。
+既存6つのMCP toolは変更せず、明示的なHTTP/CLI投稿を追加します。
 
 ```sh
 rdsh-dashboard instruction context --project /path/to/project --consumer-id consumer_id

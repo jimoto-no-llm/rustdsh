@@ -1,5 +1,7 @@
 //! Read-only inspection of $DSH_HOME without Node: sessions, logs, skills, profiles.
-//! Never writes; missing dirs are reported, not errors (exit 0 with a note).
+//! Session/profile inputs are read-only. The token-size cache uses XDG_CACHE_HOME
+//! or the user's .cache directory, which can be inside $DSH_HOME by configuration.
+//! Missing dirs are reported, not errors (exit 0 with a note).
 
 /// User home directory without a dirs/home crate: HOME, USERPROFILE, then
 /// HOMEDRIVE+HOMEPATH (native Windows). One resolver for the whole binary so
@@ -38,10 +40,10 @@ fn format_time(t: std::time::SystemTime) -> String {
         .unwrap_or(0) as i64;
     let days = secs.div_euclid(86400);
     let tod = secs.rem_euclid(86400);
-    let z = days + 719468;
-    let era = z.div_euclid(146097);
-    let doe = z.rem_euclid(146097);
-    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z.rem_euclid(146_097);
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365;
     let y = yoe + era * 400;
     let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
     let mp = (5 * doy + 2) / 153;
@@ -132,7 +134,7 @@ fn scan_sessions(root: &str, project: Option<&str>) -> Vec<Session> {
             Err(_) => return vec![],
         },
     };
-    let mut out: Vec<Session> = vec![];
+    let mut out: Vec<Session> = Vec::new();
     if projs.len() >= 2 {
         // Bounded worker pool (issue #85-3): one batch at a time so a host
         // with hundreds of projects never spawns hundreds of threads.
@@ -207,29 +209,20 @@ pub fn cmd_sessions(
             .iter()
             .zip(sizes.iter())
             .map(|(s, (decomp, exact))| {
-                let tok = match decomp {
-                    Some(b) => Some(b / 4),
-                    None => Some(s.bytes / 4),
-                };
-                if tokens {
-                    serde_json::json!({
-                        "project": s.project,
-                        "id": s.id,
-                        "bytes": s.bytes,
-                        "mtime": s.mtime_s,
-                        "tokens": tok,
-                        "tokens_exact": exact,
-                    })
-                } else {
-                    serde_json::json!({
-                        "project": s.project,
-                        "id": s.id,
-                        "bytes": s.bytes,
-                        "mtime": s.mtime_s,
-                        "tokens": null,
-                        "tokens_exact": false,
-                    })
-                }
+                // serde_json::Map sorts these keys by default; when
+                // preserve_order is enabled, explicit insertion keeps the same
+                // legacy `sessions --json` byte order.
+                let mut row = serde_json::Map::new();
+                row.insert("bytes".into(), serde_json::json!(s.bytes));
+                row.insert("id".into(), serde_json::json!(s.id));
+                row.insert("mtime".into(), serde_json::json!(s.mtime_s));
+                row.insert("project".into(), serde_json::json!(s.project));
+                row.insert(
+                    "tokens".into(),
+                    serde_json::json!(tokens.then(|| decomp.map_or(s.bytes / 4, |b| b / 4))),
+                );
+                row.insert("tokens_exact".into(), serde_json::json!(tokens && *exact));
+                serde_json::Value::Object(row)
             })
             .collect();
         println!("{}", serde_json::json!({"sessions": items, "total": total}));
@@ -544,7 +537,7 @@ fn batch_decompressed(
 ) -> Vec<(Option<u64>, bool)> {
     let mut out: Vec<(Option<u64>, bool)> = vec![(None, false); shown.len()];
     // Serial cache pass first: hits never touch threads or IO.
-    let mut pending: Vec<(usize, Session)> = vec![];
+    let mut pending: Vec<(usize, Session)> = Vec::new();
     for (i, sess) in shown.iter().enumerate() {
         let key = TokensCache::key(root, &sess.project, &sess.id);
         match cache.get(&key, sess.mtime, sess.bytes, zstd_cli) {
@@ -667,7 +660,7 @@ fn session_decompressed_bytes_uncached(
             return (None, false);
         }
         // Per-file cache: only grown/added files pay for re-expansion.
-        let mut todo: Vec<std::path::PathBuf> = vec![];
+        let mut todo: Vec<std::path::PathBuf> = Vec::new();
         for p in &deferred {
             let Some(name) = p.file_name().map(|s| s.to_string_lossy().into_owned()) else {
                 continue;
@@ -692,7 +685,7 @@ fn session_decompressed_bytes_uncached(
         // Stale reuse: grown files with a recent exact value skip expansion
         // (marked inexact by the caller via the returned flag).
         let stale_window = stale_secs;
-        let mut todo2: Vec<std::path::PathBuf> = vec![];
+        let mut todo2: Vec<std::path::PathBuf> = Vec::new();
         for p in &todo {
             let stale_hit = (stale_window > 0)
                 .then(|| {
@@ -1459,7 +1452,7 @@ mod tests {
         let mut seed = 0x9E37_79B9u64;
         let mut body = vec![0u8; 100_000];
         for b in &mut body {
-            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+            seed = seed.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(1);
             *b = (seed >> 33) as u8;
         }
         std::fs::write(&src, &body).unwrap();

@@ -1,4 +1,0 @@
-- insert:
-    - id: rdsh-agent-ui
-      name: "rdsh-agent-ui"
-      config: {}

@@ -100,22 +100,37 @@ function close(fixture, which = 'dismiss') {
   assert.ok(button); button.props.onClick(); assert.equal(fixture.render(), null);
 }
 for (const which of ['dismiss', 'close']) {
-  test(`${which} closes only this occurrence; remount keeps it closed and full reload shows it`, async (t) => {
+  test(`${which} is final for that update through polls, remount and a full reload`, async (t) => {
     const fixture = await shown(t); close(fixture, which); await fixture.poll(); assert.equal(fixture.render(), null);
     fixture.remount(); await settle(); assert.equal(fixture.render(), null);
-    await shown(t, { storage: fixture.storage });
+    await fixture.advance(PERIOD * 2); await fixture.poll(); assert.equal(fixture.render(), null);
+    const reload = host({ storage: fixture.storage, now: START + 2 * PERIOD });
+    t.after(() => reload.dispose()); reload.render(); await settle();
+    assert.equal(reload.render(), null);
+    reload.setUpdate(update('v-next', { at: START + 1 })); await reload.poll();
+    assert.ok(reload.render());
     assert.equal(fixture.posts[0].at, START); assert.equal(fixture.posts[0].cycle, 0);
   });
 }
-test('two-hour cadence is anchored to update time, continues through close/reload, and repeats', async (t) => {
+test('a dismissal posts the server-validated cycle for the update it closes', async (t) => {
+  const fixture = await shown(t, { now: START + 2 * PERIOD + 5000 });
+  close(fixture);
+  const post = fixture.posts.find((p) => p.url.endsWith('/dismiss'));
+  assert.equal(post.kind, 'rustdsh'); assert.equal(post.to, 'v-next'); assert.equal(post.at, START);
+  assert.ok(Number.isSafeInteger(post.cycle) && post.cycle >= 0 && post.cycle <= 1000000);
+  assert.equal(post.cycle, 2);
+});
+test('time passing never reopens a dismissed update; a new at or to notifies again', async (t) => {
   const fixture = await shown(t, { now: START + PERIOD - 600000 }); close(fixture);
-  await fixture.advance(599999); assert.equal(fixture.render(), null);
-  await fixture.advance(1); assert.ok(fixture.render()); close(fixture);
-  await fixture.advance(PERIOD - 1); assert.equal(fixture.render(), null);
-  await fixture.advance(1); assert.ok(fixture.render());
-  const reload = await shown(t, { storage: fixture.storage, now: START + 2 * PERIOD + 3600000 }); close(reload);
-  await reload.advance(3599999); assert.equal(reload.render(), null);
-  await reload.advance(1); assert.ok(reload.render());
+  await fixture.advance(PERIOD); await fixture.poll(); assert.equal(fixture.render(), null);
+  await fixture.advance(PERIOD * 5); await fixture.poll(); assert.equal(fixture.render(), null);
+  fixture.setUpdate(update('v-next', { at: START + 1 })); await fixture.poll();
+  assert.ok(fixture.render()); close(fixture);
+  fixture.setUpdate(update('v-other', { at: START + 1 })); await fixture.poll();
+  assert.ok(fixture.render()); close(fixture);
+  fixture.setUpdate(update('v-other', { at: START + 2 })); await fixture.poll();
+  assert.ok(fixture.render()); close(fixture);
+  await fixture.advance(PERIOD * 3); assert.equal(fixture.render(), null);
 });
 test('live state reaches an idle page without polling; a new update time starts a new occurrence', async (t) => {
   const fixture = host({ initial: { ok: true, updated: false }, streaming: true }); t.after(() => fixture.dispose());
@@ -134,23 +149,27 @@ test('late reads cannot resurrect a close or overwrite a streamed newer update',
   await live.push('state', update('v-newest')); finish(response(update('v-stale'))); await settle();
   assert.ok(JSON.stringify(live.render()).includes('v-newest'));
 });
-test('storage and stream closes match the current update and period, never a later reminder', async (t) => {
+test('storage and stream closes match the current update and never return for it', async (t) => {
   const fixture = await shown(t, { streaming: true });
   const ack = { kind: 'rustdsh', to: 'v-next', at: START, cycle: 0 };
   fixture.event({ key: CLOSE_KEY, newValue: JSON.stringify({ ...ack, to: 'wrong' }) }); assert.ok(fixture.render());
   fixture.event({ key: CLOSE_KEY, newValue: '{broken' }); assert.ok(fixture.render());
   fixture.event({ key: CLOSE_KEY, newValue: JSON.stringify(ack) }); assert.equal(fixture.render(), null);
-  await fixture.advance(PERIOD); assert.ok(fixture.render());
+  await fixture.advance(PERIOD); assert.equal(fixture.render(), null);
+  await fixture.push('state', update('v-newer')); assert.ok(fixture.render());
   await fixture.push('close', ack); assert.ok(fixture.render());
-  await fixture.push('close', { ...ack, cycle: 1 }); assert.equal(fixture.render(), null);
+  await fixture.push('close', { ...ack, to: 'v-newer', cycle: 7 }); assert.equal(fixture.render(), null);
 });
-test('legacy permanent dismissals are ignored; storage failures still support close, remount and reminders', async (t) => {
+test('legacy permanent dismissals are ignored; storage failures still support close and remount', async (t) => {
   await shown(t, { initial: update('v-next', { dismissed: true }), storage: new Map([
     ['rdsh-update-dismissed', JSON.stringify({ key: 'v-next@1', at: 1 })],
     ['rdsh-update-dismissed:v2:["rustdsh","v-next"]', '1'],
   ]) });
   const fixture = await shown(t, { storageFails: true }); close(fixture); fixture.remount(); await settle();
-  assert.equal(fixture.render(), null); await fixture.advance(PERIOD); assert.ok(fixture.render());
+  assert.equal(fixture.render(), null);
+  await fixture.advance(PERIOD); await fixture.poll(); assert.equal(fixture.render(), null);
+  fixture.setUpdate(update('v-later', { at: START + PERIOD })); await fixture.poll();
+  assert.ok(fixture.render());
 });
 test('disconnected streams fall back to polling and reconnect without reopening a closed occurrence', async (t) => {
   const fixture = await shown(t, { streaming: true }); close(fixture);
@@ -160,21 +179,24 @@ test('disconnected streams fall back to polling and reconnect without reopening 
   await fixture.push('state', update('v-during-disconnect')); assert.equal(fixture.render(), null);
   await fixture.push('state', update('v-after-reconnect')); assert.ok(fixture.render());
 });
-test('returning to a suspended page catches up to the fixed cadence without resetting it', async (t) => {
+test('returning to a suspended page keeps a dismissed update closed until a new one arrives', async (t) => {
   const fixture = await shown(t); close(fixture); fixture.jump(PERIOD + 3600000);
-  fixture.event({}, 'visibilitychange'); await settle(); assert.ok(fixture.render()); close(fixture);
-  await fixture.advance(3599999); assert.equal(fixture.render(), null);
-  await fixture.advance(1); assert.ok(fixture.render());
+  fixture.event({}, 'visibilitychange'); await settle(); assert.equal(fixture.render(), null);
+  await fixture.poll(); assert.equal(fixture.render(), null);
+  fixture.setUpdate(update('v-next', { at: START + PERIOD + 3600000 })); await fixture.poll();
+  assert.ok(fixture.render());
 });
-test('successful updater check closes its occurrence, preserves the cadence and allows reload', async (t) => {
+test('successful updater check closes its occurrence for good and a new update still notifies', async (t) => {
   const fixture = await shown(t);
   await fixture.advance(PERIOD - 600000);
   await run(fixture); await settle(); assert.equal(fixture.render(), null);
   await fixture.poll(); assert.equal(fixture.render(), null);
   fixture.remount(); await settle(); assert.equal(fixture.render(), null);
-  await shown(t, { storage: fixture.storage });
-  await fixture.advance(599999); assert.equal(fixture.render(), null);
-  await fixture.advance(1); assert.ok(fixture.render());
+  const reload = host({ storage: fixture.storage }); t.after(() => reload.dispose());
+  reload.render(); await settle(); assert.equal(reload.render(), null);
+  await fixture.advance(PERIOD); await fixture.poll(); assert.equal(fixture.render(), null);
+  fixture.setUpdate(update('v-next', { at: START + PERIOD })); await fixture.poll();
+  assert.ok(fixture.render());
 });
 function run(fixture, label = 'update') {
   const button = find(fixture.render(), (n) => n.tag === 'button' && n.children.includes(label));
@@ -203,11 +225,14 @@ test('an in-flight updater blocks duplicate clicks and cannot dismiss a newer up
   fixture.setPostRequest(null); await run(fixture); await settle(); assert.equal(fixture.render(), null);
   assert.equal(fixture.posts.filter((p) => p.url.endsWith('/run')).length, 2);
 });
-test('minimize persists within an occurrence; the next reminder expands it; cleanup removes timers', async (t) => {
+test('minimize persists for the update; the next update expands the card; cleanup removes timers', async (t) => {
   const fixture = await shown(t);
   find(fixture.render(), (n) => n.props.className === 'rub-row1').props.onClick(); await fixture.poll();
   assert.ok(find(fixture.render(), (n) => n.props.className === 'rub-mini')); assert.equal(fixture.posts.length, 0);
-  await fixture.advance(PERIOD); assert.ok(find(fixture.render(), (n) => n.props.className === 'rub-card'));
+  await fixture.advance(PERIOD); await fixture.poll();
+  assert.ok(find(fixture.render(), (n) => n.props.className === 'rub-mini'));
+  fixture.setUpdate(update('v-next', { at: START + PERIOD })); await fixture.poll();
+  assert.ok(find(fixture.render(), (n) => n.props.className === 'rub-card'));
   fixture.dispose(); assert.equal(fixture.timers.size, 0); assert.equal(fixture.intervals.size, 0);
 });
 

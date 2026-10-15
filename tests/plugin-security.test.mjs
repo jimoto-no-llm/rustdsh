@@ -14,11 +14,8 @@ const execFile = childProcess.execFile;
 childProcess.execFile = (...args) => {
   const done = args.at(-1);
   // The settings card probes the installed rdsh version (issue #397); only the
-  // updater invocation counts as an update run. The binary may arrive as the
-  // bare name (PATH hit) or as a resolved absolute path when the login shell
-  // PATH is missing the install directory, so match the basename.
-  const rdshName = String(args[0]).split(/[\\/]/).pop();
-  if ((rdshName === 'rdsh' || rdshName === 'rdsh.exe') && Array.isArray(args[1]) && args[1][0] === '--version') {
+  // updater invocation counts as an update run.
+  if (args[0] === 'rdsh' && Array.isArray(args[1]) && args[1][0] === '--version') {
     queueMicrotask(() => done(null, 'rdsh 0.0.0-test\n', ''));
     return new EventEmitter();
   }
@@ -29,26 +26,6 @@ childProcess.execFile = (...args) => {
 syncBuiltinESMExports();
 const settings = await import('../plugins/rdsh-settings/index.js');
 const updates = await import('../plugins/rdsh-update-banner/index.js');
-
-test('settings plugin resolves the rdsh binary like the compute bridge', () => {
-  // Same order as plugins/rdsh-compute: RDSH_BIN, then PATH, then the
-  // well-known install locations, then the historical bare name.
-  assert.equal(settings.resolveRdshBin({ RDSH_BIN: '/opt/custom/rdsh' }, 'linux', () => false), '/opt/custom/rdsh');
-  assert.equal(settings.resolveRdshBin({ RDSH_BIN: '   ' }, 'linux', () => false), 'rdsh');
-  assert.equal(
-    settings.resolveRdshBin({ PATH: '/opt/bin:/usr/bin', HOME: '/home/u' }, 'linux', (p) => p === '/opt/bin/rdsh'),
-    'rdsh',
-  );
-  assert.equal(
-    settings.resolveRdshBin({ HOME: '/home/u' }, 'linux', (p) => p === '/home/u/.local/bin/rdsh'),
-    '/home/u/.local/bin/rdsh',
-  );
-  assert.equal(
-    settings.resolveRdshBin({ LOCALAPPDATA: 'C:\\Users\\u\\AppData\\Local', USERPROFILE: 'C:\\Users\\u' }, 'win32', (p) => p.endsWith('rdsh.exe')),
-    'C:\\Users\\u\\AppData\\Local\\rdsh\\bin\\rdsh.exe',
-  );
-  assert.equal(settings.resolveRdshBin({}, 'linux', () => false), 'rdsh');
-});
 
 test('plugin security boundary and settings preservation', async (t) => {
   const home = await mkdtemp(join(tmpdir(), 'rdsh-plugin-security-'));

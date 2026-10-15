@@ -129,6 +129,30 @@ fn sessions_known_and_concatenated_frames_cache_and_growth() {
 }
 
 #[test]
+fn sessions_json_preserves_legacy_object_key_order() {
+    let f = Fixture::new();
+    f.session("one", b"hello", true);
+    let output = String::from_utf8(f.ok(&["sessions", "--tokens", "--json"], b"")).unwrap();
+    let row = output
+        .split("\"sessions\":[{")
+        .nth(1)
+        .expect("one session row in JSON output");
+    let positions = [
+        "\"bytes\":",
+        "\"id\":",
+        "\"mtime\":",
+        "\"project\":",
+        "\"tokens\":",
+        "\"tokens_exact\":",
+    ]
+    .map(|key| row.find(key).expect("session output field"));
+    assert!(
+        positions.windows(2).all(|pair| pair[0] < pair[1]),
+        "legacy session JSON key order changed: {output}"
+    );
+}
+
+#[test]
 fn legacy_cache_cannot_promote_an_old_estimate_to_exact() {
     let f = Fixture::new();
     let p = f.session("one", &vec![b'a'; 8192], true);
@@ -246,7 +270,7 @@ fn concurrent_session_writers_leave_parseable_correct_cache() {
     for _ in 0..8 {
         let cache = f.0.join("cache/rdsh/sessions-tokens.json");
         let _ = fs::remove_file(&cache);
-        let mut children = (0..4)
+        let children = (0..4)
             .map(|_| {
                 f.command(&["sessions", "--tokens", "--json"])
                     .stdout(Stdio::piped())
@@ -255,7 +279,7 @@ fn concurrent_session_writers_leave_parseable_correct_cache() {
                     .unwrap()
             })
             .collect::<Vec<_>>();
-        for child in children.drain(..) {
+        for child in children {
             let o = child.wait_with_output().unwrap();
             assert!(o.status.success());
             let v: Value = serde_json::from_slice(&o.stdout).unwrap();
@@ -310,7 +334,7 @@ impl Server {
     fn start(f: &Fixture, args: &[&str]) -> Self {
         let _startup_guard = SERVER_STARTUP
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut child = f
             .command(args)
             .stdin(Stdio::null())

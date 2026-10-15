@@ -6,19 +6,12 @@ TMPD="$(mktemp -d)"
 trap 'rm -rf "$TMPD"' EXIT
 FAKE_BIN="$TMPD/fake-bin"
 mkdir -p "$FAKE_BIN"
-
-# The installer decides whether Rust is already available with
-# `command -v cargo`. This fixture must reach the rustup-init path even on a
-# host with a system-wide toolchain (Fedora ships /usr/bin/cargo), so the fake
-# bin directory becomes the whole PATH: only the utilities this path needs are
-# linked in, and no host cargo/rustc/rustup can short-circuit it into building
-# the empty fixture project with the real toolchain.
-# curl and sha256sum are written by this fixture below, so they are skipped.
-for tool in awk bash cat chmod cp cut date dirname env expr find getconf \
-  grep gzip head install ldd ln ls mkdir mktemp mv printf rm rmdir sed sh \
-  shasum sort tail tar tee touch tr true uname uniq wc; do
-  found="$(command -v "$tool" 2>/dev/null || true)"
-  [ -n "$found" ] && ln -sf "$found" "$FAKE_BIN/$tool"
+# Do not let a system /usr/bin/cargo bypass the rustup branch under test.
+# Supply the installer's utilities explicitly, then add only the generated
+# Cargo stub through this fixture's HOME/.cargo/bin.
+for utility in bash env uname tr awk sed grep head tail cut dirname basename mktemp mkdir rm chmod install cp mv tar stat ldd sleep date tee sort cat readlink realpath gzip touch wc; do
+  tool="$(command -v "$utility" 2>/dev/null || true)"
+  [ -z "$tool" ] || ln -s "$tool" "$FAKE_BIN/$utility"
 done
 
 RUSTUP_INIT_VERSION="1.29.0"

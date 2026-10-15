@@ -166,42 +166,29 @@ test('release_probe=true keeps the loopback credential requirement', async (t) =
 });
 
 // -------------------------------------------------------------- install.sh
-test('install.sh installs sound+gitview by default unless opted out or vetoed', { skip: process.platform === 'win32' }, async (t) => {
+test('install.sh offers sound with SOUND=1 unless features.sound is false', { skip: process.platform === 'win32' }, async (t) => {
   const home = await mkdtemp(join(tmpdir(), 'rdsh-install-features-'));
   t.after(() => rm(home, { recursive: true, force: true }));
   const script = join(repo, 'plugins', 'install.sh');
   const base = { ...process.env, PATH: `${dirname(process.execPath)}:${process.env.PATH ?? ''}`,
     HOME: home, DSH_HOME: home, PROFILE: 'web', DRY_RUN: '1' };
   delete base.SOUND;
-  delete base.GITVIEW;
   const run = async (extra) => {
     const env = { ...base, ...extra };
     for (const [name, value] of Object.entries(env)) if (value === undefined) delete env[name];
     return (await exec('sh', [script], { cwd: repo, env })).stdout;
   };
   const sound = /dsh-sound-notifications/;
-  const gitview = /dsh-gitview/;
-  // No rdsh.json yet: both third-party plugins are offered by default.
-  assert.match(await run({}), sound);
-  assert.match(await run({}), gitview);
+  // No rdsh.json yet: the SOUND=1 opt-in still offers it (legacy behavior).
   assert.match(await run({ SOUND: '1' }), sound);
-  assert.doesNotMatch(await run({ SOUND: '0' }), sound);
-  assert.match(await run({ SOUND: '0' }), gitview);
-  assert.doesNotMatch(await run({ GITVIEW: '0' }), gitview);
-  assert.match(await run({ GITVIEW: '0' }), sound);
   await writeFile(join(home, 'rdsh.json'), JSON.stringify({ features: { sound: false } }));
   assert.doesNotMatch(await run({ SOUND: '1' }), sound);
-  assert.match(await run({ SOUND: '1' }), gitview);
-  await writeFile(join(home, 'rdsh.json'), JSON.stringify({ features: { gitview: false } }));
-  assert.doesNotMatch(await run({}), gitview);
-  assert.match(await run({}), sound);
   // A corrupt file must not silently remove the offer.
   await writeFile(join(home, 'rdsh.json'), '{broken json');
   assert.match(await run({ SOUND: '1' }), sound);
-  assert.match(await run({}), gitview);
-  await writeFile(join(home, 'rdsh.json'), JSON.stringify({ features: { sound: true, gitview: true } }));
+  await writeFile(join(home, 'rdsh.json'), JSON.stringify({ features: { sound: true } }));
   const offered = await run({ SOUND: '1' });
   assert.match(offered, /dsh plugin --profile web add github:cwd514\/dsh-sound-notifications/);
-  assert.match(offered, /dsh plugin --profile web add github:yugapor\/dsh-gitview/);
+  assert.doesNotMatch(await run({}), sound); // SOUND unset
   assert.match(offered, /@deepseek-ai\/dsh-tool-present/); // normal installs still run
 });

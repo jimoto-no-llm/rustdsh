@@ -40,7 +40,7 @@ fn force_init_recovers_corrupt_settings_and_loads_defaults() {
     for raw in ["{broken", "", "null", "[]", "false", "42", "\"text\""] {
         let fixture = Fixture::new(raw);
         let output = fixture.run(&["settings", "init", "--force"]);
-        assert!(output.status.success(), "{:?}", output);
+        assert!(output.status.success(), "{output:?}");
         let settings: serde_json::Value = serde_json::from_str(&fixture.read()).unwrap();
         assert_eq!(settings["schema"], 1);
         assert_eq!(settings["extras"]["enable"], serde_json::json!([]));
@@ -299,11 +299,7 @@ fn feature_switches_list_defaults_and_round_trip_through_the_cli() {
         keys.contains("features.discord(bool, default ON)"),
         "{keys}"
     );
-    assert!(keys.contains("features.sound(bool, default ON)"), "{keys}");
-    assert!(
-        keys.contains("features.gitview(bool, default ON)"),
-        "{keys}"
-    );
+    assert!(keys.contains("features.sound(bool, default OFF)"), "{keys}");
 }
 
 #[test]
