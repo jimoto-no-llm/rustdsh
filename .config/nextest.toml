@@ -7,3 +7,10 @@ retries = 0
 [profile.ci.junit]
 path = "junit.xml"
 report-name = "rustdsh-rust-tests"
+
+[test-groups]
+native-e2e = { max-threads = 1 }
+
+[[profile.ci.overrides]]
+filter = "binary_id(/native_e2e/)"
+test-group = "native-e2e"
