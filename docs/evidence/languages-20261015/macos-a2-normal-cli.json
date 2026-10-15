@@ -1,0 +1,308 @@
+{
+  "scope": "Actual normal release artifact after all Cargo tests; isolated homes; zero model or credential access",
+  "normal_build_command": "cargo build --release --locked",
+  "binary_sha256": "098a955a6fe8c6f2513bb90e9a63d06bb628b816f130e31dd15c591b3e841f31",
+  "tests": 52,
+  "all_passed": true,
+  "cases": [
+    {
+      "language": "en",
+      "case": "validate",
+      "exit": 0,
+      "stdout_identical_to_upstream": true
+    },
+    {
+      "language": "en",
+      "case": "policy",
+      "exit": 0,
+      "stdout_identical_to_upstream": true
+    },
+    {
+      "language": "en",
+      "case": "worker-scope --help",
+      "exit": 0
+    },
+    {
+      "language": "en",
+      "case": "worker-scope validate --help",
+      "exit": 0
+    },
+    {
+      "language": "en",
+      "case": "worker-scope policy --help",
+      "exit": 0
+    },
+    {
+      "language": "en",
+      "case": "help worker-scope",
+      "exit": 0
+    },
+    {
+      "language": "en",
+      "case": "invalid-input-6e6f742d6a736f6e",
+      "exit": 2,
+      "stdout_empty": true
+    },
+    {
+      "language": "en",
+      "case": "invalid-input-ff",
+      "exit": 2,
+      "stdout_empty": true
+    },
+    {
+      "language": "en",
+      "case": "invalid-input-7b7d",
+      "exit": 2,
+      "stdout_empty": true
+    },
+    {
+      "language": "en",
+      "case": "reject-corrupt-settings --help",
+      "exit": 1,
+      "stdout_empty": true
+    },
+    {
+      "language": "en",
+      "case": "reject-corrupt-settings tokens --help",
+      "exit": 1,
+      "stdout_empty": true
+    },
+    {
+      "language": "en",
+      "case": "reject-corrupt-settings --help worker-scope",
+      "exit": 1,
+      "stdout_empty": true
+    },
+    {
+      "language": "en",
+      "case": "reject-corrupt-settings -h worker-scope validate",
+      "exit": 1,
+      "stdout_empty": true
+    },
+    {
+      "language": "en",
+      "case": "reject-corrupt-settings --help help worker-scope",
+      "exit": 1,
+      "stdout_empty": true
+    },
+    {
+      "language": "en",
+      "case": "reject-corrupt-settings --profile worker-scope --help",
+      "exit": 1,
+      "stdout_empty": true
+    },
+    {
+      "language": "en",
+      "case": "reject-corrupt-settings tokens -- --help",
+      "exit": 1,
+      "stdout_empty": true
+    },
+    {
+      "language": "en",
+      "case": "reject-corrupt-settings settings get -- --help",
+      "exit": 1,
+      "stdout_empty": true
+    },
+    {
+      "language": "zh-CN",
+      "case": "validate",
+      "exit": 0,
+      "stdout_identical_to_upstream": true
+    },
+    {
+      "language": "zh-CN",
+      "case": "policy",
+      "exit": 0,
+      "stdout_identical_to_upstream": true
+    },
+    {
+      "language": "zh-CN",
+      "case": "worker-scope --help",
+      "exit": 0
+    },
+    {
+      "language": "zh-CN",
+      "case": "worker-scope validate --help",
+      "exit": 0
+    },
+    {
+      "language": "zh-CN",
+      "case": "worker-scope policy --help",
+      "exit": 0
+    },
+    {
+      "language": "zh-CN",
+      "case": "help worker-scope",
+      "exit": 0
+    },
+    {
+      "language": "zh-CN",
+      "case": "invalid-input-6e6f742d6a736f6e",
+      "exit": 2,
+      "stdout_empty": true
+    },
+    {
+      "language": "zh-CN",
+      "case": "invalid-input-ff",
+      "exit": 2,
+      "stdout_empty": true
+    },
+    {
+      "language": "zh-CN",
+      "case": "invalid-input-7b7d",
+      "exit": 2,
+      "stdout_empty": true
+    },
+    {
+      "language": "zh-CN",
+      "case": "reject-corrupt-settings --help",
+      "exit": 1,
+      "stdout_empty": true
+    },
+    {
+      "language": "zh-CN",
+      "case": "reject-corrupt-settings tokens --help",
+      "exit": 1,
+      "stdout_empty": true
+    },
+    {
+      "language": "zh-CN",
+      "case": "reject-corrupt-settings --help worker-scope",
+      "exit": 1,
+      "stdout_empty": true
+    },
+    {
+      "language": "zh-CN",
+      "case": "reject-corrupt-settings -h worker-scope validate",
+      "exit": 1,
+      "stdout_empty": true
+    },
+    {
+      "language": "zh-CN",
+      "case": "reject-corrupt-settings --help help worker-scope",
+      "exit": 1,
+      "stdout_empty": true
+    },
+    {
+      "language": "zh-CN",
+      "case": "reject-corrupt-settings --profile worker-scope --help",
+      "exit": 1,
+      "stdout_empty": true
+    },
+    {
+      "language": "zh-CN",
+      "case": "reject-corrupt-settings tokens -- --help",
+      "exit": 1,
+      "stdout_empty": true
+    },
+    {
+      "language": "zh-CN",
+      "case": "reject-corrupt-settings settings get -- --help",
+      "exit": 1,
+      "stdout_empty": true
+    },
+    {
+      "language": "ja",
+      "case": "validate",
+      "exit": 0,
+      "stdout_identical_to_upstream": true
+    },
+    {
+      "language": "ja",
+      "case": "policy",
+      "exit": 0,
+      "stdout_identical_to_upstream": true
+    },
+    {
+      "language": "ja",
+      "case": "worker-scope --help",
+      "exit": 0
+    },
+    {
+      "language": "ja",
+      "case": "worker-scope validate --help",
+      "exit": 0
+    },
+    {
+      "language": "ja",
+      "case": "worker-scope policy --help",
+      "exit": 0
+    },
+    {
+      "language": "ja",
+      "case": "help worker-scope",
+      "exit": 0
+    },
+    {
+      "language": "ja",
+      "case": "invalid-input-6e6f742d6a736f6e",
+      "exit": 2,
+      "stdout_empty": true
+    },
+    {
+      "language": "ja",
+      "case": "invalid-input-ff",
+      "exit": 2,
+      "stdout_empty": true
+    },
+    {
+      "language": "ja",
+      "case": "invalid-input-7b7d",
+      "exit": 2,
+      "stdout_empty": true
+    },
+    {
+      "language": "ja",
+      "case": "reject-corrupt-settings --help",
+      "exit": 1,
+      "stdout_empty": true
+    },
+    {
+      "language": "ja",
+      "case": "reject-corrupt-settings tokens --help",
+      "exit": 1,
+      "stdout_empty": true
+    },
+    {
+      "language": "ja",
+      "case": "reject-corrupt-settings --help worker-scope",
+      "exit": 1,
+      "stdout_empty": true
+    },
+    {
+      "language": "ja",
+      "case": "reject-corrupt-settings -h worker-scope validate",
+      "exit": 1,
+      "stdout_empty": true
+    },
+    {
+      "language": "ja",
+      "case": "reject-corrupt-settings --help help worker-scope",
+      "exit": 1,
+      "stdout_empty": true
+    },
+    {
+      "language": "ja",
+      "case": "reject-corrupt-settings --profile worker-scope --help",
+      "exit": 1,
+      "stdout_empty": true
+    },
+    {
+      "language": "ja",
+      "case": "reject-corrupt-settings tokens -- --help",
+      "exit": 1,
+      "stdout_empty": true
+    },
+    {
+      "language": "ja",
+      "case": "reject-corrupt-settings settings get -- --help",
+      "exit": 1,
+      "stdout_empty": true
+    },
+    {
+      "case": "persisted Japanese help",
+      "exit": 0
+    }
+  ],
+  "owned_fixture_removed": true
+}

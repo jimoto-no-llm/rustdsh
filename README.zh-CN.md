@@ -24,6 +24,8 @@ rdsh settings set general.language zh-CN
 
 优先顺序为 `--language`、非空 `RDSH_LANG`、非 `auto` 的 `general.language`、`LC_ALL`、`LC_MESSAGES`、`LANG`，最后是英语。委派给 `dsh` 的参数、模型输出、API JSON 字段、文件内容、名称和协议标识符保持原文。
 
+`worker-scope validate` 和 `worker-scope policy` 的帮助与 CLI 诊断也支持三种语言。这些纯计算命令及其帮助不依赖无关的损坏设置；普通命令和根帮助仍报告设置错误。规范 JSON、策略代码和输入路径保持不变。
+
 设置文件和浏览器设置页面的详细字段见 [docs/RDSH-SETTINGS.md](docs/RDSH-SETTINGS.md)；项目仪表板的独立启动方式见 [dashboard/README.md](dashboard/README.md)。
 
 ## 受保护启动的兼容版本

@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "status": "pass",
+  "files": 1111,
+  "everyFileSha256Equal": true,
+  "windowsFilesDigest": "734e4394ba0d44a2d8732a76b91ceb4d50fe6561710ff5cabd18d1cd87f8ffc7",
+  "linuxManifestSha256": "7c8efc44e8589f3118695c7894b53c997b1a666ac683b2b629b23ebd90bfe7bb",
+  "testOnlyOverlays": [
+    "tests/worker_scopes.rs",
+    "tests/serial_proxy.rs"
+  ]
+}

@@ -326,6 +326,8 @@ rdsh settings set general.language zh-CN
 
 優先順は `--language`、`RDSH_LANG`、`general.language`、`LC_ALL`、`LC_MESSAGES`、`LANG` です。明示した `general.language` が不正なら設定を書き換えずに停止します。委譲する `dsh` 引数、モデル出力、JSON フィールド、ファイル、プロトコル識別子は翻訳しません。
 
+`worker-scope validate` と `worker-scope policy` のヘルプ・CLI診断も3言語に対応します。この純粋な処理とそのヘルプは無関係な壊れた設定に依存しません。通常のコマンドとルートのヘルプは設定エラーを報告します。正規JSON・ポリシーコード・渡されたパスは変えません。
+
 ### 拡張ダッシュボード (`rdsh-dashboard`)
 
 プロジェクト全体の稼働状況、質問・回答の確認、モバイル端末からの接続などを行える拡張ダッシュボードです（要 Node.js 22+）：

@@ -3,8 +3,8 @@
   "files": [
     {
       "path": "README.md",
-      "bytes": 17863,
-      "sha256": "419bc0caf30518c63d318ca956376d67713be3f8616284e4c6329038a8635762"
+      "bytes": 24570,
+      "sha256": "5d6255e2f0086146a0d8472df2c499790afd027e64401f804e9d2395e570ea55"
     },
     {
       "path": "before-desktop.png",
@@ -77,6 +77,11 @@
       "sha256": "d482dada6736f453b5e5666d5fc280a33a0d9d712bf31a27d05669cf02815aaf"
     },
     {
+      "path": "cross-platform-a2-source.json",
+      "bytes": 359,
+      "sha256": "9ca87bd13d7f6c3636cd4a1b5740e5a865a3c748883d5c3e712ad88680dfb64b"
+    },
+    {
       "path": "dashboard-platforms.json",
       "bytes": 25493,
       "sha256": "7d240375b2f015f5b61141cd2d5bd8bbea6ead308d618e06a1c6cdbcde39e8cf"
@@ -123,8 +128,28 @@
     },
     {
       "path": "known-exceptions.json",
-      "bytes": 6628,
-      "sha256": "5b77cf951776d634521355e9bd7896b4c94e2bda84178b2c2bfba7ef3758198a"
+      "bytes": 7888,
+      "sha256": "f27020d609ad24a836ccadfaa9f3b1e0f4c228f30b150ad7bc51dbd064d60049"
+    },
+    {
+      "path": "legacy-workflow-board-baseline.json",
+      "bytes": 11019,
+      "sha256": "eda61e1edc2b1cdde5c5f6408bcafc8f1bff9f64617e67f39717db375e45d8a0"
+    },
+    {
+      "path": "linux-a2-post-test-overlay.json",
+      "bytes": 2312,
+      "sha256": "200125140c3fd23effc0191e3d5100664b13b6b225dc3bcff5b60d98fd507f22"
+    },
+    {
+      "path": "linux-a2-source.json",
+      "bytes": 197391,
+      "sha256": "c15d536c79d70329a122a1a9cb3816cf3046bdc63973d83c5b86b36b31c0a968"
+    },
+    {
+      "path": "linux-a2-validation.json",
+      "bytes": 91057,
+      "sha256": "e7f8e26f62373c321cb2c02a0f2cab9889e03609ab41dde55f1af6ae737d751b"
     },
     {
       "path": "linux-cc019-native.json",
@@ -170,6 +195,26 @@
       "path": "linux-guarded-launcher.json",
       "bytes": 16481,
       "sha256": "8faf7acc481a1e647304fd8a0167a402c9317b25dbadd2719199742e87bbf183"
+    },
+    {
+      "path": "linux-serial-fixture-repair.json",
+      "bytes": 5478,
+      "sha256": "e333f64ba925a4546cd4377bc5cfd2a1611b798f3fe3d439cec173c5c0bd10c5"
+    },
+    {
+      "path": "linux-serial-fixture-source.json",
+      "bytes": 197333,
+      "sha256": "264aecafa5eb9b8446ca108806e325f9297ebc0a2d17a99b6d08bfcbf9753a8d"
+    },
+    {
+      "path": "macos-a2-normal-cli.json",
+      "bytes": 6822,
+      "sha256": "d9cb105b9368f813b46d072ec2f736a62b18310edb9102f875f5658f7c29ab4d"
+    },
+    {
+      "path": "macos-a2-validation.json",
+      "bytes": 41499,
+      "sha256": "40f23c5737895f5eacd7d245c5a38be49723efd468c74448a983b787de5f3667"
     },
     {
       "path": "macos-main29-validation.json",
@@ -220,6 +265,56 @@
       "path": "outcome-verification-flow-ja.webm",
       "bytes": 263402,
       "sha256": "d74ca2aac97f932686ff66d99f9ccbacf6251c4c525bdd764148a5751dfd61f3"
+    },
+    {
+      "path": "performance-a2-basic.json",
+      "bytes": 8232,
+      "sha256": "9fe25c0321f6269e4942f92e25a313b6643d9cf1c4fda1b901f1db1feea06718"
+    },
+    {
+      "path": "performance-a2-execution.json",
+      "bytes": 1803,
+      "sha256": "a27f1b84aa9bab6670fe991f0d66fda97c9f0765a0e9760f156bd6a61db190c3"
+    },
+    {
+      "path": "performance-a2-extended.json",
+      "bytes": 15955,
+      "sha256": "aa253cff5593c17d16e09c53002e75141aa283390427e9c4b8a0a1ffb104a3c8"
+    },
+    {
+      "path": "performance-a2-regression.json",
+      "bytes": 5905,
+      "sha256": "38dea05dd9b9c323371a79c93ac8ee35ba46604a31cb60c56be9178254aa33bd"
+    },
+    {
+      "path": "performance-a2-summary.json",
+      "bytes": 2301,
+      "sha256": "71764adfea3af8e97a7b173fb7a4e0bd3688a083d2eb8b624cebd9b69e70caf8"
+    },
+    {
+      "path": "performance-a2-test-stage-basic.json",
+      "bytes": 8354,
+      "sha256": "556ebcf49686b3f44bada0f425d7ec3893724877c5699d543175c9f92a28bdd9"
+    },
+    {
+      "path": "performance-a2-test-stage-execution.json",
+      "bytes": 2071,
+      "sha256": "97700b115b819835fe71c19c7d8e407982359d957fe4b1108cfc84049c521508"
+    },
+    {
+      "path": "performance-a2-test-stage-extended.json",
+      "bytes": 16201,
+      "sha256": "a9d4e6f746214a3a1d6303f8ae668788cbb5af55c6d2fecfe1cdc932709d9206"
+    },
+    {
+      "path": "performance-a2-test-stage-regression.json",
+      "bytes": 6078,
+      "sha256": "9668744b1bdcb0b5c9e46b796e5f07b56ec79bc73150cad0440d87d5ad0e6791"
+    },
+    {
+      "path": "performance-a2-test-stage-summary.json",
+      "bytes": 2452,
+      "sha256": "63fb9a2aae54468a8185aac45830231d2e2e8a6f34346d65ffcc3fefc81d07d9"
     },
     {
       "path": "performance-cc019-basic.json",
@@ -303,8 +398,8 @@
     },
     {
       "path": "performance.md",
-      "bytes": 6875,
-      "sha256": "4e809067d40a028e1e8864f8a007486a1b5b7182a83134a2987b018c161bf995"
+      "bytes": 8685,
+      "sha256": "a3da51128e24304cc9ef92f0025234fa7e42eae6037a28d624f7cf7849c1c03b"
     },
     {
       "path": "platform-ledger.md",
@@ -407,6 +502,11 @@
       "sha256": "e08162d3eed93e46b6ac6950b469990aff2ccc22984478273f36fe4cd125eccf"
     },
     {
+      "path": "serial-proxy-fixture-repair.json",
+      "bytes": 1481,
+      "sha256": "ff529569137c514fe56a11f105aace959c4597d6f5a4d924a8f6778eb4a7c209"
+    },
+    {
       "path": "source-files.json",
       "bytes": 48076,
       "sha256": "ba7d3adec1d81d63c4ca8e060d9ee9b34c5cb6d4601956097dd680d358b3adc3"
@@ -427,6 +527,36 @@
       "sha256": "e7fb2a93300e436d21c82b1ebbec2330b4d35451cefbd4ce08c35ccc094b698a"
     },
     {
+      "path": "windows-a2-cleanup.json",
+      "bytes": 933,
+      "sha256": "92915b4ebf43c53e2b925dbb4261ef567c941a178cb16ea2078d2870d12c864f"
+    },
+    {
+      "path": "windows-a2-cost-ledger.json",
+      "bytes": 42371,
+      "sha256": "72cd787fe67b4509f043a003ce69c55d0fa6a3e6d3b3abed4ae98d39c23d5a60"
+    },
+    {
+      "path": "windows-a2-log-index.json",
+      "bytes": 8944,
+      "sha256": "4dfa33bb4fa5563f5211f4dcfd32fd4ea877280450c07255c6d4be14bf9b82ef"
+    },
+    {
+      "path": "windows-a2-source.json",
+      "bytes": 174549,
+      "sha256": "b4cb46c8a2fcc705cfd0754776a69497654d40a598d731b33cfc520342400900"
+    },
+    {
+      "path": "windows-a2-validation.json",
+      "bytes": 8257,
+      "sha256": "d221c300a634cbc4624abd4db343f9ebdb059f79fbe0d53ca77adb615700f842"
+    },
+    {
+      "path": "windows-a2-worker-scope.json",
+      "bytes": 1050,
+      "sha256": "6b4af3ccdafd54aa3e9206836ee141feea5a6191b97628c4e0be8d55da2b9f51"
+    },
+    {
       "path": "windows-conpty.json",
       "bytes": 1149,
       "sha256": "5e799c22630d17fc42632bc48b6f8a50ea99f4c0260d328a78849097502bd3ec"
@@ -445,6 +575,21 @@
       "path": "windows-product-cost-ledger.json",
       "bytes": 26353,
       "sha256": "0e16e9e87fdd3090fb6c0a433143fb8c388ea645483917a405f51f36587028dc"
+    },
+    {
+      "path": "worker-scope-before-after-test-stage.json",
+      "bytes": 910,
+      "sha256": "24a6a8cc319734fd4388a8419802f11d0c999851604780e2206d23e97a1fa7f0"
+    },
+    {
+      "path": "worker-scope-before-after.json",
+      "bytes": 923,
+      "sha256": "6f4e967dc9884f59010c344fdb59a525a0d6753ec5cc7c1b4ea6d2d04d71195e"
+    },
+    {
+      "path": "worker-scope-localization.json",
+      "bytes": 5951,
+      "sha256": "70ba3918307732581044e0a672147a0c54a1f47b3225d25cc24b628095cb257f"
     },
     {
       "path": "zh-CN-desktop.png",

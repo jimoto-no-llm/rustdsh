@@ -1,0 +1,242 @@
+{
+  "schema": 1,
+  "status": "matching-preexisting-errors",
+  "baseline": "f97c0438fb1608bbc4c08c88a27344249795ea22",
+  "runtime": {
+    "node": "v24.21.0",
+    "nodeSha256": "e4b5a3af0e05c75de2eae013904145f40fe7fc2a6e6f17510128bf45cca4e79b",
+    "platform": "darwin",
+    "architecture": "arm64",
+    "heapMiB": 4096
+  },
+  "sourceComparison": {
+    "scripts/oh-my-dsh.spec.ts": {
+      "officialSha256": "3c13a8f282795a2e77368e0c556a0190e2167313a9676ed038976e671bdd04b5",
+      "baselineSha256": "3c13a8f282795a2e77368e0c556a0190e2167313a9676ed038976e671bdd04b5",
+      "patchedSha256": "3c13a8f282795a2e77368e0c556a0190e2167313a9676ed038976e671bdd04b5",
+      "patchedByteEqualOfficial": true
+    },
+    "scripts/oh-my-dsh/tui.ts": {
+      "officialSha256": "09833418db6221f239033773440e8824dc4c01ece1479587735e33a8a606b980",
+      "baselineSha256": "09833418db6221f239033773440e8824dc4c01ece1479587735e33a8a606b980",
+      "patchedSha256": "09833418db6221f239033773440e8824dc4c01ece1479587735e33a8a606b980",
+      "patchedByteEqualOfficial": true
+    },
+    "tsconfig.host.json": {
+      "officialSha256": "c0cb623b4704661804214da63d0ffab1c5bb3e020dfe97baf4816d63379d74b8",
+      "baselineSha256": "c0cb623b4704661804214da63d0ffab1c5bb3e020dfe97baf4816d63379d74b8",
+      "patchedSha256": "c0cb623b4704661804214da63d0ffab1c5bb3e020dfe97baf4816d63379d74b8",
+      "patchedByteEqualOfficial": true
+    },
+    "tsconfig.base.json": {
+      "officialSha256": "2526f3bfc40abc15e30e9b6a94386ba234686028cafb3fbcbd215eb842325e2e",
+      "baselineSha256": "2526f3bfc40abc15e30e9b6a94386ba234686028cafb3fbcbd215eb842325e2e",
+      "patchedSha256": "2526f3bfc40abc15e30e9b6a94386ba234686028cafb3fbcbd215eb842325e2e",
+      "patchedByteEqualOfficial": true
+    },
+    "package.json": {
+      "officialSha256": "ddd38fa51d1656565648f7ca0169743da5d40f87728a64b4380d7a6b79fa38c3",
+      "baselineSha256": "ddd38fa51d1656565648f7ca0169743da5d40f87728a64b4380d7a6b79fa38c3",
+      "patchedSha256": "ddd38fa51d1656565648f7ca0169743da5d40f87728a64b4380d7a6b79fa38c3",
+      "patchedByteEqualOfficial": true
+    },
+    "pnpm-lock.yaml": {
+      "officialSha256": "5d3980bcd2a0113101815aabfeb4f8a875d556a333521539b7f11d790f4a50aa",
+      "baselineSha256": "5d3980bcd2a0113101815aabfeb4f8a875d556a333521539b7f11d790f4a50aa",
+      "patchedSha256": "91a3d6f97f0fef3250b7949f306311085558e7684fd7e07818fa5a586c04f068",
+      "patchedByteEqualOfficial": false
+    },
+    "pnpm-workspace.yaml": {
+      "officialSha256": "39ab979fec4496d68219c6fb492fe828eb9035a33cf7d17478eac90d73cc691d",
+      "baselineSha256": "39ab979fec4496d68219c6fb492fe828eb9035a33cf7d17478eac90d73cc691d",
+      "patchedSha256": "39ab979fec4496d68219c6fb492fe828eb9035a33cf7d17478eac90d73cc691d",
+      "patchedByteEqualOfficial": true
+    }
+  },
+  "dependencyIdentity": {
+    "compilerVersion": "6.0.3",
+    "compilerSha256": "569177652966bd528c319171c7dd22860dbf72bde116cbc4f644f1d02bb12e39",
+    "externalLockPackagesIdentical": true,
+    "externalLockSnapshotsIdentical": true,
+    "rootModulesAreNormalOwnDirectories": true,
+    "baselineLeafModules": 312,
+    "patchedLeafModules": 312,
+    "rootCompilerOptionsIdentical": true,
+    "rootHostConfigByteIdentical": true,
+    "fileSetOnlyInPatched": [],
+    "fileSetOnlyInBaseline": [],
+    "actualInstalledLinkedDependencies": {
+      "linkedDependencyCounts": [
+        3989,
+        3992
+      ],
+      "onlyBaseline": [],
+      "onlyPatched": [
+        "packages/client/ui-workflow-run/node_modules/@deepseek-ai/cordis-plugin-include",
+        "packages/client/ui-workflow-run/node_modules/@deepseek-ai/cordis-plugin-loader",
+        "packages/client/ui-workflow-run/node_modules/@deepseek-ai/dsh-client-ui-sidebar-right"
+      ],
+      "differentShared": {
+        "packages/bundle/web-app/node_modules/@deepseek-ai/dsh-client-ui-workflow-run": {
+          "baseline": {
+            "resolvedPackage": "[SOURCE_ROOT]/packages/client/ui-workflow-run/package.json",
+            "packageJsonSha256": "e72097dae156de86460cd3a03dc4119fde6ff0e6c9c256580e2513a802b8c182"
+          },
+          "patched": {
+            "resolvedPackage": "[SOURCE_ROOT]/packages/client/ui-workflow-run/package.json",
+            "packageJsonSha256": "0a1726340c07dd35077b5f6aa23b162f279fd4be545d68e6b3f89a9e0972b42a"
+          }
+        }
+      },
+      "interpretation": "Three added workspace dependency links and the changed workflow-run manifest through its existing consumer; all other shared linked package locations and manifest bytes match."
+    },
+    "installedRootModulesAndLeafLayout": "Normal separate pnpm root directories with 312 package-local node_modules each; previous root-only symlink run excluded.",
+    "inspectedModules": {
+      "typescript": {
+        "version": "6.0.3",
+        "packageJsonSha256": "9332e97c30d3e53ed54910b89207ed657fb444066484df6e5b6965bf130865e9",
+        "realPackageJson": "[SOURCE_ROOT]/node_modules/.pnpm/typescript@6.0.3/node_modules/typescript/package.json"
+      },
+      "@types/node": {
+        "version": "22.20.0",
+        "packageJsonSha256": "bd099499b14620577adc89c69900e2dbdca07e8edf1bb0d80db176883a77d78d",
+        "realPackageJson": "[SOURCE_ROOT]/node_modules/.pnpm/@types+node@22.20.0/node_modules/@types/node/package.json"
+      },
+      "vitest": {
+        "version": "4.1.8",
+        "packageJsonSha256": "7514764431c71b6145ac008c36bdb8995d1998dfefe9f7bbbe3ca2da96716f3d",
+        "realPackageJson": "[SOURCE_ROOT]/node_modules/.pnpm/vitest@4.1.8_@opentelemetry+api@1.9.1_@types+node@22.20.0_@vitest+coverage-v8@4.1.8_hap_c353b8f649d25fdfb1de02f01ebaca2b/node_modules/vitest/package.json"
+      },
+      "yaml": {
+        "version": "2.9.0",
+        "packageJsonSha256": "20b8b197cbd10dad245d45e463dfe58e4c8c25a47e24bc4256ad9ab58bf35683",
+        "realPackageJson": "[SOURCE_ROOT]/node_modules/.pnpm/yaml@2.9.0/node_modules/yaml/package.json"
+      }
+    },
+    "effectiveCompilerOptionsSha256": "e3197fbbc2735f2d20c8b40c479f7953b2ab88dd474dee260c2b35c0cc7e59fe",
+    "effectiveHostInputCount": 1873,
+    "lockPackagesSha256": "460a94522b303437fc0de86fc9e50c7418101ded819907bf8d3c45db03c81bf5",
+    "lockSnapshotsSha256": "aa4984e2cf2a77299ab53a2a99fe21c4c0cc8d89c7b7ed1d504811ae0822b497"
+  },
+  "execution": {
+    "command": [
+      "node",
+      "--max-old-space-size=4096",
+      "./node_modules/typescript/bin/tsc",
+      "-b",
+      "tsconfig.host.json"
+    ],
+    "baselineExitCode": 2,
+    "durationSeconds": 46.53,
+    "normalBuildMode": true,
+    "forcedRebuild": false,
+    "patchedLog": "existing workflow-board-legacy-full-build.log",
+    "invalidOldRootOnlyLinkRunExcluded": true,
+    "baselineDiagnostics": [
+      {
+        "file": "scripts/oh-my-dsh.spec.ts",
+        "line": 128,
+        "column": 51,
+        "code": "TS7006",
+        "message": "Parameter 'row' implicitly has an 'any' type."
+      },
+      {
+        "file": "scripts/oh-my-dsh.spec.ts",
+        "line": 133,
+        "column": 43,
+        "code": "TS7006",
+        "message": "Parameter 'row' implicitly has an 'any' type."
+      },
+      {
+        "file": "scripts/oh-my-dsh/tui.ts",
+        "line": 145,
+        "column": 3,
+        "code": "TS2375",
+        "message": "Type '{ sessionId: string | undefined; exitCode: number; }' is not assignable to type 'TurnResult' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties."
+      }
+    ],
+    "patchedDiagnostics": [
+      {
+        "file": "scripts/oh-my-dsh.spec.ts",
+        "line": 128,
+        "column": 51,
+        "code": "TS7006",
+        "message": "Parameter 'row' implicitly has an 'any' type."
+      },
+      {
+        "file": "scripts/oh-my-dsh.spec.ts",
+        "line": 133,
+        "column": 43,
+        "code": "TS7006",
+        "message": "Parameter 'row' implicitly has an 'any' type."
+      },
+      {
+        "file": "scripts/oh-my-dsh/tui.ts",
+        "line": 145,
+        "column": 3,
+        "code": "TS2375",
+        "message": "Type '{ sessionId: string | undefined; exitCode: number; }' is not assignable to type 'TurnResult' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties."
+      }
+    ],
+    "exactDiagnosticsMatch": true
+  },
+  "environment": {
+    "cleanHome": "existing task-owned legacy-build-home",
+    "path": "pinned Node directory plus standard system directories",
+    "CI": "true",
+    "emptyNpmUserAndGlobalConfigs": true,
+    "providerModelEnvInherited": false,
+    "paidApiRequests": 0,
+    "modelRequests": 0
+  },
+  "cleanup": {
+    "directCompilerProcessAwaited": true,
+    "ownedCompilerProcessRunning": false,
+    "ownTemporaryNamespaceAbsent": true,
+    "ownTemporaryEntriesBeforeRemoval": 1,
+    "baselineSourceUnchanged": true,
+    "baselineGitStatusUnchanged": true,
+    "baselineAndPatchedTreesRetained": "intentional owner request; retain dependencies, outputs and historical diagnostic logs",
+    "userInstalledBinariesOrSettingsModified": false
+  },
+  "timestampUtc": "2026-10-15T06:29:09.028780+00:00",
+  "scope": "legacy workflow-board change on exact historical f97 base; comparison only, not latest upstream CI",
+  "officialSourceIdentity": {
+    "commit": "f97c0438fb1608bbc4c08c88a27344249795ea22",
+    "localGitObjectByteCompared": true,
+    "baselineDetachedHeadExact": true,
+    "remoteLiveFetchClaimed": false
+  },
+  "evidence": {
+    "dependencies.json": {
+      "sha256": "5284c4fa62a9a184453180ac3b90f76612fcba9b9b330d5b11ef255165e16848",
+      "bytes": 401084
+    },
+    "baseline-host-typecheck.stdout.log": {
+      "sha256": "41f72009b7838abaa4ecde3603f420cefe3de8d70f0ac7344c62ab83dda12520",
+      "bytes": 621
+    },
+    "linked-dependencies.json": {
+      "sha256": "aea83cbe074f6ae9bd844964c344de8c012c7fa95317d8b4503e5fde0ffffb7d",
+      "bytes": 2200719
+    },
+    "patched-existing-host-diagnostics.log": {
+      "sha256": "41f72009b7838abaa4ecde3603f420cefe3de8d70f0ac7344c62ab83dda12520",
+      "bytes": 621
+    },
+    "baseline-host-typecheck.stderr.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "originalPatchedFullBuildLog": {
+      "sha256": "58eb4310f3bbc2c32b7b47ce2382f34c8f9e54ec5ed5567ddee479d339a0bc57",
+      "published": "Only matching diagnostic excerpt; original historical log retained by owner."
+    }
+  },
+  "limitations": [
+    "The historical full build remains failing on these three existing host TypeScript diagnostics; baseline comparison does not turn that build green.",
+    "This run compares historical f97 under the pinned dependency/toolchain set; current upstream or platform CI is a separate gate.",
+    "The initial private inspector invocation stopped before typecheck because yaml was not a root dependency; corrected inspector reads the existing single pnpm-store yaml. Product files and dependencies were unchanged."
+  ],
+  "originalReceiptSha256": "e886ee6136e074da95e9392dc6a03cef9d16c0083767b19e8bfb1f5276a38503"
+}

@@ -532,3 +532,43 @@ fn auth_localizes_owned_details_and_preserves_json_and_external_identifiers() {
         assert!(!fixture.0.join(".credentials.yaml").exists());
     }
 }
+
+#[test]
+fn worker_scope_help_ignores_corrupt_settings_without_bypassing_other_commands() {
+    let fixture = Fixture::new("{broken");
+    for args in [
+        vec!["worker-scope", "--help"],
+        vec!["worker-scope", "validate", "--help"],
+        vec!["worker-scope", "policy", "-h"],
+        vec!["help", "worker-scope"],
+    ] {
+        let output = fixture.run(&args);
+        assert!(output.status.success(), "{args:?}: {output:?}");
+        assert!(!output.stdout.is_empty());
+        assert_eq!(fixture.read(), "{broken");
+    }
+    for args in [
+        vec!["--help"],
+        vec!["--help", "worker-scope"],
+        vec!["-h", "worker-scope", "validate"],
+        vec!["--help", "help", "worker-scope"],
+        vec!["tokens", "--help"],
+        vec!["tokens", "worker-scope", "--help"],
+        vec!["--profile", "worker-scope", "--help"],
+        vec!["settings", "get", "worker-scope", "--help"],
+        vec!["tokens", "--", "--help"],
+        vec!["settings", "get", "--", "--help"],
+    ] {
+        let output = fixture.run(&args);
+        assert!(
+            !output.status.success(),
+            "literal flag bypassed corrupt settings: {args:?}"
+        );
+        assert!(output.stdout.is_empty());
+        assert_eq!(fixture.read(), "{broken");
+    }
+    let valid = Fixture::new(r#"{"general":{"language":"ja"}}"#);
+    let output = valid.run(&["worker-scope", "--help"]);
+    assert!(output.status.success(), "{output:?}");
+    assert!(String::from_utf8_lossy(&output.stdout).contains("ワーカー作業範囲"));
+}

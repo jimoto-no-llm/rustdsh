@@ -1,0 +1,134 @@
+{
+  "schema": 1,
+  "timestampUtc": "2026-10-15T06:39:09.184243+00:00",
+  "scope": "Worker-scope native localization after fixed upstream a2c0827 merge; source ownership only four listed files",
+  "ownedSourceSha256": {
+    "src/worker_scopes.rs": "fe4f21809e826b01dc41321ed8ec4d1016d743ad71c3a2351fbdc1cbf922f9d5",
+    "src/locale.rs": "c8609a861746a56a20f4d27d73702dfe395206c1976988a395a095ac569fdc3d",
+    "tests/worker_scopes.rs": "22c238ae643bf3c6ecedabeef5cc75535fe9b48f6b9bf84f4d162315c2630c6c",
+    "docs/ARCHITECTURE.md": "f775e4c32bc72bfb596a2e939f8feefe8acc9fd081f0eb9585e06311802ff4df"
+  },
+  "sourceFrozen": true,
+  "committedOrStagedByWorker": false,
+  "implementation": {
+    "cmdSignatures": [
+      "cmd_validate(Locale)",
+      "cmd_policy(Locale)"
+    ],
+    "newEnglishChineseJapaneseDiagnostics": 28,
+    "helpHome": "Root-owned main.rs localized_command_about only; no duplicate dictionary entries",
+    "canonicalEngineFromDeclarationResultThroughTestsByteUnchanged": true,
+    "canonicalEngineSha256": "fd6ff78024c0e34ae10da2ec25d8e8fbc34b776d02ef868193cb57fb32ac99e3",
+    "machineCodesPathsJsonValuesUnchanged": true,
+    "inputLimitBytes": 2097152,
+    "policyArrayLimit": 4096,
+    "nativeFailureExitCode": 2,
+    "unknownOperatingSystemAndParserReasonsRaw": true
+  },
+  "checks": {
+    "realCliCargoIntegration": {
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--test",
+        "worker_scopes"
+      ],
+      "exitCode": 0,
+      "passed": 10,
+      "failed": 0,
+      "ignored": 0,
+      "testDurationSeconds": 1.28,
+      "compileDurationSeconds": 1.69
+    },
+    "formatter": {
+      "command": [
+        "rustfmt",
+        "--edition",
+        "2021",
+        "--check",
+        "src/worker_scopes.rs",
+        "src/locale.rs",
+        "tests/worker_scopes.rs"
+      ],
+      "exitCode": 0
+    },
+    "diffWhitespace": {
+      "command": [
+        "git",
+        "diff",
+        "--check",
+        "--",
+        "src/worker_scopes.rs",
+        "src/locale.rs",
+        "tests/worker_scopes.rs",
+        "docs/ARCHITECTURE.md"
+      ],
+      "exitCode": 0
+    },
+    "redUpstreamModule": {
+      "case": "malformed_worker_scope_documents_have_localized_context_and_raw_parser_reasons",
+      "expectedFailure": "Chinese parse context still English"
+    },
+    "omitLocaleNegative": {
+      "privateModuleRunner": "Real owned module with only locale argument forced to English; repository source unchanged",
+      "sameTestGreenExitCode": 0,
+      "omittedLocaleExitCode": 101,
+      "expectedFailure": "Chinese input parsing context remains English"
+    },
+    "coveredBehavior": [
+      "Literal expected compact JSON bytes in en/zh-CN/ja; Japanese paths and canonical error codes",
+      "Explicit flag and RDSH_LANG precedence with corrupt unrelated settings; ordinary settings command still rejects",
+      "Malformed JSON, invalid UTF-8, wrong root document, oversized stdin, all policy structural fields and batch item limits",
+      "Native help parent and both actions in all three languages through corrupt settings",
+      "Unix real EISDIR/EPIPE descriptors with localized context and unchanged raw OS reasons"
+    ]
+  },
+  "historicalFailures": {
+    "initialActualCli": "8 pass / 1 help fail: root-owned requested_locale opened corrupt settings for Clap DisplayHelp; subsequently fixed by root, final ten tests pass",
+    "initialIoExpectation": "Expected failure during serialize, actual stdout line buffer flushed on newline; test now checks exact write-context; production unchanged"
+  },
+  "cleanup": {
+    "allActualCliChildrenAwaited": true,
+    "ownedFixtureRootsRemovedByDrop": true,
+    "allOwnedPipeDescriptorsConvertedOnceAndClosed": true,
+    "oldAndOmitModuleRunnersNotRunning": true,
+    "privateBuildAndLogsRetainedForOwner": true,
+    "userConfigOrInstalledBinaryChanged": false,
+    "ownedFixturePrefixMatchesAfterRun": 0,
+    "upstreamSettingsFixturePrefixMatchesAfterRun": 0
+  },
+  "nextGate": "Root global format + full fixed-source gates, then actual native Windows final-a2 build and dashboard matrix. This receipt claims only focused Mac gates.",
+  "evidence": {
+    "red.log": {
+      "sha256": "be072fcbf787c6bb37d2a9f503d44f836326c81b1093cab3143c1a3a45c373e1",
+      "originalSha256": "a20e0d0a9f316149c315e549d54740e4687086415a7c91b9b8b9f273490d069f"
+    },
+    "module-green.log": {
+      "sha256": "98302e0c643a467e2e2b8bfe0553f15f9b59370fedf9c27ab3b37e478941b5c2",
+      "originalSha256": "98302e0c643a467e2e2b8bfe0553f15f9b59370fedf9c27ab3b37e478941b5c2"
+    },
+    "omit-locale-negative.log": {
+      "sha256": "420c55a5c3b0558f1d257c4658bdbc6d128445d283cad743223df4f96f7e9ee4",
+      "originalSha256": "5ca0d2a89218ea14f291f3d4697d307d02badffd3d54c8eda08dee0628f7735b"
+    },
+    "focused-rust.log": {
+      "sha256": "9a5f2cb49236053dc7f4d4e88339233c4b7946870166d3dfdefd3efa563d0580",
+      "originalSha256": "1ccc4a310372b8b17d78299f9e3caf96ea2815f6701ec8a7d542f40da537813b"
+    },
+    "focused-io.log": {
+      "sha256": "e73af36fe063a9c7f2970dcf34229ec48560c9b45f699995ed7cdc33c0274ca6",
+      "originalSha256": "c31e6ba83e4bbc7ac2104426ac2e95dcfff6895cacc35b08e5a2daf71aff2b84"
+    },
+    "focused-io-final.log": {
+      "sha256": "0b0200d78356a01695bc117be0a74b92894b814a36717d30ed707ad48cbcdcf4",
+      "originalSha256": "cda2652716f6ecc6a4c12f29523425c9490da2a16d33e4ceb39269daadd0524f"
+    },
+    "focused-rust-final.log": {
+      "sha256": "ee20dc5823e7cef4bf685636efde53bf512ca68279c1ef4a86308cf309630ad0",
+      "originalSha256": "2a0e7140c548e8bb2ef8485349529ae00a8395b808b2183cf9fff1f6434936a5"
+    }
+  },
+  "originalReceiptSha256": "d1608c4602ec43f5cc735df447dca6ff498fd16a3116892a48cb6a035590d4f0",
+  "laterScopeNote": "Owner-local receipt predates main help recovery repairs and final architecture wording. Final integrated product and all-platform checks have their own receipt; its main help result is not inherited."
+}

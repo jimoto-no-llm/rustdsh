@@ -338,6 +338,8 @@ the CLI presentation; their existing JSON strings remain unchanged, including
 malformed or oversized guard-input reasons. Native search continues to refuse
 unsupported non-Unix platforms before accessing the requested directory.
 
+`worker-scope validate` and `worker-scope policy` also localize their help and CLI diagnostics. These pure commands and their help ignore unrelated corrupt settings; ordinary commands and root help still report the settings error. Canonical JSON, policy codes and supplied paths stay unchanged.
+
 ### Protected delegated tools
 
 The opt-in agent tool sandbox supports Linux x86_64 with bubblewrap, prlimit,

@@ -1,0 +1,31 @@
+{
+  "scope": "Actual normal release artifact and exact upstream same malformed input; no models or credentials",
+  "cases": [
+    {
+      "name": "upstream",
+      "binary_sha256": "d009fc92d2cb758b5f9dc513066667c2bc85dee7d025bb09be1893b4ceab5343",
+      "arguments": [
+        "worker-scope",
+        "validate"
+      ],
+      "input_utf8": "not-json",
+      "exit": 2,
+      "stdout": "",
+      "stderr": "[rdsh] error: parse worker scope declarations: expected ident at line 1 column 2\n"
+    },
+    {
+      "name": "candidate",
+      "binary_sha256": "098a955a6fe8c6f2513bb90e9a63d06bb628b816f130e31dd15c591b3e841f31",
+      "arguments": [
+        "--language",
+        "ja",
+        "worker-scope",
+        "validate"
+      ],
+      "input_utf8": "not-json",
+      "exit": 2,
+      "stdout": "",
+      "stderr": "[rdsh] エラー: ワーカー範囲の宣言を解析: expected ident at line 1 column 2\n"
+    }
+  ]
+}

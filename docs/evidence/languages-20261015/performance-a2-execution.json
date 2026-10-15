@@ -1,0 +1,84 @@
+[
+  {
+    "name": "basic",
+    "command": [
+      "python3",
+      "scripts/benchmark.py",
+      "--bin",
+      "<private-artifact>/final-a2-normal-candidate-rdsh",
+      "--baseline",
+      "<private-artifact>/rdsh",
+      "--n",
+      "15",
+      "--output",
+      "<private-artifact>/performance-a2-basic.json"
+    ],
+    "exit": 0,
+    "seconds": 2.820428166000056,
+    "load_before": [
+      5.9375,
+      7.619140625,
+      8.4228515625
+    ],
+    "load_after": [
+      5.8623046875,
+      7.5751953125,
+      8.40234375
+    ],
+    "owned_mac_builds_and_tests_quiescent": true
+  },
+  {
+    "name": "extended",
+    "command": [
+      "target/release/examples/benchmark_extended",
+      "--bin",
+      "<private-artifact>/final-a2-normal-candidate-rdsh",
+      "--baseline",
+      "<private-artifact>/rdsh",
+      "--n",
+      "15",
+      "--output",
+      "<private-artifact>/performance-a2-extended.json"
+    ],
+    "exit": 0,
+    "seconds": 7.892144666999229,
+    "load_before": [
+      5.8623046875,
+      7.5751953125,
+      8.40234375
+    ],
+    "load_after": [
+      6.193359375,
+      7.615234375,
+      8.41162109375
+    ],
+    "owned_mac_builds_and_tests_quiescent": true
+  },
+  {
+    "name": "regression",
+    "command": [
+      "target/release/examples/benchmark_regression",
+      "--bin",
+      "<private-artifact>/final-a2-normal-candidate-rdsh",
+      "--baseline",
+      "<private-artifact>/rdsh",
+      "--n",
+      "15",
+      "--output",
+      "<private-artifact>/performance-a2-regression.json"
+    ],
+    "exit": 0,
+    "seconds": 1.3138317079938133,
+    "load_before": [
+      6.193359375,
+      7.615234375,
+      8.41162109375
+    ],
+    "load_after": [
+      6.193359375,
+      7.615234375,
+      8.41162109375
+    ],
+    "owned_mac_builds_and_tests_quiescent": true
+  }
+]

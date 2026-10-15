@@ -37,6 +37,19 @@ admission; its pure cost-ledger CLI bridge invokes Rust through a private file.
 - Delegation is a verbatim `exec`: zero behavior change by construction.
 - Optimizations must be output-identical (see `tests/regress.sh`).
 
+## Worker-scope validation and policy
+
+`worker-scope validate` reads declarations from stdin; `worker-scope policy`
+evaluates write paths, intersections and shared files in a single stdin batch.
+Both commands return compact canonical JSON without opening settings or
+accessing sessions, credentials or models. Explicit language flags and process
+locale select English, Chinese or Japanese help and CLI-owned diagnostics;
+JSON field names, declaration error codes, path values and policy decisions do
+not change with language. Parser and operating-system error details remain raw
+beneath the localized context. Invalid input keeps the native failure status and
+produces no JSON output. The input limit remains 2 MiB; each policy batch array
+retains its 4096-item limit.
+
 ## Crate layout (`src/`)
 
 | File | Role |

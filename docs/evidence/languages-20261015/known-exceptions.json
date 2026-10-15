@@ -43,12 +43,14 @@
     {
       "id": "local-linux-owned-process-matrix",
       "status": "native-linux-verified-at-recorded-source",
-      "scope": "Focused cgroup/pidfd lifecycle and later ordinary Linux cc019 dashboard 353=342 pass/11 explicit skips; native release Rust 461 pass/13 targets/zero ignored. Later alpha.3 plugin repairs are separate.",
+      "scope": "Final a2 source: native Linux release Rust484/14targets0ignore; Dashboard357/374pass17platformskips; current normal shipping executable additionally passes guarded3/3 and settings16/16.",
       "limits": "WSL2 Ubuntu kernel with existing delegated user manager; no physical-keyboard/IME or production claim.",
       "evidence": [
         "linux-cgroup-native.json",
         "linux-cc019-native.json",
-        "linux-cc019-source.json"
+        "linux-cc019-source.json",
+        "linux-a2-validation.json",
+        "linux-a2-source.json"
       ]
     },
     {
@@ -90,20 +92,27 @@
     {
       "id": "loaded-performance-tail",
       "status": "observed-shared-host-measurement-limit",
-      "scope": "Earlier 8ee/2db loaded streaming-zstd p95 ratio 2.267 is retained. Later cc019 comparison has 13 identical stdout values, median ratios 0.921–1.034 and maximum p95 ratio 1.160. Different baseline/load prevents causal attribution. Final latest-main29 candidate retains all13 identical stdout values, median ratios0.955–1.068 and maxp95ratio1.375; maintained10% median regression gate passes.",
+      "scope": "Earlier 8ee/2db loaded streaming-zstd p95 ratio 2.267 is retained. Later cc019 comparison has 13 identical stdout values, median ratios 0.921–1.034 and maximum p95 ratio 1.160. Different baseline/load prevents causal attribution. Final latest-main29 candidate retains all13 identical stdout values, median ratios0.955–1.068 and maxp95ratio1.375; maintained10% median regression gate passes. Historical a2 test-stage p95max4.691 is retained. Final a2 normal release:13identicalstdout,medianratios0.921–1.015,maxp95ratio2.133; unchanged10%median gate passes.",
       "next_gate": "isolated reproducibility and causal attribution before a speedup/regression claim",
       "evidence": [
         "performance.md",
         "performance-summary.json",
         "performance-cc019-summary.json",
-        "performance-main29-summary.json"
+        "performance-main29-summary.json",
+        "performance-a2-summary.json"
       ]
     },
     {
       "id": "new-head-ci-review-and-release",
       "status": "separate-gates",
-      "scope": "Source commit 8ee5d7f94f221db6135a9b3a3116707cc0fd4511 passed all 26 GitHub checks. The failed native Windows tray-start job passed an unchanged-SHA failed-job retry; the original failure remains recorded. Later evidence-only commits require their own CI. Human review, merge and release remain separate gates. Latest main29 source is locally verified in macos-main29-validation.json and windows-product-cost-ledger.json; its new-head CI is not inherited from these historical runs.",
-      "historical_evidence": "https://github.com/jimoto-no-llm/rustdsh/actions/runs/38675592833/attempts/2"
+      "scope": "Historical8ee source passed26GitHub checks including unchanged-source Windows retry. Final a2 product has current source-bound macOS487/Linux484/Windows450 Rust tests and corresponding normal-artifact smokes. Current PR head CI must be read back after the normal merge commit; it is not inherited. Human re-review, merge and release remain separate.",
+      "historical_evidence": "https://github.com/jimoto-no-llm/rustdsh/actions/runs/38675592833/attempts/2",
+      "evidence": [
+        "macos-a2-validation.json",
+        "linux-a2-validation.json",
+        "linux-serial-fixture-repair.json",
+        "windows-a2-validation.json"
+      ]
     },
     {
       "id": "before-image-source-binding",
@@ -116,22 +125,36 @@
     },
     {
       "id": "windows-protected-request-product",
-      "status": "verified-at-recorded-source",
-      "scope": "actual native product plus Node bridge en/zh-CN/ja,75outercommands57Rustinvocations30ACLobservations",
+      "status": "verified-on-final-normal-release-artifact",
+      "scope": "Final a2 native normal release c65b88...: actual worker30 plus ledger75outercommands57Rustinvocations30ACLobservations, en/zh-CN/ja; no user ACL changes.",
       "evidence": [
         "windows-private-request-focused.json",
-        "windows-product-cost-ledger.json"
+        "windows-product-cost-ledger.json",
+        "windows-a2-validation.json",
+        "windows-a2-cost-ledger.json",
+        "windows-a2-worker-scope.json"
       ],
       "limits": "one native Windows x64 administrator-token context and NTFS; no separate standard-account session or other filesystem claim"
     },
     {
       "id": "protected-official-runtime-matrix",
-      "status": "verified-at-recorded-security-source",
+      "status": "verified-on-final-normal-release-artifact",
       "scope": "Linuxx86_64 actual Rust launcher/official profile/embedded preload/kernel3versions;32ordinarysecurity22MCP6Rust checks,zero skips",
-      "limits": "Matrix binary predates provider-only main29 integration;8guard/test source hashes matchcurrent. Finalwhole-sourceLinux/CI separate.",
+      "limits": "Final normal a2 Linux x86_64 release SHA5e1b83... passes actual3required official profiles/kernel with zero skips. Earlier security32/MCP22/Rust6 remain exact unchanged-source proof, explicitly historical.",
       "evidence": [
-        "linux-guarded-launcher.json"
+        "linux-guarded-launcher.json",
+        "linux-a2-validation.json",
+        "linux-a2-source.json"
       ]
+    },
+    {
+      "id": "frozen-legacy-workflow-board-full-build",
+      "status": "preexisting-errors-reproduced-on-exact-unpatched-baseline",
+      "scope": "Optional workflow-board compatibility on historical upstream f97c0438fb1608bbc4c08c88a27344249795ea22 only; full tsc -b remains failed with three identical diagnostics in untouched oh-my-dsh sources. Current alpha.3 application gates are separate.",
+      "evidence": [
+        "legacy-workflow-board-baseline.json"
+      ],
+      "limits": "49 owner tests and bundle pass do not imply a passing historical full build. No compiler/type safety rule weakened."
     }
   ]
 }

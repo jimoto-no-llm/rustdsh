@@ -1,0 +1,235 @@
+{
+  "schema": 1,
+  "status": "pass",
+  "scope": "Native Windows final a2 product validation; no repository writes or Git operations",
+  "platform": "Windows native x64",
+  "nodeVersion": "24.21.0",
+  "rustcVersion": "1.99.0 (b940084d7)",
+  "cargoVersion": "1.99.0 (5f94df478)",
+  "source": {
+    "files": 1111,
+    "filesDigest": "734e4394ba0d44a2d8732a76b91ceb4d50fe6561710ff5cabd18d1cd87f8ffc7",
+    "baseArchiveSha256": "bc720bcec45327d6acaa9852179a20f41d04040b32470fd3b6aa7a2298cfa0bb",
+    "upstream": "a2c0827c50d7d2ab3cdfe70c94a39e6e6e6a8919",
+    "checkpoint": "25bdfb3776e618403aa5b912fac33f1fe66c704d",
+    "productFreezeFiles": 13,
+    "postExecutionByteEquality": true,
+    "subsequentChangesFromSharedArchive": "Only worker AtomicU64 fixture and serial TCP fixture; product files unchanged"
+  },
+  "fullRust": {
+    "command": "cargo test --release --locked",
+    "exitCode": 0,
+    "targets": 14,
+    "passed": 450,
+    "failed": 0,
+    "ignored": 0,
+    "filtered": 0,
+    "perTarget": [
+      {
+        "target": "unittests src\\main.rs",
+        "passed": 293,
+        "failed": 0,
+        "ignored": 0,
+        "filtered": 0
+      },
+      {
+        "target": "tests\\auth_sharing.rs",
+        "passed": 16,
+        "failed": 0,
+        "ignored": 0,
+        "filtered": 0
+      },
+      {
+        "target": "tests\\cli_localization.rs",
+        "passed": 16,
+        "failed": 0,
+        "ignored": 0,
+        "filtered": 0
+      },
+      {
+        "target": "tests\\cost_ledger_cli.rs",
+        "passed": 13,
+        "failed": 0,
+        "ignored": 0,
+        "filtered": 0
+      },
+      {
+        "target": "tests\\doctor_cli.rs",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "filtered": 0
+      },
+      {
+        "target": "tests\\log_session_boundaries.rs",
+        "passed": 5,
+        "failed": 0,
+        "ignored": 0,
+        "filtered": 0
+      },
+      {
+        "target": "tests\\native_e2e.rs",
+        "passed": 17,
+        "failed": 0,
+        "ignored": 0,
+        "filtered": 0
+      },
+      {
+        "target": "tests\\provider_cli.rs",
+        "passed": 23,
+        "failed": 0,
+        "ignored": 0,
+        "filtered": 0
+      },
+      {
+        "target": "tests\\serial_proxy.rs",
+        "passed": 13,
+        "failed": 0,
+        "ignored": 0,
+        "filtered": 0
+      },
+      {
+        "target": "tests\\settings_cli.rs",
+        "passed": 18,
+        "failed": 0,
+        "ignored": 0,
+        "filtered": 0
+      },
+      {
+        "target": "tests\\subagents_cli.rs",
+        "passed": 8,
+        "failed": 0,
+        "ignored": 0,
+        "filtered": 0
+      },
+      {
+        "target": "tests\\task_outcomes_cli.rs",
+        "passed": 12,
+        "failed": 0,
+        "ignored": 0,
+        "filtered": 0
+      },
+      {
+        "target": "tests\\update_auto_cli.rs",
+        "passed": 6,
+        "failed": 0,
+        "ignored": 0,
+        "filtered": 0
+      },
+      {
+        "target": "tests\\worker_scopes.rs",
+        "passed": 9,
+        "failed": 0,
+        "ignored": 0,
+        "filtered": 0
+      }
+    ]
+  },
+  "serialFocused": {
+    "command": "cargo test --release --locked --test serial_proxy",
+    "passed": 13,
+    "failed": 0,
+    "ignored": 0,
+    "executableRecompiled": true,
+    "beforeSha256": "8918eb84b31d6732edafec251c7d5e8e7b839d35dcd0887d9dc5b45fc51e042e",
+    "afterSha256": "3c71c6f44c0a4efb1066c9a975248d12d5235f86776d38ec5a2822a6e313d989"
+  },
+  "debugFocused": {
+    "targets": [
+      "cli_localization",
+      "settings_cli",
+      "worker_scopes"
+    ],
+    "passed": 43,
+    "failed": 0,
+    "workerWindowsCompiledCases": 9,
+    "unixOnlyWorkerIoCaseCompiled": false,
+    "workerFixtureRecompiled": true
+  },
+  "dashboardFull": {
+    "command": "npm --prefix dashboard test",
+    "tests": 374,
+    "passed": 360,
+    "failed": 0,
+    "skipped": 14,
+    "skipLines": [
+      "・｣ unsupported ownership rejects before ACP execution and retains a confirmed no-child stop (1.3827ms) # Requires an OS without the kernel ownership backend; supported OS lifecycle cases run separately",
+      "・｣ smoke retains a pre-ownership rejection and removes its isolated unused home (0.3089ms) # Requires an OS without the kernel ownership backend; supported OS lifecycle cases run separately",
+      "・｣ missing native process identity keeps Tunnel readiness unconfirmed without probing its URL (0.4418ms) # Requires a platform without the native process identity reader",
+      "・｣ cost-ledger CLI invokes rdsh with a private temporary request file (1.0751ms) # SKIP",
+      "・｣ Darwin observes an external fixture with a rechecked owner without signalling it (0.6895ms) # SKIP",
+      "・｣ POSIX request lease preserves UTF-8 JSON, mode 0600 and exact disposal (1.2455ms) # SKIP",
+      "・｣ framed supervisor drains queued child output before input-close exit (0.1336ms) # SKIP",
+      "・｣ installer dry run previews rdsh-docs without creating a DSH home (0.6074ms) # the source skill installer is POSIX shell",
+      "・｣ installer copies rdsh-docs and keeps forced-refresh backups outside skill discovery (0.1743ms) # the source skill installer is POSIX shell",
+      "・｣ legacy subagents command forwards arguments and exit status (0.3261ms) # SKIP",
+      "・｣ legacy subagents command skips a non-executable PATH candidate (0.206ms) # SKIP",
+      "・｣ legacy task-outcomes command forwards arguments and exit status (0.3097ms) # SKIP",
+      "・｣ legacy task-outcomes command forwards the successful exit status (0.1633ms) # SKIP",
+      "・｣ legacy task-outcomes command skips non-executable rdsh candidates on Unix (1.5468ms) # SKIP"
+    ],
+    "stage": "Shared final product snapshot before two Rust test-only fixture overlays",
+    "binaryProfile": "actual debug Cargo test dependency graph"
+  },
+  "normalDebugCompat": {
+    "tests": 20,
+    "passed": 20,
+    "failed": 0,
+    "skipped": 0,
+    "binarySha256": "2e1f812bd43fc56f6ba4220be7a3bbb90a9b9d0ad210e961698c09b1b8a0d1b6"
+  },
+  "finalNormalRelease": {
+    "command": "cargo build --release --locked",
+    "exitCode": 0,
+    "sha256": "c65b88c9ffd11b998d1e9124007c40b2e162e69796caf2b4b7d6a97856d0fbef",
+    "testDependencyGraphSha256": "c7e7fed955c8ef9655865b4f63d86f60c828455400d4f8eba6d7c92d991b9a9b",
+    "binaryCopiedAndHashVerifiedLocally": true,
+    "normalBinaryDifferedFromPrior": true,
+    "actualSmokesRepeatedForNewNormal": true,
+    "workerScopeCommands": 30,
+    "ledgerOuterCommands": 75,
+    "ledgerRustProcesses": 57,
+    "protectedAclObservations": 30,
+    "languages": [
+      "en",
+      "zh-CN",
+      "ja"
+    ]
+  },
+  "retainedFailures": {
+    "initialFullReleaseExit": 101,
+    "case": "serial_proxy::mock_upstream_consumes_chunked_bodies_and_trailers_before_closing",
+    "error": "Windows 10054 ConnectionReset in read_to_string",
+    "failedTargetBeforeRepair": {
+      "passed": 12,
+      "failed": 1
+    },
+    "fixedTestSha256": "c88811976fb2e2ddda976d10c6c0db179e030135332414b993b97a7a0fc24468",
+    "historicalNormalSha256": "5bb8bb372fd27a7e8c0322dace3e07c8c830f8cb98b2eb243c72e2b38a9d5e94",
+    "historicalTestDependencyGraphSha256": "f85c41024441a4ceeaeb51ebb2c12d580d24bc5ac101455e1c9356c921a04b88",
+    "notCountedAsPassing": true
+  },
+  "transport": {
+    "oneLongSshKeepaliveTimeout": true,
+    "controllerContinuedAndPersistedCompletion": true,
+    "noDuplicateLongJobStarted": true,
+    "laterCommandsSshExit0": true,
+    "globalSshOrHostSettingsChanged": false
+  },
+  "safety": {
+    "existingUserSettingsAclsDataChanged": false,
+    "installedBinariesChanged": false,
+    "unrelatedProcessesModified": 0,
+    "modelRequests": 0,
+    "paidApiRequests": 0,
+    "ownedRootsAndControllersRemoved": true,
+    "ownedProcessesBeforeCleanup": 0
+  },
+  "limits": [
+    "Existing SSH user context; no separate standard-user login.",
+    "Platform skips remain skips; native Rust 450 is the Windows compiled denominator, not Linux/Mac count.",
+    "Full Dashboard used the same product sources before only Rust fixture changes; normal debug consumer compatibility was separately tested.",
+    "CI/current PR head is a separate parent-owned gate."
+  ],
+  "completedUtc": "2026-10-15T07:29:16.3866791Z"
+}

@@ -1,0 +1,124 @@
+{
+  "scope": "Native Linux serial-proxy target validation after test-only graceful TCP closure repair; augments prior final484-case acceptance",
+  "date": "2026-10-15",
+  "source": {
+    "head": "25bdfb3776e618403aa5b912fac33f1fe66c704d",
+    "pendingMergeHead": "a2c0827c50d7d2ab3cdfe70c94a39e6e6e6a8919",
+    "privateBeforeManifestSha256": "7f54a6040fd45ec419401c50657d72204d2c9cc15446a464222e7f71d3e5edf7",
+    "privateFinalManifestSha256": "7c8efc44e8589f3118695c7894b53c997b1a666ac683b2b629b23ebd90bfe7bb",
+    "sourceRecordsFile": "linux-serial-fixture-source.json",
+    "sourceRecordsSha256": "264aecafa5eb9b8446ca108806e325f9297ebc0a2d17a99b6d08bfcbf9753a8d",
+    "verifiedFiles": 1111,
+    "onlyChangedRecord": {
+      "file": "tests/serial_proxy.rs",
+      "beforeSha256": "f72766243bf7a515858f397b983cd32207e724de8d8f6d5c1da5d26591543203",
+      "sha256": "c88811976fb2e2ddda976d10c6c0db179e030135332414b993b97a7a0fc24468"
+    },
+    "productSourceBytesUnchanged": true,
+    "fixtureMtimeRefreshedBeforeCompilation": true
+  },
+  "host": {
+    "os": "Linux",
+    "surface": "already-running WSL Ubuntu",
+    "arch": "x86_64",
+    "uid": 1000,
+    "existingRustAndPrivateDependencyCacheUsed": true
+  },
+  "test": {
+    "command": "cargo test --release --locked --offline -j2 --test serial_proxy",
+    "exit": 0,
+    "passed": 13,
+    "failed": 0,
+    "ignored": 0,
+    "cases": [
+      "invalid_serial_proxy_options_exit_with_usage_status",
+      "mock_upstream_consumes_chunked_bodies_and_trailers_before_closing",
+      "disconnect_during_sse_releases_slot_and_cancels_upstream_stream",
+      "disconnect_while_waiting_for_rpm_releases_slot_without_dispatch",
+      "closed_stderr_does_not_abort_startup_or_tool_choice_streaming",
+      "ipv6_upstream_host_header_keeps_exactly_one_pair_of_brackets",
+      "serial_proxy_runs_when_binary_is_invoked_as_dsh",
+      "native_cli_rpm_window_is_reported_and_waiter_times_out",
+      "serial_proxy_runtime_startup_failure_keeps_runtime_status",
+      "native_cli_queue_timeout_returns_503_without_dispatching_waiter",
+      "disconnect_while_queued_removes_waiter_before_slot_opens",
+      "native_cli_caps_upstream_concurrency_and_rejects_full_queue",
+      "native_cli_rewrites_tool_choice_and_streams_sse"
+    ],
+    "explicitCompilationObserved": true,
+    "testArtifactSha256": "e78d466d0eee8dc38deaad3e9723d8061c26bddd59ae4fa780252cbe74e70b82",
+    "existingTimeoutsAndAssertionsPreserved": true,
+    "newAssertion": "Complete chunked HTTP response retains the terminal zero chunk; read_to_string still fails on reset",
+    "covers": [
+      "direct chunked requests and trailers",
+      "intentional SSE client cancellation",
+      "queued and RPM-wait cancellation",
+      "queue timeout and capacity",
+      "concurrency cap",
+      "IPv6 Host header",
+      "closed stderr",
+      "runtime startup failure",
+      "CLI invocation and usage status"
+    ]
+  },
+  "artifactSeparation": {
+    "normalReleaseBeforeSha256": "5e1b83dc413253d8f725c0fcd867de28d9f9bd621a566d2c89e160bf9a66c2d4",
+    "normalReleaseRestoredSha256": "5e1b83dc413253d8f725c0fcd867de28d9f9bd621a566d2c89e160bf9a66c2d4",
+    "normalReleaseExplicitlyRecompiled": true,
+    "normalDebugBeforeAndAfterSha256": "77b6a50750fdb91f57f57283f356079c1e3224d675d9a61f8f294e348086442c",
+    "cargoTestStageSha256": "e78d466d0eee8dc38deaad3e9723d8061c26bddd59ae4fa780252cbe74e70b82",
+    "ownedPreservedArtifacts": [
+      "preserved-normal-shipping-rdsh",
+      "preserved-cargo-test-stage-rdsh"
+    ],
+    "restoreCommands": [
+      "cargo clean --release --package rdsh",
+      "cargo build --release --locked --offline -j2"
+    ],
+    "invalidationScope": "Only owned rdsh release package artifacts; dependency cache and normal debug binary retained"
+  },
+  "priorAcceptanceReuse": {
+    "receiptSha256": "e7f8e26f62373c321cb2c02a0f2cab9889e03609ab41dde55f1af6ae737d751b",
+    "basis": "Only this fixture changed; normal shipping binary is SHA-identical after rebuild",
+    "normalShippingActualOfficialMatrix": {
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "reusedByBinarySha256": "5e1b83dc413253d8f725c0fcd867de28d9f9bd621a566d2c89e160bf9a66c2d4",
+      "rerunAfterThisFixtureOnlyChange": false
+    },
+    "normalDebugDashboard": {
+      "tests": 374,
+      "passed": 357,
+      "failed": 0,
+      "platformSkipped": 17,
+      "reusedByBinarySha256": "77b6a50750fdb91f57f57283f356079c1e3224d675d9a61f8f294e348086442c"
+    },
+    "rustDistinctCases": 484,
+    "counting": "These13 replace previously executed members of484; they are not13 additional distinct tests"
+  },
+  "cleanup": {
+    "ownedSerialProcessesRemaining": 0,
+    "ownedSerialFixtureDirectoriesRemaining": 0,
+    "sourceFilesReverifiedAfterTestAndRestore": 1111,
+    "installedAppsOrServicesChanged": false,
+    "canonicalRepositoryWrites": 0
+  },
+  "modelRequests": 0,
+  "externalPaidRequests": 0,
+  "logRecords": [
+    {
+      "file": "owned-release-package-invalidation.log",
+      "sha256": "4694b2e36260e264c255147da272d2f78e67be40fafd9124ff9426705785b92a"
+    },
+    {
+      "file": "restored-normal-release-build.log",
+      "sha256": "35dca7cda69af72eccf8291b294a79c1cabc4f82dfec4afccd33587a36bce84f"
+    },
+    {
+      "file": "serial-proxy-native-linux.log",
+      "sha256": "8d177ff87151d64eb99fbecd505e0e9afc9a1515b299709e22060d4f2619b311"
+    }
+  ],
+  "originalPortableReceiptSha256": "81118d86911d1084b8452c7eba62b6044b935257315d94ef227d994764073522"
+}

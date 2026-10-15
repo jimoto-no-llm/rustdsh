@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "checks": [
+    {
+      "schema": 1,
+      "status": "pass",
+      "sourceFilesVerifiedBeforeCleanup": 1111,
+      "oldCancelledSourceFilesVerifiedBeforeCleanup": 1111,
+      "debugBinarySha256": "2e1f812bd43fc56f6ba4220be7a3bbb90a9b9d0ad210e961698c09b1b8a0d1b6",
+      "releaseBinarySha256": "c65b88c9ffd11b998d1e9124007c40b2e162e69796caf2b4b7d6a97856d0fbef",
+      "cargoTestStageReleaseSha256": "c7e7fed955c8ef9655865b4f63d86f60c828455400d4f8eba6d7c92d991b9a9b",
+      "finalOwnedQaRootAbsent": true,
+      "finalOwnedTransferRootAbsent": true,
+      "oldCancelledQaRootAbsent": true,
+      "oldCancelledTransferRootAbsent": true,
+      "existingSettingsAclsDataChanged": false,
+      "installedBinariesChanged": false,
+      "modelRequests": 0
+    },
+    {
+      "ownedProcessesBeforeCleanup": 0,
+      "unrelatedProcessesModified": 0
+    }
+  ],
+  "controllersRemoved": true,
+  "localEvidenceRetained": true
+}

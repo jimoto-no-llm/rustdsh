@@ -1,0 +1,46 @@
+{
+  "scope": "Test-only serial-proxy mock graceful-close repair; product sources remain identical",
+  "file": "tests/serial_proxy.rs",
+  "sha256": "c88811976fb2e2ddda976d10c6c0db179e030135332414b993b97a7a0fc24468",
+  "repair": [
+    "Borrow the one TCP socket rather than cloning its owned descriptor",
+    "Explicit Write half-close on mock response and direct-test request",
+    "Keep read_to_string failure assertion; require both SSE events and terminal chunk"
+  ],
+  "initialWindowsFailure": {
+    "code": 10054,
+    "kind": "ConnectionReset",
+    "fullRunExit": 101,
+    "targetsExecuted": 9,
+    "passed": 396,
+    "failed": 1,
+    "laterTargets": "not executed by the stopped initial full run"
+  },
+  "rootCauseLimit": "Exact Windows kernel/provider cause is not asserted; acceptance is the repaired native tests.",
+  "platforms": {
+    "macOS": {
+      "passed": 13,
+      "exit": 0,
+      "receipt": "macos-a2-validation.json"
+    },
+    "Linux": {
+      "passed": 13,
+      "exit": 0,
+      "receipt": "linux-serial-fixture-repair.json"
+    },
+    "Windows": {
+      "passed": 13,
+      "exit": 0,
+      "receipt": "windows-a2-validation.json"
+    }
+  },
+  "windowsFinalFullRust": {
+    "passed": 450,
+    "targets": 14,
+    "failed": 0,
+    "ignored": 0
+  },
+  "assertionsWeakened": false,
+  "newSleepOrRetryOrTimeoutChange": false,
+  "primaryReference": "https://learn.microsoft.com/en-us/windows/win32/winsock/graceful-shutdown-linger-options-and-socket-closure-2"
+}

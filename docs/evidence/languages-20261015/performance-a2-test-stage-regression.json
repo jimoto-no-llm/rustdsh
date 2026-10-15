@@ -1,0 +1,238 @@
+{
+  "schema_version": 2,
+  "tool": "benchmark_regression",
+  "generated_at_utc": 1792047371,
+  "platform": {
+    "os": "macos",
+    "arch": "aarch64",
+    "family": "unix",
+    "cpu_count": 18
+  },
+  "toolchain": {
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "cargo": "cargo 1.99.0 (5f94df478 2026-08-27)"
+  },
+  "config": {
+    "n": 15,
+    "warmups": 3,
+    "max_regression_percent": 10.0,
+    "headline_cases": [
+      "version_startup",
+      "tokens_1mib",
+      "tokens_10mib",
+      "search_tree_200_files"
+    ],
+    "timing": "parent wall clock from spawn to last stdout byte; process launch included",
+    "scope": "real rdsh subprocess with per-build isolated HOME/DSH_HOME/XDG and working directories; no model calls and no credentials",
+    "fixtures": {
+      "tokens_1mib_bytes": 1048652,
+      "tokens_10mib_bytes": 10485812,
+      "search_tree_files": 200,
+      "search_tree_bytes": 2776584
+    }
+  },
+  "binaries": {
+    "candidate": {
+      "path": "<private-artifact>/final-a2-candidate-rdsh",
+      "size_bytes": 4412400,
+      "sha256": "5e3cc1e4b4c01aa35de0c55b0d4711c89a689b2a974ae5fc5f5449a7e991c4e2"
+    },
+    "baseline": {
+      "path": "/private/var/folders/th/b4c841yj4vsfd0cp40pwkbnd_1cjj0/T/rdsh-main-a2-perf-baseline-as74edpo/target/release/rdsh",
+      "size_bytes": 4230704,
+      "sha256": "d009fc92d2cb758b5f9dc513066667c2bc85dee7d025bb09be1893b4ceab5343"
+    }
+  },
+  "cases": {
+    "version_startup": {
+      "samples_ms": [
+        5.573,
+        5.423,
+        5.351,
+        5.513,
+        40.017,
+        4.559,
+        7.146,
+        5.2,
+        4.493,
+        3.899,
+        3.735,
+        3.574,
+        3.738,
+        3.662,
+        4.402
+      ],
+      "median_ms": 4.559,
+      "p95_ms": 40.017,
+      "min_ms": 3.574,
+      "max_ms": 40.017,
+      "throughput_mib_s": null,
+      "correct": true,
+      "evidence": "version=0.4.0",
+      "input_bytes": 0,
+      "cpu_median_ms": 1.859,
+      "peak_rss_bytes": 3080192,
+      "exit_code": 0,
+      "argv": [
+        "--version"
+      ],
+      "comparison": {
+        "baseline_label": "binary:/private/var/folders/th/b4c841yj4vsfd0cp40pwkbnd_1cjj0/T/rdsh-main-a2-perf-baseline-as74edpo/target/release/rdsh",
+        "baseline_median_ms": 4.425,
+        "ratio": 1.03,
+        "delta_percent": 3.032,
+        "stdout_equal": true,
+        "output_compatible": true,
+        "regressed": false
+      },
+      "outcome": "ok",
+      "headline": true
+    },
+    "tokens_1mib": {
+      "samples_ms": [
+        3.945,
+        5.079,
+        4.66,
+        4.582,
+        5.732,
+        5.393,
+        5.747,
+        6.174,
+        4.931,
+        5.679,
+        6.554,
+        6.118,
+        5.702,
+        5.042,
+        5.86
+      ],
+      "median_ms": 5.679,
+      "p95_ms": 6.554,
+      "min_ms": 3.945,
+      "max_ms": 6.554,
+      "throughput_mib_s": 176.095,
+      "correct": true,
+      "evidence": "tokens=262163",
+      "input_bytes": 1048652,
+      "cpu_median_ms": 2.052,
+      "peak_rss_bytes": null,
+      "exit_code": 0,
+      "argv": [
+        "tokens",
+        "<private-artifact>/tokens-1mib.txt",
+        "--preview",
+        "0"
+      ],
+      "comparison": {
+        "baseline_label": "binary:/private/var/folders/th/b4c841yj4vsfd0cp40pwkbnd_1cjj0/T/rdsh-main-a2-perf-baseline-as74edpo/target/release/rdsh",
+        "baseline_median_ms": 6.034,
+        "ratio": 0.941,
+        "delta_percent": -5.878,
+        "stdout_equal": true,
+        "output_compatible": true,
+        "regressed": false
+      },
+      "outcome": "ok",
+      "headline": true
+    },
+    "tokens_10mib": {
+      "samples_ms": [
+        7.555,
+        7.153,
+        7.478,
+        7.485,
+        7.848,
+        7.756,
+        7.866,
+        7.23,
+        6.885,
+        7.845,
+        7.788,
+        6.901,
+        7.434,
+        7.724,
+        7.283
+      ],
+      "median_ms": 7.485,
+      "p95_ms": 7.866,
+      "min_ms": 6.885,
+      "max_ms": 7.866,
+      "throughput_mib_s": 1336.072,
+      "correct": true,
+      "evidence": "tokens=2621453",
+      "input_bytes": 10485812,
+      "cpu_median_ms": 3.52,
+      "peak_rss_bytes": null,
+      "exit_code": 0,
+      "argv": [
+        "tokens",
+        "<private-artifact>/tokens-10mib.txt",
+        "--preview",
+        "0"
+      ],
+      "comparison": {
+        "baseline_label": "binary:/private/var/folders/th/b4c841yj4vsfd0cp40pwkbnd_1cjj0/T/rdsh-main-a2-perf-baseline-as74edpo/target/release/rdsh",
+        "baseline_median_ms": 7.823,
+        "ratio": 0.957,
+        "delta_percent": -4.327,
+        "stdout_equal": true,
+        "output_compatible": true,
+        "regressed": false
+      },
+      "outcome": "ok",
+      "headline": true
+    },
+    "search_tree_200_files": {
+      "samples_ms": [
+        8.454,
+        8.744,
+        8.442,
+        8.609,
+        8.977,
+        8.453,
+        10.098,
+        8.363,
+        9.086,
+        9.139,
+        7.887,
+        8.706,
+        7.637,
+        8.483,
+        8.794
+      ],
+      "median_ms": 8.609,
+      "p95_ms": 10.098,
+      "min_ms": 7.637,
+      "max_ms": 10.098,
+      "throughput_mib_s": 307.592,
+      "correct": true,
+      "evidence": "hits=200",
+      "input_bytes": 0,
+      "cpu_median_ms": 18.562,
+      "peak_rss_bytes": null,
+      "exit_code": 0,
+      "argv": [
+        "search",
+        "regression-needle",
+        "--dir",
+        "<private-artifact>/search-tree",
+        "--max",
+        "210"
+      ],
+      "comparison": {
+        "baseline_label": "binary:/private/var/folders/th/b4c841yj4vsfd0cp40pwkbnd_1cjj0/T/rdsh-main-a2-perf-baseline-as74edpo/target/release/rdsh",
+        "baseline_median_ms": 8.904,
+        "ratio": 0.967,
+        "delta_percent": -3.317,
+        "stdout_equal": true,
+        "output_compatible": true,
+        "regressed": false
+      },
+      "outcome": "ok",
+      "headline": true
+    }
+  },
+  "failures": [],
+  "regressions": [],
+  "artifact_scope": "Historical Cargo test-stage executable, SHA5e3cc1e4..., before subsequent normal release098a955a...; never substituted for normal shipping artifact."
+}

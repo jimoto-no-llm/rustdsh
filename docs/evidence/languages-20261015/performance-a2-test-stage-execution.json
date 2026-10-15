@@ -1,0 +1,87 @@
+{
+  "artifact_scope": "Historical Cargo test-stage executable, not final normal release",
+  "executions": [
+    {
+      "name": "basic",
+      "command": [
+        "python3",
+        "scripts/benchmark.py",
+        "--bin",
+        "<private-artifact>/final-a2-candidate-rdsh",
+        "--baseline",
+        "<private-artifact>/rdsh",
+        "--n",
+        "15",
+        "--output",
+        "<private-artifact>/performance-a2-basic.json"
+      ],
+      "exit": 0,
+      "seconds": 3.062001957994653,
+      "load_before": [
+        10.4130859375,
+        10.02294921875,
+        9.4765625
+      ],
+      "load_after": [
+        10.4599609375,
+        10.0390625,
+        9.4853515625
+      ],
+      "owned_mac_builds_and_tests_quiescent": true
+    },
+    {
+      "name": "extended",
+      "command": [
+        "target/release/examples/benchmark_extended",
+        "--bin",
+        "<private-artifact>/final-a2-candidate-rdsh",
+        "--baseline",
+        "<private-artifact>/rdsh",
+        "--n",
+        "15",
+        "--output",
+        "<private-artifact>/performance-a2-extended.json"
+      ],
+      "exit": 0,
+      "seconds": 7.474740541998472,
+      "load_before": [
+        10.4599609375,
+        10.0390625,
+        9.4853515625
+      ],
+      "load_after": [
+        9.61376953125,
+        9.8720703125,
+        9.4326171875
+      ],
+      "owned_mac_builds_and_tests_quiescent": true
+    },
+    {
+      "name": "regression",
+      "command": [
+        "target/release/examples/benchmark_regression",
+        "--bin",
+        "<private-artifact>/final-a2-candidate-rdsh",
+        "--baseline",
+        "<private-artifact>/rdsh",
+        "--n",
+        "15",
+        "--output",
+        "<private-artifact>/performance-a2-regression.json"
+      ],
+      "exit": 0,
+      "seconds": 1.4840284170059022,
+      "load_before": [
+        9.61376953125,
+        9.8720703125,
+        9.4326171875
+      ],
+      "load_after": [
+        9.61376953125,
+        9.8720703125,
+        9.4326171875
+      ],
+      "owned_mac_builds_and_tests_quiescent": true
+    }
+  ]
+}

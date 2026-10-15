@@ -1,0 +1,1467 @@
+{
+  "schema": 1,
+  "status": "pass",
+  "modelRequests": 0,
+  "paidApiRequests": 0,
+  "nodeVersion": "v24.21.0",
+  "architecture": "x64",
+  "binarySha256": "c65b88c9ffd11b998d1e9124007c40b2e162e69796caf2b4b7d6a97856d0fbef",
+  "actualProductBinary": true,
+  "referenceCommands": 9,
+  "bridgeCommands": 60,
+  "ordinaryFailClosedCommands": 6,
+  "protectedAclObservations": 30,
+  "observations": [
+    {
+      "action": "validate",
+      "requestBytes": 181,
+      "requestSha256": "21ba9e7fb0520f6ab9f126133891b7309e0c7b5581a6623029821d82cec9bdf0",
+      "acl": {
+        "owner": "CURRENT_USER",
+        "protected": true,
+        "rules": [
+          {
+            "role": "SYSTEM",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "ADMINISTRATORS",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "CURRENT_USER",
+            "allow": true,
+            "inherited": false
+          }
+        ]
+      }
+    },
+    {
+      "action": "public",
+      "requestBytes": 179,
+      "requestSha256": "74ea2f23e9193d5cf5603c1cad92ec54b4f923994bd95615817fd736d2717d6a",
+      "acl": {
+        "owner": "CURRENT_USER",
+        "protected": true,
+        "rules": [
+          {
+            "role": "SYSTEM",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "ADMINISTRATORS",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "CURRENT_USER",
+            "allow": true,
+            "inherited": false
+          }
+        ]
+      }
+    },
+    {
+      "action": "schema",
+      "requestBytes": 179,
+      "requestSha256": "b39b9fe9f2caa20aabf3488ad8e4f528fbc7a7cb8f83b3219e53f6053aa0a245",
+      "acl": {
+        "owner": "CURRENT_USER",
+        "protected": true,
+        "rules": [
+          {
+            "role": "SYSTEM",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "ADMINISTRATORS",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "CURRENT_USER",
+            "allow": true,
+            "inherited": false
+          }
+        ]
+      }
+    },
+    {
+      "action": "validate",
+      "requestBytes": 179,
+      "requestSha256": "b39b9fe9f2caa20aabf3488ad8e4f528fbc7a7cb8f83b3219e53f6053aa0a245",
+      "acl": {
+        "owner": "CURRENT_USER",
+        "protected": true,
+        "rules": [
+          {
+            "role": "SYSTEM",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "ADMINISTRATORS",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "CURRENT_USER",
+            "allow": true,
+            "inherited": false
+          }
+        ]
+      }
+    },
+    {
+      "action": "validate",
+      "requestBytes": 181,
+      "requestSha256": "5f3c62ad9ac628dd2427b9fedc4248f9fd979dbafc5032c4061d2cdb1806e89e",
+      "acl": {
+        "owner": "CURRENT_USER",
+        "protected": true,
+        "rules": [
+          {
+            "role": "SYSTEM",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "ADMINISTRATORS",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "CURRENT_USER",
+            "allow": true,
+            "inherited": false
+          }
+        ]
+      }
+    },
+    {
+      "action": "validate",
+      "requestBytes": 181,
+      "requestSha256": "21ba9e7fb0520f6ab9f126133891b7309e0c7b5581a6623029821d82cec9bdf0",
+      "acl": {
+        "owner": "CURRENT_USER",
+        "protected": true,
+        "rules": [
+          {
+            "role": "SYSTEM",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "ADMINISTRATORS",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "CURRENT_USER",
+            "allow": true,
+            "inherited": false
+          }
+        ]
+      }
+    },
+    {
+      "action": "public",
+      "requestBytes": 179,
+      "requestSha256": "74ea2f23e9193d5cf5603c1cad92ec54b4f923994bd95615817fd736d2717d6a",
+      "acl": {
+        "owner": "CURRENT_USER",
+        "protected": true,
+        "rules": [
+          {
+            "role": "SYSTEM",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "ADMINISTRATORS",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "CURRENT_USER",
+            "allow": true,
+            "inherited": false
+          }
+        ]
+      }
+    },
+    {
+      "action": "schema",
+      "requestBytes": 179,
+      "requestSha256": "b39b9fe9f2caa20aabf3488ad8e4f528fbc7a7cb8f83b3219e53f6053aa0a245",
+      "acl": {
+        "owner": "CURRENT_USER",
+        "protected": true,
+        "rules": [
+          {
+            "role": "SYSTEM",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "ADMINISTRATORS",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "CURRENT_USER",
+            "allow": true,
+            "inherited": false
+          }
+        ]
+      }
+    },
+    {
+      "action": "validate",
+      "requestBytes": 179,
+      "requestSha256": "b39b9fe9f2caa20aabf3488ad8e4f528fbc7a7cb8f83b3219e53f6053aa0a245",
+      "acl": {
+        "owner": "CURRENT_USER",
+        "protected": true,
+        "rules": [
+          {
+            "role": "SYSTEM",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "ADMINISTRATORS",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "CURRENT_USER",
+            "allow": true,
+            "inherited": false
+          }
+        ]
+      }
+    },
+    {
+      "action": "validate",
+      "requestBytes": 181,
+      "requestSha256": "5f3c62ad9ac628dd2427b9fedc4248f9fd979dbafc5032c4061d2cdb1806e89e",
+      "acl": {
+        "owner": "CURRENT_USER",
+        "protected": true,
+        "rules": [
+          {
+            "role": "SYSTEM",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "ADMINISTRATORS",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "CURRENT_USER",
+            "allow": true,
+            "inherited": false
+          }
+        ]
+      }
+    },
+    {
+      "action": "validate",
+      "requestBytes": 181,
+      "requestSha256": "21ba9e7fb0520f6ab9f126133891b7309e0c7b5581a6623029821d82cec9bdf0",
+      "acl": {
+        "owner": "CURRENT_USER",
+        "protected": true,
+        "rules": [
+          {
+            "role": "SYSTEM",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "ADMINISTRATORS",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "CURRENT_USER",
+            "allow": true,
+            "inherited": false
+          }
+        ]
+      }
+    },
+    {
+      "action": "public",
+      "requestBytes": 179,
+      "requestSha256": "74ea2f23e9193d5cf5603c1cad92ec54b4f923994bd95615817fd736d2717d6a",
+      "acl": {
+        "owner": "CURRENT_USER",
+        "protected": true,
+        "rules": [
+          {
+            "role": "SYSTEM",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "ADMINISTRATORS",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "CURRENT_USER",
+            "allow": true,
+            "inherited": false
+          }
+        ]
+      }
+    },
+    {
+      "action": "schema",
+      "requestBytes": 179,
+      "requestSha256": "b39b9fe9f2caa20aabf3488ad8e4f528fbc7a7cb8f83b3219e53f6053aa0a245",
+      "acl": {
+        "owner": "CURRENT_USER",
+        "protected": true,
+        "rules": [
+          {
+            "role": "SYSTEM",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "ADMINISTRATORS",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "CURRENT_USER",
+            "allow": true,
+            "inherited": false
+          }
+        ]
+      }
+    },
+    {
+      "action": "validate",
+      "requestBytes": 179,
+      "requestSha256": "b39b9fe9f2caa20aabf3488ad8e4f528fbc7a7cb8f83b3219e53f6053aa0a245",
+      "acl": {
+        "owner": "CURRENT_USER",
+        "protected": true,
+        "rules": [
+          {
+            "role": "SYSTEM",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "ADMINISTRATORS",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "CURRENT_USER",
+            "allow": true,
+            "inherited": false
+          }
+        ]
+      }
+    },
+    {
+      "action": "validate",
+      "requestBytes": 181,
+      "requestSha256": "5f3c62ad9ac628dd2427b9fedc4248f9fd979dbafc5032c4061d2cdb1806e89e",
+      "acl": {
+        "owner": "CURRENT_USER",
+        "protected": true,
+        "rules": [
+          {
+            "role": "SYSTEM",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "ADMINISTRATORS",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "CURRENT_USER",
+            "allow": true,
+            "inherited": false
+          }
+        ]
+      }
+    },
+    {
+      "action": "validate",
+      "requestBytes": 181,
+      "requestSha256": "21ba9e7fb0520f6ab9f126133891b7309e0c7b5581a6623029821d82cec9bdf0",
+      "acl": {
+        "owner": "CURRENT_USER",
+        "protected": true,
+        "rules": [
+          {
+            "role": "SYSTEM",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "ADMINISTRATORS",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "CURRENT_USER",
+            "allow": true,
+            "inherited": false
+          }
+        ]
+      }
+    },
+    {
+      "action": "public",
+      "requestBytes": 179,
+      "requestSha256": "74ea2f23e9193d5cf5603c1cad92ec54b4f923994bd95615817fd736d2717d6a",
+      "acl": {
+        "owner": "CURRENT_USER",
+        "protected": true,
+        "rules": [
+          {
+            "role": "SYSTEM",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "ADMINISTRATORS",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "CURRENT_USER",
+            "allow": true,
+            "inherited": false
+          }
+        ]
+      }
+    },
+    {
+      "action": "schema",
+      "requestBytes": 179,
+      "requestSha256": "b39b9fe9f2caa20aabf3488ad8e4f528fbc7a7cb8f83b3219e53f6053aa0a245",
+      "acl": {
+        "owner": "CURRENT_USER",
+        "protected": true,
+        "rules": [
+          {
+            "role": "SYSTEM",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "ADMINISTRATORS",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "CURRENT_USER",
+            "allow": true,
+            "inherited": false
+          }
+        ]
+      }
+    },
+    {
+      "action": "validate",
+      "requestBytes": 179,
+      "requestSha256": "b39b9fe9f2caa20aabf3488ad8e4f528fbc7a7cb8f83b3219e53f6053aa0a245",
+      "acl": {
+        "owner": "CURRENT_USER",
+        "protected": true,
+        "rules": [
+          {
+            "role": "SYSTEM",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "ADMINISTRATORS",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "CURRENT_USER",
+            "allow": true,
+            "inherited": false
+          }
+        ]
+      }
+    },
+    {
+      "action": "validate",
+      "requestBytes": 181,
+      "requestSha256": "5f3c62ad9ac628dd2427b9fedc4248f9fd979dbafc5032c4061d2cdb1806e89e",
+      "acl": {
+        "owner": "CURRENT_USER",
+        "protected": true,
+        "rules": [
+          {
+            "role": "SYSTEM",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "ADMINISTRATORS",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "CURRENT_USER",
+            "allow": true,
+            "inherited": false
+          }
+        ]
+      }
+    },
+    {
+      "action": "validate",
+      "requestBytes": 181,
+      "requestSha256": "21ba9e7fb0520f6ab9f126133891b7309e0c7b5581a6623029821d82cec9bdf0",
+      "acl": {
+        "owner": "CURRENT_USER",
+        "protected": true,
+        "rules": [
+          {
+            "role": "SYSTEM",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "ADMINISTRATORS",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "CURRENT_USER",
+            "allow": true,
+            "inherited": false
+          }
+        ]
+      }
+    },
+    {
+      "action": "public",
+      "requestBytes": 179,
+      "requestSha256": "74ea2f23e9193d5cf5603c1cad92ec54b4f923994bd95615817fd736d2717d6a",
+      "acl": {
+        "owner": "CURRENT_USER",
+        "protected": true,
+        "rules": [
+          {
+            "role": "SYSTEM",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "ADMINISTRATORS",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "CURRENT_USER",
+            "allow": true,
+            "inherited": false
+          }
+        ]
+      }
+    },
+    {
+      "action": "schema",
+      "requestBytes": 179,
+      "requestSha256": "b39b9fe9f2caa20aabf3488ad8e4f528fbc7a7cb8f83b3219e53f6053aa0a245",
+      "acl": {
+        "owner": "CURRENT_USER",
+        "protected": true,
+        "rules": [
+          {
+            "role": "SYSTEM",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "ADMINISTRATORS",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "CURRENT_USER",
+            "allow": true,
+            "inherited": false
+          }
+        ]
+      }
+    },
+    {
+      "action": "validate",
+      "requestBytes": 179,
+      "requestSha256": "b39b9fe9f2caa20aabf3488ad8e4f528fbc7a7cb8f83b3219e53f6053aa0a245",
+      "acl": {
+        "owner": "CURRENT_USER",
+        "protected": true,
+        "rules": [
+          {
+            "role": "SYSTEM",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "ADMINISTRATORS",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "CURRENT_USER",
+            "allow": true,
+            "inherited": false
+          }
+        ]
+      }
+    },
+    {
+      "action": "validate",
+      "requestBytes": 181,
+      "requestSha256": "5f3c62ad9ac628dd2427b9fedc4248f9fd979dbafc5032c4061d2cdb1806e89e",
+      "acl": {
+        "owner": "CURRENT_USER",
+        "protected": true,
+        "rules": [
+          {
+            "role": "SYSTEM",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "ADMINISTRATORS",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "CURRENT_USER",
+            "allow": true,
+            "inherited": false
+          }
+        ]
+      }
+    },
+    {
+      "action": "validate",
+      "requestBytes": 181,
+      "requestSha256": "21ba9e7fb0520f6ab9f126133891b7309e0c7b5581a6623029821d82cec9bdf0",
+      "acl": {
+        "owner": "CURRENT_USER",
+        "protected": true,
+        "rules": [
+          {
+            "role": "SYSTEM",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "ADMINISTRATORS",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "CURRENT_USER",
+            "allow": true,
+            "inherited": false
+          }
+        ]
+      }
+    },
+    {
+      "action": "public",
+      "requestBytes": 179,
+      "requestSha256": "74ea2f23e9193d5cf5603c1cad92ec54b4f923994bd95615817fd736d2717d6a",
+      "acl": {
+        "owner": "CURRENT_USER",
+        "protected": true,
+        "rules": [
+          {
+            "role": "SYSTEM",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "ADMINISTRATORS",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "CURRENT_USER",
+            "allow": true,
+            "inherited": false
+          }
+        ]
+      }
+    },
+    {
+      "action": "schema",
+      "requestBytes": 179,
+      "requestSha256": "b39b9fe9f2caa20aabf3488ad8e4f528fbc7a7cb8f83b3219e53f6053aa0a245",
+      "acl": {
+        "owner": "CURRENT_USER",
+        "protected": true,
+        "rules": [
+          {
+            "role": "SYSTEM",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "ADMINISTRATORS",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "CURRENT_USER",
+            "allow": true,
+            "inherited": false
+          }
+        ]
+      }
+    },
+    {
+      "action": "validate",
+      "requestBytes": 179,
+      "requestSha256": "b39b9fe9f2caa20aabf3488ad8e4f528fbc7a7cb8f83b3219e53f6053aa0a245",
+      "acl": {
+        "owner": "CURRENT_USER",
+        "protected": true,
+        "rules": [
+          {
+            "role": "SYSTEM",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "ADMINISTRATORS",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "CURRENT_USER",
+            "allow": true,
+            "inherited": false
+          }
+        ]
+      }
+    },
+    {
+      "action": "validate",
+      "requestBytes": 181,
+      "requestSha256": "5f3c62ad9ac628dd2427b9fedc4248f9fd979dbafc5032c4061d2cdb1806e89e",
+      "acl": {
+        "owner": "CURRENT_USER",
+        "protected": true,
+        "rules": [
+          {
+            "role": "SYSTEM",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "ADMINISTRATORS",
+            "allow": true,
+            "inherited": false
+          },
+          {
+            "role": "CURRENT_USER",
+            "allow": true,
+            "inherited": false
+          }
+        ]
+      }
+    }
+  ],
+  "cases": [
+    {
+      "kind": "bridge",
+      "language": "en",
+      "parent": "default-inherited-owned",
+      "action": "validate",
+      "observed": false,
+      "code": 0,
+      "stdoutSha256": "daf67c9bc768fa9df4e69110fbaf92a2351ffccfd91fe6a442661a8497624916",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "en",
+      "parent": "default-inherited-owned",
+      "action": "validate",
+      "observed": true,
+      "code": 0,
+      "stdoutSha256": "daf67c9bc768fa9df4e69110fbaf92a2351ffccfd91fe6a442661a8497624916",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "en",
+      "parent": "default-inherited-owned",
+      "action": "public",
+      "observed": false,
+      "code": 0,
+      "stdoutSha256": "7802c61ceb1a74263a0a1444bb75b4da7f2822231aaf4f631ee2b1ed42b39009",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "en",
+      "parent": "default-inherited-owned",
+      "action": "public",
+      "observed": true,
+      "code": 0,
+      "stdoutSha256": "7802c61ceb1a74263a0a1444bb75b4da7f2822231aaf4f631ee2b1ed42b39009",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "en",
+      "parent": "default-inherited-owned",
+      "action": "schema",
+      "observed": false,
+      "code": 0,
+      "stdoutSha256": "2e4a77d0f80f6c34e44939a250e5884290e59bed75d5ac8bf1443da525e6ad48",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "en",
+      "parent": "default-inherited-owned",
+      "action": "schema",
+      "observed": true,
+      "code": 0,
+      "stdoutSha256": "2e4a77d0f80f6c34e44939a250e5884290e59bed75d5ac8bf1443da525e6ad48",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "en",
+      "parent": "default-inherited-owned",
+      "action": "validate",
+      "observed": true,
+      "code": 1,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "c0b071d8ec65de69f84f60695711eaccd77152d90c20129d1f318fe42221eb72",
+      "negative": "malformed-json"
+    },
+    {
+      "kind": "bridge",
+      "language": "en",
+      "parent": "default-inherited-owned",
+      "action": "validate",
+      "observed": true,
+      "code": 1,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "c0b071d8ec65de69f84f60695711eaccd77152d90c20129d1f318fe42221eb72",
+      "negative": "invalid-utf8"
+    },
+    {
+      "kind": "bridge",
+      "language": "en",
+      "parent": "default-inherited-owned",
+      "action": "validate",
+      "observed": true,
+      "code": 1,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "b68520078641b18549b8b3fb164fe8d1dab8ea23c7f2fe0b3545d71734952943",
+      "negative": "native-operation-mismatch"
+    },
+    {
+      "kind": "bridge",
+      "language": "en",
+      "parent": "default-inherited-owned",
+      "action": "validate",
+      "observed": true,
+      "code": 1,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "511adb7b97e3a87b6d95a2bbdd5dbd6d914e663fd3dd4cd38ece23b5ad9b4529",
+      "negative": "native-invalid-ledger"
+    },
+    {
+      "kind": "ordinary-settings-failclosed",
+      "language": "en",
+      "parent": "default-inherited-owned",
+      "code": 1
+    },
+    {
+      "kind": "bridge",
+      "language": "zh-CN",
+      "parent": "default-inherited-owned",
+      "action": "validate",
+      "observed": false,
+      "code": 0,
+      "stdoutSha256": "daf67c9bc768fa9df4e69110fbaf92a2351ffccfd91fe6a442661a8497624916",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "zh-CN",
+      "parent": "default-inherited-owned",
+      "action": "validate",
+      "observed": true,
+      "code": 0,
+      "stdoutSha256": "daf67c9bc768fa9df4e69110fbaf92a2351ffccfd91fe6a442661a8497624916",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "zh-CN",
+      "parent": "default-inherited-owned",
+      "action": "public",
+      "observed": false,
+      "code": 0,
+      "stdoutSha256": "7802c61ceb1a74263a0a1444bb75b4da7f2822231aaf4f631ee2b1ed42b39009",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "zh-CN",
+      "parent": "default-inherited-owned",
+      "action": "public",
+      "observed": true,
+      "code": 0,
+      "stdoutSha256": "7802c61ceb1a74263a0a1444bb75b4da7f2822231aaf4f631ee2b1ed42b39009",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "zh-CN",
+      "parent": "default-inherited-owned",
+      "action": "schema",
+      "observed": false,
+      "code": 0,
+      "stdoutSha256": "2e4a77d0f80f6c34e44939a250e5884290e59bed75d5ac8bf1443da525e6ad48",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "zh-CN",
+      "parent": "default-inherited-owned",
+      "action": "schema",
+      "observed": true,
+      "code": 0,
+      "stdoutSha256": "2e4a77d0f80f6c34e44939a250e5884290e59bed75d5ac8bf1443da525e6ad48",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "zh-CN",
+      "parent": "default-inherited-owned",
+      "action": "validate",
+      "observed": true,
+      "code": 1,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "dd89ef8c64991c675e56f2018c8bc3f88768681d156f5bec18f096b094569868",
+      "negative": "malformed-json"
+    },
+    {
+      "kind": "bridge",
+      "language": "zh-CN",
+      "parent": "default-inherited-owned",
+      "action": "validate",
+      "observed": true,
+      "code": 1,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "dd89ef8c64991c675e56f2018c8bc3f88768681d156f5bec18f096b094569868",
+      "negative": "invalid-utf8"
+    },
+    {
+      "kind": "bridge",
+      "language": "zh-CN",
+      "parent": "default-inherited-owned",
+      "action": "validate",
+      "observed": true,
+      "code": 1,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "9a6eb2ea7216ee575907d0ce745370c004b3a13a61231febe5329199c0fda2e0",
+      "negative": "native-operation-mismatch"
+    },
+    {
+      "kind": "bridge",
+      "language": "zh-CN",
+      "parent": "default-inherited-owned",
+      "action": "validate",
+      "observed": true,
+      "code": 1,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "41f32b1c9c4a84b736751fe744076e38c89542bd4c5379d4c392ac0149278e3b",
+      "negative": "native-invalid-ledger"
+    },
+    {
+      "kind": "ordinary-settings-failclosed",
+      "language": "zh-CN",
+      "parent": "default-inherited-owned",
+      "code": 1
+    },
+    {
+      "kind": "bridge",
+      "language": "ja",
+      "parent": "default-inherited-owned",
+      "action": "validate",
+      "observed": false,
+      "code": 0,
+      "stdoutSha256": "daf67c9bc768fa9df4e69110fbaf92a2351ffccfd91fe6a442661a8497624916",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "ja",
+      "parent": "default-inherited-owned",
+      "action": "validate",
+      "observed": true,
+      "code": 0,
+      "stdoutSha256": "daf67c9bc768fa9df4e69110fbaf92a2351ffccfd91fe6a442661a8497624916",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "ja",
+      "parent": "default-inherited-owned",
+      "action": "public",
+      "observed": false,
+      "code": 0,
+      "stdoutSha256": "7802c61ceb1a74263a0a1444bb75b4da7f2822231aaf4f631ee2b1ed42b39009",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "ja",
+      "parent": "default-inherited-owned",
+      "action": "public",
+      "observed": true,
+      "code": 0,
+      "stdoutSha256": "7802c61ceb1a74263a0a1444bb75b4da7f2822231aaf4f631ee2b1ed42b39009",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "ja",
+      "parent": "default-inherited-owned",
+      "action": "schema",
+      "observed": false,
+      "code": 0,
+      "stdoutSha256": "2e4a77d0f80f6c34e44939a250e5884290e59bed75d5ac8bf1443da525e6ad48",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "ja",
+      "parent": "default-inherited-owned",
+      "action": "schema",
+      "observed": true,
+      "code": 0,
+      "stdoutSha256": "2e4a77d0f80f6c34e44939a250e5884290e59bed75d5ac8bf1443da525e6ad48",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "ja",
+      "parent": "default-inherited-owned",
+      "action": "validate",
+      "observed": true,
+      "code": 1,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e629d5a7e819249ce06b1677c290b57149d78060609f984b6ce3f15d0b5fc889",
+      "negative": "malformed-json"
+    },
+    {
+      "kind": "bridge",
+      "language": "ja",
+      "parent": "default-inherited-owned",
+      "action": "validate",
+      "observed": true,
+      "code": 1,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e629d5a7e819249ce06b1677c290b57149d78060609f984b6ce3f15d0b5fc889",
+      "negative": "invalid-utf8"
+    },
+    {
+      "kind": "bridge",
+      "language": "ja",
+      "parent": "default-inherited-owned",
+      "action": "validate",
+      "observed": true,
+      "code": 1,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "04afbf7098caa9f5ae9d619f5f8394be5fdff7aa085019a3eb1f8d8b217887c0",
+      "negative": "native-operation-mismatch"
+    },
+    {
+      "kind": "bridge",
+      "language": "ja",
+      "parent": "default-inherited-owned",
+      "action": "validate",
+      "observed": true,
+      "code": 1,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "ceed39716022f15e41dfb637e0df40b8c9260b300d263cf87b9123b543c892d7",
+      "negative": "native-invalid-ledger"
+    },
+    {
+      "kind": "ordinary-settings-failclosed",
+      "language": "ja",
+      "parent": "default-inherited-owned",
+      "code": 1
+    },
+    {
+      "kind": "bridge",
+      "language": "en",
+      "parent": "explicit-shared-owned",
+      "action": "validate",
+      "observed": false,
+      "code": 0,
+      "stdoutSha256": "daf67c9bc768fa9df4e69110fbaf92a2351ffccfd91fe6a442661a8497624916",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "en",
+      "parent": "explicit-shared-owned",
+      "action": "validate",
+      "observed": true,
+      "code": 0,
+      "stdoutSha256": "daf67c9bc768fa9df4e69110fbaf92a2351ffccfd91fe6a442661a8497624916",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "en",
+      "parent": "explicit-shared-owned",
+      "action": "public",
+      "observed": false,
+      "code": 0,
+      "stdoutSha256": "7802c61ceb1a74263a0a1444bb75b4da7f2822231aaf4f631ee2b1ed42b39009",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "en",
+      "parent": "explicit-shared-owned",
+      "action": "public",
+      "observed": true,
+      "code": 0,
+      "stdoutSha256": "7802c61ceb1a74263a0a1444bb75b4da7f2822231aaf4f631ee2b1ed42b39009",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "en",
+      "parent": "explicit-shared-owned",
+      "action": "schema",
+      "observed": false,
+      "code": 0,
+      "stdoutSha256": "2e4a77d0f80f6c34e44939a250e5884290e59bed75d5ac8bf1443da525e6ad48",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "en",
+      "parent": "explicit-shared-owned",
+      "action": "schema",
+      "observed": true,
+      "code": 0,
+      "stdoutSha256": "2e4a77d0f80f6c34e44939a250e5884290e59bed75d5ac8bf1443da525e6ad48",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "en",
+      "parent": "explicit-shared-owned",
+      "action": "validate",
+      "observed": true,
+      "code": 1,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "c0b071d8ec65de69f84f60695711eaccd77152d90c20129d1f318fe42221eb72",
+      "negative": "malformed-json"
+    },
+    {
+      "kind": "bridge",
+      "language": "en",
+      "parent": "explicit-shared-owned",
+      "action": "validate",
+      "observed": true,
+      "code": 1,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "c0b071d8ec65de69f84f60695711eaccd77152d90c20129d1f318fe42221eb72",
+      "negative": "invalid-utf8"
+    },
+    {
+      "kind": "bridge",
+      "language": "en",
+      "parent": "explicit-shared-owned",
+      "action": "validate",
+      "observed": true,
+      "code": 1,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "b68520078641b18549b8b3fb164fe8d1dab8ea23c7f2fe0b3545d71734952943",
+      "negative": "native-operation-mismatch"
+    },
+    {
+      "kind": "bridge",
+      "language": "en",
+      "parent": "explicit-shared-owned",
+      "action": "validate",
+      "observed": true,
+      "code": 1,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "511adb7b97e3a87b6d95a2bbdd5dbd6d914e663fd3dd4cd38ece23b5ad9b4529",
+      "negative": "native-invalid-ledger"
+    },
+    {
+      "kind": "ordinary-settings-failclosed",
+      "language": "en",
+      "parent": "explicit-shared-owned",
+      "code": 1
+    },
+    {
+      "kind": "bridge",
+      "language": "zh-CN",
+      "parent": "explicit-shared-owned",
+      "action": "validate",
+      "observed": false,
+      "code": 0,
+      "stdoutSha256": "daf67c9bc768fa9df4e69110fbaf92a2351ffccfd91fe6a442661a8497624916",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "zh-CN",
+      "parent": "explicit-shared-owned",
+      "action": "validate",
+      "observed": true,
+      "code": 0,
+      "stdoutSha256": "daf67c9bc768fa9df4e69110fbaf92a2351ffccfd91fe6a442661a8497624916",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "zh-CN",
+      "parent": "explicit-shared-owned",
+      "action": "public",
+      "observed": false,
+      "code": 0,
+      "stdoutSha256": "7802c61ceb1a74263a0a1444bb75b4da7f2822231aaf4f631ee2b1ed42b39009",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "zh-CN",
+      "parent": "explicit-shared-owned",
+      "action": "public",
+      "observed": true,
+      "code": 0,
+      "stdoutSha256": "7802c61ceb1a74263a0a1444bb75b4da7f2822231aaf4f631ee2b1ed42b39009",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "zh-CN",
+      "parent": "explicit-shared-owned",
+      "action": "schema",
+      "observed": false,
+      "code": 0,
+      "stdoutSha256": "2e4a77d0f80f6c34e44939a250e5884290e59bed75d5ac8bf1443da525e6ad48",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "zh-CN",
+      "parent": "explicit-shared-owned",
+      "action": "schema",
+      "observed": true,
+      "code": 0,
+      "stdoutSha256": "2e4a77d0f80f6c34e44939a250e5884290e59bed75d5ac8bf1443da525e6ad48",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "zh-CN",
+      "parent": "explicit-shared-owned",
+      "action": "validate",
+      "observed": true,
+      "code": 1,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "dd89ef8c64991c675e56f2018c8bc3f88768681d156f5bec18f096b094569868",
+      "negative": "malformed-json"
+    },
+    {
+      "kind": "bridge",
+      "language": "zh-CN",
+      "parent": "explicit-shared-owned",
+      "action": "validate",
+      "observed": true,
+      "code": 1,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "dd89ef8c64991c675e56f2018c8bc3f88768681d156f5bec18f096b094569868",
+      "negative": "invalid-utf8"
+    },
+    {
+      "kind": "bridge",
+      "language": "zh-CN",
+      "parent": "explicit-shared-owned",
+      "action": "validate",
+      "observed": true,
+      "code": 1,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "9a6eb2ea7216ee575907d0ce745370c004b3a13a61231febe5329199c0fda2e0",
+      "negative": "native-operation-mismatch"
+    },
+    {
+      "kind": "bridge",
+      "language": "zh-CN",
+      "parent": "explicit-shared-owned",
+      "action": "validate",
+      "observed": true,
+      "code": 1,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "41f32b1c9c4a84b736751fe744076e38c89542bd4c5379d4c392ac0149278e3b",
+      "negative": "native-invalid-ledger"
+    },
+    {
+      "kind": "ordinary-settings-failclosed",
+      "language": "zh-CN",
+      "parent": "explicit-shared-owned",
+      "code": 1
+    },
+    {
+      "kind": "bridge",
+      "language": "ja",
+      "parent": "explicit-shared-owned",
+      "action": "validate",
+      "observed": false,
+      "code": 0,
+      "stdoutSha256": "daf67c9bc768fa9df4e69110fbaf92a2351ffccfd91fe6a442661a8497624916",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "ja",
+      "parent": "explicit-shared-owned",
+      "action": "validate",
+      "observed": true,
+      "code": 0,
+      "stdoutSha256": "daf67c9bc768fa9df4e69110fbaf92a2351ffccfd91fe6a442661a8497624916",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "ja",
+      "parent": "explicit-shared-owned",
+      "action": "public",
+      "observed": false,
+      "code": 0,
+      "stdoutSha256": "7802c61ceb1a74263a0a1444bb75b4da7f2822231aaf4f631ee2b1ed42b39009",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "ja",
+      "parent": "explicit-shared-owned",
+      "action": "public",
+      "observed": true,
+      "code": 0,
+      "stdoutSha256": "7802c61ceb1a74263a0a1444bb75b4da7f2822231aaf4f631ee2b1ed42b39009",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "ja",
+      "parent": "explicit-shared-owned",
+      "action": "schema",
+      "observed": false,
+      "code": 0,
+      "stdoutSha256": "2e4a77d0f80f6c34e44939a250e5884290e59bed75d5ac8bf1443da525e6ad48",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "ja",
+      "parent": "explicit-shared-owned",
+      "action": "schema",
+      "observed": true,
+      "code": 0,
+      "stdoutSha256": "2e4a77d0f80f6c34e44939a250e5884290e59bed75d5ac8bf1443da525e6ad48",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "bridge",
+      "language": "ja",
+      "parent": "explicit-shared-owned",
+      "action": "validate",
+      "observed": true,
+      "code": 1,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e629d5a7e819249ce06b1677c290b57149d78060609f984b6ce3f15d0b5fc889",
+      "negative": "malformed-json"
+    },
+    {
+      "kind": "bridge",
+      "language": "ja",
+      "parent": "explicit-shared-owned",
+      "action": "validate",
+      "observed": true,
+      "code": 1,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e629d5a7e819249ce06b1677c290b57149d78060609f984b6ce3f15d0b5fc889",
+      "negative": "invalid-utf8"
+    },
+    {
+      "kind": "bridge",
+      "language": "ja",
+      "parent": "explicit-shared-owned",
+      "action": "validate",
+      "observed": true,
+      "code": 1,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "04afbf7098caa9f5ae9d619f5f8394be5fdff7aa085019a3eb1f8d8b217887c0",
+      "negative": "native-operation-mismatch"
+    },
+    {
+      "kind": "bridge",
+      "language": "ja",
+      "parent": "explicit-shared-owned",
+      "action": "validate",
+      "observed": true,
+      "code": 1,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "ceed39716022f15e41dfb637e0df40b8c9260b300d263cf87b9123b543c892d7",
+      "negative": "native-invalid-ledger"
+    },
+    {
+      "kind": "ordinary-settings-failclosed",
+      "language": "ja",
+      "parent": "explicit-shared-owned",
+      "code": 1
+    }
+  ],
+  "cleanup": {
+    "caseRootAbsent": true,
+    "requestDirectoriesVerifiedEmptyAfterEachBridge": true
+  },
+  "limits": [
+    "SSH existing user context; no separate standard-user login",
+    "Shared ACL is applied only to a newly created owned fixture parent",
+    "Spawn observer runs only for half of successful bridge commands; matching uninstrumented product commands also pass"
+  ]
+}

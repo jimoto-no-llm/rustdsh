@@ -124,10 +124,7 @@ fn serve_mock_request(mut stream: TcpStream, state: Arc<MockState>) {
         return;
     }
     let _ = stream.set_read_timeout(Some(Duration::from_secs(3)));
-    let Ok(reader_stream) = stream.try_clone() else {
-        return;
-    };
-    let mut reader = BufReader::new(reader_stream);
+    let mut reader = BufReader::new(&mut stream);
     let mut request_line = String::new();
     if reader.read_line(&mut request_line).is_err() {
         return;
@@ -235,6 +232,8 @@ fn serve_mock_request(mut stream: TcpStream, state: Arc<MockState>) {
         let _ = stream.write_all(b"0\r\n\r\n");
         let _ = stream.flush();
     }
+    // Send EOF explicitly before releasing the mock's single socket handle.
+    let _ = stream.shutdown(std::net::Shutdown::Write);
     state.active.fetch_sub(1, Ordering::SeqCst);
     state.finished.fetch_add(1, Ordering::SeqCst);
 }
@@ -262,9 +261,13 @@ fn mock_upstream_consumes_chunked_bodies_and_trailers_before_closing() {
             .set_read_timeout(Some(Duration::from_secs(3)))
             .unwrap();
         write!(stream, "{method} /chunked HTTP/1.1\r\nhost: {}\r\ntransfer-encoding: chunked\r\nconnection: close\r\n\r\n{chunks}", upstream.addr).unwrap();
+        stream.shutdown(std::net::Shutdown::Write).unwrap();
         let mut response = String::new();
         stream.read_to_string(&mut response).unwrap();
         assert!(response.starts_with("HTTP/1.1 200 OK\r\n"));
+        assert!(response.contains("data: first\n\n"));
+        assert!(response.contains("data: second\n\n"));
+        assert!(response.ends_with("0\r\n\r\n"));
         let seen = upstream.state.seen.lock().unwrap();
         assert_eq!(seen.len(), 1);
         assert_eq!(seen[0].body, expected.as_bytes());

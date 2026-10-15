@@ -8,7 +8,11 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { identity } from "../state.mjs";
 import { WorkerWorkspaces } from "../workers.mjs";
-import { declaration } from "../worker-scopes.mjs";
+import {
+  declaration,
+  declarationResults,
+  policyResults as evaluateWorkerPolicy,
+} from "../worker-scopes.mjs";
 
 const exec = promisify(execFile);
 const cli = fileURLToPath(new URL("../cli.mjs", import.meta.url));
@@ -22,7 +26,7 @@ const scope = (id, writes = ["src/a.txt"], role = "edit") => ({
   lease_seconds: 60,
 });
 const error = (code) => (e) => e.code === code;
-async function setup(t) {
+async function setup(t, { policyEvaluator } = {}) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-workers-qa-"));
   const repo = path.join(root, "project");
   await fs.mkdir(path.join(repo, "src"), { recursive: true });
@@ -47,7 +51,10 @@ async function setup(t) {
   const project = await identity(repo);
   project.directory = path.join(root, "state");
   let now = Date.now();
-  const workers = await WorkerWorkspaces.open(project, { now: () => now });
+  const workers = await WorkerWorkspaces.open(project, {
+    now: () => now,
+    policyEvaluator,
+  });
   const prepare = async (request) => {
     const plan = await workers.plan(request);
     assert.equal(plan.can_prepare, true, JSON.stringify(plan.warnings));
@@ -76,6 +83,82 @@ async function setup(t) {
     },
   };
 }
+
+test("worker planning filters shared paths before expanding per-worker checks", async (t) => {
+  const policyRequests = [];
+  const f = await setup(t, {
+    policyEvaluator(request) {
+      policyRequests.push(structuredClone(request));
+      return evaluateWorkerPolicy(request);
+    },
+  });
+  const trackedDirectory = path.join(f.repo, "generated");
+  await fs.mkdir(trackedDirectory);
+  for (let index = 0; index < 4_100; index++) {
+    await fs.writeFile(
+      path.join(trackedDirectory, `file-${String(index).padStart(5, "0")}.txt`),
+      "tracked\n",
+    );
+  }
+  await f.git(f.repo, "add", ".");
+  await f.git(f.repo, "commit", "-m", "add many tracked paths");
+
+  const rows = Array.from({ length: 256 }, (_, index) => {
+    const workerId = `worker-${index}`;
+    const leaseId = `wrk_00000000-0000-0000-0000-${String(index).padStart(12, "0")}`;
+    const baseSha = "a".repeat(40);
+    return {
+      worker_id: workerId,
+      lease_id: leaseId,
+      declaration: scope(workerId, [
+        index === 0 ? "Cargo.lock" : `src/worker-${index}.txt`,
+      ]),
+      worktree: f.workers.slot(workerId),
+      branch: `codex/worker-${workerId}-${leaseId.slice(4)}`,
+      base_sha: baseSha,
+      created_at: "2026-10-15T03:00:00.000Z",
+      expires_at: "2026-10-15T03:01:00.000Z",
+      released_at: null,
+      state: "ready",
+      error: null,
+      source_before: { head_sha: baseSha, branch: "fixture-main", dirty_paths: [] },
+    };
+  });
+  const registry = {
+    schema: 1,
+    project_id: f.project.id,
+    root: f.workers.git.root,
+    git_common_dir: f.workers.git.git_common_dir,
+    revision: 0,
+    workers: rows,
+  };
+  await fs.mkdir(f.workers.directory, { recursive: true });
+  await fs.writeFile(f.workers.file, JSON.stringify(registry));
+
+  const previousBin = process.env.RDSH_BIN;
+  delete process.env.RDSH_BIN;
+  try {
+    const plan = await f.workers.plan(scope("candidate", ["Cargo.lock"]));
+    assert.ok(
+      plan.warnings.some(
+        (warning) =>
+          warning.code === "shared_file_overlap" &&
+          warning.worker_id === "worker-0" &&
+          warning.path === "Cargo.lock",
+      ),
+    );
+    assert.equal(policyRequests.length, 2);
+    assert.equal(policyRequests[0].shared_files.length, 4_105);
+    assert.equal(policyRequests[1].intersections.length, 256);
+    assert.equal(policyRequests[1].write_checks.length, 258);
+    assert.ok(
+      policyRequests[1].write_checks.every((check) => check.files.length <= 1),
+    );
+  } finally {
+    if (previousBin === undefined) delete process.env.RDSH_BIN;
+    else process.env.RDSH_BIN = previousBin;
+  }
+});
 
 test("editors get separate real branches/checkouts; review defaults to no write scope", async (t) => {
   const f = await setup(t);
@@ -291,12 +374,19 @@ test("path escape, globs, unknown fields and review writes are rejected", () => 
     "src\\file",
     "src/**",
     ".git/config",
+    "src/.git/config",
     "src//a",
   ])
     assert.throws(
       () => declaration(scope("bad", [file])),
       error("invalid_scope_path"),
     );
+  if (process.platform === "win32") {
+    assert.throws(
+      () => declaration(scope("bad", ["src/.GIT/config"])),
+      error("invalid_scope_path"),
+    );
+  }
   assert.throws(
     () => declaration(scope("review", ["src"], "review")),
     error("review_worker_is_read_only"),
@@ -309,6 +399,17 @@ test("path escape, globs, unknown fields and review writes are rejected", () => 
     () => declaration({ ...scope("bad"), read_paths: ["tests"] }),
     error("write_scope_must_be_readable"),
   );
+});
+
+test("empty scope batches do not launch or require the native helper", () => {
+  const previous = process.env.RDSH_BIN;
+  process.env.RDSH_BIN = path.join(os.tmpdir(), "missing-rdsh-worker-scope");
+  try {
+    assert.deepEqual(declarationResults([]), []);
+  } finally {
+    if (previous === undefined) delete process.env.RDSH_BIN;
+    else process.env.RDSH_BIN = previous;
+  }
 });
 
 test("renamed/deleted paths and forbidden paths remain visible in scope diagnostics", async (t) => {

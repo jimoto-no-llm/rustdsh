@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "status": "pass",
+  "binarySha256": "c65b88c9ffd11b998d1e9124007c40b2e162e69796caf2b4b7d6a97856d0fbef",
+  "releaseCommands": 30,
+  "languages": [
+    {
+      "language": "en",
+      "compactJsonEqual": true,
+      "canonicalCodePreserved": true,
+      "japanesePathPreserved": true,
+      "malformedJsonAndUtf8Rejected": true,
+      "helpWithBrokenSettings": true,
+      "ordinarySettingsFailClosed": true
+    },
+    {
+      "language": "zh-CN",
+      "compactJsonEqual": true,
+      "canonicalCodePreserved": true,
+      "japanesePathPreserved": true,
+      "malformedJsonAndUtf8Rejected": true,
+      "helpWithBrokenSettings": true,
+      "ordinarySettingsFailClosed": true
+    },
+    {
+      "language": "ja",
+      "compactJsonEqual": true,
+      "canonicalCodePreserved": true,
+      "japanesePathPreserved": true,
+      "malformedJsonAndUtf8Rejected": true,
+      "helpWithBrokenSettings": true,
+      "ordinarySettingsFailClosed": true
+    }
+  ],
+  "ownedFixtureAbsent": true,
+  "modelRequests": 0,
+  "paidApiRequests": 0
+}

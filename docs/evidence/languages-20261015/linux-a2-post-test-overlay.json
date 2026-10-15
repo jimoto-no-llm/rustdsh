@@ -1,0 +1,49 @@
+{
+  "scope": "Changes after the preserved 1111-file Linux test-time snapshot: documentation and one separately verified serial-proxy fixture. New evidence payloads are in manifest.json, not executable source inputs.",
+  "test_time_snapshot_file": "linux-a2-source.json",
+  "test_time_snapshot_sha256": "c15d536c79d70329a122a1a9cb3816cf3046bdc63973d83c5b86b36b31c0a968",
+  "executable_input_changes": 0,
+  "generatedIndexFiles": [
+    "docs/evidence/languages-20261015/manifest.json"
+  ],
+  "documentationRecords": [
+    {
+      "file": "README.ja.md",
+      "test_time_sha256": "e72da0b4b59f935dfc7e446bdd2509a6014d35c47cfbcce0082f225d4bcfbc78",
+      "final_sha256": "eae75940bffd102e31b4362c6873246d3f2da8e1d4efc043d33df8263d684ac5"
+    },
+    {
+      "file": "README.md",
+      "test_time_sha256": "aed218daa8e00d8cebcd22c0100a845574635369a2299263f2a3c4391a7f2ba9",
+      "final_sha256": "7e3fc519af9418711fe128958fe4b32d2f44e48d81368e51ec6e83cf93b929d2"
+    },
+    {
+      "file": "README.zh-CN.md",
+      "test_time_sha256": "9285aea84e3f710c690d7e58a30d439c99def159f28fe0c544a86f8478646645",
+      "final_sha256": "e905d804222cc8417db9b1c8f8f2dfc91172152912732a23d1621c190381d737"
+    },
+    {
+      "file": "docs/evidence/languages-20261015/README.md",
+      "test_time_sha256": "419bc0caf30518c63d318ca956376d67713be3f8616284e4c6329038a8635762",
+      "final_sha256": "5d6255e2f0086146a0d8472df2c499790afd027e64401f804e9d2395e570ea55"
+    },
+    {
+      "file": "docs/evidence/languages-20261015/known-exceptions.json",
+      "test_time_sha256": "5b77cf951776d634521355e9bd7896b4c94e2bda84178b2c2bfba7ef3758198a",
+      "final_sha256": "f27020d609ad24a836ccadfaa9f3b1e0f4c228f30b150ad7bc51dbd064d60049"
+    },
+    {
+      "file": "docs/evidence/languages-20261015/performance.md",
+      "test_time_sha256": "4e809067d40a028e1e8864f8a007486a1b5b7182a83134a2987b018c161bf995",
+      "final_sha256": "a3da51128e24304cc9ef92f0025234fa7e42eae6037a28d624f7cf7849c1c03b"
+    }
+  ],
+  "testFixtureRecords": [
+    {
+      "file": "tests/serial_proxy.rs",
+      "test_time_sha256": "f72766243bf7a515858f397b983cd32207e724de8d8f6d5c1da5d26591543203",
+      "final_sha256": "c88811976fb2e2ddda976d10c6c0db179e030135332414b993b97a7a0fc24468"
+    }
+  ],
+  "testFixtureValidation": "serial-proxy-fixture-repair.json"
+}

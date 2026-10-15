@@ -1,0 +1,237 @@
+{
+  "schema_version": 2,
+  "tool": "benchmark_regression",
+  "generated_at_utc": 1792048064,
+  "platform": {
+    "os": "macos",
+    "arch": "aarch64",
+    "family": "unix",
+    "cpu_count": 18
+  },
+  "toolchain": {
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "cargo": "cargo 1.99.0 (5f94df478 2026-08-27)"
+  },
+  "config": {
+    "n": 15,
+    "warmups": 3,
+    "max_regression_percent": 10.0,
+    "headline_cases": [
+      "version_startup",
+      "tokens_1mib",
+      "tokens_10mib",
+      "search_tree_200_files"
+    ],
+    "timing": "parent wall clock from spawn to last stdout byte; process launch included",
+    "scope": "real rdsh subprocess with per-build isolated HOME/DSH_HOME/XDG and working directories; no model calls and no credentials",
+    "fixtures": {
+      "tokens_1mib_bytes": 1048652,
+      "tokens_10mib_bytes": 10485812,
+      "search_tree_files": 200,
+      "search_tree_bytes": 2776584
+    }
+  },
+  "binaries": {
+    "candidate": {
+      "path": "<private-artifact>/final-a2-normal-candidate-rdsh",
+      "size_bytes": 4412400,
+      "sha256": "098a955a6fe8c6f2513bb90e9a63d06bb628b816f130e31dd15c591b3e841f31"
+    },
+    "baseline": {
+      "path": "/private/var/folders/th/b4c841yj4vsfd0cp40pwkbnd_1cjj0/T/rdsh-main-a2-perf-baseline-as74edpo/target/release/rdsh",
+      "size_bytes": 4230704,
+      "sha256": "d009fc92d2cb758b5f9dc513066667c2bc85dee7d025bb09be1893b4ceab5343"
+    }
+  },
+  "cases": {
+    "version_startup": {
+      "samples_ms": [
+        4.094,
+        4.407,
+        4.102,
+        4.293,
+        5.752,
+        5.103,
+        5.547,
+        5.678,
+        4.789,
+        5.698,
+        5.208,
+        6.116,
+        5.625,
+        5.633,
+        6.176
+      ],
+      "median_ms": 5.547,
+      "p95_ms": 6.176,
+      "min_ms": 4.094,
+      "max_ms": 6.176,
+      "throughput_mib_s": null,
+      "correct": true,
+      "evidence": "version=0.4.0",
+      "input_bytes": 0,
+      "cpu_median_ms": 1.869,
+      "peak_rss_bytes": 3080192,
+      "exit_code": 0,
+      "argv": [
+        "--version"
+      ],
+      "comparison": {
+        "baseline_label": "binary:/private/var/folders/th/b4c841yj4vsfd0cp40pwkbnd_1cjj0/T/rdsh-main-a2-perf-baseline-as74edpo/target/release/rdsh",
+        "baseline_median_ms": 5.676,
+        "ratio": 0.977,
+        "delta_percent": -2.26,
+        "stdout_equal": true,
+        "output_compatible": true,
+        "regressed": false
+      },
+      "outcome": "ok",
+      "headline": true
+    },
+    "tokens_1mib": {
+      "samples_ms": [
+        4.869,
+        4.82,
+        4.98,
+        5.509,
+        5.058,
+        4.884,
+        4.574,
+        4.212,
+        4.757,
+        4.34,
+        4.385,
+        4.438,
+        4.416,
+        5.808,
+        7.018
+      ],
+      "median_ms": 4.82,
+      "p95_ms": 7.018,
+      "min_ms": 4.212,
+      "max_ms": 7.018,
+      "throughput_mib_s": 207.464,
+      "correct": true,
+      "evidence": "tokens=262163",
+      "input_bytes": 1048652,
+      "cpu_median_ms": 2.265,
+      "peak_rss_bytes": null,
+      "exit_code": 0,
+      "argv": [
+        "tokens",
+        "<private-artifact>/tokens-1mib.txt",
+        "--preview",
+        "0"
+      ],
+      "comparison": {
+        "baseline_label": "binary:/private/var/folders/th/b4c841yj4vsfd0cp40pwkbnd_1cjj0/T/rdsh-main-a2-perf-baseline-as74edpo/target/release/rdsh",
+        "baseline_median_ms": 4.699,
+        "ratio": 1.026,
+        "delta_percent": 2.587,
+        "stdout_equal": true,
+        "output_compatible": true,
+        "regressed": false
+      },
+      "outcome": "ok",
+      "headline": true
+    },
+    "tokens_10mib": {
+      "samples_ms": [
+        8.092,
+        7.413,
+        9.499,
+        8.986,
+        10.971,
+        9.863,
+        9.027,
+        7.645,
+        8.068,
+        7.86,
+        8.083,
+        8.348,
+        8.543,
+        6.926,
+        18.914
+      ],
+      "median_ms": 8.348,
+      "p95_ms": 18.914,
+      "min_ms": 6.926,
+      "max_ms": 18.914,
+      "throughput_mib_s": 1197.88,
+      "correct": true,
+      "evidence": "tokens=2621453",
+      "input_bytes": 10485812,
+      "cpu_median_ms": 3.918,
+      "peak_rss_bytes": null,
+      "exit_code": 0,
+      "argv": [
+        "tokens",
+        "<private-artifact>/tokens-10mib.txt",
+        "--preview",
+        "0"
+      ],
+      "comparison": {
+        "baseline_label": "binary:/private/var/folders/th/b4c841yj4vsfd0cp40pwkbnd_1cjj0/T/rdsh-main-a2-perf-baseline-as74edpo/target/release/rdsh",
+        "baseline_median_ms": 8.725,
+        "ratio": 0.957,
+        "delta_percent": -4.317,
+        "stdout_equal": true,
+        "output_compatible": true,
+        "regressed": false
+      },
+      "outcome": "ok",
+      "headline": true
+    },
+    "search_tree_200_files": {
+      "samples_ms": [
+        7.881,
+        7.119,
+        7.224,
+        7.299,
+        7.217,
+        7.1,
+        7.338,
+        7.322,
+        8.63,
+        9.179,
+        8.263,
+        8.983,
+        9.211,
+        8.972,
+        9.097
+      ],
+      "median_ms": 7.881,
+      "p95_ms": 9.211,
+      "min_ms": 7.1,
+      "max_ms": 9.211,
+      "throughput_mib_s": 336.003,
+      "correct": true,
+      "evidence": "hits=200",
+      "input_bytes": 0,
+      "cpu_median_ms": 19.074,
+      "peak_rss_bytes": null,
+      "exit_code": 0,
+      "argv": [
+        "search",
+        "regression-needle",
+        "--dir",
+        "<private-artifact>/search-tree",
+        "--max",
+        "210"
+      ],
+      "comparison": {
+        "baseline_label": "binary:/private/var/folders/th/b4c841yj4vsfd0cp40pwkbnd_1cjj0/T/rdsh-main-a2-perf-baseline-as74edpo/target/release/rdsh",
+        "baseline_median_ms": 7.771,
+        "ratio": 1.014,
+        "delta_percent": 1.417,
+        "stdout_equal": true,
+        "output_compatible": true,
+        "regressed": false
+      },
+      "outcome": "ok",
+      "headline": true
+    }
+  },
+  "failures": [],
+  "regressions": []
+}

@@ -188,6 +188,8 @@ jobs:
         run: ./tests/e2e/cli-tty-windows.ps1
         env:
           RDSH_E2E_BIN: ./target/debug/rdsh.exe
+      - run: node --test dashboard/test/worker-scopes-compat.test.mjs
+
       - run: npm ci --ignore-scripts --no-audit --no-fund
         working-directory: plugins/rdsh-compute
       - run: npm test
@@ -201,6 +203,7 @@ jobs:
           printf '#!/bin/sh\necho stub-dsh $@' > /tmp/stub-dsh && chmod +x /tmp/stub-dsh
           BIN=./target/debug/rdsh DSH_ORIG_BIN=/tmp/stub-dsh sh tests/regress.sh
           BIN=./target/debug/rdsh sh tests/context_prototype.sh
+          BIN=./target/debug/rdsh sh tests/settings_prototype.sh
       - if: '! matrix.regress'
         shell: pwsh
         run: |
