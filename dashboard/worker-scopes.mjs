@@ -1,5 +1,11 @@
 // Declarations and observed changes. Runtime tool/sandbox policy remains in DSH.
+import fs from "node:fs";
+import { spawnSync } from "node:child_process";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const MAX_NATIVE_POLICY_BATCH_ITEMS = 4096;
+const workerScopeCapabilities = new Map();
 
 export class WorkerError extends Error {
   constructor(code, details = null) {
@@ -22,6 +28,12 @@ export const covers = (scope, file) => {
   }
   return scope === "." || file === scope || file.startsWith(scope + "/");
 };
+const isGitMetadataPath = (file) =>
+  file.split("/").some((component) =>
+    process.platform === "win32"
+      ? component.toLowerCase() === ".git"
+      : component === ".git",
+  );
 export const samePath = (a, b) =>
   process.platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b;
 export const within = (root, file) => {
@@ -45,7 +57,7 @@ function relativeScope(value) {
   const normalized = value.endsWith("/") ? value.slice(0, -1) : value;
   requireWorker(
     normalized.split("/").every((p) => p && p !== "." && p !== "..") &&
-      !covers(".git", normalized),
+      !isGitMetadataPath(normalized),
     "invalid_scope_path",
   );
   return normalized;
@@ -64,7 +76,7 @@ export function leaseSeconds(value) {
   );
   return value;
 }
-export function declaration(input) {
+function legacyDeclaration(input) {
   const allowed = [
     "worker_id",
     "role",
@@ -119,9 +131,243 @@ export function declaration(input) {
     lease_seconds: leaseSeconds(input.lease_seconds),
   };
 }
+
+function executable(file) {
+  try {
+    if (!fs.statSync(file).isFile()) return false;
+    if (process.platform !== "win32") fs.accessSync(file, fs.constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function supportsWorkerScope(file) {
+  let stat;
+  try {
+    stat = fs.statSync(file);
+  } catch {
+    return false;
+  }
+  const cacheKey = [file, stat.dev, stat.ino, stat.size, stat.mtimeMs].join(":");
+  const cached = workerScopeCapabilities.get(cacheKey);
+  if (cached !== undefined) return cached;
+
+  const result = spawnSync(file, ["--help"], {
+    encoding: "utf8",
+    windowsHide: true,
+    shell: false,
+    timeout: 2_000,
+    maxBuffer: 64 * 1024,
+  });
+  const help = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+  const supported =
+    !result.error &&
+    result.status === 0 &&
+    /(?:^|\r?\n)\s*worker-scope\s{2,}\S/.test(help);
+  workerScopeCapabilities.set(cacheKey, supported);
+  return supported;
+}
+
+function rdshExecutable() {
+  if (process.env.RDSH_BIN) {
+    if (!path.isAbsolute(process.env.RDSH_BIN)) {
+      throw new WorkerError("invalid_rdsh_bin");
+    }
+    return path.resolve(process.env.RDSH_BIN);
+  }
+  const executableName = process.platform === "win32" ? "rdsh.exe" : "rdsh";
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const candidates = [
+    path.join(root, "target", "debug", executableName),
+    path.join(root, "target", "release", executableName),
+  ];
+  return candidates.find((candidate) =>
+    executable(candidate) && supportsWorkerScope(candidate),
+  ) ?? null;
+}
+
+function normalizedDeclaration(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new WorkerError("native_worker_policy_unavailable");
+  }
+  return {
+    worker_id: value.worker_id,
+    role: value.role,
+    read_paths: value.read_paths,
+    write_paths: value.write_paths,
+    modules: value.modules,
+    forbidden_paths: value.forbidden_paths,
+    lease_seconds: value.lease_seconds,
+  };
+}
+
+function legacyDeclarationResults(inputs) {
+  return inputs.map((input) => {
+    try {
+      return { ok: true, value: legacyDeclaration(input) };
+    } catch (error) {
+      if (error instanceof WorkerError) return { ok: false, code: error.code };
+      throw error;
+    }
+  });
+}
+
+function legacyPolicyResults(input) {
+  return {
+    write_checks: (input.write_checks ?? []).map(({ scope, files }) =>
+      files.map((file) => mayWrite(scope, file)),
+    ),
+    intersections: (input.intersections ?? []).map(({ left, right }) =>
+      intersections(left, right),
+    ),
+    shared_files: (input.shared_files ?? []).map(sharedFile),
+  };
+}
+
+export function policyResults(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new WorkerError("invalid_scope_policy_batch");
+  }
+  const request = {
+    write_checks: input.write_checks ?? [],
+    intersections: input.intersections ?? [],
+    shared_files: input.shared_files ?? [],
+  };
+  if (
+    !Array.isArray(request.write_checks) ||
+    !Array.isArray(request.intersections) ||
+    !Array.isArray(request.shared_files)
+  ) {
+    throw new WorkerError("invalid_scope_policy_batch");
+  }
+  if (
+    request.write_checks.length === 0 &&
+    request.intersections.length === 0 &&
+    request.shared_files.length === 0
+  ) {
+    return { write_checks: [], intersections: [], shared_files: [] };
+  }
+
+  if (
+    request.write_checks.length > MAX_NATIVE_POLICY_BATCH_ITEMS ||
+    request.intersections.length > MAX_NATIVE_POLICY_BATCH_ITEMS ||
+    request.shared_files.length > MAX_NATIVE_POLICY_BATCH_ITEMS
+  ) {
+    return legacyPolicyResults(request);
+  }
+
+  const binary = rdshExecutable();
+  if (!binary) return legacyPolicyResults(request);
+  const serialized = JSON.stringify(request);
+  if (Buffer.byteLength(serialized) > 2 * 1024 * 1024) {
+    return legacyPolicyResults(request);
+  }
+  const output = spawnSync(binary, ["worker-scope", "policy"], {
+    input: serialized,
+    encoding: "utf8",
+    windowsHide: true,
+    shell: false,
+    timeout: 10_000,
+    maxBuffer: 4 * 1024 * 1024,
+  });
+  if (output.error?.code === "ENOENT" && !process.env.RDSH_BIN) {
+    return legacyPolicyResults(request);
+  }
+  if (output.error || output.status !== 0) {
+    throw new WorkerError("native_worker_policy_unavailable");
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(output.stdout);
+  } catch {
+    throw new WorkerError("native_worker_policy_unavailable");
+  }
+  if (
+    !parsed ||
+    typeof parsed !== "object" ||
+    !Array.isArray(parsed.write_checks) ||
+    parsed.write_checks.length !== request.write_checks.length ||
+    !Array.isArray(parsed.intersections) ||
+    parsed.intersections.length !== request.intersections.length ||
+    !Array.isArray(parsed.shared_files) ||
+    parsed.shared_files.length !== request.shared_files.length
+  ) {
+    throw new WorkerError("native_worker_policy_unavailable");
+  }
+  const writeChecksValid = parsed.write_checks.every(
+    (results, index) =>
+      Array.isArray(results) &&
+      results.length === request.write_checks[index].files.length &&
+      results.every((value) => typeof value === "boolean"),
+  );
+  const intersectionsValid = parsed.intersections.every(
+    (paths) =>
+      Array.isArray(paths) && paths.every((value) => typeof value === "string"),
+  );
+  if (
+    !writeChecksValid ||
+    !intersectionsValid ||
+    !parsed.shared_files.every((value) => typeof value === "boolean")
+  ) {
+    throw new WorkerError("native_worker_policy_unavailable");
+  }
+  return parsed;
+}
+
+export function declarationResults(inputs) {
+  requireWorker(Array.isArray(inputs), "invalid_scope_declarations");
+  if (inputs.length === 0) return [];
+  const binary = rdshExecutable();
+  if (!binary) return legacyDeclarationResults(inputs);
+
+  const output = spawnSync(binary, ["worker-scope", "validate"], {
+    input: JSON.stringify(inputs),
+    encoding: "utf8",
+    windowsHide: true,
+    shell: false,
+    timeout: 10_000,
+    maxBuffer: 4 * 1024 * 1024,
+  });
+  if (output.error?.code === "ENOENT" && !process.env.RDSH_BIN) {
+    return legacyDeclarationResults(inputs);
+  }
+  if (output.error || output.status !== 0) {
+    throw new WorkerError("native_worker_policy_unavailable");
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(output.stdout);
+  } catch {
+    throw new WorkerError("native_worker_policy_unavailable");
+  }
+  if (!Array.isArray(parsed) || parsed.length !== inputs.length) {
+    throw new WorkerError("native_worker_policy_unavailable");
+  }
+  return parsed.map((result) => {
+    if (result?.ok === true) {
+      return { ok: true, value: normalizedDeclaration(result.value) };
+    }
+    if (
+      result?.ok === false &&
+      typeof result.code === "string" &&
+      /^[a-z0-9_]+$/.test(result.code)
+    ) {
+      return { ok: false, code: result.code };
+    }
+    throw new WorkerError("native_worker_policy_unavailable");
+  });
+}
+
+export function declaration(input) {
+  const result = declarationResults([input])[0];
+  if (!result.ok) throw new WorkerError(result.code);
+  return result.value;
+}
 export function mayWrite(scope, file) {
   return (
-    !covers(".git", file) &&
+    !isGitMetadataPath(file) &&
     scope.write_paths.some((p) => covers(p, file)) &&
     !scope.forbidden_paths.some((p) => covers(p, file))
   );
