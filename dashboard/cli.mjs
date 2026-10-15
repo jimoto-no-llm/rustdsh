@@ -65,6 +65,7 @@ rdsh-dashboard instruction context --project <directory> --consumer-id <consumer
 rdsh-dashboard instruction submit|resolve --project <directory> --input-file <json>
 rdsh-dashboard cost-ledger declare|report --project <directory> --input-file <json>
 rdsh-dashboard cost-ledger inspect --project <directory>
+rdsh-dashboard cost-ledger validate|public|schema --input-file <request-json>   (native Rust)
 rdsh-dashboard task-outcomes apply|validate|schema --input-file <request-json>
 rdsh-dashboard budget policy|usage --project <directory> --input-file <json>
 rdsh-dashboard budget inspect --project <directory>
@@ -257,6 +258,38 @@ async function runNativeSubagentPlan(inputFile) {
     child.once("close", (code) => resolve(code ?? 1));
   });
   process.exitCode = exitCode;
+}
+
+// The ledger logic also lives in Rust (`rdsh cost-ledger`). This command keeps
+// the dashboard entry point working through the native implementation, while
+// `dashboard/state.mjs` keeps importing the JS module in-process.
+async function runNativeCostLedger(action, document) {
+  const executable = await nativeRdsh();
+  const file = path.join(
+    stateHome(),
+    `cost-ledger-${process.pid}-${randomUUID()}.json`,
+  );
+  await fs.mkdir(path.dirname(file), { recursive: true });
+  try {
+    const handle = await fs.open(file, "wx", 0o600);
+    try {
+      await handle.writeFile(JSON.stringify(document));
+    } finally {
+      await handle.close();
+    }
+    const exitCode = await new Promise((resolve, reject) => {
+      const child = spawn(
+        executable,
+        ["cost-ledger", action, "--input-file", file],
+        { stdio: "inherit", windowsHide: true },
+      );
+      child.once("error", reject);
+      child.once("close", (code) => resolve(code ?? 1));
+    });
+    process.exitCode = exitCode;
+  } finally {
+    await fs.rm(file, { force: true });
+  }
 }
 async function inPinnedCli(artifact, selectionRevision) {
   if (process.env.NODE_OPTIONS || process.env.NODE_PATH)
@@ -698,31 +731,49 @@ try {
   } else if (command === "cost-ledger") {
     const action = positionals[1],
       allowed = new Set(["project", "input-file", "help"]);
-    if (
-      positionals.length !== 2 ||
-      !["declare", "report", "inspect"].includes(action) ||
-      Object.keys(values).some((key) => !allowed.has(key)) ||
-      (action === "inspect"
-        ? values["input-file"] !== undefined
-        : !values["input-file"])
-    )
-      throw new Error(
-        "Cost ledger declare/report requires --input-file; inspect takes no input file",
-      );
-    const project = await identity(values.project || process.cwd());
-    console.log(
-      JSON.stringify(
-        await costRequest(
-          project,
-          action,
-          action === "inspect"
-            ? undefined
-            : await localJson(values["input-file"]),
+    // The pure projection and validation live in Rust (`rdsh cost-ledger`).
+    // They take no `--project`: the caller passes the whole state document, so
+    // no store is opened and no server is contacted.
+    if (["validate", "public", "schema"].includes(action)) {
+      if (
+        positionals.length !== 2 ||
+        !values["input-file"] ||
+        values.project !== undefined ||
+        Object.keys(values).some((key) => !allowed.has(key))
+      )
+        throw new Error(
+          "Cost ledger validate/public/schema requires --input-file and takes no project",
+        );
+      // Dispatch to the native command and leave the server path untouched;
+      // this is a module-level `try`, so the branch cannot `return`.
+      await runNativeCostLedger(action, await localJson(values["input-file"]));
+    } else {
+      if (
+        positionals.length !== 2 ||
+        !["declare", "report", "inspect"].includes(action) ||
+        Object.keys(values).some((key) => !allowed.has(key)) ||
+        (action === "inspect"
+          ? values["input-file"] !== undefined
+          : !values["input-file"])
+      )
+        throw new Error(
+          "Cost ledger declare/report requires --input-file; inspect takes no input file",
+        );
+      const project = await identity(values.project || process.cwd());
+      console.log(
+        JSON.stringify(
+          await costRequest(
+            project,
+            action,
+            action === "inspect"
+              ? undefined
+              : await localJson(values["input-file"]),
+          ),
+          null,
+          2,
         ),
-        null,
-        2,
-      ),
-    );
+      );
+    }
   } else if (command === "budget") {
     const action = positionals[1];
     const allowed = new Set(["project", "input-file", "help"]);
