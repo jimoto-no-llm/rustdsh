@@ -124,10 +124,7 @@ fn serve_mock_request(mut stream: TcpStream, state: Arc<MockState>) {
         return;
     }
     let _ = stream.set_read_timeout(Some(Duration::from_secs(3)));
-    let Ok(reader_stream) = stream.try_clone() else {
-        return;
-    };
-    let mut reader = BufReader::new(reader_stream);
+    let mut reader = BufReader::new(&stream);
     let mut request_line = String::new();
     if reader.read_line(&mut request_line).is_err() {
         return;
@@ -832,6 +829,7 @@ fn invalid_serial_proxy_options_exit_with_usage_status() {
         ("fractional rpm", &["--rpm", "1.5"]),
         ("negative rpm", &["--rpm=-1"]),
         ("zero max", &["--max", "0"]),
+        ("zero max queue", &["--max-queue", "0"]),
         ("zero body cap", &["--max-body-bytes", "0"]),
         ("non-numeric body cap", &["--max-body-bytes", "x"]),
         ("non-finite queue timeout", &["--queue-timeout", "NaN"]),

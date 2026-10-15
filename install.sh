@@ -481,7 +481,9 @@ if [ "$MODE" = as-dsh ]; then
   tmp="$PREFIX/.dsh.new.$$"
   install -m755 "$PREFIX/rdsh" "$tmp" && mv -f "$tmp" "$PREFIX/dsh"
   echo "installed rdsh as $PREFIX/dsh (atomic replace; revert: ./install.sh --restore)"
-  if grep -l "node" "$PREFIX"/* 2>/dev/null | xargs grep -l "dsh" 2>/dev/null | grep -q .; then
+  # -I: バイナリは走査しない。rdsh/dsh 自身が "node" と "dsh" の両方を含むため、
+  # テキストのラッパーが1つも無くても常に一致して誤検知になる。
+  if grep -Il "node" "$PREFIX"/* 2>/dev/null | xargs grep -Il "dsh" 2>/dev/null | grep -q .; then
     echo "note: wrappers calling 'node ...dsh...' break while dsh is shadowed (native binary, not JS)."
     echo "note: exec dsh/rdsh directly instead of via node; 'rdsh doctor' lists the offenders."
   fi

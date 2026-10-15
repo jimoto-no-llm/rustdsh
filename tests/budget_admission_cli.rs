@@ -661,6 +661,19 @@ fn usage_refuses_unknown_receipts_and_a_call_that_has_not_finished() {
 }
 
 #[test]
+fn apply_does_not_admit_when_a_stored_call_has_malformed_policy_ids() {
+    let fixture = Fixture::new();
+    let mut document = fixture.document_with_a_finished_call();
+    document["state"]["budget_admission"]["policies"]["project-budget"]["hard_limit"] =
+        serde_json::json!("0.3");
+    document["state"]["budget_admission"]["calls"]["call-1"]["policy_ids"] =
+        serde_json::Value::Null;
+
+    let error = fixture.run_failure(&document);
+    assert!(error.contains("budget_invalid_store"), "{error}");
+}
+
+#[test]
 fn validate_accepts_and_rejects_like_the_js_module() {
     let fixture = Fixture::new();
     let ok = fixture

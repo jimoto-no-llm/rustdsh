@@ -5,6 +5,17 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Fixed
+
+- 更新通知を dismiss したら、その更新については再表示しない（新しい更新のときだけ通知する）。
+
+### Changed
+
+- `AGENTS.md` and `docs/PROJECT-SETUP.md` record the working agreements that came
+  out of the v0.4.0 cycle: the nine required checks and the branch-protection
+  switches that are deliberately off, pinning the installer ledgers after every
+  release, and keeping the security page at zero open alerts.
+
 ## [0.4.0] - 2026-10-15
 
 ### Security
@@ -57,6 +68,21 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   warnings instead of guessed tiers. It starts no agent and writes nothing; the
   existing `workers prepare` still owns the checkout allocation
   (`docs/SUBAGENT-PLANNING.md`).
+- `rdsh-dashboard agents list|submit|status|result|cancel` runs cursor-agent and
+  devin as detached, cancellable jobs with untrusted-data results. The default
+  `--permission read-only` selects each CLI's most restrictive mode
+  (`--mode ask --sandbox enabled` for cursor-agent, `--permission-mode auto`
+  for devin); it is a flag mapping, not an OS sandbox, and the known gaps are
+  listed in `docs/AGENT-RUNNERS.md`. Every job end, and `cancel`, stops the
+  agent's process group with TERM, a grace period and KILL, and records
+  whether the stop was confirmed (`cleanup`); `cancel` also acts on jobs whose
+  supervisor was lost or that finished with leftover processes, but only after
+  proving the recorded group number still belongs to the job (a confirmed job
+  is a no-op; where no process identity can be read, a group cannot be stopped
+  after its supervisor is lost). On
+  Windows descendants cannot be observed (no Job Object support): the leader
+  tree is killed with `taskkill /T /F` while the leader is alive and cleanup is
+  always reported `unconfirmed` (`windows_tree_unobservable`).
 - `rdsh serial-proxy` replaces the standalone Node.js proxy with a native Rust
   command. It keeps the FIFO concurrency and rate limits, streams request and
   response bodies, and supports `--tool-choice-default <none|auto|required>`

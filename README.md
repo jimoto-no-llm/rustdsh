@@ -325,7 +325,7 @@ Optional Node.js dashboard for project metrics, human-in-the-loop Q&A, and mobil
 rdsh-dashboard project --project <directory>
 ```
 
-*On native Windows, the dashboard runs in the system tray and can be opened or stopped from the taskbar (`--no-tray` keeps it in the terminal). See [dashboard/README.md](dashboard/README.md).*
+*On native Windows, the dashboard runs in the system tray and can be opened or stopped from the taskbar (`--no-tray` keeps it in the terminal). See [dashboard/README.md](dashboard/README.md). External agent CLIs (cursor-agent, devin) can be run as supervised jobs: see [docs/AGENT-RUNNERS.md](docs/AGENT-RUNNERS.md).*
 
 ## Desktop App (Electron)
 
@@ -430,6 +430,7 @@ Measurements conducted on Linux x86_64:
 ## Community
 
 - Contributions: See [CONTRIBUTING.md](CONTRIBUTING.md).
+- Rust development setup: [Rust development guide](docs/RUST-DEVELOPMENT.md).
 - Issues & Ideas: [Issue tracker](https://github.com/jimoto-no-llm/rustdsh/issues/new/choose) (Japanese or English).
 - Security: Please report vulnerabilities privately according to [SECURITY.md](SECURITY.md).
 - Support: [SUPPORT.md](SUPPORT.md) / Code of Conduct: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).

@@ -103,6 +103,51 @@ fn public_fails_closed_for_malformed_stored_amounts() {
 }
 
 #[test]
+fn public_rejects_malformed_policy_and_call_shapes() {
+    let fixture = Fixture::new();
+    let empty_book = || {
+        serde_json::json!({
+            "schema": 1, "project_id": "p1",
+            "policies": { "p1": policy("p1", "0") },
+            "jobs": {}, "calls": {}, "receipts": {},
+            "decisions": [], "operations": [],
+        })
+    };
+    let mut null_policies = empty_book();
+    null_policies["policies"] = serde_json::Value::Null;
+    let mut non_object_policy = empty_book();
+    non_object_policy["policies"] = serde_json::json!({ "p1": true });
+    let mut null_calls = empty_book();
+    null_calls["calls"] = serde_json::Value::Null;
+    let mut non_object_call = empty_book();
+    non_object_call["calls"] = serde_json::json!({ "call-1": true });
+    let mut missing_policy_ids = empty_book();
+    missing_policy_ids["calls"] = serde_json::json!({
+        "call-1": { "amount": null, "reservation": "1" }
+    });
+    let mut non_array_policy_ids = empty_book();
+    non_array_policy_ids["calls"] = serde_json::json!({
+        "call-1": { "policy_ids": null, "amount": null, "reservation": "1" }
+    });
+
+    for (name, book) in [
+        ("null policies", null_policies),
+        ("non-object policy", non_object_policy),
+        ("null calls", null_calls),
+        ("non-object call", non_object_call),
+        ("missing policy_ids", missing_policy_ids),
+        ("non-array policy_ids", non_array_policy_ids),
+    ] {
+        let error = fixture.run_failure(&serde_json::json!({
+            "operation": "public",
+            "state": { "project": { "id": "p1" }, "budget_admission": book },
+            "now": NOW,
+        }));
+        assert!(error.contains("budget_invalid_store"), "{name}: {error}");
+    }
+}
+
+#[test]
 fn public_accepts_a_valid_state_larger_than_the_old_cli_cap() {
     let fixture = Fixture::new();
     let document = serde_json::json!({
