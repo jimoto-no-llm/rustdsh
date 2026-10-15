@@ -97,9 +97,10 @@ export async function writeJson(file, value) {
   await fs.rename(temp, file);
 }
 export class ProjectStore {
-  constructor(project, value) {
+  constructor(project, value, { instructionQueueWorker } = {}) {
     this.project = project;
     this.value = value;
+    this.instructionQueueWorker = instructionQueueWorker || null;
     this.historyIds = validateRestoredHistory(value);
     this.protectedHistory = freezeHistory(value.history_backups);
   }
@@ -109,7 +110,7 @@ export class ProjectStore {
     if (history_backups !== undefined) next.history_backups = history_backups;
     return next;
   }
-  static async open(project) {
+  static async open(project, options = {}) {
     let value;
     try {
       value = JSON.parse(
@@ -139,7 +140,7 @@ export class ProjectStore {
     validateCostLedger(value);
     validateBudgetAdmission(value);
     validateTaskOutcomes(value);
-    return new ProjectStore(project, value);
+    return new ProjectStore(project, value, options);
   }
   async mutate(operation, input) {
     const next = this.clone();
@@ -150,7 +151,7 @@ export class ProjectStore {
     return this.commit(next, operation, input);
   }
   async mutateReply(operation, input, context) {
-    const next = this.clone();
+    let next = this.clone();
     const handlers = {
       register: registerReplyConsumer,
       ack: applyReplyAck,
@@ -158,7 +159,48 @@ export class ProjectStore {
       instruction_resolve: resolveInstruction,
       control: applyInstructionControl,
     };
-    const result = handlers[operation](next, input, context);
+    const nativeOperations = {
+      instruction_submit: "submit",
+      instruction_resolve: "resolve",
+      control: "control",
+    };
+    let result;
+    const nativeOperation = nativeOperations[operation];
+    if (this.instructionQueueWorker && nativeOperation) {
+      const response = await this.instructionQueueWorker.request({
+        operation: nativeOperation,
+        state: {
+          project: { id: next.project.id },
+          feedback: next.feedback,
+          answer_applications: next.answer_applications,
+          ...(Object.hasOwn(next, "instructions")
+            ? { instructions: next.instructions }
+            : {}),
+        },
+        input,
+        context,
+      });
+      if (
+        !response ||
+        response.operation !== nativeOperation ||
+        !response.state ||
+        typeof response.state !== "object" ||
+        Array.isArray(response.state) ||
+        !response.state.instructions ||
+        typeof response.state.instructions !== "object" ||
+        Array.isArray(response.state.instructions) ||
+        !Object.hasOwn(response, "result")
+      ) {
+        throw Object.assign(
+          new Error("Rust instruction worker returned an invalid response"),
+          { status: 500 },
+        );
+      }
+      next.instructions = response.state.instructions;
+      result = response.result;
+    } else {
+      result = handlers[operation](next, input, context);
+    }
     validateAnswerApplications(next);
     validateInstructions(next);
     await this.commit(next);

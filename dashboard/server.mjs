@@ -7,6 +7,10 @@ import QRCode from "qrcode";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { ProjectStore, writeJson, stateHome, publicState } from "./state.mjs";
+import {
+  InstructionQueueWorker,
+  resolveRdshExecutable,
+} from "./instruction-queue-worker.mjs";
 import { createMcpServer } from "./mcp.mjs";
 import { enableShare, inspectShare } from "./tailscale.mjs";
 import { startHarness, proxyHarness, upgradeHarness } from "./harness.mjs";
@@ -159,9 +163,13 @@ export async function startDashboard(options) {
   const connections = new ConnectionObservations();
   const localUrl = `http://127.0.0.1:${port}/`;
   const cookieName = `rdsh_${kind === "project" ? project.id : "harness"}`;
-  let store, eventsHub, humanAnnotations, observedCli;
+  let store, eventsHub, humanAnnotations, observedCli, instructionQueueWorker;
   try {
-    store = kind === "project" ? await ProjectStore.open(project) : null;
+    if (kind === "project") {
+      const executable = await resolveRdshExecutable();
+      if (executable) instructionQueueWorker = new InstructionQueueWorker(executable);
+      store = await ProjectStore.open(project, { instructionQueueWorker });
+    } else store = null;
     humanAnnotations = store ? await HumanAnnotationStore.open(project) : null;
     eventsHub = store
       ? await EventsHub.open(project, () => store.value, options.webhookPost)
@@ -172,6 +180,7 @@ export async function startDashboard(options) {
         })
       : null;
   } catch (error) {
+    await instructionQueueWorker?.close().catch(() => {});
     await removeDashboardLockIfOwned(lockFile, lockContent).catch(() => {});
     throw error;
   }
@@ -987,6 +996,7 @@ export async function startDashboard(options) {
       for (const response of live) response.end();
       for (const { mcp } of sessions.values()) await mcp.server.close();
       await updateQueue;
+      await instructionQueueWorker?.close();
       await eventsHub?.queue;
       for (const socket of sockets) socket.destroy();
       await new Promise((resolve) => server.close(resolve));

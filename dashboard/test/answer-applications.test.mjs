@@ -1541,6 +1541,139 @@ test("unknown/corrupt application schemas preserve the original file and legacy 
   }
 });
 
+test("ProjectStore commits Rust instruction results and leaves state untouched on native errors", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-native-queue-store-"));
+  t.after(() => fs.rm(root, { recursive: true }));
+  const project = { id: "fixture", name: "fixture", root, directory: root };
+  await fs.writeFile(
+    path.join(root, "state.json"),
+    JSON.stringify({
+      schema: 1,
+      project: { id: project.id, name: project.name, root },
+      revision: 0,
+      updated_at: null,
+      metrics: {},
+      tasks: [],
+      questions: [],
+      events: [],
+      feedback: [],
+      history_backups: [],
+    }),
+  );
+
+  let fail = false;
+  let received;
+  const instructionQueueWorker = {
+    async request(document) {
+      received = document;
+      if (fail) throw Object.assign(new Error("native conflict"), { status: 409 });
+      return {
+        operation: document.operation,
+        state: {
+          instructions: {
+            schema: 1,
+            revision: 0,
+            sequence: 0,
+            requests: {},
+            commands: {},
+          },
+          history_backups: [{ malformed: true }],
+        },
+        result: { command_id: "native-command" },
+      };
+    },
+  };
+  const store = await ProjectStore.open(project, { instructionQueueWorker });
+  const runId = "run_" + randomUUID();
+  await store.mutateReply("register", {
+    run_id: runId,
+    cli_session_id: "fixture-session",
+    task_id: "fixture-task",
+  });
+  const historyBackups = store.value.history_backups;
+  const result = await store.mutateReply(
+    "instruction_submit",
+    { command_id: "input_" + randomUUID(), run_id: runId },
+    { actor: "human" },
+  );
+
+  assert.equal(received.operation, "submit");
+  assert.deepEqual(Object.keys(received.state).sort(), [
+    "answer_applications",
+    "feedback",
+    "project",
+  ]);
+  assert.deepEqual(result, { command_id: "native-command" });
+  assert.deepEqual(store.value.instructions, {
+    schema: 1,
+    revision: 0,
+    sequence: 0,
+    requests: {},
+    commands: {},
+  });
+  assert.equal(store.value.history_backups, historyBackups);
+  const beforeFailure = structuredClone(store.value);
+  const persistedBeforeFailure = await fs.readFile(path.join(root, "state.json"), "utf8");
+  fail = true;
+  await assert.rejects(
+    store.mutateReply("instruction_resolve", {}, { actor: "human" }),
+    (error) => error.message === "native conflict" && error.status === 409,
+  );
+  assert.deepEqual(store.value, beforeFailure);
+  assert.equal(
+    await fs.readFile(path.join(root, "state.json"), "utf8"),
+    persistedBeforeFailure,
+  );
+});
+
+test("live Dashboard uses and closes the installed Rust instruction worker", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-live-native-queue-"));
+  const projectRoot = path.join(root, "project");
+  await fs.mkdir(projectRoot);
+  const project = await identity(projectRoot);
+  project.directory = path.join(root, "dashboard");
+  const executable = path.join(root, "rdsh-fixture");
+  await fs.writeFile(
+    executable,
+    `#!${process.execPath}
+const readline = require("node:readline");
+const input = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
+input.on("line", (line) => {
+  const request = JSON.parse(line);
+  const state = request.state;
+  state.instructions ||= { schema: 1, revision: 0, sequence: 0, requests: {}, commands: {} };
+  process.stdout.write(JSON.stringify({ operation: request.operation, state, result: { native: true } }) + "\\n");
+});
+`,
+    { mode: 0o700 },
+  );
+  const previousRdshBin = process.env.RDSH_BIN;
+  process.env.RDSH_BIN = executable;
+  let dashboard;
+  t.after(async () => {
+    if (dashboard) await dashboard.close();
+    if (previousRdshBin === undefined) delete process.env.RDSH_BIN;
+    else process.env.RDSH_BIN = previousRdshBin;
+    await fs.rm(root, { recursive: true, force: true });
+  });
+
+  dashboard = await startDashboard({
+    project,
+    port: await freePort(),
+    tailscale: false,
+  });
+  const worker = dashboard.store.instructionQueueWorker;
+  assert.ok(worker);
+  assert.deepEqual(
+    await dashboard.store.mutateReply("control", { command_id: "fixture" }, { actor: "human" }),
+    { native: true },
+  );
+  assert.ok(worker.record);
+  await dashboard.close();
+  assert.equal(worker.closed, true);
+  assert.equal(worker.record, null);
+});
+
 test(
   "public CLI once resumes the exact session, applies once, and inspection never launches another prompt",
   options,

@@ -122,6 +122,8 @@ fn instruction_queue_serve_processes_ordered_requests_after_errors() {
         .collect();
     assert_eq!(responses.len(), 3);
     assert_eq!(responses[0]["result"]["request"]["status"], "accepted");
+    assert_eq!(responses[0]["state"].as_object().unwrap().len(), 1);
+    assert!(responses[0]["state"]["instructions"]["requests"].is_object());
     assert_eq!(responses[1]["status"], 400);
     assert_eq!(responses[1]["error"], "Unknown instruction field");
     assert_eq!(responses[2]["valid"], true);

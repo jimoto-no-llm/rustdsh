@@ -7,6 +7,7 @@ use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 
 const REGISTRY_KEYS: [&str; 5] = ["schema", "revision", "sequence", "requests", "commands"];
+const MAX_WORKER_REQUEST_BYTES: usize = 64 * 1024 * 1024;
 const REQUEST_KEYS: [&str; 19] = [
     "command_id",
     "consumer_id",
@@ -1699,7 +1700,6 @@ pub fn cmd_instruction_queue(action: &str, input_file: &str) -> Result<()> {
 }
 
 fn worker_response(line: &[u8]) -> Value {
-    const MAX_WORKER_REQUEST_BYTES: usize = 64 * 1024 * 1024;
     if line.len() > MAX_WORKER_REQUEST_BYTES {
         return serde_json::json!({
             "error": "Input JSON exceeds the 64 MiB worker limit",
@@ -1717,11 +1717,59 @@ fn worker_response(line: &[u8]) -> Value {
     };
     let action = string(&document, "operation").unwrap_or("");
     match run_instruction_queue(action, &document) {
-        Ok(response) => response,
+        Ok(mut response) => {
+            if ["submit", "resolve", "control"].contains(&action) {
+                if let Some(instructions) = response
+                    .get("state")
+                    .and_then(|state| state.get("instructions"))
+                    .cloned()
+                {
+                    response["state"] = serde_json::json!({"instructions": instructions});
+                }
+            }
+            response
+        }
         Err(error) => serde_json::json!({
             "error": error.to_string(),
             "status": error_status(&error)
         }),
+    }
+}
+
+fn read_bounded_worker_line<R: BufRead>(
+    input: &mut R,
+    line: &mut Vec<u8>,
+    maximum: usize,
+) -> std::io::Result<Option<bool>> {
+    line.clear();
+    let mut oversized = false;
+    loop {
+        let (consumed, line_ended) = {
+            let available = input.fill_buf()?;
+            if available.is_empty() {
+                return if line.is_empty() && !oversized {
+                    Ok(None)
+                } else {
+                    Ok(Some(!oversized))
+                };
+            }
+            let length = available
+                .iter()
+                .position(|byte| *byte == b'\n')
+                .map_or(available.len(), |index| index + 1);
+            let line_ended = available[length - 1] == b'\n';
+            if !oversized {
+                let remaining = maximum.saturating_sub(line.len());
+                let kept = length.min(remaining);
+                line.extend_from_slice(&available[..kept]);
+                oversized = kept < length;
+            }
+            (length, line_ended)
+        };
+        input.consume(consumed);
+        if line_ended {
+            return Ok(Some(!oversized));
+        }
     }
 }
 
@@ -1733,14 +1781,45 @@ pub fn cmd_instruction_queue_serve() -> Result<()> {
     let mut output = BufWriter::new(stdout.lock());
     let mut line = Vec::new();
     loop {
-        line.clear();
-        if input.read_until(b'\n', &mut line)? == 0 {
-            break;
-        }
-        let response = worker_response(&line);
+        let response =
+            match read_bounded_worker_line(&mut input, &mut line, MAX_WORKER_REQUEST_BYTES)? {
+                None => break,
+                Some(true) => worker_response(&line),
+                Some(false) => serde_json::json!({
+                    "error": "Input JSON exceeds the 64 MiB worker limit",
+                    "status": 400
+                }),
+            };
         serde_json::to_writer(&mut output, &response)?;
         output.write_all(b"\n")?;
         output.flush()?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod worker_line_tests {
+    use super::read_bounded_worker_line;
+    use std::io::{BufReader, Cursor};
+
+    #[test]
+    fn oversized_worker_line_is_discarded_without_losing_the_next_request() {
+        let mut reader = BufReader::new(Cursor::new(b"0123456789\nok\n"));
+        let mut line = Vec::new();
+
+        assert_eq!(
+            read_bounded_worker_line(&mut reader, &mut line, 4).unwrap(),
+            Some(false)
+        );
+        assert_eq!(line, b"0123");
+        assert_eq!(
+            read_bounded_worker_line(&mut reader, &mut line, 4).unwrap(),
+            Some(true)
+        );
+        assert_eq!(line, b"ok\n");
+        assert_eq!(
+            read_bounded_worker_line(&mut reader, &mut line, 4).unwrap(),
+            None
+        );
+    }
 }
