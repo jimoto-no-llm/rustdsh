@@ -17,6 +17,11 @@ installer and badge links use that owner. Keep historical evidence intact.
   assets. Candidates use exact-tag installer URLs and never replace `latest`.
 - Preserve all five platform archives, their SHA256 sidecars, and both installers.
   Publication belongs to the final CD job after upload verification.
+- Publication is not finished until the digests are pinned: merge the pull
+  request the `pin-release-digests` workflow opens, or run
+  `python3 scripts/pin-release-digests.py vX.Y.Z`. Installers and the automatic
+  updater only resolve releases pinned in `release-digests.tsv` and
+  `release-digests-windows.tsv`, and `latest` moves forward only.
 - A project settings change does not itself request a new version release.
 
 ## Repository configuration
@@ -26,3 +31,27 @@ installer and badge links use that owner. Keep historical evidence intact.
 - `P0`–`P3` express priority; component/type labels describe the work. Preserve
   existing labels and issue assignments when adding definitions.
 - Keep release changes focused and preserve unrelated working-tree edits.
+
+## Working agreements
+
+- Pull requests keep the four-line body (概要 / 変更 / 検証 / 注意点) and stay
+  green: `cargo fmt --check`, clippy with zero warnings, the tests the change
+  touches, and `tests/regress.sh` for behavior changes.
+- Required checks, review rules and the administrator bypass are documented in
+  [docs/PROJECT-SETUP.md](docs/PROJECT-SETUP.md). Never merge a pull request with
+  unresolved review threads: read the head commit against each thread, reply with
+  the evidence, and resolve it — do not bypass it with `--admin`.
+- Keep the security page at zero open alerts. Dependabot, CodeQL and secret
+  scanning are the sources; every npm manifest directory belongs in
+  `.github/dependabot.yml`, and an alert is only dismissed with a recorded
+  reason (see `docs/PROJECT-SETUP.md`).
+- The Web UI update notice is dismissed per update event. A dismissed notice for
+  an already applied update must not come back; only a new `at`/`to` notifies
+  again. Its state lives in `~/.local/share/rdsh/` (`update-state.json`,
+  `update-notice-close.json`).
+- Parallel work uses one `git worktree` per pull request, `TMPDIR=/var/tmp` and a
+  per-worktree `CARGO_TARGET_DIR`. Never commit or revert another agent's
+  uncommitted files, and push branches that change `.github/workflows/` over SSH
+  (`git@github.com:jimoto-no-llm/rustdsh.git`).
+- The marketing and evidence docs follow their own format rules; runtime behavior
+  changes belong in `docs/` next to the feature they describe, not in AGENTS.md.
