@@ -1,0 +1,4 @@
+- insert:
+    - id: rdsh-mobile-ui
+      name: "rdsh-mobile-ui"
+      config: {}

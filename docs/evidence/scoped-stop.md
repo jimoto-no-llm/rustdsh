@@ -6,7 +6,7 @@ probe/resume/stop sequence to finish on a loaded runner; operation deadlines
 remain bounded independently. Stop-history failures retain their original
 error as `cause`, alongside the independently observed process result.
 
-Issue: [#35](https://github.com/sahenjp/rustdsh/issues/35).
+Issue: [#35](https://github.com/jimoto-no-llm/rustdsh/issues/35).
 Contract: [scoped staged stop](../SCOPED-STOP.md).
 
 ## Before and after

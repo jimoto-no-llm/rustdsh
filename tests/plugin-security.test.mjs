@@ -12,8 +12,15 @@ import { syncBuiltinESMExports } from 'node:module';
 let updateCalls = 0;
 const execFile = childProcess.execFile;
 childProcess.execFile = (...args) => {
+  const done = args.at(-1);
+  // The settings card probes the installed rdsh version (issue #397); only the
+  // updater invocation counts as an update run.
+  if (args[0] === 'rdsh' && Array.isArray(args[1]) && args[1][0] === '--version') {
+    queueMicrotask(() => done(null, 'rdsh 0.0.0-test\n', ''));
+    return new EventEmitter();
+  }
   updateCalls++;
-  queueMicrotask(() => args.at(-1)(null, 'test updater', ''));
+  queueMicrotask(() => done(null, 'test updater', ''));
   return new EventEmitter();
 };
 syncBuiltinESMExports();
@@ -97,6 +104,8 @@ test('plugin security boundary and settings preservation', async (t) => {
       assert.equal((await request(path)).status, 200);
       assert.equal((await request(path, { method: 'DELETE' })).status, 405);
     }
+    // The settings card shows the running versions (issue #397).
+    assert.deepEqual((await request('/api/rdsh-settings')).body.versions.rdsh, '0.0.0-test');
     const saved = await request('/api/rdsh-context/save', { method: 'POST', body: JSON.stringify({ goal: 'new legacy goal' }) });
     assert.equal(saved.status, 200);
     assert.equal(JSON.parse(await readFile(contextFile, 'utf8')).goal, 'new legacy goal');

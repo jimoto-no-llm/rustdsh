@@ -6,6 +6,7 @@ import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { randomUUID } from "node:crypto";
 import { identity } from "../state.mjs";
 import { SessionLedger, attachRecordedSession } from "../session-ledger.mjs";
 import { Checkpoints } from "../checkpoints.mjs";
@@ -166,6 +167,94 @@ test("formal checkpoint resume confirms the same native ID and repeated recovery
     trace.filter((item) => item.method === "session/prompt").length,
     0,
   );
+});
+
+test("a checkpoint safety refusal keeps its specific error code and blocks replay", async (t) => {
+  const f = await setup(t),
+    checkpoint = await f.record(),
+    inspect = f.store.inspect.bind(f.store);
+  f.store.inspect = async (...args) => {
+    const result = await inspect(...args);
+    result.checkpoint.context = {
+      ...result.checkpoint.context,
+      branch: "changed-after-inspection",
+    };
+    return result;
+  };
+
+  let failure;
+  try {
+    await f.store.recover(checkpoint.checkpoint_id, {
+      ...f.options,
+      mode: "resume",
+    });
+  } catch (error) {
+    failure = error;
+  }
+  assert.equal(failure?.code, "recovery_context_changed");
+  const action = await f.store.action(checkpoint.checkpoint_id);
+  assert.equal(action.status, "unknown");
+  assert.equal(action.error_code, "recovery_context_changed");
+  const trace = await f.trace();
+  assert.equal(
+    trace.filter((item) => item.method === "session/resume").length,
+    0,
+  );
+  await assert.rejects(
+    f.store.recover(checkpoint.checkpoint_id, {
+      ...f.options,
+      mode: "resume",
+    }),
+    error("recovery_action_uncertain"),
+  );
+  assert.deepEqual(await f.trace(), trace);
+});
+
+test("a context safety error is preserved in the uncertain recovery record and never retried", async (t) => {
+  const f = await setup(t),
+    checkpoint = await f.record(),
+    inspect = f.store.inspect.bind(f.store);
+  f.store.inspect = async (...args) => {
+    const result = await inspect(...args);
+    await exec(
+      "git",
+      ["-C", f.projectRoot, "switch", "-c", "changed-after-inspection"],
+      { env: f.env, windowsHide: true },
+    );
+    return result;
+  };
+
+  let failure;
+  try {
+    await f.store.recover(checkpoint.checkpoint_id, {
+      ...f.options,
+      mode: "resume",
+    });
+  } catch (error) {
+    failure = error;
+  }
+  assert.equal(failure?.code, "repository_context_changed");
+
+  const action = await f.store.action(checkpoint.checkpoint_id);
+  assert.equal(action.status, "unknown");
+  assert.equal(action.error_code, "repository_context_changed");
+  const trace = await f.trace();
+  assert.equal(
+    trace.filter((item) => item.method === "session/new").length,
+    1,
+  );
+  assert.equal(
+    trace.filter((item) => item.method === "session/resume").length,
+    0,
+  );
+  await assert.rejects(
+    f.store.recover(checkpoint.checkpoint_id, {
+      ...f.options,
+      mode: "resume",
+    }),
+    error("recovery_action_uncertain"),
+  );
+  assert.deepEqual(await f.trace(), trace);
 });
 
 test("missing and expired-session fixtures require a new-session choice, while unsupported or malformed native evidence is distinct", async (t) => {
@@ -436,6 +525,7 @@ test("a lost summary response leaves the new session link uncertain and never di
     await Checkpoints.open(f.project)
   ).action(checkpoint.checkpoint_id);
   assert.equal(result.status, "unknown");
+  assert.equal(result.error_code, "recovery_result_unknown");
   assert.equal(result.summary_status, "unknown");
   assert.notEqual(result.cli_session_id, checkpoint.cli_session_id);
   const trace = await f.trace();
@@ -543,5 +633,106 @@ test("separate public CLI clients record, inspect, resume and reject unsafe summ
     call("start-new", "--checkpoint-id", checkpoint.checkpoint_id),
     (failure) =>
       /--summary-file and --accept-context-loss/.test(failure.stderr),
+  );
+});
+
+// These two tests exercise the lease helper directly. Every test above needs a
+// real owned process scope; a lease cleanup failure only needs its lock file.
+async function leaseFixture(t) {
+  const root = await fs.mkdtemp(
+    path.join(os.tmpdir(), "rdsh-checkpoint-lease-test-"),
+  );
+  const cwd = path.join(root, "project");
+  await fs.mkdir(cwd);
+  const project = await identity(cwd);
+  project.directory = path.join(root, "dashboard", "projects", project.id);
+  t.after(async () => {
+    assert.equal(path.dirname(path.resolve(root)), path.resolve(os.tmpdir()));
+    assert.ok(path.basename(root).startsWith("rdsh-checkpoint-lease-test-"));
+    await fs.rm(root, { recursive: true });
+  });
+  return { project, store: await Checkpoints.open(project) };
+}
+const recoveryAction = (id) => ({
+  schema: 1,
+  checkpoint_id: id,
+  action_id: "recover_" + randomUUID(),
+  mode: "resume",
+  status: "completed",
+  run_id: "run_" + randomUUID(),
+  cli_session_id: "fixture-checkpoint-session",
+  summary_digest: null,
+  summary_bytes: 0,
+  summary_status: "not_requested",
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+});
+const failLockCleanup = (t, lock) => {
+  const originalUnlink = fs.unlink;
+  t.mock.method(fs, "unlink", async (file, ...args) => {
+    if (path.resolve(String(file)) === path.resolve(lock)) {
+      const error = new Error("fixture lock cleanup failure");
+      error.code = "EACCES";
+      throw error;
+    }
+    return originalUnlink(file, ...args);
+  });
+};
+
+test("a lease cleanup failure keeps a completed operation's result and reports it committed", async (t) => {
+  const { store } = await leaseFixture(t),
+    id = "cp_" + randomUUID(),
+    lock = store.file(id, ".lock"),
+    action = recoveryAction(id);
+  failLockCleanup(t, lock);
+  let failure;
+  await assert.rejects(
+    store.lease(id, async () => {
+      await store.saveAction(action);
+      return "fixture-lease-result";
+    }),
+    (error) => {
+      failure = error;
+      return error.code === "checkpoint_lock_cleanup_unconfirmed";
+    },
+  );
+  assert.equal(failure.committed, true);
+  assert.equal(failure.lock_cleanup_unconfirmed, true);
+  assert.deepEqual(failure.event_ids, []);
+  assert.deepEqual(await store.action(id), action);
+  await assert.rejects(
+    store.lease(id, async () => {}),
+    error("checkpoint_busy"),
+  );
+});
+
+test("a leased operation failure keeps its own code when the lock cleanup also fails", async (t) => {
+  const { store } = await leaseFixture(t),
+    id = "cp_" + randomUUID(),
+    lock = store.file(id, ".lock"),
+    action = recoveryAction(id);
+  failLockCleanup(t, lock);
+  let failure;
+  await assert.rejects(
+    store.lease(id, async () => {
+      await store.saveAction(action);
+      await store.saveAction({
+        ...action,
+        summary_digest: "0".repeat(64),
+      });
+    }),
+    (error) => {
+      failure = error;
+      return error.code === "invalid_recovery_action";
+    },
+  );
+  // The helper cannot observe how far the caller's own writes got.
+  assert.equal(failure.committed, null);
+  assert.equal(failure.lock_cleanup_unconfirmed, true);
+  assert.deepEqual(failure.event_ids, []);
+  assert.deepEqual(await store.action(id), action);
+  await assert.rejects(
+    store.lease(id, async () => {}),
+    error("checkpoint_busy"),
   );
 });

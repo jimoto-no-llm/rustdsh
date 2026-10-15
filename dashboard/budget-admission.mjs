@@ -1,6 +1,9 @@
 import { costSources } from "./cost-ledger.mjs";
 
 const scale = 1000000000n;
+// Keep replay-derived aggregates process-local. The operation log remains
+// the persisted source of truth.
+const totalsByBook = new WeakMap();
 export class BudgetError extends Error {
   constructor(code) {
     super(code);
@@ -97,22 +100,55 @@ function decision(book, kind, data, now) {
   return entry;
 }
 function totals(book, policy) {
-  let spent = policy.baseline === null ? null : units(policy.baseline);
-  let reserved = 0n,
-    executing = 0,
-    awaiting = 0;
-  for (const call of Object.values(book.calls)) {
-    if (!call.policy_ids.includes(policy.policy_id)) continue;
-    if (call.amount !== null) {
-      if (spent !== null) spent += units(call.amount);
-    } else {
-      reserved += units(call.reservation);
-      if (call.finished_at === null) executing++;
-      else awaiting++;
-    }
+  let cache = totalsByBook.get(book);
+  if (!cache) {
+    cache = new Map();
+    totalsByBook.set(book, cache);
   }
-  const effective = spent === null ? null : spent + reserved;
-  return { spent, reserved, effective, executing, awaiting };
+  let total = cache.get(policy.policy_id);
+  if (!total) {
+    let spent = policy.baseline === null ? null : units(policy.baseline);
+    let reserved = 0n,
+      executing = 0,
+      awaiting = 0;
+    for (const call of Object.values(book.calls)) {
+      if (!call.policy_ids.includes(policy.policy_id)) continue;
+      if (call.amount !== null) {
+        if (spent !== null) spent += units(call.amount);
+      } else {
+        reserved += units(call.reservation);
+        if (call.finished_at === null) executing++;
+        else awaiting++;
+      }
+    }
+    total = { spent, reserved, executing, awaiting };
+    cache.set(policy.policy_id, total);
+  }
+  return {
+    ...total,
+    effective: total.spent === null ? null : total.spent + total.reserved,
+  };
+}
+function seedCachedPolicyTotals(book, policy) {
+  let cache = totalsByBook.get(book);
+  if (!cache) {
+    cache = new Map();
+    totalsByBook.set(book, cache);
+  }
+  cache.set(policy.policy_id, {
+    spent: policy.baseline === null ? null : units(policy.baseline),
+    reserved: 0n,
+    executing: 0,
+    awaiting: 0,
+  });
+}
+function updateCachedCallTotals(book, call, update) {
+  const cache = totalsByBook.get(book);
+  if (!cache) return;
+  for (const policyId of call.policy_ids) {
+    const total = cache.get(policyId);
+    if (total) update(total);
+  }
 }
 function matched(book, runId) {
   return Object.values(book.policies).filter(
@@ -254,6 +290,7 @@ function operate(state, operation, input, now) {
     } else if (Object.keys(book.policies).length >= 100)
       fail("budget_policies_full");
     book.policies[policyId] = p;
+    if (!previous) seedCachedPolicyTotals(book, p);
     decision(
       book,
       "policy",
@@ -361,6 +398,10 @@ function operate(state, operation, input, now) {
       amount: null,
       receipt_id: null,
     };
+    updateCachedCallTotals(book, book.calls[callId], (total) => {
+      total.reserved += reservation;
+      total.executing++;
+    });
     return {
       call_id: callId,
       reservation: money(reservation),
@@ -393,6 +434,11 @@ function operate(state, operation, input, now) {
     call.finished_at = now;
     call.outcome = input.outcome;
     call.tokens = tokens;
+    if (call.amount === null)
+      updateCachedCallTotals(book, call, (total) => {
+        total.executing--;
+        total.awaiting++;
+      });
     decision(
       book,
       "finish",
@@ -442,6 +488,14 @@ function operate(state, operation, input, now) {
       fail("budget_receipts_full");
     book.receipts[receipt.event_id] = receipt;
     if (receipt.amount !== null) {
+      const amountUnits = units(receipt.amount);
+      if (call.amount === null)
+        updateCachedCallTotals(book, call, (total) => {
+          total.reserved -= units(call.reservation);
+          if (total.spent !== null) total.spent += amountUnits;
+          if (call.finished_at === null) total.executing--;
+          else total.awaiting--;
+        });
       call.amount = receipt.amount;
       call.receipt_id ||= receipt.event_id;
     }

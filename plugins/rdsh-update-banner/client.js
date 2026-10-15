@@ -30,7 +30,9 @@ window.__ModuleLoader__.load({
       ".rub-pop{animation:rub-pop .45s cubic-bezier(.2,.9,.25,1.2)}" +
       ".rub-mini{display:flex;align-items:center;gap:10px;padding:7px 18px 7px 8px;cursor:pointer;white-space:nowrap}" +
       ".rub-card{padding:12px 12px 12px 12px;position:relative}" +
-      ".rub-row1{display:flex;gap:10px;align-items:flex-start;cursor:pointer}" +
+      // The close button is absolutely positioned in the card's top-right corner;
+      // reserve that corner so the title and the "now" label never sit under it.
+      ".rub-row1{display:flex;gap:10px;align-items:flex-start;cursor:pointer;padding-right:28px}" +
       ".rub-ico{width:40px;height:40px;border-radius:10px;flex:none}" +
       ".rub-mini .rub-ico{width:24px;height:24px}" +
       ".rub-tt{flex:1;min-width:0;font-weight:600;font-size:14px;display:flex;align-items:baseline;gap:8px}" +

@@ -2,15 +2,25 @@ name: docs
 
 on:
   push:
+    branches: [main]
+    tags: ['v*']
     paths:
       - '**/*.md'
       - '.markdownlint.yml'
-      - '.github/workflows/docs.yml'
+      - '.lychee.toml'
+      # Every workflow edit re-runs docs validation. `lint` and `links` are
+      # required checks, so a pull request changing only a workflow file other
+      # than this one (codeql.yml, for example) would skip this workflow
+      # entirely, never report them, and stay permanently unmergeable even
+      # with every other check green.
+      - '.github/workflows/**'
   pull_request:
     paths:
       - '**/*.md'
       - '.markdownlint.yml'
-      - '.github/workflows/docs.yml'
+      - '.lychee.toml'
+      - '.github/workflows/**'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -35,10 +45,10 @@ jobs:
       - uses: actions/checkout@v7
       - uses: lycheeverse/lychee-action@v2
         with:
-          # x.com returns 403 to link-checker bots; the links are fine for humans.
-          # Check transferred repository URLs at their canonical owner.
+          # Resolve former-owner links after the repository transfer, while
+          # keeping the destination issue, file and release checks enabled.
           args: >-
-            --verbose --no-progress --exclude x\.com
+            --config .lychee.toml --verbose --no-progress
             --remap '^https://github[.]com/sahenjp/rustdsh(/.*)?$ https://github.com/jimoto-no-llm/rustdsh$1'
             README.md README.ja.md CHANGELOG.md CONTRIBUTING.md SECURITY.md SUPPORT.md docs/**/*.md dashboard/README.md
           fail: true

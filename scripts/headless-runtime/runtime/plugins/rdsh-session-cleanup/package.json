@@ -1,0 +1,10 @@
+{
+  "name": "rdsh-session-cleanup",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "engines": { "node": ">=22.19.0" },
+  "peerDependencies": { "@earendil-works/pi-ai": "0.87.1" },
+  "dsh": { "bundle": { "patch": "./cordis.patch.yml" } }
+}

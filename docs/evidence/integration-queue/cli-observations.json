@@ -1,0 +1,484 @@
+{
+  "source_revision": "ba73929e060d23e7b79a86bb6e042c55f4170a1b",
+  "baseline_revision": "cf1762a447e188e636c863110ca6599062121f1c",
+  "node": "v22.23.3",
+  "platform": "win32",
+  "observations": [
+    {
+      "name": "before: main has no integration command",
+      "exit_code": 1,
+      "revision": null,
+      "target_sha": null,
+      "entries": [],
+      "validation": null,
+      "ready_for_review": false,
+      "can_apply": false,
+      "publish_authority": false,
+      "error": "[rdsh-dashboard] Unknown command; use --help"
+    },
+    {
+      "name": "init: no checks dispatched",
+      "exit_code": 0,
+      "revision": 2,
+      "target_sha": "db5f462e4a146d37a5ae0065d4dc72906650d559",
+      "entries": [],
+      "validation": {
+        "verified": false,
+        "status": "not-run",
+        "reason": "full_validation_required",
+        "retryable": true,
+        "checks": []
+      },
+      "ready_for_review": false,
+      "can_apply": false,
+      "publish_authority": false,
+      "error": null
+    },
+    {
+      "name": "enqueue worker-a: target unchanged",
+      "exit_code": 0,
+      "revision": 3,
+      "target_sha": "db5f462e4a146d37a5ae0065d4dc72906650d559",
+      "entries": [
+        {
+          "sequence": 1,
+          "source_head_sha": "3053e2b6425253fd74451ecad58c5b0f8aa4e4fc",
+          "state": "queued",
+          "target_before": null,
+          "target_after": null,
+          "reason": null,
+          "conflicts": []
+        }
+      ],
+      "validation": {
+        "verified": false,
+        "status": "not-run",
+        "reason": "full_validation_required",
+        "retryable": true,
+        "checks": []
+      },
+      "ready_for_review": false,
+      "can_apply": true,
+      "publish_authority": false,
+      "error": null
+    },
+    {
+      "name": "enqueue worker-b: target unchanged",
+      "exit_code": 0,
+      "revision": 4,
+      "target_sha": "db5f462e4a146d37a5ae0065d4dc72906650d559",
+      "entries": [
+        {
+          "sequence": 1,
+          "source_head_sha": "3053e2b6425253fd74451ecad58c5b0f8aa4e4fc",
+          "state": "queued",
+          "target_before": null,
+          "target_after": null,
+          "reason": null,
+          "conflicts": []
+        },
+        {
+          "sequence": 2,
+          "source_head_sha": "95619ad849816b765d124075d30cf6d6868b2bbb",
+          "state": "queued",
+          "target_before": null,
+          "target_after": null,
+          "reason": null,
+          "conflicts": []
+        }
+      ],
+      "validation": {
+        "verified": false,
+        "status": "not-run",
+        "reason": "full_validation_required",
+        "retryable": true,
+        "checks": []
+      },
+      "ready_for_review": false,
+      "can_apply": true,
+      "publish_authority": false,
+      "error": null
+    },
+    {
+      "name": "apply sequence 1",
+      "exit_code": 0,
+      "revision": 6,
+      "target_sha": "18e85501c6c42d36ce03800a4d85ec345933ab88",
+      "entries": [
+        {
+          "sequence": 1,
+          "source_head_sha": "3053e2b6425253fd74451ecad58c5b0f8aa4e4fc",
+          "state": "integrated",
+          "target_before": "db5f462e4a146d37a5ae0065d4dc72906650d559",
+          "target_after": "18e85501c6c42d36ce03800a4d85ec345933ab88",
+          "reason": null,
+          "conflicts": []
+        },
+        {
+          "sequence": 2,
+          "source_head_sha": "95619ad849816b765d124075d30cf6d6868b2bbb",
+          "state": "queued",
+          "target_before": null,
+          "target_after": null,
+          "reason": null,
+          "conflicts": []
+        }
+      ],
+      "validation": {
+        "verified": false,
+        "status": "not-run",
+        "reason": "full_validation_required",
+        "retryable": true,
+        "checks": []
+      },
+      "ready_for_review": false,
+      "can_apply": false,
+      "publish_authority": false,
+      "error": null
+    },
+    {
+      "name": "full validation fails with exit 7",
+      "exit_code": 1,
+      "revision": 10,
+      "target_sha": "18e85501c6c42d36ce03800a4d85ec345933ab88",
+      "entries": [
+        {
+          "sequence": 1,
+          "source_head_sha": "3053e2b6425253fd74451ecad58c5b0f8aa4e4fc",
+          "state": "integrated",
+          "target_before": "db5f462e4a146d37a5ae0065d4dc72906650d559",
+          "target_after": "18e85501c6c42d36ce03800a4d85ec345933ab88",
+          "reason": null,
+          "conflicts": []
+        },
+        {
+          "sequence": 2,
+          "source_head_sha": "95619ad849816b765d124075d30cf6d6868b2bbb",
+          "state": "queued",
+          "target_before": null,
+          "target_after": null,
+          "reason": null,
+          "conflicts": []
+        }
+      ],
+      "validation": {
+        "verified": false,
+        "status": "failed",
+        "reason": "declared_full_checks_did_not_pass",
+        "retryable": true,
+        "checks": [
+          {
+            "id": "files",
+            "status": "pass",
+            "verified": true,
+            "reason": null,
+            "evidence_id": "evi_b0c4678e-b520-465f-9297-d5b2d21328e5"
+          },
+          {
+            "id": "retry-fixture",
+            "status": "fail",
+            "verified": false,
+            "reason": "test_exit_nonzero",
+            "evidence_id": "evi_d65d5e8d-d7e6-4e0d-b340-687dfae89211"
+          }
+        ]
+      },
+      "ready_for_review": false,
+      "can_apply": false,
+      "publish_authority": false,
+      "error": null
+    },
+    {
+      "name": "sequence 2 blocked until complete checks pass",
+      "exit_code": 1,
+      "revision": null,
+      "target_sha": null,
+      "entries": [],
+      "validation": null,
+      "ready_for_review": false,
+      "can_apply": false,
+      "publish_authority": false,
+      "error": "[rdsh-dashboard] Integration queue: previous_integration_validation_required"
+    },
+    {
+      "name": "retry runs all checks on same target",
+      "exit_code": 0,
+      "revision": 14,
+      "target_sha": "18e85501c6c42d36ce03800a4d85ec345933ab88",
+      "entries": [
+        {
+          "sequence": 1,
+          "source_head_sha": "3053e2b6425253fd74451ecad58c5b0f8aa4e4fc",
+          "state": "integrated",
+          "target_before": "db5f462e4a146d37a5ae0065d4dc72906650d559",
+          "target_after": "18e85501c6c42d36ce03800a4d85ec345933ab88",
+          "reason": null,
+          "conflicts": []
+        },
+        {
+          "sequence": 2,
+          "source_head_sha": "95619ad849816b765d124075d30cf6d6868b2bbb",
+          "state": "queued",
+          "target_before": null,
+          "target_after": null,
+          "reason": null,
+          "conflicts": []
+        }
+      ],
+      "validation": {
+        "verified": true,
+        "status": "passed",
+        "reason": null,
+        "retryable": true,
+        "checks": [
+          {
+            "id": "files",
+            "status": "pass",
+            "verified": true,
+            "reason": null,
+            "evidence_id": "evi_fd04e1a7-25a6-4011-a9cc-d505772d5e46"
+          },
+          {
+            "id": "retry-fixture",
+            "status": "pass",
+            "verified": true,
+            "reason": null,
+            "evidence_id": "evi_92ddd31d-9cb9-4066-a8fe-7e2f8e129457"
+          }
+        ]
+      },
+      "ready_for_review": false,
+      "can_apply": true,
+      "publish_authority": false,
+      "error": null
+    },
+    {
+      "name": "apply sequence 2 invalidates old success",
+      "exit_code": 0,
+      "revision": 16,
+      "target_sha": "0da45d734e45e28032a25cbd3060187806674ce7",
+      "entries": [
+        {
+          "sequence": 1,
+          "source_head_sha": "3053e2b6425253fd74451ecad58c5b0f8aa4e4fc",
+          "state": "integrated",
+          "target_before": "db5f462e4a146d37a5ae0065d4dc72906650d559",
+          "target_after": "18e85501c6c42d36ce03800a4d85ec345933ab88",
+          "reason": null,
+          "conflicts": []
+        },
+        {
+          "sequence": 2,
+          "source_head_sha": "95619ad849816b765d124075d30cf6d6868b2bbb",
+          "state": "integrated",
+          "target_before": "18e85501c6c42d36ce03800a4d85ec345933ab88",
+          "target_after": "0da45d734e45e28032a25cbd3060187806674ce7",
+          "reason": null,
+          "conflicts": []
+        }
+      ],
+      "validation": {
+        "verified": false,
+        "status": "stale",
+        "reason": "validation_target_changed_or_unavailable",
+        "retryable": false,
+        "checks": []
+      },
+      "ready_for_review": false,
+      "can_apply": false,
+      "publish_authority": false,
+      "error": null
+    },
+    {
+      "name": "complete checks pass on sequence 2",
+      "exit_code": 0,
+      "revision": 20,
+      "target_sha": "0da45d734e45e28032a25cbd3060187806674ce7",
+      "entries": [
+        {
+          "sequence": 1,
+          "source_head_sha": "3053e2b6425253fd74451ecad58c5b0f8aa4e4fc",
+          "state": "integrated",
+          "target_before": "db5f462e4a146d37a5ae0065d4dc72906650d559",
+          "target_after": "18e85501c6c42d36ce03800a4d85ec345933ab88",
+          "reason": null,
+          "conflicts": []
+        },
+        {
+          "sequence": 2,
+          "source_head_sha": "95619ad849816b765d124075d30cf6d6868b2bbb",
+          "state": "integrated",
+          "target_before": "18e85501c6c42d36ce03800a4d85ec345933ab88",
+          "target_after": "0da45d734e45e28032a25cbd3060187806674ce7",
+          "reason": null,
+          "conflicts": []
+        }
+      ],
+      "validation": {
+        "verified": true,
+        "status": "passed",
+        "reason": null,
+        "retryable": true,
+        "checks": [
+          {
+            "id": "files",
+            "status": "pass",
+            "verified": true,
+            "reason": null,
+            "evidence_id": "evi_38a97871-7f6f-4eaa-a637-dd08c4c72c7d"
+          },
+          {
+            "id": "retry-fixture",
+            "status": "pass",
+            "verified": true,
+            "reason": null,
+            "evidence_id": "evi_508cf195-fd53-45f7-8e15-f69440994312"
+          }
+        ]
+      },
+      "ready_for_review": true,
+      "can_apply": false,
+      "publish_authority": false,
+      "error": null
+    },
+    {
+      "name": "changed target invalidates recorded pass",
+      "exit_code": 0,
+      "revision": 20,
+      "target_sha": "0da45d734e45e28032a25cbd3060187806674ce7",
+      "entries": [
+        {
+          "sequence": 1,
+          "source_head_sha": "3053e2b6425253fd74451ecad58c5b0f8aa4e4fc",
+          "state": "integrated",
+          "target_before": "db5f462e4a146d37a5ae0065d4dc72906650d559",
+          "target_after": "18e85501c6c42d36ce03800a4d85ec345933ab88",
+          "reason": null,
+          "conflicts": []
+        },
+        {
+          "sequence": 2,
+          "source_head_sha": "95619ad849816b765d124075d30cf6d6868b2bbb",
+          "state": "integrated",
+          "target_before": "18e85501c6c42d36ce03800a4d85ec345933ab88",
+          "target_after": "0da45d734e45e28032a25cbd3060187806674ce7",
+          "reason": null,
+          "conflicts": []
+        }
+      ],
+      "validation": {
+        "verified": false,
+        "status": "stale",
+        "reason": "validation_target_changed_or_unavailable",
+        "retryable": false,
+        "checks": []
+      },
+      "ready_for_review": false,
+      "can_apply": false,
+      "publish_authority": false,
+      "error": null
+    },
+    {
+      "name": "retarget records clean descendant",
+      "exit_code": 0,
+      "revision": 21,
+      "target_sha": "1873754aa5e4215a2e3f8af87b691a6c7bf0499d",
+      "entries": [
+        {
+          "sequence": 1,
+          "source_head_sha": "3053e2b6425253fd74451ecad58c5b0f8aa4e4fc",
+          "state": "integrated",
+          "target_before": "db5f462e4a146d37a5ae0065d4dc72906650d559",
+          "target_after": "18e85501c6c42d36ce03800a4d85ec345933ab88",
+          "reason": null,
+          "conflicts": []
+        },
+        {
+          "sequence": 2,
+          "source_head_sha": "95619ad849816b765d124075d30cf6d6868b2bbb",
+          "state": "integrated",
+          "target_before": "18e85501c6c42d36ce03800a4d85ec345933ab88",
+          "target_after": "0da45d734e45e28032a25cbd3060187806674ce7",
+          "reason": null,
+          "conflicts": []
+        }
+      ],
+      "validation": {
+        "verified": false,
+        "status": "stale",
+        "reason": "validation_target_changed_or_unavailable",
+        "retryable": false,
+        "checks": []
+      },
+      "ready_for_review": false,
+      "can_apply": false,
+      "publish_authority": false,
+      "error": null
+    },
+    {
+      "name": "complete checks rerun on changed target",
+      "exit_code": 0,
+      "revision": 25,
+      "target_sha": "1873754aa5e4215a2e3f8af87b691a6c7bf0499d",
+      "entries": [
+        {
+          "sequence": 1,
+          "source_head_sha": "3053e2b6425253fd74451ecad58c5b0f8aa4e4fc",
+          "state": "integrated",
+          "target_before": "db5f462e4a146d37a5ae0065d4dc72906650d559",
+          "target_after": "18e85501c6c42d36ce03800a4d85ec345933ab88",
+          "reason": null,
+          "conflicts": []
+        },
+        {
+          "sequence": 2,
+          "source_head_sha": "95619ad849816b765d124075d30cf6d6868b2bbb",
+          "state": "integrated",
+          "target_before": "18e85501c6c42d36ce03800a4d85ec345933ab88",
+          "target_after": "0da45d734e45e28032a25cbd3060187806674ce7",
+          "reason": null,
+          "conflicts": []
+        }
+      ],
+      "validation": {
+        "verified": true,
+        "status": "passed",
+        "reason": null,
+        "retryable": true,
+        "checks": [
+          {
+            "id": "files",
+            "status": "pass",
+            "verified": true,
+            "reason": null,
+            "evidence_id": "evi_f3903248-78e6-4709-92a4-358c80ca918f"
+          },
+          {
+            "id": "retry-fixture",
+            "status": "pass",
+            "verified": true,
+            "reason": null,
+            "evidence_id": "evi_3662a25c-db15-4b83-842a-faa1a81c46af"
+          }
+        ]
+      },
+      "ready_for_review": true,
+      "can_apply": false,
+      "publish_authority": false,
+      "error": null
+    }
+  ],
+  "source_before": {
+    "head": "db5f462e4a146d37a5ae0065d4dc72906650d559",
+    "status": "?? human.txt",
+    "remotes": ""
+  },
+  "source_after": {
+    "head": "db5f462e4a146d37a5ae0065d4dc72906650d559",
+    "status": "?? human.txt",
+    "remotes": ""
+  },
+  "source_human_file_retained": true,
+  "provider_calls": 0,
+  "publication_actions": 0
+}

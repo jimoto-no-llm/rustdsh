@@ -42,6 +42,71 @@ class ReleaseMetadataTests(unittest.TestCase):
             with self.subTest(tag=tag), self.assertRaisesRegex(ValueError, "tag must"):
                 release.validate(self.root, tag)
 
+    def test_candidate_shell_comment_cannot_change_the_block_language(self):
+        notes = self.fixture("1.2.3-rc.1")
+        original = notes.read_text(encoding="utf-8")
+        notes.write_text(original + "\n```sh\n./install.sh --from-release # Windows uses install.ps1\n```\n", encoding="utf-8")
+        with self.assertRaises(ValueError):
+            release.validate(self.root, "v1.2.3-rc.1")
+        notes.write_text(original + "\n```sh\n./install.sh --from-release --version=v1.2.3-rc.1 # Windows uses install.ps1\n```\n", encoding="utf-8")
+        release.validate(self.root, "v1.2.3-rc.1")
+
+    def test_candidate_quoted_powershell_invocations_require_the_tag(self):
+        for path in ('"./install.ps1"', "'./install.ps1'"):
+            notes = self.fixture("1.2.3-rc.1")
+            original = notes.read_text(encoding="utf-8")
+            notes.write_text(original + f"\nWindows: `& {path} -FromRelease`.\n", encoding="utf-8")
+            with self.subTest(path=path), self.assertRaises(ValueError):
+                release.validate(self.root, "v1.2.3-rc.1")
+            notes.write_text(original + f"\nWindows: `& {path} -FromRelease -Version v1.2.3-rc.1`.\n", encoding="utf-8")
+            release.validate(self.root, "v1.2.3-rc.1")
+
+    def test_candidate_markdown_code_block_forms_have_the_same_policy(self):
+        for block in ("~~~sh\n{}\n~~~", "````sh\n{}\n````", "    {}", "\t{}"):
+            notes = self.fixture("1.2.3-rc.1")
+            original = notes.read_text(encoding="utf-8")
+            notes.write_text(original + "\n" + block.format("./install.sh --from-release") + "\n", encoding="utf-8")
+            with self.subTest(block=block), self.assertRaises(ValueError):
+                release.validate(self.root, "v1.2.3-rc.1")
+            notes.write_text(original + "\n" + block.format("./install.sh --from-release --version=v1.2.3-rc.1") + "\n", encoding="utf-8")
+            release.validate(self.root, "v1.2.3-rc.1")
+
+    def test_candidate_opposite_platform_commands_are_not_silently_skipped(self):
+        for language, command in (("powershell", "./install.sh --from-release"),
+                                  ("sh", '& "./install.ps1" -FromRelease')):
+            notes = self.fixture("1.2.3-rc.1")
+            notes.write_text(notes.read_text(encoding="utf-8") + f"\n```{language}\n{command}\n```\n", encoding="utf-8")
+            with self.subTest(language=language), self.assertRaises(ValueError):
+                release.validate(self.root, "v1.2.3-rc.1")
+
+    def test_candidate_comment_continuations_do_not_hide_the_next_command(self):
+        for language, comment, command, version in (
+                ("sh", "# optional install \\", "./install.sh --from-release", " --version=v1.2.3-rc.1"),
+                ("powershell", "# optional install `", "./install.ps1 -FromRelease", " -Version v1.2.3-rc.1")):
+            notes = self.fixture("1.2.3-rc.1")
+            original = notes.read_text(encoding="utf-8")
+            block = f"\n```{language}\n{comment}\n{{}}\n```\n"
+            notes.write_text(original + block.format(command), encoding="utf-8")
+            with self.subTest(language=language), self.assertRaises(ValueError):
+                release.validate(self.root, "v1.2.3-rc.1")
+            notes.write_text(original + block.format(command + version), encoding="utf-8")
+            release.validate(self.root, "v1.2.3-rc.1")
+
+    def test_candidate_html_comment_strings_remain_visible_in_code(self):
+        for language, command, version, output in (
+                ("sh", "./install.sh --from-release", " --version=v1.2.3-rc.1", "printf '%s'"),
+                ("powershell", "./install.ps1 -FromRelease", " -Version v1.2.3-rc.1", "Write-Output")):
+            notes = self.fixture("1.2.3-rc.1")
+            original = notes.read_text(encoding="utf-8")
+            block = f"\n```{language}\n{output} '<!--'; {{}}; {output} '-->'\n```\n"
+            notes.write_text(original + block.format(command), encoding="utf-8")
+            with self.subTest(language=language), self.assertRaises(ValueError):
+                release.validate(self.root, "v1.2.3-rc.1")
+            notes.write_text(original + block.format(command + version), encoding="utf-8")
+            release.validate(self.root, "v1.2.3-rc.1")
+        notes.write_text(original + "\n<!--\n```sh\n./install.sh --from-release\n```\n-->\n", encoding="utf-8")
+        release.validate(self.root, "v1.2.3-rc.1")
+
     def test_manifest_and_lock_must_match_tag(self):
         self.fixture()
         for filename in ("Cargo.toml", "Cargo.lock"):

@@ -301,6 +301,113 @@ def powershell_version_selectors(arguments):
             if token.lower() == "-version"]
 
 
+def instruction_fence(line):
+    fence = re.fullmatch(r" {0,3}(`{3,}|~{3,})([^\r\n]*)", line)
+    legacy = None if fence else re.search(r"(`{3,})(powershell|pwsh|ps1|sh|bash|shell)[ \t]*$", line)
+    return fence or legacy, bool(legacy)
+
+
+def instruction_fence_end(marker, legacy):
+    suffix = r"[ \t]*[.。]?" if legacy else r"[ \t]*"
+    return re.compile(r" {0,3}" + re.escape(marker[0]) + "{" + str(len(marker)) + r",}" + suffix)
+
+
+def without_markdown_comments(instructions):
+    # HTMLコメントを消すのはコードの外だけ。文字列リテラルは残す。
+    output = []
+    comment = False
+    inline_ticks = None
+    closing = None
+    for line in instructions.splitlines(keepends=True):
+        bare = line.rstrip("\r\n")
+        if closing is not None:
+            output.append(line)
+            if closing.fullmatch(bare):
+                closing = None
+            continue
+        if not comment and inline_ticks is None:
+            fence, legacy = instruction_fence(bare)
+            if fence:
+                closing = instruction_fence_end(fence.group(1), legacy)
+                output.append(line)
+                continue
+            if line.startswith(("    ", "\t")):
+                output.append(line)
+                continue
+        index = 0
+        while index < len(line):
+            if comment:
+                end = line.find("-->", index)
+                if end < 0:
+                    if line.endswith("\n"):
+                        output.append("\n")
+                    break
+                comment = False
+                index = end + 3
+            elif line[index] == "`":
+                end = index + 1
+                while end < len(line) and line[end] == "`":
+                    end += 1
+                count = end - index
+                if inline_ticks is None:
+                    inline_ticks = count
+                elif count == inline_ticks:
+                    inline_ticks = None
+                output.append(line[index:end])
+                index = end
+            elif inline_ticks is None and line.startswith("<!--", index):
+                comment = True
+                output.append(" ")
+                index += 4
+            else:
+                output.append(line[index])
+                index += 1
+    return "".join(output)
+
+
+def instruction_snippets(instructions):
+    # 表示上のコードブロックとinlineを重複させず抽出する。
+    lines = instructions.splitlines(keepends=True)
+    prose = []
+    index = 0
+    while index < len(lines):
+        line = lines[index].rstrip("\r\n")
+        fence, legacy = instruction_fence(line)
+        if legacy:
+            # 従来の「Windows: ```powershell ... ```。」も検査対象に残す。
+            prose.append(line[:fence.start()] + "\n")
+        if fence:
+            marker, language = fence.groups()
+            closing = instruction_fence_end(marker, legacy)
+            block = []
+            index += 1
+            while index < len(lines) and not closing.fullmatch(lines[index].rstrip("\r\n")):
+                block.append(lines[index])
+                index += 1
+            yield language, "".join(block)
+            index += 1
+        elif line.startswith(("    ", "\t")):
+            block = []
+            while index < len(lines):
+                line = lines[index]
+                if line.startswith("    "):
+                    block.append(line[4:])
+                elif line.startswith("\t"):
+                    block.append(line[1:])
+                elif not line.strip():
+                    block.append(line)
+                else:
+                    break
+                index += 1
+            yield "", "".join(block)
+        else:
+            prose.append(lines[index])
+            index += 1
+        prose.append("\n")
+    for span in re.finditer(r"(?<!`)(`+)(?!`)(.*?)(?<!`)\1(?!`)", "".join(prose), re.S):
+        yield "", span.group(2).replace("\n", " ")
+
+
 def validate(root, tag):
     if not TAG.fullmatch(tag):
         raise ValueError("tag must be vX.Y.Z or vX.Y.Z-{alpha,beta,rc}.N")
@@ -335,17 +442,17 @@ def validate(root, tag):
         if (not any(asset == "sh" for _, asset in installers)
                 or any(channel != f"download/{tag}" for channel, _ in installers)):
             raise ValueError("prerelease installer URLs must use this exact tag URL")
-        instructions = re.sub(r"<!--.*?-->", "", authored, flags=re.S)
-        snippets = re.findall(r"```([^\n]*)\n(.*?)\n```|`([^`\n]+)`", instructions, re.S)
+        instructions = without_markdown_comments(authored)
         unix_commands, windows_commands = [], []
-        for language, block, inline in snippets:
-            code = re.sub(r"[\\`]\r?\n", " ", block or inline)
+        for language, snippet in instruction_snippets(instructions):
+            code = snippet
             language = language.strip().lower().split(maxsplit=1)[0] if language.strip() else ""
             is_powershell = language in ("powershell", "pwsh", "ps1")
-            if not is_powershell:
-                is_powershell = re.search(
-                    r"(?i)(?:^|[\s;&|])(?:&\s+)?(?:\S*[/\\])?install\.ps1(?:\s|$)", code
-                ) is not None
+            if language not in ("powershell", "pwsh", "ps1", "sh", "bash", "shell", "zsh", "posix"):
+                # ラベルの無い呼出しは引用解除後のtokenで判別する。
+                preview = command_pipelines(without_powershell_comments(code), powershell=True)
+                is_powershell = any(has_installer_reference(command, "ps1")
+                                    for pipeline in preview for command in pipeline)
             if is_powershell:
                 code = without_powershell_comments(code)
                 pipelines = command_pipelines(code, powershell=True)
@@ -361,6 +468,8 @@ def validate(root, tag):
                                 raise ValueError("unsupported prerelease installer pipeline")
                         elif installer_source(command, "ps1", powershell=True) and index + 1 < len(pipeline):
                             raise ValueError("unsupported prerelease installer pipeline")
+                        elif has_installer_reference(command, "sh"):
+                            raise ValueError("unsupported prerelease installer command: mixed languages")
             else:
                 code = "\n".join(without_shell_comment(line) for line in code.splitlines())
                 pipelines = command_pipelines(code)
@@ -377,6 +486,8 @@ def validate(root, tag):
                                 unix_commands.append(arguments)
                         elif has_installer_reference(command, "sh"):
                             raise ValueError("unsupported prerelease installer command")
+                        elif has_installer_reference(command, "ps1"):
+                            raise ValueError("unsupported prerelease installer command: mixed languages")
         for commands, selectors in ((unix_commands, unix_version_selectors),
                                     (windows_commands, powershell_version_selectors)):
             if not commands or any(not (values := selectors(command))

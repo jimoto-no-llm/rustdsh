@@ -1,7 +1,24 @@
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
 export const inject = ["llm"];
 export const name = "rdsh-budget-guard";
+
+// Feature switches live in $DSH_HOME/rdsh.json. An absent id (or a missing,
+// unreadable or corrupt file) keeps the fallback; an explicit false disables
+// the hook without validating env, subscribing or calling any endpoint.
+function featureEnabled(id, fallback, env = process.env) {
+  try {
+    const path = join(env.DSH_HOME || join(homedir(), ".dsh"), "rdsh.json");
+    const value = JSON.parse(readFileSync(path, "utf8"))?.features?.[id];
+    return typeof value === "boolean" ? value : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export function createBudgetHook({ base, key, job_id, fetchImpl = fetch }) {
   const url = new URL(base);
   if (
@@ -94,6 +111,7 @@ export function createBudgetHook({ base, key, job_id, fetchImpl = fetch }) {
   return { initialize, stream };
 }
 export function apply(ctx) {
+  if (!featureEnabled("budget_guard", true)) return;
   const hook = createBudgetHook({
     base: process.env.RDSH_BUDGET_BASE,
     key: process.env.RDSH_BUDGET_KEY,
