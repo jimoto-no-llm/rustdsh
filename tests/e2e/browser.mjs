@@ -43,7 +43,12 @@ try{
  assert.deepEqual(JSON.parse(await readFile(path.join(env.DSH_HOME,'rdsh.json'),'utf8')).extras.enable,['serve']);
  await page.reload();await page.waitForFunction(value=>document.querySelector('#extras .row')?.textContent.includes(value),copy.enabled);
  await screenshot(page,'setup-desktop');await page.setViewportSize(report.viewports[1]);await check(page,/rdsh setup/);await screenshot(page,'setup-mobile');
- await page.close();await stop(setup.child);await rm(setup.tokenFile,{force:true});report.flows.push('setup: protected token handoff -> Extras enable -> file readback -> reload retained');
+ const sharingFile=path.join(env.DSH_HOME,'rdsh-auth-sharing.json');await writeFile(sharingFile,'{broken policy');await page.evaluate(()=>load());
+ const policyCopy={en:'invalid credential sharing policy; imports are disabled','zh-CN':'凭据共享策略无效；已禁用导入',ja:'認証情報の共有ポリシーが無効です。インポートは無効です'}[language];
+ assert.ok((await page.locator('#sharehint').innerText()).includes(policyCopy));
+ const rawPolicy=await page.evaluate(async()=>{const response=await fetch('/api/status',{headers:{'X-RDSH-Token':setupToken}});return(await response.json()).sharing.policy_error;});
+ assert.equal(rawPolicy,'invalid credential sharing policy; imports are disabled');assert.equal(await readFile(sharingFile,'utf8'),'{broken policy');await screenshot(page,'setup-policy-error-mobile');await rm(sharingFile);await page.evaluate(()=>load());assert.ok(!(await page.locator('#sharehint').innerText()).includes(policyCopy));
+ await page.close();await stop(setup.child);await rm(setup.tokenFile,{force:true});report.flows.push('setup: protected token handoff -> Extras enable -> file readback -> reload retained -> corrupt sharing policy localized with canonical API JSON -> repair');
 
  const session=path.join(env.DSH_HOME,'sessions','example','session-one');await mkdir(session,{recursive:true});await writeFile(path.join(session,'messages.jsonl'),'synthetic session');
  const skills=path.join(env.DSH_HOME,'skills','e2e-skill');await mkdir(skills,{recursive:true});await writeFile(path.join(skills,'SKILL.md'),'# Synthetic skill');

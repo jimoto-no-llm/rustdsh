@@ -1,0 +1,25 @@
+✖ ephemeral dashboard ports stay bound and are published consistently while the default is occupied (10.665166ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 161.806042
+
+✖ failing tests:
+
+test at dashboard/test/history-backup.test.mjs:145:1
+✖ ephemeral dashboard ports stay bound and are published consistently while the default is occupied (10.665166ms)
+  Error: listen EADDRINUSE: address already in use 127.0.0.1:38668
+      at Server.setupListenHandle [as _listen2] (node:net:2328:16)
+      at listenInCluster (node:net:2437:12)
+      at node:net:2666:7
+      at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+    code: 'EADDRINUSE',
+    errno: -48,
+    syscall: 'listen',
+    address: '127.0.0.1',
+    port: 38668
+  }

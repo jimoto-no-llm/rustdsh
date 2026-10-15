@@ -265,7 +265,7 @@ enum Commands {
         max: usize,
         #[arg(long = "queue-timeout", default_value = "600", value_parser = parse_positive_finite)]
         queue_timeout: f64,
-        #[arg(long = "max-queue", default_value_t = 64)]
+        #[arg(long = "max-queue", default_value_t = 64, value_parser = parse_positive_usize)]
         max_queue: usize,
         #[arg(long = "tool-choice-default", value_enum)]
         tool_choice_default: Option<ToolChoiceDefaultArg>,

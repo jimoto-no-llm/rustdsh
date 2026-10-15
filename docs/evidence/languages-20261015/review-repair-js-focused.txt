@@ -1,0 +1,45 @@
+✔ CLI catalog has all three languages, matching placeholders and typed validation origins (5.620375ms)
+✔ CLI help and validation use en without translating machine output or raw text (3319.477916ms)
+✔ CLI help and validation use zh-CN without translating machine output or raw text (3253.236458ms)
+✔ CLI help and validation use ja without translating machine output or raw text (3124.837167ms)
+✔ CLI resolves flag, environment and persisted language while refusing invalid files without overwriting bytes (817.855708ms)
+✔ CLI explicit language does not change delegated version-probe argv or locale environment (221.172666ms)
+✔ preflight preserves inline values when removing display-language options (696.634625ms)
+✔ preflight retains unexpected positionals and option terminators for strict validation (662.87725ms)
+✔ CLI project startup propagates en to real server HTML (185.202833ms)
+✔ CLI project startup propagates zh-CN to real server HTML (218.467292ms)
+✔ CLI project startup propagates ja to real server HTML (189.571833ms)
+✔ pure native JSON bridges ignore corrupt settings while ordinary commands fail closed (4186.454833ms)
+✔ observed CLI status uses en and keeps received identifiers (58.445458ms)
+✔ observed CLI status uses zh-CN and keeps received identifiers (50.395083ms)
+✔ observed CLI status uses ja and keeps received identifiers (50.668375ms)
+✔ dashboard language uses the CLI precedence and first nonblank OS value (0.481ms)
+✔ dashboard refuses invalid persisted language even with an explicit override and preserves bytes (8.018041ms)
+✔ restoring an older snapshot never revalidates that older revision's answer (11.783333ms)
+✔ legacy consultations retain their field shapes and a default action grants no typed approval (3.401625ms)
+✔ typed choices, fixed target and a human answer persist atomically without creating execution authority (4.725458ms)
+✔ changing an action and cost invalidates old answers and stale browser requests while retaining immutable feedback and revision history (5.91675ms)
+✔ unanswered, expired and cancelled questions never become automatic approval and cancellation invalidates a saved answer (4.423208ms)
+✔ incomplete approvals, duplicate choices, forged fields and corrupt persisted metadata preserve the last readable state (5.189958ms)
+✔ authenticated human HTTP answers bind the seen revision; MCP/admin cannot forge an answer or a human cancellation (43.167ms)
+✔ question cards renders en while preserving received values (58.496583ms)
+✔ question cards renders zh-CN while preserving received values (63.5355ms)
+✔ question cards renders ja while preserving received values (61.933167ms)
+✔ legacy subagents command validates options before launching rdsh (340.1345ms)
+✔ legacy subagents command forwards arguments and exit status (315.325375ms)
+✔ legacy subagents command skips a non-executable PATH candidate (296.837042ms)
+✔ legacy task-outcomes command validates options before launching rdsh (645.988083ms)
+✔ legacy task-outcomes command forwards arguments and exit status (414.062ms)
+✔ legacy task-outcomes command forwards the successful exit status (755.254291ms)
+✔ legacy task-outcomes command skips non-executable rdsh candidates on Unix (295.822875ms)
+✔ setup renders owned policy failures in en and preserves external text (2.094125ms)
+✔ setup renders owned policy failures in zh-CN and preserves external text (1.259875ms)
+✔ setup renders owned policy failures in ja and preserves external text (1.630541ms)
+ℹ tests 37
+ℹ suites 0
+ℹ pass 37
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 16935.303666

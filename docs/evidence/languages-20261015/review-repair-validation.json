@@ -1,0 +1,217 @@
+{
+  "source_identity": {
+    "local_base": "e0d4a16e95b2915b2f4892b07873dbf1ff8e0cfc",
+    "merged_upstream": "99a42fd46e703e9cdf3be4405ecbbf45e75cd361",
+    "state": "Uncommitted merge-forward plus review repairs; no future commit SHA assigned.",
+    "files": [
+      {
+        "path": "dashboard/cli.mjs",
+        "sha256": "cd58e0c7e198f9cb3b26fa2fe17481e633863855b740d60634f91cf147a5aa64"
+      },
+      {
+        "path": "dashboard/product-locale.mjs",
+        "sha256": "6ee8a1a87c344de66bc2019c25a774b8da0eb7f4c27edd9694cf2b1a84f4bdd3"
+      },
+      {
+        "path": "dashboard/server.mjs",
+        "sha256": "ffce505c3e8a8e0ec80200d7a03b8b0407977afd24bfc8297de5cad1dc2c4fef"
+      },
+      {
+        "path": "dashboard/test/cli-locale.test.mjs",
+        "sha256": "51ccc495e27ac85c2d51db587ded0422622eb7492b080e25cf45b16cebe727cb"
+      },
+      {
+        "path": "dashboard/test/history-backup.test.mjs",
+        "sha256": "e8ae3d4f3f4e17adb960387a98b6932336f25b460d63346a62225aebe285946f"
+      },
+      {
+        "path": "dashboard/test/setup-policy-locale.test.mjs",
+        "sha256": "69ef243afd05c02018cbfe94df53b55ec8f9c873ecaf7ba4abe2e716aa028f8d"
+      },
+      {
+        "path": "src/main.rs",
+        "sha256": "d8f157fbe3f38670c3d5ffbf5b389d061bcc0eb83af8cddebf3ea535005e934c"
+      },
+      {
+        "path": "src/providers.rs",
+        "sha256": "0093f4b746372b4afa02b3666c4348d922c0399e9cdfcdce9509a4c5ab0691af"
+      },
+      {
+        "path": "src/setup.html",
+        "sha256": "32e9ed6ee82870375c1c4a69887bf0862fe57d546d7a0f8eeb52465611581c94"
+      },
+      {
+        "path": "tests/provider_cli.rs",
+        "sha256": "6e5acd76e83bb173096d4df4068a57350b39573448131a2042618f5f91de1e62"
+      },
+      {
+        "path": "tests/e2e/browser.mjs",
+        "sha256": "44b18fb251a75c75e8bc2e63a1f54f48830b181274097e02ad12cf5055c37070"
+      },
+      {
+        "path": "tests/e2e/outcome-languages.mjs",
+        "sha256": "77964141fb8fa4dba3592f9aa1a87f5f192f8c1a9867f3ca5fa9c0135f8b79c3"
+      },
+      {
+        "path": "install.sh",
+        "sha256": "fdc8524ece1eb0d6fb206161d56801d127ce82107973ce89cffe904518a0be41"
+      },
+      {
+        "path": "scripts/demo-buzz.sh",
+        "sha256": "7cee372b3f1dd488e8419928c98345def4952accb5861ca299356354e1ad06a1"
+      },
+      {
+        "path": "tests/install-isolated/cases/as-dsh-roundtrip.sh",
+        "sha256": "8c17689b7b80c7df5a9cc323b88ef87a11baa4227733597f15242d461ed6cbf1"
+      },
+      {
+        "path": "tests/serial_proxy.rs",
+        "sha256": "f72766243bf7a515858f397b983cd32207e724de8d8f6d5c1da5d26591543203"
+      }
+    ]
+  },
+  "scope": "Private local no-model fixtures and actual loopback Chromium interactions. No installed binary, real account, provider, Tailscale or production settings changed.",
+  "checks": [
+    {
+      "command": "node --test dashboard/test/cli-locale.test.mjs dashboard/test/subagent-bridge.test.mjs dashboard/test/task-outcomes-bridge.test.mjs dashboard/test/product-locale.test.mjs tests/setup-policy-locale.test.mjs dashboard/test/observed-cli-ui.test.mjs dashboard/test/question-contracts.test.mjs",
+      "result": "PASS",
+      "passed": 37,
+      "skipped": 0,
+      "log": "review-repair-js-focused.txt",
+      "note": "The policy fixture was subsequently relocated without behavior changes into dashboard/test so the ordinary dashboard CI wildcard executes it."
+    },
+    {
+      "command": "node --test dashboard/test/setup-policy-locale.test.mjs",
+      "result": "PASS",
+      "passed": 3,
+      "skipped": 0,
+      "log": "review-repair-policy-focused.txt"
+    },
+    {
+      "command": "node --test dashboard/test/history-backup.test.mjs dashboard/test/server-lock.test.mjs dashboard/test/server-close.test.mjs",
+      "result": "PASS",
+      "passed": 12,
+      "skipped": 1,
+      "log": "review-repair-port-focused.txt",
+      "skip": "Existing Darwin has no owned process-scope backend; no new skip."
+    },
+    {
+      "command": "cargo test --release --test provider_cli an_inline_providers_mapping_is_refused_with_the_yaml_to_add",
+      "result": "PASS",
+      "passed": 1,
+      "languages": [
+        "en",
+        "ja",
+        "zh-CN"
+      ],
+      "log": "review-repair-provider-focused.txt"
+    },
+    {
+      "command": "cargo test --release --test auth_sharing invalid_policy_fails_closed_without_exposing_its_content",
+      "result": "PASS",
+      "passed": 1,
+      "log": "review-repair-auth-machine-focused.txt"
+    },
+    {
+      "command": "cargo test --release --test serial_proxy invalid_serial_proxy_options_exit_with_usage_status",
+      "result": "PASS",
+      "passed": 1,
+      "log": "review-repair-upstream-options-focused.txt"
+    },
+    {
+      "command": "cargo fmt --check",
+      "result": "PASS"
+    },
+    {
+      "command": "git diff --check",
+      "result": "PASS"
+    },
+    {
+      "command": "RDSH_E2E_BIN=./target/release/rdsh RDSH_E2E_OUTPUT=/tmp/rdsh-review-browser-20261015 node tests/e2e/languages.mjs",
+      "result": "PASS",
+      "languages": [
+        "en",
+        "zh-CN",
+        "ja"
+      ],
+      "records": [
+        "review-repair-browser-en.json",
+        "review-repair-browser-zh-CN.json",
+        "review-repair-browser-ja.json"
+      ]
+    },
+    {
+      "command": "RDSH_OUTCOME_RECORD_FLOW=1 RDSH_OUTCOME_LANGUAGES_OUTPUT=/tmp/rdsh-review-outcome-flow-20261015 node tests/e2e/outcome-languages.mjs",
+      "result": "PASS",
+      "languages": 3,
+      "viewports_per_language": 2,
+      "local_criteria_per_language": 2,
+      "record": "review-repair-outcome-languages.json"
+    }
+  ],
+  "before_controls": [
+    {
+      "area": "INTEGRATION-05",
+      "result": "FAIL as expected",
+      "reason": "Corrupt rdsh.json prevents valid native bridge dispatch.",
+      "log": "review-repair-bridge-before.txt"
+    },
+    {
+      "area": "MAIN-02 setup",
+      "result": "FAIL as expected in ja/zh-CN",
+      "reason": "Owned canonical policy error is appended unchanged to UI.",
+      "log": "review-repair-setup-before.txt"
+    },
+    {
+      "area": "MAIN-02 provider",
+      "result": "FAIL as expected",
+      "reason": "Japanese refusal envelope contains fixed English inline providers reason.",
+      "log": "review-repair-provider-before.txt"
+    },
+    {
+      "area": "port allocation",
+      "result": "FAIL as expected",
+      "reason": "A held default listener makes the old ignored port:0 request fail EADDRINUSE.",
+      "log": "review-repair-port-before.txt"
+    }
+  ],
+  "recording": {
+    "input": "outcome-verification-flow-ja.webm",
+    "input_sha256": "d74ca2aac97f932686ff66d99f9ccbacf6251c4c525bdd764148a5751dfd61f3",
+    "method": "Actual Playwright Chromium video of local outcome check/criterion execution/refresh; GIF is the recording slowed to half speed and resampled to 8 fps at 960px width. No UI image was fabricated.",
+    "gif": "outcome-verification-flow-ja.gif",
+    "gif_sha256": "553daae6281a3138022694ba9d51bcfe639a0068fc46fb8a063c0edc88ca82c0",
+    "decoded": {
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "width": 960,
+          "height": 750,
+          "nb_read_frames": "32"
+        }
+      ],
+      "format": {
+        "duration": "4.010000",
+        "size": "2174441"
+      }
+    },
+    "checkpoints": [
+      "outcome-flow-ja-initial.png",
+      "outcome-flow-ja-unmet.png",
+      "outcome-flow-ja-verified.png"
+    ]
+  },
+  "before_image_limitation": "Preexisting before-desktop.png and before-mobile.png retain their unrecorded source-commit limitation. These new videos/checkpoints capture the current candidate only and do not assign source attribution to historical images.",
+  "limits": [
+    "No full suite rerun by this worker after the repairs; parent/CI own exhaustive verification.",
+    "Linux ordinary 8ee run failed once at the historical freePort TOCTOU; a focused unchanged retry passed but does not replace the failed full result. New-source Linux qualification is pending separately.",
+    "Current dashboard wildcard denominator is expected to increase from 347 to 352 (new bridge, port and three setup cases); this is an inventory expectation, not a full-suite pass claim.",
+    "New-head CI, human approval, merge, release and paid signing remain separate."
+  ],
+  "binary": {
+    "path": "target/release/rdsh",
+    "sha256": "66081a77a8b3f8c1eb7d0eb72005ac22667639c9212894bea4313ad2d19d63e5"
+  },
+  "published_log_redaction": "The local checkout path prefix is replaced by <worktree>; test names, assertions and outcomes are preserved. Original execution logs remain in private QA evidence. Trailing whitespace and terminal blank lines are normalized in the published text copies."
+}

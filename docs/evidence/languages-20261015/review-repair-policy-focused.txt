@@ -1,0 +1,11 @@
+✔ setup renders owned policy failures in en and preserves external text (1.884333ms)
+✔ setup renders owned policy failures in zh-CN and preserves external text (0.932042ms)
+✔ setup renders owned policy failures in ja and preserves external text (1.383292ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 54.97475

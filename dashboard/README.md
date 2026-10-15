@@ -53,12 +53,21 @@ and server error details are shown exactly as received.
 Choose a single invocation with `rdsh-dashboard --language ja project ...`;
 selection uses `--language`, nonblank `RDSH_LANG`, `general.language`, then the
 first nonblank `LC_ALL`/`LC_MESSAGES`/`LANG`, finally English. A malformed saved
-language stops startup without rewriting its file. The DSH settings plugin has
-its own live selector; its `auto` follows the browser language.
+language stops startup without rewriting its file. The native JSON bridges
+`subagents plan` and `task-outcomes apply|validate|schema` do not read settings;
+they resolve display language from the explicit flag or environment and preserve
+native request/output bytes and exit status even if `rdsh.json` is corrupt.
+The DSH settings plugin has its own live selector; its `auto` follows the browser language.
+The setup page translates known credential-sharing policy failures for display;
+the status API retains canonical reasons, and unknown external details stay unchanged.
 The command palette searches all three translated labels regardless of the
 current display language; Escape closes it and returns focus. Known observed
 CLI states and newly generated cancellation reasons use the selected language.
 Received cancellation reasons and future status labels remain original values.
+
+Programmatic callers can pass `port: 0` to `startDashboard` to reserve a loopback
+port atomically. The returned port, URLs and persisted runtime/MCP metadata use
+the listening socket's assigned port. Omitting the port keeps the usual default.
 
 Display-only `--language` options are removed when re-executing an immutable
 captured CLI, so older captures need no new option grammar. Other argument bytes,

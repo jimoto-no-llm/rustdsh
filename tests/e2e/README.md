@@ -135,3 +135,12 @@ The existing native CI matrix runs this test on Linux and macOS.
 The outcome language flow runs actual synthetic acceptance checks through the local server in English, Simplified Chinese and Japanese. It checks initial unverified state, verified criteria, original Japanese task values, and desktop/mobile layout without provider calls.
 
 On native Windows, `powershell -NoProfile -File tests/e2e/cli-tty-windows.ps1` checks all six interactive setup cases through ConPTY using isolated homes and no provider requests. `RDSH_E2E_BIN` selects a built `.exe`. POSIX hosts use `python3 tests/e2e/cli-tty.py`. These tests do not exercise a physical keyboard or the Windows OS IME.
+
+Set `RDSH_OUTCOME_RECORD_FLOW=1` when running `node tests/e2e/outcome-languages.mjs`
+to capture real Chromium video and initial/unmet/verified PNG checkpoints for each
+language. `RDSH_OUTCOME_LANGUAGES_OUTPUT` selects the private output directory.
+The recording includes actual local criterion execution and browser clicks; it
+contains no model or account call. Convert the resulting WebM to a GIF with an
+existing video tool if a review attachment needs that format. Setup browser flows
+also render a deliberately corrupt private sharing policy, verify the localized
+warning and unchanged canonical API reason, then repair the private file.

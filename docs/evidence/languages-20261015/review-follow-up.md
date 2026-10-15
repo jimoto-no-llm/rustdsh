@@ -20,3 +20,9 @@ The merged upstream release introduced ordered JSON objects and a new source-con
 The prior language-selection pre-pass initially broke the upstream pure-planner corrupt-settings test. The final code restores settings independence for actual Clap-recognized recovery/pure JSON commands; the unchanged upstream test passes. The complete final macOS suite passes 434 tests and the Windows native suite passes 399.
 
 The included source and local receipts are review evidence. New-head GitHub CI, human approval, merging and release are separate acceptance steps.
+
+## Subsequent review and Linux fixture repair
+
+The 2026-10-15 03:47/04:25 UTC review's remaining INTEGRATION-05 and MAIN-02 paths are addressed in the [new focused source receipt](review-repair-validation.json). Older unresolved GitHub thread flags are not treated as new defects: observed CLI states and newly generated cancellation reasons already use locale-owned keys; their three-language tests and real browser cancellation flows still pass. No thread was resolved or replied to by this worker.
+
+Upstream `99a42fd` contributes three small commits (five files): zero serial-proxy queue rejection, installer wrapper-warning correction and the demo default argument. The merge-forward preserves them; the option-refusal test passes. A separate real Linux full run on 8ee failed at a port-allocation race, and its unchanged focused retry passed. The repair uses atomic product `listen(0)` allocation and preserves runtime/API address consistency; the deterministic occupied-default negative control fails before that repair and passes afterward. A new full Linux run is required before claiming Linux qualification.

@@ -517,29 +517,48 @@ fn invalid_input_is_refused_before_anything_is_written() {
 
 #[test]
 fn an_inline_providers_mapping_is_refused_with_the_yaml_to_add() {
-    let f = Fixture::new();
-    let inline = "- id: llm-pi-ai\n  config:\n    providers: {}\n";
-    f.set_patch(inline);
-    let out = f.run(&[
-        "provider",
-        "add",
-        "hai",
-        "--profile",
-        "tui",
-        "--model",
-        "m1",
-    ]);
-    assert!(!out.status.success());
-    let msg = text(&out);
-    assert!(
-        msg.contains("add this under llm-pi-ai config providers by hand"),
-        "{msg}"
-    );
-    assert!(
-        msg.contains("baseURL: https://hai-api.hcloud.ltd/v1"),
-        "{msg}"
-    );
-    assert_eq!(f.patch(), inline);
+    for (language, reason, manual) in [
+        (
+            "en",
+            "providers is written inline (for example `providers: {}`)",
+            "add this under llm-pi-ai config providers by hand",
+        ),
+        (
+            "ja",
+            "providersがインライン形式です（例: `providers: {}`）",
+            "llm-pi-ai config providers の下に次の内容を手動で追加してください",
+        ),
+        (
+            "zh-CN",
+            "providers 采用内联形式（例如 `providers: {}`）",
+            "请手动将以下内容添加到 llm-pi-ai config providers 下",
+        ),
+    ] {
+        let f = Fixture::new();
+        let inline = "- id: llm-pi-ai\n  config:\n    providers: {}\n";
+        f.set_patch(inline);
+        let out = f.run(&[
+            "--language",
+            language,
+            "provider",
+            "add",
+            "hai",
+            "--profile",
+            "tui",
+            "--model",
+            "m1",
+        ]);
+        assert!(!out.status.success());
+        let msg = text(&out);
+        assert!(msg.contains(reason), "{language}: {msg}");
+        assert!(msg.contains(manual), "{language}: {msg}");
+        assert!(
+            msg.contains("baseURL: https://hai-api.hcloud.ltd/v1"),
+            "{msg}"
+        );
+        assert_eq!(f.patch(), inline);
+        assert!(f.creds().is_empty());
+    }
 }
 
 #[test]

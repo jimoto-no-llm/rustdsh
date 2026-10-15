@@ -114,13 +114,6 @@ const index = (projectId) => ({
     },
   ],
 });
-async function freePort() {
-  const server = net.createServer();
-  await new Promise((r) => server.listen(0, "127.0.0.1", r));
-  const port = server.address().port;
-  await new Promise((r) => server.close(r));
-  return port;
-}
 async function setup(t, count = 1) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-backup-test-")),
     projects = [],
@@ -141,7 +134,7 @@ async function setup(t, count = 1) {
   async function start(project) {
     const d = await startDashboard({
       project,
-      port: await freePort(),
+      port: 0,
       tailscale: false,
     });
     dashboards.push(d);
@@ -149,6 +142,37 @@ async function setup(t, count = 1) {
   }
   return { root, projects, start };
 }
+test("ephemeral dashboard ports stay bound and are published consistently while the default is occupied", async (t) => {
+  const f = await setup(t, 2);
+  const reserved = net.createServer();
+  const defaultPort = 38100 + (parseInt(f.projects[0].id.slice(0, 4), 16) % 1000);
+  const owned = await new Promise((resolve, reject) => {
+    reserved.once("error", error => error.code === "EADDRINUSE" ? resolve(false) : reject(error));
+    reserved.listen(defaultPort, "127.0.0.1", () => resolve(true));
+  });
+  if (owned) t.after(() => new Promise(resolve => reserved.close(resolve)));
+  const servers = [];
+  for (const project of f.projects) {
+    const dashboard = await f.start(project);
+    servers.push(dashboard);
+    const port = dashboard.server.address().port;
+    assert.ok(port > 0);
+    assert.equal(dashboard.port, port);
+    assert.equal(dashboard.localUrl, `http://127.0.0.1:${port}/`);
+    assert.equal(new URL(dashboard.browserUrl).port, String(port));
+    const runtime = JSON.parse(await fs.readFile(path.join(project.directory, "runtime.json"), "utf8"));
+    assert.equal(runtime.port, port);
+    assert.equal(runtime.local_url, dashboard.localUrl);
+    assert.equal(runtime.browser_url, dashboard.browserUrl);
+    const mcp = JSON.parse(await fs.readFile(path.join(project.directory, "mcp-http-config.json"), "utf8"));
+    assert.equal(mcp.mcpServers[`dashboard-${project.id}`].url, `${dashboard.localUrl}mcp`);
+    const response = await fetch(`${dashboard.localUrl}api/state`, { headers: { authorization: `Bearer ${runtime.token}`, origin: dashboard.localUrl.slice(0, -1) } });
+    assert.equal(response.status, 200);
+  }
+  assert.notEqual(servers[0].port, defaultPort);
+  assert.notEqual(servers[0].port, servers[1].port);
+});
+
 test("backup API rejects proxy-forwarded requests even when the peer is loopback", async (t) => {
   const f = await setup(t),
     dashboard = await f.start(f.projects[0]),

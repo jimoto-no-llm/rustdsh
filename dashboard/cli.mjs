@@ -380,8 +380,15 @@ try {
     !["en", "zh-CN", "ja"].includes(explicitLanguage)
   )
     throw new CliDiagnosticError("error.language");
-  language = await loadProductLocale(explicitLanguage);
   const command = positionals[0];
+  // These native JSON operations do not consume dashboard settings. Keep the
+  // bridge available even when a settings file needs repair.
+  const nativeJsonBridge =
+    (command === "subagents" && positionals[1] === "plan") ||
+    (command === "task-outcomes" && ["apply", "validate", "schema"].includes(positionals[1]));
+  language = nativeJsonBridge
+    ? resolveProductLocale(explicitLanguage)
+    : await loadProductLocale(explicitLanguage);
   if (
     command !== "release" &&
     ["release-id", "selection-revision"].some((k) => values[k] !== undefined)

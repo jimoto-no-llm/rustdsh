@@ -1,0 +1,7 @@
+    Finished `release` profile [optimized] target(s) in 0.08s
+     Running tests/auth_sharing.rs (target/release/deps/auth_sharing-2882c9c24177ad28)
+
+running 1 test
+test invalid_policy_fails_closed_without_exposing_its_content ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 16 filtered out; finished in 0.29s

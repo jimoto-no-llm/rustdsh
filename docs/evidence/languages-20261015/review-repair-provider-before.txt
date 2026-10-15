@@ -1,0 +1,34 @@
+   Compiling rdsh v0.4.0 (<worktree>)
+    Finished `release` profile [optimized] target(s) in 30.47s
+     Running tests/provider_cli.rs (target/release/deps/provider_cli-b44658ef0e4bca24)
+
+running 1 test
+test an_inline_providers_mapping_is_refused_with_the_yaml_to_add ... FAILED
+
+failures:
+
+---- an_inline_providers_mapping_is_refused_with_the_yaml_to_add stdout ----
+
+thread 'an_inline_providers_mapping_is_refused_with_the_yaml_to_add' (16245133) panicked at tests/provider_cli.rs:533:9:
+ja: [rdsh] エラー: providers.hai を安全に配置できません: providers is written inline (for example `providers: {}`)
+llm-pi-ai config providers の下に次の内容を手動で追加してください:
+- id: llm-pi-ai
+  config:
+    providers:
+      hai:
+        displayName: HAI
+        apiKeyEnv: HAI_API_KEY
+        api: openai-completions
+        baseURL: https://hai-api.hcloud.ltd/v1
+        models:
+          - id: m1
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    an_inline_providers_mapping_is_refused_with_the_yaml_to_add
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.40s
+
+error: test failed, to rerun pass `--test provider_cli`

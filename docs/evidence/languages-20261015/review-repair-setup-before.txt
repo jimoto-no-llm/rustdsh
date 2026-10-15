@@ -1,0 +1,49 @@
+✔ setup renders owned policy failures in en and preserves external text (1.782291ms)
+✖ setup renders owned policy failures in zh-CN and preserves external text (0.463167ms)
+✖ setup renders owned policy failures in ja and preserves external text (0.235583ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 1
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 60.191958
+
+✖ failing tests:
+
+test at tests/setup-policy-locale.test.mjs:13:3
+✖ setup renders owned policy failures in zh-CN and preserves external text (0.463167ms)
+  AssertionError [ERR_ASSERTION]: 持久保存位置：日本語/path。此 DSH_HOME 中所有配置文件都可使用副本。取消选择会停止将来导入，并保留现有副本。要停止使用副本，请停止 DSH 并删除对应 record/ref。在提供方撤销需要单独进行。 credential sharing policy is unreadable; imports are disabled
+      at TestContext.<anonymous> (file://<worktree>/tests/setup-policy-locale.test.mjs:28:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests/setup-policy-locale.test.mjs:13:3
+✖ setup renders owned policy failures in ja and preserves external text (0.235583ms)
+  AssertionError [ERR_ASSERTION]: 永続保存先: 日本語/path。保存内容は同じDSH_HOMEの全プロファイルで利用できます。選択解除は今後の取込を止め、保存済みのコピーは残します。利用を止めるにはDSHを停止して該当record/refを削除します。発行元での失効は別途必要です。 credential sharing policy is unreadable; imports are disabled
+      at TestContext.<anonymous> (file://<worktree>/tests/setup-policy-locale.test.mjs:28:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

@@ -1257,7 +1257,10 @@ fn apply_route(
     };
     if !key_rest(&lines[providers], "providers", locale).is_some_and(str::is_empty) {
         return Err(refuse(
-            "providers is written inline (for example `providers: {}`)",
+            crate::locale::diagnostic(
+                locale,
+                "providers is written inline (for example `providers: {}`)",
+            ),
             route,
             locale,
         ));

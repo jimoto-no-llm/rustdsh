@@ -1,0 +1,8 @@
+   Compiling rdsh v0.4.0 (<worktree>)
+    Finished `release` profile [optimized] target(s) in 31.69s
+     Running tests/provider_cli.rs (target/release/deps/provider_cli-b44658ef0e4bca24)
+
+running 1 test
+test an_inline_providers_mapping_is_refused_with_the_yaml_to_add ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.36s

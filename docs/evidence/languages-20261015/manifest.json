@@ -3,8 +3,8 @@
   "files": [
     {
       "path": "README.md",
-      "bytes": 7048,
-      "sha256": "3d41765a77d93cdac2e806e1b5b83e0fbaac25deded3c3291cb06e8b473032ea"
+      "bytes": 10143,
+      "sha256": "c5529d0803b48a9cb824e8ef3c5409bc38fcb8ca18424844c135c7e95a54ac78"
     },
     {
       "path": "before-desktop.png",
@@ -52,6 +52,11 @@
       "sha256": "e720845a781b9f1913b565342eb00659788d194288b0a7f4123f714df418150b"
     },
     {
+      "path": "en-setup-policy-error-mobile.png",
+      "bytes": 87837,
+      "sha256": "1e867062e43b88d4938634f1b99fcce7a1b2cb30afd232457efbdce1e615db17"
+    },
+    {
       "path": "input-records.json",
       "bytes": 3183,
       "sha256": "42491ee0e58b8177a3b60284586526b9f07b5c2c9dd67e2bd013afb6910a8eee"
@@ -65,6 +70,11 @@
       "path": "ja-mobile.png",
       "bytes": 91905,
       "sha256": "6ef3262f2c4c5387468cc1babfe6f60474d4d1e4081628ab126d1412014a4094"
+    },
+    {
+      "path": "ja-setup-policy-error-mobile.png",
+      "bytes": 90190,
+      "sha256": "3bcd54fb78d7bcdad3183ae0a2b06cd835be99c79f69f7256af3064cfca7f56b"
     },
     {
       "path": "known-exceptions.json",
@@ -87,9 +97,34 @@
       "sha256": "122c64b5c50628ec834f64fc04e1bfc28c3e79eda593f7fd1753582d4366426f"
     },
     {
+      "path": "outcome-flow-ja-initial.png",
+      "bytes": 153866,
+      "sha256": "b5954d775cd81f1114e68ce17be89e882f40f705dea5d7db57528f020872f8b4"
+    },
+    {
+      "path": "outcome-flow-ja-unmet.png",
+      "bytes": 215052,
+      "sha256": "1347643b2169d8c2585cc354a7d7df80c4d0e24071e263408625e8cbbc3f8463"
+    },
+    {
+      "path": "outcome-flow-ja-verified.png",
+      "bytes": 217010,
+      "sha256": "451d5539aa7e93a5403bb950136db62efde2f83152a8354a125f98aa996d9862"
+    },
+    {
       "path": "outcome-languages.json",
       "bytes": 1297,
       "sha256": "a18843b5cda0a8f7d20fbe824155fb6a38e2c257d003efeb83d262df0daebe72"
+    },
+    {
+      "path": "outcome-verification-flow-ja.gif",
+      "bytes": 2174441,
+      "sha256": "553daae6281a3138022694ba9d51bcfe639a0068fc46fb8a063c0edc88ca82c0"
+    },
+    {
+      "path": "outcome-verification-flow-ja.webm",
+      "bytes": 263402,
+      "sha256": "d74ca2aac97f932686ff66d99f9ccbacf6251c4c525bdd764148a5751dfd61f3"
     },
     {
       "path": "performance-extended-initial.json",
@@ -148,8 +183,83 @@
     },
     {
       "path": "review-follow-up.md",
-      "bytes": 4017,
-      "sha256": "f97368aa5331636b7722ae1ace5de393f2538622db28d7765b28afd7e33b795e"
+      "bytes": 5136,
+      "sha256": "900221c3d39515985749813c599b4647d4fa4649eeef4d2e835c5a5793e3d788"
+    },
+    {
+      "path": "review-repair-auth-machine-focused.txt",
+      "bytes": 330,
+      "sha256": "781ffbd00e0adb72a6d4c54844c3e67cd3601d21fbc5873a9eec39bffcee2719"
+    },
+    {
+      "path": "review-repair-bridge-before.txt",
+      "bytes": 1071,
+      "sha256": "fa5722ac8c10a493dd9fd99245fbb1f70e66e49bce17e316f6a7220da6951a3a"
+    },
+    {
+      "path": "review-repair-browser-en.json",
+      "bytes": 1108,
+      "sha256": "83a991a6d9af2e485462fb47c024f1eeaa4684f7df81501bc7973e07236b6d7d"
+    },
+    {
+      "path": "review-repair-browser-ja.json",
+      "bytes": 1108,
+      "sha256": "f2ce3065eafee4d5767f3712f61ea3d61b0421982163c263f374c5c040910356"
+    },
+    {
+      "path": "review-repair-browser-zh-CN.json",
+      "bytes": 1111,
+      "sha256": "1ac4a98d2c57e3055d6cab0539822ad9070e728b9603cdf589cb0ef5d632a756"
+    },
+    {
+      "path": "review-repair-js-focused.txt",
+      "bytes": 3672,
+      "sha256": "830542c2bace8ca3837825c03d642abc8c45d72bd101e52186a72afa214ec267"
+    },
+    {
+      "path": "review-repair-outcome-languages.json",
+      "bytes": 1551,
+      "sha256": "0a289bcd500303125a94ad22583deb61555e131ac65541f5f376e12b221190fc"
+    },
+    {
+      "path": "review-repair-policy-focused.txt",
+      "bytes": 377,
+      "sha256": "6dedadd86d3d3efe03a8a3ce035d64c79b9614967f4c292a9a80ae2906a5ae21"
+    },
+    {
+      "path": "review-repair-port-before.txt",
+      "bytes": 820,
+      "sha256": "e8933c6255e59836ad47b08a8c3233b785899e1d860ee4e695b7d2533807c719"
+    },
+    {
+      "path": "review-repair-port-focused.txt",
+      "bytes": 1783,
+      "sha256": "f3bcb118bdd384dba2e3b4ed45f3bb487a80e4c9a3a13ca051f0b51746ec895e"
+    },
+    {
+      "path": "review-repair-provider-before.txt",
+      "bytes": 1240,
+      "sha256": "7ff9086e123ea2fb8177c6f38ba25af81b4ab8ae46091efbaab444bf851347e0"
+    },
+    {
+      "path": "review-repair-provider-focused.txt",
+      "bytes": 372,
+      "sha256": "d7083af918d98d18d1368239f391ff8c2b78a176ff32514a5f6c5d483f3f9ced"
+    },
+    {
+      "path": "review-repair-setup-before.txt",
+      "bytes": 2707,
+      "sha256": "6a35d5bfd6b3587f53485b2c6f822fcfb022c32614e609f4a5c99fde2315cc7a"
+    },
+    {
+      "path": "review-repair-upstream-options-focused.txt",
+      "bytes": 364,
+      "sha256": "563e9e45eae2a7a5f8afc4044cb2d771de9bb87ac2f47d15fe9e0f364fb19a12"
+    },
+    {
+      "path": "review-repair-validation.json",
+      "bytes": 8697,
+      "sha256": "e08162d3eed93e46b6ac6950b469990aff2ccc22984478273f36fe4cd125eccf"
     },
     {
       "path": "source-files.json",
@@ -190,6 +300,11 @@
       "path": "zh-CN-mobile.png",
       "bytes": 80427,
       "sha256": "a1cc66445edd7387ad15d00576dec4ba1bcc8e34bac05c670ae415345b1b8d40"
+    },
+    {
+      "path": "zh-CN-setup-policy-error-mobile.png",
+      "bytes": 85690,
+      "sha256": "5512a4c20a138a4852d0d7285c626c20f20bd2dfc583a535d2d8b15292d4bc33"
     }
   ]
 }

@@ -1,0 +1,21 @@
+✔ ephemeral dashboard ports stay bound and are published consistently while the default is occupied (29.433208ms)
+✔ backup API rejects proxy-forwarded requests even when the peer is loopback (10.907416ms)
+✔ selected task, original question revision, answer and evidence remain linked while all raw free text/code/credentials are withheld (3.813792ms)
+✔ review is pinned to source and selection; unsafe replacements/metadata and nonexistent paths are refused (1.619166ms)
+✔ answer date range restores its older decision revision and task dependencies, never replacing it with the current revision (1.092791ms)
+✔ corruption, forged authority, unknown fields and broken relationships fail validation even with a recomputed checksum (1.394ms)
+✔ empty target restores only historical data using fresh authentication; old keys cannot reconnect or recreate event subscriptions (19.908417ms)
+✔ all collisions, stale revisions and corrupt restores leave state bytes unchanged; concurrent restores serialize atomically (17.057125ms)
+✔ CLI previews, reviews, exports, inspects, restores and re-exports a portable archive; exclusive files and invalid UTF-8 fail safely (966.929833ms)
+✔ existing question and acceptance evidence IDs reject import before writing, and imported history is validated on reopen (14.395291ms)
+﹣ concurrent close shares one attempt and retries an unconfirmed stop (0.270042ms) # darwin has no owned process-scope backend; requires Linux cgroup v2 delegation/pidfds or a Windows Job
+✔ concurrent stale-lock reclamation admits a single writer (12.23425ms)
+✔ lock acquisition serializes stale steals at the file level (1.803541ms)
+ℹ tests 13
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 1
+ℹ todo 0
+ℹ duration_ms 1228.782

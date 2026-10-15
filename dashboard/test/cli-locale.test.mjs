@@ -6,7 +6,7 @@ import path from "node:path";
 import net from "node:net";
 import { spawn, execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   cliEntries,
   cliCatalog,
@@ -398,3 +398,52 @@ for (const language of ["en", "zh-CN", "ja"])
     assert.ok(stdout.includes(cliText(language, "status.open")));
     assert.ok(stdout.includes(cliText(language, "share.disabled")));
   });
+
+
+test("pure native JSON bridges ignore corrupt settings while ordinary commands fail closed", async (t) => {
+  const { root, settings, run } = await fixture(t);
+  const malformed = "{broken settings";
+  await writeFile(path.join(settings, "rdsh.json"), malformed);
+  const request = path.join(root, "要求_日本語.json");
+  const payload = { task_id: "未取得", raw: "日本語 {id}" };
+  await writeFile(request, JSON.stringify(payload));
+  // This private preload reports only the native child; it leaves the outer
+  // dashboard process alone and works without an executable shell fixture.
+  const reporter = path.join(root, "native-reporter.mjs");
+  await writeFile(reporter, `
+import { readFileSync } from "node:fs";
+import path from "node:path";
+const command = path.basename(process.argv[1]);
+if (["subagents", "task-outcomes"].includes(command)) {
+  console.log(JSON.stringify({ args: [command, ...process.argv.slice(2)], language: process.env.RDSH_LANG, request: JSON.parse(readFileSync(process.argv.at(-1), "utf8")) }));
+  console.error("native raw 日本語");
+  process.exit(Number(process.env.RDSH_BRIDGE_TEST_EXIT || 0));
+}
+`);
+  const native = {
+    RDSH_BIN: process.execPath,
+    NODE_OPTIONS: `--import=${pathToFileURL(reporter).href}`,
+  };
+  for (const [flags, environment, language] of [
+    [["--language", "ja"], { RDSH_LANG: "zh-CN" }, "ja"],
+    [[], { RDSH_LANG: "zh-CN", LC_ALL: "ja_JP.UTF-8" }, "zh-CN"],
+    [[], { RDSH_LANG: "", LC_ALL: "ja_JP.UTF-8" }, "ja"],
+    [[], { RDSH_LANG: "", LC_ALL: "C" }, "en"],
+  ]) {
+    for (const command of [["subagents", "plan"], ...["apply", "validate", "schema"].map(action => ["task-outcomes", action])]) {
+      const args = [...command, "--input-file", request];
+      const result = await run([...flags, ...args], { ...native, ...environment });
+      assert.equal(result.code, 0, result.stderr);
+      assert.deepEqual(JSON.parse(result.stdout), { args, language, request: payload });
+      assert.equal(result.stderr, "native raw 日本語\n");
+    }
+    const ordinary = await run([...flags, "--help"], { ...native, ...environment });
+    assert.equal(ordinary.code, 1);
+    assert.equal(ordinary.stdout, "");
+    assert.ok(ordinary.stderr.includes(path.join(settings, "rdsh.json")));
+    assert.equal(await readFile(path.join(settings, "rdsh.json"), "utf8"), malformed);
+  }
+  const failed = await run(["task-outcomes", "validate", "--input-file", request], { ...native, RDSH_BRIDGE_TEST_EXIT: "7" });
+  assert.equal(failed.code, 7);
+  assert.equal(failed.stderr, "native raw 日本語\n");
+});

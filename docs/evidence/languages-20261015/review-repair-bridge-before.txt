@@ -1,0 +1,30 @@
+✖ pure native JSON bridges ignore corrupt settings while ordinary commands fail closed (257.115708ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 314.621125
+
+✖ failing tests:
+
+test at dashboard/test/cli-locale.test.mjs:403:1
+✖ pure native JSON bridges ignore corrupt settings while ordinary commands fail closed (257.115708ms)
+  AssertionError [ERR_ASSERTION]: [rdsh-dashboard] rdshの表示言語設定を読み込めません: /var/folders/th/b4c841yj4vsfd0cp40pwkbnd_1cjj0/T/rdsh-cli-language-EU39IJ/settings/rdsh.json
+
+
+  1 !== 0
+
+      at TestContext.<anonymous> (file://<worktree>/dashboard/test/cli-locale.test.mjs:434:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

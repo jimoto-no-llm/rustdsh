@@ -136,8 +136,8 @@ async function readBody(req, maximum = 131072) {
 export async function startDashboard(options) {
   const { kind = "project", project, tailscale = true } = options;
   const displayLocale = await loadProductLocale(options.language, options.environment ?? process.env);
-  const port =
-    options.port ||
+  let port =
+    options.port ??
     (kind === "harness"
       ? 38081
       : 38100 + (parseInt(project.id.slice(0, 4), 16) % 1000));
@@ -159,7 +159,7 @@ export async function startDashboard(options) {
   const instanceId = randomUUID();
   const startedAt = new Date().toISOString();
   const connections = new ConnectionObservations();
-  const localUrl = `http://127.0.0.1:${port}/`;
+  let localUrl = `http://127.0.0.1:${port}/`;
   const cookieName = `rdsh_${kind === "project" ? project.id : "harness"}`;
   let store, eventsHub, humanAnnotations, observedCli;
   try {
@@ -1010,6 +1010,8 @@ export async function startDashboard(options) {
       server.once("error", reject);
       server.listen(port, "127.0.0.1", resolve);
     });
+    port = server.address().port;
+    localUrl = `http://127.0.0.1:${port}/`;
     if (kind === "harness")
       harness = await startHarness(options.harnessPort || 3081, port, {
         ...options.harnessOptions,
