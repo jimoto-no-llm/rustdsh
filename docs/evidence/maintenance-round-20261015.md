@@ -131,10 +131,12 @@ runs completed. That is one observed ordering, not a guarantee.
 
 PR #519 landed a different mechanism for `ci`: feature-branch pushes no longer
 start the workflow at all (`push` is limited to `main` and `v*` tags), so there
-is no push run to race with. The branch-key variant is still under review for
-`codeql` in #525, where the two limitations above apply. The guarantee that a
-required check cannot lose the cancellation race belongs to #519/#525, not to
-this evidence record.
+is no push run to race with. `codeql` was resolved separately in #525: its
+concurrency group keys on `github.ref`, which is `refs/pull/N/merge` for a pull
+request, so forks that reuse a branch name no longer cancel each other, and
+`paths-ignore` skips documentation- and shell-only changes. Neither limitation
+above therefore applies to `codeql`. The guarantee that a required check cannot
+lose the cancellation race belongs to #519/#525, not to this evidence record.
 
 ## Rust migration (PR #521)
 
