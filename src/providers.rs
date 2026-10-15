@@ -1370,6 +1370,18 @@ fn apply_route(text: &str, route: &Route, replace: bool) -> Result<Applied> {
     let col = dash_key_col(&lines[entry]);
     let entry_end = block_end(&lines, entry);
     let Some(config) = find_at(&lines, entry + 1, entry_end, col, "config") else {
+        // エントリに中身があるのに `- ` 直下のカラムにキーが1つも無いレイアウトは
+        // 解釈できない。ここで追記すると同じエントリに2つ目の `config:` を作り、
+        // YAML の重複マッピングキーになって既存の providers が無言で消える。
+        let body = &lines[entry + 1..entry_end.min(lines.len())];
+        let has_body = body.iter().any(|l| !skippable(l));
+        let has_col_key = body.iter().any(|l| !skippable(l) && indent_of(l) == col);
+        if has_body && !has_col_key {
+            return Err(refuse(
+                "the llm-pi-ai entry is indented in a form this module will not edit",
+                route,
+            ));
+        }
         let at = content_end(&lines, entry, entry_end);
         let mut block = vec![
             format!("{}config:", " ".repeat(col)),
