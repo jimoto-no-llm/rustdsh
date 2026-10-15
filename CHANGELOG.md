@@ -5,6 +5,13 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Changed
+
+- `AGENTS.md` and `docs/PROJECT-SETUP.md` record the working agreements that came
+  out of the v0.4.0 cycle: the nine required checks and the branch-protection
+  switches that are deliberately off, pinning the installer ledgers after every
+  release, and keeping the security page at zero open alerts.
+
 ## [0.4.0] - 2026-10-15
 
 ### Security
