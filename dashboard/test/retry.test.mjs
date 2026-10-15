@@ -643,3 +643,105 @@ test("original CLI version retry uses actual bounded children and persistent ins
   assert.equal(normal.retry.attempts, 1);
   assert.equal(normal.adapter.health, "version_matched");
 });
+
+const failLockCleanup = (t, lock) => {
+  const originalUnlink = fs.unlink;
+  t.mock.method(fs, "unlink", async (file, ...args) => {
+    if (path.resolve(String(file)) === path.resolve(lock)) {
+      const error = new Error("fixture lock cleanup failure");
+      error.code = "EACCES";
+      throw error;
+    }
+    return originalUnlink(file, ...args);
+  });
+};
+
+test("a completed retry operation is reported committed when its lock cannot be removed", async (t) => {
+  const { history, timing } = await setup(t),
+    operation_id = opId(),
+    lock = path.join(history.directory, operation_id + ".lock");
+  failLockCleanup(t, lock);
+  let failure;
+  await assert.rejects(
+    runWithRetry({
+      history,
+      operation_id,
+      kind: "cli_usage_read",
+      scope_digest: scope,
+      authorize: authorized,
+      execute: async () => {},
+      ...timing,
+    }),
+    (error) => {
+      failure = error;
+      return error.code === "retry_lock_cleanup_unconfirmed";
+    },
+  );
+  assert.equal(failure.committed, true);
+  assert.equal(failure.lock_cleanup_unconfirmed, true);
+  assert.deepEqual(failure.event_ids, []);
+  assert.equal((await history.inspect(operation_id)).status, "completed");
+  await assert.rejects(
+    runWithRetry({
+      history,
+      operation_id,
+      kind: "cli_usage_read",
+      scope_digest: scope,
+      authorize: authorized,
+      execute: async () => {},
+      ...timing,
+    }),
+    error("operation_busy"),
+  );
+});
+
+test("a retry operation failure keeps its own code when its lock cannot be removed", async (t) => {
+  const { history, timing } = await setup(t),
+    operation_id = opId(),
+    lock = path.join(history.directory, operation_id + ".lock");
+  const completed = await runWithRetry({
+    history,
+    operation_id,
+    kind: "cli_usage_read",
+    scope_digest: scope,
+    authorize: authorized,
+    execute: async () => {},
+    ...timing,
+  });
+  assert.equal(completed.status, "completed");
+  const committed = await fs.readFile(history.file(operation_id));
+  failLockCleanup(t, lock);
+  let failure;
+  await assert.rejects(
+    runWithRetry({
+      history,
+      operation_id,
+      kind: "external_send",
+      scope_digest: scope,
+      authorize: authorized,
+      execute: async () => {},
+      ...timing,
+    }),
+    (error) => {
+      failure = error;
+      return error.code === "operation_changed";
+    },
+  );
+  // The helper cannot observe how far runWithRetry's own writes got.
+  assert.equal(failure.committed, null);
+  assert.equal(failure.lock_cleanup_unconfirmed, true);
+  assert.deepEqual(failure.event_ids, []);
+  assert.deepEqual(await fs.readFile(history.file(operation_id)), committed);
+  await assert.rejects(
+    runWithRetry({
+      history,
+      operation_id,
+      kind: "cli_usage_read",
+      scope_digest: scope,
+      authorize: authorized,
+      execute: async () => {},
+      ...timing,
+    }),
+    error("operation_busy"),
+  );
+});

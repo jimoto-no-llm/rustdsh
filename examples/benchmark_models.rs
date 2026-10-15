@@ -2,6 +2,7 @@
 use anyhow::{bail, Context, Result};
 use clap::Parser;
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
@@ -36,6 +37,96 @@ struct Args {
     only_case: Option<String>,
     #[arg(long, value_parser = ["openai-codex", "anthropic"])]
     only_provider: Option<String>,
+    /// Use SSE without a WebSocket session cache in the isolated Codex profile.
+    #[arg(long)]
+    codex_sse: bool,
+    /// Exact model ID from the supplied openai-codex catalog (no fallback).
+    #[arg(long, default_value = "gpt-6.1-sol", value_parser = parse_model_id)]
+    codex_model: String,
+    /// Exact model ID from the supplied anthropic catalog (no fallback).
+    #[arg(long, default_value = "claude-sonnet-5-5", value_parser = parse_model_id)]
+    anthropic_model: String,
+}
+
+fn parse_model_id(value: &str) -> std::result::Result<String, String> {
+    if value.len() > 128
+        || !value
+            .as_bytes()
+            .first()
+            .is_some_and(u8::is_ascii_alphanumeric)
+        || !value
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b))
+    {
+        return Err("model ID must start with an ASCII letter or digit and contain only letters, digits, dots, hyphens or underscores (128 bytes maximum)".into());
+    }
+    Ok(value.to_owned())
+}
+
+fn provider_configs(
+    catalog: &Value,
+    selections: &[(&str, &str)],
+    only: Option<&str>,
+) -> Result<Vec<Option<Value>>> {
+    selections
+        .iter()
+        .map(|&(provider, model)| {
+            if only.is_some_and(|selected| selected != provider) {
+                return Ok(None);
+            }
+            let provider_catalog = catalog.get(provider).with_context(|| {
+                format!("catalog provider {provider} missing for model {model}")
+            })?;
+            provider_catalog["models"]
+                .as_array()
+                .with_context(|| {
+                    format!("catalog models missing for provider {provider} and model {model}")
+                })?
+                .iter()
+                .find(|v| v["id"] == model)
+                .with_context(|| {
+                    format!("requested model {model} missing from catalog provider {provider}")
+                })?;
+            Ok(Some(
+                json!({"models":[{"id":model}],"retryPolicy":{"mode":"normal","maxRetries":0}}),
+            ))
+        })
+        .collect()
+}
+
+fn summarize_runs(runs: &[Value], selections: &[(&str, &str)], only: Option<&str>) -> Vec<Value> {
+    let mut summaries = Vec::new();
+    for (provider, model) in selections.iter().copied() {
+        if only.is_some_and(|selected| selected != provider) {
+            continue;
+        }
+        for (case, launcher) in [
+            ("response", "original"),
+            ("response", "rdsh"),
+            ("read", "rdsh"),
+            ("rust_fix", "rdsh"),
+        ] {
+            let group: Vec<&Value> = runs
+                .iter()
+                .filter(|v| {
+                    v["provider"] == provider
+                        && v["model"] == model
+                        && v["case"] == case
+                        && v["launcher"] == launcher
+                })
+                .collect();
+            let times: Vec<f64> = group
+                .iter()
+                .filter(|v| v["model_passed"] == true)
+                .filter_map(|v| v["response_elapsed_seconds"].as_f64())
+                .collect();
+            summaries.push(json!({"provider":provider,"model":model,"case":case,"launcher":launcher,"attempts":group.len(),"passed":times.len(),
+                "runtime_passed":group.iter().filter(|v|v["passed"]==true).count(),
+                "median_success_seconds":percentile(&times,0.5),"p95_success_seconds":percentile(&times,0.95),
+                "max_success_seconds":percentile(&times,1.0)}));
+        }
+    }
+    summaries
 }
 
 fn accepted(events: &[Value], expected: &str, needs_tool: bool, exit_ok: bool) -> bool {
@@ -155,6 +246,12 @@ fn patch(args: &Args, run: &Path, selection: (&str, &str), config: &Value, case:
     };
     let mut providers = json!({});
     providers[provider] = config.clone();
+    if args.codex_sse && provider == "openai-codex" {
+        providers[provider]["transport"] = json!("sse");
+        providers[provider]["cacheRetention"] = json!("none");
+    }
+    let fence = json!({"id":"benchmark-fence", "name":Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/model_benchmark/fence.mjs"),
+      "config":{"cwd":cwd,"readable":readable,"writable":writable,"maxRequests":if case == "response" {1} else if case == "read" {2} else {4}}});
     let mut entries = vec![
         json!({"id":"credentials", "config":{"path":args.credentials,"watch":false}}),
         json!({"id":"agent-default-model", "config":{"provider":provider,"model":model,"reasoningEffort":"high"}}),
@@ -162,8 +259,7 @@ fn patch(args: &Args, run: &Path, selection: (&str, &str), config: &Value, case:
         json!({"id":"session-persistence-jsonl", "config":{"root":run.join("sessions")}}),
         json!({"id":"sandbox-policy", "config":{"mode":if case == "rust_fix" {"workspace-write"} else {"read-only"},"workspaceRoot":cwd}}),
         json!({"id":"tools", "config":{"mode":"native"}}),
-        json!({"id":"benchmark-fence", "name":Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/model_benchmark/fence.mjs"),
-          "config":{"cwd":cwd,"readable":readable,"writable":writable,"maxRequests":if case == "response" {1} else if case == "read" {2} else {4}}}),
+        json!({"insert":[fence]}),
     ];
     // Keep core Agent/Session/fs code official; remove unrelated capabilities.
     for id in [
@@ -590,6 +686,19 @@ fn fingerprint(path: &Path) -> Result<String> {
     Ok(hash.to_owned())
 }
 
+fn fingerprint_bytes(bytes: &[u8]) -> String {
+    Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+fn load_catalog(path: &Path) -> Result<(Value, String)> {
+    let bytes = fs::read(path).context("catalog read failed")?;
+    let catalog = serde_json::from_slice(&bytes).context("catalog JSON parse failed")?;
+    Ok((catalog, fingerprint_bytes(&bytes)))
+}
+
 fn version(path: &Path) -> Result<String> {
     let output = Command::new(path).arg("--version").output()?;
     if !output.status.success() {
@@ -616,21 +725,12 @@ fn main() -> Result<()> {
     if args.out.exists() {
         bail!("output directory already exists; use a new directory");
     }
-    let catalog: Value = serde_json::from_slice(&fs::read(&args.catalog)?)?;
+    let (catalog, catalog_sha256) = load_catalog(&args.catalog)?;
     let selections = [
-        ("openai-codex", "gpt-6.1-sol"),
-        ("anthropic", "claude-sonnet-5-5"),
+        ("openai-codex", args.codex_model.as_str()),
+        ("anthropic", args.anthropic_model.as_str()),
     ];
-    let mut configs = Vec::new();
-    for (provider, model) in selections {
-        let spec = catalog[provider]["models"]
-            .as_array()
-            .context("catalog models missing")?
-            .iter()
-            .find(|v| v["id"] == model)
-            .context("requested model missing from catalog")?;
-        configs.push(json!({"models":[spec],"retryPolicy":{"mode":"normal","maxRetries":0}}));
-    }
+    let configs = provider_configs(&catalog, &selections, args.only_provider.as_deref())?;
     private_dir(&args.out)?;
     args.out = fs::canonicalize(&args.out)?;
     let cleanup = RunCleanup(args.out.clone());
@@ -646,6 +746,9 @@ fn main() -> Result<()> {
         "runtime_artifact_sha256":args.runtime_artifact.as_deref().map(fingerprint).transpose()?,
         "measurement":"response from spawn to committed turn_end; process lifetime and normal exit tracked separately; first text is not first token",
         "ordering":"sequential; alternate provider and launcher order every sample; no automatic retries",
+        "catalog_sha256":catalog_sha256,
+        "catalog_resolution":"exact ID selected from supplied catalog; official installed catalog supplies model metadata without raw SDK compat overrides",
+        "codex_sse_enabled":args.codex_sse,
         "authentication":"existing official credential provider; normal OAuth refresh permitted; no credential export",
         "only_case":args.only_case,"only_provider":args.only_provider,
         "runs":[]});
@@ -679,7 +782,9 @@ fn main() -> Result<()> {
                     index,
                     sample,
                     (provider, model),
-                    &configs[p],
+                    configs[p]
+                        .as_ref()
+                        .context("selected provider configuration missing")?,
                     "response",
                     launcher,
                 )?;
@@ -703,7 +808,9 @@ fn main() -> Result<()> {
                     index,
                     sample,
                     (provider, model),
-                    &configs[p],
+                    configs[p]
+                        .as_ref()
+                        .context("selected provider configuration missing")?,
                     case,
                     "rdsh",
                 )?;
@@ -716,29 +823,7 @@ fn main() -> Result<()> {
         }
     }
     let runs = report["runs"].as_array().unwrap();
-    let mut summaries = Vec::new();
-    for (_, model) in selections {
-        for (case, launcher) in [
-            ("response", "original"),
-            ("response", "rdsh"),
-            ("read", "rdsh"),
-            ("rust_fix", "rdsh"),
-        ] {
-            let group: Vec<&Value> = runs
-                .iter()
-                .filter(|v| v["model"] == model && v["case"] == case && v["launcher"] == launcher)
-                .collect();
-            let times: Vec<f64> = group
-                .iter()
-                .filter(|v| v["model_passed"] == true)
-                .filter_map(|v| v["response_elapsed_seconds"].as_f64())
-                .collect();
-            summaries.push(json!({"model":model,"case":case,"launcher":launcher,"attempts":group.len(),"passed":times.len(),
-                "runtime_passed":group.iter().filter(|v|v["passed"]==true).count(),
-                "median_success_seconds":percentile(&times,0.5),"p95_success_seconds":percentile(&times,0.95),
-                "max_success_seconds":percentile(&times,1.0)}));
-        }
-    }
+    let summaries = summarize_runs(runs, &selections, args.only_provider.as_deref());
     let all_ok = runs.iter().all(|v| v["passed"] == true);
     let all_model_ok = runs.iter().all(|v| v["model_passed"] == true);
     report["summaries"] = json!(summaries);
@@ -760,6 +845,233 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn summaries_separate_providers_with_the_same_model_id_and_respect_selection() {
+        let runs = vec![
+            json!({"provider":"openai-codex","model":"shared","case":"response","launcher":"rdsh","model_passed":true,"passed":true,"response_elapsed_seconds":2.0}),
+            json!({"provider":"anthropic","model":"shared","case":"response","launcher":"rdsh","model_passed":true,"passed":false,"response_elapsed_seconds":8.0}),
+        ];
+        let selections = [("openai-codex", "shared"), ("anthropic", "shared")];
+        let summaries = summarize_runs(&runs, &selections, None);
+        let codex = summaries
+            .iter()
+            .find(|v| {
+                v["provider"] == "openai-codex"
+                    && v["case"] == "response"
+                    && v["launcher"] == "rdsh"
+            })
+            .unwrap();
+        assert_eq!(codex["attempts"], 1);
+        assert_eq!(codex["median_success_seconds"], 2.0);
+        assert_eq!(codex["runtime_passed"], 1);
+        let only = summarize_runs(&runs, &selections, Some("anthropic"));
+        assert_eq!(only.len(), 4);
+        assert!(only.iter().all(|v| v["provider"] == "anthropic"));
+        assert_eq!(only[1]["median_success_seconds"], 8.0);
+        assert_eq!(only[1]["runtime_passed"], 0);
+    }
+
+    #[test]
+    fn codex_sse_is_opt_in_and_preserves_other_provider_options() {
+        let base = [
+            "benchmark_models",
+            "--bin",
+            "rdsh",
+            "--original",
+            "dsh",
+            "--credentials",
+            "credentials.yaml",
+            "--catalog",
+            "catalog.json",
+            "--out",
+            "run",
+        ];
+        let default = Args::try_parse_from(base).unwrap();
+        assert!(!default.codex_sse);
+        let selected = Args::try_parse_from(base.into_iter().chain(["--codex-sse"])).unwrap();
+        let supplied =
+            json!({"models":[{"id":"gpt-6-sol"}],"retryPolicy":{"mode":"normal","maxRetries":0}});
+        let profile = |args: &Args, provider| {
+            patch(
+                args,
+                Path::new("run"),
+                (provider, "gpt-6-sol"),
+                &supplied,
+                "response",
+            )
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|v| v["id"] == "llm-pi-ai")
+            .unwrap()["config"]["providers"][provider]
+                .clone()
+        };
+        assert_eq!(profile(&default, "openai-codex"), supplied);
+        let mut expected = supplied.clone();
+        expected["transport"] = json!("sse");
+        expected["cacheRetention"] = json!("none");
+        assert_eq!(profile(&selected, "openai-codex"), expected);
+        assert_eq!(profile(&selected, "anthropic"), supplied);
+    }
+
+    #[test]
+    fn benchmark_fence_is_inserted_as_a_loadable_plugin() {
+        let args = Args::try_parse_from([
+            "benchmark_models",
+            "--bin",
+            "rdsh",
+            "--original",
+            "dsh",
+            "--credentials",
+            "credentials.yaml",
+            "--catalog",
+            "catalog.json",
+            "--out",
+            "run",
+        ])
+        .unwrap();
+        let overlay = patch(
+            &args,
+            Path::new("run"),
+            ("openai-codex", "gpt-6-sol"),
+            &json!({"models":[{"id":"gpt-6-sol"}]}),
+            "read",
+        );
+        let inserts = overlay
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|entry| entry.get("insert").is_some())
+            .unwrap()["insert"]
+            .as_array()
+            .unwrap();
+        assert_eq!(inserts.len(), 1);
+        assert_eq!(inserts[0]["id"], "benchmark-fence");
+        assert!(inserts[0]["name"]
+            .as_str()
+            .unwrap()
+            .ends_with("tests/model_benchmark/fence.mjs"));
+    }
+
+    #[test]
+    fn model_selection_is_explicit_and_preserves_defaults() {
+        let base = [
+            "benchmark_models",
+            "--bin",
+            "rdsh",
+            "--original",
+            "dsh",
+            "--credentials",
+            "credentials.yaml",
+            "--catalog",
+            "catalog.json",
+            "--out",
+            "run",
+        ];
+        let custom = Args::try_parse_from(base.into_iter().chain([
+            "--codex-model",
+            "gpt-6-astra",
+            "--anthropic-model",
+            "claude-opus-5-5",
+            "--only-provider",
+            "openai-codex",
+        ]));
+        let custom = custom.unwrap();
+        assert_eq!(custom.codex_model, "gpt-6-astra");
+        assert_eq!(custom.anthropic_model, "claude-opus-5-5");
+        let defaults = Args::try_parse_from(base).unwrap();
+        assert_eq!(defaults.codex_model, "gpt-6.1-sol");
+        assert_eq!(defaults.anthropic_model, "claude-sonnet-5-5");
+    }
+
+    #[test]
+    fn model_ids_cannot_escape_the_run_directory() {
+        for model in [
+            "../../outside",
+            "",
+            "../outside",
+            "model/name",
+            "model\\name",
+            "a\nsecret",
+            ".",
+            "..",
+        ] {
+            let parsed = Args::try_parse_from([
+                "benchmark_models",
+                "--bin",
+                "rdsh",
+                "--original",
+                "dsh",
+                "--credentials",
+                "credentials.yaml",
+                "--catalog",
+                "catalog.json",
+                "--out",
+                "run",
+                "--codex-model",
+                model,
+            ]);
+            assert!(parsed.is_err(), "unsafe model ID accepted");
+        }
+    }
+    #[test]
+    fn only_selected_provider_is_required_and_unknown_models_never_fallback() {
+        let catalog =
+            json!({"openai-codex":{"models":[{"id":"gpt-6-astra","compat":{"test":true}}]}});
+        let selections = [("openai-codex", "gpt-6-astra"), ("anthropic", "missing")];
+        let result = provider_configs(&catalog, &selections, Some("openai-codex")).unwrap();
+        assert!(result[1].is_none());
+        assert_eq!(
+            result[0].as_ref().unwrap()["models"][0],
+            json!({"id":"gpt-6-astra"})
+        );
+        assert_eq!(result[0].as_ref().unwrap()["retryPolicy"]["maxRetries"], 0);
+        let missing_provider = provider_configs(&catalog, &selections, None).unwrap_err();
+        assert!(missing_provider
+            .to_string()
+            .contains("catalog provider anthropic missing for model missing"));
+        let missing_model = provider_configs(
+            &catalog,
+            &[("openai-codex", "absent")],
+            Some("openai-codex"),
+        )
+        .unwrap_err();
+        assert!(missing_model
+            .to_string()
+            .contains("requested model absent missing from catalog provider openai-codex"));
+        let missing_models = provider_configs(
+            &json!({"openai-codex": {}}),
+            &[("openai-codex", "absent")],
+            Some("openai-codex"),
+        )
+        .unwrap_err();
+        assert!(missing_models
+            .to_string()
+            .contains("catalog models missing for provider openai-codex and model absent"));
+    }
+
+    #[test]
+    fn catalog_fingerprint_is_bound_to_the_same_bytes_that_were_parsed() {
+        let path = std::env::temp_dir().join(format!(
+            "rdsh-benchmark-catalog-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let first = br#"{"openai-codex":{"models":[{"id":"gpt-6-astra"}]}}"#;
+        let replacement = br#"{"openai-codex":{"models":[{"id":"changed"}]}}"#;
+        fs::write(&path, first).unwrap();
+        let (_, digest) = load_catalog(&path).unwrap();
+        fs::write(&path, replacement).unwrap();
+        assert_eq!(
+            digest,
+            "fc078d53d4da3d94215b1f6b4d1c4e82783adb305fc02c53611d3281b1b36a0b"
+        );
+        assert_ne!(digest, fingerprint_bytes(&fs::read(&path).unwrap()));
+        fs::remove_file(path).unwrap();
+    }
 
     #[test]
     fn tool_runs_require_a_nonempty_valid_catalog() {

@@ -1,6 +1,6 @@
 # Model routing evidence
 
-Issue: [#20](https://github.com/sahenjp/rustdsh/issues/20), CLI assertions and evidence.
+Issue: [#20](https://github.com/jimoto-no-llm/rustdsh/issues/20), CLI assertions and evidence.
 The baseline entrypoint from `5a7235e740ed9eadee60032fe0f051be5a643632`, evaluated
 with the current common dependencies, rejects `routing inspect`. The new command
 separates an explicit request from an observed native session configuration.

@@ -5,20 +5,75 @@
 // NOTE: upstream dsh (0.2.0) does not read any RDSH_* key; they only tune
 // rdsh-side behavior. The one env below that the Node runtime itself reads
 // is NODE_COMPILE_CACHE (effective on Node >= 22.1; ignored on older).
-// Static table: no per-boot heap allocation (same 6 pairs, same bytes out).
-pub fn slim_env() -> &'static [(&'static str, &'static str)] {
-    &[
-        ("RDSH_SLIM", "1"),
-        ("RDSH_LAZY_PLUGINS", "1"),
-        ("RDSH_DISABLE_VOICE", "1"),
-        ("RDSH_DISABLE_AUTO_REVIEW", "1"),
-        ("RDSH_TOKEN_BUDGET", "8000"),
-        ("RDSH_TOOL_RESULT_BUDGET", "4000"),
-    ]
+// ---- feature switches (settings-driven) ----
+
+/// Which slim hints are applied, resolved once per process from
+/// `features.*` in rdsh.json. Defaults reproduce the historical hints.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SlimFeatures {
+    pub lazy_plugins: bool,
+    pub disable_voice: bool,
+    pub disable_auto_review: bool,
+    pub node_compile_cache: bool,
 }
 
-pub fn describe() -> &'static str {
-    "RDSH_SLIM=1 RDSH_LAZY_PLUGINS=1 RDSH_DISABLE_VOICE=1 RDSH_DISABLE_AUTO_REVIEW=1 NODE_COMPILE_CACHE=<cache-dir> (effective on Node >= 22.1), RDSH_NODE_COMPILE_CACHE=0 to disable"
+impl Default for SlimFeatures {
+    fn default() -> Self {
+        Self {
+            lazy_plugins: true,
+            disable_voice: true,
+            disable_auto_review: true,
+            node_compile_cache: true,
+        }
+    }
+}
+
+static FEATURES: std::sync::OnceLock<SlimFeatures> = std::sync::OnceLock::new();
+
+/// Record the settings-derived switches for this process (first call wins).
+pub fn configure(cfg: &crate::rdsh_config::RdshSettings) {
+    let _ = FEATURES.set(SlimFeatures {
+        lazy_plugins: crate::rdsh_config::feature_enabled(cfg, "slim_lazy_plugins"),
+        disable_voice: crate::rdsh_config::feature_enabled(cfg, "slim_disable_voice"),
+        disable_auto_review: crate::rdsh_config::feature_enabled(cfg, "slim_disable_auto_review"),
+        node_compile_cache: crate::rdsh_config::feature_enabled(cfg, "node_compile_cache"),
+    });
+}
+
+/// Active switches (defaults until configure runs).
+pub fn features() -> SlimFeatures {
+    *FEATURES.get_or_init(SlimFeatures::default)
+}
+
+/// Hints applied to delegated runs, filtered by the feature switches.
+pub fn slim_env() -> Vec<(&'static str, &'static str)> {
+    let active = features();
+    let mut env = vec![("RDSH_SLIM", "1")];
+    if active.lazy_plugins {
+        env.push(("RDSH_LAZY_PLUGINS", "1"));
+    }
+    if active.disable_voice {
+        env.push(("RDSH_DISABLE_VOICE", "1"));
+    }
+    if active.disable_auto_review {
+        env.push(("RDSH_DISABLE_AUTO_REVIEW", "1"));
+    }
+    env.push(("RDSH_TOKEN_BUDGET", "8000"));
+    env.push(("RDSH_TOOL_RESULT_BUDGET", "4000"));
+    env
+}
+
+pub fn describe() -> String {
+    let mut parts: Vec<String> = slim_env().iter().map(|(k, v)| format!("{k}={v}")).collect();
+    if features().node_compile_cache {
+        parts.push(
+            "NODE_COMPILE_CACHE=<cache-dir> (effective on Node >= 22.1), RDSH_NODE_COMPILE_CACHE=0 to disable"
+                .to_string(),
+        );
+    } else {
+        parts.push("NODE_COMPILE_CACHE=off (features.node_compile_cache=false)".to_string());
+    }
+    parts.join(" ")
 }
 
 // Default on-disk dir for the Node compile cache (V8 code cache for the

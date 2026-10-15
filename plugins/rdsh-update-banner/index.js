@@ -1,13 +1,16 @@
 import { homedir } from "node:os";
-import { join } from "node:path";
-import { readFile, writeFile, mkdir, lstat, stat, rename, unlink } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
+import { readFileSync, realpathSync } from "node:fs";
+import { readFile, writeFile, mkdir, lstat, rename, unlink } from "node:fs/promises";
 import { watch } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 export const inject = ["webServer", "connection"];
 
-const SYNC_SCRIPT = "/home/sahen/File/Prog/rustdsh/sync-dsh.sh";
+const PLUGIN_DIRECTORY = dirname(realpathSync(fileURLToPath(import.meta.url)));
+const DEFAULT_SYNC_SCRIPT = resolve(PLUGIN_DIRECTORY, "../../sync-dsh.sh");
 const RUN_TIMEOUT_MS = 5 * 60 * 1000;
 const updateDirectory = () => join(homedir(), ".local", "share", "rdsh");
 const closePath = () => join(updateDirectory(), "update-notice-close.json");
@@ -16,6 +19,19 @@ const validTarget = (s) => typeof s?.to === "string" && s.to.length > 0 && s.to.
   typeof s.kind === "string" && s.kind.length > 0 && s.kind.length <= 64;
 const validClose = (s) => validTarget(s) && typeof s.id === "string" && /^[a-f0-9-]{36}$/.test(s.id) &&
   Number.isFinite(s.at) && s.at > 0 && Number.isSafeInteger(s.cycle) && s.cycle >= 0 && s.cycle <= 1000000;
+
+// Feature switches live in $DSH_HOME/rdsh.json. An absent id (or a missing,
+// unreadable or corrupt file) keeps the fallback; an explicit false removes the
+// capability without throwing.
+function featureEnabled(id, fallback, env = process.env) {
+  try {
+    const path = join(env.DSH_HOME || join(homedir(), ".dsh"), "rdsh.json");
+    const value = JSON.parse(readFileSync(path, "utf8"))?.features?.[id];
+    return typeof value === "boolean" ? value : fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 async function readClose() {
   try {
@@ -135,13 +151,26 @@ function authorize(ctx, req, res) {
   return false;
 }
 
-function runSync() {
+async function runSync(syncScript) {
+  let file;
+  try {
+    file = await lstat(syncScript);
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      return { ok: false, message: "updater not found; install from a local rustdsh checkout or set syncScript" };
+    }
+    return { ok: false, message: "could not inspect updater; check the local rustdsh installation" };
+  }
+  const uid = typeof process.getuid === "function" ? process.getuid() : undefined;
+  if (!file.isFile() || file.isSymbolicLink() || file.nlink !== 1 || uid === undefined || file.uid !== uid) {
+    return { ok: false, message: "updater must be a regular file owned by the current user" };
+  }
   return new Promise((resolve) => {
     let child;
     try {
       child = execFile(
         "/bin/sh",
-        [SYNC_SCRIPT],
+        [syncScript],
         { timeout: RUN_TIMEOUT_MS, maxBuffer: 256 * 1024 },
         (err, stdout, stderr) => {
           const tail = String(stdout || "").split("\n").slice(-6).join("\n");
@@ -158,9 +187,15 @@ function runSync() {
 }
 
 export function apply(ctx, config) {
+  const updateCheck = featureEnabled("update_check", true);
+  const updateNotifications = featureEnabled("update_notifications", true);
   const demo = config && config.demo === true;
+  const configuredSyncScript = typeof config?.syncScript === "string" && config.syncScript.trim()
+    ? resolve(PLUGIN_DIRECTORY, config.syncScript.trim())
+    : DEFAULT_SYNC_SCRIPT;
   return ctx.effect(() => {
     if (!ctx.webServer) return;
+    if (!updateCheck) return;
     const demoState = { ok: true, updated: true, kind: "demo", from: "0.2.0-rc.2", to: "0.2.1-rc.1", at: Date.now(), demo: true };
     const getState = () => demo ? Promise.resolve(demoState) : readState();
     const stream = notificationStream(getState);
@@ -175,7 +210,7 @@ export function apply(ctx, config) {
           return;
         }
         try {
-          const out = await runSync();
+          const out = await runSync(configuredSyncScript);
           const body = JSON.stringify(out);
           res.writeHead(200, {
             "content-type": "application/json; charset=utf-8",
@@ -248,7 +283,8 @@ export function apply(ctx, config) {
         } catch (error) { json(res, 500, { ok: false, error: "dismiss-failed" }); }
       },
     });
-    const off4 = ctx.webServer.register({
+    // Without notifications the client keeps polling /api/rdsh-update.
+    const off4 = updateNotifications ? ctx.webServer.register({
       kind: "exact", path: "/api/rdsh-update/events",
       handler: async (req, res) => {
         if (!authorize(ctx, req, res)) return;
@@ -259,7 +295,7 @@ export function apply(ctx, config) {
         res.flushHeaders?.();
         await stream.subscribe(res);
       },
-    });
+    }) : undefined;
     return () => {
       stream.dispose();
       try {
@@ -277,8 +313,8 @@ export function apply(ctx, config) {
 async function readState() {
   try {
     const path = join(updateDirectory(), "update-state.json");
-    const file = await stat(path);
-    if (!file.isFile() || file.size > 4096) return { ok: false };
+    const file = await lstat(path);
+    if (!file.isFile() || file.isSymbolicLink() || file.nlink !== 1 || file.size > 4096) return { ok: false };
     const raw = await readFile(path, "utf8");
     const s = JSON.parse(raw);
     if (!s?.updated) return { ok: true, updated: false };
