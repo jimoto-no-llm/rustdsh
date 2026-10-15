@@ -180,13 +180,24 @@ if [ "$node" = 1 ] || { [ "$rust" = 1 ] && [ "$mode" != quick ]; }; then
 fi
 for t in $ci_only_tests; do skip "$t (CI job with its own setup; see $ci)"; done
 
+# remove_tree DIR: delete a tree this run created, including read-only parts
+# (the candidate builder chmods it to 0500/0400). Symlinks are not followed.
+remove_tree() {
+  [ -e "$1" ] || return 0
+  chmod -R u+rwX "$1" 2>/dev/null || true
+  if ! rm -rf "$1" || [ -e "$1" ]; then
+    echo "check: could not remove $1" >&2
+    return 1
+  fi
+}
 headless_run() {
   cand=$(mktemp -d)
   rc=0
   # shellcheck disable=SC2086 # CI's globs, expanded here as in CI
   node scripts/headless-runtime/build-candidate.mjs --out "$cand/candidate" \
     && RDSH_CANDIDATE="$cand/candidate" node --test $headless_tests || rc=$?
-  rm -rf "$cand"
+  # A leftover candidate is a failure too, not a silent pass.
+  remove_tree "$cand" || { [ "$rc" = 0 ] && rc=1; }
   return "$rc"
 }
 if [ "$headless" = 1 ]; then

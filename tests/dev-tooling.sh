@@ -303,6 +303,49 @@ has "cannot read the CI node suites" "missing CI suites"
 cd "$root"
 ok "check.sh derives node suites from ci.yml and never drops an unmapped change silently"
 
+# --- check.sh headless candidate cleanup ------------------------------------------
+git init -q --bare "$tmp/hl-origin.git"
+git clone -q "$tmp/hl-origin.git" "$tmp/hl" 2>/dev/null
+cd "$tmp/hl"
+mkdir -p scripts/headless-runtime/test scripts/headless-runtime/runtime/node_modules .github/workflows tests "$tmp/hlbin"
+cp "$root/scripts/check.sh" "$root/scripts/check-conflicts.sh" scripts/
+cat > .github/workflows/ci.yml <<'YML'
+      - run: node --test tests/plugin-security.test.mjs
+          RDSH_CANDIDATE="$RUNNER_TEMP/c" node --test scripts/headless-runtime/test/*.test.mjs
+      - run: node --test tests/runtime-compatibility.test.mjs
+YML
+for t in tests/plugin-security.test.mjs tests/runtime-compatibility.test.mjs; do
+  printf "import test from 'node:test';\ntest('ok', () => {});\n" > "$t"
+done
+# Builder stand-in: a read-only tree like the real candidate (dirs 0500, files 0400).
+cat > scripts/headless-runtime/build-candidate.mjs <<'JS'
+import { mkdirSync, writeFileSync, chmodSync, appendFileSync } from 'node:fs';
+const out = process.argv[process.argv.indexOf('--out') + 1];
+mkdirSync(`${out}/lib`, { recursive: true });
+writeFileSync(`${out}/lib/a.js`, 'x');
+chmodSync(`${out}/lib/a.js`, 0o400); chmodSync(`${out}/lib`, 0o500); chmodSync(out, 0o500);
+appendFileSync(process.env.HL_RECORD, `${out}\n`);
+JS
+printf "import test from 'node:test';\nimport assert from 'node:assert';\nimport { existsSync } from 'node:fs';\ntest('candidate', () => assert.ok(existsSync(process.env.RDSH_CANDIDATE)));\n" \
+  > scripts/headless-runtime/test/a.test.mjs
+printf '#!/bin/sh\nexit 0\n' > "$tmp/hlbin/cargo" && chmod +x "$tmp/hlbin/cargo"   # no Rust crate here
+git add -A && git commit -qm base && git push -q origin main
+git switch -qc topic
+printf '// change\n' >> scripts/headless-runtime/test/a.test.mjs
+git commit -qam topic
+expect_rc 0 "headless run" env PATH="$tmp/hlbin:$PATH" HL_RECORD="$tmp/hl-record" sh scripts/check.sh
+has "ok    headless runtime candidate + tests" "headless run"
+cand=$(tail -n 1 "$tmp/hl-record")
+[ -n "$cand" ] && [ ! -e "$(dirname "$cand")" ] || die "read-only candidate left behind: $cand"
+printf '#!/bin/sh\nexit 1\n' > "$tmp/hlbin/rm" && chmod +x "$tmp/hlbin/rm"
+expect_rc 1 "cleanup failure" env PATH="$tmp/hlbin:$PATH" HL_RECORD="$tmp/hl-record" sh scripts/check.sh
+has "could not remove" "cleanup failure"
+has "FAIL  headless runtime candidate + tests" "cleanup failure"
+rm -f "$tmp/hlbin/rm"
+cand=$(tail -n 1 "$tmp/hl-record"); chmod -R u+rwX "$(dirname "$cand")"; rm -rf "$(dirname "$cand")"
+cd "$root"
+ok "check.sh removes the read-only headless candidate and fails when it cannot"
+
 # --- check.sh selection ----------------------------------------------------------
 cd "$root"
 expect_rc 0 "quick list" sh scripts/check.sh quick --list
