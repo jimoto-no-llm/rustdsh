@@ -51,7 +51,11 @@ struct MockState {
     finished: AtomicUsize,
     /// Connections that reached the first request read, so a test can write
     /// its request only after the mock is already blocked waiting for it.
+    /// Advanced only once `socket_is_blocking` confirms the socket.
     reading: AtomicUsize,
+    /// Whether the accepted socket was confirmed blocking before the first
+    /// read. A non-zero `reading` implies this is already set.
+    blocking: AtomicBool,
     delay: Duration,
 }
 
@@ -81,6 +85,7 @@ impl MockUpstream {
             peak: AtomicUsize::new(0),
             finished: AtomicUsize::new(0),
             reading: AtomicUsize::new(0),
+            blocking: AtomicBool::new(false),
             delay,
         });
         let stop = Arc::new(AtomicBool::new(false));
@@ -122,12 +127,38 @@ impl Drop for MockUpstream {
     }
 }
 
+/// Whether the kernel reports `O_NONBLOCK` cleared on this socket.
+///
+/// `TcpStream::set_nonblocking(false)` gives no observable confirmation, and
+/// the macOS failure this mock pins is exactly an accepted socket that stays
+/// nonblocking, so read the flag back from the descriptor itself.
+#[cfg(unix)]
+fn socket_is_blocking(stream: &TcpStream) -> bool {
+    use std::os::fd::AsRawFd;
+    // SAFETY: `stream` owns a live socket descriptor for the whole call.
+    let flags = unsafe { libc::fcntl(stream.as_raw_fd(), libc::F_GETFL) };
+    flags >= 0 && flags & libc::O_NONBLOCK == 0
+}
+
+/// Windows has no readable equivalent; the successful std call is the contract.
+#[cfg(not(unix))]
+fn socket_is_blocking(_stream: &TcpStream) -> bool {
+    true
+}
+
 fn serve_mock_request(mut stream: TcpStream, state: Arc<MockState>) {
     // Accepted sockets may inherit the listener's nonblocking mode on macOS.
     if stream.set_nonblocking(false).is_err() {
         return;
     }
     let _ = stream.set_read_timeout(Some(Duration::from_secs(3)));
+    // Read the flag back instead of trusting the call: on macOS `accept` hands
+    // back a socket that inherits the listener's `O_NONBLOCK`, and only the
+    // kernel's answer proves the `read_line` below blocks for late bytes.
+    if !socket_is_blocking(&stream) {
+        return;
+    }
+    state.blocking.store(true, Ordering::SeqCst);
     let mut reader = BufReader::new(&stream);
     state.reading.fetch_add(1, Ordering::SeqCst);
     let mut request_line = String::new();
@@ -295,6 +326,10 @@ fn mock_upstream_waits_for_a_request_sent_after_accept() {
         );
         thread::yield_now();
     }
+    assert!(
+        upstream.state.blocking.load(Ordering::SeqCst),
+        "accepted socket is not blocking"
+    );
     write!(
         stream,
         "POST /late HTTP/1.1\r\nhost: {}\r\ncontent-length: 2\r\nconnection: close\r\n\r\nok",
