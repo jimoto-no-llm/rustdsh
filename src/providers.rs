@@ -1075,6 +1075,18 @@ fn apply_route(text: &str, route: &Route, replace: bool) -> Result<Applied> {
     let col = dash_key_col(&lines[entry]);
     let entry_end = block_end(&lines, entry);
     let Some(config) = find_at(&lines, entry + 1, entry_end, col, "config") else {
+        // エントリに中身があるのに `- ` 直下のカラムにキーが1つも無いレイアウトは
+        // 解釈できない。ここで追記すると同じエントリに2つ目の `config:` を作り、
+        // YAML の重複マッピングキーになって既存の providers が無言で消える。
+        let body = &lines[entry + 1..entry_end.min(lines.len())];
+        let has_body = body.iter().any(|l| !skippable(l));
+        let has_col_key = body.iter().any(|l| !skippable(l) && indent_of(l) == col);
+        if has_body && !has_col_key {
+            return Err(refuse(
+                "the llm-pi-ai entry is indented in a form this module will not edit",
+                route,
+            ));
+        }
         let at = content_end(&lines, entry, entry_end);
         let mut block = vec![
             format!("{}config:", " ".repeat(col)),
@@ -2424,6 +2436,34 @@ mod tests {
             .text;
         assert!(!out.replace("\r\n", "").contains('\n'));
         assert_eq!(routes_in(&out).len(), 2);
+    }
+
+    /// `config:` が `id:` より深い（有効な YAML だが `- ` 直下のキーではない）レイアウトは
+    /// 解釈できないので refuse する。以前は同じエントリに2つ目の `config:` を追記し、
+    /// YAML の重複マッピングキーを作って既存の providers を無言で無効化していた。
+    #[test]
+    fn deeper_config_indent_is_refused_instead_of_duplicated() {
+        let text =
+            "- id: llm-pi-ai\n   config:\n      providers:\n         r0:\n            baseURL: http://old\n";
+        let err = apply_route(text, &route("hai", &["m1"]), false)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("by hand"), "{err}");
+        assert!(err.contains("- id: llm-pi-ai"), "{err}");
+    }
+
+    /// 期待カラムのキーがあるエントリには、これまでどおり config を足せる。
+    #[test]
+    fn sibling_keys_at_the_expected_column_still_get_config() {
+        let text = "- id: llm-pi-ai\n  enabled: true\n- id: next\n";
+        let out = apply_route(text, &route("hai", &["m1"]), false)
+            .unwrap()
+            .text;
+        assert!(
+            out.contains("  enabled: true\n  config:\n    providers:\n      hai:\n"),
+            "{out}"
+        );
+        assert_eq!(routes_in(&out).len(), 1);
     }
 
     #[test]

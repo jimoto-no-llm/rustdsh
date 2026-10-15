@@ -185,6 +185,11 @@ gh api repos/jimoto-no-llm/rustdsh/releases/tags/vX.Y.Z \
   --jq '.assets[]|"\(.name) \(.digest)"'
 ```
 
+After publication, the `pin-release-digests` workflow runs this script on `main`
+and opens the `chore/pin-<tag>-digests` PR automatically: review both ledgers and
+merge it. Prereleases are skipped, and a release that is already pinned opens no
+PR.
+
 Review both updated ledgers before announcing the new stable channel. Their
 `latest` rows must name the release GitHub marks Latest.
 

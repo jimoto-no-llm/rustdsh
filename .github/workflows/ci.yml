@@ -138,6 +138,11 @@ jobs:
       - if: runner.os == 'macOS'
         run: command -v zstd || brew install zstd
       - run: cargo test
+      - name: 並列開発ツールの回帰検査
+        if: runner.os == 'Linux'
+        run: python3 -m unittest discover -s tests -p 'test_parallel_dev.py' -v
+        env:
+          RDSH_PARALLEL_TEST_TMPDIR: ${{ github.workspace }}/.tmp-parallel-dev-tests
       - uses: actions/setup-node@v7
         with:
           node-version: 22
@@ -145,6 +150,7 @@ jobs:
       - run: cargo test --example benchmark_extended
       - run: cargo test --example benchmark_models
       - run: cargo build
+      - run: node --test dashboard/test/worker-scopes-compat.test.mjs
       - run: npm ci --ignore-scripts --no-audit --no-fund
         working-directory: plugins/rdsh-compute
       - run: npm test
@@ -158,6 +164,7 @@ jobs:
           printf '#!/bin/sh\necho stub-dsh $@' > /tmp/stub-dsh && chmod +x /tmp/stub-dsh
           BIN=./target/debug/rdsh DSH_ORIG_BIN=/tmp/stub-dsh sh tests/regress.sh
           BIN=./target/debug/rdsh sh tests/context_prototype.sh
+          BIN=./target/debug/rdsh sh tests/settings_prototype.sh
       - if: '! matrix.regress'
         shell: pwsh
         run: |

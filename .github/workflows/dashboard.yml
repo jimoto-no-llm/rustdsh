@@ -4,9 +4,21 @@ on:
   push:
     branches: [main]
     tags: ['v*']
-    paths: ["dashboard/**", "assets/**", ".github/workflows/dashboard.yml"]
+    paths:
+      - "dashboard/**"
+      - "assets/**"
+      - "src/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/dashboard.yml"
   pull_request:
-    paths: ["dashboard/**", "assets/**", ".github/workflows/dashboard.yml"]
+    paths:
+      - "dashboard/**"
+      - "assets/**"
+      - "src/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/dashboard.yml"
   workflow_dispatch:
 
 permissions:
@@ -28,6 +40,10 @@ jobs:
         working-directory: dashboard
     steps:
       - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build native dashboard policy helper
+        run: cargo build --locked --bin rdsh
+        working-directory: .
       - uses: actions/setup-node@v7
         with:
           node-version: 22
