@@ -1,0 +1,94 @@
+{
+  "operation": "ack",
+  "state": {
+    "project": {
+      "id": "fixture"
+    },
+    "revision": 1,
+    "questions": [],
+    "feedback": [],
+    "answer_applications": {
+      "schema": 1,
+      "consumers": {
+        "consumer_83ca3f922609863760d5de5eb2f7bc77": {
+          "consumer_id": "consumer_83ca3f922609863760d5de5eb2f7bc77",
+          "project_id": "fixture",
+          "run_id": "run_01234567-89ab-cdef-0123-456789abcdef",
+          "session_id": "session-fixture",
+          "task_id": null,
+          "created_at": "2026-10-15T02:20:09.985Z"
+        }
+      },
+      "commands": {}
+    },
+    "instructions": {
+      "schema": 1,
+      "revision": 1,
+      "sequence": 1,
+      "requests": {
+        "input_01234567-89ab-cdef-0123-456789abcdef": {
+          "command_id": "input_01234567-89ab-cdef-0123-456789abcdef",
+          "consumer_id": "consumer_83ca3f922609863760d5de5eb2f7bc77",
+          "run_id": "run_01234567-89ab-cdef-0123-456789abcdef",
+          "session_id": "session-fixture",
+          "text": "fixture instruction",
+          "mode": "next_turn",
+          "expected_queue_revision": 0,
+          "active_command_id": null,
+          "actor": "human",
+          "fingerprint": "73e7a0fcc074ff2e7da4d180a16c4831b4e42a13da75c9c386e2b2b68aa9e391",
+          "created_at": "2026-10-15T02:20:09.986Z",
+          "status": "accepted",
+          "effective_mode": "next_turn",
+          "timing_reason": null,
+          "review_reason": null,
+          "comparison": [],
+          "resolution": null,
+          "resolved_at": null,
+          "control": null
+        }
+      },
+      "commands": {
+        "input_01234567-89ab-cdef-0123-456789abcdef": {
+          "source_kind": "instruction",
+          "command_id": "input_01234567-89ab-cdef-0123-456789abcdef",
+          "project_id": "fixture",
+          "consumer_id": "consumer_83ca3f922609863760d5de5eb2f7bc77",
+          "run_id": "run_01234567-89ab-cdef-0123-456789abcdef",
+          "session_id": "session-fixture",
+          "queue_sequence": 1,
+          "input_hash": "d09ed8bbe77e15008c5d39b70a1920da35b38745931c4c7b82552e24ca8063bd",
+          "saved_at": "2026-10-15T02:20:09.986Z",
+          "read_at": "2026-10-15T02:20:09.986Z",
+          "started_at": null,
+          "completed_at": null,
+          "phase": "read",
+          "attempt_id": null,
+          "attempt_owner_id": null,
+          "native_command_id": null,
+          "result_reason": null
+        }
+      }
+    }
+  },
+  "input": {
+    "command_id": "input_01234567-89ab-cdef-0123-456789abcdef",
+    "phase": "begin",
+    "attempt_id": "attempt_01234567-89ab-cdef-0123-456789abcdef",
+    "native_command_id": "cmd_01234567-89ab-cdef-0123-456789abcdef",
+    "context": {
+      "consumer": {
+        "consumer_id": "consumer_83ca3f922609863760d5de5eb2f7bc77",
+        "project_id": "fixture",
+        "run_id": "run_01234567-89ab-cdef-0123-456789abcdef",
+        "session_id": "session-fixture",
+        "task_id": null,
+        "created_at": "2026-10-15T02:20:09.985Z"
+      },
+      "available": true,
+      "owner_id": "owner_01234567-89ab-cdef-0123-456789abcdef",
+      "actor": "human"
+    }
+  },
+  "now": "2026-06-01T00:00:00.000Z"
+}

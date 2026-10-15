@@ -26,14 +26,16 @@ and JSON even when the job fails.
 
 The default command also runs `update-banner.mjs` with the real React component
 and two independent authenticated plugin hosts. Dummy HOME and loopback ports
-cover live update push, cross-tab/port close events, two-hour boundaries, reload
-notification, project remounts, legacy records and unavailable browser storage.
+cover live update push, cross-tab/port close events, dismiss finality across
+polls, remount, reload and later hours, notification of a newer target or update
+time, project remounts, legacy records and unavailable browser storage.
 Mocked updater responses also cover successful close, failed retry, and a newer
 update arriving during a request; the actual updater never runs in this fixture.
-The browser clock advances the cadence without waiting two hours. It saves real
-PNGs and a verification report; it never restarts production DSH or executes the
-updater. Run just this flow with `npm run test:updates`. Set
-`RDSH_UPDATE_BASELINE_CLIENT` to the previous client file for before/after captures.
+The browser clock advances hours without waiting, proving a dismissed update
+stays hidden. It saves real PNGs and a verification report; it never restarts
+production DSH or executes the updater. Run just this flow with
+`npm run test:updates`. Set `RDSH_UPDATE_BASELINE_CLIENT` to the previous client
+file for before/after captures.
 
 The default command also runs `task-outcomes.mjs` against the actual project
 server and isolated acceptance checks. It covers reported done versus verified,
@@ -61,6 +63,24 @@ bundled Playwright can set `RDSH_PLAYWRIGHT_MODULE` to its module path.
 
 See [the verification matrix](../../docs/evidence/e2e-20261008.md) for observed
 coverage and remaining environment-specific checks.
+
+## Answer guard (installed DSH, no provider)
+
+```sh
+RDSH_NATIVE_MODULES=/path/to/original/dsh/node_modules npm run test:answer-guard --prefix tests/e2e
+```
+
+This composes the real `AgentLoop`, `LlmRuntime`, session store and projections
+in-process and registers a stub `LlmAdapter`, so no provider, network or model
+API is involved. The stub answers the first call with the recorded failure shape
+— one `reasoning` block, no `text`, no tool call — and the second with ordinary
+text. The harness then requires that `plugins/rdsh-answer-guard` caused a second
+model call inside the same turn, that the notice reached that request, and that
+a `text` block landed in the session log. It also runs two contrasting
+scenarios (plugin not applied, `features.answer_guard=false`) that must stop
+after one call, so a passing run shows the guard, not the loop, recovered the
+turn. Like `discord-native.mjs` it needs an installed DSH tree and is not part
+of CI; its exit code is the verdict.
 
 ## Discord integration
 

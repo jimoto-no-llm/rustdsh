@@ -7,5 +7,9 @@
     "@earendil-works/pi-ai": "0.87.1",
     "ws": "8.22.0",
     "rdsh-session-cleanup": "file:plugins/rdsh-session-cleanup"
+  },
+  "overrides": {
+    "@modelcontextprotocol/client": "^2.2.0",
+    "fflate": "^0.8.3"
   }
 }

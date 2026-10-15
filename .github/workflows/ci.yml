@@ -58,7 +58,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-      - run: node --test tests/plugin-security.test.mjs tests/settings-client.test.mjs tests/update-banner.test.mjs tests/rdsh-mobile-ui.test.mjs tests/feature-switches.test.mjs tests/discord-presence.test.mjs tests/model_benchmark/fence.test.mjs
+      - run: node --test tests/plugin-security.test.mjs tests/settings-client.test.mjs tests/update-banner.test.mjs tests/rdsh-mobile-ui.test.mjs tests/answer-guard.test.mjs tests/feature-switches.test.mjs tests/discord-presence.test.mjs tests/model_benchmark/fence.test.mjs
       - name: Populate the pinned headless runtime cache
         run: npm ci --ignore-scripts --no-audit --no-fund
         working-directory: scripts/headless-runtime/runtime
@@ -148,6 +148,11 @@ jobs:
           name: rust-tests-${{ matrix.os }}
           path: target/nextest/ci/junit.xml
           if-no-files-found: warn
+      - name: 並列開発ツールの回帰検査
+        if: runner.os == 'Linux'
+        run: python3 -m unittest discover -s tests -p 'test_parallel_dev.py' -v
+        env:
+          RDSH_PARALLEL_TEST_TMPDIR: ${{ github.workspace }}/.tmp-parallel-dev-tests
       - uses: actions/setup-node@v7
         with:
           node-version: 22

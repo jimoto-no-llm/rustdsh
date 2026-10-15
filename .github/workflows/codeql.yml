@@ -3,14 +3,20 @@ name: codeql
 on:
   push:
     branches: [main]
+    # release gate はタグの SHA に CodeQL 結果を要求するため、main は省略しない。
   pull_request:
     branches: [main]
+    # 未知の拡張子や入れ子の設定を取りこぼさず、文書・シェルだけの変更を省略する。
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.sh'
   schedule:
     - cron: '0 3 * * 1'
 
 permissions:
   contents: read
 
+# PR 番号を含む ref で分け、大小文字だけ異なる branch の PR も相互に中止しない。
 concurrency:
   group: codeql-${{ github.ref }}
   cancel-in-progress: true
