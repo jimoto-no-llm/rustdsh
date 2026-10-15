@@ -49,6 +49,13 @@ struct MockState {
     active: AtomicUsize,
     peak: AtomicUsize,
     finished: AtomicUsize,
+    /// Connections that reached the first request read, so a test can write
+    /// its request only after the mock is already blocked waiting for it.
+    /// Advanced only once `socket_is_blocking` confirms the socket.
+    reading: AtomicUsize,
+    /// Whether the accepted socket was confirmed blocking before the first
+    /// read. A non-zero `reading` implies this is already set.
+    blocking: AtomicBool,
     delay: Duration,
 }
 
@@ -77,6 +84,8 @@ impl MockUpstream {
             active: AtomicUsize::new(0),
             peak: AtomicUsize::new(0),
             finished: AtomicUsize::new(0),
+            reading: AtomicUsize::new(0),
+            blocking: AtomicBool::new(false),
             delay,
         });
         let stop = Arc::new(AtomicBool::new(false));
@@ -118,16 +127,40 @@ impl Drop for MockUpstream {
     }
 }
 
+/// Whether the kernel reports `O_NONBLOCK` cleared on this socket.
+///
+/// `TcpStream::set_nonblocking(false)` gives no observable confirmation, and
+/// the macOS failure this mock pins is exactly an accepted socket that stays
+/// nonblocking, so read the flag back from the descriptor itself.
+#[cfg(unix)]
+fn socket_is_blocking(stream: &TcpStream) -> bool {
+    use std::os::fd::AsRawFd;
+    // SAFETY: `stream` owns a live socket descriptor for the whole call.
+    let flags = unsafe { libc::fcntl(stream.as_raw_fd(), libc::F_GETFL) };
+    flags >= 0 && flags & libc::O_NONBLOCK == 0
+}
+
+/// Windows has no readable equivalent; the successful std call is the contract.
+#[cfg(not(unix))]
+fn socket_is_blocking(_stream: &TcpStream) -> bool {
+    true
+}
+
 fn serve_mock_request(mut stream: TcpStream, state: Arc<MockState>) {
     // Accepted sockets may inherit the listener's nonblocking mode on macOS.
     if stream.set_nonblocking(false).is_err() {
         return;
     }
     let _ = stream.set_read_timeout(Some(Duration::from_secs(3)));
-    let Ok(reader_stream) = stream.try_clone() else {
+    // Read the flag back instead of trusting the call: on macOS `accept` hands
+    // back a socket that inherits the listener's `O_NONBLOCK`, and only the
+    // kernel's answer proves the `read_line` below blocks for late bytes.
+    if !socket_is_blocking(&stream) {
         return;
-    };
-    let mut reader = BufReader::new(reader_stream);
+    }
+    state.blocking.store(true, Ordering::SeqCst);
+    let mut reader = BufReader::new(&stream);
+    state.reading.fetch_add(1, Ordering::SeqCst);
     let mut request_line = String::new();
     if reader.read_line(&mut request_line).is_err() {
         return;
@@ -269,6 +302,49 @@ fn mock_upstream_consumes_chunked_bodies_and_trailers_before_closing() {
         assert_eq!(seen.len(), 1);
         assert_eq!(seen[0].body, expected.as_bytes());
     }
+}
+
+/// Regression for the intermittent `left: 502, right: 200` on macOS
+/// (run 38669940239). BSD `accept` hands back a socket that inherits the
+/// listener's `O_NONBLOCK`, so a mock that accepted the proxy's connection
+/// before the request bytes arrived saw `WouldBlock` from its first read,
+/// closed the socket, and the proxy reported the upstream as failed. Writing
+/// the request only after the mock has started reading forces that ordering
+/// on every run instead of depending on the accept poll interval.
+#[test]
+fn mock_upstream_waits_for_a_request_sent_after_accept() {
+    let upstream = MockUpstream::start(Duration::ZERO);
+    let mut stream = TcpStream::connect(upstream.addr).unwrap();
+    stream
+        .set_read_timeout(Some(Duration::from_secs(3)))
+        .unwrap();
+    let deadline = std::time::Instant::now() + wait_deadline();
+    while upstream.state.reading.load(Ordering::SeqCst) == 0 {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "mock upstream never accepted the connection"
+        );
+        thread::yield_now();
+    }
+    assert!(
+        upstream.state.blocking.load(Ordering::SeqCst),
+        "accepted socket is not blocking"
+    );
+    write!(
+        stream,
+        "POST /late HTTP/1.1\r\nhost: {}\r\ncontent-length: 2\r\nconnection: close\r\n\r\nok",
+        upstream.addr
+    )
+    .unwrap();
+    let mut response = String::new();
+    let _ = stream.read_to_string(&mut response);
+    assert!(
+        response.starts_with("HTTP/1.1 200 OK\r\n"),
+        "mock upstream closed before reading the request: {response:?}"
+    );
+    let seen = upstream.state.seen.lock().unwrap();
+    assert_eq!(seen.len(), 1);
+    assert_eq!(seen[0].body, b"ok");
 }
 
 impl ProxyProcess {
@@ -872,12 +948,37 @@ fn serial_proxy_runtime_startup_failure_keeps_runtime_status() {
     assert_eq!(output.status.code(), Some(1));
 }
 
+/// Returns a loopback port nothing listens on, for a child that cannot
+/// announce a `--port 0` address because its stderr is closed.
+///
+/// The test process must not bind the port itself. A listener it opens, even
+/// briefly, can be inherited by `rdsh` children that parallel tests spawn at
+/// that moment (macOS has no `SOCK_CLOEXEC`, so close-on-exec is set only after
+/// `socket()`); `lsof` showed four such children holding the probe port in
+/// `LISTEN`. The proxy then fails with `Address already in use`, and with
+/// stderr closed its error report panics (exit 101), surfacing as `proxy did
+/// not start with a closed stderr`. A failed connect leaves nothing to inherit;
+/// any failure counts as free because Windows times out instead of refusing a
+/// closed loopback port. Ports below every platform's default ephemeral range
+/// (Linux 32768, macOS and Windows 49152) are never handed to `:0` listeners or
+/// outgoing connections.
+fn unused_port_outside_ephemeral_range() -> u16 {
+    const FIRST: u16 = 20_000;
+    const COUNT: u16 = 12_000;
+    let offset = (std::process::id() % u32::from(COUNT)) as u16;
+    (0..COUNT)
+        .map(|step| FIRST + (offset + step) % COUNT)
+        .find(|port| {
+            let addr = SocketAddr::from(([127, 0, 0, 1], *port));
+            TcpStream::connect_timeout(&addr, Duration::from_millis(200)).is_err()
+        })
+        .expect("no free loopback port below the ephemeral range")
+}
+
 #[tokio::test]
 async fn closed_stderr_does_not_abort_startup_or_tool_choice_streaming() {
     let upstream = MockUpstream::start(Duration::from_millis(10));
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let port = listener.local_addr().unwrap().port();
-    drop(listener);
+    let port = unused_port_outside_ephemeral_range();
     let mut child = Command::new(env!("CARGO_BIN_EXE_rdsh"))
         .args([
             "serial-proxy",
@@ -901,7 +1002,7 @@ async fn closed_stderr_does_not_abort_startup_or_tool_choice_streaming() {
         binary_dir: None,
     };
     let client = Client::new();
-    let status = tokio::time::timeout(Duration::from_secs(3), async {
+    let status = tokio::time::timeout(wait_deadline(), async {
         loop {
             if let Ok(response) = client
                 .get(format!("{}/__proxy/status", proxy.url))

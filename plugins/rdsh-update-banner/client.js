@@ -10,10 +10,18 @@ window.__ModuleLoader__.load({
     const ENDPOINT = "/api/rdsh-update";
     const CLOSE_KEY = "rdsh-update-close:v3";
     const REMINDER_MS = 2 * 60 * 60 * 1000;
-    // Project remounts keep this occurrence closed; a full page load starts fresh.
-    let dismissedOccurrence = null;
+    // A dismissal is final for one update event; only a new kind/to/at notifies again.
+    const occurrence = (j) => JSON.stringify([j.kind || "update", j.to, Number(j.at)]);
+    // Sent with a dismissal so the server keeps receiving the cycle it validates.
     const cycle = (j) => Math.max(0, Math.floor((Date.now() - Number(j.at)) / REMINDER_MS));
-    const occurrence = (j, period = cycle(j)) => JSON.stringify([j.kind || "update", j.to, Number(j.at), period]);
+    // Replay the stored close so a reload keeps an already dismissed update closed.
+    const storedOccurrence = () => {
+      try {
+        const value = JSON.parse(localStorage.getItem(CLOSE_KEY) || "null");
+        return value && typeof value.to === "string" && Number(value.at) > 0 ? occurrence(value) : null;
+      } catch (e) { return null; }
+    };
+    let dismissedOccurrence = storedOccurrence();
     function acknowledge(j) {
       return fetch(ENDPOINT + "/dismiss", {
         method: "POST", cache: "no-store",
@@ -76,14 +84,12 @@ window.__ModuleLoader__.load({
       const loadGeneration = useRef(0);
       const latest = useRef(null);
       const lastOccurrence = useRef(null);
-      const reminder = useRef(null);
-      const reload = useRef(null);
       const updating = useRef(false);
       const accept = useCallback((j) => {
         if (!j || !j.ok) return;
         if (!j.updated) {
           latest.current = null; lastOccurrence.current = null; dismissedOccurrence = null;
-          clearTimeout(reminder.current); setData(null); return;
+          setData(null); return;
         }
         if (typeof j.to !== "string" || !Number.isFinite(Number(j.at)) || Number(j.at) <= 0) return;
         const current = occurrence(j);
@@ -94,17 +100,10 @@ window.__ModuleLoader__.load({
           setRunning((value) => value === "busy" ? value : "idle");
         }
         setData(dismissedOccurrence === current ? null : j);
-        clearTimeout(reminder.current);
-        // Recompute the fixed boundary; polls, reloads and close never restart it.
-        const delay = Number(j.at) + (cycle(j) + 1) * REMINDER_MS - Date.now();
-        reminder.current = setTimeout(() => {
-          ++loadGeneration.current;
-          accept(latest.current); reload.current?.();
-        }, Math.max(1, Math.min(REMINDER_MS, delay)));
       }, []);
       const hide = useCallback((value) => {
         const current = latest.current;
-        if (!current || occurrence(current) !== occurrence(value, value.cycle)) return false;
+        if (!current || occurrence(current) !== occurrence(value)) return false;
         dismissedOccurrence = occurrence(current);
         ++loadGeneration.current; setData(null);
         return true;
@@ -119,7 +118,6 @@ window.__ModuleLoader__.load({
           accept(j);
         } catch (e) {}
       }, []);
-      reload.current = load;
       useEffect(() => {
         let disposed = false, connected = false, retry;
         const controller = new AbortController();
@@ -170,7 +168,7 @@ window.__ModuleLoader__.load({
         document.addEventListener("visibilitychange", visible);
         return () => {
           disposed = true; controller.abort();
-          clearInterval(t); clearTimeout(retry); clearTimeout(reminder.current);
+          clearInterval(t); clearTimeout(retry);
           window.removeEventListener("storage", onStorage);
           window.removeEventListener("focus", wake);
           document.removeEventListener("visibilitychange", visible);
@@ -192,7 +190,7 @@ window.__ModuleLoader__.load({
           kind: current.kind || "update", to: current.to, at: Number(current.at), cycle: cycle(current),
         };
         const sameOccurrence = () => requested && latest.current &&
-          occurrence(latest.current) === occurrence(requested, requested.cycle);
+          occurrence(latest.current) === occurrence(requested);
         updating.current = true;
         setRunning("busy");
         setResult("");

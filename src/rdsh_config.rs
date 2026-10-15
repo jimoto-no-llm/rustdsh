@@ -131,6 +131,11 @@ pub const FEATURES: &[FeatureDef] = &[
         summary: "budget guard hook in the DSH plugin",
     },
     FeatureDef {
+        id: "answer_guard",
+        default: true,
+        summary: "ask the model once more when a turn ends with reasoning only",
+    },
+    FeatureDef {
         id: "agent_tool_sandbox",
         default: false,
         summary: "confine delegated agent tools to --share-file files (no network, no host writes)",
