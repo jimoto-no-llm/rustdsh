@@ -488,6 +488,7 @@ Measurements conducted on Linux x86_64:
 ## Community
 
 - Contributions: See [CONTRIBUTING.md](CONTRIBUTING.md).
+- Rust development setup: [Rust development guide](docs/RUST-DEVELOPMENT.md).
 - Issues & Ideas: [Issue tracker](https://github.com/jimoto-no-llm/rustdsh/issues/new/choose) (Japanese or English).
 - Security: Please report vulnerabilities privately according to [SECURITY.md](SECURITY.md).
 - Support: [SUPPORT.md](SUPPORT.md) / Code of Conduct: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
