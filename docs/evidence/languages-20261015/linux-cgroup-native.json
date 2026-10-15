@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "scope": "One native Linux kernel-owned process-scope lifecycle probe, not the complete dashboard test matrix or GitHub CI.",
+  "source": {
+    "head": "8ee5d7f94f221db6135a9b3a3116707cc0fd4511",
+    "files_sha256": {
+      "dashboard/process-scope.mjs": "06d1c30c2baf5ac76ec77ae12e86ede6f10ed9503b8c1da17e02f96171373eb1",
+      "dashboard/process-scope-supervisor.mjs": "1306c5af1878da24fd3726fdb8f4fda9cbedabfaa451e0e8250c8f2853169006",
+      "dashboard/process-scope-backends.mjs": "13e19956d109108067cf54c94053f58565885283b446efc40522c48e329a08ca",
+      "dashboard/process-identity.mjs": "5b178237ca8be48838b889a52e8f4605c63f572f5880a3947bce924a749b1d34",
+      "dashboard/darwin-process-identity.mjs": "7e5fc1ff394991c6a25782d2c7ba662813768bd3f0e6499017bb1b1f14c4a6c1",
+      "dashboard/test/fixtures/owned-tree.mjs": "9f0f73984ab2f6c4efb7f03d2915e8c544c9ce8298857e7cacfa944bf3368328",
+      "dashboard/package.json": "76459cb13893e46e1763a2010d1fbf620f88e48c2dbb1dca93316f0dd49af909",
+      "dashboard/package-lock.json": "1275c1155abcb6c04a6538f96dac88c4ab829b617162160f1dda5768875b09cc"
+    },
+    "unchanged_from_commit": true,
+    "private_evidence_archive_sha256": "1faca53f0437ddc2a55b1fbe35edc9ab9d66621bd901ca223ad68d4d5aa7f668"
+  },
+  "platform": {
+    "os": "linux",
+    "environment": "WSL2",
+    "distribution": "Ubuntu",
+    "kernel": "6.18.33.2-microsoft-standard-WSL2",
+    "arch": "x86_64",
+    "uid": 1000,
+    "node": "v24.16.0",
+    "koffi": "3.3.3"
+  },
+  "prerequisites": {
+    "cgroup_version": 2,
+    "mount_writable": true,
+    "mount_nsdelegate": true,
+    "existing_user_manager_active": true,
+    "existing_user_manager_delegate": true,
+    "delegated_parent_writable_by_uid": 1000,
+    "required_kernel_interfaces": [
+      "cgroup.procs",
+      "cgroup.events",
+      "cgroup.kill",
+      "pidfd_open",
+      "pidfd_send_signal"
+    ],
+    "resource_controller_enablement_requested": false,
+    "system_or_user_configuration_changed": false
+  },
+  "execution": {
+    "entry": "An already active delegated systemd user manager launched one dedicated transient user service with --wait --pipe --collect; no Delegate property override.",
+    "source_backend": "linux_cgroup_v2",
+    "public_dependency_install": "Pinned dashboard lockfile in a private source projection, npm ci --ignore-scripts; no installed binaries replaced.",
+    "paid_model_or_api_requests": 0
+  },
+  "case_results": [
+    {
+      "name": "native-owned-tree-detached-descendant-pidfd-and-cgroup-stop",
+      "status": "passed",
+      "owned_roles": [
+        "root",
+        "child",
+        "detached grandchild"
+      ],
+      "actual_owned_members": 3,
+      "membership_read_back_for_all_roles": true,
+      "held_cgroup_inode_matched_kernel_id": true,
+      "pidfd_sigterm_observed_for_all_roles": true,
+      "forced_stop_reason": "cgroup_kill_held_descriptor",
+      "concurrent_stop_calls": 2,
+      "distinct_kernel_kill_requests": 1,
+      "stop_result": {
+        "status": "exit_confirmed",
+        "confirmed": true,
+        "remaining_count": 0,
+        "resources_released": true
+      },
+      "independent_canary_survived_owned_stop": true,
+      "independent_canary_cleanup": "The held child object received SIGTERM and its exit was observed.",
+      "cgroup_removed": true
+    }
+  ],
+  "counts": {
+    "named_cases": 1,
+    "passed": 1,
+    "failed": 0,
+    "skipped": 0
+  },
+  "cleanup": {
+    "transient_unit_absent": true,
+    "remaining_owned_cgroups": 0,
+    "remaining_owned_process_commands": 0,
+    "existing_delegation_unchanged": true,
+    "running_distribution_preserved": true
+  },
+  "feasibility_inventory": {
+    "physical_windows_hosts": 3,
+    "running_development_distributions": 4,
+    "ubuntu": 3,
+    "archlinux": 1,
+    "cgroup_v2_mounts": 4,
+    "existing_active_delegated_user_managers": 3,
+    "existing_failed_user_manager": 1,
+    "other_distributions_executed_lifecycle_probe": false,
+    "container_engine_distributions_excluded": true
+  },
+  "limits": [
+    "The other three distributions were inspected read-only for feasibility; no complete Linux dashboard matrix is claimed.",
+    "Physical-keyboard/IME, real external provider model calls and production deployment are not exercised by this process-scope probe."
+  ],
+  "observed_at": "2026-10-15T04:27:38.575Z"
+}

@@ -1,6 +1,6 @@
 # Three-language review follow-up, 2026-10-15
 
-This record covers the PR #500 integration of upstream `2db470bd15d2efbe58c9ff1a43e6679e5cea4d4a` with English, Simplified Chinese and Japanese product copy. These are local macOS and physical Windows results, not GitHub CI results or a release. The tested source was an uncommitted merge integration; [350 relative source-file hashes](source-files.json) identify it without assigning a future commit SHA. All 350 files match the transferred Windows source and current checkout; all 46 Rust receipt files match across both platforms. [Source verification](source-verification.json).
+This record covers the PR #500 integration of upstream `2db470bd15d2efbe58c9ff1a43e6679e5cea4d4a` with English, Simplified Chinese and Japanese product copy. The original integration receipts cover local macOS and physical Windows; the additional Linux receipt below covers one native kernel lifecycle case. Source commit `8ee5d7f94f221db6135a9b3a3116707cc0fd4511` subsequently passed all 26 GitHub checks, including an unchanged-source retry of the failed Windows tray-start job ([run](https://github.com/jimoto-no-llm/rustdsh/actions/runs/38675592833/attempts/2)). Later evidence-only commits require their own CI; human approval, merge and release remain separate. The tested source was an uncommitted merge integration; [350 relative source-file hashes](source-files.json) identify it without assigning a future commit SHA. All 350 files match the transferred Windows source and current checkout; all 46 Rust receipt files match across both platforms. [Source verification](source-verification.json).
 
 The [2026-10-14 record](../languages-20261014/README.md) remains historical. Its older source bases, test counts, Darwin identity limitation, Windows terminal gap and earlier benchmark numbers do not describe this integration. Historical passing CI on `c3d5d9f` does not establish passing CI for the new integration.
 
@@ -12,6 +12,7 @@ The [2026-10-14 record](../languages-20261014/README.md) remains historical. Its
 | Windows native Rust release suite | 399 pass, 0 fail, 0 ignored; 12 targets | [Receipt](windows-native.json) |
 | macOS ordinary full dashboard suite | 347 total: 256 pass, 91 platform skips, 0 fail | [Every skipped case](dashboard-platforms.json) |
 | Windows ordinary full dashboard suite | 347 total: 335 pass, 12 platform skips, 0 fail | [Every skipped case](dashboard-platforms.json) |
+| Linux native kernel ownership | One case passes: three generations, pidfd TERM, forced cgroup stop once, canary survives, complete cleanup | [Receipt and prerequisites](linux-cgroup-native.json) |
 | macOS POSIX terminal | 6 actual PTY cases, all pass | [Receipt](posix-tty.json) |
 | Windows native terminal | 6 actual ConPTY cases, all pass | [Receipt](windows-conpty.json) |
 | Setup, native dashboard, project HTTP/MCP/browser | All three languages pass at desktop/mobile widths | [English](browser-en.json), [Chinese](browser-zh-CN.json), [Japanese](browser-ja.json) |
@@ -40,7 +41,7 @@ The new outcome language flow preserves original Japanese values and verifies tw
 
 Recovery and pure JSON operations retain upstream settings independence: `settings init --force`, `task-outcomes` and `subagents plan` can parse without opening unrelated corrupt settings. Their language comes from the explicit flag, environment override and OS locale environment; other commands still refuse corrupt settings without replacing it.
 
-No real provider login, model invocation, external Discord presence publication, installed binary replacement or release was performed. Live Muse CLI/catalog operation remains unverified. The full [remaining/intentional-exception ledger](known-exceptions.json) distinguishes runtime prerequisites, unsupported features, preserved raw data and current-head CI acceptance.
+No real provider login, model invocation, external Discord presence publication, installed binary replacement or release was performed. Live Muse CLI/catalog operation remains unverified: [read-only feasibility checks](muse-feasibility.json) across six physical hosts and four running WSL surfaces found no existing CLI in PATH or checked standard installation locations. No arbitrary external paths or other accounts were searched. The full [remaining/intentional-exception ledger](known-exceptions.json) distinguishes runtime prerequisites, unsupported features, preserved raw data and current-head CI acceptance.
 
 ## Measurements
 

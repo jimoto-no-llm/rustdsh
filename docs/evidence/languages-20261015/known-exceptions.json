@@ -42,18 +42,22 @@
     },
     {
       "id": "local-linux-owned-process-matrix",
-      "status": "not-observed-current-integration",
-      "scope": "no current local Linux delegated-cgroup acquisition is established by the macOS/Windows receipts",
-      "next_gate": "new submitted-head CI on supported Linux with its actual ownership prerequisites"
+      "status": "focused-native-kernel-verified",
+      "scope": "One unmodified 8ee process-scope lifecycle case on WSL2 Ubuntu with existing delegated cgroup v2: three generations, pidfd TERM, forced stop once, independent canary and cleanup verified.",
+      "limits": "The other three running development distributions were surveyed read-only; this receipt is not the complete Linux dashboard matrix.",
+      "evidence": [
+        "linux-cgroup-native.json"
+      ]
     },
     {
       "id": "live-muse-runtime-catalog",
       "status": "not-verified",
       "scope": "live external Muse CLI/login/catalog and real model response",
       "available_evidence": "synthetic catalog/worker fixtures through real adapter/protocol paths",
-      "prerequisites": "available runtime and suitable existing account; no purchase or model request performed",
+      "prerequisites": "Standard runtime/auth locations surveyed across six physical hosts and four running WSL surfaces; no existing CLI found. No catalog, login, purchase or model request performed.",
       "evidence": [
-        "plugins.json"
+        "plugins.json",
+        "muse-feasibility.json"
       ]
     },
     {
@@ -93,8 +97,8 @@
     {
       "id": "new-head-ci-review-and-release",
       "status": "separate-gates",
-      "scope": "local passing tests are not current-head GitHub CI, new human approval, merge or release",
-      "historical_evidence": "c3d5d9f CI remains historical and is not promoted to this merged tree"
+      "scope": "Source commit 8ee5d7f94f221db6135a9b3a3116707cc0fd4511 passed all 26 GitHub checks. The failed native Windows tray-start job passed an unchanged-SHA failed-job retry; the original failure remains recorded. Later evidence-only commits require their own CI. Human review, merge and release remain separate gates.",
+      "historical_evidence": "https://github.com/jimoto-no-llm/rustdsh/actions/runs/38675592833/attempts/2"
     },
     {
       "id": "before-image-source-binding",

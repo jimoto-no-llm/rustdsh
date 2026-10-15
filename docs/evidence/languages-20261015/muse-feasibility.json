@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "scope": "Read-only search for an existing Muse runtime and standard authentication metadata; no login, catalog, model turn or purchase.",
+  "observed_source_head": "8ee5d7f94f221db6135a9b3a3116707cc0fd4511",
+  "inventory": {
+    "physical_hosts": 6,
+    "native_macos_surfaces": 2,
+    "native_windows_surfaces": 4,
+    "running_linux_wsl_surfaces": 4,
+    "total_surfaces": 10,
+    "muse_on_path": 0,
+    "muse_in_checked_native_install_prefixes": 0,
+    "configured_muse_command_environment": 0,
+    "standard_auth_file_present": 0
+  },
+  "catalog": {
+    "status": "blocked_missing_existing_cli",
+    "requests": 0,
+    "prerequisite": "An existing Muse CLI binary must be available before a live read-only model/list request can be attempted.",
+    "adapter_catalog_requires_auth_file": false
+  },
+  "model_response": {
+    "status": "not_performed",
+    "requests": 0,
+    "prerequisites": "An appropriate existing account and explicit allowed model work; account suitability and billing were not inferred."
+  },
+  "preservation": {
+    "installed_binary_changes": 0,
+    "authentication_changes": 0,
+    "credentials_recorded": false,
+    "stopped_distributions_started": 0
+  },
+  "limits": [
+    "PATH and selected standard native installation prefixes were checked; arbitrary external paths and other user accounts were not searched.",
+    "The standard Muse auth file was absent on the surveyed accounts; this does not prove that no other account or storage exists.",
+    "No claim about API pricing or a free model allowance is made."
+  ],
+  "observed_at": "2026-10-15T04:30:19.658963+00:00"
+}

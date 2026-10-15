@@ -3,8 +3,8 @@
   "files": [
     {
       "path": "README.md",
-      "bytes": 6182,
-      "sha256": "32710172beb7980de71c2c3d214204bed803c27fcd93038d8c239dd01296ea6e"
+      "bytes": 7048,
+      "sha256": "3d41765a77d93cdac2e806e1b5b83e0fbaac25deded3c3291cb06e8b473032ea"
     },
     {
       "path": "before-desktop.png",
@@ -68,13 +68,23 @@
     },
     {
       "path": "known-exceptions.json",
-      "bytes": 4336,
-      "sha256": "a223726ff0ed35b1ac2837429cef44e0dc8da3d6d5c25c0005f4e76321dea5c5"
+      "bytes": 4888,
+      "sha256": "b3cca9a6d5479b82e025259b19d840b2fecae38283b34fff72fd1bb68dd13da8"
+    },
+    {
+      "path": "linux-cgroup-native.json",
+      "bytes": 4348,
+      "sha256": "019ed25b5dfe47e0a1e0117ea03a818055a6f0ebb8f392159fde85f0a8d6451d"
     },
     {
       "path": "macos-native.json",
       "bytes": 3259,
       "sha256": "a418dc07d94b17aceddd8d1d84a12c8e8848512428538fefea10dd9388cdd8e7"
+    },
+    {
+      "path": "muse-feasibility.json",
+      "bytes": 1632,
+      "sha256": "122c64b5c50628ec834f64fc04e1bfc28c3e79eda593f7fd1753582d4366426f"
     },
     {
       "path": "outcome-languages.json",
@@ -123,8 +133,8 @@
     },
     {
       "path": "platform-ledger.md",
-      "bytes": 20379,
-      "sha256": "2356f55b122fa3368394ac1382dd1f4e176a42ad16c75a965e494c87b9399d47"
+      "bytes": 20912,
+      "sha256": "c00063e87e9be75b419c125c5e29a9e430f2fd01cb6a1077120cbda72151d4f8"
     },
     {
       "path": "plugins.json",
