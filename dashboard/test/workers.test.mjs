@@ -38,6 +38,42 @@ test("worker Git rejects a relative RDSH_BIN override", async () => {
   }
 });
 
+test("worker Git ignores relative PATH entries when probing binaries", {
+  skip: process.platform === "win32",
+}, async (t) => {
+  const f = await setup(t);
+  const previousCwd = process.cwd();
+  const previousPath = process.env.PATH;
+  const previousBinary = process.env.RDSH_BIN;
+  const cwd = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-worker-git-path-"));
+  const marker = path.join(cwd, "called");
+  const fake = path.join(cwd, "rdsh");
+  await fs.writeFile(
+    fake,
+    `#!/bin/sh\nprintf 'called\\n' >> '${marker}'\nprintf 'Internal JSON bridge for dashboard Git observations\\n'\n`,
+  );
+  await fs.chmod(fake, 0o755);
+  t.after(async () => {
+    process.chdir(previousCwd);
+    if (previousPath === undefined) delete process.env.PATH;
+    else process.env.PATH = previousPath;
+    if (previousBinary === undefined) delete process.env.RDSH_BIN;
+    else process.env.RDSH_BIN = previousBinary;
+    await fs.rm(cwd, { recursive: true, force: true });
+  });
+
+  process.chdir(cwd);
+  process.env.PATH = [
+    ".",
+    ...(previousPath ?? "").split(path.delimiter).filter(path.isAbsolute),
+  ].join(path.delimiter);
+  delete process.env.RDSH_BIN;
+
+  const repository = await workerGitRepository(f.repo);
+  assert.equal(repository.root, await fs.realpath(f.repo));
+  await assert.rejects(fs.access(marker), { code: "ENOENT" });
+});
+
 async function setup(t) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-workers-qa-"));
   const repo = path.join(root, "project");

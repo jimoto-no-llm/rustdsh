@@ -190,6 +190,25 @@ fn repository_and_git_path_operations_preserve_nul_framing() {
     ));
 }
 
+#[cfg(unix)]
+#[test]
+fn repository_metadata_preserves_newlines_in_repository_paths() {
+    let temp = TempDir::new();
+    let root = temp.0.join("repo\nwith newline");
+    init_repo(&root);
+    fs::write(root.join("tracked.txt"), "base\n").unwrap();
+    git(&root, &["add", "--all"]);
+    git(&root, &["commit", "-qm", "initial"]);
+
+    let repository = response(invoke(json!({"op":"repository","root":root})));
+    let canonical = root.canonicalize().unwrap();
+    assert_eq!(repository["root"], canonical.to_str().unwrap());
+    assert_eq!(
+        repository["git_common_dir"],
+        canonical.join(".git").to_str().unwrap()
+    );
+}
+
 #[test]
 fn canonical_future_resolves_existing_parents_and_add_worktree_uses_isolated_hooks() {
     let temp = TempDir::new();

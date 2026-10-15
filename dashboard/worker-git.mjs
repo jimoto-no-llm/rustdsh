@@ -12,6 +12,9 @@ import {
 } from "./worker-scopes.mjs";
 
 const exec = promisify(execFile);
+// observe-worktree can run five Git commands in sequence, each with a 30s
+// native bound. Keep enough room for the whole request plus process startup.
+const NATIVE_REQUEST_TIMEOUT_MS = 160_000;
 const environment = () => ({
   ...Object.fromEntries(
     Object.entries(process.env).filter(([key]) =>
@@ -220,7 +223,7 @@ async function nativeRequest(request, executablePath = null) {
     const timer = setTimeout(() => {
       timedOut = true;
       child.kill();
-    }, 35_000);
+    }, NATIVE_REQUEST_TIMEOUT_MS);
 
     const capture = (chunks, chunk, current, limit) => {
       if (current + chunk.length > limit) {
@@ -247,7 +250,9 @@ async function nativeRequest(request, executablePath = null) {
     child.once("close", (status) => {
       clearTimeout(timer);
       if (timedOut) {
-        const error = new Error("rdsh worker-git timed out after 35 seconds");
+        const error = new Error(
+          `rdsh worker-git timed out after ${NATIVE_REQUEST_TIMEOUT_MS / 1000} seconds`,
+        );
         error.code = "ETIMEDOUT";
         reject(error);
         return;

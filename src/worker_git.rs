@@ -6,9 +6,13 @@ use std::{
     io::{self, Read, Write},
     path::{Path, PathBuf},
     process::{Command, ExitStatus, Stdio},
+    sync::mpsc,
     thread,
     time::{Duration, Instant},
 };
+
+#[cfg(unix)]
+use std::os::unix::process::CommandExt;
 
 const MAX_INPUT_BYTES: usize = 2 * 1024 * 1024;
 const MAX_OUTPUT_BYTES: usize = 2 * 1024 * 1024;
@@ -225,31 +229,37 @@ fn repository_info(root: &Path) -> Result<RepositoryInfo> {
             "HEAD",
         ],
     )?;
-    let mut lines = metadata.lines();
-    let top = normalize_windows_path(
-        &fs::canonicalize(lines.next().context("Git project root is unavailable")?)
-            .context("resolve Git project root")?,
-    );
+    let metadata = metadata
+        .strip_suffix('\n')
+        .context("Git repository metadata is incomplete")?;
+    let mut fields = metadata.rsplitn(4, '\n');
+    let branch_field = fields.next().context("Git branch is unavailable")?;
+    let head_sha = fields
+        .next()
+        .context("Git HEAD is unavailable")?
+        .to_string();
+    let common_raw = fields
+        .next()
+        .context("Git common directory is unavailable")?;
+    let top_raw = fields.next().context("Git project root is unavailable")?;
+    ensure!(fields.next().is_none(), "unexpected Git metadata output");
+    let top =
+        normalize_windows_path(&fs::canonicalize(top_raw).context("resolve Git project root")?);
     ensure!(
         same_path(&canonical, &top),
         "exact_git_project_root_required"
     );
 
-    let common_raw = lines
-        .next()
-        .context("Git common directory is unavailable")?;
     let common = normalize_windows_path(
         &fs::canonicalize(canonical.join(common_raw.trim()))
             .context("resolve Git common directory")?,
     );
-    let head_sha = lines.next().context("Git HEAD is unavailable")?.to_string();
     ensure!(valid_head_sha(&head_sha), "git_head_unavailable");
 
-    let branch = match lines.next().context("Git branch is unavailable")? {
+    let branch = match branch_field {
         "HEAD" => None,
         branch => Some(branch.to_string()),
     };
-    ensure!(lines.next().is_none(), "unexpected Git metadata output");
 
     Ok(RepositoryInfo {
         root: canonical,
@@ -504,38 +514,69 @@ fn git_raw_with(root: &Path, configure: impl FnOnce(&mut Command)) -> Result<Pro
 }
 
 fn run_bounded(mut command: Command, timeout: Duration, max_bytes: usize) -> Result<ProcessOutput> {
+    configure_process_tree(&mut command);
     let mut child = command.spawn().context("start Git command")?;
+    let mut process_tree = match ProcessTreeGuard::attach(&mut child) {
+        Ok(process_tree) => process_tree,
+        Err(error) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(error).context("isolate Git command process tree");
+        }
+    };
     let stdout = child.stdout.take().context("capture Git stdout")?;
     let stderr = child.stderr.take().context("capture Git stderr")?;
-    let stdout_reader = thread::spawn(move || read_limited(stdout, max_bytes));
-    let stderr_reader = thread::spawn(move || read_limited(stderr, max_bytes));
+    let (stdout_tx, stdout_rx) = mpsc::sync_channel(1);
+    let (stderr_tx, stderr_rx) = mpsc::sync_channel(1);
+    let stdout_reader = thread::spawn(move || {
+        let _ = stdout_tx.send(read_limited(stdout, max_bytes));
+    });
+    let stderr_reader = thread::spawn(move || {
+        let _ = stderr_tx.send(read_limited(stderr, max_bytes));
+    });
     let started = Instant::now();
     let status = loop {
         match child.try_wait() {
             Ok(Some(status)) => break status,
             Ok(None) if started.elapsed() < timeout => thread::sleep(Duration::from_millis(5)),
             Ok(None) => {
-                let _ = child.kill();
+                process_tree.terminate(&mut child);
                 let _ = child.wait();
-                let _ = stdout_reader.join();
-                let _ = stderr_reader.join();
                 bail!("Git command timed out after {} seconds", timeout.as_secs());
             }
             Err(error) => {
-                let _ = child.kill();
+                process_tree.terminate(&mut child);
                 let _ = child.wait();
-                let _ = stdout_reader.join();
-                let _ = stderr_reader.join();
                 return Err(error).context("wait for Git command");
             }
         }
     };
-    let (stdout, stdout_overflow) = stdout_reader
+    let remaining = timeout.saturating_sub(started.elapsed());
+    let stdout_result = match stdout_rx.recv_timeout(remaining) {
+        Ok(result) => result,
+        Err(_) => {
+            process_tree.terminate(&mut child);
+            let _ = child.wait();
+            bail!("Git command timed out after {} seconds", timeout.as_secs());
+        }
+    };
+    let remaining = timeout.saturating_sub(started.elapsed());
+    let stderr_result = match stderr_rx.recv_timeout(remaining) {
+        Ok(result) => result,
+        Err(_) => {
+            process_tree.terminate(&mut child);
+            let _ = child.wait();
+            bail!("Git command timed out after {} seconds", timeout.as_secs());
+        }
+    };
+    stdout_reader
         .join()
-        .map_err(|_| anyhow::anyhow!("Git stdout reader stopped unexpectedly"))??;
-    let (stderr, stderr_overflow) = stderr_reader
+        .map_err(|_| anyhow::anyhow!("Git stdout reader stopped unexpectedly"))?;
+    stderr_reader
         .join()
-        .map_err(|_| anyhow::anyhow!("Git stderr reader stopped unexpectedly"))??;
+        .map_err(|_| anyhow::anyhow!("Git stderr reader stopped unexpectedly"))?;
+    let (stdout, stdout_overflow) = stdout_result?;
+    let (stderr, stderr_overflow) = stderr_result?;
     if stdout_overflow || stderr_overflow {
         bail!("Git output exceeds 2 MiB");
     }
@@ -544,6 +585,191 @@ fn run_bounded(mut command: Command, timeout: Duration, max_bytes: usize) -> Res
         stdout,
         stderr,
     })
+}
+
+#[cfg(unix)]
+fn configure_process_tree(command: &mut Command) {
+    command.process_group(0);
+}
+
+#[cfg(windows)]
+fn configure_process_tree(command: &mut Command) {
+    use std::os::windows::process::CommandExt;
+    use windows_sys::Win32::System::Threading::{CREATE_NO_WINDOW, CREATE_SUSPENDED};
+
+    command.creation_flags(CREATE_NO_WINDOW | CREATE_SUSPENDED);
+}
+
+#[cfg(not(any(unix, windows)))]
+fn configure_process_tree(_command: &mut Command) {}
+
+#[cfg(unix)]
+struct ProcessTreeGuard {
+    process_group: i32,
+    terminated: bool,
+}
+
+#[cfg(unix)]
+impl ProcessTreeGuard {
+    fn attach(child: &mut std::process::Child) -> io::Result<Self> {
+        Ok(Self {
+            process_group: child.id() as i32,
+            terminated: false,
+        })
+    }
+
+    fn terminate(&mut self, child: &mut std::process::Child) {
+        let result = unsafe { libc::kill(-self.process_group, libc::SIGKILL) };
+        if result == 0 || io::Error::last_os_error().raw_os_error() == Some(libc::ESRCH) {
+            self.terminated = true;
+        }
+        let _ = child.kill();
+    }
+}
+
+#[cfg(unix)]
+impl Drop for ProcessTreeGuard {
+    fn drop(&mut self) {
+        if !self.terminated {
+            unsafe {
+                libc::kill(-self.process_group, libc::SIGKILL);
+            }
+        }
+    }
+}
+
+#[cfg(windows)]
+struct ProcessTreeGuard {
+    job: windows_sys::Win32::Foundation::HANDLE,
+}
+
+#[cfg(windows)]
+impl ProcessTreeGuard {
+    fn attach(child: &mut std::process::Child) -> io::Result<Self> {
+        use std::{
+            mem::{size_of, zeroed},
+            os::windows::io::AsRawHandle,
+            ptr::null,
+        };
+        use windows_sys::Win32::{
+            Foundation::{CloseHandle, HANDLE, INVALID_HANDLE_VALUE},
+            System::{
+                Diagnostics::ToolHelp::{
+                    CreateToolhelp32Snapshot, Thread32First, Thread32Next, TH32CS_SNAPTHREAD,
+                    THREADENTRY32,
+                },
+                JobObjects::{
+                    AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
+                    SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+                    JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+                },
+                Threading::{OpenThread, ResumeThread, THREAD_SUSPEND_RESUME},
+            },
+        };
+
+        struct Handle(HANDLE);
+        impl Drop for Handle {
+            fn drop(&mut self) {
+                unsafe {
+                    CloseHandle(self.0);
+                }
+            }
+        }
+        impl Handle {
+            fn into_raw(self) -> HANDLE {
+                let handle = self.0;
+                std::mem::forget(self);
+                handle
+            }
+        }
+
+        unsafe {
+            let job = CreateJobObjectW(null(), null());
+            if job.is_null() {
+                return Err(io::Error::last_os_error());
+            }
+            let job = Handle(job);
+            let mut limits: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = zeroed();
+            limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+            if SetInformationJobObject(
+                job.0,
+                JobObjectExtendedLimitInformation,
+                (&limits as *const JOBOBJECT_EXTENDED_LIMIT_INFORMATION).cast(),
+                size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+            ) == 0
+            {
+                return Err(io::Error::last_os_error());
+            }
+            let process = child.as_raw_handle() as HANDLE;
+            if AssignProcessToJobObject(job.0, process) == 0 {
+                return Err(io::Error::last_os_error());
+            }
+
+            let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+            if snapshot == INVALID_HANDLE_VALUE {
+                return Err(io::Error::last_os_error());
+            }
+            let snapshot = Handle(snapshot);
+            let mut entry = THREADENTRY32 {
+                dwSize: size_of::<THREADENTRY32>() as u32,
+                ..Default::default()
+            };
+            let mut primary_thread = None;
+            if Thread32First(snapshot.0, &mut entry) != 0 {
+                loop {
+                    if entry.th32OwnerProcessID == child.id() {
+                        primary_thread = Some(entry.th32ThreadID);
+                        break;
+                    }
+                    if Thread32Next(snapshot.0, &mut entry) == 0 {
+                        break;
+                    }
+                }
+            }
+            let thread_id = primary_thread.ok_or_else(io::Error::last_os_error)?;
+            let thread = OpenThread(THREAD_SUSPEND_RESUME, 0, thread_id);
+            if thread.is_null() {
+                return Err(io::Error::last_os_error());
+            }
+            let thread = Handle(thread);
+            if ResumeThread(thread.0) == u32::MAX {
+                return Err(io::Error::last_os_error());
+            }
+            Ok(Self {
+                job: job.into_raw(),
+            })
+        }
+    }
+
+    fn terminate(&mut self, child: &mut std::process::Child) {
+        unsafe {
+            windows_sys::Win32::System::JobObjects::TerminateJobObject(self.job, 1);
+        }
+        let _ = child.kill();
+    }
+}
+
+#[cfg(windows)]
+impl Drop for ProcessTreeGuard {
+    fn drop(&mut self) {
+        unsafe {
+            windows_sys::Win32::Foundation::CloseHandle(self.job);
+        }
+    }
+}
+
+#[cfg(not(any(unix, windows)))]
+struct ProcessTreeGuard;
+
+#[cfg(not(any(unix, windows)))]
+impl ProcessTreeGuard {
+    fn attach(_child: &mut std::process::Child) -> io::Result<Self> {
+        Ok(Self)
+    }
+
+    fn terminate(&self, child: &mut std::process::Child) {
+        let _ = child.kill();
+    }
 }
 
 fn read_limited(mut reader: impl Read, max_bytes: usize) -> io::Result<(Vec<u8>, bool)> {
@@ -639,5 +865,33 @@ mod tests {
         let error = run_bounded(command, Duration::from_millis(25), 1024).unwrap_err();
         assert!(error.to_string().contains("timed out"), "{error:?}");
         assert!(start.elapsed() < Duration::from_secs(2));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn command_timeout_kills_descendants_that_hold_pipes_open() {
+        let mut command = Command::new("sh");
+        command
+            .args(["-c", "sleep 3 & wait"])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        let start = Instant::now();
+        let error = run_bounded(command, Duration::from_millis(100), 1024).unwrap_err();
+        assert!(error.to_string().contains("timed out"), "{error:?}");
+        assert!(start.elapsed() < Duration::from_secs(1));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn command_exit_does_not_wait_for_descendants_that_hold_pipes_open() {
+        let mut command = Command::new("sh");
+        command
+            .args(["-c", "sleep 3 & exit 0"])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        let start = Instant::now();
+        let error = run_bounded(command, Duration::from_millis(100), 1024).unwrap_err();
+        assert!(error.to_string().contains("timed out"), "{error:?}");
+        assert!(start.elapsed() < Duration::from_secs(1));
     }
 }
