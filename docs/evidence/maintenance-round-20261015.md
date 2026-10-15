@@ -8,7 +8,8 @@ re-executed for this revision.
 
 ## Pull requests opened or rescued
 
-Ten PRs are OPEN, MERGEABLE and (where the base allows) armed for auto-merge:
+以下は、このラウンドで扱った10件と、各PRのレビュー時に著者が記録した検証です。
+現在のOPEN件数やmainへの取り込み済み件数を表す表ではありません。
 
 | PR | Topic | Verification |
 | -- | ----- | ------------ |
@@ -25,6 +26,20 @@ Ten PRs are OPEN, MERGEABLE and (where the base allows) armed for auto-merge:
 
 The verification counts in this table were recorded when each pull request was
 reviewed; they were not re-counted for this revision.
+
+2026-10-15 05:25 UTCにGitHubのPR APIで確認した状態は、#267/#460/#518がOPEN、
+PR #509/#512/#517/#519/#521がmainへマージ済みです。#465は2026-10-14 16:44:05 UTC、
+PR #496は同16:44:09 UTCにマージ済みですが、取り込み先はいずれも
+`feat/codex-model-sync`であり、mainへのマージを示す記録ではありません。
+復旧用#523は確認時点でclosed・未マージです。以降の技術記録は各節に示す当時の
+revisionについての記録で、現在のmainや#525の実装・状態を示すものではありません。
+
+状態の確認に使ったコマンド（`<number>`は上記各PR番号）:
+
+```console
+gh api repos/jimoto-no-llm/rustdsh/pulls/<number> \
+    --jq '{number, state, merged, merged_at, base: .base.ref}'
+```
 
 `scripts/check-pr-conflicts.sh` reported `CONFLICTING: 40  MERGEABLE: 21` early in
 the round and `MERGEABLE` rose as the rebases landed. Rebase conflicts were
