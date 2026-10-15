@@ -832,6 +832,7 @@ fn invalid_serial_proxy_options_exit_with_usage_status() {
         ("fractional rpm", &["--rpm", "1.5"]),
         ("negative rpm", &["--rpm=-1"]),
         ("zero max", &["--max", "0"]),
+        ("zero max queue", &["--max-queue", "0"]),
         ("zero body cap", &["--max-body-bytes", "0"]),
         ("non-numeric body cap", &["--max-body-bytes", "x"]),
         ("non-finite queue timeout", &["--queue-timeout", "NaN"]),
