@@ -20,7 +20,7 @@
     "@remotion/cli": "4.0.534",
     "@remotion/three": "4.0.534",
     "@remotion/transitions": "4.0.534",
-    "@types/three": "0.183.1",
+    "@types/three": "0.186.0",
     "react": "19.3.0",
     "react-dom": "19.2.0",
     "remotion": "4.0.534",
