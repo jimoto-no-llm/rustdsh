@@ -501,7 +501,10 @@ fn user_texts(value: &serde_json::Value) -> Vec<String> {
         Some(kind) if kind == "assistant" || kind.starts_with("assistant/") => Vec::new(),
         _ => {
             let message = value.get("message").unwrap_or(value);
-            if message["role"].as_str().or_else(|| value["role"].as_str()) != Some("user") {
+            if is_hook_generated(value)
+                || is_hook_generated(message)
+                || message["role"].as_str().or_else(|| value["role"].as_str()) != Some("user")
+            {
                 return Vec::new();
             }
             message
@@ -3764,8 +3767,13 @@ mod v3_tests {
     fn distill_excludes_hook_generated_messages_but_keeps_source_less_users() {
         let transcript = r#"{"type":"user/message","source":{"kind":"hooks-claude-code"},"data":{"content":[{"type":"text","text":"[mem] must not repeat generated context"}]}}
 {"type":"agent/inbox/spliced","data":{"inserted":[{"content":[{"type":"text","text":"[mem] never learn injected memory"}],"source":{"kind":"hooks-claude-code"}}]}}
+{"role":"user","source":{"kind":"hooks-claude-code"},"content":"must not learn generated raw input"}
+{"type":"user","source":{"kind":"hooks-claude-code"},"message":{"role":"user","content":"must not learn generated wrapped input"}}
+{"type":"user","message":{"role":"user","source":{"kind":"hooks-claude-code"},"content":[{"type":"text","text":"must not learn generated nested input"}]}}
+{"type":"user","source":{"kind":"direct-user"},"message":{"role":"user","source":{"kind":"hooks-claude-code"},"text":"must not learn generated nested text"}}
 {"type":"user/message","data":{"content":[{"type":"text","text":"必ず旧形式のuser messageを残す"}]}}
-{"role":"user","content":"次はsourceなしの従来形式を保つ"}"#;
+{"role":"user","content":"次はsourceなしの従来形式を保つ"}
+{"type":"user","source":{"kind":"direct-user"},"message":{"role":"user","source":{"kind":"conversation"},"content":"必ず明示的な人間入力を残す"}}"#;
 
         let candidates = distill_candidates(transcript);
         assert_eq!(
@@ -3775,7 +3783,8 @@ mod v3_tests {
                 .collect::<Vec<_>>(),
             vec![
                 "必ず旧形式のuser messageを残す",
-                "次はsourceなしの従来形式を保つ"
+                "次はsourceなしの従来形式を保つ",
+                "必ず明示的な人間入力を残す"
             ]
         );
     }
