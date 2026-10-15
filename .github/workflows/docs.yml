@@ -2,17 +2,25 @@ name: docs
 
 on:
   push:
+    branches: [main]
+    tags: ['v*']
     paths:
       - '**/*.md'
       - '.markdownlint.yml'
       - '.lychee.toml'
-      - '.github/workflows/docs.yml'
+      # Every workflow edit re-runs docs validation. `lint` and `links` are
+      # required checks, so a pull request changing only a workflow file other
+      # than this one (codeql.yml, for example) would skip this workflow
+      # entirely, never report them, and stay permanently unmergeable even
+      # with every other check green.
+      - '.github/workflows/**'
   pull_request:
     paths:
       - '**/*.md'
       - '.markdownlint.yml'
       - '.lychee.toml'
-      - '.github/workflows/docs.yml'
+      - '.github/workflows/**'
+  workflow_dispatch:
 
 permissions:
   contents: read

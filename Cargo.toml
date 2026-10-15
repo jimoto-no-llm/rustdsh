@@ -1,6 +1,6 @@
 [package]
 name = "rdsh"
-version = "0.3.3"
+version = "0.4.0"
 edition = "2021"
 rust-version = "1.85"
 description = "Rust port/shim for dsh: fast launcher, token saver, zero behavior breakage via passthrough"
@@ -17,7 +17,11 @@ path = "src/main.rs"
 
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
-serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+# preserve_order keeps JSON object key order. task-outcomes must serialise
+# byte-identically to the former dashboard/task-outcomes.mjs, whose spread
+# merges (and therefore its output key order) follow insertion order.
+serde_json = { version = "1.0", features = ["preserve_order"] }
 anyhow = "1.0"
 getrandom = "0.4"
 libc = "0.2"
