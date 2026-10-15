@@ -58,6 +58,8 @@ carries a `code`:
 | `output_too_large` | cursor-agent output exceeded 1 MiB |
 | `workspace_untrusted` | devin refused an untrusted workspace |
 | `spawn_failed`, `prompt_unreadable` | The supervisor could not start the CLI |
+| `supervisor_init_failed` | The supervisor failed while setting up after the CLI started (for example a `job.json` write error); it stopped the CLI itself and `cleanup` says whether that was confirmed |
+| `output_write_failed` | Writing the CLI's `stdout`/`stderr` to the job directory failed; the CLI was stopped |
 | `supervisor_lost` | The supervisor died without writing a result (the agent may still be running; use `cancel`) |
 
 `submit` rejects bad input before creating a job (`invalid_runner`,

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
+import fsSync from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,6 +25,7 @@ import {
   sanitizeText,
   cancelWaitMs,
   supervisorStopMs,
+  supervise,
 } from "../agent-runners.mjs";
 import { readProcessIdentity } from "../process-identity.mjs";
 
@@ -56,6 +58,7 @@ if (mode === "stubborn") stubborn();
 if (mode === "slow") {
   const c = cp.spawn(process.execPath, ["-e", "setInterval(()=>{},1000)"], { stdio: "ignore" });
   fs.writeFileSync(path.join(__dirname, "grandchild.pid"), String(c.pid));
+
   setInterval(() => {}, 1000);
 } else if (mode === "iserror") {
   done({ type: "result", subtype: "error", is_error: true, result: "boom", session_id: "s1" });
@@ -865,4 +868,99 @@ test("cancel waits at least the supervisor's whole stop budget for a running job
   assert.equal(cancelWaitMs({ running: true, termMs: 60000, killMs: 60000 }), 123000);
   // A terminal job is not waited on through the supervisor.
   assert.equal(cancelWaitMs({ running: false, termMs: 3000, killMs: 3000 }), 9000);
+});
+
+// Supervisor failure paths: supervise() is driven directly, with injected I/O,
+// on a hand-made job directory (no real supervisor is spawned for it).
+async function manualJob(t, mode) {
+  const f = await fixture(t);
+  const directory = path.join(process.env.RDSH_DASHBOARD_HOME, "agent-jobs", "job_" + path.basename(f.dir));
+  await fs.mkdir(directory, { recursive: true });
+  await fs.copyFile(await f.prompt(mode), path.join(directory, "prompt.txt"));
+  const job = {
+    id: path.basename(directory),
+    runner: "cursor-agent",
+    project: f.project,
+    permission: "read-only",
+    executable: process.execPath,
+    entrypoint: f.cursorBin,
+    agent_pid: null,
+    agent_pgid: null,
+    state: "queued",
+  };
+  await fs.writeFile(path.join(directory, "job.json"), JSON.stringify(job));
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  return { f, directory };
+}
+// Counts sink fds still open; `fail` decides which writeJson / writeSync calls throw.
+function seam({ failJson = () => false, failWrite = false } = {}) {
+  const open = new Set();
+  const seen = { pid: null }; // the agent pid, as the supervisor recorded it
+  const eio = () => Object.assign(new Error("EIO"), { code: "EIO" });
+  return {
+    open,
+    seen,
+    deps: {
+      writeJson: async (file, value) => {
+        if (value.agent_pid) seen.pid = value.agent_pid;
+        if (failJson(file, value)) throw eio();
+        await fs.writeFile(file, JSON.stringify(value));
+      },
+      openSync: (...a) => {
+        const fd = fsSync.openSync(...a);
+        open.add(fd);
+        return fd;
+      },
+      writeSync: (fd, ...a) => {
+        if (failWrite) throw eio();
+        return fsSync.writeSync(fd, ...a);
+      },
+      closeSync: (fd) => {
+        open.delete(fd);
+        fsSync.closeSync(fd);
+      },
+    },
+  };
+}
+const afterSpawn = (file, value) => path.basename(file) === "job.json" && value.agent_pid;
+const readResult = (directory) =>
+  fs.readFile(path.join(directory, "result.json"), "utf8").then(JSON.parse, () => null);
+const expectedStop = process.platform === "win32" ? "unconfirmed" : "confirmed";
+
+test("supervise: a failed job.json write after spawn stops the agent and records supervisor_init_failed", async (t) => {
+  const { directory } = await manualJob(t, "slow");
+  const io = seam({ failJson: afterSpawn });
+  await supervise(directory, io.deps);
+  assert.ok(await gone(io.seen.pid), "agent is stopped");
+  assert.equal(io.open.size, 0, "both sinks closed");
+  const r = await readResult(directory);
+  assert.equal(r.state, "failed");
+  assert.equal(r.code, "supervisor_init_failed");
+  assert.equal(r.cleanup, expectedStop);
+});
+
+test("supervise: when the result cannot be written either, the agent is still stopped", async (t) => {
+  const { directory } = await manualJob(t, "slow");
+  let spawned = false;
+  const io = seam({
+    failJson: (file, value) => {
+      if (afterSpawn(file, value)) spawned = true;
+      return spawned;
+    },
+  });
+  await supervise(directory, io.deps); // resolves instead of rejecting
+  assert.ok(await gone(io.seen.pid), "agent is stopped");
+  assert.equal(io.open.size, 0, "both sinks closed");
+  assert.equal(await readResult(directory), null);
+});
+
+test("supervise: a sink write failure stops the agent and records output_write_failed", async (t) => {
+  const { directory } = await manualJob(t, "big");
+  const io = seam({ failWrite: true });
+  await supervise(directory, io.deps);
+  const r = await readResult(directory);
+  assert.equal(r.state, "failed");
+  assert.equal(r.code, "output_write_failed");
+  assert.equal(r.cleanup, expectedStop);
+  assert.equal(io.open.size, 0, "both sinks closed");
 });

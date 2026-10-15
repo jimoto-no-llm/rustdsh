@@ -609,8 +609,8 @@ async function load(id) {
   return { directory, job, result };
 }
 
-async function writeResult(directory, value) {
-  await writeJson(path.join(directory, "result.json"), value);
+async function writeResult(directory, value, write = writeJson) {
+  await write(path.join(directory, "result.json"), value);
 }
 
 export async function status(id) {
@@ -845,22 +845,37 @@ export async function waitForJob(id, { intervalMs = 200, timeoutMs = 0 } = {}) {
 }
 
 // Writes at most `cap` bytes and keeps draining so the child never blocks.
-function sink(file, cap) {
-  const fd = openSync(file, "w", 0o600);
+// A write error never throws out of the stream handler: the sink stops
+// accepting data and reports once through `onError`. close() is idempotent.
+function sink(file, cap, onError, io = { openSync, writeSync, closeSync }) {
+  const fd = io.openSync(file, "w", 0o600);
   const state = { bytes: 0, truncated: false };
+  let failed = false;
+  let closed = false;
   return {
     state,
     write(chunk) {
+      if (failed) return;
       const room = cap - state.bytes;
-      if (room > 0) {
-        const part = chunk.length > room ? chunk.subarray(0, room) : chunk;
-        writeSync(fd, part);
-        state.bytes += part.length;
+      try {
+        if (room > 0) {
+          const part = chunk.length > room ? chunk.subarray(0, room) : chunk;
+          io.writeSync(fd, part);
+          state.bytes += part.length;
+        }
+      } catch {
+        failed = true;
+        onError();
+        return;
       }
       if (chunk.length > Math.max(room, 0)) state.truncated = true;
     },
     close() {
-      closeSync(fd);
+      if (closed) return;
+      closed = true;
+      try {
+        io.closeSync(fd);
+      } catch {}
     },
   };
 }
@@ -875,7 +890,15 @@ async function readCapped(file, size) {
   }
 }
 
-async function supervise(directory) {
+// `deps` is a test seam: writeJson/openSync/writeSync/closeSync default to the
+// real ones. The CLI entry below never passes it.
+export async function supervise(directory, deps = {}) {
+  const write = deps.writeJson ?? writeJson;
+  const sinkFs = {
+    openSync: deps.openSync ?? openSync,
+    writeSync: deps.writeSync ?? writeSync,
+    closeSync: deps.closeSync ?? closeSync,
+  };
   const jobFile = path.join(directory, "job.json");
   const job = await readJson(jobFile);
   const runner = runnerFor(job.runner);
@@ -891,13 +914,13 @@ async function supervise(directory) {
       parsed: null,
       ...fields,
       finished_at,
-    });
-    await writeJson(jobFile, { ...job, state: fields.state });
+    }, write);
+    await write(jobFile, { ...job, state: fields.state });
   };
   job.supervisor_pid = process.pid;
   job.started_at = new Date().toISOString();
   job.state = "running";
-  await writeJson(jobFile, job);
+  await write(jobFile, job);
   if (await exists(cancelFile))
     return finish({ state: "cancelled", code: "cancelled" });
 
@@ -917,9 +940,23 @@ async function supervise(directory) {
     exportFile: path.join(directory, "export.json"),
     prompt,
   });
-  const out = sink(path.join(directory, "stdout"), OUTPUT_CAP);
-  const err = sink(path.join(directory, "stderr"), OUTPUT_CAP);
+  // From the moment the child exists, `fail` is the one way to stop it early:
+  // the first reason wins and the group is stopped once.
   let child;
+  let failure = null;
+  let stopping = null;
+  const fail = (code) => {
+    failure ??= code;
+    stopping ??= stopGroup(child.pid);
+  };
+  const out = sink(path.join(directory, "stdout"), OUTPUT_CAP, () => fail("output_write_failed"), sinkFs);
+  let err;
+  try {
+    err = sink(path.join(directory, "stderr"), OUTPUT_CAP, () => fail("output_write_failed"), sinkFs);
+  } catch {
+    out.close();
+    return finish({ state: "failed", code: "output_write_failed" });
+  }
   try {
     child = spawn(job.executable, [...(job.entrypoint ? [job.entrypoint] : []), ...argv], {
       cwd: job.project,
@@ -949,40 +986,68 @@ async function supervise(directory) {
   );
   child.stdout.on("data", (chunk) => out.write(chunk));
   child.stderr.on("data", (chunk) => err.write(chunk));
-  job.agent_pid = child.pid;
-  job.agent_pgid = child.pid;
-  job.agent_identity = null;
-  await writeJson(jobFile, job);
-  // cancel() only writes the cancel file; this supervisor holds the child
-  // handle, so it is the one that stops the group. The watcher starts before
-  // the identity is read (PowerShell on Windows can take seconds), so a cancel
-  // that arrives meanwhile is not delayed beyond SUPERVISOR_STOP_MS.
   let exitedAlready = false;
   let cancelling = null;
-  const watcher = setInterval(async () => {
-    if (exitedAlready || cancelling || !(await exists(cancelFile))) return;
-    if (exitedAlready) return; // the child exited while the file was checked
-    cancelling = stopGroup(job.agent_pgid);
-  }, 100);
+  let watcher;
   const forward = () => signalGroup(job.agent_pgid, "SIGTERM");
-  process.on("SIGTERM", forward);
-  process.on("SIGINT", forward);
-  // Lets cancel later prove the number still names this job's group. Read in
-  // the background and awaited before the result, so job.json is never
-  // rewritten after the job has finished.
-  const identityRead = readProcessIdentity(child.pid)
-    .then(async ({ identity }) => {
-      if (!identity) return;
-      job.agent_identity = identity;
-      await writeJson(jobFile, job);
-    })
-    .catch(() => {});
+  let identityRead = Promise.resolve();
+  try {
+    job.agent_pid = child.pid;
+    job.agent_pgid = child.pid;
+    job.agent_identity = null;
+    await write(jobFile, job);
+    // cancel() only writes the cancel file; this supervisor holds the child
+    // handle, so it is the one that stops the group. The watcher starts before
+    // the identity is read (PowerShell on Windows can take seconds), so a cancel
+    // that arrives meanwhile is not delayed beyond SUPERVISOR_STOP_MS.
+    watcher = setInterval(async () => {
+      if (exitedAlready || cancelling || !(await exists(cancelFile))) return;
+      if (exitedAlready) return; // the child exited while the file was checked
+      cancelling = stopGroup(job.agent_pgid);
+    }, 100);
+    process.on("SIGTERM", forward);
+    process.on("SIGINT", forward);
+    // Lets cancel later prove the number still names this job's group. Read in
+    // the background and awaited before the result, so job.json is never
+    // rewritten after the job has finished.
+    identityRead = readProcessIdentity(child.pid)
+      .then(async ({ identity }) => {
+        if (!identity) return;
+        job.agent_identity = identity;
+        await write(jobFile, job);
+      })
+      .catch(() => {});
+  } catch {
+    // Initialisation failed with a live child: stop it using our own handle
+    // (job.json may not name it, so cancel could never find it), release the
+    // sinks, then record the failure if that is still possible.
+    exitedAlready = true;
+    clearInterval(watcher);
+    process.off("SIGTERM", forward);
+    process.off("SIGINT", forward);
+    fail("supervisor_init_failed");
+    const stopped = await stopping;
+    child.stdout.destroy();
+    child.stderr.destroy();
+    out.close();
+    err.close();
+    try {
+      await finish({
+        state: "failed",
+        code: failure,
+        cleanup: stopped.cleanup,
+        ...(stopped.code ? { cleanup_code: stopped.code } : {}),
+      });
+    } catch {} // the child is already stopped; nothing more can be recorded
+    return;
+  }
 
   const exit = await exited;
   exitedAlready = true;
   clearInterval(watcher);
   await cancelling;
   await identityRead;
+  await stopping; // a sink failure may have started the stop
   // Reap leftover descendants right away, by the supervisor's own pgid: this
   // process saw the group non-empty up to the leader's exit, so the number
   // cannot have been recycled yet. No waiting before this, and no external
@@ -1007,6 +1072,7 @@ async function supervise(directory) {
     stdout_truncated: out.state.truncated,
     stderr_truncated: err.state.truncated,
   };
+  if (failure) return finish({ ...base, state: "failed", code: failure });
   if (exit.spawnFailed)
     return finish({ ...base, state: "failed", code: "spawn_failed" });
   if (await exists(cancelFile))
