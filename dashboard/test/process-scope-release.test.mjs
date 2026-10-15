@@ -43,9 +43,8 @@ if (process.argv[1]?.endsWith("process-scope-supervisor.mjs")) {
   const original = cp.execFile;
   function delayed(...args) {
     const callback = args.pop();
-    const command = args[1]?.indexOf("-Command");
-    const selected = command >= 0 && /GetProcessById\\(\\d+\\)/.test(args[1][command + 1]);
-    if (selected) args[1][command + 1] = "Start-Sleep -Milliseconds 6000; " + args[1][command + 1];
+    const selected = args[0] === process.execPath && args[1]?.[0]?.endsWith("process-identity-windows.mjs");
+    if (selected) args[1].unshift("--import=data:text/javascript," + encodeURIComponent("await new Promise(resolve => setTimeout(resolve, 6000));"));
     return original(...args, (error, stdout, stderr) => {
       if (selected) fs.writeFileSync(${JSON.stringify(observation)}, JSON.stringify({ timeout: args[2]?.timeout, killed: error?.killed === true }));
       callback(error, stdout, stderr);
