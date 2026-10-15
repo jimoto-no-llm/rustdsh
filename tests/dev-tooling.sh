@@ -268,6 +268,41 @@ has "overlap with them is unknown" "incomplete file list"
 rm -f "$tmp/gh/fail-api"
 ok "check-conflicts --open-prs matches UTF-8 paths, paginates large PRs and skips its own PR"
 
+# --- check.sh changed-mode selection against a fixture ci.yml -------------------
+git init -q --bare "$tmp/sel-origin.git"
+git clone -q "$tmp/sel-origin.git" "$tmp/sel" 2>/dev/null
+cd "$tmp/sel"
+mkdir -p scripts .github/workflows tests plugins/rdsh-session-cleanup plugins/nopkg misc
+cp "$root/scripts/check.sh" "$root/scripts/check-conflicts.sh" scripts/
+cat > .github/workflows/ci.yml <<'YML'
+      - run: node --test tests/plugin-security.test.mjs tests/new-suite.test.mjs
+          RDSH_CANDIDATE="$RUNNER_TEMP/c" node --test scripts/headless-runtime/test/*.test.mjs plugins/rdsh-session-cleanup/test/*.test.mjs
+      - run: node --test tests/special.test.mjs
+      - run: node --test tests/runtime-compatibility.test.mjs
+YML
+printf 'x\n' > misc/keep.txt
+git add -A && git commit -qm base && git push -q origin main
+git switch -qc topic
+for f in tests/new-suite.test.mjs tests/special.test.mjs tests/adhoc.test.mjs \
+         plugins/rdsh-session-cleanup/cleanup.mjs plugins/nopkg/x.js misc/other.txt .github/workflows/extra.yml; do
+  printf 'x\n' > "$f"
+done
+git add -A && git commit -qm topic
+expect_rc 0 "changed selection" sh scripts/check.sh --list
+has "node tests (CI plugin-security set)" "CI-derived suite selected"
+if grep -q "new-suite" "$tmp/out"; then die "test already in a CI suite must not be listed separately"; fi
+has "(not run) tests/special.test.mjs (CI job with its own setup" "CI-only test reported"
+has "changed node tests" "test outside CI runs directly"
+has "headless runtime tests" "headless suite selected from ci.yml"
+has "(not run) plugins/nopkg (no package.json" "plugin without package.json reported"
+has "(not run) misc/other.txt (no local check mapped" "unmapped file reported"
+has "(not run) .github/workflows/extra.yml (CI configuration" "CI config reported"
+printf 'name: ci\n' > .github/workflows/ci.yml && git commit -qam "drop suites"
+expect_rc 2 "missing CI suites" sh scripts/check.sh --list
+has "cannot read the CI node suites" "missing CI suites"
+cd "$root"
+ok "check.sh derives node suites from ci.yml and never drops an unmapped change silently"
+
 # --- check.sh selection ----------------------------------------------------------
 cd "$root"
 expect_rc 0 "quick list" sh scripts/check.sh quick --list

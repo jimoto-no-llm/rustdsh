@@ -62,8 +62,10 @@ sh scripts/check.sh --list   # 実行せずに、選ばれる検証だけを表�
 既定モードでは、変更したファイルから対象を選びます。
 
 - `src/` など: Rust 一式、`tests/regress.sh`、CI と同じ Node テスト
-- `tests/*.test.mjs`、`plugins/`: CI の Node テスト、変更したテスト自体、
-  変更した plugin の `npm test`
+- `tests/*.test.mjs`、`plugins/`、`scripts/headless-runtime/`: CI の Node テスト、
+  変更したテスト自体、変更した plugin の `npm test`、headless runtime の候補ビルドと
+  テスト。Node テストの一覧は `.github/workflows/ci.yml` から読み取るため、main で
+  増えたテストも自動で対象になります
 - `dashboard/`: `npm test`
 - リリース関連: Python の試験と `prepare-release.py`
 - installer: 構文チェック。Linux で Docker が使える場合は
@@ -73,7 +75,8 @@ sh scripts/check.sh --list   # 実行せずに、選ばれる検証だけを表�
 最後に一覧で表示します。依存（`node_modules`）がなく実行できないテストは、
 成功と取り違えないよう失敗として扱います。手元では実行できない CI 専用の検証
 （bubblewrap を使う security-boundaries、Windows、Isolated install、
-browser-e2e）は `todo` として一覧に残ります。CI で結果を確認してください。
+browser-e2e）と、どの検証にも対応しない変更ファイルは、`todo` として一覧に
+残ります。CI で結果を確認してください。
 
 ## Git hooks
 

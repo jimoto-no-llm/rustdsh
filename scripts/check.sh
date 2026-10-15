@@ -47,56 +47,75 @@ changed_files() {
   git -c core.quotePath=false ls-files --others --exclude-standard
 }
 
-# Node tests by CI job. Linux-only suites need bubblewrap and run in CI only.
-node_base="tests/plugin-security.test.mjs tests/settings-client.test.mjs tests/update-banner.test.mjs
-tests/feature-switches.test.mjs tests/discord-presence.test.mjs tests/model_benchmark/fence.test.mjs
-tests/serial_proxy/serial-proxy.test.mjs plugins/workflow-board/tests/source-patch.test.mjs"
-node_built="tests/runtime-compatibility.test.mjs tests/icon-assets.test.mjs"
-node_ci_only="tests/security-boundaries.test.mjs tests/tool-isolation.test.mjs tests/desktop.test.mjs
-tests/upstream-approval-integrity.test.mjs"
+# Node suites are read from CI itself, so tests added or moved on main are picked
+# up without editing this script. ci_suite PATTERN: the .mjs arguments (globs kept)
+# of the first `node --test` line in ci.yml that contains PATTERN.
+ci=.github/workflows/ci.yml
+ci_suite() {
+  awk -v p="$1" 'index($0, "node --test") && index($0, p) { sub(/.*node --test /, ""); print; exit }' "$ci" \
+    | tr ' ' '\n' | grep '\.mjs$' | tr '\n' ' '
+}
+node_base=$(ci_suite tests/plugin-security.test.mjs)
+node_built=$(ci_suite tests/runtime-compatibility.test.mjs)
+headless_tests=$(ci_suite headless-runtime/test/)
+if [ -z "$node_base" ] || [ -z "$node_built" ]; then
+  echo "check: cannot read the CI node suites from $ci; update scripts/check.sh" >&2
+  exit 2
+fi
+# Directories whose tests run in the headless-runtime CI step (e.g. scripts/headless-runtime/).
+headless_dirs=""
+for g in $headless_tests; do headless_dirs="$headless_dirs ${g%%/test/*}/"; done
 in_list() { case " $(printf '%s' "$2" | tr '\n' ' ') " in *" $1 "*) return 0 ;; esac; return 1; }
 
-rust=0 node=0 dashboard=0 release=0 markdown=0 shell=0 devtools=0 installer=0 ps1=0 e2e=0
-plugins="" extra_tests="" ci_only_tests=""
+rust=0 node=0 dashboard=0 release=0 markdown=0 shell=0 devtools=0 installer=0 ps1=0 e2e=0 headless=0
+plugins="" extra_tests="" ci_only_tests="" unmapped=""
 add_word() { case " $1 " in *" $2 "*) printf '%s' "$1" ;; *) printf '%s' "${1:+$1 }$2" ;; esac; }
+# classify_test FILE: run it with a CI-derived suite, as a CI-only suite, or directly.
+classify_test() {
+  if in_list "$1" "$node_base $node_built"; then :
+  elif grep -qF -- "$1" "$ci"; then ci_only_tests=$(add_word "$ci_only_tests" "$1")
+  else extra_tests=$(add_word "$extra_tests" "$1"); fi
+}
 case "$mode" in
   quick) rust=1 ;;
   full)
     rust=1 node=1 dashboard=1 release=1 markdown=1 shell=1 devtools=1 installer=1 ps1=1 e2e=1
+    [ -n "$headless_tests" ] && headless=1
     for d in plugins/*/; do plugins=$(add_word "$plugins" "${d%/}"); done
-    ci_only_tests="$node_ci_only" ;;
+    for t in tests/*.test.mjs tests/*/*.test.mjs; do [ -f "$t" ] && classify_test "$t"; done ;;
   changed)
     files=$(changed_files | sort -u)
     old_ifs=$IFS; IFS='
 '
     for f in $files; do
+      m=0   # set when some local check (or an explicit CI todo) covers $f
       case "$f" in
-        src/*|tests/*.rs|examples/*|benches/*|build.rs|Cargo.toml|Cargo.lock|assets/*|tests/regress.sh|tests/context_prototype.sh) rust=1 ;;
+        src/*|tests/*.rs|examples/*|benches/*|build.rs|Cargo.toml|Cargo.lock|assets/*|tests/regress.sh|tests/context_prototype.sh) rust=1 m=1 ;;
       esac
       case "$f" in
-        dashboard/*) dashboard=1 ;;
-        tests/e2e/*) e2e=1 ;;
-        tests/*.mjs|security/*|plugins/*|scripts/*.mjs) node=1 ;;
+        dashboard/*) dashboard=1 m=1 ;;
+        tests/e2e/*) e2e=1 m=1 ;;
+        tests/*.test.mjs) node=1 m=1; classify_test "$f" ;;
+        tests/*.mjs|security/*|scripts/*.mjs) node=1 m=1 ;;
+      esac
+      IFS=$old_ifs
+      for h in $headless_dirs; do case "$f" in "$h"*) headless=1 m=1 ;; esac; done
+      IFS='
+'
+      case "$f" in
+        plugins/*/*) d=${f#plugins/}; plugins=$(add_word "$plugins" "plugins/${d%%/*}"); node=1 m=1 ;;
       esac
       case "$f" in
-        plugins/*/*) d=${f#plugins/}; plugins=$(add_word "$plugins" "plugins/${d%%/*}") ;;
+        install.sh|install-banner.sh|sync-dsh.sh|release-digests.tsv|tests/install-isolated*|tests/installer-*) installer=1 m=1 ;;
+        *.ps1) ps1=1 m=1 ;;
       esac
       case "$f" in
-        tests/e2e/*) ;;
-        tests/*.test.mjs)
-          if in_list "$f" "$node_ci_only"; then ci_only_tests=$(add_word "$ci_only_tests" "$f")
-          elif ! in_list "$f" "$node_base $node_built"; then extra_tests=$(add_word "$extra_tests" "$f"); fi ;;
+        scripts/*.py|tests/test_*.py|Cargo.toml|CHANGELOG.md|docs/releases/*|release-digests.tsv) release=1 m=1 ;;
       esac
-      case "$f" in
-        install.sh|install-banner.sh|sync-dsh.sh|release-digests.tsv|tests/install-isolated*|tests/installer-*) installer=1 ;;
-        *.ps1) ps1=1 ;;
-      esac
-      case "$f" in
-        scripts/*.py|tests/test_*.py|Cargo.toml|CHANGELOG.md|docs/releases/*|release-digests.tsv) release=1 ;;
-      esac
-      case "$f" in *.md) markdown=1 ;; esac
-      case "$f" in *.sh|.githooks/*) shell=1 ;; esac
-      case "$f" in scripts/check-conflicts.sh|scripts/dev-setup.sh|scripts/check.sh|scripts/label-conflicts.sh|.githooks/*|tests/dev-tooling.sh) devtools=1 ;; esac
+      case "$f" in *.md) markdown=1 m=1 ;; esac
+      case "$f" in scripts/check-conflicts.sh|scripts/dev-setup.sh|scripts/check.sh|scripts/label-conflicts.sh|.githooks/*|tests/dev-tooling.sh) devtools=1 shell=1 m=1 ;; esac
+      [ "$m" = 1 ] || unmapped="$unmapped
+$f"
     done
     IFS=$old_ifs ;;
 esac
@@ -159,11 +178,40 @@ if [ "$node" = 1 ] || { [ "$rust" = 1 ] && [ "$mode" != quick ]; }; then
   # shellcheck disable=SC2086
   [ -n "$extra_tests" ] && step "changed node tests" node --test $extra_tests
 fi
-for t in $ci_only_tests; do skip "$t (CI security-boundaries job: Linux + bubblewrap)"; done
+for t in $ci_only_tests; do skip "$t (CI job with its own setup; see $ci)"; done
+
+headless_run() {
+  cand=$(mktemp -d)
+  rc=0
+  # shellcheck disable=SC2086 # CI's globs, expanded here as in CI
+  node scripts/headless-runtime/build-candidate.mjs --out "$cand/candidate" \
+    && RDSH_CANDIDATE="$cand/candidate" node --test $headless_tests || rc=$?
+  rm -rf "$cand"
+  return "$rc"
+}
+if [ "$headless" = 1 ]; then
+  rt=scripts/headless-runtime/runtime
+  if [ ! -f scripts/headless-runtime/build-candidate.mjs ]; then
+    skip "headless runtime tests (CI plugin-security job; build script not found)"
+  elif [ ! -d "$rt/node_modules" ]; then
+    step "headless runtime tests (node_modules missing: npm ci --ignore-scripts --prefix $rt)" false
+  else
+    step "headless runtime candidate + tests (CI plugin-security job)" headless_run
+  fi
+fi
 
 for d in $plugins; do
-  [ -f "$d/package.json" ] || continue
-  grep -q '"test"' "$d/package.json" || continue
+  if [ ! -f "$d/package.json" ]; then
+    skip "$d (no package.json; no local check)"
+    continue
+  fi
+  if ! grep -q '"test"' "$d/package.json"; then
+    # Covered by the headless step, by another CI step, or by nothing: never silently.
+    case " $headless_dirs " in *" $d/ "*) continue ;; esac
+    if grep -qF -- "$d/" "$ci"; then skip "$d (no npm test; CI runs it with its own setup, see $ci)"
+    else skip "$d (no npm test script of its own; check the root node suites cover it)"; fi
+    continue
+  fi
   if grep -q '"\(dev\)\{0,1\}[dD]ependencies"' "$d/package.json" && [ ! -d "$d/node_modules" ]; then
     step "$d npm test (node_modules missing: npm ci --ignore-scripts --prefix $d)" false
   else
@@ -219,6 +267,17 @@ fi
 [ "$e2e" = 1 ] && skip "browser e2e (CI browser-e2e job; local: tests/e2e/README.md)"
 
 [ "$devtools" = 1 ] && step "tests/dev-tooling.sh" sh tests/dev-tooling.sh
+
+# Changed files no check above covers are listed, never silently treated as verified.
+old_ifs=$IFS; IFS='
+'
+for f in $unmapped; do
+  case "$f" in
+    .github/*) skip "$f (CI configuration; verified by the CI run itself)" ;;
+    *) skip "$f (no local check mapped; confirm in CI)" ;;
+  esac
+done
+IFS=$old_ifs
 step "check-conflicts vs $base" sh scripts/check-conflicts.sh --base "$base"
 
 [ "$list_only" = 1 ] && exit 0
