@@ -41,7 +41,7 @@ case "$(uname -s)" in
   MINGW*|MSYS*|CYGWIN*)
     native_snap=$(cygpath -am "$snap")
     # Windows rustfmt reports native paths, sometimes with an extended path prefix.
-    tr '\\' '/' < "$snap/.out" \
+    tr '\134' '/' < "$snap/.out" \
       | sed -e 's@^Diff in //?/UNC/@Diff in //@' -e 's@^Diff in //?/@Diff in @' > "$snap/.diffs"
     diffs="$snap/.diffs" ;;
 esac
