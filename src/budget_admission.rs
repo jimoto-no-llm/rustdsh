@@ -523,6 +523,44 @@ fn call_has_policy(call: &Value, policy_id: &str) -> BudgetResult<bool> {
     }
 }
 
+/// Public projection also enumerates string collections, without imposing the
+/// accounting record shape on rows that JavaScript object spread accepts.
+fn public_values<'a>(
+    book: &'a Map<String, Value>,
+    key: &str,
+) -> BudgetResult<Vec<std::borrow::Cow<'a, Value>>> {
+    if let Some(Value::String(text)) = book.get(key) {
+        return Ok(text
+            .chars()
+            .map(|character| std::borrow::Cow::Owned(json!(character.to_string())))
+            .collect());
+    }
+    Ok(stored_values(book, key)?
+        .into_iter()
+        .map(std::borrow::Cow::Borrowed)
+        .collect())
+}
+
+/// The enumerable fields of a public row (`{...row}`). Numeric/boolean rows
+/// contribute no fields; arrays and strings retain their indexed fields.
+fn public_spread(row: &Value) -> BudgetResult<Map<String, Value>> {
+    match row {
+        Value::Object(fields) => Ok(fields.clone()),
+        Value::Array(values) => Ok(values
+            .iter()
+            .enumerate()
+            .map(|(index, value)| (index.to_string(), value.clone()))
+            .collect()),
+        Value::String(text) => Ok(text
+            .chars()
+            .enumerate()
+            .map(|(index, character)| (index.to_string(), json!(character.to_string())))
+            .collect()),
+        Value::Null => fail("budget_invalid_store"),
+        _ => Ok(Map::new()),
+    }
+}
+
 /// `Object.keys(book.policies)` order, i.e. the JS own-property order.
 ///
 /// `JSON.parse` builds ordinary objects, and ordinary objects enumerate every
@@ -1984,41 +2022,29 @@ pub fn public_budget_admission(state: &Value, live_jobs: &Value, now: &str) -> B
     output.insert("policies".into(), Value::Array(policies));
 
     let mut jobs = Vec::new();
-    for job in stored_values(book, "jobs")? {
-        if job.is_null() {
-            return fail("budget_invalid_store");
-        }
-        let Some(job) = job.as_object() else {
-            continue;
-        };
+    for job in public_values(book, "jobs")? {
         let job_id = job.get("job_id").and_then(Value::as_str).unwrap_or("");
-        let enforcement = if !job.get("closed_at").unwrap_or(&Value::Null).is_null() {
+        let enforcement = if job.get("closed_at") != Some(&Value::Null) {
             "stopped"
         } else if live_jobs.get(job_id) == Some(&Value::Bool(true)) {
             "guard_registered"
         } else {
             "unknown"
         };
-        let mut entry = job.clone();
+        let mut entry = public_spread(&job)?;
         entry.insert("enforcement".into(), json!(enforcement));
         jobs.push(Value::Object(entry));
     }
     output.insert("jobs".into(), Value::Array(jobs));
 
     let mut calls = Vec::new();
-    for call in stored_values(book, "calls")? {
-        if call.is_null() {
-            return fail("budget_invalid_store");
-        }
-        let Some(call) = call.as_object() else {
-            continue;
-        };
-        let accounting = if call.get("amount").unwrap_or(&Value::Null).is_null() {
+    for call in public_values(book, "calls")? {
+        let accounting = if call.get("amount") == Some(&Value::Null) {
             "unconfirmed"
         } else {
             "source_reported"
         };
-        let mut entry = call.clone();
+        let mut entry = public_spread(&call)?;
         entry.insert("accounting".into(), json!(accounting));
         calls.push(Value::Object(entry));
     }

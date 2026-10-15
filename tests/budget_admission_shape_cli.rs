@@ -168,6 +168,89 @@ fn projection_only_books_keep_js_accepted_partial_collections() {
 }
 
 #[test]
+fn public_projection_distinguishes_missing_fields_from_null() {
+    let fixture = Fixture::new();
+    let state = json!({"budget_admission":{
+        "policies":{},
+        "jobs":{"missing":{},"null":{"closed_at":null},"false":{"closed_at":false}},
+        "calls":{"missing":{},"null":{"amount":null},"zero":{"amount":"0"}},
+    }});
+    let result = fixture.success("public", "public", &state, Value::Null);
+    assert_eq!(
+        result["budget_admission"]["jobs"],
+        json!([
+            {"enforcement":"stopped"},
+            {"closed_at":null,"enforcement":"unknown"},
+            {"closed_at":false,"enforcement":"stopped"},
+        ])
+    );
+    assert_eq!(
+        result["budget_admission"]["calls"],
+        json!([
+            {"accounting":"source_reported"},
+            {"amount":null,"accounting":"unconfirmed"},
+            {"amount":"0","accounting":"source_reported"},
+        ])
+    );
+}
+
+#[test]
+fn public_projection_keeps_primitive_and_array_rows() {
+    let fixture = Fixture::new();
+    for (row, spread) in [
+        (json!(true), json!({})),
+        (json!(false), json!({})),
+        (json!(0), json!({})),
+        (json!(2), json!({})),
+        (json!("abc"), json!({"0":"a","1":"b","2":"c"})),
+        (json!([]), json!({})),
+        (json!([1]), json!({"0":1})),
+        (
+            json!([null,{"nested":true}]),
+            json!({"0":null,"1":{"nested":true}}),
+        ),
+    ] {
+        let state = json!({"budget_admission":{
+            "policies":{},"jobs":{"j":row},"calls":{"c":row},
+        }});
+        let result = fixture.success("public", "public", &state, Value::Null);
+        let mut job = spread.clone();
+        job["enforcement"] = json!("stopped");
+        let mut call = spread;
+        call["accounting"] = json!("source_reported");
+        assert_eq!(result["budget_admission"]["jobs"], json!([job]));
+        assert_eq!(result["budget_admission"]["calls"], json!([call]));
+    }
+}
+
+#[test]
+fn public_projection_enumerates_string_collections_and_rejects_null_rows() {
+    let fixture = Fixture::new();
+    let state = json!({"budget_admission":{"policies":{},"jobs":"abc","calls":"xy"}});
+    let result = fixture.success("public", "public", &state, Value::Null);
+    assert_eq!(
+        result["budget_admission"]["jobs"],
+        json!([
+            {"0":"a","enforcement":"stopped"},
+            {"0":"b","enforcement":"stopped"},
+            {"0":"c","enforcement":"stopped"},
+        ])
+    );
+    assert_eq!(
+        result["budget_admission"]["calls"],
+        json!([
+            {"0":"x","accounting":"source_reported"},
+            {"0":"y","accounting":"source_reported"},
+        ])
+    );
+    for key in ["jobs", "calls"] {
+        let mut state = json!({"budget_admission":{"policies":{},"jobs":{},"calls":{}}});
+        state["budget_admission"][key] = json!({"broken":null});
+        fixture.failure("public", "public", &state, Value::Null);
+    }
+}
+
+#[test]
 fn active_policy_edits_do_not_scan_calls_that_js_short_circuits() {
     let fixture = Fixture::new();
     let mut state = fixture.reserved_state();
