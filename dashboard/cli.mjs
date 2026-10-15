@@ -46,6 +46,7 @@ import { fileURLToPath } from "node:url";
 import { Releases } from "./releases.mjs";
 import { IntegrationQueue } from "./integration.mjs";
 import { WorkerWorkspaces } from "./workers.mjs";
+import * as agentRunners from "./agent-runners.mjs";
 import {
   loopbackBase,
   recordTunnel,
@@ -90,6 +91,9 @@ rdsh-dashboard workers prepare --project <${cliText(language, "arg.directory")}>
 rdsh-dashboard workers inspect --project <${cliText(language, "arg.directory")}>
 rdsh-dashboard workers renew --project <${cliText(language, "arg.directory")}> --worker-id <id> --lease-seconds <n> --expected-revision <n>
 rdsh-dashboard workers release --project <${cliText(language, "arg.directory")}> --worker-id <id> --expected-revision <n>
+rdsh-dashboard agents list [--probe]
+rdsh-dashboard agents submit --agent <cursor-agent|devin> --project <${cliText(language, "arg.directory")}> --prompt-file <${cliText(language, "arg.file")}> [--model <${cliText(language, "arg.name")}>] [--permission read-only|edit|full] [--resume <id>] [--trust-workspace] [--executable <${cliText(language, "arg.path")}>] [--entrypoint <${cliText(language, "arg.script")}>] [--wait]
+rdsh-dashboard agents status|result|cancel <job_id>
 rdsh-dashboard backup preview|export --project <${cliText(language, "arg.directory")}> --selection-file <json> [--review-file <json>] [--output-file <new-json>]
 rdsh-dashboard backup inspect --archive-file <json>
 rdsh-dashboard backup restore --project <${cliText(language, "arg.directory")}> --archive-file <json> --expected-revision <n>
@@ -188,6 +192,14 @@ try {
       "selection-revision": { type: "string" },
       "managed-release-id": { type: "string" },
       "managed-revision": { type: "string" },
+      agent: { type: "string" },
+      "prompt-file": { type: "string" },
+      model: { type: "string" },
+      permission: { type: "string" },
+      resume: { type: "string" },
+      "trust-workspace": { type: "boolean" },
+      wait: { type: "boolean" },
+      probe: { type: "boolean" },
       help: { type: "boolean", short: "h" },
     },
   }));
@@ -717,6 +729,62 @@ try {
       (action === "validate" && !result.validation.verified)
     )
       process.exitCode = 1;
+  } else if (command === "agents") {
+    // External agent CLIs (cursor-agent, devin); never the DSH ACP adapter.
+    const action = positionals[1];
+    const options = {
+      list: ["probe"],
+      submit: [
+        "agent",
+        "project",
+        "prompt-file",
+        "model",
+        "permission",
+        "resume",
+        "trust-workspace",
+        "executable",
+        "entrypoint",
+        "wait",
+      ],
+      status: [],
+      result: [],
+      cancel: [],
+    };
+    if (
+      !Object.hasOwn(options, action) ||
+      positionals.length !== (["list", "submit"].includes(action) ? 2 : 3) ||
+      Object.keys(values).some((k) => !options[action].includes(k))
+    )
+      throw new CliDiagnosticError("error.agentsAction");
+    let output;
+    if (action === "list")
+      output = await agentRunners.list({ probe: Boolean(values.probe) });
+    else if (action === "submit") {
+      if (!values.agent || !values.project || !values["prompt-file"])
+        throw new CliDiagnosticError("error.agentsSubmit");
+      output = await agentRunners.submit({
+        runner: values.agent,
+        project: values.project,
+        promptFile: values["prompt-file"],
+        model: values.model,
+        permission: values.permission,
+        resume: values.resume,
+        trustWorkspace: Boolean(values["trust-workspace"]),
+        executable: values.executable,
+        entrypoint: values.entrypoint,
+      });
+      if (values.wait) {
+        await agentRunners.waitForJob(output.id);
+        output = await agentRunners.result(output.id);
+        if (output.state !== "succeeded") process.exitCode = 1;
+      }
+    } else if (action === "status") output = await agentRunners.status(positionals[2]);
+    else if (action === "result") {
+      output = await agentRunners.result(positionals[2]);
+      if (!["queued", "running", "succeeded"].includes(output.state))
+        process.exitCode = 1;
+    } else output = await agentRunners.cancel(positionals[2]);
+    console.log(JSON.stringify(output));
   } else if (command === "subagents") {
     if (
       positionals.length !== 2 ||

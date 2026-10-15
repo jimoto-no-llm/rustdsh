@@ -1,5 +1,5 @@
 {
-  "scope": "Changes after the preserved 1111-file Linux test-time snapshot: documentation and one separately verified serial-proxy fixture. New evidence payloads are in manifest.json, not executable source inputs.",
+  "scope": "Historical a2 checkpoint at 28e639893f8a43b71a5f3d6ccb5defb25032e182: changes after its preserved 1111-file Linux test-time snapshot. Later 096 integration changes are recorded separately in integration-096-validation.json; these final_sha256 values describe a2 only.",
   "test_time_snapshot_file": "linux-a2-source.json",
   "test_time_snapshot_sha256": "c15d536c79d70329a122a1a9cb3816cf3046bdc63973d83c5b86b36b31c0a968",
   "executable_input_changes": 0,

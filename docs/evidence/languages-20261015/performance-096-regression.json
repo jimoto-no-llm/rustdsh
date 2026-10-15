@@ -1,0 +1,237 @@
+{
+  "schema_version": 2,
+  "tool": "benchmark_regression",
+  "generated_at_utc": 1792051024,
+  "platform": {
+    "os": "macos",
+    "arch": "aarch64",
+    "family": "unix",
+    "cpu_count": 18
+  },
+  "toolchain": {
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "cargo": "cargo 1.99.0 (5f94df478 2026-08-27)"
+  },
+  "config": {
+    "n": 15,
+    "warmups": 3,
+    "max_regression_percent": 10.0,
+    "headline_cases": [
+      "version_startup",
+      "tokens_1mib",
+      "tokens_10mib",
+      "search_tree_200_files"
+    ],
+    "timing": "parent wall clock from spawn to last stdout byte; process launch included",
+    "scope": "real rdsh subprocess with per-build isolated HOME/DSH_HOME/XDG and working directories; no model calls and no credentials",
+    "fixtures": {
+      "tokens_1mib_bytes": 1048652,
+      "tokens_10mib_bytes": 10485812,
+      "search_tree_files": 200,
+      "search_tree_bytes": 2776584
+    }
+  },
+  "binaries": {
+    "candidate": {
+      "path": "<private-artifact>/rdsh-normal-096",
+      "size_bytes": 4412400,
+      "sha256": "6c32974fa817b324375afdbd9dc086339ca9a4c3cc042f29003188ec0706870e"
+    },
+    "baseline": {
+      "path": "<private-artifact>/final-a2-normal-candidate-rdsh",
+      "size_bytes": 4412400,
+      "sha256": "098a955a6fe8c6f2513bb90e9a63d06bb628b816f130e31dd15c591b3e841f31"
+    }
+  },
+  "cases": {
+    "version_startup": {
+      "samples_ms": [
+        4.153,
+        3.597,
+        4.492,
+        4.484,
+        5.281,
+        4.814,
+        4.447,
+        5.927,
+        6.021,
+        4.917,
+        4.86,
+        5.268,
+        6.054,
+        4.45,
+        5.028
+      ],
+      "median_ms": 4.86,
+      "p95_ms": 6.054,
+      "min_ms": 3.597,
+      "max_ms": 6.054,
+      "throughput_mib_s": null,
+      "correct": true,
+      "evidence": "version=0.4.0",
+      "input_bytes": 0,
+      "cpu_median_ms": 1.764,
+      "peak_rss_bytes": 3080192,
+      "exit_code": 0,
+      "argv": [
+        "--version"
+      ],
+      "comparison": {
+        "baseline_label": "binary:/Users/s30519/work/artifacts/rdsh-final-cc019-20261015/final-a2-normal-candidate-rdsh",
+        "baseline_median_ms": 5.389,
+        "ratio": 0.902,
+        "delta_percent": -9.819,
+        "stdout_equal": true,
+        "output_compatible": true,
+        "regressed": false
+      },
+      "outcome": "ok",
+      "headline": true
+    },
+    "tokens_1mib": {
+      "samples_ms": [
+        7.582,
+        7.116,
+        6.592,
+        5.761,
+        6.426,
+        4.741,
+        6.98,
+        5.67,
+        5.13,
+        7.191,
+        4.914,
+        4.093,
+        5.19,
+        6.399,
+        4.672
+      ],
+      "median_ms": 5.761,
+      "p95_ms": 7.582,
+      "min_ms": 4.093,
+      "max_ms": 7.582,
+      "throughput_mib_s": 173.587,
+      "correct": true,
+      "evidence": "tokens=262163",
+      "input_bytes": 1048652,
+      "cpu_median_ms": 2.219,
+      "peak_rss_bytes": null,
+      "exit_code": 0,
+      "argv": [
+        "tokens",
+        "<private-artifact>/tokens-1mib.txt",
+        "--preview",
+        "0"
+      ],
+      "comparison": {
+        "baseline_label": "binary:/Users/s30519/work/artifacts/rdsh-final-cc019-20261015/final-a2-normal-candidate-rdsh",
+        "baseline_median_ms": 6.225,
+        "ratio": 0.926,
+        "delta_percent": -7.448,
+        "stdout_equal": true,
+        "output_compatible": true,
+        "regressed": false
+      },
+      "outcome": "ok",
+      "headline": true
+    },
+    "tokens_10mib": {
+      "samples_ms": [
+        5.751,
+        7.032,
+        6.271,
+        6.265,
+        8.966,
+        8.693,
+        7.47,
+        7.916,
+        8.441,
+        7.578,
+        5.8,
+        5.912,
+        5.688,
+        6.296,
+        6.871
+      ],
+      "median_ms": 6.871,
+      "p95_ms": 8.966,
+      "min_ms": 5.688,
+      "max_ms": 8.966,
+      "throughput_mib_s": 1455.329,
+      "correct": true,
+      "evidence": "tokens=2621453",
+      "input_bytes": 10485812,
+      "cpu_median_ms": 3.471,
+      "peak_rss_bytes": null,
+      "exit_code": 0,
+      "argv": [
+        "tokens",
+        "<private-artifact>/tokens-10mib.txt",
+        "--preview",
+        "0"
+      ],
+      "comparison": {
+        "baseline_label": "binary:/Users/s30519/work/artifacts/rdsh-final-cc019-20261015/final-a2-normal-candidate-rdsh",
+        "baseline_median_ms": 6.803,
+        "ratio": 1.01,
+        "delta_percent": 1.01,
+        "stdout_equal": true,
+        "output_compatible": true,
+        "regressed": false
+      },
+      "outcome": "ok",
+      "headline": true
+    },
+    "search_tree_200_files": {
+      "samples_ms": [
+        6.72,
+        7.181,
+        9.456,
+        7.904,
+        8.984,
+        8.985,
+        9.095,
+        9.039,
+        23.944,
+        7.252,
+        7.852,
+        8.058,
+        7.792,
+        7.349,
+        7.364
+      ],
+      "median_ms": 7.904,
+      "p95_ms": 23.944,
+      "min_ms": 6.72,
+      "max_ms": 23.944,
+      "throughput_mib_s": 335.018,
+      "correct": true,
+      "evidence": "hits=200",
+      "input_bytes": 0,
+      "cpu_median_ms": 18.372,
+      "peak_rss_bytes": null,
+      "exit_code": 0,
+      "argv": [
+        "search",
+        "regression-needle",
+        "--dir",
+        "<private-artifact>/search-tree",
+        "--max",
+        "210"
+      ],
+      "comparison": {
+        "baseline_label": "binary:/Users/s30519/work/artifacts/rdsh-final-cc019-20261015/final-a2-normal-candidate-rdsh",
+        "baseline_median_ms": 8.43,
+        "ratio": 0.938,
+        "delta_percent": -6.239,
+        "stdout_equal": true,
+        "output_compatible": true,
+        "regressed": false
+      },
+      "outcome": "ok",
+      "headline": true
+    }
+  },
+  "failures": [],
+  "regressions": []
+}

@@ -105,13 +105,14 @@
     {
       "id": "new-head-ci-review-and-release",
       "status": "separate-gates",
-      "scope": "Historical8ee source passed26GitHub checks including unchanged-source Windows retry. Final a2 product has current source-bound macOS487/Linux484/Windows450 Rust tests and corresponding normal-artifact smokes. Current PR head CI must be read back after the normal merge commit; it is not inherited. Human re-review, merge and release remain separate.",
+      "scope": "Historical 8ee CI and a2 native platform receipts retain their own source and artifact identities. The later 096 integration has a separate source inventory and local validation. Read current PR head CI after its normal merge commit; no historical success is inherited. Human re-review, merge and release remain separate.",
       "historical_evidence": "https://github.com/jimoto-no-llm/rustdsh/actions/runs/38675592833/attempts/2",
       "evidence": [
         "macos-a2-validation.json",
         "linux-a2-validation.json",
         "linux-serial-fixture-repair.json",
-        "windows-a2-validation.json"
+        "windows-a2-validation.json",
+        "integration-096-validation.json"
       ]
     },
     {

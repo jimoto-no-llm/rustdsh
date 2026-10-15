@@ -423,10 +423,10 @@ fn default_tool_choice(body: &[u8], value: &str) -> Option<Bytes> {
     let json: serde_json::Value = serde_json::from_slice(body).ok()?;
     let object = json.as_object()?;
     if object.contains_key("tool_choice")
-        || !object
+        || object
             .get("tools")
             .and_then(serde_json::Value::as_array)
-            .is_some_and(|tools| !tools.is_empty())
+            .is_none_or(|tools| tools.is_empty())
     {
         return None;
     }
@@ -640,7 +640,7 @@ async fn proxy(State(state): State<Arc<ProxyState>>, request: Request<Body>) -> 
         && inspection_path.ends_with("/chat/completions")
         && is_json_content_type(parts.headers.get(header::CONTENT_TYPE))
         && !parts.headers.contains_key(header::CONTENT_ENCODING)
-        && !content_length.is_some_and(|length| length > state.max_body_bytes as u64);
+        && content_length.is_none_or(|length| length <= state.max_body_bytes as u64);
     let choice = if inspect {
         state.tool_choice_default.as_deref()
     } else {

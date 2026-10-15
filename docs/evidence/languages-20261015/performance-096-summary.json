@@ -1,0 +1,75 @@
+{
+  "scope": "096 integration compared with preserved a2 localized normal artifact; this is a checkpoint regression comparison, not a fresh 096-upstream or provider benchmark. Earlier exact-upstream a2 measurements remain historical.",
+  "warmups": 3,
+  "samples": 15,
+  "cases": {
+    "version": {
+      "stdout_equal": true,
+      "median_ratio": 0.9917087693628932,
+      "p95_ratio": 1.0169095686200778
+    },
+    "tokens_ascii": {
+      "stdout_equal": true,
+      "median_ratio": 0.9854478557065103,
+      "p95_ratio": 0.9957763295719773
+    },
+    "tokens_cjk": {
+      "stdout_equal": true,
+      "median_ratio": 0.9666655011247479,
+      "p95_ratio": 1.038326414391242
+    },
+    "search": {
+      "stdout_equal": true,
+      "median_ratio": 0.9668491444607326,
+      "p95_ratio": 0.8756243366335731
+    },
+    "prune": {
+      "stdout_equal": true,
+      "median_ratio": 0.986363068188322,
+      "p95_ratio": 1.007570769426654
+    },
+    "sessions_tokens": {
+      "stdout_equal": true,
+      "median_ratio": 1.037637684368733,
+      "p95_ratio": 1.110333341594093
+    },
+    "sessions_known_frame_first_cache_miss": {
+      "stdout_equal": true,
+      "median_ratio": 1.007974940005583,
+      "p95_ratio": 2.1809628697137016
+    },
+    "sessions_cache_disabled": {
+      "stdout_equal": true,
+      "median_ratio": 0.985088855516007,
+      "p95_ratio": 1.5409980402737935
+    },
+    "sessions_cache_warm": {
+      "stdout_equal": true,
+      "median_ratio": 0.9688680504496353,
+      "p95_ratio": 0.9900263106949545
+    },
+    "sessions_streaming_zstd_no_content_size": {
+      "stdout_equal": true,
+      "median_ratio": 1.0521660832711683,
+      "p95_ratio": 0.7491790812552782
+    },
+    "search_under_32": {
+      "stdout_equal": true,
+      "median_ratio": 0.9500592407568866,
+      "p95_ratio": 0.9410660568907301
+    },
+    "search_at_least_32": {
+      "stdout_equal": true,
+      "median_ratio": 0.9588457774551704,
+      "p95_ratio": 0.7452443291931417
+    },
+    "compact_jsonl_1mib": {
+      "stdout_equal": true,
+      "median_ratio": 0.9958676462979952,
+      "p95_ratio": 1.1617827408978953
+    }
+  },
+  "candidate_sha256": "6c32974fa817b324375afdbd9dc086339ca9a4c3cc042f29003188ec0706870e",
+  "baseline_sha256": "098a955a6fe8c6f2513bb90e9a63d06bb628b816f130e31dd15c591b3e841f31",
+  "maintained_default_10percent_median_gate_exit": 0
+}

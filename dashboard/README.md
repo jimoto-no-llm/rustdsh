@@ -3,6 +3,9 @@
 [Worker scopes and worktrees](../docs/WORKER-WORKSPACES.md): local CLI allocation,
 source/worker conflict scans and retained checkouts after lease expiry or release.
 
+[External agent runners](../docs/AGENT-RUNNERS.md): detached cursor-agent and devin
+jobs with status, cancel, permission mapping and untrusted result handling.
+
 [Budget admission control](../docs/BUDGET-CONTROL.md): soft warnings, hard guarded
 DSH job/model-call limits, durable parallel reservations and delayed usage holds.
 Native guard registration is required; ordinary/unsupported CLIs are display-only.
@@ -45,6 +48,8 @@ and reports. It preserves unobserved states and requires target confirmation
 before stopping the live owned Harness run.
 
 `rdsh-dashboard` provides two separate entry points:
+
+External-agent `agents` help and CLI diagnostics use the same three languages. Its machine JSON, canonical states/codes and returned agent text stay unchanged; UTF-8 prompt files may contain Japanese filenames and instructions. [Agent runner commands and permission limits](../docs/AGENT-RUNNERS.md).
 
 The browser chrome follows the effective rdsh language (`en`, `zh-CN`, or
 `ja`). It localizes dashboard-owned labels, dates, numbers, and status text;

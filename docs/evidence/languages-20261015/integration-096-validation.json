@@ -1,0 +1,241 @@
+{
+  "scope": "Actual macOS 096 merge integration; no paid APIs, provider requests, signing purchases or installed binary replacement.",
+  "source_inventory": "integration-096-source.json",
+  "source_inventory_sha256": "7eac6e50f840a372e0fef6addf5f2858d7d44b432f36ca344640ee849e6ba30f",
+  "normal_release_sha256": "6c32974fa817b324375afdbd9dc086339ca9a4c3cc042f29003188ec0706870e",
+  "upstream_engine_sha256": "a9f504de566b5f40d13cdc91b1b572618b863b66c866c68932f8e6124d8371f6",
+  "engine_identical_to_upstream": true,
+  "results": {
+    "rust": {
+      "passed": 487,
+      "targets": 14,
+      "failed": 0,
+      "ignored": 0
+    },
+    "dashboard": {
+      "total": 419,
+      "passed": 320,
+      "failed": 0,
+      "platform_skipped": 99
+    },
+    "desktop": {
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0
+    },
+    "new_agent_locale": {
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0,
+      "fake_jobs": 9,
+      "real_model_calls": 0
+    },
+    "normal_cli": {
+      "passed": 52
+    },
+    "regress": {
+      "passed": 70,
+      "missing_binary_control_exit": 1
+    },
+    "format_and_both_clippy_modes": 0,
+    "both_example_suites": 0,
+    "model_fence": 0,
+    "performance": {
+      "identical_stdout_cases": 13,
+      "default_10percent_median_gate_exit": 0,
+      "baseline": "preserved a2 localized normal artifact",
+      "minimum_median_ratio": 0.9500592407568866,
+      "maximum_median_ratio": 1.0521660832711683,
+      "maximum_p95_ratio": 2.1809628697137016
+    }
+  },
+  "initial_failures": [
+    {
+      "log": "desktop.log",
+      "passed": 6,
+      "failed": 1,
+      "reason": "Fixture assumed absence of a global installed Desktop application; repaired test independently observes directories, verifies truthful detection and preserves private uninitialized profile assertions."
+    },
+    {
+      "log": "agent-runners-upstream.log",
+      "passed": 34,
+      "failed": 1,
+      "platform_skipped": 2,
+      "reason": "Root integration referenced new dictionaries before their implementation; final dashboard includes the repaired test."
+    },
+    {
+      "log": "dashboard-full.log",
+      "passed": 319,
+      "failed": 1,
+      "platform_skipped": 99,
+      "reason": "Old diagnostic-origin count 95 required updating to 97 for two added owned validations; exact locale and placeholder assertions remain."
+    },
+    {
+      "log": "dashboard-repaired.log",
+      "passed": 319,
+      "failed": 1,
+      "platform_skipped": 99,
+      "reason": "Repeated pre-repair count loaded before correction after a wrong-working-directory edit invocation; final canonical run passes."
+    }
+  ],
+  "history": "a2 native Linux/Windows release and runtime/ACL receipts retain their exact historical source and binaries. Current-head CI is separate, pending publication.",
+  "logs": [
+    {
+      "file": "checks.json",
+      "bytes": 2557,
+      "sha256": "d928ed1047d8e9d9ebbd95ca824378ae97b96cb3b4097d71fe5ca229bf7e6a01",
+      "location": "private task artifact, not a public file path"
+    },
+    {
+      "file": "fmt.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "location": "private task artifact, not a public file path"
+    },
+    {
+      "file": "clippy-debug.log",
+      "bytes": 153,
+      "sha256": "963c3f0978771371843fb95c1160188af6a6eaa0d5a357c6ea5e9925a7054185",
+      "location": "private task artifact, not a public file path"
+    },
+    {
+      "file": "clippy-release.log",
+      "bytes": 143,
+      "sha256": "5826a4aa0a20a6084c849465dadf6392895a72c0942082a9627b9a37dfcde053",
+      "location": "private task artifact, not a public file path"
+    },
+    {
+      "file": "rust-release.log",
+      "bytes": 38023,
+      "sha256": "13bf86c0f3e0eb17871a2ee824c9ed49df3c6de52bda47ff5c064db5a8cba4ea",
+      "location": "private task artifact, not a public file path"
+    },
+    {
+      "file": "example-extended.log",
+      "bytes": 487,
+      "sha256": "3276ca854c13addf00af4da62c787b2bfb0551cd5cb6d26348378ca0d1950bbd",
+      "location": "private task artifact, not a public file path"
+    },
+    {
+      "file": "example-models.log",
+      "bytes": 1189,
+      "sha256": "d7dede6b59da1cfa32a87533dbdb0094aa7b5b00c7990052e6dde2bc4e1af7e1",
+      "location": "private task artifact, not a public file path"
+    },
+    {
+      "file": "normal-build.log",
+      "bytes": 144,
+      "sha256": "8bffecfa5313a9c7a6e89d4ec3d2891bbe2470e6db044c335f4d8e0fa84e8e58",
+      "location": "private task artifact, not a public file path"
+    },
+    {
+      "file": "fence.log",
+      "bytes": 317,
+      "sha256": "db47633338110524943329c035f58b550a6094ddc0366454d77bf8a50a4e3412",
+      "location": "private task artifact, not a public file path"
+    },
+    {
+      "file": "desktop.log",
+      "bytes": 1303,
+      "sha256": "6048f3302c3f82060ee90bc2b714875619cd0025215461f5917e1e3f6cd5c97e",
+      "location": "private task artifact, not a public file path"
+    },
+    {
+      "file": "desktop-repaired.log",
+      "bytes": 680,
+      "sha256": "c8e8d236dd05f23482345052eaa0faa31e4ebef7c55bc74b8ce6150a069a6cf3",
+      "location": "private task artifact, not a public file path"
+    },
+    {
+      "file": "agent-runners-upstream.log",
+      "bytes": 5040,
+      "sha256": "8c42577ef407e4427be4352cb3c0ea3290d3901b5c7282f7b98a71804498da11",
+      "location": "private task artifact, not a public file path"
+    },
+    {
+      "file": "dashboard-full.log",
+      "bytes": 52407,
+      "sha256": "2cc5bac1d0da0885a14ae1d9c84e4bfb983dc8ce5f63044ffafade582161737d",
+      "location": "private task artifact, not a public file path"
+    },
+    {
+      "file": "dashboard-repaired.log",
+      "bytes": 52420,
+      "sha256": "d08d8adf2b96d01e299a391158e1beaad0ff8c62f827553d1bb23707b36304bc",
+      "location": "private task artifact, not a public file path"
+    },
+    {
+      "file": "dashboard-final.log",
+      "bytes": 51747,
+      "sha256": "79a705ccb45059f35b255ad48410c232ccd07298c26d1d4f03dbd490697f7ccf",
+      "location": "private task artifact, not a public file path"
+    },
+    {
+      "file": "cli-locale-repaired.log",
+      "bytes": 1596,
+      "sha256": "a7f32b73e191e8d8e2dd54b1dcfddc58f1225bf0b423560fd6a5ddf24aab494e",
+      "location": "private task artifact, not a public file path"
+    },
+    {
+      "file": "locale-red.log",
+      "bytes": 3890,
+      "sha256": "ff1bfdd63292383db7660d2dc3f38d069e8fde025b028a7706753be5e10207be",
+      "location": "private task artifact, not a public file path"
+    },
+    {
+      "file": "locale-final.log",
+      "bytes": 781,
+      "sha256": "a1c91e1c909f32fd882161d526dbc6cb9b04f46aab60b40fc33961f0f7714668",
+      "location": "private task artifact, not a public file path"
+    },
+    {
+      "file": "normal-cli.json",
+      "bytes": 6822,
+      "sha256": "de426c25b5ed9063880e71c40fe535319defde0e382b33c7f6cde260d69fdc7a",
+      "location": "private task artifact, not a public file path"
+    },
+    {
+      "file": "regress-checks.json",
+      "bytes": 516,
+      "sha256": "c4d03ece738083073783a25bc9821fa27c8b0055d070555963448a5dd608e027",
+      "location": "private task artifact, not a public file path"
+    },
+    {
+      "file": "regress.log",
+      "bytes": 4976,
+      "sha256": "f64bfb66a9aaeb37e5e7459e0bc76ad97b0090e52d2a76af92b5bbfd449233a2",
+      "location": "private task artifact, not a public file path"
+    },
+    {
+      "file": "regress-missing-negative.log",
+      "bytes": 29,
+      "sha256": "658442dbf64993f85576d03d8f1a402ef433e04f3b283508338219a636517a89",
+      "location": "private task artifact, not a public file path"
+    },
+    {
+      "file": "debug-build.log",
+      "bytes": 153,
+      "sha256": "ea95310afc23da68baaeee80fd2bf8b588c461798fe78c345e845ea91c76dc1d",
+      "location": "private task artifact, not a public file path"
+    },
+    {
+      "file": "desktop-current-debug.log",
+      "bytes": 677,
+      "sha256": "f27ff047c7013f0ec6d8d952ed7f1ea4947026736ab8abcc7fa618ad46124e62",
+      "location": "private task artifact, not a public file path"
+    },
+    {
+      "file": "debug-artifact.json",
+      "bytes": 130,
+      "sha256": "b513f9f1ac12932c95931f3cde88f57c26370a54c7ed4bd4bdace0baada26ef7",
+      "location": "private task artifact, not a public file path"
+    }
+  ],
+  "performance": "performance-096-summary.json",
+  "current_debug_artifact": {
+    "build_exit": 0,
+    "binary_sha256": "f5f38a4a6268783d324dfcd3f08b6ffb4f580a8a48f79e89faaa4b898aaa2c2c",
+    "desktop_exit": 0,
+    "scope": "A fresh cargo build --locked after all source edits precedes the final desktop test; normal release copy and its benchmark remain separately bound."
+  }
+}

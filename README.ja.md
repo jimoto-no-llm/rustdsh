@@ -336,7 +336,7 @@ rdsh settings set general.language zh-CN
 rdsh-dashboard project --project <ディレクトリ>
 ```
 
-※ Windows ネイティブではタスクトレイに常駐し、タスクバーから簡単に開閉できます（端末起動したい場合は `--no-tray` を指定）。詳細は [dashboard/README.md](dashboard/README.md) をご覧ください。
+※ Windows ネイティブではタスクトレイに常駐し、タスクバーから簡単に開閉できます（端末起動したい場合は `--no-tray` を指定）。詳細は [dashboard/README.md](dashboard/README.md) をご覧ください。外部エージェント CLI（cursor-agent、devin）を監視付きジョブとして実行できます（[docs/AGENT-RUNNERS.md](docs/AGENT-RUNNERS.md)、英語）。
 
 ## デスクトップアプリ (Electron)
 
@@ -458,3 +458,7 @@ MIT（[LICENSE](LICENSE)）です。本家 DeepSeek Harness および依存ラ�
 ## 保護付き起動の対応版
 
 明示的な共有ファイルだけを扱う隔離機能は、Linux x86_64 と bubblewrap・prlimit・ユーザー名前空間が必要です。監査済みのDSHとツールランタイムの同一版の組は `0.2.0-rc.2`、`0.2.1-alpha.1`、`0.2.1-alpha.3` です。未知・混在・改変されたランタイムや別の依存先へ解決されたランタイムは拒否します。macOSとWindowsでは保護付き委譲を拒否します。[ダッシュボードの固定更新](docs/STAGED-UPDATES.md)は別の対応版一覧を持ちます。
+
+### 外部エージェントのジョブ
+
+`node dashboard/cli.mjs --language ja agents list`で表示言語を選べます。外部エージェントのヘルプとCLI診断は英語・簡体字中国語・日本語に対応します。ジョブ状態・エラーコード・JSONキー・エージェント出力は原文を保持します。日本語のファイル名と指示文はUTF-8の`--prompt-file`で渡せます。[コマンドと権限の制約](docs/AGENT-RUNNERS.md)を確認してください。実ジョブは外部サービスの料金が発生する場合があります。言語検証はローカルのテスト用実行ファイルで行います。

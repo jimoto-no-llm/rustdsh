@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile, stat } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -11,8 +11,6 @@ import { fileURLToPath } from 'node:url';
 const exec = promisify(execFile);
 const repo = fileURLToPath(new URL('..', import.meta.url));
 const bin = join(repo, 'target', process.platform === 'win32' ? 'debug/rdsh.exe' : 'debug/rdsh');
-const posixOnly = process.platform === 'win32' ? 'Desktop command stub is POSIX-only' : false;
-
 // Desktop (Electron) owns the reserved `desktop` profile; the npm dsh CLI
 // cannot manage it, so `rdsh desktop install` only forwards
 // `plugin --profile desktop add` to the Desktop-installed command. These tests
@@ -65,7 +63,7 @@ async function stubCommand(box) {
 async function run(args, env) {
   const options = { env: { ...process.env, ...env }, cwd: repo, maxBuffer: 4 * 1024 * 1024 };
   try {
-    const { stdout, stderr } = await exec(bin, args, options);
+    const { stdout, stderr } = await exec(bin, ["--language", "en", ...args], options);
     return { code: 0, stdout, stderr };
   } catch (error) {
     return { code: error.code ?? 1, stdout: error.stdout ?? '', stderr: error.stderr ?? '' };
@@ -74,22 +72,47 @@ async function run(args, env) {
 
 async function baseEnv(t) {
   const box = await sandbox(t);
-  return { box, env: { DSH_HOME: box.home } };
+  return { box, env: {
+    HOME: box.root, USERPROFILE: box.root, DSH_HOME: box.home,
+    XDG_CONFIG_HOME: join(box.root, "config"), APPDATA: join(box.root, "appdata"),
+    LOCALAPPDATA: join(box.root, "localappdata"), ProgramFiles: join(box.root, "program-files"),
+    ProgramW6432: join(box.root, "program-files"),
+    DSH_DESKTOP_USER_DATA_DIR: join(box.root, "electron-user-data"),
+    DSH_DESKTOP_APP_DIR: "", DSH_DESKTOP_CLI: "",
+  } };
 }
 
 async function initProfile(box, doc) {
   await writeFile(box.profile, JSON.stringify(doc, null, 2) + '\n');
 }
 
-test('status is truthful with no Desktop app and no profile', async (t) => {
+test('status reports installed applications and an uninitialized private profile', async (t) => {
   const { env } = await baseEnv(t);
   const { code, stdout } = await run(['desktop', 'status', '--json'], { ...env, DSH_DESKTOP_CLI: '' });
   assert.equal(code, 0);
   const status = JSON.parse(stdout);
-  assert.equal(status.available, false);
+  assert.ok(Array.isArray(status.app.candidates) && status.app.candidates.length > 0);
+  assert.ok(status.app.candidates.every((candidate) => typeof candidate === "string"));
+  if (process.platform === "darwin")
+    assert.ok(status.app.candidates.includes("/Applications/DeepSeek Harness.app"));
+  const installed = [];
+  for (const candidate of status.app.candidates) {
+    try {
+      if ((await stat(candidate)).isDirectory()) installed.push(candidate);
+    } catch (error) {
+      if (!["ENOENT", "ENOTDIR"].includes(error.code)) throw error;
+    }
+  }
+  assert.equal(status.app.path, installed[0] ?? null);
+  if (status.command.path !== null) {
+    assert.equal((await stat(status.command.path)).isFile(), true);
+    assert.equal(status.command.source, "detected");
+  } else assert.equal(status.command.source, null);
+  assert.equal(status.command.problem, null);
+  assert.equal(status.available, installed.length > 0 || status.command.path !== null);
   assert.equal(status.profile.initialized, false);
-  assert.equal(status.command.path, null);
   assert.deepEqual(status.profile.plugins.map((p) => [p.name, p.enabled]), [['rdsh-settings', false], ['rdsh-compute', false]]);
+  assert.ok(status.profile.plugins.every((plugin) => plugin.installed === false));
 });
 
 test('status reports the Desktop command and enabled plugins', async (t) => {
@@ -179,8 +202,4 @@ test('a --plugins-dir without the plugins is skipped for a real checkout', async
   assert.notEqual(resolved, join(box.root, 'nope'));
   assert.match(resolved, /plugins$/);
   assert.equal(existsSync(join(resolved, 'rdsh-settings', 'package.json')), true);
-});
-
-test('POSIX stub coverage is skipped on Windows', { skip: posixOnly }, async () => {
-  assert.equal(posixOnly, false);
 });

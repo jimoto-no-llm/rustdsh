@@ -1900,9 +1900,7 @@ fn resolve_default_profile(
     locale: locale::Locale,
 ) -> anyhow::Result<String> {
     let env = std::env::var("RDSH_DEFAULT_PROFILE").ok();
-    if !env.as_deref().is_some_and(|e| !e.trim().is_empty())
-        && !configured_default.trim().is_empty()
-    {
+    if env.as_deref().is_none_or(|e| e.trim().is_empty()) && !configured_default.trim().is_empty() {
         return Ok(configured_default.trim().to_string());
     }
     let home = crate::inspect::dsh_home();

@@ -3,8 +3,8 @@
   "files": [
     {
       "path": "README.md",
-      "bytes": 24570,
-      "sha256": "5d6255e2f0086146a0d8472df2c499790afd027e64401f804e9d2395e570ea55"
+      "bytes": 25872,
+      "sha256": "0660fed1e957c570286b87570878e70345e469ec7802707311e7b4f23d4748ff"
     },
     {
       "path": "before-desktop.png",
@@ -112,6 +112,16 @@
       "sha256": "42491ee0e58b8177a3b60284586526b9f07b5c2c9dd67e2bd013afb6910a8eee"
     },
     {
+      "path": "integration-096-source.json",
+      "bytes": 87962,
+      "sha256": "7eac6e50f840a372e0fef6addf5f2858d7d44b432f36ca344640ee849e6ba30f"
+    },
+    {
+      "path": "integration-096-validation.json",
+      "bytes": 8678,
+      "sha256": "8df6172e55fad711c30c119892f60345725815d484678090ae120be9fea97061"
+    },
+    {
       "path": "ja-desktop.png",
       "bytes": 214176,
       "sha256": "7a3e4193d2262c312c24615c6fe856474da3ec7e14e005f2f3a26789a78231a6"
@@ -128,8 +138,8 @@
     },
     {
       "path": "known-exceptions.json",
-      "bytes": 7888,
-      "sha256": "f27020d609ad24a836ccadfaa9f3b1e0f4c228f30b150ad7bc51dbd064d60049"
+      "bytes": 7903,
+      "sha256": "f7ebad7d94ccddfc37aa9bbab59333a6205ff4b8776fee5c01f02dce825b0f9b"
     },
     {
       "path": "legacy-workflow-board-baseline.json",
@@ -138,8 +148,8 @@
     },
     {
       "path": "linux-a2-post-test-overlay.json",
-      "bytes": 2312,
-      "sha256": "200125140c3fd23effc0191e3d5100664b13b6b225dc3bcff5b60d98fd507f22"
+      "bytes": 2378,
+      "sha256": "561fa8d535a548ad53d49dc642c61405e472e9e2c1733d49ea5870be33068991"
     },
     {
       "path": "linux-a2-source.json",
@@ -265,6 +275,31 @@
       "path": "outcome-verification-flow-ja.webm",
       "bytes": 263402,
       "sha256": "d74ca2aac97f932686ff66d99f9ccbacf6251c4c525bdd764148a5751dfd61f3"
+    },
+    {
+      "path": "performance-096-basic.json",
+      "bytes": 8249,
+      "sha256": "29659b579838af7f25a6f4975197c4fb0799a967000d599739a0fbaae4f0d0b2"
+    },
+    {
+      "path": "performance-096-execution.json",
+      "bytes": 2420,
+      "sha256": "4e5b80a64bba05a69ea5d13f45aaa984d738ab7763f2a0ba75b5e2ea912954ef"
+    },
+    {
+      "path": "performance-096-extended.json",
+      "bytes": 15948,
+      "sha256": "e346ae9af7a902b8a79fa63b43cf8f467b52a4da62c278b7d90d3bda2b58882e"
+    },
+    {
+      "path": "performance-096-regression.json",
+      "bytes": 5716,
+      "sha256": "636c9cdfc64e726de66eb7268906047c83a611f13c3f7221e7d27eaf5776c1c5"
+    },
+    {
+      "path": "performance-096-summary.json",
+      "bytes": 2362,
+      "sha256": "165e2d1c6721521237e3f56be558c5ce6edc85b7f5c3426c3a35f92f8ed49ecf"
     },
     {
       "path": "performance-a2-basic.json",
@@ -398,8 +433,8 @@
     },
     {
       "path": "performance.md",
-      "bytes": 8685,
-      "sha256": "a3da51128e24304cc9ef92f0025234fa7e42eae6037a28d624f7cf7849c1c03b"
+      "bytes": 9611,
+      "sha256": "c596c106bdac9daf3d5ba4fb22e33838d33030a82ad1eac33000b009dcacc783"
     },
     {
       "path": "platform-ledger.md",

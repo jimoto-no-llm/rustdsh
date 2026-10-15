@@ -360,7 +360,7 @@ Optional Node.js dashboard for project metrics, human-in-the-loop Q&A, and mobil
 rdsh-dashboard project --project <directory>
 ```
 
-*On native Windows, the dashboard runs in the system tray and can be opened or stopped from the taskbar (`--no-tray` keeps it in the terminal). See [dashboard/README.md](dashboard/README.md).*
+*On native Windows, the dashboard runs in the system tray and can be opened or stopped from the taskbar (`--no-tray` keeps it in the terminal). See [dashboard/README.md](dashboard/README.md). External agent CLIs (cursor-agent, devin) can be run as supervised jobs: see [docs/AGENT-RUNNERS.md](docs/AGENT-RUNNERS.md).*
 
 ## Desktop App (Electron)
 
@@ -493,3 +493,7 @@ authors):
 ## License
 
 MIT — see [LICENSE](LICENSE). Upstream DeepSeek Harness and its dependencies retain their respective licenses.
+
+### External agent jobs
+
+`node dashboard/cli.mjs --language ja agents list` selects the same display language as the dashboard. External-agent help and CLI diagnostics support `en`, `zh-CN`, and `ja`; job states, error codes, JSON keys and agent output remain canonical. Use `agents submit --prompt-file` for UTF-8 instructions, including Japanese filenames and text. See [agent runners](docs/AGENT-RUNNERS.md) for commands and permission limits. Submitting a real job can incur the external provider’s charges; the locale tests use local fake executables only.

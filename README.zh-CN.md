@@ -31,3 +31,7 @@ rdsh settings set general.language zh-CN
 ## 受保护启动的兼容版本
 
 仅访问显式共享文件的隔离功能要求 Linux x86_64、bubblewrap、prlimit 和用户命名空间。已审计的 DSH 与工具运行时必须使用相同版本：`0.2.0-rc.2`、`0.2.1-alpha.1` 或 `0.2.1-alpha.3`。未知、混合、被修改或解析到其他依赖副本的运行时会被拒绝。macOS 和 Windows 拒绝受保护的委派。[仪表板的固定更新](docs/STAGED-UPDATES.md)保留单独的兼容版本列表。
+
+## 外部代理任务
+
+`node dashboard/cli.mjs --language zh-CN agents list` 使用与仪表板一致的显示语言。帮助和 CLI 诊断支持英语、简体中文和日语；任务状态、错误代码、JSON 字段与代理输出保留原文。`agents submit --prompt-file` 接受 UTF-8 指令与日文文件名。命令和权限限制参阅[代理运行器](docs/AGENT-RUNNERS.md)。实际任务可能产生外部服务费用；语言测试只启动本地模拟程序。

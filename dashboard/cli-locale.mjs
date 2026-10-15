@@ -1,6 +1,10 @@
 import { ProductLocaleError } from "./product-locale.mjs";
+import { RunnerError } from "./agent-runners.mjs";
 
 export const cliEntries = [
+  ["error.agentsAction", "agentsの操作またはオプションが不正です", "Invalid agents action/options", "agents 操作或选项无效"],
+  ["error.agentsSubmit", "agents submitには--agent、--project、--prompt-fileが必要です", "agents submit requires --agent, --project and --prompt-file", "agents submit 需要 --agent、--project 和 --prompt-file"],
+  ["error.agentRunner", "エージェント実行エラー: {code}", "Agent runner: {code}", "代理运行器错误：{code}"],
   ["error.privateJson", "非公開JSON要求ファイルの処理に失敗しました（{operation}、コード{code}）", "Private JSON request file operation failed ({operation}, code {code})", "私密 JSON 请求文件操作失败（{operation}，代码 {code}）"],
   ["error.costPureOptions", "cost-ledgerのvalidate/public/schemaには--input-fileが必要です。projectは指定できません", "Cost ledger validate/public/schema requires --input-file and takes no project", "cost-ledger 的 validate/public/schema 需要 --input-file，不能指定 project"],
   ["error.nativeAbsolute", "RDSH_BINは絶対パスで指定してください", "RDSH_BIN must be an absolute path", "RDSH_BIN 必须为绝对路径"],
@@ -624,6 +628,8 @@ export const cliEntries = [
   ["arg.number", "数値", "number", "数字"],
   ["arg.file", "ファイル", "file", "文件"],
   ["arg.name", "名前", "name", "名称"],
+  ["arg.path", "パス", "path", "路径"],
+  ["arg.script", "スクリプト", "script", "脚本"],
   ["arg.relative-path", "相対パス", "relative-path", "相对路径"],
   [
     "status.stopping",
@@ -747,6 +753,8 @@ export function cliErrorText(language, error) {
     return cliText(language, error.key, error.values);
   if (error instanceof ProductLocaleError)
     return cliText(language, error.key, { file: error.file });
+  if (error instanceof RunnerError)
+    return cliText(language, "error.agentRunner", { code: error.code });
   return cliText(language, "error.context", { detail: error.message });
 }
 export function shareText(language, share) {

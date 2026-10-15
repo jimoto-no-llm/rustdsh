@@ -1,0 +1,89 @@
+{
+  "comparison": "096 integration vs preserved a2 localized normal release checkpoint, not exact 096 upstream or model performance",
+  "candidate_sha256": "6c32974fa817b324375afdbd9dc086339ca9a4c3cc042f29003188ec0706870e",
+  "baseline_sha256": "098a955a6fe8c6f2513bb90e9a63d06bb628b816f130e31dd15c591b3e841f31",
+  "checks": [
+    {
+      "name": "basic",
+      "command": [
+        "python3",
+        "scripts/benchmark.py",
+        "--bin",
+        "<private-artifact>/rdsh-normal-096",
+        "--baseline",
+        "<private-artifact>/final-a2-normal-candidate-rdsh",
+        "--n",
+        "15",
+        "--output",
+        "<private-artifact>/performance-basic.json"
+      ],
+      "exit": 0,
+      "seconds": 2.689,
+      "load_before": [
+        12.28271484375,
+        11.12841796875,
+        9.31396484375
+      ],
+      "load_after": [
+        12.28271484375,
+        11.12841796875,
+        9.31396484375
+      ],
+      "log_sha256": "6ec9a2ad61c9ef1cdc4d2143a645b60c5b50d84408ffdf610cac19d66cc2c133"
+    },
+    {
+      "name": "extended",
+      "command": [
+        "target/release/examples/benchmark_extended",
+        "--bin",
+        "<private-artifact>/rdsh-normal-096",
+        "--baseline",
+        "<private-artifact>/final-a2-normal-candidate-rdsh",
+        "--n",
+        "15",
+        "--output",
+        "<private-artifact>/performance-extended.json"
+      ],
+      "exit": 0,
+      "seconds": 7.652,
+      "load_before": [
+        12.28271484375,
+        11.12841796875,
+        9.31396484375
+      ],
+      "load_after": [
+        14.19921875,
+        11.556640625,
+        9.48583984375
+      ],
+      "log_sha256": "97d97b090df29c4dfe6a23b49c2f6e2478c0ef07d4c68887f2893813b9ea56ff"
+    },
+    {
+      "name": "regression",
+      "command": [
+        "target/release/examples/benchmark_regression",
+        "--bin",
+        "<private-artifact>/rdsh-normal-096",
+        "--baseline",
+        "<private-artifact>/final-a2-normal-candidate-rdsh",
+        "--n",
+        "15",
+        "--output",
+        "<private-artifact>/performance-regression.json"
+      ],
+      "exit": 0,
+      "seconds": 1.463,
+      "load_before": [
+        14.19921875,
+        11.556640625,
+        9.48583984375
+      ],
+      "load_after": [
+        14.19921875,
+        11.556640625,
+        9.48583984375
+      ],
+      "log_sha256": "328b30da400ac83de8aa386db45add14be808d02b43239e11958d8b578190a80"
+    }
+  ]
+}
