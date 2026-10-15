@@ -144,6 +144,33 @@ class PinReleaseDigestsTest(unittest.TestCase):
         self.assertNotIn("1" * 64, updated)
         self.assertIn("a" * 64, updated)
 
+    def test_pinning_an_older_release_keeps_latest(self) -> None:
+        # R537-LATEST01: re-pinning an older release must only backfill rows.
+        pinned = pin_unix(REGISTRY, "v0.3.3")
+        backfilled = pin_unix(pinned, "v0.3.2")
+        lines = backfilled.splitlines()
+        self.assertIn("latest v0.3.3", lines)
+        self.assertNotIn("latest v0.3.2", lines)
+        self.assertEqual(backfilled.count("v0.3.2 "), 4)
+        self.assertIn(row("v0.3.3", "rdsh-linux-x64.tar.gz", "a" * 64), lines)
+
+    def test_pinning_a_newer_release_advances_latest(self) -> None:
+        pinned = pin_unix(REGISTRY, "v0.3.3")
+        advanced = pin_unix(pinned, "v0.4.0")
+        lines = advanced.splitlines()
+        self.assertIn("latest v0.4.0", lines)
+        self.assertNotIn("latest v0.3.3", lines)
+        self.assertEqual(advanced.count("v0.4.0 "), 4)
+        self.assertIn(row("v0.3.3", "rdsh-linux-x64.tar.gz", "a" * 64), lines)
+
+    def test_windows_ledger_keeps_its_latest_when_backfilling(self) -> None:
+        pinned = pin_windows(WINDOWS_REGISTRY, "v0.3.3")
+        backfilled = pin_windows(pinned, "v0.3.2")
+        lines = backfilled.splitlines()
+        self.assertIn("latest v0.3.3", lines)
+        self.assertNotIn("latest v0.3.2", lines)
+        self.assertIn(row("v0.3.2", "rdsh-windows-x64.zip", "e" * 64), lines)
+
     def test_refuses_prerelease_tag(self) -> None:
         with self.assertRaises(ValueError):
             pin_unix(REGISTRY, "v0.3.4-rc.1")
