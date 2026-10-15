@@ -252,7 +252,7 @@ test("native OS observation identifies an owned live process and then its exit w
   children.push(child);
   await once(child, "spawn");
   const before = await readProcessIdentity(child.pid);
-  if (["win32", "linux"].includes(process.platform)) {
+  if (["win32", "linux", "darwin"].includes(process.platform)) {
     assert.equal(before.status, "observed");
     assert.equal(
       matchProcessIdentity(
@@ -277,6 +277,7 @@ test("native OS observation identifies an owned live process and then its exit w
     (await readProcessIdentity("1; fixture-secret")).status,
     "unknown",
   );
+  assert.equal((await readProcessIdentity(-1)).status, "unknown");
 });
 
 test("hard exits around intent and ack recover committed events without replaying a fixture side effect", async (t) => {
@@ -432,6 +433,49 @@ test("a lock cleanup failure reports the committed event and retains the lock to
   await assert.rejects(f.history.register(id), error("history_busy"));
   assert.deepEqual(await fs.readFile(f.history.lock, "utf8"), lock);
   assert.equal((await f.history.read()).events.length, 1);
+});
+
+test("a journal handle close failure after a durable sync still reports the committed event", async (t) => {
+  const f = await setup(t),
+    id = runId(),
+    originalOpen = fs.open;
+  let failure;
+  t.mock.method(fs, "open", async (file, ...args) => {
+    const handle = await originalOpen(file, ...args);
+    if (
+      path.resolve(String(file)) === path.resolve(f.history.file) &&
+      args[0] === "a"
+    ) {
+      const originalClose = handle.close.bind(handle);
+      handle.close = async () => {
+        await originalClose();
+        const error = new Error("fixture journal handle close failure");
+        error.code = "EIO";
+        throw error;
+      };
+    }
+    return handle;
+  });
+
+  await assert.rejects(f.history.register(id), (error) => {
+    failure = error;
+    return error.code === "history_journal_close_unconfirmed";
+  });
+  assert.equal(failure.committed, true);
+  assert.equal(failure.lock_cleanup_unconfirmed, false);
+  const state = await f.history.read();
+  assert.equal(state.runs.has(id), true);
+  assert.equal(state.events.length, 1);
+  assert.deepEqual(failure.event_ids, [state.events[0].event_id]);
+  // The event is durable and the lock was released, so a retry reconciles
+  // against the recorded run instead of registering it a second time.
+  await f.history.register(id);
+  assert.equal(
+    (await f.history.read()).events.filter(
+      (event) => event.type === "registered",
+    ).length,
+    1,
+  );
 });
 
 test("corrupt, foreign-project and unknown-schema histories are preserved and rejected", async (t) => {

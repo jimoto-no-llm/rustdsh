@@ -5,6 +5,7 @@ import os from "node:os";
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { readDarwinProcess } from "./darwin-process-identity.mjs";
 
 const exec = promisify(execFile);
 const digest = (value) => createHash("sha256").update(value).digest("hex");
@@ -16,7 +17,7 @@ export function validProcessIdentity(value) {
     typeof value === "object" &&
     !Array.isArray(value) &&
     Object.keys(value).length === 4 &&
-    ["win32", "linux"].includes(value.platform) &&
+    ["win32", "linux", "darwin"].includes(value.platform) &&
     pidValue(value.pid) &&
     typeof value.birth === "string" &&
     /^[1-9][0-9]{0,29}$/.test(value.birth) &&
@@ -94,6 +95,15 @@ export async function readProcessIdentity(pid) {
       if (data.status !== "observed" || !validProcessIdentity(identity))
         throw new Error();
       return { status: "observed", identity };
+    }
+    if (process.platform === "darwin") {
+      const observation = await readDarwinProcess(pid);
+      if (
+        observation.status !== "observed" ||
+        !validProcessIdentity(observation.identity)
+      )
+        return observation;
+      return { status: "observed", identity: observation.identity };
     }
   } catch (error) {
     // ENOENT for an absent /proc/PID is an observation, not a guessed exit code.

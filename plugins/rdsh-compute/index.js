@@ -14,13 +14,15 @@
 
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, posix, win32 } from "node:path";
 
 export const PROTOCOL_VERSION = 1;
 export const MAX_TEXT_BYTES = 1_048_576;
 const DEFAULT_TIMEOUT_MS = 5000;
+const DEFAULT_SHUTDOWN_GRACE_MS = 250;
+const DEFAULT_SHUTDOWN_TIMEOUT_MS = 1000;
 
 // Feature switches live in $DSH_HOME/rdsh.json. An id that is absent (or a
 // missing, unreadable or corrupt file) keeps the caller's fallback; an explicit
@@ -65,18 +67,87 @@ export function isEnabled(env = process.env) {
   return featureEnabled("compute", env.RDSH_COMPUTE === "1", env);
 }
 
-export function createComputeBridge({ bin = "rdsh", timeoutMs = DEFAULT_TIMEOUT_MS, spawnImpl = spawn } = {}) {
+function defaultExists(path) {
+  try {
+    return existsSync(path);
+  } catch {
+    return false;
+  }
+}
+
+function wellKnownBins(env, platform, name) {
+  const { join } = platform === "win32" ? win32 : posix;
+  const home = platform === "win32" ? env.USERPROFILE || env.HOME || homedir() : env.HOME || homedir();
+  if (platform === "win32") {
+    const localAppData = env.LOCALAPPDATA || join(home, "AppData", "Local");
+    const cargoHome = env.CARGO_HOME || join(home, ".cargo");
+    return [
+      join(localAppData, "rdsh", "bin", name),
+      join(home, ".local", "bin", name),
+      join(cargoHome, "bin", name),
+    ];
+  }
+  return [join(home, ".local", "bin", name), join("/usr/local/bin", name), join(home, ".cargo", "bin", name)];
+}
+
+// Desktop ships its own runtime and is not guaranteed to inherit the login
+// shell PATH (~/.local/bin can be missing), so a bare "rdsh" is not enough:
+// an explicit RDSH_BIN wins, then PATH, then the well-known install locations.
+// Nothing resolved returns the historical "rdsh" default, so a later spawn
+// failure still falls back to the JS implementation exactly as before.
+export function resolveRdshBin(env = process.env, platform = process.platform, exists = defaultExists) {
+  if (typeof env.RDSH_BIN === "string" && env.RDSH_BIN.trim() !== "") return env.RDSH_BIN;
+  const { join } = platform === "win32" ? win32 : posix;
+  const name = platform === "win32" ? "rdsh.exe" : "rdsh";
+  const pathSep = platform === "win32" ? ";" : ":";
+  for (const dir of (env.PATH || env.Path || "").split(pathSep)) {
+    if (dir && exists(join(dir, name))) return "rdsh"; // PATH hit: the bare name spawns as before
+  }
+  for (const candidate of wellKnownBins(env, platform, name)) {
+    if (exists(candidate)) return candidate;
+  }
+  return "rdsh";
+}
+
+export function createComputeBridge({
+  bin = "rdsh",
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  shutdownGraceMs = DEFAULT_SHUTDOWN_GRACE_MS,
+  shutdownTimeoutMs = DEFAULT_SHUTDOWN_TIMEOUT_MS,
+  spawnImpl = spawn,
+} = {}) {
   let child = null;
-  let ready = false;
+  let closed = false;
+  let closing = null;
   let seq = 0;
   const pending = new Map();
-  let buffer = "";
+  const failedWorkers = new WeakSet();
+
+  function failWorker(worker, err) {
+    if (failedWorkers.has(worker)) return;
+    failedWorkers.add(worker);
+    for (const [id, slot] of pending) {
+      if (slot.worker !== worker) continue;
+      pending.delete(id);
+      clearTimeout(slot.timer);
+      slot.reject(err);
+    }
+    if (child === worker) child = null;
+    if (worker.exitCode === null && worker.signalCode === null) {
+      try {
+        worker.kill();
+      } catch {}
+    }
+  }
 
   function ensureChild() {
     if (child) return child;
-    child = spawnImpl(bin, ["compute"], { stdio: ["pipe", "pipe", "inherit"] });
-    child.stdout.setEncoding("utf8");
-    child.stdout.on("data", (chunk) => {
+    const worker = spawnImpl(bin, ["compute"], { stdio: ["pipe", "pipe", "inherit"] });
+    child = worker;
+    let buffer = "";
+    worker.stdout.setEncoding("utf8");
+    worker.stdout.on("data", (chunk) => {
+      if (child !== worker) return;
       buffer += chunk;
       let idx;
       while ((idx = buffer.indexOf("\n")) >= 0) {
@@ -90,26 +161,18 @@ export function createComputeBridge({ bin = "rdsh", timeoutMs = DEFAULT_TIMEOUT_
           continue; // one bad line never resolves pending calls
         }
         const slot = pending.get(msg.id);
-        if (slot) {
+        if (slot?.worker === worker) {
           pending.delete(msg.id);
           clearTimeout(slot.timer);
           slot.resolve(msg);
         }
       }
     });
-    const failAll = (err) => {
-      for (const [, slot] of pending) {
-        clearTimeout(slot.timer);
-        slot.reject(err);
-      }
-      pending.clear();
-      child = null;
-      ready = false;
-    };
-    child.on("exit", () => failAll(new Error("rdsh compute exited")));
-    child.on("error", failAll);
-    ready = true;
-    return child;
+    worker.stdin.on("error", (err) => failWorker(worker, err));
+    worker.stdout.on("error", (err) => failWorker(worker, err));
+    worker.on("exit", () => failWorker(worker, new Error("rdsh compute exited")));
+    worker.on("error", (err) => failWorker(worker, err));
+    return worker;
   }
 
   function request(op, payload) {
@@ -128,13 +191,19 @@ export function createComputeBridge({ bin = "rdsh", timeoutMs = DEFAULT_TIMEOUT_
         pending.delete(id);
         reject(new Error(`rdsh compute timeout after ${timeoutMs}ms`));
       }, timeoutMs);
-      pending.set(id, { resolve, reject, timer, started });
+      const slot = { resolve, reject, timer, started, worker: null };
+      pending.set(id, slot);
       try {
-        ensureChild().stdin.write(JSON.stringify({ v: PROTOCOL_VERSION, id, op, ...payload }) + "\n");
+        slot.worker = ensureChild();
+        slot.worker.stdin.write(JSON.stringify({ v: PROTOCOL_VERSION, id, op, ...payload }) + "\n");
       } catch (err) {
-        pending.delete(id);
-        clearTimeout(timer);
-        reject(err);
+        if (slot.worker) {
+          failWorker(slot.worker, err);
+        } else if (pending.get(id) === slot) {
+          pending.delete(id);
+          clearTimeout(timer);
+          reject(err);
+        }
       }
     }).then((msg) => ({
       ...msg,
@@ -145,8 +214,9 @@ export function createComputeBridge({ bin = "rdsh", timeoutMs = DEFAULT_TIMEOUT_
   // High-level helpers: return { result, usedRust, timings }.
   // On any worker error the JS fallback runs and usedRust=false.
   async function estimate(text) {
-    const fallback = () => ({ tokens: jsEstimate(text), chars: Buffer.byteLength(text, "utf8") });
-    if (!isEnabled()) return { result: fallback(), usedRust: false, timings: null };
+    // chars counts Unicode scalars, matching Rust str::chars().count().
+    const fallback = () => ({ tokens: jsEstimate(text), chars: [...text].length });
+    if (closed || !isEnabled()) return { result: fallback(), usedRust: false, timings: null };
     const t0 = process.hrtime.bigint();
     try {
       const msg = await request("tokens.estimate", { text });
@@ -164,10 +234,10 @@ export function createComputeBridge({ bin = "rdsh", timeoutMs = DEFAULT_TIMEOUT_
   async function estimateBatch(texts) {
     const fallback = () => ({
       tokens: texts.map(jsEstimate),
-      chars: texts.map((t) => Buffer.byteLength(t, "utf8")),
+      chars: texts.map((t) => [...t].length),
       total: texts.map(jsEstimate).reduce((a, b) => a + b, 0),
     });
-    if (!isEnabled()) return { result: fallback(), usedRust: false, timings: null };
+    if (closed || !isEnabled()) return { result: fallback(), usedRust: false, timings: null };
     const t0 = process.hrtime.bigint();
     try {
       const msg = await request("tokens.estimate_batch", { texts });
@@ -188,7 +258,7 @@ export function createComputeBridge({ bin = "rdsh", timeoutMs = DEFAULT_TIMEOUT_
 
   async function prune(text, maxTokens = 4000) {
     const fallback = () => ({ pruned: text, before: jsEstimate(text), after: jsEstimate(text), budget: maxTokens });
-    if (!isEnabled()) return { result: fallback(), usedRust: false, timings: null };
+    if (closed || !isEnabled()) return { result: fallback(), usedRust: false, timings: null };
     const t0 = process.hrtime.bigint();
     try {
       const msg = await request("tokens.prune", { text, max_tokens: maxTokens });
@@ -208,21 +278,64 @@ export function createComputeBridge({ bin = "rdsh", timeoutMs = DEFAULT_TIMEOUT_
   }
 
   function close() {
-    try {
-      child?.stdin?.end();
-      child?.kill();
-    } catch {}
+    if (closing) return closing;
+    closed = true;
+    const worker = child;
     child = null;
+    if (!worker) return closing = Promise.resolve();
+    closing = new Promise((resolve, reject) => {
+      let settled = false;
+      let graceTimer;
+      let finalTimer;
+      const cleanup = () => {
+        clearTimeout(graceTimer);
+        clearTimeout(finalTimer);
+        worker.removeListener?.("exit", finish);
+        worker.removeListener?.("close", finish);
+      };
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve();
+      };
+      const fail = () => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(new Error("rdsh compute worker did not exit after SIGTERM and SIGKILL"));
+      };
+      const signal = (name) => {
+        try {
+          worker.kill(name);
+        } catch {}
+      };
+      worker.once("exit", finish);
+      worker.once("close", finish);
+      try {
+        worker.stdin?.end();
+      } catch {}
+      signal("SIGTERM");
+      if (settled) return;
+      graceTimer = setTimeout(() => {
+        if (settled) return;
+        if (worker.exitCode === null && worker.signalCode === null) signal("SIGKILL");
+        if (settled) return;
+        finalTimer = setTimeout(fail, shutdownTimeoutMs);
+      }, shutdownGraceMs);
+    });
+    return closing;
   }
 
   return { estimate, estimateBatch, prune, close, jsEstimate, isEnabled };
 }
 
-// Cordis plugin entry: registers nothing by default; exposes the bridge on
-// ctx for an explicit opt-in call site. No event subscription, so existing
-// Web/API behavior is unchanged while disabled.
+// Cordis plugin entry: the bridge is a service owned by this plugin's fiber.
+// Its disposer unregisters the service before the bridge waits for its worker.
 export function apply(ctx) {
-  const bridge = createComputeBridge({ bin: process.env.RDSH_BIN ?? "rdsh" });
-  ctx.rdshCompute = bridge;
-  ctx.on?.("dispose", () => bridge.close());
+  return ctx.effect(() => {
+    const bridge = createComputeBridge({ bin: resolveRdshBin() });
+    ctx.provide("rdshCompute", bridge);
+    return () => bridge.close();
+  }, "rdsh-compute");
 }

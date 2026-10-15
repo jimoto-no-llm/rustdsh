@@ -7,6 +7,10 @@ Startup cost (~10s to ready URL, measured on Linux web profile) comes from
 Chromium + Node + plugin loading, so no external shim can make the app
 itself boot like a 1MB native binary.
 
+See [DESKTOP-INTEGRATION.md](DESKTOP-INTEGRATION.md) for the supported attach
+path (`rdsh desktop install` into the reserved profile) and its verification
+status.
+
 ## Where rdsh helps (measured, release build)
 
 | Call site | rdsh | Baseline |

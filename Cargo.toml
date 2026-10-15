@@ -1,6 +1,6 @@
 [package]
 name = "rdsh"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 rust-version = "1.85"
 description = "Rust port/shim for dsh: fast launcher, token saver, zero behavior breakage via passthrough"
@@ -17,13 +17,28 @@ path = "src/main.rs"
 
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
-serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+# preserve_order keeps JSON object key order. cost-ledger and task-outcomes
+# must retain insertion order to match their former dashboard implementations.
+serde_json = { version = "1.0", features = ["preserve_order"] }
 anyhow = "1.0"
 getrandom = "0.4"
 libc = "0.2"
+sha2 = "0.11.0"
+axum = { version = "0.8.4", default-features = false, features = ["http1", "json", "tokio"] }
+bytes = "1.10"
+futures-util = "0.3"
+hyper = { version = "1.7", features = ["http1", "server"] }
+hyper-util = { version = "0.1", features = ["service", "tokio"] }
+reqwest = { version = "0.12.9", default-features = false, features = ["rustls-tls", "stream"] }
+tokio = { version = "1.48", features = ["macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
+tower = { version = "0.5", features = ["util"] }
 
 [build-dependencies]
-embed-resource = "=3.0.11"
+embed-resource = "=3.0.12"
+
+[dev-dependencies]
+tokio = { version = "1.48", features = ["test-util"] }
 
 [profile.release]
 # Speed-first: opt 3 + fat LTO beats opt-z for launcher + search/token loops.

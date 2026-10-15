@@ -162,7 +162,9 @@ fn clean(s: &str) -> String {
     decode_entities(&strip_tags(s))
 }
 
-/// First `href` + link text inside an `<article class="...result...">` block.
+/// First `href` + link text inside an `<article>` block whose `class`
+/// attribute marks it as a result. Only the start tag's class tokens decide:
+/// body text (title/URL/snippet) must never affect classification.
 fn parse_html(h: &str, limit: usize) -> Vec<Hit> {
     let mut hits = Vec::new();
     let mut rest = h;
@@ -174,7 +176,19 @@ fn parse_html(h: &str, limit: usize) -> Vec<Hit> {
             .unwrap_or(block.len());
         let blk = &block[..end];
         rest = &block[end.min(block.len())..];
-        if !blk.contains("result") || blk.contains("correction") {
+        // Classify by the article start tag's class tokens only: title, URL
+        // and snippet text must never affect the decision (#382).
+        let head = &blk[..blk
+            .find('>')
+            .map(|i| i + 1)
+            .unwrap_or(blk.len())
+            .min(blk.len())];
+        let class = attr(head, "class").unwrap_or_default();
+        let tokens: Vec<&str> = class.split_whitespace().collect();
+        if !tokens.iter().any(|t| t.contains("result")) {
+            continue;
+        }
+        if tokens.iter().any(|t| t.contains("correction")) {
             continue;
         }
         let href = match find_href(blk) {
@@ -335,10 +349,21 @@ fn fetch(base: &str, query: &str) -> anyhow::Result<Vec<Hit>> {
         Some(i) => &text[i + 4..],
         None => anyhow::bail!("bad HTTP response from {base}"),
     };
-    if !body.contains("<article") {
-        anyhow::bail!("no SearXNG results page from {base} (is SEARXNG_URL right?)");
-    }
+    ensure_results_page(body, base)?;
     Ok(parse_html(body, 50))
+}
+
+/// SearXNG の 0 件応答は `<article` を含まないため、本文の見た目だけで
+/// URL 設定ミスと断定しない。SearXNG だと分かるマーカーがあれば 0 件として通す。
+fn ensure_results_page(body: &str, base: &str) -> anyhow::Result<()> {
+    if body.contains("<article") || looks_like_searxng(body) {
+        return Ok(());
+    }
+    anyhow::bail!("no SearXNG results page from {base} (is SEARXNG_URL right?)")
+}
+
+fn looks_like_searxng(body: &str) -> bool {
+    body.contains("id=\"results\"") || body.contains("content=\"searxng")
 }
 
 pub fn cmd_search_web(query: &str, limit: usize, json: bool) -> anyhow::Result<()> {
@@ -383,6 +408,27 @@ pub fn cmd_search_web(query: &str, limit: usize, json: bool) -> anyhow::Result<(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // 0 件でも正しい SearXNG インスタンスなら成功扱いにする（設定ミスと誤診しない）。
+    #[test]
+    fn empty_searxng_page_is_not_a_configuration_error() {
+        let page =
+            "<html><body><div id=\"results\"><p>No results were found.</p></div></body></html>";
+        assert!(ensure_results_page(page, "http://127.0.0.1:8888").is_ok());
+        assert!(parse_html(page, 50).is_empty());
+    }
+
+    #[test]
+    fn searxng_generator_meta_is_accepted() {
+        let page = "<html><head><meta name=\"generator\" content=\"searxng/2026\"></head></html>";
+        assert!(ensure_results_page(page, "http://127.0.0.1:8888").is_ok());
+    }
+
+    #[test]
+    fn a_plain_page_is_still_reported_as_a_wrong_url() {
+        let page = "<html><body><h1>hello</h1></body></html>";
+        assert!(ensure_results_page(page, "http://127.0.0.1:8888").is_err());
+    }
 
     #[test]
     fn query_encoding() {
@@ -494,6 +540,28 @@ mod tests {
         assert_eq!(hits[0].title, "A B");
         assert_eq!(hits[0].url, "https://e.com/x?a=1&b=2");
         assert_eq!(hits[0].content, "one <two>");
+    }
+
+    #[test]
+    fn html_parsing_keeps_correction_words_in_title_url_snippet() {
+        // Regression test for #382: the word "correction" in body text must
+        // not exclude a normal result; only the start tag's class tokens decide.
+        let h = concat!(
+            "<article class=\"result\"><h3><a href=\"https://example.invalid/a\">",
+            "Quantum error correction</a></h3><p class=\"content\">Useful paper</p></article>",
+            "<article class=\"result\"><h3><a href=\"https://example.invalid/correction-notes\">",
+            "Quantum paper</a></h3><p class=\"content\">Useful paper</p></article>",
+            "<article class=\"result\"><h3><a href=\"https://example.invalid/b\">",
+            "Quantum paper</a></h3><p class=\"content\">About error correction</p></article>",
+            "<article class=\"result result-correction\"><h3><a href=\"https://example.invalid/d\">",
+            "Did you mean?</a></h3></article>",
+        );
+        let hits = parse_html(h, 10);
+        assert_eq!(hits.len(), 3);
+        assert_eq!(hits[0].title, "Quantum error correction");
+        assert_eq!(hits[0].url, "https://example.invalid/a");
+        assert_eq!(hits[1].url, "https://example.invalid/correction-notes");
+        assert_eq!(hits[2].content, "About error correction");
     }
 
     #[test]

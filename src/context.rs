@@ -64,7 +64,7 @@ impl Default for ContextConfig {
 impl From<crate::rdsh_config::ContextSection> for ContextConfig {
     fn from(c: crate::rdsh_config::ContextSection) -> Self {
         Self {
-            token_budget: c.token_budget.clamp(500, 200000),
+            token_budget: c.token_budget.clamp(500, 200_000),
             enable_retriever: c.enable_retriever,
             enable_packer: c.enable_packer,
             enable_verifier: c.enable_verifier,
@@ -105,6 +105,13 @@ fn is_cjk(c: char) -> bool {
         | '\u{f900}'..='\u{faff}' | '\u{ff00}'..='\u{ffef}' | '\u{20000}'..='\u{2ebef}')
 }
 
+/// CJK bigram（2文字ともCJK）か。ノイズ抑制の弱加点・除外判定に使う。
+/// バイト数ではなく文字数とis_cjkで判定する（CJK2文字はUTF-8で6bytesのため）。
+/// ASCIIの2文字語（CI/UI/Goなど）は含まない。
+fn is_cjk_bigram(term: &str) -> bool {
+    term.chars().count() == 2 && term.chars().all(is_cjk)
+}
+
 fn push_term(terms: &mut Vec<String>, t: &str) {
     if t.is_empty() || terms.len() >= 16 {
         return;
@@ -131,7 +138,7 @@ fn query_terms(query: &str) -> Vec<String> {
         spaced.push(c);
         prev = Some(c);
     }
-    let mut terms: Vec<String> = vec![];
+    let mut terms: Vec<String> = Vec::new();
     for raw in spaced
         .to_lowercase()
         .split(|c: char| !(c.is_alphanumeric() || c == '_' || c == '-' || c == '/'))
@@ -146,9 +153,6 @@ fn query_terms(query: &str) -> Vec<String> {
         let has_cjk = t.chars().any(is_cjk);
         // ASCIIは2文字未満を落とす。CJKを含む語は1文字から残す。
         if !has_cjk && nchars < 2 {
-            continue;
-        }
-        if nchars < 1 {
             continue;
         }
         // よくある英単語・日本語助詞のノイズだけ落とす
@@ -207,7 +211,7 @@ fn score_line(line_lower: &str, terms: &[String]) -> usize {
     let mut matched = 0usize;
     let line_chars: Vec<char> = line_lower.chars().collect();
     for t in terms {
-        if t.len() == 2 && t.chars().count() == 2 && t.chars().all(is_cjk) {
+        if is_cjk_bigram(t) {
             // CJK bigramは弱めに加点（ノイズ抑制）
             if line_lower.contains(t) {
                 score += 3;
@@ -334,7 +338,7 @@ fn truncate_list(items: &[String], max_items: usize, max_chars: usize) -> (Strin
     if items.is_empty() {
         return (String::new(), 0);
     }
-    let mut kept: Vec<&str> = vec![];
+    let mut kept: Vec<&str> = Vec::new();
     let mut chars = 0usize;
     for it in items.iter().take(max_items) {
         let len = it.chars().count();
@@ -475,7 +479,7 @@ fn session_files_sorted(limit_dirs: usize) -> Vec<std::path::PathBuf> {
         }
         Err(_) => return vec![],
     };
-    let mut files: Vec<(u64, std::path::PathBuf)> = vec![];
+    let mut files: Vec<(u64, std::path::PathBuf)> = Vec::new();
     for proj in projs {
         let mut sessions = std::fs::read_dir(&proj)
             .map(|e| e.filter_map(Result::ok).collect::<Vec<_>>())
@@ -531,7 +535,7 @@ fn recent_sessions(query: &str, limit: usize) -> Vec<String> {
             .map(|p| format!("[session] {}", short_session(&p)))
             .collect();
     }
-    let mut scored: Vec<(usize, u64, String)> = vec![];
+    let mut scored: Vec<(usize, u64, String)> = Vec::new();
     for p in session_files_sorted(4).into_iter().take(120) {
         let bytes = read_small_regular(
             &p,
@@ -549,11 +553,14 @@ fn recent_sessions(query: &str, limit: usize) -> Vec<String> {
         let mut snippet = String::new();
         let mut best_snippet_score = 0usize;
         for t in &terms {
-            if t.len() == 2 && t.chars().count() == 2 {
-                continue;
-            }
+            // CJK bigramは弱めに加点（ノイズ抑制）。ASCIIの2文字語は通常加点する。
+            let weak = is_cjk_bigram(t);
             if lower.contains(t) {
-                score += 3 + t.chars().count().min(12);
+                if weak {
+                    score += 3;
+                } else {
+                    score += 3 + t.chars().count().min(12);
+                }
                 matched += 1;
                 // その語を含む最良行をスニペットにする
                 for line in text.lines().take(400) {
@@ -653,7 +660,7 @@ const SKIP_DIRS: &[&str] = &[
 const MAX_PER_FILE: usize = 3;
 
 fn load_gitignore_patterns(root: &std::path::Path) -> Vec<String> {
-    let mut pats: Vec<String> = vec![];
+    let mut pats: Vec<String> = Vec::new();
     for cand in [root.join(".gitignore"), root.join(".git/info/exclude")] {
         let Ok(text) = std::fs::read_to_string(&cand) else {
             continue;
@@ -802,7 +809,7 @@ fn code_hits(query: &str, max: usize) -> Vec<String> {
         return vec![];
     };
     let ignore_pats = load_gitignore_patterns(&root);
-    let mut scored: Vec<(usize, String)> = vec![];
+    let mut scored: Vec<(usize, String)> = Vec::new();
     let mut stack = vec![root.clone()];
     let mut files_seen = 0usize;
     // 決定的な走査順にするためディレクトリ・ファイルとも名前順に処理する。
@@ -811,7 +818,7 @@ fn code_hits(query: &str, max: usize) -> Vec<String> {
             .map(|e| e.filter_map(Result::ok).collect::<Vec<_>>())
             .unwrap_or_default();
         entries.sort_by_key(|e| e.file_name());
-        let mut subdirs: Vec<std::path::PathBuf> = vec![];
+        let mut subdirs: Vec<std::path::PathBuf> = Vec::new();
         for e in entries {
             let name = e.file_name().to_string_lossy().into_owned();
             // 隠しパスは原則スキップ（.gitignore がある主要 .github も含め速度優先）
@@ -863,7 +870,9 @@ fn code_hits(query: &str, max: usize) -> Vec<String> {
             let path_lower = p.display().to_string().to_lowercase();
             let mut file_bonus = 0usize;
             for t in &terms {
-                if t.len() == 2 && t.chars().count() == 2 {
+                // CJK bigramはファイル名加点の対象外（ノイズ抑制）。
+                // ASCIIの2文字語は通常どおり加点する。
+                if is_cjk_bigram(t) {
                     continue;
                 }
                 if path_lower.contains(t) {
@@ -876,12 +885,12 @@ fn code_hits(query: &str, max: usize) -> Vec<String> {
                 .and_then(|s| s.to_str())
                 .map(|x| x.to_lowercase())
             {
-                Some(ref e) if e == "md" => 0usize,
+                Some(e) if e == "md" => 0usize,
                 Some(_) => 1usize,
                 None => 1usize,
             };
             // 全行を採点し、行番号が若い順のバイアスを排して上位だけ残す。
-            let mut best: Vec<(usize, usize, String)> = vec![];
+            let mut best: Vec<(usize, usize, String)> = Vec::new();
             for (i, line) in text.lines().enumerate().take(2000) {
                 let trimmed = line.trim();
                 if trimmed.is_empty() {
@@ -957,7 +966,7 @@ fn priority_order() -> Vec<&'static str> {
 }
 
 fn assemble(query: &str, cfg: &ContextConfig) -> Vec<Section> {
-    let mut secs: Vec<Section> = vec![];
+    let mut secs: Vec<Section> = Vec::new();
     let goal = if cfg.goal.trim().is_empty() {
         "(unset — set with: rdsh settings set context.goal \"...\")".to_string()
     } else {
@@ -975,7 +984,7 @@ fn assemble(query: &str, cfg: &ContextConfig) -> Vec<Section> {
         });
     }
     if !cfg.working_files.is_empty() {
-        let mut parts: Vec<String> = vec![];
+        let mut parts: Vec<String> = Vec::new();
         for f in cfg.working_files.iter().take(12) {
             match read_working_file(f, 8000) {
                 Ok(t) => {
@@ -1024,7 +1033,7 @@ fn assemble(query: &str, cfg: &ContextConfig) -> Vec<Section> {
     }
     if cfg.enable_retriever {
         let q = query.trim();
-        let mut parts: Vec<String> = vec![];
+        let mut parts: Vec<String> = Vec::new();
         for h in code_hits(q, cfg.max_code_hits) {
             parts.push(h);
         }
@@ -1118,7 +1127,7 @@ fn pack_by_priority(sections: Vec<Section>, budget: usize) -> String {
 /// goal と constraints を温存したまま残りを予算に収める。
 fn prune_keep_goal(sections: &[Section], budget: usize) -> String {
     let mut head = String::new();
-    let mut rest: Vec<&Section> = vec![];
+    let mut rest: Vec<&Section> = Vec::new();
     for s in sections {
         if s.name == "goal" || s.name == "constraints" {
             head.push_str(&format!("# {}\n{}\n\n", s.name, s.body));
@@ -1142,7 +1151,7 @@ fn prune_keep_goal(sections: &[Section], budget: usize) -> String {
 
 /// pack 後の本文を節ごとに割って実測トークンを付ける。
 fn packed_breakdown(packed: &str) -> Vec<serde_json::Value> {
-    let mut out: Vec<serde_json::Value> = vec![];
+    let mut out: Vec<serde_json::Value> = Vec::new();
     let mut name = String::new();
     let mut body = String::new();
     let flush = |name: &mut String, body: &mut String, out: &mut Vec<serde_json::Value>| {
@@ -1176,7 +1185,7 @@ fn render(sections: &[Section]) -> String {
 
 fn missing_files(cfg: &ContextConfig) -> Vec<String> {
     let root = std::fs::canonicalize(".").ok();
-    let mut out: Vec<String> = vec![];
+    let mut out: Vec<String> = Vec::new();
     for f in &cfg.working_files {
         let bad = match std::fs::metadata(f) {
             Err(_) => true,
@@ -1287,7 +1296,7 @@ pub fn cmd_build(
 ) -> anyhow::Result<()> {
     let cfg = load_config();
     let q = query.unwrap_or_default();
-    let budget = budget.unwrap_or(cfg.token_budget).clamp(500, 200000);
+    let budget = budget.unwrap_or(cfg.token_budget).clamp(500, 200_000);
     let sections = assemble(&q, &cfg);
     let full = render(&sections);
     let before = estimate(&full);
@@ -1364,7 +1373,7 @@ pub fn cmd_search(query: String, max: usize) -> anyhow::Result<()> {
 pub fn cmd_explain(query: Option<String>, budget: Option<usize>) -> anyhow::Result<()> {
     let cfg = load_config();
     let q = query.unwrap_or_default();
-    let budget = budget.unwrap_or(cfg.token_budget).clamp(500, 200000);
+    let budget = budget.unwrap_or(cfg.token_budget).clamp(500, 200_000);
     let sections = assemble(&q, &cfg);
     let stdout = std::io::stdout();
     let mut out = std::io::BufWriter::new(stdout.lock());
@@ -1444,6 +1453,23 @@ mod tests {
         );
     }
 
+    // #388: 2文字ASCII語（CI/UI/Go）を検索語として捨てない。
+    #[test]
+    fn two_char_ascii_terms_are_searchable() {
+        assert_eq!(query_terms("CI"), vec!["ci".to_string()]);
+        assert_eq!(query_terms("Go"), vec!["go".to_string()]);
+        assert!(!is_cjk_bigram("ci"));
+        assert!(!is_cjk_bigram("go"));
+        assert!(is_cjk_bigram("日本"));
+        // ASCIIの2文字語は通常加点される。
+        assert!(score_line("ci pipeline", &["ci".to_string()]) > 0);
+        // CJK bigramは弱い加点になり、通常語と区別される。
+        let weak = score_line("日本語のテスト", &["日本".to_string()]);
+        let normal = score_line("pipeline のテスト", &["pipeline".to_string()]);
+        assert!(weak > 0);
+        assert!(weak < normal);
+    }
+
     #[test]
     fn head_tail_truncates_by_unicode_characters() {
         let (text, truncated) = head_tail("あいうえおABCDE", 2, 3);
@@ -1472,6 +1498,57 @@ mod tests {
     fn shrinking_a_nonempty_section_keeps_at_least_one_line() {
         assert_eq!(shrink_lines("first\nsecond\nthird", 0.1), "first");
         assert_eq!(shrink_lines("first\nsecond", 1.0), "first\nsecond");
+    }
+
+    fn pack_fixture() -> Vec<Section> {
+        vec![
+            Section {
+                name: "goal",
+                body: "ship the release".to_string(),
+            },
+            Section {
+                name: "constraints",
+                body: "no breaking changes".to_string(),
+            },
+            Section {
+                name: "retrieved",
+                body: "hit\n".repeat(400),
+            },
+            Section {
+                name: "open_tasks",
+                body: "task\n".repeat(200),
+            },
+            Section {
+                name: "decisions",
+                body: "decision\n".repeat(200),
+            },
+            Section {
+                name: "git_diff",
+                body: "diff\n".repeat(400),
+            },
+        ]
+    }
+
+    /// goal と constraints は最後まで残し、最終的に予算内へ収める。
+    #[test]
+    fn pack_by_priority_keeps_goal_and_constraints_within_budget() {
+        for budget in [64, 128, 512, 4096] {
+            let packed = pack_by_priority(pack_fixture(), budget);
+            assert!(estimate(&packed) <= budget, "budget {budget} exceeded");
+            assert!(packed.contains("# goal"), "budget {budget} dropped goal");
+            assert!(
+                packed.contains("# constraints"),
+                "budget {budget} dropped constraints"
+            );
+        }
+    }
+
+    #[test]
+    fn prune_keep_goal_starts_with_goal_within_budget() {
+        let pruned = prune_keep_goal(&pack_fixture(), 200);
+        assert!(estimate(&pruned) <= 200, "budget exceeded");
+        assert!(pruned.starts_with("# goal"), "goal must come first");
+        assert!(pruned.contains("# constraints"), "constraints must be kept");
     }
 }
 

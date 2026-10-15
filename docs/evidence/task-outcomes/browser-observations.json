@@ -1,0 +1,156 @@
+{
+  "scope": "real local project server and Chromium; fixture checks only; no models, provider authentication, Tailscale or production adoption",
+  "node": "v22.23.3",
+  "source_files": {
+    "dashboard/app.mjs": "5777f1c0024e9869086fa6d11d36d40932a2c6d5445719c6c64848daf39268bf",
+    "dashboard/ui.html": "97f0f7b8e5b8af5d199bf4ed3d4b4ca3e7c5ad09691614759fd86f28daff1a00",
+    "dashboard/state.mjs": "d75cbfbd88b90584dd01fdb5d3347ac97e1f89c4ed872e29ad6823fcc8966295",
+    "dashboard/mcp.mjs": "45e311d94cb8a7014332f10e365c9a83a5324ebe31d88b8d155923ba2dda3f54",
+    "dashboard/server.mjs": "92f257fc053be9c4ed690b5a3d7f82c1aaec7a0ae4c54a338a75838472d7f5f0",
+    "dashboard/task-outcomes.mjs": "153e2679551d105e693c8231645d0cad42b708010c777273e2debfa5ad682d8d",
+    "dashboard/task-outcomes-view.mjs": "889c7b89622dde9dcb2459759be845d99df5254edd9d1aaf156927e4750b6296",
+    "dashboard/task-outcomes-ui.mjs": "dd41539168df62984104dcb514389dc9a17ba43fbd2c51067972c2b719110d1a"
+  },
+  "captures": {
+    "before": {
+      "selector": "#tasks-detail",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "interaction_viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    "before-mobile": {
+      "selector": "#tasks-detail",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "interaction_viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    "after-unchecked": {
+      "selector": "#tasks-detail",
+      "viewport": {
+        "width": 1280,
+        "height": 1504
+      },
+      "interaction_viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    "after-unverified": {
+      "selector": "#tasks-detail",
+      "viewport": {
+        "width": 1280,
+        "height": 1629
+      },
+      "interaction_viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    "after-partial": {
+      "selector": "#tasks-detail",
+      "viewport": {
+        "width": 1280,
+        "height": 1632
+      },
+      "interaction_viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    "after": {
+      "selector": "#tasks-detail",
+      "viewport": {
+        "width": 1280,
+        "height": 1707
+      },
+      "interaction_viewport": {
+        "width": 1280,
+        "height": 900
+      }
+    },
+    "after-mobile": {
+      "selector": "#tasks-detail",
+      "viewport": {
+        "width": 390,
+        "height": 2621
+      },
+      "interaction_viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    "after-mobile-viewport": {
+      "selector": "viewport",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "focus": "#task-goal"
+    },
+    "after-mobile-milestone": {
+      "selector": "viewport",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "focus": "#task-milestones"
+    },
+    "after-stale": {
+      "selector": "#tasks-detail",
+      "viewport": {
+        "width": 390,
+        "height": 2876
+      },
+      "interaction_viewport": {
+        "width": 390,
+        "height": 844
+      }
+    }
+  },
+  "flows": [
+    "done remains unverified; all purpose/owner/outcome/next step/blocker fields reachable",
+    "only current observed full checks satisfy fixed criteria; 0/2 -> 1/2 -> 2/2",
+    "adding two split tasks preserves the fixed criterion numerator and denominator",
+    "related code change invalidates earlier passes without changing reported done",
+    "late response from a previous state revision is ignored and recheck remains usable"
+  ],
+  "page_errors": [],
+  "head": "3c8375a811541c1181fb446e47fa9464da7c1b49",
+  "before_first_task_ready_ms": 170.40379999999982,
+  "baseline": "origin/main d705ed7; same fixture task and acceptance definitions",
+  "after_first_task_ready_ms": 147.5326,
+  "chromium": "154.0.8037.98",
+  "mobile": {
+    "width": 390,
+    "height": 844,
+    "horizontal_overflow": false
+  },
+  "render_benchmark": [
+    {
+      "tasks": 40,
+      "samples": 5,
+      "median_ms": 6.800000011920929,
+      "max_ms": 7.5999999940395355,
+      "includes_dom_and_layout": true,
+      "checks_executed": 0
+    },
+    {
+      "tasks": 200,
+      "samples": 5,
+      "median_ms": 31.700000017881393,
+      "max_ms": 41,
+      "includes_dom_and_layout": true,
+      "checks_executed": 0
+    }
+  ]
+}

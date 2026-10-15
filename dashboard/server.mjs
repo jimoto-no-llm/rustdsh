@@ -16,6 +16,7 @@ import { AnswerApplicationServer } from "./answer-application-server.mjs";
 import { BudgetAdmissionServer } from "./budget-server.mjs";
 import { createHistoryBackup, backupMaximum } from "./history-backup.mjs";
 import { AcceptanceStore } from "./acceptance.mjs";
+import { inspectTaskOutcomes } from "./task-outcomes-view.mjs";
 import { ObservedCliStore } from "./observed-cli.mjs";
 import {
   ConnectionObservations,
@@ -32,6 +33,91 @@ const equal = (a, b) =>
   timingSafeEqual(Buffer.from(a), Buffer.from(b));
 const loopbackAddresses = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
 const forwardingHeaders = ["forwarded", "x-forwarded-for", "x-forwarded-host"];
+// Exclusive live-instance lock: stale-lock reclamation is serialized
+// in-process, cross-process steals use an atomic rename, and cleanup only
+// removes a lock owned by this starter (`pid:token`).
+let dashboardLockQueue = Promise.resolve();
+function parseDashboardLock(content) {
+  const text = String(content ?? "").trim();
+  const sep = text.indexOf(":");
+  if (sep === -1) return { pid: Number(text), token: null };
+  return { pid: Number(text.slice(0, sep)), token: text.slice(sep + 1) };
+}
+function dashboardPidAlive(pid) {
+  if (!Number.isFinite(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error?.code === "EPERM";
+  }
+}
+export async function removeDashboardLockIfOwned(lockFile, ownedContent) {
+  let current = null;
+  try {
+    current = await fs.readFile(lockFile, "utf8");
+  } catch {
+    return false;
+  }
+  if (current !== ownedContent) return false;
+  try {
+    await fs.unlink(lockFile);
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+  return true;
+}
+export async function acquireDashboardLock(lockFile, ownedContent) {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      await fs.writeFile(lockFile, ownedContent, { flag: "wx", mode: 0o600 });
+      return;
+    } catch (error) {
+      if (error?.code !== "EEXIST") throw error;
+    }
+    let existing = null;
+    try {
+      existing = await fs.readFile(lockFile, "utf8");
+    } catch (error) {
+      if (error?.code === "ENOENT") continue;
+      throw error;
+    }
+    if (dashboardPidAlive(parseDashboardLock(existing).pid)) {
+      throw new Error(
+        "This dashboard is already running; use rdsh-dashboard open with the same project",
+      );
+    }
+    const backup = `${lockFile}.stale.${process.pid}.${randomUUID()}`;
+    try {
+      await fs.rename(lockFile, backup);
+    } catch (error) {
+      if (error?.code === "ENOENT") continue;
+      throw error;
+    }
+    let stolen = null;
+    try {
+      stolen = await fs.readFile(backup, "utf8");
+    } catch {
+      stolen = null;
+    }
+    if (stolen !== existing) {
+      if (stolen !== null) {
+        try {
+          await fs.writeFile(lockFile, stolen, { flag: "wx", mode: 0o600 });
+          await fs.unlink(backup).catch(() => {});
+        } catch (restoreError) {
+          if (restoreError?.code !== "EEXIST") throw restoreError;
+          await fs.unlink(backup).catch(() => {});
+        }
+      } else {
+        await fs.unlink(backup).catch(() => {});
+      }
+      continue;
+    }
+    await fs.unlink(backup).catch(() => {});
+  }
+  throw new Error("Could not acquire dashboard lock");
+}
 function json(res, status, value) {
   res.writeHead(status, { "content-type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(value));
@@ -58,31 +144,13 @@ export async function startDashboard(options) {
   await fs.mkdir(directory, { recursive: true });
   // Exclusive live-instance lock: never launch two writers for the same project.
   const lockFile = path.join(directory, "server.lock");
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      await fs.writeFile(lockFile, String(process.pid), {
-        flag: "wx",
-        mode: 0o600,
-      });
-      break;
-    } catch (e) {
-      if (e.code !== "EEXIST") throw e;
-      const pid = Number(await fs.readFile(lockFile, "utf8"));
-      let alive = false;
-      try {
-        process.kill(pid, 0);
-        alive = true;
-      } catch (error) {
-        if (error.code === "EPERM") alive = true;
-      }
-      if (alive)
-        throw new Error(
-          "This dashboard is already running; use rdsh-dashboard open with the same project",
-        );
-      await fs.unlink(lockFile);
-      if (attempt === 1) throw new Error("Could not acquire dashboard lock");
-    }
-  }
+  const lockContent = `${process.pid}:${randomUUID()}`;
+  const acquisition = dashboardLockQueue.then(
+    () => acquireDashboardLock(lockFile, lockContent),
+    () => acquireDashboardLock(lockFile, lockContent),
+  );
+  dashboardLockQueue = acquisition.catch(() => {});
+  await acquisition;
   const token = randomBytes(32).toString("hex"); // local administrator
   const mcpToken = randomBytes(32).toString("hex");
   const browserToken = randomBytes(32).toString("hex");
@@ -104,7 +172,7 @@ export async function startDashboard(options) {
         })
       : null;
   } catch (error) {
-    await fs.unlink(lockFile);
+    await removeDashboardLockIfOwned(lockFile, lockContent).catch(() => {});
     throw error;
   }
   const live = new Set(),
@@ -400,6 +468,7 @@ export async function startDashboard(options) {
       const agentRoute =
         route === "/mcp" ||
         route === "/api/state" ||
+        (req.method === "GET" && route === "/api/task-outcomes") ||
         route === "/api/instructions/context" ||
         (req.method === "POST" && route === "/api/instructions/submit") ||
         (req.method === "POST" &&
@@ -451,12 +520,14 @@ export async function startDashboard(options) {
           route === "/observations.mjs" ||
           route === "/reports-view.mjs" ||
           route === "/question-cards-ui.mjs" ||
+          route === "/model-catalog-ui.mjs" ||
           route === "/project-overview.mjs" ||
           route === "/connection-diagnostics-ui.mjs" ||
           route === "/answer-applications-ui.mjs" ||
           route === "/instruction-queue-ui.mjs" ||
           route === "/cost-ledger-ui.mjs" ||
           route === "/budget-ui.mjs" ||
+          route === "/task-outcomes-ui.mjs" ||
           route === "/observed-cli-ui.mjs" ||
           route === "/favicon.ico" ||
           route === "/icon.png" ||
@@ -551,12 +622,14 @@ export async function startDashboard(options) {
           "/observations.mjs",
           "/reports-view.mjs",
           "/question-cards-ui.mjs",
+          "/model-catalog-ui.mjs",
           "/project-overview.mjs",
           "/connection-diagnostics-ui.mjs",
           "/answer-applications-ui.mjs",
           "/instruction-queue-ui.mjs",
           "/cost-ledger-ui.mjs",
           "/budget-ui.mjs",
+          "/task-outcomes-ui.mjs",
           "/observed-cli-ui.mjs",
         ].includes(route)
       ) {
@@ -791,6 +864,24 @@ export async function startDashboard(options) {
         }
         if (req.method === "GET" && route === "/api/state")
           return json(res, 200, await visibleState());
+        if (req.method === "GET" && route === "/api/task-outcomes") {
+          const entries = [...url.searchParams.entries()];
+          if (entries.length !== 1)
+            return json(res, 400, {
+              error: "Select exactly one task_id or milestone_id",
+            });
+          const state = store.clone();
+          const result = await inspectTaskOutcomes(
+            project,
+            state,
+            Object.fromEntries(entries),
+          );
+          if (store.value.revision !== state.revision)
+            return json(res, 409, {
+              error: "Project state changed; refresh and inspect again",
+            });
+          return json(res, 200, result);
+        }
         if (req.method === "POST" && route?.startsWith("/api/update/")) {
           const operation = route.slice("/api/update/".length);
           if (
@@ -899,7 +990,7 @@ export async function startDashboard(options) {
       await eventsHub?.queue;
       for (const socket of sockets) socket.destroy();
       await new Promise((resolve) => server.close(resolve));
-      await fs.unlink(lockFile).catch(() => {});
+      await removeDashboardLockIfOwned(lockFile, lockContent).catch(() => {});
     });
     closePromise = attempt;
     // A failed preflight leaves the dashboard available, so let a later caller retry.

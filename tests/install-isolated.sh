@@ -119,11 +119,13 @@ register_cases() {
     "CASE OK: fallback-unrunnable-glibc" "" 1 ""
   add_case "release/pinned-version" "ubuntu-24.04" "pinned-version.sh" ok \
     "CASE OK: pinned-version" "" 0 "RDSH_RELEASE_VERSION=__TAG__"
+  add_case "release/download-cleanup" "ubuntu-24.04" "download-cleanup.sh" ok \
+    "CASE OK: download-cleanup" "" 0 ""
   # Fail-closed guards.
   add_case "guard/checksum-mismatch" "ubuntu-24.04" "checksum-mismatch.sh" ok \
     "CASE OK: checksum-mismatch" "" 0 ""
-  add_case "guard/missing-sidecar" "ubuntu-24.04" "missing-sidecar.sh" ok \
-    "CASE OK: missing-sidecar" "" 0 ""
+  add_case "guard/unpinned-asset" "ubuntu-24.04" "unpinned-asset.sh" ok \
+    "CASE OK: unpinned-asset" "" 0 ""
   add_case "guard/unsupported-arch" "debian-12" "unsupported-arch.sh" ok \
     "CASE OK: unsupported-arch" "" 0 ""
   # CLI behaviors that a new user hits right after installing.
@@ -208,6 +210,35 @@ stage_layout() {
       cp -f "$asset" "$target/"
     done
   done
+}
+
+stage_digest_registry() {
+  # $1: the tag the staged layout serves. install.sh verifies each archive
+  # against release-digests.tsv fetched from a fixed canonical URL, but the
+  # cases run with --network=none, so stage the equivalent file for this tag
+  # and hand it over through RDSH_RELEASE_DIGESTS. install.sh honours that
+  # variable only for a file:// release base, so a real install can never be
+  # redirected to a registry the release origin controls.
+  local version="$1" asset sum
+  local dir="$STAGE_DIR/download/$version"
+  local assets=(rdsh-linux-x64.tar.gz rdsh-linux-x64-musl.tar.gz rdsh-macos-arm64.tar.gz rdsh-macos-x64.tar.gz)
+  local zero="0000000000000000000000000000000000000000000000000000000000000000"
+  {
+    printf '# fixture for tests/install-isolated.sh: digests of the staged archives\n'
+    printf 'latest %s\n' "$version"
+    for asset in "${assets[@]}"; do
+      if [ -f "$dir/$asset" ]; then
+        sum="$(cd "$dir" && sha256sum "$asset" | awk '{print $1}')"
+      elif [ "$asset" = "rdsh-linux-x64.tar.gz" ]; then
+        die "no staged $asset to pin in the digest fixture"
+      else
+        # Unstaged musl assets belong to skipped cases, and the containers are
+        # Linux-only, so the registry shape check is all these rows satisfy.
+        sum="$zero"
+      fi
+      printf '%s %s %s\n' "$version" "$asset" "$sum"
+    done
+  } > "$STAGE_DIR/release-digests.tsv"
 }
 
 resolve_published_tag() {
@@ -299,6 +330,7 @@ stage_assets() {
   esac
   if musl_asset_available "$dir"; then MUSL_AVAILABLE=1; fi
   stage_layout "$dir"
+  stage_digest_registry "$RESOLVED_TAG"
   stage_installer
   # The non-root scenario reads the mounts as uid 1000; a 077 umask on the
   # host would otherwise leave the staged tree unreadable.
@@ -395,6 +427,7 @@ run_case() {
     -e "PREFIX=$PREFIX"
     -e "ASSET_BASE=/base"
     -e "RDSH_RELEASE_BASE=file:///base"
+    -e "RDSH_RELEASE_DIGESTS=/base/release-digests.tsv"
     -e "RDSH_RELEASE_VERSION=$RELEASE_TAG")
 
   local entry user_env

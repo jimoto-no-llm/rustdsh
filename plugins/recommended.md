@@ -23,6 +23,24 @@ DRY_RUN=1 ./plugins/install.sh         # print the pnpm commands only
 PROFILE=web SOUND=1 ./plugins/install.sh  # also add Web sound/desktop notifications (below)
 ```
 
+### Desktop app (Electron) profile
+
+The Desktop application owns the reserved `desktop` profile and its own
+bundled command runtime, and the npm `dsh` CLI refuses to manage it. Use the
+profile installer, which forwards every package to the app's own command:
+
+```sh
+PROFILE=desktop ./plugins/install.sh              # recommended + bundled plugins
+PROFILE=desktop COMPUTE=1 ./plugins/install.sh    # plus the compute bridge
+```
+
+It runs `rdsh desktop install --no-bundled --package <spec>`, which invokes
+`resources/runtime/cli/bin/dsh plugin --profile desktop add ...`. Quit the app
+before attaching and reopen it afterwards; the app's own **Plugins** page can
+install the same packages without a command runtime. The installers do the same
+inline with `./install.sh --desktop` or `.\install.ps1 -Desktop`. See
+[docs/DESKTOP-INTEGRATION.md](../docs/DESKTOP-INTEGRATION.md).
+
 ## Optional Web UI plugins (third-party, opt-in)
 
 Installed only when `SOUND=1` is set. Kept out of the default set so the
@@ -41,14 +59,36 @@ Notes:
   arrive without a rustdsh release. Upstream repo:
   <https://github.com/cwd514/dsh-sound-notifications>
 
+## Third-party credits
+
+Third-party sources used by the installers and the bundled plugins. These
+projects are independent of rdsh; their licenses and copyrights stay with their
+authors.
+
+| Upstream | License | How rdsh uses it |
+| --- | --- | --- |
+| [Smart-DSH](https://github.com/hikarioyama/Smart-DSH) by hikarioyama | MIT | Source of the phone-width layout bundled as `rdsh-mobile-ui` (the mobile rail of its `dsh-notify-push` browser bundle). Its Web Push notifications, Esc-to-stop, task hub and shared-HMR workaround are not bundled. |
+| [dsh-sound-notifications](https://github.com/cwd514/dsh-sound-notifications) by cwd514 | MIT | Opt-in effect sounds and desktop notifications, installed only with `SOUND=1`. |
+| [dsh-gitview](https://github.com/yugapor/dsh-gitview) by yugapor | MIT | Optional sidebar Git panel. The installer does not offer it; add it with `dsh plugin --profile web add github:yugapor/dsh-gitview`. |
+
 ## Bundled rdsh plugins (this repo)
 
 `./plugins/install.sh` also installs these local plugins into the same
-profile, so the rdsh settings UI is available by default:
+profile, so the rdsh settings UI and the phone-width layout are available by
+default:
 
 | Plugin | Why |
 | --- | --- |
 | `rdsh-settings` | rdsh section in DSH settings (budgets, retrieval, memory, beta flags) |
+| `rdsh-update-banner` | release banner and notifications in the Web UI (`PROFILE=web` only). Installing it keeps the profile's own insert block from failing to import on every boot (issue #5) |
+| `rdsh-mobile-ui` | Phone-width layout for the DSH Web chat: full-width chat and composer, one-tap logo to the session list. Adapted from Smart-DSH (MIT) — see [its README](rdsh-mobile-ui/README.md). |
+
+The banner's package supplies a bundle patch. A Web profile previously wired
+with `install-banner.sh` may also have a manual insert with the same ID. DSH
+`0.2.0-rc.2` combines entries by ID and applies the profile's entry after the
+bundle entry, retaining the manual configuration. This installer leaves that
+profile patch untouched. After upgrading to a different DSH loader version,
+check its duplicate-ID behavior before migrating existing profiles.
 
 ## Workflow board source preparation
 
@@ -58,18 +98,24 @@ tooling, not an installable plugin, and `plugins/install.sh` does not install it
 It adds the board and shared workflow UI projection rules; build and adoption
 of the patched DSH remain separate operator decisions.
 
-## Filesystem skills (rtk + ponytail)
+## Filesystem skills (rdsh-docs + ponytail + rtk)
 
 Install with `./plugins/install-skills.sh` (defaults to `~/.dsh/skills`).
 
 | Skill | Source | Notes |
 | --- | --- | --- |
-| ponytail + 5 companions | `DietrichGebert/ponytail@main` | shallow clone, `FORCE=1` refreshes with timestamped backup |
+| rdsh-docs | `plugins/skills/rdsh-docs` in this source checkout | Documents the verified DSH/rdsh version scope and read-only inspection procedure |
+| ponytail + 5 companions | `DietrichGebert/ponytail@main` | shallow clone, `FORCE=1` refreshes with backup under `$DSH_HOME/skill-backups/` |
 | rtk | local `rtk` binary (want 0.46.0+) | verified by the script; its `SKILL.md` is kept as-is |
 
 ```sh
 ./plugins/install-skills.sh                  # into ~/.dsh/skills
 DSH_HOME=/tmp/test sh plugins/install-skills.sh  # sandbox trial
-FORCE=1 ./plugins/install-skills.sh          # refresh ponytail from upstream
+FORCE=1 ./plugins/install-skills.sh          # refresh installed skills; preserve old copies outside skills/
 DRY_RUN=1 ./plugins/install-skills.sh        # preview only
 ```
+
+The bundled `rdsh-docs` skill is installed only from a source checkout. It targets the `web` profile's `standard` and
+`cordis` presets and tells agents to check the installed DSH version before relying on its version-pinned references.
+Model selection and runtime skill loading require a separate DSH acceptance run; the installer and `rdsh skills` do not
+prove that a model loaded or followed the skill.

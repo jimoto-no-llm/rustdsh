@@ -31,7 +31,7 @@
 - [使い方](#使い方)
   - [`dsh` 互換での実行](#dsh-互換での実行)
   - [高速ネイティブコマンド](#高速ネイティブコマンド)
-  - [認証情報のセットアップ](#認証情報のセットアップ-rdsh-auth)
+  - [選択した認証情報だけを共有する](#選択した認証情報だけを共有するrdsh-auth)
   - [エージェント実行の安全な隔離](#エージェント実行の安全な隔離)
   - [フック監視](#フック監視-rdsh-guard)
 - [Web UI とダッシュボード](#web-ui-とダッシュボード)
@@ -146,21 +146,106 @@ rdsh sessions --limit 20 --tokens   # 過去セッション一覧と展開トー
 rdsh compact ./s.jsonl              # セッション JSONL を圧縮（元ファイルは不変）
 rdsh doctor                         # 本家 dsh、環境変数、パスなどの健全性診断
 rdsh profiles / rdsh skills         # 利用可能なプロファイル・スキル一覧
+rdsh desktop status                 # DeepSeek Harness Desktop アプリとプロファイルの検出
 rdsh bench --n 5                    # rdsh と本家 dsh の起動速度比較
 ```
 
-### 認証情報のセットアップ (`rdsh auth`)
+### 選択した認証情報だけを共有する（rdsh auth）
 
-他ツールですでに完了しているログインを、DSH が利用する `$DSH_HOME/.credentials.yaml` へ安全に取り込みます：
+Codex / OpenCode / 環境変数の認証情報を、秘密値なしで一覧にします。
+共有元とcredentialを選ぶまでコピーしません。取込先はDSH本来の
+$DSH_HOME/.credentials.yamlです。選択は秘密値を含まない
+$DSH_HOME/rdsh-auth-sharing.jsonに保存します。
 
 ```sh
-rdsh auth                                  # 現在のログイン状態を確認
-rdsh auth --import --provider openai-codex # Codex / opencode のログインを取り込み
-rdsh setup                                 # 対話型セットアップウィザード
-rdsh setup --web                           # ブラウザから行える Web 設定画面
+rdsh auth                                      # 共有元・保存先・選択状態・解除手順
+rdsh auth --json                               # 秘密値を含まない機械可読の一覧
+rdsh --dry-run auth --select codex:openai-codex --import # previewのみ、ファイル変更なし
+rdsh auth --select codex:openai-codex --import    # CodexのOAuthだけ共有
+rdsh auth --select opencode:openai-codex --import # OpenCodeのopenaiログインだけ共有
+rdsh auth --select codex:OPENAI_API_KEY --import  # CodexのAPIキーは別に選択
+rdsh auth --select env:DEEPSEEK_API_KEY --import  # この環境変数だけ永続保存
+rdsh auth --unselect codex:openai-codex          # 将来の取込停止、既存コピーは保持
+rdsh setup                                    # 選択済みの同期と初回案内
+rdsh setup --web                              # 共有元・選択コマンド・個別キー保存
 ```
 
-※ 他ツールの認証情報を無断で外部へ送信したり、同期したりしません。明示的に指定したログイン情報のみをローカルで安全に管理します。
+--select / --unselectは必要なものだけ個別に繰り返せます。選択すると
+boot・dump-config・plugin・dsh名での委譲・setupでも、その共有元から
+同期します。--importはすぐに取り込みます。別CLIの未選択トークンが
+新しくても採用しません。DSH側の新しいgrantや既存API-key記録・ref、
+他のエントリ、コメント、改行形式は保持します。Unixの認証ファイルと
+選択ファイルは0600で保存します。
+
+対象はCodexの ~/.codex/auth.json、OpenCodeの
+$XDG_DATA_HOME/opencode/auth.json（未設定時はOSのdataディレクトリ）と
+旧 ~/.config/opencode/auth.jsonです。OpenCodeのopenaiログインはDSHの
+openai-codexへ写すので、選択名はopencode:openai-codexです。
+環境変数の保存対象はDEEPSEEK_API_KEY、OPENAI_API_KEY、ANTHROPIC_API_KEYです。
+一覧は形式・存在の確認であり、実際の認証成功を意味しません。
+
+すでに渡した環境変数は、DSHとその子プロセスに引き継がれます。
+この経路ではrdshはファイルを書かず、JSONにpersistent=false、
+共有先、停止・失効手順を表示します。保存するなら別途選択してください。
+setup --yesだけでは全環境キーを保存しません。対話setupやWeb画面での
+個別の保存は引き続き可能です。
+
+**利用範囲と解除:** 保存した内容は同じDSH_HOMEの全プロファイルで
+使えます。選択解除は将来のrdshによる取込を止め、保存済みコピーと
+実行中プロセスは残します。コピーの利用を止めるにはDSHを停止して
+認証ファイル内の該当record/refを削除します。credential自体の失効は
+providerでOAuth grantを取り消すかAPIキーを更新してください。
+共有元CLIも使えなくなる場合があります。rdshによるコピーの制御であり、
+DSH自身の更新・環境変数の継承・OS sandboxを制御するものではありません。
+
+**従来版からの移行:** 既存のDSH認証情報は残します。選択ファイルが
+なければ何も選択せず、従来のauth --importも選択を要求します。
+RDSH_AUTH_AUTOSYNC=1で全取込へ戻ることはありません。一覧とpreviewで
+確認して必要な共有元を選んでください。RDSH_AUTH_AUTOSYNC=0では
+選択を残して自動同期だけを止めます。明示したauth --importは実行できます。
+壊れた・読めない選択ファイルでは同期を停止します。
+
+選択変更とrdshの認証書込は共通lockで直列化し、解除完了後に古い選択で
+取り込むことを防ぎます。writerの異常終了でlockが残った場合は、
+rdsh auth/setupの書込が動いていないことを確認してから
+$DSH_HOME/.rdsh-auth-sharing.lockを除去してください。lock中は
+launcherが取込をスキップします。
+
+setup --webは毎回アクセス鍵を発行し、#key=...付きURLを表示します。
+読み取り・キー保存・終了に同じ鍵が必要です。URLを他人に共有しないでください。
+画面では保存前に保存先・利用範囲と、選択解除・コピー削除・provider失効の
+違いを確認できます。
+
+一度だけ取り込む場合は `rdsh auth --import --provider openai-codex --source codex` または `rdsh auth --import --ref OPENAI_API_KEY --source codex` を使えます。この指定は継続コピーの選択に保存されず、既存の共有方針を変更しません。継続する場合は別途 `--select` で指定します。
+
+### 追加機能（初期状態では OFF）
+
+サーバー型の機能は有効化するまで動きません。初期状態は高速な dsh として動きます。
+設定画面（`rdsh setup --web` の追加機能欄）か CLI で有効にします：
+
+```sh
+rdsh settings set extras.enable serve,search-web
+rdsh settings get extras.enable
+```
+
+| 機能 | コマンド | 備考 |
+| --- | --- | --- |
+| `serve` | `rdsh serve`（既定 :38080） | 手元の状態ページです。localhost のみ、起動ごとの鍵が必要です。 |
+| `search-web` | `rdsh search-web "調べたい語" --limit 5` | SearXNG が必要です。 |
+
+`rdsh serve` は dsh の Web GUI（:3080）と競合しません。`--port 0` で空きポートを使えます。
+API とダッシュボードの詳しくは [Web UI](#web-ui) を見てください。
+
+dsh が同梱していない OpenAI 互換エンドポイント（HAI、Sarashina、自宅の llama.cpp / vLLM / LM Studio / Ollama など）は、プロファイルのルートとして追加できます：
+
+```sh
+rdsh provider add hai --model deepseek-v4-flash              # 鍵は HAI_API_KEY か --key-stdin
+rdsh provider add sarashina                                  # 鍵は SARASHINA_API_KEY。mini と nano は組み込み
+rdsh provider add local-openai --base-url http://host:8080/v1 --discover --no-key
+rdsh provider list                                           # プリセットと各プロファイルの設定・鍵の状態
+```
+
+詳細は [docs/PROVIDERS.md](docs/PROVIDERS.md)（英語）を参照してください。
 
 ### エージェント実行の安全な隔離
 
@@ -180,6 +265,29 @@ DSH の `hooks.json` と連携し、危険なコマンド実行を瞬時に検�
 echo "$input" | rdsh guard --deny "rm -rf /*" --deny "*token*"
 ```
 
+対応するファイル操作を構造で判定する場合は、任意でpolicy fileを指定できます。
+次の例は、既存のプロジェクトディレクトリ内の `Read` だけを分類上許可します。
+
+```json
+{
+  "schema": 1,
+  "rules": [
+    { "id": "project-read", "tool": "Read", "access": "read", "roots": ["/absolute/project/path"] }
+  ]
+}
+```
+
+```sh
+echo "$hook_json" | rdsh guard --policy-file ./hook-policy.json --json
+```
+
+構造判定が対応するのは `Read`・`Write`・`Edit` のファイルpath schemaです。
+作業ディレクトリと対象pathを正規化し、toolとread/write範囲を既存rootに照合して、
+秘密を含まない理由とともに `allow`・`deny`・`unknown` を返します。JSONの `allow` は分類結果だけで、
+ホストのpermission/approvalを意味しません。そのため `decision` は出力せず、最終的な権限判断はホストに残します。
+未知のtool、shell command、壊れた入力、未対応の引数はfail closedです。shell構文解析とnetwork先の判定は未対応です。
+path判定後にファイルシステムが変わる競合もあり、このhookはOS sandboxではありません。実際の強制には実行sandboxを使ってください。
+
 ```json
 {
   "hooks": {
@@ -191,6 +299,8 @@ echo "$input" | rdsh guard --deny "rm -rf /*" --deny "*token*"
 ```
 
 Rust ネイティブ処理のため、呼び出しごとのオーバーヘッドは約1msと非常に軽量です。
+
+<a id="web-ui"></a>
 
 ## Web UI とダッシュボード
 
@@ -213,6 +323,26 @@ rdsh-dashboard project --project <ディレクトリ>
 
 ※ Windows ネイティブではタスクトレイに常駐し、タスクバーから簡単に開閉できます（端末起動したい場合は `--no-tray` を指定）。詳細は [dashboard/README.md](dashboard/README.md) をご覧ください。
 
+## デスクトップアプリ (Electron)
+
+DeepSeek Harness Desktop は、Web アプリケーション全体を内包した Electron シェルです。CLI と `$DSH_HOME` を共有しますが、**予約済みプロファイル**（`$DSH_HOME/profiles/desktop`）と同梱の独自コマンドランタイムを持つため、npm の `dsh` CLI ではプラグインを管理できません。`rdsh desktop` はこれらを自動検出し、プラグインの組み込みをアプリ自身のコマンドへ転送します。rdsh 側でプロファイルを起動したり直接書き換えたりすることはありません：
+
+```sh
+rdsh desktop status                 # アプリ、コマンドランタイム、プロファイル、プラグインの状態（読み取り専用）
+rdsh desktop install --plugins-dir .   # desktop プロファイルに rdsh-settings を組み込み
+rdsh desktop install --plugins-dir . --compute   # 常駐 compute bridge もあわせて追加
+rdsh desktop verify                 # プロファイルに rdsh プラグインがない場合は 0 以外で終了
+```
+
+プロファイルインストーラーや各種インストーラーからも同様に利用できます：
+
+```sh
+PROFILE=desktop ./plugins/install.sh   # 推奨パッケージをすべて適切に転送して導入
+./install.sh --desktop                 # インストール時に rdsh プラグインを組み込み
+```
+
+※ プラグインを組み込む前にアプリを終了し、完了後に再起動してください。アプリ内の Plugins 画面からも、コマンドを使わずに同じパッケージをインストールできます。Electron ランタイム自体が置き換わることはなく、アプリ内の処理委譲はオプトインかつフェイルオープンな compute bridge に限定されます。詳細は [DESKTOP-INTEGRATION.md](docs/DESKTOP-INTEGRATION.md) をご覧ください。
+
 ## Smart-DSH との併用
 
 [Smart-DSH](https://github.com/hikarioyama/Smart-DSH)（Web プロファイル向けプラグイン集）と問題なく共存できます：
@@ -224,6 +354,12 @@ rdsh --profile web                             # プラグイン付きで起動
 ```
 
 ポート番号（DSH Web: `3080`、rdsh serve: `38080`）も競合しません。
+
+rdsh が同梱するのは Smart-DSH のスマホ幅レイアウトだけです
+（[`plugins/rdsh-mobile-ui`](plugins/rdsh-mobile-ui/README.md)、MIT・Smart-DSH 由来）。
+767px 以下でチャットと入力欄が全幅になり、ロゴを1タップするとセッション一覧が開きます。
+Smart-DSH の通知・Esc 停止・タスクハブ・HMR 回避策は上流バンドルのままなので、必要な場合は
+上流のバンドルを導入してください。
 
 ## 実測ベンチマーク
 
@@ -270,8 +406,10 @@ Linux x86_64 環境での測定値です：
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 委譲の仕組みとアーキテクチャ設計 |
 | [docs/BENCHMARKS.md](docs/BENCHMARKS.md) | ベンチマークの詳細と再現手順 |
 | [docs/RDSH-SETTINGS.md](docs/RDSH-SETTINGS.md) | 設定画面の機能と CLI キー一覧 |
+| [docs/DESKTOP-INTEGRATION.md](docs/DESKTOP-INTEGRATION.md) | デスクトップアプリ (Electron) との連携 |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 今後の開発ロードマップ |
 | [docs/RELEASING.md](docs/RELEASING.md) | リリース手順 |
+| [docs/SERIAL-PROXY.md](docs/SERIAL-PROXY.md) | 同時リクエスト数制限プロキシ |
 | [CHANGELOG.md](CHANGELOG.md) | バージョンごとの主な変更履歴 |
 
 ## コミュニティ
@@ -287,8 +425,16 @@ Linux x86_64 環境での測定値です：
 
 - アイコン制作: [PENTACoXIAN](https://x.com/PENTACoXIAN)
 - セキュリティレビュー・脆弱性報告: [GrEarl](https://github.com/GrEarl)、[PENTACoXIAN](https://x.com/PENTACoXIAN)
-- 実装・改善・検証協力: [StudioYebisu](https://github.com/yebisu0529-ship-it)、[RNA4219](https://github.com/RNA4219)、[eightman999](https://github.com/eightman999)
+- 実装・改善・検証協力: [StudioYebisu](https://github.com/yebisu0529-ship-it)、[RNA4219](https://github.com/RNA4219)、[eightman999](https://github.com/eightman999),[cyrne1-7208](https://github.com/cyrne1-7208)
 - アイディア・製品提案: [@remydre8](https://x.com/remydre8)
+
+rdsh が利用・改変・推薦している第三者製 DSH プラグインです（いずれも MIT、著作権は各作者に帰属します）:
+
+- [Smart-DSH](https://github.com/hikarioyama/Smart-DSH)（hikarioyama）—
+  [`rdsh-mobile-ui`](plugins/rdsh-mobile-ui/README.md) として同梱するスマホ幅レイアウト
+- [dsh-sound-notifications](https://github.com/cwd514/dsh-sound-notifications)（cwd514）—
+  オプトインの効果音とデスクトップ通知（`SOUND=1`）
+- [dsh-gitview](https://github.com/yugapor/dsh-gitview)（yugapor）— 任意のサイドバー Git パネル
 
 ## ライセンス
 
