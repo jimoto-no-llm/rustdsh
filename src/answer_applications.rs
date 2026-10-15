@@ -857,10 +857,14 @@ pub fn register_reply_consumer(state: &mut Value, record: &Value, now: &str) -> 
         ("session_id", record.get("cli_session_id")),
         ("task_id", record.get("task_id")),
     ] {
-        // An undefined source property is dropped by `JSON.stringify`, so a
-        // missing field must be omitted rather than emitted as `null`.
-        if let Some(value) = value {
-            consumer.insert(key.to_string(), value.clone());
+        match value {
+            Some(value) => {
+                consumer.insert(key.to_string(), value.clone());
+            }
+            None if key == "task_id" => {
+                consumer.insert(key.to_string(), Value::Null);
+            }
+            None => {}
         }
     }
     consumer.insert("created_at".to_string(), Value::String(now.to_string()));
@@ -2013,6 +2017,9 @@ pub fn cmd_answer_applications(action: &str, input_file: &str) -> Result<()> {
                         output.insert("consumer".to_string(), reply);
                     }
                     output.insert("message".to_string(), message);
+                    if let Some(instructions) = state.get("instructions") {
+                        output.insert("instructions".to_string(), instructions.clone());
+                    }
                 }
                 _ => {
                     let context = input.get("context").cloned().unwrap_or(Value::Null);
@@ -2138,6 +2145,19 @@ mod tests {
             register_reply_consumer(&mut state, &consumer_record(), now()).expect("idempotent");
         assert_eq!(again, consumer);
         assert_eq!(state, before);
+    }
+
+    #[test]
+    fn registration_normalizes_missing_task_id_and_passes_validation() {
+        let mut state = json!({ "project": project(), "revision": 3, "feedback": [] });
+        let mut record = consumer_record();
+        record.as_object_mut().unwrap().remove("task_id");
+
+        let consumer = register_reply_consumer(&mut state, &record, now()).expect("registration");
+
+        assert!(consumer.get("task_id").is_some());
+        assert_eq!(consumer["task_id"], Value::Null);
+        validate_answer_applications(&state).expect("registered consumer is valid");
     }
 
     #[test]

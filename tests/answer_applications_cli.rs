@@ -169,6 +169,79 @@ fn record_outputs_only_the_answer_application_registry() {
 }
 
 #[test]
+fn record_returns_updated_instruction_queue_revision_and_sequence() {
+    let fixture = Fixture::new();
+    let valid_id = "reply_01234567-89ab-cdef-0123-456789abcdef";
+    let consumer_id = "consumer_83ca3f922609863760d5de5eb2f7bc77";
+    let run_id = "run_01234567-89ab-cdef-0123-456789abcdef";
+    let session_id = "session-fixture";
+    let request = serde_json::json!({
+        "operation": "record",
+        "state": {
+            "project": { "id": "fixture" },
+            "revision": 1,
+            "feedback": [],
+            "answer_applications": {
+                "schema": 1,
+                "consumers": {
+                    "consumer_83ca3f922609863760d5de5eb2f7bc77": {
+                        "consumer_id": consumer_id,
+                        "project_id": "fixture",
+                        "run_id": run_id,
+                        "session_id": session_id,
+                        "task_id": null,
+                        "created_at": "2026-10-15T02:20:09.985Z"
+                    }
+                },
+                "commands": {}
+            },
+            "question_contracts": {
+                "cards": {
+                    "Q1": {
+                        "snapshot": {
+                            "decision": {
+                                "consumer_id": consumer_id,
+                                "target": {
+                                    "run_id": run_id,
+                                    "session_id": session_id,
+                                    "task_id": null
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "instructions": {
+                "schema": 1,
+                "revision": 4,
+                "sequence": 4,
+                "requests": {},
+                "commands": {}
+            }
+        },
+        "input": {
+            "command_id": valid_id,
+            "message": { "question_id": "Q1", "sequence": 4 }
+        },
+        "now": NOW
+    })
+    .to_string();
+    let output = fixture.run("apply", &request);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let printed: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(printed["instructions"]["sequence"], 5);
+    assert_eq!(printed["instructions"]["revision"], 5);
+    assert_eq!(
+        printed["answer_applications"]["commands"][valid_id]["queue_sequence"],
+        5
+    );
+}
+
+#[test]
 fn ack_claims_instruction_when_control_is_null() {
     let fixture = Fixture::new();
     let request = include_str!("fixtures/instruction-ack-null-control.json");
