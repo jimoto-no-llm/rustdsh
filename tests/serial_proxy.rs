@@ -49,6 +49,9 @@ struct MockState {
     active: AtomicUsize,
     peak: AtomicUsize,
     finished: AtomicUsize,
+    /// Connections that reached the first request read, so a test can write
+    /// its request only after the mock is already blocked waiting for it.
+    reading: AtomicUsize,
     delay: Duration,
 }
 
@@ -77,6 +80,7 @@ impl MockUpstream {
             active: AtomicUsize::new(0),
             peak: AtomicUsize::new(0),
             finished: AtomicUsize::new(0),
+            reading: AtomicUsize::new(0),
             delay,
         });
         let stop = Arc::new(AtomicBool::new(false));
@@ -128,6 +132,7 @@ fn serve_mock_request(mut stream: TcpStream, state: Arc<MockState>) {
         return;
     };
     let mut reader = BufReader::new(reader_stream);
+    state.reading.fetch_add(1, Ordering::SeqCst);
     let mut request_line = String::new();
     if reader.read_line(&mut request_line).is_err() {
         return;
@@ -269,6 +274,45 @@ fn mock_upstream_consumes_chunked_bodies_and_trailers_before_closing() {
         assert_eq!(seen.len(), 1);
         assert_eq!(seen[0].body, expected.as_bytes());
     }
+}
+
+/// Regression for the intermittent `left: 502, right: 200` on macOS
+/// (run 38669940239). BSD `accept` hands back a socket that inherits the
+/// listener's `O_NONBLOCK`, so a mock that accepted the proxy's connection
+/// before the request bytes arrived saw `WouldBlock` from its first read,
+/// closed the socket, and the proxy reported the upstream as failed. Writing
+/// the request only after the mock has started reading forces that ordering
+/// on every run instead of depending on the accept poll interval.
+#[test]
+fn mock_upstream_waits_for_a_request_sent_after_accept() {
+    let upstream = MockUpstream::start(Duration::ZERO);
+    let mut stream = TcpStream::connect(upstream.addr).unwrap();
+    stream
+        .set_read_timeout(Some(Duration::from_secs(3)))
+        .unwrap();
+    let deadline = std::time::Instant::now() + wait_deadline();
+    while upstream.state.reading.load(Ordering::SeqCst) == 0 {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "mock upstream never accepted the connection"
+        );
+        thread::yield_now();
+    }
+    write!(
+        stream,
+        "POST /late HTTP/1.1\r\nhost: {}\r\ncontent-length: 2\r\nconnection: close\r\n\r\nok",
+        upstream.addr
+    )
+    .unwrap();
+    let mut response = String::new();
+    let _ = stream.read_to_string(&mut response);
+    assert!(
+        response.starts_with("HTTP/1.1 200 OK\r\n"),
+        "mock upstream closed before reading the request: {response:?}"
+    );
+    let seen = upstream.state.seen.lock().unwrap();
+    assert_eq!(seen.len(), 1);
+    assert_eq!(seen[0].body, b"ok");
 }
 
 impl ProxyProcess {
@@ -901,7 +945,7 @@ async fn closed_stderr_does_not_abort_startup_or_tool_choice_streaming() {
         binary_dir: None,
     };
     let client = Client::new();
-    let status = tokio::time::timeout(Duration::from_secs(3), async {
+    let status = tokio::time::timeout(wait_deadline(), async {
         loop {
             if let Ok(response) = client
                 .get(format!("{}/__proxy/status", proxy.url))
