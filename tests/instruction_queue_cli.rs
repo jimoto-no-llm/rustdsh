@@ -1,5 +1,6 @@
+use std::io::Write;
 use std::path::PathBuf;
-use std::process::{Command, Output};
+use std::process::{Command, Output, Stdio};
 
 struct Fixture {
     root: PathBuf,
@@ -42,6 +43,88 @@ impl Drop for Fixture {
     fn drop(&mut self) {
         let _ = std::fs::remove_dir_all(&self.root);
     }
+}
+
+#[test]
+fn instruction_queue_serve_processes_ordered_requests_after_errors() {
+    let fixture = Fixture::new();
+    let state = serde_json::json!({
+        "project": {"id": "p"},
+        "feedback": [],
+        "answer_applications": {
+            "consumers": {
+                "consumer-1": {
+                    "consumer_id": "consumer-1",
+                    "run_id": "run-1",
+                    "session_id": "session-1"
+                }
+            },
+            "commands": {}
+        }
+    });
+    let submit = serde_json::json!({
+        "operation": "submit",
+        "state": state,
+        "input": {
+            "command_id": "input_00000000-0000-0000-0000-000000000071",
+            "consumer_id": "consumer-1",
+            "run_id": "run-1",
+            "session_id": "session-1",
+            "text": "常駐Rustプロセスで追加",
+            "mode": "next_turn",
+            "expected_queue_revision": 0
+        },
+        "context": {"actor": "human", "now": "2026-10-15T01:00:00.000Z"}
+    });
+    let invalid = serde_json::json!({
+        "operation": "submit",
+        "state": state,
+        "input": {"unknown": true},
+        "context": {"actor": "human"}
+    });
+    let validate = serde_json::json!({
+        "operation": "validate",
+        "state": state
+    });
+    let mut child = Command::new(env!("CARGO_BIN_EXE_rdsh"))
+        .args(["instruction-queue", "serve"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .env("HOME", fixture.root.join("home"))
+        .env("USERPROFILE", fixture.root.join("home"))
+        .env("APPDATA", fixture.root.join("appdata"))
+        .env("XDG_DATA_HOME", fixture.root.join("data"))
+        .env("XDG_CONFIG_HOME", fixture.root.join("config"))
+        .env_remove("RDSH_ORIG_BIN")
+        .env_remove("RDSH_PASSTHROUGH")
+        .env_remove("RDSH_DRY_RUN")
+        .spawn()
+        .unwrap();
+    {
+        let stdin = child.stdin.as_mut().unwrap();
+        for request in [submit, invalid, validate] {
+            writeln!(stdin, "{request}").expect("serve must accept JSONL requests on stdin");
+        }
+    }
+    drop(child.stdin.take());
+    let output = child.wait_with_output().unwrap();
+
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let responses: Vec<serde_json::Value> = stdout
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    assert_eq!(responses.len(), 3);
+    assert_eq!(responses[0]["result"]["request"]["status"], "accepted");
+    assert_eq!(responses[1]["status"], 400);
+    assert_eq!(responses[1]["error"], "Unknown instruction field");
+    assert_eq!(responses[2]["valid"], true);
 }
 
 #[test]

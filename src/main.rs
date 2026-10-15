@@ -376,11 +376,11 @@ enum Commands {
     /// Pure logic: no provider call and no file write.
     #[command(name = "instruction-queue")]
     InstructionQueue {
-        /// validate | context | submit | resolve | control
+        /// validate | context | submit | resolve | control | serve
         action: String,
-        /// Request JSON file holding { operation, state, input }
+        /// Request JSON file holding { operation, state, input, context }
         #[arg(long = "input-file")]
-        input_file: String,
+        input_file: Option<String>,
     },
     /// Feature switches: list every optional capability, or turn one on/off
     Features {
@@ -927,9 +927,18 @@ fn main() {
         Some(Commands::AnswerApplications { action, input_file }) => {
             answer_applications::cmd_answer_applications(&action, &input_file)
         }
-        Some(Commands::InstructionQueue { action, input_file }) => {
-            instruction_queue::cmd_instruction_queue(&action, &input_file)
-        }
+        Some(Commands::InstructionQueue { action, input_file }) => match action.as_str() {
+            "serve" if input_file.is_none() => instruction_queue::cmd_instruction_queue_serve(),
+            "serve" => Err(anyhow::anyhow!(
+                "instruction-queue serve does not accept --input-file"
+            )),
+            _ => match input_file {
+                Some(input_file) => instruction_queue::cmd_instruction_queue(&action, &input_file),
+                None => Err(anyhow::anyhow!(
+                    "--input-file is required for instruction-queue actions"
+                )),
+            },
+        },
         Some(Commands::Features { action, json }) => match action {
             None => features_list(&cfg, json),
             Some(FeaturesAction::On { id }) => features_toggle(&id, true),
