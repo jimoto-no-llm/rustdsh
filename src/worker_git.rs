@@ -965,10 +965,15 @@ mod tests {
     #[test]
     fn repository_context_preserves_newlines_in_common_dir() {
         let head = "0123456789abcdef0123456789abcdef01234567";
-        let output = format!("\n/tmp/repo\nname/.git\n{head}\n");
+        let common = if cfg!(windows) {
+            PathBuf::from("C:\\tmp\\repo\nname\\.git")
+        } else {
+            PathBuf::from("/tmp/repo\nname/.git")
+        };
+        let output = format!("\n{}\n{head}\n", common.display());
         assert_eq!(
             parse_repository_context(&output).unwrap(),
-            (PathBuf::from("/tmp/repo\nname/.git"), head.to_string())
+            (common, head.to_string())
         );
     }
 
