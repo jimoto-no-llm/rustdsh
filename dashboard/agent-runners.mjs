@@ -329,6 +329,13 @@ const PIPE_GRACE_MS = 2000;
 // (Windows), the pipe grace, and a margin for writing the result.
 const SUPERVISOR_STOP_MS =
   100 + Math.max(2 * (STOP_TERM_MS + STOP_KILL_MS), TASKKILL_TIMEOUT_MS) + PIPE_GRACE_MS + 1000;
+// How long cancel() waits. A running job is stopped by its supervisor, so the
+// wait covers the supervisor's own stop budget, not only this call's
+// TERM/KILL budget.
+export function cancelWaitMs({ running, termMs, killMs }) {
+  return Math.max(termMs + killMs + 3000, running ? SUPERVISOR_STOP_MS : 0);
+}
+export const supervisorStopMs = () => SUPERVISOR_STOP_MS;
 // Runs `taskkill /PID <pid> /T /F` and resolves true only when it succeeded.
 // Windows only; the tree is reachable through the leader PID while it lives.
 function taskkillTree(pid, timeout = TASKKILL_TIMEOUT_MS) {
@@ -700,10 +707,7 @@ export async function cancel(
   if (!running && !(first.job.agent_pgid && groupAlive(first.job.agent_pgid)))
     return initial;
   const started = Date.now();
-  // A running job is stopped by its supervisor, so wait for the supervisor's
-  // own stop budget, not only for this call's TERM/KILL budget.
-  const deadline =
-    started + Math.max(termMs + killMs + 3000, running ? SUPERVISOR_STOP_MS : 0);
+  const deadline = started + cancelWaitMs({ running, termMs, killMs });
   if (running) {
     await fs.writeFile(path.join(directory, "cancel"), "", { mode: 0o600 });
     // The supervisor stops the group itself; a lost one is recorded by status.
@@ -949,13 +953,10 @@ async function supervise(directory) {
   job.agent_pgid = child.pid;
   job.agent_identity = null;
   await writeJson(jobFile, job);
-  // Lets cancel later prove the number still names this job's group.
-  job.agent_identity = (await readProcessIdentity(child.pid)).identity ?? null;
-  if (job.agent_identity) await writeJson(jobFile, job);
-  // A cancel that arrived while the agent started.
-  if (await exists(cancelFile)) signalGroup(job.agent_pgid, "SIGTERM");
   // cancel() only writes the cancel file; this supervisor holds the child
-  // handle, so it is the one that stops the group.
+  // handle, so it is the one that stops the group. The watcher starts before
+  // the identity is read (PowerShell on Windows can take seconds), so a cancel
+  // that arrives meanwhile is not delayed beyond SUPERVISOR_STOP_MS.
   let exitedAlready = false;
   let cancelling = null;
   const watcher = setInterval(async () => {
@@ -966,11 +967,22 @@ async function supervise(directory) {
   const forward = () => signalGroup(job.agent_pgid, "SIGTERM");
   process.on("SIGTERM", forward);
   process.on("SIGINT", forward);
+  // Lets cancel later prove the number still names this job's group. Read in
+  // the background and awaited before the result, so job.json is never
+  // rewritten after the job has finished.
+  const identityRead = readProcessIdentity(child.pid)
+    .then(async ({ identity }) => {
+      if (!identity) return;
+      job.agent_identity = identity;
+      await writeJson(jobFile, job);
+    })
+    .catch(() => {});
 
   const exit = await exited;
   exitedAlready = true;
   clearInterval(watcher);
   await cancelling;
+  await identityRead;
   // Reap leftover descendants right away, by the supervisor's own pgid: this
   // process saw the group non-empty up to the leader's exit, so the number
   // cannot have been recycled yet. No waiting before this, and no external

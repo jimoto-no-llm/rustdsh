@@ -22,6 +22,8 @@ import {
   waitForJob,
   runnerCatalog,
   sanitizeText,
+  cancelWaitMs,
+  supervisorStopMs,
 } from "../agent-runners.mjs";
 import { readProcessIdentity } from "../process-identity.mjs";
 
@@ -852,4 +854,15 @@ test("groupAlive treats an unreadable /proc as possibly alive and falls back to 
   process.kill(-live.pid, "SIGKILL");
   await new Promise((r) => live.once("exit", r));
   assert.equal(groupAlive(live.pid, proc), false); // ESRCH establishes absence
+});
+
+test("cancel waits at least the supervisor's whole stop budget for a running job", () => {
+  // One taskkill (10 s) plus the 2 s pipe grace must fit, and so must two
+  // POSIX TERM/KILL rounds (2 x 5 s) plus the grace.
+  assert.ok(supervisorStopMs() >= 10000 + 2000);
+  assert.ok(supervisorStopMs() >= 2 * (2000 + 3000) + 2000);
+  assert.equal(cancelWaitMs({ running: true, termMs: 3000, killMs: 3000 }), supervisorStopMs());
+  assert.equal(cancelWaitMs({ running: true, termMs: 60000, killMs: 60000 }), 123000);
+  // A terminal job is not waited on through the supervisor.
+  assert.equal(cancelWaitMs({ running: false, termMs: 3000, killMs: 3000 }), 9000);
 });
