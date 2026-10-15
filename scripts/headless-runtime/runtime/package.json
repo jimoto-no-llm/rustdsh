@@ -4,7 +4,7 @@
   "dependencies": {
     "@deepseek-ai/dsh": "0.2.0-rc.2",
     "@deepseek-ai/dsh-llm-pi-ai": "0.2.0-rc.2",
-    "@earendil-works/pi-ai": "0.87.1",
+    "@earendil-works/pi-ai": "1.1.0",
     "ws": "8.22.0",
     "rdsh-session-cleanup": "file:plugins/rdsh-session-cleanup"
   },
