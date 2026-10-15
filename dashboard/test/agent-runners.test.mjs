@@ -30,7 +30,8 @@ const cli = fileURLToPath(new URL("../cli.mjs", import.meta.url));
 const SECRET = "SECRET-PROMPT-TEXT-48151623";
 const root = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-agents-"));
 process.env.RDSH_DASHBOARD_HOME = path.join(root, "state");
-test.after(() => fs.rm(root, { recursive: true, force: true }));
+// Windows keeps a file busy briefly after its process exits; retry the cleanup.
+test.after(() => fs.rm(root, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 }));
 
 // The fakes pick their behaviour from `MODE:<name>` in the prompt and never
 // echo the prompt, so tests can prove it is not stored in job metadata.

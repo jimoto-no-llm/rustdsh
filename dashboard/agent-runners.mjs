@@ -29,9 +29,11 @@ const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const self = fileURLToPath(import.meta.url);
 
 export class RunnerError extends Error {
-  constructor(code) {
+  constructor(code, detail = null) {
     super("Agent runner: " + code);
     this.code = code;
+    // Non-secret state for diagnosing a failure (never prompt or output text).
+    this.detail = detail;
   }
 }
 
@@ -316,9 +318,20 @@ function signalGroup(pgid, signal) {
     // Already gone.
   }
 }
+// Stop timings shared by the supervisor and cancel(): cancel must wait at
+// least as long as the supervisor may need to stop the group and write its
+// result, or a slow stop (e.g. taskkill on Windows) is misreported.
+const STOP_TERM_MS = 2000;
+const STOP_KILL_MS = 3000;
+const TASKKILL_TIMEOUT_MS = 10000;
+const PIPE_GRACE_MS = 2000;
+// Watcher tick, the cancel stop and the post-exit stop (POSIX) or one taskkill
+// (Windows), the pipe grace, and a margin for writing the result.
+const SUPERVISOR_STOP_MS =
+  100 + Math.max(2 * (STOP_TERM_MS + STOP_KILL_MS), TASKKILL_TIMEOUT_MS) + PIPE_GRACE_MS + 1000;
 // Runs `taskkill /PID <pid> /T /F` and resolves true only when it succeeded.
 // Windows only; the tree is reachable through the leader PID while it lives.
-function taskkillTree(pid, timeout = 10000) {
+function taskkillTree(pid, timeout = TASKKILL_TIMEOUT_MS) {
   return new Promise((resolve) => {
     try {
       execFile("taskkill", ["/pid", String(pid), "/T", "/F"], { timeout }, (error) =>
@@ -346,7 +359,13 @@ async function stopWindowsTree(pgid, { taskkill = taskkillTree, isAlive = alive 
 // `platform`, `taskkill` and `isAlive` are test seams for the win32 branch.
 export async function stopGroup(
   pgid,
-  { termMs = 2000, killMs = 3000, platform = process.platform, taskkill, isAlive } = {},
+  {
+    termMs = STOP_TERM_MS,
+    killMs = STOP_KILL_MS,
+    platform = process.platform,
+    taskkill,
+    isAlive,
+  } = {},
 ) {
   if (!pgid) return { cleanup: "confirmed" };
   if (platform === "win32") return stopWindowsTree(pgid, { taskkill, isAlive });
@@ -680,7 +699,11 @@ export async function cancel(
   if (!running && first.result?.cleanup === "confirmed") return initial;
   if (!running && !(first.job.agent_pgid && groupAlive(first.job.agent_pgid)))
     return initial;
-  const deadline = Date.now() + termMs + killMs + 3000;
+  const started = Date.now();
+  // A running job is stopped by its supervisor, so wait for the supervisor's
+  // own stop budget, not only for this call's TERM/KILL budget.
+  const deadline =
+    started + Math.max(termMs + killMs + 3000, running ? SUPERVISOR_STOP_MS : 0);
   if (running) {
     await fs.writeFile(path.join(directory, "cancel"), "", { mode: 0o600 });
     // The supervisor stops the group itself; a lost one is recorded by status.
@@ -690,7 +713,14 @@ export async function cancel(
     }
   }
   let { job, result: stored } = await load(id);
-  if (!stored) throw new RunnerError("cancel_unconfirmed");
+  if (!stored)
+    throw new RunnerError("cancel_unconfirmed", {
+      reason: "no_supervisor_result",
+      waited_ms: Date.now() - started,
+      job_state: job.state ?? null,
+      supervisor_alive: alive(job.supervisor_pid),
+      agent_alive: job.agent_pid ? alive(job.agent_pid) : null,
+    });
   const lost = stored.code === "supervisor_lost";
   const settle = async (extra) => {
     const next = { ...stored, ...extra };
@@ -950,7 +980,7 @@ async function supervise(directory) {
   // Pipes held open by descendants must not stall the job.
   await Promise.race([
     Promise.all(closed),
-    pause(2000),
+    pause(PIPE_GRACE_MS),
   ]);
   child.stdout.destroy();
   child.stderr.destroy();
