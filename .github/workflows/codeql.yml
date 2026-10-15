@@ -3,49 +3,22 @@ name: codeql
 on:
   push:
     branches: [main]
-    paths:
-      - '**/*.rs'
-      - '**/*.mjs'
-      - '**/*.js'
-      - '**/*.ts'
-      - '**/*.tsx'
-      - '**/*.html'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - 'dashboard/package.json'
-      - 'dashboard/package-lock.json'
-      - 'plugins/**/package.json'
-      - 'plugins/**/package-lock.json'
-      - '.github/workflows/codeql.yml'
+    # release gate はタグの SHA に CodeQL 結果を要求するため、main は省略しない。
   pull_request:
     branches: [main]
-    paths:
-      - '**/*.rs'
-      - '**/*.mjs'
-      - '**/*.js'
-      - '**/*.ts'
-      - '**/*.tsx'
-      - '**/*.html'
-      - 'Cargo.toml'
-      - 'Cargo.lock'
-      - 'dashboard/package.json'
-      - 'dashboard/package-lock.json'
-      - 'plugins/**/package.json'
-      - 'plugins/**/package-lock.json'
-      - '.github/workflows/codeql.yml'
+    # 未知の拡張子や入れ子の設定を取りこぼさず、文書・シェルだけの変更を省略する。
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.sh'
   schedule:
     - cron: '0 3 * * 1'
 
 permissions:
   contents: read
 
-# Key on the branch, not `github.ref`: a branch push uses `refs/heads/<branch>`
-# while its pull request uses `refs/pull/<n>/merge`, so a ref-keyed group lets
-# both run for the same commit. The repository is part of the key, so a branch
-# in a fork cannot cancel a same-named branch here. `head_ref` is empty on a
-# push, so fall back to `ref_name`.
+# PR 番号を含む ref で分け、大小文字だけ異なる branch の PR も相互に中止しない。
 concurrency:
-  group: codeql-${{ github.event.pull_request.head.repo.full_name || github.repository }}-${{ github.event.pull_request.head.ref || github.ref_name }}
+  group: codeql-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
