@@ -38,6 +38,32 @@ function assistantMessage(session, turn, content, guard) {
   guard.observe(session, { type: 'assistant/message', data: { turn, step: 1, message: { role: 'assistant', content } } });
 }
 
+// Minimal stand-in for the cordis event dispatcher. `serial()` in
+// `@deepseek-ai/cordis/lib/index.js` (line 289) awaits each listener in
+// registration order and stops at the first bail value; `isBailed` (line 219)
+// bails unless the value is null, false or undefined. `dsh-agent-loop`
+// (lib/index.js line 999) dispatches `agent/turn-stopping` through exactly this
+// contract, so a listener that returns anything else swallows every listener
+// registered after it.
+function serialDispatch(listeners, payload) {
+  for (const listener of listeners) {
+    const result = listener(payload);
+    if (result !== null && result !== false && result !== undefined) return result;
+  }
+  return undefined;
+}
+
+// Record every handler per event in registration order, like a real Context.
+function listenerLog() {
+  const listeners = new Map();
+  return {
+    ctx: {
+      on: (event, handler) => listeners.set(event, [...(listeners.get(event) ?? []), handler]),
+    },
+    handlers: (event) => listeners.get(event) ?? [],
+  };
+}
+
 // The exact shape recorded in session-95eb2a07 turn 38 on
 // opencode-go/deepseek-v4.1-flash: one reasoning block, no text, stop=stop.
 const REASONING_ONLY = [{ type: 'reasoning', text: 'Complete picture. Let me summarize for the user.' }];
@@ -205,4 +231,95 @@ test('apply subscribes when rdsh.json is missing or corrupt', async (t) => {
   const second = new Map();
   apply({ on: (event, handler) => second.set(event, handler) }, {});
   assert.ok(second.has('agent/turn-stopping'));
+});
+
+test('serialDispatch mirrors the cordis bail contract', () => {
+  const hops = (value) => {
+    const seen = [];
+    serialDispatch([
+      () => {
+        seen.push('guard');
+        return value;
+      },
+      () => {
+        seen.push('later');
+      },
+    ]);
+    return seen;
+  };
+  // null/false/undefined continue the chain; anything else, including 0 and '',
+  // stops it before the next listener.
+  assert.deepEqual(hops(null), ['guard', 'later']);
+  assert.deepEqual(hops(false), ['guard', 'later']);
+  assert.deepEqual(hops(undefined), ['guard', 'later']);
+  assert.deepEqual(hops(true), ['guard']);
+  assert.deepEqual(hops(0), ['guard']);
+  assert.deepEqual(hops(''), ['guard']);
+});
+
+test('apply: a guard nudge leaves later turn-stopping listeners running', async (t) => {
+  await featureHome(t, undefined);
+  const { ctx, handlers } = listenerLog();
+  apply(ctx, {});
+  const later = [];
+  // A block body: `Array#push` returns a length, which is itself a bail value.
+  ctx.on('agent/turn-stopping', ({ turn }) => {
+    later.push(turn);
+  });
+
+  const { agent, steered, session } = fakeAgent();
+  handlers('session/event')[0](session, {
+    type: 'assistant/message',
+    data: { turn: 9, step: 1, message: { role: 'assistant', content: REASONING_ONLY } },
+  });
+  const result = serialDispatch(handlers('agent/turn-stopping'), { agent, turn: 9 });
+
+  // The guard did steer this turn...
+  assert.equal(steered.length, 1);
+  // ...yet the listener registered after it still ran and the guard handed the
+  // dispatcher no bail value.
+  assert.deepEqual(later, [9]);
+  assert.equal(result, undefined);
+});
+
+test('apply: a turn the guard leaves alone also leaves later listeners running', async (t) => {
+  await featureHome(t, undefined);
+  const cases = [
+    {
+      name: 'aborted signal',
+      config: {},
+      content: REASONING_ONLY,
+      signal: () => {
+        const controller = new AbortController();
+        controller.abort();
+        return controller.signal;
+      },
+    },
+    { name: 'nudge budget exhausted', config: { maxNudges: 0 }, content: REASONING_ONLY },
+    { name: 'visible reply', config: {}, content: [{ type: 'text', text: 'answer' }] },
+  ];
+
+  for (const { name, config, content, signal } of cases) {
+    const { ctx, handlers } = listenerLog();
+    apply(ctx, config);
+    const later = [];
+    ctx.on('agent/turn-stopping', ({ turn }) => {
+      later.push(turn);
+    });
+
+    const { agent, steered, session } = fakeAgent();
+    handlers('session/event')[0](session, {
+      type: 'assistant/message',
+      data: { turn: 5, step: 1, message: { role: 'assistant', content } },
+    });
+    const result = serialDispatch(handlers('agent/turn-stopping'), {
+      agent,
+      turn: 5,
+      signal: signal?.(),
+    });
+
+    assert.equal(steered.length, 0, `${name}: the guard must not steer`);
+    assert.deepEqual(later, [5], `${name}: the later listener must still run`);
+    assert.equal(result, undefined, `${name}: nothing may bail the chain`);
+  }
 });

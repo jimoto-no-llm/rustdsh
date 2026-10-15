@@ -166,5 +166,11 @@ export function apply(ctx, config = {}) {
   ctx.on("session/event", (session, event) => guard.observe(session, event));
   // turn-stopping is a serial hook: a listener that steers makes the loop
   // re-read its inbox, and fresh steering runs another step.
-  ctx.on("agent/turn-stopping", ({ agent, turn, signal }) => guard.stopping({ agent, turn, signal }));
+  // The block body drops `stopping()`'s return value on purpose: cordis's
+  // `serial()` stops at the first listener that returns anything but
+  // null/false/undefined, so an expression body would swallow every
+  // turn-stopping listener registered after this one whenever a nudge fires.
+  ctx.on("agent/turn-stopping", ({ agent, turn, signal }) => {
+    guard.stopping({ agent, turn, signal });
+  });
 }
