@@ -912,12 +912,14 @@ fn git_index_content_signature(path: &Path, deadline: Option<Instant>) -> Option
     if expired(deadline) {
         return None;
     }
-    let file = std::fs::File::open(path).ok()?;
-    let metadata = file.metadata().ok()?;
+    let parent = std::fs::canonicalize(path.parent()?).ok()?;
+    let root = crate::file_security::Root::new(&parent)?;
+    let index = root.open(&parent.join(path.file_name()?))?;
+    let metadata = index.metadata().ok()?;
     if !metadata.is_file() || metadata.len() > MAX_INDEX_BYTES {
         return None;
     }
-    let mut input = file.take(MAX_INDEX_BYTES + 1);
+    let mut input = index.take(MAX_INDEX_BYTES + 1);
     let mut hasher = Sha256::new();
     let mut total = 0u64;
     let mut buffer = [0u8; 8192];
@@ -4312,6 +4314,43 @@ mod v3_tests {
         assert_eq!(status_before, status_after);
         assert_eq!(std::fs::read(&file).unwrap(), b"working tree\n");
         assert_ne!(content_before, content_after);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn git_snapshot_does_not_wait_when_index_is_replaced_by_fifo() {
+        use std::process::Command;
+        use std::{ffi::CString, os::unix::ffi::OsStrExt, sync::mpsc, time::Duration};
+
+        let temporary = TempDir::new();
+        let output = Command::new("git")
+            .args(["init", "--quiet"])
+            .current_dir(&temporary.0)
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "git init failed: {output:?}");
+        let cwd = std::fs::canonicalize(&temporary.0).unwrap();
+        let git_dir =
+            git_output_in(Some(&cwd), &["rev-parse", "--absolute-git-dir"], None).unwrap();
+        let index = PathBuf::from(git_dir.trim()).join("index");
+        std::fs::write(&index, b"index").unwrap();
+        std::fs::rename(&index, index.with_extension("saved")).unwrap();
+        let name = CString::new(index.as_os_str().as_bytes()).unwrap();
+        assert_eq!(unsafe { libc::mkfifo(name.as_ptr(), 0o600) }, 0);
+
+        let (sender, receiver) = mpsc::channel();
+        std::thread::spawn(move || {
+            let result = git_dirty_content_signature(
+                &cwd,
+                Some(&BTreeMap::new()),
+                Some(Instant::now() + Duration::from_secs(5)),
+            );
+            let _ = sender.send(result);
+        });
+        assert!(receiver
+            .recv_timeout(Duration::from_secs(6))
+            .expect("Git index inspection must not wait on a FIFO")
+            .is_none());
     }
 
     #[test]
