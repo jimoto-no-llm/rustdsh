@@ -6,6 +6,8 @@ use anyhow::{anyhow, bail, Context, Result};
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 
+const MAX_JSON_BYTES: usize = 64 * 1024 * 1024;
+const MAX_RESPONSE_BYTES: usize = MAX_JSON_BYTES - 1024 * 1024;
 const REGISTRY_KEYS: [&str; 5] = ["schema", "revision", "sequence", "requests", "commands"];
 const REQUEST_KEYS: [&str; 19] = [
     "command_id",
@@ -1540,16 +1542,15 @@ fn read_json(input_file: &str) -> Result<Value> {
     let metadata = file
         .metadata()
         .with_context(|| format!("cannot read JSON {input_file}"))?;
-    const MAX_INPUT_BYTES: usize = 256 * 1024;
-    if !metadata.is_file() || metadata.len() > MAX_INPUT_BYTES as u64 {
-        bail!("Input JSON must be a regular file of at most 256 KiB");
+    if !metadata.is_file() || metadata.len() > MAX_JSON_BYTES as u64 {
+        bail!("Input JSON must be a regular file of at most 64 MiB");
     }
     let mut bytes = Vec::with_capacity(metadata.len() as usize);
-    file.take((MAX_INPUT_BYTES + 1) as u64)
+    file.take((MAX_JSON_BYTES + 1) as u64)
         .read_to_end(&mut bytes)
         .with_context(|| format!("cannot read JSON {input_file}"))?;
-    if bytes.len() > MAX_INPUT_BYTES {
-        bail!("Input JSON exceeds 256 KiB");
+    if bytes.len() > MAX_JSON_BYTES {
+        bail!("Input JSON exceeds 64 MiB");
     }
     let Ok(text) = std::str::from_utf8(&bytes) else {
         bail!("Input JSON is invalid");
@@ -1623,6 +1624,10 @@ pub fn cmd_instruction_queue(action: &str, input_file: &str) -> Result<()> {
         }
         _ => bail!("Invalid instruction-queue action/options"),
     }
-    println!("{}", serde_json::to_string(&Value::Object(output))?);
+    let output = serde_json::to_string(&Value::Object(output))?;
+    if output.len() > MAX_RESPONSE_BYTES {
+        bail!("Instruction queue response exceeds 63 MiB");
+    }
+    println!("{output}");
     Ok(())
 }

@@ -310,6 +310,97 @@ fn resolve_can_append_a_stale_request_as_the_next_turn() {
 }
 
 #[test]
+fn stale_submit_state_above_256_kib_can_still_be_resolved() {
+    let fixture = Fixture::new();
+    let instruction_text = "x".repeat(8_000);
+    let mut state = serde_json::json!({
+        "project": {"id": "p"},
+        "feedback": [],
+        "answer_applications": {
+            "consumers": {
+                "consumer-1": {
+                    "consumer_id": "consumer-1",
+                    "run_id": "run-1",
+                    "session_id": "session-1"
+                }
+            },
+            "commands": {}
+        }
+    });
+
+    for index in 0..20 {
+        let command_id = format!("input_00000000-0000-0000-0000-{index:012}");
+        let document = serde_json::json!({
+            "operation": "submit",
+            "state": state,
+            "input": {
+                "command_id": command_id,
+                "consumer_id": "consumer-1",
+                "run_id": "run-1",
+                "session_id": "session-1",
+                "text": instruction_text,
+                "mode": "next_turn",
+                "expected_queue_revision": index
+            },
+            "context": {"actor": "human", "now": "2026-10-15T01:00:00.000Z"}
+        });
+        let output = fixture.run("submit", &document.to_string());
+        assert!(
+            output.status.success(),
+            "submit {index}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        state =
+            serde_json::from_slice::<serde_json::Value>(&output.stdout).unwrap()["state"].clone();
+    }
+    assert!(serde_json::to_vec(&state).unwrap().len() < 256 * 1024);
+
+    let command_id = "input_00000000-0000-0000-0000-000099999999";
+    let stale = serde_json::json!({
+        "operation": "submit",
+        "state": state,
+        "input": {
+            "command_id": command_id,
+            "consumer_id": "consumer-1",
+            "run_id": "run-1",
+            "session_id": "session-1",
+            "text": "stale review",
+            "mode": "next_turn",
+            "expected_queue_revision": 0
+        },
+        "context": {"actor": "human", "now": "2026-10-15T01:01:00.000Z"}
+    });
+    let output = fixture.run("submit", &stale.to_string());
+    assert!(
+        output.status.success(),
+        "stale submit: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stale: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let state = stale["state"].clone();
+    assert!(serde_json::to_vec(&state).unwrap().len() > 256 * 1024);
+
+    let resolve = serde_json::json!({
+        "operation": "resolve",
+        "state": state,
+        "input": {
+            "command_id": command_id,
+            "expected_queue_revision": stale["state"]["instructions"]["revision"],
+            "decision": "append_next_turn"
+        },
+        "context": {"actor": "human", "now": "2026-10-15T01:02:00.000Z"}
+    });
+    let output = fixture.run("resolve", &resolve.to_string());
+    assert!(
+        output.status.success(),
+        "resolve after large stale submit: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let resolved: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(resolved["result"]["request"]["status"], "accepted");
+}
+
+#[test]
 fn interrupt_review_and_control_bind_only_the_exact_active_command() {
     let fixture = Fixture::new();
     let owner = "owner_00000000-0000-0000-0000-000000000001";
@@ -445,9 +536,90 @@ fn interrupt_review_and_control_bind_only_the_exact_active_command() {
         "cmd_00000000-0000-0000-0000-000000000002"
     );
 
-    let reconcile = serde_json::json!({
+    let repeated_begin = serde_json::json!({
         "operation": "control",
         "state": printed["state"],
+        "input": {
+            "consumer_id": "consumer-1",
+            "command_id": command_id,
+            "phase": "begin",
+            "native_command_id": "cmd_00000000-0000-0000-0000-000000000003"
+        },
+        "context": {
+            "consumer": {"consumer_id": "consumer-1"},
+            "available": true,
+            "owner_id": owner,
+            "now": "2026-10-15T01:02:30.000Z"
+        }
+    });
+    let retried = fixture.run("control", &repeated_begin.to_string());
+    assert!(
+        retried.status.success(),
+        "{}",
+        String::from_utf8_lossy(&retried.stderr)
+    );
+    let retried: serde_json::Value = serde_json::from_slice(&retried.stdout).unwrap();
+    assert_eq!(retried["result"]["claimed"], false);
+    assert_eq!(
+        retried["result"]["control"]["native_command_id"],
+        "cmd_00000000-0000-0000-0000-000000000002"
+    );
+
+    let incomplete_proof = serde_json::json!({
+        "operation": "control",
+        "state": retried["state"],
+        "input": {
+            "consumer_id": "consumer-1",
+            "command_id": command_id,
+            "phase": "reconcile"
+        },
+        "context": {
+            "consumer": {"consumer_id": "consumer-1"},
+            "owner_id": owner,
+            "cancel_proof": true,
+            "now": "2026-10-15T01:02:45.000Z"
+        }
+    });
+    let incomplete = fixture.run("control", &incomplete_proof.to_string());
+    assert!(
+        incomplete.status.success(),
+        "{}",
+        String::from_utf8_lossy(&incomplete.stderr)
+    );
+    let incomplete: serde_json::Value = serde_json::from_slice(&incomplete.stdout).unwrap();
+    assert_eq!(
+        incomplete["result"]["control"]["phase"],
+        "notification_sent"
+    );
+    assert_ne!(incomplete["result"]["control"]["phase"], "confirmed");
+
+    let unknown = serde_json::json!({
+        "operation": "control",
+        "state": incomplete["state"],
+        "input": {
+            "consumer_id": "consumer-1",
+            "command_id": command_id,
+            "phase": "unknown"
+        },
+        "context": {
+            "consumer": {"consumer_id": "consumer-1"},
+            "owner_id": owner,
+            "now": "2026-10-15T01:02:50.000Z"
+        }
+    });
+    let unknown = fixture.run("control", &unknown.to_string());
+    assert!(
+        unknown.status.success(),
+        "{}",
+        String::from_utf8_lossy(&unknown.stderr)
+    );
+    let unknown: serde_json::Value = serde_json::from_slice(&unknown.stdout).unwrap();
+    assert_eq!(unknown["result"]["control"]["phase"], "unknown");
+    assert_ne!(unknown["result"]["control"]["phase"], "confirmed");
+
+    let reconcile = serde_json::json!({
+        "operation": "control",
+        "state": unknown["state"],
         "input": {
             "consumer_id": "consumer-1",
             "command_id": command_id,
