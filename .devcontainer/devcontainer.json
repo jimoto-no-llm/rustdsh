@@ -1,0 +1,20 @@
+{
+  "name": "rustdsh",
+  "image": "mcr.microsoft.com/devcontainers/rust:1-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": { "version": "22" },
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y --no-install-recommends python3 zstd shellcheck && rustup component add rustfmt clippy && sh scripts/dev-setup.sh --with-node-deps",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "editorconfig.editorconfig",
+        "tamasfe.even-better-toml",
+        "davidanson.vscode-markdownlint",
+        "timonwong.shellcheck"
+      ]
+    }
+  }
+}

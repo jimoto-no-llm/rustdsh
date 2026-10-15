@@ -29,6 +29,7 @@ import {
   inspectTunnel,
 } from "./connection-diagnostics.mjs";
 import { HumanAnnotationStore } from "./human-annotations.mjs";
+import { inspectGitHubStatus } from "./github-status.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const equal = (a, b) =>
@@ -139,6 +140,8 @@ async function readBody(req, maximum = 131072) {
 }
 export async function startDashboard(options) {
   const { kind = "project", project, tailscale = true } = options;
+  const githubStatusInspector =
+    options.githubStatusInspector || inspectGitHubStatus;
   const port =
     options.port ||
     (kind === "harness"
@@ -542,6 +545,7 @@ export async function startDashboard(options) {
           route === "/model-catalog-ui.mjs" ||
           route === "/project-overview.mjs" ||
           route === "/connection-diagnostics-ui.mjs" ||
+          route === "/github-status-ui.mjs" ||
           route === "/answer-applications-ui.mjs" ||
           route === "/instruction-queue-ui.mjs" ||
           route === "/cost-ledger-ui.mjs" ||
@@ -644,6 +648,7 @@ export async function startDashboard(options) {
           "/model-catalog-ui.mjs",
           "/project-overview.mjs",
           "/connection-diagnostics-ui.mjs",
+          "/github-status-ui.mjs",
           "/answer-applications-ui.mjs",
           "/instruction-queue-ui.mjs",
           "/cost-ledger-ui.mjs",
@@ -700,6 +705,19 @@ export async function startDashboard(options) {
         route === "/api/diagnostics"
       )
         return json(res, 200, await diagnostics());
+      if (
+        kind === "project" &&
+        req.method === "GET" &&
+        route === "/api/github/status"
+      ) {
+        if (!humanAuthorized)
+          return json(res, 403, { error: "Human browser credential required" });
+        return json(
+          res,
+          200,
+          await githubStatusInspector({ cwd: project.directory }),
+        );
+      }
       if (req.method === "GET" && route === "/api/config")
         return json(res, 200, {
           kind,

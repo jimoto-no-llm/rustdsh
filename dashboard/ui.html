@@ -967,6 +967,7 @@
           <p id="managed-status" role="status" aria-live="polite">
             所有範囲を確認中…
           </p>
+          <p id="managed-provider" class="sub"></p>
           <p id="managed-remaining" class="sub"></p>
           <details>
             <summary>実行IDと停止履歴</summary>
@@ -1071,6 +1072,22 @@
           <p id="observed-cli-status" role="status" aria-live="polite"></p>
           <div class="feed" id="observed-cli-list" aria-live="polite"></div>
           <button id="observed-cli-refresh" type="button">識別状態を再確認</button>
+        </details>
+        <details class="fold" id="github-status-detail">
+          <summary>最新push・CI・レビュー状態</summary>
+          <p class="sub">
+            ローカルHEAD、追跡先の実SHA、PR headを照合します。GitHubのrequired判定とpush／pull_request起動を分けて表示します。取得できない状態は成功として扱いません。
+          </p>
+          <button id="github-status-refresh">GitHub状態を読み取る</button>
+          <p id="github-status-message" class="sub" role="status" aria-live="polite">
+            未確認 · ボタンを押すと最新状態を取得します。
+          </p>
+          <section
+            id="github-status-result"
+            class="decision-grid"
+            aria-label="GitHub push・CI・レビュー状態"
+            aria-live="polite"
+          ></section>
         </details>
             <h3 id="pending-heading" tabindex="-1">未回答の質問</h3>
             <p class="sub" id="pending-note">

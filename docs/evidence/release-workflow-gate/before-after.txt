@@ -1,0 +1,16 @@
+Baseline: 3791b7b12b2e6a5dd70e3d4905356ba498ec709c; Python 3.12.14
+Synthetic API-shaped fixtures; no tag, workflow or release was created.
+Case: old success + newer queued run/job; started_at=null on queued check
+before: ACCEPTED (incorrectly selected old successful check)
+after: REJECTED: latest workflow run 11 attempt 1 is queued/no conclusion
+Case: old undated cancelled run + later successful run
+after: ACCEPTED (later successful run, no permanent undated-check block)
+Case: queued rerun begins after final workflow list
+after: REJECTED: ci.yml: workflow run changed during verification; retry
+Recorded public GitHub API data replay (read-only; no live release):
+  SHA 3791b7b12b2e6a5dd70e3d4905356ba498ec709c
+  ci.yml: run 38120909459, attempt 1, success
+  codeql.yml: run 38120909474, attempt 1, success
+  result: ACCEPTED, all 12 required jobs successful
+  Run-list data was filtered by workflow from the repository run-list response;
+  the gh subprocess endpoint itself was not exercised by this recorded replay.

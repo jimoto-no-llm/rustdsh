@@ -59,10 +59,12 @@ test("resolveRdshExecutable accepts an absolute override and searches absolute P
 });
 
 test("serve capability probe requires the current worker protocol", async () => {
-  const reply = (value) => {
-    const line = JSON.stringify(`${JSON.stringify(value)}\n`);
-    return `process.stdin.resume(); process.stdin.on(\"end\", () => process.stdout.write(${line}));`;
-  };
+  const reply = (value) => [
+    "-e",
+    'process.stdin.resume(); process.stdin.on("end", () => process.stdout.write(process.argv[1]));',
+    "--",
+    `${JSON.stringify(value)}\n`,
+  ];
   const supported = reply({
     operation: "capabilities",
     protocol: 1,
@@ -74,13 +76,13 @@ test("serve capability probe requires the current worker protocol", async () => 
   });
   assert.equal(
     await supportsInstructionQueueServe(process.execPath, {
-      prefixArgs: ["-e", supported],
+      prefixArgs: supported,
     }),
     true,
   );
   assert.equal(
     await supportsInstructionQueueServe(process.execPath, {
-      prefixArgs: ["-e", unsupported],
+      prefixArgs: unsupported,
     }),
     false,
   );

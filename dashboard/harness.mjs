@@ -1,32 +1,12 @@
 import http from "node:http";
 import net from "node:net";
 import { randomUUID } from "node:crypto";
-import { spawnOwnedProcess } from "./process-scope.mjs";
+import { resolveHarnessProvider } from "./harness-providers.mjs";
 import { RunHistory } from "./run-history.mjs";
 
 export async function startHarness(port, frontPort, options = {}) {
-  // A managed instance keeps the original Harness process token and its browser fence intact.
-  if (process.platform !== "win32" && !options.command)
-    throw new Error(
-      "Harness mode currently requires Windows + WSL; project mode is portable",
-    );
-  const distro = process.env.RDSH_WSL_DISTRO || "FlashNext";
-  const wrapper =
-    process.env.RDSH_WSL_HARNESS_BIN || "/root/.local/bin/rdsh-env";
-  const command = options.command ?? [
-    wrapper,
-    "dsh",
-    "--profile",
-    "web",
-    "--host",
-    "127.0.0.1",
-    "--port",
-    String(port),
-    "--no-open",
-    "--trusted-host",
-    `127.0.0.1:${frontPort}`,
-    `localhost:${frontPort}`,
-  ];
+  const provider = resolveHarnessProvider(options);
+  const launch = provider.launchOptions({ port, frontPort, options });
   const history = await RunHistory.open(options.project);
   const run_id = "run_" + randomUUID();
   await history.register(run_id);
@@ -34,22 +14,28 @@ export async function startHarness(port, frontPort, options = {}) {
   await history.scopeIntent(run_id);
   let historyError = null;
   const stages = [];
-  const owned = await spawnOwnedProcess({
-    command,
-    cwd: options.cwd ?? "/root",
-    env: options.env,
-    wsl: options.wsl ?? (options.command ? null : distro),
-    wslNode: process.env.RDSH_WSL_NODE,
-    owner_id: history.owner_id,
-    onStage: async (stage) => {
-      stages.push(stage);
-      try {
-        await history.stopStage(run_id, stage);
-      } catch {
+  let owned;
+  try {
+    owned = await provider.start({
+      ...launch,
+      owner_id: history.owner_id,
+      onStage: async (stage) => {
+        stages.push(stage);
+        try {
+          await history.stopStage(run_id, stage);
+        } catch {
+          historyError = "history_write_failed";
+        }
+      },
+    });
+  } catch (error) {
+    await history.transition(run_id, "unknown", "operation_unconfirmed").catch(
+      () => {
         historyError = "history_write_failed";
-      }
-    },
-  });
+      },
+    );
+    throw error;
+  }
   const child = owned.child;
   try {
     await history.bindScope(run_id, owned.descriptor);
@@ -59,7 +45,10 @@ export async function startHarness(port, frontPort, options = {}) {
       child.pid,
     );
   } catch (error) {
-    await owned.stop();
+    await provider.stop(owned, {
+      gracefulTimeout: options.stopTimeout ?? 3000,
+      killTimeout: options.stopTimeout ?? 3000,
+    });
     throw error;
   }
   child.on("exit", () => {
@@ -67,7 +56,6 @@ export async function startHarness(port, frontPort, options = {}) {
       historyError = "history_write_failed";
     });
   });
-  let output = "";
   let stopping = null,
     final = null;
   const stop = () => {
@@ -85,7 +73,7 @@ export async function startHarness(port, frontPort, options = {}) {
           historyError = "history_write_failed";
         }
       }
-      const result = await owned.stop({
+      const result = await provider.stop(owned, {
         gracefulTimeout: options.stopTimeout ?? 3000,
         killTimeout: options.stopTimeout ?? 3000,
       });
@@ -112,40 +100,9 @@ export async function startHarness(port, frontPort, options = {}) {
     })();
     return stopping;
   };
-  const ready = new Promise((resolve, reject) => {
-    const timeout = setTimeout(
-      () =>
-        reject(
-          new Error(
-            "Harness startup timed out; check the existing dsh web profile",
-          ),
-        ),
-      45000,
-    );
-    const capture = (chunk) => {
-      output = (output + chunk.toString()).slice(-32000);
-      const match = output.match(
-        /dsh web: (http:\/\/127\.0\.0\.1:\d+\/[^\s]*)/,
-      );
-      if (match) {
-        clearTimeout(timeout);
-        resolve(new URL(match[1]));
-      }
-    };
-    child.stdout.on("data", capture);
-    child.stderr.on("data", capture);
-    child.once("error", (error) => {
-      clearTimeout(timeout);
-      reject(error);
-    });
-    child.once("exit", (code) => {
-      clearTimeout(timeout);
-      reject(
-        new Error(
-          `Harness exited with code ${code}; port ${port} may already be used`,
-        ),
-      );
-    });
+  const ready = provider.waitUntilReady(child, {
+    port,
+    timeout: options.startupTimeout ?? 45_000,
   });
   try {
     await owned.release();
@@ -159,11 +116,12 @@ export async function startHarness(port, frontPort, options = {}) {
       run_id,
       inspect: async () => ({
         run_id,
+        provider: provider.status,
         scope:
           final ??
           (stopping
             ? { ...owned.state, status: "stopping", confirmed: false }
-            : await owned.inspect()),
+            : await provider.health(owned)),
         stages: structuredClone(stages),
       }),
       disconnectMonitor: () => owned.disconnectMonitor(),

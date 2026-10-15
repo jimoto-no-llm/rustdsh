@@ -15,6 +15,6 @@ curl -fsSL https://github.com/jimoto-no-llm/rustdsh/releases/latest/download/ins
 
 Windows は同じ Release の `install.ps1 -FromRelease` を使用してください。
 
-<!-- 候補版では latest を使用せず、両 OS の導入方法を該当タグの URL に変更する。 -->
+<!-- 候補版では両 OS の取得 URL を該当タグへ変更し、Unix に --version=vX.Y.Z-rc.N、Windows に -Version vX.Y.Z-rc.N を追加する。取得 URL の変更だけでは latest のバイナリが入る。 -->
 <!-- What's Changed・貢献者・Full Changelog は公開時に自動追加される。 -->
 <!-- 比較元を選ぶ場合は、previous-tag: vX.Y.Z だけのHTMLコメントをここに記録する。 -->

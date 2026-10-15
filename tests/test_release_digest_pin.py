@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
+import json
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -50,12 +54,29 @@ def pin_unix(text, tag, digests=ALL_DIGESTS, **kwargs):
     return pin_release_digests.pin(text, tag, digests, **kwargs)
 
 
-def pin_windows(text, tag, digests=ALL_DIGESTS):
+def pin_windows(text, tag, digests=ALL_DIGESTS, **kwargs):
     return pin_release_digests.pin(
         text, tag, digests,
         (pin_release_digests.WINDOWS_ASSET,),
         pin_release_digests.WINDOWS_HEADER,
+        **kwargs,
     )
+
+
+def cli_fixture(directory, windows_text=WINDOWS_REGISTRY):
+    unix_path = directory / "unix.tsv"
+    windows_path = directory / "windows.tsv"
+    unix_path.write_text(REGISTRY, encoding="utf-8")
+    windows_path.write_text(windows_text, encoding="utf-8")
+    assets = [{"name": name,
+               "digest": "sha256:" + hashlib.sha256(f"fixture {name}".encode()).hexdigest()}
+              for name in pin_release_digests.ASSETS]
+    assets_path = directory / "assets.json"
+    assets_path.write_text(json.dumps({"assets": assets}), encoding="utf-8")
+    command = [sys.executable, "-B", str(SCRIPT),
+               "--registry", str(unix_path), "--windows-registry", str(windows_path),
+               "--from-json", str(assets_path)]
+    return unix_path, windows_path, assets, command
 
 
 class PinReleaseDigestsTest(unittest.TestCase):
@@ -174,6 +195,119 @@ class PinReleaseDigestsTest(unittest.TestCase):
     def test_refuses_prerelease_tag(self) -> None:
         with self.assertRaises(ValueError):
             pin_unix(REGISTRY, "v0.3.4-rc.1")
+
+    def test_explicit_candidates_keep_the_stable_latest_in_both_ledgers(self) -> None:
+        for phase in ("alpha", "beta", "rc"):
+            tag = f"v0.4.0-{phase}.1"
+            for text, update, assets in (
+                (REGISTRY, pin_unix, pin_release_digests.UNIX_ASSETS),
+                (WINDOWS_REGISTRY, pin_windows, (pin_release_digests.WINDOWS_ASSET,)),
+            ):
+                with self.subTest(tag=tag, assets=assets):
+                    result = update(text, tag, allow_prerelease=True)
+                    self.assertIn("latest v0.3.2\n", result)
+                    self.assertNotIn(f"latest {tag}", result)
+                    for asset in assets:
+                        self.assertIn(row(tag, asset, ALL_DIGESTS[asset]), result.splitlines())
+                    self.assertEqual(result.count(f"{tag} "), len(assets))
+                    self.assertEqual(update(result, tag, allow_prerelease=True), result)
+
+    def test_later_stable_pins_preserve_candidates_in_both_ledgers(self) -> None:
+        tag = "v0.4.0-rc.10"
+        for text, update, assets in (
+            (REGISTRY, pin_unix, pin_release_digests.UNIX_ASSETS),
+            (WINDOWS_REGISTRY, pin_windows, (pin_release_digests.WINDOWS_ASSET,)),
+        ):
+            with self.subTest(assets=assets):
+                candidate = update(text, tag, allow_prerelease=True)
+                stable = update(candidate, "v0.4.0")
+                self.assertIn("latest v0.4.0\n", stable)
+                for asset in assets:
+                    self.assertIn(row(tag, asset, ALL_DIGESTS[asset]), stable.splitlines())
+                self.assertEqual(update(stable, "v0.3.2").splitlines()[2], "latest v0.4.0")
+
+    def test_candidate_rows_follow_version_phase_and_numeric_sequence_order(self) -> None:
+        updated = REGISTRY
+        for tag in ("v0.4.0-rc.2", "v0.4.0-alpha.1", "v0.4.0-rc.10", "v0.4.0-beta.1"):
+            updated = pin_unix(updated, tag, allow_prerelease=True)
+        updated = pin_unix(updated, "v0.4.0")
+        versions = list(dict.fromkeys(line.split()[0] for line in updated.splitlines()[3:]))
+        self.assertEqual(versions[:5], ["v0.4.0", "v0.4.0-rc.10", "v0.4.0-rc.2",
+                                       "v0.4.0-beta.1", "v0.4.0-alpha.1"])
+
+    def test_candidate_requires_a_complete_existing_stable_latest(self) -> None:
+        for text in (
+            "\n".join(pin_release_digests.UNIX_HEADER) + "\n",
+            REGISTRY.replace("latest v0.3.2", "latest v0.4.0-rc.1"),
+            REGISTRY.replace("latest v0.3.2", "latest v0.0.1"),
+            REGISTRY.replace(row("v0.3.2", "rdsh-linux-x64.tar.gz", "1" * 64) + "\n", ""),
+            REGISTRY.replace("1" * 64, "short"),
+        ):
+            with self.subTest(text=text), self.assertRaises(SystemExit):
+                pin_unix(text, "v0.4.0-rc.1", allow_prerelease=True)
+
+    def test_candidate_tags_must_be_literal_supported_versions(self) -> None:
+        for tag in ("v0.4.0-preview.1", "v0.4.0-rc", "v0.4.0-rc.1\n", "v0.4.0-rc.$N"):
+            with self.subTest(tag=tag), self.assertRaises(ValueError):
+                pin_unix(REGISTRY, tag, allow_prerelease=True)
+
+    def test_candidate_cli_then_stable_pin_preserves_exact_fixture_digests(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            unix_path, windows_path, assets, command = cli_fixture(Path(tmp))
+            candidate = "v0.4.0-rc.1"
+            for arguments in ((candidate, "--allow-prerelease"), ("v0.4.0",)):
+                result = subprocess.run(command + list(arguments), capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+            unix_text = unix_path.read_text(encoding="utf-8")
+            windows_text = windows_path.read_text(encoding="utf-8")
+            self.assertIn("latest v0.4.0\n", unix_text)
+            self.assertIn("latest v0.4.0\n", windows_text)
+            for asset in assets:
+                text = windows_text if asset["name"] == pin_release_digests.WINDOWS_ASSET else unix_text
+                for tag in (candidate, "v0.4.0"):
+                    self.assertIn(row(tag, asset["name"], asset["digest"].removeprefix("sha256:")),
+                                  text.splitlines())
+            self.assertNotIn(pin_release_digests.WINDOWS_ASSET, unix_text)
+            for asset in pin_release_digests.UNIX_ASSETS:
+                self.assertNotIn(asset, windows_text)
+
+    def test_candidate_cli_dry_run_and_invalid_second_ledger_do_not_write(self) -> None:
+        for windows_text, dry_run in ((WINDOWS_REGISTRY, True),
+                                     ("\n".join(pin_release_digests.WINDOWS_HEADER) + "\n", False)):
+            with self.subTest(dry_run=dry_run), tempfile.TemporaryDirectory() as tmp:
+                unix_path, windows_path, _assets, command = cli_fixture(Path(tmp), windows_text)
+                before = (unix_path.read_bytes(), windows_path.read_bytes())
+                args = ["v0.4.0-rc.1", "--allow-prerelease"] + (["--dry-run"] if dry_run else [])
+                result = subprocess.run(command + args, capture_output=True, text=True)
+                if dry_run:
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertIn("v0.4.0-rc.1", result.stdout)
+                else:
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("stable latest", result.stderr)
+                self.assertEqual((unix_path.read_bytes(), windows_path.read_bytes()), before)
+
+    def test_candidate_cli_refuses_each_missing_or_invalid_asset_without_writing(self) -> None:
+        for asset_name in pin_release_digests.ASSETS:
+            for invalid_digest in (False, True):
+                with self.subTest(asset=asset_name, invalid_digest=invalid_digest), \
+                        tempfile.TemporaryDirectory() as tmp:
+                    directory = Path(tmp)
+                    unix_path, windows_path, assets, command = cli_fixture(directory)
+                    if invalid_digest:
+                        for asset in assets:
+                            if asset["name"] == asset_name:
+                                asset["digest"] = "sha256:short"
+                    else:
+                        assets = [asset for asset in assets if asset["name"] != asset_name]
+                    (directory / "assets.json").write_text(json.dumps({"assets": assets}), encoding="utf-8")
+                    before = (unix_path.read_bytes(), windows_path.read_bytes())
+                    result = subprocess.run(command + ["v0.4.0-rc.1", "--allow-prerelease"],
+                                            capture_output=True, text=True)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("unusable digest" if invalid_digest else "missing required assets",
+                                  result.stderr)
+                    self.assertEqual((unix_path.read_bytes(), windows_path.read_bytes()), before)
 
     def test_refuses_missing_assets(self) -> None:
         with self.assertRaises(SystemExit):

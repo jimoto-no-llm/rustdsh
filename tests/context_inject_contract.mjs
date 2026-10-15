@@ -2,8 +2,9 @@
 //
 // The shell regression checks the JSON shape by hand; this test decodes the
 // same stdout with @deepseek-ai/dsh-hook-protocol, the package the DSH
-// Claude Code / Codex bridges actually use. It skips (exit 0) when that package
-// is not installed, so CI without DSH still passes.
+// Claude Code / Codex bridges actually use. A local run skips (exit 0) when
+// that package is not installed; CI sets RDSH_HOOK_CODEC_REQUIRED=1, where a
+// missing or mistyped DSH_HOOK_PROTOCOL fails the run instead.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -25,7 +26,20 @@ function protocolPath() {
   return candidates.find((path) => path && existsSync(path));
 }
 
+// CI passes RDSH_HOOK_CODEC_REQUIRED=1 so that a missing or mistyped
+// DSH_HOOK_PROTOCOL fails this file instead of skipping the contract.
+function hookCodecRequired() {
+  const value = process.env.RDSH_HOOK_CODEC_REQUIRED;
+  return value !== undefined && value !== "" && value !== "0";
+}
+
 const protocol = protocolPath();
+if (!protocol && hookCodecRequired()) {
+  throw new Error(
+    "RDSH_HOOK_CODEC_REQUIRED is set but the hook protocol package was not found" +
+      ` (DSH_HOOK_PROTOCOL=${process.env.DSH_HOOK_PROTOCOL ?? "<unset>"})`,
+  );
+}
 const mod = protocol ? await import(pathToFileURL(resolve(protocol)).href) : undefined;
 
 test("inject output decodes as a UserPromptSubmit context hook", { skip: !mod && "hook protocol package not installed" }, () => {

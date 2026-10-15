@@ -24,6 +24,18 @@ installer and badge links use that owner. Keep historical evidence intact.
   `release-digests-windows.tsv`, and `latest` moves forward only.
 - A project settings change does not itself request a new version release.
 
+## Development
+
+- Set up a checkout with `sh scripts/dev-setup.sh`; verify with
+  `sh scripts/check.sh` (`quick` / `full` modes) before opening a PR.
+- Branch from a fresh `origin/main`, one topic per branch and one writer per
+  worktree. Run `sh scripts/check-conflicts.sh --open-prs` before pushing and
+  coordinate when another open PR touches the same files.
+- Keep changes local to the feature: new modules and test files rather than
+  growing `src/main.rs` or shared test files; no drive-by reformatting.
+- Resolve lockfile conflicts by taking `main`'s file and regenerating it.
+  Details: `docs/DEVELOPMENT.md`.
+
 ## Repository configuration
 
 - Managed labels live in `.github/labels.yml`; the labels workflow syncs changes

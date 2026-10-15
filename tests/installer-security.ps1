@@ -1,4 +1,7 @@
-param([string]$InstallerPath = (Join-Path $PSScriptRoot '../install.ps1'))
+param(
+  [string]$InstallerPath = (Join-Path $PSScriptRoot '../install.ps1'),
+  [string]$Version = 'latest'
+)
 $ErrorActionPreference = 'Stop'
 if (!(Test-Path -LiteralPath $InstallerPath -PathType Leaf)) { throw 'Installer source is missing' }
 $taskRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('rdsh-installer-security-' + [Guid]::NewGuid().ToString('N'))
@@ -98,6 +101,27 @@ try {
   if ($requests[1] -cne 'https://fixture.invalid/releases/download/v9.9.9/rdsh-windows-x64.zip') { throw "latest did not resolve through the registry: $($requests -join ', ')" }
   if (@($requests | Where-Object { $_ -like '*.sha256' }).Count -ne 0) { throw 'a release sidecar was requested' }
   Write-Output 'PASS: the Windows registry pin resolves latest and reaches extraction'
+
+  if ($Version -ne 'latest') {
+    # 候補版はcanonical台帳の行で認可し、stableのlatestを動かさない。
+    $rows = @(New-AssetRows -Version 'v9.9.9' -Digest $goodDigest) + @(New-AssetRows -Version $Version -Digest $goodDigest)
+    $global:RdshInstallerSecurityFixture.registry = New-Registry -Latest 'v9.9.9' -Rows $rows
+    $before = $global:RdshInstallerSecurityFixture.extractions
+    $caught = Invoke-Installer -Extra @{ Version = $Version }
+    if ($global:RdshInstallerSecurityFixture.extractions -ne ($before + 1) -or $caught -ne 'fixture reached extraction') { throw "pinned candidate rejected: $caught" }
+    $requests = $global:RdshInstallerSecurityFixture.requests
+    $expectedArchive = "https://fixture.invalid/releases/download/$Version/$asset"
+    if ($requests.Count -ne 2 -or $requests[0] -cne $registryUrl -or $requests[1] -cne $expectedArchive) { throw "candidate did not use the canonical registry and exact tag: $($requests -join ', ')" }
+    Write-Output 'PASS: a pinned candidate uses its exact tag after the canonical registry'
+
+    $rows = New-AssetRows -Version 'v9.9.9' -Digest $goodDigest
+    $global:RdshInstallerSecurityFixture.registry = New-Registry -Latest 'v9.9.9' -Rows $rows
+    $before = $global:RdshInstallerSecurityFixture.extractions
+    $caught = Invoke-Installer -Extra @{ Version = $Version }
+    if ($global:RdshInstallerSecurityFixture.extractions -ne $before -or $caught -notmatch 'no pinned checksum for release') { throw "unpinned candidate was not refused: $caught" }
+    if (Test-AssetRequested) { throw 'an unpinned candidate still downloaded an archive' }
+    Write-Output 'PASS: an unpinned candidate is refused before download'
+  }
 
   # A registry row that pins different bytes cannot authorize the archive.
   $rows = New-AssetRows -Version 'v9.9.9' -Digest $zeroDigest

@@ -20,7 +20,6 @@ jobs:
     timeout-minutes: 20
     permissions:
       actions: read
-      checks: read
       contents: read
     steps:
       - uses: actions/checkout@v7
@@ -58,8 +57,7 @@ jobs:
           set -euo pipefail
           tag_sha="$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
           git fetch --no-tags origin main
-          gh api --paginate --slurp "repos/${GITHUB_REPOSITORY}/commits/${tag_sha}/check-runs?per_page=100" > "$RUNNER_TEMP/release-check-runs.json"
-          python3 scripts/release_ci.py "$tag_sha" "$RUNNER_TEMP/release-check-runs.json" --main-ref FETCH_HEAD
+          python3 scripts/release_ci.py "$tag_sha" --repo "$GITHUB_REPOSITORY" --tag "$RELEASE_TAG" --main-ref FETCH_HEAD
       - run: python3 -m unittest discover -s tests -p 'test_release_*.py'
 
   release:

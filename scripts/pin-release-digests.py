@@ -16,6 +16,7 @@ Usage:
     python3 scripts/pin-release-digests.py vX.Y.Z
     python3 scripts/pin-release-digests.py vX.Y.Z --from-json assets.json
     python3 scripts/pin-release-digests.py vX.Y.Z --dry-run
+    python3 scripts/pin-release-digests.py vX.Y.Z-rc.N --allow-prerelease
 """
 
 from __future__ import annotations
@@ -51,18 +52,26 @@ LEDGERS = (
     (UNIX_REGISTRY, UNIX_HEADER, UNIX_ASSETS),
     (WINDOWS_REGISTRY, WINDOWS_HEADER, (WINDOWS_ASSET,)),
 )
-TAG_RE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$")
+TAG_RE = re.compile(r"v([0-9]+)\.([0-9]+)\.([0-9]+)(?:-(alpha|beta|rc)\.([0-9]+))?")
 DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
 LATEST_RE = re.compile(r"^latest\s+(\S+)\s*$")
 
 
-def parse_tag(tag: str) -> tuple:
-    match = TAG_RE.match(tag)
+def parse_tag(tag: str, *, allow_prerelease=False) -> tuple:
+    match = TAG_RE.fullmatch(tag)
     if not match:
         raise ValueError(f"unsupported release tag: {tag}")
-    if match.group(4):
+    if match.group(4) and not allow_prerelease:
         raise ValueError(f"refusing to pin a prerelease tag: {tag}")
     return tuple(int(part) for part in match.groups()[:3])
+
+
+def registry_tag_key(tag: str) -> tuple:
+    version = parse_tag(tag, allow_prerelease=True)
+    match = TAG_RE.fullmatch(tag)
+    phase, sequence = match.groups()[3:]
+    return (*version, {"alpha": 0, "beta": 1, "rc": 2, None: 3}[phase],
+            int(sequence) if sequence is not None else 0)
 
 
 def parse_asset_lines(lines) -> dict:
@@ -134,13 +143,13 @@ def split_registry(text: str) -> tuple:
         if len(parts) != 3:
             raise SystemExit(f"malformed registry row: {stripped!r}")
         version, name, digest = parts
-        parse_tag(version)
+        parse_tag(version, allow_prerelease=True)
         versions.setdefault(version, []).append((name, digest))
     return comments, latest, versions
 
 
 def render_registry(tag: str, versions: dict, assets=UNIX_ASSETS, header=UNIX_HEADER) -> str:
-    ordered = sorted(versions, key=parse_tag, reverse=True)
+    ordered = sorted(versions, key=registry_tag_key, reverse=True)
     lines = list(header)
     lines.append(f"latest {tag}")
     for version in ordered:
@@ -161,36 +170,48 @@ def channel_for(latest, tag: str) -> str:
     automatic updates resolve to.
     """
     if latest is None:
+        if "-" in tag:
+            raise SystemExit("prerelease pins require an existing stable latest row")
         return tag
     try:
         parse_tag(latest)
     except ValueError as error:
         raise SystemExit(f"existing latest row is unusable: {error}") from None
+    if "-" in tag:
+        return latest
     return max(latest, tag, key=parse_tag)
 
 
-def pin(text: str, tag: str, digests: dict, assets=UNIX_ASSETS, header=UNIX_HEADER) -> str:
-    parse_tag(tag)
+def pin(text: str, tag: str, digests: dict, assets=UNIX_ASSETS, header=UNIX_HEADER,
+        *, allow_prerelease=False) -> str:
+    parse_tag(tag, allow_prerelease=allow_prerelease)
     rows = require_assets(tag, digests, assets)
     comments, latest, versions = split_registry(text)
     if comments != list(header):
         raise SystemExit("registry header changed; update the header in this script first")
+    channel = channel_for(latest, tag)
+    if "-" in tag:
+        # 候補だけの台帳や欠けたstable pinを新しいlatestとして公開しない。
+        require_assets(channel, dict(versions.get(channel, [])), assets)
     versions[tag] = rows
-    return render_registry(channel_for(latest, tag), versions, assets, header)
+    return render_registry(channel, versions, assets, header)
 
 
-def pin_all(tag: str, digests: dict, ledgers=LEDGERS) -> list:
+def pin_all(tag: str, digests: dict, ledgers=LEDGERS, *, allow_prerelease=False) -> list:
     """Render every ledger for one release before anything is written."""
     updates = []
     for path, header, assets in ledgers:
-        updated = pin(path.read_text(encoding="utf-8"), tag, digests, assets, header)
+        updated = pin(path.read_text(encoding="utf-8"), tag, digests, assets, header,
+                      allow_prerelease=allow_prerelease)
         updates.append((path, updated, assets))
     return updates
 
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("tag", help="published stable tag, e.g. v0.3.4")
+    parser.add_argument("tag", help="published tag, e.g. v0.3.4 or v0.4.0-rc.1")
+    parser.add_argument("--allow-prerelease", action="store_true",
+                        help="pin an exact alpha/beta/rc tag without changing stable latest")
     parser.add_argument("--registry", type=Path, default=UNIX_REGISTRY,
                         help=f"Unix ledger to update (default: {UNIX_REGISTRY})")
     parser.add_argument("--windows-registry", type=Path, default=WINDOWS_REGISTRY,
@@ -199,10 +220,11 @@ def main(argv=None) -> int:
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
 
+    parse_tag(args.tag, allow_prerelease=args.allow_prerelease)
     digests = load_assets_json(args.from_json) if args.from_json else fetch_asset_digests(args.tag)
     ledgers = ((args.registry, UNIX_HEADER, UNIX_ASSETS),
                (args.windows_registry, WINDOWS_HEADER, (WINDOWS_ASSET,)))
-    updates = pin_all(args.tag, digests, ledgers)
+    updates = pin_all(args.tag, digests, ledgers, allow_prerelease=args.allow_prerelease)
     if args.dry_run:
         for path, updated, _assets in updates:
             sys.stdout.write(f"# --- {path} (dry run) ---\n{updated}")

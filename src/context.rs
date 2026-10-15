@@ -501,6 +501,9 @@ fn user_texts(value: &serde_json::Value) -> Vec<String> {
         Some(kind) if kind == "assistant" || kind.starts_with("assistant/") => Vec::new(),
         _ => {
             let message = value.get("message").unwrap_or(value);
+            if is_hook_generated(value) || is_hook_generated(message) {
+                return Vec::new();
+            }
             if message["role"].as_str().or_else(|| value["role"].as_str()) != Some("user") {
                 return Vec::new();
             }
@@ -3776,6 +3779,27 @@ mod v3_tests {
             vec![
                 "必ず旧形式のuser messageを残す",
                 "次はsourceなしの従来形式を保つ"
+            ]
+        );
+    }
+
+    #[test]
+    fn distill_excludes_hook_generated_legacy_and_wrapped_shapes() {
+        let transcript = r#"{"role":"user","content":"必ずhook生成のraw発話を除外","source":{"kind":"hooks-claude-code"}}
+{"type":"user","message":{"role":"user","content":"必ずhook生成のwrapped外側を除外"},"source":{"kind":"hooks-claude-code"}}
+{"type":"user","message":{"role":"user","content":"必ずhook生成のwrapped内側を除外","source":{"kind":"hooks-claude-code"}}}
+{"role":"user","content":"必ずsourceなしのraw発話を残す"}
+{"type":"user","message":{"role":"user","content":"必ずsourceなしのwrapped発話を残す"}}"#;
+
+        let candidates = distill_candidates(transcript);
+        assert_eq!(
+            candidates
+                .iter()
+                .map(|candidate| candidate.text.as_str())
+                .collect::<Vec<_>>(),
+            vec![
+                "必ずsourceなしのraw発話を残す",
+                "必ずsourceなしのwrapped発話を残す"
             ]
         );
     }

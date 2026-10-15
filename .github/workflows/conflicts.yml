@@ -1,0 +1,36 @@
+name: conflicts
+
+# Flag open PRs that no longer merge cleanly as soon as main moves, so authors
+# update early instead of discovering conflicts at merge time.
+on:
+  push:
+    branches: [main]
+  pull_request_target:
+    # edited: re-check when the base branch is changed (title/body edits are skipped below).
+    types: [opened, reopened, synchronize, edited]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  label:
+    if: github.event.action != 'edited' || github.event.changes.base != null
+    concurrency:
+      group: rdsh-conflicts-notification
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # Always the default branch: neither PR code nor a dispatched branch runs with write tokens.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      # Pending events may be coalesced; every run checks all open PRs.
+      - run: sh scripts/label-conflicts.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}

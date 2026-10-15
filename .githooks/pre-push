@@ -1,0 +1,38 @@
+#!/bin/sh
+# rustdsh pre-push: warn when a pushed branch conflicts with origin/main.
+# Every ref git passes on stdin is checked, not only the checked-out branch.
+# Warning only by default. RDSH_STRICT_PUSH=1 blocks the push on conflicts and
+# also when origin/main cannot be fetched or compared.
+# Skip with `git push --no-verify`, or set RDSH_SKIP_HOOKS=1.
+set -eu
+[ "${RDSH_SKIP_HOOKS:-}" = 1 ] && exit 0
+
+root=$(git rev-parse --show-toplevel)
+strict="${RDSH_STRICT_PUSH:-}"
+zero=$(git hash-object --stdin </dev/null | tr '0-9a-f' '0')
+
+fetch_arg=""
+[ "$strict" = 1 ] && fetch_arg=--require-fetch
+worst=0
+checked=0
+# stdin: <local ref> <local sha> <remote ref> <remote sha>
+while read -r local_ref local_sha remote_ref _remote_sha; do
+  [ "$local_sha" = "$zero" ] && continue            # branch deletion
+  case "$remote_ref" in refs/heads/main|refs/tags/*) continue ;; esac
+  echo "pre-push: checking $local_ref -> $remote_ref" >&2
+  rc=0
+  # shellcheck disable=SC2086 # empty or one flag
+  sh "$root/scripts/check-conflicts.sh" $fetch_arg --head "$local_sha" >&2 || rc=$?
+  checked=$((checked+1))
+  fetch_arg=--no-fetch                                # fetch origin/main once
+  [ "$rc" -gt "$worst" ] && worst=$rc
+done
+
+[ "$checked" = 0 ] && exit 0
+[ "$worst" = 0 ] && exit 0
+if [ "$strict" = 1 ]; then
+  echo "pre-push: blocked by RDSH_STRICT_PUSH=1 (check-conflicts exit $worst)" >&2
+  exit 1
+fi
+echo "pre-push: continuing (conflict check is advisory)" >&2
+exit 0

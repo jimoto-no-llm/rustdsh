@@ -66,7 +66,9 @@ jobs:
       - name: Test plugin and hook contracts
         run: node --test tests/plugin-security.test.mjs tests/settings-client.test.mjs tests/update-banner.test.mjs tests/rdsh-mobile-ui.test.mjs tests/answer-guard.test.mjs tests/feature-switches.test.mjs tests/discord-presence.test.mjs tests/model_benchmark/fence.test.mjs tests/context_inject_contract.mjs
         env:
+          BIN: ${{ github.workspace }}/target/debug/rdsh
           DSH_HOOK_PROTOCOL: ${{ github.workspace }}/scripts/headless-runtime/runtime/node_modules/@deepseek-ai/dsh-hook-protocol/lib/index.js
+          RDSH_HOOK_CODEC_REQUIRED: '1'
       - name: Build and test the offline headless runtime
         run: |
           node scripts/headless-runtime/build-candidate.mjs --out "$RUNNER_TEMP/rdsh-headless-candidate"
@@ -179,6 +181,7 @@ jobs:
         env:
           BIN: ${{ github.workspace }}/target/debug/rdsh.exe
           DSH_HOOK_PROTOCOL: ${{ github.workspace }}/scripts/headless-runtime/runtime/node_modules/@deepseek-ai/dsh-hook-protocol/lib/index.js
+          RDSH_HOOK_CODEC_REQUIRED: '1'
       - if: matrix.regress
         shell: bash
         run: |
@@ -192,6 +195,7 @@ jobs:
         shell: pwsh
         run: |
           ./tests/installer-security.ps1
+          ./tests/installer-security.ps1 -Version v0.0.0-rc.1
           ./tests/icon-assets.ps1
           $tmp = Join-Path $env:RUNNER_TEMP 'rdsh-smoke'
           $h = Join-Path $tmp 'home'
