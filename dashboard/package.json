@@ -19,6 +19,6 @@
     "koffi": "3.3.3",
     "qrcode": "1.5.4",
     "standardwebhooks": "1.1.1",
-    "zod": "4.6.5"
+    "zod": "4.6.6"
   }
 }
