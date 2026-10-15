@@ -13,10 +13,14 @@ use std::{
 
 #[cfg(unix)]
 use std::os::unix::process::CommandExt;
+#[cfg(windows)]
+use std::sync::atomic::{AtomicBool, Ordering};
 
 const MAX_INPUT_BYTES: usize = 2 * 1024 * 1024;
 const MAX_OUTPUT_BYTES: usize = 2 * 1024 * 1024;
 const GIT_TIMEOUT: Duration = Duration::from_secs(30);
+#[cfg(windows)]
+static PROCESS_TREE_CONTAINMENT_ACTIVE: AtomicBool = AtomicBool::new(false);
 const SAFE_ENV: &[&str] = &[
     "PATH",
     "PATHEXT",
@@ -39,6 +43,9 @@ struct ProcessOutput {
 }
 
 pub fn cmd() -> Result<()> {
+    #[cfg(windows)]
+    let _ = enable_process_tree_containment();
+
     let request = read_request()?;
     let object = request
         .as_object()
@@ -226,9 +233,10 @@ fn repository_info(root: &Path) -> Result<RepositoryInfo> {
             "--show-cdup",
             "--path-format=absolute",
             "--git-common-dir",
+            "HEAD",
         ],
     )?;
-    let common_raw = parse_repository_context(&context_output)?;
+    let (common_raw, head_sha) = parse_repository_context(&context_output)?;
     let common = normalize_windows_path(
         &fs::canonicalize(&common_raw).context("resolve Git common directory")?,
     );
@@ -237,15 +245,15 @@ fn repository_info(root: &Path) -> Result<RepositoryInfo> {
         &canonical,
         &[
             "status",
-            "--porcelain=v2",
+            "--porcelain=v1",
             "--branch",
             "--no-ahead-behind",
             "-z",
             "--untracked-files=all",
         ],
     )?;
-    let status = parse_status_v2(&status)?;
-    let head_sha = status.head_sha.context("git_head_unavailable")?;
+    let status = parse_status_v1(&status)?;
+    ensure!(valid_head_sha(&head_sha), "git_head_unavailable");
     ensure!(status.branch_header, "Git branch is unavailable");
 
     Ok(RepositoryInfo {
@@ -257,29 +265,31 @@ fn repository_info(root: &Path) -> Result<RepositoryInfo> {
     })
 }
 
-fn parse_repository_context(output: &str) -> Result<PathBuf> {
-    let common = output
+fn parse_repository_context(output: &str) -> Result<(PathBuf, String)> {
+    let context = output
         .strip_prefix('\n')
         .context("exact_git_project_root_required")?
         .strip_suffix('\n')
         .context("Git common directory is unavailable")?;
+    let (common, head) = context
+        .rsplit_once('\n')
+        .context("Git repository identity is incomplete")?;
     ensure!(
         Path::new(common).is_absolute(),
         "Git common directory is unavailable"
     );
-    Ok(PathBuf::from(common))
+    ensure!(valid_head_sha(head), "git_head_unavailable");
+    Ok((PathBuf::from(common), head.to_string()))
 }
 
 struct StatusSnapshot {
-    head_sha: Option<String>,
     branch: Option<String>,
     branch_header: bool,
     dirty_paths: Vec<String>,
 }
 
-fn parse_status_v2(status: &str) -> Result<StatusSnapshot> {
+fn parse_status_v1(status: &str) -> Result<StatusSnapshot> {
     let parts: Vec<&str> = status.split('\0').collect();
-    let mut head_sha = None;
     let mut branch = None;
     let mut branch_header = false;
     let mut names = HashSet::new();
@@ -290,37 +300,20 @@ fn parse_status_v2(status: &str) -> Result<StatusSnapshot> {
         if item.is_empty() {
             continue;
         }
-        if let Some(value) = item.strip_prefix("# branch.oid ") {
-            if value == "(initial)" {
-                head_sha = None;
-            } else {
-                ensure!(valid_head_sha(value), "git_head_unavailable");
-                head_sha = Some(value.to_string());
-            }
-            continue;
-        }
-        if let Some(value) = item.strip_prefix("# branch.head ") {
+        if let Some(value) = item.strip_prefix("## ") {
+            ensure!(!branch_header, "git_status_unobservable");
             branch_header = true;
-            branch = (value != "(detached)").then(|| value.to_string());
-            continue;
-        }
-        if item.starts_with("# ") {
-            continue;
-        }
-        if let Some(path) = item.strip_prefix("? ") {
-            names.insert(path.to_string());
+            branch = parse_branch_header(value);
             continue;
         }
 
-        let (fields, path_field) = match item.as_bytes().first() {
-            Some(b'1') => (item.splitn(9, ' ').collect::<Vec<_>>(), 8),
-            Some(b'2') => (item.splitn(10, ' ').collect::<Vec<_>>(), 9),
-            Some(b'u') => (item.splitn(11, ' ').collect::<Vec<_>>(), 10),
-            _ => bail!("git_status_unobservable"),
-        };
-        ensure!(fields.len() == path_field + 1, "git_status_unobservable");
-        names.insert(fields[path_field].to_string());
-        if item.starts_with("2 ") {
+        let bytes = item.as_bytes();
+        ensure!(
+            bytes.len() >= 3 && bytes[2] == b' ',
+            "git_status_unobservable"
+        );
+        names.insert(item[3..].to_string());
+        if bytes[..2].contains(&b'R') || bytes[..2].contains(&b'C') {
             let original = parts
                 .get(index)
                 .filter(|path| !path.is_empty())
@@ -329,15 +322,30 @@ fn parse_status_v2(status: &str) -> Result<StatusSnapshot> {
             index += 1;
         }
     }
+    ensure!(branch_header, "Git branch is unavailable");
 
     let mut dirty_paths: Vec<String> = names.into_iter().collect();
     dirty_paths.sort_by(|left, right| left.encode_utf16().cmp(right.encode_utf16()));
     Ok(StatusSnapshot {
-        head_sha,
         branch,
         branch_header,
         dirty_paths,
     })
+}
+
+fn parse_branch_header(header: &str) -> Option<String> {
+    if header == "HEAD (no branch)" {
+        return None;
+    }
+    let branch = header
+        .strip_prefix("No commits yet on ")
+        .or_else(|| header.strip_prefix("Initial commit on "))
+        .unwrap_or(header);
+    let branch = branch
+        .split_once("...")
+        .map_or(branch, |(branch, _)| branch);
+    let branch = branch.split_once(" [").map_or(branch, |(branch, _)| branch);
+    (!branch.is_empty()).then(|| branch.to_string())
 }
 
 fn current_head_sha(root: &Path) -> Result<String> {
@@ -674,9 +682,14 @@ fn configure_process_tree(command: &mut Command) {
 #[cfg(windows)]
 fn configure_process_tree(command: &mut Command) {
     use std::os::windows::process::CommandExt;
-    use windows_sys::Win32::System::Threading::{CREATE_NO_WINDOW, CREATE_SUSPENDED};
+    use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
 
-    command.creation_flags(CREATE_NO_WINDOW | CREATE_SUSPENDED);
+    let flags = if PROCESS_TREE_CONTAINMENT_ACTIVE.load(Ordering::Relaxed) {
+        CREATE_NO_WINDOW
+    } else {
+        CREATE_NO_WINDOW | windows_sys::Win32::System::Threading::CREATE_SUSPENDED
+    };
+    command.creation_flags(flags);
 }
 
 #[cfg(not(any(unix, windows)))]
@@ -719,12 +732,18 @@ impl Drop for ProcessTreeGuard {
 
 #[cfg(windows)]
 struct ProcessTreeGuard {
-    job: windows_sys::Win32::Foundation::HANDLE,
+    job: Option<windows_sys::Win32::Foundation::HANDLE>,
 }
 
 #[cfg(windows)]
 impl ProcessTreeGuard {
     fn attach(child: &mut std::process::Child) -> io::Result<Self> {
+        if PROCESS_TREE_CONTAINMENT_ACTIVE.load(Ordering::Relaxed) {
+            // Git inherits the worker's job before it starts, so this operation
+            // avoids a system-wide thread snapshot for every Git subprocess.
+            return Ok(Self { job: None });
+        }
+
         use std::{
             mem::{size_of, zeroed},
             os::windows::io::AsRawHandle,
@@ -815,14 +834,16 @@ impl ProcessTreeGuard {
                 return Err(io::Error::last_os_error());
             }
             Ok(Self {
-                job: job.into_raw(),
+                job: Some(job.into_raw()),
             })
         }
     }
 
     fn terminate(&mut self, child: &mut std::process::Child) {
-        unsafe {
-            windows_sys::Win32::System::JobObjects::TerminateJobObject(self.job, 1);
+        if let Some(job) = self.job {
+            unsafe {
+                windows_sys::Win32::System::JobObjects::TerminateJobObject(job, 1);
+            }
         }
         let _ = child.kill();
     }
@@ -831,10 +852,59 @@ impl ProcessTreeGuard {
 #[cfg(windows)]
 impl Drop for ProcessTreeGuard {
     fn drop(&mut self) {
-        unsafe {
-            windows_sys::Win32::Foundation::CloseHandle(self.job);
+        if let Some(job) = self.job {
+            unsafe {
+                windows_sys::Win32::Foundation::CloseHandle(job);
+            }
         }
     }
+}
+
+#[cfg(windows)]
+fn enable_process_tree_containment() -> io::Result<()> {
+    use std::{mem::zeroed, ptr::null};
+    use windows_sys::Win32::{
+        Foundation::CloseHandle,
+        System::{
+            JobObjects::{
+                AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
+                SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+                JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+            },
+            Threading::GetCurrentProcess,
+        },
+    };
+
+    unsafe {
+        let job = CreateJobObjectW(null(), null());
+        if job.is_null() {
+            return Err(io::Error::last_os_error());
+        }
+        let mut limits: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = zeroed();
+        limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        if SetInformationJobObject(
+            job,
+            JobObjectExtendedLimitInformation,
+            (&limits as *const JOBOBJECT_EXTENDED_LIMIT_INFORMATION).cast(),
+            std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+        ) == 0
+        {
+            let error = io::Error::last_os_error();
+            CloseHandle(job);
+            return Err(error);
+        }
+        if AssignProcessToJobObject(job, GetCurrentProcess()) == 0 {
+            let error = io::Error::last_os_error();
+            CloseHandle(job);
+            return Err(error);
+        }
+
+        // Keep the kill-on-close handle open until this one-request bridge
+        // process exits. Windows then terminates any Git descendants still
+        // inside the job. Closing it here would also terminate this process.
+        PROCESS_TREE_CONTAINMENT_ACTIVE.store(true, Ordering::Relaxed);
+    }
+    Ok(())
 }
 
 #[cfg(not(any(unix, windows)))]
@@ -894,16 +964,17 @@ mod tests {
 
     #[test]
     fn repository_context_preserves_newlines_in_common_dir() {
-        let output = "\n/tmp/repo\nname/.git\n";
+        let head = "0123456789abcdef0123456789abcdef01234567";
+        let output = format!("\n/tmp/repo\nname/.git\n{head}\n");
         assert_eq!(
-            parse_repository_context(output).unwrap(),
-            PathBuf::from("/tmp/repo\nname/.git")
+            parse_repository_context(&output).unwrap(),
+            (PathBuf::from("/tmp/repo\nname/.git"), head.to_string())
         );
     }
 
     #[test]
     fn repository_context_rejects_non_root_working_directories() {
-        let output = "../\n/tmp/repo/.git\n";
+        let output = "../\n/tmp/repo/.git\n0123456789abcdef0123456789abcdef01234567\n";
         assert_eq!(
             parse_repository_context(output).unwrap_err().to_string(),
             "exact_git_project_root_required"
@@ -911,16 +982,14 @@ mod tests {
     }
 
     #[test]
-    fn porcelain_v2_status_returns_branch_head_and_nul_framed_paths() {
-        let head = "0123456789abcdef0123456789abcdef01234567";
-        let status = format!(
-            "# branch.oid {head}\0# branch.head feature/test\0# branch.upstream origin/feature/test\0# branch.ab +1 -2\0\
-             1 .M N... 100644 100644 100644 {head} {head} modified path.txt\0\
-             2 R. N... 100644 100644 100644 {head} {head} R100 new name.txt\0old name.txt\0\
-             ? untracked\nname.txt\0"
+    fn porcelain_v1_status_preserves_branch_and_rename_paths() {
+        let status = concat!(
+            "## feature/test...origin/feature/test [ahead 1]\0",
+            " M modified path.txt\0",
+            "R  new name.txt\0old name.txt\0",
+            "?? untracked\nname.txt\0"
         );
-        let parsed = parse_status_v2(&status).unwrap();
-        assert_eq!(parsed.head_sha.as_deref(), Some(head));
+        let parsed = parse_status_v1(status).unwrap();
         assert_eq!(parsed.branch.as_deref(), Some("feature/test"));
         assert_eq!(
             parsed.dirty_paths,
@@ -934,11 +1003,23 @@ mod tests {
     }
 
     #[test]
-    fn porcelain_v2_status_uses_no_branch_for_detached_head() {
-        let head = "abcdef0123456789abcdef0123456789abcdef01";
-        let status = format!("# branch.oid {head}\0# branch.head (detached)\0");
-        let parsed = parse_status_v2(&status).unwrap();
-        assert_eq!(parsed.head_sha.as_deref(), Some(head));
+    fn porcelain_v1_status_keeps_twenty_thousand_dirty_paths_under_output_limit() {
+        use std::fmt::Write as _;
+
+        let mut status = String::from("## main\0");
+        for index in 0..20_000 {
+            write!(status, " M file-{index:05}.txt\0").unwrap();
+        }
+        assert!(status.len() < MAX_OUTPUT_BYTES);
+
+        let parsed = parse_status_v1(&status).unwrap();
+        assert_eq!(parsed.branch.as_deref(), Some("main"));
+        assert_eq!(parsed.dirty_paths.len(), 20_000);
+    }
+
+    #[test]
+    fn porcelain_v1_status_uses_no_branch_for_detached_head() {
+        let parsed = parse_status_v1("## HEAD (no branch)\0").unwrap();
         assert_eq!(parsed.branch, None);
         assert!(parsed.dirty_paths.is_empty());
     }

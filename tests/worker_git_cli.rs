@@ -48,6 +48,35 @@ fn git(root: &Path, args: &[&str]) -> String {
         .to_string()
 }
 
+fn git_with_input(root: &Path, args: &[&str], input: &[u8]) -> String {
+    let mut child = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("start git fixture command");
+    child
+        .stdin
+        .take()
+        .expect("git fixture stdin")
+        .write_all(input)
+        .expect("write git fixture input");
+    let output = child.wait_with_output().expect("read git fixture output");
+    assert!(
+        output.status.success(),
+        "git {:?} failed: {}",
+        args,
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8(output.stdout)
+        .expect("fixture git output is UTF-8")
+        .trim()
+        .to_string()
+}
+
 fn init_repo(root: &Path) {
     fs::create_dir_all(root).expect("create repository directory");
     git(root, &["init", "-q"]);
@@ -115,6 +144,45 @@ fn path_with_git_counter(bin: &Path) -> std::ffi::OsString {
         &std::env::var_os("PATH").unwrap_or_default(),
     ));
     std::env::join_paths(paths).expect("join PATH entries")
+}
+
+#[cfg(windows)]
+fn windows_process_is_running(pid: u32) -> bool {
+    use windows_sys::Win32::{
+        Foundation::{CloseHandle, WAIT_TIMEOUT},
+        System::Threading::{OpenProcess, WaitForSingleObject, PROCESS_SYNCHRONIZE},
+    };
+
+    unsafe {
+        let process = OpenProcess(PROCESS_SYNCHRONIZE, 0, pid);
+        if process.is_null() {
+            return false;
+        }
+        let running = WaitForSingleObject(process, 0) == WAIT_TIMEOUT;
+        CloseHandle(process);
+        running
+    }
+}
+
+#[cfg(windows)]
+fn terminate_windows_test_process(pid: u32) {
+    use windows_sys::Win32::{
+        Foundation::CloseHandle,
+        System::Threading::{
+            OpenProcess, TerminateProcess, WaitForSingleObject, PROCESS_SYNCHRONIZE,
+            PROCESS_TERMINATE,
+        },
+    };
+
+    unsafe {
+        let process = OpenProcess(PROCESS_SYNCHRONIZE | PROCESS_TERMINATE, 0, pid);
+        if process.is_null() {
+            return;
+        }
+        TerminateProcess(process, 1);
+        WaitForSingleObject(process, 1_000);
+        CloseHandle(process);
+    }
 }
 
 fn response(output: Output) -> Value {
@@ -229,6 +297,128 @@ fn repository_and_git_path_operations_preserve_nul_framing() {
     response(invoke(
         json!({"op":"is-ancestor","root":root,"ancestor":base,"descendant":head}),
     ));
+}
+
+#[cfg(windows)]
+#[test]
+fn worker_git_terminates_git_descendants_when_the_bridge_exits() {
+    use std::{thread, time::Duration};
+
+    let temp = TempDir::new();
+    let root = temp.0.join("repo");
+    init_repo(&root);
+    let fake_bin = temp.0.join("fake-git-bin");
+    fs::create_dir_all(&fake_bin).unwrap();
+    let fake_git = fake_bin.join("git.exe");
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("fixtures")
+        .join("worker_git_descendant.rs");
+    let compile = Command::new("rustc")
+        .arg("--edition=2024")
+        .arg(fixture)
+        .arg("-o")
+        .arg(&fake_git)
+        .output()
+        .expect("compile fake Git executable");
+    assert!(
+        compile.status.success(),
+        "compile fake Git failed: {}",
+        String::from_utf8_lossy(&compile.stderr)
+    );
+    let path = std::env::join_paths([fake_bin]).expect("build fake Git PATH");
+
+    let result = invoke_with_path(json!({"op":"repository","root":root}), Some(&path));
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let repository = response(result);
+    assert_eq!(
+        repository["head_sha"],
+        "0123456789abcdef0123456789abcdef01234567"
+    );
+
+    let pid_file = root.join(".git").join("worker-git-descendants");
+    let pids: Vec<u32> = fs::read_to_string(pid_file)
+        .expect("read descendant PIDs")
+        .lines()
+        .map(|pid| pid.parse().expect("valid descendant PID"))
+        .collect();
+    assert_eq!(pids.len(), 2);
+
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    let mut running: Vec<u32> = pids
+        .into_iter()
+        .filter(|pid| windows_process_is_running(*pid))
+        .collect();
+    while !running.is_empty() && std::time::Instant::now() < deadline {
+        thread::sleep(Duration::from_millis(10));
+        running.retain(|pid| windows_process_is_running(*pid));
+    }
+    for pid in &running {
+        terminate_windows_test_process(*pid);
+    }
+    assert!(
+        running.is_empty(),
+        "worker Git left descendant processes alive: {running:?}"
+    );
+}
+
+#[test]
+fn source_snapshot_accepts_twenty_thousand_dirty_paths_within_git_output_limit() {
+    use std::fmt::Write as _;
+
+    let temp = TempDir::new();
+    let root = temp.0.join("repo");
+    init_repo(&root);
+    let blob = git_with_input(&root, &["hash-object", "-w", "--stdin"], b"tracked\n");
+
+    let mut index = String::with_capacity(20_000 * 64);
+    for number in 0..20_000 {
+        writeln!(index, "100644 {blob}\tfile-{number:05}.txt").unwrap();
+    }
+    git_with_input(&root, &["update-index", "--index-info"], index.as_bytes());
+    let tree = git(&root, &["write-tree"]);
+    let commit = git_with_input(
+        &root,
+        &["commit-tree", &tree, "-m", "large dirty-path fixture"],
+        b"",
+    );
+    git(&root, &["update-ref", "HEAD", &commit]);
+
+    let v1 = git(
+        &root,
+        &[
+            "status",
+            "--porcelain=v1",
+            "--branch",
+            "--no-ahead-behind",
+            "-z",
+            "--untracked-files=all",
+        ],
+    );
+    let v2 = git(
+        &root,
+        &[
+            "status",
+            "--porcelain=v2",
+            "--branch",
+            "--no-ahead-behind",
+            "-z",
+            "--untracked-files=all",
+        ],
+    );
+    let git_output_limit = 2 * 1024 * 1024;
+    assert!(v1.len() < git_output_limit);
+    assert!(v2.len() > git_output_limit);
+
+    let source = response(invoke(json!({"op":"source-snapshot","root":root})));
+    let paths = source["dirty_paths"].as_array().unwrap();
+    assert_eq!(paths.len(), 20_000);
+    assert_eq!(paths.first().unwrap(), "file-00000.txt");
+    assert_eq!(paths.last().unwrap(), "file-19999.txt");
 }
 
 #[cfg(unix)]
