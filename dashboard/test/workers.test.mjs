@@ -77,6 +77,115 @@ async function setup(t) {
   };
 }
 
+test("worker planning filters shared paths before expanding per-worker checks", async (t) => {
+  const f = await setup(t);
+  const trackedDirectory = path.join(f.repo, "generated");
+  await fs.mkdir(trackedDirectory);
+  for (let index = 0; index < 4_100; index++) {
+    await fs.writeFile(
+      path.join(trackedDirectory, `file-${String(index).padStart(5, "0")}.txt`),
+      "tracked\n",
+    );
+  }
+  await f.git(f.repo, "add", ".");
+  await f.git(f.repo, "commit", "-m", "add many tracked paths");
+
+  const trace = path.join(f.root, "policy-trace.jsonl");
+  const fakeBinary = path.join(f.root, "rdsh-fixture");
+  await fs.writeFile(
+    fakeBinary,
+    `#!${process.execPath}
+const fs = require("node:fs");
+const [command, action] = process.argv.slice(2);
+if (command === "--help") {
+  process.stdout.write("worker-scope  fixture policy helper\\n");
+} else {
+  const request = JSON.parse(fs.readFileSync(0, "utf8"));
+  if (action === "validate") {
+    process.stdout.write(JSON.stringify(request.map((value) => ({ ok: true, value }))));
+  } else if (action === "policy") {
+    fs.appendFileSync(process.env.RDSH_POLICY_TRACE, JSON.stringify({
+      shared_file_count: (request.shared_files ?? []).length,
+      write_file_counts: request.write_checks.map((check) => check.files.length),
+      intersection_count: request.intersections.length
+    }) + "\\n");
+    const canWrite = (scope, file) =>
+      scope.write_paths.some((item) => item === "." || file === item || file.startsWith(item + "/")) &&
+      !scope.forbidden_paths.some((item) => item === "." || file === item || file.startsWith(item + "/"));
+    process.stdout.write(JSON.stringify({
+      write_checks: request.write_checks.map((check) => check.files.map((file) => canWrite(check.scope, file))),
+      intersections: request.intersections.map(() => []),
+      shared_files: (request.shared_files ?? []).map((file) => file === "Cargo.lock" || file === "package.json")
+    }));
+  }
+}
+`,
+    { mode: 0o700 },
+  );
+
+  const rows = Array.from({ length: 256 }, (_, index) => {
+    const workerId = `worker-${index}`;
+    const leaseId = `wrk_00000000-0000-0000-0000-${String(index).padStart(12, "0")}`;
+    const baseSha = "a".repeat(40);
+    return {
+      worker_id: workerId,
+      lease_id: leaseId,
+      declaration: scope(workerId, [
+        index === 0 ? "Cargo.lock" : `src/worker-${index}.txt`,
+      ]),
+      worktree: f.workers.slot(workerId),
+      branch: `codex/worker-${workerId}-${leaseId.slice(4)}`,
+      base_sha: baseSha,
+      created_at: "2026-10-15T03:00:00.000Z",
+      expires_at: "2026-10-15T03:01:00.000Z",
+      released_at: null,
+      state: "ready",
+      error: null,
+      source_before: { head_sha: baseSha, branch: "fixture-main", dirty_paths: [] },
+    };
+  });
+  const registry = {
+    schema: 1,
+    project_id: f.project.id,
+    root: f.workers.git.root,
+    git_common_dir: f.workers.git.git_common_dir,
+    revision: 0,
+    workers: rows,
+  };
+  await fs.mkdir(f.workers.directory, { recursive: true });
+  await fs.writeFile(f.workers.file, JSON.stringify(registry));
+
+  const previousBin = process.env.RDSH_BIN;
+  const previousTrace = process.env.RDSH_POLICY_TRACE;
+  process.env.RDSH_BIN = fakeBinary;
+  process.env.RDSH_POLICY_TRACE = trace;
+  try {
+    const plan = await f.workers.plan(scope("candidate", ["Cargo.lock"]));
+    assert.ok(
+      plan.warnings.some(
+        (warning) =>
+          warning.code === "shared_file_overlap" &&
+          warning.worker_id === "worker-0" &&
+          warning.path === "Cargo.lock",
+      ),
+    );
+    const calls = (await fs.readFile(trace, "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].shared_file_count, 0);
+    assert.equal(calls[0].intersection_count, 256);
+    assert.equal(calls[0].write_file_counts.length, 258);
+    assert.ok(calls[0].write_file_counts.every((count) => count <= 1));
+  } finally {
+    if (previousBin === undefined) delete process.env.RDSH_BIN;
+    else process.env.RDSH_BIN = previousBin;
+    if (previousTrace === undefined) delete process.env.RDSH_POLICY_TRACE;
+    else process.env.RDSH_POLICY_TRACE = previousTrace;
+  }
+});
+
 test("editors get separate real branches/checkouts; review defaults to no write scope", async (t) => {
   const f = await setup(t);
   const a = await f.prepare(scope("editor-a"));

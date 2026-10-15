@@ -8,6 +8,7 @@ import {
   requireWorker,
   declaration,
   declarationResults,
+  mayWrite,
   policyResults,
   leaseSeconds,
   workerId,
@@ -381,7 +382,7 @@ export class WorkerWorkspaces {
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
     }
-    const sharedCandidates = state.workers.length
+    const sharedTrackedCandidates = state.workers.length
       ? [
           ...new Set([
             ...(await trackedPaths(this.git.root)),
@@ -389,6 +390,13 @@ export class WorkerWorkspaces {
           ]),
         ]
       : [];
+    const sharedTrackedResults = sharedTrackedCandidates.length
+      ? policyResults({ shared_files: sharedTrackedCandidates }).shared_files
+      : [];
+    const sharedCandidates = sharedTrackedCandidates.filter(
+      (file, index) =>
+        sharedTrackedResults[index] && mayWrite(scope, file),
+    );
     const writeChecks = [{ scope, files: source.dirty_paths }];
     if (state.workers.length) {
       writeChecks.push({ scope, files: sharedCandidates });
@@ -408,7 +416,6 @@ export class WorkerWorkspaces {
         left: scope,
         right: row.declaration,
       })),
-      shared_files: sharedCandidates,
     });
     for (const [index, file] of source.dirty_paths.entries()) {
       if (policy.write_checks[0][index]) {
@@ -429,7 +436,6 @@ export class WorkerWorkspaces {
       const rowWriteChecks = policy.write_checks[2 + rowIndex];
       for (const [fileIndex, file] of sharedCandidates.entries()) {
         if (
-          !policy.shared_files[fileIndex] ||
           !policy.write_checks[1][fileIndex] ||
           !rowWriteChecks[fileIndex]
         ) {
