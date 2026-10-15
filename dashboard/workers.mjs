@@ -9,7 +9,7 @@ import {
   declaration,
   declarationResults,
   mayWrite,
-  policyResults,
+  policyResults as evaluateWorkerPolicy,
   leaseSeconds,
   workerId,
   headSha,
@@ -36,22 +36,27 @@ const revision = (v) => Number.isSafeInteger(v) && v >= 0;
 const limit = 2 * 1024 * 1024;
 
 export class WorkerWorkspaces {
-  constructor(project, git, directory, now) {
+  constructor(project, git, directory, now, policyEvaluator) {
     this.project = { ...project };
     this.git = git;
     this.directory = directory;
     this.file = path.join(directory, "registry.json");
     this.lock = path.join(directory, "registry.lock");
     this.now = now;
+    this.policyEvaluator = policyEvaluator;
   }
-  static async open(project, { now = Date.now } = {}) {
+  static async open(
+    project,
+    { now = Date.now, policyEvaluator = evaluateWorkerPolicy } = {},
+  ) {
     requireWorker(
       object(project) &&
         typeof project.id === "string" &&
         /^[0-9a-f]{16}$/.test(project.id) &&
         typeof project.root === "string" &&
         typeof project.directory === "string" &&
-        typeof now === "function",
+        typeof now === "function" &&
+        typeof policyEvaluator === "function",
       "invalid_project",
     );
     const git = await repository(project.root);
@@ -67,6 +72,7 @@ export class WorkerWorkspaces {
       git,
       directory,
       now,
+      policyEvaluator,
     );
   }
   slot(id) {
@@ -341,7 +347,7 @@ export class WorkerWorkspaces {
       );
       const writeResults = deferScopePolicy
         ? null
-        : policyResults({
+        : this.policyEvaluator({
             write_checks: [{ scope: row.declaration, files: changed }],
           }).write_checks[0];
       result.tree = {
@@ -391,7 +397,7 @@ export class WorkerWorkspaces {
         ]
       : [];
     const sharedTrackedResults = sharedTrackedCandidates.length
-      ? policyResults({ shared_files: sharedTrackedCandidates }).shared_files
+      ? this.policyEvaluator({ shared_files: sharedTrackedCandidates }).shared_files
       : [];
     const sharedCandidates = sharedTrackedCandidates.filter(
       (file, index) =>
@@ -407,7 +413,7 @@ export class WorkerWorkspaces {
         })),
       );
     }
-    const policy = policyResults({
+    const policy = this.policyEvaluator({
       write_checks:
         source.dirty_paths.length > 0 || state.workers.length > 0
           ? writeChecks
@@ -559,7 +565,7 @@ export class WorkerWorkspaces {
       workerCount > 0 ? [...new Set([...source.dirty_paths, ...changedPaths])] : [];
     const policy =
       sharedCandidates.length > 0
-        ? policyResults({
+        ? this.policyEvaluator({
             write_checks: [
               ...workers.map((worker) => ({
                 scope: worker.declaration,

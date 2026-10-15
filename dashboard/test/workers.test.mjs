@@ -8,7 +8,11 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { identity } from "../state.mjs";
 import { WorkerWorkspaces } from "../workers.mjs";
-import { declaration, declarationResults } from "../worker-scopes.mjs";
+import {
+  declaration,
+  declarationResults,
+  policyResults as evaluateWorkerPolicy,
+} from "../worker-scopes.mjs";
 
 const exec = promisify(execFile);
 const cli = fileURLToPath(new URL("../cli.mjs", import.meta.url));
@@ -22,7 +26,7 @@ const scope = (id, writes = ["src/a.txt"], role = "edit") => ({
   lease_seconds: 60,
 });
 const error = (code) => (e) => e.code === code;
-async function setup(t) {
+async function setup(t, { policyEvaluator } = {}) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-workers-qa-"));
   const repo = path.join(root, "project");
   await fs.mkdir(path.join(repo, "src"), { recursive: true });
@@ -47,7 +51,10 @@ async function setup(t) {
   const project = await identity(repo);
   project.directory = path.join(root, "state");
   let now = Date.now();
-  const workers = await WorkerWorkspaces.open(project, { now: () => now });
+  const workers = await WorkerWorkspaces.open(project, {
+    now: () => now,
+    policyEvaluator,
+  });
   const prepare = async (request) => {
     const plan = await workers.plan(request);
     assert.equal(plan.can_prepare, true, JSON.stringify(plan.warnings));
@@ -78,7 +85,13 @@ async function setup(t) {
 }
 
 test("worker planning filters shared paths before expanding per-worker checks", async (t) => {
-  const f = await setup(t);
+  const policyRequests = [];
+  const f = await setup(t, {
+    policyEvaluator(request) {
+      policyRequests.push(structuredClone(request));
+      return evaluateWorkerPolicy(request);
+    },
+  });
   const trackedDirectory = path.join(f.repo, "generated");
   await fs.mkdir(trackedDirectory);
   for (let index = 0; index < 4_100; index++) {
@@ -89,39 +102,6 @@ test("worker planning filters shared paths before expanding per-worker checks", 
   }
   await f.git(f.repo, "add", ".");
   await f.git(f.repo, "commit", "-m", "add many tracked paths");
-
-  const trace = path.join(f.root, "policy-trace.jsonl");
-  const fakeBinary = path.join(f.root, "rdsh-fixture");
-  await fs.writeFile(
-    fakeBinary,
-    `#!${process.execPath}
-const fs = require("node:fs");
-const [command, action] = process.argv.slice(2);
-if (command === "--help") {
-  process.stdout.write("worker-scope  fixture policy helper\\n");
-} else {
-  const request = JSON.parse(fs.readFileSync(0, "utf8"));
-  if (action === "validate") {
-    process.stdout.write(JSON.stringify(request.map((value) => ({ ok: true, value }))));
-  } else if (action === "policy") {
-    fs.appendFileSync(process.env.RDSH_POLICY_TRACE, JSON.stringify({
-      shared_file_count: (request.shared_files ?? []).length,
-      write_file_counts: request.write_checks.map((check) => check.files.length),
-      intersection_count: request.intersections.length
-    }) + "\\n");
-    const canWrite = (scope, file) =>
-      scope.write_paths.some((item) => item === "." || file === item || file.startsWith(item + "/")) &&
-      !scope.forbidden_paths.some((item) => item === "." || file === item || file.startsWith(item + "/"));
-    process.stdout.write(JSON.stringify({
-      write_checks: request.write_checks.map((check) => check.files.map((file) => canWrite(check.scope, file))),
-      intersections: request.intersections.map(() => []),
-      shared_files: (request.shared_files ?? []).map((file) => file === "Cargo.lock" || file === "package.json")
-    }));
-  }
-}
-`,
-    { mode: 0o700 },
-  );
 
   const rows = Array.from({ length: 256 }, (_, index) => {
     const workerId = `worker-${index}`;
@@ -156,9 +136,7 @@ if (command === "--help") {
   await fs.writeFile(f.workers.file, JSON.stringify(registry));
 
   const previousBin = process.env.RDSH_BIN;
-  const previousTrace = process.env.RDSH_POLICY_TRACE;
-  process.env.RDSH_BIN = fakeBinary;
-  process.env.RDSH_POLICY_TRACE = trace;
+  delete process.env.RDSH_BIN;
   try {
     const plan = await f.workers.plan(scope("candidate", ["Cargo.lock"]));
     assert.ok(
@@ -169,20 +147,16 @@ if (command === "--help") {
           warning.path === "Cargo.lock",
       ),
     );
-    const calls = (await fs.readFile(trace, "utf8"))
-      .trim()
-      .split("\n")
-      .map((line) => JSON.parse(line));
-    assert.equal(calls.length, 1);
-    assert.equal(calls[0].shared_file_count, 0);
-    assert.equal(calls[0].intersection_count, 256);
-    assert.equal(calls[0].write_file_counts.length, 258);
-    assert.ok(calls[0].write_file_counts.every((count) => count <= 1));
+    assert.equal(policyRequests.length, 2);
+    assert.equal(policyRequests[0].shared_files.length, 4_105);
+    assert.equal(policyRequests[1].intersections.length, 256);
+    assert.equal(policyRequests[1].write_checks.length, 258);
+    assert.ok(
+      policyRequests[1].write_checks.every((check) => check.files.length <= 1),
+    );
   } finally {
     if (previousBin === undefined) delete process.env.RDSH_BIN;
     else process.env.RDSH_BIN = previousBin;
-    if (previousTrace === undefined) delete process.env.RDSH_POLICY_TRACE;
-    else process.env.RDSH_POLICY_TRACE = previousTrace;
   }
 });
 
