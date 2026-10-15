@@ -74,14 +74,15 @@ authors.
 ## Bundled rdsh plugins (this repo)
 
 `./plugins/install.sh` also installs these local plugins into the same
-profile, so the rdsh settings UI and the phone-width layout are available by
-default:
+profile, so the rdsh settings UI, the phone-width layout and the answer guard
+are available by default:
 
 | Plugin | Why |
 | --- | --- |
 | `rdsh-settings` | rdsh section in DSH settings (budgets, retrieval, memory, beta flags) |
 | `rdsh-update-banner` | release banner and notifications in the Web UI (`PROFILE=web` only). Installing it keeps the profile's own insert block from failing to import on every boot (issue #5) |
 | `rdsh-mobile-ui` | Phone-width layout for the DSH Web chat: full-width chat and composer, one-tap logo to the session list. Adapted from Smart-DSH (MIT) — see [its README](rdsh-mobile-ui/README.md). |
+| `rdsh-answer-guard` | When a turn ends with the reply only in the reasoning channel, the reader sees no answer and the agent looks stuck. The guard steers one reminder so the model restates it as text. `rdsh features off answer_guard` disables it — see [its README](rdsh-answer-guard/README.md). |
 
 The banner's package supplies a bundle patch. A Web profile previously wired
 with `install-banner.sh` may also have a manual insert with the same ID. DSH
