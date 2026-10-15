@@ -336,7 +336,7 @@ git commit -qam topic
 expect_rc 0 "headless run" env PATH="$tmp/hlbin:$PATH" HL_RECORD="$tmp/hl-record" sh scripts/check.sh
 has "ok    headless runtime candidate + tests" "headless run"
 cand=$(tail -n 1 "$tmp/hl-record")
-[ -n "$cand" ] && [ ! -e "$(dirname "$cand")" ] || die "read-only candidate left behind: $cand"
+if [ -z "$cand" ] || [ -e "$(dirname "$cand")" ]; then die "read-only candidate left behind: $cand"; fi
 printf '#!/bin/sh\nexit 1\n' > "$tmp/hlbin/rm" && chmod +x "$tmp/hlbin/rm"
 expect_rc 1 "cleanup failure" env PATH="$tmp/hlbin:$PATH" HL_RECORD="$tmp/hl-record" sh scripts/check.sh
 has "could not remove" "cleanup failure"
