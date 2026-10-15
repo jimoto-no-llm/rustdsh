@@ -484,39 +484,81 @@ fn is_falsy(value: &Value) -> bool {
 
 /// The book as an object, after [`ledger`] has guaranteed the slot.
 fn book_of(state: &Value) -> BudgetResult<&Map<String, Value>> {
-    let book = state
+    state
         .get("budget_admission")
         .and_then(Value::as_object)
-        .ok_or_else(|| BudgetError::code("budget_invalid_input"))?;
-    validate_book_record_shapes(book)?;
-    Ok(book)
+        .ok_or_else(|| BudgetError::code("budget_invalid_input"))
 }
 
-/// Reject malformed persisted collections before treating them as empty.
-/// JavaScript's `Object.values(book.calls)` and `call.policy_ids.includes(...)`
-/// throw on these shapes; silently skipping them could admit a second call
-/// without accounting for a reservation already in the book.
-fn validate_book_record_shapes(book: &Map<String, Value>) -> BudgetResult<()> {
-    for key in ["policies", "jobs", "calls", "receipts"] {
-        let records = book
-            .get(key)
-            .and_then(Value::as_object)
-            .ok_or_else(|| BudgetError::code("budget_invalid_store"))?;
-        if records.values().any(|record| !record.is_object()) {
-            return fail("budget_invalid_store");
-        }
+/// Stored collections follow `Object.values`: null and undefined throw,
+/// arrays enumerate their elements, and boxed booleans/numbers have no rows.
+fn stored_values<'a>(book: &'a Map<String, Value>, key: &str) -> BudgetResult<Vec<&'a Value>> {
+    match book.get(key) {
+        Some(Value::Object(values)) => Ok(js_values(values)),
+        Some(Value::Array(values)) => Ok(values.iter().collect()),
+        Some(Value::Null) | None => fail("budget_invalid_store"),
+        _ => Ok(Vec::new()),
     }
-    let calls = book
-        .get("calls")
-        .and_then(Value::as_object)
-        .ok_or_else(|| BudgetError::code("budget_invalid_store"))?;
-    if calls
-        .values()
-        .any(|call| call.get("policy_ids").and_then(Value::as_array).is_none())
+}
+
+/// Accounting reads properties on every row. A nonempty string collection
+/// enumerates string rows in JS, whose `policy_ids`/`baseline` access throws.
+fn accounting_values<'a>(book: &'a Map<String, Value>, key: &str) -> BudgetResult<Vec<&'a Value>> {
+    if book
+        .get(key)
+        .is_some_and(|value| value.as_str().is_some_and(|text| !text.is_empty()))
     {
         return fail("budget_invalid_store");
     }
-    Ok(())
+    stored_values(book, key)
+}
+
+/// `call.policy_ids.includes(policyId)` must not turn a damaged row into an
+/// unrelated call. Strings also have `includes` in JS and still carry a charge.
+fn call_has_policy(call: &Value, policy_id: &str) -> BudgetResult<bool> {
+    match call.get("policy_ids") {
+        Some(Value::Array(ids)) => Ok(ids.iter().any(|id| id.as_str() == Some(policy_id))),
+        Some(Value::String(ids)) => Ok(ids.contains(policy_id)),
+        _ => fail("budget_invalid_store"),
+    }
+}
+
+/// Public projection also enumerates string collections, without imposing the
+/// accounting record shape on rows that JavaScript object spread accepts.
+fn public_values<'a>(
+    book: &'a Map<String, Value>,
+    key: &str,
+) -> BudgetResult<Vec<std::borrow::Cow<'a, Value>>> {
+    if let Some(Value::String(text)) = book.get(key) {
+        return Ok(text
+            .chars()
+            .map(|character| std::borrow::Cow::Owned(json!(character.to_string())))
+            .collect());
+    }
+    Ok(stored_values(book, key)?
+        .into_iter()
+        .map(std::borrow::Cow::Borrowed)
+        .collect())
+}
+
+/// The enumerable fields of a public row (`{...row}`). Numeric/boolean rows
+/// contribute no fields; arrays and strings retain their indexed fields.
+fn public_spread(row: &Value) -> BudgetResult<Map<String, Value>> {
+    match row {
+        Value::Object(fields) => Ok(fields.clone()),
+        Value::Array(values) => Ok(values
+            .iter()
+            .enumerate()
+            .map(|(index, value)| (index.to_string(), value.clone()))
+            .collect()),
+        Value::String(text) => Ok(text
+            .chars()
+            .enumerate()
+            .map(|(index, character)| (index.to_string(), json!(character.to_string())))
+            .collect()),
+        Value::Null => fail("budget_invalid_store"),
+        _ => Ok(Map::new()),
+    }
 }
 
 /// `Object.keys(book.policies)` order, i.e. the JS own-property order.
@@ -769,36 +811,30 @@ fn totals(
         },
         ..Totals::default()
     };
-    if let Some(calls) = book.get("calls").and_then(Value::as_object) {
-        for call in js_values(calls) {
-            let Some(call) = call.as_object() else {
-                continue;
-            };
-            let includes = call
-                .get("policy_ids")
-                .and_then(Value::as_array)
-                .is_some_and(|ids| ids.iter().any(|id| id.as_str() == Some(policy_id)));
-            if !includes {
-                continue;
+    for call in accounting_values(book, "calls")? {
+        if !call_has_policy(call, policy_id)? {
+            continue;
+        }
+        let call = call
+            .as_object()
+            .ok_or_else(|| BudgetError::code("budget_invalid_store"))?;
+        let amount = call
+            .get("amount")
+            .ok_or_else(|| BudgetError::code("budget_invalid_amount"))?;
+        if !amount.is_null() {
+            let amount = units_of(amount)?;
+            if let Some(spent) = total.spent.as_mut() {
+                *spent += amount;
             }
-            let amount = call
-                .get("amount")
+        } else {
+            let reservation = call
+                .get("reservation")
                 .ok_or_else(|| BudgetError::code("budget_invalid_amount"))?;
-            if !amount.is_null() {
-                let amount = units_of(amount)?;
-                if let Some(spent) = total.spent.as_mut() {
-                    *spent += amount;
-                }
+            total.reserved += units_of(reservation)?;
+            if call.get("finished_at").unwrap_or(&Value::Null).is_null() {
+                total.executing += 1;
             } else {
-                let reservation = call
-                    .get("reservation")
-                    .ok_or_else(|| BudgetError::code("budget_invalid_amount"))?;
-                total.reserved += units_of(reservation)?;
-                if call.get("finished_at").unwrap_or(&Value::Null).is_null() {
-                    total.executing += 1;
-                } else {
-                    total.awaiting += 1;
-                }
+                total.awaiting += 1;
             }
         }
     }
@@ -874,22 +910,25 @@ impl TotalsCache {
 
 /// `matched(book, runId)`: the active policies that scope this run, in the
 /// book's JS own-property order.
-fn matched(book: &Map<String, Value>, run_id: &str) -> Vec<Map<String, Value>> {
-    let Some(policies) = book.get("policies").and_then(Value::as_object) else {
-        return Vec::new();
-    };
-    js_values(policies)
-        .into_iter()
-        .filter_map(Value::as_object)
-        .filter(|policy| {
-            policy.get("active").and_then(Value::as_bool) == Some(true)
-                && match policy.get("run_id") {
-                    Some(Value::Null) | None => true,
-                    Some(value) => value.as_str() == Some(run_id),
-                }
-        })
-        .cloned()
-        .collect()
+fn matched(book: &Map<String, Value>, run_id: &str) -> BudgetResult<Vec<Map<String, Value>>> {
+    let mut matched = Vec::new();
+    for policy in stored_values(book, "policies")? {
+        if policy.is_null() {
+            return fail("budget_invalid_store");
+        }
+        let Some(policy) = policy.as_object() else {
+            continue;
+        };
+        if policy.get("active").and_then(Value::as_bool) == Some(true)
+            && match policy.get("run_id") {
+                Some(Value::Null) | None => true,
+                Some(value) => value.as_str() == Some(run_id),
+            }
+        {
+            matched.push(policy.clone());
+        }
+    }
+    Ok(matched)
 }
 
 /// `units(p.call_reservation)` for a policy the callers already validated.
@@ -916,7 +955,7 @@ fn assess(
     now: &str,
     reserve: bool,
 ) -> BudgetResult<Map<String, Value>> {
-    let policies = matched(book, run_id);
+    let policies = matched(book, run_id)?;
     let mut reason: Option<&'static str> = if policies.is_empty() {
         Some("budget_policy_missing")
     } else {
@@ -1203,19 +1242,12 @@ fn operate_policy(
             }
         }
         let active = policy.get("active").and_then(Value::as_bool) == Some(true);
-        let has_open_call = book_of(state)?
-            .get("calls")
-            .and_then(Value::as_object)
-            .is_some_and(|calls| {
-                calls.values().filter_map(Value::as_object).any(|call| {
-                    call.get("policy_ids")
-                        .and_then(Value::as_array)
-                        .is_some_and(|ids| ids.iter().any(|id| id.as_str() == Some(&policy_id)))
-                        && call.get("amount").unwrap_or(&Value::Null).is_null()
-                })
-            });
-        if !active && has_open_call {
-            return fail("budget_unconfirmed_calls_conflict");
+        if !active {
+            for call in accounting_values(book_of(state)?, "calls")? {
+                if call_has_policy(call, &policy_id)? && call.get("amount") == Some(&Value::Null) {
+                    return fail("budget_unconfirmed_calls_conflict");
+                }
+            }
         }
     } else {
         let count = book_of(state)?
@@ -1264,6 +1296,10 @@ fn operate_job(
     let job_id = id(required(&input, "job_id"))?;
     let run_id = id(required(&input, "run_id"))?;
     let worker_id = id(required(&input, "worker_id"))?;
+    // JS indexes `book.jobs` before assessment, even when admission is denied.
+    if book_of(state)?.get("jobs").is_none_or(Value::is_null) {
+        return fail("budget_invalid_store");
+    }
     let exists = book_of(state)?
         .get("jobs")
         .and_then(Value::as_object)
@@ -1394,6 +1430,10 @@ fn operate_call(
         || job.get("registered_at").unwrap_or(&Value::Null).is_null()
     {
         return fail("budget_hook_unavailable");
+    }
+    // A missing/null collection throws before JS can return a policy denial.
+    if book_of(state)?.get("calls").is_none_or(Value::is_null) {
+        return fail("budget_invalid_store");
     }
     let replay = book_of(state)?
         .get("calls")
@@ -1559,14 +1599,16 @@ fn operate_finish(
 ) -> BudgetResult<Value> {
     let input = object(input, &FINISH_KEYS)?.clone();
     let call_id = id(required(&input, "call_id"))?;
-    let job_id = id(required(&input, "job_id"))?;
     let call = book_of(state)?
         .get("calls")
         .and_then(Value::as_object)
         .and_then(|calls| calls.get(&call_id))
-        .and_then(Value::as_object)
-        .cloned();
-    let Some(mut call) = call else {
+        .filter(|call| !is_falsy(call));
+    let Some(call) = call else {
+        return fail("budget_call_missing");
+    };
+    let job_id = id(required(&input, "job_id"))?;
+    let Some(mut call) = call.as_object().cloned() else {
         return fail("budget_call_missing");
     };
     if call.get("job_id").and_then(Value::as_str) != Some(job_id.as_str()) {
@@ -1834,10 +1876,6 @@ pub fn validate_budget_admission(state: &Value) -> BudgetResult<()> {
     if !store_ok {
         return fail("budget_invalid_store");
     }
-    validate_book_record_shapes(
-        book.as_object()
-            .ok_or_else(|| BudgetError::code("budget_invalid_store"))?,
-    )?;
     // Replay canonical records, so damaged amounts, policy revisions and scope
     // IDs cannot quietly turn into a zero-spend admission after a restart.
     let mut replay = Map::new();
@@ -1897,7 +1935,6 @@ pub fn public_budget_admission(state: &Value, live_jobs: &Value, now: &str) -> B
     let book = book
         .as_object()
         .ok_or_else(|| BudgetError::code("budget_invalid_store"))?;
-    validate_book_record_shapes(book)?;
     let mut cache = TotalsCache::default();
     let mut output = Map::new();
     output.insert("schema".into(), json!(1));
@@ -1909,15 +1946,10 @@ pub fn public_budget_admission(state: &Value, live_jobs: &Value, now: &str) -> B
     }
 
     let mut policies = Vec::new();
-    for policy in book
-        .get("policies")
-        .and_then(Value::as_object)
-        .map(js_values)
-        .unwrap_or_default()
-    {
-        let Some(policy) = policy.as_object() else {
-            continue;
-        };
+    for policy in accounting_values(book, "policies")? {
+        let policy = policy
+            .as_object()
+            .ok_or_else(|| BudgetError::code("budget_invalid_store"))?;
         let total = totals(book, policy, &mut cache)?;
         let effective = total.spent.map(|spent| spent + total.reserved);
         let hard_limit = limit_of(policy, "hard_limit")?;
@@ -1990,45 +2022,29 @@ pub fn public_budget_admission(state: &Value, live_jobs: &Value, now: &str) -> B
     output.insert("policies".into(), Value::Array(policies));
 
     let mut jobs = Vec::new();
-    for job in book
-        .get("jobs")
-        .and_then(Value::as_object)
-        .map(js_values)
-        .unwrap_or_default()
-    {
-        let Some(job) = job.as_object() else {
-            continue;
-        };
+    for job in public_values(book, "jobs")? {
         let job_id = job.get("job_id").and_then(Value::as_str).unwrap_or("");
-        let enforcement = if !job.get("closed_at").unwrap_or(&Value::Null).is_null() {
+        let enforcement = if job.get("closed_at") != Some(&Value::Null) {
             "stopped"
         } else if live_jobs.get(job_id) == Some(&Value::Bool(true)) {
             "guard_registered"
         } else {
             "unknown"
         };
-        let mut entry = job.clone();
+        let mut entry = public_spread(&job)?;
         entry.insert("enforcement".into(), json!(enforcement));
         jobs.push(Value::Object(entry));
     }
     output.insert("jobs".into(), Value::Array(jobs));
 
     let mut calls = Vec::new();
-    for call in book
-        .get("calls")
-        .and_then(Value::as_object)
-        .map(js_values)
-        .unwrap_or_default()
-    {
-        let Some(call) = call.as_object() else {
-            continue;
-        };
-        let accounting = if call.get("amount").unwrap_or(&Value::Null).is_null() {
+    for call in public_values(book, "calls")? {
+        let accounting = if call.get("amount") == Some(&Value::Null) {
             "unconfirmed"
         } else {
             "source_reported"
         };
-        let mut entry = call.clone();
+        let mut entry = public_spread(&call)?;
         entry.insert("accounting".into(), json!(accounting));
         calls.push(Value::Object(entry));
     }

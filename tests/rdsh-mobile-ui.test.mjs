@@ -143,6 +143,14 @@ test('the package composes as a web client bundle and keeps the upstream credit'
   assert.ok(patch.includes('rdsh-mobile-ui'));
   const host = await import('../plugins/rdsh-mobile-ui/index.js');
   assert.equal(typeof host.apply, 'function');
-  assert.ok(source.includes('https://github.com/hikarioyama/Smart-DSH'));
+  // Parse the URL and compare the host and path exactly: a look-alike host or
+  // a longer path must not satisfy the upstream attribution check.
+  const urls = [...source.matchAll(/https?:\/\/[^\s)>\]]+/g)]
+    .map(([raw]) => raw.replace(/[.,;:'"`]+$/, ''))
+    .map((raw) => new URL(raw));
+  assert.ok(
+    urls.some((url) => url.hostname === 'github.com' && url.pathname === '/hikarioyama/Smart-DSH'),
+    'the Smart-DSH attribution link is missing',
+  );
   assert.ok(source.includes('MIT'));
 });

@@ -21,13 +21,13 @@
     "@remotion/three": "4.0.534",
     "@remotion/transitions": "4.0.534",
     "@types/three": "0.183.1",
-    "react": "19.2.0",
+    "react": "19.3.0",
     "react-dom": "19.2.0",
     "remotion": "4.0.534",
     "three": "0.186.1"
   },
   "devDependencies": {
-    "@types/react": "19.2.0",
+    "@types/react": "19.3.0",
     "typescript": "5.9.3"
   }
 }

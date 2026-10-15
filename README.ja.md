@@ -321,7 +321,7 @@ rdsh serve                             # 起動（ローカルホスト限定、
 rdsh-dashboard project --project <ディレクトリ>
 ```
 
-※ Windows ネイティブではタスクトレイに常駐し、タスクバーから簡単に開閉できます（端末起動したい場合は `--no-tray` を指定）。詳細は [dashboard/README.md](dashboard/README.md) をご覧ください。
+※ Windows ネイティブではタスクトレイに常駐し、タスクバーから簡単に開閉できます（端末起動したい場合は `--no-tray` を指定）。詳細は [dashboard/README.md](dashboard/README.md) をご覧ください。外部エージェント CLI（cursor-agent、devin）を監視付きジョブとして実行できます（[docs/AGENT-RUNNERS.md](docs/AGENT-RUNNERS.md)、英語）。
 
 ## デスクトップアプリ (Electron)
 
@@ -415,6 +415,7 @@ Linux x86_64 環境での測定値です：
 ## コミュニティ
 
 - コントリビューション：[CONTRIBUTING.md](CONTRIBUTING.md) をご覧ください。
+- Rust開発環境：[Rust開発ガイド](docs/RUST-DEVELOPMENT.md) をご覧ください。
 - バグ報告・要望：[Issue フォーム](https://github.com/jimoto-no-llm/rustdsh/issues/new/choose)（日本語 OK）へお寄せください。
 - セキュリティ脆弱性報告：公開 Issue ではなく [SECURITY.md](SECURITY.md) に記載の手順でご報告ください。
 - サポート：[SUPPORT.md](SUPPORT.md) / 行動規範：[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
