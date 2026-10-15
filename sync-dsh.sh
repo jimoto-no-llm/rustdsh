@@ -8,14 +8,19 @@
 # --check-only to preview without installing.
 # rdsh self-update prefers a prebuilt release binary; source builds run only with
 # RDSH_SYNC_FROM_SOURCE=1 (under nice/ionice). Regress always runs sandboxed.
+# Release integrity: the archive must match the digest pinned in the repository
+# release-digests.tsv (canonical origin), never an <asset>.sha256 from the base.
 set -u
+# Trusted digest registry for released archives. Keep this canonical origin
+# independent of RDSH_RELEASE_BASE and of every other environment value (#303).
+RELEASE_DIGESTS_URL="https://raw.githubusercontent.com/jimoto-no-llm/rustdsh/main/release-digests.tsv"
 CHANNEL="rc"
 CHECK_ONLY=0
 for a in "$@"; do
   case "$a" in
     --check-only) CHECK_ONLY=1 ;;
     --channel=*) CHANNEL="${a#--channel=}" ;;
-    -h|--help) echo "usage: sync-dsh.sh [--check-only] [--channel rc|any]"; echo "  env: RDSH_SYNC_FROM_SOURCE=1 (rebuild rdsh from source instead of release binary)"; echo "       RDSH_MUSL=1 (prefer the static musl build), RDSH_SYNC_VERSION=VER (pin release)"; exit 0 ;;
+    -h|--help) echo "usage: sync-dsh.sh [--check-only] [--channel rc|any]"; echo "  env: RDSH_SYNC_FROM_SOURCE=1 (rebuild rdsh from source instead of release binary)"; echo "       RDSH_MUSL=1 (prefer the static musl build), RDSH_SYNC_VERSION=VER (pin release)"; echo "       DSH_PKG_ROOT=DIR (use DIR as the @deepseek-ai/dsh package root instead of discovering it), NPM_BIN=npm"; exit 0 ;;
     *) echo "unknown arg: $a" >&2; exit 2 ;;
   esac
 done
@@ -59,8 +64,29 @@ else
   export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
 fi
 write_state() {
-  printf "{\"updated\":true,\"kind\":\"%s\",\"from\":\"%s\",\"to\":\"%s\",\"at\":%s}\n" \
-    "$1" "$2" "$3" "$(date +%s)000" > "$LOGDIR/update-state.json"
+  node - "$LOGDIR/update-state.json" "$1" "$2" "$3" "$(date +%s)000" <<'JSON'
+const fs = require('node:fs');
+const [target, kind, from, to, at] = process.argv.slice(2);
+const timestamp = Number(at);
+if (!Number.isSafeInteger(timestamp)) process.exit(1);
+const temporary = `${target}.${process.pid}.tmp`;
+let created = false;
+let fd;
+try {
+  fd = fs.openSync(temporary, 'wx', 0o600);
+  created = true;
+  fs.writeFileSync(fd, `${JSON.stringify({updated:true,kind,from,to,at:timestamp})}\n`);
+  fs.closeSync(fd);
+  fd = undefined;
+  fs.renameSync(temporary, target);
+  created = false;
+} catch (error) {
+  if (fd !== undefined) try { fs.closeSync(fd); } catch {}
+  if (created) try { fs.unlinkSync(temporary); } catch {}
+  process.stderr.write(`failed to write update state: ${error.message}\n`);
+  process.exitCode = 1;
+}
+JSON
 }
 FROM_SOURCE="${RDSH_SYNC_FROM_SOURCE:-0}"
 PREFIX_BIN="${PREFIX_BIN:-$HOME/.local/bin}"
@@ -107,22 +133,18 @@ rdsh_release_asset() {
   esac
 }
 verify_sha256() {
-  # Same check as install.sh: the first field of sidecar $2 must equal the
-  # sha256 of $1 (case-insensitive). A missing or empty sidecar fails.
-  line="$(cat "$2" 2>/dev/null)"
-  want="${line%% *}"
-  if [ -z "$want" ]; then
-    log "empty checksum sidecar"
-    return 1
-  fi
-  if ! printf '%s\n' "$want" | grep -Eq '^[a-fA-F0-9]{64}$'; then
-    log "invalid release checksum; refusing update"
-    return 1
-  fi
+  # Same check as install.sh: $2 is the pinned sha256 of $1 (case-insensitive).
+  # A missing or malformed pin fails.
+  file="$1"
+  want="$2"
+  case "$want" in
+    ''|*[!0123456789abcdefABCDEF]*) log "invalid pinned SHA-256"; return 1 ;;
+  esac
+  if [ "${#want}" -ne 64 ]; then log "invalid pinned SHA-256 length"; return 1; fi
   if command -v sha256sum >/dev/null 2>&1; then
-    out="$(sha256sum "$1")"
+    out="$(sha256sum "$file")"
   elif command -v shasum >/dev/null 2>&1; then
-    out="$(shasum -a 256 "$1")"
+    out="$(shasum -a 256 "$file")"
   else
     log "no sha256sum or shasum available"
     return 1
@@ -137,22 +159,129 @@ verify_sha256() {
   log "CHECKSUM MISMATCH"
   return 1
 }
+release_version() {
+  case "$1" in
+    v*) printf '%s' "$1" ;;
+    *) printf 'v%s' "$1" ;;
+  esac
+}
+validate_release_digest_manifest() {
+  awk '
+    BEGIN { FS = "[ \t]+"; bad = 0; latest_count = 0 }
+    /^[ \t]*#/ || NF == 0 { next }
+    function valid_version(v) { return v ~ /^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$/ }
+    function valid_asset(a) {
+      return a == "rdsh-linux-x64.tar.gz" || a == "rdsh-linux-x64-musl.tar.gz" ||
+        a == "rdsh-macos-arm64.tar.gz" || a == "rdsh-macos-x64.tar.gz"
+    }
+    $1 == "latest" {
+      if (NF != 2 || !valid_version($2) || $2 ~ /-/ || latest_count++) bad = 1
+      latest = $2
+      next
+    }
+    {
+      if (NF != 3 || !valid_version($1) || !valid_asset($2) || length($3) != 64 || $3 ~ /[^0-9a-fA-F]/) {
+        bad = 1
+        next
+      }
+      key = $1 SUBSEP $2
+      if (seen[key]++) bad = 1
+      versions[$1] = 1
+      if ($1 == latest) latest_assets++
+    }
+    END {
+      if (bad || latest_count != 1 || !versions[latest] || latest_assets != 4) exit 1
+    }
+  ' "$1"
+}
+latest_release_version() {
+  awk '$1 == "latest" { print $2 }' "$1"
+}
+expected_release_sha256() {
+  awk -v wanted_version="$2" -v wanted_asset="$3" '
+    $1 == wanted_version && $2 == wanted_asset { print $3; matches++ }
+    END { if (matches != 1) exit 1 }
+  ' "$1"
+}
+# `latest` in the pinned registry can lag a published release. Compare the
+# stable target's numeric core with the installed version before downloading.
+# Node is already required for DSH synchronization; no SemVer package is needed.
+automatic_release_order() {
+  node - "$PREFIX_BIN/rdsh" "$1" <<'RDSH_ORDER'
+const {execFileSync} = require('node:child_process');
+try {
+  const [binary, target] = process.argv.slice(2);
+  const installed = execFileSync(binary, ['--version'], {
+    encoding: 'utf8', timeout: 2000, killSignal: 'SIGKILL', maxBuffer: 4096,
+    stdio: ['ignore', 'pipe', 'ignore'],
+  }).trim();
+  const current = /^rdsh (0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.exec(installed);
+  const next = /^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/.exec(target);
+  if (!current || !next) process.exit(1);
+  // The registry's latest row is stable, which is at least as new as a
+  // prerelease with the same core; build metadata never changes precedence.
+  for (let i = 1; i <= 3; i++) {
+    const a = BigInt(current[i]), b = BigInt(next[i]);
+    if (a !== b) { console.log(a > b ? 'older' : 'eligible'); process.exit(0); }
+  }
+  console.log('eligible');
+} catch { process.exit(1); }
+RDSH_ORDER
+}
 fetch_rdsh_release() {
-  # Install the prebuilt release rdsh binary to $1 after checking it against
-  # its <asset>.sha256 sidecar. Honors RDSH_RELEASE_BASE (tests: file:///path)
-  # and RDSH_SYNC_VERSION (default: latest).
+  # Install the prebuilt release rdsh binary to $1 after checking it against the
+  # digest registry pinned to the repository, never against an
+  # <asset>.sha256 fetched from the same origin as the artifact (issue #303).
+  # Honors RDSH_RELEASE_BASE (tests) and RDSH_SYNC_VERSION (default: latest).
+  # The registry URL above is deliberately not overridable from the environment.
   dest="$1"
   base="${RDSH_RELEASE_BASE:-https://github.com/jimoto-no-llm/rustdsh/releases}"
+  case "$base" in
+    https://*) ;;
+    *)
+      # A pinned digest still protects the payload, but a plain-http base can be
+      # made to serve an older pinned release (downgrade) or nothing at all.
+      if [ "${RDSH_TEST_INSECURE_BASE:-0}" != 1 ]; then
+        log "refusing non-https release base: $base (RDSH_TEST_INSECURE_BASE=1 is for local tests only)"
+        return 1
+      fi
+      log "RDSH_TEST_INSECURE_BASE=1: using non-https release base: $base"
+      ;;
+  esac
   ver="${RDSH_SYNC_VERSION:-latest}"
   asset="$(rdsh_release_asset)" || { log "no prebuilt rdsh binary for this host; set RDSH_SYNC_FROM_SOURCE=1 to build"; return 1; }
-  if [ "$ver" = "latest" ]; then url="$base/latest/download/$asset"; else url="$base/download/$ver/$asset"; fi
   tmpd="$(mktemp -d 2>/dev/null || mktemp -d -t rdsh-sync-fetch)"
-  log "fetching rdsh release: $url"
-  if ! curl -fsSL -o "$tmpd/pkg.tgz" "$url"; then rm -rf "$tmpd"; return 1; fi
-  if ! curl -fsSL -o "$tmpd/pkg.tgz.sha256" "$url.sha256" 2>/dev/null; then
-    log "no checksum sidecar: $url.sha256"; rm -rf "$tmpd"; return 1
+  if ! curl --proto '=https' --proto-redir '=https' --tlsv1.2 -fsSL -o "$tmpd/release-digests.tsv" "$RELEASE_DIGESTS_URL"; then
+    log "could not fetch the trusted release digest registry; refusing update"
+    rm -rf "$tmpd"; return 1
   fi
-  if ! verify_sha256 "$tmpd/pkg.tgz" "$tmpd/pkg.tgz.sha256"; then rm -rf "$tmpd"; return 1; fi
+  if ! validate_release_digest_manifest "$tmpd/release-digests.tsv"; then
+    log "trusted release digest registry is invalid; refusing update"
+    rm -rf "$tmpd"; return 1
+  fi
+  if [ "$ver" = "latest" ]; then version="$(latest_release_version "$tmpd/release-digests.tsv")"; else version="$(release_version "$ver")"; fi
+  if ! printf '%s\n' "$version" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$'; then
+    log "invalid release version: $version"; rm -rf "$tmpd"; return 1
+  fi
+  if ! expected="$(expected_release_sha256 "$tmpd/release-digests.tsv" "$version" "$asset")"; then
+    log "no pinned checksum for release $version asset $asset; refusing update"
+    rm -rf "$tmpd"; return 1
+  fi
+  if [ "$ver" = "latest" ] && [ -e "$PREFIX_BIN/rdsh" ]; then
+    if ! order="$(automatic_release_order "$version")"; then
+      log "cannot compare the installed rdsh version; refusing automatic update"
+      rm -rf "$tmpd"; return 1
+    fi
+    if [ "$order" = "older" ]; then
+      log "refusing automatic rdsh downgrade to $version; installed binary and notice state preserved"
+      rm -rf "$tmpd"; return 1
+    fi
+  fi
+  url="$base/download/$version/$asset"
+  log "fetching rdsh release: $version/$asset"
+  # A configured https base must not be bounced onto plain http either.
+  if ! curl --proto-redir '=https' -fsSL -o "$tmpd/pkg.tgz" "$url"; then rm -rf "$tmpd"; return 1; fi
+  if ! verify_sha256 "$tmpd/pkg.tgz" "$expected"; then rm -rf "$tmpd"; return 1; fi
   if ! tar -xzf "$tmpd/pkg.tgz" -C "$tmpd"; then rm -rf "$tmpd"; return 1; fi
   if [ ! -x "$tmpd/rdsh" ]; then rm -rf "$tmpd"; return 1; fi
   install -m755 "$tmpd/rdsh" "$dest"
@@ -166,8 +295,38 @@ for cand in "${NPM_BIN:-}" "$HOME/.local/bin/npm" "$NODEBIN/npm" "$(command -v n
 done
 if [ -z "$NPM" ]; then log "npm not found; set NPM_BIN"; exit 1; fi
 log "using npm: $NPM"
-PKGROOT="$("$NPM" root -g 2>/dev/null)/@deepseek-ai/dsh"
-if [ ! -f "$PKGROOT/package.json" ]; then log "dsh package not found under $PKGROOT"; exit 1; fi
+# The npm that owns the running dsh is not necessarily the npm first on PATH:
+# rdsh is a passthrough launcher, so the tree can live under
+# $HOME/.local/opt/<dir>/lib/node_modules while `npm root -g` names a different
+# prefix. Try, in order: the DSH_PKG_ROOT override, npm's own global root, the
+# newest $HOME/.local/opt/* tree, then the older per-user prefixes. The first
+# candidate whose package.json is readable wins.
+NPM_ROOT="$("$NPM" root -g 2>/dev/null || true)"
+OPT_TREE=""
+for d in "$HOME"/.local/opt/*/lib/node_modules/@deepseek-ai/dsh; do
+  [ -f "$d/package.json" ] || continue
+  # -nt needs no GNU-only sort and keeps paths with spaces intact.
+  if [ -z "$OPT_TREE" ] || [ "$d" -nt "$OPT_TREE" ]; then OPT_TREE="$d"; fi
+done
+PKGROOT=""
+for cand in "${DSH_PKG_ROOT:-}" "${NPM_ROOT:+$NPM_ROOT/@deepseek-ai/dsh}" "$OPT_TREE" \
+  "$HOME/.npm-global/lib/node_modules/@deepseek-ai/dsh" "$HOME/.local/lib/node_modules/@deepseek-ai/dsh"; do
+  if [ -n "$cand" ] && [ -f "$cand/package.json" ]; then PKGROOT="$cand"; break; fi
+done
+# `npm install -g` writes into npm's own global root, so a tree found anywhere
+# else (the $HOME/.local/opt layout) cannot be updated that way; re-reading it
+# after an install there would only report a false verification failure.
+DSH_MANAGED=1
+if [ -n "$PKGROOT" ] && { [ -z "$NPM_ROOT" ] || [ "${PKGROOT#"$NPM_ROOT"/}" = "$PKGROOT" ]; }; then
+  DSH_MANAGED=0
+fi
+if [ -z "$PKGROOT" ]; then
+  # A tree we cannot locate is a reporting gap, not a failed sync: rdsh itself
+  # still updates from the release below, and a layout that keeps moving must
+  # not make the daily run and its notification fail forever.
+  log "dsh tree not found; DSH skipped, rdsh release update continues"
+else
+log "using dsh tree: $PKGROOT"
 INSTALLED="$(node -p "require(process.argv[1]).version" "$PKGROOT/package.json" 2>/dev/null)"
 if [ -z "$INSTALLED" ]; then log "cannot read installed version"; exit 1; fi
 ALL="$("$NPM" view @deepseek-ai/dsh versions --json 2>/dev/null || true)"
@@ -230,7 +389,10 @@ else
   DSH_CHANGED=1
   if [ "$CHECK_ONLY" = 1 ]; then log "dsh update available: $LATEST"; fi
 fi
-if [ "$DSH_CHANGED" = 1 ] && [ "$CHECK_ONLY" = 0 ]; then
+if [ "$DSH_CHANGED" = 1 ] && [ "$CHECK_ONLY" = 0 ] && [ "$DSH_MANAGED" = 0 ]; then
+  log "dsh tree $PKGROOT is outside npm's global root (${NPM_ROOT:-unknown}); DSH update skipped, tree left as is"
+fi
+if [ "$DSH_CHANGED" = 1 ] && [ "$CHECK_ONLY" = 0 ] && [ "$DSH_MANAGED" = 1 ]; then
 log "updating $INSTALLED -> $LATEST"
 if ! "$NPM" install -g "@deepseek-ai/dsh@$LATEST" >> "$LOGDIR/sync.log" 2>&1; then
   log "npm install failed; kept $INSTALLED"; exit 1
@@ -247,8 +409,10 @@ else
   exit 1
 fi
 fi
+# Closes the dsh tree update; an empty PKGROOT skipped it above.
+fi
 REPO="$(cd "$(dirname "$0")" && pwd)"
-if [ -x "$REPO/target/release/rdsh" ] && [ -f "$REPO/tests/regress.sh" ]; then
+if [ "$CHECK_ONLY" = 0 ] && [ -x "$REPO/target/release/rdsh" ] && [ -f "$REPO/tests/regress.sh" ]; then
   if sandboxed_regress "$REPO/target/release/rdsh"; then
     log "post-update regress: ALL PASS"
   else

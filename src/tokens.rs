@@ -167,7 +167,7 @@ pub fn cmd_tokens(files: Vec<String>, preview: usize) -> anyhow::Result<()> {
             out,
             "{{\"tokens\": {}, \"chars\": {}}}",
             estimate_tokens(&text),
-            text.len()
+            text.chars().count()
         )?;
         out.flush()?;
         return Ok(());
@@ -199,7 +199,7 @@ pub fn cmd_prune(max_tokens: usize, file: Option<String>) -> anyhow::Result<()> 
     // The old code cloned the whole input here on the common path.
     // Fast path: plain text never parses; skip failed parse (same fallback).
     let parsed: Option<serde_json::Value> = match text.trim_start().as_bytes().first() {
-        Some(b'{') | Some(b'[') | Some(b'"') => serde_json::from_str(&text).ok(),
+        Some(b'{' | b'[' | b'"') => serde_json::from_str(&text).ok(),
         _ => None,
     };
     let raw: &str = parsed
@@ -233,10 +233,16 @@ mod tests {
 
     #[test]
     fn non_ascii_counts() {
+        // 非ASCIIスカラーは1個1トークン。é×4 は8バイトなので、バイト長基準なら 2 に
+        // なってしまう。この assertion が単位の取り違えを検出する。
+        assert_eq!(estimate_tokens("\u{e9}\u{e9}\u{e9}\u{e9}"), 4);
+        assert_eq!(estimate_tokens("\u{3042}"), 1);
+        // ASCIIランと非ASCIIの境界: ceil(3/4)=1 に非ASCIIの1を足して 2。
+        assert_eq!(estimate_tokens("abc\u{3042}"), 2);
+        assert_eq!(estimate_tokens("\u{3042}abc"), 2);
+        // ASCIIだけの入力は高速パス(バイト長/4)のまま。
         assert_eq!(estimate_tokens("a"), 1);
-        assert!(estimate_tokens("hello") > 0);
-        let mixed = "abcXdef";
-        assert_eq!(estimate_tokens(mixed), 2);
+        assert_eq!(estimate_tokens("abcXdef"), 2);
     }
 
     #[test]

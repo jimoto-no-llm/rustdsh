@@ -1,0 +1,4 @@
+--- baseline: dashboard close probe on main
++++ candidate: dashboard close probe with shared in-flight promise
+-{"samePromise":false,"stopCalls":2}
++{"samePromise":true,"stopCalls":1}

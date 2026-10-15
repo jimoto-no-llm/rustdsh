@@ -2,6 +2,7 @@
 param([string]$BinDirectory = (Join-Path $env:USERPROFILE '.local\bin'))
 $ErrorActionPreference = 'Stop'
 $taskNode = (Get-Command node.exe -ErrorAction Stop).Source
+$taskPwsh = (Get-Command pwsh.exe -ErrorAction Stop).Source
 $taskLauncher = Join-Path $PSScriptRoot 'rdsh-dashboard.ps1'
 $taskNpm = Join-Path (Split-Path (Get-Command npm.cmd -ErrorAction Stop).Source) 'node_modules/npm/bin/npm-cli.js'
 if (-not (Test-Path -LiteralPath $taskNpm -PathType Leaf)) { throw 'Cannot locate npm CLI beside npm.cmd' }
@@ -50,5 +51,7 @@ try {
 New-Item -ItemType Directory -Force -Path $BinDirectory | Out-Null
 $taskWrapper = "`$taskInstalledDashboardNode = '" + $taskNode.Replace("'", "''") + "'`n& '" + $taskLauncher.Replace("'", "''") + "' @args`nexit `$LASTEXITCODE`n"
 Set-Content -LiteralPath (Join-Path $BinDirectory 'rdsh-dashboard.ps1') -Value $taskWrapper -Encoding utf8NoBOM
-Set-Content -LiteralPath (Join-Path $BinDirectory 'rdsh-dashboard.cmd') -Value '@echo off', 'pwsh.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0rdsh-dashboard.ps1" %*' -Encoding ascii
+# cmd.exe resolves a bare command name in the working directory first; pin the captured path.
+$taskCmdPwsh = '"' + $taskPwsh.Replace('%', '%%') + '"'
+Set-Content -LiteralPath (Join-Path $BinDirectory 'rdsh-dashboard.cmd') -Value '@echo off', "$taskCmdPwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File `"%~dp0rdsh-dashboard.ps1`" %*" -Encoding oem
 Write-Host "Installed rdsh-dashboard in $BinDirectory. Add that directory to PATH if needed."

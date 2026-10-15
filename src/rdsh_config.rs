@@ -36,6 +36,7 @@ pub struct RdshSettings {
     pub beta: BetaSection,
     pub context: ContextSection,
     pub extras: ExtrasSection,
+    pub features: FeaturesSection,
 }
 
 /// Optional server-type features, off by default. Known ids are listed in
@@ -47,12 +48,184 @@ pub struct ExtrasSection {
 
 /// Extra feature ids that can be enabled via `extras.enable`.
 /// `serve` = `rdsh serve` dashboard, `search-web` = `rdsh search-web`.
-/// Setup itself (`rdsh setup --web`) always runs: it hosts the switches.
+/// Setup is not an extra; `features.setup_web` (default on) gates it instead.
 pub const KNOWN_EXTRAS: &[&str] = &["serve", "search-web"];
 
 /// True when the named extra is enabled in settings (unknown ids never match).
 pub fn extra_enabled(cfg: &RdshSettings, id: &str) -> bool {
     KNOWN_EXTRAS.contains(&id) && cfg.extras.enable.iter().any(|e| e == id)
+}
+
+/// Extra ids that are actually enabled, honoring an explicit `features.<id>`.
+/// The setup UI reads this so its switches show the effective state.
+pub fn enabled_extras(cfg: &RdshSettings) -> Vec<String> {
+    KNOWN_EXTRAS
+        .iter()
+        .filter(|id| feature_enabled(cfg, id))
+        .map(|id| (*id).to_string())
+        .collect()
+}
+
+/// One switchable capability. `default` reproduces the behavior that existed
+/// before the switch was introduced, so an older rdsh.json keeps working and
+/// an id that is absent from the file never changes anything.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FeatureDef {
+    pub id: &'static str,
+    pub default: bool,
+    pub summary: &'static str,
+}
+
+/// Every capability `rdsh` or its bundled DSH plugins can turn off.
+/// `serve`, `search-web`, `context_engine` and `discord` also keep their
+/// legacy keys working (extras.enable / beta.context_engine / discord.enabled).
+pub const FEATURES: &[FeatureDef] = &[
+    FeatureDef {
+        id: "discord",
+        default: true,
+        summary: "Discord Rich Presence (needs the DSH web service running)",
+    },
+    FeatureDef {
+        id: "update_check",
+        default: true,
+        summary: "look for rustdsh updates and show the update banner",
+    },
+    FeatureDef {
+        id: "update_notifications",
+        default: true,
+        summary: "push a notification when an update is found",
+    },
+    FeatureDef {
+        id: "sound",
+        default: false,
+        summary: "allow the DSH sound notifications install (installer SOUND=1)",
+    },
+    FeatureDef {
+        id: "serve",
+        default: false,
+        summary: "local read-only dashboard (rdsh serve)",
+    },
+    FeatureDef {
+        id: "search-web",
+        default: false,
+        summary: "SearXNG web search (rdsh search-web)",
+    },
+    FeatureDef {
+        id: "context_engine",
+        default: false,
+        summary: "experimental per-turn context engine (rdsh context)",
+    },
+    FeatureDef {
+        id: "compute",
+        default: false,
+        summary: "allow the resident compute bridge (RDSH_COMPUTE=1)",
+    },
+    FeatureDef {
+        id: "budget_guard",
+        default: true,
+        summary: "budget guard hook in the DSH plugin",
+    },
+    FeatureDef {
+        id: "agent_tool_sandbox",
+        default: false,
+        summary: "confine delegated agent tools to --share-file files (no network, no host writes)",
+    },
+    FeatureDef {
+        id: "release_probe",
+        default: false,
+        summary: "run the release qualification probe when its environment is set",
+    },
+    FeatureDef {
+        id: "setup_web",
+        default: true,
+        summary: "rdsh setup --web local setup page",
+    },
+    FeatureDef {
+        id: "sessions_token_cache",
+        default: true,
+        summary: "cache decompressed session token sizes",
+    },
+    FeatureDef {
+        id: "node_compile_cache",
+        default: true,
+        summary: "Node compile cache for delegated runs (Node >= 22.1)",
+    },
+    FeatureDef {
+        id: "slim_lazy_plugins",
+        default: true,
+        summary: "ask DSH to load plugins lazily in slim mode",
+    },
+    FeatureDef {
+        id: "slim_disable_voice",
+        default: true,
+        summary: "disable DSH voice features in slim mode",
+    },
+    FeatureDef {
+        id: "slim_disable_auto_review",
+        default: true,
+        summary: "disable DSH auto review in slim mode",
+    },
+];
+
+/// Look up one feature definition (unknown ids never match).
+pub fn feature_def(id: &str) -> Option<&'static FeatureDef> {
+    FEATURES.iter().find(|f| f.id == id)
+}
+
+/// Built-in default for one feature id (unknown ids are false).
+pub fn feature_default(id: &str) -> bool {
+    feature_def(id).is_some_and(|f| f.default)
+}
+
+/// `features` 節: 明示された on/off のみ保持する。未記載の id は既定値に従う。
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct FeaturesSection {
+    pub values: std::collections::BTreeMap<String, bool>,
+}
+
+impl FeaturesSection {
+    fn from_value(v: &serde_json::Value) -> Self {
+        let mut values = std::collections::BTreeMap::new();
+        if let Some(map) = v.as_object() {
+            for (id, value) in map {
+                if let Some(on) = value.as_bool() {
+                    if feature_def(id).is_some() {
+                        values.insert(id.clone(), on);
+                    }
+                }
+            }
+        }
+        Self { values }
+    }
+
+    fn to_value(&self) -> serde_json::Value {
+        serde_json::Value::Object(
+            self.values
+                .iter()
+                .map(|(id, on)| (id.clone(), serde_json::Value::Bool(*on)))
+                .collect(),
+        )
+    }
+}
+
+/// 最終的な on/off。`features.<id>` が明示されていればそれが最優先で、未記載なら
+/// 旧キー（extras.enable / beta.context_engine / discord.enabled）を見て、
+/// それも無ければ既定値に従う。
+pub fn feature_enabled(cfg: &RdshSettings, id: &str) -> bool {
+    if let Some(on) = cfg.features.values.get(id) {
+        return *on;
+    }
+    match id {
+        "serve" | "search-web" => extra_enabled(cfg, id),
+        "context_engine" => cfg.beta.context_engine,
+        "discord" => cfg.discord.enabled,
+        _ => feature_default(id),
+    }
+}
+
+/// True when the id is written in rdsh.json (as opposed to following a default).
+pub fn feature_is_explicit(cfg: &RdshSettings, id: &str) -> bool {
+    cfg.features.values.contains_key(id)
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -308,6 +481,7 @@ impl Default for RdshSettings {
             beta: BetaSection::default(),
             context: ContextSection::default(),
             extras: ExtrasSection::default(),
+            features: FeaturesSection::default(),
         }
     }
 }
@@ -341,7 +515,11 @@ pub fn load() -> RdshSettings {
 /// 行/列・復旧手順つきの Err を返す（guard 系設定の fail-open 禁止）。
 pub fn try_load() -> anyhow::Result<RdshSettings> {
     let path = settings_path();
-    let raw: Option<String> = match std::fs::read_to_string(&path) {
+    try_load_at(&path)
+}
+
+fn try_load_at(path: &str) -> anyhow::Result<RdshSettings> {
+    let raw: Option<String> = match std::fs::read_to_string(path) {
         Ok(raw) => Some(raw),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
         Err(e) => {
@@ -380,11 +558,43 @@ pub fn try_load() -> anyhow::Result<RdshSettings> {
     Ok(cfg)
 }
 
+/// Apply one settings mutation as a cross-process read-modify-write transaction.
+/// The lock spans load, caller mutation, and atomic rename so distinct updates
+/// cannot replace one another with snapshots read before either write.
+pub(crate) fn update<T>(
+    mutate: impl FnOnce(&mut RdshSettings) -> anyhow::Result<T>,
+) -> anyhow::Result<(RdshSettings, T)> {
+    let path = settings_path();
+    let _lock = crate::file_lock::FileLock::exclusive_for(std::path::Path::new(&path))?;
+    let mut cfg = try_load_at(&path)?;
+    let result = mutate(&mut cfg)?;
+    cfg.save_locked(&path)?;
+    Ok((cfg, result))
+}
+
+/// Initialize settings only if absent, or replace them when `force` is true.
+/// The existence check and write share the same lock as settings mutations.
+pub(crate) fn initialize(force: bool) -> anyhow::Result<bool> {
+    let path = settings_path();
+    let _lock = crate::file_lock::FileLock::exclusive_for(std::path::Path::new(&path))?;
+    if std::path::Path::new(&path).exists() && !force {
+        return Ok(false);
+    }
+    RdshSettings::default().save_locked(&path)?;
+    Ok(true)
+}
+
 impl RdshSettings {
     /// `mkdir -p` した上で mode 600 相当で保存する。
+    #[cfg(test)]
     pub fn save(&self) -> anyhow::Result<()> {
         let path = settings_path();
-        if let Some(parent) = std::path::Path::new(&path).parent() {
+        let _lock = crate::file_lock::FileLock::exclusive_for(std::path::Path::new(&path))?;
+        self.save_locked(&path)
+    }
+
+    fn save_locked(&self, path: &str) -> anyhow::Result<()> {
+        if let Some(parent) = std::path::Path::new(path).parent() {
             if !parent.as_os_str().is_empty() {
                 std::fs::create_dir_all(parent)?;
             }
@@ -394,7 +604,7 @@ impl RdshSettings {
         let text = serde_json::to_string_pretty(&clean.to_value())?;
         // Exclusive random temporary file + rename: never truncate a
         // repository-controlled link target or expose a partially written file.
-        crate::auth::write_creds(&path, &format!("{text}\n"))
+        crate::auth::write_creds(path, &format!("{text}\n"))
     }
 
     fn from_value(v: &serde_json::Value) -> Self {
@@ -423,7 +633,7 @@ impl RdshSettings {
             },
             discord: DiscordSection::from_value(&sec("discord")),
             tokens: TokensSection {
-                default_budget: clamp_u64(num(&t, "default_budget"), 4000, 500, 200000) as usize,
+                default_budget: clamp_u64(num(&t, "default_budget"), 4000, 500, 200_000) as usize,
             },
             search: SearchSection {
                 dir: {
@@ -439,7 +649,7 @@ impl RdshSettings {
                 searxng_url: text(&s, "searxng_url", URL_CHARS),
             },
             compact: CompactSection {
-                max_tokens: clamp_u64(num(&c, "max_tokens"), 8000, 500, 200000) as usize,
+                max_tokens: clamp_u64(num(&c, "max_tokens"), 8000, 500, 200_000) as usize,
             },
             sessions: SessionsSection {
                 limit: clamp_u64(num(&ss, "limit"), 20, 1, 100) as usize,
@@ -470,7 +680,7 @@ impl RdshSettings {
                 context_engine: flag(&be, "context_engine", false),
             },
             context: ContextSection {
-                token_budget: clamp_u64(num(&cx, "token_budget"), 4000, 500, 200000) as usize,
+                token_budget: clamp_u64(num(&cx, "token_budget"), 4000, 500, 200_000) as usize,
                 enable_retriever: flag(&cx, "enable_retriever", true),
                 enable_packer: flag(&cx, "enable_packer", true),
                 enable_verifier: flag(&cx, "enable_verifier", true),
@@ -489,6 +699,7 @@ impl RdshSettings {
                     .filter(|e| KNOWN_EXTRAS.contains(&e.as_str()))
                     .collect(),
             },
+            features: FeaturesSection::from_value(&sec("features")),
         };
         out.sanitize();
         out
@@ -514,7 +725,7 @@ impl RdshSettings {
         out.discord = DiscordSection::from_value(&v["discord"]);
         let t = v.get("tokens").cloned().unwrap_or(serde_json::Value::Null);
         out.tokens.default_budget =
-            clamp_u64(num(&t, "default_budget"), 4000, 500, 200000) as usize;
+            clamp_u64(num(&t, "default_budget"), 4000, 500, 200_000) as usize;
         let s = v.get("search").cloned().unwrap_or(serde_json::Value::Null);
         out.search.dir = {
             let d = text(&s, "dir", PATH_CHARS);
@@ -528,7 +739,7 @@ impl RdshSettings {
         out.search.web_limit = clamp_u64(num(&s, "web_limit"), 10, 1, 100) as usize;
         out.search.searxng_url = text(&s, "searxng_url", URL_CHARS);
         let c = v.get("compact").cloned().unwrap_or(serde_json::Value::Null);
-        out.compact.max_tokens = clamp_u64(num(&c, "max_tokens"), 8000, 500, 200000) as usize;
+        out.compact.max_tokens = clamp_u64(num(&c, "max_tokens"), 8000, 500, 200_000) as usize;
         let ss = v
             .get("sessions")
             .cloned()
@@ -558,8 +769,13 @@ impl RdshSettings {
             .into_iter()
             .filter(|e| KNOWN_EXTRAS.contains(&e.as_str()))
             .collect();
+        out.features = FeaturesSection::from_value(
+            &v.get("features")
+                .cloned()
+                .unwrap_or(serde_json::Value::Null),
+        );
         let cx = v.get("context").cloned().unwrap_or(serde_json::Value::Null);
-        out.context.token_budget = clamp_u64(num(&cx, "token_budget"), 4000, 500, 200000) as usize;
+        out.context.token_budget = clamp_u64(num(&cx, "token_budget"), 4000, 500, 200_000) as usize;
         out.context.enable_retriever = flag(&cx, "enable_retriever", true);
         out.context.enable_packer = flag(&cx, "enable_packer", true);
         out.context.enable_verifier = flag(&cx, "enable_verifier", true);
@@ -612,6 +828,7 @@ impl RdshSettings {
             "setup": { "web_port": self.setup.web_port },
             "beta": { "context_engine": self.beta.context_engine },
             "extras": { "enable": self.extras.enable },
+            "features": self.features.to_value(),
             "context": {
                 "token_budget": self.context.token_budget,
                 "enable_retriever": self.context.enable_retriever,
@@ -636,6 +853,12 @@ impl RdshSettings {
         if key.is_empty() || key == "all" {
             return Some(v);
         }
+        // set_dotted が受理する旧別名は読み出しでも解決する。解決しないと
+        // 保存に成功した直後の読み戻しが失敗し、成功した set が exit 1 になる。
+        let key = match key {
+            "context.files" => "context.working_files",
+            other => other,
+        };
         let mut cur = &v;
         for part in key.split('.') {
             cur = cur.get(part)?;
@@ -689,11 +912,11 @@ impl RdshSettings {
             "sessions.with_tokens" => self.sessions.with_tokens = parse_bool(raw)?,
             "sessions.stale_secs" => self.sessions.stale_secs = parse_usize(raw, 60)? as u64,
             "logs.tail" => self.logs.tail = parse_usize(raw, 50)? as usize,
-            "serve.port" => self.serve.port = parse_usize(raw, 38080)? as u16,
+            "serve.port" => self.serve.port = parse_u16(raw, "serve.port")?,
             "guard.deny" => self.guard.deny = parse_list(raw, TEXT_CHARS),
             "guard.reason" => self.guard.reason = parse_string(raw, TEXT_CHARS),
-            "bench.n" => self.bench.n = parse_usize(raw, 5)? as u32,
-            "setup.web_port" => self.setup.web_port = parse_usize(raw, 0)? as u16,
+            "bench.n" => self.bench.n = parse_u32(raw, "bench.n")?,
+            "setup.web_port" => self.setup.web_port = parse_u16(raw, "setup.web_port")?,
             "beta.context_engine" => self.beta.context_engine = parse_bool(raw)?,
             "extras.enable" => self.extras.enable = parse_list(raw, TEXT_CHARS),
             "context.token_budget" => self.context.token_budget = parse_usize(raw, 4000)? as usize,
@@ -710,6 +933,15 @@ impl RdshSettings {
             "context.max_code_hits" => self.context.max_code_hits = parse_usize(raw, 20)? as usize,
             "context.max_sessions" => self.context.max_sessions = parse_usize(raw, 0)? as usize,
             "context.include_git_diff" => self.context.include_git_diff = parse_bool(raw)?,
+            k if k.starts_with("features.") => {
+                let id = &k["features.".len()..];
+                if feature_def(id).is_none() {
+                    anyhow::bail!("unknown feature id: {id} (try: rdsh features)");
+                }
+                self.features
+                    .values
+                    .insert(id.to_string(), parse_bool(raw)?);
+            }
             _ => return Err(bad()),
         }
         self.sanitize();
@@ -735,11 +967,15 @@ impl RdshSettings {
                 | "setup"
                 | "beta"
                 | "extras"
+                | "features"
                 | "context"
                 | "all"
                 | ""
         );
-        if !known_section && RdshSettings::default().get_dotted(&key).is_none() {
+        let known_feature = key
+            .strip_prefix("features.")
+            .is_some_and(|id| feature_def(id).is_some());
+        if !known_section && !known_feature && RdshSettings::default().get_dotted(&key).is_none() {
             return Err(anyhow::anyhow!(
                 "unknown settings key: {key} (try: rdsh settings keys)"
             ));
@@ -759,8 +995,17 @@ impl RdshSettings {
             "setup" => self.setup = d.setup,
             "beta" => self.beta = d.beta,
             "extras" => self.extras = d.extras,
+            "features" => self.features = d.features,
             "context" => self.context = d.context,
             "all" | "" => *self = d,
+            k if k.starts_with("features.") => {
+                // Feature switches have no default entry: unset removes the key.
+                let id = &k["features.".len()..];
+                if feature_def(id).is_none() {
+                    anyhow::bail!("unknown feature id: {id} (try: rdsh features)");
+                }
+                self.features.values.remove(id);
+            }
             _ => {
                 // 単項目は既定節から写す
                 self.set_dotted_fallback(&key, &d)?;
@@ -832,6 +1077,36 @@ impl RdshSettings {
             "context.include_git_diff(bool)",
         ]
     }
+
+    /// feature スイッチのキー一覧（help用）。
+    pub fn feature_keys() -> Vec<String> {
+        FEATURES
+            .iter()
+            .map(|f| {
+                format!(
+                    "features.{}(bool, default {})",
+                    f.id,
+                    if f.default { "ON" } else { "OFF" }
+                )
+            })
+            .collect()
+    }
+
+    /// 全 feature の実効値（`rdsh features --json` 用）。
+    pub fn feature_state(cfg: &RdshSettings) -> Vec<serde_json::Value> {
+        FEATURES
+            .iter()
+            .map(|f| {
+                serde_json::json!({
+                    "id": f.id,
+                    "enabled": feature_enabled(cfg, f.id),
+                    "default": f.default,
+                    "explicit": feature_is_explicit(cfg, f.id),
+                    "summary": f.summary,
+                })
+            })
+            .collect()
+    }
 }
 
 // ---- legacy (旧 rdsh-context.json: 読み取り専用) ----
@@ -858,7 +1133,7 @@ fn complement_from_legacy(cfg: &mut RdshSettings, has_context: bool) {
         return;
     }
     let c = &mut cfg.context;
-    let budget = clamp_u64(num(&v, "token_budget"), 4000, 500, 200000) as usize;
+    let budget = clamp_u64(num(&v, "token_budget"), 4000, 500, 200_000) as usize;
     if c.token_budget == ContextSection::default().token_budget && budget != c.token_budget {
         c.token_budget = budget;
     }
@@ -870,6 +1145,9 @@ fn complement_from_legacy(cfg: &mut RdshSettings, has_context: bool) {
     }
     if c.enable_verifier && !flag(&v, "enable_verifier", true) {
         c.enable_verifier = false;
+    }
+    if c.include_git_diff && !flag(&v, "include_git_diff", true) {
+        c.include_git_diff = false;
     }
     if c.goal.is_empty() {
         c.goal = text(&v, "goal", GOAL_CHARS);
@@ -962,6 +1240,16 @@ fn parse_bool(raw: &str) -> anyhow::Result<bool> {
     }
 }
 
+fn parse_u16(raw: &str, key: &str) -> anyhow::Result<u16> {
+    let value = parse_usize(raw, 0)?;
+    u16::try_from(value).map_err(|_| anyhow::anyhow!("{key} is out of range for u16: {raw}"))
+}
+
+fn parse_u32(raw: &str, key: &str) -> anyhow::Result<u32> {
+    let value = parse_usize(raw, 0)?;
+    u32::try_from(value).map_err(|_| anyhow::anyhow!("{key} is out of range for u32: {raw}"))
+}
+
 fn parse_usize(raw: &str, _fallback: u64) -> anyhow::Result<u64> {
     let s = raw.trim();
     if let Ok(v) = serde_json::from_str::<serde_json::Value>(s) {
@@ -1042,13 +1330,14 @@ mod rdsh_config_tests {
         static M: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
         M.get_or_init(|| std::sync::Mutex::new(()))
             .lock()
-            .unwrap_or_else(|e| e.into_inner())
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
     /// DSH_HOME を一時 dir に向けて f を実行する（復元・後片付けつき）。
     fn with_home(tag: &str, f: impl FnOnce(&str)) {
         let _guard = lock();
-        let dir = std::env::temp_dir().join(format!("rdsh-settings-{}-{tag}", std::process::id()));
+        let pid = std::process::id();
+        let dir = std::env::temp_dir().join(format!("rdsh-settings-{pid}-{tag}"));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let prev = std::env::var("DSH_HOME").ok();
@@ -1175,7 +1464,7 @@ mod rdsh_config_tests {
             std::fs::write(
                 &p,
                 serde_json::json!({
-                    "tokens": { "default_budget": 9999999 },
+                    "tokens": { "default_budget": 9_999_999 },
                     "compact": { "max_tokens": 1 },
                     "context": { "token_budget": 10 },
                     "search": { "max": 500, "web_limit": 0 },
@@ -1189,7 +1478,7 @@ mod rdsh_config_tests {
             )
             .unwrap();
             let c = load();
-            assert_eq!(c.tokens.default_budget, 200000);
+            assert_eq!(c.tokens.default_budget, 200_000);
             assert_eq!(c.compact.max_tokens, 500);
             assert_eq!(c.context.token_budget, 500);
             assert_eq!(c.search.max, 100);
@@ -1265,6 +1554,39 @@ mod rdsh_config_tests {
     }
 
     #[test]
+    fn concurrent_settings_transactions_keep_both_updates() {
+        with_home("concurrent-rmw", |_| {
+            let barrier = std::sync::Arc::new(std::sync::Barrier::new(3));
+            let mut joins = Vec::new();
+            for update_passthrough in [true, false] {
+                let barrier = std::sync::Arc::clone(&barrier);
+                joins.push(std::thread::spawn(move || {
+                    barrier.wait();
+                    update(|cfg| {
+                        // Hold the transaction open so a competing process
+                        // reaches the same read-modify-write window.
+                        std::thread::sleep(std::time::Duration::from_millis(100));
+                        if update_passthrough {
+                            cfg.general.passthrough = true;
+                        } else {
+                            cfg.general.dry_run = true;
+                        }
+                        Ok(())
+                    })
+                    .unwrap();
+                }));
+            }
+            barrier.wait();
+            for join in joins {
+                join.join().unwrap();
+            }
+            let saved = try_load().unwrap();
+            assert!(saved.general.passthrough);
+            assert!(saved.general.dry_run);
+        });
+    }
+
+    #[test]
     fn explicit_working_files_override_legacy_alias() {
         for (context, expected) in [
             (
@@ -1309,6 +1631,7 @@ mod rdsh_config_tests {
                     "goal": "旧ファイルのgoal",
                     "files": ["src/tokens.rs"],
                     "open_tasks": ["packing評価"],
+                    "include_git_diff": false,
                 })
                 .to_string(),
             )
@@ -1321,6 +1644,8 @@ mod rdsh_config_tests {
             assert_eq!(c.context.goal, "旧ファイルのgoal");
             assert_eq!(c.context.working_files, vec!["src/tokens.rs".to_string()]);
             assert_eq!(c.context.open_tasks, vec!["packing評価".to_string()]);
+            // 旧ファイルの opt-out を無言で無視しない（既定 true のときだけ補完する）。
+            assert!(!c.context.include_git_diff);
             assert!(!std::path::Path::new(&settings_path()).exists());
 
             std::fs::write(
@@ -1361,6 +1686,13 @@ mod rdsh_config_tests {
         c.set_dotted("context.working_files", "src/a.rs, src/b.rs")
             .unwrap();
         assert_eq!(c.context.working_files.len(), 2);
+        // 旧別名 context.files は set が受理するので get でも解決できること
+        // （解決しないと main.rs の読み戻しが失敗し、保存済みなのに exit 1 になる）。
+        c.set_dotted("context.files", "src/c.rs").unwrap();
+        assert_eq!(
+            c.get_dotted("context.files").unwrap(),
+            serde_json::json!(["src/c.rs"])
+        );
         c.set_dotted("serve.port", "38080").unwrap();
         assert_eq!(c.serve.port, 38080);
         assert!(c.set_dotted("unknown.key", "1").is_err());
@@ -1375,5 +1707,36 @@ mod rdsh_config_tests {
         c.reset_dotted("all").unwrap();
         assert_eq!(c, RdshSettings::default());
         assert!(c.reset_dotted("unknown.key").is_err());
+    }
+
+    #[test]
+    fn feature_enabled_precedence_and_defaults() {
+        let mut c = RdshSettings::default();
+        // 既定値: discord は既定 on、sound は既定 off、未知 id は false。
+        assert!(feature_enabled(&c, "discord"));
+        assert!(!feature_enabled(&c, "sound"));
+        assert!(!feature_enabled(&c, "no-such-feature"));
+        assert!(!feature_is_explicit(&c, "discord"));
+
+        // features.<id> が未記載なら旧キーを見る。
+        c.discord.enabled = false;
+        assert!(!feature_enabled(&c, "discord"));
+        c.extras.enable = vec!["search-web".to_string()];
+        assert!(feature_enabled(&c, "search-web"));
+        c.beta.context_engine = true;
+        assert!(feature_enabled(&c, "context_engine"));
+        assert_eq!(enabled_extras(&c), vec!["search-web".to_string()]);
+
+        // 明示 features.<id> が最優先で、旧キーを上書きする。
+        c.features.values.insert("discord".to_string(), true);
+        c.features.values.insert("search-web".to_string(), false);
+        c.features
+            .values
+            .insert("context_engine".to_string(), false);
+        assert!(feature_enabled(&c, "discord"));
+        assert!(feature_is_explicit(&c, "discord"));
+        assert!(!feature_enabled(&c, "search-web"));
+        assert!(!feature_enabled(&c, "context_engine"));
+        assert!(enabled_extras(&c).is_empty());
     }
 }

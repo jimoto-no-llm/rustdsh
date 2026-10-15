@@ -120,6 +120,21 @@ export class AnswerApplicationServer {
   }
   async register(input) {
     replyKeys(input, ["run_id", "session_id", "owner_id"]);
+    replyCheck(
+      typeof input.owner_id === "string" &&
+        /^owner_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(
+          input.owner_id,
+        ),
+      "Invalid registered owner ID",
+      400,
+    );
+    replyCheck(
+      typeof input.session_id === "string" &&
+        input.session_id.trim().length > 0 &&
+        input.session_id.length <= 256,
+      "Invalid native session ID",
+      400,
+    );
     const ledger = await SessionLedger.open(this.project),
       record = await ledger.resolve(input.run_id);
     replyCheck(

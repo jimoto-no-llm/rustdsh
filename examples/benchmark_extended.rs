@@ -565,21 +565,30 @@ fn http_case(bin: &Path, s: &Sandbox, n: usize) -> Result<Value> {
     let stderr = server.0.stderr.take().unwrap();
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
+        let mut url = None;
+        let mut handoff = None;
         for line in BufReader::new(stderr).lines().map_while(Result::ok) {
-            if let Some(url) = line
+            if let Some(value) = line
                 .split_whitespace()
                 .find(|x| x.starts_with("http://127.0.0.1:"))
             {
-                let _ = tx.send(url.to_owned());
+                url = Some(value.to_owned());
+            }
+            if let Some(value) = line.strip_prefix("[rdsh] token handoff file: ") {
+                handoff = Some(PathBuf::from(value));
+            }
+            if let Some(url) = &url {
+                // Older baseline binaries put the key in the URL; current
+                // servers keep it only in their protected handoff file.
+                if url.contains("/#key=") || handoff.is_some() {
+                    let _ = tx.send((url.clone(), handoff));
+                    break;
+                }
             }
         }
     });
-    let url = rx.recv_timeout(Duration::from_secs(15))?;
-    let (port, token) = url
-        .trim_start_matches("http://127.0.0.1:")
-        .split_once("/#key=")
-        .ok_or_else(|| anyhow!("invalid readiness URL"))?;
-    let port: u16 = port.parse()?;
+    let (url, handoff) = rx.recv_timeout(Duration::from_secs(15))?;
+    let (port, token) = http_auth(&url, handoff.as_deref())?;
     let mut report = serde_json::Map::new();
     let text = "a".repeat(40960);
     for (name, method, route, body) in [
@@ -634,6 +643,26 @@ fn http_case(bin: &Path, s: &Sandbox, n: usize) -> Result<Value> {
     Ok(
         json!({"timing":"TCP connect + HTTP response, persistent Rust server, no browser rendering","cases":report}),
     )
+}
+
+fn http_auth(url: &str, handoff: Option<&Path>) -> Result<(u16, String)> {
+    let address = url
+        .strip_prefix("http://127.0.0.1:")
+        .ok_or_else(|| anyhow!("invalid readiness URL"))?;
+    let (port, token) = if let Some((port, token)) = address.split_once("/#key=") {
+        (port, token.to_owned())
+    } else {
+        let port = address
+            .strip_suffix('/')
+            .ok_or_else(|| anyhow!("invalid readiness URL"))?;
+        let token = fs::read_to_string(handoff.context("missing token handoff file")?)?;
+        (port, token.trim().to_owned())
+    };
+    if token.is_empty() || !token.bytes().all(|b| b.is_ascii_hexdigit()) {
+        bail!("invalid HTTP benchmark token");
+    }
+    let port: u16 = port.parse()?;
+    Ok((port, token))
 }
 
 fn delegation_case(bin: &Path, original: &Path, s: &Sandbox, n: usize) -> Result<Value> {
@@ -881,6 +910,23 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn http_benchmark_uses_the_protected_token_handoff() {
+        let tmp = TempDir::new().unwrap();
+        let handoff = tmp.path().join("token.txt");
+        fs::write(&handoff, "abcdef0123456789\n").unwrap();
+        assert_eq!(
+            http_auth("http://127.0.0.1:1234/", Some(&handoff)).unwrap(),
+            (1234, "abcdef0123456789".into())
+        );
+        assert!(http_auth("http://127.0.0.1:1234/", None).is_err());
+        fs::write(&handoff, "abc\r\nInjected: header").unwrap();
+        assert!(http_auth("http://127.0.0.1:1234/", Some(&handoff)).is_err());
+        assert_eq!(
+            http_auth("http://127.0.0.1:1234/#key=abcd", None).unwrap(),
+            (1234, "abcd".into())
+        );
+    }
     #[test]
     fn p95_uses_nearest_rank_and_keeps_last_sample() {
         assert_eq!(percentile(&[1., 2., 3., 4., 5.], 0.95), 5.);

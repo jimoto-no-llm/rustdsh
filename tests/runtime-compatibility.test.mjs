@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
-import {mkdtempSync, mkdirSync, writeFileSync, copyFileSync, rmSync, symlinkSync, realpathSync} from 'node:fs';
+import {mkdtempSync, mkdirSync, writeFileSync, readFileSync, copyFileSync, rmSync, symlinkSync, realpathSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -63,6 +63,26 @@ test('metadata delegation uses the selected DSH tree interpreter, resolves alias
   const standalone=path.join(root,'standalone.js');copyFileSync(entry,standalone);check(standalone,systemNode);
 });
 
+test('sync --check-only never launches post-update regression', {skip:process.platform==='win32'?'sync-dsh.sh is Unix-only':false},t=>{
+  const {root,home,env}=fixture(t);
+  const repo=path.join(root,'repo'), packages=path.join(root,'packages');
+  mkdirSync(path.join(repo,'target','release'),{recursive:true});
+  mkdirSync(path.join(repo,'tests'));
+  const packageDir=path.join(packages,'@deepseek-ai','dsh');mkdirSync(packageDir,{recursive:true});
+  writeFileSync(path.join(packageDir,'package.json'),JSON.stringify({version:'1.0.0'}));
+  copyFileSync('sync-dsh.sh',path.join(repo,'sync-dsh.sh'));
+  writeFileSync(path.join(repo,'target','release','rdsh'),'#!/bin/sh\nexit 0\n',{mode:0o700});
+  writeFileSync(path.join(repo,'tests','regress.sh'),'#!/bin/sh\nexit 91\n',{mode:0o700});
+  const npm=path.join(root,'npm');
+  writeFileSync(npm,'#!/bin/sh\ncase "$1" in root) printf "%s\\n" "$FIXTURE_PACKAGE_ROOT" ;; view) printf \'["1.0.0","2.0.0"]\\n\' ;; *) exit 91 ;; esac\n',{mode:0o700});
+  mkdirSync(path.join(home,'.local','bin'),{recursive:true});
+  symlinkSync(process.execPath,path.join(home,'.local','bin','node'));
+  const result=spawnSync('sh',[path.join(repo,'sync-dsh.sh'),'--check-only','--channel=any'],{env:{...env,NPM_BIN:npm,FIXTURE_PACKAGE_ROOT:packages},encoding:'utf8',timeout:15000});
+  assert.equal(result.status,0,result.stderr);
+  assert.match(result.stdout,/dsh update available: 2\.0\.0/);
+  assert.doesNotMatch(result.stdout,/post-update regress/);
+});
+
 test('sync --check-only follows SemVer precedence and never upgrades to a lower version', {skip:process.platform==='win32'?'sync-dsh.sh is Unix-only':false},t=>{
   const {root,home,env}=fixture(t);
   const pkgRoot=path.join(root,'packages'), pkg=path.join(pkgRoot,'@deepseek-ai','dsh');
@@ -114,4 +134,37 @@ test('sync --check-only follows SemVer precedence and never upgrades to a lower 
   const invalidChannel=spawnSync('sh',['sync-dsh.sh','--check-only','--channel=typo'],{env,encoding:'utf8',timeout:15000});
   assert.equal(invalidChannel.status,2,invalidChannel.stdout+invalidChannel.stderr);
   assert.match(invalidChannel.stderr,/unsupported channel/);
+});
+
+test('sync update state JSON safely encodes version output', {skip:process.platform==='win32'?'sync-dsh.sh is Unix-only':false},t=>{
+  const {root}=fixture(t);
+  const stateDir=path.join(root,'state');mkdirSync(stateDir);
+  const source=readFileSync('sync-dsh.sh','utf8');
+  const start=source.indexOf('write_state() {');
+  const end=source.indexOf('\nFROM_SOURCE=',start);
+  assert.ok(start>=0&&end>start,'write_state function is present');
+  const writeState=source.slice(start,end).trimEnd();
+  const from='0.2.0","injected":true,"value":"';
+  const to='rdsh 0.1.0\n{"updated":false}';
+  const env={...process.env,LOGDIR:stateDir,KIND:'rdsh-release',FROM:from,TO:to};
+  const vulnerable=spawnSync('sh',['-c',`printf '{"updated":true,"kind":"%s","from":"%s","to":"%s","at":%s}\\n' "$KIND" "$FROM" "$TO" "$(date +%s)000"`],{
+    env,encoding:'utf8',timeout:15000,
+  });
+  assert.equal(vulnerable.status,0,vulnerable.stderr);
+  assert.match(vulnerable.stdout,/"injected":true/);
+  assert.throws(()=>JSON.parse(vulnerable.stdout),SyntaxError);
+  const result=spawnSync('sh',['-c',`${writeState}\nwrite_state "$KIND" "$FROM" "$TO"`],{
+    env,
+    encoding:'utf8',timeout:15000,
+  });
+  assert.equal(result.status,0,result.stderr);
+  const contents=readFileSync(path.join(stateDir,'update-state.json'),'utf8');
+  const state=JSON.parse(contents);
+  assert.equal(contents.trimEnd().split('\n').length,1);
+  assert.equal(state.updated,true);
+  assert.equal(state.kind,'rdsh-release');
+  assert.equal(state.from,from);
+  assert.equal(state.to,to);
+  assert.equal(state.injected,undefined);
+  assert.equal(typeof state.at,'number');
 });

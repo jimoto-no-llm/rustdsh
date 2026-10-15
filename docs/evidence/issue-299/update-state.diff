@@ -1,0 +1,13 @@
+Fixture input:
+  from=0.2.0","injected":true,"value":"
+  to=rdsh 0.1.0\n{"updated":false}
+
+Before (captured from the previous printf format; invalid JSON):
+{"updated":true,"kind":"rdsh-release","from":"0.2.0","injected":true,"value":"","to":"rdsh 0.1.0
+{"updated":false}","at":1791667028000}
+
+After (captured from write_state; valid one-line JSON):
+{"updated":true,"kind":"rdsh-release","from":"0.2.0\",\"injected\":true,\"value\":\"","to":"rdsh 0.1.0\n{\"updated\":false}","at":1791667029000}
+
+The after output parses as one object; `from` and `to` round-trip exactly,
+and the injected top-level `injected` field is absent.

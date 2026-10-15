@@ -63,6 +63,14 @@ Project 画面の QR 鍵はブラウザー専用です。画面は鍵を URL fra
 中継時には Harness 側へ渡しません。同じホスト上の別ポートにも Harness Cookie
 が届くため、そのホスト上で信頼できない Web サービスを開かないでください。
 
+プロジェクト画面では、Dashboard と同じ host・OS view から見える別terminalの
+CLI process をPIDで読取専用登録できます。表示するのはprocessの生存状態と、登録時の
+開始識別子・所有者が続いているかだけです。コマンドライン、環境変数、会話、ログは
+読みません。観測解除やDashboard再起動で外部processへsignalを送りません。登録情報は
+Dashboardのproject別状態ディレクトリにある `observed-cli.json` に保持し、所有者はOSの
+UID/SIDそのものではなくscope付きSHA-256 fingerprintで保存します。Dashboardを別hostやPID namespaceから起動した
+場合、同じPIDを同じprocessとは扱わず、識別できない状態にします。
+
 This optional Node.js component is separate from the Rust launcher's `rdsh serve`
 status page. It does not replace the original Harness agent loop.
 
@@ -116,6 +124,8 @@ policy; machine/user policy is not changed and enforced Group Policy still appli
 Opening a browser passes its authenticated URL to the Windows URL handler, as the
 existing `open` command does. Other processes with the same OS-user access can
 observe that short-lived command line; the tray helper itself receives no URL/key.
+PowerShell 7 is resolved from PATH and the URL handler from the Windows system
+directory; an executable placed in the project or working directory is never used.
 Re-run the installer after upgrading to refresh an older launcher.
 Installation uses the lockfile's native prebuilts without package lifecycle
 scripts and verifies that Koffi loads before writing the launchers. An unavailable
@@ -182,6 +192,12 @@ configuration after a restart, because the bearer key rotates.
 | `dashboard_get_state`      | Read this project's current state            |
 
 Example tool arguments:
+
+Optional [outcome cards and fixed milestone criteria](../docs/TASK-OUTCOMES.md)
+add purpose, ownership, latest outcome and next step to these tasks. Inspect
+existing acceptance evidence from each card; reported `done`, partial checks and
+operator reports never substitute for current full-check evidence. Task splits
+do not change a milestone's declared criterion list.
 
 ```json
 {
@@ -301,6 +317,11 @@ Reference strings and sources are displayed as text, never opened or executed.
 
 Artifact references are displayed as text. Local file contents are never opened
 or served. Treat all user-authored questions, answers, progress, and paths as data.
+
+The opt-in [local integration queue](../docs/INTEGRATION-QUEUE.md) applies fixed
+worker commits in order to a dedicated worktree and requires current full-check
+evidence before the next integration. Only explicit local CLI actions execute
+Git/checks; queue registration and dashboard/MCP reads grant no push authority.
 
 ## OpenAI ChatGPT Dots and MCP Events
 

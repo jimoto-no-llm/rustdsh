@@ -1,0 +1,25 @@
+{
+  "name": "rdsh-mobile-ui",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Phone-width layout for the DSH Web chat (rdsh mobile UI)",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": []
+    }
+  },
+  "meta": {
+    "title": "rdsh スマホUI",
+    "description": "スマホ幅（767px以下）でチャットと入力欄を全幅にし、ロゴ1タップでセッション一覧を開きます。Smart-DSH（MIT）のモバイル表示を元にしています。"
+  }
+}
