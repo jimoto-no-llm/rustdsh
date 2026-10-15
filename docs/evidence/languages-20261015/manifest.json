@@ -1,10 +1,10 @@
 {
-  "scope": "public evidence payload; excludes this manifest itself",
+  "scope": "All payload files in this dated evidence directory; manifest excludes itself. Source-bound historical receipts remain historical.",
   "files": [
     {
       "path": "README.md",
-      "bytes": 14347,
-      "sha256": "9599fa3c272d628b71a9fb5cd3c307e8df4bd5324a88b3501bb44a4f8f3476e1"
+      "bytes": 17863,
+      "sha256": "419bc0caf30518c63d318ca956376d67713be3f8616284e4c6329038a8635762"
     },
     {
       "path": "before-desktop.png",
@@ -97,6 +97,11 @@
       "sha256": "1e867062e43b88d4938634f1b99fcce7a1b2cb30afd232457efbdce1e615db17"
     },
     {
+      "path": "headless-required-cleanup.json",
+      "bytes": 9674,
+      "sha256": "d73278babac92e81a1e8d23caa378aac3e46014908837bfe09cde7a4eb6e5507"
+    },
+    {
       "path": "input-records.json",
       "bytes": 3183,
       "sha256": "42491ee0e58b8177a3b60284586526b9f07b5c2c9dd67e2bd013afb6910a8eee"
@@ -118,8 +123,8 @@
     },
     {
       "path": "known-exceptions.json",
-      "bytes": 5198,
-      "sha256": "7d98452cafdb0fdfe554f4f7a76dcb006c1cd60e41a10f37e703e3333b7e1053"
+      "bytes": 6628,
+      "sha256": "5b77cf951776d634521355e9bd7896b4c94e2bda84178b2c2bfba7ef3758198a"
     },
     {
       "path": "linux-cc019-native.json",
@@ -128,7 +133,7 @@
     },
     {
       "path": "linux-cc019-source.json",
-      "bytes": 123411,
+      "bytes": 164018,
       "sha256": "4b30f7a73d854a9dd6a97df4bb24d4abd9aa0a52d2943bf647757c21c51ce2b2"
     },
     {
@@ -138,7 +143,7 @@
     },
     {
       "path": "linux-dashboard-before-repair-source.json",
-      "bytes": 119220,
+      "bytes": 158725,
       "sha256": "84cbc1348204a1b6e72c99f153150ee3e64f9c7f1203e189f1082932e3f2b62a"
     },
     {
@@ -148,13 +153,28 @@
     },
     {
       "path": "linux-dashboard-repaired-source.json",
-      "bytes": 120164,
+      "bytes": 159783,
       "sha256": "0651dd9f3b60ba3c2cf57fbf32f19ebae164fac7899dcbb777e5efa997ae7fc5"
     },
     {
       "path": "linux-dashboard-repaired.json",
       "bytes": 95980,
       "sha256": "8f0c105d5af1fd485c12e31be26ceb37bfa7db10622a2f0a4b841476f5038b6e"
+    },
+    {
+      "path": "linux-guarded-dependencies.json",
+      "bytes": 2392,
+      "sha256": "0bcb31991f9cee0e7fc8fedc270c9efc56a11db6c9b7c14323e9998ae3a367dc"
+    },
+    {
+      "path": "linux-guarded-launcher.json",
+      "bytes": 16481,
+      "sha256": "8faf7acc481a1e647304fd8a0167a402c9317b25dbadd2719199742e87bbf183"
+    },
+    {
+      "path": "macos-main29-validation.json",
+      "bytes": 4868,
+      "sha256": "2c0574b5d360d8fd3c0f4a7f4471960fb9dcaf8dbe61898e8d3133999fdff88a"
     },
     {
       "path": "macos-native.json",
@@ -242,6 +262,31 @@
       "sha256": "8bf886e2d0a73e47b47b6fe64a5ba1faafe5a84c1f8adbb93365b6ce2aacf9f3"
     },
     {
+      "path": "performance-main29-basic.json",
+      "bytes": 8046,
+      "sha256": "f78d932a34c286242a6e8eef6292b6a71751ef19ed7bee987e8c01f473a2d776"
+    },
+    {
+      "path": "performance-main29-execution.json",
+      "bytes": 1132,
+      "sha256": "032af9fb1939594b0f0c40faa3d747d87c69599f5262c7d8fa7366ca63ee11be"
+    },
+    {
+      "path": "performance-main29-extended.json",
+      "bytes": 15998,
+      "sha256": "ca776aedae1ea6ae5d7444dc4f5dfb645ddc9c44bcac2a1c8132e5ea95ac886a"
+    },
+    {
+      "path": "performance-main29-regression.json",
+      "bytes": 5908,
+      "sha256": "cd0e2e976d29b092afec092c58995f4e936ac31f2716e9574543470bbb79a996"
+    },
+    {
+      "path": "performance-main29-summary.json",
+      "bytes": 2378,
+      "sha256": "fe7768acda2441228e81b23354b35a4a10235861f72429d113f5c4f7b509c6b1"
+    },
+    {
       "path": "performance-repeat-load.json",
       "bytes": 501,
       "sha256": "0e186eeff8eda08e0a57551096284327dd899d663cc8e5e19feabe6c8b21a5c9"
@@ -258,13 +303,18 @@
     },
     {
       "path": "performance.md",
-      "bytes": 5749,
-      "sha256": "0eb7a52f3987af490b06eb783928b9358b604f6801eac1cc75b899c1ecc7e0e3"
+      "bytes": 6875,
+      "sha256": "4e809067d40a028e1e8864f8a007486a1b5b7182a83134a2987b018c161bf995"
     },
     {
       "path": "platform-ledger.md",
       "bytes": 20912,
       "sha256": "c00063e87e9be75b419c125c5e29a9e430f2fd01cb6a1077120cbda72151d4f8"
+    },
+    {
+      "path": "plugins-exact-matrix-owner.json",
+      "bytes": 29363,
+      "sha256": "b60630470ba878b8c7341db265885e0f520e00bbce97844da66c3bb29199928f"
     },
     {
       "path": "plugins.json",
@@ -385,6 +435,16 @@
       "path": "windows-native.json",
       "bytes": 2388,
       "sha256": "f7e96b19baa30d438f4abd57ab971a73ccbcdb65fc86597c06c37ac48f706be0"
+    },
+    {
+      "path": "windows-private-request-focused.json",
+      "bytes": 6367,
+      "sha256": "5b69f9017b1ab29dd624a51280876e4462d05e85496bebb94a037b1688990546"
+    },
+    {
+      "path": "windows-product-cost-ledger.json",
+      "bytes": 26353,
+      "sha256": "0e16e9e87fdd3090fb6c0a433143fb8c388ea645483917a405f51f36587028dc"
     },
     {
       "path": "zh-CN-desktop.png",

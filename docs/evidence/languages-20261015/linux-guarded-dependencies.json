@@ -1,0 +1,83 @@
+{
+  "releases": [
+    {
+      "requested": "0.2.0-rc.2",
+      "versions": {
+        "dsh": "0.2.0-rc.2",
+        "dsh-tools": "0.2.0-rc.2",
+        "dsh-llm": "0.2.0-rc.2",
+        "dsh-llm-pi-ai": "0.2.0-rc.2",
+        "dsh-subprocess-local": "0.2.0-rc.2"
+      },
+      "lockSha256": "96d13fb6ce6bfb2ae9061680a76ba92bb5d7eba045e0d851eb62eb31408bdcfc",
+      "lifecycleScripts": false,
+      "modelRequests": 0,
+      "paidRequests": 0
+    },
+    {
+      "requested": "0.2.1-alpha.1",
+      "versions": {
+        "dsh": "0.2.1-alpha.1",
+        "dsh-tools": "0.2.1-alpha.1",
+        "dsh-llm": "0.2.1-alpha.1",
+        "dsh-llm-pi-ai": "0.2.1-alpha.1",
+        "dsh-subprocess-local": "0.2.1-alpha.1"
+      },
+      "lockSha256": "4cc96f4109837d55b1e49ae9be3c603a735f5a346d73c9ea6482a22ef141e2cb",
+      "lifecycleScripts": false,
+      "modelRequests": 0,
+      "paidRequests": 0
+    },
+    {
+      "requested": "0.2.1-alpha.3",
+      "versions": {
+        "dsh": "0.2.1-alpha.3",
+        "dsh-tools": "0.2.1-alpha.3",
+        "dsh-llm": "0.2.1-alpha.3",
+        "dsh-llm-pi-ai": "0.2.1-alpha.3",
+        "dsh-subprocess-local": "0.2.1-alpha.3"
+      },
+      "lockSha256": "0880998d68936e3f7785b517dbfab1c0e537870aa2792ea4e90e8fdb03c10a19",
+      "lifecycleScripts": false,
+      "modelRequests": 0,
+      "paidRequests": 0
+    }
+  ],
+  "repoSourceCopied": false,
+  "cargoBuildStarted": false,
+  "existingServicesChanged": false,
+  "modelRequests": 0,
+  "paidRequests": 0,
+  "platform": {
+    "platform": "Linux",
+    "architecture": "x86_64",
+    "kernel": "6.18.33.2-microsoft-standard-WSL2",
+    "uid": 1000,
+    "node": {
+      "exitCode": 0,
+      "stdout": "v24.16.0",
+      "stderr": ""
+    },
+    "npm": {
+      "exitCode": 0,
+      "stdout": "11.13.0",
+      "stderr": ""
+    },
+    "bwrap": "/usr/bin/bwrap",
+    "prlimit": "/usr/bin/prlimit",
+    "userns": {
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "cgroupControllers": "cpuset cpu io memory hugetlb pids rdma",
+    "userManagerDelegate": {
+      "exitCode": 0,
+      "stdout": "yes",
+      "stderr": ""
+    }
+  },
+  "archiveSha256": "ee501859b1528ca4273ce3939bda060e235ebe1086d6be5748c74a875d751d56",
+  "status": "three exact official dependency installations prepared; no launch/build performed",
+  "nativeKernelAcceptance": "pending final root source freeze and actual Rust launcher matrix"
+}

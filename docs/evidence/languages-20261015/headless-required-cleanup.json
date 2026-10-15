@@ -1,0 +1,168 @@
+{
+  "format": "rdsh-headless-required-cleanup-verification-v1",
+  "date": "2026-10-15",
+  "status": "passed",
+  "sourceFreezeManifest": {
+    "sha256": "526ad46b009bf060e9e5ea669f4c8425531852abd9e5a92986cea8add98e6b51",
+    "files": 47,
+    "unchangedAfterVerification": true,
+    "mismatches": []
+  },
+  "sourceHashes": {
+    "plugins/rdsh-session-cleanup/README.md": "7cddc664130f46ed34a8334db78c3c6f2fbec6df8ceaafc2138b365fb0ca2cb7",
+    "plugins/rdsh-session-cleanup/cleanup.mjs": "1835d550305d785b79d77bf251e058c50231f212c62a70f0532c0b9a5118e53c",
+    "plugins/rdsh-session-cleanup/cordis.patch.yml": "ed09535c9fafb9363f6122b66f0453a73058e85d187eb19a0164f0d749c9da0d",
+    "plugins/rdsh-session-cleanup/diagnostics.mjs": "0e738ca0d7546215afbb094df7d45c29b7fe74519088de695dd0a4a3a5f4b24c",
+    "plugins/rdsh-session-cleanup/index.js": "2b267891e0dcb14d362b3c8a92526334644bfa3b42adb3f1cf6f38c0a6e604b4",
+    "plugins/rdsh-session-cleanup/package.json": "85f24945142bb64a9d990363ca0c4185848c61a5d5f816ba724eac9184ae986b",
+    "plugins/rdsh-session-cleanup/test/cleanup.test.mjs": "d09b34cd917ff4082ae1d19275d64492a13098098cecef1be6cf522a69b0a838",
+    "plugins/rdsh-session-cleanup/test/locale.test.mjs": "57d3f89c74fb843cca6264d414da40e3ba982b4cbdb7b2bd81cc6e5b1a42400b",
+    "scripts/headless-runtime/build-candidate.mjs": "ad65a0db9d1c4f1c58614f128222c6d04aea9703201d920ea22b8c4518045ef5",
+    "scripts/headless-runtime/runtime/plugins/rdsh-session-cleanup/cleanup.mjs": "1835d550305d785b79d77bf251e058c50231f212c62a70f0532c0b9a5118e53c",
+    "scripts/headless-runtime/runtime/plugins/rdsh-session-cleanup/cordis.patch.yml": "ed09535c9fafb9363f6122b66f0453a73058e85d187eb19a0164f0d749c9da0d",
+    "scripts/headless-runtime/runtime/plugins/rdsh-session-cleanup/diagnostics.mjs": "0e738ca0d7546215afbb094df7d45c29b7fe74519088de695dd0a4a3a5f4b24c",
+    "scripts/headless-runtime/runtime/plugins/rdsh-session-cleanup/index.js": "2b267891e0dcb14d362b3c8a92526334644bfa3b42adb3f1cf6f38c0a6e604b4",
+    "scripts/headless-runtime/runtime/plugins/rdsh-session-cleanup/package.json": "85f24945142bb64a9d990363ca0c4185848c61a5d5f816ba724eac9184ae986b",
+    "scripts/headless-runtime/test/actual-dsh-profile-boot.test.mjs": "39de8c55531ad0094825d0da339c6adb99a7b75b8a4a4d96504698dddc993e2f",
+    "scripts/headless-runtime/test/plugin-snapshot.test.mjs": "d36d8f088fc7a90698b59bea7350e92ed856a6c4bc30249320b29487af947a07"
+  },
+  "immutableCandidate": {
+    "builtWith": "canonical updated offline builder into a new private root",
+    "packages": {
+      "@deepseek-ai/dsh": "0.2.0-rc.2",
+      "@deepseek-ai/dsh-llm-pi-ai": "0.2.0-rc.2",
+      "@earendil-works/pi-ai": "0.87.1",
+      "ws": "8.22.0"
+    },
+    "unchangedPinnedPatchSourceHashes": {
+      "dshLlmPiAi": "d46dbc30aeb3414190000e6f8aeaaf994246b5e5c651de07639f4a7e92de37ef",
+      "sessionResources": "9228618eeaebc6b5a1746d28d1859b1e23f0f65e978dc9f6e20eb29d65b17e2a",
+      "codexResponses": "6e69310d77278231cfc87d7f03ee815d4a0f2ff273e6c43fcee6835e7df2b0c7"
+    },
+    "tree": {
+      "sha256": "9d2e49e5b9e528418652b177ef8591e2cc208e9ea734a75adb23ba99961ff4d4",
+      "files": 26664,
+      "directories": 3386,
+      "links": 13
+    },
+    "runtimePluginHashes": {
+      "cleanup.mjs": "1835d550305d785b79d77bf251e058c50231f212c62a70f0532c0b9a5118e53c",
+      "cordis.patch.yml": "ed09535c9fafb9363f6122b66f0453a73058e85d187eb19a0164f0d749c9da0d",
+      "diagnostics.mjs": "0e738ca0d7546215afbb094df7d45c29b7fe74519088de695dd0a4a3a5f4b24c",
+      "index.js": "2b267891e0dcb14d362b3c8a92526334644bfa3b42adb3f1cf6f38c0a6e604b4",
+      "package.json": "85f24945142bb64a9d990363ca0c4185848c61a5d5f816ba724eac9184ae986b"
+    },
+    "runtimeCopies": "canonical, bundled snapshot, immutable source plugin and installed file dependency all exact",
+    "readyService": "rdshSessionCleanupReady",
+    "requiredConsumer": "headless-runner",
+    "applicationLoopChanged": false
+  },
+  "checks": [
+    {
+      "log": "headless-ready-owner-tests.log",
+      "sha256": "46af3d2d341135f2fa33ec0c9cf2d86c231241507a249ec9461024bbd56d39bc",
+      "counts": {
+        "tests": 22,
+        "pass": 22,
+        "fail": 0,
+        "skipped": 0
+      },
+      "names": [
+        "terminal disposal awaits one exact owned cleanup despite duplicate events",
+        "profile teardown cleans only remaining owned sessions",
+        "non-headless profiles install no listeners or cleanup",
+        "module activation in non-headless profiles does not import or require a patched SDK",
+        "synchronous and asynchronous owned cleanup failures remain observed through teardown",
+        "headless rejects a missing asynchronous completion API with localized diagnostics and unchanged code",
+        "failed candidate construction removes its uniquely-owned staging directory",
+        "candidate hash changes when a file or directory mode changes and records symlinks without following them",
+        "exit proof accepts drained event loops and rejects forced exit 0",
+        "standard runtime-style peer completes a graceful close without termination",
+        "opt-in node-ws peer that does not acknowledge close is terminated once and settles under two seconds",
+        "noncached peer is closed directly and never creates a retention timer",
+        "exact cleanup barriers await cached and noncached owned peers without touching another session",
+        "an early rejected silent close remains observable to the exact-session barrier",
+        "a rejecting close waits for another owned close and remains visible to later barriers",
+        "standard cached fallback retains the upstream debug_close reason",
+        "fork selects node ws only when the provider opts in and preserves the runtime constructor path",
+        "fork patch refuses an unexpected pi-ai source shape",
+        "offline fork writes the awaitable public SDK module and the owned-close helper",
+        "offline fork rejects a source hash mismatch before it writes",
+        "adapter fork accepts node-ws only as an explicit provider field",
+        "candidate plugin snapshot exactly matches the canonical cleanup plugin"
+      ]
+    },
+    {
+      "log": "headless-ready-actual-product-overlay-tests.log",
+      "sha256": "76846830e73dea022624ee2875f06fd81ff5214775171ba10f3a53d07c2a4bdf",
+      "counts": {
+        "tests": 10,
+        "pass": 10,
+        "fail": 0,
+        "skipped": 0
+      },
+      "names": [
+        "actual headless boot mounts ready cleanup and closes only its created agent session (en)",
+        "actual headless boot mounts ready cleanup and closes only its created agent session (zh-CN)",
+        "actual headless boot mounts ready cleanup and closes only its created agent session (ja)",
+        "actual headless CLI propagates node-ws through streamSimple and naturally exits after a local Codex WebSocket completion",
+        "actual required headless runner refuses a missing asynchronous cleanup API before a provider request (en)",
+        "actual required headless runner refuses a missing asynchronous cleanup API before a provider request (ja)",
+        "actual required headless runner refuses a missing asynchronous cleanup API before a provider request (zh-CN)",
+        "actual patched acquire keeps cached busy, keep-false, and abort sockets behind the exact-session barrier",
+        "actual standard WebSocket non-ACK stays silent and legacy sync-only cleanup has no unhandled rejection",
+        "candidate node-pty prebuild starts and joins a credential-free local PTY command"
+      ]
+    }
+  ],
+  "localization": {
+    "positiveOwnedCleanup": [
+      "en",
+      "zh-CN",
+      "ja"
+    ],
+    "missingAsyncMandatoryRefusal": [
+      "en",
+      "zh-CN",
+      "ja"
+    ],
+    "originalCleanupFailureCodeAndAggregateErrors": [
+      "en",
+      "zh-CN",
+      "ja"
+    ]
+  },
+  "negativeControls": [
+    {
+      "mutation": "remove required-runner inject only in private projection",
+      "expected": "same Japanese actual CLI refusal test must fail",
+      "actualExitCode": 1,
+      "reason": "without mandatory dependency, startup did not refuse before the existing 10s watchdog",
+      "logSha256": "09c01c65103eaa52e65a7763ddd7c0d6c547127c48752c620625315871c0ffdf"
+    },
+    {
+      "mutation": "omit diagnostics.mjs only from private copied snapshot",
+      "expected": "snapshot gate must fail",
+      "actualExitCode": 1,
+      "reason": "ENOENT for runtime snapshot diagnostics.mjs; other canonical/runtime files match",
+      "logSha256": "0b863506d2f4676d2d948aed974303950244d4831495d4c5c90d646455800a1f"
+    }
+  ],
+  "execution": {
+    "paidRequests": 0,
+    "externalProviderRequests": 0,
+    "realModelInference": 0,
+    "successfulLoopbackWebSocketModelFixtureTurns": 1,
+    "negativeRefusalProviderCanaryRequests": 0,
+    "invalidControlProviderTraffic": "restricted to private loopback; the failure log does not report request count",
+    "nativeSystem": "macOS arm64 Node24.21.0, real local WebSocket disposal and local node-pty child",
+    "modelFixture": "scripted local Codex WebSocket completion, no real service/account",
+    "existingInstalledAppsChanged": false,
+    "existingRuntimeCandidatesChanged": false
+  },
+  "limits": [
+    "This receipt verifies the explicit supported patched rc.2 headless runtime, not unmodified alpha.3/pi-ai1.1 asynchronous cleanup.",
+    "An optional plugin activation refusal alone does not imply whole-profile refusal; the shipped required-ready dependency supplies the fatal startup check.",
+    "Cleanup failure propagation is owner-local unit coverage; actual-profile tests cover successful awaited cleanup and missing-API startup refusal."
+  ]
+}

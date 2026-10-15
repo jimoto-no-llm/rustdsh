@@ -1,0 +1,57 @@
+[
+  {
+    "name": "basic",
+    "command": [
+      "python3",
+      "scripts/benchmark.py",
+      "--bin",
+      "<candidate-rdsh>",
+      "--baseline",
+      "<baseline-rdsh>",
+      "--n",
+      "15",
+      "--output",
+      "<evidence>/performance-main29-basic.json"
+    ],
+    "exit": 0,
+    "seconds": 2.6632421016693115,
+    "load_before": [
+      14.58056640625,
+      11.44970703125,
+      11.54296875
+    ],
+    "load_after": [
+      14.05322265625,
+      11.39208984375,
+      11.52197265625
+    ],
+    "owned_mac_builds_and_tests_quiescent": true
+  },
+  {
+    "name": "extended",
+    "command": [
+      "target/release/examples/benchmark_extended",
+      "--bin",
+      "<candidate-rdsh>",
+      "--baseline",
+      "<baseline-rdsh>",
+      "--n",
+      "15",
+      "--output",
+      "<evidence>/performance-main29-extended.json"
+    ],
+    "exit": 0,
+    "seconds": 8.131478071212769,
+    "load_before": [
+      14.05322265625,
+      11.39208984375,
+      11.52197265625
+    ],
+    "load_after": [
+      14.76953125,
+      11.58447265625,
+      11.5888671875
+    ],
+    "owned_mac_builds_and_tests_quiescent": true
+  }
+]

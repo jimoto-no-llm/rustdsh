@@ -1,0 +1,770 @@
+{
+  "format": "rdsh-exact-plugin-compatibility-final-owner-verification-v1",
+  "date": "2026-10-15",
+  "status": "owner compatibility/profile checks passed; separate mandatory security guard acceptance pending",
+  "scope": {
+    "distributions": 10,
+    "loadable": 9,
+    "actualAlpha3PluginLoads": 9,
+    "formalProfileRuns": 8,
+    "legacySourcePatchDistributions": 1
+  },
+  "releaseMatrix": {
+    "mcp": {
+      "coherentDshPeers": [
+        "0.2.0-rc.2",
+        "0.2.1-alpha.3"
+      ],
+      "mixedPeers": "rejected before registration/connection",
+      "unknownFutureMissing": "rejected before registration/connection",
+      "rc2Modes": [
+        "native",
+        "ptc",
+        "both"
+      ],
+      "alpha3Modes": [
+        "native",
+        "ptc"
+      ],
+      "alpha3Both": "rejected by original schema",
+      "schemastery": "3.18.5-alpha.2 validated with both runtime releases"
+    },
+    "muse": {
+      "dshLlmPeers": [
+        "0.2.1-alpha.1",
+        "0.2.1-alpha.3"
+      ],
+      "sdk": "1.4.8",
+      "signedCli": "1.4.8-R6256.1",
+      "readOnlyCatalog": "zero-row bundledCatalog without auth/model turn on both runtime releases",
+      "newImageTargetApi": "alpha.3 only, absent on alpha.1"
+    }
+  },
+  "profiles": [
+    {
+      "name": "mcp-matrix-final-native",
+      "harnessVersion": "0.2.1-alpha.3",
+      "result": {
+        "status": "passed",
+        "mode": "native",
+        "helpers": 3,
+        "directToolRegistered": true,
+        "hiddenToolAbsent": true,
+        "presentation": "native",
+        "modelRequests": 0
+      },
+      "exit": {
+        "code": 0,
+        "signal": null
+      },
+      "modelRequests": 0,
+      "mcp": {
+        "listRequests": 1,
+        "toolCalls": 0
+      },
+      "canaryRequests": [],
+      "evidenceHashes": {
+        "-report.private.json": "9055c676f8ebca6d065e8a44b962a2992a439548de3c364e0b2d99049cd71203",
+        "-controller.private.json": "543a57c56d73ebf860c2f5e743ab44928295df0932e7d0a0856b700c5a6665f0"
+      }
+    },
+    {
+      "name": "mcp-matrix-final-ptc",
+      "harnessVersion": "0.2.1-alpha.3",
+      "result": {
+        "status": "passed",
+        "mode": "ptc",
+        "helpers": 3,
+        "directToolRegistered": true,
+        "hiddenToolAbsent": true,
+        "presentation": "ptc",
+        "modelRequests": 0
+      },
+      "exit": {
+        "code": 0,
+        "signal": null
+      },
+      "modelRequests": 0,
+      "mcp": {
+        "listRequests": 1,
+        "toolCalls": 0
+      },
+      "canaryRequests": [],
+      "evidenceHashes": {
+        "-report.private.json": "a0ac9934faaeffa62b94861aeb638d22d3feeacd8f44f40741fa7920b43eff23",
+        "-controller.private.json": "543a57c56d73ebf860c2f5e743ab44928295df0932e7d0a0856b700c5a6665f0"
+      }
+    },
+    {
+      "name": "mcp-matrix-final-rc2-profile-native",
+      "harnessVersion": "0.2.0-rc.2",
+      "result": {
+        "status": "passed",
+        "mode": "native",
+        "helpers": 3,
+        "directToolRegistered": true,
+        "hiddenToolAbsent": true,
+        "presentation": "native",
+        "modelRequests": 0
+      },
+      "exit": {
+        "code": 0,
+        "signal": null
+      },
+      "modelRequests": 0,
+      "mcp": {
+        "listRequests": 1,
+        "toolCalls": 0
+      },
+      "canaryRequests": [],
+      "evidenceHashes": {
+        "-report.private.json": "9055c676f8ebca6d065e8a44b962a2992a439548de3c364e0b2d99049cd71203",
+        "-controller.private.json": "543a57c56d73ebf860c2f5e743ab44928295df0932e7d0a0856b700c5a6665f0"
+      }
+    },
+    {
+      "name": "mcp-matrix-final-rc2-profile-ptc",
+      "harnessVersion": "0.2.0-rc.2",
+      "result": {
+        "status": "passed",
+        "mode": "ptc",
+        "helpers": 3,
+        "directToolRegistered": true,
+        "hiddenToolAbsent": true,
+        "presentation": "ptc",
+        "modelRequests": 0
+      },
+      "exit": {
+        "code": 0,
+        "signal": null
+      },
+      "modelRequests": 0,
+      "mcp": {
+        "listRequests": 1,
+        "toolCalls": 0
+      },
+      "canaryRequests": [],
+      "evidenceHashes": {
+        "-report.private.json": "a0ac9934faaeffa62b94861aeb638d22d3feeacd8f44f40741fa7920b43eff23",
+        "-controller.private.json": "543a57c56d73ebf860c2f5e743ab44928295df0932e7d0a0856b700c5a6665f0"
+      }
+    },
+    {
+      "name": "mcp-matrix-final-rc2-profile-both",
+      "harnessVersion": "0.2.0-rc.2",
+      "result": {
+        "status": "passed",
+        "mode": "both",
+        "helpers": 3,
+        "directToolRegistered": true,
+        "hiddenToolAbsent": true,
+        "presentation": "both",
+        "modelRequests": 0
+      },
+      "exit": {
+        "code": 0,
+        "signal": null
+      },
+      "modelRequests": 0,
+      "mcp": {
+        "listRequests": 1,
+        "toolCalls": 0
+      },
+      "canaryRequests": [],
+      "evidenceHashes": {
+        "-report.private.json": "20ee800401992f369b7bd131edfa61ddd166d5f4a3ef1196f6319c6921f70000",
+        "-controller.private.json": "543a57c56d73ebf860c2f5e743ab44928295df0932e7d0a0856b700c5a6665f0"
+      }
+    },
+    {
+      "name": "muse-matrix-final",
+      "harnessVersion": "0.2.1-alpha.3",
+      "result": {
+        "status": "passed",
+        "providers": [
+          {
+            "id": "muse-code",
+            "name": "Muse Code · 定額契約"
+          },
+          {
+            "id": "muse-code-contributor",
+            "name": "Muse Code · Contributor（学習利用）"
+          }
+        ],
+        "models": [],
+        "imageRequestTarget": {
+          "width": 121,
+          "height": 83,
+          "maxBytes": 321
+        },
+        "modelRequests": 0
+      },
+      "exit": {
+        "code": 0,
+        "signal": null
+      },
+      "modelRequests": 0,
+      "mcp": null,
+      "canaryRequests": [],
+      "evidenceHashes": {
+        "-report.private.json": "d4f0e7d0974d39e000336b9067d981866b44f3d421e68e893d20d61960ba5bf2",
+        "-controller.private.json": "3c8d639a6cae1437dca4ae20de4513fe8b6fff69aecf7d4768bef644968da7b1"
+      }
+    },
+    {
+      "name": "muse-matrix-final-alpha1-profile",
+      "harnessVersion": "0.2.1-alpha.1",
+      "result": {
+        "status": "passed",
+        "providers": [
+          {
+            "id": "muse-code",
+            "name": "Muse Code · 定額契約"
+          },
+          {
+            "id": "muse-code-contributor",
+            "name": "Muse Code · Contributor（学習利用）"
+          }
+        ],
+        "models": [],
+        "baseVersion": "0.2.1-alpha.1",
+        "imageRequestTarget": "absent in this released API",
+        "modelRequests": 0
+      },
+      "exit": {
+        "code": 0,
+        "signal": null
+      },
+      "modelRequests": 0,
+      "mcp": null,
+      "canaryRequests": [],
+      "evidenceHashes": {
+        "-report.private.json": "afa3ad1e7ccab9785929775257c986ef322cd930d48101bf7c3af64ee407f149",
+        "-controller.private.json": "3c8d639a6cae1437dca4ae20de4513fe8b6fff69aecf7d4768bef644968da7b1"
+      }
+    },
+    {
+      "name": "remaining-profile-matrix-final",
+      "harnessVersion": "0.2.1-alpha.3",
+      "result": {
+        "status": "passed",
+        "plugins": [
+          {
+            "name": "rdsh-budget-guard",
+            "enabled": true,
+            "fiberPhase": "active",
+            "meta": null
+          },
+          {
+            "name": "rdsh-compute",
+            "enabled": true,
+            "fiberPhase": "active",
+            "meta": null
+          },
+          {
+            "name": "rdsh-mobile-ui",
+            "enabled": true,
+            "fiberPhase": "active",
+            "meta": null
+          },
+          {
+            "name": "rdsh-release-probe",
+            "enabled": true,
+            "fiberPhase": "active",
+            "meta": null
+          },
+          {
+            "name": "rdsh-session-cleanup",
+            "enabled": true,
+            "fiberPhase": "active",
+            "meta": null
+          },
+          {
+            "name": "rdsh-settings",
+            "enabled": true,
+            "fiberPhase": "active",
+            "meta": null
+          },
+          {
+            "name": "rdsh-update-banner",
+            "enabled": true,
+            "fiberPhase": "active",
+            "meta": null
+          }
+        ],
+        "computeService": true,
+        "computeOptIn": false,
+        "callbacks": {
+          "budgetReady": 1,
+          "releaseReady": 1,
+          "modelRequests": 0
+        },
+        "discordPresenceEnabled": false,
+        "modelRequests": 0
+      },
+      "exit": {
+        "code": 0,
+        "signal": null
+      },
+      "modelRequests": 0,
+      "mcp": null,
+      "canaryRequests": [
+        {
+          "method": "POST",
+          "url": "/api/budget/producer/ready"
+        },
+        {
+          "method": "POST",
+          "url": "/ready"
+        },
+        {
+          "method": "GET",
+          "url": "/probe/status"
+        }
+      ],
+      "evidenceHashes": {
+        "-report.private.json": "312afa883fdd1f5addfea20c3ff0a6bbb1b217883b9e7bd8d3e67100879b826b",
+        "-controller.private.json": "39ad52822f28e461184c5c7ba15f9ba834a28b02d3db22b6440d65b8cf86af91"
+      }
+    }
+  ],
+  "sourceHashes": {
+    "rdsh-session-cleanup": [
+      {
+        "file": "README.md",
+        "sha256": "7cddc664130f46ed34a8334db78c3c6f2fbec6df8ceaafc2138b365fb0ca2cb7"
+      },
+      {
+        "file": "cleanup.mjs",
+        "sha256": "1835d550305d785b79d77bf251e058c50231f212c62a70f0532c0b9a5118e53c"
+      },
+      {
+        "file": "cordis.patch.yml",
+        "sha256": "ed09535c9fafb9363f6122b66f0453a73058e85d187eb19a0164f0d749c9da0d"
+      },
+      {
+        "file": "diagnostics.mjs",
+        "sha256": "0e738ca0d7546215afbb094df7d45c29b7fe74519088de695dd0a4a3a5f4b24c"
+      },
+      {
+        "file": "index.js",
+        "sha256": "2b267891e0dcb14d362b3c8a92526334644bfa3b42adb3f1cf6f38c0a6e604b4"
+      },
+      {
+        "file": "package.json",
+        "sha256": "85f24945142bb64a9d990363ca0c4185848c61a5d5f816ba724eac9184ae986b"
+      },
+      {
+        "file": "test/cleanup.test.mjs",
+        "sha256": "d09b34cd917ff4082ae1d19275d64492a13098098cecef1be6cf522a69b0a838"
+      },
+      {
+        "file": "test/locale.test.mjs",
+        "sha256": "57d3f89c74fb843cca6264d414da40e3ba982b4cbdb7b2bd81cc6e5b1a42400b"
+      }
+    ],
+    "rdsh-compute": [
+      {
+        "file": "README.md",
+        "sha256": "344e68eff8b5bd9db9827b98236a0beff34b308313dce8e06e5077041d5c7a87"
+      },
+      {
+        "file": "cordis.patch.yml",
+        "sha256": "8852ad44aa518402eec622b4a024e9141605ff04347fd02ee2f251997d0d8e78"
+      },
+      {
+        "file": "index.js",
+        "sha256": "619f8a1038d94269d31e4a5d600963b1ff0d46b72273961d30dacaa4266d4d3f"
+      },
+      {
+        "file": "package-lock.json",
+        "sha256": "6828ab408e1bdae414bbad9951d5e7a15c1b178facd42f36f6456cc3f1438f48"
+      },
+      {
+        "file": "package.json",
+        "sha256": "7d29bf98e03fc8a09e55a36fcfb821cfb140b20a744a2d837334e1502ee3879f"
+      },
+      {
+        "file": "test/bridge.test.mjs",
+        "sha256": "dafe062a93b9289a4d60ab9f9d9d3fc8e83d7b4050d31e737e7b9403abaff795"
+      },
+      {
+        "file": "test/cordis-sdk.test.mjs",
+        "sha256": "d6cc44d15b5e377599e7324800edcf8fbc2cd7fede53ecacd0bdbd06336b527e"
+      },
+      {
+        "file": "test/resolve.test.mjs",
+        "sha256": "0170bd0ece6dc1dd4dae26880f335d61bd34572906a88ebfb0838175ac49936e"
+      }
+    ],
+    "rdsh-release-probe": {
+      "index.js": "533bbc5c864132f71c0240a5327a70659b843c17b63d584445a4201dd01b4e7f",
+      "package.json": "c0b13e0dc7af41b24ddce0f1de7609416f139c402d5c71eeaa992b80727fad54"
+    },
+    "rdsh-settings": [
+      {
+        "file": "README.md",
+        "sha256": "226f5ba277fc39fcc61159d3a4d379b3d67ad82c06586bb249eeef4e9e91de3e"
+      },
+      {
+        "file": "assets/rushDSH.png",
+        "sha256": "ad3e5003f51188335d5e54b0fa2b636ca37089cfd0d83fb715ef461f17656726"
+      },
+      {
+        "file": "client.js",
+        "sha256": "188ab117523164effdaa4ae7c143f5ccbe2c9d6ffd6934c7e41c29e5b82a5b29"
+      },
+      {
+        "file": "cordis.patch.yml",
+        "sha256": "a911267d82741ab646547021b3ae8c3541ba00b20b409e931ce45def2f66c7b0"
+      },
+      {
+        "file": "discord-wsl.ps1",
+        "sha256": "9bd52c8f18e706618b61ec362d9bc8c29f5d2215ee1ceb10bd03d72d39182c8c"
+      },
+      {
+        "file": "discord.js",
+        "sha256": "2fb1834a13eb2fad76cc668e89a83e31a6491aefcfcd38efea2cfec533de1620"
+      },
+      {
+        "file": "index.js",
+        "sha256": "29cdf1c8e28ee349f8a1fa713c0b50b3c4d36ccb8359439d5d9dac4336e54f4f"
+      },
+      {
+        "file": "package.json",
+        "sha256": "55ea4b5134e3028c425197521d7241f6fcd8240a17e0fe9f9069def6be5a2289"
+      }
+    ],
+    "rdsh-mobile-ui": {
+      "README.md": "42172157f65f86d330271b86fc9d77d9c36558d163fdb94cd12ab02571114bf0",
+      "THIRD_PARTY_NOTICES.md": "2b06c3b2070a6ee72ad0ffe4d470ed3f005b7358e85d4777e727a7b60b25da27",
+      "client.js": "f9918ba9c6306036b2cde1dc005d44b32435bbd9e2463e662b4726c827e7ee0b",
+      "cordis.patch.yml": "9dc67d6b035b10a47a4100cc8da30d8fe36e27c598bddaaa8e5ca468deed8087",
+      "index.js": "df561b5223d2ece253e5671d9f751737935f39a7d3f5ef933109f84dc41571a4",
+      "package.json": "96ab0ae1373a4dc9ad4101223a23ab58ad0757b388dea208eb262c843661f662"
+    },
+    "rdsh-update-banner": {
+      "README.md": "a19ff3d0bfe424534b6b09a85b71a0ba7106ee3946a495d186930acc3b46ae11",
+      "client.js": "65d2b106d1faca750d4eb7c79f59f1b000665b85c55c70eda5af42e115b88e0a",
+      "cordis.patch.yml": "15a322e327fb57582411896b556a4ed6f80045bb12841b5c1324c20ffbe7026b",
+      "index.js": "f45f61f46bbad96a8a3c20d5dd1844a2cf72e819058040812692fa9475bf0ba7",
+      "package.json": "1d8959d361bc94b38a684380fcd267432bd65be28bdf4d4697a94c13904d0cc1"
+    },
+    "rdsh-budget-guard": {
+      "cordis.patch.yml": "0ab160ee98067bd8003ce8a78fd710c75ee570e53d1c9f3c336217c3792c8233",
+      "index.js": "f2054e43ac4db80d366eb798bd8eea36596b860aa117088eddaf55922d7312d7",
+      "package.json": "34e97fc809b75e44bbf789768255856ee1f2d8c51b46f166786c038658d36063"
+    },
+    "rdsh-mcp-exposure": [
+      {
+        "file": "README.md",
+        "sha256": "445d86db2c58dc3025b7591ca51c43e13e9083d7148e6a739eb4ab78aa64f754"
+      },
+      {
+        "file": "benchmark.mjs",
+        "sha256": "59adb71482e6b9de251b1f7abefe5280412d157c11cb9308e946a54a299d6d4f"
+      },
+      {
+        "file": "compatibility.js",
+        "sha256": "8f0f82c72be35c16bd1a83434b93da04557624e824761535d9a55f644480df4e"
+      },
+      {
+        "file": "cordis.patch.yml",
+        "sha256": "311a2c2ac4691e2786c2e50b5ba083f02d058c6bb0dcc563e2db8cf225c45166"
+      },
+      {
+        "file": "diagnostics.js",
+        "sha256": "9d06eabd8481fdbf48267c8759aff74a2c1fd412153b1709b6f91d6969c9a0ee"
+      },
+      {
+        "file": "discovery.js",
+        "sha256": "b178c83b42268060b5a09737795c8129d7ac17cbc5eb4f090b80cc9d3d7aa54f"
+      },
+      {
+        "file": "index.js",
+        "sha256": "95b895f583e874f6dd00ca849965cee79389256245f432959465ddde52d44491"
+      },
+      {
+        "file": "package-lock.json",
+        "sha256": "fd3793e40eb0af1dd328473000ab56fe1f9ffccde1e4847a7026969a6e7f44c6"
+      },
+      {
+        "file": "package.json",
+        "sha256": "2111e5c41a8925437d01008be84446ca220b58f1739583610d2c55d5bb550251"
+      },
+      {
+        "file": "policy.js",
+        "sha256": "b73d7ba06437919013781f0345da4a448b1c44e35d0ff4e91e3f97614be5b6ab"
+      },
+      {
+        "file": "test/compatibility-locale.test.mjs",
+        "sha256": "010ff77b68986c8e306577526769c18720c65b39eac3b5eca0ff49119beeefbe"
+      },
+      {
+        "file": "test/discovery.test.mjs",
+        "sha256": "f489787c7aadb91ea5332f2ce80204053bdf8cd958bcdb8a2ca4e0abf9baadab"
+      },
+      {
+        "file": "test/fixtures.mjs",
+        "sha256": "3e532629b66be78c743176b6e09b8c8f9a9be1816b5d571480ebaa2b2efd5661"
+      },
+      {
+        "file": "test/guarded-probe.mjs",
+        "sha256": "42ae82fa32d894ba99daf570e5cb88edfaee39ca3eda02d16334edbf7abe1794"
+      },
+      {
+        "file": "test/guarded.test.mjs",
+        "sha256": "2af8f53221a61161a1b33ab185be443115d4b589f063070a923f6f638e88ddcc"
+      },
+      {
+        "file": "test/integration.test.mjs",
+        "sha256": "31a5178b8f7d4189f797f4e911cfc10516ec627ca07f257a3bf8e55b3e431004"
+      },
+      {
+        "file": "test/mcp-fixture.mjs",
+        "sha256": "560bdcedf467dfff1af1faabf632ad09033fba062c4c8e4e7216290a68cab5b6"
+      },
+      {
+        "file": "test/policy.test.mjs",
+        "sha256": "dd3955d982a028afeaa4e6dbca7fb8a618ae88e0621d0136b9ad6ef129f1c4cd"
+      },
+      {
+        "file": "tools.js",
+        "sha256": "67cfb1deb1415d1ff5d3aa80a52e41baefab830b246b44c9abd943f86020ebb6"
+      }
+    ],
+    "rdsh-llm-muse-code-subscription": [
+      {
+        "file": ".gitignore",
+        "sha256": "ca1838cde9e4cfb493f3ea87a08bf973a9d6102aac688fc8828107d5586042aa"
+      },
+      {
+        "file": "README.md",
+        "sha256": "cb3f34a9507d0d9e218242c0c63a5dce1553026f429c65900246b39d482c4e97"
+      },
+      {
+        "file": "index.js",
+        "sha256": "60347bbd6c28dce7767bf4f56988bac499a3482bbfe3de7efef400cadf18f7bf"
+      },
+      {
+        "file": "muse.mjs",
+        "sha256": "ffbfc7665c3449f604b54fff37987a30a70dc1f90382cc6fb45c13e859a679f7"
+      },
+      {
+        "file": "package-lock.json",
+        "sha256": "bc44beee97ea8715f1fff2697a556066dd397fb673d9946b62e18fd22e50e377"
+      },
+      {
+        "file": "package.json",
+        "sha256": "85dc884ce148cbf96fd82910ff194932347cb06fd354b967e5ee4d8a565149d1"
+      },
+      {
+        "file": "protocol.mjs",
+        "sha256": "787d0839d9f56550ba5d2a1be35f187b04418fabc4d5c4b587fcfd9ac090375d"
+      },
+      {
+        "file": "runner.mjs",
+        "sha256": "e1007923f4a51f8cd0ac928a4f698f2400d824319817456a0e93131f76412e72"
+      },
+      {
+        "file": "test/bridge.test.mjs",
+        "sha256": "f791fe4df784c4a0e95d84af9cb7d08d12066c3afe068a9393ef7d40aab97008"
+      },
+      {
+        "file": "test/catalog.mjs",
+        "sha256": "823eed1b47127219a605131d9b2e0cce9a1cd34857bd644ddb63c3ffab6431ac"
+      },
+      {
+        "file": "test/helper.mjs",
+        "sha256": "c9713414ea0d5ebe69f5f6f1b88759d22fb9f3b9a115d85a2820b1f675ad73e2"
+      },
+      {
+        "file": "worker.mjs",
+        "sha256": "930a5e2942cc5c81cc56f0d3ea437bfe48486d4ec063254d14cb8d9b25df05d0"
+      }
+    ]
+  },
+  "ownerUnitChecks": [
+    {
+      "log": "muse-exact-matrix-final-tests.log",
+      "sha256": "3bc6047f07cbdf65ca33f7105addc61d0e6991a796c9a19cae1060485a26e7b1",
+      "counts": {
+        "tests": 28,
+        "pass": 28,
+        "fail": 0,
+        "skipped": 0
+      },
+      "names": [
+        "rejects unsupported input and mode before any child is started",
+        "JSON tool requests are constrained to the current Harness tool list",
+        "removes both API-key variables with Windows case folding and preserves other environment",
+        "optional or malformed usage remains unknown",
+        "inactive, API-key and missing logins never launch the SDK host",
+        "uses an empty temporary workspace, denies native approvals and confirms SDK shutdown",
+        "native tool activity, schema drift and raw SDK errors are rejected",
+        "cancelling a pending SDK iterator closes the owned host and settles without a model terminal",
+        "real helper stdio preserves Japanese, tool calls and optional usage",
+        "helper failure cannot be mistaken for successful completion or leak diagnostics",
+        "user cancellation, timeout and an unresponsive helper all settle",
+        "Harness adapter emits the native text/tool vocabulary and provider registration disposes",
+        "Harness disposal aborts active inference and emits an aborted finish",
+        "disposal does not wait for a UI consumer paused at a buffered answer",
+        "discovers the full CLI catalog without reading credentials or starting a model turn",
+        "the supported Harness base adapter retains its released image metadata API without a model call",
+        "the pinned SDK accepts the released Muse CLI schema and identifies another schema as drift",
+        "catalog discovery rejects schema drift before querying models or reading credentials",
+        "an empty bundled catalog stays empty without inventing account entitlements",
+        "future catalog models work without editing a fixed model allowlist",
+        "absent model ids and model-specific unsupported efforts stop before inference",
+        "Contributor is an explicit per-request mode using the CLI catalog model id",
+        "guard and CLI auth roots match; unrelated authFile overrides cannot authorize a different account",
+        "catalog capabilities stay unknown when undeclared and reject wrong providers or fake catalogs",
+        "picker caches discovery once per mode and uses the CLI context/output/effort metadata",
+        "Muse picker metadata changes with saved language without changing provider, model, response or custom catalog data",
+        "an in-flight Muse catalog retains its requested locale when settings change",
+        "owned Muse failures retain codes and localize catalog and stream diagnostics"
+      ]
+    },
+    {
+      "log": "muse-alpha1-canonical-matrix-tests.log",
+      "sha256": "d33d964d7e0ffc6831a39f9b50539ad5de5409adb4bb5ea7dc51fb69a57f8b93",
+      "counts": {
+        "tests": 28,
+        "pass": 28,
+        "fail": 0,
+        "skipped": 0
+      },
+      "names": [
+        "rejects unsupported input and mode before any child is started",
+        "JSON tool requests are constrained to the current Harness tool list",
+        "removes both API-key variables with Windows case folding and preserves other environment",
+        "optional or malformed usage remains unknown",
+        "inactive, API-key and missing logins never launch the SDK host",
+        "uses an empty temporary workspace, denies native approvals and confirms SDK shutdown",
+        "native tool activity, schema drift and raw SDK errors are rejected",
+        "cancelling a pending SDK iterator closes the owned host and settles without a model terminal",
+        "real helper stdio preserves Japanese, tool calls and optional usage",
+        "helper failure cannot be mistaken for successful completion or leak diagnostics",
+        "user cancellation, timeout and an unresponsive helper all settle",
+        "Harness adapter emits the native text/tool vocabulary and provider registration disposes",
+        "Harness disposal aborts active inference and emits an aborted finish",
+        "disposal does not wait for a UI consumer paused at a buffered answer",
+        "discovers the full CLI catalog without reading credentials or starting a model turn",
+        "the supported Harness base adapter retains its released image metadata API without a model call",
+        "the pinned SDK accepts the released Muse CLI schema and identifies another schema as drift",
+        "catalog discovery rejects schema drift before querying models or reading credentials",
+        "an empty bundled catalog stays empty without inventing account entitlements",
+        "future catalog models work without editing a fixed model allowlist",
+        "absent model ids and model-specific unsupported efforts stop before inference",
+        "Contributor is an explicit per-request mode using the CLI catalog model id",
+        "guard and CLI auth roots match; unrelated authFile overrides cannot authorize a different account",
+        "catalog capabilities stay unknown when undeclared and reject wrong providers or fake catalogs",
+        "picker caches discovery once per mode and uses the CLI context/output/effort metadata",
+        "Muse picker metadata changes with saved language without changing provider, model, response or custom catalog data",
+        "an in-flight Muse catalog retains its requested locale when settings change",
+        "owned Muse failures retain codes and localize catalog and stream diagnostics"
+      ]
+    },
+    {
+      "log": "mcp-rc2-final-frozen-tests.log",
+      "sha256": "d59d63ad333fd3ebc92d754ec1e68448f51222f64f82115842161f01a52674cb",
+      "counts": {
+        "tests": 21,
+        "pass": 21,
+        "fail": 0,
+        "skipped": 0
+      },
+      "names": [
+        "each exact supported release accepts coherent peers and rejects mixed, unknown, future and missing peers",
+        "the installed upstream presentation schema retains its released modes",
+        "saved language localizes owned configuration, runtime and guarded-launcher failures without changing codes",
+        "hidden tools never register, search, bind or execute; direct and deferred use the original pipeline",
+        "overlapping server names guard direct and PTC calls using the registered tool owner",
+        "receipt schema fingerprints retain object and array identity while ignoring object property order",
+        "native receipts survive disk restore and exact forks without sharing a sibling or another project",
+        "original nested PTC dispatch receipts restore branch-local discovery",
+        "withdrawal, schema changes and scope restrictions invalidate receipts; monotonic guards still deny bodies",
+        "paging is stable and stale revisions never return another page; denied loads cannot settle",
+        "agent-local registration metadata never appears to a sibling and native mode stays native",
+        "post-body cancellation and invalid canonical output never activate a deferred declaration",
+        "complete prompts and preexisting SDK budget transformations remain owned by their original providers",
+        "explicit canonical tool order and unrelated declaration positions survive MCP metadata updates",
+        "declaration capacity and caller cancellation are enforced without partial receipts",
+        "original MCP background discovery does not hold the first native prompt; loading preserves wire names and guards",
+        "a direct server waits for original discovery; fully hidden server does not connect",
+        "real MCP list updates invalidate withdrawn schemas and preserve deterministic declaration order",
+        "actual Cordis Config/inject lifecycle releases original MCP tools and leaves unrelated registrations intact",
+        "exact public names override patterns; patterns use their declared order and retain sources",
+        "reject ambiguous config before registering or connecting and keep hidden-only servers dormant"
+      ]
+    },
+    {
+      "log": "mcp-exact-matrix-final-compatibility-test.log",
+      "sha256": "14e1e73d1c2110a8c39b843b389a7f4277a83ccdc2457f77d3c42a6cdab8820b",
+      "counts": {
+        "tests": 3,
+        "pass": 3,
+        "fail": 0,
+        "skipped": 0
+      },
+      "names": [
+        "each exact supported release accepts coherent peers and rejects mixed, unknown, future and missing peers",
+        "the installed upstream presentation schema retains its released modes",
+        "saved language localizes owned configuration, runtime and guarded-launcher failures without changing codes"
+      ]
+    }
+  ],
+  "headless": {
+    "receipt": "headless-required-cleanup-final.publishable.json",
+    "sha256": "d73278babac92e81a1e8d23caa378aac3e46014908837bfe09cde7a4eb6e5507",
+    "supportedRuntime": "explicit patched rc.2 candidate",
+    "latestWeb": "intentional no-op, not headless disposal proof"
+  },
+  "separateLegacySourcePatch": {
+    "receipt": "workflow-board-version-scope.publishable.json",
+    "readOnlyReady": "passed",
+    "actualApply18Blobs": "passed afterward in private exact-base tree",
+    "focusedBoardTests": {
+      "files": 2,
+      "pass": 49,
+      "fail": 0
+    },
+    "boardBundle": "passed",
+    "fullLegacyBuild": "blocked by three untouched host-TypeScript errors; unpatched equivalent baseline still pending valid leaf-dependency install",
+    "countedAsLoadable": false
+  },
+  "pendingSecurityGuard": {
+    "case": "actual mandatory rdsh preload refuses bundle without opening PTC or changing audited Native registrations",
+    "latestCompleteAlpha3McpUnitResult": {
+      "tests": 22,
+      "pass": 21,
+      "fail": 1,
+      "skip": 0
+    },
+    "cause": "strict audited runtime adapter not yet frozen by separate owner",
+    "weakenedOrSkipped": false
+  },
+  "execution": {
+    "modelRequests": 0,
+    "paidRequests": 0,
+    "mcpToolsList": 5,
+    "mcpToolsCall": 0,
+    "providerModelCanaryRequests": 0,
+    "otherLoopbackFixtureCalls": {
+      "budgetReady": 1,
+      "releaseReady": 1,
+      "statusRead": 1
+    },
+    "freshPrivateHomes": true,
+    "loaderVersionExemptions": false,
+    "existingInstalledAppsChanged": false
+  },
+  "limits": [
+    "Mobile frontend rendering, actual compute workers, external Discord IPC and real update installation are outside these backend load checks.",
+    "Bundled zero-row Muse catalog does not establish account entitlement or inference.",
+    "The original guarded launcher intentionally rejects the MCP plugin; its final security acceptance is a separate still-pending check.",
+    "Historical pre-repair failed receipts are preserved and not promoted to pass."
+  ],
+  "originalPortableReceiptSha256": "fc31ed3b82bda58f0288f9a8fd5e72c9830e5e30496956c029da4801375af319",
+  "publicationFormat": "File/hash maps use explicit file and sha256 records with unchanged values."
+}

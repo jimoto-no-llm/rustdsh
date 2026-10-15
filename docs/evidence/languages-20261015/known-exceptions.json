@@ -55,11 +55,12 @@
       "id": "live-muse-runtime-catalog",
       "status": "verified-logged-out-readonly-catalog",
       "scope": "Official signed CLI 1.4.8-R6256.1 plus SDK 1.4.8: exact schema, initialize/model-list/clean shutdown, empty bundledCatalog preserved.",
-      "available_evidence": "Real adapter and signed CLI; 27 plugin tests and old-SDK schema negative control.",
+      "available_evidence": "Exact alpha.1/alpha.3 official profiles, signed CLI/SDK1.4.8 schema, read-only empty catalog and owned plugin checks.",
       "prerequisites": "Authenticated nonempty catalog and real model response remain unverified; no credential read or model request performed.",
       "evidence": [
         "muse-readonly-catalog.json",
-        "muse-feasibility.json"
+        "muse-feasibility.json",
+        "plugins-exact-matrix-owner.json"
       ]
     },
     {
@@ -89,18 +90,19 @@
     {
       "id": "loaded-performance-tail",
       "status": "observed-shared-host-measurement-limit",
-      "scope": "Earlier 8ee/2db loaded streaming-zstd p95 ratio 2.267 is retained. Later cc019 comparison has 13 identical stdout values, median ratios 0.921–1.034 and maximum p95 ratio 1.160. Different baseline/load prevents causal attribution.",
+      "scope": "Earlier 8ee/2db loaded streaming-zstd p95 ratio 2.267 is retained. Later cc019 comparison has 13 identical stdout values, median ratios 0.921–1.034 and maximum p95 ratio 1.160. Different baseline/load prevents causal attribution. Final latest-main29 candidate retains all13 identical stdout values, median ratios0.955–1.068 and maxp95ratio1.375; maintained10% median regression gate passes.",
       "next_gate": "isolated reproducibility and causal attribution before a speedup/regression claim",
       "evidence": [
         "performance.md",
         "performance-summary.json",
-        "performance-cc019-summary.json"
+        "performance-cc019-summary.json",
+        "performance-main29-summary.json"
       ]
     },
     {
       "id": "new-head-ci-review-and-release",
       "status": "separate-gates",
-      "scope": "Source commit 8ee5d7f94f221db6135a9b3a3116707cc0fd4511 passed all 26 GitHub checks. The failed native Windows tray-start job passed an unchanged-SHA failed-job retry; the original failure remains recorded. Later evidence-only commits require their own CI. Human review, merge and release remain separate gates.",
+      "scope": "Source commit 8ee5d7f94f221db6135a9b3a3116707cc0fd4511 passed all 26 GitHub checks. The failed native Windows tray-start job passed an unchanged-SHA failed-job retry; the original failure remains recorded. Later evidence-only commits require their own CI. Human review, merge and release remain separate gates. Latest main29 source is locally verified in macos-main29-validation.json and windows-product-cost-ledger.json; its new-head CI is not inherited from these historical runs.",
       "historical_evidence": "https://github.com/jimoto-no-llm/rustdsh/actions/runs/38675592833/attempts/2"
     },
     {
@@ -110,6 +112,25 @@
       "behavior": "do not attribute the before PNGs to a specific commit without the original capture record",
       "evidence": [
         "captures.json"
+      ]
+    },
+    {
+      "id": "windows-protected-request-product",
+      "status": "verified-at-recorded-source",
+      "scope": "actual native product plus Node bridge en/zh-CN/ja,75outercommands57Rustinvocations30ACLobservations",
+      "evidence": [
+        "windows-private-request-focused.json",
+        "windows-product-cost-ledger.json"
+      ],
+      "limits": "one native Windows x64 administrator-token context and NTFS; no separate standard-account session or other filesystem claim"
+    },
+    {
+      "id": "protected-official-runtime-matrix",
+      "status": "verified-at-recorded-security-source",
+      "scope": "Linuxx86_64 actual Rust launcher/official profile/embedded preload/kernel3versions;32ordinarysecurity22MCP6Rust checks,zero skips",
+      "limits": "Matrix binary predates provider-only main29 integration;8guard/test source hashes matchcurrent. Finalwhole-sourceLinux/CI separate.",
+      "evidence": [
+        "linux-guarded-launcher.json"
       ]
     }
   ]

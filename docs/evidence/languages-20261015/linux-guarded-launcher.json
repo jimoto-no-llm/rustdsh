@@ -1,0 +1,331 @@
+{
+  "scope": "Native Linux x86_64 initial frozen security product source acceptance; final integrated main29 full Rust/dashboard verification is separate",
+  "sourceHead": "7a5ee5f2585990b03b5acb93b8eb76bcd10cf104",
+  "sourcePendingMerge": "cc019b7eb259faa6664009c5c88ff7d4c70462ef",
+  "finalIntegratedHeadForUnchangedSecurityBytes": "ca65dfb2664a5041c7600f28bb9b88ea1f4e4084",
+  "productAndTestSha256": {
+    "src/tool_security.rs": "122025feaa4b535d0028eba657d99524a108d4415d2fc756924b3c7e50adfb7a",
+    "security/preload.mjs": "b2dcebf543049e4fbd03a48e3e97e1522385796d7e7270673af49d72f1d9e87f",
+    "security/tool-isolation.mjs": "ad430851474a09e0229dbbb85adf26b2c8f2e64499c7f4f65b1e2fe492cad185",
+    "security/opencode-session-header.mjs": "ab3302de00f0feb7e6c48f1e3ad8512d5c5599949797cc7701cebbb54c299c38",
+    "tests/guarded-launcher-matrix.test.mjs": "09ef6e73740ebfe8dba7440242adb61fcfe800b4f2b6937200fb5be5c1b1bf3a",
+    "tests/guarded-runtime-probe.mjs": "b2d715ee98f153b1759020da3ed5c7dc6e946267a07edc3dcc128c8a9c1881af",
+    "tests/security-boundaries.test.mjs": "860c6e5864e11f92e276a893a7bc9ea328909406908856ab529871a2e0c8520e",
+    "plugins/rdsh-mcp-exposure/test/guarded.test.mjs": "366651f90ce5d3986d33c7066db4c7438ea3e053d5eecc41a48bda16ceb50ae2"
+  },
+  "binarySha256": "144f410bf2d96de3c32be707734e89de53cf21ca57ff790668e5972106ced3d9",
+  "exactOfficialPackages": {
+    "0.2.0-rc.2": {
+      "dsh": {
+        "version": "0.2.0-rc.2",
+        "manifestSha256": "0a85203e3e907dd2e3bec34324a2494758ca6cdee234b07090a7c8df0b11acac"
+      },
+      "dsh-tools": {
+        "version": "0.2.0-rc.2",
+        "manifestSha256": "fa34d96a62f4b40ee3add8e23dab87e50379781e04faeaceeddd084c258435af"
+      },
+      "dsh-llm": {
+        "version": "0.2.0-rc.2",
+        "manifestSha256": "6fb2d880b26d0c69b792d2830efbb1642f1d849537e24114301e0d9fbe9e8e4e"
+      },
+      "dsh-llm-pi-ai": {
+        "version": "0.2.0-rc.2",
+        "manifestSha256": "202c51795238f9ef8f3d57319bda831973eb91a0eb8661256aa6a75476e6e53f"
+      },
+      "dsh-subprocess-local": {
+        "version": "0.2.0-rc.2",
+        "manifestSha256": "9b47e357ccece5d25dc09a5a549a4c6e362131cabe2f8eebd0ef41769edbfffa"
+      },
+      "dsh/lib/bin.js": {
+        "sha256": "1a03dee18683483ff6a1b27b2a1e650230da6bcca9a0f55f7d81b3308c3f307f"
+      },
+      "dsh-tools/lib/index.js": {
+        "sha256": "40f47709337c3c205d4e09e647f8588f4977e66f6d52f019b3cc7ef81159d84f"
+      }
+    },
+    "0.2.1-alpha.1": {
+      "dsh": {
+        "version": "0.2.1-alpha.1",
+        "manifestSha256": "dbb4a7c1d88c412278fc8baccac7553f6d2310e85f5ffea1470a30106e99c688"
+      },
+      "dsh-tools": {
+        "version": "0.2.1-alpha.1",
+        "manifestSha256": "ce999c619acafd8dea49050553b125f6cb45c610d9bafb1a047a9664c18ba5ee"
+      },
+      "dsh-llm": {
+        "version": "0.2.1-alpha.1",
+        "manifestSha256": "8a116e03c629ba2bbbaad960ad30dcc18f00f4482085e52598ad2f7e355502bc"
+      },
+      "dsh-llm-pi-ai": {
+        "version": "0.2.1-alpha.1",
+        "manifestSha256": "8da3244523a8917fe35889fc031ab87f711d62f30d73aa043908b957f8826c66"
+      },
+      "dsh-subprocess-local": {
+        "version": "0.2.1-alpha.1",
+        "manifestSha256": "283943e8dcac28e07d0d9fc526cfe6e737a7d8c4661f61a204785da8b56e9518"
+      },
+      "dsh/lib/bin.js": {
+        "sha256": "1a03dee18683483ff6a1b27b2a1e650230da6bcca9a0f55f7d81b3308c3f307f"
+      },
+      "dsh-tools/lib/index.js": {
+        "sha256": "2e9b6a72ba6b917197965c08eb894d4e8d01dc6f81e0e1c9870a5ae8514687a7"
+      }
+    },
+    "0.2.1-alpha.3": {
+      "dsh": {
+        "version": "0.2.1-alpha.3",
+        "manifestSha256": "32082cfa0c5121f79af5f69f8aeb9f5f35e40951f63b2abea3dedcb7e351e641"
+      },
+      "dsh-tools": {
+        "version": "0.2.1-alpha.3",
+        "manifestSha256": "b4613e0e9886758cd2778399c381af44f82ea31e21d2c07946447a64e2d3f3c4"
+      },
+      "dsh-llm": {
+        "version": "0.2.1-alpha.3",
+        "manifestSha256": "9abcd3966e663d14af291cb9f74fa22d9bcae8a7e74fee82318eeb24b2db9523"
+      },
+      "dsh-llm-pi-ai": {
+        "version": "0.2.1-alpha.3",
+        "manifestSha256": "a7f35c20e8918887f24716b9c2b430d7f98bdcd8b348575cca4c459a49e077a3"
+      },
+      "dsh-subprocess-local": {
+        "version": "0.2.1-alpha.3",
+        "manifestSha256": "e0839631eba53f743fafd7ee32b1e6c3308f99844095d9239f21a1efc6fa4a5b"
+      },
+      "dsh/lib/bin.js": {
+        "sha256": "80112efe368efb1a39720c7ada0af00442e5131fb2744edaaff8a3e8bb499e6f"
+      },
+      "dsh-tools/lib/index.js": {
+        "sha256": "614e4f50fff440f3f80cbe047148f7ad0ef2807ca27379e57f7e4f57925642cf"
+      }
+    }
+  },
+  "dependencyLockSha256": {
+    "0.2.0-rc.2": "96d13fb6ce6bfb2ae9061680a76ba92bb5d7eba045e0d851eb62eb31408bdcfc",
+    "0.2.1-alpha.1": "4cc96f4109837d55b1e49ae9be3c603a735f5a346d73c9ea6482a22ef141e2cb",
+    "0.2.1-alpha.3": "0880998d68936e3f7785b517dbfab1c0e537870aa2792ea4e90e8fdb03c10a19"
+  },
+  "auditedEnvironment": {
+    "RDSH_GUARDED_MATRIX_REQUIRED": "1",
+    "BIN": "private release binary bound by SHA256",
+    "RDSH_AUDITED_DSH_*": "exact official dsh/lib/bin.js for each of the three releases",
+    "RDSH_AUDITED_RUNTIME_*": "matching exact official dsh-tools/lib/index.js for each release",
+    "HOME": "fresh private QA home",
+    "providerCredentials": "absent"
+  },
+  "host": {
+    "os": "Linux",
+    "arch": "x86_64",
+    "kernel": "6.18.33.2-microsoft-standard-WSL2",
+    "surface": "already-running WSL Ubuntu",
+    "uid": 1000,
+    "node": "24.16.0",
+    "rustc": "1.99.0",
+    "cargo": "1.99.0",
+    "bwrap": true,
+    "prlimit": true,
+    "unprivilegedUserNamespace": "available; unshare --user --map-root-user true exit0"
+  },
+  "acceptance": {
+    "actualRustOfficialProfiles": {
+      "counts": {
+        "tests": 3,
+        "pass": 3,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      "cases": [
+        "Rust launcher enforces the official 0.2.0-rc.2 profile through the kernel",
+        "Rust launcher enforces the official 0.2.1-alpha.1 profile through the kernel",
+        "Rust launcher enforces the official 0.2.1-alpha.3 profile through the kernel"
+      ],
+      "reports": [
+        {
+          "version": "0.2.0-rc.2",
+          "sharedRead": true,
+          "secretsDenied": true,
+          "writesDenied": true,
+          "namespaceDenied": true,
+          "networkDenied": true,
+          "dispatcherGuarded": true
+        },
+        {
+          "version": "0.2.1-alpha.1",
+          "sharedRead": true,
+          "secretsDenied": true,
+          "writesDenied": true,
+          "namespaceDenied": true,
+          "networkDenied": true,
+          "dispatcherGuarded": true
+        },
+        {
+          "version": "0.2.1-alpha.3",
+          "sharedRead": true,
+          "secretsDenied": true,
+          "writesDenied": true,
+          "namespaceDenied": true,
+          "networkDenied": true,
+          "dispatcherGuarded": true
+        }
+      ],
+      "reportEvidence": "Canonical test captures child stdout RDSH_LAUNCHER_KERNEL JSON and asserts exact deepEqual for each report; successful reporter prints case names only, so these are assertion-verified fields, not independently retained raw child stdout."
+    },
+    "ordinarySecurity": {
+      "counts": {
+        "tests": 32,
+        "pass": 32,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      "cases": [
+        "status is truthful with no Desktop app and no profile",
+        "status reports the Desktop command and enabled plugins",
+        "install --dry-run prints the forwarded command and changes nothing",
+        "install forwards to the Desktop command and verify then passes",
+        "install --compute also attaches the compute bridge",
+        "install and verify refuse an uninitialized Desktop profile",
+        "a --plugins-dir without the plugins is skipped for a real checkout",
+        "POSIX stub coverage is skipped on Windows",
+        "custom-route provider builder attaches the OpenCode header by endpoint",
+        "patching is idempotent",
+        "unexpected source shapes are left untouched",
+        "audited preload rejects unknown, modified and cross-version runtimes with localized codes",
+        "audited preload rejects a different known runtime swapped in during loading",
+        "preload refuses a nested tool runtime selected by another importer",
+        "deny hook never supplies an affirmative approval on a miss",
+        "anchored deny cannot be bypassed by hook metadata",
+        "malformed or oversized hook input fails closed",
+        "unsupported runtime is refused without copying external login credentials",
+        "forged tool exports fail before delegated code runs",
+        "agent tools default to normal file access",
+        "context working files cannot read credentials outside the current repository",
+        "native search does not read hard links or symlinks to outside files",
+        "context working files reject in-tree symlinks and hard links to outside files",
+        "context rejects a FIFO without blocking while opening it",
+        "context does not retrieve other projects sessions by default",
+        "automatic updater verifies against the pinned registry, not a same-origin sidecar",
+        "imports require an explicit provider or ref and copy only the selected source",
+        "kernel isolation blocks credentials, network, writes and inherited environment",
+        "unavailable enforcement fails closed and never runs the requested command",
+        "global monotonic guard denies every other tool and a scoped name replacement",
+        "explicit sharing rejects hard links and hidden credentials",
+        "rdsh_inspect declares an OpenAI-compatible function parameter schema"
+      ],
+      "binaryLayout": "Desktop fixture hardcodes target/debug/rdsh; private symlink references the same release binary hash without source changes"
+    },
+    "mcp": {
+      "counts": {
+        "tests": 22,
+        "pass": 22,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      "cases": [
+        "each exact supported release accepts coherent peers and rejects mixed, unknown, future and missing peers",
+        "the installed upstream presentation schema retains its released modes",
+        "saved language localizes owned configuration, runtime and guarded-launcher failures without changing codes",
+        "hidden tools never register, search, bind or execute; direct and deferred use the original pipeline",
+        "overlapping server names guard direct and PTC calls using the registered tool owner",
+        "receipt schema fingerprints retain object and array identity while ignoring object property order",
+        "native receipts survive disk restore and exact forks without sharing a sibling or another project",
+        "original nested PTC dispatch receipts restore branch-local discovery",
+        "withdrawal, schema changes and scope restrictions invalidate receipts; monotonic guards still deny bodies",
+        "paging is stable and stale revisions never return another page; denied loads cannot settle",
+        "agent-local registration metadata never appears to a sibling and native mode stays native",
+        "post-body cancellation and invalid canonical output never activate a deferred declaration",
+        "complete prompts and preexisting SDK budget transformations remain owned by their original providers",
+        "explicit canonical tool order and unrelated declaration positions survive MCP metadata updates",
+        "declaration capacity and caller cancellation are enforced without partial receipts",
+        "the actual mandatory rdsh preload refuses the bundle without opening PTC or changing audited Native registrations",
+        "original MCP background discovery does not hold the first native prompt; loading preserves wire names and guards",
+        "a direct server waits for original discovery; fully hidden server does not connect",
+        "real MCP list updates invalidate withdrawn schemas and preserve deterministic declaration order",
+        "actual Cordis Config/inject lifecycle releases original MCP tools and leaves unrelated registrations intact",
+        "exact public names override patterns; patterns use their declared order and retain sources",
+        "reject ambiguous config before registering or connecting and keep hidden-only servers dormant"
+      ],
+      "guardedProbe": {
+        "guardedNativeRefusedBeforeRegistration": true,
+        "nativeInspectionRetained": true,
+        "runCodeAbsent": true
+      },
+      "scope": "Canonical npm test all22, including mandatory source preload. Actual Rust matrix separately proves the same preload source embedded in built launcher."
+    },
+    "rustSecurity": {
+      "pass": 6,
+      "fail": 0,
+      "ignored": 0,
+      "filter": "tool_security",
+      "scope": "Rust unit tests with exact official all3 runtime paths; full Rust suite separate",
+      "cases": [
+        "tool_security::tests::boundary_is_opt_in",
+        "tool_security::tests::audited_adapter_requires_exact_release_pairs",
+        "tool_security::tests::conditional_exports_cannot_select_an_unpatched_runtime",
+        "tool_security::tests::package_files_cannot_escape_through_symlinks",
+        "tool_security::tests::node_resolution_uses_first_package_and_supports_hoisting",
+        "tool_security::tests::installed_runtime_matrix_builds_protected_commands"
+      ]
+    }
+  },
+  "retainedHistory": [
+    {
+      "log": "actual-launcher-matrix.log",
+      "status": "Interrupted owned fixture after missing explicit --share-file CLI approval; not acceptance"
+    },
+    {
+      "log": "actual-launcher-matrix-share-file.log",
+      "status": "Interrupted when staged result tag assertion was obsolete; not acceptance"
+    },
+    {
+      "log": "diagnostic-launcher-matrix.log",
+      "status": "Failfast diagnostic exposed obsolete expected post-result tag; not acceptance"
+    },
+    {
+      "log": "actual-launcher-matrix-probe-tag.log",
+      "status": "3 failures because full execution frame JSON serialization reached Cordis Context proxy; final test serializes result payload and asserts isError while preserving all guard checks"
+    },
+    {
+      "log": "ordinary-security.log",
+      "status": "Initial private-layout ENOENT because Desktop fixture ignores BIN; corrected private binary path without test changes and rerun32pass"
+    }
+  ],
+  "modelRequests": 0,
+  "paidRequests": 0,
+  "repositoryWrites": 0,
+  "installedAppsModified": false,
+  "sourceByteIdentityAcrossFinalOverlay": {
+    "src/tool_security.rs": true,
+    "security/preload.mjs": true,
+    "security/tool-isolation.mjs": true,
+    "security/opencode-session-header.mjs": true,
+    "tests/guarded-launcher-matrix.test.mjs": true,
+    "tests/guarded-runtime-probe.mjs": true,
+    "tests/security-boundaries.test.mjs": true,
+    "plugins/rdsh-mcp-exposure/test/guarded.test.mjs": true
+  },
+  "cleanup": {
+    "ownedMatrixProfileProcessesRemaining": 0,
+    "ownedTmpMatrixFixturesRemaining": 0,
+    "installedAppsModified": false,
+    "servicesOrDelegationChanged": false,
+    "modelRequests": 0,
+    "paidRequests": 0,
+    "ownedInterruptedMatrixFixturesRemoved": 2,
+    "interruptedFixtureOwnershipBeforeRemoval": "Exact private tmp root, plugin marker/workspace path, and all three dummy file contents verified before removing only those two owned directories"
+  },
+  "evidenceLogSha256": {
+    "ordinary-security-binary-layout.log": "02aada13d2c452ca7d685f07512b8c283f0423932719b342ce6d68cbc514475a",
+    "mcp-full22.log": "4589ba29b92843ef152155545aac7bebeffc3546790feca02283e0b822b4f78c",
+    "mcp-npm-ci.log": "5a8ae2f3cb4367f662255acb5a59d3320d677e449abe84866a822fee99efe2e2",
+    "actual-launcher-matrix.log": "b1df2b2c16f21800bcf1317a3566e2d36d37140100f9e69dd63f85853509f0db",
+    "actual-launcher-matrix-result-payload.log": "fe2a297ac7e8781830c9e732c1cb0b26c173151c247fbc898c21bf014da86385",
+    "rust-security-focused.log": "2a6a747a42734be30e655644141928a4b9b3e1de6187b576ba84a3710026903a",
+    "ordinary-security.log": "a420d7edf382ebfc11afe78be56e63a771e4a67ca9af50a3ece9eaec8dce8c8d",
+    "diagnostic-launcher-matrix.log": "4925fc549774bd1c214b2121ab85e501107a47965036b1c1cbc1d8e29a630296",
+    "actual-launcher-matrix-probe-tag.log": "ee0bd7f287a41f87719f7ec3edfcc5543d73771377c4d1129fec395ac25bfe32",
+    "actual-launcher-matrix-share-file.log": "b1df2b2c16f21800bcf1317a3566e2d36d37140100f9e69dd63f85853509f0db"
+  }
+}

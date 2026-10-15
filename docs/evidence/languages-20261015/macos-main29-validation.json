@@ -1,0 +1,156 @@
+{
+  "scope": "macOS ARM64 final main29 product source validation; platform skips are not passes",
+  "date": "2026-10-15",
+  "source_commit": "ca65dfb2664a5041c7600f28bb9b88ea1f4e4084",
+  "source_files": [
+    {
+      "file": "src/locale.rs",
+      "sha256": "020bdff195f1c50a440bd60b7335b5912da458524d91e53f0ceaa4f399736389"
+    },
+    {
+      "file": "src/providers.rs",
+      "sha256": "0ec194bfc7445a8a4f2a5bdb9047d2461926b686eeac26f717f2bf2280e4017e"
+    },
+    {
+      "file": "src/main.rs",
+      "sha256": "41461b899238bdfc93f6cea405e21243ac21b2186afb29b1c91b2f226eda220e"
+    },
+    {
+      "file": "src/tool_security.rs",
+      "sha256": "122025feaa4b535d0028eba657d99524a108d4415d2fc756924b3c7e50adfb7a"
+    },
+    {
+      "file": "security/preload.mjs",
+      "sha256": "b2dcebf543049e4fbd03a48e3e97e1522385796d7e7270673af49d72f1d9e87f"
+    },
+    {
+      "file": "security/tool-isolation.mjs",
+      "sha256": "ad430851474a09e0229dbbb85adf26b2c8f2e64499c7f4f65b1e2fe492cad185"
+    },
+    {
+      "file": "dashboard/cli.mjs",
+      "sha256": "d07e2964c6e3472d3718f2d158829c8e61d240d27e7e160301ee8465136d7c6b"
+    },
+    {
+      "file": "dashboard/private-json-file.mjs",
+      "sha256": "6a121f1f4ec345112abd133d4511699d978962a3f0d3edda06099b4450e60d10"
+    },
+    {
+      "file": "tests/provider_cli.rs",
+      "sha256": "7c261f4bcc94eb9392ef656043077941542784dadc05041c96f50c78aa9f22bc"
+    },
+    {
+      "file": "tests/security-boundaries.test.mjs",
+      "sha256": "860c6e5864e11f92e276a893a7bc9ea328909406908856ab529871a2e0c8520e"
+    }
+  ],
+  "rust_release": {
+    "targets": 13,
+    "passed": 472,
+    "failed": 0,
+    "ignored": 0,
+    "command": "cargo test --release --locked",
+    "log_sha256": "93160ea69eec7ee743e410a99666b1c3d45b91d00954856ac24e614fae253f13"
+  },
+  "clippy": {
+    "command": "cargo clippy --all-targets --locked -- -D warnings",
+    "exit": 0,
+    "log_sha256": "2f8b29e554fcbeee56cae1bfa4d5121ebda0c32a490912af59db000af4271d8c"
+  },
+  "dashboard": {
+    "command": "npm test --prefix dashboard",
+    "tests": 367,
+    "passed": 270,
+    "skipped": 97,
+    "failed": 0,
+    "skip_scope": "ownership backends unsupported on Darwin and Windows-only cases",
+    "log_sha256": "2a208b3f8fa8d7d57851e04c8ae3fbd6f5924a9c5815efaff5b719362f40de5f"
+  },
+  "focused_runtime_negative": {
+    "command": "node --test --test-name-pattern=audited preload|nested tool runtime|forged tool exports tests/security-boundaries.test.mjs",
+    "tests": 4,
+    "passed": 4,
+    "skipped": 0,
+    "log_sha256": "60f2c44396da008e29d65c7c60082272b2ccdb044ad7e71ad4d8fedc73ab0e1b"
+  },
+  "additional_checks": [
+    {
+      "name": "examples-extended",
+      "command": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "--example",
+        "benchmark_extended"
+      ],
+      "exit": 0,
+      "elapsed": 0.48146486282348633,
+      "log_sha256": "d1688cac2a252b04dd2420e5e64b2d4ec41e541d47317e813701cc98492ff415"
+    },
+    {
+      "name": "examples-models",
+      "command": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "--example",
+        "benchmark_models"
+      ],
+      "exit": 0,
+      "elapsed": 0.7034058570861816,
+      "log_sha256": "b9fa60ab8eea77a3d7a8ca40d3cdfa5cd79c1f34a405116ac74b320e8801f6a2"
+    },
+    {
+      "name": "fence",
+      "command": [
+        "node",
+        "--test",
+        "tests/model_benchmark/fence.test.mjs"
+      ],
+      "exit": 0,
+      "elapsed": 0.07963371276855469,
+      "log_sha256": "70877f7ca43a641b5588b5225dc5f60fd1274d79560df59fc6bc25cfb3a51772"
+    },
+    {
+      "name": "regress",
+      "command": [
+        "sh",
+        "tests/regress.sh"
+      ],
+      "exit": 0,
+      "elapsed": 33.3842408657074,
+      "log_sha256": "999cda42d5a60f81d56fe82b581fff9173dcc27f4ce12375fcbb6cd35c7b3aca"
+    },
+    {
+      "name": "tty",
+      "command": [
+        "python3",
+        "tests/e2e/cli-tty.py"
+      ],
+      "exit": 0,
+      "elapsed": 0.07694625854492188,
+      "log_sha256": "cb1bd0dc646b223dcdebcf6ff89405436b2f6aba3befcf453060530e66ceed3a"
+    },
+    {
+      "name": "browser",
+      "command": [
+        "npm",
+        "test",
+        "--prefix",
+        "tests/e2e"
+      ],
+      "exit": 0,
+      "elapsed": 33.23262000083923,
+      "log_sha256": "f73884e2dbde28247f88e14da3ce6642b87d557acdb06649a7d00236d2f0ba56"
+    }
+  ],
+  "historical_invocation_error": {
+    "command": "node --test dashboard/test/*.test.mjs from repository root",
+    "result": "one existing relative CLI entry test failed; canonical npm script sets dashboard working directory and all selected tests pass; no test assertion changed"
+  },
+  "model_requests": 0,
+  "paid_requests": 0,
+  "linux_only_fixture_scope": "guarded-launcher-matrix and dispatcher probes are accepted only in their separate native Linux receipt; no Mac execution claim"
+}

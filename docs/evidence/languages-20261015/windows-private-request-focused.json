@@ -1,0 +1,118 @@
+{
+  "schema": 1,
+  "status": "focused-validation-pass",
+  "date": "2026-10-15",
+  "target": "nicolas2025 native Windows x64",
+  "sourceFiles": {
+    "dashboard/private-json-file.mjs": "6a121f1f4ec345112abd133d4511699d978962a3f0d3edda06099b4450e60d10",
+    "dashboard/cli.mjs": "d07e2964c6e3472d3718f2d158829c8e61d240d27e7e160301ee8465136d7c6b",
+    "dashboard/cli-locale.mjs": "8a56e31e52fa140a332f0f65c5e3f3b4f6c2a2a961639c110c6d8ca738f2a26a",
+    "dashboard/test/private-json-file.test.mjs": "53a3d35f3d8adb71bd7fcb3ae269bf456ec8df129d4edec5e757d64acf799c06",
+    "dashboard/test/private-json-file-windows.test.mjs": "22a9f8c8d9e59015e75805b2f28daf5501599204e5017c9fe209b39806f46f77",
+    "dashboard/test/cli-locale.test.mjs": "5a2da03e83297d9b7a85d3996c53999818d054a87d428392d1293af165d0fefe",
+    "dashboard/test/cost-ledger-cli.test.mjs": "e65820fe3b911981a1c9c73d59e85f95db72256ecd66adbb7aa0c4a5ad5d78a5",
+    "dashboard/README.md": "ea264398e68e872789893d2f0bcd9122ebee903d4b162b66771bcf8b73342cdd"
+  },
+  "requestPrivacyFix": {
+    "atomicCreation": "CreateFileW CREATE_NEW + protected SECURITY_ATTRIBUTES, no inheritable creator handle",
+    "payloadGate": "read back owner/protected DACL/exact allow ACEs before WriteFile",
+    "allowedRoles": [
+      "CURRENT_USER",
+      "SYSTEM",
+      "ADMINISTRATORS"
+    ],
+    "lease": "creator HANDLE denies write/delete sharing and stays held until native child exits",
+    "cleanup": "FILE_FLAG_DELETE_ON_CLOSE deletes held object; no Windows pathname unlink",
+    "posix": "exclusive wx mode0600 retained"
+  },
+  "baseline": {
+    "stateHomeExists": false,
+    "matchedParentFixture": "two newly owned directory levels under nearest existing production parent; actual default stateHome remains absent",
+    "temp": "supplemental comparison only",
+    "otherReaders": "inherited local-group Modify includes two other enabled standard users; Everyone/AuthenticatedUsers/BuiltinUsers direct read rules absent",
+    "operatorContext": "existing SSH account, administrator token true; no elevation or impersonation"
+  },
+  "validation": {
+    "windows": {
+      "tests": 35,
+      "pass": 33,
+      "skip": 2,
+      "fail": 0,
+      "skips": [
+        "POSIX mode0600",
+        "POSIX native executable fixture"
+      ]
+    },
+    "macos": {
+      "tests": 35,
+      "pass": 29,
+      "skip": 6,
+      "fail": 0,
+      "skips": [
+        "3 Windows SDK cases",
+        "3 Windows CLI collision diagnostics"
+      ]
+    },
+    "syntaxAndDiffCheck": "node --check helper + CLI; git diff --check passed",
+    "actualNativeCases": [
+      "protected owner/ACL readback under default and explicitly shared newly owned parents",
+      "file rename/write and immediate parent/ancestor rename denied while lease held",
+      ">300 character Japanese request path",
+      "three-language CLI CreateFileW collision diagnostics preserve caller data",
+      "Rust std::fs::OpenOptions reads exact UTF-8 bytes with held creator HANDLE",
+      "real SDK protected create/readback plus injected verification refusal: WriteFile calls0, owned file absent"
+    ],
+    "mockOnlyCases": [
+      "partial/zero-progress writes",
+      "write API failure",
+      "identity/ACL backend unavailable",
+      "foreign pathname reuse after held-object deletion"
+    ]
+  },
+  "historicalFailure": {
+    "result": "first native SDK run failed exit3221225477 before payload creation",
+    "cause": "Koffi raw string16 pointer decoded through generic pointer-to-variable API",
+    "fix": "documented koffi.decode.string16 API",
+    "retained": "windows-first-failed-run.redacted.log and prior crash empty-fixture cleanup receipt",
+    "finalRuns": "subsequent native SDK tests and final35-case run passed"
+  },
+  "limits": [
+    "Windows actual product cost-ledger Rust executable was not invoked in this bounded proof; independent Rust std read path and actual Node CLI native-delegation fixtures were exercised",
+    "ordinary account is administrator-token context; no separate standard-account login attempted",
+    "NTFS ACL evidence is this one reachable native Windows host; other filesystems/platform matrix remain parent CI responsibility"
+  ],
+  "cleanup": {
+    "ownedQaRootAbsent": true,
+    "ownedTransferRootAbsent": true,
+    "controllerAbsent": true,
+    "ownedProcessesAfterCleanup": 0,
+    "requestFixturesBeforeCleanup": 0,
+    "remainingTempBeforeCleanup": "Node compile cache only, removed with owned QA root",
+    "existingFoldersAclDataChanged": false,
+    "installedBinariesChanged": false
+  },
+  "modelRequests": 0,
+  "paidApiRequests": 0,
+  "sources": [
+    "https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew",
+    "https://learn.microsoft.com/en-us/windows/win32/fileio/file-security-and-access-rights",
+    "https://devblogs.microsoft.com/oldnewthing/20200320-00/?p=103579",
+    "https://koffi.dev/values"
+  ],
+  "artifacts": {
+    "macos-focused.log": "731ebc0c74f018abbc1044dcd137e347dc87a56f1132f0429e8b5c3fb183e060",
+    "owned-cleanup-regression-green.log": "35ef728353c35e1a4418c52e2eb498a653d98993503f6f659b00356cc3242a32",
+    "owned-cleanup-regression-red.log": "a6a6a97297e68dd8b2b8f4af894ddf065807738f5e0944bef25d558cee454b2d",
+    "source-freeze.json": "a9caf7cb6ab4ac39f89964be6d5a153a79755dbc403abe642bee97f2b7b7da9b",
+    "windows-baseline-acls.json": "4f78c942dd4df78e4ffe9c137fc76f19fbeeae7997de831c173c02374f11002f",
+    "windows-baseline-bootstrap-cleanup.json": "82f1de54986c48f5064c068dcf6560d4aa9279391e0a1471740033057c1644b7",
+    "windows-baseline-cleanup.json": "5a51e82397ea5d92020ed3d15574a77da3ef48f9d3990766a1224ee79fdfc363",
+    "windows-baseline-principal-classes.json": "f2dea2fceece88a82b3041e41d156a3101a8a78086528195fbe7cad63b17a20b",
+    "windows-cleanup.json": "fa37b7c550c008085d692b1af8d18828a6b8526390e99a49daa15010b4942344",
+    "windows-first-failed-run.redacted.log": "e940f3c1a594f2b6278d667327780f8acc544f41300242f37b81eeb104aa7669",
+    "windows-focused.log": "acfacc6269a150faee1ef6a4a4b5069316131b5e5b72dfcd43cff2b06dd151a3",
+    "windows-native-proof.json": "c6588dfd911cbba2a9dd0f1964785105026c4699b744b30e3b46d2a649f25b1b",
+    "windows-postcleanup.json": "7061d50bfa14d0cb2e37e006eebc488de28ef7e472938b2979d8199f1946aed1",
+    "windows-prior-crash-cleanup.json": "c3f3ee02e34123c8fe86a7c68a6afd5bb5d60d6f6a91b136314e10961222de5e"
+  }
+}
