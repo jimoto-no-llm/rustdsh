@@ -916,12 +916,37 @@ fn serial_proxy_runtime_startup_failure_keeps_runtime_status() {
     assert_eq!(output.status.code(), Some(1));
 }
 
+/// Returns a loopback port nothing listens on, for a child that cannot
+/// announce a `--port 0` address because its stderr is closed.
+///
+/// The test process must not bind the port itself. A listener it opens, even
+/// briefly, can be inherited by `rdsh` children that parallel tests spawn at
+/// that moment (macOS has no `SOCK_CLOEXEC`, so close-on-exec is set only after
+/// `socket()`); `lsof` showed four such children holding the probe port in
+/// `LISTEN`. The proxy then fails with `Address already in use`, and with
+/// stderr closed its error report panics (exit 101), surfacing as `proxy did
+/// not start with a closed stderr`. A failed connect leaves nothing to inherit;
+/// any failure counts as free because Windows times out instead of refusing a
+/// closed loopback port. Ports below every platform's default ephemeral range
+/// (Linux 32768, macOS and Windows 49152) are never handed to `:0` listeners or
+/// outgoing connections.
+fn unused_port_outside_ephemeral_range() -> u16 {
+    const FIRST: u16 = 20_000;
+    const COUNT: u16 = 12_000;
+    let offset = (std::process::id() % u32::from(COUNT)) as u16;
+    (0..COUNT)
+        .map(|step| FIRST + (offset + step) % COUNT)
+        .find(|port| {
+            let addr = SocketAddr::from(([127, 0, 0, 1], *port));
+            TcpStream::connect_timeout(&addr, Duration::from_millis(200)).is_err()
+        })
+        .expect("no free loopback port below the ephemeral range")
+}
+
 #[tokio::test]
 async fn closed_stderr_does_not_abort_startup_or_tool_choice_streaming() {
     let upstream = MockUpstream::start(Duration::from_millis(10));
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let port = listener.local_addr().unwrap().port();
-    drop(listener);
+    let port = unused_port_outside_ephemeral_range();
     let mut child = Command::new(env!("CARGO_BIN_EXE_rdsh"))
         .args([
             "serial-proxy",
