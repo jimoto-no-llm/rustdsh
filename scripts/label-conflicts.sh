@@ -36,7 +36,7 @@ if [ $# -gt 0 ]; then
   pending="$*"
 else
   # Capture first: a failing gh must not look like "no open PRs".
-  numbers=$(gh pr list --repo "$repo" --state open --limit 200 --json number --jq '.[].number')
+  numbers=$(gh api --paginate "repos/$repo/pulls?state=open&per_page=100" --jq '.[].number')
   pending=$(printf '%s\n' "$numbers" | tr '\n' ' ')
 fi
 [ -n "${pending# }" ] || { echo "label-conflicts: no open PRs"; exit 0; }
@@ -59,13 +59,18 @@ while [ -n "${pending# }" ] && [ "$round" -le "$rounds" ]; do
     has=$(printf '%s' "$info" | cut -f2)
     base=$(printf '%s' "$info" | cut -f3)
     case "$state:$has" in
-      CONFLICTING:false)
-        # Comment first: the label is the "already notified" marker, so a failed or
-        # cancelled run leaves no label and the next run retries both.
-        echo "#$n conflicts with $base: commenting and adding $label"
-        act gh pr comment "$n" --repo "$repo" --body "$(comment_body "$base")"
-        act gh pr edit "$n" --repo "$repo" --add-label "$label" ;;
-      CONFLICTING:true) echo "#$n still conflicts" ;;
+      CONFLICTING:false|CONFLICTING:true)
+        # Check notification and label independently: either write can fail or be retried.
+        notified=$(gh api --paginate "repos/$repo/issues/$n/comments" \
+          --jq '.[] | select((.body // "") | startswith("<!-- rdsh:needs-rebase -->")) | .id')
+        if [ -z "$notified" ]; then
+          echo "#$n conflicts with $base: commenting"
+          act gh pr comment "$n" --repo "$repo" --body "$(comment_body "$base")"
+        fi
+        if [ "$has" = false ]; then
+          echo "#$n conflicts with $base: adding $label"
+          act gh pr edit "$n" --repo "$repo" --add-label "$label"
+        fi ;;
       MERGEABLE:true)
         echo "#$n merges cleanly: removing $label"
         act gh pr edit "$n" --repo "$repo" --remove-label "$label" ;;

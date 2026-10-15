@@ -156,6 +156,9 @@ echo "check: mode=$mode base=$base"
 if [ "$rust" = 1 ]; then
   step "cargo fmt --check" cargo fmt --check
   step "cargo clippy --all-targets -D warnings" cargo clippy --all-targets -- -D warnings
+  if [ "$mode" = full ]; then
+    step "cargo clippy --release --all-targets -D warnings" cargo clippy --release --all-targets -- -D warnings
+  fi
   # shellcheck disable=SC2086 # release_flag is empty or one word
   step "cargo test${release_flag:+ $release_flag}" cargo test $release_flag
   if [ "$mode" != quick ]; then

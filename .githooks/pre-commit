@@ -35,8 +35,18 @@ rc=0
   > "$snap/.out" 2> "$snap/.err" || rc=$?
 
 # Only the staged files decide; diffs in unstaged index copies are not this commit's.
+diffs="$snap/.out"
+native_snap="$snap"
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*)
+    native_snap=$(cygpath -am "$snap")
+    # Windows rustfmt reports native paths, sometimes with an extended path prefix.
+    tr '\\' '/' < "$snap/.out" \
+      | sed -e 's@^Diff in //?/UNC/@Diff in //@' -e 's@^Diff in //?/@Diff in @' > "$snap/.diffs"
+    diffs="$snap/.diffs" ;;
+esac
 bad=$(tr '\0' '\n' < "$snap/.staged" | while IFS= read -r f; do
-  if grep -Fq "Diff in $snap/$f:" "$snap/.out"; then printf ' %s' "$f"; fi
+  if grep -Fq "Diff in $snap/$f:" "$diffs" || grep -Fq "Diff in $native_snap/$f:" "$diffs"; then printf ' %s' "$f"; fi
 done)
 if [ -n "$bad" ]; then
   echo "pre-commit: staged Rust is not formatted:$bad. Run: cargo fmt && git add" >&2

@@ -143,6 +143,9 @@ push を止めます。pre-commit の書式チェックはステージした内�
 `.github/workflows/conflicts.yml` は、`main` への push、PR の更新、PR の base 変更のたびに
 `scripts/label-conflicts.sh` を実行します。base と衝突している open PR には
 `needs-rebase` ラベルと案内のコメントを 1 度だけ付け、解消後にラベルを外します。
+通知 workflow はリポジトリ共通のキューで直列実行し、main 更新と PR 更新が重なっても
+同じ PR へ並行して投稿しません。実行中の処理は取り消さず、待機する更新は最新の確認へ
+まとめます。毎回すべての open PR を取得するため、まとめられた更新の対象も確認します。
 `pull_request_target` で動きますが、チェックアウトするのは base ブランチだけで、
 PR のコードは実行しません。手元で結果を確認するには、`gh` で認証したうえで
 `DRY_RUN=1 sh scripts/label-conflicts.sh` を実行します。

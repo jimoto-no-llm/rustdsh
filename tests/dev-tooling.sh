@@ -194,13 +194,24 @@ echo "$*" >> "$d/calls"
 case "$1 $2" in
   "pr list") printf '1\n2\n3\n' ;;
   "api repos/o/r/labels/needs-rebase") exit 0 ;;
+  "api --paginate")
+    case "$3" in
+      "repos/o/r/pulls?state=open&per_page=100") printf '1\n2\n3\n' ;;
+      repos/o/r/issues/*/comments) [ ! -f "$d/notified" ] || echo 42 ;;
+      *) echo "unexpected paginated API $3" >&2; exit 9 ;;
+    esac ;;
   "pr view")
     case "$3" in
-      1) printf 'CONFLICTING\tfalse\tmain\n' ;;
+      1) if [ -f "$d/labeled" ]; then printf 'CONFLICTING\ttrue\tmain\n'; else printf 'CONFLICTING\tfalse\tmain\n'; fi ;;
       2) printf 'MERGEABLE\ttrue\tmain\n' ;;
       3) if [ -f "$d/seen3" ]; then printf 'MERGEABLE\tfalse\tmain\n'; else : > "$d/seen3"; printf 'UNKNOWN\tfalse\tmain\n'; fi ;;
     esac ;;
-  "pr edit"|"pr comment") [ -f "$d/fail-comment" ] && exit 1; : ;;
+  "pr comment") [ ! -f "$d/fail-comment" ] || exit 1; : > "$d/notified" ;;
+  "pr edit")
+    if [ "$3" = 1 ]; then
+      if [ -f "$d/fail-label" ]; then rm "$d/fail-label"; exit 1; fi
+      : > "$d/labeled"
+    fi ;;
   *) echo "unexpected gh $*" >&2; exit 9 ;;
 esac
 STUB
@@ -217,14 +228,29 @@ if grep -q '^pr \(edit\|comment\) 3 ' "$calls"; then die "PR 3 must stay untouch
 if grep -q '^label create' "$calls"; then die "existing label must not be recreated"; fi
 ok "label-conflicts labels, unlabels and retries unknown mergeability"
 
-: > "$calls"; rm -f "$tmp/gh/seen3"; : > "$tmp/gh/fail-comment"
+: > "$calls"; rm -f "$tmp/gh/seen3" "$tmp/gh/notified" "$tmp/gh/labeled"; : > "$tmp/gh/fail-comment"
 expect_rc 1 "comment failure" env PATH="$tmp/bin:$PATH" GH_STUB_DIR="$tmp/gh" REPO=o/r WAIT=0 \
   sh "$root/scripts/label-conflicts.sh" 1
 if grep -q '^pr edit 1 .*--add-label' "$calls"; then die "label added although the comment failed"; fi
 rm -f "$tmp/gh/fail-comment"
 ok "label-conflicts leaves no label when the comment fails, so the next run retries"
 
-: > "$calls"
+: > "$calls"; : > "$tmp/gh/fail-label"
+expect_rc 1 "label fails after comment" env PATH="$tmp/bin:$PATH" GH_STUB_DIR="$tmp/gh" REPO=o/r WAIT=0 \
+  sh "$root/scripts/label-conflicts.sh" 1
+expect_rc 0 "retry label without duplicate comment" env PATH="$tmp/bin:$PATH" GH_STUB_DIR="$tmp/gh" REPO=o/r WAIT=0 \
+  sh "$root/scripts/label-conflicts.sh" 1
+[ "$(grep -c '^pr comment 1 ' "$calls")" = 1 ] || die "label retry duplicated the comment"
+ok "label-conflicts retries a failed label without duplicating its comment"
+
+: > "$calls"; rm -f "$tmp/gh/notified"; : > "$tmp/gh/labeled"
+expect_rc 0 "label exists without comment" env PATH="$tmp/bin:$PATH" GH_STUB_DIR="$tmp/gh" REPO=o/r WAIT=0 \
+  sh "$root/scripts/label-conflicts.sh" 1
+grep -q '^pr comment 1 ' "$calls" || die "existing label suppressed the missing comment"
+if grep -q '^pr edit 1 ' "$calls"; then die "existing label must not be added again"; fi
+ok "label-conflicts tracks its comment separately from the label"
+
+: > "$calls"; rm -f "$tmp/gh/notified" "$tmp/gh/labeled"
 expect_rc 0 "dry run" env PATH="$tmp/bin:$PATH" GH_STUB_DIR="$tmp/gh" REPO=o/r WAIT=0 DRY_RUN=1 \
   sh "$root/scripts/label-conflicts.sh" 1
 has "dry-run: gh pr edit 1" "dry run prints actions"
@@ -237,7 +263,7 @@ echo "HTTP 502" >&2; exit 1
 STUB
 expect_rc 1 "gh failure" env PATH="$tmp/bin:$PATH" REPO=o/r WAIT=0 sh "$root/scripts/label-conflicts.sh"
 if grep -q "no open PRs" "$tmp/out"; then die "gh failure reported as no PRs"; fi
-ok "label-conflicts fails when gh pr list fails"
+ok "label-conflicts fails when the open PR listing fails"
 
 # --- check-conflicts.sh --open-prs with a stub gh --------------------------------
 cd "$tmp/work"
@@ -350,15 +376,21 @@ ok "check.sh removes the read-only headless candidate and fails when it cannot"
 cd "$root"
 expect_rc 0 "quick list" sh scripts/check.sh quick --list
 has "cargo clippy --all-targets -D warnings" "quick list"
+if grep -q "cargo clippy --release" "$tmp/out"; then die "quick mode must not run release clippy"; fi
 if grep -q "regress" "$tmp/out"; then die "quick mode must not run regress"; fi
 expect_rc 0 "full list" sh scripts/check.sh full --list
+has "cargo clippy --release --all-targets -D warnings" "full release clippy"
 has "tests/regress.sh" "full list"
 has "release policy unittest" "full list"
-has "node tests (CI test job, BIN=./target/release/rdsh)" "full mode tests the release binary"
-if grep "npm test (RDSH_BIN=" "$tmp/out" | grep -v "(RDSH_BIN=$root/target/release/rdsh)" | grep -q .; then
+exe=""
+case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) exe=.exe ;; esac
+release_bin="$(git -C "$root" rev-parse --show-toplevel)/target/release/rdsh$exe"
+has "node tests (CI test job, BIN=./target/release/rdsh$exe)" "full mode tests the release binary"
+if grep -F "npm test (RDSH_BIN=" "$tmp/out" | grep -vF "(RDSH_BIN=$release_bin)" | grep -q .; then
   die "plugin tests must get the absolute release binary in full mode"
 fi
-grep -q "plugins/rdsh-compute npm test (RDSH_BIN=$root/target/release/rdsh)\|plugins/rdsh-compute npm test (node_modules missing" "$tmp/out" \
+{ grep -Fq "plugins/rdsh-compute npm test (RDSH_BIN=$release_bin)" "$tmp/out" || \
+  grep -Fq "plugins/rdsh-compute npm test (node_modules missing" "$tmp/out"; } \
   || die "rdsh-compute plugin test not selected with RDSH_BIN"
 [ "$(grep -c "cargo build --release" "$tmp/out")" = 1 ] || die "release build must be selected exactly once"
 has "(not run) tests/security-boundaries.test.mjs" "CI-only suites reported"

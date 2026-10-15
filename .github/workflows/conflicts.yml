@@ -15,13 +15,12 @@ permissions:
   issues: write
   pull-requests: write
 
-concurrency:
-  group: conflicts-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
-
 jobs:
   label:
     if: github.event.action != 'edited' || github.event.changes.base != null
+    concurrency:
+      group: rdsh-conflicts-notification
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -30,9 +29,8 @@ jobs:
         with:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
-      # Empty on push and workflow_dispatch: every open PR is checked.
-      - run: sh scripts/label-conflicts.sh ${PR_NUMBER:+"$PR_NUMBER"}
+      # Pending events may be coalesced; every run checks all open PRs.
+      - run: sh scripts/label-conflicts.sh
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
