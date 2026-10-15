@@ -108,7 +108,6 @@ export class InstructionQueueWorker {
         const error = new Error("Rust instruction worker timed out");
         error.status = 504;
         this.fail(record, error);
-        record.child.kill();
       }, this.requestTimeoutMs);
       pending.timer.unref?.();
       try {
@@ -157,7 +156,6 @@ export class InstructionQueueWorker {
     const pending = this.pending;
     if (this.record !== record || pending?.record !== record) {
       this.fail(record, new Error("Rust instruction worker returned an unsolicited response"));
-      record.child.kill();
       return;
     }
     let response;
@@ -165,12 +163,10 @@ export class InstructionQueueWorker {
       response = JSON.parse(line);
     } catch {
       this.fail(record, new Error("Rust instruction worker returned invalid JSON"));
-      record.child.kill();
       return;
     }
     if (!response || typeof response !== "object" || Array.isArray(response)) {
       this.fail(record, new Error("Rust instruction worker returned an invalid response"));
-      record.child.kill();
       return;
     }
     this.pending = null;
@@ -188,6 +184,8 @@ export class InstructionQueueWorker {
     if (this.record !== record) return;
     this.record = null;
     record.reader.close();
+    if (record.child.exitCode === null && record.child.signalCode === null)
+      record.child.kill();
     const pending = this.pending;
     if (pending?.record !== record) return;
     this.pending = null;

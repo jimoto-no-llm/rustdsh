@@ -3,12 +3,13 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { spawn } from "node:child_process";
 import {
   InstructionQueueWorker,
   resolveRdshExecutable,
 } from "../instruction-queue-worker.mjs";
 
-function fakeWorker(t) {
+function fakeWorker(t, onSpawn = () => {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "rdsh-iq-worker-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const script = path.join(root, "fake-worker.mjs");
@@ -27,6 +28,11 @@ input.on("close", () => process.exit(0));\n`,
   );
   return new InstructionQueueWorker(process.execPath, {
     prefixArgs: [script],
+    spawnProcess(...args) {
+      const child = spawn(...args);
+      onSpawn(child);
+      return child;
+    },
     requestTimeoutMs: 2_000,
     closeTimeoutMs: 2_000,
   });
@@ -99,4 +105,23 @@ test("close drains requests accepted before shutdown", async (t) => {
   const closing = worker.close();
   assert.deepEqual(await request, { id: "accepted-before-close" });
   await closing;
+});
+
+test("worker kills its child after request serialization fails", async (t) => {
+  const children = [];
+  t.after(() => {
+    for (const child of children)
+      if (child.exitCode === null && child.signalCode === null) child.kill();
+  });
+  const worker = fakeWorker(t, (child) => children.push(child));
+  const cyclic = {};
+  cyclic.self = cyclic;
+  await assert.rejects(worker.request(cyclic), /circular/i);
+  assert.deepEqual(await worker.request({ id: "after-serialization-error" }), {
+    id: "after-serialization-error",
+  });
+  await worker.close();
+  await new Promise((resolve) => setTimeout(resolve, 25));
+  assert.ok(children[0].exitCode !== null || children[0].signalCode !== null);
+  assert.equal(children.length, 2);
 });
