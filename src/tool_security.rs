@@ -10,6 +10,7 @@ use std::sync::atomic::{AtomicU8, Ordering};
 
 const PRELOAD: &str = include_str!("../security/preload.mjs");
 const ISOLATION: &str = include_str!("../security/tool-isolation.mjs");
+const SECCOMP: &str = include_str!("../security/seccomp.mjs");
 
 /// 0 = follow settings, 1 = boundary on, 2 = boundary off.
 static SANDBOX: AtomicU8 = AtomicU8::new(0);
@@ -95,6 +96,7 @@ pub fn command(orig: &str, node: &str) -> anyhow::Result<std::process::Command> 
         &directory.join("tool-isolation.mjs").to_string_lossy(),
         ISOLATION,
     )?;
+    crate::auth::write_creds(&directory.join("seccomp.mjs").to_string_lossy(), SECCOMP)?;
     let mut command = std::process::Command::new(node);
     command
         .arg("--import")

@@ -25,6 +25,7 @@ export async function policyFixture(t) {
     repository: project.root, allowed_scope: "src and selected command/origin",
     write_roots: [src], forbidden_actions: ["No publication"],
     completion_conditions: ["Tests pass"], change_reason: "Initial policy",
+    worker_roles: ["review", "implementation"],
     operation_policy: {
       schema: 1, read_roots: [src],
       executables: [{ file: process.execPath, args: ["--version"] }],

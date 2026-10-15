@@ -151,6 +151,9 @@ export async function verifyRelease(home, id) {
     ].every((file) => expected.has(file))
   )
     throw new ReleaseError("artifact_incomplete");
+  if (expected.has("adapter/dashboard/worker-sandbox.mjs") !==
+      expected.has("adapter/security/seccomp.mjs"))
+    throw new ReleaseError("artifact_incomplete");
   const inspect = async (dir, prefix = "") => {
     // The canonical slot and this complete regular-file/directory walk reject
     // linked parents too, without resolving every shared parent for every file.
@@ -281,6 +284,10 @@ export async function captureRelease(
         ["package.json", "package-lock.json"].includes(file)
       )
         inputs.push([path.join(dash, file), "adapter/dashboard/" + file]);
+    inputs.push([
+      path.join(adapter, "security", "seccomp.mjs"),
+      "adapter/security/seccomp.mjs",
+    ]);
     await tree(
       path.join(dash, "node_modules"),
       "adapter/dashboard/node_modules",

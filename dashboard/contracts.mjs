@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 const contractKeys = [
   "task_id", "expected_version", "purpose", "repository", "allowed_scope",
   "write_roots", "forbidden_actions", "completion_conditions", "change_reason", "operation_policy",
+  "worker_roles",
 ];
 const checkKeys = ["task_id", "contract_version", "repository", "cwd", "write_paths"];
 
@@ -116,12 +117,20 @@ export async function prepareContract(state, input) {
     if (!contains(repository, root)) throw new Error("Write root is outside the repository");
     if (!writeRoots.includes(root)) writeRoots.push(root);
   }
+  const workerRoles = input.worker_roles === undefined
+    ? ["review"]
+    : [...new Set(strings(input.worker_roles, "worker_roles", 1))];
+  if (workerRoles.some((role) => !["review", "implementation"].includes(role)))
+    throw new Error("Invalid worker role");
   return {
     version: (current?.version || 0) + 1,
     purpose: text(input.purpose, "purpose"),
     repository,
     allowed_scope: text(input.allowed_scope, "allowed_scope"),
     write_roots: writeRoots,
+    // Existing contracts remain read-only until an administrator explicitly
+    // adds the implementation role in a new version.
+    worker_roles: workerRoles,
     operation_policy: await prepareOperationPolicy(input.operation_policy, repository),
     forbidden_actions: strings(input.forbidden_actions, "forbidden_actions"),
     completion_conditions: strings(input.completion_conditions, "completion_conditions", 1),

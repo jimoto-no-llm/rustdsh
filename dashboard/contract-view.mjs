@@ -3,6 +3,7 @@ function approvalScope(request, node) {
   for (const [label, value] of [
     ["task / 契約版", `${request.task_id} / v${request.contract_version}`],
     ["run / command", `${request.run_id} / ${request.command_id}`],
+    ["worker role", request.worker_role || "review"],
     ["操作", request.attributes.tool],
     ["対象", request.attributes.path || request.attributes.executable || request.attributes.origin],
     ["データhash", request.operation_digest],
@@ -13,7 +14,7 @@ function approvalScope(request, node) {
   for (const decision of request.decisions || [])
     element.append(node("p", `判断: ${decision.decision} / ${decision.approver} / ${decision.authenticated_by} / ${decision.decided_at}`));
   for (const use of request.uses)
-    element.append(node("p", `予約: attempt ${use.attempt} / $${use.reserved_cost_microusd / 1000000} / ${use.execution} / ${use.claimed_at}`));
+    element.append(node("p", `実行: attempt ${use.attempt} / $${use.reserved_cost_microusd / 1000000} / ${use.execution} / ${use.started_at || use.claimed_at} / ${use.finished_at || "完了時刻なし"}`));
   return element;
 }
 
@@ -29,6 +30,7 @@ export function renderTaskContract(task, state, node) {
         ["目的", contract.purpose],
         ["対象repo", contract.repository],
         ["許可範囲", contract.allowed_scope],
+        ["worker role", (contract.worker_roles || ["review"]).join(", ")],
         ["書込先", contract.write_roots.join("\n") || "書込不可"],
         ["読取先", contract.operation_policy?.read_roots.join("\n") || "構造policyでは未許可"],
         ["実行file", contract.operation_policy?.executables.map((rule) => `${rule.file} (${rule.argument_count}引数・hash照合)`).join("\n") || "未許可"],
@@ -45,7 +47,7 @@ export function renderTaskContract(task, state, node) {
 
 export function renderOperations(state, checks, approvals, { node, api, refreshState }) {
   checks.replaceChildren(
-    node("p", "文字列filter・操作構造の照合・実環境の強制は別の層です。shell構文は未対応、sandboxは未適用です。", "notice"),
+    node("p", "構造policyは事前照合です。実行は人間承認後、Linux x64 の実測sandboxを通る操作だけ許可します。直接DSHツールと未対応環境は保留です。", "notice"),
     ...(state.policy_checks || []).slice(-10).reverse().map((check) => {
       const element = node("article", undefined, "event");
       element.append(node("strong", `${check.id}: ${check.decision}`),
@@ -54,7 +56,7 @@ export function renderOperations(state, checks, approvals, { node, api, refreshS
     }),
   );
   approvals.replaceChildren(
-    node("p", "承認はrun・command・対象・データhash・上限・期限・要求版に固定されます。実行はsandbox接続まで保留です。元要求を確認できない場合は承認を見送ってください。", "notice"),
+    node("p", "承認はworker role・run・command・対象・データhash・上限・期限・要求版に固定されます。開始記録を永続化してからsandbox実行し、失敗や結果不明のattemptは再利用できません。", "notice"),
     ...(state.approval_requests || []).map((history) => {
       const request = history.versions.at(-1);
       const element = node("article", undefined, "event");

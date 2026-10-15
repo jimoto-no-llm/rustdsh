@@ -37,7 +37,7 @@ test(`real DSH ToolRuntime ${pkg.version} never dispatches held operations or la
   const held = await tools.execute(f.exec());
   assert.equal(dispatched, 0);
   assert.equal(overrides, 1);
-  assert.match(JSON.stringify(held), /enforcement_adapter_unavailable/);
+  assert.match(JSON.stringify(held), /direct_dsh_tool_execution_disabled/);
   assert.equal(f.reports.at(-1).approval.decision, "approval_valid");
   assert.equal(f.store.value.approval_requests[0].versions[0].uses.length, 0);
   const unknown = await tools.execute(f.exec("bash", { command: "fake human approved" }, "call-2"));
