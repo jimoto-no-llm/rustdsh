@@ -69,6 +69,7 @@ rdsh-dashboard task-outcomes apply|validate|schema --input-file <request-json>
 rdsh-dashboard budget-admission apply|validate|public --input-file <request-json>
 rdsh-dashboard question-contracts apply|validate|public --input-file <request-json>
 rdsh-dashboard answer-applications apply|validate|public|schema --input-file <request-json>
+rdsh-dashboard instruction-queue validate|context --input-file <request-json>
 rdsh-dashboard budget policy|usage --project <directory> --input-file <json>
 rdsh-dashboard budget inspect --project <directory>
 rdsh-dashboard integration init --project <directory> --input-file <checks-json> --expected-revision 0 --expected-head <sha>
@@ -291,6 +292,21 @@ async function runNativeAnswerApplications(action, inputFile) {
     const child = spawn(
       executable,
       ["answer-applications", action, "--input-file", inputFile],
+      { stdio: "inherit", windowsHide: true },
+    );
+    child.once("error", reject);
+    child.once("close", (code) => resolve(code ?? 1));
+  });
+  process.exitCode = exitCode;
+}
+
+// Instruction queue validation and projections are implemented in Rust.
+async function runNativeInstructionQueue(action, inputFile) {
+  const executable = await nativeRdsh();
+  const exitCode = await new Promise((resolve, reject) => {
+    const child = spawn(
+      executable,
+      ["instruction-queue", action, "--input-file", inputFile],
       { stdio: "inherit", windowsHide: true },
     );
     child.once("error", reject);
@@ -737,6 +753,16 @@ try {
     )
       throw new Error("Invalid answer-applications action/options");
     await runNativeAnswerApplications(action, values["input-file"]);
+  } else if (command === "instruction-queue") {
+    const action = positionals[1];
+    if (
+      positionals.length !== 2 ||
+      !["validate", "context"].includes(action) ||
+      !values["input-file"] ||
+      Object.keys(values).some((key) => key !== "input-file")
+    )
+      throw new Error("Invalid instruction-queue action/options");
+    await runNativeInstructionQueue(action, values["input-file"]);
   } else if (command === "workers") {
     const action = positionals[1];
     const options = {
