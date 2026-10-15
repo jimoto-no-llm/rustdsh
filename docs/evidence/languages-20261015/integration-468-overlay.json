@@ -1,0 +1,132 @@
+{
+  "scope": "Subsequent clean normal merge of upstream developer environment and CI only; all product and test source records in the 096 inventory stay identical. The four changed existing inventory files and six new developer files are listed below.",
+  "checkpoint": "10e32d4771268c65aa66ce0b11ecb7a294320601",
+  "upstream_parent": "46813893e8f3525a946677c907a89c23bda72aad",
+  "previous_source_inventory": "integration-096-source.json",
+  "previous_validation": "integration-096-validation.json",
+  "changed_existing_inventory_files": [
+    ".github/workflows/ci.yml",
+    ".gitignore",
+    "README.ja.md",
+    "README.md"
+  ],
+  "product_source_changes": 0,
+  "records": [
+    {
+      "file": ".config/nextest.toml",
+      "sha256": "dbb8e21bc1fd939ebb8eff0f3f913b965c8370d5d0d0967dbfa98f2abe675d7c"
+    },
+    {
+      "file": ".github/workflows/ci.yml",
+      "sha256": "c27a562956a2c8db758fe458c3547f7927b61c508e688f0515872b62841665b4"
+    },
+    {
+      "file": ".github/workflows/rust-audit.yml",
+      "sha256": "1af00445ff37ba769092578a33cd25a41227bd96df7d769ede0bffea14db52e8"
+    },
+    {
+      "file": ".gitignore",
+      "sha256": "7032ace285b4664b3c246fe2752cc58457daedef742d372a1eb5b6923eea30ca"
+    },
+    {
+      "file": ".vscode/extensions.json",
+      "sha256": "59ae902a55fc5d5915cffde898048215867e62db507ab7ce03ca317fefde811a"
+    },
+    {
+      "file": ".vscode/settings.json",
+      "sha256": "5457d1935eb8f9ddb76581a2c94ebc1767469bf5a89fa66f0d76a3021025317a"
+    },
+    {
+      "file": "README.ja.md",
+      "sha256": "336aa9564d1275752b465abe1a492b41bb4f2d22f1023a47bb2ac93e0ef6effc"
+    },
+    {
+      "file": "README.md",
+      "sha256": "6e1cce8738186895354f14feb2bb391977ee489ebaad922499f2dd6d9a294a7d"
+    },
+    {
+      "file": "docs/RUST-DEVELOPMENT.md",
+      "sha256": "78e44d3111e0f5e9e17e1fb54ccca3d0971980354bbd0ad80dae3b6248c2a4c9"
+    },
+    {
+      "file": "rust-toolchain.toml",
+      "sha256": "7458b2d74495e6fb1c1edeea4d5a793705476431dadb60627187111f91441e13"
+    }
+  ],
+  "current_head_CI": "pending publication; must be read back for the final merge commit",
+  "local_checks": [
+    {
+      "name": "468-fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 1.27,
+      "log": "468-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "468-clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 1.339,
+      "log": "468-clippy.log",
+      "sha256": "b295cfeaaf8e1f948fdce11e8289d785a1983d9f746c60c322cdc557e46121d1"
+    },
+    {
+      "name": "468-msrv",
+      "command": [
+        "cargo",
+        "+1.85.0",
+        "check",
+        "--locked",
+        "--all-targets"
+      ],
+      "exit": 0,
+      "seconds": 24.036,
+      "log": "468-msrv.log",
+      "sha256": "1c2fa40a69543697675f2b6817898c494d2acfdace990e286194adf72ab6eb85"
+    },
+    {
+      "name": "468-actionlint",
+      "command": [
+        "actionlint",
+        ".github/workflows/ci.yml",
+        ".github/workflows/rust-audit.yml"
+      ],
+      "exit": 0,
+      "seconds": 0.317,
+      "log": "468-actionlint.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "468-doclint",
+      "command": [
+        "npx",
+        "--yes",
+        "markdownlint-cli2",
+        "README.md",
+        "README.ja.md",
+        "docs/RUST-DEVELOPMENT.md"
+      ],
+      "exit": 0,
+      "seconds": 0.775,
+      "log": "468-doclint.log",
+      "sha256": "da6aadc6534650c047dcc722eefeeeb5a86c98cf33555788579000ce69eae73e"
+    }
+  ],
+  "log_location": "Private task artifact; listed hashes verified by task owner"
+}

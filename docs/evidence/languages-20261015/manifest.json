@@ -3,8 +3,8 @@
   "files": [
     {
       "path": "README.md",
-      "bytes": 25872,
-      "sha256": "0660fed1e957c570286b87570878e70345e469ec7802707311e7b4f23d4748ff"
+      "bytes": 26353,
+      "sha256": "0e79f8700847354faa9086a468eaedd384d940ed0dfe299a812c138965b0916f"
     },
     {
       "path": "before-desktop.png",
@@ -120,6 +120,11 @@
       "path": "integration-096-validation.json",
       "bytes": 8678,
       "sha256": "8df6172e55fad711c30c119892f60345725815d484678090ae120be9fea97061"
+    },
+    {
+      "path": "integration-468-overlay.json",
+      "bytes": 3905,
+      "sha256": "07954bc1ff0c08810860f2e1212c5d1f2521245131e3ac93a8a9ec2def46d3a1"
     },
     {
       "path": "ja-desktop.png",
