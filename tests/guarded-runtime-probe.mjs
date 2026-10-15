@@ -39,10 +39,11 @@ assert.equal(blockedPrePolicy, false, 'a forbidden tool must not reach approval 
 assert.match(JSON.stringify(blocked), /RDSH_SECURITY/);
 const scheduler = tools[TOOL_RUNTIME_SCHEDULER];
 const stagedBlocked = await scheduler.prepare({ name: 'blocked_probe', arguments: {}, agent, callId: 'dummy-staged-blocked', signal: new AbortController().signal });
-assert.equal(stagedBlocked.kind, 'post-result');
+assert.equal(stagedBlocked.kind, 'final-result');
+assert.equal(stagedBlocked.result.isError, true);
 assert.equal(invoked, false);
 assert.equal(blockedPrePolicy, false, 'a staged forbidden tool must not reach approval middleware');
-assert.match(JSON.stringify(stagedBlocked), /RDSH_SECURITY/);
+assert.match(JSON.stringify(stagedBlocked.result), /RDSH_SECURITY/);
 let shadowInvoked = false;
 const stagedAgent = {};
 const stagedScoped = createScope(ctx, stagedAgent);
@@ -64,7 +65,8 @@ for (const callId of ['dummy-staged-after-policy', 'dummy-staged-late-shadow']) 
   const dispatchedStage = await scheduler.dispatch(prepared.exec);
   assert.equal(invoked, false, 'staged around-dispatch middleware must not switch to a blocked tool');
   assert.equal(shadowInvoked, false, 'a staged late scoped replacement must not bypass the body guard');
-  assert.match(JSON.stringify(dispatchedStage), /RDSH_SECURITY/);
+  assert.equal(dispatchedStage.result.isError, true);
+  assert.match(JSON.stringify(dispatchedStage.result), /RDSH_SECURITY/);
 }
 for (const callId of ['dummy-after-policy', 'dummy-late-shadow']) {
   const rewritten = await tools.execute({ name: 'rdsh_inspect', arguments: { command: 'printf DUMMY_REWRITTEN' }, agent, callId, signal: new AbortController().signal });

@@ -45,6 +45,7 @@ import { readFile } from 'node:fs/promises';
 export const name = 'rdsh-guarded-launcher-probe';
 export const inject = ['tools', 'appReady', 'appExit'];
 export async function apply(ctx) {
+  try {
   assert.equal(process.env.RDSH_TOOL_ADAPTER, ${JSON.stringify(`dsh-tools-${version}`)});
   assert.equal(ctx.tools.defaultMode, 'native');
   const run = command => ctx.tools.get('rdsh_inspect').execute({ command });
@@ -67,6 +68,11 @@ export async function apply(ctx) {
     console.log('RDSH_LAUNCHER_KERNEL ' + JSON.stringify({ version: ${JSON.stringify(version)}, sharedRead: true, secretsDenied: true, writesDenied: true, namespaceDenied: true, networkDenied: true, dispatcherGuarded: true }));
     ctx.appExit(0);
   }));
+  } catch (error) {
+    console.error(error);
+    ctx.appExit(1);
+    throw error;
+  }
 }
 `);
     const overlay = path.join(root, 'probe.yml');
@@ -76,7 +82,7 @@ export async function apply(ctx) {
       '- id: workspace-controller', '  config:', `    documentsDirectory: ${JSON.stringify(workspace)}`,
       '- insert:', '    - id: rdsh-guarded-launcher-probe', `      name: ${JSON.stringify(plugin)}`,
     ].join('\n') + '\n');
-    const result = spawnSync(bin, ['--profile', 'web', '--patch', overlay, '--no-open', '--port', '0'], {
+    const result = spawnSync(bin, ['--share-file', 'README.md', '--profile', 'web', '--patch', overlay, '--no-open', '--port', '0'], {
       cwd: workspace,
       env: {
         PATH: `${path.dirname(process.execPath)}:${process.env.PATH}`,
