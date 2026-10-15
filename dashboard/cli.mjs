@@ -69,7 +69,7 @@ rdsh-dashboard task-outcomes apply|validate|schema --input-file <request-json>
 rdsh-dashboard budget-admission apply|validate|public --input-file <request-json>
 rdsh-dashboard question-contracts apply|validate|public --input-file <request-json>
 rdsh-dashboard answer-applications apply|validate|public|schema --input-file <request-json>
-rdsh-dashboard instruction-queue validate|context --input-file <request-json>
+rdsh-dashboard instruction-queue validate|context|submit|resolve|control --input-file <request-json>
 rdsh-dashboard budget policy|usage --project <directory> --input-file <json>
 rdsh-dashboard budget inspect --project <directory>
 rdsh-dashboard integration init --project <directory> --input-file <checks-json> --expected-revision 0 --expected-head <sha>
@@ -757,7 +757,7 @@ try {
     const action = positionals[1];
     if (
       positionals.length !== 2 ||
-      !["validate", "context"].includes(action) ||
+      !["validate", "context", "submit", "resolve", "control"].includes(action) ||
       !values["input-file"] ||
       Object.keys(values).some((key) => key !== "input-file")
     )

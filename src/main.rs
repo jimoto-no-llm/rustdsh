@@ -334,7 +334,7 @@ enum Commands {
     TaskOutcomes {
         /// apply | validate | schema
         action: String,
-        /// Request JSON file holding { operation, state, input }
+        /// Request JSON file holding { operation, state, input, context }
         #[arg(long = "input-file")]
         input_file: String,
     },
@@ -376,7 +376,7 @@ enum Commands {
     /// Pure logic: no provider call and no file write.
     #[command(name = "instruction-queue")]
     InstructionQueue {
-        /// validate | context
+        /// validate | context | submit | resolve | control
         action: String,
         /// Request JSON file holding { operation, state, input }
         #[arg(long = "input-file")]
