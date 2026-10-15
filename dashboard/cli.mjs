@@ -80,6 +80,9 @@ rdsh-dashboard cost-ledger inspect --project <${cliText(language, "arg.directory
 rdsh-dashboard cost-ledger validate|public|schema --input-file <request-json>
 rdsh-dashboard task-outcomes apply|validate|schema --input-file <request-json>
 rdsh-dashboard budget-admission apply|validate|public --input-file <request-json>
+rdsh-dashboard question-contracts apply|validate|public --input-file <request-json>
+rdsh-dashboard answer-applications apply|validate|public|schema --input-file <request-json>
+rdsh-dashboard instruction-queue validate|context|submit|resolve|control --input-file <request-json>
 rdsh-dashboard budget policy|usage --project <${cliText(language, "arg.directory")}> --input-file <json>
 rdsh-dashboard budget inspect --project <${cliText(language, "arg.directory")}>
 rdsh-dashboard integration init --project <${cliText(language, "arg.directory")}> --input-file <checks-json> --expected-revision 0 --expected-head <sha>
@@ -327,6 +330,54 @@ async function runNativeBudgetAdmission(action, inputFile) {
   process.exitCode = exitCode;
 }
 
+// Typed question contracts are a self-contained pure-logic module in Rust
+// (`rdsh question-contracts`); the dashboard keeps its own copy for the store
+// hot path, and this entry point exposes the native implementation.
+async function runNativeQuestionContracts(action, inputFile) {
+  const executable = await nativeRdsh();
+  const exitCode = await new Promise((resolve, reject) => {
+    const child = spawn(
+      executable,
+      ["question-contracts", action, "--input-file", inputFile],
+      { stdio: "inherit", windowsHide: true, env: { ...process.env, RDSH_LANG: language } },
+    );
+    child.once("error", reject);
+    child.once("close", (code) => resolve(code ?? 1));
+  });
+  process.exitCode = exitCode;
+}
+
+// Answer application state transitions and projections are implemented in
+// Rust; this CLI keeps the dashboard's stateful store path in JavaScript.
+async function runNativeAnswerApplications(action, inputFile) {
+  const executable = await nativeRdsh();
+  const exitCode = await new Promise((resolve, reject) => {
+    const child = spawn(
+      executable,
+      ["answer-applications", action, "--input-file", inputFile],
+      { stdio: "inherit", windowsHide: true, env: { ...process.env, RDSH_LANG: language } },
+    );
+    child.once("error", reject);
+    child.once("close", (code) => resolve(code ?? 1));
+  });
+  process.exitCode = exitCode;
+}
+
+// Instruction queue validation and projections are implemented in Rust.
+async function runNativeInstructionQueue(action, inputFile) {
+  const executable = await nativeRdsh();
+  const exitCode = await new Promise((resolve, reject) => {
+    const child = spawn(
+      executable,
+      ["instruction-queue", action, "--input-file", inputFile],
+      { stdio: "inherit", windowsHide: true, env: { ...process.env, RDSH_LANG: language } },
+    );
+    child.once("error", reject);
+    child.once("close", (code) => resolve(code ?? 1));
+  });
+  process.exitCode = exitCode;
+}
+
 async function runNativeSubagentPlan(inputFile) {
   const executable = await nativeRdsh();
   const exitCode = await new Promise((resolve, reject) => {
@@ -451,6 +502,9 @@ try {
   // These native JSON operations do not consume dashboard settings. Keep the
   // bridge available even when a settings file needs repair.
   const nativeJsonBridge =
+    (command === "question-contracts" && ["apply", "validate", "public"].includes(positionals[1])) ||
+    (command === "answer-applications" && ["apply", "validate", "public", "schema"].includes(positionals[1])) ||
+    (command === "instruction-queue" && ["validate", "context", "submit", "resolve", "control"].includes(positionals[1])) ||
     (command === "budget-admission" && ["apply", "validate", "public"].includes(positionals[1])) ||
     (command === "subagents" && positionals[1] === "plan") ||
     (command === "task-outcomes" && ["apply", "validate", "schema"].includes(positionals[1])) ||
@@ -833,6 +887,36 @@ try {
     )
       throw new CliDiagnosticError("error.budgetAdmissionAction");
     await runNativeBudgetAdmission(action, values["input-file"]);
+  } else if (command === "question-contracts") {
+    const action = positionals[1];
+    if (
+      positionals.length !== 2 ||
+      !["apply", "validate", "public"].includes(action) ||
+      !values["input-file"] ||
+      Object.keys(values).some((key) => key !== "input-file")
+    )
+      throw new CliDiagnosticError("error.questionContractsAction");
+    await runNativeQuestionContracts(action, values["input-file"]);
+  } else if (command === "answer-applications") {
+    const action = positionals[1];
+    if (
+      positionals.length !== 2 ||
+      !["apply", "validate", "public", "schema"].includes(action) ||
+      !values["input-file"] ||
+      Object.keys(values).some((key) => key !== "input-file")
+    )
+      throw new CliDiagnosticError("error.answerApplicationsAction");
+    await runNativeAnswerApplications(action, values["input-file"]);
+  } else if (command === "instruction-queue") {
+    const action = positionals[1];
+    if (
+      positionals.length !== 2 ||
+      !["validate", "context", "submit", "resolve", "control"].includes(action) ||
+      !values["input-file"] ||
+      Object.keys(values).some((key) => key !== "input-file")
+    )
+      throw new CliDiagnosticError("error.instructionQueueAction");
+    await runNativeInstructionQueue(action, values["input-file"]);
   } else if (command === "workers") {
     const action = positionals[1];
     const options = {

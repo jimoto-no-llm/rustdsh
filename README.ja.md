@@ -465,3 +465,5 @@ MIT（[LICENSE](LICENSE)）です。本家 DeepSeek Harness および依存ラ�
 `node dashboard/cli.mjs --language ja agents list`で表示言語を選べます。外部エージェントのヘルプとCLI診断は英語・簡体字中国語・日本語に対応します。ジョブ状態・エラーコード・JSONキー・エージェント出力は原文を保持します。日本語のファイル名と指示文はUTF-8の`--prompt-file`で渡せます。[コマンドと権限の制約](docs/AGENT-RUNNERS.md)を確認してください。実ジョブは外部サービスの料金が発生する場合があります。言語検証はローカルのテスト用実行ファイルで行います。
 
 `budget-admission apply|validate|public --input-file <request-json>`も設定に依存しない純JSONコマンドです。nativeとDashboardのヘルプ・診断を3言語化し、予算コードとJSON出力は保持します。プロバイダーの呼び出しや予算台帳の書き込みは行いません。[予算管理](docs/BUDGET-CONTROL.md)を参照してください。
+
+`question-contracts apply|validate|public`、`answer-applications apply|validate|public|schema`、`instruction-queue validate|context|submit|resolve|control`も`--input-file <request-json>`を受け取り、無関係な設定を読みません。nativeとDashboardのヘルプ・所有する診断は3言語に対応し、エンジンのメッセージ・状態コード・正規JSONは上流の値を保持します。任意の[応答ガード](plugins/rdsh-answer-guard/README.md)も通知要約と設定エラーを3言語化し、モデルへの再出力指示は保持します。

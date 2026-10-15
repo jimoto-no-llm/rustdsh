@@ -1,0 +1,131 @@
+{
+  "scope": "Actual final normal release; native and Dashboard bridge with exact upstream baseline; private Japanese paths and broken settings; no model/provider call",
+  "binary_sha256": "1a7d683e4e97815a9837b56261c33d43e1316f6105d909edb2ad66e9f1470397",
+  "baseline_commit": "77869b3a297de5bfc7fceb0f90efbc68a7505f27",
+  "baseline_sha256": "92eeac9dd018e5656ac06895e5404d1930bd79bac50df5915c0e9d93c09b0fb2",
+  "cases": [
+    {
+      "language": "en",
+      "case": "native validate",
+      "exit": 0,
+      "stdout_identical_to_exact_upstream": true
+    },
+    {
+      "language": "en",
+      "case": "dashboard validate",
+      "exit": 0,
+      "stdout_identical_to_exact_upstream": true
+    },
+    {
+      "language": "en",
+      "case": "native public",
+      "exit": 0,
+      "stdout_identical_to_exact_upstream": true
+    },
+    {
+      "language": "en",
+      "case": "dashboard public",
+      "exit": 0,
+      "stdout_identical_to_exact_upstream": true
+    },
+    {
+      "language": "en",
+      "case": "invalid-json",
+      "exit": 1
+    },
+    {
+      "language": "en",
+      "case": "engine-code",
+      "exit": 1,
+      "canonical_codes_identical": true
+    },
+    {
+      "language": "en",
+      "case": "help",
+      "exit": 0
+    },
+    {
+      "language": "zh-CN",
+      "case": "native validate",
+      "exit": 0,
+      "stdout_identical_to_exact_upstream": true
+    },
+    {
+      "language": "zh-CN",
+      "case": "dashboard validate",
+      "exit": 0,
+      "stdout_identical_to_exact_upstream": true
+    },
+    {
+      "language": "zh-CN",
+      "case": "native public",
+      "exit": 0,
+      "stdout_identical_to_exact_upstream": true
+    },
+    {
+      "language": "zh-CN",
+      "case": "dashboard public",
+      "exit": 0,
+      "stdout_identical_to_exact_upstream": true
+    },
+    {
+      "language": "zh-CN",
+      "case": "invalid-json",
+      "exit": 1
+    },
+    {
+      "language": "zh-CN",
+      "case": "engine-code",
+      "exit": 1,
+      "canonical_codes_identical": true
+    },
+    {
+      "language": "zh-CN",
+      "case": "help",
+      "exit": 0
+    },
+    {
+      "language": "ja",
+      "case": "native validate",
+      "exit": 0,
+      "stdout_identical_to_exact_upstream": true
+    },
+    {
+      "language": "ja",
+      "case": "dashboard validate",
+      "exit": 0,
+      "stdout_identical_to_exact_upstream": true
+    },
+    {
+      "language": "ja",
+      "case": "native public",
+      "exit": 0,
+      "stdout_identical_to_exact_upstream": true
+    },
+    {
+      "language": "ja",
+      "case": "dashboard public",
+      "exit": 0,
+      "stdout_identical_to_exact_upstream": true
+    },
+    {
+      "language": "ja",
+      "case": "invalid-json",
+      "exit": 1
+    },
+    {
+      "language": "ja",
+      "case": "engine-code",
+      "exit": 1,
+      "canonical_codes_identical": true
+    },
+    {
+      "language": "ja",
+      "case": "help",
+      "exit": 0
+    }
+  ],
+  "tests": 21,
+  "all_passed": true,
+  "owned_fixture_removed": true
+}

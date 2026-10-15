@@ -48,6 +48,7 @@ fn parse_positive_finite(value: &str) -> Result<f64, String> {
     }
     Ok(parsed)
 }
+mod answer_applications;
 mod auth;
 mod auth_sharing;
 mod budget_admission;
@@ -61,6 +62,8 @@ mod file_lock;
 mod file_security;
 mod guard;
 mod inspect;
+mod instruction_queue;
+mod js_json;
 mod local_http;
 mod locale;
 #[cfg(test)]
@@ -68,6 +71,7 @@ mod locale_test;
 mod opencode_header;
 mod passthrough;
 mod providers;
+mod question_contracts;
 mod rdsh_config;
 mod search;
 mod serial_proxy;
@@ -89,7 +93,7 @@ mod worker_scopes;
     name = "rdsh",
     version,
     about = "Rust fast launcher for dsh (safe: native fast-paths + passthrough)",
-    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|auth|setup|context|settings|features|subagents|provider|task-outcomes|budget-admission|cost-ledger|update|worker-scope|dump-config|boot|serial-proxy)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh provider add hai --model deepseek-v4-flash   register HAI as a dsh route\n  rdsh provider add sarashina    register Sarashina (SARASHINA_API_KEY; mini and nano built in)\n  rdsh provider add local-openai --base-url http://host:8080/v1 --discover --no-key\n  rdsh provider list              presets and per-profile route/key status\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh desktop status             detect the Desktop (Electron) app and its reserved profile\n  rdsh desktop install            attach the bundled rdsh plugins to that profile\n  rdsh --passthrough tui          no slim env; mandatory tool isolation remains\n  rdsh --dry-run tui -- --resume abc   show what would exec"
+    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|auth|setup|context|settings|features|subagents|provider|task-outcomes|budget-admission|cost-ledger|question-contracts|answer-applications|instruction-queue|update|worker-scope|dump-config|boot|serial-proxy)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh provider add hai --model deepseek-v4-flash   register HAI as a dsh route\n  rdsh provider add sarashina    register Sarashina (SARASHINA_API_KEY; mini and nano built in)\n  rdsh provider add local-openai --base-url http://host:8080/v1 --discover --no-key\n  rdsh provider list              presets and per-profile route/key status\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh desktop status             detect the Desktop (Electron) app and its reserved profile\n  rdsh desktop install            attach the bundled rdsh plugins to that profile\n  rdsh --passthrough tui          no slim env; mandatory tool isolation remains\n  rdsh --dry-run tui -- --resume abc   show what would exec"
 )]
 struct Cli {
     /// Explicitly share a project file with isolated model tools (repeatable).
@@ -372,6 +376,38 @@ enum Commands {
         #[arg(long = "input-file")]
         input_file: String,
     },
+    /// Typed question contracts: create, revise or cancel one question card,
+    /// record the answer to an open card, validate a stored extension by
+    /// recomputing every fingerprint, or print the card projection the
+    /// dashboard shows. Pure logic: no provider call and no file write
+    #[command(name = "question-contracts")]
+    QuestionContracts {
+        /// apply | validate | public
+        action: String,
+        /// Request JSON file holding { operation, state, input, now }
+        #[arg(long = "input-file")]
+        input_file: String,
+    },
+    /// Human answer application to the exact run/session that asked.
+    /// Pure logic: no provider call and no file write.
+    #[command(name = "answer-applications")]
+    AnswerApplications {
+        /// apply | validate | public | schema
+        action: String,
+        /// Request JSON file holding { operation, state, input, now, live_jobs }
+        #[arg(long = "input-file")]
+        input_file: String,
+    },
+    /// Validate and inspect the ordered human-instruction queue.
+    /// Pure logic: no provider call and no file write.
+    #[command(name = "instruction-queue")]
+    InstructionQueue {
+        /// validate | context | submit | resolve | control
+        action: String,
+        /// Request JSON file holding { operation, state, input, context }
+        #[arg(long = "input-file")]
+        input_file: String,
+    },
     /// Feature switches: list every optional capability, or turn one on/off
     Features {
         #[command(subcommand)]
@@ -602,6 +638,9 @@ const NATIVE_FIRST: &[&str] = &[
     "subagents",
     "task-outcomes",
     "budget-admission",
+    "question-contracts",
+    "answer-applications",
+    "instruction-queue",
     "worker-scope",
 ];
 
@@ -691,6 +730,9 @@ fn main() {
             action: SettingsAction::Init { force: true }
         }) | Some(Commands::TaskOutcomes { .. })
             | Some(Commands::BudgetAdmission { .. })
+            | Some(Commands::QuestionContracts { .. })
+            | Some(Commands::AnswerApplications { .. })
+            | Some(Commands::InstructionQueue { .. })
             | Some(Commands::Subagents { .. })
             | Some(Commands::CostLedger { .. })
     ) {
@@ -1028,6 +1070,15 @@ fn main() {
         }
         Some(Commands::BudgetAdmission { action, input_file }) => {
             budget_admission::cmd_budget_admission(&action, &input_file, locale)
+        }
+        Some(Commands::QuestionContracts { action, input_file }) => {
+            question_contracts::cmd_question_contracts(&action, &input_file, locale)
+        }
+        Some(Commands::AnswerApplications { action, input_file }) => {
+            answer_applications::cmd_answer_applications(&action, &input_file, locale)
+        }
+        Some(Commands::InstructionQueue { action, input_file }) => {
+            instruction_queue::cmd_instruction_queue(&action, &input_file, locale)
         }
         Some(Commands::Features { action, json }) => match action {
             None => features_list(&cfg, json, locale),
@@ -1452,6 +1503,9 @@ fn settings_independent_invocation() -> bool {
                 } | Commands::TaskOutcomes { .. }
                     | Commands::Subagents { .. }
                     | Commands::BudgetAdmission { .. }
+                    | Commands::QuestionContracts { .. }
+                    | Commands::AnswerApplications { .. }
+                    | Commands::InstructionQueue { .. }
                     | Commands::CostLedger { .. }
                     | Commands::WorkerScope { .. }
             ),
@@ -1683,6 +1737,18 @@ fn localized_command_about(name: &str, locale: locale::Locale) -> Option<&'stati
             "应用、验证预算准入记录或输出公开视图",
             "予算受付記録を適用・検証し公開表示を出力",
         ),
+        "question-contracts" => (
+            "应用、验证问题契约或输出公开视图",
+            "質問契約を適用・検証し公開表示を出力",
+        ),
+        "answer-applications" => (
+            "应用、验证回答或输出公开视图与 JSON schema",
+            "回答適用を実行・検証し公開表示やJSONスキーマを出力",
+        ),
+        "instruction-queue" => (
+            "验证、提交、解决或控制指令队列",
+            "指示キューを検証・送信・解決・制御",
+        ),
         "cost-ledger" => (
             "声明、记录、验证费用台账或输出公开视图与 JSON schema",
             "費用台帳を宣言・記録・検証し公開表示やJSONスキーマを出力",
@@ -1748,8 +1814,8 @@ fn localized_command_about(name: &str, locale: locale::Locale) -> Option<&'stati
 
 fn localized_after_help(name: &str, locale: locale::Locale) -> Option<&'static str> {
     (name == "rdsh").then(|| match locale {
-        locale::Locale::Chinese => "用法：\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|auth|setup|context|settings|features|provider|subagents|task-outcomes|budget-admission|cost-ledger|update|worker-scope|dump-config|boot|serial-proxy)\n\n示例：\n  rdsh tui                        启动 tui 配置文件（slim 环境开启，委托给 dsh）\n  rdsh --profile web --patch x.yml 使用叠加层启动 web\n  rdsh dump-config --profile tui  委托 dsh 输出准确配置\n  rdsh tokens ./AGENTS.md         原生估算输入令牌数\n  rdsh auth --import --provider openai-codex   只导入选定提供方\n  rdsh provider list              查看预设、路由和密钥状态\n  rdsh provider add hai --model deepseek-v4-flash   注册 HAI 路由\n  rdsh setup                      首次连接：选择共享、登录流程和后续步骤\n  rdsh search hello --dir .       无 Node 的快速文件搜索\n  rdsh search-web \"rust async\"      通过 SearXNG 网页搜索（无需 API 密钥）\n  rdsh desktop status             检测 Desktop（Electron）应用及其保留配置文件\n  rdsh desktop install            将捆绑 rdsh 插件附加到该配置文件\n  rdsh --passthrough tui          不使用 slim 环境；必需的工具隔离仍会启用\n  rdsh --dry-run tui -- --resume abc   显示将执行的命令",
-        locale::Locale::Japanese => "使い方：\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|auth|setup|context|settings|features|provider|subagents|task-outcomes|budget-admission|cost-ledger|update|worker-scope|dump-config|boot|serial-proxy)\n\n例：\n  rdsh tui                        tuiプロファイルを起動（slim環境ON、dshへ委譲）\n  rdsh --profile web --patch x.yml オーバーレイ付きでwebを起動\n  rdsh dump-config --profile tui  dshへ正確な設定出力を委譲\n  rdsh tokens ./AGENTS.md         入力トークン数をネイティブで推定\n  rdsh auth --import --provider openai-codex   選択したプロバイダーだけをインポート\n  rdsh provider list              プリセット・経路・キーの状態を確認\n  rdsh provider add hai --model deepseek-v4-flash   HAI経路を登録\n  rdsh setup                      初回接続: 共有の選択、ログイン手順、次のステップ\n  rdsh search hello --dir .       Nodeなしの高速ファイル検索\n  rdsh search-web \"rust async\"      SearXNGによるWeb検索（APIキー不要）\n  rdsh desktop status             Desktop（Electron）アプリと専用プロファイルを検出\n  rdsh desktop install            同プロファイルに同梱rdshプラグインを追加\n  rdsh --passthrough tui          slim環境なし。必須のツール分離は維持\n  rdsh --dry-run tui -- --resume abc   実行するコマンドを表示",
+        locale::Locale::Chinese => "用法：\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|auth|setup|context|settings|features|provider|subagents|task-outcomes|budget-admission|cost-ledger|question-contracts|answer-applications|instruction-queue|update|worker-scope|dump-config|boot|serial-proxy)\n\n示例：\n  rdsh tui                        启动 tui 配置文件（slim 环境开启，委托给 dsh）\n  rdsh --profile web --patch x.yml 使用叠加层启动 web\n  rdsh dump-config --profile tui  委托 dsh 输出准确配置\n  rdsh tokens ./AGENTS.md         原生估算输入令牌数\n  rdsh auth --import --provider openai-codex   只导入选定提供方\n  rdsh provider list              查看预设、路由和密钥状态\n  rdsh provider add hai --model deepseek-v4-flash   注册 HAI 路由\n  rdsh setup                      首次连接：选择共享、登录流程和后续步骤\n  rdsh search hello --dir .       无 Node 的快速文件搜索\n  rdsh search-web \"rust async\"      通过 SearXNG 网页搜索（无需 API 密钥）\n  rdsh desktop status             检测 Desktop（Electron）应用及其保留配置文件\n  rdsh desktop install            将捆绑 rdsh 插件附加到该配置文件\n  rdsh --passthrough tui          不使用 slim 环境；必需的工具隔离仍会启用\n  rdsh --dry-run tui -- --resume abc   显示将执行的命令",
+        locale::Locale::Japanese => "使い方：\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|auth|setup|context|settings|features|provider|subagents|task-outcomes|budget-admission|cost-ledger|question-contracts|answer-applications|instruction-queue|update|worker-scope|dump-config|boot|serial-proxy)\n\n例：\n  rdsh tui                        tuiプロファイルを起動（slim環境ON、dshへ委譲）\n  rdsh --profile web --patch x.yml オーバーレイ付きでwebを起動\n  rdsh dump-config --profile tui  dshへ正確な設定出力を委譲\n  rdsh tokens ./AGENTS.md         入力トークン数をネイティブで推定\n  rdsh auth --import --provider openai-codex   選択したプロバイダーだけをインポート\n  rdsh provider list              プリセット・経路・キーの状態を確認\n  rdsh provider add hai --model deepseek-v4-flash   HAI経路を登録\n  rdsh setup                      初回接続: 共有の選択、ログイン手順、次のステップ\n  rdsh search hello --dir .       Nodeなしの高速ファイル検索\n  rdsh search-web \"rust async\"      SearXNGによるWeb検索（APIキー不要）\n  rdsh desktop status             Desktop（Electron）アプリと専用プロファイルを検出\n  rdsh desktop install            同プロファイルに同梱rdshプラグインを追加\n  rdsh --passthrough tui          slim環境なし。必須のツール分離は維持\n  rdsh --dry-run tui -- --resume abc   実行するコマンドを表示",
         locale::Locale::English => unreachable!(),
     })
 }

@@ -1,0 +1,21 @@
+{
+  "name": "rdsh-answer-guard",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Recover a turn whose reply was emitted only as reasoning, so the reader sees an answer",
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "meta": {
+    "title": "rdsh answer guard",
+    "description": "Request one visible answer when a turn ends with reasoning and no reply text."
+  }
+}

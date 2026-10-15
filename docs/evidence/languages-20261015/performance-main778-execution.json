@@ -1,0 +1,89 @@
+{
+  "comparison": "Final integration vs exact unmodified upstream 77869b3a297de5bfc7fceb0f90efbc68a7505f27; normal release artifacts; no model calls",
+  "candidate_sha256": "1a7d683e4e97815a9837b56261c33d43e1316f6105d909edb2ad66e9f1470397",
+  "baseline_sha256": "92eeac9dd018e5656ac06895e5404d1930bd79bac50df5915c0e9d93c09b0fb2",
+  "checks": [
+    {
+      "name": "basic",
+      "command": [
+        "python3",
+        "scripts/benchmark.py",
+        "--bin",
+        "/Users/s30519/work/artifacts/rdsh-main778-integration-20261015/rdsh-normal-main778",
+        "--baseline",
+        "/var/tmp/rdsh-main778-baseline-zbrqzwsa/target/release/rdsh",
+        "--n",
+        "15",
+        "--output",
+        "/Users/s30519/work/artifacts/rdsh-main778-integration-20261015/performance-basic.json"
+      ],
+      "exit": 0,
+      "seconds": 3.809,
+      "load_before": [
+        33.36474609375,
+        40.2890625,
+        34.6376953125
+      ],
+      "load_after": [
+        33.36474609375,
+        40.2890625,
+        34.6376953125
+      ],
+      "log_sha256": "711e56270d3d7777bee7b3a03131aac9312358ea1defac9a9abec8f2d141e103"
+    },
+    {
+      "name": "extended",
+      "command": [
+        "target/release/examples/benchmark_extended",
+        "--bin",
+        "/Users/s30519/work/artifacts/rdsh-main778-integration-20261015/rdsh-normal-main778",
+        "--baseline",
+        "/var/tmp/rdsh-main778-baseline-zbrqzwsa/target/release/rdsh",
+        "--n",
+        "15",
+        "--output",
+        "/Users/s30519/work/artifacts/rdsh-main778-integration-20261015/performance-extended.json"
+      ],
+      "exit": 0,
+      "seconds": 13.627,
+      "load_before": [
+        33.36474609375,
+        40.2890625,
+        34.6376953125
+      ],
+      "load_after": [
+        28.6328125,
+        38.90283203125,
+        34.2412109375
+      ],
+      "log_sha256": "97d97b090df29c4dfe6a23b49c2f6e2478c0ef07d4c68887f2893813b9ea56ff"
+    },
+    {
+      "name": "regression",
+      "command": [
+        "target/release/examples/benchmark_regression",
+        "--bin",
+        "/Users/s30519/work/artifacts/rdsh-main778-integration-20261015/rdsh-normal-main778",
+        "--baseline",
+        "/var/tmp/rdsh-main778-baseline-zbrqzwsa/target/release/rdsh",
+        "--n",
+        "15",
+        "--output",
+        "/Users/s30519/work/artifacts/rdsh-main778-integration-20261015/performance-regression.json"
+      ],
+      "exit": 0,
+      "seconds": 2.603,
+      "load_before": [
+        28.6328125,
+        38.90283203125,
+        34.2412109375
+      ],
+      "load_after": [
+        26.900390625,
+        38.373046875,
+        34.08154296875
+      ],
+      "log_sha256": "3607bfb1dbebf724c11095f3aa3b2dc748878d5b11612a19f87df587d1507b4d"
+    }
+  ]
+}

@@ -18,9 +18,9 @@ path = "src/main.rs"
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
 serde = { version = "1.0", features = ["derive"] }
-# preserve_order keeps JSON object key order. cost-ledger and task-outcomes
-# must retain insertion order to match their former dashboard implementations.
-serde_json = { version = "1.0", features = ["preserve_order"] }
+# preserve_order retains JavaScript insertion ordering for native dashboard ports.
+# float_roundtrip parses decimal JSON numbers to the same binary64 values as JavaScript.
+serde_json = { version = "1.0", features = ["float_roundtrip", "preserve_order"] }
 anyhow = "1.0"
 getrandom = "0.4"
 libc = "0.2"

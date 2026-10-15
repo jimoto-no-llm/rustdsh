@@ -297,6 +297,21 @@ pub fn ui_message(locale: Locale, key: UiMessage) -> &'static str {
 /// Translate a known rdsh diagnostic or state value; external text is preserved.
 pub fn diagnostic(locale: Locale, text: &str) -> &str {
     let pair = match text {
+        "Input JSON must be a regular file" => ("输入JSON必须是普通文件", "入力JSONは通常ファイルである必要があります"),
+        "Invalid answer application timestamp" => ("回答应用时间戳无效", "回答適用の日時が不正です"),
+        "unknown question-contracts action" => ("未知的question-contracts操作", "不明なquestion-contracts操作"),
+        "unknown answer-applications action" => ("未知的answer-applications操作", "不明なanswer-applications操作"),
+        "Invalid instruction-queue action/options" => ("instruction-queue操作或选项无效", "instruction-queueの操作またはオプションが不正です"),
+        "Instruction queue response exceeds 63 MiB" => ("指令队列响应超过63 MiB", "指示キューの応答が63 MiBを超えています"),
+        "write question contracts" => ("无法写入问题契约", "質問契約を書き込めません"),
+        "flush question contracts" => ("无法刷新问题契约输出", "質問契約の出力を完了できません"),
+        "serialize answer applications" => ("无法将回答应用序列化为JSON", "回答適用をJSONに変換できません"),
+        "write answer applications" => ("无法写入回答应用", "回答適用を書き込めません"),
+        "flush answer applications" => ("无法刷新回答应用输出", "回答適用の出力を完了できません"),
+        "Instruction queue" => ("指令队列", "指示キュー"),
+        "Answer applications" => ("回答应用", "回答適用"),
+        "Question contracts" => ("问题契约", "質問契約"),
+        "serialize instruction queue" => ("无法将指令队列序列化为JSON", "指示キューをJSONに変換できません"),
         "worker scope declarations must be a JSON array" => ("工作进程范围声明必须是 JSON 数组", "ワーカー範囲の宣言はJSON配列である必要があります"),
         "worker scope policy batch must be a JSON object" => ("工作进程范围策略批次必须是 JSON 对象", "ワーカー範囲のポリシーバッチはJSONオブジェクトである必要があります"),
         "unknown worker scope policy batch field" => ("未知的工作进程范围策略批次字段", "不明なワーカー範囲ポリシーバッチのフィールドです"),

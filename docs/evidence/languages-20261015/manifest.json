@@ -1,10 +1,10 @@
 {
-  "scope": "All payload files; manifest excludes itself. Source/artifact-bound historical evidence remains historical.",
+  "scope": "All payloads, excluding this manifest. Each historical receipt retains its source identity.",
   "files": [
     {
       "path": "README.md",
-      "bytes": 27806,
-      "sha256": "39079443caafbc5202f0c69cef180bdb72798e6a56ae80bea992a9ac9aa9ed61"
+      "bytes": 29908,
+      "sha256": "1f65563e92aa5f6f981511224ecf29fe3e342c2904316419cd7a01213135e6f6"
     },
     {
       "path": "before-desktop.png",
@@ -127,6 +127,16 @@
       "sha256": "07954bc1ff0c08810860f2e1212c5d1f2521245131e3ac93a8a9ec2def46d3a1"
     },
     {
+      "path": "integration-main778-source.json",
+      "bytes": 106660,
+      "sha256": "0a3c0b0c35e425086e71ebf58d92f99bb96c984e70b6d9cb0f5d44efb73500bd"
+    },
+    {
+      "path": "integration-main778-validation.json",
+      "bytes": 17138,
+      "sha256": "28613eb1f1ee484ae07f890ce962a39f8ba154e3edd3b97799d31d93fb738561"
+    },
+    {
       "path": "integration-main9-source.json",
       "bytes": 90041,
       "sha256": "83ec36e23415342d5ea69c0edc69289d6238da1b80f6393ef114dde52f7b749f"
@@ -153,8 +163,8 @@
     },
     {
       "path": "known-exceptions.json",
-      "bytes": 8271,
-      "sha256": "35c89815466d498a1623060f84c13b026800b684ac5cfc30884be85b36eb6c1a"
+      "bytes": 8589,
+      "sha256": "ec05fd7aeaf2fcce60895fb7cccb92f87cf76c4a1d1bdb71d61e71c0b446f262"
     },
     {
       "path": "legacy-workflow-board-baseline.json",
@@ -250,6 +260,46 @@
       "path": "macos-native.json",
       "bytes": 3259,
       "sha256": "a418dc07d94b17aceddd8d1d84a12c8e8848512428538fefea10dd9388cdd8e7"
+    },
+    {
+      "path": "main778-browser-en.json",
+      "bytes": 1108,
+      "sha256": "83a991a6d9af2e485462fb47c024f1eeaa4684f7df81501bc7973e07236b6d7d"
+    },
+    {
+      "path": "main778-browser-ja.json",
+      "bytes": 1108,
+      "sha256": "f2ce3065eafee4d5767f3712f61ea3d61b0421982163c263f374c5c040910356"
+    },
+    {
+      "path": "main778-browser-zh-CN.json",
+      "bytes": 1111,
+      "sha256": "1ac4a98d2c57e3055d6cab0539822ad9070e728b9603cdf589cb0ef5d632a756"
+    },
+    {
+      "path": "main778-dashboard.json",
+      "bytes": 983,
+      "sha256": "0abbdbd341bf9685e643fe7ec6ba7ec553f459a72324a02bae29d4fb16d2b877"
+    },
+    {
+      "path": "main778-normal-budget-cli.json",
+      "bytes": 3001,
+      "sha256": "9b4b1f9f31a67ddf4caeab7723ab517d00df1b7fb32c9bcdfb395ef9dd169fd0"
+    },
+    {
+      "path": "main778-normal-cli.json",
+      "bytes": 6822,
+      "sha256": "6698f49dbfa79b86f5e374e7d11e0ff815422806ee56ed8f0e7f8d2ec4c606d7"
+    },
+    {
+      "path": "main778-normal-contracts-cli.json",
+      "bytes": 12852,
+      "sha256": "134eed588c501e8ef2b604c288d5563a9151c0153b705631bf22096855621c14"
+    },
+    {
+      "path": "main778-posix-tty.json",
+      "bytes": 1144,
+      "sha256": "15c304c7ea443c36adba904b0cd48d06da7515bb21ddd9fe1a2fa5d674f9f4c2"
     },
     {
       "path": "main9-normal-budget-cli.json",
@@ -447,6 +497,36 @@
       "sha256": "fe7768acda2441228e81b23354b35a4a10235861f72429d113f5c4f7b509c6b1"
     },
     {
+      "path": "performance-main778-baseline.json",
+      "bytes": 459,
+      "sha256": "364cbb1dd891e7c184bf7adfe2e7cc69a7823f5e37b43de0b3e9eb2e6b5f4a23"
+    },
+    {
+      "path": "performance-main778-basic.json",
+      "bytes": 8222,
+      "sha256": "4712fea689f14dbed5056982b8a78aefbceff422ea7173ac430a37f9c21a28e0"
+    },
+    {
+      "path": "performance-main778-execution.json",
+      "bytes": 2736,
+      "sha256": "55f2914dc785a9bca8baad6e6e94de7b9e8d735b0bc05371551601530c0e3391"
+    },
+    {
+      "path": "performance-main778-extended.json",
+      "bytes": 16039,
+      "sha256": "e588982b2ea69552d53446e0f38bc0537c95c0f9dd108922937234b068d3ecb3"
+    },
+    {
+      "path": "performance-main778-regression.json",
+      "bytes": 5941,
+      "sha256": "d807715cb8c39b8ac54da8ba9c1e5af4b0996698d3c3f9b7fb58eb59bf47470c"
+    },
+    {
+      "path": "performance-main778-summary.json",
+      "bytes": 2974,
+      "sha256": "21b29189c15fc38b776cdbdd209bc35ab4bf4e63f876b4ed656002bcc4fe0676"
+    },
+    {
       "path": "performance-main9-baseline.json",
       "bytes": 515,
       "sha256": "4007017acb9f013be2d82fbc53657404bf9e63d7426dca171369e4492da82003"
@@ -498,8 +578,8 @@
     },
     {
       "path": "performance.md",
-      "bytes": 11691,
-      "sha256": "9127ac6a59d545792a4c76af83ce7baf44493c28b57a58f1d52ce51847d43a02"
+      "bytes": 12769,
+      "sha256": "78bf16908c0a35dfa6f18624d7be39c2b2fd99d1ac0a91b93be95bb002ce2094"
     },
     {
       "path": "platform-ledger.md",

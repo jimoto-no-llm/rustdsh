@@ -1,0 +1,95 @@
+{
+  "cases": {
+    "version": {
+      "stdout_equal": true,
+      "median_ratio": 0.9810485913052748,
+      "p95_ratio": 0.8197789253658332,
+      "candidate_peak_rss_bytes": 3309568,
+      "baseline_peak_rss_bytes": 3178496
+    },
+    "tokens_ascii": {
+      "stdout_equal": true,
+      "median_ratio": 0.9752912499502752,
+      "p95_ratio": 0.9648026878313266,
+      "candidate_peak_rss_bytes": 14467072,
+      "baseline_peak_rss_bytes": 13926400
+    },
+    "tokens_cjk": {
+      "stdout_equal": true,
+      "median_ratio": 0.9628893261110842,
+      "p95_ratio": 0.9767119501743816,
+      "candidate_peak_rss_bytes": 5521408,
+      "baseline_peak_rss_bytes": 4947968
+    },
+    "search": {
+      "stdout_equal": true,
+      "median_ratio": 1.0364217663030382,
+      "p95_ratio": 0.7475839157512857,
+      "candidate_peak_rss_bytes": 5373952,
+      "baseline_peak_rss_bytes": 4849664
+    },
+    "prune": {
+      "stdout_equal": true,
+      "median_ratio": 0.9997147762678847,
+      "p95_ratio": 0.9138883192736581,
+      "candidate_peak_rss_bytes": 5406720,
+      "baseline_peak_rss_bytes": 4980736
+    },
+    "sessions_tokens": {
+      "stdout_equal": true,
+      "median_ratio": 0.9838311314950201,
+      "p95_ratio": 0.9393667996329353,
+      "candidate_peak_rss_bytes": 4554752,
+      "baseline_peak_rss_bytes": 4046848
+    },
+    "sessions_known_frame_first_cache_miss": {
+      "stdout_equal": true,
+      "median_ratio": 1.0046186585397894,
+      "p95_ratio": 1.0453861490823957,
+      "candidate_peak_rss_bytes": 5390336,
+      "baseline_peak_rss_bytes": 5226496
+    },
+    "sessions_cache_disabled": {
+      "stdout_equal": true,
+      "median_ratio": 0.9864656378490948,
+      "p95_ratio": 1.0016852707977852,
+      "candidate_peak_rss_bytes": 6242304,
+      "baseline_peak_rss_bytes": 5226496
+    },
+    "sessions_cache_warm": {
+      "stdout_equal": true,
+      "median_ratio": 1.0348089080532934,
+      "p95_ratio": 1.2245050105196962,
+      "candidate_peak_rss_bytes": 4472832,
+      "baseline_peak_rss_bytes": 4096000
+    },
+    "sessions_streaming_zstd_no_content_size": {
+      "stdout_equal": true,
+      "median_ratio": 1.01791919939511,
+      "p95_ratio": 0.8136570307767229,
+      "candidate_peak_rss_bytes": 7602176,
+      "baseline_peak_rss_bytes": 7225344
+    },
+    "search_under_32": {
+      "stdout_equal": true,
+      "median_ratio": 1.0061827509312846,
+      "p95_ratio": 0.9700100185528758,
+      "candidate_peak_rss_bytes": 4374528,
+      "baseline_peak_rss_bytes": 3850240
+    },
+    "search_at_least_32": {
+      "stdout_equal": true,
+      "median_ratio": 0.9792613751904449,
+      "p95_ratio": 1.0437341489517358,
+      "candidate_peak_rss_bytes": 4620288,
+      "baseline_peak_rss_bytes": 4030464
+    },
+    "compact_jsonl_1mib": {
+      "stdout_equal": true,
+      "median_ratio": 0.9436470791084743,
+      "p95_ratio": 1.8604338227433534,
+      "candidate_peak_rss_bytes": 5914624,
+      "baseline_peak_rss_bytes": 5406720
+    }
+  }
+}

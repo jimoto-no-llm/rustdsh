@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "rdsh answer guard",
+    "description": "Request one visible answer when a turn ends with reasoning and no reply text."
+  }
+}

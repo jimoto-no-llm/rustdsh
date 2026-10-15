@@ -2,6 +2,9 @@ import { ProductLocaleError } from "./product-locale.mjs";
 import { RunnerError } from "./agent-runners.mjs";
 
 export const cliEntries = [
+  ["error.questionContractsAction", "question-contractsの操作またはオプションが不正です", "Invalid question-contracts action/options", "question-contracts 操作或选项无效"],
+  ["error.answerApplicationsAction", "answer-applicationsの操作またはオプションが不正です", "Invalid answer-applications action/options", "answer-applications 操作或选项无效"],
+  ["error.instructionQueueAction", "instruction-queueの操作またはオプションが不正です", "Invalid instruction-queue action/options", "instruction-queue 操作或选项无效"],
   ["error.budgetAdmissionAction", "budget-admissionの操作またはオプションが不正です", "Invalid budget-admission action/options", "budget-admission 操作或选项无效"],
   ["error.agentsAction", "agentsの操作またはオプションが不正です", "Invalid agents action/options", "agents 操作或选项无效"],
   ["error.agentsSubmit", "agents submitには--agent、--project、--prompt-fileが必要です", "agents submit requires --agent, --project and --prompt-file", "agents submit 需要 --agent、--project 和 --prompt-file"],

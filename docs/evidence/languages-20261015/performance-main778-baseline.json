@@ -1,0 +1,14 @@
+{
+  "source": "77869b3a297de5bfc7fceb0f90efbc68a7505f27",
+  "root": "/var/tmp/rdsh-main778-baseline-zbrqzwsa",
+  "binary": "/var/tmp/rdsh-main778-baseline-zbrqzwsa/target/release/rdsh",
+  "cache": "APFS cloned release dependency cache; original checkpoint cache unchanged",
+  "command": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked"
+  ],
+  "build_exit": 0,
+  "binary_sha256": "92eeac9dd018e5656ac06895e5404d1930bd79bac50df5915c0e9d93c09b0fb2"
+}

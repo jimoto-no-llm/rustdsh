@@ -1,0 +1,25 @@
+{
+  "command": "npm test",
+  "cwd": "/Users/s30519/.codex/worktrees/rdsh-languages/rustdsh/dashboard",
+  "startedAt": "2026-10-15T09:46:22.325226+00:00",
+  "completedAt": "2026-10-15T09:47:15.285418+00:00",
+  "exitCode": 0,
+  "counts": {
+    "tests": 422,
+    "pass": 323,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 99,
+    "todo": 0
+  },
+  "source": {
+    "file": "dashboard/test/dashboard.test.mjs",
+    "sha256": "9eb92303b76095399ea7bfc835b0f316bc6df5e5eb70fcfcdb534fb303e7d48a"
+  },
+  "log": {
+    "path": "/Users/s30519/work/artifacts/rdsh-main778-integration-20261015/dashboard-final.log",
+    "sha256": "d5f13284004e2bb0016e30cbb02d3314b85bd5fb38c6039988b3eb26efe6204f"
+  },
+  "initialFailurePreserved": true,
+  "cause": "The stdio test resolved cli.mjs from process cwd; at repository root that nonexistent file makes the child exit MODULE_NOT_FOUND, closing MCP. Fixture now resolves its CLI relative to import.meta.url and uses private settings and project cwd."
+}

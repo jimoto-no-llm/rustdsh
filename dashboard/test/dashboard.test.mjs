@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import net from "node:net";
 import http from "node:http";
+import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
@@ -307,14 +308,23 @@ test("project state, HTTP/stdio MCP, subscriptions, answers, and auth work toget
     { name: "stdio-test", version: "1.0.0" },
     { capabilities: {} },
   );
-  await stdio.connect(
-    new StdioClientTransport({
-      command: process.execPath,
-      args: [path.resolve("cli.mjs"), "mcp", "--project", alpha.root],
-      env: { ...process.env },
-      stderr: "pipe",
-    }),
-  );
+  const transport = new StdioClientTransport({
+    command: process.execPath,
+    args: [fileURLToPath(new URL("../cli.mjs", import.meta.url)), "mcp", "--project", alpha.root],
+    cwd: alpha.root,
+    env: { ...process.env, DSH_HOME: path.join(temporary, "dsh") },
+    stderr: "pipe",
+  });
+  let childDiagnostics = "";
+  transport.stderr.on("data", (chunk) => {
+    childDiagnostics = (childDiagnostics + chunk.toString()).slice(-8192);
+  });
+  try {
+    await stdio.connect(transport);
+  } catch (error) {
+    t.diagnostic(`MCP child stderr: ${childDiagnostics}`);
+    throw error;
+  }
   const stdioFeedback = await stdio.callTool({
     name: "dashboard_get_feedback",
     arguments: { after: 0 },

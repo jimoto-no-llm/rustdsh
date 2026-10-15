@@ -60,7 +60,9 @@ selection uses `--language`, nonblank `RDSH_LANG`, `general.language`, then the
 first nonblank `LC_ALL`/`LC_MESSAGES`/`LANG`, finally English. A malformed saved
 language stops startup without rewriting its file. The native JSON bridges
 `subagents plan`, `task-outcomes apply|validate|schema`, and
-`cost-ledger validate|public|schema`, and `budget-admission apply|validate|public` do not read settings;
+`cost-ledger validate|public|schema`, `budget-admission apply|validate|public`,
+`question-contracts apply|validate|public`, `answer-applications apply|validate|public|schema`,
+and `instruction-queue validate|context|submit|resolve|control` do not read settings;
 they resolve display language from the explicit flag or environment and preserve
 native request/output data and exit status even if `rdsh.json` is corrupt.
 The cost-ledger bridge serializes its validated input into an exclusive request

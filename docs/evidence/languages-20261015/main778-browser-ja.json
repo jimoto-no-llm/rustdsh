@@ -1,0 +1,25 @@
+{
+  "language": "ja",
+  "scope": "real Rust setup/serve and Node project CLI+HTTP MCP+browser; no model calls, Tailscale or Electron Desktop",
+  "browser": "Browser plugin not available; Playwright",
+  "viewports": [
+    {
+      "width": 1280,
+      "height": 900
+    },
+    {
+      "width": 390,
+      "height": 844
+    }
+  ],
+  "flows": [
+    "setup: protected token handoff -> Extras enable -> file readback -> reload retained -> corrupt sharing policy localized with canonical API JSON -> repair",
+    "native serve: protected token handoff -> tokens -> prune -> sessions -> reload retained",
+    "palette: Chinese, Japanese and English queries find localized commands; Escape restores focus",
+    "cancellation: selected-language owned reason persisted through real authenticated HTTP; original question unchanged",
+    "project CLI: workspace layout persistence/navigation plus  real MCP task/question -> browser draft preserved on SSE -> browser answer -> MCP/file readback -> process restart retained answer and revoked old key"
+  ],
+  "page_errors": [],
+  "console_errors": [],
+  "result": "PASS"
+}

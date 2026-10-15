@@ -1,0 +1,48 @@
+{
+  "result": "PASS",
+  "scope": "actual POSIX PTY, no provider/model calls, no credentials entered or stored",
+  "cases": [
+    {
+      "language": "en",
+      "mode": "paste",
+      "prompt": "paste DEEPSEEK_API_KEY here",
+      "exit": 0,
+      "credentials_written": false
+    },
+    {
+      "language": "en",
+      "mode": "save",
+      "prompt": "persist DEEPSEEK_API_KEY from environment",
+      "exit": 0,
+      "credentials_written": false
+    },
+    {
+      "language": "zh-CN",
+      "mode": "paste",
+      "prompt": "在此粘贴 DEEPSEEK_API_KEY",
+      "exit": 0,
+      "credentials_written": false
+    },
+    {
+      "language": "zh-CN",
+      "mode": "save",
+      "prompt": "将环境变量 DEEPSEEK_API_KEY 保存到",
+      "exit": 0,
+      "credentials_written": false
+    },
+    {
+      "language": "ja",
+      "mode": "paste",
+      "prompt": "DEEPSEEK_API_KEY を貼り付けてください",
+      "exit": 0,
+      "credentials_written": false
+    },
+    {
+      "language": "ja",
+      "mode": "save",
+      "prompt": "環境変数 DEEPSEEK_API_KEY を",
+      "exit": 0,
+      "credentials_written": false
+    }
+  ]
+}

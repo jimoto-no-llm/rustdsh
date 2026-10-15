@@ -1,0 +1,596 @@
+{
+  "scope": "Normal integration of upstream77869b3; macOS source and immutable ordinary release artifact. No model API, paid runner, certificate purchase or installed binary replacement.",
+  "first_parent": "33af94b9b2b46209dab4c55fb5c06d98798f6ef2",
+  "upstream_parent": "77869b3a297de5bfc7fceb0f90efbc68a7505f27",
+  "source_inventory": "integration-main778-source.json",
+  "source_inventory_sha256": "0a3c0b0c35e425086e71ebf58d92f99bb96c984e70b6d9cb0f5d44efb73500bd",
+  "artifacts": {
+    "normal_build_command": [
+      "cargo",
+      "build",
+      "--release",
+      "--locked"
+    ],
+    "normal_binary": "/Users/s30519/work/artifacts/rdsh-main778-integration-20261015/rdsh-normal-main778",
+    "normal_sha256": "1a7d683e4e97815a9837b56261c33d43e1316f6105d909edb2ad66e9f1470397",
+    "debug_sha256": "47ade201951e006aec3a086a3ab7832efa8c938b0c8cffbea041c00bf716270d"
+  },
+  "checks": [
+    {
+      "name": "format",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all"
+      ],
+      "exit": 0,
+      "seconds": 0.818,
+      "log": "format.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "fmt-check",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 0.824,
+      "log": "fmt-check.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "clippy-debug",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 1.444,
+      "log": "clippy-debug.log",
+      "sha256": "0396f23213a3754104056d40c6dfb2dc98c96855febe43c6db735bf830420257"
+    },
+    {
+      "name": "clippy-release",
+      "command": [
+        "cargo",
+        "clippy",
+        "--release",
+        "--locked",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 1.446,
+      "log": "clippy-release.log",
+      "sha256": "8f9cd7db070df086c8b1de2e84f1a6591b4217931ad6cb6f5d48a391d898c222"
+    },
+    {
+      "name": "rust-release",
+      "command": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked"
+      ],
+      "exit": 0,
+      "seconds": 29.626,
+      "log": "rust-release.log",
+      "sha256": "e30c883cbfb7ff7fc5790ad35c47db6c917b8564dbbc93b30562a4e377062731"
+    },
+    {
+      "name": "example-extended",
+      "command": [
+        "cargo",
+        "test",
+        "--release",
+        "--example",
+        "benchmark_extended"
+      ],
+      "exit": 0,
+      "seconds": 6.601,
+      "log": "example-extended.log",
+      "sha256": "ad29fd80a0f5dd5aec1f373d5c02957b8be253d9c2a2fb56de394c323c9592bf"
+    },
+    {
+      "name": "example-models",
+      "command": [
+        "cargo",
+        "test",
+        "--release",
+        "--example",
+        "benchmark_models"
+      ],
+      "exit": 0,
+      "seconds": 9.402,
+      "log": "example-models.log",
+      "sha256": "62109dd8c82bcbe85b628c5916e97cd24b3efda448cba2fac844f14a470f76a2"
+    },
+    {
+      "name": "build-debug",
+      "command": [
+        "cargo",
+        "build",
+        "--locked"
+      ],
+      "exit": 0,
+      "seconds": 9.627,
+      "log": "build-debug.log",
+      "sha256": "90202f0987f5d168e10c5e622e37a43c82ccfd8bd47c33976680d3560c6ea854"
+    },
+    {
+      "name": "build-normal",
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked"
+      ],
+      "exit": 0,
+      "seconds": 59.466,
+      "log": "build-normal.log",
+      "sha256": "8c8c02367593a42fd534388ef90e758f0426d452d0becbc7608f6b90d7da90d4"
+    },
+    {
+      "name": "desktop",
+      "command": [
+        "node",
+        "--test",
+        "tests/desktop.test.mjs"
+      ],
+      "exit": 0,
+      "seconds": 3.992,
+      "log": "desktop.log",
+      "sha256": "39afab0600f9ba5c0c69a17b87b720d0e1d1d4d409f1ab2ae4aaf09702eab976"
+    },
+    {
+      "name": "fence",
+      "command": [
+        "node",
+        "--test",
+        "tests/model_benchmark/fence.test.mjs"
+      ],
+      "exit": 0,
+      "seconds": 0.094,
+      "log": "fence.log",
+      "sha256": "b91798467c2853eba7dccc433f6959292fef4390219beba2a0bbab34822a3e9c"
+    },
+    {
+      "name": "regress",
+      "command": [
+        "sh",
+        "tests/regress.sh"
+      ],
+      "exit": 0,
+      "seconds": 38.741,
+      "log": "regress.log",
+      "sha256": "f64bfb66a9aaeb37e5e7459e0bc76ad97b0090e52d2a76af92b5bbfd449233a2"
+    }
+  ],
+  "extra_checks": [
+    {
+      "name": "msrv",
+      "command": [
+        "cargo",
+        "+1.85.0",
+        "check",
+        "--locked",
+        "--all-targets"
+      ],
+      "exit": 0,
+      "seconds": 13.722,
+      "log": "msrv.log",
+      "sha256": "83e0c9784b9cb15f7c7a7045f63a4c9c8e4866fd275224799771e5c81a4df9c8"
+    },
+    {
+      "name": "actionlint",
+      "command": [
+        "actionlint",
+        ".github/workflows/ci.yml",
+        ".github/workflows/codeql.yml",
+        ".github/workflows/pin-release-digests.yml"
+      ],
+      "exit": 0,
+      "seconds": 0.241,
+      "log": "actionlint.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "guard-native-en",
+      "command": [
+        "node",
+        "tests/e2e/answer-guard-native.mjs"
+      ],
+      "exit": 0,
+      "seconds": 0.222,
+      "log": "guard-native-en.log",
+      "sha256": "a2686b23b8360bec4792e3364d47fb3e0010f8fe65e408d64aa9dcd66daeca54"
+    },
+    {
+      "name": "guard-native-zh-CN",
+      "command": [
+        "node",
+        "tests/e2e/answer-guard-native.mjs"
+      ],
+      "exit": 0,
+      "seconds": 0.149,
+      "log": "guard-native-zh-CN.log",
+      "sha256": "5485176b2e6fb60eb994eb008bcf70f687acadf9570694c38de090854708634a"
+    },
+    {
+      "name": "guard-native-ja",
+      "command": [
+        "node",
+        "tests/e2e/answer-guard-native.mjs"
+      ],
+      "exit": 0,
+      "seconds": 0.146,
+      "log": "guard-native-ja.log",
+      "sha256": "9090527b83a0e85b790bae5b4b469da71fcfc64889fcaa8f94937326719b1972"
+    }
+  ],
+  "plugin_checks": [
+    {
+      "name": "plugins",
+      "command": [
+        "node",
+        "--test",
+        "tests/plugin-security.test.mjs",
+        "tests/settings-client.test.mjs",
+        "tests/update-banner.test.mjs",
+        "tests/rdsh-mobile-ui.test.mjs",
+        "tests/answer-guard.test.mjs",
+        "tests/answer-guard-locale.test.mjs",
+        "tests/feature-switches.test.mjs",
+        "tests/discord-presence.test.mjs",
+        "tests/model_benchmark/fence.test.mjs"
+      ],
+      "exit": 0,
+      "seconds": 14.74,
+      "log": "plugins.log",
+      "sha256": "5318b2e03142a4c1174063f3d5619e59f51d8fe4a31825952557b996ec26c6c2"
+    },
+    {
+      "name": "guard-native",
+      "command": [
+        "node",
+        "tests/e2e/answer-guard-native.mjs"
+      ],
+      "exit": 0,
+      "seconds": 0.223,
+      "log": "guard-native.log",
+      "sha256": "9090527b83a0e85b790bae5b4b469da71fcfc64889fcaa8f94937326719b1972"
+    }
+  ],
+  "browser_checks": [
+    {
+      "name": "languages",
+      "command": [
+        "node",
+        "tests/e2e/languages.mjs"
+      ],
+      "exit": 0,
+      "seconds": 19.481,
+      "log": "languages-browser.log",
+      "sha256": "ac869bd8058fd64cc7f38edb8c7bada2392cbc87799f43dd3b71f222b6c60c49"
+    },
+    {
+      "name": "task-outcomes",
+      "command": [
+        "node",
+        "tests/e2e/task-outcomes.mjs"
+      ],
+      "exit": 0,
+      "seconds": 10.341,
+      "log": "task-outcomes-browser.log",
+      "sha256": "5729eb0218f691bc9e2fe076f82cde6dede4495f3f5258007fd7b6c80c0db075"
+    },
+    {
+      "name": "outcome-languages",
+      "command": [
+        "node",
+        "tests/e2e/outcome-languages.mjs"
+      ],
+      "exit": 0,
+      "seconds": 11.983,
+      "log": "outcome-languages-browser.log",
+      "sha256": "3f152f5785a8c00d9e7aa220a8a43b28cc404c17c19f47b0368444a30c10a55a"
+    }
+  ],
+  "ui_checks": [
+    {
+      "name": "tty",
+      "command": [
+        "python3",
+        "tests/e2e/cli-tty.py"
+      ],
+      "exit": 0,
+      "seconds": 0.165,
+      "log": "tty.log",
+      "sha256": "d4429571c543e19b3e6f85ee679bed176513d0da7100b01c7711500e7e2c0204"
+    },
+    {
+      "name": "banner-browser",
+      "command": [
+        "node",
+        "tests/e2e/update-banner.mjs"
+      ],
+      "exit": 0,
+      "seconds": 10.235,
+      "log": "banner-browser.log",
+      "sha256": "da57d577abcdb6f46e26edb2cd3d9dde525ce0767f5ceaef334d8556fa80eb80"
+    }
+  ],
+  "results": {
+    "rust_release": {
+      "passed": 638,
+      "targets": 22,
+      "failed": 0,
+      "ignored": 0
+    },
+    "dashboard": {
+      "tests": 422,
+      "pass": 323,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 99,
+      "todo": 0
+    },
+    "plugins": {
+      "passed": 115,
+      "failed": 0,
+      "skipped": 0
+    },
+    "normal_cli": {
+      "worker_scope": 52,
+      "budget": 21,
+      "contracts": 36,
+      "total": 109
+    },
+    "settings_prototype": {
+      "passed": 16
+    },
+    "posix_tty": {
+      "passed": 6,
+      "physical_ime": false,
+      "credentials_written": false
+    },
+    "answer_guard_actual_agent_loop": {
+      "languages": [
+        "en",
+        "zh-CN",
+        "ja"
+      ],
+      "scenarios_per_language": 4,
+      "paid_model_calls": 0,
+      "provider": "local scripted LlmAdapter in the actual installed Cordis/AgentLoop; not real inference",
+      "runtime": "0.2.0-rc.2 immutable pinned headless candidate built at9bf; runtime files unchanged at778",
+      "notice_only_localized": true,
+      "model_facing_reminder_unchanged": true
+    },
+    "browser": {
+      "languages": [
+        "en",
+        "zh-CN",
+        "ja"
+      ],
+      "all_maintained_flows_passed": true,
+      "banner_flows": 12
+    },
+    "regress": {
+      "passed": 70
+    },
+    "performance": {
+      "equal_stdout_cases": 13,
+      "maintained_four_case_default_ten_percent_gate_exit": 0,
+      "median_ratio_range": [
+        0.9436470791084743,
+        1.0364217663030382
+      ],
+      "max_p95_ratio": 1.8604338227433534,
+      "samples": 15,
+      "warmups": 3,
+      "shared_host": true
+    }
+  },
+  "initial_failures": [
+    {
+      "file": "initial-contract-fixture-failure/rust-release.log",
+      "cause": "New locale fixture supplied a now field to instruction-queue, whose request rejects that field. Corrected only that fixture to the upstream request fields; exact canonical JSON and nonmutation assertions remain."
+    },
+    {
+      "file": "initial-dashboard-connection-failure/dashboard.log",
+      "cause": "A fixture resolved cli.mjs from process cwd. Repository-root execution selected a nonexistent file and closed stdio MCP. Reproduced exact MODULE_NOT_FOUND, then fixed only module-relative path and private settings. Root-focused and normal dashboard npm test pass with original assertions."
+    },
+    {
+      "file": "normal-contracts CLI exploratory setup",
+      "cause": "The initial private probe passed operation=schema although upstream schema expects operation=public; baseline rejected it before candidate comparison. Corrected private fixture, final36comparisons pass."
+    }
+  ],
+  "engine_invariance": "All three engine bodies before their CLI JSON reader and js_json.rs match exact upstream778; only CLI presentation contexts/read diagnostics changed. Official locale/en,zh,ja.json exports localize plugin metadata.",
+  "historic_limits": "Earlier a2 Linux/Windows,9bf headless and before/after/GIF receipts keep their own source/binary identities; no pass inheritance. Current-head CI and human re-review are separate after publication. Physical OS IME, authenticated external services and signing prerequisites remain in known-exceptions.",
+  "logs": [
+    {
+      "file": "actionlint.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "answer-guard-locale.log",
+      "bytes": 1854,
+      "sha256": "bd30b6744724e38d3cd479c2e3a512b058fdbdfc2ae714fdfdad704d416d0261"
+    },
+    {
+      "file": "banner-browser.log",
+      "bytes": 161,
+      "sha256": "da57d577abcdb6f46e26edb2cd3d9dde525ce0767f5ceaef334d8556fa80eb80"
+    },
+    {
+      "file": "build-debug.log",
+      "bytes": 211,
+      "sha256": "90202f0987f5d168e10c5e622e37a43c82ccfd8bd47c33976680d3560c6ea854"
+    },
+    {
+      "file": "build-normal.log",
+      "bytes": 169,
+      "sha256": "8c8c02367593a42fd534388ef90e758f0426d452d0becbc7608f6b90d7da90d4"
+    },
+    {
+      "file": "clippy-debug.log",
+      "bytes": 153,
+      "sha256": "0396f23213a3754104056d40c6dfb2dc98c96855febe43c6db735bf830420257"
+    },
+    {
+      "file": "clippy-release.log",
+      "bytes": 247,
+      "sha256": "8f9cd7db070df086c8b1de2e84f1a6591b4217931ad6cb6f5d48a391d898c222"
+    },
+    {
+      "file": "dashboard-final.log",
+      "bytes": 51984,
+      "sha256": "d5f13284004e2bb0016e30cbb02d3314b85bd5fb38c6039988b3eb26efe6204f"
+    },
+    {
+      "file": "dashboard.log",
+      "bytes": 53302,
+      "sha256": "21fd812ebfd395539c6d13e5b124acd7e59f026738022d97191621e53753c19d"
+    },
+    {
+      "file": "desktop.log",
+      "bytes": 683,
+      "sha256": "39afab0600f9ba5c0c69a17b87b720d0e1d1d4d409f1ab2ae4aaf09702eab976"
+    },
+    {
+      "file": "example-extended.log",
+      "bytes": 568,
+      "sha256": "ad29fd80a0f5dd5aec1f373d5c02957b8be253d9c2a2fb56de394c323c9592bf"
+    },
+    {
+      "file": "example-models.log",
+      "bytes": 1270,
+      "sha256": "62109dd8c82bcbe85b628c5916e97cd24b3efda448cba2fac844f14a470f76a2"
+    },
+    {
+      "file": "fence.log",
+      "bytes": 317,
+      "sha256": "b91798467c2853eba7dccc433f6959292fef4390219beba2a0bbab34822a3e9c"
+    },
+    {
+      "file": "fmt-check.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "format.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "guard-native-en.log",
+      "bytes": 7282,
+      "sha256": "a2686b23b8360bec4792e3364d47fb3e0010f8fe65e408d64aa9dcd66daeca54"
+    },
+    {
+      "file": "guard-native-ja.log",
+      "bytes": 7290,
+      "sha256": "9090527b83a0e85b790bae5b4b469da71fcfc64889fcaa8f94937326719b1972"
+    },
+    {
+      "file": "guard-native-zh-CN.log",
+      "bytes": 7248,
+      "sha256": "5485176b2e6fb60eb994eb008bcf70f687acadf9570694c38de090854708634a"
+    },
+    {
+      "file": "guard-native.log",
+      "bytes": 7290,
+      "sha256": "9090527b83a0e85b790bae5b4b469da71fcfc64889fcaa8f94937326719b1972"
+    },
+    {
+      "file": "initial-contract-fixture-failure/rust-release.log",
+      "bytes": 35086,
+      "sha256": "7bed79a65cd2b4a4573990d82f88ed5843eb1384c031f36cf69b183b4722178a"
+    },
+    {
+      "file": "initial-dashboard-connection-failure/dashboard.log",
+      "bytes": 53302,
+      "sha256": "21fd812ebfd395539c6d13e5b124acd7e59f026738022d97191621e53753c19d"
+    },
+    {
+      "file": "languages-browser.log",
+      "bytes": 2481,
+      "sha256": "ac869bd8058fd64cc7f38edb8c7bada2392cbc87799f43dd3b71f222b6c60c49"
+    },
+    {
+      "file": "main778-baseline-build.log",
+      "bytes": 196,
+      "sha256": "42c8c524faf46f241cf46a151e4f878468230e26522af29085f55a5948ba5428"
+    },
+    {
+      "file": "msrv.log",
+      "bytes": 212,
+      "sha256": "83e0c9784b9cb15f7c7a7045f63a4c9c8e4866fd275224799771e5c81a4df9c8"
+    },
+    {
+      "file": "outcome-languages-browser.log",
+      "bytes": 1080,
+      "sha256": "3f152f5785a8c00d9e7aa220a8a43b28cc404c17c19f47b0368444a30c10a55a"
+    },
+    {
+      "file": "performance-basic.log",
+      "bytes": 422,
+      "sha256": "711e56270d3d7777bee7b3a03131aac9312358ea1defac9a9abec8f2d141e103"
+    },
+    {
+      "file": "performance-extended.log",
+      "bytes": 35,
+      "sha256": "97d97b090df29c4dfe6a23b49c2f6e2478c0ef07d4c68887f2893813b9ea56ff"
+    },
+    {
+      "file": "performance-regression.log",
+      "bytes": 591,
+      "sha256": "3607bfb1dbebf724c11095f3aa3b2dc748878d5b11612a19f87df587d1507b4d"
+    },
+    {
+      "file": "plugins.log",
+      "bytes": 10371,
+      "sha256": "5318b2e03142a4c1174063f3d5619e59f51d8fe4a31825952557b996ec26c6c2"
+    },
+    {
+      "file": "regress.log",
+      "bytes": 4976,
+      "sha256": "f64bfb66a9aaeb37e5e7459e0bc76ad97b0090e52d2a76af92b5bbfd449233a2"
+    },
+    {
+      "file": "rust-release.log",
+      "bytes": 50909,
+      "sha256": "e30c883cbfb7ff7fc5790ad35c47db6c917b8564dbbc93b30562a4e377062731"
+    },
+    {
+      "file": "settings-prototype.log",
+      "bytes": 461,
+      "sha256": "069a88e802d6b83e9f188c37b39fbce99c2ccedeb6ff83d9ff3fb7c5babef358"
+    },
+    {
+      "file": "task-outcomes-browser.log",
+      "bytes": 135,
+      "sha256": "5729eb0218f691bc9e2fe076f82cde6dede4495f3f5258007fd7b6c80c0db075"
+    },
+    {
+      "file": "tty.log",
+      "bytes": 111,
+      "sha256": "d4429571c543e19b3e6f85ee679bed176513d0da7100b01c7711500e7e2c0204"
+    }
+  ]
+}

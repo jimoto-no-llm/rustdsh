@@ -92,7 +92,7 @@
     {
       "id": "loaded-performance-tail",
       "status": "observed-shared-host-measurement-limit",
-      "scope": "Earlier 8ee/2db loaded streaming-zstd p95 ratio 2.267 is retained. Later cc019 comparison has 13 identical stdout values, median ratios 0.921–1.034 and maximum p95 ratio 1.160. Different baseline/load prevents causal attribution. Final latest-main29 candidate retains all13 identical stdout values, median ratios0.955–1.068 and maxp95ratio1.375; maintained10% median regression gate passes. Historical a2 test-stage p95max4.691 is retained. Final a2 normal release:13identicalstdout,medianratios0.921–1.015,maxp95ratio2.133; unchanged10%median gate passes. Final exact9bf comparison preserves13equalstdout, first median range0.894–1.142/maxp95ratio1.367; four maintained headline cases pass default10%gate. Targeted31sample sessions confirmation median1.026/p951.014; first samples retained.",
+      "scope": "Earlier 8ee/2db loaded streaming-zstd p95 ratio 2.267 is retained. Later cc019 comparison has 13 identical stdout values, median ratios 0.921–1.034 and maximum p95 ratio 1.160. Different baseline/load prevents causal attribution. Final latest-main29 candidate retains all13 identical stdout values, median ratios0.955–1.068 and maxp95ratio1.375; maintained10% median regression gate passes. Historical a2 test-stage p95max4.691 is retained. Final a2 normal release:13identicalstdout,medianratios0.921–1.015,maxp95ratio2.133; unchanged10%median gate passes. Final exact9bf comparison preserves13equalstdout, first median range0.894–1.142/maxp95ratio1.367; four maintained headline cases pass default10%gate. Targeted31sample sessions confirmation median1.026/p951.014; first samples retained. Final778 exactupstream comparison preserves13equalstdout, median0.944–1.036/maxp951.860; default fourheadline10%gate passes. Earlier outliers remain historical.",
       "next_gate": "isolated reproducibility and causal attribution before a speedup/regression claim",
       "evidence": [
         "performance.md",
@@ -101,13 +101,15 @@
         "performance-main29-summary.json",
         "performance-a2-summary.json",
         "performance-main9-summary.json",
-        "performance-main9-sessions-confirmation.json"
+        "performance-main9-sessions-confirmation.json",
+        "performance-main778-summary.json",
+        "performance-main778-regression.json"
       ]
     },
     {
       "id": "new-head-ci-review-and-release",
       "status": "separate-gates",
-      "scope": "Final 9bf integration local proof is separately recorded: macOS552Rust/18targets, Dashboard320/419(99OSskips), rebuilt normal artifact CLI52+budget21. Historical a2 native Linux/Windows receipts retain their own source and binary identities. Current-head CI, human approval, merge and release remain separate.",
+      "scope": "Latest778 integration local proof: macOS638Rust/22targets, Dashboard323/422(99OSskips), normalartifact109CLI comparisons,3languages actualAgentLoop/4scenarios each,115plugin checks. Historical Linux/Windows receipts retain their own source/binary identities. Current-head CI, human approval, merge and release remain separate.",
       "historical_evidence": "https://github.com/jimoto-no-llm/rustdsh/actions/runs/38675592833/attempts/2",
       "evidence": [
         "macos-a2-validation.json",
@@ -115,7 +117,8 @@
         "linux-serial-fixture-repair.json",
         "windows-a2-validation.json",
         "integration-096-validation.json",
-        "integration-main9-validation.json"
+        "integration-main9-validation.json",
+        "integration-main778-validation.json"
       ]
     },
     {

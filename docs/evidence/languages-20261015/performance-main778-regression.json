@@ -1,0 +1,237 @@
+{
+  "schema_version": 2,
+  "tool": "benchmark_regression",
+  "generated_at_utc": 1792057758,
+  "platform": {
+    "os": "macos",
+    "arch": "aarch64",
+    "family": "unix",
+    "cpu_count": 18
+  },
+  "toolchain": {
+    "rustc": "rustc 1.99.0 (b940084d7 2026-09-28)",
+    "cargo": "cargo 1.99.0 (5f94df478 2026-08-27)"
+  },
+  "config": {
+    "n": 15,
+    "warmups": 3,
+    "max_regression_percent": 10.0,
+    "headline_cases": [
+      "version_startup",
+      "tokens_1mib",
+      "tokens_10mib",
+      "search_tree_200_files"
+    ],
+    "timing": "parent wall clock from spawn to last stdout byte; process launch included",
+    "scope": "real rdsh subprocess with per-build isolated HOME/DSH_HOME/XDG and working directories; no model calls and no credentials",
+    "fixtures": {
+      "tokens_1mib_bytes": 1048652,
+      "tokens_10mib_bytes": 10485812,
+      "search_tree_files": 200,
+      "search_tree_bytes": 2776584
+    }
+  },
+  "binaries": {
+    "candidate": {
+      "path": "/Users/s30519/work/artifacts/rdsh-main778-integration-20261015/rdsh-normal-main778",
+      "size_bytes": 4875488,
+      "sha256": "1a7d683e4e97815a9837b56261c33d43e1316f6105d909edb2ad66e9f1470397"
+    },
+    "baseline": {
+      "path": "/private/var/tmp/rdsh-main778-baseline-zbrqzwsa/target/release/rdsh",
+      "size_bytes": 4660752,
+      "sha256": "92eeac9dd018e5656ac06895e5404d1930bd79bac50df5915c0e9d93c09b0fb2"
+    }
+  },
+  "cases": {
+    "version_startup": {
+      "samples_ms": [
+        8.711,
+        8.004,
+        7.123,
+        7.686,
+        7.524,
+        6.752,
+        7.69,
+        7.545,
+        8.726,
+        7.973,
+        7.396,
+        7.801,
+        7.403,
+        7.176,
+        9.978
+      ],
+      "median_ms": 7.686,
+      "p95_ms": 9.978,
+      "min_ms": 6.752,
+      "max_ms": 9.978,
+      "throughput_mib_s": null,
+      "correct": true,
+      "evidence": "version=0.4.0",
+      "input_bytes": 0,
+      "cpu_median_ms": 3.267,
+      "peak_rss_bytes": 3325952,
+      "exit_code": 0,
+      "argv": [
+        "--version"
+      ],
+      "comparison": {
+        "baseline_label": "binary:/private/var/tmp/rdsh-main778-baseline-zbrqzwsa/target/release/rdsh",
+        "baseline_median_ms": 8.443,
+        "ratio": 0.91,
+        "delta_percent": -8.963,
+        "stdout_equal": true,
+        "output_compatible": true,
+        "regressed": false
+      },
+      "outcome": "ok",
+      "headline": true
+    },
+    "tokens_1mib": {
+      "samples_ms": [
+        8.836,
+        8.311,
+        8.992,
+        8.545,
+        8.359,
+        8.108,
+        8.662,
+        9.963,
+        8.363,
+        8.019,
+        8.467,
+        8.625,
+        7.787,
+        10.637,
+        8.205
+      ],
+      "median_ms": 8.467,
+      "p95_ms": 10.637,
+      "min_ms": 7.787,
+      "max_ms": 10.637,
+      "throughput_mib_s": 118.111,
+      "correct": true,
+      "evidence": "tokens=262163",
+      "input_bytes": 1048652,
+      "cpu_median_ms": 3.95,
+      "peak_rss_bytes": null,
+      "exit_code": 0,
+      "argv": [
+        "tokens",
+        "/var/folders/th/b4c841yj4vsfd0cp40pwkbnd_1cjj0/T/rdsh-perf-18821-3715bc61a77f6784/tokens-1mib.txt",
+        "--preview",
+        "0"
+      ],
+      "comparison": {
+        "baseline_label": "binary:/private/var/tmp/rdsh-main778-baseline-zbrqzwsa/target/release/rdsh",
+        "baseline_median_ms": 8.617,
+        "ratio": 0.983,
+        "delta_percent": -1.734,
+        "stdout_equal": true,
+        "output_compatible": true,
+        "regressed": false
+      },
+      "outcome": "ok",
+      "headline": true
+    },
+    "tokens_10mib": {
+      "samples_ms": [
+        10.159,
+        9.828,
+        9.906,
+        10.012,
+        10.648,
+        10.098,
+        10.292,
+        11.633,
+        11.16,
+        10.866,
+        10.957,
+        9.962,
+        10.179,
+        9.801,
+        10.814
+      ],
+      "median_ms": 10.179,
+      "p95_ms": 11.633,
+      "min_ms": 9.801,
+      "max_ms": 11.633,
+      "throughput_mib_s": 982.416,
+      "correct": true,
+      "evidence": "tokens=2621453",
+      "input_bytes": 10485812,
+      "cpu_median_ms": 5.793,
+      "peak_rss_bytes": null,
+      "exit_code": 0,
+      "argv": [
+        "tokens",
+        "/var/folders/th/b4c841yj4vsfd0cp40pwkbnd_1cjj0/T/rdsh-perf-18821-3715bc61a77f6784/tokens-10mib.txt",
+        "--preview",
+        "0"
+      ],
+      "comparison": {
+        "baseline_label": "binary:/private/var/tmp/rdsh-main778-baseline-zbrqzwsa/target/release/rdsh",
+        "baseline_median_ms": 10.509,
+        "ratio": 0.969,
+        "delta_percent": -3.144,
+        "stdout_equal": true,
+        "output_compatible": true,
+        "regressed": false
+      },
+      "outcome": "ok",
+      "headline": true
+    },
+    "search_tree_200_files": {
+      "samples_ms": [
+        12.915,
+        13.758,
+        11.145,
+        11.576,
+        11.5,
+        12.153,
+        10.831,
+        11.406,
+        11.585,
+        11.638,
+        11.387,
+        10.921,
+        11.604,
+        12.303,
+        11.952
+      ],
+      "median_ms": 11.585,
+      "p95_ms": 13.758,
+      "min_ms": 10.831,
+      "max_ms": 13.758,
+      "throughput_mib_s": 228.574,
+      "correct": true,
+      "evidence": "hits=200",
+      "input_bytes": 0,
+      "cpu_median_ms": 24.045,
+      "peak_rss_bytes": null,
+      "exit_code": 0,
+      "argv": [
+        "search",
+        "regression-needle",
+        "--dir",
+        "/var/folders/th/b4c841yj4vsfd0cp40pwkbnd_1cjj0/T/rdsh-perf-18821-3715bc61a77f6784/search-tree",
+        "--max",
+        "210"
+      ],
+      "comparison": {
+        "baseline_label": "binary:/private/var/tmp/rdsh-main778-baseline-zbrqzwsa/target/release/rdsh",
+        "baseline_median_ms": 11.558,
+        "ratio": 1.002,
+        "delta_percent": 0.232,
+        "stdout_equal": true,
+        "output_compatible": true,
+        "regressed": false
+      },
+      "outcome": "ok",
+      "headline": true
+    }
+  },
+  "failures": [],
+  "regressions": []
+}
