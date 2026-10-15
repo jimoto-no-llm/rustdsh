@@ -118,3 +118,52 @@ fn action_and_document_must_match() {
     assert!(String::from_utf8_lossy(&output.stderr)
         .contains("Input JSON operation does not match the requested action"));
 }
+
+#[test]
+fn record_requires_a_valid_reply_command_id() {
+    let fixture = Fixture::new();
+    let request = format!(
+        r#"{{"operation":"record","state":{{"project":{{"id":"prj_0123456789abcdef"}},"feedback":[]}},"input":{{"command_id":"bad","message":{{"question_id":"Q1"}}}},"now":"{NOW}"}}"#
+    );
+    let output = fixture.run("apply", &request);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("Input JSON is invalid"));
+}
+
+#[test]
+fn record_requires_an_object_message_with_question_id() {
+    let fixture = Fixture::new();
+    let valid_id = "reply_01234567-89ab-cdef-0123-456789abcdef";
+    for message in ["null", "[]", "{}"] {
+        let request = format!(
+            r#"{{"operation":"record","state":{{"project":{{"id":"prj_0123456789abcdef"}},"feedback":[]}},"input":{{"command_id":"{valid_id}","message":{message}}},"now":"{NOW}"}}"#
+        );
+        let output = fixture.run("apply", &request);
+        assert_eq!(output.status.code(), Some(1), "message={message}");
+        assert!(output.stdout.is_empty(), "message={message}");
+        assert!(
+            String::from_utf8_lossy(&output.stderr).contains("Input JSON is invalid"),
+            "message={message}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+}
+
+#[test]
+fn record_outputs_only_the_answer_application_registry() {
+    let fixture = Fixture::new();
+    let valid_id = "reply_01234567-89ab-cdef-0123-456789abcdef";
+    let request = format!(
+        r#"{{"operation":"record","state":{{"project":{{"id":"prj_0123456789abcdef"}},"feedback":[]}},"input":{{"command_id":"{valid_id}","message":{{"question_id":"Q1"}}}},"now":"{NOW}"}}"#
+    );
+    let output = fixture.run("apply", &request);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let printed: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(printed["answer_applications"], serde_json::Value::Null);
+    assert!(printed["answer_applications"].get("project").is_none());
+}

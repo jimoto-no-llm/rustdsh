@@ -165,7 +165,7 @@ fn identifier(value: Option<&Value>, label: &str) -> QuestionResult<String> {
 
 /// `digest(value)`: the sha256 hex of `JSON.stringify(value)`.
 fn digest(value: &Value) -> String {
-    let json = serde_json::to_string(value).expect("state values serialise");
+    let json = crate::js_json::stringify(value);
     let mut hasher = Sha256::new();
     hasher.update(json.as_bytes());
     let bytes = hasher.finalize();
@@ -194,12 +194,8 @@ fn timestamp(value: Option<&Value>) -> QuestionResult<Value> {
     Ok(Value::String(instant))
 }
 
-/// The millisecond offset from the epoch `Date.parse` gives for a string it
-/// accepts, restricted to the spellings this module can meet.
-///
-/// `Date.parse` also accepts a bare date, a space separator and an offset, but
-/// no fixture needs those, and the port refuses them instead of guessing. They
-/// are reported as `Invalid expires_at`, the same message a rejection gives.
+/// The ISO date and date-time spellings needed to match the JavaScript module:
+/// date-only UTC, local date-times, and explicit `Z`/numeric offsets.
 fn parse_js_date(text: &str) -> Option<String> {
     let bytes = text.as_bytes();
     let digits = |range: std::ops::Range<usize>| -> Option<u32> {
@@ -210,11 +206,7 @@ fn parse_js_date(text: &str) -> Option<String> {
             None
         }
     };
-    // `YYYY-MM-DDTHH:MM:SS`, optionally with `.mmm`, then `Z` or `±HH:MM`.
-    if bytes.len() < 19 || bytes[4] != b'-' || bytes[7] != b'-' || bytes[10] != b'T' {
-        return None;
-    }
-    if bytes[13] != b':' || bytes[16] != b':' {
+    if bytes.len() < 10 || bytes[4] != b'-' || bytes[7] != b'-' {
         return None;
     }
     let (year, month, day) = (
@@ -222,22 +214,38 @@ fn parse_js_date(text: &str) -> Option<String> {
         digits(5..7)? as i64,
         digits(8..10)? as i64,
     );
-    let (hour, minute, second) = (
-        digits(11..13)? as i64,
-        digits(14..16)? as i64,
-        digits(17..19)? as i64,
-    );
-    if !(1..=12).contains(&month) || hour > 24 || minute > 59 || second > 59 {
-        return None;
-    }
     // The ECMAScript Date parser normalises a day that overflows a short month
     // (2026-02-30 becomes 2026-03-02), so the day only has to be 1..=31 here.
-    if !(1..=31).contains(&day) {
+    if !(1..=12).contains(&month) || !(1..=31).contains(&day) {
         return None;
     }
-    let mut rest = &text[19..];
+    // ECMAScript interprets an ISO date-only form as midnight UTC.
+    if bytes.len() == 10 {
+        return Some(format_iso(days_from_civil(year, month, day) * 86_400_000));
+    }
+    // The ISO `T` separator is standard. JavaScript engines also accept a
+    // space in this position, so keep that common Date.parse spelling.
+    if !matches!(bytes.get(10), Some(b'T' | b' ')) || bytes.len() < 16 {
+        return None;
+    }
+    if bytes[13] != b':' {
+        return None;
+    }
+    let (hour, minute) = (digits(11..13)? as i64, digits(14..16)? as i64);
+    let mut cursor = 16;
+    let second = if bytes.get(cursor) == Some(&b':') {
+        cursor += 1;
+        let second = digits(cursor..cursor + 2)? as i64;
+        cursor += 2;
+        second
+    } else {
+        0
+    };
+    if hour > 24 || minute > 59 || second > 59 {
+        return None;
+    }
     let mut millis = 0i64;
-    if let Some(fraction) = rest.strip_prefix('.') {
+    if let Some(fraction) = text.get(cursor..)?.strip_prefix('.') {
         let end = fraction
             .find(|character: char| !character.is_ascii_digit())
             .unwrap_or(fraction.len());
@@ -251,30 +259,166 @@ fn parse_js_date(text: &str) -> Option<String> {
             padded.push('0');
         }
         millis = padded[..3].parse().ok()?;
-        rest = &fraction[end..];
+        cursor += 1 + end;
     }
+    let rest = text.get(cursor..)?;
     let offset = match rest.as_bytes() {
-        [b'Z'] => 0i64,
-        [sign @ (b'+' | b'-'), ..] if rest.len() == 6 => {
+        [b'Z'] | [b'z'] => Some((b'Z', 0i64, 0i64)),
+        [sign @ (b'+' | b'-'), _, _, _, _] => {
+            let hours = digits_abs(rest.as_bytes(), 1..3)? as i64;
+            let minutes = digits_abs(rest.as_bytes(), 3..5)? as i64;
+            Some((*sign, hours, minutes))
+        }
+        [sign @ (b'+' | b'-'), _, _, b':', _, _] => {
             let hours = digits_abs(rest.as_bytes(), 1..3)? as i64;
             let minutes = digits_abs(rest.as_bytes(), 4..6)? as i64;
-            if rest.as_bytes()[3] != b':' || hours > 23 || minutes > 59 {
-                return None;
-            }
-            let total = hours * 3_600_000 + minutes * 60_000;
-            if *sign == b'+' {
-                total
-            } else {
-                -total
-            }
+            Some((*sign, hours, minutes))
         }
+        [] => None,
         _ => return None,
     };
-    let year = if year < 100 { 1900 + year } else { year };
-    let days = days_from_civil(year, month, day);
-    let seconds = days * 86_400 + hour * 3_600 + minute * 60 + second;
-    let millis_total = seconds * 1000 + millis - offset;
-    Some(format_iso(millis_total))
+    if hour == 24 && (minute != 0 || second != 0 || millis != 0) {
+        return None;
+    }
+    let local_seconds =
+        days_from_civil(year, month, day) * 86_400 + hour * 3_600 + minute * 60 + second;
+    if let Some(offset) = offset {
+        let offset = match offset {
+            (b'Z' | b'z', _, _) => 0,
+            (sign, hours, minutes) if hours <= 23 && minutes <= 59 => {
+                let total = hours * 3_600_000 + minutes * 60_000;
+                if sign == b'+' {
+                    total
+                } else {
+                    -total
+                }
+            }
+            _ => return None,
+        };
+        return Some(format_iso(local_seconds * 1000 + millis - offset));
+    }
+
+    // A date-time without an explicit zone is interpreted in the process's
+    // local timezone by JavaScript. Normalize overflowing day/hour fields
+    // before handing the wall time to the platform timezone converter.
+    let local_days = local_seconds.div_euclid(86_400);
+    let local_time = local_seconds.rem_euclid(86_400);
+    let (local_year, local_month, local_day) = civil_from_days(local_days);
+    let local_hour = local_time / 3_600;
+    let local_minute = local_time % 3_600 / 60;
+    let local_second = local_time % 60;
+    local_datetime_millis(
+        local_year,
+        local_month,
+        local_day,
+        local_hour,
+        local_minute,
+        local_second,
+        millis,
+    )
+    .map(format_iso)
+}
+
+#[cfg(unix)]
+fn local_datetime_millis(
+    year: i64,
+    month: i64,
+    day: i64,
+    hour: i64,
+    minute: i64,
+    second: i64,
+    millis: i64,
+) -> Option<i64> {
+    let mut local: libc::tm = unsafe { std::mem::zeroed() };
+    local.tm_year = i32::try_from(year - 1900).ok()?;
+    local.tm_mon = i32::try_from(month - 1).ok()?;
+    local.tm_mday = i32::try_from(day).ok()?;
+    local.tm_hour = i32::try_from(hour).ok()?;
+    local.tm_min = i32::try_from(minute).ok()?;
+    local.tm_sec = i32::try_from(second).ok()?;
+    local.tm_isdst = -1;
+    let seconds = unsafe { libc::mktime(&mut local) } as i64;
+    seconds.checked_mul(1000)?.checked_add(millis)
+}
+
+#[cfg(windows)]
+#[repr(C)]
+struct WindowsSystemTime {
+    year: u16,
+    month: u16,
+    day_of_week: u16,
+    day: u16,
+    hour: u16,
+    minute: u16,
+    second: u16,
+    milliseconds: u16,
+}
+
+#[cfg(windows)]
+#[link(name = "kernel32")]
+unsafe extern "system" {
+    fn TzSpecificLocalTimeToSystemTime(
+        timezone: *const std::ffi::c_void,
+        local: *const WindowsSystemTime,
+        utc: *mut WindowsSystemTime,
+    ) -> i32;
+}
+
+#[cfg(windows)]
+fn local_datetime_millis(
+    year: i64,
+    month: i64,
+    day: i64,
+    hour: i64,
+    minute: i64,
+    second: i64,
+    millis: i64,
+) -> Option<i64> {
+    let local = WindowsSystemTime {
+        year: u16::try_from(year).ok()?,
+        month: u16::try_from(month).ok()?,
+        day_of_week: 0,
+        day: u16::try_from(day).ok()?,
+        hour: u16::try_from(hour).ok()?,
+        minute: u16::try_from(minute).ok()?,
+        second: u16::try_from(second).ok()?,
+        milliseconds: u16::try_from(millis).ok()?,
+    };
+    let mut utc = WindowsSystemTime {
+        year: 0,
+        month: 0,
+        day_of_week: 0,
+        day: 0,
+        hour: 0,
+        minute: 0,
+        second: 0,
+        milliseconds: 0,
+    };
+    let success = unsafe { TzSpecificLocalTimeToSystemTime(std::ptr::null(), &local, &mut utc) };
+    if success == 0 {
+        return None;
+    }
+    let days = days_from_civil(utc.year.into(), utc.month.into(), utc.day.into());
+    let seconds = days * 86_400
+        + i64::from(utc.hour) * 3_600
+        + i64::from(utc.minute) * 60
+        + i64::from(utc.second);
+    seconds
+        .checked_mul(1000)?
+        .checked_add(i64::from(utc.milliseconds))
+}
+
+#[cfg(not(any(unix, windows)))]
+fn local_datetime_millis(
+    _year: i64,
+    _month: i64,
+    _day: i64,
+    _hour: i64,
+    _minute: i64,
+    _second: i64,
+    _millis: i64,
+) -> Option<i64> {
+    None
 }
 
 fn digits_abs(bytes: &[u8], range: std::ops::Range<usize>) -> Option<u32> {
@@ -349,9 +493,7 @@ fn is_safe_integer(value: Option<&Value>) -> bool {
 fn differs(left: Option<&Value>, right: Option<&Value>) -> bool {
     // `JSON.stringify(undefined)` is `undefined`, which never equals a
     // string, so a missing key differs from any present value.
-    let render = |value: Option<&Value>| {
-        value.map(|value| serde_json::to_string(value).expect("state values serialise"))
-    };
+    let render = |value: Option<&Value>| value.map(crate::js_json::stringify);
     render(left) != render(right)
 }
 
@@ -482,7 +624,8 @@ fn normalize_decision(input: Option<&Value>) -> QuestionResult<Value> {
         let cost_input = cost_input.expect("checked above");
         let maximum = cost_input.get("max");
         let valid_max = match maximum {
-            None | Some(Value::Null) => true,
+            None => false,
+            Some(Value::Null) => true,
             Some(value) => match value.as_f64() {
                 // `typeof value === "number" && Number.isFinite(value)`.
                 Some(number) => number.is_finite() && number >= 0.0,
@@ -736,7 +879,7 @@ fn extension(state: &Value) -> Option<&Value> {
 
 /// `validateQuestionContracts(state)`.
 fn validate_question_contracts(state: &Value) -> QuestionResult<()> {
-    let Some(extension) = extension(state) else {
+    let Some(extension) = state.get("question_contracts") else {
         return Ok(());
     };
     keys(Some(extension), &["schema", "cards"])?;
@@ -792,44 +935,51 @@ fn validate_question_contracts(state: &Value) -> QuestionResult<()> {
                 allowed.push("history");
             }
             keys(Some(record), &allowed)?;
-            let snapshot = record.get("snapshot");
+            let stored_snapshot = record.get("snapshot");
             keys(
-                snapshot,
+                stored_snapshot,
                 &["question", "urgency", "default_action", "decision"],
             )?;
-            let snapshot = snapshot.expect("checked above");
-            let mut reparsed = snapshot.clone();
-            reparsed["decision"] = snapshot.get("decision").cloned().unwrap_or(Value::Null);
+            let snapshot_value = stored_snapshot.expect("checked above");
+            let normalized_snapshot = snapshot(snapshot_value)?;
             check(
                 record.get("revision") == Some(&json!(index + 1))
                     && record
                         .get("fingerprint")
                         .and_then(Value::as_str)
-                        .is_some_and(|fingerprint| fingerprint == digest(&reparsed))
+                        .is_some_and(|fingerprint| fingerprint == digest(&normalized_snapshot))
                     && parseable(record.get("created_at"))
                     && parseable(record.get("updated_at")),
                 "Question contract snapshot is corrupt",
             )?;
             let answer = record.get("answer");
-            if answer.is_some_and(|answer| !answer.is_null()) {
-                let answer = answer.expect("checked above");
-                let valid = own(answer)
-                    && answer.get("text").is_some_and(Value::is_string)
-                    && answer.get("contract_fingerprint") == record.get("fingerprint")
-                    && parseable(answer.get("answered_at"))
-                    && (answer.get("choice_id").is_none_or(Value::is_null)
-                        || snapshot
-                            .get("decision")
-                            .and_then(|decision| decision.get("choices"))
-                            .and_then(Value::as_array)
-                            .is_some_and(|choices| {
-                                choices
-                                    .iter()
-                                    .any(|choice| Some(&choice["id"]) == answer.get("choice_id"))
-                            }));
-                check(valid, "Invalid question contract answer")?;
+            let valid_answer = match answer {
+                Some(Value::Null) => true,
+                Some(answer) => {
+                    let choice_id_valid = answer.get("choice_id").is_some_and(|choice_id| {
+                        choice_id.is_null()
+                            || snapshot_value
+                                .get("decision")
+                                .and_then(|decision| decision.get("choices"))
+                                .and_then(Value::as_array)
+                                .is_some_and(|choices| {
+                                    choices
+                                        .iter()
+                                        .any(|choice| choice.get("id") == Some(choice_id))
+                                })
+                    });
+                    own(answer)
+                        && answer.get("text").is_some_and(Value::is_string)
+                        && answer.get("contract_fingerprint") == record.get("fingerprint")
+                        && parseable(answer.get("answered_at"))
+                        && choice_id_valid
+                }
+                None => false,
+            };
+            check(valid_answer, "Invalid question contract answer")?;
+            if let Some(answer) = answer.filter(|answer| !answer.is_null()) {
                 keys(
-                    answer.into(),
+                    Some(answer),
                     &["text", "choice_id", "answered_at", "contract_fingerprint"],
                 )?;
             }
@@ -967,7 +1117,7 @@ fn feedback_validity(state: &Value, message: &Value, now_millis: Option<i64>) ->
 /// `changeQuestionContract(state, input)`: create, revise or cancel one card.
 ///
 /// Returns `undefined` in JS, which the JSON output carries as `null`.
-fn change_question_contract(state: &mut Value, input: &Value) -> QuestionResult<Value> {
+fn change_question_contract(state: &mut Value, input: &Value, now: &str) -> QuestionResult<Value> {
     let action = match input.get("action") {
         Some(Value::Null) | None => "create".to_string(),
         Some(value) => match value.as_str() {
@@ -995,8 +1145,8 @@ fn change_question_contract(state: &mut Value, input: &Value) -> QuestionResult<
         "Invalid question action",
     )?;
     let id = identifier(input.get("id"), "question id")?;
-    // `new Date().toISOString()`: the revision instant.
-    let now = now_iso();
+    // The caller supplies the validated instant, as the JS store does.
+    let now = now.to_string();
     if action == "cancel" {
         check(
             !["question", "urgency", "default_action", "decision"]
@@ -1060,6 +1210,7 @@ fn change_question_contract(state: &mut Value, input: &Value) -> QuestionResult<
         let object = superseded
             .as_object_mut()
             .expect("current() returns a card");
+        object.remove("history");
         object.insert("status".to_string(), json!("superseded"));
         object.insert("invalidated_at".to_string(), json!(now));
         object.insert(
@@ -1315,15 +1466,6 @@ fn answer_question_contract(
     Ok(Value::Object(output))
 }
 
-/// `new Date().toISOString()` for the current instant.
-fn now_iso() -> String {
-    let millis = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|elapsed| elapsed.as_millis() as i64)
-        .unwrap_or(0);
-    format_iso(millis)
-}
-
 /// Read one JSON request document, refusing anything over 256 KiB.
 fn read_json(input_file: &str) -> Result<Value> {
     let file =
@@ -1437,7 +1579,7 @@ pub fn cmd_question_contracts(action: &str, input_file: &str) -> Result<()> {
             }
             output.insert("operation".into(), json!(operation));
             let result = if operation == "question" {
-                change_question_contract(&mut state, &input)?
+                change_question_contract(&mut state, &input, &canonical_now)?
             } else {
                 let mut question = state
                     .get("questions")
@@ -1456,7 +1598,24 @@ pub fn cmd_question_contracts(action: &str, input_file: &str) -> Result<()> {
                     .ok_or_else(|| QuestionError::new("Typed question not found"))?;
                 question["answer"] = Value::String(text(input.get("answer"), "answer", 2000)?);
                 question["answered_at"] = Value::String(canonical_now.clone());
-                answer_question_contract(&mut state, &question, &input, Some(now_instant))?
+                let result =
+                    answer_question_contract(&mut state, &question, &input, Some(now_instant))?;
+                if result.is_null() {
+                    let question_id = question.get("id").and_then(Value::as_str);
+                    if let Some(record) = state
+                        .get_mut("questions")
+                        .and_then(Value::as_array_mut)
+                        .and_then(|questions| {
+                            questions.iter_mut().find(|record| {
+                                record.get("id").and_then(Value::as_str) == question_id
+                            })
+                        })
+                    {
+                        record["answer"] = question["answer"].clone();
+                        record["answered_at"] = question["answered_at"].clone();
+                    }
+                }
+                result
             };
             output.insert("result".into(), result);
             output.insert(
@@ -1541,5 +1700,33 @@ mod input_tests {
         assert_eq!(parsed["operation"], "validate");
         assert_eq!(parsed["state"], json!({}));
         std::fs::remove_dir_all(root).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod date_tests {
+    use super::parse_js_date;
+
+    #[test]
+    fn date_parser_accepts_standard_date_and_timezone_spellings() {
+        assert_eq!(
+            parse_js_date("2026-06-01"),
+            Some("2026-06-01T00:00:00.000Z".to_string())
+        );
+        assert_eq!(
+            parse_js_date("2026-06-01 09:30:00+0930"),
+            Some("2026-06-01T00:00:00.000Z".to_string())
+        );
+        assert!(parse_js_date("2026-06-01T09:30:00").is_some());
+        assert_eq!(
+            parse_js_date("2026-06-01T24:00:00Z"),
+            Some("2026-06-02T00:00:00.000Z".to_string())
+        );
+        assert_eq!(parse_js_date("2026-06-01T24:01:00Z"), None);
+        assert_eq!(parse_js_date("2026-06-01T09:30+09"), None);
+        assert_eq!(
+            parse_js_date("2026-06-01T09:30+0900"),
+            Some("2026-06-01T00:30:00.000Z".to_string())
+        );
     }
 }
