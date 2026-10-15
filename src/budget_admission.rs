@@ -484,10 +484,39 @@ fn is_falsy(value: &Value) -> bool {
 
 /// The book as an object, after [`ledger`] has guaranteed the slot.
 fn book_of(state: &Value) -> BudgetResult<&Map<String, Value>> {
-    state
+    let book = state
         .get("budget_admission")
         .and_then(Value::as_object)
-        .ok_or_else(|| BudgetError::code("budget_invalid_input"))
+        .ok_or_else(|| BudgetError::code("budget_invalid_input"))?;
+    validate_book_record_shapes(book)?;
+    Ok(book)
+}
+
+/// Reject malformed persisted collections before treating them as empty.
+/// JavaScript's `Object.values(book.calls)` and `call.policy_ids.includes(...)`
+/// throw on these shapes; silently skipping them could admit a second call
+/// without accounting for a reservation already in the book.
+fn validate_book_record_shapes(book: &Map<String, Value>) -> BudgetResult<()> {
+    for key in ["policies", "jobs", "calls", "receipts"] {
+        let records = book
+            .get(key)
+            .and_then(Value::as_object)
+            .ok_or_else(|| BudgetError::code("budget_invalid_store"))?;
+        if records.values().any(|record| !record.is_object()) {
+            return fail("budget_invalid_store");
+        }
+    }
+    let calls = book
+        .get("calls")
+        .and_then(Value::as_object)
+        .ok_or_else(|| BudgetError::code("budget_invalid_store"))?;
+    if calls
+        .values()
+        .any(|call| call.get("policy_ids").and_then(Value::as_array).is_none())
+    {
+        return fail("budget_invalid_store");
+    }
+    Ok(())
 }
 
 /// `Object.keys(book.policies)` order, i.e. the JS own-property order.
@@ -1805,6 +1834,10 @@ pub fn validate_budget_admission(state: &Value) -> BudgetResult<()> {
     if !store_ok {
         return fail("budget_invalid_store");
     }
+    validate_book_record_shapes(
+        book.as_object()
+            .ok_or_else(|| BudgetError::code("budget_invalid_store"))?,
+    )?;
     // Replay canonical records, so damaged amounts, policy revisions and scope
     // IDs cannot quietly turn into a zero-spend admission after a restart.
     let mut replay = Map::new();
@@ -1864,6 +1897,7 @@ pub fn public_budget_admission(state: &Value, live_jobs: &Value, now: &str) -> B
     let book = book
         .as_object()
         .ok_or_else(|| BudgetError::code("budget_invalid_store"))?;
+    validate_book_record_shapes(book)?;
     let mut cache = TotalsCache::default();
     let mut output = Map::new();
     output.insert("schema".into(), json!(1));
