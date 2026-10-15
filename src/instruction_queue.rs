@@ -6,8 +6,10 @@ use anyhow::{anyhow, bail, Context, Result};
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 
+const MAX_JSON_BYTES: usize = 64 * 1024 * 1024;
+const MAX_RESPONSE_BYTES: usize = MAX_JSON_BYTES - 1024 * 1024;
 const REGISTRY_KEYS: [&str; 5] = ["schema", "revision", "sequence", "requests", "commands"];
-const MAX_WORKER_REQUEST_BYTES: usize = 64 * 1024 * 1024;
+const MAX_WORKER_REQUEST_BYTES: usize = MAX_JSON_BYTES;
 const REQUEST_KEYS: [&str; 19] = [
     "command_id",
     "consumer_id",
@@ -122,7 +124,11 @@ fn error_status(error: &anyhow::Error) -> u16 {
 
 fn check_keys(value: &Value, allowed: &[&str]) -> Result<()> {
     let Some(object) = value.as_object() else {
-        bail!("Unknown instruction field");
+        return Err(InstructionQueueError {
+            status: 400,
+            message: "Unknown instruction field".into(),
+        }
+        .into());
     };
     check_status(
         object.keys().all(|key| allowed.contains(&key.as_str())),
@@ -1589,16 +1595,15 @@ fn read_json(input_file: &str) -> Result<Value> {
     let metadata = file
         .metadata()
         .with_context(|| format!("cannot read JSON {input_file}"))?;
-    const MAX_INPUT_BYTES: usize = 256 * 1024;
-    if !metadata.is_file() || metadata.len() > MAX_INPUT_BYTES as u64 {
-        bail!("Input JSON must be a regular file of at most 256 KiB");
+    if !metadata.is_file() || metadata.len() > MAX_JSON_BYTES as u64 {
+        bail!("Input JSON must be a regular file of at most 64 MiB");
     }
     let mut bytes = Vec::with_capacity(metadata.len() as usize);
-    file.take((MAX_INPUT_BYTES + 1) as u64)
+    file.take((MAX_JSON_BYTES + 1) as u64)
         .read_to_end(&mut bytes)
         .with_context(|| format!("cannot read JSON {input_file}"))?;
-    if bytes.len() > MAX_INPUT_BYTES {
-        bail!("Input JSON exceeds 256 KiB");
+    if bytes.len() > MAX_JSON_BYTES {
+        bail!("Input JSON exceeds 64 MiB");
     }
     let Ok(text) = std::str::from_utf8(&bytes) else {
         bail!("Input JSON is invalid");
@@ -1691,11 +1696,21 @@ fn run_instruction_queue(action: &str, document: &Value) -> Result<Value> {
     Ok(Value::Object(output))
 }
 
+fn serialize_bounded_response(response: &Value, maximum_bytes: usize) -> Result<Option<String>> {
+    let serialized = serde_json::to_string(response)?;
+    if serialized.len() > maximum_bytes {
+        return Ok(None);
+    }
+    Ok(Some(serialized))
+}
+
 /// Run `rdsh instruction-queue validate|context|submit|resolve|control --input-file <request>`.
 pub fn cmd_instruction_queue(action: &str, input_file: &str) -> Result<()> {
     let document = read_json(input_file)?;
     let output = run_instruction_queue(action, &document)?;
-    println!("{}", serde_json::to_string(&output)?);
+    let output = serialize_bounded_response(&output, MAX_RESPONSE_BYTES)?
+        .ok_or_else(|| anyhow!("Instruction queue response exceeds 63 MiB"))?;
+    println!("{output}");
     Ok(())
 }
 
@@ -1703,7 +1718,7 @@ fn worker_response(line: &[u8]) -> Value {
     if line.len() > MAX_WORKER_REQUEST_BYTES {
         return serde_json::json!({
             "error": "Input JSON exceeds the 64 MiB worker limit",
-            "status": 400
+            "status": 413
         });
     }
     let document = match std::str::from_utf8(line)
@@ -1787,10 +1802,14 @@ pub fn cmd_instruction_queue_serve() -> Result<()> {
                 Some(true) => worker_response(&line),
                 Some(false) => serde_json::json!({
                     "error": "Input JSON exceeds the 64 MiB worker limit",
-                    "status": 400
+                    "status": 413
                 }),
             };
-        serde_json::to_writer(&mut output, &response)?;
+        let response =
+            serialize_bounded_response(&response, MAX_RESPONSE_BYTES)?.unwrap_or_else(|| {
+                r#"{"error":"Instruction queue response exceeds 63 MiB","status":413}"#.into()
+            });
+        output.write_all(response.as_bytes())?;
         output.write_all(b"\n")?;
         output.flush()?;
     }
@@ -1799,8 +1818,29 @@ pub fn cmd_instruction_queue_serve() -> Result<()> {
 
 #[cfg(test)]
 mod worker_line_tests {
-    use super::read_bounded_worker_line;
+    use super::{read_bounded_worker_line, serialize_bounded_response, worker_response};
     use std::io::{BufReader, Cursor};
+
+    #[test]
+    fn oversized_response_is_rejected_before_it_reaches_the_worker_stream() {
+        let response = serde_json::json!({"state": "long"});
+        assert_eq!(serialize_bounded_response(&response, 10).unwrap(), None);
+        assert!(serialize_bounded_response(&response, 32).unwrap().is_some());
+    }
+
+    #[test]
+    fn non_object_instruction_input_is_a_bad_request() {
+        let request = serde_json::json!({
+            "operation": "submit",
+            "state": {"instructions": {"schema": 1, "revision": 0, "sequence": 0, "requests": {}, "commands": {}}},
+            "input": [],
+            "context": {"actor": "human"}
+        });
+        assert_eq!(
+            worker_response(request.to_string().as_bytes())["status"],
+            400
+        );
+    }
 
     #[test]
     fn oversized_worker_line_is_discarded_without_losing_the_next_request() {

@@ -167,37 +167,47 @@ export class ProjectStore {
     let result;
     const nativeOperation = nativeOperations[operation];
     if (this.instructionQueueWorker && nativeOperation) {
-      const response = await this.instructionQueueWorker.request({
-        operation: nativeOperation,
-        state: {
-          project: { id: next.project.id },
-          feedback: next.feedback,
-          answer_applications: next.answer_applications,
-          ...(Object.hasOwn(next, "instructions")
-            ? { instructions: next.instructions }
-            : {}),
-        },
-        input,
-        context,
-      });
-      if (
-        !response ||
-        response.operation !== nativeOperation ||
-        !response.state ||
-        typeof response.state !== "object" ||
-        Array.isArray(response.state) ||
-        !response.state.instructions ||
-        typeof response.state.instructions !== "object" ||
-        Array.isArray(response.state.instructions) ||
-        !Object.hasOwn(response, "result")
-      ) {
-        throw Object.assign(
-          new Error("Rust instruction worker returned an invalid response"),
-          { status: 500 },
-        );
+      let response;
+      try {
+        response = await this.instructionQueueWorker.request({
+          operation: nativeOperation,
+          state: {
+            project: { id: next.project.id },
+            feedback: next.feedback,
+            answer_applications: next.answer_applications,
+            ...(Object.hasOwn(next, "instructions")
+              ? { instructions: next.instructions }
+              : {}),
+          },
+          input,
+          context,
+        });
+      } catch (error) {
+        if (error.status !== 413) throw error;
+        // A valid project can outgrow the bounded native transport. Preserve
+        // the existing JS implementation for that request rather than making
+        // a previously valid queue impossible to reconcile.
+        result = handlers[operation](next, input, context);
       }
-      next.instructions = response.state.instructions;
-      result = response.result;
+      if (response) {
+        if (
+          response.operation !== nativeOperation ||
+          !response.state ||
+          typeof response.state !== "object" ||
+          Array.isArray(response.state) ||
+          !response.state.instructions ||
+          typeof response.state.instructions !== "object" ||
+          Array.isArray(response.state.instructions) ||
+          !Object.hasOwn(response, "result")
+        ) {
+          throw Object.assign(
+            new Error("Rust instruction worker returned an invalid response"),
+            { status: 500 },
+          );
+        }
+        next.instructions = response.state.instructions;
+        result = response.result;
+      }
     } else {
       result = handlers[operation](next, input, context);
     }

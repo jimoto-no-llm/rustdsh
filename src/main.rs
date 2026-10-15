@@ -334,7 +334,7 @@ enum Commands {
     TaskOutcomes {
         /// apply | validate | schema
         action: String,
-        /// Request JSON file holding { operation, state, input, context }
+        /// Request JSON file holding { operation, state, input }
         #[arg(long = "input-file")]
         input_file: String,
     },

@@ -12,6 +12,7 @@ import { identity, ProjectStore, publicState } from "../state.mjs";
 import { SessionLedger, attachRecordedSession } from "../session-ledger.mjs";
 import { ReplyConsumer } from "../reply-consumer.mjs";
 import { startDashboard } from "../server.mjs";
+import { InstructionQueueWorker } from "../instruction-queue-worker.mjs";
 import { feedbackSince } from "../mcp.mjs";
 import { EventsHub } from "../webhooks.mjs";
 import { Webhook } from "standardwebhooks";
@@ -1626,16 +1627,56 @@ test("ProjectStore commits Rust instruction results and leaves state untouched o
   );
 });
 
-test("live Dashboard uses and closes the installed Rust instruction worker", async (t) => {
+test("ProjectStore uses JavaScript when a valid queue exceeds the native transport bound", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-native-queue-overflow-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const project = { id: "fixture", name: "fixture", root, directory: root };
+  let requests = 0;
+  const instructionQueueWorker = {
+    async request() {
+      requests++;
+      throw Object.assign(new Error("request exceeds worker limit"), {
+        status: 413,
+      });
+    },
+  };
+  const store = await ProjectStore.open(project, { instructionQueueWorker });
+  const runId = "run_" + randomUUID();
+  const sessionId = "fixture-session";
+  const consumer = await store.mutateReply("register", {
+    run_id: runId,
+    cli_session_id: sessionId,
+    task_id: "fixture-task",
+  });
+  const result = await store.mutateReply(
+    "instruction_submit",
+    {
+      command_id: "input_" + randomUUID(),
+      consumer_id: consumer.consumer_id,
+      run_id: runId,
+      session_id: sessionId,
+      text: "保存して続行してください",
+      mode: "next_turn",
+      expected_queue_revision: 0,
+    },
+    { actor: "human" },
+  );
+
+  assert.equal(requests, 1);
+  assert.equal(result.request.status, "accepted");
+  assert.equal(Object.keys(store.value.instructions.requests).length, 1);
+});
+
+test("live Dashboard uses and closes its configured instruction worker", async (t) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-live-native-queue-"));
   const projectRoot = path.join(root, "project");
   await fs.mkdir(projectRoot);
   const project = await identity(projectRoot);
   project.directory = path.join(root, "dashboard");
-  const executable = path.join(root, "rdsh-fixture");
+  const executable = path.join(root, "rdsh-fixture.cjs");
   await fs.writeFile(
     executable,
-    `#!${process.execPath}
+    `
 const readline = require("node:readline");
 const input = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
 input.on("line", (line) => {
@@ -1645,10 +1686,41 @@ input.on("line", (line) => {
   process.stdout.write(JSON.stringify({ operation: request.operation, state, result: { native: true } }) + "\\n");
 });
 `,
-    { mode: 0o700 },
   );
+  let dashboard;
+  const worker = new InstructionQueueWorker(process.execPath, {
+    prefixArgs: [executable],
+  });
+  t.after(async () => {
+    if (dashboard) await dashboard.close();
+    await fs.rm(root, { recursive: true, force: true });
+  });
+
+  dashboard = await startDashboard({
+    project,
+    port: await freePort(),
+    tailscale: false,
+    instructionQueueWorker: worker,
+  });
+  assert.ok(worker);
+  assert.deepEqual(
+    await dashboard.store.mutateReply("control", { command_id: "fixture" }, { actor: "human" }),
+    { native: true },
+  );
+  assert.ok(worker.record);
+  await dashboard.close();
+  assert.equal(worker.closed, true);
+  assert.equal(worker.record, null);
+});
+
+test("live Dashboard keeps JavaScript routing when rdsh lacks the serve action", async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-old-native-queue-"));
+  const projectRoot = path.join(root, "project");
+  await fs.mkdir(projectRoot);
+  const project = await identity(projectRoot);
+  project.directory = path.join(root, "dashboard");
   const previousRdshBin = process.env.RDSH_BIN;
-  process.env.RDSH_BIN = executable;
+  process.env.RDSH_BIN = process.execPath;
   let dashboard;
   t.after(async () => {
     if (dashboard) await dashboard.close();
@@ -1662,16 +1734,50 @@ input.on("line", (line) => {
     port: await freePort(),
     tailscale: false,
   });
-  const worker = dashboard.store.instructionQueueWorker;
-  assert.ok(worker);
-  assert.deepEqual(
-    await dashboard.store.mutateReply("control", { command_id: "fixture" }, { actor: "human" }),
-    { native: true },
+  assert.equal(dashboard.store.instructionQueueWorker, null);
+  const runId = "run_" + randomUUID();
+  const sessionId = "fixture-session";
+  const consumer = await dashboard.store.mutateReply("register", {
+    run_id: runId,
+    cli_session_id: sessionId,
+    task_id: "fixture-task",
+  });
+  const result = await dashboard.store.mutateReply(
+    "instruction_submit",
+    {
+      command_id: "input_" + randomUUID(),
+      consumer_id: consumer.consumer_id,
+      run_id: runId,
+      session_id: sessionId,
+      text: "従来経路で受け付ける",
+      mode: "next_turn",
+      expected_queue_revision: 0,
+    },
+    { actor: "human" },
   );
-  assert.ok(worker.record);
-  await dashboard.close();
-  assert.equal(worker.closed, true);
-  assert.equal(worker.record, null);
+  assert.equal(result.request.status, "accepted");
+});
+
+test("Dashboard preserves Rust worker failure and timeout HTTP statuses", options, async (t) => {
+  const f = await setup(t);
+  const runId = "run_" + randomUUID();
+  const sessionId = "fixture-session";
+  const consumer = await f.server.store.mutateReply("register", {
+    run_id: runId,
+    cli_session_id: sessionId,
+    task_id: "fixture-task",
+  });
+  const input = await instruction(f, { consumer });
+  for (const status of [500, 504]) {
+    f.server.store.instructionQueueWorker = {
+      async request() {
+        throw Object.assign(new Error("worker unavailable"), { status });
+      },
+    };
+    const response = await f.post("instructions/submit", input);
+    assert.equal(response.status, status);
+    assert.equal((await response.json()).error, "worker unavailable");
+  }
 });
 
 test(

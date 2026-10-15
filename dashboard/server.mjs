@@ -10,6 +10,7 @@ import { ProjectStore, writeJson, stateHome, publicState } from "./state.mjs";
 import {
   InstructionQueueWorker,
   resolveRdshExecutable,
+  supportsInstructionQueueServe,
 } from "./instruction-queue-worker.mjs";
 import { createMcpServer } from "./mcp.mjs";
 import { enableShare, inspectShare } from "./tailscale.mjs";
@@ -166,8 +167,12 @@ export async function startDashboard(options) {
   let store, eventsHub, humanAnnotations, observedCli, instructionQueueWorker;
   try {
     if (kind === "project") {
-      const executable = await resolveRdshExecutable();
-      if (executable) instructionQueueWorker = new InstructionQueueWorker(executable);
+      instructionQueueWorker = options.instructionQueueWorker || null;
+      if (!instructionQueueWorker) {
+        const executable = await resolveRdshExecutable();
+        if (executable && (await supportsInstructionQueueServe(executable)))
+          instructionQueueWorker = new InstructionQueueWorker(executable);
+      }
       store = await ProjectStore.open(project, { instructionQueueWorker });
     } else store = null;
     humanAnnotations = store ? await HumanAnnotationStore.open(project) : null;
@@ -962,7 +967,7 @@ export async function startDashboard(options) {
       json(res, 404, { error: "Not found" });
     } catch (e) {
       if (!res.headersSent)
-        json(res, [401, 403, 409].includes(e.status) ? e.status : 400, {
+        json(res, [401, 403, 409, 413, 500, 504].includes(e.status) ? e.status : 400, {
           error: e.message,
         });
       else res.end();

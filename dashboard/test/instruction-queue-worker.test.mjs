@@ -7,6 +7,7 @@ import { spawn } from "node:child_process";
 import {
   InstructionQueueWorker,
   resolveRdshExecutable,
+  supportsInstructionQueueServe,
 } from "../instruction-queue-worker.mjs";
 
 function fakeWorker(t, onSpawn = () => {}) {
@@ -54,6 +55,22 @@ test("resolveRdshExecutable accepts an absolute override and searches absolute P
   assert.equal(
     await resolveRdshExecutable({ PATH: `${root}${path.delimiter}/relative` }),
     binary,
+  );
+});
+
+test("serve capability probe falls back for binaries without the worker protocol", async () => {
+  const command = "process.exit(process.argv.slice(-2).join(' ') === 'instruction-queue serve' ? 0 : 64)";
+  assert.equal(
+    await supportsInstructionQueueServe(process.execPath, {
+      prefixArgs: ["-e", command],
+    }),
+    true,
+  );
+  assert.equal(
+    await supportsInstructionQueueServe(process.execPath, {
+      prefixArgs: ["-e", "process.exit(64)"],
+    }),
+    false,
   );
 });
 
@@ -105,6 +122,36 @@ test("close drains requests accepted before shutdown", async (t) => {
   const closing = worker.close();
   assert.deepEqual(await request, { id: "accepted-before-close" });
   await closing;
+});
+
+test("close force-kills a worker that ignores graceful shutdown and waits for exit", async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "rdsh-iq-stubborn-worker-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const script = path.join(root, "stubborn-worker.mjs");
+  fs.writeFileSync(
+    script,
+    `import { createInterface } from "node:readline";
+process.on("SIGTERM", () => {});
+const input = createInterface({ input: process.stdin, crlfDelay: Infinity });
+input.on("line", (line) => process.stdout.write(JSON.stringify({ id: JSON.parse(line).id }) + "\\n"));
+setInterval(() => {}, 1000);
+`,
+  );
+  let child;
+  const worker = new InstructionQueueWorker(process.execPath, {
+    prefixArgs: [script],
+    closeTimeoutMs: 30,
+    spawnProcess(...args) {
+      child = spawn(...args);
+      return child;
+    },
+  });
+  assert.deepEqual(await worker.request({ id: "still-running" }), {
+    id: "still-running",
+  });
+  await worker.close();
+  assert.ok(child.exitCode !== null || child.signalCode !== null);
+  assert.equal(worker.record, null);
 });
 
 test("worker kills its child after request serialization fails", async (t) => {

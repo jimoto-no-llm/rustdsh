@@ -26,6 +26,42 @@ export async function resolveRdshExecutable(env = process.env, platform = proces
   return null;
 }
 
+export function supportsInstructionQueueServe(
+  executable,
+  { prefixArgs = [], spawnProcess = nodeSpawn, timeoutMs = 3_000 } = {},
+) {
+  if (!path.isAbsolute(executable)) return Promise.resolve(false);
+  return new Promise((resolve) => {
+    let settled = false;
+    let timedOut = false;
+    let timer;
+    const finish = (supported) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(supported);
+    };
+    let child;
+    try {
+      child = spawnProcess(
+        executable,
+        [...prefixArgs, "instruction-queue", "serve"],
+        { stdio: ["ignore", "ignore", "ignore"], windowsHide: true },
+      );
+    } catch {
+      finish(false);
+      return;
+    }
+    timer = setTimeout(() => {
+      timedOut = true;
+      child.kill("SIGKILL");
+    }, timeoutMs);
+    timer.unref?.();
+    child.once("error", () => finish(false));
+    child.once("close", (code) => finish(!timedOut && code === 0));
+  });
+}
+
 export class InstructionQueueWorker {
   constructor(
     executable,
@@ -70,37 +106,22 @@ export class InstructionQueueWorker {
         this.closed = true;
         return;
       }
-      await new Promise((resolve) => {
-        let finished = false;
-        const finish = () => {
-          if (finished) return;
-          finished = true;
-          clearTimeout(timer);
-          clearTimeout(killTimer);
-          resolve();
-        };
-        const timer = setTimeout(() => {
-          record.child.kill();
-          killTimer = setTimeout(finish, this.closeTimeoutMs);
-          killTimer.unref?.();
-        }, this.closeTimeoutMs);
+      let timer;
+      if (record.child.exitCode === null && record.child.signalCode === null) {
+        timer = setTimeout(() => record.child.kill("SIGKILL"), this.closeTimeoutMs);
         timer.unref?.();
-        let killTimer = null;
-        record.child.once("close", finish);
-        if (record.child.exitCode !== null || record.child.signalCode !== null) {
-          finish();
-          return;
-        }
         record.child.stdin.end();
-      });
+      }
+      await record.closed;
+      clearTimeout(timer);
       if (this.record === record) this.record = null;
       this.closed = true;
     })();
     return this.closePromise;
   }
 
-  requestOne(document) {
-    const record = this.ensureChild();
+  async requestOne(document) {
+    const record = await this.ensureChild();
     return new Promise((resolve, reject) => {
       const pending = { record, resolve, reject, timer: null };
       this.pending = pending;
@@ -121,16 +142,26 @@ export class InstructionQueueWorker {
     });
   }
 
-  ensureChild() {
+  async ensureChild() {
+    if (this.record?.failed) {
+      const failed = this.record;
+      await failed.closed;
+      if (this.record === failed) this.record = null;
+    }
     if (this.record) return this.record;
     const child = this.spawnProcess(
       this.executable,
       [...this.prefixArgs, "instruction-queue", "serve"],
       { stdio: ["pipe", "pipe", "pipe"], windowsHide: true },
     );
+    let resolveClosed;
     const record = {
       child,
       reader: createInterface({ input: child.stdout, crlfDelay: Infinity }),
+      failed: false,
+      closed: new Promise((resolve) => {
+        resolveClosed = resolve;
+      }),
     };
     this.record = record;
     child.stderr.resume();
@@ -148,6 +179,8 @@ export class InstructionQueueWorker {
           { status: 500 },
         ),
       );
+      resolveClosed();
+      if (this.record === record) this.record = null;
     });
     return record;
   }
@@ -181,11 +214,11 @@ export class InstructionQueueWorker {
   }
 
   fail(record, error) {
-    if (this.record !== record) return;
-    this.record = null;
+    if (this.record !== record || record.failed) return;
+    record.failed = true;
     record.reader.close();
     if (record.child.exitCode === null && record.child.signalCode === null)
-      record.child.kill();
+      record.child.kill("SIGKILL");
     const pending = this.pending;
     if (pending?.record !== record) return;
     this.pending = null;
