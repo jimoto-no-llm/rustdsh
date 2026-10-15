@@ -94,17 +94,49 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo build --locked
       - run: sudo apt-get update && sudo apt-get install -y bubblewrap
+      - name: Install audited DSH runtime matrix
+        run: |
+          set -eu
+          for pair in \
+            'RC2 0.2.0-rc.2' \
+            'ALPHA1 0.2.1-alpha.1' \
+            'ALPHA3 0.2.1-alpha.3'
+          do
+            label=${pair%% *}
+            version=${pair#* }
+            prefix="$RUNNER_TEMP/rdsh-runtime-$label"
+            npm install --prefix "$prefix" --ignore-scripts --no-audit --no-fund "@deepseek-ai/dsh@$version"
+            dsh="$prefix/node_modules/@deepseek-ai/dsh/lib/bin.js"
+            test -f "$dsh"
+            runtime=$(node -e 'const { createRequire } = require("node:module"); process.stdout.write(createRequire(process.argv[1]).resolve("@deepseek-ai/dsh-tools"))' "$dsh")
+            test "$runtime" = "$prefix/node_modules/@deepseek-ai/dsh-tools/lib/index.js"
+            test -f "$runtime"
+            echo "RDSH_AUDITED_DSH_${label}=$dsh" >> "$GITHUB_ENV"
+            echo "RDSH_AUDITED_RUNTIME_${label}=$runtime" >> "$GITHUB_ENV"
+          done
       - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - run: cargo test --locked tool_security
       - run: node --test tests/security-boundaries.test.mjs tests/tool-isolation.test.mjs tests/desktop.test.mjs tests/opencode-session-header.test.mjs
+      - name: Verify Rust launcher, official profiles and kernel enforcement together
+        run: RDSH_GUARDED_MATRIX_REQUIRED=1 node --test tests/guarded-launcher-matrix.test.mjs
       - name: Install pinned upstream tool-bash for approval integrity test
         run: npm install --prefix "$RUNNER_TEMP/rdsh-runtime" --ignore-scripts --no-audit --no-fund @deepseek-ai/dsh-tool-bash@0.2.0-rc.2
       - name: Test approval integrity against pinned upstream source
         run: DSH_TOOL_BASH_SOURCE="$RUNNER_TEMP/rdsh-runtime/node_modules/@deepseek-ai/dsh-tool-bash/lib/index.js" node --test tests/upstream-approval-integrity.test.mjs
       - run: python3 -m unittest discover -s tests -p 'test_release_assets.py'
-      - name: Verify the audited dispatcher and late middleware changes
+      - name: Verify audited dispatchers and late middleware changes
         run: |
-          npm install --prefix "$RUNNER_TEMP/rdsh-runtime" --ignore-scripts --no-audit --no-fund @deepseek-ai/dsh-tools@0.2.0-rc.2
-          RDSH_TOOL_RUNTIME="$RUNNER_TEMP/rdsh-runtime/node_modules/@deepseek-ai/dsh-tools/lib/index.js" RDSH_SECURE_WORKSPACE="$GITHUB_WORKSPACE" RDSH_SHARED_FILES='[]' node --import ./security/preload.mjs tests/guarded-runtime-probe.mjs
+          set -eu
+          for pair in \
+            'dsh-tools-0.2.0-rc.2 RDSH_AUDITED_RUNTIME_RC2' \
+            'dsh-tools-0.2.1-alpha.1 RDSH_AUDITED_RUNTIME_ALPHA1' \
+            'dsh-tools-0.2.1-alpha.3 RDSH_AUDITED_RUNTIME_ALPHA3'
+          do
+            adapter=${pair%% *}
+            variable=${pair#* }
+            runtime=${!variable}
+            RDSH_TOOL_ADAPTER="$adapter" RDSH_TOOL_RUNTIME="$runtime" RDSH_SECURE_WORKSPACE="$GITHUB_WORKSPACE" RDSH_SHARED_FILES='[]' node --import ./security/preload.mjs tests/guarded-runtime-probe.mjs
+          done
 
   lint:
     name: "Rust lint${{ github.event_name == 'push' && github.ref_type == 'branch' && github.event.repository.default_branch && github.ref_name != github.event.repository.default_branch && ' [branch push]' || '' }}"

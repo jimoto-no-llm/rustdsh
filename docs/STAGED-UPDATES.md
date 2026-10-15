@@ -51,7 +51,7 @@ verified publisher identity. Current supported tuple:
 | -------------------- | -------------------------------------------- |
 | Local dashboard CLI | `0.1.0`, captured source/dependencies |
 | ACP adapter | `acp-stdio-v1`, captured source/dependencies |
-| Original DSH | `0.2.0-rc.2`, `0.2.1-alpha.1` |
+| Original DSH | `0.2.0-rc.2` |
 | Qualification plugin | `rdsh-release-probe`, contract 1 |
 | Node | Exact captured binary/version, Node 22+ |
 | Platform | Exact OS and architecture |

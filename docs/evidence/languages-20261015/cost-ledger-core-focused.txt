@@ -1,0 +1,25 @@
+   Compiling rdsh v0.4.0 (<worktree>)
+    Finished `release` profile [optimized] target(s) in 28.11s
+     Running unittests src/main.rs (target/release/deps/rdsh-5521950aff74f9aa)
+
+running 18 tests
+test cost_ledger::tests::identifiers_match_the_js_pattern_and_refuse_prototype_names ... ok
+test cost_ledger::tests::declare_rejects_another_project_and_duplicate_targets ... ok
+test cost_ledger::tests::stored_timestamp_errors_are_preserved ... ok
+test cost_ledger::tests::schemas_keep_the_advertised_shape ... ok
+test cost_ledger::tests::source_text_uses_ecmascript_trim_characters ... ok
+test cost_ledger::tests::public_event_tie_break_matches_javascript_locale_compare ... ok
+test cost_ledger::tests::time_requires_the_canonical_utc_spelling ... ok
+test cost_ledger::tests::report_rejects_unknown_sources_targets_and_certainty ... ok
+test cost_ledger::tests::report_requires_a_declared_scope_and_normalizes_the_amount ... ok
+test cost_ledger::tests::declare_is_idempotent_and_freezes_identity ... ok
+test cost_ledger::tests::json_reader_matches_javascript_integer_keys_and_safe_integers ... ok
+test cost_ledger::tests::units_and_decimal_round_trip_like_js_bigint ... ok
+test cost_ledger::tests::public_projection_reports_the_latest_cumulative_snapshot ... ok
+test cost_ledger::tests::accepted_safe_integer_numbers_are_canonicalized_before_storage ... ok
+test cost_ledger::tests::public_scope_tie_break_matches_javascript_locale_compare ... ok
+test cost_ledger::tests::cumulative_streams_reject_decreases_and_time_travel ... ok
+test cost_ledger::tests::validation_preserves_object_rest_key_order ... ok
+test cost_ledger::tests::validate_accepts_a_missing_document_and_the_recorded_one ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 285 filtered out; finished in 0.00s

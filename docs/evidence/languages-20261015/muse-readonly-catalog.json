@@ -1,0 +1,131 @@
+{
+  "schema_version": 1,
+  "status": "passed_readonly_catalog",
+  "scope": "Official signed CLI download to private QA storage and an exact-schema read-only model/list through the real adapter. No installed CLI or account state changed.",
+  "platform": {
+    "os": "macos",
+    "arch": "arm64",
+    "node": "v26.11.1"
+  },
+  "official_sources": {
+    "installation": "https://dev.meta.ai/docs/muse-code",
+    "installer": "https://dev.meta.ai/install.sh",
+    "channel": "https://api.meta.ai/muse-code/channels/muse-stable",
+    "sdk_repository": "https://github.com/meta-models/muse-code-sdk",
+    "logged_out_catalog_recipe": "https://meta-models.github.io/muse-code-sdk/next/cookbook/list-models-and-switch-mid-session/",
+    "model_list_protocol": "https://meta-models.github.io/muse-code-sdk/next/generated/msp/methods/model-list/"
+  },
+  "distribution": {
+    "version": "1.4.8-R6256.1",
+    "platform": "aarch64_macos",
+    "download_host": "lookaside.facebook.com",
+    "anonymous_channel_http_status": 200,
+    "anonymous_manifest_http_status": 200,
+    "anonymous_artifact_http_status": 200,
+    "channel_sha256": "0d0bea7097431eb20e6fe6cee55bfe0e75c8fd0d03057d4ba0bb9c4b8e767887",
+    "manifest_sha256": "12c622e20945ea64b1be46d4356e2a6c9e25492eb7da9daae3656d53e494ce5e",
+    "artifact_size": 366924368,
+    "artifact_sha256": "5721763b4723f961709cd28f69aa049763965b46c4d4d70f883a0a90e5ddf39c",
+    "official_size_and_sha256_match": true,
+    "sdk_version": "1.4.8",
+    "sdk_tarball_sha256": "95fa28e5d762d86dbf50f56aa0e9c1deaa4ff40365642d4ed8549588b1c8bd34",
+    "sdk_npm_sha512_integrity_verified": true
+  },
+  "signature": {
+    "codesign_strict_verify_exit_code": 0,
+    "authority": "Developer ID Application: Meta Platforms, Inc. (V9WTTPBFK9)",
+    "apple_certificate_chain_valid": true,
+    "team_identifier": "V9WTTPBFK9",
+    "hardened_runtime": true,
+    "gatekeeper_assessment": {
+      "exit_code": 3,
+      "message": "the code is valid but does not seem to be an app",
+      "scope": "Standalone Mach-O command-line executable, not an application bundle. No Gatekeeper override or quarantine removal performed."
+    }
+  },
+  "schema": {
+    "pinned_sdk": "sha256:4e3200c3c9dc0cd7919d11022630d43f9bc1c5cdda375381e90b0183b5665069",
+    "served_cli": "sha256:4e3200c3c9dc0cd7919d11022630d43f9bc1c5cdda375381e90b0183b5665069",
+    "exact_match": true,
+    "warning": null,
+    "previous_sdk": "1.4.6",
+    "previous_sdk_fingerprint": "sha256:eae467ab60cb9a5d5af4de616830f065e59375c987fd59269c8cc33ed2a1137f",
+    "previous_adapter_result": "MUSE_SCHEMA_CHANGED before model/list",
+    "strict_guard_preserved": true
+  },
+  "actual_adapter": {
+    "started_at": "2026-10-15T04:53:52.844Z",
+    "finished_at": "2026-10-15T04:53:52.949Z",
+    "request_methods": [
+      "initialize",
+      "model/list"
+    ],
+    "session_starts": 0,
+    "model_requests": 0,
+    "credential_reads": 0,
+    "auth_file_present": false,
+    "private_home": true,
+    "contributor_mode": "off",
+    "shell_disabled": true,
+    "write_disabled": true,
+    "catalog": {
+      "providerId": "meta",
+      "source": "bundledCatalog",
+      "models": []
+    },
+    "events": [
+      "models",
+      "exit"
+    ],
+    "exit_kind": "cleanShutdown",
+    "owned_child_exit": {
+      "code": 0,
+      "signal": null
+    }
+  },
+  "regression_tests": {
+    "command": "npm test --prefix plugins/rdsh-llm-muse-code-subscription",
+    "tests": 27,
+    "passed": 27,
+    "failed": 0,
+    "skipped": 0,
+    "old_sdk_negative_control": "The released-schema test fails with SDK 1.4.6 in an isolated projection.",
+    "added_cases": [
+      "the pinned SDK accepts the released Muse CLI schema and identifies another schema as drift",
+      "catalog discovery rejects schema drift before querying models or reading credentials",
+      "an empty bundled catalog stays empty without inventing account entitlements"
+    ]
+  },
+  "source_files_sha256": {
+    "plugins/rdsh-llm-muse-code-subscription/README.md": "579d98e392cd79da495047a3df7fcc2ae9c7445f52773ed377ecb259cde8ef5d",
+    "plugins/rdsh-llm-muse-code-subscription/package.json": "9b415e42898ca5632d2e9e7f246b064ae582a19f635101f945a86955379055b6",
+    "plugins/rdsh-llm-muse-code-subscription/package-lock.json": "d9f5a507c3f1c359b8b5cfa1ba3c7e53334c66500dd8169df116ea830c36ee06",
+    "plugins/rdsh-llm-muse-code-subscription/test/bridge.test.mjs": "a005a52c85d543fbc7b066c05bdfe07a9b49424b3bbbcb54cca4348fc03e3d0e",
+    "plugins/rdsh-llm-muse-code-subscription/muse.mjs": "ffbfc7665c3449f604b54fff37987a30a70dc1f90382cc6fb45c13e859a679f7",
+    "plugins/rdsh-llm-muse-code-subscription/protocol.mjs": "787d0839d9f56550ba5d2a1be35f187b04418fabc4d5c4b587fcfd9ac090375d",
+    "plugins/rdsh-llm-muse-code-subscription/runner.mjs": "e1007923f4a51f8cd0ac928a4f698f2400d824319817456a0e93131f76412e72",
+    "plugins/rdsh-llm-muse-code-subscription/worker.mjs": "930a5e2942cc5c81cc56f0d3ea437bfe48486d4ec063254d14cb8d9b25df05d0",
+    "plugins/rdsh-llm-muse-code-subscription/index.js": "60347bbd6c28dce7767bf4f56988bac499a3482bbfe3de7efef400cadf18f7bf"
+  },
+  "cleanup": {
+    "remaining_owned_cli_processes": 0,
+    "existing_path_cli_still_absent": true,
+    "existing_account_auth_still_absent": true,
+    "installer_executed": false,
+    "global_settings_changed": false,
+    "installed_bins_changed": false
+  },
+  "evidence_sha256": {
+    "plugin-tests.log": "b34e039bfe7f2ba36fdd3c57be58f362ffddfcbbda9efd886f5e7376056e4f7b",
+    "negative-old-sdk.log": "69ce94d21bc88340681e7f49bf62465494ce66d38aa38889bb7a30910e76b091",
+    "final-adapter-catalog-result.private.json": "3036771d2e8b5185e76f9962741b5954fe8c3eabad15c2164dc2cfcfb929a634",
+    "signature-0.txt": "64a3d40559cdd846e505c95b08ffc6275e155c2619d6ca0452a8253be9877285",
+    "signature-1.txt": "4e7c67c67395b443b99b24e1b34549b13b035562eefebed65b4269b1c0cbcdf1",
+    "signature-2.txt": "de2d6edd9b00c9a3cc5f002b003fb39e3dc4a8d207b2a4e69c20ea380986d479"
+  },
+  "limits": [
+    "Logged-out bundledCatalog contained zero models; this does not verify paid subscription entitlement or model generation.",
+    "No login, session/start, turn/start, API key, model request or billing operation was performed.",
+    "Live authenticated model responses and subscription billing remain outside the free verification scope."
+  ]
+}

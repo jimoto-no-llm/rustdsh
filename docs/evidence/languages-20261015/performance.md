@@ -41,3 +41,9 @@ The initial run has mixed median directions, including cases above 1.0; it is no
 - [Summary with binary SHA-256 and all thirteen comparisons](performance-summary.json).
 
 Local absolute command paths and machine-identifying metadata are omitted from public copies; numerical samples, load observations, exit statuses and binary identifiers are retained. The extended runner's FNV identifiers are not substituted for the SHA-256 binary identities above. The optional original-DSH series is null and supplies no delegation-performance claim.
+
+## Later fixed cc019 comparison
+
+The later merged native candidate (`390cc393bf10a96f2093a5f466bfd9f63d0b9e1042381daee1e157272c1b16f0`) is compared with an isolated exact upstream cc019 build (`6062372c5b32016e852f921e26d7d869c6579346c3be74644c19ac5b1a37b161`). Both retain all 13 comparable stdout values. With three warmups and 15 samples, median ratios range from 0.921 to 1.034; the largest p95 ratio is 1.160 for cached session tokens. The streaming-zstd median/p95 ratios are 0.970/0.759 in this run. The earlier 2.267 tail remains recorded above; this observation does not identify its source cause.
+
+Owned local builds and ordinary tests had completed before these measurements. Host load changed from 6.25/7.27/9.66 to 6.28/7.22/9.60, so this is still a shared-host observation. Optional plugin-only compatibility follow-ups do not change these native binaries. [Basic raw observations](performance-cc019-basic.json), [extended raw observations](performance-cc019-extended.json), [source/binary/exit/load receipt](performance-cc019-execution.json), [all 13 comparisons](performance-cc019-summary.json). No model/provider request, external user data or installed binary replacement is involved.

@@ -9,7 +9,7 @@ import { LOAD, SEARCH, STATUS } from '../discovery.js';
 const ctx = new Context();
 new SystemPrompt(ctx, { includeHarnessIdentity: false, includeRuntimeContext: false });
 new SessionStore(ctx);
-const tools = new ToolRuntime(ctx, { mode: 'both' });
+const tools = new ToolRuntime(ctx, { mode: 'ptc' });
 const before = tools.schemas().map(tool => tool.name);
 assert.ok(tools.get('rdsh_inspect'));
 assert.equal(tools.get('run_code'), undefined);

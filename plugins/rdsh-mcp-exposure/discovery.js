@@ -1,3 +1,4 @@
+import { diagnostic } from './diagnostics.js';
 import { createHash } from 'node:crypto';
 import { ExposureError } from './policy.js';
 
@@ -108,7 +109,7 @@ export class Discovery {
       const effective = policy.resolve(definition.name);
       // No schema or callback for a hidden tool enters the parent registry.
       if (effective.exposure === 'hidden') return () => {};
-      if (this.records.has(definition.name)) throw new ExposureError('RDSH_MCP_NAMESPACE', 'A live MCP generation already owns this tool name');
+      if (this.records.has(definition.name)) throw new ExposureError('RDSH_MCP_NAMESPACE', diagnostic('liveName'));
       const schema = schemaOf(definition);
       const record = Object.freeze({ name: definition.name, server: policy.serverName, definition, schema,
         digest: digest({ route: routeIdentity, schema }), ...effective });
@@ -166,7 +167,7 @@ export class Discovery {
       || !Number.isSafeInteger(limit) || limit < 1 || limit > this.config.maxSearchResults
       || (args.server !== undefined && typeof args.server !== 'string')
       || (args.revision !== undefined && typeof args.revision !== 'string'))
-      throw new ExposureError('RDSH_MCP_SEARCH_INPUT', 'MCP search arguments are outside their supported range');
+      throw new ExposureError('RDSH_MCP_SEARCH_INPUT', diagnostic('search'));
     await this.ready(signal);
     const visible = this.visible(scope), revision = this.revision(visible);
     if ((offset > 0 && !args.revision) || (args.revision && args.revision !== revision)) return { status: 'stale', revision, results: [], nextOffset: null };
@@ -187,7 +188,7 @@ export class Discovery {
     if (!Array.isArray(args.names) || args.names.length < 1 || args.names.length > 64 || new Set(args.names).size !== args.names.length
       || !args.names.every(name => typeof name === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(name))
       || (args.revision !== undefined && typeof args.revision !== 'string'))
-      throw new ExposureError('RDSH_MCP_LOAD_INPUT', 'MCP load requires up to 64 unique public names');
+      throw new ExposureError('RDSH_MCP_LOAD_INPUT', diagnostic('load'));
     const projectId = project(scope?.session);
     if (!projectId) return { status: 'session_required' };
     await this.ready(signal);

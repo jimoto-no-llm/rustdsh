@@ -53,6 +53,7 @@ mod auth_sharing;
 mod compact;
 mod compute;
 mod context;
+mod cost_ledger;
 mod desktop;
 mod dsh_args;
 mod file_lock;
@@ -86,7 +87,7 @@ mod websearch;
     name = "rdsh",
     version,
     about = "Rust fast launcher for dsh (safe: native fast-paths + passthrough)",
-    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|auth|setup|context|settings|features|subagents|provider|task-outcomes|update|dump-config|boot|serial-proxy)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh provider add hai --model deepseek-v4-flash   register HAI as a dsh route\n  rdsh provider add sarashina    register Sarashina (SARASHINA_API_KEY; mini and nano built in)\n  rdsh provider add local-openai --base-url http://host:8080/v1 --discover --no-key\n  rdsh provider list              presets and per-profile route/key status\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh desktop status             detect the Desktop (Electron) app and its reserved profile\n  rdsh desktop install            attach the bundled rdsh plugins to that profile\n  rdsh --passthrough tui          no slim env; mandatory tool isolation remains\n  rdsh --dry-run tui -- --resume abc   show what would exec"
+    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|auth|setup|context|settings|features|subagents|provider|task-outcomes|cost-ledger|update|dump-config|boot|serial-proxy)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh provider add hai --model deepseek-v4-flash   register HAI as a dsh route\n  rdsh provider add sarashina    register Sarashina (SARASHINA_API_KEY; mini and nano built in)\n  rdsh provider add local-openai --base-url http://host:8080/v1 --discover --no-key\n  rdsh provider list              presets and per-profile route/key status\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh desktop status             detect the Desktop (Electron) app and its reserved profile\n  rdsh desktop install            attach the bundled rdsh plugins to that profile\n  rdsh --passthrough tui          no slim env; mandatory tool isolation remains\n  rdsh --dry-run tui -- --resume abc   show what would exec"
 )]
 struct Cli {
     /// Explicitly share a project file with isolated model tools (repeatable).
@@ -365,6 +366,17 @@ enum Commands {
         #[command(subcommand)]
         action: SubagentsAction,
     },
+    /// Reported cost observations: declare one scope, record one report,
+    /// validate a stored ledger, project the public view, or print the two
+    /// JSON schemas the dashboard MCP tool advertises
+    #[command(name = "cost-ledger")]
+    CostLedger {
+        /// declare | report | validate | public | schema
+        action: String,
+        /// Request JSON file holding { operation, state, input }
+        #[arg(long = "input-file")]
+        input_file: String,
+    },
     /// DeepSeek Harness Desktop (Electron): detect the app, its reserved
     /// profile and its bundled command runtime, then attach rdsh plugins
     #[command(name = "desktop")]
@@ -556,6 +568,7 @@ const NATIVE_FIRST: &[&str] = &[
     "context",
     "settings",
     "features",
+    "cost-ledger",
     "update",
     "serial-proxy",
     "subagents",
@@ -624,15 +637,16 @@ fn main() {
             serde_json::to_string(&cli.share_file).unwrap(),
         );
     }
-    // Recovery, the pure task-outcome validator and the pure subagent planner
-    // do not depend on settings.
-    // Commands that use settings still fail closed on a corrupt document.
+    // Recovery, pure task-outcome and cost-ledger validators, and the pure
+    // subagent planner do not depend on settings. Commands that use settings
+    // still fail closed on a corrupt document.
     let cfg = if matches!(
         &cli.command,
         Some(Commands::Settings {
             action: SettingsAction::Init { force: true }
         }) | Some(Commands::TaskOutcomes { .. })
             | Some(Commands::Subagents { .. })
+            | Some(Commands::CostLedger { .. })
     ) {
         rdsh_config::RdshSettings::default()
     } else {
@@ -972,6 +986,9 @@ fn main() {
                 subagent_plan::cmd_plan(&input_file, locale)
             }
         },
+        Some(Commands::CostLedger { action, input_file }) => {
+            cost_ledger::cmd_cost_ledger(&action, &input_file, locale)
+        }
         Some(Commands::Desktop { action, json }) => match action {
             None => desktop::cmd_status(json, locale),
             Some(DesktopAction::Status { json: inner }) => {
@@ -1325,6 +1342,7 @@ fn settings_independent_invocation() -> bool {
                     action: SettingsAction::Init { force: true }
                 } | Commands::TaskOutcomes { .. }
                     | Commands::Subagents { .. }
+                    | Commands::CostLedger { .. }
             ),
             ..
         })
@@ -1465,8 +1483,20 @@ fn localize_command_tree(command: clap::Command, locale: locale::Locale) -> clap
             };
             let arg = arg.help_heading(heading);
             let id = arg.get_id().to_string();
-            let help = localized_arg_help(&id, locale)
-                .unwrap_or_else(|| panic!("missing localized argument description for {id}"));
+            let help = if name == "cost-ledger" && id == "action" {
+                match locale {
+                    locale::Locale::Chinese => {
+                        "操作：declare | report | validate | public | schema"
+                    }
+                    locale::Locale::Japanese => {
+                        "操作: declare | report | validate | public | schema"
+                    }
+                    locale::Locale::English => unreachable!(),
+                }
+            } else {
+                localized_arg_help(&id, locale)
+                    .unwrap_or_else(|| panic!("missing localized argument description for {id}"))
+            };
             let arg = arg.help(help);
             if id == "language" {
                 arg.hide_possible_values(true)
@@ -1538,6 +1568,10 @@ fn localized_command_about(name: &str, locale: locale::Locale) -> Option<&'stati
             "读取请求并生成分派计划，不启动代理",
             "要求を読み取り割り当て計画を作成（エージェントは起動しません）",
         ),
+        "cost-ledger" => (
+            "声明、记录、验证费用台账或输出公开视图与 JSON schema",
+            "費用台帳を宣言・記録・検証し公開表示やJSONスキーマを出力",
+        ),
         "task-outcomes" => (
             "应用或验证任务结果与固定里程碑",
             "タスク結果と固定マイルストーンを適用・検証",
@@ -1587,8 +1621,8 @@ fn localized_command_about(name: &str, locale: locale::Locale) -> Option<&'stati
 
 fn localized_after_help(name: &str, locale: locale::Locale) -> Option<&'static str> {
     (name == "rdsh").then(|| match locale {
-        locale::Locale::Chinese => "用法：\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|auth|setup|context|settings|features|provider|subagents|task-outcomes|update|dump-config|boot|serial-proxy)\n\n示例：\n  rdsh tui                        启动 tui 配置文件（slim 环境开启，委托给 dsh）\n  rdsh --profile web --patch x.yml 使用叠加层启动 web\n  rdsh dump-config --profile tui  委托 dsh 输出准确配置\n  rdsh tokens ./AGENTS.md         原生估算输入令牌数\n  rdsh auth --import --provider openai-codex   只导入选定提供方\n  rdsh provider list              查看预设、路由和密钥状态\n  rdsh provider add hai --model deepseek-v4-flash   注册 HAI 路由\n  rdsh setup                      首次连接：选择共享、登录流程和后续步骤\n  rdsh search hello --dir .       无 Node 的快速文件搜索\n  rdsh search-web \"rust async\"      通过 SearXNG 网页搜索（无需 API 密钥）\n  rdsh desktop status             检测 Desktop（Electron）应用及其保留配置文件\n  rdsh desktop install            将捆绑 rdsh 插件附加到该配置文件\n  rdsh --passthrough tui          不使用 slim 环境；必需的工具隔离仍会启用\n  rdsh --dry-run tui -- --resume abc   显示将执行的命令",
-        locale::Locale::Japanese => "使い方：\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|auth|setup|context|settings|features|provider|subagents|task-outcomes|update|dump-config|boot|serial-proxy)\n\n例：\n  rdsh tui                        tuiプロファイルを起動（slim環境ON、dshへ委譲）\n  rdsh --profile web --patch x.yml オーバーレイ付きでwebを起動\n  rdsh dump-config --profile tui  dshへ正確な設定出力を委譲\n  rdsh tokens ./AGENTS.md         入力トークン数をネイティブで推定\n  rdsh auth --import --provider openai-codex   選択したプロバイダーだけをインポート\n  rdsh provider list              プリセット・経路・キーの状態を確認\n  rdsh provider add hai --model deepseek-v4-flash   HAI経路を登録\n  rdsh setup                      初回接続: 共有の選択、ログイン手順、次のステップ\n  rdsh search hello --dir .       Nodeなしの高速ファイル検索\n  rdsh search-web \"rust async\"      SearXNGによるWeb検索（APIキー不要）\n  rdsh desktop status             Desktop（Electron）アプリと専用プロファイルを検出\n  rdsh desktop install            同プロファイルに同梱rdshプラグインを追加\n  rdsh --passthrough tui          slim環境なし。必須のツール分離は維持\n  rdsh --dry-run tui -- --resume abc   実行するコマンドを表示",
+        locale::Locale::Chinese => "用法：\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|auth|setup|context|settings|features|provider|subagents|task-outcomes|cost-ledger|update|dump-config|boot|serial-proxy)\n\n示例：\n  rdsh tui                        启动 tui 配置文件（slim 环境开启，委托给 dsh）\n  rdsh --profile web --patch x.yml 使用叠加层启动 web\n  rdsh dump-config --profile tui  委托 dsh 输出准确配置\n  rdsh tokens ./AGENTS.md         原生估算输入令牌数\n  rdsh auth --import --provider openai-codex   只导入选定提供方\n  rdsh provider list              查看预设、路由和密钥状态\n  rdsh provider add hai --model deepseek-v4-flash   注册 HAI 路由\n  rdsh setup                      首次连接：选择共享、登录流程和后续步骤\n  rdsh search hello --dir .       无 Node 的快速文件搜索\n  rdsh search-web \"rust async\"      通过 SearXNG 网页搜索（无需 API 密钥）\n  rdsh desktop status             检测 Desktop（Electron）应用及其保留配置文件\n  rdsh desktop install            将捆绑 rdsh 插件附加到该配置文件\n  rdsh --passthrough tui          不使用 slim 环境；必需的工具隔离仍会启用\n  rdsh --dry-run tui -- --resume abc   显示将执行的命令",
+        locale::Locale::Japanese => "使い方：\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|auth|setup|context|settings|features|provider|subagents|task-outcomes|cost-ledger|update|dump-config|boot|serial-proxy)\n\n例：\n  rdsh tui                        tuiプロファイルを起動（slim環境ON、dshへ委譲）\n  rdsh --profile web --patch x.yml オーバーレイ付きでwebを起動\n  rdsh dump-config --profile tui  dshへ正確な設定出力を委譲\n  rdsh tokens ./AGENTS.md         入力トークン数をネイティブで推定\n  rdsh auth --import --provider openai-codex   選択したプロバイダーだけをインポート\n  rdsh provider list              プリセット・経路・キーの状態を確認\n  rdsh provider add hai --model deepseek-v4-flash   HAI経路を登録\n  rdsh setup                      初回接続: 共有の選択、ログイン手順、次のステップ\n  rdsh search hello --dir .       Nodeなしの高速ファイル検索\n  rdsh search-web \"rust async\"      SearXNGによるWeb検索（APIキー不要）\n  rdsh desktop status             Desktop（Electron）アプリと専用プロファイルを検出\n  rdsh desktop install            同プロファイルに同梱rdshプラグインを追加\n  rdsh --passthrough tui          slim環境なし。必須のツール分離は維持\n  rdsh --dry-run tui -- --resume abc   実行するコマンドを表示",
         locale::Locale::English => unreachable!(),
     })
 }

@@ -1,0 +1,29 @@
+✔ CLI catalog has all three languages, matching placeholders and typed validation origins (4.764125ms)
+✔ CLI help and validation use en without translating machine output or raw text (3978.888541ms)
+✔ CLI help and validation use zh-CN without translating machine output or raw text (3747.051834ms)
+✔ CLI help and validation use ja without translating machine output or raw text (3889.478833ms)
+✔ CLI resolves flag, environment and persisted language while refusing invalid files without overwriting bytes (940.159584ms)
+✔ CLI explicit language does not change delegated version-probe argv or locale environment (260.381375ms)
+✔ preflight preserves inline values when removing display-language options (647.7315ms)
+✔ preflight retains unexpected positionals and option terminators for strict validation (674.028416ms)
+✔ CLI project startup propagates en to real server HTML (227.53575ms)
+✔ CLI project startup propagates zh-CN to real server HTML (247.446958ms)
+✔ CLI project startup propagates ja to real server HTML (186.641458ms)
+✔ pure native JSON bridges ignore corrupt settings while ordinary commands fail closed (7002.701042ms)
+✔ cost-ledger CLI invokes rdsh with a private temporary request file (341.197459ms)
+✔ two independent workers sum exactly; identical IDs, reordered JSON and repeated cumulative reports never add (22.370083ms)
+✔ out-of-order cumulative snapshots replace earlier totals; decreasing/reset counters and mixed deltas fail (7.830125ms)
+✔ provider, CLI, explicit estimate and a different invoice retain separate amounts, references and period (11.772041ms)
+✔ missing workers and unknown amounts stay partial; unknown population and mixed currencies cannot become a full total (7.227833ms)
+✔ independent event sequences add once; an unknown event in a worker keeps its subtotal partial (5.010625ms)
+✔ scope identity, source certainty, dates and malformed persisted ledger fail without rewriting evidence (3.976292ms)
+✔ existing MCP metrics tool records ledger reports; old metrics and exactly six tool names remain compatible (3.267708ms)
+✔ HTTP parallel worker reports, lost response retry, browser read-only and public CLI share one durable ledger (423.637333ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 21860.698917

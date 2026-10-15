@@ -1,6 +1,8 @@
 import { ProductLocaleError } from "./product-locale.mjs";
 
 export const cliEntries = [
+  ["error.privateJson", "非公開JSON要求ファイルの処理に失敗しました（{operation}、コード{code}）", "Private JSON request file operation failed ({operation}, code {code})", "私密 JSON 请求文件操作失败（{operation}，代码 {code}）"],
+  ["error.costPureOptions", "cost-ledgerのvalidate/public/schemaには--input-fileが必要です。projectは指定できません", "Cost ledger validate/public/schema requires --input-file and takes no project", "cost-ledger 的 validate/public/schema 需要 --input-file，不能指定 project"],
   ["error.nativeAbsolute", "RDSH_BINは絶対パスで指定してください", "RDSH_BIN must be an absolute path", "RDSH_BIN 必须为绝对路径"],
   ["error.nativeMissing", "rdshがPATHにありません（RDSH_BINでも指定できます）", "rdsh is not installed on PATH (or set RDSH_BIN)", "PATH 中未安装 rdsh（也可设置 RDSH_BIN）"],
   ["error.taskOutcomesAction", "task-outcomesの操作またはオプションが不正です", "Invalid task-outcomes action/options", "task-outcomes 操作或选项无效"],

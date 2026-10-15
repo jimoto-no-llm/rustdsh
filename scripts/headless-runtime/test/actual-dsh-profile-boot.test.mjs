@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { spawn } from 'node:child_process';
-import { copyFile, mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
 import test from 'node:test';
 
@@ -19,7 +20,7 @@ async function waitFor(predicate, timeoutMs = 1_000) {
   assert.equal(predicate(), true, 'condition did not settle before timeout');
 }
 
-test('actual headless boot mounts the inserted cleanup plugin and closes only its created agent session', { skip: !candidate }, async () => {
+for (const language of ['en', 'zh-CN', 'ja']) test(`actual headless boot mounts ready cleanup and closes only its created agent session (${language})`, { skip: !candidate }, async () => {
   const require = createRequire(import.meta.url);
   const { WebSocketServer } = require(path.join(candidate, 'node_modules/ws'));
   const server = new WebSocketServer({ port: 0 });
@@ -31,6 +32,7 @@ test('actual headless boot mounts the inserted cleanup plugin and closes only it
   const home = await mkdtemp(path.join(tmpdir(), 'rdsh-headless-profile-'));
   let boot;
   try {
+    await writeFile(path.join(home, 'rdsh.json'), JSON.stringify({ general: { language } }));
     const overlay = path.join(home, 'headless-cleanup.yml');
     const plugin = path.join(candidate, 'plugins/rdsh-session-cleanup/index.js');
     await writeFile(overlay, `- id: headless-startup\n  disabled: true\n- id: headless-runner\n  disabled: true\n- insert:\n    - id: rdsh-session-cleanup\n      name: ${plugin}\n      config: {}\n`);
@@ -43,6 +45,7 @@ test('actual headless boot mounts the inserted cleanup plugin and closes only it
     const environment = createLaunchEnvironmentSnapshot([{ source: 'process', values: {} }]);
     boot = await profileBoot.runProfile({ environment, profile: 'headless', patchFiles: [overlay], args: [] });
     assert.equal(boot.ctx.get('profileContext')?.name, 'headless');
+    assert.equal(boot.ctx.get('rdshSessionCleanupReady'), true);
 
     const handle = await boot.ctx.agents.create({ sessionId: randomUUID() });
     const sdk = await import(pathToFileURL(path.join(candidate, 'node_modules/@earendil-works/pi-ai/dist/api/openai-codex-responses.js')).href);
@@ -96,6 +99,9 @@ test('actual headless CLI propagates node-ws through streamSimple and naturally 
     for (const name of ['home', 'dsh-home', 'workspace', 'sessions', 'tmp', 'cache']) await mkdir(path.join(run, name));
     const patch = path.join(run, 'headless.yml');
     const cleanup = path.join(candidate, 'plugins/rdsh-session-cleanup/index.js');
+    const cleanupPatch = path.join(run, 'required-cleanup.yml');
+    const cleanupOverlay = await readFile(path.join(candidate, 'plugins/rdsh-session-cleanup/cordis.patch.yml'), 'utf8');
+    await writeFile(cleanupPatch, cleanupOverlay.replace('name: "rdsh-session-cleanup"', `name: ${JSON.stringify(cleanup)}`));
     const diagnostic = path.join(run, 'cleanup-diagnostic.mjs');
     const evidence = path.join(run, 'cleanup-diagnostic.json');
     await copyFile(path.resolve('scripts/headless-runtime/test/fixtures/cleanup-diagnostic-plugin.mjs'), diagnostic);
@@ -106,9 +112,9 @@ test('actual headless CLI propagates node-ws through streamSimple and naturally 
       { id: 'session-persistence-jsonl', config: { root: path.join(run, 'sessions') } },
       { id: 'session-title-llm', disabled: true },
       { id: 'session-telemetry-otel', disabled: true },
-      { insert: [{ id: 'rdsh-session-cleanup', name: cleanup, config: {} }, { id: 'cleanup-diagnostic', name: diagnostic, config: {} }] },
+      { insert: [{ id: 'cleanup-diagnostic', name: diagnostic, config: {} }] },
     ]));
-    child = spawn(path.join(candidate, 'node_modules/.bin/dsh'), ['headless', '--patch', patch, '--json', 'reply'], {
+    child = spawn(path.join(candidate, 'node_modules/.bin/dsh'), ['headless', '--patch', patch, '--patch', cleanupPatch, '--json', 'reply'], {
       cwd: path.join(run, 'workspace'),
       env: { PATH: process.env.PATH, HOME: path.join(run, 'home'), DSH_HOME: path.join(run, 'dsh-home'), TMPDIR: path.join(run, 'tmp'), NODE_COMPILE_CACHE: path.join(run, 'cache'), FAKE_API_KEY: fakeToken, RDSH_CANDIDATE: candidate, RDSH_CLEANUP_DIAGNOSTIC: evidence },
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -164,6 +170,58 @@ test('actual headless CLI propagates node-ws through streamSimple and naturally 
     if (child && child.exitCode === null) child.kill('SIGTERM');
     for (const peer of peers) peer.terminate();
     await new Promise(resolve => server.close(resolve));
+    await rm(run, { recursive: true, force: true });
+  }
+});
+
+for (const [language, message] of Object.entries({
+  en: 'Session cleanup requires the rdsh headless runtime with its asynchronous close-completion API.',
+  ja: 'セッションの後始末には、非同期の終了完了待機APIを備えたrdsh headlessランタイムが必要です。',
+  'zh-CN': '会话清理需要提供异步关闭完成API的rdsh headless运行时。',
+})) test(`actual required headless runner refuses a missing asynchronous cleanup API before a provider request (${language})`, { skip: !candidate }, async () => {
+  const run = await mkdtemp(path.join(tmpdir(), 'rdsh-headless-required-'));
+  let requests = 0;
+  const canary = createServer((_request, response) => { requests++; response.writeHead(503).end(); });
+  await new Promise(resolve => canary.listen(0, '127.0.0.1', resolve));
+  let child;
+  try {
+    const plugin = path.join(run, 'plugin');
+    const sdk = path.join(plugin, 'node_modules/@earendil-works/pi-ai');
+    await mkdir(sdk, { recursive: true });
+    for (const file of ['index.js', 'cleanup.mjs', 'diagnostics.mjs', 'package.json']) {
+      await copyFile(path.resolve('plugins/rdsh-session-cleanup', file), path.join(plugin, file));
+    }
+    await writeFile(path.join(sdk, 'package.json'), JSON.stringify({ name: '@earendil-works/pi-ai', version: '0.87.1', type: 'module', exports: './index.js' }));
+    await writeFile(path.join(sdk, 'index.js'), 'export function cleanupSessionResources() { throw new Error("synchronous API must never be substituted"); }\n');
+    const home = path.join(run, 'home');
+    await mkdir(home);
+    await writeFile(path.join(home, 'rdsh.json'), JSON.stringify({ general: { language } }));
+    const patch = path.join(run, 'required.yml');
+    const overlay = await readFile(path.resolve('plugins/rdsh-session-cleanup/cordis.patch.yml'), 'utf8');
+    await writeFile(patch, overlay.replace('name: "rdsh-session-cleanup"', `name: ${JSON.stringify(path.join(plugin, 'index.js'))}`));
+    child = spawn(process.execPath, [path.join(candidate, 'node_modules/@deepseek-ai/dsh/lib/bin.js'), 'headless', '--patch', patch, '--json', 'private fixture must not reach a model'], {
+      cwd: run,
+      env: { PATH: process.env.PATH, HOME: home, DSH_HOME: home, TMPDIR: run, DSH_LANG: language, RDSH_LANG: language,
+        DEEPSEEK_API_KEY: 'keyless-private-canary', DEEPSEEK_BASE_URL: `http://127.0.0.1:${canary.address().port}/v1` },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let output = '', errors = '';
+    child.stdout.on('data', value => { output += value; });
+    child.stderr.on('data', value => { errors += value; });
+    const watchdog = setTimeout(() => child.kill('SIGKILL'), 10_000);
+    let result;
+    try { result = await new Promise(resolve => child.once('close', (code, signal) => resolve({ code, signal }))); }
+    finally { clearTimeout(watchdog); }
+    assert.equal(result.signal, null, 'startup refusal must finish without the watchdog');
+    assert.equal(result.code, 1);
+    assert.ok(errors.includes(message));
+    assert.match(errors, /headless-runner/);
+    assert.match(errors, /rdshSessionCleanupReady/);
+    assert.equal(requests, 0);
+    assert.ok(!output.includes('turn_end'));
+  } finally {
+    if (child?.exitCode === null && child?.signalCode === null) child.kill('SIGKILL');
+    await new Promise(resolve => canary.close(resolve));
     await rm(run, { recursive: true, force: true });
   }
 });

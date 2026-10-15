@@ -1,4 +1,5 @@
 import test from "node:test";
+import { createRequire } from "node:module";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -17,6 +18,7 @@ import {
   validateRequest,
 } from "../protocol.mjs";
 import { catalog } from "./catalog.mjs";
+import { checkServedFingerprint } from "@muse-code/sdk";
 
 const previousHome = process.env.DSH_HOME,
   previousLanguage = process.env.RDSH_LANG;
@@ -515,6 +517,69 @@ test("discovers the full CLI catalog without reading credentials or starting a m
       .catalog.models.map((row) => row.modelId),
     catalog().models.map((row) => row.modelId),
   );
+  assert.equal(fixture.state.queries, 1);
+  assert.equal(fixture.state.turns, 0);
+  assert.equal(fixture.state.closed, 1);
+});
+
+test("the supported Harness base adapter retains its released image metadata API without a model call", () => {
+  const adapter = new MuseSubscriptionAdapter({});
+  const release = createRequire(import.meta.url)("@deepseek-ai/dsh-llm/package.json").version;
+  if (release === "0.2.1-alpha.1") assert.equal(typeof adapter.imageRequestTarget, "undefined");
+  else {
+    assert.equal(release, "0.2.1-alpha.3");
+    assert.deepEqual(
+      adapter.imageRequestTarget("muse-code", "metadata-only", { width: 121, height: 83, bytes: 321 }),
+      { width: 121, height: 83, maxBytes: 321 },
+    );
+  }
+});
+
+test("the pinned SDK accepts the released Muse CLI schema and identifies another schema as drift", () => {
+  const releasedSchema = "sha256:4e3200c3c9dc0cd7919d11022630d43f9bc1c5cdda375381e90b0183b5665069";
+  assert.equal(checkServedFingerprint(releasedSchema), undefined);
+  const warning = checkServedFingerprint("sha256:fixture-foreign-schema");
+  assert.equal(warning.kind, "schemaFingerprintMismatch");
+  assert.equal(warning.served, "sha256:fixture-foreign-schema");
+  assert.equal(warning.pinned, releasedSchema);
+});
+
+test("catalog discovery rejects schema drift before querying models or reading credentials", async () => {
+  const fixture = fakeSdk({ schemaChanged: true });
+  const events = [];
+  await assert.rejects(
+    runMuse(
+      { operation: "list-models" },
+      {
+        sdk: fixture.sdk,
+        readAuth: async () => assert.fail("discovery must not read credentials"),
+        emit: (event) => events.push(event),
+      },
+    ),
+    (error) => error.code === "MUSE_SCHEMA_CHANGED",
+  );
+  assert.equal(fixture.state.queries, 0);
+  assert.equal(fixture.state.turns, 0);
+  assert.equal(fixture.state.closed, 1);
+  assert.deepEqual(events, [{ type: "exit", kind: "cleanShutdown" }]);
+});
+
+test("an empty bundled catalog stays empty without inventing account entitlements", async () => {
+  const models = { providerId: "meta", source: "bundledCatalog", models: [] };
+  const fixture = fakeSdk({ models });
+  const events = [];
+  await runMuse(
+    { operation: "list-models" },
+    {
+      sdk: fixture.sdk,
+      readAuth: async () => assert.fail("discovery must not read credentials"),
+      emit: (event) => events.push(event),
+    },
+  );
+  assert.deepEqual(events, [
+    { type: "models", catalog: models },
+    { type: "exit", kind: "cleanShutdown" },
+  ]);
   assert.equal(fixture.state.queries, 1);
   assert.equal(fixture.state.turns, 0);
   assert.equal(fixture.state.closed, 1);

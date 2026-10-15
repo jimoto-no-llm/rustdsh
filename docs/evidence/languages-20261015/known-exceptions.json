@@ -42,21 +42,23 @@
     },
     {
       "id": "local-linux-owned-process-matrix",
-      "status": "focused-native-kernel-verified",
-      "scope": "One unmodified 8ee process-scope lifecycle case on WSL2 Ubuntu with existing delegated cgroup v2: three generations, pidfd TERM, forced stop once, independent canary and cleanup verified.",
-      "limits": "The other three running development distributions were surveyed read-only; this receipt is not the complete Linux dashboard matrix.",
+      "status": "native-linux-verified-at-recorded-source",
+      "scope": "Focused cgroup/pidfd lifecycle and later ordinary Linux cc019 dashboard 353=342 pass/11 explicit skips; native release Rust 461 pass/13 targets/zero ignored. Later alpha.3 plugin repairs are separate.",
+      "limits": "WSL2 Ubuntu kernel with existing delegated user manager; no physical-keyboard/IME or production claim.",
       "evidence": [
-        "linux-cgroup-native.json"
+        "linux-cgroup-native.json",
+        "linux-cc019-native.json",
+        "linux-cc019-source.json"
       ]
     },
     {
       "id": "live-muse-runtime-catalog",
-      "status": "not-verified",
-      "scope": "live external Muse CLI/login/catalog and real model response",
-      "available_evidence": "synthetic catalog/worker fixtures through real adapter/protocol paths",
-      "prerequisites": "Standard runtime/auth locations surveyed across six physical hosts and four running WSL surfaces; no existing CLI found. No catalog, login, purchase or model request performed.",
+      "status": "verified-logged-out-readonly-catalog",
+      "scope": "Official signed CLI 1.4.8-R6256.1 plus SDK 1.4.8: exact schema, initialize/model-list/clean shutdown, empty bundledCatalog preserved.",
+      "available_evidence": "Real adapter and signed CLI; 27 plugin tests and old-SDK schema negative control.",
+      "prerequisites": "Authenticated nonempty catalog and real model response remain unverified; no credential read or model request performed.",
       "evidence": [
-        "plugins.json",
+        "muse-readonly-catalog.json",
         "muse-feasibility.json"
       ]
     },
@@ -86,12 +88,13 @@
     },
     {
       "id": "loaded-performance-tail",
-      "status": "observed-open-measurement-limit",
-      "scope": "streaming zstd p95 ratio 2.267, several other tails and child RSS increases observed on loaded repeat",
+      "status": "observed-shared-host-measurement-limit",
+      "scope": "Earlier 8ee/2db loaded streaming-zstd p95 ratio 2.267 is retained. Later cc019 comparison has 13 identical stdout values, median ratios 0.921–1.034 and maximum p95 ratio 1.160. Different baseline/load prevents causal attribution.",
       "next_gate": "isolated reproducibility and causal attribution before a speedup/regression claim",
       "evidence": [
         "performance.md",
-        "performance-summary.json"
+        "performance-summary.json",
+        "performance-cc019-summary.json"
       ]
     },
     {

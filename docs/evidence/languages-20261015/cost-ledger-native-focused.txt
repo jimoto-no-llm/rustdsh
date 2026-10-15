@@ -1,0 +1,42 @@
+   Compiling rdsh v0.4.0 (<worktree>)
+    Finished `release` profile [optimized] target(s) in 29.36s
+     Running tests/cli_localization.rs (target/release/deps/cli_localization-0628bd86670cddf4)
+
+running 16 tests
+test help_does_not_hide_invalid_settings ... ok
+test invalid_option_keeps_the_raw_value_and_labels_the_clap_diagnostic ... ok
+test provider_human_labels_and_protocol_json_resolve_languages_independently ... ok
+test localized_context_desktop_and_logs_errors_keep_raw_unicode_values ... ok
+test auth_selection_failure_is_localized_without_copying_credentials ... ok
+test main_native_labels_and_errors_are_localized_without_changing_json ... ok
+test guard_json_parse_and_size_reasons_stay_canonical_english ... ok
+test english_native_presentations_match_the_default_locale ... ok
+test help_accepts_native_flags_without_required_positionals_in_every_language ... ok
+test native_command_errors_keep_unicode_values_in_chinese_and_japanese ... ok
+test settings_and_guard_errors_localize_without_changing_raw_values_or_json_reasons ... ok
+test native_results_stay_identical_while_human_labels_change_language ... ok
+test integrated_provider_and_new_native_help_cover_every_language ... ok
+test auth_and_doctor_errors_are_localized_and_keep_raw_configuration ... ok
+test structured_compute_and_guard_json_stay_wire_compatible_across_languages ... ok
+test version_like_values_after_double_dash_do_not_trigger_version_display ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.10s
+
+     Running tests/cost_ledger_cli.rs (target/release/deps/cost_ledger_cli-df87c929f85e44b1)
+
+running 13 tests
+test commands_require_the_input_file_option ... ok
+test declare_prints_the_js_json_shape ... ok
+test schema_prints_the_advertised_js_schemas ... ok
+test commands_accept_a_utf8_bom_like_the_dashboard_cli ... ok
+test report_rejects_a_decreased_cumulative_counter ... ok
+test report_is_idempotent_and_rejects_a_conflicting_event ... ok
+test public_is_byte_identical_across_runs ... ok
+test validate_accepts_and_rejects_like_the_js_module ... ok
+test commands_refuse_unreadable_invalid_and_mismatched_input ... ok
+test report_records_and_public_projects_the_js_payload ... ok
+test commands_reject_the_js_error_cases_verbatim ... ok
+test commands_ignore_unrelated_corrupt_settings_without_replacing_them ... ok
+test human_diagnostics_are_localized_without_changing_input_or_raw_paths ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s

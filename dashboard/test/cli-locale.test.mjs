@@ -82,7 +82,7 @@ test("CLI catalog has all three languages, matching placeholders and typed valid
   const diagnostics = [
     ...source.matchAll(/new CliDiagnosticError\(\s*"([^"]+)"/g),
   ].map((match) => match[1]);
-  assert.equal(new Set(diagnostics).size, 93);
+  assert.equal(new Set(diagnostics).size, 95);
   for (const key of diagnostics)
     for (const language of ["en", "ja", "zh-CN"]) {
       const diagnostic = new CliDiagnosticError(key, {
@@ -139,6 +139,8 @@ for (const language of ["en", "zh-CN", "ja"])
       ],
       [["subagents", "plan"], "error.subagentsAction"],
       [["task-outcomes", "bad"], "error.taskOutcomesAction"],
+      [["cost-ledger", "validate"], "error.costPureOptions"],
+      [["cost-ledger", "bad"], "error.costOptions"],
       [["backup", "bad"], "error.backupAction"],
       [["workers", "bad"], "error.workersAction"],
       [["integration", "bad"], "error.integrationAction"],
@@ -414,7 +416,7 @@ test("pure native JSON bridges ignore corrupt settings while ordinary commands f
 import { readFileSync } from "node:fs";
 import path from "node:path";
 const command = path.basename(process.argv[1]);
-if (["subagents", "task-outcomes"].includes(command)) {
+if (["subagents", "task-outcomes", "cost-ledger"].includes(command)) {
   console.log(JSON.stringify({ args: [command, ...process.argv.slice(2)], language: process.env.RDSH_LANG, request: JSON.parse(readFileSync(process.argv.at(-1), "utf8")) }));
   console.error("native raw 日本語");
   process.exit(Number(process.env.RDSH_BRIDGE_TEST_EXIT || 0));
@@ -430,11 +432,20 @@ if (["subagents", "task-outcomes"].includes(command)) {
     [[], { RDSH_LANG: "", LC_ALL: "ja_JP.UTF-8" }, "ja"],
     [[], { RDSH_LANG: "", LC_ALL: "C" }, "en"],
   ]) {
-    for (const command of [["subagents", "plan"], ...["apply", "validate", "schema"].map(action => ["task-outcomes", action])]) {
+    for (const command of [["subagents", "plan"], ...["apply", "validate", "schema"].map(action => ["task-outcomes", action]), ...["validate", "public", "schema"].map(action => ["cost-ledger", action])]) {
       const args = [...command, "--input-file", request];
       const result = await run([...flags, ...args], { ...native, ...environment });
       assert.equal(result.code, 0, result.stderr);
-      assert.deepEqual(JSON.parse(result.stdout), { args, language, request: payload });
+      const observed = JSON.parse(result.stdout);
+      if (command[0] === "cost-ledger") {
+        const temporary = observed.args.at(-1);
+        assert.notEqual(temporary, request);
+        assert.equal(path.dirname(temporary), path.join(root, "state"));
+        await assert.rejects(readFile(temporary), { code: "ENOENT" });
+        observed.args[observed.args.length - 1] = request;
+      }
+      assert.deepEqual(observed, { args, language, request: payload });
+      assert.equal(await readFile(request, "utf8"), JSON.stringify(payload));
       assert.equal(result.stderr, "native raw 日本語\n");
     }
     const ordinary = await run([...flags, "--help"], { ...native, ...environment });
@@ -443,7 +454,45 @@ if (["subagents", "task-outcomes"].includes(command)) {
     assert.ok(ordinary.stderr.includes(path.join(settings, "rdsh.json")));
     assert.equal(await readFile(path.join(settings, "rdsh.json"), "utf8"), malformed);
   }
-  const failed = await run(["task-outcomes", "validate", "--input-file", request], { ...native, RDSH_BRIDGE_TEST_EXIT: "7" });
-  assert.equal(failed.code, 7);
-  assert.equal(failed.stderr, "native raw 日本語\n");
+  for (const command of ["task-outcomes", "cost-ledger"]) {
+    const failed = await run([command, "validate", "--input-file", request], { ...native, RDSH_BRIDGE_TEST_EXIT: "7" });
+    assert.equal(failed.code, 7);
+    assert.equal(failed.stderr, "native raw 日本語\n");
+    if (command === "cost-ledger") await assert.rejects(readFile(JSON.parse(failed.stdout).args.at(-1)), { code: "ENOENT" });
+  }
+  const stored = await run(["cost-ledger", "inspect"], native);
+  assert.equal(stored.code, 1);
+  assert.ok(stored.stderr.includes(path.join(settings, "rdsh.json")));
 });
+
+for (const language of ["en", "zh-CN", "ja"])
+  test(`Windows private-request failure uses ${language} and preserves the colliding caller file`, { skip: process.platform !== "win32" }, async (t) => {
+    const { root, env, run } = await fixture(t);
+    const request = path.join(root, "要求 日本語.json");
+    await writeFile(request, JSON.stringify({ operation: "schema", state: {} }));
+    const preload = path.join(root, "exclusive-collision.mjs");
+    await writeFile(preload, `
+import crypto from "node:crypto";
+import { syncBuiltinESMExports } from "node:module";
+import fs from "node:fs";
+import path from "node:path";
+const id = "00000000-0000-4000-8000-000000000001";
+crypto.randomUUID = () => id;
+syncBuiltinESMExports();
+if (path.basename(process.argv[1]) === "cli.mjs") {
+  fs.mkdirSync(process.env.RDSH_DASHBOARD_HOME, { recursive: true });
+  fs.writeFileSync(path.join(process.env.RDSH_DASHBOARD_HOME, "cost-ledger-" + process.pid + "-" + id + ".json"), "existing caller 日本語", { flag: "wx" });
+}
+`);
+    const result = await run(["--language", language, "cost-ledger", "schema", "--input-file", request], {
+      RDSH_BIN: process.execPath,
+      NODE_OPTIONS: `--import=${pathToFileURL(preload).href}`,
+    });
+    assert.equal(result.code, 1);
+    assert.equal(result.stdout, "");
+    assert.equal(result.stderr, expected(language, "error.privateJson", { operation: "CreateFileW", code: 80 }));
+    const { readdir } = await import("node:fs/promises");
+    const remaining = await readdir(env.RDSH_DASHBOARD_HOME);
+    assert.equal(remaining.length, 1);
+    assert.equal(await readFile(path.join(env.RDSH_DASHBOARD_HOME, remaining[0]), "utf8"), "existing caller 日本語");
+  });

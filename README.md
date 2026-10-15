@@ -338,6 +338,18 @@ the CLI presentation; their existing JSON strings remain unchanged, including
 malformed or oversized guard-input reasons. Native search continues to refuse
 unsupported non-Unix platforms before accessing the requested directory.
 
+### Protected delegated tools
+
+The opt-in agent tool sandbox supports Linux x86_64 with bubblewrap, prlimit,
+and unprivileged user namespaces. Its audited DSH/tool-runtime pairs are
+`0.2.0-rc.2`, `0.2.1-alpha.1`, and `0.2.1-alpha.3`, with matching versions in
+each pair. It verifies package metadata, runtime bytes and the loaded module,
+then limits inspection to explicitly shared files. Unknown, mixed, modified or
+unexpectedly resolved runtimes stop before delegation. macOS and Windows
+refuse protected delegation; ordinary delegation keeps the original tools.
+This matrix applies to the Rust launcher. Project-pinned dashboard releases
+retain their separate [supported tuple](docs/STAGED-UPDATES.md#capture-trusted-runtime-code).
+
 ### Extended Dashboard (`rdsh-dashboard`)
 
 Optional Node.js dashboard for project metrics, human-in-the-loop Q&A, and mobile access (requires Node.js 22+):

@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 
-const files = ['cleanup.mjs', 'cordis.patch.yml', 'index.js', 'package.json'];
+const files = ['cleanup.mjs', 'cordis.patch.yml', 'diagnostics.mjs', 'index.js', 'package.json'];
 
 test('candidate plugin snapshot exactly matches the canonical cleanup plugin', async () => {
   for (const file of files) {

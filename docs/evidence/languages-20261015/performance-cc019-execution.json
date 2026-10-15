@@ -1,0 +1,27 @@
+{
+  "baselineSource": "cc019b7eb259faa6664009c5c88ff7d4c70462ef",
+  "baselineBinarySha256": "6062372c5b32016e852f921e26d7d869c6579346c3be74644c19ac5b1a37b161",
+  "candidateBinarySha256": "390cc393bf10a96f2093a5f466bfd9f63d0b9e1042381daee1e157272c1b16f0",
+  "loadBefore": [
+    6.2451171875,
+    7.26513671875,
+    9.65576171875
+  ],
+  "start": 1792040286.549933,
+  "results": [
+    {
+      "exitCode": 0,
+      "seconds": 3.169339179992676
+    },
+    {
+      "exitCode": 0,
+      "seconds": 8.333704948425293
+    }
+  ],
+  "finish": 1792040298.05304,
+  "loadAfter": [
+    6.275390625,
+    7.21875,
+    9.59716796875
+  ]
+}

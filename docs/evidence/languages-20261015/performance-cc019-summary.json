@@ -1,0 +1,143 @@
+{
+  "scope": "Frozen cc019 merged candidate native CLI only; optional plugin-only follow-ups do not change either binary. Shared host observation, not an idle controlled experiment.",
+  "comparisons": [
+    {
+      "case": "version",
+      "stdoutEqual": true,
+      "baselineMedianMs": 5.963958,
+      "candidateMedianMs": 5.731,
+      "medianRatio": 0.9609390274042842,
+      "baselineP95Ms": 8.044334,
+      "candidateP95Ms": 7.853625,
+      "p95Ratio": 0.9762927546270457
+    },
+    {
+      "case": "tokens_ascii",
+      "stdoutEqual": true,
+      "baselineMedianMs": 10.446708,
+      "candidateMedianMs": 10.321042,
+      "medianRatio": 0.9879707559548904,
+      "baselineP95Ms": 12.246042,
+      "candidateP95Ms": 11.949042,
+      "p95Ratio": 0.975747265932944
+    },
+    {
+      "case": "tokens_cjk",
+      "stdoutEqual": true,
+      "baselineMedianMs": 11.324541,
+      "candidateMedianMs": 10.833667,
+      "medianRatio": 0.9566539606329298,
+      "baselineP95Ms": 14.4055,
+      "candidateP95Ms": 12.333958,
+      "p95Ratio": 0.8561978411023567
+    },
+    {
+      "case": "search",
+      "stdoutEqual": true,
+      "baselineMedianMs": 12.057416,
+      "candidateMedianMs": 12.472292,
+      "medianRatio": 1.034408367431297,
+      "baselineP95Ms": 15.03825,
+      "candidateP95Ms": 14.443791,
+      "p95Ratio": 0.9604702009874819
+    },
+    {
+      "case": "prune",
+      "stdoutEqual": true,
+      "baselineMedianMs": 12.456792,
+      "candidateMedianMs": 11.471959,
+      "medianRatio": 0.9209400783122974,
+      "baselineP95Ms": 15.164708,
+      "candidateP95Ms": 13.362584,
+      "p95Ratio": 0.8811632904504327
+    },
+    {
+      "case": "sessions_tokens",
+      "stdoutEqual": true,
+      "baselineMedianMs": 14.96675,
+      "candidateMedianMs": 14.053625,
+      "medianRatio": 0.9389897606360766,
+      "baselineP95Ms": 16.772625,
+      "candidateP95Ms": 19.458875,
+      "p95Ratio": 1.160156803124138
+    },
+    {
+      "case": "sessions_known_frame_first_cache_miss",
+      "stdoutEqual": true,
+      "baselineMedianMs": 17.610750000000003,
+      "candidateMedianMs": 16.976708,
+      "medianRatio": 0.9639968769075704,
+      "baselineP95Ms": 19.193542,
+      "candidateP95Ms": 20.176167,
+      "p95Ratio": 1.0511956052718148
+    },
+    {
+      "case": "sessions_cache_disabled",
+      "stdoutEqual": true,
+      "baselineMedianMs": 14.019167000000001,
+      "candidateMedianMs": 13.966707999999999,
+      "medianRatio": 0.9962580515661165,
+      "baselineP95Ms": 15.43,
+      "candidateP95Ms": 15.322959,
+      "p95Ratio": 0.9930627997407648
+    },
+    {
+      "case": "sessions_cache_warm",
+      "stdoutEqual": true,
+      "baselineMedianMs": 13.787417,
+      "candidateMedianMs": 13.256499999999999,
+      "medianRatio": 0.9614926421678549,
+      "baselineP95Ms": 15.415125,
+      "candidateP95Ms": 15.274292,
+      "p95Ratio": 0.9908639728837749
+    },
+    {
+      "case": "sessions_streaming_zstd_no_content_size",
+      "stdoutEqual": true,
+      "baselineMedianMs": 64.81087500000001,
+      "candidateMedianMs": 62.863459,
+      "medianRatio": 0.9699523266735712,
+      "baselineP95Ms": 91.607542,
+      "candidateP95Ms": 69.5185,
+      "p95Ratio": 0.7588731067579567
+    },
+    {
+      "case": "search_under_32",
+      "stdoutEqual": true,
+      "baselineMedianMs": 5.424875,
+      "candidateMedianMs": 5.140542,
+      "medianRatio": 0.9475871794280973,
+      "baselineP95Ms": 7.3902079999999994,
+      "candidateP95Ms": 7.8549999999999995,
+      "p95Ratio": 1.062892952404046
+    },
+    {
+      "case": "search_at_least_32",
+      "stdoutEqual": true,
+      "baselineMedianMs": 5.527666,
+      "candidateMedianMs": 5.48475,
+      "medianRatio": 0.9922361445137966,
+      "baselineP95Ms": 6.149666,
+      "candidateP95Ms": 6.018625,
+      "p95Ratio": 0.9786913630756533
+    },
+    {
+      "case": "compact_jsonl_1mib",
+      "stdoutEqual": true,
+      "baselineMedianMs": 5.356167,
+      "candidateMedianMs": 5.109624999999999,
+      "medianRatio": 0.9539704419223671,
+      "baselineP95Ms": 30.294291,
+      "candidateP95Ms": 5.708042,
+      "p95Ratio": 0.18841972568362797
+    }
+  ],
+  "medianRange": [
+    0.9209400783122974,
+    1.034408367431297
+  ],
+  "p95Range": [
+    0.18841972568362797,
+    1.160156803124138
+  ]
+}

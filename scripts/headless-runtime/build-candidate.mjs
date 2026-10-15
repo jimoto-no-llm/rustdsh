@@ -19,7 +19,7 @@ const sourceHashes = {
   sessionResources: '9228618eeaebc6b5a1746d28d1859b1e23f0f65e978dc9f6e20eb29d65b17e2a',
   codexResponses: '6e69310d77278231cfc87d7f03ee815d4a0f2ff273e6c43fcee6835e7df2b0c7',
 };
-const pluginFiles = ['cleanup.mjs', 'cordis.patch.yml', 'index.js', 'package.json'];
+const pluginFiles = ['cleanup.mjs', 'cordis.patch.yml', 'diagnostics.mjs', 'index.js', 'package.json'];
 const nativeSetupHooks = [
   {
     packageName: 'node-pty', version: '1.2.0-beta.15', script: 'scripts/prebuild.js',

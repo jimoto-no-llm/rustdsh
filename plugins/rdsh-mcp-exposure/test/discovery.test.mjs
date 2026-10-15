@@ -22,12 +22,14 @@ function populate(f) {
 }
 
 test('hidden tools never register, search, bind or execute; direct and deferred use the original pipeline', async t => {
-  const f = fixture({ config, mode: 'both' }); t.after(() => f.close());
+  const f = fixture({ config, ptc: true }); t.after(() => f.close());
   const owner = f.agent(), peer = f.agent(), filled = populate(f);
   assert.equal(f.tools.get('mcp__docs__secret'), undefined);
   const initial = await f.prompt.assemble({ scope: owner });
   assert.deepEqual(initial.tools.filter(tool => tool.name.startsWith('mcp__')).map(tool => tool.name), ['mcp__docs__direct']);
-  const sdk = initial.sections.find(section => section.name === 'tools:sdk').text;
+  const ptcInitial = await f.ptcPrompt(owner);
+  assert.deepEqual(ptcInitial.tools.map(tool => tool.name), ['run_code']);
+  const sdk = ptcInitial.sections.find(section => section.name === 'tools:sdk').text;
   assert.match(sdk, /mcp__docs__ptc/);
   assert.doesNotMatch(sdk, /mcp__docs__deferred/);
   assert.equal(JSON.stringify(initial).includes('HIDDEN_DESCRIPTION_SENTINEL'), false);
@@ -42,7 +44,7 @@ test('hidden tools never register, search, bind or execute; direct and deferred 
   assert.match(loaded.tools[0].types.typescript, /value.*string/s);
   assert.match(loaded.tools[0].types.python, /value.*str/s);
   assert.equal(value(await f.execute(owner, 'mcp__docs__deferred')).value, 'deferred');
-  assert.match((await f.prompt.assemble({ scope: owner })).sections.find(section => section.name === 'tools:sdk').text,
+  assert.match((await f.ptcPrompt(owner)).sections.find(section => section.name === 'tools:sdk').text,
     /mcp__docs__deferred/);
   assert.equal((await f.execute(peer, 'mcp__docs__deferred')).isError, true);
   assert.equal((await f.execute(owner, 'mcp__docs__ptc')).isError, true);
@@ -69,7 +71,7 @@ test('overlapping server names guard direct and PTC calls using the registered t
   ];
 
   for (const servers of configurations) {
-    const f = fixture({ config: { servers }, mode: 'both' }); t.after(() => f.close());
+    const f = fixture({ config: { servers }, ptc: true }); t.after(() => f.close());
     const policy = f.compiled.servers.find(server => server.serverName === 'docs__team');
     let calls = 0;
     f.discovery.bridge(policy, 'fixed-team-route').register(definition(name, 'Read the team fixture.', async () => {
@@ -110,7 +112,7 @@ test('native receipts survive disk restore and exact forks without sharing a sib
 });
 
 test('original nested PTC dispatch receipts restore branch-local discovery', async t => {
-  const f = fixture({ config, mode: 'both' }); t.after(() => f.close()); populate(f);
+  const f = fixture({ config, ptc: true }); t.after(() => f.close()); populate(f);
   const parent = f.agent();
   assert.equal(value(await f.ptc(parent, tools => tools[LOAD]({ names: ['mcp__docs__deferred'] }))).result.status, 'loaded');
   const snapshot = parent.session.snapshotEvents();
@@ -142,7 +144,7 @@ test('withdrawal, schema changes and scope restrictions invalidate receipts; mon
 });
 
 test('paging is stable and stale revisions never return another page; denied loads cannot settle', async t => {
-  const f = fixture({ config, mode: 'both' }); t.after(() => f.close()); const filled = populate(f), owner = f.agent();
+  const f = fixture({ config, ptc: true }); t.after(() => f.close()); const filled = populate(f), owner = f.agent();
   const page = value(await f.execute(owner, SEARCH, { limit: 1 }));
   assert.equal(page.results.length, 1); assert.equal(page.nextOffset, 1);
   assert.equal(value(await f.execute(owner, SEARCH, { limit: 1, offset: 1, revision: page.revision })).status, 'ok');
@@ -188,7 +190,7 @@ test('post-body cancellation and invalid canonical output never activate a defer
 });
 
 test('complete prompts and preexisting SDK budget transformations remain owned by their original providers', async t => {
-  const f = fixture({ config, mode: 'both' }); t.after(() => f.close()); populate(f);
+  const f = fixture({ config, mode: 'ptc' }); t.after(() => f.close()); populate(f);
   const agent = f.agent();
   f.ctx.on('system-prompt/assemble', async (_assembly, _context, next) => {
     const result = await next(); return { ...result, sections: result.sections.map(section => section.name === 'tools:sdk'

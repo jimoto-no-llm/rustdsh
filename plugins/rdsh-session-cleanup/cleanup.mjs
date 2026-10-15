@@ -1,3 +1,5 @@
+import { cleanupDiagnostic } from './diagnostics.mjs';
+
 export function attachSessionCleanup(ctx, cleanup) {
   if (ctx.get('profileContext')?.name !== 'headless') return;
   const owned = new Set();
@@ -25,6 +27,10 @@ export function attachSessionCleanup(ctx, cleanup) {
     stopDisposed();
     for (const id of [...owned]) clean(id);
     while (pending.size) await Promise.all([...pending]);
-    if (failures.length) throw new AggregateError(failures, 'headless WebSocket cleanup failed');
+    if (failures.length) {
+      const error = new AggregateError(failures, cleanupDiagnostic('failed'));
+      error.code = 'RDSH_SESSION_CLEANUP_FAILED';
+      throw error;
+    }
   }, 'await owned headless WebSocket cleanup');
 }

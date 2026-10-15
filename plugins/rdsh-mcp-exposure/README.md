@@ -1,11 +1,17 @@
 # Optional MCP exposure bundle
 
-For an authorized original DSH **0.2.0-rc.2** composition, register MCP tools
+For an authorized original DSH **0.2.0-rc.2 or 0.2.1-alpha.3** composition, register MCP tools
 through the existing MCP client and control which declarations the model sees.
 The original client owns transports, namespaces, instructions, resources,
 reconnection and disposal; the original ToolRuntime owns execution, validation,
 approvals, scope restrictions and PTC. This bundle uses public Cordis
 `Context.extend`, `register`, `get`, `schemas`, guards and prompt waterfalls.
+
+The four DSH peers must all be exact `0.2.0-rc.2` or all exact `0.2.1-alpha.3`; mixed, unknown and future releases fail before registration or connection. Cordis peers are exact `4.0.4` or `4.0.5-alpha.2`. The owned configuration schema uses Schemastery `3.18.5-alpha.2`, also checked with the original rc.2 MCP schema.
+
+### Updating an older configuration
+
+The rc.2 release retains `native`, `ptc` and `both`. Harness `0.2.1-alpha.3` accepts `tools.config.mode: native` or `ptc`; the former `both` value is rejected. Keep `native` for native declarations. Choose `ptc` for the generated SDK and `run_code`, or use the original scoped `tools.presentAs()` API when a composition selects a different presentation for an agent. PTC execution with an Agent also requires the original `workingDirectory` service, in addition to `ptcRuntime`. The shipped Web profile provides these services; this bundle supplies neither service and never changes tool presentation itself.
 
 **The current guarded `rdsh` launcher rejects this bundle before registration
 or connection.** It reserves its audited Native tool set. This optional bundle
@@ -122,6 +128,10 @@ current endpoint/stdio command participates in a private hash; credentials do
 not appear in the receipt. Path spelling is compared conservatively, so moving
 or renaming a project can require rediscovery.
 
+## Display language
+
+Owned configuration, version, namespace, discovery and guarded-launcher errors follow `general.language` (`en`, `zh-CN`, `ja`) in `$DSH_HOME/rdsh.json`. Unspecified or `auto` values use the first nonempty `RDSH_LANG`, `LC_ALL`, `LC_MESSAGES`, `LANG`, then the Node locale. Codes, configuration keys, public tool names, enum values, MCP payloads and raw upstream errors remain unchanged.
+
 ## Verification and measurements
 
 ```sh
@@ -130,9 +140,11 @@ npm test --prefix plugins/rdsh-mcp-exposure
 node plugins/rdsh-mcp-exposure/benchmark.mjs --output /new/path/measurement.json
 ```
 
+The current compatibility target is the original Harness `0.2.1-alpha.3`, tested through its shipped Web profile in both native and PTC presentations with a private loopback MCP server and zero model requests. Those load checks do not authorize use in the guarded rdsh launcher.
+
 The tests exercise actual original Cordis lifecycle, ToolRuntime, SystemPrompt,
 session fork/restore, SDK rendering and the real MCP SDK/client over loopback
-HTTP. PTC tests use a fixed callback provider with the original `run_code`
+HTTP. PTC unit tests use a fixed callback provider and working-directory fixture with the original `run_code`
 dispatcher; they do not benchmark a real sandbox/model. A child process using
 the repository's actual mandatory preload proves guarded Native activation is
 refused before helper registration and `run_code` remains absent.
@@ -146,3 +158,5 @@ assembly samples exclude tokenization. Discovery adds two helper calls per case
 plus one startup-probe search; its CPU cost and schema growth after 80 loads are
 reported explicitly. No real model, external MCP server, credentials or paid
 API is used. [Recorded output and measurements](../../docs/evidence/mcp-exposure/README.md).
+
+The exact rc.2 matrix was also loaded through its original Web profile in `native`, `ptc` and `both`, with a private loopback MCP server. These checks exercise registration, hidden-tool exclusion and prompt/SDK presentation with no tool execution or model request. The alpha.3 matrix separately exercises `native` and `ptc`; it does not re-enable `both`.

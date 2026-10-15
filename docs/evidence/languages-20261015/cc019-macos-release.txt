@@ -1,0 +1,543 @@
+    Finished `release` profile [optimized] target(s) in 0.20s
+     Running unittests src/main.rs (target/release/deps/rdsh-5521950aff74f9aa)
+
+running 303 tests
+test auth::tests::api_key_names_follow_provider_routes ... ok
+test auth::tests::credential_scalars_cannot_create_new_yaml_lines ... ok
+test auth::tests::freshness_rules ... ok
+test auth::tests::credential_values_are_always_single_quoted_yaml_strings ... ok
+test auth::tests::jwt_exp_decode ... ok
+test auth::tests::jwt_exp_overflow_is_rejected ... ok
+test auth::tests::lang_detect ... ok
+test auth::tests::provider_keys_can_be_saved_from_setup ... ok
+test auth::tests::parse_patches ... ok
+test auth::tests::setup_errors_do_not_echo_untrusted_credential_names ... ok
+test auth::tests::record_id_grammar ... ok
+test auth::tests::provider_and_ref_selectors_keep_credentials_typed ... ok
+test auth::tests::source_only_filter_includes_matching_grants_and_keys ... ok
+test auth::tests::refs_update_replaces_inline_value_without_duplicates ... ok
+test auth::tests::splice_creates_sections ... ok
+test auth::tests::provider_routes_are_connected_by_their_declared_key_name ... ok
+test auth::tests::splice_insert_and_replace ... ok
+test auth_sharing::tests::consent_is_specific_to_both_source_and_credential ... ok
+test auth_sharing::tests::selectors_cannot_be_wildcards_or_arbitrary_secret_text ... ok
+test auth::tests::quoted_ref_write_preserves_existing_refs_and_records ... ok
+test compact::tests::tiny_budgets_never_exceed_budget ... ok
+test compact::tests::noop_returns_source_verbatim_within_budget ... ok
+test compute::tests::accepts_a_128_char_non_ascii_id ... ok
+test compute::tests::batch_matches_sum_of_direct ... ok
+test auth::tests::setup_status_shape ... ok
+test compact::tests::newlines_count_toward_noop_budget ... ok
+test compute::tests::estimate_matches_direct ... ok
+test compute::tests::estimate_reports_char_count_not_byte_count ... ok
+test auth::tests::credential_file_is_private_when_created ... ok
+test compute::tests::prune_matches_direct_and_respects_budget ... ok
+test compute::tests::rejects_bad_json_and_id ... ok
+test compute::tests::rejects_an_id_over_the_char_limit ... ok
+test compute::tests::run_lines_answers_without_a_trailing_newline ... ok
+test compute::tests::run_lines_once_stops_after_the_first_request ... ok
+test compute::tests::run_lines_answers_each_request_in_order ... ok
+test compute::tests::run_lines_reports_bad_utf8_and_keeps_going ... ok
+test context::bounded_read_tests::empty_input_and_zero_cap_are_safe ... ok
+test context::bounded_read_tests::lossy_replacements_stay_within_the_byte_cap ... ok
+test context::bounded_read_tests::truncation_drops_a_partial_multibyte_scalar ... ok
+test context::tests::defaults_keep_retrieval_bounded_and_git_diff_enabled ... ok
+test context::tests::head_tail_truncates_by_unicode_characters ... ok
+test context::tests::prune_keep_goal_starts_with_goal_within_budget ... ok
+test auth_sharing::tests::lock_does_not_allow_overlapping_writes ... ok
+test context::tests::query_terms_split_identifiers_and_recall_cjk_bigrams ... ok
+test context::tests::shrinking_a_nonempty_section_keeps_at_least_one_line ... ok
+test context::tests::pack_by_priority_keeps_goal_and_constraints_within_budget ... ok
+test context::tests::truncate_list_obeys_character_and_item_limits ... ok
+test context::tests::two_char_ascii_terms_are_searchable ... ok
+test cost_ledger::tests::identifiers_match_the_js_pattern_and_refuse_prototype_names ... ok
+test compute::tests::rejects_unknown_op_version_and_size ... ok
+test cost_ledger::tests::declare_rejects_another_project_and_duplicate_targets ... ok
+test cost_ledger::tests::schemas_keep_the_advertised_shape ... ok
+test cost_ledger::tests::accepted_safe_integer_numbers_are_canonicalized_before_storage ... ok
+test cost_ledger::tests::declare_is_idempotent_and_freezes_identity ... ok
+test cost_ledger::tests::source_text_uses_ecmascript_trim_characters ... ok
+test cost_ledger::tests::json_reader_matches_javascript_integer_keys_and_safe_integers ... ok
+test cost_ledger::tests::public_event_tie_break_matches_javascript_locale_compare ... ok
+test cost_ledger::tests::cumulative_streams_reject_decreases_and_time_travel ... ok
+test cost_ledger::tests::report_rejects_unknown_sources_targets_and_certainty ... ok
+test cost_ledger::tests::report_requires_a_declared_scope_and_normalizes_the_amount ... ok
+test cost_ledger::tests::time_requires_the_canonical_utc_spelling ... ok
+test cost_ledger::tests::units_and_decimal_round_trip_like_js_bigint ... ok
+test cost_ledger::tests::stored_timestamp_errors_are_preserved ... ok
+test cost_ledger::tests::public_scope_tie_break_matches_javascript_locale_compare ... ok
+test cost_ledger::tests::public_projection_reports_the_latest_cumulative_snapshot ... ok
+test cost_ledger::tests::validation_preserves_object_rest_key_order ... ok
+test default_profile_tests::env_wins ... ok
+test cost_ledger::tests::validate_accepts_a_missing_document_and_the_recorded_one ... ok
+test default_profile_tests::guided_error_without_either ... ok
+test default_profile_tests::local_tui_fallback ... ok
+test desktop::tests::cli_paths_cover_macos_bundle_and_plain_install ... ok
+test default_profile_tests::every_subcommand_is_native_first ... ok
+test desktop::tests::compute_is_opt_in ... ok
+test default_profile_tests::boot_rejects_empty_from_default_profile ... ok
+test default_profile_tests::boot_preserves_valid_from_default_profile ... ok
+test default_profile_tests::after_help_lists_every_native_subcommand ... ok
+test desktop::tests::tail_keeps_the_last_lines ... ok
+test doctor_wrapper_tests::node_wrapper_diagnostic_ignores_comments ... ok
+test doctor_wrapper_tests::shebang_and_reference_parsing ... ok
+test desktop::tests::app_candidates_follow_the_platform ... ok
+test dsh_args::tests::abbreviated_profile_keeps_positional_args ... ok
+test dsh_args::tests::abbreviated_profile_keeps_many_positional_args_in_order ... ok
+test desktop::tests::missing_profile_is_reported_not_created ... ok
+test dsh_args::tests::dump_flags_keep_their_kind ... ok
+test dsh_args::tests::dump_keeps_from_default_profile ... ok
+test dsh_args::tests::from_default_profile_without_value_is_rejected ... ok
+test desktop::tests::desktop_targets_mix_bundled_plugins_and_packages ... ok
+test dsh_args::tests::plugin_needs_pnpm_args ... ok
+test dsh_args::tests::rejects_desktop ... ok
+test dsh_args::tests::rejects_double_profile ... ok
+test dsh_args::tests::rejects_dump_with_args ... ok
+test dsh_args::tests::positional_is_profile ... ok
+test dsh_args::tests::unknown_flag_starts_app_args ... ok
+test default_profile_tests::native_first_matches_subcommands ... ok
+test doctor_wrapper_tests::shadow_backup_reports_missing_and_unusable_backups ... ok
+test doctor_wrapper_tests::non_executable_local_wrapper_is_reported ... ok
+test file_lock::tests::takeover_claim_name_matches_dsh_record_digest ... ok
+test file_security::secure_open_tests::macos_nofollow_any_falls_back_only_for_supported_open_errors ... ok
+test file_lock::tests::credential_lock_writes_dsh_pid_marker_and_removes_it_on_drop ... ok
+test desktop::tests::profile_state_reads_dependencies_and_bundles ... ok
+test doctor_wrapper_tests::broken_wrappers_are_reported_but_healthy_ones_are_not ... ok
+test desktop::tests::running_hint_uses_the_electron_singleton_lock ... ok
+test doctor_wrapper_tests::origin_ledger_reports_stale_entries ... ok
+test desktop::tests::plugins_dir_accepts_a_checkout_or_its_plugins_directory ... ok
+test guard::tests::anchored_pattern_matches_command_inside_hook_payload ... ok
+test guard::tests::collect_nested_json_values_only ... ok
+test guard::tests::deny_credential_globs ... ok
+test file_lock::tests::credential_lock_takes_over_dead_dsh_marker_using_shared_claim_name ... ok
+test guard::tests::collect_json_strings ... ok
+test doctor_wrapper_tests::path_hits_follow_path_order_and_skip_non_candidates ... ok
+test guard::tests::empty_patterns_never_match ... ok
+test guard::tests::invalid_policy_fields_and_roots_are_rejected ... ok
+test file_security::secure_open_tests::macos_nofollow_any_preserves_non_directory_namedfork_rejection ... ok
+test guard::tests::wild_anchors ... ok
+test guard::tests::wild_basic ... ok
+test guard::tests::wild_middle ... ok
+test guard::tests::wild_multi_star_order ... ok
+test guard::tests::unsupported_shell_and_malformed_hook_do_not_become_allows ... ok
+test file_security::secure_open_tests::cached_root_keeps_approved_identity_when_path_is_replaced ... ok
+test desktop::tests::command_detection_prefers_env_then_app ... ok
+test file_security::secure_open_tests::macos_nofollow_any_kernel_guard_rejects_every_symlink_component ... ok
+test guard::tests::structured_policy_denies_symlinks_outside_root ... ok
+test inspect::tests::worker_cap ... ok
+test file_security::secure_open_tests::macos_nofollow_any_falls_back_for_a_path_longer_than_path_max ... ok
+test local_http::tests::explicit_origin_and_host_are_always_checked ... ok
+test local_http::tests::browser_posts_require_origin_but_native_clients_and_navigation_still_work ... ok
+test file_security::secure_open_tests::rejects_symlink_swap_after_validation_and_hardlinked_outside_file ... ok
+test locale_test::an_explicit_unsupported_environment_locale_does_not_fall_through ... ok
+test locale_test::chinese_log_path_diagnostic_uses_chinese_copy ... ok
+test locale_test::english_help_uses_the_derive_generated_tree_unchanged ... ok
+test locale_test::environment_override_precedes_the_persisted_setting ... ok
+test locale_test::every_generated_command_and_argument_id_has_a_localized_help_entry ... ok
+test guard::tests::structured_policy_denies_relative_escape ... ok
+test locale_test::falls_back_to_english_for_an_unknown_locale ... ok
+test locale_test::native_message_catalog_has_text_for_every_supported_language ... ok
+test locale_test::native_ui_catalog_has_text_for_every_supported_language ... ok
+test locale_test::recognizes_windows_code_page_locale_names ... ok
+test locale_test::resolves_explicit_language_before_the_environment ... ok
+test locale_test::resolves_settings_before_the_operating_system_locale ... ok
+test inspect::tests::frame_header_sizes ... ok
+test locale_test::settings_default_to_automatic_language_selection ... ok
+test native_dump_tests::native_dump_escapes_untrusted_profile_and_home_strings ... ok
+test opencode_header::tests::file_urls_keep_plain_unix_and_windows_paths_readable ... ok
+test opencode_header::tests::file_urls_encode_reserved_characters ... ok
+test inspect::tests::tokens_cache_legacy_null_rechecked_with_cli ... ok
+test opencode_header::tests::file_urls_keep_unc_authorities_readable ... ok
+test inspect::tests::frame_header_fallback_cases ... ok
+test auth::tests::concurrent_imports_keep_both_credential_updates ... ok
+test file_security::secure_open_tests::rejects_parent_symlink_swaps_and_fifo_without_waiting ... ok
+test opencode_header::tests::import_specifier_is_a_file_url_for_the_staged_preload ... ok
+test guard::tests::structured_policy_uses_tool_path_and_cwd_not_matching_text ... ok
+test inspect::tests::tokens_cache_skips_none_without_cli ... ok
+test opencode_header::tests::unix_double_slash_paths_keep_an_empty_authority ... ok
+test opencode_header::tests::a_preexisting_symlink_is_not_followed ... ok
+test file_security::secure_open_tests::rejects_nested_parent_symlink_swap_after_a_successful_open ... ok
+test opencode_header::tests::preload_directory_and_file_are_private ... ok
+test passthrough::tests::parses_tree_names ... ok
+test opencode_header::tests::the_preload_never_sits_directly_in_the_shared_temp_root ... ok
+test opencode_header::tests::writes_the_embedded_preload ... ok
+test passthrough::tests::skips_foreign_trees_and_picks_latest ... ok
+test providers::tests::a_missing_entry_is_created ... ok
+test passthrough::tests::delegated_extensionless_node_backups_receive_the_preload ... ok
+test passthrough::tests::a_symlinked_backup_is_still_a_node_entrypoint ... ok
+test providers::tests::a_quoted_existing_key_is_found ... ok
+test providers::tests::a_nested_llm_pi_ai_is_refused_never_shadowed_by_an_appended_entry ... ok
+test providers::tests::a_second_route_does_not_disturb_the_first ... ok
+test passthrough::tests::delegated_js_boots_receive_the_preload_as_a_file_url ... ok
+test providers::tests::adding_keeps_every_other_byte ... ok
+test providers::tests::adding_twice_is_a_no_op_and_replace_rewrites_only_the_block ... ok
+test providers::tests::base_urls_are_validated ... ok
+test providers::tests::chunked_bodies_decode ... ok
+test providers::tests::anchors_aliases_tags_and_flow_collections_are_refused ... ok
+test providers::tests::an_escaped_top_level_id_is_the_existing_entry ... ok
+test providers::tests::blanks_before_the_colon_are_still_the_same_key ... ok
+test passthrough::tests::skips_directory_and_non_executable_candidates ... ok
+test passthrough::tests::delegated_shell_wrappers_keep_their_direct_exec ... ok
+test providers::tests::chunked_bodies_keep_extensions_and_zero_termination ... ok
+test providers::tests::chunked_bodies_reject_truncated_frames ... ok
+test providers::tests::chunked_bodies_reject_size_overflow ... ok
+test providers::tests::discover_is_refused_for_sarashina_before_any_profile_access ... ok
+test providers::tests::escaped_nested_ids_are_refused_with_the_file_unchanged ... ok
+test providers::tests::curl_config_hides_the_key_from_argv_and_pins_https ... ok
+test providers::tests::ids_that_cannot_be_read_safely_are_refused_not_duplicated ... ok
+test providers::tests::empty_levels_get_children_at_the_right_depth ... ok
+test providers::tests::crlf_files_keep_their_line_endings ... ok
+test providers::tests::compat_sits_beside_models_and_is_replaced_with_the_block ... ok
+test providers::tests::invalid_escapes_and_multiline_quotes_are_refused ... ok
+test providers::tests::jsonc_comments_urls_and_trailing_commas ... ok
+test providers::tests::key_names_follow_the_route_id ... ok
+test providers::tests::listings_in_openai_and_ollama_shapes ... ok
+test providers::tests::llm_pi_ai_id_spellings_are_one_entry ... ok
+test providers::tests::missing_levels_are_filled_in ... ok
+test providers::tests::models_merge_in_priority_order ... ok
+test providers::tests::model_keys_align_with_id_for_every_indent_width ... ok
+test providers::tests::opencode_models_are_mapped_and_the_api_key_is_ignored ... ok
+test providers::tests::other_providers_survive_every_add ... ok
+test providers::tests::preset_models_fill_known_ids_and_clamp_max_tokens ... ok
+test providers::tests::read_back_rejects_a_lost_route_or_misaligned_keys ... ok
+test providers::tests::scalars_are_quoted_when_ambiguous ... ok
+test passthrough::tests::node_entrypoints_are_detected_from_the_shebang_not_the_name ... ok
+test providers::tests::sarashina_preset_facts ... ok
+test providers::tests::unsafe_layouts_are_refused_with_the_manual_yaml ... ok
+test providers::tests::yaml_double_quoted_escapes_decode ... ok
+test rdsh_config::rdsh_config_tests::feature_enabled_precedence_and_defaults ... ok
+test rdsh_config::rdsh_config_tests::dotted_get_set_unset_cover_all_sections ... ok
+test rdsh_config::rdsh_config_tests::defaults_match_spec ... ok
+test rdsh_config::rdsh_config_tests::explicit_working_files_override_legacy_alias ... ok
+test passthrough::tests::path_lookup_skips_non_executable_dsh_and_node ... ok
+test local_http::tests::accepted_nonblocking_socket_waits_for_delayed_header_fragments ... ok
+test local_http::tests::waits_for_a_split_body_and_rejects_ambiguous_framing ... ok
+test inspect::tests::header_matches_stream_on_real_files ... ok
+test file_lock::tests::exclusive_lock_serializes_threads_and_releases_on_drop ... ok
+test opencode_header::tests::node_accepts_the_staged_preload_url ... ok
+test search::tests::capped_boundary ... ok
+test local_http::tests::idle_connections_are_silent_but_partial_requests_retain_http_failures ... ok
+test file_lock::tests::credential_lock_serializes_threads_using_one_marker ... ok
+test search::tests::truncate_marks_only_when_chars_are_actually_cut ... ok
+test opencode_header::tests::node_accepts_a_preload_url_under_a_double_slash_temp_root ... ok
+test search::tests::search_rejects_files_replaced_after_collection ... ok
+test search::tests::recursive_search_does_not_follow_repository_symlinks ... ok
+test search::tests::worker_cap ... ok
+test serial_proxy::tests::content_type_accepts_json_and_utf8_only ... ok
+test serial_proxy::tests::path_mapping_preserves_base_and_query_rules ... ok
+test serial_proxy::tests::tool_choice_only_rewrites_valid_nonempty_tool_lists ... ok
+test slim::tests::default_dir_shape ... ok
+test slim::tests::default_used_when_unset ... ok
+test slim::tests::existing_user_value_wins ... ok
+test serial_proxy::tests::canceling_first_rate_waiter_removes_its_ticket_and_releases_the_next ... ok
+test slim::tests::opt_out_disables ... ok
+test shadowing_original_tests::searches_os_path_components_for_platform_binary_name ... ok
+test subagent_plan::tests::accepts_one_and_two_hundred_items_and_refuses_more ... ok
+test subagent_plan::tests::fallback_picks_the_closest_declared_tier ... ok
+test subagent_plan::tests::difficulty_grows_with_files_risk_uncertainty_and_weight ... ok
+test subagent_plan::tests::falls_back_to_a_declared_tier_and_reports_it ... ok
+test subagent_plan::tests::invalid_tiers_report_the_first_error_in_source_order ... ok
+test subagent_plan::tests::accepts_only_the_declared_item_and_label_boundaries ... ok
+test search::tests::bounded_workers_preserve_global_prefix_and_skip_reads_at_zero ... ok
+test subagent_plan::tests::numbers_agent_ids_across_tiers ... ok
+test subagent_plan::tests::is_deterministic_for_the_same_request_and_marks_read_only_use_cases ... ok
+test subagent_plan::tests::item_and_signal_defaults_match_the_request ... ok
+test subagent_plan::tests::limits_accept_only_their_declared_bounds ... ok
+test subagent_plan::tests::packs_items_into_agents_within_the_declared_limits ... ok
+test subagent_plan::tests::places_easy_work_on_the_fast_tier_and_hard_work_on_the_deep_tier ... ok
+test serial_proxy::tests::rate_window_caps_each_window_and_releases_waiters_fifo_after_rollover ... ok
+test subagent_plan::tests::reports_a_declared_budget_that_the_plan_exceeds ... ok
+test subagent_plan::tests::rejects_malformed_requests_instead_of_guessing ... ok
+test subagent_plan::tests::serializes_exactly_like_the_js_planner ... ok
+test subagent_plan::tests::splits_agents_into_waves_bounded_by_max_parallel ... ok
+test subagent_plan::tests::warns_instead_of_splitting_an_item_that_cannot_fit_and_keeps_it ... ok
+test task_outcomes::tests::apply_creates_and_patches_reports_like_the_js_module ... ok
+test subagent_plan::tests::tier_choice_uses_the_exact_score_boundaries ... ok
+test subagent_plan::tests::warnings_are_sorted_by_code_then_item ... ok
+test subagent_plan::tests::warning_order_matches_javascript_locale_compare ... ok
+test task_outcomes::tests::apply_freezes_milestone_criteria_under_one_id ... ok
+test task_outcomes::tests::apply_reports_nothing_without_outcome_or_contract ... ok
+test task_outcomes::tests::apply_rejects_forged_and_malformed_reports ... ok
+test task_outcomes::tests::apply_rejects_stored_milestone_with_different_json_key_order ... ok
+test task_outcomes::tests::apply_returns_an_error_for_malformed_stored_outcomes ... ok
+test task_outcomes::tests::apply_uses_the_js_falsy_fallback_for_stored_outcomes ... ok
+test task_outcomes::tests::criterion_ids_follow_the_js_pattern ... ok
+test task_outcomes::tests::schemas_keep_the_advertised_shape ... ok
+test task_outcomes::tests::text_matches_ecmascript_trim_and_utf16_length ... ok
+test task_outcomes::tests::validate_accepts_a_missing_document_and_the_applied_one ... ok
+test task_outcomes::tests::validate_rejects_unknown_tasks_and_duplicates ... ok
+test tokens::tests::ascii_counts ... ok
+test tokens::tests::cjk_chars_count_one_each ... ok
+test tokens::tests::classifier_batch_fits_shared_budget ... ok
+test tokens::tests::inline_type_budget_for_tool_catalog ... ok
+test tokens::tests::non_ascii_counts ... ok
+test tokens::tests::prune_keeps_small ... ok
+test tokens::tests::prune_marks_big ... ok
+test tokens::tests::prune_keeps_head_and_tail_order ... ok
+test tokens::tests::small_state_snapshot_kept_verbatim ... ok
+test tokens::tests::prune_respects_small_and_unicode_budgets ... ok
+test tool_security::tests::boundary_is_opt_in ... ok
+test websearch::tests::attribute_name_at_end_does_not_panic ... ok
+test websearch::tests::a_plain_page_is_still_reported_as_a_wrong_url ... ok
+test websearch::tests::base_rejects_http_request_injection_and_malformed_authorities ... ok
+test websearch::tests::base_splitting ... ok
+test websearch::tests::empty_results_and_invalid_pages_retain_the_requested_language ... ok
+test websearch::tests::empty_searxng_page_is_not_a_configuration_error ... ok
+test token_handoff::tests::handoff_contains_token_and_is_removed_on_drop ... ok
+test task_outcomes::tests::input_json_uses_the_open_file_if_its_path_is_replaced ... ok
+test websearch::tests::html_parsing_skips_utf8_attribute_name_candidates ... ok
+test websearch::tests::html_parsing ... ok
+test websearch::tests::html_parsing_keeps_correction_words_in_title_url_snippet ... ok
+test websearch::tests::malformed_numeric_entity_does_not_panic_or_hide_later_entities ... ok
+test websearch::tests::query_encoding ... ok
+test websearch::tests::searxng_generator_meta_is_accepted ... ok
+test websearch::tests::fetch_encodes_query_and_preserves_configured_prefix ... ok
+test file_lock::tests::credential_lock_waits_for_live_dsh_marker_to_be_removed ... ok
+test file_lock::tests::credential_lock_does_not_reclaim_an_incomplete_pid_record ... ok
+test rdsh_config::rdsh_config_tests::concurrent_settings_transactions_keep_both_updates ... ok
+test rdsh_config::rdsh_config_tests::corrupt_json_is_hard_error_with_location ... ok
+test rdsh_config::rdsh_config_tests::empty_file_is_hard_error ... ok
+test rdsh_config::rdsh_config_tests::guard_deny_list_survives_reload ... ok
+test rdsh_config::rdsh_config_tests::legacy_file_completes_empty_context_without_writing ... ok
+test rdsh_config::rdsh_config_tests::long_strings_and_lists_are_truncated ... ok
+test rdsh_config::rdsh_config_tests::missing_file_returns_default ... ok
+test rdsh_config::rdsh_config_tests::out_of_range_values_are_clamped ... ok
+test rdsh_config::rdsh_config_tests::save_roundtrip_and_mode_600 ... ok
+test rdsh_config::rdsh_config_tests::settings_save_never_truncates_a_symlink_target ... ok
+test rdsh_config::rdsh_config_tests::setup_web_port_zero_means_random ... ok
+
+test result: ok. 303 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+
+     Running tests/auth_sharing.rs (target/release/deps/auth_sharing-2882c9c24177ad28)
+
+running 17 tests
+test one_time_key_reference_does_not_enable_automatic_copying ... ok
+test dry_run_previews_destination_and_scope_without_saving_consent_or_secrets ... ok
+test invalid_selector_and_selected_credential_errors_are_secret_free ... ok
+test locked_consent_cannot_be_changed_and_autosync_cannot_write ... ok
+test one_time_key_reference_rejects_unlisted_names_without_writing ... ok
+test setup_dry_run_does_not_import_an_existing_selection ... ok
+test selected_api_key_refresh_replaces_a_changed_existing_ref_and_reports_it ... ok
+test source_selection_beats_a_newer_unselected_source_and_preserves_other_bytes ... ok
+test identical_selected_sources_for_one_ref_are_imported_once ... ok
+test missing_policy_is_read_only_and_import_requires_selection ... ok
+test one_time_provider_import_does_not_persist_consent_or_copy_other_secrets ... ok
+test conflicting_selected_sources_for_one_ref_fail_closed_without_writes ... ok
+test unselect_retains_copies_and_prevents_automatic_reimport_after_copy_removal ... ok
+test environment_references_are_transient_and_persistence_requires_each_selection ... ok
+test invalid_policy_fails_closed_without_exposing_its_content ... ok
+test unreadable_or_ambiguous_credentials_are_never_replaced ... ok
+test delegation_enforcement_precedes_copying_and_metadata_obeys_consent ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.35s
+
+     Running tests/cli_localization.rs (target/release/deps/cli_localization-0628bd86670cddf4)
+
+running 16 tests
+test help_does_not_hide_invalid_settings ... ok
+test invalid_option_keeps_the_raw_value_and_labels_the_clap_diagnostic ... ok
+test auth_selection_failure_is_localized_without_copying_credentials ... ok
+test provider_human_labels_and_protocol_json_resolve_languages_independently ... ok
+test main_native_labels_and_errors_are_localized_without_changing_json ... ok
+test guard_json_parse_and_size_reasons_stay_canonical_english ... ok
+test version_like_values_after_double_dash_do_not_trigger_version_display ... ok
+test localized_context_desktop_and_logs_errors_keep_raw_unicode_values ... ok
+test english_native_presentations_match_the_default_locale ... ok
+test native_command_errors_keep_unicode_values_in_chinese_and_japanese ... ok
+test auth_and_doctor_errors_are_localized_and_keep_raw_configuration ... ok
+test help_accepts_native_flags_without_required_positionals_in_every_language ... ok
+test settings_and_guard_errors_localize_without_changing_raw_values_or_json_reasons ... ok
+test native_results_stay_identical_while_human_labels_change_language ... ok
+test integrated_provider_and_new_native_help_cover_every_language ... ok
+test structured_compute_and_guard_json_stay_wire_compatible_across_languages ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.90s
+
+     Running tests/cost_ledger_cli.rs (target/release/deps/cost_ledger_cli-df87c929f85e44b1)
+
+running 13 tests
+test declare_prints_the_js_json_shape ... ok
+test commands_require_the_input_file_option ... ok
+test commands_accept_a_utf8_bom_like_the_dashboard_cli ... ok
+test schema_prints_the_advertised_js_schemas ... ok
+test report_rejects_a_decreased_cumulative_counter ... ok
+test commands_refuse_unreadable_invalid_and_mismatched_input ... ok
+test report_records_and_public_projects_the_js_payload ... ok
+test public_is_byte_identical_across_runs ... ok
+test validate_accepts_and_rejects_like_the_js_module ... ok
+test report_is_idempotent_and_rejects_a_conflicting_event ... ok
+test commands_reject_the_js_error_cases_verbatim ... ok
+test commands_ignore_unrelated_corrupt_settings_without_replacing_them ... ok
+test human_diagnostics_are_localized_without_changing_input_or_raw_paths ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.90s
+
+     Running tests/doctor_cli.rs (target/release/deps/doctor_cli-0a9bb88e735ec35d)
+
+running 3 tests
+test doctor_accepts_bare_js_original_override_from_current_directory ... ok
+test doctor_does_not_resolve_bare_js_original_override_from_path ... ok
+test doctor_resolves_bare_original_override_from_path_not_working_directory ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+
+     Running tests/log_session_boundaries.rs (target/release/deps/log_session_boundaries-18cd9baa0adad8a3)
+
+running 12 tests
+test logs_reads_legit_file ... ok
+test logs_rejects_outside_symlink ... ok
+test cache_tmp_symlink_cannot_clobber ... ok
+test logs_tail_preserves_grep_zero_and_unterminated_final_line ... ok
+test logs_rejects_hardlink ... ok
+test logs_fifo_is_rejected_without_blocking ... ok
+test sessions_rejects_symlinked_project ... ok
+test cache_file_is_0600 ... ok
+test logs_rejects_absolute_and_dotdot ... ok
+test logs_preserves_relative_home_latest_selection_and_tail_filter ... ok
+test token_sizes_ignore_linked_zstd ... ok
+test sessions_rejects_project_traversal ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+
+     Running tests/native_e2e.rs (target/release/deps/native_e2e-a31641b8164f985a)
+
+running 21 tests
+test dashboard_uses_the_persisted_product_language_without_changing_api_data ... ok
+test setup_page_uses_the_resolved_product_language ... ok
+test sessions_json_preserves_legacy_object_key_order ... ok
+test http_truncated_and_oversized_requests_do_not_damage_serve ... ok
+test missing_compressed_file_never_reports_an_exact_partial_total ... ok
+test legacy_cache_cannot_promote_an_old_estimate_to_exact ... ok
+test tokens_chars_counts_characters_not_bytes ... ok
+test sessions_known_and_concatenated_frames_cache_and_growth ... ok
+test dsh_alias_preserves_language_argument_bytes_for_delegation ... ok
+test partly_corrupt_session_never_reports_an_exact_partial_total ... ok
+test web_search_gate_and_real_http_results_and_failure ... ok
+test setup_extras_follow_explicit_feature_switches ... ok
+test context_search_finds_two_char_ascii_terms ... ok
+test empty_browser_connections_close_silently_and_fragmented_headers_are_accepted ... ok
+test unreadable_session_is_inexact_on_first_and_cached_multi_session_views ... ok
+test streaming_growth_stays_inexact_until_recomputed_single_and_parallel ... ok
+test concurrent_session_writers_leave_parseable_correct_cache ... ok
+test cli_tokens_prune_compact_search_logs_guard_and_settings_work_together ... ok
+test path_search_skips_non_executable_dsh_and_node_candidates ... ok
+test setup_save_extras_restart_serve_and_use_real_http_api ... ok
+test http_browser_origin_guard_preserves_authenticated_native_clients ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.81s
+
+     Running tests/provider_cli.rs (target/release/deps/provider_cli-b44658ef0e4bca24)
+
+running 23 tests
+test from_opencode_reads_jsonc_models_and_ignores_the_api_key ... ok
+test sarashina_model_flag_clamps_max_tokens_and_notes_unknown_ids ... ok
+test a_route_key_counts_once_the_default_route_uses_it ... ok
+test an_id_that_cannot_be_read_is_refused_without_writing ... ok
+test overflowing_chunk_size_is_a_cli_error_without_profile_writes ... ok
+test sarashina_key_from_env_is_stored_but_never_printed ... ok
+test sarashina_refuses_discover_before_writing ... ok
+test an_inline_providers_mapping_is_refused_with_the_yaml_to_add ... ok
+test the_first_run_banner_is_not_suppressed_by_a_route_key_alone ... ok
+test hai_add_keeps_other_bytes_is_idempotent_and_dry_run_writes_nothing ... ok
+test a_stored_route_key_without_a_route_is_not_a_connection ... ok
+test auth_reports_the_new_routes_as_ok_or_missing_with_the_key_name ... ok
+test nested_and_blank_before_colon_definitions_are_handled_safely ... ok
+test malformed_route_layout_is_localized_and_never_rewritten ... ok
+test provider_http_failure_localizes_owned_context_and_preserves_endpoint_and_status ... ok
+test default_profile_follows_the_existing_rules ... ok
+test sarashina_writes_compat_and_both_models_and_is_idempotent ... ok
+test an_unrelated_ok_default_does_not_let_an_unregistered_route_key_skip_setup ... ok
+test the_key_is_stored_but_never_printed ... ok
+test local_openai_discovers_models_from_a_mock_server ... ok
+test invalid_input_is_refused_before_anything_is_written ... ok
+test quoted_and_commented_ids_and_wide_indents_keep_every_route ... ok
+test an_exported_route_key_without_a_route_is_not_a_connection ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s
+
+     Running tests/serial_proxy.rs (target/release/deps/serial_proxy-f5d6ed37d85a2b15)
+
+running 13 tests
+test serial_proxy_runtime_startup_failure_keeps_runtime_status ... ok
+test mock_upstream_consumes_chunked_bodies_and_trailers_before_closing ... ok
+test ipv6_upstream_host_header_keeps_exactly_one_pair_of_brackets ... ok
+test closed_stderr_does_not_abort_startup_or_tool_choice_streaming ... ok
+test native_cli_rpm_window_is_reported_and_waiter_times_out ... ok
+test serial_proxy_runs_when_binary_is_invoked_as_dsh ... ok
+test disconnect_during_sse_releases_slot_and_cancels_upstream_stream ... ok
+test disconnect_while_waiting_for_rpm_releases_slot_without_dispatch ... ok
+test invalid_serial_proxy_options_exit_with_usage_status ... ok
+test native_cli_queue_timeout_returns_503_without_dispatching_waiter ... ok
+test disconnect_while_queued_removes_waiter_before_slot_opens ... ok
+test native_cli_rewrites_tool_choice_and_streams_sse ... ok
+test native_cli_caps_upstream_concurrency_and_rejects_full_queue ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.58s
+
+     Running tests/settings_cli.rs (target/release/deps/settings_cli-dabcd5e5b44efebb)
+
+running 17 tests
+test init_without_force_preserves_existing_valid_settings ... ok
+test language_option_localizes_auth_and_setup_guidance ... ok
+test language_option_localizes_rdsh_owned_settings_diagnostics ... ok
+test unknown_feature_ids_are_rejected_without_touching_settings ... ok
+test settings_set_rejects_values_that_do_not_fit_storage_types ... ok
+test disabled_features_refuse_their_commands_and_point_at_the_switch ... ok
+test discord_defaults_on_and_preserves_explicit_off ... ok
+test language_setting_round_trips_and_invalid_persisted_value_fails_closed ... ok
+test auth_localizes_owned_details_and_preserves_json_and_external_identifiers ... ok
+test feature_switches_follow_legacy_keys_and_explicit_values_win ... ok
+test settings_set_preserves_valid_port_boundaries_and_random_web_port ... ok
+test auth_renders_synthetic_source_without_copying_or_exposing_its_value ... ok
+test discord_uses_bundled_application_id_until_explicitly_overridden ... ok
+test feature_switches_list_defaults_and_round_trip_through_the_cli ... ok
+test discord_settings_round_trip_through_cli_and_section_reset ... ok
+test force_init_recovers_corrupt_settings_and_loads_defaults ... ok
+test ordinary_commands_do_not_overwrite_corrupt_settings ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.66s
+
+     Running tests/subagents_cli.rs (target/release/deps/subagents_cli-70d155baf8167c82)
+
+running 8 tests
+test plan_accepts_utf8_bom_like_the_dashboard_cli ... ok
+test plan_reports_the_js_error_code_and_exits_nonzero ... ok
+test plan_requires_the_input_file_option ... ok
+test plan_refuses_unreadable_and_invalid_input ... ok
+test plan_is_byte_identical_across_runs ... ok
+test plan_ignores_unrelated_corrupt_settings_without_replacing_them ... ok
+test plan_prints_the_js_json_shape ... ok
+test plan_json_flag_keeps_the_same_output ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/task_outcomes_cli.rs (target/release/deps/task_outcomes_cli-3b39f894addac4dc)
+
+running 12 tests
+test apply_prints_the_js_json_shape ... ok
+test apply_rejects_changed_criteria_for_a_stored_milestone ... ok
+test apply_accepts_a_utf8_bom_like_the_dashboard_cli ... ok
+test commands_refuse_unreadable_invalid_and_mismatched_input ... ok
+test commands_require_the_input_file_option ... ok
+test apply_ignores_unrelated_corrupt_settings_without_replacing_them ... ok
+test apply_without_outcome_or_contract_keeps_the_state ... ok
+test apply_is_byte_identical_across_runs ... ok
+test validate_accepts_and_rejects_like_the_js_module ... ok
+test schema_prints_the_advertised_js_schemas ... ok
+test apply_is_idempotent_for_a_fixed_milestone_contract ... ok
+test apply_rejects_forged_and_malformed_reports_with_the_js_message ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+
+     Running tests/update_auto_cli.rs (target/release/deps/update_auto_cli-afa770baf3fcee4b)
+
+running 7 tests
+test a_missing_updater_is_refused_instead_of_installing_a_dead_timer ... ok
+test dry_run_plans_without_writing_anything ... ok
+test status_reports_paths_before_anything_is_installed ... ok
+test unit_quotes_a_script_path_with_whitespace_and_percent ... ok
+test unknown_actions_and_arguments_are_rejected ... ok
+test on_writes_units_for_this_machine_then_status_confirms_them ... ok
+test off_removes_the_units_and_is_idempotent ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s

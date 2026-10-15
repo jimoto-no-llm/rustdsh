@@ -3,8 +3,8 @@
   "files": [
     {
       "path": "README.md",
-      "bytes": 10143,
-      "sha256": "c5529d0803b48a9cb824e8ef3c5409bc38fcb8ca18424844c135c7e95a54ac78"
+      "bytes": 14347,
+      "sha256": "9599fa3c272d628b71a9fb5cd3c307e8df4bd5324a88b3501bb44a4f8f3476e1"
     },
     {
       "path": "before-desktop.png",
@@ -35,6 +35,46 @@
       "path": "captures.json",
       "bytes": 7497,
       "sha256": "9a8ccfb3283dfe364dfae5a594ce1b541a63e847f383c1907e3252dcbebe1ba7"
+    },
+    {
+      "path": "cc019-macos-dashboard.txt",
+      "bytes": 45742,
+      "sha256": "f813c60ee2b1bd88615f1d8a0abe5e98117cb8a958d5b5062eed2adad25aa3d0"
+    },
+    {
+      "path": "cc019-macos-release.txt",
+      "bytes": 35884,
+      "sha256": "22ff489b6751877f463b5e3daf39133ea51fe62c7a9d9f8765712607bb319030"
+    },
+    {
+      "path": "cost-ledger-bridge-negative.txt",
+      "bytes": 1163,
+      "sha256": "fe6b7833d1a6c808eabef12d307d278438e4c4fae8a57744cf2bd1a595b184cd"
+    },
+    {
+      "path": "cost-ledger-clippy.txt",
+      "bytes": 100,
+      "sha256": "a184bea8868e394fd24584558774a93a89646b73d405a060b8bb4a9a77b15b35"
+    },
+    {
+      "path": "cost-ledger-core-focused.txt",
+      "bytes": 1790,
+      "sha256": "2d4891032f8edbe49971280d9d396360cc7f4472b9cbf8e03a0dcaffea6fe050"
+    },
+    {
+      "path": "cost-ledger-dashboard-focused.txt",
+      "bytes": 2353,
+      "sha256": "6073c238d4817b050232cf47c75e809ecb71cbfa19ac4e845a6a10245fa4d728"
+    },
+    {
+      "path": "cost-ledger-integration.json",
+      "bytes": 6988,
+      "sha256": "b3c4d22861bf40ab92c937723c9e74e0b04cfda84414c31fd348f58cc6f9de11"
+    },
+    {
+      "path": "cost-ledger-native-focused.txt",
+      "bytes": 2526,
+      "sha256": "d482dada6736f453b5e5666d5fc280a33a0d9d712bf31a27d05669cf02815aaf"
     },
     {
       "path": "dashboard-platforms.json",
@@ -78,13 +118,43 @@
     },
     {
       "path": "known-exceptions.json",
-      "bytes": 4888,
-      "sha256": "b3cca9a6d5479b82e025259b19d840b2fecae38283b34fff72fd1bb68dd13da8"
+      "bytes": 5198,
+      "sha256": "7d98452cafdb0fdfe554f4f7a76dcb006c1cd60e41a10f37e703e3333b7e1053"
+    },
+    {
+      "path": "linux-cc019-native.json",
+      "bytes": 154685,
+      "sha256": "616dc61a1188fd9da43657f05ea8df9887ebc70ee0f870a239f644076bc93f20"
+    },
+    {
+      "path": "linux-cc019-source.json",
+      "bytes": 123411,
+      "sha256": "4b30f7a73d854a9dd6a97df4bb24d4abd9aa0a52d2943bf647757c21c51ce2b2"
     },
     {
       "path": "linux-cgroup-native.json",
       "bytes": 4348,
       "sha256": "019ed25b5dfe47e0a1e0117ea03a818055a6f0ebb8f392159fde85f0a8d6451d"
+    },
+    {
+      "path": "linux-dashboard-before-repair-source.json",
+      "bytes": 119220,
+      "sha256": "84cbc1348204a1b6e72c99f153150ee3e64f9c7f1203e189f1082932e3f2b62a"
+    },
+    {
+      "path": "linux-dashboard-before-repair.json",
+      "bytes": 95431,
+      "sha256": "45813858d0b4672f41ae6b39f30cf61e4462b9b58f2b022c838003ee869cffb9"
+    },
+    {
+      "path": "linux-dashboard-repaired-source.json",
+      "bytes": 120164,
+      "sha256": "0651dd9f3b60ba3c2cf57fbf32f19ebae164fac7899dcbb777e5efa997ae7fc5"
+    },
+    {
+      "path": "linux-dashboard-repaired.json",
+      "bytes": 95980,
+      "sha256": "8f0c105d5af1fd485c12e31be26ceb37bfa7db10622a2f0a4b841476f5038b6e"
     },
     {
       "path": "macos-native.json",
@@ -95,6 +165,11 @@
       "path": "muse-feasibility.json",
       "bytes": 1632,
       "sha256": "122c64b5c50628ec834f64fc04e1bfc28c3e79eda593f7fd1753582d4366426f"
+    },
+    {
+      "path": "muse-readonly-catalog.json",
+      "bytes": 6311,
+      "sha256": "0d86624619f6d61c1caa89795f34a111b1ad4b6e30e2543a5825f7d19c1511e9"
     },
     {
       "path": "outcome-flow-ja-initial.png",
@@ -125,6 +200,26 @@
       "path": "outcome-verification-flow-ja.webm",
       "bytes": 263402,
       "sha256": "d74ca2aac97f932686ff66d99f9ccbacf6251c4c525bdd764148a5751dfd61f3"
+    },
+    {
+      "path": "performance-cc019-basic.json",
+      "bytes": 8111,
+      "sha256": "deaf6ba993060b29fa968ee3f943463c1186c07f5478fe77dbf2ef08c2434b70"
+    },
+    {
+      "path": "performance-cc019-execution.json",
+      "bytes": 621,
+      "sha256": "6ff6c16fa46bab4f8efa9cc72e42952b5e61b7b89d37cb496d2fad3f9523db6c"
+    },
+    {
+      "path": "performance-cc019-extended.json",
+      "bytes": 16078,
+      "sha256": "7fed8f564555ea454552e4d1366270ffd60998a66651caa4a9ad98605185de73"
+    },
+    {
+      "path": "performance-cc019-summary.json",
+      "bytes": 4251,
+      "sha256": "a0c9b30b420b0f7637bc407d993540870d7e4b0f03fbac338acea1aaa2ebcd3a"
     },
     {
       "path": "performance-extended-initial.json",
@@ -163,8 +258,8 @@
     },
     {
       "path": "performance.md",
-      "bytes": 4545,
-      "sha256": "0e59292eb24ae48d7b570bb4ebe46b4e3e4f312833c560e383e94b1e22eea8f9"
+      "bytes": 5749,
+      "sha256": "0eb7a52f3987af490b06eb783928b9358b604f6801eac1cc75b899c1ecc7e0e3"
     },
     {
       "path": "platform-ledger.md",

@@ -61,3 +61,30 @@ test('non-headless profiles install no listeners or cleanup', async () => {
   assert.deepEqual(ids, []);
   assert.equal(ctx.count(), 0);
 });
+
+test('module activation in non-headless profiles does not import or require a patched SDK', async () => {
+  const { apply } = await import('../index.js');
+  const ctx = context('web');
+  await apply(ctx);
+  assert.equal(ctx.count(), 0);
+  await ctx.dispose();
+});
+
+test('synchronous and asynchronous owned cleanup failures remain observed through teardown', async () => {
+  const ctx = context();
+  const sync = new Error('original synchronous failure');
+  const async = new Error('original asynchronous failure');
+  plugin.attachSessionCleanup(ctx, id => {
+    if (id === 'sync') throw sync;
+    return Promise.reject(async);
+  });
+  ctx.emit('agent/created', agent('sync'));
+  ctx.emit('agent/created', agent('async'));
+  ctx.emit('session/disposed', { id: 'sync' });
+  await assert.rejects(ctx.dispose(), error => {
+    assert.equal(error.code, 'RDSH_SESSION_CLEANUP_FAILED');
+    assert.deepEqual(error.errors, [sync, async]);
+    return true;
+  });
+  assert.equal(ctx.count(), 0);
+});

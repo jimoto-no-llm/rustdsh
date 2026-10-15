@@ -54,9 +54,24 @@ Choose a single invocation with `rdsh-dashboard --language ja project ...`;
 selection uses `--language`, nonblank `RDSH_LANG`, `general.language`, then the
 first nonblank `LC_ALL`/`LC_MESSAGES`/`LANG`, finally English. A malformed saved
 language stops startup without rewriting its file. The native JSON bridges
-`subagents plan` and `task-outcomes apply|validate|schema` do not read settings;
+`subagents plan`, `task-outcomes apply|validate|schema`, and
+`cost-ledger validate|public|schema` do not read settings;
 they resolve display language from the explicit flag or environment and preserve
-native request/output bytes and exit status even if `rdsh.json` is corrupt.
+native request/output data and exit status even if `rdsh.json` is corrupt.
+The cost-ledger bridge serializes its validated input into an exclusive request
+file. POSIX uses mode `0600`. Windows creates a protected DACL allowing only the
+current user, SYSTEM and Administrators, verifies that ACL before writing any
+payload, and holds its creator handle until the native process exits. Windows
+sharing rejects write, rename and parent-directory replacement while held;
+delete-on-close removes the owned object without unlinking a reused pathname.
+ACL/API failure stops dispatch, and a name collision never changes or removes
+an existing file. Parent directory ACLs remain unchanged. Success and failure
+both dispose the owned request.
+Its pure actions take no project or dashboard connection. Existing
+`cost-ledger declare|report|inspect` commands keep their project store path and
+still refuse corrupt settings. Native cost-ledger help and diagnostics follow
+the selected language; machine JSON, amounts, source text and canonical
+in-process validation reasons keep their original values.
 The DSH settings plugin has its own live selector; its `auto` follows the browser language.
 The setup page translates known credential-sharing policy failures for display;
 the status API retains canonical reasons, and unknown external details stay unchanged.

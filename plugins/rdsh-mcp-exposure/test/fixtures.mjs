@@ -8,7 +8,7 @@ import { Discovery } from '../discovery.js';
 import { discoveryTools } from '../tools.js';
 import { compileConfig } from '../policy.js';
 
-export function fixture({ mode = 'native', config, setupDiscovery = true, promptConfig = {} } = {}) {
+export function fixture({ mode = 'native', ptc = false, config, setupDiscovery = true, promptConfig = {} } = {}) {
   const ctx = new Context();
   const prompt = new SystemPrompt(ctx, { includeHarnessIdentity: false, includeRuntimeContext: false, ...promptConfig });
   const sessions = new SessionStore(ctx);
@@ -20,7 +20,10 @@ export function fixture({ mode = 'native', config, setupDiscovery = true, prompt
       try { return { logs: [], value: await program(request.bindings[0].functions) }; }
       catch (error) { return { logs: [], error: { kind: 'exception', message: error.message } }; }
     } };
-  if (mode !== 'native') ctx.provide('ptcRuntime', runtime);
+  if (mode === 'ptc' || ptc) {
+    ctx.provide('ptcRuntime', runtime);
+    ctx.provide('workingDirectory', { ensure: async agent => agent.session.header.cwd });
+  }
   const tools = new ToolRuntime(ctx, { mode, maxParallelSubCalls: 8 });
   const compiled = config ? compileConfig(config) : undefined;
   const discovery = setupDiscovery && compiled ? new Discovery(tools, compiled, { typescript: renderToolsSdk, python: renderToolsSdkPy }) : undefined;
@@ -40,9 +43,11 @@ export function fixture({ mode = 'native', config, setupDiscovery = true, prompt
   async function execute(scope, name, args = {}, signal = new AbortController().signal) {
     return tools.execute({ name, arguments: args, agent: scope, callId: `mcp-call-${++nextCall}`, signal });
   }
-  async function ptc(scope, program) {
+  async function ptcCall(scope, program) {
     programs.push(program);
-    return execute(scope, 'run_code', { code: '// fixed test provider callback; never evaluates model source', description: 'MCP exposure fixture' });
+    const restore = scope.ctx.tools.presentAs('ptc');
+    try { return await execute(scope, 'run_code', { code: '// fixed test provider callback; never evaluates model source', description: 'MCP exposure fixture' }); }
+    finally { restore(); }
   }
   // A standard durable native receipt, authored using the original message and
   // Session APIs. Tests use the normal pipeline's canonical returned result.
@@ -58,7 +63,8 @@ export function fixture({ mode = 'native', config, setupDiscovery = true, prompt
     session.append('step/end', { turn, step });
     session.append('turn/end', { turn, reason: 'completed' });
   }
-  return { ctx, prompt, tools, sessions, runtime, requests, compiled, discovery, agent, execute, ptc, persistNative,
+  return { ctx, prompt, tools, sessions, runtime, requests, compiled, discovery, agent, execute, ptc: ptcCall, persistNative,
+    async ptcPrompt(scope) { const restore = scope.ctx.tools.presentAs('ptc'); try { return await prompt.assemble({ scope }); } finally { restore(); } },
     async close() { discovery?.dispose(); await ctx.fiber.dispose(); } };
 }
 

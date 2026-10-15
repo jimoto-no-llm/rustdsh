@@ -1,12 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, symlinkSync, linkSync, unlinkSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, realpathSync, existsSync, rmSync, symlinkSync, linkSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
+import { pathToFileURL } from 'node:url';
 
 const bin = path.resolve(process.env.BIN || 'target/debug/rdsh');
+const securityPreload = path.resolve('security/preload.mjs');
 function isolated(t) {
   const dir = mkdtempSync(path.join(tmpdir(), 'rdsh-security-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
@@ -14,6 +16,124 @@ function isolated(t) {
   mkdirSync(home);
   return { dir, env: { PATH: process.env.PATH, HOME: home, DSH_HOME: path.join(dir, 'dsh') } };
 }
+
+function auditedRuntimeEnvironment() {
+  return {
+    rc2: process.env.RDSH_AUDITED_RUNTIME_RC2,
+    alpha1: process.env.RDSH_AUDITED_RUNTIME_ALPHA1,
+    alpha3: process.env.RDSH_AUDITED_RUNTIME_ALPHA3,
+  };
+}
+
+function runPreload(runtime, adapter, extra = {}) {
+  const env = {
+    ...process.env,
+    RDSH_TOOL_RUNTIME: runtime,
+    RDSH_TOOL_ADAPTER: adapter,
+    RDSH_SECURE_WORKSPACE: process.cwd(),
+    RDSH_SHARED_FILES: '[]',
+    ...extra,
+  };
+  delete env.RDSH_SECURITY_LANG;
+  return spawnSync(process.execPath, [
+    '--import', securityPreload,
+    '--input-type=module',
+    '--eval', `await import(${JSON.stringify(pathToFileURL(runtime).href)})`,
+  ], { env, encoding: 'utf8' });
+}
+
+test('audited preload rejects unknown, modified and cross-version runtimes with localized codes', t => {
+  const runtimes = auditedRuntimeEnvironment();
+  if (Object.values(runtimes).some(value => !value)) {
+    t.skip('official audited runtime paths are supplied by the Linux security matrix');
+    return;
+  }
+  const { dir } = isolated(t);
+  const modified = path.join(dir, 'modified-runtime.mjs');
+  writeFileSync(modified, `${readFileSync(runtimes.rc2, 'utf8')}\n`);
+  const cases = [
+    ['en', 'unsupported tool runtime', 'UNSUPPORTED_RUNTIME'],
+    ['zh', '不支持的工具运行时', 'UNSUPPORTED_RUNTIME'],
+    ['ja', '対応していないツールランタイム', 'UNSUPPORTED_RUNTIME'],
+  ];
+  for (const [language, text, code] of cases) {
+    const result = runPreload(modified, 'dsh-tools-0.2.0-rc.2', { RDSH_LANG: language });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, new RegExp(`RDSH_SECURITY\\[${code}\\]`));
+    assert.match(result.stderr, new RegExp(text));
+  }
+  const unknown = runPreload(runtimes.rc2, 'dsh-tools-future', { RDSH_LANG: 'en' });
+  assert.notEqual(unknown.status, 0);
+  assert.match(unknown.stderr, /RDSH_SECURITY\[UNKNOWN_ADAPTER\]/);
+  const crossVersion = runPreload(runtimes.alpha1, 'dsh-tools-0.2.0-rc.2', { RDSH_LANG: 'en' });
+  assert.notEqual(crossVersion.status, 0);
+  assert.match(crossVersion.stderr, /RDSH_SECURITY\[UNSUPPORTED_RUNTIME\]/);
+});
+
+test('audited preload rejects a different known runtime swapped in during loading', t => {
+  const runtimes = auditedRuntimeEnvironment();
+  if (Object.values(runtimes).some(value => !value)) {
+    t.skip('official audited runtime paths are supplied by the Linux security matrix');
+    return;
+  }
+  const { dir } = isolated(t);
+  const selected = path.join(dir, 'selected-runtime.mjs');
+  const entry = path.join(dir, 'swap-before-import.mjs');
+  writeFileSync(selected, readFileSync(runtimes.rc2));
+  writeFileSync(entry, [
+    "import { copyFileSync } from 'node:fs';",
+    `copyFileSync(${JSON.stringify(runtimes.alpha1)}, ${JSON.stringify(selected)});`,
+    `await import(${JSON.stringify(pathToFileURL(selected).href)});`,
+  ].join('\n'));
+  const result = spawnSync(process.execPath, ['--import', securityPreload, entry], {
+    env: {
+      ...process.env,
+      RDSH_TOOL_RUNTIME: selected,
+      RDSH_TOOL_ADAPTER: 'dsh-tools-0.2.0-rc.2',
+      RDSH_SECURE_WORKSPACE: process.cwd(),
+      RDSH_SHARED_FILES: '[]',
+      RDSH_SECURITY_LANG: 'en',
+    },
+    encoding: 'utf8',
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /RDSH_SECURITY\[RUNTIME_CHANGED\]/);
+});
+
+test('preload refuses a nested tool runtime selected by another importer', t => {
+  const runtime = auditedRuntimeEnvironment().alpha3;
+  if (!runtime) {
+    t.skip('the official alpha3 runtime path is supplied by the Linux security matrix');
+    return;
+  }
+  const { dir, env } = isolated(t);
+  const importer = path.join(dir, 'importer');
+  const nested = path.join(importer, 'node_modules/@deepseek-ai/dsh-tools');
+  const marker = path.join(dir, 'nested-body-ran');
+  mkdirSync(path.join(nested, 'lib'), { recursive: true });
+  writeFileSync(path.join(nested, 'package.json'), JSON.stringify({
+    name: '@deepseek-ai/dsh-tools', type: 'module',
+    exports: { '.': { default: './lib/index.js' } },
+  }));
+  const target = path.join(nested, 'lib/index.js');
+  writeFileSync(target, `import { writeFileSync } from 'node:fs'; writeFileSync(${JSON.stringify(marker)}, 'NESTED_RAN');`);
+  const oracle = path.join(importer, 'resolve.mjs');
+  writeFileSync(oracle, "console.log(import.meta.resolve('@deepseek-ai/dsh-tools'));\n");
+  const resolved = spawnSync(process.execPath, [oracle], { env, encoding: 'utf8' });
+  assert.equal(resolved.status, 0, resolved.stderr);
+  assert.equal(resolved.stdout.trim(), pathToFileURL(realpathSync(target)).href);
+  assert.equal(existsSync(marker), false, 'resolution must not execute the nested body');
+  const entry = path.join(importer, 'entry.mjs');
+  writeFileSync(entry, "await import('@deepseek-ai/dsh-tools');\n");
+  const result = spawnSync(process.execPath, ['--import', securityPreload, entry], {
+    env: { ...env, RDSH_TOOL_RUNTIME: runtime, RDSH_TOOL_ADAPTER: 'dsh-tools-0.2.1-alpha.3',
+      RDSH_SECURE_WORKSPACE: dir, RDSH_SHARED_FILES: '[]', RDSH_SECURITY_LANG: 'en' },
+    encoding: 'utf8',
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /RDSH_SECURITY\[RUNTIME_RESOLUTION_MISMATCH\]/);
+  assert.equal(existsSync(marker), false, 'a mismatched runtime must not execute');
+});
 test('deny hook never supplies an affirmative approval on a miss', t => {
   const { env } = isolated(t);
   const result = spawnSync(bin, ['guard', '--json', '--deny', '*blocked*'], { env, input: '{"tool_input":{"command":"echo safe"}}', encoding: 'utf8' });
@@ -37,9 +157,10 @@ test('unsupported runtime is refused without copying external login credentials'
   mkdirSync(path.join(env.HOME, '.codex'));
   writeFileSync(path.join(env.HOME, '.codex', 'auth.json'), JSON.stringify({ tokens: { access_token: 'DUMMY_ACCESS', refresh_token: 'DUMMY_REFRESH' } }));
   const pkg = path.join(dir, 'pkg');
+  const bodyMarker = path.join(dir, 'delegated-body-ran');
   mkdirSync(path.join(pkg, 'lib'), { recursive: true });
   mkdirSync(path.join(pkg, 'node_modules', '@deepseek-ai', 'dsh-tools', 'lib'), { recursive: true });
-  writeFileSync(path.join(pkg, 'lib', 'bin.js'), '#!/usr/bin/env node\nprocess.exit(0);\n', { mode: 0o700 });
+  writeFileSync(path.join(pkg, 'lib', 'bin.js'), `#!/usr/bin/env node\nrequire('node:fs').writeFileSync(${JSON.stringify(bodyMarker)}, 'BODY_RAN');\n`, { mode: 0o700 });
   writeFileSync(path.join(pkg, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh', version: '0.2.0-rc.2' }));
   writeFileSync(path.join(pkg, 'node_modules', '@deepseek-ai', 'dsh-tools', 'lib', 'index.js'), '');
   env.RDSH_ORIG_BIN = path.join(pkg, 'lib', 'bin.js');
@@ -48,6 +169,7 @@ test('unsupported runtime is refused without copying external login credentials'
   const strict = spawnSync(bin, ['--profile', 'tui'], { env: { ...env, RDSH_SECURITY: '1' }, encoding: 'utf8' });
   assert.notEqual(strict.status, 0);
   assert.match(strict.stderr, /RDSH_SECURITY/);
+  assert.equal(existsSync(bodyMarker), false, 'an invalid runtime must fail before delegated code runs');
   assert.equal(existsSync(path.join(env.DSH_HOME, '.credentials.yaml')), false);
   const autoStatus = spawnSync(bin, ['setup', '--json'], { env: { ...env, RDSH_AUTH_AUTOSYNC: '1' }, encoding: 'utf8' });
   assert.equal(autoStatus.status, 0);
@@ -60,6 +182,52 @@ test('unsupported runtime is refused without copying external login credentials'
   assert.equal(spawnSync(bin, ['auth', '--import', '--provider', 'openai-codex'], { env }).status, 0);
   assert.match(readFileSync(path.join(env.DSH_HOME, '.credentials.yaml'), 'utf8'), /DUMMY_ACCESS/);
   assert.equal(JSON.parse(spawnSync(bin, ['setup', '--json'], { env, encoding: 'utf8' }).stdout).needed, false);
+});
+
+test('forged tool exports fail before delegated code runs', t => {
+  const runtime = process.env.RDSH_AUDITED_RUNTIME_ALPHA3;
+  if (!runtime) {
+    t.skip('the official alpha3 runtime path is supplied by the Linux security matrix');
+    return;
+  }
+  const { dir, env } = isolated(t);
+  const pkg = path.join(dir, 'pkg');
+  const tools = path.join(dir, 'node_modules', '@deepseek-ai', 'dsh-tools');
+  const bodyMarker = path.join(dir, 'forged-exports-body-ran');
+  mkdirSync(path.join(pkg, 'lib'), { recursive: true });
+  mkdirSync(path.join(tools, 'lib'), { recursive: true });
+  writeFileSync(path.join(pkg, 'lib', 'bin.js'), `#!/usr/bin/env node\nrequire('node:fs').writeFileSync(${JSON.stringify(bodyMarker)}, 'BODY_RAN');\n`, { mode: 0o700 });
+  writeFileSync(path.join(pkg, 'package.json'), JSON.stringify({
+    name: '@deepseek-ai/dsh',
+    version: '0.2.1-alpha.3',
+    dependencies: { '@deepseek-ai/dsh-agent-instructions': '0.2.1-alpha.3' },
+    devDependencies: { '@deepseek-ai/dsh-tools': '0.2.1-alpha.3' },
+  }));
+  writeFileSync(path.join(tools, 'lib', 'index.js'), readFileSync(runtime));
+  writeFileSync(path.join(tools, 'lib', 'other.js'), `require('node:fs').writeFileSync(${JSON.stringify(bodyMarker)}, 'OTHER_RAN');\n`);
+  const oracle = path.join(pkg, 'lib', 'resolve.mjs');
+  writeFileSync(oracle, "console.log(import.meta.resolve('@deepseek-ai/dsh-tools'));\n");
+  env.RDSH_ORIG_BIN = path.join(pkg, 'lib', 'bin.js');
+  for (const condition of ['default', 'node', 'import', 'require']) {
+    const exports = condition === 'default' ? { default: './lib/other.js' }
+      : { types: './lib/types/index.d.ts', [condition]: './lib/other.js', default: './lib/index.js' };
+    writeFileSync(path.join(tools, 'package.json'), JSON.stringify({
+      name: '@deepseek-ai/dsh-tools', version: '0.2.1-alpha.3',
+      main: 'lib/index.js', exports: { '.': exports },
+    }));
+    const resolved = spawnSync(process.execPath, [oracle], { env, encoding: 'utf8' });
+    assert.equal(resolved.status, 0, resolved.stderr);
+    const expected = condition === 'require' ? 'index.js' : 'other.js';
+    assert.equal(resolved.stdout.trim(), pathToFileURL(realpathSync(path.join(tools, 'lib', expected))).href);
+    const result = spawnSync(bin, ['--profile', 'tui'], {
+      env: { ...env, RDSH_SECURITY: '1' }, encoding: 'utf8',
+    });
+    assert.notEqual(result.status, 0, condition);
+    assert.match(result.stderr, /RDSH_SECURITY/);
+    if (process.platform === 'linux' && process.arch === 'x64')
+      assert.match(result.stderr, /unsupported DSH and tool runtime version pair/, condition);
+    assert.equal(existsSync(bodyMarker), false, `${condition} exports must fail before either entry executes`);
+  }
 });
 test('agent tools default to normal file access', t => {
   const { dir, env } = isolated(t);

@@ -1,0 +1,158 @@
+{
+  "created_at": "2026-10-15T04:57:11.062245+00:00",
+  "source_identity": {
+    "local_base": "7a5ee5f2585990b03b5acb93b8eb76bcd10cf104",
+    "merged_upstream": "cc019b7eb259faa6664009c5c88ff7d4c70462ef",
+    "state": "Uncommitted fixed cc019 merge-forward plus cost-ledger locale integration; no future commit SHA assigned. Muse plugin changes are separately owned and are outside this focused receipt.",
+    "files": [
+      {
+        "path": "Cargo.toml",
+        "sha256": "5ed986f6fbf09a327db05237dfdc28caafa0fe549ff18762641751d56528a21b"
+      },
+      {
+        "path": "src/main.rs",
+        "sha256": "41461b899238bdfc93f6cea405e21243ac21b2186afb29b1c91b2f226eda220e"
+      },
+      {
+        "path": "src/cost_ledger.rs",
+        "sha256": "211cb53fc920940a122770398792307e416e7095fd62f1589b77d09a094b69f4"
+      },
+      {
+        "path": "src/locale.rs",
+        "sha256": "87613e4b0ba0626342802790c40b7787ae64a9062bda867e00e75cae3f45618f"
+      },
+      {
+        "path": "tests/cost_ledger_cli.rs",
+        "sha256": "ee3a77a39841fde2cbda9326ad82f69a42a9e4d1c4ded30774cd16c0e60a4041"
+      },
+      {
+        "path": "dashboard/cli.mjs",
+        "sha256": "402846ca56bbe75a967e60435c03c55f651b0efac245e0519dd8340cae30d68d"
+      },
+      {
+        "path": "dashboard/cli-locale.mjs",
+        "sha256": "5363f826f41da8ef2d7a0f9db3259d5e6cfbbbc52c98c1e6c7e3f716fae1564a"
+      },
+      {
+        "path": "dashboard/test/cli-locale.test.mjs",
+        "sha256": "70caf915ce98d29ff36b167420695a01ddd0f89de550d295a16f9a631b086f0e"
+      },
+      {
+        "path": "dashboard/test/cost-ledger-cli.test.mjs",
+        "sha256": "e65820fe3b911981a1c9c73d59e85f95db72256ecd66adbb7aa0c4a5ad5d78a5"
+      },
+      {
+        "path": "dashboard/cost-ledger.mjs",
+        "sha256": "1c05571608f2286c32e83c212302d6b6784b9e94368340d5a7beacb383f4acc8"
+      },
+      {
+        "path": "dashboard/test/cost-ledger.test.mjs",
+        "sha256": "0c7d13ab5504478f1b5a4da329acbb1b831232bc03b374355336b238e32dc2c5"
+      }
+    ]
+  },
+  "platform": "macOS arm64 local; no external accounts, models, provider APIs or installed binary replacement",
+  "checks": [
+    {
+      "command": "cargo test --release --test cost_ledger_cli --test cli_localization",
+      "result": "pass",
+      "passed": 29,
+      "failed": 0,
+      "ignored": 0,
+      "log": "cost-ledger-native-focused.txt"
+    },
+    {
+      "command": "cargo test --release --bin rdsh cost_ledger",
+      "result": "pass",
+      "passed": 18,
+      "failed": 0,
+      "filtered": 285,
+      "log": "cost-ledger-core-focused.txt"
+    },
+    {
+      "command": "node --test dashboard/test/cli-locale.test.mjs dashboard/test/cost-ledger-cli.test.mjs dashboard/test/cost-ledger.test.mjs",
+      "result": "pass",
+      "passed": 21,
+      "failed": 0,
+      "skipped": 0,
+      "log": "cost-ledger-dashboard-focused.txt"
+    },
+    {
+      "command": "cargo clippy --release --all-targets -- -D warnings",
+      "result": "pass",
+      "log": "cost-ledger-clippy.txt"
+    },
+    {
+      "command": "cargo fmt --check",
+      "result": "pass"
+    },
+    {
+      "command": "git diff --check",
+      "result": "pass"
+    }
+  ],
+  "negative_control": {
+    "kind": "Private omission control, not an unmodified historical-source run.",
+    "mutation": "Remove only cost-ledger validate/public/schema from the settings-independent Node dispatch of a private candidate copy.",
+    "command": "node --test --test-name-pattern=pure native JSON bridges <private-copy>/dashboard/test/cli-locale.test.mjs",
+    "exit": 1,
+    "observed": "The new cost-ledger bridge invocation refuses malformed unrelated rdsh.json instead of forwarding, expected 0/actual 1.",
+    "log": "cost-ledger-bridge-negative.txt"
+  },
+  "core_parity": {
+    "upstream": "cc019b7eb259faa6664009c5c88ff7d4c70462ef",
+    "enginePrefixBeforeJsonReaderByteIdentical": true,
+    "enginePrefixSha256": "895065a69cbccb65b58f3a0ada5a0ba6ab3fb4fb93075f3a1e12c6bc5748832f",
+    "knownCostReasons": 35,
+    "allKnownReasonsHaveChineseAndJapaneseEntries": true,
+    "reasonKeys": [
+      "unexpected or missing fields",
+      "invalid identifier",
+      "invalid source text",
+      "UTC timestamp required",
+      "invalid UTC timestamp",
+      "amount must be a nonnegative decimal string with at most 9 fractional digits",
+      "scope belongs to another project",
+      "period must have a positive duration",
+      "membership_complete must be explicit",
+      "declare 1 to 100 expected targets",
+      "duplicate target identity",
+      "unknown source kind",
+      "unknown scope",
+      "unknown target; only an unallocated invoice may use null",
+      "invalid report mode",
+      "positive stable sequence required",
+      "currency must be an explicit three-letter code",
+      "certainty must match the amount and source",
+      "invalid reported token counter",
+      "cached input exceeds input",
+      "observation precedes its period",
+      "do not mix event/cumulative modes or currencies in one source stream",
+      "sequence already refers to a different observation",
+      "cumulative observation time moved backwards",
+      "cumulative counter decreased; declare a new period for a meter reset",
+      "invalid ledger identity",
+      "scope identity is immutable",
+      "scope retention limit reached",
+      "declare the exact scope before reporting",
+      "event ID already refers to different data",
+      "report retention limit reached",
+      "retention limit exceeded",
+      "invalid stored scope",
+      "stored report scope missing",
+      "invalid stored report"
+    ]
+  },
+  "acceptance": [
+    "All five native cost-ledger actions accept corrupt unrelated settings and emit the same JSON across en/zh-CN/ja after the existing declared_at/received_at timestamp normalization; ordinary settings show still rejects the file without replacement.",
+    "Actual native errors for invalid JSON, operation mismatch, unknown action, negative amount, immutable scope conflict and missing Japanese path use the requested language; rejected input and raw path remain unchanged.",
+    "Native help retains declare/report/validate/public/schema tokens in all three languages.",
+    "Pure dashboard validate/public/schema forward explicit/env/OS language, request data, raw stderr and exit status; unique private temporary files are removed on success and exit 7.",
+    "POSIX private request mode is 0600. Existing dashboard declare/report/inspect retains its store path, and inspect still refuses corrupt settings.",
+    "Existing JS cost-ledger, durable state, MCP schema consumers and HTTP consumers pass the unmodified ledger tests."
+  ],
+  "limits": [
+    "This focused receipt does not qualify full current-head CI or all platform suites. Earlier 7a and 8ee receipts remain historical.",
+    "Windows ACL behavior is not established by the POSIX mode assertion; the preload-based dispatch checks are platform-neutral but were run locally on macOS."
+  ]
+}

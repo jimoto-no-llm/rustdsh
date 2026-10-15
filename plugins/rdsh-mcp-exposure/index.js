@@ -1,4 +1,6 @@
 import { createRequire } from 'node:module';
+import { diagnostic } from './diagnostics.js';
+import { assertDshVersions, DSH_PACKAGES } from './compatibility.js';
 import z from '@deepseek-ai/schemastery';
 import * as McpClient from '@deepseek-ai/dsh-mcp-client';
 import { renderToolsSdk, renderToolsSdkPy } from '@deepseek-ai/dsh-tools';
@@ -22,12 +24,10 @@ const require = createRequire(import.meta.url);
 export async function apply(ctx, input = {}) {
   const config = compileConfig(input);
   if (globalThis[Symbol.for('rdsh.tool-boundary.install')])
-    throw new ExposureError('RDSH_MCP_GUARDED_NATIVE', 'The guarded rdsh launcher reserves its audited Native tool set; this bundle requires an existing authorized original DSH composition');
-  for (const pkg of ['dsh-tools', 'dsh-mcp-client', 'dsh-session', 'dsh-system-prompt'])
-    if (require(`@deepseek-ai/${pkg}/package.json`).version !== '0.2.0-rc.2')
-      throw new ExposureError('RDSH_MCP_VERSION', 'rdsh-mcp-exposure supports DSH 0.2.0-rc.2');
+    throw new ExposureError('RDSH_MCP_GUARDED_NATIVE', diagnostic('guardedNative'));
+  assertDshVersions(Object.fromEntries(DSH_PACKAGES.map(pkg => [pkg, require(`@deepseek-ai/${pkg}/package.json`).version])));
   if (config.servers.some(server => server.needsPtc)) {
-    if (!ctx.get('ptcRuntime')) throw new ExposureError('RDSH_MCP_PTC_RUNTIME', 'PTC-only exposure requires an existing original DSH PTC runtime');
+    if (!ctx.get('ptcRuntime')) throw new ExposureError('RDSH_MCP_PTC_RUNTIME', diagnostic('ptcRuntime'));
   }
   // Apply the original schema/defaults before registering effects or connecting.
   const connections = input.servers.map(server => McpClient.Config(server.connection));

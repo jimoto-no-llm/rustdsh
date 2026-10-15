@@ -1,3 +1,5 @@
+- id: headless-runner
+  inject: [headlessStartup, rdshSessionCleanupReady]
 - insert:
     - id: rdsh-session-cleanup
       name: "rdsh-session-cleanup"
