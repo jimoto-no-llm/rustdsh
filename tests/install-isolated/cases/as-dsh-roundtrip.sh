@@ -7,7 +7,16 @@ mkdir -p "$PREFIX"
 printf '#!/bin/sh\necho "original-dsh $*"\n' > "$PREFIX/dsh"
 chmod 755 "$PREFIX/dsh"
 
-install_rdsh --from-release --as-dsh
+install_out="$(install_rdsh --from-release --as-dsh)"
+printf '%s\n' "$install_out"
+# バイナリの rdsh/dsh は "node" と "dsh" を両方含むので、テキストのラッパーが
+# 無いのに node ラッパー警告が出たら誤検知（grep -I で走査対象から外す）。
+case "$install_out" in
+  *"wrappers calling 'node"*)
+    echo "spurious node-wrapper note without a text wrapper" >&2
+    exit 1
+    ;;
+esac
 [ -x "$PREFIX/dsh-orig" ] || { echo "no dsh-orig backup" >&2; exit 1; }
 # `dsh --version` is delegated verbatim to the original dsh by design, so the
 # shadowing check uses a native command instead.
