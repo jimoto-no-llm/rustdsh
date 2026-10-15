@@ -490,13 +490,184 @@ fn book_of(state: &Value) -> BudgetResult<&Map<String, Value>> {
         .ok_or_else(|| BudgetError::code("budget_invalid_input"))
 }
 
+/// `Object.keys(book.policies)` order, i.e. the JS own-property order.
+///
+/// `JSON.parse` builds ordinary objects, and ordinary objects enumerate every
+/// *array index* own key first — ascending, numerically — and only then the
+/// remaining string keys in insertion order. An array index is a canonical
+/// `ToString(ToUint32(key))` round trip below `2^32 - 1`, so `"2"` sorts before
+/// `"10"` while `"01"` and `"4294967295"` stay in insertion order.
+///
+/// `preserve_order` keeps `serde_json` insertion order instead, which differs
+/// whenever a document spells its keys out of numeric order. Every place that
+/// walks or emits one of the dynamic maps (`policies`, `jobs`, `calls`,
+/// `receipts`) therefore has to go through this helper to match the JS output
+/// byte for byte.
+fn js_key_order(map: &Map<String, Value>) -> Vec<&str> {
+    // `k >>> 0 === k` and `k !== 4294967295`: the canonical array-index form.
+    let index_of = |key: &str| -> Option<u64> {
+        if key.is_empty() || key.len() > 10 || !key.bytes().all(|byte| byte.is_ascii_digit()) {
+            return None;
+        }
+        if key.len() > 1 && key.starts_with('0') {
+            return None;
+        }
+        let value: u64 = key.parse().ok()?;
+        (value < u64::from(u32::MAX)).then_some(value)
+    };
+    let mut indices: Vec<(u64, &str)> = Vec::new();
+    let mut strings: Vec<&str> = Vec::new();
+    for key in map.keys() {
+        match index_of(key) {
+            Some(value) => indices.push((value, key)),
+            None => strings.push(key),
+        }
+    }
+    indices.sort_by_key(|(value, _)| *value);
+    indices
+        .into_iter()
+        .map(|(_, key)| key)
+        .chain(strings)
+        .collect()
+}
+
+/// `Object.values(map)` in the JS own-property order of [`js_key_order`].
+fn js_values(map: &Map<String, Value>) -> Vec<&Value> {
+    js_key_order(map)
+        .into_iter()
+        .filter_map(|key| map.get(key))
+        .collect()
+}
+
+/// One dynamic map re-keyed into the JS own-property order, so the serializer
+/// walks it the way `JSON.stringify` would.
+fn js_ordered_object(map: &Map<String, Value>) -> Value {
+    let mut ordered = Map::new();
+    for key in js_key_order(map) {
+        if let Some(value) = map.get(key) {
+            ordered.insert(key.to_string(), value.clone());
+        }
+    }
+    Value::Object(ordered)
+}
+
+/// Re-key one dynamic map in place after a write.
+///
+/// A JS assignment to `book.policies[policyId]` lands the key in its
+/// own-property position: a new array-index key slots into the ascending
+/// numeric run ahead of the string keys, and every other new key goes last.
+/// A plain `Map::insert` would instead append the key, so each insert site
+/// re-orders the map it just wrote.
+fn js_reorder(map: &mut Map<String, Value>) {
+    let ordered = match js_ordered_object(map) {
+        Value::Object(ordered) => ordered,
+        _ => return,
+    };
+    *map = ordered;
+}
+
+/// Re-key one dynamic map on the book, tolerating a missing or damaged map.
+fn js_reorder_in(book: &mut Map<String, Value>, key: &str) {
+    if let Some(map) = book.get_mut(key).and_then(Value::as_object_mut) {
+        js_reorder(map);
+    }
+}
+
 /// `same(a, b)`: `JSON.stringify(a) === JSON.stringify(b)`.
 ///
-/// `preserve_order` makes the serializer walk the map in insertion order, which
-/// is the same order `JSON.stringify` walks a JS object, so a plain string
-/// comparison is the exact JS behaviour.
+/// This is *not* structural equality: `JSON.stringify` walks own keys in
+/// [`js_key_order`] order, so `{a:1,b:2}` and `{b:2,a:1}` stringify differently
+/// and a plain `Value` comparison (which ignores key order) would accept them.
+/// Numbers are also compared as JS spells them, so `1.0` and `1` are equal
+/// while `serde_json` would keep them apart. Both sides are normalized through
+/// [`js_canonical`] and compared as serialized text.
 fn same(left: &Value, right: &Value) -> bool {
-    left == right
+    match (
+        serde_json::to_string(&js_canonical(left)),
+        serde_json::to_string(&js_canonical(right)),
+    ) {
+        (Ok(left), Ok(right)) => left == right,
+        _ => false,
+    }
+}
+
+/// The value as JS would write it: dynamic-key maps in own-property order and
+/// every number in its JS spelling.
+///
+/// JS has one numeric type, so a safe integer that arrived as `1.0`, `1e3` or
+/// `-0` is the same value as `1`, `1000` and `0` and stringifies that way.
+/// `serde_json` keeps the distinction, which would otherwise show up in the
+/// serialized output and in [`same`].
+fn js_canonical(value: &Value) -> Value {
+    match value {
+        Value::Object(map) => {
+            let mut ordered = Map::new();
+            for key in js_key_order(map) {
+                if let Some(value) = map.get(key) {
+                    ordered.insert(key.to_string(), js_canonical(value));
+                }
+            }
+            Value::Object(ordered)
+        }
+        Value::Array(items) => Value::Array(items.iter().map(js_canonical).collect()),
+        Value::Number(number) => js_number(number),
+        other => other.clone(),
+    }
+}
+
+/// One number in its JS spelling.
+///
+/// Every JSON number is an IEEE-754 double in JS. A double that is a safe
+/// integer prints without a fraction, so the port re-emits it as an integer and
+/// `1.0`, `1e3` and `-0` collapse onto `1`, `1000` and `0`. Anything else is
+/// left exactly as parsed.
+fn js_number(number: &serde_json::Number) -> Value {
+    if let Some(value) = number.as_f64() {
+        if value.is_finite()
+            && value.fract() == 0.0
+            && value.abs() <= MAX_SAFE_INTEGER
+            && !(value == 0.0 && number.to_string().starts_with('-'))
+        {
+            let value = value as i64;
+            return Value::Number(serde_json::Number::from(value));
+        }
+        if value == 0.0 {
+            return Value::Number(serde_json::Number::from(0));
+        }
+    }
+    Value::Number(number.clone())
+}
+
+/// Read a key the JS branch tests with a bare `input.key`.
+///
+/// `object(input, keys)` only rejects unknown keys; it never requires one to be
+/// present. Presence is enforced later, by the accessor the JS code hands the
+/// value to. An absent key reads as `undefined` there, which is a different
+/// value from an explicit `null`, so the port must keep the two apart rather
+/// than collapsing `None` onto `Value::Null`. The returned borrow is the
+/// `undefined` sentinel `Value::Null` only where the JS branch tolerates it.
+fn present<'a>(input: &'a Map<String, Value>, key: &str) -> Option<&'a Value> {
+    input.get(key)
+}
+
+/// `input[key]` for an accessor that rejects `undefined`.
+///
+/// Absent and explicit `null` both reach the accessor as a non-string, and each
+/// accessor answers with its own code (`budget_invalid_id`, `budget_invalid_text`,
+/// `budget_invalid_amount`, …), so the sentinel is simply a value the accessor
+/// rejects.
+fn required<'a>(input: &'a Map<String, Value>, key: &str) -> &'a Value {
+    input.get(key).unwrap_or(&Value::Null)
+}
+
+/// `amount(input[key])` for a key the JS code reads with a bare `input.key`.
+/// `amount(null)` is valid, but `amount(undefined)` reaches `units(undefined)`
+/// and fails. Keep an absent key distinct from an explicit `null`.
+fn required_amount(input: &Map<String, Value>, key: &str) -> BudgetResult<Value> {
+    match input.get(key) {
+        Some(value) => amount(value),
+        None => fail("budget_invalid_amount"),
+    }
 }
 
 /// `decision(book, kind, data, now)`: append one audit entry.
@@ -550,28 +721,27 @@ fn totals(
     book: &Map<String, Value>,
     policy: &Map<String, Value>,
     cache: &mut TotalsCache,
-) -> Totals {
+) -> BudgetResult<Totals> {
     let policy_id = policy
         .get("policy_id")
         .and_then(Value::as_str)
         .unwrap_or("");
     if let Some(total) = cache.get(policy_id) {
-        return total;
+        return Ok(total);
     }
-    let baseline = policy.get("baseline").unwrap_or(&Value::Null);
+    let baseline = policy
+        .get("baseline")
+        .ok_or_else(|| BudgetError::code("budget_invalid_amount"))?;
     let mut total = Totals {
         spent: if baseline.is_null() {
             None
         } else {
-            units_of(baseline).ok()
+            Some(units_of(baseline)?)
         },
         ..Totals::default()
     };
-    if baseline.is_null() {
-        total.spent = None;
-    }
     if let Some(calls) = book.get("calls").and_then(Value::as_object) {
-        for call in calls.values() {
+        for call in js_values(calls) {
             let Some(call) = call.as_object() else {
                 continue;
             };
@@ -582,17 +752,19 @@ fn totals(
             if !includes {
                 continue;
             }
-            if !call.get("amount").unwrap_or(&Value::Null).is_null() {
-                if let (Some(spent), Ok(amount)) = (
-                    total.spent,
-                    units_of(call.get("amount").unwrap_or(&Value::Null)),
-                ) {
-                    total.spent = Some(spent + amount);
+            let amount = call
+                .get("amount")
+                .ok_or_else(|| BudgetError::code("budget_invalid_amount"))?;
+            if !amount.is_null() {
+                let amount = units_of(amount)?;
+                if let Some(spent) = total.spent.as_mut() {
+                    *spent += amount;
                 }
             } else {
-                if let Ok(reservation) = units_of(call.get("reservation").unwrap_or(&Value::Null)) {
-                    total.reserved += reservation;
-                }
+                let reservation = call
+                    .get("reservation")
+                    .ok_or_else(|| BudgetError::code("budget_invalid_amount"))?;
+                total.reserved += units_of(reservation)?;
                 if call.get("finished_at").unwrap_or(&Value::Null).is_null() {
                     total.executing += 1;
                 } else {
@@ -602,27 +774,32 @@ fn totals(
         }
     }
     cache.set(policy_id.to_string(), total.clone());
-    total
+    Ok(total)
 }
 
 /// `seedCachedPolicyTotals(book, policy)`.
-fn seed_cached_policy_totals(cache: &mut TotalsCache, policy: &Map<String, Value>) {
+fn seed_cached_policy_totals(
+    cache: &mut TotalsCache,
+    policy: &Map<String, Value>,
+) -> BudgetResult<()> {
     let policy_id = policy
         .get("policy_id")
         .and_then(Value::as_str)
         .unwrap_or("");
     let baseline = policy.get("baseline").unwrap_or(&Value::Null);
+    let spent = if baseline.is_null() {
+        None
+    } else {
+        Some(units_of(baseline)?)
+    };
     cache.set(
         policy_id.to_string(),
         Totals {
-            spent: if baseline.is_null() {
-                None
-            } else {
-                units_of(baseline).ok()
-            },
+            spent,
             ..Totals::default()
         },
     );
+    Ok(())
 }
 
 /// `updateCachedCallTotals(book, call, update)`: mutate the cached entry of
@@ -667,13 +844,13 @@ impl TotalsCache {
 }
 
 /// `matched(book, runId)`: the active policies that scope this run, in the
-/// book's insertion order.
+/// book's JS own-property order.
 fn matched(book: &Map<String, Value>, run_id: &str) -> Vec<Map<String, Value>> {
     let Some(policies) = book.get("policies").and_then(Value::as_object) else {
         return Vec::new();
     };
-    policies
-        .values()
+    js_values(policies)
+        .into_iter()
         .filter_map(Value::as_object)
         .filter(|policy| {
             policy.get("active").and_then(Value::as_bool) == Some(true)
@@ -687,21 +864,19 @@ fn matched(book: &Map<String, Value>, run_id: &str) -> Vec<Map<String, Value>> {
 }
 
 /// `units(p.call_reservation)` for a policy the callers already validated.
-fn reservation_of(policy: &Map<String, Value>) -> u128 {
-    policy
+fn reservation_of(policy: &Map<String, Value>) -> BudgetResult<u128> {
+    let reservation = policy
         .get("call_reservation")
-        .and_then(Value::as_str)
-        .and_then(parse_units)
-        .unwrap_or(0)
+        .ok_or_else(|| BudgetError::code("budget_invalid_amount"))?;
+    units_of(reservation)
 }
 
 /// `units(p.soft_limit)` / `units(p.hard_limit)`.
-fn limit_of(policy: &Map<String, Value>, key: &str) -> u128 {
-    policy
+fn limit_of(policy: &Map<String, Value>, key: &str) -> BudgetResult<u128> {
+    let limit = policy
         .get(key)
-        .and_then(Value::as_str)
-        .and_then(parse_units)
-        .unwrap_or(0)
+        .ok_or_else(|| BudgetError::code("budget_invalid_amount"))?;
+    units_of(limit)
 }
 
 /// `assess(book, runId, now, reserve)`: whether the run may admit a call.
@@ -711,7 +886,7 @@ fn assess(
     run_id: &str,
     now: &str,
     reserve: bool,
-) -> Map<String, Value> {
+) -> BudgetResult<Map<String, Value>> {
     let policies = matched(book, run_id);
     let mut reason: Option<&'static str> = if policies.is_empty() {
         Some("budget_policy_missing")
@@ -720,14 +895,22 @@ fn assess(
     };
     let mut warning = false;
     let pending = if reserve {
-        policies.iter().map(reservation_of).max().unwrap_or(0)
+        policies
+            .iter()
+            .map(reservation_of)
+            .collect::<BudgetResult<Vec<_>>>()?
+            .into_iter()
+            .max()
+            .unwrap_or(0)
     } else {
         0
     };
     for policy in &policies {
-        let total = totals(book, policy, cache);
+        let total = totals(book, policy, cache)?;
         let effective = total.spent.map(|spent| spent + total.reserved);
-        warning |= effective.is_some_and(|value| value + pending >= limit_of(policy, "soft_limit"));
+        let soft_limit = limit_of(policy, "soft_limit")?;
+        let hard_limit = limit_of(policy, "hard_limit")?;
+        warning |= effective.is_some_and(|value| value + pending >= soft_limit);
         let period_start = policy
             .get("period_start")
             .and_then(Value::as_str)
@@ -743,10 +926,8 @@ fn assess(
             reason.get_or_insert("budget_period_closed");
         } else if effective.is_none() {
             reason.get_or_insert("budget_spend_unknown");
-        } else if effective.is_some_and(|value| {
-            value >= limit_of(policy, "hard_limit")
-                || value + pending > limit_of(policy, "hard_limit")
-        }) {
+        } else if effective.is_some_and(|value| value >= hard_limit || value + pending > hard_limit)
+        {
             reason.get_or_insert("budget_hard_limit");
         }
     }
@@ -793,7 +974,7 @@ fn assess(
         "policy_ids".into(),
         Value::Array(policy_ids.into_iter().map(Value::String).collect()),
     );
-    result
+    Ok(result)
 }
 
 /// `applyBudgetOperation(state, operation, input, now)`.
@@ -806,8 +987,21 @@ pub fn apply_budget_operation(
     input: &Value,
     now: &str,
 ) -> BudgetResult<Value> {
-    let now = time(&Value::String(now.to_string()))?;
     let mut cache = TotalsCache::default();
+    apply_budget_operation_with_cache(state, operation, input, now, &mut cache)
+}
+
+/// Apply one operation while reusing the per-book totals cache. Validation
+/// uses this across audit replay so each policy's existing calls are scanned
+/// once rather than once for every replayed call.
+fn apply_budget_operation_with_cache(
+    state: &mut Value,
+    operation: &str,
+    input: &Value,
+    now: &str,
+    cache: &mut TotalsCache,
+) -> BudgetResult<Value> {
+    let now = time(&Value::String(now.to_string()))?;
     ledger(state)?;
     let operation_count = book_of(state)?
         .get("operations")
@@ -817,7 +1011,7 @@ pub fn apply_budget_operation(
     if operation_count >= AUDIT_LIMIT {
         return fail("budget_audit_full");
     }
-    let result = operate(state, &mut cache, operation, input, &now)?;
+    let result = operate(state, cache, operation, input, &now)?;
     let book = state
         .get_mut("budget_admission")
         .and_then(Value::as_object_mut)
@@ -892,20 +1086,23 @@ fn operate_policy(
         "revision".into(),
         Value::Number(serde_json::Number::from((expected_revision + 1.0) as i64)),
     );
+    // `input.run_id === null ? null : id(input.run_id)`: an absent key is
+    // `undefined`, not `null`, so `id` sees it and fails `budget_invalid_id`.
     policy.insert(
         "run_id".into(),
-        match input.get("run_id") {
-            Some(Value::Null) | None => Value::Null,
+        match present(&input, "run_id") {
+            Some(Value::Null) => Value::Null,
             Some(value) => json!(id(value)?),
+            None => return fail("budget_invalid_id"),
         },
     );
     policy.insert(
         "period_start".into(),
-        json!(time(input.get("period_start").unwrap_or(&Value::Null))?),
+        json!(time(required(&input, "period_start"))?),
     );
     policy.insert(
         "period_end".into(),
-        json!(time(input.get("period_end").unwrap_or(&Value::Null))?),
+        json!(time(required(&input, "period_end"))?),
     );
     policy.insert(
         "currency".into(),
@@ -915,25 +1112,16 @@ fn operate_policy(
         "source_kind".into(),
         input.get("source_kind").cloned().unwrap_or(Value::Null),
     );
-    policy.insert(
-        "baseline".into(),
-        amount(input.get("baseline").unwrap_or(&Value::Null))?,
-    );
+    policy.insert("baseline".into(), required_amount(&input, "baseline")?);
     policy.insert(
         "baseline_basis".into(),
-        json!(text(input.get("baseline_basis").unwrap_or(&Value::Null))?),
+        json!(text(required(&input, "baseline_basis"))?),
     );
-    policy.insert(
-        "soft_limit".into(),
-        amount(input.get("soft_limit").unwrap_or(&Value::Null))?,
-    );
-    policy.insert(
-        "hard_limit".into(),
-        amount(input.get("hard_limit").unwrap_or(&Value::Null))?,
-    );
+    policy.insert("soft_limit".into(), required_amount(&input, "soft_limit")?);
+    policy.insert("hard_limit".into(), required_amount(&input, "hard_limit")?);
     policy.insert(
         "call_reservation".into(),
-        amount(input.get("call_reservation").unwrap_or(&Value::Null))?,
+        required_amount(&input, "call_reservation")?,
     );
     policy.insert(
         "paused".into(),
@@ -943,13 +1131,24 @@ fn operate_policy(
         "active".into(),
         input.get("active").cloned().unwrap_or(Value::Null),
     );
-    let reason = text(input.get("reason").unwrap_or(&Value::Null))?;
+    let reason = text(required(&input, "reason"))?;
 
     let currency = policy.get("currency").and_then(Value::as_str).unwrap_or("");
     let source_kind = policy
         .get("source_kind")
         .and_then(Value::as_str)
         .unwrap_or("");
+    let has_limits = ["soft_limit", "hard_limit", "call_reservation"]
+        .iter()
+        .all(|key| !policy.get(*key).unwrap_or(&Value::Null).is_null());
+    let limits_ok = if has_limits {
+        let soft_limit = limit_of(&policy, "soft_limit")?;
+        let hard_limit = limit_of(&policy, "hard_limit")?;
+        let reservation = reservation_of(&policy)?;
+        soft_limit <= hard_limit && reservation != 0
+    } else {
+        false
+    };
     let shape_ok = currency.len() == 3
         && currency.bytes().all(|byte| byte.is_ascii_uppercase())
         && COST_SOURCES.contains(&source_kind)
@@ -963,14 +1162,7 @@ fn operate_policy(
                 .get("period_end")
                 .and_then(Value::as_str)
                 .unwrap_or("")
-        && !policy.get("soft_limit").unwrap_or(&Value::Null).is_null()
-        && !policy.get("hard_limit").unwrap_or(&Value::Null).is_null()
-        && !policy
-            .get("call_reservation")
-            .unwrap_or(&Value::Null)
-            .is_null()
-        && limit_of(&policy, "soft_limit") <= limit_of(&policy, "hard_limit")
-        && reservation_of(&policy) != 0;
+        && limits_ok;
     if !shape_ok {
         return fail("budget_invalid_policy");
     }
@@ -1012,12 +1204,13 @@ fn operate_policy(
         .and_then(Value::as_object_mut)
         .ok_or_else(|| BudgetError::code("budget_invalid_store"))?;
     if previous.is_none() {
-        seed_cached_policy_totals(cache, &policy);
+        seed_cached_policy_totals(cache, &policy)?;
     }
     book.get_mut("policies")
         .and_then(Value::as_object_mut)
         .ok_or_else(|| BudgetError::code("budget_invalid_store"))?
         .insert(policy_id, Value::Object(policy.clone()));
+    js_reorder_in(book, "policies");
 
     let mut data = Map::new();
     data.insert("policy".into(), Value::Object(policy.clone()));
@@ -1039,9 +1232,9 @@ fn operate_job(
     now: &str,
 ) -> BudgetResult<Value> {
     let input = object(input, &JOB_KEYS)?.clone();
-    let job_id = id(input.get("job_id").unwrap_or(&Value::Null))?;
-    let run_id = id(input.get("run_id").unwrap_or(&Value::Null))?;
-    let worker_id = id(input.get("worker_id").unwrap_or(&Value::Null))?;
+    let job_id = id(required(&input, "job_id"))?;
+    let run_id = id(required(&input, "run_id"))?;
+    let worker_id = id(required(&input, "worker_id"))?;
     let exists = book_of(state)?
         .get("jobs")
         .and_then(Value::as_object)
@@ -1057,7 +1250,7 @@ fn operate_job(
     if count >= AUDIT_LIMIT {
         return fail("budget_jobs_full");
     }
-    let result = assess(book_of(state)?, cache, &run_id, now, false);
+    let result = assess(book_of(state)?, cache, &run_id, now, false)?;
     let mut data = Map::new();
     data.insert("job_id".into(), json!(job_id));
     data.insert("run_id".into(), json!(run_id));
@@ -1087,6 +1280,12 @@ fn operate_job(
             .ok_or_else(|| BudgetError::code("budget_invalid_store"))?
             .insert(job_id.clone(), Value::Object(job));
     }
+    if let Some(book) = state
+        .get_mut("budget_admission")
+        .and_then(Value::as_object_mut)
+    {
+        js_reorder_in(book, "jobs");
+    }
     let mut output = Map::new();
     output.insert("job_id".into(), json!(job_id));
     for (key, value) in result {
@@ -1103,7 +1302,7 @@ fn operate_hook(
     now: &str,
 ) -> BudgetResult<Value> {
     let input = object(input, &JOB_ONLY_KEYS)?.clone();
-    let job_id = id(input.get("job_id").unwrap_or(&Value::Null))?;
+    let job_id = id(required(&input, "job_id"))?;
     let job = book_of(state)?
         .get("jobs")
         .and_then(Value::as_object)
@@ -1186,22 +1385,28 @@ fn operate_call(
     if count >= AUDIT_LIMIT {
         return fail("budget_calls_full");
     }
-    let session_id = match input.get("session_id") {
-        Some(Value::Null) | None => Value::Null,
+    // `input.session_id === null ? null : text(input.session_id, 160)`: an
+    // absent key is `undefined`, which is not `null`, so it reaches `text` and
+    // fails `budget_invalid_text`.
+    let session_id = match present(&input, "session_id") {
+        Some(Value::Null) => Value::Null,
         Some(value) => json!(text_max(value, 160)?),
+        None => return fail("budget_invalid_text"),
     };
-    let provider = text_max(input.get("provider").unwrap_or(&Value::Null), 160)?;
-    let model = text_max(input.get("model").unwrap_or(&Value::Null), 160)?;
-    let purpose = match input.get("purpose") {
-        Some(Value::Null) | None => Value::Null,
+    let provider = text_max(required(&input, "provider"), 160)?;
+    let model = text_max(required(&input, "model"), 160)?;
+    // Same shape as `session_id`, with the 80-character limit.
+    let purpose = match present(&input, "purpose") {
+        Some(Value::Null) => Value::Null,
         Some(value) => json!(text_max(value, 80)?),
+        None => return fail("budget_invalid_text"),
     };
     let run_id = job
         .get("run_id")
         .and_then(Value::as_str)
         .unwrap_or("")
         .to_string();
-    let result = assess(book_of(state)?, cache, &run_id, now, true);
+    let result = assess(book_of(state)?, cache, &run_id, now, true)?;
 
     let mut data = Map::new();
     data.insert("call_id".into(), json!(call_id));
@@ -1245,7 +1450,13 @@ fn operate_call(
         .iter()
         .filter_map(|policy_id| policies.get(policy_id).and_then(Value::as_object).cloned())
         .collect();
-    let reservation = selected.iter().map(reservation_of).max().unwrap_or(0);
+    let reservation = selected
+        .iter()
+        .map(reservation_of)
+        .collect::<BudgetResult<Vec<_>>>()?
+        .into_iter()
+        .max()
+        .unwrap_or(0);
     // `policies[0]`: `assess` always found at least one matching policy here,
     // because an empty match is a denial.
     let Some(first) = selected.first() else {
@@ -1293,6 +1504,12 @@ fn operate_call(
         .and_then(Value::as_object_mut)
         .ok_or_else(|| BudgetError::code("budget_invalid_store"))?
         .insert(call_id.clone(), Value::Object(call));
+    if let Some(book) = state
+        .get_mut("budget_admission")
+        .and_then(Value::as_object_mut)
+    {
+        js_reorder_in(book, "calls");
+    }
 
     let mut output = Map::new();
     output.insert("call_id".into(), json!(call_id));
@@ -1312,8 +1529,8 @@ fn operate_finish(
     now: &str,
 ) -> BudgetResult<Value> {
     let input = object(input, &FINISH_KEYS)?.clone();
-    let call_id = id(input.get("call_id").unwrap_or(&Value::Null))?;
-    let job_id = id(input.get("job_id").unwrap_or(&Value::Null))?;
+    let call_id = id(required(&input, "call_id"))?;
+    let job_id = id(required(&input, "job_id"))?;
     let call = book_of(state)?
         .get("calls")
         .and_then(Value::as_object)
@@ -1334,24 +1551,35 @@ fn operate_finish(
         return fail("budget_invalid_outcome");
     }
     let mut tokens = Value::Null;
-    if !input.get("tokens").unwrap_or(&Value::Null).is_null() {
-        let tokens_input =
-            object(input.get("tokens").unwrap_or(&Value::Null), &TOKEN_KEYS)?.clone();
-        let mut stored = Map::new();
-        for key in TOKEN_KEYS {
-            let value = tokens_input.get(key).cloned().unwrap_or(Value::Null);
-            if !value.is_null() {
-                let ok = value
-                    .as_f64()
-                    .is_some_and(|number| number.fract() == 0.0 && number >= 0.0)
-                    && value.as_f64().unwrap_or(f64::NAN) <= MAX_SAFE_INTEGER;
-                if !ok {
-                    return fail("budget_invalid_tokens");
+    // `input.tokens === null ? null : object(input.tokens, TOKEN_KEYS)`: only an
+    // explicit `null` skips validation. An absent key is `undefined`, which is
+    // not an object, so `object` fails `budget_invalid_input`.
+    match present(&input, "tokens") {
+        Some(Value::Null) => {}
+        Some(value) => {
+            let tokens_input = object(value, &TOKEN_KEYS)?.clone();
+            let mut stored = Map::new();
+            for key in TOKEN_KEYS {
+                // `value !== null`: absent reads as `undefined`, which fails the
+                // safe-integer test below rather than defaulting to `null`.
+                let value = match present(&tokens_input, key) {
+                    Some(value) => value.clone(),
+                    None => return fail("budget_invalid_tokens"),
+                };
+                if !value.is_null() {
+                    let ok = value
+                        .as_f64()
+                        .is_some_and(|number| number.fract() == 0.0 && number >= 0.0)
+                        && value.as_f64().unwrap_or(f64::NAN) <= MAX_SAFE_INTEGER;
+                    if !ok {
+                        return fail("budget_invalid_tokens");
+                    }
                 }
+                stored.insert(key.to_string(), value);
             }
-            stored.insert(key.to_string(), value);
+            tokens = Value::Object(stored);
         }
-        tokens = Value::Object(stored);
+        None => return fail("budget_invalid_input"),
     }
 
     if !call.get("finished_at").unwrap_or(&Value::Null).is_null() {
@@ -1405,18 +1633,9 @@ fn operate_usage(
 ) -> BudgetResult<Value> {
     let input = object(input, &USAGE_KEYS)?.clone();
     let mut receipt = Map::new();
-    receipt.insert(
-        "event_id".into(),
-        json!(id(input.get("event_id").unwrap_or(&Value::Null))?),
-    );
-    receipt.insert(
-        "call_id".into(),
-        json!(id(input.get("call_id").unwrap_or(&Value::Null))?),
-    );
-    receipt.insert(
-        "amount".into(),
-        amount(input.get("amount").unwrap_or(&Value::Null))?,
-    );
+    receipt.insert("event_id".into(), json!(id(required(&input, "event_id"))?));
+    receipt.insert("call_id".into(), json!(id(required(&input, "call_id"))?));
+    receipt.insert("amount".into(), required_amount(&input, "amount")?);
     receipt.insert(
         "currency".into(),
         input.get("currency").cloned().unwrap_or(Value::Null),
@@ -1427,16 +1646,13 @@ fn operate_usage(
     );
     receipt.insert(
         "source_ref".into(),
-        json!(text(input.get("source_ref").unwrap_or(&Value::Null))?),
+        json!(text(required(&input, "source_ref"))?),
     );
     receipt.insert(
         "observed_at".into(),
-        json!(time(input.get("observed_at").unwrap_or(&Value::Null))?),
+        json!(time(required(&input, "observed_at"))?),
     );
-    receipt.insert(
-        "basis".into(),
-        json!(text(input.get("basis").unwrap_or(&Value::Null))?),
-    );
+    receipt.insert("basis".into(), json!(text(required(&input, "basis"))?));
     let event_id = receipt
         .get("event_id")
         .and_then(Value::as_str)
@@ -1518,6 +1734,12 @@ fn operate_usage(
         .and_then(Value::as_object_mut)
         .ok_or_else(|| BudgetError::code("budget_invalid_store"))?
         .insert(event_id.clone(), Value::Object(receipt.clone()));
+    if let Some(book) = state
+        .get_mut("budget_admission")
+        .and_then(Value::as_object_mut)
+    {
+        js_reorder_in(book, "receipts");
+    }
 
     if !receipt.get("amount").unwrap_or(&Value::Null).is_null() {
         let amount_units = units_of(receipt.get("amount").unwrap_or(&Value::Null))?;
@@ -1571,7 +1793,9 @@ pub fn validate_budget_admission(state: &Value) -> BudgetResult<()> {
         return Ok(());
     };
     let store_ok = book.as_object().is_some_and(|book| {
-        book.get("schema").and_then(Value::as_i64) == Some(1)
+        // `book.schema !== 1` in JS compares doubles, so a stored `1.0` is the
+        // same value as `1` and passes. `as_i64` alone would reject it.
+        book.get("schema").and_then(Value::as_f64) == Some(1.0)
             && book.get("project_id") == state.get("project").and_then(|project| project.get("id"))
             && book
                 .get("operations")
@@ -1594,6 +1818,7 @@ pub fn validate_budget_admission(state: &Value) -> BudgetResult<()> {
         .and_then(Value::as_array)
         .cloned()
         .unwrap_or_default();
+    let mut cache = TotalsCache::default();
     for operation in operations {
         let operation_name = operation
             .get("operation")
@@ -1606,7 +1831,13 @@ pub fn validate_budget_admission(state: &Value) -> BudgetResult<()> {
             .and_then(Value::as_str)
             .unwrap_or("")
             .to_string();
-        apply_budget_operation(&mut replay, &operation_name, &input, &recorded_at)?;
+        apply_budget_operation_with_cache(
+            &mut replay,
+            &operation_name,
+            &input,
+            &recorded_at,
+            &mut cache,
+        )?;
     }
     if !same(replay.get("budget_admission").unwrap_or(&Value::Null), book) {
         return fail("budget_invalid_audit");
@@ -1619,6 +1850,11 @@ pub fn validate_budget_admission(state: &Value) -> BudgetResult<()> {
 /// `now` is passed in rather than read from the clock, matching the CLI
 /// contract that every externally observed value comes from the request.
 pub fn public_budget_admission(state: &Value, live_jobs: &Value, now: &str) -> BudgetResult<Value> {
+    // `publicBudgetAdmission` compares `now` with the period boundaries. JS has
+    // already run it through `time` on the way in, so do the same here rather
+    // than trusting the caller: a malformed value is `budget_invalid_time` and
+    // the canonical form is what the lexical comparisons below are valid for.
+    let now = time(&Value::String(now.to_string()))?;
     let Some(book) = state.get("budget_admission") else {
         return Ok(Value::Null);
     };
@@ -1631,26 +1867,28 @@ pub fn public_budget_admission(state: &Value, live_jobs: &Value, now: &str) -> B
     let mut cache = TotalsCache::default();
     let mut output = Map::new();
     output.insert("schema".into(), json!(1));
-    output.insert(
-        "project_id".into(),
-        book.get("project_id").cloned().unwrap_or(Value::Null),
-    );
+    // `project_id` may be absent on an existing book. JS serializes its
+    // `undefined` projection by omitting the property, while explicit `null`
+    // remains present.
+    if let Some(project_id) = book.get("project_id") {
+        output.insert("project_id".into(), project_id.clone());
+    }
 
     let mut policies = Vec::new();
     for policy in book
         .get("policies")
         .and_then(Value::as_object)
-        .map(|policies| policies.values().cloned().collect::<Vec<_>>())
+        .map(js_values)
         .unwrap_or_default()
     {
         let Some(policy) = policy.as_object() else {
             continue;
         };
-        let total = totals(book, policy, &mut cache);
+        let total = totals(book, policy, &mut cache)?;
         let effective = total.spent.map(|spent| spent + total.reserved);
-        let hard_limit = limit_of(policy, "hard_limit");
-        let soft_limit = limit_of(policy, "soft_limit");
-        let reservation = reservation_of(policy);
+        let hard_limit = limit_of(policy, "hard_limit")?;
+        let soft_limit = limit_of(policy, "soft_limit")?;
+        let reservation = reservation_of(policy)?;
         let active = policy.get("active").and_then(Value::as_bool) == Some(true);
         let paused = policy.get("paused").and_then(Value::as_bool) == Some(true);
         let period_start = policy
@@ -1684,8 +1922,8 @@ pub fn public_budget_admission(state: &Value, live_jobs: &Value, now: &str) -> B
             json!(
                 active
                     && !paused
-                    && now >= period_start
-                    && now < period_end
+                    && now.as_str() >= period_start
+                    && now.as_str() < period_end
                     && effective.is_some_and(|value| value < hard_limit)
                     && effective.is_some_and(|value| value + reservation <= hard_limit)
             ),
@@ -1694,7 +1932,7 @@ pub fn public_budget_admission(state: &Value, live_jobs: &Value, now: &str) -> B
             "inactive"
         } else if paused {
             "paused"
-        } else if now < period_start || now >= period_end {
+        } else if now.as_str() < period_start || now.as_str() >= period_end {
             "period_closed"
         } else if effective.is_none() {
             "unknown"
@@ -1721,7 +1959,7 @@ pub fn public_budget_admission(state: &Value, live_jobs: &Value, now: &str) -> B
     for job in book
         .get("jobs")
         .and_then(Value::as_object)
-        .map(|jobs| jobs.values().cloned().collect::<Vec<_>>())
+        .map(js_values)
         .unwrap_or_default()
     {
         let Some(job) = job.as_object() else {
@@ -1745,7 +1983,7 @@ pub fn public_budget_admission(state: &Value, live_jobs: &Value, now: &str) -> B
     for call in book
         .get("calls")
         .and_then(Value::as_object)
-        .map(|calls| calls.values().cloned().collect::<Vec<_>>())
+        .map(js_values)
         .unwrap_or_default()
     {
         let Some(call) = call.as_object() else {
@@ -1761,29 +1999,30 @@ pub fn public_budget_admission(state: &Value, live_jobs: &Value, now: &str) -> B
         calls.push(Value::Object(entry));
     }
     output.insert("calls".into(), Value::Array(calls));
-    output.insert(
-        "decisions".into(),
-        book.get("decisions").cloned().unwrap_or(Value::Null),
-    );
+    // Same absent-versus-null behavior as `project_id` above.
+    if let Some(decisions) = book.get("decisions") {
+        output.insert("decisions".into(), decisions.clone());
+    }
     Ok(Value::Object(output))
 }
 
-/// Read one JSON request document, refusing anything over 256 KiB.
+/// Read one JSON request document, refusing anything over 128 MiB.
 fn read_json(input_file: &str) -> Result<Value> {
-    const MAX_INPUT_BYTES: usize = 256 * 1024;
-    let metadata =
-        std::fs::metadata(input_file).with_context(|| format!("cannot read JSON {input_file}"))?;
+    const MAX_INPUT_BYTES: usize = 128 * 1024 * 1024;
+    let file =
+        open_json_input(input_file).with_context(|| format!("cannot read JSON {input_file}"))?;
+    let metadata = file
+        .metadata()
+        .with_context(|| format!("cannot read JSON {input_file}"))?;
     if !metadata.is_file() || metadata.len() > MAX_INPUT_BYTES as u64 {
-        bail!("Input JSON must be a regular file of at most 256 KiB");
+        bail!("Input JSON must be a regular file of at most 128 MiB");
     }
     let mut bytes = Vec::with_capacity(metadata.len() as usize);
-    std::fs::File::open(input_file)
-        .with_context(|| format!("cannot read JSON {input_file}"))?
-        .take((MAX_INPUT_BYTES + 1) as u64)
+    file.take((MAX_INPUT_BYTES + 1) as u64)
         .read_to_end(&mut bytes)
         .with_context(|| format!("cannot read JSON {input_file}"))?;
     if bytes.len() > MAX_INPUT_BYTES {
-        bail!("Input JSON exceeds 256 KiB");
+        bail!("Input JSON exceeds 128 MiB");
     }
     let Ok(text) = std::str::from_utf8(&bytes) else {
         bail!("Input JSON is invalid");
@@ -1791,6 +2030,23 @@ fn read_json(input_file: &str) -> Result<Value> {
     // TextDecoder("utf-8") in the dashboard CLI removed a leading BOM.
     let text = text.strip_prefix('\u{feff}').unwrap_or(text);
     serde_json::from_str(text).map_err(|_| anyhow!("Input JSON is invalid"))
+}
+
+#[cfg(unix)]
+fn open_json_input(input_file: &str) -> std::io::Result<std::fs::File> {
+    use std::os::unix::fs::OpenOptionsExt;
+
+    std::fs::OpenOptions::new()
+        .read(true)
+        // A FIFO swapped into the path cannot block between the pathname check
+        // and `open`: `read_json` validates the metadata of this same handle.
+        .custom_flags(libc::O_CLOEXEC | libc::O_NONBLOCK)
+        .open(input_file)
+}
+
+#[cfg(not(unix))]
+fn open_json_input(input_file: &str) -> std::io::Result<std::fs::File> {
+    std::fs::File::open(input_file)
 }
 
 /// The document shape every action accepts: `{ operation, state, input, now,
@@ -1843,11 +2099,15 @@ const ALL_OPERATIONS: [&str; 7] = ["policy", "job", "ready", "close", "call", "f
 pub fn cmd_budget_admission(action: &str, input_file: &str) -> Result<()> {
     let document = read_json(input_file)?;
     let (operation, mut state, input, now, live_jobs) = read_request(&document)?;
-    let now = if now.is_empty() {
-        return Err(BudgetError::code("budget_invalid_time").into());
-    } else {
-        now
-    };
+    // `public` derives the period status and `next_call_fits` by comparing `now`
+    // against the policy boundaries, and `apply`/`validate` stamp it into audit
+    // entries. JS normalizes it once with `time(now)` — which rejects a
+    // malformed value as `budget_invalid_time` and rewrites it to the canonical
+    // millisecond form. Comparing the raw string instead would both misjudge the
+    // boundary (`.500Z` starts half a second after `...00Z`) and accept
+    // nonsense such as `"zzz"`. NOTE: `read_request` still surfaces an empty
+    // `now` as an empty string, which `time` rejects the same way.
+    let now = time(&Value::String(now))?;
     let mut output = Map::new();
     match action {
         "apply" => {
@@ -1889,8 +2149,12 @@ pub fn cmd_budget_admission(action: &str, input_file: &str) -> Result<()> {
         }
         other => bail!("unknown budget-admission action {other}"),
     }
-    let text =
-        serde_json::to_string(&Value::Object(output)).context("serialize budget admission")?;
+    // Canonicalize before serializing: this reproduces JS own-property order for
+    // the dynamic-key maps (`policies`, `jobs`, `calls`, `receipts` — integer-like
+    // keys first, ascending) and JS double formatting for integral numbers
+    // (`1.0` → `1`), so the emitted bytes match `JSON.stringify` exactly.
+    let canonical = js_canonical(&Value::Object(output));
+    let text = serde_json::to_string(&canonical).context("serialize budget admission")?;
     let stdout = std::io::stdout();
     let mut handle = stdout.lock();
     writeln!(handle, "{text}")?;
@@ -1900,6 +2164,21 @@ pub fn cmd_budget_admission(action: &str, input_file: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn module_rejects_non_object_input_with_the_js_message() {
+        // The CLI envelope refuses a non-object `input` before dispatch, so
+        // this reaches the module only through the library API. The module
+        // itself must still answer exactly like `object()` in the JS module.
+        let mut state = json!({"schema": 1, "project": {"id": "project-1"}});
+        for input in [json!("nope"), Value::Null, json!([]), json!(7), json!(true)] {
+            let error =
+                apply_budget_operation(&mut state, "policy", &input, "2026-10-15T00:00:00Z")
+                    .unwrap_err();
+            assert_eq!(error.message, "budget_invalid_input", "input was {input}");
+            assert_eq!(error.status, 400, "input was {input}");
+        }
+    }
     use serde_json::json;
 
     /// One policy with an explicit baseline, so the spend is known.
@@ -1927,11 +2206,47 @@ mod tests {
         json!({ "schema": 1, "project": { "id": "project-1" } })
     }
 
+    fn state_with_registered_job() -> Value {
+        let mut state = state();
+        apply_budget_operation(&mut state, "policy", &policy(&json!("0")), NOW).unwrap();
+        apply_budget_operation(
+            &mut state,
+            "job",
+            &json!({ "job_id": "job-1", "run_id": "run-1", "worker_id": "worker-1" }),
+            NOW,
+        )
+        .unwrap();
+        apply_budget_operation(&mut state, "ready", &json!({ "job_id": "job-1" }), NOW).unwrap();
+        state
+    }
+
+    fn state_with_open_call() -> Value {
+        let mut state = state_with_registered_job();
+        apply_budget_operation(
+            &mut state,
+            "call",
+            &json!({
+                "job_id": "job-1", "call_id": "call-1", "session_id": null,
+                "provider": "fixture-provider", "model": "fixture-model", "purpose": null,
+            }),
+            NOW,
+        )
+        .unwrap();
+        state
+    }
+
     const NOW: &str = "2026-10-15T00:00:00Z";
 
     fn failing<T>(code: &str, result: BudgetResult<T>) {
         let error = result.err().expect("call should be refused");
         assert_eq!(error.message, code);
+    }
+
+    fn failing_named<T>(name: &str, code: &str, result: BudgetResult<T>) {
+        let error = result
+            .err()
+            .unwrap_or_else(|| panic!("{name}: call should be refused"));
+        assert_eq!(error.message, code, "{name}");
     }
 
     #[test]
@@ -2006,6 +2321,22 @@ mod tests {
     }
 
     #[test]
+    fn js_canonical_matches_key_order_and_safe_integer_spelling() {
+        let value: Value =
+            serde_json::from_str(r#"{"10":"ten","2":"two","a":1.0,"b":1e3,"c":-0}"#).unwrap();
+        assert_eq!(
+            serde_json::to_string(&js_canonical(&value)).unwrap(),
+            r#"{"2":"two","10":"ten","a":1,"b":1000,"c":0}"#
+        );
+        let first: Value = serde_json::from_str(r#"{"a":1,"b":2}"#).unwrap();
+        let reordered: Value = serde_json::from_str(r#"{"b":2,"a":1}"#).unwrap();
+        assert!(!same(&first, &reordered));
+        let decimal: Value = serde_json::from_str(r#"{"count":1.0}"#).unwrap();
+        let integer: Value = serde_json::from_str(r#"{"count":1}"#).unwrap();
+        assert!(same(&decimal, &integer));
+    }
+
+    #[test]
     fn text_rejects_blank_control_and_overlong_values() {
         assert_eq!(text_max(&json!("ok"), 10).unwrap(), "ok");
         // U+3000 is ECMAScript WhiteSpace, so it satisfies the non-blank
@@ -2040,6 +2371,78 @@ mod tests {
         failing(
             "budget_policy_revision_conflict",
             apply_budget_operation(&mut state, "policy", &bad, NOW),
+        );
+    }
+
+    #[test]
+    fn absent_nullable_fields_are_not_treated_as_explicit_null() {
+        let mut missing_run_id = policy(&json!("0"));
+        missing_run_id.as_object_mut().unwrap().remove("run_id");
+        failing_named(
+            "missing run_id",
+            "budget_invalid_id",
+            apply_budget_operation(&mut state(), "policy", &missing_run_id, NOW),
+        );
+
+        let mut missing_baseline = policy(&json!("0"));
+        missing_baseline.as_object_mut().unwrap().remove("baseline");
+        failing_named(
+            "missing baseline",
+            "budget_invalid_amount",
+            apply_budget_operation(&mut state(), "policy", &missing_baseline, NOW),
+        );
+
+        for missing_key in ["session_id", "purpose"] {
+            let mut input = json!({
+                "job_id": "job-1", "call_id": "call-1",
+                "session_id": null, "provider": "fixture-provider",
+                "model": "fixture-model", "purpose": null,
+            });
+            input.as_object_mut().unwrap().remove(missing_key);
+            failing_named(
+                missing_key,
+                "budget_invalid_text",
+                apply_budget_operation(&mut state_with_registered_job(), "call", &input, NOW),
+            );
+        }
+
+        failing_named(
+            "missing tokens",
+            "budget_invalid_input",
+            apply_budget_operation(
+                &mut state_with_open_call(),
+                "finish",
+                &json!({ "job_id": "job-1", "call_id": "call-1", "outcome": "finished" }),
+                NOW,
+            ),
+        );
+    }
+
+    #[test]
+    fn usage_receipt_requires_amount_even_when_null_is_allowed() {
+        let mut state = state_with_open_call();
+        apply_budget_operation(
+            &mut state,
+            "finish",
+            &json!({
+                "job_id": "job-1", "call_id": "call-1", "outcome": "finished", "tokens": null,
+            }),
+            NOW,
+        )
+        .unwrap();
+        failing_named(
+            "missing usage amount",
+            "budget_invalid_amount",
+            apply_budget_operation(
+                &mut state,
+                "usage",
+                &json!({
+                    "event_id": "usage-1", "call_id": "call-1", "currency": "USD",
+                    "source_kind": "provider_usage", "source_ref": "fixture",
+                    "observed_at": NOW, "basis": "fixture",
+                }),
+                NOW,
+            ),
         );
     }
 

@@ -740,11 +740,14 @@ fn commands_refuse_unreadable_invalid_and_mismatched_input() {
         public_output(&missing)
     );
     let oversized = fixture.path("oversized.json");
-    std::fs::write(&oversized, vec![b' '; 300 * 1024]).unwrap();
+    std::fs::File::create(&oversized)
+        .unwrap()
+        .set_len(128 * 1024 * 1024 + 1)
+        .unwrap();
     let huge = fixture.run(&["budget-admission", "public", "--input-file", &oversized]);
     assert!(!huge.status.success());
     assert!(
-        public_output(&huge).contains("at most 256 KiB"),
+        public_output(&huge).contains("at most 128 MiB"),
         "{}",
         public_output(&huge)
     );
