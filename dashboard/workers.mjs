@@ -7,12 +7,12 @@ import {
   WorkerError,
   requireWorker,
   declaration,
+  declarationResults,
+  mayWrite,
+  policyResults as evaluateWorkerPolicy,
   leaseSeconds,
   workerId,
   headSha,
-  mayWrite,
-  intersections,
-  sharedFile,
   samePath,
   within,
 } from "./worker-scopes.mjs";
@@ -36,22 +36,27 @@ const revision = (v) => Number.isSafeInteger(v) && v >= 0;
 const limit = 2 * 1024 * 1024;
 
 export class WorkerWorkspaces {
-  constructor(project, git, directory, now) {
+  constructor(project, git, directory, now, policyEvaluator) {
     this.project = { ...project };
     this.git = git;
     this.directory = directory;
     this.file = path.join(directory, "registry.json");
     this.lock = path.join(directory, "registry.lock");
     this.now = now;
+    this.policyEvaluator = policyEvaluator;
   }
-  static async open(project, { now = Date.now } = {}) {
+  static async open(
+    project,
+    { now = Date.now, policyEvaluator = evaluateWorkerPolicy } = {},
+  ) {
     requireWorker(
       object(project) &&
         typeof project.id === "string" &&
         /^[0-9a-f]{16}$/.test(project.id) &&
         typeof project.root === "string" &&
         typeof project.directory === "string" &&
-        typeof now === "function",
+        typeof now === "function" &&
+        typeof policyEvaluator === "function",
       "invalid_project",
     );
     const git = await repository(project.root);
@@ -67,6 +72,7 @@ export class WorkerWorkspaces {
       git,
       directory,
       now,
+      policyEvaluator,
     );
   }
   slot(id) {
@@ -101,9 +107,12 @@ export class WorkerWorkspaces {
         state.workers.length <= 256,
       "invalid_worker_registry",
     );
+    const scopeResults = declarationResults(
+      state.workers.map((row) => row?.declaration),
+    );
     const ids = new Set(),
       branches = new Set();
-    for (const row of state.workers) {
+    for (const [index, row] of state.workers.entries()) {
       requireWorker(
         exact(row, [
           "worker_id",
@@ -142,9 +151,10 @@ export class WorkerWorkspaces {
         "invalid_worker_record",
       );
       requireWorker(
-        JSON.stringify(declaration(row.declaration)) ===
+        scopeResults[index]?.ok === true &&
+          JSON.stringify(scopeResults[index].value) ===
           JSON.stringify(row.declaration) &&
-          row.declaration.worker_id === row.worker_id,
+          row.declaration?.worker_id === row.worker_id,
         "invalid_worker_scope",
       );
       requireWorker(
@@ -279,7 +289,7 @@ export class WorkerWorkspaces {
       dirty_paths: info.dirty_paths,
     };
   }
-  async observe(row) {
+  async observe(row, { deferScopePolicy = false } = {}) {
     const lease =
       row.state === "released"
         ? "released"
@@ -316,17 +326,26 @@ export class WorkerWorkspaces {
         branch: row.branch,
         base: row.base_sha,
       });
-      const { dirty_paths: dirty, committed_paths: committed } = gitTree;
+      const {
+        dirty_paths: dirty,
+        committed_paths: committed,
+        changed_paths: changed,
+      } = gitTree;
+      const writeResults = deferScopePolicy
+        ? null
+        : this.policyEvaluator({
+            write_checks: [{ scope: row.declaration, files: changed }],
+          }).write_checks[0];
       result.tree = {
         status: "observed",
         dirty: dirty.length > 0,
         head_sha: gitTree.head_sha,
         dirty_paths: dirty,
         committed_paths: committed,
-        changed_paths: gitTree.changed_paths,
-        scope_violations: gitTree.changed_paths.filter((p) =>
-          !mayWrite(row.declaration, p),
-        ),
+        changed_paths: changed,
+        scope_violations: deferScopePolicy
+          ? []
+          : changed.filter((_, index) => !writeResults[index]),
         reason: null,
       };
     } catch (error) {
@@ -355,16 +374,48 @@ export class WorkerWorkspaces {
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
     }
-    for (const file of source.dirty_paths.filter((p) => mayWrite(scope, p)))
-      warnings.push({ code: "human_dirty_scope_overlap", path: file });
-    const shared = [
-      ...new Set([
-        ...(await trackedPaths(this.git.root)).filter(sharedFile),
-        ...scope.write_paths.filter(sharedFile),
-      ]),
-    ];
-    for (const row of state.workers) {
-      const overlap = intersections(scope, row.declaration);
+    const sharedTrackedCandidates = state.workers.length
+      ? [
+          ...new Set([
+            ...(await trackedPaths(this.git.root)),
+            ...scope.write_paths,
+          ]),
+        ]
+      : [];
+    const sharedTrackedResults = sharedTrackedCandidates.length
+      ? this.policyEvaluator({ shared_files: sharedTrackedCandidates }).shared_files
+      : [];
+    const sharedCandidates = sharedTrackedCandidates.filter(
+      (file, index) =>
+        sharedTrackedResults[index] && mayWrite(scope, file),
+    );
+    const writeChecks = [{ scope, files: source.dirty_paths }];
+    if (state.workers.length) {
+      writeChecks.push({ scope, files: sharedCandidates });
+      writeChecks.push(
+        ...state.workers.map((row) => ({
+          scope: row.declaration,
+          files: sharedCandidates,
+        })),
+      );
+    }
+    const policy = this.policyEvaluator({
+      write_checks:
+        source.dirty_paths.length > 0 || state.workers.length > 0
+          ? writeChecks
+          : [],
+      intersections: state.workers.map((row) => ({
+        left: scope,
+        right: row.declaration,
+      })),
+    });
+    for (const [index, file] of source.dirty_paths.entries()) {
+      if (policy.write_checks[0][index]) {
+        warnings.push({ code: "human_dirty_scope_overlap", path: file });
+      }
+    }
+    for (const [rowIndex, row] of state.workers.entries()) {
+      const overlap = policy.intersections[rowIndex];
       for (const file of overlap)
         warnings.push({
           code:
@@ -374,9 +425,14 @@ export class WorkerWorkspaces {
           worker_id: row.worker_id,
           path: file,
         });
-      for (const file of shared.filter(
-        (p) => mayWrite(scope, p) && mayWrite(row.declaration, p),
-      ))
+      const rowWriteChecks = policy.write_checks[2 + rowIndex];
+      for (const [fileIndex, file] of sharedCandidates.entries()) {
+        if (
+          !policy.write_checks[1][fileIndex] ||
+          !rowWriteChecks[fileIndex]
+        ) {
+          continue;
+        }
         warnings.push({
           code:
             row.state === "released"
@@ -385,6 +441,7 @@ export class WorkerWorkspaces {
           worker_id: row.worker_id,
           path: file,
         });
+      }
     }
     return {
       project_id: this.project.id,
@@ -486,22 +543,58 @@ export class WorkerWorkspaces {
     const state = await this.read(),
       source = await this.source();
     const workers = [];
-    for (const row of state.workers) workers.push(await this.observe(row));
+    for (const row of state.workers)
+      workers.push(await this.observe(row, { deferScopePolicy: true }));
+    const changedPaths = workers.flatMap((worker) => worker.tree.changed_paths);
+    const workerCount = workers.length;
+    const sharedCandidates =
+      workerCount > 0 ? [...new Set([...source.dirty_paths, ...changedPaths])] : [];
+    const policy =
+      sharedCandidates.length > 0
+        ? this.policyEvaluator({
+            write_checks: [
+              ...workers.map((worker) => ({
+                scope: worker.declaration,
+                files: worker.tree.changed_paths,
+              })),
+              ...workers.map((worker) => ({
+                scope: worker.declaration,
+                files: source.dirty_paths,
+              })),
+            ],
+            shared_files: sharedCandidates,
+          })
+        : {
+            write_checks: Array.from({ length: workerCount * 2 }, () => []),
+            shared_files: [],
+          };
+    const sharedFileResults = new Map(
+      sharedCandidates.map((file, index) => [file, policy.shared_files[index]]),
+    );
+    for (let index = 0; index < workerCount; index++) {
+      const changed = workers[index].tree.changed_paths;
+      const allowed = policy.write_checks[index];
+      workers[index].tree.scope_violations = changed.filter(
+        (_, fileIndex) => !allowed[fileIndex],
+      );
+    }
     const conflicts = [];
-    for (const worker of workers)
-      for (const file of source.dirty_paths) {
+    for (const [workerIndex, worker] of workers.entries()) {
+      const mayWriteSource = policy.write_checks[workerCount + workerIndex];
+      for (const [fileIndex, file] of source.dirty_paths.entries()) {
         if (
-          mayWrite(worker.declaration, file) ||
+          mayWriteSource[fileIndex] ||
           worker.tree.changed_paths.some((p) => samePath(p, file))
         )
           conflicts.push({
-            code: sharedFile(file)
+            code: sharedFileResults.get(file)
               ? "human_shared_file_changes"
               : "human_worker_scope_overlap",
             workers: ["source", worker.worker_id],
             path: file,
           });
       }
+    }
     for (let a = 0; a < workers.length; a++)
       for (let b = a + 1; b < workers.length; b++) {
         const x = workers[a],
@@ -510,7 +603,7 @@ export class WorkerWorkspaces {
           y.tree.changed_paths.some((v) => samePath(p, v)),
         ))
           conflicts.push({
-            code: sharedFile(file)
+            code: sharedFileResults.get(file)
               ? "shared_file_changes"
               : "overlapping_changes",
             workers: [x.worker_id, y.worker_id],

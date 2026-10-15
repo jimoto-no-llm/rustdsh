@@ -5,28 +5,22 @@ on:
     branches: [main]
     tags: ['v*']
     paths:
-      [
-        "dashboard/**",
-        "assets/**",
-        "src/main.rs",
-        "src/worker_git.rs",
-        "scripts/bench-worker-git.mjs",
-        "Cargo.toml",
-        "Cargo.lock",
-        ".github/workflows/dashboard.yml",
-      ]
+      - "dashboard/**"
+      - "assets/**"
+      - "src/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/dashboard.yml"
+      - "scripts/bench-worker-git.mjs"
   pull_request:
     paths:
-      [
-        "dashboard/**",
-        "assets/**",
-        "src/main.rs",
-        "src/worker_git.rs",
-        "scripts/bench-worker-git.mjs",
-        "Cargo.toml",
-        "Cargo.lock",
-        ".github/workflows/dashboard.yml",
-      ]
+      - "dashboard/**"
+      - "assets/**"
+      - "src/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/dashboard.yml"
+      - "scripts/bench-worker-git.mjs"
   workflow_dispatch:
 
 permissions:
@@ -49,7 +43,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
-      - name: Build the native dashboard Git bridge
+      - name: Build the native dashboard bridge and policy helper
         run: cargo build --locked --manifest-path ../Cargo.toml --bin rdsh
       - uses: actions/setup-node@v7
         with:

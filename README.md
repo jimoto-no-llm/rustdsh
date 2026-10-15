@@ -325,7 +325,7 @@ Optional Node.js dashboard for project metrics, human-in-the-loop Q&A, and mobil
 rdsh-dashboard project --project <directory>
 ```
 
-*On native Windows, the dashboard runs in the system tray and can be opened or stopped from the taskbar (`--no-tray` keeps it in the terminal). See [dashboard/README.md](dashboard/README.md).*
+*On native Windows, the dashboard runs in the system tray and can be opened or stopped from the taskbar (`--no-tray` keeps it in the terminal). See [dashboard/README.md](dashboard/README.md). External agent CLIs (cursor-agent, devin) can be run as supervised jobs: see [docs/AGENT-RUNNERS.md](docs/AGENT-RUNNERS.md).*
 
 ## Desktop App (Electron)
 
