@@ -11,8 +11,6 @@ import { fileURLToPath } from 'node:url';
 const exec = promisify(execFile);
 const repo = fileURLToPath(new URL('..', import.meta.url));
 const bin = join(repo, 'target', process.platform === 'win32' ? 'debug/rdsh.exe' : 'debug/rdsh');
-const posixOnly = process.platform === 'win32' ? 'Desktop command stub is POSIX-only' : false;
-
 // Desktop (Electron) owns the reserved `desktop` profile; the npm dsh CLI
 // cannot manage it, so `rdsh desktop install` only forwards
 // `plugin --profile desktop add` to the Desktop-installed command. These tests
@@ -181,6 +179,3 @@ test('a --plugins-dir without the plugins is skipped for a real checkout', async
   assert.equal(existsSync(join(resolved, 'rdsh-settings', 'package.json')), true);
 });
 
-test('POSIX stub coverage is skipped on Windows', { skip: posixOnly }, async () => {
-  assert.equal(posixOnly, false);
-});

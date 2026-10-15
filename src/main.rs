@@ -37,8 +37,10 @@ fn parse_positive_finite(value: &str) -> Result<f64, String> {
     }
     Ok(parsed)
 }
+mod answer_applications;
 mod auth;
 mod auth_sharing;
+mod budget_admission;
 mod compact;
 mod compute;
 mod context;
@@ -49,10 +51,12 @@ mod file_lock;
 mod file_security;
 mod guard;
 mod inspect;
+mod js_json;
 mod local_http;
 mod opencode_header;
 mod passthrough;
 mod providers;
+mod question_contracts;
 mod rdsh_config;
 mod search;
 mod serial_proxy;
@@ -67,13 +71,14 @@ mod tokens;
 mod tool_security;
 mod update_auto;
 mod websearch;
+mod worker_scopes;
 
 #[derive(Parser, Debug)]
 #[command(
     name = "rdsh",
     version,
     about = "Rust fast launcher for dsh (safe: native fast-paths + passthrough)",
-    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|auth|setup|context|settings|features|subagents|provider|task-outcomes|cost-ledger|update|dump-config|boot|serial-proxy)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh provider add hai --model deepseek-v4-flash   register HAI as a dsh route\n  rdsh provider add sarashina    register Sarashina (SARASHINA_API_KEY; mini and nano built in)\n  rdsh provider add local-openai --base-url http://host:8080/v1 --discover --no-key\n  rdsh provider list              presets and per-profile route/key status\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh desktop status             detect the Desktop (Electron) app and its reserved profile\n  rdsh desktop install            attach the bundled rdsh plugins to that profile\n  rdsh --passthrough tui          no slim env; mandatory tool isolation remains\n  rdsh --dry-run tui -- --resume abc   show what would exec"
+    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|auth|setup|context|settings|features|subagents|provider|task-outcomes|budget-admission|cost-ledger|question-contracts|answer-applications|update|worker-scope|dump-config|boot|serial-proxy)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh provider add hai --model deepseek-v4-flash   register HAI as a dsh route\n  rdsh provider add sarashina    register Sarashina (SARASHINA_API_KEY; mini and nano built in)\n  rdsh provider add local-openai --base-url http://host:8080/v1 --discover --no-key\n  rdsh provider list              presets and per-profile route/key status\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh desktop status             detect the Desktop (Electron) app and its reserved profile\n  rdsh desktop install            attach the bundled rdsh plugins to that profile\n  rdsh --passthrough tui          no slim env; mandatory tool isolation remains\n  rdsh --dry-run tui -- --resume abc   show what would exec"
 )]
 struct Cli {
     /// Explicitly share a project file with isolated model tools (repeatable).
@@ -301,6 +306,12 @@ enum Commands {
         #[arg(long = "once")]
         once: bool,
     },
+    /// Validate and normalize dashboard worker workspace declarations from stdin.
+    #[command(name = "worker-scope")]
+    WorkerScope {
+        #[command(subcommand)]
+        action: WorkerScopeAction,
+    },
     /// Hook helper for hooks.json: block stdin text matching --deny (exit 2)
     Guard {
         #[arg(long = "deny")]
@@ -332,6 +343,40 @@ enum Commands {
         /// apply | validate | schema
         action: String,
         /// Request JSON file holding { operation, state, input }
+        #[arg(long = "input-file")]
+        input_file: String,
+    },
+    /// Admission budget book for one project: apply one policy/job/call/
+    /// finish/usage operation, validate a stored book by replaying its
+    /// operation log, or print the public projection the dashboard shows.
+    /// Pure logic: no provider call and no file write
+    #[command(name = "budget-admission")]
+    BudgetAdmission {
+        /// apply | validate | public
+        action: String,
+        /// Request JSON file holding { operation, state, input, now, live_jobs }
+        #[arg(long = "input-file")]
+        input_file: String,
+    },
+    /// Typed question contracts: create, revise or cancel one question card,
+    /// record the answer to an open card, validate a stored extension by
+    /// recomputing every fingerprint, or print the card projection the
+    /// dashboard shows. Pure logic: no provider call and no file write
+    #[command(name = "question-contracts")]
+    QuestionContracts {
+        /// apply | validate | public
+        action: String,
+        /// Request JSON file holding { operation, state, input, now }
+        #[arg(long = "input-file")]
+        input_file: String,
+    },
+    /// Human answer application to the exact run/session that asked.
+    /// Pure logic: no provider call and no file write.
+    #[command(name = "answer-applications")]
+    AnswerApplications {
+        /// apply | validate | public | schema
+        action: String,
+        /// Request JSON file holding { operation, state, input, now, live_jobs }
         #[arg(long = "input-file")]
         input_file: String,
     },
@@ -370,6 +415,14 @@ enum Commands {
         #[arg(long = "json")]
         json: bool,
     },
+}
+
+#[derive(Subcommand, Debug)]
+enum WorkerScopeAction {
+    /// Read a JSON array of declarations and write JSON result records.
+    Validate,
+    /// Evaluate write paths, scope intersections, and shared-file policy in one batch.
+    Policy,
 }
 
 #[derive(Subcommand, Debug)]
@@ -556,6 +609,10 @@ const NATIVE_FIRST: &[&str] = &[
     "serial-proxy",
     "subagents",
     "task-outcomes",
+    "budget-admission",
+    "question-contracts",
+    "answer-applications",
+    "worker-scope",
 ];
 
 fn invoked_as_dsh() -> bool {
@@ -591,6 +648,17 @@ fn main() {
     }
     // NOTE: --version/-V is served by clap itself (prints "rdsh x.y.z", exit 0).
     let cli = Cli::parse();
+    if let Some(Commands::WorkerScope { action }) = &cli.command {
+        let result = match action {
+            WorkerScopeAction::Validate => worker_scopes::cmd_validate(),
+            WorkerScopeAction::Policy => worker_scopes::cmd_policy(),
+        };
+        if let Err(error) = result {
+            eprintln!("[rdsh] error: {error:#}");
+            std::process::exit(2);
+        }
+        return;
+    }
     // Fast path: empty share list is by far the common case; skip JSON serializer.
     // Same bytes out ("[]"), one allocation saved per invocation.
     if cli.share_file.is_empty() {
@@ -609,6 +677,9 @@ fn main() {
         Some(Commands::Settings {
             action: SettingsAction::Init { force: true }
         }) | Some(Commands::TaskOutcomes { .. })
+            | Some(Commands::BudgetAdmission { .. })
+            | Some(Commands::QuestionContracts { .. })
+            | Some(Commands::AnswerApplications { .. })
             | Some(Commands::Subagents { .. })
             | Some(Commands::CostLedger { .. })
     ) {
@@ -697,6 +768,9 @@ fn main() {
         }),
         Some(Commands::Bench { n }) => bench(n.unwrap_or(cfg.bench.n)),
         Some(Commands::Compute { once }) => compute::cmd_compute(once),
+        Some(Commands::WorkerScope { .. }) => {
+            unreachable!("worker-scope returns before settings load")
+        }
         Some(Commands::Guard {
             deny,
             policy_file,
@@ -875,6 +949,15 @@ fn main() {
         },
         Some(Commands::TaskOutcomes { action, input_file }) => {
             task_outcomes::cmd_task_outcomes(&action, &input_file)
+        }
+        Some(Commands::BudgetAdmission { action, input_file }) => {
+            budget_admission::cmd_budget_admission(&action, &input_file)
+        }
+        Some(Commands::QuestionContracts { action, input_file }) => {
+            question_contracts::cmd_question_contracts(&action, &input_file)
+        }
+        Some(Commands::AnswerApplications { action, input_file }) => {
+            answer_applications::cmd_answer_applications(&action, &input_file)
         }
         Some(Commands::Features { action, json }) => match action {
             None => features_list(&cfg, json),
@@ -1109,9 +1192,7 @@ fn profile_or_default(opt: Option<String>, configured_default: &str) -> anyhow::
 
 fn resolve_default_profile(configured_default: &str) -> anyhow::Result<String> {
     let env = std::env::var("RDSH_DEFAULT_PROFILE").ok();
-    if !env.as_deref().is_some_and(|e| !e.trim().is_empty())
-        && !configured_default.trim().is_empty()
-    {
+    if env.as_deref().is_none_or(|e| e.trim().is_empty()) && !configured_default.trim().is_empty() {
         return Ok(configured_default.trim().to_string());
     }
     let home = crate::inspect::dsh_home();

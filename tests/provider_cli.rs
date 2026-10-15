@@ -907,3 +907,778 @@ fn an_id_that_cannot_be_read_is_refused_without_writing() {
 fn text_of(out: &Output) -> String {
     text(out)
 }
+
+#[test]
+fn entry_scalar_spellings_preserve_other_routes() {
+    for head in [
+        "- id: llm-pi-ai # custom routes",
+        "- id: 'llm-pi-ai'",
+        "- id: \"llm-pi-ai\" # custom routes",
+        "- id:   llm-pi-ai  ",
+        "- id : llm-pi-ai",
+        "- 'id': 'llm-pi-ai'",
+        r#"- id: "llm-pi-\u0061i""#,
+        "- name: '@deepseek-ai/dsh-llm-pi-ai' # custom routes",
+        "- enabled: true\n  id: 'llm-pi-ai' # custom routes",
+    ] {
+        let f = Fixture::new();
+        let original = PATCH.replacen("- id: llm-pi-ai", head, 1).replacen(
+            "        apiKeyEnv: OTHER_API_KEY\n",
+            "        baseURL: http://127.0.0.1:1/v1\n        apiKeyEnv: OTHER_API_KEY\n",
+            1,
+        );
+        f.set_patch(&original);
+        let args = ["provider", "add", "sarashina", "--profile", "tui", "--json"];
+        ok(&f.run(&args));
+        let want = original.replacen(
+            "          - id: x\n",
+            &format!("          - id: x\n{SARASHINA_BLOCK}"),
+            1,
+        );
+        assert_eq!(f.patch(), want, "{head}");
+        let again = f.run(&args);
+        ok(&again);
+        let v: Value = serde_json::from_slice(&again.stdout).unwrap();
+        assert_eq!(v["change"], "exists", "{head}");
+        assert_eq!(f.patch(), want, "{head}");
+        let list = f.run(&["provider", "list", "--json"]);
+        ok(&list);
+        let v: Value = serde_json::from_slice(&list.stdout).unwrap();
+        let routes = v["profiles"][0]["routes"].as_array().unwrap();
+        assert!(routes.iter().any(|route| route["id"] == "other"), "{head}");
+        assert!(
+            routes.iter().any(|route| route["id"] == "sarashina"),
+            "{head}"
+        );
+    }
+}
+
+#[test]
+fn model_continuation_keys_align_with_the_id_at_every_indent_width() {
+    for step in [1usize, 2, 3, 4] {
+        let f = Fixture::new();
+        let at = |depth: usize| " ".repeat(4 + step * depth);
+        let original = format!(
+            "- id: llm-pi-ai\n  config:\n    providers:\n{}other:\n{}apiKeyEnv: OTHER_API_KEY\n{}models:\n{}- id: x\n- id: agent-default-model\n  config:\n    provider: other\n    model: x\n",
+            at(1), at(2), at(2), at(3),
+        );
+        f.set_patch(&original);
+        ok(&f.run(&["provider", "add", "sarashina", "--profile", "tui"]));
+        let patch = f.patch();
+        let item = at(3);
+        let continuation = format!("{item}  ");
+        assert!(
+            patch.contains(&format!(
+                "{item}- id: sarashina3-mini\n{continuation}name: Sarashina3 mini\n{continuation}contextWindow: 128000\n{continuation}maxTokens: 8000\n{continuation}input: [text]\n"
+            )),
+            "step={step}: {patch}",
+        );
+        assert!(patch.starts_with(original.split("- id: agent-default-model").next().unwrap()));
+        assert!(patch.ends_with(
+            "- id: agent-default-model\n  config:\n    provider: other\n    model: x\n"
+        ));
+        ok(&f.run(&[
+            "provider",
+            "add",
+            "sarashina",
+            "--profile",
+            "tui",
+            "--model",
+            "sarashina3-mini",
+            "--replace",
+            "--dry-run",
+        ]));
+        assert_eq!(f.patch(), patch);
+        ok(&f.run(&[
+            "provider",
+            "add",
+            "sarashina",
+            "--profile",
+            "tui",
+            "--model",
+            "sarashina3-mini",
+            "--replace",
+        ]));
+        assert!(f
+            .patch()
+            .contains(&format!("{continuation}contextWindow: 128000\n")));
+        assert!(!f.patch().contains("sarashina3-nano"));
+    }
+}
+
+#[test]
+fn inserted_llm_entries_are_refused_without_profile_or_key_writes() {
+    for identifier in [
+        "name: '@deepseek-ai/dsh-llm-pi-ai' # inserted plugin",
+        "id: llm-pi-ai",
+    ] {
+        let f = Fixture::new();
+        let original = format!(
+            "- insert:\n    - {identifier}\n      config:\n        providers:\n          other:\n            apiKeyEnv: OTHER_API_KEY\n            models:\n              - id: x\n"
+        );
+        f.set_patch(&original);
+        for flags in [vec![], vec!["--dry-run"], vec!["--replace"]] {
+            let mut args = vec!["provider", "add", "sarashina", "--profile", "tui", "--json"];
+            args.extend(flags);
+            let out = f.run_with(&args, &[("SARASHINA_API_KEY", "synthetic-env-key")], b"");
+            assert_eq!(out.status.code(), Some(1), "{}", text(&out));
+            assert!(text(&out).contains("insert"), "{}", text(&out));
+            assert!(text(&out).contains("by hand"), "{}", text(&out));
+            assert!(!text(&out).contains("synthetic-env-key"));
+            assert_eq!(f.patch(), original);
+            assert!(f.creds().is_empty());
+        }
+    }
+}
+
+#[test]
+fn ambiguous_entry_layouts_are_refused_without_changing_existing_keys() {
+    for original in [
+        PATCH.replacen("id: llm-pi-ai", "id: &plugin llm-pi-ai", 1),
+        PATCH.replacen("id: llm-pi-ai", "id: >-\n    llm-pi-ai", 1),
+        format!("{PATCH}{PATCH}"),
+        "- {id: llm-pi-ai, config: {providers: {other: {models: [{id: x}]}}}}\n".to_string(),
+        "- config:\n    providers:\n      other:\n        models:\n          - id: x\n  id: llm-pi-ai\n".to_string(),
+        "- id: previous\n  config: &shared\n    providers:\n      other:\n        models:\n          - id: x\n- id: llm-pi-ai\n  config:\n    <<: *shared\n".to_string(),
+        "- id: previous\n  config: &shared\n    id: llm-pi-ai\n    config:\n      providers:\n        other:\n          models:\n            - id: x\n- <<: *shared\n".to_string(),
+        "- ? id\n  : llm-pi-ai\n  config:\n    providers:\n      other:\n        models:\n          - id: x\n".to_string(),
+        "- insert:\n    - {id: llm-pi-ai, config: {providers: {other: {models: [{id: x}]}}}}\n".to_string(),
+        "- insert:\n    - name: unrelated-plugin\n      config: &shared\n        id: llm-pi-ai\n    - *shared\n".to_string(),
+        "- insert:\n    - ? id\n      : llm-pi-ai\n      config:\n        providers:\n          other:\n            models:\n              - id: x\n".to_string(),
+        "- id: llm-pi-ai\n  config:\n    providers:\n      - id: other\n        models:\n          - id: x\n".to_string(),
+        "- id: llm-pi-ai\n  config:\n    providers:\n    - id: other\n      models:\n        - id: x\n".to_string(),
+        "- id: llm-pi-ai\n  config:\n    - providers:\n        other:\n          models:\n            - id: x\n".to_string(),
+        "- id: llm-pi-ai\n  config:\n  - providers:\n      other:\n        models:\n          - id: x\n".to_string(),
+    ] {
+        let f = Fixture::new();
+        f.set_patch(&original);
+        let credentials = "version: 1\nrefs:\n  LOCAL_OPENAI_API_KEY: synthetic-existing-key\n";
+        fs::write(f.0.join("dsh/.credentials.yaml"), credentials).unwrap();
+        let out = f.run_with(
+            &["provider", "add", "sarashina", "--profile", "tui", "--key-stdin"],
+            &[],
+            b"synthetic-new-key\n",
+        );
+        assert_eq!(out.status.code(), Some(1), "{}", text(&out));
+        assert!(text(&out).contains("by hand"), "{}", text(&out));
+        assert!(!text(&out).contains("synthetic-new-key"));
+        assert_eq!(f.patch(), original);
+        assert_eq!(f.creds(), credentials);
+    }
+}
+
+#[test]
+fn escaped_identifiers_and_mapping_keys_keep_supported_route_operations() {
+    let report = |out: Output| -> Value {
+        ok(&out);
+        serde_json::from_slice(&out.stdout).unwrap()
+    };
+    for original in [
+        PATCH.replacen("id: llm-pi-ai", r#"id: "llm-pi-\x61i""#, 1),
+        PATCH.replacen("id: llm-pi-ai", r#""\u0069d": llm-pi-ai"#, 1),
+        PATCH.replacen("  config:", r#"  "\u0063onfig":"#, 1),
+        PATCH.replacen("    providers:", r#"    "\u0070roviders":"#, 1),
+    ] {
+        let f = Fixture::new();
+        f.set_patch(&original);
+        let args = ["provider", "add", "sarashina", "--profile", "tui", "--json"];
+        assert_eq!(report(f.run(&args))["change"], "added");
+        let written = f.patch();
+        assert!(written.contains("      other:\n"));
+        assert!(written.contains("      sarashina:\n"));
+        assert!(written.contains("    provider: other\n    model: x\n"));
+        assert_eq!(report(f.run(&args))["change"], "exists");
+        assert_eq!(f.patch(), written);
+        assert!(!f.0.join("dsh/.credentials.yaml").exists());
+    }
+    let f = Fixture::new();
+    let original = PATCH.replacen("      other:", r#"      "sarashi\u006ea":"#, 1);
+    f.set_patch(&original);
+    let args = ["provider", "add", "sarashina", "--profile", "tui", "--json"];
+    assert_eq!(report(f.run(&args))["change"], "exists");
+    assert_eq!(f.patch(), original);
+    let mut replace = args.to_vec();
+    replace.push("--replace");
+    let mut dry = replace.clone();
+    dry.push("--dry-run");
+    assert_eq!(report(f.run(&dry))["change"], "replaced");
+    assert_eq!(f.patch(), original);
+    assert_eq!(report(f.run(&replace))["change"], "replaced");
+    let written = f.patch();
+    assert_eq!(report(f.run(&replace))["change"], "unchanged");
+    assert_eq!(f.patch(), written);
+    assert!(!f.0.join("dsh/.credentials.yaml").exists());
+}
+
+#[test]
+fn tagged_keys_and_duplicate_entry_keys_are_refused_before_writes() {
+    for original in [
+        "- id: unrelated\n  config:\n    saved: &target\n      id: llm-pi-ai\n      config:\n        providers:\n          old:\n            models: [keep]\n- disabled: false\n  !!merge '<<': *target\n".to_string(),
+        "- id: llm-pi-ai\n  config:\n    providers:\n      old:\n        models: [keep]\n  config:\n    providers:\n      replacement:\n        models: [retained]\n".to_string(),
+        "- id: llm-pi-ai\n  id: unrelated\n  config:\n    providers:\n      old:\n        models: [keep]\n".to_string(),
+        "- name: '@deepseek-ai/dsh-llm-pi-ai'\n  name: unrelated\n  config:\n    providers:\n      old:\n        models: [keep]\n".to_string(),
+        PATCH.replacen("id: llm-pi-ai", "&entry-key id: llm-pi-ai", 1),
+        PATCH.replacen("  config:", "  !!str config:", 1),
+        PATCH.replacen("    providers:", "    !!str providers:", 1),
+        PATCH.replacen("      other:", "      !!str sarashina:", 1),
+        "- id: unrelated\n  config:\n    key: &id-key id\n- *id-key : llm-pi-ai\n  config:\n    providers:\n      old:\n        models: [keep]\n".to_string(),
+        "- id: llm-pi-ai\n  'id': unrelated\n  config:\n    providers:\n      old:\n        models: [keep]\n".to_string(),
+    ] {
+        let f = Fixture::new();
+        f.set_patch(&original);
+        let credentials = "version: 1\nrefs:\n  LOCAL_OPENAI_API_KEY: synthetic-existing-key\n";
+        fs::write(f.0.join("dsh/.credentials.yaml"), credentials).unwrap();
+        for flags in [vec![], vec!["--dry-run"], vec!["--replace"]] {
+            let mut args = vec![
+                "provider", "add", "sarashina", "--profile", "tui", "--key-stdin",
+            ];
+            args.extend(flags);
+            let out = f.run_with(&args, &[], b"synthetic-new-key\n");
+            assert_eq!(out.status.code(), Some(1), "{}", text(&out));
+            assert!(text(&out).contains("by hand"), "{}", text(&out));
+            assert!(!text(&out).contains("synthetic-new-key"));
+            assert_eq!(f.patch(), original);
+            assert_eq!(f.creds(), credentials);
+        }
+    }
+}
+
+#[test]
+fn unrelated_insert_and_nested_names_are_kept_without_becoming_the_target() {
+    for original in [
+        "- insert:\n    - id: llm-muse-code-subscription\n      name: /fixture/muse/index.js\n      config:\n        museCommand: /fixture/muse\n",
+        "- id: unrelated\n  config:\n    name: '@deepseek-ai/dsh-llm-pi-ai'\n",
+        "- insert:\n    - id: unrelated-plugin\n      name: /fixture/unrelated/index.js\n      config:\n        models:\n          - id: llm-pi-ai\n",
+        "- insert:\n    - id: unrelated-plugin\n      name: /fixture/unrelated/index.js\n      config:\n        name: '@deepseek-ai/dsh-llm-pi-ai'\n",
+    ] {
+        let f = Fixture::new();
+        f.set_patch(original);
+        let args = ["provider", "add", "sarashina", "--profile", "tui", "--json"];
+        ok(&f.run(&args));
+        let patch = f.patch();
+        assert!(patch.starts_with(original));
+        assert!(patch[original.len()..].starts_with("- id: llm-pi-ai\n  config:\n    providers:\n"));
+        let again = f.run(&args);
+        ok(&again);
+        let v: Value = serde_json::from_slice(&again.stdout).unwrap();
+        assert_eq!(v["change"], "exists");
+        assert_eq!(f.patch(), patch);
+    }
+}
+
+#[test]
+fn unicode_whitespace_is_part_of_the_plugin_identifier() {
+    let f = Fixture::new();
+    let original = PATCH.replacen("id: llm-pi-ai", "id: \u{a0}llm-pi-ai\u{a0}", 1);
+    f.set_patch(&original);
+    let args = ["provider", "add", "sarashina", "--profile", "tui", "--json"];
+    ok(&f.run(&args));
+    let patch = f.patch();
+    assert!(patch.starts_with(&original), "{patch}");
+    assert!(patch[original.len()..].starts_with("- id: llm-pi-ai\n"));
+    ok(&f.run(&args));
+    assert_eq!(f.patch(), patch);
+}
+
+#[test]
+fn block_scalar_prompts_are_preserved_as_text() {
+    for style in ["|", "|-", ">", ">+", "|2-", ">+2", "|1"] {
+        for insert in [false, true] {
+            let f = Fixture::new();
+            let (entry, indent) = if insert {
+                (
+                    "- insert:\n    - id: unrelated-plugin\n      config:\n",
+                    "        ",
+                )
+            } else {
+                ("- id: unrelated-plugin\n  config:\n", "    ")
+            };
+            let original = format!(
+                "{PATCH}{entry}{indent}prompt: {style}\n{indent}  <<: this is ordinary prompt text\n{indent}  \"\\u0070roviders\": ordinary prompt text\n{indent}  id: llm-pi-ai\n"
+            );
+            f.set_patch(&original);
+            let args = ["provider", "add", "sarashina", "--profile", "tui", "--json"];
+            ok(&f.run(&args));
+            let want = original.replacen(
+                "          - id: x\n",
+                &format!("          - id: x\n{SARASHINA_BLOCK}"),
+                1,
+            );
+            assert_eq!(f.patch(), want, "style={style}, insert={insert}");
+            ok(&f.run(&args));
+            assert_eq!(f.patch(), want);
+        }
+        let f = Fixture::new();
+        let original = format!(
+            "- id: llm-pi-ai\n  config:\n    prompt: {style}\n      # this is ordinary prompt text\n\n"
+        );
+        f.set_patch(&original);
+        ok(&f.run(&["provider", "add", "sarashina", "--profile", "tui"]));
+        assert!(
+            f.patch().starts_with(&original),
+            "style={style}: {}",
+            f.patch()
+        );
+    }
+}
+
+#[test]
+fn sequence_block_scalar_prompts_are_preserved_as_text() {
+    for style in ["|", "|-", ">", ">+", "|2-", ">+2", "|1"] {
+        for insert in [false, true] {
+            let f = Fixture::new();
+            let (entry, indent) = if insert {
+                (
+                    "- insert:\n    - id: unrelated-plugin\n      config:\n",
+                    "        ",
+                )
+            } else {
+                ("- id: unrelated-plugin\n  config:\n", "    ")
+            };
+            let original = format!(
+                "{PATCH}{entry}{indent}prompts:\n{indent}  - {style}\n{indent}    <<: ordinary prompt text\n{indent}    id: llm-pi-ai\n{indent}    config:\n{indent}    providers:\n{indent}    \"\\u0070roviders\": ordinary prompt text\n{indent}  - {style}\n{indent}    # this is ordinary prompt text\n\n"
+            );
+            f.set_patch(&original);
+            let args = ["provider", "add", "sarashina", "--profile", "tui", "--json"];
+            ok(&f.run(&args));
+            let want = original.replacen(
+                "          - id: x\n",
+                &format!("          - id: x\n{SARASHINA_BLOCK}"),
+                1,
+            );
+            assert_eq!(f.patch(), want, "style={style}, insert={insert}");
+            ok(&f.run(&args));
+            assert_eq!(f.patch(), want);
+        }
+        for body in ["      # this is ordinary prompt text\n\n", "\n\n"] {
+            let f = Fixture::new();
+            let original =
+                format!("- id: llm-pi-ai\n  config:\n    prompts:\n    - {style}\n{body}");
+            f.set_patch(&original);
+            ok(&f.run(&["provider", "add", "sarashina", "--profile", "tui"]));
+            assert!(
+                f.patch().starts_with(&original),
+                "style={style}: {}",
+                f.patch()
+            );
+        }
+    }
+}
+#[test]
+fn duplicate_nested_keys_and_scalar_entries_are_refused_before_writes() {
+    for original in [
+        PATCH.replace("        apiKeyEnv: OTHER_API_KEY", "        baseURL: http://127.0.0.1:1/v1\n        baseURL: http://127.0.0.1:2/v1\n        apiKeyEnv: OTHER_API_KEY"),
+        PATCH.replace("          - id: x", "          - id: x\n            name: first\n            name: last"),
+        "- literal-plugin\n".to_string(),
+        "- insert:\n    - literal-plugin\n".to_string(),
+    ] {
+        let fixture = Fixture::new();
+        fixture.set_patch(&original);
+        let credentials = "version: 1\nrefs:\n  LOCAL_OPENAI_API_KEY: synthetic-existing-key\n";
+        fs::write(fixture.0.join("dsh/.credentials.yaml"), credentials).unwrap();
+        for flags in [vec![], vec!["--dry-run"], vec!["--replace"]] {
+            let mut args = vec!["provider", "add", "sarashina", "--profile", "tui", "--key-stdin"];
+            args.extend(flags);
+            let out = fixture.run_with(&args, &[], b"synthetic-new-key\n");
+            assert_eq!(out.status.code(), Some(1), "{}", text(&out));
+            assert!(text(&out).contains("by hand"), "{}", text(&out));
+            assert_eq!(fixture.patch(), original);
+            assert_eq!(fixture.creds(), credentials);
+        }
+    }
+}
+
+#[test]
+fn unicode_whitespace_in_plain_mapping_keys_is_refused_before_writes() {
+    for whitespace in ['\u{a0}', '\u{2003}'] {
+        let fixture = Fixture::new();
+        let original = PATCH.replacen(
+            "- id: llm-pi-ai",
+            &format!("- {whitespace}id: llm-pi-ai"),
+            1,
+        );
+        fixture.set_patch(&original);
+        let credentials = "version: 1\nrefs:\n  LOCAL_OPENAI_API_KEY: synthetic-existing-key\n";
+        fs::write(fixture.0.join("dsh/.credentials.yaml"), credentials).unwrap();
+        for flags in [vec![], vec!["--dry-run"], vec!["--replace"]] {
+            let mut args = vec![
+                "provider",
+                "add",
+                "sarashina",
+                "--profile",
+                "tui",
+                "--key-stdin",
+            ];
+            args.extend(flags);
+            let out = fixture.run_with(&args, &[], b"synthetic-new-key\n");
+            assert_eq!(out.status.code(), Some(1), "{}", text(&out));
+            assert!(text(&out).contains("by hand"), "{}", text(&out));
+            assert_eq!(fixture.patch(), original);
+            assert_eq!(fixture.creds(), credentials);
+        }
+        let text =
+            format!("- id: unrelated\n  config:\n    prompt: |\n      {whitespace}id: llm-pi-ai\n");
+        fixture.set_patch(&text);
+        ok(&fixture.run(&["provider", "add", "sarashina", "--profile", "tui"]));
+        assert!(fixture.patch().starts_with(&text));
+    }
+}
+
+#[test]
+fn list_keeps_routes_when_other_plugins_use_unsupported_write_forms() {
+    for settings in [
+        "    labels: {name: retained, value: unchanged}\n",
+        "    origin: &label retained\n    copied: *label\n",
+        "    note: !!str retained\n",
+        "    note: \"first\n      continuation\"\n",
+    ] {
+        let fixture = Fixture::new();
+        let routes = PATCH.replacen(
+            "      other:\n",
+            "      hai:\n        baseURL: http://127.0.0.1:2/v1\n        models:\n          - id: existing-hai\n      other:\n        baseURL: http://127.0.0.1:1/v1\n",
+            1,
+        );
+        let original = format!("{routes}- id: unrelated\n  config:\n{settings}");
+        fixture.set_patch(&original);
+        let credentials = "version: 1\nrefs:\n  OTHER_API_KEY: test\n";
+        fs::write(fixture.0.join("dsh/.credentials.yaml"), credentials).unwrap();
+
+        let output = fixture.run(&["provider", "list", "--json"]);
+        ok(&output);
+        let value: Value = serde_json::from_slice(&output.stdout).unwrap();
+        let listed = value["profiles"][0]["routes"].as_array().unwrap();
+        for (id, url) in [
+            ("other", "http://127.0.0.1:1/v1"),
+            ("hai", "http://127.0.0.1:2/v1"),
+        ] {
+            let route = listed.iter().find(|route| route["id"] == id);
+            assert!(route.is_some(), "{id} is missing for {settings}: {value}");
+            let route = route.unwrap();
+            assert_eq!(route["configured"], true, "{settings}: {value}");
+            assert_eq!(route["models"], 1);
+            assert_eq!(route["baseURL"], url);
+        }
+        let output = fixture.run(&["provider", "list"]);
+        ok(&output);
+        assert!(text(&output).contains("other"), "{}", text(&output));
+        assert!(text(&output).contains("OTHER_API_KEY"));
+        assert_eq!(fixture.patch(), original);
+        assert_eq!(fixture.creds(), credentials);
+
+        for flags in [vec![], vec!["--dry-run"], vec!["--replace"]] {
+            let mut args = vec![
+                "provider",
+                "add",
+                "sarashina",
+                "--profile",
+                "tui",
+                "--key-stdin",
+            ];
+            args.extend(flags);
+            let output = fixture.run_with(&args, &[], b"replacement\n");
+            assert_eq!(output.status.code(), Some(1), "{}", text(&output));
+            assert!(text(&output).contains("by hand"), "{}", text(&output));
+            assert_eq!(fixture.patch(), original);
+            assert_eq!(fixture.creds(), credentials);
+        }
+    }
+}
+
+#[test]
+fn appending_after_unterminated_block_scalars_refuses_before_writes() {
+    for style in [
+        "|",
+        "|+",
+        ">",
+        ">+",
+        "|2",
+        "|2+",
+        "|+2",
+        ">2",
+        ">2+",
+        ">+2",
+        "| # note-with-dash",
+        "|+ # note-with-dash",
+        "> # note-with-dash",
+        ">+ # note-with-dash",
+    ] {
+        for sequence in [false, true] {
+            let original = if sequence {
+                format!(
+                    "- id: unrelated\n  config:\n    prompts:\n    - {style}\n      say llm-pi-ai"
+                )
+            } else {
+                format!("- id: unrelated\n  config:\n    prompt: {style}\n      say llm-pi-ai")
+            };
+            for crlf in [false, true] {
+                let original = if crlf {
+                    original.replace('\n', "\r\n")
+                } else {
+                    original.clone()
+                };
+                let fixture = Fixture::new();
+                fixture.set_patch(&original);
+                let credentials = "version: 1\nrefs:\n  OTHER_API_KEY: test\n";
+                fs::write(fixture.0.join("dsh/.credentials.yaml"), credentials).unwrap();
+                for flags in [vec![], vec!["--dry-run"], vec!["--replace"]] {
+                    let mut args = vec![
+                        "provider",
+                        "add",
+                        "sarashina",
+                        "--profile",
+                        "tui",
+                        "--key-stdin",
+                    ];
+                    args.extend(flags);
+                    let output = fixture.run_with(&args, &[], b"replacement\n");
+                    assert_eq!(output.status.code(), Some(1), "{}", text(&output));
+                    assert!(text(&output).contains("by hand"), "{}", text(&output));
+                    assert_eq!(fixture.patch(), original);
+                    assert_eq!(fixture.creds(), credentials);
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn final_scalar_boundaries_that_preserve_values_keep_supported_operations() {
+    let mut endings = Vec::new();
+    for style in ["|-", ">-", "|2-", "|-2", ">2-", ">-2"] {
+        endings.push(format!(
+            "- id: unrelated\n  config:\n    prompt: {style}\n      say llm-pi-ai"
+        ));
+    }
+    for style in ["|", "|+", ">", ">+"] {
+        endings.push(format!("- id: unrelated\n  config:\n    prompt: {style}"));
+        endings.push(format!("- id: unrelated\n  config:\n    prompt: {style}\n"));
+        for end in ["\n", "\n\n"] {
+            endings.push(format!(
+                "- id: unrelated\n  config:\n    prompt: {style}\n      say llm-pi-ai{end}"
+            ));
+        }
+    }
+    for style in ["|", ">"] {
+        endings.push(format!(
+            "- id: unrelated\n  config:\n    prompt: {style}\n      "
+        ));
+        endings.push(format!(
+            "- id: unrelated\n  config:\n    prompt: {style}\n      say llm-pi-ai\n      "
+        ));
+    }
+    for original in endings {
+        let fixture = Fixture::new();
+        fixture.set_patch(&original);
+        let args = ["provider", "add", "sarashina", "--profile", "tui", "--json"];
+        let mut dry = args.to_vec();
+        dry.push("--dry-run");
+        ok(&fixture.run(&dry));
+        assert_eq!(fixture.patch(), original);
+        ok(&fixture.run(&args));
+        assert!(fixture.patch().starts_with(&original));
+        let written = fixture.patch();
+        ok(&fixture.run(&args));
+        assert_eq!(fixture.patch(), written);
+    }
+
+    for style in ["|", "|+", ">", ">+"] {
+        let fixture = Fixture::new();
+        let tail = format!("- id: unrelated\n  config:\n    prompt: {style}\n      say llm-pi-ai");
+        fixture.set_patch(&format!("{PATCH}{tail}"));
+        let args = ["provider", "add", "sarashina", "--profile", "tui", "--json"];
+        ok(&fixture.run(&args));
+        assert!(fixture.patch().ends_with(&tail));
+        let mut replace = args.to_vec();
+        replace.extend(["--replace", "--model", "sarashina3-mini"]);
+        let written = fixture.patch();
+        let mut dry = replace.clone();
+        dry.push("--dry-run");
+        ok(&fixture.run(&dry));
+        assert_eq!(fixture.patch(), written);
+        ok(&fixture.run(&replace));
+        assert!(fixture.patch().ends_with(&tail));
+        let written = fixture.patch();
+        ok(&fixture.run(&replace));
+        assert_eq!(fixture.patch(), written);
+    }
+}
+
+fn entries_ending_in_scalar(style: &str, ending: &str) -> [String; 3] {
+    [
+        format!("- id: llm-pi-ai\n  note: {style}\n    say llm-pi-ai{ending}"),
+        format!("- id: llm-pi-ai\n  config:\n    note: {style}\n      say llm-pi-ai{ending}"),
+        format!("- id: llm-pi-ai\n  config:\n    providers:\n      other:\n        baseURL: http://127.0.0.1:1/v1\n        apiKeyEnv: OTHER_API_KEY\n        models:\n          - id: keep\n        note: {style}\n          say llm-pi-ai{ending}"),
+    ]
+}
+
+#[test]
+fn every_container_append_refuses_to_change_an_unterminated_scalar() {
+    for style in ["|", "|+", ">", ">+", "| # note-with-dash", ">+2"] {
+        for original in entries_ending_in_scalar(style, "") {
+            for crlf in [false, true] {
+                let original = if crlf {
+                    original.replace('\n', "\r\n")
+                } else {
+                    original.clone()
+                };
+                let fixture = Fixture::new();
+                fixture.set_patch(&original);
+                let credentials = "version: 1\nrefs:\n  OTHER_API_KEY: test\n";
+                fs::write(fixture.0.join("dsh/.credentials.yaml"), credentials).unwrap();
+                for flags in [vec![], vec!["--dry-run"], vec!["--replace"]] {
+                    let mut args = vec![
+                        "provider",
+                        "add",
+                        "sarashina",
+                        "--profile",
+                        "tui",
+                        "--key-stdin",
+                    ];
+                    args.extend(flags);
+                    let output = fixture.run_with(&args, &[], b"replacement\n");
+                    assert_eq!(output.status.code(), Some(1), "{}", text(&output));
+                    assert!(text(&output).contains("by hand"), "{}", text(&output));
+                    assert_eq!(fixture.patch(), original);
+                    assert_eq!(fixture.creds(), credentials);
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn safe_container_appends_and_explicit_route_replacement_still_work() {
+    let mut originals = Vec::new();
+    for style in ["|-", ">-", "|2-", "|-2", ">2-", ">-2"] {
+        originals.extend(entries_ending_in_scalar(style, ""));
+    }
+    for style in ["|", "|+", ">", ">+"] {
+        for ending in ["\n", "\n\n"] {
+            originals.extend(entries_ending_in_scalar(style, ending));
+        }
+    }
+    for original in originals {
+        let fixture = Fixture::new();
+        fixture.set_patch(&original);
+        let args = ["provider", "add", "sarashina", "--profile", "tui", "--json"];
+        let mut dry = args.to_vec();
+        dry.push("--dry-run");
+        ok(&fixture.run(&dry));
+        assert_eq!(fixture.patch(), original);
+        ok(&fixture.run(&args));
+        assert!(fixture.patch().starts_with(&original));
+        let written = fixture.patch();
+        ok(&fixture.run(&args));
+        assert_eq!(fixture.patch(), written);
+    }
+
+    for style in ["|", "|+", ">", ">+"] {
+        let fixture = Fixture::new();
+        let original = format!(
+            "- id: llm-pi-ai\n  config:\n    providers:\n      sarashina:\n        baseURL: http://127.0.0.1:1/v1\n        models:\n          - id: old\n        note: {style}\n          replaced intentionally"
+        );
+        fixture.set_patch(&original);
+        let args = [
+            "provider",
+            "add",
+            "sarashina",
+            "--profile",
+            "tui",
+            "--replace",
+            "--json",
+        ];
+        let mut dry = args.to_vec();
+        dry.push("--dry-run");
+        ok(&fixture.run(&dry));
+        assert_eq!(fixture.patch(), original);
+        ok(&fixture.run(&args));
+        assert!(!fixture.patch().contains("replaced intentionally"));
+    }
+}
+
+fn entries_with_scalar_whitespace(style: &str, shape: &str) -> Vec<String> {
+    [
+        ("- id: unrelated\n  config:\n    note: ", 4),
+        ("- id: llm-pi-ai\n  note: ", 2),
+        ("- id: llm-pi-ai\n  config:\n    note: ", 4),
+        ("- id: llm-pi-ai\n  config:\n    providers:\n      other:\n        baseURL: http://127.0.0.1:1/v1\n        models:\n          - id: keep\n        note: ", 8),
+    ]
+    .into_iter()
+    .map(|(header, parent)| {
+        let step = style.chars().find_map(|c| c.to_digit(10)).unwrap_or(2) as usize;
+        let padding = " ".repeat(parent + step);
+        let content = match shape {
+            "tab" => format!("{padding}\t"),
+            "extra" => format!("{padding}kept\n{padding}  "),
+            "empty" => padding.clone(),
+            "blank" => format!("{padding}kept\n{padding}"),
+            _ => unreachable!(),
+        };
+        format!("{header}{style} # comment-with-dash\n{content}")
+    })
+    .collect()
+}
+
+#[test]
+fn meaningful_scalar_whitespace_is_not_an_empty_final_line() {
+    for style in ["|", ">", "|2", ">2", "|9"] {
+        for shape in ["tab", "extra"] {
+            for original in entries_with_scalar_whitespace(style, shape) {
+                for crlf in [false, true] {
+                    let original = if crlf {
+                        original.replace('\n', "\r\n")
+                    } else {
+                        original.clone()
+                    };
+                    let fixture = Fixture::new();
+                    fixture.set_patch(&original);
+                    let credentials = "version: 1\nrefs:\n  OTHER_API_KEY: test\n";
+                    fs::write(fixture.0.join("dsh/.credentials.yaml"), credentials).unwrap();
+                    for flags in [vec![], vec!["--dry-run"], vec!["--replace"]] {
+                        let mut args = vec![
+                            "provider",
+                            "add",
+                            "sarashina",
+                            "--profile",
+                            "tui",
+                            "--key-stdin",
+                        ];
+                        args.extend(flags);
+                        let output = fixture.run_with(&args, &[], b"replacement\n");
+                        assert_eq!(output.status.code(), Some(1), "{}", text(&output));
+                        assert!(text(&output).contains("by hand"), "{}", text(&output));
+                        assert_eq!(fixture.patch(), original);
+                        assert_eq!(fixture.creds(), credentials);
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn empty_scalar_lines_and_stripped_whitespace_still_allow_append() {
+    for style in ["|", ">", "|2", ">2", "|-", ">-", "|2-", "|-2", ">2-", ">-2"] {
+        let shapes = if style.contains('-') {
+            vec!["empty", "blank", "tab", "extra"]
+        } else {
+            vec!["empty", "blank"]
+        };
+        for shape in shapes {
+            for original in entries_with_scalar_whitespace(style, shape) {
+                let fixture = Fixture::new();
+                fixture.set_patch(&original);
+                let args = ["provider", "add", "sarashina", "--profile", "tui", "--json"];
+                let mut dry = args.to_vec();
+                dry.push("--dry-run");
+                ok(&fixture.run(&dry));
+                assert_eq!(fixture.patch(), original);
+                ok(&fixture.run(&args));
+                assert!(fixture.patch().starts_with(&original));
+                let written = fixture.patch();
+                ok(&fixture.run(&args));
+                assert_eq!(fixture.patch(), written);
+            }
+        }
+    }
+}

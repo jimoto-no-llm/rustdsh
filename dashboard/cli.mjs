@@ -37,6 +37,7 @@ import { fileURLToPath } from "node:url";
 import { Releases } from "./releases.mjs";
 import { IntegrationQueue } from "./integration.mjs";
 import { WorkerWorkspaces } from "./workers.mjs";
+import * as agentRunners from "./agent-runners.mjs";
 import {
   loopbackBase,
   recordTunnel,
@@ -67,6 +68,9 @@ rdsh-dashboard cost-ledger declare|report --project <directory> --input-file <js
 rdsh-dashboard cost-ledger inspect --project <directory>
 rdsh-dashboard cost-ledger validate|public|schema --input-file <request-json>   (native Rust)
 rdsh-dashboard task-outcomes apply|validate|schema --input-file <request-json>
+rdsh-dashboard budget-admission apply|validate|public --input-file <request-json>
+rdsh-dashboard question-contracts apply|validate|public --input-file <request-json>
+rdsh-dashboard answer-applications apply|validate|public|schema --input-file <request-json>
 rdsh-dashboard budget policy|usage --project <directory> --input-file <json>
 rdsh-dashboard budget inspect --project <directory>
 rdsh-dashboard integration init --project <directory> --input-file <checks-json> --expected-revision 0 --expected-head <sha>
@@ -79,6 +83,9 @@ rdsh-dashboard workers prepare --project <directory> --input-file <worker-json> 
 rdsh-dashboard workers inspect --project <directory>
 rdsh-dashboard workers renew --project <directory> --worker-id <id> --lease-seconds <n> --expected-revision <n>
 rdsh-dashboard workers release --project <directory> --worker-id <id> --expected-revision <n>
+rdsh-dashboard agents list [--probe]
+rdsh-dashboard agents submit --agent <cursor-agent|devin> --project <directory> --prompt-file <file> [--model <name>] [--permission read-only|edit|full] [--resume <id>] [--trust-workspace] [--executable <path>] [--entrypoint <script>] [--wait]
+rdsh-dashboard agents status|result|cancel <job_id>
 rdsh-dashboard backup preview|export --project <directory> --selection-file <json> [--review-file <json>] [--output-file <new-json>]
 rdsh-dashboard backup inspect --archive-file <json>
 rdsh-dashboard backup restore --project <directory> --archive-file <json> --expected-revision <n>
@@ -158,6 +165,14 @@ const { values, positionals } = parseArgs({
     "selection-revision": { type: "string" },
     "managed-release-id": { type: "string" },
     "managed-revision": { type: "string" },
+    agent: { type: "string" },
+    "prompt-file": { type: "string" },
+    model: { type: "string" },
+    permission: { type: "string" },
+    resume: { type: "string" },
+    "trust-workspace": { type: "boolean" },
+    wait: { type: "boolean" },
+    probe: { type: "boolean" },
     help: { type: "boolean", short: "h" },
   },
 });
@@ -239,6 +254,56 @@ async function runNativeTaskOutcomes(action, inputFile) {
     const child = spawn(
       executable,
       ["task-outcomes", action, "--input-file", inputFile],
+      { stdio: "inherit", windowsHide: true },
+    );
+    child.once("error", reject);
+    child.once("close", (code) => resolve(code ?? 1));
+  });
+  process.exitCode = exitCode;
+}
+
+// Budget admission is a self-contained pure-logic module in Rust
+// (`rdsh budget-admission`); the dashboard keeps its own copy for the store
+// hot path, and this entry point exposes the native implementation.
+async function runNativeBudgetAdmission(action, inputFile) {
+  const executable = await nativeRdsh();
+  const exitCode = await new Promise((resolve, reject) => {
+    const child = spawn(
+      executable,
+      ["budget-admission", action, "--input-file", inputFile],
+      { stdio: "inherit", windowsHide: true },
+    );
+    child.once("error", reject);
+    child.once("close", (code) => resolve(code ?? 1));
+  });
+  process.exitCode = exitCode;
+}
+
+// Typed question contracts are a self-contained pure-logic module in Rust
+// (`rdsh question-contracts`); the dashboard keeps its own copy for the store
+// hot path, and this entry point exposes the native implementation.
+async function runNativeQuestionContracts(action, inputFile) {
+  const executable = await nativeRdsh();
+  const exitCode = await new Promise((resolve, reject) => {
+    const child = spawn(
+      executable,
+      ["question-contracts", action, "--input-file", inputFile],
+      { stdio: "inherit", windowsHide: true },
+    );
+    child.once("error", reject);
+    child.once("close", (code) => resolve(code ?? 1));
+  });
+  process.exitCode = exitCode;
+}
+
+// Answer application state transitions and projections are implemented in
+// Rust; this CLI keeps the dashboard's stateful store path in JavaScript.
+async function runNativeAnswerApplications(action, inputFile) {
+  const executable = await nativeRdsh();
+  const exitCode = await new Promise((resolve, reject) => {
+    const child = spawn(
+      executable,
+      ["answer-applications", action, "--input-file", inputFile],
       { stdio: "inherit", windowsHide: true },
     );
     child.once("error", reject);
@@ -668,6 +733,62 @@ try {
       (action === "validate" && !result.validation.verified)
     )
       process.exitCode = 1;
+  } else if (command === "agents") {
+    // External agent CLIs (cursor-agent, devin); never the DSH ACP adapter.
+    const action = positionals[1];
+    const options = {
+      list: ["probe"],
+      submit: [
+        "agent",
+        "project",
+        "prompt-file",
+        "model",
+        "permission",
+        "resume",
+        "trust-workspace",
+        "executable",
+        "entrypoint",
+        "wait",
+      ],
+      status: [],
+      result: [],
+      cancel: [],
+    };
+    if (
+      !Object.hasOwn(options, action) ||
+      positionals.length !== (["list", "submit"].includes(action) ? 2 : 3) ||
+      Object.keys(values).some((k) => !options[action].includes(k))
+    )
+      throw new Error("Invalid agents action/options");
+    let output;
+    if (action === "list")
+      output = await agentRunners.list({ probe: Boolean(values.probe) });
+    else if (action === "submit") {
+      if (!values.agent || !values.project || !values["prompt-file"])
+        throw new Error("agents submit requires --agent, --project and --prompt-file");
+      output = await agentRunners.submit({
+        runner: values.agent,
+        project: values.project,
+        promptFile: values["prompt-file"],
+        model: values.model,
+        permission: values.permission,
+        resume: values.resume,
+        trustWorkspace: Boolean(values["trust-workspace"]),
+        executable: values.executable,
+        entrypoint: values.entrypoint,
+      });
+      if (values.wait) {
+        await agentRunners.waitForJob(output.id);
+        output = await agentRunners.result(output.id);
+        if (output.state !== "succeeded") process.exitCode = 1;
+      }
+    } else if (action === "status") output = await agentRunners.status(positionals[2]);
+    else if (action === "result") {
+      output = await agentRunners.result(positionals[2]);
+      if (!["queued", "running", "succeeded"].includes(output.state))
+        process.exitCode = 1;
+    } else output = await agentRunners.cancel(positionals[2]);
+    console.log(JSON.stringify(output));
   } else if (command === "subagents") {
     if (
       positionals.length !== 2 ||
@@ -687,6 +808,36 @@ try {
     )
       throw new Error("Invalid task-outcomes action/options");
     await runNativeTaskOutcomes(action, values["input-file"]);
+  } else if (command === "budget-admission") {
+    const action = positionals[1];
+    if (
+      positionals.length !== 2 ||
+      !["apply", "validate", "public"].includes(action) ||
+      !values["input-file"] ||
+      Object.keys(values).some((key) => key !== "input-file")
+    )
+      throw new Error("Invalid budget-admission action/options");
+    await runNativeBudgetAdmission(action, values["input-file"]);
+  } else if (command === "question-contracts") {
+    const action = positionals[1];
+    if (
+      positionals.length !== 2 ||
+      !["apply", "validate", "public"].includes(action) ||
+      !values["input-file"] ||
+      Object.keys(values).some((key) => key !== "input-file")
+    )
+      throw new Error("Invalid question-contracts action/options");
+    await runNativeQuestionContracts(action, values["input-file"]);
+  } else if (command === "answer-applications") {
+    const action = positionals[1];
+    if (
+      positionals.length !== 2 ||
+      !["apply", "validate", "public", "schema"].includes(action) ||
+      !values["input-file"] ||
+      Object.keys(values).some((key) => key !== "input-file")
+    )
+      throw new Error("Invalid answer-applications action/options");
+    await runNativeAnswerApplications(action, values["input-file"]);
   } else if (command === "workers") {
     const action = positionals[1];
     const options = {
