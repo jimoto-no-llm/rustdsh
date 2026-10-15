@@ -103,8 +103,8 @@ rdsh serial-proxy --upstream https://api.sarashina.ai/v1 --tool-choice-default a
 ```
 
 rdsh 側は `rdsh provider add sarashina --base-url http://127.0.0.1:18081/v1` で
-プロキシに向けます。`docs/PROVIDERS.md` は main にまだ無く、オープン中の PR #474 で
-追加されます。Sarashina の節への追記はそちらで行ってください。
+プロキシに向けます。Sarashina のプリセットと注意点は `docs/PROVIDERS.md` の
+Sarashina 節（すでに main にあります）を参照してください。
 dsh は 1 ターンで本体とタイトル生成の 2 件以上を送るため、`--rpm` を超える分は待機になります。
 
 ## dsh の設定
