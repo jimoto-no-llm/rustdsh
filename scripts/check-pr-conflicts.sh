@@ -4,15 +4,16 @@
 # `gh pr list` refreshes GitHub's own mergeability verdict, so this stays
 # current without fetching or rebasing anything locally. "AHEAD/BEHIND" is
 # measured against the PR's base branch when that head ref is already present
-# under refs/remotes/origin/; it is "-" otherwise. This script never fetches,
-# never checks a branch out and never writes to the repository.
+# under refs/remotes/origin/ *and* origin is the repository being listed; it is
+# "-" otherwise. This script never fetches, never checks a branch out and never
+# writes to the repository.
 #
 #   scripts/check-pr-conflicts.sh                    # every open PR
 #   scripts/check-pr-conflicts.sh --conflicting-only # only CONFLICTING
 #   scripts/check-pr-conflicts.sh --mergeable-only   # only MERGEABLE
 #   scripts/check-pr-conflicts.sh --json             # machine-readable
 #
-# Exit status: 0 no conflicts, 3 some conflicts, 2 usage or gh failure.
+# Exit status: 0 no CONFLICTING PRs in the selection, 3 some, 2 usage/gh error.
 set -euo pipefail
 
 die() { printf 'error: %s\n' "$*" >&2; exit 2; }
@@ -29,8 +30,9 @@ usage: scripts/check-pr-conflicts.sh [--mergeable-only | --conflicting-only]
   --repo OWNER/REPO    override the repository (default: the current one)
   -h, --help           show this message
 
-Exit status is 0 when the selection has no CONFLICTING PRs, 3 when it has
-some (so the command can gate a script), and 2 on a usage or gh failure.
+Exit status is 0 when the selected PRs contain no CONFLICTING entry, 3 when
+they do (so the command can gate a script), and 2 on a usage or gh failure.
+With --repo, AHEAD/BEHIND is only computed when origin is that repository.
 USAGE
 }
 
@@ -93,8 +95,30 @@ if ! prs="$(gh pr list --state open --limit "$limit" \
   exit 2
 fi
 
+# Reduce a remote URL or OWNER/REPO argument to "owner/repo" so the two can be
+# compared. Anything without two path components only matches itself.
+repo_slug() {
+  printf '%s' "$1" | sed -e 's#\.git$##' -e 's#/+$##' \
+    -e 's#^[A-Za-z][A-Za-z0-9+.-]*://##' -e 's#^[^/@]*@##' -e 's#:#/#' |
+    awk -F/ '{ if (NF >= 2) print tolower($(NF-1) "/" $NF); else print "" }'
+}
+
 # Ahead/behind per PR, computed here because only the shell can ask Git about
-# local refs. Missing refs yield "-" rather than a fetch.
+# local refs. Missing refs yield "-" rather than a fetch, and so does a --repo
+# that is not origin: refs/remotes/origin/* belong to another repository then.
+ab_enabled=1
+ab_note=""
+if [ -n "$repo" ]; then
+  origin_url="$(git remote get-url origin 2>/dev/null || printf '')"
+  if [ -z "$origin_url" ] || [ "$(repo_slug "$origin_url")" != "$(repo_slug "$repo")" ]; then
+    ab_enabled=0
+    ab_note="origin is not $repo; AHEAD/BEHIND is shown as - for every PR"
+  fi
+fi
+if [ -n "$ab_note" ]; then
+  printf 'note: %s\n' "$ab_note" >&2
+fi
+
 ab_file="$(mktemp 2>/dev/null || mktemp -t rdsh-ab)" || die "cannot create a temp file"
 trap 'rm -f "$ab_file"' EXIT INT TERM
 
@@ -110,8 +134,11 @@ ab_json+="{"
 first=1
 while IFS="$(printf '\t')" read -r number head base; do
   [ -n "$number" ] || continue
+  # Native Python on Windows writes CRLF; the record terminator is not a ref.
+  base="${base%$'\r'}"
   value="-"
-  if git rev-parse --verify --quiet "refs/remotes/origin/$head" >/dev/null 2>&1 &&
+  if [ "$ab_enabled" -eq 1 ] &&
+    git rev-parse --verify --quiet "refs/remotes/origin/$head" >/dev/null 2>&1 &&
     git rev-parse --verify --quiet "refs/remotes/origin/$base" >/dev/null 2>&1; then
     if counts="$(git rev-list --left-right --count \
       "refs/remotes/origin/$base...refs/remotes/origin/$head" 2>/dev/null)"; then
@@ -158,6 +185,9 @@ rank = {"CONFLICTING": 2, "UNKNOWN": 1, "MERGEABLE": 0}
 selected.sort(key=lambda p: (-rank.get(state(p), 1), -int(p.get("number", 0))))
 
 conflicting = counts.get("CONFLICTING", 0)
+# The gate follows the selection: --mergeable-only must exit 0 when none of
+# the listed PRs conflicts, even if an unlisted one does.
+selected_conflicting = sum(1 for p in selected if state(p) == "CONFLICTING")
 
 if as_json:
     print(json.dumps({
@@ -166,6 +196,8 @@ if as_json:
             "conflicting": conflicting,
             "mergeable": counts.get("MERGEABLE", 0),
             "unknown": counts.get("UNKNOWN", 0),
+            "selected": len(selected),
+            "selected_conflicting": selected_conflicting,
         },
         "prs": [
             {
@@ -179,7 +211,7 @@ if as_json:
             for p in selected
         ],
     }, ensure_ascii=False, indent=2))
-    sys.exit(3 if conflicting else 0)
+    sys.exit(3 if selected_conflicting else 0)
 
 if not selected:
     print("no PRs match the selected filter")
@@ -203,7 +235,9 @@ summary = "open PRs: %d  CONFLICTING: %d  MERGEABLE: %d" % (
     len(prs), conflicting, counts.get("MERGEABLE", 0))
 if counts.get("UNKNOWN"):
     summary += "  UNKNOWN: %d" % counts["UNKNOWN"]
+if filter_mode != "all":
+    summary += "  selected: %d (CONFLICTING: %d)" % (len(selected), selected_conflicting)
 print()
 print(summary)
-sys.exit(3 if conflicting else 0)
+sys.exit(3 if selected_conflicting else 0)
 ' "$filter" "$json" "$ab_json"

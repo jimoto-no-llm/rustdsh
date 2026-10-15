@@ -24,8 +24,15 @@ mechanism.
   coordinate first. A forced push invalidates their review.
 - **`remove` only deletes what it resolved.** The command resolves the target
   path first and refuses anything that is not `<parent>/.worktrees/rustdsh-<slug>`.
-- **Uncommitted work is sacred.** `remove` refuses a dirty worktree. `--force`
-  is for a worktree you have consciously decided to throw away.
+  A `git status` that fails counts as an error, not as "clean", and deleting the
+  directory directly needs both `--force` and proof that it is a linked worktree of
+  the shared mirror. Its `.git` pointer and the mirror admin directory's `gitdir`
+  backlink must point to each other; a copied pointer is not ownership proof.
+- **Local work is sacred.** `remove` refuses a dirty worktree or a HEAD with
+  commits absent from every local remote-tracking ref, including detached HEADs.
+  `--force` is for a worktree you have consciously decided to throw away.
+  Only the shared mirror's branch is removed; a canonical branch with the same
+  name is kept.
 
 ## Where things live
 
@@ -44,7 +51,10 @@ worktrees land in the sibling directory `~/ghq/github.com/owner/.worktrees/`.
 
 A worktree is a full repository with its own index, so parallel topics never
 fight over `git add`. It shares the object database with the mirror, which is
-why creating one is fast.
+why creating one is fast. The script finds this layout through
+`git rev-parse --git-common-dir`, not `--show-toplevel`, so running it from
+inside a worktree still resolves the same `.worktrees/` root instead of nesting
+`.worktrees/.worktrees`.
 
 ## Ports
 
@@ -61,18 +71,33 @@ The port is the first four bytes of `sha256("rustdsh-parallel/<slug>")` modulo
 1000, plus the base. It is stable across machines and runs, so a dashboard URL
 or a `--port` flag can be written down once and reused.
 
+Two slugs can hash to the same offset. `new` then takes the first port that no
+other managed worktree holds and records it in that worktree's admin dir, so
+`list`, `status` and `port <slug>` report the port that is really in use.
+Selection and recording share an atomic directory lock, so simultaneous `new`
+commands cannot reserve the same port. A busy lock is retried for a bounded
+period and then fails without reporting a port. If a process is forcibly killed
+and leaves `.rdsh-port-allocation.lock`, confirm no `new` is running before
+removing that empty lock directory and retrying with a new slug.
+`port <slug>` for a worktree that does not exist yet prints the unshifted hash
+position; it is the same value once the worktree is created unless it collides.
+
 Set `RDSH_PARALLEL_PORT_BASE` when the default range collides with something
 already running, or when two different projects share a machine and would
 otherwise pick overlapping ports. The override shifts the whole range; it does
-not change which slug gets which offset.
+not change which slug gets which offset. The base must be between 1024 and
+64536, so the last port of the range (`base + 999`) stays at or below 65535.
+The base is a decimal integer; leading zeros are ignored. Oversized integers
+are rejected before shell arithmetic.
 
 ## Command reference
 
 ### `new <slug>`
 
 Create a worktree at `<parent>/.worktrees/rustdsh-<slug>` on a new branch
-`parallel/<slug>`, based on the latest `origin/main`. The remote is fetched
-first; the mirror and the object store are created on the first run. The slug
+`parallel/<slug>`, based on the latest `<remote>/main` (`origin/main` by
+default). The remote is fetched first; the mirror and the object store are
+created on the first run. The slug
 uses lowercase letters, digits and single dashes: it must not start with a
 dash, and consecutive dashes (`--`) are rejected.
 
@@ -90,9 +115,10 @@ port    49703
 next    cd <parent>/.worktrees/rustdsh-dashboard-fix
 ```
 
-The command refuses a slug that already has a worktree or a local branch. Use
-`RDSH_PARALLEL_BASE_REF=origin/release` to base the worktree on something other
-than `origin/main`.
+The command refuses a slug that already has a worktree or a local branch. The
+default base ref follows `RDSH_PARALLEL_REMOTE`, so `RDSH_PARALLEL_REMOTE=upstream`
+bases the worktree on `upstream/main`; use `RDSH_PARALLEL_BASE_REF=origin/release`
+to base it on something else.
 
 ### `list`
 
@@ -111,7 +137,15 @@ rustdsh-installer-fix        parallel/installer-fix     5c86c568   49533
 ### `status`
 
 For every managed worktree: branch, ahead/behind the remote base, dirty state,
-and whether the branch would conflict with it.
+and whether the branch would conflict with it. `status` fetches the shared
+mirror first, so the counts are never a stale leftover; `status --no-fetch`
+skips the fetch and says on stderr that the numbers are only as fresh as the
+last one. Both commands compare against `RDSH_PARALLEL_BASE_REF` when it is set,
+and against `<remote>/main` otherwise.
+
+If reading a worktree's Git status fails, its `DIRTY` column is `unknown` and
+the diagnostic is printed to stderr. The other rows are still shown, and the
+command exits nonzero so an unreadable worktree is never reported as clean.
 
 ```sh
 scripts/parallel-dev.sh status
@@ -150,11 +184,18 @@ error: commit, stash or discard them, or re-run with --force
 scripts/parallel-dev.sh remove dashboard-fix --force   # discard the changes too
 ```
 
+It also refuses unpublished commits or a failure to inspect them. This check
+uses the mirror's local remote-tracking refs; fetch the remote first if they
+are stale. `--force` explicitly permits discarding local commits as well as
+uncommitted changes. The worktree must belong to the shared mirror in either
+mode; matching the directory or branch name alone is insufficient.
+
 It also refuses a path that does not resolve to `<parent>/.worktrees/rustdsh-<slug>`.
 
 ### `port <slug>`
 
-Print the port, and nothing else, so it composes:
+Print the port, and nothing else, so it composes. For an existing worktree
+this is the port it was created with, collision shift included:
 
 ```sh
 PORT="$(scripts/parallel-dev.sh port dashboard-fix)"
@@ -279,11 +320,18 @@ open PRs: 3  CONFLICTING: 1  MERGEABLE: 2
 ```
 
 `--conflicting-only`, `--mergeable-only` and `--json` narrow the output for
-scripts. The command exits `3` when conflicts remain, so it can gate a job:
+scripts. The command exits `3` when a PR in the selection is `CONFLICTING` (so
+`--mergeable-only` exits `0` even when an unlisted PR conflicts), which lets it
+gate a job:
 
 ```sh
 scripts/check-pr-conflicts.sh --conflicting-only || echo "rebase needed"
 ```
+
+`--repo OWNER/REPO` checks another repository. The ahead/behind counts come from
+local `refs/remotes/origin/*`, which only describe the selected repository when
+`origin` is that repository, so every other `--repo` shows `-` for
+`AHEAD/BEHIND` instead of numbers from the wrong repository.
 
 ## Build caches
 
