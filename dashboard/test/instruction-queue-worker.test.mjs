@@ -58,17 +58,42 @@ test("resolveRdshExecutable accepts an absolute override and searches absolute P
   );
 });
 
-test("serve capability probe falls back for binaries without the worker protocol", async () => {
-  const command = "process.exit(process.argv.slice(-2).join(' ') === 'instruction-queue serve' ? 0 : 64)";
+test("serve capability probe requires the current worker protocol", async () => {
+  const reply = (value) => {
+    const line = JSON.stringify(`${JSON.stringify(value)}\n`);
+    return `process.stdin.resume(); process.stdin.on(\"end\", () => process.stdout.write(${line}));`;
+  };
+  const supported = reply({
+    operation: "capabilities",
+    protocol: 1,
+    features: { prevalidated_state: true },
+  });
+  const unsupported = reply({
+    error: "Invalid instruction-queue action/options",
+    status: 400,
+  });
   assert.equal(
     await supportsInstructionQueueServe(process.execPath, {
-      prefixArgs: ["-e", command],
+      prefixArgs: ["-e", supported],
     }),
     true,
   );
   assert.equal(
     await supportsInstructionQueueServe(process.execPath, {
+      prefixArgs: ["-e", unsupported],
+    }),
+    false,
+  );
+  assert.equal(
+    await supportsInstructionQueueServe(process.execPath, {
       prefixArgs: ["-e", "process.exit(64)"],
+    }),
+    false,
+  );
+  assert.equal(
+    await supportsInstructionQueueServe(process.execPath, {
+      prefixArgs: ["-e", "process.stdin.resume()"],
+      timeoutMs: 50,
     }),
     false,
   );

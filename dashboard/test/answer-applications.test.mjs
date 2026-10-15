@@ -1726,7 +1726,7 @@ test(
     const executable = path.join(root, "rdsh");
     await fs.writeFile(
       executable,
-      '#!/bin/sh\n[ "$1" = "instruction-queue" ] && [ "$2" = "serve" ] && exit 0\nexit 64\n',
+      "#!/bin/sh\n[ \"$1\" = \"instruction-queue\" ] && [ \"$2\" = \"serve\" ] || exit 64\ncat >/dev/null\nprintf '%s\\n' '{\"operation\":\"capabilities\",\"protocol\":1,\"features\":{\"prevalidated_state\":true}}'\n",
     );
     await fs.chmod(executable, 0o700);
     const previousRdshBin = process.env.RDSH_BIN;
@@ -1816,6 +1816,66 @@ test("live Dashboard keeps JavaScript routing when rdsh lacks the serve action",
   );
   assert.equal(result.request.status, "accepted");
 });
+
+test(
+  "live Dashboard keeps JavaScript routing when serve lacks prevalidated-state support",
+  { skip: process.platform === "win32" },
+  async (t) => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-old-native-protocol-"));
+    const projectRoot = path.join(root, "project");
+    await fs.mkdir(projectRoot);
+    const project = await identity(projectRoot);
+    project.directory = path.join(root, "dashboard");
+    const executable = path.join(root, "rdsh-old");
+    await fs.writeFile(
+      executable,
+      "#!/bin/sh\n[ \"$1\" = \"instruction-queue\" ] && [ \"$2\" = \"serve\" ] || exit 64\ncat >/dev/null\nprintf '%s\\n' '{\"error\":\"Invalid instruction-queue action/options\",\"status\":400}'\n",
+    );
+    await fs.chmod(executable, 0o700);
+    const previousRdshBin = process.env.RDSH_BIN;
+    const previousWorkerSetting = process.env.RDSH_DASHBOARD_RUST_INSTRUCTION_QUEUE;
+    process.env.RDSH_BIN = executable;
+    process.env.RDSH_DASHBOARD_RUST_INSTRUCTION_QUEUE = "1";
+    let dashboard;
+    t.after(async () => {
+      if (dashboard) await dashboard.close();
+      if (previousRdshBin === undefined) delete process.env.RDSH_BIN;
+      else process.env.RDSH_BIN = previousRdshBin;
+      if (previousWorkerSetting === undefined)
+        delete process.env.RDSH_DASHBOARD_RUST_INSTRUCTION_QUEUE;
+      else process.env.RDSH_DASHBOARD_RUST_INSTRUCTION_QUEUE = previousWorkerSetting;
+      await fs.rm(root, { recursive: true, force: true });
+    });
+
+    dashboard = await startDashboard({
+      project,
+      port: await freePort(),
+      tailscale: false,
+    });
+    assert.equal(dashboard.store.instructionQueueWorker, null);
+    const runId = "run_" + randomUUID();
+    const sessionId = "fixture-session";
+    const consumer = await dashboard.store.mutateReply("register", {
+      run_id: runId,
+      cli_session_id: sessionId,
+      task_id: "fixture-task",
+    });
+    const result = await dashboard.store.mutateReply(
+      "instruction_submit",
+      {
+        command_id: "input_" + randomUUID(),
+        consumer_id: consumer.consumer_id,
+        run_id: runId,
+        session_id: sessionId,
+        text: "旧Rust workerでも受け付ける",
+        mode: "next_turn",
+        expected_queue_revision: 0,
+      },
+      { actor: "human" },
+    );
+    assert.equal(result.request.status, "accepted");
+  },
+);
 
 test("Dashboard preserves Rust worker failure and timeout HTTP statuses", options, async (t) => {
   const f = await setup(t);

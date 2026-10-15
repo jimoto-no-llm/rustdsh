@@ -1764,6 +1764,13 @@ fn worker_response(line: &[u8]) -> Value {
         }
     };
     let action = string(&document, "operation").unwrap_or("");
+    if action == "capabilities" {
+        return serde_json::json!({
+            "operation": "capabilities",
+            "protocol": 1,
+            "features": {"prevalidated_state": true}
+        });
+    }
     let input_prevalidated = document
         .get("prevalidated")
         .and_then(Value::as_bool)

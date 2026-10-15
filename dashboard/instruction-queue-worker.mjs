@@ -33,32 +33,66 @@ export function supportsInstructionQueueServe(
   if (!path.isAbsolute(executable)) return Promise.resolve(false);
   return new Promise((resolve) => {
     let settled = false;
-    let timedOut = false;
     let timer;
+    let output = "";
+    let responseSeen = false;
+    let supported = false;
+    let child;
     const finish = (supported) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
       resolve(supported);
     };
-    let child;
     try {
       child = spawnProcess(
         executable,
         [...prefixArgs, "instruction-queue", "serve"],
-        { stdio: ["ignore", "ignore", "ignore"], windowsHide: true },
+        { stdio: ["pipe", "pipe", "ignore"], windowsHide: true },
       );
     } catch {
       finish(false);
       return;
     }
     timer = setTimeout(() => {
-      timedOut = true;
+      finish(false);
       child.kill("SIGKILL");
     }, timeoutMs);
     timer.unref?.();
     child.once("error", () => finish(false));
-    child.once("close", (code) => finish(!timedOut && code === 0));
+    child.once("close", (code) =>
+      finish(responseSeen && supported && code === 0),
+    );
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => {
+      if (responseSeen) return;
+      output += chunk;
+      if (Buffer.byteLength(output) > 64 * 1024) {
+        child.kill("SIGKILL");
+        return;
+      }
+      const newline = output.indexOf("\n");
+      if (newline < 0) return;
+      let response;
+      try {
+        response = JSON.parse(output.slice(0, newline));
+      } catch {
+        responseSeen = true;
+        child.kill("SIGKILL");
+        return;
+      }
+      responseSeen = true;
+      supported =
+        response?.operation === "capabilities" &&
+        response?.protocol === 1 &&
+        response?.features?.prevalidated_state === true;
+      if (!supported) child.kill("SIGKILL");
+    });
+    child.stdin.on("error", () => {
+      child.kill("SIGKILL");
+      finish(false);
+    });
+    child.stdin.end(JSON.stringify({ operation: "capabilities" }) + "\n");
   });
 }
 

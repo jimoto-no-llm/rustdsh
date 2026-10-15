@@ -158,6 +158,38 @@ fn instruction_queue_serve_processes_ordered_requests_after_errors() {
 }
 
 #[test]
+fn instruction_queue_serve_advertises_prevalidated_state_support() {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_rdsh"))
+        .args(["instruction-queue", "serve"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut stdin = child.stdin.take().unwrap();
+    stdin
+        .write_all(b"{\"operation\":\"capabilities\"}\n")
+        .unwrap();
+    drop(stdin);
+
+    let output = child.wait_with_output().unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let response: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(
+        response,
+        json!({
+            "operation": "capabilities",
+            "protocol": 1,
+            "features": {"prevalidated_state": true}
+        })
+    );
+}
+
+#[test]
 fn validate_accepts_a_state_without_an_instruction_registry() {
     let fixture = Fixture::new();
     let output = fixture.run(
