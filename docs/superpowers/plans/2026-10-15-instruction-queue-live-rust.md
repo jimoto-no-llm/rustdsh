@@ -10,9 +10,10 @@
 
 ---
 
-### Task 1: Add the Rust JSONL worker protocol
+## Task 1: Add the Rust JSONL worker protocol
 
 **Files:**
+
 - Modify: `src/instruction_queue.rs`
 - Modify: `src/main.rs`
 - Test: `tests/instruction_queue_cli.rs`
@@ -23,9 +24,10 @@
 - [x] Add an integration test that sends a successful mutation, an invalid request, then another valid request through one child and verifies three ordered response lines and continued service after the error.
 - [x] Verify RED/GREEN with `CARGO_TARGET_DIR=/tmp/rdsh-instruction-queue-target cargo test --locked --test instruction_queue_cli instruction_queue_serve`.
 
-### Task 2: Add a managed Node worker
+## Task 2: Add a managed Node worker
 
 **Files:**
+
 - Create: `dashboard/instruction-queue-worker.mjs`
 - Create: `dashboard/test/instruction-queue-worker.test.mjs`
 
@@ -35,9 +37,10 @@
 - [x] Use a temporary fake executable in tests to cover request order, native error status, premature exit, and clean close.
 - [x] Verify with `mise exec node@22.23.2 -- node --test dashboard/test/instruction-queue-worker.test.mjs`.
 
-### Task 3: Route ProjectStore writes through the worker
+## Task 3: Route ProjectStore writes through the worker
 
 **Files:**
+
 - Modify: `dashboard/state.mjs`
 - Modify: `dashboard/server.mjs`
 - Modify: `dashboard/test/answer-applications.test.mjs`
@@ -48,9 +51,10 @@
 - [ ] Keep direct `ProjectStore` tests injectable so existing tests without a compiled binary continue to use the existing JavaScript handler.
 - [ ] Add a store test proving native returned state/result are committed and native errors leave the stored state untouched; run `mise exec node@22.23.2 -- node --test --test-concurrency=1 dashboard/test/answer-applications.test.mjs dashboard/test/instruction-queue-worker.test.mjs`.
 
-### Task 4: Verify the live boundary and performance
+## Task 4: Verify the live boundary and performance
 
 **Files:**
+
 - Modify: `docs/` only if observed behavior changes the migration record.
 
 - [ ] Build the release binary and run Dashboard store mutation tests with `RDSH_BIN` pointing at it.
