@@ -24,6 +24,15 @@ updates:
     commit-message:
       prefix: chore(deps)
     open-pull-requests-limit: 5
+    # The headless candidate runtime pins the exact upstream bytes of these
+    # packages and verifies their source hashes before it builds. A version
+    # update is therefore not a routine bump: it invalidates the pin on
+    # purpose. Security alerts still arrive; re-pinning is a reviewed change.
+    ignore:
+      - dependency-name: "@earendil-works/pi-ai"
+      - dependency-name: "@deepseek-ai/dsh"
+      - dependency-name: "@deepseek-ai/dsh-llm-pi-ai"
+      - dependency-name: "ws"
   - package-ecosystem: npm
     directory: /plugins/rdsh-compute
     schedule:
