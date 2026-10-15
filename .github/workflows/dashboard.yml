@@ -10,6 +10,7 @@ on:
         "assets/**",
         "src/main.rs",
         "src/worker_git.rs",
+        "scripts/bench-worker-git.mjs",
         "Cargo.toml",
         "Cargo.lock",
         ".github/workflows/dashboard.yml",
@@ -21,6 +22,7 @@ on:
         "assets/**",
         "src/main.rs",
         "src/worker_git.rs",
+        "scripts/bench-worker-git.mjs",
         "Cargo.toml",
         "Cargo.lock",
         ".github/workflows/dashboard.yml",
@@ -55,6 +57,13 @@ jobs:
           cache: npm
           cache-dependency-path: dashboard/package-lock.json
       - run: npm ci
+      - if: runner.os == 'Windows'
+        name: Measure worker Git bridge latency
+        shell: pwsh
+        run: |
+          cargo build --locked --release --manifest-path ../Cargo.toml --bin rdsh
+          $env:RDSH_BENCH_BIN = (Resolve-Path ../target/release/rdsh.exe).Path
+          node ../scripts/bench-worker-git.mjs
       - if: runner.os == 'Windows'
         # Native GUI startup must not compete with every process-heavy fixture.
         # Run every test with the same assertions and startup deadlines.

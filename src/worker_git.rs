@@ -213,55 +213,140 @@ struct RepositoryInfo {
     git_common_dir: PathBuf,
     head_sha: String,
     branch: Option<String>,
+    dirty_paths: Vec<String>,
 }
 
 fn repository_info(root: &Path) -> Result<RepositoryInfo> {
     let canonical =
         normalize_windows_path(&fs::canonicalize(root).context("resolve worker repository")?);
-    let top_output = git_text(&canonical, &["rev-parse", "--show-toplevel"])?;
-    let top_raw = top_output
-        .strip_suffix('\n')
-        .context("Git project root is unavailable")?;
-    let top =
-        normalize_windows_path(&fs::canonicalize(top_raw).context("resolve Git project root")?);
-    ensure!(
-        same_path(&canonical, &top),
-        "exact_git_project_root_required"
-    );
-
-    let common_output = git_text(&canonical, &["rev-parse", "--git-common-dir"])?;
-    let common_raw = common_output
-        .strip_suffix('\n')
-        .context("Git common directory is unavailable")?;
+    let context_output = git_text(
+        &canonical,
+        &[
+            "rev-parse",
+            "--show-cdup",
+            "--path-format=absolute",
+            "--git-common-dir",
+        ],
+    )?;
+    let common_raw = parse_repository_context(&context_output)?;
     let common = normalize_windows_path(
-        &fs::canonicalize(canonical.join(common_raw)).context("resolve Git common directory")?,
+        &fs::canonicalize(&common_raw).context("resolve Git common directory")?,
     );
 
-    let identity_output = git_text(&canonical, &["rev-parse", "HEAD", "--abbrev-ref", "HEAD"])?;
-    let identity = identity_output
-        .strip_suffix('\n')
-        .context("Git repository identity is incomplete")?;
-    let (head_sha, branch_field) = identity
-        .split_once('\n')
-        .context("Git branch is unavailable")?;
-    ensure!(
-        !branch_field.contains('\n'),
-        "unexpected Git repository identity output"
-    );
-    let head_sha = head_sha.to_string();
-    ensure!(valid_head_sha(&head_sha), "git_head_unavailable");
-
-    let branch = match branch_field {
-        "HEAD" => None,
-        branch => Some(branch.to_string()),
-    };
+    let status = git_text(
+        &canonical,
+        &[
+            "status",
+            "--porcelain=v2",
+            "--branch",
+            "--no-ahead-behind",
+            "-z",
+            "--untracked-files=all",
+        ],
+    )?;
+    let status = parse_status_v2(&status)?;
+    let head_sha = status.head_sha.context("git_head_unavailable")?;
+    ensure!(status.branch_header, "Git branch is unavailable");
 
     Ok(RepositoryInfo {
         root: canonical,
         git_common_dir: common,
         head_sha,
-        branch,
+        branch: status.branch,
+        dirty_paths: status.dirty_paths,
     })
+}
+
+fn parse_repository_context(output: &str) -> Result<PathBuf> {
+    let common = output
+        .strip_prefix('\n')
+        .context("exact_git_project_root_required")?
+        .strip_suffix('\n')
+        .context("Git common directory is unavailable")?;
+    ensure!(
+        Path::new(common).is_absolute(),
+        "Git common directory is unavailable"
+    );
+    Ok(PathBuf::from(common))
+}
+
+struct StatusSnapshot {
+    head_sha: Option<String>,
+    branch: Option<String>,
+    branch_header: bool,
+    dirty_paths: Vec<String>,
+}
+
+fn parse_status_v2(status: &str) -> Result<StatusSnapshot> {
+    let parts: Vec<&str> = status.split('\0').collect();
+    let mut head_sha = None;
+    let mut branch = None;
+    let mut branch_header = false;
+    let mut names = HashSet::new();
+    let mut index = 0;
+    while index < parts.len() {
+        let item = parts[index];
+        index += 1;
+        if item.is_empty() {
+            continue;
+        }
+        if let Some(value) = item.strip_prefix("# branch.oid ") {
+            if value == "(initial)" {
+                head_sha = None;
+            } else {
+                ensure!(valid_head_sha(value), "git_head_unavailable");
+                head_sha = Some(value.to_string());
+            }
+            continue;
+        }
+        if let Some(value) = item.strip_prefix("# branch.head ") {
+            branch_header = true;
+            branch = (value != "(detached)").then(|| value.to_string());
+            continue;
+        }
+        if item.starts_with("# ") {
+            continue;
+        }
+        if let Some(path) = item.strip_prefix("? ") {
+            names.insert(path.to_string());
+            continue;
+        }
+
+        let (fields, path_field) = match item.as_bytes().first() {
+            Some(b'1') => (item.splitn(9, ' ').collect::<Vec<_>>(), 8),
+            Some(b'2') => (item.splitn(10, ' ').collect::<Vec<_>>(), 9),
+            Some(b'u') => (item.splitn(11, ' ').collect::<Vec<_>>(), 10),
+            _ => bail!("git_status_unobservable"),
+        };
+        ensure!(fields.len() == path_field + 1, "git_status_unobservable");
+        names.insert(fields[path_field].to_string());
+        if item.starts_with("2 ") {
+            let original = parts
+                .get(index)
+                .filter(|path| !path.is_empty())
+                .context("git_status_unobservable")?;
+            names.insert((*original).to_string());
+            index += 1;
+        }
+    }
+
+    let mut dirty_paths: Vec<String> = names.into_iter().collect();
+    dirty_paths.sort_by(|left, right| left.encode_utf16().cmp(right.encode_utf16()));
+    Ok(StatusSnapshot {
+        head_sha,
+        branch,
+        branch_header,
+        dirty_paths,
+    })
+}
+
+fn current_head_sha(root: &Path) -> Result<String> {
+    let output = git_text(root, &["rev-parse", "--verify", "HEAD"])?;
+    let head = output
+        .strip_suffix('\n')
+        .context("Git repository identity is incomplete")?;
+    ensure!(valid_head_sha(head), "git_head_unavailable");
+    Ok(head.to_string())
 }
 
 fn dirty_paths(root: &Path) -> Result<Vec<String>> {
@@ -341,13 +426,12 @@ fn tracked_paths(root: &Path) -> Result<Vec<String>> {
 
 fn source_snapshot(root: &Path) -> Result<Value> {
     let repo = repository_info(root)?;
-    let dirty = dirty_paths(&repo.root)?;
     Ok(serde_json::json!({
         "root": path_text(&repo.root)?,
         "git_common_dir": path_text(&repo.git_common_dir)?,
         "head_sha": repo.head_sha,
         "branch": repo.branch,
-        "dirty_paths": dirty,
+        "dirty_paths": repo.dirty_paths,
     }))
 }
 
@@ -365,7 +449,7 @@ fn observe_worktree(
         "worker_worktree_identity_changed"
     );
     is_ancestor(&current.root, base, &current.head_sha)?;
-    let dirty = dirty_paths(&current.root)?;
+    let dirty = current.dirty_paths;
     let committed = changed_paths(&current.root, base, &current.head_sha)?;
     let mut changed: Vec<String> = dirty
         .iter()
@@ -376,7 +460,7 @@ fn observe_worktree(
         .collect();
     changed.sort_by(|left, right| left.encode_utf16().cmp(right.encode_utf16()));
     ensure!(
-        repository_info(&current.root)?.head_sha == current.head_sha,
+        current_head_sha(&current.root)? == current.head_sha,
         "worker_head_changed_during_scan"
     );
     Ok(serde_json::json!({
@@ -807,6 +891,57 @@ fn git_failure(output: &ProcessOutput) -> String {
 mod tests {
     use super::*;
     use std::io::Cursor;
+
+    #[test]
+    fn repository_context_preserves_newlines_in_common_dir() {
+        let output = "\n/tmp/repo\nname/.git\n";
+        assert_eq!(
+            parse_repository_context(output).unwrap(),
+            PathBuf::from("/tmp/repo\nname/.git")
+        );
+    }
+
+    #[test]
+    fn repository_context_rejects_non_root_working_directories() {
+        let output = "../\n/tmp/repo/.git\n";
+        assert_eq!(
+            parse_repository_context(output).unwrap_err().to_string(),
+            "exact_git_project_root_required"
+        );
+    }
+
+    #[test]
+    fn porcelain_v2_status_returns_branch_head_and_nul_framed_paths() {
+        let head = "0123456789abcdef0123456789abcdef01234567";
+        let status = format!(
+            "# branch.oid {head}\0# branch.head feature/test\0# branch.upstream origin/feature/test\0# branch.ab +1 -2\0\
+             1 .M N... 100644 100644 100644 {head} {head} modified path.txt\0\
+             2 R. N... 100644 100644 100644 {head} {head} R100 new name.txt\0old name.txt\0\
+             ? untracked\nname.txt\0"
+        );
+        let parsed = parse_status_v2(&status).unwrap();
+        assert_eq!(parsed.head_sha.as_deref(), Some(head));
+        assert_eq!(parsed.branch.as_deref(), Some("feature/test"));
+        assert_eq!(
+            parsed.dirty_paths,
+            [
+                "modified path.txt",
+                "new name.txt",
+                "old name.txt",
+                "untracked\nname.txt"
+            ]
+        );
+    }
+
+    #[test]
+    fn porcelain_v2_status_uses_no_branch_for_detached_head() {
+        let head = "abcdef0123456789abcdef0123456789abcdef01";
+        let status = format!("# branch.oid {head}\0# branch.head (detached)\0");
+        let parsed = parse_status_v2(&status).unwrap();
+        assert_eq!(parsed.head_sha.as_deref(), Some(head));
+        assert_eq!(parsed.branch, None);
+        assert!(parsed.dirty_paths.is_empty());
+    }
 
     #[test]
     fn nul_status_parsing_keeps_both_names_and_uses_utf16_sort_order() {

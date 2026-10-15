@@ -60,11 +60,16 @@ fn init_repo(root: &Path) {
 }
 
 fn invoke(request: Value) -> Output {
+    invoke_with_path(request, None)
+}
+
+fn invoke_with_path(request: Value, path: Option<&std::ffi::OsStr>) -> Output {
     let mut child = Command::new(env!("CARGO_BIN_EXE_rdsh"))
         .arg("worker-git")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
+        .envs(path.into_iter().map(|path| ("PATH", path)))
         .spawn()
         .expect("start rdsh worker-git command");
     child
@@ -74,6 +79,42 @@ fn invoke(request: Value) -> Output {
         .write_all(request.to_string().as_bytes())
         .expect("write worker-git request");
     child.wait_with_output().expect("read worker-git response")
+}
+
+#[cfg(unix)]
+fn install_git_counter(temp: &Path) -> (PathBuf, PathBuf) {
+    use std::os::unix::fs::PermissionsExt;
+
+    let real_git = std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())
+        .map(|directory| directory.join("git"))
+        .find(|candidate| candidate.is_file())
+        .expect("find real git executable");
+    let bin = temp.join("bin");
+    fs::create_dir_all(&bin).unwrap();
+    let count = temp.join("git-count");
+    let wrapper = bin.join("git");
+    fs::write(
+        &wrapper,
+        format!(
+            "#!/bin/sh\nprintf x >> '{}'\nexec '{}' \"$@\"\n",
+            count.display(),
+            real_git.display()
+        ),
+    )
+    .unwrap();
+    let mut permissions = fs::metadata(&wrapper).unwrap().permissions();
+    permissions.set_mode(0o700);
+    fs::set_permissions(&wrapper, permissions).unwrap();
+    (bin, count)
+}
+
+#[cfg(unix)]
+fn path_with_git_counter(bin: &Path) -> std::ffi::OsString {
+    let mut paths = vec![bin.to_path_buf()];
+    paths.extend(std::env::split_paths(
+        &std::env::var_os("PATH").unwrap_or_default(),
+    ));
+    std::env::join_paths(paths).expect("join PATH entries")
 }
 
 fn response(output: Output) -> Value {
@@ -188,6 +229,42 @@ fn repository_and_git_path_operations_preserve_nul_framing() {
     response(invoke(
         json!({"op":"is-ancestor","root":root,"ancestor":base,"descendant":head}),
     ));
+}
+
+#[cfg(unix)]
+#[test]
+fn source_snapshot_and_worktree_observation_minimize_git_process_starts() {
+    let temp = TempDir::new();
+    let root = temp.0.join("repo");
+    init_repo(&root);
+    fs::write(root.join("tracked.txt"), "base\n").unwrap();
+    git(&root, &["add", "--all"]);
+    git(&root, &["commit", "-qm", "initial"]);
+    let base = git(&root, &["rev-parse", "HEAD"]);
+    let repository = response(invoke(json!({"op":"repository","root":root})));
+    let (bin, count) = install_git_counter(&temp.0);
+    let path = path_with_git_counter(&bin);
+
+    let source = response(invoke_with_path(
+        json!({"op":"source-snapshot","root":root}),
+        Some(&path),
+    ));
+    assert_eq!(source["head_sha"], base);
+    assert_eq!(fs::read(&count).unwrap().len(), 2);
+
+    fs::write(&count, "").unwrap();
+    let observed = response(invoke_with_path(
+        json!({
+            "op":"observe-worktree",
+            "root":root,
+            "git_common_dir":repository["git_common_dir"],
+            "branch":repository["branch"],
+            "base":base
+        }),
+        Some(&path),
+    ));
+    assert_eq!(observed["head_sha"], base);
+    assert_eq!(fs::read(&count).unwrap().len(), 5);
 }
 
 #[cfg(unix)]
