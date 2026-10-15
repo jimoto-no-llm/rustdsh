@@ -1,0 +1,102 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import {
+  InstructionQueueWorker,
+  resolveRdshExecutable,
+} from "../instruction-queue-worker.mjs";
+
+function fakeWorker(t) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "rdsh-iq-worker-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const script = path.join(root, "fake-worker.mjs");
+  fs.writeFileSync(
+    script,
+    `import { createInterface } from "node:readline";
+const input = createInterface({ input: process.stdin, crlfDelay: Infinity });
+input.on("line", (line) => {
+  const request = JSON.parse(line);
+  if (request.exit) process.exit(7);
+  if (request.malformed) return process.stdout.write("not-json\\n");
+  if (request.fail) return process.stdout.write(JSON.stringify({ error: "conflict", status: 409 }) + "\\n");
+  process.stdout.write(JSON.stringify({ id: request.id }) + "\\n");
+});
+input.on("close", () => process.exit(0));\n`,
+  );
+  return new InstructionQueueWorker(process.execPath, {
+    prefixArgs: [script],
+    requestTimeoutMs: 2_000,
+    closeTimeoutMs: 2_000,
+  });
+}
+
+test("resolveRdshExecutable accepts an absolute override and searches absolute PATH entries", async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "rdsh-iq-path-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const name = process.platform === "win32" ? "rdsh.exe" : "rdsh";
+  const binary = path.join(root, name);
+  fs.writeFileSync(binary, "test executable");
+  if (process.platform !== "win32") fs.chmodSync(binary, 0o755);
+
+  assert.equal(await resolveRdshExecutable({ RDSH_BIN: binary }), binary);
+  await assert.rejects(
+    resolveRdshExecutable({ RDSH_BIN: "./rdsh" }),
+    /RDSH_BIN must be an absolute path/,
+  );
+  assert.equal(
+    await resolveRdshExecutable({ PATH: `${root}${path.delimiter}/relative` }),
+    binary,
+  );
+});
+
+test("worker serializes requests and preserves Rust error status", async (t) => {
+  const worker = fakeWorker(t);
+  const results = await Promise.all([
+    worker.request({ id: "first" }),
+    worker.request({ id: "second" }),
+  ]);
+  assert.deepEqual(results, [{ id: "first" }, { id: "second" }]);
+  await assert.rejects(worker.request({ fail: true }), (error) => {
+    assert.equal(error.message, "conflict");
+    assert.equal(error.status, 409);
+    return true;
+  });
+  assert.deepEqual(await worker.request({ id: "after-error" }), {
+    id: "after-error",
+  });
+  await worker.close();
+});
+
+test("worker rejects malformed output and unexpected process exits, then restarts", async (t) => {
+  const worker = fakeWorker(t);
+  await assert.rejects(worker.request({ malformed: true }), /invalid JSON/);
+  await assert.rejects(worker.request({ exit: true }), /exited unexpectedly/);
+  assert.deepEqual(await worker.request({ id: "restarted" }), {
+    id: "restarted",
+  });
+  await worker.close();
+});
+
+test("worker reports spawn failures and closes cleanly", async (t) => {
+  const missing = path.join(os.tmpdir(), `rdsh-missing-${process.pid}`);
+  const broken = new InstructionQueueWorker(missing, { requestTimeoutMs: 2_000 });
+  await assert.rejects(broken.request({ id: "missing" }), /spawn|ENOENT/i);
+  await broken.close();
+
+  const worker = fakeWorker(t);
+  assert.deepEqual(await worker.request({ id: "before-close" }), {
+    id: "before-close",
+  });
+  await worker.close();
+  await assert.rejects(worker.request({ id: "after-close" }), /closed/);
+});
+
+test("close drains requests accepted before shutdown", async (t) => {
+  const worker = fakeWorker(t);
+  const request = worker.request({ id: "accepted-before-close" });
+  const closing = worker.close();
+  assert.deepEqual(await request, { id: "accepted-before-close" });
+  await closing;
+});

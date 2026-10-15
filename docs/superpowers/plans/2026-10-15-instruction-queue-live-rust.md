@@ -17,11 +17,11 @@
 - Modify: `src/main.rs`
 - Test: `tests/instruction_queue_cli.rs`
 
-- [ ] Add `instruction_queue::cmd_instruction_queue_serve()` and a `serve` CLI action that does not require `--input-file`.
-- [ ] Parse each input line as `{ operation, state, input, context }`; return a result line with the existing operation output, or `{ "error": message, "status": code }` for that request, then continue reading the next line.
-- [ ] Keep file-based `validate|context|submit|resolve|control` behavior unchanged by extracting a shared `run_instruction_queue(action, document)` function.
-- [ ] Add an integration test that sends a successful mutation, an invalid request, then another valid request through one child and verifies three ordered response lines and continued service after the error.
-- [ ] Verify RED/GREEN with `CARGO_TARGET_DIR=/tmp/rdsh-instruction-queue-target cargo test --locked --test instruction_queue_cli instruction_queue_serve`.
+- [x] Add `instruction_queue::cmd_instruction_queue_serve()` and a `serve` CLI action that does not require `--input-file`.
+- [x] Parse each input line as `{ operation, state, input, context }`; return a result line with the existing operation output, or `{ "error": message, "status": code }` for that request, then continue reading the next line.
+- [x] Keep file-based `validate|context|submit|resolve|control` behavior unchanged by extracting a shared `run_instruction_queue(action, document)` function.
+- [x] Add an integration test that sends a successful mutation, an invalid request, then another valid request through one child and verifies three ordered response lines and continued service after the error.
+- [x] Verify RED/GREEN with `CARGO_TARGET_DIR=/tmp/rdsh-instruction-queue-target cargo test --locked --test instruction_queue_cli instruction_queue_serve`.
 
 ### Task 2: Add a managed Node worker
 
@@ -29,11 +29,11 @@
 - Create: `dashboard/instruction-queue-worker.mjs`
 - Create: `dashboard/test/instruction-queue-worker.test.mjs`
 
-- [ ] Resolve the absolute `rdsh` executable from `RDSH_BIN` or absolute `PATH` entries, spawn `rdsh instruction-queue serve`, and serialize requests through a promise queue.
-- [ ] Pair each request with exactly one stdout JSON line; reject the waiting call on parse failure, process exit, or spawn error, and throw native errors with their returned `status`.
-- [ ] Implement `close()` by ending stdin and waiting for process exit, with a bounded termination fallback.
-- [ ] Use a temporary fake executable in tests to cover request order, native error status, premature exit, and clean close.
-- [ ] Verify with `mise exec node@22.23.2 -- node --test dashboard/test/instruction-queue-worker.test.mjs`.
+- [x] Resolve the absolute `rdsh` executable from `RDSH_BIN` or absolute `PATH` entries, spawn `rdsh instruction-queue serve`, and serialize requests through a promise queue.
+- [x] Pair each request with exactly one stdout JSON line; reject the waiting call on parse failure, process exit, or spawn error, and throw native errors with their returned `status`.
+- [x] Implement `close()` by ending stdin and waiting for process exit, with a bounded termination fallback.
+- [x] Use a temporary fake executable in tests to cover request order, native error status, premature exit, and clean close.
+- [x] Verify with `mise exec node@22.23.2 -- node --test dashboard/test/instruction-queue-worker.test.mjs`.
 
 ### Task 3: Route ProjectStore writes through the worker
 
