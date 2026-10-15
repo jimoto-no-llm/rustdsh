@@ -921,13 +921,19 @@ fn git_dirty_content_signature(
     if untracked.len() > 1000 {
         return None;
     }
-    let root = crate::file_security::Root::new(cwd)?;
+    let worktree_output = git_output_in(Some(cwd), &["rev-parse", "--show-toplevel"], deadline)?;
+    let worktree = worktree_output.strip_suffix('\n')?;
+    if worktree.is_empty() || expired(deadline) {
+        return None;
+    }
+    let worktree = std::fs::canonicalize(worktree).ok()?;
+    let root = crate::file_security::Root::new(&worktree)?;
     let mut remaining = 4 * 1024 * 1024usize;
     for (path, _) in untracked {
         if expired(deadline) {
             return None;
         }
-        let file = root.open(&cwd.join(path))?;
+        let file = root.open(&worktree.join(path))?;
         let size = usize::try_from(file.metadata().ok()?.len()).ok()?;
         if size > remaining {
             return None;
@@ -4189,6 +4195,58 @@ mod v3_tests {
         .unwrap();
         let dirty_after = git_dirty_paths(&status_after);
         let content_after = git_dirty_content_signature(&cwd, Some(&dirty_after), None).unwrap();
+
+        assert_eq!(status_before, status_after);
+        assert_ne!(content_before, content_after);
+    }
+
+    #[test]
+    fn git_snapshot_hashes_root_relative_untracked_paths_from_nested_cwd() {
+        use std::process::Command;
+
+        let temporary = TempDir::new();
+        let run_git = |args: &[&str]| {
+            let output = Command::new("git")
+                .args(args)
+                .current_dir(&temporary.0)
+                .output()
+                .unwrap();
+            assert!(output.status.success(), "git {args:?}: {output:?}");
+            output
+        };
+        run_git(&["init", "--quiet"]);
+        run_git(&["config", "user.name", "rdsh test"]);
+        run_git(&["config", "user.email", "rdsh-test@example.invalid"]);
+        let repository = std::fs::canonicalize(&temporary.0).unwrap();
+        let nested = repository.join("sub");
+        std::fs::create_dir_all(&nested).unwrap();
+        std::fs::write(nested.join("note.txt"), "tracked sibling").unwrap();
+        run_git(&["add", "sub/note.txt"]);
+        run_git(&["commit", "--quiet", "-m", "base"]);
+
+        let untracked = repository.join("note.txt");
+        std::fs::write(&untracked, "first untracked value").unwrap();
+        let nested = std::fs::canonicalize(nested).unwrap();
+        let status_before = git_output_in(
+            Some(&nested),
+            &["status", "--porcelain=v1", "-z", "--untracked-files=all"],
+            None,
+        )
+        .unwrap();
+        let dirty_before = git_dirty_paths(&status_before);
+        assert!(dirty_before.contains_key("note.txt"));
+        let content_before =
+            git_dirty_content_signature(&nested, Some(&dirty_before), None).unwrap();
+
+        std::fs::write(&untracked, "second untracked value").unwrap();
+        let status_after = git_output_in(
+            Some(&nested),
+            &["status", "--porcelain=v1", "-z", "--untracked-files=all"],
+            None,
+        )
+        .unwrap();
+        let dirty_after = git_dirty_paths(&status_after);
+        let content_after = git_dirty_content_signature(&nested, Some(&dirty_after), None).unwrap();
 
         assert_eq!(status_before, status_after);
         assert_ne!(content_before, content_after);
