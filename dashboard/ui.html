@@ -360,11 +360,19 @@
         font-size: 14px;
         white-space: nowrap;
       }
+      .outcome-card .decision-heading .status {
+        max-width: 100%;
+        white-space: normal;
+        overflow-wrap: anywhere;
+      }
       .doing {
         color: var(--blue);
       }
       .done {
         color: var(--green);
+      }
+      .status.stale {
+        color: var(--red);
       }
       .blocked {
         color: var(--red);
@@ -398,6 +406,27 @@
       .decision-card h3 {
         font-size: 18px;
         margin: 12px 0;
+      }
+      .outcome-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr));
+        gap: 16px;
+      }
+      .outcome-checks {
+        border-top: 1px solid var(--line);
+        padding-top: 12px;
+      }
+      .outcome-checks ul {
+        padding-left: 22px;
+      }
+      .outcome-checks li {
+        margin: 12px 0;
+      }
+      .outcome-checks p {
+        margin: 4px 0 8px;
+      }
+      .outcome-checks code {
+        overflow-wrap: anywhere;
       }
       .decision-details {
         display: grid;
@@ -628,6 +657,85 @@
         padding: 13px 16px;
         background: #edf1f7;
         border-radius: 8px;
+      }
+      .workspace-settings {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+        margin: 16px 0;
+      }
+      .workspace-settings fieldset {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+        margin: 0;
+        padding: 8px 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+      .workspace-settings legend {
+        padding: 0 5px;
+      }
+      .workspace-settings label {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .workspace-settings input {
+        width: auto;
+        min-height: 0;
+      }
+      .workspace-pane-nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 12px 0;
+      }
+      .workspace-pane-nav a {
+        display: inline-block;
+        min-height: 40px;
+        padding: 8px 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+      .workspace-grid {
+        display: grid;
+        align-items: start;
+        gap: 16px;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .workspace-grid[data-layout="1"] {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      .workspace-grid[data-layout="2"] {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .workspace-grid[data-layout="3"] {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .workspace-pane {
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
+      .workspace-pane:focus {
+        outline: 2px solid var(--blue);
+        outline-offset: 3px;
+      }
+      @media (max-width: 1100px) {
+        .workspace-grid[data-layout="2"],
+        .workspace-grid[data-layout="3"] {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+      @media (max-width: 700px) {
+        .workspace-grid,
+        .workspace-grid[data-layout="1"],
+        .workspace-grid[data-layout="2"],
+        .workspace-grid[data-layout="3"] {
+          grid-template-columns: minmax(0, 1fr);
+        }
       }
       /* Stable anchors and the existing command palette remain usable. */
       .skip {
@@ -874,38 +982,73 @@
         </section>
       </section>
       <div id="project-content" tabindex="-1">
-        <section
-          id="project-overview"
-          class="summary-card"
-          aria-labelledby="overview-heading"
-        >
-          <h2 id="overview-heading" tabindex="-1"><span data-i18n="chrome.overview">いまの状況</span></h2>
-          <label for="overview-task"><span data-i18n="chrome.scope">確認する範囲</span></label
-          ><select id="overview-task"></select>
-          <p id="overview-context"></p>
-          <dl class="summary-facts">
-            <dt><span data-i18n="chrome.status">状態</span></dt>
-            <dd>
-              <div id="overview-state"><span data-i18n="chrome.executionUnavailable">実行状態は未取得</span></div>
-              <p class="sub" id="overview-task-report"></p>
-            </dd>
-            <dt><span data-i18n="chrome.observation">観測</span></dt>
-            <dd>
-              <div id="overview-observed"><span data-i18n="chrome.noObservation">実行の観測記録なし</span></div>
-              <p class="sub" id="overview-report-updated"></p>
-            </dd>
-            <dt><span data-i18n="chrome.lastResult">最後の結果</span></dt>
-            <dd>
-              <div id="overview-result"><span data-i18n="chrome.unavailable">未取得</span></div>
-              <p class="sub" id="overview-result-detail"></p>
-            </dd>
-            <dt><span data-i18n="chrome.decision">判断</span></dt>
-            <dd id="overview-decision"><span data-i18n="chrome.checking">確認中…</span></dd>
-            <dt><span data-i18n="chrome.stop">停止</span></dt>
-            <dd id="overview-stop"><span data-i18n="chrome.stopUnsupported">この画面からの停止は非対応</span></dd>
-          </dl>
-          <ul id="overview-pending"></ul>
-        </section>
+        <div class="workspace-settings">
+          <fieldset
+            id="workspace-layout-controls"
+            disabled
+            aria-describedby="workspace-layout-help"
+          >
+            <legend><span data-i18n="workspace.columns">PCの最大列数</span></legend>
+            <label>
+              <input type="radio" name="workspace-layout" value="1" /><span data-i18n="workspace.one">1列</span>
+            </label>
+            <label>
+              <input type="radio" name="workspace-layout" value="2" /><span data-i18n="workspace.two">2列</span>
+            </label>
+            <label>
+              <input type="radio" name="workspace-layout" value="3" checked /><span data-i18n="workspace.three">3列</span>
+            </label>
+          </fieldset>
+          <p class="sub" id="workspace-layout-help">
+            <span data-i18n="workspace.help">選んだ列数をPCでの上限としてprojectごとにこのブラウザーへ保存します。画面幅1100px以下では最大2列、700px以下では1列になります。</span>
+          </p>
+        </div>
+        <p id="workspace-layout-status" role="status" aria-live="polite"></p>
+        <nav class="workspace-pane-nav" aria-label="ワークスペースのペインへ移動" data-i18n-aria-label="workspace.navigate">
+          <a href="#workspace-decisions"><span data-i18n="workspace.decisions">判断と質問</span></a>
+          <a href="#workspace-work"><span data-i18n="workspace.work">タスクと作業</span></a>
+          <a href="#workspace-history"><span data-i18n="workspace.history">履歴と成果</span></a>
+        </nav>
+        <div class="workspace-grid" id="workspace-grid" data-layout="3">
+          <section
+            id="workspace-decisions"
+            class="workspace-pane"
+            tabindex="-1"
+            aria-labelledby="workspace-decisions-heading"
+          >
+            <h2 id="workspace-decisions-heading"><span data-i18n="workspace.decisions">判断と質問</span></h2>
+            <section
+              id="project-overview"
+              class="summary-card"
+              aria-labelledby="overview-heading"
+            >
+              <h3 id="overview-heading" tabindex="-1"><span data-i18n="chrome.overview">いまの状況</span></h3>
+              <label for="overview-task"><span data-i18n="chrome.scope">確認する範囲</span></label
+              ><select id="overview-task"></select>
+              <p id="overview-context"></p>
+              <dl class="summary-facts">
+                <dt><span data-i18n="chrome.status">状態</span></dt>
+                <dd>
+                  <div id="overview-state"><span data-i18n="chrome.executionUnavailable">実行状態は未取得</span></div>
+                  <p class="sub" id="overview-task-report"></p>
+                </dd>
+                <dt><span data-i18n="chrome.observation">観測</span></dt>
+                <dd>
+                  <div id="overview-observed"><span data-i18n="chrome.noObservation">実行の観測記録なし</span></div>
+                  <p class="sub" id="overview-report-updated"></p>
+                </dd>
+                <dt><span data-i18n="chrome.lastResult">最後の結果</span></dt>
+                <dd>
+                  <div id="overview-result"><span data-i18n="chrome.unavailable">未取得</span></div>
+                  <p class="sub" id="overview-result-detail"></p>
+                </dd>
+                <dt><span data-i18n="chrome.decision">判断</span></dt>
+                <dd id="overview-decision"><span data-i18n="chrome.checking">確認中…</span></dd>
+                <dt><span data-i18n="chrome.stop">停止</span></dt>
+                <dd id="overview-stop"><span data-i18n="chrome.stopUnsupported">この画面からの停止は非対応</span></dd>
+              </dl>
+              <ul id="overview-pending"></ul>
+            </section>
         <details class="fold" id="observed-cli-panel">
           <summary><span data-i18n="chrome.observeCli">別terminalのCLIを読取専用で観測</span></summary>
           <p class="sub">
@@ -921,7 +1064,7 @@
               <select id="observed-cli-kind">
                 <option value="dsh">DSH</option>
                 <option value="rdsh">rdsh</option>
-                <option value="other" data-i18n="chrome.other">その他</option>
+                <option value="other" data-i18n="observed.other">その他</option>
               </select>
             </label>
             <label for="observed-cli-task">
@@ -934,93 +1077,109 @@
           <div class="feed" id="observed-cli-list" aria-live="polite"></div>
           <button id="observed-cli-refresh" type="button"><span data-i18n="chrome.recheck">識別状態を再確認</span></button>
         </details>
-        <h2 id="pending-heading" tabindex="-1"><span data-i18n="chrome.pending">未回答の質問</span></h2>
-        <p class="sub" id="pending-note">
-          <span data-i18n="chrome.pendingHelp">プロジェクト全体の質問です。回答はこの質問への返答のみです。対象・条件が変わった場合は回答前に内容を再確認してください。回答しただけで実行権限は生まれません。</span>
-        </p>
-        <div
-          id="questions"
-          class="decision-grid"
-          aria-labelledby="pending-heading"
-          aria-describedby="pending-note"
-        ></div>
-        <section id="budget-admission" aria-label="予算制御" data-i18n-aria-label="chrome.budget"></section>
-        <details class="fold" id="metrics-detail">
-          <summary><span data-i18n="chrome.metricsSummary">プロジェクト全体の数値</span></summary>
-          <h2 id="metrics-heading" tabindex="-1"><span data-i18n="chrome.metrics">数値の詳細</span></h2>
-          <div class="cards" id="cards"></div>
-          <h2><span data-i18n="chrome.costDetails">費用の明細と出所</span></h2>
-          <section id="cost-ledger" aria-label="費用台帳" data-i18n-aria-label="chrome.costLedger"></section>
-        </details>
-        <details class="fold" id="model-catalog-detail">
-          <summary><span data-i18n="chrome.modelPrototype">モデルカタログ（試作）</span></summary>
-          <p class="sub">
-            <span data-i18n="chrome.modelHelp">手入力の報告値です。総・有効パラメータは出所確認用で、実測の断定ではありません。</span>
-          </p>
-          <section id="model-catalog" aria-label="モデルカタログ" data-i18n-aria-label="chrome.modelCatalog"></section>
-        </details>
-        <details class="fold" id="tasks-detail">
-          <summary><span data-i18n="chrome.taskList">タスク一覧</span></summary>
-          <h2 id="tasks-heading" tabindex="-1">
-            <span data-i18n="chrome.tasks">タスク</span> <span class="sub" id="task-milestones"></span>
-          </h2>
-          <div class="table-box">
-            <!-- #57: 各行に task-<id> の目印を付け、端末を替えても同じ行へ戻れるようにします。 -->
-            <table aria-labelledby="tasks-heading">
-              <thead>
-                <tr>
-                  <th scope="col">ID</th>
-                  <th scope="col"><span data-i18n="chrome.status">状態</span></th>
-                  <th scope="col"><span data-i18n="chrome.title">題名</span></th>
-                  <th scope="col"><span data-i18n="chrome.blocker">ブロック要因</span></th>
-                </tr>
-              </thead>
-              <tbody id="tasks"></tbody>
-            </table>
-          </div>
-        </details>
-        <details class="fold" id="human-annotation-detail">
-          <summary><span data-i18n="chrome.annotationSummary">人間のブックマーク・注釈</span></summary>
-          <h2><span data-i18n="chrome.annotations">人間のブックマーク</span></h2>
-          <p class="sub">
-            <span data-i18n="chrome.annotationHelp">AI要約と別ファイルに保存します。ログ・決定内容・Git差分の参照先は固定され、変更や削除を検出した場合は状態を表示します。</span>
-          </p>
-          <section id="human-annotations-panel" aria-label="人間のブックマーク管理" data-i18n-aria-label="chrome.annotationManage"></section>
-        </details>
-        <details class="fold" id="instruction-detail">
-          <summary><span data-i18n="chrome.followUpSummary">同じsessionへ追指示を送る</span></summary>
-          <h2><span data-i18n="chrome.followUp">追指示と適用タイミング</span></h2>
-          <p class="sub">
-            <span data-i18n="chrome.followUpHelp">下書きはこの端末で保持します。入力は順番に配送し、結果不明の入力がある場合は保留します。指示の保存で新しい実行権限は発行されません。</span>
-          </p>
-          <section
-            id="instruction-panel"
-            aria-label="追指示の投稿と確認" data-i18n-aria-label="chrome.followUpManage"
-          ></section>
-        </details>
-        <details class="fold" id="reply-detail">
-          <summary><span data-i18n="chrome.answerSummary">回答の保存・適用を確認</span></summary>
-          <section
-            id="reply-applications"
-            hidden
-            aria-labelledby="reply-heading"
-          >
-            <h2 id="reply-heading"><span data-i18n="chrome.answers">回答の適用状況</span></h2>
-            <p class="sub">
-              <span data-i18n="chrome.answerHelp">保存・通知配送・対象consumerの読取・入力処理の結果を分けて確認します。完了表示はこの回答入力へのACP応答です。作業の完了は受入検証で確認します。</span>
+            <h3 id="pending-heading" tabindex="-1"><span data-i18n="chrome.pending">未回答の質問</span></h3>
+            <p class="sub" id="pending-note">
+              <span data-i18n="chrome.pendingHelp">プロジェクト全体の質問です。回答はこの質問への返答のみです。対象・条件が変わった場合は回答前に内容を再確認してください。回答しただけで実行権限は生まれません。</span>
             </p>
-            <div id="reply-status" class="decision-grid"></div>
+            <div
+              id="questions"
+              class="decision-grid"
+              aria-labelledby="pending-heading"
+              aria-describedby="pending-note"
+            ></div>
+            <section id="budget-admission" aria-label="予算制御" data-i18n-aria-label="chrome.budget"></section>
           </section>
-        </details>
-        <details class="fold" id="progress-detail">
-          <summary><span data-i18n="chrome.progressSummary">進捗・成果物の報告</span></summary>
-          <h2><span data-i18n="chrome.progress">進捗・成果物の報告履歴</span></h2>
-          <div class="feed" id="events"></div>
-        </details>
-        <details id="answered">
-          <summary><span data-i18n="chrome.answered">回答済みの質問</span></summary>
-          <div class="feed" id="answers"></div>
-        </details>
+          <section
+            id="workspace-work"
+            class="workspace-pane"
+            tabindex="-1"
+            aria-labelledby="workspace-work-heading"
+          >
+            <h2 id="workspace-work-heading"><span data-i18n="workspace.work">タスクと作業</span></h2>
+            <details class="fold" id="metrics-detail">
+              <summary><span data-i18n="chrome.metricsSummary">プロジェクト全体の数値</span></summary>
+              <h3 id="metrics-heading" tabindex="-1"><span data-i18n="chrome.metrics">数値の詳細</span></h3>
+              <div class="cards" id="cards"></div>
+              <h3><span data-i18n="chrome.costDetails">費用の明細と出所</span></h3>
+              <section id="cost-ledger" aria-label="費用台帳" data-i18n-aria-label="chrome.costLedger"></section>
+            </details>
+            <details class="fold" id="model-catalog-detail">
+              <summary><span data-i18n="chrome.modelPrototype">モデルカタログ（試作）</span></summary>
+              <p class="sub">
+                <span data-i18n="chrome.modelHelp">手入力の報告値です。総・有効パラメータは出所確認用で、実測の断定ではありません。</span>
+              </p>
+              <section id="model-catalog" aria-label="モデルカタログ" data-i18n-aria-label="chrome.modelCatalog"></section>
+            </details>
+            <details class="fold" id="tasks-detail">
+              <summary><span data-i18n="outcome.heading">成果と受入条件</span></summary>
+              <h3 id="tasks-heading" tabindex="-1"><span data-i18n="outcome.cards">成果中心のタスクカード</span></h3>
+              <p class="sub">
+                <span data-i18n="outcome.disclaimer">done は作業の申告です。受入条件の検証結果とは別に確認します。</span>
+              </p>
+              <div
+                id="tasks"
+                class="outcome-grid"
+                aria-labelledby="tasks-heading"
+              ></div>
+              <h3 id="milestones-heading"><span data-i18n="outcome.milestones">マイルストーンの終了条件</span></h3>
+              <div
+                id="task-milestones"
+                class="outcome-grid"
+                aria-labelledby="milestones-heading"
+              ></div>
+            </details>
+            <details class="fold" id="instruction-detail">
+              <summary><span data-i18n="chrome.followUpSummary">同じsessionへ追指示を送る</span></summary>
+              <h3><span data-i18n="chrome.followUp">追指示と適用タイミング</span></h3>
+              <p class="sub">
+                <span data-i18n="chrome.followUpHelp">下書きはこの端末で保持します。入力は順番に配送し、結果不明の入力がある場合は保留します。指示の保存で新しい実行権限は発行されません。</span>
+              </p>
+              <section
+                id="instruction-panel"
+                aria-label="追指示の投稿と確認" data-i18n-aria-label="chrome.followUpManage"
+              ></section>
+            </details>
+            <details class="fold" id="reply-detail">
+              <summary><span data-i18n="chrome.answerSummary">回答の保存・適用を確認</span></summary>
+              <section
+                id="reply-applications"
+                hidden
+                aria-labelledby="reply-heading"
+              >
+                <h3 id="reply-heading"><span data-i18n="chrome.answers">回答の適用状況</span></h3>
+                <p class="sub">
+                  <span data-i18n="chrome.answerHelp">保存・通知配送・対象consumerの読取・入力処理の結果を分けて確認します。完了表示はこの回答入力へのACP応答です。作業の完了は受入検証で確認します。</span>
+                </p>
+                <div id="reply-status" class="decision-grid"></div>
+              </section>
+            </details>
+          </section>
+          <section
+            id="workspace-history"
+            class="workspace-pane"
+            tabindex="-1"
+            aria-labelledby="workspace-history-heading"
+          >
+            <h2 id="workspace-history-heading"><span data-i18n="workspace.history">履歴と成果</span></h2>
+            <details class="fold" id="human-annotation-detail">
+              <summary><span data-i18n="chrome.annotationSummary">人間のブックマーク・注釈</span></summary>
+              <h3><span data-i18n="chrome.annotations">人間のブックマーク</span></h3>
+              <p class="sub">
+                <span data-i18n="chrome.annotationHelp">AI要約と別ファイルに保存します。ログ・決定内容・Git差分の参照先は固定され、変更や削除を検出した場合は状態を表示します。</span>
+              </p>
+              <section id="human-annotations-panel" aria-label="人間のブックマーク管理" data-i18n-aria-label="chrome.annotationManage"></section>
+            </details>
+            <details class="fold" id="progress-detail">
+              <summary><span data-i18n="chrome.progressSummary">進捗・成果物の報告</span></summary>
+              <h3><span data-i18n="chrome.progress">進捗・成果物の報告履歴</span></h3>
+              <div class="feed" id="events"></div>
+            </details>
+            <details id="answered">
+              <summary><span data-i18n="chrome.answered">回答済みの質問</span></summary>
+              <div class="feed" id="answers"></div>
+            </details>
+          </section>
+        </div>
       </div>
       <nav id="quick-actions" aria-label="プロジェクトの操作" data-i18n-aria-label="chrome.actions" hidden>
         <p id="quick-context" class="sub"></p>
@@ -1035,7 +1194,7 @@
       <dialog id="palette" aria-labelledby="palette-title">
         <h2 id="palette-title"><span data-i18n="chrome.commands">コマンド</span></h2>
         <p class="sub">
-          <span data-i18n="chrome.paletteHelp">日本語・中国語・英語で絞り込めます。Escで閉じて元の位置に戻ります。</span>
+          <span data-i18n="chrome.paletteHelp">日本語・英語・中国語で絞り込めます。Escで閉じて元の位置に戻ります。</span>
         </p>
         <input
           id="palette-search"
@@ -1059,7 +1218,6 @@
         <span data-i18n="chrome.footer">未取得の指標はMCPから報告されたときに表示されます。費用は報告元のAPI換算値で、請求額とは別です。</span>
       </footer>
     </main>
-    <script type="module" src="./locale.mjs"></script>
     <script type="module" src="./app.mjs"></script>
   </body>
 </html>

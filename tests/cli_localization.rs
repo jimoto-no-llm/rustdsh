@@ -294,7 +294,7 @@ fn settings_and_guard_errors_localize_without_changing_raw_values_or_json_reason
         assert!(json.status.success(), "{json:?}");
         assert_eq!(
             json.stdout,
-            b"{\"classification\":\"unknown\",\"decision\":\"block\",\"reason\":\"policy_unavailable\"}\n",
+            b"{\"decision\":\"block\",\"classification\":\"unknown\",\"reason\":\"policy_unavailable\"}\n",
             "{language}"
         );
     }
@@ -664,8 +664,8 @@ fn main_native_labels_and_errors_are_localized_without_changing_json() {
 fn auth_and_doctor_errors_are_localized_and_keep_raw_configuration() {
     let fixture = Fixture::new();
     for (language, auth_error, doctor_label) in [
-        ("zh-CN", "凭据导入需要", "原始 dsh"),
-        ("ja", "認証情報のインポートには", "元の dsh"),
+        ("zh-CN", "未选择凭据共享", "原始 dsh"),
+        ("ja", "共有する認証情報が選択されていません", "元の dsh"),
     ] {
         let auth = fixture.run(&["--language", language, "auth", "--import"]);
         assert_eq!(auth.status.code(), Some(1), "{auth:?}");
@@ -679,5 +679,96 @@ fn auth_and_doctor_errors_are_localized_and_keep_raw_configuration() {
             String::from_utf8_lossy(&doctor.stdout).contains(doctor_label),
             "{doctor:?}"
         );
+    }
+}
+
+#[test]
+fn integrated_provider_and_new_native_help_cover_every_language() {
+    let fixture = Fixture::new();
+    let commands: &[&[&str]] = &[
+        &["--help"],
+        &["provider", "--help"],
+        &["provider", "list", "--help"],
+        &["provider", "add", "--help"],
+        &["auth", "--help"],
+        &["update", "auto", "status", "--help"],
+        &["subagents", "plan", "--help"],
+        &["task-outcomes", "--help"],
+        &["serial-proxy", "--help"],
+    ];
+    for (language, heading) in [("en", "Options"), ("zh-CN", "选项"), ("ja", "オプション")] {
+        for command in commands {
+            let mut args = vec!["--language", language];
+            args.extend_from_slice(command);
+            let output = fixture.run(&args);
+            assert!(
+                output.status.success(),
+                "{args:?}: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            assert!(stdout.contains(heading), "{args:?}: {stdout}");
+            if command == &["provider", "add", "--help"] {
+                for flag in [
+                    "--model",
+                    "--from-opencode",
+                    "--discover",
+                    "--key-stdin",
+                    "--no-key",
+                    "--replace",
+                ] {
+                    assert!(stdout.contains(flag), "{language}: {stdout}");
+                }
+            }
+            if command == &["auth", "--help"] {
+                assert!(
+                    stdout.contains("--select") && stdout.contains("--unselect"),
+                    "{stdout}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn provider_human_labels_and_protocol_json_resolve_languages_independently() {
+    let fixture = Fixture::new();
+    let mut json_outputs = Vec::new();
+    for (language, heading) in [
+        ("en", "presets:"),
+        ("zh-CN", "预设："),
+        ("ja", "プリセット:"),
+    ] {
+        let output = fixture.run(&["--language", language, "provider", "list"]);
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(String::from_utf8_lossy(&output.stdout).contains(heading));
+        let output = fixture.run(&["--language", language, "provider", "list", "--json"]);
+        assert!(output.status.success());
+        json_outputs.push(output.stdout);
+    }
+    assert_eq!(json_outputs[0], json_outputs[1]);
+    assert_eq!(json_outputs[0], json_outputs[2]);
+}
+
+#[test]
+fn auth_selection_failure_is_localized_without_copying_credentials() {
+    let fixture = Fixture::new();
+    for (language, label) in [
+        ("en", "no credential sharing selected"),
+        ("zh-CN", "未选择凭据共享"),
+        ("ja", "共有する認証情報が選択されていません"),
+    ] {
+        let output = fixture.run(&["--language", language, "auth", "--import"]);
+        assert!(!output.status.success());
+        assert!(
+            String::from_utf8_lossy(&output.stderr).contains(label),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(!fixture.0.join("dsh/.credentials.yaml").exists());
     }
 }

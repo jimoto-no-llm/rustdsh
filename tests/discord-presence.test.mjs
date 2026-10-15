@@ -552,6 +552,7 @@ for (const [language, details, idle, running] of [
     try {
       await presence.refresh();
       assert.equal(sent.at(-1).details, details);
+      assert.equal(presence.status().language, language);
       assert.equal(sent.at(-1).state, idle);
       presence.observe({}, "running");
       presence.observe({}, "running");

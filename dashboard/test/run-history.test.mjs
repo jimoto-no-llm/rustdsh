@@ -253,7 +253,7 @@ test("native OS observation identifies an owned live process and then its exit w
   children.push(child);
   await once(child, "spawn");
   const before = await readProcessIdentity(child.pid);
-  if (["win32", "linux"].includes(process.platform)) {
+  if (["win32", "linux", "darwin"].includes(process.platform)) {
     assert.equal(before.status, "observed");
     assert.equal(
       matchProcessIdentity(
@@ -278,6 +278,7 @@ test("native OS observation identifies an owned live process and then its exit w
     (await readProcessIdentity("1; fixture-secret")).status,
     "unknown",
   );
+  assert.equal((await readProcessIdentity(-1)).status, "unknown");
 });
 
 test("hard exits around intent and ack recover committed events without replaying a fixture side effect", async (t) => {

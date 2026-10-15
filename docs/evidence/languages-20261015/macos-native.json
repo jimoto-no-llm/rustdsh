@@ -1,0 +1,142 @@
+{
+  "result": "PASS",
+  "execution": "local macOS arm64, not CI",
+  "candidate_binary_sha256": "7ec1e90782490ba61873b5a85e2238ba40ba617de1195c1c31ab7d52bd7a206c",
+  "release_tests": {
+    "passed": 434,
+    "failed": 0,
+    "ignored": 0,
+    "targets": [
+      {
+        "target": "unittests src/main.rs",
+        "result": "ok",
+        "passed": 285,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "tests/auth_sharing.rs",
+        "result": "ok",
+        "passed": 17,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "tests/cli_localization.rs",
+        "result": "ok",
+        "passed": 16,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "tests/doctor_cli.rs",
+        "result": "ok",
+        "passed": 3,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "tests/log_session_boundaries.rs",
+        "result": "ok",
+        "passed": 12,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "tests/native_e2e.rs",
+        "result": "ok",
+        "passed": 21,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "tests/provider_cli.rs",
+        "result": "ok",
+        "passed": 23,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "tests/serial_proxy.rs",
+        "result": "ok",
+        "passed": 13,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "tests/settings_cli.rs",
+        "result": "ok",
+        "passed": 17,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "tests/subagents_cli.rs",
+        "result": "ok",
+        "passed": 8,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "tests/task_outcomes_cli.rs",
+        "result": "ok",
+        "passed": 12,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "tests/update_auto_cli.rs",
+        "result": "ok",
+        "passed": 7,
+        "failed": 0,
+        "ignored": 0
+      }
+    ]
+  },
+  "regress_checks": 69,
+  "posix_tty_cases": 6,
+  "checks": [
+    {
+      "command": "cargo test --release",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo fmt --check",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo clippy --all-targets -- -D warnings",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo clippy --release --all-targets -- -D warnings",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo test --release --example benchmark_extended",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo test --release --example benchmark_models",
+      "exit_code": 0
+    },
+    {
+      "command": "node --test tests/model_benchmark/fence.test.mjs",
+      "exit_code": 0
+    },
+    {
+      "command": "sh tests/regress.sh",
+      "exit_code": 0
+    },
+    {
+      "command": "RDSH_E2E_BIN=./target/release/rdsh python3 tests/e2e/cli-tty.py",
+      "exit_code": 0
+    },
+    {
+      "command": "npm exec --yes --package=markdownlint-cli2 -- markdownlint-cli2 docs/RDSH-SETTINGS.md",
+      "exit_code": 0,
+      "issues": 0
+    }
+  ],
+  "environment_note": "regress selected the installed Python through PATH; no skipped assertions or relaxed product limits"
+}

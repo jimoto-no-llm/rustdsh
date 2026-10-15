@@ -1,0 +1,109 @@
+{
+  "scope": "rustdsh PR #500 only; Harness distribution/IME acceptance has its own evidence",
+  "rows": [
+    {
+      "id": "three-product-languages",
+      "status": "verified",
+      "scope": "en/zh-CN/ja CLI, setup/native/project/outcome UI and owned settings/Muse/Discord copy",
+      "evidence": [
+        "macos-native.json",
+        "windows-native.json",
+        "plugins.json",
+        "targeted-runs.json",
+        "outcome-languages.json"
+      ]
+    },
+    {
+      "id": "native-terminal-prompts",
+      "status": "verified",
+      "scope": "actual POSIX PTY and native Windows ConPTY, three languages and two prompt paths each",
+      "limits": "programmatic terminal input; no physical-keyboard/IME claim; no real credential entered or persisted",
+      "evidence": [
+        "posix-tty.json",
+        "windows-conpty.json"
+      ]
+    },
+    {
+      "id": "darwin-process-identity",
+      "status": "verified",
+      "scope": "read-only native identity independent of managed ownership; positives execute on Darwin",
+      "evidence": [
+        "dashboard-platforms.json"
+      ]
+    },
+    {
+      "id": "darwin-managed-process-scopes",
+      "status": "unsupported-existing-capability",
+      "scope": "82 kernel ownership positive tests explicitly excluded on macOS; supported Windows backend tested separately",
+      "behavior": "refuse managed launch with ownership_unavailable; no PID-only fallback",
+      "evidence": [
+        "platform-ledger.md"
+      ]
+    },
+    {
+      "id": "local-linux-owned-process-matrix",
+      "status": "not-observed-current-integration",
+      "scope": "no current local Linux delegated-cgroup acquisition is established by the macOS/Windows receipts",
+      "next_gate": "new submitted-head CI on supported Linux with its actual ownership prerequisites"
+    },
+    {
+      "id": "live-muse-runtime-catalog",
+      "status": "not-verified",
+      "scope": "live external Muse CLI/login/catalog and real model response",
+      "available_evidence": "synthetic catalog/worker fixtures through real adapter/protocol paths",
+      "prerequisites": "available runtime and suitable existing account; no purchase or model request performed",
+      "evidence": [
+        "plugins.json"
+      ]
+    },
+    {
+      "id": "external-discord-publication",
+      "status": "not-verified",
+      "scope": "actual publication to a live Discord client/account",
+      "available_evidence": "real local IPC framing and synthetic RPC acknowledgements; browser/server locale reflection regression fixtures",
+      "evidence": [
+        "plugins.json"
+      ]
+    },
+    {
+      "id": "provider-model-calls",
+      "status": "not-performed",
+      "scope": "no paid or live provider/model request; local loopback discovery/error fixtures only",
+      "evidence": [
+        "macos-native.json",
+        "windows-native.json"
+      ]
+    },
+    {
+      "id": "raw-data-language",
+      "status": "intentional-preservation",
+      "scope": "user/model text, filenames, IDs, wire JSON values, generated YAML/config, raw OS/library diagnostics and genuine upstream response text",
+      "behavior": "retain original bytes; localize surrounding rdsh-owned display text"
+    },
+    {
+      "id": "loaded-performance-tail",
+      "status": "observed-open-measurement-limit",
+      "scope": "streaming zstd p95 ratio 2.267, several other tails and child RSS increases observed on loaded repeat",
+      "next_gate": "isolated reproducibility and causal attribution before a speedup/regression claim",
+      "evidence": [
+        "performance.md",
+        "performance-summary.json"
+      ]
+    },
+    {
+      "id": "new-head-ci-review-and-release",
+      "status": "separate-gates",
+      "scope": "local passing tests are not current-head GitHub CI, new human approval, merge or release",
+      "historical_evidence": "c3d5d9f CI remains historical and is not promoted to this merged tree"
+    },
+    {
+      "id": "before-image-source-binding",
+      "status": "capture-source-not-recorded-in-bundle",
+      "scope": "the two real earlier PNGs have no companion commit receipt; after PNGs are bound to four recorded UI source files",
+      "behavior": "do not attribute the before PNGs to a specific commit without the original capture record",
+      "evidence": [
+        "captures.json"
+      ]
+    }
+  ]
+}

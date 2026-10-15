@@ -1,0 +1,90 @@
+{
+  "result": "PASS",
+  "tests": 56,
+  "passed": 56,
+  "failed": 0,
+  "skipped": 0,
+  "execution": "captured local targeted Node runner output; separate from the 347-case ordinary dashboard run",
+  "scope": "real adapter and IPC/helper paths with synthetic catalog/worker/RPC fixtures; no live provider authentication, model invocation or external Discord publication",
+  "tests_observed": [
+    "rejects unsupported input and mode before any child is started",
+    "JSON tool requests are constrained to the current Harness tool list",
+    "removes both API-key variables with Windows case folding and preserves other environment",
+    "optional or malformed usage remains unknown",
+    "inactive, API-key and missing logins never launch the SDK host",
+    "uses an empty temporary workspace, denies native approvals and confirms SDK shutdown",
+    "native tool activity, schema drift and raw SDK errors are rejected",
+    "cancelling a pending SDK iterator closes the owned host and settles without a model terminal",
+    "real helper stdio preserves Japanese, tool calls and optional usage",
+    "helper failure cannot be mistaken for successful completion or leak diagnostics",
+    "user cancellation, timeout and an unresponsive helper all settle",
+    "Harness adapter emits the native text/tool vocabulary and provider registration disposes",
+    "Harness disposal aborts active inference and emits an aborted finish",
+    "disposal does not wait for a UI consumer paused at a buffered answer",
+    "discovers the full CLI catalog without reading credentials or starting a model turn",
+    "future catalog models work without editing a fixed model allowlist",
+    "absent model ids and model-specific unsupported efforts stop before inference",
+    "Contributor is an explicit per-request mode using the CLI catalog model id",
+    "guard and CLI auth roots match; unrelated authFile overrides cannot authorize a different account",
+    "catalog capabilities stay unknown when undeclared and reject wrong providers or fake catalogs",
+    "picker caches discovery once per mode and uses the CLI context/output/effort metadata",
+    "Muse picker metadata changes with saved language without changing provider, model, response or custom catalog data",
+    "an in-flight Muse catalog retains its requested locale when settings change",
+    "owned Muse failures retain codes and localize catalog and stream diagnostics",
+    "WSL system services detect the Windows bridge without inherited WSL environment variables",
+    "real IPC handshake, fragmented/coalesced frames, ping, ACK and clear",
+    "rejected activity and acknowledgement timeout close the connection",
+    "malformed and oversized frames reject outstanding work without leaking sockets",
+    "settings gate actual connections; multiple agents, privacy, edits and disable reach IPC",
+    "disconnect reconnects and republishes current state; changing Application ID clears old presence",
+    "unavailable Discord and corrupt settings never fail agent work or retain published state",
+    "shutdown during connection prevents a late READY from restoring activity",
+    "platform paths and text limits preserve Unicode and omit disabled fields",
+    "unconfigured presence connects by default; missing or blank ID uses the bundled dsh application",
+    "RPC presentation selects a valid status field and gates optional assets and buttons",
+    "rate limiting coalesces agents and reports only acknowledged activity; disabling clears during a delayed update",
+    "public App Icon changes refresh through the cache; offline metadata keeps the last usable image",
+    "Discord owned defaults follow en while custom text and RPC fields remain exact",
+    "Discord owned defaults follow zh-CN while custom text and RPC fields remain exact",
+    "Discord owned defaults follow ja while custom text and RPC fields remain exact",
+    "failed settings load offers an error and retry instead of permanent loading",
+    "a failed refresh discards stale editable settings even if an error response includes config",
+    "clearing the dashboard port saves its default rather than privileged port one",
+    "Discord controls save changes without status polling overwriting edits",
+    "Discord preview and partial save preserve drafts in other sections",
+    "invalid Discord URLs block saving with an actionable error, then recover",
+    "Discord save failures keep the draft and provide a working retry",
+    "connection alone is not reported as an acknowledged current preview",
+    "settings render, language changes and save feedback retain en and raw data",
+    "settings render, language changes and save feedback retain zh-CN and raw data",
+    "settings render, language changes and save feedback retain ja and raw data",
+    "invalid returned locale blocks editing while auto language uses the browser",
+    "Discord reflection uses server en with UI auto/ja-JP",
+    "Discord reflection uses server zh-CN with UI auto/en-US",
+    "Discord reflection uses server ja with UI ja/en-US",
+    "Discord reflection uses server en with UI en/ja-JP"
+  ],
+  "source_files": [
+    {
+      "path": "tests/settings-client.test.mjs",
+      "sha256": "5b15ca637d6952bb10c8680e8995f0423169a0815c7dd42a7ca2672696dab1ed"
+    },
+    {
+      "path": "tests/discord-presence.test.mjs",
+      "sha256": "4dfaa66ea8d5018aef869fe90d1510f86d041ca360439a145eecfeb8725744b1"
+    },
+    {
+      "path": "plugins/rdsh-llm-muse-code-subscription/test/bridge.test.mjs",
+      "sha256": "b0b843def96df2fd01befe20eb8ec200b15ddf8712123663812bf62fb08c7b81"
+    },
+    {
+      "path": "plugins/rdsh-settings/client.js",
+      "sha256": "188ab117523164effdaa4ae7c143f5ccbe2c9d6ffd6934c7e41c29e5b82a5b29"
+    },
+    {
+      "path": "plugins/rdsh-llm-muse-code-subscription/index.js",
+      "sha256": "60347bbd6c28dce7767bf4f56988bac499a3482bbfe3de7efef400cadf18f7bf"
+    }
+  ],
+  "runner_log_sha256": "c0bd9a3176fbd1b3e0a7495ab931c267286f1ce5c74250c52c2e558be496d759"
+}

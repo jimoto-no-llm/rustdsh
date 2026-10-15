@@ -47,7 +47,7 @@ input[type=password]:focus { border-color: rgba(10,132,255,.7); }
 button.primary { border: 0; border-radius: 10px; padding: 9px 18px; font-size: 13px; font-weight: 600; color: #fff; background: #0a84ff; cursor: pointer; }
 button.primary:active { transform: scale(.98); }
 button.ghost { background: none; border: 1px solid rgba(255,255,255,.16); border-radius: 10px; padding: 8px 16px; font-size: 13px; color: #f5f5f7; cursor: pointer; }
-.hint { font-size: 12px; color: rgba(235,235,245,.5); margin: 10px 0 0; }
+.hint { font-size: 12px; color: rgba(235,235,245,.5); margin: 10px 0 0; overflow-wrap: anywhere; }
 .foot { display: flex; gap: 10px; margin-top: 28px; }
 @media (prefers-color-scheme: light) {
   body { color: #1d1d1f; }
@@ -69,13 +69,16 @@ button.ghost { background: none; border: 1px solid rgba(255,255,255,.16); border
 <div class="card">
 <img src="/icon.png" width="44" height="44" alt="rdsh">
 <h1 id="t">モデル接続</h1>
-<p class="sub" id="s">Codex / opencode のログインをdshに接続します</p>
+<p class="sub" id="s">Codex / opencode のログインから、共有する認証情報を選びます</p>
 <div class="okbar" id="okbar"></div>
 <div id="token-box" class="field" style="display:none"><input type="password" id="setup-token" autocomplete="off" spellcheck="false" placeholder="保護済みトークンファイルの内容"><button class="primary" id="setup-connect" onclick="connectSetup()">接続</button></div>
 <p class="hint" id="token-hint" style="display:none">端末に表示された保護済みトークンファイルの内容を入力してください。トークンはアドレスバーに保存されません。</p>
 <div id="list"></div>
 <h3 id="h0">dshが使うモデル</h3>
 <div id="defs"></div>
+<h3 id="hs">共有する認証情報を選ぶ</h3>
+<div id="sharing"></div>
+<p class="hint" id="sharehint"></p>
 <h3 id="hx">追加機能（任意）</h3>
 <div id="extras"></div>
 <p class="hint" id="khx">普段は不要です。必要になったものだけ有効にできます</p>
@@ -84,7 +87,7 @@ button.ghost { background: none; border: 1px solid rgba(255,255,255,.16); border
 <div class="cmd"><code>codex login</code><button class="link" id="copy-codex" onclick="cp(this)">コピー</button></div>
 <h3 id="h2">DeepSeekキーを使う</h3>
 <div class="field"><input type="password" id="key" placeholder="DEEPSEEK_API_KEY"><button class="primary" id="save-key" onclick="setupAction(save)">保存</button></div>
-<p class="hint" id="kh">platform.deepseek.com で発行したキーを貼り付け（0600で保存）</p>
+<p class="hint" id="kh">保存すると、表示した認証ファイルから全DSHプロファイルで利用できます。利用を止めるにはDSHを停止して該当refを削除し、キーの失効は発行元で行います。</p>
 <div><button class="ghost" id="issue" onclick="window.open('https://platform.deepseek.com','_blank','noopener')">キーを発行する</button></div>
 <div class="foot"><button class="ghost" id="refresh" onclick="setupAction(load)">更新</button><button class="ghost" id="done" onclick="setupAction(bye)" style="display:none">閉じる</button></div>
 </div>
@@ -97,7 +100,8 @@ var JA = LANG === "ja";
 var ZH = LANG === "zh-CN";
 function t(ja, en, zh){ return JA ? ja : (ZH ? zh : en); }
 function text(id, ja, en, zh){ document.getElementById(id).textContent = t(ja, en, zh); }
-text("t", "モデルを接続", "Connect a model", "连接模型"); text("s", "Codex / opencode のログインをdshに接続します", "Link Codex / opencode logins to dsh", "将 Codex / opencode 登录连接到 dsh"); text("h1", "サブスク — APIキー不要", "Subscription — no API key needed", "订阅 — 无需 API 密钥"); text("h2", "DeepSeekキーを使う", "Use a DeepSeek key", "使用 DeepSeek 密钥"); text("kh", "platform.deepseek.comで発行したキーを貼り付け（0600で保存）", "Paste a key from platform.deepseek.com (stored 0600)", "粘贴 platform.deepseek.com 签发的密钥（以 0600 保存）"); text("h0", "dshが使用するモデル", "Models dsh will use", "dsh 将使用的模型"); text("hx", "追加機能（任意）", "Extras (optional)", "附加功能（可选）"); text("khx", "通常は不要です。必要な機能だけ有効にしてください。", "Usually unnecessary. Enable only what you need.", "通常不需要。只启用所需的功能。"); text("issue", "キーを発行する", "Get a key", "获取密钥"); text("mock-new", "＋ 新しいセッション", "+ New session", "+ 新建会话"); text("mock-plugins", "プラグイン", "Plugins", "插件"); text("mock-workspaces", "ワークスペース", "WORKSPACES", "工作区"); text("mock-sample", "適当", "Sample", "示例"); text("mock-status", "dshの現在の状況を確認", "Check dsh status", "检查 dsh 状态"); text("mock-settings", "設定", "Settings", "设置"); text("mock-hero", "新しい発見へ", "Discover what is next", "探索新发现"); text("mock-preview", "プレビュー", "Preview", "预览"); text("mock-prompt", "作りたいものを説明してください（/コマンド、@ファイル／セッション）", "Describe what you want to make (/ commands, @ files/sessions)", "描述你想创建的内容（/ 命令、@ 文件/会话）"); document.getElementById("setup-token").placeholder = t("保護済みトークンファイルの内容", "Protected token file contents", "受保护令牌文件的内容"); document.getElementById("token-hint").textContent = t("端末に表示された保護済みトークンファイルの内容を入力してください。トークンはアドレスバーに保存されません。", "Paste the contents of the protected token file printed in the terminal. The token is not stored in the address bar.", "粘贴终端中显示的受保护令牌文件内容。令牌不会保存在地址栏中。");
+text("t", "モデルを接続", "Connect a model", "连接模型"); text("s", "共有する Codex / opencode 認証情報を選びます", "Choose which Codex / opencode credentials to share", "选择要共享的 Codex / opencode 凭据"); text("h1", "サブスク — APIキー不要", "Subscription — no API key needed", "订阅 — 无需 API 密钥"); text("h2", "DeepSeekキーを使う", "Use a DeepSeek key", "使用 DeepSeek 密钥"); text("kh", "保存すると全DSHプロファイルで利用できます。利用を止めるにはDSHを停止して該当refを削除し、失効は発行元で行います。", "Saving persists this key for every DSH profile. Stop DSH and remove the ref to stop using the copy; revoke the key at its provider.", "保存后所有 DSH 配置文件都可使用此密钥。要停止使用副本，请停止 DSH 并删除对应 ref；请在提供方撤销密钥。"); text("h0", "dshが使用するモデル", "Models dsh will use", "dsh 将使用的模型"); text("hx", "追加機能（任意）", "Extras (optional)", "附加功能（可选）"); text("khx", "通常は不要です。必要な機能だけ有効にしてください。", "Usually unnecessary. Enable only what you need.", "通常不需要。只启用所需的功能。"); text("issue", "キーを発行する", "Get a key", "获取密钥"); text("mock-new", "＋ 新しいセッション", "+ New session", "+ 新建会话"); text("mock-plugins", "プラグイン", "Plugins", "插件"); text("mock-workspaces", "ワークスペース", "WORKSPACES", "工作区"); text("mock-sample", "適当", "Sample", "示例"); text("mock-status", "dshの現在の状況を確認", "Check dsh status", "检查 dsh 状态"); text("mock-settings", "設定", "Settings", "设置"); text("mock-hero", "新しい発見へ", "Discover what is next", "探索新发现"); text("mock-preview", "プレビュー", "Preview", "预览"); text("mock-prompt", "作りたいものを説明してください（/コマンド、@ファイル／セッション）", "Describe what you want to make (/ commands, @ files/sessions)", "描述你想创建的内容（/ 命令、@ 文件/会话）"); document.getElementById("setup-token").placeholder = t("保護済みトークンファイルの内容", "Protected token file contents", "受保护令牌文件的内容"); document.getElementById("token-hint").textContent = t("端末に表示された保護済みトークンファイルの内容を入力してください。トークンはアドレスバーに保存されません。", "Paste the contents of the protected token file printed in the terminal. The token is not stored in the address bar.", "粘贴终端中显示的受保护令牌文件内容。令牌不会保存在地址栏中。");
+text("hs", "共有する認証情報を選ぶ", "Choose credentials to share", "选择要共享的凭据");
 text("mock-setup", "設定", "SETUP", "设置");
 text("mock-access", "＋ 完全アクセス", "+ Full access", "+ 完全访问");
 text("setup-connect", "接続", "Connect", "连接");
@@ -114,9 +118,40 @@ function showSetupError(error) { const bar=document.getElementById("okbar"); bar
 async function setupAction(action) { try { await action(); } catch(error) { showSetupError(error); } }
 function cp(b){ var value = b.parentNode.querySelector("code").textContent; function ok(){ b.textContent = t("済", "done", "已复制"); setTimeout(function(){ b.textContent = t("コピー", "copy", "复制"); }, 1200); } if (navigator.clipboard) { navigator.clipboard.writeText(value).then(ok, function(){ prompt(t("コピー:", "copy:", "复制："), value); }); } else { prompt(t("コピー:", "copy:", "复制："), value); } }
 async function connectSetup(candidateInput){ var candidate = typeof candidateInput === "string" ? candidateInput : document.getElementById("setup-token").value.trim(); var warning = document.getElementById("okbar"); try { var response = await fetch("/api/status", {headers: {"X-RDSH-Token": candidate}}); if (!response.ok) throw new Error(t("トークンを確認できません。ファイルの内容を確認してください。", "Token rejected. Check the handoff file contents.", "令牌被拒绝。请检查交接文件内容。")); setupToken = candidate; sessionStorage.setItem("rdsh_setup_token", setupToken); document.getElementById("setup-token").value = ""; document.getElementById("token-box").style.display = "none"; document.getElementById("token-hint").style.display = "none"; warning.style.display = "none"; await load(); await loadExtras(); startRefresh(); } catch(e) { warning.style.display = "block"; warning.textContent = e.message; document.getElementById("token-box").style.display = "flex"; document.getElementById("token-hint").style.display = "block"; } }
-async function load(){ var response = await fetch("/api/status", {headers: {"X-RDSH-Token": setupToken}}); if (!response.ok) { var warning = document.getElementById("okbar"); warning.style.display = "block"; warning.textContent = t("保護済みトークンファイルの内容を入力してください", "Enter the contents of the protected token handoff file", "请输入受保护令牌交接文件的内容"); document.getElementById("token-box").style.display = "flex"; document.getElementById("token-hint").style.display = "block"; return; } var r = await response.json(); var el = document.getElementById("list"); el.innerHTML = ""; (r.records || []).forEach(function(x){ var d = document.createElement("div"); d.className = "row"; var good = x.action === "ok"; var dot = document.createElement("span"); dot.className = "dot " + (good ? "on" : "off"); var nm = document.createElement("span"); nm.textContent = x.provider; var sm = document.createElement("small"); sm.textContent = x.from + " / " + statusLabel(x.action); d.appendChild(dot); d.appendChild(nm); d.appendChild(sm); el.appendChild(d); }); var df = document.getElementById("defs"); df.innerHTML = ""; (r.defaults || []).forEach(function(x){ var d = document.createElement("div"); d.className = "row"; var good = x.state === "ok"; var dot = document.createElement("span"); dot.className = "dot " + (good ? "on" : "off"); var nm = document.createElement("span"); nm.textContent = x.profile + " " + x.provider + "/" + x.model; var sm = document.createElement("small"); sm.textContent = x.via + " / " + statusLabel(x.state); d.appendChild(dot); d.appendChild(nm); d.appendChild(sm); df.appendChild(d); }); var bar = document.getElementById("okbar"); if (!r.needed) { bar.style.display = "block"; bar.textContent = t("接続OK — この画面は閉じてOKです", "Connected — you can close this page", "已连接 — 可以关闭此页面"); document.getElementById("done").style.display = ""; } else { bar.style.display = "none"; document.getElementById("done").style.display = "none"; } }
+async function load(){ var response = await fetch("/api/status", {headers: {"X-RDSH-Token": setupToken}}); if (!response.ok) { var warning = document.getElementById("okbar"); warning.style.display = "block"; warning.textContent = t("保護済みトークンファイルの内容を入力してください", "Enter the contents of the protected token handoff file", "请输入受保护令牌交接文件的内容"); document.getElementById("token-box").style.display = "flex"; document.getElementById("token-hint").style.display = "block"; return; } var r = await response.json(); var el = document.getElementById("list"); el.innerHTML = ""; (r.records || []).forEach(function(x){ var d = document.createElement("div"); d.className = "row"; var good = x.action === "ok"; var dot = document.createElement("span"); dot.className = "dot " + (good ? "on" : "off"); var nm = document.createElement("span"); nm.textContent = x.provider; var sm = document.createElement("small"); sm.textContent = x.from + " / " + statusLabel(x.action); d.appendChild(dot); d.appendChild(nm); d.appendChild(sm); el.appendChild(d); }); showSharing(r.sharing || {}); var df = document.getElementById("defs"); df.innerHTML = ""; (r.defaults || []).forEach(function(x){ var d = document.createElement("div"); d.className = "row"; var good = x.state === "ok"; var dot = document.createElement("span"); dot.className = "dot " + (good ? "on" : "off"); var nm = document.createElement("span"); nm.textContent = x.profile + " " + x.provider + "/" + x.model; var sm = document.createElement("small"); sm.textContent = x.via + " / " + statusLabel(x.state); d.appendChild(dot); d.appendChild(nm); d.appendChild(sm); df.appendChild(d); }); var bar = document.getElementById("okbar"); if (!r.needed) { bar.style.display = "block"; bar.textContent = t("接続OK — この画面は閉じてOKです", "Connected — you can close this page", "已连接 — 可以关闭此页面"); document.getElementById("done").style.display = ""; } else { bar.style.display = "none"; document.getElementById("done").style.display = "none"; } }
 var EXTRAS = [{id: "serve", ja: "ダッシュボード（rdsh serve）", en: "dashboard (rdsh serve)", zh: "仪表板（rdsh serve）"}, {id: "search-web", ja: "Web検索（rdsh search-web）", en: "web search (rdsh search-web)", zh: "网页搜索（rdsh search-web）"}];
 async function loadExtras(){ var response = await fetch("/api/extras", {headers: {"X-RDSH-Token": setupToken}}); if (!response.ok) return; var r = await response.json(); var on = (r && r.enable) || []; var el = document.getElementById("extras"); el.innerHTML = ""; EXTRAS.forEach(function(x){ var d = document.createElement("div"); d.className = "row"; var good = on.indexOf(x.id) >= 0; var dot = document.createElement("span"); dot.className = "dot " + (good ? "on" : "off"); var nm = document.createElement("span"); nm.textContent = t(x.ja, x.en, x.zh); var sm = document.createElement("small"); sm.textContent = good ? t("有効", "on", "已启用") : t("無効", "off", "已禁用"); d.appendChild(dot); d.appendChild(nm); d.appendChild(sm); d.style.cursor = "pointer"; d.onclick = function(){ setupAction(function(){ return toggleExtra(x.id, !good); }); }; el.appendChild(d); }); }
+function showSharing(sharing) {
+  var list = document.getElementById("sharing");
+  list.replaceChildren();
+  var hint = document.getElementById("sharehint");
+  hint.textContent = t("永続保存先: ", "Persistent destination: ", "持久保存位置：") + (sharing.persistent_destination || "") + t("。保存内容は同じDSH_HOMEの全プロファイルで利用できます。選択解除は今後の取込を止め、保存済みのコピーは残します。利用を止めるにはDSHを停止して該当record/refを削除します。発行元での失効は別途必要です。", ". Copies are available to every profile in this DSH_HOME. Unselect stops future imports and retains existing copies. Stop DSH and remove the named record/ref to stop using a copy. Provider revocation is separate.", "。此 DSH_HOME 中所有配置文件都可使用副本。取消选择会停止将来导入，并保留现有副本。要停止使用副本，请停止 DSH 并删除对应 record/ref。在提供方撤销需要单独进行。");
+  if (sharing.policy_error) {
+    hint.textContent += " " + sharing.policy_error;
+    return;
+  }
+  var seen = new Set();
+  (sharing.inventory || []).forEach(function(item) {
+    if (seen.has(item.selector)) return;
+    seen.add(item.selector);
+    var row = document.createElement("div");
+    row.className = "cmd";
+    var code = document.createElement("code");
+    code.textContent = "rdsh auth --" + (item.selected ? "unselect " : "select ") + item.selector + (item.selected ? "" : " --import");
+    var button = document.createElement("button");
+    button.className = "link";
+    button.textContent = t("コピー", "Copy", "复制");
+    button.onclick = function() { cp(button); };
+    row.append(code, button);
+    list.appendChild(row);
+  });
+  (sharing.environment_references || []).forEach(function(item) {
+    var note = document.createElement("p");
+    note.className = "hint";
+    note.textContent = item.name + t(": 環境変数として利用中。ファイル保存なし。DSHを停止し、次回起動前に環境変数を解除すると共有が止まります。", ": inherited environment reference; no file write. Stop DSH and unset it before the next launch to stop sharing.", "：继承的环境变量引用；未写入文件。要停止共享，请停止 DSH 并在下次启动前取消环境变量。");
+    list.appendChild(note);
+  });
+}
 async function toggleExtra(id, want){ var r = await (await fetch("/api/extras", {headers: {"X-RDSH-Token": setupToken}})).json(); var on = (r && r.enable) || []; if (want && on.indexOf(id) < 0) on.push(id); if (!want) on = on.filter(function(y){ return y !== id; }); await fetch("/api/extras", {method: "POST", headers: {"Content-Type": "application/json", "X-RDSH-Token": setupToken}, body: JSON.stringify({enable: on})}); loadExtras(); }
 async function save(){ var v = document.getElementById("key").value; var r = await (await fetch("/api/key", {method: "POST", headers: {"Content-Type": "application/json", "X-RDSH-Token": setupToken}, body: JSON.stringify({name: "DEEPSEEK_API_KEY", value: v})})).json(); if (r.stored) { document.getElementById("key").value = ""; load(); } else { alert(t("保存に失敗しました: ", "save failed: ", "保存失败：") + (r.error || "?")); } }
 async function bye(){ var r = await fetch("/api/done", {method: "POST", headers: {"X-RDSH-Token": setupToken}, body: "{}"}); if (!r.ok) return; document.body.innerHTML = "<p style=\"text-align:center;margin-top:22vh;opacity:.55\">" + t("完了 — このタブを閉じてください", "done — close this tab", "完成 — 请关闭此标签页") + "</p>"; }

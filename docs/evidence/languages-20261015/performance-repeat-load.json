@@ -1,0 +1,24 @@
+{
+  "scope": "repeat after the ordinary Node tests completed; retained earlier overlapping run",
+  "load_before": [
+    21.3564453125,
+    15.5,
+    12.755859375
+  ],
+  "started": 1792032176.450848,
+  "results": [
+    {
+      "exit": 0
+    },
+    {
+      "exit": 0
+    }
+  ],
+  "finished": 1792032189.577695,
+  "load_after": [
+    19.37109375,
+    15.3447265625,
+    12.74755859375
+  ],
+  "redaction": "local absolute command paths omitted; timing values, load observations and exit codes retained"
+}

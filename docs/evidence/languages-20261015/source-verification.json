@@ -1,0 +1,198 @@
+{
+  "result": "PASS",
+  "scope": "relative source paths and SHA-256 only; no credentials or installed-binary replacements",
+  "merged_main": "2db470bd15d2efbe58c9ff1a43e6679e5cea4d4a",
+  "head_checkpoint": "c3d5d9fd0bb902edf020dbe107df954d3b922429",
+  "tested_tree_state": "uncommitted merge integration; source identities below bind the tests independently of the eventual merge-commit SHA",
+  "transferred_files": 350,
+  "current_checkout_matches": 350,
+  "macos_rust_receipt_files": 46,
+  "shared_macos_windows_rust_files": 46,
+  "shared_mismatches": 0,
+  "macos_rust_files": [
+    {
+      "path": "src/auth.rs",
+      "sha256": "9c98cee5392fd655c70f103b19853cffea87bbff01abae1ed00365571415469c"
+    },
+    {
+      "path": "src/auth_sharing.rs",
+      "sha256": "267b873bb5119ff4024b182d4058ed5a998309726820623aa56a07b418f7debf"
+    },
+    {
+      "path": "src/compact.rs",
+      "sha256": "77f85a371f6cc52a889402bedb50668c5ebecc5fe43603a362fa504c89ab5133"
+    },
+    {
+      "path": "src/compute.rs",
+      "sha256": "fd63a4438ef0a60b803f34f79088f6a4d839e3f0df608b64494ed89e79f5fb42"
+    },
+    {
+      "path": "src/context.rs",
+      "sha256": "04b00578e42e771db483b9d1fb25a058e14fa1c675ebf656b40367cf95e26f9c"
+    },
+    {
+      "path": "src/desktop.rs",
+      "sha256": "0221aab7029d4a28b006a85ba1a5c1e9ea7bf2e0c5d61d0ea72a4cba0384d96e"
+    },
+    {
+      "path": "src/dsh_args.rs",
+      "sha256": "56fbc37fb4d0d858bd9b135a28e66ac12dfeb1c54653bb99c07a6c1e2fb68d86"
+    },
+    {
+      "path": "src/file_lock.rs",
+      "sha256": "cb5d9997ce52d06cc626d77f3c71d9417cc00b750db66d58a88cf2da7714abc9"
+    },
+    {
+      "path": "src/file_security.rs",
+      "sha256": "cafcf12d2cad0918108e16ad2f2fcb5c990cf53ccae221deeffbe56e29627946"
+    },
+    {
+      "path": "src/guard.rs",
+      "sha256": "665bc073d71407a23656de7410666430ab4c56d6d336a3ccad6e5f33dd40a7c5"
+    },
+    {
+      "path": "src/inspect.rs",
+      "sha256": "8d8364df9da96c6442646a1a037b39e7deb536eb020feded61131b7ea4cebf3e"
+    },
+    {
+      "path": "src/local_http.rs",
+      "sha256": "60dc194f51b588c4e300629115f58a635419354c194699bcb855d0f8ee7fe243"
+    },
+    {
+      "path": "src/locale.rs",
+      "sha256": "e6cfddcc5a0246093d323a8f12baec6d6177969be3552ae73553e590d38f38c7"
+    },
+    {
+      "path": "src/locale_test.rs",
+      "sha256": "1685cb5d927daec4f846b6c516a9fbcef555ba3ad85b6266c7fdbb5fa22637f7"
+    },
+    {
+      "path": "src/main.rs",
+      "sha256": "8189c5357d80cb1e380e0edb1cf14a0ab68b31d678a19652aafca22384b60da4"
+    },
+    {
+      "path": "src/opencode_header.rs",
+      "sha256": "5fe2cf16bcabcaabb9fd4900b49a25ee3481f9792a81e900829d5fd9609d6959"
+    },
+    {
+      "path": "src/passthrough.rs",
+      "sha256": "e160687ddf7e04eb6969b05be98ac893a08081b8322caee1882cd84cb7cd8e68"
+    },
+    {
+      "path": "src/providers.rs",
+      "sha256": "2654e467b6b472217c92ace537ad875fc1831dd8c9c959919918b3702686a51b"
+    },
+    {
+      "path": "src/rdsh_config.rs",
+      "sha256": "a21685cce3722e5ae4e36e816f75dfea82149da669a74d1781e5d2aa3d861f53"
+    },
+    {
+      "path": "src/search.rs",
+      "sha256": "e33298b321a1177cb6a1f8ce453dedcde44e95e22f33be1a5724ff4bf681aeeb"
+    },
+    {
+      "path": "src/serial_proxy.rs",
+      "sha256": "65cf8e8bdece1aba93e5b2190417bdb33a8ccf78547541c7775a7c6f44185776"
+    },
+    {
+      "path": "src/serve.rs",
+      "sha256": "c0277eb0246da37f8b50437a8f2f7a906faf165b0922cea27ff90d195d469e7b"
+    },
+    {
+      "path": "src/setup.html",
+      "sha256": "cd3749d0bde1988302e9877a6c63175f18eddee5b3b910de27c4743ebdccc995"
+    },
+    {
+      "path": "src/setup_web.rs",
+      "sha256": "7f855906bd085c0504865abde84b0b8d13f45f26ca16d0d7066267fd87a70264"
+    },
+    {
+      "path": "src/shutdown.rs",
+      "sha256": "10fbda3f9077b7866bf409189913a1d9470a500d6c32d3a117ddf14156c23cd2"
+    },
+    {
+      "path": "src/slim.rs",
+      "sha256": "c796412248a41e1f34cc25294d7b157388f09742932194e144730c3e65b8b057"
+    },
+    {
+      "path": "src/subagent_plan.rs",
+      "sha256": "6aedb068e05636cbcd9aa69cb2eb1b0bd90de269a1cabddf7206db45dc5d1800"
+    },
+    {
+      "path": "src/task_outcomes.rs",
+      "sha256": "f385d7ec42b56885bc67955fd3f462fbc09845a37fc5ad4af6161a311b525343"
+    },
+    {
+      "path": "src/token_handoff.rs",
+      "sha256": "e0c60e95d87ac403d68cbb24d84f190f95b9ea72efd4a4355f45a55a87326ed4"
+    },
+    {
+      "path": "src/tokens.rs",
+      "sha256": "eb0d832ab39b630ca607cf522d1536a8c6ca90e99e08cd2b89328b6911c2c72c"
+    },
+    {
+      "path": "src/tool_security.rs",
+      "sha256": "7c4a3361923a983663080ee6ed8ac3360beea8bed1a7a481031d7ceab99e6da4"
+    },
+    {
+      "path": "src/ui.html",
+      "sha256": "eb384dbe5c5fc037f514eb60e590d83abd2a01986875d1b9bde5de0281e6b75a"
+    },
+    {
+      "path": "src/update_auto.rs",
+      "sha256": "8341535536c64d044ca45abae057d19ff51c59f06bc00d0c10c62ae62aa4c8a1"
+    },
+    {
+      "path": "src/websearch.rs",
+      "sha256": "b084fc5f36aeeabb913634e0b820621c7ef737491bce19c12be37f580be915b0"
+    },
+    {
+      "path": "tests/auth_sharing.rs",
+      "sha256": "d33534591bbe470d60c3ccaf2cb3336863ad63e33a32272166a2f9644e17584d"
+    },
+    {
+      "path": "tests/cli_localization.rs",
+      "sha256": "359c409a9ca20fbc7dbbaa088c4087a8dc4afab4b2b1d3ab2f001bacae6d9e3d"
+    },
+    {
+      "path": "tests/doctor_cli.rs",
+      "sha256": "d7cd85df30a074077b1217a4c5cef151d3d7ef3f8a11250a4fb62901257e97cd"
+    },
+    {
+      "path": "tests/e2e/cli-tty.py",
+      "sha256": "4e84267224bd1dc014eddba49a9e88fdfa8e5a62c1c65354bc44e88716aa7ce9"
+    },
+    {
+      "path": "tests/log_session_boundaries.rs",
+      "sha256": "52f85df2754ee063db90414cb367c8540aee72ad6f78418c2abd7ded7457907d"
+    },
+    {
+      "path": "tests/native_e2e.rs",
+      "sha256": "ad8e9a06c25ebd0aa0b6250fe9c02d4199f0cd5b6dfa9bf13301dd7802987713"
+    },
+    {
+      "path": "tests/provider_cli.rs",
+      "sha256": "76bbbc3890b65015d4174bc435994d8175d867b259a5357eedc10947257fbedc"
+    },
+    {
+      "path": "tests/serial_proxy.rs",
+      "sha256": "7e39ed26b25f219d9aa7e59711844531670aa6bc79d7adff403eced67aca8e2c"
+    },
+    {
+      "path": "tests/settings_cli.rs",
+      "sha256": "e39a630e0ccb630313c466b7e53cc7f750b5f30c20fe75c895a8e2dca0952dec"
+    },
+    {
+      "path": "tests/subagents_cli.rs",
+      "sha256": "f45680fe46d4badef5938fe5e7a743bd4e6eae70d0fd658a9b87b0cec343d660"
+    },
+    {
+      "path": "tests/task_outcomes_cli.rs",
+      "sha256": "af001ce23992a9a001875149a814fb5193c567c3cb2fbce64c4eb1655dc88c4b"
+    },
+    {
+      "path": "tests/update_auto_cli.rs",
+      "sha256": "66132c377bca395cd4f18f8642c6f739d1c10a44644d01621c92fcb3f30a1b38"
+    }
+  ]
+}

@@ -5,13 +5,104 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-15
+
+### Security
+
+- The optional `rdsh-mcp-exposure` plugin pins its development
+  `@modelcontextprotocol/client` to the patched line (2.3.1, override) instead
+  of the 2.0.0 that the upstream `dsh-mcp-client` peer pulls in, clearing the
+  high-severity GHSA-6qxp-vccf-f47h alert. Runtime resolution is unchanged: the
+  plugin uses the host DSH's MCP client.
+
+- `install.ps1 -FromRelease` verifies the Windows archive against the digests
+  pinned in `release-digests-windows.tsv` instead of the `.sha256` sidecar
+  served next to it, so a release base that serves its own archive can no
+  longer choose the checksum that admits it. The bypass needs `-NoChecksum`
+  plus a typed `YES` at a terminal.
+
+- The Windows pin lives in its own `release-digests-windows.tsv` ledger because
+  the published v0.3.3 `install.sh` and every `sync-dsh.sh` copy refuse
+  `release-digests.tsv` as a whole once one row names an asset outside the four
+  Unix archives. `release-digests.tsv` therefore stays Unix-only, so
+  `--from-release` and the automatic updater keep working for installs users
+  already have, and `scripts/pin-release-digests.py` updates both ledgers.
+
 ### Added
 
-- `rdsh-dashboard subagents plan` turns a declared use case into a deterministic
+- `plugins/rdsh-mobile-ui` is bundled and installed by `./plugins/install.sh`:
+  below 767px the Web chat and composer use the full viewport width, the collapsed
+  sidebar becomes a one-tap logo for the session list, and question cards fit the
+  phone. The rules are adapted from Smart-DSH
+  (<https://github.com/hikarioyama/Smart-DSH>, MIT) and ship only that responsive
+  layout — not Smart-DSH's notifications, Esc handling or task hub. See
+  [README](plugins/rdsh-mobile-ui/README.md).
+- `rdsh provider add hai|sarashina|local-openai` writes an OpenAI-compatible route into a
+  profile's `llm-pi-ai` providers (models from `--model`, opencode's
+  `provider.<id>` or `GET /models`), keeping every other byte of
+  `cordis.patch.yml`; `rdsh provider list` shows presets and per-profile
+  route and key status. The `sarashina` preset writes the `compat` lines
+  (`supportsStore`, `supportsUsageInStreaming`) and `maxTokens: 8000` that the
+  API requires; its `tool_choice` default is a known open question for agent
+  use. `HAI_API_KEY`, `SARASHINA_API_KEY` and `LOCAL_OPENAI_API_KEY` can be
+  saved from the setup UI (`rdsh setup --yes` does not save them), but they count as a connection only when a profile's
+  default model uses a route that reads them. Existing `llm-pi-ai` entries
+  written with quotes, comments or any indent width are edited in place; a
+  layout that cannot be read safely (including any other mention of
+  `llm-pi-ai`, such as inside `- insert:`) is refused with the YAML to add by
+  hand. See `docs/PROVIDERS.md`.
+- `rdsh subagents plan` turns a declared use case into a deterministic
   dispatch plan for delegated subagents: role and model tier per item, bounded
   items and weight per agent, waves limited by `max_parallel`, and explicit
   warnings instead of guessed tiers. It starts no agent and writes nothing; the
   existing `workers prepare` still owns the checkout allocation
+  (`docs/SUBAGENT-PLANNING.md`).
+- `rdsh serial-proxy` replaces the standalone Node.js proxy with a native Rust
+  command. It keeps the FIFO concurrency and rate limits, streams request and
+  response bodies, and supports `--tool-choice-default <none|auto|required>`
+  for Sarashina-compatible requests. See `docs/SERIAL-PROXY.md`.
+- `rdsh update auto status|on|off` turns the daily automatic update on with one
+  command: it writes a systemd user unit with the machine's own executable path
+  and runs `daemon-reload` and `enable --now`. The update itself stays with
+  `sync-dsh.sh` (digest pinning, downgrade refusal, verification, rollback) and
+  the timer runs daily with up to 30 minutes of jitter. See
+  `docs/AUTO-UPDATE.md`.
+- `rdsh doctor` warns about broken wrappers and shadowed executables: dangling
+  symlinks, a missing shebang, vanished `node`/`dsh` targets, duplicate `PATH`
+  entries, a missing `dsh-orig` and an inconsistent `origin` ledger, collected
+  in one bounded scan. It only warns; exit status and existing messages are
+  unchanged.
+- The `rdsh-update-banner` plugin is bundled again for the `web` profile, so
+  update notifications return. Install it through the installer because pnpm
+  prunes links it does not manage.
+
+### Fixed
+
+- `sync-dsh.sh` discovers the `@deepseek-ai/dsh` tree by candidate instead of
+  `npm root -g` alone (`DSH_PKG_ROOT`, npm's global root, the newest
+  `~/.local/opt/*` tree, then the older per-user prefixes). A tree it cannot
+  find, or one outside npm's global root, is reported and skipped while the
+  rdsh release update still succeeds; npm-managed trees keep digest pinning,
+  downgrade refusal, verification and rollback. See `docs/AUTO-UPDATE.md`.
+- `rdsh update` stays native when rustdsh is invoked as `dsh`: it is back in
+  the native command list and in `--help`, instead of being delegated to
+  upstream `dsh`.
+- The auto-update systemd unit quotes and escapes `ExecStart`, so an executable
+  path containing spaces or `%` no longer breaks the timer.
+- The update banner's close button no longer overlaps the timestamp.
+
+- `release-digests.tsv` pins v0.3.3. Its follow-up PR was missing, so
+  `install.sh --from-release` and the automatic updater stopped at v0.3.2 even
+  though GitHub marks v0.3.3 Latest. `scripts/pin-release-digests.py` turns the
+  follow-up into one reviewed command (refusing prerelease tags, missing
+  archives and non-SHA-256 values), and `docs/RELEASING.md` uses it.
+
+### Changed
+
+- `rdsh-dashboard subagents plan` forwards to `rdsh subagents plan`: the planner
+  is now the Rust implementation in `src/subagent_plan.rs`, the JavaScript
+  planning module is removed so there is a single source of truth, and the
+  request, plan and warning contract is unchanged
   (`docs/SUBAGENT-PLANNING.md`).
 
 ## [0.3.3] - 2026-10-13

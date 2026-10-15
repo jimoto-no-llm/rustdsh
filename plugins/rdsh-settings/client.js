@@ -696,13 +696,15 @@ window.__ModuleLoader__.load({
       const be = sec("bench");
       const dc = sec("discord");
       const discordDirty = JSON.stringify(dc) !== JSON.stringify(savedDiscord);
+      const presenceCopy = (key, values) =>
+        settingText(discordStatus?.language || displayLanguage, key, values);
       const detailsText = wireText(
-        dc.details?.trim() ? dc.details : copy("defaultDetails"),
+        dc.details?.trim() ? dc.details : presenceCopy("defaultDetails"),
       );
       const agentText =
         discordStatus?.running_agents > 0
-          ? copy("running", { count: discordStatus.running_agents })
-          : copy("idle");
+          ? presenceCopy("running", { count: discordStatus.running_agents })
+          : presenceCopy("idle");
       const commonApp =
         !dc.application_id?.trim() ||
         dc.application_id.trim() === defaultDiscordId;

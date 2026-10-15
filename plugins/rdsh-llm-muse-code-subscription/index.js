@@ -75,6 +75,17 @@ const museCopy = {
     "Muse Code catalog unavailable",
     "无法获取 Muse Code 目录",
   ],
+  MUSE_INPUT_INVALID: ["Muse CodeはこのアダプターでテキストとHarnessツールに対応します。", "Muse Code supports text and Harness tools in this adapter.", "此适配器中的 Muse Code 支持文本和 Harness 工具。"],
+  MUSE_INPUT_TOO_LARGE: ["Muse Code互換リクエストが32 MiBを超えています。", "The Muse Code compatibility request exceeds 32 MiB.", "Muse Code 兼容请求超过 32 MiB。"],
+  MUSE_UNKNOWN_MODEL: ["非対応のMuse Codeモデルまたは推論レベルです。", "Unsupported Muse Code model or reasoning effort.", "不支持的 Muse Code 模型或推理级别。"],
+  MUSE_SUBSCRIPTION_LOGIN_REQUIRED: ["Muse Code CLIで有効な定額契約にログインしてください。", "Sign in to an active subscription with the Muse Code CLI.", "请通过 Muse Code CLI 登录有效订阅。"],
+  MUSE_AUTH_STORE_MISMATCH: ["認証ファイルはMuse Codeヘルパーのホームと一致する必要があります。別の認証ストアは非対応です。", "The auth file must match the Muse Code helper home; alternate auth stores are unsupported.", "认证文件必须与 Muse Code 辅助进程的主目录匹配；不支持其他认证存储。"],
+  MUSE_PROTOCOL_ERROR: ["ローカルのMuse Codeヘルパーが不正な応答を返しました。", "The local Muse Code helper returned an invalid response.", "本地 Muse Code 辅助进程返回了无效响应。"],
+  MUSE_SCHEMA_CHANGED: ["Muse CodeとSDKのスキーマが異なります。互換性のあるSDKを確認してください。", "Muse Code and SDK schemas differ; verify a compatible SDK before use.", "Muse Code 与 SDK 的架构不同；请先确认 SDK 兼容性。"],
+  MUSE_NATIVE_TOOL_USED: ["Muse Code独自のツールが使用されたため、応答を拒否しました。", "Muse Code used its own tool; the response was rejected.", "Muse Code 使用了自带工具；响应已被拒绝。"],
+  MUSE_UNAVAILABLE: ["Muse Codeが正常終了しませんでした。ローカルCLIと定額契約を確認してください。", "Muse Code did not complete cleanly; check the local CLI and subscription.", "Muse Code 未正常完成；请检查本地 CLI 和订阅。"],
+  MUSE_TIMEOUT: ["Muse Codeリクエストが制限時間を超えました。", "The Muse Code request exceeded its time limit.", "Muse Code 请求超时。"],
+  ABORTED: ["Muse Codeリクエストをキャンセルしました。", "Muse Code request cancelled.", "Muse Code 请求已取消。"],
   helperFailed: [
     "Muse Codeヘルパーに失敗しました",
     "Muse Code helper failed",
@@ -179,7 +190,7 @@ export class MuseSubscriptionAdapter extends LlmAdapter {
       .catch((error) => {
         throw new LlmError(
           error instanceof BridgeError
-            ? error.message
+            ? museText(error.code, language)
             : museText("unavailable"),
           error instanceof BridgeError ? error.code : "MUSE_UNAVAILABLE",
         );
@@ -200,6 +211,7 @@ export class MuseSubscriptionAdapter extends LlmAdapter {
     return resolved;
   }
   async *stream(options) {
+    const language = museLanguage();
     const controller = new AbortController();
     const abort = () => controller.abort();
     options.signal?.addEventListener("abort", abort, { once: true });
@@ -274,13 +286,13 @@ export class MuseSubscriptionAdapter extends LlmAdapter {
           type: "finish",
           reason: {
             kind: "aborted",
-            failure: { code: "ABORTED", message: error.message },
+            failure: { code: "ABORTED", message: museText(error.code, language) },
           },
         };
       } else
         throw new LlmError(
           error instanceof BridgeError
-            ? error.message
+            ? museText(error.code, language)
             : museText("helperFailed"),
           error instanceof BridgeError ? error.code : "MUSE_UNAVAILABLE",
         );

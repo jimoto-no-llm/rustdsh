@@ -1,0 +1,94 @@
+[
+  {
+    "input": "rdsh-rust-integration-validation-final.json",
+    "sha256": "66ece3b749cd8222eb91dbf80eac9f592043115e059e957882b8506d8e2a39a3"
+  },
+  {
+    "input": "rdsh-windows-review-source-20261015.json",
+    "sha256": "ba7d3adec1d81d63c4ca8e060d9ee9b34c5cb6d4601956097dd680d358b3adc3"
+  },
+  {
+    "input": "rdsh-windows-native-result-20261015.json",
+    "sha256": "4128985f951241675c0995c8b771e554744fb1b1439874079f40fe6e18b12754"
+  },
+  {
+    "input": "rdsh-windows-native-release-20261015.txt",
+    "sha256": "e7baa47d59c7e70c2e0965a925c21a8106130d7d9973e2013b84be69fd80428f"
+  },
+  {
+    "input": "cli-tty-results.json",
+    "sha256": "15c304c7ea443c36adba904b0cd48d06da7515bb21ddd9fe1a2fa5d674f9f4c2"
+  },
+  {
+    "input": "rdsh-windows-tty-result-20261015.json",
+    "sha256": "b613d42551582c20b97d14924646477e6476f6e02248baada3e0ca15c243b584"
+  },
+  {
+    "input": "rdsh-dashboard-merged-final.txt",
+    "sha256": "cc0cfced257f45515e9f4a9abf65db30629354d25fb264ad65c662b3a0cc6419"
+  },
+  {
+    "input": "rdsh-windows-dashboard-result-20261015.json",
+    "sha256": "233445054ec8891d3f9fdc9dee43bf518a5ea58208c2d886d7876f1bf53a5b3c"
+  },
+  {
+    "input": "rdsh-windows-dashboard-tests-20261015.txt",
+    "sha256": "85da91f976b9a31b7bb81bb04d51967e983795ca8b38b43dc24b20da61659de6"
+  },
+  {
+    "input": "browser-results.json",
+    "sha256": "9d0666ecd0a48f583e63bf5ece169519fa0234eaa07b35a0214ea5e946c267f1"
+  },
+  {
+    "input": "browser-results.json",
+    "sha256": "d4a41c20acf1c1c5ea4300ea4adf2c443fce105a3a159b74ad183ca6f93fe8ed"
+  },
+  {
+    "input": "browser-results.json",
+    "sha256": "abed86ce233467d2e3c3f590e59c69d4bc2cb5432072cc917e062faf53d5c9b8"
+  },
+  {
+    "input": "verification.json",
+    "sha256": "e7fb2a93300e436d21c82b1ebbec2330b4d35451cefbd4ce08c35ccc094b698a"
+  },
+  {
+    "input": "results.json",
+    "sha256": "a18843b5cda0a8f7d20fbe824155fb6a38e2c257d003efeb83d262df0daebe72"
+  },
+  {
+    "input": "performance-20261015.json",
+    "sha256": "94e82a8695dd924bd5d33fd7d7b0a672b887bb76c74220b8cde014b5996a40fb"
+  },
+  {
+    "input": "performance-extended-20261015.json",
+    "sha256": "cb4bc4c1bdac4b80350243d840721762e602cb6c3b1934462c1dbf5d33e3405c"
+  },
+  {
+    "input": "performance-repeat-20261015.json",
+    "sha256": "9a902cb730f200fc2961dadf352886189ae4df380e8e908064e8bf19702cc0ea"
+  },
+  {
+    "input": "performance-extended-repeat-20261015.json",
+    "sha256": "c2ec120273c448a71e35233e100df4a66e9bd5248002bfb902371954f0fa15a6"
+  },
+  {
+    "input": "performance-load-20261015.json",
+    "sha256": "fc317249e9b5eae2b8318d315f7cfef9ecbd5a38868bdc69efc3609157a165bc"
+  },
+  {
+    "input": "performance-repeat-load-20261015.json",
+    "sha256": "f8a49c8715fbfe8b483faab1661b990f90a75bb83d1dbead8cb8125c5327d8f1"
+  },
+  {
+    "input": "rdsh-plugins-review-positive-final.log",
+    "sha256": "c0bd9a3176fbd1b3e0a7495ab931c267286f1ce5c74250c52c2e558be496d759"
+  },
+  {
+    "input": "rdsh-review-plugin-tests.log",
+    "sha256": "fd82ca93cac78f60f6ac27b784997e7a1666b491143ea4f2e0efac772b8857fb"
+  },
+  {
+    "input": "rdsh-final-ui-review-tests.log",
+    "sha256": "c43f1e1506e2dceb6ecd2f4d1b4d1e834e4e92c6a8a6a18d630437afc445dfc2"
+  }
+]

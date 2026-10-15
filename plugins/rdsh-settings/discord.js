@@ -463,6 +463,7 @@ export function createDiscordPresence({
   minUpdateInterval = 5000,
   imageResolver = async () => defaultDiscordImage,
 }) {
+  let resolvedLanguage = discordLanguage();
   let settings = { ...discordDefaults },
     rpc,
     applicationId,
@@ -481,6 +482,7 @@ export function createDiscordPresence({
   const started = Math.floor(Date.now() / 1000);
   const status = () => ({
     state: state === "connected" && rpc?.closed ? "disconnected" : state,
+    language: resolvedLanguage,
     running_agents: [...agents.values()].filter((s) => s === "running").length,
     started_at: started,
     updated_at: updatedAt,
@@ -516,6 +518,7 @@ export function createDiscordPresence({
       )
         throw new Error("invalid general.language");
       settings = normalizeDiscord(document.discord);
+      resolvedLanguage = discordLanguage(document.general?.language);
     } catch {
       state = "invalid_settings";
       await disconnect();

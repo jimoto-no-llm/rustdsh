@@ -791,3 +791,27 @@ test("an in-flight Muse catalog retains its requested locale when settings chang
     await adapter.dispose();
   }
 });
+
+test("owned Muse failures retain codes and localize catalog and stream diagnostics", async () => {
+  const workerPath = join(settingsHome, "owned-error.mjs");
+  const expected = {
+    en: ["Sign in to an active subscription with the Muse Code CLI.", "The Muse Code request exceeded its time limit."],
+    ja: ["Muse Code CLIで有効な定額契約にログインしてください。", "Muse Codeリクエストが制限時間を超えました。"],
+    "zh-CN": ["请通过 Muse Code CLI 登录有效订阅。", "Muse Code 请求超时。"],
+  };
+  try {
+    for (const [language, messages] of Object.entries(expected)) {
+      await writeFile(join(settingsHome, "rdsh.json"), JSON.stringify({ general: { language } }));
+      for (const [index, code] of ["MUSE_SUBSCRIPTION_LOGIN_REQUIRED", "MUSE_TIMEOUT"].entries()) {
+        await writeFile(workerPath, `process.stdin.once('data', () => { process.stdout.write(JSON.stringify({ type: 'error', code: '${code}' }) + '\\n'); process.stdin.destroy(); });`);
+        const adapter = new MuseSubscriptionAdapter({ sessions: { get: () => null } }, { ...config, workerPath });
+        try {
+          await assert.rejects(adapter.listModels("muse-code"), { code, message: messages[index] });
+          await assert.rejects(Array.fromAsync(adapter.stream(job())), { code, message: messages[index] });
+        } finally { await adapter.dispose(); }
+      }
+    }
+  } finally {
+    await writeFile(join(settingsHome, "rdsh.json"), JSON.stringify({ general: { language: "en" } }));
+  }
+});

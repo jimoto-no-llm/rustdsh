@@ -1,0 +1,48 @@
+{
+  "scope": "actual Windows ConPTY, no provider/model calls, no credentials entered or stored",
+  "result": "PASS",
+  "cases": [
+    {
+      "credentials_written": false,
+      "prompt": "paste DEEPSEEK_API_KEY here",
+      "language": "en",
+      "mode": "paste",
+      "exit": 0
+    },
+    {
+      "credentials_written": false,
+      "prompt": "persist DEEPSEEK_API_KEY from environment",
+      "language": "en",
+      "mode": "save",
+      "exit": 0
+    },
+    {
+      "credentials_written": false,
+      "prompt": "在此粘贴 DEEPSEEK_API_KEY",
+      "language": "zh-CN",
+      "mode": "paste",
+      "exit": 0
+    },
+    {
+      "credentials_written": false,
+      "prompt": "将环境变量 DEEPSEEK_API_KEY 保存到",
+      "language": "zh-CN",
+      "mode": "save",
+      "exit": 0
+    },
+    {
+      "credentials_written": false,
+      "prompt": "DEEPSEEK_API_KEY を貼り付けてください",
+      "language": "ja",
+      "mode": "paste",
+      "exit": 0
+    },
+    {
+      "credentials_written": false,
+      "prompt": "環境変数 DEEPSEEK_API_KEY を",
+      "language": "ja",
+      "mode": "save",
+      "exit": 0
+    }
+  ]
+}

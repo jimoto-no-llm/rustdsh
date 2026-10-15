@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node languages.mjs && node update-banner.mjs",
+    "test": "node languages.mjs && node update-banner.mjs && node task-outcomes.mjs && node outcome-languages.mjs",
     "test:harness": "node harness-settings.mjs",
     "test:muse": "node muse-subscription.mjs",
     "test:updates": "node update-banner.mjs"

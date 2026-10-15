@@ -1,0 +1,5 @@
+# Synthetic provider keys in tests/provider_cli.rs; no production credentials.
+# Keep each exception tied to the exact rule, test file, and line.
+tests/provider_cli.rs:generic-api-key:291
+tests/provider_cli.rs:generic-api-key:325
+tests/provider_cli.rs:generic-api-key:673

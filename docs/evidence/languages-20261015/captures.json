@@ -1,0 +1,219 @@
+{
+  "scope": "real images, no image generation or editing; before and after may differ in state and scroll position",
+  "captures": [
+    {
+      "path": "before-desktop.png",
+      "sha256": "fb112c142636fb4f1c9b2f39fabbcbf6bfe2d403cc90ab651b5824537bab0b8d",
+      "bytes": 204244,
+      "viewport": {
+        "width": 1280,
+        "height": 1000
+      },
+      "kind": "actual Chromium screenshot",
+      "fixture": "synthetic task/criteria and original Japanese text",
+      "stage": "earlier unverified card",
+      "source_files": null,
+      "commit_metadata_recorded": false
+    },
+    {
+      "path": "before-mobile.png",
+      "sha256": "90577b919703d2e9156b44c1248cf4e961c9ee024001d0cf71b572574ad8fb6f",
+      "bytes": 83875,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "kind": "actual Chromium screenshot",
+      "fixture": "synthetic task/criteria and original Japanese text",
+      "stage": "earlier unverified card",
+      "source_files": null,
+      "commit_metadata_recorded": false
+    },
+    {
+      "path": "en-desktop.png",
+      "sha256": "b83c60eb8a8cf9c9e92c8e70ad185627cde1c72935f3fd7d6f2c574fae7a5c37",
+      "bytes": 186165,
+      "viewport": {
+        "width": 1280,
+        "height": 1000
+      },
+      "kind": "actual Chromium screenshot",
+      "fixture": "synthetic task/criteria and original Japanese text",
+      "stage": "after two actual local criterion checks",
+      "source_files": [
+        {
+          "path": "dashboard/task-outcomes-ui.mjs",
+          "sha256": "1be1809b4ee70465587264bf326e2627f07845b392e1900c1412800582152179"
+        },
+        {
+          "path": "dashboard/app.mjs",
+          "sha256": "c92563410c2b3c3ad0c8c8a5d34ce77d0e18f61403bd34584463fe74ec4f754c"
+        },
+        {
+          "path": "dashboard/locale.mjs",
+          "sha256": "60bebf5a5e6f2d10258876a97bb6b8dd509bba5d35704d0344115c5b1575b715"
+        },
+        {
+          "path": "dashboard/ui.html",
+          "sha256": "b92219f73a67533e7478c73c0cf6938a53cce362ca608781661d379bc9fd6743"
+        }
+      ],
+      "commit_metadata_recorded": false
+    },
+    {
+      "path": "en-mobile.png",
+      "sha256": "e720845a781b9f1913b565342eb00659788d194288b0a7f4123f714df418150b",
+      "bytes": 78103,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "kind": "actual Chromium screenshot",
+      "fixture": "synthetic task/criteria and original Japanese text",
+      "stage": "after two actual local criterion checks",
+      "source_files": [
+        {
+          "path": "dashboard/task-outcomes-ui.mjs",
+          "sha256": "1be1809b4ee70465587264bf326e2627f07845b392e1900c1412800582152179"
+        },
+        {
+          "path": "dashboard/app.mjs",
+          "sha256": "c92563410c2b3c3ad0c8c8a5d34ce77d0e18f61403bd34584463fe74ec4f754c"
+        },
+        {
+          "path": "dashboard/locale.mjs",
+          "sha256": "60bebf5a5e6f2d10258876a97bb6b8dd509bba5d35704d0344115c5b1575b715"
+        },
+        {
+          "path": "dashboard/ui.html",
+          "sha256": "b92219f73a67533e7478c73c0cf6938a53cce362ca608781661d379bc9fd6743"
+        }
+      ],
+      "commit_metadata_recorded": false
+    },
+    {
+      "path": "ja-desktop.png",
+      "sha256": "7a3e4193d2262c312c24615c6fe856474da3ec7e14e005f2f3a26789a78231a6",
+      "bytes": 214176,
+      "viewport": {
+        "width": 1280,
+        "height": 1000
+      },
+      "kind": "actual Chromium screenshot",
+      "fixture": "synthetic task/criteria and original Japanese text",
+      "stage": "after two actual local criterion checks",
+      "source_files": [
+        {
+          "path": "dashboard/task-outcomes-ui.mjs",
+          "sha256": "1be1809b4ee70465587264bf326e2627f07845b392e1900c1412800582152179"
+        },
+        {
+          "path": "dashboard/app.mjs",
+          "sha256": "c92563410c2b3c3ad0c8c8a5d34ce77d0e18f61403bd34584463fe74ec4f754c"
+        },
+        {
+          "path": "dashboard/locale.mjs",
+          "sha256": "60bebf5a5e6f2d10258876a97bb6b8dd509bba5d35704d0344115c5b1575b715"
+        },
+        {
+          "path": "dashboard/ui.html",
+          "sha256": "b92219f73a67533e7478c73c0cf6938a53cce362ca608781661d379bc9fd6743"
+        }
+      ],
+      "commit_metadata_recorded": false
+    },
+    {
+      "path": "ja-mobile.png",
+      "sha256": "6ef3262f2c4c5387468cc1babfe6f60474d4d1e4081628ab126d1412014a4094",
+      "bytes": 91905,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "kind": "actual Chromium screenshot",
+      "fixture": "synthetic task/criteria and original Japanese text",
+      "stage": "after two actual local criterion checks",
+      "source_files": [
+        {
+          "path": "dashboard/task-outcomes-ui.mjs",
+          "sha256": "1be1809b4ee70465587264bf326e2627f07845b392e1900c1412800582152179"
+        },
+        {
+          "path": "dashboard/app.mjs",
+          "sha256": "c92563410c2b3c3ad0c8c8a5d34ce77d0e18f61403bd34584463fe74ec4f754c"
+        },
+        {
+          "path": "dashboard/locale.mjs",
+          "sha256": "60bebf5a5e6f2d10258876a97bb6b8dd509bba5d35704d0344115c5b1575b715"
+        },
+        {
+          "path": "dashboard/ui.html",
+          "sha256": "b92219f73a67533e7478c73c0cf6938a53cce362ca608781661d379bc9fd6743"
+        }
+      ],
+      "commit_metadata_recorded": false
+    },
+    {
+      "path": "zh-CN-desktop.png",
+      "sha256": "827ebb0abffb19b5da9c15834dddb2ba72da3ea5d1b1a38fb7972596b6432aed",
+      "bytes": 182183,
+      "viewport": {
+        "width": 1280,
+        "height": 1000
+      },
+      "kind": "actual Chromium screenshot",
+      "fixture": "synthetic task/criteria and original Japanese text",
+      "stage": "after two actual local criterion checks",
+      "source_files": [
+        {
+          "path": "dashboard/task-outcomes-ui.mjs",
+          "sha256": "1be1809b4ee70465587264bf326e2627f07845b392e1900c1412800582152179"
+        },
+        {
+          "path": "dashboard/app.mjs",
+          "sha256": "c92563410c2b3c3ad0c8c8a5d34ce77d0e18f61403bd34584463fe74ec4f754c"
+        },
+        {
+          "path": "dashboard/locale.mjs",
+          "sha256": "60bebf5a5e6f2d10258876a97bb6b8dd509bba5d35704d0344115c5b1575b715"
+        },
+        {
+          "path": "dashboard/ui.html",
+          "sha256": "b92219f73a67533e7478c73c0cf6938a53cce362ca608781661d379bc9fd6743"
+        }
+      ],
+      "commit_metadata_recorded": false
+    },
+    {
+      "path": "zh-CN-mobile.png",
+      "sha256": "a1cc66445edd7387ad15d00576dec4ba1bcc8e34bac05c670ae415345b1b8d40",
+      "bytes": 80427,
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "kind": "actual Chromium screenshot",
+      "fixture": "synthetic task/criteria and original Japanese text",
+      "stage": "after two actual local criterion checks",
+      "source_files": [
+        {
+          "path": "dashboard/task-outcomes-ui.mjs",
+          "sha256": "1be1809b4ee70465587264bf326e2627f07845b392e1900c1412800582152179"
+        },
+        {
+          "path": "dashboard/app.mjs",
+          "sha256": "c92563410c2b3c3ad0c8c8a5d34ce77d0e18f61403bd34584463fe74ec4f754c"
+        },
+        {
+          "path": "dashboard/locale.mjs",
+          "sha256": "60bebf5a5e6f2d10258876a97bb6b8dd509bba5d35704d0344115c5b1575b715"
+        },
+        {
+          "path": "dashboard/ui.html",
+          "sha256": "b92219f73a67533e7478c73c0cf6938a53cce362ca608781661d379bc9fd6743"
+        }
+      ],
+      "commit_metadata_recorded": false
+    }
+  ]
+}

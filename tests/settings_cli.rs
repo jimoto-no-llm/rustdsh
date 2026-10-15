@@ -316,8 +316,11 @@ fn language_option_localizes_auth_and_setup_guidance() {
     assert!(auth.status.success());
     let auth_stdout = String::from_utf8_lossy(&auth.stdout);
     assert!(auth_stdout.contains("凭据"), "{auth_stdout}");
-    assert!(auth_stdout.contains("未找到外部登录"), "{auth_stdout}");
-    assert!(auth_stdout.contains("首次使用"), "{auth_stdout}");
+    assert!(auth_stdout.contains("未选择共享"), "{auth_stdout}");
+    assert!(
+        auth_stdout.contains("--select SOURCE:CREDENTIAL --import"),
+        "{auth_stdout}"
+    );
     assert!(!fixture.0.join(".credentials.yaml").exists());
 
     let setup = fixture.run(&["--language", "zh-CN", "setup"]);
@@ -462,14 +465,15 @@ fn auth_renders_synthetic_source_without_copying_or_exposing_its_value() {
     )
     .unwrap();
     for (language, label) in [
-        ("en", "source codex"),
-        ("zh-CN", "来源 codex"),
-        ("ja", "ソース codex"),
+        ("en", "persistent credentials"),
+        ("zh-CN", "持久凭据"),
+        ("ja", "永続保存する認証情報"),
     ] {
         let output = fixture.run(&["--language", language, "auth"]);
         assert!(output.status.success());
         let text = String::from_utf8_lossy(&output.stdout);
         assert!(text.contains(label), "{text}");
+        assert!(text.contains("codex:OPENAI_API_KEY"), "{text}");
         assert!(!text.contains("fixture-value"));
         assert!(!fixture.0.join(".credentials.yaml").exists());
     }
@@ -487,36 +491,31 @@ fn auth_localizes_owned_details_and_preserves_json_and_external_identifiers() {
     std::fs::create_dir_all(fixture.0.join("data/opencode")).unwrap();
     std::fs::write(
         fixture.0.join("data/opencode/auth.json"),
-        r#"{"独自の接続":{"access":"fixture-access","refresh":"fixture-refresh"}}"#,
+        r#"{"独自の接続":{"type":"oauth","access":"fixture-access","refresh":"fixture-refresh"}}"#,
     )
     .unwrap();
-    for (language, disposition, unknown, skipped) in [
-        (
-            "en",
-            "would import from codex",
-            "expires_ms=unknown",
-            "skipped",
-        ),
-        ("zh-CN", "可从 codex 导入", "expires_ms=未知", "已跳过"),
-        (
-            "ja",
-            "codex からインポートできます",
-            "expires_ms=不明",
-            "スキップしました",
-        ),
+    // Only explicitly selected sources receive an import decision; this command
+    // previews the decision without copying a credential.
+    std::fs::write(
+        fixture.0.join("rdsh-auth-sharing.json"),
+        r#"{"version":1,"selected":["codex:openai-codex"]}"#,
+    )
+    .unwrap();
+    for (language, disposition, skipped) in [
+        ("en", "would import from codex", "skipped"),
+        ("zh-CN", "可从 codex 导入", "已跳过"),
+        ("ja", "codex からインポートできます", "スキップ"),
     ] {
         let output = fixture.run(&["--language", language, "auth"]);
         assert!(output.status.success());
         let text = String::from_utf8_lossy(&output.stdout);
-        for expected in [
-            disposition,
-            unknown,
-            skipped,
-            "独自の接続",
-            "llm-pi-ai/openai-codex",
-        ] {
+        for expected in [disposition, skipped, "llm-pi-ai/openai-codex"] {
             assert!(text.contains(expected), "{text}");
         }
+        assert!(
+            !text.contains("独自の接続"),
+            "untrusted provider names must not enter diagnostics: {text}"
+        );
         assert!(!text.contains("fixture-access"));
         assert!(!text.contains("fixture-refresh"));
         let json = fixture.run(&["--language", language, "auth", "--json"]);
@@ -524,7 +523,7 @@ fn auth_localizes_owned_details_and_preserves_json_and_external_identifiers() {
         let value: serde_json::Value = serde_json::from_slice(&json.stdout).unwrap();
         assert_eq!(
             value["notes"],
-            serde_json::json!(["opencode login '独自の接続' skipped: not a dsh record id"])
+            serde_json::json!(["opencode login skipped: invalid provider id"])
         );
         assert_eq!(
             value["records"][0]["detail"],

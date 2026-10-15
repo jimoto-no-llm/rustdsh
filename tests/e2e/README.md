@@ -40,6 +40,14 @@ PNGs and a verification report; it never restarts production DSH or executes the
 updater. Run just this flow with `npm run test:updates`. Set
 `RDSH_UPDATE_BASELINE_CLIENT` to the previous client file for before/after captures.
 
+The default command also runs `task-outcomes.mjs` against the actual project
+server and isolated acceptance checks. It covers reported done versus verified,
+partial/full checks, fixed milestones after task splits, stale code and an old
+response arriving after an SSE update. `RDSH_OUTCOMES_OUTPUT` selects its evidence
+directory; `RDSH_OUTCOMES_BASELINE` optionally points to a previous `server.mjs`.
+Full-panel PNGs use extra viewport height to keep the fixed action bar clear;
+separate phone PNGs and overflow checks use the actual 390 x 844 viewport.
+
 ## Optional installed DSH integration
 
 ```sh
@@ -123,3 +131,7 @@ observes both the pasted-key prompt and environment-key confirmation, skips or
 refuses both, and verifies no credential is written. Only a synthetic placeholder
 is placed in the child environment; no secret is entered and no provider is called.
 The existing native CI matrix runs this test on Linux and macOS.
+
+The outcome language flow runs actual synthetic acceptance checks through the local server in English, Simplified Chinese and Japanese. It checks initial unverified state, verified criteria, original Japanese task values, and desktop/mobile layout without provider calls.
+
+On native Windows, `powershell -NoProfile -File tests/e2e/cli-tty-windows.ps1` checks all six interactive setup cases through ConPTY using isolated homes and no provider requests. `RDSH_E2E_BIN` selects a built `.exe`. POSIX hosts use `python3 tests/e2e/cli-tty.py`. These tests do not exercise a physical keyboard or the Windows OS IME.

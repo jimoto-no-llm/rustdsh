@@ -1,6 +1,9 @@
 import { ProductLocaleError } from "./product-locale.mjs";
 
 export const cliEntries = [
+  ["error.nativeAbsolute", "RDSH_BINは絶対パスで指定してください", "RDSH_BIN must be an absolute path", "RDSH_BIN 必须为绝对路径"],
+  ["error.nativeMissing", "rdshがPATHにありません（RDSH_BINでも指定できます）", "rdsh is not installed on PATH (or set RDSH_BIN)", "PATH 中未安装 rdsh（也可设置 RDSH_BIN）"],
+  ["error.taskOutcomesAction", "task-outcomesの操作またはオプションが不正です", "Invalid task-outcomes action/options", "task-outcomes 操作或选项无效"],
   [
     "error.portRange",
     "ポートは1024～65535の整数で指定してください",

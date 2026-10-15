@@ -16,9 +16,9 @@ output = Path(os.environ.get('RDSH_E2E_OUTPUT', str(repo / 'target/cli-tty')))
 output.mkdir(parents=True, exist_ok=True)
 cases = []
 for language, paste, save in [
-    ('en', 'paste DEEPSEEK_API_KEY here', 'save DEEPSEEK_API_KEY from the environment'),
-    ('zh-CN', '在此粘贴 DEEPSEEK_API_KEY', '将环境中的 DEEPSEEK_API_KEY 保存到凭据中'),
-    ('ja', 'DEEPSEEK_API_KEY を貼り付けてください', '環境変数 DEEPSEEK_API_KEY を認証情報に保存しますか'),
+    ('en', 'paste DEEPSEEK_API_KEY here', 'persist DEEPSEEK_API_KEY from environment'),
+    ('zh-CN', '在此粘贴 DEEPSEEK_API_KEY', '将环境变量 DEEPSEEK_API_KEY 保存到'),
+    ('ja', 'DEEPSEEK_API_KEY を貼り付けてください', '環境変数 DEEPSEEK_API_KEY を'),
 ]:
     for mode, expected, answer in [('paste', paste, b'\n'), ('save', save, b'n\n')]:
         with tempfile.TemporaryDirectory(prefix='rdsh-cli-tty-') as home:

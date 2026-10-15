@@ -34,13 +34,6 @@ function card(label, value, detail, progress, warning = false) {
   }
   return element;
 }
-function emptyRow(text, columns) {
-  const tr = node("tr");
-  const cell = node("td", text, "empty");
-  cell.colSpan = columns;
-  tr.append(cell);
-  return tr;
-}
 const date = (value) =>
   value ? formatDateTime(value) : text("report.unreported");
 const freshnessLabels = {
@@ -179,42 +172,9 @@ export function renderReports(state, now = Date.now()) {
     card(text("report.currentDone"), `${currentDone} / ${state.tasks.length}`, text("report.breakdown") + counts),
     card(text("report.pending"), String(pending.length), text("report.answered", {count:answered})),
   );
-  $("task-milestones").textContent = [
-    ...new Set(state.tasks.map((task) => task.milestone).filter(Boolean)),
-  ].join(" / ");
-  $("tasks").replaceChildren(
-    ...state.tasks.map((task) => {
-      // #57: 端末を替えても同じ行へ戻れる安定アンカー。
-      const tr = node("tr");
-      tr.id = "task-" + task.id;
-      const status = node("td");
-      const view = observationView(task.status, task.observation, now);
-      const statusLabel = (view.kind === "estimated" ? text("report.estimated") : "") +
-        text("task.status."+task.status) + (view.current ? "" : "（" + freshnessLabels[view.freshness] + "）");
-      status.append(node(
-        "span", statusLabel,
-        "status " + (view.current && view.kind !== "estimated" ? task.status : ""),
-      ));
-      const title = node("td", task.title);
-      title.append(provenance(view, undefined, String, "task:" + task.id));
-      tr.append(
-        node("td", task.id, "id"),
-        status,
-        title,
-        node("td", task.blocker),
-      );
-      const taskLink = node("a", task.id);
-      taskLink.href = "#task-" + encodeURIComponent(task.id);
-      taskLink.dataset.taskId = task.id;
-      tr.children[0].replaceChildren(taskLink);
-      [...tr.children].forEach((cell, index) => {
-        cell.dataset.label = ["ID", text("report.status"), text("report.title"), text("report.blocker")][index];
-      });
-      return tr;
-    }),
-  );
-  if (!state.tasks.length)
-    $("tasks").append(emptyRow(text("report.noTasks"), 4));
+  // Task outcome cards and milestones have a dedicated renderer. This
+  // function can run again for the same SSE revision, so it must not replace
+  // content owned by that revision-aware renderer.
   renderEvents(state, now);
   if (activeDisclosure)
     [...document.querySelectorAll("summary[data-observation-id]")]

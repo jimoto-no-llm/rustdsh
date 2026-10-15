@@ -60,3 +60,5 @@ npm test --prefix plugins/rdsh-llm-muse-code-subscription
 回帰テストはプロバイダーを呼び出さず、認証条件、APIキー除外、ツール名検証、SDK停止、実子プロセスでのJSON通信・キャンセル・タイムアウト・異常終了、Harnessのイベント変換を検査します。実モデルでの確認範囲は [確認記録](../../docs/evidence/muse-code-subscription.md) を参照してください。
 
 公式資料: [SDK / MSP](https://meta-models.github.io/muse-code-sdk/1.4/)、[モデルと提供範囲](https://dev.meta.ai/docs/models)、[定額契約とContributor mode](https://dev.meta.ai/docs/muse-code/subscriptions)。定額資格情報の利用先はMuse Code CLIです。直接Meta APIへ接続するキーを追加すると従量課金になります。
+
+既知のログイン不足・タイムアウトなど、アダプターが定義する診断文は英語・簡体字中国語・日本語で表示します。エラーコード、provider/model ID、カタログの独自説明、モデル本文は変更しません。

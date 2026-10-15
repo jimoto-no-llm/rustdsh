@@ -1,0 +1,51 @@
+{
+  "scope": "real local HTTP+Chromium and actual synthetic criterion processes; no provider/model/Tailscale/production",
+  "cases": [
+    {
+      "language": "en",
+      "result": "PASS",
+      "criteria": 2,
+      "real_checks": 2,
+      "raw_Japanese_preserved": true,
+      "viewports": 2,
+      "page_errors": []
+    },
+    {
+      "language": "zh-CN",
+      "result": "PASS",
+      "criteria": 2,
+      "real_checks": 2,
+      "raw_Japanese_preserved": true,
+      "viewports": 2,
+      "page_errors": []
+    },
+    {
+      "language": "ja",
+      "result": "PASS",
+      "criteria": 2,
+      "real_checks": 2,
+      "raw_Japanese_preserved": true,
+      "viewports": 2,
+      "page_errors": []
+    }
+  ],
+  "source_files": [
+    {
+      "path": "dashboard/task-outcomes-ui.mjs",
+      "sha256": "1be1809b4ee70465587264bf326e2627f07845b392e1900c1412800582152179"
+    },
+    {
+      "path": "dashboard/app.mjs",
+      "sha256": "c92563410c2b3c3ad0c8c8a5d34ce77d0e18f61403bd34584463fe74ec4f754c"
+    },
+    {
+      "path": "dashboard/locale.mjs",
+      "sha256": "60bebf5a5e6f2d10258876a97bb6b8dd509bba5d35704d0344115c5b1575b715"
+    },
+    {
+      "path": "dashboard/ui.html",
+      "sha256": "b92219f73a67533e7478c73c0cf6938a53cce362ca608781661d379bc9fd6743"
+    }
+  ],
+  "result": "PASS"
+}

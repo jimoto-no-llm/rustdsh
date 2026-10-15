@@ -681,3 +681,25 @@ test("invalid returned locale blocks editing while auto language uses the browse
     undefined,
   );
 });
+
+for (const [language, browser, presenceLanguage, details, agent] of [
+  ["auto", "ja-JP", "en", "Working in dsh", "Idle"],
+  ["auto", "en-US", "zh-CN", "正在使用 dsh 工作", "待机中"],
+  ["ja", "en-US", "ja", "dshで作業中", "待機中"],
+  ["en", "ja-JP", "en", "Working in dsh", "Idle"],
+]) {
+  test(`Discord reflection uses server ${presenceLanguage} with UI ${language}/${browser}`, async () => {
+    const fixture = await host(async (path) => ({
+      ok: true,
+      json: async () => path === "/api/rdsh-discord" ? {
+        ok: true, language: presenceLanguage, state: "connected", running_agents: 0,
+        published_activity: { details, state: agent, status_display_type: 2 },
+      } : { config: { general: { language }, discord: {
+        enabled: true, details: "", show_elapsed: false, show_image: false,
+      } } },
+    }), browser);
+    fixture.render(); await fixture.settle();
+    const reflected = fixture.copy(language, "reflected");
+    assert.ok(find(fixture.render(), node => node.props.role === "status" && node.children.includes(reflected)));
+  });
+}

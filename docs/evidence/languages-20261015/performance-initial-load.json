@@ -1,0 +1,27 @@
+{
+  "started": 1792032066.0986161,
+  "load_before": [
+    10.86376953125,
+    11.9150390625,
+    11.255859375
+  ],
+  "baseline": "2db470bd15d2efbe58c9ff1a43e6679e5cea4d4a",
+  "candidate_binary_sha256": "7ec1e90782490ba61873b5a85e2238ba40ba617de1195c1c31ab7d52bd7a206c",
+  "finished": 1792032094.008476,
+  "load_after": [
+    19.5302734375,
+    13.798828125,
+    11.95361328125
+  ],
+  "results": [
+    {
+      "exit": 0,
+      "seconds": 6.571496963500977
+    },
+    {
+      "exit": 0,
+      "seconds": 21.33616304397583
+    }
+  ],
+  "redaction": "local absolute command paths omitted; timing values, load observations and exit codes retained"
+}

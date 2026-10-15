@@ -225,29 +225,20 @@ pub fn cmd_sessions(
             .iter()
             .zip(sizes.iter())
             .map(|(s, (decomp, exact))| {
-                let tok = match decomp {
-                    Some(b) => Some(b / 4),
-                    None => Some(s.bytes / 4),
-                };
-                if tokens {
-                    serde_json::json!({
-                        "project": s.project,
-                        "id": s.id,
-                        "bytes": s.bytes,
-                        "mtime": s.mtime_s,
-                        "tokens": tok,
-                        "tokens_exact": exact,
-                    })
-                } else {
-                    serde_json::json!({
-                        "project": s.project,
-                        "id": s.id,
-                        "bytes": s.bytes,
-                        "mtime": s.mtime_s,
-                        "tokens": null,
-                        "tokens_exact": false,
-                    })
-                }
+                // serde_json::Map sorts these keys by default; when
+                // preserve_order is enabled, explicit insertion keeps the same
+                // legacy `sessions --json` byte order.
+                let mut row = serde_json::Map::new();
+                row.insert("bytes".into(), serde_json::json!(s.bytes));
+                row.insert("id".into(), serde_json::json!(s.id));
+                row.insert("mtime".into(), serde_json::json!(s.mtime_s));
+                row.insert("project".into(), serde_json::json!(s.project));
+                row.insert(
+                    "tokens".into(),
+                    serde_json::json!(tokens.then(|| decomp.map_or(s.bytes / 4, |b| b / 4))),
+                );
+                row.insert("tokens_exact".into(), serde_json::json!(tokens && *exact));
+                serde_json::Value::Object(row)
             })
             .collect();
         println!("{}", serde_json::json!({"sessions": items, "total": total}));

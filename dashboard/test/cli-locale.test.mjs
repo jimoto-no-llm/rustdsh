@@ -82,7 +82,7 @@ test("CLI catalog has all three languages, matching placeholders and typed valid
   const diagnostics = [
     ...source.matchAll(/new CliDiagnosticError\(\s*"([^"]+)"/g),
   ].map((match) => match[1]);
-  assert.equal(new Set(diagnostics).size, 90);
+  assert.equal(new Set(diagnostics).size, 93);
   for (const key of diagnostics)
     for (const language of ["en", "ja", "zh-CN"]) {
       const diagnostic = new CliDiagnosticError(key, {
@@ -137,7 +137,8 @@ for (const language of ["en", "zh-CN", "ja"])
         ["project", "--project", root, "--port", "1", "--no-tailscale"],
         "error.portRange",
       ],
-      [["subagents", "plan"], "error.inputRequired"],
+      [["subagents", "plan"], "error.subagentsAction"],
+      [["task-outcomes", "bad"], "error.taskOutcomesAction"],
       [["backup", "bad"], "error.backupAction"],
       [["workers", "bad"], "error.workersAction"],
       [["integration", "bad"], "error.integrationAction"],
@@ -163,8 +164,8 @@ for (const language of ["en", "zh-CN", "ja"])
     );
     const missing = path.join(root, "原文 中文 {id}.json");
     const rawError = await run([
-      "subagents",
-      "plan",
+      "release",
+      "stage",
       "--input-file",
       missing,
       "--language",

@@ -1,0 +1,103 @@
+{
+  "result": "PASS",
+  "execution": "physical Windows native host, not WSL and not CI",
+  "completed_utc": "2026-10-15T03:05:32.9347630Z",
+  "build_exit": 0,
+  "tests_exit": 0,
+  "candidate_binary_sha256": "71771ab61664e6912d28e3bc48ba461271b883341641c6443ad9e8acfba8132a",
+  "release_tests": {
+    "passed": 399,
+    "failed": 0,
+    "ignored": 0,
+    "targets": [
+      {
+        "target": "unittests src/main.rs",
+        "result": "ok",
+        "passed": 266,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "tests/auth_sharing.rs",
+        "result": "ok",
+        "passed": 16,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "tests/cli_localization.rs",
+        "result": "ok",
+        "passed": 16,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "tests/doctor_cli.rs",
+        "result": "ok",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "tests/log_session_boundaries.rs",
+        "result": "ok",
+        "passed": 5,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "tests/native_e2e.rs",
+        "result": "ok",
+        "passed": 17,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "tests/provider_cli.rs",
+        "result": "ok",
+        "passed": 22,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "tests/serial_proxy.rs",
+        "result": "ok",
+        "passed": 13,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "tests/settings_cli.rs",
+        "result": "ok",
+        "passed": 17,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "tests/subagents_cli.rs",
+        "result": "ok",
+        "passed": 8,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "tests/task_outcomes_cli.rs",
+        "result": "ok",
+        "passed": 12,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "target": "tests/update_auto_cli.rs",
+        "result": "ok",
+        "passed": 6,
+        "failed": 0,
+        "ignored": 0
+      }
+    ]
+  },
+  "conpty_cases": 6,
+  "remaining_test_owned_processes": 0,
+  "source_manifest": "source-files.json",
+  "secrets_and_launches": "isolated HOME/DSH_HOME; no real provider/model invocation; installed binaries retained"
+}
