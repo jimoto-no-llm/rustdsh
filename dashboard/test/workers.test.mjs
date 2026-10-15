@@ -10,6 +10,7 @@ import { identity } from "../state.mjs";
 import { WorkerWorkspaces } from "../workers.mjs";
 import { declaration } from "../worker-scopes.mjs";
 import { repository as workerGitRepository } from "../worker-git.mjs";
+import * as workerGit from "../worker-git.mjs";
 
 const exec = promisify(execFile);
 const cli = fileURLToPath(new URL("../cli.mjs", import.meta.url));
@@ -23,6 +24,17 @@ const scope = (id, writes = ["src/a.txt"], role = "edit") => ({
   lease_seconds: 60,
 });
 const error = (code) => (e) => e.code === code;
+
+test("native worker Git request deadline covers the observe command budget", () => {
+  const maxGitCommands = 9;
+  const gitCommandTimeoutMs = 30_000;
+  const cleanupAllowanceMs = 30_000;
+  assert.ok(
+    workerGit.NATIVE_REQUEST_TIMEOUT_MS >=
+      maxGitCommands * gitCommandTimeoutMs + cleanupAllowanceMs,
+    `request deadline ${workerGit.NATIVE_REQUEST_TIMEOUT_MS}ms is shorter than the worst-case Git budget`,
+  );
+});
 
 test("worker Git rejects a relative RDSH_BIN override", async () => {
   const previous = process.env.RDSH_BIN;

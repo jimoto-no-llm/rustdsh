@@ -12,9 +12,9 @@ import {
 } from "./worker-scopes.mjs";
 
 const exec = promisify(execFile);
-// observe-worktree can run five Git commands in sequence, each with a 30s
-// native bound. Keep enough room for the whole request plus process startup.
-const NATIVE_REQUEST_TIMEOUT_MS = 160_000;
+// observe-worktree can run nine Git commands in sequence: each is bounded to
+// 30s in Rust. Keep the request alive for that 270s maximum plus cleanup time.
+export const NATIVE_REQUEST_TIMEOUT_MS = 300_000;
 const environment = () => ({
   ...Object.fromEntries(
     Object.entries(process.env).filter(([key]) =>
