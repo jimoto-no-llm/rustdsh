@@ -73,6 +73,7 @@ rdsh context status   # 有効化後に記憶の状態を見る
 | context_engine | off | 実験的なコンテキストエンジン |
 | compute | off | 常駐 pure-compute worker 連携（RDSH_COMPUTE=1） |
 | budget_guard | on | 予算ガードフック |
+| answer_guard | on | 本文が空（reasoning のみ）でターンが閉じるとき、再出力を1回だけ促す |
 | agent_tool_sandbox | off | 委譲したエージェントツールを --share-file の範囲に限定（ネットワーク・ホスト書き込みなし） |
 | release_probe | off | リリース検証プローブ（環境変数があるときだけ実行） |
 | setup_web | on | rdsh setup --web |
@@ -88,7 +89,7 @@ rdsh context status   # 有効化後に記憶の状態を見る
 
 - ネイティブ側（`serve` / `search-web` / `context_engine` / `setup_web`）は、無効なコマンドを実行すると理由と有効化方法を表示して終了します。
 - slim のヒント（`slim_lazy_plugins` / `slim_disable_voice` / `slim_disable_auto_review`）と `node_compile_cache` は、委譲して起動する DSH プロセスの環境変数に反映されます。
-- プラグイン側（`discord` / `sound` / `compute` / `budget_guard` / `release_probe` / `update_check` / `update_notifications`）は `rdsh.json` を読み込んで動作を停止します。DSH を再起動すると反映されます。
+- プラグイン側（`discord` / `sound` / `compute` / `budget_guard` / `answer_guard` / `release_probe` / `update_check` / `update_notifications`）は `rdsh.json` を読み込んで動作を停止します。DSH を再起動すると反映されます。
 
 ## context engine（実験的、既定OFF）
 
