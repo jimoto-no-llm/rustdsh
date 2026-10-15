@@ -153,14 +153,30 @@ def render_registry(tag: str, versions: dict, assets=UNIX_ASSETS, header=UNIX_HE
     return "\n".join(lines) + "\n"
 
 
+def channel_for(latest, tag: str) -> str:
+    """Return the channel row to write: the newest of the stored and pinned tags.
+
+    Re-pinning an older release backfills its rows without moving the channel
+    backwards, so a registered latest release keeps being what installs and
+    automatic updates resolve to.
+    """
+    if latest is None:
+        return tag
+    try:
+        parse_tag(latest)
+    except ValueError as error:
+        raise SystemExit(f"existing latest row is unusable: {error}") from None
+    return max(latest, tag, key=parse_tag)
+
+
 def pin(text: str, tag: str, digests: dict, assets=UNIX_ASSETS, header=UNIX_HEADER) -> str:
     parse_tag(tag)
     rows = require_assets(tag, digests, assets)
-    comments, _latest, versions = split_registry(text)
+    comments, latest, versions = split_registry(text)
     if comments != list(header):
         raise SystemExit("registry header changed; update the header in this script first")
     versions[tag] = rows
-    return render_registry(tag, versions, assets, header)
+    return render_registry(channel_for(latest, tag), versions, assets, header)
 
 
 def pin_all(tag: str, digests: dict, ledgers=LEDGERS) -> list:
