@@ -363,6 +363,7 @@ pub fn diagnostic(locale: Locale, text: &str) -> &str {
         "the file uses a flow mapping" => ("文件使用了流式映射", "ファイルにフロー形式のマッピングが使われています"),
         "the file uses a flow sequence that may hold keys" => ("文件使用了可能包含键的流式序列", "ファイルにキーを含む可能性のあるフロー形式の配列が使われています"),
         "llm-pi-ai is also mentioned elsewhere in the file (a nested or second definition)" => ("文件其他位置也出现 llm-pi-ai（嵌套或重复定义）", "ファイルの別の場所にもllm-pi-aiがあります（入れ子または重複定義）"),
+        "the llm-pi-ai entry is indented in a form this module will not edit" => ("llm-pi-ai 条目的缩进格式无法安全编辑", "llm-pi-aiエントリのインデント形式を安全に編集できません"),
         "the llm-pi-ai entry is not found after the edit" => ("编辑后找不到 llm-pi-ai 条目", "編集後にllm-pi-aiエントリが見つかりません"),
         "the providers block is not found after the edit" => ("编辑后找不到 providers 区块", "編集後にprovidersブロックが見つかりません"),
         "the written route is not found exactly once on read-back" => ("重新读取时路由不是恰好出现一次", "再読み取り時の経路が1件ではありません"),

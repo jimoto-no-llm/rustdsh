@@ -562,6 +562,49 @@ fn an_inline_providers_mapping_is_refused_with_the_yaml_to_add() {
 }
 
 #[test]
+fn deeper_provider_config_is_refused_in_three_languages_without_writes() {
+    let malformed = "- id: llm-pi-ai\n   config:\n      providers:\n         r0:\n            baseURL: http://old\n";
+    for (language, reason, manual) in [
+        (
+            "en",
+            "the llm-pi-ai entry is indented in a form this module will not edit",
+            "add this under llm-pi-ai config providers by hand",
+        ),
+        (
+            "zh-CN",
+            "llm-pi-ai 条目的缩进格式无法安全编辑",
+            "请手动将以下内容添加到 llm-pi-ai config providers 下",
+        ),
+        (
+            "ja",
+            "llm-pi-aiエントリのインデント形式を安全に編集できません",
+            "llm-pi-ai config providers の下に次の内容を手動で追加してください",
+        ),
+    ] {
+        let fixture = Fixture::new();
+        fixture.set_patch(malformed);
+        let output = fixture.run(&[
+            "--language",
+            language,
+            "provider",
+            "add",
+            "hai",
+            "--profile",
+            "tui",
+            "--model",
+            "model-原値",
+        ]);
+        assert_eq!(output.status.code(), Some(1), "{}", text(&output));
+        let message = text(&output);
+        assert!(message.contains(reason), "{language}: {message}");
+        assert!(message.contains(manual), "{language}: {message}");
+        assert!(message.contains("model-原値"), "{message}");
+        assert_eq!(fixture.patch(), malformed);
+        assert!(fixture.creds().is_empty());
+    }
+}
+
+#[test]
 fn auth_reports_the_new_routes_as_ok_or_missing_with_the_key_name() {
     let f = Fixture::new();
     f.set_patch("- id: agent-default-model\n  config:\n    provider: hai\n    model: m1\n");
