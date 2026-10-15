@@ -130,6 +130,44 @@ fn apply_is_byte_identical_across_runs() {
 }
 
 #[test]
+fn apply_prints_javascript_number_spelling_for_numeric_snapshots() {
+    let fixture = Fixture::new();
+    for (input_number, expected) in [
+        ("1.0", "\"max\":1,\"description\""),
+        ("-0.0", "\"max\":0,\"description\""),
+        ("1e-6", "\"max\":0.000001,\"description\""),
+        ("1e20", "\"max\":100000000000000000000,\"description\""),
+        (
+            "9007199254740993",
+            "\"max\":9007199254740992,\"description\"",
+        ),
+    ] {
+        let document = serde_json::json!({
+            "operation": "question",
+            "state": { "questions": [] },
+            "input": {
+                "id": "Q1",
+                "question": "numeric fixture",
+                "decision": {
+                    "kind": "consultation",
+                    "cost": { "currency": "USD", "max": "NUMBER_PLACEHOLDER" }
+                }
+            },
+            "now": NOW
+        });
+        let raw = serde_json::to_string(&document).unwrap().replace(
+            "\"max\":\"NUMBER_PLACEHOLDER\"",
+            &format!("\"max\":{input_number}"),
+        );
+        let output = fixture.run_raw(&raw);
+        assert!(
+            output.contains(expected),
+            "input={input_number}, expected={expected}, stdout={output}"
+        );
+    }
+}
+
+#[test]
 fn apply_rejects_every_documented_error_with_the_js_message() {
     let fixture = Fixture::new();
     let cases: &[(&str, &str, &str)] = &[

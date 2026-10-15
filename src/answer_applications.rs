@@ -449,40 +449,20 @@ fn civil_from_days(days: i64) -> (i64, i64, i64) {
     (if m <= 2 { y + 1 } else { y }, m, d)
 }
 
-/// The millisecond instant of a canonical `toISOString()` spelling.
-fn instant_millis(canonical: &str) -> Option<i64> {
-    let bytes = canonical.as_bytes();
-    if bytes.len() < 20 || bytes[4] != b'-' {
-        return None;
-    }
-    let number = |range: std::ops::Range<usize>| -> Option<i64> {
-        std::str::from_utf8(bytes.get(range)?).ok()?.parse().ok()
-    };
-    let year = number(0..4)?;
-    let (month, day) = (number(5..7)?, number(8..10)?);
-    let (hour, minute, second) = (number(11..13)?, number(14..16)?, number(17..19)?);
-    let millis = number(20..23)?;
-    Some(
-        (days_from_civil(year, month, day) * 86_400 + hour * 3_600 + minute * 60 + second) * 1000
-            + millis,
-    )
-}
-
 /// The millisecond instant of the request's `now` field.
 fn now_millis(now: &str) -> Option<i64> {
     if now.is_empty() {
         return None;
     }
-    parse_js_date(now).and_then(|canonical| instant_millis(&canonical))
+    crate::question_contracts::parse_iso_millis(now)
 }
 
 // ---------------------------------------------------------------------------
 // Question-contract feedback verdicts
 //
 // `feedbackValidity` and `contractStatus` live in `dashboard/question-contracts.mjs`
-// and are ported by `src/question_contracts.rs`. They are reproduced here so
-// this module stays self-contained; the two implementations must agree, and a
-// shared home would be preferable once both ports settle.
+// and are ported by `src/question_contracts.rs`. Expiry parsing is shared with
+// that module so answer feedback and public question status use one clock.
 // ---------------------------------------------------------------------------
 
 /// `contractStatus(card, now)`: the derived status the public view reports.
@@ -496,10 +476,9 @@ fn contract_status(card: &Value, now: Option<i64>) -> String {
         .and_then(|snapshot| snapshot.get("decision"))
         .and_then(|decision| decision.get("expires_at"));
     if let (Some(expires), Some(now)) = (expires_at.and_then(Value::as_str), now) {
-        if let Some(expiry) = parse_js_date(expires) {
-            if instant_millis(&expiry).is_some_and(|millis| millis <= now) {
-                return "expired".to_string();
-            }
+        if crate::question_contracts::parse_iso_millis(expires).is_some_and(|millis| millis <= now)
+        {
+            return "expired".to_string();
         }
     }
     stored.to_string()
@@ -878,10 +857,14 @@ pub fn register_reply_consumer(state: &mut Value, record: &Value, now: &str) -> 
         ("session_id", record.get("cli_session_id")),
         ("task_id", record.get("task_id")),
     ] {
-        // An undefined source property is dropped by `JSON.stringify`, so a
-        // missing field must be omitted rather than emitted as `null`.
-        if let Some(value) = value {
-            consumer.insert(key.to_string(), value.clone());
+        match value {
+            Some(value) => {
+                consumer.insert(key.to_string(), value.clone());
+            }
+            None if key == "task_id" => {
+                consumer.insert(key.to_string(), Value::Null);
+            }
+            None => {}
         }
     }
     consumer.insert("created_at".to_string(), Value::String(now.to_string()));
@@ -953,12 +936,21 @@ fn validate_record_request(state: &Value, message: &Value, command_id: &str) -> 
                 .is_some_and(|id| !id.trim().is_empty()),
         "Input JSON is invalid",
     )?;
-    let reused = state
+    let reused_answer_command = state
         .get("answer_applications")
         .and_then(|registry| registry.get("commands"))
         .and_then(Value::as_object)
         .is_some_and(|commands| commands.contains_key(command_id));
-    reply_check(!reused, "Answer application command id already exists", 409)
+    let reused_instruction_command = state
+        .get("instructions")
+        .and_then(|registry| registry.get("commands"))
+        .and_then(Value::as_object)
+        .is_some_and(|commands| commands.contains_key(command_id));
+    reply_check(
+        !(reused_answer_command || reused_instruction_command),
+        "Answer application command id already exists",
+        409,
+    )
 }
 
 /// `decision?.consumer_id === undefined`: an absent key or a JSON `null` both
@@ -1374,7 +1366,8 @@ pub fn apply_reply_ack(
                 .get("instructions")
                 .and_then(|value| value.get("requests"))
                 .and_then(|requests| requests.get(&command_id))
-                .and_then(|request| request.get("control"));
+                .and_then(|request| request.get("control"))
+                .filter(|control| !control.is_null());
             if let Some(control) = control {
                 let control_phase = control.get("phase").and_then(Value::as_str).unwrap_or("");
                 if !["confirmed", "not_needed"].contains(&control_phase) {
@@ -2024,6 +2017,9 @@ pub fn cmd_answer_applications(action: &str, input_file: &str) -> Result<()> {
                         output.insert("consumer".to_string(), reply);
                     }
                     output.insert("message".to_string(), message);
+                    if let Some(instructions) = state.get("instructions") {
+                        output.insert("instructions".to_string(), instructions.clone());
+                    }
                 }
                 _ => {
                     let context = input.get("context").cloned().unwrap_or(Value::Null);
@@ -2152,6 +2148,19 @@ mod tests {
     }
 
     #[test]
+    fn registration_normalizes_missing_task_id_and_passes_validation() {
+        let mut state = json!({ "project": project(), "revision": 3, "feedback": [] });
+        let mut record = consumer_record();
+        record.as_object_mut().unwrap().remove("task_id");
+
+        let consumer = register_reply_consumer(&mut state, &record, now()).expect("registration");
+
+        assert!(consumer.get("task_id").is_some());
+        assert_eq!(consumer["task_id"], Value::Null);
+        validate_answer_applications(&state).expect("registered consumer is valid");
+    }
+
+    #[test]
     fn validation_requires_the_consumer_task_id_field() {
         let mut state = registered_state();
         let consumer = state["answer_applications"]["consumers"]
@@ -2165,6 +2174,21 @@ mod tests {
         let error = validate_answer_applications(&state).expect_err("task_id must be present");
         assert_eq!(error.message, "Invalid answer consumer binding");
         assert_eq!(error.status, 400);
+    }
+
+    #[test]
+    fn expanded_year_expiry_uses_the_question_contract_clock() {
+        let expired = json!({
+            "status": "open",
+            "snapshot": { "decision": { "expires_at": "-000001-01-01T00:00:00.000Z" } }
+        });
+        assert_eq!(contract_status(&expired, Some(0)), "expired");
+
+        let future = json!({
+            "status": "open",
+            "snapshot": { "decision": { "expires_at": "+010000-01-01T00:59:59.000Z" } }
+        });
+        assert_eq!(contract_status(&future, Some(0)), "open");
     }
 
     #[test]
@@ -2185,6 +2209,28 @@ mod tests {
         let error = record_answer_application(&mut state, &mut message, command_id)
             .expect_err("reused reply command id");
         assert_eq!(error.status, 409);
+        assert_eq!(state, before);
+        assert_eq!(message, json!({ "question_id": "Q1" }));
+    }
+
+    #[test]
+    fn recording_rejects_command_id_collisions_with_instruction_registry() {
+        let mut state = registered_state();
+        let command_id = "reply_01234567-89ab-cdef-0123-456789abcdef";
+        state["instructions"] = json!({
+            "commands": { command_id: { "command_id": command_id } }
+        });
+        let before = state.clone();
+        let mut message = json!({ "question_id": "Q1" });
+
+        let error = record_answer_application(&mut state, &mut message, command_id)
+            .expect_err("cross-registry command id collision");
+
+        assert_eq!(error.status, 409);
+        assert_eq!(
+            error.message,
+            "Answer application command id already exists"
+        );
         assert_eq!(state, before);
         assert_eq!(message, json!({ "question_id": "Q1" }));
     }
