@@ -1,0 +1,85 @@
+name: pin-release-digests
+
+# A published stable release only reaches install.sh --from-release, the
+# automatic updater and install.ps1 -FromRelease once its archive digests are
+# pinned in the two ledgers on main; see docs/RELEASING.md.
+
+on:
+  release:
+    types: [published]
+  # The cd workflow publishes with the repository GITHUB_TOKEN, and events
+  # caused by that token do not start new workflows. Completing that run is
+  # still delivered as a workflow_run event, so both triggers are registered;
+  # the ledger check below makes the second one a no-op.
+  workflow_run:
+    workflows: ["cd"]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: pin-release-digests-${{ github.event.release.tag_name || github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  pin:
+    if: >-
+      (github.event_name == 'release' && github.event.release.prerelease == false) ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Pin the published digests in both ledgers
+        env:
+          TAG: ${{ github.event.release.tag_name || github.event.workflow_run.head_branch }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # The updater and installers only ever resolve stable releases.
+          if ! printf '%s' "${TAG}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "not a stable release tag: ${TAG}; nothing to pin"
+            exit 0
+          fi
+          python3 scripts/pin-release-digests.py "${TAG}"
+
+      - name: Open the pin pull request only when the ledgers changed
+        env:
+          TAG: ${{ github.event.release.tag_name || github.event.workflow_run.head_branch }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "${TAG} is already pinned; no pull request needed"
+            exit 0
+          fi
+
+          branch="chore/pin-${TAG}-digests"
+          if gh pr view "${branch}" --json number >/dev/null 2>&1; then
+            echo "the pin pull request for ${TAG} is already open"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "${branch}"
+          git add release-digests.tsv release-digests-windows.tsv
+          git commit -m "chore(release): pin ${TAG} digests"
+          git push origin "${branch}"
+
+          cat > "${RUNNER_TEMP}/pin-pr-body.md" <<EOF
+          概要: ${TAG} の公開アセットのダイジェストを installer 台帳へ pin します。
+          変更: release-digests.tsv と release-digests-windows.tsv に ${TAG} の行を追加し、latest 行を更新します。
+          検証: ダイジェストは GitHub Releases API の値を使い、prerelease・欠損アセット・不正な値はスクリプトが拒否します。
+          注意点: マージすると自動更新とインストーラがこの版を解決できるようになるため、両台帳の差分を確認してからマージしてください。
+          EOF
+
+          gh pr create --base main --head "${branch}" \
+            --title "chore(release): ${TAG} のダイジェストを台帳へ pin" \
+            --body-file "${RUNNER_TEMP}/pin-pr-body.md"

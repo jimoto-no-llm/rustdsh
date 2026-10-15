@@ -5,14 +5,6 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
-### Security
-
-- The optional `rdsh-mcp-exposure` plugin pins its development
-  `@modelcontextprotocol/client` to the patched line (2.3.1, override) instead
-  of the 2.0.0 that the upstream `dsh-mcp-client` peer pulls in, clearing the
-  high-severity GHSA-6qxp-vccf-f47h alert. Runtime resolution is unchanged: the
-  plugin uses the host DSH's MCP client.
-
 ### Added
 
 - `plugins/rdsh-answer-guard` recovers a turn whose reply was emitted only into
@@ -24,6 +16,43 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   never on an aborted turn, and never when a tool result is still owed. It is
   installed by `./plugins/install.sh` and `rdsh features off answer_guard`
   disables it. See [README](plugins/rdsh-answer-guard/README.md).
+
+### Fixed
+
+- 更新通知を dismiss したら、その更新については再表示しない（新しい更新のときだけ通知する）。
+
+### Changed
+
+- `AGENTS.md` and `docs/PROJECT-SETUP.md` record the working agreements that came
+  out of the v0.4.0 cycle: the nine required checks and the branch-protection
+  switches that are deliberately off, pinning the installer ledgers after every
+  release, and keeping the security page at zero open alerts.
+
+## [0.4.0] - 2026-10-15
+
+### Security
+
+- The optional `rdsh-mcp-exposure` plugin pins its development
+  `@modelcontextprotocol/client` to the patched line (2.3.1, override) instead
+  of the 2.0.0 that the upstream `dsh-mcp-client` peer pulls in, clearing the
+  high-severity GHSA-6qxp-vccf-f47h alert. Runtime resolution is unchanged: the
+  plugin uses the host DSH's MCP client.
+
+- `install.ps1 -FromRelease` verifies the Windows archive against the digests
+  pinned in `release-digests-windows.tsv` instead of the `.sha256` sidecar
+  served next to it, so a release base that serves its own archive can no
+  longer choose the checksum that admits it. The bypass needs `-NoChecksum`
+  plus a typed `YES` at a terminal.
+
+- The Windows pin lives in its own `release-digests-windows.tsv` ledger because
+  the published v0.3.3 `install.sh` and every `sync-dsh.sh` copy refuse
+  `release-digests.tsv` as a whole once one row names an asset outside the four
+  Unix archives. `release-digests.tsv` therefore stays Unix-only, so
+  `--from-release` and the automatic updater keep working for installs users
+  already have, and `scripts/pin-release-digests.py` updates both ledgers.
+
+### Added
+
 - `plugins/rdsh-mobile-ui` is bundled and installed by `./plugins/install.sh`:
   below 767px the Web chat and composer use the full viewport width, the collapsed
   sidebar becomes a one-tap logo for the session list, and question cards fit the
@@ -51,10 +80,39 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   warnings instead of guessed tiers. It starts no agent and writes nothing; the
   existing `workers prepare` still owns the checkout allocation
   (`docs/SUBAGENT-PLANNING.md`).
+- `rdsh-dashboard agents list|submit|status|result|cancel` runs cursor-agent and
+  devin as detached, cancellable jobs with untrusted-data results. The default
+  `--permission read-only` selects each CLI's most restrictive mode
+  (`--mode ask --sandbox enabled` for cursor-agent, `--permission-mode auto`
+  for devin); it is a flag mapping, not an OS sandbox, and the known gaps are
+  listed in `docs/AGENT-RUNNERS.md`. Every job end, and `cancel`, stops the
+  agent's process group with TERM, a grace period and KILL, and records
+  whether the stop was confirmed (`cleanup`); `cancel` also acts on jobs whose
+  supervisor was lost or that finished with leftover processes, but only after
+  proving the recorded group number still belongs to the job (a confirmed job
+  is a no-op; where no process identity can be read, a group cannot be stopped
+  after its supervisor is lost). On
+  Windows descendants cannot be observed (no Job Object support): the leader
+  tree is killed with `taskkill /T /F` while the leader is alive and cleanup is
+  always reported `unconfirmed` (`windows_tree_unobservable`).
 - `rdsh serial-proxy` replaces the standalone Node.js proxy with a native Rust
   command. It keeps the FIFO concurrency and rate limits, streams request and
   response bodies, and supports `--tool-choice-default <none|auto|required>`
   for Sarashina-compatible requests. See `docs/SERIAL-PROXY.md`.
+- `rdsh update auto status|on|off` turns the daily automatic update on with one
+  command: it writes a systemd user unit with the machine's own executable path
+  and runs `daemon-reload` and `enable --now`. The update itself stays with
+  `sync-dsh.sh` (digest pinning, downgrade refusal, verification, rollback) and
+  the timer runs daily with up to 30 minutes of jitter. See
+  `docs/AUTO-UPDATE.md`.
+- `rdsh doctor` warns about broken wrappers and shadowed executables: dangling
+  symlinks, a missing shebang, vanished `node`/`dsh` targets, duplicate `PATH`
+  entries, a missing `dsh-orig` and an inconsistent `origin` ledger, collected
+  in one bounded scan. It only warns; exit status and existing messages are
+  unchanged.
+- The `rdsh-update-banner` plugin is bundled again for the `web` profile, so
+  update notifications return. Install it through the installer because pnpm
+  prunes links it does not manage.
 
 ### Fixed
 
@@ -64,6 +122,18 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   find, or one outside npm's global root, is reported and skipped while the
   rdsh release update still succeeds; npm-managed trees keep digest pinning,
   downgrade refusal, verification and rollback. See `docs/AUTO-UPDATE.md`.
+- `rdsh update` stays native when rustdsh is invoked as `dsh`: it is back in
+  the native command list and in `--help`, instead of being delegated to
+  upstream `dsh`.
+- The auto-update systemd unit quotes and escapes `ExecStart`, so an executable
+  path containing spaces or `%` no longer breaks the timer.
+- The update banner's close button no longer overlaps the timestamp.
+
+- `release-digests.tsv` pins v0.3.3. Its follow-up PR was missing, so
+  `install.sh --from-release` and the automatic updater stopped at v0.3.2 even
+  though GitHub marks v0.3.3 Latest. `scripts/pin-release-digests.py` turns the
+  follow-up into one reviewed command (refusing prerelease tags, missing
+  archives and non-SHA-256 values), and `docs/RELEASING.md` uses it.
 
 ### Changed
 

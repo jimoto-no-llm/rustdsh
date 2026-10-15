@@ -10,6 +10,15 @@ it and rolls back on any failure. The repository ships
 happens on its own, once a day — but they are templates: the service names the
 machine its `ExecStart` was written on, and nothing installed or enabled them.
 
+The pinned digests are the gate: a release that is not pinned on `main` cannot be
+installed or auto-updated however long it has been published, and the daily run
+keeps reporting the previous release as latest. The `pin-release-digests`
+workflow opens that pull request as soon as a stable release is published, so
+merge it — or run `python3 scripts/pin-release-digests.py vX.Y.Z` — before
+announcing the release. `install.ps1` reads the Windows ledger
+(`release-digests-windows.tsv`) the same way. See [RELEASING.md](RELEASING.md)
+and [PROJECT-SETUP.md](PROJECT-SETUP.md).
+
 `rdsh update auto` writes those units for *this* machine and hands them to the
 user's systemd instance.
 

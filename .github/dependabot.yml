@@ -16,6 +16,54 @@ updates:
     commit-message:
       prefix: chore(deps)
     open-pull-requests-limit: 5
+  - package-ecosystem: npm
+    directory: /scripts/headless-runtime/runtime
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: chore(deps)
+    open-pull-requests-limit: 5
+  - package-ecosystem: npm
+    directory: /plugins/rdsh-compute
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: chore(deps)
+    open-pull-requests-limit: 5
+  - package-ecosystem: npm
+    directory: /plugins/rdsh-llm-muse-code-subscription
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: chore(deps)
+    open-pull-requests-limit: 5
+  - package-ecosystem: npm
+    directory: /plugins/rdsh-mcp-exposure
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: chore(deps)
+    open-pull-requests-limit: 5
+  - package-ecosystem: npm
+    directory: /media/rdsh-intro
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: chore(deps)
+    open-pull-requests-limit: 5
+  - package-ecosystem: npm
+    directory: /tests/e2e
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: chore(deps)
+    open-pull-requests-limit: 5
   - package-ecosystem: github-actions
     directory: /
     schedule:

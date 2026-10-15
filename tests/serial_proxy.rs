@@ -18,6 +18,24 @@ use tokio::{
     net::TcpStream as AsyncTcpStream,
 };
 
+/// How long a `wait_*` helper polls for observable proxy state before giving up.
+///
+/// These waits only observe state a healthy proxy reaches in well under a
+/// second locally, so the deadline exists to fail a genuinely stuck proxy, not
+/// to bound normal work. A shared runner starting the child process and
+/// completing the first HTTP round-trip can exceed 5s under load, which
+/// surfaced in CI as `condition timed out`
+/// (tests/serial_proxy.rs:282 on the macOS job). The default is generous, and
+/// `RDSH_TEST_WAIT_SECS` overrides it.
+fn wait_deadline() -> Duration {
+    let secs = std::env::var("RDSH_TEST_WAIT_SECS")
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(30);
+    Duration::from_secs(secs)
+}
+
 #[derive(Clone, Debug)]
 struct SeenRequest {
     method: String,
@@ -90,7 +108,10 @@ impl MockUpstream {
 impl Drop for MockUpstream {
     fn drop(&mut self) {
         self.stop.store(true, Ordering::Relaxed);
-        let _ = TcpStream::connect(self.addr);
+        // Wake the accept loop, but never block teardown: on a host where
+        // loopback connections are dropped rather than refused, an untimed
+        // connect retries for over two minutes before it gives up.
+        let _ = TcpStream::connect_timeout(&self.addr, Duration::from_millis(500));
         if let Some(thread) = self.accept_thread.take() {
             let _ = thread.join();
         }
@@ -103,10 +124,7 @@ fn serve_mock_request(mut stream: TcpStream, state: Arc<MockState>) {
         return;
     }
     let _ = stream.set_read_timeout(Some(Duration::from_secs(3)));
-    let Ok(reader_stream) = stream.try_clone() else {
-        return;
-    };
-    let mut reader = BufReader::new(reader_stream);
+    let mut reader = BufReader::new(&stream);
     let mut request_line = String::new();
     if reader.read_line(&mut request_line).is_err() {
         return;
@@ -340,7 +358,7 @@ impl Drop for ProxyProcess {
 }
 
 async fn wait_until(mut condition: impl FnMut() -> bool) {
-    tokio::time::timeout(Duration::from_secs(5), async {
+    tokio::time::timeout(wait_deadline(), async {
         loop {
             if condition() {
                 return;
@@ -353,7 +371,7 @@ async fn wait_until(mut condition: impl FnMut() -> bool) {
 }
 
 async fn wait_for_queued(client: &Client, proxy_url: &str, queued: usize) {
-    tokio::time::timeout(Duration::from_secs(5), async {
+    tokio::time::timeout(wait_deadline(), async {
         loop {
             if let Ok(response) = client
                 .get(format!("{proxy_url}/__proxy/status"))
@@ -376,7 +394,7 @@ async fn wait_for_queued(client: &Client, proxy_url: &str, queued: usize) {
 }
 
 async fn wait_for_active(client: &Client, proxy_url: &str, active: usize) {
-    tokio::time::timeout(Duration::from_secs(5), async {
+    tokio::time::timeout(wait_deadline(), async {
         loop {
             if let Ok(response) = client
                 .get(format!("{proxy_url}/__proxy/status"))
@@ -408,6 +426,50 @@ async fn raw_request(proxy_url: &str, path: &str) -> AsyncTcpStream {
     stream
 }
 
+/// How long a plain IPv6 loopback connect may take before this host is treated
+/// as unable to carry the traffic the IPv6 test needs.
+const IPV6_LOOPBACK_PROBE_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Checks that an IPv6 loopback *connection* can be established, not just bound.
+///
+/// `TcpListener::bind("[::1]:0")` succeeds on hosts where connecting to `::1`
+/// still fails (a firewall that drops loopback IPv6, a stack that is only half
+/// enabled). The proxy then answers `502 upstream connection failed`
+/// (src/serial_proxy.rs, the `is_connect()` branch) and the host header this
+/// test exists to check is never observable. Only that environment
+/// precondition is skipped: once this probe has reached an IPv6 loopback
+/// listener, any later failure is a regression and still fails the test.
+fn ipv6_loopback_is_usable() -> Result<(), String> {
+    let listener = TcpListener::bind("[::1]:0").map_err(|error| error.to_string())?;
+    let addr = listener.local_addr().map_err(|error| error.to_string())?;
+    TcpStream::connect_timeout(&addr, IPV6_LOOPBACK_PROBE_TIMEOUT)
+        .map(|_| ())
+        .map_err(|error| error.to_string())
+}
+
+/// Returns the response when the proxy answered `200 OK`; otherwise fails with
+/// the proxy's own upstream error and the child's stderr.
+///
+/// The JSON error body is the only place the proxy distinguishes `upstream
+/// connection failed` from `upstream timeout`, so printing it keeps the next
+/// Windows/macOS transport failure diagnosable from the test log alone
+/// (issue #528) instead of a bare `left: 502, right: 200`.
+async fn expect_proxy_ok(
+    response: reqwest::Response,
+    logs: &Arc<Mutex<Vec<String>>>,
+) -> reqwest::Response {
+    if response.status() == reqwest::StatusCode::OK {
+        return response;
+    }
+    let status = response.status();
+    let body = response.text().await.unwrap_or_default();
+    let logs = logs
+        .lock()
+        .unwrap_or_else(|error| error.into_inner())
+        .join("\n");
+    panic!("proxy answered {status}: {body}\nserial-proxy stderr:\n{logs}");
+}
+
 #[tokio::test]
 async fn native_cli_rewrites_tool_choice_and_streams_sse() {
     let upstream = MockUpstream::start(Duration::from_millis(250));
@@ -415,15 +477,18 @@ async fn native_cli_rewrites_tool_choice_and_streams_sse() {
     let proxy = ProxyProcess::start(&base_url, &["--tool-choice-default", "auto"]);
     let client = Client::new();
     let body = br#"{"model":"m","tools":[{"type":"function","function":{"name":"f"}}]}"#;
-    let response = client
-        .post(format!("{}/chat/completions?x=1", proxy.url))
-        .header("content-type", "application/json")
-        .header("authorization", "Bearer test-secret")
-        .body(body.to_vec())
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(response.status(), reqwest::StatusCode::OK);
+    let response = expect_proxy_ok(
+        client
+            .post(format!("{}/chat/completions?x=1", proxy.url))
+            .header("content-type", "application/json")
+            .header("authorization", "Bearer test-secret")
+            .body(body.to_vec())
+            .send()
+            .await
+            .unwrap(),
+        &proxy.logs,
+    )
+    .await;
 
     let mut stream = response.bytes_stream();
     let first = stream.next().await.unwrap().unwrap();
@@ -471,14 +536,17 @@ async fn native_cli_rewrites_tool_choice_and_streams_sse() {
     assert_eq!(upstream.state.finished.load(Ordering::SeqCst), 1);
 
     let unchanged = br#"{ "tools" : [1], "tool_choice" : null }"#;
-    let response = client
-        .post(format!("{}/chat/completions", proxy.url))
-        .header("content-type", "application/json")
-        .body(unchanged.to_vec())
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(response.status(), reqwest::StatusCode::OK);
+    let response = expect_proxy_ok(
+        client
+            .post(format!("{}/chat/completions", proxy.url))
+            .header("content-type", "application/json")
+            .body(unchanged.to_vec())
+            .send()
+            .await
+            .unwrap(),
+        &proxy.logs,
+    )
+    .await;
     response.bytes().await.unwrap();
     wait_until(|| upstream.state.seen.lock().unwrap().len() == 2).await;
     assert_eq!(upstream.state.seen.lock().unwrap()[1].body, unchanged);
@@ -505,8 +573,8 @@ async fn native_cli_caps_upstream_concurrency_and_rejects_full_queue() {
     let first = tokio::spawn(async move {
         let response = first_client.get(first_url).send().await.unwrap();
         let status = response.status();
-        response.bytes().await.unwrap();
-        status
+        let body = response.bytes().await.unwrap();
+        (status, body)
     });
     wait_until(|| upstream.state.seen.lock().unwrap().len() == 1).await;
 
@@ -515,8 +583,8 @@ async fn native_cli_caps_upstream_concurrency_and_rejects_full_queue() {
     let second = tokio::spawn(async move {
         let response = second_client.get(second_url).send().await.unwrap();
         let status = response.status();
-        response.bytes().await.unwrap();
-        status
+        let body = response.bytes().await.unwrap();
+        (status, body)
     });
     wait_for_queued(&client, &proxy.url, 1).await;
     let full = client
@@ -528,8 +596,20 @@ async fn native_cli_caps_upstream_concurrency_and_rejects_full_queue() {
     let error: serde_json::Value = serde_json::from_slice(&full.bytes().await.unwrap()).unwrap();
     assert_eq!(error["error"]["type"], "serial_proxy_error");
 
-    assert_eq!(first.await.unwrap(), reqwest::StatusCode::OK);
-    assert_eq!(second.await.unwrap(), reqwest::StatusCode::OK);
+    let (first_status, first_body) = first.await.unwrap();
+    assert_eq!(
+        first_status,
+        reqwest::StatusCode::OK,
+        "{}",
+        String::from_utf8_lossy(&first_body)
+    );
+    let (second_status, second_body) = second.await.unwrap();
+    assert_eq!(
+        second_status,
+        reqwest::StatusCode::OK,
+        "{}",
+        String::from_utf8_lossy(&second_body)
+    );
     assert_eq!(upstream.state.peak.load(Ordering::SeqCst), 1);
     assert_eq!(upstream.state.seen.lock().unwrap().len(), 2);
 }
@@ -571,12 +651,15 @@ async fn native_cli_rpm_window_is_reported_and_waiter_times_out() {
         &["--rpm", "1", "--queue-timeout", "0.05"],
     );
     let client = Client::new();
-    let first = client
-        .get(format!("{}/first", proxy.url))
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(first.status(), reqwest::StatusCode::OK);
+    let first = expect_proxy_ok(
+        client
+            .get(format!("{}/first", proxy.url))
+            .send()
+            .await
+            .unwrap(),
+        &proxy.logs,
+    )
+    .await;
     first.bytes().await.unwrap();
 
     let status = client
@@ -700,13 +783,20 @@ async fn ipv6_upstream_host_header_keeps_exactly_one_pair_of_brackets() {
         }
         Err(error) => panic!("failed to bind IPv6 loopback: {error}"),
     };
+    if let Err(error) = ipv6_loopback_is_usable() {
+        eprintln!("skipping IPv6 upstream test: IPv6 loopback is not usable: {error}");
+        return;
+    }
     let proxy = ProxyProcess::start(&format!("http://{}/v1", upstream.addr), &[]);
-    let response = Client::new()
-        .get(format!("{}/forward", proxy.url))
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(response.status(), reqwest::StatusCode::OK);
+    let response = expect_proxy_ok(
+        Client::new()
+            .get(format!("{}/forward", proxy.url))
+            .send()
+            .await
+            .unwrap(),
+        &proxy.logs,
+    )
+    .await;
     response.bytes().await.unwrap();
     wait_until(|| upstream.state.seen.lock().unwrap().len() == 1).await;
 
@@ -739,6 +829,7 @@ fn invalid_serial_proxy_options_exit_with_usage_status() {
         ("fractional rpm", &["--rpm", "1.5"]),
         ("negative rpm", &["--rpm=-1"]),
         ("zero max", &["--max", "0"]),
+        ("zero max queue", &["--max-queue", "0"]),
         ("zero body cap", &["--max-body-bytes", "0"]),
         ("non-numeric body cap", &["--max-body-bytes", "x"]),
         ("non-finite queue timeout", &["--queue-timeout", "NaN"]),
@@ -826,14 +917,17 @@ async fn closed_stderr_does_not_abort_startup_or_tool_choice_streaming() {
     status.bytes().await.unwrap();
 
     let body = br#"{"tools":[{"type":"function"}]}"#;
-    let response = client
-        .post(format!("{}/v1/chat/completions", proxy.url))
-        .header("content-type", "application/json")
-        .body(body.to_vec())
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(response.status(), reqwest::StatusCode::OK);
+    let response = expect_proxy_ok(
+        client
+            .post(format!("{}/v1/chat/completions", proxy.url))
+            .header("content-type", "application/json")
+            .body(body.to_vec())
+            .send()
+            .await
+            .unwrap(),
+        &proxy.logs,
+    )
+    .await;
     response.bytes().await.unwrap();
     wait_until(|| upstream.state.seen.lock().unwrap().len() == 1).await;
     let forwarded: serde_json::Value =

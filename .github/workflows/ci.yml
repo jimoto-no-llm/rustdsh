@@ -24,7 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@1.85.0
-      - run: cargo check --locked --all-targets
+      - run: cargo +1.85.0 check --locked --all-targets
 
   release-policy:
     name: "release-policy${{ github.event_name == 'push' && github.ref_type == 'branch' && github.event.repository.default_branch && github.ref_name != github.event.repository.default_branch && ' [branch push]' || '' }}"
@@ -59,6 +59,13 @@ jobs:
         with:
           node-version: 22
       - run: node --test tests/plugin-security.test.mjs tests/settings-client.test.mjs tests/update-banner.test.mjs tests/rdsh-mobile-ui.test.mjs tests/answer-guard.test.mjs tests/feature-switches.test.mjs tests/discord-presence.test.mjs tests/model_benchmark/fence.test.mjs
+      - name: Populate the pinned headless runtime cache
+        run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: scripts/headless-runtime/runtime
+      - name: Build and test the offline headless runtime
+        run: |
+          node scripts/headless-runtime/build-candidate.mjs --out "$RUNNER_TEMP/rdsh-headless-candidate"
+          RDSH_CANDIDATE="$RUNNER_TEMP/rdsh-headless-candidate" node --test scripts/headless-runtime/test/*.test.mjs plugins/rdsh-session-cleanup/test/*.test.mjs
 
   muse-subscription:
     name: "muse-subscription (${{ matrix.os }})${{ github.event_name == 'push' && github.ref_type == 'branch' && github.event.repository.default_branch && github.ref_name != github.event.repository.default_branch && ' [branch push]' || '' }}"
@@ -107,8 +114,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-      - run: cargo fmt --check
-      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --locked --all-targets --all-features -- -D warnings
 
   test:
     name: "test (${{ matrix.os }}, ${{ matrix.regress }})${{ github.event_name == 'push' && github.ref_type == 'branch' && github.event.repository.default_branch && github.ref_name != github.event.repository.default_branch && ' [branch push]' || '' }}"
@@ -126,18 +133,32 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: nextest
       - if: runner.os == 'Linux'
         run: command -v zstd || (sudo apt-get update && sudo apt-get install -y zstd)
       - if: runner.os == 'macOS'
         run: command -v zstd || brew install zstd
-      - run: cargo test
+      - name: Run Rust tests
+        run: cargo nextest run --locked --all-targets --profile ci
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: rust-tests-${{ matrix.os }}
+          path: target/nextest/ci/junit.xml
+          if-no-files-found: warn
+      - name: 並列開発ツールの回帰検査
+        if: runner.os == 'Linux'
+        run: python3 -m unittest discover -s tests -p 'test_parallel_dev.py' -v
+        env:
+          RDSH_PARALLEL_TEST_TMPDIR: ${{ github.workspace }}/.tmp-parallel-dev-tests
       - uses: actions/setup-node@v7
         with:
           node-version: 22
       - run: node --test plugins/workflow-board/tests/source-patch.test.mjs
-      - run: cargo test --example benchmark_extended
-      - run: cargo test --example benchmark_models
       - run: cargo build
+      - run: node --test dashboard/test/worker-scopes-compat.test.mjs
       - run: npm ci --ignore-scripts --no-audit --no-fund
         working-directory: plugins/rdsh-compute
       - run: npm test
@@ -151,6 +172,7 @@ jobs:
           printf '#!/bin/sh\necho stub-dsh $@' > /tmp/stub-dsh && chmod +x /tmp/stub-dsh
           BIN=./target/debug/rdsh DSH_ORIG_BIN=/tmp/stub-dsh sh tests/regress.sh
           BIN=./target/debug/rdsh sh tests/context_prototype.sh
+          BIN=./target/debug/rdsh sh tests/settings_prototype.sh
       - if: '! matrix.regress'
         shell: pwsh
         run: |
@@ -172,6 +194,61 @@ jobs:
       - if: '! matrix.regress'
         shell: bash
         run: BIN=./target/debug/rdsh.exe bash tests/regress.sh --windows-installer-delegation
+
+  # Records the CLI fast-path trend on every run. It deliberately passes no
+  # --baseline: a fresh runner has no previous binary, and comparing against a
+  # stale artifact would fail spuriously. The JSON is uploaded for trend review
+  # and the job only asserts that every case produced correct output.
+  perf-regression:
+    name: "perf-regression${{ github.event_name == 'push' && github.ref_type == 'branch' && github.event.repository.default_branch && github.ref_name != github.event.repository.default_branch && ' [branch push]' || '' }}"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --locked --example benchmark_regression
+      - run: cargo build --release
+      - name: Measure the CLI fast paths
+        run: |
+          cargo run --release --example benchmark_regression -- \
+            --bin ./target/release/rdsh --n 15 \
+            --output "$RUNNER_TEMP/rdsh-perf.json"
+      - name: Assert the report exists and every case is correct
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+
+          path = os.path.join(os.environ["RUNNER_TEMP"], "rdsh-perf.json")
+          if not os.path.exists(path):
+              sys.exit(f"perf report was not produced at {path}")
+
+          with open(path, encoding="utf-8") as handle:
+              report = json.load(handle)
+
+          cases = report.get("cases") or {}
+          if not cases:
+              sys.exit("perf report contains no cases")
+
+          bad = []
+          for name, case in cases.items():
+              if case.get("correct") is not True:
+                  bad.append(f"{name}: {case.get('outcome')}")
+              if case.get("outcome") == "failed":
+                  bad.append(f"{name}: marked failed")
+              if "median_ms" not in case or "p95_ms" not in case:
+                  bad.append(f"{name}: missing median/p95")
+              if not case.get("samples_ms"):
+                  bad.append(f"{name}: no samples")
+          if report.get("failures"):
+              bad.append(f"failures: {report['failures']}")
+          if bad:
+              sys.exit("perf regression report is not clean:\n  " + "\n  ".join(bad))
+          print(f"{len(cases)} cases correct")
+          PY
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: perf-regression
+          path: ${{ runner.temp }}/rdsh-perf.json
 
   browser-e2e:
     name: "browser-e2e${{ github.event_name == 'push' && github.ref_type == 'branch' && github.event.repository.default_branch && github.ref_name != github.event.repository.default_branch && ' [branch push]' || '' }}"
