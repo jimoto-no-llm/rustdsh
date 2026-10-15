@@ -300,13 +300,17 @@ fn manual_snippet(route: &Route) -> String {
 
 // --- line surgery on cordis.patch.yml ------------------------------------------
 
+fn trim_yaml(value: &str) -> &str {
+    value.trim_matches([' ', '\t', '\r'])
+}
+
 fn skippable(line: &str) -> bool {
-    let t = line.trim();
+    let t = trim_yaml(line);
     t.is_empty() || t.starts_with('#')
 }
 
 fn indent_of(line: &str) -> usize {
-    line.len() - line.trim_start().len()
+    line.len() - line.trim_start_matches(' ').len()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -427,7 +431,7 @@ fn scan_line(line: &str) -> Scan<'_> {
 
 /// A scalar with any trailing YAML comment removed.
 fn strip_comment(value: &str) -> &str {
-    value[..scan_line(value).end].trim_end()
+    value[..scan_line(value).end].trim_end_matches([' ', '\t', '\r'])
 }
 
 /// Decode the inside of a single-line YAML 1.2 double-quoted scalar.
@@ -487,7 +491,7 @@ fn decode_double(inner: &str) -> std::result::Result<String, String> {
 /// A whole scalar value (comment already removed) read as YAML. `Err` when it
 /// is quoted but not exactly one readable quoted scalar.
 fn try_unquote(value: &str) -> std::result::Result<String, String> {
-    let v = value.trim();
+    let v = trim_yaml(value);
     if v.starts_with('"') {
         return match double_end(v) {
             Some(end) if end == v.len() - 1 => decode_double(&v[1..end]),
@@ -505,14 +509,14 @@ fn try_unquote(value: &str) -> std::result::Result<String, String> {
 
 /// `try_unquote`, falling back to the raw text (display only).
 fn unquote(value: &str) -> String {
-    try_unquote(value).unwrap_or_else(|_| value.trim().to_string())
+    try_unquote(value).unwrap_or_else(|_| trim_yaml(value).to_string())
 }
 
 /// For a line that opens with `key:` (plain or quoted, escapes decoded), the
 /// value after the colon without a trailing comment; `Some("")` for a block or
 /// empty value.
 fn key_rest<'a>(line: &'a str, key: &str) -> Option<&'a str> {
-    let trimmed = line.trim_start();
+    let trimmed = line.trim_start_matches([' ', '\t']);
     let rest = if trimmed.starts_with('"') {
         let end = double_end(trimmed)?;
         (decode_double(&trimmed[1..end]).ok()? == key).then_some(&trimmed[end + 1..])?
@@ -524,7 +528,138 @@ fn key_rest<'a>(line: &'a str, key: &str) -> Option<&'a str> {
     };
     // YAML allows blanks between the key and its colon.
     let after = rest.trim_start_matches([' ', '\t']).strip_prefix(':')?;
-    (after.is_empty() || after.starts_with([' ', '\t', '\r'])).then(|| strip_comment(after.trim()))
+    (after.is_empty() || after.starts_with([' ', '\t', '\r']))
+        .then(|| strip_comment(trim_yaml(after)))
+}
+
+/// Split a mapping key from its value, without reading colons inside quotes.
+fn mapping_parts(line: &str) -> Option<(&str, &str)> {
+    let line = line.trim_start_matches([' ', '\t']);
+    let bytes = line.as_bytes();
+    let mut quote = None;
+    let mut escaped = false;
+    for (index, byte) in bytes.iter().enumerate() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        match quote {
+            Some(b'"') if *byte == b'\\' => escaped = true,
+            Some(b'\'') if *byte == b'\'' && bytes.get(index + 1) == Some(&b'\'') => {
+                escaped = true;
+            }
+            Some(open) if *byte == open => quote = None,
+            Some(_) => {}
+            None if index == 0 && matches!(*byte, b'\'' | b'"') => quote = Some(*byte),
+            None if *byte == b':'
+                && bytes
+                    .get(index + 1)
+                    .is_none_or(|b| matches!(b, b' ' | b'\t' | b'\r')) =>
+            {
+                return Some((
+                    trim_yaml(&line[..index]),
+                    strip_comment(trim_yaml(&line[index + 1..])),
+                ));
+            }
+            None => {}
+        }
+    }
+    None
+}
+
+fn block_scalar_header(line: &str) -> Option<(&str, usize)> {
+    let mut node = line.trim_start_matches(' ');
+    let mut column = indent_of(line);
+    let mut sequence_parent = None;
+    while node.starts_with("- ") {
+        sequence_parent = Some(column);
+        let offset = dash_key_col(node);
+        column += offset;
+        node = &node[offset..];
+    }
+    let scalar = mapping_parts(node)
+        .map(|(_, value)| (value, column))
+        .or_else(|| sequence_parent.map(|parent| (strip_comment(trim_yaml(node)), parent)));
+    scalar.filter(|(value, _)| {
+        value.starts_with(['|', '>'])
+            && value[1..]
+                .chars()
+                .all(|c| matches!(c, '+' | '-' | '1'..='9'))
+    })
+}
+
+fn scalar_payloads(lines: &[String]) -> Vec<bool> {
+    let mut out = vec![false; lines.len()];
+    let mut scalar_parent = None;
+    for (index, line) in lines.iter().enumerate() {
+        if let Some(parent) = scalar_parent {
+            if trim_yaml(line).is_empty() || indent_of(line) > parent {
+                out[index] = true;
+                continue;
+            }
+            scalar_parent = None;
+        }
+        if let Some((_, parent)) = block_scalar_header(line) {
+            scalar_parent = Some(parent);
+        }
+    }
+    out
+}
+
+/// Keep line positions, but mask block-scalar payload while inspecting keys.
+/// The original lines are still used for byte-preserving insertion/replacement.
+fn structural_lines(lines: &[String]) -> Vec<String> {
+    let mut out = lines.to_vec();
+    for (line, payload) in out.iter_mut().zip(scalar_payloads(lines)) {
+        if payload {
+            line.clear();
+        }
+    }
+    out
+}
+
+/// A config/providers value must contain mapping keys, never sequence items.
+fn mapping_child_indent(lines: &[String], parent: usize, end: usize) -> Result<Option<usize>> {
+    let structure = structural_lines(lines);
+    let next = (parent + 1..structure.len()).find(|i| !skippable(&structure[*i]));
+    if next.is_some_and(|i| {
+        indent_of(&structure[i]) == indent_of(&structure[parent])
+            && structure[i].trim_start_matches(' ').starts_with("- ")
+    }) {
+        bail!("config/providers must be a block mapping, not a sequence");
+    }
+    let Some(child) = child_indent(&structure, parent, end) else {
+        return Ok(None);
+    };
+    let mut keys = Vec::new();
+    let mut block_value = false;
+    for line in &structure[parent + 1..end] {
+        if skippable(line) || indent_of(line) != child {
+            continue;
+        }
+        let trimmed = line.trim_start_matches(' ');
+        if trimmed.starts_with("- ") {
+            if !block_value {
+                bail!("config/providers must be a simple block mapping");
+            }
+            // An indentless sequence belongs to the preceding key's value;
+            // its items are not additional keys of this mapping.
+            continue;
+        }
+        if trimmed.starts_with(['?', '&', '*', '!']) {
+            bail!("config/providers must be a simple block mapping");
+        }
+        let Some((key, value)) = mapping_parts(trimmed) else {
+            bail!("config/providers must be a simple block mapping");
+        };
+        let key = unquote(key);
+        if keys.contains(&key) {
+            bail!("config/providers contains duplicate mapping keys");
+        }
+        keys.push(key);
+        block_value = value.is_empty();
+    }
+    Ok(Some(child))
 }
 
 /// The first line after `start` that is indented no deeper than `start`.
@@ -542,9 +677,13 @@ fn block_end(lines: &[String], start: usize) -> usize {
 
 /// One past the last real (non-blank, non-comment) line in `[start, end)`.
 fn content_end(lines: &[String], start: usize, end: usize) -> usize {
+    let payload = scalar_payloads(lines);
     (start..end.min(lines.len()))
         .rev()
-        .find(|i| !skippable(&lines[*i]))
+        .find(|i| {
+            !skippable(&lines[*i])
+                || (payload[*i] && (*i + 1 < lines.len() || !lines[*i].is_empty()))
+        })
         .map_or(start + 1, |i| i + 1)
 }
 
@@ -590,67 +729,191 @@ fn scalar_key(line: &str, key: &str) -> std::result::Result<Option<String>, Stri
 /// not. `Err` when an entry cannot be read safely or the plugin is declared
 /// twice (a later entry replaces the whole config in Cordis).
 fn llm_pi_ai_entry(lines: &[String]) -> std::result::Result<Option<usize>, String> {
+    inspect_patch_entries(lines, false).map_err(|error| error.to_string())
+}
+
+/// Check block-mapping keys in one structural view, including existing
+/// provider/model mappings. Sequence items open separate mapping scopes.
+fn inspect_mapping_keys(lines: &[String]) -> Result<()> {
+    let mut scopes: Vec<(usize, Vec<String>)> = Vec::new();
+    for line in lines.iter().filter(|line| !skippable(line)) {
+        let mut node = line.trim_start_matches(' ');
+        let mut column = indent_of(line);
+        let mut sequence = false;
+        while node.starts_with("- ") {
+            let offset = dash_key_col(node);
+            column += offset;
+            node = &node[offset..];
+            sequence = true;
+        }
+        scopes.retain(|(depth, _)| {
+            if sequence {
+                *depth < column
+            } else {
+                *depth <= column
+            }
+        });
+        if node.starts_with("? ") || node.starts_with(": ") {
+            bail!("complex YAML mapping keys cannot be inspected safely");
+        }
+        let Some((key, _)) = mapping_parts(node) else {
+            continue;
+        };
+        if key.chars().next().is_some_and(char::is_whitespace) {
+            bail!("a plain YAML key starting with Unicode whitespace cannot be inspected safely");
+        }
+        if key.starts_with(['!', '&', '*']) {
+            bail!("tagged, anchored or aliased YAML keys cannot be inspected safely");
+        }
+        if scopes.last().is_none_or(|(depth, _)| *depth != column) {
+            scopes.push((column, Vec::new()));
+        }
+        let keys = &mut scopes.last_mut().expect("scope inserted above").1;
+        let key = try_unquote(key).map_err(anyhow::Error::msg)?;
+        if key == "<<" {
+            bail!("YAML merge keys cannot be inspected safely");
+        }
+        if keys.contains(&key) {
+            bail!("the profile contains duplicate mapping keys");
+        }
+        keys.push(key);
+    }
+    Ok(())
+}
+
+fn inspect_patch_entries(lines: &[String], for_write: bool) -> Result<Option<usize>> {
+    let structure = structural_lines(lines);
+    let lines = &structure;
+    // 一覧では他pluginの設定を編集可能かどうかに依存せず既存routeを読む。
+    // 書込時はdocument全体の安全性を検査してから変更する。
+    if for_write {
+        check_document(lines).map_err(anyhow::Error::msg)?;
+        inspect_mapping_keys(lines)?;
+    }
+    if lines
+        .iter()
+        .find(|line| !skippable(line))
+        .is_some_and(|line| indent_of(line) != 0)
+        || lines
+            .iter()
+            .filter(|line| !skippable(line) && indent_of(line) == 0)
+            .any(|line| !line.starts_with("- "))
+    {
+        bail!("the file is not a plain sequence of patch entries");
+    }
     let starts: Vec<usize> = (0..lines.len())
-        .filter(|i| {
-            indent_of(&lines[*i]) == 0
-                && lines[*i].starts_with('-')
-                && !lines[*i].starts_with("---")
-        })
+        .filter(|i| indent_of(&lines[*i]) == 0 && lines[*i].starts_with("- "))
         .collect();
-    let mut found = Vec::new();
+    let mut found = None;
     for (position, start) in starts.iter().enumerate() {
         let end = starts.get(position + 1).copied().unwrap_or(lines.len());
-        if !lines[*start].starts_with("- ") {
-            return Err("a patch entry does not start with `- key:` on one line".to_string());
-        }
         let col = dash_key_col(&lines[*start]);
-        let head = &lines[*start][col..];
-        if head.starts_with(['{', '[', '#']) || head.trim().is_empty() {
-            return Err(
-                "a patch entry is written in flow style or without a first key".to_string(),
-            );
+        let head = trim_yaml(&lines[*start][col..]);
+        if head.starts_with(['{', '[', '*', '&', '!']) {
+            bail!("the patch entry uses an unsupported inline or aliased mapping");
         }
-        let mut hit = false;
-        let candidates = std::iter::once(head).chain(
-            (start + 1..end)
-                .filter(|i| !skippable(&lines[*i]) && indent_of(&lines[*i]) == col)
-                .map(|i| lines[i].trim_start()),
-        );
-        for text in candidates {
-            if scalar_key(text, "id")?.is_some_and(|v| v == PI_AI_ID)
-                || scalar_key(text, "name")?.is_some_and(|v| v == PI_AI_NAME)
+        if mapping_parts(head).is_none() {
+            bail!("the patch entry must be a block mapping, not a scalar");
+        }
+        let direct: Vec<usize> = std::iter::once(*start)
+            .chain((start + 1..end).filter(|i| indent_of(&lines[*i]) == col))
+            .collect();
+        let mut identifies = false;
+        let mut insert = None;
+        let mut keys = Vec::new();
+        for i in direct {
+            let key_line = if i == *start {
+                head
+            } else {
+                trim_yaml(&lines[i])
+            };
+            if skippable(key_line) {
+                continue;
+            }
+            if mapping_parts(key_line).is_none() {
+                bail!("the patch entry must contain simple mapping keys");
+            }
+            if mapping_parts(key_line).is_some_and(|(key, _)| key == "<<")
+                || key_line.starts_with("? ")
+                || key_line.starts_with(": ")
             {
-                hit = true;
+                bail!("YAML merge or complex mapping keys cannot be inspected safely");
+            }
+            if let Some((key, _)) = mapping_parts(key_line) {
+                let key = try_unquote(key).map_err(anyhow::Error::msg)?;
+                if keys.contains(&key) {
+                    bail!("the patch entry contains duplicate mapping keys");
+                }
+                keys.push(key);
+            }
+            identifies |= scalar_key(key_line, "id")
+                .map_err(anyhow::Error::msg)?
+                .is_some_and(|value| value == PI_AI_ID)
+                || scalar_key(key_line, "name")
+                    .map_err(anyhow::Error::msg)?
+                    .is_some_and(|value| value == PI_AI_NAME);
+            if (key_rest(key_line, "id").is_some() || key_rest(key_line, "name").is_some())
+                && (i + 1..end)
+                    .find(|j| !skippable(&lines[*j]))
+                    .is_some_and(|j| indent_of(&lines[j]) > col)
+            {
+                bail!("the patch entry identifier uses a multiline YAML scalar");
+            }
+            if let Some(value) = key_rest(key_line, "insert") {
+                if !value.is_empty() {
+                    bail!("insert is written inline and cannot be inspected safely");
+                }
+                insert = Some(i);
             }
         }
-        if hit {
-            if key_rest(head, "config").is_some() {
-                return Err("the llm-pi-ai entry starts with its config key".to_string());
+        if identifies && key_rest(head, "config").is_some() {
+            bail!("the llm-pi-ai config shares the sequence marker; edit it by hand");
+        }
+        if let Some(insert) = insert {
+            if identifies {
+                bail!("the llm-pi-ai entry uses insert; its outer config is not applied");
             }
-            found.push(*start);
+            // Inspect the inserted plugin entries as a sequence of mappings,
+            // using the same direct-key rules. Descendants such as model ids
+            // belong to a plugin's config, not to the plugin's identity.
+            let insert_end = (insert + 1..end)
+                .find(|i| {
+                    !skippable(&lines[*i])
+                        && (indent_of(&lines[*i]) < col
+                            || (indent_of(&lines[*i]) == col
+                                && !lines[*i].trim_start_matches(' ').starts_with("- ")))
+                })
+                .unwrap_or(end);
+            let nested_indent = (insert + 1..insert_end)
+                .find(|i| !skippable(&lines[*i]))
+                .map(|i| indent_of(&lines[i]));
+            if let Some(indent) = nested_indent {
+                let nested: Vec<String> = lines[insert + 1..insert_end]
+                    .iter()
+                    .map(|line| {
+                        if skippable(line) {
+                            line.clone()
+                        } else {
+                            line[indent.min(indent_of(line))..].to_string()
+                        }
+                    })
+                    .collect();
+                let target = inspect_patch_entries(&nested, for_write).map_err(|error| {
+                    anyhow::anyhow!("insert entries cannot be inspected safely: {error}")
+                })?;
+                if target.is_some() {
+                    bail!("llm-pi-ai is inside insert; edit its providers by hand");
+                }
+            }
+        }
+        if identifies {
+            if found.is_some() {
+                bail!("multiple llm-pi-ai patch entries cannot be edited safely");
+            }
+            found = Some(*start);
         }
     }
-    if found.len() > 1 {
-        return Err("llm-pi-ai is declared by more than one patch entry".to_string());
-    }
-    Ok(found.first().copied())
-}
-
-fn has_pi_ai_token(text: &str) -> bool {
-    text.split(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '_' | '@' | '/' | '.' | '-')))
-        .any(|tok| tok == PI_AI_ID || tok == PI_AI_NAME)
-}
-
-/// Whether a line (comment removed) holds `llm-pi-ai` or the plugin name as a
-/// whole scalar token, at any depth and in any position, also inside quoted
-/// scalars (double-quoted ones with their escapes decoded).
-fn mentions_pi_ai(line: &str) -> bool {
-    scan_line(line).pieces.iter().any(|piece| match piece.kind {
-        Kind::Double => {
-            has_pi_ai_token(&decode_double(piece.text).unwrap_or_else(|_| piece.text.to_string()))
-        }
-        _ => has_pi_ai_token(piece.text),
-    })
+    Ok(found)
 }
 
 /// Refuse constructs the line scanner cannot resolve: a quoted scalar that
@@ -661,7 +924,7 @@ fn check_document(lines: &[String]) -> std::result::Result<(), String> {
     let mut block: Option<usize> = None;
     for line in lines {
         if let Some(depth) = block {
-            if line.trim().is_empty() || indent_of(line) > depth {
+            if trim_yaml(line).is_empty() || indent_of(line) > depth {
                 continue;
             }
             block = None;
@@ -694,7 +957,7 @@ fn check_document(lines: &[String]) -> std::result::Result<(), String> {
                 }
                 '{' if starts(i) => {
                     let inside: String = chars[i + 1..].iter().collect();
-                    if !inside.trim_start().starts_with('}') {
+                    if !inside.trim_start_matches([' ', '\t']).starts_with('}') {
                         return Err("the file uses a flow mapping".to_string());
                     }
                 }
@@ -715,9 +978,9 @@ fn check_document(lines: &[String]) -> std::result::Result<(), String> {
             }
         }
         // A block scalar's body is free text.
-        let body = line[..scan.end].trim_end();
+        let body = line[..scan.end].trim_end_matches([' ', '\t', '\r']);
         let last = body.rsplit([' ', '\t']).next().unwrap_or("");
-        let before = body[..body.len() - last.len()].trim_end();
+        let before = body[..body.len() - last.len()].trim_end_matches([' ', '\t', '\r']);
         let indicator = last.starts_with(['|', '>'])
             && last[1..]
                 .chars()
@@ -728,9 +991,9 @@ fn check_document(lines: &[String]) -> std::result::Result<(), String> {
             let mut col = indent_of(line);
             let mut rest = &line[col..];
             while let Some(r) = rest.strip_prefix("- ") {
-                let blanks = r.len() - r.trim_start().len();
+                let blanks = r.len() - r.trim_start_matches([' ', '\t']).len();
                 col += 2 + blanks;
-                rest = r.trim_start();
+                rest = r.trim_start_matches([' ', '\t']);
             }
             block = Some(col);
         }
@@ -738,38 +1001,16 @@ fn check_document(lines: &[String]) -> std::result::Result<(), String> {
     Ok(())
 }
 
-/// `llm_pi_ai_entry`, plus: the document defines llm-pi-ai in exactly one
-/// place. Cordis lets a later top-level patch target an entry inserted
-/// earlier, so appending a top-level `- id: llm-pi-ai` next to a nested
-/// definition would replace that definition's whole config. Any mention
-/// outside the entry's own top-level keys (another entry, a nested `insert`,
-/// a deeper key) is therefore refused.
+/// The structural inspection also checks inserted entries and duplicate
+/// identities; mentions in model ids or prompt text do not define plugins.
 fn sole_pi_ai_entry(lines: &[String]) -> std::result::Result<Option<usize>, String> {
-    check_document(lines)?;
-    let entry = llm_pi_ai_entry(lines)?;
-    let (own, col) = match entry {
-        Some(start) => (start..block_end(lines, start), dash_key_col(&lines[start])),
-        None => (0..0, 0),
-    };
-    for (i, line) in lines.iter().enumerate() {
-        if !mentions_pi_ai(line) {
-            continue;
-        }
-        let top_key = entry.is_some_and(|s| i == s || indent_of(line) == col);
-        if !(own.contains(&i) && top_key) {
-            return Err(
-                "llm-pi-ai is also mentioned elsewhere in the file (a nested or second definition)"
-                    .to_string(),
-            );
-        }
-    }
-    Ok(entry)
+    inspect_patch_entries(lines, true).map_err(|error| error.to_string())
 }
 
 /// Column of the first key on a `- key: v` line.
 fn dash_key_col(line: &str) -> usize {
     let after = &line[2..];
-    2 + after.len() - after.trim_start().len()
+    2 + after.len() - after.trim_start_matches([' ', '\t']).len()
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -783,7 +1024,9 @@ struct Providers {
 /// `Ok(None)` when any level is absent, `Err` when a level is written in a
 /// form this module will not edit.
 fn locate_providers(lines: &[String]) -> Result<Option<Providers>> {
-    let Some(entry) = llm_pi_ai_entry(lines).map_err(|e| anyhow::anyhow!(e))? else {
+    let structure = structural_lines(lines);
+    let lines = &structure;
+    let Some(entry) = llm_pi_ai_entry(lines).map_err(anyhow::Error::msg)? else {
         return Ok(None);
     };
     let col = dash_key_col(&lines[entry]);
@@ -795,7 +1038,7 @@ fn locate_providers(lines: &[String]) -> Result<Option<Providers>> {
         bail!("the llm-pi-ai config is written inline on one line");
     }
     let config_end = block_end(lines, config);
-    let Some(ci) = child_indent(lines, config, config_end) else {
+    let Some(ci) = mapping_child_indent(lines, config, config_end)? else {
         return Ok(None);
     };
     let Some(providers) = find_at(lines, config + 1, config_end, ci, "providers") else {
@@ -805,7 +1048,8 @@ fn locate_providers(lines: &[String]) -> Result<Option<Providers>> {
         bail!("providers is written inline (for example `providers: {{}}`)");
     }
     let end = block_end(lines, providers);
-    let child = child_indent(lines, providers, end).unwrap_or(indent_of(&lines[providers]) + 2);
+    let child =
+        mapping_child_indent(lines, providers, end)?.unwrap_or(indent_of(&lines[providers]) + 2);
     Ok(Some(Providers {
         line: providers,
         end,
@@ -827,7 +1071,7 @@ fn split_lines(text: &str) -> Vec<String> {
 }
 
 fn routes_in(text: &str) -> Vec<RouteInfo> {
-    let lines = split_lines(text);
+    let lines = structural_lines(&split_lines(text));
     let Ok(Some(p)) = locate_providers(&lines) else {
         return Vec::new();
     };
@@ -836,7 +1080,7 @@ fn routes_in(text: &str) -> Vec<RouteInfo> {
         if skippable(&lines[i]) || indent_of(&lines[i]) != p.child_indent {
             continue;
         }
-        let trimmed = lines[i].trim();
+        let trimmed = trim_yaml(&lines[i]);
         let Some(colon) = trimmed.find(':') else {
             continue;
         };
@@ -854,13 +1098,13 @@ fn routes_in(text: &str) -> Vec<RouteInfo> {
             .map(|m| {
                 let mend = block_end(&lines, m);
                 let item = (m + 1..mend)
-                    .find(|j| lines[*j].trim_start().starts_with("- "))
+                    .find(|j| lines[*j].trim_start_matches(' ').starts_with("- "))
                     .map(|j| indent_of(&lines[j]));
                 item.map_or(0, |item| {
                     (m + 1..mend)
                         .filter(|j| {
                             indent_of(&lines[*j]) == item
-                                && lines[*j].trim_start().starts_with("- ")
+                                && lines[*j].trim_start_matches(' ').starts_with("- ")
                         })
                         .count()
                 })
@@ -991,7 +1235,7 @@ fn verify_written(
             continue;
         }
         let col = indent_of(line);
-        if line.trim_start().starts_with("- ") {
+        if line.trim_start_matches(' ').starts_with("- ") {
             if *item_col.get_or_insert(col) != col {
                 return Err("model items are at different columns".to_string());
             }
@@ -1003,6 +1247,55 @@ fn verify_written(
     if items != route.models.len() {
         return Err("the written models do not match the requested count".to_string());
     }
+    Ok(())
+}
+
+/// すべての挿入経路で、EOFのscalarへ区切り改行が混入しないことを確認する。
+/// 非empty rangeの明示置換は、指定route内のscalarも置き換える契約に従う。
+fn splice_route_checked(
+    lines: &mut Vec<String>,
+    range: std::ops::Range<usize>,
+    block: Vec<String>,
+    route: &Route,
+) -> Result<()> {
+    if range.start == range.end && range.start == lines.len() {
+        let payload = scalar_payloads(lines);
+        if payload.last() == Some(&true) {
+            let header = payload.iter().rposition(|inside| !inside).unwrap();
+            let (style, parent) = block_scalar_header(&lines[header]).unwrap();
+            // YAML 1.2.2 8.1.1.1: 内容indent以降のTAB/追加空白も値の一部。
+            // 暗黙indentで非空行がない場合だけ、最長の空行でindentを決める。
+            let content = &lines[header + 1..];
+            let content_indent = style
+                .chars()
+                .find_map(|c| c.to_digit(10))
+                .map(|step| parent + step as usize)
+                .or_else(|| {
+                    content
+                        .iter()
+                        .find(|line| {
+                            !line
+                                .trim_end_matches('\r')
+                                .trim_start_matches(' ')
+                                .is_empty()
+                        })
+                        .map(|line| indent_of(line))
+                })
+                .unwrap_or_else(|| content.iter().map(|line| indent_of(line)).max().unwrap());
+            let last = lines.last().unwrap().trim_end_matches('\r');
+            let last_has_content = last.len() > content_indent
+                || (indent_of(last) < content_indent && !last.trim_start_matches(' ').is_empty());
+            let adds_scalar_newline =
+                !style.contains('-') && (style.contains('+') || last_has_content);
+            if adds_scalar_newline {
+                return Err(refuse(
+                    "appending a block would change the final block scalar value",
+                    route,
+                ));
+            }
+        }
+    }
+    lines.splice(range, block);
     Ok(())
 }
 
@@ -1034,6 +1327,8 @@ fn apply_route(text: &str, route: &Route, replace: bool) -> Result<Applied> {
         }
     };
 
+    // Validate every editable container before profile or credential writes.
+    locate_providers(&lines).map_err(|error| refuse(&error.to_string(), route))?;
     let has_content = lines.iter().any(|l| !skippable(l));
     let entry = sole_pi_ai_entry(&lines).map_err(|e| refuse(&e, route))?;
     let Some(entry) = entry else {
@@ -1065,7 +1360,7 @@ fn apply_route(text: &str, route: &Route, replace: bool) -> Result<Applied> {
             tail_trim(&lines)
         };
         let at_end = at >= tail_trim(&lines);
-        lines.splice(at..at, with_eol(block));
+        splice_route_checked(&mut lines, at..at, with_eol(block), route)?;
         if at_end && !lines.last().is_some_and(|l| l.is_empty()) {
             lines.push(String::new());
         }
@@ -1081,7 +1376,7 @@ fn apply_route(text: &str, route: &Route, replace: bool) -> Result<Applied> {
             format!("{}providers:", " ".repeat(col + 2)),
         ];
         block.extend(render_route(route, col + 4, 2));
-        lines.splice(at..at, with_eol(block));
+        splice_route_checked(&mut lines, at..at, with_eol(block), route)?;
         return finish(lines, Change::Added);
     };
     if !key_rest(&lines[config], "config").is_some_and(str::is_empty) {
@@ -1096,7 +1391,7 @@ fn apply_route(text: &str, route: &Route, replace: bool) -> Result<Applied> {
         let at = config + 1;
         let mut block = vec![format!("{}providers:", " ".repeat(config_indent + 2))];
         block.extend(render_route(route, config_indent + 4, 2));
-        lines.splice(at..at, with_eol(block));
+        splice_route_checked(&mut lines, at..at, with_eol(block), route)?;
         return finish(lines, Change::Added);
     };
     let Some(providers) = find_at(&lines, config + 1, config_end, ci, "providers") else {
@@ -1104,7 +1399,7 @@ fn apply_route(text: &str, route: &Route, replace: bool) -> Result<Applied> {
         let mut block = vec![format!("{}providers:", " ".repeat(ci))];
         let step = (ci - config_indent).max(1);
         block.extend(render_route(route, ci + step, step));
-        lines.splice(at..at, with_eol(block));
+        splice_route_checked(&mut lines, at..at, with_eol(block), route)?;
         return finish(lines, Change::Added);
     };
     if !key_rest(&lines[providers], "providers").is_some_and(str::is_empty) {
@@ -1127,12 +1422,17 @@ fn apply_route(text: &str, route: &Route, replace: bool) -> Result<Applied> {
             if lines[existing..end] == block[..] {
                 return finish(lines, Change::Identical);
             }
-            lines.splice(existing..end, block);
+            splice_route_checked(&mut lines, existing..end, block, route)?;
             finish(lines, Change::Replaced)
         }
         None => {
             let at = content_end(&lines, providers, providers_end);
-            lines.splice(at..at, with_eol(render_route(route, child, step)));
+            splice_route_checked(
+                &mut lines,
+                at..at,
+                with_eol(render_route(route, child, step)),
+                route,
+            )?;
             finish(lines, Change::Added)
         }
     }
@@ -2426,6 +2726,33 @@ mod tests {
         assert_eq!(routes_in(&out).len(), 2);
     }
 
+    /// 不正なインデントの入力は、重複した config を追記する前に拒否する。
+    /// これは有効な YAML が破壊されることの証明ではなく、不正入力の保護を確かめる。
+    #[test]
+    fn deeper_config_indent_is_refused_instead_of_duplicated() {
+        let text =
+            "- id: llm-pi-ai\n   config:\n      providers:\n         r0:\n            baseURL: http://old\n";
+        let err = apply_route(text, &route("hai", &["m1"]), false)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("by hand"), "{err}");
+        assert!(err.contains("- id: llm-pi-ai"), "{err}");
+    }
+
+    /// 期待カラムの兄弟キーがあるエントリには config を追加できる。
+    #[test]
+    fn sibling_keys_at_the_expected_column_still_get_config() {
+        let text = "- id: llm-pi-ai\n  enabled: true\n- id: next\n";
+        let out = apply_route(text, &route("hai", &["m1"]), false)
+            .unwrap()
+            .text;
+        assert!(
+            out.contains("  enabled: true\n  config:\n    providers:\n      hai:\n"),
+            "{out}"
+        );
+        assert_eq!(routes_in(&out).len(), 1);
+    }
+
     #[test]
     fn unsafe_layouts_are_refused_with_the_manual_yaml() {
         let r = route("hai", &["m1"]);
@@ -2572,11 +2899,17 @@ mod tests {
         let with_entry = "- id: llm-pi-ai\n  config:\n    providers:\n      a:\n        baseURL: http://a\n- insert:\n    - id: llm-pi-ai\n      config: {}\n";
         let deeper = "- id: llm-pi-ai\n  config:\n    providers:\n      a:\n        baseURL: http://a\n    note: llm-pi-ai\n";
         let other_entry = "- id: x\n  config:\n    use: llm-pi-ai\n";
-        for text in [nested, with_entry, deeper, other_entry] {
+        for text in [nested, with_entry] {
             let err = apply_route(text, &route("hai", &["m1"]), false)
                 .unwrap_err()
                 .to_string();
             assert!(err.contains("by hand"), "{text:?}: {err}");
+        }
+        // Direct plugin identities determine the target; these are scalar values.
+        for text in [deeper, other_entry] {
+            let out = apply_route(text, &route("hai", &["m1"]), false).unwrap();
+            assert!(out.text.contains("note: llm-pi-ai") || out.text.contains("use: llm-pi-ai"));
+            assert!(routes_in(&out.text).iter().any(|item| item.id == "hai"));
         }
         // Comments do not count as a mention.
         let commented = "# llm-pi-ai goes here\n- id: x\n";

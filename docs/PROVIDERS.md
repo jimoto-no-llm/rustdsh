@@ -41,7 +41,31 @@ the profile lock. If there is no `llm-pi-ai` entry, one is appended.
 - A route that already exists is left alone (the command prints that and exits
   successfully). `--replace` rewrites exactly that block.
 - If the structure cannot be placed safely (for example `providers: {}` written
-  inline), nothing is written and the YAML to add by hand is printed.
+  inline, an `llm-pi-ai` entry inside `insert`, multiple matching entries or
+  identifiers using aliases, tags or folded YAML), nothing is written and the
+  YAML to add by hand is printed. Only direct entry identifiers are inspected;
+  identifiers inside a plugin's config do not identify that plugin. Inserted
+  entries must use block mappings; flow, alias, scalar or complex entries are
+  refused when their identity cannot be inspected safely. An outer `insert`
+  entry's `config` is not applied by Cordis.
+- `config` and `providers` must be block mappings. Sequences, duplicate block
+  mapping keys (including existing provider/model fields) and keys with YAML
+  tags, anchors or aliases are refused before the profile or
+  key changes. Unicode characters such as NBSP remain part of an identifier;
+  mapping and sequence block-scalar prompt text is preserved as text and is
+  not inspected as keys.
+- Structural columns use ASCII whitespace. Plain mapping keys starting with
+  Unicode whitespace are unsupported and refused before any write.
+- Single-line quoted keys and identifiers support YAML escapes; decoded
+  duplicate keys are still refused, and non-target scalar contents are kept.
+- `provider list` remains read-only and can inspect existing routes when an
+  unrelated plugin uses a form that `provider add` will not edit.
+- Appending an entry, config, providers mapping or route is refused if its
+  separating newline would change the value of a final block scalar. Strip
+  chomping and already terminated scalar values keep their supported insertion
+  paths. `--replace` still replaces the selected route's whole block.
+  Content includes tabs and spaces beyond the scalar's content indentation;
+  an all-space empty scalar remains supported when the newline preserves it.
 - `--dry-run` shows what would change and writes nothing, including no key.
 - `--profile <name>` picks the profile; without it the usual default applies
   (`RDSH_DEFAULT_PROFILE`, `general.default_profile`, else a local `tui`).
@@ -88,10 +112,10 @@ discovery over https passes it to `curl` through a config on stdin, not argv.
   `SARASHINA_API_KEY`) alone does not count as a connection in `rdsh setup`
   or the first-run banner: it counts only when a profile's default model uses
   a registered route that declares exactly that key.
-- If `llm-pi-ai` is mentioned anywhere other than one plain top-level entry
-  (for example inside `- insert:`), `provider add` refuses and prints the YAML
-  to add by hand, because appending a second entry would replace the nested
-  definition's config.
+- A plugin entry inside `insert` that identifies `llm-pi-ai` is refused with
+  the YAML to add by hand: appending another entry could replace the inserted
+  definition's config. A model id or prompt mentioning that text does not
+  identify a plugin.
 
 ## HAI
 
