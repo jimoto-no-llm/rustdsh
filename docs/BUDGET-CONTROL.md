@@ -176,3 +176,7 @@ HTTP admission/finish and native local chunks; they exclude external fee receipt
 and real provider latency. This does not prove provider authentication, current
 prices or invoice reconciliation. Real captures and outputs are in
 [evidence/budget-control](evidence/budget-control/README.md).
+
+## Native JSON and display language
+
+`rdsh --language en|zh-CN|ja budget-admission apply|validate|public --input-file request.json` exposes the pure admission engine. `node dashboard/cli.mjs --language ja budget-admission ...` delegates the same request and exit status. Both entrypoints ignore unrelated broken settings, preserve canonical error codes, JSON and Japanese caller text, and perform no provider call or write. Human diagnostics follow the selected language; raw OS errors retain their detail. The request's 128 MiB limit and required `operation`, `state`, `now`, and action-specific fields remain unchanged.

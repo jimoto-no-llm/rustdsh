@@ -1,0 +1,76 @@
+{
+  "scope": "Final normal candidate vs freshly built exact unmodified upstream 9bfdaa1; synthetic CLI and private loopback only, no provider/model calls",
+  "baseline_commit": "9bfdaa166e2800ef393a365d8d45fc1117e8d884",
+  "baseline_sha256": "c33ad187f71a97af5df4696f71df342b87f8167b63713284ba383b13af20f942",
+  "candidate_sha256": "f22d06f5b7d3687c56e7865acd7d0b94423251c1bbd6cf5a5f08b930afc5c128",
+  "warmups": 3,
+  "samples": 15,
+  "cases": {
+    "version": {
+      "stdout_equal": true,
+      "median_ratio": 0.8942323926527928,
+      "p95_ratio": 0.9918949848132765
+    },
+    "tokens_ascii": {
+      "stdout_equal": true,
+      "median_ratio": 1.0246093514058285,
+      "p95_ratio": 0.45956261658386355
+    },
+    "tokens_cjk": {
+      "stdout_equal": true,
+      "median_ratio": 1.0514279268821949,
+      "p95_ratio": 1.0573181747069362
+    },
+    "search": {
+      "stdout_equal": true,
+      "median_ratio": 1.0088097605374164,
+      "p95_ratio": 0.6547645175449921
+    },
+    "prune": {
+      "stdout_equal": true,
+      "median_ratio": 1.0140869409683437,
+      "p95_ratio": 1.2115725974502132
+    },
+    "sessions_tokens": {
+      "stdout_equal": true,
+      "median_ratio": 1.1422257505235518,
+      "p95_ratio": 0.9506200053715219
+    },
+    "sessions_known_frame_first_cache_miss": {
+      "stdout_equal": true,
+      "median_ratio": 0.9726583872345848,
+      "p95_ratio": 1.052420819540456
+    },
+    "sessions_cache_disabled": {
+      "stdout_equal": true,
+      "median_ratio": 0.9319543766023125,
+      "p95_ratio": 0.9480081374528553
+    },
+    "sessions_cache_warm": {
+      "stdout_equal": true,
+      "median_ratio": 0.9642166532666905,
+      "p95_ratio": 0.9163803162205981
+    },
+    "sessions_streaming_zstd_no_content_size": {
+      "stdout_equal": true,
+      "median_ratio": 0.9799060153464549,
+      "p95_ratio": 0.9358294041852049
+    },
+    "search_under_32": {
+      "stdout_equal": true,
+      "median_ratio": 0.9805018640156222,
+      "p95_ratio": 1.3667709041316964
+    },
+    "search_at_least_32": {
+      "stdout_equal": true,
+      "median_ratio": 0.9764261900779301,
+      "p95_ratio": 1.0467144436079387
+    },
+    "compact_jsonl_1mib": {
+      "stdout_equal": true,
+      "median_ratio": 0.9791418879984097,
+      "p95_ratio": 0.8811824155605205
+    }
+  },
+  "default_10percent_median_gate_exit": 0
+}

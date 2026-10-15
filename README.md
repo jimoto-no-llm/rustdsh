@@ -498,3 +498,5 @@ MIT — see [LICENSE](LICENSE). Upstream DeepSeek Harness and its dependencies r
 ### External agent jobs
 
 `node dashboard/cli.mjs --language ja agents list` selects the same display language as the dashboard. External-agent help and CLI diagnostics support `en`, `zh-CN`, and `ja`; job states, error codes, JSON keys and agent output remain canonical. Use `agents submit --prompt-file` for UTF-8 instructions, including Japanese filenames and text. See [agent runners](docs/AGENT-RUNNERS.md) for commands and permission limits. Submitting a real job can incur the external provider’s charges; the locale tests use local fake executables only.
+
+`budget-admission apply|validate|public --input-file <request-json>` is also a settings-independent pure JSON command. Native and dashboard entrypoints localize owned help/errors in all three languages, preserve canonical budget codes and output, and never call a provider or write the budget book. See [budget control](docs/BUDGET-CONTROL.md).

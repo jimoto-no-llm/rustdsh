@@ -8,15 +8,15 @@ through the authenticated `/api/rdsh-update/events` stream. File changes trigger
 push delivery; a one-second server check covers missed filesystem events. If the
 stream is unavailable, the client checks every five seconds and reconnects.
 
-The card appears immediately, on every full page reload, and every **two hours**
-from the recorded update time. **Dismiss** and **×** close the current occurrence.
-Closing, polling, reloading, or switching projects does not reset the two-hour
-schedule. A project remount keeps the current occurrence closed; the next reminder
-or an actual new update appears again. Minimizing keeps the notification.
+The card appears when an update is recorded. **Dismiss** and **×** close that
+update for good: the dismissal is remembered per update event (component, target
+and update time), so time passing, polling, project remounts and full page reloads
+do not bring it back. An actual new update — a different target or a different
+update time — appears again. Minimizing keeps the notification.
 
-A successful **update** / **update again** check closes the occurrence that started
-the request, like Dismiss, without resetting the schedule. Failed checks remain
-visible and retryable. A newer update arriving during the request remains visible.
+A successful **update** / **update again** check closes the update that started
+the request, like Dismiss. Failed checks remain visible and retryable. A newer
+update arriving during the request remains visible.
 The release updater compares verified binary bytes with the installed binary:
 an unchanged payload neither reinstalls nor rewrites the notification time. A
 changed payload still updates even if its version label is the same. See
@@ -25,15 +25,16 @@ changed payload still updates even if its version label is the same. See
 Same-origin tabs share close events through browser storage. Independent GUI
 ports running as the same OS user also share live close events through the private,
 atomically replaced `~/.local/share/rdsh/update-notice-close.json` file. The
-notification identifies the component, target, update time and two-hour period, so
-an old close cannot hide a newer update or reminder. Existing close records are
-not replayed on page load. Separate OS accounts keep separate records.
+notification identifies the component, target and update time, so an old close
+cannot hide a newer update. The browser-storage record is replayed on page load,
+which is what keeps a dismissal closed across reloads. Separate OS accounts keep
+separate records.
 
 Legacy permanent dismissal records are ignored and retained on disk. Closing
 works in memory when browser storage is disabled, including project remounts;
-full reload intentionally shows the notification again. Demo closes never write
-account state. Activate the new server/client code through the normal GUI
-restart/reload once; running user sessions are not restarted automatically.
+that configuration cannot remember the dismissal for a full reload. Demo closes
+never write account state. Activate the new server/client code through the normal
+GUI restart/reload once; running user sessions are not restarted automatically.
 
 ## Install
 
@@ -77,11 +78,16 @@ on the `:38080` demo instance).
 After the next GUI restart, confirm on `:3080`:
 
 1. An actual update appears in an open page without reloading.
-2. Dismiss/× close it; full reload and the next two-hour boundary show it again.
-3. Minimize and updater actions still work; no boot errors appear in GUI logs.
+2. Dismiss/× close it; polls, a project switch and a full reload keep it hidden,
+   and it never reappears hours later.
+3. A newer update appears again; minimize and updater actions still work and no
+   boot errors appear in GUI logs.
 
-[Reproducible browser evidence](../../docs/evidence/update-notice-repeat/README.md)
-uses isolated authenticated hosts and dummy state without restarting the live GUI.
+The earlier two-hour reminder captures in
+[docs/evidence/update-notice-repeat](../../docs/evidence/update-notice-repeat/README.md)
+are historical; the current `update-banner.mjs` flow asserts that a dismissed
+update never returns. It uses isolated authenticated hosts without restarting the
+live GUI.
 
 Then stop creating demo instances for this check.
 

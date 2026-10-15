@@ -1,0 +1,615 @@
+{
+  "scope": "Final normal merge of upstream 9bfdaa1; macOS application/source tests and owned artifacts; no paid provider/model calls, signing purchases or installed binary replacement.",
+  "first_parent": "4f081d0432ea58d2d2b9eb2158dd9886b2a6932b",
+  "upstream_parent": "9bfdaa166e2800ef393a365d8d45fc1117e8d884",
+  "source_inventory": "integration-main9-source.json",
+  "source_inventory_sha256": "83ec36e23415342d5ea69c0edc69289d6238da1b80f6393ef114dde52f7b749f",
+  "artifacts": {
+    "normal_sha256": "f22d06f5b7d3687c56e7865acd7d0b94423251c1bbd6cf5a5f08b930afc5c128",
+    "debug_sha256": "f2a608dcb7e428afbc44ccedae9dd5fa18f31d4a7e353e74c79d56f44f382806",
+    "command": "cargo build --release --locked, after full Cargo tests; immutable task-owned copy"
+  },
+  "checks": [
+    {
+      "name": "format",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all"
+      ],
+      "exit": 0,
+      "seconds": 0.382,
+      "log": "format.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "fmt-check",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 0.349,
+      "log": "fmt-check.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "clippy-debug",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 1.222,
+      "log": "clippy-debug.log",
+      "sha256": "6622ed72e2d1a8b45c0da65a73f0ce8ca30cea6441167cf83f5aa9168508fd0a"
+    },
+    {
+      "name": "clippy-release",
+      "command": [
+        "cargo",
+        "clippy",
+        "--release",
+        "--locked",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 0.4,
+      "log": "clippy-release.log",
+      "sha256": "fa8abdb8a5765a3a6c1d4e7ec6899fd854bbe54db8718fbd632101e89521a8d4"
+    },
+    {
+      "name": "rust-release",
+      "command": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked"
+      ],
+      "exit": 0,
+      "seconds": 20.262,
+      "log": "rust-release.log",
+      "sha256": "fd0fa55621e6e740640ac1084bb4741697271ef0dd8a28280670ad5fdcfc385b"
+    },
+    {
+      "name": "example-extended",
+      "command": [
+        "cargo",
+        "test",
+        "--release",
+        "--example",
+        "benchmark_extended"
+      ],
+      "exit": 0,
+      "seconds": 4.465,
+      "log": "example-extended.log",
+      "sha256": "ba6c7b290a85168700b15799f389c67de64821a10a1b09f45e5e4d313971c0ea"
+    },
+    {
+      "name": "example-models",
+      "command": [
+        "cargo",
+        "test",
+        "--release",
+        "--example",
+        "benchmark_models"
+      ],
+      "exit": 0,
+      "seconds": 7.351,
+      "log": "example-models.log",
+      "sha256": "f09f8947dad24cc2dec7e3b631eb02c0004096ac1e5af6428e776a5220694c2f"
+    },
+    {
+      "name": "build-debug",
+      "command": [
+        "cargo",
+        "build",
+        "--locked"
+      ],
+      "exit": 0,
+      "seconds": 6.557,
+      "log": "build-debug.log",
+      "sha256": "aac1132efd3546451b8913ebade8bc2618ad0ba1c4a7ab61d03949b154e54a16"
+    },
+    {
+      "name": "build-normal",
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "--locked"
+      ],
+      "exit": 0,
+      "seconds": 33.969,
+      "log": "build-normal.log",
+      "sha256": "82bbafe6a57ba74727c6c8155f0d6ebcd40b5cc61d4a5beeb2c79fdfdd3f60b3"
+    },
+    {
+      "name": "desktop",
+      "command": [
+        "node",
+        "--test",
+        "tests/desktop.test.mjs"
+      ],
+      "exit": 0,
+      "seconds": 1.978,
+      "log": "desktop.log",
+      "sha256": "4ba9208589ec6c5732e39988cdefb2e28b60a2993d3b1a5d82f5bfce092f15aa"
+    },
+    {
+      "name": "fence",
+      "command": [
+        "node",
+        "--test",
+        "tests/model_benchmark/fence.test.mjs"
+      ],
+      "exit": 0,
+      "seconds": 0.079,
+      "log": "fence.log",
+      "sha256": "b9d6f4ab55dfd11beb5d52b60be2c5ff01292fcb3ecfefd3dc4696a1e8aeda11"
+    },
+    {
+      "name": "regress",
+      "command": [
+        "sh",
+        "tests/regress.sh"
+      ],
+      "exit": 0,
+      "seconds": 31.016,
+      "log": "regress.log",
+      "sha256": "f64bfb66a9aaeb37e5e7459e0bc76ad97b0090e52d2a76af92b5bbfd449233a2"
+    }
+  ],
+  "final_tool_checks": [
+    {
+      "name": "final-fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 0.937,
+      "log": "final-fmt.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "final-clippy-debug",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 1.111,
+      "log": "final-clippy-debug.log",
+      "sha256": "83c84f09a233bb78b9dc3b47dcec219782f378f418ca7581a021b0df8446568a"
+    },
+    {
+      "name": "final-clippy-release",
+      "command": [
+        "cargo",
+        "clippy",
+        "--release",
+        "--locked",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 0.739,
+      "log": "final-clippy-release.log",
+      "sha256": "517ce67a544edda3c07886d0ba0acb8d0ec5f052dd6494a59ed2e1076f61f26a"
+    },
+    {
+      "name": "final-msrv",
+      "command": [
+        "cargo",
+        "+1.85.0",
+        "check",
+        "--locked",
+        "--all-targets"
+      ],
+      "exit": 0,
+      "seconds": 10.256,
+      "log": "final-msrv.log",
+      "sha256": "fcc7b953dc9e1a7b85c6e1b7d5911329b668cb292f62ca5b8d44248f18d05b66"
+    },
+    {
+      "name": "benchmark-diagnostic-tests",
+      "command": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "--example",
+        "benchmark_extended"
+      ],
+      "exit": 0,
+      "seconds": 7.288,
+      "log": "benchmark-diagnostic-tests.log",
+      "sha256": "8876b0821cd476fb73dc89fa9975c45755ac085721b51eac388cbc5f6e14c0f7"
+    },
+    {
+      "name": "actionlint",
+      "command": [
+        "actionlint",
+        ".github/workflows/ci.yml",
+        ".github/workflows/codeql.yml",
+        ".github/workflows/pin-release-digests.yml"
+      ],
+      "exit": 0,
+      "seconds": 0.193,
+      "log": "actionlint.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "results": {
+    "rust_release": {
+      "passed": 552,
+      "targets": 18,
+      "failed": 0,
+      "ignored": 0
+    },
+    "dashboard": {
+      "total": 419,
+      "passed": 320,
+      "failed": 0,
+      "platform_skipped": 99
+    },
+    "normal_worker_cli": {
+      "passed": 52,
+      "evidence": "normal-cli.json in private task artifact"
+    },
+    "normal_budget_cli": {
+      "passed": 21,
+      "evidence": "native and actual dashboard bridge; exact upstream canonical JSON comparison"
+    },
+    "regress": {
+      "passed": 70,
+      "missing_binary_negative_exit": 1
+    },
+    "desktop": {
+      "passed": 7,
+      "skipped": 0
+    },
+    "headless": {
+      "passed": 32,
+      "skipped": 0,
+      "build_exit": 0
+    },
+    "banner_units": {
+      "passed": 27,
+      "skipped": 0
+    },
+    "parallel_development": {
+      "passed": 27
+    },
+    "browser": {
+      "languages": [
+        "en",
+        "zh-CN",
+        "ja"
+      ],
+      "all_maintained_flows_passed": true,
+      "banner_flows": 12,
+      "no_page_or_console_errors": true
+    },
+    "performance": {
+      "equal_stdout_cases": 13,
+      "maintained_gate_exit": 0,
+      "maintained_gate_scope": [
+        "version_startup",
+        "tokens_1mib",
+        "tokens_10mib",
+        "search_tree_200_files"
+      ],
+      "all_13_initial_median_range": [
+        0.8942323926527928,
+        1.1422257505235518
+      ],
+      "targeted_sessions_31_sample_median_ratio": 1.0257683467353997,
+      "targeted_sessions_p95_ratio": 1.0138153065868407
+    },
+    "tty": {
+      "passed": 6,
+      "scope": "Actual POSIX pseudo-terminal, three display languages, no real credentials or physical IME claim",
+      "binary_sha256": "f22d06f5b7d3687c56e7865acd7d0b94423251c1bbd6cf5a5f08b930afc5c128"
+    }
+  },
+  "initial_failures": [
+    {
+      "log": "initial-clippy-failure/clippy-debug.log",
+      "reason": "New test fixture borrowed a temporary Command builder; fixed by keeping the owned Command before adding arguments. No product or assertion change."
+    },
+    {
+      "log": "initial-provider-fixture-failure/rust-release.log",
+      "passed_in_provider_target": 42,
+      "failed_in_provider_target": 2,
+      "reason": "One old assertion expected the previous YAML refusal reason; the new fixture used a flag unavailable to its preset. Updated the precise three-language reason and removed that invalid flag; all refusal, profile/credential bytes and raw caller-value assertions remain."
+    },
+    {
+      "log": "performance-extended-initial-failure.log",
+      "reason": "One non-200 private loopback HTTP response; exact cause unconfirmed. Independent 108-request probe passes; benchmark diagnostics now identify binary/route/status. Unchanged sample count/assertions/timeout/threshold rerun passes."
+    }
+  ],
+  "performance_initial_vs_confirmation": "The first sessions_tokens median is +14.2%; all first samples remain. Its concrete concern prompted one targeted 31-sample alternating-order confirmation, +2.6% median and +1.4% p95. This does not establish zero overhead or a source cause.",
+  "headless_artifact": "New immutable candidate built from the updated pinned runtime lock; all32 actual keyless profile/cleanup tests pass.",
+  "historic_scope": "Earlier a2/096/468 receipts keep their own source/binary identities. Current-head public CI and human re-review remain separate pending publication.",
+  "logs": [
+    {
+      "file": "actionlint.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "banner-browser.log",
+      "bytes": 159,
+      "sha256": "ee18beed94288f2e43c0efdc24591d509af66966d070d6b829ae960b1eda7e7e",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "benchmark-build.log",
+      "bytes": 143,
+      "sha256": "99a7dbf0c176794f18ba6c7ae021d4bf5884ff7bdfdaf302f10c597f1317ab89",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "benchmark-diagnostic-build.log",
+      "bytes": 143,
+      "sha256": "dd1af26ae62e5cb538947785861bd4fda5df10426a22af34569df2259d420bdb",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "benchmark-diagnostic-tests.log",
+      "bytes": 568,
+      "sha256": "8876b0821cd476fb73dc89fa9975c45755ac085721b51eac388cbc5f6e14c0f7",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "build-debug.log",
+      "bytes": 270,
+      "sha256": "aac1132efd3546451b8913ebade8bc2618ad0ba1c4a7ab61d03949b154e54a16",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "build-normal.log",
+      "bytes": 169,
+      "sha256": "82bbafe6a57ba74727c6c8155f0d6ebcd40b5cc61d4a5beeb2c79fdfdd3f60b3",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "clippy-debug.log",
+      "bytes": 153,
+      "sha256": "6622ed72e2d1a8b45c0da65a73f0ce8ca30cea6441167cf83f5aa9168508fd0a",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "clippy-release.log",
+      "bytes": 143,
+      "sha256": "fa8abdb8a5765a3a6c1d4e7ec6899fd854bbe54db8718fbd632101e89521a8d4",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "dashboard-final.log",
+      "bytes": 51720,
+      "sha256": "3058f2c35a68c49b57d9211444e31fbbcc391e46dc826889045c46b199ae74f3",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "desktop.log",
+      "bytes": 676,
+      "sha256": "4ba9208589ec6c5732e39988cdefb2e28b60a2993d3b1a5d82f5bfce092f15aa",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "example-extended.log",
+      "bytes": 568,
+      "sha256": "ba6c7b290a85168700b15799f389c67de64821a10a1b09f45e5e4d313971c0ea",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "example-models.log",
+      "bytes": 1270,
+      "sha256": "f09f8947dad24cc2dec7e3b631eb02c0004096ac1e5af6428e776a5220694c2f",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "fence.log",
+      "bytes": 317,
+      "sha256": "b9d6f4ab55dfd11beb5d52b60be2c5ff01292fcb3ecfefd3dc4696a1e8aeda11",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "final-clippy-debug.log",
+      "bytes": 153,
+      "sha256": "83c84f09a233bb78b9dc3b47dcec219782f378f418ca7581a021b0df8446568a",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "final-clippy-release.log",
+      "bytes": 143,
+      "sha256": "517ce67a544edda3c07886d0ba0acb8d0ec5f052dd6494a59ed2e1076f61f26a",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "final-fmt.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "final-msrv.log",
+      "bytes": 271,
+      "sha256": "fcc7b953dc9e1a7b85c6e1b7d5911329b668cb292f62ca5b8d44248f18d05b66",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "fmt-check.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "format.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "headless-build.log",
+      "bytes": 367,
+      "sha256": "3778134d0cf66ac6e3628b5eb62899198d1295b660b9a7ff333af1d019b53f01",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "headless-install.log",
+      "bytes": 119,
+      "sha256": "ed89a098b6bad03a2523e9e6d47b250fb16157d21382fb56450d3f80dd12e9bd",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "headless-tests.log",
+      "bytes": 3366,
+      "sha256": "53420185b36db8cf3fbd19271fedd7d52d77e6a69d13086ec526cbd5675c1cb3",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "initial-clippy-failure/clippy-debug.log",
+      "bytes": 1629,
+      "sha256": "9b6f69ea7e230e8874dbb63124753acdd3d60f759391acd6fdb7f37d66c5861d",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "initial-clippy-failure/fmt-check.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "initial-clippy-failure/format.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "initial-provider-fixture-failure/clippy-debug.log",
+      "bytes": 153,
+      "sha256": "25476c4dce5327f14b5799e9bd317e69a5eacfab37bae2ac0cdd67622843a20c",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "initial-provider-fixture-failure/clippy-release.log",
+      "bytes": 260,
+      "sha256": "7c53c97b0ad1dd799ff058b9e72d9407b5d41f0dd9c8a2cf4108be4974c4c23e",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "initial-provider-fixture-failure/fmt-check.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "initial-provider-fixture-failure/format.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "initial-provider-fixture-failure/rust-release.log",
+      "bytes": 39192,
+      "sha256": "0e95f7c015fb58dbeba11c18e55fee8746af6aa71345ed27a7774c0cda9bfa49",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "languages-browser.log",
+      "bytes": 2475,
+      "sha256": "132ea0ca3ba6e01b62c1d103dc54ecd4bd2e2299af338235b3a7f940429b50aa",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "outcome-languages-browser.log",
+      "bytes": 1080,
+      "sha256": "3f152f5785a8c00d9e7aa220a8a43b28cc404c17c19f47b0368444a30c10a55a",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "performance-basic.log",
+      "bytes": 423,
+      "sha256": "32259297780244ab852462d936ae6c044389ba8775af3afb2211573e93b71cef",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "performance-extended-initial-failure.log",
+      "bytes": 37,
+      "sha256": "73e906570f77b464567b4746c8abb0d5c857c4d9325d9eba62e1476cce85fb3e",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "performance-extended.log",
+      "bytes": 35,
+      "sha256": "97d97b090df29c4dfe6a23b49c2f6e2478c0ef07d4c68887f2893813b9ea56ff",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "performance-regression.log",
+      "bytes": 589,
+      "sha256": "3aede61f64519824d4e70e67818cceae7085bf1983a8b558f467b2513449d064",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "regress-missing-negative.log",
+      "bytes": 29,
+      "sha256": "658442dbf64993f85576d03d8f1a402ef433e04f3b283508338219a636517a89",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "regress.log",
+      "bytes": 4976,
+      "sha256": "f64bfb66a9aaeb37e5e7459e0bc76ad97b0090e52d2a76af92b5bbfd449233a2",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "rust-release.log",
+      "bytes": 43686,
+      "sha256": "fd0fa55621e6e740640ac1084bb4741697271ef0dd8a28280670ad5fdcfc385b",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "task-outcomes-browser.log",
+      "bytes": 133,
+      "sha256": "371ed8159eb73343ca8dcc1e66b993ecf23bc91d9691c8839b5a10fe641a7026",
+      "location": "private task artifact; filename is not a public link"
+    },
+    {
+      "file": "tty.log",
+      "bytes": 109,
+      "sha256": "0eb2c4b2559a3dd09d4b8712467149a2226de2a45fe61b32dd911036930a17bc",
+      "location": "private task artifact"
+    }
+  ]
+}

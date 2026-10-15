@@ -124,7 +124,7 @@ fn serve_mock_request(mut stream: TcpStream, state: Arc<MockState>) {
         return;
     }
     let _ = stream.set_read_timeout(Some(Duration::from_secs(3)));
-    let mut reader = BufReader::new(&mut stream);
+    let mut reader = BufReader::new(&stream);
     let mut request_line = String::new();
     if reader.read_line(&mut request_line).is_err() {
         return;

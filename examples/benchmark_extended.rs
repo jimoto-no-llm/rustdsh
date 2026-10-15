@@ -620,7 +620,11 @@ fn http_case(bin: &Path, s: &Sandbox, n: usize) -> Result<Value> {
                 .split_once("\r\n\r\n")
                 .ok_or_else(|| anyhow!("incomplete HTTP response"))?;
             if head.split_whitespace().nth(1) != Some("200") {
-                bail!("HTTP benchmark request failed");
+                bail!(
+                    "HTTP benchmark request failed for {}: {method} {route}, status {}",
+                    bin.display(),
+                    head.split_whitespace().nth(1).unwrap_or("missing")
+                );
             }
             let value: Value = serde_json::from_str(payload)?;
             match name {

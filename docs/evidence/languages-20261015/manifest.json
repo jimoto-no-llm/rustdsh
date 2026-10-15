@@ -1,10 +1,10 @@
 {
-  "scope": "All payload files in this dated evidence directory; manifest excludes itself. Source-bound historical receipts remain historical.",
+  "scope": "All payload files; manifest excludes itself. Source/artifact-bound historical evidence remains historical.",
   "files": [
     {
       "path": "README.md",
-      "bytes": 26353,
-      "sha256": "0e79f8700847354faa9086a468eaedd384d940ed0dfe299a812c138965b0916f"
+      "bytes": 27806,
+      "sha256": "39079443caafbc5202f0c69cef180bdb72798e6a56ae80bea992a9ac9aa9ed61"
     },
     {
       "path": "before-desktop.png",
@@ -127,6 +127,16 @@
       "sha256": "07954bc1ff0c08810860f2e1212c5d1f2521245131e3ac93a8a9ec2def46d3a1"
     },
     {
+      "path": "integration-main9-source.json",
+      "bytes": 90041,
+      "sha256": "83ec36e23415342d5ea69c0edc69289d6238da1b80f6393ef114dde52f7b749f"
+    },
+    {
+      "path": "integration-main9-validation.json",
+      "bytes": 19873,
+      "sha256": "075f53dfecc216a1046ecadd1bcb460c5c4a8003a4d00bf1669f6c1b22689c55"
+    },
+    {
       "path": "ja-desktop.png",
       "bytes": 214176,
       "sha256": "7a3e4193d2262c312c24615c6fe856474da3ec7e14e005f2f3a26789a78231a6"
@@ -143,8 +153,8 @@
     },
     {
       "path": "known-exceptions.json",
-      "bytes": 7903,
-      "sha256": "f7ebad7d94ccddfc37aa9bbab59333a6205ff4b8776fee5c01f02dce825b0f9b"
+      "bytes": 8271,
+      "sha256": "35c89815466d498a1623060f84c13b026800b684ac5cfc30884be85b36eb6c1a"
     },
     {
       "path": "legacy-workflow-board-baseline.json",
@@ -240,6 +250,21 @@
       "path": "macos-native.json",
       "bytes": 3259,
       "sha256": "a418dc07d94b17aceddd8d1d84a12c8e8848512428538fefea10dd9388cdd8e7"
+    },
+    {
+      "path": "main9-normal-budget-cli.json",
+      "bytes": 3001,
+      "sha256": "00e0bdc5ee2108bc94acb54354e89ff2cde0c9d0f65ac916a4b09fbaafd877ec"
+    },
+    {
+      "path": "main9-normal-cli.json",
+      "bytes": 6822,
+      "sha256": "a325693a3f1f6203f621c298589a795641fe49cd857115c021b135b0d4888017"
+    },
+    {
+      "path": "main9-tty.json",
+      "bytes": 1144,
+      "sha256": "15c304c7ea443c36adba904b0cd48d06da7515bb21ddd9fe1a2fa5d674f9f4c2"
     },
     {
       "path": "muse-feasibility.json",
@@ -422,6 +447,41 @@
       "sha256": "fe7768acda2441228e81b23354b35a4a10235861f72429d113f5c4f7b509c6b1"
     },
     {
+      "path": "performance-main9-baseline.json",
+      "bytes": 515,
+      "sha256": "4007017acb9f013be2d82fbc53657404bf9e63d7426dca171369e4492da82003"
+    },
+    {
+      "path": "performance-main9-basic.json",
+      "bytes": 8288,
+      "sha256": "c366efaa7e29e51c0ec61d041784d78986a848160cfdb3b5ad5afd33a5abab57"
+    },
+    {
+      "path": "performance-main9-execution.json",
+      "bytes": 2361,
+      "sha256": "9a6067897a9b5b83f65dbd6567720f5a4fb7483d1263f1378aac281a879c5e24"
+    },
+    {
+      "path": "performance-main9-extended.json",
+      "bytes": 15981,
+      "sha256": "6c782a93c022c767d2b7ae8ffecdd9a15ed7d63d4d6e83c86cecc73b78d5cd00"
+    },
+    {
+      "path": "performance-main9-regression.json",
+      "bytes": 5619,
+      "sha256": "26b111a5cebfe7c77f408e5ee04ab34b1a719fd41deda987e4ad7865dec0125e"
+    },
+    {
+      "path": "performance-main9-sessions-confirmation.json",
+      "bytes": 2305,
+      "sha256": "7ac39eecf13ed7943b953d23c4885994c0fa78b17c2f7f7d27aee9eded3a714e"
+    },
+    {
+      "path": "performance-main9-summary.json",
+      "bytes": 2343,
+      "sha256": "27894a454d76b2e0816232d13fec2823f44e283809d6b84ec2e4160b4b9e61ed"
+    },
+    {
       "path": "performance-repeat-load.json",
       "bytes": 501,
       "sha256": "0e186eeff8eda08e0a57551096284327dd899d663cc8e5e19feabe6c8b21a5c9"
@@ -438,8 +498,8 @@
     },
     {
       "path": "performance.md",
-      "bytes": 9611,
-      "sha256": "c596c106bdac9daf3d5ba4fb22e33838d33030a82ad1eac33000b009dcacc783"
+      "bytes": 11691,
+      "sha256": "9127ac6a59d545792a4c76af83ce7baf44493c28b57a58f1d52ce51847d43a02"
     },
     {
       "path": "platform-ledger.md",

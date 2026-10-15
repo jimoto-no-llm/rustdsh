@@ -79,6 +79,7 @@ rdsh-dashboard cost-ledger declare|report --project <${cliText(language, "arg.di
 rdsh-dashboard cost-ledger inspect --project <${cliText(language, "arg.directory")}>
 rdsh-dashboard cost-ledger validate|public|schema --input-file <request-json>
 rdsh-dashboard task-outcomes apply|validate|schema --input-file <request-json>
+rdsh-dashboard budget-admission apply|validate|public --input-file <request-json>
 rdsh-dashboard budget policy|usage --project <${cliText(language, "arg.directory")}> --input-file <json>
 rdsh-dashboard budget inspect --project <${cliText(language, "arg.directory")}>
 rdsh-dashboard integration init --project <${cliText(language, "arg.directory")}> --input-file <checks-json> --expected-revision 0 --expected-head <sha>
@@ -309,6 +310,23 @@ async function runNativeTaskOutcomes(action, inputFile) {
   process.exitCode = exitCode;
 }
 
+// Budget admission is a self-contained pure-logic module in Rust
+// (`rdsh budget-admission`); the dashboard keeps its own copy for the store
+// hot path, and this entry point exposes the native implementation.
+async function runNativeBudgetAdmission(action, inputFile) {
+  const executable = await nativeRdsh();
+  const exitCode = await new Promise((resolve, reject) => {
+    const child = spawn(
+      executable,
+      ["budget-admission", action, "--input-file", inputFile],
+      { stdio: "inherit", windowsHide: true, env: { ...process.env, RDSH_LANG: language } },
+    );
+    child.once("error", reject);
+    child.once("close", (code) => resolve(code ?? 1));
+  });
+  process.exitCode = exitCode;
+}
+
 async function runNativeSubagentPlan(inputFile) {
   const executable = await nativeRdsh();
   const exitCode = await new Promise((resolve, reject) => {
@@ -433,6 +451,7 @@ try {
   // These native JSON operations do not consume dashboard settings. Keep the
   // bridge available even when a settings file needs repair.
   const nativeJsonBridge =
+    (command === "budget-admission" && ["apply", "validate", "public"].includes(positionals[1])) ||
     (command === "subagents" && positionals[1] === "plan") ||
     (command === "task-outcomes" && ["apply", "validate", "schema"].includes(positionals[1])) ||
     (command === "cost-ledger" && ["validate", "public", "schema"].includes(positionals[1]));
@@ -804,6 +823,16 @@ try {
     )
       throw new CliDiagnosticError("error.taskOutcomesAction");
     await runNativeTaskOutcomes(action, values["input-file"]);
+  } else if (command === "budget-admission") {
+    const action = positionals[1];
+    if (
+      positionals.length !== 2 ||
+      !["apply", "validate", "public"].includes(action) ||
+      !values["input-file"] ||
+      Object.keys(values).some((key) => key !== "input-file")
+    )
+      throw new CliDiagnosticError("error.budgetAdmissionAction");
+    await runNativeBudgetAdmission(action, values["input-file"]);
   } else if (command === "workers") {
     const action = positionals[1];
     const options = {

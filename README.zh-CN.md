@@ -35,3 +35,5 @@ rdsh settings set general.language zh-CN
 ## 外部代理任务
 
 `node dashboard/cli.mjs --language zh-CN agents list` 使用与仪表板一致的显示语言。帮助和 CLI 诊断支持英语、简体中文和日语；任务状态、错误代码、JSON 字段与代理输出保留原文。`agents submit --prompt-file` 接受 UTF-8 指令与日文文件名。命令和权限限制参阅[代理运行器](docs/AGENT-RUNNERS.md)。实际任务可能产生外部服务费用；语言测试只启动本地模拟程序。
+
+`budget-admission apply|validate|public --input-file <request-json>` 同样是独立于设置的纯 JSON 命令。原生与仪表板入口的帮助和诊断支持三种语言；预算代码和 JSON 输出保持不变。此命令不调用服务商，也不写入预算账本。参阅[预算控制](docs/BUDGET-CONTROL.md)。

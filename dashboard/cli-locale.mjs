@@ -2,6 +2,7 @@ import { ProductLocaleError } from "./product-locale.mjs";
 import { RunnerError } from "./agent-runners.mjs";
 
 export const cliEntries = [
+  ["error.budgetAdmissionAction", "budget-admissionの操作またはオプションが不正です", "Invalid budget-admission action/options", "budget-admission 操作或选项无效"],
   ["error.agentsAction", "agentsの操作またはオプションが不正です", "Invalid agents action/options", "agents 操作或选项无效"],
   ["error.agentsSubmit", "agents submitには--agent、--project、--prompt-fileが必要です", "agents submit requires --agent, --project and --prompt-file", "agents submit 需要 --agent、--project 和 --prompt-file"],
   ["error.agentRunner", "エージェント実行エラー: {code}", "Agent runner: {code}", "代理运行器错误：{code}"],

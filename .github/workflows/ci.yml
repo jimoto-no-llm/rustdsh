@@ -180,6 +180,11 @@ jobs:
           name: rust-tests-${{ matrix.os }}
           path: target/nextest/ci/junit.xml
           if-no-files-found: warn
+      - name: 並列開発ツールの回帰検査
+        if: runner.os == 'Linux'
+        run: python3 -m unittest discover -s tests -p 'test_parallel_dev.py' -v
+        env:
+          RDSH_PARALLEL_TEST_TMPDIR: ${{ github.workspace }}/.tmp-parallel-dev-tests
       - uses: actions/setup-node@v7
         with:
           node-version: 22

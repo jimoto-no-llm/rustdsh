@@ -1,0 +1,89 @@
+{
+  "comparison": "Final integration vs exact unmodified upstream 9bfdaa166e2800ef393a365d8d45fc1117e8d884; normal release artifacts; no model calls",
+  "candidate_sha256": "f22d06f5b7d3687c56e7865acd7d0b94423251c1bbd6cf5a5f08b930afc5c128",
+  "baseline_sha256": "c33ad187f71a97af5df4696f71df342b87f8167b63713284ba383b13af20f942",
+  "checks": [
+    {
+      "name": "basic",
+      "command": [
+        "python3",
+        "scripts/benchmark.py",
+        "--bin",
+        "<private-artifact>/rdsh-normal-main9",
+        "--baseline",
+        "<private-artifact>/rdsh",
+        "--n",
+        "15",
+        "--output",
+        "<private-artifact>/performance-basic.json"
+      ],
+      "exit": 0,
+      "seconds": 4.582,
+      "load_before": [
+        8.248046875,
+        11.251953125,
+        15.18798828125
+      ],
+      "load_after": [
+        9.02880859375,
+        11.36376953125,
+        15.2041015625
+      ],
+      "log_sha256": "32259297780244ab852462d936ae6c044389ba8775af3afb2211573e93b71cef"
+    },
+    {
+      "name": "extended",
+      "command": [
+        "target/release/examples/benchmark_extended",
+        "--bin",
+        "<private-artifact>/rdsh-normal-main9",
+        "--baseline",
+        "<private-artifact>/rdsh",
+        "--n",
+        "15",
+        "--output",
+        "<private-artifact>/performance-extended.json"
+      ],
+      "exit": 0,
+      "seconds": 8.943,
+      "load_before": [
+        12.8740234375,
+        12.05859375,
+        14.703125
+      ],
+      "load_after": [
+        12.77734375,
+        12.05810546875,
+        14.67138671875
+      ],
+      "log_sha256": "97d97b090df29c4dfe6a23b49c2f6e2478c0ef07d4c68887f2893813b9ea56ff"
+    },
+    {
+      "name": "regression",
+      "command": [
+        "target/release/examples/benchmark_regression",
+        "--bin",
+        "<private-artifact>/rdsh-normal-main9",
+        "--baseline",
+        "<private-artifact>/rdsh",
+        "--n",
+        "15",
+        "--output",
+        "<private-artifact>/performance-regression.json"
+      ],
+      "exit": 0,
+      "seconds": 1.721,
+      "load_before": [
+        12.77734375,
+        12.05810546875,
+        14.67138671875
+      ],
+      "load_after": [
+        12.77734375,
+        12.05810546875,
+        14.67138671875
+      ],
+      "log_sha256": "3aede61f64519824d4e70e67818cceae7085bf1983a8b558f467b2513449d064"
+    }
+  ]
+}

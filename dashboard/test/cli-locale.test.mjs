@@ -82,7 +82,7 @@ test("CLI catalog has all three languages, matching placeholders and typed valid
   const diagnostics = [
     ...source.matchAll(/new CliDiagnosticError\(\s*"([^"]+)"/g),
   ].map((match) => match[1]);
-  assert.equal(new Set(diagnostics).size, 97);
+  assert.equal(new Set(diagnostics).size, 98);
   for (const key of diagnostics)
     for (const language of ["en", "ja", "zh-CN"]) {
       const diagnostic = new CliDiagnosticError(key, {
@@ -139,6 +139,7 @@ for (const language of ["en", "zh-CN", "ja"])
       ],
       [["subagents", "plan"], "error.subagentsAction"],
       [["task-outcomes", "bad"], "error.taskOutcomesAction"],
+      [["budget-admission", "bad"], "error.budgetAdmissionAction"],
       [["cost-ledger", "validate"], "error.costPureOptions"],
       [["cost-ledger", "bad"], "error.costOptions"],
       [["backup", "bad"], "error.backupAction"],
@@ -416,7 +417,7 @@ test("pure native JSON bridges ignore corrupt settings while ordinary commands f
 import { readFileSync } from "node:fs";
 import path from "node:path";
 const command = path.basename(process.argv[1]);
-if (["subagents", "task-outcomes", "cost-ledger"].includes(command)) {
+if (["subagents", "task-outcomes", "cost-ledger", "budget-admission"].includes(command)) {
   console.log(JSON.stringify({ args: [command, ...process.argv.slice(2)], language: process.env.RDSH_LANG, request: JSON.parse(readFileSync(process.argv.at(-1), "utf8")) }));
   console.error("native raw 日本語");
   process.exit(Number(process.env.RDSH_BRIDGE_TEST_EXIT || 0));
@@ -432,7 +433,7 @@ if (["subagents", "task-outcomes", "cost-ledger"].includes(command)) {
     [[], { RDSH_LANG: "", LC_ALL: "ja_JP.UTF-8" }, "ja"],
     [[], { RDSH_LANG: "", LC_ALL: "C" }, "en"],
   ]) {
-    for (const command of [["subagents", "plan"], ...["apply", "validate", "schema"].map(action => ["task-outcomes", action]), ...["validate", "public", "schema"].map(action => ["cost-ledger", action])]) {
+    for (const command of [...["apply", "validate", "public"].map(action => ["budget-admission", action]), ["subagents", "plan"], ...["apply", "validate", "schema"].map(action => ["task-outcomes", action]), ...["validate", "public", "schema"].map(action => ["cost-ledger", action])]) {
       const args = [...command, "--input-file", request];
       const result = await run([...flags, ...args], { ...native, ...environment });
       assert.equal(result.code, 0, result.stderr);
@@ -454,7 +455,7 @@ if (["subagents", "task-outcomes", "cost-ledger"].includes(command)) {
     assert.ok(ordinary.stderr.includes(path.join(settings, "rdsh.json")));
     assert.equal(await readFile(path.join(settings, "rdsh.json"), "utf8"), malformed);
   }
-  for (const command of ["task-outcomes", "cost-ledger"]) {
+  for (const command of ["task-outcomes", "cost-ledger", "budget-admission"]) {
     const failed = await run([command, "validate", "--input-file", request], { ...native, RDSH_BRIDGE_TEST_EXIT: "7" });
     assert.equal(failed.code, 7);
     assert.equal(failed.stderr, "native raw 日本語\n");
