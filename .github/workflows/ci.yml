@@ -165,6 +165,7 @@ jobs:
           BIN=./target/debug/rdsh sh tests/context_prototype.sh
           BIN=./target/debug/rdsh sh tests/context_hook_prototype.sh
           BIN=./target/debug/rdsh sh tests/deps_prototype.sh
+          BIN=./target/debug/rdsh sh tests/settings_prototype.sh
       - if: '! matrix.regress'
         shell: pwsh
         run: |
