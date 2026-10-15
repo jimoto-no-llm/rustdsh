@@ -2,6 +2,32 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::process::{Command, Output, Stdio};
 
+use serde_json::{json, Map, Value};
+use sha2::Digest;
+
+fn refresh_request_fingerprint(request: &mut Value) {
+    let mut payload = Map::new();
+    for key in [
+        "command_id",
+        "consumer_id",
+        "run_id",
+        "session_id",
+        "text",
+        "mode",
+        "expected_queue_revision",
+        "active_command_id",
+        "actor",
+    ] {
+        payload.insert(key.into(), request.get(key).cloned().unwrap_or(Value::Null));
+    }
+    let serialized = serde_json::to_vec(&Value::Object(payload)).unwrap();
+    let digest = sha2::Sha256::digest(serialized);
+    request["fingerprint"] = json!(digest
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>());
+}
+
 struct Fixture {
     root: PathBuf,
 }
@@ -794,6 +820,114 @@ fn validate_rejects_unknown_registry_fields() {
     assert_eq!(output.status.code(), Some(1));
     assert!(output.stdout.is_empty());
     assert!(String::from_utf8_lossy(&output.stderr).contains("Unknown instruction field"));
+}
+
+#[test]
+fn validate_falls_back_only_for_missing_or_null_queue_sequences() {
+    let fixture = Fixture::new();
+    for invalid in [json!(1.5), json!(false), json!("bad")] {
+        let mut document: Value =
+            serde_json::from_str(include_str!("fixtures/instruction_queue_valid.json")).unwrap();
+        document["state"]["instructions"]["sequence"] = json!(2);
+        document["state"]["answer_applications"]["commands"]["legacy"] = json!({
+            "queue_sequence": invalid,
+            "feedback_sequence": 2,
+        });
+        let output = fixture.run("validate", &document.to_string());
+
+        assert_eq!(output.status.code(), Some(1), "queue_sequence={invalid}");
+        assert!(output.stdout.is_empty(), "queue_sequence={invalid}");
+        assert!(
+            String::from_utf8_lossy(&output.stderr).contains("Corrupt or duplicate input order"),
+            "queue_sequence={invalid}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    for missing_value in [None, Some(Value::Null)] {
+        let mut document: Value =
+            serde_json::from_str(include_str!("fixtures/instruction_queue_valid.json")).unwrap();
+        document["state"]["instructions"]["sequence"] = json!(2);
+        let mut command = json!({ "feedback_sequence": 2 });
+        if let Some(value) = missing_value {
+            command["queue_sequence"] = value;
+        }
+        document["state"]["answer_applications"]["commands"]["legacy"] = command;
+        let output = fixture.run("validate", &document.to_string());
+
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+}
+
+#[test]
+fn validate_rejects_null_consumers_even_when_request_ids_are_null() {
+    let fixture = Fixture::new();
+    let mut document: Value =
+        serde_json::from_str(include_str!("fixtures/instruction_queue_valid.json")).unwrap();
+    let request = &mut document["state"]["instructions"]["requests"]
+        ["input_00000000-0000-0000-0000-000000000001"];
+    request["status"] = json!("review_required");
+    request["effective_mode"] = Value::Null;
+    request["review_reason"] = json!("queue_revision_changed");
+    request["control"] = Value::Null;
+    request["run_id"] = Value::Null;
+    request["session_id"] = Value::Null;
+    refresh_request_fingerprint(request);
+    document["state"]["answer_applications"]["consumers"]["consumer-1"] = Value::Null;
+    document["state"]["instructions"]["commands"]
+        .as_object_mut()
+        .unwrap()
+        .remove("input_00000000-0000-0000-0000-000000000001");
+
+    let output = fixture.run("validate", &document.to_string());
+
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty());
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("Invalid instruction snapshot"),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn validate_accepts_large_valid_instruction_histories() {
+    let fixture = Fixture::new();
+    let mut document: Value =
+        serde_json::from_str(include_str!("fixtures/instruction_queue_valid.json")).unwrap();
+    let template = document["state"]["instructions"]["requests"]
+        ["input_00000000-0000-0000-0000-000000000001"]
+        .clone();
+    for index in 0..40 {
+        let id = format!("input_00000000-0000-0000-0000-00000000{:04x}", index + 2);
+        let mut request = template.clone();
+        request["command_id"] = json!(id);
+        request["text"] = json!("x".repeat(8_000));
+        request["status"] = json!("review_required");
+        request["effective_mode"] = Value::Null;
+        request["timing_reason"] = Value::Null;
+        request["review_reason"] = json!("queue_revision_changed");
+        request["comparison"] = json!([]);
+        request["resolution"] = Value::Null;
+        request["resolved_at"] = Value::Null;
+        request["control"] = Value::Null;
+        refresh_request_fingerprint(&mut request);
+        document["state"]["instructions"]["requests"][id] = request;
+    }
+    let serialized = document.to_string();
+    assert!(serialized.len() > 256 * 1024);
+
+    let output = fixture.run("validate", &serialized);
+
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 #[test]

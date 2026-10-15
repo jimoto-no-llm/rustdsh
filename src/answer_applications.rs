@@ -267,7 +267,7 @@ fn nullable_time(value: Option<&Value>) -> bool {
 
 /// `JSON.stringify(value)`, as the JS module compares it.
 fn stringify(value: &Value) -> String {
-    serde_json::to_string(value).unwrap_or_else(|_| "undefined".to_string())
+    crate::js_json::stringify(value)
 }
 
 /// The ECMAScript `String.prototype.trim` whitespace set.
@@ -940,6 +940,27 @@ pub fn validate_reply_recipient(state: &Value, decision: &Value) -> ReplyResult<
     )
 }
 
+/// Validate the deterministic CLI record input before the caller changes its
+/// in-memory state (for example, by registering a consumer).
+fn validate_record_request(state: &Value, message: &Value, command_id: &str) -> ReplyResult<()> {
+    let command = Value::String(command_id.to_string());
+    reply_check_bad_request(uuid(Some(&command), "reply"), "Input JSON is invalid")?;
+    reply_check_bad_request(
+        message.is_object()
+            && message
+                .get("question_id")
+                .and_then(Value::as_str)
+                .is_some_and(|id| !id.trim().is_empty()),
+        "Input JSON is invalid",
+    )?;
+    let reused = state
+        .get("answer_applications")
+        .and_then(|registry| registry.get("commands"))
+        .and_then(Value::as_object)
+        .is_some_and(|commands| commands.contains_key(command_id));
+    reply_check(!reused, "Answer application command id already exists", 409)
+}
+
 /// `decision?.consumer_id === undefined`: an absent key or a JSON `null` both
 /// read as "no consumer bound", and any other present value is validated.
 fn decision_has_consumer_id(decision: &Value) -> bool {
@@ -955,6 +976,7 @@ pub fn record_answer_application(
     message: &mut Value,
     command_id: &str,
 ) -> ReplyResult<()> {
+    validate_record_request(state, message, command_id)?;
     let decision = state
         .get("question_contracts")
         .and_then(|extension| extension.get("cards"))
@@ -1641,9 +1663,10 @@ pub fn validate_answer_applications(state: &Value) -> ReplyResult<()> {
         keys(consumer, &CONSUMER_KEYS)?;
         let session_id = consumer.get("session_id").and_then(Value::as_str);
         let task_ok = match consumer.get("task_id") {
-            Some(Value::Null) | None => true,
+            Some(Value::Null) => true,
             Some(Value::String(task)) => utf16_len(task) <= TASK_ID_MAX,
             Some(_) => false,
+            None => false,
         };
         let derived = consumer_id(
             &project_id(state),
@@ -1988,6 +2011,7 @@ pub fn cmd_answer_applications(action: &str, input_file: &str) -> Result<()> {
                         .and_then(Value::as_str)
                         .ok_or_else(|| anyhow!("Input JSON is invalid"))?;
                     let mut message = input.get("message").cloned().unwrap_or(Value::Null);
+                    validate_record_request(&state, &message, command_id).map_err(reply_failure)?;
                     let reply = if input.get("consumer").is_some() {
                         let record = input.get("consumer").cloned().unwrap_or(Value::Null);
                         Some(register_reply_consumer(&mut state, &record, &now)?)
@@ -2011,7 +2035,13 @@ pub fn cmd_answer_applications(action: &str, input_file: &str) -> Result<()> {
                     output.insert("result".to_string(), result);
                 }
             }
-            output.insert("answer_applications".to_string(), state);
+            output.insert(
+                "answer_applications".to_string(),
+                state
+                    .get("answer_applications")
+                    .cloned()
+                    .unwrap_or(Value::Null),
+            );
         }
         "validate" => {
             if operation != action {
@@ -2119,6 +2149,44 @@ mod tests {
             register_reply_consumer(&mut state, &consumer_record(), now()).expect("idempotent");
         assert_eq!(again, consumer);
         assert_eq!(state, before);
+    }
+
+    #[test]
+    fn validation_requires_the_consumer_task_id_field() {
+        let mut state = registered_state();
+        let consumer = state["answer_applications"]["consumers"]
+            .as_object_mut()
+            .expect("consumers")
+            .values_mut()
+            .next()
+            .expect("one consumer");
+        consumer.as_object_mut().unwrap().remove("task_id");
+
+        let error = validate_answer_applications(&state).expect_err("task_id must be present");
+        assert_eq!(error.message, "Invalid answer consumer binding");
+        assert_eq!(error.status, 400);
+    }
+
+    #[test]
+    fn recording_rejects_invalid_or_reused_command_ids_before_mutation() {
+        let mut state = registered_state();
+        let before = state.clone();
+        let mut message = json!({ "question_id": "Q1" });
+        let error = record_answer_application(&mut state, &mut message, "bad")
+            .expect_err("invalid reply command id");
+        assert_eq!(error.status, 400);
+        assert_eq!(state, before);
+        assert_eq!(message, json!({ "question_id": "Q1" }));
+
+        let command_id = "reply_01234567-89ab-cdef-0123-456789abcdef";
+        state["answer_applications"]["commands"][command_id] = json!({ "command_id": command_id });
+        let before = state.clone();
+        let mut message = json!({ "question_id": "Q1" });
+        let error = record_answer_application(&mut state, &mut message, command_id)
+            .expect_err("reused reply command id");
+        assert_eq!(error.status, 409);
+        assert_eq!(state, before);
+        assert_eq!(message, json!({ "question_id": "Q1" }));
     }
 
     #[test]

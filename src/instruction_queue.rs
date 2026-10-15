@@ -1,6 +1,6 @@
 //! Native validation, projections, and state transitions for Dashboard instruction queues.
 use std::collections::BTreeSet;
-use std::io::{BufRead, BufWriter, Read, Write};
+use std::io::{BufRead, BufReader, BufWriter, Write};
 
 use anyhow::{anyhow, bail, Context, Result};
 use serde_json::{Map, Value};
@@ -296,12 +296,11 @@ fn all_input_commands(state: &Value) -> Vec<&Value> {
 }
 
 fn input_sequence(command: &Value) -> Option<i64> {
-    safe_integer(
-        command
-            .get("queue_sequence")
-            .filter(|value| !value.is_null()),
-    )
-    .or_else(|| safe_integer(command.get("feedback_sequence")))
+    let value = command
+        .get("queue_sequence")
+        .filter(|value| !value.is_null())
+        .or_else(|| command.get("feedback_sequence"));
+    safe_integer(value)
 }
 
 fn sha256_text(value: &str) -> String {
@@ -501,7 +500,8 @@ pub fn validate_instructions(state: &Value) -> Result<()> {
     for (id, request) in requests.as_object().unwrap() {
         check_keys(request, &REQUEST_KEYS)?;
         let consumer = string(request, "consumer_id")
-            .and_then(|consumer_id| consumers.and_then(|items| items.get(consumer_id)));
+            .and_then(|consumer_id| consumers.and_then(|items| items.get(consumer_id)))
+            .filter(|consumer| js_truthy(consumer));
         let mode = string(request, "mode").unwrap_or("");
         let actor = string(request, "actor").unwrap_or("");
         let status = string(request, "status").unwrap_or("");
@@ -1595,21 +1595,24 @@ fn read_json(input_file: &str) -> Result<Value> {
     let metadata = file
         .metadata()
         .with_context(|| format!("cannot read JSON {input_file}"))?;
-    if !metadata.is_file() || metadata.len() > MAX_JSON_BYTES as u64 {
-        bail!("Input JSON must be a regular file of at most 64 MiB");
+    if !metadata.is_file() {
+        bail!("Input JSON must be a regular file");
     }
-    let mut bytes = Vec::with_capacity(metadata.len() as usize);
-    file.take((MAX_JSON_BYTES + 1) as u64)
-        .read_to_end(&mut bytes)
-        .with_context(|| format!("cannot read JSON {input_file}"))?;
-    if bytes.len() > MAX_JSON_BYTES {
-        bail!("Input JSON exceeds 64 MiB");
+    let mut reader = BufReader::new(file);
+    let starts_with_bom = reader
+        .fill_buf()
+        .with_context(|| format!("cannot read JSON {input_file}"))?
+        .starts_with(b"\xef\xbb\xbf");
+    if starts_with_bom {
+        reader.consume(3);
     }
-    let Ok(text) = std::str::from_utf8(&bytes) else {
-        bail!("Input JSON is invalid");
-    };
-    serde_json::from_str(text.strip_prefix('\u{feff}').unwrap_or(text))
-        .map_err(|_| anyhow!("Input JSON is invalid"))
+    serde_json::from_reader(reader).map_err(|error| {
+        if error.is_io() {
+            anyhow!("cannot read JSON {input_file}")
+        } else {
+            anyhow!("Input JSON is invalid")
+        }
+    })
 }
 
 #[cfg(unix)]

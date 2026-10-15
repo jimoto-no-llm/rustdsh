@@ -593,6 +593,197 @@ fn large_integers_never_serialise_as_floats() {
     assert!(!raw.contains("9.007199254740991e15"), "{raw}");
 }
 
+#[test]
+fn validate_normalizes_persisted_snapshots_before_fingerprinting() {
+    let fixture = Fixture::new();
+    let created = fixture.run_json(&create_document());
+    let mut state = serde_json::json!({
+        "question_contracts": created["question_contracts"],
+        "questions": created["questions"],
+    });
+    // JavaScript JSON.parse turns 5.0 into the same Number as 5, and
+    // JSON.stringify emits "5" when checking the stored fingerprint.
+    state["question_contracts"]["cards"]["Q1"]["snapshot"]["decision"]["cost"]["max"] =
+        serde_json::json!(5.0);
+
+    let request =
+        format!(r#"{{"operation":"validate","state":{state},"input":{{}},"now":"{NOW}"}}"#);
+    let validated = fixture.run_json(&request);
+    assert_eq!(validated["valid"], true, "{validated}");
+}
+
+#[test]
+fn revise_drops_the_current_card_history_from_its_superseded_snapshot() {
+    let fixture = Fixture::new();
+    let created = fixture.run_json(&create_document());
+    let state = serde_json::json!({
+        "question_contracts": created["question_contracts"],
+        "questions": created["questions"],
+    });
+    let decision: serde_json::Value = serde_json::from_str(APPROVAL).unwrap();
+    let request = serde_json::json!({
+        "operation": "question",
+        "state": state,
+        "input": {
+            "id": "Q1",
+            "question": "改訂後の質問ですか？",
+            "decision": decision,
+            "action": "revise",
+            "expected_revision": 1,
+        },
+        "now": NOW,
+    });
+    let revised = fixture.run_json(&request.to_string());
+    assert!(revised["question_contracts"]["cards"]["Q1"]["history"][0]
+        .get("history")
+        .is_none());
+
+    let state = serde_json::json!({
+        "question_contracts": revised["question_contracts"],
+        "questions": revised["questions"],
+    });
+    let validated = fixture.run_json(&format!(
+        r#"{{"operation":"validate","state":{state},"input":{{}},"now":"{NOW}"}}"#
+    ));
+    assert_eq!(validated["valid"], true, "{validated}");
+}
+
+#[test]
+fn explicit_null_question_contract_extension_is_invalid() {
+    let fixture = Fixture::new();
+    let request = format!(
+        r#"{{"operation":"validate","state":{{"question_contracts":null,"questions":[]}},"input":{{}},"now":"{NOW}"}}"#
+    );
+    let printed = fixture.run_failure_str(&request);
+    assert!(
+        printed.contains("Unknown question contract field"),
+        "{printed}"
+    );
+}
+
+#[test]
+fn approval_cost_requires_an_explicit_max_field() {
+    let fixture = Fixture::new();
+    let mut decision: serde_json::Value = serde_json::from_str(APPROVAL).unwrap();
+    decision["cost"].as_object_mut().unwrap().remove("max");
+    let request = serde_json::json!({
+        "operation": "question",
+        "state": { "questions": [] },
+        "input": {
+            "id": "Q1",
+            "question": "公開しますか？",
+            "decision": decision,
+        },
+        "now": NOW,
+    });
+    let printed = fixture.run_failure_str(&request.to_string());
+    assert!(
+        printed.contains("Cost requires USD and a nonnegative limit or null"),
+        "{printed}"
+    );
+}
+
+#[test]
+fn date_only_expiry_is_normalized_as_utc() {
+    let fixture = Fixture::new();
+    let mut decision: serde_json::Value = serde_json::from_str(APPROVAL).unwrap();
+    decision["expires_at"] = serde_json::json!("2026-06-01");
+    let request = serde_json::json!({
+        "operation": "question",
+        "state": { "questions": [] },
+        "input": {
+            "id": "Q1",
+            "question": "公開しますか？",
+            "decision": decision,
+        },
+        "now": NOW,
+    });
+    let created = fixture.run_json(&request.to_string());
+    assert_eq!(
+        created["question_contracts"]["cards"]["Q1"]["snapshot"]["decision"]["expires_at"],
+        "2026-06-01T00:00:00.000Z"
+    );
+}
+
+#[test]
+fn question_mutations_use_the_request_timestamp() {
+    let fixture = Fixture::new();
+    let created = fixture.run_json(&create_document());
+    let card = &created["question_contracts"]["cards"]["Q1"];
+    assert_eq!(card["created_at"], NOW);
+    assert_eq!(card["updated_at"], NOW);
+    assert_eq!(created["questions"][0]["created_at"], NOW);
+}
+
+#[test]
+fn legacy_answer_updates_the_question_record() {
+    let fixture = Fixture::new();
+    let request = serde_json::json!({
+        "operation": "answer",
+        "state": { "questions": [{ "id": "legacy", "question": "旧形式", "answer": null }] },
+        "input": { "id": "legacy", "answer": "回答" },
+        "now": NOW,
+    });
+    let output = fixture.run_json(&request.to_string());
+    assert_eq!(output["questions"][0]["answer"], "回答");
+    assert_eq!(output["questions"][0]["answered_at"], NOW);
+}
+
+#[test]
+fn validate_rejects_missing_answer_fields() {
+    let fixture = Fixture::new();
+    let created = fixture.run_json(&create_document());
+    let mut state = serde_json::json!({
+        "question_contracts": created["question_contracts"],
+        "questions": created["questions"],
+    });
+    state["question_contracts"]["cards"]["Q1"]
+        .as_object_mut()
+        .unwrap()
+        .remove("answer");
+    let missing_answer =
+        format!(r#"{{"operation":"validate","state":{state},"input":{{}},"now":"{NOW}"}}"#);
+    let printed = fixture.run_failure_str(&missing_answer);
+    assert!(
+        printed.contains("Invalid question contract answer"),
+        "{printed}"
+    );
+
+    let created = fixture.run_json(&create_document());
+    let card = &created["question_contracts"]["cards"]["Q1"];
+    let answer = serde_json::json!({
+        "operation": "answer",
+        "state": {
+            "question_contracts": created["question_contracts"],
+            "questions": created["questions"],
+        },
+        "input": {
+            "id": "Q1",
+            "answer": "保留",
+            "choice_id": null,
+            "expected_revision": 1,
+            "contract_fingerprint": card["fingerprint"],
+        },
+        "now": NOW,
+    });
+    let answered = fixture.run_json(&answer.to_string());
+    let mut state = serde_json::json!({
+        "question_contracts": answered["question_contracts"],
+        "questions": answered["questions"],
+    });
+    state["question_contracts"]["cards"]["Q1"]["answer"]
+        .as_object_mut()
+        .unwrap()
+        .remove("choice_id");
+    let missing_choice =
+        format!(r#"{{"operation":"validate","state":{state},"input":{{}},"now":"{NOW}"}}"#);
+    let printed = fixture.run_failure_str(&missing_choice);
+    assert!(
+        printed.contains("Invalid question contract answer"),
+        "{printed}"
+    );
+}
+
 struct Fixture {
     root: PathBuf,
 }
