@@ -167,3 +167,18 @@ fn record_outputs_only_the_answer_application_registry() {
     assert_eq!(printed["answer_applications"], serde_json::Value::Null);
     assert!(printed["answer_applications"].get("project").is_none());
 }
+
+#[test]
+fn ack_claims_instruction_when_control_is_null() {
+    let fixture = Fixture::new();
+    let request = include_str!("fixtures/instruction-ack-null-control.json");
+    let output = fixture.run("apply", request);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let printed: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(printed["result"]["claimed"], true);
+    assert_eq!(printed["result"]["command"]["phase"], "started");
+}

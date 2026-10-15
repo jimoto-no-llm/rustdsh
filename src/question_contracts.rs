@@ -197,6 +197,12 @@ fn timestamp(value: Option<&Value>) -> QuestionResult<Value> {
 /// The ISO date and date-time spellings needed to match the JavaScript module:
 /// date-only UTC, local date-times, and explicit `Z`/numeric offsets.
 fn parse_js_date(text: &str) -> Option<String> {
+    parse_iso_millis(text).map(format_iso)
+}
+
+/// Parse an ISO date to the ECMAScript millisecond instant, shared by every
+/// contract expiry and answer-feedback guard.
+pub(crate) fn parse_iso_millis(text: &str) -> Option<i64> {
     let bytes = text.as_bytes();
     let digits = |range: std::ops::Range<usize>| -> Option<u32> {
         let slice = bytes.get(range)?;
@@ -206,33 +212,57 @@ fn parse_js_date(text: &str) -> Option<String> {
             None
         }
     };
-    if bytes.len() < 10 || bytes[4] != b'-' || bytes[7] != b'-' {
+    let (year, month_start) = match bytes.first().copied()? {
+        sign @ (b'+' | b'-') => {
+            if bytes.get(7) != Some(&b'-') {
+                return None;
+            }
+            let magnitude = digits_abs(bytes, 1..7)? as i64;
+            if sign == b'-' && magnitude == 0 {
+                return None;
+            }
+            (if sign == b'-' { -magnitude } else { magnitude }, 8)
+        }
+        _ => {
+            if bytes.get(4) != Some(&b'-') {
+                return None;
+            }
+            (digits(0..4)? as i64, 5)
+        }
+    };
+    let month_end = month_start + 2;
+    if bytes.get(month_end) != Some(&b'-') {
         return None;
     }
-    let (year, month, day) = (
-        digits(0..4)? as i64,
-        digits(5..7)? as i64,
-        digits(8..10)? as i64,
-    );
+    let day_start = month_end + 1;
+    let date_length = day_start + 2;
+    if bytes.len() < date_length {
+        return None;
+    }
+    let month = digits(month_start..month_end)? as i64;
+    let day = digits(day_start..date_length)? as i64;
     // The ECMAScript Date parser normalises a day that overflows a short month
     // (2026-02-30 becomes 2026-03-02), so the day only has to be 1..=31 here.
     if !(1..=12).contains(&month) || !(1..=31).contains(&day) {
         return None;
     }
     // ECMAScript interprets an ISO date-only form as midnight UTC.
-    if bytes.len() == 10 {
-        return Some(format_iso(days_from_civil(year, month, day) * 86_400_000));
+    if bytes.len() == date_length {
+        return time_clip(days_from_civil(year, month, day) * 86_400_000);
     }
     // The ISO `T` separator is standard. JavaScript engines also accept a
     // space in this position, so keep that common Date.parse spelling.
-    if !matches!(bytes.get(10), Some(b'T' | b' ')) || bytes.len() < 16 {
+    if !matches!(bytes.get(date_length), Some(b'T' | b' ')) || bytes.len() < date_length + 6 {
         return None;
     }
-    if bytes[13] != b':' {
+    if bytes[date_length + 3] != b':' {
         return None;
     }
-    let (hour, minute) = (digits(11..13)? as i64, digits(14..16)? as i64);
-    let mut cursor = 16;
+    let (hour, minute) = (
+        digits(date_length + 1..date_length + 3)? as i64,
+        digits(date_length + 4..date_length + 6)? as i64,
+    );
+    let mut cursor = date_length + 6;
     let second = if bytes.get(cursor) == Some(&b':') {
         cursor += 1;
         let second = digits(cursor..cursor + 2)? as i64;
@@ -295,7 +325,7 @@ fn parse_js_date(text: &str) -> Option<String> {
             }
             _ => return None,
         };
-        return Some(format_iso(local_seconds * 1000 + millis - offset));
+        return time_clip(local_seconds * 1000 + millis - offset);
     }
 
     // A date-time without an explicit zone is interpreted in the process's
@@ -316,7 +346,12 @@ fn parse_js_date(text: &str) -> Option<String> {
         local_second,
         millis,
     )
-    .map(format_iso)
+    .and_then(time_clip)
+}
+
+fn time_clip(millis: i64) -> Option<i64> {
+    const LIMIT: i64 = 8_640_000_000_000_000;
+    (-LIMIT..=LIMIT).contains(&millis).then_some(millis)
 }
 
 #[cfg(unix)]
@@ -839,35 +874,11 @@ fn contract_status(card: &Value, now_millis: Option<i64>) -> String {
         .and_then(|snapshot| snapshot.get("decision"))
         .and_then(|decision| decision.get("expires_at"));
     if let (Some(expires), Some(now)) = (expires_at.and_then(Value::as_str), now_millis) {
-        if let Some(expiry) = parse_js_date(expires) {
-            if parse_js_date(&expiry)
-                .and_then(|canonical| instant_millis(&canonical))
-                .is_some_and(|millis| millis <= now)
-            {
-                return "expired".to_string();
-            }
+        if parse_iso_millis(expires).is_some_and(|millis| millis <= now) {
+            return "expired".to_string();
         }
     }
     stored.to_string()
-}
-
-/// The millisecond instant of a canonical `toISOString()` spelling.
-fn instant_millis(canonical: &str) -> Option<i64> {
-    let bytes = canonical.as_bytes();
-    if bytes.len() < 20 || bytes[4] != b'-' {
-        return None;
-    }
-    let number = |range: std::ops::Range<usize>| -> Option<i64> {
-        std::str::from_utf8(bytes.get(range)?).ok()?.parse().ok()
-    };
-    let year = number(0..4)?;
-    let (month, day) = (number(5..7)?, number(8..10)?);
-    let (hour, minute, second) = (number(11..13)?, number(14..16)?, number(17..19)?);
-    let millis = number(20..23)?;
-    Some(
-        (days_from_civil(year, month, day) * 86_400 + hour * 3_600 + minute * 60 + second) * 1000
-            + millis,
-    )
 }
 
 /// The `state.question_contracts` extension, when the state carries one.
@@ -1565,7 +1576,7 @@ pub fn cmd_question_contracts(action: &str, input_file: &str) -> Result<()> {
     let canonical_now =
         parse_js_date(&now).ok_or_else(|| QuestionError::new("Invalid expires_at"))?;
     let now_instant =
-        instant_millis(&canonical_now).ok_or_else(|| QuestionError::new("Invalid expires_at"))?;
+        parse_iso_millis(&canonical_now).ok_or_else(|| QuestionError::new("Invalid expires_at"))?;
     let mut output = Map::new();
     match action {
         "apply" => {
@@ -1656,8 +1667,7 @@ pub fn cmd_question_contracts(action: &str, input_file: &str) -> Result<()> {
         }
         other => bail!("unknown question-contracts action {other}"),
     }
-    let text =
-        serde_json::to_string(&Value::Object(output)).context("serialize question contracts")?;
+    let text = crate::js_json::stringify(&Value::Object(output));
     let stdout = std::io::stdout();
     let mut handle = stdout.lock();
     handle
@@ -1728,5 +1738,26 @@ mod date_tests {
             parse_js_date("2026-06-01T09:30+0900"),
             Some("2026-06-01T00:30:00.000Z".to_string())
         );
+    }
+
+    #[test]
+    fn expanded_years_roundtrip_and_obey_time_clip() {
+        for (input, expected) in [
+            (
+                "9999-12-31T23:59:59.000-01:00",
+                "+010000-01-01T00:59:59.000Z",
+            ),
+            ("+010000-01-01T00:59:59.000Z", "+010000-01-01T00:59:59.000Z"),
+            ("-000001-01-01T00:00:00.000Z", "-000001-01-01T00:00:00.000Z"),
+            ("+000099-01-01T00:00:00.000Z", "0099-01-01T00:00:00.000Z"),
+            ("+000000-01-01T00:00:00.000Z", "0000-01-01T00:00:00.000Z"),
+            ("+275760-09-13T00:00:00.000Z", "+275760-09-13T00:00:00.000Z"),
+            ("-271821-04-20T00:00:00.000Z", "-271821-04-20T00:00:00.000Z"),
+        ] {
+            assert_eq!(parse_js_date(input).as_deref(), Some(expected), "{input}");
+        }
+        assert_eq!(parse_js_date("-000000-01-01T00:00:00.000Z"), None);
+        assert_eq!(parse_js_date("+275760-09-13T00:00:00.001Z"), None);
+        assert_eq!(parse_js_date("-271821-04-19T23:59:59.999Z"), None);
     }
 }

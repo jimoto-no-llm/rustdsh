@@ -61,7 +61,7 @@ fn number_to_string(value: &Number) -> String {
         return "0".into();
     }
 
-    let raw = number.abs().to_string();
+    let raw = serde_json::to_string(&number.abs()).expect("finite doubles serialize");
     let (mantissa, exponent) =
         raw.split_once(['e', 'E'])
             .map_or((raw.as_str(), 0i32), |(mantissa, exponent)| {
@@ -113,7 +113,7 @@ fn number_to_string(value: &Number) -> String {
 #[cfg(test)]
 mod tests {
     use super::stringify;
-    use serde_json::Value;
+    use serde_json::{Number, Value};
 
     #[test]
     fn numbers_follow_json_stringify_decimal_and_exponent_ranges() {
@@ -136,5 +136,18 @@ mod tests {
     fn integer_object_keys_are_emitted_before_other_keys() {
         let value: Value = serde_json::from_str(r#"{"b":1,"2":2,"1":1,"a":0}"#).unwrap();
         assert_eq!(stringify(&value), r#"{"1":1,"2":2,"b":1,"a":0}"#);
+    }
+
+    #[test]
+    fn parses_json_numbers_to_the_javascript_binary64_value() {
+        let value: Value = serde_json::from_str("913420.7214268055").unwrap();
+        assert_eq!(value.as_f64().unwrap().to_bits(), 0x412b_e019_715e_dab0);
+        assert_eq!(stringify(&value), "913420.7214268055");
+    }
+
+    #[test]
+    fn formats_binary64_with_the_javascript_shortest_decimal() {
+        let number = Number::from_f64(f64::from_bits(0x430c_6bf5_2634_0002)).unwrap();
+        assert_eq!(stringify(&Value::Number(number)), "1000000000000000.2");
     }
 }
