@@ -61,6 +61,23 @@ fn apply_prints_the_js_json_shape() {
 }
 
 #[test]
+fn help_documents_context_only_for_instruction_queue_requests() {
+    let fixture = Fixture::new();
+    let outcomes = fixture.run(&["task-outcomes", "--help"]);
+    assert!(outcomes.status.success(), "{}", public_output(&outcomes));
+    assert!(stdout(&outcomes).contains("{ operation, state, input }"));
+    assert!(!stdout(&outcomes).contains("{ operation, state, input, context }"));
+
+    let instructions = fixture.run(&["instruction-queue", "--help"]);
+    assert!(
+        instructions.status.success(),
+        "{}",
+        public_output(&instructions)
+    );
+    assert!(stdout(&instructions).contains("{ operation, state, input, context }"));
+}
+
+#[test]
 fn apply_is_byte_identical_across_runs() {
     let fixture = Fixture::new();
     fixture.write("request.json", REQUEST);
