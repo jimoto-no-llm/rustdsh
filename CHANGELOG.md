@@ -5,6 +5,10 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Fixed
+
+- 更新通知を dismiss したら、その更新については再表示しない（新しい更新のときだけ通知する）。
+
 ## [0.4.0] - 2026-10-15
 
 ### Security
