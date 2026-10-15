@@ -165,12 +165,16 @@ export class ProjectStore {
       control: "control",
     };
     let result;
+    let workerValidatedState = false;
     const nativeOperation = nativeOperations[operation];
     if (this.instructionQueueWorker && nativeOperation) {
       let response;
       try {
         response = await this.instructionQueueWorker.request({
           operation: nativeOperation,
+          // ProjectStore.open() and every mutation path validate this state.
+          // Rust still validates the returned state before acknowledging it.
+          prevalidated: true,
           state: {
             project: { id: next.project.id },
             feedback: next.feedback,
@@ -205,6 +209,7 @@ export class ProjectStore {
             { status: 500 },
           );
         }
+        workerValidatedState = response.state_validated === true;
         next.instructions = response.state.instructions;
         result = response.result;
       }
@@ -212,7 +217,7 @@ export class ProjectStore {
       result = handlers[operation](next, input, context);
     }
     validateAnswerApplications(next);
-    validateInstructions(next);
+    if (!workerValidatedState) validateInstructions(next);
     await this.commit(next);
     return structuredClone(result);
   }

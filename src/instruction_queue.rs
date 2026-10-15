@@ -1050,7 +1050,12 @@ fn activate_instruction(
     Ok(())
 }
 
-fn submit_instruction(state: &mut Value, input: &Value, context: &Value) -> Result<Value> {
+fn submit_instruction(
+    state: &mut Value,
+    input: &Value,
+    context: &Value,
+    input_prevalidated: bool,
+) -> Result<Value> {
     check_keys(
         input,
         &[
@@ -1098,7 +1103,9 @@ fn submit_instruction(state: &mut Value, input: &Value, context: &Value) -> Resu
         "Verified instruction actor required",
         403,
     )?;
-    validate_instructions(state).map_err(bad_request)?;
+    if !input_prevalidated {
+        validate_instructions(state).map_err(bad_request)?;
+    }
     ensure_instruction_registry(state)?;
 
     let mut payload = Map::new();
@@ -1246,7 +1253,12 @@ fn submit_instruction(state: &mut Value, input: &Value, context: &Value) -> Resu
     }))
 }
 
-fn resolve_instruction(state: &mut Value, input: &Value, context: &Value) -> Result<Value> {
+fn resolve_instruction(
+    state: &mut Value,
+    input: &Value,
+    context: &Value,
+    input_prevalidated: bool,
+) -> Result<Value> {
     check_keys(
         input,
         &["command_id", "expected_queue_revision", "decision"],
@@ -1273,7 +1285,9 @@ fn resolve_instruction(state: &mut Value, input: &Value, context: &Value) -> Res
         "Invalid review decision",
         400,
     )?;
-    validate_instructions(state).map_err(bad_request)?;
+    if !input_prevalidated {
+        validate_instructions(state).map_err(bad_request)?;
+    }
     let now = operation_time(context)?;
     let request_snapshot = instruction_request(state, id)
         .cloned()
@@ -1324,7 +1338,12 @@ fn resolve_instruction(state: &mut Value, input: &Value, context: &Value) -> Res
     }))
 }
 
-fn apply_instruction_control(state: &mut Value, input: &Value, context: &Value) -> Result<Value> {
+fn apply_instruction_control(
+    state: &mut Value,
+    input: &Value,
+    context: &Value,
+    input_prevalidated: bool,
+) -> Result<Value> {
     check_keys(
         input,
         &["consumer_id", "command_id", "phase", "native_command_id"],
@@ -1345,7 +1364,9 @@ fn apply_instruction_control(state: &mut Value, input: &Value, context: &Value) 
                 .and_then(|consumer| string(consumer, "consumer_id")),
         "Interrupt belongs to another recipient",
     )?;
-    validate_instructions(state).map_err(bad_request)?;
+    if !input_prevalidated {
+        validate_instructions(state).map_err(bad_request)?;
+    }
 
     if let Some(parent_proof) = context.get("parent_proof").filter(|value| js_truthy(value)) {
         let phase = string(&control, "phase").unwrap_or("");
@@ -1630,6 +1651,14 @@ fn open_json_input(input_file: &str) -> std::io::Result<std::fs::File> {
 }
 
 fn run_instruction_queue(action: &str, document: &Value) -> Result<Value> {
+    run_instruction_queue_with_prevalidated_state(action, document, false)
+}
+
+fn run_instruction_queue_with_prevalidated_state(
+    action: &str,
+    document: &Value,
+    input_prevalidated: bool,
+) -> Result<Value> {
     let Some(object) = document.as_object() else {
         return Err(InstructionQueueError {
             status: 400,
@@ -1638,9 +1667,9 @@ fn run_instruction_queue(action: &str, document: &Value) -> Result<Value> {
         .into());
     };
     check_status(
-        object
-            .keys()
-            .all(|key| ["operation", "state", "input", "context"].contains(&key.as_str())),
+        object.keys().all(|key| {
+            ["operation", "state", "input", "context", "prevalidated"].contains(&key.as_str())
+        }),
         "Input JSON is invalid",
         400,
     )?;
@@ -1678,17 +1707,18 @@ fn run_instruction_queue(action: &str, document: &Value) -> Result<Value> {
             );
         }
         "submit" => {
-            let result = submit_instruction(&mut state, &input, &context)?;
+            let result = submit_instruction(&mut state, &input, &context, input_prevalidated)?;
             output.insert("state".into(), state);
             output.insert("result".into(), result);
         }
         "resolve" => {
-            let result = resolve_instruction(&mut state, &input, &context)?;
+            let result = resolve_instruction(&mut state, &input, &context, input_prevalidated)?;
             output.insert("state".into(), state);
             output.insert("result".into(), result);
         }
         "control" => {
-            let result = apply_instruction_control(&mut state, &input, &context)?;
+            let result =
+                apply_instruction_control(&mut state, &input, &context, input_prevalidated)?;
             output.insert("state".into(), state);
             output.insert("result".into(), result);
         }
@@ -1734,7 +1764,11 @@ fn worker_response(line: &[u8]) -> Value {
         }
     };
     let action = string(&document, "operation").unwrap_or("");
-    match run_instruction_queue(action, &document) {
+    let input_prevalidated = document
+        .get("prevalidated")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    match run_instruction_queue_with_prevalidated_state(action, &document, input_prevalidated) {
         Ok(mut response) => {
             if ["submit", "resolve", "control"].contains(&action) {
                 if let Some(instructions) = response
@@ -1743,6 +1777,7 @@ fn worker_response(line: &[u8]) -> Value {
                     .cloned()
                 {
                     response["state"] = serde_json::json!({"instructions": instructions});
+                    response["state_validated"] = Value::Bool(true);
                 }
             }
             response

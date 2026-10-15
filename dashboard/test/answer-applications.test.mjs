@@ -1599,6 +1599,7 @@ test("ProjectStore commits Rust instruction results and leaves state untouched o
   );
 
   assert.equal(received.operation, "submit");
+  assert.equal(received.prevalidated, true);
   assert.deepEqual(Object.keys(received.state).sort(), [
     "answer_applications",
     "feedback",
@@ -1713,6 +1714,59 @@ input.on("line", (line) => {
   assert.equal(worker.record, null);
 });
 
+test(
+  "live Dashboard keeps JavaScript routing by default when a Rust worker is available",
+  { skip: process.platform === "win32" },
+  async (t) => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-native-queue-default-"));
+    const projectRoot = path.join(root, "project");
+    await fs.mkdir(projectRoot);
+    const project = await identity(projectRoot);
+    project.directory = path.join(root, "dashboard");
+    const executable = path.join(root, "rdsh");
+    await fs.writeFile(
+      executable,
+      '#!/bin/sh\n[ "$1" = "instruction-queue" ] && [ "$2" = "serve" ] && exit 0\nexit 64\n',
+    );
+    await fs.chmod(executable, 0o700);
+    const previousRdshBin = process.env.RDSH_BIN;
+    const previousWorkerSetting = process.env.RDSH_DASHBOARD_RUST_INSTRUCTION_QUEUE;
+    process.env.RDSH_BIN = executable;
+    delete process.env.RDSH_DASHBOARD_RUST_INSTRUCTION_QUEUE;
+    let dashboard;
+    let enabledDashboard;
+    t.after(async () => {
+      if (dashboard) await dashboard.close();
+      if (enabledDashboard) await enabledDashboard.close();
+      if (previousRdshBin === undefined) delete process.env.RDSH_BIN;
+      else process.env.RDSH_BIN = previousRdshBin;
+      if (previousWorkerSetting === undefined)
+        delete process.env.RDSH_DASHBOARD_RUST_INSTRUCTION_QUEUE;
+      else process.env.RDSH_DASHBOARD_RUST_INSTRUCTION_QUEUE = previousWorkerSetting;
+      await fs.rm(root, { recursive: true, force: true });
+    });
+
+    dashboard = await startDashboard({
+      project,
+      port: await freePort(),
+      tailscale: false,
+    });
+    assert.equal(dashboard.store.instructionQueueWorker, null);
+
+    const enabledRoot = path.join(root, "enabled-project");
+    await fs.mkdir(enabledRoot);
+    const enabledProject = await identity(enabledRoot);
+    enabledProject.directory = path.join(root, "enabled-dashboard");
+    process.env.RDSH_DASHBOARD_RUST_INSTRUCTION_QUEUE = "1";
+    enabledDashboard = await startDashboard({
+      project: enabledProject,
+      port: await freePort(),
+      tailscale: false,
+    });
+    assert.ok(enabledDashboard.store.instructionQueueWorker);
+  },
+);
+
 test("live Dashboard keeps JavaScript routing when rdsh lacks the serve action", async (t) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-old-native-queue-"));
   const projectRoot = path.join(root, "project");
@@ -1720,12 +1774,17 @@ test("live Dashboard keeps JavaScript routing when rdsh lacks the serve action",
   const project = await identity(projectRoot);
   project.directory = path.join(root, "dashboard");
   const previousRdshBin = process.env.RDSH_BIN;
+  const previousWorkerSetting = process.env.RDSH_DASHBOARD_RUST_INSTRUCTION_QUEUE;
   process.env.RDSH_BIN = process.execPath;
+  process.env.RDSH_DASHBOARD_RUST_INSTRUCTION_QUEUE = "1";
   let dashboard;
   t.after(async () => {
     if (dashboard) await dashboard.close();
     if (previousRdshBin === undefined) delete process.env.RDSH_BIN;
     else process.env.RDSH_BIN = previousRdshBin;
+    if (previousWorkerSetting === undefined)
+      delete process.env.RDSH_DASHBOARD_RUST_INSTRUCTION_QUEUE;
+    else process.env.RDSH_DASHBOARD_RUST_INSTRUCTION_QUEUE = previousWorkerSetting;
     await fs.rm(root, { recursive: true, force: true });
   });
 

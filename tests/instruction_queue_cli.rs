@@ -90,6 +90,7 @@ fn instruction_queue_serve_processes_ordered_requests_after_errors() {
     });
     let submit = serde_json::json!({
         "operation": "submit",
+        "prevalidated": true,
         "state": state,
         "input": {
             "command_id": "input_00000000-0000-0000-0000-000000000071",
@@ -148,6 +149,7 @@ fn instruction_queue_serve_processes_ordered_requests_after_errors() {
         .collect();
     assert_eq!(responses.len(), 3);
     assert_eq!(responses[0]["result"]["request"]["status"], "accepted");
+    assert_eq!(responses[0]["state_validated"], true);
     assert_eq!(responses[0]["state"].as_object().unwrap().len(), 1);
     assert!(responses[0]["state"]["instructions"]["requests"].is_object());
     assert_eq!(responses[1]["status"], 400);
@@ -190,6 +192,37 @@ fn validate_accepts_a_snapshot_created_by_the_javascript_module() {
     assert_eq!(
         output.stdout,
         b"{\"operation\":\"validate\",\"valid\":true}\n"
+    );
+}
+
+#[test]
+fn file_cli_does_not_trust_the_worker_prevalidation_hint() {
+    let fixture = Fixture::new();
+    let id = "input_00000000-0000-0000-0000-000000000001";
+    let mut document: Value =
+        serde_json::from_str(include_str!("fixtures/instruction_queue_valid.json")).unwrap();
+    let request = document["state"]["instructions"]["requests"][id].clone();
+    document["operation"] = Value::String("submit".into());
+    document["prevalidated"] = Value::Bool(true);
+    document["state"]["instructions"]["requests"][id]["unexpected"] = Value::Bool(true);
+    document["input"] = serde_json::json!({
+        "command_id": id,
+        "consumer_id": request["consumer_id"],
+        "run_id": request["run_id"],
+        "session_id": request["session_id"],
+        "text": request["text"],
+        "mode": request["mode"],
+        "expected_queue_revision": request["expected_queue_revision"],
+        "active_command_id": request["active_command_id"],
+    });
+    document["context"] = serde_json::json!({ "actor": "human" });
+    let output = fixture.run("submit", &document.to_string());
+
+    assert!(!output.status.success());
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("Unknown instruction field"),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
     );
 }
 

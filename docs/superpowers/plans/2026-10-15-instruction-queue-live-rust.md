@@ -45,11 +45,11 @@
 - Modify: `dashboard/server.mjs`
 - Modify: `dashboard/test/answer-applications.test.mjs`
 
-- [ ] Let `ProjectStore.open(project, { instructionQueueWorker })` retain an optional worker. In `mutateReply`, map `instruction_submit|instruction_resolve|control` to `submit|resolve|control`, send the cloned state and context, validate the returned state, and commit only after a successful native response.
-- [ ] Preserve the `history_backups` reference in the cloned state because instruction mutations cannot change it and `commit()` uses reference identity to detect restored-history changes.
-- [ ] Construct one worker for the live project Dashboard when an installed `rdsh` is available, pass it to `ProjectStore`, and close it after the update queue drains during normal shutdown.
-- [ ] Keep direct `ProjectStore` tests injectable so existing tests without a compiled binary continue to use the existing JavaScript handler.
-- [ ] Add a store test proving native returned state/result are committed and native errors leave the stored state untouched; run `mise exec node@22.23.2 -- node --test --test-concurrency=1 dashboard/test/answer-applications.test.mjs dashboard/test/instruction-queue-worker.test.mjs`.
+- [x] Let `ProjectStore.open(project, { instructionQueueWorker })` retain an optional worker. In `mutateReply`, map `instruction_submit|instruction_resolve|control` to `submit|resolve|control`, send the cloned state and context, and commit only after a successful native response. Rust validates the returned instruction state before acknowledging it.
+- [x] Preserve the `history_backups` reference in the cloned state because instruction mutations cannot change it and `commit()` uses reference identity to detect restored-history changes.
+- [x] Allow one worker for the live project Dashboard behind `RDSH_DASHBOARD_RUST_INSTRUCTION_QUEUE=1`, pass it to `ProjectStore`, and close it after the update queue drains during normal shutdown. Automatic use remains disabled until the live latency gate passes.
+- [x] Keep direct `ProjectStore` tests injectable so existing tests without a compiled binary continue to use the existing JavaScript handler.
+- [x] Add a store test proving native returned state/result are committed and native errors leave the stored state untouched; run focused store/worker tests.
 
 ## Task 4: Verify the live boundary and performance
 
@@ -57,8 +57,14 @@
 
 - Modify: `docs/` only if observed behavior changes the migration record.
 
-- [ ] Build the release binary and run Dashboard store mutation tests with `RDSH_BIN` pointing at it.
+- [x] Build the release binary and run ProjectStore mutation benchmarks against that exact worker binary.
 - [ ] Compare JavaScript and Rust outputs for submit, retry, stale review, append, interrupt approval, cancel claim, and proof reconciliation.
-- [ ] Measure the live ProjectStore mutation end-to-end before and after worker routing using the same state fixture; record median and p95, and retain the JavaScript fallback if the worker regresses the measured end-to-end path.
-- [ ] Run `cargo test --locked --release`, `cargo clippy --locked --all-targets --release -- -D warnings`, `cargo +1.85.0 check --locked --all-targets`, `cargo fmt --all -- --check`, and the focused Node tests.
-- [ ] Do not mark the full Dashboard runtime migrated; this worker only closes the instruction mutation path.
+- [x] Measure the live ProjectStore mutation end-to-end before and after worker routing using the same state fixture; record median and p95, and retain the JavaScript fallback if the worker regresses the measured end-to-end path.
+- [x] Run `cargo test --locked --release`, `cargo clippy --locked --all-targets --release -- -D warnings`, `cargo +1.85.0 check --locked --all-targets`, `cargo fmt --all -- --check`, and the focused Node tests.
+- Full Dashboard runtime migration remains open; this worker covers only instruction mutations.
+
+### 2026-10-15 performance gate
+
+On macOS arm64 with Node 24.21.0 and the Release `rdsh` from this worktree, the same fixture started with 100 accepted instructions. Five pairs each measured 20 mutations after five warm-up operations. Median-of-pair-medians was 2.18 ms for JavaScript and 4.68 ms for the Rust worker; median-of-pair-p95 values were 3.05 ms and 5.94 ms. The JSONL worker remains opt-in through `RDSH_DASHBOARD_RUST_INSTRUCTION_QUEUE=1`; the default Dashboard path stays in-process JavaScript until a lower-overhead Rust state boundary removes this regression.
+
+The focused Node 22 ProjectStore/worker tests pass. The complete answer-applications suite still has 22 failures at session setup with `Session ledger: cleanup_unconfirmed`, tracked separately as issue #548; the tests that reach the ProjectStore/worker cases pass.

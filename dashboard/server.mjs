@@ -168,7 +168,12 @@ export async function startDashboard(options) {
   try {
     if (kind === "project") {
       instructionQueueWorker = options.instructionQueueWorker || null;
-      if (!instructionQueueWorker) {
+      // Keep the JSONL subprocess experimental until it meets the live
+      // mutation latency gate; tests and benchmarks can still opt in.
+      if (
+        !instructionQueueWorker &&
+        process.env.RDSH_DASHBOARD_RUST_INSTRUCTION_QUEUE === "1"
+      ) {
         const executable = await resolveRdshExecutable();
         if (executable && (await supportsInstructionQueueServe(executable)))
           instructionQueueWorker = new InstructionQueueWorker(executable);
