@@ -155,7 +155,7 @@ export async function startWindowsTray({
       timer = setTimeout(() => {
         record("ready-timeout");
         reject(new Error("Windows tray did not become ready"));
-      }, 15000);
+      }, 30000);
       fail = () =>
         reject(new Error("Windows notification-area tray is unavailable"));
       child.once("error", fail);

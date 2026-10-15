@@ -151,6 +151,32 @@ test("tray tooltip identifies its project and bounds Unicode labels", async () =
   tray.dispose();
 });
 
+test(
+  "tray accepts readiness after the first 15 seconds of Windows startup",
+  { timeout: 5000 },
+  async (t) => {
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    const f = fixture(async () => {});
+    let settled = false;
+    const observed = f.pending.then(
+      () => {
+        settled = true;
+      },
+      () => {
+        settled = true;
+      },
+    );
+
+    t.mock.timers.tick(15000);
+    await tick();
+    assert.equal(settled, false);
+
+    f.child.stdout.write("ready\n");
+    (await f.pending).dispose();
+    await observed;
+  },
+);
+
 test("Exit closes only its captured dashboard, coalesces clicks, and waits for proof", async () => {
   let calls = 0,
     finish;
@@ -218,7 +244,7 @@ test("failed tray startup cleans only its owned helper", async () => {
   assert.equal(f.server.listenerCount("close"), 0);
 });
 
-test("an unready tray retains its original 15-second startup deadline and owns only its helper", async (t) => {
+test("an unready tray retains its 30-second startup deadline and owns only its helper", async (t) => {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   let calls = 0;
   const slow = fixture(async () => {
@@ -240,7 +266,7 @@ test("an unready tray retains its original 15-second startup deadline and owns o
     calls++;
   });
   const rejected = assert.rejects(lost.pending, /did not become ready/);
-  t.mock.timers.tick(14999);
+  t.mock.timers.tick(29999);
   await tick();
   assert.equal(lost.child.killed, undefined);
   t.mock.timers.tick(1);
@@ -483,7 +509,7 @@ test(
       return /did not become ready/.test(error.message);
     });
     await phase;
-    t.mock.timers.tick(15000);
+    t.mock.timers.tick(30000);
     await rejected;
     assert.equal(failure.trayDiagnostics.cleanup.exit_observed, true);
     assert.ok(
