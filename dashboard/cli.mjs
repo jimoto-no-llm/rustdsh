@@ -67,6 +67,8 @@ rdsh-dashboard cost-ledger declare|report --project <directory> --input-file <js
 rdsh-dashboard cost-ledger inspect --project <directory>
 rdsh-dashboard task-outcomes apply|validate|schema --input-file <request-json>
 rdsh-dashboard budget-admission apply|validate|public --input-file <request-json>
+rdsh-dashboard question-contracts apply|validate|public --input-file <request-json>
+rdsh-dashboard answer-applications apply|validate|public|schema --input-file <request-json>
 rdsh-dashboard budget policy|usage --project <directory> --input-file <json>
 rdsh-dashboard budget inspect --project <directory>
 rdsh-dashboard integration init --project <directory> --input-file <checks-json> --expected-revision 0 --expected-head <sha>
@@ -256,6 +258,39 @@ async function runNativeBudgetAdmission(action, inputFile) {
     const child = spawn(
       executable,
       ["budget-admission", action, "--input-file", inputFile],
+      { stdio: "inherit", windowsHide: true },
+    );
+    child.once("error", reject);
+    child.once("close", (code) => resolve(code ?? 1));
+  });
+  process.exitCode = exitCode;
+}
+
+// Typed question contracts are a self-contained pure-logic module in Rust
+// (`rdsh question-contracts`); the dashboard keeps its own copy for the store
+// hot path, and this entry point exposes the native implementation.
+async function runNativeQuestionContracts(action, inputFile) {
+  const executable = await nativeRdsh();
+  const exitCode = await new Promise((resolve, reject) => {
+    const child = spawn(
+      executable,
+      ["question-contracts", action, "--input-file", inputFile],
+      { stdio: "inherit", windowsHide: true },
+    );
+    child.once("error", reject);
+    child.once("close", (code) => resolve(code ?? 1));
+  });
+  process.exitCode = exitCode;
+}
+
+// Answer application state transitions and projections are implemented in
+// Rust; this CLI keeps the dashboard's stateful store path in JavaScript.
+async function runNativeAnswerApplications(action, inputFile) {
+  const executable = await nativeRdsh();
+  const exitCode = await new Promise((resolve, reject) => {
+    const child = spawn(
+      executable,
+      ["answer-applications", action, "--input-file", inputFile],
       { stdio: "inherit", windowsHide: true },
     );
     child.once("error", reject);
@@ -682,6 +717,26 @@ try {
     )
       throw new Error("Invalid budget-admission action/options");
     await runNativeBudgetAdmission(action, values["input-file"]);
+  } else if (command === "question-contracts") {
+    const action = positionals[1];
+    if (
+      positionals.length !== 2 ||
+      !["apply", "validate", "public"].includes(action) ||
+      !values["input-file"] ||
+      Object.keys(values).some((key) => key !== "input-file")
+    )
+      throw new Error("Invalid question-contracts action/options");
+    await runNativeQuestionContracts(action, values["input-file"]);
+  } else if (command === "answer-applications") {
+    const action = positionals[1];
+    if (
+      positionals.length !== 2 ||
+      !["apply", "validate", "public", "schema"].includes(action) ||
+      !values["input-file"] ||
+      Object.keys(values).some((key) => key !== "input-file")
+    )
+      throw new Error("Invalid answer-applications action/options");
+    await runNativeAnswerApplications(action, values["input-file"]);
   } else if (command === "workers") {
     const action = positionals[1];
     const options = {
