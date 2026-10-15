@@ -472,7 +472,9 @@ cmd_remove() {
   # files. The rm is the fallback for a worktree that is already broken; it
   # requires --force *and* proof that the directory belongs to the mirror, so
   # an unrelated directory that shares the name is never deleted.
-  if ! git -C "$mirror" worktree remove --force "$resolved" 2>/dev/null; then
+  local -a remove_args=("$resolved")
+  [ "$force" -ne 1 ] || remove_args=(--force "$resolved")
+  if ! git -C "$mirror" worktree remove "${remove_args[@]}" 2>/dev/null; then
     if [ "$force" -ne 1 ]; then
       die "git worktree remove failed for $resolved; re-run with --force to delete it directly"
     fi

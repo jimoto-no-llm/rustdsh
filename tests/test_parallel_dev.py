@@ -120,6 +120,11 @@ if [ "${1:-}" = -C ]; then
   if [ "${1:-}" = status ] && [ "${RDSH_TEST_STATUS_FAIL:-}" = 1 ]; then
     printf 'fixture status unavailable\\n' >&2; exit 42
   fi
+  if [ "${1:-}" = status ] && [ "${RDSH_TEST_SAVE_AFTER_STATUS:-}" = 1 ]; then
+    "''' + GIT.as_posix() + '''" -C "$dir" "$@" || exit "$?"
+    printf 'saved after clean check\\n' > "$dir/fixture.txt"
+    exit 0
+  fi
   if [ "${1:-}" = rev-list ] && [ "${RDSH_TEST_HISTORY_FAIL:-}" = 1 ]; then
     printf 'fixture history unavailable\\n' >&2; exit 42
   fi
@@ -259,6 +264,21 @@ exec "''' + GIT.as_posix() + '''" "$@"
         result = self.command("remove", "topic", check=False)
         self.assertNotEqual(result.returncode, 0)
         self.assertTrue((directory / "dirty.txt").exists())
+
+    def test_remove_preserves_save_after_clean_unless_forced(self):
+        for slug, options in (("normal", ()), ("force", ("--force",)), ("short-force", ("-f",))):
+            with self.subTest(options=options):
+                directory = self.new(slug)
+                self.assertEqual(self.git("status", "--porcelain", cwd=directory).stdout, "")
+                self.git_shim()
+                result = self.command("remove", slug, *options, check=False,
+                                      env=dict(self.env, RDSH_TEST_SAVE_AFTER_STATUS="1"))
+                if options:
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertFalse(directory.exists())
+                else:
+                    self.assertNotEqual(result.returncode, 0, result.stdout)
+                    self.assertEqual((directory / "fixture.txt").read_text(), "saved after clean check\n")
 
     def test_configured_remote_selects_base(self):
         self.git("remote", "rename", "origin", "upstream")
