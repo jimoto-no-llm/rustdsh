@@ -51,6 +51,7 @@ mod file_lock;
 mod file_security;
 mod guard;
 mod inspect;
+mod instruction_queue;
 mod js_json;
 mod local_http;
 mod opencode_header;
@@ -78,7 +79,7 @@ mod worker_scopes;
     name = "rdsh",
     version,
     about = "Rust fast launcher for dsh (safe: native fast-paths + passthrough)",
-    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|auth|setup|context|settings|features|subagents|provider|task-outcomes|budget-admission|cost-ledger|question-contracts|answer-applications|update|worker-scope|dump-config|boot|serial-proxy)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh provider add hai --model deepseek-v4-flash   register HAI as a dsh route\n  rdsh provider add sarashina    register Sarashina (SARASHINA_API_KEY; mini and nano built in)\n  rdsh provider add local-openai --base-url http://host:8080/v1 --discover --no-key\n  rdsh provider list              presets and per-profile route/key status\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh desktop status             detect the Desktop (Electron) app and its reserved profile\n  rdsh desktop install            attach the bundled rdsh plugins to that profile\n  rdsh --passthrough tui          no slim env; mandatory tool isolation remains\n  rdsh --dry-run tui -- --resume abc   show what would exec"
+    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|auth|setup|context|settings|features|subagents|provider|task-outcomes|budget-admission|cost-ledger|question-contracts|answer-applications|instruction-queue|update|worker-scope|dump-config|boot|serial-proxy)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh provider add hai --model deepseek-v4-flash   register HAI as a dsh route\n  rdsh provider add sarashina    register Sarashina (SARASHINA_API_KEY; mini and nano built in)\n  rdsh provider add local-openai --base-url http://host:8080/v1 --discover --no-key\n  rdsh provider list              presets and per-profile route/key status\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh desktop status             detect the Desktop (Electron) app and its reserved profile\n  rdsh desktop install            attach the bundled rdsh plugins to that profile\n  rdsh --passthrough tui          no slim env; mandatory tool isolation remains\n  rdsh --dry-run tui -- --resume abc   show what would exec"
 )]
 struct Cli {
     /// Explicitly share a project file with isolated model tools (repeatable).
@@ -380,6 +381,16 @@ enum Commands {
         #[arg(long = "input-file")]
         input_file: String,
     },
+    /// Validate and inspect the ordered human-instruction queue.
+    /// Pure logic: no provider call and no file write.
+    #[command(name = "instruction-queue")]
+    InstructionQueue {
+        /// validate | context | submit | resolve | control
+        action: String,
+        /// Request JSON file holding { operation, state, input, context }
+        #[arg(long = "input-file")]
+        input_file: String,
+    },
     /// Feature switches: list every optional capability, or turn one on/off
     Features {
         #[command(subcommand)]
@@ -612,6 +623,7 @@ const NATIVE_FIRST: &[&str] = &[
     "budget-admission",
     "question-contracts",
     "answer-applications",
+    "instruction-queue",
     "worker-scope",
 ];
 
@@ -680,6 +692,7 @@ fn main() {
             | Some(Commands::BudgetAdmission { .. })
             | Some(Commands::QuestionContracts { .. })
             | Some(Commands::AnswerApplications { .. })
+            | Some(Commands::InstructionQueue { .. })
             | Some(Commands::Subagents { .. })
             | Some(Commands::CostLedger { .. })
     ) {
@@ -958,6 +971,9 @@ fn main() {
         }
         Some(Commands::AnswerApplications { action, input_file }) => {
             answer_applications::cmd_answer_applications(&action, &input_file)
+        }
+        Some(Commands::InstructionQueue { action, input_file }) => {
+            instruction_queue::cmd_instruction_queue(&action, &input_file)
         }
         Some(Commands::Features { action, json }) => match action {
             None => features_list(&cfg, json),

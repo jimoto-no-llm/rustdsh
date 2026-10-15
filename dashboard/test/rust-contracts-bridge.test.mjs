@@ -24,7 +24,7 @@ function fakeRdsh(t, body) {
   return executable;
 }
 
-test("question and answer contract commands forward native arguments", {
+test("Rust-backed contract and instruction commands forward native arguments", {
   skip: process.platform === "win32",
 }, (t) => {
   const executable = fakeRdsh(t, "console.log(JSON.stringify(process.argv.slice(2)));");
@@ -32,6 +32,10 @@ test("question and answer contract commands forward native arguments", {
   for (const [command, action] of [
     ["question-contracts", "public"],
     ["answer-applications", "schema"],
+    ["instruction-queue", "context"],
+    ["instruction-queue", "submit"],
+    ["instruction-queue", "resolve"],
+    ["instruction-queue", "control"],
   ]) {
     const result = run(
       [command, action, "--input-file", "request.json"],
@@ -72,4 +76,11 @@ test("contract bridge rejects invalid actions before resolving rdsh", () => {
 
   assert.equal(result.status, 1);
   assert.match(result.stderr, /Invalid question-contracts action\/options/);
+
+  const instruction = run(
+    ["instruction-queue", "mutate", "--input-file", "request.json"],
+    { RDSH_BIN: "./relative-rdsh" },
+  );
+  assert.equal(instruction.status, 1);
+  assert.match(instruction.stderr, /Invalid instruction-queue action\/options/);
 });

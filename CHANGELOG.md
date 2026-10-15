@@ -7,6 +7,15 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Added
 
+- `plugins/rdsh-answer-guard` recovers a turn whose reply was emitted only into
+  the reasoning channel: DSH closes such a turn as `completed` (its
+  `EMPTY_RESPONSE` check only sees a fully empty message) and the Web UI folds
+  the reasoning away, so the reader sees no answer and the agent looks stuck.
+  The guard watches the committed events and, at `agent/turn-stopping`, steers
+  one notice asking the model to restate the answer as text — once per turn,
+  never on an aborted turn, and never when a tool result is still owed. It is
+  installed by `./plugins/install.sh` and `rdsh features off answer_guard`
+  disables it. See [README](plugins/rdsh-answer-guard/README.md).
 - 日本語以外で確定したテキストのみの回答を、Web UI のボタン1つで和訳して履歴上
   の表示を置き換える `plugins/rdsh-translation` を同梱しました。元の回答は
   append-only のセッションログと「元の回答を表示」に残り、`/ja <message-id>` で
