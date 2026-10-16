@@ -14,6 +14,7 @@ import { readLocalRuntime } from "../../dashboard/private-runtime.mjs";
 const { chromium } = await import(
   process.env.RDSH_PLAYWRIGHT_MODULE || "playwright"
 );
+process.env.RDSH_LANG = "ja";
 const repo = path.resolve(import.meta.dirname, "../.."),
   exec = promisify(execFile),
   output = path.resolve(

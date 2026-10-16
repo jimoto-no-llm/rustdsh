@@ -19,6 +19,7 @@ import { readCausalTimeline } from "../../dashboard/causal-timeline.mjs";
 const { chromium } = await import(
   process.env.RDSH_PLAYWRIGHT_MODULE || "playwright"
 );
+process.env.RDSH_LANG = "ja";
 const exec = promisify(execFile);
 const repository = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),

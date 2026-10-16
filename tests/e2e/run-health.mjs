@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { chromium } from "playwright";
+process.env.RDSH_LANG = "ja";
 
 const testFile = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(testFile), "../..");
