@@ -1,6 +1,10 @@
 # Trusted SHA-256 registry for the exact release archives supported by install.sh.
 # Regenerate each entry from the published release asset digest; do not copy .sha256 sidecars.
-latest v0.5.1
+latest v0.5.2
+v0.5.2 rdsh-linux-x64.tar.gz f64404d6267dbacb5b0d7660519b613042600c2fe8d6d9bb2311f324404053a0
+v0.5.2 rdsh-linux-x64-musl.tar.gz 1f8d20cd644e3596513cebc1962bd4a36f8c61e00607476becc5599eadf0b478
+v0.5.2 rdsh-macos-arm64.tar.gz d26a08f81cb8c6449ce4ab108c18c9db4d87dca6d1c937e7602872636557240b
+v0.5.2 rdsh-macos-x64.tar.gz 8f21bb0fb35ed421a16800ba4936e6dc7df80c2bc37ddd763a44536af2832386
 v0.5.1 rdsh-linux-x64.tar.gz cde4719407d4ea70c3372f84157f1ba4dfcbd31007fb8c4a26e6d8c4934f12de
 v0.5.1 rdsh-linux-x64-musl.tar.gz 581962f2692e5c25c523a8b5f6557a457c14abf2d09144a85462b8b992313354
 v0.5.1 rdsh-macos-arm64.tar.gz 2d94de3c81c360e79ece9dfdca2bae75ce798c6e5b09a3edf4f64908d73c5069

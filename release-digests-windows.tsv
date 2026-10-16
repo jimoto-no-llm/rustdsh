@@ -1,6 +1,7 @@
 # Trusted SHA-256 registry for the windows release archive (install.ps1).
 # Regenerate each entry from the published release asset digest; do not copy .sha256 sidecars.
-latest v0.5.1
+latest v0.5.2
+v0.5.2 rdsh-windows-x64.zip ccf882f714a8001b1d897fb5073800a309b335bde4e779202655f52e61bdc65b
 v0.5.1 rdsh-windows-x64.zip 2854eb77137bdb6aadb81e79986cd8bcb546a50668a6a60959cd38582f25d35a
 v0.5.0 rdsh-windows-x64.zip be799debf47f9346313b4231c9b58e3a5185a189195005246c3a47bde02c5dca
 v0.4.0 rdsh-windows-x64.zip f474258dcc7dcfbc4278696764786eba762c3cf7edc2b090f7f2339c026c5c81
