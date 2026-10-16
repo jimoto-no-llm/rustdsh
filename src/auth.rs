@@ -1784,7 +1784,7 @@ fn prompt_secret(locale: crate::locale::Locale) -> Option<String> {
 
 #[cfg(not(unix))]
 fn prompt_secret(locale: crate::locale::Locale) -> Option<String> {
-    prompt_line(&localized(
+    prompt_line(localized(
         locale,
         "[rdsh setup] paste DEEPSEEK_API_KEY here (Enter to skip, input echoed): ",
         "[rdsh setup] 在此粘贴 DEEPSEEK_API_KEY（Enter 跳过，输入会显示）：",

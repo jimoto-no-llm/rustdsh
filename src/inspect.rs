@@ -950,7 +950,7 @@ fn zstd_frame_content_size_file(file: &mut std::fs::File) -> Option<u64> {
 /// or an omitted frame content size. Anything indecisive (short/truncated
 /// prefix, skippable first frame) returns false so the full walk decides.
 /// Output-identical by construction: it only shortcuts definite rejections.
-#[cfg(test)]
+#[cfg(all(test, unix))]
 fn plain_file_no_follow(path: &std::path::Path) -> bool {
     path.parent()
         .and_then(|root| open_session_file(root, path))
@@ -1065,7 +1065,7 @@ fn now_secs() -> u64 {
 }
 
 /// (mtime_ms, bytes) for cache identity; None when the file is unreadable.
-#[cfg(test)]
+#[cfg(all(test, unix))]
 fn file_meta(path: &std::path::Path) -> Option<(u64, u64)> {
     let root = path.parent()?;
     let file = open_session_file(root, path)?;
@@ -1099,7 +1099,7 @@ fn stream_decompressed_file(file: &mut std::fs::File) -> Option<u64> {
     stream_decompressed_file_for_identity(file, identity, std::ffi::OsStr::new("zstd"))
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 fn stream_decompressed_file_with(
     file: &mut std::fs::File,
     program: &std::ffi::OsStr,
@@ -1473,6 +1473,7 @@ mod tests {
     }
 
     /// Minimal single-segment frame with one raw block (RFC 8878 §3.1).
+    #[cfg(unix)]
     fn raw_frame(
         fcs_flag: u8,
         dict_id: &[u8],
@@ -1508,6 +1509,7 @@ mod tests {
         v
     }
 
+    #[cfg(unix)]
     fn write_tmp(name: &str, bytes: &[u8]) -> std::path::PathBuf {
         let p = std::env::temp_dir().join(name);
         std::fs::write(&p, bytes).unwrap();
@@ -1575,6 +1577,7 @@ mod tests {
         TokensCache::load_from(Some(dir.join("cache.json").to_string_lossy().into_owned()))
     }
 
+    #[cfg(unix)]
     fn sess(project: &str, id: &str) -> Session {
         Session {
             project: project.to_string(),
