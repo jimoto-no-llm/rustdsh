@@ -1825,7 +1825,14 @@ fn settings_independent_invocation() -> bool {
             command: Some(
                 Commands::Settings {
                     action: SettingsAction::Init { force: true }
-                } | Commands::TaskOutcomes { .. }
+                }
+                    // A DSH hook must never block a prompt: `context inject`
+                    // fails open on its own, so it must reach dispatch even when
+                    // the settings document cannot be read.
+                    | Commands::Context {
+                        action: ContextAction::Inject { .. }
+                    }
+                    | Commands::TaskOutcomes { .. }
                     | Commands::Subagents { .. }
                     | Commands::BudgetAdmission { .. }
                     | Commands::QuestionContracts { .. }
