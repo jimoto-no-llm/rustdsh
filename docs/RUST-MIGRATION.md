@@ -191,6 +191,10 @@ CLI入口は [Rust dispatch](<../src/main.rs>) と [Dashboard bridge](<../dashbo
   ファイル名から73行だけの移植と見積もらず、これらをinspectの一つの垂直スライスに含める。
   既存serde_json/sha2/file safety helperを照合し、新依存や新IPC protocolを前提にしない。
   JS validatorは他のbackup/state caller用に残す。
+- **実装前に解く既知差分**: 正常値で上書きされる重複keyに `1e309` やlone surrogateが含まれても、Nodeはlast-wins後のarchiveを受理する。
+  既存archiveを使う追加実験でもchecksum不変で受理したため、途中で拒否する通常のserde読込へ単純置換できない。
+  JSのtrim/空白/URL判定とRust既定判定の差、既存Rust file helperのhard-link数・親symlink制限の差もある。
+  全面native化はこれらの受理範囲・安全契約の一致が前提。JS互換境界を残す場合も、その残存を明示しNode不要完了とは呼ばない。
 - **互換・安全受入**: [仕様](<HISTORY-BACKUP.md>) と [既存CLI/file試験](<../dashboard/test/history-backup.test.mjs#L597-L705>) をoracleにし、
   有効archiveのstdout JSON・field/key順・selection digest、無効入力のlocale診断/stderr/exitを旧CLIと比較する。
   canonical sort・JSON数値表現・UTF-16長/順序・UTC時刻、改竄checksum、再sealしたauthority/参照破損、
@@ -209,5 +213,6 @@ instruction workerの既定有効化やDashboard全state移行は、この候補
 母集団の再計測、ローカルリンク117件、差分whitespaceを確認した。
 `RDSH_CHECK_BASE=upstream/main sh scripts/check.sh changed` の選択checkは成功したが、markdownlintはローカル未導入のためskip。
 `npx --no-install markdownlint-cli2 docs/RUST-MIGRATION.md` でも利用できず、lint/CI成功は未確認である。
-上記のruntime試験・既存evidenceの再現・provider実行・全CI/全OS試験・起動/常駐メモリ測定は未実施。
+追加のNode実験では、既存archiveと重複keyへoverflow/lone surrogateを追加した計3条件すべてで、checksum不変の受理を確認した。
+native実装の差分試験・evidence全体の再現・provider実行・全CI/全OS試験・起動/常駐メモリ測定は未実施。
 前提修正や他PRのCI成功を #516 の受入へ読み替えない。
