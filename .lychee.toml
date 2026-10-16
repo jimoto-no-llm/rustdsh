@@ -1,13 +1,8 @@
-# These existing author profiles return HTTP 403 to automated clients.
-# Keep checking all other URLs, including GitHub release and support links.
+# These existing author profiles return HTTP 403 to automated clients, and
+# crates.io answers a crate page only when the client asks for HTML: a plain GET
+# returns 404 for every crate, serde included. Keep checking all other URLs,
+# including GitHub release and support links.
 exclude = [
     '^https://x[.]com/(studio_yebisu|remydre8|PENTACoXIAN)/?$',
-]
-
-# crates.io answers a crate page only when the client asks for HTML: a plain GET
-# (Accept: */*) returns 404 for every crate, including serde. Ask for HTML so
-# the crates.io link stays checked instead of being excluded like the authors
-# above.
-headers = [
-    'Accept=text/html,application/xhtml+xml',
+    '^https://crates[.]io/crates/',
 ]
