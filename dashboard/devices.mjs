@@ -136,8 +136,8 @@ export class DeviceRegistry {
     if (!device) return null;
     if (!device.revoked_at) {
       device.revoked_at = new Date().toISOString();
-      await this.persist();
     }
+    await this.persist();
     return publicDevice(device);
   }
 
