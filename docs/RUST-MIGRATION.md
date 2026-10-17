@@ -216,3 +216,32 @@ instruction workerの既定有効化やDashboard全state移行は、この候補
 追加のNode実験では、既存archiveと重複keyへoverflow/lone surrogateを追加した計3条件すべてで、checksum不変の受理を確認した。
 native実装の差分試験・evidence全体の再現・provider実行・全CI/全OS試験・起動/常駐メモリ測定は未実施。
 前提修正や他PRのCI成功を #516 の受入へ読み替えない。
+
+## 現状追記（2026-10-17）
+
+上記218行は `b713e88132d7388573d3667f57d19e1f633a8647` の歴史snapshotであり、477 files / 117,201 lines等の数値・計測条件を更新していない。**新しい全数は未計測**。
+元の相対リンク・行番号で歴史基準を読む場合は、[台帳の固定版](https://github.com/jimoto-no-llm/rustdsh/blob/78216438c948a42322379d3ec985f370b0b8917c/docs/RUST-MIGRATION.md) を参照する。
+参照mainは `c374551fb9b6c9e58cc3a1825cd52bc073f57a63`。`5c0c2221b7edba8532ae2a65247365fbc61e0889` との差は、事前のGitHub API確認では [公式PR #733](https://github.com/jimoto-no-llm/rustdsh/pull/733) の `ci.yml` DOM試験追加のみ。
+以下は固定headの既存証拠を整理した追記であり、この文書変更でCI・性能・実機試験を再実行したものではない。
+
+| 候補・独立前提 | 固定ソース / CI_ONLY | 証拠と受入の境界 |
+| --- | --- | --- |
+| catalog | source `3dc1f3bce787c31d6a311ba931cbe060c128576d` / CI_ONLY `42e5b2e5b1eb5c5b03be5fbdeaa0c4047f55f74f` | [Fork PR #7の記録](https://github.com/paisu-supai/rustdsh/pull/7#issuecomment-6229158878)。旧Node CLIはまだ必要で、sliceは静的metadataのみ |
+| native backup inspect | source `9178e87b812c7345a9d68159c174fb265d755277` / CI_ONLY `969a26dabc316eac4b8f0d16e18bb41c5fd0fe96` | [Fork PR #6の記録](https://github.com/paisu-supai/rustdsh/pull/6#issuecomment-6211993984)。hostedの差分318条件・actual CLI 4条件・reader等の実行証拠はあるが、受入保留 |
+| OAuth独立前提 | `f87342e2612f3a0902d1bff438fd443ded42d143` | [別PR #696](https://github.com/jimoto-no-llm/rustdsh/pull/696)。catalogのgreenをOAuth受入へ転用しない |
+
+- **catalogのCI**: [専用3 OS run 38998480647](https://github.com/paisu-supai/rustdsh/actions/runs/38998480647)、[Main 38998485798](https://github.com/paisu-supai/rustdsh/actions/runs/38998485798) 全20 jobs、[Dashboard 38998485751](https://github.com/paisu-supai/rustdsh/actions/runs/38998485751) 全4 jobs、[実Desktop 38998485716](https://github.com/paisu-supai/rustdsh/actions/runs/38998485716) 全2 jobs。記録上は実行19 workflows成功で、専用3 OS試験だけの結果ではない。
+- **catalogの性能限界**: CLI medianは15.8–18.4%短縮。一方、Linux serverは +21.57 ms / +7.45%、Windows serverは +22.86 ms / +3.74%、Mac primary RSSは +2.07%を残す。事前宣言予算超過なしは全指標改善を意味しない。
+  操作待ち時間はpublic HTTP、常駐メモリはreadyから1秒後のprimary RSS点観測に限る。process tree/private/長期観測・保護APIは未検証。
+- **backupの未達**: deep 125k / 250k / 1mは `equivalent:false`（Node `RangeError` / native `invalid_backup_fields`）。実ACL・並行writerは未達で、参照mainへの再統合も未確認。
+  古いローカルの `qrcode` 欠落ログはローカル失敗として保持し、hosted actual CLI成功と混同しない。任意V8閾値・例外偽装・JS fallback・受入緩和で差を埋めず保留する。
+- **前提修正と現head**: Windows fixtures [#665](https://github.com/jimoto-no-llm/rustdsh/pull/665) / Clippy [#667](https://github.com/jimoto-no-llm/rustdsh/pull/667) は元Issue #209の解決ではない。
+  PRのDraft/Ready・headは変動している。上記の歴史CIは固定head限定であり、古いcatalog/OAuth/CI_ONLYの成功を新headへ流用しない。現headのupstream CI・外部review・本来の受入は別途要確認。
+
+### 抱き合わせない残件
+
+- [#668](https://github.com/jimoto-no-llm/rustdsh/issues/668) は2026-10-17 04:09 UTCにmaintainerがCLOSED（completed）へ更新した。[完了記録](https://github.com/jimoto-no-llm/rustdsh/issues/668#issuecomment-6229470215) はCHANGELOGだけでなく、v0.5.0以降のタグ同梱・公開とROADMAPを根拠とする。close状態とコメントをAPI再確認し、本追記では再実装・release・Issue closeを行わない。
+- [#448](https://github.com/jimoto-no-llm/rustdsh/issues/448) は #664 / #718着地だけでは受入済みにしない。画面差替のDSH API・cacheコストは未達。
+- [#488](https://github.com/jimoto-no-llm/rustdsh/issues/488) の実モデル検証と [#485](https://github.com/jimoto-no-llm/rustdsh/issues/485) の対象Mac worker実機検証は本追記では未実施。[#87](https://github.com/jimoto-no-llm/rustdsh/issues/87) は自動実装対象外。未受入として残し、新機能へ抱え込まない。
+
+この追記ではRuntime・ROADMAP・workflow・依存を変更せず、全数再計測・受入試験・release操作も行っていない。
