@@ -376,6 +376,68 @@ fn choose_tier(
     used
 }
 
+/// Accepted limit ranges (the JS planner's). Shared by the request overrides
+/// and the settings-derived defaults so both agree on what is admissible.
+const LIMIT_BOUNDS: [(&str, i64, i64); 4] = [
+    ("max_parallel", 1, 16),
+    ("max_items_per_agent", 1, 20),
+    ("max_weight_per_agent", 1, 128),
+    ("budget_units", 1, 100_000),
+];
+
+/// One limit's inclusive range. `LIMIT_BOUNDS` covers every planner limit.
+fn limit_bound(key: &str) -> (i64, i64) {
+    LIMIT_BOUNDS
+        .iter()
+        .find(|(name, _, _)| *name == key)
+        .map(|(_, min, max)| (*min, *max))
+        .expect("LIMIT_BOUNDS covers every planner limit")
+}
+
+/// Defaults a request inherits when it omits `limits`. `Default` reproduces
+/// the planner's built-in numbers; `rdsh subagents plan` overlays the
+/// `subagents` section of `$DSH_HOME/rdsh.json` on top of them and
+/// `rdsh subagents defaults` reports the effective result.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PlanDefaults {
+    pub max_parallel: i64,
+    pub max_items_per_agent: i64,
+    pub max_weight_per_agent: i64,
+    pub budget_units: Option<i64>,
+}
+
+impl Default for PlanDefaults {
+    fn default() -> Self {
+        Self {
+            max_parallel: 3,
+            max_items_per_agent: 3,
+            max_weight_per_agent: 9,
+            budget_units: None,
+        }
+    }
+}
+
+/// Clamp caller-supplied defaults into `LIMIT_BOUNDS`. `max_parallel: 0` would
+/// otherwise reach `chunks(0)`, so this is a total function on purpose.
+fn bounded_defaults(defaults: PlanDefaults) -> PlanDefaults {
+    let (min, max) = limit_bound("max_parallel");
+    let max_parallel = defaults.max_parallel.clamp(min, max);
+    let (min, max) = limit_bound("max_items_per_agent");
+    let max_items_per_agent = defaults.max_items_per_agent.clamp(min, max);
+    let (min, max) = limit_bound("max_weight_per_agent");
+    let max_weight_per_agent = defaults.max_weight_per_agent.clamp(min, max);
+    let (min, max) = limit_bound("budget_units");
+    let budget_units = defaults
+        .budget_units
+        .filter(|units| *units >= min && *units <= max);
+    PlanDefaults {
+        max_parallel,
+        max_items_per_agent,
+        max_weight_per_agent,
+        budget_units,
+    }
+}
+
 /// Limits after defaults and validation.
 #[derive(Debug, Clone, Copy)]
 struct Limits {
@@ -539,9 +601,23 @@ fn locale_cmp(left: &str, right: &str) -> Ordering {
     left_case.cmp(&right_case)
 }
 
-/// Build a deterministic dispatch plan, or fail with the first error code the
-/// JS planner would report for the same request.
+/// Build a deterministic dispatch plan with the built-in defaults, or fail
+/// with the first error code the JS planner would report for the same request.
+///
+/// The CLI overlays the settings-derived defaults, so production always goes
+/// through `plan_subagents_with`; this built-in entry point stays for tests.
+#[cfg(test)]
 pub fn plan_subagents(request: &Value) -> std::result::Result<Plan, PlanError> {
+    plan_subagents_with(request, PlanDefaults::default())
+}
+
+/// `plan_subagents` with explicit defaults for keys the request omits. The
+/// request always wins; `defaults` are clamped by `bounded_defaults`.
+pub fn plan_subagents_with(
+    request: &Value,
+    defaults: PlanDefaults,
+) -> std::result::Result<Plan, PlanError> {
+    let defaults = bounded_defaults(defaults);
     let request = request
         .as_object()
         .ok_or_else(|| PlanError::new("invalid-request"))?;
@@ -603,10 +679,10 @@ pub fn plan_subagents(request: &Value) -> std::result::Result<Plan, PlanError> {
     }
 
     let mut limits = Limits {
-        max_parallel: 3,
-        max_items_per_agent: 3,
-        max_weight_per_agent: 9,
-        budget_units: None,
+        max_parallel: defaults.max_parallel,
+        max_items_per_agent: defaults.max_items_per_agent,
+        max_weight_per_agent: defaults.max_weight_per_agent,
+        budget_units: defaults.budget_units,
     };
     if let Some(limits_value) = request.get("limits") {
         let object = limits_value
@@ -621,14 +697,8 @@ pub fn plan_subagents(request: &Value) -> std::result::Result<Plan, PlanError> {
         if object.keys().any(|key| !LIMIT_KEYS.contains(&key.as_str())) {
             return Err(PlanError::new("invalid-limits"));
         }
-        // Bounds and check order are the JS planner's.
-        const BOUNDS: [(&str, i64, i64); 4] = [
-            ("max_parallel", 1, 16),
-            ("max_items_per_agent", 1, 20),
-            ("max_weight_per_agent", 1, 128),
-            ("budget_units", 1, 100_000),
-        ];
-        for (key, min, max) in BOUNDS {
+        // Bounds and check order are the JS planner's (LIMIT_BOUNDS).
+        for (key, min, max) in LIMIT_BOUNDS {
             let Some(value) = object.get(key) else {
                 continue;
             };
@@ -762,7 +832,11 @@ fn read_request(input_file: &str, locale: crate::locale::Locale) -> Result<Value
         )
     })?;
     if !metadata.is_file() || metadata.len() > 256 * 1024 {
-        bail!("Input JSON must be a regular file of at most 256 KiB");
+        bail!(crate::locale::diagnostic(
+            locale,
+            "Input JSON must be a regular file of at most 256 KiB"
+        )
+        .to_string());
     }
     let mut bytes = Vec::with_capacity(metadata.len() as usize);
     file.take(256 * 1024 + 1)
@@ -776,22 +850,81 @@ fn read_request(input_file: &str, locale: crate::locale::Locale) -> Result<Value
             )
         })?;
     if bytes.len() > 256 * 1024 {
-        bail!("Input JSON exceeds 256 KiB");
+        bail!(crate::locale::diagnostic(locale, "Input JSON exceeds 256 KiB").to_string());
     }
     let Ok(text) = std::str::from_utf8(&bytes) else {
-        bail!("Input JSON is invalid");
+        bail!(crate::locale::diagnostic(locale, "Input JSON is invalid").to_string());
     };
     // TextDecoder("utf-8") in the former dashboard CLI removed a leading BOM.
     let text = text.strip_prefix('\u{feff}').unwrap_or(text);
-    serde_json::from_str(text).map_err(|_| anyhow!("Input JSON is invalid"))
+    serde_json::from_str(text).map_err(|_| {
+        anyhow!(crate::locale::diagnostic(locale, "Input JSON is invalid").to_string())
+    })
+}
+
+/// Planner defaults from `$DSH_HOME/rdsh.json` (`subagents` section), with
+/// the built-in numbers as the fallback. Planning stays pure: a missing or
+/// unreadable settings document never fails a plan, so an unrelated corrupt
+/// file cannot block dispatch. The second value names the source for
+/// `rdsh subagents defaults`.
+fn effective_defaults(locale: crate::locale::Locale) -> (PlanDefaults, &'static str) {
+    // A missing settings file also loads as defaults, so existence is what
+    // separates "the operator's rdsh.json is in effect" from "built-in".
+    let present = std::path::Path::new(&crate::rdsh_config::settings_path()).is_file();
+    match crate::rdsh_config::try_load_with_locale(locale) {
+        Ok(cfg) if present => (
+            PlanDefaults {
+                max_parallel: cfg.subagents.max_parallel as i64,
+                max_items_per_agent: cfg.subagents.max_items_per_agent as i64,
+                max_weight_per_agent: cfg.subagents.max_weight_per_agent as i64,
+                budget_units: (cfg.subagents.budget_units > 0)
+                    .then_some(cfg.subagents.budget_units as i64),
+            },
+            "settings",
+        ),
+        _ => (PlanDefaults::default(), "builtin"),
+    }
 }
 
 /// `rdsh subagents plan --input-file <request-json>`: read one request and
-/// print the plan as compact JSON on stdout, like the JS CLI did.
+/// print the plan as compact JSON on stdout, like the JS CLI did. Limits the
+/// request omits come from the `subagents` settings section.
 pub fn cmd_plan(input_file: &str, locale: crate::locale::Locale) -> Result<()> {
     let request = read_request(input_file, locale)?;
-    let plan = plan_subagents(&request)?;
-    let text = serde_json::to_string(&plan).context("serialize subagent plan")?;
+    let plan = plan_subagents_with(&request, effective_defaults(locale).0)?;
+    print_json(&plan, "serialize subagent plan")
+}
+
+/// `rdsh subagents defaults` output: the inherited limits and their source.
+#[derive(Serialize)]
+struct DefaultsReport {
+    source: &'static str,
+    max_parallel: i64,
+    max_items_per_agent: i64,
+    max_weight_per_agent: i64,
+    budget_units: Option<i64>,
+}
+
+/// `rdsh subagents defaults [--json]`: print the limits a request inherits
+/// when it omits `limits`, and whether they came from `rdsh.json` or the
+/// built-in defaults. JSON is the only output format, as with `plan`.
+pub fn cmd_defaults(locale: crate::locale::Locale) -> Result<()> {
+    let (defaults, source) = effective_defaults(locale);
+    print_json(
+        &DefaultsReport {
+            source,
+            max_parallel: defaults.max_parallel,
+            max_items_per_agent: defaults.max_items_per_agent,
+            max_weight_per_agent: defaults.max_weight_per_agent,
+            budget_units: defaults.budget_units,
+        },
+        "serialize subagent defaults",
+    )
+}
+
+/// One compact JSON document on stdout, the JS CLI's single-line form.
+fn print_json<T: Serialize>(value: &T, context: &'static str) -> Result<()> {
+    let text = serde_json::to_string(value).context(context)?;
     let stdout = std::io::stdout();
     let mut handle = stdout.lock();
     writeln!(handle, "{text}")?;
@@ -1362,6 +1495,107 @@ mod tests {
             "invalid-limits",
             &json!({ "use_case": "review", "tiers": tiers(), "items": [item("a")], "limits": null }),
         );
+    }
+
+    #[test]
+    fn supplied_defaults_fill_omitted_limits_and_the_request_still_wins() {
+        let request = json!({
+            "use_case": "review",
+            "tiers": tiers(),
+            "items": [item("a"), item("b"), item("c")]
+        });
+        // The built-in defaults pack three weight-1 items into one agent.
+        let built_in = plan_subagents_with(&request, PlanDefaults::default()).unwrap();
+        assert_eq!(built_in.totals.agents, 1);
+        assert_eq!(built_in.totals.waves, 1);
+
+        // Settings-derived defaults apply to keys the request omits.
+        let strict = plan_subagents_with(
+            &request,
+            PlanDefaults {
+                max_parallel: 1,
+                max_items_per_agent: 1,
+                max_weight_per_agent: 1,
+                budget_units: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(strict.totals.agents, 3);
+        assert_eq!(strict.totals.waves, 3);
+
+        // An explicit request limit wins over the supplied default.
+        let explicit = plan_subagents_with(
+            &json!({
+                "use_case": "review",
+                "tiers": tiers(),
+                "items": [item("a"), item("b")],
+                "limits": { "max_items_per_agent": 2 }
+            }),
+            PlanDefaults {
+                max_items_per_agent: 1,
+                ..PlanDefaults::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(explicit.totals.agents, 1);
+    }
+
+    #[test]
+    fn a_default_budget_reports_the_same_warning_a_request_budget_does() {
+        let request = json!({
+            "use_case": "review",
+            "tiers": tiers(),
+            "items": [{ "id": "a", "weight": 4 }]
+        });
+        let budgeted = plan_subagents_with(
+            &request,
+            PlanDefaults {
+                budget_units: Some(2),
+                ..PlanDefaults::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(budgeted.totals.cost_units, 12);
+        assert!(budgeted.warnings.iter().any(|warning| matches!(
+            warning,
+            Warning::BudgetExceeded {
+                budget_units: 2,
+                ..
+            }
+        )));
+    }
+
+    #[test]
+    fn supplied_defaults_are_clamped_into_the_admissible_ranges() {
+        let request =
+            json!({ "use_case": "review", "tiers": tiers(), "items": [item("a"), item("b")] });
+        // max_parallel 0 would otherwise reach chunks(0) and panic.
+        let zero = plan_subagents_with(
+            &request,
+            PlanDefaults {
+                max_parallel: 0,
+                ..PlanDefaults::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(zero.totals.waves, 1);
+
+        // Out-of-range values clamp to the bounds instead of refusing the plan.
+        let huge = plan_subagents_with(
+            &request,
+            PlanDefaults {
+                max_parallel: 999,
+                max_items_per_agent: 999,
+                max_weight_per_agent: 999,
+                budget_units: Some(999_999),
+            },
+        )
+        .unwrap();
+        assert_eq!(huge.totals.waves, 1);
+        assert!(!huge
+            .warnings
+            .iter()
+            .any(|warning| matches!(warning, Warning::BudgetExceeded { .. })));
     }
 
     #[test]

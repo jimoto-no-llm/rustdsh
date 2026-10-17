@@ -572,7 +572,11 @@ fn read_json_file(
         )
     })?;
     if !metadata.is_file() || metadata.len() > MAX_INPUT_BYTES as u64 {
-        bail!("Input JSON must be a regular file of at most 256 KiB");
+        bail!(crate::locale::diagnostic(
+            locale,
+            "Input JSON must be a regular file of at most 256 KiB"
+        )
+        .to_string());
     }
     let mut bytes = Vec::with_capacity(metadata.len() as usize);
     file.take((MAX_INPUT_BYTES + 1) as u64)
@@ -586,14 +590,16 @@ fn read_json_file(
             )
         })?;
     if bytes.len() > MAX_INPUT_BYTES {
-        bail!("Input JSON exceeds 256 KiB");
+        bail!(crate::locale::diagnostic(locale, "Input JSON exceeds 256 KiB").to_string());
     }
     let Ok(text) = std::str::from_utf8(&bytes) else {
-        bail!("Input JSON is invalid");
+        bail!(crate::locale::diagnostic(locale, "Input JSON is invalid").to_string());
     };
     // TextDecoder("utf-8") in the dashboard CLI removed a leading BOM.
     let text = text.strip_prefix('\u{feff}').unwrap_or(text);
-    serde_json::from_str(text).map_err(|_| anyhow!("Input JSON is invalid"))
+    serde_json::from_str(text).map_err(|_| {
+        anyhow!(crate::locale::diagnostic(locale, "Input JSON is invalid").to_string())
+    })
 }
 
 #[cfg(unix)]
@@ -622,27 +628,33 @@ pub fn cmd_task_outcomes(
     locale: crate::locale::Locale,
 ) -> Result<()> {
     let document = read_json(input_file, locale)?;
-    let object = document
-        .as_object()
-        .ok_or_else(|| anyhow!("Input JSON is invalid"))?;
+    let object = document.as_object().ok_or_else(|| {
+        anyhow!(crate::locale::diagnostic(locale, "Input JSON is invalid").to_string())
+    })?;
     const CLI_KEYS: [&str; 3] = ["operation", "state", "input"];
     if object.keys().any(|key| !CLI_KEYS.contains(&key.as_str())) {
-        bail!("Input JSON is invalid");
+        bail!(crate::locale::diagnostic(locale, "Input JSON is invalid").to_string());
     }
     let operation = object
         .get("operation")
         .and_then(Value::as_str)
         .unwrap_or("");
     if operation != action {
-        bail!("Input JSON operation does not match the requested action");
+        bail!(crate::locale::diagnostic(
+            locale,
+            "Input JSON operation does not match the requested action"
+        )
+        .to_string());
     }
     let state = object
         .get("state")
         .filter(|value| value.is_object())
-        .ok_or_else(|| anyhow!("Input JSON is invalid"))?;
+        .ok_or_else(|| {
+            anyhow!(crate::locale::diagnostic(locale, "Input JSON is invalid").to_string())
+        })?;
     let input = object.get("input").cloned().unwrap_or(Value::Null);
     if action == "apply" && !input.is_object() {
-        bail!("Input JSON is invalid");
+        bail!(crate::locale::diagnostic(locale, "Input JSON is invalid").to_string());
     }
     let mut output = Map::new();
     output.insert("operation".into(), json!(action));

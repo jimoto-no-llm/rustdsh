@@ -2,11 +2,26 @@ import { createHash } from 'node:crypto';
 
 const fail = (code) => Object.assign(new Error(code), { code });
 const integer = (value, min, max) => Number.isSafeInteger(value) && value >= min && value <= max;
-const defaults = { maxConcurrent: 2, maxQueued: 8, waitTimeoutMs: 10000, maxPromptBytes: 65536, maxTokens: 4096, maxDepth: 1 };
+
+/**
+ * Shipped admission policy for fresh-context exploration. The code default
+ * (`policy({})`) and the bundled `cordis.patch.yml` entry use these numbers, so
+ * an installed profile and a code-only load admit the same work.
+ *
+ * `maxConcurrent` is the planner's own default wave size (`max_parallel: 3` in
+ * `src/subagent_plan.rs`), so one default `rdsh subagents plan` wave is admitted
+ * without queueing. `waitTimeoutMs` must outlast at least one concurrency batch
+ * of real runs: the previous 10 s expired before a single scout run could
+ * finish, which made the 8-deep queue unreachable and turned queued work into
+ * `RDSH_SUBAGENT_WAIT_TIMEOUT` instead of waiting.
+ */
+export const DEFAULT_POLICY = Object.freeze({ maxConcurrent: 3, maxQueued: 8, waitTimeoutMs: 120000, maxPromptBytes: 65536, maxTokens: 4096, maxDepth: 1 });
 
 export function policy(input = {}) {
-  const value = { ...defaults, ...input };
-  const ranges = { maxConcurrent: [1, 32], maxQueued: [0, 64], waitTimeoutMs: [1, 60000], maxPromptBytes: [1, 1048576], maxTokens: [1, 131072], maxDepth: [0, 32] };
+  const value = { ...DEFAULT_POLICY, ...input };
+  // The wait ceiling has to exceed one run, not one admission: a queue of 8
+  // cannot drain inside 60 s when its predecessors are whole scout runs.
+  const ranges = { maxConcurrent: [1, 32], maxQueued: [0, 64], waitTimeoutMs: [1, 600000], maxPromptBytes: [1, 1048576], maxTokens: [1, 131072], maxDepth: [0, 32] };
   if (Object.keys(value).some(key => !Object.hasOwn(ranges, key)) || Object.entries(ranges).some(([key, range]) => !integer(value[key], ...range)))
     throw fail('RDSH_SUBAGENT_INVALID_POLICY');
   return Object.freeze(value);
@@ -116,6 +131,8 @@ export function createOptimizer({ getBackend, snapshotContext, config, name = 'r
   };
   return {
     provider,
+    // Effective admission policy after config overrides, for operators and tests.
+    limits,
     stats: () => ({ active, queued: queue.length, starts, duplicates }),
     async close() {
       closed = true;

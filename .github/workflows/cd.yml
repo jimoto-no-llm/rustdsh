@@ -116,8 +116,59 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  # Native OS packages (.deb/.rpm) for x86_64. Kept out of the release matrix
+  # above so the five platform archives keep their exact flow; the artifacts
+  # merge into the same publish step through the release-* pattern.
+  packages:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          # Pinned together with nfpm: nfpm v2.48.0 declares go 1.26.4.
+          go-version: '1.26.9'
+      - name: Install nfpm (pinned)
+        run: |
+          set -euo pipefail
+          go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.48.0
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      - name: Prove the pinned nfpm module version
+        run: |
+          set -euo pipefail
+          nfpm --version
+          go version -m "$(command -v nfpm)" | grep 'github.com/goreleaser/nfpm'
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --locked --release --target x86_64-unknown-linux-gnu
+      - name: Build the .deb and .rpm
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          # nfpm cannot carry the tag's leading v, so strip it here.
+          version="${RELEASE_TAG#v}"
+          test "$version" != "$RELEASE_TAG"
+          binary="$PWD/target/x86_64-unknown-linux-gnu/release/rdsh"
+          test -x "$binary"
+          mkdir -p dist
+          RDSH_VERSION="$version" RDSH_BINARY="$binary" \
+            nfpm package --config packaging/nfpm.yaml --packager deb --target dist/
+          RDSH_VERSION="$version" RDSH_BINARY="$binary" \
+            nfpm package --config packaging/nfpm.yaml --packager rpm --target dist/
+          # Same sidecar shape as the platform archives.
+          cd dist
+          for file in *.deb *.rpm; do sha256sum "$file" > "$file.sha256"; done
+          ls -l .
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-packages
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7
+
   publish:
-    needs: release
+    needs: [release, packages]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -172,3 +223,25 @@ jobs:
           else
             gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --notes-file "$RUNNER_TEMP/release-notes.md" --draft=false --prerelease=false --latest
           fi
+
+  # Publish the crate only after the GitHub release is up, so a tag that never
+  # produced installable archives cannot reach crates.io first.
+  publish-crate:
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Publish rdsh to crates.io
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          # Fail closed: a release without the crate is the bug this job fixes.
+          if [ -z "${CARGO_REGISTRY_TOKEN:-}" ]; then
+            echo "::error::CARGO_REGISTRY_TOKEN is unset; add the crates.io API token (gh secret set CARGO_REGISTRY_TOKEN) and re-run this job."
+            exit 1
+          fi
+          python3 scripts/crate-release.py publish --tag "$RELEASE_TAG"

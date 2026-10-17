@@ -1,0 +1,69 @@
+# nfpm v2 configuration for the .deb and .rpm release packages.
+# Schema: https://nfpm.goreleaser.com/configuration/
+#
+# Run nfpm from the repository root: a relative `src` resolves against the
+# current working directory (not against this file), so `./LICENSE` is the
+# repository's LICENSE. ${RDSH_VERSION} and ${RDSH_BINARY} come from the
+# environment, and .github/workflows/cd.yml runs exactly this:
+#
+#   RDSH_VERSION=0.6.0 \
+#   RDSH_BINARY="${PWD}/target/x86_64-unknown-linux-gnu/release/rdsh" \
+#     nfpm package --config packaging/nfpm.yaml --packager deb --target dist/
+#   RDSH_VERSION=0.6.0 \
+#   RDSH_BINARY="${PWD}/target/x86_64-unknown-linux-gnu/release/rdsh" \
+#     nfpm package --config packaging/nfpm.yaml --packager rpm --target dist/
+#
+# nfpm expands ${...} in the version, release, arch, platform and dependency
+# fields on its own; `expand: true` on the binary entry is what expands
+# ${RDSH_BINARY}. RDSH_VERSION must carry no leading "v" (the CD job strips
+# the tag's `v`). nfpm writes `amd64` into the .deb and maps it to `x86_64`
+# in the .rpm, so the assets are rdsh_<version>_amd64.deb and
+# rdsh-<version>-1.x86_64.rpm.
+
+name: rdsh
+arch: amd64
+platform: linux
+version: ${RDSH_VERSION}
+
+# Metadata mirrors Cargo.toml (description, license, homepage, repository) and
+# CITATION.cff (author name). Debian and RPM both require a maintainer e-mail;
+# the GitHub noreply address keeps a personal address out of published packages.
+maintainer: sahenjp <sahenjp@users.noreply.github.com>
+vendor: jimoto-no-llm
+homepage: https://github.com/jimoto-no-llm/rustdsh
+license: MIT
+section: utils
+priority: optional
+description: |
+  Fast, safe launcher for DeepSeek Harness (dsh).
+  A Rust port/shim for dsh: fast launcher, token saver and zero behavior
+  breakage via passthrough. Tokens, code search, session listing and
+  diagnostics run natively in Rust; every other command goes to the upstream
+  dsh unchanged.
+
+contents:
+  - src: ${RDSH_BINARY}
+    dst: /usr/bin/rdsh
+    expand: true
+    file_info:
+      mode: 0755
+  - src: ./LICENSE
+    dst: /usr/share/doc/rdsh/LICENSE
+    file_info:
+      mode: 0644
+  - src: ./README.md
+    dst: /usr/share/doc/rdsh/README.md
+    file_info:
+      mode: 0644
+
+# The release binary is dynamically linked against the host C library, so the
+# package names the one runtime dependency it actually needs. The dependency
+# stays unversioned: the tag build's glibc baseline is the CI runner's, not a
+# figure this file can promise.
+overrides:
+  deb:
+    depends:
+      - libc6
+  rpm:
+    depends:
+      - glibc

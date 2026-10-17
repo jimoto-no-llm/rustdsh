@@ -1,7 +1,7 @@
 # Metric freshness and main integration evidence
 
-Issue: [#16](https://github.com/sahenjp/rustdsh/issues/16).
-PR: [#90](https://github.com/sahenjp/rustdsh/pull/90).
+Issue: [#16](https://github.com/jimoto-no-llm/rustdsh/issues/16).
+PR: [#90](https://github.com/jimoto-no-llm/rustdsh/pull/90).
 Captured on 2026-10-06 JST after integrating main
 `190dd7ce60ec051cdc5e52cd15950b182f820baa`.
 

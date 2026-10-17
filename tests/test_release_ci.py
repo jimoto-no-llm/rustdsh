@@ -76,7 +76,7 @@ class FakeApi:
 class ReleaseCiTests(unittest.TestCase):
     def test_all_latest_workflow_jobs_succeed(self):
         api = FakeApi()
-        self.assertEqual(len(REQUIRED_CHECKS), 13)
+        self.assertEqual(len(REQUIRED_CHECKS), 14)
         result = verify_workflows(REPO, SHA, TAG, api)
         self.assertEqual(result["ci.yml"]["id"], 10)
         self.assertEqual(api.list_calls, {"ci.yml": 2, "codeql.yml": 2})

@@ -1,0 +1,148 @@
+name: release-cadence
+
+# 刻むリズム: 利用者に見える変更が main に入ったら、まとめずに semver で
+# 版を決めて用意する。既定はパッチ（vX.Y.(Z+1)）で、[Unreleased] に ### Added
+# があれば minor（vX.(Y+1).0）、前回タグ以降に feature / enhancement / breaking
+# ラベル付きの PR があれば minor 以上にする（docs/RELEASING.md の判定表）。
+# このワークフローが作るのは準備ブランチ release/vX.Y.Z-prep と PR までで、
+# **タグは打たない**。タグは Lead が必須チェックの緑を確認した exact SHA に
+# 手で打つ。
+#
+# Actions の GITHUB_TOKEN が起こした pull_request イベントは新しい workflow run
+# を開始しないため、この PR では必須チェックが自動で走らないことがある。
+# チェックが現れない場合は、準備ブランチに空コミットを push するか手元の gh で
+# PR を作り直してから、緑の exact SHA にタグを打つ。
+#
+# リポジトリ設定 can_approve_pull_request_reviews=false の間は gh pr create が
+# 403 (Resource not accessible by integration) で失敗する。その場合もブランチは
+# push 済みのままにし、準備内容と次の一手を issue に記録して正常終了する。
+# 再実行時は、準備済みブランチを見つけたら内容の生成を省いて PR の作成だけを
+# 試すため、設定を有効にした次の回から PR が開く。
+
+on:
+  schedule:
+    # 毎日 22:40 UTC（JST 翌 7:40）。既定ブランチ main の先頭で走る。
+    - cron: '40 22 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: release-cadence
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Plan the next release
+        id: plan
+        env:
+          # gh pr list で前回タグ以降のマージ済み PR ラベルを読む。
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          python3 scripts/prepare-cadence-release.py plan --query-pr-labels --github-output "$GITHUB_OUTPUT"
+
+      - name: Nothing to release
+        if: steps.plan.outputs.unreleased == 'empty'
+        run: echo "::notice::[Unreleased] は空です。刻む変更が無いので何もしません。"
+
+      - name: Prepare and validate the release content
+        id: prepare
+        if: steps.plan.outputs.unreleased != 'empty'
+        env:
+          BRANCH: ${{ steps.plan.outputs.branch }}
+          NEXT: ${{ steps.plan.outputs.next }}
+          LATEST: ${{ steps.plan.outputs.latest }}
+          BUMP: ${{ steps.plan.outputs.bump }}
+          REASON: ${{ steps.plan.outputs.reason }}
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads origin "${BRANCH}" >/dev/null 2>&1; then
+            echo "::notice::${BRANCH} は既に origin にあるため、内容は作り直さず PR の作成だけを試します。"
+            echo "existing=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          python3 scripts/prepare-cadence-release.py promote "${NEXT}" --previous-tag "${LATEST}" --bump "${BUMP}" --reason "${REASON}"
+          # タグ前と同じ検証を準備ブランチの上で先に通す。
+          python3 scripts/prepare-release.py "${NEXT}"
+          python3 -m unittest discover -s tests -p 'test_release_*.py'
+          echo "existing=false" >> "$GITHUB_OUTPUT"
+
+      - name: Push the preparation branch
+        id: push
+        if: steps.prepare.outputs.existing == 'false'
+        env:
+          BRANCH: ${{ steps.plan.outputs.branch }}
+          NEXT: ${{ steps.plan.outputs.next }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "${BRANCH}"
+          git add Cargo.toml Cargo.lock CHANGELOG.md "docs/releases/${NEXT}.md"
+          git commit -m "chore(release): prepare ${NEXT}"
+          git push origin "${BRANCH}"
+
+      - name: Open the preparation pull request
+        if: steps.prepare.outcome == 'success' && steps.plan.outputs.unreleased != 'empty'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ steps.plan.outputs.branch }}
+          NEXT: ${{ steps.plan.outputs.next }}
+          LATEST: ${{ steps.plan.outputs.latest }}
+          BUMP: ${{ steps.plan.outputs.bump }}
+          REASON: ${{ steps.plan.outputs.reason }}
+        run: |
+          set -euo pipefail
+          sha=$(git ls-remote origin "refs/heads/${BRANCH}" | cut -f1)
+          if [ -z "${sha}" ]; then
+            echo "::error::${BRANCH} が origin に見つかりません。"
+            exit 1
+          fi
+          title="chore(release): ${NEXT} の準備"
+          body="${RUNNER_TEMP}/release-cadence-pr.md"
+          cat > "${body}" <<EOF
+          概要: ${LATEST} の後に積んだ [Unreleased] を ${NEXT} として刻む準備PRです（判定: ${BUMP} — ${REASON}）。
+          変更: Cargo.toml / Cargo.lock を ${NEXT} に上げ、CHANGELOG の [Unreleased] を日付入りへ繰り上げ、docs/releases/${NEXT}.md の雛形を追加します。
+          検証: scripts/prepare-release.py ${NEXT} が Validated、release テストが緑の状態を commit ${sha} にしています。
+          注意点: 雛形の要約と互換性の記述をレビューし、必須チェックが緑の exact SHA にタグを打ってください（このワークフローはタグを打ちません）。
+          EOF
+          if gh pr view "${BRANCH}" --json number >/dev/null 2>&1; then
+            echo "::notice::${BRANCH} の PR は既に開いています。"
+            exit 0
+          fi
+          pr_error=""
+          if ! pr_error=$(gh pr create --base main --head "${BRANCH}" --title "${title}" --body-file "${body}" 2>&1); then
+            # フォールバック: 設定 can_approve_pull_request_reviews=false では Actions は
+            # PR を作れない。ブランチは push 済みなので、次の一手を issue に残す。
+            pr_error=$(printf '%s' "${pr_error}" | tr '\n' ' ')
+            echo "::warning::PR を作成できませんでした: ${pr_error}"
+            issue="${RUNNER_TEMP}/release-cadence-issue.md"
+            cat > "${issue}" <<EOF
+          概要: release-cadence が ${BRANCH} を push しましたが、Actions が PR を作成できませんでした（${pr_error}）。
+          準備内容: commit ${sha} で Cargo.toml / Cargo.lock / CHANGELOG.md / docs/releases/${NEXT}.md を更新し、scripts/prepare-release.py ${NEXT} は Validated です。
+          判定: ${BUMP} — ${REASON}
+          次の一手: 手元で gh pr create --base main --head ${BRANCH} --title "${title}" を実行するか、Settings → Actions → General の "Allow GitHub Actions to create and approve pull requests" を有効にしてこのワークフローを再実行してください。
+          注意点: タグは必須チェックが緑の exact SHA に Lead が打ちます（このワークフローは打ちません）。
+          EOF
+            issue_title="[release] ${NEXT} の準備ブランチを PR にしてください"
+            if gh issue list --state open --limit 200 --json number,title \
+                 --jq ".[] | select(.title == \"${issue_title}\") | .number" | grep -q .; then
+              echo "::notice::${issue_title} は既に開いています。"
+              exit 0
+            fi
+            gh issue create --title "${issue_title}" --body-file "${issue}"
+            exit 0
+          fi
+

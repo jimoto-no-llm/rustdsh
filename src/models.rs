@@ -1626,12 +1626,52 @@ fn sync_profile_locked(
 
 /// `rdsh models sync`: append missing entries and refresh stale names, or
 /// preview with `--dry-run`.
+///
+/// `auto` is the daily timer's mode. It honours `features.models_sync` and turns
+/// every failure into a reported, successful exit: the run it belongs to must
+/// not stop because a catalog could not be refreshed. A manual invocation keeps
+/// the switch out of the way and keeps its failing status.
 pub(crate) fn cmd_models_sync(
     profile: Option<&str>,
     provider: Option<&str>,
     dry_run: bool,
+    auto: bool,
     json: bool,
 ) -> Result<()> {
+    match cmd_models_sync_inner(profile, provider, dry_run, auto, json) {
+        Err(error) if auto => {
+            eprintln!("[rdsh] models sync --auto: {error:#}");
+            Ok(())
+        }
+        other => other,
+    }
+}
+
+fn cmd_models_sync_inner(
+    profile: Option<&str>,
+    provider: Option<&str>,
+    dry_run: bool,
+    auto: bool,
+    json: bool,
+) -> Result<()> {
+    if auto && !crate::rdsh_config::feature_enabled(&crate::rdsh_config::load(), "models_sync") {
+        // The timer calls this every day: stay modest, keep `--json` parseable
+        // and leave the profiles alone.
+        if json {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({
+                    "dry_run": dry_run,
+                    "auto": true,
+                    "skipped": "models_sync",
+                    "profiles": [],
+                }))?
+            );
+        } else {
+            println!("[rdsh] models_sync is off; skipping model catalog sync");
+        }
+        return Ok(());
+    }
     let sources = selected_sources(provider)?;
     let profiles = profile_paths(profile)?;
     let mut reports = Vec::new();
@@ -1692,10 +1732,7 @@ pub(crate) fn cmd_models_sync(
                 "profiles": reports.iter().map(ProviderReport::to_json).collect::<Vec<_>>(),
             }))?
         );
-        if failed {
-            std::process::exit(1);
-        }
-        return Ok(());
+        return finish_sync(failed, auto);
     }
     use std::io::Write as _;
     for report in &reports {
@@ -1735,10 +1772,21 @@ pub(crate) fn cmd_models_sync(
             "[rdsh] restart the harness (or reload its config) to pick up the new models"
         );
     }
-    if failed {
-        std::process::exit(1);
+    finish_sync(failed, auto)
+}
+
+/// Close a run whose reports carried errors. A manual run keeps its failing
+/// status; `--auto` (the daily timer) reports the failure and returns success,
+/// so the update run it belongs to is never stopped by an unreachable catalog.
+fn finish_sync(failed: bool, auto: bool) -> Result<()> {
+    if !failed {
+        return Ok(());
     }
-    Ok(())
+    if auto {
+        eprintln!("[rdsh] models sync --auto: one or more providers reported errors");
+        return Ok(());
+    }
+    std::process::exit(1)
 }
 
 #[cfg(test)]

@@ -7,6 +7,7 @@
 [![docs](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/docs.yml/badge.svg)](https://github.com/jimoto-no-llm/rustdsh/actions/workflows/docs.yml)
 [![codecov](https://codecov.io/gh/jimoto-no-llm/rustdsh/graph/badge.svg)](https://codecov.io/gh/jimoto-no-llm/rustdsh)
 [![release](https://img.shields.io/github/v/release/jimoto-no-llm/rustdsh.svg)](https://github.com/jimoto-no-llm/rustdsh/releases)
+[![crates.io](https://img.shields.io/crates/v/rdsh.svg)](https://crates.io/crates/rdsh)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://www.rust-lang.org/)
 
@@ -19,7 +20,7 @@ It ports frequently used CLI operations (token calculation, code search, session
 
 ## Why rdsh?
 
-- ⚡ **Sub-millisecond startup & low memory**: `--version` launches in ~0.90 ms with ~2.9 MB peak memory, compared to ~88 ms and ~66 MB for Node.js-based `dsh`.
+- ⚡ **Sub-millisecond process launch**: `rdsh --version` starts in ~0.90 ms with ~2.9 MB peak RSS, versus ~88 ms and ~66 MB for Node.js-based `dsh --version`. This is process launch only: a booted agent profile still runs upstream Node.js, so conversation startup and session memory match upstream. See [Benchmarks](#benchmarks).
 - 🔄 **100% Drop-in Compatible**: Subcommands that are not rdsh-native are passed straight to upstream `dsh`. Existing scripts and workflows keep running unchanged.
 - 🛠 **Fast Native Utilities**: Estimate tokens, search code, list sessions, and run health diagnostics (`rdsh doctor`) instantly without starting Node.js.
 - 🛡 **Safe by Default**: Read-only commands never modify source files, credentials are never automatically synced or exported, and `rdsh_inspect` can be confined to explicitly shared files on Linux.
@@ -72,6 +73,16 @@ Invoke-WebRequest -Uri https://github.com/jimoto-no-llm/rustdsh/releases/latest/
 & $f -FromRelease
 ```
 
+Or install the crate from crates.io (needs Rust 1.85+):
+
+```sh
+cargo install rdsh
+```
+
+`cargo install` builds from source and installs the same binary as the release
+archives. Debian/Ubuntu and Fedora/RHEL users can also install the release
+[`.deb`/`.rpm`](#native-packages-deb--rpm) with `apt`/`dnf`.
+
 ### 2. Verify & Setup
 
 ```sh
@@ -99,6 +110,26 @@ rdsh --profile web              # start with Web profile
 | Optional | Node.js 22+ for the [Node.js dashboard](dashboard/README.md); SearXNG for `search-web` |
 
 ## Installation
+
+### Native Packages (`.deb` / `.rpm`)
+
+Linux x86_64 users on Debian/Ubuntu (and WSL) or Fedora/RHEL can install the
+same release binary with the OS package manager. Download the `.deb` or `.rpm`
+from the
+[latest release](https://github.com/jimoto-no-llm/rustdsh/releases/latest) and
+install that file directly; no extra repository is configured.
+
+```sh
+sudo apt install ./rdsh_<version>_amd64.deb      # Debian, Ubuntu, WSL
+sudo dnf install ./rdsh-<version>-1.x86_64.rpm   # Fedora, RHEL, Rocky, AlmaLinux
+```
+
+`<version>` is the release tag without its leading `v` (`0.6.0` for `v0.6.0`).
+The package installs `/usr/bin/rdsh` together with the licence and README, so
+`rdsh --version` works right after installation: no Rust toolchain, no
+`install.sh`. Like `rdsh-linux-x64.tar.gz`, both packages carry the glibc
+build, so the musl archive and `install.sh` stay the fallback for older
+distributions.
 
 ### Building from Source & Advanced Options
 
@@ -129,6 +160,36 @@ cd rustdsh
 | Linux / macOS | `./install.sh` | Needs `cargo` or `curl` (guided via rustup if missing). |
 | WSL | `./install.sh` inside distro | Auto-detects WSL. `install.ps1 -Wsl` installs in both environments. |
 | Windows (native) | `.\install.ps1` | Needs Rust and MSVC build tools (`winget install Rustlang.Rustup`). |
+
+### Package Managers (Homebrew / Scoop / winget)
+
+Advanced users on macOS and Windows can let a package manager own the installed
+`rdsh` binary. The manifests in [packaging/](packaging/README.md) pin the exact
+release archives and their SHA-256 values;
+[docs/PACKAGE-MANAGERS.md](docs/PACKAGE-MANAGERS.md) lists the install commands
+and the update procedure.
+
+**macOS (Homebrew)** — installs the Apple Silicon or Intel archive:
+
+```sh
+brew install --formula ./packaging/homebrew/rdsh.rb
+```
+
+**Windows (Scoop)**:
+
+```powershell
+scoop install https://raw.githubusercontent.com/jimoto-no-llm/rustdsh/main/packaging/scoop/rdsh.json
+```
+
+**Windows (winget)** — winget 1.6 or newer reads the three manifests directly;
+submitting them to `microsoft/winget-pkgs` stays a manual step:
+
+```powershell
+winget install --manifest .\packaging\winget
+```
+
+These channels track one release at a time, so a new tag is not served until
+`python3 scripts/update-packaging-manifests.py --version vX.Y.Z` refreshes them.
 
 ## Usage
 
@@ -512,7 +573,7 @@ rdsh desktop verify                 # exit nonzero when the profile has no rdsh 
 The same is available through the profile installer and the installers:
 
 ```sh
-PROFILE=desktop ./plugins/install.sh   # every recommended package, forwarded correctly
+PROFILE=desktop ./plugins/install.sh   # essential + default recommended, forwarded correctly
 ./install.sh --desktop                 # attach the rdsh plugins during installation
 ```
 
@@ -532,9 +593,10 @@ Two optional plugins extend the existing Desktop/Web runtime:
   fresh context, bounded concurrency and output, and active duplicate suppression
   through the native DSH `spawn` provider (0.2.0-rc.2).
 
-Use the app's Plugins page to add the corresponding directory, or enable
-`EASY_WORK=1` / `SUBAGENTS=1` in `plugins/install.sh`. These are opt-in features
-being prepared for 0.4.0. See the [acceptance evidence](docs/reviews/2026-10-14-easy-work.md).
+Use the app's Plugins page to add the corresponding directory, or select them
+with `./plugins/install.sh --recommended=easy-work,subagents` (`EASY_WORK=1` /
+`SUBAGENTS=1` still work). These are opt-in features being prepared for 0.4.0.
+See the [acceptance evidence](docs/reviews/2026-10-14-easy-work.md).
 
 [Desktop SDK and upstream preparation](desktop/README.md) provide a pinned
 official SDK, an isolated fork home, bundled Rust launcher, and a dedicated
@@ -608,19 +670,42 @@ when you want those.
 
 ## Benchmarks
 
-Measurements conducted on Linux x86_64:
+Process-level measurements on Linux x86_64. Every row names the exact command it
+measures, and none of them describe an agent session: when rdsh boots a profile it
+`exec`s the same upstream Node.js `dsh`, so conversation startup, interactive
+latency and session memory are those of upstream.
 
-| Benchmark | rdsh | Upstream dsh / Baseline | Improvement |
+Only the `--version` rows compare rdsh with upstream `dsh`. The hook, `tokens`
+and `search` rows compare against an equivalent Node.js implementation of the
+same work; upstream `dsh` exposes no `tokens`/`search` subcommand, so no
+upstream ratio is claimed for them. They were measured on one Linux x86_64 host
+by `scripts/benchmark-node-vs-rust.py`.
+
+| What is measured | rdsh | Baseline | Factor |
 | --- | --- | --- | --- |
-| `--version` startup | **~0.90 ms** | ~88 ms | **~98x faster** |
-| `--version` peak RSS | **~2.9 MB** | ~66 MB | **~1/23 memory** |
-| Hook-equivalent memory | **~2.7 MB** | ~45 MB (Node equivalent) | **~1/16 memory** |
-| Code search (`search`) | **~17 ms** | ~41 ms | **~2.4x faster** |
-| Token estimate (`tokens`) | **~12 ms** | ~35 ms | **~2.9x faster** |
-| Session list (`sessions --tokens`) | **~0.41 s** | ~1.65 s | **~4.0x faster** |
-| Binary size | **~1.97 MB** (single binary) | ~508 MB (Node tree) | **Ultra compact** |
+| `rdsh --version` process launch | **~0.90 ms** | ~88 ms, upstream `dsh --version` | **~98x faster** |
+| `rdsh --version` peak RSS | **~2.9 MB** | ~66 MB, upstream `dsh --version` | **~1/23 memory** |
+| PreToolUse hook `rdsh guard`, per tool call (launch included) | **~2.0 ms** | ~80–100 ms, equivalent Node.js judge | **~40–50x faster** |
+| PreToolUse hook over 200 tool calls (cumulative, 10% denied) | **~0.4–0.6 s** | ~16–24 s, equivalent Node.js judge | **~42x faster** |
+| PreToolUse hook peak RSS | **~6.0 MB** | ~49 MB, equivalent Node.js judge | **~1/8 memory** |
+| `rdsh tokens` (9.6 MB ASCII text) | **~8 ms** | ~175–195 ms, Node.js reference | **~22x faster** |
+| `rdsh search` (300 files, 600k lines) | **~10–25 ms** | ~125–230 ms, Node.js reference | **~9–12x faster** |
+| `sessions --tokens` (20 sessions) | **~0.41 s** | ~1.65 s, previous rdsh build (historical) | **~4.0x faster** |
+| Distribution size | **one ~1.8–2.3 MB binary** (per platform) | ~508 MB Node tree | **ultra compact** |
 
-*Reproduce with `rdsh bench --n 5`. See [docs/BENCHMARKS.md](docs/BENCHMARKS.md) for detailed test setups and measurements.*
+The `--version`, `sessions` and size rows are the historical headline numbers
+recorded in [docs/BENCHMARKS.md](docs/BENCHMARKS.md); their absolute values are
+host-dependent. The hook, `tokens` and `search` numbers are one Linux x86_64
+host at `n=15` with process launch included; regenerate them with:
+
+```sh
+cargo build --release
+python3 scripts/benchmark-node-vs-rust.py --bin ./target/release/rdsh \
+  --mode all --n 15 --calls 200 --output /tmp/rdsh-node-vs-rust.json
+```
+
+For startup, run `rdsh bench --n 5`. See
+[docs/BENCHMARKS.md](docs/BENCHMARKS.md) for every test setup and raw sample.
 
 ## Safety Design
 
@@ -657,6 +742,7 @@ Measurements conducted on Linux x86_64:
 | [docs/PROVIDERS.md](docs/PROVIDERS.md) | `rdsh provider`: HAI, Sarashina and home LLM server routes |
 | [docs/DESKTOP-INTEGRATION.md](docs/DESKTOP-INTEGRATION.md) | DeepSeek Harness Desktop (Electron) integration |
 | [docs/FEDORA.md](docs/FEDORA.md) | Fedora / RHEL packages, optional tools, and the Linux desktop reality |
+| [docs/PACKAGE-MANAGERS.md](docs/PACKAGE-MANAGERS.md) | Homebrew, Scoop and winget manifests, and how to update them |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Project roadmap and planned capabilities |
 | [docs/RELEASING.md](docs/RELEASING.md) | Release procedures |
 | [docs/SERIAL-PROXY.md](docs/SERIAL-PROXY.md) | Concurrency-limiting proxy for single-slot providers |
@@ -691,6 +777,10 @@ authors):
   cwd514 — opt-in effect sounds and desktop notifications (`SOUND=1`)
 - [dsh-gitview](https://github.com/yugapor/dsh-gitview) by yugapor — optional
   sidebar Git panel
+- [dsh-intelligent-ui](https://github.com/cwd514/dsh-intelligent-ui) by cwd514
+  (MIT, (c) 2026 cwd514) — opt-in visual answers in the DSH Web chat via the
+  declarative `render_ui` tool (`--recommended=intelligent-ui` or
+  `INTELLIGENT_UI=1`)
 
 ## License
 

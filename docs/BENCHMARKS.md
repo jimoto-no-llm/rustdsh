@@ -10,13 +10,19 @@ or the performance of delegated model execution.
 For real Codex/Claude tasks, see the [Rust model runner](MODEL_BENCHMARKS.md)
 and [2026-10-08 model runtime results](evidence/model-runtime-20261008.md).
 
+Only the `--version` rows compare against upstream `dsh`. The `search`,
+`tokens` and `sessions` baselines are earlier rdsh builds, and the hook row is an
+equivalent Node.js judge; upstream `dsh` exposes none of those subcommands. See
+[Node.js comparison](#nodejs-comparison-benchmark-node-vs-rustpy) for the current
+side-by-side harness and its raw JSON.
+
 ## Headline numbers
 
 | Case | rdsh | Baseline | Factor |
 | ---- | ---- | -------- | ------ |
 | `--version` startup (median, n=5) | ~0.90ms | original `dsh` ~88ms | ~98x |
 | `--version` peak RSS | ~2.9MB | original ~66MB | ~1/23 |
-| Hook-equivalent peak RSS | ~2.7MB | equivalent Node script ~45MB | ~1/16 |
+| PreToolUse hook peak RSS (`rdsh guard`, n=15) | ~6.0MB | equivalent Node.js judge ~49MB | ~1/8 |
 | search (`--max 10`, 160 files, 960k matching lines) | ~4.61ms | v0.2.0 ~197.77ms | ~42.9x |
 | tokens (9.6MB text) | ~12ms | before ~35ms | ~2.9x |
 | sessions --tokens (20 sessions) | ~0.41s | before ~1.65s | ~4.0x |
@@ -182,6 +188,40 @@ uploads the JSON as the `perf-regression` artifact. It intentionally passes no
 `--baseline`: a fresh runner has no previous binary, and comparing against a
 stale artifact would fail spuriously. The job asserts that the report exists
 and that every case is marked correct; it does not fail on timing.
+
+## Node.js comparison (`benchmark-node-vs-rust.py`)
+
+`rdsh`'s speed claims have mixed three different baselines. This harness makes the
+Node.js side explicit and reproducible on one machine:
+
+```sh
+cargo build --release
+python3 scripts/benchmark-node-vs-rust.py --bin ./target/release/rdsh \
+  --mode all --n 15 --calls 200 --output /tmp/rdsh-node-vs-rust.json
+```
+
+* `--mode hook` measures the PreToolUse hook: `rdsh guard` against
+  `scripts/benchmark-node-reference.mjs guard`, one process per call, including
+  process launch. It reports per-case median/p95 and the accumulated cost over
+  `--calls` simulated tool calls with `--deny-percent` of them blocked.
+* `--mode native` measures `rdsh tokens` and `rdsh search` against the same
+  algorithms in `scripts/benchmark-node-reference.mjs` on one generated dataset
+  (10 MiB ASCII text, 50,000 CJK lines, 300 files x 2,000 lines).
+
+The reference script is a benchmark stand-in, not upstream `dsh`: upstream
+exposes no `tokens`/`search` subcommand, so passing `--dsh PATH` only records
+that absence in the report and never yields an upstream product ratio. Every case
+is checked for output equality first (`tokens` values, sorted `search` hit sets,
+allow/block decisions and the matched deny pattern); a mismatch aborts the run.
+Search results are compared as sets because rdsh walks directories in raw readdir
+order while Node's scandir sorts names, so a hit cap below the total hit count
+would make the two orders select different subsets.
+
+The JSON report records the OS, CPU count, `n`, warmups, timing scope, binary and
+reference-script SHA-256, every raw sample, and the cumulative hook totals.
+Fixtures run under a temporary `HOME`, `DSH_HOME` and `XDG_*`; no user data,
+sessions, credentials or model calls are read. The upstream `dsh` binary is never
+required; `node` is required for the comparison.
 
 ## Rules for benchmark PRs
 

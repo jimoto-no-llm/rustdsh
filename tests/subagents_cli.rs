@@ -19,6 +19,18 @@ const REQUEST: &str = r#"{
   ]
 }"#;
 
+/// The same shape as REQUEST but with no `limits`: every limit comes from the
+/// built-in defaults or the `subagents` settings section.
+const OMITTED_LIMITS_REQUEST: &str = r#"{
+  "use_case": "review",
+  "tiers": {
+    "fast": { "provider": "example-provider", "model": "fast-model", "effort": "low" },
+    "balanced": { "provider": "example-provider", "model": "balanced-model", "effort": "medium" },
+    "deep": { "provider": "example-provider", "model": "deep-model", "effort": "high" }
+  },
+  "items": [{ "id": "a" }, { "id": "b" }, { "id": "c" }]
+}"#;
+
 /// Exact `JSON.stringify(planSubagents(request))` from the removed JS planner.
 const EXPECTED: &str = concat!(
     r#"{"use_case":"review","read_only":true,"tiers_used":["balanced","deep"],"waves":[{"wave":1,"agents":["#,
@@ -175,6 +187,115 @@ fn plan_refuses_unreadable_and_invalid_input() {
         public_output(&huge).contains("at most 256 KiB"),
         "{}",
         public_output(&huge)
+    );
+}
+
+#[test]
+fn defaults_prints_the_built_in_limits_when_no_settings_file_exists() {
+    let fixture = Fixture::new();
+    let output = fixture.run(&["subagents", "defaults"]);
+    assert!(output.status.success(), "{}", public_output(&output));
+    assert!(output.stderr.is_empty(), "{}", public_output(&output));
+    assert_eq!(
+        stdout(&output),
+        format!(
+            "{}\n",
+            r#"{"source":"builtin","max_parallel":3,"max_items_per_agent":3,"max_weight_per_agent":9,"budget_units":null}"#
+        )
+    );
+}
+
+#[test]
+fn defaults_reports_the_settings_section_and_clamps_out_of_range_values() {
+    let fixture = Fixture::new();
+    fixture.write(
+        "dsh/rdsh.json",
+        r#"{"subagents":{"max_parallel":2,"max_items_per_agent":1,"max_weight_per_agent":4,"budget_units":5}}"#,
+    );
+    let output = fixture.run(&["subagents", "defaults", "--json"]);
+    assert!(output.status.success(), "{}", public_output(&output));
+    assert_eq!(
+        stdout(&output),
+        format!(
+            "{}\n",
+            r#"{"source":"settings","max_parallel":2,"max_items_per_agent":1,"max_weight_per_agent":4,"budget_units":5}"#
+        )
+    );
+
+    // A stored value outside the planner's range is clamped, not refused.
+    fixture.write(
+        "dsh/rdsh.json",
+        r#"{"subagents":{"max_parallel":99,"budget_units":0}}"#,
+    );
+    let clamped = fixture.run(&["subagents", "defaults"]);
+    assert!(clamped.status.success(), "{}", public_output(&clamped));
+    assert_eq!(
+        stdout(&clamped),
+        format!(
+            "{}\n",
+            r#"{"source":"settings","max_parallel":16,"max_items_per_agent":3,"max_weight_per_agent":9,"budget_units":null}"#
+        )
+    );
+}
+
+#[test]
+fn plan_uses_the_settings_section_for_limits_the_request_omits() {
+    let fixture = Fixture::new();
+    fixture.write("request.json", OMITTED_LIMITS_REQUEST);
+    let built_in = fixture.run(&[
+        "subagents",
+        "plan",
+        "--input-file",
+        &fixture.path("request.json"),
+    ]);
+    assert!(built_in.status.success(), "{}", public_output(&built_in));
+    let built_in: serde_json::Value = serde_json::from_str(&stdout(&built_in)).unwrap();
+    assert_eq!(
+        built_in["totals"],
+        serde_json::json!({ "agents": 1, "items": 3, "waves": 1, "cost_units": 3 })
+    );
+
+    fixture.write(
+        "dsh/rdsh.json",
+        r#"{"subagents":{"max_parallel":2,"max_items_per_agent":1,"max_weight_per_agent":4}}"#,
+    );
+    let narrowed = fixture.run(&[
+        "subagents",
+        "plan",
+        "--input-file",
+        &fixture.path("request.json"),
+    ]);
+    assert!(narrowed.status.success(), "{}", public_output(&narrowed));
+    let narrowed: serde_json::Value = serde_json::from_str(&stdout(&narrowed)).unwrap();
+    assert_eq!(
+        narrowed["totals"],
+        serde_json::json!({ "agents": 3, "items": 3, "waves": 2, "cost_units": 3 })
+    );
+    assert_eq!(narrowed["warnings"], serde_json::json!([]));
+}
+
+#[test]
+fn an_explicit_request_limit_still_wins_over_the_settings_section() {
+    let fixture = Fixture::new();
+    fixture.write(
+        "dsh/rdsh.json",
+        r#"{"subagents":{"max_items_per_agent":1,"max_weight_per_agent":1,"max_parallel":1}}"#,
+    );
+    fixture.write(
+        "request.json",
+        r#"{"use_case":"review","tiers":{"balanced":{"provider":"p","model":"m","effort":null}},"limits":{"max_items_per_agent":3,"max_weight_per_agent":9,"max_parallel":3},"items":[{"id":"a"},{"id":"b"},{"id":"c"}]}"#,
+    );
+    let output = fixture.run(&[
+        "subagents",
+        "plan",
+        "--input-file",
+        &fixture.path("request.json"),
+    ]);
+    assert!(output.status.success(), "{}", public_output(&output));
+    let plan: serde_json::Value = serde_json::from_str(&stdout(&output)).unwrap();
+    assert_eq!(
+        plan["totals"],
+        serde_json::json!({ "agents": 1, "items": 3, "waves": 1, "cost_units": 9 })
     );
 }
 

@@ -76,6 +76,54 @@ The command then reports `"systemctl": "skipped"` and the operator schedules
 the script however that host wants. The same switch keeps the tests away from
 the test runner's own systemd instance.
 
+## The script keeps itself current
+
+The run starts by replacing itself when `main` holds a newer `sync-dsh.sh`. Every
+machine has its own copy — the one `rdsh update auto` found, or the copy an
+installer left behind — so a fix merged on `main` (the model-catalog step, for
+instance) would otherwise wait for a manual update before that machine ran it.
+The step fetches
+<https://raw.githubusercontent.com/jimoto-no-llm/rustdsh/main/sync-dsh.sh>,
+accepts it only when it is a non-empty shell script whose `sh -n` passes, writes
+it next to the running copy, logs one line and `exec`s the new copy once with
+`RDSH_SYNC_SELF_UPDATED=1` set, which is what keeps that re-exec from looping.
+
+Nothing here fails the daily run: an origin that is unreachable, content that is
+not a shell script, or a directory that cannot be written is logged and the
+current copy continues. The digest pin that protects release archives has no
+equivalent for the script itself, so the https origin and those checks are the
+gate. A copy inside a git checkout is never touched (it is the checkout's own
+file, and `RDSH_SYNC_FROM_SOURCE=1` says the same thing), a symlink is left as
+it is, and `--check-only` logs `self-update skipped (--check-only)` without
+fetching anything.
+
+Two environment values change the step:
+
+- `RDSH_SYNC_SELF_UPDATE=0` keeps the copy as it is for one run, or for every
+  run when it is part of the service unit's environment.
+- `RDSH_SYNC_SCRIPT_URL=URL` fetches from another origin — a mirror, or a local
+  `file://` fixture. Like `RDSH_RELEASE_BASE`, a non-https origin needs
+  `RDSH_TEST_INSECURE_BASE=1`.
+
+## Model catalogs
+
+The daily run refreshes the provider model catalogs too. Its last step is
+`rdsh models sync --auto`, which appends the models a provider advertises but
+the profile lacks (and renames stale entries) exactly like a manual
+`rdsh models sync`. `--auto` is the timer's mode: a catalog it cannot reach is
+logged as a failure and the step still returns success, because a release
+update must not stop with the catalog refresh.
+
+Two switches stop it:
+
+- `rdsh features off models_sync` (the switch defaults to on, and
+  `rdsh features on models_sync` brings it back) for every run.
+- `RDSH_MODELS_SYNC=0` in the environment of one run, for an operator who wants
+  the release update without the catalog refresh.
+
+`--check-only` never reaches the step, and neither does a missing
+`$PREFIX_BIN/rdsh`: both are logged and the profiles are left untouched.
+
 ## What it does not do
 
 - It does not update anything itself: the daily run is `sync-dsh.sh`, with the

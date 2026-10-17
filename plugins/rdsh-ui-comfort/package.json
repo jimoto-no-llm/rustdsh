@@ -1,0 +1,25 @@
+{
+  "name": "rdsh-ui-comfort",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Deliberate Enter for the DSH Web chat (rdsh UI comfort)",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": []
+    }
+  },
+  "meta": {
+    "title": "rdsh 入力の快適さ",
+    "description": "チャットは Enter 2回で送信（1回目は改行）。ゴール編集中は Enter で確定せず、Ctrl/Cmd+Enter か保存ボタンで確定します。"
+  }
+}

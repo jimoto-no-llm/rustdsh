@@ -1,0 +1,42 @@
+{
+  "capture": "CUA actual DSH 0.2.0-rc.2 Web profile and actual plugin; provider is local stub",
+  "conversion": "Browser returns JPEG. PNG conversion preserves decoded pixels; GIF uses the three captured frames.",
+  "images": [
+    {
+      "path": "dsh-dialog-before.png",
+      "sha256": "8de2a36209d2492205fe0f5c37b1516d306f91021d432ccbd8e867acdc99fe20",
+      "size": [
+        1280,
+        720
+      ],
+      "sourceSha256": "5858df849993445447e49db916a189ace570bcc9d5737a79615cf0ba3dccbc30"
+    },
+    {
+      "path": "dsh-dialog-after.png",
+      "sha256": "965163a767bf6bfbc6f6b97931f241ad7a541a949659be06b0bc8a144412accd",
+      "size": [
+        1280,
+        720
+      ],
+      "sourceSha256": "66da1a4b792faa3c3647b94588d296379b6ffa5ea37bb4f24fed0841a1305878"
+    },
+    {
+      "path": "dsh-dialog-closed.png",
+      "sha256": "c07183c1c1e4a9931cab38f4aea5fc4b1620c85f6d38401a5a8163181e7ab38d",
+      "size": [
+        1280,
+        720
+      ],
+      "sourceSha256": "d0549d10fd54f1c13644845d9fb8be7293b57253b72839dbc5625329c888d743"
+    },
+    {
+      "path": "dsh-baseline.png",
+      "sha256": "8c20664baa6898663dde208785d1fba137333ea58b7b2d902c96ded943174722",
+      "size": [
+        1280,
+        720
+      ],
+      "sourceSha256": "ef0667d323a27a63dd3384b45e687275a53679c1d6775a6d69eec245fe691564"
+    }
+  ]
+}

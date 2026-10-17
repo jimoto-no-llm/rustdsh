@@ -105,8 +105,19 @@ if run context inject < "$SB/garbage"; then
   if [ -s "$SB/out" ]; then bad "garbage stdin must not produce output"; else ok "garbage stdin is ignored (fail-open)"; fi
 else bad "garbage stdin must exit 0"; fi
 if DSH_HOME="$SB/dsh/rdsh.json/nested" "$BIN" context inject < "$SB/payload.json" >"$SB/out" 2>"$SB/err"; then
-  ok "unwritable DSH_HOME still exits 0"
+  if [ -s "$SB/out" ] || [ -s "$SB/err" ]; then bad "unwritable DSH_HOME must stay silent"; else ok "unwritable DSH_HOME is silent and exits 0"; fi
 else bad "unwritable DSH_HOME broke inject"; fi
+
+# Locale resolution must not read settings before the hook's fail-open path.
+cp "$DSH_HOME/rdsh.json" "$SB/settings-backup.json"
+printf 'not json at all' > "$DSH_HOME/rdsh.json"
+for event in user-prompt-submit session-start; do
+  if run context inject --event "$event" < "$SB/payload.json"; then
+    if [ -s "$SB/out" ] || [ -s "$SB/err" ]; then bad "corrupt settings must keep $event silent"; else ok "corrupt settings keep $event silent and exit 0"; fi
+  else bad "corrupt settings broke $event inject"; fi
+done
+if run context status --json; then bad "ordinary context commands must reject corrupt settings"; else ok "ordinary context commands still reject corrupt settings"; fi
+cp "$SB/settings-backup.json" "$DSH_HOME/rdsh.json"
 
 # ---- memory store ----
 if run context remember "APIの互換性を必ず保つ" --kind constraint --json; then ok "remember stores an item"; else bad "remember failed"; cat "$SB/err"; fi

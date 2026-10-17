@@ -52,6 +52,32 @@ request file and prints JSON.
 rdsh subagents plan --input-file subagents.json
 ```
 
+## Defaults
+
+A limit the request omits comes from the `subagents` section of
+`$DSH_HOME/rdsh.json` and then from the built-in number below. A limit the
+request declares always wins, and a JSON `null` keeps the default.
+
+| key | built-in | accepted |
+| --- | --- | --- |
+| `max_parallel` | 3 | 1-16 |
+| `max_items_per_agent` | 3 | 1-20 |
+| `max_weight_per_agent` | 9 | 1-128 |
+| `budget_units` | off | 0 = off, 1-100000 |
+
+```sh
+rdsh settings set subagents.max_parallel 2
+rdsh subagents defaults --json
+```
+
+`rdsh subagents defaults` prints the effective limits and their `source`:
+`settings` when `rdsh.json` was read, `builtin` when it is missing or
+unreadable. Planning never fails on a broken or unrelated settings document —
+it falls back to the built-in defaults, so an operator notices the fallback in
+`defaults` rather than in a failed plan. A value outside the accepted range in
+`rdsh.json` is clamped when the file is read. See
+[RDSH-SETTINGS.md](RDSH-SETTINGS.md#サブエージェント計画の既定値subagents).
+
 `--json` is accepted for scripts; JSON is always the output format. A request
 that cannot produce a plan exits 1 with the error code on stderr, for example
 `Subagent plan: duplicate-item:pr-460`. The input must be a regular JSON file
@@ -77,5 +103,5 @@ report:
 Warnings are sorted by `code` and then by `item`, using the ordering the
 JavaScript planner produced with `localeCompare`. Malformed requests are
 refused by name (`invalid-item-signals`, `duplicate-item`,
-`invalid-limits`, ...) rather than repaired. The same request always produces
-the same plan.
+`invalid-limits`, ...) rather than repaired. The same request with the same
+effective defaults always produces the same plan.

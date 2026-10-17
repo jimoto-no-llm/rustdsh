@@ -9,6 +9,8 @@ const repo=path.resolve(import.meta.dirname,'../..');
 const {startDashboard}=await import(pathToFileURL(path.join(repo,'dashboard/server.mjs')));
 const {createOutcomeProject}=await import(pathToFileURL(path.join(repo,'dashboard/test/fixtures/task-outcomes-project.mjs')));
 const {catalog}=await import(pathToFileURL(path.join(repo,'dashboard/locale.mjs')));
+// The public runtime.json carries no browser URL; the owner credentials do.
+const {readLocalRuntime}=await import(pathToFileURL(path.join(repo,'dashboard/private-runtime.mjs')));
 const {chromium}=await import(pathToFileURL(path.join(repo,'tests/e2e/node_modules/playwright/index.mjs')));
 const recordFlow=process.env.RDSH_OUTCOME_RECORD_FLOW==='1';
 const output=path.resolve(process.env.RDSH_OUTCOME_LANGUAGES_OUTPUT || path.join(repo,'target/e2e/outcome-languages'));await fs.mkdir(output,{recursive:true});
@@ -21,7 +23,7 @@ try{
   const f=await createOutcomeProject(path.join(root,language));const server=await startDashboard({project:f.project,port:0,tailscale:false,language});const context=await browser.newContext({locale:language,viewport:{width:1280,height:1000},...(recordFlow?{recordVideo:{dir:path.join(output,'video'),size:{width:1280,height:1000}}}:{})});
   const errors=[];const page=await context.newPage();const video=page.video();page.on('pageerror',e=>errors.push(e.message));
   try{
-   const runtime=JSON.parse(await fs.readFile(path.join(f.project.directory,'runtime.json'),'utf8'));await page.goto(runtime.browser_url);await page.locator('#tasks-detail').evaluate(e=>e.open=true);
+   const runtime=await readLocalRuntime(f.project.directory);await page.goto(runtime.browser_url);await page.locator('#tasks-detail').evaluate(e=>e.open=true);
    const task=page.locator('#task-goal');await task.waitFor();const copy=catalog[language];
    assert.equal(await page.locator('html').getAttribute('lang'),language);
    assert.ok((await task.innerText()).includes('必要な値と出力を提供する'));

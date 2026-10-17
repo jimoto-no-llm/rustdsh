@@ -44,6 +44,7 @@ try {
     kind: "harness",
     port: await unusedPort(),
     tailscale: false,
+    language: "ja",
     harnessOptions: {
       cwd: temporaryHome,
       command: [process.execPath, "-e", fakeHarness],

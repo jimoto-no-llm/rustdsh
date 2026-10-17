@@ -2913,7 +2913,14 @@ pub fn cmd_inject(
     json: bool,
 ) -> anyhow::Result<()> {
     let result = (|| -> anyhow::Result<Option<serde_json::Value>> {
-        let settings = crate::rdsh_config::try_load()?;
+        // The hook must never block a prompt: when the settings document is
+        // unreadable (unwritable DSH_HOME, a file in the way, corrupt JSON)
+        // there is simply no context to inject, so stay silent instead of
+        // turning the failure into a non-zero exit for DSH.
+        let settings = match crate::rdsh_config::try_load() {
+            Ok(settings) => settings,
+            Err(_) => return Ok(None),
+        };
         let locale = crate::locale::current(None, &settings.general.language);
         if !crate::rdsh_config::feature_enabled(&settings, "context_engine") {
             return Ok(None);
