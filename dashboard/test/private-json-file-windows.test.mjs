@@ -12,8 +12,12 @@ const windows = process.platform === "win32";
 const document = { operation: "schema", state: { note: "日本語 / 中文 {id}" } };
 async function powershell(script, env) {
   const binary = path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+  // Keep the WindowsPowerShell ACL oracle on its own default module path.
+  const childEnv = { ...process.env, ...env };
+  for (const key of Object.keys(childEnv))
+    if (key.toLowerCase() === "psmodulepath") delete childEnv[key];
   const { stdout } = await exec(binary, ["-NoProfile", "-NonInteractive", "-EncodedCommand", Buffer.from(script, "utf16le").toString("base64")], {
-    env: { ...process.env, ...env }, windowsHide: true, timeout: 15000,
+    env: childEnv, windowsHide: true, timeout: 15000,
   });
   return JSON.parse(stdout.trim());
 }
@@ -36,6 +40,24 @@ $digest=[BitConverter]::ToString([Security.Cryptography.SHA256]::Create().Comput
 $fileDigest=[BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash($acl.GetSecurityDescriptorBinaryForm())).Replace('-','').ToLowerInvariant()
 [ordered]@{ownerRole=(Role ($acl.GetOwner([Security.Principal.SecurityIdentifier])));protected=$acl.AreAccessRulesProtected;rules=$rules;parentDigest=$digest;fileDigest=$fileDigest}|ConvertTo-Json -Depth 5 -Compress
 `;
+
+test("WindowsPowerShell fixture resets inherited module search paths", { skip: !windows }, async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "rdsh-foreign-modules-"));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const module = path.join(root, "Microsoft.PowerShell.Security");
+  await fs.mkdir(module);
+  // Simulate a discoverable foreign-edition module that cannot load.
+  await fs.writeFile(path.join(module, "Microsoft.PowerShell.Security.psd1"), "@{RootModule='Microsoft.PowerShell.Security.psm1';ModuleVersion='7.0.0';PowerShellVersion='3.0';FunctionsToExport=@('Get-Acl')}");
+  await fs.writeFile(path.join(module, "Microsoft.PowerShell.Security.psm1"), "throw 'foreign edition fixture'; function Get-Acl {}; Export-ModuleMember -Function Get-Acl");
+  const parentModulePath = process.env.PSModulePath;
+  const observed = await powershell(`
+$ErrorActionPreference='Stop'
+$acl=Get-Acl -LiteralPath $env:RDSH_QA_FILE
+[ordered]@{edition=$PSVersionTable.PSEdition;major=$PSVersionTable.PSVersion.Major;owner=[bool]$acl.Owner}|ConvertTo-Json -Compress
+`, { PSMODULEPATH: root, RDSH_QA_FILE: root });
+  assert.deepEqual(observed, { edition: "Desktop", major: 5, owner: true });
+  assert.equal(process.env.PSModulePath, parentModulePath);
+});
 
 for (const broadParent of [false, true])
   test(`Windows creates a protected file atomically under ${broadParent ? "an explicitly shared" : "the default temporary"} parent and holds its name until disposal`, { skip: !windows }, async (t) => {
