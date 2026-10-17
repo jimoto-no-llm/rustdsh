@@ -40,6 +40,34 @@ test('concurrent publications save complete surfaces', { timeout: 5000 }, async 
   assert.deepEqual(await fs.readdir(path.dirname(target)), ['surface.json']);
 });
 
+test('the last completed replacement wins even when it was published first', { timeout: 5000 }, async (t) => {
+  const dir = await home(t);
+  const target = surfacePath(dir);
+  const rename = fs.rename;
+  const arrived = Promise.withResolvers();
+  const release = Promise.withResolvers();
+  t.mock.method(fs, 'rename', async (source, destination) => {
+    if (destination === target && JSON.parse(await fs.readFile(source, 'utf8')).surface_id === 'first') {
+      arrived.resolve();
+      await release.promise;
+    }
+    return rename(source, destination);
+  });
+  const first = writeSurface(dir, surface('first', 'finishes last'));
+  try {
+    await arrived.promise;
+    const second = await writeSurface(dir, surface('second', 'finishes first'));
+    assert.deepEqual((await readSurface(dir)).surface, second.surface);
+    release.resolve();
+    const last = await first;
+    assert.deepEqual((await readSurface(dir)).surface, last.surface);
+    assert.deepEqual(await fs.readdir(path.dirname(target)), ['surface.json']);
+  } finally {
+    release.resolve();
+    await first.catch(() => {});
+  }
+});
+
 test('a failed replacement preserves the previous surface and removes its temporary file', async (t) => {
   const dir = await home(t);
   const initial = await writeSurface(dir, surface('initial', 'preserve'));
