@@ -1,0 +1,133 @@
+{
+  "source_sha": "0d7b5d4241166bc39c881c8ea0f4aeefbbddbbda",
+  "paths_redacted": true,
+  "scope": "macOS release only; 7 alternating pairs; no Windows or performance acceptance claim",
+  "metadata": {
+    "benchmark": "worker-git",
+    "platform": "darwin-arm64",
+    "node": "v24.22.0",
+    "fixture": {
+      "tracked": 128,
+      "dirty": 8
+    },
+    "warmupsPerMode": 1,
+    "alternatingPairs": 7,
+    "nativeBinary": {
+      "sourcePath": "<release-binary>",
+      "executionPath": "<private-fixture>/rdsh",
+      "sha256": "b20f7eb0f745e985f2011748d45145c33a4713d9d236c9663f91dc44ce688f54"
+    },
+    "measurementBoundary": {
+      "timingScope": "operation-request-only",
+      "excludes": [
+        "native-binary-discovery",
+        "worker-git-capability-preflight",
+        "fixture-setup",
+        "output-parity-check",
+        "warmup"
+      ]
+    }
+  },
+  "operations": [
+    {
+      "operation": "repository",
+      "javascriptMedianMs": 33.96,
+      "rustMedianMs": 33.18,
+      "rustOverJavascript": 0.98,
+      "javascriptSamplesMs": [
+        37.635583,
+        35.50408300000004,
+        33.964333000000124,
+        30.55266699999993,
+        30.807207999999946,
+        34.70454199999995,
+        31.576958999999988
+      ],
+      "rustSamplesMs": [
+        41.09254099999998,
+        34.351541,
+        38.68287499999997,
+        33.0363339999999,
+        33.17699999999991,
+        32.278542000000016,
+        33.02954199999999
+      ],
+      "outputsMatch": true
+    },
+    {
+      "operation": "sourceSnapshot",
+      "javascriptMedianMs": 44.7,
+      "rustMedianMs": 34.38,
+      "rustOverJavascript": 0.77,
+      "javascriptSamplesMs": [
+        43.22458299999994,
+        51.41733399999998,
+        44.704083999999966,
+        42.040707999999995,
+        45.61949999999979,
+        47.595374999999876,
+        44.68466599999965
+      ],
+      "rustSamplesMs": [
+        33.18858399999999,
+        38.00858399999993,
+        31.876875000000155,
+        34.38354099999992,
+        33.09137499999997,
+        35.39787500000011,
+        35.23416700000007
+      ],
+      "outputsMatch": true
+    },
+    {
+      "operation": "dirtyPaths",
+      "javascriptMedianMs": 12.33,
+      "rustMedianMs": 21.02,
+      "rustOverJavascript": 1.71,
+      "javascriptSamplesMs": [
+        12.046499999999924,
+        12.325667000000067,
+        11.686624999999822,
+        12.62887499999988,
+        11.502207999999882,
+        12.375583000000006,
+        12.370042000000012
+      ],
+      "rustSamplesMs": [
+        20.8814169999996,
+        20.239666999999827,
+        21.268749999999727,
+        21.0170420000004,
+        22.028541000000132,
+        20.839542000000165,
+        28.472957999999835
+      ],
+      "outputsMatch": true
+    },
+    {
+      "operation": "observeWorktree",
+      "javascriptMedianMs": 101.66,
+      "rustMedianMs": 75.73,
+      "rustOverJavascript": 0.74,
+      "javascriptSamplesMs": [
+        101.00487499999963,
+        102.44733399999996,
+        116.88916599999993,
+        101.66112499999963,
+        95.60608300000013,
+        108.41829099999995,
+        91.4250420000003
+      ],
+      "rustSamplesMs": [
+        75.73279200000025,
+        80.05291699999998,
+        73.49924999999985,
+        75.35408300000017,
+        76.79554099999996,
+        83.02291600000035,
+        72.02641700000004
+      ],
+      "outputsMatch": true
+    }
+  ]
+}

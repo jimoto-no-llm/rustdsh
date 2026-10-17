@@ -130,6 +130,56 @@ async function legacyTrackedPaths(root) {
     .split("\0")
     .filter(Boolean);
 }
+async function legacySourceSnapshot(root) {
+  const info = await legacyRepository(root);
+  return {
+    ...info,
+    dirty_paths: await legacyDirtyPaths(info.root),
+  };
+}
+async function legacyObserveWorktree(root, { git_common_dir, branch, base }) {
+  const current = await legacyRepository(root);
+  requireWorker(
+    samePath(current.git_common_dir, git_common_dir) &&
+      current.branch === branch,
+    "worker_worktree_identity_changed",
+  );
+  await legacyWorkerGit(
+    root,
+    "merge-base",
+    "--is-ancestor",
+    base,
+    current.head_sha,
+  );
+  const dirty = await legacyDirtyPaths(root);
+  const committed = await legacyChangedPaths(root, base, current.head_sha);
+  const changed = [...new Set([...dirty, ...committed])].sort();
+  requireWorker(
+    (await legacyRepository(root)).head_sha === current.head_sha,
+    "worker_head_changed_during_scan",
+  );
+  return {
+    head_sha: current.head_sha,
+    dirty_paths: dirty,
+    committed_paths: committed,
+    changed_paths: changed,
+  };
+}
+
+export async function legacyWorkerGitRequest(request) {
+  switch (request.op) {
+    case "repository":
+      return legacyRepository(request.root);
+    case "source-snapshot":
+      return legacySourceSnapshot(request.root);
+    case "dirty-paths":
+      return legacyDirtyPaths(request.root);
+    case "observe-worktree":
+      return legacyObserveWorktree(request.root, request);
+    default:
+      throw new Error("unsupported legacy worker-git benchmark operation");
+  }
+}
 
 const NATIVE_UNAVAILABLE = Symbol("native worker-git unavailable");
 const workerGitCapabilities = new Map();
@@ -178,7 +228,7 @@ async function supportsWorkerGit(file) {
   return pending;
 }
 
-async function workerGitExecutable() {
+async function workerGitExecutable({ required = false } = {}) {
   const name = process.platform === "win32" ? "rdsh.exe" : "rdsh";
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
   const override = process.env.RDSH_BIN;
@@ -200,7 +250,12 @@ async function workerGitExecutable() {
       return candidate;
     }
   }
+  if (required) throw new Error("configured rdsh binary does not support worker-git");
   return null;
+}
+
+export async function requireWorkerGitExecutable() {
+  return workerGitExecutable({ required: true });
 }
 
 async function nativeRequest(request, executablePath = null) {
@@ -287,6 +342,11 @@ async function nativeRequest(request, executablePath = null) {
   return JSON.parse(output);
 }
 
+export async function nativeWorkerGitRequest(request, executablePath) {
+  if (!executablePath) throw new Error("native worker-git executable is required");
+  return nativeRequest(request, executablePath);
+}
+
 function nativeRequestForGitCommand(root, args) {
   if (
     args.length === 4 &&
@@ -362,12 +422,7 @@ export async function trackedPaths(root) {
 
 export async function sourceSnapshot(root) {
   const native = await nativeRequest({ op: "source-snapshot", root });
-  if (native !== NATIVE_UNAVAILABLE) return native;
-  const info = await legacyRepository(root);
-  return {
-    ...info,
-    dirty_paths: await legacyDirtyPaths(info.root),
-  };
+  return native === NATIVE_UNAVAILABLE ? legacySourceSnapshot(root) : native;
 }
 
 export async function observeWorktree(root, { git_common_dir, branch, base }) {
@@ -378,32 +433,7 @@ export async function observeWorktree(root, { git_common_dir, branch, base }) {
     branch,
     base,
   });
-  if (native !== NATIVE_UNAVAILABLE) return native;
-
-  const current = await legacyRepository(root);
-  requireWorker(
-    samePath(current.git_common_dir, git_common_dir) &&
-      current.branch === branch,
-    "worker_worktree_identity_changed",
-  );
-  await legacyWorkerGit(
-    root,
-    "merge-base",
-    "--is-ancestor",
-    base,
-    current.head_sha,
-  );
-  const dirty = await legacyDirtyPaths(root);
-  const committed = await legacyChangedPaths(root, base, current.head_sha);
-  const changed = [...new Set([...dirty, ...committed])].sort();
-  requireWorker(
-    (await legacyRepository(root)).head_sha === current.head_sha,
-    "worker_head_changed_during_scan",
-  );
-  return {
-    head_sha: current.head_sha,
-    dirty_paths: dirty,
-    committed_paths: committed,
-    changed_paths: changed,
-  };
+  return native === NATIVE_UNAVAILABLE
+    ? legacyObserveWorktree(root, { git_common_dir, branch, base })
+    : native;
 }
