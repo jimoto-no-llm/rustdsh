@@ -6,11 +6,29 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
+import { setTimeout as delay } from 'node:timers/promises';
 
 export const MAX_SURFACE_BYTES = 262144;
 export const MAX_ACTION_BYTES = 8192;
 export const MAX_BLOCKS = 200;
 export const MAX_ACTIONS_RETURNED = 100;
+
+async function replaceSurfaceFile(temporary, target) {
+  if (process.platform !== 'win32') return fs.rename(temporary, target);
+  const deadline = performance.now() + 50;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fs.rename(temporary, target);
+    } catch (error) {
+      const wait = 2 ** attempt;
+      // Windows readers may briefly block replacement; never remove the target.
+      if (error.code !== 'EPERM' || attempt >= 5 || performance.now() + wait >= deadline)
+        throw error;
+      await delay(wait);
+      if (performance.now() >= deadline) throw error;
+    }
+  }
+}
 
 // The dashboard renderer owns the full set; this list only has to reject
 // obviously wrong data before it reaches the browser.
@@ -80,7 +98,7 @@ export async function writeSurface(home, value, now) {
   try {
     await file.writeFile(body);
     await file.close();
-    await fs.rename(temporary, target);
+    await replaceSurfaceFile(temporary, target);
   } catch (error) {
     await file.close().catch(() => {});
     await fs.unlink(temporary).catch(() => {});
