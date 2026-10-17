@@ -1,0 +1,216 @@
+import { randomBytes } from 'node:crypto';
+
+export const DEFAULT_KANA_THRESHOLD = 0.08;
+export const MIN_KANA_THRESHOLD = 0.01;
+export const MAX_KANA_THRESHOLD = 0.5;
+
+const KANA = /^[\u3040-\u309f\u30a0-\u30ff\uff66-\uff9d]$/u;
+const LETTER_OR_NUMBER = /^[\p{L}\p{N}]$/u;
+
+export function normalizeKanaThreshold(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return DEFAULT_KANA_THRESHOLD;
+  return Math.min(MAX_KANA_THRESHOLD, Math.max(MIN_KANA_THRESHOLD, value));
+}
+
+export function textBlocksContent(content) {
+  if (!Array.isArray(content)) return '';
+  return content
+    .filter((block) => block && (block.kind === 'text' || block.type === 'text') && typeof block.text === 'string')
+    .map((block) => block.text)
+    .join('\n');
+}
+
+function markdownLineContent(line) {
+  return line.replace(/^(?: {0,3}>[ \t]?)+/u, '');
+}
+
+export function stripFencedCode(value) {
+  const lines = String(value ?? '').match(/[^\n]*(?:\n|$)/gu) ?? [];
+  const visible = [];
+  let openFence;
+  for (const line of lines) {
+    const content = markdownLineContent(line);
+    const opening = content.match(/^ {0,3}(`{3,}|~{3,})/u)?.[1];
+    if (!openFence) {
+      if (opening) openFence = { char: opening[0], length: opening.length };
+      else if (line && !/^(?: {4}|\t)/u.test(content)) visible.push(content);
+      continue;
+    }
+    const closing = content.match(/^ {0,3}(`{3,}|~{3,})[ \t]*(?:\r?\n|$)/u)?.[1];
+    if (closing && closing[0] === openFence.char && closing.length >= openFence.length) openFence = undefined;
+  }
+  return visible.join('');
+}
+
+export function kanaRatio(content) {
+  const text = stripFencedCode(textBlocksContent(content));
+  let kana = 0;
+  let lexical = 0;
+  for (const character of text) {
+    if (LETTER_OR_NUMBER.test(character)) lexical += 1;
+    if (KANA.test(character)) kana += 1;
+  }
+  return { kana, lexical, ratio: lexical === 0 ? 0 : kana / lexical };
+}
+
+export function shouldOfferTranslation(content, threshold = DEFAULT_KANA_THRESHOLD) {
+  const score = kanaRatio(content);
+  return score.lexical > 0 && score.ratio < normalizeKanaThreshold(threshold);
+}
+
+export function isFinalTranslatableAssistant(data, messageId, threshold = DEFAULT_KANA_THRESHOLD) {
+  const finalNode = data?.finalNode;
+  if (data?.status !== 'settled' || !finalNode || finalNode.messageId !== messageId) return false;
+  if (finalNode.interrupted === true || finalNode.blocks?.some((block) => !['text', 'reasoning'].includes(block?.kind))) return false;
+  return shouldOfferTranslation(finalNode.blocks, threshold);
+}
+
+function escapedBacktick(source, index) {
+  let slashes = 0;
+  for (let cursor = index - 1; cursor >= 0 && source[cursor] === '\\'; cursor -= 1) slashes += 1;
+  return slashes % 2 === 1;
+}
+
+function inlineCodeSpans(source) {
+  const spans = [];
+  const tick = String.fromCharCode(96);
+  let index = 0;
+
+  while (index < source.length) {
+    if (source.charCodeAt(index) !== 96) {
+      index += 1;
+      continue;
+    }
+
+    let runEnd = index + 1;
+    while (source.charCodeAt(runEnd) === 96) runEnd += 1;
+    const delimiterLength = runEnd - index;
+    if (escapedBacktick(source, index)) {
+      index = runEnd;
+      continue;
+    }
+
+    let candidate = runEnd;
+    let closeStart = -1;
+    while (candidate < source.length) {
+      const next = source.indexOf(tick, candidate);
+      if (next < 0) break;
+      let nextEnd = next + 1;
+      while (source.charCodeAt(nextEnd) === 96) nextEnd += 1;
+      if (nextEnd - next === delimiterLength) {
+        closeStart = next;
+        break;
+      }
+      candidate = nextEnd;
+    }
+
+    if (closeStart >= 0) {
+      const end = closeStart + delimiterLength;
+      spans.push({ start: index, end });
+      index = end;
+    } else {
+      index = runEnd;
+    }
+  }
+
+  return spans;
+}
+
+function fencedAndInlineCodeSpans(source) {
+  const spans = [];
+  const lines = source.match(/[^\n]*(?:\n|$)/gu) ?? [];
+  let offset = 0;
+  let openFence;
+  let paragraphStart = -1;
+  let paragraphEnd = -1;
+
+  const flushParagraph = () => {
+    if (paragraphStart < 0) return;
+    const paragraph = source.slice(paragraphStart, paragraphEnd);
+    for (const span of inlineCodeSpans(paragraph)) {
+      spans.push({ start: paragraphStart + span.start, end: paragraphStart + span.end });
+    }
+    paragraphStart = -1;
+    paragraphEnd = -1;
+  };
+
+  for (const line of lines) {
+    const content = markdownLineContent(line.replace(/\r?\n$/u, ''));
+    if (openFence) {
+      const close = content.match(/^ {0,3}(`{3,}|~{3,})[ \t]*$/u)?.[1];
+      if (close && close[0] === openFence.char && close.length >= openFence.length) {
+        spans.push({ start: openFence.start, end: offset + line.length });
+        openFence = undefined;
+      }
+    } else {
+      const fence = content.match(/^ {0,3}(`{3,}|~{3,})/u)?.[1];
+      if (fence) {
+        flushParagraph();
+        openFence = { start: offset, char: fence[0], length: fence.length };
+      } else if (/^(?: {4}|\t)/u.test(content)) {
+        flushParagraph();
+        spans.push({ start: offset, end: offset + line.length });
+      } else if (/^[ \t]*$/u.test(content)) {
+        flushParagraph();
+      } else {
+        if (paragraphStart < 0) paragraphStart = offset;
+        paragraphEnd = offset + line.length;
+      }
+    }
+    offset += line.length;
+  }
+
+  flushParagraph();
+  if (openFence) spans.push({ start: openFence.start, end: source.length });
+  return spans;
+}
+
+export function protectLiterals(input, nonce = randomBytes(8).toString('hex')) {
+  const source = String(input ?? '');
+  const spans = fencedAndInlineCodeSpans(source);
+  const patterns = [
+    /https?:\/\/[^\s<>]+|(?<![\w./\\])--?[A-Za-z][\w-]*(?![\w./\\])|\b[A-Za-z_](?=[A-Za-z0-9_]*[A-Z]|[A-Za-z0-9_]*_[A-Za-z0-9_])[A-Za-z0-9_]*\b/gu,
+    /\b[A-Za-z]:[\\/][^\s<>"']+/gu,
+    /\\\\[\p{L}\p{N}\p{M}\p{S}_.$-]+\\[\p{L}\p{N}\p{M}\p{S}_.$-]+(?:\\[\p{L}\p{N}\p{M}\p{S}_.$-]+)*/gu,
+    /(?<![\p{L}\p{N}\p{M}_.])\/(?:[\p{L}\p{N}\p{M}\p{S}_.$-]+\/)*[\p{L}\p{N}\p{M}\p{S}_.$-]+/gu,
+    /(?<![\p{L}\p{N}\p{M}_.])(?:\.\.?[\\/](?:[\p{L}\p{N}\p{M}\p{S}_.$-]+[\\/])*[\p{L}\p{N}\p{M}\p{S}_.$-]+|(?:[\p{L}\p{N}\p{M}\p{S}_.$-]+[\\/])+[\p{L}\p{N}\p{M}\p{S}_.$-]+)/gu,
+    /(?<![\p{L}\p{N}\p{M}_])[\p{L}\p{N}\p{M}\p{S}_./\\-]+\.(?:rs|js|mjs|ts|json|toml|yaml|yml|md|sh|ps1|py|exe)\b/gu,
+  ];
+  for (const match of patterns.flatMap((pattern) => [...source.matchAll(pattern)])) {
+    spans.push({ start: match.index, end: match.index + match[0].length });
+  }
+  spans.sort((a, b) => a.start - b.start || b.end - a.end);
+  const literals = [];
+  let masked = '';
+  let cursor = 0;
+  for (const span of spans) {
+    if (span.start < cursor || span.end <= span.start) continue;
+    const value = source.slice(span.start, span.end);
+    if (!value) continue;
+    const token = `__RDSH_KEEP_${nonce}_${literals.length}__`;
+    masked += source.slice(cursor, span.start) + token;
+    literals.push({ token, value });
+    cursor = span.end;
+  }
+  masked += source.slice(cursor);
+  return { masked, literals };
+}
+
+export function restoreLiterals(translated, literals) {
+  let result = String(translated ?? '');
+  for (const { token, value } of literals) {
+    const first = result.indexOf(token);
+    if (first < 0 || result.indexOf(token, first + token.length) >= 0) {
+      throw new Error('翻訳結果でコード・識別子・パスの保護情報を確認できません');
+    }
+    result = result.slice(0, first) + value + result.slice(first + token.length);
+  }
+  return result;
+}
+
+export function buildTranslationPrompt(text, literals = []) {
+  const protection = literals.length
+    ? `\n保護トークンはすべて一度だけ、綴りを変えずに出力へ残してください: ${literals.map((item) => item.token).join(' ')}`
+    : '';
+  return `次の回答文だけを自然な日本語に翻訳してください。要約、説明、前置き、追指示は追加せず、翻訳文だけを返してください。文の意味とMarkdownの段落構造を保ってください。\n${protection}\n\n--- 翻訳対象 ---\n${text}`;
+}

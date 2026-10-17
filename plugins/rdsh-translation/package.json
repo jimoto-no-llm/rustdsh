@@ -1,0 +1,15 @@
+{
+  "name": "rdsh-translation",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Show a Japanese translation of a finished answer, or replace the answer in the conversation history with it",
+  "exports": { ".": "./index.js", "./client": "./client.js", "./locale/*.json": "./locale/*.json" },
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": { "platform": "web", "immediately": true, "inject": [] }
+  },
+  "meta": {
+    "title": "rdsh Japanese translation",
+    "description": "Show a Japanese translation of an answer, or replace the answer in the conversation history with its translation."
+  }
+}

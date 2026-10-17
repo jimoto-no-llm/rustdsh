@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createOptimizer, policy } from '../optimizer.js';
+import { readFile } from 'node:fs/promises';
+import { createOptimizer, policy, DEFAULT_POLICY } from '../optimizer.js';
 
 const code = value => error => error.code === value;
 const tick = () => new Promise(resolve => setImmediate(resolve));
@@ -16,6 +17,46 @@ function fixture(config = {}) {
   const request = text => ({ parent, prompt: [{ type: 'text', text }], signal: new AbortController().signal });
   return { optimizer, provider: optimizer.provider, backend, parent, request, received };
 }
+
+/** Policy keys the bundled DSH patch pins, read back from its YAML entry. */
+async function bundlePolicy() {
+  const text = await readFile(new URL('../cordis.patch.yml', import.meta.url), 'utf8');
+  const lines = text.split('\n');
+  const start = lines.findIndex(line => line.trim() === 'name: rdsh-subagent-optimizer');
+  assert.notEqual(start, -1, 'cordis.patch.yml declares the optimizer');
+  const config = {};
+  let inConfig = false;
+  for (const line of lines.slice(start + 1)) {
+    if (/^\s*-\s*id:/.test(line)) break;
+    if (/^\s+config:\s*$/.test(line)) { inConfig = true; continue; }
+    if (!inConfig) continue;
+    const match = /^\s+([A-Za-z][A-Za-z0-9]*):\s*(\d+)\s*$/.exec(line);
+    if (match) config[match[1]] = Number(match[2]);
+  }
+  return config;
+}
+
+test('the shipped policy admits one planned wave and its wait covers a queued run', async () => {
+  // One default `rdsh subagents plan` wave is `max_parallel: 3` (src/subagent_plan.rs).
+  assert.deepEqual(policy({}), { ...DEFAULT_POLICY });
+  assert.equal(DEFAULT_POLICY.maxConcurrent, 3);
+  assert.equal(DEFAULT_POLICY.waitTimeoutMs, 120000);
+  // The wait ceiling has to allow a queue longer than one batch of real runs.
+  assert.equal(policy({ waitTimeoutMs: 600000 }).waitTimeoutMs, 600000);
+  assert.throws(() => policy({ waitTimeoutMs: 600001 }), code('RDSH_SUBAGENT_INVALID_POLICY'));
+  const bundled = await bundlePolicy();
+  assert.deepEqual(Object.keys(bundled).sort(), ['maxConcurrent', 'maxDepth', 'maxQueued', 'maxTokens', 'waitTimeoutMs']);
+  for (const [key, value] of Object.entries(bundled)) {
+    assert.equal(value, DEFAULT_POLICY[key], `bundled ${key} must equal the code default`);
+  }
+});
+
+test('the effective policy is observable per optimizer and config overrides win', () => {
+  const f = fixture({ maxConcurrent: 5, waitTimeoutMs: 60000 });
+  assert.deepEqual(f.optimizer.limits, { ...DEFAULT_POLICY, maxConcurrent: 5, waitTimeoutMs: 60000 });
+  assert.equal(Object.isFrozen(f.optimizer.limits), true);
+  assert.deepEqual(fixture().optimizer.limits, { ...DEFAULT_POLICY });
+});
 
 test('fresh provider caps output/depth and forwards the prompt, model, schema and tool restrictions unchanged', async () => {
   const f = fixture();

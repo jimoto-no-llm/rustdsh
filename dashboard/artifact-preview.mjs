@@ -85,11 +85,43 @@ const secretPatterns = [
   [/\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}\b/g, "[REDACTED]"],
   [/\bAKIA[0-9A-Z]{16}\b/g, "[REDACTED]"],
   [/\bBearer\s+[A-Za-z0-9._~+/-]+=*/gi, "Bearer [REDACTED]"],
-  [/([a-z][a-z0-9+.-]*:\/\/)[^\s/@:]+:[^\s/@]+@/gi, "$1[REDACTED]@"],
 ];
 
 function fail(status, reason) {
   return { status, reason };
+}
+
+function redactUrlCredentials(text) {
+  const parts = [];
+  let copied = 0;
+  let cursor = 0;
+  while (true) {
+    const delimiter = text.indexOf("://", cursor);
+    if (delimiter === -1) break;
+    cursor = delimiter + 3;
+    // Delimiter slashes bound both neighboring scans.
+    let hasScheme = false;
+    for (let index = delimiter - 1; index >= 0; index--) {
+      const character = text[index];
+      if (!/[a-z0-9+.-]/i.test(character)) break;
+      if (/[a-z]/i.test(character)) hasScheme = true;
+    }
+    if (!hasScheme) continue;
+
+    let end = cursor;
+    let colon = -1;
+    while (end < text.length && !/[\s/@]/.test(text[end])) {
+      if (colon === -1 && text[end] === ":") colon = end;
+      end++;
+    }
+    if (text[end] !== "@" || colon <= cursor || colon + 1 >= end) continue;
+    parts.push(text.slice(copied, cursor), "[REDACTED]@");
+    copied = end + 1;
+    cursor = copied;
+  }
+  if (copied === 0) return text;
+  parts.push(text.slice(copied));
+  return parts.join("");
 }
 
 function redact(text) {
@@ -98,6 +130,7 @@ function redact(text) {
     pattern.lastIndex = 0;
     value = value.replace(pattern, replacement);
   }
+  value = redactUrlCredentials(value);
   return { text: value, redacted: value !== text };
 }
 
@@ -154,6 +187,8 @@ async function resolveArtifact(root, reference) {
         };
       if (index < segments.length - 1 && !entry.isDirectory())
         return { error: fail(404, "成果物の参照先を確認できません") };
+      if (index === segments.length - 1 && !entry.isFile())
+        return { error: fail(415, "通常ファイルだけをプレビューできます") };
     }
     const real = await fs.realpath(candidate);
     if (!inside(rootReal, real))
@@ -232,7 +267,10 @@ export async function createArtifactPreview(project, events, sequence) {
   let handle;
   try {
     const noFollow = constants.O_NOFOLLOW || 0;
-    handle = await fs.open(resolved.path, constants.O_RDONLY | noFollow);
+    handle = await fs.open(
+      resolved.path,
+      constants.O_RDONLY | noFollow | (constants.O_NONBLOCK || 0),
+    );
     const stat = await handle.stat();
     if (!stat.isFile()) return fail(415, "通常ファイルだけをプレビューできます");
     // The name may have been re-pointed after resolution: serve the file
@@ -268,9 +306,10 @@ export async function createArtifactPreview(project, events, sequence) {
     const redacted = redact(type.text);
     const previewBytes = Buffer.from(redacted.text, "utf8");
     const truncated = previewBytes.length > maximumTextPreviewBytes;
-    const preview = truncated
-      ? previewBytes.subarray(0, maximumTextPreviewBytes)
-      : previewBytes;
+    let end = Math.min(previewBytes.length, maximumTextPreviewBytes);
+    if (truncated)
+      while ((previewBytes[end] & 0xc0) === 0x80) end--;
+    const preview = previewBytes.subarray(0, end);
     return {
       status: 200,
       kind: type.kind,

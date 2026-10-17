@@ -6,11 +6,16 @@ import os from "node:os";
 import path from "node:path";
 import { PassThrough } from "node:stream";
 import { setImmediate as tick } from "node:timers/promises";
-import { startWindowsTray } from "../windows-tray.mjs";
+import { startWindowsTray, TRAY_READY_STALL_MS } from "../windows-tray.mjs";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
+
+// Harness timers are backstops, not the helper's own deadline: they must
+// outlive the tray's startup silence window so a real startup failure is
+// reported with its observed phases instead of an opaque testTimeoutFailure.
+const NATIVE_TRAY_TEST_TIMEOUT_MS = TRAY_READY_STALL_MS + 15000;
 
 const originalPath = process.env.PATH;
 const originalCwd = process.cwd();
@@ -167,7 +172,7 @@ test(
       },
     );
 
-    t.mock.timers.tick(15000);
+    t.mock.timers.tick(TRAY_READY_STALL_MS / 2);
     await tick();
     assert.equal(settled, false);
 
@@ -266,7 +271,7 @@ test("an unready tray retains its 30-second startup deadline and owns only its h
     calls++;
   });
   const rejected = assert.rejects(lost.pending, /did not become ready/);
-  t.mock.timers.tick(29999);
+  t.mock.timers.tick(TRAY_READY_STALL_MS - 1);
   await tick();
   assert.equal(lost.child.killed, undefined);
   t.mock.timers.tick(1);
@@ -274,6 +279,37 @@ test("an unready tray retains its 30-second startup deadline and owns only its h
   assert.equal(lost.child.killed, true);
   assert.equal(lost.server.listenerCount("close"), 0);
   assert.equal(calls, 0);
+});
+
+test("observed startup progress re-arms the ready deadline instead of killing a live helper", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const f = fixture(async () => {});
+  let settled = false,
+    failure = null;
+  f.pending.then(
+    () => {
+      settled = true;
+    },
+    (error) => {
+      settled = true;
+      failure = error;
+    },
+  );
+  // Three nearly-complete silence windows in a row. One absolute deadline
+  // would have expired after the first, but every phase is forward progress.
+  for (const phase of ["powershell-start", "forms-loaded", "drawing-loaded"]) {
+    t.mock.timers.tick(TRAY_READY_STALL_MS - 1);
+    await tick();
+    assert.equal(settled, false);
+    assert.equal(f.child.killed, undefined);
+    f.child.stdout.write(`phase:${phase}\n`);
+    await tick();
+  }
+  f.child.stdout.write("ready\n");
+  const tray = await f.pending;
+  tray.dispose();
+  await tick();
+  assert.equal(failure, null);
 });
 
 test("tray diagnostics bound stderr and keep its contents out of observations", async () => {
@@ -306,9 +342,19 @@ test("tray diagnostics bound stderr and keep its contents out of observations", 
 async function stopFixtureHelper(child) {
   if (!child?.pid || child.exitCode !== null || child.signalCode !== null)
     return true;
-  const exited = once(child, "exit", { signal: AbortSignal.timeout(5000) });
+  // A helper that ignores the graceful kill must not leave the run waiting or
+  // turn a real test failure into an unhandled hook rejection.
+  const wait = () =>
+    once(child, "exit", { signal: AbortSignal.timeout(5000) }).catch(
+      () => null,
+    );
+  const exited = wait();
   child.kill();
   await exited;
+  if (child.exitCode !== null || child.signalCode !== null) return true;
+  const forced = wait();
+  child.kill("SIGKILL");
+  await forced;
   return child.exitCode !== null || child.signalCode !== null;
 }
 
@@ -331,7 +377,7 @@ test(
   "native Windows menu emits Open and Exit actions",
   {
     skip: process.platform !== "win32",
-    timeout: 25000,
+    timeout: NATIVE_TRAY_TEST_TIMEOUT_MS,
   },
   async (t) => {
     const started = performance.now();
@@ -355,6 +401,24 @@ test(
       ],
       { windowsHide: true, stdio: ["ignore", "ignore", "pipe"] },
     );
+    // The child reports its startup phases; only silence is a failure, so the
+    // wait follows those events instead of a fixed harness wall clock.
+    let stallTimer;
+    let stall;
+    const stalled = new Promise((_resolve, reject) => {
+      stall = reject;
+    });
+    const watch = () => {
+      clearTimeout(stallTimer);
+      stallTimer = setTimeout(() => {
+        stall(
+          new Error(
+            `no tray startup phase for ${TRAY_READY_STALL_MS} ms; observed ${JSON.stringify(phases)}`,
+          ),
+        );
+      }, TRAY_READY_STALL_MS);
+    };
+    watch();
     child.stderr.on("data", (chunk) => {
       const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
       stderrBytes += bytes.length;
@@ -379,10 +443,12 @@ test(
         ) {
           phases.push(line);
           t.diagnostic(line);
+          watch();
         }
       }
     });
     t.after(async () => {
+      clearTimeout(stallTimer);
       const cleanupExitObserved = await stopFixtureHelper(child);
       t.diagnostic(
         JSON.stringify({
@@ -402,7 +468,11 @@ test(
         }),
       );
     });
-    const [code] = await once(child, "close", { signal: t.signal });
+    const [code] = await Promise.race([
+      once(child, "close", { signal: t.signal }),
+      stalled,
+    ]);
+    clearTimeout(stallTimer);
     assert.equal(code, 0);
   },
 );
@@ -411,7 +481,7 @@ test(
   "native Windows creates a real NotifyIcon and disposes it on server close",
   {
     skip: process.platform !== "win32",
-    timeout: 25000,
+    timeout: NATIVE_TRAY_TEST_TIMEOUT_MS,
   },
   async (t) => {
     const server = new EventEmitter();
@@ -442,7 +512,7 @@ test(
   "native Windows runs real PowerShell despite a planted pwsh.exe in the working directory",
   {
     skip: process.platform !== "win32",
-    timeout: 25000,
+    timeout: NATIVE_TRAY_TEST_TIMEOUT_MS,
   },
   async (t) => {
     // A genuine executable under the helper's name: it exits on PowerShell's

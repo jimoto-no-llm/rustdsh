@@ -16,6 +16,10 @@
 //   critical operations must rely on tool isolation, not on deny-list hits.
 // - #29 structured policy is opt-in: only known file tool schemas are classified;
 //   shell commands and unknown tools stay blocked rather than guessed.
+// - Priority 3 shell hardening: command strings are quote-stripped, tokenized and
+//   variable-expanded into bounded candidate texts before the same structural
+//   patterns match, and path arguments are folded/resolved against the hook cwd.
+//   Candidates only add matches; a pattern never becomes an allow-list.
 
 use std::path::{Path, PathBuf};
 
@@ -55,11 +59,434 @@ pub fn wildcard_match(pattern: &str, text: &str) -> bool {
     }
     true
 }
-fn matches_value(pattern: &str, value: &serde_json::Value) -> bool {
+// Priority 3 shell-awareness: deny patterns stay structural (wildcards and
+// anchors), not semantic allow-lists (#29). Normalization only adds candidate
+// texts that the same wildcard matcher sees, so quoting (r"m" -rf), same-line
+// variable assembly (A=rm; $A -rf) and path traversal (/tmp/../important) can
+// no longer displace a pattern. Everything is bounded so the PreToolUse hook
+// keeps its sub-millisecond budget.
+
+/// Values above this size are matched exactly: no character-by-character
+/// normalization, so an oversized payload cannot slow the hook down.
+const MAX_NORMALIZED_INPUT: usize = 16 * 1024;
+/// Bound on candidate texts derived from one input string.
+const MAX_NORMALIZED_CANDIDATES: usize = 16;
+/// Bound on shell words kept from one command string.
+const MAX_SHELL_WORDS: usize = 512;
+/// Bound on filesystem probes (canonicalize) per hook invocation.
+const MAX_PATH_PROBES: usize = 8;
+
+/// Split one shell command into words, dropping quotes and treating control
+/// operators (semicolon, pipe, ampersand, newline, parentheses, redirections)
+/// as segment boundaries. Returns one word list per segment. This is a bounded
+/// approximation of shell word splitting, not a full POSIX parser.
+fn shell_segments(command: &str) -> Vec<Vec<String>> {
+    let mut segments = Vec::new();
+    let mut words: Vec<String> = Vec::new();
+    let mut word = String::new();
+    let mut has_word = false;
+    let mut single = false;
+    let mut double = false;
+    let mut backtick = false;
+    let mut escaped = false;
+    let mut total = 0usize;
+
+    fn flush(words: &mut Vec<String>, word: &mut String, has_word: &mut bool, total: &mut usize) {
+        if *has_word {
+            *total += 1;
+            words.push(std::mem::take(word));
+            *has_word = false;
+        } else {
+            word.clear();
+        }
+    }
+
+    for ch in command.chars() {
+        if escaped {
+            word.push(ch);
+            has_word = true;
+            escaped = false;
+            continue;
+        }
+        if single {
+            if ch == '\u{27}' {
+                single = false;
+            } else {
+                word.push(ch);
+            }
+            continue;
+        }
+        if backtick {
+            if ch == '\u{60}' {
+                backtick = false;
+            } else {
+                word.push(ch);
+            }
+            continue;
+        }
+        if double {
+            match ch {
+                '"' => double = false,
+                '\u{5c}' => escaped = true,
+                _ => word.push(ch),
+            }
+            continue;
+        }
+        match ch {
+            '\u{5c}' => {
+                escaped = true;
+                has_word = true;
+            }
+            '\u{27}' => {
+                single = true;
+                has_word = true;
+            }
+            '"' => {
+                double = true;
+                has_word = true;
+            }
+            '\u{60}' => {
+                backtick = true;
+                has_word = true;
+            }
+            ';' | '|' | '&' | '(' | ')' | '<' | '>' => {
+                flush(&mut words, &mut word, &mut has_word, &mut total);
+                if !words.is_empty() {
+                    segments.push(std::mem::take(&mut words));
+                }
+            }
+            _ if ch.is_whitespace() => {
+                flush(&mut words, &mut word, &mut has_word, &mut total);
+            }
+            _ => {
+                word.push(ch);
+                has_word = true;
+            }
+        }
+        if total >= MAX_SHELL_WORDS {
+            break;
+        }
+    }
+    flush(&mut words, &mut word, &mut has_word, &mut total);
+    if !words.is_empty() {
+        segments.push(words);
+    }
+    segments
+}
+
+/// NAME=value at the start of a segment (optionally after a launcher word).
+fn split_assignment(word: &str) -> Option<(&str, &str)> {
+    let (name, value) = word.split_once('=')?;
+    let mut chars = name.chars();
+    let first = chars.next()?;
+    if !(first.is_ascii_alphabetic() || first == '_') {
+        return None;
+    }
+    if !chars.all(|c| c.is_ascii_alphanumeric() || c == '_') {
+        return None;
+    }
+    Some((name, value))
+}
+
+fn shell_assignments(segments: &[Vec<String>]) -> Vec<(String, String)> {
+    let mut variables: Vec<(String, String)> = Vec::new();
+    for segment in segments {
+        let mut index = 0;
+        while let Some(word) = segment.get(index) {
+            if matches!(
+                word.as_str(),
+                "export" | "env" | "command" | "nohup" | "exec" | "time"
+            ) {
+                index += 1;
+                continue;
+            }
+            let Some((name, value)) = split_assignment(word) else {
+                break;
+            };
+            match variables.iter_mut().find(|(known, _)| known == name) {
+                Some(entry) => entry.1 = value.to_owned(),
+                None => variables.push((name.to_owned(), value.to_owned())),
+            }
+            index += 1;
+        }
+    }
+    variables
+}
+
+/// Substitute dollar-variable references outside single quotes, bounded to a
+/// few rounds so chained same-line assignments (A=rm; B=$A; $B -rf) resolve.
+fn expand_variables(command: &str, variables: &[(String, String)]) -> String {
+    if variables.is_empty() || !command.contains('$') {
+        return command.to_owned();
+    }
+    let mut current = command.to_owned();
+    for _ in 0..4 {
+        let next = expand_variables_once(&current, variables);
+        if next == current {
+            break;
+        }
+        current = next;
+        if current.len() > MAX_NORMALIZED_INPUT {
+            break;
+        }
+    }
+    current
+}
+
+fn expand_variables_once(input: &str, variables: &[(String, String)]) -> String {
+    let mut output = String::with_capacity(input.len());
+    let mut chars = input.chars().peekable();
+    let mut single = false;
+    let mut double = false;
+    while let Some(ch) = chars.next() {
+        match ch {
+            '\u{5c}' if !single => {
+                output.push(ch);
+                if let Some(next) = chars.next() {
+                    output.push(next);
+                }
+            }
+            '\u{27}' if !double => {
+                single = !single;
+                output.push(ch);
+            }
+            '"' if !single => {
+                double = !double;
+                output.push(ch);
+            }
+            '$' if !single => {
+                let braced = chars.peek() == Some(&'{');
+                if braced {
+                    chars.next();
+                }
+                let mut name = String::new();
+                while let Some(&next) = chars.peek() {
+                    if next.is_ascii_alphanumeric() || next == '_' {
+                        name.push(next);
+                        chars.next();
+                    } else {
+                        break;
+                    }
+                }
+                if braced && chars.peek() != Some(&'}') {
+                    output.push('$');
+                    output.push('{');
+                    output.push_str(&name);
+                    continue;
+                }
+                if braced {
+                    chars.next();
+                }
+                match variables.iter().find(|(known, _)| *known == name) {
+                    Some((_, value)) => output.push_str(value),
+                    None => {
+                        output.push('$');
+                        if braced {
+                            output.push('{');
+                        }
+                        output.push_str(&name);
+                        if braced {
+                            output.push('}');
+                        }
+                    }
+                }
+            }
+            _ => output.push(ch),
+        }
+    }
+    output
+}
+
+fn push_candidate(out: &mut Vec<String>, candidate: String) {
+    if candidate.is_empty()
+        || out.len() >= MAX_NORMALIZED_CANDIDATES
+        || out.iter().any(|existing| existing == &candidate)
+    {
+        return;
+    }
+    out.push(candidate);
+}
+
+fn push_segment_candidates(out: &mut Vec<String>, segments: &[Vec<String>]) {
+    let joined = segments
+        .iter()
+        .flatten()
+        .cloned()
+        .collect::<Vec<_>>()
+        .join(" ");
+    push_candidate(out, joined);
+    for segment in segments {
+        push_candidate(out, segment.join(" "));
+    }
+}
+
+/// Fold '.' and '..' segments without touching the filesystem.
+fn lexical_normalize_path(path: &str) -> String {
+    let absolute = path.starts_with('/');
+    let mut parts: Vec<&str> = Vec::new();
+    for part in path.split('/') {
+        match part {
+            "" | "." => {}
+            ".." => {
+                if parts.last().is_some_and(|last| *last != "..") {
+                    parts.pop();
+                } else if !absolute {
+                    parts.push("..");
+                }
+            }
+            other => parts.push(other),
+        }
+    }
+    let mut output = String::new();
+    if absolute {
+        output.push('/');
+    }
+    output.push_str(&parts.join("/"));
+    if path.ends_with('/') && !output.ends_with('/') {
+        output.push('/');
+    }
+    if output.is_empty() {
+        output.push(if absolute { '/' } else { '.' });
+    }
+    output
+}
+
+/// Resolve one path-like word: lexical dot-dot folding, then canonicalize
+/// against the hook's cwd so symlinks point at their real target. The guard's
+/// own working directory is never used as the base.
+fn normalize_path_word(word: &str, cwd: Option<&Path>, probes: &mut usize) -> Option<String> {
+    let mut normalized = None;
+    if word.contains('/') {
+        let lexical = lexical_normalize_path(word);
+        if lexical != word {
+            normalized = Some(lexical);
+        }
+    }
+    // Only canonicalize needs a filesystem base. A hook may carry no cwd (plain
+    // text) or a cwd this platform rejects as absolute (bash-style "/tmp" on
+    // Windows); the lexical fold above must survive either way.
+    let Some(base) = cwd else {
+        return normalized;
+    };
+    if *probes >= MAX_PATH_PROBES || word.len() > 4096 {
+        return normalized;
+    }
+    *probes += 1;
+    let candidate = if Path::new(word).is_absolute() {
+        PathBuf::from(word)
+    } else {
+        base.join(word)
+    };
+    if let Ok(resolved) = std::fs::canonicalize(&candidate) {
+        if let Some(resolved) = resolved.to_str() {
+            if resolved != word {
+                normalized = Some(resolved.to_owned());
+            }
+        }
+    }
+    normalized
+}
+
+/// All normalized forms of one input string, bounded and deduplicated.
+fn command_candidates(command: &str, cwd: Option<&Path>, probes: &mut usize) -> Vec<String> {
+    let mut out = Vec::new();
+    let segments = shell_segments(command);
+    push_segment_candidates(&mut out, &segments);
+
+    let variables = shell_assignments(&segments);
+    let expanded = if variables.is_empty() {
+        segments
+    } else {
+        shell_segments(&expand_variables(command, &variables))
+    };
+    if !variables.is_empty() {
+        push_segment_candidates(&mut out, &expanded);
+    }
+
+    // Command-name normalization: an absolute command scans as its basename.
+    for segment in &expanded {
+        if out.len() >= MAX_NORMALIZED_CANDIDATES {
+            break;
+        }
+        let Some(first) = segment.first() else {
+            continue;
+        };
+        let Some((_, base)) = first.rsplit_once('/') else {
+            continue;
+        };
+        if base.is_empty() || base == first {
+            continue;
+        }
+        let mut variant = segment.clone();
+        variant[0] = base.to_owned();
+        push_candidate(&mut out, variant.join(" "));
+    }
+
+    // A quoted word can carry a whole nested command (sh -c "rm -rf /",
+    // backticks). Re-scan a whitespace-bearing word on its own so the nested
+    // command name still sits at the pattern anchor.
+    'quoted: for segment in &expanded {
+        for word in segment {
+            if out.len() >= MAX_NORMALIZED_CANDIDATES {
+                break 'quoted;
+            }
+            if !word.contains(char::is_whitespace) {
+                continue;
+            }
+            push_segment_candidates(&mut out, &shell_segments(word));
+        }
+    }
+
+    // Path normalization: dot-dot folding plus symlink resolution.
+    'segments: for segment in &expanded {
+        for (index, word) in segment.iter().enumerate() {
+            if out.len() >= MAX_NORMALIZED_CANDIDATES || *probes >= MAX_PATH_PROBES {
+                break 'segments;
+            }
+            if word.is_empty() || word.starts_with('-') || word.contains('=') {
+                continue;
+            }
+            let Some(normalized) = normalize_path_word(word, cwd, probes) else {
+                continue;
+            };
+            let mut variant = segment.clone();
+            variant[index] = normalized;
+            push_candidate(&mut out, variant.join(" "));
+        }
+    }
+    out
+}
+
+fn hook_cwd(value: &serde_json::Value) -> Option<PathBuf> {
+    value
+        .get("cwd")
+        .and_then(serde_json::Value::as_str)
+        .map(PathBuf::from)
+        .filter(|path| path.is_absolute())
+}
+
+fn matches_text(pattern: &str, text: &str, cwd: Option<&Path>, probes: &mut usize) -> bool {
+    if wildcard_match(pattern, text) {
+        return true;
+    }
+    if text.len() > MAX_NORMALIZED_INPUT {
+        return false;
+    }
+    command_candidates(text, cwd, probes)
+        .iter()
+        .any(|candidate| wildcard_match(pattern, candidate))
+}
+
+fn matches_value(
+    pattern: &str,
+    value: &serde_json::Value,
+    cwd: Option<&Path>,
+    probes: &mut usize,
+) -> bool {
     match value {
-        serde_json::Value::String(s) => wildcard_match(pattern, s),
-        serde_json::Value::Array(a) => a.iter().any(|v| matches_value(pattern, v)),
-        serde_json::Value::Object(m) => m.values().any(|v| matches_value(pattern, v)),
+        serde_json::Value::String(s) => matches_text(pattern, s, cwd, probes),
+        serde_json::Value::Array(a) => a.iter().any(|v| matches_value(pattern, v, cwd, probes)),
+        serde_json::Value::Object(m) => m.values().any(|v| matches_value(pattern, v, cwd, probes)),
         _ => false,
     }
 }
@@ -71,15 +498,18 @@ fn denied_pattern<'a>(raw: &str, deny: &'a [String]) -> anyhow::Result<Option<&'
     // block every hook invocation.
     if matches!(t.as_bytes().first(), Some(b'{') | Some(b'[') | Some(b'"')) {
         let value = serde_json::from_str::<serde_json::Value>(raw)?;
+        let cwd = hook_cwd(&value);
+        let mut probes = 0usize;
         Ok(deny
             .iter()
             .filter(|p| !p.trim().is_empty())
-            .find(|p| matches_value(p, &value)))
+            .find(|p| matches_value(p, &value, cwd.as_deref(), &mut probes)))
     } else {
+        let mut probes = 0usize;
         Ok(deny
             .iter()
             .filter(|p| !p.trim().is_empty())
-            .find(|p| wildcard_match(p, raw)))
+            .find(|p| matches_text(p, raw, None, &mut probes)))
     }
 }
 
@@ -760,6 +1190,149 @@ mod tests {
                 .unwrap()
                 .is_none());
         }
+    }
+
+    // Priority 3: shell quoting must not displace an anchored deny pattern.
+    #[test]
+    fn quoted_command_name_cannot_bypass_deny_patterns() {
+        let double =
+            r#"{"cwd":"/tmp","tool_name":"Bash","tool_input":{"command":"r\"m\" -rf / x"}}"#;
+        assert!(denied_pattern(double, &["rm -rf /*".into()])
+            .unwrap()
+            .is_some());
+        let single = r#"{"cwd":"/tmp","tool_name":"Bash","tool_input":{"command":"r'm' -rf / x"}}"#;
+        assert!(denied_pattern(single, &["rm -rf /*".into()])
+            .unwrap()
+            .is_some());
+        for command in ["sh -c \"rm -rf /\"", "echo `rm -rf /`"] {
+            let raw = serde_json::json!({
+                "cwd": "/tmp",
+                "tool_name": "Bash",
+                "tool_input": { "command": command }
+            })
+            .to_string();
+            assert!(
+                denied_pattern(&raw, &["rm -rf /*".into()])
+                    .unwrap()
+                    .is_some(),
+                "{command}"
+            );
+        }
+        let escaped =
+            r#"{"cwd":"/tmp","tool_name":"Bash","tool_input":{"command":"r\\m -rf / x"}}"#;
+        assert!(denied_pattern(escaped, &["rm -rf /*".into()])
+            .unwrap()
+            .is_some());
+    }
+
+    // Priority 3: same-line variable assembly resolves before matching.
+    #[test]
+    fn variable_assembly_cannot_bypass_deny_patterns() {
+        for command in [
+            "A=rm; $A -rf / x",
+            "A=rm; B=$A; $B -rf / x",
+            "C=\"rm -rf /\"; ${C} x",
+        ] {
+            let raw = serde_json::json!({
+                "cwd": "/tmp",
+                "tool_name": "Bash",
+                "tool_input": { "command": command }
+            })
+            .to_string();
+            assert!(
+                denied_pattern(&raw, &["rm -rf /*".into()])
+                    .unwrap()
+                    .is_some(),
+                "{command}"
+            );
+        }
+    }
+
+    // Priority 3: absolute command paths and dot-dot paths match the
+    // effective path, not the literal text.
+    #[test]
+    fn path_normalization_cannot_bypass_deny_patterns() {
+        let absolute = serde_json::json!({
+            "cwd": "/tmp",
+            "tool_name": "Bash",
+            "tool_input": { "command": "/bin/rm -rf / x" }
+        })
+        .to_string();
+        assert!(denied_pattern(&absolute, &["rm -rf /*".into()])
+            .unwrap()
+            .is_some());
+        let traversal = serde_json::json!({
+            "cwd": "/tmp",
+            "tool_name": "Bash",
+            "tool_input": { "command": "rm -rf /tmp/../important/x" }
+        })
+        .to_string();
+        assert!(denied_pattern(&traversal, &["rm -rf /important*".into()])
+            .unwrap()
+            .is_some());
+        // A plain-text payload carries no cwd at all, and Windows rejects a
+        // bash-style "/tmp" as absolute. Dot-dot folding must not depend on
+        // either: it is lexical, so it applies on every platform.
+        assert!(
+            denied_pattern("rm -rf /tmp/../important/x", &["rm -rf /important*".into()])
+                .unwrap()
+                .is_some()
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlink_targets_are_matched_through_the_hook_cwd() {
+        use std::os::unix::fs::symlink;
+        let tree = TestTree::new();
+        std::fs::write(tree.path().join("secret.txt"), "never report this").unwrap();
+        symlink(tree.path().join("secret.txt"), tree.path().join("safe.txt")).unwrap();
+        let raw = serde_json::json!({
+            "cwd": tree.path().to_string_lossy(),
+            "tool_name": "Bash",
+            "tool_input": { "command": "cat safe.txt" }
+        })
+        .to_string();
+        assert!(denied_pattern(&raw, &["*secret.txt*".into()])
+            .unwrap()
+            .is_some());
+    }
+
+    // Structural semantics stay structural: a plain argument that merely
+    // mentions the pattern inside one command is still not an anchored hit.
+    #[test]
+    fn anchored_pattern_does_not_match_plain_argument_text() {
+        let raw = r#"{"cwd":"/tmp","tool_name":"Bash","tool_input":{"command":"echo rm -rf / x"}}"#;
+        assert!(denied_pattern(raw, &["rm -rf /*".into()])
+            .unwrap()
+            .is_none());
+    }
+
+    #[test]
+    fn shell_segments_remove_quotes_and_split_operators() {
+        assert_eq!(
+            shell_segments("r\"m\" -rf / x"),
+            vec![vec!["rm".to_string(), "-rf".into(), "/".into(), "x".into()]]
+        );
+        assert_eq!(
+            shell_segments("a && b | c"),
+            vec![vec!["a".to_string()], vec!["b".into()], vec!["c".into()]]
+        );
+        assert_eq!(
+            shell_segments("echo 'a b' \"c d\""),
+            vec![vec!["echo".to_string(), "a b".into(), "c d".into()]]
+        );
+    }
+
+    #[test]
+    fn lexical_path_normalization_folds_dot_segments() {
+        assert_eq!(
+            lexical_normalize_path("/tmp/../important/x"),
+            "/important/x"
+        );
+        assert_eq!(lexical_normalize_path("./a/./b/"), "a/b/");
+        assert_eq!(lexical_normalize_path("../a"), "../a");
+        assert_eq!(lexical_normalize_path("/e/../.."), "/");
     }
 
     struct TestTree(PathBuf);

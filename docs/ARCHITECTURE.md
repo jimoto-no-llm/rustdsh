@@ -28,7 +28,10 @@ plugin delegates authentication to the DSH connection service.
 Ordinary commands fail on corrupt JSON. `settings init --force` is the explicit
 operation that replaces the document with defaults. Pure `subagents plan`,
 `task-outcomes` and native `cost-ledger` operations resolve their display language
-from the explicit flag and process locale without opening unrelated settings.
+from the explicit flag and process locale. `subagents plan` additionally reads
+only its own `subagents` section for dispatch defaults, and falls back to the
+built-in numbers when the document is missing or unreadable, so an unrelated
+corrupt file cannot block a plan.
 Cost-ledger validation, decimal arithmetic, JSON key order and schema output
 match the in-process dashboard module; only CLI diagnostics are localized.
 The dashboard keeps its synchronous JS ledger for stores, MCP schemas and budget

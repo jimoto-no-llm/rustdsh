@@ -304,12 +304,15 @@ async function previewArtifact(sequence) {
     if (request !== artifactPreviewRequest) return;
     const redacted = response.headers.get("x-rdsh-preview-redacted") === "true";
     const truncated = response.headers.get("x-rdsh-preview-truncated") === "true";
+    const isImage = response.headers.get("x-rdsh-preview-kind") === "image";
+    const text = isImage ? null : await blob.text();
+    if (request !== artifactPreviewRequest) return;
     const stale =
       latestState != null &&
       revision !== -1 &&
       latestState.revision !== revision;
     const staleNote = stale ? "（取得後に状態が更新されました）" : "";
-    if (response.headers.get("x-rdsh-preview-kind") === "image") {
+    if (isImage) {
       artifactPreviewUrl = URL.createObjectURL(blob);
       const image = node("img", undefined, "artifact-preview-image");
       image.src = artifactPreviewUrl;
@@ -318,7 +321,7 @@ async function previewArtifact(sequence) {
       status.textContent =
         "画像を読み取り専用で表示しています。" + staleNote;
     } else {
-      content.append(node("pre", await blob.text(), "artifact-preview-text"));
+      content.append(node("pre", text, "artifact-preview-text"));
       status.textContent =
         [
           redacted

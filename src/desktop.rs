@@ -827,7 +827,10 @@ fn desktop_targets(
     let mut targets = Vec::new();
     let mut root = None;
     if !no_bundled {
-        let plugins_root = resolve_plugins_dir(plugins_dir, env, locale)?;
+        // 相対の --plugins-dir は絶対化してから spec を作る。DSH は `./` 始まりの
+        // spec を起動ディレクトリ基準で解決するため、相対のままだと
+        // plugins/plugins/<name> を探して失敗する。
+        let plugins_root = absolute(&resolve_plugins_dir(plugins_dir, env, locale)?);
         for name in plugin_selection(compute) {
             let spec = plugins_root.join(name).display().to_string();
             // Windows separators become CLI spec separators. On Unix a
@@ -1553,6 +1556,35 @@ mod tests {
             plugins
         );
         std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// 相対の --plugins-dir でも spec は絶対パスになること（相対 spec だと DSH が
+    /// 起動ディレクトリ基準で解決し、plugins/plugins/<name> を探してしまう）。
+    #[test]
+    fn relative_plugins_dir_produces_absolute_specs() {
+        let cwd = std::env::current_dir().unwrap();
+        if !cwd.join("plugins/rdsh-settings/package.json").exists() {
+            return; // パッケージ化された crate ではチェックアウトが無い。
+        }
+        let env = base_env(&std::env::temp_dir());
+        let (targets, root) = desktop_targets(
+            Some("./plugins"),
+            &[],
+            false,
+            false,
+            false,
+            false,
+            &env,
+            crate::locale::Locale::English,
+        )
+        .unwrap();
+        assert!(root.unwrap().is_absolute());
+        // 同梱プラグインの spec は絶対パス。third-party は `github:` 参照なので対象外。
+        let settings = targets
+            .iter()
+            .find(|target| target.label == "rdsh-settings")
+            .expect("bundled rdsh-settings target");
+        assert!(Path::new(&settings.spec).is_absolute(), "{}", settings.spec);
     }
 
     #[test]

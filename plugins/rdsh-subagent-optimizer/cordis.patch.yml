@@ -2,8 +2,9 @@
     - id: rdsh-subagent-optimizer
       name: rdsh-subagent-optimizer
       config:
-        maxConcurrent: 2
+        maxConcurrent: 3
         maxQueued: 8
+        waitTimeoutMs: 120000
         maxTokens: 4096
         maxDepth: 1
     - id: rdsh-explore-tool

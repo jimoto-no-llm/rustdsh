@@ -10,21 +10,21 @@ Issue [#19](https://github.com/jimoto-no-llm/rustdsh/issues/19) の追指示投�
 
 ## 対象と入力処理の確認
 
-`reply-consumer serve` で元のrun/sessionへ明示接続し、表示されたconsumer IDを使います。
-ブラウザーの「同じsessionへ追指示を送る」でtask・run・sessionを確認します。
-保存は新しいsessionを作らず、切断時にも別sessionへ振り替えません。
+`reply-consumer serve` で元のrun/sessionへ明示的に接続し、表示されたconsumer IDを使います。
+ブラウザーの「同じsessionへ追指示を送る」画面でtask・run・sessionを確認します。
+保存時に新しいsessionは作成されず、切断時にも別sessionへ振り替えられることはありません。
 
-保存、対象consumerの読取、送信開始、元のCLIの応答を分けて表示します。
-送信開始は永続claimの取得です。結果確認には同じnative commandのACP応答が必要です。
-入力処理の完了は、タスクの完了・受入検証・新しい実行権限を意味しません。
+保存、対象consumerの読み取り、送信開始、元のCLIからの応答を分けて表示します。
+送信開始は永続claimの取得を意味します。結果の確認には、同じnative commandのACP応答が必要です。
+なお、入力処理の完了は、タスクの完了・受入検証・新しい実行権限を意味するものではありません。
 
 ## 適用タイミング
 
 | 希望             | 実際の扱い                                                                               |
 | ---------------- | ---------------------------------------------------------------------------------------- |
-| 次ターンへ追加   | 同じ対象の先行入力の結果確認を待つ                                                       |
-| 現ターンへsteer  | 現在のDSH adapterには検証済みsteerがないため、次ターン待ちと明示する                     |
-| 明示中断して変更 | 人間が確認した現在の入力だけにcancelを送り、対応する取消し応答を確認してから追指示を送る |
+| 次ターンへ追加   | 同じ対象の先行入力における結果確認を待つ                                                 |
+| 現ターンへsteer  | 現在のDSH adapterには検証済みのsteerがないため、次ターン待ちと明示する                   |
+| 明示中断して変更 | 人間が確認した現在の入力にのみcancelを送り、対応する取消し応答を確認してから追指示を送る |
 
 中断の確認は現在のinput command IDに固定します。処理対象が変わればチェックを外します。
 native cancelのclaimも一度だけ取得できます。cancelはACP通知なので、送信だけでは
@@ -32,8 +32,8 @@ native cancelのclaimも一度だけ取得できます。cancelはACP通知な�
 cancel記録が必要です。claim前に対象が終わった場合は、native結果を確認して中断不要とします。
 結果不明は後続入力を保留し、timeoutで成功や失敗を推測しません。
 
-管理エージェントの中断要求は保存して人間の確認待ちにします。
-MCP資格情報では、人間の確認やconsumerの読取・結果ackを発行できません。
+管理エージェントからの中断要求は、保存したうえで人間の確認待ちとします。
+MCP資格情報では、人間の確認やconsumerの読み取り、結果ackを発行できません。
 
 ## ID、入力順、下書きと競合
 
@@ -67,10 +67,10 @@ rdsh-dashboard instruction resolve --project /path/to/project --input-file revie
 rdsh-dashboard reply-consumer inspect --project /path/to/project --command-id input_uuid
 ```
 
-`context` / `submit` はprojectのMCP資格情報を使い、管理エージェントとして記録します。
-`resolve` はローカル管理者の資格情報で人間の確認を明示実行するコマンドです。
-これらはproviderを呼ばず、native CLIや新しいsessionを起動しません。
-入力JSONはUTF-8の通常ファイルを使い、リトライ時は同じIDと内容を保持します。
+`context` および `submit` はprojectのMCP資格情報を使用し、管理エージェントとして記録します。
+`resolve` はローカル管理者の資格情報を用いて人間の確認を明示的に実行するコマンドです。
+これらはproviderを呼び出さず、native CLIや新しいsessionを起動することもありません。
+入力JSONにはUTF-8の通常ファイルを使用し、リトライ時には同じIDと内容を保持します。
 
 `input.json` のconsumer・run・session・revisionは最新のcontextに置き換えます。
 

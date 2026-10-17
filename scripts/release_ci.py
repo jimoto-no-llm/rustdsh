@@ -21,6 +21,7 @@ REQUIRED_WORKFLOWS = {
         "browser-e2e",
         "security-boundaries",
         "release-policy",
+        "crate-package",
         "plugin-security",
         "msrv",
         "update-banner-windows",

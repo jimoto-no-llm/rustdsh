@@ -10,13 +10,16 @@ installer and badge links use that owner. Keep historical evidence intact.
   generated PR/author list and Full Changelog.
 - Create version notes from `docs/releases/TEMPLATE.md`. Keep `Cargo.toml`,
   `Cargo.lock`, the dated CHANGELOG entry and `vX.Y.Z` tag consistent.
+- Release cadence: semver — an important addition takes a minor (e.g. `v0.7.0`)
+  and a fix-only release takes a patch (e.g. `v0.6.1`); every release empties `[Unreleased]`.
 - Before tagging, run `python3 scripts/prepare-release.py vX.Y.Z` and
   `python3 -m unittest discover -s tests -p 'test_release_*.py'`, followed by
   the verification matrix in `CONTRIBUTING.md`.
 - Use annotated tags. Never move or delete published tags or overwrite release
   assets. Candidates use exact-tag installer URLs and never replace `latest`.
-- Preserve all five platform archives, their SHA256 sidecars, and both installers.
-  Publication belongs to the final CD job after upload verification.
+- Preserve all five platform archives, their SHA256 sidecars, both installers
+  and the `.deb`/`.rpm` native packages. Publication belongs to the final CD
+  job after upload verification.
 - Publication is not finished until the digests are pinned: merge the pull
   request the `pin-release-digests` workflow opens, or run
   `python3 scripts/pin-release-digests.py vX.Y.Z`. Installers and the automatic

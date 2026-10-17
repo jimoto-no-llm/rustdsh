@@ -37,6 +37,30 @@ pub struct RdshSettings {
     pub context: ContextSection,
     pub extras: ExtrasSection,
     pub features: FeaturesSection,
+    pub subagents: SubagentsSection,
+}
+
+/// Subagent dispatch defaults read by `rdsh subagents plan` when the request
+/// omits `limits` (see docs/SUBAGENT-PLANNING.md). The numbers reproduce the
+/// planner's built-in defaults, so an absent section changes nothing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SubagentsSection {
+    pub max_parallel: usize,
+    pub max_items_per_agent: usize,
+    pub max_weight_per_agent: usize,
+    /// 0 keeps the planner's unbounded `budget_units: null`.
+    pub budget_units: usize,
+}
+
+impl Default for SubagentsSection {
+    fn default() -> Self {
+        Self {
+            max_parallel: 3,
+            max_items_per_agent: 3,
+            max_weight_per_agent: 9,
+            budget_units: 0,
+        }
+    }
 }
 
 /// Optional server-type features, off by default. Known ids are listed in
@@ -124,6 +148,11 @@ pub const FEATURES: &[FeatureDef] = &[
         id: "dep_graph",
         default: true,
         summary: "static code-dependency graph and change impact (rdsh deps)",
+    },
+    FeatureDef {
+        id: "models_sync",
+        default: true,
+        summary: "refresh provider model catalogs from the daily auto-update run",
     },
     FeatureDef {
         id: "compute",
@@ -511,6 +540,7 @@ impl Default for RdshSettings {
             context: ContextSection::default(),
             extras: ExtrasSection::default(),
             features: FeaturesSection::default(),
+            subagents: SubagentsSection::default(),
         }
     }
 }
@@ -767,6 +797,7 @@ impl RdshSettings {
         let su = sec("setup");
         let be = sec("beta");
         let cx = sec("context");
+        let sub = sec("subagents");
         let mut out = Self {
             schema: SCHEMA_VERSION,
             general: GeneralSection {
@@ -851,6 +882,13 @@ impl RdshSettings {
                     .collect(),
             },
             features: FeaturesSection::from_value(&sec("features")),
+            subagents: SubagentsSection {
+                max_parallel: clamp_u64(num(&sub, "max_parallel"), 3, 1, 16) as usize,
+                max_items_per_agent: clamp_u64(num(&sub, "max_items_per_agent"), 3, 1, 20) as usize,
+                max_weight_per_agent: clamp_u64(num(&sub, "max_weight_per_agent"), 9, 1, 128)
+                    as usize,
+                budget_units: clamp_u64(num(&sub, "budget_units"), 0, 0, 100_000) as usize,
+            },
         };
         out.sanitize();
         out
@@ -926,6 +964,16 @@ impl RdshSettings {
                 .cloned()
                 .unwrap_or(serde_json::Value::Null),
         );
+        let sub = v
+            .get("subagents")
+            .cloned()
+            .unwrap_or(serde_json::Value::Null);
+        out.subagents.max_parallel = clamp_u64(num(&sub, "max_parallel"), 3, 1, 16) as usize;
+        out.subagents.max_items_per_agent =
+            clamp_u64(num(&sub, "max_items_per_agent"), 3, 1, 20) as usize;
+        out.subagents.max_weight_per_agent =
+            clamp_u64(num(&sub, "max_weight_per_agent"), 9, 1, 128) as usize;
+        out.subagents.budget_units = clamp_u64(num(&sub, "budget_units"), 0, 0, 100_000) as usize;
         let cx = v.get("context").cloned().unwrap_or(serde_json::Value::Null);
         out.context.token_budget = clamp_u64(num(&cx, "token_budget"), 4000, 500, 200_000) as usize;
         out.context.enable_retriever = flag(&cx, "enable_retriever", true);
@@ -988,6 +1036,12 @@ impl RdshSettings {
             "beta": { "context_engine": self.beta.context_engine },
             "extras": { "enable": self.extras.enable },
             "features": self.features.to_value(),
+            "subagents": {
+                "max_parallel": self.subagents.max_parallel,
+                "max_items_per_agent": self.subagents.max_items_per_agent,
+                "max_weight_per_agent": self.subagents.max_weight_per_agent,
+                "budget_units": self.subagents.budget_units,
+            },
             "context": {
                 "token_budget": self.context.token_budget,
                 "enable_retriever": self.context.enable_retriever,
@@ -1147,6 +1201,18 @@ impl RdshSettings {
             "context.inject_session_count" => {
                 self.context.inject_session_count = parse_usize(raw, 2, locale)? as usize
             }
+            "subagents.max_parallel" => {
+                self.subagents.max_parallel = parse_usize(raw, 3, locale)? as usize
+            }
+            "subagents.max_items_per_agent" => {
+                self.subagents.max_items_per_agent = parse_usize(raw, 3, locale)? as usize
+            }
+            "subagents.max_weight_per_agent" => {
+                self.subagents.max_weight_per_agent = parse_usize(raw, 9, locale)? as usize
+            }
+            "subagents.budget_units" => {
+                self.subagents.budget_units = parse_usize(raw, 0, locale)? as usize
+            }
             k if k.starts_with("features.") => {
                 let id = &k["features.".len()..];
                 if feature_def(id).is_none() {
@@ -1202,6 +1268,7 @@ impl RdshSettings {
                 | "extras"
                 | "features"
                 | "context"
+                | "subagents"
                 | "all"
                 | ""
         );
@@ -1242,6 +1309,7 @@ impl RdshSettings {
             "extras" => self.extras = d.extras,
             "features" => self.features = d.features,
             "context" => self.context = d.context,
+            "subagents" => self.subagents = d.subagents,
             "all" | "" => *self = d,
             k if k.starts_with("features.") => {
                 // Feature switches have no default entry: unset removes the key.
@@ -1320,6 +1388,10 @@ impl RdshSettings {
             "search.web_limit(1-100)",
             "search.searxng_url(string)",
             "compact.max_tokens(500-200000)",
+            "subagents.max_parallel(1-16, default 3)",
+            "subagents.max_items_per_agent(1-20, default 3)",
+            "subagents.max_weight_per_agent(1-128, default 9)",
+            "subagents.budget_units(0=off, 1-100000)",
             "sessions.limit(1-100)",
             "sessions.with_tokens(bool)",
             "sessions.stale_secs(0-3600, 0=off)",

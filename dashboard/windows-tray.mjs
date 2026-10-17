@@ -17,6 +17,14 @@ function powershellPath() {
   );
 }
 
+// A cold Windows host can spend twelve seconds loading WinForms before the
+// helper emits its first phase, so an absolute "ready by" wall clock cannot
+// tell a slow but live helper from a stuck one. This is the longest silence
+// tolerated between two observed startup events: every helper event re-arms it,
+// while a silent helper still fails at exactly this deadline. The launcher's own
+// startup confirmation and the helper's finite phase set bound the total wait.
+export const TRAY_READY_STALL_MS = 30000;
+
 // The tray receives no credentials or URLs. It controls only this server object.
 export async function startWindowsTray({
   dashboard,
@@ -33,18 +41,31 @@ export async function startWindowsTray({
     stderrTruncated = false;
   const stderrHash = createHash("sha256");
   let cleanup = { requested: false, exit_observed: false };
-  const record = (phase) => {
+  let lastEvent = "spawn-requested",
+    lastEventAt = started;
+  // Replaced once the ready wait installs its timer; no helper event can arrive
+  // before that synchronous setup completes.
+  let rearm = () => {};
+  const record = (phase, progress = false) => {
     if (phases.length < 16)
       phases.push({
         phase,
         elapsed_ms: Math.round((performance.now() - started) * 1000) / 1000,
       });
+    if (progress) {
+      lastEvent = phase;
+      lastEventAt = performance.now();
+      rearm();
+    }
   };
   const diagnostics = () => ({
     schema: 1,
     node: process.version,
     powershell: powershellVersion,
     elapsed_ms: Math.round((performance.now() - started) * 1000) / 1000,
+    last_event: lastEvent,
+    quiet_ms: Math.round((performance.now() - lastEventAt) * 1000) / 1000,
+    stall_ms: TRAY_READY_STALL_MS,
     phases: phases.map((item) => ({ ...item })),
     helper_exit: helperExit ? { ...helperExit } : null,
     spawn_error_code: spawnError,
@@ -94,7 +115,7 @@ export async function startWindowsTray({
     ],
     { windowsHide: true, stdio: ["pipe", "pipe", "pipe"], env },
   );
-  child.once("spawn", () => record("process-spawned"));
+  child.once("spawn", () => record("process-spawned", true));
   child.once("exit", (code, signal) => {
     helperExit = { code, signal: signal ?? null };
     record("process-exited");
@@ -152,10 +173,15 @@ export async function startWindowsTray({
   let timer, fail;
   try {
     await new Promise((resolve, reject) => {
-      timer = setTimeout(() => {
+      const expire = () => {
         record("ready-timeout");
         reject(new Error("Windows tray did not become ready"));
-      }, 30000);
+      };
+      rearm = () => {
+        clearTimeout(timer);
+        timer = setTimeout(expire, TRAY_READY_STALL_MS);
+      };
+      rearm();
       fail = () =>
         reject(new Error("Windows notification-area tray is unavailable"));
       child.once("error", fail);
@@ -171,7 +197,7 @@ export async function startWindowsTray({
         ) {
           const [, phase, version] = line.split(":");
           if (phase === "powershell-start") powershellVersion = version ?? null;
-          record(phase);
+          record(phase, true);
         } else if (line === "open" && !disposed) open(dashboard.browserUrl);
         else if (line === "exit") void stop();
       });

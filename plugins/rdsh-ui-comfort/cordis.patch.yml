@@ -1,0 +1,4 @@
+- insert:
+    - id: rdsh-ui-comfort
+      name: "rdsh-ui-comfort"
+      config: {}

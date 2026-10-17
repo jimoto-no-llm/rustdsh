@@ -1,6 +1,6 @@
 [package]
 name = "rdsh"
-version = "0.4.0"
+version = "0.7.0"
 edition = "2021"
 rust-version = "1.85"
 description = "Rust port/shim for dsh: fast launcher, token saver, zero behavior breakage via passthrough"
@@ -10,6 +10,31 @@ homepage = "https://github.com/jimoto-no-llm/rustdsh"
 readme = "README.md"
 keywords = ["dsh", "cli", "launcher", "dashboard", "deepseek"]
 categories = ["command-line-utilities", "development-tools"]
+documentation = "https://docs.rs/rdsh"
+
+# crates.io refuses a .crate file over 10 MB and the release archives ship the
+# binary alone. Without this list the media, docs and dashboard assets were
+# packaged too (~173 MiB compressed) and no publish could ever succeed.
+# src/, assets/ and security/ stay: build.rs and the include_str! /
+# include_bytes! calls read them at compile time, and scripts/crate-release.py
+# fails CI when one of those inputs disappears.
+exclude = [
+  "/.github/**",
+  "/dashboard/**",
+  "/desktop/**",
+  "/docs/**",
+  "/examples/**",
+  "/media/**",
+  "/mock/**",
+  "/plugins/**",
+  "/promo-video/**",
+  "/scripts/**",
+  "/strix_runs/**",
+  "/tests/**",
+  "/install.ps1",
+  "/preview-*",
+  "/sync-dsh.sh",
+]
 
 [[bin]]
 name = "rdsh"

@@ -25,6 +25,45 @@ in v0.2.0; do not drop contributors or manually copy a previous version's PRs.
 The script replaces any existing generated tail, so reruns do not duplicate it.
 Generation failure stops publication.
 
+## Release cadence
+
+Ship small: a change that lands on `main` goes out on its own instead of waiting
+for a milestone, and the version follows semantic versioning, so the bump is
+chosen from what users can do after the release.
+
+| Bump | When | Typical changes |
+| --- | --- | --- |
+| **patch** `vX.Y.(Z+1)` | The default. Nothing new for users to learn. | Bug fixes, documentation, dependency updates, internal improvements, small UX adjustments. |
+| **minor** `vX.(Y+1).0` | An important addition users notice. | A new command or feature, a new distribution channel, a change to a default users can see, security hardening users recognise. |
+| **major** `v(X+1).0.0` | A breaking change. | While the project is `0.x` there is no `1.0.0` yet, so a breaking change takes a minor bump exactly as the existing `0.x` releases do; the CHANGELOG entry and the release notes must still say so. |
+
+When in doubt, ask whether a user would recognise the change as a new feature:
+if yes, it is a minor. Leave one line in the release notes saying why that
+version was chosen; `docs/releases/vX.Y.Z.md` starts from the automatic
+decision, so keep or correct that line.
+
+Every release empties `[Unreleased]`: promote the whole section into the dated
+`## [X.Y.Z] - YYYY-MM-DD` entry, then start appending to a fresh, empty
+`[Unreleased]` right away. An entry left behind never reaches that release's
+notes.
+
+[.github/workflows/release-cadence.yml](../.github/workflows/release-cadence.yml)
+runs daily and, once `[Unreleased]` has content, pushes `release/vX.Y.Z-prep`
+with the version bump, the CHANGELOG promotion and a notes skeleton, then opens
+the preparation pull request (or, while Actions cannot create pull requests, an
+issue naming the branch and the next step). It never tags. The bump is decided
+the same way as this table: a `### Added` section in `[Unreleased]`, or a
+merged pull request labelled `feature`, `enhancement` or `breaking` since the
+previous tag, is a minor; anything else is a patch. The decision and its reason
+are recorded in the preparation pull request.
+
+**Tag on the exact SHA whose required checks are green.** Create the annotated
+`vX.Y.Z` tag only after the preparation pull request is merged and that commit's
+required checks have passed; never tag a branch tip that changed after the checks
+ran, and never move or delete a published tag. The generated
+`docs/releases/vX.Y.Z.md` is a skeleton: review its summary and compatibility
+notes, and start the next `[Unreleased]` entry as soon as the release is out.
+
 ## Prepare and verify
 
 1. Create a release preparation PR against `main`. Update `Cargo.toml`, refresh
@@ -115,7 +154,9 @@ The `cd` workflow first refuses malformed or lightweight tags, tags outside
 `main`, tags whose exact-SHA tag-push CI is missing or unsuccessful, mismatched
 versions, missing CHANGELOG entries and incomplete release notes. It also
 requires every required check on the tagged commit to be successful, then builds
-five targets with `cargo build --locked --release` only after those gates pass.
+its five matrix targets with `cargo build --locked --release` only after those
+gates pass; the `packages` job rebuilds the x86_64 glibc target once more for
+nfpm.
 After the exact-tag CI wait, the gate queries the pinned `ci.yml` and `codeql.yml`
 workflows, using only push runs for the exact SHA on `main` or the release tag. It selects
 by GitHub's per-workflow `run_number`, then verifies `run_attempt` and the latest
@@ -133,7 +174,8 @@ reads, the gate re-lists the workflow runs and re-reads the selected run to dete
 a newer run or attempt. This is a
 checked snapshot, not an atomic lock against a later rerun after validation.
 Validation uses `actions: read` and `contents: read`; only the final publication
-job receives `contents: write`. The build/upload/publish dependency chain is unchanged.
+job receives `contents: write`. The dependency chain keeps its shape: `publish`
+still runs last, now after both `release` and `packages`.
 
 GitHub documents the stable run number and increasing attempt number in its
 [variables reference](https://docs.github.com/en/actions/reference/workflows-and-actions/variables).
@@ -142,21 +184,28 @@ provides all job executions, including previous attempts. The required workflow
 files and job names live in `scripts/release_ci.py`; workflow/job-name changes
 must update that mapping and its tests:
 
-| Platform | Archive |
+| Platform | Asset |
 | --- | --- |
 | Linux x86_64 (glibc) | `rdsh-linux-x64.tar.gz` |
 | Linux x86_64 (musl) | `rdsh-linux-x64-musl.tar.gz` |
 | macOS arm64 | `rdsh-macos-arm64.tar.gz` |
 | macOS x86_64 | `rdsh-macos-x64.tar.gz` |
 | Windows x86_64 | `rdsh-windows-x64.zip` |
+| Linux x86_64 (`.deb`) | `rdsh_<version>_amd64.deb` |
+| Linux x86_64 (`.rpm`) | `rdsh-<version>-1.x86_64.rpm` |
 
 Each archive has its own `.sha256` sidecar, but neither installer trusts it:
 both verify the archive against the reviewed digest ledgers described below.
-`install.sh` and `install.ps1`
-are added once, for **12 release assets** total. Builds stage Actions artifacts;
-only the final job has permission to write a release. It validates the complete
-local set, creates or reuses a draft, uploads once, downloads the actual uploaded
-assets and validates them again. Incomplete or corrupt assets stop publication.
+`install.sh` and `install.ps1` are added once, and the `packages` job adds
+one `.deb` and one `.rpm` with the same kind of sidecar, for **16 release
+assets** total. The packages are built from `packaging/nfpm.yaml` by a pinned
+nfpm (`go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.48.0`) on the same
+x86_64 glibc build as the Linux archive, and they stay out of both digest
+ledgers: `install.sh` and `install.ps1` read the archives only. Builds stage
+Actions artifacts; only the final job has permission to write a release. It
+validates the complete local set, creates or reuses a draft, uploads once,
+downloads the actual uploaded assets and validates them again. Incomplete or
+corrupt assets stop publication.
 
 Stable versions publish as `latest`. Candidates publish with `prerelease=true`
 and `latest=false`, preserving the current stable installer channel. The workflow
@@ -193,7 +242,20 @@ archive's GitHub-reported SHA-256 in a reviewed follow-up PR before announcing
 or directing users to install that release. Keep older rows for explicit
 `--version` installs. Do not derive pins from release `.sha256` sidecars.
 
-After publication, confirm the body, 12 assets and correct channel in GitHub.
+The same tag publishes the crate to crates.io. The `publish-crate` CD job runs
+after the release is published, requires `vX.Y.Z` to match the `Cargo.toml`
+version, refuses a crate outside the 10 MB crates.io limit, and skips a version
+the registry already has. It fails closed while `CARGO_REGISTRY_TOKEN` is unset;
+create the token on crates.io, store it once with
+`gh secret set CARGO_REGISTRY_TOKEN`, and re-run the failed job instead of
+recreating the tag. Verify the upload with:
+
+```sh
+python3 scripts/crate-release.py check --tag vX.Y.Z
+cargo info rdsh          # registry metadata for the published version
+```
+
+After publication, confirm the body, 16 assets and correct channel in GitHub.
 Download and verify the actual published assets:
 
 ```sh
@@ -243,6 +305,17 @@ git diff release-digests.tsv release-digests-windows.tsv
 
 Review both updated ledgers before announcing the new stable channel. Their
 `latest` rows must name the release GitHub marks Latest.
+
+The package-manager manifests in `packaging/` pin the same release, so refresh
+them in the same follow-up and review the regenerated files:
+
+```sh
+python3 scripts/update-packaging-manifests.py --version vX.Y.Z
+python3 -m unittest discover -s tests -p 'test_release_packaging_manifests.py'
+```
+
+[docs/PACKAGE-MANAGERS.md](PACKAGE-MANAGERS.md) describes the Homebrew, Scoop
+and winget channels and what each manifest pins.
 
 Test README installation commands in a clean environment. Announcements use the
 published notes. Failed builds leave staged artifacts; failed uploads or verification

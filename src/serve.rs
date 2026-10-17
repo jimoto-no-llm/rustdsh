@@ -179,14 +179,20 @@ fn handle(
         ("GET", "/") => (
             200,
             "text/html; charset=utf-8",
-            Cow::Owned(UI.replace(
-                "__RDSH_LOCALE__",
-                match locale {
-                    crate::locale::Locale::English => "en",
-                    crate::locale::Locale::Chinese => "zh-CN",
-                    crate::locale::Locale::Japanese => "ja",
-                },
-            )),
+            Cow::Owned(
+                UI.replace(
+                    "__RDSH_LOCALE__",
+                    match locale {
+                        crate::locale::Locale::English => "en",
+                        crate::locale::Locale::Chinese => "zh-CN",
+                        crate::locale::Locale::Japanese => "ja",
+                    },
+                )
+                // The build version is already public (rdsh --version and the
+                // terminal banner), so render it immediately instead of leaving
+                // the header blank until the token-gated /api/version answers.
+                .replace("__RDSH_VERSION__", env!("CARGO_PKG_VERSION")),
+            ),
         ),
         ("GET", "/icon.svg") => (200, "image/svg+xml", Cow::Borrowed(ICON)),
         ("GET", "/api/version") => (200, "application/json", Cow::Borrowed(VERSION_JSON)),

@@ -48,11 +48,15 @@ requests unmergeable instead of safer:
   pull requests `BEHIND`, and the "Update branch" push that fixed it dismissed the
   approval again, so the same pull request bounced between states.
 
-Required checks (GitHub Actions app, nine names):
+Required checks (GitHub Actions app, ten names):
 
-`Rust lint`, `release-policy`, `plugin-security`, `security-boundaries`,
-`update-banner-windows`, `test (ubuntu-latest, true)`, `test (macos-latest, true)`,
-`test (windows-latest, false)`, `browser-e2e`.
+`Rust lint`, `release-policy`, `crate-package`, `plugin-security`,
+`security-boundaries`, `update-banner-windows`, `test (ubuntu-latest, true)`,
+`test (macos-latest, true)`, `test (windows-latest, false)`, `browser-e2e`.
+
+`crate-package` runs on every pull request, so it can be required: it packages
+the crate and rebuilds it from the packaged file list without contacting the
+registry.
 
 Only checks that run on every PR are required. Docs, CodeQL and dashboard
 workflows have path filters; requiring their individual jobs globally would leave
@@ -89,6 +93,35 @@ python3 -m unittest discover -s tests -p 'test_release_digest_pin.py'
 Both ledgers carry a `latest` row. Pinning an older release only backfills its
 rows; the channel moves forward only, so installs and updates never resolve an
 older release by accident.
+
+## crates.io publication
+
+`cd` publishes `rdsh` to crates.io from the same annotated tag that publishes
+the GitHub release, in the `publish-crate` job. It runs after the release assets
+are up, requires the tag to match the `Cargo.toml` version, and skips a version
+the registry already has, so re-running the job is safe.
+
+Two rules keep that job working:
+
+- **The crate stays under the 10 MB crates.io limit.** The `exclude` list in
+  [Cargo.toml](../Cargo.toml) drops the media, docs, dashboard and test trees
+  because the release archives ship the binary alone; `src/`, `assets/`,
+  `security/` and `install.sh` remain because `build.rs` and the `include_str!`
+  / `include_bytes!` calls read them at compile time.
+  `scripts/crate-release.py check` fails when a required input goes missing or a
+  release-only tree creeps back in, and `ci.yml` runs it as `crate-package`.
+- **The `CARGO_REGISTRY_TOKEN` secret must exist.** Create the token on the
+  crates.io account settings page and store it once with
+  `gh secret set CARGO_REGISTRY_TOKEN`. A missing token fails the job with that
+  instruction instead of publishing nothing silently; add the secret and re-run
+  the failed job rather than recreating the tag.
+
+Verify what the registry has:
+
+```sh
+python3 scripts/crate-release.py check --tag vX.Y.Z
+cargo info rdsh          # registry metadata for the published version
+```
 
 ## Coverage
 
@@ -138,6 +171,25 @@ Keep the alert counts at zero:
 - Never bypass secret-scanning push protection in a workflow, and treat a
   CodeQL alert in tests the same as one in product code.
 
+## Automation and review bots
+
+- **Copilot code review** reviews pull requests (the registered
+  `dynamic/agents/copilot-pull-request-reviewer` workflow is active). Treat its
+  comments as review input; the required approving review stays human.
+- **Dependabot** opens weekly update pull requests for Cargo, every npm manifest
+  listed in [.github/dependabot.yml](../.github/dependabot.yml) and GitHub
+  Actions. `dependabot-automerge.yml` enables auto-merge for patch and minor
+  updates only: the required approval and every required check still apply, and
+  major updates stay manual.
+- **CodeQL** and **rust-audit** keep the security page at zero open alerts.
+- **labels** syncs [.github/labels.yml](../.github/labels.yml) on `main`;
+  **conflicts** labels an open pull request that no longer merges cleanly;
+  **pin-release-digests** opens the ledger pull request after a release;
+  **codecov** reports coverage without blocking a merge.
+- Workflow secrets: `CODECOV_TOKEN` (coverage upload) and
+  `CARGO_REGISTRY_TOKEN` (crates.io publication). Everything else uses the
+  automatic `GITHUB_TOKEN`; no bot needs a personal access token.
+
 ## Verify the live settings
 
 ```sh
@@ -152,7 +204,7 @@ gh label list --repo jimoto-no-llm/rustdsh --limit 100
 gh release view --repo jimoto-no-llm/rustdsh --json tagName,isDraft,isPrerelease,assets
 ```
 
-Expected: nine required checks, `strict` and `require_last_push_approval` false,
+Expected: ten required checks, `strict` and `require_last_push_approval` false,
 one approval with stale dismissals, conversation resolution on, both alert counts
 zero, and a published `latest` release with twelve assets.
 

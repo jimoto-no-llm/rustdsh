@@ -15,6 +15,7 @@ import { Readable } from "node:stream";
 import childProcess from "node:child_process";
 import { EventEmitter } from "node:events";
 import { syncBuiltinESMExports } from "node:module";
+import { fileURLToPath } from "node:url";
 
 // Never run the real updater in a regression test.
 let updateCalls = 0;
@@ -37,6 +38,14 @@ childProcess.execFile = (...args) => {
 syncBuiltinESMExports();
 const settings = await import("../plugins/rdsh-settings/index.js");
 const updates = await import("../plugins/rdsh-update-banner/index.js");
+
+// 既存のexecFile差替えと環境変更を混ぜず、CIから独立した子プロセスで実行する。
+test('translation preview suite has its own isolated plugin host', async () => {
+  await new Promise((resolve, reject) => {
+    execFile(process.execPath, ['--test', fileURLToPath(new URL('./translation-preview.test.mjs', import.meta.url))],
+      { timeout: 30000 }, (error, stdout, stderr) => error ? reject(new Error(stdout + stderr)) : resolve());
+  });
+});
 
 test('settings plugin resolves the rdsh binary like the compute bridge', () => {
   // Same order as plugins/rdsh-compute: RDSH_BIN, then PATH, then the
@@ -97,8 +106,10 @@ test('plugin security boundary and settings preservation', async (t) => {
   };
   assert.deepEqual(settings.inject, []);
   assert.ok(updates.inject.includes("connection"));
+  const updaterScript = join(home, 'test-updater.sh');
+  await writeFile(updaterScript, '#!/bin/sh\nprintf "test updater\\n"\n', { mode: 0o600 });
   const disposeSettings = settings.apply(ctx, {});
-  const disposeUpdates = updates.apply(ctx, { demo: true });
+  const disposeUpdates = updates.apply(ctx, { demo: true, syncScript: updaterScript });
   t.after(async () => {
     await disposeSettings();
     disposeUpdates();
@@ -201,11 +212,21 @@ test('plugin security boundary and settings preservation', async (t) => {
         JSON.parse(await readFile(contextFile, "utf8")).goal,
         "new legacy goal",
       );
-      assert.equal(
-        (await request("/api/rdsh-update/run", { method: "POST" })).status,
-        200,
-      );
-      assert.equal(updateCalls, 1);
+      // The updater checks Unix ownership before execFile. Supply the fixture's
+      // owner on platforms without getuid so the stubbed invocation is exercised.
+      const getuid = process.getuid;
+      if (getuid === undefined) {
+        const owner = (await stat(updaterScript)).uid;
+        process.getuid = () => owner;
+      }
+      try {
+        const updated = await request('/api/rdsh-update/run', { method: 'POST' });
+        assert.equal(updated.status, 200);
+        assert.equal(updated.body.ok, true);
+        assert.equal(updateCalls, 1);
+      } finally {
+        if (getuid === undefined) delete process.getuid;
+      }
     },
   );
 

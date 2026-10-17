@@ -1,6 +1,6 @@
 # Contributing (寄稿ガイド)
 
-English summary first, 日本語の詳細は後に続きます.
+English summary first, 日本語の詳細は後述します。
 
 ## Quick start
 
@@ -80,32 +80,32 @@ Current repository settings and label conventions are documented in
 
 ### main の保護設定
 
-設定は管理者権限が必要なため、詳しくは
-[Issue #11](https://github.com/jimoto-no-llm/rustdsh/issues/11)を見てください。
-寄稿者は `main` へのPRとチェック通過だけ意識すれば十分です。
+設定には管理者権限が必要なため、詳しくは
+[Issue #11](https://github.com/jimoto-no-llm/rustdsh/issues/11)を参照してください。
+寄稿者は `main` への PR とチェックの通過だけを意識すれば十分です。
 
 ### 開発環境
 
-最初に `sh scripts/dev-setup.sh` を実行し、検証は `sh scripts/check.sh` で
-まとめて行います。dev container と hooks の説明、コンフリクトを避ける進め方は
-[DEVELOPMENT.md](docs/DEVELOPMENT.md) にあります。
+初めに `sh scripts/dev-setup.sh` を実行し、検証は `sh scripts/check.sh` で
+まとめて行います。dev container や hooks の説明、コンフリクトを回避するワークフローについては
+[DEVELOPMENT.md](docs/DEVELOPMENT.md) に記載されています。
 
 ### Pull Request
 
-- 本文は4行で書きます（概要／変更／検証／注意点）。
+- PR 本文は4行で記述します（概要／変更／検証／注意点）。
 - `cargo fmt --check`、`cargo clippy --release --all-targets`（警告ゼロ）、
-  `cargo test --release`、`tests/regress.sh` の全通過を確認してから出します。
-- 既存の動作を変えるときは、新旧の出力差分を添えてください。
-- 最新の `origin/main` から分岐し、`main` が進んだら早めに取り込みます。
-  push 前に `sh scripts/check-conflicts.sh --open-prs` で衝突と、
-  同じファイルを触る open PR を確認できます。衝突した PR には
-  `needs-rebase` ラベルが自動で付きます。
+  `cargo test --release`、`tests/regress.sh` の全通過を確認してから提出します。
+- 既存の動作を変更する場合は、新旧の出力差分を添付してください。
+- 最新の `origin/main` から分岐し、`main` が更新されたら早めに取り込みます。
+  push 前に `sh scripts/check-conflicts.sh --open-prs` でコンフリクトや、
+  同じファイルを変更している open PR を確認できます。コンフリクトが発生した PR には
+  `needs-rebase` ラベルが自動で付与されます。
 
 ### UIを変えるときの約束
 
-- 見た目の変更は、必ずPNG画像をPRに添付します。文言だけの説明は不可です。
+- 見た目を変更する場合は、必ず PNG 画像を PR に添付します。テキストのみの説明は不可です。
 - 変更前と変更後の2枚を並べるのが基本です。
-- 動きのある変更（遷移・アニメ・操作手順）は、短いGIFも付けます。
-  GIFだけでは追えない箇所はPNGを併用します。
-- 画像とGIFは実際に動かした画面の撮影にし、モックや想像図は混ぜません。
-- 応答速度など数値で示すべきものは、計測値も一緒に書きます。
+- 動きのある変更（画面遷移・アニメーション・操作手順）は、短い GIF も添付します。
+  GIF だけでは追えない箇所は PNG を併用します。
+- 画像や GIF は実際に動作させた画面のキャプチャとし、モックやイメージ図は含めません。
+- 応答速度など数値で示すべき項目は、実測値も併記します。

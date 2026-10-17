@@ -772,3 +772,16 @@ fn auth_selection_failure_is_localized_without_copying_credentials() {
         assert!(!fixture.0.join("dsh/.credentials.yaml").exists());
     }
 }
+
+/// logs ディレクトリが無いときの英語表示は #617 前の原文のままであること。
+/// 汎用の NoDirectory を使うと "no logs dir at" になり、非英語では kind が
+/// 未翻訳のまま混ざる。
+#[test]
+fn missing_logs_keeps_the_original_english_string() {
+    let fixture = Fixture::new();
+    let output = fixture.run(&["logs"]);
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("no logs at"), "{stdout}");
+    assert!(!stdout.contains("no logs dir at"), "{stdout}");
+}

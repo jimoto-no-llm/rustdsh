@@ -9,7 +9,7 @@ approvals, scope restrictions and PTC. This bundle uses public Cordis
 
 The four DSH peers must all be exact `0.2.0-rc.2` or all exact `0.2.1-alpha.3`; mixed, unknown and future releases fail before registration or connection. Cordis peers are exact `4.0.4` or `4.0.5-alpha.2`. The owned configuration schema uses Schemastery `3.18.5-alpha.2`, also checked with the original rc.2 MCP schema.
 
-### Updating an older configuration
+## Updating an older configuration
 
 The rc.2 release retains `native`, `ptc` and `both`. Harness `0.2.1-alpha.3` accepts `tools.config.mode: native` or `ptc`; the former `both` value is rejected. Keep `native` for native declarations. Choose `ptc` for the generated SDK and `run_code`, or use the original scoped `tools.presentAs()` API when a composition selects a different presentation for an agent. PTC execution with an Agent also requires the original `workingDirectory` service, in addition to `ptcRuntime`. The shipped Web profile provides these services; this bundle supplies neither service and never changes tool presentation itself.
 
