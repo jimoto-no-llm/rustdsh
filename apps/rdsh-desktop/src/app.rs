@@ -5,6 +5,7 @@
 //! receives updates through channels.
 
 use std::collections::HashMap;
+use std::ops::Range;
 use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
 use std::time::{Duration, Instant};
 
@@ -1125,6 +1126,7 @@ pub struct DesktopApp {
     running: bool,
     dirty: bool,
     picker: bool,
+    marked: Option<Range<usize>>,
     sidebar_scroll: ScrollHandle,
     timeline_scroll: ScrollHandle,
     model_scroll: ScrollHandle,
@@ -1222,6 +1224,7 @@ impl DesktopApp {
             running: false,
             dirty: false,
             picker: false,
+            marked: None,
             sidebar_scroll: ScrollHandle::new(),
             timeline_scroll: ScrollHandle::new(),
             model_scroll: ScrollHandle::new(),
@@ -2101,6 +2104,8 @@ impl Render for DesktopApp {
         // An empty composer shows the placeholder instead of an empty row.
         let placeholder = "メッセージを入力…".to_string();
 
+        let ime_entity = cx.entity();
+        let ime_focus = self.focus.clone();
         let composer = div()
             .id("composer")
             .track_focus(&self.focus)
@@ -2216,6 +2221,7 @@ impl Render for DesktopApp {
                     .max_h(px(COMPOSER_MAX_HEIGHT))
                     .overflow_y_scroll()
                     .track_scroll(&self.composer_scroll)
+                    .relative()
                     .cursor(CursorStyle::IBeam)
                     .text_size(theme::body_size())
                     .line_height(theme::body_line_height())
@@ -2232,7 +2238,23 @@ impl Render for DesktopApp {
                                 .text_color(theme::tertiary())
                                 .child(placeholder),
                         )
-                    }),
+                    })
+                    .child(
+                        canvas(
+                            |bounds, _window, _cx| bounds,
+                            move |bounds, _prepaint, window, cx| {
+                                window.handle_input(
+                                    &ime_focus,
+                                    ElementInputHandler::new(bounds, ime_entity.clone()),
+                                    cx,
+                                );
+                            },
+                        )
+                        .absolute()
+                        .top_0()
+                        .left_0()
+                        .size_full(),
+                    ),
             )
             .child(
                 div()
@@ -2368,4 +2390,149 @@ fn action_button(
         }))
         .child(text)
         .into_any_element()
+}
+
+
+// ---- IME / text input plumbing -------------------------------------------
+//
+// gpui delivers IME composition and committed text through an InputHandler that
+// is installed during paint. Ranges on that wire are UTF-16, so they are mapped
+// to the editor's byte offsets here.
+
+fn utf16_to_byte(text: &str, utf16: usize) -> usize {
+    let mut units = 0;
+    for (byte, character) in text.char_indices() {
+        if units >= utf16 {
+            return byte;
+        }
+        units += character.len_utf16();
+    }
+    text.len()
+}
+
+fn byte_to_utf16(text: &str, byte: usize) -> usize {
+    let byte = byte.min(text.len());
+    text[..byte]
+        .chars()
+        .map(|character| character.len_utf16())
+        .sum()
+}
+
+impl DesktopApp {
+    fn ime_replace(&mut self, range: Option<Range<usize>>, text: &str) {
+        let current = self.editor.text().to_string();
+        let (start, end) = match range {
+            Some(range) => (
+                utf16_to_byte(&current, range.start),
+                utf16_to_byte(&current, range.end),
+            ),
+            None => {
+                let selection = self.editor.selection();
+                (selection.start, selection.end)
+            }
+        };
+        let start = start.min(current.len());
+        let end = end.min(current.len()).max(start);
+        self.editor.move_to(start);
+        self.editor.select_to(end);
+        self.editor.insert(text);
+    }
+}
+
+impl EntityInputHandler for DesktopApp {
+    fn text_for_range(
+        &mut self,
+        range: Range<usize>,
+        adjusted_range: &mut Option<Range<usize>>,
+        _window: &mut Window,
+        _cx: &mut Context<Self>,
+    ) -> Option<String> {
+        let text = self.editor.text();
+        let start = utf16_to_byte(text, range.start);
+        let end = utf16_to_byte(text, range.end).max(start);
+        *adjusted_range = Some(byte_to_utf16(text, start)..byte_to_utf16(text, end));
+        Some(text[start..end].to_string())
+    }
+
+    fn selected_text_range(
+        &mut self,
+        _ignore_disabled_input: bool,
+        _window: &mut Window,
+        _cx: &mut Context<Self>,
+    ) -> Option<UTF16Selection> {
+        let text = self.editor.text();
+        let selection = self.editor.selection();
+        Some(UTF16Selection {
+            range: byte_to_utf16(text, selection.start)..byte_to_utf16(text, selection.end),
+            reversed: self.editor.caret() < self.editor.anchor(),
+        })
+    }
+
+    fn marked_text_range(
+        &self,
+        _window: &mut Window,
+        _cx: &mut Context<Self>,
+    ) -> Option<Range<usize>> {
+        self.marked.clone()
+    }
+
+    fn unmark_text(&mut self, _window: &mut Window, _cx: &mut Context<Self>) {
+        self.marked = None;
+    }
+
+    fn replace_text_in_range(
+        &mut self,
+        range: Option<Range<usize>>,
+        text: &str,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.ime_replace(range, text);
+        self.marked = None;
+        log::info!("IME commit: {} chars", text.chars().count());
+        cx.notify();
+    }
+
+    fn replace_and_mark_text_in_range(
+        &mut self,
+        range: Option<Range<usize>>,
+        new_text: &str,
+        new_selected_range: Option<Range<usize>>,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.ime_replace(range, new_text);
+        let text = self.editor.text();
+        let caret = self.editor.caret();
+        let end = byte_to_utf16(text, caret);
+        let width = new_text
+            .chars()
+            .map(|character| character.len_utf16())
+            .sum::<usize>();
+        let start = end.saturating_sub(width);
+        self.marked = Some(start..end);
+        let _ = new_selected_range;
+        log::debug!("IME composing: {} chars", new_text.chars().count());
+        cx.notify();
+    }
+
+    fn bounds_for_range(
+        &mut self,
+        _range_utf16: Range<usize>,
+        element_bounds: Bounds<Pixels>,
+        _window: &mut Window,
+        _cx: &mut Context<Self>,
+    ) -> Option<Bounds<Pixels>> {
+        Some(element_bounds)
+    }
+
+    fn character_index_for_point(
+        &mut self,
+        _point: Point<Pixels>,
+        _window: &mut Window,
+        _cx: &mut Context<Self>,
+    ) -> Option<usize> {
+        let text = self.editor.text();
+        Some(byte_to_utf16(text, self.editor.caret()))
+    }
 }

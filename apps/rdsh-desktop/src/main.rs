@@ -227,7 +227,19 @@ fn main() {
 
     // GPUI reports renderer and window problems through `log`; without a
     // subscriber a failed surface looks like an idle process.
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    let mut logger = env_logger::Builder::from_env(
+        env_logger::Env::default().default_filter_or("warn,rdsh_desktop=info"),
+    );
+    if let Some(path) = std::env::var_os("RDSH_DESKTOP_LOG") {
+        if let Ok(file) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+        {
+            logger.target(env_logger::Target::Pipe(Box::new(file)));
+        }
+    }
+    logger.init();
     log::info!("rdsh-desktop {} starting", env!("CARGO_PKG_VERSION"));
 
     Application::new().run(|cx: &mut App| {
