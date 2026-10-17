@@ -61,6 +61,7 @@ mod deps;
 mod desktop;
 mod distro;
 mod dsh_args;
+mod dsh_env;
 mod executable;
 mod file_lock;
 mod file_security;
@@ -489,6 +490,11 @@ enum ModelsAction {
         /// Print what would change without writing the profile
         #[arg(long = "dry-run")]
         dry_run: bool,
+        /// Non-interactive run for the daily auto-update timer: a no-op that
+        /// exits 0 when `features.models_sync` is off, and never a failing
+        /// status
+        #[arg(long = "auto")]
+        auto: bool,
         #[arg(long = "json")]
         json: bool,
     },
@@ -560,6 +566,13 @@ enum SubagentsAction {
         /// Request JSON file
         #[arg(long = "input-file")]
         input_file: String,
+        /// JSON output (the default; accepted for script compatibility)
+        #[arg(long = "json")]
+        json: bool,
+    },
+    /// Print the limits a plan request inherits when it omits limits
+    /// (the subagents section of rdsh.json; docs/SUBAGENT-PLANNING.md)
+    Defaults {
         /// JSON output (the default; accepted for script compatibility)
         #[arg(long = "json")]
         json: bool,
@@ -1311,6 +1324,7 @@ fn main() {
             SubagentsAction::Plan { input_file, .. } => {
                 subagent_plan::cmd_plan(&input_file, locale)
             }
+            SubagentsAction::Defaults { .. } => subagent_plan::cmd_defaults(locale),
         },
         Some(Commands::CostLedger { action, input_file }) => {
             cost_ledger::cmd_cost_ledger(&action, &input_file, locale)
@@ -1459,11 +1473,13 @@ fn main() {
                 profile,
                 provider: sync_provider,
                 dry_run,
+                auto,
                 json: sync_json,
             }) => models::cmd_models_sync(
                 profile.or(cli.profile).as_deref(),
                 sync_provider.or(provider).as_deref(),
                 dry_run || dry,
+                auto,
                 sync_json || json,
             ),
         },
@@ -1816,8 +1832,8 @@ fn worker_scope_help_requested() -> bool {
     }
 }
 
-/// Recovery and pure JSON commands resolve language from flags or the process
-/// environment without opening an unrelated settings file.
+/// Recovery, hook injection and pure JSON commands resolve language from flags
+/// or the process environment without opening an unrelated settings file.
 fn settings_independent_invocation() -> bool {
     matches!(
         Cli::try_parse_from(std::env::args_os()),
@@ -1825,6 +1841,10 @@ fn settings_independent_invocation() -> bool {
             command: Some(
                 Commands::Settings {
                     action: SettingsAction::Init { force: true }
+                } | Commands::Context {
+                    // The hook path runs before any settings read and must stay
+                    // fail-open, so the locale bootstrap skips the document too.
+                    action: ContextAction::Inject { .. }
                 } | Commands::TaskOutcomes { .. }
                     | Commands::Subagents { .. }
                     | Commands::BudgetAdmission { .. }
@@ -2058,6 +2078,10 @@ fn localized_command_about(name: &str, locale: locale::Locale) -> Option<&'stati
             "读取请求并生成分派计划，不启动代理",
             "要求を読み取り割り当て計画を作成（エージェントは起動しません）",
         ),
+        "defaults" => (
+            "输出分派计划继承的默认上限",
+            "割り当て計画が継承する既定の上限を出力",
+        ),
         "budget-admission" => (
             "应用、验证预算准入记录或输出公开视图",
             "予算受付記録を適用・検証し公開表示を出力",
@@ -2196,6 +2220,10 @@ fn localized_arg_help(id: &str, locale: locale::Locale) -> Option<&'static str> 
         ),
         "passthrough" => ("关闭 slim 委托", "slim委譲を無効化"),
         "dry_run" => ("只显示将要执行的操作", "実行せずに内容を表示"),
+        "auto" => (
+            "每日自动更新定时器使用；功能开关关闭时不执行任何操作并以 0 退出",
+            "毎日の自動更新タイマー用。機能スイッチが無効なら何もせず0で終了",
+        ),
         "slim" => ("强制 slim 委托", "slim委譲を強制"),
         "no_slim" => ("关闭 slim 委托", "slim委譲を無効化"),
         "patch" => (
@@ -2678,6 +2706,7 @@ fn doctor_json() -> anyhow::Result<()> {
         },
         "path_shadowed": shadowed,
         "warnings": warnings,
+        "environment": dsh_env::json(&dsh_env::diagnose()),
     });
     let stdout = std::io::stdout();
     let mut out = stdout.lock();
@@ -2715,6 +2744,12 @@ fn doctor(locale: locale::Locale) -> anyhow::Result<()> {
     ));
     let home = crate::inspect::dsh_home();
     say(format!("[rdsh] DSH_HOME: {home}"));
+    // Node.js / npm / pnpm as this host resolves them, plus the pnpm
+    // build-script policy (ERR_PNPM_IGNORED_BUILDS). Advisory only: doctor's
+    // exit status is decided by the original dsh check at the end.
+    for line in dsh_env::doctor_lines(&dsh_env::diagnose(), locale) {
+        say(line);
+    }
     match profile_count(&home) {
         Ok(count) => say(format!(
             "[rdsh] {}: {} {}",
@@ -2853,9 +2888,8 @@ fn doctor(locale: locale::Locale) -> anyhow::Result<()> {
 
 /// Best-effort, bounded `dsh --version` readout. Only the owned child is killed.
 fn original_version(orig: &str) -> Option<String> {
-    use std::io::Read;
-    use std::process::{Command, Stdio};
-    use std::time::{Duration, Instant};
+    use std::process::Command;
+    use std::time::Duration;
     if orig.is_empty() {
         return None;
     }
@@ -2866,45 +2900,10 @@ fn original_version(orig: &str) -> Option<String> {
     } else {
         Command::new(orig)
     };
-    let mut child = command
-        .arg("--version")
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .ok()?;
-    let stdout = child.stdout.take()?;
-    let (sender, receiver) = std::sync::mpsc::channel();
-    // Bound memory even if a launcher prints endlessly. A descendant retaining
-    // the pipe must not extend the command deadline, so do not join this reader.
-    std::thread::spawn(move || {
-        let mut bytes = Vec::new();
-        let result = stdout.take(4096).read_to_end(&mut bytes).map(|_| bytes);
-        let _ = sender.send(result);
-    });
-    let deadline = Instant::now() + Duration::from_secs(2);
-    loop {
-        match child.try_wait() {
-            Ok(Some(status)) => {
-                if !status.success() {
-                    return None;
-                }
-                break;
-            }
-            Ok(None) if Instant::now() < deadline => {
-                std::thread::sleep(Duration::from_millis(10));
-            }
-            _ => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return None;
-            }
-        }
-    }
-    let bytes = receiver
-        .recv_timeout(deadline.saturating_duration_since(Instant::now()))
-        .ok()?
-        .ok()?;
+    command.arg("--version");
+    // The deadline, the bounded read and the never-joined reader live in
+    // dsh_env, shared with the Node/npm/pnpm probes.
+    let bytes = dsh_env::run_bounded_capture(command, 4096, Duration::from_secs(2))?;
     String::from_utf8_lossy(&bytes)
         .lines()
         .next()
@@ -3052,7 +3051,11 @@ fn node_wrapper_warnings(
                 for token in line {
                     let base = token.rsplit(['/', '\\']).next().unwrap_or_default();
                     has_node |= base == "node" || base == "node.exe";
-                    has_dsh |= token.contains("dsh");
+                    // An explicit `node /path/to/dsh/index.js` entry does not
+                    // resolve the `dsh` command, so shadowing cannot break it.
+                    // docs/DOCTOR.md promises exactly this exclusion.
+                    let explicit_js_entry = token.contains('/') && token.ends_with(".js");
+                    has_dsh |= token.contains("dsh") && !explicit_js_entry;
                 }
             }
             has_node && has_dsh && !skip.contains(&name.as_str())
@@ -4025,6 +4028,35 @@ mod doctor_wrapper_tests {
             "{broken:?}"
         );
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn node_wrapper_diagnostic_ignores_an_explicit_js_entry() {
+        // docs/DOCTOR.md: an explicit `node /path/to/dsh/index.js` wrapper does
+        // not resolve the `dsh` command, so it cannot break when dsh is shadowed.
+        let text = |body: &str| super::WrapperScan {
+            texts: vec![("dsh-wrapper".to_string(), body.to_string())],
+            broken_links: Vec::new(),
+            non_executable: Vec::new(),
+        };
+        assert!(super::node_wrapper_warnings(
+            &text("exec /usr/bin/node /opt/dsh/lib/bin.js \"$@\"\n"),
+            Path::new("unused"),
+            true,
+            &[],
+            crate::locale::Locale::English
+        )
+        .is_empty());
+        // The command-substitution form still breaks, so it keeps its warning.
+        let warnings = super::node_wrapper_warnings(
+            &text("exec node \"$(command -v dsh)\" \"$@\"\n"),
+            Path::new("unused"),
+            true,
+            &[],
+            crate::locale::Locale::English,
+        );
+        assert_eq!(warnings.len(), 1, "{warnings:?}");
+        assert!(warnings[0].contains("dsh-wrapper"), "{warnings:?}");
     }
 
     #[test]

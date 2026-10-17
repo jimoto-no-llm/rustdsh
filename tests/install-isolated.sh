@@ -114,6 +114,10 @@ register_cases() {
   add_case "install/nonroot-ubuntu-24.04" "ubuntu-24.04" "install-and-smoke.sh" ok \
     "CASE OK: install-and-smoke" "" 0 \
     "USER=1000:1000|HOME=/home/tester|PREFIX=/home/tester/.local/bin"
+  # The rpm-family hints read /etc/os-release, so a faked ID=fedora on a
+  # Debian-based image has to print the dnf command in CI on every host.
+  add_case "install/os-release-hints" "ubuntu-24.04" "os-release-hints.sh" ok \
+    "CASE OK: os-release-hints" "retrying with the static musl build" 0 ""
   # Release-path behavior: fallback, pinned tag.
   add_case "release/fallback-unrunnable-glibc" "ubuntu-24.04" "fallback-unrunnable-glibc.sh" ok \
     "CASE OK: fallback-unrunnable-glibc" "" 1 ""

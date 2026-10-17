@@ -3,10 +3,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-      "test": "node --test qa-matrix.test.mjs && node browser.mjs && node project-overview.mjs && node languages.mjs && node update-banner.mjs && node easy-work.mjs && node run-health.mjs && node execution-plan.mjs && node causal-timeline.mjs && node task-outcomes.mjs && node outcome-languages.mjs",
+      "test": "node --test qa-matrix.test.mjs && node browser.mjs && node project-overview.mjs && node languages.mjs && node update-banner.mjs && node easy-work.mjs && node run-health.mjs && node execution-plan.mjs && node causal-timeline.mjs && node task-outcomes.mjs && node outcome-languages.mjs && node artifact-preview.mjs",
     "test:harness": "node harness-settings.mjs",
     "test:language": "node harness-language.mjs",
     "test:answer-guard": "node answer-guard-native.mjs",
+    "test:translation": "node translation-native.mjs",
     "test:muse": "node muse-subscription.mjs",
     "test:review": "node review-evidence.mjs",
     "test:updates": "node update-banner.mjs",

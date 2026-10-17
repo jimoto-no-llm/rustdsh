@@ -16,7 +16,7 @@
     "@deepseek-ai/dsh-credentials": "0.2.0-rc.2",
     "@deepseek-ai/dsh-credentials-local": "0.2.0-rc.2",
     "@deepseek-ai/dsh-mcp-client": "0.2.0-rc.2",
-    "@modelcontextprotocol/client": "2.2.0"
+    "@modelcontextprotocol/client": "2.3.1"
   },
   "overrides": {
     "@deepseek-ai/dsh-mcp-client@0.2.0-rc.2": {

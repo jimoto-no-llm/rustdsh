@@ -8,6 +8,10 @@
 # --check-only to preview without installing.
 # rdsh self-update prefers a prebuilt release binary; source builds run only with
 # RDSH_SYNC_FROM_SOURCE=1 (under nice/ionice). Regress always runs sandboxed.
+# The run ends by refreshing the provider model catalogs (step 7); set
+# RDSH_MODELS_SYNC=0 to skip that step, and its failure never fails the run.
+# Before any of that it replaces its own installed copy with the current script
+# from main (step 0); set RDSH_SYNC_SELF_UPDATE=0 to run the copy as it is.
 # Release integrity: the archive must match the digest pinned in the repository
 # release-digests.tsv (canonical origin), never an <asset>.sha256 from the base.
 set -u
@@ -20,7 +24,7 @@ for a in "$@"; do
   case "$a" in
     --check-only) CHECK_ONLY=1 ;;
     --channel=*) CHANNEL="${a#--channel=}" ;;
-    -h|--help) echo "usage: sync-dsh.sh [--check-only] [--channel rc|any]"; echo "  env: RDSH_SYNC_FROM_SOURCE=1 (rebuild rdsh from source instead of release binary)"; echo "       RDSH_MUSL=1 (prefer the static musl build), RDSH_SYNC_VERSION=VER (pin release)"; echo "       DSH_PKG_ROOT=DIR (use DIR as the @deepseek-ai/dsh package root instead of discovering it), NPM_BIN=npm"; exit 0 ;;
+    -h|--help) echo "usage: sync-dsh.sh [--check-only] [--channel rc|any]"; echo "  env: RDSH_SYNC_FROM_SOURCE=1 (rebuild rdsh from source instead of release binary)"; echo "       RDSH_MUSL=1 (prefer the static musl build), RDSH_SYNC_VERSION=VER (pin release)"; echo "       DSH_PKG_ROOT=DIR (use DIR as the @deepseek-ai/dsh package root instead of discovering it), NPM_BIN=npm"; echo "       RDSH_SYNC_SELF_UPDATE=0 (keep this copy of the script), RDSH_SYNC_SCRIPT_URL=URL (self-update origin)"; exit 0 ;;
     *) echo "unknown arg: $a" >&2; exit 2 ;;
   esac
 done
@@ -35,6 +39,91 @@ log() { printf "%s %s\n" "$(date -u +%FT%TZ)" "$*" | tee -a "$LOGDIR/sync.log"; 
 if command -v flock >/dev/null 2>&1; then
   exec 9>"$LOCK" || exit 1
   flock -n 9 || { log "another sync is running; exit"; exit 0; }
+fi
+# install.sh leaves a copy of this script on the machine, so a fix merged on main
+# would otherwise never reach it: the daily timer re-runs its own old copy. Fetch
+# the current script and re-exec it once when it changed. A digest pin cannot
+# apply to the script itself, so the origin is https-only, the payload must be a
+# valid shell script, and any doubt keeps the running copy. A copy inside a git
+# checkout is never touched (RDSH_SYNC_FROM_SOURCE=1 says the same thing).
+SELF_UPDATE_URL="${RDSH_SYNC_SCRIPT_URL:-https://raw.githubusercontent.com/jimoto-no-llm/rustdsh/main/sync-dsh.sh}"
+SELF_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
+SELF_PATH=""
+[ -n "$SELF_DIR" ] && SELF_PATH="$SELF_DIR/$(basename "$0")"
+self_update() { # $1 = running script; 0 = replaced (the caller re-execs), 1 = keep it
+  _target="$1"
+  _dir="$(cd "$(dirname "$_target")" 2>/dev/null && pwd)" || _dir=""
+  if [ -z "$_dir" ] || [ ! -w "$_dir" ]; then
+    log "self-update skipped (cannot write next to $_target)"
+    return 1
+  fi
+  if [ ! -f "$_target" ] || [ -L "$_target" ] || [ "$(head -n 1 "$_target" 2>/dev/null)" != "#!/bin/sh" ]; then
+    log "self-update skipped (not this script: $_target)"
+    return 1
+  fi
+  if [ -e "$_dir/.git" ]; then
+    log "self-update skipped (git checkout)"
+    return 1
+  fi
+  _tmp="$(mktemp "$_dir/.sync-dsh.XXXXXX" 2>/dev/null || true)"
+  if [ -z "$_tmp" ]; then
+    log "self-update skipped (no temporary file in $_dir)"
+    return 1
+  fi
+  _fetched=0
+  case "$SELF_UPDATE_URL" in
+    https://*)
+      curl --proto '=https' --proto-redir '=https' --tlsv1.2 -fsSL -o "$_tmp" "$SELF_UPDATE_URL" && _fetched=1 ;;
+    *)
+      # RDSH_SYNC_SCRIPT_URL exists for local fixtures and mirrors; a non-https
+      # origin is accepted only under the same guard as a release base.
+      if [ "${RDSH_TEST_INSECURE_BASE:-0}" = 1 ]; then
+        log "RDSH_TEST_INSECURE_BASE=1: using non-https self-update origin: $SELF_UPDATE_URL"
+        curl -fsSL -o "$_tmp" "$SELF_UPDATE_URL" && _fetched=1
+      else
+        log "refusing non-https self-update origin: $SELF_UPDATE_URL (RDSH_TEST_INSECURE_BASE=1 is for local tests only)"
+      fi ;;
+  esac
+  if [ "$_fetched" != 1 ]; then
+    log "self-update skipped (could not fetch $SELF_UPDATE_URL)"
+    rm -f "$_tmp"
+    return 1
+  fi
+  if [ ! -s "$_tmp" ] || [ "$(head -c 2 "$_tmp" 2>/dev/null)" != "#!" ] || ! sh -n "$_tmp" 2>/dev/null; then
+    log "self-update skipped (fetched file is not a shell script)"
+    rm -f "$_tmp"
+    return 1
+  fi
+  if cmp -s "$_tmp" "$_target"; then
+    log "self-update current (no change at $SELF_UPDATE_URL)"
+    rm -f "$_tmp"
+    return 1
+  fi
+  _new="$_dir/.sync-dsh.new.$$"
+  if ! install -m755 "$_tmp" "$_new" 2>/dev/null || ! mv -f "$_new" "$_target" 2>/dev/null; then
+    log "self-update skipped (could not replace $_target)"
+    rm -f "$_tmp" "$_new"
+    return 1
+  fi
+  rm -f "$_tmp"
+  export RDSH_SYNC_SELF_UPDATED=1
+  log "self-update: installed the current script from $SELF_UPDATE_URL; re-executing"
+  return 0
+}
+if [ "${RDSH_SYNC_SELF_UPDATE:-1}" = 0 ]; then
+  log "self-update skipped (RDSH_SYNC_SELF_UPDATE=0)"
+elif [ "${RDSH_SYNC_SELF_UPDATED:-0}" = 1 ]; then
+  log "self-update skipped (already re-executed)"
+elif [ "$CHECK_ONLY" = 1 ]; then
+  log "self-update skipped (--check-only)"
+elif [ "${RDSH_SYNC_FROM_SOURCE:-0}" = 1 ]; then
+  log "self-update skipped (RDSH_SYNC_FROM_SOURCE=1)"
+elif [ -z "$SELF_PATH" ]; then
+  log "self-update skipped (cannot resolve $0)"
+elif ! command -v curl >/dev/null 2>&1; then
+  log "self-update skipped (curl not found)"
+elif self_update "$SELF_PATH"; then
+  exec "$SELF_PATH" "$@"
 fi
 # Resolve the newest locally-installed node-v* tree (same "latest matching
 # tree" rule rdsh itself uses) instead of a pinned version dir.
@@ -480,5 +569,21 @@ else
     fi
     rm -f "$NEWBIN"
   fi
+fi
+# Model catalogs follow the same daily run: a model released after the build
+# reaches the picker without editing rdsh.json by hand. `rdsh features off
+# models_sync` or RDSH_MODELS_SYNC=0 for one run turns it off. Nothing here may
+# write during --check-only or fail the run, so every path logs one line and
+# continues.
+if [ "${RDSH_MODELS_SYNC:-1}" = 0 ]; then
+  log "models sync skipped (RDSH_MODELS_SYNC=0)"
+elif [ ! -x "$PREFIX_BIN/rdsh" ]; then
+  log "models sync skipped (no executable at $PREFIX_BIN/rdsh)"
+elif [ "$CHECK_ONLY" = 1 ]; then
+  log "models sync skipped (--check-only)"
+elif "$PREFIX_BIN/rdsh" models sync --auto >> "$LOGDIR/sync.log" 2>&1; then
+  log "models sync done"
+else
+  log "models sync failed; model catalogs left as is"
 fi
 log "done"

@@ -5,7 +5,238 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-17
+
 ### Added
+
+- Release native Linux packages, `rdsh_<version>_amd64.deb` and
+  `rdsh-<version>-1.x86_64.rpm`, built from `packaging/nfpm.yaml` with a
+  pinned nfpm (v2.48.0) in a new `packages` CD job. `sudo apt install
+  ./rdsh_*.deb` and `sudo dnf install ./rdsh-*.rpm` install `/usr/bin/rdsh`
+  without a Rust toolchain or `install.sh`; README.md, README.ja.md and
+  docs/FEDORA.md document both commands, and release verification refuses a
+  missing, duplicated, mislabelled or tampered package.
+
+- `packaging/` carries install manifests for the published macOS and Windows
+  archives: `packaging/homebrew/rdsh.rb` (Homebrew, Apple Silicon and Intel),
+  `packaging/scoop/rdsh.json` (Scoop) and the three `packaging/winget/`
+  manifests (winget). Each one pins the exact v0.6.0 URL and SHA-256, with
+  install commands and the update step in `packaging/README.md` and
+  `docs/PACKAGE-MANAGERS.md`. `scripts/update-packaging-manifests.py`
+  regenerates every pinned value from `release-digests.tsv` and
+  `release-digests-windows.tsv` and verifies them with `--check`, so the
+  manifests never drop out of sync with what the installers trust
+  (#728).
+
+## [0.6.0] - 2026-10-17
+
+### Security
+
+- `rdsh guard` normalizes a command string before deny matching: quoting
+  (`r"m" -rf`), same-line variable assembly (`A=rm; $A -rf`), command
+  basenames (`/bin/rm -rf /`), nested quoted commands (`sh -c "rm -rf /"`) and
+  path traversal or symlink targets are folded into bounded candidate texts, so
+  the structural patterns can no longer be displaced by obfuscation (the
+  #29/#32/#33 semantics are unchanged, and block still exits 2 with the same
+  stderr) (#708).
+
+### Added
+
+- `scripts/benchmark-node-vs-rust.py` and its
+  `scripts/benchmark-node-reference.mjs` reference measure the PreToolUse hook
+  (`rdsh guard`), `rdsh tokens` and `rdsh search` against equivalent Node.js
+  work on one generated dataset, with output-equality oracles, a JSON report and
+  every raw sample. README.md, README.ja.md and docs/BENCHMARKS.md name the exact
+  command each number measures, so the ~0.90 ms headline is stated as
+  `--version` process launch only and the hook is reported at ~2.0 ms per call
+  including process launch (#706).
+
+- `rdsh doctor` finds the original `dsh` through the nvm, volta, fnm, pnpm and
+  `npm -g` directories when a non-interactive shell or a service unit never ran
+  their initialization, while PATH and the local backups keep their resolution
+  order, and Node discovery accepts the nvm layout
+  (`~/.nvm/versions/node/vX.Y.Z`). It prints a Node/npm/pnpm environment block
+  (en/ja/zh, and under `doctor --json` as `environment`) and reports the pnpm
+  build-script policy with the approval command that matches the installed pnpm
+  release. Warnings never change the exit status, which still depends on the
+  original `dsh` alone (#707).
+
+- `plugins/install.sh` now separates **essential** plugins (installed on every
+  run and printed first) from **recommended** ones, and accepts
+  `--recommended=all|none|list|id,...` (or the `RECOMMENDED` environment
+  variable) so non-interactive runs select a set without a prompt. With a TTY it
+  lists the recommended plugins and asks before adding them; without one the
+  historical per-profile defaults are unchanged. `plugins/recommended.md`,
+  README.md, README.ja.md and docs/DESKTOP-INTEGRATION.md document the tiers
+  (#713).
+
+- `install.sh` reports a host readiness check before it downloads or builds
+  anything: the tools the chosen path needs (`curl`, `tar`, `gzip`, coreutils),
+  the Node.js 22+ / original `dsh` state and whether `PREFIX` is writable, each
+  with the host's own install command (`sudo dnf install -y ...` on rpm hosts,
+  and the Debian, Alpine, Arch and openSUSE equivalents). Fedora, RHEL, CentOS,
+  Rocky, AlmaLinux and Oracle Linux also get the optional `zstd`/`bubblewrap`
+  packages, a `PATH` hint and a note on which glibc or static musl archive was
+  chosen, so no musl package is implied. `tests/install-isolated.sh` covers the
+  rpm branch with a faked `ID=fedora` on a Debian base (#714).
+
+- `rdsh subagents defaults [--json]` prints the limits `rdsh subagents plan`
+  applies to a request that omits `limits`, together with the `source`
+  (`settings` or `builtin`). The planner's built-in numbers are now overridable
+  once through the new `subagents` section of `rdsh.json`
+  (`max_parallel`, `max_items_per_agent`, `max_weight_per_agent`,
+  `budget_units`); a request key still wins, and a missing or unreadable
+  settings document falls back to the built-in defaults so an unrelated corrupt
+  file cannot block a plan. The exploration subagent plugin also exposes its
+  effective admission policy as `createOptimizer(...).limits` (#715).
+
+- `plugins/rdsh-translation` は、完了した英語・中国語回答のアクション行に
+  「日本語訳で置き換える」を追加しました（#448 Step 2, #718）。表示専用の「日本語訳を表示」は
+  そのままに、明示操作のときだけ`/ja-replace`が独立した翻訳を1回送り、
+  `surfaceOp: { op: 'replace', startSeq, endSeq }`と`source.kind: 'rdsh-translation'`で
+  対象回答のsurfaceノードを訳文に置き換えます。新しいターンも追指示のuserメッセージも追加せず、
+  元の回答は追記専用ログと人間向けtranscriptに残ります。busy・対象なし・保護トークン欠落・
+  session拒否・置換済みは追記せずエラーを表示します。DSHが置換をモデル可視surfaceだけに
+  適用するため画面上の回答表示は差し替わりません（訳文はダイアログで確認できます）。
+
+- `plugins/rdsh-ui-comfort` makes Enter deliberate in the DSH Web chat and
+  adds a `rdsh 入力` settings section. A plain Enter in the composer inserts a
+  line break and a second Enter inside 1.5 s sends; the goal editor no longer
+  commits on Enter, including the Enter that confirms an IME conversion, so
+  Ctrl/Cmd+Enter (or the check button) commits and Escape still cancels. Both
+  behaviours default to on and every modified Enter, completion-menu Enter,
+  key auto-repeat and IME composition stay with the shell. A profile gets the
+  plugin with `dsh plugin --profile web add <repo>/plugins/rdsh-ui-comfort`
+  (#716).
+
+### Changed
+
+- `rdsh serve` states its role in the header as the Audit & Performance Monitor
+  for DeepSeek Harness in English, Chinese and Japanese, renders the build
+  version and a role overview before the token is entered, and fills the doctor
+  diagnostics, sessions and skills cards in parallel once connected, so the first
+  paint no longer reads as an empty chat page (#705).
+
+- Former-owner `sahenjp/rustdsh` issue and pull-request links in
+  `dashboard/README.md`, `docs/evidence/*.md` and the workflow-board READMEs
+  point at the canonical `jimoto-no-llm/rustdsh` repository, because the old
+  `issues/N` paths answer 404 instead of redirecting. The docs link-check remap
+  stays so a pull request opened before the unification still resolves (#704).
+
+- `release-digests.tsv` and `release-digests-windows.tsv` pin the published
+  v0.5.2 archives and move the `latest` row to v0.5.2, so `install.sh
+  --from-release` and the automatic updater install the release GitHub marks
+  Latest (#702).
+
+- The bounded-exploration subagent plugin admits 3 concurrent runs by default
+  instead of 2, matching the planner's own default wave width (`max_parallel: 3`
+  in `src/subagent_plan.rs`), so one default `rdsh subagents plan` wave runs
+  without queueing. Its queue wait default rises from 10 s to 120 s and the
+  accepted ceiling from 60 s to 600 s: a 10 s deadline expired before a single
+  scout run could finish, which made the documented 8-deep queue unreachable and
+  turned queued work into `RDSH_SUBAGENT_WAIT_TIMEOUT`. The bundled
+  `cordis.patch.yml` pins the same values and a test now fails if the two
+  drift (#715).
+
+### Fixed
+
+- The Windows tray helper waits for readiness by observed startup progress
+  instead of an absolute clock: `dashboard/windows-tray.mjs` re-arms a
+  `TRAY_READY_STALL_MS` quiet window at spawn and at each startup phase, so a
+  cold start that is still alive is no longer killed by a fixed deadline, and
+  the diagnostics report `last_event` and `quiet_ms` (#717).
+
+## [0.5.2] - 2026-10-16
+
+### Fixed
+
+- The dashboard artifact preview truncates text on a UTF-8 character boundary
+  instead of splitting a multi-byte sequence, refuses a non-regular file with
+  415 instead of opening it, redacts credentials in a URL without the previous
+  regular expression, and discards a preview that a newer request replaced. A
+  dashboard test and the browser E2E check cover the bounds (#698).
+
+### Changed
+
+- `sync-dsh.sh` replaces its own installed copy with the current script from
+  `main` before it does any work, so a fix to the daily run (the model-catalog
+  step, for instance) reaches every machine instead of waiting for a manual
+  update. `RDSH_SYNC_SELF_UPDATE=0` turns the step off, a copy inside a git
+  checkout is never touched, and an origin that is unreachable or returns
+  something other than a shell script keeps the current copy; see
+  [docs/AUTO-UPDATE.md](docs/AUTO-UPDATE.md) (#697).
+
+- `release-digests.tsv` and `release-digests-windows.tsv` pin the published
+  v0.5.1 archives and move the `latest` row to v0.5.1, so `install.sh
+  --from-release` and the automatic updater install the release GitHub marks
+  Latest (#695).
+
+## [0.5.1] - 2026-10-16
+
+### Added
+
+- The daily auto-update run refreshes the provider model catalogs: `sync-dsh.sh`
+  ends with `rdsh models sync --auto`, which appends the models a provider
+  advertises that the profiles lack and reports a catalog it could not reach
+  without failing the run. `rdsh features off models_sync` (the default is on)
+  or `RDSH_MODELS_SYNC=0` for one run turns the step off; see
+  [docs/AUTO-UPDATE.md](docs/AUTO-UPDATE.md) (#692).
+
+### Fixed
+
+- The translation plugin classifies a malformed `rdsh.json` as
+  `settings.malformed` ("format is invalid") instead of the unreadable-settings
+  message, and `ci.yml` runs the `translation-core` and
+  `translation-client-crlf` suites so a regression fails CI (#691).
+
+- The links job parses `.lychee.toml` again: lychee 0.24.2 rejects the unknown
+  `headers` key, so the crates.io crate pages are excluded by pattern instead
+  (#689).
+
+### Changed
+
+- Dependency updates: `sha2` 0.11.1, `@modelcontextprotocol/client` 2.3.1 in
+  `plugins/rdsh-mcp-oauth`, `dependabot/fetch-metadata` 3 and
+  `pnpm/action-setup` 6 (#685, #686, #687, #688).
+
+- `release-digests.tsv` and `release-digests-windows.tsv` pin the published
+  v0.5.0 archives and move the `latest` row to v0.5.0, so `install.sh
+  --from-release` and the automatic updater install the release GitHub marks
+  Latest (#690).
+
+## [0.5.0] - 2026-10-16
+
+### Security
+
+- The unresolved Dependabot and Code scanning alerts are cleared in one change:
+  the headless runtime and the MCP plugins pin `@modelcontextprotocol/client`
+  to 2.3.1 and `fflate` to 0.8.3, and every npm manifest is registered with
+  Dependabot (#564, #647, #663).
+
+- The audited-runtime guard reports `RDSH_SECURITY[UNSUPPORTED_RUNTIME]`,
+  `[RUNTIME_CHANGED]` and `[RUNTIME_RESOLUTION_MISMATCH]` again: the preload
+  compares each adapter digest, honours `RDSH_TOOL_ADAPTER`, detects a
+  resolution mismatch in its `resolve` hook and refuses to run the nested body
+  when the runtime is not the audited one (#676).
+
+### Added
+
+- 完了した英語・中国語回答に「日本語訳を表示」ボタンを追加。現在のモデルへ
+  独立した翻訳リクエストを送り、コード・パスと原文・会話履歴を保持して訳文を表示します。
+  Web／Desktop向けの導入と、失敗時の再試行に対応します。画面とコマンドの文言は
+  DSHのlocaleカタログ（en/zh/ja）経由です（#448 Step 1）。
+- `rdsh` publishes to crates.io from the release tag. The `cd` workflow gained a
+  `publish-crate` job that runs after the GitHub release, and the `exclude` list
+  in `Cargo.toml` drops the media, docs, dashboard and test trees so the crate
+  fits the 10 MB registry limit (about 1.6 MB instead of 173 MiB). `ci.yml`
+  guards both with the `crate-package` check, so `cargo install rdsh` and the
+  prebuilt archives ship the same program.
+
+- `rdsh models` prints the provider model catalog and `rdsh models sync`
+  refreshes it from each provider's own published catalog, so a new model
+  becomes selectable without editing `rdsh.json` by hand. The command landed
+  after v0.4.0 (#641) and therefore ships in the next release; see
+  [docs/MODEL-ROUTING.md](docs/MODEL-ROUTING.md).
 
 - `plugins/rdsh-answer-guard` recovers a turn whose reply was emitted only into
   the reasoning channel: DSH closes such a turn as `completed` (its
@@ -17,11 +248,51 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   installed by `./plugins/install.sh` and `rdsh features off answer_guard`
   disables it. See [README](plugins/rdsh-answer-guard/README.md).
 
+- rdsh-owned output speaks English, Simplified Chinese and Japanese across the
+  CLI, the Web UI, the bundled settings plugin and the standalone dashboard:
+  help, diagnostics, interactive setup prompts and policy validation follow
+  `--language`, `RDSH_LANG`, `general.language`, then the OS locale,
+  defaulting to English. Delegated `dsh` arguments, model output, JSON fields,
+  files and protocol identifiers are never translated (#617, #675, #678).
+
+- The parallel dashboard feature work landed in one integration (#652):
+  history survives a project move, per-device permissions, a versioned human
+  decision log, versioned project profiles, provider quota and retry status,
+  conservative run-stall diagnostics, a cross-project overview, a causal
+  timeline, prioritized notifications, project-scoped deep links, reusable
+  workflow recipes, artifact preview, secret-safe replay manifests, safe
+  project state migrations and CPU, RAM and port reservations are all in
+  `dashboard/`.
+
 ### Fixed
 
 - 更新通知を dismiss したら、その更新については再表示しない（新しい更新のときだけ通知する）。
 
+- Windows debug builds no longer overflow the main-thread stack while clap
+  builds its parser: `build.rs` reserves the same 8 MiB as Unix
+  (`/STACK:8388608` for MSVC, `-Wl,--stack,8388608` for GNU) (#655, #656).
+
+- The settings plugin truncates strings by Unicode scalar value instead of
+  UTF-16 code unit, so a GUI save can no longer write an isolated surrogate
+  into `rdsh.json` and break every CLI command; its limits now match the Rust
+  side (`default_profile` 200, `searxng_url` 2000) (#636, #637).
+
+- `rdsh logs` shows its own "no logs" text again instead of the generic
+  directory message the multilingual change introduced (#670), and
+  `rdsh desktop install --plugins-dir` absolutizes a relative directory before
+  building the plugin specs (#669).
+
+- A failed update keeps its reason on stderr (#651), and the rpm family check
+  matches quoted IDs and the real Oracle ID (#662).
+
 ### Changed
+
+- Dependabot patch and minor pull requests enable auto-merge once the required
+  approval and required checks pass (`dependabot-automerge.yml`); major updates
+  stay manual. `.github/project-settings.json` lists the `crate-package`
+  required check (ten names), enables secret-scanning validity checks, and
+  records `require_last_push_approval: false`, matching the live branch
+  protection and `docs/PROJECT-SETUP.md`.
 
 - `AGENTS.md` and `docs/PROJECT-SETUP.md` record the working agreements that came
   out of the v0.4.0 cycle: the nine required checks and the branch-protection

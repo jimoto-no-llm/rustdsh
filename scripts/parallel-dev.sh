@@ -300,6 +300,29 @@ reserve_port() (
   printf '%s\n' "$port"
 )
 
+# Serialize every command that mutates the shared mirror. Two `new` processes
+# otherwise race on the mirror's worktree administration: `git worktree add`
+# scans $GIT_DIR/worktrees and reads every entry's commondir, so an admin
+# directory the other process created but has not finished writing makes this
+# one die with "fatal: failed to read worktrees/<name>/commondir". The lock is
+# the same mkdir spin as reserve_port, and it is never held while the port lock
+# is taken, so the two locks cannot deadlock.
+with_mirror_lock() (
+  local lock tries=0
+  lock="$(worktrees_root)/.rdsh-mirror.lock"
+  while ! mkdir "$lock" 2>/dev/null; do
+    tries=$((tries + 1))
+    # A shared-mirror fetch can legitimately take a while; wait it out rather
+    # than failing the second `new`, but still give up on a stale lock.
+    [ "$tries" -lt 1200 ] || die "the shared mirror is busy at $lock"
+    sleep .05
+  done
+  trap 'rmdir "$lock"' EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  "$@"
+)
+
 # Make the worktree borrow loose objects from the shared local object store.
 # The alternates file lives next to the *common* object database, which is what
 # `--git-path` resolves; the per-worktree git dir has no objects of its own, so
@@ -370,25 +393,26 @@ cmd_new() {
     die "branch $(branch_for "$slug") already exists in $(repo_root)"
 
   mkdir -p "$root"
-  ensure_object_store
-  ensure_mirror
+  with_mirror_lock ensure_object_store
+  with_mirror_lock ensure_mirror
 
   mirror="$(mirror_path)" || exit 1
   printf 'fetching %s in %s\n' "$remote" "$mirror" >&2
-  git -C "$mirror" fetch --prune --quiet "$remote" "+refs/heads/*:refs/remotes/$remote/*" ||
+  with_mirror_lock git -C "$mirror" fetch --prune --quiet "$remote" \
+    "+refs/heads/*:refs/remotes/$remote/*" ||
     die "fetch failed in $mirror"
 
   git -C "$mirror" rev-parse --verify --quiet "refs/remotes/$ref" >/dev/null ||
     die "base ref '$ref' does not exist (try RDSH_PARALLEL_BASE_REF=main)"
   base_sha="$(git -C "$mirror" rev-parse "refs/remotes/$ref")"
 
-  git -C "$mirror" worktree add --quiet --no-checkout -b "$(branch_for "$slug")" \
-    "$dir" "refs/remotes/$ref" ||
+  with_mirror_lock git -C "$mirror" worktree add --quiet --no-checkout \
+    -b "$(branch_for "$slug")" "$dir" "refs/remotes/$ref" ||
     die "git worktree add failed for $dir"
   git -C "$dir" read-tree --reset -u HEAD ||
     die "cannot check out $base_sha into $dir"
 
-  point_at_object_store "$dir" "$(object_store)" || true
+  with_mirror_lock point_at_object_store "$dir" "$(object_store)" || true
   git -C "$dir" fetch --quiet "$remote" "+refs/heads/*:refs/remotes/$remote/*" ||
     printf 'warning: fetch in %s failed; retry with git fetch %s\n' "$dir" "$remote" >&2
 

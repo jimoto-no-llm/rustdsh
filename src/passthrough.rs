@@ -189,7 +189,12 @@ pub fn find_original_dsh() -> Option<String> {
             }
         }
     }
-    None
+    // Last resort, strictly after every location above: a version manager
+    // (nvm, fnm, volta) or a global package install (pnpm, npm) that a
+    // non-interactive shell never put on PATH. Appending keeps the resolution
+    // order of an existing setup identical, so only a host that previously
+    // failed to find any dsh gains a candidate here.
+    crate::dsh_env::find_tool_fallback("dsh", me.as_deref())
 }
 
 // Rust target mapped to Node dist labels (node-v<VERSION>-<os>-<arch>).
@@ -297,16 +302,20 @@ pub fn find_node_bin() -> Option<String> {
             }
         }
     }
-    let tree = latest_node_tree()?;
-    #[cfg(target_os = "windows")]
-    let cand = format!("{tree}/bin/node.exe");
-    #[cfg(not(target_os = "windows"))]
-    let cand = format!("{tree}/bin/node");
-    if is_executable_candidate(std::path::Path::new(&cand)) {
-        Some(cand)
-    } else {
-        None
+    if let Some(tree) = latest_node_tree() {
+        #[cfg(target_os = "windows")]
+        let cand = format!("{tree}/bin/node.exe");
+        #[cfg(not(target_os = "windows"))]
+        let cand = format!("{tree}/bin/node");
+        if is_executable_candidate(std::path::Path::new(&cand)) {
+            return Some(cand);
+        }
     }
+    // nvm keeps its trees outside ~/.local/opt, and a non-interactive shell
+    // never put them on PATH either. Same last-resort position as dsh above.
+    let home = crate::inspect::home_dir()?;
+    crate::dsh_env::latest_nvm_node(std::path::Path::new(&home))
+        .map(|node| node.to_string_lossy().into_owned())
 }
 
 // A versioned Node installation can contain native DSH dependencies built for
@@ -341,7 +350,9 @@ fn node_for_dsh(orig: &str) -> Option<String> {
             }
         }
     }
-    None
+    // nvm names its trees vX.Y.Z without an OS/CPU label (they are built for
+    // this host), so they need their own ancestor rule.
+    crate::dsh_env::nvm_node_ancestor(&entry).map(|node| node.to_string_lossy().into_owned())
 }
 
 /// Read-only runtime selection shared by delegation and doctor.

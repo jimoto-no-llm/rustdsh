@@ -33,10 +33,13 @@ What happens next:
   tools and normal file access by default. The optional strict boundary
   (`--share-file`, `features.agent_tool_sandbox=true`, or `RDSH_SECURITY=1`)
   requires the audited DSH tool adapter and Linux x86_64 kernel isolation, and
-  fails closed on unsupported combinations. With it active, only explicitly
-  shared project files are exposed to model tools; their contents may reach the
-  configured model provider. Plugins and profiles are trusted code. Direct
-  upstream DSH execution is outside this protection. Upstream Harness
-  vulnerabilities should also be reported upstream.
+  fails closed on unsupported combinations. With it active, rdsh adds an
+  isolated `rdsh_inspect` tool: it can read only the explicitly shared project
+  files, with disposable temporary storage and no network, host writes,
+  escalation, plugins or background jobs. The other DSH tools keep their
+  upstream permissions, so treat their file access as unchanged; shared
+  contents may reach the configured model provider. Plugins and profiles are
+  trusted code. Direct upstream DSH execution is outside this protection.
+  Upstream Harness vulnerabilities should also be reported upstream.
 - The Node dashboard (dashboard/*) binds to loopback by default. Tailscale
   Serve QR URLs are credentials - never paste them into public issues.

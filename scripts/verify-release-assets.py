@@ -16,6 +16,13 @@ ARCHIVES = (
     "rdsh-windows-x64.zip",
 )
 INSTALLERS = ("install.sh", "install.ps1")
+# The native packages carry the release version in their file name, so their
+# expected set is a glob: exactly one .deb and exactly one .rpm, each with the
+# same sha256 sidecar the archives use.
+PACKAGES = ("rdsh_*.deb", "rdsh-*.rpm")
+# Native package magic: a .deb opens with the ar(5) header, an .rpm with its
+# lead. A renamed or substituted file is refused before it can be published.
+PACKAGE_MAGIC = {".deb": b"!<arch>\n", ".rpm": b"\xed\xab\xee\xdb"}
 
 
 def regular_file(path):
@@ -31,11 +38,49 @@ def sha256_file(path):
     return digest.hexdigest()
 
 
+def verify_checksum(directory, name):
+    """The sidecar pins the asset bytes; installers refuse any mismatch."""
+    sidecar = directory / (name + ".sha256")
+    regular_file(sidecar)
+    if sidecar.stat().st_size > 1024:
+        raise ValueError(f"oversized checksum: {sidecar.name}")
+    fields = sidecar.read_text(encoding="ascii").split()
+    if (len(fields) not in (1, 2)
+            or not re.fullmatch(r"[a-fA-F0-9]{64}", fields[0])
+            or (len(fields) == 2 and fields[1].lstrip("*") != name)):
+        raise ValueError(f"invalid checksum: {sidecar.name}")
+    if sha256_file(directory / name) != fields[0].lower():
+        raise ValueError(f"checksum mismatch: {name}")
+
+
+def package_names(directory):
+    """The versioned native packages a release must carry, without sidecars."""
+    names = []
+    for pattern in PACKAGES:
+        matches = sorted(path.name for path in directory.glob(pattern) if path.is_file())
+        if len(matches) != 1:
+            raise ValueError(f"expected one {pattern} package, found {len(matches)}")
+        names.append(matches[0])
+    return names
+
+
+def verify_package(directory, name):
+    package = directory / name
+    regular_file(package)
+    verify_checksum(directory, name)
+    with package.open("rb") as stream:
+        lead = stream.read(8)
+    if not lead.startswith(PACKAGE_MAGIC[package.suffix]):
+        raise ValueError(f"invalid native package: {name}")
+
+
 def missing_assets(directory, existing):
     """Reuse identical draft assets; fail before upload if any differ."""
     directory, existing = Path(directory), Path(existing)
     verify(directory)
-    names = (*ARCHIVES, *(name + ".sha256" for name in ARCHIVES), *INSTALLERS)
+    packages = package_names(directory)
+    names = (*ARCHIVES, *(name + ".sha256" for name in ARCHIVES),
+             *packages, *(name + ".sha256" for name in packages), *INSTALLERS)
     for path in existing.iterdir():
         if path.name not in names:
             raise ValueError(f"unexpected draft asset: {path.name}")
@@ -51,18 +96,8 @@ def verify(directory):
         regular_file(directory / name)
     for name in ARCHIVES:
         archive = directory / name
-        sidecar = directory / (name + ".sha256")
         regular_file(archive)
-        regular_file(sidecar)
-        if sidecar.stat().st_size > 1024:
-            raise ValueError(f"oversized checksum: {sidecar.name}")
-        fields = sidecar.read_text(encoding="ascii").split()
-        if (len(fields) not in (1, 2)
-                or not re.fullmatch(r"[a-fA-F0-9]{64}", fields[0])
-                or (len(fields) == 2 and fields[1].lstrip("*") != name)):
-            raise ValueError(f"invalid checksum: {sidecar.name}")
-        if sha256_file(archive) != fields[0].lower():
-            raise ValueError(f"checksum mismatch: {name}")
+        verify_checksum(directory, name)
         if name.endswith(".zip"):
             with zipfile.ZipFile(archive) as package:
                 entries = package.infolist()
@@ -79,6 +114,8 @@ def verify(directory):
                         or not entries[0].isfile()
                         or not 0 < entries[0].size <= 64 * 1024 * 1024):
                     raise ValueError(f"invalid binary archive: {name}")
+    for name in package_names(directory):
+        verify_package(directory, name)
 
 
 if __name__ == "__main__":
@@ -94,4 +131,4 @@ if __name__ == "__main__":
         arguments.missing_output.write_text("".join(f"{path}\n" for path in pending), encoding="utf-8")
     else:
         verify(arguments.directory)
-    print("Verified 5 binary archives, 5 checksums and 2 installers")
+    print("Verified 5 binary archives, 5 checksums, 2 native packages and 2 installers")

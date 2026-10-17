@@ -272,6 +272,7 @@ install_pinned_rustup() {
   echo "downloading pinned rustup-init $RUSTUP_INIT_VERSION for $target..." >&2
   curl --proto "=https" --proto-redir "=https" --tlsv1.2 --fail --silent --show-error --location --output "$binary" "$url" || {
     echo "rustup-init download failed: $url" >&2
+    echo "next: check the network or proxy, then re-run this installer" >&2
     return 1
   }
   verify_pinned_sha256 "$binary" "$expected" || return 1
@@ -458,6 +459,7 @@ fetch_release() {
     manifest="$DOWNLOAD_TMPD/release-digests.tsv"
     fetch_release_digests "$manifest" || {
       echo "could not fetch the trusted release digest registry; refusing release install" >&2
+      echo "next: check the network or proxy, then re-run this installer" >&2
       exit 1
     }
     validate_release_digest_manifest "$manifest" || {
@@ -501,7 +503,11 @@ fetch_release() {
   # Network downloads and redirects remain restricted to HTTPS.
   download_protocol='=https'
   case "$base" in file://*) download_protocol='=file' ;; esac
-  curl --proto "$download_protocol" --proto-redir '=https' --tlsv1.2 -fsSL -o "$DOWNLOAD_TMPD/pkg.tgz" "$url" || { echo "download failed for release asset $version/$asset" >&2; exit 1; }
+  curl --proto "$download_protocol" --proto-redir '=https' --tlsv1.2 -fsSL -o "$DOWNLOAD_TMPD/pkg.tgz" "$url" || {
+    echo "download failed for release asset $version/$asset" >&2
+    echo "next: check the network or proxy, then re-run this installer" >&2
+    exit 1
+  }
   if [ "${RDSH_NO_CHECKSUM:-0}" != 1 ]; then
     verify_sha256 "$DOWNLOAD_TMPD/pkg.tgz" "$expected" || exit 1
   fi
@@ -512,6 +518,155 @@ fetch_release() {
   fi
   echo "$DOWNLOAD_TMPD/rdsh"
 }
+# ------------------------------------------------------------------ host checks
+# Everything below is read-only and runs before the first download or build.
+# The installer never guesses a package name: it prints this host's own command
+# when it can name one, and only a missing tool this path cannot finish without
+# becomes a hard error.
+os_release_id() {
+  [ -r /etc/os-release ] || return 0
+  sed -n 's/^ID=//p' /etc/os-release | head -n 1 | tr -d '"' | tr 'A-Z' 'a-z'
+}
+# The rpm families below are shared with src/distro.rs, whose test asserts this
+# exact quoted-ID spelling so install.sh and `rdsh doctor` cannot drift apart.
+is_rpm_family() {
+  [ -r /etc/os-release ] || return 1
+  grep -qE '^ID="?(fedora|rhel|centos|rocky|almalinux|ol)"?$' /etc/os-release
+}
+package_install_command() {
+  # $@: package names. Print this host's install command, or nothing when the
+  # distribution is unknown (the caller then prints no "next:" line at all).
+  local id
+  id="$(os_release_id)"
+  case "$id" in
+    fedora|rhel|centos|rocky|almalinux|ol) printf 'sudo dnf install -y %s' "$*" ;;
+    ubuntu|debian|linuxmint|pop|raspbian|zorin) printf 'sudo apt-get install -y %s' "$*" ;;
+    alpine) printf 'sudo apk add %s' "$*" ;;
+    arch|manjaro|endeavouros) printf 'sudo pacman -S --needed %s' "$*" ;;
+    opensuse*|sles) printf 'sudo zypper install -y %s' "$*" ;;
+  esac
+}
+prefix_writable() {
+  # mkdir -p creates the missing part, so walk up to the nearest directory that
+  # already exists and test that one.
+  local dir="$PREFIX"
+  while [ ! -e "$dir" ] && [ "$dir" != "/" ]; do dir="$(dirname "$dir")"; done
+  [ -d "$dir" ] && [ -w "$dir" ]
+}
+preflight_prefix() {
+  prefix_writable && return 0
+  echo "error: $PREFIX is not writable by $(id -un 2>/dev/null || echo 'this user')" >&2
+  echo "next: ./install.sh --prefix=\"\$HOME/.local/bin\"   # user-writable, no sudo" >&2
+  echo "next: or re-run with sudo for a system-wide prefix" >&2
+  exit 1
+}
+preflight_tools() {
+  local tool missing_names="" missing_pkgs="" need_coreutils=0 fatal=0
+  # curl/tar/gzip fetch and unpack the release archive, so --from-release cannot
+  # finish without them; a source build only needs curl when Rust itself still
+  # has to be downloaded.
+  for tool in curl tar gzip; do
+    if ! command -v "$tool" >/dev/null 2>&1; then
+      missing_names="$missing_names $tool"
+      missing_pkgs="$missing_pkgs $tool"
+      if [ "$FROM_RELEASE" = 1 ]; then fatal=1; fi
+    fi
+  done
+  if ! command -v sha256sum >/dev/null 2>&1 && ! command -v shasum >/dev/null 2>&1; then
+    missing_names="$missing_names sha256sum"
+    need_coreutils=1
+    if [ "$FROM_RELEASE" = 1 ]; then fatal=1; fi
+  fi
+  # install(1) is the coreutils copy that places the binary in PREFIX; every
+  # path that installs anything needs it.
+  if ! command -v install >/dev/null 2>&1; then
+    missing_names="$missing_names install"
+    need_coreutils=1
+    fatal=1
+  fi
+  if [ "$need_coreutils" = 1 ]; then missing_pkgs="$missing_pkgs coreutils"; fi
+  if [ -z "$missing_names" ]; then return 0; fi
+  echo "note: installer prerequisites missing:$missing_names"
+  local hint=""
+  # shellcheck disable=SC2086 # the package names are the command's arguments
+  hint="$(package_install_command $missing_pkgs)"
+  if [ -n "$hint" ]; then echo "next: $hint   # then re-run this installer"; fi
+  if [ "$fatal" = 1 ]; then
+    echo "error: this install path cannot continue without:$missing_names" >&2
+    exit 1
+  fi
+}
+preflight_runtime() {
+  # rdsh is one native binary; conversations and agent runs delegate to the
+  # original dsh, which needs Node.js 22+. Native commands keep working without
+  # either one, so these stay notes.
+  local missing="" node_version="" node_major=""
+  if command -v node >/dev/null 2>&1; then
+    node_version="$(node --version 2>/dev/null || true)"
+    node_major="${node_version#v}"
+    node_major="${node_major%%.*}"
+    case "$node_major" in ''|*[!0-9]*) node_major="" ;; esac
+    if [ -n "$node_major" ] && [ "$node_major" -lt 22 ]; then missing="$missing node($node_version)"; fi
+  else
+    missing="$missing node"
+  fi
+  if ! command -v npm >/dev/null 2>&1; then missing="$missing npm"; fi
+  if ! command -v dsh >/dev/null 2>&1 && [ -z "${DSH_ORIG_BIN:-}${RDSH_ORIG_BIN:-}" ]; then
+    missing="$missing dsh"
+  fi
+  if [ -z "$missing" ]; then return 0; fi
+  echo "note: conversations and agent runs need Node.js 22+ and the original dsh; missing:$missing"
+  echo "next: install Node.js 22+ (nvm install 22 / volta install node@22), then: npm install -g @deepseek-ai/dsh"
+  echo "next: already have dsh elsewhere? set DSH_ORIG_BIN=/path/to/dsh"
+  echo "note: native commands (tokens, search, sessions, doctor) work without Node.js."
+}
+preflight_checks() {
+  preflight_prefix
+  preflight_tools
+  preflight_runtime
+}
+# The user-facing "what now?" block after a successful install: PATH, the
+# optional rpm-family packages, and how the release build was chosen.
+post_install_notes() {
+  case ":$PATH:" in
+    *":$PREFIX:"*) ;;
+    *)
+      echo "note: $PREFIX is not on PATH yet"
+      echo "next: export PATH=\"$PREFIX:\$PATH\"   # add the same line to ~/.bashrc to keep it"
+      ;;
+  esac
+  if is_rpm_family; then
+    local id missing_names="" missing_pkgs=""
+    if ! command -v zstd >/dev/null 2>&1; then
+      missing_names="$missing_names zstd (rdsh sessions --tokens)"
+      missing_pkgs="$missing_pkgs zstd"
+    fi
+    if ! command -v bwrap >/dev/null 2>&1 && ! command -v bubblewrap >/dev/null 2>&1; then
+      missing_names="$missing_names bubblewrap (--share-file sandbox)"
+      missing_pkgs="$missing_pkgs bubblewrap"
+    fi
+    if [ -n "$missing_pkgs" ]; then
+      echo "note: optional tools missing on this rpm-based host:$missing_names"
+      # shellcheck disable=SC2086 # the package names are the command's arguments
+      echo "next: $(package_install_command $missing_pkgs)"
+    fi
+    # rpm hosts ship a current glibc, so the static musl archive is only the
+    # fallback and never needs a musl package of its own.
+    if [ "$FROM_RELEASE" = 1 ]; then
+      id="$(os_release_id)"
+      local gv=""
+      gv="$(glibc_version 2>/dev/null || true)"
+      if [ "${USE_MUSL:-0}" = 1 ]; then
+        echo "note: static musl build requested (--musl); it needs no extra package"
+      elif [ -n "$gv" ] && ver_lt "$gv" "$RELEASE_GLIBC_FLOOR"; then
+        echo "note: glibc $gv is older than $RELEASE_GLIBC_FLOOR; the static musl fallback needs no extra package"
+      elif [ -n "$gv" ]; then
+        echo "note: $id ships glibc $gv; the standard glibc build is used (no musl package needed)"
+      fi
+    fi
+  fi
+}
+preflight_checks
 BIN_SRC="target/release/rdsh"
 if [ "$FROM_RELEASE" = 1 ]; then
   BIN_SRC="$(install_release_binary)"
@@ -524,7 +679,10 @@ else
     install_pinned_rustup
     export PATH="$HOME/.cargo/bin:$PATH"
   fi
-  cargo build --release
+  if ! cargo build --release; then
+    echo "next: fix the build error above, or use the prebuilt binary: ./install.sh --from-release" >&2
+    exit 1
+  fi
 fi
 mkdir -p "$PREFIX" "$HOME/.config/rdsh"
 # Preserve a provable legacy shadow before replacing its only native anchor.
@@ -579,19 +737,7 @@ echo "next: run '$PREFIX/rdsh setup' to connect a model (GPT subscription via OA
 if [ -f "./plugins/install.sh" ]; then
   echo "next: PROFILE=web ./plugins/install.sh adds recommended plugins, including the rdsh settings UI and the phone-width Web layout"
 fi
-# rpm-based hosts (Fedora, RHEL, ...) ship everything rdsh needs to run, but two
-# optional tools unlock extra features. Naming the exact command here saves a
-# round trip to the docs; nothing here fails the install.
-if [ -r /etc/os-release ] && grep -qE '^ID="?(fedora|rhel|centos|rocky|almalinux|ol)"?' /etc/os-release; then
-  rpm_missing=""
-  command -v zstd >/dev/null 2>&1 || rpm_missing="$rpm_missing zstd"
-  if ! command -v bwrap >/dev/null 2>&1 && ! command -v bubblewrap >/dev/null 2>&1; then
-    rpm_missing="$rpm_missing bubblewrap"
-  fi
-  if [ -n "$rpm_missing" ]; then
-    echo "next: sudo dnf install -y$rpm_missing  # optional: token unpacking and the --share-file sandbox"
-  fi
-fi
+post_install_notes
 # Desktop (Electron) keeps its own reserved profile next to the CLI profiles.
 # Detection is read-only and never fails the install.
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"

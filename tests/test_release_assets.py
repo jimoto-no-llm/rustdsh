@@ -25,6 +25,17 @@ class ReleaseAssetsTests(unittest.TestCase):
             (self.root / name).write_text("DUMMY_INSTALLER")
         for name in release.ARCHIVES:
             self.package(name)
+        for name in self.native_package_names:
+            self.native_package(name)
+
+    @property
+    def native_package_names(self):
+        return ("rdsh_0.6.0_amd64.deb", "rdsh-0.6.0-1.x86_64.rpm")
+
+    def native_package(self, name, magic=None):
+        default = b"!<arch>\n" if name.endswith(".deb") else b"\xed\xab\xee\xdb"
+        (self.root / name).write_bytes((default if magic is None else magic) + b"DUMMY_PACKAGE")
+        self.checksum(name)
 
     def checksum(self, name):
         digest = hashlib.sha256((self.root / name).read_bytes()).hexdigest()
@@ -100,11 +111,11 @@ class ReleaseAssetsTests(unittest.TestCase):
     def test_draft_retry_reuses_identical_files_and_uploads_only_missing(self):
         with tempfile.TemporaryDirectory() as temporary:
             existing = Path(temporary)
-            self.assertEqual(len(release.missing_assets(self.root, existing)), 12)
+            self.assertEqual(len(release.missing_assets(self.root, existing)), 16)
             for name in release.INSTALLERS:
                 (existing / name).write_bytes((self.root / name).read_bytes())
             pending = release.missing_assets(self.root, existing)
-            self.assertEqual(len(pending), 10)
+            self.assertEqual(len(pending), 14)
             self.assertFalse(any(path.name in release.INSTALLERS for path in pending))
             for path in pending:
                 (existing / path.name).write_bytes(path.read_bytes())
@@ -138,8 +149,47 @@ class ReleaseAssetsTests(unittest.TestCase):
                                      "--existing-directory", str(existing), "--missing-output", str(output)],
                                     capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(len(output.read_text().splitlines()), 12)
+            self.assertEqual(len(output.read_text().splitlines()), 16)
 
+    def test_missing_or_duplicated_native_package(self):
+        deb = self.root / "rdsh_0.6.0_amd64.deb"
+        sidecar = Path(str(deb) + ".sha256")
+        saved = (deb.read_bytes(), sidecar.read_bytes())
+        for path in (deb, sidecar):
+            path.unlink()
+        with self.assertRaisesRegex(ValueError, r"expected one rdsh_\*\.deb package, found 0"):
+            release.verify(self.root)
+        deb.write_bytes(saved[0])
+        sidecar.write_bytes(saved[1])
+        (self.root / "rdsh_0.6.0_arm64.deb").write_bytes(saved[0])
+        with self.assertRaisesRegex(ValueError, r"expected one rdsh_\*\.deb package, found 2"):
+            release.verify(self.root)
+
+    def test_native_package_checksum_and_magic(self):
+        deb = self.root / "rdsh_0.6.0_amd64.deb"
+        saved = deb.read_bytes()
+        deb.write_bytes(b"DUMMY_TAMPER" + saved)
+        with self.assertRaisesRegex(ValueError, "checksum mismatch"):
+            release.verify(self.root)
+        sidecar = Path(str(deb) + ".sha256")
+        saved_sidecar = sidecar.read_bytes()
+        sidecar.write_text("0" * 64)
+        with self.assertRaisesRegex(ValueError, "checksum mismatch"):
+            release.verify(self.root)
+        sidecar.write_bytes(saved_sidecar)
+        self.native_package(deb.name, magic=b"NOTADEB!")
+        with self.assertRaisesRegex(ValueError, "invalid native package"):
+            release.verify(self.root)
+        deb.write_bytes(saved)
+        sidecar.write_bytes(saved_sidecar)
+        release.verify(self.root)
+
+    def test_draft_retry_refuses_a_different_package_version(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            existing = Path(temporary)
+            (existing / "rdsh_0.5.2_amd64.deb").write_bytes(b"DUMMY_OLD")
+            with self.assertRaisesRegex(ValueError, "unexpected draft asset"):
+                release.missing_assets(self.root, existing)
 
 if __name__ == "__main__":
     unittest.main()

@@ -365,6 +365,7 @@ configuration after a restart, because the bearer key rotates.
 | `dashboard_present_ui`             | Present structured UI a human can act on         |
 | `dashboard_record_review`          | Store a version-bound independent-review report  |
 | `dashboard_get_review_evidence`    | Read review reports and freshness status         |
+
 `runtime.json` は MCP 用の `mcp_token` と接続情報を保持し、管理 token と
 ブラウザー鍵は `owner-credentials.json` に分けて保存します。stdio MCP は
 `runtime.json` だけを読み、管理コマンドとブラウザー起動だけが別ファイルを開きます。
@@ -519,6 +520,7 @@ timer completions remain unpaired, and a metric with no completed samples stays
 unavailable instead of displaying zero. Token snapshots are exported separately
 from human-effort metrics so a token reduction cannot hide more resends or slower
 recovery.
+
 ### Provider status, quota and retry hints (#59)
 
 `dashboard_report_provider_status` records one latest report per provider and
@@ -697,13 +699,14 @@ history section remains available after resolution and restart. Clients cannot
 supply or replace `attention_history`; its unclassified `blocked` snapshots are
 internal, not an accepted input kind.
 
-[#13](https://github.com/sahenjp/rustdsh/issues/13) requires actionable items with
+[#13](https://github.com/jimoto-no-llm/rustdsh/issues/13) requires actionable items with
 deadline/impact/operation sorting, same-cause grouping, and retained history after
 resolution. The priority and compatibility rules above are this implementation's
 design proposal. Producers remain the existing MCP tools and HTTP reporting API;
 this adds no automatic Harness monitoring. Dependency execution (#15), question
 contracts (#40), answer application (#41), and notification delivery (#56) remain
 separate work.
+
 ## Versioned task contracts (P0 foundation, Issue #12)
 
 Current-main integration, fresh tests, and real browser evidence are recorded in

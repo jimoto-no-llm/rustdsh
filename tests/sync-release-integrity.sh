@@ -6,7 +6,9 @@
 #
 # The DSH tree is discovered by candidate instead of `npm root -g` alone, a
 # missing tree leaves the rdsh release update a success, and a tree npm cannot
-# manage is reported instead of half-updated.
+# manage is reported instead of half-updated. The installed copy also replaces
+# itself from the origin and re-execs once; those scenarios keep the step on and
+# every other scenario pins the step off so it tests its own revision.
 #
 # SYNC_SCRIPT points the same harness at another revision of the script (used to
 # show that an older revision installs the hostile archive); SCENARIOS selects a
@@ -147,12 +149,41 @@ STUB_EOF
 
 reset_prefix() { rm -rf "$OUT/bin"; mkdir -p "$OUT/bin"; }
 
+# Self-update fixture: an installed copy one revision behind the origin it should
+# fetch. The step stays enabled, and both origins are file://, so it runs offline.
+SELF_REPO="$TEST_ROOT/selfrepo"
+SELF_ORIGIN="$TEST_ROOT/self-origin.sh"
+write_older_copy() {
+  mkdir -p "$SELF_REPO"
+  { head -n 1 "$REPO/sync-dsh.sh"; printf '# an installed copy, one revision behind\n'; tail -n +2 "$REPO/sync-dsh.sh"; } \
+    >"$SELF_REPO/sync-dsh.sh"
+  chmod +x "$SELF_REPO/sync-dsh.sh"
+  cp "$SELF_REPO/sync-dsh.sh" "$TEST_ROOT/self-before.sh"
+}
+self_sync() { # $1 = log, $2 = 0|1 self-update, rest = script args
+  log_file="$1"; mode="$2"; shift 2
+  : >"$CURL_LOG"
+  SYNC_RC=0
+  if ! env -u RDSH_SYNC_FROM_SOURCE -u RDSH_MUSL \
+    HOME="$HOME_DIR" NPM_BIN="$HOME_DIR/.local/bin/npm" PREFIX_BIN="$OUT/bin" \
+    TMPDIR="$TEST_ROOT/tmp" RDSH_RELEASE_BASE="$BASE" RDSH_TEST_INSECURE_BASE=1 \
+    RDSH_SYNC_SELF_UPDATE="$mode" RDSH_SYNC_SCRIPT_URL="file://$SELF_ORIGIN" \
+    PATH="$SHIM:$PATH" sh "$SELF_REPO/sync-dsh.sh" "$@" >"$log_file" 2>&1; then
+    SYNC_RC=1
+    echo "note: self-update fixture exited non-zero for $log_file" >&2
+  fi
+}
+
 run_sync() { # $1 = log, $2 = registry mode, $3 = RDSH_TEST_INSECURE_BASE, $4 = RDSH_SYNC_VERSION, rest = extra VAR=VALUE
   log_file="$1"; registry="$2"; insecure="$3"; version="${4:-}"
   if [ "$#" -gt 4 ]; then shift 4; else shift "$#"; fi
   : >"$CURL_LOG"
   SYNC_RC=0
+  # Every scenario here pins one revision of the script (SYNC_SCRIPT); it must
+  # not replace itself from the origin mid-scenario. scenario_self_update runs
+  # its own copy with the step enabled.
   if ! env -u RDSH_SYNC_FROM_SOURCE -u RDSH_MUSL \
+    RDSH_SYNC_SELF_UPDATE=0 \
     HOME="$HOME_DIR" NPM_BIN="$HOME_DIR/.local/bin/npm" PREFIX_BIN="$OUT/bin" \
     TMPDIR="$TEST_ROOT/tmp" RDSH_RELEASE_BASE="$BASE" RDSH_TEST_INSECURE_BASE="$insecure" \
     RDSH_TEST_REGISTRY="$registry" RDSH_SYNC_VERSION="${version:-latest}" \
@@ -540,6 +571,69 @@ scenario_tree_missing() {
   ok "a missing DSH tree skips DSH and still installs the release"
 }
 
+# An installed copy keeps itself current: the origin replaces it, and the new
+# copy runs to completion after exactly one re-exec. Both other outcomes leave
+# the copy untouched: RDSH_SYNC_SELF_UPDATE=0 and --check-only.
+scenario_self_update() {
+  if ! grep -q '^SELF_UPDATE_URL=' "$REPO/sync-dsh.sh"; then
+    ok "self-update fixture: this revision (SYNC_SCRIPT) has no self-update step, scenario skipped"
+    return 0
+  fi
+  make_stub "$PKG/good" good
+  make_archive "$PKG/good" "$TEST_ROOT/good.tar.gz"
+  stage_release "$TEST_ROOT/good.tar.gz"
+  write_manifest "$(sum_file "$TEST_ROOT/good.tar.gz")"
+  BASE="file://$REL"
+  mkdir -p "$SELF_REPO"
+  cp "$REPO/sync-dsh.sh" "$SELF_ORIGIN"
+  write_older_copy
+  self_sync "$LOGS/self-on.log" 1
+  if [ "$SYNC_RC" -ne 0 ]; then
+    show "$LOGS/self-on.log"
+    fail "the self-update run failed"
+    return 0
+  fi
+  if ! cmp -s "$SELF_REPO/sync-dsh.sh" "$SELF_ORIGIN"; then
+    show "$LOGS/self-on.log"
+    fail "the outdated copy was not replaced by the origin"
+    return 0
+  fi
+  if [ "$(grep -c 'self-update: installed the current script' "$LOGS/self-on.log")" != 1 ] \
+    || [ "$(grep -c "file://$SELF_ORIGIN" "$CURL_LOG")" != 1 ]; then
+    show "$LOGS/self-on.log"
+    fail "the updated script did not fetch and re-exec exactly once"
+    return 0
+  fi
+  if ! grep -q "using npm:" "$LOGS/self-on.log" \
+    || ! tail -n 1 "$LOGS/self-on.log" | grep -q " done$"; then
+    show "$LOGS/self-on.log"
+    fail "the re-executed script did not finish the ordinary run"
+    return 0
+  fi
+  ok "an outdated copy is replaced and re-executed once"
+
+  write_older_copy
+  self_sync "$LOGS/self-off.log" 0
+  if [ "$SYNC_RC" -ne 0 ] || ! cmp -s "$SELF_REPO/sync-dsh.sh" "$TEST_ROOT/self-before.sh" \
+    || ! grep -q "self-update skipped (RDSH_SYNC_SELF_UPDATE=0)" "$LOGS/self-off.log"; then
+    show "$LOGS/self-off.log"
+    fail "RDSH_SYNC_SELF_UPDATE=0 did not keep the installed copy"
+    return 0
+  fi
+  ok "RDSH_SYNC_SELF_UPDATE=0 keeps the installed copy"
+
+  write_older_copy
+  self_sync "$LOGS/self-check.log" 1 --check-only
+  if [ "$SYNC_RC" -ne 0 ] || ! cmp -s "$SELF_REPO/sync-dsh.sh" "$TEST_ROOT/self-before.sh" \
+    || ! grep -q "self-update skipped (--check-only)" "$LOGS/self-check.log" \
+    || [ -s "$CURL_LOG" ]; then
+    show "$LOGS/self-check.log"
+    fail "--check-only replaced the copy or fetched the origin"
+    return 0
+  fi
+  ok "--check-only leaves the copy as it is"
+}
+
 scenario_static() {
   if ! grep -q "^RELEASE_DIGESTS_URL=\"$REGISTRY_URL\"\$" "$REPO/sync-dsh.sh"; then
     fail "digest registry URL is not the canonical literal"
@@ -553,10 +647,15 @@ scenario_static() {
     fail "release URL still uses the redirecting latest/download path"
     return 0
   fi
+  if grep -q '^SELF_UPDATE_URL=' "$REPO/sync-dsh.sh" \
+    && ! grep -q '^SELF_UPDATE_URL="${RDSH_SYNC_SCRIPT_URL:-https://raw.githubusercontent.com/jimoto-no-llm/rustdsh/main/sync-dsh.sh}"$' "$REPO/sync-dsh.sh"; then
+    fail "self-update origin is not the canonical literal"
+    return 0
+  fi
   ok "digest registry origin is a fixed literal and archives are version-pinned"
 }
 
-for name in hostile pinned http redirect registry_unreachable registry_invalid unpinned downgrade tree_opt tree_override tree_unmanaged tree_missing static; do
+for name in hostile pinned http redirect registry_unreachable registry_invalid unpinned downgrade tree_opt tree_override tree_unmanaged tree_missing self_update static; do
   case "$SCENARIOS" in
     all | *"$name"*) "scenario_$name" ;;
   esac

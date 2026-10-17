@@ -115,17 +115,19 @@ affects the app's native folder dialog.
 ### All profiles in one command
 
 ```sh
-PROFILE=web      ./plugins/install.sh    # recommended plugins, web profile (+ default third-party)
+PROFILE=web      ./plugins/install.sh    # essential + web defaults (translation, sound, gitview)
 PROFILE=tui      ./plugins/install.sh    # tui profile
 PROFILE=desktop  ./plugins/install.sh    # forwarded through `rdsh desktop install`
 PROFILE=desktop COMPUTE=1 ./plugins/install.sh   # plus the compute bridge
+PROFILE=web      ./plugins/install.sh --recommended=none  # essential plugins only
 PROFILE=web SOUND=0 GITVIEW=0 ./plugins/install.sh  # skip the default third-party plugins
 ```
 
 `PROFILE=desktop` never calls `dsh plugin` directly (the npm CLI refuses the
 reserved profile); it forwards every package to `rdsh desktop install
---no-bundled --package <spec>`. With no `rdsh` on PATH it prints the manual
-Plugins-page steps instead.
+--no-bundled --package <spec>`, essential set first and then the selected
+recommended set. With no `rdsh` on PATH it prints the manual Plugins-page
+steps, labelled `[essential]` and `[recommended]`, instead.
 
 The installers can do this inline: `./install.sh --desktop` and
 `.\install.ps1 -Desktop` attach `rdsh-settings`, `rdsh-compute`, and the default
@@ -145,7 +147,9 @@ forwarded. On Unix a non-executable `DSH_DESKTOP_CLI` is run through `sh`.
 | `rdsh-compute` | resident `rdsh compute` worker for token estimate/batch/prune through the Web plugin bridge | `rdsh features on compute` (off by default) |
 | `github:cwd514/dsh-sound-notifications` (MIT, (c) 2026 cwd514) | effect sounds and desktop notifications for reply-done / approval / questions / errors | default on; `rdsh desktop install --no-sound`, `SOUND=0`, or `features.sound=false` to skip |
 | `github:yugapor/dsh-gitview` (MIT, (c) 2026 yugapor) | Git panel: changes, diffs, history, branches, blame, CI status | default on; `rdsh desktop install --no-gitview`, `GITVIEW=0`, or `features.gitview=false` to skip |
-| recommended upstream packages | `dsh-tool-present`, `dsh-tool-ask-user`, `dsh-skill-office`, `dsh-mcp-client`, and the rest of `plugins/recommended.md` | `PROFILE=desktop ./plugins/install.sh` (forwards the same command), or the Plugins page |
+| `github:cwd514/dsh-intelligent-ui` (MIT, (c) 2026 cwd514) | visual answers in the Web chat: the model's `render_ui` tool draws tables, charts, comparisons, timelines and calculators below the answer | off by default; opt in with `--recommended=intelligent-ui` or `INTELLIGENT_UI=1` in `plugins/install.sh`, or the Plugins page |
+| essential upstream packages | `dsh-tool-present`, `dsh-tool-ask-user`, `dsh-skill-office`, `dsh-mcp-client`, and the rest of `plugins/recommended.md` | always installed; `PROFILE=desktop ./plugins/install.sh` forwards the same command, or use the Plugins page |
+| recommended plugins | `rdsh-translation`, `rdsh-compute`, `rdsh-easy-work`, `rdsh-subagent-optimizer`, `rdsh-ui-comfort`, `sound`, `gitview`, `intelligent-ui` | a TTY prompts for them; otherwise `--recommended=all\|none\|id,id` — see `plugins/recommended.md` |
 
 The compute bridge keeps its documented contract: pure string operations only,
 1 MiB input cap, 5 s timeout, and a fallback to the JavaScript implementation on

@@ -4,7 +4,7 @@ The captures below describe the original `f2a7dc6` baseline. See the
 [current-main re-review](issue-13-rereview.md) for the subsequent integration,
 typed-question lifecycle fixes, and fresh tests/captures.
 
-Issue: [#13](https://github.com/sahenjp/rustdsh/issues/13).
+Issue: [#13](https://github.com/jimoto-no-llm/rustdsh/issues/13).
 Baseline: `f2a7dc6b2850a6f0c0e1ea1b53494b12cd2e1221`.
 
 ## Scope and design choices for review
@@ -29,7 +29,7 @@ legacy unclassified stops clear when their status leaves blocked. A new stopped
 episode can reopen after completion or explicit resolution.
 
 Maintainer review is requested on these priority/compatibility rules and the
-reporting contract. [#74](https://github.com/sahenjp/rustdsh/issues/74) supplies
+reporting contract. [#74](https://github.com/jimoto-no-llm/rustdsh/issues/74) supplies
 the broader single-user workflow. Dependency execution (#15), typed/revisioned
 questions (#40), same-session answer application (#41), and notification delivery
 (#56) remain separate work. This PR only navigates to the existing task/answer UI.

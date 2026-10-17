@@ -1,5 +1,11 @@
 version: 2
 updates:
+  - package-ecosystem: npm
+    directory: /plugins/rdsh-translation
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
   - package-ecosystem: cargo
     directory: /
     schedule:
@@ -8,6 +14,12 @@ updates:
     commit-message:
       prefix: chore(deps)
     open-pull-requests-limit: 5
+    # Cargo.toml declares rust-version = 1.85 and CI checks it with that
+    # toolchain. sha2 0.11.1 raised its own MSRV to 1.88, so that bump has to
+    # arrive together with a deliberate MSRV increase, not as a routine update.
+    ignore:
+      - dependency-name: "sha2"
+        versions: [">= 0.11.1"]
   - package-ecosystem: npm
     directory: /dashboard
     schedule:

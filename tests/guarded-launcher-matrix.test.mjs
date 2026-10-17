@@ -5,7 +5,6 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 
 const matrix = [
   ['RC2', '0.2.0-rc.2'],
@@ -21,7 +20,6 @@ if (process.env.RDSH_GUARDED_MATRIX_REQUIRED === '1') {
   }
 }
 const bin = path.resolve(process.env.BIN || 'target/debug/rdsh');
-const dispatcherProbe = pathToFileURL(path.resolve('tests/guarded-runtime-probe.mjs')).href;
 
 for (const [label, version] of matrix) {
   const dsh = process.env[`RDSH_AUDITED_DSH_${label}`];
@@ -42,6 +40,8 @@ for (const [label, version] of matrix) {
     writeFileSync(plugin, `
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
 export const name = 'rdsh-guarded-launcher-probe';
 export const inject = ['tools', 'appReady', 'appExit'];
 export async function apply(ctx) {
@@ -63,7 +63,33 @@ export async function apply(ctx) {
     assert.notEqual(result.exitCode, 0);
     assert.match(result.stderr, /Operation not permitted/);
   }
-  await import(${JSON.stringify(dispatcherProbe)});
+  // Use the launched registry and its matching scope package; the standalone
+  // catalog probe has separate rc2 dependencies and cannot share this matrix.
+  const { createScope } = await import(pathToFileURL(
+    createRequire(process.env.RDSH_TOOL_RUNTIME).resolve('@deepseek-ai/dsh-scope')
+  ).href);
+  const agent = {};
+  const scoped = createScope(ctx, agent);
+  agent.ctx = scoped.ctx;
+  try {
+    scoped.ctx.tools.presentAs('ptc');
+    assert.equal(ctx.tools.defaultMode, 'native');
+    assert.equal(ctx.tools.modeFor(), 'native');
+    assert.equal(ctx.tools.modeFor(agent), 'ptc');
+    assert.ok(ctx.tools.get('rdsh_inspect', agent));
+    assert.ok(ctx.tools.get('run_code', agent));
+    for (const name of ['bash', 'run_code', 'rdsh_inspect'])
+      assert.equal(ctx.tools.guardReason({ name, agent }), undefined);
+    const dispatched = await ctx.tools.execute({
+      name: 'rdsh_inspect', arguments: { command: 'printf DUMMY_MODEL_DISPATCH' },
+      agent, callId: 'dummy-dispatch', signal: new AbortController().signal,
+    });
+    assert.equal(dispatched.isError, true);
+    assert.match(JSON.stringify(dispatched), /only \\x60run_code\\x60 is callable directly/);
+  } finally {
+    await scoped.dispose();
+  }
+  assert.equal(ctx.tools.modeFor(agent), 'native');
   ctx.effect(() => ctx.appReady.onReady(() => {
     console.log('RDSH_LAUNCHER_KERNEL ' + JSON.stringify({ version: ${JSON.stringify(version)}, sharedRead: true, secretsDenied: true, writesDenied: true, namespaceDenied: true, networkDenied: true, dispatcherGuarded: true }));
     ctx.appExit(0);

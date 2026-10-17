@@ -355,3 +355,103 @@ fn models_refuses_uninterpreted_patch_entries_without_hiding_duplicate_plugins()
         }
     }
 }
+
+/// `rdsh features --json` carries the new gate with its built-in default.
+#[test]
+fn models_sync_feature_is_listed_and_on_by_default() {
+    let fixture = Fixture::new();
+    let output = fixture.run(&["features", "--json"], false);
+    assert!(output.status.success());
+    let document: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let entry = document["features"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|entry| entry["id"] == "models_sync")
+        .expect("models_sync is missing from rdsh features --json");
+    assert_eq!(entry["default"], json!(true));
+    assert_eq!(entry["enabled"], json!(true));
+    assert_eq!(entry["explicit"], json!(false));
+}
+
+/// The timer runs `--auto`: with the switch off it reports the skip, writes
+/// nothing and still succeeds, so the daily run it belongs to is not stopped.
+#[test]
+fn models_sync_auto_is_a_no_op_when_the_switch_is_off() {
+    let fixture = Fixture::new();
+    std::fs::write(
+        fixture.root.join(".dsh/rdsh.json"),
+        json!({"features": {"models_sync": false}}).to_string(),
+    )
+    .unwrap();
+    let output = fixture.run(
+        &[
+            "models",
+            "sync",
+            "--profile",
+            "web",
+            "--provider",
+            "openai-codex",
+            "--json",
+            "--auto",
+        ],
+        false,
+    );
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    // `--json` stays machine-readable, and the profile stays untouched.
+    let report: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(report["skipped"], json!("models_sync"));
+    assert_eq!(report["profiles"], json!([]));
+    assert_eq!(std::fs::read_to_string(&fixture.patch).unwrap(), PROFILE);
+}
+
+/// `--auto` is not a dry run: with the switch on (the default) it writes like
+/// the manual command does.
+#[test]
+fn models_sync_auto_writes_when_the_switch_is_on() {
+    let fixture = Fixture::new();
+    let output = fixture.run(
+        &[
+            "models",
+            "sync",
+            "--profile",
+            "web",
+            "--provider",
+            "openai-codex",
+            "--json",
+            "--auto",
+        ],
+        false,
+    );
+    assert!(output.status.success());
+    let report: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(report["profiles"][0]["added"], json!(["gpt-6.1-sol"]));
+    assert_eq!(report["profiles"][0]["written"], json!(true));
+}
+
+/// A catalog the run cannot read must not stop the daily run; the manual
+/// command still reports the same failure with a failing status.
+#[test]
+fn models_sync_auto_survives_a_failing_run() {
+    let fixture = Fixture::new();
+    let auto = fixture.run(
+        &["models", "sync", "--provider", "no-such-provider", "--auto"],
+        false,
+    );
+    assert!(
+        auto.status.success(),
+        "models sync --auto must not fail the daily run: {}",
+        String::from_utf8_lossy(&auto.stderr)
+    );
+    assert!(String::from_utf8_lossy(&auto.stderr).contains("models sync --auto"));
+    let manual = fixture.run(&["models", "sync", "--provider", "no-such-provider"], false);
+    assert!(
+        !manual.status.success(),
+        "a manual run still reports the failure"
+    );
+    assert_eq!(std::fs::read_to_string(&fixture.patch).unwrap(), PROFILE);
+}

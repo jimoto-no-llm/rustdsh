@@ -1,0 +1,30 @@
+name: dependabot-automerge
+
+# Dependency pull requests still need the human approval that main requires.
+# This only enables auto-merge, so an approved dependabot bump merges itself
+# once the required checks pass. Major updates stay manual.
+
+on: pull_request
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: dependabot-automerge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  automerge:
+    if: github.event.pull_request.user.login == 'dependabot[bot]' && github.repository == 'jimoto-no-llm/rustdsh'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: dependabot/fetch-metadata@v3
+        id: metadata
+      - name: Enable auto-merge for patch and minor updates
+        if: steps.metadata.outputs.update-type != 'version-update:semver-major'
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr merge --auto --squash "$PR_URL"

@@ -1,6 +1,26 @@
 # Trusted SHA-256 registry for the exact release archives supported by install.sh.
 # Regenerate each entry from the published release asset digest; do not copy .sha256 sidecars.
-latest v0.4.0
+latest v0.7.0
+v0.7.0 rdsh-linux-x64.tar.gz 711ef1c8980f5f201c77fc79eff250dbcf3a02ec9f83b385c2516296281f0d0e
+v0.7.0 rdsh-linux-x64-musl.tar.gz 239fd6972256909e52fd396a80e928be54de2767d22b0dde5b2d0a3f900ad126
+v0.7.0 rdsh-macos-arm64.tar.gz 499c607effe9888bd11aa1680a680036afe507e725ccddff85be8f37f5cba709
+v0.7.0 rdsh-macos-x64.tar.gz a17832d86257788e5f3f59c096f80226074369445eec21d1e39546099ab21960
+v0.6.0 rdsh-linux-x64.tar.gz cdf06f4fb86b6dcc43ab39b57f148e73f37975793fa7b341e4af5718e72fae3d
+v0.6.0 rdsh-linux-x64-musl.tar.gz bdac15b3797a19e132e26429b7d4c5c35ba5d1f6836ec6117977fb58f98c6e63
+v0.6.0 rdsh-macos-arm64.tar.gz 422ef3b9387406fa855ffd4ea1b873031fffbc951770ba1c4e54c5ea68efb703
+v0.6.0 rdsh-macos-x64.tar.gz d0f42fd6a462748804bc981358fe4644b3f2d7a5a134c51928e983adf5493a91
+v0.5.2 rdsh-linux-x64.tar.gz f64404d6267dbacb5b0d7660519b613042600c2fe8d6d9bb2311f324404053a0
+v0.5.2 rdsh-linux-x64-musl.tar.gz 1f8d20cd644e3596513cebc1962bd4a36f8c61e00607476becc5599eadf0b478
+v0.5.2 rdsh-macos-arm64.tar.gz d26a08f81cb8c6449ce4ab108c18c9db4d87dca6d1c937e7602872636557240b
+v0.5.2 rdsh-macos-x64.tar.gz 8f21bb0fb35ed421a16800ba4936e6dc7df80c2bc37ddd763a44536af2832386
+v0.5.1 rdsh-linux-x64.tar.gz cde4719407d4ea70c3372f84157f1ba4dfcbd31007fb8c4a26e6d8c4934f12de
+v0.5.1 rdsh-linux-x64-musl.tar.gz 581962f2692e5c25c523a8b5f6557a457c14abf2d09144a85462b8b992313354
+v0.5.1 rdsh-macos-arm64.tar.gz 2d94de3c81c360e79ece9dfdca2bae75ce798c6e5b09a3edf4f64908d73c5069
+v0.5.1 rdsh-macos-x64.tar.gz 1168df7f0e193441dd75c49ffe3127f664afe28aa3fc19bb13e4882a232f369f
+v0.5.0 rdsh-linux-x64.tar.gz e34ec1f8f2ce3c7d838a0fddfaed31ece561e397c71699865a85e933ed9a2bf2
+v0.5.0 rdsh-linux-x64-musl.tar.gz 5435135f9865af96bf82e7c06c4d666b9fcead1a4555451dc44b03543395a003
+v0.5.0 rdsh-macos-arm64.tar.gz df47d8ebc2578909f595ae6bea99efbb3f5d2757294ab60c19790d51df6dd305
+v0.5.0 rdsh-macos-x64.tar.gz d90ff0e83c59d461f3ee62ebee6d26141ebb5d229254f6ba8922c78e262f5271
 v0.4.0 rdsh-linux-x64.tar.gz 5515786f0d5d0ea547bceb9319fad22d9dbd5b96214d5295a3bff28b2ba87393
 v0.4.0 rdsh-linux-x64-musl.tar.gz 8c8e9731a1af71cafcba85b09ead920ad2ed04328eabaaabc5b830e800f07dd5
 v0.4.0 rdsh-macos-arm64.tar.gz fad4df15d772608d7c954c692301f1c8a3453d61b55ebd38ef4dacc29899390a

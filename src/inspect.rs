@@ -1338,10 +1338,11 @@ pub fn cmd_logs(
                 (p, handle)
             }
             None => {
+                // 専用の NoLogs を使う。汎用 NoDirectory だと英語が
+                // "no logs dir at" になり、非英語では kind が未翻訳で残る。
                 println!(
                     "# {} {dir}",
-                    crate::locale::ui_message(locale, crate::locale::UiMessage::NoDirectory)
-                        .replace("{kind}", "logs")
+                    crate::locale::ui_message(locale, crate::locale::UiMessage::NoLogs)
                 );
                 return Ok(());
             }

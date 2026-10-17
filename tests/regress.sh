@@ -160,6 +160,26 @@ env -u RDSH_ORIG_BIN -u DSH_ORIG_BIN HOME="$ND/home" PATH="/nonexistent" "$BIN" 
 code=$?
 if [ "$code" = 1 ] && grep -q "original 'dsh' not found" "$ND/err"; then ok "doctor exits 1 when original dsh is missing"; else echo "FAIL(output): doctor missing-dsh error (exit $code)"; cat "$ND/err"; exit 1; fi
 rm -rf "$ND"
+# --- fallback discovery: an nvm install the non-interactive PATH never sees ---
+FB="$RG_TMP/fallback"
+mkdir -p "$FB/home/.nvm/versions/node/v22.10.0/bin" "$FB/empty"
+printf '#!/bin/sh\necho stub-nvm-dsh "$@"\n' > "$FB/home/.nvm/versions/node/v22.10.0/bin/dsh"
+chmod +x "$FB/home/.nvm/versions/node/v22.10.0/bin/dsh"
+env -u RDSH_ORIG_BIN -u DSH_ORIG_BIN RDSH_LANG=en HOME="$FB/home" DSH_HOME="$FB/dsh" PATH="$FB/empty" "$BIN" doctor > "$FB/out" 2> "$FB/err"
+code=$?
+if [ "$code" = 0 ] && grep -q ".nvm/versions/node/v22.10.0/bin/dsh" "$FB/out"; then ok "doctor resolves dsh under ~/.nvm outside PATH"; else echo "FAIL(exit $code): nvm fallback"; cat "$FB/out" "$FB/err"; exit 1; fi
+rm -rf "$FB"
+# --- doctor: pnpm build-script policy and the command that resolves it ---
+PN="$RG_TMP/pnpm-policy"
+mkdir -p "$PN/home/.local/share/pnpm" "$PN/empty" "$PN/config/pnpm"
+printf '#!/bin/sh\necho 10.32.0\n' > "$PN/home/.local/share/pnpm/pnpm"
+chmod +x "$PN/home/.local/share/pnpm/pnpm"
+RDSH_LANG=en HOME="$PN/home" DSH_HOME="$PN/dsh" XDG_CONFIG_HOME="$PN/config" PATH="$PN/empty" "$BIN" doctor > "$PN/out" 2> "$PN/err"
+if grep -q "fix: pnpm approve-builds --all -g" "$PN/out"; then ok "doctor prints the pnpm build-script fix"; else echo "FAIL(output): pnpm ignored-builds fix"; cat "$PN/out" "$PN/err"; exit 1; fi
+printf 'only-built-dependencies[]=sharp\n' > "$PN/config/pnpm/rc"
+RDSH_LANG=en HOME="$PN/home" DSH_HOME="$PN/dsh" XDG_CONFIG_HOME="$PN/config" PATH="$PN/empty" "$BIN" doctor > "$PN/out" 2> "$PN/err"
+if grep -q "build scripts allowed by the global config" "$PN/out"; then ok "doctor respects an approved pnpm policy"; else echo "FAIL(output): pnpm approved policy"; cat "$PN/out" "$PN/err"; exit 1; fi
+rm -rf "$PN"
 # --- sessions --tokens: exact size from zstd frame headers when recorded, zstd CLI only otherwise ---
 ZS="$RG_TMP/zst"
 mkdir -p "$ZS/dsh/sessions/p/s1" "$ZS/dsh/sessions/p/s2" "$ZS/shim"
@@ -392,7 +412,9 @@ manifest() {
   } > "$FS/release-digests.tsv"
 }
 manifest
-fs_sync() { env -u RDSH_SYNC_FROM_SOURCE -u RDSH_MUSL HOME="$FS/home" NPM_BIN="$FS/npm" PREFIX_BIN="$1" RDSH_RELEASE_BASE="file://$FS/rel" RDSH_TEST_INSECURE_BASE=1 RDSH_SYNC_VERSION="${3:-latest}" PATH="$FS/shim:$PATH" sh $FS/repo/sync-dsh.sh > "$2" 2>&1; }
+# RDSH_SYNC_SELF_UPDATE=0: these cases pin the script copy under test, so it
+# must not fetch a newer copy of itself from the origin.
+fs_sync() { env -u RDSH_SYNC_FROM_SOURCE -u RDSH_MUSL RDSH_SYNC_SELF_UPDATE=0 HOME="$FS/home" NPM_BIN="$FS/npm" PREFIX_BIN="$1" RDSH_RELEASE_BASE="file://$FS/rel" RDSH_TEST_INSECURE_BASE=1 RDSH_SYNC_VERSION="${3:-latest}" PATH="$FS/shim:$PATH" sh $FS/repo/sync-dsh.sh > "$2" 2>&1; }
 fs_sync "$FS/bin" $FS/sync-ok.log
 if grep -q "checksum ok" $FS/sync-ok.log && grep -q "rdsh updated OK via release binary" $FS/sync-ok.log && "$FS/bin/rdsh" --version 2>/dev/null | grep -q "rdsh"; then ok "sync-dsh release update with pinned digest"; else echo "FAIL(output): sync-dsh release update with pinned digest"; tail -n 8 $FS/sync-ok.log; exit 1; fi
 # A no-op check must not masquerade as a new update and restart notification time.

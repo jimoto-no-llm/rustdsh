@@ -19,6 +19,7 @@ const copies={
  'zh-CN':{connect:'连接',enabled:'已启用',estimate:'估算',prune:'执行裁剪',nativeTitle:'rdsh 仪表板',projectTitle:'项目仪表板',answer:'提交回答',empty:'没有待回答的问题',tokens:'令牌',projects:'个项目'},
 };
 assert.ok(Object.hasOwn(copies,language));const copy=copies[language];
+const {catalog}=await import(pathToFileURL(path.join(repo,'dashboard/locale.mjs')));
 const root=await mkdtemp(path.join(tmpdir(),'rdsh-browser-e2e-'));
 const env=Object.fromEntries(['PATH','SystemRoot','WINDIR','COMSPEC','TEMP','TMP'].filter(k=>process.env[k]).map(k=>[k,process.env[k]]));
 Object.assign(env,{RDSH_LANG:language,HOME:root,USERPROFILE:root,DSH_HOME:path.join(root,'dsh'),XDG_CACHE_HOME:path.join(root,'cache'),XDG_CONFIG_HOME:path.join(root,'config'),XDG_DATA_HOME:path.join(root,'data'),RDSH_ORIG_BIN:path.join(root,'no-original'),RDSH_DASHBOARD_HOME:path.join(root,'projects-state')});
@@ -77,7 +78,7 @@ try{
  const {Client}=await import(pathToFileURL(path.join(repo,'dashboard/node_modules/@modelcontextprotocol/sdk/dist/esm/client/index.js')));
  const {StreamableHTTPClientTransport}=await import(pathToFileURL(path.join(repo,'dashboard/node_modules/@modelcontextprotocol/sdk/dist/esm/client/streamableHttp.js')));
  const project=path.join(root,'alpha');await mkdir(project);const identityAlpha=await identity(project);
- const dashboard=await launch(process.execPath,[path.join(repo,'dashboard/cli.mjs'),'project','--project',project,'--port',await freePort(),'--no-tailscale'],/project: (http:\/\/127\.0\.0\.1:\d+\/)/);
+ const dashboard=await launch(process.execPath,[path.join(repo,'dashboard/cli.mjs'),'project','--project',project,'--port',await freePort(),'--no-tailscale'],/project[^\n]*?(http:\/\/127\.0\.0\.1:\d+\/)/);
  const runtime=await readLocalRuntime(identityAlpha.directory);
  const client=new Client({name:'browser-e2e',version:'1.0.0'},{capabilities:{}});
  await client.connect(new StreamableHTTPClientTransport(new URL(runtime.local_url+'mcp'),{requestInit:{headers:{authorization:`Bearer ${runtime.mcp_token}`}}}));
@@ -85,7 +86,7 @@ try{
  const call=async(name,args)=>{const result=await client.callTool({name,arguments:args});assert.notEqual(result.isError,true);return result;};
  await call('dashboard_upsert_task',{id:'T1',title:'E2E task',status:'doing'});
  await call('dashboard_ask_question',{id:'Q1',question:'E2E: choose an answer',urgency:'high'});
- const projectPage=await pageFor(browser,runtime.browser_url);await projectPage.locator('#question-Q1 textarea').waitFor();await check(projectPage,/dashboard/i);
+ const projectPage=await pageFor(browser,runtime.browser_url);await projectPage.locator('#question-Q1 textarea').waitFor();await check(projectPage,new RegExp(copy.projectTitle));
  const updateSummary=projectPage.locator('#update-summary');
  await projectPage.waitForFunction(()=>document.querySelector('#update-summary-status')?.textContent.includes('初回確認'));
  await projectPage.evaluate(async()=>{
@@ -139,7 +140,7 @@ try{
  assert.equal(new URL(pairedPage.url()).hash,'');assert.equal(new URL(pairedPage.url()).searchParams.has('rdsh_id'),false);
  assert.equal(await pairedPage.evaluate(()=>localStorage.getItem('rdsh_pending_project_deep_link_v1')),null);
  await pairedPage.setViewportSize(report.viewports[1]);await pairedPage.goto(questionLink);await pairedPage.locator('#question-Q1').waitFor();
- await pairedPage.waitForFunction(()=>document.activeElement?.id==='question-Q1');await check(pairedPage,/dashboard/i);
+ await pairedPage.waitForFunction(()=>document.activeElement?.id==='question-Q1');await check(pairedPage,new RegExp(copy.projectTitle));
  assert.equal(new URL(pairedPage.url()).hash,'');assert.equal(new URL(pairedPage.url()).searchParams.has('rdsh_id'),false);
  report.flows.push('project deep links: task/question URLs omit auth key; unauthenticated target resumes after pairing and opens exact task; mobile returns to exact question');
  const observedCli=projectPage.locator('#observed-cli-panel');
@@ -175,7 +176,7 @@ try{
  await viewerPage.locator('#question-Q1 textarea').waitFor();await viewerPage.locator('#device-access-notice').filter({hasText:'閲覧'}).waitFor();
  assert.equal(await viewerPage.locator('#question-Q1 textarea').isDisabled(),true);assert.equal(await viewerPage.locator('#question-Q1 button[type=submit]').isDisabled(),true);
  assert.equal(await viewerPage.locator('#share-toggle').isHidden(),true);assert.equal(await viewerPage.locator('#device-detail').isHidden(),true);
- await viewerPage.setViewportSize(report.viewports[1]);await check(viewerPage,/dashboard/i);
+ await viewerPage.setViewportSize(report.viewports[1]);await check(viewerPage,new RegExp(copy.projectTitle));
  const viewerToken=await viewerPage.evaluate(()=>sessionStorage.getItem('rdsh_project_browser_token'));
  const deniedAnswer=await fetch(new URL('api/update/answer',viewerPage.url()),{method:'POST',headers:{'x-rdsh-browser-token':viewerToken,'content-type':'application/json'},body:JSON.stringify({id:'Q1',answer:'forged'})});
  assert.equal(deniedAnswer.status,403);
@@ -263,7 +264,7 @@ try{
  assert.equal(await projectPage.evaluate(()=>document.activeElement.id),'palette-search');
  await paletteSearch.fill('answered');
  assert.equal(await projectPage.locator('#palette-list [role="option"]').count(),1,'English aliases should filter commands');
- assert.match(await projectPage.locator('#palette-count').innerText(),/回答済み.*Toggle answered questions/);
+ assert.match(await projectPage.locator('#palette-count').innerText(),new RegExp(catalog[language]['palette.toggleAnswered']));
  const paletteUpdate=projectPage.waitForResponse(r=>r.url().endsWith('/api/state')&&r.status()===200);
  await call('dashboard_update_metrics',{input_tokens:2000,cached_input_tokens:700,tool_calls:11,tool_errors:0});await paletteUpdate;
  assert.equal(await paletteSearch.inputValue(),'answered');
@@ -283,8 +284,8 @@ try{
  await projectPage.waitForFunction(()=>document.activeElement.id==='pending-heading');
  assert.equal(await projectPage.evaluate(()=>document.activeElement.id),'pending-heading','navigation command should focus its destination');
  passQaCase('desktop.command-palette','browser-results.json#qa_results.desktop.command-palette');
- await projectPage.locator('#question-Q1 textarea').fill('E2E saved answer');await projectPage.locator('#question-Q1').getByRole('button',{name:'回答を返す'}).click();
- await projectPage.locator('#questions').filter({hasText:'未回答の質問はありません'}).waitFor();await projectPage.locator('#answered').evaluate(e=>e.open=true);await projectPage.locator('#answers').filter({hasText:'E2E saved answer'}).waitFor();
+ await projectPage.locator('#question-Q1 textarea').fill('E2E saved answer');await projectPage.locator('#question-Q1').getByRole('button',{name:copy.answer}).click();
+ await projectPage.locator('#questions').filter({hasText:copy.empty}).waitFor();await projectPage.locator('#answered').evaluate(e=>e.open=true);await projectPage.locator('#answers').filter({hasText:'E2E saved answer'}).waitFor();
  await projectPage.waitForFunction(()=>document.querySelector('#update-summary-items')?.textContent.includes('質問への回答が保存'));
  await updateSummary.locator('#update-summary-mark-read').click();
  await projectPage.waitForFunction(()=>document.querySelector('#update-summary-status')?.textContent.includes('変更はありません'));
@@ -303,7 +304,7 @@ try{
  await projectPage.route('**/api/update/answer',async route=>{if(route.request().postDataJSON()?.id==='Q2')doubleSubmitRequests++;await route.continue();});
  beginQaCase('desktop.double-submit');
  const doubleSubmitResponse=projectPage.waitForResponse(response=>response.url().endsWith('/api/update/answer')&&response.request().postDataJSON()?.id==='Q2');
- await projectPage.locator('#question-Q2').getByRole('button',{name:'回答を返す'}).dblclick({delay:40});
+ await projectPage.locator('#question-Q2').getByRole('button',{name:copy.answer}).dblclick({delay:40});
  assert.equal((await doubleSubmitResponse).status(),200);
  await projectPage.unroute('**/api/update/answer');
  let stateAfter=await readState();
@@ -316,13 +317,13 @@ try{
  await projectPage.locator('#question-Q3 textarea').fill('Retry this draft after reconnecting');
  beginQaCase('desktop.offline-retry');
  await projectPage.context().setOffline(true);
- await projectPage.locator('#question-Q3').getByRole('button',{name:'回答を返す'}).click();
+ await projectPage.locator('#question-Q3').getByRole('button',{name:copy.answer}).click();
  await projectPage.waitForFunction(()=>Boolean(document.querySelector('#question-Q3 [role="alert"]')?.textContent));
  assert.equal(await projectPage.locator('#question-Q3 textarea').inputValue(),'Retry this draft after reconnecting');
  assert.equal((await readState()).questions.find(item=>item.id==='Q3').answer,null);
  await projectPage.context().setOffline(false);
  const retryResponse=projectPage.waitForResponse(response=>response.url().endsWith('/api/update/answer')&&response.request().postDataJSON()?.id==='Q3');
- await projectPage.locator('#question-Q3').getByRole('button',{name:'回答を返す'}).click();
+ await projectPage.locator('#question-Q3').getByRole('button',{name:copy.answer}).click();
  assert.equal((await retryResponse).status(),200);
  stateAfter=await readState();
  assert.equal(stateAfter.questions.find(item=>item.id==='Q3').answer,'Retry this draft after reconnecting');
@@ -338,7 +339,7 @@ try{
    const response=await route.fetch();serverCommitted=response.status()===200;await response.text();await route.abort('failed');
  });
  beginQaCase('desktop.lost-response');
- await projectPage.locator('#question-Q4').getByRole('button',{name:'回答を返す'}).click();
+ await projectPage.locator('#question-Q4').getByRole('button',{name:copy.answer}).click();
  await projectPage.locator('#answered').evaluate(e=>e.open=true);
  await projectPage.locator('#answers').filter({hasText:'Server committed before the response was lost'}).waitFor();
  await projectPage.unroute('**/api/update/answer');
@@ -349,15 +350,15 @@ try{
  passQaCase('desktop.lost-response','browser-results.json#qa_results.desktop.lost-response');
 
  const alphaState=await readFile(path.join(identityAlpha.directory,'state.json'),'utf8');assert.ok(alphaState.includes('E2E saved answer'));
- await screenshot(projectPage,'project-desktop');await projectPage.setViewportSize(report.viewports[1]);await check(projectPage,/dashboard/i);passQaCase('mobile.viewport','project-mobile.png');await screenshot(projectPage,'project-mobile');
+ await screenshot(projectPage,'project-desktop');await projectPage.setViewportSize(report.viewports[1]);await check(projectPage,new RegExp(copy.projectTitle));passQaCase('mobile.viewport','project-mobile.png');await screenshot(projectPage,'project-mobile');
  await projectPage.close();await client.close();await stop(dashboard.child);
- const restarted=await launch(process.execPath,[path.join(repo,'dashboard/cli.mjs'),'project','--project',project,'--port',await freePort(),'--no-tailscale'],/project: (http:\/\/127\.0\.0\.1:\d+\/)/);
+ const restarted=await launch(process.execPath,[path.join(repo,'dashboard/cli.mjs'),'project','--project',project,'--port',await freePort(),'--no-tailscale'],/project[^\n]*?(http:\/\/127\.0\.0\.1:\d+\/)/);
  const fresh=await readLocalRuntime(identityAlpha.directory);
  assert.notEqual(fresh.browser_url,runtime.browser_url);
  const staleToken=new URL(runtime.browser_url).hash.slice('#key='.length);assert.equal((await fetch(fresh.local_url+'api/state',{headers:{'x-rdsh-browser-token':staleToken}})).status,401);
- const newPage=await pageFor(browser,fresh.browser_url);await newPage.locator('#tasks-detail').evaluate(e=>e.open=true);await newPage.locator('#task-T1').waitFor();await newPage.locator('#answered').evaluate(e=>e.open=true);await newPage.locator('#answers').filter({hasText:'E2E saved answer'}).waitFor();await check(newPage,/dashboard/i);
+ const newPage=await pageFor(browser,fresh.browser_url);await newPage.locator('#tasks-detail').evaluate(e=>e.open=true);await newPage.locator('#task-T1').waitFor();await newPage.locator('#answered').evaluate(e=>e.open=true);await newPage.locator('#answers').filter({hasText:'E2E saved answer'}).waitFor();await check(newPage,new RegExp(copy.projectTitle));
  const persisted=await fetch(fresh.local_url+'api/state',{headers:{authorization:`Bearer ${fresh.token}`}});assert.equal(persisted.status,200);const persistedState=await persisted.json();assert.equal(persistedState.questions.find(item=>item.id==='Q1').answer,'E2E saved answer');assert.equal(persistedState.feedback.filter(item=>item.question_id==='Q1'&&item.type==='question_answered').length,1);
- passQaCase('desktop.answer-reload','browser-results.json#qa_results.desktop.answer-reload');await stop(restarted.child);
+ passQaCase('desktop.answer-reload','browser-results.json#qa_results.desktop.answer-reload');await newPage.close();await stop(restarted.child);
  report.flows.push('project CLI: real MCP task/question -> preserved read-only CLI observation panel -> project-specific pane layout persistence, keyboard navigation and mobile one-column -> browser draft and focus preserved on SSE plus change summary -> command palette English/Japanese search, arrows, Enter, Escape, ARIA state and SSE resilience -> browser answer -> per-project summary checkpoint, MCP/file readback -> process restart retained answer and revoked old key');
  }finally{await client.close();}
  assert.deepEqual(report.page_errors,[]);assert.deepEqual(report.console_errors,[]);

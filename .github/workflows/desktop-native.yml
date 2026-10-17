@@ -37,7 +37,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo build --release --locked
       - run: node desktop/prepare.mjs --checkout target/desktop-native-fork --rdsh-bin ${{ matrix.binary }}
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@v6
         with:
           version: 11.28.5
       - name: Install the pinned official dependency graph

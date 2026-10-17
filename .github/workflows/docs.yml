@@ -45,8 +45,12 @@ jobs:
       - uses: actions/checkout@v7
       - uses: lycheeverse/lychee-action@v2
         with:
-          # Resolve former-owner links after the repository transfer, while
-          # keeping the destination issue, file and release checks enabled.
+          # Former-owner links are remapped to the current repository: the old
+          # `issues/N` paths no longer resolve (GitHub answers 404, not a
+          # redirect), so refs that still carry them -- a pull request branch
+          # opened before the unification, for example -- keep resolving to the
+          # destination issue, file and release checks instead of failing this
+          # required job. `main` itself contains no former-owner link.
           args: >-
             --config .lychee.toml --verbose --no-progress
             --remap '^https://github[.]com/sahenjp/rustdsh(/.*)?$ https://github.com/jimoto-no-llm/rustdsh$1'

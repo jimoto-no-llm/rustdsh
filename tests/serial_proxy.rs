@@ -618,6 +618,7 @@ async fn native_cli_rewrites_tool_choice_and_streams_sse() {
         seen.headers["content-length"].parse::<usize>().unwrap(),
         seen.body.len()
     );
+    wait_until(|| upstream.state.finished.load(Ordering::SeqCst) == 1).await;
     assert_eq!(upstream.state.finished.load(Ordering::SeqCst), 1);
 
     let unchanged = br#"{ "tools" : [1], "tool_choice" : null }"#;
@@ -635,6 +636,7 @@ async fn native_cli_rewrites_tool_choice_and_streams_sse() {
     response.bytes().await.unwrap();
     wait_until(|| upstream.state.seen.lock().unwrap().len() == 2).await;
     assert_eq!(upstream.state.seen.lock().unwrap()[1].body, unchanged);
+    wait_until(|| upstream.state.finished.load(Ordering::SeqCst) == 2).await;
     assert_eq!(upstream.state.finished.load(Ordering::SeqCst), 2);
     let logs = proxy
         .logs

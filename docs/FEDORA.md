@@ -22,6 +22,19 @@ sudo dnf install -y cargo gcc gcc-c++ make git
 ./install.sh            # add --as-dsh to shadow the dsh command
 ```
 
+Native package:
+
+```sh
+sudo dnf install ./rdsh-<version>-1.x86_64.rpm
+```
+
+Download the `.rpm` from the
+[latest release](https://github.com/jimoto-no-llm/rustdsh/releases/latest);
+`<version>` is the tag without its leading `v`. The package installs
+`/usr/bin/rdsh` plus the licence and README, and carries the same glibc build
+as `rdsh-linux-x64.tar.gz`. On a host whose glibc is older than that build's,
+use the musl archive or `install.sh` instead.
+
 ## Optional packages
 
 | Package | Unlocks | Without it |
@@ -32,13 +45,27 @@ sudo dnf install -y cargo gcc gcc-c++ make git
 | `searxng` (own service or container) | `rdsh search-web` | local web search is unavailable |
 
 `rdsh doctor` prints exactly which of these this host is missing, with the
-command that installs them; `install.sh` prints the same line once after
+command that installs them; `install.sh` prints the same list once after
 installing. Both stay silent when nothing is missing, and neither fails on
 non-rpm hosts.
 
 ```sh
 sudo dnf install -y zstd bubblewrap
 ```
+
+`install.sh` also checks what the install itself needs before it downloads or
+builds anything: `curl`, `tar`, `gzip` and coreutils (`sha256sum`/`install`),
+plus the Node.js 22+ / original `dsh` state and whether `PREFIX` is writable.
+Each finding comes with the host's own command (`sudo dnf install -y ...` on
+rpm hosts, the equivalent on Debian, Alpine, Arch and openSUSE) and, when the
+chosen path cannot finish without a tool, the installer stops there instead of
+failing halfway.
+
+The release archives carry a glibc build and a static musl fallback. An rpm host
+uses the glibc build, and the static fallback needs no package either, so
+`musl-libc`/`musl-gcc` are never required to run a prebuilt binary; `--musl`
+only selects the static archive explicitly. The installer prints which one it
+chose after a release install.
 
 ## Desktop application
 
@@ -79,4 +106,6 @@ if a minimal install is missing it. Everything else it uses (zstd, node,
 python3, tar, gzip) is already listed above or ships with Fedora.
 
 CI builds and tests this repository inside a `fedora:latest` container, so
-the package names on this page are exercised on every push.
+the package names on this page are exercised on every push. The isolated
+install suite also runs `install/os-release-hints`, which fakes `ID=fedora` on
+a Debian base so the rpm branch stays covered on hosts that are not Fedora.

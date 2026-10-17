@@ -77,6 +77,35 @@ async function runtime(root, name) {
   throw new Error("Own test dashboard runtime not available");
 }
 
+async function gone(pid) {
+  for (let n = 0; n < 100; n++) {
+    try {
+      process.kill(pid, 0);
+    } catch {
+      return true;
+    }
+    await delay(100);
+  }
+  return false;
+}
+// Windows releases a stopped process's directory handles asynchronously, so
+// wait for the owned processes instead of guessing with a fixed sleep.
+async function removeFixture(root) {
+  for (let n = 0; ; n++) {
+    try {
+      await fs.rm(root, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      if (
+        n >= 50 ||
+        !["EBUSY", "EPERM", "ENOTEMPTY", "EACCES"].includes(error.code)
+      )
+        throw error;
+      await delay(100);
+    }
+  }
+}
+
 test("launcher help remains foreground", async () => {
   const result = await run(["project", "--help"], process.env).finished;
   assert.equal(result.code, 0);
@@ -193,14 +222,7 @@ test(
       assert.equal(duplicate.code, 1);
       assert.match(duplicate.output, /already running/);
       assert.equal((await stop(instances[0])).status, 200);
-      for (let n = 0; n < 100; n++) {
-        try {
-          process.kill(instances[0].pid, 0);
-        } catch {
-          break;
-        }
-        await delay(100);
-      }
+      assert.equal(await gone(instances[0].pid), true);
       assert.throws(() => process.kill(instances[0].pid, 0));
       const response = await fetch(`${instances[1].local_url}api/config`, {
         headers: { authorization: `Bearer ${instances[1].token}` },
@@ -213,10 +235,12 @@ test(
         instances[1].instance_id,
       );
     } finally {
-      for (const instance of instances) await stop(instance).catch(() => {});
-      // Wait for owned shutdown before removing only the temporary fixture.
-      await delay(1000);
-      await fs.rm(root, { recursive: true, force: true });
+      for (const instance of instances) {
+        await stop(instance).catch(() => {});
+        // Wait for owned shutdown before removing only the temporary fixture.
+        await gone(instance.pid);
+      }
+      await removeFixture(root);
     }
   },
 );

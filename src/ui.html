@@ -11,8 +11,14 @@
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.6 system-ui, "Hiragino Sans", sans-serif; }
 header { padding: 20px 24px; border-bottom: 1px solid var(--line); display: flex; gap: 12px; align-items: center; }
+header .titles { display: flex; flex-direction: column; gap: 2px; }
 header h1 { margin: 0; font-size: 20px; }
-header span { color: var(--mut); font-size: 12px; }
+header span { color: var(--mut); font-size: 12px; margin-left: auto; white-space: nowrap; }
+header .subtitle { margin: 0; color: var(--mut); font-size: 12px; }
+#overview { margin: 16px 24px 0; }
+#overview h2 { margin: 0 0 8px; font-size: 15px; }
+#overview p { color: var(--mut); font-size: 12px; margin: 0 0 8px; }
+#connect-state { color: var(--warn); }
 main { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; padding: 20px 24px; max-width: 1100px; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
 .card h2 { margin: 0 0 8px; font-size: 15px; }
@@ -33,14 +39,17 @@ footer { padding: 0 24px 24px; color: var(--mut); font-size: 12px; }
 </style>
 </head>
 <body>
-<header><img src="/icon.png" width="40" height="40" alt="rdsh"><h1 id="ui-title">rdsh dashboard</h1><span id="ver">…</span></header>
+<header><img src="/icon.png" width="40" height="40" alt="rdsh"><div class="titles"><h1 id="ui-title">Audit &amp; Performance Monitor for DeepSeek Harness</h1><p id="ui-subtitle" class="subtitle">Local-only monitoring dashboard served by rdsh serve — not the upstream dsh web chat interface.</p></div><span id="ver">rdsh __RDSH_VERSION__</span></header>
+<section id="overview" class="card">
+<h2 id="ui-overview-heading">What this dashboard is for</h2><p id="ui-overview-help">Audits and measures doctor diagnostics, recent sessions, token estimates, prune, skills and benchmarks locally. Cards load automatically once you connect.</p>
+<p id="connect-state">Not connected: enter the token printed in the terminal.</p></section>
 <section id="auth" class="card" style="margin:16px 24px 0" hidden>
 <h2 id="ui-connect-heading">ダッシュボードに接続</h2><p id="ui-connect-help">端末に表示された保護済みトークンファイルの内容を入力してください。トークンはアドレスバーに保存されません。</p>
 <input id="dashboard-token" type="password" autocomplete="off" spellcheck="false" aria-label="Dashboard token">
 <button id="ui-connect" onclick="connectDashboard()">接続</button><p id="auth-error" role="alert"></p></section>
 <main>
 <section class="card"><h2 id="ui-doctor-heading">状態 (doctor)</h2><p id="ui-doctor-help">本家dsh・DSH_HOME・slim設定を確認</p>
-<button class="ghost" id="ui-refresh-doctor" onclick="doctor()">更新</button><pre id="doctor">未取得</pre></section>
+<button class="ghost" id="ui-refresh-doctor" onclick="doctor()">更新</button><pre id="doctor">Loads automatically after you connect</pre></section>
 <section class="card"><h2 id="ui-tokens-heading">トークン推定</h2><p id="ui-tokens-help">初期入力トークンの見積もり（約4文字=1トークン）</p>
 <textarea id="ttext" placeholder="ここにテキストを貼り付け"></textarea>
 <button id="ui-estimate" onclick="tokens()">推定する</button><pre id="tout">-</pre></section>
@@ -49,9 +58,9 @@ footer { padding: 0 24px 24px; color: var(--mut); font-size: 12px; }
 <div class="row"><label id="ui-budget">予算</label><input id="pmax" type="number" value="4000" min="100"></div>
 <button id="ui-prune" onclick="prune()">prune実行</button> <button class="ghost" id="pcopy" onclick="copyPrune()">コピー</button><pre id="pout">-</pre></section>
 <section class="card"><h2 id="ui-sessions-heading">セッション</h2><p id="ui-sessions-help">最新のセッション一覧（Nodeなし）</p>
-<button class="ghost" id="ui-refresh-sessions" onclick="sessions()">更新</button><pre id="sess">未取得</pre></section>
+<button class="ghost" id="ui-refresh-sessions" onclick="sessions()">更新</button><pre id="sess">Loads automatically after you connect</pre></section>
 <section class="card"><h2 id="ui-skills-heading">スキル</h2><p id="ui-skills-help">導入済みスキル一覧</p>
-<button class="ghost" id="ui-refresh-skills" onclick="skills()">更新</button><pre id="sk">未取得</pre></section>
+<button class="ghost" id="ui-refresh-skills" onclick="skills()">更新</button><pre id="sk">Loads automatically after you connect</pre></section>
 <section class="card"><h2 id="ui-bench-heading">ベンチ</h2><p id="ui-bench-help">rdsh vs dsh の起動速度を比較</p>
 <button class="ghost" id="ui-bench" onclick="bench()">計測 (n=3)</button><pre id="bench">未計測</pre></section>
 </main>
@@ -68,8 +77,16 @@ for (const [key, ja, en, zh] of [
   ["response.invalid", "応答の解析に失敗: サーバーから不正な応答が返されました。再試行してください。", "Could not parse the response: the server returned an invalid response. Retry.", "无法解析响应：服务器返回了无效响应。请重试。"],
   ["connection.failed", "接続できません: rdsh serve が起動しているか確認し、再試行してください。", "Could not connect: check that rdsh serve is running and retry.", "无法连接：请确认 rdsh serve 正在运行，然后重试。"],
 
+  ["app.role", "DeepSeek Harness の監査・パフォーマンスモニター", "Audit & Performance Monitor for DeepSeek Harness", "DeepSeek Harness 审计与性能监控"],
+  ["app.subtitle", "rdsh serve が提供するローカル専用の監視ダッシュボードです。本家 dsh web のチャット画面ではありません。", "Local-only monitoring dashboard served by rdsh serve — not the upstream dsh web chat interface.", "由 rdsh serve 提供的仅限本地的监控仪表板，并非上游 dsh web 的聊天界面。"],
+  ["overview.heading", "このダッシュボードの役割", "What this dashboard is for", "此仪表板的用途"],
+  ["overview.help", "システム診断 (doctor)・直近セッション・トークン推定・prune・スキル・ベンチマークをローカルで監査・計測します。接続すると各カードへ自動で読み込まれます。", "Audits and measures doctor diagnostics, recent sessions, token estimates, prune, skills and benchmarks locally. Cards load automatically once you connect.", "在本地审计和测量 doctor 诊断、近期会话、令牌估算、prune、技能与基准测试。连接后各卡片会自动加载。"],
+  ["awaiting", "接続後に自動表示します", "Loads automatically after you connect", "连接后将自动显示"],
+  ["connection.waiting", "未接続: 端末に表示されたトークンを入力してください。", "Not connected: enter the token printed in the terminal.", "未连接：请输入终端显示的令牌。"],
+  ["connection.connected", "接続済み: {time} に更新", "Connected: updated {time}", "已连接：更新于 {time}"],
+
   ["connect.heading", "ダッシュボードに接続", "Connect to dashboard", "连接到仪表板"], ["connect.help", "端末に表示された保護済みトークンファイルの内容を入力してください。トークンはアドレスバーに保存されません。", "Enter the protected token handoff file contents printed in the terminal. The token is not stored in the address bar.", "请输入终端显示的受保护令牌交接文件内容。令牌不会保存在地址栏中。"], ["connect.button", "接続", "Connect", "连接"],
-  ["doctor.heading", "状態 (doctor)", "Status (doctor)", "状态 (doctor)"], ["doctor.help", "本家dsh・DSH_HOME・slim設定を確認", "Check upstream dsh, DSH_HOME, and slim settings", "检查上游 dsh、DSH_HOME 和 slim 设置"], ["refresh", "更新", "Refresh", "刷新"], ["unavailable", "未取得", "Unavailable", "未获取"],
+  ["doctor.heading", "状態 (doctor)", "Status (doctor)", "状态 (doctor)"], ["doctor.help", "本家dsh・DSH_HOME・slim設定を確認", "Check upstream dsh, DSH_HOME, and slim settings", "检查上游 dsh、DSH_HOME 和 slim 设置"], ["refresh", "更新", "Refresh", "刷新"],
   ["tokens.heading", "トークン推定", "Token estimate", "令牌估算"], ["tokens.help", "初期入力トークンの見積もり（約4文字=1トークン）", "Estimate initial input tokens (about 4 characters = 1 token)", "估算初始输入令牌（约 4 个字符 = 1 个令牌）"], ["tokens.placeholder", "ここにテキストを貼り付け", "Paste text here", "在此粘贴文本"], ["tokens.estimate", "推定する", "Estimate", "估算"],
   ["prune.heading", "prune（切り詰め）", "Prune", "裁剪"], ["prune.help", "head+tailを残して予算内に収める", "Keep head and tail within the budget", "保留开头和结尾并控制在预算内"], ["prune.placeholder", "長いツール出力を貼り付け", "Paste long tool output", "粘贴较长的工具输出"], ["budget", "予算", "Budget", "预算"], ["prune.run", "prune実行", "Run prune", "执行裁剪"], ["copy", "コピー", "Copy", "复制"],
   ["sessions.heading", "セッション", "Sessions", "会话"], ["sessions.help", "最新のセッション一覧（Nodeなし）", "Latest sessions (without Node)", "最新会话列表（无 Node）"], ["skills.heading", "スキル", "Skills", "技能"], ["skills.help", "導入済みスキル一覧", "Installed skills", "已安装的技能"], ["bench.heading", "ベンチ", "Benchmark", "基准测试"], ["bench.help", "rdsh vs dsh の起動速度を比較", "Compare rdsh and dsh startup speed", "比较 rdsh 与 dsh 的启动速度"], ["bench.measure", "計測 (n=3)", "Measure (n=3)", "测量 (n=3)"], ["bench.pending", "計測中…", "Measuring…", "正在测量…"], ["bench.none", "未計測", "Not measured", "未测量"], ["footer", "rdsh は本家dshを壊さない安全なRustランチャーです。serveは127.0.0.1のみで待ち受けます。", "rdsh is a safe Rust launcher that leaves upstream dsh intact. serve listens only on 127.0.0.1.", "rdsh 是不会破坏上游 dsh 的安全 Rust 启动器。serve 仅监听 127.0.0.1。"],
@@ -77,6 +94,7 @@ for (const [key, ja, en, zh] of [
   ["http.400", "不正なリクエスト (400): {path} への送信内容を確認してください。", "Bad request (400): check the data sent to {path}.", "请求无效 (400)：请检查发送到 {path} 的数据。"], ["http.401", "認証エラー (401): ダッシュボードのトークンが必要です。", "Authentication error (401): dashboard token required.", "认证错误 (401)：需要仪表板令牌。"], ["http.403", "アクセス拒否 (403): 信頼できないホスト/オリジンです。127.0.0.1 のダッシュボードURLから直接開いてください。", "Access denied (403): untrusted host/origin. Open directly from the 127.0.0.1 dashboard URL.", "访问被拒绝 (403)：主机或来源不受信任。请直接从 127.0.0.1 仪表板 URL 打开。"], ["http.404", "見つかりません (404): {path} は存在しません。", "Not found (404): {path} does not exist.", "未找到 (404)：{path} 不存在。"], ["http.413", "送信データが大きすぎます (413): テキストを短くして再試行してください。", "Request data is too large (413): shorten the text and retry.", "发送数据过大 (413)：请缩短文本后重试。"], ["http.429", "混雑しています (429): しばらく待って再試行してください。", "Busy (429): wait and retry.", "繁忙 (429)：请稍候重试。"], ["http.500", "サーバー内部エラー (500): 再試行してください。直らない場合は serve を再起動してください。", "Internal server error (500): retry. If it continues, restart serve.", "服务器内部错误 (500)：请重试。若持续发生，请重启 serve。"], ["http.503", "サーバーが混み合っています (503): しばらく待って再試行してください。", "Server is busy (503): wait and retry.", "服务器繁忙 (503)：请稍候重试。"], ["http.default", "リクエスト失敗 ({status}): {path}。再試行してください。", "Request failed ({status}): {path}. Retry.", "请求失败 ({status})：{path}。请重试。"],
 ]) { (RDSH_UI_CATALOG[key] ||= {}) .ja = ja; RDSH_UI_CATALOG[key].en = en; RDSH_UI_CATALOG[key]["zh-CN"] = zh; }
 function t(key, values = {}) { return (RDSH_UI_CATALOG[key]?.[RDSH_UI_LOCALE] || key).replace(/\{(\w+)\}/g, (_, name) => String(values[name] ?? `{${name}}`)); }
+function setConnectState(key, values) { document.getElementById("connect-state").textContent = t(key, values); }
 function formatNumber(value) { return new Intl.NumberFormat(RDSH_UI_LOCALE).format(value); }
 function formatSessionTime(value) {
   if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(value)) return value;
@@ -84,7 +102,7 @@ function formatSessionTime(value) {
   const date = new Date(value.replace(" ", "T") + ":00Z");
   return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat(RDSH_UI_LOCALE, {timeZone:"UTC",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",timeZoneName:"short"}).format(date);
 }
-for (const [id, key] of Object.entries({ "ui-title":"page.title", "ui-page-title":"page.title", "doctor":"unavailable", "sess":"unavailable", "sk":"unavailable", "bench":"bench.none", "ui-connect-heading": "connect.heading", "ui-connect-help": "connect.help", "ui-connect": "connect.button", "ui-doctor-heading": "doctor.heading", "ui-doctor-help": "doctor.help", "ui-refresh-doctor": "refresh", "ui-tokens-heading": "tokens.heading", "ui-tokens-help": "tokens.help", "ui-estimate": "tokens.estimate", "ui-prune-heading": "prune.heading", "ui-prune-help": "prune.help", "ui-budget": "budget", "ui-prune": "prune.run", pcopy: "copy", "ui-sessions-heading": "sessions.heading", "ui-sessions-help": "sessions.help", "ui-refresh-sessions": "refresh", "ui-skills-heading": "skills.heading", "ui-skills-help": "skills.help", "ui-refresh-skills": "refresh", "ui-bench-heading": "bench.heading", "ui-bench-help": "bench.help", "ui-bench": "bench.measure", "ui-footer": "footer" })) document.getElementById(id).textContent = t(key);
+for (const [id, key] of Object.entries({ "ui-title":"app.role", "ui-page-title":"page.title", "ui-subtitle":"app.subtitle", "ui-overview-heading":"overview.heading", "ui-overview-help":"overview.help", "connect-state":"connection.waiting", "doctor":"awaiting", "sess":"awaiting", "sk":"awaiting", "bench":"bench.none", "ui-connect-heading": "connect.heading", "ui-connect-help": "connect.help", "ui-connect": "connect.button", "ui-doctor-heading": "doctor.heading", "ui-doctor-help": "doctor.help", "ui-refresh-doctor": "refresh", "ui-tokens-heading": "tokens.heading", "ui-tokens-help": "tokens.help", "ui-estimate": "tokens.estimate", "ui-prune-heading": "prune.heading", "ui-prune-help": "prune.help", "ui-budget": "budget", "ui-prune": "prune.run", pcopy: "copy", "ui-sessions-heading": "sessions.heading", "ui-sessions-help": "sessions.help", "ui-refresh-sessions": "refresh", "ui-skills-heading": "skills.heading", "ui-skills-help": "skills.help", "ui-refresh-skills": "refresh", "ui-bench-heading": "bench.heading", "ui-bench-help": "bench.help", "ui-bench": "bench.measure", "ui-footer": "footer" })) document.getElementById(id).textContent = t(key);
 document.getElementById("dashboard-token").setAttribute("aria-label", t("token.label"));
 document.getElementById("ttext").placeholder = t("tokens.placeholder");
 document.getElementById("ptext").placeholder = t("prune.placeholder");
@@ -96,6 +114,7 @@ function showAuth(message){
   sessionStorage.removeItem("rdsh_dashboard_token");
   document.getElementById("auth").hidden = false;
   document.getElementById("auth-error").textContent = message || "";
+  setConnectState("connection.waiting");
 }
 async function connectDashboard(candidateInput){
   const candidate = typeof candidateInput === "string" ? candidateInput : document.getElementById("dashboard-token").value.trim();
@@ -107,9 +126,12 @@ async function connectDashboard(candidateInput){
     sessionStorage.setItem("rdsh_dashboard_token", dashboardToken);
     document.getElementById("dashboard-token").value = "";
     document.getElementById("auth").hidden = true;
-    const version = await jget("/api/version");
+    // Render the role header and connect state first, then fill every card in
+    // parallel so the first connected paint already shows diagnostics and the
+    // latest sessions instead of placeholders.
+    setConnectState("connection.connected", { time: new Date().toLocaleTimeString(RDSH_UI_LOCALE) });
+    const [version] = await Promise.all([jget("/api/version"), doctor(), sessions(), skills()]);
     document.getElementById("ver").textContent = version.name + " " + version.version;
-    await Promise.all([doctor(), sessions(), skills()]);
   } catch(e) { showAuth(e.message); error.textContent = e.message; }
 }
 function statusMessage(status, path){
