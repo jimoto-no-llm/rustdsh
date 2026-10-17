@@ -237,8 +237,9 @@ native実装の差分試験・evidence全体の再現・provider実行・全CI/�
   古いローカルの `qrcode` 欠落ログはローカル失敗として保持し、hosted actual CLI成功と混同しない。任意V8閾値・例外偽装・JS fallback・受入緩和で差を埋めず保留する。
 - **前提修正と現head**: Windows fixtures [#665](https://github.com/jimoto-no-llm/rustdsh/pull/665) / Clippy [#667](https://github.com/jimoto-no-llm/rustdsh/pull/667) は元Issue #209の解決ではない。
   PRのDraft/Ready・headは変動している。上記の歴史CIは固定head限定であり、古いcatalog/OAuth/CI_ONLYの成功を新headへ流用しない。現headのupstream CI・外部review・本来の受入は別途要確認。
+  2026-10-17 04:21 UTCにはmaintainerが [#699](https://github.com/jimoto-no-llm/rustdsh/pull/699) と #696をmergeし、mainは `4f5b2bbc44eb181f0cb48309a61cc632e55d75e0` へ進んだ。上表はマージ前の固定証拠であり、マージ後target SHAでの必要検証は本追記では未実施。
 
-### 抱き合わせない残件
+### 関連項目と未達
 
 - [#668](https://github.com/jimoto-no-llm/rustdsh/issues/668) は2026-10-17 04:09 UTCにmaintainerがCLOSED（completed）へ更新した。[完了記録](https://github.com/jimoto-no-llm/rustdsh/issues/668#issuecomment-6229470215) はCHANGELOGだけでなく、v0.5.0以降のタグ同梱・公開とROADMAPを根拠とする。close状態とコメントをAPI再確認し、本追記では再実装・release・Issue closeを行わない。
 - [#448](https://github.com/jimoto-no-llm/rustdsh/issues/448) は #664 / #718着地だけでは受入済みにしない。画面差替のDSH API・cacheコストは未達。
