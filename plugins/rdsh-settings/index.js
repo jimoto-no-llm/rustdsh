@@ -101,7 +101,7 @@ function settingsDefaults() {
     discord: { ...discordDefaults },
     general: { slim: true, passthrough: false, dry_run: false, default_profile: '', language: 'auto' },
     tokens: { default_budget: 4000 },
-    search: { dir: '.', max: 100, web_limit: 10, searxng_url: '' },
+    search: { dir: '.', max: 100, web_limit: 10, searxng_url: '', dsh_search_provider: '' },
     compact: { max_tokens: 8000 },
     sessions: { limit: 20, with_tokens: false },
     logs: { tail: 50 },
@@ -256,6 +256,8 @@ export function sanitizeSettings(j) {
       web_limit: clampInt(se.web_limit, 1, 100, d.search.web_limit),
       // Rust 側の URL_CHARS と同じ上限（src/rdsh_config.rs）。
       searxng_url: str(se.searxng_url, 2000, d.search.searxng_url),
+      // Rust 側の PROVIDER_CHARS と同じ上限（src/rdsh_config.rs）。
+      dsh_search_provider: str(se.dsh_search_provider, 100, d.search.dsh_search_provider),
     },
     compact: {
       max_tokens: clampInt(co.max_tokens, 500, 200000, d.compact.max_tokens),

@@ -15,6 +15,8 @@ const TEXT_CHARS: usize = 500;
 const PATH_CHARS: usize = 300;
 const PROFILE_CHARS: usize = 200;
 const URL_CHARS: usize = 2000;
+/// An upstream provider id (`DSH_WEB_SEARCH_PROVIDER`), not free text.
+const PROVIDER_CHARS: usize = 100;
 
 // ---- top-level ----
 
@@ -368,6 +370,9 @@ pub struct SearchSection {
     pub max: usize,
     pub web_limit: usize,
     pub searxng_url: String,
+    /// Upstream provider id exported as `DSH_WEB_SEARCH_PROVIDER` for
+    /// delegated DSH runs. Empty (the default) leaves the child env alone.
+    pub dsh_search_provider: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -465,6 +470,7 @@ impl Default for SearchSection {
             max: 100,
             web_limit: 10,
             searxng_url: String::new(),
+            dsh_search_provider: String::new(),
         }
     }
 }
@@ -828,6 +834,7 @@ impl RdshSettings {
                 max: clamp_u64(num(&s, "max"), 100, 1, 100) as usize,
                 web_limit: clamp_u64(num(&s, "web_limit"), 10, 1, 100) as usize,
                 searxng_url: text(&s, "searxng_url", URL_CHARS),
+                dsh_search_provider: text(&s, "dsh_search_provider", PROVIDER_CHARS),
             },
             compact: CompactSection {
                 max_tokens: clamp_u64(num(&c, "max_tokens"), 8000, 500, 200_000) as usize,
@@ -933,6 +940,7 @@ impl RdshSettings {
         out.search.max = clamp_u64(num(&s, "max"), 100, 1, 100) as usize;
         out.search.web_limit = clamp_u64(num(&s, "web_limit"), 10, 1, 100) as usize;
         out.search.searxng_url = text(&s, "searxng_url", URL_CHARS);
+        out.search.dsh_search_provider = text(&s, "dsh_search_provider", PROVIDER_CHARS);
         let c = v.get("compact").cloned().unwrap_or(serde_json::Value::Null);
         out.compact.max_tokens = clamp_u64(num(&c, "max_tokens"), 8000, 500, 200_000) as usize;
         let ss = v
@@ -1030,6 +1038,7 @@ impl RdshSettings {
                 "max": self.search.max,
                 "web_limit": self.search.web_limit,
                 "searxng_url": self.search.searxng_url,
+                "dsh_search_provider": self.search.dsh_search_provider,
             },
             "compact": { "max_tokens": self.compact.max_tokens },
             "sessions": { "limit": self.sessions.limit, "with_tokens": self.sessions.with_tokens, "stale_secs": self.sessions.stale_secs },
@@ -1160,6 +1169,9 @@ impl RdshSettings {
             "search.max" => self.search.max = parse_usize(raw, 100, locale)? as usize,
             "search.web_limit" => self.search.web_limit = parse_usize(raw, 10, locale)? as usize,
             "search.searxng_url" => self.search.searxng_url = parse_string(raw, URL_CHARS),
+            "search.dsh_search_provider" => {
+                self.search.dsh_search_provider = parse_string(raw, PROVIDER_CHARS)
+            }
             "compact.max_tokens" => {
                 self.compact.max_tokens = parse_usize(raw, 8000, locale)? as usize
             }
@@ -1392,6 +1404,7 @@ impl RdshSettings {
             "search.max(1-100)",
             "search.web_limit(1-100)",
             "search.searxng_url(string)",
+            "search.dsh_search_provider(string, DSH_WEB_SEARCH_PROVIDER for delegated runs)",
             "compact.max_tokens(500-200000)",
             "subagents.max_parallel(1-16, default 3)",
             "subagents.max_items_per_agent(1-20, default 3)",
@@ -1920,6 +1933,7 @@ mod rdsh_config_tests {
         assert_eq!(d.search.dir, ".");
         assert_eq!((d.search.max, d.search.web_limit), (100, 10));
         assert_eq!(d.search.searxng_url, "");
+        assert_eq!(d.search.dsh_search_provider, "");
         assert_eq!(d.compact.max_tokens, 8000);
         assert_eq!((d.sessions.limit, d.sessions.with_tokens), (20, false));
         assert_eq!(d.logs.tail, 50);
