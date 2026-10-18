@@ -213,8 +213,10 @@ mod tests {
         let verified = verified_binary(&path, &digest).unwrap();
         #[cfg(unix)]
         {
+            use std::os::unix::fs::PermissionsExt;
             std::fs::rename(&path, fixture.0.join("checked-binary")).unwrap();
-            std::fs::copy("/bin/false", &path).unwrap();
+            std::fs::write(&path, b"#!/bin/sh\nexit 1\n").unwrap();
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
             assert_eq!(
                 verified
                     .command()
