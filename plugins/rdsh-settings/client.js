@@ -2315,3 +2315,71 @@ window.__ModuleLoader__.load({
     };
   },
 });
+
+;
+// rdsh-ui-controls: DSH Web側には /rdsh-ui-controls.css ルートが無いため、共有コントロールCSSをこの場で注入する
+if (typeof document !== 'undefined' && !document.getElementById('rdsh-ui-controls')) {
+  const style = document.createElement('style');
+  style.id = 'rdsh-ui-controls';
+  style.textContent = `/* Shared browser controls: DSH, native serve/setup and the project dashboard. */
+:root {
+  --rdsh-control-accent: var(--dsw-alias-button-primary-fill, var(--acc, var(--blue, #386ed6)));
+  --rdsh-control-thumb: var(--dsw-alias-label-tertiary, var(--mut, #8b949e));
+  --rdsh-control-track: var(--dsw-alias-border-l3, var(--line, #30363d));
+  --rdsh-control-surface: var(--dsw-alias-bg-module-platform, var(--card, #161b22));
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--rdsh-control-thumb) transparent;
+}
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track, *::-webkit-scrollbar-corner { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: var(--rdsh-control-thumb);
+  background-clip: content-box;
+  border: 3px solid transparent;
+  border-radius: 10px;
+}
+*::-webkit-scrollbar-thumb:hover { background-color: var(--rdsh-control-accent); }
+input[type="range"] {
+  appearance: none;
+  -webkit-appearance: none;
+  min-width: 0;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  accent-color: var(--rdsh-control-accent);
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px; border-radius: 4px; background: var(--rdsh-control-track);
+}
+input[type="range"]::-moz-range-track {
+  height: 4px; border-radius: 4px; background: var(--rdsh-control-track);
+}
+input[type="range"]::-moz-range-progress {
+  height: 4px; border-radius: 4px; background: var(--rdsh-control-accent);
+}
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none; -webkit-appearance: none;
+  width: 18px; height: 18px; margin-top: -7px;
+  border: 2px solid var(--rdsh-control-surface); border-radius: 50%;
+  background: var(--rdsh-control-accent);
+}
+input[type="range"]::-moz-range-thumb {
+  box-sizing: border-box; width: 18px; height: 18px;
+  border: 2px solid var(--rdsh-control-surface); border-radius: 50%;
+  background: var(--rdsh-control-accent);
+}
+input[type="range"]:focus-visible {
+  outline: 2px solid var(--rdsh-control-accent); outline-offset: 3px;
+}
+input[type="range"]:disabled { opacity: .45; cursor: not-allowed; }
+@media (forced-colors: active) {
+  * { scrollbar-color: auto; }
+  input[type="range"] { appearance: auto; -webkit-appearance: auto; }
+}
+`;
+  document.head.append(style);
+}
