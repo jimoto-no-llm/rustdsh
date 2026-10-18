@@ -1,8 +1,23 @@
-//! `rdsh search-web`: web search through SearXNG (self-hosted default).
-//! No API key needed: talks to `$SEARXNG_URL` (default `http://127.0.0.1:8888`)
-//! over plain HTTP with a hand-rolled client (no new dependencies). The HTML
-//! results page is parsed because many instances (including a default
-//! local one) only serve HTML, not the JSON API.
+//! `rdsh search-web`: SearXNG by default, or explicitly selected Ollama search.
+//! SearXNG needs no API key and retains its HTML-based HTTP client. Ollama uses
+//! the hosted HTTPS API with `OLLAMA_API_KEY`; providers never fall back to one
+//! another, so a local search cannot silently become a cloud request.
+
+mod ollama;
+
+#[derive(Clone, Copy, Debug, clap::ValueEnum)]
+pub enum Provider {
+    Searxng,
+    Ollama,
+}
+
+pub fn help(locale: crate::locale::Locale) -> &'static str {
+    match locale {
+        crate::locale::Locale::English => "Enable: rdsh features on search-web\nOllama: set OLLAMA_API_KEY, then use --provider ollama (up to 10 results).\nWeb Search API service guide: Tavily https://www.tavily.com/\nTavily quickstart: https://docs.tavily.com/documentation/quickstart\nBuilt-in providers: searxng, ollama. Tavily is a service reference.\nDocs: https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/WEB-SEARCH.md",
+        crate::locale::Locale::Chinese => "启用：rdsh features on search-web\nOllama：设置 OLLAMA_API_KEY 后使用 --provider ollama（最多10条结果）。\nWeb Search API 服务指南：Tavily https://www.tavily.com/\nTavily 入门：https://docs.tavily.com/documentation/quickstart\n内置提供方：searxng、ollama。Tavily 为服务介绍。\n文档：https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/WEB-SEARCH.md",
+        crate::locale::Locale::Japanese => "有効化: rdsh features on search-web\nOllama: OLLAMA_API_KEY を設定し --provider ollama を指定（最大10件）。\nWeb Search API サービスの案内: Tavily https://www.tavily.com/\nTavily 入門: https://docs.tavily.com/documentation/quickstart\n組み込み検索先: searxng、ollama。Tavily はサービスの紹介です。\n利用手順: https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/WEB-SEARCH.md",
+    }
+}
 
 fn default_base() -> String {
     match std::env::var("SEARXNG_URL") {
@@ -484,10 +499,20 @@ pub fn cmd_search_web(
     query: &str,
     limit: usize,
     json: bool,
+    provider: Provider,
     locale: crate::locale::Locale,
 ) -> anyhow::Result<()> {
-    let base = default_base();
-    let hits = fetch(&base, query, locale)?;
+    let (base, hits) = match provider {
+        Provider::Searxng => {
+            let base = default_base();
+            let hits = fetch(&base, query, locale)?;
+            (base, hits)
+        }
+        Provider::Ollama => (
+            ollama::ENDPOINT.to_string(),
+            ollama::search(query, limit, locale)?,
+        ),
+    };
     let shown: Vec<&Hit> = hits.iter().take(limit.max(1)).collect();
     if json {
         println!(
