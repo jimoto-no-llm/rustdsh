@@ -16,6 +16,7 @@ Web ページ取得**、およびその動作に必要な認証・トークン�
 | Discord Rich Presence | 無効 | `features.discord`（旧 `discord.enabled`）の既定を off |
 | 更新確認・リリース探索 | 無効 | `features.release_probe` は既定 off。日次更新は `rdsh update auto on` を明示したときだけ |
 | Web 検索（`rdsh search-web`） | 無効 | `features.search-web`（`search-web` extra）は既定 off |
+| DSH 本体の Web 検索プロバイダ | 変更しない | `search.dsh_search_provider` を設定したときだけ子プロセスへ `DSH_WEB_SEARCH_PROVIDER` を渡す（シェルの明示値が優先） |
 
 `DSH_TELEMETRY_DISABLED` は upstream DSH の opt-out で、**空でない値なら
 `0` や `false` でも無効**として扱われます（upstream の `session-telemetry-otel`

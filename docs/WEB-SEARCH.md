@@ -60,6 +60,32 @@ docker compose -f docker-compose.searxng.yml down   # 停止
 - `rdsh doctor` はSearXNGの到達性、コンテナランタイム、composeファイルの位置を
   表示します。doctor はコンテナを起動しません。
 
+## DSH本体の検索先を固定する（任意）
+
+`rdsh search-web` はDSH本体の検索ツールを変更しません。エージェントの
+`web_search` をローカルのSearXNGへ向けたい場合は、DSH側でプロバイダ
+プラグインを導入したうえで、そのプラグインが登録するIDを設定します。
+
+```sh
+dsh plugin --profile web add dsh-web-search-searxng
+rdsh settings set search.dsh_search_provider searxng
+```
+
+上の例の `dsh-web-search-searxng` は `searxng` というIDを登録します。
+パッケージ名とIDは異なることがあるため、使うプラグインのREADMEで確認してください。
+
+設定すると、rdshは委譲するDSHの子プロセスへ `DSH_WEB_SEARCH_PROVIDER` を渡します
+（`--passthrough` でも渡します）。
+
+- 既定は空で、何も渡しません。
+- シェルで `DSH_WEB_SEARCH_PROVIDER` を明示している場合はそちらが優先され、
+  rdshは上書きしません。
+- プロバイダIDとして扱えない値（空白や制御文字を含むもの）は渡しません。
+- **登録済みのIDを指定してください。** 未登録のIDではupstreamが
+  `WEB_PROVIDER_CONFIGURED_MISSING` で検索を失敗させます。
+- 対象は委譲したDSHだけで、`rdsh search-web` 自身の検索先は
+  `SEARXNG_URL` と `--provider` のままです。
+
 ## Ollama Web Search API
 
 [OllamaのAPIキー](https://ollama.com/settings/keys)を取得し、実行環境の

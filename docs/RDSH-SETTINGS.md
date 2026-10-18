@@ -76,6 +76,11 @@ rdsh context status   # 有効化後に記憶の状態を見る
 `rdsh settings set extras.enable serve,search-web` で変更します。
 ローカル状態画面の既定ポートは 38080 です。
 
+DSH 本体の Web 検索プロバイダは `search.dsh_search_provider` で固定できます
+（例: `rdsh settings set search.dsh_search_provider searxng`）。
+既定は空で、設定したときだけ委譲先へ `DSH_WEB_SEARCH_PROVIDER` を渡します。
+登録済みのプロバイダ ID が必要です。詳細は [Web検索](WEB-SEARCH.md) を参照してください。
+
 設定の破損時は読み込みを停止します。元のファイルを退避し、既定値に戻すと判断した
 場合のみ `rdsh settings init --force` を実行してください。
 [復旧後の確認と利用の流れ](USER-FLOW.md#4-設定が読めないとき)。

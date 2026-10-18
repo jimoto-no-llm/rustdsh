@@ -7,6 +7,12 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Added
 
+- `search.dsh_search_provider` pins the upstream web-search provider
+  (`DSH_WEB_SEARCH_PROVIDER`) for delegated DSH runs, so an agent's
+  `web_search` can use a local SearXNG provider plugin. Empty by default; the
+  caller's own environment value still wins, a value that is not a plain
+  provider id is refused, and the id must be registered upstream.
+
 - `rdsh search-web --auto-start` (SearXNG provider) starts the bundled
   `docker-compose.searxng.yml` through `docker compose`, `docker-compose`,
   `podman compose` or `podman-compose` when the loopback endpoint is down,

@@ -871,6 +871,7 @@ fn main() {
                 !passthrough::env_passthrough() && !scfg.general.passthrough && scfg.general.slim;
             let dry = passthrough::env_dry() || scfg.general.dry_run;
             crate::slim::configure(&scfg);
+            crate::passthrough::configure_web_search_provider(&scfg);
             crate::tool_security::configure(agent_tool_sandbox(&scfg, false));
             if let Err(e) = passthrough::exec_raw(&raw, dry, slim) {
                 eprintln!("[rdsh] error: {e:#}");
@@ -980,6 +981,7 @@ fn main() {
     // Feature switches (rdsh features) steer the delegated-run env and the
     // native session caches; an explicit environment variable still wins.
     crate::slim::configure(&cfg);
+    crate::passthrough::configure_web_search_provider(&cfg);
     crate::tool_security::configure(agent_tool_sandbox(&cfg, !cli.share_file.is_empty()));
     if !rdsh_config::feature_enabled(&cfg, "sessions_token_cache")
         && std::env::var_os("RDSH_TOKENS_CACHE").is_none()
