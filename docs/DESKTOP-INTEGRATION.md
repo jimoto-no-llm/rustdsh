@@ -121,6 +121,7 @@ PROFILE=desktop  ./plugins/install.sh    # forwarded through `rdsh desktop insta
 PROFILE=desktop COMPUTE=1 ./plugins/install.sh   # plus the compute bridge
 PROFILE=web      ./plugins/install.sh --recommended=none  # essential plugins only
 PROFILE=web SOUND=0 GITVIEW=0 INTELLIGENT_UI=0 ./plugins/install.sh  # skip the default third-party plugins
+rdsh plugins install --profile desktop   # binary-native path; forwards to `rdsh desktop install`
 ```
 
 `PROFILE=desktop` never calls `dsh plugin` directly (the npm CLI refuses the

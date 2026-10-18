@@ -306,3 +306,35 @@ fn doctor_json_publishes_the_environment_block() {
     assert!(output.contains("pnpm approve-builds"), "{output}");
     fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn doctor_reports_the_essential_plugins_a_profile_is_missing() {
+    let root = temp_dir("plugins-missing");
+    let profile = root.join("dsh").join("profiles").join("web");
+    fs::create_dir_all(&profile).unwrap();
+    // One bundled plugin is attached, so the line has to count the rest rather
+    // than report the profile as untouched.
+    fs::write(
+        profile.join("package.json"),
+        r#"{"dependencies":{"rdsh-settings":"link:/checkout/plugins/rdsh-settings"},"dsh":{"profile":{"bundles":["rdsh-settings"]}}}"#,
+    )
+    .unwrap();
+    let empty_path = root.join("empty-path");
+    fs::create_dir_all(&empty_path).unwrap();
+
+    let result = run_doctor_fallback(&root, &empty_path, &[], None);
+    let output = String::from_utf8_lossy(&result.stdout);
+    assert!(
+        output.contains("plugins: web is missing"),
+        "doctor must name the profile missing the essential tier: {output}"
+    );
+    assert!(
+        output.contains("rdsh plugins install --profile web"),
+        "doctor must print the fix: {output}"
+    );
+    assert!(
+        !output.contains("plugins: web is missing 11"),
+        "the attached package must not be counted as missing: {output}"
+    );
+    fs::remove_dir_all(root).unwrap();
+}

@@ -5,6 +5,19 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Added
+
+- `rdsh plugins status|install` が必須プラグインのカタログ
+  （`src/plugin_catalog.json`、バイナリに同梱）を読み、プロファイルに欠けている
+  パッケージを `dsh plugin --profile <name> add` で補完します。必須ティアは
+  `plugins/install.sh` にしか無く、このスクリプトを自動で呼ぶ経路が無いため、
+  バイナリを更新しても `$DSH_HOME/profiles/<profile>/package.json` は
+  書き換わらず、必須プラグインが欠けたままでした。`--json` は schema 1、
+  `--recommended=none|all|starter|id,id` は `plugins/install.sh` と同じ選択を
+  提供し、`--profile desktop` は `rdsh desktop install` へ転送します。
+- `rdsh doctor` が、必須ティアの不足している初期化済みプロファイルごとに
+  1行で不足数と修正コマンドを表示します。
+
 ## [0.9.0] - 2026-10-18
 
 ### Added

@@ -1,0 +1,113 @@
+{
+  "schema": 1,
+  "note": "Compiled into the rdsh binary (include_str!) so a release install can report and repair a profile without the checkout. plugins/install.sh keeps its own lists; tests/plugin-catalog.test.mjs fails when the two drift.",
+  "starter_profiles": [
+    "web",
+    "desktop"
+  ],
+  "essential": [
+    {
+      "package": "@deepseek-ai/dsh-tool-present",
+      "why": "final deliverables as file cards"
+    },
+    {
+      "package": "@deepseek-ai/dsh-tool-ask-user",
+      "why": "ask the user mid-run"
+    },
+    {
+      "package": "@deepseek-ai/dsh-tool-str-replace-editor",
+      "why": "view/create/str_replace editor tool"
+    },
+    {
+      "package": "@deepseek-ai/dsh-skill-office",
+      "why": "Word/PowerPoint/Excel and PDF conversion"
+    },
+    {
+      "package": "@deepseek-ai/dsh-hooks-claude-code",
+      "why": "reuse an existing Claude Code hooks.json"
+    },
+    {
+      "package": "@deepseek-ai/dsh-tool-bash-persistent",
+      "why": "shell with cwd/env/jobs across calls"
+    },
+    {
+      "package": "@deepseek-ai/dsh-mcp-client",
+      "why": "tools from external MCP servers"
+    },
+    {
+      "package": "rdsh-settings",
+      "bundled": true,
+      "why": "rdsh section in DSH settings"
+    },
+    {
+      "package": "rdsh-mobile-ui",
+      "bundled": true,
+      "why": "phone-width Web layout"
+    },
+    {
+      "package": "rdsh-answer-guard",
+      "bundled": true,
+      "why": "restate reasoning-only replies as text"
+    },
+    {
+      "package": "rdsh-update-banner",
+      "bundled": true,
+      "profiles": [
+        "web"
+      ],
+      "why": "Web release banner"
+    }
+  ],
+  "recommended": [
+    {
+      "id": "translation",
+      "package": "rdsh-translation",
+      "bundled": true,
+      "starter": true,
+      "why": "Japanese translation settings and preview"
+    },
+    {
+      "id": "compute",
+      "package": "rdsh-compute",
+      "bundled": true,
+      "why": "resident compute bridge"
+    },
+    {
+      "id": "easy-work",
+      "package": "rdsh-easy-work",
+      "bundled": true,
+      "why": "guided file organization"
+    },
+    {
+      "id": "subagents",
+      "package": "rdsh-subagent-optimizer",
+      "bundled": true,
+      "starter": true,
+      "why": "bounded exploration subagents"
+    },
+    {
+      "id": "ui-comfort",
+      "package": "rdsh-ui-comfort",
+      "bundled": true,
+      "why": "deliberate Enter in the Web chat"
+    },
+    {
+      "id": "sound",
+      "package": "github:cwd514/dsh-sound-notifications",
+      "starter": true,
+      "why": "effect sounds and desktop notifications"
+    },
+    {
+      "id": "gitview",
+      "package": "github:yugapor/dsh-gitview",
+      "starter": true,
+      "why": "Web sidebar Git panel"
+    },
+    {
+      "id": "intelligent-ui",
+      "package": "github:cwd514/dsh-intelligent-ui",
+      "starter": true,
+      "why": "interactive visual answers (render_ui)"
+    }
+  ]
+}
