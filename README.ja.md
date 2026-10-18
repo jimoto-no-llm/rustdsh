@@ -612,6 +612,8 @@ python3 scripts/benchmark-node-vs-rust.py --bin ./target/release/rdsh \
 
 ## 資料
 
+- [LinuxでWebサービスを自動再起動する](docs/WEB-AUTO-RESTART.md)
+
 | 資料 | 内容 |
 | --- | --- |
 | [docs/USER-FLOW.md](docs/USER-FLOW.md) | 導入から設定・利用・復旧までの全体フロー |

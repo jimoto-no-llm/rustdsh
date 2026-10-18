@@ -742,6 +742,8 @@ For startup, run `rdsh bench --n 5`. See
 
 ## Documentation
 
+- [Automatic Web service recovery on Linux](docs/WEB-AUTO-RESTART.md)
+
 | Document | Description |
 | --- | --- |
 | [docs/USER-FLOW.md](docs/USER-FLOW.md) | End-to-end installation, usage, and recovery flow |
