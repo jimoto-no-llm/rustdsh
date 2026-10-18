@@ -242,15 +242,31 @@ export function apply(ctx, config) {
         try {
           let body;
           if (demo) {
-            body = JSON.stringify(demoState);
+            body = JSON.stringify({ ...demoState, dsh: await readDshStatus() });
           } else {
-            body = JSON.stringify(await readState());
+            const state = await readState();
+            body = JSON.stringify({ ...state, dsh: await readDshStatus() });
           }
           res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "content-length": Buffer.byteLength(body) });
           res.end(body);
         } catch (err) {
           res.writeHead(500, { "content-type": "application/json; charset=utf-8" });
           res.end(JSON.stringify({ ok: false }));
+        }
+      },
+    });
+    const offDsh = ctx.webServer.register({
+      kind: "exact",
+      path: "/api/rdsh-update/dsh/run",
+      handler: async (req, res) => {
+        if (!authorize(ctx, req, res)) return;
+        if (req.method !== "POST") return json(res, 405, { ok: false, error: "method-not-allowed" });
+        try {
+          const status = await readDshStatus();
+          if (!status.available || !status.to) return json(res, 200, { ok: false, message: "no dsh update available" });
+          json(res, 200, await runDshUpdate(status.to));
+        } catch (error) {
+          json(res, 500, { ok: false });
         }
       },
     });
@@ -309,9 +325,116 @@ export function apply(ctx, config) {
       try {
         if (typeof off2 === "function") off2();
       } catch (e) {}
+      try { if (typeof offDsh === "function") offDsh(); } catch (e) {}
       try { if (typeof off3 === "function") off3(); } catch (e) {}
       try { if (typeof off4 === "function") off4(); } catch (e) {}
     };
+  });
+}
+
+// ---- dsh update availability ---------------------------------------------
+// The rdsh banner watches an update that already happened; this half watches
+// the published dsh release so the same card can offer the upgrade.
+const DSH_REFRESH_MS = 12 * 60 * 60 * 1000;
+const DSH_QUERY_TIMEOUT_MS = 25 * 1000;
+const VERSION_PATTERN = /^[0-9]+(\.[0-9]+)*(?:-[0-9A-Za-z.-]+)?$/;
+let dshRefreshing = false;
+
+const dshCachePath = () => join(homedir(), ".cache", "rdsh-desktop", "update-check.json");
+
+function compareVersions(left, right) {
+  const split = (value) => {
+    const parts = String(value).split("-");
+    return { base: parts[0].split(".").map((part) => Number(part) || 0), pre: parts.length > 1 ? parts.slice(1).join("-") : null };
+  };
+  const a = split(left);
+  const b = split(right);
+  const length = Math.max(a.base.length, b.base.length);
+  for (let index = 0; index < length; index += 1) {
+    const x = a.base[index] || 0;
+    const y = b.base[index] || 0;
+    if (x !== y) return x < y ? -1 : 1;
+  }
+  if (a.pre === b.pre) return 0;
+  if (a.pre === null) return 1;
+  if (b.pre === null) return -1;
+  return a.pre < b.pre ? -1 : 1;
+}
+
+async function readDshCache() {
+  try {
+    const path = dshCachePath();
+    const file = await lstat(path);
+    if (!file.isFile() || file.isSymbolicLink() || file.nlink !== 1 || file.size > 4096) return null;
+    const value = JSON.parse(await readFile(path, "utf8"));
+    const newest = typeof value?.newest === "string" ? value.newest : "";
+    if (!VERSION_PATTERN.test(newest)) return null;
+    return { newest, checkedAt: Number(value?.checkedAt) || 0 };
+  } catch (error) {
+    return null;
+  }
+}
+
+function queryPublishedDsh() {
+  return new Promise((resolve) => {
+    execFile("npm", ["view", "@deepseek-ai/dsh", "versions", "--json"], { timeout: DSH_QUERY_TIMEOUT_MS, maxBuffer: 1024 * 1024 }, async (error, stdout) => {
+      if (error) { resolve(null); return; }
+      try {
+        const parsed = JSON.parse(stdout);
+        const list = (Array.isArray(parsed) ? parsed : [parsed]).filter((item) => typeof item === "string" && VERSION_PATTERN.test(item));
+        if (list.length === 0) { resolve(null); return; }
+        const newest = list.reduce((best, item) => (compareVersions(item, best) > 0 ? item : best), list[0]);
+        try {
+          await mkdir(dirname(dshCachePath()), { recursive: true });
+          await writeFile(dshCachePath(), JSON.stringify({ checkedAt: Date.now(), newest }));
+        } catch (writeError) {}
+        resolve(newest);
+      } catch (parseError) {
+        resolve(null);
+      }
+    });
+  });
+}
+
+function activeDshVersion() {
+  try {
+    const url = import.meta.resolve("@deepseek-ai/dsh/package.json");
+    if (url) {
+      const value = JSON.parse(readFileSync(fileURLToPath(url), "utf8"));
+      if (typeof value.version === "string" && VERSION_PATTERN.test(value.version)) return value.version;
+    }
+  } catch (error) {}
+  return typeof process.env.DSH_VERSION === "string" && VERSION_PATTERN.test(process.env.DSH_VERSION)
+    ? process.env.DSH_VERSION : "";
+}
+
+async function readDshStatus() {
+  const cache = await readDshCache();
+  const stale = !cache || Date.now() - cache.checkedAt > DSH_REFRESH_MS;
+  if (stale && process.env.RDSH_DESKTOP_UPDATE_CHECK !== "0" && !dshRefreshing) {
+    dshRefreshing = true;
+    queryPublishedDsh().catch(() => {}).finally(() => { dshRefreshing = false; });
+  }
+  const newest = cache ? cache.newest : "";
+  const active = activeDshVersion();
+  return {
+    available: Boolean(newest && active && compareVersions(newest, active) > 0),
+    from: active || null,
+    to: newest || null,
+    at: (cache && cache.checkedAt) || Date.now(),
+    command: newest ? "npm install -g @deepseek-ai/dsh@" + newest : null,
+    details: newest ? "https://www.npmjs.com/package/@deepseek-ai/dsh/v/" + newest : null,
+  };
+}
+
+function runDshUpdate(version) {
+  if (!VERSION_PATTERN.test(version)) return Promise.resolve({ ok: false, message: "invalid version" });
+  return new Promise((resolve) => {
+    execFile("npm", ["install", "-g", "@deepseek-ai/dsh@" + version], { timeout: RUN_TIMEOUT_MS, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+      const tail = String(stderr || stdout || "").trim().split("\n").slice(-3).join(" ");
+      if (error) { resolve({ ok: false, message: tail || String(error.message || "npm failed") }); return; }
+      resolve({ ok: true, message: "installed dsh " + version + " (restart the web service to use it)" });
+    });
   });
 }
 
