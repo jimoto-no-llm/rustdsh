@@ -1,0 +1,42 @@
+{
+  "kind": "local_dsh_loopback_smoke",
+  "platform": "WSL Ubuntu on Windows",
+  "scope": "One headless DSH turn through existing rdsh with a deterministic loopback model response; no Gas City, code editing, tool execution or real LLM inference.",
+  "runtime": {
+    "rdsh_version": "0.7.0",
+    "rdsh_sha256": "e96a0af5819d96af4f2508ce2eda2d5ccd6a3a7acf95db10533d7be3f64e3594",
+    "dsh_version": "0.2.1-rc.2",
+    "dsh_source_commit": "687f282e8625c6b8d11ff58211a90524be2e4317",
+    "node_version": "24.15.0",
+    "current_cloud_branch_binary_tested": false
+  },
+  "host_snapshot": {
+    "logical_processors": 12,
+    "cpu_load_percent": 9,
+    "memory_total_gib": 63.8,
+    "memory_available_gib": 29.3
+  },
+  "result": {
+    "exit_code": 0,
+    "turn_end": "completed",
+    "final_text": "LOCAL_OK",
+    "loopback_requests": 1,
+    "paid_api_requests": 0,
+    "elapsed_seconds": 2.83,
+    "max_rss_kib": 206700,
+    "user_cpu_seconds": 1.31,
+    "system_cpu_seconds": 0.76
+  },
+  "measurement": "GNU time around timeout and rdsh/DSH; maximum process RSS, not aggregate process-tree memory. Local mock server memory is excluded. Single sample, not a capacity estimate.",
+  "isolation": "Fresh HOME, DSH_HOME and workspace, explicit environment allowlist, loopback model endpoint, test-only credential, 20-second deadline.",
+  "setup_attempts": {
+    "failed_attempts_before_success": 2,
+    "causes": ["Existing DeepSeek provider declaration conflicted with the test override", "Local fixture initially implemented chat completions while the selected route uses Responses"]
+  },
+  "limitations": [
+    "Gas City binary is not installed in the inspected environment; orchestration was not exercised.",
+    "Existing DSH build reports missing typert-registry and api-gateway artifacts; typert-loader waits for typert. This is not a qualified complete runtime.",
+    "Real code editing, builds, model inference and concurrent workers were not measured.",
+    "No cloud services or new runtimes were installed or started."
+  ]
+}

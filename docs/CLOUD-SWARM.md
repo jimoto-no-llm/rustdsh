@@ -155,6 +155,17 @@ Windowsでは最後の実行ファイルを`target/debug/rdsh.exe`とする。
 意味し、ゼロ実績を意味しない。Pool applyは費用・容量承認フローができるまで
 1 replica以下に制限する。未検証の実クラスタ結果を合格として扱わない。
 
+## ローカルでの最小負荷確認（2026-10-18）
+
+既存WSLのrdsh 0.7.0とDSH 0.2.1-rc.2を、専用HOME・DSH_HOME・workspaceと
+ローカル模擬LLMに接続し、1要求→`LOCAL_OK`→正常終了を確認した。
+所要2.83秒、GNU timeの最大RSSは206,700KiB（約202MiB）。これは1プロセスの
+最大RSSで、プロセス群の合計や実コード編集・ビルド時の負荷ではない。
+有料API呼出しは0。Gas Cityは未配置であり、今回のCloud CLIの実クラスタ経路や
+スウォームの実行試験ではない。既存DSHにはtypert-registry／api-gatewayの
+未ビルド警告が残る。並列数の上限や完全なruntimeの合格へ外挿しない。
+実測値と制約は[`local-dsh-smoke-20261018.json`](../cloud/evidence/local-dsh-smoke-20261018.json)。
+
 ## DeepInfra API負荷試験（2026-10-18）
 
 [`scripts/deepinfra-load-test.mjs`](../scripts/deepinfra-load-test.mjs) で、
