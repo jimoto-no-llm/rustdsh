@@ -110,7 +110,7 @@ rdsh --profile web              # start with Web profile
 | OS | Linux, macOS, WSL, Windows (native) |
 | DSH runtime | Required for conversations and agent runs (native tools and diagnostics run standalone) |
 | Rust | 1.85+ (only needed when building from source; prebuilt binaries require no Rust) |
-| Optional | Node.js 22+ for the [Node.js dashboard](dashboard/README.md); SearXNG for `search-web` |
+| Optional | Node.js 22+ for the [Node.js dashboard](dashboard/README.md); SearXNG or an Ollama API key for `search-web` |
 
 ## Installation
 
@@ -311,7 +311,7 @@ rdsh settings get extras.enable
 | Extra | Command | Notes |
 | --- | --- | --- |
 | `serve` | `rdsh serve` (default :38080) | Local status page, localhost only, per-launch key. |
-| `search-web` | `rdsh search-web "query" --limit 5` | Needs SearXNG. |
+| `search-web` | `rdsh search-web "query" --limit 5` | SearXNG by default; `--provider ollama` uses `OLLAMA_API_KEY`. See [Web search](docs/WEB-SEARCH.md). |
 
 To connect an OpenAI-compatible endpoint that dsh does not ship (HAI, Command Code, Sarashina, a home llama.cpp / vLLM / LM Studio / Ollama server), add it as a profile route:
 

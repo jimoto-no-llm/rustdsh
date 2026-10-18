@@ -19,6 +19,15 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   `headless` still installs the essential tier only. `ui-comfort`,
   `easy-work` and `compute` stay opt-in.
 
+### Added
+
+- `rdsh search-web --provider ollama` uses Ollama's hosted Web Search API
+  with `OLLAMA_API_KEY`, up to 10 results, and the existing text/JSON format.
+  SearXNG stays the default; cloud search requires explicit selection and the
+  existing search feature switch. No new dependency or model route is needed.
+  The localized CLI help and Web search guide also link to Tavily and its
+  official quickstart as an API service reference.
+
 ## [0.8.0] - 2026-10-18
 
 ### Added

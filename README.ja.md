@@ -109,7 +109,7 @@ rdsh --profile web              # Web プロファイルで起動
 | OS | Linux、macOS、WSL、Windows（ネイティブ） |
 | DSH 本体 | エージェントとの会話実行に必要です（トークン計算や検索などの独立ツールは単体で動作します） |
 | Rust | ビルド済みバイナリを利用する場合は不要。ソースからビルドする場合のみ 1.85 以上 |
-| 任意 | [Node.js ダッシュボード](dashboard/README.md) には Node.js 22 以上、`search-web` には SearXNG が必要 |
+| 任意 | [Node.js ダッシュボード](dashboard/README.md) には Node.js 22 以上、`search-web` には SearXNG または Ollama API キーが必要 |
 
 ## インストール
 
@@ -301,7 +301,7 @@ rdsh settings get extras.enable
 | 機能 | コマンド | 備考 |
 | --- | --- | --- |
 | `serve` | `rdsh serve`（既定 :38080） | 手元の状態ページです。localhost のみ、起動ごとの鍵が必要です。 |
-| `search-web` | `rdsh search-web "調べたい語" --limit 5` | SearXNG が必要です。 |
+| `search-web` | `rdsh search-web "調べたい語" --limit 5` | 既定は SearXNG。`--provider ollama` は `OLLAMA_API_KEY` を使います。[Web検索](docs/WEB-SEARCH.md)を参照。 |
 
 `rdsh serve` は dsh の Web GUI（:3080）と競合しません。`--port 0` で空きポートを利用できます。
 API とダッシュボードの詳細については [Web UI](#web-ui) を参照してください。

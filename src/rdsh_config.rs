@@ -142,7 +142,7 @@ pub const FEATURES: &[FeatureDef] = &[
     FeatureDef {
         id: "search-web",
         default: false,
-        summary: "SearXNG web search (rdsh search-web)",
+        summary: "SearXNG / Ollama web search (rdsh search-web)",
     },
     FeatureDef {
         id: "context_engine",

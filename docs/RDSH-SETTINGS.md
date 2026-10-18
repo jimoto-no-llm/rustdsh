@@ -95,7 +95,7 @@ rdsh context status   # 有効化後に記憶の状態を見る
 | sound | on | DSH サウンド通知の導入（不要ならインストーラの SOUND=0／`features.sound=false`） |
 | gitview | on | DSH Git パネルの導入（不要ならインストーラの GITVIEW=0／`features.gitview=false`） |
 | serve | off | ローカル閲覧画面（rdsh serve） |
-| search-web | off | SearXNG 経由の Web 検索 |
+| search-web | off | SearXNG または明示選択した Ollama API による [Web検索](WEB-SEARCH.md) |
 | context_engine | off | 実験的なコンテキストエンジン |
 | models_sync | on | 毎日の自動更新でプロバイダのモデルカタログも更新する（`RDSH_MODELS_SYNC=0` で1回だけスキップ） |
 | dep_graph | on | 静的な依存グラフと変更影響（`rdsh deps`。読み取り専用の解析のため既定 ON） |
