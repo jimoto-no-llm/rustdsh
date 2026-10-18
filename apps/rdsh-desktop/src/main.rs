@@ -119,6 +119,18 @@ fn main() {
         return;
     }
 
+    if args.iter().any(|arg| arg == "--check-host") {
+        let online = args.iter().any(|arg| arg == "--online");
+        match check_host(online) {
+            Ok(report) => println!("{report}"),
+            Err(error) => {
+                eprintln!("[rdsh-desktop] check-host failed: {error:#}");
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
+
     if args.iter().any(|arg| arg == "--stop-host") {
         match host::stop_cached() {
             Ok(message) => println!("{message}"),
@@ -285,6 +297,75 @@ fn select_model(session: &str, provider: &str, model: &str) -> anyhow::Result<St
         "model": model,
         "modelSelection": value,
     }))?)
+}
+
+
+/// Report which harness launcher the app would use and whether it answers.
+fn check_host(online: bool) -> anyhow::Result<String> {
+    let (binary, version) = host::resolve_launcher()?;
+    let latest = if online { latest_published() } else { None };
+    let newest = if online { newest_published() } else { None };
+    let chat = app::Chat::connect(|_step| {})?;
+    let newer = newest
+        .as_ref()
+        .map(|newest| host::compare_versions(newest, chat.host_version()).is_gt())
+        .unwrap_or(false);
+    Ok(serde_json::to_string_pretty(&serde_json::json!({
+        "launcher": binary.display().to_string(),
+        "version": version,
+        "activeVersion": chat.host_version(),
+        "attached": chat.reused,
+        "sessions": chat.sessions.len(),
+        "catalogProviders": chat.catalog.len(),
+        "latestPublished": latest,
+        "newestPublished": newest,
+        "updateAvailable": newer,
+    }))?)
+}
+
+/// Highest published harness version, including prereleases.
+fn newest_published() -> Option<String> {
+    let mut command = std::process::Command::new("npm");
+    command.args(["view", "@deepseek-ai/dsh", "versions", "--json"]);
+    if let Some(path) = std::env::var_os("PATH") {
+        command.env("PATH", path);
+    }
+    let output = command.output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&output.stdout);
+    let versions: Vec<String> = match serde_json::from_str::<serde_json::Value>(text.trim()) {
+        Ok(serde_json::Value::Array(values)) => values
+            .into_iter()
+            .filter_map(|value| value.as_str().map(str::to_string))
+            .collect(),
+        Ok(serde_json::Value::String(single)) => vec![single],
+        _ => Vec::new(),
+    };
+    versions.into_iter().reduce(|best, candidate| {
+        if host::compare_versions(&candidate, &best).is_gt() {
+            candidate
+        } else {
+            best
+        }
+    })
+}
+
+/// Newest published harness version, when npm can answer.
+fn latest_published() -> Option<String> {
+    let mut command = std::process::Command::new("npm");
+    command.args(["view", "@deepseek-ai/dsh", "version"]);
+    if let Some(path) = std::env::var_os("PATH") {
+        command.env("PATH", path);
+    }
+    let output = command.output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&output.stdout);
+    let version = text.split_whitespace().last()?.trim().to_string();
+    (!version.is_empty()).then_some(version)
 }
 
 /// Verify that conversation titles resolve (the window fills them in the

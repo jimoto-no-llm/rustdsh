@@ -23,6 +23,10 @@ pub struct Host {
     pub token: String,
     /// Pre-minted session cookie for an already running host.
     pub cookie: Option<String>,
+    /// Launcher this host was started from (empty when attached by accident).
+    pub binary: std::path::PathBuf,
+    /// Version reported by that launcher.
+    pub version: String,
     /// True when this launch reused a detached host instead of starting one.
     pub reused: bool,
 }
@@ -53,11 +57,16 @@ impl Host {
             }
             let authority = origin.strip_prefix("http://")?.to_string();
             let (name, value) = crate::cookies::cookie_for(&secret, &authority);
+            let (binary, version) = resolve_launcher()
+                .map(|(binary, version)| (binary, version))
+                .unwrap_or_else(|_| (std::path::PathBuf::new(), "unknown".to_string()));
             return Some(Self {
                 url: origin.clone(),
                 origin,
                 token: String::new(),
                 cookie: Some(format!("{name}={value}")),
+                binary,
+                version,
                 reused: true,
             });
         }
@@ -65,7 +74,7 @@ impl Host {
     }
 
     fn spawn() -> Result<Self> {
-        let binary = resolve_dsh()?;
+        let (binary, version) = resolve_launcher()?;
         let log_path = cache_dir()?.join("host.log");
         if let Some(parent) = log_path.parent() {
             fs::create_dir_all(parent).ok();
@@ -111,6 +120,8 @@ impl Host {
                     origin,
                     token,
                     cookie: None,
+                    binary: binary.clone(),
+                    version: version.clone(),
                     reused: false,
                 });
             }
@@ -269,40 +280,156 @@ fn parse_ready(text: &str) -> Option<(String, String, String)> {
     None
 }
 
-/// RDSH_DESKTOP_DSH, then PATH, then the layout used by the local install.
-fn resolve_dsh() -> Result<PathBuf> {
+/// Every place a harness launcher may live, most specific first.
+fn candidate_binaries() -> Vec<PathBuf> {
+    let mut candidates: Vec<PathBuf> = Vec::new();
     if let Ok(value) = std::env::var("RDSH_DESKTOP_DSH") {
         if !value.is_empty() {
-            return Ok(PathBuf::from(value));
+            candidates.push(PathBuf::from(value));
         }
     }
     if let Some(path) = std::env::var_os("PATH") {
         for dir in std::env::split_paths(&path) {
             for name in ["dsh", "dsh-orig"] {
-                let candidate = dir.join(name);
-                if candidate.is_file() {
-                    return Ok(candidate);
+                candidates.push(dir.join(name));
+            }
+        }
+    }
+    if let Some(home) = std::env::var_os("HOME") {
+        let home = PathBuf::from(home);
+        candidates.push(home.join(".local/bin/dsh"));
+        candidates.push(home.join(".local/opt/dsh-original/bin/dsh"));
+        candidates.push(home.join(".npm-global/bin/dsh"));
+    }
+    candidates.push(PathBuf::from("/usr/local/bin/dsh"));
+    candidates.push(PathBuf::from("/usr/bin/dsh"));
+    candidates
+}
+
+/// Version reported by one launcher, or None when it does not answer.
+pub fn version_of(binary: &Path) -> Option<String> {
+    let output = Command::new(binary).arg("--version").output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&output.stdout);
+    let candidate = text.split_whitespace().last()?.trim().to_string();
+    let looks_like_version = candidate
+        .chars()
+        .next()
+        .map(|character| character.is_ascii_digit())
+        .unwrap_or(false);
+    looks_like_version.then_some(candidate)
+}
+
+fn split_prerelease(version: &str) -> (&str, Option<&str>) {
+    match version.split_once('-') {
+        Some((base, pre)) => (base, Some(pre)),
+        None => (version, None),
+    }
+}
+
+fn compare_numeric(left: &str, right: &str) -> std::cmp::Ordering {
+    let left: Vec<u64> = left
+        .split('.')
+        .map(|part| part.parse::<u64>().unwrap_or(0))
+        .collect();
+    let right: Vec<u64> = right
+        .split('.')
+        .map(|part| part.parse::<u64>().unwrap_or(0))
+        .collect();
+    for index in 0..left.len().max(right.len()) {
+        let left = left.get(index).copied().unwrap_or(0);
+        let right = right.get(index).copied().unwrap_or(0);
+        match left.cmp(&right) {
+            std::cmp::Ordering::Equal => continue,
+            other => return other,
+        }
+    }
+    std::cmp::Ordering::Equal
+}
+
+/// Compare dotted versions; a prerelease sorts below its release tag.
+pub fn compare_versions(left: &str, right: &str) -> std::cmp::Ordering {
+    let (left_base, left_pre) = split_prerelease(left);
+    let (right_base, right_pre) = split_prerelease(right);
+    let base = compare_numeric(left_base, right_base);
+    if base != std::cmp::Ordering::Equal {
+        return base;
+    }
+    match (left_pre, right_pre) {
+        (None, None) => std::cmp::Ordering::Equal,
+        (None, Some(_)) => std::cmp::Ordering::Greater,
+        (Some(_), None) => std::cmp::Ordering::Less,
+        (Some(left), Some(right)) => {
+            let (left_tag, left_number) = match left.rsplit_once('.') {
+                Some((tag, number)) if number.chars().all(|c| c.is_ascii_digit()) => (tag, number),
+                _ => (left, ""),
+            };
+            let (right_tag, right_number) = match right.rsplit_once('.') {
+                Some((tag, number)) if number.chars().all(|c| c.is_ascii_digit()) => (tag, number),
+                _ => (right, ""),
+            };
+            match left_tag.cmp(right_tag) {
+                std::cmp::Ordering::Equal => compare_numeric(left_number, right_number),
+                other => other,
+            }
+        }
+    }
+}
+
+/// Pick the newest launcher that answers, so an upstream upgrade is picked up
+/// without touching the app. RDSH_DESKTOP_DSH always wins when it is set.
+pub fn resolve_launcher() -> Result<(PathBuf, String)> {
+    if let Ok(value) = std::env::var("RDSH_DESKTOP_DSH") {
+        if !value.is_empty() {
+            let binary = PathBuf::from(&value);
+            let version = version_of(&binary).unwrap_or_else(|| "unknown".to_string());
+            return Ok((binary, version));
+        }
+    }
+    let mut best: Option<(PathBuf, String)> = None;
+    for candidate in candidate_binaries() {
+        if !candidate.is_file() {
+            continue;
+        }
+        match version_of(&candidate) {
+            Some(version) => {
+                let better = best
+                    .as_ref()
+                    .map(|(_, current)| compare_versions(&version, current).is_gt())
+                    .unwrap_or(true);
+                if better {
+                    best = Some((candidate, version));
+                }
+            }
+            None => {
+                if best.is_none() {
+                    best = Some((candidate, "unknown".to_string()));
                 }
             }
         }
     }
-    for candidate in [
-        "/home/sahen/.local/opt/dsh-original/bin/dsh",
-        "/home/sahen/.local/bin/dsh",
-    ] {
-        let path = PathBuf::from(candidate);
-        if path.is_file() {
-            return Ok(path);
-        }
-    }
-    Err(anyhow!(
-        "dsh was not found; set RDSH_DESKTOP_DSH to the harness launcher"
-    ))
+    best.ok_or_else(|| {
+        anyhow!("dsh was not found; set RDSH_DESKTOP_DSH to the harness launcher")
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::parse_ready;
+
+    #[test]
+    fn orders_releases_above_their_prereleases() {
+        use super::compare_versions;
+        use std::cmp::Ordering;
+        assert_eq!(compare_versions("0.2.1", "0.2.1-rc.2"), Ordering::Greater);
+        assert_eq!(compare_versions("0.2.1-rc.2", "0.2.1-alpha.2"), Ordering::Greater);
+        assert_eq!(compare_versions("0.2.1-rc.2", "0.2.0-rc.2"), Ordering::Greater);
+        assert_eq!(compare_versions("0.2.1-alpha.10", "0.2.1-alpha.2"), Ordering::Greater);
+        assert_eq!(compare_versions("0.2.1-rc.2", "0.2.1-rc.2"), Ordering::Equal);
+        assert_eq!(compare_versions("0.2.0", "0.10.0"), Ordering::Less);
+    }
 
     #[test]
     fn reads_the_ready_url_from_noisy_output() {

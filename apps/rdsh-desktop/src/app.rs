@@ -135,9 +135,10 @@ impl Chat {
         chat.load_conversation()?;
         chat.startup_ms = started.elapsed().as_millis();
         chat.status = format!(
-            "{} 件の会話 / 接続 {}ms{}",
+            "{} 件の会話 / 接続 {}ms / dsh {}{}",
             chat.sessions.len(),
             chat.startup_ms,
+            chat.host_version(),
             if chat.reused { "（ホスト再利用）" } else { "" }
         );
         Ok(chat)
@@ -388,6 +389,16 @@ impl Chat {
         self.selected = Some(0);
         self.messages.clear();
         Ok(id)
+    }
+
+    /// Version of the harness launcher this session runs against.
+    pub fn host_version(&self) -> &str {
+        &self.host.version
+    }
+
+    /// Path of the launcher, when one was resolved.
+    pub fn host_binary(&self) -> &std::path::Path {
+        &self.host.binary
     }
 
     pub fn switch_model(&mut self, session_id: &str, provider: &str, model: &str) -> anyhow::Result<()> {

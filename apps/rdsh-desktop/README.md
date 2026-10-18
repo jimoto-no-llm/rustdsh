@@ -74,6 +74,21 @@ pinned revision):
 - Model changes go through session/selectModel, so the host keeps them for the
   conversation and the chip and header update immediately.
 
+## Following upstream dsh updates
+
+The app does not pin a harness version. It resolves the launcher at startup,
+preferring RDSH_DESKTOP_DSH, then every dsh on PATH, the local install paths and
+the npm global bin, and keeps the newest one that answers --version. Upgrading
+dsh (for example npm install -g @deepseek-ai/dsh@latest) is therefore enough to
+move the app onto the new build.
+
+- --check-host prints the launcher, its version, whether a host answered and the
+  session count; add --online to compare against npm, which sets
+  updateAvailable when upstream has something newer (prereleases included).
+- scripts/verify-harness.sh /path/to/dsh checks the session list, model catalog
+  and live events against one build without disturbing a running service.
+- The startup status line names the harness version in use.
+
 ## Harness compatibility
 
 The app speaks the harness client protocol (unary HTTP plus one WebSocket) and
