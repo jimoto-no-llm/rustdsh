@@ -1,5 +1,8 @@
 # TUI profile setup
 
+This is a preserved setup example for DSH 0.2.0-rc.2. The pinned plugin below
+has not been revalidated against newer DSH releases.
+
 `rdsh tui` delegates to the `tui` profile in dsh. DSH 0.2.0-rc.2 does not ship
 that profile, so a fresh installation needs a TUI plugin first. The
 [`@deepseek-harness-tui/dsh-tui` plugin](https://github.com/ccch1mneyyy/dsh-TUI)

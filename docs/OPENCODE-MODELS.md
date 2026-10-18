@@ -1,5 +1,10 @@
 # OpenCode models in rdsh Web and TUI
 
+This recovered helper targets legacy Node-based DSH 0.2.0-rc.2. Compatibility
+with newer DSH versions and coordination with concurrent credential/profile
+writers still require review. Do not run it against an active installation
+while another process may update those files.
+
 The sync command shares an existing authenticated **OpenCode Go** route between
 profiles and imports the **OpenCode Zen** catalog when a Zen API key exists.
 Web and TUI then use the normal DSH model selector and agent loop;
