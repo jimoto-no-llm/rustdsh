@@ -1,0 +1,50 @@
+{
+  "kind": "local_dsh_ten_loopback_smoke",
+  "created_at": "2026-10-18T06:32:48.810Z",
+  "platform": "WSL Ubuntu on Windows",
+  "scope": "Ten real rdsh/DSH headless processes with deterministic loopback Responses API fixtures. No Gas City, real model inference, tool execution or code editing.",
+  "repository_start": {
+    "branch": "feat/cloud-swarm-runtime",
+    "head": "16ec344b3575b428380db5598ce0989f19d98890",
+    "tracked_tree_clean": true
+  },
+  "runtime": {
+    "rdsh_version": "0.7.0",
+    "rdsh_sha256": "e96a0af5819d96af4f2508ce2eda2d5ccd6a3a7acf95db10533d7be3f64e3594",
+    "dsh_version": "0.2.1-rc.2",
+    "dsh_source_commit": "687f282e8625c6b8d11ff58211a90524be2e4317",
+    "node_version": "24.15.0",
+    "current_cloud_branch_binary_tested": false,
+    "new_runtime_installations": 0,
+    "disabled_plugins": ["session-title-llm", "session-telemetry-otel", "typert", "typert-loader", "typert-gateway"]
+  },
+  "result": {
+    "workers": 10,
+    "completed_turns": 10,
+    "zero_exit_codes": 10,
+    "matching_final_responses": 10,
+    "unique_sessions": 10,
+    "matching_distinct_workspaces": 10,
+    "requests_per_worker": 1,
+    "max_concurrent_model_requests": 10,
+    "barrier_at_ms": 4524.7123,
+    "barrier_hold_ms": 250,
+    "elapsed_seconds": 5.188326583,
+    "sampled_worker_tree_rss_peak_kib": 2083004,
+    "rss_samples": 50,
+    "user_cpu_seconds_sum": 22.0,
+    "system_cpu_seconds_sum": 11.6,
+    "paid_api_requests": 0,
+    "passed": true
+  },
+  "measurement": "A loopback response barrier waits for all ten workers before replying. Aggregate worker process-tree RSS is sampled from procfs every 100ms; it can miss short peaks and counts shared pages repeatedly. Fixture server memory is excluded. CPU values are GNU time sums, not instantaneous host utilization. One sample, not a capacity bound.",
+  "isolation": "Each worker has fresh HOME, DSH_HOME, workspace and TMPDIR; inherited credentials are excluded by an environment allowlist. Only a dummy loopback key is supplied. Each process has a 30-second deadline and 2-second kill grace.",
+  "verification": "Saved JSONL was checked for ten distinct session IDs, matching per-worker workspace, completed turn_end, exact final LOCAL_OK_N, exit 0 and one model request each. Final script incorporates the same checks; node --check and git diff --check passed. No broader product regression suite was rerun for this standalone test script/documentation change.",
+  "raw_logs": "/tmp/rdsh-local-ten-6QkfDp/result.json",
+  "limitations": [
+    "Gas City orchestration, CloudBackend, Kubernetes and real model inference were not exercised.",
+    "The headless smoke profile explicitly disables unbuilt typert/loader/gateway components; the full DSH runtime remains unqualified.",
+    "Workspace and session separation are configuration checks, not a security isolation test.",
+    "Real editing, builds and long-running tasks will have different resource use."
+  ]
+}

@@ -166,6 +166,30 @@ Windowsでは最後の実行ファイルを`target/debug/rdsh.exe`とする。
 未ビルド警告が残る。並列数の上限や完全なruntimeの合格へ外挿しない。
 実測値と制約は[`local-dsh-smoke-20261018.json`](../cloud/evidence/local-dsh-smoke-20261018.json)。
 
+### ローカル10件同時の確認
+
+既存ランタイムを再利用し、10個の実DSHプロセスを専用HOME・DSH_HOME・workspaceで起動。
+模擬API側で全10件の要求が揃うまで応答を保留し、同時待機を確認した。
+10/10が正常終了し、異なる10セッションと各workerの完了応答・作業ディレクトリを照合した。
+所要5.19秒、100ms間隔で観測したプロセス群の合計RSSピークは約1.99GiB。
+API課金は0。追加ランタイムのインストールは不要だった。
+
+headless試験に不要なtypert／typert-loader／typert-gatewayと、タイトル生成・telemetryを
+試験patchで無効化した。Gas Cityによるdispatch、実モデル推論、コード編集・ビルドは未検証。
+RSSは共有ページの重複計上と短いピークの見逃しがあり、実作業の必要メモリや並列上限ではない。
+記録は[`local-dsh-ten-20261018.json`](../cloud/evidence/local-dsh-ten-20261018.json)。
+
+再実行（Linux、既存のrdsh・ビルド済みDSH・Node・GNU time・timeoutを使用）：
+
+```sh
+LOCAL_RDSH_BIN=/absolute/path/to/rdsh \
+LOCAL_DSH_ENTRY=/absolute/path/to/deepseek-harness/apps/cli/lib/bin.js \
+node scripts/cloud-local-smoke.mjs
+```
+
+同時数は10固定。実モデルのキーは渡さず、loopbackにのみモデル要求を送る。
+各workerは30秒でtimeout、2秒後に強制終了。ログは表示された`/tmp/rdsh-local-ten-*`へ保存する。
+
 ## DeepInfra API負荷試験（2026-10-18）
 
 [`scripts/deepinfra-load-test.mjs`](../scripts/deepinfra-load-test.mjs) で、
