@@ -494,21 +494,18 @@ mod tests {
         }
     }
 
+    /// Writes "ok" to 'marker' through a shell, so the fall-through is proven
+    /// by a side effect. The path travels as a positional argument, which keeps
+    /// the quoting identical for every path.
+    #[cfg(unix)]
     fn marker_command(marker: &Path) -> Vec<String> {
-        let target = marker.display().to_string();
-        if cfg!(windows) {
-            vec![
-                "cmd".to_string(),
-                "/c".to_string(),
-                format!("echo ok > \"{target}\""),
-            ]
-        } else {
-            vec![
-                "sh".to_string(),
-                "-c".to_string(),
-                format!("printf ok > '{target}'"),
-            ]
-        }
+        vec![
+            "sh".to_string(),
+            "-c".to_string(),
+            "printf ok > \"$1\"".to_string(),
+            "rdsh-searxng-test".to_string(),
+            marker.display().to_string(),
+        ]
     }
 
     #[test]
@@ -601,9 +598,32 @@ mod tests {
     #[test]
     fn an_unusable_runtime_falls_through_to_the_next_candidate() {
         let dir = test_dir("fallthrough");
-        let marker = dir.join("second-ran");
         // The first runtime exits at once, as 'docker compose' does without the
-        // Compose v2 plugin; the second one must still get its turn.
+        // Compose v2 plugin. Missing the second candidate only becomes visible
+        // now that the first failure does not end the attempt: the old code
+        // stopped at the first successful spawn and reported a timeout.
+        let runtimes = vec![
+            failing_command(),
+            vec!["rdsh-compose-does-not-exist-9f3a".to_string()],
+        ];
+        let plan = Plan {
+            compose: ComposeSource::Override(compose_in(&dir)),
+            start_timeout: Duration::from_millis(250),
+        };
+        let base = format!("http://127.0.0.1:{}", free_port());
+        assert_eq!(
+            ensure_with(&base, true, english(), &plan, &|_| runtimes.clone()),
+            Outcome::NoRuntime
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_candidate_after_a_failed_runtime_really_runs() {
+        let dir = test_dir("fallthrough-runs");
+        let marker = dir.join("second-ran");
+        // The first runtime exits at once; the second one must still get its
+        // turn, proven by the file it writes.
         let runtimes = vec![failing_command(), marker_command(&marker)];
         let plan = Plan {
             compose: ComposeSource::Override(compose_in(&dir)),
