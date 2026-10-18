@@ -60,6 +60,7 @@ mod context_hook;
 mod cost_ledger;
 mod deps;
 mod desktop;
+mod desktop_webui;
 mod distro;
 mod dsh_args;
 mod dsh_env;
@@ -561,6 +562,31 @@ enum DesktopAction {
         /// Plugin that must be enabled (repeatable; default: rdsh-settings)
         #[arg(long = "require")]
         require: Vec<String>,
+        #[arg(long = "json")]
+        json: bool,
+    },
+    /// Keep the native client's local Web UI running from login (opt-in)
+    #[command(name = "web-ui")]
+    WebUi {
+        #[command(subcommand)]
+        action: WebUiAction,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum WebUiAction {
+    /// Show whether the Web UI service is installed, enabled and running
+    Status {
+        #[arg(long = "json")]
+        json: bool,
+    },
+    /// Write the user unit and start the Web UI now and at login
+    On {
+        #[arg(long = "json")]
+        json: bool,
+    },
+    /// Stop the Web UI and remove its autostart link
+    Off {
         #[arg(long = "json")]
         json: bool,
     },
@@ -1388,6 +1414,17 @@ fn main() {
                 require,
                 json: inner,
             }) => desktop::cmd_verify(&require, json || inner, locale),
+            Some(DesktopAction::WebUi { action }) => match action {
+                WebUiAction::Status { json: inner } => {
+                    desktop_webui::cmd_web_ui("status", json || inner, locale)
+                }
+                WebUiAction::On { json: inner } => {
+                    desktop_webui::cmd_web_ui("on", json || inner, locale)
+                }
+                WebUiAction::Off { json: inner } => {
+                    desktop_webui::cmd_web_ui("off", json || inner, locale)
+                }
+            },
         },
         Some(Commands::Context { action }) => {
             // inject runs as a DSH hook: it must never block a prompt, so it
@@ -2166,6 +2203,10 @@ fn localized_command_about(name: &str, locale: locale::Locale) -> Option<&'stati
         "desktop" => (
             "DeepSeek Harness Desktop 集成",
             "DeepSeek Harness Desktop連携",
+        ),
+        "web-ui" => (
+            "本地 Web UI 的常时启动（默认关闭）",
+            "ローカルWeb UIの常時起動（既定はオフ）",
         ),
         "deps" => (
             "静态代码依赖图（rdsh deps）",

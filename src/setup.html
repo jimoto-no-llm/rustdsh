@@ -222,6 +222,12 @@ details[open] > summary::before { transform: rotate(90deg); }
       <h1 id="finish-title">準備ができました</h1>
       <p class="lead" id="finish-lead">さっそく AI に話しかけてみましょう。</p>
       <div class="starts" id="starts"></div>
+      <div class="option" id="webui-box">
+        <div class="head"><h2 id="webui-title">Web UI を常時起動</h2><span class="badge" id="webui-badge">…</span></div>
+        <p class="hint" id="webui-state"></p>
+        <div class="row-actions" id="webui-actions"></div>
+        <p class="hint" id="webui-url" hidden></p>
+      </div>
       <p class="hint" id="finish-cmd-hint">うまく開かないときは、ターミナルで次のコマンドを実行してください。</p>
       <div class="cmd" id="finish-cmd"><code>rdsh tui</code><button class="link" onclick="cp(this)">コピー</button></div>
       <p class="hint" id="model-line"></p>
@@ -290,6 +296,7 @@ text("connect-next", "次へ", "Next", "下一步");
 text("finish-title", "準備ができました", "You're all set", "准备就绪");
 text("finish-lead", "さっそく AI に話しかけてみましょう。", "Say hello to your AI.", "现在就和 AI 对话吧。");
 text("finish-cmd-hint", "うまく開かないときは、ターミナルで次のコマンドを実行してください。", "If nothing opens, run this in a terminal.", "如果没有打开，请在终端运行以下命令。");
+text("webui-title", "Web UI を常時起動", "Always start the Web UI", "常时启动 Web UI");
 text("hx", "追加機能（必要なときだけ）", "Extras (only if you need them)", "附加功能（按需）");
 text("khx", "ふだんは不要です。使いたいものだけ、押してオンにできます。", "Usually unnecessary. Click one to turn it on.", "通常不需要。点击即可开启。");
 text("finish-back", "戻る", "Back", "返回");
@@ -335,7 +342,7 @@ function go(step) {
     li.className = i < at ? "done" : (i === at ? "now" : "");
     if (i === at) li.setAttribute("aria-current", "step"); else li.removeAttribute("aria-current");
   });
-  if (step === "finish") { renderFinish(); setupAction(loadExtras); }
+  if (step === "finish") { renderFinish(); setupAction(loadExtras); setupAction(loadWebUi); }
   window.scrollTo({top: 0, behavior: "smooth"});
   var heading = document.querySelector("#step-" + step + " h1");
   if (heading) { heading.tabIndex = -1; heading.focus({preventScroll: true}); }
@@ -596,6 +603,41 @@ async function toggleExtra(id, want) {
   if (!want) on = on.filter(function (y) { return y !== id; });
   await api("POST", "/api/extras", {enable: on});
   await loadExtras();
+}
+async function loadWebUi() {
+  var r = await api("GET", "/api/webui");
+  var on = !!r.enabled;
+  var badge = $("webui-badge");
+  badge.textContent = on ? t("オン", "on", "已开启") : t("オフ", "off", "已关闭");
+  badge.className = "badge" + (on ? " ok" : "");
+  var state = $("webui-state");
+  state.textContent = on
+    ? (r.active ? t("このPCのログイン時に起動しています。", "Starts when you log in to this PC.", "登录此 PC 时自动启动。")
+                : t("有効ですが、まだ動作していません。", "Enabled, but not running yet.", "已启用，但尚未运行。"))
+    : t("既定ではオフです。オンにすると、ログイン時に Web UI が起動します。", "Off by default. Turn it on to start the Web UI at login.", "默认关闭。开启后将在登录时启动 Web UI。");
+  if (r.hint) state.textContent += " " + r.hint;
+  var actions = $("webui-actions"); actions.replaceChildren();
+  var onb = el("button", on ? "" : "primary", t("オンにする", "Turn on", "开启"));
+  onb.disabled = on;
+  onb.onclick = function () { setupAction(function () { return setWebUi(true); }); };
+  var offb = el("button", on ? "primary" : "", t("オフにする", "Turn off", "关闭"));
+  offb.disabled = !on;
+  offb.onclick = function () { setupAction(function () { return setWebUi(false); }); };
+  actions.append(onb, offb);
+  var url = $("webui-url");
+  url.replaceChildren();
+  url.hidden = !(r.active && r.url);
+  if (r.active && r.url) {
+    url.append(document.createTextNode(t("開く: ", "Open: ", "打开：")));
+    var a = el("a", "linkish", r.url);
+    a.href = r.url; a.target = "_blank"; a.rel = "noreferrer";
+    url.append(a);
+  }
+}
+async function setWebUi(enable) {
+  await api("POST", "/api/webui", {enable: enable});
+  toast(enable ? t("オンにしました", "Turned on", "已开启") : t("オフにしました", "Turned off", "已关闭"));
+  await loadWebUi();
 }
 async function storeKey(name, input) {
   var r = await api("POST", "/api/key", {name: name, value: input.value});
