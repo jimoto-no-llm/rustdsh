@@ -12,7 +12,7 @@ Japanese is welcome (Japanese OK). The issue forms accept Japanese.
 
 ## Discord
 
-The community server is https://discord.gg/r7PPXTYGmf
+The community server is [Discord](https://discord.gg/r7PPXTYGmf).
 Ask quick questions, share setups, or follow announcements there. Bugs and
 feature requests still belong in the issue tracker so they stay searchable.
 
