@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>rdsh ローカル UI</title>
+<style>
+  :root {
+    --page: #ffffff;
+    --sidebar: #f9fafb;
+    --accent: #4176e6;
+    --user-bubble: #edf3fe;
+    --hairline: rgba(0, 0, 0, .1);
+    --label: #0f1115;
+    --label-2: #61666b;
+    --label-3: #81858c;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    background: var(--page);
+    color: var(--label);
+    font: 14px/22px -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN",
+      "Noto Sans JP", Meiryo, sans-serif;
+  }
+  .app { display: flex; height: 100vh; }
+
+  /* sidebar */
+  .sidebar {
+    width: 280px;
+    flex: none;
+    background: var(--sidebar);
+    border-right: 1px solid var(--hairline);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .sidebar-head {
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .brand { font-size: 13px; font-weight: 600; letter-spacing: .01em; }
+  .status { margin-top: 4px; font-size: 11px; line-height: 16px; color: var(--label-3); }
+  .groups { flex: 1; overflow-y: auto; padding: 8px 8px 16px; }
+  .group { margin-bottom: 10px; }
+  .group-label {
+    padding: 6px 8px 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--label-2);
+    text-transform: none;
+  }
+  .group-path { font-weight: 400; color: var(--label-3); }
+  .session {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 6px 8px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--label);
+    font: inherit;
+    font-size: 13px;
+    line-height: 20px;
+    text-align: left;
+    cursor: pointer;
+  }
+  .session:hover { background: rgba(0, 0, 0, .04); }
+  .session.selected { background: var(--user-bubble); color: var(--accent); }
+  .session .title {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .dot {
+    flex: none;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+  @keyframes pulse { 50% { opacity: .25; } }
+
+  /* main column */
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .timeline { flex: 1; overflow-y: auto; padding: 24px 0; }
+  .column { max-width: 920px; margin: 0 auto; padding: 0 24px; }
+
+  .row { display: flex; margin-bottom: 18px; }
+  .row.user { justify-content: flex-end; }
+  .row-text { font-size: 14px; line-height: 24px; white-space: pre-wrap; word-break: break-word; }
+  .user-bubble {
+    max-width: 75%;
+    padding: 10px 14px;
+    border-radius: var(--radius-lg);
+    background: var(--user-bubble);
+  }
+  .assistant-text { flex: 1; }
+  .reasoning {
+    flex: 1;
+    padding: 8px 12px;
+    border-left: 2px solid var(--hairline);
+    color: var(--label-2);
+    font-size: 13px;
+    line-height: 22px;
+  }
+  .reasoning .badge { display: block; margin-bottom: 2px; font-size: 11px; color: var(--label-3); }
+  .tool {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-sm);
+    background: #fbfcfd;
+    color: var(--label-2);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    line-height: 20px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .empty { color: var(--label-3); font-size: 13px; }
+  .cursor {
+    display: inline-block;
+    width: 7px;
+    height: 15px;
+    margin-left: 2px;
+    vertical-align: -2px;
+    background: var(--accent);
+    animation: blink 1s step-start infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+  .notes { margin-top: 8px; }
+  .note { font-size: 12px; color: var(--label-3); }
+
+  /* banner */
+  .banner {
+    display: none;
+    margin: 0 auto 16px;
+    max-width: 920px;
+    padding: 10px 14px;
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-md);
+    background: #fffdf5;
+  }
+  .banner.show { display: block; }
+  .banner-title { font-size: 13px; font-weight: 600; }
+  .banner-body { margin-top: 4px; font-size: 13px; line-height: 22px; }
+  .banner-actions { margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .button {
+    padding: 6px 12px;
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-sm);
+    background: #fff;
+    color: var(--label);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .button:hover { background: #f4f6f8; }
+  .button.primary { border-color: var(--accent); background: var(--accent); color: #fff; }
+  .button.primary:hover { background: #3568d4; }
+
+  /* composer */
+  .composer { border-top: 1px solid var(--hairline); background: var(--page); padding: 12px 0 16px; }
+  .composer-inner { max-width: 920px; margin: 0 auto; padding: 0 24px; }
+  .composer-box {
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-md);
+    background: #fff;
+    padding: 8px 10px;
+  }
+  .composer-box:focus-within { border-color: var(--accent); }
+  textarea {
+    width: 100%;
+    min-height: 44px;
+    max-height: 200px;
+    border: 0;
+    outline: 0;
+    resize: none;
+    background: transparent;
+    color: var(--label);
+    font: inherit;
+    font-size: 14px;
+    line-height: 24px;
+  }
+  .composer-foot { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    border: 1px solid var(--hairline);
+    border-radius: 999px;
+    background: var(--sidebar);
+    font-size: 12px;
+    color: var(--label-2);
+    cursor: pointer;
+  }
+  select.model-picker {
+    max-width: 320px;
+    padding: 3px 6px;
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-sm);
+    background: #fff;
+    color: var(--label);
+    font: inherit;
+    font-size: 12px;
+  }
+  .spacer { flex: 1; }
+  .hint { font-size: 11px; color: var(--label-3); }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-head">
+      <div class="brand">rdsh ローカル UI</div>
+      <div class="status" id="status">接続しています…</div>
+    </div>
+    <div class="groups" id="groups"></div>
+  </aside>
+
+  <main class="main">
+    <div class="timeline" id="timeline">
+      <div class="column">
+        <div class="banner" id="banner">
+          <div class="banner-title" id="banner-title"></div>
+          <div class="banner-body" id="banner-body"></div>
+          <div class="banner-actions" id="banner-actions"></div>
+        </div>
+        <div id="messages"></div>
+        <div class="notes" id="notes"></div>
+      </div>
+    </div>
+
+    <div class="composer">
+      <div class="composer-inner">
+        <div class="composer-box">
+          <textarea id="input" rows="2" placeholder="メッセージを入力（Enter で送信、Shift+Enter で改行）"></textarea>
+          <div class="composer-foot">
+            <span class="chip" id="model-chip" title="現在のモデル">モデル: —</span>
+            <select class="model-picker hidden" id="model-picker" aria-label="モデルを選択"></select>
+            <span class="spacer"></span>
+            <span class="hint" id="hint"></span>
+            <button class="button hidden" id="cancel">停止</button>
+            <button class="button primary" id="send">送信</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+"use strict";
+(function () {
+  // The server substitutes its random page token for this marker, so the page
+  // never carries the harness cookie.
+  var TOKEN = "__RDSH_TOKEN__";
+  var state = null;
+  var streaming = "";
+  var lastRole = "";
+  var wasRunning = false;
+  var hidden = false;
+  var notifiedFinish = false;
+  var permissionAsked = false;
+
+  var el = function (id) { return document.getElementById(id); };
+  var timeline = el("timeline");
+  var messages = el("messages");
+  var groupsBox = el("groups");
+  var statusBox = el("status");
+  var notesBox = el("notes");
+  var banner = el("banner");
+  var bannerTitle = el("banner-title");
+  var bannerBody = el("banner-body");
+  var bannerActions = el("banner-actions");
+  var input = el("input");
+  var modelChip = el("model-chip");
+  var picker = el("model-picker");
+  var cancelButton = el("cancel");
+  var sendButton = el("send");
+  var hint = el("hint");
+
+  function api(path, body) {
+    var init = { headers: {} };
+    init.headers["x-rdsh-token"] = TOKEN;
+    if (body !== undefined) {
+      init.method = "POST";
+      init.headers["Content-Type"] = "application/json";
+      init.body = JSON.stringify(body);
+    }
+    return fetch(path, init).then(function (response) {
+      return response.json().catch(function () { return {}; }).then(function (value) {
+        if (!response.ok) {
+          throw new Error(value.error || ("HTTP " + response.status));
+        }
+        return value;
+      });
+    });
+  }
+
+  function nearBottom() {
+    return timeline.scrollHeight - timeline.scrollTop - timeline.clientHeight < 140;
+  }
+
+  function render() {
+    if (!state) { return; }
+    var stick = nearBottom();
+    statusBox.textContent = state.status || "";
+    if (state.currentModel) {
+      modelChip.textContent = "モデル: " + state.currentModel;
+    } else {
+      modelChip.textContent = "モデル: —";
+    }
+    cancelButton.classList.toggle("hidden", !state.running);
+
+    renderGroups();
+    renderPicker();
+
+    var parts = [];
+    var all = (state.messages || []).slice();
+    if (state.streaming) {
+      all.push({ role: "assistant", text: state.streaming, streaming: true });
+    }
+    if (all.length === 0) {
+      parts.push('<div class="empty">会話を選ぶと、ここにタイムラインが表示されます。</div>');
+    }
+    for (var index = 0; index < all.length; index += 1) {
+      parts.push(renderRow(all[index]));
+    }
+    messages.innerHTML = parts.join("");
+
+    var notes = state.notes || [];
+    notesBox.innerHTML = notes
+      .slice(-4)
+      .map(function (note) { return '<div class="note">' + escapeHtml(note) + "</div>"; })
+      .join("");
+
+    renderBanner();
+
+    if (stick) {
+      timeline.scrollTop = timeline.scrollHeight;
+    }
+  }
+
+  function escapeHtml(text) {
+    return String(text)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function renderRow(message) {
+    var role = message.role || "assistant";
+    var body = escapeHtml(message.text || "");
+    if (role === "user") {
+      return '<div class="row user"><div class="user-bubble"><div class="row-text">' + body + "</div></div></div>";
+    }
+    if (role === "reasoning") {
+      return '<div class="row"><div class="reasoning"><span class="badge">推論</span>' + body + "</div></div>";
+    }
+    if (role === "tool") {
+      return '<div class="row"><div class="tool">' + body + "</div></div>";
+    }
+    var cursor = message.streaming ? '<span class="cursor"></span>' : "";
+    return '<div class="row"><div class="assistant-text row-text">' + body + cursor + "</div></div>";
+  }
+
+  function renderGroups() {
+    var groups = state.groups || [];
+    var html = "";
+    groups.forEach(function (group) {
+      html += '<div class="group"><div class="group-label">' + escapeHtml(group.label);
+      if (group.path && group.path !== group.label) {
+        html += ' <span class="group-path">' + escapeHtml(group.path) + "</span>";
+      }
+      html += "</div>";
+      (group.sessions || []).forEach(function (session) {
+        var selected = state.selected === session.id ? " selected" : "";
+        var dot = session.running ? '<span class="dot" title="実行中"></span>' : "";
+        var title = escapeHtml(session.title || session.id);
+        html += '<button class="session' + selected + '" data-session="' + escapeHtml(session.id) + '">'
+          + dot + '<span class="title">' + title + "</span></button>";
+      });
+      html += "</div>";
+    });
+    if (!html) {
+      html = '<div class="empty" style="padding:12px">会話がありません。</div>';
+    }
+    groupsBox.innerHTML = html;
+  }
+
+  function renderPicker() {
+    var providers = state.modelGroups || [];
+    var currentId = "";
+    var html = "";
+    providers.forEach(function (provider) {
+      var group = document.createElement("optgroup");
+      group.label = provider.name + (provider.current ? "（現在）" : "");
+      (provider.models || []).forEach(function (model) {
+        if (model.current) { currentId = provider.id + "/" + model.id; }
+        html += '<option value="' + escapeHtml(provider.id + "/" + model.id) + '">'
+          + escapeHtml(provider.name + " · " + model.name) + "</option>";
+      });
+      void group;
+    });
+    if (html) {
+      picker.innerHTML = html;
+      picker.value = currentId;
+      picker.classList.remove("hidden");
+      modelChip.classList.add("hidden");
+    } else {
+      picker.classList.add("hidden");
+      modelChip.classList.remove("hidden");
+    }
+  }
+
+  function renderBanner() {
+    var pending = state.pending;
+    if (!pending) {
+      banner.classList.remove("show");
+      bannerActions.innerHTML = "";
+      return;
+    }
+    banner.classList.add("show");
+    bannerActions.innerHTML = "";
+    if (pending.kind === "approval") {
+      bannerTitle.textContent = "承認待ち: " + (pending.tool || "tool");
+      bannerBody.textContent = pending.reason || "";
+      addButton("許可", "primary", function () {
+        api("/api/approve", { allow: true }).then(refresh).catch(showError);
+      });
+      addButton("拒否", "", function () {
+        api("/api/approve", { allow: false }).then(refresh).catch(showError);
+      });
+      return;
+    }
+    bannerTitle.textContent = "質問";
+    bannerBody.textContent = "";
+    var questions = pending.questions || [];
+    questions.forEach(function (question) {
+      var block = document.createElement("div");
+      block.style.marginBottom = "6px";
+      var label = document.createElement("div");
+      label.textContent = (question.header ? "[" + question.header + "] " : "") + (question.question || "");
+      block.appendChild(label);
+      var state_ = { id: question.id, selected: [], custom: "" };
+      (question.options || []).forEach(function (option) {
+        var choice = document.createElement("label");
+        choice.style.display = "block";
+        choice.style.fontSize = "13px";
+        var box = document.createElement("input");
+        box.type = question.multiSelect ? "checkbox" : "radio";
+        box.name = "q-" + question.id;
+        box.value = option.label;
+        box.addEventListener("change", function () {
+          if (question.multiSelect) {
+            state_.selected = Array.prototype.slice
+              .call(block.querySelectorAll("input:checked"))
+              .map(function (node) { return node.value; });
+          } else {
+            state_.selected = [option.label];
+          }
+        });
+        choice.appendChild(box);
+        choice.appendChild(document.createTextNode(" " + option.label
+          + (option.description ? "（" + option.description + "）" : "")));
+        block.appendChild(choice);
+      });
+      if (question.allowCustom) {
+        var custom = document.createElement("input");
+        custom.type = "text";
+        custom.placeholder = "自由入力";
+        custom.style.width = "100%";
+        custom.style.marginTop = "4px";
+        custom.style.font = "inherit";
+        custom.style.fontSize = "13px";
+        custom.addEventListener("input", function () {
+          state_.custom = custom.value;
+        });
+        block.appendChild(custom);
+      }
+      bannerBody.appendChild(block);
+      pending.answers = pending.answers || [];
+      pending.answers.push(state_);
+    });
+    addButton("回答", "primary", function () {
+      var answers = (pending.answers || []).map(function (answer) {
+        var selected = answer.selected.slice();
+        if (answer.custom) { selected.push(answer.custom); }
+        return { id: answer.id, selected: selected };
+      });
+      api("/api/answer", { answers: answers }).then(refresh).catch(showError);
+    });
+  }
+
+  function addButton(text, klass, onClick) {
+    var button = document.createElement("button");
+    button.className = "button " + klass;
+    button.textContent = text;
+    button.addEventListener("click", onClick);
+    bannerActions.appendChild(button);
+  }
+
+  function showError(error) {
+    hint.textContent = String(error.message || error);
+  }
+
+  function refresh() {
+    return api("/api/state").then(function (value) {
+      applyState(value);
+    }).catch(showError);
+  }
+
+  function applyState(value) {
+    state = value;
+    streaming = value.streaming || "";
+    var running = !!value.running;
+    if (wasRunning && !running && hidden && !notifiedFinish) {
+      notify("実行が完了しました", "rdsh の応答が届きました");
+      notifiedFinish = true;
+    }
+    if (running) { notifiedFinish = false; }
+    wasRunning = running;
+    render();
+  }
+
+  function notify(title, body) {
+    if (typeof Notification === "undefined" || Notification.permission !== "granted") {
+      return;
+    }
+    try {
+      new Notification(title, { body: body });
+    } catch (error) { /* a blocked notification must not break the UI */ }
+  }
+
+  function askPermission() {
+    if (permissionAsked || typeof Notification === "undefined") { return; }
+    permissionAsked = true;
+    if (Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }
+
+  // ---- actions -----------------------------------------------------------
+
+  groupsBox.addEventListener("click", function (event) {
+    var button = event.target.closest("button.session");
+    if (!button) { return; }
+    var session = button.getAttribute("data-session");
+    if (!session || (state && state.selected === session)) { return; }
+    api("/api/select", { sessionId: session }).then(refresh).catch(showError);
+  });
+
+  function send() {
+    var text = input.value.trim();
+    if (!text) { return; }
+    input.value = "";
+    api("/api/send", { text: text }).then(refresh).catch(showError);
+  }
+
+  input.addEventListener("keydown", function (event) {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      send();
+    }
+  });
+  sendButton.addEventListener("click", send);
+  cancelButton.addEventListener("click", function () {
+    api("/api/cancel", {}).then(refresh).catch(showError);
+  });
+  picker.addEventListener("change", function () {
+    var parts = picker.value.split("/");
+    if (parts.length < 2) { return; }
+    api("/api/model", { provider: parts[0], model: parts.slice(1).join("/") })
+      .then(refresh)
+      .catch(showError);
+  });
+
+  // The first click asks for notification permission, like the native client.
+  document.addEventListener("click", askPermission, { once: true });
+  document.addEventListener("visibilitychange", function () {
+    hidden = document.hidden;
+  });
+  hidden = document.hidden;
+
+  // ---- live stream -------------------------------------------------------
+
+  function connect() {
+    var source = new EventSource("/api/events?token=" + encodeURIComponent(TOKEN));
+    source.addEventListener("state", function (event) {
+      applyState(JSON.parse(event.data));
+    });
+    source.addEventListener("refreshed", function (event) {
+      applyState(JSON.parse(event.data));
+    });
+    source.addEventListener("delta", function (event) {
+      var data = JSON.parse(event.data);
+      streaming += data.text || "";
+      if (state) {
+        state.streaming = streaming;
+        state.running = true;
+      }
+      wasRunning = true;
+      render();
+    });
+    source.addEventListener("idle", function () {
+      streaming = "";
+      if (state) { state.streaming = ""; }
+      refresh();
+    });
+    source.addEventListener("pending", function (event) {
+      var pending = JSON.parse(event.data);
+      if (state) { state.pending = pending; }
+      render();
+      var title = pending.kind === "approval"
+        ? "承認待ちがあります"
+        : "質問が届きました";
+      notify(title, pending.reason || (pending.questions && pending.questions[0]
+        ? pending.questions[0].question
+        : ""));
+    });
+    source.addEventListener("dismissed", function () {
+      if (state) { state.pending = null; }
+      render();
+    });
+    source.addEventListener("note", function (event) {
+      var data = JSON.parse(event.data);
+      hint.textContent = data.text || "";
+    });
+    source.addEventListener("error", function () {
+      // EventSource reconnects by itself; the state frame re-syncs us.
+      hint.textContent = "イベント接続を再接続しています…";
+    });
+  }
+
+  refresh().then(connect);
+})();
+</script>
+</body>
+</html>

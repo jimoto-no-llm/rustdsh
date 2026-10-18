@@ -14,6 +14,7 @@ mod live;
 mod mux;
 mod rdsh;
 mod theme;
+mod web;
 
 use gpui::*;
 
@@ -22,9 +23,48 @@ fn main() {
 
     if args.iter().any(|arg| arg == "--help" || arg == "-h") {
         println!(
-            "rdsh-desktop {}\n\nUSAGE:\n  rdsh-desktop [--print-json] [--probe]\n\nOPTIONS:\n  --print-json  Collect one native rdsh snapshot and print it as JSON (no window)\n  --probe       Start the harness host, exchange the token and print the conversation list (no window)\n  -h, --help    Show this help",
-            env!("CARGO_PKG_VERSION")
+            "rdsh-desktop {}\n\nUSAGE:\n  rdsh-desktop [--serve-web [--port N]] [--print-json] [--probe]\n\nOPTIONS:\n  --serve-web   Serve the same harness session as a local web UI on 127.0.0.1 (no window)\n  --port N      Port for --serve-web (default {})\n  --print-json  Collect one native rdsh snapshot and print it as JSON (no window)\n  --probe       Start the harness host, exchange the token and print the conversation list (no window)\n  -h, --help    Show this help",
+            env!("CARGO_PKG_VERSION"),
+            web::DEFAULT_PORT
         );
+        return;
+    }
+
+    if args.iter().any(|arg| arg == "--serve-web") {
+        let port = args
+            .iter()
+            .position(|arg| arg == "--port")
+            .and_then(|index| args.get(index + 1))
+            .and_then(|value| value.parse::<u16>().ok())
+            .unwrap_or(web::DEFAULT_PORT);
+        if port == 0 {
+            eprintln!("[rdsh-desktop] --port needs a port in 1..=65535");
+            std::process::exit(2);
+        }
+        match web::WebServer::start(port) {
+            Ok(server) => {
+                println!(
+                    "[rdsh-desktop] ローカル Web UI (port {}): {}",
+                    server.port(),
+                    server.url()
+                );
+                println!(
+                    "[rdsh-desktop] 127.0.0.1 のみにバインドしています。上の URL をそのまま開いてください。"
+                );
+                println!(
+                    "[rdsh-desktop] URL の token は推測困難なアクセス用の値で、ハーネスの cookie やトークンはこのプロセスから外へ出ません。"
+                );
+                println!("[rdsh-desktop] 停止するには Ctrl+C を押してください。");
+                if let Err(error) = server.serve() {
+                    eprintln!("[rdsh-desktop] serve-web failed: {error:#}");
+                    std::process::exit(1);
+                }
+            }
+            Err(error) => {
+                eprintln!("[rdsh-desktop] serve-web failed: {error:#}");
+                std::process::exit(1);
+            }
+        }
         return;
     }
 

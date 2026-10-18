@@ -74,6 +74,24 @@ pinned revision):
 - Model changes go through session/selectModel, so the host keeps them for the
   conversation and the chip and header update immediately.
 
+## Web UI
+
+The same experience is reachable from a browser, with no Node and no build step:
+
+~~~sh
+rdsh-desktop --serve-web --port 8790
+~~~
+
+It binds 127.0.0.1 only, prints a URL carrying a random token, and rejects
+requests without that token. The page shows project groups, the conversation,
+streaming text, tool and reasoning rows, the model chip and pending approvals or
+questions. Live updates arrive over Server-Sent Events, and the page raises
+browser notifications when an approval or question arrives, and when a run
+finishes while the tab is hidden. The harness cookie never leaves the process.
+
+Endpoints: /api/state, /api/events (SSE), /api/select, /api/send, /api/cancel,
+/api/model, /api/approve, /api/answer.
+
 ## Following upstream dsh updates
 
 The app does not pin a harness version. It resolves the launcher at startup,

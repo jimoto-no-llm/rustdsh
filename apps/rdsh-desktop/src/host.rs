@@ -51,15 +51,33 @@ impl Host {
     /// Try the running candidates in order and mint a cookie for the first hit.
     pub fn attach() -> Option<Self> {
         let secret = crate::cookies::load_secret()?;
+        let mut rejected_cache = false;
         for origin in candidate_origins() {
             if !alive(&origin) {
                 continue;
             }
             let authority = origin.strip_prefix("http://")?.to_string();
             let (name, value) = crate::cookies::cookie_for(&secret, &authority);
+            // A recorded host may belong to another harness home, in which case
+            // our signed cookie is refused. Never trust a candidate that does not
+            // accept the cookie we can mint: drop the stale cache and move on.
+            if !accepts_cookie(&origin, &format!("{name}={value}")) {
+                if origin == cached_origin().unwrap_or_default() {
+                    // The cache points at a host we cannot use; drop it so the
+                    // next launch goes straight to a host we can talk to.
+                    if let Ok(dir) = cache_dir() {
+                        let _ = std::fs::remove_file(dir.join("host.json"));
+                    }
+                    rejected_cache = true;
+                }
+                continue;
+            }
             let (binary, version) = resolve_launcher()
                 .map(|(binary, version)| (binary, version))
                 .unwrap_or_else(|_| (std::path::PathBuf::new(), "unknown".to_string()));
+            if rejected_cache {
+                log::info!("discarded a cached host that refused our cookie");
+            }
             return Some(Self {
                 url: origin.clone(),
                 origin,
@@ -203,6 +221,25 @@ fn write_cache(url: &str, origin: &str, token: &str, pid: u32) -> Result<()> {
         let _ = fs::set_permissions(&path, fs::Permissions::from_mode(0o600));
     }
     Ok(())
+}
+
+fn cached_origin() -> Option<String> {
+    read_cache().map(|cached| cached.origin)
+}
+
+/// The host must accept a unary call with the cookie we minted, otherwise it
+/// belongs to another harness home and is useless to us.
+fn accepts_cookie(origin: &str, cookie: &str) -> bool {
+    let request = serde_json::json!({
+        "type": "client-request",
+        "rpcId": "rdsh-desktop-attach-check",
+        "method": "session/list",
+        "payload": { "args": { "_request": {} } }
+    });
+    match crate::http::post_json(origin, "/api/session/list", cookie, &request.to_string()) {
+        Ok(response) => response.status < 400,
+        Err(_) => false,
+    }
 }
 
 /// Origins to try, cheapest first: explicit override, cached host, user service.
