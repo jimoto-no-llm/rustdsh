@@ -23,6 +23,7 @@ cargo test --release
 cargo test --release --example benchmark_extended
 cargo test --release --example benchmark_models
 node --test tests/model_benchmark/fence.test.mjs
+node --test tests/plugin-catalog.test.mjs   # catalog vs plugins/install.sh
 sh tests/regress.sh
 # Installer or release packaging changes (containers, offline file:// base):
 tests/install-isolated.sh --source local

@@ -13,6 +13,33 @@
   `Install recommended plugins? [Y=profile defaults/n/a=all/s=select individually]`;
   without a terminal the per-profile defaults apply.
 
+### Provision an existing profile from the binary (`rdsh plugins`)
+
+`./plugins/install.sh` needs the checkout, and nothing calls it by itself: a
+release archive carries the `rdsh` binary alone. Upgrading therefore leaves
+`$DSH_HOME/profiles/<profile>/package.json` untouched, and the profile keeps
+whatever was attached by hand. The binary carries the same essential tier
+(`src/plugin_catalog.json`, compiled in) and can report and close that gap:
+
+```sh
+rdsh plugins status                      # essential and recommended state, read-only
+rdsh plugins status --profile web --json # machine-readable (schema 1)
+rdsh plugins install                     # attach what the profile is missing
+rdsh plugins install --profile web       # web/desktop defaults also add the starter set
+rdsh plugins install --recommended=all   # every recommended plugin
+rdsh plugins install --recommended=none  # essential tier only
+rdsh plugins install --no-bundled        # no checkout: the upstream tools only
+rdsh plugins install --plugins-dir <checkout>  # or set RDSH_PLUGINS_DIR
+```
+
+Attaching goes through the same `dsh plugin --profile <name> add <spec>` the
+installer uses (`RDSH_DSH_BIN` overrides the CLI), so the result is identical.
+Bundled plugins are resolved from the checkout and an absent checkout is
+reported rather than skipped quietly. `rdsh doctor` prints one line per profile
+whose essential tier is incomplete, `--profile desktop` forwards to
+`rdsh desktop install`, and `tests/plugin-catalog.test.mjs` fails whenever this
+catalog and `plugins/install.sh` disagree.
+
 ### Starter set (on by default for web and desktop)
 
 A newcomer who arrives from Codex or Claude Code should get a capable setup

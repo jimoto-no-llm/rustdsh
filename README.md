@@ -222,12 +222,40 @@ rdsh doctor                         # check health of dsh, environment, and path
 rdsh doctor --json                  # read-only metadata for scripts; no DSH/Node launch
 rdsh profiles / rdsh skills         # list available profiles and skills
 rdsh desktop status                 # detect the DeepSeek Harness Desktop app and profile
+rdsh plugins status                 # essential plugins a profile is still missing
+rdsh plugins install --profile web  # attach them after an upgrade
 rdsh bench --n 5                    # benchmark startup speed between rdsh and dsh
 ```
 
 On Windows, compressed session histories are not opened until rdsh can reject
 parent junctions safely; `sessions --tokens` may omit those histories and its
 totals are inexact.
+
+### Plugin provisioning (`rdsh plugins`)
+
+The essential plugin tier (the upstream tools absent from `dsh-base` plus the
+bundled rdsh plugins) only lived in `plugins/install.sh`, and nothing runs that
+script by itself: upgrading the binary leaves the profile manifest untouched,
+so an install can miss every essential package without any signal. The same
+catalog is compiled into the binary, so a release install can see and close the
+gap without the checkout:
+
+```sh
+rdsh plugins status                      # read-only state per package, plus the fix
+rdsh plugins status --profile web --json # schema 1 for scripts and dashboards
+rdsh plugins install                     # attach what the profile is missing
+rdsh plugins install --profile web       # web/desktop defaults also add the starter set
+rdsh plugins install --recommended=none  # the essential tier only
+rdsh plugins install --no-bundled        # no checkout: the upstream tools only
+rdsh plugins install --plugins-dir <checkout>  # or export RDSH_PLUGINS_DIR
+```
+
+Packages go through `dsh plugin --profile <name> add <spec>` (`RDSH_DSH_BIN`
+overrides the CLI), exactly as the checkout installer does. Bundled plugins are
+resolved from the checkout, and an absent checkout is reported instead of being
+skipped quietly. `rdsh doctor` prints the same gap for every initialized
+profile, and `--profile desktop` forwards to `rdsh desktop install`. See
+[plugins/recommended.md](plugins/recommended.md) for the tiers and the ids.
 
 ### Credential sharing with rdsh auth
 

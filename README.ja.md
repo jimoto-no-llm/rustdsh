@@ -213,11 +213,39 @@ rdsh compact ./s.jsonl              # セッション JSONL を圧縮（元フ�
 rdsh doctor                         # 本家 dsh、環境変数、パスなどの健全性診断
 rdsh profiles / rdsh skills         # 利用可能なプロファイル・スキル一覧
 rdsh desktop status                 # DeepSeek Harness Desktop アプリとプロファイルの検出
+rdsh plugins status                 # プロファイルに不足している必須プラグインの表示
+rdsh plugins install --profile web  # アップグレード後に必須プラグインを補完
 rdsh bench --n 5                    # rdsh と本家 dsh の起動速度比較
 ```
 
 Windows では親ジャンクションを安全に拒否する読み込み処理が用意できるまで、圧縮履歴を開きません。
 そのため、`sessions --tokens` の合計には一部の履歴が含まれず、正確な値にはなりません。
+
+### プラグインの補完（`rdsh plugins`）
+
+必須プラグインの一覧は `plugins/install.sh` にしか無く、このスクリプトを自動で
+呼ぶ経路もありません。そのためバイナリを更新しても
+`$DSH_HOME/profiles/<profile>/package.json` は書き換わらず、必須プラグインが
+欠けたまま気づけない状態でした。同じカタログをバイナリに同梱しているので、
+チェックアウト無しでも不足を確認して1コマンドで補完できます。
+
+```sh
+rdsh plugins status                      # 読み取り専用で各パッケージの状態と修正コマンドを表示
+rdsh plugins status --profile web --json # スクリプト向け（schema 1）
+rdsh plugins install                     # 不足しているプラグインを追加
+rdsh plugins install --profile web       # web/desktop はスターターセットも追加
+rdsh plugins install --recommended=none  # 必須ティアのみ
+rdsh plugins install --no-bundled        # チェックアウト無しで上流パッケージのみ
+rdsh plugins install --plugins-dir <checkout>  # または RDSH_PLUGINS_DIR を設定
+```
+
+追加はチェックアウト側のインストーラと同じ
+`dsh plugin --profile <name> add <spec>` 経由です（CLI は `RDSH_DSH_BIN` で
+差し替え可）。同梱プラグインはチェックアウトから解決し、見つからない場合は
+黙って省略せず報告します。`rdsh doctor` は必須ティアが不足している
+プロファイルごとに1行表示し、`--profile desktop` は
+`rdsh desktop install` に転送します。ティアと id の一覧は
+[plugins/recommended.md](plugins/recommended.md) を参照してください。
 
 ### 選択した認証情報だけを共有する（rdsh auth）
 
