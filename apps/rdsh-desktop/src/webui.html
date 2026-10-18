@@ -273,6 +273,12 @@
   var hidden = false;
   var notifiedFinish = false;
   var permissionAsked = false;
+  // What the user has picked and typed for the pending question. The worker
+  // publishes a full state frame every 250 ms while a question is open, so the
+  // banner is rebuilt constantly; keeping the answers here (keyed by call id)
+  // means a rebuild never discards a half-finished answer.
+  var answerDrafts = {};
+  var answerDraftsCall = "";
 
   var el = function (id) { return document.getElementById(id); };
   var timeline = el("timeline");
@@ -461,13 +467,22 @@
     bannerTitle.textContent = "質問";
     bannerBody.textContent = "";
     var questions = pending.questions || [];
+    // A new question set starts from empty drafts; re-rendering keeps them.
+    if (answerDraftsCall !== (pending.callId || "")) {
+      answerDraftsCall = pending.callId || "";
+      answerDrafts = {};
+    }
     questions.forEach(function (question) {
       var block = document.createElement("div");
       block.style.marginBottom = "6px";
       var label = document.createElement("div");
       label.textContent = (question.header ? "[" + question.header + "] " : "") + (question.question || "");
       block.appendChild(label);
-      var state_ = { id: question.id, selected: [], custom: "" };
+      var draft = answerDrafts[question.id];
+      if (!draft) {
+        draft = { id: question.id, selected: [], custom: "" };
+        answerDrafts[question.id] = draft;
+      }
       (question.options || []).forEach(function (option) {
         var choice = document.createElement("label");
         choice.style.display = "block";
@@ -476,13 +491,14 @@
         box.type = question.multiSelect ? "checkbox" : "radio";
         box.name = "q-" + question.id;
         box.value = option.label;
+        box.checked = draft.selected.indexOf(option.label) >= 0;
         box.addEventListener("change", function () {
           if (question.multiSelect) {
-            state_.selected = Array.prototype.slice
+            draft.selected = Array.prototype.slice
               .call(block.querySelectorAll("input:checked"))
               .map(function (node) { return node.value; });
           } else {
-            state_.selected = [option.label];
+            draft.selected = [option.label];
           }
         });
         choice.appendChild(box);
@@ -498,20 +514,20 @@
         custom.style.marginTop = "4px";
         custom.style.font = "inherit";
         custom.style.fontSize = "13px";
+        custom.value = draft.custom;
         custom.addEventListener("input", function () {
-          state_.custom = custom.value;
+          draft.custom = custom.value;
         });
         block.appendChild(custom);
       }
       bannerBody.appendChild(block);
-      pending.answers = pending.answers || [];
-      pending.answers.push(state_);
     });
     addButton("回答", "primary", function () {
-      var answers = (pending.answers || []).map(function (answer) {
-        var selected = answer.selected.slice();
-        if (answer.custom) { selected.push(answer.custom); }
-        return { id: answer.id, selected: selected };
+      var answers = questions.map(function (question) {
+        var draft = answerDrafts[question.id] || { selected: [], custom: "" };
+        var selected = draft.selected.slice();
+        if (draft.custom) { selected.push(draft.custom); }
+        return { id: question.id, selected: selected };
       });
       api("/api/answer", { answers: answers }).then(refresh).catch(showError);
     });

@@ -456,22 +456,30 @@ impl WebState {
     /// The whole page state as one JSON document, with the live pending and
     /// streaming values merged over the last harness snapshot.
     pub fn state_json(&self) -> Value {
+        let view = self.view();
         let guard = self.snapshot.lock().unwrap_or_else(|poison| poison.into_inner());
         match guard.as_ref() {
-            Some(snapshot) => merge_view(snapshot, &self.view()),
-            None => json!({
-                "status": "ハーネスに接続しています…",
-                "connecting": true,
-                "groups": [],
-                "selected": null,
-                "messages": [],
-                "currentModel": null,
-                "modelGroups": [],
-                "running": false,
-                "streaming": "",
-                "pending": null,
-                "notes": [],
-            }),
+            Some(snapshot) => merge_view(snapshot, &view),
+            None => {
+                // No snapshot yet: the worker is either still connecting or it
+                // stopped after a connection failure. Merge the live view over
+                // the placeholder anyway so a recorded error note reaches the
+                // page instead of an endless "connecting" message.
+                let placeholder = json!({
+                    "status": "ハーネスに接続しています…",
+                    "connecting": true,
+                    "groups": [],
+                    "selected": null,
+                    "messages": [],
+                    "currentModel": null,
+                    "modelGroups": [],
+                    "running": false,
+                    "streaming": "",
+                    "pending": null,
+                    "notes": [],
+                });
+                merge_view(&placeholder, &view)
+            }
         }
     }
 
@@ -851,6 +859,7 @@ fn run_worker(state: Arc<WebState>, commands: Receiver<WebCommand>) {
     state.set_snapshot(chat_snapshot(&chat, &state));
 
     let mut last_publish = Instant::now() - WORKER_TICK;
+    let mut turn_end = TurnEnd::default();
     loop {
         // Commands first so a click is not delayed by a tick.
         while let Ok(command) = commands.try_recv() {
@@ -858,7 +867,18 @@ fn run_worker(state: Arc<WebState>, commands: Receiver<WebCommand>) {
         }
         // Live events: deltas, pending decisions and connection notes.
         while let Ok(event) = live_rx.try_recv() {
+            let answer_finished = turn_end.observe(&event);
             apply_event(&event, &state);
+            if answer_finished {
+                // The streamed answer is complete, but the snapshot the workers
+                // publish is rebuilt from the conversation loaded when the
+                // prompt was sent. Re-read it now so the finished response
+                // replaces the live buffer that was just cleared instead of
+                // disappearing until the next action.
+                let _ = chat.load_conversation();
+                state.set_snapshot(chat_snapshot(&chat, &state));
+                state.publish("state", &state.state_json());
+            }
         }
         if last_publish.elapsed() >= WORKER_TICK {
             state.set_snapshot(chat_snapshot(&chat, &state));
@@ -981,6 +1001,35 @@ fn run_work(
         state.note(message.clone());
     }
     result
+}
+
+/// Watches for the end of a streamed answer so the worker can pull the durable
+/// timeline before the live buffer is dropped.
+///
+/// `Idle` also arrives when the followed conversation stream reconnects, so the
+/// reload is tied to a streamed answer having been seen: otherwise a flapping
+/// stream would re-read the conversation on every reconnect.
+#[derive(Default)]
+struct TurnEnd {
+    streamed: bool,
+}
+
+impl TurnEnd {
+    /// Feeds one live event. True means a streamed answer just finished, so the
+    /// worker must re-read the open conversation.
+    fn observe(&mut self, event: &LiveEvent) -> bool {
+        match event {
+            LiveEvent::Delta(_) => {
+                self.streamed = true;
+                false
+            }
+            LiveEvent::Idle if self.streamed => {
+                self.streamed = false;
+                true
+            }
+            _ => false,
+        }
+    }
 }
 
 /// Applies one live event to the shared state and broadcasts it.
@@ -1534,6 +1583,39 @@ mod tests {
     }
 
     #[test]
+    fn the_connecting_placeholder_shows_a_recorded_connection_error() {
+        let state = WebState::default();
+        state.note("ハーネスに接続できません: connection refused".to_string());
+        // The worker stops after recording the failure, so this placeholder is
+        // the only state the page ever sees. The note must not be dropped.
+        let value = state.state_json();
+        assert_eq!(value["connecting"], true);
+        assert_eq!(
+            value["notes"][0],
+            "ハーネスに接続できません: connection refused"
+        );
+        assert_eq!(value["running"], false);
+    }
+
+    #[test]
+    fn a_finished_stream_asks_for_exactly_one_conversation_reload() {
+        let mut turn_end = TurnEnd::default();
+        // Nothing streamed yet: an idle frame (a stream reconnect) is not a
+        // finished answer and must not trigger a reload.
+        assert!(!turn_end.observe(&LiveEvent::Idle));
+        assert!(!turn_end.observe(&LiveEvent::Activity));
+        assert!(!turn_end.observe(&LiveEvent::Note("再接続します".to_string())));
+        // The streamed answer ends: one reload, even if a second idle frame
+        // follows from the conversation stream closing.
+        assert!(!turn_end.observe(&LiveEvent::Delta("答え".to_string())));
+        assert!(turn_end.observe(&LiveEvent::Idle));
+        assert!(!turn_end.observe(&LiveEvent::Idle));
+        // A later answer is reported again.
+        assert!(!turn_end.observe(&LiveEvent::Delta("次".to_string())));
+        assert!(turn_end.observe(&LiveEvent::Idle));
+    }
+
+    #[test]
     fn the_view_is_merged_over_the_published_snapshot() {
         let state = WebState::default();
         let snapshot = json!({
@@ -1623,6 +1705,17 @@ mod tests {
         assert!(!PAGE.contains("https://"));
         // The notification hook the task asks for is present.
         assert!(PAGE.contains("Notification"));
+    }
+
+    #[test]
+    fn the_page_keeps_question_answers_out_of_the_state_snapshot() {
+        // The worker publishes a full state frame every 250 ms while a question
+        // is open, so the answers must live outside the snapshot the banner is
+        // rebuilt from; otherwise every re-render discards them.
+        assert!(PAGE.contains("var answerDrafts = {};"));
+        assert!(PAGE.contains("box.checked = draft.selected.indexOf(option.label) >= 0;"));
+        assert!(PAGE.contains("custom.value = draft.custom;"));
+        assert!(!PAGE.contains("pending.answers"));
     }
 
     #[test]
