@@ -93,6 +93,8 @@ enum Update {
     Step(String),
     Titles(Vec<(String, String)>),
     Ready(Box<Chat>),
+    /// Newest published harness version, when it is ahead of the active one.
+    Update(String),
     Failed(String),
 }
 
@@ -1141,6 +1143,8 @@ pub struct DesktopApp {
     sidebar_scroll: ScrollHandle,
     timeline_scroll: ScrollHandle,
     model_scroll: ScrollHandle,
+    /// Newest published harness version when an upgrade exists.
+    update: Option<String>,
 }
 
 impl DesktopApp {
@@ -1174,7 +1178,21 @@ impl DesktopApp {
                 .map(|session| session.id.clone())
                 .collect();
             let titles = update_tx.clone();
+            let active_version = chat.host_version().to_string();
             let _ = update_tx.send(Update::Ready(Box::new(chat)));
+            // Update awareness mirrors rustdsh's own update notification: one
+            // background registry query per launch, never blocking the window.
+            if std::env::var("RDSH_DESKTOP_UPDATE_CHECK").as_deref() != Ok("0") {
+                let updates = update_tx.clone();
+                let active_version = active_version.clone();
+                std::thread::spawn(move || {
+                    if let Some(newest) = crate::host::newest_published() {
+                        if crate::host::compare_versions(&newest, &active_version).is_gt() {
+                            let _ = updates.send(Update::Update(newest));
+                        }
+                    }
+                });
+            }
             if !pending.is_empty() {
                 std::thread::spawn(move || {
                     let queue = std::sync::Arc::new(std::sync::Mutex::new(pending));
@@ -1239,6 +1257,7 @@ impl DesktopApp {
             sidebar_scroll: ScrollHandle::new(),
             timeline_scroll: ScrollHandle::new(),
             model_scroll: ScrollHandle::new(),
+            update: None,
         }
     }
 
@@ -1348,6 +1367,12 @@ fn poll(
                         for (id, title) in batch {
                             app.titles.insert(id, title);
                         }
+                        cx.notify();
+                    });
+                }
+                Ok(Update::Update(newest)) => {
+                    let _ = this.update(cx, |app, cx| {
+                        app.update = Some(newest);
                         cx.notify();
                     });
                 }
@@ -1704,7 +1729,20 @@ impl Render for DesktopApp {
                             .text_size(theme::micro_size())
                             .text_color(theme::tertiary())
                             .child(status),
-                    ),
+                    )
+                    .when(self.update.is_some(), |element| {
+                        let newest = self.update.clone().unwrap_or_default();
+                        element.child(
+                            div()
+                                .px(px(6.))
+                                .py(px(1.))
+                                .rounded(theme::radius_sm())
+                                .bg(rgb(0xe8f0ff))
+                                .text_size(theme::micro_size())
+                                .text_color(theme::accent())
+                                .child(format!("dsh {newest} が利用可能")),
+                        )
+                    }),
             );
 
         let header = div()
