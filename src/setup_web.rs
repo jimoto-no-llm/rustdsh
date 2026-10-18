@@ -123,6 +123,13 @@ fn handle(
         match (req.method.as_str(), req.target.as_str()) {
             ("GET", "/") => (200, "text/html; charset=utf-8", Cow::Borrowed(HTML)),
             ("GET", "/icon.svg") => (200, "image/svg+xml", Cow::Borrowed(ICON)),
+            ("GET", "/rdsh-ui-controls.css") => (
+                200,
+                "text/css; charset=utf-8",
+                Cow::Borrowed(include_str!(
+                    "../plugins/rdsh-settings/assets/ui-controls.css"
+                )),
+            ),
             ("GET", "/api/status") if !req.authorized(token) => (
                 401,
                 "application/json",

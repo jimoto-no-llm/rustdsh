@@ -1,0 +1,14 @@
+{
+  "result": "PASS",
+  "source": "cwd514/dsh-intelligent-ui 0.3.1",
+  "scope": "real upstream renderer + rdsh settings stylesheet loader; synthetic data; no model call or production profile",
+  "checks": [
+    "light/dark",
+    "desktop/mobile",
+    "before/after",
+    "ArrowRight updates range and calculator",
+    "visible keyboard focus",
+    "scrolling remains available",
+    "no overflow or page errors"
+  ]
+}

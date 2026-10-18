@@ -260,6 +260,15 @@ window.__ModuleLoader__.load({
     return {
       inject: ['slots'],
       apply(ctx) {
+        // Global controls load before the settings section is ever opened.
+        if (typeof document !== 'undefined') ctx.effect(() => {
+          const link = document.createElement('link');
+          link.rel = 'stylesheet';
+          link.href = '/rdsh-ui-controls.css';
+          link.dataset.rdshControls = 'true';
+          document.head.append(link);
+          return () => link.remove();
+        });
         ctx.slots.inject('settings.section', () => ctx.slots.register({
           name: 'settings.section',
           id: 'rdsh',

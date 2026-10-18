@@ -77,8 +77,8 @@ test('plugin security boundary and settings preservation', async (t) => {
   const initialSettings = await readFile(settingsFile, 'utf8');
   const initialContext = await readFile(contextFile, 'utf8');
 
-  await t.test('all ten routes reject before body consumption or side effects', async () => {
-    assert.equal(routes.size, 10);
+  await t.test('all routes reject before body consumption or side effects', async () => {
+    assert.equal(routes.size, 11);
     for (const rejection of [401, 403]) {
       for (const path of routes.keys()) {
         for (const method of ['GET', 'HEAD', 'POST']) {
@@ -119,6 +119,13 @@ test('plugin security boundary and settings preservation', async (t) => {
     assert.equal(icon.status, 200); assert.deepEqual(icon.body, supplied);
     assert.equal((await request('/api/rdsh-discord/icon', { method: 'HEAD' })).body, undefined);
     assert.equal((await request('/api/rdsh-discord/icon', { method: 'POST' })).status, 405);
+  });
+  await t.test('shared controls stylesheet is authenticated and supports HEAD', async () => {
+    const supplied = await readFile(new URL('../plugins/rdsh-settings/assets/ui-controls.css', import.meta.url));
+    const css = await request('/rdsh-ui-controls.css');
+    assert.equal(css.status, 200); assert.deepEqual(css.body, supplied);
+    assert.equal((await request('/rdsh-ui-controls.css', { method: 'HEAD' })).body, undefined);
+    assert.equal((await request('/rdsh-ui-controls.css', { method: 'POST' })).status, 405);
   });
 
   await t.test('round-trip and partial saves preserve keys outside the form', async () => {

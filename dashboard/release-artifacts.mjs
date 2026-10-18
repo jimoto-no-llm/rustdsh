@@ -278,12 +278,16 @@ export async function captureRelease(
     for (const file of (await fs.readdir(dash)).sort())
       if (
         file.endsWith(".mjs") ||
-        ["package.json", "package-lock.json"].includes(file)
+        ["package.json", "package-lock.json", "ui.html"].includes(file)
       )
         inputs.push([path.join(dash, file), "adapter/dashboard/" + file]);
     await tree(
       path.join(dash, "node_modules"),
       "adapter/dashboard/node_modules",
+    );
+    await copy(
+      path.join(adapter, "plugins/rdsh-settings/assets/ui-controls.css"),
+      "adapter/plugins/rdsh-settings/assets/ui-controls.css",
     );
     for (const name of ["rdsh-budget-guard", "rdsh-release-probe"])
       await tree(

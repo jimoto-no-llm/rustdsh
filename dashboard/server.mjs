@@ -512,6 +512,7 @@ export async function startDashboard(options) {
         kind === "project" &&
         req.method === "GET" &&
         (route === "/" ||
+          route === "/rdsh-ui-controls.css" ||
           route === "/app.mjs" ||
           route === "/human-annotations-ui.mjs" ||
           route === "/annotation-identifiers.mjs" ||
@@ -609,6 +610,10 @@ export async function startDashboard(options) {
       if (req.method === "GET" && route === "/") {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         return res.end(await fs.readFile(path.join(here, "ui.html")));
+      }
+      if (req.method === "GET" && route === "/rdsh-ui-controls.css") {
+        res.writeHead(200, { "content-type": "text/css; charset=utf-8" });
+        return res.end(await fs.readFile(path.join(here, "../plugins/rdsh-settings/assets/ui-controls.css")));
       }
       if (
         req.method === "GET" &&

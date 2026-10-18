@@ -139,6 +139,10 @@ test("project state, HTTP/stdio MCP, subscriptions, answers, and auth work toget
     "content-type": "application/json",
   };
   assert.equal((await fetch(dashboard.localUrl + "api/state")).status, 401);
+  const controls = await fetch(dashboard.localUrl + "rdsh-ui-controls.css");
+  assert.equal(controls.status, 200);
+  assert.equal(controls.headers.get("content-type"), "text/css; charset=utf-8");
+  assert.equal(await controls.text(), await fs.readFile(new URL("../../plugins/rdsh-settings/assets/ui-controls.css", import.meta.url), "utf8"));
   const favicon = await fetch(dashboard.localUrl + "favicon.ico");
   assert.equal(favicon.status, 200);
   assert.equal(favicon.headers.get("content-type"), "image/x-icon");

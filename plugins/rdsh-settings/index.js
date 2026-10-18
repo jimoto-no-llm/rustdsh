@@ -303,6 +303,21 @@ function authorize(ctx, req, res) {
 
 function registerWeb(ctx, presence) {
   return ctx.effect(() => {
+    const offControls = ctx.webServer.register({
+      kind: 'exact', path: '/rdsh-ui-controls.css',
+      handler: async (req, res) => {
+        if (!authorize(ctx, req, res)) return;
+        if (!['GET', 'HEAD'].includes(req.method)) {
+          json(res, 405, { ok: false, error: 'method-not-allowed' }); return;
+        }
+        try {
+          const css = await readFile(new URL('./assets/ui-controls.css', import.meta.url));
+          res.writeHead(200, { 'content-type': 'text/css; charset=utf-8',
+            'content-length': css.length, 'x-content-type-options': 'nosniff' });
+          res.end(req.method === 'HEAD' ? undefined : css);
+        } catch { json(res, 500, { ok: false, error: 'stylesheet-unavailable' }); }
+      },
+    });
     const offDiscordIcon = ctx.webServer.register({
       kind: 'exact', path: '/api/rdsh-discord/icon',
       handler: async (req, res) => {
@@ -420,7 +435,7 @@ function registerWeb(ctx, presence) {
       },
     });
     return () => {
-      for (const off of [offDiscordIcon, offDiscord, offGet, offPost, offGetSettings, offPostSettings]) {
+      for (const off of [offControls, offDiscordIcon, offDiscord, offGet, offPost, offGetSettings, offPostSettings]) {
         if (typeof off === 'function') off();
       }
     };

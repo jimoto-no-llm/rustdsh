@@ -139,6 +139,13 @@ fn handle(mut s: std::net::TcpStream, token: &str, port: u16) -> anyhow::Result<
     let (status, ctype, payload): (u16, &str, Cow<'_, str>) = match (method, path) {
         ("GET", "/") => (200, "text/html; charset=utf-8", Cow::Borrowed(UI)),
         ("GET", "/icon.svg") => (200, "image/svg+xml", Cow::Borrowed(ICON)),
+        ("GET", "/rdsh-ui-controls.css") => (
+            200,
+            "text/css; charset=utf-8",
+            Cow::Borrowed(include_str!(
+                "../plugins/rdsh-settings/assets/ui-controls.css"
+            )),
+        ),
         ("GET", "/api/version") => (200, "application/json", Cow::Borrowed(VERSION_JSON)),
         ("GET", "/api/doctor") => (200, "application/json", Cow::Owned(doctor_json())),
         ("POST", "/api/tokens") => {
