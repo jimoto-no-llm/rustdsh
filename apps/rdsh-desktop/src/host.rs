@@ -435,6 +435,41 @@ pub fn newest_published() -> Option<String> {
     })
 }
 
+/// Cache file shared by the desktop app and the local Web UI, so a launch can
+/// show the update notice immediately instead of waiting on the registry.
+pub fn update_cache_path() -> Option<std::path::PathBuf> {
+    let base = std::env::var_os("XDG_CACHE_HOME")
+        .map(std::path::PathBuf::from)
+        .or_else(|| {
+            std::env::var_os("HOME").map(|home| std::path::PathBuf::from(home).join(".cache"))
+        })?;
+    Some(base.join("rdsh-desktop").join("update-check.json"))
+}
+
+/// Newest published version recorded by an earlier check.
+pub fn cached_newest_published() -> Option<String> {
+    let path = update_cache_path()?;
+    let text = std::fs::read_to_string(path).ok()?;
+    let value: serde_json::Value = serde_json::from_str(&text).ok()?;
+    let newest = value.get("newest")?.as_str()?.to_string();
+    (!newest.is_empty()).then_some(newest)
+}
+
+/// Record the newest published version for the other components.
+pub fn store_newest_published(newest: &str) -> Option<std::path::PathBuf> {
+    let path = update_cache_path()?;
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).ok()?;
+    }
+    let checked_at = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|value| value.as_millis() as u64)
+        .unwrap_or(0);
+    let body = serde_json::json!({ "checkedAt": checked_at, "newest": newest });
+    std::fs::write(&path, body.to_string()).ok()?;
+    Some(path)
+}
+
 /// A live host accepts TCP connections on its loopback port.
 ///
 /// The signed session cookie is sent to whatever answers here, so a candidate
