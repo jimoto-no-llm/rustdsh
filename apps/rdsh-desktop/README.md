@@ -75,6 +75,42 @@ pinned revision):
 - Model changes go through session/selectModel, so the host keeps them for the
   conversation and the chip and header update immediately.
 
+## Platforms
+
+The crate builds on Linux, macOS and Windows. The GPUI dependency is
+target-specific: Linux uses the Wayland feature set and needs the xkbcommon
+development libraries, while macOS and Windows use the default backend. The
+link-time helper in build.rs only runs on Linux, and the vendored xattr shim has
+a branch per platform.
+
+- Linux: install libxkbcommon-devel (Fedora) or libxkbcommon-dev (Debian) and a
+  Vulkan driver.
+- macOS: packaging/macos/Info.plist and bundle.sh create rdsh-desktop.app; copy
+  packaging/icon.icns into the bundle resources.
+- Windows: build the exe and point a Start-menu shortcut at it with
+  packaging/icon.ico; see packaging/windows/README.md.
+
+The CI workflow desktop.yml builds and tests the crate on all three platforms.
+
+## Keyboard and themes
+
+| Key | Action |
+| --- | --- |
+| Enter / Ctrl+Enter | Send the message |
+| Shift+Enter | Newline |
+| Esc | Clear the composer, or close the search filter |
+| Esc Esc (while running) | Stop the run |
+| Ctrl+K | Focus the composer |
+| Ctrl+N | New conversation |
+
+The sidebar has a search filter (title and project path) and each project row
+folds, archives and restores. The timeline loads older history on demand and
+keeps at most 400 messages in memory.
+
+Theme: `RDSH_DESKTOP_THEME=light|dark|system` or `--theme`; system follows the
+desktop appearance setting when it can be read. The window never shrinks below
+900x600.
+
 ## Sidebar projects
 
 The sidebar groups conversations by project. Each project header folds the

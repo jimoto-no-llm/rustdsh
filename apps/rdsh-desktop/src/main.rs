@@ -290,8 +290,10 @@ fn main() {
         ..Default::default()
     };
 
-    // Fail with a clear message instead of a panic when started outside a
-    // graphical session (for example from a service or a plain SSH shell).
+    // Linux reaches the window server through Wayland or X11, so a missing
+    // display is a configuration error worth naming. macOS and Windows always
+    // have a window server, so the check only applies there.
+    #[cfg(target_os = "linux")]
     if std::env::var_os("WAYLAND_DISPLAY").is_none() && std::env::var_os("DISPLAY").is_none() {
         eprintln!(
             "[rdsh-desktop] no graphical session: set WAYLAND_DISPLAY or DISPLAY, or use a headless mode such as --dump-ui"
