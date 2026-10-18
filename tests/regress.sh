@@ -540,3 +540,15 @@ if [ "${RDSH_REGRESS_SANDBOXED:-}" = 1 ] && [ -n "${RR_SANDBOX:-}" ] && [ "$HOME
 rm -rf $AB
 rm -rf $SB "$RG_TMP/rr-in.txt" "$RG_TMP/rr-out" "$RG_TMP/rr-err"
 echo "ALL PASS ($pass checks)"
+# --- the installer must not truncate the doctor report through a closed pipe ---
+# A closed pipe made the process abort (panic on EPIPE with panic=abort), so the
+# installer captures the report and slices it instead. Guard both sides.
+if [ -f install.sh ] && grep -q 'rdsh" doctor 2>&1 | head' install.sh; then
+  echo "FAIL(output): install.sh pipes doctor into head again"; exit 1
+fi
+mkdir -p "$RG_TMP/doctor"
+if "$BIN" doctor >"$RG_TMP/doctor/full.out" 2>"$RG_TMP/doctor/full.err"; then
+  ok "doctor survives a fully consumed report"
+else
+  echo "FAIL(output): doctor exited non-zero with its report fully consumed"; cat "$RG_TMP/doctor/full.err"; exit 1
+fi

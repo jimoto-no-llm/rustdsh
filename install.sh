@@ -735,7 +735,8 @@ if [ "$MODE" = as-dsh ]; then
   fi
 fi
 echo "--- rdsh doctor ---"
-"$PREFIX/rdsh" doctor 2>&1 | head -n 12 || true
+doctor_report=$("$PREFIX/rdsh" doctor 2>&1 || true)
+printf '%s\n' "$doctor_report" | sed -n '1,12p'
 if [ -f "./plugins/install.sh" ]; then
   echo "next: PROFILE=web ./plugins/install.sh adds the essential plugins and the beginner starter set (translation, subagents, sound, Git panel, visual answers)"
 fi
@@ -758,12 +759,14 @@ if printf '%s' "$desktop_status" | grep -q "desktop profile: .*(initialized)"; t
 fi
 # First run: at an interactive terminal (also when piped from curl, through
 # /dev/tty), open the browser setup screen; otherwise print the next step.
-if [ "$NO_SETUP" = 0 ] && [ -z "${CI:-}" ] && [ -t 1 ] && { [ -t 0 ] || { [ -r /dev/tty ] && [ -w /dev/tty ]; }; }   && [ "$MODE" != "restore" ] && [ -x "$PREFIX/rdsh" ]; then
+if [ "$NO_SETUP" = 0 ] && [ -z "${CI:-}" ] && [ -t 1 ] && { [ -t 0 ] || { [ -r /dev/tty ] && [ -w /dev/tty ]; }; } && { [ -n "${DISPLAY:-}" ] || [ -n "${WAYLAND_DISPLAY:-}" ]; } && [ "$MODE" != "restore" ] && [ -x "$PREFIX/rdsh" ]; then
   case "${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}" in
     ja*) echo "ブラウザでセットアップ画面を開きます。終わったら画面の「セットアップを終える」を押してください。" ;;
     *) echo "Opening the setup screen in your browser. Press \"Finish setup\" there when you are done." ;;
   esac
   if [ -t 0 ]; then "$PREFIX/rdsh" setup --web || true; else "$PREFIX/rdsh" setup --web < /dev/tty || true; fi
 else
-  echo "next: run '$PREFIX/rdsh setup --web' to connect a model in your browser (GPT subscription via OAuth needs no API key)"
+  echo "next: run '$PREFIX/rdsh setup --web' to connect a model in your browser"
+  echo "      no browser here (headless): forward the port, e.g. ssh -L 8080:127.0.0.1:8080 <host>, then open http://127.0.0.1:8080"
+  echo "      a GPT subscription via OAuth needs no API key. Re-run the installer without --no-setup to open the page automatically."
 fi
