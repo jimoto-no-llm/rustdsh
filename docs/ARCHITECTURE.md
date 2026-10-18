@@ -74,7 +74,7 @@ retains its 4096-item limit.
 | `guard.rs` | Stdin hook guard (`--deny` patterns and opt-in structured file policy) |
 | `auth.rs` | OAuth state detection (`provider_needs()`), credential import |
 | `setup_web.rs` + `setup.html` | First-run setup flow |
-| `websearch.rs` | SearXNG-backed web search |
+| `websearch.rs`, `websearch/ollama.rs` | SearXNG or explicitly selected Ollama Web Search API |
 | `ui.html` | Native status dashboard UI |
 | `rdsh_config.rs` | Unified settings, defaults, validation, legacy fallback |
 | `local_http.rs` | Local HTTP framing, trust checks, and per-launch token |

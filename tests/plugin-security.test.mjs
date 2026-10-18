@@ -31,6 +31,12 @@ childProcess.execFile = (...args) => {
     queueMicrotask(() => done(null, 'rdsh 0.0.0-test\n', ''));
     return new EventEmitter();
   }
+  // The banner reads the published dsh release with `npm view`; that is a
+  // registry read, not an update run, so it must never count as one.
+  if (rdshName === 'npm' && Array.isArray(args[1]) && args[1][0] === 'view') {
+    queueMicrotask(() => done(new Error('registry read disabled in tests'), '', ''));
+    return new EventEmitter();
+  }
   updateCalls++;
   queueMicrotask(() => done(null, "test updater", ""));
   return new EventEmitter();
@@ -158,9 +164,9 @@ test('plugin security boundary and settings preservation', async (t) => {
   const initialContext = await readFile(contextFile, "utf8");
 
   await t.test(
-    "all ten routes reject before body consumption or side effects",
+    "all eleven routes reject before body consumption or side effects",
     async () => {
-      assert.equal(routes.size, 10);
+      assert.equal(routes.size, 11);
       for (const rejection of [401, 403]) {
         for (const path of routes.keys()) {
           for (const method of ["GET", "HEAD", "POST"]) {

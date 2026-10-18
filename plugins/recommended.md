@@ -10,15 +10,28 @@
   the bundled rdsh settings UI, phone-width layout and answer guard.
 - **Recommended** — convenience plugins you decide on. With a terminal on
   stdin the installer lists them and asks
-  `Install recommended plugins? [Y/n/a=all/s=select individually]`; without a
-  terminal the historical per-profile defaults apply, so existing scripts and
-  CI are unchanged.
+  `Install recommended plugins? [Y=profile defaults/n/a=all/s=select individually]`;
+  without a terminal the per-profile defaults apply.
+
+### Starter set (on by default for web and desktop)
+
+A newcomer who arrives from Codex or Claude Code should get a capable setup
+without choosing anything. `PROFILE=web` and `PROFILE=desktop` therefore start
+with the **starter set** on: Japanese translation (`translation`), bounded
+exploration subagents (`subagents`), effect sounds and notifications (`sound`),
+the Git panel (`gitview`) and visual answers (`intelligent-ui`). Plugins that
+change a familiar default (`ui-comfort` replaces Enter-to-send, `easy-work`
+replaces the empty-chat preset picker) or need extra setup (`compute`) stay off.
+`headless` keeps the essential tier only, so CI and automation are unchanged.
+`--recommended=starter` selects the same set on any profile; `=0` on one
+variable (for example `INTELLIGENT_UI=0`) or `--recommended=none` turns it off.
 
 Choose a set explicitly (or for CI) with `--recommended`:
 
 | Value | Effect |
 | --- | --- |
-| *(unset)* | historical per-profile defaults (see the Default column below) |
+| *(unset)* | per-profile defaults: the starter set for web/desktop, nothing for others (see the Default column below) |
+| `starter` | the beginner starter set on any profile |
 | `all` | every recommended plugin |
 | `none` | essential plugins only |
 | `list` | print the catalog, essential tier first, then exit |
@@ -33,15 +46,16 @@ spec replaces the `TRANSLATION`, `COMPUTE`, `EASY_WORK`, `SUBAGENTS`,
 those two, even under `--recommended=all`.
 
 ```sh
-./plugins/install.sh                    # PROFILE=headless (default); historical defaults
-PROFILE=web ./plugins/install.sh        # + web defaults (translation, sound, gitview)
+./plugins/install.sh                    # PROFILE=headless (default); essential only
+PROFILE=web ./plugins/install.sh        # + the starter set (translation, subagents, sound, gitview, intelligent-ui)
 ./plugins/install.sh --recommended=list # catalog: essential first, then recommended
 ./plugins/install.sh --recommended=none # essential plugins only
 ./plugins/install.sh --recommended=all  # every recommended plugin
 ./plugins/install.sh --recommended=compute,gitview
 DRY_RUN=1 ./plugins/install.sh --recommended=all  # print the dsh plugin commands only
 PROFILE=web SOUND=0 GITVIEW=0 ./plugins/install.sh  # skip the default third-party Web UI plugins
-PROFILE=web INTELLIGENT_UI=1 ./plugins/install.sh    # add the opt-in visual answers
+PROFILE=web INTELLIGENT_UI=0 ./plugins/install.sh    # starter set without visual answers
+./plugins/install.sh --recommended=starter            # the starter set on another profile
 ```
 
 ### Essential plugins (always installed)
@@ -78,11 +92,11 @@ check its duplicate-ID behavior before migrating existing profiles.
 | `translation` | `rdsh-translation` | web, desktop | Japanese translation settings and preview |
 | `compute` | `rdsh-compute` | off | Web compute bridge (`rdsh features on compute`) |
 | `easy-work` | `rdsh-easy-work` | off | Guided file-organization workflow entry points |
-| `subagents` | `rdsh-subagent-optimizer` | off | Bounded exploration subagents |
+| `subagents` | `rdsh-subagent-optimizer` | web, desktop | Bounded exploration subagents |
 | `ui-comfort` | `rdsh-ui-comfort` | off | Deliberate Enter in the DSH Web chat: the composer sends on a second Enter within 1.5 s instead of the first, and the goal editor keeps Enter from committing the edit; both toggle live in the **rdsh 入力** settings section through `localStorage`. |
 | `sound` | `github:cwd514/dsh-sound-notifications` (MIT, (c) 2026 cwd514) | web, desktop | Effect sounds (Web Audio synthesis, no audio files) and desktop notifications for reply-done / approval-waiting / questions / errors / re-login. Zero dependencies, no build step. |
 | `gitview` | `github:yugapor/dsh-gitview` (MIT, (c) 2026 yugapor) | web, desktop | Git panel in the Web sidebar: working-tree changes, staging and commits, unified/side-by-side diffs, commit graph, branches, blame, reflog, and CI status. |
-| `intelligent-ui` | `github:cwd514/dsh-intelligent-ui` (MIT, (c) 2026 cwd514) | off | ChatGPT-style visual answers: the model calls the declarative `render_ui` tool and the plugin draws the view (tables, charts, comparisons, timelines, inputs, calculators; 15 block types, nesting up to 6 levels). A browser client plugin, so `PROFILE=web` is the intended target; opt in with `--recommended=intelligent-ui` or `INTELLIGENT_UI=1`. |
+| `intelligent-ui` | `github:cwd514/dsh-intelligent-ui` (MIT, (c) 2026 cwd514) | web, desktop | ChatGPT-style visual answers: the model calls the declarative `render_ui` tool and the plugin draws the view (tables, charts, comparisons, timelines, inputs, calculators; 15 block types, nesting up to 6 levels). A browser client plugin, so `PROFILE=web` is the intended target; skip it with `INTELLIGENT_UI=0`. |
 
 Notes:
 
@@ -98,10 +112,9 @@ Notes:
   (`127.0.0.1`/`localhost`/`https`) and the browser's notification
   permission; otherwise only the sounds play (see the upstream README).
 - `intelligent-ui` is a third-party Web client plugin fetched from upstream
-  at install time. Unlike `sound` and `gitview` it stays **off** by default, so
-  the non-interactive web/desktop set is unchanged; opt in with
-  `--recommended=intelligent-ui`, `INTELLIGENT_UI=1`, or the app's Plugins
-  page. It has no `features.*` veto in `rdsh.json`.
+  at install time. It is part of the web/desktop starter set; skip it with
+  `INTELLIGENT_UI=0` or `rdsh desktop install --no-intelligent-ui`. It has no
+  `features.*` veto in `rdsh.json`.
 - `ui-comfort` is a Web client plugin that deliberately replaces the stock
   Enter-to-send in the composer, so it stays **off** by default and never enters
   the web/desktop default set: opt in with `--recommended=ui-comfort` (or
@@ -144,7 +157,7 @@ authors.
 | [Smart-DSH](https://github.com/hikarioyama/Smart-DSH) by hikarioyama | MIT | Source of the phone-width layout bundled as `rdsh-mobile-ui` (the mobile rail of its `dsh-notify-push` browser bundle). Its Web Push notifications, Esc-to-stop, task hub and shared-HMR workaround are not bundled. |
 | [dsh-sound-notifications](https://github.com/cwd514/dsh-sound-notifications) by cwd514 | MIT | Recommended `sound` plugin: effect sounds and desktop notifications. Default on for web/desktop; skip with `--recommended=none`, `SOUND=0`, or `features.sound=false`. |
 | [dsh-gitview](https://github.com/yugapor/dsh-gitview) by yugapor | MIT | Recommended `gitview` plugin: sidebar Git panel. Default on for web/desktop; skip with `--recommended=none`, `GITVIEW=0`, or `features.gitview=false`. |
-| [dsh-intelligent-ui](https://github.com/cwd514/dsh-intelligent-ui) by cwd514 | MIT | Recommended `intelligent-ui` plugin: `render_ui` visual answers in the DSH Web chat. Opt-in only; add with `--recommended=intelligent-ui` or `INTELLIGENT_UI=1`. |
+| [dsh-intelligent-ui](https://github.com/cwd514/dsh-intelligent-ui) by cwd514 | MIT | Recommended `intelligent-ui` plugin: `render_ui` visual answers in the DSH Web chat. Default on for web/desktop; skip with `--recommended=none`, `INTELLIGENT_UI=0`, or `rdsh desktop install --no-intelligent-ui`. |
 
 ## Workflow board source preparation
 

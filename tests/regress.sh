@@ -540,3 +540,23 @@ if [ "${RDSH_REGRESS_SANDBOXED:-}" = 1 ] && [ -n "${RR_SANDBOX:-}" ] && [ "$HOME
 rm -rf $AB
 rm -rf $SB "$RG_TMP/rr-in.txt" "$RG_TMP/rr-out" "$RG_TMP/rr-err"
 echo "ALL PASS ($pass checks)"
+# --- the installer must not truncate the doctor report through a closed pipe ---
+# A closed pipe made the process abort (panic on EPIPE with panic=abort), so the
+# installer captures the report and slices it instead. Guard both sides.
+if [ -f install.sh ] && grep -q 'rdsh" doctor 2>&1 | head' install.sh; then
+  echo "FAIL(output): install.sh pipes doctor into head again"; exit 1
+fi
+mkdir -p "$RG_TMP/doctor"
+if "$BIN" doctor >"$RG_TMP/doctor/full.out" 2>"$RG_TMP/doctor/full.err"; then
+  ok "doctor survives a fully consumed report"
+else
+  echo "FAIL(output): doctor exited non-zero with its report fully consumed"; cat "$RG_TMP/doctor/full.err"; exit 1
+fi
+
+# --- a consumer closing the pipe must not abort the process ---
+# `doctor 2>&1 | head` used to panic on EPIPE and dump core (exit 134).
+pipe_rc=$(bash -c '"$1" doctor 2>&1 | head -n 5 >/dev/null; echo ${PIPESTATUS[0]}' _ "$BIN" 2>/dev/null)
+case "$pipe_rc" in
+  134) echo "FAIL(output): doctor aborted when the pipe closed (exit 134)"; exit 1 ;;
+  *) ok "doctor exits quietly when the pipe closes (exit $pipe_rc)" ;;
+esac

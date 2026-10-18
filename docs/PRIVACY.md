@@ -15,7 +15,8 @@ Web ページ取得**、およびその動作に必要な認証・トークン�
 | 委譲先 DSH のセッション telemetry（OpenTelemetry） | 無効 | 子プロセスへ `DSH_TELEMETRY_DISABLED=1` を渡す |
 | Discord Rich Presence | 無効 | `features.discord`（旧 `discord.enabled`）の既定を off |
 | 更新確認・リリース探索 | 無効 | `features.release_probe` は既定 off。日次更新は `rdsh update auto on` を明示したときだけ |
-| SearXNG Web 検索（`rdsh search-web`） | 無効 | `features.search-web`（`search-web` extra）は既定 off |
+| Web 検索（`rdsh search-web`） | 無効 | `features.search-web`（`search-web` extra）は既定 off |
+| DSH 本体の Web 検索プロバイダ | 変更しない | `search.dsh_search_provider` を設定したときだけ子プロセスへ `DSH_WEB_SEARCH_PROVIDER` を渡す（シェルの明示値が優先） |
 
 `DSH_TELEMETRY_DISABLED` は upstream DSH の opt-out で、**空でない値なら
 `0` や `false` でも無効**として扱われます（upstream の `session-telemetry-otel`
@@ -51,9 +52,14 @@ rdsh settings set discord.enabled true   # 旧キーも引き続き有効
 
 - 設定済み LLM プロバイダへの推論・モデル一覧取得などの API リクエスト
 - 利用者が明示的に実行した Web 検索・Web ページ取得（`rdsh search-web` を
-  有効化した場合の SearXNG、DSH の検索ツールなど）
+  有効化した場合の SearXNG、`--provider ollama` で選んだ Ollama Web Search API、DSH の検索ツールなど）
 - 上記に必要な認証・トークン更新
 - `rdsh serve` / `rdsh setup --web` は `127.0.0.1` のローカル待受だけを使います
+
+`rdsh search-web` の既定は SearXNG です。`OLLAMA_API_KEY` が設定されているだけでは
+Ollama へ送りません。`--provider ollama` の指定時は検索語と件数を
+`https://ollama.com/api/web_search` へ、API キーを Bearer 認証ヘッダーとして送信します。
+リダイレクトは追跡せず、失敗時に別の検索先へ切り替えません。[Web検索](WEB-SEARCH.md)を参照してください。
 
 ## 制約と保証できない範囲
 

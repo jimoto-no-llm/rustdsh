@@ -44,7 +44,8 @@ rdsh settings set extras.enable serve,search-web
 rdsh settings get extras.enable
 ```
 
-Web検索には別途SearXNGが必要です。DSH内のrdsh設定プラグインと、
+Web検索は既定でSearXNGを使います。`--provider ollama` と `OLLAMA_API_KEY` を使う場合は
+SearXNGの起動は不要です。詳しくは [Web検索](WEB-SEARCH.md) を参照してください。DSH内のrdsh設定プラグインと、
 `setup --web` の初回設定画面は別の入口です。詳細は [設定画面の詳細](RDSH-SETTINGS.md) を参照してください。
 
 表示言語は `--language` または `general.language` で英語、簡体字中国語、日本語を選択できます。CLI の `auto` はロケール環境変数を参照し、未設定または未対応の場合は英語になります。画面固有のラベル、日時、数値のみが切り替わり、モデルの応答、会話、タスク本文、API JSON、ファイル名は原文のまま保持されます。

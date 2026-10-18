@@ -1,10 +1,38 @@
-//! `rdsh search-web`: web search through SearXNG (self-hosted default).
-//! No API key needed: talks to `$SEARXNG_URL` (default `http://127.0.0.1:8888`)
-//! over plain HTTP with a hand-rolled client (no new dependencies). The HTML
-//! results page is parsed because many instances (including a default
-//! local one) only serve HTML, not the JSON API.
+//! `rdsh search-web`: SearXNG by default, or explicitly selected Ollama search.
+//! SearXNG needs no API key and retains its HTML-based HTTP client; a local
+//! rustxng sidecar is the same protocol, so it rides the same client. Ollama
+//! uses the hosted HTTPS API with `OLLAMA_API_KEY`; providers never fall back
+//! to one another, so a local search cannot silently become a cloud request.
 
-fn default_base() -> String {
+mod ollama;
+
+#[derive(Clone, Copy, Debug, clap::ValueEnum)]
+pub enum Provider {
+    Searxng,
+    Ollama,
+}
+
+/// Which SearXNG-compatible engine `search-web` should resolve.
+///
+/// `Auto` keeps the historical environment order and only then tries a local
+/// rustxng. An explicit `Searxng` never spawns rustxng, so a scripted run
+/// keeps today's behaviour exactly.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, clap::ValueEnum)]
+pub enum Engine {
+    Auto,
+    Searxng,
+    Rustxng,
+}
+
+pub fn help(locale: crate::locale::Locale) -> &'static str {
+    match locale {
+        crate::locale::Locale::English => "Enable: rdsh features on search-web\nOllama: set OLLAMA_API_KEY, then use --provider ollama (up to 10 results).\nEngines: --engine auto|searxng|rustxng. auto resolves SEARXNG_URL, then RUSTXNG_URL, then a local rustxng, then http://127.0.0.1:8888.\nLocal rustxng: set RUSTXNG_BIN (or install rustxng) and rdsh starts the sidecar itself; --engine searxng never spawns it.\nWeb Search API service guide: Tavily https://www.tavily.com/\nTavily quickstart: https://docs.tavily.com/documentation/quickstart\nBuilt-in providers: searxng, ollama. Tavily is a service reference.\nSearXNG down? --auto-start runs docker-compose.searxng.yml (loopback only).\nDocs: https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/WEB-SEARCH.md",
+        crate::locale::Locale::Chinese => "启用：rdsh features on search-web\nOllama：设置 OLLAMA_API_KEY 后使用 --provider ollama（最多10条结果）。\n搜索引擎：--engine auto|searxng|rustxng。auto 依次使用 SEARXNG_URL、RUSTXNG_URL、本地 rustxng，最后是 http://127.0.0.1:8888。\n本地 rustxng：设置 RUSTXNG_BIN（或安装 rustxng）后由 rdsh 启动该服务；--engine searxng 不会启动它。\nWeb Search API 服务指南：Tavily https://www.tavily.com/\nTavily 入门：https://docs.tavily.com/documentation/quickstart\n内置提供方：searxng、ollama。Tavily 为服务介绍。\nSearXNG 未启动时：--auto-start 会运行 docker-compose.searxng.yml（仅回环地址）。\n文档：https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/WEB-SEARCH.md",
+        crate::locale::Locale::Japanese => "有効化: rdsh features on search-web\nOllama: OLLAMA_API_KEY を設定し --provider ollama を指定（最大10件）。\nエンジン: --engine auto|searxng|rustxng。auto は SEARXNG_URL、RUSTXNG_URL、ローカル rustxng、http://127.0.0.1:8888 の順に解決します。\nローカル rustxng: RUSTXNG_BIN を設定（または rustxng を導入）すると rdsh がサイドカーを起動します。--engine searxng は起動しません。\nWeb Search API サービスの案内: Tavily https://www.tavily.com/\nTavily 入門: https://docs.tavily.com/documentation/quickstart\n組み込み検索先: searxng、ollama。Tavily はサービスの紹介です。\nSearXNG が停止中: --auto-start が docker-compose.searxng.yml を起動します（ループバック限定）。\n利用手順: https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/WEB-SEARCH.md",
+    }
+}
+
+pub(crate) fn default_base() -> String {
     match std::env::var("SEARXNG_URL") {
         Ok(s) => {
             let s = s.trim_end_matches('/').to_string();
@@ -26,7 +54,58 @@ fn default_base() -> String {
     }
 }
 
-fn encode_query(s: &str) -> String {
+/// Wrapper around the loopback health probe: the unit tests swap this so the
+/// resolution order can be checked without a listener.
+fn engine_health(base: &str) -> bool {
+    crate::rustxng::health(base)
+}
+
+/// Resolve the SearXNG-compatible base URL for one search.
+///
+/// `Auto` walks SEARXNG_URL, RUSTXNG_URL, a local rustxng (started on demand),
+/// then the historical http://127.0.0.1:8888 default. `Searxng` still honours
+/// SEARXNG_URL and then the `rdsh.json` search.searxng_url override, but never
+/// starts rustxng. `Rustxng` uses RUSTXNG_URL, else a local rustxng, and never
+/// falls through to a different engine.
+pub(crate) fn resolve_base(engine: Engine) -> anyhow::Result<String> {
+    resolve_base_with(engine, engine_health)
+}
+
+fn resolve_base_with(engine: Engine, health: impl Fn(&str) -> bool) -> anyhow::Result<String> {
+    match engine {
+        Engine::Searxng => Ok(default_base()),
+        Engine::Rustxng => match crate::rustxng::base_url() {
+            Some(url) => Ok(url),
+            None => crate::rustxng::ensure().map_err(anyhow::Error::new),
+        },
+        Engine::Auto => {
+            if let Some(url) = env_url("SEARXNG_URL") {
+                return Ok(url);
+            }
+            if let Some(url) = env_url("RUSTXNG_URL") {
+                return Ok(url);
+            }
+            // A healthy instance is reused; a missing binary or a process that
+            // never answered falls back to the historical default, whose own
+            // connection error names both variables.
+            if let Ok(base) = crate::rustxng::ensure() {
+                if health(&base) {
+                    return Ok(base);
+                }
+            }
+            Ok(default_base())
+        }
+    }
+}
+
+/// One trimmed, trailing-slash-free environment URL, when it is set.
+fn env_url(name: &str) -> Option<String> {
+    let value = std::env::var(name).ok()?;
+    let value = value.trim().trim_end_matches('/').to_string();
+    (!value.is_empty()).then_some(value)
+}
+
+pub(crate) fn encode_query(s: &str) -> String {
     use std::fmt::Write as _;
     let mut out = String::with_capacity(s.len());
     for b in s.bytes() {
@@ -42,7 +121,10 @@ fn encode_query(s: &str) -> String {
 }
 
 /// Split an `http://host[:port][/prefix]` base URL.
-fn split_base(base: &str, locale: crate::locale::Locale) -> anyhow::Result<(String, u16, String)> {
+pub(crate) fn split_base(
+    base: &str,
+    locale: crate::locale::Locale,
+) -> anyhow::Result<(String, u16, String)> {
     // The configured endpoint is a human-selected capability, not a URL from
     // search results. Preserve remote instances, but never interpolate request
     // separators, userinfo, queries, or fragments into the HTTP request.
@@ -119,7 +201,7 @@ fn split_base(base: &str, locale: crate::locale::Locale) -> anyhow::Result<(Stri
 
 /// Loopback check for the SearXNG warning: 127/8, ::1 and localhost names.
 /// Bracketed IPv6 literals (as kept by split_base) are unwrapped first.
-fn is_loopback_host(host: &str) -> bool {
+pub(crate) fn is_loopback_host(host: &str) -> bool {
     let h = host
         .strip_prefix('[')
         .and_then(|s| s.strip_suffix(']'))
@@ -132,10 +214,10 @@ fn is_loopback_host(host: &str) -> bool {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-struct Hit {
-    title: String,
-    url: String,
-    content: String,
+pub(crate) struct Hit {
+    pub(crate) title: String,
+    pub(crate) url: String,
+    pub(crate) content: String,
 }
 
 fn strip_tags(s: &str) -> String {
@@ -322,6 +404,23 @@ fn find_snippet(blk: &str) -> Option<String> {
     None
 }
 
+/// The connection-failure sentence. It names both variables that can point at
+/// a SearXNG instance and says that installing rustxng gives rdsh a local
+/// engine it can start itself.
+fn unreachable_engine_message(base: &str, locale: crate::locale::Locale) -> String {
+    match locale {
+        crate::locale::Locale::English => format!(
+            "cannot reach SearXNG at {base}; is it running? Set SEARXNG_URL or RUSTXNG_URL, or install the rustxng binary (RUSTXNG_BIN) so rdsh can start the local engine"
+        ),
+        crate::locale::Locale::Chinese => format!(
+            "无法连接 {base} 的 SearXNG；它是否正在运行？请设置 SEARXNG_URL 或 RUSTXNG_URL，或安装 rustxng（RUSTXNG_BIN）以便 rdsh 启动本地引擎"
+        ),
+        crate::locale::Locale::Japanese => format!(
+            "{base} の SearXNG に接続できません。起動していますか？SEARXNG_URL か RUSTXNG_URL を設定するか、rustxng（RUSTXNG_BIN）を導入すると rdsh がローカルエンジンを起動できます"
+        ),
+    }
+}
+
 fn fetch(base: &str, query: &str, locale: crate::locale::Locale) -> anyhow::Result<Vec<Hit>> {
     use std::io::{Read, Write};
     use std::net::ToSocketAddrs;
@@ -344,17 +443,8 @@ fn fetch(base: &str, query: &str, locale: crate::locale::Locale) -> anyhow::Resu
             break;
         }
     }
-    let mut s = stream.ok_or_else(|| match locale {
-        crate::locale::Locale::English => {
-            anyhow::anyhow!("cannot reach SearXNG at {base}; is it running? SEARXNG_URL overrides")
-        }
-        crate::locale::Locale::Chinese => {
-            anyhow::anyhow!("无法连接 {base} 的 SearXNG；它是否正在运行？SEARXNG_URL 会覆盖设置")
-        }
-        crate::locale::Locale::Japanese => {
-            anyhow::anyhow!("{base} の SearXNG に接続できません。起動していますか？SEARXNG_URL が設定を上書きします")
-        }
-    })?;
+    let mut s =
+        stream.ok_or_else(|| anyhow::anyhow!("{}", unreachable_engine_message(base, locale)))?;
     let ua = format!("rdsh/{}", env!("CARGO_PKG_VERSION"));
     // Virtual-hosted instances need the port to route; the default port is
     // omitted per convention. Bracketed IPv6 literals pass through as-is.
@@ -476,6 +566,17 @@ fn ensure_results_page(
     );
 }
 
+/// The real HTML search client against one base URL. Shared with the rustxng
+/// unit test, which points it at its own TCP stub.
+#[cfg(test)]
+pub(crate) fn fetch_via_stub(
+    base: &str,
+    query: &str,
+    locale: crate::locale::Locale,
+) -> anyhow::Result<Vec<Hit>> {
+    fetch(base, query, locale)
+}
+
 fn looks_like_searxng(body: &str) -> bool {
     body.contains("id=\"results\"") || body.contains("content=\"searxng")
 }
@@ -484,10 +585,35 @@ pub fn cmd_search_web(
     query: &str,
     limit: usize,
     json: bool,
+    provider: Provider,
+    engine: Engine,
+    auto_start: bool,
     locale: crate::locale::Locale,
 ) -> anyhow::Result<()> {
-    let base = default_base();
-    let hits = fetch(&base, query, locale)?;
+    let (base, hits) = match provider {
+        Provider::Searxng => {
+            let base = resolve_base(engine)?;
+            // Opt-in only: the search still runs (and reports its own
+            // connection error) when a container cannot be started, except for
+            // the explicit --auto-start failures below, which say why. A
+            // rustxng base keeps --auto-start out of the compose path.
+            if auto_start && engine != Engine::Rustxng {
+                let outcome = crate::searxng::ensure_running(&base, true, locale);
+                if let Some(notice) = outcome.notice(&base, locale) {
+                    eprintln!("{notice}");
+                }
+                if let Some(failure) = outcome.start_failure(&base, locale) {
+                    anyhow::bail!("{failure}");
+                }
+            }
+            let hits = fetch(&base, query, locale)?;
+            (base, hits)
+        }
+        Provider::Ollama => (
+            ollama::ENDPOINT.to_string(),
+            ollama::search(query, limit, locale)?,
+        ),
+    };
     let shown: Vec<&Hit> = hits.iter().take(limit.max(1)).collect();
     if json {
         println!(
@@ -595,6 +721,161 @@ mod tests {
             .to_string();
             assert!(error.contains(expected), "{error}");
             assert!(error.contains("http://127.0.0.1:8888"));
+        }
+    }
+
+    // Engine selection: auto falls back to the historical default when neither
+    // variable is set and no local rustxng answers.
+    #[test]
+    fn auto_engine_falls_back_to_the_default() {
+        let _lock = engine_env_lock();
+        let dir = std::env::temp_dir().join(format!(
+            "rdsh-websearch-auto-{}-{}",
+            std::process::id(),
+            nondet_nonce()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let _env = EngineEnvGuard::apply(&[
+            ("SEARXNG_URL", None),
+            ("RUSTXNG_URL", None),
+            ("RUSTXNG_PORT", None),
+            ("DSH_HOME", Some(dir.to_string_lossy().as_ref())),
+            ("HOME", Some(dir.to_string_lossy().as_ref())),
+            // No PATH entry, so the lookup cannot reach a real install.
+            ("PATH", Some(dir.to_string_lossy().as_ref())),
+        ]);
+        // With nothing configured and no local engine the historical default
+        // is the answer, and the health probe is never consulted.
+        assert_eq!(
+            resolve_base_with(Engine::Auto, |_| panic!("no probe without a local engine")).unwrap(),
+            "http://127.0.0.1:8888"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A unique tag for temp directories shared by the resolution tests.
+    fn nondet_nonce() -> u128 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or_default()
+    }
+
+    // SEARXNG_URL is consulted before RUSTXNG_URL, and both before the local
+    // sidecar (the health probe must never be reached).
+    #[test]
+    fn auto_engine_prefers_searxng_url_then_rustxng_url() {
+        let _lock = engine_env_lock();
+        let _env = EngineEnvGuard::apply(&[
+            ("SEARXNG_URL", Some("http://127.0.0.1:9999/")),
+            ("RUSTXNG_URL", Some("http://127.0.0.1:7777")),
+        ]);
+        assert_eq!(
+            resolve_base_with(Engine::Auto, |_| panic!("no probe when an env URL is set")).unwrap(),
+            "http://127.0.0.1:9999"
+        );
+        std::env::remove_var("SEARXNG_URL");
+        assert_eq!(
+            resolve_base_with(Engine::Auto, |_| panic!("no probe when RUSTXNG_URL is set"))
+                .unwrap(),
+            "http://127.0.0.1:7777"
+        );
+    }
+
+    // --engine searxng keeps today's behaviour and never starts rustxng, even
+    // when RUSTXNG_URL points somewhere.
+    #[test]
+    fn explicit_searxng_never_spawns_rustxng() {
+        let _lock = engine_env_lock();
+        let _env = EngineEnvGuard::apply(&[
+            ("RUSTXNG_URL", Some("http://127.0.0.1:7777")),
+            ("SEARXNG_URL", Some("http://127.0.0.1:9999")),
+        ]);
+        assert_eq!(
+            resolve_base_with(Engine::Searxng, |_| panic!(
+                "searxng must not probe rustxng"
+            ))
+            .unwrap(),
+            "http://127.0.0.1:9999"
+        );
+        std::env::remove_var("SEARXNG_URL");
+        let base = resolve_base_with(Engine::Searxng, |_| {
+            panic!("searxng must not probe rustxng")
+        })
+        .unwrap();
+        assert!(!base.contains("7777"), "{base}");
+    }
+
+    // --engine rustxng uses RUSTXNG_URL and never another engine.
+    #[test]
+    fn explicit_rustxng_uses_only_the_configured_or_local_engine() {
+        let _lock = engine_env_lock();
+        let _env = EngineEnvGuard::apply(&[
+            ("RUSTXNG_URL", Some("http://127.0.0.1:7777")),
+            ("SEARXNG_URL", Some("http://127.0.0.1:9999")),
+        ]);
+        assert_eq!(
+            resolve_base_with(Engine::Rustxng, |_| panic!(
+                "a configured URL needs no probe"
+            ))
+            .unwrap(),
+            "http://127.0.0.1:7777"
+        );
+        // With nothing configured the local engine decides; a missing binary is
+        // an explicit error rather than a silent fallback.
+        std::env::remove_var("RUSTXNG_URL");
+        let dir = std::env::temp_dir().join(format!(
+            "rdsh-websearch-resolve-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or_default()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::env::set_var("DSH_HOME", &dir);
+        std::env::remove_var("RUSTXNG_PORT");
+        let result = resolve_base_with(Engine::Rustxng, |_| false);
+        std::env::remove_var("RUSTXNG_BIN");
+        assert!(result.is_err(), "rustxng must not fall back to searxng");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Serialises the environment-touching resolution tests in this module.
+    fn engine_env_lock() -> std::sync::MutexGuard<'static, ()> {
+        static LOCK: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
+        LOCK.get_or_init(|| std::sync::Mutex::new(()))
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    /// Sets variables for one test and restores them on drop.
+    struct EngineEnvGuard {
+        saved: Vec<(String, Option<String>)>,
+    }
+
+    impl EngineEnvGuard {
+        fn apply(pairs: &[(&str, Option<&str>)]) -> Self {
+            let mut saved = Vec::new();
+            for (name, value) in pairs {
+                saved.push(((*name).to_string(), std::env::var(name).ok()));
+                match value {
+                    Some(value) => std::env::set_var(name, value),
+                    None => std::env::remove_var(name),
+                }
+            }
+            Self { saved }
+        }
+    }
+
+    impl Drop for EngineEnvGuard {
+        fn drop(&mut self) {
+            for (name, value) in &self.saved {
+                match value {
+                    Some(value) => std::env::set_var(name, value),
+                    None => std::env::remove_var(name),
+                }
+            }
         }
     }
 

@@ -11,20 +11,73 @@ mod editor;
 mod host;
 mod http;
 mod live;
+mod markdown;
 mod mux;
 mod rdsh;
 mod theme;
+mod web;
 
 use gpui::*;
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
 
+    // Decide the palette before anything renders. The environment wins over the
+    // flag, and "system" reads the desktop appearance once.
+    let theme_flag = args
+        .iter()
+        .position(|arg| arg == "--theme")
+        .and_then(|index| args.get(index + 1))
+        .map(String::as_str);
+    theme::init_from_env_and_args(theme_flag);
+
     if args.iter().any(|arg| arg == "--help" || arg == "-h") {
         println!(
-            "rdsh-desktop {}\n\nUSAGE:\n  rdsh-desktop [--print-json] [--probe]\n\nOPTIONS:\n  --print-json  Collect one native rdsh snapshot and print it as JSON (no window)\n  --probe       Start the harness host, exchange the token and print the conversation list (no window)\n  -h, --help    Show this help",
-            env!("CARGO_PKG_VERSION")
+            "rdsh-desktop {}\n\nUSAGE:\n  rdsh-desktop [--serve-web [--port N]] [--print-json] [--probe] [--theme MODE]\n\nOPTIONS:\n  --serve-web   Serve the same harness session as a local web UI on 127.0.0.1 (no window)\n  --port N      Port for --serve-web (default {})\n  --print-json  Collect one native rdsh snapshot and print it as JSON (no window)\n  --probe       Start the harness host, exchange the token and print the conversation list (no window)\n  --theme MODE  Palette for the window: light (default), dark, or system\n  -h, --help    Show this help",
+            env!("CARGO_PKG_VERSION"),
+            web::DEFAULT_PORT
         );
+        return;
+    }
+
+    if args.iter().any(|arg| arg == "--serve-web") {
+        let port = args
+            .iter()
+            .position(|arg| arg == "--port")
+            .and_then(|index| args.get(index + 1))
+            .and_then(|value| value.parse::<u16>().ok())
+            .unwrap_or(web::DEFAULT_PORT);
+        if port == 0 {
+            eprintln!("[rdsh-desktop] --port needs a port in 1..=65535");
+            std::process::exit(2);
+        }
+        match web::WebServer::start(port) {
+            Ok(server) => {
+                println!(
+                    "[rdsh-desktop] ローカル Web UI (port {}): {}",
+                    server.port(),
+                    server.url()
+                );
+                println!(
+                    "[rdsh-desktop] 127.0.0.1 のみにバインドしています。上の URL をそのまま開いてください。"
+                );
+                println!(
+                    "[rdsh-desktop] URL の token は推測困難なアクセス用の値で、ハーネスの cookie やトークンはこのプロセスから外へ出ません。"
+                );
+                println!("[rdsh-desktop] 停止するには Ctrl+C を押してください。");
+                if let Err(error) = publish_web_url(&server.url()) {
+                    eprintln!("[rdsh-desktop] URL ファイルを書けませんでした: {error:#}");
+                }
+                if let Err(error) = server.serve() {
+                    eprintln!("[rdsh-desktop] serve-web failed: {error:#}");
+                    std::process::exit(1);
+                }
+            }
+            Err(error) => {
+                eprintln!("[rdsh-desktop] serve-web failed: {error:#}");
+                std::process::exit(1);
+            }
+        }
         return;
     }
 
@@ -113,6 +166,18 @@ fn main() {
             Ok(report) => println!("{report}"),
             Err(error) => {
                 eprintln!("[rdsh-desktop] select-model failed: {error:#}");
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
+
+    if args.iter().any(|arg| arg == "--check-host") {
+        let online = args.iter().any(|arg| arg == "--online");
+        match check_host(online) {
+            Ok(report) => println!("{report}"),
+            Err(error) => {
+                eprintln!("[rdsh-desktop] check-host failed: {error:#}");
                 std::process::exit(1);
             }
         }
@@ -213,6 +278,15 @@ fn main() {
     let bounds = Bounds::new(point(px(80.), px(80.)), size(px(1280.), px(860.)));
     let options = WindowOptions {
         window_bounds: Some(WindowBounds::Windowed(bounds)),
+        // Keeps the sidebar, header and composer from being crushed: the
+        // minimum comes from the token module, not from a bare literal.
+        window_min_size: Some(size(
+            px(theme::WINDOW_MIN_WIDTH),
+            px(theme::WINDOW_MIN_HEIGHT),
+        )),
+        // Lets the desktop match this window to rdsh-desktop.desktop, so the
+        // taskbar and switcher show the project icon.
+        app_id: Some("rdsh-desktop".to_string()),
         ..Default::default()
     };
 
@@ -227,7 +301,19 @@ fn main() {
 
     // GPUI reports renderer and window problems through `log`; without a
     // subscriber a failed surface looks like an idle process.
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    let mut logger = env_logger::Builder::from_env(
+        env_logger::Env::default().default_filter_or("warn,rdsh_desktop=info"),
+    );
+    if let Some(path) = std::env::var_os("RDSH_DESKTOP_LOG") {
+        if let Ok(file) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+        {
+            logger.target(env_logger::Target::Pipe(Box::new(file)));
+        }
+    }
+    logger.init();
     log::info!("rdsh-desktop {} starting", env!("CARGO_PKG_VERSION"));
 
     Application::new().run(|cx: &mut App| {
@@ -273,6 +359,97 @@ fn select_model(session: &str, provider: &str, model: &str) -> anyhow::Result<St
         "model": model,
         "modelSelection": value,
     }))?)
+}
+
+
+/// Write the Web UI URL where a background service user can read it.
+fn publish_web_url(url: &str) -> anyhow::Result<()> {
+    let path = match std::env::var_os("RDSH_DESKTOP_WEB_URL_FILE") {
+        Some(value) => std::path::PathBuf::from(value),
+        None => {
+            let base = std::env::var_os("XDG_CACHE_HOME")
+                .map(std::path::PathBuf::from)
+                .or_else(|| {
+                    std::env::var_os("HOME").map(|home| std::path::PathBuf::from(home).join(".cache"))
+                })
+                .ok_or_else(|| anyhow::anyhow!("neither XDG_CACHE_HOME nor HOME is set"))?;
+            base.join("rdsh-desktop").join("webui.url")
+        }
+    };
+    if let Some(parent) = path.parent() {
+        host::create_owner_only_dir(parent)?;
+    }
+    host::write_owner_only(&path, format!("{url}\n").as_bytes())?;
+    println!("[rdsh-desktop] URL を {} に保存しました", path.display());
+    Ok(())
+}
+
+/// Report which harness launcher the app would use and whether it answers.
+fn check_host(online: bool) -> anyhow::Result<String> {
+    let (binary, version) = host::resolve_launcher()?;
+    let latest = if online { host::latest_published() } else { None };
+    let newest = if online { host::newest_published() } else { None };
+    let chat = app::Chat::connect(|_step| {})?;
+    let newer = newest
+        .as_ref()
+        .map(|newest| host::compare_versions(newest, chat.host_version()).is_gt())
+        .unwrap_or(false);
+    Ok(serde_json::to_string_pretty(&serde_json::json!({
+        "launcher": binary.display().to_string(),
+        "version": version,
+        "activeVersion": chat.host_version(),
+        "attached": chat.reused,
+        "sessions": chat.sessions.len(),
+        "catalogProviders": chat.catalog.len(),
+        "latestPublished": latest,
+        "newestPublished": newest,
+        "updateAvailable": newer,
+    }))?)
+}
+
+/// Highest published harness version, including prereleases.
+fn newest_published() -> Option<String> {
+    let mut command = std::process::Command::new("npm");
+    command.args(["view", "@deepseek-ai/dsh", "versions", "--json"]);
+    if let Some(path) = std::env::var_os("PATH") {
+        command.env("PATH", path);
+    }
+    let output = command.output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&output.stdout);
+    let versions: Vec<String> = match serde_json::from_str::<serde_json::Value>(text.trim()) {
+        Ok(serde_json::Value::Array(values)) => values
+            .into_iter()
+            .filter_map(|value| value.as_str().map(str::to_string))
+            .collect(),
+        Ok(serde_json::Value::String(single)) => vec![single],
+        _ => Vec::new(),
+    };
+    versions.into_iter().reduce(|best, candidate| {
+        if host::compare_versions(&candidate, &best).is_gt() {
+            candidate
+        } else {
+            best
+        }
+    })
+}
+
+/// Newest published harness version, when npm can answer.
+fn latest_published() -> Option<String> {
+    let mut command = std::process::Command::new("npm");
+    command.args(["view", "@deepseek-ai/dsh", "version"]);
+    if let Some(path) = std::env::var_os("PATH") {
+        command.env("PATH", path);
+    }
+    let output = command.output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&output.stdout);
+    let version = text.split_whitespace().last()?.trim().to_string();
+    (!version.is_empty()).then_some(version)
 }
 
 /// Verify that conversation titles resolve (the window fills them in the

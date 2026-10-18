@@ -20,7 +20,8 @@ Electron, no bundled Chromium, no local web server.
 - Approval prompts and user questions ($events waterfall, answered through
   $events/result and userQuestions/answer)
 - Tool call rows and reasoning blocks in the timeline
-- New conversation (session/create), Enter to send, composer focus handling
+- New conversation (session/create), Enter to send, composer focus handling,
+  and Japanese IME composition in the composer
 
 ## Run
 
@@ -74,6 +75,100 @@ pinned revision):
 - Model changes go through session/selectModel, so the host keeps them for the
   conversation and the chip and header update immediately.
 
+## Sidebar projects
+
+The sidebar groups conversations by project. Each project header folds the
+group away when clicked (the caret shows the state), and the × button on the
+header archives the project out of the list. Archived projects stay hidden
+until the footer toggle (アーカイブ) shows them again, dimmed, with a 戻す
+button. Both states persist in `~/.config/rdsh-desktop/ui.json`.
+
+The window uses the project orca icon: packaging/rdsh-desktop.desktop points at
+`~/.local/share/rdsh-desktop/icon.png` (copied from assets/icon-256.png), and
+the window sets app_id rdsh-desktop so the taskbar matches that entry.
+
+## Web UI
+
+The same experience is reachable from a browser, with no Node and no build step:
+
+~~~sh
+rdsh-desktop --serve-web --port 8790
+~~~
+
+It binds 127.0.0.1 only, prints a URL carrying a random token, and rejects
+requests without that token. The page shows project groups, the conversation,
+streaming text, tool and reasoning rows, the model chip and pending approvals or
+questions. Live updates arrive over Server-Sent Events, and the page raises
+browser notifications when an approval or question arrives, and when a run
+finishes while the tab is hidden. The harness cookie never leaves the process.
+
+Endpoints: /api/state, /api/events (SSE), /api/select, /api/send, /api/cancel,
+/api/model, /api/approve, /api/answer.
+
+## Following upstream dsh updates
+
+The app does not pin a harness version. It resolves the launcher at startup,
+preferring RDSH_DESKTOP_DSH, then every dsh on PATH, the local install paths and
+the npm global bin, and keeps the newest one that answers --version. Upgrading
+dsh (for example npm install -g @deepseek-ai/dsh@latest) is therefore enough to
+move the app onto the new build.
+
+- --check-host prints the launcher, its version, whether a host answered and the
+  session count; add --online to compare against npm, which sets
+  updateAvailable when upstream has something newer (prereleases included).
+- scripts/verify-harness.sh /path/to/dsh checks the session list, model catalog
+  and live events against one build without disturbing a running service.
+- The startup status line names the harness version in use.
+
+## Harness compatibility
+
+The app speaks the harness client protocol (unary HTTP plus one WebSocket) and
+follows the installed host instead of pinning a version. Verified against:
+
+- 0.2.0-rc.2 (the dsh installed on this machine)
+- 0.2.1-alpha.2 (the revision the upstream prototype pins)
+- 0.2.1-rc.2
+
+Each check covered the session list, the model catalog, the $events and
+conversation streams, prompt streaming (reasoning-delta and text-delta) and the
+cookie attach path. To exercise one harness build on its own, set
+RDSH_DESKTOP_DSH to that dsh and RDSH_DESKTOP_NO_ATTACH=1, which forces a fresh
+host instead of attaching to a running one.
+
+The attach path mints the v1 authority cookie; 0.2.1 still accepts it next to
+its v2 peer cookie, so attaching stays available on both.
+
+## Composer IME input
+
+The composer takes platform IME input (Japanese composition included) through
+GPUI's `EntityInputHandler`: `ElementInputHandler` is installed over the text
+area during paint, and every range on that wire is UTF-16, mapped to the
+editor's byte offsets.
+
+- A replacement replaces the active preedit first: the range the platform sends
+  wins, otherwise the marked (composing) range is replaced, otherwise the editor
+  selection. A `k` -> `ka` update therefore rewrites the preedit instead of
+  appending to it, and the commit replaces it instead of leaving `kか` behind.
+- The IME's selected range inside the preedit is rebased onto the inserted text
+  and becomes the editor selection, so `selected_text_range` reports the
+  composing segment.
+- Platform paths: Linux Wayland (`set_marked_text` / `insert_text`), Windows
+  (IMM composition, `GCS_COMPSTR` with `GCS_CURSORPOS`), macOS
+  (`NSTextInputClient` `setMarkedText:selectedRange:` /
+  `insertText:replacementRange:`). Wayland never sends a preedit selection
+  range, so that part only runs on Windows and macOS.
+- Known limitations: `bounds_for_range` returns the whole composer rect, so the
+  candidate window is anchored to the composer rather than the caret, and
+  `character_index_for_point` returns the caret, so clicking inside composing
+  text does not place the cursor. Only the pure range mapping is unit tested
+  (`cargo test` in this directory); no real IME runs in CI, so the platform
+  wiring still needs a manual pass.
+
+To try it by hand: `cargo run --release`, focus the composer, compose with a
+Japanese IME, and check that the preedit is rewritten in place and that the
+committed text lands exactly once. Enter sends; while composing it commits the
+composition instead.
+
 ## Startup and weight
 
 The app paints its shell first and loads data in the background. It attaches to a
@@ -92,6 +187,30 @@ builds dependencies at opt-level 3, which keeps dev runs responsive.
 
 Measured with --dump-ui: attach 606ms (release) / 949ms (dev), cold 9.4s,
 app RSS about 52MB.
+
+### Run the Web UI as a user service (optional, off by default)
+
+The service is **not** enabled by default. Switch it on from the setup page
+(rdsh setup --web) or from the CLI with rdsh desktop web-ui on, and turn it off
+again with rdsh desktop web-ui off. The steps below describe what that toggle
+does, for reference:
+
+To keep the Web UI available without a terminal, install it as a systemd user
+service. The page token is pinned so the URL survives restarts:
+
+~~~sh
+mkdir -p ~/.config/rdsh-desktop
+umask 077 && printf "RDSH_DESKTOP_WEB_TOKEN=%s\n" "$(head -c16 /dev/urandom | od -An -tx1 | tr -d " \n")" \
+  > ~/.config/rdsh-desktop/webui.env
+mkdir -p ~/.config/systemd/user
+cp packaging/rdsh-webui.service ~/.config/systemd/user/rdsh-webui.service
+systemctl --user daemon-reload
+systemctl --user enable --now rdsh-webui.service
+cat ~/.cache/rdsh-desktop/webui.url
+~~~
+
+Manage it with systemctl --user status|restart|stop rdsh-webui.service.
+RDSH_DESKTOP_UPDATE_CHECK=0 in webui.env disables the background update check.
 
 ## Notes
 

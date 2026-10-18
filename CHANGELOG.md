@@ -5,6 +5,141 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-18
+
+### Added
+
+- `rdsh desktop web-ui status|on|off`（`--json` 可）と、`rdsh setup --web` の
+  設定画面から、ブラウザ用のローカル Web UI を systemd ユーザーサービスとして
+  常時起動できます。既定は常に OFF で、有効にしたときだけユニットを作成して
+  enable し、状態・稼働中の URL・次の一手を表示します。トークンは 0600 の
+  環境ファイルに置き、起動した URL はホストのキャッシュへ 0600 で書きます
+  （#793、#796、#798）。
+
+- ネイティブ・デスクトップアプリと Web UI が、アシスタントの返答を
+  見出し・リスト・引用・コードブロック（言語ラベルとコピーボタン付き）として
+  描画し、ツール行は進行・成功・失敗の状態色、推論行は既定で折りたたんで
+  表示するようになりました。デスクトップは依存を増やさない自作の描画器、
+  Web UI は DOM ノード構築のみ（`innerHTML` 不使用）で実装しています
+  （#796）。デスクトップの IME 入力は `EntityInputHandler` 経由になり、
+  Wayland の text-input-v3（fcitx5 など）から日本語を入力でき、変換中の
+  marked range と preedit の選択範囲も正しく反映します（#788）。
+
+- デスクトップアプリが起動時に、PATH・ローカル導入・npm グローバルの
+  `dsh` から `--version` に応答する最新のものを選び、本体だけを更新しても
+  新しいビルドへ乗り換えられるようになりました。`--check-host` は使用中の
+  ランチャー・バージョン・接続状況・セッション数を表示し、`--online` を
+  付けると npm の公開版と比較して更新の有無を示します。Web UI とデスクトップ
+  GUI は「dsh X が利用可能」バッジでも知らせます（#788、#793）。
+
+- デスクトップアプリと Web UI が、上流 DSH 0.2.1-rc.2 でも動くことを実機で
+  確認しました。特定ビルドだけを試す `RDSH_DESKTOP_NO_ATTACH=1` を追加し、
+  `--serve-web` は `RDSH_DESKTOP_WEB_TOKEN` でトークンを固定できます（未指定
+  なら乱数）。`apps/rdsh-desktop/scripts/verify-harness.sh` は指定ビルドに
+  対してセッション一覧・モデルカタログ・ライブイベントを検証します（#788）。
+
+- UI（ドキュメント）ギャラリーを rdsh 0.8.0 向けに更新: 3ステップの
+  セットアップウィザード、ダッシュボードの簡易／詳細表示、GPUI デスクトップ
+  アプリ、実際の CLI 画面、0.7.0 → 0.8.0 の更新バッジを撮り直しました
+  （#792）。
+
+- `search.dsh_search_provider` pins the upstream web-search provider
+  (`DSH_WEB_SEARCH_PROVIDER`) for delegated DSH runs, so an agent's
+  `web_search` can use a local SearXNG provider plugin. Empty by default; the
+  caller's own environment value still wins, a value that is not a plain
+  provider id is refused, and the id must be registered upstream (#795).
+
+- `rdsh search-web --auto-start` (SearXNG provider) starts the bundled
+  `docker-compose.searxng.yml` through `docker compose`, `docker-compose`,
+  `podman compose` or `podman-compose` when the loopback endpoint is down,
+  waits up to 10 seconds and then searches. The compose project and its settings
+  are compiled into the binary, so an installed `rdsh` no longer reports the
+  file as missing and the published port follows `SEARXNG_URL`. A host without
+  a container runtime gets one sentence explaining why search was skipped
+  instead of a hang or a panic; `rdsh doctor` reports SearXNG reachability,
+  the container runtime and the compose file it would use (#794).
+
+- `rdsh search-web --provider ollama` uses Ollama's hosted Web Search API
+  with `OLLAMA_API_KEY`, up to 10 results, and the existing text/JSON format.
+  SearXNG stays the default; cloud search requires explicit selection and the
+  existing search feature switch. No new dependency or model route is needed.
+  The localized CLI help and Web search guide also link to Tavily and its
+  official quickstart as an API service reference (#789).
+
+- License policy: `deny.toml` pins the allowed dependency licenses, and the
+  `Rust dependency audit` job now also runs
+  `cargo deny check licenses sources` with
+  `include-dev = true` on every pull request, push to `main` and weekly run, so
+  a copyleft license reachable only through a dev-dependency or an unknown
+  registry cannot enter the dependency tree unnoticed (#790).
+
+- [Third-party licenses](THIRD_PARTY_LICENSES.md) records the pinned upstream
+  DeepSeek Harness packages, the permissive crate set and the trademark
+  disclaimer; both README license sections link to it (#790).
+
+### Changed
+
+- Beginner starter set on by default: `PROFILE=web` and `PROFILE=desktop`
+  now install Japanese translation, bounded exploration subagents, sound
+  notifications, the Git panel and visual answers (`dsh-intelligent-ui`)
+  without any choice, so a newcomer from Codex or Claude Code gets a capable
+  setup. `rdsh desktop install` (and `install.sh --desktop` /
+  `install.ps1 -Desktop`) also attaches `rdsh-answer-guard`,
+  `rdsh-translation` and `rdsh-subagent-optimizer` when the checkout carries
+  them, plus `dsh-intelligent-ui`; `--no-intelligent-ui` skips it.
+  `plugins/install.sh --recommended=starter` selects the set on any profile;
+  `headless` still installs the essential tier only. `ui-comfort`,
+  `easy-work` and `compute` stay opt-in (#791).
+
+### Fixed
+
+- A consumer that closes the pipe early no longer makes the process dump core:
+  `rdsh doctor 2>&1 | head` used to panic on EPIPE (exit 134 with a core dump),
+  and now ends quietly while every other panic keeps the default hook.
+
+- The first-run installer no longer aborts on `rdsh doctor`. It piped the report
+  through `head`, and closing that pipe early made the process panic on EPIPE and
+  dump core on a Node-less host; the installer now captures the report and slices
+  it, and the regression suite fails if the pipe comes back. The browser setup
+  screen only opens when `DISPLAY` or `WAYLAND_DISPLAY` exists, so a serial or
+  SSH install prints the next step (with the `ssh -L` port-forward hint) instead
+  of waiting on a page nobody can see (#799).
+
+- The desktop app attaches only to a literal loopback address and replaces its
+  host cache atomically, and `--stop-host` signals only the PID recorded with
+  the spawned binary instead of any command line mentioning `dsh` and `web`.
+  A cached cookie the host rejects is discarded before the next candidate, so a
+  stale cache no longer surfaces as a `401` (#784, #793).
+
+- A completed assistant response no longer disappears in the Web UI when the
+  conversation stream reconnects, a failed connection shows its recorded reason
+  instead of staying on "connecting", and a question banner keeps the selected
+  choice and the free-text draft across its state refreshes (#793).
+
+- `rdsh provider add commandcode --discover` keeps only the listed models
+  whose `supported_endpoints` include Chat Completions, so Claude models that
+  answer on `/v1/messages` only are no longer registered on a route that would
+  fail every request; listings without the field are unchanged (#785).
+
+- An empty `RDSH_BENCH_MAX_OVERHEAD_MS` is rejected instead of being read as
+  zero, which used to zero every operation budget and report a regression rather
+  than a configuration error (#781).
+
+- Every device revocation waits for its persistence to finish, so a revoked
+  device cannot reappear after a restart (#787).
+
+- The agent UI surface-replacement tests cover the retry-failure path, and a
+  `#[test]` attribute lost in a rebase is restored (#783, #796).
+
+### Security
+
+- Native desktop app: the host cache directory, its `host.log` and the Web UI
+  `webui.url` file are owner-only (0700/0600) instead of inheriting the umask.
+  Both files hold the token-bearing ready URL, so on a shared machine with the
+  usual 0022 umask any local user could read them. The Web UI URL is now
+  written owner-only from creation, and files left by an earlier run are
+  tightened before they are written again (#797).
+
 ## [0.8.0] - 2026-10-18
 
 ### Added

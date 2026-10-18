@@ -5,27 +5,27 @@
 #   Essential   - installed on every run and listed first: the upstream tools
 #                 plus the bundled settings UI, phone-width layout, answer
 #                 guard, and the Web release banner.
-#   Recommended - convenience plugins the operator opts into. Non-interactive
-#                 runs keep the historical per-profile defaults, so CI and
-#                 existing scripts are unchanged.
+#   Recommended - convenience plugins the operator opts into. The web and
+#                 desktop profiles start with the beginner starter set on
+#                 (translation, subagents, sound, gitview, intelligent-ui);
+#                 headless keeps the essential tier only, so CI is unchanged.
 #
 # Usage: [PROFILE=headless] [DRY_RUN=1] [SOUND=0] [GITVIEW=0] [COMPUTE=1]
 #        [EASY_WORK=1] [SUBAGENTS=1] [UI_COMFORT=1] [INTELLIGENT_UI=1]
-#        [RECOMMENDED=all|none|list|id,...]
-#        ./plugins/install.sh [--recommended=all|none|list|id,...] [--list]
+#        [RECOMMENDED=all|starter|none|list|id,...]
+#        ./plugins/install.sh [--recommended=all|starter|none|list|id,...] [--list]
 # PROFILE=desktop targets the Electron application's reserved profile: the npm
 # dsh CLI refuses it, so the work is forwarded to the Desktop-installed command
 # through `rdsh desktop install` (or you install the packages from the app's
 # own Plugins page).
-# Third-party Web UI plugins default on for web/desktop (both MIT, used with
-# upstream permission; see Credits in README.md and plugins/recommended.md):
+# Third-party Web UI plugins default on for web/desktop (all MIT; see Credits
+# in README.md and plugins/recommended.md):
 # - sound/desktop notifications (cwd514/dsh-sound-notifications, zero deps)
-# - Git panel (yugapor/dsh-gitview).
+# - Git panel (yugapor/dsh-gitview)
+# - visual answers (cwd514/dsh-intelligent-ui).
 # They are browser client plugins, so PROFILE=web is the intended target.
-# Set SOUND=0 or GITVIEW=0 to skip one. Other profiles can opt in with =1.
-# One further third-party browser plugin is opt-in only and never part of the
-# defaults: visual answers (cwd514/dsh-intelligent-ui, MIT) with
-# INTELLIGENT_UI=1 or --recommended=intelligent-ui.
+# Set SOUND=0, GITVIEW=0 or INTELLIGENT_UI=0 to skip one. Other profiles can
+# opt in with =1 or --recommended=starter.
 set -u
 PROFILE="${PROFILE:-headless}"
 DRY_RUN="${DRY_RUN:-0}"
@@ -34,9 +34,9 @@ SOUND="${SOUND:-$BROWSER_PLUGINS_DEFAULT}"
 GITVIEW="${GITVIEW:-$BROWSER_PLUGINS_DEFAULT}"
 COMPUTE="${COMPUTE:-0}"
 EASY_WORK="${EASY_WORK:-0}"
-SUBAGENTS="${SUBAGENTS:-0}"
+SUBAGENTS="${SUBAGENTS:-$BROWSER_PLUGINS_DEFAULT}"
 UI_COMFORT="${UI_COMFORT:-0}"
-INTELLIGENT_UI="${INTELLIGENT_UI:-0}"
+INTELLIGENT_UI="${INTELLIGENT_UI:-$BROWSER_PLUGINS_DEFAULT}"
 TRANSLATION="${TRANSLATION:-$BROWSER_PLUGINS_DEFAULT}"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 RECOMMENDED_IDS="translation compute easy-work subagents ui-comfort sound gitview intelligent-ui"
@@ -45,6 +45,7 @@ usage() {
   cat <<EOF
 Usage: [PROFILE=...] [DRY_RUN=1] ./plugins/install.sh [--recommended=SPEC] [--list]
   --recommended=all       install every recommended plugin
+  --recommended=starter   install the beginner starter set (web/desktop default)
   --recommended=none      install the essential plugins only
   --recommended=list      print the essential and recommended catalog, then exit
   --recommended=id,id     install exactly the listed recommended plugins
@@ -73,14 +74,15 @@ Essential plugins (always installed, listed first)
   rdsh-update-banner                        Web release banner (PROFILE=web only)
 
 Recommended plugins (optional; choose with --recommended)
-  translation  rdsh-translation              Japanese translation settings and preview
-  compute      rdsh-compute                  compute bridge
-  easy-work    rdsh-easy-work                guided workflow entry points
-  subagents    rdsh-subagent-optimizer       subagent prompt shaping
-  ui-comfort   rdsh-ui-comfort               deliberate Enter in the Web chat
-  sound        github:cwd514/dsh-sound-notifications   effect sounds and desktop notifications
-  gitview      github:yugapor/dsh-gitview    Web sidebar Git panel
-  intelligent-ui github:cwd514/dsh-intelligent-ui   interactive visual answers (render_ui)
+  * = starter set, on by default for PROFILE=web and PROFILE=desktop
+  translation*    rdsh-translation            Japanese translation settings and preview
+  subagents*      rdsh-subagent-optimizer     bounded exploration subagents
+  sound*          github:cwd514/dsh-sound-notifications   effect sounds and desktop notifications
+  gitview*        github:yugapor/dsh-gitview  Web sidebar Git panel
+  intelligent-ui* github:cwd514/dsh-intelligent-ui   interactive visual answers (render_ui)
+  compute         rdsh-compute                compute bridge
+  easy-work       rdsh-easy-work              guided workflow entry points
+  ui-comfort      rdsh-ui-comfort             deliberate Enter in the Web chat
 EOF
 }
 
@@ -112,7 +114,7 @@ if [ "$RECOMMENDED_SPEC" = "list" ]; then
 fi
 
 # --- recommended selection ---------------------------------------------------
-# Defaults reproduce the historical behavior exactly; an explicit
+# Defaults are the per-profile set (starter for web/desktop); an explicit
 # --recommended/RECOMMENDED value replaces them.
 rec_translation="$TRANSLATION"
 rec_compute="$COMPUTE"
@@ -126,6 +128,12 @@ rec_gitview="$GITVIEW"
 recommended_all() {
   rec_translation=1; rec_compute=1; rec_easy_work=1; rec_subagents=1; rec_ui_comfort=1; rec_intelligent_ui=1; rec_sound=1; rec_gitview=1
 }
+# The beginner starter set: what a newcomer from Codex or Claude Code expects
+# without configuring anything. Plugins that change a familiar default (Enter
+# to send, the empty-chat preset picker) or need extra setup stay out of it.
+recommended_starter() {
+  rec_translation=1; rec_compute=0; rec_easy_work=0; rec_subagents=1; rec_ui_comfort=0; rec_intelligent_ui=1; rec_sound=1; rec_gitview=1
+}
 recommended_none() {
   rec_translation=0; rec_compute=0; rec_easy_work=0; rec_subagents=0; rec_ui_comfort=0; rec_intelligent_ui=0; rec_sound=0; rec_gitview=0
 }
@@ -133,6 +141,7 @@ recommended_none() {
 apply_recommended_spec() {
   case "$1" in
     all) recommended_all ;;
+    starter) recommended_starter ;;
     none) recommended_none ;;
     *)
       recommended_none

@@ -377,6 +377,7 @@ fn base_cmd(
             std::process::Command::new(orig)
         };
         apply_privacy_default(&mut command);
+        apply_web_search_provider(&mut command);
         return Ok(command);
     }
     let bin = selected_node(orig).ok_or_else(|| {
@@ -410,12 +411,53 @@ fn base_cmd(
         // The rdsh settings card reports this without spawning a second binary.
         command.env("RDSH_VERSION", env!("CARGO_PKG_VERSION"));
         apply_privacy_default(&mut command);
+        apply_web_search_provider(&mut command);
         return Ok(command);
     }
     let mut command = crate::tool_security::command(orig, &bin, locale)?;
     command.env("RDSH_VERSION", env!("CARGO_PKG_VERSION"));
     apply_privacy_default(&mut command);
+    apply_web_search_provider(&mut command);
     Ok(command)
+}
+
+/// Upstream provider id for delegated web search, set once from the settings
+/// document in `main`. Empty means "leave the child environment alone".
+static WEB_SEARCH_PROVIDER: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
+/// Remember the configured provider id for later delegated runs.
+pub fn configure_web_search_provider(cfg: &crate::rdsh_config::RdshSettings) {
+    let _ = WEB_SEARCH_PROVIDER.set(cfg.search.dsh_search_provider.clone());
+}
+
+const WEB_SEARCH_PROVIDER_ENV: &str = "DSH_WEB_SEARCH_PROVIDER";
+
+/// The id to export, or `None` to leave the child environment untouched.
+///
+/// Opt-in: an empty setting exports nothing, and a value the caller already put
+/// in the environment always wins. Upstream fails a search closed with
+/// `WEB_PROVIDER_CONFIGURED_MISSING` when the id is not registered, so a value
+/// that is not a plain provider id (whitespace or control characters) is
+/// ignored rather than passed on.
+fn provider_env_id<'a>(configured: &'a str, existing: Option<&str>) -> Option<&'a str> {
+    if existing.is_some_and(|value| !value.is_empty()) {
+        return None;
+    }
+    let id = configured.trim();
+    if id.is_empty() || id.chars().any(|c| c.is_control() || c.is_whitespace()) {
+        return None;
+    }
+    Some(id)
+}
+
+/// Pin the upstream web-search provider for delegated runs when
+/// `search.dsh_search_provider` is set. See docs/WEB-SEARCH.md.
+fn apply_web_search_provider(cmd: &mut std::process::Command) {
+    let configured = WEB_SEARCH_PROVIDER.get().map(String::as_str).unwrap_or("");
+    let existing = std::env::var(WEB_SEARCH_PROVIDER_ENV).ok();
+    if let Some(id) = provider_env_id(configured, existing.as_deref()) {
+        cmd.env(WEB_SEARCH_PROVIDER_ENV, id);
+    }
 }
 
 /// Privacy default for every delegated DSH run: upstream telemetry stays off
@@ -636,6 +678,27 @@ mod tests {
 
     fn sv(v: &[&str]) -> Vec<String> {
         v.iter().map(ToString::to_string).collect()
+    }
+
+    // The provider pin is opt-in and never overrides the caller's environment:
+    // an unregistered id would make every upstream search fail closed.
+    #[test]
+    fn web_search_provider_is_opt_in_and_never_overrides_the_caller() {
+        assert_eq!(provider_env_id("", None), None);
+        assert_eq!(provider_env_id("   ", Some("")), None);
+        // Not a provider id: whitespace and control characters are refused.
+        assert_eq!(provider_env_id("local searxng", None), None);
+        assert_eq!(
+            provider_env_id("searxng\nDSH_TELEMETRY_DISABLED=1", None),
+            None
+        );
+        // The caller's own value wins, including a non-empty one on purpose.
+        assert_eq!(provider_env_id("searxng", Some("exa")), None);
+        assert_eq!(provider_env_id(" searxng ", Some("")), Some("searxng"));
+        assert_eq!(
+            provider_env_id("dsh-web-search-searxng", None),
+            Some("dsh-web-search-searxng")
+        );
     }
 
     #[test]

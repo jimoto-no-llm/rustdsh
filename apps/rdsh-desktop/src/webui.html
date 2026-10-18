@@ -1,0 +1,1283 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>rdsh ローカル UI</title>
+<style>
+  :root {
+    --page: #ffffff;
+    --sidebar: #f9fafb;
+    --accent: #4176e6;
+    --user-bubble: #edf3fe;
+    --hairline: rgba(0, 0, 0, .1);
+    --label: #0f1115;
+    --label-2: #61666b;
+    --label-3: #81858c;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    background: var(--page);
+    color: var(--label);
+    font: 14px/22px -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN",
+      "Noto Sans JP", Meiryo, sans-serif;
+  }
+  .app { display: flex; height: 100vh; }
+
+  /* sidebar */
+  .sidebar {
+    width: 280px;
+    flex: none;
+    background: var(--sidebar);
+    border-right: 1px solid var(--hairline);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .sidebar-head {
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .brand { font-size: 13px; font-weight: 600; letter-spacing: .01em; }
+  .status { margin-top: 4px; font-size: 11px; line-height: 16px; color: var(--label-3); }
+  .groups { flex: 1; overflow-y: auto; padding: 8px 8px 16px; }
+  .group { margin-bottom: 10px; }
+  .group-label {
+    padding: 6px 8px 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--label-2);
+    text-transform: none;
+  }
+  .group-path { font-weight: 400; color: var(--label-3); }
+  .session {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 6px 8px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--label);
+    font: inherit;
+    font-size: 13px;
+    line-height: 20px;
+    text-align: left;
+    cursor: pointer;
+  }
+  .session:hover { background: rgba(0, 0, 0, .04); }
+  .session.selected { background: var(--user-bubble); color: var(--accent); }
+  .session .title {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .dot {
+    flex: none;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+  @keyframes pulse { 50% { opacity: .25; } }
+
+  /* main column */
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .timeline { flex: 1; overflow-y: auto; padding: 24px 0; }
+  .column { max-width: 920px; margin: 0 auto; padding: 0 24px; }
+
+  .row { display: flex; margin-bottom: 18px; }
+  .row.user { justify-content: flex-end; }
+  .row-text { font-size: 14px; line-height: 24px; white-space: pre-wrap; word-break: break-word; }
+  .user-bubble {
+    max-width: 75%;
+    padding: 10px 14px;
+    border-radius: var(--radius-lg);
+    background: var(--user-bubble);
+  }
+  .assistant-text { flex: 1; }
+  .reasoning {
+    flex: 1;
+    min-width: 0;
+    padding: 8px 12px;
+    border-left: 2px solid var(--hairline);
+    color: var(--label-2);
+    font-size: 13px;
+    line-height: 22px;
+  }
+  .reasoning-head {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--label-3);
+    font: inherit;
+    font-size: 11px;
+    line-height: 18px;
+    cursor: pointer;
+  }
+  .reasoning-head:hover { color: var(--label-2); }
+  .reasoning-caret { font-size: 10px; }
+  .reasoning-body { display: none; margin-top: 4px; }
+  .reasoning.open .reasoning-body { display: block; }
+
+  /* tool rows */
+  .tool { flex: 1; min-width: 0; }
+  .tool-row {
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-sm);
+    background: #fbfcfd;
+  }
+  .tool-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 5px 10px;
+    border: 0;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--label-2);
+    font: inherit;
+    font-size: 12px;
+    line-height: 18px;
+    text-align: left;
+    cursor: pointer;
+  }
+  .tool-glyph { flex: none; font-size: 11px; }
+  .tool-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--label);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+  }
+  .tool-state { flex: none; font-size: 11px; }
+  .tool-caret { flex: none; color: var(--label-3); font-size: 10px; }
+  .tool-running .tool-glyph, .tool-running .tool-state { color: #b26a00; }
+  .tool-done .tool-glyph, .tool-done .tool-state { color: #1a7f37; }
+  .tool-failed .tool-glyph, .tool-failed .tool-state { color: #c02b2b; }
+  .tool-body {
+    display: none;
+    margin: 0 10px 8px;
+    padding: 6px 8px;
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+    background: #f6f7f9;
+    color: var(--label-2);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    line-height: 18px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .tool-row.open .tool-body { display: block; }
+
+  /* markdown */
+  .md { white-space: normal; }
+  .md > :first-child { margin-top: 0; }
+  .md > :last-child { margin-bottom: 0; }
+  .md-p { margin: 0 0 8px; }
+  .md-h { margin: 14px 0 6px; font-weight: 600; line-height: 1.35; }
+  h1.md-h { font-size: 19px; }
+  h2.md-h { font-size: 17px; }
+  h3.md-h { font-size: 15px; }
+  h4.md-h, h5.md-h, h6.md-h { font-size: 14px; }
+  .md-list { margin: 0 0 8px; padding-left: 22px; }
+  .md-list .md-list { margin: 2px 0 0; }
+  .md-li { margin: 2px 0; }
+  .md-quote {
+    margin: 0 0 8px;
+    padding: 2px 0 2px 12px;
+    border-left: 3px solid var(--hairline);
+    color: var(--label-2);
+  }
+  .md-hr { height: 0; margin: 12px 0; border: 0; border-top: 1px solid var(--hairline); }
+  .md-code {
+    padding: 1px 5px;
+    border: 1px solid var(--hairline);
+    border-radius: 5px;
+    background: #f1f3f5;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: .92em;
+  }
+  .md-link { color: var(--accent); text-decoration: none; }
+  .md-link:hover { text-decoration: underline; }
+  .md-codeblock {
+    margin: 8px 0;
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-sm);
+    background: #fbfcfd;
+    overflow: hidden;
+  }
+  .md-codeblock-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 3px 6px 3px 10px;
+    border-bottom: 1px solid var(--hairline);
+    background: #f4f6f8;
+    color: var(--label-3);
+    font-size: 11px;
+    line-height: 18px;
+  }
+  .md-codeblock-lang {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .md-copy {
+    flex: none;
+    padding: 1px 8px;
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--label-2);
+    font: inherit;
+    font-size: 11px;
+    line-height: 16px;
+    cursor: pointer;
+  }
+  .md-copy:hover { background: #eef1f4; }
+  .md-pre {
+    margin: 0;
+    padding: 10px 12px;
+    overflow-x: auto;
+    background: transparent;
+  }
+  .md-codeblock-code {
+    display: block;
+    color: var(--label);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    line-height: 19px;
+    white-space: pre;
+  }
+  .empty { color: var(--label-3); font-size: 13px; }
+  .cursor {
+    display: inline-block;
+    width: 7px;
+    height: 15px;
+    margin-left: 2px;
+    vertical-align: -2px;
+    background: var(--accent);
+    animation: blink 1s step-start infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+  .notes { margin-top: 8px; }
+  .note { font-size: 12px; color: var(--label-3); }
+
+  /* banner */
+  .banner {
+    display: none;
+    margin: 0 auto 16px;
+    max-width: 920px;
+    padding: 10px 14px;
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-md);
+    background: #fffdf5;
+  }
+  .banner.show { display: block; }
+  .update-notice { background: #fff8e8; border-color: #f0d9a8; }
+  .update-notice .banner-actions { margin-top: 10px; }
+  .banner-title { font-size: 13px; font-weight: 600; }
+  .banner-body { margin-top: 4px; font-size: 13px; line-height: 22px; }
+  .banner-actions { margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .button {
+    padding: 6px 12px;
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-sm);
+    background: #fff;
+    color: var(--label);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .button:hover { background: #f4f6f8; }
+  .button.primary { border-color: var(--accent); background: var(--accent); color: #fff; }
+  .button.primary:hover { background: #3568d4; }
+
+  /* composer */
+  .composer { border-top: 1px solid var(--hairline); background: var(--page); padding: 12px 0 16px; }
+  .composer-inner { max-width: 920px; margin: 0 auto; padding: 0 24px; }
+  .composer-box {
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-md);
+    background: #fff;
+    padding: 8px 10px;
+  }
+  .composer-box:focus-within { border-color: var(--accent); }
+  textarea {
+    width: 100%;
+    min-height: 44px;
+    max-height: 200px;
+    border: 0;
+    outline: 0;
+    resize: none;
+    background: transparent;
+    color: var(--label);
+    font: inherit;
+    font-size: 14px;
+    line-height: 24px;
+  }
+  .composer-foot { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    border: 1px solid var(--hairline);
+    border-radius: 999px;
+    background: var(--sidebar);
+    font-size: 12px;
+    color: var(--label-2);
+    cursor: pointer;
+  }
+  select.model-picker {
+    max-width: 320px;
+    padding: 3px 6px;
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-sm);
+    background: #fff;
+    color: var(--label);
+    font: inherit;
+    font-size: 12px;
+  }
+  .spacer { flex: 1; }
+  .hint { font-size: 11px; color: var(--label-3); }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-head">
+      <div class="brand">rdsh ローカル UI</div>
+      <div class="status" id="status">接続しています…</div>
+      <span class="chip hidden" id="update-badge" title="ハーネスの更新">更新: —</span>
+    </div>
+    <div class="groups" id="groups"></div>
+  </aside>
+
+  <main class="main">
+    <div class="banner update-notice" id="update-notice">
+      <div class="banner-title" id="update-notice-title"></div>
+      <div class="banner-body" id="update-notice-body"></div>
+      <div class="banner-actions">
+        <button class="button" id="update-notice-close">閉じる</button>
+      </div>
+    </div>
+    <div class="timeline" id="timeline">
+      <div class="column">
+        <div class="banner" id="banner">
+          <div class="banner-title" id="banner-title"></div>
+          <div class="banner-body" id="banner-body"></div>
+          <div class="banner-actions" id="banner-actions"></div>
+        </div>
+        <div id="messages"></div>
+        <div class="notes" id="notes"></div>
+      </div>
+    </div>
+
+    <div class="composer">
+      <div class="composer-inner">
+        <div class="composer-box">
+          <textarea id="input" rows="2" placeholder="メッセージを入力（Enter で送信、Shift+Enter で改行）"></textarea>
+          <div class="composer-foot">
+            <span class="chip" id="model-chip" title="現在のモデル">モデル: —</span>
+            <select class="model-picker hidden" id="model-picker" aria-label="モデルを選択"></select>
+            <span class="spacer"></span>
+            <span class="hint" id="hint"></span>
+            <button class="button hidden" id="cancel">停止</button>
+            <button class="button primary" id="send">送信</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+"use strict";
+(function () {
+  // The server substitutes its random page token for this marker, so the page
+  // never carries the harness cookie.
+  var TOKEN = "__RDSH_TOKEN__";
+  var state = null;
+  var streaming = "";
+  var lastRole = "";
+  var wasRunning = false;
+  var hidden = false;
+  var notifiedFinish = false;
+  var permissionAsked = false;
+  // What the user has picked and typed for the pending question. The worker
+  // publishes a full state frame every 250 ms while a question is open, so the
+  // banner is rebuilt constantly; keeping the answers here (keyed by call id)
+  // means a rebuild never discards a half-finished answer.
+  var answerDrafts = {};
+  var answerDraftsCall = "";
+  // Which reasoning rows the user opened, keyed by "session#index". It lives
+  // outside the message list so a state frame rebuild keeps the toggle.
+  var reasoningOpen = {};
+
+  var el = function (id) { return document.getElementById(id); };
+  var timeline = el("timeline");
+  var messages = el("messages");
+  var groupsBox = el("groups");
+  var statusBox = el("status");
+  var notesBox = el("notes");
+  var banner = el("banner");
+  var bannerTitle = el("banner-title");
+  var bannerBody = el("banner-body");
+  var bannerActions = el("banner-actions");
+  var input = el("input");
+  var modelChip = el("model-chip");
+  var updateBadge = el("update-badge");
+  var updateNotice = el("update-notice");
+  var updateNoticeTitle = el("update-notice-title");
+  var updateNoticeBody = el("update-notice-body");
+  var updateNotified = false;
+  var updateDismissed = false;
+  el("update-notice-close").onclick = function () {
+    updateDismissed = true;
+    updateNotice.classList.remove("show");
+  };
+  var picker = el("model-picker");
+  var cancelButton = el("cancel");
+  var sendButton = el("send");
+  var hint = el("hint");
+
+  function api(path, body) {
+    var init = { headers: {} };
+    init.headers["x-rdsh-token"] = TOKEN;
+    if (body !== undefined) {
+      init.method = "POST";
+      init.headers["Content-Type"] = "application/json";
+      init.body = JSON.stringify(body);
+    }
+    return fetch(path, init).then(function (response) {
+      return response.json().catch(function () { return {}; }).then(function (value) {
+        if (!response.ok) {
+          throw new Error(value.error || ("HTTP " + response.status));
+        }
+        return value;
+      });
+    });
+  }
+
+  function nearBottom() {
+    return timeline.scrollHeight - timeline.scrollTop - timeline.clientHeight < 140;
+  }
+
+  function render() {
+    if (!state) { return; }
+    var stick = nearBottom();
+    statusBox.textContent = state.status || "";
+    if (state.update && state.update.available) {
+      updateBadge.textContent = "dsh " + state.update.newest + " が利用可能";
+      updateBadge.classList.remove("hidden");
+      if (!updateDismissed) {
+        updateNoticeTitle.textContent = "dsh " + state.update.newest + " が利用可能です";
+        updateNoticeBody.textContent =
+          "現在 " + (state.update.active || "不明") + " を使用中。更新: npm install -g @deepseek-ai/dsh@" + state.update.newest;
+        updateNotice.classList.add("show");
+      }
+      if (!updateNotified) {
+        updateNotified = true;
+        notify("ハーネスの更新があります", "dsh " + state.update.newest + " が公開されています");
+      }
+    } else {
+      updateBadge.classList.add("hidden");
+      updateNotice.classList.remove("show");
+    }
+    if (state.currentModel) {
+      modelChip.textContent = "モデル: " + state.currentModel;
+    } else {
+      modelChip.textContent = "モデル: —";
+    }
+    cancelButton.classList.toggle("hidden", !state.running);
+
+    renderGroups();
+    renderPicker();
+
+    var all = (state.messages || []).slice();
+    if (state.streaming) {
+      all.push({ role: "assistant", text: state.streaming, streaming: true });
+    }
+    while (messages.firstChild) { messages.removeChild(messages.firstChild); }
+    if (all.length === 0) {
+      var placeholder = document.createElement("div");
+      placeholder.className = "empty";
+      placeholder.textContent = "会話を選ぶと、ここにタイムラインが表示されます。";
+      messages.appendChild(placeholder);
+    }
+    for (var index = 0; index < all.length; index += 1) {
+      messages.appendChild(renderRow(all[index], index));
+    }
+
+    var notes = state.notes || [];
+    notesBox.innerHTML = notes
+      .slice(-4)
+      .map(function (note) { return '<div class="note">' + escapeHtml(note) + "</div>"; })
+      .join("");
+
+    renderBanner();
+
+    if (stick) {
+      timeline.scrollTop = timeline.scrollHeight;
+    }
+  }
+
+  function escapeHtml(text) {
+    return String(text)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  // __MD_BEGIN__
+  // Markdown renderer. It never assigns untrusted text to innerHTML: the
+  // source is first parsed into a plain node tree ({tag, attrs, children},
+  // where tag === null is a text node) and hydrate() turns that tree into real
+  // DOM with createElement/createTextNode/setAttribute only.
+  var mdTreeCache = {};
+  var mdCacheKeys = [];
+
+  function textNode(text) { return { tag: null, text: String(text) }; }
+
+  // Only http(s), mailto and in-page links survive; javascript:, data: and
+  // vbscript: targets are dropped and the label is kept as plain text.
+  function safeHref(href) {
+    var value = String(href == null ? "" : href).trim();
+    if (/^(https?:|mailto:)/i.test(value)) { return value; }
+    if (value.charAt(0) === "#") { return value; }
+    return "";
+  }
+
+  function mdInline(source) {
+    var text = String(source == null ? "" : source);
+    var nodes = [];
+    var buffer = "";
+    var index = 0;
+    function flush() {
+      if (buffer) { nodes.push(textNode(buffer)); buffer = ""; }
+    }
+    while (index < text.length) {
+      var ch = text.charAt(index);
+      if (ch === "\n") {
+        flush();
+        nodes.push({ tag: "br", attrs: {}, children: [] });
+        index += 1;
+        continue;
+      }
+      if (ch === "`") {
+        var tick = text.indexOf("`", index + 1);
+        if (tick > index + 1) {
+          flush();
+          nodes.push({ tag: "code", attrs: { class: "md-code" },
+            children: [textNode(text.slice(index + 1, tick))] });
+          index = tick + 1;
+          continue;
+        }
+      }
+      if (ch === "*" && text.charAt(index + 1) === "*") {
+        var strongEnd = text.indexOf("**", index + 2);
+        if (strongEnd > index + 2) {
+          flush();
+          nodes.push({ tag: "strong", attrs: {},
+            children: mdInline(text.slice(index + 2, strongEnd)) });
+          index = strongEnd + 2;
+          continue;
+        }
+      }
+      if (ch === "*" || ch === "_") {
+        var joined = index > 0 && /[0-9A-Za-z]/.test(text.charAt(index - 1));
+        var closeAt = text.indexOf(ch, index + 1);
+        var joinedAfter = closeAt >= 0 && /[0-9A-Za-z]/.test(text.charAt(closeAt + 1));
+        if (!joined && closeAt > index + 1 && !joinedAfter) {
+          flush();
+          nodes.push({ tag: "em", attrs: {},
+            children: mdInline(text.slice(index + 1, closeAt)) });
+          index = closeAt + 1;
+          continue;
+        }
+      }
+      if (ch === "[") {
+        var labelEnd = text.indexOf("](", index + 1);
+        if (labelEnd > index) {
+          var hrefEnd = text.indexOf(")", labelEnd + 2);
+          if (hrefEnd > labelEnd + 1) {
+            flush();
+            nodes.push(mdLink(text.slice(index + 1, labelEnd), text.slice(labelEnd + 2, hrefEnd)));
+            index = hrefEnd + 1;
+            continue;
+          }
+        }
+      }
+      buffer += ch;
+      index += 1;
+    }
+    flush();
+    return nodes;
+  }
+
+  function mdLink(label, href) {
+    var safe = safeHref(href);
+    if (!safe) {
+      return { tag: "span", attrs: { class: "md-link-raw" }, children: mdInline(label) };
+    }
+    return { tag: "a", attrs: { class: "md-link", href: safe, target: "_blank", rel: "noopener noreferrer" },
+      children: mdInline(label) };
+  }
+
+  var MD_FENCE = /^\s*(?:```|~~~)\s*([^\s`]*)\s*$/;
+  var MD_ITEM = /^(\s*)(?:[-*+]|\d+[.)])\s+(.*)$/;
+
+  function mdOrdered(line) { return /^\s*\d+[.)]\s+/.test(line); }
+
+  function mdIsBlockStart(line) {
+    return MD_FENCE.test(line)
+      || /^\s*#{1,6}\s+/.test(line)
+      || /^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/.test(line)
+      || /^\s*>/.test(line)
+      || MD_ITEM.test(line);
+  }
+
+  function mdList(lines, start) {
+    var first = MD_ITEM.exec(lines[start]);
+    var ordered = mdOrdered(lines[start]);
+    var baseIndent = first[1].length;
+    var node = { tag: ordered ? "ol" : "ul",
+      attrs: { class: "md-list" + (ordered ? " md-list-ol" : "") }, children: [] };
+    var index = start;
+    while (index < lines.length) {
+      var item = MD_ITEM.exec(lines[index]);
+      if (!item) {
+        if (/^\s*$/.test(lines[index])) {
+          var look = index;
+          while (look < lines.length && /^\s*$/.test(lines[look])) { look += 1; }
+          var after = look < lines.length ? MD_ITEM.exec(lines[look]) : null;
+          if (after && after[1].length >= baseIndent && mdOrdered(lines[look]) === ordered) {
+            index = look;
+            continue;
+          }
+          break;
+        }
+        var previous = node.children[node.children.length - 1];
+        var continuation = /^(\s+)(\S.*)$/.exec(lines[index]);
+        if (previous && continuation && continuation[1].length >= baseIndent + 2) {
+          previous.children.push(textNode(" " + continuation[2].trim()));
+          index += 1;
+          continue;
+        }
+        break;
+      }
+      var indent = item[1].length;
+      if (indent < baseIndent) { break; }
+      if (indent > baseIndent) {
+        var nested = mdList(lines, index);
+        var target = node.children[node.children.length - 1];
+        if (!target) { break; }
+        target.children.push(nested.node);
+        index = nested.next;
+        continue;
+      }
+      if (mdOrdered(lines[index]) !== ordered) { break; }
+      node.children.push({ tag: "li", attrs: { class: "md-li" }, children: mdInline(item[2]) });
+      index += 1;
+    }
+    return { node: node, next: index };
+  }
+
+  function mdCodeBlock(lang, code) {
+    return {
+      tag: "div",
+      attrs: { class: "md-codeblock" },
+      children: [
+        { tag: "div", attrs: { class: "md-codeblock-bar" }, children: [
+          { tag: "span", attrs: { class: "md-codeblock-lang" }, children: [textNode(lang || "text")] },
+          { tag: "button", attrs: { class: "md-copy", type: "button", title: "コードをコピー" },
+            children: [textNode("コピー")] }
+        ] },
+        { tag: "pre", attrs: { class: "md-pre" }, children: [
+          { tag: "code", attrs: { class: "md-codeblock-code" }, children: [textNode(code)] }
+        ] }
+      ]
+    };
+  }
+
+  function mdBlocks(source) {
+    var lines = String(source == null ? "" : source).replace(/\r\n?/g, "\n").split("\n");
+    var nodes = [];
+    var index = 0;
+    while (index < lines.length) {
+      var line = lines[index];
+      var fence = MD_FENCE.exec(line);
+      if (fence) {
+        var lang = fence[1] || "";
+        var code = [];
+        index += 1;
+        while (index < lines.length && !MD_FENCE.test(lines[index])) {
+          code.push(lines[index]);
+          index += 1;
+        }
+        if (index < lines.length) { index += 1; }
+        nodes.push(mdCodeBlock(lang, code.join("\n")));
+        continue;
+      }
+      if (/^\s*$/.test(line)) { index += 1; continue; }
+      var heading = /^\s*(#{1,6})\s+(.*)$/.exec(line);
+      if (heading) {
+        nodes.push({ tag: "h" + heading[1].length, attrs: { class: "md-h" },
+          children: mdInline(heading[2].replace(/\s+#+\s*$/, "").trim()) });
+        index += 1;
+        continue;
+      }
+      if (/^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/.test(line)) {
+        nodes.push({ tag: "hr", attrs: { class: "md-hr" }, children: [] });
+        index += 1;
+        continue;
+      }
+      if (/^\s*>/.test(line)) {
+        var quoted = [];
+        while (index < lines.length && /^\s*>/.test(lines[index])) {
+          quoted.push(lines[index].replace(/^\s*>\s?/, ""));
+          index += 1;
+        }
+        nodes.push({ tag: "blockquote", attrs: { class: "md-quote" },
+          children: mdBlocks(quoted.join("\n")) });
+        continue;
+      }
+      if (MD_ITEM.test(line)) {
+        var list = mdList(lines, index);
+        nodes.push(list.node);
+        index = list.next;
+        continue;
+      }
+      var paragraph = [];
+      while (index < lines.length && !/^\s*$/.test(lines[index]) && !mdIsBlockStart(lines[index])) {
+        paragraph.push(lines[index].trim());
+        index += 1;
+      }
+      if (paragraph.length) {
+        nodes.push({ tag: "p", attrs: { class: "md-p" }, children: mdInline(paragraph.join("\n")) });
+      } else {
+        index += 1;
+      }
+    }
+    return nodes;
+  }
+
+  function mdCached(text) {
+    var key = String(text == null ? "" : text);
+    if (Object.prototype.hasOwnProperty.call(mdTreeCache, key)) { return mdTreeCache[key]; }
+    var tree = mdBlocks(key);
+    mdTreeCache[key] = tree;
+    mdCacheKeys.push(key);
+    if (mdCacheKeys.length > 120) {
+      delete mdTreeCache[mdCacheKeys.shift()];
+    }
+    return tree;
+  }
+
+  function hydrate(node) {
+    if (!node.tag) { return document.createTextNode(node.text == null ? "" : node.text); }
+    var element = document.createElement(node.tag);
+    var attrs = node.attrs || {};
+    Object.keys(attrs).forEach(function (name) {
+      if (/^on/i.test(name)) { return; }
+      var value = attrs[name];
+      if (name === "href") {
+        value = safeHref(value);
+        if (!value) { return; }
+      }
+      element.setAttribute(name, value);
+    });
+    (node.children || []).forEach(function (child) {
+      element.appendChild(hydrate(child));
+    });
+    return element;
+  }
+
+  function markdownFragment(text) {
+    var fragment = document.createDocumentFragment();
+    mdCached(text).forEach(function (node) {
+      fragment.appendChild(hydrate(node));
+    });
+    return fragment;
+  }
+  // __MD_END__
+
+  function renderRow(message, index) {
+    var role = message.role || "assistant";
+    var row = document.createElement("div");
+    row.className = "row" + (role === "user" ? " user" : "");
+    if (role === "user") {
+      var bubble = document.createElement("div");
+      bubble.className = "user-bubble";
+      var userText = document.createElement("div");
+      userText.className = "row-text md";
+      userText.appendChild(markdownFragment(message.text || ""));
+      bubble.appendChild(userText);
+      row.appendChild(bubble);
+      return row;
+    }
+    if (role === "reasoning") {
+      row.appendChild(reasoningElement(message, index));
+      return row;
+    }
+    if (role === "tool") {
+      row.appendChild(toolElement(message));
+      return row;
+    }
+    var body = document.createElement("div");
+    body.className = "assistant-text row-text md";
+    body.appendChild(markdownFragment(message.text || ""));
+    if (message.streaming) {
+      var cursor = document.createElement("span");
+      cursor.className = "cursor";
+      body.appendChild(cursor);
+    }
+    row.appendChild(body);
+    return row;
+  }
+
+  // Collapsed by default; reasoningOpen remembers the user's choice while the
+  // page is open, including across the full re-render done on every frame.
+  function reasoningElement(message, index) {
+    var key = (state && state.selected ? state.selected : "") + "#" + index;
+    var open = !!reasoningOpen[key];
+    var box = document.createElement("div");
+    box.className = "reasoning" + (open ? " open" : "");
+    var head = document.createElement("button");
+    head.type = "button";
+    head.className = "reasoning-head";
+    var caret = document.createElement("span");
+    caret.className = "reasoning-caret";
+    caret.textContent = open ? "\u25be" : "\u25b8";
+    var label = document.createElement("span");
+    label.textContent = open ? "推論を隠す" : "推論を表示";
+    head.appendChild(caret);
+    head.appendChild(label);
+    head.addEventListener("click", function () {
+      var next = !reasoningOpen[key];
+      reasoningOpen[key] = next;
+      box.classList.toggle("open", next);
+      caret.textContent = next ? "\u25be" : "\u25b8";
+      label.textContent = next ? "推論を隠す" : "推論を表示";
+    });
+    var body = document.createElement("div");
+    body.className = "reasoning-body row-text md";
+    body.appendChild(markdownFragment(message.text || ""));
+    box.appendChild(head);
+    box.appendChild(body);
+    return box;
+  }
+
+  function splitTool(text) {
+    var value = String(text == null ? "" : text);
+    var at = value.indexOf(" · ");
+    if (at < 0) { return { name: value, detail: "" }; }
+    return { name: value.slice(0, at), detail: value.slice(at + 3) };
+  }
+
+  // /api/state publishes only {role, text} for a tool call, so the state is
+  // inferred from the text. An explicit state/status field wins if the server
+  // ever adds one.
+  function toolStatus(message, text) {
+    var declared = String(message.state || message.status || "").toLowerCase();
+    if (/fail|error|abort/.test(declared) || declared === "失敗") {
+      return { label: "失敗", cls: "tool-failed", glyph: "\u2715" };
+    }
+    if (/run|pending|start/.test(declared) || declared === "実行中") {
+      return { label: "実行中", cls: "tool-running", glyph: "\u25d0" };
+    }
+    if (/done|complete|success|ok/.test(declared) || declared === "完了") {
+      return { label: "完了", cls: "tool-done", glyph: "\u2713" };
+    }
+    var value = String(text == null ? "" : text);
+    if (/失敗|エラー|拒否|タイムアウト/.test(value)
+      || /(?:^|[^A-Za-z])(?:error|failed|failure|fatal|denied|timeout|exception)(?:[^A-Za-z]|$)/i.test(value)) {
+      return { label: "失敗", cls: "tool-failed", glyph: "\u2715" };
+    }
+    if (/実行中|running|pending|開始|処理中|承認待ち|in progress/i.test(value)) {
+      return { label: "実行中", cls: "tool-running", glyph: "\u25d0" };
+    }
+    return { label: "完了", cls: "tool-done", glyph: "\u2713" };
+  }
+
+  function toolElement(message) {
+    var text = message.text || "";
+    var parts = splitTool(text);
+    var status = toolStatus(message, text);
+    var wrap = document.createElement("div");
+    wrap.className = "tool-row " + status.cls;
+    var head = document.createElement("button");
+    head.type = "button";
+    head.className = "tool-head";
+    var glyph = document.createElement("span");
+    glyph.className = "tool-glyph";
+    glyph.textContent = status.glyph;
+    var name = document.createElement("span");
+    name.className = "tool-name";
+    name.textContent = parts.name;
+    var stateLabel = document.createElement("span");
+    stateLabel.className = "tool-state";
+    stateLabel.textContent = status.label;
+    head.appendChild(glyph);
+    head.appendChild(name);
+    head.appendChild(stateLabel);
+    wrap.appendChild(head);
+    if (parts.detail) {
+      var caret = document.createElement("span");
+      caret.className = "tool-caret";
+      caret.textContent = "\u25b8";
+      head.appendChild(caret);
+      var body = document.createElement("div");
+      body.className = "tool-body";
+      body.textContent = parts.detail;
+      head.addEventListener("click", function () {
+        var open = wrap.classList.toggle("open");
+        caret.textContent = open ? "\u25be" : "\u25b8";
+      });
+      wrap.appendChild(body);
+    }
+    return wrap;
+  }
+
+  function renderGroups() {
+    var groups = state.groups || [];
+    var html = "";
+    groups.forEach(function (group) {
+      html += '<div class="group"><div class="group-label">' + escapeHtml(group.label);
+      if (group.path && group.path !== group.label) {
+        html += ' <span class="group-path">' + escapeHtml(group.path) + "</span>";
+      }
+      html += "</div>";
+      (group.sessions || []).forEach(function (session) {
+        var selected = state.selected === session.id ? " selected" : "";
+        var dot = session.running ? '<span class="dot" title="実行中"></span>' : "";
+        var title = escapeHtml(session.title || session.id);
+        html += '<button class="session' + selected + '" data-session="' + escapeHtml(session.id) + '">'
+          + dot + '<span class="title">' + title + "</span></button>";
+      });
+      html += "</div>";
+    });
+    if (!html) {
+      html = '<div class="empty" style="padding:12px">会話がありません。</div>';
+    }
+    groupsBox.innerHTML = html;
+  }
+
+  function renderPicker() {
+    var providers = state.modelGroups || [];
+    var currentId = "";
+    var html = "";
+    providers.forEach(function (provider) {
+      var group = document.createElement("optgroup");
+      group.label = provider.name + (provider.current ? "（現在）" : "");
+      (provider.models || []).forEach(function (model) {
+        if (model.current) { currentId = provider.id + "/" + model.id; }
+        html += '<option value="' + escapeHtml(provider.id + "/" + model.id) + '">'
+          + escapeHtml(provider.name + " · " + model.name) + "</option>";
+      });
+      void group;
+    });
+    if (html) {
+      picker.innerHTML = html;
+      picker.value = currentId;
+      picker.classList.remove("hidden");
+      modelChip.classList.add("hidden");
+    } else {
+      picker.classList.add("hidden");
+      modelChip.classList.remove("hidden");
+    }
+  }
+
+  function renderBanner() {
+    var pending = state.pending;
+    if (!pending) {
+      banner.classList.remove("show");
+      bannerActions.innerHTML = "";
+      return;
+    }
+    banner.classList.add("show");
+    bannerActions.innerHTML = "";
+    if (pending.kind === "approval") {
+      bannerTitle.textContent = "承認待ち: " + (pending.tool || "tool");
+      bannerBody.textContent = pending.reason || "";
+      addButton("許可", "primary", function () {
+        api("/api/approve", { allow: true }).then(refresh).catch(showError);
+      });
+      addButton("拒否", "", function () {
+        api("/api/approve", { allow: false }).then(refresh).catch(showError);
+      });
+      return;
+    }
+    bannerTitle.textContent = "質問";
+    bannerBody.textContent = "";
+    var questions = pending.questions || [];
+    // A new question set starts from empty drafts; re-rendering keeps them.
+    if (answerDraftsCall !== (pending.callId || "")) {
+      answerDraftsCall = pending.callId || "";
+      answerDrafts = {};
+    }
+    questions.forEach(function (question) {
+      var block = document.createElement("div");
+      block.style.marginBottom = "6px";
+      var label = document.createElement("div");
+      label.textContent = (question.header ? "[" + question.header + "] " : "") + (question.question || "");
+      block.appendChild(label);
+      var draft = answerDrafts[question.id];
+      if (!draft) {
+        draft = { id: question.id, selected: [], custom: "" };
+        answerDrafts[question.id] = draft;
+      }
+      (question.options || []).forEach(function (option) {
+        var choice = document.createElement("label");
+        choice.style.display = "block";
+        choice.style.fontSize = "13px";
+        var box = document.createElement("input");
+        box.type = question.multiSelect ? "checkbox" : "radio";
+        box.name = "q-" + question.id;
+        box.value = option.label;
+        box.checked = draft.selected.indexOf(option.label) >= 0;
+        box.addEventListener("change", function () {
+          if (question.multiSelect) {
+            draft.selected = Array.prototype.slice
+              .call(block.querySelectorAll("input:checked"))
+              .map(function (node) { return node.value; });
+          } else {
+            draft.selected = [option.label];
+          }
+        });
+        choice.appendChild(box);
+        choice.appendChild(document.createTextNode(" " + option.label
+          + (option.description ? "（" + option.description + "）" : "")));
+        block.appendChild(choice);
+      });
+      if (question.allowCustom) {
+        var custom = document.createElement("input");
+        custom.type = "text";
+        custom.placeholder = "自由入力";
+        custom.style.width = "100%";
+        custom.style.marginTop = "4px";
+        custom.style.font = "inherit";
+        custom.style.fontSize = "13px";
+        custom.value = draft.custom;
+        custom.addEventListener("input", function () {
+          draft.custom = custom.value;
+        });
+        block.appendChild(custom);
+      }
+      bannerBody.appendChild(block);
+    });
+    addButton("回答", "primary", function () {
+      var answers = questions.map(function (question) {
+        var draft = answerDrafts[question.id] || { selected: [], custom: "" };
+        var selected = draft.selected.slice();
+        if (draft.custom) { selected.push(draft.custom); }
+        return { id: question.id, selected: selected };
+      });
+      api("/api/answer", { answers: answers }).then(refresh).catch(showError);
+    });
+  }
+
+  function addButton(text, klass, onClick) {
+    var button = document.createElement("button");
+    button.className = "button " + klass;
+    button.textContent = text;
+    button.addEventListener("click", onClick);
+    bannerActions.appendChild(button);
+  }
+
+  function showError(error) {
+    hint.textContent = String(error.message || error);
+  }
+
+  function refresh() {
+    return api("/api/state").then(function (value) {
+      applyState(value);
+    }).catch(showError);
+  }
+
+  function applyState(value) {
+    state = value;
+    streaming = value.streaming || "";
+    var running = !!value.running;
+    if (wasRunning && !running && hidden && !notifiedFinish) {
+      notify("実行が完了しました", "rdsh の応答が届きました");
+      notifiedFinish = true;
+    }
+    if (running) { notifiedFinish = false; }
+    wasRunning = running;
+    render();
+  }
+
+  function notify(title, body) {
+    if (typeof Notification === "undefined" || Notification.permission !== "granted") {
+      return;
+    }
+    try {
+      new Notification(title, { body: body });
+    } catch (error) { /* a blocked notification must not break the UI */ }
+  }
+
+  function askPermission() {
+    if (permissionAsked || typeof Notification === "undefined") { return; }
+    permissionAsked = true;
+    if (Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }
+
+  // ---- actions -----------------------------------------------------------
+
+  groupsBox.addEventListener("click", function (event) {
+    var button = event.target.closest("button.session");
+    if (!button) { return; }
+    var session = button.getAttribute("data-session");
+    if (!session || (state && state.selected === session)) { return; }
+    api("/api/select", { sessionId: session }).then(refresh).catch(showError);
+  });
+
+  // Copy buttons inside rendered code blocks. The code text is read back from
+  // the <code> element, so no source text is stored in an attribute.
+  messages.addEventListener("click", function (event) {
+    var button = event.target.closest("button.md-copy");
+    if (!button) { return; }
+    var block = button.closest(".md-codeblock");
+    var code = block ? block.querySelector("code") : null;
+    copyText(code ? code.textContent : "").then(function () {
+      if (button.copyTimer) { clearTimeout(button.copyTimer); }
+      button.textContent = "コピーしました";
+      button.copyTimer = setTimeout(function () {
+        button.textContent = "コピー";
+        button.copyTimer = null;
+      }, 1600);
+    }).catch(function () {
+      button.textContent = "コピーできません";
+    });
+  });
+
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text).catch(function () { return fallbackCopy(text); });
+    }
+    return Promise.resolve().then(function () { return fallbackCopy(text); });
+  }
+
+  function fallbackCopy(text) {
+    var area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "readonly");
+    area.style.position = "fixed";
+    area.style.top = "-1000px";
+    document.body.appendChild(area);
+    area.select();
+    try { document.execCommand("copy"); } catch (error) { /* ignored */ }
+    document.body.removeChild(area);
+  }
+
+  function send() {
+    var text = input.value.trim();
+    if (!text) { return; }
+    input.value = "";
+    api("/api/send", { text: text }).then(refresh).catch(showError);
+  }
+
+  input.addEventListener("keydown", function (event) {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      send();
+    }
+  });
+  sendButton.addEventListener("click", send);
+  cancelButton.addEventListener("click", function () {
+    api("/api/cancel", {}).then(refresh).catch(showError);
+  });
+  picker.addEventListener("change", function () {
+    var parts = picker.value.split("/");
+    if (parts.length < 2) { return; }
+    api("/api/model", { provider: parts[0], model: parts.slice(1).join("/") })
+      .then(refresh)
+      .catch(showError);
+  });
+
+  // The first click asks for notification permission, like the native client.
+  document.addEventListener("click", askPermission, { once: true });
+  document.addEventListener("visibilitychange", function () {
+    hidden = document.hidden;
+  });
+  hidden = document.hidden;
+
+  // ---- live stream -------------------------------------------------------
+
+  function connect() {
+    var source = new EventSource("/api/events?token=" + encodeURIComponent(TOKEN));
+    source.addEventListener("state", function (event) {
+      applyState(JSON.parse(event.data));
+    });
+    source.addEventListener("refreshed", function (event) {
+      applyState(JSON.parse(event.data));
+    });
+    source.addEventListener("delta", function (event) {
+      var data = JSON.parse(event.data);
+      streaming += data.text || "";
+      if (state) {
+        state.streaming = streaming;
+        state.running = true;
+      }
+      wasRunning = true;
+      render();
+    });
+    source.addEventListener("idle", function () {
+      streaming = "";
+      if (state) { state.streaming = ""; }
+      refresh();
+    });
+    source.addEventListener("pending", function (event) {
+      var pending = JSON.parse(event.data);
+      if (state) { state.pending = pending; }
+      render();
+      var title = pending.kind === "approval"
+        ? "承認待ちがあります"
+        : "質問が届きました";
+      notify(title, pending.reason || (pending.questions && pending.questions[0]
+        ? pending.questions[0].question
+        : ""));
+    });
+    source.addEventListener("dismissed", function () {
+      if (state) { state.pending = null; }
+      render();
+    });
+    source.addEventListener("note", function (event) {
+      var data = JSON.parse(event.data);
+      hint.textContent = data.text || "";
+    });
+    source.addEventListener("error", function () {
+      // EventSource reconnects by itself; the state frame re-syncs us.
+      hint.textContent = "イベント接続を再接続しています…";
+    });
+  }
+
+  refresh().then(connect);
+})();
+</script>
+</body>
+</html>

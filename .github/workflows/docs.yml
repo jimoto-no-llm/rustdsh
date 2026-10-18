@@ -54,5 +54,5 @@ jobs:
           args: >-
             --config .lychee.toml --verbose --no-progress
             --remap '^https://github[.]com/sahenjp/rustdsh(/.*)?$ https://github.com/jimoto-no-llm/rustdsh$1'
-            README.md README.ja.md CHANGELOG.md CONTRIBUTING.md SECURITY.md SUPPORT.md docs/**/*.md dashboard/README.md
+            README.md README.ja.md CHANGELOG.md CONTRIBUTING.md SECURITY.md SUPPORT.md THIRD_PARTY_LICENSES.md docs/**/*.md dashboard/README.md
           fail: true

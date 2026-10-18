@@ -1,0 +1,42 @@
+# Dependency license and registry policy for the rdsh crate.
+#
+# Enforced by the "Rust dependency audit" job in
+# .github/workflows/rust-audit.yml, which runs:
+#   cargo deny check licenses sources
+# Advisories are covered there by cargo audit.
+#
+# Reproduce locally:
+#   cargo install cargo-deny --locked
+#   cargo deny check licenses sources
+#
+# The allow list is exactly the set of licenses reachable from Cargo.lock,
+# dev-dependencies included. Adding a dependency with a new license is a
+# deliberate decision: extend the list only after checking its terms, so a
+# copyleft license never enters the dependency tree unnoticed.
+
+[licenses]
+version = 2
+# cargo-deny skips dev-dependencies by default. rdsh checks them too so the
+# policy above covers every crate in Cargo.lock, not just the ones that end up
+# in the shipped binary.
+include-dev = true
+# Default confidence for matching a license text to its SPDX identifier.
+confidence-threshold = 0.8
+allow = [
+  "MIT",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-3-Clause",
+  "BSL-1.0",
+  "CDLA-Permissive-2.0",
+  "ISC",
+  "Unicode-3.0",
+  "Unlicense",
+  "Zlib",
+]
+
+[sources]
+# Every crate must come from crates.io or an explicit path in this repository.
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
