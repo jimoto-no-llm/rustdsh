@@ -119,30 +119,80 @@ window.__ModuleLoader__.load({
     const GET_ALL = "/api/rdsh-settings";
     const SAVE_ALL = "/api/rdsh-settings/save";
     const card = {
-      border: "0.5px solid var(--dsw-alias-settings-card-stroke)",
+      border: "1px solid var(--dsw-alias-settings-card-stroke)",
       background: "var(--dsw-alias-settings-card-fill)",
       borderRadius: "12px",
+      color: "var(--dsw-alias-label-primary)",
+      minWidth: 0,
+    };
+    const cardHead = {
+      display: "flex",
+      alignItems: "center",
+      gap: "8px",
+      margin: "0",
+      padding: "0",
+    };
+    const groupToggle = {
+      display: "grid",
+      gridTemplateColumns: "auto minmax(0, 1fr) auto",
+      alignItems: "center",
+      columnGap: "10px",
+      width: "100%",
+      margin: "0",
       padding: "12px 14px",
+      background: "transparent",
+      border: "0",
+      borderRadius: "12px",
+      color: "inherit",
+      textAlign: "left",
+      cursor: "pointer",
+    };
+    const caretStyle = {
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      width: "20px",
+      height: "20px",
+      color: "var(--dsw-alias-label-tertiary)",
+      transition: "transform 150ms ease",
+    };
+    const headText = {
       display: "flex",
       flexDirection: "column",
-      gap: "10px",
-      color: "var(--dsw-alias-label-primary)",
+      gap: "2px",
+      minWidth: 0,
+    };
+    const summaryText = {
+      fontSize: "12px",
+      color: "var(--dsw-alias-label-tertiary)",
+      overflowWrap: "anywhere",
+    };
+    const groupBody = {
+      display: "flex",
+      flexDirection: "column",
+      gap: "12px",
+      padding: "12px 14px 14px",
+      borderTop: "1px solid var(--dsw-alias-border-l3)",
+      minWidth: 0,
     };
     const title = {
       margin: "0",
-      fontSize: "16px",
-      fontWeight: 500,
+      fontSize: "15px",
+      fontWeight: 600,
+      lineHeight: 1.4,
       color: "var(--dsw-alias-label-primary)",
     };
     const desc = {
       margin: "0",
-      fontSize: "13px",
+      fontSize: "12.5px",
+      lineHeight: 1.6,
       color: "var(--dsw-alias-label-tertiary)",
     };
     const label = {
       fontSize: "12px",
       fontWeight: 600,
       color: "var(--dsw-alias-label-secondary)",
+      lineHeight: 1.6,
     };
     const input = {
       font: "inherit",
@@ -159,22 +209,78 @@ window.__ModuleLoader__.load({
       fontSize: "13px",
       color: "var(--dsw-alias-label-primary)",
     };
+    const checkboxRow = {
+      ...row,
+      minHeight: "32px",
+      margin: "0",
+    };
     const warn = {
       margin: "0",
       fontSize: "12px",
+      lineHeight: 1.6,
       color: "var(--dsw-alias-label-warning, #b7791f)",
     };
-    const cssText =
-      ".rdsh-settings input,.rdsh-settings textarea,.rdsh-settings select{background:var(--dsw-alias-bg-module-platform);color:var(--dsw-alias-label-primary);border:.5px solid var(--dsw-alias-border-l3);outline:none}.rdsh-settings input:focus,.rdsh-settings textarea:focus,.rdsh-settings select:focus{box-shadow:0 0 0 2px var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));border-color:transparent}.rdsh-settings input::placeholder,.rdsh-settings textarea::placeholder{color:var(--dsw-alias-label-dimmed)}.rdsh-settings input[type=checkbox]{accent-color:var(--dsw-alias-button-primary-fill);width:15px;height:15px;background:none;border:none;padding:0}.rdsh-settings button{font:inherit}.rdsh-btn-pri{background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground);border:none}.rdsh-btn-pri:hover{background:var(--dsw-alias-button-primary-hover)}.rdsh-btn-pri:disabled{opacity:.4;cursor:default}.rdsh-btn-sec{background:transparent;color:var(--dsw-alias-label-primary);border:.5px solid var(--dsw-alias-border-l3)}.rdsh-btn-sec:hover{background:var(--dsw-alias-interactive-bg-hover)}.rdsh-btn-sec:disabled{opacity:.4;cursor:default}.rdsh-msg{font-size:12px;color:var(--dsw-alias-label-secondary)}";
+    const hint = {
+      margin: "0",
+      fontSize: "12px",
+      lineHeight: 1.6,
+      color: "var(--dsw-alias-label-tertiary)",
+    };
+    const cssText = [
+      ".rdsh-settings{color:var(--dsw-alias-label-primary)}",
+      ".rdsh-settings *{box-sizing:border-box}",
+      ".rdsh-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;align-items:start}",
+      ".rdsh-card{min-width:0}",
+      ".rdsh-group-toggle:hover{background:var(--dsw-alias-interactive-bg-hover)}",
+      ".rdsh-group-toggle:hover .rdsh-caret{color:var(--dsw-alias-label-secondary)}",
+      ".rdsh-card[data-open=true] .rdsh-caret{transform:rotate(90deg)}",
+      ".rdsh-card-body[hidden]{display:none!important}",
+      ".rdsh-settings input:not([type=checkbox]),.rdsh-settings textarea,.rdsh-settings select{background:var(--dsw-alias-bg-module-platform);color:var(--dsw-alias-label-primary);border:1px solid var(--dsw-alias-border-l3);outline:none}",
+      ".rdsh-settings input:not([type=checkbox]):focus,.rdsh-settings textarea:focus,.rdsh-settings select:focus{box-shadow:0 0 0 2px var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));border-color:transparent}",
+      ".rdsh-settings input::placeholder,.rdsh-settings textarea::placeholder{color:var(--dsw-alias-label-dimmed)}",
+      ".rdsh-settings input[type=checkbox]{accent-color:var(--dsw-alias-button-primary-fill);width:15px;height:15px;flex:none;margin:0}",
+      ".rdsh-settings fieldset{border:0;padding:0;margin:0;min-width:0}",
+      ".rdsh-settings button{font:inherit;cursor:pointer}",
+      ".rdsh-settings button:focus-visible{outline:2px solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));outline-offset:2px}",
+      ".rdsh-settings textarea{resize:vertical}",
+      ".rdsh-btn-pri{background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground);border:1px solid transparent}",
+      ".rdsh-btn-pri:hover{background:var(--dsw-alias-button-primary-hover)}",
+      ".rdsh-btn-pri:disabled{opacity:.4;cursor:default}",
+      ".rdsh-btn-sec{background:transparent;color:var(--dsw-alias-label-primary);border:1px solid var(--dsw-alias-border-l3)}",
+      ".rdsh-btn-sec:hover{background:var(--dsw-alias-interactive-bg-hover)}",
+      ".rdsh-btn-sec:disabled{opacity:.4;cursor:default}",
+      ".rdsh-btn-sm{padding:5px 10px;border-radius:8px;font-size:12px}",
+      ".rdsh-msg{font-size:12px;color:var(--dsw-alias-label-secondary)}",
+      ".rdsh-settings [aria-invalid=true]{border-color:var(--dsw-alias-state-error)}",
+    ].join("");
     const grid2 = {
       display: "grid",
       gridTemplateColumns: "1fr 1fr",
-      gap: "10px",
+      gap: "10px 12px",
+      alignItems: "end",
     };
-    const discordDesc = {
-      ...desc,
+    // 読みやすさを優先する2列のフォーム (ラベル + 入力)。
+    const gridField = {
+      display: "grid",
+      gridTemplateColumns: "minmax(84px, 140px) minmax(0, 1fr)",
+      alignItems: "center",
+      gap: "4px 10px",
+      fontSize: "12px",
+      fontWeight: 600,
       color: "var(--dsw-alias-label-secondary)",
-      lineHeight: 1.6,
+    };
+    // 参加/離脱が一度きりのチェックボックス群。
+    const checkGrid = {
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+      gap: "4px 16px",
+    };
+    // ラベルと入力が縦に並ぶ通常のフィールド。
+    const field = {
+      display: "flex",
+      flexDirection: "column",
+      gap: "4px",
+      minWidth: 0,
     };
     const defaultDiscordId = "1557873849280888903";
     const defaultDiscordImage =
@@ -571,6 +677,115 @@ window.__ModuleLoader__.load({
       general: ["全般 (general)", "General", "常规"],
       defaultProfile: ["既定プロファイル", "Default profile", "默认配置文件"],
       unspecified: ["未指定", "Not set", "未设置"],
+      groupConnection: [
+        "接続とプロバイダの共有",
+        "Connection and provider sharing",
+        "连接与提供商共享",
+      ],
+      groupConnectionDesc: [
+        "dsh 本体に渡す検索プロバイダと、ローカル状態画面の待ち受けポートを決めます。",
+        "Choose the search provider handed to dsh and the port for the local status page.",
+        "设置交给 dsh 的搜索提供商，以及本地状态页面的监听端口。",
+      ],
+      providerDelegation: [
+        "dsh 本体の検索プロバイダ",
+        "Search provider for dsh",
+        "dsh 的搜索提供商",
+      ],
+      providerPlaceholder: [
+        "例: searxng（空欄で自動）",
+        "Example: searxng (blank = automatic)",
+        "例如：searxng（留空为自动）",
+      ],
+      providerHelp: [
+        "登録済みのプロバイダ ID を指定したときだけ、委譲先の dsh へ DSH_WEB_SEARCH_PROVIDER を渡します。",
+        "Only when a registered provider ID is set, DSH_WEB_SEARCH_PROVIDER is passed to the delegated dsh process.",
+        "仅当设置了已注册的提供商 ID 时，才向委派的 dsh 传递 DSH_WEB_SEARCH_PROVIDER。",
+      ],
+      statusPort: [
+        "ローカル状態画面のポート",
+        "Port for the local status page",
+        "本地状态页面的端口",
+      ],
+      statusPortHelp: [
+        "rdsh serve の待ち受けポートです。既定は 38080 です。",
+        "The listening port used by rdsh serve. The default is 38080.",
+        "rdsh serve 的监听端口，默认 38080。",
+      ],
+      groupModel: [
+        "モデル",
+        "Model",
+        "模型",
+      ],
+      groupModelDesc: [
+        "トークン予算と記憶の取り込み量を決めます。ここが会話の長さとコストに直結します。",
+        "Set the token budget and how much memory is pulled in; this drives conversation length and cost.",
+        "设置令牌预算与记忆引入量，直接影响对话长度和成本。",
+      ],
+      modelBudgetHelp: [
+        "会話とコンテキストに使う上限です。既定のトークン予算は 4000、上限トークンは 8000 です。",
+        "Upper bounds for the conversation and context. Defaults are a 4000 token budget and 8000 maximum tokens.",
+        "对话与上下文的上限。默认令牌预算 4000，最大令牌 8000。",
+      ],
+      modelBudgetSummary: [
+        "予算 {budget} / 上限 {max}",
+        "Budget {budget} / max {max}",
+        "预算 {budget} / 上限 {max}",
+      ],
+      groupFeatures: [
+        "追加機能",
+        "Extra features",
+        "附加功能",
+      ],
+      groupFeaturesDesc: [
+        "context engine、全体設定、保存したくない項目の4つのカードをまとめています。",
+        "Holds the context engine, global settings and long-term memory cards.",
+        "汇总上下文引擎、全局设置与长期记忆的卡片。",
+      ],
+      groupDetails: [
+        "詳細",
+        "Details",
+        "详细",
+      ],
+      groupDetailsDesc: [
+        "検索、セッション、ログ、サーバー、guard、bench、setup の各設定です。",
+        "Search, sessions, logs, server, guard, bench and setup settings.",
+        "搜索、会话、日志、服务器、防护、基准测试与安装设置。",
+      ],
+      groupsShowAll: ["すべて開く", "Expand all", "全部展开"],
+      groupsHideAll: ["すべて閉じる", "Collapse all", "全部折叠"],
+      groupSummaryUnset: ["未設定", "Not set", "未配置"],
+      groupSummaryBudget: [
+        "予算 {budget} / 上限 {max}",
+        "Budget {budget} / max {max}",
+        "预算 {budget} / 上限 {max}",
+      ],
+      groupSummaryContext: [
+        "context engine {state}",
+        "Context engine {state}",
+        "上下文引擎 {state}",
+      ],
+      groupSummaryDetails: [
+        "検索 {max} 件 ・ ログ {tail} 行",
+        "Search {max} results · logs {tail} lines",
+        "搜索 {max} 条 · 日志 {tail} 行",
+      ],
+    };
+    // 5つのグループ。id は aria-controls と localStorage のキーに使います。
+    const RDSH_GROUPS = [
+      { id: "connection", title: "groupConnection" },
+      { id: "model", title: "groupModel" },
+      { id: "discord", title: "discordTitle" },
+      { id: "features", title: "groupFeatures" },
+      { id: "details", title: "groupDetails" },
+    ];
+    const RDSH_GROUP_IDS = RDSH_GROUPS.map((item) => item.id);
+    const OPEN_STORAGE_KEY = "rdsh-settings-open:v1";
+    // 開閉状態の既定値。最初のカードだけ開きます。
+    const openThemes = (active) => {
+      const next = {};
+      for (const item of RDSH_GROUPS) next[item.id] = item.id === active;
+      return next;
     };
     function settingsLocale(language) {
       if (language === "en" || language === "zh-CN" || language === "ja")
@@ -591,9 +806,9 @@ window.__ModuleLoader__.load({
     }
     // Scope the host layout adjustment to this mounted section; use semantic anchors, not generated CSS names.
     const narrowCss =
-      "@media(max-width:640px){[data-shortcut-modal=settings]:has(.rdsh-settings){flex-direction:column}[data-shortcut-modal=settings]:has(.rdsh-settings)>nav{width:100%;padding:16px 12px 0;gap:8px}[data-shortcut-modal=settings]:has(.rdsh-settings)>nav>div:last-child{flex-direction:row;overflow-x:auto;overflow-y:hidden}[data-shortcut-modal=settings]:has(.rdsh-settings)>nav button{flex:none}[data-shortcut-modal=settings]:has(.rdsh-settings)>nav+div{min-height:0}[data-shortcut-modal=settings]:has(.rdsh-settings)>nav+div>div:first-child{height:48px;padding:8px 12px}[data-shortcut-modal=settings]:has(.rdsh-settings)>nav+div>div:last-child{padding:0 12px 16px}}";
+      "@media(max-width:640px){.rdsh-settings .rdsh-cards,.rdsh-settings .rdsh-grid-2,.rdsh-settings .rdsh-grid-field{grid-template-columns:1fr}[data-shortcut-modal=settings]:has(.rdsh-settings){flex-direction:column}[data-shortcut-modal=settings]:has(.rdsh-settings)>nav{width:100%;padding:16px 12px 0;gap:8px}[data-shortcut-modal=settings]:has(.rdsh-settings)>nav>div:last-child{flex-direction:row;overflow-x:auto;overflow-y:hidden}[data-shortcut-modal=settings]:has(.rdsh-settings)>nav button{flex:none}[data-shortcut-modal=settings]:has(.rdsh-settings)>nav+div{min-height:0}[data-shortcut-modal=settings]:has(.rdsh-settings)>nav+div>div:first-child{height:48px;padding:8px 12px}[data-shortcut-modal=settings]:has(.rdsh-settings)>nav+div>div:last-child{padding:0 12px 16px}}";
     const discordCss =
-      ".rdsh-discord{min-width:0;overflow-wrap:anywhere}.rdsh-discord fieldset{border:0;padding:0;margin:0;min-width:0;display:flex;flex-direction:column;gap:12px}.rdsh-discord label{line-height:1.6}.rdsh-discord summary{cursor:pointer;padding:8px 0;min-height:32px;box-sizing:border-box}.rdsh-discord summary:focus-visible,.rdsh-settings button:focus-visible{outline:2px solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));outline-offset:3px}.rdsh-discord-fields{display:flex;flex-direction:column;gap:12px;padding:8px 0}.rdsh-discord-preview{margin:0;padding:12px 0;border-block:1px solid var(--dsw-alias-border-l3);display:flex;flex-direction:column;gap:6px;font-size:13px}.rdsh-discord-preview p{margin:0}.rdsh-discord-preview strong{font-size:15px}.rdsh-discord-meta{font-size:12px;color:var(--dsw-alias-label-secondary);line-height:1.6}.rdsh-discord-actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px}.rdsh-discord-actions button{padding:9px 12px;min-height:36px;border-radius:8px;cursor:pointer;font-size:13px}.rdsh-discord-pill{font-size:12px;color:var(--dsw-alias-label-secondary);background:var(--dsw-alias-bg-module-platform);border:1px solid var(--dsw-alias-border-l3);border-radius:12px;padding:3px 9px}.rdsh-discord-link{align-self:flex-start;font-size:12px;padding:6px 12px;background:var(--dsw-alias-interactive-bg-hover);border-radius:8px}.rdsh-discord input,.rdsh-discord select{min-height:34px}.rdsh-discord input[type=checkbox]{min-height:15px;flex-shrink:0}.rdsh-discord select{width:100%}.rdsh-discord ::selection{background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground)}";
+      ".rdsh-discord{min-width:0;overflow-wrap:anywhere}.rdsh-discord fieldset{border:0;padding:0;margin:0;min-width:0;display:flex;flex-direction:column;gap:12px}.rdsh-discord label{line-height:1.6}.rdsh-discord summary{cursor:pointer;padding:8px 0;min-height:32px;box-sizing:border-box}.rdsh-discord summary:focus-visible,.rdsh-settings button:focus-visible{outline:2px solid var(--dsw-focus-ring-color,var(--dsw-alias-state-business-primary));outline-offset:3px}.rdsh-discord-fields{display:flex;flex-direction:column;gap:12px;padding:8px 0}.rdsh-discord-preview{margin:0;padding:12px 0;border-block:1px solid var(--dsw-alias-border-l3);display:flex;flex-direction:column;gap:6px;font-size:13px}.rdsh-discord-preview p{margin:0}.rdsh-discord-preview strong{font-size:15px}.rdsh-discord-meta{font-size:12px;color:var(--dsw-alias-label-secondary);line-height:1.6}.rdsh-discord-actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px}.rdsh-discord-actions button{padding:9px 12px;min-height:36px;border-radius:8px;cursor:pointer;font-size:13px}.rdsh-discord-link{align-self:flex-start;font-size:12px;padding:6px 12px;background:var(--dsw-alias-interactive-bg-hover);border-radius:8px}.rdsh-discord input,.rdsh-discord select{min-height:34px}.rdsh-discord input[type=checkbox]{min-height:15px;flex-shrink:0}.rdsh-discord select{width:100%}.rdsh-discord ::selection{background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground)}";
     function wireText(value) {
       let result = "";
       for (const char of value) {
@@ -655,6 +870,40 @@ window.__ModuleLoader__.load({
       const vr = useState({});
       const versions = vr[0];
       const setVersions = vr[1];
+      const readOpenGroups = () => {
+        const fallback = openThemes(RDSH_GROUP_IDS[0]);
+        try {
+          const raw = globalThis.localStorage?.getItem(OPEN_STORAGE_KEY);
+          if (raw === null || raw === undefined) return fallback;
+          const stored = JSON.parse(raw);
+          if (!stored || typeof stored !== "object") return fallback;
+          const next = {};
+          for (const id of RDSH_GROUP_IDS) next[id] = stored[id] === true;
+          return next;
+        } catch (e) {
+          return fallback;
+        }
+      };
+      const og = useState(readOpenGroups);
+      const openGroups = og[0];
+      const setOpenGroups = og[1];
+      useEffect(() => {
+        try {
+          globalThis.localStorage?.setItem(
+            OPEN_STORAGE_KEY,
+            JSON.stringify(openGroups),
+          );
+        } catch (e) {
+          /* 保存できない環境では既定の開閉状態のままにします */
+        }
+      }, [openGroups]);
+      const toggleOpen = (id) =>
+        setOpenGroups((current) => ({ ...current, [id]: !current[id] }));
+      const setAllOpen = (value) => {
+        const next = {};
+        for (const id of RDSH_GROUP_IDS) next[id] = value;
+        setOpenGroups(next);
+      };
       const load = useCallback(async () => {
         setLoading(true);
         setMsg("");
@@ -924,820 +1173,1092 @@ window.__ModuleLoader__.load({
       ]
         .filter(Boolean)
         .join(" ・ ");
+
+      const summaryValue = (value, fallback) =>
+        value === undefined || value === null || value === ""
+          ? fallback
+          : String(value);
+      const presenceSummary = [
+        connectionText,
+        dc.enabled && dc.details?.trim() ? dc.details.trim() : "",
+      ]
+        .filter(Boolean)
+        .join(" ・ ");
+      const modelSummary = copy("modelBudgetSummary", {
+        budget: summaryValue(tk.default_budget, 4000),
+        max: summaryValue(co.max_tokens, 8000),
+      });
+      const featuresSummary = copy("groupSummaryContext", {
+        state: bt.context_engine ? "ON" : "OFF",
+      });
+      const detailsSummary = copy("groupSummaryDetails", {
+        max: summaryValue(se.max, 100),
+        tail: summaryValue(lg2.tail, 50),
+      });
+      const pad = (...children) =>
+        h(
+          "div",
+          {
+            style: {
+              display: "flex",
+              flexDirection: "column",
+              gap: 16,
+              minWidth: 0,
+            },
+          },
+          children,
+        );
+      const caret = () =>
+        h(
+          "span",
+          {
+            className: "rdsh-caret",
+            "aria-hidden": "true",
+            style: caretStyle,
+          },
+          h(
+            "svg",
+            {
+              viewBox: "0 0 16 16",
+              width: 16,
+              height: 16,
+              focusable: "false",
+            },
+            h("path", {
+              d: "M6 3.5 10.5 8 6 12.5",
+              fill: "none",
+              stroke: "currentColor",
+              strokeWidth: 1.75,
+              strokeLinecap: "round",
+              strokeLinejoin: "round",
+            }),
+          ),
+        );
+      // 各カードの見出しはボタンで、本体だけを開閉します。
+      const card = (id, cardTitle, cardDesc, open, onToggle, summary, ...body) =>
+        h(
+          "section",
+          {
+            key: id,
+            className: "rdsh-card",
+            "data-open": open ? "true" : "false",
+          },
+          h(
+            "h3",
+            { style: cardHead },
+            h(
+              "button",
+              {
+                type: "button",
+                className: "rdsh-group-toggle",
+                style: groupToggle,
+                "aria-expanded": open,
+                "aria-controls": "rdsh-group-" + id,
+                onClick: onToggle,
+              },
+              caret(),
+              h(
+                "span",
+                { style: headText },
+                h("span", { style: title }, cardTitle),
+                h("span", { style: hint }, cardDesc),
+                summary
+                  ? h(
+                      "span",
+                      { className: "rdsh-group-summary", style: summaryText },
+                      summary,
+                    )
+                  : null,
+              ),
+            ),
+          ),
+          h(
+            "div",
+            {
+              className: "rdsh-card-body",
+              id: "rdsh-group-" + id,
+              hidden: !open,
+              style: groupBody,
+            },
+            body,
+          ),
+        );
       return h(
         "div",
         {
-          className: "rdsh-settings",
+          "aria-label": copy("advanced"),
           style: {
-            maxWidth: 720,
             display: "flex",
             flexDirection: "column",
             gap: 12,
+            minWidth: 0,
           },
         },
         h("style", null, cssText + discordCss + narrowCss),
         h(
-          "p",
+          "div",
           {
             className: "rdsh-version",
-            style: { ...desc, fontSize: "12px" },
-            "aria-label": copy("version"),
-          },
-          versionText,
-        ),
-        h(
-          "section",
-          {
-            className: "rdsh-discord",
-            style: card,
-            "aria-label": copy("discordTitle"),
-          },
-          h(
-            "div",
-            {
-              style: {
-                ...row,
-                justifyContent: "space-between",
-                flexWrap: "wrap",
-              },
+            style: {
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: 8,
             },
-            h("h3", { style: title }, copy("discordTitle")),
-            h(
-              "span",
-              { className: "rdsh-discord-pill" },
-              discordDirty
-                ? copy("unsaved")
-                : dc.enabled
-                  ? copy("presenceOn")
-                  : copy("presenceOff"),
-            ),
-          ),
-          h("p", { style: discordDesc }, copy("discordIntro")),
+          },
           h(
-            "fieldset",
-            { disabled: saving },
-            h(
-              "label",
-              { style: row },
-              h("input", {
-                type: "checkbox",
-                checked: !!dc.enabled,
-                onChange: (e) =>
-                  setPath("discord", "enabled", e.target.checked),
-              }),
-              copy("enableDiscord"),
-            ),
-            h(
-              "label",
-              { style: label },
-              copy("details"),
-              h("input", {
-                style: input,
-                value: dc.details ?? "",
-                maxLength: 128,
-                placeholder: copy("defaultDetails"),
-                onChange: (e) => setPath("discord", "details", e.target.value),
-              }),
-            ),
-            detailsText !==
-              (dc.details?.trim() ? dc.details : presenceCopy("defaultDetails"))
-              ? h("p", { style: warn }, copy("truncated"))
-              : null,
-            h(
-              "label",
-              { style: row },
-              h("input", {
-                type: "checkbox",
-                checked: dc.show_agent_status !== false,
-                onChange: (e) =>
-                  setPath("discord", "show_agent_status", e.target.checked),
-              }),
-              copy("showAgents"),
-            ),
-            h(
-              "label",
-              { style: row },
-              h("input", {
-                type: "checkbox",
-                checked: dc.show_elapsed !== false,
-                onChange: (e) =>
-                  setPath("discord", "show_elapsed", e.target.checked),
-              }),
-              copy("showElapsed"),
-            ),
-            h(
-              "figure",
-              {
-                className: "rdsh-discord-preview",
-                "aria-label": copy("discordPreview"),
-              },
-              h(
-                "figcaption",
-                { className: "rdsh-discord-meta" },
-                copy("preview"),
-                discordDirty ? copy("unsavedSuffix") : "",
-              ),
-              h(
-                "div",
-                { style: { display: "flex", alignItems: "center", gap: 12 } },
-                previewImage
-                  ? h("img", {
-                      src: previewImage,
-                      width: 48,
-                      height: 48,
-                      alt: "",
-                      referrerPolicy: "no-referrer",
-                      style: {
-                        borderRadius: 8,
-                        objectFit: "cover",
-                        flexShrink: 0,
-                      },
-                      onError: (e) => {
-                        e.currentTarget.hidden = true;
-                      },
-                    })
-                  : null,
-                h(
-                  "div",
-                  null,
-                  h("strong", null, appName),
-                  h("p", null, detailsText),
-                ),
-              ),
-              dc.show_agent_status !== false ? h("p", null, agentText) : null,
-              dc.show_elapsed !== false
-                ? h("p", { className: "rdsh-discord-meta" }, elapsedText)
-                : null,
-              dc.button_label?.trim() && dc.button_url?.trim() && buttonValid
-                ? h(
-                    "span",
-                    { className: "rdsh-discord-link" },
-                    dc.button_label.trim(),
-                  )
-                : null,
-              h(
-                "p",
-                { className: "rdsh-discord-meta" },
-                copy("members"),
-                memberText,
-              ),
-              h(
-                "p",
-                { className: "rdsh-discord-meta" },
-                dc.enabled ? copy("previewNote") : copy("offNote"),
-              ),
-              dc.show_image !== false && dc.large_image
-                ? h("p", { className: "rdsh-discord-meta" }, copy("imageNote"))
-                : null,
-            ),
-            h(
-              "details",
-              null,
-              h("summary", { style: label }, copy("advanced")),
-              h(
-                "div",
-                { className: "rdsh-discord-fields" },
-                h(
-                  "label",
-                  { style: label },
-                  copy("memberDisplay"),
-                  h(
-                    "select",
-                    {
-                      style: input,
-                      value: dc.status_display || "details",
-                      onChange: (e) =>
-                        setPath("discord", "status_display", e.target.value),
-                    },
-                    h("option", { value: "details" }, copy("details")),
-                    h(
-                      "option",
-                      {
-                        value: "state",
-                        disabled: dc.show_agent_status === false,
-                      },
-                      copy("agentState"),
-                    ),
-                    h("option", { value: "name" }, copy("appName")),
-                  ),
-                ),
-                dc.status_display === "state" && dc.show_agent_status === false
-                  ? h("p", { style: discordDesc }, copy("stateFallback"))
-                  : null,
-                h(
-                  "label",
-                  { style: row },
-                  h("input", {
-                    type: "checkbox",
-                    checked: dc.show_image !== false,
-                    onChange: (e) =>
-                      setPath("discord", "show_image", e.target.checked),
-                  }),
-                  copy("showImage"),
-                ),
-                h(
-                  "label",
-                  { style: label },
-                  copy("imageAsset"),
-                  h("input", {
-                    style: input,
-                    value: dc.large_image || "",
-                    maxLength: 512,
-                    placeholder: copy("imagePlaceholder"),
-                    onChange: (e) =>
-                      setPath("discord", "large_image", e.target.value),
-                    "aria-invalid": !assetValid,
-                  }),
-                ),
-                h("p", { style: discordDesc }, copy("imageHelp")),
-                !assetValid
-                  ? h("p", { role: "alert", style: warn }, copy("imageInvalid"))
-                  : null,
-                h(
-                  "label",
-                  { style: label },
-                  copy("imageTooltip"),
-                  h("input", {
-                    style: input,
-                    value: dc.large_text || "",
-                    maxLength: 128,
-                    placeholder: "dsh",
-                    onChange: (e) =>
-                      setPath("discord", "large_text", e.target.value),
-                  }),
-                ),
-                h(
-                  "label",
-                  { style: label },
-                  copy("buttonName"),
-                  h("input", {
-                    style: input,
-                    value: dc.button_label || "",
-                    maxLength: 32,
-                    placeholder: copy("buttonPlaceholder"),
-                    onChange: (e) =>
-                      setPath("discord", "button_label", e.target.value),
-                  }),
-                ),
-                h(
-                  "label",
-                  { style: label },
-                  copy("link"),
-                  h("input", {
-                    style: input,
-                    type: "url",
-                    value: dc.button_url || "",
-                    maxLength: 512,
-                    placeholder: "https://…",
-                    onChange: (e) =>
-                      setPath("discord", "button_url", e.target.value),
-                    "aria-invalid": !buttonValid,
-                  }),
-                ),
-                !buttonValid || !buttonComplete
-                  ? h(
-                      "p",
-                      { role: "alert", style: warn },
-                      copy("buttonInvalid"),
-                    )
-                  : null,
-                h("p", { style: discordDesc }, copy("buttonNote")),
-              ),
-            ),
-            h(
-              "details",
-              null,
-              h("summary", { style: label }, copy("customDiscord")),
-              h(
-                "div",
-                { className: "rdsh-discord-fields" },
-                h("p", { style: discordDesc }, copy("customHelp")),
-                h(
-                  "label",
-                  { style: label },
-                  copy("applicationId"),
-                  h("input", {
-                    style: input,
-                    value: dc.application_id || "",
-                    inputMode: "numeric",
-                    maxLength: 20,
-                    placeholder: copy("applicationPlaceholder"),
-                    onChange: (e) =>
-                      setPath("discord", "application_id", e.target.value),
-                    "aria-invalid": !idValid,
-                  }),
-                ),
-                !idValid
-                  ? h(
-                      "p",
-                      { role: "alert", style: warn },
-                      copy("applicationInvalid"),
-                    )
-                  : null,
-                h("p", { style: discordDesc }, copy("customNote")),
-              ),
-            ),
+            "span",
+            { className: "rdsh-group-summary", style: summaryText },
+            versionText,
           ),
           h(
             "div",
-            { className: "rdsh-discord-actions" },
+            { style: { display: "flex", alignItems: "center", gap: 8 } },
             h(
               "button",
               {
-                className: "rdsh-btn-pri",
-                disabled: saving || !discordDirty || !discordValid,
-                onClick: () => saveAll(true),
+                type: "button",
+                className: "rdsh-btn-sec rdsh-btn-sm",
+                onClick: () => setAllOpen(true),
               },
-              saving ? copy("saving") : copy("saveDiscord"),
+              copy("groupsShowAll"),
             ),
             h(
-              "span",
+              "button",
               {
-                role: discordMsg === "saveFailed" ? "alert" : "status",
-                className: "rdsh-discord-meta",
+                type: "button",
+                className: "rdsh-btn-sec rdsh-btn-sm",
+                onClick: () => setAllOpen(false),
               },
-              discordFeedback,
+              copy("groupsHideAll"),
             ),
           ),
-          h(
-            "p",
-            { role: "status", className: "rdsh-discord-meta" },
-            connectionText,
-            discordStatus?.state === "connected" && discordStatus.updated_at
-              ? copy("lastUpdated", {
-                  time: new Date(discordStatus.updated_at).toLocaleTimeString(
-                    settingsLocale(displayLanguage),
+        ),
+        h(
+          "div",
+          { className: "rdsh-cards rdsh-grid" },
+          card(
+            "connection",
+            copy("groupConnection"),
+            copy("groupConnectionDesc"),
+            openGroups.connection,
+            () => toggleOpen("connection"),
+            null,
+            h(
+              "div",
+              { className: "rdsh-grid-2", style: grid2 },
+              h(
+                "label",
+                { className: "rdsh-grid-field", style: gridField },
+                copy("providerDelegation"),
+                h("input", {
+                  style: input,
+                  value: se.dsh_search_provider || "",
+                  placeholder: copy("providerPlaceholder"),
+                  onChange: (e) =>
+                    setPath("search", "dsh_search_provider", e.target.value),
+                }),
+              ),
+              h(
+                "label",
+                { className: "rdsh-grid-field", style: gridField },
+                copy("statusPort"),
+                h("input", {
+                  type: "number",
+                  min: 1,
+                  max: 65535,
+                  value: svv.port,
+                  onChange: (e) => num("serve", "port", e.target.value, 38080),
+                  style: { ...input, maxWidth: 120 },
+                }),
+              ),
+            ),
+            h("p", { style: hint }, copy("providerHelp")),
+            h("p", { style: hint }, copy("statusPortHelp")),
+          ),
+          card(
+            "model",
+            copy("groupModel"),
+            copy("groupModelDesc"),
+            openGroups.model,
+            () => toggleOpen("model"),
+            modelSummary,
+            h(
+              "div",
+              { className: "rdsh-grid-2", style: grid2 },
+              h(
+                "label",
+                { className: "rdsh-grid-field", style: gridField },
+                copy("defaultBudget"),
+                h("input", {
+                  type: "number",
+                  min: 500,
+                  max: 200000,
+                  step: 100,
+                  value: tk.default_budget,
+                  onChange: (e) =>
+                    num("tokens", "default_budget", e.target.value, 4000),
+                  style: input,
+                }),
+              ),
+              h(
+                "label",
+                { className: "rdsh-grid-field", style: gridField },
+                copy("maxTokens"),
+                h("input", {
+                  type: "number",
+                  min: 500,
+                  max: 200000,
+                  step: 100,
+                  value: co.max_tokens,
+                  onChange: (e) =>
+                    num("compact", "max_tokens", e.target.value, 8000),
+                  style: input,
+                }),
+              ),
+            ),
+            h("p", { style: hint }, copy("modelBudgetHelp")),
+          ),
+          card(
+            "discord",
+            copy("discordTitle"),
+            copy("discordIntro"),
+            openGroups.discord,
+            () => toggleOpen("discord"),
+            presenceSummary,
+            h(
+              "fieldset",
+              { disabled: saving },
+              h(
+                "label",
+                { style: checkboxRow },
+                h("input", {
+                  type: "checkbox",
+                  checked: !!dc.enabled,
+                  onChange: (e) =>
+                    setPath("discord", "enabled", e.target.checked),
+                }),
+                copy("enableDiscord"),
+              ),
+              h(
+                "label",
+                { style: field },
+                copy("details"),
+                h("input", {
+                  style: input,
+                  value: dc.details ?? "",
+                  maxLength: 128,
+                  placeholder: copy("defaultDetails"),
+                  onChange: (e) => setPath("discord", "details", e.target.value),
+                }),
+              ),
+              detailsText !==
+                (dc.details?.trim()
+                  ? dc.details
+                  : presenceCopy("defaultDetails"))
+                ? h("p", { style: warn }, copy("truncated"))
+                : null,
+              h(
+                "label",
+                { style: checkboxRow },
+                h("input", {
+                  type: "checkbox",
+                  checked: dc.show_agent_status !== false,
+                  onChange: (e) =>
+                    setPath("discord", "show_agent_status", e.target.checked),
+                }),
+                copy("showAgents"),
+              ),
+              h(
+                "label",
+                { style: checkboxRow },
+                h("input", {
+                  type: "checkbox",
+                  checked: dc.show_elapsed !== false,
+                  onChange: (e) =>
+                    setPath("discord", "show_elapsed", e.target.checked),
+                }),
+                copy("showElapsed"),
+              ),
+              h(
+                "figure",
+                {
+                  className: "rdsh-discord-preview",
+                  "aria-label": copy("discordPreview"),
+                },
+                h(
+                  "figcaption",
+                  { className: "rdsh-discord-meta" },
+                  copy("preview"),
+                  discordDirty ? copy("unsavedSuffix") : "",
+                ),
+                h(
+                  "div",
+                  {
+                    style: { display: "flex", alignItems: "center", gap: 12 },
+                  },
+                  previewImage
+                    ? h("img", {
+                        src: previewImage,
+                        width: 48,
+                        height: 48,
+                        alt: "",
+                        referrerPolicy: "no-referrer",
+                        style: {
+                          borderRadius: 8,
+                          objectFit: "cover",
+                          flexShrink: 0,
+                        },
+                        onError: (e) => {
+                          e.currentTarget.hidden = true;
+                        },
+                      })
+                    : null,
+                  h(
+                    "div",
+                    { style: { minWidth: 0 } },
+                    h("strong", null, appName),
+                    h("p", null, detailsText),
                   ),
-                })
-              : "",
-          ),
-          discordStatus?.state === "disconnected" ||
+                ),
+                dc.show_agent_status !== false ? h("p", null, agentText) : null,
+                dc.show_elapsed !== false
+                  ? h("p", { className: "rdsh-discord-meta" }, elapsedText)
+                  : null,
+                dc.button_label?.trim() && dc.button_url?.trim() && buttonValid
+                  ? h(
+                      "span",
+                      { className: "rdsh-discord-link" },
+                      dc.button_label.trim(),
+                    )
+                  : null,
+                h(
+                  "p",
+                  { className: "rdsh-discord-meta" },
+                  copy("members"),
+                  memberText,
+                ),
+                h(
+                  "p",
+                  { className: "rdsh-discord-meta" },
+                  dc.enabled ? copy("previewNote") : copy("offNote"),
+                ),
+                dc.show_image !== false && dc.large_image
+                  ? h(
+                      "p",
+                      { className: "rdsh-discord-meta" },
+                      copy("imageNote"),
+                    )
+                  : null,
+              ),
+              h(
+                "details",
+                null,
+                h("summary", { style: label }, copy("advanced")),
+                h(
+                  "div",
+                  { className: "rdsh-discord-fields" },
+                  h(
+                    "label",
+                    { style: field },
+                    copy("memberDisplay"),
+                    h(
+                      "select",
+                      {
+                        style: input,
+                        value: dc.status_display || "details",
+                        onChange: (e) =>
+                          setPath("discord", "status_display", e.target.value),
+                      },
+                      h("option", { value: "details" }, copy("details")),
+                      h(
+                        "option",
+                        {
+                          value: "state",
+                          disabled: dc.show_agent_status === false,
+                        },
+                        copy("agentState"),
+                      ),
+                      h("option", { value: "name" }, copy("appName")),
+                    ),
+                  ),
+                  dc.status_display === "state" &&
+                  dc.show_agent_status === false
+                    ? h("p", { style: hint }, copy("stateFallback"))
+                    : null,
+                  h(
+                    "label",
+                    { style: checkboxRow },
+                    h("input", {
+                      type: "checkbox",
+                      checked: dc.show_image !== false,
+                      onChange: (e) =>
+                        setPath("discord", "show_image", e.target.checked),
+                    }),
+                    copy("showImage"),
+                  ),
+                  h(
+                    "label",
+                    { style: field },
+                    copy("imageAsset"),
+                    h("input", {
+                      style: input,
+                      value: dc.large_image || "",
+                      maxLength: 512,
+                      placeholder: copy("imagePlaceholder"),
+                      onChange: (e) =>
+                        setPath("discord", "large_image", e.target.value),
+                      "aria-invalid": !assetValid,
+                    }),
+                  ),
+                  h("p", { style: hint }, copy("imageHelp")),
+                  !assetValid
+                    ? h(
+                        "p",
+                        { role: "alert", style: warn },
+                        copy("imageInvalid"),
+                      )
+                    : null,
+                  h(
+                    "label",
+                    { style: field },
+                    copy("imageTooltip"),
+                    h("input", {
+                      style: input,
+                      value: dc.large_text || "",
+                      maxLength: 128,
+                      placeholder: "dsh",
+                      onChange: (e) =>
+                        setPath("discord", "large_text", e.target.value),
+                    }),
+                  ),
+                  h(
+                    "label",
+                    { style: field },
+                    copy("buttonName"),
+                    h("input", {
+                      style: input,
+                      value: dc.button_label || "",
+                      maxLength: 32,
+                      placeholder: copy("buttonPlaceholder"),
+                      onChange: (e) =>
+                        setPath("discord", "button_label", e.target.value),
+                    }),
+                  ),
+                  h(
+                    "label",
+                    { style: field },
+                    copy("link"),
+                    h("input", {
+                      style: input,
+                      type: "url",
+                      value: dc.button_url || "",
+                      maxLength: 512,
+                      placeholder: "https://…",
+                      onChange: (e) =>
+                        setPath("discord", "button_url", e.target.value),
+                      "aria-invalid": !buttonValid,
+                    }),
+                  ),
+                  !buttonValid || !buttonComplete
+                    ? h(
+                        "p",
+                        { role: "alert", style: warn },
+                        copy("buttonInvalid"),
+                      )
+                    : null,
+                  h("p", { style: hint }, copy("buttonNote")),
+                ),
+              ),
+              h(
+                "details",
+                null,
+                h("summary", { style: label }, copy("customDiscord")),
+                h(
+                  "div",
+                  { className: "rdsh-discord-fields" },
+                  h("p", { style: hint }, copy("customHelp")),
+                  h(
+                    "label",
+                    { style: field },
+                    copy("applicationId"),
+                    h("input", {
+                      style: input,
+                      value: dc.application_id || "",
+                      inputMode: "numeric",
+                      maxLength: 20,
+                      placeholder: copy("applicationPlaceholder"),
+                      onChange: (e) =>
+                        setPath("discord", "application_id", e.target.value),
+                      "aria-invalid": !idValid,
+                    }),
+                  ),
+                  !idValid
+                    ? h(
+                        "p",
+                        { role: "alert", style: warn },
+                        copy("applicationInvalid"),
+                      )
+                    : null,
+                  h("p", { style: hint }, copy("customNote")),
+                ),
+              ),
+            ),
+            h(
+              "div",
+              { className: "rdsh-discord-actions" },
+              h(
+                "button",
+                {
+                  type: "button",
+                  className: "rdsh-btn-pri",
+                  disabled: saving || !discordDirty || !discordValid,
+                  onClick: () => saveAll(true),
+                },
+                saving ? copy("saving") : copy("saveDiscord"),
+              ),
+              h(
+                "span",
+                {
+                  role: discordMsg === "saveFailed" ? "alert" : "status",
+                  className: "rdsh-discord-meta",
+                },
+                discordFeedback,
+              ),
+            ),
+            h(
+              "p",
+              { role: "status", className: "rdsh-discord-meta" },
+              connectionText,
+              discordStatus?.state === "connected" && discordStatus.updated_at
+                ? copy("lastUpdated", {
+                    time: new Date(discordStatus.updated_at).toLocaleTimeString(
+                      settingsLocale(displayLanguage),
+                    ),
+                  })
+                : "",
+            ),
+            discordStatus?.state === "disconnected" ||
             discordStatus?.state === "connecting"
-            ? h("p", { style: discordDesc }, copy("openDiscord"))
-            : null,
-          discordStatus?.state === "connected"
-            ? h("p", { style: discordDesc }, copy("discordPrivacy"))
-            : null,
-          h("p", { style: discordDesc }, copy("privacy")),
+              ? h("p", { style: hint }, copy("openDiscord"))
+              : null,
+            discordStatus?.state === "connected"
+              ? h("p", { style: hint }, copy("discordPrivacy"))
+              : null,
+            h("p", { style: hint }, copy("privacy")),
+          ),
+          card(
+            "features",
+            copy("groupFeatures"),
+            copy("groupFeaturesDesc"),
+            openGroups.features,
+            () => toggleOpen("features"),
+            featuresSummary,
+            pad(
+              h(
+                "div",
+                { style: field },
+                h("p", { style: title }, copy("contextTitle")),
+                h("p", { style: hint }, copy("contextHelp")),
+                h(
+                  "label",
+                  { style: checkboxRow },
+                  h("input", {
+                    type: "checkbox",
+                    checked: !!bt.context_engine,
+                    onChange: (e) =>
+                      setPath("beta", "context_engine", e.target.checked),
+                  }),
+                  copy("enableContext"),
+                ),
+                legacy && cxActive
+                  ? h("p", { style: warn }, copy("legacy"))
+                  : null,
+              ),
+              h(
+                "div",
+                { style: field },
+                h("p", { style: title }, copy("workingMemory")),
+                h("p", { style: hint }, copy("workingHelp")),
+                h(
+                  "label",
+                  { className: "rdsh-grid-field", style: gridField },
+                  copy("tokenBudget"),
+                  h("input", {
+                    type: "number",
+                    min: 500,
+                    max: 200000,
+                    step: 100,
+                    value: cx.token_budget,
+                    onChange: (e) =>
+                      num("context", "token_budget", e.target.value, 4000),
+                    style: { ...input, maxWidth: 140 },
+                  }),
+                ),
+                h(
+                  "div",
+                  { style: checkGrid },
+                  h(
+                    "label",
+                    { style: checkboxRow },
+                    h("input", {
+                      type: "checkbox",
+                      checked: !!cx.enable_retriever,
+                      onChange: (e) =>
+                        setPath(
+                          "context",
+                          "enable_retriever",
+                          e.target.checked,
+                        ),
+                    }),
+                    copy("retriever"),
+                  ),
+                  h(
+                    "label",
+                    { style: checkboxRow },
+                    h("input", {
+                      type: "checkbox",
+                      checked: !!cx.enable_packer,
+                      onChange: (e) =>
+                        setPath("context", "enable_packer", e.target.checked),
+                    }),
+                    copy("packer"),
+                  ),
+                  h(
+                    "label",
+                    { style: checkboxRow },
+                    h("input", {
+                      type: "checkbox",
+                      checked: !!cx.enable_verifier,
+                      onChange: (e) =>
+                        setPath("context", "enable_verifier", e.target.checked),
+                    }),
+                    copy("verifier"),
+                  ),
+                  h(
+                    "label",
+                    { style: checkboxRow },
+                    h("input", {
+                      type: "checkbox",
+                      checked: !!cx.include_git_diff,
+                      onChange: (e) =>
+                        setPath("context", "include_git_diff", e.target.checked),
+                    }),
+                    copy("gitDiff"),
+                  ),
+                ),
+                h(
+                  "div",
+                  { className: "rdsh-grid-2", style: grid2 },
+                  h(
+                    "label",
+                    { className: "rdsh-grid-field", style: gridField },
+                    copy("codeLimit"),
+                    h("input", {
+                      type: "number",
+                      min: 1,
+                      max: 100,
+                      value: cx.max_code_hits,
+                      onChange: (e) =>
+                        num("context", "max_code_hits", e.target.value, 20),
+                      style: { ...input, maxWidth: 110 },
+                    }),
+                  ),
+                  h(
+                    "label",
+                    { className: "rdsh-grid-field", style: gridField },
+                    copy("historyLimit"),
+                    h("input", {
+                      type: "number",
+                      min: 0,
+                      max: 100,
+                      value: cx.max_sessions,
+                      onChange: (e) =>
+                        num("context", "max_sessions", e.target.value, 0),
+                      style: { ...input, maxWidth: 110 },
+                    }),
+                  ),
+                ),
+                h(
+                  "label",
+                  { style: field },
+                  copy("goal"),
+                  h("input", {
+                    value: cx.goal || "",
+                    placeholder: copy("goalPlaceholder"),
+                    onChange: (e) => setPath("context", "goal", e.target.value),
+                    style: input,
+                  }),
+                ),
+                h(
+                  "label",
+                  { style: field },
+                  copy("workingFiles"),
+                  h("textarea", {
+                    value: toLines(cx.working_files),
+                    rows: 3,
+                    onChange: (e) =>
+                      setPath(
+                        "context",
+                        "working_files",
+                        fromLines(e.target.value),
+                      ),
+                    style: { ...input, minHeight: 56 },
+                  }),
+                ),
+                h(
+                  "label",
+                  { style: field },
+                  copy("openTasks"),
+                  h("textarea", {
+                    value: toLines(cx.open_tasks),
+                    rows: 3,
+                    onChange: (e) =>
+                      setPath("context", "open_tasks", e.target.value),
+                    style: { ...input, minHeight: 56 },
+                  }),
+                ),
+              ),
+              h(
+                "div",
+                { style: field },
+                h("p", { style: title }, copy("longMemory")),
+                h("p", { style: hint }, copy("longHelp")),
+                h(
+                  "label",
+                  { style: field },
+                  copy("decisions"),
+                  h("textarea", {
+                    value: toLines(cx.decisions),
+                    rows: 3,
+                    onChange: (e) =>
+                      setPath("context", "decisions", fromLines(e.target.value)),
+                    style: { ...input, minHeight: 56 },
+                  }),
+                ),
+                h(
+                  "label",
+                  { style: field },
+                  copy("constraints"),
+                  h("textarea", {
+                    value: toLines(cx.constraints),
+                    rows: 3,
+                    onChange: (e) =>
+                      setPath(
+                        "context",
+                        "constraints",
+                        fromLines(e.target.value),
+                      ),
+                    style: { ...input, minHeight: 56 },
+                  }),
+                ),
+              ),
+            ),
+            h("p", { style: hint }, copy("allHelp")),
+          ),
+          card(
+            "details",
+            copy("groupDetails"),
+            copy("groupDetailsDesc"),
+            openGroups.details,
+            () => toggleOpen("details"),
+            detailsSummary,
+            pad(
+              h(
+                "div",
+                { style: field },
+                h("p", { style: title }, copy("allSettings")),
+                h("p", { style: hint }, copy("general")),
+                h(
+                  "div",
+                  { style: checkGrid },
+                  h(
+                    "label",
+                    { style: checkboxRow },
+                    h("input", {
+                      type: "checkbox",
+                      checked: !!g.slim,
+                      onChange: (e) =>
+                        setPath("general", "slim", e.target.checked),
+                    }),
+                    copy("slim"),
+                  ),
+                  h(
+                    "label",
+                    { style: checkboxRow },
+                    h("input", {
+                      type: "checkbox",
+                      checked: !!g.passthrough,
+                      onChange: (e) =>
+                        setPath("general", "passthrough", e.target.checked),
+                    }),
+                    copy("passthrough"),
+                  ),
+                  h(
+                    "label",
+                    { style: checkboxRow },
+                    h("input", {
+                      type: "checkbox",
+                      checked: !!g.dry_run,
+                      onChange: (e) =>
+                        setPath("general", "dry_run", e.target.checked),
+                    }),
+                    copy("dryRun"),
+                  ),
+                ),
+                h(
+                  "label",
+                  { style: field },
+                  copy("defaultProfile"),
+                  h("input", {
+                    value: g.default_profile || "",
+                    placeholder: copy("unspecified"),
+                    onChange: (e) =>
+                      setPath("general", "default_profile", e.target.value),
+                    style: input,
+                  }),
+                ),
+                h(
+                  "label",
+                  { style: field },
+                  copy("language"),
+                  h(
+                    "select",
+                    {
+                      value: displayLanguage,
+                      disabled: saving,
+                      onChange: (e) =>
+                        setPath("general", "language", e.target.value),
+                      style: input,
+                    },
+                    h("option", { value: "auto" }, copy("auto")),
+                    h("option", { value: "en" }, "English"),
+                    h("option", { value: "zh-CN" }, "简体中文"),
+                    h("option", { value: "ja" }, "日本語"),
+                  ),
+                ),
+                h(
+                  "label",
+                  { className: "rdsh-grid-field", style: gridField },
+                  copy("defaultBudget"),
+                  h("input", {
+                    type: "number",
+                    min: 500,
+                    max: 200000,
+                    step: 100,
+                    value: tk.default_budget,
+                    onChange: (e) =>
+                      num("tokens", "default_budget", e.target.value, 4000),
+                    style: { ...input, maxWidth: 140 },
+                  }),
+                ),
+              ),
+              h(
+                "div",
+                { style: field },
+                h("p", { style: title }, copy("search")),
+                h(
+                  "label",
+                  { style: field },
+                  copy("directory"),
+                  h("input", {
+                    value: se.dir || "",
+                    onChange: (e) => setPath("search", "dir", e.target.value),
+                    style: input,
+                  }),
+                ),
+                h(
+                  "div",
+                  { className: "rdsh-grid-2", style: grid2 },
+                  h(
+                    "label",
+                    { className: "rdsh-grid-field", style: gridField },
+                    copy("maxResults"),
+                    h("input", {
+                      type: "number",
+                      min: 1,
+                      max: 100,
+                      value: se.max,
+                      onChange: (e) => num("search", "max", e.target.value, 100),
+                      style: { ...input, maxWidth: 110 },
+                    }),
+                  ),
+                  h(
+                    "label",
+                    { className: "rdsh-grid-field", style: gridField },
+                    copy("webLimit"),
+                    h("input", {
+                      type: "number",
+                      min: 1,
+                      max: 100,
+                      value: se.web_limit,
+                      onChange: (e) =>
+                        num("search", "web_limit", e.target.value, 10),
+                      style: { ...input, maxWidth: 110 },
+                    }),
+                  ),
+                ),
+                h(
+                  "label",
+                  { style: field },
+                  copy("searxng"),
+                  h("input", {
+                    value: se.searxng_url || "",
+                    placeholder: copy("unset"),
+                    onChange: (e) =>
+                      setPath("search", "searxng_url", e.target.value),
+                    style: input,
+                  }),
+                ),
+              ),
+              h(
+                "div",
+                { style: field },
+                h("p", { style: title }, copy("compact")),
+                h(
+                  "label",
+                  { className: "rdsh-grid-field", style: gridField },
+                  copy("maxTokens"),
+                  h("input", {
+                    type: "number",
+                    min: 500,
+                    max: 200000,
+                    step: 100,
+                    value: co.max_tokens,
+                    onChange: (e) =>
+                      num("compact", "max_tokens", e.target.value, 8000),
+                    style: { ...input, maxWidth: 140 },
+                  }),
+                ),
+                h("p", { style: title }, copy("sessions")),
+                h(
+                  "div",
+                  { className: "rdsh-grid-2", style: grid2 },
+                  h(
+                    "label",
+                    { className: "rdsh-grid-field", style: gridField },
+                    copy("retention"),
+                    h("input", {
+                      type: "number",
+                      min: 1,
+                      max: 100,
+                      value: ss.limit,
+                      onChange: (e) =>
+                        num("sessions", "limit", e.target.value, 20),
+                      style: { ...input, maxWidth: 110 },
+                    }),
+                  ),
+                  h(
+                    "label",
+                    { style: checkboxRow },
+                    h("input", {
+                      type: "checkbox",
+                      checked: !!ss.with_tokens,
+                      onChange: (e) =>
+                        setPath("sessions", "with_tokens", e.target.checked),
+                    }),
+                    copy("withTokens"),
+                  ),
+                ),
+                h("p", { style: title }, copy("logs")),
+                h(
+                  "label",
+                  { className: "rdsh-grid-field", style: gridField },
+                  copy("tail"),
+                  h("input", {
+                    type: "number",
+                    min: 1,
+                    max: 500,
+                    value: lg2.tail,
+                    onChange: (e) => num("logs", "tail", e.target.value, 50),
+                    style: { ...input, maxWidth: 110 },
+                  }),
+                ),
+                h("p", { style: title }, copy("server")),
+                h(
+                  "label",
+                  { className: "rdsh-grid-field", style: gridField },
+                  copy("port"),
+                  h("input", {
+                    type: "number",
+                    min: 1,
+                    max: 65535,
+                    value: svv.port,
+                    onChange: (e) => num("serve", "port", e.target.value, 38080),
+                    style: { ...input, maxWidth: 110 },
+                  }),
+                ),
+                h("p", { style: title }, copy("guard")),
+                h(
+                  "label",
+                  { style: field },
+                  copy("denyPaths"),
+                  h("textarea", {
+                    value: toLines(gu.deny),
+                    rows: 2,
+                    onChange: (e) =>
+                      setPath("guard", "deny", fromLines(e.target.value)),
+                    style: { ...input, minHeight: 44 },
+                  }),
+                ),
+                h(
+                  "label",
+                  { style: field },
+                  copy("reason"),
+                  h("input", {
+                    value: gu.reason || "",
+                    onChange: (e) => setPath("guard", "reason", e.target.value),
+                    style: input,
+                  }),
+                ),
+                h("p", { style: title }, copy("benchmark")),
+                h(
+                  "label",
+                  { className: "rdsh-grid-field", style: gridField },
+                  copy("iterations"),
+                  h("input", {
+                    type: "number",
+                    min: 1,
+                    max: 20,
+                    value: be.n,
+                    onChange: (e) => num("bench", "n", e.target.value, 5),
+                    style: { ...input, maxWidth: 110 },
+                  }),
+                ),
+                h("p", { style: title }, copy("setup")),
+                h(
+                  "label",
+                  { className: "rdsh-grid-field", style: gridField },
+                  copy("webPort"),
+                  h("input", {
+                    type: "number",
+                    min: 0,
+                    max: 65535,
+                    value: su.web_port,
+                    onChange: (e) =>
+                      num("setup", "web_port", e.target.value, 0),
+                    style: { ...input, maxWidth: 110 },
+                  }),
+                ),
+              ),
+            ),
+          ),
         ),
         h(
           "div",
-          { style: card },
-          h("p", { style: title }, copy("contextTitle")),
-          h("p", { style: desc }, copy("contextHelp")),
-          h(
-            "div",
-            { style: row },
-            h(
-              "label",
-              { style: row },
-              h("input", {
-                type: "checkbox",
-                checked: !!bt.context_engine,
-                onChange: (e) =>
-                  setPath("beta", "context_engine", e.target.checked),
-              }),
-              copy("enableContext"),
-            ),
-          ),
-          legacy && cxActive ? h("p", { style: warn }, copy("legacy")) : null,
-        ),
-        h(
-          "div",
-          { style: card },
-          h("p", { style: title }, copy("workingMemory")),
-          h("p", { style: desc }, copy("workingHelp")),
-          h(
-            "div",
-            { style: row },
-            h("span", { style: label }, copy("tokenBudget")),
-            h("input", {
-              type: "number",
-              min: 500,
-              max: 200000,
-              step: 100,
-              value: cx.token_budget,
-              onChange: (e) =>
-                num("context", "token_budget", e.target.value, 4000),
-              style: { ...input, maxWidth: 140 },
-            }),
-          ),
-          h(
-            "div",
-            { style: grid2 },
-            h(
-              "label",
-              { style: row },
-              h("input", {
-                type: "checkbox",
-                checked: !!cx.enable_retriever,
-                onChange: (e) =>
-                  setPath("context", "enable_retriever", e.target.checked),
-              }),
-              copy("retriever"),
-            ),
-            h(
-              "label",
-              { style: row },
-              h("input", {
-                type: "checkbox",
-                checked: !!cx.enable_packer,
-                onChange: (e) =>
-                  setPath("context", "enable_packer", e.target.checked),
-              }),
-              copy("packer"),
-            ),
-            h(
-              "label",
-              { style: row },
-              h("input", {
-                type: "checkbox",
-                checked: !!cx.enable_verifier,
-                onChange: (e) =>
-                  setPath("context", "enable_verifier", e.target.checked),
-              }),
-              copy("verifier"),
-            ),
-            h(
-              "label",
-              { style: row },
-              h("input", {
-                type: "checkbox",
-                checked: !!cx.include_git_diff,
-                onChange: (e) =>
-                  setPath("context", "include_git_diff", e.target.checked),
-              }),
-              copy("gitDiff"),
-            ),
-          ),
-          h(
-            "div",
-            { style: grid2 },
-            h(
-              "div",
-              { style: row },
-              h("span", { style: label }, copy("codeLimit")),
-              h("input", {
-                type: "number",
-                min: 1,
-                max: 100,
-                value: cx.max_code_hits,
-                onChange: (e) =>
-                  num("context", "max_code_hits", e.target.value, 20),
-                style: { ...input, maxWidth: 110 },
-              }),
-            ),
-            h(
-              "div",
-              { style: row },
-              h("span", { style: label }, copy("historyLimit")),
-              h("input", {
-                type: "number",
-                min: 0,
-                max: 100,
-                value: cx.max_sessions,
-                onChange: (e) =>
-                  num("context", "max_sessions", e.target.value, 0),
-                style: { ...input, maxWidth: 110 },
-              }),
-            ),
-          ),
-          h(
-            "div",
-            null,
-            h("div", { style: label }, copy("goal")),
-            h("input", {
-              value: cx.goal || "",
-              placeholder: copy("goalPlaceholder"),
-              onChange: (e) => setPath("context", "goal", e.target.value),
-              style: input,
-            }),
-          ),
-          h(
-            "div",
-            null,
-            h("div", { style: label }, copy("workingFiles")),
-            h("textarea", {
-              value: toLines(cx.working_files),
-              rows: 3,
-              onChange: (e) =>
-                setPath("context", "working_files", fromLines(e.target.value)),
-              style: { ...input, minHeight: 56 },
-            }),
-          ),
-          h(
-            "div",
-            null,
-            h("div", { style: label }, copy("openTasks")),
-            h("textarea", {
-              value: toLines(cx.open_tasks),
-              rows: 3,
-              onChange: (e) => setPath("context", "open_tasks", e.target.value),
-              style: { ...input, minHeight: 56 },
-            }),
-          ),
-        ),
-        h(
-          "div",
-          { style: card },
-          h("p", { style: title }, copy("longMemory")),
-          h("p", { style: desc }, copy("longHelp")),
-          h(
-            "div",
-            null,
-            h("div", { style: label }, copy("decisions")),
-            h("textarea", {
-              value: toLines(cx.decisions),
-              rows: 3,
-              onChange: (e) =>
-                setPath("context", "decisions", fromLines(e.target.value)),
-              style: { ...input, minHeight: 56 },
-            }),
-          ),
-          h(
-            "div",
-            null,
-            h("div", { style: label }, copy("constraints")),
-            h("textarea", {
-              value: toLines(cx.constraints),
-              rows: 3,
-              onChange: (e) =>
-                setPath("context", "constraints", fromLines(e.target.value)),
-              style: { ...input, minHeight: 56 },
-            }),
-          ),
-        ),
-        h(
-          "div",
-          { style: card },
-          h("p", { style: title }, copy("allSettings")),
-          h("p", { style: desc }, copy("allHelp")),
-          h("div", { style: label }, copy("general")),
-          h(
-            "div",
-            { style: grid2 },
-            h(
-              "label",
-              { style: row },
-              h("input", {
-                type: "checkbox",
-                checked: !!g.slim,
-                onChange: (e) => setPath("general", "slim", e.target.checked),
-              }),
-              copy("slim"),
-            ),
-            h(
-              "label",
-              { style: row },
-              h("input", {
-                type: "checkbox",
-                checked: !!g.passthrough,
-                onChange: (e) =>
-                  setPath("general", "passthrough", e.target.checked),
-              }),
-              copy("passthrough"),
-            ),
-            h(
-              "label",
-              { style: row },
-              h("input", {
-                type: "checkbox",
-                checked: !!g.dry_run,
-                onChange: (e) =>
-                  setPath("general", "dry_run", e.target.checked),
-              }),
-              copy("dryRun"),
-            ),
-          ),
-          h(
-            "div",
-            null,
-            h("div", { style: label }, copy("defaultProfile")),
-            h("input", {
-              value: g.default_profile || "",
-              placeholder: copy("unspecified"),
-              onChange: (e) =>
-                setPath("general", "default_profile", e.target.value),
-              style: input,
-            }),
-          ),
-          h(
-            "label",
-            { style: label },
-            copy("language"),
-            h(
-              "select",
-              {
-                value: displayLanguage,
-                disabled: saving,
-                onChange: (e) => setPath("general", "language", e.target.value),
-                style: input,
-              },
-              h("option", { value: "auto" }, copy("auto")),
-              h("option", { value: "en" }, "English"),
-              h("option", { value: "zh-CN" }, "简体中文"),
-              h("option", { value: "ja" }, "日本語"),
-            ),
-          ),
-          h("div", { style: label }, copy("tokens")),
-          h(
-            "div",
-            { style: row },
-            h("span", { style: label }, copy("defaultBudget")),
-            h("input", {
-              type: "number",
-              min: 500,
-              max: 200000,
-              step: 100,
-              value: tk.default_budget,
-              onChange: (e) =>
-                num("tokens", "default_budget", e.target.value, 4000),
-              style: { ...input, maxWidth: 140 },
-            }),
-          ),
-          h("div", { style: label }, copy("search")),
-          h(
-            "div",
-            null,
-            h("div", { style: label }, copy("directory")),
-            h("input", {
-              value: se.dir || "",
-              onChange: (e) => setPath("search", "dir", e.target.value),
-              style: input,
-            }),
-          ),
-          h(
-            "div",
-            { style: grid2 },
-            h(
-              "div",
-              { style: row },
-              h("span", { style: label }, copy("maxResults")),
-              h("input", {
-                type: "number",
-                min: 1,
-                max: 100,
-                value: se.max,
-                onChange: (e) => num("search", "max", e.target.value, 100),
-                style: { ...input, maxWidth: 110 },
-              }),
-            ),
-            h(
-              "div",
-              { style: row },
-              h("span", { style: label }, copy("webLimit")),
-              h("input", {
-                type: "number",
-                min: 1,
-                max: 100,
-                value: se.web_limit,
-                onChange: (e) => num("search", "web_limit", e.target.value, 10),
-                style: { ...input, maxWidth: 110 },
-              }),
-            ),
-          ),
-          h(
-            "div",
-            null,
-            h("div", { style: label }, copy("searxng")),
-            h("input", {
-              value: se.searxng_url || "",
-              placeholder: copy("unset"),
-              onChange: (e) => setPath("search", "searxng_url", e.target.value),
-              style: input,
-            }),
-          ),
-          h("div", { style: label }, copy("compact")),
-          h(
-            "div",
-            { style: row },
-            h("span", { style: label }, copy("maxTokens")),
-            h("input", {
-              type: "number",
-              min: 500,
-              max: 200000,
-              step: 100,
-              value: co.max_tokens,
-              onChange: (e) =>
-                num("compact", "max_tokens", e.target.value, 8000),
-              style: { ...input, maxWidth: 140 },
-            }),
-          ),
-          h("div", { style: label }, copy("sessions")),
-          h(
-            "div",
-            { style: grid2 },
-            h(
-              "div",
-              { style: row },
-              h("span", { style: label }, copy("retention")),
-              h("input", {
-                type: "number",
-                min: 1,
-                max: 100,
-                value: ss.limit,
-                onChange: (e) => num("sessions", "limit", e.target.value, 20),
-                style: { ...input, maxWidth: 110 },
-              }),
-            ),
-            h(
-              "label",
-              { style: row },
-              h("input", {
-                type: "checkbox",
-                checked: !!ss.with_tokens,
-                onChange: (e) =>
-                  setPath("sessions", "with_tokens", e.target.checked),
-              }),
-              copy("withTokens"),
-            ),
-          ),
-          h("div", { style: label }, copy("logs")),
-          h(
-            "div",
-            { style: row },
-            h("span", { style: label }, copy("tail")),
-            h("input", {
-              type: "number",
-              min: 1,
-              max: 500,
-              value: lg2.tail,
-              onChange: (e) => num("logs", "tail", e.target.value, 50),
-              style: { ...input, maxWidth: 110 },
-            }),
-          ),
-          h("div", { style: label }, copy("server")),
-          h(
-            "div",
-            { style: row },
-            h("span", { style: label }, copy("port")),
-            h("input", {
-              type: "number",
-              min: 1,
-              max: 65535,
-              value: svv.port,
-              onChange: (e) => num("serve", "port", e.target.value, 38080),
-              style: { ...input, maxWidth: 110 },
-            }),
-          ),
-          h("div", { style: label }, copy("guard")),
-          h(
-            "div",
-            null,
-            h("div", { style: label }, copy("denyPaths")),
-            h("textarea", {
-              value: toLines(gu.deny),
-              rows: 2,
-              onChange: (e) =>
-                setPath("guard", "deny", fromLines(e.target.value)),
-              style: { ...input, minHeight: 44 },
-            }),
-          ),
-          h(
-            "div",
-            null,
-            h("div", { style: label }, copy("reason")),
-            h("input", {
-              value: gu.reason || "",
-              onChange: (e) => setPath("guard", "reason", e.target.value),
-              style: input,
-            }),
-          ),
-          h("div", { style: label }, copy("benchmark")),
-          h(
-            "div",
-            { style: row },
-            h("span", { style: label }, copy("iterations")),
-            h("input", {
-              type: "number",
-              min: 1,
-              max: 20,
-              value: be.n,
-              onChange: (e) => num("bench", "n", e.target.value, 5),
-              style: { ...input, maxWidth: 110 },
-            }),
-          ),
-          h("div", { style: label }, copy("setup")),
-          h(
-            "div",
-            { style: row },
-            h("span", { style: label }, copy("webPort")),
-            h("input", {
-              type: "number",
-              min: 0,
-              max: 65535,
-              value: su.web_port,
-              onChange: (e) => num("setup", "web_port", e.target.value, 0),
-              style: { ...input, maxWidth: 110 },
-            }),
-          ),
-        ),
-        h(
-          "div",
-          { style: { display: "flex", gap: 8, alignItems: "center" } },
+          {
+            style: {
+              display: "flex",
+              gap: 8,
+              alignItems: "center",
+              flexWrap: "wrap",
+            },
+          },
           h(
             "button",
             {
+              type: "button",
               className: "rdsh-btn-pri",
               onClick: () => saveAll(),
               disabled: saving || !discordValid,
@@ -1753,6 +2274,7 @@ window.__ModuleLoader__.load({
           h(
             "button",
             {
+              type: "button",
               className: "rdsh-btn-sec",
               onClick: load,
               disabled: saving,
@@ -1775,6 +2297,7 @@ window.__ModuleLoader__.load({
           ),
         ),
       );
+
     }
     return {
       inject: ['slots', 'locale'],
