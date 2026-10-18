@@ -1281,13 +1281,30 @@ impl DesktopApp {
             // Update awareness mirrors rustdsh's own update notification: one
             // background registry query per launch, never blocking the window.
             if std::env::var("RDSH_DESKTOP_UPDATE_CHECK").as_deref() != Ok("0") {
+                // Announce what the last check already knows, so the notice is
+                // visible on the first frame instead of one registry round later.
+                if let Some(cached) = crate::host::cached_newest_published() {
+                    if crate::host::compare_versions(&cached, &active_version).is_gt() {
+                        let _ = update_tx.send(Update::Update(cached));
+                    }
+                }
                 let updates = update_tx.clone();
                 let active_version = active_version.clone();
                 std::thread::spawn(move || {
-                    if let Some(newest) = crate::host::newest_published() {
-                        if crate::host::compare_versions(&newest, &active_version).is_gt() {
-                            let _ = updates.send(Update::Update(newest));
+                    let newest = crate::host::newest_published();
+                    match newest {
+                        Some(newest) => {
+                            crate::host::store_newest_published(&newest);
+                            let newer =
+                                crate::host::compare_versions(&newest, &active_version).is_gt();
+                            log::info!(
+                                "update check: active {active_version}, newest {newest}, newer {newer}"
+                            );
+                            if newer {
+                                let _ = updates.send(Update::Update(newest));
+                            }
                         }
+                        None => log::info!("update check: the registry did not answer"),
                     }
                 });
             }
@@ -2139,6 +2156,60 @@ impl Render for DesktopApp {
             .py(px(24.))
             .children(rows);
 
+        let update_notice = self.update.clone().map(|newest| {
+            let command = format!("npm install -g @deepseek-ai/dsh@{newest}");
+            div()
+                .mx(px(32.))
+                .mb(px(10.))
+                .px(px(16.))
+                .py(px(10.))
+                .rounded(theme::radius_lg())
+                .bg(rgb(0xfff7e6))
+                .border_1()
+                .border_color(rgb(0xf0d9a8))
+                .flex()
+                .flex_row()
+                .items_center()
+                .justify_between()
+                .gap(px(12.))
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap(px(2.))
+                        .child(
+                            div()
+                                .text_size(theme::meta_size())
+                                .font_weight(FontWeight::MEDIUM)
+                                .text_color(theme::label())
+                                .child(format!("dsh {newest} が利用可能です")),
+                        )
+                        .child(
+                            div()
+                                .text_size(theme::micro_size())
+                                .text_color(theme::secondary())
+                                .child(format!("更新: {command}")),
+                        ),
+                )
+                .child(
+                    div()
+                        .id("dismiss-update")
+                        .px(px(8.))
+                        .py(px(2.))
+                        .rounded(theme::radius_sm())
+                        .cursor_pointer()
+                        .hover(|style| style.bg(rgb(0xf4e6c8)))
+                        .text_size(theme::micro_size())
+                        .text_color(theme::secondary())
+                        .child("閉じる")
+                        .on_click(cx.listener(|this, _event, _window, cx| {
+                            this.update = None;
+                            cx.notify();
+                        })),
+                )
+                .into_any_element()
+        });
+
         let banner = pending.as_ref().map(|pending| match pending {
             Pending::Approval { tool, reason, .. } => {
                 let (tool, reason) = (tool.clone(), reason.clone());
@@ -2582,6 +2653,7 @@ impl Render for DesktopApp {
             .bg(theme::page())
             .child(header)
             .child(timeline)
+            .children(update_notice)
             .children(banner)
             .children(picker_panel)
             .child(composer);
