@@ -24,6 +24,57 @@ pub enum Engine {
     Rustxng,
 }
 
+/// How one engine serves results: SearXNG renders result markup, while
+/// rustxng keeps that markup incompatible on purpose and publishes JSON.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Format {
+    Html,
+    Json,
+}
+
+fn format_for(engine: Engine) -> Format {
+    match engine {
+        Engine::Rustxng => Format::Json,
+        Engine::Searxng | Engine::Auto => Format::Html,
+    }
+}
+
+/// Parse the JSON result document rustxng serves (and SearXNG serves when the
+/// json format is enabled): {"results":[{"url","title","content"}...]}.
+fn parse_json(body: &str, limit: usize) -> anyhow::Result<Vec<Hit>> {
+    let value: serde_json::Value = serde_json::from_str(body)
+        .map_err(|error| anyhow::anyhow!("the search engine did not return JSON: {error}"))?;
+    let Some(results) = value.get("results").and_then(serde_json::Value::as_array) else {
+        anyhow::bail!("the search engine JSON has no results array");
+    };
+    let mut hits = Vec::new();
+    for item in results {
+        let Some(url) = item.get("url").and_then(serde_json::Value::as_str) else {
+            continue;
+        };
+        if url.is_empty() || !url.starts_with("http") {
+            continue;
+        }
+        let title = item
+            .get("title")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or(url);
+        let content = item
+            .get("content")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("");
+        hits.push(Hit {
+            title: title.trim().to_string(),
+            url: url.to_string(),
+            content: content.trim().to_string(),
+        });
+        if hits.len() >= limit {
+            break;
+        }
+    }
+    Ok(hits)
+}
+
 pub fn help(locale: crate::locale::Locale) -> &'static str {
     match locale {
         crate::locale::Locale::English => "Enable: rdsh features on search-web\nOllama: set OLLAMA_API_KEY, then use --provider ollama (up to 10 results).\nEngines: --engine auto|searxng|rustxng. auto resolves SEARXNG_URL, then RUSTXNG_URL, then a local rustxng, then http://127.0.0.1:8888.\nLocal rustxng: set RUSTXNG_BIN (or install rustxng) and rdsh starts the sidecar itself; --engine searxng never spawns it.\nWeb Search API service guide: Tavily https://www.tavily.com/\nTavily quickstart: https://docs.tavily.com/documentation/quickstart\nBuilt-in providers: searxng, ollama. Tavily is a service reference.\nSearXNG down? --auto-start runs docker-compose.searxng.yml (loopback only).\nDocs: https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/WEB-SEARCH.md",
@@ -421,7 +472,12 @@ fn unreachable_engine_message(base: &str, locale: crate::locale::Locale) -> Stri
     }
 }
 
-fn fetch(base: &str, query: &str, locale: crate::locale::Locale) -> anyhow::Result<Vec<Hit>> {
+fn fetch_with(
+    base: &str,
+    query: &str,
+    locale: crate::locale::Locale,
+    format: Format,
+) -> anyhow::Result<Vec<Hit>> {
     use std::io::{Read, Write};
     use std::net::ToSocketAddrs;
     let (host, port, prefix) = split_base(base, locale)?;
@@ -430,7 +486,10 @@ fn fetch(base: &str, query: &str, locale: crate::locale::Locale) -> anyhow::Resu
         // Advisory only: remote instances stay usable via an SSH tunnel.
         eprintln!("[rdsh] warning: SearXNG host {host} is not loopback; prefer an SSH tunnel to localhost");
     }
-    let target = format!("{prefix}/search?q={}", encode_query(query));
+    let mut target = format!("{prefix}/search?q={}", encode_query(query));
+    if format == Format::Json {
+        target.push_str("&format=json");
+    }
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
     let mut stream = None;
     for address in format!("{host}:{port}").to_socket_addrs()? {
@@ -453,7 +512,12 @@ fn fetch(base: &str, query: &str, locale: crate::locale::Locale) -> anyhow::Resu
     } else {
         format!("{host}:{port}")
     };
-    let request = format!("GET {target} HTTP/1.0\r\nHost: {host_header}\r\nUser-Agent: {ua}\r\nAccept: text/html\r\nConnection: close\r\n\r\n");
+    let accept = if format == Format::Json {
+        "application/json"
+    } else {
+        "text/html"
+    };
+    let request = format!("GET {target} HTTP/1.0\r\nHost: {host_header}\r\nUser-Agent: {ua}\r\nAccept: {accept}\r\nConnection: close\r\n\r\n");
     let mut pending = request.as_bytes();
     while !pending.is_empty() {
         let remaining = deadline.saturating_duration_since(std::time::Instant::now());
@@ -542,8 +606,17 @@ fn fetch(base: &str, query: &str, locale: crate::locale::Locale) -> anyhow::Resu
             crate::locale::native_message(locale, crate::locale::NativeMessage::BadSearxResponse)
         ),
     };
+    if format == Format::Json {
+        return parse_json(body, 50);
+    }
     ensure_results_page(body, base, locale)?;
     Ok(parse_html(body, 50))
+}
+
+/// HTML search client used by the stub tests.
+#[cfg(test)]
+fn fetch(base: &str, query: &str, locale: crate::locale::Locale) -> anyhow::Result<Vec<Hit>> {
+    fetch_with(base, query, locale, Format::Html)
 }
 
 /// Accept recognizable empty SearXNG pages; preserve locale on invalid pages.
@@ -606,7 +679,23 @@ pub fn cmd_search_web(
                     anyhow::bail!("{failure}");
                 }
             }
-            let hits = fetch(&base, query, locale)?;
+            let format = format_for(engine);
+            let hits = match fetch_with(&base, query, locale, format) {
+                Ok(hits) => hits,
+                Err(error) => {
+                    // An auto-detected rustxng base also serves JSON rather
+                    // than the SearXNG result markup, so one JSON retry is
+                    // worth it unless the operator pinned SearXNG.
+                    if format == Format::Html && engine != Engine::Searxng {
+                        match fetch_with(&base, query, locale, Format::Json) {
+                            Ok(hits) => hits,
+                            Err(_) => return Err(error),
+                        }
+                    } else {
+                        return Err(error);
+                    }
+                }
+            };
             (base, hits)
         }
         Provider::Ollama => (
@@ -934,6 +1023,29 @@ mod tests {
         }
         // The query is encoded separately and cannot create a second request.
         assert_eq!(encode_query("\r\nInjected: yes"), "%0D%0AInjected%3A+yes");
+    }
+
+    #[test]
+    fn rustxng_uses_the_json_format() {
+        assert_eq!(format_for(Engine::Rustxng), Format::Json);
+        assert_eq!(format_for(Engine::Searxng), Format::Html);
+        assert_eq!(format_for(Engine::Auto), Format::Html);
+    }
+
+    #[test]
+    fn json_results_are_parsed_and_limited() {
+        let body = r#"{"results":[{"url":"https://a.example/1","title":"A","content":"one"},{"url":"https://b.example/2","title":"B"},{"title":"no url"},{"url":"https://c.example/3","title":"C","content":"three"}]}"#;
+        let hits = parse_json(body, 2).expect("json body");
+        assert_eq!(hits.len(), 2);
+        assert_eq!(hits[0].title, "A");
+        assert_eq!(hits[0].url, "https://a.example/1");
+        assert_eq!(hits[1].content, "");
+    }
+
+    #[test]
+    fn json_without_results_is_an_error() {
+        assert!(parse_json("<html>not json</html>", 5).is_err());
+        assert!(parse_json("{\"nope\":1}", 5).is_err());
     }
 
     #[test]
