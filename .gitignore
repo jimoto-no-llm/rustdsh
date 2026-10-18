@@ -39,6 +39,8 @@ Thumbs.db
 /tmp/
 *.tmp
 .local/
+# Raw live API journals retain local recovery data; publish sanitized summaries only.
+/cloud/evidence/*.journal/
 .serena/
 /strix_runs/
 

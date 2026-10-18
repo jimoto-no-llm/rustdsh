@@ -1,0 +1,33 @@
+{
+  "kind": "minimal_offline_verification",
+  "base_commit": "3e1099180eb2287aaeb9c68f59ee7eef4c530bf4",
+  "working_tree_dirty": true,
+  "platform": "Windows x64",
+  "profile": "debug",
+  "paid_api_requests": 0,
+  "real_sandboxes_created": 0,
+  "fake_load": {
+    "jobs": 10000,
+    "simultaneous_leases": 10000,
+    "elapsed_ms": 116,
+    "acquire_latency_p50_us": 5,
+    "acquire_latency_p95_us": 9,
+    "acquire_latency_p99_us": 28,
+    "executed": 10000,
+    "released": 10000,
+    "remaining_sandboxes": 0,
+    "scope": "Sequential acquisition, in-memory lease retention, correlated simulated results and release. No agent processes, LLM calls or distributed controller."
+  },
+  "verification": {
+    "cargo_fmt_check": "passed",
+    "cargo_clippy_locked_all_targets_deny_warnings": "passed after Windows-only lint fixes",
+    "cargo_test": {"passed": 860, "failed": 0, "suites": 28},
+    "node_cli_and_offline_burst_contracts": {"passed": 25, "failed": 0},
+    "regress_windows_installer_delegation": "passed under Git Bash",
+    "regress_sh": "stopped at existing native search: secure native search is unavailable on Windows",
+    "linux_regress": "not run",
+    "real_gas_city_agent_sandbox_e2e": "not run",
+    "remote_ci": "not run"
+  },
+  "note": "Rust suite passed before the subsequent Windows lint-only fixes; clippy checked all targets after those fixes and the binary was rebuilt for Windows regression."
+}

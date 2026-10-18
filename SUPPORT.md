@@ -6,7 +6,7 @@
 | ----------- | ---------------------------------------------------- |
 | Issues      | Bugs, feature requests and usage questions           |
 | Advisories  | Vulnerabilities - see SECURITY.md, never pub issues  |
-| Discord     | Community chat and quick questions (Japanese OK)    |
+| Discord     | Community chat and quick questions (Japanese OK)     |
 
 Japanese is welcome (Japanese OK). The issue forms accept Japanese.
 

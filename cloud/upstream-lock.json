@@ -1,0 +1,25 @@
+{
+  "checked_at": "2026-10-18",
+  "status": "source-inspected-not-distribution-qualified",
+  "local_runtime": {
+    "gas_city_version": "1.5.0",
+    "gas_city_commit": "f66474617d2bb7fbe51a3d746da5f3ceab2b8517",
+    "gas_city_license": "MIT",
+    "gas_city_linux_amd64_archive_sha256": "0ff5cfc3f1cb2e4260d3d93fcce7a4e40bb5675b74eb9de185156757d4f7fa9c",
+    "gas_city_linux_amd64_binary_sha256": "02d9cac82babe4f0316c4764cdb5faadd40c3cae85796c8acbfdcf34b9258376",
+    "jq_version": "1.8.1",
+    "jq_commit": "4467af7068b1bcd7f882defff6e7ea674c5357f4",
+    "jq_linux_amd64_sha256": "020468de7539ce70ef1bceaf7cde2e8c4f2ca6c3afb84642aabc5c97d9fc2a0d",
+    "distribution": "Official external binaries installed locally; not included in rdsh release artifacts"
+  },
+  "sources": [
+    {"name":"rustdsh","repository":"jimoto-no-llm/rustdsh","commit":"3e1099180eb2287aaeb9c68f59ee7eef4c530bf4","license":"MIT","role":"integration source"},
+    {"name":"swarm-rdsh","repository":"RNA4219/swarm-rdsh","commit":"b9edd76cdaf29f2c4b1470f16b50535a8c480242","license":"MIT","role":"compatibility reference; no code copied"},
+    {"name":"Gas City","repository":"gastownhall/gascity","commit":"fec82025d24392176eef9153ebf7af8759c6ef0c","license":"MIT","role":"external gc executable; not bundled"},
+    {"name":"Gas Town","repository":"gastownhall/gastown","commit":"649b832b7672bc7a2dbef26f5983aba6198b819b","license":"MIT","role":"legacy adapter reference; not bundled"},
+    {"name":"Beads","repository":"gastownhall/beads","commit":"4a67d0d0288c1b4ee23e17fc896f47616931ba2d","license":"MIT","role":"external task state; not bundled"},
+    {"name":"Agent Sandbox","repository":"kubernetes-sigs/agent-sandbox","commit":"e0b002e221a7e8d5534f686fe1d3ef4fdfd6d6bb","license":"Apache-2.0","role":"Kubernetes API contract; not bundled"},
+    {"name":"Kueue","repository":"kubernetes-sigs/kueue","commit":"bb201e17bd1cf47909aad100b0f6aaaa92bd3efd","license":"Apache-2.0","role":"admission design reference; not integrated"},
+    {"name":"DeepSeek Harness","repository":"deepseek-ai/deepseek-harness","commit":"687f282e8625c6b8d11ff58211a90524be2e4317","license":"MIT","role":"worker image source build"}
+  ]
+}

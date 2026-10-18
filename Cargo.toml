@@ -41,7 +41,7 @@ name = "rdsh"
 path = "src/main.rs"
 
 [dependencies]
-clap = { version = "4.5", features = ["derive"] }
+clap = { version = "4.5", features = ["derive", "env"] }
 serde = { version = "1.0", features = ["derive"] }
 # preserve_order retains JavaScript insertion ordering for native dashboard ports.
 # float_roundtrip parses decimal JSON numbers to the same binary64 values as JavaScript.
@@ -56,7 +56,7 @@ futures-util = "0.3"
 hyper = { version = "1.7", features = ["http1", "server"] }
 hyper-util = { version = "0.1", features = ["service", "tokio"] }
 reqwest = { version = "0.12.9", default-features = false, features = ["rustls-tls", "stream"] }
-tokio = { version = "1.48", features = ["macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
+tokio = { version = "1.48", features = ["io-util", "macros", "net", "process", "rt-multi-thread", "signal", "sync", "time"] }
 tower = { version = "0.5", features = ["util"] }
 
 [target.'cfg(windows)'.dependencies]

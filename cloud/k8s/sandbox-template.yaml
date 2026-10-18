@@ -1,0 +1,60 @@
+# Replace the image with the exact digest built from cloud/worker/Dockerfile.
+# Egress is DNS only; a reviewed endpoint-specific policy is needed for model calls.
+apiVersion: extensions.agents.x-k8s.io/v1beta1
+kind: SandboxTemplate
+metadata:
+  name: rdsh-worker
+  namespace: rdsh-cloud
+spec:
+  podTemplate:
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+      containers:
+        - name: worker
+          image: REPLACE_WITH_RDSH_WORKER_IMAGE_AT_SHA256_DIGEST
+          imagePullPolicy: IfNotPresent
+          command: ["sleep", "infinity"]
+          env:
+            - name: HOME
+              value: /home/node
+            - name: DSH_HOME
+              value: /home/node/.dsh
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: home
+              mountPath: /home/node
+            - name: workspace
+              mountPath: /workspace
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: home
+          emptyDir: {}
+        - name: workspace
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+  networkPolicy:
+    ingress: []
+    egress:
+      - ports:
+          - protocol: UDP
+            port: 53
+          - protocol: TCP
+            port: 53

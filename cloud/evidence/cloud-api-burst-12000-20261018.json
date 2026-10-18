@@ -1,0 +1,1603 @@
+{
+  "version": 2,
+  "phase": "aborted_before_burst",
+  "startedAt": "2026-10-18T05:52:05.725Z",
+  "targetSimultaneous": 10000,
+  "total": 12000,
+  "maximumRequests": 12000,
+  "budgetUsd": 0.0266,
+  "plans": [
+    {
+      "provider": "openrouter",
+      "model": "ibm-granite/granite-4.0-h-micro",
+      "count": 200,
+      "allowedModels": [
+        "ibm-granite/granite-4.0-h-micro"
+      ],
+      "reserveUsd": 7.216e-7,
+      "body": {
+        "model": "ibm-granite/granite-4.0-h-micro",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.017000000017000003,
+            "completion": 0.11200000011200001,
+            "request": 0
+          }
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "openai/gpt-oss-20b",
+      "count": 200,
+      "allowedModels": [
+        "openai/gpt-oss-20b"
+      ],
+      "reserveUsd": 7.326e-7,
+      "body": {
+        "model": "openai/gpt-oss-20b",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.018000000018,
+            "completion": 0.09000000009,
+            "request": 0
+          }
+        },
+        "reasoning": {
+          "enabled": false
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "inclusionai/ling-3.0-flash",
+      "count": 200,
+      "allowedModels": [
+        "inclusionai/ling-3.0-flash",
+        "inclusionai/ling-3.0-flash-20260723"
+      ],
+      "reserveUsd": 8.085e-7,
+      "body": {
+        "model": "inclusionai/ling-3.0-flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.021000000020999998,
+            "completion": 0.06300000006300001,
+            "request": 0
+          }
+        },
+        "reasoning": {
+          "enabled": false
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "nex-agi/nex-n2.5-mini",
+      "count": 200,
+      "allowedModels": [
+        "nex-agi/nex-n2.5-mini",
+        "nex-agi/nex-n2.5-mini-20260908"
+      ],
+      "reserveUsd": 9.9e-7,
+      "body": {
+        "model": "nex-agi/nex-n2.5-mini",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.025000000025,
+            "completion": 0.1000000001,
+            "request": 0
+          }
+        },
+        "reasoning": {
+          "enabled": false
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "mistralai/mistral-nemo",
+      "count": 200,
+      "allowedModels": [
+        "mistralai/mistral-nemo"
+      ],
+      "reserveUsd": 0.0000010538,
+      "body": {
+        "model": "mistralai/mistral-nemo",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.029000000029000005,
+            "completion": 0.03000000003,
+            "request": 0
+          }
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "meta-llama/llama-3.2-1b-instruct",
+      "count": 200,
+      "allowedModels": [
+        "meta-llama/llama-3.2-1b-instruct"
+      ],
+      "reserveUsd": 0.0000011715000000000001,
+      "body": {
+        "model": "meta-llama/llama-3.2-1b-instruct",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.027000000027000003,
+            "completion": 0.20100000020100003,
+            "request": 0
+          }
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "qwen/qwen3.7-flash",
+      "count": 200,
+      "allowedModels": [
+        "qwen/qwen3.7-flash",
+        "qwen/qwen3.7-flash-20260727"
+      ],
+      "reserveUsd": 0.000001199,
+      "body": {
+        "model": "qwen/qwen3.7-flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.03000000003,
+            "completion": 0.13000000013000002,
+            "request": 0
+          }
+        },
+        "reasoning": {
+          "enabled": false
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "inference-net/schematron-v2-turbo",
+      "count": 200,
+      "allowedModels": [
+        "inference-net/schematron-v2-turbo",
+        "inference-net/schematron-v2-turbo-20260902"
+      ],
+      "reserveUsd": 0.000001221,
+      "body": {
+        "model": "inference-net/schematron-v2-turbo",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.03000000003,
+            "completion": 0.15000000015,
+            "request": 0
+          }
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "amazon/nova-micro-v1",
+      "count": 200,
+      "allowedModels": [
+        "amazon/nova-micro-v1"
+      ],
+      "reserveUsd": 0.0000013860000000000002,
+      "body": {
+        "model": "amazon/nova-micro-v1",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.035000000035000006,
+            "completion": 0.14000000014000002,
+            "request": 0
+          }
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "sao10k/l3-lunaris-8b",
+      "count": 200,
+      "allowedModels": [
+        "sao10k/l3-lunaris-8b"
+      ],
+      "reserveUsd": 0.000001463,
+      "body": {
+        "model": "sao10k/l3-lunaris-8b",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.040000000040000004,
+            "completion": 0.05000000005,
+            "request": 0
+          }
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "cohere/command-r7b-12-2024",
+      "count": 200,
+      "allowedModels": [
+        "cohere/command-r7b-12-2024"
+      ],
+      "reserveUsd": 0.0000014850000000000002,
+      "body": {
+        "model": "cohere/command-r7b-12-2024",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.0375000000375,
+            "completion": 0.15000000015,
+            "request": 0
+          }
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "inception/mercury-2.5",
+      "count": 200,
+      "allowedModels": [
+        "inception/mercury-2.5",
+        "inception/mercury-2.5-20260908"
+      ],
+      "reserveUsd": 0.0000015730000000000002,
+      "body": {
+        "model": "inception/mercury-2.5",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.040000000040000004,
+            "completion": 0.15000000015,
+            "request": 0
+          }
+        },
+        "reasoning": {
+          "enabled": false
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "tencent/hy-mt2-1.8b",
+      "count": 200,
+      "allowedModels": [
+        "tencent/hy-mt2-1.8b",
+        "tencent/hy-mt2-1.8b-20260521"
+      ],
+      "reserveUsd": 0.0000017435,
+      "body": {
+        "model": "tencent/hy-mt2-1.8b",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.044000000044,
+            "completion": 0.17700000017700004,
+            "request": 0
+          }
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "mistralai/mistral-small-24b-instruct-2501",
+      "count": 200,
+      "allowedModels": [
+        "mistralai/mistral-small-24b-instruct-2501"
+      ],
+      "reserveUsd": 0.0000018480000000000001,
+      "body": {
+        "model": "mistralai/mistral-small-24b-instruct-2501",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.05000000005,
+            "completion": 0.08000000008000001,
+            "request": 0
+          }
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "meta-llama/llama-3.1-8b-instruct",
+      "count": 200,
+      "allowedModels": [
+        "meta-llama/llama-3.1-8b-instruct"
+      ],
+      "reserveUsd": 0.0000018480000000000001,
+      "body": {
+        "model": "meta-llama/llama-3.1-8b-instruct",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.05000000005,
+            "completion": 0.08000000008000001,
+            "request": 0
+          }
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "google/gemma-3-4b-it",
+      "count": 200,
+      "allowedModels": [
+        "google/gemma-3-4b-it"
+      ],
+      "reserveUsd": 0.0000018699999999999999,
+      "body": {
+        "model": "google/gemma-3-4b-it",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.05000000005,
+            "completion": 0.1000000001,
+            "request": 0
+          }
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "z-ai/glm-5.3-flash",
+      "count": 200,
+      "allowedModels": [
+        "z-ai/glm-5.3-flash",
+        "z-ai/glm-5.3-flash-20260826"
+      ],
+      "reserveUsd": 0.0000019096000000000003,
+      "body": {
+        "model": "z-ai/glm-5.3-flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.04800000004800001,
+            "completion": 0.2000000002,
+            "request": 0
+          }
+        },
+        "reasoning": {
+          "enabled": false
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "google/gemma-3-12b-it",
+      "count": 200,
+      "allowedModels": [
+        "google/gemma-3-12b-it"
+      ],
+      "reserveUsd": 0.000001925,
+      "body": {
+        "model": "google/gemma-3-12b-it",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.05000000005,
+            "completion": 0.15000000015,
+            "request": 0
+          }
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "upstage/solar-mini4",
+      "count": 200,
+      "allowedModels": [
+        "upstage/solar-mini4",
+        "upstage/solar-mini4-20260922"
+      ],
+      "reserveUsd": 0.00000198,
+      "body": {
+        "model": "upstage/solar-mini4",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.05000000005,
+            "completion": 0.2000000002,
+            "request": 0
+          }
+        },
+        "reasoning": {
+          "enabled": false
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "inference-net/schematron-v2-small",
+      "count": 200,
+      "allowedModels": [
+        "inference-net/schematron-v2-small",
+        "inference-net/schematron-v2-small-20260902"
+      ],
+      "reserveUsd": 0.000002013,
+      "body": {
+        "model": "inference-net/schematron-v2-small",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.05000000005,
+            "completion": 0.23000000023,
+            "request": 0
+          }
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "meta-llama/llama-3.2-3b-instruct",
+      "count": 200,
+      "allowedModels": [
+        "meta-llama/llama-3.2-3b-instruct"
+      ],
+      "reserveUsd": 0.0000021230000000000003,
+      "body": {
+        "model": "meta-llama/llama-3.2-3b-instruct",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.05000000005,
+            "completion": 0.33000000033000004,
+            "request": 0
+          }
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "openai/gpt-5-nano",
+      "count": 200,
+      "allowedModels": [
+        "openai/gpt-5-nano",
+        "openai/gpt-5-nano-2025-08-07"
+      ],
+      "reserveUsd": 0.0000022,
+      "body": {
+        "model": "openai/gpt-5-nano",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.05000000005,
+            "completion": 0.4000000004,
+            "request": 0
+          }
+        },
+        "reasoning": {
+          "enabled": false
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "poolside/laguna-xs-2.1",
+      "count": 200,
+      "allowedModels": [
+        "poolside/laguna-xs-2.1",
+        "poolside/laguna-xs-2.1-20260625"
+      ],
+      "reserveUsd": 0.000002244,
+      "body": {
+        "model": "poolside/laguna-xs-2.1",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.06000000006,
+            "completion": 0.12000000012,
+            "request": 0
+          }
+        },
+        "reasoning": {
+          "enabled": false
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "inclusionai/ling-3.0-flash-vl",
+      "count": 200,
+      "allowedModels": [
+        "inclusionai/ling-3.0-flash-vl",
+        "inclusionai/ling-3.0-flash-vl-20260910"
+      ],
+      "reserveUsd": 0.00000231,
+      "body": {
+        "model": "inclusionai/ling-3.0-flash-vl",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.06000000006,
+            "completion": 0.18000000018,
+            "request": 0
+          }
+        },
+        "reasoning": {
+          "enabled": false
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "nvidia/nemotron-3-nano-30b-a3b",
+      "count": 200,
+      "allowedModels": [
+        "nvidia/nemotron-3-nano-30b-a3b"
+      ],
+      "reserveUsd": 0.0000023759999999999998,
+      "body": {
+        "model": "nvidia/nemotron-3-nano-30b-a3b",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.06000000006,
+            "completion": 0.24000000024,
+            "request": 0
+          }
+        },
+        "reasoning": {
+          "enabled": false
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "amazon/nova-lite-v1",
+      "count": 200,
+      "allowedModels": [
+        "amazon/nova-lite-v1"
+      ],
+      "reserveUsd": 0.0000023759999999999998,
+      "body": {
+        "model": "amazon/nova-lite-v1",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.06000000006,
+            "completion": 0.24000000024,
+            "request": 0
+          }
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "ibm-granite/granite-4.2-8b",
+      "count": 200,
+      "allowedModels": [
+        "ibm-granite/granite-4.2-8b",
+        "ibm-granite/granite-4.2-8b-20260831"
+      ],
+      "reserveUsd": 0.000002387,
+      "body": {
+        "model": "ibm-granite/granite-4.2-8b",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.06000000006,
+            "completion": 0.25000000025,
+            "request": 0
+          }
+        },
+        "reasoning": {
+          "enabled": false
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "deepseek/deepseek-v4.1-flash",
+      "count": 200,
+      "allowedModels": [
+        "deepseek/deepseek-v4.1-flash",
+        "deepseek/deepseek-v4.1-flash-20260910"
+      ],
+      "reserveUsd": 0.00000243936,
+      "body": {
+        "model": "deepseek/deepseek-v4.1-flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.0648000000648,
+            "completion": 0.144000000144,
+            "request": 0
+          }
+        },
+        "reasoning": {
+          "enabled": false
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "liquid/lfm-2.5-24b-a2b",
+      "count": 200,
+      "allowedModels": [
+        "liquid/lfm-2.5-24b-a2b",
+        "liquid/lfm-2.5-24b-a2b-20261012"
+      ],
+      "reserveUsd": 0.0000025300000000000003,
+      "body": {
+        "model": "liquid/lfm-2.5-24b-a2b",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.05000000005,
+            "completion": 0.7000000007,
+            "request": 0
+          }
+        },
+        "reasoning": {
+          "enabled": false
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "z-ai/glm-4.7-flash",
+      "count": 200,
+      "allowedModels": [
+        "z-ai/glm-4.7-flash",
+        "z-ai/glm-4.7-flash-20260119"
+      ],
+      "reserveUsd": 0.0000025696000000000004,
+      "body": {
+        "model": "z-ai/glm-4.7-flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.06050000006050001,
+            "completion": 0.4000000004,
+            "request": 0
+          }
+        },
+        "reasoning": {
+          "enabled": false
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "qwen/qwen3.5-flash-02-23",
+      "count": 200,
+      "allowedModels": [
+        "qwen/qwen3.5-flash-02-23",
+        "qwen/qwen3.5-flash-20260224"
+      ],
+      "reserveUsd": 0.0000025740000000000003,
+      "body": {
+        "model": "qwen/qwen3.5-flash-02-23",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.06500000006500001,
+            "completion": 0.26000000026000003,
+            "request": 0
+          }
+        },
+        "reasoning": {
+          "enabled": false
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "microsoft/phi-4",
+      "count": 200,
+      "allowedModels": [
+        "microsoft/phi-4"
+      ],
+      "reserveUsd": 0.000002618,
+      "body": {
+        "model": "microsoft/phi-4",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.07000000007000001,
+            "completion": 0.14000000014000002,
+            "request": 0
+          }
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "google/gemma-4-26b-a4b-it",
+      "count": 200,
+      "allowedModels": [
+        "google/gemma-4-26b-a4b-it",
+        "google/gemma-4-26b-a4b-it-20260403"
+      ],
+      "reserveUsd": 0.0000026235000000000004,
+      "body": {
+        "model": "google/gemma-4-26b-a4b-it",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.06750000006750001,
+            "completion": 0.225000000225,
+            "request": 0
+          }
+        },
+        "reasoning": {
+          "enabled": false
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "nvidia/nemotron-3.5-lightning",
+      "count": 200,
+      "allowedModels": [
+        "nvidia/nemotron-3.5-lightning",
+        "nvidia/nemotron-3.5-lightning-20260807"
+      ],
+      "reserveUsd": 0.0000026840000000000005,
+      "body": {
+        "model": "nvidia/nemotron-3.5-lightning",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.07000000007000001,
+            "completion": 0.2000000002,
+            "request": 0
+          }
+        },
+        "reasoning": {
+          "enabled": false
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "qwen/qwen3-coder-30b-a3b-instruct",
+      "count": 200,
+      "allowedModels": [
+        "qwen/qwen3-coder-30b-a3b-instruct"
+      ],
+      "reserveUsd": 0.0000027720000000000003,
+      "body": {
+        "model": "qwen/qwen3-coder-30b-a3b-instruct",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.07000000007000001,
+            "completion": 0.28000000028000005,
+            "request": 0
+          }
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "inclusionai/ling-3.1-flash",
+      "count": 200,
+      "allowedModels": [
+        "inclusionai/ling-3.1-flash",
+        "inclusionai/ling-3.1-flash-20261002"
+      ],
+      "reserveUsd": 0.0000028875,
+      "body": {
+        "model": "inclusionai/ling-3.1-flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.075000000075,
+            "completion": 0.225000000225,
+            "request": 0
+          }
+        },
+        "reasoning": {
+          "enabled": false
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "nex-agi/nex-n2.5-pro",
+      "count": 200,
+      "allowedModels": [
+        "nex-agi/nex-n2.5-pro",
+        "nex-agi/nex-n2.5-pro-20260907"
+      ],
+      "reserveUsd": 0.0000029150000000000005,
+      "body": {
+        "model": "nex-agi/nex-n2.5-pro",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.075000000075,
+            "completion": 0.25000000025,
+            "request": 0
+          }
+        },
+        "reasoning": {
+          "enabled": false
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "tencent/hy-mt2-30b-a3b",
+      "count": 200,
+      "allowedModels": [
+        "tencent/hy-mt2-30b-a3b",
+        "tencent/hy-mt2-30b-a3b-20260521"
+      ],
+      "reserveUsd": 0.0000029293000000000005,
+      "body": {
+        "model": "tencent/hy-mt2-30b-a3b",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.074000000074,
+            "completion": 0.295000000295,
+            "request": 0
+          }
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "tencent/hy-mt2-7b",
+      "count": 200,
+      "allowedModels": [
+        "tencent/hy-mt2-7b",
+        "tencent/hy-mt2-7b-20260521"
+      ],
+      "reserveUsd": 0.0000029293000000000005,
+      "body": {
+        "model": "tencent/hy-mt2-7b",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.074000000074,
+            "completion": 0.295000000295,
+            "request": 0
+          }
+        }
+      }
+    },
+    {
+      "provider": "openrouter",
+      "model": "gryphe/mythomax-l2-13b",
+      "count": 200,
+      "allowedModels": [
+        "gryphe/mythomax-l2-13b"
+      ],
+      "reserveUsd": 0.000002937,
+      "body": {
+        "model": "gryphe/mythomax-l2-13b",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1,
+        "provider": {
+          "allow_fallbacks": true,
+          "require_parameters": true,
+          "max_price": {
+            "prompt": 0.08000000008000001,
+            "completion": 0.11000000011000001,
+            "request": 0
+          }
+        }
+      }
+    },
+    {
+      "provider": "deepinfra",
+      "model": "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+      "count": 200,
+      "allowedModels": [
+        "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo"
+      ],
+      "reserveUsd": 7.480000000000001e-7,
+      "body": {
+        "model": "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1
+      }
+    },
+    {
+      "provider": "deepinfra",
+      "model": "mistralai/Mistral-Nemo-Instruct-2407",
+      "count": 200,
+      "allowedModels": [
+        "mistralai/Mistral-Nemo-Instruct-2407"
+      ],
+      "reserveUsd": 0.0000010538,
+      "body": {
+        "model": "mistralai/Mistral-Nemo-Instruct-2407",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1
+      }
+    },
+    {
+      "provider": "deepinfra",
+      "model": "openai/gpt-oss-20b",
+      "count": 200,
+      "allowedModels": [
+        "openai/gpt-oss-20b"
+      ],
+      "reserveUsd": 0.00000121,
+      "body": {
+        "model": "openai/gpt-oss-20b",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1
+      }
+    },
+    {
+      "provider": "deepinfra",
+      "model": "Sao10K/L3-8B-Lunaris-v1-Turbo",
+      "count": 200,
+      "allowedModels": [
+        "Sao10K/L3-8B-Lunaris-v1-Turbo"
+      ],
+      "reserveUsd": 0.000001463,
+      "body": {
+        "model": "Sao10K/L3-8B-Lunaris-v1-Turbo",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1
+      }
+    },
+    {
+      "provider": "deepinfra",
+      "model": "openai/gpt-oss-120b",
+      "count": 200,
+      "allowedModels": [
+        "openai/gpt-oss-120b"
+      ],
+      "reserveUsd": 0.0000014894000000000003,
+      "body": {
+        "model": "openai/gpt-oss-120b",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1
+      }
+    },
+    {
+      "provider": "deepinfra",
+      "model": "mistralai/Mistral-Small-24B-Instruct-2501",
+      "count": 200,
+      "allowedModels": [
+        "mistralai/Mistral-Small-24B-Instruct-2501"
+      ],
+      "reserveUsd": 0.0000018480000000000003,
+      "body": {
+        "model": "mistralai/Mistral-Small-24B-Instruct-2501",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1
+      }
+    },
+    {
+      "provider": "deepinfra",
+      "model": "google/gemma-3-4b-it",
+      "count": 200,
+      "allowedModels": [
+        "google/gemma-3-4b-it"
+      ],
+      "reserveUsd": 0.0000018700000000000005,
+      "body": {
+        "model": "google/gemma-3-4b-it",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1
+      }
+    },
+    {
+      "provider": "deepinfra",
+      "model": "google/gemma-3-12b-it",
+      "count": 200,
+      "allowedModels": [
+        "google/gemma-3-12b-it"
+      ],
+      "reserveUsd": 0.000001925,
+      "body": {
+        "model": "google/gemma-3-12b-it",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1
+      }
+    },
+    {
+      "provider": "deepinfra",
+      "model": "nvidia/NVIDIA-Nemotron-3.5-Lightning",
+      "count": 200,
+      "allowedModels": [
+        "nvidia/NVIDIA-Nemotron-3.5-Lightning"
+      ],
+      "reserveUsd": 0.000002288000000000001,
+      "body": {
+        "model": "nvidia/NVIDIA-Nemotron-3.5-Lightning",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1
+      }
+    },
+    {
+      "provider": "deepinfra",
+      "model": "inclusionAI/Ling-3.0-flash",
+      "count": 200,
+      "allowedModels": [
+        "inclusionAI/Ling-3.0-flash"
+      ],
+      "reserveUsd": 0.0000023100000000000003,
+      "body": {
+        "model": "inclusionAI/Ling-3.0-flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1
+      }
+    },
+    {
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "count": 200,
+      "allowedModels": [
+        "deepseek-ai/DeepSeek-V4-Flash-0731"
+      ],
+      "reserveUsd": 0.0000023100000000000003,
+      "body": {
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1
+      }
+    },
+    {
+      "provider": "deepinfra",
+      "model": "inclusionAI/Ling-3.0-flash-VL",
+      "count": 200,
+      "allowedModels": [
+        "inclusionAI/Ling-3.0-flash-VL"
+      ],
+      "reserveUsd": 0.0000023100000000000003,
+      "body": {
+        "model": "inclusionAI/Ling-3.0-flash-VL",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1
+      }
+    },
+    {
+      "provider": "deepinfra",
+      "model": "ibm-granite/granite-4.2-8b",
+      "count": 200,
+      "allowedModels": [
+        "ibm-granite/granite-4.2-8b"
+      ],
+      "reserveUsd": 0.0000023870000000000006,
+      "body": {
+        "model": "ibm-granite/granite-4.2-8b",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1
+      }
+    },
+    {
+      "provider": "deepinfra",
+      "model": "microsoft/phi-4",
+      "count": 200,
+      "allowedModels": [
+        "microsoft/phi-4"
+      ],
+      "reserveUsd": 0.000002618,
+      "body": {
+        "model": "microsoft/phi-4",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1
+      }
+    },
+    {
+      "provider": "deepinfra",
+      "model": "google/gemma-4-26B-A4B-it",
+      "count": 200,
+      "allowedModels": [
+        "google/gemma-4-26B-A4B-it"
+      ],
+      "reserveUsd": 0.0000028380000000000006,
+      "body": {
+        "model": "google/gemma-4-26B-A4B-it",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1
+      }
+    },
+    {
+      "provider": "deepinfra",
+      "model": "mistralai/Mistral-Small-3.2-24B-Instruct-2506",
+      "count": 200,
+      "allowedModels": [
+        "mistralai/Mistral-Small-3.2-24B-Instruct-2506"
+      ],
+      "reserveUsd": 0.00000286,
+      "body": {
+        "model": "mistralai/Mistral-Small-3.2-24B-Instruct-2506",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1
+      }
+    },
+    {
+      "provider": "deepinfra",
+      "model": "google/gemma-3-27b-it",
+      "count": 200,
+      "allowedModels": [
+        "google/gemma-3-27b-it"
+      ],
+      "reserveUsd": 0.0000029920000000000003,
+      "body": {
+        "model": "google/gemma-3-27b-it",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1
+      }
+    },
+    {
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-32B",
+      "count": 200,
+      "allowedModels": [
+        "Qwen/Qwen3-32B"
+      ],
+      "reserveUsd": 0.000003124,
+      "body": {
+        "model": "Qwen/Qwen3-32B",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1
+      }
+    },
+    {
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash",
+      "count": 200,
+      "allowedModels": [
+        "deepseek-ai/DeepSeek-V4-Flash"
+      ],
+      "reserveUsd": 0.000003366,
+      "body": {
+        "model": "deepseek-ai/DeepSeek-V4-Flash",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1
+      }
+    },
+    {
+      "provider": "deepinfra",
+      "model": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B",
+      "count": 200,
+      "allowedModels": [
+        "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B"
+      ],
+      "reserveUsd": 0.000003432,
+      "body": {
+        "model": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B",
+        "messages": [
+          {
+            "role": "user",
+            "content": "1"
+          }
+        ],
+        "max_tokens": 1
+      }
+    }
+  ],
+  "reservedTotalUsd": 0.024961771999999997,
+  "preflight": {
+    "checkedAt": "2026-10-18T05:52:05.724Z",
+    "deepinfraPerModelLimit": 200,
+    "deepinfraTpmLimit": 1100000
+  },
+  "journalDir": "cloud-api-burst-12000-20261018.json.journal",
+  "requestsStarted": 0,
+  "readyWorkers": 40
+}

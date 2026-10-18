@@ -1,0 +1,40 @@
+{
+  "kind": "offline_contract_tests",
+  "date": "2026-10-18",
+  "git_head": "3e1099180eb2287aaeb9c68f59ee7eef4c530bf4",
+  "branch": "feat/cloud-swarm-runtime",
+  "working_tree_dirty": true,
+  "node_version": "v24.15.0",
+  "platform": "Windows",
+  "command": "node --test scripts/deepinfra-load-test.test.mjs scripts/deepinfra-multimodel-test.test.mjs scripts/deepinfra-burst-10000.test.mjs scripts/deepinfra-burst-transport.test.mjs scripts/deepinfra-burst-journal.test.mjs",
+  "tests_passed": 19,
+  "tests_failed": 0,
+  "suite_duration_ms": 13299.1382,
+  "mock_burst": {
+    "models": 50,
+    "requests_per_model": 200,
+    "target_simultaneous": 10000,
+    "recorded_starts": 10000,
+    "completed_results": 10000,
+    "peak_client_in_flight": 10000,
+    "duration_ms": 8289.9683,
+    "includes_artificial_response_delay_ms": 5000
+  },
+  "crash_injection": {
+    "requests_started": 6,
+    "completed_results_preserved": 4,
+    "interrupted_unknown": 2,
+    "worker_exit_code": 17,
+    "offline_recovery_passed": true
+  },
+  "real_loopback_socket_reset_test_passed": true,
+  "real_provider_chat_requests": 0,
+  "server_concurrency_measured": false,
+  "live_failure_rate_improvement_measured": false,
+  "previous_worker_crash_root_cause_identified": false,
+  "ci_registered": [
+    "ubuntu-latest",
+    "windows-latest"
+  ],
+  "remote_ci_executed": false
+}

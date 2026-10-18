@@ -1,0 +1,896 @@
+{
+  "phase": "partial",
+  "startedAt": "2026-10-18T05:27:00.965Z",
+  "finishedAt": "2026-10-18T05:28:04.562Z",
+  "targetSimultaneous": 10000,
+  "modelCount": 50,
+  "perModel": 200,
+  "budgetUsd": 0.0266,
+  "reservedTotalUsd": 0.02654674,
+  "accountPerModelLimit": 200,
+  "accountTpmLimit": 1100000,
+  "completeWorkers": 49,
+  "launchedReported": 10000,
+  "peakClientInFlight": 9800,
+  "peakClientInFlightIsLowerBound": true,
+  "serverSideConcurrencyMeasured": false,
+  "http200": 6688,
+  "usable": 4033,
+  "rateLimited": 821,
+  "serverUnknown": 0,
+  "transportUnknown": 2291,
+  "modelMismatch": 0,
+  "missingCost": 0,
+  "knownCostUsd": 0.024906216999999987,
+  "unknownReserveUsd": 0.006017480699999999,
+  "httpErrors": {},
+  "transportErrors": {
+    "TypeError:ECONNRESET": 2062,
+    "TypeError:ETIMEDOUT": 121,
+    "TypeError:UND_ERR_CONNECT_TIMEOUT": 101,
+    "TimeoutError:none": 7
+  },
+  "byModel": {
+    "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo": {
+      "model": "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+      "launched": 200,
+      "http200": 163,
+      "usable": 163,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 37,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 37
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.00004238000000000007,
+      "unknownReserveUsd": 0.000013838000000000004
+    },
+    "mistralai/Mistral-Nemo-Instruct-2407": {
+      "model": "mistralai/Mistral-Nemo-Instruct-2407",
+      "launched": 200,
+      "http200": 174,
+      "usable": 174,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 26,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 26
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.00003549600000000001,
+      "unknownReserveUsd": 0.000013299000000000003
+    },
+    "openai/gpt-oss-20b": {
+      "model": "openai/gpt-oss-20b",
+      "launched": 200,
+      "http200": 200,
+      "usable": 0,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 0,
+      "transportErrors": {},
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.00035799999999999916,
+      "unknownReserveUsd": 0
+    },
+    "Sao10K/L3-8B-Lunaris-v1-Turbo": {
+      "model": "Sao10K/L3-8B-Lunaris-v1-Turbo",
+      "launched": 200,
+      "http200": 164,
+      "usable": 164,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 36,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 7,
+        "TypeError:ETIMEDOUT": 12,
+        "TypeError:UND_ERR_CONNECT_TIMEOUT": 17
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.00008035999999999998,
+      "unknownReserveUsd": 0.000025739999999999994
+    },
+    "openai/gpt-oss-120b": {
+      "model": "openai/gpt-oss-120b",
+      "launched": 200,
+      "http200": 90,
+      "usable": 0,
+      "rateLimited": 74,
+      "serverUnknown": 0,
+      "transportUnknown": 36,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 36
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.00021306999999999977,
+      "unknownReserveUsd": 0.000028710000000000008
+    },
+    "mistralai/Mistral-Small-24B-Instruct-2501": {
+      "model": "mistralai/Mistral-Small-24B-Instruct-2501",
+      "launched": 200,
+      "http200": 134,
+      "usable": 134,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 66,
+      "transportErrors": {
+        "TypeError:ETIMEDOUT": 27,
+        "TypeError:ECONNRESET": 38,
+        "TypeError:UND_ERR_CONNECT_TIMEOUT": 1
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.0011095200000000034,
+      "unknownReserveUsd": 0.000060258000000000086
+    },
+    "google/gemma-3-4b-it": {
+      "model": "google/gemma-3-4b-it",
+      "launched": 200,
+      "http200": 134,
+      "usable": 134,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 66,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 66
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.0000804000000000001,
+      "unknownReserveUsd": 0.00006170999999999991
+    },
+    "google/gemma-3-12b-it": {
+      "model": "google/gemma-3-12b-it",
+      "launched": 200,
+      "http200": 69,
+      "usable": 69,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 131,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 124,
+        "TypeError:UND_ERR_CONNECT_TIMEOUT": 7
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.00004485000000000003,
+      "unknownReserveUsd": 0.00012969000000000023
+    },
+    "nvidia/NVIDIA-Nemotron-3.5-Lightning": {
+      "model": "nvidia/NVIDIA-Nemotron-3.5-Lightning",
+      "launched": 200,
+      "http200": 187,
+      "usable": 187,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 13,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 13
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.00022066000000000094,
+      "unknownReserveUsd": 0.000015158000000000003
+    },
+    "inclusionAI/Ling-3.0-flash": {
+      "model": "inclusionAI/Ling-3.0-flash",
+      "launched": 200,
+      "http200": 0,
+      "usable": 0,
+      "rateLimited": 199,
+      "serverUnknown": 0,
+      "transportUnknown": 1,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 1
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0,
+      "unknownReserveUsd": 0.000001188
+    },
+    "inclusionAI/Ling-3.0-flash-VL": {
+      "model": "inclusionAI/Ling-3.0-flash-VL",
+      "launched": 200,
+      "http200": 0,
+      "usable": 0,
+      "rateLimited": 133,
+      "serverUnknown": 0,
+      "transportUnknown": 67,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 67
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0,
+      "unknownReserveUsd": 0.00007959600000000011
+    },
+    "deepseek-ai/DeepSeek-V4-Flash-0731": {
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "launched": 200,
+      "http200": 158,
+      "usable": 158,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 42,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 10,
+        "TypeError:ETIMEDOUT": 10,
+        "TypeError:UND_ERR_CONNECT_TIMEOUT": 22
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.00007583999999999998,
+      "unknownReserveUsd": 0.00004989600000000004
+    },
+    "ibm-granite/granite-4.2-8b": {
+      "model": "ibm-granite/granite-4.2-8b",
+      "launched": 200,
+      "http200": 119,
+      "usable": 0,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 81,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 81
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.0001439899999999997,
+      "unknownReserveUsd": 0.0001024649999999999
+    },
+    "microsoft/phi-4": {
+      "model": "microsoft/phi-4",
+      "launched": 200,
+      "http200": 120,
+      "usable": 120,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 80,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 80
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.00008399999999999997,
+      "unknownReserveUsd": 0.00010471999999999985
+    },
+    "mistralai/Mistral-Small-3.2-24B-Instruct-2506": {
+      "model": "mistralai/Mistral-Small-3.2-24B-Instruct-2506",
+      "launched": 200,
+      "http200": 83,
+      "usable": 83,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 117,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 117
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.00004149999999999993,
+      "unknownReserveUsd": 0.00017052749999999983
+    },
+    "google/gemma-3-27b-it": {
+      "model": "google/gemma-3-27b-it",
+      "launched": 200,
+      "http200": 186,
+      "usable": 186,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 14,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 14
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.00017855999999999967,
+      "unknownReserveUsd": 0.000020944000000000005
+    },
+    "google/gemma-4-26B-A4B-it": {
+      "model": "google/gemma-4-26B-A4B-it",
+      "launched": 200,
+      "http200": 126,
+      "usable": 126,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 74,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 74
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.0001663199999999996,
+      "unknownReserveUsd": 0.00011314600000000017
+    },
+    "Qwen/Qwen3-32B": {
+      "model": "Qwen/Qwen3-32B",
+      "launched": 200,
+      "http200": 74,
+      "usable": 0,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 126,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 126
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.00007399999999999989,
+      "unknownReserveUsd": 0.00020512799999999973
+    },
+    "deepseek-ai/DeepSeek-V4-Flash": {
+      "model": "deepseek-ai/DeepSeek-V4-Flash",
+      "launched": 200,
+      "http200": 167,
+      "usable": 167,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 33,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 33
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.00010520999999999988,
+      "unknownReserveUsd": 0.00005553899999999997
+    },
+    "Qwen/Qwen3.5-9B": {
+      "model": "Qwen/Qwen3.5-9B",
+      "launched": 200,
+      "http200": 196,
+      "usable": 0,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 4,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 2,
+        "TypeError:UND_ERR_CONNECT_TIMEOUT": 2
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.00024500000000000053,
+      "unknownReserveUsd": 0.00000726
+    },
+    "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B": {
+      "model": "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B",
+      "launched": 200,
+      "http200": 3,
+      "usable": 3,
+      "rateLimited": 170,
+      "serverUnknown": 0,
+      "transportUnknown": 27,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 27
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.0000055349999999999995,
+      "unknownReserveUsd": 0.000049747500000000025
+    },
+    "google/gemma-4-31B-it-turbo": {
+      "model": "google/gemma-4-31B-it-turbo",
+      "launched": 200,
+      "http200": 174,
+      "usable": 174,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 26,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 26
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.0002784000000000005,
+      "unknownReserveUsd": 0.000048333999999999975
+    },
+    "meta-llama/Llama-4-Scout-17B-16E-Instruct": {
+      "model": "meta-llama/Llama-4-Scout-17B-16E-Instruct",
+      "launched": 200,
+      "http200": 0,
+      "usable": 0,
+      "rateLimited": 168,
+      "serverUnknown": 0,
+      "transportUnknown": 32,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 28,
+        "TypeError:ETIMEDOUT": 2,
+        "TypeError:UND_ERR_CONNECT_TIMEOUT": 2
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0,
+      "unknownReserveUsd": 0.00006335999999999999
+    },
+    "meta-llama/Llama-3.3-70B-Instruct-Turbo": {
+      "model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+      "launched": 200,
+      "http200": 169,
+      "usable": 169,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 31,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 31
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.00023997999999999964,
+      "unknownReserveUsd": 0.00006206199999999998
+    },
+    "nvidia/NVIDIA-Nemotron-3.5-Super-VL": {
+      "model": "nvidia/NVIDIA-Nemotron-3.5-Super-VL",
+      "launched": 200,
+      "http200": 180,
+      "usable": 0,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 20,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 20
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.0003779999999999995,
+      "unknownReserveUsd": 0.0000418
+    },
+    "ByteDance/Seed-2.0-mini": {
+      "model": "ByteDance/Seed-2.0-mini",
+      "launched": 200,
+      "http200": 165,
+      "usable": 0,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 35,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 33,
+        "TypeError:UND_ERR_CONNECT_TIMEOUT": 2
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.0008744999999999984,
+      "unknownReserveUsd": 0.00007315000000000003
+    },
+    "Qwen/Qwen3-235B-A22B-Instruct-2507": {
+      "model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "launched": 200,
+      "http200": 166,
+      "usable": 166,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 34,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 34
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.00022576000000000006,
+      "unknownReserveUsd": 0.00007106000000000003
+    },
+    "Qwen/Qwen3-14B": {
+      "model": "Qwen/Qwen3-14B",
+      "launched": 200,
+      "http200": 186,
+      "usable": 0,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 14,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 14
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.0002455199999999993,
+      "unknownReserveUsd": 0.000031416000000000005
+    },
+    "Qwen/Qwen3.8-Flash": {
+      "model": "Qwen/Qwen3.8-Flash",
+      "launched": 200,
+      "http200": 127,
+      "usable": 127,
+      "rateLimited": 62,
+      "serverUnknown": 0,
+      "transportUnknown": 11,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 11
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.005910005999999998,
+      "unknownReserveUsd": 0.000025131699999999995
+    },
+    "Qwen/Qwen3-30B-A3B": {
+      "model": "Qwen/Qwen3-30B-A3B",
+      "launched": 200,
+      "http200": 173,
+      "usable": 0,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 27,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 26,
+        "TypeError:UND_ERR_CONNECT_TIMEOUT": 1
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.00027333999999999936,
+      "unknownReserveUsd": 0.00006830999999999999
+    },
+    "XiaomiMiMo/MiMo-V2.6-Flash": {
+      "model": "XiaomiMiMo/MiMo-V2.6-Flash",
+      "launched": 200,
+      "http200": 179,
+      "usable": 0,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 21,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 14,
+        "TypeError:UND_ERR_CONNECT_TIMEOUT": 7
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.0002380699999999992,
+      "unknownReserveUsd": 0.000054978000000000015
+    },
+    "Qwen/Qwen3.6-35B-A3B": {
+      "model": "Qwen/Qwen3.6-35B-A3B",
+      "launched": 200,
+      "http200": 167,
+      "usable": 0,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 33,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 33
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.0003423500000000007,
+      "unknownReserveUsd": 0.00008893500000000002
+    },
+    "Qwen/Qwen3-Next-80B-A3B-Instruct": {
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "launched": 200,
+      "http200": 97,
+      "usable": 97,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 103,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 103
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.00018526999999999956,
+      "unknownReserveUsd": 0.0002775849999999993
+    },
+    "zai-org/GLM-5.3-Flash": {
+      "model": "zai-org/GLM-5.3-Flash",
+      "launched": 200,
+      "http200": 152,
+      "usable": 0,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 48,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 17,
+        "TypeError:ETIMEDOUT": 10,
+        "TypeError:UND_ERR_CONNECT_TIMEOUT": 21
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.00018619999999999962,
+      "unknownReserveUsd": 0.00014520000000000014
+    },
+    "Qwen/Qwen3-VL-30B-A3B-Instruct": {
+      "model": "Qwen/Qwen3-VL-30B-A3B-Instruct",
+      "launched": 200,
+      "http200": 171,
+      "usable": 171,
+      "rateLimited": 15,
+      "serverUnknown": 0,
+      "transportUnknown": 14,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 14
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.00033345000000000027,
+      "unknownReserveUsd": 0.000043890000000000015
+    },
+    "Qwen/Qwen3.5-35B-A3B": {
+      "model": "Qwen/Qwen3.5-35B-A3B",
+      "launched": 200,
+      "http200": 80,
+      "usable": 0,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 120,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 120
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.00020320000000000039,
+      "unknownReserveUsd": 0.00040920000000000095
+    },
+    "google/gemma-4-31B-it": {
+      "model": "google/gemma-4-31B-it",
+      "launched": 200,
+      "http200": 151,
+      "usable": 151,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 49,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 49
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.0004832000000000016,
+      "unknownReserveUsd": 0.00018325999999999984
+    },
+    "deepseek-ai/DeepSeek-V4.1-Flash-1017": {
+      "launchedReported": 200,
+      "resultMissing": true,
+      "exitCode": 3221226505,
+      "stderrTail": ""
+    },
+    "deepseek-ai/DeepSeek-V4.1-Flash": {
+      "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "launched": 200,
+      "http200": 100,
+      "usable": 100,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 100,
+      "transportErrors": {
+        "TypeError:ETIMEDOUT": 35,
+        "TypeError:ECONNRESET": 64,
+        "TypeError:UND_ERR_CONNECT_TIMEOUT": 1
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.00011200000000000019,
+      "unknownReserveUsd": 0.0003960000000000006
+    },
+    "Qwen/Qwen3-VL-235B-A22B-Instruct": {
+      "model": "Qwen/Qwen3-VL-235B-A22B-Instruct",
+      "launched": 200,
+      "http200": 84,
+      "usable": 84,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 116,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 116
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.00022511999999999971,
+      "unknownReserveUsd": 0.000495087999999999
+    },
+    "openai/gpt-oss-120b-Ultra": {
+      "model": "openai/gpt-oss-120b-Ultra",
+      "launched": 200,
+      "http200": 185,
+      "usable": 185,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 15,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 15
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.0026917499999999876,
+      "unknownReserveUsd": 0.00006517500000000001
+    },
+    "deepseek-ai/DeepSeek-V3.2": {
+      "model": "deepseek-ai/DeepSeek-V3.2",
+      "launched": 200,
+      "http200": 194,
+      "usable": 194,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 6,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 6
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.0003259199999999996,
+      "unknownReserveUsd": 0.00002824800000000001
+    },
+    "deepseek-ai/DeepSeek-V3.1": {
+      "model": "deepseek-ai/DeepSeek-V3.1",
+      "launched": 200,
+      "http200": 86,
+      "usable": 86,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 114,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 114
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.00020628000000000004,
+      "unknownReserveUsd": 0.0005893799999999988
+    },
+    "google/gemma-4-31B-it-Ultra": {
+      "model": "google/gemma-4-31B-it-Ultra",
+      "launched": 200,
+      "http200": 169,
+      "usable": 169,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 31,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 31
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.0007672600000000012,
+      "unknownReserveUsd": 0.00016402100000000014
+    },
+    "google/gemini-3.1-flash-lite": {
+      "model": "google/gemini-3.1-flash-lite",
+      "launched": 200,
+      "http200": 184,
+      "usable": 0,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 16,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 1,
+        "TypeError:ETIMEDOUT": 13,
+        "TypeError:UND_ERR_CONNECT_TIMEOUT": 2
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.0000459999999999999,
+      "unknownReserveUsd": 0.00009240000000000002
+    },
+    "MiniMaxAI/MiniMax-M3": {
+      "model": "MiniMaxAI/MiniMax-M3",
+      "launched": 200,
+      "http200": 155,
+      "usable": 0,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 45,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 45
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.0034081400000000052,
+      "unknownReserveUsd": 0.0002623499999999999
+    },
+    "inclusionAI/Ling-3.1-flash": {
+      "model": "inclusionAI/Ling-3.1-flash",
+      "launched": 200,
+      "http200": 183,
+      "usable": 0,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 17,
+      "transportErrors": {
+        "TypeError:ETIMEDOUT": 9,
+        "TypeError:ECONNRESET": 7,
+        "TypeError:UND_ERR_CONNECT_TIMEOUT": 1
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.0009223199999999989,
+      "unknownReserveUsd": 0.00010098000000000003
+    },
+    "Qwen/Qwen3-Coder-480B-A35B-Instruct-Turbo": {
+      "model": "Qwen/Qwen3-Coder-480B-A35B-Instruct-Turbo",
+      "launched": 200,
+      "http200": 115,
+      "usable": 115,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 85,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 85
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.00042549999999999934,
+      "unknownReserveUsd": 0.0005142500000000005
+    },
+    "Qwen/Qwen3.8-27B": {
+      "model": "Qwen/Qwen3.8-27B",
+      "launched": 200,
+      "http200": 172,
+      "usable": 0,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 28,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 3,
+        "TypeError:ETIMEDOUT": 3,
+        "TypeError:UND_ERR_CONNECT_TIMEOUT": 15,
+        "TimeoutError:none": 7
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.0016898999999999974,
+      "unknownReserveUsd": 0.00016940000000000005
+    },
+    "deepseek-ai/DeepSeek-V3": {
+      "model": "deepseek-ai/DeepSeek-V3",
+      "launched": 200,
+      "http200": 177,
+      "usable": 177,
+      "rateLimited": 0,
+      "serverUnknown": 0,
+      "transportUnknown": 23,
+      "transportErrors": {
+        "TypeError:ECONNRESET": 23
+      },
+      "httpErrors": {},
+      "modelMismatch": 0,
+      "missingCost": 0,
+      "knownCostUsd": 0.00038409000000000034,
+      "unknownReserveUsd": 0.00014395699999999995
+    }
+  }
+}
