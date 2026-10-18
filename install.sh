@@ -619,7 +619,12 @@ preflight_runtime() {
   fi
   if [ -z "$missing" ]; then return 0; fi
   echo "note: conversations and agent runs need Node.js 22+ and the original dsh; missing:$missing"
-  echo "next: install Node.js 22+ (nvm install 22 / volta install node@22), then: npm install -g @deepseek-ai/dsh"
+  if [ -n "$node_major" ] && [ "$node_major" -lt 22 ]; then
+    echo "note: node $node_version is too old. The Ubuntu/Debian packages ship Node 18, so do not use 'apt install nodejs' for this."
+  fi
+  echo "next: Debian/Ubuntu: curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt-get install -y nodejs"
+  echo "next: or a version manager: nvm install 22 / volta install node@22 / fnm install 22"
+  echo "next: then: npm install -g @deepseek-ai/dsh   (with sudo, or 'npm config set prefix ~/.local' and add ~/.local/bin to PATH)"
   echo "next: already have dsh elsewhere? set DSH_ORIG_BIN=/path/to/dsh"
   echo "note: native commands (tokens, search, sessions, doctor) work without Node.js."
 }
