@@ -14,6 +14,7 @@ mod live;
 mod mux;
 mod rdsh;
 mod theme;
+mod web;
 
 use gpui::*;
 
@@ -22,9 +23,51 @@ fn main() {
 
     if args.iter().any(|arg| arg == "--help" || arg == "-h") {
         println!(
-            "rdsh-desktop {}\n\nUSAGE:\n  rdsh-desktop [--print-json] [--probe]\n\nOPTIONS:\n  --print-json  Collect one native rdsh snapshot and print it as JSON (no window)\n  --probe       Start the harness host, exchange the token and print the conversation list (no window)\n  -h, --help    Show this help",
-            env!("CARGO_PKG_VERSION")
+            "rdsh-desktop {}\n\nUSAGE:\n  rdsh-desktop [--serve-web [--port N]] [--print-json] [--probe]\n\nOPTIONS:\n  --serve-web   Serve the same harness session as a local web UI on 127.0.0.1 (no window)\n  --port N      Port for --serve-web (default {})\n  --print-json  Collect one native rdsh snapshot and print it as JSON (no window)\n  --probe       Start the harness host, exchange the token and print the conversation list (no window)\n  -h, --help    Show this help",
+            env!("CARGO_PKG_VERSION"),
+            web::DEFAULT_PORT
         );
+        return;
+    }
+
+    if args.iter().any(|arg| arg == "--serve-web") {
+        let port = args
+            .iter()
+            .position(|arg| arg == "--port")
+            .and_then(|index| args.get(index + 1))
+            .and_then(|value| value.parse::<u16>().ok())
+            .unwrap_or(web::DEFAULT_PORT);
+        if port == 0 {
+            eprintln!("[rdsh-desktop] --port needs a port in 1..=65535");
+            std::process::exit(2);
+        }
+        match web::WebServer::start(port) {
+            Ok(server) => {
+                println!(
+                    "[rdsh-desktop] ローカル Web UI (port {}): {}",
+                    server.port(),
+                    server.url()
+                );
+                println!(
+                    "[rdsh-desktop] 127.0.0.1 のみにバインドしています。上の URL をそのまま開いてください。"
+                );
+                println!(
+                    "[rdsh-desktop] URL の token は推測困難なアクセス用の値で、ハーネスの cookie やトークンはこのプロセスから外へ出ません。"
+                );
+                println!("[rdsh-desktop] 停止するには Ctrl+C を押してください。");
+                if let Err(error) = publish_web_url(&server.url()) {
+                    eprintln!("[rdsh-desktop] URL ファイルを書けませんでした: {error:#}");
+                }
+                if let Err(error) = server.serve() {
+                    eprintln!("[rdsh-desktop] serve-web failed: {error:#}");
+                    std::process::exit(1);
+                }
+            }
+            Err(error) => {
+                eprintln!("[rdsh-desktop] serve-web failed: {error:#}");
+                std::process::exit(1);
+            }
+        }
         return;
     }
 
@@ -300,11 +343,38 @@ fn select_model(session: &str, provider: &str, model: &str) -> anyhow::Result<St
 }
 
 
+/// Write the Web UI URL where a background service user can read it.
+fn publish_web_url(url: &str) -> anyhow::Result<()> {
+    let path = match std::env::var_os("RDSH_DESKTOP_WEB_URL_FILE") {
+        Some(value) => std::path::PathBuf::from(value),
+        None => {
+            let base = std::env::var_os("XDG_CACHE_HOME")
+                .map(std::path::PathBuf::from)
+                .or_else(|| {
+                    std::env::var_os("HOME").map(|home| std::path::PathBuf::from(home).join(".cache"))
+                })
+                .ok_or_else(|| anyhow::anyhow!("neither XDG_CACHE_HOME nor HOME is set"))?;
+            base.join("rdsh-desktop").join("webui.url")
+        }
+    };
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(&path, format!("{url}\n"))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
+    }
+    println!("[rdsh-desktop] URL を {} に保存しました", path.display());
+    Ok(())
+}
+
 /// Report which harness launcher the app would use and whether it answers.
 fn check_host(online: bool) -> anyhow::Result<String> {
     let (binary, version) = host::resolve_launcher()?;
-    let latest = if online { latest_published() } else { None };
-    let newest = if online { newest_published() } else { None };
+    let latest = if online { host::latest_published() } else { None };
+    let newest = if online { host::newest_published() } else { None };
     let chat = app::Chat::connect(|_step| {})?;
     let newer = newest
         .as_ref()
