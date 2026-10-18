@@ -742,8 +742,18 @@ fi
 echo "--- rdsh doctor ---"
 doctor_report=$("$PREFIX/rdsh" doctor 2>&1 || true)
 printf '%s\n' "$doctor_report" | sed -n '1,12p'
-if [ -f "./plugins/install.sh" ]; then
-  echo "next: PROFILE=web ./plugins/install.sh adds the essential plugins and the beginner starter set (translation, subagents, sound, Git panel, visual answers)"
+REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
+# The web profile gets the essential rdsh plugins (settings tab, phone-width
+# layout, update banner) without asking: a missing update banner means people
+# never learn that a release exists. The starter extras stay opt-in. Skip with
+# RDSH_SKIP_PLUGINS=1.
+if [ -f "$REPO_ROOT/plugins/install.sh" ] && [ "${RDSH_SKIP_PLUGINS:-0}" != "1" ]; then
+  echo "--- rdsh plugins (web profile) ---"
+  if PROFILE=web "$REPO_ROOT/plugins/install.sh" --recommended=none; then
+    echo "note: restart the web UI to load the update banner and the settings tab"
+  else
+    echo "note: plugin attach failed; rerun PROFILE=web ./plugins/install.sh" >&2
+  fi
 fi
 post_install_notes
 # Desktop (Electron) keeps its own reserved profile next to the CLI profiles.
