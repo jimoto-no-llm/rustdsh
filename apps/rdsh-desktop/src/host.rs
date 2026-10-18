@@ -281,7 +281,7 @@ fn write_cache(url: &str, origin: &str, pid: u32, binary: &str) -> Result<()> {
 /// `create_dir_all` alone inherits the umask, so a host with the usual 0022
 /// would leave the directory, and everything later created inside it, readable
 /// by other local users.
-fn create_owner_only_dir(path: &Path) -> std::io::Result<()> {
+pub(crate) fn create_owner_only_dir(path: &Path) -> std::io::Result<()> {
     fs::create_dir_all(path)?;
     #[cfg(unix)]
     {
@@ -313,6 +313,30 @@ fn open_owner_only_append(path: &Path) -> std::io::Result<std::fs::File> {
         let _ = fs::set_permissions(path, fs::Permissions::from_mode(0o600));
     }
     Ok(file)
+}
+
+/// Write a cache file owner-only on unix.
+///
+/// The Web UI URL carries the access token too. Setting the mode when the
+/// file is created, and tightening a file from an earlier run before writing
+/// to it, keeps the contents private without a window where they are briefly
+/// readable under the process umask.
+pub(crate) fn write_owner_only(path: &Path, contents: &[u8]) -> std::io::Result<()> {
+    let mut options = OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut file = options.open(path)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        // Tighten a file left behind by an earlier run before writing to it.
+        let _ = fs::set_permissions(path, fs::Permissions::from_mode(0o600));
+    }
+    std::io::Write::write_all(&mut file, contents)
 }
 
 fn cached_origin() -> Option<String> {
@@ -629,7 +653,7 @@ pub fn resolve_launcher() -> Result<(PathBuf, String)> {
 mod tests {
     use super::{
         create_owner_only_dir, is_host_command, loopback_addresses, open_owner_only_append,
-        parse_ready,
+        parse_ready, write_owner_only,
     };
 
     #[test]
@@ -730,6 +754,18 @@ mod tests {
         fs::set_permissions(&log, fs::Permissions::from_mode(0o644)).unwrap();
         drop(open_owner_only_append(&log).unwrap());
         assert_eq!(fs::metadata(&log).unwrap().permissions().mode() & 0o777, 0o600);
+
+        // The Web UI URL carries the same token, and a loose file from an
+        // earlier run is tightened before the new value is written.
+        let url = dir.join("webui.url");
+        fs::write(&url, "http://127.0.0.1:1/?token=old\n").unwrap();
+        fs::set_permissions(&url, fs::Permissions::from_mode(0o644)).unwrap();
+        write_owner_only(&url, b"http://127.0.0.1:1/?token=new\n").unwrap();
+        assert_eq!(fs::metadata(&url).unwrap().permissions().mode() & 0o777, 0o600);
+        assert_eq!(
+            fs::read_to_string(&url).unwrap(),
+            "http://127.0.0.1:1/?token=new\n"
+        );
         let _ = fs::remove_dir_all(&dir);
     }
 }

@@ -358,14 +358,9 @@ fn publish_web_url(url: &str) -> anyhow::Result<()> {
         }
     };
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
+        host::create_owner_only_dir(parent)?;
     }
-    std::fs::write(&path, format!("{url}\n"))?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
-    }
+    host::write_owner_only(&path, format!("{url}\n").as_bytes())?;
     println!("[rdsh-desktop] URL を {} に保存しました", path.display());
     Ok(())
 }
