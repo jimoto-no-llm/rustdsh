@@ -26,6 +26,9 @@ rdsh setup --web
 トークンの貼り付けは不要です。トークン自体は端末の出力やブラウザーの起動引数には含まれません。
 ブラウザーを手動で開いた場合だけ、端末に表示された保護済みトークンファイルの内容を貼り付けます。
 
+`rdsh tui` を使う場合は、対応するTUIプラグインと既存プロファイルが必要です。
+導入例は [TUIの設定手順](TUI-SETUP.md) を参照してください。
+
 - 準備: Node.js 22以上、本家DSH、rdshの有無を確認し、足りないものの導入コマンドを示します。
 - AIとつなぐ: 見つかったCodex／OpenCodeのログインを1クリックで共有します（`rdsh auth --select … --import` と同じ永続設定）。
   未ログインなら `codex login`／`opencode auth login` を新しい端末ウィンドウで起動します。DeepSeek・OpenAI・Anthropicのキーも保存できます。
