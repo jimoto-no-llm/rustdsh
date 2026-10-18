@@ -274,12 +274,12 @@ pre {
   <div class="brand">
     <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" focusable="false"><path d="M3 15.5h3.4l2.3-6.8 3.2 9.6 2.6-7 1.7 4.2H21" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
     <div class="brand-copy">
-      <h1 class="brand-title"><span class="brand-name">rdsh</span><span class="brand-role" id="ui-title">Audit &amp; Performance Monitor for DeepSeek Harness</span></h1>
-      <p class="brand-sub" id="ui-subtitle">Local-only monitoring dashboard served by rdsh serve — not the upstream dsh web chat interface.</p>
+      <h1 class="brand-title"><span class="brand-name">rdsh</span><span class="brand-role" id="ui-title">dsh のようすを見るページ（このパソコンの中だけで開けます）</span></h1>
+      <p class="brand-sub" id="ui-subtitle">見るだけのダッシュボードです。本家 dsh のチャット画面ではありません。</p>
     </div>
   </div>
   <div class="header-actions">
-    <span id="connect-state" class="badge badge-warn" role="status" aria-live="polite">Not connected: enter the token printed in the terminal.</span>
+    <span id="connect-state" class="badge badge-warn" role="status" aria-live="polite">まだつながっていません</span>
     <span id="ver">rdsh __RDSH_VERSION__</span>
     <span class="updated" id="glance-updated"></span>
     <button type="button" class="btn btn-ghost" id="ui-reload" onclick="reloadData()">再読み込み</button>
@@ -529,8 +529,9 @@ function setHero(kind, values) {
   const hero = document.getElementById("status-hero");
   const ok = kind === "ok";
   hero.className = "panel hero" + (ok ? "" : " hero-warn");
-  document.getElementById("hero-title").textContent = t("hero." + kind + ".title", values);
-  document.getElementById("hero-sub").textContent = t("hero." + kind + ".sub", values);
+  const keys = { ok: ["hero.ok.title", "hero.ok.sub"], missing: ["hero.missing.title", "hero.missing.sub"], fail: ["hero.fail.title", "hero.fail.sub"] };
+  document.getElementById("hero-title").textContent = t(keys[kind][0], values);
+  document.getElementById("hero-sub").textContent = t(keys[kind][1], values);
   hero.hidden = false;
 }
 function setUpdatedAt(value) {
