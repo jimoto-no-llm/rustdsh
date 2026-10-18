@@ -590,7 +590,11 @@ fn plugin_selection(plugins_root: &Path, compute: bool) -> Vec<&'static str> {
     );
     // The update banner is part of the product, not an opt-in: every profile
     // this command touches should know when a newer rdsh or harness is out.
-    if plugins_root.join("rdsh-update-banner").join("package.json").is_file() {
+    if plugins_root
+        .join("rdsh-update-banner")
+        .join("package.json")
+        .is_file()
+    {
         names.push("rdsh-update-banner");
     }
     if compute {
