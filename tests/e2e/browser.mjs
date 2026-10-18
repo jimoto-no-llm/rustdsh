@@ -15,9 +15,9 @@ const binary=path.resolve(repo,process.env.RDSH_E2E_BIN || path.join(repo,'targe
 const output=path.resolve(process.env.RDSH_E2E_OUTPUT || path.join(repo,'target/e2e'));
 const language=process.env.RDSH_E2E_LANGUAGE || 'ja';
 const copies={
- ja:{connect:'接続',enabled:'有効',estimate:'推定する',prune:'prune実行',nativeTitle:'rdsh ダッシュボード',projectTitle:'プロジェクトダッシュボード',answer:'回答を返す',empty:'未回答の質問はありません',tokens:'トークン',projects:'プロジェクト'},
- en:{connect:'Connect',enabled:'on',estimate:'Estimate',prune:'Run prune',nativeTitle:'rdsh dashboard',projectTitle:'PROJECT DASHBOARD',answer:'Submit answer',empty:'No unanswered questions',tokens:'tokens',projects:'projects'},
- 'zh-CN':{connect:'连接',enabled:'已启用',estimate:'估算',prune:'执行裁剪',nativeTitle:'rdsh 仪表板',projectTitle:'项目仪表板',answer:'提交回答',empty:'没有待回答的问题',tokens:'令牌',projects:'个项目'},
+ ja:{setupConnect:'接続',connect:'つなぐ',enabled:'有効',estimate:'推定する',prune:'prune実行',nativeTitle:'rdsh ダッシュボード',projectTitle:'プロジェクトダッシュボード',answer:'回答を返す',empty:'未回答の質問はありません',tokens:'トークン',projects:'プロジェクト'},
+ en:{setupConnect:'Connect',connect:'Connect',enabled:'on',estimate:'Estimate',prune:'Run prune',nativeTitle:'rdsh dashboard',projectTitle:'PROJECT DASHBOARD',answer:'Submit answer',empty:'No unanswered questions',tokens:'tokens',projects:'projects'},
+ 'zh-CN':{setupConnect:'连接',connect:'连接',enabled:'已启用',estimate:'估算',prune:'执行裁剪',nativeTitle:'rdsh 仪表板',projectTitle:'项目仪表板',answer:'提交回答',empty:'没有待回答的问题',tokens:'令牌',projects:'个项目'},
 };
 assert.ok(Object.hasOwn(copies,language));const copy=copies[language];
 const {catalog}=await import(pathToFileURL(path.join(repo,'dashboard/locale.mjs')));
@@ -47,7 +47,7 @@ detailedView(browser);
 report.environment.browser=browser.version();
 try{
  const setup=await launch(binary,['setup','--web','--port','0'],/(http:\/\/127\.0\.0\.1:\d+\/)[\s\S]*?(?:token handoff file|トークン引き渡しファイル|令牌交接文件): ([^\r\n]+)/);handoffFiles.push(setup.tokenFile);assert.equal(new URL(setup.url).hash,'');
- const page=await pageFor(browser,setup.url);await page.locator('#token-box').waitFor({state:'visible'});await page.locator('#setup-token').fill((await readFile(setup.tokenFile,'utf8')).trim());await page.getByRole('button',{name:copy.connect}).click();await page.locator('#step-ready h1').waitFor();await page.evaluate(()=>go('finish'));await page.locator('#hx').click();await page.locator('#extras .row').first().waitFor();await check(page,/rdsh setup/);
+ const page=await pageFor(browser,setup.url);await page.locator('#token-box').waitFor({state:'visible'});await page.locator('#setup-token').fill((await readFile(setup.tokenFile,'utf8')).trim());await page.getByRole('button',{name:copy.setupConnect}).click();await page.locator('#step-ready h1').waitFor();await page.evaluate(()=>go('finish'));await page.locator('#hx').click();await page.locator('#extras .row').first().waitFor();await check(page,/rdsh setup/);
  assert.equal(new URL(page.url()).hash,'');await page.locator('#extras .row').filter({hasText:'rdsh serve'}).click();
  await page.waitForFunction(value=>document.querySelector('#extras .row')?.textContent.includes(value),copy.enabled);
  assert.deepEqual(JSON.parse(await readFile(path.join(env.DSH_HOME,'rdsh.json'),'utf8')).extras.enable,['serve']);
@@ -63,7 +63,7 @@ try{
  const session=path.join(env.DSH_HOME,'sessions','example','session-one');await mkdir(session,{recursive:true});await writeFile(path.join(session,'messages.jsonl'),'synthetic session');
  const skills=path.join(env.DSH_HOME,'skills','e2e-skill');await mkdir(skills,{recursive:true});await writeFile(path.join(skills,'SKILL.md'),'# Synthetic skill');
  const serve=await launch(binary,['serve','--port','0'],/(http:\/\/127\.0\.0\.1:\d+\/)[\s\S]*?(?:token handoff file|トークン引き渡しファイル|令牌交接文件): ([^\r\n]+)/);handoffFiles.push(serve.tokenFile);assert.equal(new URL(serve.url).hash,'');
- const native=await pageFor(browser,serve.url);await native.locator('#auth').waitFor({state:'visible'});await native.locator('#dashboard-token').fill((await readFile(serve.tokenFile,'utf8')).trim());await native.getByRole('button',{name:copy.connect}).click();await native.locator('#sess').filter({hasText:'session-one'}).waitFor();await check(native,new RegExp(copy.nativeTitle));await native.locator('#advanced').evaluate(el=>{el.open=true;});
+ const native=await pageFor(browser,serve.url);await native.locator('#auth').waitFor({state:'visible'});await native.locator('#dashboard-token').fill((await readFile(serve.tokenFile,'utf8')).trim());await native.getByRole('button',{name:copy.connect}).click();await native.locator('#sess').filter({hasText:'example'}).waitFor();await check(native,new RegExp(copy.nativeTitle));await native.locator('#advanced').evaluate(el=>{el.open=true;});
  await native.locator('#ttext').fill('abcd日本語');await native.getByRole('button',{name:copy.estimate,exact:true}).click();await native.waitForFunction(()=>document.querySelector('#tout').textContent.includes('4'));
  assert.ok((await native.locator('#tout').innerText()).includes(copy.tokens));
  assert.ok((await native.locator('#sess').innerText()).includes(copy.projects));
@@ -71,7 +71,7 @@ try{
  assert.equal(await native.evaluate(()=>formatSessionTime('-')),'-');
  await native.locator('#ptext').fill('START\n'+'日本語 context\n'.repeat(1000)+'END');await native.locator('#pmax').fill('100');await native.getByRole('button',{name:copy.prune,exact:true}).click();await native.locator('#pout').filter({hasText:'rdsh pruned'}).waitFor();
  assert.ok((await native.locator('#pout').innerText()).includes('START'));assert.ok((await native.locator('#pout').innerText()).includes('END'));
- await screenshot(native,'native-desktop');await native.reload();await native.locator('#sess').filter({hasText:'session-one'}).waitFor();await native.setViewportSize(report.viewports[1]);await check(native,new RegExp(copy.nativeTitle));await screenshot(native,'native-mobile');
+ await screenshot(native,'native-desktop');await native.reload();await native.locator('#sess').filter({hasText:'example'}).waitFor();await native.setViewportSize(report.viewports[1]);await check(native,new RegExp(copy.nativeTitle));await screenshot(native,'native-mobile');
  await native.close();await stop(serve.child);await rm(serve.tokenFile,{force:true});report.flows.push('native serve: protected token handoff -> tokens -> prune -> sessions -> reload retained');
 
  const {identity}=await import(pathToFileURL(path.join(repo,'dashboard/state.mjs')));

@@ -42,7 +42,7 @@ test("the serve header states the monitor role in en, ja and zh", async () => {
   ]) {
     assert.ok(catalog.has(key), `${key} is localizable`);
   }
-  assert.equal(catalog.get("app.role").en, "Audit & Performance Monitor for DeepSeek Harness");
+  assert.equal(catalog.get("app.role").en, "See what dsh is doing (opens only on this computer)");
   for (const locale of ["ja", "zh"]) {
     assert.ok(catalog.get("app.role")[locale].length > 0, `app.role has ${locale}`);
     assert.notEqual(catalog.get("app.role")[locale], catalog.get("app.role").en, `app.role translates ${locale}`);
@@ -72,7 +72,7 @@ test("the header names the monitor role while the page title stays the chat-styl
   assert.match(source, /"ui-title":"app\.role"/);
   assert.match(source, /"ui-page-title":"page\.title"/);
   assert.match(source, /id="ui-subtitle"/);
-  assert.match(source, /not the upstream dsh web chat interface/);
+  assert.match(source, /チャット画面ではありません/);
 });
 
 test("the first paint shows the role, an overview and the build version without a fetch", async () => {
