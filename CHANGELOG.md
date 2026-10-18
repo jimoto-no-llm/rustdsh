@@ -52,6 +52,14 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Fixed
 
+- The first-run installer no longer aborts on `rdsh doctor`. Truncating the report
+  through a closed pipe (`doctor | head`) raised EPIPE, which made the process
+  panic and dump core on a Node-less host; the binary now restores the default
+  SIGPIPE behaviour and the installer captures the report instead of piping it.
+  The browser setup screen only opens when a graphical session exists, so a
+  serial or SSH install prints the next step (and the `ssh -L` port-forward
+  hint) instead of waiting on a page nobody can see.
+
 - Native desktop app: the host cache directory, its `host.log` and the Web UI
   `webui.url` file are owner-only (0700/0600) instead of inheriting the umask.
   Both files hold the token-bearing ready URL, so on a shared machine with the
