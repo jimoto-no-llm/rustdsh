@@ -5,6 +5,7 @@
 //! receives updates through channels.
 
 use std::collections::HashMap;
+use std::ops::Range;
 use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
 use std::time::{Duration, Instant};
 
@@ -134,9 +135,10 @@ impl Chat {
         chat.load_conversation()?;
         chat.startup_ms = started.elapsed().as_millis();
         chat.status = format!(
-            "{} 件の会話 / 接続 {}ms{}",
+            "{} 件の会話 / 接続 {}ms / dsh {}{}",
             chat.sessions.len(),
             chat.startup_ms,
+            chat.host_version(),
             if chat.reused { "（ホスト再利用）" } else { "" }
         );
         Ok(chat)
@@ -387,6 +389,16 @@ impl Chat {
         self.selected = Some(0);
         self.messages.clear();
         Ok(id)
+    }
+
+    /// Version of the harness launcher this session runs against.
+    pub fn host_version(&self) -> &str {
+        &self.host.version
+    }
+
+    /// Path of the launcher, when one was resolved.
+    pub fn host_binary(&self) -> &std::path::Path {
+        &self.host.binary
     }
 
     pub fn switch_model(&mut self, session_id: &str, provider: &str, model: &str) -> anyhow::Result<()> {
@@ -900,8 +912,9 @@ fn short_model(model: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        composer_model_label, order_providers, project_label, project_path,
-        providers_from_catalog, short_model, CatalogModel, CatalogProvider, Model,
+        byte_to_utf16, composer_model_label, ime_replacement_range, ime_selected_range,
+        order_providers, project_label, project_path, providers_from_catalog, short_model,
+        utf16_to_byte, CatalogModel, CatalogProvider, Model,
     };
 
     fn provider(id: &str, name: &str, models: &[&str]) -> CatalogProvider {
@@ -1080,6 +1093,54 @@ mod tests {
             "deepseek-v4.1-flash-ghost · commandcode-goat"
         );
     }
+
+    #[test]
+    fn ime_replacement_prefers_the_platform_range() {
+        assert_eq!(
+            ime_replacement_range(Some(2..5), Some(0..1), 9..9),
+            2..5,
+            "an explicit platform range wins over the marked preedit"
+        );
+    }
+
+    #[test]
+    fn ime_replacement_falls_back_to_the_marked_preedit() {
+        assert_eq!(
+            ime_replacement_range(None, Some(0..1), 3..3),
+            0..1,
+            "a preedit update replaces the marked text instead of inserting after it"
+        );
+    }
+
+    #[test]
+    fn ime_replacement_falls_back_to_the_editor_selection() {
+        assert_eq!(ime_replacement_range(None, None, 4..7), 4..7);
+    }
+
+    #[test]
+    fn ime_selected_range_is_relative_to_the_inserted_text() {
+        // "k" replaced by "ka" at UTF-16 3..5: the cursor at the end stays there.
+        assert_eq!(ime_selected_range(3..5, 2..2), 5..5);
+        // A segment selected inside the preedit keeps its span.
+        assert_eq!(ime_selected_range(3..7, 1..3), 4..6);
+    }
+
+    #[test]
+    fn ime_selected_range_is_clamped_to_the_inserted_text() {
+        assert_eq!(ime_selected_range(3..5, 0..99), 3..5);
+        assert_eq!(ime_selected_range(3..5, 9..9), 5..5);
+    }
+
+    #[test]
+    fn ime_offsets_map_across_surrogate_pairs() {
+        let text = "a😀b"; // UTF-16: a=0..1, 😀=1..3, b=3..4
+        assert_eq!(utf16_to_byte(text, 0), 0);
+        assert_eq!(utf16_to_byte(text, 1), 1);
+        assert_eq!(utf16_to_byte(text, 3), 5);
+        assert_eq!(utf16_to_byte(text, 4), 6);
+        assert_eq!(byte_to_utf16(text, 1), 1);
+        assert_eq!(byte_to_utf16(text, 5), 3);
+    }
 }
 
 fn short_id(id: &str) -> String {
@@ -1125,6 +1186,7 @@ pub struct DesktopApp {
     running: bool,
     dirty: bool,
     picker: bool,
+    marked: Option<Range<usize>>,
     sidebar_scroll: ScrollHandle,
     timeline_scroll: ScrollHandle,
     model_scroll: ScrollHandle,
@@ -1222,6 +1284,7 @@ impl DesktopApp {
             running: false,
             dirty: false,
             picker: false,
+            marked: None,
             sidebar_scroll: ScrollHandle::new(),
             timeline_scroll: ScrollHandle::new(),
             model_scroll: ScrollHandle::new(),
@@ -2101,6 +2164,8 @@ impl Render for DesktopApp {
         // An empty composer shows the placeholder instead of an empty row.
         let placeholder = "メッセージを入力…".to_string();
 
+        let ime_entity = cx.entity();
+        let ime_focus = self.focus.clone();
         let composer = div()
             .id("composer")
             .track_focus(&self.focus)
@@ -2216,6 +2281,7 @@ impl Render for DesktopApp {
                     .max_h(px(COMPOSER_MAX_HEIGHT))
                     .overflow_y_scroll()
                     .track_scroll(&self.composer_scroll)
+                    .relative()
                     .cursor(CursorStyle::IBeam)
                     .text_size(theme::body_size())
                     .line_height(theme::body_line_height())
@@ -2232,7 +2298,23 @@ impl Render for DesktopApp {
                                 .text_color(theme::tertiary())
                                 .child(placeholder),
                         )
-                    }),
+                    })
+                    .child(
+                        canvas(
+                            |bounds, _window, _cx| bounds,
+                            move |bounds, _prepaint, window, cx| {
+                                window.handle_input(
+                                    &ime_focus,
+                                    ElementInputHandler::new(bounds, ime_entity.clone()),
+                                    cx,
+                                );
+                            },
+                        )
+                        .absolute()
+                        .top_0()
+                        .left_0()
+                        .size_full(),
+                    ),
             )
             .child(
                 div()
@@ -2368,4 +2450,182 @@ fn action_button(
         }))
         .child(text)
         .into_any_element()
+}
+
+
+// ---- IME / text input plumbing -------------------------------------------
+//
+// gpui delivers IME composition and committed text through an InputHandler that
+// is installed during paint. Ranges on that wire are UTF-16, so they are mapped
+// to the editor's byte offsets here.
+
+fn utf16_to_byte(text: &str, utf16: usize) -> usize {
+    let mut units = 0;
+    for (byte, character) in text.char_indices() {
+        if units >= utf16 {
+            return byte;
+        }
+        units += character.len_utf16();
+    }
+    text.len()
+}
+
+fn byte_to_utf16(text: &str, byte: usize) -> usize {
+    let byte = byte.min(text.len());
+    text[..byte]
+        .chars()
+        .map(|character| character.len_utf16())
+        .sum()
+}
+
+/// Pick the UTF-16 range an IME replacement overwrites. The range the platform
+/// sends wins; otherwise the active preedit is replaced, so a `k` -> `ka`
+/// update rewrites the marked text instead of appending after it; otherwise the
+/// editor selection is used, which is an insert at the caret.
+fn ime_replacement_range(
+    requested: Option<Range<usize>>,
+    marked: Option<Range<usize>>,
+    selection: Range<usize>,
+) -> Range<usize> {
+    requested.or(marked).unwrap_or(selection)
+}
+
+/// Rebase the IME's selected range — UTF-16 offsets relative to the newly
+/// inserted preedit — onto the document, clamped to the inserted text.
+fn ime_selected_range(inserted: Range<usize>, selected: Range<usize>) -> Range<usize> {
+    let start = inserted
+        .start
+        .saturating_add(selected.start)
+        .min(inserted.end);
+    let end = inserted
+        .start
+        .saturating_add(selected.end)
+        .min(inserted.end)
+        .max(start);
+    start..end
+}
+
+impl DesktopApp {
+    /// Replace the IME range with `text` and return the inserted range as UTF-16
+    /// offsets into the new text.
+    fn ime_replace(&mut self, range: Option<Range<usize>>, text: &str) -> Range<usize> {
+        let current = self.editor.text().to_string();
+        let selection = self.editor.selection();
+        let selection =
+            byte_to_utf16(&current, selection.start)..byte_to_utf16(&current, selection.end);
+        let range = ime_replacement_range(range, self.marked.clone(), selection);
+        let start = utf16_to_byte(&current, range.start);
+        let end = utf16_to_byte(&current, range.end).max(start);
+        let start = start.min(current.len());
+        let end = end.min(current.len()).max(start);
+        let inserted_end = start + text.len();
+        self.editor.move_to(start);
+        self.editor.select_to(end);
+        self.editor.insert(text);
+        let current = self.editor.text();
+        byte_to_utf16(current, start)..byte_to_utf16(current, inserted_end)
+    }
+}
+
+impl EntityInputHandler for DesktopApp {
+    fn text_for_range(
+        &mut self,
+        range: Range<usize>,
+        adjusted_range: &mut Option<Range<usize>>,
+        _window: &mut Window,
+        _cx: &mut Context<Self>,
+    ) -> Option<String> {
+        let text = self.editor.text();
+        let start = utf16_to_byte(text, range.start);
+        let end = utf16_to_byte(text, range.end).max(start);
+        *adjusted_range = Some(byte_to_utf16(text, start)..byte_to_utf16(text, end));
+        Some(text[start..end].to_string())
+    }
+
+    fn selected_text_range(
+        &mut self,
+        _ignore_disabled_input: bool,
+        _window: &mut Window,
+        _cx: &mut Context<Self>,
+    ) -> Option<UTF16Selection> {
+        let text = self.editor.text();
+        let selection = self.editor.selection();
+        Some(UTF16Selection {
+            range: byte_to_utf16(text, selection.start)..byte_to_utf16(text, selection.end),
+            reversed: self.editor.caret() < self.editor.anchor(),
+        })
+    }
+
+    fn marked_text_range(
+        &self,
+        _window: &mut Window,
+        _cx: &mut Context<Self>,
+    ) -> Option<Range<usize>> {
+        self.marked.clone()
+    }
+
+    fn unmark_text(&mut self, _window: &mut Window, _cx: &mut Context<Self>) {
+        self.marked = None;
+    }
+
+    fn replace_text_in_range(
+        &mut self,
+        range: Option<Range<usize>>,
+        text: &str,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.ime_replace(range, text);
+        self.marked = None;
+        log::info!("IME commit: {} chars", text.chars().count());
+        cx.notify();
+    }
+
+    fn replace_and_mark_text_in_range(
+        &mut self,
+        range: Option<Range<usize>>,
+        new_text: &str,
+        new_selected_range: Option<Range<usize>>,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let inserted = self.ime_replace(range, new_text);
+        if new_text.is_empty() {
+            self.marked = None;
+        } else {
+            self.marked = Some(inserted.clone());
+            // The platform reports this range relative to the preedit it just
+            // sent, so rebase it onto the document before moving the caret.
+            if let Some(selected) = new_selected_range {
+                let selected = ime_selected_range(inserted, selected);
+                let text = self.editor.text();
+                let start = utf16_to_byte(text, selected.start);
+                let end = utf16_to_byte(text, selected.end);
+                self.editor.move_to(start);
+                self.editor.select_to(end);
+            }
+        }
+        log::debug!("IME composing: {} chars", new_text.chars().count());
+        cx.notify();
+    }
+
+    fn bounds_for_range(
+        &mut self,
+        _range_utf16: Range<usize>,
+        element_bounds: Bounds<Pixels>,
+        _window: &mut Window,
+        _cx: &mut Context<Self>,
+    ) -> Option<Bounds<Pixels>> {
+        Some(element_bounds)
+    }
+
+    fn character_index_for_point(
+        &mut self,
+        _point: Point<Pixels>,
+        _window: &mut Window,
+        _cx: &mut Context<Self>,
+    ) -> Option<usize> {
+        let text = self.editor.text();
+        Some(byte_to_utf16(text, self.editor.caret()))
+    }
 }
