@@ -71,10 +71,7 @@ pub(crate) fn resolve_base(engine: Engine) -> anyhow::Result<String> {
     resolve_base_with(engine, engine_health)
 }
 
-fn resolve_base_with(
-    engine: Engine,
-    health: impl Fn(&str) -> bool,
-) -> anyhow::Result<String> {
+fn resolve_base_with(engine: Engine, health: impl Fn(&str) -> bool) -> anyhow::Result<String> {
     match engine {
         Engine::Searxng => Ok(default_base()),
         Engine::Rustxng => match crate::rustxng::base_url() {
@@ -446,7 +443,8 @@ fn fetch(base: &str, query: &str, locale: crate::locale::Locale) -> anyhow::Resu
             break;
         }
     }
-    let mut s = stream.ok_or_else(|| anyhow::anyhow!("{}", unreachable_engine_message(base, locale)))?;
+    let mut s =
+        stream.ok_or_else(|| anyhow::anyhow!("{}", unreachable_engine_message(base, locale)))?;
     let ua = format!("rdsh/{}", env!("CARGO_PKG_VERSION"));
     // Virtual-hosted instances need the port to route; the default port is
     // omitted per convention. Bracketed IPv6 literals pass through as-is.
@@ -749,8 +747,7 @@ mod tests {
         // With nothing configured and no local engine the historical default
         // is the answer, and the health probe is never consulted.
         assert_eq!(
-            resolve_base_with(Engine::Auto, |_| panic!("no probe without a local engine"))
-                .unwrap(),
+            resolve_base_with(Engine::Auto, |_| panic!("no probe without a local engine")).unwrap(),
             "http://127.0.0.1:8888"
         );
         let _ = std::fs::remove_dir_all(&dir);
@@ -795,12 +792,17 @@ mod tests {
             ("SEARXNG_URL", Some("http://127.0.0.1:9999")),
         ]);
         assert_eq!(
-            resolve_base_with(Engine::Searxng, |_| panic!("searxng must not probe rustxng")).unwrap(),
+            resolve_base_with(Engine::Searxng, |_| panic!(
+                "searxng must not probe rustxng"
+            ))
+            .unwrap(),
             "http://127.0.0.1:9999"
         );
         std::env::remove_var("SEARXNG_URL");
-        let base = resolve_base_with(Engine::Searxng, |_| panic!("searxng must not probe rustxng"))
-            .unwrap();
+        let base = resolve_base_with(Engine::Searxng, |_| {
+            panic!("searxng must not probe rustxng")
+        })
+        .unwrap();
         assert!(!base.contains("7777"), "{base}");
     }
 
@@ -813,8 +815,10 @@ mod tests {
             ("SEARXNG_URL", Some("http://127.0.0.1:9999")),
         ]);
         assert_eq!(
-            resolve_base_with(Engine::Rustxng, |_| panic!("a configured URL needs no probe"))
-                .unwrap(),
+            resolve_base_with(Engine::Rustxng, |_| panic!(
+                "a configured URL needs no probe"
+            ))
+            .unwrap(),
             "http://127.0.0.1:7777"
         );
         // With nothing configured the local engine decides; a missing binary is

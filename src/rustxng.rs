@@ -50,7 +50,9 @@ pub enum Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::BinNotFound => write!(f, "{}", missing_binary_hint(crate::locale::Locale::English)),
+            Self::BinNotFound => {
+                write!(f, "{}", missing_binary_hint(crate::locale::Locale::English))
+            }
             Self::Spawn(e) => write!(f, "could not start rustxng: {e}"),
             Self::Unresponsive(url) => write!(
                 f,
@@ -111,7 +113,11 @@ pub fn binary() -> Option<PathBuf> {
     {
         use std::sync::atomic::Ordering;
         match BIN_MODE.load(Ordering::Relaxed) {
-            1 => return env("RUSTXNG_BIN").map(PathBuf::from).filter(|p| p.is_file()),
+            1 => {
+                return env("RUSTXNG_BIN")
+                    .map(PathBuf::from)
+                    .filter(|p| p.is_file())
+            }
             2 => return None,
             _ => {}
         }
@@ -212,7 +218,11 @@ fn read_state(path: &Path) -> Option<(u16, Option<u32>)> {
 /// hand-edited file can never inject an argument into the spawn call.
 fn parse_state(text: &str) -> Option<(u16, Option<u32>)> {
     let mut fields = text.split_whitespace();
-    let port = fields.next()?.parse::<u16>().ok().filter(|port| *port != 0)?;
+    let port = fields
+        .next()?
+        .parse::<u16>()
+        .ok()
+        .filter(|port| *port != 0)?;
     let pid = fields.next().and_then(|pid| pid.parse::<u32>().ok());
     Some((port, pid))
 }
@@ -276,7 +286,9 @@ pub fn health(base: &str) -> bool {
     }
     match response.json() {
         Some(value) => match value.get("status").and_then(|status| status.as_str()) {
-            Some(status) => status.eq_ignore_ascii_case("ok") || status.eq_ignore_ascii_case("healthy"),
+            Some(status) => {
+                status.eq_ignore_ascii_case("ok") || status.eq_ignore_ascii_case("healthy")
+            }
             None => true,
         },
         None => true,
@@ -491,7 +503,11 @@ pub fn process_is_rustxng(pid: u32) -> bool {
         std::process::Command::new("ps")
             .args(["-p", &pid.to_string(), "-o", "comm="])
             .output()
-            .map(|out| String::from_utf8_lossy(&out.stdout).trim().contains(BIN_NAME))
+            .map(|out| {
+                String::from_utf8_lossy(&out.stdout)
+                    .trim()
+                    .contains(BIN_NAME)
+            })
             .unwrap_or(false)
     }
     #[cfg(not(unix))]
@@ -525,12 +541,12 @@ fn terminate(pid: u32) -> bool {
 fn process_running(pid: u32) -> bool {
     #[cfg(target_os = "linux")]
     {
-        return std::fs::read_to_string(format!("/proc/{pid}/stat"))
+        std::fs::read_to_string(format!("/proc/{pid}/stat"))
             .map(|stat| {
                 let state = stat.rsplit(')').next().unwrap_or_default();
                 !state.trim_start().starts_with('Z')
             })
-            .unwrap_or(false);
+            .unwrap_or(false)
     }
     #[cfg(not(target_os = "linux"))]
     {
@@ -659,7 +675,8 @@ pub fn cmd_stop(locale: crate::locale::Locale) -> Result<()> {
             (crate::locale::Locale::English, false) => "no rustxng instance was running",
             (crate::locale::Locale::Chinese, true) => "已停止记录的 rustxng 实例",
             (crate::locale::Locale::Chinese, false) => "没有正在运行的 rustxng 实例",
-            (crate::locale::Locale::Japanese, true) => "記録された rustxng インスタンスを停止しました",
+            (crate::locale::Locale::Japanese, true) =>
+                "記録された rustxng インスタンスを停止しました",
             (crate::locale::Locale::Japanese, false) => {
                 "稼働中の rustxng インスタンスはありませんでした"
             }
@@ -798,10 +815,7 @@ fn parse_response(text: &str) -> Result<HttpResponse> {
 fn decode_chunked(body: &str) -> String {
     let mut out = String::new();
     let mut rest = body;
-    loop {
-        let Some(eol) = rest.find("\r\n") else {
-            break;
-        };
+    while let Some(eol) = rest.find("\r\n") {
         let size = usize::from_str_radix(rest[..eol].trim(), 16).unwrap_or(0);
         if size == 0 {
             break;
@@ -866,7 +880,8 @@ pub(crate) mod tests {
     impl BinGuard {
         pub(crate) fn install(path: Option<&Path>) -> Self {
             use std::sync::atomic::Ordering;
-            let previous_mode = BIN_MODE.swap(if path.is_some() { 1 } else { 2 }, Ordering::Relaxed);
+            let previous_mode =
+                BIN_MODE.swap(if path.is_some() { 1 } else { 2 }, Ordering::Relaxed);
             let previous = std::env::var("RUSTXNG_BIN").ok();
             match path {
                 Some(path) => std::env::set_var("RUSTXNG_BIN", path),
@@ -986,7 +1001,10 @@ pub(crate) mod tests {
         std::fs::create_dir_all(&path_dir).unwrap();
         write_executable(&path_dir.join(exe_name(BIN_NAME)), "#!/bin/sh\nexit 0\n");
         let lookup = |name: &str| (name == "RUSTXNG_BIN").then(|| explicit.display().to_string());
-        assert_eq!(binary_with(&lookup, &dirs(&path_dir), Some(&dir)), Some(explicit));
+        assert_eq!(
+            binary_with(&lookup, &dirs(&path_dir), Some(&dir)),
+            Some(explicit)
+        );
     }
 
     // A directory named rustxng, or a missing RUSTXNG_BIN path, is not a binary.
@@ -1097,8 +1115,7 @@ pub(crate) mod tests {
 
     #[test]
     fn plain_chunked_and_bad_health_responses_are_understood() {
-        let plain =
-            parse_response("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok").unwrap();
+        let plain = parse_response("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok").unwrap();
         assert_eq!(plain.status, 200);
         assert_eq!(plain.body, "ok");
         assert!(plain.healthy());
