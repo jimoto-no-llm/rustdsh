@@ -397,15 +397,35 @@ function queryPublishedDsh() {
 }
 
 function activeDshVersion() {
+  if (typeof process.env.DSH_VERSION === "string" && VERSION_PATTERN.test(process.env.DSH_VERSION)) {
+    return process.env.DSH_VERSION;
+  }
+  // The plugin is loaded by the dsh host, so the host entry script sits inside
+  // the installed package. Walk up from it instead of resolving the dependency
+  // from this plugin's own directory, which has no dsh in its node_modules.
+  const candidates = [];
+  try {
+    if (process.argv[1]) candidates.push(realpathSync(process.argv[1]));
+  } catch (error) {}
   try {
     const url = import.meta.resolve("@deepseek-ai/dsh/package.json");
-    if (url) {
-      const value = JSON.parse(readFileSync(fileURLToPath(url), "utf8"));
-      if (typeof value.version === "string" && VERSION_PATTERN.test(value.version)) return value.version;
-    }
+    if (url) candidates.push(fileURLToPath(url));
   } catch (error) {}
-  return typeof process.env.DSH_VERSION === "string" && VERSION_PATTERN.test(process.env.DSH_VERSION)
-    ? process.env.DSH_VERSION : "";
+  for (const candidate of candidates) {
+    let directory = dirname(candidate);
+    for (let depth = 0; depth < 8; depth += 1) {
+      try {
+        const value = JSON.parse(readFileSync(join(directory, "package.json"), "utf8"));
+        if (value.name === "@deepseek-ai/dsh" && typeof value.version === "string" && VERSION_PATTERN.test(value.version)) {
+          return value.version;
+        }
+      } catch (error) {}
+      const parent = dirname(directory);
+      if (parent === directory) break;
+      directory = parent;
+    }
+  }
+  return "";
 }
 
 async function readDshStatus() {
