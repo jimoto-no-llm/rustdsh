@@ -51,15 +51,33 @@ impl Host {
     /// Try the running candidates in order and mint a cookie for the first hit.
     pub fn attach() -> Option<Self> {
         let secret = crate::cookies::load_secret()?;
+        let mut rejected_cache = false;
         for origin in candidate_origins() {
             if !alive(&origin) {
                 continue;
             }
             let authority = origin.strip_prefix("http://")?.to_string();
             let (name, value) = crate::cookies::cookie_for(&secret, &authority);
+            // A recorded host may belong to another harness home, in which case
+            // our signed cookie is refused. Never trust a candidate that does not
+            // accept the cookie we can mint: drop the stale cache and move on.
+            if !accepts_cookie(&origin, &format!("{name}={value}")) {
+                if origin == cached_origin().unwrap_or_default() {
+                    // The cache points at a host we cannot use; drop it so the
+                    // next launch goes straight to a host we can talk to.
+                    if let Ok(dir) = cache_dir() {
+                        let _ = std::fs::remove_file(dir.join("host.json"));
+                    }
+                    rejected_cache = true;
+                }
+                continue;
+            }
             let (binary, version) = resolve_launcher()
                 .map(|(binary, version)| (binary, version))
                 .unwrap_or_else(|_| (std::path::PathBuf::new(), "unknown".to_string()));
+            if rejected_cache {
+                log::info!("discarded a cached host that refused our cookie");
+            }
             return Some(Self {
                 url: origin.clone(),
                 origin,
@@ -260,6 +278,25 @@ fn write_cache(url: &str, origin: &str, pid: u32, binary: &str) -> Result<()> {
     written
 }
 
+fn cached_origin() -> Option<String> {
+    read_cache().map(|cached| cached.origin)
+}
+
+/// The host must accept a unary call with the cookie we minted, otherwise it
+/// belongs to another harness home and is useless to us.
+fn accepts_cookie(origin: &str, cookie: &str) -> bool {
+    let request = serde_json::json!({
+        "type": "client-request",
+        "rpcId": "rdsh-desktop-attach-check",
+        "method": "session/list",
+        "payload": { "args": { "_request": {} } }
+    });
+    match crate::http::post_json(origin, "/api/session/list", cookie, &request.to_string()) {
+        Ok(response) => response.status < 400,
+        Err(_) => false,
+    }
+}
+
 /// Origins to try, cheapest first: explicit override, cached host, user service.
 fn candidate_origins() -> Vec<String> {
     let mut list: Vec<String> = Vec::new();
@@ -274,6 +311,67 @@ fn candidate_origins() -> Vec<String> {
     list.push("http://127.0.0.1:3080".to_string());
     list.dedup();
     list
+}
+
+/// Run one npm query with a hard deadline, so a hung registry cannot stall the caller.
+fn npm_view(arguments: &[&str]) -> Option<String> {
+    let mut command = std::process::Command::new("npm");
+    command
+        .args(arguments)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null());
+    let mut child = command.spawn().ok()?;
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(25);
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                if !status.success() {
+                    return None;
+                }
+                break;
+            }
+            Ok(None) => {
+                if std::time::Instant::now() > deadline {
+                    let _ = child.kill();
+                    return None;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(200));
+            }
+            Err(_) => return None,
+        }
+    }
+    let mut output = String::new();
+    use std::io::Read;
+    child.stdout.take()?.read_to_string(&mut output).ok()?;
+    Some(output)
+}
+
+/// Version behind the npm latest tag.
+pub fn latest_published() -> Option<String> {
+    let output = npm_view(&["view", "@deepseek-ai/dsh", "version"])?;
+    let version = output.split_whitespace().last()?.trim().to_string();
+    (!version.is_empty()).then_some(version)
+}
+
+/// Highest published version, prereleases included.
+pub fn newest_published() -> Option<String> {
+    let output = npm_view(&["view", "@deepseek-ai/dsh", "versions", "--json"])?;
+    let versions: Vec<String> = match serde_json::from_str::<serde_json::Value>(output.trim()) {
+        Ok(serde_json::Value::Array(values)) => values
+            .into_iter()
+            .filter_map(|value| value.as_str().map(str::to_string))
+            .collect(),
+        Ok(serde_json::Value::String(single)) => vec![single],
+        _ => Vec::new(),
+    };
+    versions.into_iter().reduce(|best, candidate| {
+        if compare_versions(&candidate, &best).is_gt() {
+            candidate
+        } else {
+            best
+        }
+    })
 }
 
 /// A live host accepts TCP connections on its loopback port.

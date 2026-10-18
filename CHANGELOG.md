@@ -5,6 +5,20 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Changed
+
+- Beginner starter set on by default: `PROFILE=web` and `PROFILE=desktop`
+  now install Japanese translation, bounded exploration subagents, sound
+  notifications, the Git panel and visual answers (`dsh-intelligent-ui`)
+  without any choice, so a newcomer from Codex or Claude Code gets a capable
+  setup. `rdsh desktop install` (and `install.sh --desktop` /
+  `install.ps1 -Desktop`) also attaches `rdsh-answer-guard`,
+  `rdsh-translation` and `rdsh-subagent-optimizer` when the checkout carries
+  them, plus `dsh-intelligent-ui`; `--no-intelligent-ui` skips it.
+  `plugins/install.sh --recommended=starter` selects the set on any profile;
+  `headless` still installs the essential tier only. `ui-comfort`,
+  `easy-work` and `compute` stay opt-in.
+
 ### Added
 
 - `search.dsh_search_provider` pins the upstream web-search provider
@@ -27,6 +41,14 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   existing search feature switch. No new dependency or model route is needed.
   The localized CLI help and Web search guide also link to Tavily and its
   official quickstart as an API service reference.
+- License policy: `deny.toml` pins the allowed dependency licenses and the
+  `Rust dependency audit` job now also runs
+  `cargo deny check licenses sources` on every pull request, push to `main`
+  and weekly run, so a copyleft license or an unknown registry cannot enter
+  the dependency tree unnoticed.
+- [Third-party licenses](THIRD_PARTY_LICENSES.md) records the pinned upstream
+  DeepSeek Harness packages, the permissive crate set and the trademark
+  disclaimer; both README license sections link to it.
 
 ## [0.8.0] - 2026-10-18
 

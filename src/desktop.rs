@@ -43,13 +43,22 @@ macro_rules! err {
 pub const PROFILE: &str = "desktop";
 /// Bundled rdsh plugins that can be attached to a DSH profile.
 pub const BUNDLED_PLUGINS: &[&str] = &["rdsh-settings", "rdsh-compute"];
-/// Third-party Web UI plugins installed by default (both MIT, used with upstream
-/// permission; see Credits in README.md). They are fetched from GitHub at
-/// install time so fixes arrive without a rustdsh release.
+/// Beginner starter plugins attached after `rdsh-settings` when the checkout
+/// carries them; an older checkout without one simply skips it. They match the
+/// starter set of `plugins/install.sh` for the desktop profile.
+pub const STARTER_PLUGINS: &[&str] = &[
+    "rdsh-answer-guard",
+    "rdsh-translation",
+    "rdsh-subagent-optimizer",
+];
+/// Third-party Web UI plugins installed by default (all MIT; see Credits in
+/// README.md). They are fetched from GitHub at install time so fixes arrive
+/// without a rustdsh release.
 pub const SOUND_SPEC: &str = "github:cwd514/dsh-sound-notifications";
 pub const GITVIEW_SPEC: &str = "github:yugapor/dsh-gitview";
+pub const INTELLIGENT_UI_SPEC: &str = "github:cwd514/dsh-intelligent-ui";
 /// Default third-party specs attached alongside the bundled plugins.
-pub const DEFAULT_THIRD_PARTY: &[&str] = &[SOUND_SPEC, GITVIEW_SPEC];
+pub const DEFAULT_THIRD_PARTY: &[&str] = &[SOUND_SPEC, GITVIEW_SPEC, INTELLIGENT_UI_SPEC];
 /// Product name used by the macOS bundle and the Windows install directory.
 const APP_NAME: &str = "DeepSeek Harness";
 fn text(
@@ -572,12 +581,17 @@ fn command_for(cli: &Path, args: &[String]) -> Command {
     }
 }
 
-fn plugin_selection(compute: bool) -> Vec<&'static str> {
+fn plugin_selection(plugins_root: &Path, compute: bool) -> Vec<&'static str> {
+    let mut names = vec![BUNDLED_PLUGINS[0]];
+    names.extend(
+        STARTER_PLUGINS
+            .iter()
+            .filter(|name| plugins_root.join(name).join("package.json").is_file()),
+    );
     if compute {
-        BUNDLED_PLUGINS.to_vec()
-    } else {
-        BUNDLED_PLUGINS[..1].to_vec()
+        names.push(BUNDLED_PLUGINS[1]);
     }
+    names
 }
 
 fn plugin_json(state: &ProfileState, name: &str) -> serde_json::Value {
@@ -811,16 +825,12 @@ struct Target {
     spec: String,
 }
 
-// The Desktop install flags plus the selected locale; main's option set already
-// sat at the clippy limit before the multilingual parameter was added.
-#[allow(clippy::too_many_arguments)]
 fn desktop_targets(
     plugins_dir: Option<&str>,
     packages: &[String],
     no_bundled: bool,
     compute: bool,
-    no_sound: bool,
-    no_gitview: bool,
+    skipped_third_party: &[&str],
     env: &OsEnv,
     locale: crate::locale::Locale,
 ) -> Result<(Vec<Target>, Option<PathBuf>)> {
@@ -831,7 +841,7 @@ fn desktop_targets(
         // spec を起動ディレクトリ基準で解決するため、相対のままだと
         // plugins/plugins/<name> を探して失敗する。
         let plugins_root = absolute(&resolve_plugins_dir(plugins_dir, env, locale)?);
-        for name in plugin_selection(compute) {
+        for name in plugin_selection(&plugins_root, compute) {
             let spec = plugins_root.join(name).display().to_string();
             // Windows separators become CLI spec separators. On Unix a
             // backslash is part of a filename and must remain unchanged.
@@ -844,7 +854,7 @@ fn desktop_targets(
         }
         root = Some(plugins_root);
         for spec in DEFAULT_THIRD_PARTY {
-            if (*spec == SOUND_SPEC && no_sound) || (*spec == GITVIEW_SPEC && no_gitview) {
+            if skipped_third_party.contains(spec) {
                 continue;
             }
             let label = spec
@@ -891,6 +901,7 @@ pub struct InstallOptions {
     pub compute: bool,
     pub no_sound: bool,
     pub no_gitview: bool,
+    pub no_intelligent_ui: bool,
     pub json: bool,
 }
 
@@ -905,6 +916,7 @@ pub fn cmd_install(options: InstallOptions, locale: crate::locale::Locale) -> Re
         compute,
         no_sound,
         no_gitview,
+        no_intelligent_ui,
         json: json_out,
     } = options;
     let env = OsEnv::from_process();
@@ -938,13 +950,20 @@ pub fn cmd_install(options: InstallOptions, locale: crate::locale::Locale) -> Re
             text(locale, "Desktop command runtime not found; open DeepSeek Harness once and use Manage dsh Command... -> Install, or set DSH_DESKTOP_CLI to resources/runtime/cli/bin/dsh (dsh.cmd on Windows). The app's own Plugins page can install the same packages without the command", "未找到桌面命令运行时；请打开一次 DeepSeek Harness 并使用 Manage dsh Command... -> Install，或将 DSH_DESKTOP_CLI 设为 resources/runtime/cli/bin/dsh（Windows 为 dsh.cmd）。应用的 Plugins 页面也可安装相同软件包", "デスクトップコマンドランタイムが見つかりません。DeepSeek Harness を一度起動して Manage dsh Command... -> Install を実行するか、DSH_DESKTOP_CLI に resources/runtime/cli/bin/dsh（Windows は dsh.cmd）を設定してください。アプリの Plugins ページでも同じパッケージをインストールできます")
         );
     };
+    let skipped: Vec<&str> = [
+        (no_sound, SOUND_SPEC),
+        (no_gitview, GITVIEW_SPEC),
+        (no_intelligent_ui, INTELLIGENT_UI_SPEC),
+    ]
+    .into_iter()
+    .filter_map(|(skip, spec)| skip.then_some(spec))
+    .collect();
     let (targets, plugins_root) = desktop_targets(
         plugins_dir.as_deref(),
         &packages,
         no_bundled,
         compute,
-        no_sound,
-        no_gitview,
+        &skipped,
         &env,
         locale,
     )?;
@@ -1572,8 +1591,7 @@ mod tests {
             &[],
             false,
             false,
-            false,
-            false,
+            &[],
             &env,
             crate::locale::Locale::English,
         )
@@ -1604,13 +1622,12 @@ mod tests {
             &[],
             false,
             false,
-            false,
-            false,
+            &[],
             &env,
             crate::locale::Locale::English,
         )
         .unwrap();
-        assert_eq!(targets.len(), 3);
+        assert_eq!(targets.len(), 4);
         assert_eq!(targets[0].label, "rdsh-settings");
         assert_eq!(
             Path::new(&targets[0].spec),
@@ -1618,6 +1635,7 @@ mod tests {
         );
         assert_eq!(targets[1].label, "dsh-sound-notifications");
         assert_eq!(targets[2].label, "dsh-gitview");
+        assert_eq!(targets[3].label, "dsh-intelligent-ui");
         assert!(dir.unwrap().ends_with("plugins"));
 
         let (targets, _) = desktop_targets(
@@ -1625,8 +1643,7 @@ mod tests {
             &[],
             false,
             false,
-            true,
-            true,
+            &[SOUND_SPEC, GITVIEW_SPEC, INTELLIGENT_UI_SPEC],
             &env,
             crate::locale::Locale::English,
         )
@@ -1643,8 +1660,7 @@ mod tests {
             &packages,
             true,
             false,
-            false,
-            false,
+            &[],
             &env,
             crate::locale::Locale::English,
         )
@@ -1658,8 +1674,7 @@ mod tests {
             &[],
             true,
             false,
-            false,
-            false,
+            &[],
             &env,
             crate::locale::Locale::English,
         )
@@ -1669,11 +1684,42 @@ mod tests {
 
     #[test]
     fn compute_is_opt_in() {
-        assert_eq!(plugin_selection(false), vec!["rdsh-settings"]);
+        let root = temp_root("compute-opt-in");
+        assert_eq!(plugin_selection(&root, false), vec!["rdsh-settings"]);
         assert_eq!(
-            plugin_selection(true),
+            plugin_selection(&root, true),
             vec!["rdsh-settings", "rdsh-compute"]
         );
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn starter_plugins_follow_settings_when_the_checkout_has_them() {
+        let root = temp_root("starter");
+        for name in STARTER_PLUGINS {
+            std::fs::create_dir_all(root.join(name)).unwrap();
+            std::fs::write(root.join(name).join("package.json"), b"{}").unwrap();
+        }
+        assert_eq!(
+            plugin_selection(&root, true),
+            vec![
+                "rdsh-settings",
+                "rdsh-answer-guard",
+                "rdsh-translation",
+                "rdsh-subagent-optimizer",
+                "rdsh-compute"
+            ]
+        );
+        std::fs::remove_dir_all(root.join("rdsh-translation")).unwrap();
+        assert_eq!(
+            plugin_selection(&root, false),
+            vec![
+                "rdsh-settings",
+                "rdsh-answer-guard",
+                "rdsh-subagent-optimizer"
+            ]
+        );
+        std::fs::remove_dir_all(&root).unwrap();
     }
 
     #[test]

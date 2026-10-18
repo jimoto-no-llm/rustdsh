@@ -15,7 +15,8 @@ spec.loader.exec_module(crate_release)
 
 
 def members_with(*extra):
-    return ["Cargo.toml", "build.rs", "install.sh", "LICENSE", "README.md",
+    return ["Cargo.toml", "build.rs", "docker-compose.searxng.yml",
+            "docker/searxng/settings.yml", "install.sh", "LICENSE", "README.md",
             "assets/icon.ico", "security/preload.mjs", "src/main.rs", *extra]
 
 
@@ -27,6 +28,17 @@ class ValidateMembersTest(unittest.TestCase):
         members = [name for name in members_with() if not name.startswith("security/")]
         errors = crate_release.validate_members(members)
         self.assertEqual(errors, ["missing from the crate: security/"])
+
+    def test_missing_embedded_compose_project_is_reported(self):
+        members = [name for name in members_with() if not name.startswith("docker")]
+        errors = crate_release.validate_members(members)
+        self.assertEqual(
+            errors,
+            [
+                "missing from the crate: docker-compose.searxng.yml",
+                "missing from the crate: docker/",
+            ],
+        )
 
     def test_missing_embedded_install_script_is_reported(self):
         members = [name for name in members_with() if name != "install.sh"]

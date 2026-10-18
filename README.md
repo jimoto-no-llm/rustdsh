@@ -569,9 +569,9 @@ rewrites the profile:
 
 ```sh
 rdsh desktop status                 # app, command runtime, profile, plugin state (read-only)
-rdsh desktop install --plugins-dir .   # rdsh-settings + default third-party (sound, gitview)
+rdsh desktop install --plugins-dir .   # rdsh-settings + starter plugins + default third-party (sound, gitview, intelligent-ui)
 rdsh desktop install --plugins-dir . --compute   # + the resident compute bridge
-rdsh desktop install --plugins-dir . --no-sound --no-gitview  # skip third-party
+rdsh desktop install --plugins-dir . --no-sound --no-gitview --no-intelligent-ui  # skip third-party
 rdsh desktop verify                 # exit nonzero when the profile has no rdsh plugin
 ```
 
@@ -598,9 +598,12 @@ Two optional plugins extend the existing Desktop/Web runtime:
   fresh context, bounded concurrency and output, and active duplicate suppression
   through the native DSH `spawn` provider (0.2.0-rc.2).
 
-Use the app's Plugins page to add the corresponding directory, or select them
-with `./plugins/install.sh --recommended=easy-work,subagents` (`EASY_WORK=1` /
-`SUBAGENTS=1` still work). These are opt-in features being prepared for 0.4.0.
+The subagents plugin is part of the web/desktop starter set (see
+[plugins/recommended.md](plugins/recommended.md#starter-set-on-by-default-for-web-and-desktop));
+file organization stays opt-in. Use the app's Plugins page to add the
+corresponding directory, or select them with
+`./plugins/install.sh --recommended=easy-work,subagents` (`EASY_WORK=1` /
+`SUBAGENTS=1` still work).
 See the [acceptance evidence](docs/reviews/2026-10-14-easy-work.md).
 
 [Desktop SDK and upstream preparation](desktop/README.md) provide a pinned
@@ -785,13 +788,13 @@ authors):
 - [dsh-gitview](https://github.com/yugapor/dsh-gitview) by yugapor — optional
   sidebar Git panel
 - [dsh-intelligent-ui](https://github.com/cwd514/dsh-intelligent-ui) by cwd514
-  (MIT, (c) 2026 cwd514) — opt-in visual answers in the DSH Web chat via the
-  declarative `render_ui` tool (`--recommended=intelligent-ui` or
-  `INTELLIGENT_UI=1`)
+  (MIT, (c) 2026 cwd514) — visual answers in the DSH Web chat via the
+  declarative `render_ui` tool; on by default for web/desktop (`INTELLIGENT_UI=0`
+  or `--no-intelligent-ui` skips it)
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Upstream DeepSeek Harness and its dependencies retain their respective licenses.
+MIT — see [LICENSE](LICENSE). Upstream DeepSeek Harness and its dependencies retain their respective licenses; the pinned versions and the trademark notice are in [third-party licenses](THIRD_PARTY_LICENSES.md).
 
 ### External agent jobs
 

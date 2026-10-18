@@ -511,9 +511,9 @@ DeepSeek Harness Desktop は、Web アプリケーション全体を内包した
 
 ```sh
 rdsh desktop status                 # アプリ、コマンドランタイム、プロファイル、プラグインの状態（読み取り専用）
-rdsh desktop install --plugins-dir .   # rdsh-settings＋標準サードパーティ（sound、gitview）を組み込み
+rdsh desktop install --plugins-dir .   # rdsh-settings＋スターターセット＋標準サードパーティ（sound、gitview、intelligent-ui）を組み込み
 rdsh desktop install --plugins-dir . --compute   # 常駐 compute bridge もあわせて追加
-rdsh desktop install --plugins-dir . --no-sound --no-gitview  # サードパーティを省く場合
+rdsh desktop install --plugins-dir . --no-sound --no-gitview --no-intelligent-ui  # サードパーティを省く場合
 rdsh desktop verify                 # プロファイルに rdsh プラグインがない場合は 0 以外で終了
 ```
 
@@ -657,11 +657,11 @@ rdsh が利用・改変・推薦している第三者製 DSH プラグインで�
   `GITVIEW=0`／`features.gitview=false` でスキップできます
 - [dsh-intelligent-ui](https://github.com/cwd514/dsh-intelligent-ui)（cwd514、MIT、Copyright (c) 2026 cwd514）—
   推奨プラグイン `intelligent-ui`（宣言的な `render_ui` ツールによる表・グラフ・比較などの視覚回答）。
-  既定では導入せず、`--recommended=intelligent-ui` または `INTELLIGENT_UI=1` で有効にします
+  web/desktop では既定で導入し、`INTELLIGENT_UI=0` または `--no-intelligent-ui` でスキップできます
 
 ## ライセンス
 
-MIT（[LICENSE](LICENSE)）です。本家 DeepSeek Harness および依存ライブラリにはそれぞれのライセンスが適用されます。
+MIT（[LICENSE](LICENSE)）です。本家 DeepSeek Harness および依存ライブラリにはそれぞれのライセンスが適用されます。固定しているバージョンと商標の表示は[サードパーティライセンス](THIRD_PARTY_LICENSES.md)にまとめています。
 
 ## 保護付き起動の対応版
 
