@@ -22,9 +22,18 @@ use gpui::*;
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
 
+    // Decide the palette before anything renders. The environment wins over the
+    // flag, and "system" reads the desktop appearance once.
+    let theme_flag = args
+        .iter()
+        .position(|arg| arg == "--theme")
+        .and_then(|index| args.get(index + 1))
+        .map(String::as_str);
+    theme::init_from_env_and_args(theme_flag);
+
     if args.iter().any(|arg| arg == "--help" || arg == "-h") {
         println!(
-            "rdsh-desktop {}\n\nUSAGE:\n  rdsh-desktop [--serve-web [--port N]] [--print-json] [--probe]\n\nOPTIONS:\n  --serve-web   Serve the same harness session as a local web UI on 127.0.0.1 (no window)\n  --port N      Port for --serve-web (default {})\n  --print-json  Collect one native rdsh snapshot and print it as JSON (no window)\n  --probe       Start the harness host, exchange the token and print the conversation list (no window)\n  -h, --help    Show this help",
+            "rdsh-desktop {}\n\nUSAGE:\n  rdsh-desktop [--serve-web [--port N]] [--print-json] [--probe] [--theme MODE]\n\nOPTIONS:\n  --serve-web   Serve the same harness session as a local web UI on 127.0.0.1 (no window)\n  --port N      Port for --serve-web (default {})\n  --print-json  Collect one native rdsh snapshot and print it as JSON (no window)\n  --probe       Start the harness host, exchange the token and print the conversation list (no window)\n  --theme MODE  Palette for the window: light (default), dark, or system\n  -h, --help    Show this help",
             env!("CARGO_PKG_VERSION"),
             web::DEFAULT_PORT
         );
@@ -269,6 +278,15 @@ fn main() {
     let bounds = Bounds::new(point(px(80.), px(80.)), size(px(1280.), px(860.)));
     let options = WindowOptions {
         window_bounds: Some(WindowBounds::Windowed(bounds)),
+        // Keeps the sidebar, header and composer from being crushed: the
+        // minimum comes from the token module, not from a bare literal.
+        window_min_size: Some(size(
+            px(theme::WINDOW_MIN_WIDTH),
+            px(theme::WINDOW_MIN_HEIGHT),
+        )),
+        // Lets the desktop match this window to rdsh-desktop.desktop, so the
+        // taskbar and switcher show the project icon.
+        app_id: Some("rdsh-desktop".to_string()),
         ..Default::default()
     };
 

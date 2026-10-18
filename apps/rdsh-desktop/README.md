@@ -75,6 +75,18 @@ pinned revision):
 - Model changes go through session/selectModel, so the host keeps them for the
   conversation and the chip and header update immediately.
 
+## Sidebar projects
+
+The sidebar groups conversations by project. Each project header folds the
+group away when clicked (the caret shows the state), and the × button on the
+header archives the project out of the list. Archived projects stay hidden
+until the footer toggle (アーカイブ) shows them again, dimmed, with a 戻す
+button. Both states persist in `~/.config/rdsh-desktop/ui.json`.
+
+The window uses the project orca icon: packaging/rdsh-desktop.desktop points at
+`~/.local/share/rdsh-desktop/icon.png` (copied from assets/icon-256.png), and
+the window sets app_id rdsh-desktop so the taskbar matches that entry.
+
 ## Web UI
 
 The same experience is reachable from a browser, with no Node and no build step:

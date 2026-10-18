@@ -25,6 +25,12 @@ use crate::theme;
 
 const POLL: Duration = Duration::from_millis(120);
 const RELOAD_AFTER: Duration = Duration::from_millis(500);
+/// One older-history page, matching the follow window used on open.
+const PAGE_LIMIT: usize = 60;
+/// Retained timeline rows, about seven pages, to bound memory.
+const MAX_RETAINED_MESSAGES: usize = 400;
+/// A second Esc inside this window cancels the active run.
+const ESC_CANCEL_WINDOW: Duration = Duration::from_millis(700);
 
 #[derive(Clone, Debug, Default)]
 pub struct Model {
@@ -108,6 +114,13 @@ pub struct Chat {
     pub sessions: Vec<Session>,
     pub selected: Option<usize>,
     pub messages: Vec<Message>,
+    /// Log cut carried by the follow opening snapshot: the through sequence that
+    /// every session/page call must not read past.
+    pub cursor: Option<i64>,
+    /// Whether the harness still holds records older than the loaded window.
+    pub has_more: bool,
+    /// Sequence of the oldest loaded record: the beforeSeq for the next page.
+    pub oldest_seq: Option<i64>,
     pub catalog: Vec<CatalogProvider>,
     pub reused: bool,
     pub startup_ms: u128,
@@ -128,6 +141,9 @@ impl Chat {
             sessions: Vec::new(),
             selected: None,
             messages: Vec::new(),
+            cursor: None,
+            has_more: false,
+            oldest_seq: None,
             catalog: Vec::new(),
             reused,
             startup_ms: 0,
@@ -249,6 +265,9 @@ impl Chat {
             return Ok(());
         };
         self.messages.clear();
+        self.cursor = None;
+        self.has_more = false;
+        self.oldest_seq = None;
         let mut mux = Mux::connect(&self.host.origin, self.api.cookie())?;
         let address = serde_json::json!({ "kind": "session", "sessionId": session.id });
         let stream = mux.open(
@@ -285,8 +304,66 @@ impl Chat {
             .and_then(Value::as_array)
             .cloned()
             .unwrap_or_default();
+        // The opening snapshot is the paging anchor: its cursor is the log cut
+        // and its hasMore says whether an older page exists.
+        self.cursor = snapshot.get("cursor").and_then(Value::as_i64);
+        self.has_more = snapshot
+            .get("hasMore")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        self.oldest_seq = records.first().and_then(record_seq);
         self.messages = records_to_messages(&records);
+        cap_messages(&mut self.messages);
         Ok(())
+    }
+
+    /// Read the page immediately before the oldest loaded record and prepend it
+    /// in front of the window. Returns whether older records still remain.
+    pub fn load_older(&mut self) -> anyhow::Result<bool> {
+        if !self.has_more {
+            return Ok(false);
+        }
+        let Some(index) = self.selected else {
+            return Ok(false);
+        };
+        let Some(session) = self.sessions.get(index).cloned() else {
+            return Ok(false);
+        };
+        let Some(through) = self.cursor else {
+            anyhow::bail!("履歴カーソルがありません");
+        };
+        let Some(before) = self.oldest_seq else {
+            anyhow::bail!("最古の記録がありません");
+        };
+        let value = self.api.unary(
+            "session/page",
+            page_request(&session.id, through, before, PAGE_LIMIT),
+        )?;
+        let records = value
+            .get("records")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default();
+        let has_more = value
+            .get("hasMore")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        let state = advance_page(
+            PageState {
+                oldest: self.oldest_seq,
+                has_more: self.has_more,
+            },
+            &records,
+            has_more,
+        );
+        self.oldest_seq = state.oldest;
+        self.has_more = state.has_more;
+        self.messages = merge_messages(
+            records_to_messages(&records),
+            std::mem::take(&mut self.messages),
+        );
+        cap_messages(&mut self.messages);
+        Ok(self.has_more)
     }
 
     pub fn select(&mut self, index: usize) {
@@ -456,6 +533,19 @@ impl Chat {
             }),
         )?;
         Ok(())
+    }
+
+    /// Rename one conversation; the harness returns the stored title.
+    pub fn rename_session(&self, session_id: &str, title: &str) -> anyhow::Result<String> {
+        let value = self.api.unary(
+            "session/rename",
+            serde_json::json!({ "request": { "sessionId": session_id, "title": title } }),
+        )?;
+        Ok(value
+            .get("title")
+            .and_then(Value::as_str)
+            .unwrap_or(title)
+            .to_string())
     }
 
     pub fn fill_titles(
@@ -680,6 +770,121 @@ fn records_to_messages(records: &[Value]) -> Vec<Message> {
         }
     }
     messages
+}
+
+/// Durable sequence of one history record. Records wrap their event, so the
+/// sequence normally lives on the inner event.
+fn record_seq(record: &Value) -> Option<i64> {
+    record
+        .get("seq")
+        .or_else(|| record.get("event").and_then(|event| event.get("seq")))
+        .and_then(Value::as_i64)
+}
+
+/// Paging bookkeeping kept beside the timeline.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct PageState {
+    /// Sequence of the oldest loaded record, or None for an empty window.
+    oldest: Option<i64>,
+    /// Whether the harness reported older records after the last page.
+    has_more: bool,
+}
+
+/// Fold one session/page response into the current paging state. The anchor only
+/// moves when the page carries records, and an empty page clears has_more so a
+/// contradictory response cannot make the button loop forever.
+fn advance_page(state: PageState, records: &[Value], has_more: bool) -> PageState {
+    match records.first().and_then(record_seq) {
+        Some(oldest) => PageState {
+            oldest: Some(oldest),
+            has_more,
+        },
+        None => PageState {
+            oldest: state.oldest,
+            has_more: false,
+        },
+    }
+}
+
+/// The session/page request for the page ending just before "before".
+fn page_request(session_id: &str, through: i64, before: i64, limit: usize) -> Value {
+    serde_json::json!({
+        "request": {
+            "address": { "kind": "session", "sessionId": session_id },
+            "throughSeq": through,
+            "beforeSeq": before,
+            "maxMessages": limit,
+        }
+    })
+}
+
+/// Older records go in front of the window. Both slices are oldest-first, so the
+/// result stays chronological.
+fn merge_messages(older: Vec<Message>, current: Vec<Message>) -> Vec<Message> {
+    let mut merged = older;
+    merged.extend(current);
+    merged
+}
+
+/// Trim the timeline to MAX_RETAINED_MESSAGES and report how many rows went.
+///
+/// A prepend must not move what is on screen, so the rows that go are the oldest
+/// ones; the page anchor is tracked separately, so trimming never blocks paging.
+/// Only when one page is larger than the whole cap does the cut move to the
+/// middle, keeping both the newest rows and the oldest anchor instead of
+/// throwing the fresh page away.
+fn cap_messages(messages: &mut Vec<Message>) -> usize {
+    if messages.len() <= MAX_RETAINED_MESSAGES {
+        return 0;
+    }
+    let excess = messages.len() - MAX_RETAINED_MESSAGES;
+    let cut = if excess * 2 >= messages.len() {
+        excess / 2
+    } else {
+        0
+    };
+    messages.drain(cut..cut + excess);
+    excess
+}
+
+/// Whether "now" is a second Esc close enough to the previous one to cancel.
+fn esc_cancels(previous: Option<Instant>, now: Instant) -> bool {
+    previous.is_some_and(|previous| now.saturating_duration_since(previous) <= ESC_CANCEL_WINDOW)
+}
+
+/// Case-insensitive substring search over a session title and its project path.
+/// A blank or all-space filter keeps every row.
+fn session_matches(filter: &str, title: &str, cwd: &str) -> bool {
+    let needle = filter.trim().to_lowercase();
+    if needle.is_empty() {
+        return true;
+    }
+    title.to_lowercase().contains(&needle) || cwd.to_lowercase().contains(&needle)
+}
+
+/// The sidebar label for one session, shared by rendering and filtering so a row
+/// that is visible is also searchable.
+fn session_display_title(session: &Session, titles: &HashMap<String, String>) -> String {
+    titles
+        .get(&session.id)
+        .cloned()
+        .filter(|title| !title.is_empty())
+        .or_else(|| (!session.title.is_empty()).then(|| session.title.clone()))
+        .unwrap_or_else(|| {
+            if session.blank {
+                "新しい会話".to_string()
+            } else {
+                short_id(&session.id)
+            }
+        })
+}
+
+/// First (session index, title, cwd) row that passes the filter, in the order the
+/// sidebar displays them.
+fn first_match(rows: &[(usize, String, String)], filter: &str) -> Option<usize> {
+    rows.iter()
+        .find(|(_, title, cwd)| session_matches(filter, title, cwd))
+        .map(|(index, _, _)| *index)
 }
 
 fn truncate(text: &str, limit: usize) -> String {
@@ -915,13 +1120,46 @@ fn short_model(model: &str) -> String {
 }
 
 #[cfg(test)]
+mod ui_state_tests {
+    use super::{load_ui_state, save_ui_state};
+    use std::collections::HashSet;
+
+    #[test]
+    fn sidebar_state_round_trips_through_the_config_file() {
+        let home = std::env::temp_dir().join(format!("rdsh-ui-state-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&home);
+        std::fs::create_dir_all(&home).unwrap();
+        std::env::set_var("XDG_CONFIG_HOME", &home);
+        let mut collapsed = HashSet::new();
+        collapsed.insert("/home/me/Prog/one".to_string());
+        let mut archived = HashSet::new();
+        archived.insert("/home/me/Prog/two".to_string());
+        save_ui_state(&collapsed, &archived);
+        let (loaded_collapsed, loaded_archived) = load_ui_state();
+        assert_eq!(loaded_collapsed, collapsed);
+        assert_eq!(loaded_archived, archived);
+        std::env::remove_var("XDG_CONFIG_HOME");
+        let _ = std::fs::remove_dir_all(&home);
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::{
-        byte_to_utf16, composer_model_label, ime_replacement_range, ime_selected_range,
-        order_providers, project_label, project_path, providers_from_catalog, reasoning_preview,
-        short_model, tool_state_of, tool_text_state, utf16_to_byte, CatalogModel,
-        CatalogProvider, Model, ToolState,
+        advance_page, byte_to_utf16, cap_messages, composer_model_label, esc_cancels, first_match,
+        ime_replacement_range, ime_selected_range, merge_messages, order_providers, project_label,
+        project_path, providers_from_catalog, reasoning_preview, record_seq, session_matches,
+        short_model, tool_state_of, tool_text_state, utf16_to_byte, CatalogModel, CatalogProvider,
+        Message, Model, PageState, ToolState,
     };
+    use std::time::{Duration, Instant};
+
+    fn message(text: &str) -> Message {
+        Message {
+            role: "user".to_string(),
+            text: text.to_string(),
+        }
+    }
 
     fn provider(id: &str, name: &str, models: &[&str]) -> CatalogProvider {
         CatalogProvider {
@@ -1189,6 +1427,167 @@ mod tests {
         assert_eq!(preview.chars().count(), 97, "96 characters plus the ellipsis");
         assert!(preview.ends_with('…'));
     }
+
+    #[test]
+    fn older_pages_prepend_in_front_of_the_window() {
+        let older = vec![message("m1"), message("m2")];
+        let current = vec![message("m3")];
+        let merged = merge_messages(older, current);
+        let texts: Vec<&str> = merged.iter().map(|row| row.text.as_str()).collect();
+        assert_eq!(texts, ["m1", "m2", "m3"], "the page stays oldest-first");
+    }
+
+    #[test]
+    fn page_progress_moves_the_anchor_and_tracks_has_more() {
+        let records = vec![
+            serde_json::json!({ "type": "event", "event": { "seq": 7 } }),
+            serde_json::json!({ "type": "event", "event": { "seq": 9 } }),
+        ];
+        assert_eq!(record_seq(&records[0]), Some(7));
+        let state = advance_page(
+            PageState {
+                oldest: Some(20),
+                has_more: true,
+            },
+            &records,
+            true,
+        );
+        assert_eq!(
+            state,
+            PageState {
+                oldest: Some(7),
+                has_more: true,
+            }
+        );
+        // A response that claims more but carries nothing must stop the loop.
+        let exhausted = advance_page(state, &[], true);
+        assert_eq!(
+            exhausted,
+            PageState {
+                oldest: Some(7),
+                has_more: false,
+            }
+        );
+    }
+
+    #[test]
+    fn retained_timeline_drops_the_oldest_rows() {
+        let mut rows: Vec<Message> = (0..460)
+            .map(|index| message(&format!("m{index}")))
+            .collect();
+        assert_eq!(cap_messages(&mut rows), 60);
+        assert_eq!(rows.len(), 400);
+        assert_eq!(rows[0].text, "m60", "the newest 400 rows survive");
+        assert_eq!(rows[399].text, "m459");
+    }
+
+    #[test]
+    fn one_oversized_page_is_trimmed_from_the_middle() {
+        // A page larger than the whole cap cannot keep every newest row and the
+        // oldest anchor with a front-only cut, so the middle is dropped instead.
+        let mut rows: Vec<Message> = (0..900)
+            .map(|index| message(&format!("m{index}")))
+            .collect();
+        assert_eq!(cap_messages(&mut rows), 500);
+        assert_eq!(rows.len(), 400);
+        assert_eq!(rows[0].text, "m0", "the oldest anchor survives");
+        assert_eq!(rows[399].text, "m899", "so does the newest row");
+
+        let mut small: Vec<Message> = (0..400)
+            .map(|index| message(&format!("m{index}")))
+            .collect();
+        assert_eq!(cap_messages(&mut small), 0);
+        assert_eq!(small.len(), 400);
+    }
+
+    #[test]
+    fn escape_cancels_only_on_a_second_press_inside_the_window() {
+        let first = Instant::now();
+        assert!(!esc_cancels(None, first), "the first Esc only arms");
+        assert!(esc_cancels(Some(first), first + Duration::from_millis(700)));
+        assert!(!esc_cancels(Some(first), first + Duration::from_millis(701)));
+    }
+
+    #[test]
+    fn the_filter_matches_titles_and_project_paths_without_case() {
+        assert!(
+            session_matches("", "anything", "/srv/x"),
+            "a blank filter keeps every row"
+        );
+        assert!(session_matches("  ", "anything", "/srv/x"));
+        assert!(session_matches("RUST", "rustdsh の作業", "/home/me/Prog/rustdsh"));
+        assert!(session_matches(
+            "prog/rustdsh",
+            "設計レビュー",
+            "/home/me/Prog/rustdsh"
+        ));
+        assert!(session_matches("設計", "設計レビュー", "/srv/x"));
+        assert!(!session_matches("missing", "設計レビュー", "/srv/x"));
+    }
+
+    #[test]
+    fn enter_picks_the_first_visible_match() {
+        let rows = vec![
+            (3, "alpha".to_string(), "/srv/one".to_string()),
+            (5, "beta".to_string(), "/srv/two".to_string()),
+            (9, "alpha two".to_string(), "/srv/three".to_string()),
+        ];
+        assert_eq!(first_match(&rows, "ALPHA"), Some(3));
+        assert_eq!(first_match(&rows, "/srv/two"), Some(5));
+        assert_eq!(first_match(&rows, "none"), None);
+        assert_eq!(first_match(&rows, ""), Some(3));
+    }
+}
+
+/// Sidebar preferences live next to the app's other user config.
+fn ui_state_path() -> Option<std::path::PathBuf> {
+    let base = std::env::var_os("XDG_CONFIG_HOME")
+        .map(std::path::PathBuf::from)
+        .or_else(|| {
+            std::env::var_os("HOME").map(|home| std::path::PathBuf::from(home).join(".config"))
+        })?;
+    Some(base.join("rdsh-desktop").join("ui.json"))
+}
+
+fn load_ui_state() -> (HashSet<String>, HashSet<String>) {
+    let empty = || (HashSet::new(), HashSet::new());
+    let Some(path) = ui_state_path() else {
+        return empty();
+    };
+    let Ok(text) = std::fs::read_to_string(path) else {
+        return empty();
+    };
+    let Ok(value) = serde_json::from_str::<Value>(&text) else {
+        return empty();
+    };
+    let read = |key: &str| -> HashSet<String> {
+        value
+            .get(key)
+            .and_then(Value::as_array)
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(str::to_string)
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+    (read("collapsed"), read("archived"))
+}
+
+fn save_ui_state(collapsed: &HashSet<String>, archived: &HashSet<String>) {
+    let Some(path) = ui_state_path() else {
+        return;
+    };
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let body = serde_json::json!({
+        "collapsed": collapsed.iter().cloned().collect::<Vec<_>>(),
+        "archived": archived.iter().cloned().collect::<Vec<_>>(),
+    });
+    let _ = std::fs::write(path, body.to_string());
 }
 
 fn short_id(id: &str) -> String {
@@ -1243,10 +1642,25 @@ pub struct DesktopApp {
     /// Timeline message ids whose reasoning row the user expanded. Reasoning is
     /// collapsed by default, so only the opened rows are kept.
     expanded: Rc<RefCell<HashSet<String>>>,
+    /// Project rows the operator folded away.
+    collapsed_projects: HashSet<String>,
+    /// Projects archived out of the sidebar.
+    archived_projects: HashSet<String>,
+    show_archived: bool,
+    /// Conversation being renamed inline, plus its edit buffer.
+    rename_target: Option<String>,
+    rename_editor: Editor,
+    rename_focus: FocusHandle,
+    /// Sidebar search box; empty means no filtering.
+    filter: Editor,
+    filter_focus: FocusHandle,
+    /// Last Esc press, for the double-Esc cancel while a run is active.
+    last_escape: Option<Instant>,
 }
 
 impl DesktopApp {
     pub fn new(cx: &mut Context<Self>) -> Self {
+        let (collapsed_projects, archived_projects) = load_ui_state();
         let (update_tx, update_rx) = mpsc::channel();
         let (live_cmd_tx, live_cmd_rx) = mpsc::channel();
         let (live_evt_tx, live_evt_rx) = mpsc::channel();
@@ -1272,7 +1686,6 @@ impl DesktopApp {
                 .sessions
                 .iter()
                 .filter(|session| session.title.is_empty())
-                .take(80)
                 .map(|session| session.id.clone())
                 .collect();
             let titles = update_tx.clone();
@@ -1374,6 +1787,15 @@ impl DesktopApp {
             model_scroll: ScrollHandle::new(),
             update: None,
             expanded: Rc::new(RefCell::new(HashSet::new())),
+            collapsed_projects: collapsed_projects,
+            archived_projects: archived_projects,
+            show_archived: false,
+            rename_target: None,
+            rename_editor: Editor::new(),
+            rename_focus: cx.focus_handle(),
+            filter: Editor::new(),
+            filter_focus: cx.focus_handle(),
+            last_escape: None,
         }
     }
 
@@ -1416,7 +1838,70 @@ impl DesktopApp {
         self.running = false;
     }
 
+    /// Start renaming one conversation with its current title in the buffer.
+    fn begin_rename(&mut self, session_id: &str, title: &str) {
+        self.rename_editor.clear();
+        self.rename_editor.insert(title);
+        self.rename_editor.select_all();
+        self.rename_target = Some(session_id.to_string());
+    }
+
+    fn cancel_rename(&mut self) {
+        self.rename_target = None;
+        self.rename_editor.clear();
+    }
+
+    fn commit_rename(&mut self) {
+        let Some(target) = self.rename_target.clone() else {
+            return;
+        };
+        let title = self.rename_editor.text().trim().to_string();
+        if title.is_empty() {
+            self.cancel_rename();
+            return;
+        }
+        match self.chat.as_ref() {
+            Some(chat) => match chat.rename_session(&target, &title) {
+                Ok(stored) => {
+                    self.titles.insert(target.clone(), stored.clone());
+                    if let Some(chat) = self.chat.as_mut() {
+                        if let Some(session) =
+                            chat.sessions.iter_mut().find(|session| session.id == target)
+                        {
+                            session.title = stored.clone();
+                        }
+                    }
+                    self.status = format!("名前を変更しました: {stored}");
+                }
+                Err(error) => self.status = format!("名前を変更できませんでした: {error}"),
+            },
+            None => {}
+        }
+        self.cancel_rename();
+    }
+
+    /// Fold or unfold one project row in the sidebar.
+    fn toggle_collapsed(&mut self, path: &str) {
+        if !self.collapsed_projects.remove(path) {
+            self.collapsed_projects.insert(path.to_string());
+        }
+        save_ui_state(&self.collapsed_projects, &self.archived_projects);
+    }
+
+    /// Hide or restore one project in the sidebar.
+    fn set_archived(&mut self, path: &str, archived: bool) {
+        if archived {
+            self.archived_projects.insert(path.to_string());
+        } else {
+            self.archived_projects.remove(path);
+        }
+        save_ui_state(&self.collapsed_projects, &self.archived_projects);
+    }
+
     fn new_conversation(&mut self) {
+        // A brand-new session has no title yet, so it must not stay hidden
+        // behind an active search.
+        self.filter.clear();
         let cwd = self
             .chat
             .as_ref()
@@ -1435,6 +1920,62 @@ impl DesktopApp {
             }
             Err(error) => self.status = format!("作成できませんでした: {error}"),
         }
+    }
+
+    /// Load one older history page, or report that the log is exhausted.
+    fn load_older(&mut self) {
+        let result = self.chat.as_mut().map(|chat| chat.load_older());
+        match result {
+            Some(Ok(more)) => {
+                self.status = if more {
+                    "以前の履歴を読み込みました".to_string()
+                } else {
+                    "ここから先はありません".to_string()
+                };
+            }
+            Some(Err(error)) => self.status = format!("以前の履歴を読み込めませんでした: {error}"),
+            None => {}
+        }
+    }
+
+    /// Enter in the filter row: open the first session the sidebar shows for the
+    /// filter, then clear the filter so the selection is visible.
+    fn select_first_match(&mut self) {
+        let filter = self.filter.text().to_string();
+        self.filter.clear();
+        if filter.trim().is_empty() {
+            return;
+        }
+        // Mirror the sidebar's visible order: archived projects are skipped
+        // unless the operator is showing them.
+        let rows: Vec<(usize, String, String)> = {
+            let Some(chat) = self.chat.as_ref() else {
+                return;
+            };
+            let titles = self.titles.clone();
+            let mut rows = Vec::new();
+            for group in chat.groups() {
+                if !self.show_archived && self.archived_projects.contains(&group.path) {
+                    continue;
+                }
+                for (index, session) in group.sessions {
+                    let title = session_display_title(&session, &titles);
+                    rows.push((index, title, session.cwd));
+                }
+            }
+            rows
+        };
+        let Some(index) = first_match(&rows, &filter) else {
+            self.status = format!("「{filter}」に一致する会話がありません");
+            return;
+        };
+        if let Some(chat) = self.chat.as_mut() {
+            chat.select(index);
+            self.status = format!("{} メッセージ", chat.messages.len());
+        }
+        self.running = false;
+        self.streaming.clear();
+        self.follow_selected();
     }
 
     fn answer_pending(&mut self, allow: bool, answers: Option<Vec<(String, Vec<String>)>>) {
@@ -1642,12 +2183,28 @@ impl Render for DesktopApp {
             .and_then(|chat| chat.selected_session().cloned());
         let status = self.status.clone();
         let input = self.editor.text().to_string();
+        let filter_text = self.filter.text().to_string();
         let titles = self.titles.clone();
         let loading = self.chat.is_none();
         let streaming = self.streaming.clone();
         let running = self.running;
+        let has_more = self
+            .chat
+            .as_ref()
+            .map(|chat| chat.has_more)
+            .unwrap_or(false);
         let picker = self.picker;
         let pending = self.pending.clone();
+        let collapsed_paths = self.collapsed_projects.clone();
+        let archived_paths = self.archived_projects.clone();
+        let show_archived = self.show_archived;
+        let rename_target = self.rename_target.clone();
+        let rename_text = self.rename_editor.text().to_string();
+        let rename_focus = self.rename_focus.clone();
+        let archived_count = groups
+            .iter()
+            .filter(|group| self.archived_projects.contains(&group.path))
+            .count();
 
         let sidebar = div()
             .flex()
@@ -1694,6 +2251,102 @@ impl Render for DesktopApp {
                     .child("+ 新しい会話"),
             )
             .child(
+                // Sidebar search: filters the rendered rows by title and project
+                // path. It owns the keyboard while focused, exactly like the
+                // inline rename field.
+                div()
+                    .id("session-filter")
+                    .track_focus(&self.filter_focus)
+                    .mx(px(12.))
+                    .mb(px(8.))
+                    .h(px(theme::LIST_ROW_HEIGHT - 6.))
+                    .px(px(10.))
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .gap(px(6.))
+                    .rounded(theme::radius_sm())
+                    .bg(theme::composer())
+                    .border_1()
+                    .border_color(theme::border())
+                    .text_size(theme::meta_size())
+                    .cursor(CursorStyle::IBeam)
+                    .on_click(cx.listener(|this, _event, window, cx| {
+                        this.filter_focus.focus(window);
+                        cx.notify();
+                    }))
+                    .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
+                        let keystroke = &event.keystroke;
+                        if keystroke.is_ime_in_progress() {
+                            return;
+                        }
+                        let command =
+                            keystroke.modifiers.platform || keystroke.modifiers.control;
+                        match keystroke.key.as_str() {
+                            // Enter opens the first visible match and drops the
+                            // filter; Esc clears it and returns to the composer.
+                            "enter" => this.select_first_match(),
+                            "escape" => {
+                                this.filter.clear();
+                                this.focus.focus(window);
+                            }
+                            "backspace" => this.filter.delete_backward(),
+                            "delete" => this.filter.delete_forward(),
+                            "left" if command => this.filter.moved(Motion::WordLeft),
+                            "right" if command => this.filter.moved(Motion::WordRight),
+                            "left" => this.filter.moved(Motion::Left),
+                            "right" => this.filter.moved(Motion::Right),
+                            "a" if command => this.filter.select_all(),
+                            "k" if command => this.focus.focus(window),
+                            "n" if command => this.new_conversation(),
+                            _ => {
+                                if let Some(text) = &keystroke.key_char {
+                                    if !text.is_empty()
+                                        && !text.chars().any(char::is_control)
+                                        && !command
+                                        && !keystroke.modifiers.alt
+                                    {
+                                        this.filter.insert(text);
+                                    }
+                                }
+                            }
+                        }
+                        cx.notify();
+                    }))
+                    .child(
+                        div()
+                            .flex_1()
+                            .overflow_hidden()
+                            .text_color(if filter_text.is_empty() {
+                                theme::tertiary()
+                            } else {
+                                theme::label()
+                            })
+                            .child(if filter_text.is_empty() {
+                                "会話を検索…".to_string()
+                            } else {
+                                filter_text.clone()
+                            }),
+                    )
+                    .when(!filter_text.is_empty(), |element| {
+                        element.child(
+                            div()
+                                .id("clear-filter")
+                                .px(px(4.))
+                                .rounded(theme::radius_sm())
+                                .cursor_pointer()
+                                .text_size(theme::micro_size())
+                                .text_color(theme::tertiary())
+                                .hover(|style| style.bg(rgb(0xe9ecf1)))
+                                .child("×")
+                                .on_click(cx.listener(|this, _event, _window, cx| {
+                                    this.filter.clear();
+                                    cx.notify();
+                                })),
+                        )
+                    }),
+            )
+            .child(
                 div()
                     .id("sessions")
                     .flex()
@@ -1720,31 +2373,100 @@ impl Render for DesktopApp {
                         // history would otherwise create thousands of elements
                         // on every frame.
                         let mut budget = usize::MAX;
-                        element.children(groups.into_iter().filter_map(|group| {
+                        let mut matched = 0usize;
+                        let mut visible: Vec<AnyElement> = groups
+                            .into_iter()
+                            .filter_map(|group| {
                             if budget == 0 {
                                 return None;
                             }
-                            let rows: Vec<AnyElement> = group
+                            let is_archived = archived_paths.contains(&group.path);
+                            if is_archived && !show_archived {
+                                return None;
+                            }
+                            let is_collapsed = collapsed_paths.contains(&group.path);
+                            // Search runs before the row budget, so a project
+                            // whose sessions all fail the filter disappears
+                            // completely instead of leaving an empty header.
+                            let sessions: Vec<(usize, Session)> = group
                                 .sessions
                                 .into_iter()
+                                .filter(|(_, session)| {
+                                    session_matches(
+                                        &filter_text,
+                                        &session_display_title(session, &titles),
+                                        &session.cwd,
+                                    )
+                                })
                                 .take(budget)
+                                .collect();
+                            if sessions.is_empty() {
+                                return None;
+                            }
+                            matched += sessions.len();
+                            let rows: Vec<AnyElement> = if is_collapsed {
+                                Vec::new()
+                            } else {
+                                sessions
+                                .into_iter()
                                 .map(|(index, session)| {
                                     let active = selected == Some(index);
-                                    let title = titles
-                                        .get(&session.id)
-                                        .cloned()
-                                        .filter(|title| !title.is_empty())
-                                        .or_else(|| {
-                                            (!session.title.is_empty())
-                                                .then(|| session.title.clone())
-                                        })
-                                        .unwrap_or_else(|| {
-                                            if session.blank {
-                                                "新しい会話".to_string()
-                                            } else {
-                                                short_id(&session.id)
-                                            }
-                                        });
+                                    let title = session_display_title(&session, &titles);
+                                    if rename_target.as_deref() == Some(session.id.as_str()) {
+                                        let focus = rename_focus.clone();
+                                        div()
+                                            .id(("rename", index))
+                                            .flex()
+                                            .items_center()
+                                            .h(px(theme::SESSION_ROW_HEIGHT + 10.))
+                                            .px(px(8.))
+                                            .mb(px(1.))
+                                            .rounded(theme::radius_sm())
+                                            .bg(theme::composer())
+                                            .border_1()
+                                            .border_color(theme::accent())
+                                            .track_focus(&focus)
+                                            .on_key_down(cx.listener(|this, event: &KeyDownEvent, _window, cx| {
+                                                let keystroke = &event.keystroke;
+                                                if keystroke.is_ime_in_progress() {
+                                                    return;
+                                                }
+                                                let command = keystroke.modifiers.platform
+                                                    || keystroke.modifiers.control;
+                                                match keystroke.key.as_str() {
+                                                    "enter" => this.commit_rename(),
+                                                    "escape" => this.cancel_rename(),
+                                                    "backspace" => this.rename_editor.delete_backward(),
+                                                    "delete" => this.rename_editor.delete_forward(),
+                                                    "left" if command => {
+                                                        this.rename_editor.moved(Motion::WordLeft)
+                                                    }
+                                                    "right" if command => {
+                                                        this.rename_editor.moved(Motion::WordRight)
+                                                    }
+                                                    "left" => this.rename_editor.moved(Motion::Left),
+                                                    "right" => this.rename_editor.moved(Motion::Right),
+                                                    "a" if command => this.rename_editor.select_all(),
+                                                    _ => {
+                                                        if let Some(text) = &keystroke.key_char {
+                                                            if !text.is_empty()
+                                                                && !text.chars().any(|character| character.is_control())
+                                                            {
+                                                                this.rename_editor.insert(text);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                cx.notify();
+                                            }))
+                                            .child(
+                                                div()
+                                                    .text_size(theme::meta_size())
+                                                    .text_color(theme::label())
+                                                    .child(rename_text.clone()),
+                                            )
+                                            .into_any_element()
+                                    } else {
                                     div()
                                         .id(("session", index))
                                         .flex()
@@ -1790,46 +2512,117 @@ impl Render for DesktopApp {
                                                     div()
                                                         .text_size(theme::meta_size())
                                                         .text_color(theme::label())
-                                                        .child(title),
+                                                        .child(title.clone()),
+                                                )
+                                                .child(
+                                                    div()
+                                                        .id(SharedString::from(format!("rename-{}", session.id)))
+                                                        .px(px(2.))
+                                                        .rounded(theme::radius_sm())
+                                                        .cursor_pointer()
+                                                        .text_size(theme::micro_size())
+                                                        .text_color(theme::tertiary())
+                                                        .hover(|style| style.bg(rgb(0xe9ecf1)))
+                                                        .child("✎")
+                                                        .on_click(cx.listener({
+                                                            let id = session.id.clone();
+                                                            let current = title.clone();
+                                                            move |this, _event, window, cx| {
+                                                                this.begin_rename(&id, &current);
+                                                                window.focus(&this.rename_focus);
+                                                                cx.notify();
+                                                            }
+                                                        })),
                                                 ),
                                         )
                                         .child(
                                             div()
                                                 .text_size(theme::micro_size())
                                                 .text_color(theme::tertiary())
-                                                .child(format!(
-                                                    "{} ・ {}",
-                                                    relative(session.updated),
-                                                    short_id(&session.id)
-                                                )),
+                                                .child(relative(session.updated)),
                                         )
                                         .into_any_element()
+                                    }
                                 })
-                                .collect();
+                                .collect()
+                            };
                             budget = budget.saturating_sub(rows.len());
                             Some(
                             div()
                                 .flex()
                                 .flex_col()
                                 .mb(px(6.))
+                                .when(is_archived, |element| element.opacity(0.6))
                                 .child(
                                     div()
+                                        .id(SharedString::from(format!("project-{}", group.path.clone())))
                                         .flex()
+                                        .flex_row()
                                         .items_center()
+                                        .gap(px(4.))
                                         .h(px(theme::PROJECT_ROW_HEIGHT))
                                         .px(px(10.))
+                                        .cursor_pointer()
+                                        .hover(|style| style.bg(rgb(0xf4f5f7)))
+                                        .on_click(cx.listener({
+                                            let path = group.path.clone();
+                                            move |this, _event, _window, cx| {
+                                                this.toggle_collapsed(&path);
+                                                cx.notify();
+                                            }
+                                        }))
                                         .child(
                                             div()
+                                                .text_size(theme::micro_size())
+                                                .text_color(theme::tertiary())
+                                                .child(if is_collapsed { "▸" } else { "▾" }),
+                                        )
+                                        .child(
+                                            div()
+                                                .flex_1()
+                                                .overflow_hidden()
                                                 .text_size(theme::micro_size())
                                                 .font_weight(FontWeight::MEDIUM)
                                                 .text_color(theme::tertiary())
                                                 .child(group.path.clone()),
+                                        )
+                                        .child(
+                                            div()
+                                                .id(SharedString::from(format!("archive-{}", group.path)))
+                                                .px(px(4.))
+                                                .rounded(theme::radius_sm())
+                                                .cursor_pointer()
+                                                .text_size(theme::micro_size())
+                                                .text_color(theme::tertiary())
+                                                .hover(|style| style.bg(rgb(0xe9ecf1)))
+                                                .child(if is_archived { "戻す" } else { "×" })
+                                                .on_click(cx.listener({
+                                                    let path = group.path.clone();
+                                                    move |this, _event, _window, cx| {
+                                                        this.set_archived(&path, !is_archived);
+                                                        cx.notify();
+                                                    }
+                                                })),
                                         ),
                                 )
                                 .children(rows)
                                 .into_any_element(),
                             )
-                        }))
+                        })
+                        .collect();
+                        if matched == 0 && !filter_text.trim().is_empty() {
+                            visible.push(
+                                div()
+                                    .id("no-match")
+                                    .px(px(12.))
+                                    .py(px(10.))
+                                    .text_size(theme::micro_size())
+                                    .text_color(theme::tertiary())
+                                    .child("一致なし")
+                                    .into_any_element(),
+                            );
+                        }
+                        element.children(visible)
                     }),
             )
             .child(
@@ -1846,6 +2639,29 @@ impl Render for DesktopApp {
                             .text_color(theme::tertiary())
                             .child(status),
                     )
+                    .when(archived_count > 0, |element| {
+                        let label = if show_archived {
+                            format!("アーカイブを隠す ({archived_count})")
+                        } else {
+                            format!("アーカイブ ({archived_count})")
+                        };
+                        element.child(
+                            div()
+                                .id("toggle-archived")
+                                .px(px(6.))
+                                .py(px(1.))
+                                .rounded(theme::radius_sm())
+                                .cursor_pointer()
+                                .text_size(theme::micro_size())
+                                .text_color(theme::secondary())
+                                .hover(|style| style.bg(rgb(0xf1f2f5)))
+                                .child(label)
+                                .on_click(cx.listener(|this, _event, _window, cx| {
+                                    this.show_archived = !this.show_archived;
+                                    cx.notify();
+                                })),
+                        )
+                    })
                     .when(self.update.is_some(), |element| {
                         let newest = self.update.clone().unwrap_or_default();
                         element.child(
@@ -2144,6 +2960,43 @@ impl Render for DesktopApp {
                     .into_any_element(),
             );
         }
+        // Older-history affordance at the very top of the timeline. It is only
+        // meaningful once the window carries records, and the load itself is a
+        // button, so the view never scrolls on its own.
+        if !messages.is_empty() {
+            let top = if has_more {
+                div()
+                    .id("load-older")
+                    .flex()
+                    .justify_center()
+                    .w_full()
+                    .mb(px(12.))
+                    .py(px(6.))
+                    .rounded(theme::radius_sm())
+                    .cursor_pointer()
+                    .hover(|style| style.bg(rgb(0xf1f2f5)))
+                    .text_size(theme::micro_size())
+                    .text_color(theme::secondary())
+                    .on_click(cx.listener(|this, _event, _window, cx| {
+                        this.load_older();
+                        cx.notify();
+                    }))
+                    .child("以前を読み込む")
+                    .into_any_element()
+            } else {
+                div()
+                    .flex()
+                    .justify_center()
+                    .w_full()
+                    .mb(px(12.))
+                    .py(px(6.))
+                    .text_size(theme::micro_size())
+                    .text_color(theme::tertiary())
+                    .child("ここから先はありません")
+                    .into_any_element()
+            };
+            rows.insert(0, top);
+        }
 
         let timeline = div()
             .id("timeline")
@@ -2436,7 +3289,7 @@ impl Render for DesktopApp {
                 this.focus.focus(window);
                 cx.notify();
             }))
-            .on_key_down(cx.listener(|this, event: &KeyDownEvent, _window, cx| {
+            .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
                 let keystroke = &event.keystroke;
                 let modifiers = keystroke.modifiers;
                 let command = modifiers.platform || modifiers.control;
@@ -2451,6 +3304,8 @@ impl Render for DesktopApp {
                 let mut submitted = false;
                 match keystroke.key.as_str() {
                     "enter" => {
+                        // Enter and Cmd/Ctrl+Enter both send; Shift/Alt+Enter
+                        // keeps a hard line break.
                         if shift || modifiers.alt {
                             this.editor.insert_newline();
                             changed = true;
@@ -2460,7 +3315,21 @@ impl Render for DesktopApp {
                         }
                     }
                     "escape" => {
-                        this.editor.clear();
+                        if this.running {
+                            // While a run is live Esc is the stop gesture: the
+                            // first press arms it, a second one inside the window
+                            // cancels, and neither clears the draft.
+                            let now = Instant::now();
+                            if esc_cancels(this.last_escape, now) {
+                                this.last_escape = None;
+                                this.stop();
+                            } else {
+                                this.last_escape = Some(now);
+                            }
+                        } else {
+                            this.last_escape = None;
+                            this.editor.clear();
+                        }
                         changed = true;
                     }
                     "backspace" => {
@@ -2478,6 +3347,14 @@ impl Render for DesktopApp {
                     "home" => this.editor.moved(Motion::Home),
                     "end" => this.editor.moved(Motion::End),
                     "a" if command => this.editor.select_all(),
+                    "k" if command => {
+                        this.focus.focus(window);
+                        changed = true;
+                    }
+                    "n" if command => {
+                        this.new_conversation();
+                        changed = true;
+                    }
                     "c" if command => {
                         let selected = this.editor.selected_text().to_string();
                         if !selected.is_empty() {

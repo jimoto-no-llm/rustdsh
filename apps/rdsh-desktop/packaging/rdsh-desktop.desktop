@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=DeepSeek Harness (native)
+GenericName=Harness Client
+Comment=Native GPUI client for the local DeepSeek Harness
+Exec=env RDSH_DESKTOP_LOG=%h/.cache/rdsh-desktop/app.log %h/.local/bin/rdsh-desktop
+Icon=%h/.local/share/rdsh-desktop/icon.png
+Terminal=false
+Categories=Development;
+Keywords=dsh;harness;deepseek;ai;chat;
+StartupNotify=true
+StartupWMClass=rdsh-desktop
