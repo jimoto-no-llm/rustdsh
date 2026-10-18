@@ -53,7 +53,51 @@ const TOKEN_PLACEHOLDER: &str = "__RDSH_TOKEN__";
 
 /// The embedded page with this server's token substituted in.
 pub fn serve_page(token: &str) -> String {
-    PAGE.replace(TOKEN_PLACEHOLDER, token)
+    serve_page_with(token, None)
+}
+
+/// The page, with the update notice already rendered into the HTML. A browser
+/// tab that predates this build only has to reload once: the notice does not
+/// depend on the page script running.
+pub fn serve_page_with(token: &str, update: Option<&Value>) -> String {
+    let mut page = PAGE.replace(TOKEN_PLACEHOLDER, token);
+    let Some(update) = update else {
+        return page;
+    };
+    let available = update
+        .get("available")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    if !available {
+        return page;
+    }
+    let newest = update.get("newest").and_then(Value::as_str).unwrap_or("");
+    let active = update
+        .get("active")
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("不明");
+    if newest.is_empty() {
+        return page;
+    }
+    page = page.replace(
+        "<div class=\"banner update-notice\" id=\"update-notice\">",
+        "<div class=\"banner update-notice show\" id=\"update-notice\">",
+    );
+    page = page.replace(
+        "<div class=\"banner-title\" id=\"update-notice-title\"></div>",
+        &format!(
+            "<div class=\"banner-title\" id=\"update-notice-title\">dsh {newest} が利用可能です</div>"
+        ),
+    );
+    page = page.replace(
+        "<div class=\"banner-body\" id=\"update-notice-body\"></div>",
+        &format!(
+            "<div class=\"banner-body\" id=\"update-notice-body\">現在 {active} を使用中。更新: npm install -g @deepseek-ai/dsh@{newest}</div>"
+        ),
+    );
+    page = page.replace("<title>", &format!("<title>dsh {newest} が利用可能 — "));
+    page
 }
 
 // ---------------------------------------------------------------------------
@@ -1142,7 +1186,11 @@ fn handle(
     }
 
     let (status, body) = match route {
-        Route::Page => (200, serve_page(token)),
+        Route::Page => {
+            let snapshot = state.state_json();
+            let update = snapshot.get("update").cloned();
+            (200, serve_page_with(token, update.as_ref()))
+        }
         Route::State => (200, state.state_json().to_string()),
         action => handle_action(action, &request, queue),
     };
