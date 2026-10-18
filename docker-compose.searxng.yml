@@ -1,0 +1,28 @@
+# Local SearXNG for `rdsh search-web --provider searxng --auto-start`.
+#
+#   up:   rdsh search-web "query" --auto-start
+#   down: docker compose -f docker-compose.searxng.yml down
+#
+# Loopback only: the instance is reachable from this host, never from the
+# network. The first `up` pulls the image from Docker Hub, which is a network
+# request; after that the container runs locally.
+services:
+  searxng:
+    image: docker.io/searxng/searxng:2026.10.17-1c10abe2d
+    container_name: rdsh-searxng
+    # On demand: the next --auto-start starts it again after a crash or a stop.
+    restart: "no"
+    ports:
+      - "127.0.0.1:8888:8080"
+    environment:
+      SEARXNG_BASE_URL: http://127.0.0.1:8888/
+    volumes:
+      # `Z` relabels the file for SELinux hosts (otherwise the container user
+      # cannot read it there); Docker without SELinux ignores the flag.
+      - ./docker/searxng/settings.yml:/etc/searxng/settings.yml:ro,Z
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s

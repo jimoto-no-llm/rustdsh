@@ -36,6 +36,30 @@ APIキーは不要です。接続先は `SEARXNG_URL`、`search.searxng_url`、
 `http://127.0.0.1:8888` の順で決まります。既存のHTTP接続とHTML結果の解析を使います。
 SearXNGの検索結果上限は既存の50件で、`--limit` は表示件数を指定します。
 
+### 停止中はオンデマンド起動（`--auto-start`）
+
+SearXNGが停止しているときに `--auto-start` を付けると、同梱の
+`docker-compose.searxng.yml` を `docker compose up -d`（無ければ
+`docker-compose`、`podman compose`、`podman-compose`）で起動し、最大10秒
+待ってから検索します。起動した場合は1行だけ通知します。
+
+```sh
+rdsh search-web "Rust async" --auto-start
+docker compose -f docker-compose.searxng.yml down   # 停止
+```
+
+- 接続先がループバック（`127.0.0.1`、`::1`、`localhost`）のときだけ起動します。
+  リモートのSearXNGでは起動せず、そのまま検索します。
+- どのランタイムも見つからない場合や、起動しても応答しない場合は、理由を
+  1行返して終了します。他の作業を止めたり、別の検索先へ自動で切り替えたり
+  しません。
+- 初回はイメージ取得のためにDocker Hubへ接続します。以後の通信はローカルの
+  コンテナとの間だけで発生します。
+- 起動先は `RDSH_SEARXNG_COMPOSE_FILE`、カレントディレクトリ、
+  `rdsh` の実行ファイルと同じディレクトリの順で探します。
+- `rdsh doctor` はSearXNGの到達性、コンテナランタイム、composeファイルの位置を
+  表示します。doctor はコンテナを起動しません。
+
 ## Ollama Web Search API
 
 [OllamaのAPIキー](https://ollama.com/settings/keys)を取得し、実行環境の

@@ -7,6 +7,14 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Added
 
+- `rdsh search-web --auto-start` (SearXNG provider) starts the bundled
+  `docker-compose.searxng.yml` through `docker compose`, `docker-compose`,
+  `podman compose` or `podman-compose` when the loopback endpoint is down,
+  waits up to 10 seconds and then searches. A host without a container runtime
+  gets one sentence explaining why search was skipped instead of a hang or a
+  panic; `rdsh doctor` reports SearXNG reachability, the container runtime and
+  the compose file it would use.
+
 - `rdsh search-web --provider ollama` uses Ollama's hosted Web Search API
   with `OLLAMA_API_KEY`, up to 10 results, and the existing text/JSON format.
   SearXNG stays the default; cloud search requires explicit selection and the

@@ -81,6 +81,7 @@ mod providers;
 mod question_contracts;
 mod rdsh_config;
 mod search;
+mod searxng;
 mod serial_proxy;
 mod serve;
 mod setup_web;
@@ -228,6 +229,10 @@ enum Commands {
         limit: Option<usize>,
         #[arg(long = "json")]
         json: bool,
+        /// Start the shipped local SearXNG compose service when it is down
+        /// (SearXNG provider, loopback endpoint only).
+        #[arg(long = "auto-start")]
+        auto_start: bool,
     },
     Compact {
         file: String,
@@ -1001,6 +1006,7 @@ fn main() {
             limit,
             json,
             provider,
+            auto_start,
         }) => {
             if !rdsh_config::feature_enabled(&cfg, "search-web") {
                 extra_disabled("search-web", locale)
@@ -1010,6 +1016,7 @@ fn main() {
                     limit.unwrap_or(cfg.search.web_limit),
                     json,
                     provider,
+                    auto_start,
                     locale,
                 )
             }
@@ -2275,6 +2282,10 @@ fn localized_arg_help(id: &str, locale: locale::Locale) -> Option<&'static str> 
         "max" => ("最大命中数", "最大ヒット数"),
         "limit" => ("结果上限", "結果上限"),
         "json" => ("输出机器可读 JSON", "機械可読JSONを出力"),
+        "auto_start" => (
+            "SearXNG 未启动时启动同梱的本地 compose 服务（仅回环地址）",
+            "SearXNG が停止していれば同梱のローカル compose サービスを起動（ループバック限定）",
+        ),
         "project" => ("按项目筛选", "プロジェクトで絞り込む"),
         "tokens" => ("估算会话令牌数", "セッショントークン数を推定"),
         "tail" => ("显示末尾行数", "末尾から表示する行数"),
@@ -2841,6 +2852,39 @@ fn doctor(locale: locale::Locale) -> anyhow::Result<()> {
     for line in distro::doctor_notes() {
         say(line);
     }
+    // Local web search. Advisory only: doctor reports what it finds and never
+    // starts a container (that stays behind search-web --auto-start).
+    let searxng_base = websearch::default_base();
+    say(format!(
+        "[rdsh] {}: {} ({searxng_base})",
+        text("SearXNG", "SearXNG", "SearXNG"),
+        if searxng::reachable(&searxng_base, locale) {
+            text("reachable", "可连接", "接続OK")
+        } else {
+            text("not reachable", "无法连接", "未接続")
+        }
+    ));
+    let runtimes = searxng::runtime_names();
+    say(format!(
+        "[rdsh] {}: {}",
+        text("container runtime", "容器运行时", "コンテナランタイム"),
+        if runtimes.is_empty() {
+            text("none found", "未找到", "見つかりません").to_string()
+        } else {
+            runtimes.join(", ")
+        }
+    ));
+    say(format!(
+        "[rdsh] {}: {}",
+        text(
+            "SearXNG compose file",
+            "SearXNG compose 文件",
+            "SearXNG compose ファイル"
+        ),
+        searxng::compose_file()
+            .map(|path| path.display().to_string())
+            .unwrap_or_else(|| text("not found", "未找到", "見つかりません").to_string())
+    ));
     say(format!(
         "[rdsh] {}: {}",
         text("slim env", "精简环境", "slim 環境"),
