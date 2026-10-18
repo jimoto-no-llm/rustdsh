@@ -1,7 +1,7 @@
 #!/bin/sh
 # Install recommended dsh plugins into a profile (idempotent per package).
-# Also installs the bundled rdsh plugins (rdsh settings UI) so they are
-# available by default.
+# Also installs the bundled rdsh plugins (rdsh settings UI and the phone-width
+# layout adapted from Smart-DSH, MIT) so they are available by default.
 # Usage: [PROFILE=headless] [DRY_RUN=1] [SOUND=1] [COMPUTE=1] ./plugins/install.sh
 # PROFILE=desktop targets the Electron application's reserved profile: the npm
 # dsh CLI refuses it, so the work is forwarded to the Desktop-installed command
@@ -55,17 +55,18 @@ if [ "$PROFILE" = "desktop" ]; then
     echo "  $REPO_ROOT/plugins/rdsh-settings" >&2
     exit 1
   fi
-  ARGS="--no-bundled"
-  for p in $PKGS; do ARGS="$ARGS --package $p"; done
-  ARGS="$ARGS --package $REPO_ROOT/plugins/rdsh-settings"
-  [ "$COMPUTE" = "1" ] && ARGS="$ARGS --package $REPO_ROOT/plugins/rdsh-compute"
-  if sound_enabled; then ARGS="$ARGS --package github:cwd514/dsh-sound-notifications"; fi
+  set -- --no-bundled
+  for p in $PKGS; do set -- "$@" --package "$p"; done
+  for p in rdsh-settings rdsh-mobile-ui; do
+    set -- "$@" --package "$REPO_ROOT/plugins/$p"
+  done
+  [ "$COMPUTE" = "1" ] && set -- "$@" --package "$REPO_ROOT/plugins/rdsh-compute"
+  if sound_enabled; then set -- "$@" --package github:cwd514/dsh-sound-notifications; fi
   if [ "$DRY_RUN" = "1" ]; then
-    echo "$RDSH desktop install $ARGS"
+    echo "$RDSH desktop install $*"
     exit 0
   fi
-  # shellcheck disable=SC2086
-  if "$RDSH" desktop install $ARGS; then
+  if "$RDSH" desktop install "$@"; then
     echo "done: Desktop profile plugins attached; reopen DeepSeek Harness"
     exit 0
   fi
@@ -89,7 +90,7 @@ for p in $PKGS; do
     fi
   fi
 done
-for p in rdsh-settings; do
+for p in rdsh-settings rdsh-mobile-ui; do
   if [ "$DRY_RUN" = "1" ]; then
     echo "dsh plugin --profile $PROFILE add $REPO_ROOT/plugins/$p"
     ok=$((ok + 1))

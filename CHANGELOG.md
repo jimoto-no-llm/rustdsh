@@ -33,9 +33,21 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   (constraints, decisions, errors, diffs, commands) under a bounded reserve and
   reports a per-category digest, instead of keeping only the head and the newest
   turns.
+- `plugins/rdsh-mobile-ui` is bundled and installed by `./plugins/install.sh`:
+  below 767px the Web chat and composer use the full viewport width, the collapsed
+  sidebar becomes a one-tap logo for the session list, and question cards fit the
+  phone. The rules are adapted from Smart-DSH
+  (<https://github.com/hikarioyama/Smart-DSH>, MIT) and ship only that responsive
+  layout — not Smart-DSH's notifications, Esc handling or task hub. See
+  [README](plugins/rdsh-mobile-ui/README.md).
 
 ### Changed
 
+- `rdsh desktop install` attaches the bundled phone-width Web layout
+  (`rdsh-mobile-ui`, adapted from Smart-DSH, MIT) by default instead of only
+  `rdsh-settings`, so the Desktop profile receives it without an extra flag.
+  `desktop status`, `desktop verify` and `rdsh doctor` report it, and a
+  checkout that predates the plugin skips it instead of failing the attach.
 - Context retrieval expands its search hits with dependency-graph neighbours when
   the index exists, so an excerpt arrives with the files it depends on; without
   an index it degrades to the previous behaviour, and `features.dep_graph=false`

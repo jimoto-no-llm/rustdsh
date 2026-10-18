@@ -41,8 +41,14 @@ macro_rules! err {
 
 /// Reserved profile name owned by the Electron application.
 pub const PROFILE: &str = "desktop";
-/// Bundled rdsh plugins that can be attached to a DSH profile.
-pub const BUNDLED_PLUGINS: &[&str] = &["rdsh-settings", "rdsh-compute"];
+/// Bundled rdsh plugins attached to a DSH profile by default. `rdsh-mobile-ui`
+/// is the phone-width Web layout adapted from Smart-DSH (MIT).
+pub const DEFAULT_BUNDLED_PLUGINS: &[&str] = &["rdsh-settings", "rdsh-mobile-ui"];
+/// Bundled rdsh plugins attached only when the caller passes `--compute`.
+pub const COMPUTE_BUNDLED_PLUGINS: &[&str] = &["rdsh-compute"];
+/// Every bundled rdsh plugin `desktop status`, `desktop verify` and
+/// `rdsh doctor` report, in attach order.
+pub const BUNDLED_PLUGINS: &[&str] = &["rdsh-settings", "rdsh-mobile-ui", "rdsh-compute"];
 /// Product name used by the macOS bundle and the Windows install directory.
 const APP_NAME: &str = "DeepSeek Harness";
 /// Upstream's own refusal text; keeping the intent verbatim keeps the fix obvious.
@@ -386,12 +392,16 @@ fn command_for(cli: &Path) -> Command {
     Command::new(cli)
 }
 
-fn plugin_selection(compute: bool) -> Vec<&'static str> {
+/// Bundled plugins present in the checkout, in attach order: the default set
+/// plus the `--compute` opt-ins. A checkout that predates one of them skips it
+/// instead of handing a missing path to the Desktop command.
+fn plugin_selection(plugins_root: &Path, compute: bool) -> Vec<&'static str> {
+    let mut names = DEFAULT_BUNDLED_PLUGINS.to_vec();
     if compute {
-        BUNDLED_PLUGINS.to_vec()
-    } else {
-        BUNDLED_PLUGINS[..1].to_vec()
+        names.extend_from_slice(COMPUTE_BUNDLED_PLUGINS);
     }
+    names.retain(|name| plugins_root.join(name).join("package.json").is_file());
+    names
 }
 
 fn plugin_json(state: &ProfileState, name: &str) -> serde_json::Value {
@@ -541,7 +551,7 @@ fn desktop_targets(
     let mut root = None;
     if !no_bundled {
         let plugins_root = resolve_plugins_dir(plugins_dir, env)?;
-        for name in plugin_selection(compute) {
+        for name in plugin_selection(&plugins_root, compute) {
             targets.push(Target {
                 label: name.to_string(),
                 // Plugin specs stay slash-separated: Windows path separators
@@ -971,12 +981,29 @@ mod tests {
     }
 
     #[test]
-    fn compute_is_opt_in() {
-        assert_eq!(plugin_selection(false), vec!["rdsh-settings"]);
+    fn mobile_ui_is_attached_by_default_and_compute_stays_opt_in() {
+        let root = temp_root("selection");
+        let plugins = root.join("rustdsh").join("plugins");
+        for name in DEFAULT_BUNDLED_PLUGINS
+            .iter()
+            .chain(COMPUTE_BUNDLED_PLUGINS)
+        {
+            let dir = plugins.join(name);
+            std::fs::create_dir_all(&dir).unwrap();
+            std::fs::write(dir.join("package.json"), format!("{{\"name\":\"{name}\"}}")).unwrap();
+        }
         assert_eq!(
-            plugin_selection(true),
-            vec!["rdsh-settings", "rdsh-compute"]
+            plugin_selection(&plugins, false),
+            vec!["rdsh-settings", "rdsh-mobile-ui"]
         );
+        assert_eq!(
+            plugin_selection(&plugins, true),
+            vec!["rdsh-settings", "rdsh-mobile-ui", "rdsh-compute"]
+        );
+        // A checkout older than the plugin skips it instead of failing the attach.
+        std::fs::remove_dir_all(plugins.join("rdsh-mobile-ui")).unwrap();
+        assert_eq!(plugin_selection(&plugins, false), vec!["rdsh-settings"]);
+        std::fs::remove_dir_all(&root).unwrap();
     }
 
     #[test]

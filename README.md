@@ -338,7 +338,7 @@ rewrites the profile:
 
 ```sh
 rdsh desktop status                 # app, command runtime, profile, plugin state (read-only)
-rdsh desktop install --plugins-dir .   # attach rdsh-settings to the desktop profile
+rdsh desktop install --plugins-dir .   # attach rdsh-settings + rdsh-mobile-ui (phone-width Web layout)
 rdsh desktop install --plugins-dir . --compute   # + the resident compute bridge
 rdsh desktop verify                 # exit nonzero when the profile has no rdsh plugin
 ```
@@ -367,6 +367,13 @@ rdsh --profile web                             # boot web with plugins enabled
 ```
 
 Ports never collide (DSH Web: `3080`, rdsh serve: `38080`).
+
+rdsh bundles only Smart-DSH's phone-width layout, as
+[`plugins/rdsh-mobile-ui`](plugins/rdsh-mobile-ui/README.md) (MIT, adapted from
+Smart-DSH): at 767px and below the chat and composer use the full width and the
+logo opens the session list in one tap. Smart-DSH's notifications, Esc-to-stop,
+task hub and shared-HMR workaround stay upstream — install the upstream bundle
+when you want those.
 
 ## Benchmarks
 
@@ -435,6 +442,20 @@ Thanks to the upstream developers and everyone contributing code, reviews, tests
 - Security reports & review: [GrEarl](https://github.com/GrEarl), [PENTACoXIAN](https://x.com/PENTACoXIAN)
 - Contributions & validation: [StudioYebisu](https://github.com/yebisu0529-ship-it), [RNA4219](https://github.com/RNA4219), [eightman999](https://github.com/eightman999)
 - Ideas & feedback: [@remydre8](https://x.com/remydre8)
+
+Third-party DSH plugins that rdsh uses, adapts or recommends (MIT, by their
+authors):
+
+- [Smart-DSH](https://github.com/hikarioyama/Smart-DSH) by hikarioyama — the
+  phone-width layout bundled as
+  [`rdsh-mobile-ui`](plugins/rdsh-mobile-ui/README.md) and attached by default
+  by `rdsh desktop install` and `./plugins/install.sh`. MIT, upstream revision
+  `86c34f43`; only the responsive layout is taken (see
+  [THIRD_PARTY_NOTICES](plugins/rdsh-mobile-ui/THIRD_PARTY_NOTICES.md))
+- [dsh-sound-notifications](https://github.com/cwd514/dsh-sound-notifications) by
+  cwd514 — opt-in effect sounds and desktop notifications (`SOUND=1`)
+- [dsh-gitview](https://github.com/yugapor/dsh-gitview) by yugapor — optional
+  sidebar Git panel
 
 ## License
 

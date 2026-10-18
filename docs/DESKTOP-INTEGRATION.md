@@ -51,7 +51,7 @@ not attempt to boot a profile the app owns.
 
    ```sh
    rdsh desktop status                     # read-only: app, command, profile, plugins
-   rdsh desktop install --plugins-dir .    # installs rdsh-settings
+   rdsh desktop install --plugins-dir .    # installs rdsh-settings + rdsh-mobile-ui
    rdsh desktop install --plugins-dir . --compute   # also rdsh-compute
    ```
 
@@ -94,8 +94,8 @@ reserved profile); it forwards every package to `rdsh desktop install
 Plugins-page steps instead.
 
 The installers can do this inline: `./install.sh --desktop` and
-`.\install.ps1 -Desktop` attach `rdsh-settings` and `rdsh-compute` after
-installing the launcher. Both are no-ops when no initialized Desktop profile is
+`.\install.ps1 -Desktop` attach `rdsh-settings`, `rdsh-mobile-ui` and
+`rdsh-compute` after installing the launcher. Both are no-ops when no initialized Desktop profile is
 detected, and neither fails the installation.
 
 ## What the plugins give the app
@@ -103,6 +103,7 @@ detected, and neither fails the installation.
 | Plugin | Effect in the app | Gate |
 | --- | --- | --- |
 | `rdsh-settings` | rdsh settings section in the app's settings, Discord Rich Presence, context-engine switches, `rdsh.json` editing | none (default) |
+| `rdsh-mobile-ui` | phone-width Web layout adapted from Smart-DSH (MIT): full-width chat and composer, one-tap logo for the session list | none (default) |
 | `rdsh-compute` | resident `rdsh compute` worker for token estimate/batch/prune through the Web plugin bridge | `rdsh features on compute` (off by default) |
 | recommended upstream packages | `dsh-tool-present`, `dsh-tool-ask-user`, `dsh-skill-office`, `dsh-mcp-client`, and the rest of `plugins/recommended.md` | installed by the same command or the Plugins page |
 

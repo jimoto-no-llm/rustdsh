@@ -22,7 +22,7 @@ async function sandbox(t) {
   const root = await mkdtemp(join(tmpdir(), 'rdsh-desktop-'));
   const home = join(root, 'dsh');
   const checkout = join(root, 'rustdsh');
-  for (const name of ['rdsh-settings', 'rdsh-compute']) {
+  for (const name of ['rdsh-settings', 'rdsh-mobile-ui', 'rdsh-compute']) {
     await mkdir(join(checkout, 'plugins', name), { recursive: true });
     await writeFile(join(checkout, 'plugins', name, 'package.json'), JSON.stringify({ name }));
   }
@@ -89,7 +89,11 @@ test('status is truthful with no Desktop app and no profile', async (t) => {
   assert.equal(status.available, false);
   assert.equal(status.profile.initialized, false);
   assert.equal(status.command.path, null);
-  assert.deepEqual(status.profile.plugins.map((p) => [p.name, p.enabled]), [['rdsh-settings', false], ['rdsh-compute', false]]);
+  assert.deepEqual(status.profile.plugins.map((p) => [p.name, p.enabled]), [
+    ['rdsh-settings', false],
+    ['rdsh-mobile-ui', false],
+    ['rdsh-compute', false],
+  ]);
 });
 
 test('status reports the Desktop command and enabled plugins', async (t) => {
@@ -119,9 +123,11 @@ test('install --dry-run prints the forwarded command and changes nothing', async
   assert.equal(code, 0);
   const report = JSON.parse(stdout);
   assert.equal(report.dry_run, true);
-  assert.equal(report.actions.length, 1);
+  assert.equal(report.actions.length, 2);
   assert.equal(report.actions[0].plugin, 'rdsh-settings');
   assert.deepEqual(report.actions[0].args, ['plugin', '--profile', 'desktop', 'add', join(box.checkout, 'plugins', 'rdsh-settings')]);
+  assert.equal(report.actions[1].plugin, 'rdsh-mobile-ui', 'the bundled phone-width layout is attached by default');
+  assert.deepEqual(report.actions[1].args, ['plugin', '--profile', 'desktop', 'add', join(box.checkout, 'plugins', 'rdsh-mobile-ui')]);
   assert.equal(existsSync(box.log), false, 'the Desktop command must not run on --dry-run');
   assert.equal(await readFile(box.profile, 'utf8'), before);
 });
@@ -134,8 +140,10 @@ test('install forwards to the Desktop command and verify then passes', async (t)
     ...env, DSH_DESKTOP_CLI: command, STUB_LOG: box.log, STUB_PROFILE: box.profile,
   });
   assert.equal(code, 0, stdout);
-  assert.deepEqual(JSON.parse(await readFile(box.log, 'utf8')), [
-    'plugin', '--profile', 'desktop', 'add', join(box.checkout, 'plugins', 'rdsh-settings'),
+  const calls = JSON.parse(`[${(await readFile(box.log, 'utf8')).trim().split('\n').join(',')}]`);
+  assert.deepEqual(calls, [
+    ['plugin', '--profile', 'desktop', 'add', join(box.checkout, 'plugins', 'rdsh-settings')],
+    ['plugin', '--profile', 'desktop', 'add', join(box.checkout, 'plugins', 'rdsh-mobile-ui')],
   ]);
   const verify = await run(['desktop', 'verify', '--json'], { ...env, DSH_DESKTOP_CLI: command });
   assert.equal(verify.code, 0, verify.stderr);
