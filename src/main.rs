@@ -888,14 +888,6 @@ fn invoked_as_dsh() -> bool {
 }
 
 fn main() {
-    #[cfg(unix)]
-    unsafe {
-        // Restore the default SIGPIPE behaviour. Without this a consumer that
-        // closes the pipe early (rdsh doctor | head) makes the next write fail
-        // with EPIPE and aborts the process instead of exiting quietly.
-        libc::signal(libc::SIGPIPE, libc::SIG_DFL);
-    }
-
     if invoked_as_dsh() {
         let raw: Vec<String> = std::env::args().skip(1).collect();
         let first_is_native = raw

@@ -531,16 +531,6 @@ fi
 if "$BIN" search-web "hello world" 2>&1 | grep -q "disabled by default"; then ok "search-web refused while extra off"; else echo "FAIL(output): extras gate"; kill $HTTPSRV 2>/dev/null; exit 1; fi
 "$BIN" settings set extras.enable search-web >/dev/null 2>&1
 if SEARXNG_URL="http://127.0.0.1:$SWB_PORT" "$BIN" search-web "hello world" --limit 5 >"$SWB/search.out" 2>"$SWB/search.err" && grep -q "Alpha result" "$SWB/search.out"; then ok "search-web via fixture"; else echo "FAIL(output): search-web via fixture"; cat "$SWB/search.err" "$SWB/server.err"; kill $HTTPSRV 2>/dev/null; exit 1; fi
-# --- doctor must survive a consumer that closes the pipe early ---
-# Without the default SIGPIPE handling the process aborts (exit 134) here.
-if command -v bash >/dev/null 2>&1; then
-  doctor_pipe_status=$(bash -c '"$1" doctor 2>/dev/null | head -n 1 >/dev/null; echo ${PIPESTATUS[0]}' _ "$BIN")
-  case "$doctor_pipe_status" in
-    0|141) ok "doctor survives a closed pipe" ;;
-    *) echo "FAIL(output): doctor aborted on a closed pipe (exit $doctor_pipe_status)"; exit 1 ;;
-  esac
-fi
-
 kill $HTTPSRV 2>/dev/null
 wait $HTTPSRV 2>/dev/null || true
 rm -rf $SWB
@@ -550,3 +540,15 @@ if [ "${RDSH_REGRESS_SANDBOXED:-}" = 1 ] && [ -n "${RR_SANDBOX:-}" ] && [ "$HOME
 rm -rf $AB
 rm -rf $SB "$RG_TMP/rr-in.txt" "$RG_TMP/rr-out" "$RG_TMP/rr-err"
 echo "ALL PASS ($pass checks)"
+
+# --- the installer must not truncate the doctor report through a closed pipe ---
+# A closed pipe made the process abort (panic on EPIPE with panic=abort), so the
+# installer captures the report and slices it instead. Guard both sides.
+if grep -q 'doctor 2>&1 | head' install.sh; then
+  echo "FAIL(output): install.sh pipes doctor into head again"; exit 1
+fi
+if "$BIN" doctor >"$D/doctor-full.out" 2>"$D/doctor-full.err"; then
+  ok "doctor survives a full report"
+else
+  echo "FAIL(output): doctor exited non-zero with its report fully consumed"; cat "$D/doctor-full.err"; exit 1
+fi
