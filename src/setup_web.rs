@@ -262,6 +262,45 @@ fn handle(
                     Cow::Owned(serde_json::json!({"error": e.to_string()}).to_string()),
                 ),
             },
+            ("GET", "/api/webui") if !req.authorized(token) => (
+                401,
+                "application/json",
+                Cow::Borrowed("{\"error\":\"unauthorized\"}"),
+            ),
+            ("GET", "/api/webui") => (
+                200,
+                "application/json",
+                Cow::Owned(crate::desktop_webui::status(locale).to_json().to_string()),
+            ),
+            ("POST", "/api/webui") if !req.authorized(token) => (
+                401,
+                "application/json",
+                Cow::Borrowed("{\"error\":\"unauthorized\"}"),
+            ),
+            ("POST", "/api/webui") if req.header("content-type") != Some("application/json") => (
+                400,
+                "application/json",
+                Cow::Borrowed("{\"error\":\"JSON required\"}"),
+            ),
+            ("POST", "/api/webui") => match webui_body(&req.body) {
+                Ok(enable) => match crate::desktop_webui::apply(enable, locale) {
+                    Ok(state) => (
+                        200,
+                        "application/json",
+                        Cow::Owned(state.to_json().to_string()),
+                    ),
+                    Err(e) => (
+                        500,
+                        "application/json",
+                        Cow::Owned(serde_json::json!({"error": e.to_string()}).to_string()),
+                    ),
+                },
+                Err(e) => (
+                    400,
+                    "application/json",
+                    Cow::Owned(serde_json::json!({"error": e.to_string()}).to_string()),
+                ),
+            },
             ("GET", "/api/env") if !req.authorized(token) => (
                 401,
                 "application/json",
@@ -335,6 +374,14 @@ fn wizard_action(target: &str, body: &str) -> anyhow::Result<serde_json::Value> 
             Ok(serde_json::json!({"started": true}))
         }
     }
+}
+
+/// The Web UI switch takes one strict boolean: anything else is a client bug.
+fn webui_body(body: &str) -> anyhow::Result<bool> {
+    let v: serde_json::Value = serde_json::from_str(body)?;
+    v.get("enable")
+        .and_then(|x| x.as_bool())
+        .ok_or_else(|| anyhow::anyhow!("enable must be true or false"))
 }
 
 fn store_extras_body(body: &str) -> anyhow::Result<Vec<String>> {
@@ -437,7 +484,7 @@ mod tests {
         let (status, page, _) = get("/", None);
         assert_eq!(status, 200);
         assert!(page.contains("<html lang=\"ja\" data-rdsh-locale=\"ja\">"));
-        for path in ["/api/status", "/api/env", "/api/extras"] {
+        for path in ["/api/status", "/api/env", "/api/extras", "/api/webui"] {
             assert_eq!(get(path, None).0, 401, "{path}");
         }
         for path in [
@@ -446,6 +493,7 @@ mod tests {
             "/api/start",
             "/api/key",
             "/api/done",
+            "/api/webui",
         ] {
             assert_eq!(post(path, "application/json", "{}", false).0, 401, "{path}");
         }
@@ -469,6 +517,27 @@ mod tests {
         let (status, body, _) = get("/api/status", Some(TOKEN));
         assert_eq!(status, 200);
         assert!(serde_json::from_str::<serde_json::Value>(&body).unwrap()["needed"].is_boolean());
+    }
+
+    #[test]
+    fn webui_route_reports_state_and_rejects_a_non_boolean_switch() {
+        let (status, body, _) = get("/api/webui", Some(TOKEN));
+        assert_eq!(status, 200);
+        let state: serde_json::Value = serde_json::from_str(&body).unwrap();
+        for key in ["unit_present", "enabled", "active", "client_present"] {
+            assert!(state[key].is_boolean(), "{key} in {body}");
+        }
+        assert_eq!(post("/api/webui", "text/plain", "{}", true).0, 400);
+        let (status, reply, _) = post("/api/webui", "application/json", "{}", true);
+        assert_eq!(status, 400);
+        assert!(reply.contains("enable"), "{reply}");
+        for body in ["{\"enable\":\"yes\"}", "{\"enable\":1}", "not json"] {
+            assert_eq!(
+                post("/api/webui", "application/json", body, true).0,
+                400,
+                "{body}"
+            );
+        }
     }
 
     #[test]
