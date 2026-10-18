@@ -47,6 +47,11 @@ rdsh swarm --gc-binary /opt/gascity/bin/gc --gc-sha256 <64桁のSHA256> \
 
 `RDSH_GASCITY_BIN`、`RDSH_GASCITY_SHA256`、`RDSH_GASCITY_CITY` も使える。
 `rdsh` はコマンド引数をシェルへ渡さず、Gas Cityの終了コードを反映する。
+検証した実行ファイルはLinuxでは開いたファイル記述子、Windowsでは書換え・削除を
+拒否するハンドルで保持する。macOS等ではユーザー専用一時領域の
+`rdsh-gascity-<uid>-<sha256>/gc` に非公開コピーを保持し、毎回SHA-256を再検証する。
+Gas Cityの後続処理もこのコピーを参照するため、全City停止後にだけ削除する。
+同じOSユーザーの悪意あるプロセスを隔離する仕組みではない。
 Gas City以外のScheduler、task DB、Refineryは作らない。
 
 ### Agent Sandbox Claim

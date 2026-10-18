@@ -8,6 +8,9 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+#[cfg(all(unix, any(test, not(target_os = "linux"))))]
+mod verified_snapshot;
+
 #[derive(Args, Debug)]
 pub struct SwarmOptions {
     /// Absolute path to a fixed Gas City `gc` executable.
@@ -48,22 +51,18 @@ fn command_args(action: SwarmAction, city: &Path) -> Vec<std::ffi::OsString> {
 struct VerifiedBinary {
     // Keep the exact checked file open until the launched process exits.
     _file: File,
-    #[cfg(not(unix))]
+    #[cfg(not(target_os = "linux"))]
     path: PathBuf,
 }
 
 impl VerifiedBinary {
     fn command(&self) -> Command {
-        #[cfg(unix)]
+        #[cfg(target_os = "linux")]
         {
             use std::os::fd::AsRawFd;
-            #[cfg(target_os = "linux")]
-            let directory = "/proc/self/fd";
-            #[cfg(not(target_os = "linux"))]
-            let directory = "/dev/fd";
-            Command::new(format!("{directory}/{}", self._file.as_raw_fd()))
+            Command::new(format!("/proc/self/fd/{}", self._file.as_raw_fd()))
         }
-        #[cfg(not(unix))]
+        #[cfg(not(target_os = "linux"))]
         {
             Command::new(&self.path)
         }
@@ -91,6 +90,19 @@ fn verified_binary(path: &Path, expected: &str) -> Result<VerifiedBinary> {
     let mut file = options
         .open(&canonical)
         .context("Gas City 実行ファイルを読めません")?;
+    #[cfg(all(unix, not(target_os = "linux")))]
+    let (canonical, mut file) = verified_snapshot::prepare(&mut file, expected)?;
+    if !file_digest(&mut file)?.eq_ignore_ascii_case(expected) {
+        bail!("Gas City 実行ファイルの SHA-256 が固定値と一致しません");
+    }
+    Ok(VerifiedBinary {
+        _file: file,
+        #[cfg(not(target_os = "linux"))]
+        path: canonical,
+    })
+}
+
+fn file_digest(file: &mut File) -> Result<String> {
     let mut hasher = Sha256::new();
     let mut buffer = [0_u8; 64 * 1024];
     loop {
@@ -100,19 +112,11 @@ fn verified_binary(path: &Path, expected: &str) -> Result<VerifiedBinary> {
         }
         hasher.update(&buffer[..n]);
     }
-    let actual: String = hasher
+    Ok(hasher
         .finalize()
         .iter()
         .map(|byte| format!("{byte:02x}"))
-        .collect();
-    if !actual.eq_ignore_ascii_case(expected) {
-        bail!("Gas City 実行ファイルの SHA-256 が固定値と一致しません");
-    }
-    Ok(VerifiedBinary {
-        _file: file,
-        #[cfg(not(unix))]
-        path: canonical,
-    })
+        .collect())
 }
 
 pub fn run(options: SwarmOptions, action: SwarmAction) -> Result<i32> {
