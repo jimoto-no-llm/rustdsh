@@ -195,6 +195,45 @@ mod tests {
     }
 
     #[test]
+    fn positional_profile_preserves_prompt() {
+        match split_launcher_args(None, sv(&["headless", "run the tests"])) {
+            Launcher::Boot {
+                profile, app_args, ..
+            } => {
+                assert_eq!(profile, "headless");
+                assert_eq!(app_args, sv(&["run the tests"]));
+            }
+            _ => panic!("expected boot"),
+        }
+    }
+
+    #[test]
+    fn positional_profile_preserves_empty_arguments_and_following_app_flags() {
+        match split_launcher_args(None, sv(&["headless", "", "run", "--resume", "abc"])) {
+            Launcher::Boot {
+                profile, app_args, ..
+            } => {
+                assert_eq!(profile, "headless");
+                assert_eq!(app_args, sv(&["", "run", "--resume", "abc"]));
+            }
+            _ => panic!("expected boot"),
+        }
+    }
+
+    #[test]
+    fn positional_profile_preserves_double_dash_boundary() {
+        match split_launcher_args(None, sv(&["headless", "--", "run the tests"])) {
+            Launcher::Boot {
+                profile, app_args, ..
+            } => {
+                assert_eq!(profile, "headless");
+                assert_eq!(app_args, sv(&["run the tests"]));
+            }
+            _ => panic!("expected boot"),
+        }
+    }
+
+    #[test]
     fn unknown_flag_starts_app_args() {
         match split_launcher_args(Some("tui".into()), sv(&["--resume", "abc"])) {
             Launcher::Boot {
