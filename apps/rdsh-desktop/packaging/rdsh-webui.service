@@ -1,0 +1,15 @@
+[Unit]
+Description=rdsh desktop local Web UI (127.0.0.1 only)
+After=default.target
+
+[Service]
+Type=simple
+Environment=XDG_CACHE_HOME=%h/.cache
+Environment=DSH_HOME=%h/.dsh
+EnvironmentFile=%h/.config/rdsh-desktop/webui.env
+ExecStart=%h/.local/bin/rdsh-desktop --serve-web --port 8790
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target
