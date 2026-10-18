@@ -72,6 +72,32 @@ fn string_field<'a>(value: &'a Value, path: &[&str]) -> Option<&'a str> {
     field(value, path).and_then(Value::as_str)
 }
 
+fn service_address(host: &str, port: &str) -> CloudResult<String> {
+    if host.is_empty()
+        || !host
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-' || b == b':')
+        || port.parse::<u16>().is_err()
+    {
+        return Err(CloudError::new(
+            ErrorKind::Invalid,
+            "invalid Kubernetes service address",
+        ));
+    }
+    let host = if host.contains(':') {
+        let address = host.parse::<std::net::Ipv6Addr>().map_err(|_| {
+            CloudError::new(
+                ErrorKind::Invalid,
+                "invalid Kubernetes IPv6 service address",
+            )
+        })?;
+        format!("[{address}]")
+    } else {
+        host.to_owned()
+    };
+    Ok(format!("https://{host}:{port}"))
+}
+
 impl KubernetesBackend {
     pub fn from_service_account(namespace: String, pool: Option<String>) -> CloudResult<Self> {
         if !dns_name(&namespace) || pool.as_deref().is_some_and(|value| !dns_name(value)) {
@@ -91,17 +117,7 @@ impl KubernetesBackend {
             })?;
             let port =
                 std::env::var("KUBERNETES_SERVICE_PORT_HTTPS").unwrap_or_else(|_| "443".into());
-            if !host
-                .bytes()
-                .all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-' || b == b':')
-                || port.parse::<u16>().is_err()
-            {
-                return Err(CloudError::new(
-                    ErrorKind::Invalid,
-                    "invalid Kubernetes service address",
-                ));
-            }
-            format!("https://{host}:{port}")
+            service_address(&host, &port)?
         };
         let api_server = Url::parse(&server)
             .map_err(|_| CloudError::new(ErrorKind::Invalid, "invalid Kubernetes API URL"))?;

@@ -5,6 +5,10 @@
 !THIRD_PARTY_NOTICES.md
 !build.rs
 !install.sh
+!docker-compose.searxng.yml
+!docker/
+!docker/searxng/
+!docker/searxng/settings.yml
 !src/
 !src/**
 !assets/

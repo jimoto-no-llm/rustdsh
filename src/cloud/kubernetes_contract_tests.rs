@@ -42,6 +42,35 @@ fn pool() -> Value {
         "status":{"readyReplicas":2}})
 }
 
+#[test]
+fn service_urls_support_ipv6_ipv4_and_dns_without_accepting_url_syntax() {
+    for (host, port, expected) in [
+        ("fd00::1", "443", "https://[fd00::1]/"),
+        ("2001:db8::12", "6443", "https://[2001:db8::12]:6443/"),
+        ("10.96.0.1", "443", "https://10.96.0.1/"),
+        (
+            "kubernetes.default.svc",
+            "6443",
+            "https://kubernetes.default.svc:6443/",
+        ),
+    ] {
+        let url = Url::parse(&service_address(host, port).unwrap()).unwrap();
+        assert_eq!(url.as_str(), expected);
+    }
+    for (host, port) in [
+        ("", "443"),
+        ("user@host", "443"),
+        ("host/path", "443"),
+        ("bad::ipv6", "443"),
+        ("::1", "70000"),
+    ] {
+        assert_eq!(
+            service_address(host, port).unwrap_err().kind,
+            ErrorKind::Invalid
+        );
+    }
+}
+
 #[tokio::test]
 async fn capacity_follows_pages_and_excludes_released_claims_without_inventing_usage() {
     let queries = Arc::new(Mutex::new(Vec::new()));

@@ -31,6 +31,17 @@ jobs:
           node-version: 24
       - name: Offline 10000 request burst and failure recovery contracts
         run: node --test scripts/deepinfra-load-test.test.mjs scripts/deepinfra-multimodel-test.test.mjs scripts/deepinfra-burst-10000.test.mjs scripts/deepinfra-burst-transport.test.mjs scripts/deepinfra-burst-journal.test.mjs scripts/cloud-api-burst.test.mjs tests/gascity_dsh_worker.test.mjs
+      - name: Verify worker build context contains embedded inputs
+        if: runner.os == 'Linux'
+        run: |
+          docker build --file - --output "type=local,dest=$RUNNER_TEMP/rdsh-cloud-context" . <<'EOF'
+          FROM scratch
+          COPY Cargo.toml Cargo.lock build.rs install.sh docker-compose.searxng.yml /
+          COPY src /src
+          COPY assets /assets
+          COPY security /security
+          COPY docker/searxng/settings.yml /docker/searxng/settings.yml
+          EOF
 
   plan-runtime-native:
     strategy:
