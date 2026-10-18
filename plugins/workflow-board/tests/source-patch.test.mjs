@@ -46,7 +46,6 @@ function fixture(t, { before = 'started\n', after = 'started\ncompleted\n', newF
 }
 
 const forwardGit = (source, args, input) => spawnSync('git', ['-c', 'core.fsmonitor=false', '-C', source, ...args], { input, encoding: 'utf8', windowsHide: true })
-const writesPatch = args => args[0] === 'apply' && !args.some(arg => ['--check', '--numstat', '--reverse'].includes(arg))
 
 test('checks without writing; applies to a checkout with spaces; repeats with nested new files', t => {
   const f = fixture(t, { newFiles: { 'nested/fixture.yml': 'name: board\n' } })
@@ -158,26 +157,7 @@ test('CRLF text checkout bytes match the pinned Git text blobs', t => {
   assert.equal(prepare(f.source, f).state, 'already-applied')
 })
 
-test('APPLY_FAILED is reported without claiming success or reverting user files', t => {
-  const f = fixture(t)
-  const runGit = (source, args, input) => writesPatch(args) ? { status: 1, stdout: '', stderr: 'fixture write failure' } : forwardGit(source, args, input)
-  assert.throws(() => prepare(f.source, { ...f, apply: true, runGit }), { code: 'APPLY_FAILED' })
-  assert.equal(readFileSync(join(f.source, 'card.txt'), 'utf8'), 'started\n')
-  assert.equal(f.git('status', '--porcelain'), '')
-})
-
-test('VERIFY_FAILED catches post-write edits outside patch context and retains the evidence', t => {
-  const lines = Array.from({ length: 20 }, (_, i) => `line ${i}\n`).join('')
-  const f = fixture(t, { before: lines + 'started\n', after: lines + 'started\ncompleted\n' })
-  const edited = (lines + 'started\ncompleted\n').replace('line 0\n', 'concurrent edit\n')
-  const runGit = (source, args, input) => {
-    const result = forwardGit(source, args, input)
-    if (writesPatch(args) && result.status === 0) writeFileSync(join(source, 'card.txt'), edited)
-    return result
-  }
-  assert.throws(() => prepare(f.source, { ...f, apply: true, runGit }), { code: 'VERIFY_FAILED' })
-  assert.equal(readFileSync(join(f.source, 'card.txt'), 'utf8'), edited)
-})
+// Injected failures are covered in src/workflow_patch.rs.
 
 test('Git ownership protection is retained', t => {
   const f = fixture(t)

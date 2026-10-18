@@ -6,16 +6,17 @@ The patch changes only 18 DSH UI, test, documentation and lockfile paths. Its ba
 
 ## Prepare a compatible source checkout
 
-Node.js 22 or later and Git are required. Select a clean, isolated DSH source checkout at the verified base. For example, clone `sahenjp/deepseek-harness` into a separate directory and detach it at the exact base above. Do not select the global npm package, an installed profile, or another task's checkout. Non-Git package directories are rejected; the tool cannot detect whether a Git checkout is linked to an active installation, so selecting an isolated checkout remains your responsibility.
+A current rdsh build and Git are required. The legacy Node adapter additionally requires Node.js 22 or later. Select a clean, isolated DSH source checkout at the verified base. For example, clone `sahenjp/deepseek-harness` into a separate directory and detach it at the exact base above. Do not select the global npm package, an installed profile, or another task's checkout. Non-Git package directories are rejected; the tool cannot detect whether a Git checkout is linked to an active installation, so selecting an isolated checkout remains your responsibility.
 
 From the rustdsh checkout:
 
 ```sh
-node plugins/workflow-board/source-patch.mjs --source ../dsh-board-source --check
-node plugins/workflow-board/source-patch.mjs --source ../dsh-board-source --apply
+cargo build --locked
+./target/debug/rdsh workflow-board --source ../dsh-board-source --check
+./target/debug/rdsh workflow-board --source ../dsh-board-source --apply
 ```
 
-The same commands work in PowerShell, including through directory links/junctions. Check is the default and writes nothing. Apply requires an explicit source root, the exact base, an intact patch, the matching commit header/file set and a clean working tree. It runs Git's complete-patch check before writing, verifies both the reverse check and every resulting blob, then reports `applied`. Repeated application reports `already-applied` only if all target contents match and there are no unrelated tracked or untracked edits. CRLF text checkouts are compared with Git's LF blob representation without running clean filters. Git's ownership checks are retained, repository fsmonitor commands are disabled, and user whitespace preferences do not alter the checksummed patch. Preflight failures preserve existing files. `APPLY_FAILED` or `VERIFY_FAILED` requires inspecting the source diff before retrying; the tool never resets the checkout to hide a write failure.
+On Windows, use `./target/debug/rdsh.exe`; arguments are identical in PowerShell, including through directory links/junctions. Check is the default and writes nothing. Apply requires an explicit source root, the exact base, an intact patch, the matching commit header/file set and a clean working tree. It runs Git's complete-patch check before writing, verifies both the reverse check and every resulting blob, then reports `applied`. Repeated application reports `already-applied` only if all target contents match and there are no unrelated tracked or untracked edits. CRLF text checkouts are compared with Git's LF blob representation without running clean filters. Git's ownership checks are retained, repository fsmonitor commands are disabled, and user whitespace preferences do not alter the checksummed patch. Preflight failures preserve existing files. `APPLY_FAILED` or `VERIFY_FAILED` requires inspecting the source diff before retrying; the tool never resets the checkout to hide a write failure.
 
 Build the patched DSH source using its normal workspace procedure, then choose explicitly how to install that build. This tool never installs packages, runs build scripts, replaces the installed DSH, changes profiles, or starts/stops tasks. rdsh continues to delegate to the chosen original DSH. An upstream update or different source revision needs a newly reviewed patch; the tool deliberately refuses to guess compatibility.
 
@@ -28,8 +29,12 @@ The UI projection also becomes deterministic for delayed/duplicate records: memb
 ## Validation and current limits
 
 ```sh
+cargo test --locked workflow_patch
+cargo build --locked
 node --test plugins/workflow-board/tests/source-patch.test.mjs
 ```
+
+The Rust implementation lives in `src/workflow_patch.rs`; `source-patch.mjs` retains the Node API and delegates to rdsh. See [the migration notes](../../docs/RUST-MIGRATION.md).
 
 The preparation tests use temporary Git fixtures and require no network, model or profile. CI uses Node 22 on Linux, macOS and Windows. They cover read-only preflight, actual application, nested new files/staged idempotence, paths with spaces, linked CLI entry points, dirty/already-applied edits, exact blobs/CRLF, wrong roots/revisions, checksum/header/scope failures, ownership/fsmonitor protection, whitespace configuration, complete-patch conflicts and injected write/verification failures. Bundle tests compare the real patch header and numstat against the manifest.
 

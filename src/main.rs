@@ -25,13 +25,14 @@ mod token_handoff;
 mod tokens;
 mod tool_security;
 mod websearch;
+mod workflow_patch;
 
 #[derive(Parser, Debug)]
 #[command(
     name = "rdsh",
     version,
     about = "Rust fast launcher for dsh (safe: native fast-paths + passthrough)",
-    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|models|dump-config|boot)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh models                     list the models a profile is missing or names stale\n  rdsh models sync                add them and refresh stale names\n  rdsh models auto                refresh them when the interval elapsed (background)\n  rdsh desktop status             detect the Desktop (Electron) app and its reserved profile\n  rdsh desktop install            attach the bundled rdsh plugins to that profile\n  rdsh --passthrough tui          no slim env; mandatory tool isolation remains\n  rdsh --dry-run tui -- --resume abc   show what would exec"
+    after_help = "USAGE:\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (tokens|prune|search|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|workflow-board|desktop|models|dump-config|boot)\n\nEXAMPLES:\n  rdsh tui                        boot tui profile (slim env ON, delegates to dsh)\n  rdsh --profile web --patch x.yml boot web with overlay\n  rdsh dump-config --profile tui  delegate exact dump to dsh\n  rdsh tokens ./AGENTS.md         estimate input tokens natively\n  rdsh auth --import --provider openai-codex   import only the selected provider\n  rdsh setup                      first-run connect: import, login flow, next steps\n  rdsh search hello --dir .       fast file search without Node\n  rdsh search-web \"rust async\"      web search via SearXNG (no API key)\n  rdsh models                     list the models a profile is missing or names stale\n  rdsh models sync                add them and refresh stale names\n  rdsh models auto                refresh them when the interval elapsed (background)\n  rdsh desktop status             detect the Desktop (Electron) app and its reserved profile\n  rdsh desktop install            attach the bundled rdsh plugins to that profile\n  rdsh --passthrough tui          no slim env; mandatory tool isolation remains\n  rdsh --dry-run tui -- --resume abc   show what would exec"
 )]
 struct Cli {
     /// Explicitly share a project file with isolated model tools (repeatable).
@@ -197,6 +198,20 @@ enum Commands {
         /// Handle one request line then exit (for IPC cost comparison).
         #[arg(long = "once")]
         once: bool,
+    },
+    /// Verify or apply the bundled workflow board patch to an isolated source checkout.
+    #[command(name = "workflow-board")]
+    WorkflowBoard {
+        #[arg(long, required_unless_present = "json_stdin")]
+        source: Option<String>,
+        #[arg(long, conflicts_with = "check")]
+        apply: bool,
+        /// Read-only preflight (the default).
+        #[arg(long)]
+        check: bool,
+        /// JSON adapter protocol for the legacy Node entry point.
+        #[arg(long, hide = true, conflicts_with_all = ["source", "apply", "check"])]
+        json_stdin: bool,
     },
     /// Hook helper for hooks.json: block stdin text matching --deny (exit 2)
     Guard {
@@ -529,7 +544,9 @@ const NATIVE_FIRST: &[&str] = &[
     "logs",
     "guard",
     "compute",
+    "workflow-board",
     "desktop",
+    "deps",
     "auth",
     "setup",
     "search-web",
@@ -668,6 +685,12 @@ fn main() {
         }
         Some(Commands::Bench { n }) => bench(n.unwrap_or(cfg.bench.n)),
         Some(Commands::Compute { once }) => compute::cmd_compute(once),
+        Some(Commands::WorkflowBoard {
+            source,
+            apply,
+            json_stdin,
+            ..
+        }) => workflow_patch::cmd(source, apply, json_stdin),
         Some(Commands::Guard {
             deny,
             policy_file,
@@ -1531,8 +1554,21 @@ mod default_profile_tests {
     }
 
     /// NATIVE_FIRST (used by dsh-shadowed dispatch) and the clap Commands
-    /// enum must never drift apart: a missing name silently delegates a
-    /// native subcommand to dsh instead of running it here.
+    /// enum must never drift apart in either direction: a missing name
+    /// silently delegates a native subcommand to dsh instead of running
+    /// it here, and an unlisted subcommand never reaches this binary when
+    /// shadow-installed as `dsh`.
+    #[test]
+    fn subcommands_are_all_native_first() {
+        use clap::CommandFactory;
+        for sub in Cli::command().get_subcommands() {
+            let name = sub.get_name();
+            assert!(
+                crate::NATIVE_FIRST.contains(&name),
+                "subcommand {name:?} is missing from NATIVE_FIRST and would delegate to dsh"
+            );
+        }
+    }
     #[test]
     fn native_first_matches_subcommands() {
         use clap::error::ErrorKind;

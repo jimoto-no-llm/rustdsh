@@ -6,18 +6,21 @@ patchはDSHのUI・テスト・文書・lockfileの18ファイルだけを変更
 
 ## 対応sourceの準備
 
-Node.js 22以降とGitが必要です。検証済みbaseのcleanな隔離DSH checkoutを選択します。例えば `sahenjp/deepseek-harness` を別ディレクトリへcloneし、上記baseでdetached checkoutします。global npm package、導入済みprofile、他タスクのcheckoutは指定しないでください。Git管理外のpackageディレクトリは拒否しますが、Git checkoutが稼働中の導入先にリンクされているかは検出できません。隔離sourceの選択は利用者が行います。
+現在のrdshビルドとGitが必要です。旧Node入口を使う場合はNode.js 22以降も必要です。検証済みbaseのcleanな隔離DSH checkoutを選択します。例えば `sahenjp/deepseek-harness` を別ディレクトリへcloneし、上記baseでdetached checkoutします。global npm package、導入済みprofile、他タスクのcheckoutは指定しないでください。Git管理外のpackageディレクトリは拒否しますが、Git checkoutが稼働中の導入先にリンクされているかは検出できません。隔離sourceの選択は利用者が行います。
 
-rustdsh checkoutから実行します。PowerShellでも同じコマンドです。
+rustdsh checkoutから実行します。Windowsでは `./target/debug/rdsh.exe` を使います。
 
 ```sh
-node plugins/workflow-board/source-patch.mjs --source ../dsh-board-source --check
-node plugins/workflow-board/source-patch.mjs --source ../dsh-board-source --apply
+cargo build --locked
+./target/debug/rdsh workflow-board --source ../dsh-board-source --check
+./target/debug/rdsh workflow-board --source ../dsh-board-source --apply
 ```
 
 既定は書き込まないcheckです。directory link/junction経由でもCLIを実行できます。applyはsource root・exact base・patch checksum・commit header・18ファイルの一致とcleanな作業ツリーを要求し、patch全体を事前確認してから適用し、reverse checkと全対象blobで検証します。成功時は `applied`、全対象が一致し無関係なtracked/untracked編集がない繰返しだけ `already-applied` を返します。CRLFのtextはclean filterを実行せずGitのLF blobと照合します。Gitの所有者検査を保持し、repository fsmonitorは無効にして、利用者のwhitespace設定によるpatchの変更・誤拒否を防ぎます。事前確認に失敗した既存ファイルは保持します。`APPLY_FAILED`・`VERIFY_FAILED`の場合は再試行前にsource diffを確認してください。書込失敗を隠すresetは行いません。
 
 適用したDSH sourceは通常のworkspace手順でbuildし、そのbuildの導入方法を明示的に選択してください。このツールはpackage導入・build script実行・DSH差替え・profile変更・タスク開始/停止を行いません。rdshは選択した元DSHへ委譲を続けます。上流更新や異なるsource revisionには再検証したpatchが必要で、互換性を推測して適用しません。
+
+検証とGit操作は `src/workflow_patch.rs` に移しました。`source-patch.mjs` はNode APIを維持する互換入口です。[段階的移行の記録](../../docs/RUST-MIGRATION.md)も参照してください。
 
 ## 表示内容と検証
 
@@ -26,6 +29,8 @@ node plugins/workflow-board/source-patch.mjs --source ../dsh-board-source --appl
 表示projectionには、run終了後の遅延member-startを無視する、member outcomeとrun stop reasonは最初の記録を保持する、run終了時にoutcome未記録のmemberをinterruptedと表示する変更も含みます。遅れて届いた最初のmember outcomeで、そのmemberの状態は確定できます。既存run panelとboardに共通するrenderer/reducerの変更で、実行エンジンと永続イベント記録は変更しません。
 
 ```sh
+cargo test --locked workflow_patch
+cargo build --locked
 node --test plugins/workflow-board/tests/source-patch.test.mjs
 ```
 
