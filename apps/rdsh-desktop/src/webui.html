@@ -44,6 +44,50 @@
   }
   .brand { font-size: 13px; font-weight: 600; letter-spacing: .01em; }
   .status { margin-top: 4px; font-size: 11px; line-height: 16px; color: var(--label-3); }
+
+  /* head row: SSE state + context gauge */
+  .status-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+  .sse { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; line-height: 16px; color: var(--label-2); }
+  .sse-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--label-3); }
+  .sse-connected .sse-dot { background: #1a7f37; }
+  .sse-reconnecting .sse-dot { background: #b26a00; }
+  .sse-connecting .sse-dot { background: var(--label-3); }
+  .sse-reconnecting .sse-dot { animation: pulse 1.2s ease-in-out infinite; }
+
+  /* gauges (context, runs, updates) */
+  .gauge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    font-size: 11px;
+    line-height: 16px;
+    color: var(--label-2);
+  }
+  .gauge.hidden { display: none; }
+  .gauge-track {
+    display: block;
+    flex: 1 1 52px;
+    min-width: 36px;
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, .08);
+    overflow: hidden;
+  }
+  .gauge-fill {
+    display: block;
+    width: 0;
+    height: 100%;
+    border-radius: 999px;
+    background: var(--accent);
+    transition: width .25s ease;
+  }
+  .gauge.ok .gauge-fill { background: var(--accent); }
+  .gauge.warn .gauge-fill { background: #d98a00; }
+  .gauge.danger .gauge-fill { background: #c02b2b; }
+  .gauge-label { flex: none; font-variant-numeric: tabular-nums; }
+  .gauge-note { flex: none; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--label-3); }
+
   .groups { flex: 1; overflow-y: auto; padding: 8px 8px 16px; }
   .group { margin-bottom: 10px; }
   .group-label {
@@ -72,12 +116,26 @@
   }
   .session:hover { background: rgba(0, 0, 0, .04); }
   .session.selected { background: var(--user-bubble); color: var(--accent); }
+  .session-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
   .session .title {
     flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  /* 2px context bar under a session title; the row already carries the text. */
+  .session-bar {
+    display: block;
+    width: 100%;
+    height: 2px;
+    border-radius: 1px;
+    background: rgba(0, 0, 0, .08);
+    overflow: hidden;
+  }
+  .session-bar-fill { display: block; height: 100%; border-radius: 1px; background: var(--accent); }
+  .session-bar.ok .session-bar-fill { background: var(--accent); }
+  .session-bar.warn .session-bar-fill { background: #d98a00; }
+  .session-bar.danger .session-bar-fill { background: #c02b2b; }
   .dot {
     flex: none;
     width: 6px;
@@ -92,6 +150,42 @@
   .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   .timeline { flex: 1; overflow-y: auto; padding: 24px 0; }
   .column { max-width: 920px; margin: 0 auto; padding: 0 24px; }
+
+  /* run progress: pinned to the top of the timeline while a run is live */
+  .run-progress {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 16px;
+    padding: 4px 0;
+    background: var(--page);
+    font-size: 11px;
+    line-height: 16px;
+    color: var(--label-2);
+  }
+  .run-progress.hidden { display: none; }
+  .run-progress .gauge-track { flex: 1 1 auto; min-width: 0; height: 4px; }
+  .run-label { flex: none; }
+  .run-count { flex: none; font-variant-numeric: tabular-nums; color: var(--label-3); }
+
+  /* indeterminate sweep, used by the run and update gauges */
+  .bar-indeterminate { position: relative; }
+  .bar-indeterminate .gauge-fill {
+    width: 38%;
+    background: var(--accent);
+    transition: none;
+    animation: indeterminate 1.15s ease-in-out infinite;
+  }
+  @keyframes indeterminate {
+    0% { transform: translateX(-105%); }
+    100% { transform: translateX(275%); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bar-indeterminate .gauge-fill { animation-duration: 2.6s; }
+  }
 
   .row { display: flex; margin-bottom: 18px; }
   .row.user { justify-content: flex-end; }
@@ -310,6 +404,17 @@
   .button:hover { background: #f4f6f8; }
   .button.primary { border-color: var(--accent); background: var(--accent); color: #fff; }
   .button.primary:hover { background: #3568d4; }
+  .button:disabled { cursor: default; opacity: .65; }
+  .button:disabled:hover { background: #fff; }
+  .button.primary:disabled:hover { background: var(--accent); }
+
+  /* update action: gauge + elapsed while the update runs */
+  .update-progress { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+  .update-progress.hidden { display: none; }
+  .update-progress .gauge-track { width: 100%; flex: none; }
+  .update-status { font-size: 11px; line-height: 16px; color: var(--label-2); }
+  .update-status.ok { color: #1a7f37; }
+  .update-status.failed { color: #c02b2b; }
 
   /* composer */
   .composer { border-top: 1px solid var(--hairline); background: var(--page); padding: 12px 0 16px; }
@@ -368,21 +473,54 @@
     <div class="sidebar-head">
       <div class="brand">rdsh ローカル UI</div>
       <div class="status" id="status">接続しています…</div>
+      <div class="status-row" id="status-row">
+        <span class="sse sse-connecting" id="sse-state" title="イベントストリーム (SSE) の接続状態">
+          <span class="sse-dot" aria-hidden="true"></span><span id="sse-label">接続待ち</span>
+        </span>
+        <span class="gauge hidden" id="ctx-gauge" role="progressbar" aria-valuemin="0" aria-valuemax="100"
+          aria-valuenow="0" aria-valuetext="コンテキスト使用率 0%"
+          title="選択中の会話が使っているコンテキスト窓の割合">
+          <span class="gauge-track" aria-hidden="true"><span class="gauge-fill" id="ctx-fill"></span></span>
+          <span class="gauge-label" id="ctx-pct">0%</span>
+          <span class="gauge-note" id="ctx-tokens" title="入力トークン / 出力トークン"></span>
+        </span>
+      </div>
       <span class="chip hidden" id="update-badge" title="ハーネスの更新">更新: —</span>
     </div>
     <div class="groups" id="groups"></div>
   </aside>
 
   <main class="main">
+    <!-- class="banner update-notice" must stay immediately followed by
+         id="update-notice": web.rs string-replaces that pair to add .show. -->
     <div class="banner update-notice" id="update-notice">
       <div class="banner-title" id="update-notice-title"></div>
       <div class="banner-body" id="update-notice-body"></div>
+      <div class="update-progress hidden" id="update-progress">
+        <span class="gauge bar-indeterminate ok" id="update-gauge" role="progressbar"
+          aria-valuetext="dsh を更新しています"
+          title="dsh の更新コマンドの実行状況">
+          <span class="gauge-track" aria-hidden="true"><span class="gauge-fill" id="update-fill"></span></span>
+        </span>
+        <span class="update-status" id="update-status" role="status" aria-live="polite"></span>
+      </div>
       <div class="banner-actions">
+        <button class="button primary hidden" id="update-run" title="dsh の更新を今すぐ実行します">更新する</button>
+        <button class="button hidden" id="update-details" aria-expanded="false">詳細</button>
         <button class="button" id="update-notice-close">閉じる</button>
       </div>
+      <div class="banner-body hidden" id="update-details-body"></div>
     </div>
     <div class="timeline" id="timeline">
       <div class="column">
+        <div class="run-progress hidden" id="run-progress" role="status" aria-live="polite"
+          title="実行中のターンの進行状況">
+          <span class="run-label" id="run-label">実行中</span>
+          <span class="gauge bar-indeterminate ok" id="run-gauge" role="progressbar" aria-valuetext="実行中">
+            <span class="gauge-track" aria-hidden="true"><span class="gauge-fill" id="run-fill"></span></span>
+          </span>
+          <span class="run-count" id="run-count"></span>
+        </div>
         <div class="banner" id="banner">
           <div class="banner-title" id="banner-title"></div>
           <div class="banner-body" id="banner-body"></div>
@@ -433,6 +571,17 @@
   // Which reasoning rows the user opened, keyed by "session#index". It lives
   // outside the message list so a state frame rebuild keeps the toggle.
   var reasoningOpen = {};
+  // Live SSE link state: "connecting" | "connected" | "reconnecting".
+  var sseStatus = "connecting";
+  // Update run: true while the POST is in flight, plus its elapsed counter.
+  var updateRunning = false;
+  var updateStartedAt = 0;
+  var updateTimer = null;
+  var updateResult = null;
+  var updateResultText = "";
+  // Parsed context percentages, memoised per display string.
+  var contextCache = {};
+  var tokensCache = {};
 
   var el = function (id) { return document.getElementById(id); };
   var timeline = el("timeline");
@@ -452,10 +601,37 @@
   var updateNoticeBody = el("update-notice-body");
   var updateNotified = false;
   var updateDismissed = false;
+  var updateRunButton = el("update-run");
+  var updateDetailsButton = el("update-details");
+  var updateDetailsBody = el("update-details-body");
+  var updateProgress = el("update-progress");
+  var updateGauge = el("update-gauge");
+  var updateStatus = el("update-status");
+  var sseState = el("sse-state");
+  var sseLabel = el("sse-label");
+  var statusRow = el("status-row");
+  var ctxGauge = el("ctx-gauge");
+  var ctxFill = el("ctx-fill");
+  var ctxPct = el("ctx-pct");
+  var ctxTokens = el("ctx-tokens");
+  var runProgress = el("run-progress");
+  var runGauge = el("run-gauge");
+  var runLabel = el("run-label");
+  var runCount = el("run-count");
+
   el("update-notice-close").onclick = function () {
     updateDismissed = true;
     updateNotice.classList.remove("show");
   };
+  // Details only expand the body text the server already rendered; the notice
+  // keeps the same close behaviour it had before this row existed.
+  updateDetailsButton.onclick = function () {
+    var open = !updateDetailsBody.classList.contains("hidden");
+    updateDetailsBody.classList.toggle("hidden", open);
+    updateDetailsButton.setAttribute("aria-expanded", open ? "false" : "true");
+    updateDetailsButton.textContent = open ? "詳細" : "詳細を閉じる";
+  };
+  updateRunButton.onclick = startUpdateRun;
   var picker = el("model-picker");
   var cancelButton = el("cancel");
   var sendButton = el("send");
@@ -483,10 +659,170 @@
     return timeline.scrollHeight - timeline.scrollTop - timeline.clientHeight < 140;
   }
 
+  // ---- gauges ------------------------------------------------------------
+
+  function selectedSession() {
+    var target = state && state.selected;
+    if (!target) { return null; }
+    var groups = state.groups || [];
+    for (var g = 0; g < groups.length; g += 1) {
+      var sessions = groups[g].sessions || [];
+      for (var s = 0; s < sessions.length; s += 1) {
+        if (sessions[s].id === target) { return sessions[s]; }
+      }
+    }
+    return null;
+  }
+
+  // Empty context and token values hide both pieces, leaving no gap.
+  function renderContext() {
+    var info = contextInfo(selectedSession());
+    if (!info) {
+      ctxGauge.classList.add("hidden");
+      return;
+    }
+    ctxGauge.classList.remove("hidden");
+    ctxFill.style.width = info.percent + "%";
+    paintGauge(ctxGauge, info.percent);
+    gaugeAria(ctxGauge, true, info.percent);
+    ctxPct.textContent = info.percent + "%";
+    if (info.tokens) {
+      ctxTokens.textContent = info.tokens;
+      ctxTokens.classList.remove("hidden");
+    } else {
+      ctxTokens.textContent = "";
+      ctxTokens.classList.add("hidden");
+    }
+  }
+
+  function renderSse() {
+    sseState.classList.remove("sse-connecting", "sse-connected", "sse-reconnecting");
+    sseState.classList.add("sse-" + sseStatus);
+    sseLabel.textContent = sseStatus === "connected"
+      ? "接続中"
+      : (sseStatus === "reconnecting" ? "再接続中…" : "接続待ち");
+  }
+
+  function renderRun() {
+    var running = !!(state && state.running) || !!(state && state.streaming);
+    if (!running) {
+      runProgress.classList.add("hidden");
+      return;
+    }
+    var numbers = runNumbers(state);
+    runProgress.classList.remove("hidden");
+    if (numbers) {
+      runGauge.classList.remove("bar-indeterminate");
+      runGauge.setAttribute("aria-valuemin", "0");
+      runGauge.setAttribute("aria-valuemax", String(numbers.total));
+      runGauge.setAttribute("aria-valuenow", String(numbers.done));
+      runGauge.setAttribute("aria-valuetext", "実行中 " + numbers.done + " / " + numbers.total);
+      runLabel.textContent = "実行中 " + numbers.percent + "%";
+      runCount.textContent = numbers.done + " / " + numbers.total;
+      paintGauge(runGauge, numbers.percent);
+    } else {
+      runGauge.classList.add("bar-indeterminate");
+      runGauge.removeAttribute("aria-valuemin");
+      runGauge.removeAttribute("aria-valuemax");
+      runGauge.removeAttribute("aria-valuenow");
+      runGauge.setAttribute("aria-valuetext", "実行中");
+      runLabel.textContent = "実行中";
+      runCount.textContent = "";
+      paintGauge(runGauge, 0);
+    }
+  }
+
+  function elapsedText() {
+    var seconds = Math.max(0, Math.floor((Date.now() - updateStartedAt) / 1000));
+    return seconds + " 秒経過";
+  }
+
+  function stopUpdateTimer() {
+    if (updateTimer) {
+      clearInterval(updateTimer);
+      updateTimer = null;
+    }
+  }
+
+  function renderUpdateNotice() {
+    var update = state && state.update;
+    var available = !!(update && update.available);
+    updateRunButton.classList.toggle("hidden", !available);
+    updateDetailsButton.classList.toggle("hidden", !available);
+    if (!available) {
+      updateDetailsBody.classList.add("hidden");
+      return;
+    }
+    if (update.details) {
+      updateDetailsBody.textContent = update.details;
+    }
+    var detail = [];
+    if (update.command) { detail.push("コマンド: " + update.command); }
+    if (update.newest) { detail.push("最新: dsh " + update.newest); }
+    if (update.active) { detail.push("現在: dsh " + update.active); }
+    updateDetailsButton.title = detail.join(" / ");
+    if (updateRunning || update.running) {
+      updateRunButton.disabled = true;
+      updateRunButton.textContent = "更新中…";
+      updateProgress.classList.remove("hidden");
+      updateGauge.classList.add("bar-indeterminate", "ok");
+      updateStatus.classList.remove("ok", "failed");
+      updateStatus.textContent = updateRunning ? "更新しています… " + elapsedText() : "更新しています…";
+      return;
+    }
+    updateRunButton.disabled = false;
+    updateRunButton.textContent = updateResult === "ok"
+      ? "もう一度更新"
+      : (updateResult === "failed" ? "再試行" : "更新する");
+    if (updateResult) {
+      updateProgress.classList.remove("hidden");
+      updateGauge.classList.remove("bar-indeterminate");
+      updateStatus.classList.add(updateResult === "ok" ? "ok" : "failed");
+      updateStatus.textContent = (updateResult === "ok" ? "更新しました: " : "更新に失敗しました: ")
+        + updateResultText;
+      return;
+    }
+    updateProgress.classList.add("hidden");
+  }
+
+  function startUpdateRun() {
+    if (updateRunning) { return; }
+    updateRunning = true;
+    updateResult = null;
+    updateResultText = "";
+    updateStartedAt = Date.now();
+    stopUpdateTimer();
+    updateTimer = setInterval(function () {
+      if (!updateRunning) { stopUpdateTimer(); return; }
+      updateStatus.textContent = "更新しています… " + elapsedText();
+    }, 1000);
+    updateRunButton.disabled = true;
+    renderUpdateNotice();
+    api("/api/rdsh-update/dsh/run", {})
+      .then(function (value) {
+        updateResult = value && value.ok ? "ok" : "failed";
+        updateResultText = (value && value.message) || (updateResult === "ok" ? "完了" : "サーバーが理由を返しませんでした");
+      })
+      .catch(function (error) {
+        updateResult = "failed";
+        updateResultText = String((error && error.message) || error);
+      })
+      .then(function () {
+        updateRunning = false;
+        stopUpdateTimer();
+        renderUpdateNotice();
+        refresh();
+      });
+  }
+
   function render() {
     if (!state) { return; }
     var stick = nearBottom();
     statusBox.textContent = state.status || "";
+    renderSse();
+    renderContext();
+    renderRun();
+    renderUpdateNotice();
     if (state.update && state.update.available) {
       updateBadge.textContent = "dsh " + state.update.newest + " が利用可能";
       updateBadge.classList.remove("hidden");
@@ -548,6 +884,80 @@
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
+  }
+
+  // ---- gauge helpers (pure; no DOM) --------------------------------------
+
+  // The server sends context and tokens as display strings ("ctx 21%",
+  // "198k in / 45k out"). Parsing is defensive: anything that is not a
+  // percentage inside 0..100 reads as null, which hides the gauge.
+  function parsePercent(text) {
+    if (typeof text === "number") {
+      return Number.isFinite(text) && text >= 0 && text <= 100 ? Math.round(text) : null;
+    }
+    if (typeof text !== "string") { return null; }
+    var hit = /(\d{1,3})\s*%/.exec(text);
+    if (!hit) { return null; }
+    var value = Number(hit[1]);
+    return value >= 0 && value <= 100 ? value : null;
+  }
+
+  // Colour steps: under 50% is the neutral accent, 50-79% amber, 80%+ red.
+  function gaugeStep(percent) {
+    if (typeof percent !== "number" || !Number.isFinite(percent)) { return "ok"; }
+    if (percent >= 80) { return "danger"; }
+    if (percent >= 50) { return "warn"; }
+    return "ok";
+  }
+
+  function cachedParse(cache, text) {
+    var key = typeof text === "string" ? text : "";
+    if (!Object.prototype.hasOwnProperty.call(cache, key)) {
+      cache[key] = parsePercent(key);
+    }
+    return cache[key];
+  }
+
+  // Percent for the selected session plus the display text around it.
+  function contextInfo(session) {
+    if (!session) { return null; }
+    var percent = cachedParse(contextCache, session.context);
+    if (percent === null) { return null; }
+    return {
+      percent: percent,
+      tokens: typeof session.tokens === "string" ? session.tokens : "",
+    };
+  }
+
+  // Run progress numbers, when the state carries them. The page accepts a
+  // couple of shapes so a richer state frame becomes a determinate bar with
+  // no further change here; anything else stays indeterminate.
+  function runNumbers(value) {
+    if (!value) { return null; }
+    var source = value.progress && typeof value.progress === "object" ? value.progress : value;
+    var done = Number(source.done);
+    var total = Number(source.total);
+    if (!Number.isFinite(done) || !Number.isFinite(total) || total <= 0 || done < 0) {
+      return null;
+    }
+    done = Math.min(done, total);
+    return { done: done, total: total, percent: Math.round((done / total) * 100) };
+  }
+
+  function gaugeAria(node, active, percent) {
+    if (active) {
+      node.setAttribute("aria-valuenow", String(percent));
+      node.setAttribute("aria-valuetext", "コンテキスト使用率 " + percent + "%");
+    } else {
+      node.removeAttribute("aria-valuenow");
+    }
+  }
+
+  function paintGauge(node, percent) {
+    var step = gaugeStep(percent);
+    node.classList.remove("ok", "warn", "danger");
+    node.classList.add(step);
+    return step;
   }
 
   // __MD_BEGIN__
@@ -973,8 +1383,16 @@
         var selected = state.selected === session.id ? " selected" : "";
         var dot = session.running ? '<span class="dot" title="実行中"></span>' : "";
         var title = escapeHtml(session.title || session.id);
-        html += '<button class="session' + selected + '" data-session="' + escapeHtml(session.id) + '">'
-          + dot + '<span class="title">' + title + "</span></button>";
+        // The row text already states the context value, so the bar itself is
+        // decorative and hidden from assistive technology.
+        var percent = cachedParse(contextCache, session.context);
+        var bar = percent === null
+          ? ""
+          : '<span class="session-bar ' + gaugeStep(percent) + '" aria-hidden="true">'
+            + '<span class="session-bar-fill" style="width:' + percent + '%"></span></span>';
+        html += '<button class="session' + selected + '" data-session="' + escapeHtml(session.id) + '"'
+          + ' title="' + escapeHtml((session.title || session.id) + (session.context ? " · " + session.context : "")) + '">'
+          + dot + '<span class="session-text"><span class="title">' + title + "</span>" + bar + "</span></button>";
       });
       html += "</div>";
     });
@@ -1230,6 +1648,10 @@
 
   function connect() {
     var source = new EventSource("/api/events?token=" + encodeURIComponent(TOKEN));
+    source.onopen = function () {
+      sseStatus = "connected";
+      renderSse();
+    };
     source.addEventListener("state", function (event) {
       applyState(JSON.parse(event.data));
     });
@@ -1272,6 +1694,8 @@
     });
     source.addEventListener("error", function () {
       // EventSource reconnects by itself; the state frame re-syncs us.
+      sseStatus = "reconnecting";
+      renderSse();
       hint.textContent = "イベント接続を再接続しています…";
     });
   }
