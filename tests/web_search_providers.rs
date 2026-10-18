@@ -192,3 +192,28 @@ fn default_searxng_is_unchanged_by_an_ambient_ollama_key() {
         serde_json::json!({"query":"hello world","engine":base,"results":[{"title":"Alpha","url":"https://example.invalid/a","content":"A & B"}]})
     );
 }
+
+#[test]
+fn auto_start_is_advertised_and_a_remote_base_starts_nothing() {
+    let fixture = Fixture::new(true);
+    for language in ["en", "zh-CN", "ja"] {
+        let output = fixture.command(language, &["--help"]).output().unwrap();
+        assert!(output.status.success(), "{output:?}");
+        let help = String::from_utf8(output.stdout).unwrap();
+        assert!(help.contains("--auto-start"), "{help}");
+    }
+    // A non-loopback endpoint is never served by a local container: the run
+    // reports the connection failure instead of looking for a compose file.
+    for language in ["en", "ja"] {
+        let output = fixture
+            .command(language, &["query", "--auto-start"])
+            .env("SEARXNG_URL", "http://searx.example.invalid:8888")
+            .env("RDSH_SEARXNG_COMPOSE_FILE", fixture.0.join("missing.yml"))
+            .output()
+            .unwrap();
+        let error = failed(output);
+        assert!(!error.contains("panic"), "{error}");
+        assert!(!error.contains("container runtime"), "{error}");
+        assert!(!error.contains("コンテナランタイム"), "{error}");
+    }
+}

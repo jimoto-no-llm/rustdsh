@@ -13,13 +13,13 @@ pub enum Provider {
 
 pub fn help(locale: crate::locale::Locale) -> &'static str {
     match locale {
-        crate::locale::Locale::English => "Enable: rdsh features on search-web\nOllama: set OLLAMA_API_KEY, then use --provider ollama (up to 10 results).\nWeb Search API service guide: Tavily https://www.tavily.com/\nTavily quickstart: https://docs.tavily.com/documentation/quickstart\nBuilt-in providers: searxng, ollama. Tavily is a service reference.\nDocs: https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/WEB-SEARCH.md",
-        crate::locale::Locale::Chinese => "启用：rdsh features on search-web\nOllama：设置 OLLAMA_API_KEY 后使用 --provider ollama（最多10条结果）。\nWeb Search API 服务指南：Tavily https://www.tavily.com/\nTavily 入门：https://docs.tavily.com/documentation/quickstart\n内置提供方：searxng、ollama。Tavily 为服务介绍。\n文档：https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/WEB-SEARCH.md",
-        crate::locale::Locale::Japanese => "有効化: rdsh features on search-web\nOllama: OLLAMA_API_KEY を設定し --provider ollama を指定（最大10件）。\nWeb Search API サービスの案内: Tavily https://www.tavily.com/\nTavily 入門: https://docs.tavily.com/documentation/quickstart\n組み込み検索先: searxng、ollama。Tavily はサービスの紹介です。\n利用手順: https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/WEB-SEARCH.md",
+        crate::locale::Locale::English => "Enable: rdsh features on search-web\nOllama: set OLLAMA_API_KEY, then use --provider ollama (up to 10 results).\nWeb Search API service guide: Tavily https://www.tavily.com/\nTavily quickstart: https://docs.tavily.com/documentation/quickstart\nBuilt-in providers: searxng, ollama. Tavily is a service reference.\nSearXNG down? --auto-start runs docker-compose.searxng.yml (loopback only).\nDocs: https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/WEB-SEARCH.md",
+        crate::locale::Locale::Chinese => "启用：rdsh features on search-web\nOllama：设置 OLLAMA_API_KEY 后使用 --provider ollama（最多10条结果）。\nWeb Search API 服务指南：Tavily https://www.tavily.com/\nTavily 入门：https://docs.tavily.com/documentation/quickstart\n内置提供方：searxng、ollama。Tavily 为服务介绍。\nSearXNG 未启动时：--auto-start 会运行 docker-compose.searxng.yml（仅回环地址）。\n文档：https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/WEB-SEARCH.md",
+        crate::locale::Locale::Japanese => "有効化: rdsh features on search-web\nOllama: OLLAMA_API_KEY を設定し --provider ollama を指定（最大10件）。\nWeb Search API サービスの案内: Tavily https://www.tavily.com/\nTavily 入門: https://docs.tavily.com/documentation/quickstart\n組み込み検索先: searxng、ollama。Tavily はサービスの紹介です。\nSearXNG が停止中: --auto-start が docker-compose.searxng.yml を起動します（ループバック限定）。\n利用手順: https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/WEB-SEARCH.md",
     }
 }
 
-fn default_base() -> String {
+pub(crate) fn default_base() -> String {
     match std::env::var("SEARXNG_URL") {
         Ok(s) => {
             let s = s.trim_end_matches('/').to_string();
@@ -57,7 +57,10 @@ fn encode_query(s: &str) -> String {
 }
 
 /// Split an `http://host[:port][/prefix]` base URL.
-fn split_base(base: &str, locale: crate::locale::Locale) -> anyhow::Result<(String, u16, String)> {
+pub(crate) fn split_base(
+    base: &str,
+    locale: crate::locale::Locale,
+) -> anyhow::Result<(String, u16, String)> {
     // The configured endpoint is a human-selected capability, not a URL from
     // search results. Preserve remote instances, but never interpolate request
     // separators, userinfo, queries, or fragments into the HTTP request.
@@ -134,7 +137,7 @@ fn split_base(base: &str, locale: crate::locale::Locale) -> anyhow::Result<(Stri
 
 /// Loopback check for the SearXNG warning: 127/8, ::1 and localhost names.
 /// Bracketed IPv6 literals (as kept by split_base) are unwrapped first.
-fn is_loopback_host(host: &str) -> bool {
+pub(crate) fn is_loopback_host(host: &str) -> bool {
     let h = host
         .strip_prefix('[')
         .and_then(|s| s.strip_suffix(']'))
@@ -500,11 +503,24 @@ pub fn cmd_search_web(
     limit: usize,
     json: bool,
     provider: Provider,
+    auto_start: bool,
     locale: crate::locale::Locale,
 ) -> anyhow::Result<()> {
     let (base, hits) = match provider {
         Provider::Searxng => {
             let base = default_base();
+            // Opt-in only: the search still runs (and reports its own
+            // connection error) when a container cannot be started, except for
+            // the explicit --auto-start failures below, which say why.
+            if auto_start {
+                let outcome = crate::searxng::ensure_running(&base, true, locale);
+                if let Some(notice) = outcome.notice(&base, locale) {
+                    eprintln!("{notice}");
+                }
+                if let Some(failure) = outcome.start_failure(&base, locale) {
+                    anyhow::bail!("{failure}");
+                }
+            }
             let hits = fetch(&base, query, locale)?;
             (base, hits)
         }

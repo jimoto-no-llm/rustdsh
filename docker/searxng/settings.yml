@@ -1,0 +1,21 @@
+# Minimal SearXNG settings for the rdsh compose service.
+#
+# SearXNG fills every unset key from its own defaults, so only the deltas live
+# here. `json` is enabled so scripts and other clients can use the API;
+# `rdsh search-web` itself reads the HTML page and needs no API key.
+use_default_settings: true
+
+general:
+  instance_name: "rdsh local SearXNG"
+
+search:
+  safe_search: 0
+  formats:
+    - html
+    - json
+
+server:
+  # Replace this before exposing the instance beyond loopback.
+  secret_key: "rdsh-local-searxng-change-this-secret-key"
+  limiter: false
+  image_proxy: false

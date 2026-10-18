@@ -311,7 +311,7 @@ rdsh settings get extras.enable
 | Extra | Command | Notes |
 | --- | --- | --- |
 | `serve` | `rdsh serve` (default :38080) | Local status page, localhost only, per-launch key. |
-| `search-web` | `rdsh search-web "query" --limit 5` | SearXNG by default; `--provider ollama` uses `OLLAMA_API_KEY`. See [Web search](docs/WEB-SEARCH.md). |
+| `search-web` | `rdsh search-web "query" --limit 5` | SearXNG by default; `--provider ollama` uses `OLLAMA_API_KEY`; `--auto-start` starts the bundled local SearXNG compose service. See [Web search](docs/WEB-SEARCH.md). |
 
 To connect an OpenAI-compatible endpoint that dsh does not ship (HAI, Command Code, Sarashina, a home llama.cpp / vLLM / LM Studio / Ollama server), add it as a profile route:
 
