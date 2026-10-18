@@ -48,6 +48,15 @@ test('swarm refuses a mismatched artifact before launching it', t => {
   assert.match(result.stderr, /SHA-256/);
 });
 
+test('swarm and rustxng keep their own localized start and stop descriptions', t => {
+  const {env} = fixture(t);
+  for (const [command, expected] of [['swarm', /Gas Cityを起動/], ['rustxng', /サイドカーを起動/]]) {
+    const result = spawnSync(binary, ['--language', 'ja', command, '--help'], {env, encoding: 'utf8'});
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, expected);
+  }
+});
+
 test('cloud fake completes 10000 correlated execution results and releases every lease', t => {
   const {env} = fixture(t);
   const result = run(['cloud', '--backend', 'fake', 'load-test', '--jobs', '10000'], env);

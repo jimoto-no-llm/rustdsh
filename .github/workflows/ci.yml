@@ -30,7 +30,7 @@ jobs:
         with:
           node-version: 24
       - name: Offline 10000 request burst and failure recovery contracts
-        run: node --test scripts/deepinfra-load-test.test.mjs scripts/deepinfra-multimodel-test.test.mjs scripts/deepinfra-burst-10000.test.mjs scripts/deepinfra-burst-transport.test.mjs scripts/deepinfra-burst-journal.test.mjs scripts/cloud-api-burst.test.mjs
+        run: node --test scripts/deepinfra-load-test.test.mjs scripts/deepinfra-multimodel-test.test.mjs scripts/deepinfra-burst-10000.test.mjs scripts/deepinfra-burst-transport.test.mjs scripts/deepinfra-burst-journal.test.mjs scripts/cloud-api-burst.test.mjs tests/gascity_dsh_worker.test.mjs
 
   plan-runtime-native:
     strategy:

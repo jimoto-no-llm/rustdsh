@@ -5,6 +5,10 @@
 `SandboxClaim` を操作する独立した入口である。両者を同じジョブへ同時に
 dispatch しない。Gas City の Agent Sandbox Runtime Provider 接続は未実装。
 
+ローカルでは、Gas City → rdsh → DSH → 実モデルの10ジョブを検証済み。
+導入済み環境の操作と結果は[ローカルSwarm](LOCAL-SWARM.md)を参照。
+後述のmock試験は以前の試験記録として残している。
+
 ## 固定した調査対象と再利用判断
 
 コミットと LICENSE は [`cloud/upstream-lock.json`](../cloud/upstream-lock.json)

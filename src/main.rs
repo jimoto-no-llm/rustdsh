@@ -2166,7 +2166,20 @@ fn localize_command_tree(command: clap::Command, locale: locale::Locale) -> clap
                 arg
             }
         })
-        .mut_subcommands(|subcommand| localize_command_tree(subcommand, locale));
+        .mut_subcommands(|subcommand| {
+            let subcommand = localize_command_tree(subcommand, locale);
+            let about = match (name.as_str(), subcommand.get_name(), locale) {
+                ("swarm", "start", locale::Locale::Japanese) => Some("Gas Cityを起動"),
+                ("swarm", "stop", locale::Locale::Japanese) => Some("Gas Cityを停止"),
+                ("swarm", "start", locale::Locale::Chinese) => Some("启动 Gas City"),
+                ("swarm", "stop", locale::Locale::Chinese) => Some("停止 Gas City"),
+                _ => None,
+            };
+            match about {
+                Some(about) => subcommand.about(about),
+                None => subcommand,
+            }
+        });
     if let Some(after_help) = localized_after_help(&name, locale) {
         command.after_help(after_help)
     } else {
@@ -2195,8 +2208,6 @@ fn localized_command_about(name: &str, locale: locale::Locale) -> Option<&'stati
             "使用 Fake Backend 测试控制面",
             "Fake Backendで制御面を負荷試験",
         ),
-        "start" => ("启动 Gas City", "Gas Cityを起動"),
-        "stop" => ("停止 Gas City", "Gas Cityを停止"),
         "apply" => ("应用已审核的资源计划", "確認済みの資源計画を適用"),
         "rdsh" => (
             "dsh 的 Rust 快速启动器（安全：原生快速路径与透传）",

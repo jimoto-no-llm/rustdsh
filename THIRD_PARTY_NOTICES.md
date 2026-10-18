@@ -21,3 +21,12 @@ commits. This is not a transitive image license audit. Before distributing an
 image, retain the generated package notices and a complete SBOM for the exact
 image layers and npm/native dependencies. The repository's own license is
 [`LICENSE`](LICENSE).
+
+## Local Gas City / DSH deployment
+
+The local execution path additionally uses the official Gas City v1.5.0 binary
+(MIT, source `f66474617d2bb7fbe51a3d746da5f3ceab2b8517`) and jq 1.8.1
+(jq is MIT, source `4467af7068b1bcd7f882defff6e7ea674c5357f4`; bundled components
+retain their upstream licenses). Their artifact SHA-256 values are in
+`cloud/upstream-lock.json`. No upstream source was copied into the adapter;
+the binaries remain external and are not redistributed by this change.

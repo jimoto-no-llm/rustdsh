@@ -1,6 +1,17 @@
 {
   "checked_at": "2026-10-18",
   "status": "source-inspected-not-distribution-qualified",
+  "local_runtime": {
+    "gas_city_version": "1.5.0",
+    "gas_city_commit": "f66474617d2bb7fbe51a3d746da5f3ceab2b8517",
+    "gas_city_license": "MIT",
+    "gas_city_linux_amd64_archive_sha256": "0ff5cfc3f1cb2e4260d3d93fcce7a4e40bb5675b74eb9de185156757d4f7fa9c",
+    "gas_city_linux_amd64_binary_sha256": "02d9cac82babe4f0316c4764cdb5faadd40c3cae85796c8acbfdcf34b9258376",
+    "jq_version": "1.8.1",
+    "jq_commit": "4467af7068b1bcd7f882defff6e7ea674c5357f4",
+    "jq_linux_amd64_sha256": "020468de7539ce70ef1bceaf7cde2e8c4f2ca6c3afb84642aabc5c97d9fc2a0d",
+    "distribution": "Official external binaries installed locally; not included in rdsh release artifacts"
+  },
   "sources": [
     {"name":"rustdsh","repository":"jimoto-no-llm/rustdsh","commit":"3e1099180eb2287aaeb9c68f59ee7eef4c530bf4","license":"MIT","role":"integration source"},
     {"name":"swarm-rdsh","repository":"RNA4219/swarm-rdsh","commit":"b9edd76cdaf29f2c4b1470f16b50535a8c480242","license":"MIT","role":"compatibility reference; no code copied"},
