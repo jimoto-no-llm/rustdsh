@@ -1148,6 +1148,7 @@ mod tests {
         assert_eq!(byte_to_utf16(text, 5), 3);
     }
 
+    #[test]
     fn tool_rows_infer_their_state_from_the_message_text() {
         assert_eq!(tool_text_state("read_file · src/app.rs"), ToolState::Done);
         assert_eq!(tool_text_state("read_file · running"), ToolState::Running);
