@@ -915,6 +915,30 @@ fn short_model(model: &str) -> String {
 }
 
 #[cfg(test)]
+mod ui_state_tests {
+    use super::{load_ui_state, save_ui_state};
+    use std::collections::HashSet;
+
+    #[test]
+    fn sidebar_state_round_trips_through_the_config_file() {
+        let home = std::env::temp_dir().join(format!("rdsh-ui-state-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&home);
+        std::fs::create_dir_all(&home).unwrap();
+        std::env::set_var("XDG_CONFIG_HOME", &home);
+        let mut collapsed = HashSet::new();
+        collapsed.insert("/home/me/Prog/one".to_string());
+        let mut archived = HashSet::new();
+        archived.insert("/home/me/Prog/two".to_string());
+        save_ui_state(&collapsed, &archived);
+        let (loaded_collapsed, loaded_archived) = load_ui_state();
+        assert_eq!(loaded_collapsed, collapsed);
+        assert_eq!(loaded_archived, archived);
+        std::env::remove_var("XDG_CONFIG_HOME");
+        let _ = std::fs::remove_dir_all(&home);
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::{
         byte_to_utf16, composer_model_label, ime_replacement_range, ime_selected_range,
@@ -1191,6 +1215,57 @@ mod tests {
     }
 }
 
+/// Sidebar preferences live next to the app's other user config.
+fn ui_state_path() -> Option<std::path::PathBuf> {
+    let base = std::env::var_os("XDG_CONFIG_HOME")
+        .map(std::path::PathBuf::from)
+        .or_else(|| {
+            std::env::var_os("HOME").map(|home| std::path::PathBuf::from(home).join(".config"))
+        })?;
+    Some(base.join("rdsh-desktop").join("ui.json"))
+}
+
+fn load_ui_state() -> (HashSet<String>, HashSet<String>) {
+    let empty = || (HashSet::new(), HashSet::new());
+    let Some(path) = ui_state_path() else {
+        return empty();
+    };
+    let Ok(text) = std::fs::read_to_string(path) else {
+        return empty();
+    };
+    let Ok(value) = serde_json::from_str::<Value>(&text) else {
+        return empty();
+    };
+    let read = |key: &str| -> HashSet<String> {
+        value
+            .get(key)
+            .and_then(Value::as_array)
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(str::to_string)
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+    (read("collapsed"), read("archived"))
+}
+
+fn save_ui_state(collapsed: &HashSet<String>, archived: &HashSet<String>) {
+    let Some(path) = ui_state_path() else {
+        return;
+    };
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let body = serde_json::json!({
+        "collapsed": collapsed.iter().cloned().collect::<Vec<_>>(),
+        "archived": archived.iter().cloned().collect::<Vec<_>>(),
+    });
+    let _ = std::fs::write(path, body.to_string());
+}
+
 fn short_id(id: &str) -> String {
     id.chars()
         .rev()
@@ -1243,10 +1318,16 @@ pub struct DesktopApp {
     /// Timeline message ids whose reasoning row the user expanded. Reasoning is
     /// collapsed by default, so only the opened rows are kept.
     expanded: Rc<RefCell<HashSet<String>>>,
+    /// Project rows the operator folded away.
+    collapsed_projects: HashSet<String>,
+    /// Projects archived out of the sidebar.
+    archived_projects: HashSet<String>,
+    show_archived: bool,
 }
 
 impl DesktopApp {
     pub fn new(cx: &mut Context<Self>) -> Self {
+        let (collapsed_projects, archived_projects) = load_ui_state();
         let (update_tx, update_rx) = mpsc::channel();
         let (live_cmd_tx, live_cmd_rx) = mpsc::channel();
         let (live_evt_tx, live_evt_rx) = mpsc::channel();
@@ -1374,6 +1455,9 @@ impl DesktopApp {
             model_scroll: ScrollHandle::new(),
             update: None,
             expanded: Rc::new(RefCell::new(HashSet::new())),
+            collapsed_projects: collapsed_projects,
+            archived_projects: archived_projects,
+            show_archived: false,
         }
     }
 
@@ -1414,6 +1498,24 @@ impl DesktopApp {
             }
         }
         self.running = false;
+    }
+
+    /// Fold or unfold one project row in the sidebar.
+    fn toggle_collapsed(&mut self, path: &str) {
+        if !self.collapsed_projects.remove(path) {
+            self.collapsed_projects.insert(path.to_string());
+        }
+        save_ui_state(&self.collapsed_projects, &self.archived_projects);
+    }
+
+    /// Hide or restore one project in the sidebar.
+    fn set_archived(&mut self, path: &str, archived: bool) {
+        if archived {
+            self.archived_projects.insert(path.to_string());
+        } else {
+            self.archived_projects.remove(path);
+        }
+        save_ui_state(&self.collapsed_projects, &self.archived_projects);
     }
 
     fn new_conversation(&mut self) {
@@ -1648,6 +1750,13 @@ impl Render for DesktopApp {
         let running = self.running;
         let picker = self.picker;
         let pending = self.pending.clone();
+        let collapsed_paths = self.collapsed_projects.clone();
+        let archived_paths = self.archived_projects.clone();
+        let show_archived = self.show_archived;
+        let archived_count = groups
+            .iter()
+            .filter(|group| self.archived_projects.contains(&group.path))
+            .count();
 
         let sidebar = div()
             .flex()
@@ -1724,7 +1833,15 @@ impl Render for DesktopApp {
                             if budget == 0 {
                                 return None;
                             }
-                            let rows: Vec<AnyElement> = group
+                            let is_archived = archived_paths.contains(&group.path);
+                            if is_archived && !show_archived {
+                                return None;
+                            }
+                            let is_collapsed = collapsed_paths.contains(&group.path);
+                            let rows: Vec<AnyElement> = if is_collapsed {
+                                Vec::new()
+                            } else {
+                                group
                                 .sessions
                                 .into_iter()
                                 .take(budget)
@@ -1805,25 +1922,65 @@ impl Render for DesktopApp {
                                         )
                                         .into_any_element()
                                 })
-                                .collect();
+                                .collect()
+                            };
                             budget = budget.saturating_sub(rows.len());
                             Some(
                             div()
                                 .flex()
                                 .flex_col()
                                 .mb(px(6.))
+                                .when(is_archived, |element| element.opacity(0.6))
                                 .child(
                                     div()
+                                        .id(SharedString::from(format!("project-{}", group.path.clone())))
                                         .flex()
+                                        .flex_row()
                                         .items_center()
+                                        .gap(px(4.))
                                         .h(px(theme::PROJECT_ROW_HEIGHT))
                                         .px(px(10.))
+                                        .cursor_pointer()
+                                        .hover(|style| style.bg(rgb(0xf4f5f7)))
+                                        .on_click(cx.listener({
+                                            let path = group.path.clone();
+                                            move |this, _event, _window, cx| {
+                                                this.toggle_collapsed(&path);
+                                                cx.notify();
+                                            }
+                                        }))
                                         .child(
                                             div()
+                                                .text_size(theme::micro_size())
+                                                .text_color(theme::tertiary())
+                                                .child(if is_collapsed { "▸" } else { "▾" }),
+                                        )
+                                        .child(
+                                            div()
+                                                .flex_1()
+                                                .overflow_hidden()
                                                 .text_size(theme::micro_size())
                                                 .font_weight(FontWeight::MEDIUM)
                                                 .text_color(theme::tertiary())
                                                 .child(group.path.clone()),
+                                        )
+                                        .child(
+                                            div()
+                                                .id(SharedString::from(format!("archive-{}", group.path)))
+                                                .px(px(4.))
+                                                .rounded(theme::radius_sm())
+                                                .cursor_pointer()
+                                                .text_size(theme::micro_size())
+                                                .text_color(theme::tertiary())
+                                                .hover(|style| style.bg(rgb(0xe9ecf1)))
+                                                .child(if is_archived { "戻す" } else { "×" })
+                                                .on_click(cx.listener({
+                                                    let path = group.path.clone();
+                                                    move |this, _event, _window, cx| {
+                                                        this.set_archived(&path, !is_archived);
+                                                        cx.notify();
+                                                    }
+                                                })),
                                         ),
                                 )
                                 .children(rows)
@@ -1846,6 +2003,29 @@ impl Render for DesktopApp {
                             .text_color(theme::tertiary())
                             .child(status),
                     )
+                    .when(archived_count > 0, |element| {
+                        let label = if show_archived {
+                            format!("アーカイブを隠す ({archived_count})")
+                        } else {
+                            format!("アーカイブ ({archived_count})")
+                        };
+                        element.child(
+                            div()
+                                .id("toggle-archived")
+                                .px(px(6.))
+                                .py(px(1.))
+                                .rounded(theme::radius_sm())
+                                .cursor_pointer()
+                                .text_size(theme::micro_size())
+                                .text_color(theme::secondary())
+                                .hover(|style| style.bg(rgb(0xf1f2f5)))
+                                .child(label)
+                                .on_click(cx.listener(|this, _event, _window, cx| {
+                                    this.show_archived = !this.show_archived;
+                                    cx.notify();
+                                })),
+                        )
+                    })
                     .when(self.update.is_some(), |element| {
                         let newest = self.update.clone().unwrap_or_default();
                         element.child(

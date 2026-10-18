@@ -269,6 +269,9 @@ fn main() {
     let bounds = Bounds::new(point(px(80.), px(80.)), size(px(1280.), px(860.)));
     let options = WindowOptions {
         window_bounds: Some(WindowBounds::Windowed(bounds)),
+        // Lets the desktop match this window to rdsh-desktop.desktop, so the
+        // taskbar and switcher show the project icon.
+        app_id: Some("rdsh-desktop".to_string()),
         ..Default::default()
     };
 
