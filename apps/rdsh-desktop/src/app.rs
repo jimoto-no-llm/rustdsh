@@ -458,6 +458,19 @@ impl Chat {
         Ok(())
     }
 
+    /// Rename one conversation; the harness returns the stored title.
+    pub fn rename_session(&self, session_id: &str, title: &str) -> anyhow::Result<String> {
+        let value = self.api.unary(
+            "session/rename",
+            serde_json::json!({ "request": { "sessionId": session_id, "title": title } }),
+        )?;
+        Ok(value
+            .get("title")
+            .and_then(Value::as_str)
+            .unwrap_or(title)
+            .to_string())
+    }
+
     pub fn fill_titles(
         &mut self,
         limit: usize,
@@ -1323,6 +1336,10 @@ pub struct DesktopApp {
     /// Projects archived out of the sidebar.
     archived_projects: HashSet<String>,
     show_archived: bool,
+    /// Conversation being renamed inline, plus its edit buffer.
+    rename_target: Option<String>,
+    rename_editor: Editor,
+    rename_focus: FocusHandle,
 }
 
 impl DesktopApp {
@@ -1353,7 +1370,6 @@ impl DesktopApp {
                 .sessions
                 .iter()
                 .filter(|session| session.title.is_empty())
-                .take(80)
                 .map(|session| session.id.clone())
                 .collect();
             let titles = update_tx.clone();
@@ -1458,6 +1474,9 @@ impl DesktopApp {
             collapsed_projects: collapsed_projects,
             archived_projects: archived_projects,
             show_archived: false,
+            rename_target: None,
+            rename_editor: Editor::new(),
+            rename_focus: cx.focus_handle(),
         }
     }
 
@@ -1498,6 +1517,48 @@ impl DesktopApp {
             }
         }
         self.running = false;
+    }
+
+    /// Start renaming one conversation with its current title in the buffer.
+    fn begin_rename(&mut self, session_id: &str, title: &str) {
+        self.rename_editor.clear();
+        self.rename_editor.insert(title);
+        self.rename_editor.select_all();
+        self.rename_target = Some(session_id.to_string());
+    }
+
+    fn cancel_rename(&mut self) {
+        self.rename_target = None;
+        self.rename_editor.clear();
+    }
+
+    fn commit_rename(&mut self) {
+        let Some(target) = self.rename_target.clone() else {
+            return;
+        };
+        let title = self.rename_editor.text().trim().to_string();
+        if title.is_empty() {
+            self.cancel_rename();
+            return;
+        }
+        match self.chat.as_ref() {
+            Some(chat) => match chat.rename_session(&target, &title) {
+                Ok(stored) => {
+                    self.titles.insert(target.clone(), stored.clone());
+                    if let Some(chat) = self.chat.as_mut() {
+                        if let Some(session) =
+                            chat.sessions.iter_mut().find(|session| session.id == target)
+                        {
+                            session.title = stored.clone();
+                        }
+                    }
+                    self.status = format!("名前を変更しました: {stored}");
+                }
+                Err(error) => self.status = format!("名前を変更できませんでした: {error}"),
+            },
+            None => {}
+        }
+        self.cancel_rename();
     }
 
     /// Fold or unfold one project row in the sidebar.
@@ -1753,6 +1814,9 @@ impl Render for DesktopApp {
         let collapsed_paths = self.collapsed_projects.clone();
         let archived_paths = self.archived_projects.clone();
         let show_archived = self.show_archived;
+        let rename_target = self.rename_target.clone();
+        let rename_text = self.rename_editor.text().to_string();
+        let rename_focus = self.rename_focus.clone();
         let archived_count = groups
             .iter()
             .filter(|group| self.archived_projects.contains(&group.path))
@@ -1862,6 +1926,61 @@ impl Render for DesktopApp {
                                                 short_id(&session.id)
                                             }
                                         });
+                                    if rename_target.as_deref() == Some(session.id.as_str()) {
+                                        let focus = rename_focus.clone();
+                                        div()
+                                            .id(("rename", index))
+                                            .flex()
+                                            .items_center()
+                                            .h(px(theme::SESSION_ROW_HEIGHT + 10.))
+                                            .px(px(8.))
+                                            .mb(px(1.))
+                                            .rounded(theme::radius_sm())
+                                            .bg(theme::composer())
+                                            .border_1()
+                                            .border_color(theme::accent())
+                                            .track_focus(&focus)
+                                            .on_key_down(cx.listener(|this, event: &KeyDownEvent, _window, cx| {
+                                                let keystroke = &event.keystroke;
+                                                if keystroke.is_ime_in_progress() {
+                                                    return;
+                                                }
+                                                let command = keystroke.modifiers.platform
+                                                    || keystroke.modifiers.control;
+                                                match keystroke.key.as_str() {
+                                                    "enter" => this.commit_rename(),
+                                                    "escape" => this.cancel_rename(),
+                                                    "backspace" => this.rename_editor.delete_backward(),
+                                                    "delete" => this.rename_editor.delete_forward(),
+                                                    "left" if command => {
+                                                        this.rename_editor.moved(Motion::WordLeft)
+                                                    }
+                                                    "right" if command => {
+                                                        this.rename_editor.moved(Motion::WordRight)
+                                                    }
+                                                    "left" => this.rename_editor.moved(Motion::Left),
+                                                    "right" => this.rename_editor.moved(Motion::Right),
+                                                    "a" if command => this.rename_editor.select_all(),
+                                                    _ => {
+                                                        if let Some(text) = &keystroke.key_char {
+                                                            if !text.is_empty()
+                                                                && !text.chars().any(|character| character.is_control())
+                                                            {
+                                                                this.rename_editor.insert(text);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                cx.notify();
+                                            }))
+                                            .child(
+                                                div()
+                                                    .text_size(theme::meta_size())
+                                                    .text_color(theme::label())
+                                                    .child(rename_text.clone()),
+                                            )
+                                            .into_any_element()
+                                    } else {
                                     div()
                                         .id(("session", index))
                                         .flex()
@@ -1907,20 +2026,37 @@ impl Render for DesktopApp {
                                                     div()
                                                         .text_size(theme::meta_size())
                                                         .text_color(theme::label())
-                                                        .child(title),
+                                                        .child(title.clone()),
+                                                )
+                                                .child(
+                                                    div()
+                                                        .id(SharedString::from(format!("rename-{}", session.id)))
+                                                        .px(px(2.))
+                                                        .rounded(theme::radius_sm())
+                                                        .cursor_pointer()
+                                                        .text_size(theme::micro_size())
+                                                        .text_color(theme::tertiary())
+                                                        .hover(|style| style.bg(rgb(0xe9ecf1)))
+                                                        .child("✎")
+                                                        .on_click(cx.listener({
+                                                            let id = session.id.clone();
+                                                            let current = title.clone();
+                                                            move |this, _event, window, cx| {
+                                                                this.begin_rename(&id, &current);
+                                                                window.focus(&this.rename_focus);
+                                                                cx.notify();
+                                                            }
+                                                        })),
                                                 ),
                                         )
                                         .child(
                                             div()
                                                 .text_size(theme::micro_size())
                                                 .text_color(theme::tertiary())
-                                                .child(format!(
-                                                    "{} ・ {}",
-                                                    relative(session.updated),
-                                                    short_id(&session.id)
-                                                )),
+                                                .child(relative(session.updated)),
                                         )
                                         .into_any_element()
+                                    }
                                 })
                                 .collect()
                             };
