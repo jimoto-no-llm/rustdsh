@@ -46,7 +46,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-      - run: node --test tests/plugin-security.test.mjs tests/settings-client.test.mjs tests/update-banner.test.mjs tests/feature-switches.test.mjs tests/discord-presence.test.mjs tests/model_benchmark/fence.test.mjs tests/context_inject_contract.mjs
+      - run: node --test tests/plugin-security.test.mjs tests/settings-client.test.mjs tests/update-banner.test.mjs tests/rdsh-mobile-ui.test.mjs tests/feature-switches.test.mjs tests/discord-presence.test.mjs tests/model_benchmark/fence.test.mjs tests/context_inject_contract.mjs
 
   security-boundaries:
     runs-on: ubuntu-latest
@@ -101,13 +101,13 @@ jobs:
       - if: runner.os == 'macOS'
         run: command -v zstd || brew install zstd
       - run: cargo test
+      - run: cargo build --locked
       - uses: actions/setup-node@v7
         with:
           node-version: 22
       - run: node --test plugins/workflow-board/tests/source-patch.test.mjs
       - run: cargo test --example benchmark_extended
       - run: cargo test --example benchmark_models
-      - run: cargo build
       - uses: actions/setup-node@v7
         with:
           node-version: 22
