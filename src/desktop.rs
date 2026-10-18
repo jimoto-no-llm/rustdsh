@@ -588,6 +588,11 @@ fn plugin_selection(plugins_root: &Path, compute: bool) -> Vec<&'static str> {
             .iter()
             .filter(|name| plugins_root.join(name).join("package.json").is_file()),
     );
+    // The update banner is part of the product, not an opt-in: every profile
+    // this command touches should know when a newer rdsh or harness is out.
+    if plugins_root.join("rdsh-update-banner").join("package.json").is_file() {
+        names.push("rdsh-update-banner");
+    }
     if compute {
         names.push(BUNDLED_PLUGINS[1]);
     }
@@ -1691,6 +1696,18 @@ mod tests {
             vec!["rdsh-settings", "rdsh-compute"]
         );
         std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn the_update_banner_is_attached_when_the_checkout_carries_it() {
+        let root = temp_root("update-banner");
+        std::fs::create_dir_all(root.join("rdsh-update-banner")).unwrap();
+        std::fs::write(root.join("rdsh-update-banner").join("package.json"), b"{}").unwrap();
+        assert_eq!(
+            plugin_selection(&root, false),
+            vec!["rdsh-settings", "rdsh-update-banner"]
+        );
+        std::fs::remove_dir_all(&root).unwrap();
     }
 
     #[test]
