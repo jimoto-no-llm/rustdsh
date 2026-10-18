@@ -17,6 +17,7 @@
     "token-optimization"
   ],
   "required_checks": [
+    "PR policy",
     "Rust lint",
     "release-policy",
     "plugin-security",

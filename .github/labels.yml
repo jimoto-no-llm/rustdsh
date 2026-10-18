@@ -27,6 +27,9 @@
 - name: needs-repro
   color: e4e669
   description: Waiting for reproduction steps or doctor output
+- name: approval-required
+  color: d4c5f9
+  description: Requires maintainer approval before merge
 - name: ja
   color: 0e8a16
   description: Japanese-language thread (Japanese OK)

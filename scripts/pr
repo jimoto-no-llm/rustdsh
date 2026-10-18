@@ -1,0 +1,5 @@
+#!/bin/sh
+# Repo-local Rust CLI. Always uses this checkout's source and policy.
+set -eu
+cd "$(dirname "$0")/.."
+exec cargo run --quiet --locked --example pr -- "$@"

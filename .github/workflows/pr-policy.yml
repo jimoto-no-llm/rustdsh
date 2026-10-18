@@ -1,0 +1,31 @@
+name: pr-policy
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-policy-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  policy:
+    name: PR policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Test PR gate failure paths
+        run: cargo test --locked --example pr
+      - name: Check the PR body and show verification advice
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          cargo run --quiet --locked --example pr -- policy \
+            --event "$GITHUB_EVENT_PATH" --base "$PR_BASE_SHA"

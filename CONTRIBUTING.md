@@ -30,6 +30,12 @@ RDSH_E2E_BIN=./target/release/rdsh npm test --prefix tests/e2e
 
 ## Pull Request
 
+Maintainer triage, review evidence and preparation commands are documented in
+[PR-WORKFLOW.md](docs/PR-WORKFLOW.md). Run `sh scripts/pr --help` for the local
+Rust CLI. PR policy checks require the four template sections to be completed.
+The helper keeps GitHub operations read-only and prints a commit-pinned merge
+command after local and remote gates pass.
+
 - PR body is 4 lines: overview / changes / verification / caveats.
 - All green before opening: fmt, clippy (zero warnings), tests, regress.
 - Behavior changes need a before/after output diff attached.
