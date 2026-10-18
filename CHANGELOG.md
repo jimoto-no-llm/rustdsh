@@ -93,6 +93,10 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Fixed
 
+- A consumer that closes the pipe early no longer makes the process dump core:
+  `rdsh doctor 2>&1 | head` used to panic on EPIPE (exit 134 with a core dump),
+  and now ends quietly while every other panic keeps the default hook.
+
 - The first-run installer no longer aborts on `rdsh doctor`. It piped the report
   through `head`, and closing that pipe early made the process panic on EPIPE and
   dump core on a Node-less host; the installer now captures the report and slices

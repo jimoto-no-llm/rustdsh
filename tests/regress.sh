@@ -552,3 +552,11 @@ if "$BIN" doctor >"$RG_TMP/doctor/full.out" 2>"$RG_TMP/doctor/full.err"; then
 else
   echo "FAIL(output): doctor exited non-zero with its report fully consumed"; cat "$RG_TMP/doctor/full.err"; exit 1
 fi
+
+# --- a consumer closing the pipe must not abort the process ---
+# `doctor 2>&1 | head` used to panic on EPIPE and dump core (exit 134).
+pipe_rc=$(bash -c '"$1" doctor 2>&1 | head -n 5 >/dev/null; echo ${PIPESTATUS[0]}' _ "$BIN" 2>/dev/null)
+case "$pipe_rc" in
+  134) echo "FAIL(output): doctor aborted when the pipe closed (exit 134)"; exit 1 ;;
+  *) ok "doctor exits quietly when the pipe closes (exit $pipe_rc)" ;;
+esac

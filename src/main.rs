@@ -888,6 +888,25 @@ fn invoked_as_dsh() -> bool {
 }
 
 fn main() {
+    // A consumer that closes the pipe early (rdsh doctor | head) must end this
+    // process quietly instead of panicking: with panic=abort a panic would dump
+    // core. Only the broken-pipe panic is swallowed; every other panic keeps the
+    // default hook (and the closed-stderr paths keep running, as their tests
+    // require).
+    let default_panic_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let message = info
+            .payload()
+            .downcast_ref::<&str>()
+            .map(|text| text.to_string())
+            .or_else(|| info.payload().downcast_ref::<String>().cloned())
+            .unwrap_or_default();
+        if message.contains("Broken pipe") {
+            std::process::exit(0);
+        }
+        default_panic_hook(info);
+    }));
+
     if invoked_as_dsh() {
         let raw: Vec<String> = std::env::args().skip(1).collect();
         let first_is_native = raw
