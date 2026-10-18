@@ -9,13 +9,17 @@
 #   cargo install cargo-deny --locked
 #   cargo deny check licenses sources
 #
-# The allow list is exactly the set of licenses reachable from Cargo.lock.
-# Adding a dependency with a new license is a deliberate decision: extend the
-# list only after checking its terms, so a copyleft license never enters the
-# dependency tree unnoticed.
+# The allow list is exactly the set of licenses reachable from Cargo.lock,
+# dev-dependencies included. Adding a dependency with a new license is a
+# deliberate decision: extend the list only after checking its terms, so a
+# copyleft license never enters the dependency tree unnoticed.
 
 [licenses]
 version = 2
+# cargo-deny skips dev-dependencies by default. rdsh checks them too so the
+# policy above covers every crate in Cargo.lock, not just the ones that end up
+# in the shipped binary.
+include-dev = true
 # Default confidence for matching a license text to its SPDX identifier.
 confidence-threshold = 0.8
 allow = [

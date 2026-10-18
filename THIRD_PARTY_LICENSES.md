@@ -26,8 +26,9 @@ plugins this repository adapts or recommends, with each author and license.
 
 ## Rust crate dependencies
 
-Every crate reachable from `Cargo.lock` is permissively licensed.
-[deny.toml](deny.toml) pins the allowed set and the
+Every crate reachable from `Cargo.lock`, dev-dependencies included, is
+permissively licensed. [deny.toml](deny.toml) pins the allowed set with
+`include-dev = true` (cargo-deny skips dev-dependencies by default) and the
 `Rust dependency audit` job in
 [rust-audit.yml](.github/workflows/rust-audit.yml) enforces it, so a copyleft
 license or an unknown registry cannot enter the dependency tree unnoticed.
