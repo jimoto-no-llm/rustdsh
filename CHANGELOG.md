@@ -36,6 +36,14 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   DeepSeek Harness packages, the permissive crate set and the trademark
   disclaimer; both README license sections link to it.
 
+### Fixed
+
+- Native desktop app: the host cache directory and its `host.log` are now
+  owner-only (0700/0600) instead of inheriting the umask. The log holds the
+  ready URL, which carries the host process token, so on a shared machine with
+  the usual 0022 umask any local user could read it. An existing log from an
+  earlier run is tightened on the next start as well.
+
 ## [0.8.0] - 2026-10-18
 
 ### Added

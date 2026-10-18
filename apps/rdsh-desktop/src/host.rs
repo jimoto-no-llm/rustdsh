@@ -3,8 +3,9 @@
 //! The harness runtime is a Node process, so launching it costs seconds. The
 //! host is therefore detached from the app: it keeps running between launches,
 //! its ready URL is cached, and a later start reuses it in milliseconds. The
-//! ready URL carries the process token, so the cache is written with 0600 mode
-//! under the user cache directory.
+//! ready URL carries the process token, so the cache directory and the files
+//! in it are owner-only (0700/0600) rather than inheriting the umask: the host
+//! log holds the token-bearing ready URL the launcher printed.
 
 use std::fs::{self, OpenOptions};
 use std::io::{BufRead, BufReader, Seek, SeekFrom};
@@ -95,12 +96,9 @@ impl Host {
         let (binary, version) = resolve_launcher()?;
         let log_path = cache_dir()?.join("host.log");
         if let Some(parent) = log_path.parent() {
-            fs::create_dir_all(parent).ok();
+            create_owner_only_dir(parent).ok();
         }
-        let log = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&log_path)
+        let log = open_owner_only_append(&log_path)
             .with_context(|| format!("open {}", log_path.display()))?;
         let start_offset = log.metadata().map(|meta| meta.len()).unwrap_or(0);
 
@@ -237,7 +235,7 @@ fn read_cache() -> Option<Cached> {
 
 fn write_cache(url: &str, origin: &str, pid: u32, binary: &str) -> Result<()> {
     let dir = cache_dir()?;
-    fs::create_dir_all(&dir)?;
+    create_owner_only_dir(&dir)?;
     let path = dir.join("host.json");
     // The ready URL still carries the process token; nothing reads a separate
     // token field, so it is not stored twice.
@@ -276,6 +274,45 @@ fn write_cache(url: &str, origin: &str, pid: u32, binary: &str) -> Result<()> {
         let _ = fs::remove_file(&temporary);
     }
     written
+}
+
+/// Create the cache directory owner-only on unix.
+///
+/// `create_dir_all` alone inherits the umask, so a host with the usual 0022
+/// would leave the directory, and everything later created inside it, readable
+/// by other local users.
+fn create_owner_only_dir(path: &Path) -> std::io::Result<()> {
+    fs::create_dir_all(path)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        // Advisory on purpose: a filesystem without chmod support must not stop
+        // the launch, and a directory that is already owner-only stays so.
+        let _ = fs::set_permissions(path, fs::Permissions::from_mode(0o700));
+    }
+    Ok(())
+}
+
+/// Open a cache file for appending with owner-only permissions on unix.
+///
+/// The host log carries the ready URL, which includes the process token, so the
+/// mode is set explicitly instead of relying on the umask. A file left behind
+/// by an earlier run is tightened as well.
+fn open_owner_only_append(path: &Path) -> std::io::Result<std::fs::File> {
+    let mut options = OpenOptions::new();
+    options.create(true).append(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let file = options.open(path)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = fs::set_permissions(path, fs::Permissions::from_mode(0o600));
+    }
+    Ok(file)
 }
 
 fn cached_origin() -> Option<String> {
@@ -590,7 +627,10 @@ pub fn resolve_launcher() -> Result<(PathBuf, String)> {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_host_command, loopback_addresses, parse_ready};
+    use super::{
+        create_owner_only_dir, is_host_command, loopback_addresses, open_owner_only_append,
+        parse_ready,
+    };
 
     #[test]
     fn orders_releases_above_their_prereleases() {
@@ -662,5 +702,34 @@ mod tests {
     fn ignores_plugin_noise() {
         assert!(parse_ready("{\"level\":\"fatal\",\"message\":\"Authentication required\"}").is_none());
         assert!(parse_ready("http://example.com/?token=x").is_none());
+    }
+
+    // The host log carries the token-bearing ready URL, so its mode must not
+    // follow the umask of whoever launched the app.
+    #[cfg(unix)]
+    #[test]
+    fn cache_files_are_owner_only_even_when_a_loose_one_exists() {
+        use std::fs;
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!(
+            "rdsh-desktop-cache-mode-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        create_owner_only_dir(&dir).unwrap();
+        assert_eq!(fs::metadata(&dir).unwrap().permissions().mode() & 0o777, 0o700);
+
+        let log = dir.join("host.log");
+        drop(open_owner_only_append(&log).unwrap());
+        assert_eq!(fs::metadata(&log).unwrap().permissions().mode() & 0o777, 0o600);
+
+        // A log written by an earlier run with a looser umask is tightened.
+        fs::set_permissions(&log, fs::Permissions::from_mode(0o644)).unwrap();
+        drop(open_owner_only_append(&log).unwrap());
+        assert_eq!(fs::metadata(&log).unwrap().permissions().mode() & 0o777, 0o600);
+        let _ = fs::remove_dir_all(&dir);
     }
 }
