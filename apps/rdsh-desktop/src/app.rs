@@ -912,8 +912,9 @@ fn short_model(model: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        composer_model_label, order_providers, project_label, project_path,
-        providers_from_catalog, short_model, CatalogModel, CatalogProvider, Model,
+        byte_to_utf16, composer_model_label, ime_replacement_range, ime_selected_range,
+        order_providers, project_label, project_path, providers_from_catalog, short_model,
+        utf16_to_byte, CatalogModel, CatalogProvider, Model,
     };
 
     fn provider(id: &str, name: &str, models: &[&str]) -> CatalogProvider {
@@ -1091,6 +1092,54 @@ mod tests {
             composer_model_label(&unknown, &[]),
             "deepseek-v4.1-flash-ghost · commandcode-goat"
         );
+    }
+
+    #[test]
+    fn ime_replacement_prefers_the_platform_range() {
+        assert_eq!(
+            ime_replacement_range(Some(2..5), Some(0..1), 9..9),
+            2..5,
+            "an explicit platform range wins over the marked preedit"
+        );
+    }
+
+    #[test]
+    fn ime_replacement_falls_back_to_the_marked_preedit() {
+        assert_eq!(
+            ime_replacement_range(None, Some(0..1), 3..3),
+            0..1,
+            "a preedit update replaces the marked text instead of inserting after it"
+        );
+    }
+
+    #[test]
+    fn ime_replacement_falls_back_to_the_editor_selection() {
+        assert_eq!(ime_replacement_range(None, None, 4..7), 4..7);
+    }
+
+    #[test]
+    fn ime_selected_range_is_relative_to_the_inserted_text() {
+        // "k" replaced by "ka" at UTF-16 3..5: the cursor at the end stays there.
+        assert_eq!(ime_selected_range(3..5, 2..2), 5..5);
+        // A segment selected inside the preedit keeps its span.
+        assert_eq!(ime_selected_range(3..7, 1..3), 4..6);
+    }
+
+    #[test]
+    fn ime_selected_range_is_clamped_to_the_inserted_text() {
+        assert_eq!(ime_selected_range(3..5, 0..99), 3..5);
+        assert_eq!(ime_selected_range(3..5, 9..9), 5..5);
+    }
+
+    #[test]
+    fn ime_offsets_map_across_surrogate_pairs() {
+        let text = "a😀b"; // UTF-16: a=0..1, 😀=1..3, b=3..4
+        assert_eq!(utf16_to_byte(text, 0), 0);
+        assert_eq!(utf16_to_byte(text, 1), 1);
+        assert_eq!(utf16_to_byte(text, 3), 5);
+        assert_eq!(utf16_to_byte(text, 4), 6);
+        assert_eq!(byte_to_utf16(text, 1), 1);
+        assert_eq!(byte_to_utf16(text, 5), 3);
     }
 }
 
@@ -2429,24 +2478,52 @@ fn byte_to_utf16(text: &str, byte: usize) -> usize {
         .sum()
 }
 
+/// Pick the UTF-16 range an IME replacement overwrites. The range the platform
+/// sends wins; otherwise the active preedit is replaced, so a `k` -> `ka`
+/// update rewrites the marked text instead of appending after it; otherwise the
+/// editor selection is used, which is an insert at the caret.
+fn ime_replacement_range(
+    requested: Option<Range<usize>>,
+    marked: Option<Range<usize>>,
+    selection: Range<usize>,
+) -> Range<usize> {
+    requested.or(marked).unwrap_or(selection)
+}
+
+/// Rebase the IME's selected range — UTF-16 offsets relative to the newly
+/// inserted preedit — onto the document, clamped to the inserted text.
+fn ime_selected_range(inserted: Range<usize>, selected: Range<usize>) -> Range<usize> {
+    let start = inserted
+        .start
+        .saturating_add(selected.start)
+        .min(inserted.end);
+    let end = inserted
+        .start
+        .saturating_add(selected.end)
+        .min(inserted.end)
+        .max(start);
+    start..end
+}
+
 impl DesktopApp {
-    fn ime_replace(&mut self, range: Option<Range<usize>>, text: &str) {
+    /// Replace the IME range with `text` and return the inserted range as UTF-16
+    /// offsets into the new text.
+    fn ime_replace(&mut self, range: Option<Range<usize>>, text: &str) -> Range<usize> {
         let current = self.editor.text().to_string();
-        let (start, end) = match range {
-            Some(range) => (
-                utf16_to_byte(&current, range.start),
-                utf16_to_byte(&current, range.end),
-            ),
-            None => {
-                let selection = self.editor.selection();
-                (selection.start, selection.end)
-            }
-        };
+        let selection = self.editor.selection();
+        let selection =
+            byte_to_utf16(&current, selection.start)..byte_to_utf16(&current, selection.end);
+        let range = ime_replacement_range(range, self.marked.clone(), selection);
+        let start = utf16_to_byte(&current, range.start);
+        let end = utf16_to_byte(&current, range.end).max(start);
         let start = start.min(current.len());
         let end = end.min(current.len()).max(start);
+        let inserted_end = start + text.len();
         self.editor.move_to(start);
         self.editor.select_to(end);
         self.editor.insert(text);
+        let current = self.editor.text();
+        byte_to_utf16(current, start)..byte_to_utf16(current, inserted_end)
     }
 }
 
@@ -2512,17 +2589,22 @@ impl EntityInputHandler for DesktopApp {
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        self.ime_replace(range, new_text);
-        let text = self.editor.text();
-        let caret = self.editor.caret();
-        let end = byte_to_utf16(text, caret);
-        let width = new_text
-            .chars()
-            .map(|character| character.len_utf16())
-            .sum::<usize>();
-        let start = end.saturating_sub(width);
-        self.marked = Some(start..end);
-        let _ = new_selected_range;
+        let inserted = self.ime_replace(range, new_text);
+        if new_text.is_empty() {
+            self.marked = None;
+        } else {
+            self.marked = Some(inserted.clone());
+            // The platform reports this range relative to the preedit it just
+            // sent, so rebase it onto the document before moving the caret.
+            if let Some(selected) = new_selected_range {
+                let selected = ime_selected_range(inserted, selected);
+                let text = self.editor.text();
+                let start = utf16_to_byte(text, selected.start);
+                let end = utf16_to_byte(text, selected.end);
+                self.editor.move_to(start);
+                self.editor.select_to(end);
+            }
+        }
         log::debug!("IME composing: {} chars", new_text.chars().count());
         cx.notify();
     }

@@ -20,7 +20,8 @@ Electron, no bundled Chromium, no local web server.
 - Approval prompts and user questions ($events waterfall, answered through
   $events/result and userQuestions/answer)
 - Tool call rows and reasoning blocks in the timeline
-- New conversation (session/create), Enter to send, composer focus handling
+- New conversation (session/create), Enter to send, composer focus handling,
+  and Japanese IME composition in the composer
 
 ## Run
 
@@ -106,6 +107,37 @@ host instead of attaching to a running one.
 
 The attach path mints the v1 authority cookie; 0.2.1 still accepts it next to
 its v2 peer cookie, so attaching stays available on both.
+
+## Composer IME input
+
+The composer takes platform IME input (Japanese composition included) through
+GPUI's `EntityInputHandler`: `ElementInputHandler` is installed over the text
+area during paint, and every range on that wire is UTF-16, mapped to the
+editor's byte offsets.
+
+- A replacement replaces the active preedit first: the range the platform sends
+  wins, otherwise the marked (composing) range is replaced, otherwise the editor
+  selection. A `k` -> `ka` update therefore rewrites the preedit instead of
+  appending to it, and the commit replaces it instead of leaving `kか` behind.
+- The IME's selected range inside the preedit is rebased onto the inserted text
+  and becomes the editor selection, so `selected_text_range` reports the
+  composing segment.
+- Platform paths: Linux Wayland (`set_marked_text` / `insert_text`), Windows
+  (IMM composition, `GCS_COMPSTR` with `GCS_CURSORPOS`), macOS
+  (`NSTextInputClient` `setMarkedText:selectedRange:` /
+  `insertText:replacementRange:`). Wayland never sends a preedit selection
+  range, so that part only runs on Windows and macOS.
+- Known limitations: `bounds_for_range` returns the whole composer rect, so the
+  candidate window is anchored to the composer rather than the caret, and
+  `character_index_for_point` returns the caret, so clicking inside composing
+  text does not place the cursor. Only the pure range mapping is unit tested
+  (`cargo test` in this directory); no real IME runs in CI, so the platform
+  wiring still needs a manual pass.
+
+To try it by hand: `cargo run --release`, focus the composer, compose with a
+Japanese IME, and check that the preedit is rewritten in place and that the
+committed text lands exactly once. Enter sends; while composing it commits the
+composition instead.
 
 ## Startup and weight
 
