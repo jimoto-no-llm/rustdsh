@@ -36,6 +36,26 @@ that configuration cannot remember the dismissal for a full reload. Demo closes
 never write account state. Activate the new server/client code through the normal
 GUI restart/reload once; running user sessions are not restarted automatically.
 
+## dsh update notice
+
+The same card also reports an available harness release. When a newer
+`@deepseek-ai/dsh` is published, the card reads **dsh update available** and
+shows the active and newest version:
+
+- **update** runs `npm install -g @deepseek-ai/dsh@<newest>` on the host
+  (version string validated, no shell, five-minute timeout) and reports the
+  npm output. Restart the web service afterwards to run the new host.
+- **details** opens the npm page for that version and shows the exact command.
+- **dismiss** and **x** reuse the same close records and the two-hour remount
+  schedule as the rdsh notice.
+
+The published version is cached for twelve hours in
+`~/.cache/rdsh-desktop/update-check.json`, shared with the native client. Set
+`RDSH_DESKTOP_UPDATE_CHECK=0` in the host environment to disable the registry
+query entirely; the card then stays hidden. The active version comes from the
+running `@deepseek-ai/dsh` package, so the card disappears as soon as the host
+runs the newer build.
+
 ## Install
 
 ```sh

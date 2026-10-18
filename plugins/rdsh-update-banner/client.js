@@ -12,6 +12,22 @@ window.__ModuleLoader__.load({
     const REMINDER_MS = 2 * 60 * 60 * 1000;
     // A dismissal is final for one update event; only a new kind/to/at notifies again.
     const occurrence = (j) => JSON.stringify([j.kind || "update", j.to, Number(j.at)]);
+    // The dsh half reports an available release instead of an applied update;
+    // fold it into the same occurrence shape so one card serves both.
+    const normalize = (value) => {
+      if (!value || !value.ok || value.updated) return value;
+      const dsh = value.dsh;
+      if (!dsh || !dsh.available || typeof dsh.to !== "string") return value;
+      return {
+        ok: true,
+        updated: true,
+        kind: "dsh",
+        from: typeof dsh.from === "string" ? dsh.from : null,
+        to: dsh.to,
+        at: Number(dsh.at) > 0 ? Number(dsh.at) : Date.now(),
+        dsh: dsh,
+      };
+    };
     // Sent with a dismissal so the server keeps receiving the cycle it validates.
     const cycle = (j) => Math.max(0, Math.floor((Date.now() - Number(j.at)) / REMINDER_MS));
     // Replay the stored close so a reload keeps an already dismissed update closed.
@@ -21,6 +37,16 @@ window.__ModuleLoader__.load({
         return value && typeof value.to === "string" && Number(value.at) > 0 ? occurrence(value) : null;
       } catch (e) { return null; }
     };
+    const DSH_CLOSE_KEY = "rdsh-update-close:dsh:v3";
+    const storedDsh = () => {
+      try {
+        const value = JSON.parse(localStorage.getItem(DSH_CLOSE_KEY) || "null");
+        return value && typeof value.to === "string" && Number(value.at) > 0 ? value : null;
+      } catch (e) { return null; }
+    };
+    let dismissedDsh = storedDsh();
+    const sameDsh = (info) => Boolean(dismissedDsh && info && dismissedDsh.to === info.to &&
+      Number(dismissedDsh.at) === Number(info.at));
     let dismissedOccurrence = storedOccurrence();
     function acknowledge(j) {
       return fetch(ENDPOINT + "/dismiss", {
@@ -81,11 +107,18 @@ window.__ModuleLoader__.load({
       const resPair = useState("");
       const result = resPair[0];
       const setResult = resPair[1];
+      const dshPair = useState(null);
+      const dshInfo = dshPair[0];
+      const setDshInfo = dshPair[1];
       const loadGeneration = useRef(0);
       const latest = useRef(null);
       const lastOccurrence = useRef(null);
       const updating = useRef(false);
-      const accept = useCallback((j) => {
+      const accept = useCallback((incoming) => {
+        const info = incoming && incoming.ok && incoming.dsh && incoming.dsh.available && typeof incoming.dsh.to === "string"
+          ? incoming.dsh : null;
+        setDshInfo(info && !sameDsh(info) ? info : null);
+        const j = normalize(incoming);
         if (!j || !j.ok) return;
         if (!j.updated) {
           latest.current = null; lastOccurrence.current = null; dismissedOccurrence = null;
@@ -195,7 +228,8 @@ window.__ModuleLoader__.load({
         setRunning("busy");
         setResult("");
         try {
-          const r = await fetch(ENDPOINT + "/run", { method: "POST", cache: "no-store" });
+          const endpoint = current && current.kind === "dsh" ? ENDPOINT + "/dsh/run" : ENDPOINT + "/run";
+          const r = await fetch(endpoint, { method: "POST", cache: "no-store" });
           const j = await r.json();
           if (sameOccurrence()) {
             setRunning("done");
@@ -210,30 +244,93 @@ window.__ModuleLoader__.load({
           if (sameOccurrence()) setResult("request failed");
         } finally { updating.current = false; }
       }, [closeOccurrence, load]);
-      if (!data || !data.updated) return null;
+      const dismissDsh = useCallback(() => {
+        const info = dshInfo;
+        if (!info) return;
+        dismissedDsh = { to: info.to, at: Number(info.at) || Date.now() };
+        try { localStorage.setItem(DSH_CLOSE_KEY, JSON.stringify(dismissedDsh)); } catch (e) {}
+        setDshInfo(null);
+        fetch(ENDPOINT + "/dismiss", {
+          method: "POST", cache: "no-store",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ kind: "dsh", to: info.to, at: Number(info.at) || 0, cycle: 0 }),
+        }).catch(() => {});
+      }, [dshInfo]);
+      const runDshUpdate = async () => {
+        if (running === "busy") return;
+        setRunning("busy");
+        setResult("");
+        try {
+          const response = await fetch(ENDPOINT + "/dsh/run", { method: "POST", cache: "no-store" });
+          const value = await response.json();
+          setResult(value && value.message ? value.message : (response.ok && value && value.ok ? "done" : "failed"));
+          setExpanded(true);
+          setRunning("done");
+          load();
+        } catch (error) {
+          setRunning("done");
+          setResult("request failed");
+        }
+      };
+      if (!data || !data.updated) {
+        if (!dshInfo) return null;
+        return h("div", { className: "rub-wrap rub-pop", role: "alert", "data-testid": "dsh-update" },
+          h("style", null, CSS + KEYFRAMES),
+          h("div", { className: "rub-card" },
+            h("button", { className: "rub-x", onClick: dismissDsh, "aria-label": "close" }, "x"),
+            h("div", { className: "rub-row1" }, h(Icon, null),
+              h("div", { className: "rub-tt" }, h("b", null, "dsh update available"))),
+            h("div", { className: "rub-body" },
+              h("span", { className: "rub-ver" }, dshInfo.from || "?"), " to ", h("span", { className: "rub-ver" }, dshInfo.to || "?"),
+              result ? h("div", { className: "rub-sub" }, result) : null,
+              h("div", { className: "rub-acts" },
+                h("button", { className: "rub-tbtn", disabled: running === "busy", onClick: runDshUpdate },
+                  running === "busy" ? "updating..." : "update"),
+                h("button", { className: "rub-tbtn dim", onClick: () => {
+                  try { window.open(dshInfo.details, "_blank", "noopener"); } catch (e) {}
+                  setShowDetail(true);
+                } }, "details"),
+                h("button", { className: "rub-tbtn dim", onClick: dismissDsh }, "dismiss")))));
+      }
+      const label = data.kind === "dsh" ? "dsh update available" : "rdsh updated!";
       const inner = expanded ? h("div", { className: "rub-card" },
-        h("button", { className: "rub-x", onClick: dismiss, "aria-label": "close" }, "x"),
+        h("button", { className: "rub-x", onClick: () => { dismiss(); dismissDsh(); }, "aria-label": "close" }, "x"),
         h("div", { className: "rub-row1", onClick: () => setExpanded(false) },
           h(Icon, null),
           h("div", { className: "rub-tt" },
-            h("b", null, "rdsh updated!"),
+            h("b", null, label),
             h("span", { className: "rub-time" }, "now"))),
         h("div", { className: "rub-body" },
           h("span", { className: "rub-ver" }, data.from || "?"),
           " to ",
           h("span", { className: "rub-ver" }, data.to || "?"),
           showDetail ? h("div", { className: "rub-sub" },
-            "applied: " + (data.at ? new Date(data.at).toLocaleString() : "?"),
-            data.demo ? " (demo)" : "") : null,
+            data.kind === "dsh" && data.dsh && data.dsh.command
+              ? data.dsh.command
+              : "applied: " + (data.at ? new Date(data.at).toLocaleString() : "?") + (data.demo ? " (demo)" : "")) : null,
           result ? h("div", { className: "rub-sub" }, result) : null,
+          dshInfo ? h("div", { className: "rub-sub" },
+            "dsh " + (dshInfo.from || "?") + " から dsh " + dshInfo.to + " が利用可能",
+            h("div", { className: "rub-acts" },
+              h("button", { className: "rub-tbtn", disabled: running === "busy", onClick: runDshUpdate },
+                running === "busy" ? "updating dsh..." : "update dsh"),
+              h("button", { className: "rub-tbtn dim", onClick: () => {
+                try { window.open(dshInfo.details, "_blank", "noopener"); } catch (e) {}
+              } }, "details"),
+              h("button", { className: "rub-tbtn dim", onClick: dismissDsh }, "dismiss"))) : null,
           h("div", { className: "rub-acts" },
             h("button", { className: "rub-tbtn", disabled: running === "busy", onClick: runUpdate },
               running === "busy" ? "updating..." : running === "done" ? "update again" : "update"),
-            h("button", { className: "rub-tbtn dim", onClick: () => setShowDetail(!showDetail) }, "details"),
+            h("button", { className: "rub-tbtn dim", onClick: () => {
+              if (data.kind === "dsh" && data.dsh && data.dsh.details) {
+                try { window.open(data.dsh.details, "_blank", "noopener"); } catch (e) {}
+                setShowDetail(true);
+              } else setShowDetail(!showDetail);
+            } }, "details"),
             h("button", { className: "rub-tbtn dim", onClick: dismiss }, "dismiss"))))
         : h("div", { className: "rub-mini", onClick: () => setExpanded(true) },
           h(Icon, null),
-          h("b", null, "rdsh updated!"));
+          h("b", null, label));
       return h("div", { className: "rub-wrap rub-pop", role: "alert", "data-testid": "rdsh-update" },
         h("style", null, CSS + KEYFRAMES),
         inner);

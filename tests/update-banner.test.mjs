@@ -296,7 +296,10 @@ test('authenticated occurrence-close API keeps updater state intact and streams 
     assert.equal(await readFile(outside, 'utf8'), 'DUMMY_UNCHANGED'); await rm(closePath);
     const outsideState = path.join(root, 'DUMMY-update-state-outside'); await writeFile(outsideState, initialRaw);
     await rm(statePath); await symlink(outsideState, statePath);
-    assert.deepEqual((await get()).data, { ok: false });
+    // A planted state link reports the failure and leaks no update fields; the
+    // dsh half of the card is independent of the rdsh state file.
+    const blocked = (await get()).data;
+    assert.equal(blocked.ok, false); assert.equal(blocked.updated, undefined); assert.equal(blocked.to, undefined);
     assert.equal(await readFile(outsideState, 'utf8'), initialRaw);
     await rm(statePath); await setState(update());
     const real = path.join(root, 'real'); await mkdir(real); await writeFile(path.join(real, 'update-state.json'), initialRaw);
@@ -363,7 +366,7 @@ test('feature switches gate every update route and keep polling when notificatio
   await writeFile(path.join(home, 'rdsh.json'), '{not json');
   const broken = server();
   const disposeBroken = apply(broken.ctx, { demo: true });
-  assert.deepEqual([...broken.routes.keys()].sort(), ['/api/rdsh-update', '/api/rdsh-update/dismiss', '/api/rdsh-update/events', '/api/rdsh-update/run']);
+  assert.deepEqual([...broken.routes.keys()].sort(), ['/api/rdsh-update', '/api/rdsh-update/dismiss', '/api/rdsh-update/dsh/run', '/api/rdsh-update/events', '/api/rdsh-update/run']);
   const demo = await get(broken.routes);
   assert.equal(demo.status, 200); assert.equal(demo.data.updated, true);
   disposeBroken?.();
@@ -371,7 +374,7 @@ test('feature switches gate every update route and keep polling when notificatio
   await writeFile(path.join(home, 'rdsh.json'), JSON.stringify({ features: { update_notifications: false } }));
   const polling = server();
   const disposePolling = apply(polling.ctx, { demo: true });
-  assert.deepEqual([...polling.routes.keys()].sort(), ['/api/rdsh-update', '/api/rdsh-update/dismiss', '/api/rdsh-update/run']);
+  assert.deepEqual([...polling.routes.keys()].sort(), ['/api/rdsh-update', '/api/rdsh-update/dismiss', '/api/rdsh-update/dsh/run', '/api/rdsh-update/run']);
   const state = await get(polling.routes);
   assert.equal(state.status, 200); assert.equal(state.data.updated, true);
   disposePolling?.();
