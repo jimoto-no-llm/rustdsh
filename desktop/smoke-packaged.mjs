@@ -105,8 +105,13 @@ try {
   assert.equal(await composer.evaluate(element => element === document.activeElement || element.contains(document.activeElement)), true);
   const draft = 'rdsh native smoke draft';
   await composer.fill(draft);
+  await composer.filter({ hasText: draft }).waitFor({ state: 'visible', timeout: 10000 });
   assert.equal((await composer.textContent()).trim(), draft);
-  await composer.fill('');
+  // Use the editor's normal select-all/backspace path, then wait for the
+  // controlled renderer to acknowledge the edit before asserting.
+  await composer.press('ControlOrMeta+A');
+  await composer.press('Backspace');
+  await composer.filter({ hasText: /^\s*$/ }).waitFor({ state: 'visible', timeout: 10000 });
   assert.equal((await composer.textContent()).trim(), '');
   await workspace.screenshot({ path: join(output, 'rdsh-desktop-workspace.png') });
   const child = application.process();
