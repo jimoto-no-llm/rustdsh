@@ -5,6 +5,16 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Changed
+
+- `rdsh serve` のダッシュボード（`src/ui.html`）を、初めてでも迷わない
+  言い回しと操作に刷新しました。接続は「3つのステップ」表示、状態は
+  「dsh は動いています」の1文で確認できます。セッション一覧は更新時刻と
+  サイズを行形式で示し、技術的な詳細は「くわしい情報」に集約しました。
+  トークンをURLやページに残さない設計は変えていません。
+  スクリーンショット（`docs/screenshots/showcase/serve-dashboard-*`）は
+  新しいUIに差し替えました。
+
 ## [0.9.1] - 2026-10-18
 
 ### Added

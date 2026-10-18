@@ -32,8 +32,8 @@
   --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
   --sp-5: 24px; --sp-6: 32px; --sp-7: 48px;
   --r-sm: 6px; --r-md: 10px; --r-lg: 16px; --r-pill: 999px;
-  --fs-xs: 12px; --fs-sm: 13px; --fs-md: 14px; --fs-lg: 16px;
-  --fs-xl: 20px; --fs-2xl: 30px;
+  --fs-xs: 12px; --fs-sm: 13px; --fs-md: 16px; --fs-lg: 20px;
+  --fs-xl: 22px; --fs-2xl: 34px;
   --font: system-ui, -apple-system, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --measure: 1120px;
@@ -61,6 +61,7 @@
 }
 /* ---------- base ---------- */
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0;
@@ -113,13 +114,14 @@ svg { max-width: 100%; }
 .updated { font-size: var(--fs-xs); color: var(--fg-muted); white-space: nowrap; }
 /* ---------- buttons ---------- */
 .btn {
-  font: 600 var(--fs-sm)/1 var(--font);
-  border-radius: var(--r-sm); padding: 9px 14px; min-height: 36px;
+  font: 700 var(--fs-md)/1 var(--font);
+  border-radius: var(--r-md); padding: 12px 18px; min-height: 44px;
   border: 1px solid transparent; cursor: pointer;
   transition: background-color .12s ease, border-color .12s ease, filter .12s ease;
 }
 .btn-primary { background: var(--acc); color: var(--acc-fg); }
 .btn-primary:hover { filter: brightness(1.08); }
+.btn-connect { min-height: 52px; padding: 0 30px; font-size: var(--fs-lg); font-weight: 800; }
 .btn-ghost { background: transparent; color: var(--fg); border-color: var(--line-strong); }
 .btn-ghost:hover { background: var(--code-bg); border-color: var(--acc); }
 .btn:disabled { opacity: .55; cursor: not-allowed; }
@@ -144,10 +146,10 @@ svg { max-width: 100%; }
 .connect-card { border-color: var(--acc); box-shadow: var(--shadow-2); }
 .connect-row { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-3); }
 #dashboard-token {
-  flex: 1 1 220px; min-width: 0;
+  flex: 1 1 240px; min-width: 0; min-height: 52px;
   background: var(--code-bg); color: var(--fg);
-  border: 1px solid var(--line-strong); border-radius: var(--r-sm);
-  padding: 9px 10px; font: var(--fs-sm)/1.4 var(--font-mono);
+  border: 2px solid var(--line-strong); border-radius: var(--r-md);
+  padding: 12px 14px; font: 15px/1.4 var(--font-mono);
 }
 .error { margin: var(--sp-2) 0 0; min-height: 1.2em; color: var(--danger); font-size: var(--fs-sm); }
 /* ---------- at a glance ---------- */
@@ -165,21 +167,38 @@ svg { max-width: 100%; }
 .tile-value { font-size: var(--fs-2xl); font-weight: 700; line-height: 1.15; letter-spacing: -.01em; overflow-wrap: anywhere; }
 .tile-value-path { font: 600 var(--fs-sm)/1.5 var(--font-mono); word-break: break-all; }
 .tile-note { font-size: var(--fs-xs); color: var(--fg-muted); overflow-wrap: anywhere; }
+/* ---------- status hero ---------- */
+.hero { display: flex; align-items: center; gap: var(--sp-4); border-left: 6px solid var(--ok); color: var(--ok); }
+.hero-warn { border-left-color: var(--warn); color: var(--warn); }
+.hero-icon { flex: 0 0 auto; }
+.hero-big { margin: 0; font-size: var(--fs-2xl); font-weight: 700; line-height: 1.25; letter-spacing: -.01em; color: var(--fg); }
+.hero-sub { margin: 2px 0 0; color: var(--fg-muted); font-size: var(--fs-md); }
+/* ---------- connect steps ---------- */
+.steps { list-style: none; counter-reset: step; margin: 0 0 var(--sp-4); padding: 0; display: flex; flex-direction: column; gap: var(--sp-4); }
+.step { counter-increment: step; display: flex; gap: var(--sp-3); align-items: flex-start; }
+.step::before { content: counter(step); flex: 0 0 auto; width: 34px; height: 34px; border-radius: 50%; background: var(--acc); color: var(--acc-fg); font-weight: 700; font-size: var(--fs-lg); display: flex; align-items: center; justify-content: center; }
+.step h3 { margin: 2px 0; font-size: var(--fs-lg); }
+.step p { margin: 0; color: var(--fg-muted); font-size: var(--fs-md); }
+.step .chip { display: inline-block; margin-top: var(--sp-2); padding: 8px 12px; background: var(--code-bg); border: 1px solid var(--line-strong); border-radius: var(--r-sm); font: var(--fs-sm)/1.4 var(--font-mono); overflow-wrap: anywhere; }
+.faq { margin-top: var(--sp-4); border-top: 1px dashed var(--line-strong); padding-top: var(--sp-3); }
+.faq summary { cursor: pointer; font-weight: 600; color: var(--fg-muted); font-size: var(--fs-md); }
+.faq summary::-webkit-details-marker { display: none; }
+.faq ul { margin: var(--sp-2) 0 0; padding-left: var(--sp-5); color: var(--fg-muted); font-size: var(--fs-md); }
+.faq li { margin-top: var(--sp-2); }
+/* ---------- locked teaser ---------- */
+.locked { display: flex; align-items: center; gap: var(--sp-4); border: 1.5px dashed var(--line-strong); border-radius: var(--r-md); padding: var(--sp-5); color: var(--fg-muted); }
+.locked b { color: var(--fg); }
+.locked .locked-help { margin: 2px 0 0; font-size: var(--fs-md); }
 /* ---------- sessions ---------- */
 .session-list { display: flex; flex-direction: column; gap: var(--sp-3); min-width: 0; }
-.session-cards {
-  display: grid; gap: var(--sp-3); margin: 0; padding: 0; list-style: none;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
-}
-.session-card {
-  display: flex; flex-direction: column; gap: 2px; min-width: 0;
-  padding: var(--sp-3) var(--sp-4);
-  background: var(--bg-elevated); border: 1px solid var(--line); border-radius: var(--r-md);
-}
-.session-id { margin: 0; font: 600 var(--fs-sm)/1.5 var(--font-mono); overflow-wrap: anywhere; }
-.session-project { margin: 0; font-size: var(--fs-xs); }
-.session-meta { margin: 0; font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
-.session-projects { margin: 0; font-size: var(--fs-xs); }
+.session-rows { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.session-row { display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-4) var(--sp-2); border-top: 1px solid var(--line); }
+.session-row:first-child { border-top: none; }
+.proj { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; font-weight: 700; font-size: var(--fs-lg); min-width: 0; }
+.proj .sw { width: 10px; height: 10px; border-radius: 50%; background: var(--acc); flex: 0 0 auto; }
+.when { flex: 1 1 auto; min-width: 0; font-size: var(--fs-md); }
+.size-pill { flex: 0 0 auto; font-size: var(--fs-sm); font-weight: 600; color: var(--fg-muted); border: 1px solid var(--line-strong); border-radius: var(--r-pill); padding: 5px 12px; }
+.session-projects { margin: 0; font-size: var(--fs-sm); color: var(--fg-muted); }
 .empty {
   display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-2);
   padding: var(--sp-5);
@@ -240,6 +259,9 @@ pre {
   .header-actions { width: 100%; margin-left: 0; }
   .tile-value { font-size: var(--fs-xl); }
   .panel { padding: var(--sp-4); }
+  .session-row { flex-wrap: wrap; }
+  .proj { flex: 1 1 100%; }
+  .size-pill { margin-left: var(--sp-2); }
 }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
@@ -266,26 +288,67 @@ pre {
 <main id="main" class="layout">
   <section id="auth" class="panel connect-card" hidden aria-labelledby="ui-connect-heading">
     <h2 id="ui-connect-heading">ダッシュボードに接続</h2>
-    <p id="ui-connect-help" class="muted">端末に表示された保護済みトークンファイルの内容を入力してください。トークンはアドレスバーに保存されません。</p>
+    <p id="ui-connect-lede" class="muted">やることは3つだけです。</p>
+    <ol class="steps">
+      <li class="step">
+        <div>
+          <h3 id="ui-step1-title">端末にあいことばの入ったファイルが出ています</h3>
+          <p id="ui-step1-help">rdsh serve を動かしている画面を見てください。こんな行があります。</p>
+          <span class="chip" aria-hidden="true">cat /var/tmp/rdsh-token-xxxx….txt</span>
+        </div>
+      </li>
+      <li class="step">
+        <div>
+          <h3 id="ui-step2-title">その中身をぜんぶコピーする</h3>
+          <p id="ui-step2-help">長い文字ですが、全部が必要です。</p>
+        </div>
+      </li>
+      <li class="step">
+        <div>
+          <h3 id="ui-step3-title">下の箱に貼り付けて「つなぐ」を押す</h3>
+          <p id="ui-step3-help">あいことは、このページを開ける人を確かめるための文字です。URLには保存されません。</p>
+        </div>
+      </li>
+    </ol>
     <div class="connect-row">
-      <input id="dashboard-token" type="password" autocomplete="off" spellcheck="false" aria-label="Dashboard token">
-      <button type="button" class="btn btn-primary" id="ui-connect" onclick="connectDashboard()">接続</button>
+      <input id="dashboard-token" type="password" autocomplete="off" spellcheck="false" aria-label="あいことば">
+      <button type="button" class="btn btn-primary btn-connect" id="ui-connect" onclick="connectDashboard()">つなぐ</button>
     </div>
     <p id="auth-error" class="error" role="alert"></p>
+    <details class="faq">
+      <summary id="ui-faq-summary">わからないときは（よくある質問）</summary>
+      <ul>
+        <li id="ui-faq-1">「端末」ってどこ？ — rdsh serve を実行した、文字が流れる黒い画面のことです。</li>
+        <li id="ui-faq-2">ファイルが見つからない — 一度止めて（Ctrl-C）、もう一度 rdsh serve を実行すると新しいファイルが出ます。</li>
+        <li id="ui-faq-3">ほかのパソコンからは開けません。あやしいときは、URLが 127.0.0.1 で始まるか確認してください。</li>
+      </ul>
+    </details>
+  </section>
+
+  <section class="locked" id="locked" hidden>
+    <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true" focusable="false"><rect x="7" y="15" width="20" height="13" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M11.5 15v-4a5.5 5.5 0 0111 0v4" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+    <div>
+      <b id="ui-locked-title">つなぐと見られるもの</b>
+      <p class="locked-help" id="ui-locked-help">最近のセッション ・ dsh本体の場所 ・ くわしい情報</p>
+    </div>
+  </section>
+
+  <section class="panel hero" id="status-hero" hidden aria-live="polite">
+    <svg class="hero-icon" width="46" height="46" viewBox="0 0 46 46" aria-hidden="true" focusable="false"><circle cx="23" cy="23" r="22" fill="currentColor" opacity=".16"/><path d="M14 23.5l6.5 6.5L32 16.5" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div>
+      <p class="hero-big" id="hero-title"></p>
+      <p class="hero-sub" id="hero-sub"></p>
+    </div>
   </section>
 
   <section class="panel" id="overview" aria-labelledby="ui-overview-heading">
     <div class="panel-head">
       <div>
-        <h2 id="ui-overview-heading">概要</h2>
-        <p id="ui-overview-help" class="muted">接続状態と本家 dsh の場所、最近のセッション数をまとめています。</p>
+        <h2 id="ui-overview-heading">いまのようす</h2>
+        <p id="ui-overview-help" class="muted">よく見る3つだけを示します。</p>
       </div>
     </div>
     <dl class="glance">
-      <div class="tile">
-        <dt id="ui-glance-connection">接続</dt>
-        <dd><span class="tile-value" id="glance-connection">未接続</span><span class="tile-note" id="glance-connection-note">下の入力欄から接続してください</span></dd>
-      </div>
       <div class="tile">
         <dt id="ui-glance-dsh">本家 dsh の場所</dt>
         <dd><span class="tile-value tile-value-path" id="glance-dsh">—</span><span class="tile-note" id="glance-dsh-note"></span></dd>
@@ -301,7 +364,7 @@ pre {
     </dl>
   </section>
 
-  <section class="panel" aria-labelledby="ui-sessions-heading">
+  <section class="panel" id="sessions-panel" aria-labelledby="ui-sessions-heading">
     <div class="panel-head">
       <div>
         <h2 id="ui-sessions-heading">最近のセッション</h2>
@@ -370,65 +433,77 @@ const RDSH_UI_LOCALE = ["en", "zh-CN", "ja"].includes(document.documentElement.d
 const RDSH_UI_CATALOG = {};
 for (const [key, ja, en, zh] of [
   ["page.title", "rdsh ダッシュボード", "rdsh dashboard", "rdsh 仪表板"],
-  ["app.role", "DeepSeek Harness の監査・パフォーマンスモニター", "Audit & Performance Monitor for DeepSeek Harness", "DeepSeek Harness 审计与性能监控"],
-  ["app.subtitle", "rdsh serve が提供するローカル専用の監視ダッシュボードです。本家 dsh web のチャット画面ではありません。", "Local-only monitoring dashboard served by rdsh serve — not the upstream dsh web chat interface.", "由 rdsh serve 提供的仅限本地的监控仪表板，并非上游 dsh web 的聊天界面。"],
+  ["app.role", "dsh のようすを見るページ（このパソコンの中だけで開けます）", "See what dsh is doing (opens only on this computer)", "查看 dsh 的动态（仅在本机打开）"],
+  ["app.subtitle", "見るだけのダッシュボードです。本家 dsh のチャット画面ではありません。", "A read-only view — this is not the dsh chat.", "仅供查看的仪表板，并非 dsh 聊天界面。"],
   ["skip.toContent", "本文へスキップ", "Skip to content", "跳到主要内容"],
-  ["reload", "再読み込み", "Reload", "重新加载"],
+  ["reload", "最新にする", "Refresh data", "刷新数据"],
   ["page.updated", "最終更新: {time}", "Last updated: {time}", "最后更新：{time}"],
 
-  ["overview.heading", "概要", "At a glance", "概览"],
-  ["overview.help", "接続状態と本家 dsh の場所、最近のセッション数をまとめています。", "Connection, where rdsh finds upstream dsh, and how many sessions are recent.", "连接状态、rdsh 找到的上游 dsh 位置，以及近期会话数量。"],
-  ["glance.connection", "接続", "Connection", "连接"],
-  ["glance.connection.on", "接続済み", "Connected", "已连接"],
-  ["glance.connection.off", "未接続", "Not connected", "未连接"],
-  ["glance.connection.note.on", "トークンを確認しました", "Token verified", "令牌已验证"],
-  ["glance.connection.note.off", "下の入力欄から接続してください", "Connect from the field below", "请从下方输入框连接"],
-  ["glance.dsh", "本家 dsh の場所", "Upstream dsh", "上游 dsh"],
-  ["glance.dsh.note", "DSH_HOME: {path}", "DSH_HOME: {path}", "DSH_HOME：{path}"],
-  ["glance.dsh.missing", "見つかりません", "Not found", "未找到"],
-  ["glance.rdsh", "rdsh", "rdsh", "rdsh"],
-  ["glance.rdsh.note", "このダッシュボードを提供している版", "Version serving this dashboard", "提供此仪表板的版本"],
+  ["overview.heading", "いまのようす", "Status", "当前状态"],
+  ["overview.help", "よく見る3つだけを示します。", "The three things you normally need.", "只显示常用的三项。"],
+  ["glance.dsh", "dsh 本体の場所", "Where dsh lives", "dsh 程序位置"],
+  ["glance.dsh.note.found", "ちゃんと見つかっています", "Found and ready", "已找到，可正常使用"],
+  ["glance.dsh.note.missing", "見つかりません", "Not found", "未找到"],
+  ["glance.rdsh", "このページの版", "This page's version", "本页面版本"],
+  ["glance.rdsh.note", "更新の案内が出たら、押すだけで新しくなります。", "When an update lands, one press installs it.", "出现更新提示后，一键即可更新。"],
   ["glance.sessions", "最近のセッション", "Recent sessions", "近期会话"],
-  ["glance.sessions.note", "直近 {count} 件", "Latest {count}", "最近 {count} 条"],
+  ["glance.sessions.count", "{count} 件", "{count}", "{count} 条"],
+  ["glance.sessions.note", "このパソコンでの会話の記録", "Conversations on this computer", "本机上的对话记录"],
 
-  ["connection.waiting", "未接続: 端末に表示されたトークンを入力してください。", "Not connected: enter the token printed in the terminal.", "未连接：请输入终端显示的令牌。"],
-  ["connection.connected", "接続済み: {time} に更新", "Connected: updated {time}", "已连接：更新于 {time}"],
-  ["connect.heading", "ダッシュボードに接続", "Connect to dashboard", "连接到仪表板"],
-  ["connect.help", "端末に表示された保護済みトークンファイルの内容を入力してください。トークンはアドレスバーに保存されません。", "Enter the protected token handoff file contents printed in the terminal. The token is not stored in the address bar.", "请输入终端显示的受保护令牌交接文件内容。令牌不会保存在地址栏中。"],
-  ["connect.button", "接続", "Connect", "连接"],
-  ["token.label", "ダッシュボードのトークン", "Dashboard token", "仪表板令牌"],
+  ["connection.waiting", "まだつながっていません", "Not connected yet", "尚未连接"],
+  ["connection.connected", "つながっています（{time} 更新）", "Connected (updated {time})", "已连接（{time} 更新）"],
+  ["connect.heading", "3つやるだけで使えます", "Just three quick steps", "只需三步即可使用"],
+  ["connect.lede", "1分もかかりません。", "It takes under a minute.", "不到一分钟。"],
+  ["step1.title", "端末にあいことばの入ったファイルが出ています", "The terminal shows a file with your access phrase", "终端里显示了一个写有口令的文件"],
+  ["step1.help", "rdsh serve を動かしている画面を見てください。こんな行があります。", "Look at the window running rdsh serve. You will see a line like this.", "查看运行 rdsh serve 的窗口，会看到类似这样的一行。"],
+  ["step2.title", "その中身をぜんぶコピーする", "Copy the whole file contents", "完整复制其中的内容"],
+  ["step2.help", "長い文字ですが、全部が必要です。", "It is long, but every character is needed.", "文字很长，但全部都需要。"],
+  ["step3.title", "下の箱に貼り付けて「つなぐ」を押す", "Paste it below and press Connect", "粘贴到下方并点击“连接”"],
+  ["step3.help", "あいことば（トークン）は、このページを開ける人を確かめるための文字です。URLには保存されません。", "The phrase (token) proves it is you; it is never stored in the URL.", "口令（令牌）用于确认是本人打开页面；不会保存到网址中。"],
+  ["connect.button", "つなぐ", "Connect", "连接"],
+  ["token.label", "あいことば（トークン）", "Access phrase (token)", "口令（令牌）"],
+  ["token.placeholder", "ここに貼り付け", "Paste it here", "粘贴到此处"],
+  ["faq.summary", "わからないときは（よくある質問）", "Trouble? Common questions", "遇到问题时（常见问答）"],
+  ["faq.terminal", "「端末」ってどこ？ — rdsh serve を実行した、文字が流れる黒い画面のことです。", "Where is the terminal? — the black window where you ran rdsh serve.", "终端在哪里？— 即运行 rdsh serve 的黑色窗口。"],
+  ["faq.file", "ファイルが見つからない — 一度止めて（Ctrl-C）、もう一度 rdsh serve を実行すると新しいファイルが出ます。", "Cannot find the file? — stop with Ctrl-C and run rdsh serve again for a fresh one.", "找不到文件？— 用 Ctrl-C 停止后再次运行 rdsh serve 可生成新文件。"],
+  ["faq.local", "ほかのパソコンからは開けません。あやしいときは、URLが 127.0.0.1 で始まるか確認してください。", "It opens on this computer only; if in doubt, check the URL starts with 127.0.0.1.", "其他电脑无法打开；如有疑虑，请确认网址以 127.0.0.1 开头。"],
+  ["hero.ok.title", "dsh は動いています", "dsh is up and running", "dsh 正在运行"],
+  ["hero.ok.sub", "{time} に確認しました。くわしい点検は下の「くわしい情報」にあります。", "Checked {time}. A detailed check lives under Details below.", "已于 {time} 确认。详细检查见下方“详细信息”。"],
+  ["hero.missing.title", "dsh 本体が見つかりません", "dsh was not found", "未找到 dsh 程序"],
+  ["hero.missing.sub", "端末で dsh doctor を実行すると原因がわかります。", "Run dsh doctor in the terminal to see why.", "在终端运行 dsh doctor 可查看原因。"],
+  ["hero.fail.title", "状態を確認できませんでした", "Could not check the status", "无法确认状态"],
+  ["hero.fail.sub", "「最新にする」を押すか、serve を再起動してください。", "Press Refresh data, or restart rdsh serve.", "请点击“刷新数据”，或重启 rdsh serve。"],
 
   ["sessions.heading", "最近のセッション", "Recent sessions", "近期会话"],
-  ["sessions.help", "更新時刻・サイズ・トークン概算を表示します。", "Shows when each session was updated, its size and an estimated token count.", "显示每个会话的更新时间、大小和估算令牌数。"],
-  ["sessions.updated", "更新 {time}", "Updated {time}", "更新于 {time}"],
-  ["sessions.tokens", "約 {tokens} トークン", "≈ {tokens} tokens", "约 {tokens} 个令牌"],
-  ["sessions.projects", "（{count} プロジェクト）", "({count} projects)", "（{count} 个项目）"],
+  ["sessions.help", "いつ更新したかと、大きさを示します。", "Shows when each was updated and how big it is.", "显示各项的更新时间与大小。"],
+  ["sessions.updated", "{time} に更新", "Updated {time}", "更新于 {time}"],
+  ["sessions.projects", "{count} プロジェクトの記録", "From {count} projects", "来自 {count} 个项目"],
+  ["sessions.project.fallback", "プロジェクト", "project", "项目"],
   ["sessions.empty.title", "まだセッションがありません", "No sessions yet", "还没有会话"],
   ["sessions.empty.help", "dsh で会話を始めると、最新のセッションがここに並びます。", "Start a conversation with dsh and the latest sessions appear here.", "使用 dsh 开始对话后，最新会话会显示在这里。"],
   ["sessions.empty.connect", "トークンを入力", "Enter the token", "输入令牌"],
-  ["sessions.locked.title", "セッションは接続後に表示されます", "Sessions appear after you connect", "连接后显示会话"],
-  ["sessions.locked.help", "トークンを入力すると最新のセッションを読み込みます。", "Enter the token to load the latest sessions.", "输入令牌即可加载最新会话。"],
+  ["locked.title", "つなぐと見られるもの", "What you will see once connected", "连接后可查看的内容"],
+  ["locked.help", "最近のセッション ・ dsh本体の場所 ・ くわしい情報", "Recent sessions, where dsh lives, and details", "近期会话、dsh 程序位置、详细信息"],
   ["awaiting", "接続後に自動表示します", "Loads automatically after you connect", "连接后将自动显示"],
 
-  ["advanced.summary", "上級者向けの機能", "Advanced tools", "高级工具"],
-  ["advanced.help", "環境診断の詳細・トークン推定・履歴の整理・スキル・性能計測。ふだんは開く必要はありません。", "Diagnostics details, token estimates, history trimming, skills and performance measurement. You normally do not need these.", "诊断详情、令牌估算、历史整理、技能与性能测量。通常无需展开。"],
+  ["advanced.summary", "くわしい情報（ふだんは開かなくて大丈夫）", "Details (safe to leave closed)", "详细信息（平时无需展开）"],
+  ["advanced.help", "環境の点検・文字数のはかり・長い出力を短くする道具・スキル一覧・起動時間の測定。", "Environment checks, a character counter, long-output trimming, skills and startup timing.", "环境检查、字数估算、长输出修剪、技能列表与启动计时。"],
   ["doctor.heading", "環境診断", "Environment check", "环境诊断"], ["doctor.help", "本家 dsh の場所・DSH_HOME・slim 設定を確認します（doctor 相当）。", "Checks where upstream dsh lives, DSH_HOME and slim settings (the doctor view).", "确认上游 dsh 的位置、DSH_HOME 与 slim 设置（相当于 doctor）。"], ["refresh", "更新", "Refresh", "刷新"],
   ["tokens.heading", "トークン推定", "Token estimate", "令牌估算"], ["tokens.help", "入力テキストのトークン数を概算します（約4文字=1トークン）。", "Estimates input tokens (about 4 characters = 1 token).", "估算输入文本的令牌数（约 4 个字符 = 1 个令牌）。"], ["tokens.placeholder", "ここにテキストを貼り付け", "Paste text here", "在此粘贴文本"], ["tokens.estimate", "推定する", "Estimate", "估算"], ["tokens.result", "トークン: {tokens} / 文字数: {chars}", "tokens: {tokens} / chars: {chars}", "令牌：{tokens} / 字符：{chars}"],
-  ["prune.heading", "履歴の整理", "History trimming", "历史整理"], ["prune.help", "長い出力の先頭と末尾を残して予算内に収めます。", "Keeps the head and tail of long output within a token budget.", "保留长输出的开头和结尾，并控制在预算内。"], ["prune.placeholder", "長いツール出力を貼り付け", "Paste long tool output", "粘贴较长的工具输出"], ["budget", "予算", "Budget", "预算"], ["prune.run", "prune実行", "Run prune", "执行裁剪"], ["prune.result", "[処理前 {before} → 処理後 {after}]（{chars}文字）", "[before {before} -> after {after}] ({chars} chars)", "[处理前 {before} → 处理后 {after}]（{chars} 个字符）"], ["copy", "コピー", "Copy", "复制"],
+  ["prune.heading", "長い出力を短くする", "Trim long output", "修剪长输出"], ["prune.help", "長い出力の先頭と末尾を残して予算内に収めます。", "Keeps the head and tail of long output within a token budget.", "保留长输出的开头和结尾，并控制在预算内。"], ["prune.placeholder", "長いツール出力を貼り付け", "Paste long tool output", "粘贴较长的工具输出"], ["budget", "予算", "Budget", "预算"], ["prune.run", "prune実行", "Run prune", "执行裁剪"], ["prune.result", "[処理前 {before} → 処理後 {after}]（{chars}文字）", "[before {before} -> after {after}] ({chars} chars)", "[处理前 {before} → 处理后 {after}]（{chars} 个字符）"], ["copy", "コピー", "Copy", "复制"],
   ["skills.heading", "スキル", "Skills", "技能"], ["skills.help", "導入済みのスキル一覧。", "Installed skills.", "已安装的技能。"], ["bench.heading", "性能計測", "Performance", "性能测量"], ["bench.help", "rdsh と本家 dsh の起動時間を比べます。", "Compares rdsh and upstream dsh startup time.", "比较 rdsh 与上游 dsh 的启动时间。"], ["bench.measure", "計測 (n=3)", "Measure (n=3)", "测量 (n=3)"], ["bench.pending", "計測中…", "Measuring…", "正在测量…"], ["bench.none", "未計測", "Not measured", "未测量"],
 
   ["footer", "rdsh は本家 dsh を壊さない安全な Rust ランチャーです。", "rdsh is a safe Rust launcher that leaves upstream dsh intact.", "rdsh 是不会破坏上游 dsh 的安全 Rust 启动器。"],
   ["footer.note", "serve は 127.0.0.1 でのみ待ち受けます。", "serve listens only on 127.0.0.1.", "serve 仅监听 127.0.0.1。"],
   ["footer.license", "MIT ライセンス", "MIT License", "MIT 许可证"],
 
-  ["auth.rejected", "トークンを確認できません。ファイルの内容を確認してください。", "Token rejected. Check the handoff file contents.", "令牌被拒绝。请检查交接文件内容。"], ["error.prefix", "エラー: {message}", "Error: {message}", "错误：{message}"], ["retry", "再試行", "Retry", "重试"], ["copy.done", "コピー済み", "Copied", "已复制"], ["copy.none", "コピー対象がありません。先にprune実行してください。", "There is nothing to copy. Run prune first.", "没有可复制的内容。请先执行裁剪。"],
+  ["auth.rejected", "あいことばが違うみたいです。ファイルの中身を「ぜんぶ」コピーできていますか？", "That phrase does not match. Did you copy the whole file contents?", "口令似乎不对。是否完整复制了文件内容？"], ["error.prefix", "エラー: {message}", "Error: {message}", "错误：{message}"], ["retry", "再試行", "Retry", "重试"], ["copy.done", "コピー済み", "Copied", "已复制"], ["copy.none", "コピーするものがありません。先に「短くする」を押してください。", "Nothing to copy yet. Trim first.", "尚无可复制内容。请先执行修剪。"],
   ["response.invalid", "応答の解析に失敗: サーバーから不正な応答が返されました。再試行してください。", "Could not parse the response: the server returned an invalid response. Retry.", "无法解析响应：服务器返回了无效响应。请重试。"],
-  ["connection.failed", "接続できません: rdsh serve が起動しているか確認し、再試行してください。", "Could not connect: check that rdsh serve is running and retry.", "无法连接：请确认 rdsh serve 正在运行，然后重试。"],
+  ["connection.failed", "つながりません。rdsh serve が動いているか確認して、もう一度「つなぐ」を押してください。", "Could not connect. Check that rdsh serve is running, then try again.", "无法连接。请确认 rdsh serve 正在运行后重试。"],
   ["http.400", "不正なリクエスト (400): {path} への送信内容を確認してください。", "Bad request (400): check the data sent to {path}.", "请求无效 (400)：请检查发送到 {path} 的数据。"], ["http.401", "認証エラー (401): ダッシュボードのトークンが必要です。", "Authentication error (401): dashboard token required.", "认证错误 (401)：需要仪表板令牌。"], ["http.403", "アクセス拒否 (403): 信頼できないホスト/オリジンです。127.0.0.1 のダッシュボードURLから直接開いてください。", "Access denied (403): untrusted host/origin. Open directly from the 127.0.0.1 dashboard URL.", "访问被拒绝 (403)：主机或来源不受信任。请直接从 127.0.0.1 仪表板 URL 打开。"], ["http.404", "見つかりません (404): {path} は存在しません。", "Not found (404): {path} does not exist.", "未找到 (404)：{path} 不存在。"], ["http.413", "送信データが大きすぎます (413): テキストを短くして再試行してください。", "Request data is too large (413): shorten the text and retry.", "发送数据过大 (413)：请缩短文本后重试。"], ["http.429", "混雑しています (429): しばらく待って再試行してください。", "Busy (429): wait and retry.", "繁忙 (429)：请稍候重试。"], ["http.500", "サーバー内部エラー (500): 再試行してください。直らない場合は serve を再起動してください。", "Internal server error (500): retry. If it continues, restart serve.", "服务器内部错误 (500)：请重试。若持续发生，请重启 serve。"], ["http.503", "サーバーが混み合っています (503): しばらく待って再試行してください。", "Server is busy (503): wait and retry.", "服务器繁忙 (503)：请稍候重试。"], ["http.default", "リクエスト失敗 ({status}): {path}。再試行してください。", "Request failed ({status}): {path}. Retry.", "请求失败 ({status})：{path}。请重试。"],
 ]) { (RDSH_UI_CATALOG[key] ||= {}) .ja = ja; RDSH_UI_CATALOG[key].en = en; RDSH_UI_CATALOG[key]["zh-CN"] = zh; }
 function t(key, values = {}) { return (RDSH_UI_CATALOG[key]?.[RDSH_UI_LOCALE] || key).replace(/\{(\w+)\}/g, (_, name) => String(values[name] ?? "{" + name + "}")); }
 function formatNumber(value) { return new Intl.NumberFormat(RDSH_UI_LOCALE).format(value); }
-function formatCompact(value) { return new Intl.NumberFormat(RDSH_UI_LOCALE, { notation: "compact", maximumFractionDigits: 1 }).format(value); }
 function formatBytes(value) {
   const bytes = Number(value) || 0;
   if (bytes <= 0) return "0 B";
@@ -448,15 +523,23 @@ function setConnectState(key, values) {
   const badge = document.getElementById("connect-state");
   badge.textContent = t(key, values);
   badge.className = "badge " + (connected ? "badge-ok" : "badge-warn");
-  document.getElementById("glance-connection").textContent = t(connected ? "glance.connection.on" : "glance.connection.off");
-  document.getElementById("glance-connection-note").textContent = t(connected ? "glance.connection.note.on" : "glance.connection.note.off");
+}
+// One plain sentence about dsh itself: running, missing, or unknown.
+function setHero(kind, values) {
+  const hero = document.getElementById("status-hero");
+  const ok = kind === "ok";
+  hero.className = "panel hero" + (ok ? "" : " hero-warn");
+  document.getElementById("hero-title").textContent = t("hero." + kind + ".title", values);
+  document.getElementById("hero-sub").textContent = t("hero." + kind + ".sub", values);
+  hero.hidden = false;
 }
 function setUpdatedAt(value) {
   const time = value instanceof Date ? value.toLocaleTimeString(RDSH_UI_LOCALE) : String(value);
   document.getElementById("glance-updated").textContent = t("page.updated", { time });
 }
-for (const [id, key] of Object.entries({ "ui-skip":"skip.toContent", "ui-reload":"reload", "ui-title":"app.role", "ui-page-title":"page.title", "ui-subtitle":"app.subtitle", "ui-overview-heading":"overview.heading", "ui-overview-help":"overview.help", "connect-state":"connection.waiting", "ui-glance-connection":"glance.connection", "ui-glance-dsh":"glance.dsh", "ui-glance-rdsh":"glance.rdsh", "ui-glance-rdsh-note":"glance.rdsh.note", "ui-glance-sessions":"glance.sessions", "ui-connect-heading":"connect.heading", "ui-connect-help":"connect.help", "ui-connect":"connect.button", "ui-sessions-heading":"sessions.heading", "ui-sessions-help":"sessions.help", "ui-refresh-sessions":"refresh", "ui-advanced-summary":"advanced.summary", "ui-advanced-help":"advanced.help", "ui-doctor-heading":"doctor.heading", "ui-doctor-help":"doctor.help", "ui-refresh-doctor":"refresh", "ui-tokens-heading":"tokens.heading", "ui-tokens-help":"tokens.help", "ui-estimate":"tokens.estimate", "ui-prune-heading":"prune.heading", "ui-prune-help":"prune.help", "ui-budget":"budget", "ui-prune":"prune.run", pcopy:"copy", "ui-skills-heading":"skills.heading", "ui-skills-help":"skills.help", "ui-refresh-skills":"refresh", "ui-bench-heading":"bench.heading", "ui-bench-help":"bench.help", "ui-bench":"bench.measure", "ui-footer":"footer", "ui-footer-license":"footer.license", "ui-footer-note":"footer.note", "doctor":"awaiting", "sess":"awaiting", "sk":"awaiting", "bench":"bench.none" })) document.getElementById(id).textContent = t(key);
+for (const [id, key] of Object.entries({ "ui-skip":"skip.toContent", "ui-reload":"reload", "ui-title":"app.role", "ui-page-title":"page.title", "ui-subtitle":"app.subtitle", "ui-overview-heading":"overview.heading", "ui-overview-help":"overview.help", "connect-state":"connection.waiting", "ui-glance-dsh":"glance.dsh", "ui-glance-rdsh":"glance.rdsh", "ui-glance-rdsh-note":"glance.rdsh.note", "ui-glance-sessions":"glance.sessions", "ui-locked-title":"locked.title", "ui-locked-help":"locked.help", "ui-connect-heading":"connect.heading", "ui-connect-lede":"connect.lede", "ui-step1-title":"step1.title", "ui-step1-help":"step1.help", "ui-step2-title":"step2.title", "ui-step2-help":"step2.help", "ui-step3-title":"step3.title", "ui-step3-help":"step3.help", "ui-connect":"connect.button", "ui-faq-summary":"faq.summary", "ui-faq-1":"faq.terminal", "ui-faq-2":"faq.file", "ui-faq-3":"faq.local", "ui-sessions-heading":"sessions.heading", "ui-sessions-help":"sessions.help", "ui-refresh-sessions":"refresh", "ui-advanced-summary":"advanced.summary", "ui-advanced-help":"advanced.help", "ui-doctor-heading":"doctor.heading", "ui-doctor-help":"doctor.help", "ui-refresh-doctor":"refresh", "ui-tokens-heading":"tokens.heading", "ui-tokens-help":"tokens.help", "ui-estimate":"tokens.estimate", "ui-prune-heading":"prune.heading", "ui-prune-help":"prune.help", "ui-budget":"budget", "ui-prune":"prune.run", pcopy:"copy", "ui-skills-heading":"skills.heading", "ui-skills-help":"skills.help", "ui-refresh-skills":"refresh", "ui-bench-heading":"bench.heading", "ui-bench-help":"bench.help", "ui-bench":"bench.measure", "ui-footer":"footer", "ui-footer-license":"footer.license", "ui-footer-note":"footer.note", "doctor":"awaiting", "sess":"awaiting", "sk":"awaiting", "bench":"bench.none" })) document.getElementById(id).textContent = t(key);
 document.getElementById("dashboard-token").setAttribute("aria-label", t("token.label"));
+document.getElementById("dashboard-token").placeholder = t("token.placeholder");
 document.getElementById("ttext").placeholder = t("tokens.placeholder");
 document.getElementById("ptext").placeholder = t("prune.placeholder");
 setUpdatedAt("—");
@@ -502,7 +585,12 @@ function showAuth(message) {
   document.getElementById("auth").hidden = false;
   document.getElementById("auth-error").textContent = message || "";
   setConnectState("connection.waiting");
-  sessionEmpty("sessions.locked.title", "sessions.locked.help", focusToken);
+  // Until connected, show only the steps and a teaser; the data panels stay closed.
+  document.getElementById("locked").hidden = false;
+  document.getElementById("status-hero").hidden = true;
+  document.getElementById("overview").hidden = true;
+  document.getElementById("sessions-panel").hidden = true;
+  document.getElementById("advanced").hidden = true;
 }
 async function connectDashboard(candidateInput){
   const candidate = typeof candidateInput === "string" ? candidateInput : document.getElementById("dashboard-token").value.trim();
@@ -514,6 +602,10 @@ async function connectDashboard(candidateInput){
     sessionStorage.setItem("rdsh_dashboard_token", dashboardToken);
     document.getElementById("dashboard-token").value = "";
     document.getElementById("auth").hidden = true;
+    document.getElementById("locked").hidden = true;
+    document.getElementById("overview").hidden = false;
+    document.getElementById("sessions-panel").hidden = false;
+    document.getElementById("advanced").hidden = false;
     // Render the connect state first, then fill every section in parallel so the
     // first connected paint shows diagnostics, sessions and skills together.
     setConnectState("connection.connected", { time: new Date().toLocaleTimeString(RDSH_UI_LOCALE) });
@@ -577,7 +669,7 @@ function clearRetry(outId){
   if (btn) btn.hidden = true;
 }
 if (dashboardToken) connectDashboard(dashboardToken); else showAuth("");
-async function doctor(){ try { clearRetry("doctor"); const d = await jget("/api/doctor"); document.getElementById("doctor").textContent = JSON.stringify(d, null, 2); const target = document.getElementById("glance-dsh"); target.textContent = d && d.original_dsh ? String(d.original_dsh) : t("glance.dsh.missing"); document.getElementById("glance-dsh-note").textContent = d && d.dsh_home ? t("glance.dsh.note", {path: String(d.dsh_home)}) : ""; } catch(e){ fail("doctor", e.message, doctor); } }
+async function doctor(){ try { clearRetry("doctor"); const d = await jget("/api/doctor"); document.getElementById("doctor").textContent = JSON.stringify(d, null, 2); const found = d && d.original_dsh; const target = document.getElementById("glance-dsh"); target.textContent = found ? String(d.original_dsh) : t("glance.dsh.note.missing"); document.getElementById("glance-dsh-note").textContent = found ? t("glance.dsh.note.found") : ""; if (found) { setHero("ok", {time: new Date().toLocaleTimeString(RDSH_UI_LOCALE)}); } else { setHero("missing"); } } catch(e){ fail("doctor", e.message, doctor); setHero("fail"); } }
 async function tokens(){ try { clearRetry("tout"); const text = document.getElementById("ttext").value; const r = await jpost("/api/tokens", {text}); document.getElementById("tout").textContent = t("tokens.result", { tokens: formatNumber(r.tokens), chars: formatNumber(r.chars) }); } catch(e){ fail("tout", e.message, tokens); } }
 let lastPruned = "";
 async function prune(){
@@ -607,26 +699,32 @@ async function sessions(){
     const r = await jget("/api/sessions?limit=10");
     const list = Array.isArray(r.sessions) ? r.sessions : [];
     const projects = Number(r.projects) || 0;
-    document.getElementById("glance-sessions").textContent = formatNumber(list.length);
-    document.getElementById("glance-sessions-note").textContent = t("glance.sessions.note", {count: formatNumber(list.length)});
+    document.getElementById("glance-sessions").textContent = t("glance.sessions.count", {count: formatNumber(list.length)});
+    document.getElementById("glance-sessions-note").textContent = t("glance.sessions.note");
     if (!list.length) { sessionEmpty("sessions.empty.title", "sessions.empty.help", null); return; }
     const box = document.getElementById("sess");
     box.textContent = "";
     const ul = document.createElement("ul");
-    ul.className = "session-cards";
+    ul.className = "session-rows";
     for (const s of list) {
       const li = document.createElement("li");
-      li.className = "session-card";
-      const id = document.createElement("p");
-      id.className = "session-id";
-      id.textContent = String(s.id || "");
-      const project = document.createElement("p");
-      project.className = "session-project muted";
-      project.textContent = String(s.project || "");
-      const meta = document.createElement("p");
-      meta.className = "session-meta muted";
-      meta.textContent = t("sessions.updated", {time: formatSessionTime(String(s.mtime || ""))}) + " · " + formatBytes(s.bytes) + " · " + t("sessions.tokens", {tokens: formatCompact(Math.round((Number(s.bytes) || 0) / 4))});
-      li.append(id, project, meta);
+      li.className = "session-row";
+      // Human name first: the project folder, not the opaque session id.
+      const name = String(s.project || "").split("-").filter(Boolean).pop() || t("sessions.project.fallback");
+      li.title = String(s.id || "") + (s.project ? " · " + s.project : "");
+      const proj = document.createElement("span");
+      proj.className = "proj";
+      const sw = document.createElement("span");
+      sw.className = "sw";
+      sw.setAttribute("aria-hidden", "true");
+      proj.append(sw, document.createTextNode(name));
+      const when = document.createElement("span");
+      when.className = "when";
+      when.textContent = t("sessions.updated", {time: formatSessionTime(String(s.mtime || ""))});
+      const size = document.createElement("span");
+      size.className = "size-pill";
+      size.textContent = formatBytes(s.bytes);
+      li.append(proj, when, size);
       ul.append(li);
     }
     box.append(ul);
