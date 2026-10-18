@@ -11,6 +11,7 @@ mod editor;
 mod host;
 mod http;
 mod live;
+mod markdown;
 mod mux;
 mod rdsh;
 mod theme;

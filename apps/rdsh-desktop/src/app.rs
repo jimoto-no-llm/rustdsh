@@ -4,8 +4,10 @@
 //! Startup and all sockets run on background threads; the window paints first and
 //! receives updates through channels.
 
-use std::collections::HashMap;
+use std::cell::RefCell;
+use std::collections::{HashMap, HashSet};
 use std::ops::Range;
+use std::rc::Rc;
 use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
 use std::time::{Duration, Instant};
 
@@ -17,6 +19,7 @@ use crate::api::Api;
 use crate::editor::{Editor, Motion};
 use crate::host::Host;
 use crate::live::{self, LiveCmd, LiveEvent, Pending};
+use crate::markdown::{self, Block, Span};
 use crate::mux::Mux;
 use crate::theme;
 
@@ -915,8 +918,9 @@ fn short_model(model: &str) -> String {
 mod tests {
     use super::{
         byte_to_utf16, composer_model_label, ime_replacement_range, ime_selected_range,
-        order_providers, project_label, project_path, providers_from_catalog, short_model,
-        utf16_to_byte, CatalogModel, CatalogProvider, Model,
+        order_providers, project_label, project_path, providers_from_catalog, reasoning_preview,
+        short_model, tool_state_of, tool_text_state, utf16_to_byte, CatalogModel,
+        CatalogProvider, Model, ToolState,
     };
 
     fn provider(id: &str, name: &str, models: &[&str]) -> CatalogProvider {
@@ -1143,6 +1147,47 @@ mod tests {
         assert_eq!(byte_to_utf16(text, 1), 1);
         assert_eq!(byte_to_utf16(text, 5), 3);
     }
+
+    fn tool_rows_infer_their_state_from_the_message_text() {
+        assert_eq!(tool_text_state("read_file · src/app.rs"), ToolState::Done);
+        assert_eq!(tool_text_state("read_file · running"), ToolState::Running);
+        assert_eq!(tool_text_state("bazel · 実行中"), ToolState::Running);
+        assert_eq!(tool_text_state("cargo test · done"), ToolState::Done);
+        assert_eq!(tool_text_state("cargo test · 完了"), ToolState::Done);
+        assert_eq!(tool_text_state("write · failed"), ToolState::Failed);
+        assert_eq!(tool_text_state("write · permission denied"), ToolState::Failed);
+        assert_eq!(tool_text_state("shell · エラー"), ToolState::Failed);
+        assert_eq!(tool_text_state("shell · status: DONE, errorCount: 0"), ToolState::Failed);
+    }
+
+    #[test]
+    fn tool_rows_split_name_from_summary() {
+        let (name, state, summary) = tool_state_of("read_file · src/app.rs");
+        assert_eq!(name, "read_file");
+        assert_eq!(state, ToolState::Done);
+        assert_eq!(summary, "src/app.rs");
+
+        let (name, state, summary) = tool_state_of("tool: find · failed · no such file");
+        assert_eq!(name, "find");
+        assert_eq!(state, ToolState::Failed);
+        assert_eq!(summary, "failed · no such file");
+
+        let (name, _, summary) = tool_state_of("apply_patch");
+        assert_eq!(name, "apply_patch");
+        assert!(summary.is_empty());
+
+        let (name, _, _) = tool_state_of("   ");
+        assert_eq!(name, "tool");
+    }
+
+    #[test]
+    fn reasoning_preview_is_one_shortened_line() {
+        assert_eq!(reasoning_preview("  a\n  b  "), "a b");
+        let long = "x".repeat(200);
+        let preview = reasoning_preview(&long);
+        assert_eq!(preview.chars().count(), 97, "96 characters plus the ellipsis");
+        assert!(preview.ends_with('…'));
+    }
 }
 
 fn short_id(id: &str) -> String {
@@ -1194,6 +1239,9 @@ pub struct DesktopApp {
     model_scroll: ScrollHandle,
     /// Newest published harness version when an upgrade exists.
     update: Option<String>,
+    /// Timeline message ids whose reasoning row the user expanded. Reasoning is
+    /// collapsed by default, so only the opened rows are kept.
+    expanded: Rc<RefCell<HashSet<String>>>,
 }
 
 impl DesktopApp {
@@ -1307,6 +1355,7 @@ impl DesktopApp {
             timeline_scroll: ScrollHandle::new(),
             model_scroll: ScrollHandle::new(),
             update: None,
+            expanded: Rc::new(RefCell::new(HashSet::new())),
         }
     }
 
@@ -1901,9 +1950,119 @@ impl Render for DesktopApp {
                     ),
             );
 
+        let expanded_snapshot = self.expanded.borrow().clone();
         let mut rows: Vec<AnyElement> = messages
             .iter()
-            .map(|message| {
+            .enumerate()
+            .map(|(index, message)| {
+                let row = div()
+                    .flex()
+                    .w_full()
+                    .mb(px(14.))
+                    .when(message.role == "user", |element| element.justify_end())
+                    .when(message.role != "user", |element| element.justify_start());
+
+                if message.role == "tool" {
+                    let (name, state, summary) = tool_state_of(&message.text);
+                    let (glyph, color) = tool_glyph(state);
+                    return row
+                        .child(
+                            div()
+                                .flex()
+                                .items_center()
+                                .gap(px(6.))
+                                .px(px(10.))
+                                .py(px(4.))
+                                .rounded(theme::radius_sm())
+                                .border_1()
+                                .border_color(theme::border())
+                                .bg(rgb(0xf7f8fa))
+                                .text_size(theme::micro_size())
+                                .text_color(theme::secondary())
+                                .child(div().text_color(color).child(glyph))
+                                .child(
+                                    div()
+                                        .text_color(theme::label())
+                                        .font_weight(FontWeight::SEMIBOLD)
+                                        .child(name),
+                                )
+                                .when(!summary.is_empty(), |element| {
+                                    element.child(
+                                        div().text_color(theme::tertiary()).child(summary),
+                                    )
+                                }),
+                        )
+                        .into_any_element();
+                }
+
+                // Reasoning is collapsed behind one clickable row per message,
+                // and the expanded ids live in the view, not in the message.
+                if message.role == "reasoning" {
+                    let id = index.to_string();
+                    let expanded = expanded_snapshot.contains(&id);
+                    let toggle = Rc::clone(&self.expanded);
+                    let base = div()
+                        .max_w(px(620.))
+                        .px(px(16.))
+                        .py(px(10.))
+                        .rounded(theme::radius_xl())
+                        .bg(rgb(0xfafafa))
+                        .border_l_1()
+                        .border_color(theme::border())
+                        .text_size(theme::body_size())
+                        .line_height(theme::body_line_height())
+                        .text_color(theme::tertiary());
+                    let element = if expanded {
+                        let base = base.id(("reasoning", index));
+                        let mut content = Vec::new();
+                        content.push(
+                            div()
+                                .flex()
+                                .items_center()
+                                .gap(px(6.))
+                                .text_color(theme::secondary())
+                                .child("\u{25BE} \u{63A8}\u{8A18}\u{3092}\u{96A0}\u{3059}")
+                                .into_any_element(),
+                        );
+                        content.extend(render_blocks(
+                            &markdown::parse(&message.text),
+                            cx,
+                            theme::secondary(),
+                        ));
+                        base.flex().flex_col().children(content).into_any_element()
+                    } else {
+                        base
+                            .id(("reasoning", index))
+                            .cursor_pointer()
+                            .child(
+                                div()
+                                    .flex()
+                                    .items_center()
+                                    .gap(px(6.))
+                                    .text_color(theme::secondary())
+                                    .child("\u{25B8} \u{63A8}\u{8A18}\u{3092}\u{8868}\u{793A}"),
+                            )
+                            .child(
+                                div()
+                                    .mt(px(4.))
+                                    .text_size(theme::micro_size())
+                                    .text_color(theme::tertiary())
+                                    .child(reasoning_preview(&message.text)),
+                            )
+                            .on_click(cx.listener(move |_this, _event, _window, cx| {
+                                let open = !toggle.borrow().contains(&id);
+                                if open {
+                                    toggle.borrow_mut().insert(id.clone());
+                                } else {
+                                    toggle.borrow_mut().remove(&id);
+                                }
+                                cx.notify();
+                            }))
+                            .into_any_element()
+                    };
+                    return row.child(element).into_any_element();
+                }
+
                 let bubble = div()
                     .max_w(px(620.))
                     .px(px(16.))
@@ -1917,39 +2076,18 @@ impl Render for DesktopApp {
                     })
                     .when(message.role == "assistant", |element| {
                         element.bg(theme::code_block())
-                    })
-                    .when(message.role == "reasoning", |element| {
-                        element
-                            .bg(rgb(0xfafafa))
-                            .text_color(theme::tertiary())
-                            .border_l_1()
-                            .border_color(theme::border())
-                    })
-                    .child(message.text.clone());
-                let row = div()
-                    .flex()
-                    .w_full()
-                    .mb(px(14.))
-                    .when(message.role == "user", |element| element.justify_end())
-                    .when(message.role != "user", |element| element.justify_start());
-                if message.role == "tool" {
-                    return row
-                        .child(
-                            div()
-                                .flex()
-                                .items_center()
-                                .gap(px(6.))
-                                .px(px(10.))
-                                .py(px(4.))
-                                .rounded(theme::radius_sm())
-                                .bg(rgb(0xf4f5f7))
-                                .text_size(theme::micro_size())
-                                .text_color(theme::secondary())
-                                .child("tool")
-                                .child(message.text.clone()),
-                        )
-                        .into_any_element();
-                }
+                    });
+                // Assistant replies are Markdown; user text stays literal, so a
+                // pasted diff or inline code is never reinterpreted as formatting.
+                let bubble = if message.role == "user" {
+                    bubble.child(message.text.clone())
+                } else {
+                    bubble.children(render_blocks(
+                        &markdown::parse(&message.text),
+                        cx,
+                        theme::label(),
+                    ))
+                };
                 row.child(bubble).into_any_element()
             })
             .collect();
@@ -1970,7 +2108,11 @@ impl Render for DesktopApp {
                             .text_size(theme::body_size())
                             .line_height(theme::body_line_height())
                             .text_color(theme::secondary())
-                            .child(streaming.clone()),
+                            .children(render_blocks(
+                                &markdown::parse(&streaming),
+                                cx,
+                                theme::secondary(),
+                            )),
                     )
                     .into_any_element(),
             );
@@ -2454,6 +2596,286 @@ impl Render for DesktopApp {
             .child(center)
             .into_any_element()
     }
+}
+
+/// One rendered inline run: plain, bold, italic, code or link.
+fn inline_span(span: &Span, ctx: &mut Context<DesktopApp>, color: Rgba) -> AnyElement {
+    match span {
+        Span::Text(text) => {
+            if color == theme::label() {
+                text.clone().into_any_element()
+            } else {
+                div().text_color(color).child(text.clone()).into_any_element()
+            }
+        }
+        Span::Bold(inner) => div()
+            .font_weight(FontWeight::BOLD)
+            .children(render_inlines(inner, ctx, color))
+            .into_any_element(),
+        Span::Italic(inner) => div()
+            .italic()
+            .children(render_inlines(inner, ctx, color))
+            .into_any_element(),
+        Span::Code(code) => div()
+            .font_family(MONO_FONT)
+            .text_size(theme::meta_size())
+            .bg(theme::code_block())
+            .px(px(4.))
+            .py(px(1.))
+            .rounded(theme::radius_xs())
+            .child(code.clone())
+            .into_any_element(),
+        Span::Link { text, .. } => div()
+            .text_color(theme::accent())
+            .children(render_inlines(text, ctx, color))
+            .into_any_element(),
+    }
+}
+
+fn render_inlines(spans: &[Span], ctx: &mut Context<DesktopApp>, color: Rgba) -> Vec<AnyElement> {
+    spans
+        .iter()
+        .map(|span| inline_span(span, ctx, color))
+        .collect()
+}
+
+/// Headings scale up to 16px (theme::heading_size) with larger h1/h2.
+fn heading_size(level: u8) -> Pixels {
+    match level {
+        1 => px(18.),
+        2 => px(17.),
+        _ => theme::heading_size(),
+    }
+}
+
+/// Render a parsed message as timeline elements. `color` is the base text
+/// colour; code keeps its own background and secondary text.
+fn render_blocks(blocks: &[Block], ctx: &mut Context<DesktopApp>, color: Rgba) -> Vec<AnyElement> {
+    let last = blocks.len().saturating_sub(1);
+    blocks
+        .iter()
+        .enumerate()
+        .map(|(index, block)| block_element(block, ctx, color, index == last).into_any_element())
+        .collect()
+}
+
+fn block_element(block: &Block, ctx: &mut Context<DesktopApp>, color: Rgba, last: bool) -> Div {
+    match block {
+        Block::Paragraph(spans) => {
+            let content: Vec<AnyElement> = render_inlines(spans, ctx, color);
+            let mut element = div().flex().flex_wrap().line_height(theme::body_line_height());
+            if !last {
+                element = element.mb(px(8.));
+            }
+            element.children(content)
+        }
+        Block::Heading { level, spans } => {
+            let content: Vec<AnyElement> = render_inlines(spans, ctx, color);
+            let mut element = div()
+                .flex()
+                .flex_wrap()
+                .font_weight(FontWeight::SEMIBOLD)
+                .text_size(heading_size(*level))
+                .line_height(px(24.));
+            if !last {
+                element = element.mb(px(8.));
+            }
+            element.children(content)
+        }
+        Block::List { ordered, items } => {
+            let rows: Vec<AnyElement> = items
+                .iter()
+                .enumerate()
+                .map(|(index, item)| list_row(*ordered, index, item, ctx, color))
+                .collect();
+            let mut element = div().flex().flex_col().gap(px(4.));
+            if !last {
+                element = element.mb(px(8.));
+            }
+            element.children(rows)
+        }
+        Block::Blockquote(inner) => {
+            let content = render_blocks(inner, ctx, theme::secondary());
+            let mut element = div()
+                .flex()
+                .flex_col()
+                .pl(px(10.))
+                .border_l_1()
+                .border_color(theme::border_strong())
+                .text_color(theme::secondary());
+            if !last {
+                element = element.mb(px(8.));
+            }
+            element.children(content)
+        }
+        Block::CodeBlock { language, code } => {
+            let mut element = div()
+                .flex()
+                .flex_col()
+                .gap(px(6.))
+                .p(px(10.))
+                .rounded(theme::radius_sm())
+                .bg(theme::code_block())
+                .font_family(MONO_FONT)
+                .text_size(theme::meta_size())
+                .line_height(px(20.))
+                .text_color(theme::secondary())
+                .when_some(language.clone(), |element, language| {
+                    element.child(
+                        div()
+                            .text_size(theme::micro_size())
+                            .text_color(theme::tertiary())
+                            .child(language),
+                    )
+                });
+            if !code.is_empty() {
+                element = element.children(code.lines().map(|line| {
+                    div().flex().flex_wrap().child(if line.is_empty() {
+                        " ".to_string()
+                    } else {
+                        line.to_string()
+                    })
+                }));
+            }
+            if !last {
+                element = element.mb(px(8.));
+            }
+            element
+        }
+        Block::Rule => div()
+            .h(px(1.))
+            .w_full()
+            .my(px(6.))
+            .rounded(theme::radius_xs())
+            .bg(theme::border()),
+    }
+}
+
+fn list_row(
+    ordered: bool,
+    index: usize,
+    item: &[Span],
+    ctx: &mut Context<DesktopApp>,
+    color: Rgba,
+) -> AnyElement {
+    let marker = if ordered {
+        format!("{}.", index + 1)
+    } else {
+        "•".to_string()
+    };
+    div()
+        .flex()
+        .gap(px(8.))
+        .child(
+            div()
+                .w(px(18.))
+                .flex_shrink_0()
+                .text_color(theme::tertiary())
+                .child(marker),
+        )
+        .child(
+            div()
+                .flex()
+                .flex_wrap()
+                .flex_1()
+                .line_height(theme::body_line_height())
+                .children(render_inlines(item, ctx, color)),
+        )
+        .into_any_element()
+}
+
+/// The glyph and colour of one tool row.
+fn tool_glyph(state: ToolState) -> (&'static str, Rgba) {
+    match state {
+        ToolState::Running => ("◐", theme::accent()),
+        ToolState::Done => ("✓", theme::tertiary()),
+        ToolState::Failed => ("✕", rgb(theme::DANGER)),
+    }
+}
+
+/// Monospace family for code blocks and inline code; fontconfig resolves the
+/// generic alias to Noto Sans Mono CJK on this host.
+pub const MONO_FONT: &str = "monospace";
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ToolState {
+    Running,
+    Done,
+    Failed,
+}
+
+/// Infer the tool state from the message text: the verb the timeline shows is
+/// the state word the harness wrote into the tool row.
+fn tool_text_state(text: &str) -> ToolState {
+    let normalized: String = text
+        .chars()
+        .take(240)
+        .flat_map(char::to_lowercase)
+        .collect();
+    let has = |needle: &str| normalized.contains(needle);
+    if has("failed")
+        || has("failure")
+        || has("error")
+        || has("exception")
+        || has("denied")
+        || has("rejected")
+        || has("失敗")
+        || has("エラー")
+    {
+        ToolState::Failed
+    } else if has("running")
+        || has("started")
+        || has("pending")
+        || has("in progress")
+        || has("実行中")
+        || has("開始")
+    {
+        ToolState::Running
+    } else if has("done")
+        || has("completed")
+        || has("success")
+        || has("finished")
+        || has("完了")
+        || has("完了\u{3057}\u{307E}\u{3057}\u{305F}")
+    {
+        ToolState::Done
+    } else {
+        // A tool row that carries no state word is a finished call.
+        ToolState::Done
+    }
+}
+
+/// Split a tool row into the tool name and its compact summary.
+fn tool_state_of(text: &str) -> (String, ToolState, String) {
+    let first = text.trim().lines().next().unwrap_or_default().trim();
+    let base = first
+        .strip_prefix("tool:")
+        .or_else(|| first.strip_prefix("tool/"))
+        .or_else(|| first.strip_prefix("tool "))
+        .unwrap_or(first)
+        .trim();
+    let (name, rest) = match base.split_once("·") {
+        Some((name, rest)) => (name.trim(), rest.trim()),
+        None => match base.split_once(" - ") {
+            Some((name, rest)) => (name.trim(), rest.trim()),
+            None => (base, ""),
+        },
+    };
+    let name = if name.is_empty() {
+        "tool".to_string()
+    } else {
+        name.to_string()
+    };
+    (name, tool_text_state(text), truncate(rest, 90))
+}
+/// Collapsed reasoning shows a one-line preview of the full text.
+fn reasoning_preview(text: &str) -> String {
+    let flat = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    let mut preview: String = flat.chars().take(96).collect();
+    if flat.chars().count() > 96 {
+        preview.push('…');
+    }
+    preview
 }
 
 fn action_button(
