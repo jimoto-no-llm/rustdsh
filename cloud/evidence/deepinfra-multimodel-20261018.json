@@ -1,0 +1,484 @@
+{
+  "date": "2026-10-18T05:16:29.923Z",
+  "scope": "direct_deepinfra_chat_api_only",
+  "prompt": "1",
+  "maxOutputTokens": 1,
+  "maxRequests": 10000,
+  "budgetUsd": 0.0266,
+  "accountPerModelLimit": 200,
+  "accountTpmLimit": 1100000,
+  "availableModels": 180,
+  "chatModelsWithPrices": 96,
+  "pilotAttempted": 60,
+  "pilotEligible": 59,
+  "selectedModels": 50,
+  "plannedBurst": 9940,
+  "reservedBurstUsd": 0.0244828,
+  "attempted": 10000,
+  "http200": 66,
+  "usable": 46,
+  "rateLimited": 1,
+  "httpErrors": {},
+  "transportUnknown": 9933,
+  "missingCost": 0,
+  "modelMismatch": 0,
+  "peakClientInFlight": 9940,
+  "knownCostUsd": 0.00055047,
+  "unknownReserveUsd": 0.02448097,
+  "elapsedSeconds": 97,
+  "byModel": {
+    "mistralai/Mistral-Nemo-Instruct-2407": {
+      "attempted": 200,
+      "http200": 7,
+      "usable": 7,
+      "errors": {
+        "transport_unknown": 193
+      },
+      "knownCostUsd": 0.00000143
+    },
+    "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "Sao10K/L3-8B-Lunaris-v1-Turbo": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "deepseek-ai/DeepSeek-V4-Flash-0731": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "mistralai/Mistral-Small-3.2-24B-Instruct-2506": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "google/gemma-3-4b-it": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "google/gemma-3-12b-it": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "deepseek-ai/DeepSeek-V4-Flash": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "microsoft/phi-4": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "google/gemma-3-27b-it": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "Qwen/Qwen3-32B": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "nvidia/NVIDIA-Nemotron-3.5-Lightning": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "ibm-granite/granite-4.2-8b": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "Qwen/Qwen3.5-9B": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "google/gemma-4-26B-A4B-it": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "Qwen/Qwen3-235B-A22B-Instruct-2507": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "Qwen/Qwen3-14B": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "inclusionAI/Ling-3.0-flash": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "inclusionAI/Ling-3.0-flash-VL": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "meta-llama/Llama-3.3-70B-Instruct-Turbo": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "XiaomiMiMo/MiMo-V2.6-Flash": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "google/gemma-4-31B-it-turbo": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "Qwen/Qwen3-30B-A3B": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "openai/gpt-oss-20b": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "deepseek-ai/DeepSeek-V4.1-Flash-1017": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "deepseek-ai/DeepSeek-V4.1-Flash": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "Qwen/Qwen3-Next-80B-A3B-Instruct": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "deepseek-ai/DeepSeek-V3.2": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "Qwen/Qwen3-VL-30B-A3B-Instruct": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "google/gemini-3.1-flash-lite": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "Qwen/Qwen3.6-35B-A3B": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "nvidia/NVIDIA-Nemotron-3.5-Super-VL": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "openai/gpt-oss-120b": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "zai-org/GLM-5.3-Flash": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "deepseek-ai/DeepSeek-V3": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "Qwen/Qwen3.5-35B-A3B": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "Qwen/Qwen3-VL-235B-A22B-Instruct": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "deepseek-ai/DeepSeek-V3.1": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "google/gemini-2.5-flash": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "google/gemma-4-31B-it": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "Qwen/Qwen3-Coder-480B-A35B-Instruct-Turbo": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "Qwen/Qwen2.5-72B-Instruct": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "google/gemma-4-31B-it-Ultra": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "XiaomiMiMo/MiMo-V2.6-Pro": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "ByteDance/Seed-2.0-mini": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "Qwen/Qwen3.5-27B": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "inclusionAI/Ling-3.1-flash": {
+      "attempted": 200,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 200
+      },
+      "knownCostUsd": 0
+    },
+    "Gryphe/MythoMax-L2-13b": {
+      "attempted": 140,
+      "http200": 0,
+      "usable": 0,
+      "errors": {
+        "transport_unknown": 140
+      },
+      "knownCostUsd": 0
+    }
+  },
+  "serverSideConcurrencyMeasured": false,
+  "sandboxesCreated": 0,
+  "agentLoopsStarted": 0
+}

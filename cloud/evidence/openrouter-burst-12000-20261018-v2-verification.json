@@ -1,0 +1,63 @@
+{
+  "kind": "live_api_burst_verification",
+  "source": "openrouter-burst-12000-20261018-v2.json",
+  "git_head": "3e1099180eb2287aaeb9c68f59ee7eef4c530bf4",
+  "working_tree_dirty": true,
+  "provider": "openrouter",
+  "requested_minimum_simultaneous": 10000,
+  "model_requests_in_this_burst": 12000,
+  "http_status_200": 12000,
+  "distinct_generation_ids": 12000,
+  "valid_model_usage_and_positive_cost": 11622,
+  "peak_sent_in_flight": 12000,
+  "peak_successful_requests_in_flight": 11622,
+  "successful_overlap_start_utc": "2026-10-18T05:56:24.740Z",
+  "successful_overlap_end_utc": "2026-10-18T05:56:25.241Z",
+  "successful_overlap_duration_ms": 501,
+  "overlap_definition": "After HTTP request submission on an already established connection and before complete response reception, restricted to requests subsequently returning the expected model, token usage and positive cost.",
+  "nonempty_content_in_validated_responses": 6588,
+  "max_tokens_requested": 1,
+  "rate_limited": 0,
+  "transport_unknown": 0,
+  "workers_with_missing_results": 0,
+  "workers_completed": 40,
+  "http2_connections": 120,
+  "missing_cost": 378,
+  "missing_cost_provider": "Cohere",
+  "missing_cost_metadata_sample": {
+    "queries": 3,
+    "http_404": 3
+  },
+  "sampled_valid_generation_metadata": {
+    "id": "gen-1792302985-SZwCswbGWEVC7hjWtok1",
+    "http_status": 200,
+    "cancelled": false,
+    "finish_reason": "length",
+    "model": "ibm-granite/granite-4.0-h-micro",
+    "provider": "Cloudflare",
+    "cost_usd": 6.39e-7
+  },
+  "configured_budget_usd": 0.5,
+  "configured_max_price_per_million_tokens": {
+    "prompt": 1,
+    "completion": 3
+  },
+  "preflight_reservation_usd": 0.462,
+  "known_cost_from_responses_usd": 0.01861928363,
+  "observed_account_usage_delta_usd": 0.018619718,
+  "billing_note": "Account delta includes the successful one-request format probe; response cost sum and account accounting have different precision. Per-request cost for 378 responses remains unconfirmed.",
+  "earlier_attempts_this_turn": {
+    "mixed_provider_preparation_aborted_chat_requests": 0,
+    "invalid_four_model_fallback_burst_http_400": 12000,
+    "invalid_format_diagnostic_http_400": 1,
+    "corrected_format_probe_http_200": 1
+  },
+  "server_inference_concurrency_measured": false,
+  "sandbox_concurrency_measured": false,
+  "agent_loop_concurrency_measured": false,
+  "tests": {
+    "initial_related_suite_passed": 21,
+    "after_price_and_fallback_fix_relevant_suite_passed": 10,
+    "remote_ci_executed": false
+  }
+}

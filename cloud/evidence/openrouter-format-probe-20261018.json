@@ -1,0 +1,33 @@
+{
+  "kind": "corrected_format_probe",
+  "status": 200,
+  "model": "ibm-granite/granite-4.0-h-micro",
+  "provider": "Cloudflare",
+  "cost": 6.39e-7,
+  "generationId": "gen-1792302972-IMFcvqtB2XIlUVkHDkbY",
+  "usage": {
+    "prompt_tokens": 31,
+    "completion_tokens": 1,
+    "total_tokens": 32,
+    "cost": 6.39e-7,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "cache_write_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": 6.39e-7,
+      "upstream_inference_prompt_cost": 5.27e-7,
+      "upstream_inference_completions_cost": 1.12e-7
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0,
+      "audio_tokens": 0
+    }
+  },
+  "usable": true,
+  "message": ""
+}

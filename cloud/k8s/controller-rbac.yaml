@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: rdsh-cloud-controller
+  namespace: rdsh-cloud
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: rdsh-cloud-controller
+  namespace: rdsh-cloud
+rules:
+  - apiGroups: ["extensions.agents.x-k8s.io"]
+    resources: ["sandboxclaims"]
+    verbs: ["get", "list", "create", "patch"]
+  - apiGroups: ["extensions.agents.x-k8s.io"]
+    resources: ["sandboxwarmpools"]
+    verbs: ["get", "create", "patch"]
+  - apiGroups: ["extensions.agents.x-k8s.io"]
+    resources: ["sandboxtemplates"]
+    verbs: ["get"]
+  - apiGroups: ["agents.x-k8s.io"]
+    resources: ["sandboxes"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: rdsh-cloud-controller
+  namespace: rdsh-cloud
+subjects:
+  - kind: ServiceAccount
+    name: rdsh-cloud-controller
+    namespace: rdsh-cloud
+roleRef:
+  kind: Role
+  name: rdsh-cloud-controller
+  apiGroup: rbac.authorization.k8s.io

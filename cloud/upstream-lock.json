@@ -1,0 +1,14 @@
+{
+  "checked_at": "2026-10-18",
+  "status": "source-inspected-not-distribution-qualified",
+  "sources": [
+    {"name":"rustdsh","repository":"jimoto-no-llm/rustdsh","commit":"3e1099180eb2287aaeb9c68f59ee7eef4c530bf4","license":"MIT","role":"integration source"},
+    {"name":"swarm-rdsh","repository":"RNA4219/swarm-rdsh","commit":"b9edd76cdaf29f2c4b1470f16b50535a8c480242","license":"MIT","role":"compatibility reference; no code copied"},
+    {"name":"Gas City","repository":"gastownhall/gascity","commit":"fec82025d24392176eef9153ebf7af8759c6ef0c","license":"MIT","role":"external gc executable; not bundled"},
+    {"name":"Gas Town","repository":"gastownhall/gastown","commit":"649b832b7672bc7a2dbef26f5983aba6198b819b","license":"MIT","role":"legacy adapter reference; not bundled"},
+    {"name":"Beads","repository":"gastownhall/beads","commit":"4a67d0d0288c1b4ee23e17fc896f47616931ba2d","license":"MIT","role":"external task state; not bundled"},
+    {"name":"Agent Sandbox","repository":"kubernetes-sigs/agent-sandbox","commit":"e0b002e221a7e8d5534f686fe1d3ef4fdfd6d6bb","license":"Apache-2.0","role":"Kubernetes API contract; not bundled"},
+    {"name":"Kueue","repository":"kubernetes-sigs/kueue","commit":"bb201e17bd1cf47909aad100b0f6aaaa92bd3efd","license":"Apache-2.0","role":"admission design reference; not integrated"},
+    {"name":"DeepSeek Harness","repository":"deepseek-ai/deepseek-harness","commit":"687f282e8625c6b8d11ff58211a90524be2e4317","license":"MIT","role":"worker image source build"}
+  ]
+}

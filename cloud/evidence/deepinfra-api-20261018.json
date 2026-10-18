@@ -1,0 +1,131 @@
+{
+  "date": "2026-10-18",
+  "scope": "direct_deepinfra_chat_api_only",
+  "model": "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+  "endpoint": "https://api.deepinfra.com/v1/openai/chat/completions",
+  "max_output_tokens": 8,
+  "max_concurrency": 64,
+  "configured_budget_usd": 0.0266,
+  "configured_duration_seconds": 900,
+  "account_limit_check": {
+    "endpoint": "https://api.deepinfra.com/v1/me/rate_limit",
+    "rate_limit_per_model": 200,
+    "tpm_rate_limit": 1100000,
+    "requested_concurrency": 10000,
+    "blocked_by_preflight": true,
+    "model_requests_sent_for_10000_attempt": 0
+  },
+  "account_limit_burst": {
+    "configured_concurrency": 200,
+    "peak_client_in_flight": 200,
+    "attempted": 200,
+    "succeeded": 200,
+    "http_429": 0,
+    "transport_unknown": 0,
+    "estimated_cost_usd_from_success_responses": 0.000076,
+    "elapsed_seconds": 4
+  },
+  "staged_runs_before_main": [
+    {
+      "concurrency": 4,
+      "attempted": 16,
+      "succeeded": 16,
+      "http_429": 0,
+      "transport_unknown": 0,
+      "estimated_cost_usd": 0.00000608
+    },
+    {
+      "concurrency": 16,
+      "attempted": 32,
+      "succeeded": 32,
+      "http_429": 0,
+      "transport_unknown": 0,
+      "estimated_cost_usd": 0.00001216
+    },
+    {
+      "concurrency": 32,
+      "attempted": 100,
+      "succeeded": 100,
+      "http_429": 0,
+      "transport_unknown": 0,
+      "estimated_cost_usd": 0.000038
+    },
+    {
+      "concurrency": 64,
+      "attempted": 256,
+      "succeeded": 256,
+      "http_429": 0,
+      "transport_unknown": 0,
+      "estimated_cost_usd": 0.00009728
+    },
+    {
+      "concurrency": 128,
+      "attempted": 512,
+      "succeeded": 512,
+      "http_429": 0,
+      "transport_unknown": 0,
+      "estimated_cost_usd": 0.00019456
+    },
+    {
+      "concurrency": 256,
+      "attempted": 1056,
+      "succeeded": 1024,
+      "http_429": 31,
+      "transport_unknown": 1,
+      "estimated_cost_usd": 0.00038912
+    },
+    {
+      "concurrency": 128,
+      "attempted": 1024,
+      "succeeded": 986,
+      "http_429": 0,
+      "transport_unknown": 38,
+      "estimated_cost_usd": 0.00037468
+    },
+    {
+      "concurrency": 64,
+      "attempted": 512,
+      "succeeded": 512,
+      "http_429": 0,
+      "transport_unknown": 0,
+      "estimated_cost_usd": 0.00019456
+    }
+  ],
+  "aggregate_all_small_model_runs": {
+    "attempted": 14004,
+    "succeeded": 13898,
+    "http_429": 31,
+    "transport_unknown": 75,
+    "estimated_cost_usd_from_success_responses": 0.00528124
+  },
+  "result": {
+    "stop_reason": "duration_limit",
+    "requested_max_api_calls": 10000,
+    "api_calls_above_requested_max": 496,
+    "attempted": 10496,
+    "succeeded": 10460,
+    "expected_reply_matched": 10460,
+    "http_429": 0,
+    "http_errors": {},
+    "transport_unknown": 36,
+    "transport_error_classes": {
+      "TypeError:UND_ERR_CONNECT_TIMEOUT": 36
+    },
+    "model_mismatch": 0,
+    "missing_cost": 0,
+    "estimated_cost_usd_from_success_responses": 0.0039748,
+    "unknown_outcome_cost_reservation_usd": 0.0000576,
+    "prompt_tokens_from_success_responses": 156900,
+    "completion_tokens_from_success_responses": 20920,
+    "elapsed_seconds": 907,
+    "latency_p50_ms": 2633,
+    "latency_p95_ms": 9390,
+    "latency_p99_ms": 10608
+  },
+  "not_proven": [
+    "10000_simultaneous_llm_requests",
+    "sandbox_allocation",
+    "dsh_agent_loop",
+    "gas_city_dispatch"
+  ]
+}

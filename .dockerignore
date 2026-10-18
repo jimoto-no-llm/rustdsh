@@ -1,0 +1,16 @@
+**
+!Cargo.toml
+!Cargo.lock
+!LICENSE
+!THIRD_PARTY_NOTICES.md
+!build.rs
+!install.sh
+!src/
+!src/**
+!assets/
+!assets/**
+!security/
+!security/**
+!cloud/
+!cloud/worker/
+!cloud/worker/Dockerfile
