@@ -15,6 +15,10 @@ const POOL_LABEL: &str = "cloud.rdsh.dev/pool";
 const RETAIN_SHUTDOWN_TIME: &str = "1970-01-01T00:00:00Z";
 const MAX_EXEC_OUTPUT: usize = 1024 * 1024;
 
+#[cfg(test)]
+#[path = "kubernetes_contract_tests.rs"]
+mod contract_tests;
+
 pub struct KubernetesBackend {
     client: reqwest::Client,
     api_server: Url,
