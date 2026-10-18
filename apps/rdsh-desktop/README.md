@@ -176,6 +176,25 @@ builds dependencies at opt-level 3, which keeps dev runs responsive.
 Measured with --dump-ui: attach 606ms (release) / 949ms (dev), cold 9.4s,
 app RSS about 52MB.
 
+### Run the Web UI as a user service
+
+To keep the Web UI available without a terminal, install it as a systemd user
+service. The page token is pinned so the URL survives restarts:
+
+~~~sh
+mkdir -p ~/.config/rdsh-desktop
+umask 077 && printf "RDSH_DESKTOP_WEB_TOKEN=%s\n" "$(head -c16 /dev/urandom | od -An -tx1 | tr -d " \n")" \
+  > ~/.config/rdsh-desktop/webui.env
+mkdir -p ~/.config/systemd/user
+cp packaging/rdsh-webui.service ~/.config/systemd/user/rdsh-webui.service
+systemctl --user daemon-reload
+systemctl --user enable --now rdsh-webui.service
+cat ~/.cache/rdsh-desktop/webui.url
+~~~
+
+Manage it with systemctl --user status|restart|stop rdsh-webui.service.
+RDSH_DESKTOP_UPDATE_CHECK=0 in webui.env disables the background update check.
+
 ## Notes
 
 - The window needs a GPU-backed Wayland session; every headless mode above runs
