@@ -176,7 +176,12 @@ builds dependencies at opt-level 3, which keeps dev runs responsive.
 Measured with --dump-ui: attach 606ms (release) / 949ms (dev), cold 9.4s,
 app RSS about 52MB.
 
-### Run the Web UI as a user service
+### Run the Web UI as a user service (optional, off by default)
+
+The service is **not** enabled by default. Switch it on from the setup page
+(rdsh setup --web) or from the CLI with rdsh desktop web-ui on, and turn it off
+again with rdsh desktop web-ui off. The steps below describe what that toggle
+does, for reference:
 
 To keep the Web UI available without a terminal, install it as a systemd user
 service. The page token is pinned so the URL survives restarts:
