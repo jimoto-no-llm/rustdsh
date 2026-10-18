@@ -292,6 +292,8 @@
     background: #fffdf5;
   }
   .banner.show { display: block; }
+  .update-notice { background: #fff8e8; border-color: #f0d9a8; }
+  .update-notice .banner-actions { margin-top: 10px; }
   .banner-title { font-size: 13px; font-weight: 600; }
   .banner-body { margin-top: 4px; font-size: 13px; line-height: 22px; }
   .banner-actions { margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; }
@@ -372,6 +374,13 @@
   </aside>
 
   <main class="main">
+    <div class="banner update-notice" id="update-notice">
+      <div class="banner-title" id="update-notice-title"></div>
+      <div class="banner-body" id="update-notice-body"></div>
+      <div class="banner-actions">
+        <button class="button" id="update-notice-close">閉じる</button>
+      </div>
+    </div>
     <div class="timeline" id="timeline">
       <div class="column">
         <div class="banner" id="banner">
@@ -438,7 +447,15 @@
   var input = el("input");
   var modelChip = el("model-chip");
   var updateBadge = el("update-badge");
+  var updateNotice = el("update-notice");
+  var updateNoticeTitle = el("update-notice-title");
+  var updateNoticeBody = el("update-notice-body");
   var updateNotified = false;
+  var updateDismissed = false;
+  el("update-notice-close").onclick = function () {
+    updateDismissed = true;
+    updateNotice.classList.remove("show");
+  };
   var picker = el("model-picker");
   var cancelButton = el("cancel");
   var sendButton = el("send");
@@ -473,12 +490,19 @@
     if (state.update && state.update.available) {
       updateBadge.textContent = "dsh " + state.update.newest + " が利用可能";
       updateBadge.classList.remove("hidden");
+      if (!updateDismissed) {
+        updateNoticeTitle.textContent = "dsh " + state.update.newest + " が利用可能です";
+        updateNoticeBody.textContent =
+          "現在 " + (state.update.active || "不明") + " を使用中。更新: npm install -g @deepseek-ai/dsh@" + state.update.newest;
+        updateNotice.classList.add("show");
+      }
       if (!updateNotified) {
         updateNotified = true;
         notify("ハーネスの更新があります", "dsh " + state.update.newest + " が公開されています");
       }
     } else {
       updateBadge.classList.add("hidden");
+      updateNotice.classList.remove("show");
     }
     if (state.currentModel) {
       modelChip.textContent = "モデル: " + state.currentModel;
