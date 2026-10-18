@@ -216,10 +216,13 @@ enum Commands {
         #[arg(long = "max")]
         max: Option<usize>,
     },
-    /// Web search through SearXNG (default http://127.0.0.1:8888, $SEARXNG_URL wins)
-    #[command(name = "search-web")]
+    /// Web search through SearXNG (default) or Ollama (OLLAMA_API_KEY)
+    #[command(name = "search-web", after_help = websearch::help(locale::Locale::English))]
     SearchWeb {
         query: String,
+        /// Search provider (Ollama uses the hosted Web Search API).
+        #[arg(long, value_enum, default_value = "searxng")]
+        provider: websearch::Provider,
         /// Result limit (default: settings search.web_limit).
         #[arg(long = "limit")]
         limit: Option<usize>,
@@ -993,7 +996,12 @@ fn main() {
             let dir = dir.unwrap_or_else(|| cfg.search.dir.clone());
             search::cmd_search(&pattern, &dir, max.unwrap_or(cfg.search.max), locale)
         }
-        Some(Commands::SearchWeb { query, limit, json }) => {
+        Some(Commands::SearchWeb {
+            query,
+            limit,
+            json,
+            provider,
+        }) => {
             if !rdsh_config::feature_enabled(&cfg, "search-web") {
                 extra_disabled("search-web", locale)
             } else {
@@ -1001,6 +1009,7 @@ fn main() {
                     &query,
                     limit.unwrap_or(cfg.search.web_limit),
                     json,
+                    provider,
                     locale,
                 )
             }
@@ -2042,7 +2051,10 @@ fn localized_command_about(name: &str, locale: locale::Locale) -> Option<&'stati
         ),
         "tokens" => ("原生估算输入令牌数", "入力トークン数をネイティブで推定"),
         "search" => ("高速文件搜索", "高速ファイル検索"),
-        "search-web" => ("通过 SearXNG 进行网页搜索", "SearXNG によるWeb検索"),
+        "search-web" => (
+            "通过 SearXNG（默认）或 Ollama API 进行网页搜索",
+            "SearXNG（既定）または Ollama API によるWeb検索",
+        ),
         "serve" => (
             "启动本地仪表板（仅 127.0.0.1，只读 API）",
             "ローカルダッシュボードを起動（127.0.0.1のみ、読み取り専用API）",
@@ -2199,6 +2211,9 @@ fn localized_command_about(name: &str, locale: locale::Locale) -> Option<&'stati
 }
 
 fn localized_after_help(name: &str, locale: locale::Locale) -> Option<&'static str> {
+    if name == "search-web" {
+        return Some(websearch::help(locale));
+    }
     (name == "rdsh").then(|| match locale {
         locale::Locale::Chinese => "用法：\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (adapter-catalog|tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|auth|setup|context|settings|features|provider|subagents|task-outcomes|budget-admission|cost-ledger|question-contracts|answer-applications|instruction-queue|update|worker-scope|dump-config|boot|serial-proxy)\n\n示例：\n  rdsh tui                        启动 tui 配置文件（slim 环境开启，委托给 dsh）\n  rdsh --profile web --patch x.yml 使用叠加层启动 web\n  rdsh dump-config --profile tui  委托 dsh 输出准确配置\n  rdsh tokens ./AGENTS.md         原生估算输入令牌数\n  rdsh auth --import --provider openai-codex   只导入选定提供方\n  rdsh provider list              查看预设、路由和密钥状态\n  rdsh provider add hai --model deepseek-v4-flash   注册 HAI 路由\n  rdsh setup                      首次连接：选择共享、登录流程和后续步骤\n  rdsh search hello --dir .       无 Node 的快速文件搜索\n  rdsh search-web \"rust async\"      通过 SearXNG 网页搜索（无需 API 密钥）\n  rdsh desktop status             检测 Desktop（Electron）应用及其保留配置文件\n  rdsh desktop install            将捆绑 rdsh 插件附加到该配置文件\n  rdsh --passthrough tui          不使用 slim 环境；必需的工具隔离仍会启用\n  rdsh --dry-run tui -- --resume abc   显示将执行的命令",
         locale::Locale::Japanese => "使い方：\n  rdsh [profile] [--profile <name>] [--patch <yml>...] [app-args...]\n  rdsh <native-subcommand> ...   (adapter-catalog|tokens|prune|search|search-web|compact|doctor|bench|serve|sessions|profiles|skills|logs|guard|compute|desktop|auth|setup|context|settings|features|provider|subagents|task-outcomes|budget-admission|cost-ledger|question-contracts|answer-applications|instruction-queue|update|worker-scope|dump-config|boot|serial-proxy)\n\n例：\n  rdsh tui                        tuiプロファイルを起動（slim環境ON、dshへ委譲）\n  rdsh --profile web --patch x.yml オーバーレイ付きでwebを起動\n  rdsh dump-config --profile tui  dshへ正確な設定出力を委譲\n  rdsh tokens ./AGENTS.md         入力トークン数をネイティブで推定\n  rdsh auth --import --provider openai-codex   選択したプロバイダーだけをインポート\n  rdsh provider list              プリセット・経路・キーの状態を確認\n  rdsh provider add hai --model deepseek-v4-flash   HAI経路を登録\n  rdsh setup                      初回接続: 共有の選択、ログイン手順、次のステップ\n  rdsh search hello --dir .       Nodeなしの高速ファイル検索\n  rdsh search-web \"rust async\"      SearXNGによるWeb検索（APIキー不要）\n  rdsh desktop status             Desktop（Electron）アプリと専用プロファイルを検出\n  rdsh desktop install            同プロファイルに同梱rdshプラグインを追加\n  rdsh --passthrough tui          slim環境なし。必須のツール分離は維持\n  rdsh --dry-run tui -- --resume abc   実行するコマンドを表示",
@@ -2600,7 +2615,7 @@ fn feature_summary(locale: locale::Locale, def: &rdsh_config::FeatureDef) -> &'s
         "update_notifications" => ("发现更新时发送通知", "更新が見つかったときに通知する"),
         "sound" => ("允许安装 DSH 声音通知（installer SOUND=1）", "DSH サウンド通知の導入を許可（installer SOUND=1）"),
         "serve" => ("本地只读仪表板（rdsh serve）", "ローカル読み取り専用ダッシュボード（rdsh serve）"),
-        "search-web" => ("SearXNG Web 搜索（rdsh search-web）", "SearXNG Web 検索（rdsh search-web）"),
+        "search-web" => ("SearXNG / Ollama Web 搜索（rdsh search-web）", "SearXNG / Ollama Web 検索（rdsh search-web）"),
         "context_engine" => ("实验性的每轮上下文引擎（rdsh context）", "実験的なターン単位コンテキストエンジン（rdsh context）"),
         "compute" => ("允许常驻计算桥（RDSH_COMPUTE=1）", "常駐コンピュートブリッジを許可（RDSH_COMPUTE=1）"),
         "budget_guard" => ("DSH 插件中的预算保护 hook", "DSH プラグイン内の予算ガードフック"),
