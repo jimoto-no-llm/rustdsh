@@ -1384,6 +1384,7 @@ window.__ModuleLoader__.load({
             openGroups.model,
             () => toggleOpen("model"),
             modelSummary,
+            h("p", { style: title }, copy("tokens")),
             h(
               "div",
               { className: "rdsh-grid-2", style: grid2 },
