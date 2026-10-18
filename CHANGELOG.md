@@ -5,6 +5,8 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-10-18
+
 ### Added
 
 - `rdsh plugins status|install` が必須プラグインのカタログ
@@ -14,9 +16,36 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   バイナリを更新しても `$DSH_HOME/profiles/<profile>/package.json` は
   書き換わらず、必須プラグインが欠けたままでした。`--json` は schema 1、
   `--recommended=none|all|starter|id,id` は `plugins/install.sh` と同じ選択を
-  提供し、`--profile desktop` は `rdsh desktop install` へ転送します。
+  提供し、`--profile desktop` は `rdsh desktop install` へ転送します（#816）。
 - `rdsh doctor` が、必須ティアの不足している初期化済みプロファイルごとに
-  1行で不足数と修正コマンドを表示します。
+  1行で不足数と修正コマンドを表示します。Web プロファイルのインストールでも
+  必須プラグインを自動で入れるようになりました（#816）。
+- デスクトップアプリが会話履歴のページング・ショートカット・会話検索・ダークテーマに
+  対応し、会話タイトルを全件取得して ✎ から名前を変更でき、プロジェクトの
+  折りたたみとアーカイブ、シャチのアイコンを使えるようになりました（#806、#810）。
+- 設定タブ「rdsh」がカード表示になり、グループを折りたためるようになりました。
+  ローカル Web UI にはコンテキスト・実行・更新のゲージが付きます（#810）。
+- 更新カードが dsh 本体の更新も併記し、単独でも表示します。実行中の dsh 版は
+  ホストのエントリから特定し、通知は × で閉じられ、dsh の更新はユーザー所有の
+  prefix へ入ります（#801、#803）。
+- `rustxng` をローカル検索バックエンドとして選べるようになり、結果は HTML ではなく
+  JSON API から取得します（#805、#815）。
+- OpenCode の既存ルートを Web と TUI のプロファイルへ同期できるようになりました（#813）。
+- オプトインの swarm / sandbox CLI を追加しました（#809）。
+
+### Changed
+
+- `rdsh desktop install` の既定プラグイン構成に更新バナーが入りました（#814）。
+- ドキュメントを追加・更新しました: Discord コミュニティ、rdsh と dsh の違い、
+  デスクトップの操作、TUI の初期設定、Node.js 22 の入手方法（#807、#808、#810）。
+
+### Fixed
+
+- Web サービスを予期しない終了から復旧し、再起動をサービスツールから切り離して
+  引き渡すようにしました（#811）。
+- 読み取り側が先に閉じたときの EPIPE で panic せず静かに終了します（#804）。
+- 設定カードで失われていた tokens 見出しを戻しました（#810）。
+- macOS の swarm 検証がプライベートな検証済みスナップショットを使うようにしました（#809）。
 
 ## [0.9.0] - 2026-10-18
 
