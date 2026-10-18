@@ -97,11 +97,19 @@ window.__ModuleLoader__.load({
       const resPair = useState("");
       const result = resPair[0];
       const setResult = resPair[1];
+      const dshPair = useState(null);
+      const dshInfo = dshPair[0];
+      const setDshInfo = dshPair[1];
       const loadGeneration = useRef(0);
       const latest = useRef(null);
       const lastOccurrence = useRef(null);
       const updating = useRef(false);
       const accept = useCallback((incoming) => {
+        if (incoming && incoming.ok && incoming.dsh && incoming.dsh.available && typeof incoming.dsh.to === "string") {
+          setDshInfo(incoming.dsh);
+        } else {
+          setDshInfo(null);
+        }
         const j = normalize(incoming);
         if (!j || !j.ok) return;
         if (!j.updated) {
@@ -228,7 +236,40 @@ window.__ModuleLoader__.load({
           if (sameOccurrence()) setResult("request failed");
         } finally { updating.current = false; }
       }, [closeOccurrence, load]);
-      if (!data || !data.updated) return null;
+      const runDshUpdate = async () => {
+        if (running === "busy") return;
+        setRunning("busy");
+        setResult("");
+        try {
+          const response = await fetch(ENDPOINT + "/dsh/run", { method: "POST", cache: "no-store" });
+          const value = await response.json();
+          setResult(value && value.message ? value.message : (response.ok && value && value.ok ? "done" : "failed"));
+          setExpanded(true);
+          setRunning("done");
+          load();
+        } catch (error) {
+          setRunning("done");
+          setResult("request failed");
+        }
+      };
+      if (!data || !data.updated) {
+        if (!dshInfo) return null;
+        return h("div", { className: "rub-wrap rub-pop", role: "alert", "data-testid": "dsh-update" },
+          h("style", null, CSS + KEYFRAMES),
+          h("div", { className: "rub-card" },
+            h("div", { className: "rub-row1" }, h(Icon, null),
+              h("div", { className: "rub-tt" }, h("b", null, "dsh update available"))),
+            h("div", { className: "rub-body" },
+              h("span", { className: "rub-ver" }, dshInfo.from || "?"), " to ", h("span", { className: "rub-ver" }, dshInfo.to || "?"),
+              result ? h("div", { className: "rub-sub" }, result) : null,
+              h("div", { className: "rub-acts" },
+                h("button", { className: "rub-tbtn", disabled: running === "busy", onClick: runDshUpdate },
+                  running === "busy" ? "updating..." : "update"),
+                h("button", { className: "rub-tbtn dim", onClick: () => {
+                  try { window.open(dshInfo.details, "_blank", "noopener"); } catch (e) {}
+                  setShowDetail(true);
+                } }, "details")))));
+      }
       const label = data.kind === "dsh" ? "dsh update available" : "rdsh updated!";
       const inner = expanded ? h("div", { className: "rub-card" },
         h("button", { className: "rub-x", onClick: dismiss, "aria-label": "close" }, "x"),
@@ -246,6 +287,14 @@ window.__ModuleLoader__.load({
               ? data.dsh.command
               : "applied: " + (data.at ? new Date(data.at).toLocaleString() : "?") + (data.demo ? " (demo)" : "")) : null,
           result ? h("div", { className: "rub-sub" }, result) : null,
+          dshInfo ? h("div", { className: "rub-sub" },
+            "dsh " + (dshInfo.from || "?") + " から dsh " + dshInfo.to + " が利用可能",
+            h("div", { className: "rub-acts" },
+              h("button", { className: "rub-tbtn", disabled: running === "busy", onClick: runDshUpdate },
+                running === "busy" ? "updating dsh..." : "update dsh"),
+              h("button", { className: "rub-tbtn dim", onClick: () => {
+                try { window.open(dshInfo.details, "_blank", "noopener"); } catch (e) {}
+              } }, "details"))) : null,
           h("div", { className: "rub-acts" },
             h("button", { className: "rub-tbtn", disabled: running === "busy", onClick: runUpdate },
               running === "busy" ? "updating..." : running === "done" ? "update again" : "update"),
