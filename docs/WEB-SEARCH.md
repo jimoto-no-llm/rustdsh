@@ -45,7 +45,7 @@ SearXNGが停止しているときに `--auto-start` を付けると、同梱の
 
 ```sh
 rdsh search-web "Rust async" --auto-start
-docker compose -f docker-compose.searxng.yml down   # 停止
+docker stop rdsh-searxng                              # 停止
 ```
 
 - 接続先がループバック（`127.0.0.1`、`::1`、`localhost`）のときだけ起動します。
@@ -55,8 +55,13 @@ docker compose -f docker-compose.searxng.yml down   # 停止
   しません。
 - 初回はイメージ取得のためにDocker Hubへ接続します。以後の通信はローカルの
   コンテナとの間だけで発生します。
-- 起動先は `RDSH_SEARXNG_COMPOSE_FILE`、カレントディレクトリ、
-  `rdsh` の実行ファイルと同じディレクトリの順で探します。
+- composeプロジェクトと設定ファイルはバイナリに同梱しています。未設定なら
+  `~/.cache/rdsh/searxng/` に書き出して起動します（リリース配布物はバイナリのみで、
+  インストーラーは追加メンバーを拒否するため、実行ファイルの隣に置く方法は使えません）。
+  `RDSH_SEARXNG_COMPOSE_FILE` を設定すると、そのファイルをそのまま使います。
+- 同梱プロジェクトの公開ポートと `SEARXNG_BASE_URL` は接続先
+  （`SEARXNG_URL`、`search.searxng_url`）に合わせて書き換えます。`localhost` は
+  Dockerが要求する 127.0.0.1 にバインドします。
 - `rdsh doctor` はSearXNGの到達性、コンテナランタイム、composeファイルの位置を
   表示します。doctor はコンテナを起動しません。
 

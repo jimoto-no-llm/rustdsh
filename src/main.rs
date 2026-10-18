@@ -2881,9 +2881,7 @@ fn doctor(locale: locale::Locale) -> anyhow::Result<()> {
             "SearXNG compose 文件",
             "SearXNG compose ファイル"
         ),
-        searxng::compose_file()
-            .map(|path| path.display().to_string())
-            .unwrap_or_else(|| text("not found", "未找到", "見つかりません").to_string())
+        searxng::compose_source().label(locale)
     ));
     say(format!(
         "[rdsh] {}: {}",
