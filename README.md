@@ -761,6 +761,7 @@ For startup, run `rdsh bench --n 5`. See
 ## Community
 
 - Contributions: See [CONTRIBUTING.md](CONTRIBUTING.md).
+- Community chat: [Discord](https://discord.gg/r7PPXTYGmf) - quick questions and day-to-day chat (Japanese or English).
 - Rust development setup: [Rust development guide](docs/RUST-DEVELOPMENT.md).
 - Issues & Ideas: [Issue tracker](https://github.com/jimoto-no-llm/rustdsh/issues/new/choose) (Japanese or English).
 - Security: Please report vulnerabilities privately according to [SECURITY.md](SECURITY.md).

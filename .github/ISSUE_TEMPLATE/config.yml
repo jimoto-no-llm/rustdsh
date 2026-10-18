@@ -3,6 +3,9 @@ contact_links:
   - name: Question / Support (質問・相談)
     url: https://github.com/jimoto-no-llm/rustdsh/issues
     about: Usage questions and ideas. Japanese OK.
+  - name: Community chat (Discord)
+    url: https://discord.gg/r7PPXTYGmf
+    about: Quick questions and day-to-day chat. Japanese OK.
   - name: Security report (脆弱性の報告)
     url: https://github.com/jimoto-no-llm/rustdsh/security/advisories/new
     about: Never file vulnerabilities as public issues. See SECURITY.md.
