@@ -57,3 +57,21 @@ input[type="range"]:disabled { opacity: .45; cursor: not-allowed; }
   * { scrollbar-color: auto; }
   input[type="range"] { appearance: auto; -webkit-appearance: auto; }
 }
+/* DSH wraps a previewable markdown image in an inline-block button
+   (`_imageButton_*`), so a figure that shares a line with text is squeezed into
+   the leftover width and the paragraph wraps around it: the figure looks broken
+   and its labels stop being readable. Make the wrapper a block box and let the
+   image use the answer column, the way DSH lays out an image it does not wrap.
+   The selector stays generic because the class hash changes with every DSH
+   build while the `imageButton` name does not; both rules stay scoped to that
+   wrapper, so the dashboard and setup pages are untouched. DSH 0.2.0-rc.2 lays
+   out the wrapper at `display:inline-block` with `max-width:min(100%,640px)` and
+   `max-height:360px` on the image. */
+button[class*="imageButton"] {
+  display: block;
+  max-width: 100%;
+}
+button[class*="imageButton"] img[class*="image_"] {
+  max-width: 100%;
+  max-height: min(80vh, 1200px);
+}

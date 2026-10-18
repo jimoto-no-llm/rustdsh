@@ -15,6 +15,15 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   スクリーンショット（`docs/screenshots/showcase/serve-dashboard-*`）は
   新しいUIに差し替えました。
 
+### Fixed
+
+- DSH の回答に含まれる画像が、プレビュー用の inline-block ボタンに入れ子になっていたため、
+  テキストと同じ行にある図は行の残り幅へ押し込まれ、段落が図の周りに回り込んで崩れ、
+  ラベルも読めない大きさになっていました。同梱の共有スタイルシートがこのラッパーを
+  block にし、画像を回答カラムの幅まで使えるようにします（DSH **0.2.0-rc.2** の
+  Web UI で確認）。セレクタは DSH 側のクラス名（`imageButton`）にだけ依存するため、
+  ハッシュが変わっても効き続け、ダッシュボードと setup 画面には影響しません。
+
 ## [0.9.1] - 2026-10-18
 
 ### Added
