@@ -661,7 +661,7 @@ rdsh が利用・改変・推薦している第三者製 DSH プラグインで�
 
 ## ライセンス
 
-MIT（[LICENSE](LICENSE)）です。本家 DeepSeek Harness および依存ライブラリにはそれぞれのライセンスが適用されます。
+MIT（[LICENSE](LICENSE)）です。本家 DeepSeek Harness および依存ライブラリにはそれぞれのライセンスが適用されます。固定しているバージョンと商標の表示は[サードパーティライセンス](THIRD_PARTY_LICENSES.md)にまとめています。
 
 ## 保護付き起動の対応版
 

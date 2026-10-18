@@ -23,5 +23,10 @@ jobs:
       - uses: actions/checkout@v7
       - uses: taiki-e/install-action@v2
         with:
-          tool: cargo-audit
+          tool: cargo-audit,cargo-deny
       - run: cargo audit
+      # deny.toml pins the allowed dependency licenses and registries, so a
+      # copyleft license or an unknown registry fails on the pull request that
+      # adds it instead of at release time. Advisories stay with cargo audit.
+      - name: Check dependency licenses and registries
+        run: cargo deny check licenses sources

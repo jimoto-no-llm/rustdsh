@@ -794,7 +794,7 @@ authors):
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Upstream DeepSeek Harness and its dependencies retain their respective licenses.
+MIT — see [LICENSE](LICENSE). Upstream DeepSeek Harness and its dependencies retain their respective licenses; the pinned versions and the trademark notice are in [third-party licenses](THIRD_PARTY_LICENSES.md).
 
 ### External agent jobs
 
