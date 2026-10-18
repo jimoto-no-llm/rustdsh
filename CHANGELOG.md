@@ -50,6 +50,15 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   DeepSeek Harness packages, the permissive crate set and the trademark
   disclaimer; both README license sections link to it.
 
+### Fixed
+
+- Native desktop app: the host cache directory, its `host.log` and the Web UI
+  `webui.url` file are owner-only (0700/0600) instead of inheriting the umask.
+  Both files hold the token-bearing ready URL, so on a shared machine with the
+  usual 0022 umask any local user could read them. The Web UI URL is now
+  written owner-only from creation, and files left by an earlier run are
+  tightened before they are written again.
+
 ## [0.8.0] - 2026-10-18
 
 ### Added
