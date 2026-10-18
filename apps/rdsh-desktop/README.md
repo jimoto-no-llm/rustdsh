@@ -75,6 +75,25 @@ pinned revision):
 - Model changes go through session/selectModel, so the host keeps them for the
   conversation and the chip and header update immediately.
 
+## Keyboard and themes
+
+| Key | Action |
+| --- | --- |
+| Enter / Ctrl+Enter | Send the message |
+| Shift+Enter | Newline |
+| Esc | Clear the composer, or close the search filter |
+| Esc Esc (while running) | Stop the run |
+| Ctrl+K | Focus the composer |
+| Ctrl+N | New conversation |
+
+The sidebar has a search filter (title and project path) and each project row
+folds, archives and restores. The timeline loads older history on demand and
+keeps at most 400 messages in memory.
+
+Theme: `RDSH_DESKTOP_THEME=light|dark|system` or `--theme`; system follows the
+desktop appearance setting when it can be read. The window never shrinks below
+900x600.
+
 ## Sidebar projects
 
 The sidebar groups conversations by project. Each project header folds the
