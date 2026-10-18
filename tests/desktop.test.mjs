@@ -169,7 +169,7 @@ test('install --dry-run prints the forwarded command and changes nothing', async
   assert.equal(code, 0);
   const report = JSON.parse(stdout);
   assert.equal(report.dry_run, true);
-  assert.equal(report.actions.length, 3);
+  assert.equal(report.actions.length, 4);
   assert.equal(report.actions[0].plugin, 'rdsh-settings');
   const source = join(box.checkout, 'plugins', 'rdsh-settings');
   assert.deepEqual(report.actions[0].args, ['plugin', '--profile', 'desktop', 'add', windows ? source.replaceAll('\\', '/') : source]);
@@ -177,6 +177,8 @@ test('install --dry-run prints the forwarded command and changes nothing', async
   assert.deepEqual(report.actions[1].args, ['plugin', '--profile', 'desktop', 'add', 'github:cwd514/dsh-sound-notifications']);
   assert.equal(report.actions[2].plugin, 'dsh-gitview');
   assert.deepEqual(report.actions[2].args, ['plugin', '--profile', 'desktop', 'add', 'github:yugapor/dsh-gitview']);
+  assert.equal(report.actions[3].plugin, 'dsh-intelligent-ui');
+  assert.deepEqual(report.actions[3].args, ['plugin', '--profile', 'desktop', 'add', 'github:cwd514/dsh-intelligent-ui']);
   assert.equal(existsSync(box.log), false, 'the Desktop command must not run on --dry-run');
   assert.equal(await readFile(box.profile, 'utf8'), before);
 });
@@ -196,6 +198,7 @@ test('install forwards to the Desktop command and verify then passes', async (t)
   ]);
   assert.deepEqual(calls[1], ['plugin', '--profile', 'desktop', 'add', 'github:cwd514/dsh-sound-notifications']);
   assert.deepEqual(calls[2], ['plugin', '--profile', 'desktop', 'add', 'github:yugapor/dsh-gitview']);
+  assert.deepEqual(calls[3], ['plugin', '--profile', 'desktop', 'add', 'github:cwd514/dsh-intelligent-ui']);
   const verify = await run(['desktop', 'verify', '--json'], { ...env, DSH_DESKTOP_CLI: command });
   assert.equal(verify.code, 0, verify.stderr);
   assert.deepEqual(JSON.parse(verify.stdout).missing, []);
@@ -209,7 +212,7 @@ test('Unix plugin source paths preserve literal backslashes', { skip: windows },
   await writeFile(join(source, 'package.json'), JSON.stringify({ name: 'rdsh-settings' }));
   const command = await stubCommand(box);
   await initProfile(box, { name: 'dsh-profile-desktop' });
-  const result = await run(['desktop', 'install', '--json', '--plugins-dir', checkout, '--no-sound', '--no-gitview'], {
+  const result = await run(['desktop', 'install', '--json', '--plugins-dir', checkout, '--no-sound', '--no-gitview', '--no-intelligent-ui'], {
     ...env, DSH_DESKTOP_CLI: command, STUB_LOG: box.log, STUB_PROFILE: box.profile,
   });
   assert.equal(result.code, 0, result.stderr);
@@ -230,11 +233,11 @@ test('install --compute also attaches the compute bridge', async (t) => {
   assert.equal(verify.code, 0, verify.stderr);
 });
 
-test('install --no-sound --no-gitview skips the default third-party plugins', async (t) => {
+test('install --no-sound --no-gitview --no-intelligent-ui skips the default third-party plugins', async (t) => {
   const { box, env } = await baseEnv(t);
   const command = await stubCommand(box);
   await initProfile(box, { name: 'dsh-profile-desktop' });
-  const { code, stdout } = await run(['desktop', 'install', '--dry-run', '--json', '--plugins-dir', box.checkout, '--no-sound', '--no-gitview'], { ...env, DSH_DESKTOP_CLI: command });
+  const { code, stdout } = await run(['desktop', 'install', '--dry-run', '--json', '--plugins-dir', box.checkout, '--no-sound', '--no-gitview', '--no-intelligent-ui'], { ...env, DSH_DESKTOP_CLI: command });
   assert.equal(code, 0, stdout);
   const report = JSON.parse(stdout);
   assert.equal(report.actions.length, 1);
@@ -246,9 +249,25 @@ test('install --no-sound keeps gitview and vice versa', async (t) => {
   const command = await stubCommand(box);
   await initProfile(box, { name: 'dsh-profile-desktop' });
   const onlyGit = await run(['desktop', 'install', '--dry-run', '--json', '--plugins-dir', box.checkout, '--no-sound'], { ...env, DSH_DESKTOP_CLI: command });
-  assert.deepEqual(JSON.parse(onlyGit.stdout).actions.map((a) => a.plugin), ['rdsh-settings', 'dsh-gitview']);
+  assert.deepEqual(JSON.parse(onlyGit.stdout).actions.map((a) => a.plugin), ['rdsh-settings', 'dsh-gitview', 'dsh-intelligent-ui']);
   const onlySound = await run(['desktop', 'install', '--dry-run', '--json', '--plugins-dir', box.checkout, '--no-gitview'], { ...env, DSH_DESKTOP_CLI: command });
-  assert.deepEqual(JSON.parse(onlySound.stdout).actions.map((a) => a.plugin), ['rdsh-settings', 'dsh-sound-notifications']);
+  assert.deepEqual(JSON.parse(onlySound.stdout).actions.map((a) => a.plugin), ['rdsh-settings', 'dsh-sound-notifications', 'dsh-intelligent-ui']);
+});
+
+test('install attaches the starter plugins the checkout carries, in order', async (t) => {
+  const { box, env } = await baseEnv(t);
+  for (const name of ['rdsh-answer-guard', 'rdsh-translation', 'rdsh-subagent-optimizer']) {
+    await mkdir(join(box.checkout, 'plugins', name), { recursive: true });
+    await writeFile(join(box.checkout, 'plugins', name, 'package.json'), JSON.stringify({ name }));
+  }
+  const command = await stubCommand(box);
+  await initProfile(box, { name: 'dsh-profile-desktop' });
+  const { code, stdout } = await run(['desktop', 'install', '--dry-run', '--json', '--compute', '--plugins-dir', box.checkout], { ...env, DSH_DESKTOP_CLI: command });
+  assert.equal(code, 0, stdout);
+  assert.deepEqual(JSON.parse(stdout).actions.map((a) => a.plugin), [
+    'rdsh-settings', 'rdsh-answer-guard', 'rdsh-translation', 'rdsh-subagent-optimizer', 'rdsh-compute',
+    'dsh-sound-notifications', 'dsh-gitview', 'dsh-intelligent-ui',
+  ]);
 });
 
 test('install and verify refuse an uninitialized Desktop profile', async (t) => {
@@ -316,7 +335,7 @@ test('Desktop install honors saved sound and gitview feature vetoes', async (t) 
     const off = await run(['features', 'off', feature], env);
     assert.equal(off.code, 0, off.stderr);
   }
-  const result = await run(['desktop', 'install', '--json', '--plugins-dir', box.checkout], {
+  const result = await run(['desktop', 'install', '--json', '--plugins-dir', box.checkout, '--no-intelligent-ui'], {
     ...env, DSH_DESKTOP_CLI: command, STUB_LOG: box.log, STUB_PROFILE: box.profile,
   });
   assert.equal(result.code, 0, result.stderr);
@@ -354,7 +373,7 @@ test('a relative extracted runtime survives the plugin working directory', {
     STUB_LOG: box.log, STUB_PROFILE: box.profile,
   }, box.root);
   assert.equal(result.code, 0, result.stdout + result.stderr);
-  assert.equal((await readFile(box.log, 'utf8')).trim().split('\n').length, 3);
+  assert.equal((await readFile(box.log, 'utf8')).trim().split('\n').length, 4);
 });
 
 test('a PATH symlink discovers a Desktop runtime outside standard app locations', { skip: windows }, async (t) => {
@@ -370,16 +389,16 @@ test('a PATH symlink discovers a Desktop runtime outside standard app locations'
     PATH: alias + delimiter + process.env.PATH, STUB_LOG: box.log, STUB_PROFILE: box.profile,
   });
   assert.equal(result.code, 0, result.stdout + result.stderr);
-  assert.equal((await readFile(box.log, 'utf8')).trim().split('\n').length, 3);
+  assert.equal((await readFile(box.log, 'utf8')).trim().split('\n').length, 4);
 });
 
 test('the plugin installer defaults browser packages only for web and desktop', { skip: windows }, async (t) => {
   const { box, env } = await baseEnv(t);
   for (const profile of ['', 'headless', 'tui', 'web', 'desktop']) {
     const { stdout } = await exec('sh', [join(repo, 'plugins/install.sh')], {
-      cwd: repo, env: { ...process.env, ...env, HOME: box.root, PROFILE: profile, DRY_RUN: '1', SOUND: '', GITVIEW: '', RDSH_BIN: bin },
+      cwd: repo, env: { ...process.env, ...env, HOME: box.root, PROFILE: profile, DRY_RUN: '1', SOUND: '', GITVIEW: '', INTELLIGENT_UI: '', RDSH_BIN: bin },
     });
-    for (const name of ['dsh-sound-notifications', 'dsh-gitview'])
+    for (const name of ['dsh-sound-notifications', 'dsh-gitview', 'dsh-intelligent-ui'])
       assert.equal(stdout.includes('github:' + (name === 'dsh-gitview' ? 'yugapor/' : 'cwd514/') + name), ['web', 'desktop'].includes(profile), profile || 'default');
   }
   const { stdout } = await exec('sh', [join(repo, 'plugins/install.sh')], {

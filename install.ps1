@@ -14,7 +14,7 @@
 #   .\install.ps1 -FromRelease      # prebuilt binary from GitHub Releases (no Rust needed)
 #   .\install.ps1 -FromRelease -Version v0.1.2  # pinned release
 #   .\install.ps1 -FromRelease -NoChecksum      # skip SHA-256 only after typing YES at a terminal
-#   .\install.ps1 -Desktop         # also attach the rdsh + default third-party (sound, gitview) plugins to Desktop
+#   .\install.ps1 -Desktop         # also attach the rdsh starter + default third-party (sound, gitview, intelligent-ui) plugins to Desktop
 #   .\install.ps1 -NoSetup         # skip the first-run setup screen and the Start menu shortcut
 # -FromRelease verifies the Windows archive against this repository's
 # release-digests-windows.tsv, fetched from its fixed canonical URL; the release

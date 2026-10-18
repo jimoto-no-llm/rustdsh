@@ -5,6 +5,20 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Changed
+
+- Beginner starter set on by default: `PROFILE=web` and `PROFILE=desktop`
+  now install Japanese translation, bounded exploration subagents, sound
+  notifications, the Git panel and visual answers (`dsh-intelligent-ui`)
+  without any choice, so a newcomer from Codex or Claude Code gets a capable
+  setup. `rdsh desktop install` (and `install.sh --desktop` /
+  `install.ps1 -Desktop`) also attaches `rdsh-answer-guard`,
+  `rdsh-translation` and `rdsh-subagent-optimizer` when the checkout carries
+  them, plus `dsh-intelligent-ui`; `--no-intelligent-ui` skips it.
+  `plugins/install.sh --recommended=starter` selects the set on any profile;
+  `headless` still installs the essential tier only. `ui-comfort`,
+  `easy-work` and `compute` stay opt-in.
+
 ### Added
 
 - `rdsh search-web --provider ollama` uses Ollama's hosted Web Search API

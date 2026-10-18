@@ -68,7 +68,7 @@ for a in "$@"; do
       echo "  --no-rustup  do not auto-install Rust when cargo is missing"
       echo "  --from-release  install a prebuilt binary from GitHub Releases (no Rust needed)"
       echo "  --musl  use the static musl build (rdsh-linux-x64-musl.tar.gz; also via RDSH_MUSL=1)"
-      echo "  --desktop  also attach the bundled + default third-party (sound, gitview) plugins to the Desktop profile"
+      echo "  --desktop  also attach the bundled starter + default third-party (sound, gitview, intelligent-ui) plugins to the Desktop profile"
       echo "  --no-setup  do not open the browser setup screen after installing"
       echo "  --version=VER  release to fetch with --from-release (default: latest, resolved from repository pins)"
       echo "  RDSH_NO_CHECKSUM=1  skip SHA-256 verification only after typing YES at a terminal"
@@ -737,7 +737,7 @@ fi
 echo "--- rdsh doctor ---"
 "$PREFIX/rdsh" doctor 2>&1 | head -n 12 || true
 if [ -f "./plugins/install.sh" ]; then
-  echo "next: PROFILE=web ./plugins/install.sh adds recommended plugins, including the rdsh settings UI and the phone-width Web layout"
+  echo "next: PROFILE=web ./plugins/install.sh adds the essential plugins and the beginner starter set (translation, subagents, sound, Git panel, visual answers)"
 fi
 post_install_notes
 # Desktop (Electron) keeps its own reserved profile next to the CLI profiles.

@@ -539,6 +539,9 @@ enum DesktopAction {
         /// Skip the default Git panel (github:yugapor/dsh-gitview)
         #[arg(long = "no-gitview")]
         no_gitview: bool,
+        /// Skip the default visual answers (github:cwd514/dsh-intelligent-ui)
+        #[arg(long = "no-intelligent-ui")]
+        no_intelligent_ui: bool,
         /// Extra package spec to add (name, git URL, or path; repeatable)
         #[arg(long = "package")]
         package: Vec<String>,
@@ -1356,6 +1359,7 @@ fn main() {
                 compute,
                 no_sound,
                 no_gitview,
+                no_intelligent_ui,
                 package,
                 no_bundled,
                 json: inner,
@@ -1368,6 +1372,7 @@ fn main() {
                     compute,
                     no_sound: no_sound || !rdsh_config::feature_enabled(&cfg, "sound"),
                     no_gitview: no_gitview || !rdsh_config::feature_enabled(&cfg, "gitview"),
+                    no_intelligent_ui,
                     json: json || inner,
                 },
                 locale,
@@ -2237,6 +2242,10 @@ fn localized_arg_help(id: &str, locale: locale::Locale) -> Option<&'static str> 
         "rdsh" => ("rdsh 可执行文件路径", "rdsh実行ファイルのパス"),
         "no_sound" => ("不安装声音通知插件", "サウンド通知プラグインを導入しない"),
         "no_gitview" => ("不安装 gitview 插件", "gitviewプラグインを導入しない"),
+        "no_intelligent_ui" => (
+            "不安装可视化回答插件",
+            "ビジュアル回答プラグインを導入しない",
+        ),
         "root" => ("项目根目录", "プロジェクトルート"),
         "symbol" => ("符号名称", "シンボル名"),
         "target" => ("目标符号或文件", "対象のシンボルまたはファイル"),

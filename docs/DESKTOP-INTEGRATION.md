@@ -51,9 +51,9 @@ not attempt to boot a profile the app owns.
 
    ```sh
    rdsh desktop status                     # read-only: app, command, profile, plugins
-   rdsh desktop install --plugins-dir .    # rdsh-settings + default third-party (sound, gitview)
+   rdsh desktop install --plugins-dir .    # rdsh-settings + starter plugins + default third-party (sound, gitview, intelligent-ui)
    rdsh desktop install --plugins-dir . --compute   # also rdsh-compute
-   rdsh desktop install --plugins-dir . --no-sound --no-gitview  # skip third-party
+   rdsh desktop install --plugins-dir . --no-sound --no-gitview --no-intelligent-ui  # skip third-party
    ```
 
    `rdsh desktop install` resolves the Desktop command — `DSH_DESKTOP_CLI`,
@@ -115,12 +115,12 @@ affects the app's native folder dialog.
 ### All profiles in one command
 
 ```sh
-PROFILE=web      ./plugins/install.sh    # essential + web defaults (translation, sound, gitview)
+PROFILE=web      ./plugins/install.sh    # essential + the starter set (translation, subagents, sound, gitview, intelligent-ui)
 PROFILE=tui      ./plugins/install.sh    # tui profile
 PROFILE=desktop  ./plugins/install.sh    # forwarded through `rdsh desktop install`
 PROFILE=desktop COMPUTE=1 ./plugins/install.sh   # plus the compute bridge
 PROFILE=web      ./plugins/install.sh --recommended=none  # essential plugins only
-PROFILE=web SOUND=0 GITVIEW=0 ./plugins/install.sh  # skip the default third-party plugins
+PROFILE=web SOUND=0 GITVIEW=0 INTELLIGENT_UI=0 ./plugins/install.sh  # skip the default third-party plugins
 ```
 
 `PROFILE=desktop` never calls `dsh plugin` directly (the npm CLI refuses the
@@ -130,8 +130,10 @@ recommended set. With no `rdsh` on PATH it prints the manual Plugins-page
 steps, labelled `[essential]` and `[recommended]`, instead.
 
 The installers can do this inline: `./install.sh --desktop` and
-`.\install.ps1 -Desktop` attach `rdsh-settings`, `rdsh-compute`, and the default
-third-party plugins (sound, gitview) after installing the launcher. Both are
+`.\install.ps1 -Desktop` attach `rdsh-settings`, the starter plugins
+(`rdsh-answer-guard`, `rdsh-translation`, `rdsh-subagent-optimizer`, each when
+the checkout carries it), `rdsh-compute`, and the default third-party plugins
+(sound, gitview, intelligent-ui) after installing the launcher. Both are
 no-ops when no initialized Desktop profile is detected, and neither fails the
 installation.
 
@@ -147,9 +149,9 @@ forwarded. On Unix a non-executable `DSH_DESKTOP_CLI` is run through `sh`.
 | `rdsh-compute` | resident `rdsh compute` worker for token estimate/batch/prune through the Web plugin bridge | `rdsh features on compute` (off by default) |
 | `github:cwd514/dsh-sound-notifications` (MIT, (c) 2026 cwd514) | effect sounds and desktop notifications for reply-done / approval / questions / errors | default on; `rdsh desktop install --no-sound`, `SOUND=0`, or `features.sound=false` to skip |
 | `github:yugapor/dsh-gitview` (MIT, (c) 2026 yugapor) | Git panel: changes, diffs, history, branches, blame, CI status | default on; `rdsh desktop install --no-gitview`, `GITVIEW=0`, or `features.gitview=false` to skip |
-| `github:cwd514/dsh-intelligent-ui` (MIT, (c) 2026 cwd514) | visual answers in the Web chat: the model's `render_ui` tool draws tables, charts, comparisons, timelines and calculators below the answer | off by default; opt in with `--recommended=intelligent-ui` or `INTELLIGENT_UI=1` in `plugins/install.sh`, or the Plugins page |
+| `github:cwd514/dsh-intelligent-ui` (MIT, (c) 2026 cwd514) | visual answers in the Web chat: the model's `render_ui` tool draws tables, charts, comparisons, timelines and calculators below the answer | default on; `rdsh desktop install --no-intelligent-ui` or `INTELLIGENT_UI=0` to skip |
 | essential upstream packages | `dsh-tool-present`, `dsh-tool-ask-user`, `dsh-skill-office`, `dsh-mcp-client`, and the rest of `plugins/recommended.md` | always installed; `PROFILE=desktop ./plugins/install.sh` forwards the same command, or use the Plugins page |
-| recommended plugins | `rdsh-translation`, `rdsh-compute`, `rdsh-easy-work`, `rdsh-subagent-optimizer`, `rdsh-ui-comfort`, `sound`, `gitview`, `intelligent-ui` | a TTY prompts for them; otherwise `--recommended=all\|none\|id,id` — see `plugins/recommended.md` |
+| recommended plugins | `rdsh-translation`, `rdsh-compute`, `rdsh-easy-work`, `rdsh-subagent-optimizer`, `rdsh-ui-comfort`, `sound`, `gitview`, `intelligent-ui` | the starter set (translation, subagents, sound, gitview, intelligent-ui) is on for web/desktop; a TTY prompts; otherwise `--recommended=starter\|all\|none\|id,id` — see `plugins/recommended.md` |
 
 The compute bridge keeps its documented contract: pure string operations only,
 1 MiB input cap, 5 s timeout, and a fallback to the JavaScript implementation on
