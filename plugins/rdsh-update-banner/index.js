@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { readFileSync, realpathSync } from "node:fs";
+import { accessSync, constants, existsSync, readFileSync, realpathSync } from "node:fs";
 import { readFile, writeFile, mkdir, lstat, rename, unlink } from "node:fs/promises";
 import { watch } from "node:fs";
 import { randomUUID } from "node:crypto";
@@ -396,7 +396,10 @@ function queryPublishedDsh() {
   });
 }
 
-function activeDshVersion() {
+// Returns { version, prefix } for the dsh install that is actually running.
+// The prefix matters because npm's global prefix here is /usr/local (root),
+// while this harness lives in a user-owned directory.
+function activeDshInstall() {
   if (typeof process.env.DSH_VERSION === "string" && VERSION_PATTERN.test(process.env.DSH_VERSION)) {
     return process.env.DSH_VERSION;
   }
@@ -417,7 +420,9 @@ function activeDshVersion() {
       try {
         const value = JSON.parse(readFileSync(join(directory, "package.json"), "utf8"));
         if (value.name === "@deepseek-ai/dsh" && typeof value.version === "string" && VERSION_PATTERN.test(value.version)) {
-          return value.version;
+          const prefix = dirname(dirname(dirname(dirname(directory))));
+          const installable = existsSync(join(prefix, "lib", "node_modules"));
+          return { version: value.version, prefix: installable ? prefix : null };
         }
       } catch (error) {}
       const parent = dirname(directory);
@@ -425,7 +430,7 @@ function activeDshVersion() {
       directory = parent;
     }
   }
-  return "";
+  return { version: "", prefix: null };
 }
 
 async function readDshStatus() {
@@ -436,26 +441,55 @@ async function readDshStatus() {
     queryPublishedDsh().catch(() => {}).finally(() => { dshRefreshing = false; });
   }
   const newest = cache ? cache.newest : "";
-  const active = activeDshVersion();
+  const install = activeDshInstall();
+  const active = install.version;
   return {
     available: Boolean(newest && active && compareVersions(newest, active) > 0),
     from: active || null,
     to: newest || null,
     at: (cache && cache.checkedAt) || Date.now(),
-    command: newest ? "npm install -g @deepseek-ai/dsh@" + newest : null,
+    command: newest ? dshInstallCommand(install.prefix, newest) : null,
     details: newest ? "https://www.npmjs.com/package/@deepseek-ai/dsh/v/" + newest : null,
+    installPrefix: install.prefix,
   };
+}
+
+function dshInstallCommand(prefix, version) {
+  const target = "@deepseek-ai/dsh@" + version;
+  return prefix ? "npm install --prefix " + prefix + " " + target : "npm install -g " + target;
 }
 
 function runDshUpdate(version) {
   if (!VERSION_PATTERN.test(version)) return Promise.resolve({ ok: false, message: "invalid version" });
+  const install = activeDshInstall();
+  if (install.prefix && !isWritable(install.prefix)) {
+    return Promise.resolve({
+      ok: false,
+      message: "the install directory is not writable; run: " + dshInstallCommand(install.prefix, version),
+    });
+  }
+  const args = install.prefix
+    ? ["install", "--prefix", install.prefix, "@deepseek-ai/dsh@" + version]
+    : ["install", "-g", "@deepseek-ai/dsh@" + version];
   return new Promise((resolve) => {
-    execFile("npm", ["install", "-g", "@deepseek-ai/dsh@" + version], { timeout: RUN_TIMEOUT_MS, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
+    execFile("npm", args, { timeout: RUN_TIMEOUT_MS, maxBuffer: 1024 * 1024 }, (error, stdout, stderr) => {
       const tail = String(stderr || stdout || "").trim().split("\n").slice(-3).join(" ");
-      if (error) { resolve({ ok: false, message: tail || String(error.message || "npm failed") }); return; }
-      resolve({ ok: true, message: "installed dsh " + version + " (restart the web service to use it)" });
+      if (error) {
+        resolve({ ok: false, message: tail || String(error.message || "npm failed") });
+        return;
+      }
+      resolve({ ok: true, message: "installed dsh " + version + " into " + (install.prefix || "the global prefix") + " (restart the web service to use it)" });
     });
   });
+}
+
+function isWritable(directory) {
+  try {
+    accessSync(directory, constants.W_OK);
+    return true;
+  } catch (error) {
+    return false;
+  }
 }
 
 async function readState() {
