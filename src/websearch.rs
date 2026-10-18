@@ -613,7 +613,8 @@ fn fetch_with(
     Ok(parse_html(body, 50))
 }
 
-/// HTML search client kept for the existing callers and tests.
+/// HTML search client used by the stub tests.
+#[cfg(test)]
 fn fetch(base: &str, query: &str, locale: crate::locale::Locale) -> anyhow::Result<Vec<Hit>> {
     fetch_with(base, query, locale, Format::Html)
 }
