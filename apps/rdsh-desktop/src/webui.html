@@ -224,6 +224,7 @@
     <div class="sidebar-head">
       <div class="brand">rdsh ローカル UI</div>
       <div class="status" id="status">接続しています…</div>
+      <span class="chip hidden" id="update-badge" title="ハーネスの更新">更新: —</span>
     </div>
     <div class="groups" id="groups"></div>
   </aside>
@@ -285,6 +286,8 @@
   var bannerActions = el("banner-actions");
   var input = el("input");
   var modelChip = el("model-chip");
+  var updateBadge = el("update-badge");
+  var updateNotified = false;
   var picker = el("model-picker");
   var cancelButton = el("cancel");
   var sendButton = el("send");
@@ -316,6 +319,16 @@
     if (!state) { return; }
     var stick = nearBottom();
     statusBox.textContent = state.status || "";
+    if (state.update && state.update.available) {
+      updateBadge.textContent = "dsh " + state.update.newest + " が利用可能";
+      updateBadge.classList.remove("hidden");
+      if (!updateNotified) {
+        updateNotified = true;
+        notify("ハーネスの更新があります", "dsh " + state.update.newest + " が公開されています");
+      }
+    } else {
+      updateBadge.classList.add("hidden");
+    }
     if (state.currentModel) {
       modelChip.textContent = "モデル: " + state.currentModel;
     } else {

@@ -258,6 +258,67 @@ fn candidate_origins() -> Vec<String> {
     list
 }
 
+/// Run one npm query with a hard deadline, so a hung registry cannot stall the caller.
+fn npm_view(arguments: &[&str]) -> Option<String> {
+    let mut command = std::process::Command::new("npm");
+    command
+        .args(arguments)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null());
+    let mut child = command.spawn().ok()?;
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(25);
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                if !status.success() {
+                    return None;
+                }
+                break;
+            }
+            Ok(None) => {
+                if std::time::Instant::now() > deadline {
+                    let _ = child.kill();
+                    return None;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(200));
+            }
+            Err(_) => return None,
+        }
+    }
+    let mut output = String::new();
+    use std::io::Read;
+    child.stdout.take()?.read_to_string(&mut output).ok()?;
+    Some(output)
+}
+
+/// Version behind the npm latest tag.
+pub fn latest_published() -> Option<String> {
+    let output = npm_view(&["view", "@deepseek-ai/dsh", "version"])?;
+    let version = output.split_whitespace().last()?.trim().to_string();
+    (!version.is_empty()).then_some(version)
+}
+
+/// Highest published version, prereleases included.
+pub fn newest_published() -> Option<String> {
+    let output = npm_view(&["view", "@deepseek-ai/dsh", "versions", "--json"])?;
+    let versions: Vec<String> = match serde_json::from_str::<serde_json::Value>(output.trim()) {
+        Ok(serde_json::Value::Array(values)) => values
+            .into_iter()
+            .filter_map(|value| value.as_str().map(str::to_string))
+            .collect(),
+        Ok(serde_json::Value::String(single)) => vec![single],
+        _ => Vec::new(),
+    };
+    versions.into_iter().reduce(|best, candidate| {
+        if compare_versions(&candidate, &best).is_gt() {
+            candidate
+        } else {
+            best
+        }
+    })
+}
+
 /// A live host accepts TCP connections on its loopback port.
 fn alive(origin: &str) -> bool {
     let Some(authority) = origin.strip_prefix("http://") else {

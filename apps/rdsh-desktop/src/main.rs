@@ -55,6 +55,9 @@ fn main() {
                     "[rdsh-desktop] URL の token は推測困難なアクセス用の値で、ハーネスの cookie やトークンはこのプロセスから外へ出ません。"
                 );
                 println!("[rdsh-desktop] 停止するには Ctrl+C を押してください。");
+                if let Err(error) = publish_web_url(&server.url()) {
+                    eprintln!("[rdsh-desktop] URL ファイルを書けませんでした: {error:#}");
+                }
                 if let Err(error) = server.serve() {
                     eprintln!("[rdsh-desktop] serve-web failed: {error:#}");
                     std::process::exit(1);
@@ -340,11 +343,38 @@ fn select_model(session: &str, provider: &str, model: &str) -> anyhow::Result<St
 }
 
 
+/// Write the Web UI URL where a background service user can read it.
+fn publish_web_url(url: &str) -> anyhow::Result<()> {
+    let path = match std::env::var_os("RDSH_DESKTOP_WEB_URL_FILE") {
+        Some(value) => std::path::PathBuf::from(value),
+        None => {
+            let base = std::env::var_os("XDG_CACHE_HOME")
+                .map(std::path::PathBuf::from)
+                .or_else(|| {
+                    std::env::var_os("HOME").map(|home| std::path::PathBuf::from(home).join(".cache"))
+                })
+                .ok_or_else(|| anyhow::anyhow!("neither XDG_CACHE_HOME nor HOME is set"))?;
+            base.join("rdsh-desktop").join("webui.url")
+        }
+    };
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(&path, format!("{url}\n"))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
+    }
+    println!("[rdsh-desktop] URL を {} に保存しました", path.display());
+    Ok(())
+}
+
 /// Report which harness launcher the app would use and whether it answers.
 fn check_host(online: bool) -> anyhow::Result<String> {
     let (binary, version) = host::resolve_launcher()?;
-    let latest = if online { latest_published() } else { None };
-    let newest = if online { newest_published() } else { None };
+    let latest = if online { host::latest_published() } else { None };
+    let newest = if online { host::newest_published() } else { None };
     let chat = app::Chat::connect(|_step| {})?;
     let newer = newest
         .as_ref()

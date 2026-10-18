@@ -234,6 +234,17 @@ pub fn sse_frame(event: &str, data: &Value) -> String {
 /// Random page token: the clock and the process identity are hashed with
 /// SHA-256, which needs no dependency beyond the ones already in the crate.
 fn generate_token() -> String {
+    // A long-running service needs a stable URL, so an operator may pin the
+    // page token through the environment. Anything unusable falls back to a
+    // fresh random token, which is what a plain CLI launch wants.
+    if let Ok(pinned) = std::env::var("RDSH_DESKTOP_WEB_TOKEN") {
+        let pinned = pinned.trim();
+        let usable = (16..=128).contains(&pinned.len())
+            && pinned.chars().all(|character| character.is_ascii_graphic());
+        if usable {
+            return pinned.to_string();
+        }
+    }
     use sha2::{Digest, Sha256};
     let mut hasher = Sha256::new();
     hasher.update(now_millis().to_le_bytes());
@@ -513,6 +524,11 @@ fn merge_view(snapshot: &Value, view: &View) -> Value {
         view.pending.clone().unwrap_or(Value::Null),
     );
     object.insert("notes".to_string(), json!(view.notes));
+    let active = object
+        .get("hostVersion")
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    object.insert("update".to_string(), update_json(active.as_deref()));
     let busy = object
         .get("running")
         .and_then(Value::as_bool)
@@ -520,6 +536,71 @@ fn merge_view(snapshot: &Value, view: &View) -> Value {
         || !view.streaming.is_empty();
     object.insert("running".to_string(), Value::Bool(busy));
     merged
+}
+
+/// Where the background update check stores its last answer.
+fn update_cache_path() -> Option<std::path::PathBuf> {
+    let base = std::env::var_os("XDG_CACHE_HOME")
+        .map(std::path::PathBuf::from)
+        .or_else(|| {
+            std::env::var_os("HOME").map(|home| std::path::PathBuf::from(home).join(".cache"))
+        })?;
+    Some(base.join("rdsh-desktop").join("update-check.json"))
+}
+
+/// Newest published harness version, refreshed in the background at most once
+/// every twelve hours, so a page request never waits on the network.
+fn newest_published_cached() -> String {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    static REFRESHING: AtomicBool = AtomicBool::new(false);
+
+    let path = update_cache_path();
+    let mut cached = String::new();
+    if let Some(path) = path.as_ref() {
+        if let Ok(text) = std::fs::read_to_string(path) {
+            if let Ok(value) = serde_json::from_str::<Value>(&text) {
+                cached = value
+                    .get("newest")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_string();
+                let checked = value.get("checkedAt").and_then(Value::as_u64).unwrap_or(0);
+                let age = now_millis().saturating_sub(checked);
+                if age < 12 * 60 * 60 * 1000 {
+                    return cached;
+                }
+            }
+        }
+    }
+
+    if std::env::var("RDSH_DESKTOP_UPDATE_CHECK").as_deref() != Ok("0")
+        && !REFRESHING.swap(true, Ordering::SeqCst)
+    {
+        let path = path.clone();
+        std::thread::spawn(move || {
+            if let Some(newest) = crate::host::newest_published() {
+                if let Some(path) = path {
+                    if let Some(parent) = path.parent() {
+                        let _ = std::fs::create_dir_all(parent);
+                    }
+                    let body = json!({ "checkedAt": now_millis(), "newest": newest });
+                    let _ = std::fs::write(&path, body.to_string());
+                }
+            }
+            REFRESHING.store(false, Ordering::SeqCst);
+        });
+    }
+    cached
+}
+
+/// Update availability for the header badge.
+pub fn update_json(active: Option<&str>) -> Value {
+    let active = active.unwrap_or_default().to_string();
+    let newest = newest_published_cached();
+    let available = !active.is_empty()
+        && !newest.is_empty()
+        && crate::host::compare_versions(&newest, &active).is_gt();
+    json!({ "active": active, "newest": newest, "available": available })
 }
 
 /// The snapshot of one harness connection, with the live view mixed in.
