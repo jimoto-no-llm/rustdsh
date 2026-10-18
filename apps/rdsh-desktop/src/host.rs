@@ -34,8 +34,12 @@ impl Host {
     /// token is needed to talk to the user service or a previous launch. That
     /// turns a cold start into a single HTTP round trip.
     pub fn start() -> Result<Self> {
-        if let Some(host) = Self::attach() {
-            return Ok(host);
+        // RDSH_DESKTOP_NO_ATTACH forces a fresh host, which is how a specific
+        // harness build (for example a release candidate) gets exercised.
+        if std::env::var_os("RDSH_DESKTOP_NO_ATTACH").is_none() {
+            if let Some(host) = Self::attach() {
+                return Ok(host);
+            }
         }
         Self::spawn()
     }

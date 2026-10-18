@@ -74,6 +74,24 @@ pinned revision):
 - Model changes go through session/selectModel, so the host keeps them for the
   conversation and the chip and header update immediately.
 
+## Harness compatibility
+
+The app speaks the harness client protocol (unary HTTP plus one WebSocket) and
+follows the installed host instead of pinning a version. Verified against:
+
+- 0.2.0-rc.2 (the dsh installed on this machine)
+- 0.2.1-alpha.2 (the revision the upstream prototype pins)
+- 0.2.1-rc.2
+
+Each check covered the session list, the model catalog, the $events and
+conversation streams, prompt streaming (reasoning-delta and text-delta) and the
+cookie attach path. To exercise one harness build on its own, set
+RDSH_DESKTOP_DSH to that dsh and RDSH_DESKTOP_NO_ATTACH=1, which forces a fresh
+host instead of attaching to a running one.
+
+The attach path mints the v1 authority cookie; 0.2.1 still accepts it next to
+its v2 peer cookie, so attaching stays available on both.
+
 ## Startup and weight
 
 The app paints its shell first and loads data in the background. It attaches to a

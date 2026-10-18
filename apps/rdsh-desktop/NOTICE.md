@@ -6,6 +6,9 @@ experience. It derives from, and stays compatible with, this upstream project:
 - deepseek-ai/deepseek-harness (MIT License, Copyright (c) 2026 DeepSeek)
 - Pinned revision: d743267388641bc76f17c45ce8b4c231aed1d32c
   (recorded in rustdsh desktop/upstream.lock.json, harness 0.2.1-alpha.2)
+- Compatible released harness builds: 0.2.0-rc.2, 0.2.1-alpha.2 and
+  0.2.1-rc.2 (verified with the session list, model catalog, live streams,
+  prompt streaming and the cookie attach path)
 - Reference modules: apps/desktop (Electron shell), apps/web (web UI),
   packages/client/ui-theme (design tokens), packages/api (client protocol)
 
