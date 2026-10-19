@@ -2,6 +2,8 @@
 # Keep the original dsh in step with upstream releases (rdsh itself needs no
 # rebuild: it delegates by exec). Safe by default: verify after update,
 # roll back to the previous version on any failure.
+# A user-owned tree outside npm's global root (the ~/.local/opt install layout)
+# is refreshed in place through the prefix that owns it, after a full backup.
 # Usage: sync-dsh.sh [--check-only] [--channel rc|any]  (default channel: rc)
 # Release checklist ref (Issue #7, docs only): after `cargo publish`, the new
 # rdsh release binary is picked up here on the next run (step 6); use
@@ -478,25 +480,80 @@ else
   DSH_CHANGED=1
   if [ "$CHECK_ONLY" = 1 ]; then log "dsh update available: $LATEST"; fi
 fi
-if [ "$DSH_CHANGED" = 1 ] && [ "$CHECK_ONLY" = 0 ] && [ "$DSH_MANAGED" = 0 ]; then
-  log "dsh tree $PKGROOT is outside npm's global root (${NPM_ROOT:-unknown}); DSH update skipped, tree left as is"
-fi
-if [ "$DSH_CHANGED" = 1 ] && [ "$CHECK_ONLY" = 0 ] && [ "$DSH_MANAGED" = 1 ]; then
-log "updating $INSTALLED -> $LATEST"
-if ! "$NPM" install -g "@deepseek-ai/dsh@$LATEST" >> "$LOGDIR/sync.log" 2>&1; then
-  log "npm install failed; kept $INSTALLED"; exit 1
-fi
-GOT="$(node -p "require(process.argv[1]).version" "$PKGROOT/package.json" 2>/dev/null)"
-ORIG_BIN="$(command -v dsh-orig 2>/dev/null || printf "%s" "$HOME/.local/bin/dsh-orig")"
-if [ "$GOT" = "$LATEST" ] && [ -x "$ORIG_BIN" ] && "$ORIG_BIN" --version >/dev/null 2>&1; then
-  log "updated OK: $GOT (orig binary answers)"
-  write_state "dsh" "$INSTALLED" "$GOT"
-else
+MANAGED=0
+restore_backup() { # $1 = backup dir; put the previous tree back over a failed install
+  if [ -n "$1" ] && [ -d "$1" ]; then
+    rm -rf "$PKGROOT"
+    if mv "$1" "$PKGROOT"; then
+      log "restored the previous dsh tree"
+    else
+      log "dsh restore failed; previous tree kept at $1 for manual recovery"
+    fi
+  fi
+}
+update_dsh_tree() { # $1 = log label; $2.. = extra npm args (e.g. --prefix=DIR);
+  # MANAGED=0 updates a tree outside npm's global root, so keep a full copy for
+  # a real rollback: the run continues on failure instead of leaving a
+  # half-updated tree or aborting the whole sync. MANAGED=1 keeps the historical
+  # abort-on-failure behavior of the npm-managed path.
+  _label="$1"
+  shift
+  _backup=""
+  if [ "$MANAGED" = 0 ]; then
+    _backup="$(dirname "$PKGROOT")/.dsh-bak.$$"
+    if ! cp -a "$PKGROOT" "$_backup"; then
+      log "cannot back up $PKGROOT; keeping $INSTALLED; continuing with the rest of the sync"
+      return 1
+    fi
+  fi
+  log "updating $INSTALLED -> $LATEST$_label"
+  if ! "$NPM" install -g "@deepseek-ai/dsh@$LATEST" "$@" >> "$LOGDIR/sync.log" 2>&1; then
+    if [ "$MANAGED" = 1 ]; then
+      log "npm install failed; kept $INSTALLED"; exit 1
+    fi
+    log "npm install failed; restoring $INSTALLED"
+    restore_backup "$_backup"
+    log "in-place update failed; continuing with the rest of the sync"
+    return 1
+  fi
+  GOT="$(node -p "require(process.argv[1]).version" "$PKGROOT/package.json" 2>/dev/null)"
+  ORIG_BIN="$(command -v dsh-orig 2>/dev/null || printf "%s" "$HOME/.local/bin/dsh-orig")"
+  if [ "$GOT" = "$LATEST" ] && [ -x "$ORIG_BIN" ] && "$ORIG_BIN" --version >/dev/null 2>&1; then
+    log "updated OK: $GOT (orig binary answers)"
+    write_state "dsh" "$INSTALLED" "$GOT"
+    [ -z "$_backup" ] || rm -rf "$_backup"
+    return 0
+  fi
   log "verify failed (got=$GOT); rolling back to $INSTALLED"
-  "$NPM" install -g "@deepseek-ai/dsh@$INSTALLED" >> "$LOGDIR/sync.log" 2>&1 || true
-  log "rollback done"
-  exit 1
-fi
+  if [ "$MANAGED" = 1 ]; then
+    "$NPM" install -g "@deepseek-ai/dsh@$INSTALLED" "$@" >> "$LOGDIR/sync.log" 2>&1 || true
+    log "rollback done"
+    exit 1
+  fi
+  restore_backup "$_backup"
+  log "in-place update failed; continuing with the rest of the sync"
+  return 1
+}
+if [ "$DSH_CHANGED" = 1 ] && [ "$CHECK_ONLY" = 0 ]; then
+  if [ "$DSH_MANAGED" = 1 ]; then
+    MANAGED=1
+    update_dsh_tree ""
+  else
+    # A tree outside npm's global root (install.sh's --opt layout or any other
+    # <prefix>/lib/node_modules copy) is still ours to refresh in place when the
+    # owning prefix is user-writable and not a git checkout. npm installs
+    # globals under <prefix>/lib/node_modules, so the prefix that owns $PKGROOT
+    # is four levels up; resolve both sides through pwd to see through symlinks.
+    IN_PLACE_PREFIX="$(cd "$PKGROOT/../../../.." 2>/dev/null && pwd || true)"
+    if [ -n "$IN_PLACE_PREFIX" ] && [ -w "$IN_PLACE_PREFIX" ] \
+      && [ ! -e "$IN_PLACE_PREFIX/.git" ] \
+      && [ "$(cd "$PKGROOT/../.." 2>/dev/null && pwd)" = "$(cd "$IN_PLACE_PREFIX/lib/node_modules" 2>/dev/null && pwd)" ]; then
+      MANAGED=0
+      update_dsh_tree " (in place: $IN_PLACE_PREFIX)" --prefix="$IN_PLACE_PREFIX"
+    else
+      log "dsh tree $PKGROOT is outside npm's global root (${NPM_ROOT:-unknown}) and its prefix is not a user-writable tree; DSH update skipped, tree left as is"
+    fi
+  fi
 fi
 # Closes the dsh tree update; an empty PKGROOT skipped it above.
 fi

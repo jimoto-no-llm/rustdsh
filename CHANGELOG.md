@@ -5,6 +5,8 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-10-19
+
 ### Changed
 
 - `rdsh serve` のダッシュボード（`src/ui.html`）を、初めてでも迷わない
@@ -23,6 +25,14 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   block にし、画像を回答カラムの幅まで使えるようにします（DSH **0.2.0-rc.2** の
   Web UI で確認）。セレクタは DSH 側のクラス名（`imageButton`）にだけ依存するため、
   ハッシュが変わっても効き続け、ダッシュボードと setup 画面には影響しません。
+
+- 「dsh 本体のアップデート」ボタンを押しても更新されず、通知が繰り返し出る
+  不具合を直しました。\`~/.local/opt\` 配置（install.sh の手動配置）の dsh は
+  npm の管理外のため、sync-dsh.sh はこれまで更新を常に見送っていました。
+  書き込める配置なら、所有する prefix 経由で更新します。更新前に tree 全体を
+  バックアップし、導入や検証に失敗したら元へ戻します。sync 自体は失敗後も
+  rdsh の更新を続行します。書き込めない配置はこれまでどおり報告だけで
+  触れません。
 
 ## [0.9.1] - 2026-10-18
 
