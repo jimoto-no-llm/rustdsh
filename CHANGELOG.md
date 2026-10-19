@@ -5,6 +5,8 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-10-19
+
 ### Changed
 
 - `rdsh serve` のダッシュボード（`src/ui.html`）を、初めてでも迷わない
