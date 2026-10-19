@@ -2050,7 +2050,7 @@ fn read_inherited_session(path: &Path, root: &Path, deadline: Option<Instant>) -
     if expired(deadline) {
         return None;
     }
-    if !path.extension().is_some_and(|e| e == "zstd") {
+    if path.extension().is_none_or(|e| e != "zstd") {
         return read_small_regular(path, root, 256 * 1024);
     }
     let root = std::fs::canonicalize(root).ok()?;
@@ -2861,10 +2861,10 @@ fn inject_context(
         }
     }
     assembled.sections.retain(|s| {
-        !s.body.trim().is_empty()
-            && !(s.name == "goal" && s.body.starts_with("(unset —"))
-            && !(s.name == "git_diff" && assembled.snapshot.branch == "unknown")
-            && !(s.name == "retrieved" && query.trim().is_empty())
+        !(s.body.trim().is_empty()
+            || s.name == "goal" && s.body.starts_with("(unset —")
+            || s.name == "git_diff" && assembled.snapshot.branch == "unknown"
+            || s.name == "retrieved" && query.trim().is_empty())
     });
     let order = priority_order();
     assembled
@@ -3061,7 +3061,7 @@ fn read_session_stream(
 }
 
 fn read_distill_session(source: &Path) -> anyhow::Result<(Vec<u8>, bool)> {
-    if !source.extension().is_some_and(|e| e == "zstd") {
+    if source.extension().is_none_or(|e| e != "zstd") {
         // Same budget as the compressed path: a plain transcript is not a
         // second-class input, and the store cap (4MiB) is far too small for it.
         return read_small_regular(
