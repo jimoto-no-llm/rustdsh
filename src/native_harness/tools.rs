@@ -194,6 +194,7 @@ pub async fn execute(engine: &Engine, run_id: u64, call: &Call) -> Result<Value>
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
     fn fixture() -> std::path::PathBuf {
         let path = std::env::temp_dir().join(format!(
             "rdsh-native-tool-{}",
@@ -216,6 +217,7 @@ mod tests {
         }
         assert!(safe_path("src/example.txt").is_ok());
     }
+    #[cfg(unix)]
     #[test]
     fn bounded_reads_reject_fifo_and_large_files() {
         let root = fixture();
@@ -225,6 +227,12 @@ mod tests {
         assert!(read_file(&root, "large").is_err());
         assert!(read_file(&root, "missing").is_err());
         std::fs::remove_dir_all(root).unwrap();
+    }
+    #[cfg(not(unix))]
+    #[test]
+    fn unsupported_platform_read_fails_closed() {
+        let error = read_file(&std::env::temp_dir(), "unused.txt").unwrap_err();
+        assert!(error.to_string().contains("未対応"));
     }
     #[cfg(unix)]
     #[test]
