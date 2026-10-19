@@ -503,7 +503,7 @@ fn scalar_in(lines: &[String], site: &Site, key: &str) -> Option<String> {
 }
 
 /// Read one `refs:` entry from the credentials document.
-fn credential_ref(name: &str) -> Option<String> {
+pub(crate) fn credential_ref(name: &str) -> Option<String> {
     let path = format!("{}/.credentials.yaml", dsh_home());
     let text = std::fs::read_to_string(path).ok()?;
     let mut in_refs = false;

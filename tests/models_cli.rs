@@ -2,6 +2,8 @@ use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::process::{Command, Output};
 
+static FIXTURE_SEQUENCE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 const PROFILE: &str = "- id: llm-pi-ai\n  config:\n    providers:\n      openai-codex:\n        models:\n          - id: old\n            name: Keep\n";
 
 struct Fixture {
@@ -15,8 +17,12 @@ impl Fixture {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let root =
-            std::env::temp_dir().join(format!("rdsh-models-cli-{}-{nonce}", std::process::id()));
+        // macOS wall-clock resolution can give simultaneous tests the same nonce.
+        let sequence = FIXTURE_SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let root = std::env::temp_dir().join(format!(
+            "rdsh-models-cli-{}-{nonce}-{sequence}",
+            std::process::id()
+        ));
         let patch = root.join(".dsh/profiles/web/cordis.patch.yml");
         std::fs::create_dir_all(patch.parent().unwrap()).unwrap();
         std::fs::create_dir_all(root.join(".codex")).unwrap();
