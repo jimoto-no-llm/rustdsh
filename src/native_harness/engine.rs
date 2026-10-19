@@ -1,5 +1,5 @@
 //! Native Rust conversation loop. SDKs return proposals; only Rust executes tools.
-use super::{sdk, tools};
+use super::{profiles, sdk, tools};
 use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -78,8 +78,17 @@ pub struct Engine {
     pub sdk: sdk::SdkConfig,
     pub devin: PathBuf,
     pub secrets: Vec<String>,
+    pub registry: profiles::Registry,
 }
 impl Engine {
+    pub fn providers(&self) -> Value {
+        let mut list = providers().as_array().unwrap().clone();
+        list.extend(self.registry.public());
+        Value::Array(list)
+    }
+    pub fn model_allowed(&self, provider: &str, model: &str) -> bool {
+        model_allowed(provider, model) || self.registry.allowed(provider, model)
+    }
     pub fn redact(&self, value: &str) -> String {
         let mut value = value.to_owned();
         for secret in &self.secrets {
@@ -122,7 +131,7 @@ impl Engine {
     }
     pub fn snapshot(&self) -> Value {
         let state = self.state.lock().unwrap();
-        json!({"engine":"rust-rdsh", "workspace":self.workspace, "providers":providers(),
+        json!({"engine":"rust-rdsh", "workspace":self.workspace, "providers":self.providers(), "diagnostics":self.registry.diagnostics,
             "provider":state.provider,"model":state.model,"status":state.status,
             "messages":state.messages,"events":state.events,"pending":state.pending,"error":state.error})
     }
@@ -239,7 +248,11 @@ impl Engine {
             let mut prompt = build_prompt(&history);
             let mut turn = None;
             for attempt in 0..2 {
-                let raw = sdk::generate(&self.sdk, &provider, &model, &prompt).await?;
+                let raw = if provider.starts_with("dsh:") {
+                    self.registry.generate(&provider, &model, &prompt).await?
+                } else {
+                    sdk::generate(&self.sdk, &provider, &model, &prompt).await?
+                };
                 match parse_turn(&raw) {
                     Ok(value) => {
                         turn = Some(value);
@@ -367,6 +380,7 @@ mod tests {
                 agy_key: None,
             },
             devin: PathBuf::from("never-run"),
+            registry: profiles::Registry::default(),
             secrets: vec![secret.into()],
         });
         let call = Call {
@@ -421,6 +435,7 @@ process.stdout.write(JSON.stringify({text:JSON.stringify(turn)}));
                     agy_key: None,
                 },
                 devin: root.join("never-run"),
+                registry: profiles::Registry::default(),
                 secrets: vec![],
             });
             let task = tokio::spawn(e.clone().run(1));
@@ -476,5 +491,75 @@ process.stdout.write(JSON.stringify({text:JSON.stringify(turn)}));
             assert!(parse_turn(raw).is_err());
         }
         assert!(parse_turn(r#"{"version":1,"text":"ok","toolCalls":[]}"#).is_ok());
+    }
+    #[tokio::test]
+    async fn dsh_api_loop_requires_approval_and_returns_rust_tool_result() {
+        let _env_lock = crate::rustxng::tests::env_lock();
+        for allow in if cfg!(unix) {
+            vec![false, true]
+        } else {
+            vec![false]
+        } {
+            let root = std::env::temp_dir().join(format!(
+                "rdsh-api-loop-{}",
+                crate::local_http::random_token().unwrap()
+            ));
+            std::fs::create_dir(&root).unwrap();
+            std::fs::write(root.join("proof.txt"), "NATIVE_HTTP_READ_PROOF").unwrap();
+            let proposal = json!({"version":1,"text":"read proposal","toolCalls":[{"id":"api-read","name":"read","arguments":{"path":"proof.txt"}}]}).to_string();
+            let final_turn = json!({"version":1,"text":"done","toolCalls":[]}).to_string();
+            let (url, server) = profiles::tests::mock(vec![
+                (200, json!({"choices":[{"message":{"content":proposal}}]})),
+                (200, json!({"choices":[{"message":{"content":final_turn}}]})),
+            ]);
+            let e = Arc::new(Engine {
+                state: Mutex::new(State {
+                    provider: "dsh:test".into(),
+                    model: "test-model".into(),
+                    status: "running".into(),
+                    run_id: 1,
+                    messages: vec![Message {
+                        role: "user".into(),
+                        content: "read proof.txt".into(),
+                    }],
+                    ..State::default()
+                }),
+                workspace: root.clone(),
+                sdk: sdk::SdkConfig {
+                    bridge_dir: root.join("no-sdk-installed"),
+                    agy_key: None,
+                },
+                devin: root.join("never-run"),
+                secrets: vec!["synthetic-api-secret".into()],
+                registry: profiles::tests::registry("openai-completions", &url),
+            });
+            let next = e.clone();
+            let task = tokio::spawn(async move { next.run(1).await });
+            let id = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+                loop {
+                    if let Some(pending) = e.state.lock().unwrap().pending.clone() {
+                        break pending.id;
+                    }
+                    tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+                }
+            })
+            .await
+            .unwrap();
+            assert_eq!(e.snapshot()["status"], "approval");
+            assert!(!e.snapshot().to_string().contains("NATIVE_HTTP_READ_PROOF"));
+            e.approve(&id, allow).unwrap();
+            task.await.unwrap();
+            assert_eq!(e.snapshot()["status"], "idle");
+            let requests = server.join().unwrap();
+            assert_eq!(requests.len(), 2);
+            let prompt = requests[1].1["messages"][0]["content"].as_str().unwrap();
+            assert_eq!(prompt.contains("NATIVE_HTTP_READ_PROOF"), allow);
+            assert!(prompt.contains("tool"));
+            assert_eq!(
+                e.state.lock().unwrap().messages.last().unwrap().content,
+                "done"
+            );
+            std::fs::remove_dir_all(root).unwrap();
+        }
     }
 }

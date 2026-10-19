@@ -21,6 +21,8 @@
 //!   as a `.credentials.yaml` ref, and is passed to curl through a config on
 //!   stdin.
 
+pub(crate) mod native;
+
 use std::io::{BufRead, Read, Write};
 use std::net::ToSocketAddrs;
 use std::path::{Path, PathBuf};

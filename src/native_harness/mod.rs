@@ -1,5 +1,6 @@
 //! Standalone, authenticated loopback GUI backed exclusively by Rust-owned state.
 mod engine;
+mod profiles;
 mod sdk;
 mod tools;
 
@@ -34,7 +35,9 @@ struct ApprovalRequest {
 pub fn cmd_native_web(
     port: u16,
     workspace: PathBuf,
-    sdk_dir: PathBuf,
+    sdk_dir: Option<PathBuf>,
+    dsh_profile: Option<String>,
+    dsh_catalog: Option<PathBuf>,
     devin: Option<PathBuf>,
     locale: crate::locale::Locale,
 ) -> Result<()> {
@@ -42,12 +45,21 @@ pub fn cmd_native_web(
     if !workspace.is_dir() {
         bail!("--workspaceは既存のディレクトリを指定してください");
     }
-    let bridge_dir = sdk_dir.canonicalize()?;
-    if !bridge_dir.join("cursor-sdk-runner.mjs").is_file()
-        || !bridge_dir.join("agy-sdk.py").is_file()
+    let bridge_dir = if let Some(path) = sdk_dir {
+        path.canonicalize()?
+    } else {
+        std::env::current_dir()?.join("plugins/rdsh-direct-models")
+    };
+    let registry = if let Some(profile) = dsh_profile {
+        profiles::Registry::load(&profile, dsh_catalog)?
+    } else if PathBuf::from(crate::inspect::dsh_home())
+        .join("profiles/web")
+        .is_dir()
     {
-        bail!("--sdk-dirに公式SDKブリッジがありません");
-    }
+        profiles::Registry::load("web", dsh_catalog)?
+    } else {
+        profiles::Registry::default()
+    };
     let refs = crate::auth::stored_refs();
     let agy_key = ["GEMINI_API_KEY", "GOOGLE_API_KEY"]
         .into_iter()
@@ -58,6 +70,7 @@ pub fn cmd_native_web(
                 .or_else(|| refs.get(key).cloned())
         });
     let mut secrets: Vec<String> = refs.into_values().collect();
+    secrets.extend(registry.routes.iter().filter_map(|r| r.key.clone()));
     for (name, value) in std::env::vars() {
         if name.contains("TOKEN") || name.contains("API_KEY") || name.contains("SECRET") {
             secrets.push(value);
@@ -92,6 +105,7 @@ pub fn cmd_native_web(
             agy_key,
         },
         devin,
+        registry,
         secrets,
     });
     let runtime = Arc::new(
@@ -220,10 +234,11 @@ fn handle(
         return Ok(());
     }
     let result = dispatch(&req.method, &req.target, &req.body, engine.clone(), runtime);
-    let (code, value) = match result {
+    let (code, mut value) = match result {
         Ok(value) => (200, value),
         Err(error) => (400, json!({"error":engine.redact(&error.to_string())})),
     };
+    engine.redact_value(&mut value);
     respond(
         &mut stream,
         code,
@@ -244,7 +259,7 @@ fn dispatch(
         ("POST", "/api/model") => {
             let req: ModelRequest =
                 serde_json::from_str(body).map_err(|_| anyhow::anyhow!("モデル指定が不正です"))?;
-            if !engine::model_allowed(&req.provider, &req.model) {
+            if !engine.model_allowed(&req.provider, &req.model) {
                 bail!("登録済みモデルを選択してください");
             }
             let mut s = engine.state.lock().unwrap();
@@ -388,6 +403,7 @@ mod tests {
                 agy_key: None,
             },
             devin: cli,
+            registry: profiles::Registry::default(),
             secrets: vec![],
         });
         let (tx, _rx) = tokio::sync::oneshot::channel();
@@ -426,6 +442,7 @@ mod tests {
                 agy_key: None,
             },
             devin: PathBuf::from("devin"),
+            registry: profiles::Registry::default(),
             secrets: vec!["synthetic-secret-key".into()],
         })
     }

@@ -338,7 +338,11 @@ enum Commands {
         #[arg(long)]
         workspace: std::path::PathBuf,
         #[arg(long = "sdk-dir")]
-        sdk_dir: std::path::PathBuf,
+        sdk_dir: Option<std::path::PathBuf>,
+        #[arg(long = "dsh-profile")]
+        dsh_profile: Option<String>,
+        #[arg(long = "dsh-catalog")]
+        dsh_catalog: Option<std::path::PathBuf>,
         #[arg(long = "devin-bin")]
         devin_bin: Option<std::path::PathBuf>,
     },
@@ -1251,8 +1255,18 @@ fn main() {
             port,
             workspace,
             sdk_dir,
+            dsh_profile,
+            dsh_catalog,
             devin_bin,
-        }) => native_harness::cmd_native_web(port, workspace, sdk_dir, devin_bin, locale),
+        }) => native_harness::cmd_native_web(
+            port,
+            workspace,
+            sdk_dir,
+            dsh_profile,
+            dsh_catalog,
+            devin_bin,
+            locale,
+        ),
         Some(Commands::Serve { port }) => {
             if !rdsh_config::feature_enabled(&cfg, "serve") {
                 extra_disabled("serve", locale)
@@ -2690,6 +2704,8 @@ fn localized_arg_help(id: &str, locale: locale::Locale) -> Option<&'static str> 
         "tail" => ("显示末尾行数", "末尾から表示する行数"),
         "grep" => ("仅显示匹配文本的行", "一致するテキストの行だけを表示"),
         "workspace" => ("明确授权的本地工作目录", "明示的に使用するローカル作業ディレクトリ"),
+        "dsh_profile" => ("读取模型注册的 DSH 配置文件", "モデル登録を読むDSHプロファイル"),
+        "dsh_catalog" => ("pi-ai JSON 模型目录", "pi-aiのJSONモデルカタログディレクトリ"),
         "sdk_dir" => ("官方 SDK 桥接目录", "公式SDKブリッジのディレクトリ"),
         "devin_bin" => ("Devin CLI 可执行文件", "Devin CLIの実行ファイル"),
         "port" => ("本地监听端口", "ローカル待受ポート"),
