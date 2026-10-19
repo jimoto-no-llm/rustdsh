@@ -1171,6 +1171,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn command_timeout_kills_the_child() {
+        let _env = crate::rustxng::tests::env_lock();
         let mut command = Command::new("sh");
         command
             .args(["-c", "exec sleep 5"])
@@ -1185,6 +1186,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn command_timeout_kills_descendants_that_hold_pipes_open() {
+        let _env = crate::rustxng::tests::env_lock();
         let mut command = Command::new("sh");
         command
             .args(["-c", "sleep 3 & wait"])
@@ -1199,6 +1201,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn command_exit_does_not_wait_for_descendants_that_hold_pipes_open() {
+        let _env = crate::rustxng::tests::env_lock();
         let mut command = Command::new("sh");
         command
             .args(["-c", "sleep 3 & exit 0"])

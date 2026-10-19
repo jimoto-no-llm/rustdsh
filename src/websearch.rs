@@ -930,12 +930,9 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
-    /// Serialises the environment-touching resolution tests in this module.
-    fn engine_env_lock() -> std::sync::MutexGuard<'static, ()> {
-        static LOCK: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
-        LOCK.get_or_init(|| std::sync::Mutex::new(()))
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    /// Shares the process-wide PATH/HOME gate with sidecar and launcher tests.
+    fn engine_env_lock() -> crate::rustxng::tests::EnvLock {
+        crate::rustxng::tests::env_lock()
     }
 
     /// Sets variables for one test and restores them on drop.

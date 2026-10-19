@@ -391,7 +391,10 @@ mod tests {
     }
     #[tokio::test]
     async fn rust_loop_waits_for_approval_then_consumes_its_own_tool_result() {
-        for allow in [false, true] {
+        // This current-thread Tokio test must inherit a stable Node PATH/HOME.
+        let _env = crate::rustxng::tests::env_lock();
+        let decisions: &[bool] = if cfg!(unix) { &[false, true] } else { &[false] };
+        for &allow in decisions {
             let root = std::env::temp_dir().join(format!(
                 "rdsh-loop-test-{}",
                 crate::local_http::random_token().unwrap()

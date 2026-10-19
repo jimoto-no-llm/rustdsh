@@ -106,15 +106,14 @@ mod tests {
         let fixture = Fixture(root);
         std::fs::create_dir(&fixture.0).unwrap();
         let source_path = fixture.0.join("source");
-        std::fs::copy("/bin/sh", &source_path).unwrap();
+        super::super::tests::copy_executable_fixture(&source_path);
         let mut source = File::open(&source_path).unwrap();
         let digest = file_digest(&mut source).unwrap();
         let cache = fixture.0.join("cache");
         let (snapshot, _) = prepare_in(&mut source, &digest, &cache).unwrap();
         std::fs::write(&source_path, b"replacement").unwrap();
         assert_eq!(
-            std::process::Command::new(&snapshot)
-                .args(["-c", "exit 73"])
+            super::super::tests::fixture_command(std::process::Command::new(&snapshot))
                 .status()
                 .unwrap()
                 .code(),

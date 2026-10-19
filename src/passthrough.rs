@@ -712,11 +712,8 @@ mod tests {
         assert!(parse_node_tree_version("other-v24.0.0-linux-x64").is_none());
     }
 
-    fn env_lock() -> std::sync::MutexGuard<'static, ()> {
-        static M: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
-        M.get_or_init(|| std::sync::Mutex::new(()))
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    fn env_lock() -> crate::rustxng::tests::EnvLock {
+        crate::rustxng::tests::env_lock()
     }
 
     struct EnvGuard {

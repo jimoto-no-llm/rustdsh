@@ -149,6 +149,32 @@ pub fn run(options: SwarmOptions, action: SwarmAction) -> Result<i32> {
 mod tests {
     use super::*;
 
+    // A self-contained user executable avoids depending on relocated Apple
+    // platform binaries. No compiler, shell or mutable PATH is needed at runtime.
+    pub(super) fn copy_executable_fixture(path: &Path) {
+        std::fs::copy(std::env::current_exe().unwrap(), path).unwrap();
+    }
+
+    pub(super) fn fixture_command(mut command: Command) -> Command {
+        command
+            .args([
+                "--exact",
+                "swarm::tests::pinned_binary_fixture",
+                "--nocapture",
+            ])
+            .env("RDSH_TEST_PINNED_BINARY_FIXTURE", "exit-73");
+        command
+    }
+
+    #[test]
+    fn pinned_binary_fixture() {
+        // Only the explicitly selected subprocess terminates. The normal suite
+        // runs this helper harmlessly without changing the parent environment.
+        if std::env::var("RDSH_TEST_PINNED_BINARY_FIXTURE").as_deref() == Ok("exit-73") {
+            std::process::exit(73);
+        }
+    }
+
     #[test]
     fn delegates_only_one_gas_city_action() {
         let city = Path::new("/tmp/city");
@@ -203,13 +229,7 @@ mod tests {
         );
         std::fs::create_dir(&fixture.0).unwrap();
         let path = fixture.0.join("gc.exe");
-        #[cfg(unix)]
-        let source = PathBuf::from("/bin/sh");
-        #[cfg(windows)]
-        let source = PathBuf::from(
-            std::env::var_os("COMSPEC").unwrap_or_else(|| "C:\\Windows\\System32\\cmd.exe".into()),
-        );
-        std::fs::copy(source, &path).unwrap();
+        copy_executable_fixture(&path);
         let digest: String = Sha256::digest(std::fs::read(&path).unwrap())
             .iter()
             .map(|byte| format!("{byte:02x}"))
@@ -221,29 +241,15 @@ mod tests {
             std::fs::rename(&path, fixture.0.join("checked-binary")).unwrap();
             std::fs::write(&path, b"#!/bin/sh\nexit 1\n").unwrap();
             std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
-            assert_eq!(
-                verified
-                    .command()
-                    .args(["-c", "exit 73"])
-                    .status()
-                    .unwrap()
-                    .code(),
-                Some(73)
-            );
         }
         #[cfg(windows)]
         {
             assert!(std::fs::rename(&path, fixture.0.join("checked-binary")).is_err());
             assert!(OpenOptions::new().write(true).open(&path).is_err());
-            assert_eq!(
-                verified
-                    .command()
-                    .args(["/C", "exit 73"])
-                    .status()
-                    .unwrap()
-                    .code(),
-                Some(73)
-            );
         }
+        assert_eq!(
+            fixture_command(verified.command()).status().unwrap().code(),
+            Some(73)
+        );
     }
 }
