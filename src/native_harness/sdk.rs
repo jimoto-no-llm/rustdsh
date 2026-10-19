@@ -353,25 +353,51 @@ mod tests {
     async fn abort_kills_descendants_before_they_can_write() {
         let root = TemporaryRoot::create().unwrap();
         let started = root.0.join("started");
+        let leader = root.0.join("leader");
+        let release = root.0.join("release");
         let survivor = root.0.join("survivor");
         let mut command = Command::new("/bin/sh");
         command
             .env_clear()
             .arg("-c")
-            .arg("printf started > \"$1\"; (/bin/sleep 1; printf survivor > \"$2\") & wait")
+            .arg(r#"/bin/sh -c 'printf "%s\n" "$$" > "$1"; while [ ! -e "$2" ]; do /bin/sleep 0.01; done; printf survivor > "$3"' fixture-child "$1" "$2" "$3" & printf "%s\n" "$$" > "$4"; wait"#)
             .arg("test-child")
             .arg(&started)
-            .arg(&survivor);
+            .arg(&release)
+            .arg(&survivor)
+            .arg(&leader);
         let task = tokio::spawn(async move { run_process(command, b"", 30, 128).await });
-        tokio::time::timeout(Duration::from_secs(2), async {
-            while !started.exists() {
+        // Readiness must come from the actual descendant after fork/exec,
+        // not the leader before it has even created a background process.
+        let (parent_pid, child_pid) = tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                let read_pid = |path: &std::path::Path| {
+                    std::fs::read_to_string(path)
+                        .ok()?
+                        .trim()
+                        .parse::<u32>()
+                        .ok()
+                };
+                if let (Some(parent), Some(child)) = (read_pid(&leader), read_pid(&started)) {
+                    break (parent, child);
+                }
                 tokio::time::sleep(Duration::from_millis(10)).await;
             }
         })
         .await
         .unwrap();
+        let _cleanup = ProcessGroupGuard(Some(parent_pid));
+        assert_ne!(parent_pid, child_pid);
+        assert_eq!(
+            unsafe { libc::getpgid(child_pid as i32) },
+            parent_pid as i32
+        );
+        assert!(!survivor.exists());
         task.abort();
         assert!(task.await.unwrap_err().is_cancelled());
+        // If cancellation leaves the child alive, releasing it now makes the
+        // failure observable without racing a pre-cancellation sleep timer.
+        std::fs::write(&release, b"release").unwrap();
         tokio::time::sleep(Duration::from_millis(1300)).await;
         assert!(
             !survivor.exists(),
