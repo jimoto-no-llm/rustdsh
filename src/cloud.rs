@@ -3,11 +3,18 @@
 mod fake;
 mod kubernetes;
 
+#[cfg(test)]
+#[path = "cloud/json_input_tests.rs"]
+mod json_input_tests;
+
 use clap::{Args, Subcommand, ValueEnum};
 use serde::{Deserialize, Serialize};
 use std::future::Future;
+use std::io::Read;
 use std::path::PathBuf;
 use std::pin::Pin;
+
+const MAX_JSON_INPUT_BYTES: usize = 128 * 1024 * 1024;
 
 pub type CloudFuture<'a, T> = Pin<Box<dyn Future<Output = CloudResult<T>> + Send + 'a>>;
 pub type CloudResult<T> = Result<T, CloudError>;
@@ -253,7 +260,35 @@ pub struct PoolPlan {
 }
 
 fn read_json<T: for<'de> Deserialize<'de>>(path: &PathBuf) -> anyhow::Result<T> {
-    let bytes = std::fs::read(path)?;
+    let mut options = std::fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        // A FIFO swapped into the path must not block before the handle check.
+        options.custom_flags(libc::O_CLOEXEC | libc::O_NONBLOCK);
+    }
+    let file = options.open(path)?;
+    let metadata = file.metadata()?;
+    anyhow::ensure!(
+        metadata.is_file() && metadata.len() <= MAX_JSON_INPUT_BYTES as u64,
+        "Input JSON must be a regular file of at most 128 MiB"
+    );
+    read_json_from(file, metadata.len() as usize)
+}
+
+fn read_json_from<T: for<'de> Deserialize<'de>>(
+    reader: impl Read,
+    initial_length: usize,
+) -> anyhow::Result<T> {
+    let mut bytes = Vec::with_capacity(initial_length.min(MAX_JSON_INPUT_BYTES));
+    reader
+        .take((MAX_JSON_INPUT_BYTES + 1) as u64)
+        .read_to_end(&mut bytes)?;
+    anyhow::ensure!(
+        bytes.len() <= MAX_JSON_INPUT_BYTES,
+        "Input JSON exceeds 128 MiB"
+    );
     Ok(serde_json::from_slice(&bytes)?)
 }
 
