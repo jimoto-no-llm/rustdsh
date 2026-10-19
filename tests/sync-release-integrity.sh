@@ -81,6 +81,17 @@ cat >"$HOME_DIR/.local/bin/npm" <<NPM_EOF
 case "\$1" in
   root) echo "\${RDSH_TEST_NPM_ROOT:-$NPMROOT}" ;;
   view) echo '["1.0.0"]' ;;
+  install)
+    # Emulate a global install into --prefix (the in-place update path) or the
+    # fixture npm root, so an out-of-root DSH tree can be updated in place.
+    _prefix=""
+    for _a in "\$@"; do
+      case "\$_a" in --prefix=*) _prefix="\${_a#--prefix=}" ;; esac
+    done
+    _dest="\${_prefix:-\${RDSH_TEST_NPM_ROOT:-$NPMROOT}}/lib/node_modules/@deepseek-ai/dsh"
+    mkdir -p "\$_dest"
+    printf '{"version":"1.0.0"}\\n' >"\$_dest/package.json"
+    ;;
   *) exit 1 ;;
 esac
 NPM_EOF
@@ -89,6 +100,12 @@ cat >"$HOME_DIR/.local/bin/node" <<NODE_EOF
 exec "$REAL_NODE" "\$@"
 NODE_EOF
 chmod +x "$HOME_DIR/.local/bin/npm" "$HOME_DIR/.local/bin/node"
+# The in-place update verifies through dsh-orig, as the installed copy does.
+cat >"$HOME_DIR/.local/bin/dsh-orig" <<ORIG_EOF
+#!/bin/sh
+echo "1.0.0"
+ORIG_EOF
+chmod +x "$HOME_DIR/.local/bin/dsh-orig"
 
 # Fixture curl: the canonical registry URL is served from a local manifest, so
 # this test needs no network and proves the updater never asks the release base
@@ -502,6 +519,9 @@ scenario_tree_override() {
 
 # A tree outside npm's global root cannot be updated by `npm install -g`; the
 # sync must say so instead of installing somewhere else and failing the verify.
+# A user-owned tree outside npm's global root (install.sh's --opt layout) is
+# refreshed in place through its own prefix with the previous tree kept for
+# rollback, and the rdsh release update still runs afterwards.
 scenario_tree_unmanaged() {
   make_stub "$PKG/good" good
   make_archive "$PKG/good" "$TEST_ROOT/good.tar.gz"
@@ -521,10 +541,11 @@ scenario_tree_unmanaged() {
     fail "an npm-unmanaged DSH tree failed the whole sync"
     return 0
   fi
-  if ! grep -q "outside npm's global root" "$LOGS/tree-unmanaged.log" \
-    || grep -q "npm install failed" "$LOGS/tree-unmanaged.log"; then
+  if ! grep -q "in place:" "$LOGS/tree-unmanaged.log" \
+    || ! grep -q "updated OK: 1.0.0" "$LOGS/tree-unmanaged.log" \
+    || grep -q "in-place update failed" "$LOGS/tree-unmanaged.log"; then
     show "$LOGS/tree-unmanaged.log"
-    fail "an npm-unmanaged DSH tree was not reported as skipped"
+    fail "an npm-unmanaged DSH tree was not updated in place"
     return 0
   fi
   if [ ! -x "$OUT/bin/rdsh" ] || ! grep -q "rdsh updated OK via release binary" "$LOGS/tree-unmanaged.log"; then
@@ -532,7 +553,41 @@ scenario_tree_unmanaged() {
     fail "an npm-unmanaged DSH tree stopped the rdsh release update"
     return 0
   fi
-  ok "an npm-unmanaged DSH tree is reported, not installed into"
+  ok "an npm-unmanaged DSH tree is refreshed in place through its prefix"
+}
+
+# A tree whose owning prefix is not a standard <prefix>/lib/node_modules layout
+# cannot be updated in place; the sync reports it, leaves the tree untouched,
+# and still updates the rdsh release.
+scenario_tree_unmanaged_preserved() {
+  make_stub "$PKG/good" good
+  make_archive "$PKG/good" "$TEST_ROOT/good.tar.gz"
+  stage_release "$TEST_ROOT/good.tar.gz"
+  write_manifest "$(sum_file "$TEST_ROOT/good.tar.gz")"
+  reset_dsh_trees
+  tree="$TEST_ROOT/dsh-flat/node_modules/@deepseek-ai/dsh"
+  mkdir -p "$tree"
+  printf '{"version":"0.5.0"}\n' >"$tree/package.json"
+  reset_prefix
+  BASE="file://$REL"
+  run_sync "$LOGS/tree-preserved.log" fixture 1 "" DSH_PKG_ROOT="$tree"
+  if [ "$SYNC_RC" -ne 0 ]; then
+    show "$LOGS/tree-preserved.log"
+    fail "a non-prefix DSH tree failed the whole sync"
+    return 0
+  fi
+  if ! grep -qF "outside npm's global root" "$LOGS/tree-preserved.log" \
+    || ! grep -qF '{"version":"0.5.0"}' "$tree/package.json"; then
+    show "$LOGS/tree-preserved.log"
+    fail "a non-prefix DSH tree was touched"
+    return 0
+  fi
+  if ! grep -q "rdsh updated OK via release binary" "$LOGS/tree-preserved.log"; then
+    show "$LOGS/tree-preserved.log"
+    fail "a non-prefix DSH tree stopped the rdsh release update"
+    return 0
+  fi
+  ok "a non-prefix DSH tree is reported and left alone"
 }
 
 # No DSH tree anywhere: the release update is still the run's success, and the
@@ -655,7 +710,7 @@ scenario_static() {
   ok "digest registry origin is a fixed literal and archives are version-pinned"
 }
 
-for name in hostile pinned http redirect registry_unreachable registry_invalid unpinned downgrade tree_opt tree_override tree_unmanaged tree_missing self_update static; do
+for name in hostile pinned http redirect registry_unreachable registry_invalid unpinned downgrade tree_opt tree_override tree_unmanaged tree_unmanaged_preserved tree_missing self_update static; do
   case "$SCENARIOS" in
     all | *"$name"*) "scenario_$name" ;;
   esac
