@@ -50,7 +50,7 @@ try{
  const page=await pageFor(browser,setup.url);await page.locator('#token-box').waitFor({state:'visible'});await page.locator('#setup-token').fill((await readFile(setup.tokenFile,'utf8')).trim());await page.getByRole('button',{name:copy.setupConnect}).click();await page.locator('#step-ready h1').waitFor();await page.evaluate(()=>go('finish'));await page.locator('#hx').click();await page.locator('#extras .row').first().waitFor();await check(page,/rdsh setup/);
  assert.equal(new URL(page.url()).hash,'');await page.locator('#extras .row').filter({hasText:'rdsh serve'}).click();
  await page.waitForFunction(value=>document.querySelector('#extras .row')?.textContent.includes(value),copy.enabled);
- assert.deepEqual(JSON.parse(await readFile(path.join(env.DSH_HOME,'rdsh.json'),'utf8')).extras.enable,['serve']);
+ assert.deepEqual(JSON.parse(await readFile(path.join(env.DSH_HOME,'rdsh.json'),'utf8')).extras.enable,['serve','search-web']);
  await page.reload();await page.locator('#step-ready h1').waitFor();await page.evaluate(()=>go('finish'));await page.locator('#hx').click();await page.waitForFunction(value=>document.querySelector('#extras .row')?.textContent.includes(value),copy.enabled);
  await screenshot(page,'setup-desktop');await page.setViewportSize(report.viewports[1]);await check(page,/rdsh setup/);await screenshot(page,'setup-mobile');
  const sharingFile=path.join(env.DSH_HOME,'rdsh-auth-sharing.json');await writeFile(sharingFile,'{broken policy');await page.evaluate(()=>load());

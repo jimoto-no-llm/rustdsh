@@ -12,6 +12,29 @@ use std::process::{Command, Stdio};
 
 const HEAD: &str = "0123456789abcdef0123456789abcdef01234567";
 
+fn parse_git_arguments(args: &[std::ffi::OsString]) -> Option<(PathBuf, String)> {
+    let mut repository = None;
+    let mut command = None;
+    let mut index = 0;
+
+    while let Some(argument) = args.get(index) {
+        if argument == "-C" {
+            repository = Some(PathBuf::from(args.get(index + 1)?));
+            index += 2;
+        } else if argument == "-c" {
+            args.get(index + 1)?;
+            index += 2;
+        } else if argument == "rev-parse" || argument == "status" {
+            command = Some(argument.to_string_lossy().into_owned());
+            break;
+        } else {
+            index += 1;
+        }
+    }
+
+    Some((repository?, command?))
+}
+
 #[cfg(windows)]
 fn spawn_descendant() -> std::io::Result<u32> {
     use std::{
@@ -122,8 +145,9 @@ fn main() {
         return;
     }
 
-    let repository = PathBuf::from(&args[1]);
-    let command = args[2].to_string_lossy();
+    let Some((repository, command)) = parse_git_arguments(&args) else {
+        std::process::exit(2);
+    };
     let descendants = repository.join(".git").join("worker-git-descendants");
     let child_pid = spawn_descendant().expect("start descendant");
     writeln!(
@@ -137,7 +161,7 @@ fn main() {
     )
     .expect("record descendant PID");
 
-    match command.as_ref() {
+    match command.as_str() {
         "rev-parse" => {
             println!();
             println!(
@@ -150,5 +174,29 @@ fn main() {
         }
         "status" => print!("## main\0"),
         _ => std::process::exit(2),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_git_arguments;
+    use std::{ffi::OsString, path::PathBuf};
+
+    #[test]
+    fn finds_git_subcommand_after_config_options() {
+        let args = [
+            "-C",
+            "repo",
+            "-c",
+            "core.fsmonitor=false",
+            "rev-parse",
+            "--show-cdup",
+        ]
+        .map(OsString::from);
+
+        assert_eq!(
+            parse_git_arguments(&args),
+            Some((PathBuf::from("repo"), "rev-parse".to_string()))
+        );
     }
 }

@@ -96,6 +96,8 @@ mod slim;
 mod subagent_plan;
 mod swarm;
 mod task_outcomes;
+#[cfg(test)]
+mod test_support;
 mod token_handoff;
 mod tokens;
 mod tool_security;
