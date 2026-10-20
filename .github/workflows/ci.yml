@@ -209,14 +209,14 @@ jobs:
       - name: Download the pinned public DSH APIs
         id: public_api
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: rdsh-public-api
           path: ${{ runner.temp }}/rdsh-public-api
       - name: Download the pinned CLI
         id: binary
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: rdsh-binary
           path: target/debug
