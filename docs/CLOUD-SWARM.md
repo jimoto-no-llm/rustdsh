@@ -80,6 +80,10 @@ rdsh cloud --namespace rdsh-cloud --pool rdsh-worker reconcile \
   --lease-file lease.json
 ```
 
+`--plan-file`、`--request-file`、`--lease-file` は128 MiB以下の通常ファイルを
+受け付ける。上限超過はJSONの解析前に拒否し、読み取り中にファイルが増えた
+場合も上限を確認する。
+
 `request.json` の例。イメージはregistry digestまで固定し、Template内の
 `worker` containerと完全一致させる。
 

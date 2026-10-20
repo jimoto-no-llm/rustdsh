@@ -5,6 +5,11 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Fixed
+
+- `rdsh cloud` のJSON入力を128 MiB以下の通常ファイルに制限し、読込中の
+  サイズ増加も検出する。巨大なplan/request/leaseの無制限読込を防ぐ（#825）。
+
 ### Added
 
 - `rdsh rustxng install` が追加されました。RustXNG の最新リリースを
