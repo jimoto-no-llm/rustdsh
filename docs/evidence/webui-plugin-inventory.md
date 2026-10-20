@@ -1,6 +1,6 @@
 # Web UI プラグイン棚卸し (task-2)
 
-- 対象プロファイル: `~/.dsh/profiles/web` (dsh 0.2.1-rc.2 / GUI <http://127.0.0.1:3080>)
+- 対象プロファイル: `~/.dsh/profiles/web` (dsh 0.2.1-rc.2 / GUI `http://127.0.0.1:3080`)
 - 作業ブランチ: `test/webui-lighter` (worktree `/var/tmp/wt-uiperf`)
 - 調査は**読み取りのみ**。本番サービス `dsh-web.service` と `~/.dsh` の実設定は一切変更していない。
 - 分類は「**無効化しても安全**」「**条件付きで安全**」「**必要**」の3種。**推測は必ず「推測」と明記**した。

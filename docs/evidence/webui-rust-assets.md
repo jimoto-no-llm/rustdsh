@@ -1,7 +1,7 @@
 # Web シェル資産を Rust で事前圧縮する — 計測結果
 
 計測日: 2026-10-20 (JST) / branch `test/webui-lighter`
-実装契約: [webui-asset-cache.md](webui-asset-cache.md)
+実装契約: [webui-asset-cache.md](../webui-asset-cache.md)
 再現: `ROUNDS=6 bash scripts/webui-docker-bench3.sh`
 
 ## 0. 結論
