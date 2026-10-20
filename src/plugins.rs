@@ -580,12 +580,29 @@ pub struct InstallRequest {
 
 /// The dsh CLI that owns plugin --profile <name> add; plugins/install.sh uses
 /// the same command. RDSH_DSH_BIN overrides the PATH lookup.
-fn dsh_bin() -> String {
-    std::env::var("RDSH_DSH_BIN")
-        .ok()
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty())
-        .unwrap_or_else(|| "dsh".to_string())
+fn dsh_bin() -> anyhow::Result<String> {
+    dsh_bin_from(std::env::var("RDSH_DSH_BIN").ok())
+}
+
+fn dsh_bin_from(override_value: Option<String>) -> anyhow::Result<String> {
+    if let Some(value) = override_value {
+        let trimmed = value.trim().to_string();
+        if !trimmed.is_empty() {
+            if let Some(reason) =
+                crate::exec_trust::untrusted_reason(std::path::Path::new(&trimmed))
+            {
+                anyhow::bail!("RDSH_DSH_BIN '{trimmed}' is not trusted: {reason}");
+            }
+            return Ok(trimmed);
+        }
+    }
+    crate::exec_trust::find_trusted_on_path("dsh")
+        .map(|path| path.to_string_lossy().into_owned())
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "could not find a trusted 'dsh' on PATH; install the dsh CLI or set RDSH_DSH_BIN to its absolute path",
+            )
+        })
 }
 
 /// Resolve the selected entries to concrete specs, skipping the ones a missing
@@ -669,7 +686,7 @@ pub fn cmd_install(request: InstallRequest, locale: Locale) -> Result<()> {
     let sources = desktop::resolve_plugins_dir(request.plugins_dir.as_deref(), &env, locale)
         .ok()
         .map(|dir| dir.display().to_string());
-    let dsh = dsh_bin();
+    let dsh = dsh_bin()?;
     let mut actions = Vec::new();
     let mut not_installed: Vec<String> = unresolved
         .iter()
@@ -984,6 +1001,32 @@ mod tests {
         entries.iter().map(|entry| entry.package.clone()).collect()
     }
 
+    #[test]
+    fn dsh_bin_from_enforces_the_trust_policy() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = std::env::temp_dir().join(format!(
+            "rdsh-dsh-bin-test-{}-{}",
+            std::process::id(),
+            crate::local_http::random_token().unwrap()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let clean = root.join("dsh");
+        std::fs::write(&clean, b"#!/bin/sh\n").unwrap();
+        std::fs::set_permissions(&clean, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let resolved =
+            dsh_bin_from(Some(clean.to_string_lossy().into_owned())).expect("clean bin passes");
+        assert_eq!(resolved, clean.to_string_lossy());
+
+        let loose = root.join("loose-dsh");
+        std::fs::write(&loose, b"#!/bin/sh\n").unwrap();
+        std::fs::set_permissions(&loose, std::fs::Permissions::from_mode(0o777)).unwrap();
+        let error =
+            dsh_bin_from(Some(loose.to_string_lossy().into_owned())).expect_err("must refuse");
+        assert!(error.to_string().contains("not trusted"), "{error}");
+
+        std::fs::remove_dir_all(root).unwrap();
+    }
     #[test]
     fn catalog_carries_the_essential_tier_the_installer_ships() {
         let catalog = Catalog::load().unwrap();

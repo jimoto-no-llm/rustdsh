@@ -186,8 +186,23 @@ fn systemctl_skipped() -> bool {
     std::env::var_os("RDSH_SYSTEMD_NO_RELOAD").is_some_and(|value| value == "1")
 }
 
+/// Absolute, trust-checked `systemctl`; a hostile `PATH` head must not be
+/// able to shadow a binary the timer logic runs unattended.
+fn systemctl_program() -> Result<&'static PathBuf> {
+    static SYSTEMCTL: std::sync::OnceLock<Option<PathBuf>> = std::sync::OnceLock::new();
+    let resolved = SYSTEMCTL.get_or_init(|| {
+        crate::exec_trust::find_trusted_or_well_known(
+            "systemctl",
+            &["/usr/bin/systemctl", "/bin/systemctl"],
+        )
+    });
+    resolved
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("trusted systemctl executable not found on PATH"))
+}
+
 fn systemctl(args: &[&str], locale: crate::locale::Locale) -> Result<String> {
-    let output = Command::new("systemctl")
+    let output = Command::new(systemctl_program()?)
         .arg("--user")
         .args(args)
         .output()
@@ -218,7 +233,10 @@ fn systemctl(args: &[&str], locale: crate::locale::Locale) -> Result<String> {
 }
 
 fn systemctl_read(args: &[&str]) -> String {
-    Command::new("systemctl")
+    let Ok(program) = systemctl_program() else {
+        return "unknown".to_string();
+    };
+    Command::new(program)
         .arg("--user")
         .args(args)
         .output()
