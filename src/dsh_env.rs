@@ -114,7 +114,9 @@ pub(crate) fn find_on_path(tool: &str) -> Option<PathBuf> {
         }
         for name in tool_file_names(tool) {
             let candidate = dir.join(name);
-            if crate::executable::is_executable(&candidate) {
+            if crate::executable::is_executable(&candidate)
+                && crate::exec_trust::untrusted_reason(&candidate).is_none()
+            {
                 return Some(candidate);
             }
         }
@@ -187,7 +189,9 @@ pub(crate) fn shim_env() -> ShimEnv {
         volta_home: env_value(&["VOLTA_HOME"]),
         pnpm_home: env_value(&["PNPM_HOME"]),
         // npm reads the lower-case spelling first (npm_config_prefix).
-        npm_prefix: env_value(&["npm_config_prefix", "NPM_CONFIG_PREFIX", "PREFIX"]),
+        // The generic PREFIX is a common build-system variable and must not
+        // become an executable search root.
+        npm_prefix: env_value(&["npm_config_prefix", "NPM_CONFIG_PREFIX"]),
     }
 }
 

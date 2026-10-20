@@ -575,9 +575,29 @@ fn git_raw(root: &Path, args: &[&str]) -> Result<ProcessOutput> {
     })
 }
 
+/// Absolute path of the Git binary, resolved once through the shared trust
+/// policy so a hostile `PATH` head cannot shadow it. Well-known system
+/// locations back the PATH scan, because systemd units run with a minimal
+/// environment and a missing PATH must not disable the boundary either.
+fn git_program() -> Result<&'static PathBuf> {
+    static GIT: std::sync::OnceLock<Option<PathBuf>> = std::sync::OnceLock::new();
+    let resolved = GIT.get_or_init(|| {
+        crate::exec_trust::find_trusted_or_well_known(
+            "git",
+            &["/usr/bin/git", "/bin/git", "/usr/local/bin/git"],
+        )
+    });
+    resolved
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("trusted git executable not found on PATH"))
+}
+
 fn git_raw_with(root: &Path, configure: impl FnOnce(&mut Command)) -> Result<ProcessOutput> {
-    let mut command = Command::new("git");
+    let mut command = Command::new(git_program()?.as_os_str());
     command.arg("-C").arg(root);
+    // Repository configuration is untrusted input: core.fsmonitor would let
+    // a checked-out tree start helper programs, so it is always disabled.
+    command.arg("-c").arg("core.fsmonitor=false");
     configure(&mut command);
     command
         .stdin(Stdio::null())
@@ -591,6 +611,13 @@ fn git_raw_with(root: &Path, configure: impl FnOnce(&mut Command)) -> Result<Pro
     }
     command.env("GIT_TERMINAL_PROMPT", "0");
     command.env("GIT_OPTIONAL_LOCKS", "0");
+    // System/global git config is untrusted too: it can set fsmonitor,
+    // hooks, credential helpers or diff drivers that run programs.
+    command.env("GIT_CONFIG_NOSYSTEM", "1");
+    command.env(
+        "GIT_CONFIG_GLOBAL",
+        if cfg!(windows) { "NUL" } else { "/dev/null" },
+    );
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -1168,6 +1195,49 @@ mod tests {
         assert!(decode_stdout(vec![b'a', 0xff]).is_err());
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn git_status_never_runs_a_repository_fsmonitor_program() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = std::env::temp_dir().join(format!(
+            "rdsh-git-fsmonitor-{}-{}",
+            std::process::id(),
+            crate::local_http::random_token().unwrap()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let repo = root.join("repo");
+        std::fs::create_dir_all(&repo).unwrap();
+        git_raw_with(&repo, |command| {
+            command.args(["init", "--quiet"]);
+        })
+        .expect("git init runs");
+        let sentinel = root.join("PWNED");
+        let hook = root.join("hook.sh");
+        std::fs::write(
+            &hook,
+            format!("#!/bin/sh\ntouch {}\n", sentinel.to_string_lossy()).as_bytes(),
+        )
+        .unwrap();
+        std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755)).unwrap();
+        git_raw_with(&repo, |command| {
+            command
+                .arg("-c")
+                .arg(format!("core.fsmonitor={}", hook.to_string_lossy()))
+                .args(["config", "core.fsmonitor"])
+                .arg(&hook);
+        })
+        .expect("record hostile fsmonitor setting");
+        git_raw_with(&repo, |command| {
+            command.args(["status", "--porcelain"]);
+        })
+        .expect("status runs with fsmonitor disabled");
+        assert!(
+            !sentinel.exists(),
+            "repository core.fsmonitor must not execute its program",
+        );
+        std::fs::remove_dir_all(root).unwrap();
+    }
     #[cfg(unix)]
     #[test]
     fn command_timeout_kills_the_child() {

@@ -65,6 +65,7 @@ mod desktop_webui;
 mod distro;
 mod dsh_args;
 mod dsh_env;
+mod exec_trust;
 mod executable;
 mod file_lock;
 mod file_security;

@@ -7,6 +7,10 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Fixed
 
+- 外部コマンド起動の信頼境界を強化しました。git 起動は PATH からの信頼付き
+  解決＋`-c core.fsmonitor=false`＋`GIT_CONFIG_NOSYSTEM`/`GIT_CONFIG_GLOBAL`
+  の固定を行い、systemctl・npm/pnpm・`RDSH_DSH_BIN` も共通の owner/mode
+  検査（exec_trust）を通します。汎用 `PREFIX` は探索から外しました（#826）。
 - `rdsh worker-scope policy` の判定側 probe path を宣言側と同一規則で検証し、
   `forbidden_paths` を読み取りにも適用、交差は forbidden 部分木の減算後に
   成立判定へ変更しました（#827）。
