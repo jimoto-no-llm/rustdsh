@@ -15,7 +15,7 @@ rdsh が起動時にシェル資産を brotli q11 / gzip L6 で圧縮し、
 `/assets` の prefix ルートを登録し、以下を行います。
 
 | 項目 | 挙動 |
-|---|---|
+| ---- | ---- |
 | メソッド | `GET` / `HEAD` 以外は 405 |
 | 表現選択 | `br` → `gzip` → `identity` の優先順。`q=0` は除外。`*` は考慮しない |
 | ヘッダ | `content-type`（契約の表と同一）、`content-encoding`、`cache-control: public, max-age=31536000, immutable`、`etag`、`content-length`、必要なら `vary: accept-encoding` |
@@ -57,7 +57,7 @@ Node は圧縮しません。圧縮済みファイルを読むだけなので、
 ## 環境変数
 
 | 変数 | 意味 |
-|---|---|
+| ---- | ---- |
 | `RDSH_WEB_ASSETS` | 事前圧縮キャッシュの絶対パス。未設定ならルートを登録しない |
 | `RDSH_WEB_CACHE=0` | プラグイン全体を無効化（ヘッダタップもルートも登録しない） |
 
