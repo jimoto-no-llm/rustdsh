@@ -21,6 +21,11 @@
 //! the script cannot be found: a timer that silently fails every day is worse
 //! than no timer.
 //!
+//! The same test decides *ownership*: the timer would run the script
+//! unattended forever, so a script that is not owned by us or that user and
+//! group can write is refused before any unit exists. `--force` overrides that
+//! one check for setups that are trusted on purpose.
+//!
 //! `--dry-run` prints the plan without touching the filesystem or systemd, and
 //! `RDSH_SYSTEMD_DIR` redirects the unit directory (used by the tests and by
 //! anyone running an unsupported init system).
@@ -28,6 +33,9 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
+#[cfg(unix)]
+use std::os::unix::fs::MetadataExt;
 
 use anyhow::{bail, Context, Result};
 use serde_json::json;
@@ -83,6 +91,9 @@ fn service_unit(script: &Path) -> String {
 }
 
 /// Quote for systemd's command-line syntax.
+///
+/// `%` is a unit specifier and `$` starts a runtime variable expansion; both
+/// would rewrite the path between here and `execve`, so both are escaped.
 fn exec_start_path(script: &Path) -> String {
     let mut quoted = String::from("\"");
     for character in script.display().to_string().chars() {
@@ -92,11 +103,67 @@ fn exec_start_path(script: &Path) -> String {
                 quoted.push(character);
             }
             '%' => quoted.push_str("%%"),
+            '$' => quoted.push_str("$$"),
             _ => quoted.push(character),
         }
     }
     quoted.push('"');
     quoted
+}
+
+/// Why the candidate must not become a daily, unattended `ExecStart`.
+///
+/// Same bar as `passthrough::warn_if_risky_origin`: a regular file we own that
+/// user and group cannot rewrite. The difference is that this one refuses
+/// instead of warning, because the timer re-runs the script every day without
+/// anyone watching.
+#[cfg(unix)]
+fn script_trust_problem(script: &Path) -> Option<&'static str> {
+    let metadata = fs::metadata(script).ok()?;
+    if !metadata.is_file() {
+        // A character device or fifo would block or misread `execve` forever.
+        return Some("not a regular file");
+    }
+    // SAFETY: geteuid takes no arguments and always succeeds.
+    if metadata.uid() != unsafe { libc::geteuid() } {
+        return Some("not owned by you");
+    }
+    if metadata.mode() & 0o022 != 0 {
+        return Some("group/world-writable");
+    }
+    None
+}
+
+#[cfg(not(unix))]
+fn script_trust_problem(_script: &Path) -> Option<&'static str> {
+    None
+}
+
+/// The refusal message for one [`script_trust_problem`] reason.
+fn trust_refusal(locale: crate::locale::Locale, script: &Path, problem: &str) -> String {
+    let path = script.display().to_string();
+    if problem == "not a regular file" {
+        return localized_format!(
+            locale,
+            "{path} is not a regular file, so the daily timer would not run the updater; pass --force to register it anyway",
+            "{path} 不是普通文件，每日计时器无法运行更新器；传入 --force 可强制注册",
+            "{path} は通常ファイルではないため、毎日のタイマーは更新処理を実行できません。--force を付けると登録できます"
+        );
+    }
+    if problem == "not owned by you" {
+        return localized_format!(
+            locale,
+            "{path} is not owned by you, so another process could change what runs as you every day; fix the owner, or pass --force to register it anyway",
+            "{path} 不属于你，其他进程可能改变每天以你的身份运行的内容；请修正所有者，或传入 --force 强制注册",
+            "{path} はあなたの所有ではないため、毎日あなたの権限で実行される内容を第三者に書き換えられる可能性があります。所有者を修正するか、--force を付けると登録できます"
+        );
+    }
+    localized_format!(
+        locale,
+        "{path} is group/world-writable, so any local process could replace what runs as you every day; run chmod go-w on it, or pass --force to register it anyway",
+        "{path} 可被同组或其他用户写入，本地进程可能替换每天以你的身份运行的内容；请对其执行 chmod go-w，或传入 --force 强制注册",
+        "{path} はグループまたは全ユーザーが書き込み可能なため、毎日あなたの権限で実行される内容を他のプロセスに差し替えられる可能性があります。chmod go-w を実行するか、--force を付けると登録できます"
+    )
 }
 
 fn timer_unit() -> String {
@@ -250,13 +317,20 @@ fn status(json: bool, locale: crate::locale::Locale) -> Result<()> {
 
 /// Turn the timer on. Returns the plan that was applied so `--dry-run` and
 /// callers share one code path.
-fn enable(dry_run: bool, json: bool, locale: crate::locale::Locale) -> Result<()> {
+fn enable(dry_run: bool, json: bool, force: bool, locale: crate::locale::Locale) -> Result<()> {
     let directory = unit_directory();
     let Some(script) = sync_script() else {
         bail!(
             match locale { crate::locale::Locale::English => "sync-dsh.sh was not found; set RDSH_SYNC_SCRIPT=/path/to/sync-dsh.sh (a timer that cannot run the updater would fail silently every day)", crate::locale::Locale::Chinese => "未找到 sync-dsh.sh；请设置 RDSH_SYNC_SCRIPT=/path/to/sync-dsh.sh（无法运行更新器的计时器会每天失败）", crate::locale::Locale::Japanese => "sync-dsh.sh が見つかりません。RDSH_SYNC_SCRIPT=/path/to/sync-dsh.sh を設定してください（更新処理を実行できないタイマーは毎日失敗します）" }
         );
     };
+    // Refuse before writing a unit: a timer that shuts itself off is worse than
+    // no timer, and a dead unit left behind would be worse still.
+    if let Some(problem) = script_trust_problem(&script) {
+        if !force {
+            bail!("{}", trust_refusal(locale, &script, problem));
+        }
+    }
     let service = directory.join(SERVICE);
     let timer = directory.join(TIMER);
     if !dry_run {
@@ -298,6 +372,7 @@ fn enable(dry_run: bool, json: bool, locale: crate::locale::Locale) -> Result<()
         "sync_script": script.display().to_string(),
         "dry_run": dry_run,
         "enabled": !dry_run,
+        "forced": force,
         "systemctl": if dry_run || systemctl_skipped() { "skipped" } else { "applied" },
     });
     if json {
@@ -453,11 +528,12 @@ pub(crate) fn cmd_update_auto(
     action: &str,
     dry_run: bool,
     json: bool,
+    force: bool,
     locale: crate::locale::Locale,
 ) -> Result<()> {
     match action {
         "status" => status(json, locale),
-        "on" => enable(dry_run, json, locale),
+        "on" => enable(dry_run, json, force, locale),
         "off" => disable(dry_run, json, locale),
         other => bail!(
             "{}",

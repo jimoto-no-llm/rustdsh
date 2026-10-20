@@ -48,6 +48,10 @@ impl Fixture {
             // Never talk to the test runner's own systemd instance.
             .env("RDSH_SYSTEMD_NO_RELOAD", "1")
             .env("DSH_HOME", self.0.join("dsh"))
+            // The assertions read the English messages; the runner's locale
+            // must not decide which language they are written in.
+            .env("LC_ALL", "C")
+            .env("LANG", "C")
             .output()
             .unwrap()
     }
@@ -162,6 +166,68 @@ fn a_missing_updater_is_refused_instead_of_installing_a_dead_timer() {
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(stderr.contains("sync-dsh.sh was not found"), "{stderr}");
     assert!(!f.units().exists());
+}
+
+/// Make `path` writable by group and world, the way an unpacked tarball or a
+/// world-writable directory would leave it.
+#[cfg(unix)]
+fn make_group_and_world_writable(path: &Path) {
+    use std::os::unix::fs::PermissionsExt;
+    let mode = fs::metadata(path).unwrap().permissions().mode();
+    fs::set_permissions(path, fs::Permissions::from_mode(mode | 0o022)).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn a_group_writable_updater_is_refused_and_no_unit_is_written() {
+    let f = Fixture::new(true);
+    make_group_and_world_writable(&f.script());
+    let out = f.run(&["update", "auto", "on"]);
+    assert!(!out.status.success());
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("group/world-writable"), "{stderr}");
+    assert!(
+        stderr.contains("--force"),
+        "the refusal must point at --force: {stderr}"
+    );
+    assert!(
+        !f.units().exists(),
+        "a refused registration must not leave a unit behind"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn force_registers_a_group_writable_updater() {
+    let f = Fixture::new(true);
+    make_group_and_world_writable(&f.script());
+    let applied = f.json(&["update", "auto", "on", "--force", "--json"]);
+    assert_eq!(applied["forced"], true);
+    assert!(f.units().join("rdsh-sync.service").is_file());
+    assert!(f.units().join("rdsh-sync.timer").is_file());
+}
+
+#[cfg(unix)]
+#[test]
+fn unit_quotes_a_script_path_with_a_dollar_sign() {
+    let f = Fixture::new(false);
+    let script = f.0.join("cost$5/sync-dsh.sh");
+    fs::create_dir_all(script.parent().unwrap()).unwrap();
+    fs::write(&script, "#!/bin/sh\nexit 0\n").unwrap();
+    let out = f.run_with_script(&script, &["update", "auto", "on", "--json"]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    // Unescaped, systemd would expand $5 before exec; "$$" is a literal "$".
+    let service = service_unit(&f.0);
+    let quoted = script.display().to_string().replace('$', "$$");
+    assert!(
+        service.contains(&format!("ExecStart=\"{quoted}\"\n")),
+        "{service}"
+    );
 }
 
 #[test]
