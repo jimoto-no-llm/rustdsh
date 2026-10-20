@@ -44,7 +44,11 @@ admission; its pure cost-ledger CLI bridge invokes Rust through a private file.
 ## Worker-scope validation and policy
 
 `worker-scope validate` reads declarations from stdin; `worker-scope policy`
-evaluates write paths, intersections and shared files in a single stdin batch.
+evaluates write paths, read paths, intersections and shared files in a single
+stdin batch. Probe paths that a declaration would reject (`..`, absolute
+paths, reserved separators) are denied instead of matched, `forbidden_paths`
+cut reads as well as writes, and an intersection is granted only when it
+survives subtracting both sides' forbidden subtrees.
 Both commands return compact canonical JSON without opening settings or
 accessing sessions, credentials or models. Explicit language flags and process
 locale select English, Chinese or Japanese help and CLI-owned diagnostics;

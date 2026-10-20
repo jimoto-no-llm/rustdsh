@@ -7,6 +7,9 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Fixed
 
+- `rdsh worker-scope policy` の判定側 probe path を宣言側と同一規則で検証し、
+  `forbidden_paths` を読み取りにも適用、交差は forbidden 部分木の減算後に
+  成立判定へ変更しました（#827）。
 - strict監査（RDSH_SECURITY=1）で dsh 本体 `lib/bin.js` の SHA256 を
   ADAPTER監査表に追加し、境界設置前に内容照合するようにしました。偽ツリー
   （manifest一致のみで bin.js 差し替え）を拒否します。strict 経路では
