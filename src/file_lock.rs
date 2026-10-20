@@ -13,6 +13,11 @@ use sha2::{Digest, Sha256};
 const CREDENTIAL_LOCK_WAIT: Duration = Duration::from_secs(30);
 const CREDENTIAL_LOCK_RETRY_INITIAL: Duration = Duration::from_millis(20);
 const CREDENTIAL_LOCK_RETRY_MAX: Duration = Duration::from_millis(200);
+/// A zero-byte marker only exists inside the exclusive-create-to-PID-write
+/// window of a writer. If it stays empty past this grace, that writer crashed
+/// before writing its record (issue #865) and the marker is reclaimed like an
+/// exited holder instead of blocking every later writer until the timeout.
+const ZERO_MARKER_TAKEOVER_GRACE: Duration = Duration::from_secs(5);
 
 /// The `.credentials.yaml.lock` protocol shared with DeepSeek Harness.
 ///
@@ -20,7 +25,9 @@ const CREDENTIAL_LOCK_RETRY_MAX: Duration = Duration::from_millis(200);
 /// removed on release. DSH uses the same marker protocol, so both programs
 /// serialize updates to the credentials document. A lock with a complete PID
 /// record is reclaimed only after its holder is proven gone and contenders
-/// coordinate through DSH's record-specific takeover file.
+/// coordinate through DSH's record-specific takeover file. A zero-byte marker
+/// (its writer died between exclusive-create and the record write) is
+/// reclaimed once it is older than [`ZERO_MARKER_TAKEOVER_GRACE`].
 pub(crate) struct CredentialFileLock {
     lock_path: PathBuf,
 }
@@ -36,6 +43,15 @@ impl CredentialFileLock {
     fn exclusive_for_timeout(
         target: &Path,
         timeout: Duration,
+        locale: crate::locale::Locale,
+    ) -> anyhow::Result<Self> {
+        Self::exclusive_for_grace(target, timeout, ZERO_MARKER_TAKEOVER_GRACE, locale)
+    }
+
+    fn exclusive_for_grace(
+        target: &Path,
+        timeout: Duration,
+        zero_marker_grace: Duration,
         locale: crate::locale::Locale,
     ) -> anyhow::Result<Self> {
         if let Some(parent) = target.parent() {
@@ -79,7 +95,7 @@ impl CredentialFileLock {
                     return Ok(Self { lock_path });
                 }
                 Err(error) if lock_contention(&error, &lock_path) => {
-                    if take_over_exited_lock(&lock_path, locale)? {
+                    if take_over_exited_lock(&lock_path, zero_marker_grace, locale)? {
                         continue;
                     }
                 }
@@ -276,11 +292,43 @@ fn process_is_alive(_pid: u32) -> bool {
     true
 }
 
-fn take_over_exited_lock(lock_path: &Path, locale: crate::locale::Locale) -> anyhow::Result<bool> {
+fn record_reclaimable(record: &[u8], path: &Path, zero_marker_grace: Duration) -> bool {
+    if record.is_empty() {
+        // A zero-byte marker has no PID to prove the holder exited; the
+        // marker's own age stands in, past the writer's create-then-write
+        // window (see ZERO_MARKER_TAKEOVER_GRACE).
+        return zero_marker_is_stale(path, zero_marker_grace);
+    }
+    holder_exited(record)
+}
+
+fn zero_marker_is_stale(path: &Path, grace: Duration) -> bool {
+    let Ok(metadata) = std::fs::symlink_metadata(path) else {
+        return false;
+    };
+    // Only a genuinely empty regular file qualifies; the record read above
+    // could already have raced with its writer filling it in.
+    if !metadata.file_type().is_file() || metadata.len() != 0 {
+        return false;
+    }
+    let Ok(modified) = metadata.modified() else {
+        return false;
+    };
+    // A future mtime (clock skew) is treated as fresh, never stale.
+    std::time::SystemTime::now()
+        .duration_since(modified)
+        .is_ok_and(|age| age >= grace)
+}
+
+fn take_over_exited_lock(
+    lock_path: &Path,
+    zero_marker_grace: Duration,
+    locale: crate::locale::Locale,
+) -> anyhow::Result<bool> {
     let Some(record) = read_lock_record(lock_path) else {
         return Ok(false);
     };
-    if !holder_exited(&record) {
+    if !record_reclaimable(&record, lock_path, zero_marker_grace) {
         return Ok(false);
     }
 
@@ -318,7 +366,8 @@ fn take_over_exited_lock(lock_path: &Path, locale: crate::locale::Locale) -> any
     drop(claim);
 
     let _claim = TakeoverClaim { path: claim_path };
-    if read_lock_record(lock_path).as_deref() != Some(record.as_slice()) || !holder_exited(&record)
+    if read_lock_record(lock_path).as_deref() != Some(record.as_slice())
+        || !record_reclaimable(&record, lock_path, zero_marker_grace)
     {
         return Ok(false);
     }
@@ -666,6 +715,52 @@ mod tests {
             .expect("the waiting writer should acquire after DSH releases the marker");
         worker.join().unwrap();
         assert!(!marker.exists());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn credential_lock_takes_over_zero_byte_marker_past_grace() {
+        let (target, dir) = temp_target(".credentials.yaml");
+        let marker = lock_path(&target);
+        // The state issue #865 describes: a writer crashed right after
+        // exclusive-create, leaving a 0-byte marker with no PID record.
+        std::fs::write(&marker, b"").unwrap();
+
+        let lock = CredentialFileLock::exclusive_for_grace(
+            &target,
+            Duration::from_secs(1),
+            Duration::ZERO,
+            crate::locale::Locale::English,
+        )
+        .expect("a stale zero-byte marker should be reclaimed");
+        assert_eq!(
+            std::fs::read(&marker).unwrap(),
+            format!("{}\n", std::process::id()).as_bytes()
+        );
+        drop(lock);
+
+        assert!(!marker.exists());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn credential_lock_does_not_reclaim_zero_byte_marker_inside_grace() {
+        let (target, dir) = temp_target(".credentials.yaml");
+        let marker = lock_path(&target);
+        std::fs::write(&marker, b"").unwrap();
+
+        let error = match CredentialFileLock::exclusive_for_grace(
+            &target,
+            Duration::from_millis(300),
+            Duration::from_secs(30),
+            crate::locale::Locale::English,
+        ) {
+            Ok(_) => panic!("a fresh zero-byte marker belongs to a writer that may still be alive"),
+            Err(error) => error,
+        };
+        let text = error.to_string();
+        assert!(text.contains("timed out"), "unexpected error: {text}");
+        assert_eq!(std::fs::metadata(&marker).unwrap().len(), 0);
         std::fs::remove_dir_all(dir).unwrap();
     }
 
