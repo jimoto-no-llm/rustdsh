@@ -105,6 +105,7 @@ mod update_auto;
 mod websearch;
 mod worker_git;
 mod worker_scopes;
+mod webui_gzip;
 
 #[derive(Parser, Debug)]
 #[command(

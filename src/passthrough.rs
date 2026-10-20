@@ -360,6 +360,88 @@ pub(crate) fn selected_node(orig: &str) -> Option<String> {
     node_for_dsh(orig).or_else(find_node_bin)
 }
 
+/// Profile whose first load benefits from the higher gzip level. Other
+/// profiles are left completely alone.
+const WEB_PROFILE: &str = "web";
+
+/// Compose a profile tree through `dsh --dump-config` and return its stdout.
+///
+/// `--dump-config` runs the same patch algorithm as a real mount, so what it
+/// prints is exactly what the profile would boot with. It never binds a port.
+fn dump_composed_config(orig: &str, profile: &str) -> Option<String> {
+    let mut cmd = base_cmd(orig, false, true, crate::locale::Locale::English).ok()?;
+    cmd.arg("--profile")
+        .arg(profile)
+        .arg("--dump-config")
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null());
+    let output = cmd.output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    String::from_utf8(output.stdout).ok()
+}
+
+/// Write the generated overlay and return its path.
+///
+/// The file lands beside the settings document rather than in the profile, so
+/// nothing rdsh writes can ever be mistaken for a profile the user owns. A
+/// stable name means repeated boots reuse one small file instead of filling
+/// the directory.
+fn write_overlay(body: &str) -> std::io::Result<String> {
+    let dir = format!("{}/webui", crate::inspect::dsh_home());
+    std::fs::create_dir_all(&dir)?;
+    let path = format!("{dir}/gzip-level.patch.yml");
+    std::fs::write(&path, body)?;
+    Ok(path)
+}
+
+/// Build the gzip-level overlay for `profile`, or `None` to leave the command
+/// untouched.
+///
+/// Every failure path returns `None` on purpose: a missing `dsh`, an
+/// unreadable dump, an unexpected config shape or an unwritable cache dir must
+/// only cost the optimization, never the boot. This is the whole reason the
+/// level is applied as an extra layer instead of by editing the profile.
+fn gzip_overlay(orig: &str, profile: &str) -> Option<String> {
+    if profile != WEB_PROFILE {
+        return None;
+    }
+    // Settings can switch the layer off entirely; the env below still tunes the
+    // level when it is on.
+    if !crate::rdsh_config::feature_enabled(
+        &crate::rdsh_config::load(),
+        crate::webui_gzip::FEATURE_ID,
+    ) {
+        return None;
+    }
+    let configured = crate::webui_gzip::DEFAULT_COMPRESSION_LEVEL;
+    let level = crate::webui_gzip::resolve_level(
+        std::env::var(crate::webui_gzip::ENV_LEVEL).ok().as_deref(),
+        configured,
+    );
+    if !crate::webui_gzip::is_worth_applying(level) {
+        return None;
+    }
+    let composed = dump_composed_config(orig, profile)?;
+    let overlay = crate::webui_gzip::overlay_for(&composed, level)?;
+    write_overlay(&overlay).ok()
+}
+
+/// Append the generated overlay to a boot/dump command.
+///
+/// `dsh` applies `--patch` overlays in the order given, so inserting ours
+/// before the caller's list keeps every explicit `--patch` authoritative.
+/// Returns true when an overlay was added.
+fn apply_gzip_overlay(cmd: &mut std::process::Command, orig: &str, profile: &str) -> bool {
+    let Some(path) = gzip_overlay(orig, profile) else {
+        return false;
+    };
+    cmd.arg("--patch").arg(path);
+    true
+}
+
 fn base_cmd(
     orig: &str,
     dry: bool,
@@ -567,6 +649,8 @@ pub fn exec_boot(
     if let Some(f) = from_default {
         cmd.arg("--from-default-profile").arg(f);
     }
+    // Generated layer first so every caller-supplied --patch stays authoritative.
+    let overlay = !dry && apply_gzip_overlay(&mut cmd, &orig, profile);
     for p in patches {
         cmd.arg("--patch").arg(p);
     }
@@ -592,6 +676,9 @@ pub fn exec_boot(
             },
             crate::slim::describe()
         );
+    }
+    if overlay {
+        eprintln!("[rdsh] web ui: gzip overlay applied");
     }
     exec_or_spawn(cmd, dry, locale)
 }
