@@ -2,7 +2,7 @@
 use anyhow::{bail, Context, Result};
 use serde_json::Value;
 use std::{
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::Stdio,
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -21,6 +21,14 @@ pub struct SdkConfig {
     pub bridge_dir: PathBuf,
     /// Resolved once by the harness from its authorized credential store.
     pub agy_key: Option<String>,
+}
+
+fn sdk_python_path(bridge_dir: &Path, is_windows: bool) -> PathBuf {
+    if is_windows {
+        bridge_dir.join(".venv").join("Scripts").join("python.exe")
+    } else {
+        bridge_dir.join(".venv").join("bin").join("python")
+    }
 }
 
 /// Receives a model JSON envelope as plain text. No SDK tool is exposed.
@@ -49,7 +57,7 @@ pub async fn generate(
             )
         }
         "agy-sdk" => {
-            let mut command = Command::new(config.bridge_dir.join(".venv/bin/python"));
+            let mut command = Command::new(sdk_python_path(&config.bridge_dir, cfg!(windows)));
             command.arg(config.bridge_dir.join("agy-sdk.py"));
             (
                 command,
@@ -277,6 +285,19 @@ impl Drop for TemporaryRoot {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn agy_sdk_python_path_matches_venv_layout_for_each_platform() {
+        let bridge_dir = PathBuf::from("bridge");
+        assert_eq!(
+            sdk_python_path(&bridge_dir, true),
+            bridge_dir.join(".venv").join("Scripts").join("python.exe")
+        );
+        assert_eq!(
+            sdk_python_path(&bridge_dir, false),
+            bridge_dir.join(".venv").join("bin").join("python")
+        );
+    }
+
     #[test]
     fn raw_envelope_returned_without_execution() {
         let text = r#"{"tool_calls":[{"name":"read","arguments":{"path":"nonce.txt"}}]}"#;
