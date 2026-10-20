@@ -26,6 +26,11 @@ rdsh features off search-web
 自動で導入して使います（`rdsh rustxng install` で先に導入しておくこともできます）。
 導入を止めたいときは `RUSTXNG_SKIP_INSTALL=1` を付けます。
 
+サイドカーは依存の無い単一バイナリで、Docker 版 SearXNG のような
+常設スタック（Python・Redis・コンテナ）を要求しません。目安:
+バイナリ約 14MB（初回ダウンロードのみ）、常駐メモリー約 10MB、
+アイドル時 CPU 0%、起動から応答まで 0.3 秒程度です。
+
 `extras.enable` に `search-web` を含める従来の設定も使えます。
 `features.search-web=false` の明示指定があると、そちらが優先されます。
 

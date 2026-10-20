@@ -11,6 +11,9 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   `~/.local/bin` へ導入します。サイドカーが見つからない状態で
   `rdsh search-web` や `rdsh rustxng start` を使うと、この導入を自動で
   行ってから起動します（`RUSTXNG_SKIP_INSTALL=1` で自動導入を止められます）。
+  サイドカーは依存の無い単一バイナリです（バイナリ約14MB、常駐メモリー
+  約10MB、アイドル時CPU 0%）。低スペック機でも Docker 等の追加スタック
+  なしで動きます。
 
 ### Changed
 
