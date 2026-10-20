@@ -30,6 +30,11 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   出力先を指定できるようにしました。従来は `0` による無効化のみで、
   `$HOME` が揮発する環境ではキャッシュが毎回作り直しになりました。
   既存の `NODE_COMPILE_CACHE` が優先される挙動は変更なし（#864）。
+- 0バイトのまま残った `.credentials.yaml.lock` を、mtimeが猶予期間（5秒）を
+  過ぎた古いマーカーとして收回するようにしました。書き込み前のクラッシュで
+  この状態になると以降の起動がタイムアウトし続けるため、実運用では手動削除が
+  必要でした。PID記録を持つマーカーの收回条件（所有者の死の確認）は変わりません。
+  上流 `dsh-atomic-write` の同一挙動はこのリポジトリの修正対象外です（#865）。
 
 ### Added
 
