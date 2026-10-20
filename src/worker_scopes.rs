@@ -34,7 +34,12 @@ pub fn cmd_policy(locale: Locale) -> Result<()> {
         locale,
         "worker scope policy batch must be a JSON object",
     ))?;
-    const ALLOWED: &[&str] = &["write_checks", "intersections", "shared_files"];
+    const ALLOWED: &[&str] = &[
+        "write_checks",
+        "read_checks",
+        "intersections",
+        "shared_files",
+    ];
     if object.keys().any(|key| !ALLOWED.contains(&key.as_str())) {
         anyhow::bail!(
             locale::diagnostic(locale, "unknown worker scope policy batch field").to_string()
@@ -79,6 +84,48 @@ pub fn cmd_policy(locale: Locale) -> Result<()> {
         if write_checks.len() > MAX_POLICY_BATCH_ITEMS {
             anyhow::bail!(
                 locale::diagnostic(locale, "too many worker scope write checks").to_string()
+            );
+        }
+    }
+
+    let mut read_checks = Vec::new();
+    for check in optional_array(object, "read_checks", locale)? {
+        let check = check.as_object().context(locale::diagnostic(
+            locale,
+            "read check must be a JSON object",
+        ))?;
+        if check
+            .keys()
+            .any(|key| !matches!(key.as_str(), "scope" | "files"))
+        {
+            anyhow::bail!(locale::diagnostic(locale, "unknown read check field").to_string());
+        }
+        let scope = declaration(
+            check
+                .get("scope")
+                .context(locale::diagnostic(locale, "read check is missing scope"))?,
+        )
+        .map_err(anyhow::Error::msg)
+        .context(locale::diagnostic(locale, "invalid read check scope"))?;
+        let files = check
+            .get("files")
+            .and_then(Value::as_array)
+            .context(locale::diagnostic(
+                locale,
+                "read check files must be a JSON array",
+            ))?;
+        let mut results = Vec::with_capacity(files.len());
+        for file in files {
+            let file = file.as_str().context(locale::diagnostic(
+                locale,
+                "read check file must be a string",
+            ))?;
+            results.push(may_read(&scope, file));
+        }
+        read_checks.push(results);
+        if read_checks.len() > MAX_POLICY_BATCH_ITEMS {
+            anyhow::bail!(
+                locale::diagnostic(locale, "too many worker scope read checks").to_string()
             );
         }
     }
@@ -131,6 +178,7 @@ pub fn cmd_policy(locale: Locale) -> Result<()> {
 
     let output = serde_json::json!({
         "write_checks": write_checks,
+        "read_checks": read_checks,
         "intersections": intersections,
         "shared_files": shared_files,
     });
@@ -336,8 +384,38 @@ fn is_git_metadata_path(path: &str) -> bool {
     })
 }
 
+/// Evaluation-side mirror of `relative_scope`: the dashboard rejects `..`,
+/// absolute paths and reserved separators at declaration time, so an
+/// unvalidated probe must not earn permissive answers either. `.` is a
+/// whole-tree scope, not a file the boundary can judge.
+fn normalized_probe_path(file: &str) -> Option<String> {
+    if file.is_empty()
+        || file.encode_utf16().count() > 512
+        || file.starts_with('/')
+        || file.chars().any(|c| {
+            c <= '\u{1f}' || c == '\u{7f}' || matches!(c, '\\' | ':' | '*' | '?' | '[' | ']')
+        })
+    {
+        return None;
+    }
+    if file == "." {
+        return None;
+    }
+    let file = file.strip_suffix('/').unwrap_or(file);
+    if file
+        .split('/')
+        .any(|part| part.is_empty() || matches!(part, "." | ".."))
+    {
+        return None;
+    }
+    Some(file.to_string())
+}
+
 fn may_write(scope: &Value, file: &str) -> bool {
-    if is_git_metadata_path(file) {
+    let Some(file) = normalized_probe_path(file) else {
+        return false;
+    };
+    if is_git_metadata_path(&file) {
         return false;
     }
     let includes = |key: &str| {
@@ -348,10 +426,45 @@ fn may_write(scope: &Value, file: &str) -> bool {
                 paths
                     .iter()
                     .filter_map(Value::as_str)
-                    .any(|path| covers(path, file))
+                    .any(|path| covers(path, &file))
             })
     };
     includes("write_paths") && !includes("forbidden_paths")
+}
+
+/// Read-side gate. `forbidden_paths` cuts `read_paths` too: "never touch"
+/// holds for reads, not only for writes.
+fn may_read(scope: &Value, file: &str) -> bool {
+    let Some(file) = normalized_probe_path(file) else {
+        return false;
+    };
+    let includes = |key: &str| {
+        scope
+            .get(key)
+            .and_then(Value::as_array)
+            .is_some_and(|paths| {
+                paths
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .any(|path| covers(path, &file))
+            })
+    };
+    includes("read_paths") && !includes("forbidden_paths")
+}
+
+/// True when a forbidden subtree lies at or inside `range`. It makes the
+/// range ungrantable as a lease intersection: the remainder cannot be
+/// expressed as a single subtree.
+fn forbidden_inside(scope_decl: &Value, range: &str) -> bool {
+    scope_decl
+        .get("forbidden_paths")
+        .and_then(Value::as_array)
+        .is_some_and(|paths| {
+            paths
+                .iter()
+                .filter_map(Value::as_str)
+                .any(|path| path == range || covers(range, path))
+        })
 }
 
 fn scope_intersections(left: &Value, right: &Value) -> Vec<String> {
@@ -379,7 +492,15 @@ fn scope_intersections(left: &Value, right: &Value) -> Vec<String> {
                 None
             };
             if let Some(narrow) = narrow {
-                if may_write(left, narrow) && may_write(right, narrow) {
+                // The shared lease must still hold after subtracting either
+                // side's forbidden subtrees. When a forbidden path cuts into
+                // the common range, no single subtree expresses the remainder,
+                // so the batch reports no overlap instead of granting it.
+                if may_write(left, narrow)
+                    && may_write(right, narrow)
+                    && !forbidden_inside(left, narrow)
+                    && !forbidden_inside(right, narrow)
+                {
                     overlaps.push(narrow.to_string());
                 }
             }
@@ -530,6 +651,74 @@ mod tests {
         }
     }
 
+    #[test]
+    fn may_write_rejects_probe_paths_that_declarations_would_reject() {
+        let scope = declaration(&json!({
+            "worker_id": "editor-a",
+            "role": "edit",
+            "read_paths": ["."],
+            "write_paths": ["."],
+            "modules": ["m"],
+            "lease_seconds": 60
+        }))
+        .unwrap();
+        assert!(may_write(&scope, "src/main.rs"));
+        for hostile in ["../outside", "/etc/passwd", "src/../secret", "src//x", ""] {
+            assert!(!may_write(&scope, hostile), "{hostile} must be denied");
+        }
+    }
+
+    #[test]
+    fn may_read_honors_forbidden_subtrees() {
+        let scope = declaration(&json!({
+            "worker_id": "reviewer-a",
+            "role": "review",
+            "read_paths": ["."],
+            "forbidden_paths": ["src/private"],
+            "modules": ["m"],
+            "lease_seconds": 60
+        }))
+        .unwrap();
+        assert!(may_read(&scope, "src/other.md"));
+        assert!(!may_read(&scope, "src/private/secret.md"));
+        assert!(!may_read(&scope, "../outside"));
+    }
+
+    #[test]
+    fn intersections_shrink_when_forbidden_cuts_the_shared_range() {
+        let left = declaration(&json!({
+            "worker_id": "editor-a",
+            "role": "edit",
+            "read_paths": ["."],
+            "write_paths": ["src"],
+            "forbidden_paths": ["src/private"],
+            "modules": ["m"],
+            "lease_seconds": 60
+        }))
+        .unwrap();
+        let right = declaration(&json!({
+            "worker_id": "editor-b",
+            "role": "edit",
+            "read_paths": ["."],
+            "write_paths": ["src"],
+            "modules": ["m"],
+            "lease_seconds": 60
+        }))
+        .unwrap();
+        assert_eq!(scope_intersections(&left, &right), Vec::<String>::new());
+
+        // With no forbidden cut, the common subtree is still reported.
+        let plain = declaration(&json!({
+            "worker_id": "editor-c",
+            "role": "edit",
+            "read_paths": ["."],
+            "write_paths": ["src"],
+            "modules": ["m"],
+            "lease_seconds": 60
+        }))
+        .unwrap();
+        assert_eq!(scope_intersections(&plain, &plain), vec!["src".to_string()]);
+    }
     #[test]
     fn js_path_order_uses_utf16_code_units() {
         let mut values = vec!["\u{10000}".to_string(), "\u{e000}".to_string()];
