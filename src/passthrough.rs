@@ -937,8 +937,13 @@ mod tests {
         let dsh = bin.join("dsh");
         std::fs::write(&dsh, b"").unwrap();
 
+        // The finder canonicalizes the entry point before walking its
+        // ancestors, so compare on the same footing: macOS keeps temp dirs
+        // behind the /var -> /private/var symlink and the raw path would differ.
+        let expected = std::fs::canonicalize(&assets).unwrap();
         let found = find_frontend_assets_dir(&dsh.to_string_lossy());
-        assert_eq!(found.as_deref(), Some(assets.as_path()));
+        let found_canonical = found.as_ref().and_then(|p| std::fs::canonicalize(p).ok());
+        assert_eq!(found_canonical.as_deref(), Some(expected.as_path()));
 
         // A path pointing at nothing must not invent a directory.
         assert!(find_frontend_assets_dir("/nonexistent/rdsh/bin/dsh").is_none());
