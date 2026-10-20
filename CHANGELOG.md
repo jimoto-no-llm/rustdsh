@@ -7,6 +7,13 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Fixed
 
+- `rdsh search-web` の接続先を既定でループバックのみに制限しました。
+  ループバック以外は `SEARXNG_ALLOW_REMOTE=1` で明示許可、リンクローカルと
+  キャリア級NAT帯は常に拒否します。`https://` 接続に対応し、ログや `--json`
+  には接続先のパスをマスクして出力し、検索結果に現れた制御文字は端末へ届く
+  前に除去します（#828）。
+
+
 - `rdsh cloud` のJSON入力を128 MiB以下の通常ファイルに制限し、読込中の
   サイズ増加も検出する。巨大なplan/request/leaseの無制限読込を防ぐ（#825）。
 
