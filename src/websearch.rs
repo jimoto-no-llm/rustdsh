@@ -914,6 +914,7 @@ mod tests {
 
     #[test]
     fn remote_hosts_need_the_explicit_opt_in_and_loopback_passes() {
+        let _lock = engine_env_lock();
         std::env::remove_var("SEARXNG_ALLOW_REMOTE");
         let error = ensure_base_allowed("gw.example", crate::locale::Locale::English)
             .expect_err("remote host must fail without opt-in");
@@ -1145,11 +1146,8 @@ mod tests {
     }
 
     /// Serialises the environment-touching resolution tests in this module.
-    fn engine_env_lock() -> std::sync::MutexGuard<'static, ()> {
-        static LOCK: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
-        LOCK.get_or_init(|| std::sync::Mutex::new(()))
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    fn engine_env_lock() -> crate::test_support::EnvLock {
+        crate::test_support::env_lock()
     }
 
     /// Sets variables for one test and restores them on drop.

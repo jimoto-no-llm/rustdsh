@@ -24,7 +24,6 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   には接続先のパスをマスクして出力し、検索結果に現れた制御文字は端末へ届く
   前に除去します（#828）。
 
-
 - `rdsh cloud` のJSON入力を128 MiB以下の通常ファイルに制限し、読込中の
   サイズ増加も検出する。巨大なplan/request/leaseの無制限読込を防ぐ（#825）。
 - `RDSH_NODE_COMPILE_CACHE=<ディレクトリ>` でNodeコンパイルキャッシュの

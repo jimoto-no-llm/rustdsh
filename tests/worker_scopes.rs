@@ -165,6 +165,7 @@ fn native_worker_scope_policy_batches_write_intersection_and_shared_file_checks(
         output,
         json!({
             "write_checks": [[true, false, true, false]],
+            "read_checks": [],
             "intersections": [["Cargo.toml", "src/lib.rs"]],
             "shared_files": [true, false, true, true]
         })
@@ -296,7 +297,7 @@ fn languages_preserve_worker_scope_json_and_ignore_unrelated_corrupt_settings() 
     let policy = serde_json::to_vec(&json!({"write_checks":[{"scope":scope,"files":["資料/空 白/本文.txt","秘密/鍵"]}],
         "intersections":[{"left":scope,"right":scope}],"shared_files":["Cargo.lock","資料/空 白/本文.txt"]})).unwrap();
     let expected_policy = concat!(
-        r#"{"write_checks":[[true,false]],"intersections":[["資料/空 白"]],"shared_files":[true,false]}"#,
+        r#"{"write_checks":[[true,false]],"read_checks":[],"intersections":[["資料/空 白"]],"shared_files":[true,false]}"#,
         "\n"
     );
     for language in ["en", "zh-CN", "ja"] {

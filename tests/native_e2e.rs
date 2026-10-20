@@ -609,7 +609,7 @@ fn setup_extras_follow_explicit_feature_switches() {
     let (status, body) = setup.request("GET", "/api/extras", "", true, "");
     assert_eq!(status, 200);
     let listed: serde_json::Value = serde_json::from_str(&body).unwrap();
-    assert_eq!(listed["enable"], serde_json::json!([]));
+    assert_eq!(listed["enable"], serde_json::json!(["search-web"]));
     assert_eq!(
         setup
             .request("POST", "/api/extras", r#"{"enable":["serve"]}"#, true, "")

@@ -4452,6 +4452,7 @@ mod v3_tests {
 
     #[test]
     fn git_snapshot_detects_content_changes_with_unchanged_status() {
+        let _lock = crate::test_support::env_lock();
         use std::process::Command;
 
         let temporary = TempDir::new();
@@ -4488,6 +4489,7 @@ mod v3_tests {
 
     #[test]
     fn git_snapshot_detects_index_changes_with_unchanged_worktree_and_status() {
+        let _lock = crate::test_support::env_lock();
         use std::io::Write;
         use std::process::{Command, Stdio};
 
@@ -4565,6 +4567,7 @@ mod v3_tests {
     #[cfg(unix)]
     #[test]
     fn git_snapshot_does_not_wait_when_index_is_replaced_by_fifo() {
+        let _lock = crate::test_support::env_lock();
         use std::process::Command;
         use std::{ffi::CString, os::unix::ffi::OsStrExt, sync::mpsc, time::Duration};
 
@@ -4601,6 +4604,7 @@ mod v3_tests {
 
     #[test]
     fn git_snapshot_hashes_untracked_file_contents() {
+        let _lock = crate::test_support::env_lock();
         use std::process::Command;
 
         let temporary = TempDir::new();
@@ -4650,6 +4654,7 @@ mod v3_tests {
 
     #[test]
     fn git_snapshot_hashes_root_relative_untracked_paths_from_nested_cwd() {
+        let _lock = crate::test_support::env_lock();
         use std::process::Command;
 
         let temporary = TempDir::new();

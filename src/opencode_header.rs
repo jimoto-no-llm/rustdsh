@@ -183,6 +183,7 @@ mod tests {
 
     #[test]
     fn writes_the_embedded_preload() {
+        let _lock = crate::test_support::env_lock();
         std::env::remove_var("RDSH_OPENCODE_SESSION_HEADER");
         let path = preload_path().expect("preload path");
         assert_eq!(std::fs::read_to_string(&path).unwrap(), PRELOAD);
@@ -192,6 +193,7 @@ mod tests {
 
     #[test]
     fn the_preload_never_sits_directly_in_the_shared_temp_root() {
+        let _lock = crate::test_support::env_lock();
         std::env::remove_var("RDSH_OPENCODE_SESSION_HEADER");
         let path = preload_path().expect("preload path");
         let directory = path.parent().expect("preload directory");
@@ -202,6 +204,7 @@ mod tests {
 
     #[test]
     fn import_specifier_is_a_file_url_for_the_staged_preload() {
+        let _lock = crate::test_support::env_lock();
         std::env::remove_var("RDSH_OPENCODE_SESSION_HEADER");
         let specifier = import_specifier().expect("import specifier");
         assert!(
@@ -215,6 +218,7 @@ mod tests {
     #[test]
     fn preload_directory_and_file_are_private() {
         use std::os::unix::fs::PermissionsExt;
+        let _lock = crate::test_support::env_lock();
         std::env::remove_var("RDSH_OPENCODE_SESSION_HEADER");
         let path = preload_path().expect("preload path");
         let directory = path.parent().unwrap();
@@ -252,6 +256,7 @@ mod tests {
 
     #[test]
     fn node_accepts_the_staged_preload_url() {
+        let _lock = crate::test_support::env_lock();
         // A real delegated launch. The directory carries a space and `#`, which
         // is exactly what the raw-path form cannot express.
         let mut nonce = [0u8; 8];
@@ -329,6 +334,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn node_accepts_a_preload_url_under_a_double_slash_temp_root() {
+        let _lock = crate::test_support::env_lock();
         // A real launch through a `//`-rooted path, the shape eightman999
         // reproduced on Linux/Node 24.19.0.
         let mut nonce = [0u8; 8];

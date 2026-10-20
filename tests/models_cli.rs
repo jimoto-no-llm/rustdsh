@@ -1,6 +1,7 @@
 use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::process::{Command, Output};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 const PROFILE: &str = "- id: llm-pi-ai\n  config:\n    providers:\n      openai-codex:\n        models:\n          - id: old\n            name: Keep\n";
 
@@ -11,12 +12,23 @@ struct Fixture {
 
 impl Fixture {
     fn new() -> Self {
+        static NEXT: AtomicU64 = AtomicU64::new(0);
         let nonce = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let root =
-            std::env::temp_dir().join(format!("rdsh-models-cli-{}-{nonce}", std::process::id()));
+        let root = loop {
+            let sequence = NEXT.fetch_add(1, Ordering::Relaxed);
+            let candidate = std::env::temp_dir().join(format!(
+                "rdsh-models-cli-{}-{nonce}-{sequence}",
+                std::process::id()
+            ));
+            match std::fs::create_dir(&candidate) {
+                Ok(()) => break candidate,
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(error) => panic!("create models CLI fixture: {error}"),
+            }
+        };
         let patch = root.join(".dsh/profiles/web/cordis.patch.yml");
         std::fs::create_dir_all(patch.parent().unwrap()).unwrap();
         std::fs::create_dir_all(root.join(".codex")).unwrap();
