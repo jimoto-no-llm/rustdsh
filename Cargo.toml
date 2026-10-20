@@ -22,6 +22,8 @@ anyhow = "1.0"
 getrandom = "0.4"
 libc = "0.2"
 sha2 = "0.11.0"
+brotli = "9.0.0"
+flate2 = "1.1.10"
 
 [build-dependencies]
 embed-resource = "=3.0.12"

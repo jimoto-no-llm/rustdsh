@@ -360,6 +360,104 @@ fn gzip_overlay(orig: &str, profile: &str) -> Option<String> {
 /// `dsh` applies `--patch` overlays in the order given, so inserting ours
 /// before the caller's list keeps every explicit `--patch` authoritative.
 /// Returns true when an overlay was added.
+/// Path (relative to a DSH install root) of the frontend bundle's asset tree.
+const FRONTEND_ASSETS_REL: &str = "node_modules/@deepseek-ai/dsh-web-frontend/dist/assets";
+
+/// Locate the frontend `dist/assets` tree that belongs to `orig`.
+///
+/// `orig` reaches rdsh in three shapes and all of them are handled:
+///
+/// - `~/.local/bin/dsh-orig`, a symlink to `<tree>/bin/dsh`
+/// - `<tree>/bin/dsh` itself
+/// - `<pkg>/lib/bin.js` inside the installed package
+///
+/// The layout is walked instead of hard-coded so a relocated install still
+/// resolves. `RDSH_WEB_ASSETS_DIST` overrides the search outright.
+fn find_frontend_assets_dir(orig: &str) -> Option<std::path::PathBuf> {
+    if let Ok(explicit) = std::env::var("RDSH_WEB_ASSETS_DIST") {
+        if !explicit.is_empty() {
+            let p = std::path::PathBuf::from(&explicit);
+            return p.is_dir().then_some(p);
+        }
+    }
+    let real = std::fs::canonicalize(orig).unwrap_or_else(|_| std::path::PathBuf::from(orig));
+    for ancestor in real.ancestors() {
+        // <pkg>/lib/bin.js  ->  <pkg>/node_modules/...
+        let inside_pkg = ancestor.join(FRONTEND_ASSETS_REL);
+        if inside_pkg.is_dir() {
+            return Some(inside_pkg);
+        }
+        // <tree>/bin/dsh  ->  <tree>/lib/node_modules/@deepseek-ai/dsh/node_modules/...
+        let under_tree = ancestor
+            .join("lib")
+            .join("node_modules")
+            .join("@deepseek-ai")
+            .join("dsh")
+            .join(FRONTEND_ASSETS_REL);
+        if under_tree.is_dir() {
+            return Some(under_tree);
+        }
+    }
+    // Last resort: the installed tree that find_original_dsh() would pick.
+    let home = crate::inspect::home_dir()?;
+    let tree = latest_node_tree_for(&format!("{home}/.local/opt"))?;
+    let cand = std::path::PathBuf::from(tree)
+        .join("lib")
+        .join("node_modules")
+        .join("@deepseek-ai")
+        .join("dsh")
+        .join(FRONTEND_ASSETS_REL);
+    cand.is_dir().then_some(cand)
+}
+
+/// Read the DSH profile from delegated arguments (`--profile web` / `--profile=web`).
+///
+/// Only the profile flag is inspected; every other argument is left to DSH.
+fn profile_of(args: &[String]) -> Option<&str> {
+    let mut iter = args.iter();
+    while let Some(arg) = iter.next() {
+        if arg == "--profile" {
+            return iter.next().map(String::as_str);
+        }
+        if let Some(value) = arg.strip_prefix("--profile=") {
+            return Some(value);
+        }
+    }
+    None
+}
+
+/// Precompress the web shell assets once and point DSH at the result.
+///
+/// The compression itself is the expensive part (brotli q11 over the shell), so
+/// it happens here, in Rust, once per DSH version, and lands in an on-disk
+/// cache. DSH then serves the precompressed bytes and never compresses at
+/// request time. Everything is best-effort: a missing tree, an unwritable cache
+/// or a disabled feature simply leaves `RDSH_WEB_ASSETS` unset, and DSH behaves
+/// exactly as it does today.
+fn apply_web_assets(cmd: &mut std::process::Command, orig: &str, profile: &str) {
+    if profile != WEB_PROFILE {
+        return;
+    }
+    // An explicit value in the environment always wins.
+    if std::env::var_os("RDSH_WEB_ASSETS").is_some() {
+        return;
+    }
+    if !crate::rdsh_config::feature_enabled(
+        &crate::rdsh_config::load(),
+        crate::webui_assets::FEATURE_ID,
+    ) {
+        return;
+    }
+    let Some(dist) = find_frontend_assets_dir(orig) else {
+        return;
+    };
+    let home = crate::inspect::dsh_home();
+    let Some(cache) = crate::webui_assets::prepare(std::path::Path::new(&home), &dist) else {
+        return;
+    };
+    cmd.env("RDSH_WEB_ASSETS", cache);
+}
+
 fn apply_gzip_overlay(cmd: &mut std::process::Command, orig: &str, profile: &str) -> bool {
     let Some(path) = gzip_overlay(orig, profile) else {
         return false;
@@ -473,6 +571,7 @@ pub fn exec_boot(
     }
     cmd.args(app_args);
     apply_slim(&mut cmd, slim);
+    apply_web_assets(&mut cmd, &orig, profile);
     if slim {
         eprintln!(
             "[rdsh] boot '{profile}' via {orig} (slim ON: {})",
@@ -531,6 +630,13 @@ pub fn exec_raw(args: &[String], dry: bool, slim: bool) -> anyhow::Result<()> {
     }
     cmd.args(args);
     apply_slim(&mut cmd, slim);
+    // The shadowed-dsh path (`dsh --profile web`) is how the web profile is
+    // actually started, so the web optimizations must apply here too, not only
+    // on the `rdsh boot` subcommand.
+    if let Some(profile) = profile_of(args) {
+        let profile = profile.to_string();
+        apply_web_assets(&mut cmd, &orig, &profile);
+    }
     exec_or_spawn(cmd, dry)
 }
 
@@ -557,6 +663,56 @@ mod tests {
 
     fn sv(v: &[&str]) -> Vec<String> {
         v.iter().map(ToString::to_string).collect()
+    }
+
+    #[test]
+    fn profile_flag_is_found_in_every_spelling() {
+        // The shadowed-dsh path forwards user arguments verbatim, so the flag
+        // arrives in whichever form the user typed.
+        assert_eq!(profile_of(&sv(&["--profile", "web"])), Some("web"));
+        assert_eq!(profile_of(&sv(&["--profile=web"])), Some("web"));
+        assert_eq!(
+            profile_of(&sv(&["--profile", "web", "--", "--port", "1"])),
+            Some("web")
+        );
+        // Unrelated arguments must not be mistaken for the profile.
+        assert_eq!(profile_of(&sv(&["--port", "3080"])), None);
+        assert_eq!(profile_of(&sv(&["--profile"])), None);
+        assert_eq!(profile_of(&[]), None);
+        // A later flag does not override the first one found.
+        assert_eq!(
+            profile_of(&sv(&["--profile", "tui", "--profile", "web"])),
+            Some("tui")
+        );
+    }
+
+    #[test]
+    fn frontend_assets_are_found_through_a_bin_symlink_layout() {
+        // Mirror the installed layout: <tree>/bin/dsh plus the frontend bundle
+        // under <tree>/lib/node_modules/@deepseek-ai/dsh/node_modules.
+        let tree = std::env::temp_dir().join(format!(
+            "rdsh-assets-probe-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = std::fs::remove_dir_all(&tree);
+        let assets = tree
+            .join("lib/node_modules/@deepseek-ai/dsh")
+            .join(FRONTEND_ASSETS_REL);
+        std::fs::create_dir_all(&assets).unwrap();
+        std::fs::write(assets.join("index-abc.js"), b"x").unwrap();
+        let bin = tree.join("bin");
+        std::fs::create_dir_all(&bin).unwrap();
+        let dsh = bin.join("dsh");
+        std::fs::write(&dsh, b"").unwrap();
+
+        let found = find_frontend_assets_dir(&dsh.to_string_lossy());
+        assert_eq!(found.as_deref(), Some(assets.as_path()));
+
+        // A path pointing at nothing must not invent a directory.
+        assert!(find_frontend_assets_dir("/nonexistent/rdsh/bin/dsh").is_none());
+
+        let _ = std::fs::remove_dir_all(&tree);
     }
 
     #[test]
