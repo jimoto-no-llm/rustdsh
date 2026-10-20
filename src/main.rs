@@ -725,6 +725,10 @@ enum AutoAction {
         dry_run: bool,
         #[arg(long = "json")]
         json: bool,
+        /// Register the sync script even when it is not owned by you or is
+        /// group/world-writable
+        #[arg(long = "force")]
+        force: bool,
     },
     /// Stop and remove the auto-update timer
     Off {
@@ -1258,13 +1262,15 @@ fn main() {
         Some(Commands::Update { action }) => match action {
             UpdateAction::Auto { action } => match action {
                 AutoAction::Status { json } => {
-                    update_auto::cmd_update_auto("status", false, json, locale)
+                    update_auto::cmd_update_auto("status", false, json, false, locale)
                 }
-                AutoAction::On { dry_run, json } => {
-                    update_auto::cmd_update_auto("on", dry_run, json, locale)
-                }
+                AutoAction::On {
+                    dry_run,
+                    json,
+                    force,
+                } => update_auto::cmd_update_auto("on", dry_run, json, force, locale),
                 AutoAction::Off { dry_run, json } => {
-                    update_auto::cmd_update_auto("off", dry_run, json, locale)
+                    update_auto::cmd_update_auto("off", dry_run, json, false, locale)
                 }
             },
         },
