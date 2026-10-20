@@ -177,6 +177,11 @@ pub const FEATURES: &[FeatureDef] = &[
         summary: "ask the model once more when a turn ends with reasoning only",
     },
     FeatureDef {
+        id: "feedback",
+        default: true,
+        summary: "allow the DSH Like/Dislike and /feedback surface (off installs rdsh-no-feedback)",
+    },
+    FeatureDef {
         id: "agent_tool_sandbox",
         default: false,
         summary: "confine delegated agent tools to --share-file files (no network, no host writes)",

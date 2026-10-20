@@ -87,6 +87,10 @@ PROFILE=web INTELLIGENT_UI=0 ./plugins/install.sh    # starter set without visua
 
 ### Essential plugins (always installed)
 
+One entry below is conditional: `rdsh-no-feedback` is attached only when
+`features.feedback=false`, because the DSH feedback surface it disables is on
+by default. Every other row is attached on every run.
+
 | Package | Why |
 | --- | --- |
 | `@deepseek-ai/dsh-tool-present` | Final deliverables as file cards (spreadsheets, decks, images) |
@@ -100,6 +104,7 @@ PROFILE=web INTELLIGENT_UI=0 ./plugins/install.sh    # starter set without visua
 | `rdsh-mobile-ui` | Phone-width layout for the DSH Web chat: full-width chat and composer, one-tap logo to the session list. Adapted from Smart-DSH (MIT) — see [its README](rdsh-mobile-ui/README.md). |
 | `rdsh-answer-guard` | When a turn ends with the reply only in the reasoning channel, the reader sees no answer and the agent looks stuck. The guard steers one reminder so the model restates it as text. `rdsh features off answer_guard` disables it — see [its README](rdsh-answer-guard/README.md). |
 | `rdsh-update-banner` | Release banner and notifications in the Web UI (`PROFILE=web` only). Installing it keeps the profile's own insert block from failing to import on every boot (issue #5). |
+| `rdsh-no-feedback` | Turn off DSH's Like/Dislike on assistant messages and the `/feedback` dialog and command. Attached only when `features.feedback=false` (`rdsh features off feedback`), never by default — see [its README](rdsh-no-feedback/README.md). |
 
 The upstream entries were verified present in the shipped dsh distribution and
 absent from the `dsh-base` bundle, so each one adds real capability. The

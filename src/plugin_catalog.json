@@ -56,6 +56,12 @@
         "web"
       ],
       "why": "Web release banner"
+    },
+    {
+      "package": "rdsh-no-feedback",
+      "bundled": true,
+      "feature": "feedback",
+      "why": "disable the DSH Like/Dislike and /feedback surface"
     }
   ],
   "recommended": [

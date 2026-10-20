@@ -72,6 +72,8 @@ Essential plugins (always installed, listed first)
   rdsh-mobile-ui                            phone-width Web layout
   rdsh-answer-guard                         restate reasoning-only replies as text
   rdsh-update-banner                        Web release banner (PROFILE=web only)
+  rdsh-no-feedback                          disable the DSH Like/Dislike and /feedback
+                                            surface (added only when features.feedback=false)
 
 Recommended plugins (optional; choose with --recommended)
   * = starter set, on by default for PROFILE=web and PROFILE=desktop
@@ -233,6 +235,21 @@ gitview_feature_allowed() {
     } catch { process.exit(0); }
   ' "$settings" 2>/dev/null
 }
+# `feedback` is the one switch that adds a bundle instead of vetoing one: the
+# DSH feedback surface is on by default upstream, so turning it off means
+# installing the patch-carrying `rdsh-no-feedback` bundle. Only an explicit
+# `false` opts in; an absent id or unreadable file keeps the stock behavior.
+feedback_feature_off() {
+  command -v node >/dev/null 2>&1 || return 1
+  settings="${DSH_HOME:-${HOME:-}/.dsh}/rdsh.json"
+  node -e '
+    const fs = require("node:fs");
+    try {
+      const doc = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+      process.exit(doc && doc.features && doc.features.feedback === false ? 0 : 1);
+    } catch { process.exit(1); }
+  ' "$settings" 2>/dev/null
+}
 if [ "$rec_sound" = "1" ] && ! sound_feature_allowed; then rec_sound=0; fi
 if [ "$rec_gitview" = "1" ] && ! gitview_feature_allowed; then rec_gitview=0; fi
 
@@ -253,6 +270,11 @@ PKGS="
 ESSENTIAL_BUNDLED="rdsh-settings rdsh-mobile-ui rdsh-answer-guard"
 if [ "$PROFILE" = "web" ]; then
   ESSENTIAL_BUNDLED="$ESSENTIAL_BUNDLED rdsh-update-banner"
+fi
+# Only an explicit features.feedback=false adds this bundle; the check runs
+# before the profile branches so desktop and headless get the same behavior.
+if feedback_feature_off; then
+  ESSENTIAL_BUNDLED="$ESSENTIAL_BUNDLED rdsh-no-feedback"
 fi
 
 RECOMMENDED_BUNDLED=""
