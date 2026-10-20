@@ -126,6 +126,8 @@ pub enum NativeMessage {
     BadSearxResponse,
     SearxReturnedHttp,
     NoSearxResultsPage,
+    RemoteSearxDenied,
+    RestrictedSearxHost,
 }
 
 /// Return a native command's localized human-readable label.
@@ -158,13 +160,13 @@ pub fn native_message(locale: Locale, key: NativeMessage) -> &'static str {
         (Locale::Chinese, NativeMessage::InvalidSearxUrl) => "无效的 SearXNG URL",
         (Locale::Japanese, NativeMessage::InvalidSearxUrl) => "無効な SearXNG URL",
         (Locale::English, NativeMessage::OnlyHttpSearxUrl) => {
-            "only http:// SearXNG URLs are supported (for a remote instance use an SSH tunnel to localhost)"
+            "only http:// or https:// SearXNG URLs are supported"
         }
         (Locale::Chinese, NativeMessage::OnlyHttpSearxUrl) => {
-            "仅支持 http:// SearXNG URL（远程实例请通过 SSH 隧道连接 localhost）"
+            "仅支持 http:// 或 https:// 的 SearXNG URL"
         }
         (Locale::Japanese, NativeMessage::OnlyHttpSearxUrl) => {
-            "http:// の SearXNG URL のみ対応です（リモートインスタンスには localhost への SSH トンネルを使用してください）"
+            "http:// と https:// の SearXNG URL のみ対応です"
         }
         (Locale::English, NativeMessage::InvalidIpv6SearxHost) => "invalid IPv6 SearXNG host",
         (Locale::Chinese, NativeMessage::InvalidIpv6SearxHost) => "无效的 IPv6 SearXNG 主机",
@@ -196,6 +198,24 @@ pub fn native_message(locale: Locale, key: NativeMessage) -> &'static str {
         (Locale::English, NativeMessage::NoSearxResultsPage) => "no SearXNG results page from",
         (Locale::Chinese, NativeMessage::NoSearxResultsPage) => "以下地址没有 SearXNG 结果页：",
         (Locale::Japanese, NativeMessage::NoSearxResultsPage) => "SearXNG の結果ページがありません：",
+        (Locale::English, NativeMessage::RemoteSearxDenied) => {
+            "non-loopback SearXNG hosts are refused by default; set SEARXNG_ALLOW_REMOTE=1 to allow this host explicitly"
+        }
+        (Locale::Chinese, NativeMessage::RemoteSearxDenied) => {
+            "默认拒绝非回环的 SearXNG 主机；如需允许请显式设置 SEARXNG_ALLOW_REMOTE=1"
+        }
+        (Locale::Japanese, NativeMessage::RemoteSearxDenied) => {
+            "ループバック以外の SearXNG ホストは既定で拒否します。許可する場合は SEARXNG_ALLOW_REMOTE=1 を明示的に設定してください"
+        }
+        (Locale::English, NativeMessage::RestrictedSearxHost) => {
+            "link-local and shared-address SearXNG hosts are always refused"
+        }
+        (Locale::Chinese, NativeMessage::RestrictedSearxHost) => {
+            "链路本地和共享地址段的 SearXNG 主机始终被拒绝"
+        }
+        (Locale::Japanese, NativeMessage::RestrictedSearxHost) => {
+            "リンクローカルおよび共有アドレス帯の SearXNG ホストは常に拒否されます"
+        }
     }
 }
 

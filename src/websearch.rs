@@ -64,9 +64,9 @@ fn parse_json(body: &str, limit: usize) -> anyhow::Result<Vec<Hit>> {
             .and_then(serde_json::Value::as_str)
             .unwrap_or("");
         hits.push(Hit {
-            title: title.trim().to_string(),
-            url: url.to_string(),
-            content: content.trim().to_string(),
+            title: strip_control(title.trim()),
+            url: strip_control(url),
+            content: strip_control(content.trim()),
         });
         if hits.len() >= limit {
             break;
@@ -171,7 +171,7 @@ pub(crate) fn encode_query(s: &str) -> String {
     out
 }
 
-/// Split an `http://host[:port][/prefix]` base URL.
+/// Split an `(http|https)://host[:port][/prefix]` base URL.
 pub(crate) fn split_base(
     base: &str,
     locale: crate::locale::Locale,
@@ -185,12 +185,21 @@ pub(crate) fn split_base(
         "{}",
         crate::locale::native_message(locale, crate::locale::NativeMessage::InvalidSearxUrl)
     );
-    let rest = base.strip_prefix("http://").ok_or_else(|| {
-        anyhow::anyhow!(
-            "{}: {base}",
-            crate::locale::native_message(locale, crate::locale::NativeMessage::OnlyHttpSearxUrl)
-        )
-    })?;
+    // https:// is accepted for remote instances; plain http stays for the
+    // loopback-first default and opt-in remotes.
+    let (rest, default_port) = base
+        .strip_prefix("https://")
+        .map(|r| (r, 443u16))
+        .or_else(|| base.strip_prefix("http://").map(|r| (r, 80u16)))
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "{}: {base}",
+                crate::locale::native_message(
+                    locale,
+                    crate::locale::NativeMessage::OnlyHttpSearxUrl
+                )
+            )
+        })?;
     let (hostport, prefix) = match rest.find('/') {
         Some(i) => (&rest[..i], rest[i..].to_string()),
         None => (rest, String::new()),
@@ -231,7 +240,7 @@ pub(crate) fn split_base(
         (host, &hostport[end..])
     };
     let port = if port_text.is_empty() {
-        80
+        default_port
     } else {
         port_text
             .strip_prefix(':')
@@ -250,6 +259,46 @@ pub(crate) fn split_base(
     Ok((host.to_string(), port, prefix))
 }
 
+/// Ranges that stay refused even with SEARXNG_ALLOW_REMOTE=1: IPv4
+/// link-local (169.254/16), carrier-grade NAT (100.64/10) and IPv6
+/// link-local (fe80::/10). They carry metadata and discovery surfaces,
+/// not user-operated search engines.
+pub(crate) fn is_restricted_host(host: &str) -> bool {
+    let h = host
+        .strip_prefix('[')
+        .and_then(|s| s.strip_suffix(']'))
+        .unwrap_or(host);
+    if let Ok(ip) = h.parse::<std::net::Ipv4Addr>() {
+        let o = ip.octets();
+        return o[0] == 169 && o[1] == 254 || o[0] == 100 && (o[1] & 0xC0) == 64;
+    }
+    if let Ok(ip) = h.parse::<std::net::Ipv6Addr>() {
+        return (ip.segments()[0] & 0xffc0) == 0xfe80;
+    }
+    // Hostnames are decided by the opt-in gate; only numeric probes are
+    // classified here.
+    false
+}
+
+/// Default-deny for non-loopback engines. SEARXNG_ALLOW_REMOTE=1 opts a
+/// host in after the config was written deliberately; link-local and
+/// shared-address ranges stay refused either way.
+fn ensure_base_allowed(host: &str, locale: crate::locale::Locale) -> anyhow::Result<()> {
+    if is_loopback_host(host) {
+        return Ok(());
+    }
+    anyhow::ensure!(
+        !is_restricted_host(host),
+        "{}: {host}",
+        crate::locale::native_message(locale, crate::locale::NativeMessage::RestrictedSearxHost)
+    );
+    anyhow::ensure!(
+        std::env::var("SEARXNG_ALLOW_REMOTE").ok().as_deref() == Some("1"),
+        "{}: {host}",
+        crate::locale::native_message(locale, crate::locale::NativeMessage::RemoteSearxDenied)
+    );
+    Ok(())
+}
 /// Loopback check for the SearXNG warning: 127/8, ::1 and localhost names.
 /// Bracketed IPv6 literals (as kept by split_base) are unwrapped first.
 pub(crate) fn is_loopback_host(host: &str) -> bool {
@@ -332,8 +381,26 @@ fn decode_entities(s: &str) -> String {
     out
 }
 
+/// Display form of the engine base: scheme plus host and port only. The
+/// path prefix can carry a private token (invite gateway deployments), so
+/// it never reaches logs, stderr or --json output.
+pub(crate) fn mask_base(base: &str) -> String {
+    let Some((scheme, rest)) = base.split_once("://") else {
+        return base.to_string();
+    };
+    match rest.find('/') {
+        Some(i) => format!("{scheme}://{}/…", &rest[..i]),
+        None => base.to_string(),
+    }
+}
+/// Drop C0/C1 control characters that survived decoding so a terminal
+/// escape in a result title cannot rewrite the lines printed above it.
+fn strip_control(s: &str) -> String {
+    s.chars().filter(|c| !c.is_control()).collect()
+}
+
 fn clean(s: &str) -> String {
-    decode_entities(&strip_tags(s))
+    strip_control(&decode_entities(&strip_tags(s)))
 }
 
 /// First `href` + link text inside an `<article>` block whose `class`
@@ -459,15 +526,16 @@ fn find_snippet(blk: &str) -> Option<String> {
 /// a SearXNG instance and says that installing rustxng gives rdsh a local
 /// engine it can start itself.
 fn unreachable_engine_message(base: &str, locale: crate::locale::Locale) -> String {
+    let d = mask_base(base);
     match locale {
         crate::locale::Locale::English => format!(
-            "cannot reach SearXNG at {base}; is it running? Set SEARXNG_URL or RUSTXNG_URL, or install the rustxng binary (RUSTXNG_BIN) so rdsh can start the local engine"
+            "cannot reach SearXNG at {d}; is it running? Set SEARXNG_URL or RUSTXNG_URL, or install the rustxng binary (RUSTXNG_BIN) so rdsh can start the local engine"
         ),
         crate::locale::Locale::Chinese => format!(
-            "无法连接 {base} 的 SearXNG；它是否正在运行？请设置 SEARXNG_URL 或 RUSTXNG_URL，或安装 rustxng（RUSTXNG_BIN）以便 rdsh 启动本地引擎"
+            "无法连接 {d} 的 SearXNG；它是否正在运行？请设置 SEARXNG_URL 或 RUSTXNG_URL，或安装 rustxng（RUSTXNG_BIN）以便 rdsh 启动本地引擎"
         ),
         crate::locale::Locale::Japanese => format!(
-            "{base} の SearXNG に接続できません。起動していますか？SEARXNG_URL か RUSTXNG_URL を設定するか、rustxng（RUSTXNG_BIN）を導入すると rdsh がローカルエンジンを起動できます"
+            "{d} の SearXNG に接続できません。起動していますか？SEARXNG_URL か RUSTXNG_URL を設定するか、rustxng（RUSTXNG_BIN）を導入すると rdsh がローカルエンジンを起動できます"
         ),
     }
 }
@@ -481,14 +549,27 @@ fn fetch_with(
     use std::io::{Read, Write};
     use std::net::ToSocketAddrs;
     let (host, port, prefix) = split_base(base, locale)?;
+    ensure_base_allowed(&host, locale)?;
     if !is_loopback_host(&host) {
-        // Plain-http to a non-loopback host is observable on the network.
-        // Advisory only: remote instances stay usable via an SSH tunnel.
-        eprintln!("[rdsh] warning: SearXNG host {host} is not loopback; prefer an SSH tunnel to localhost");
+        // The remote host was explicitly opted in; discourage plaintext.
+        eprintln!("[rdsh] warning: SearXNG host {host} is not loopback; prefer https or an SSH tunnel to localhost");
     }
     let mut target = format!("{prefix}/search?q={}", encode_query(query));
     if format == Format::Json {
         target.push_str("&format=json");
+    }
+    let accept = if format == Format::Json {
+        "application/json"
+    } else {
+        "text/html"
+    };
+    if base.starts_with("https://") {
+        let body = https_request(base, &target, accept, locale)?;
+        if format == Format::Json {
+            return parse_json(&body, 50);
+        }
+        ensure_results_page(&body, base, locale)?;
+        return Ok(parse_html(&body, 50));
     }
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
     let mut stream = None;
@@ -511,11 +592,6 @@ fn fetch_with(
         host.clone()
     } else {
         format!("{host}:{port}")
-    };
-    let accept = if format == Format::Json {
-        "application/json"
-    } else {
-        "text/html"
     };
     let request = format!("GET {target} HTTP/1.0\r\nHost: {host_header}\r\nUser-Agent: {ua}\r\nAccept: {accept}\r\nConnection: close\r\n\r\n");
     let mut pending = request.as_bytes();
@@ -581,29 +657,32 @@ fn fetch_with(
         })
         .ok_or_else(|| {
             anyhow::anyhow!(
-                "{} {base}",
+                "{} {}",
                 crate::locale::native_message(
                     locale,
                     crate::locale::NativeMessage::BadSearxResponse
-                )
+                ),
+                mask_base(base)
             )
         })?;
     if !(200..300).contains(&status) {
         anyhow::bail!(
-            "{} {status} {} {base}",
+            "{} {status} {} {}",
             crate::locale::native_message(locale, crate::locale::NativeMessage::SearxReturnedHttp),
             match locale {
                 crate::locale::Locale::English => "from",
                 crate::locale::Locale::Chinese => "，来源",
                 crate::locale::Locale::Japanese => "、送信元",
-            }
+            },
+            mask_base(base)
         );
     }
     let body = match text.find("\r\n\r\n") {
         Some(i) => &text[i + 4..],
         None => anyhow::bail!(
-            "{} {base}",
-            crate::locale::native_message(locale, crate::locale::NativeMessage::BadSearxResponse)
+            "{} {}",
+            crate::locale::native_message(locale, crate::locale::NativeMessage::BadSearxResponse),
+            mask_base(base)
         ),
     };
     if format == Format::Json {
@@ -613,6 +692,60 @@ fn fetch_with(
     Ok(parse_html(body, 50))
 }
 
+/// HTTPS transport for https:// bases: reqwest over rustls with the same
+/// 15s budget and the same localized message set as the plain-http path.
+fn https_request(
+    base: &str,
+    target: &str,
+    accept: &str,
+    locale: crate::locale::Locale,
+) -> anyhow::Result<String> {
+    let url = format!("{}{}", base.trim_end_matches('/'), target);
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|error| anyhow::anyhow!("the HTTPS runtime failed to start: {error}"))?;
+    runtime.block_on(async {
+        let client = reqwest::Client::builder()
+            .user_agent(format!("rdsh/{}", env!("CARGO_PKG_VERSION")))
+            .connect_timeout(std::time::Duration::from_secs(15))
+            .timeout(std::time::Duration::from_secs(15))
+            .build()
+            .map_err(|error| anyhow::anyhow!("the HTTPS client failed to build: {error}"))?;
+        let response = client
+            .get(&url)
+            .header("Accept", accept)
+            .send()
+            .await
+            .map_err(|_| anyhow::anyhow!("{}", unreachable_engine_message(base, locale)))?;
+        let status = response.status();
+        if !(200..300).contains(&status.as_u16()) {
+            anyhow::bail!(
+                "{} {status} {} {}",
+                crate::locale::native_message(
+                    locale,
+                    crate::locale::NativeMessage::SearxReturnedHttp
+                ),
+                match locale {
+                    crate::locale::Locale::English => "from",
+                    crate::locale::Locale::Chinese => "，来源",
+                    crate::locale::Locale::Japanese => "、送信元",
+                },
+                mask_base(base)
+            );
+        }
+        response.text().await.map_err(|_| {
+            anyhow::anyhow!(
+                "{} {}",
+                crate::locale::native_message(
+                    locale,
+                    crate::locale::NativeMessage::BadSearxResponse
+                ),
+                mask_base(base)
+            )
+        })
+    })
+}
 /// HTML search client used by the stub tests.
 #[cfg(test)]
 fn fetch(base: &str, query: &str, locale: crate::locale::Locale) -> anyhow::Result<Vec<Hit>> {
@@ -629,8 +762,9 @@ fn ensure_results_page(
         return Ok(());
     }
     anyhow::bail!(
-        "{} {base}{}",
+        "{} {}{}",
         crate::locale::native_message(locale, crate::locale::NativeMessage::NoSearxResultsPage),
+        mask_base(base),
         match locale {
             crate::locale::Locale::English => " (is SEARXNG_URL right?)",
             crate::locale::Locale::Chinese => "（SEARXNG_URL 是否正确？）",
@@ -709,7 +843,7 @@ pub fn cmd_search_web(
             "{}",
             serde_json::json!({
                 "query": query,
-                "engine": base,
+                "engine": mask_base(&base),
                 "results": shown
                     .iter()
                     .map(|r| {
@@ -735,13 +869,14 @@ pub fn cmd_search_web(
         }
     }
     let _ = out.flush();
+    let d = mask_base(&base);
     match locale {
-        crate::locale::Locale::English => eprintln!("[rdsh] {} web hit(s) via {base}", shown.len()),
+        crate::locale::Locale::English => eprintln!("[rdsh] {} web hit(s) via {d}", shown.len()),
         crate::locale::Locale::Chinese => {
-            eprintln!("[rdsh] {} 个网页匹配，来源 {base}", shown.len())
+            eprintln!("[rdsh] {} 个网页匹配，来源 {d}", shown.len())
         }
         crate::locale::Locale::Japanese => {
-            eprintln!("[rdsh] {} 件のWeb一致、経由 {base}", shown.len())
+            eprintln!("[rdsh] {} 件のWeb一致、経由 {d}", shown.len())
         }
     }
     Ok(())
@@ -751,6 +886,66 @@ pub fn cmd_search_web(
 mod tests {
     use super::*;
 
+    #[test]
+    fn split_base_accepts_https_and_per_scheme_default_ports() {
+        let (host, port, prefix) = split_base(
+            "https://gw.example:8443/proxy/tok",
+            crate::locale::Locale::English,
+        )
+        .unwrap();
+        assert_eq!(
+            (host.as_str(), port, prefix.as_str()),
+            ("gw.example", 8443, "/proxy/tok")
+        );
+        let (_, port, _) =
+            split_base("https://gw.example", crate::locale::Locale::English).unwrap();
+        assert_eq!(port, 443);
+        assert!(split_base("ftp://gw.example", crate::locale::Locale::English).is_err());
+    }
+
+    #[test]
+    fn restricted_hosts_are_rejected_even_with_the_remote_opt_in() {
+        for host in ["169.254.169.254", "100.100.100.100", "fe80::1"] {
+            assert!(is_restricted_host(host), "{host} must be restricted");
+        }
+        assert!(!is_restricted_host("192.168.1.10"));
+        assert!(!is_restricted_host("gw.example"));
+    }
+
+    #[test]
+    fn remote_hosts_need_the_explicit_opt_in_and_loopback_passes() {
+        std::env::remove_var("SEARXNG_ALLOW_REMOTE");
+        let error = ensure_base_allowed("gw.example", crate::locale::Locale::English)
+            .expect_err("remote host must fail without opt-in");
+        assert!(
+            error.to_string().contains("SEARXNG_ALLOW_REMOTE"),
+            "{error}"
+        );
+        std::env::set_var("SEARXNG_ALLOW_REMOTE", "1");
+        ensure_base_allowed("gw.example", crate::locale::Locale::English).unwrap();
+        ensure_base_allowed("127.0.0.1", crate::locale::Locale::English).unwrap();
+        ensure_base_allowed("localhost", crate::locale::Locale::English).unwrap();
+        std::env::remove_var("SEARXNG_ALLOW_REMOTE");
+    }
+
+    #[test]
+    fn mask_base_hides_the_path_prefix_only() {
+        assert_eq!(
+            mask_base("http://gw.example/proxy/secret"),
+            "http://gw.example/…"
+        );
+        assert_eq!(
+            mask_base("https://[::1]:8443/gw/tok"),
+            "https://[::1]:8443/…"
+        );
+        assert_eq!(mask_base("http://127.0.0.1:8888"), "http://127.0.0.1:8888");
+    }
+
+    #[test]
+    fn control_characters_are_stripped_from_decoded_results() {
+        assert_eq!(clean("ok&#27;[1A&#27;[2Kdone"), "ok[1A[2Kdone");
+        assert_eq!(strip_control("a[0mb"), "a[0mb");
+    }
     // 0 件でも正しい SearXNG インスタンスなら成功扱いにする（設定ミスと誤診しない）。
     #[test]
     fn empty_searxng_page_is_not_a_configuration_error() {
@@ -1003,7 +1198,11 @@ mod tests {
             split_base("http://h/searx", crate::locale::Locale::English).unwrap(),
             ("h".to_string(), 80, "/searx".to_string())
         );
-        assert!(split_base("https://h/", crate::locale::Locale::English).is_err());
+        // https:// is accepted now; the default port is 443.
+        assert_eq!(
+            split_base("https://h/", crate::locale::Locale::English).unwrap(),
+            ("h".to_string(), 443, "/".to_string())
+        );
         assert_eq!(
             split_base("http://[::1]/searx", crate::locale::Locale::English).unwrap(),
             ("[::1]".to_string(), 80, "/searx".to_string())
