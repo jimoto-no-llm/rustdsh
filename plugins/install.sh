@@ -73,7 +73,7 @@ Essential plugins (always installed, listed first)
   rdsh-answer-guard                         restate reasoning-only replies as text
   rdsh-update-banner                        Web release banner (PROFILE=web only)
   rdsh-no-feedback                          disable the DSH Like/Dislike and /feedback
-                                            surface (added only when features.feedback=false)
+                                            surface (added unless features.feedback=true)
 
 Recommended plugins (optional; choose with --recommended)
   * = starter set, on by default for PROFILE=web and PROFILE=desktop
@@ -236,9 +236,10 @@ gitview_feature_allowed() {
   ' "$settings" 2>/dev/null
 }
 # `feedback` is the one switch that adds a bundle instead of vetoing one: the
-# DSH feedback surface is on by default upstream, so turning it off means
-# installing the patch-carrying `rdsh-no-feedback` bundle. Only an explicit
-# `false` opts in; an absent id or unreadable file keeps the stock behavior.
+# DSH feedback surface is on by default upstream, so rdsh turns it off by
+# default (features.feedback default false): rdsh-specific issues must not
+# reach the DSH upstream. An explicit `features.feedback=true` keeps the
+# stock surface; an absent id or unreadable file takes the OFF default.
 feedback_feature_off() {
   command -v node >/dev/null 2>&1 || return 1
   settings="${DSH_HOME:-${HOME:-}/.dsh}/rdsh.json"
@@ -246,7 +247,7 @@ feedback_feature_off() {
     const fs = require("node:fs");
     try {
       const doc = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-      process.exit(doc && doc.features && doc.features.feedback === false ? 0 : 1);
+      process.exit(doc && doc.features && doc.features.feedback === true ? 1 : 0);
     } catch { process.exit(1); }
   ' "$settings" 2>/dev/null
 }
@@ -271,8 +272,9 @@ ESSENTIAL_BUNDLED="rdsh-settings rdsh-mobile-ui rdsh-answer-guard"
 if [ "$PROFILE" = "web" ]; then
   ESSENTIAL_BUNDLED="$ESSENTIAL_BUNDLED rdsh-update-banner"
 fi
-# Only an explicit features.feedback=false adds this bundle; the check runs
-# before the profile branches so desktop and headless get the same behavior.
+# The OFF default adds this bundle unless features.feedback is explicitly
+# true; the check runs before the profile branches so desktop and headless
+# get the same behavior.
 if feedback_feature_off; then
   ESSENTIAL_BUNDLED="$ESSENTIAL_BUNDLED rdsh-no-feedback"
 fi

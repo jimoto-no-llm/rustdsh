@@ -125,7 +125,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           # Pinned together with nfpm: nfpm v2.48.0 declares go 1.26.4.
           go-version: '1.26.9'

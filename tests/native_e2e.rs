@@ -39,7 +39,10 @@ impl Fixture {
             .env("XDG_CACHE_HOME", self.0.join("cache"))
             .env("XDG_DATA_HOME", self.0.join("data"))
             .env("XDG_CONFIG_HOME", self.0.join("config"))
-            .env("RDSH_ORIG_BIN", self.0.join("no-original-dsh"));
+            .env("RDSH_ORIG_BIN", self.0.join("no-original-dsh"))
+            // Search tests pin their own fixture engine; a hermetic run must
+            // never download the sidecar through the on-demand installer.
+            .env("RUSTXNG_SKIP_INSTALL", "1");
         cmd
     }
     fn run(&self, args: &[&str], input: &[u8]) -> Output {
@@ -1172,6 +1175,8 @@ fn cli_tokens_prune_compact_search_logs_guard_and_settings_work_together() {
 #[test]
 fn web_search_gate_and_real_http_results_and_failure() {
     let f = Fixture::new();
+    // search-web は既定ON。ゲートの確認は明示的な opt-out で行う。
+    f.settings(json!({"features":{"search-web":false}}));
     assert!(!f.run(&["search-web", "hello"], b"").status.success());
     for status in [200, 503] {
         let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();

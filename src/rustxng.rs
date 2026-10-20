@@ -11,6 +11,7 @@
 //!   RUSTXNG_URL       use the instance already running there (never spawns)
 //!   RUSTXNG_PORT      port for the sidecar this module starts
 //!   RUSTXNG_SETTINGS  settings file passed as --config when it is a real file
+//!   RUSTXNG_SKIP_INSTALL  set to 1 to stop ensure() auto-installing the sidecar
 //!
 //! State lives in $DSH_HOME (see [state_file](state_file)); nothing outside
 //! $DSH_HOME, ~/.config or /tmp is written.
@@ -325,7 +326,15 @@ pub fn ensure() -> Result<String, Error> {
         }
     }
 
-    let binary = binary().ok_or(Error::BinNotFound)?;
+    let binary = match binary() {
+        Some(binary) => binary,
+        // Not installed here: provision the sidecar once (opt-out with
+        // RUSTXNG_SKIP_INSTALL=1), then fall back to the historic error.
+        None => match self_install() {
+            Ok(Some(path)) => path,
+            _ => return Err(Error::BinNotFound),
+        },
+    };
     // Reuse the recorded port while it is still free; otherwise try once per
     // fresh port. A collision between free_port() and the engine's bind is a
     // normal race on a busy host, not a reason to give up.
@@ -680,6 +689,257 @@ pub fn cmd_stop(locale: crate::locale::Locale) -> Result<()> {
             (crate::locale::Locale::Japanese, false) => {
                 "稼働中の rustxng インスタンスはありませんでした"
             }
+        }
+    );
+    Ok(())
+}
+
+/// GitHub repository that publishes the rustxng release binaries. rustxng
+/// stays a separate AGPL-3.0 program: this downloads a release asset only.
+/// Its source is never vendored or linked (see the module docs above).
+const INSTALL_REPO: &str = "sahenjp/RustXNG";
+/// How long one installer step (API call or asset download) may take.
+const INSTALL_TIMEOUT: Duration = Duration::from_secs(300);
+
+/// The release asset suffix that matches the running host. An unknown host
+/// yields a placeholder no asset matches, so the error can list what exists.
+pub(crate) fn target_triple() -> &'static str {
+    if cfg!(target_os = "linux") {
+        if cfg!(target_arch = "x86_64") {
+            "x86_64-unknown-linux-gnu"
+        } else if cfg!(target_arch = "aarch64") {
+            "aarch64-unknown-linux-gnu"
+        } else {
+            "unknown-linux-generic"
+        }
+    } else if cfg!(target_os = "macos") {
+        if cfg!(target_arch = "aarch64") {
+            "aarch64-apple-darwin"
+        } else {
+            "x86_64-apple-darwin"
+        }
+    } else if cfg!(all(target_os = "windows", target_arch = "x86_64")) {
+        "x86_64-pc-windows-msvc"
+    } else {
+        "unknown"
+    }
+}
+
+/// One downloadable file of the latest release, as the installer needs it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ReleaseAsset {
+    pub name: String,
+    pub url: String,
+}
+
+/// Extract `(name, browser_download_url)` pairs from the GitHub
+/// /releases/latest payload. Unknown fields are ignored on purpose so a
+/// release-side rename never breaks the parse.
+pub(crate) fn parse_latest_assets(json: &str) -> Vec<ReleaseAsset> {
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(json) else {
+        return Vec::new();
+    };
+    value
+        .get("assets")
+        .and_then(serde_json::Value::as_array)
+        .map(|assets| {
+            assets
+                .iter()
+                .filter_map(|asset| {
+                    let name = asset.get("name")?.as_str()?.to_string();
+                    let url = asset.get("browser_download_url")?.as_str()?.to_string();
+                    Some(ReleaseAsset { name, url })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Asset contract: `rustxng-<tag>-<triple>` plus a Windows `.exe` suffix. The
+/// tag is part of the name, so a `rustxng-v…-` prefix and the triple suffix
+/// are the whole check.
+fn matches_triple(name: &str, triple: &str) -> bool {
+    let Some(rest) = name.strip_prefix("rustxng-") else {
+        return false;
+    };
+    // Windows assets carry an .exe suffix after the triple; strip it before
+    // matching so one rule covers every platform.
+    let base = rest.strip_suffix(".exe").unwrap_or(rest);
+    match base.strip_suffix(triple) {
+        Some(tag) => tag.starts_with('v') && tag.ends_with('-'),
+        None => false,
+    }
+}
+
+fn choose_asset<'a>(assets: &'a [ReleaseAsset], triple: &str) -> Option<&'a ReleaseAsset> {
+    assets
+        .iter()
+        .find(|asset| matches_triple(&asset.name, triple))
+}
+
+/// The bytes must look like a real executable, not an HTML error page.
+fn looks_like_executable(bytes: &[u8]) -> bool {
+    bytes.starts_with(b"\x7fELF")
+        || bytes.starts_with(b"MZ")
+        || bytes.starts_with(b"\xcf\xfa\xed\xfe")
+        || bytes.starts_with(b"\xca\xfe\xba\xbe")
+}
+
+/// Install destination: ~/.local/bin/rustxng(.exe) — the first fallback dir
+/// the resolver already checks, so no extra lookup rule is introduced.
+fn install_path(home: &Path) -> PathBuf {
+    fallback_dirs(Some(home))[0].join(exe_name(BIN_NAME))
+}
+
+fn install_failed(locale: crate::locale::Locale, detail: &str) -> anyhow::Error {
+    anyhow::anyhow!(
+        "{}",
+        match locale {
+            crate::locale::Locale::English => format!("rustxng install failed: {detail}"),
+            crate::locale::Locale::Chinese => format!("rustxng 安装失败：{detail}"),
+            crate::locale::Locale::Japanese =>
+                format!("rustxng のインストールに失敗しました: {detail}"),
+        }
+    )
+}
+
+/// Download the latest release and place it at `dest` (atomic replace).
+async fn download_sidecar(dest: &Path, locale: crate::locale::Locale) -> Result<()> {
+    let client = reqwest::Client::builder()
+        .user_agent(format!("rdsh/{}", env!("CARGO_PKG_VERSION")))
+        .connect_timeout(Duration::from_secs(30))
+        .timeout(INSTALL_TIMEOUT)
+        .build()?;
+    let api = format!("https://api.github.com/repos/{INSTALL_REPO}/releases/latest");
+    let body = client
+        .get(&api)
+        .send()
+        .await?
+        .error_for_status()?
+        .text()
+        .await?;
+    let assets = parse_latest_assets(&body);
+    let triple = target_triple();
+    let asset = choose_asset(&assets, triple).ok_or_else(|| {
+        let names = assets
+            .iter()
+            .map(|a| a.name.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        install_failed(
+            locale,
+            &format!("no release asset matches {triple}; the release has: {names}"),
+        )
+    })?;
+    let bytes = client
+        .get(&asset.url)
+        .send()
+        .await?
+        .error_for_status()?
+        .bytes()
+        .await?;
+    anyhow::ensure!(
+        !bytes.is_empty() && looks_like_executable(&bytes),
+        "{}",
+        install_failed(
+            locale,
+            &format!("{} did not download as an executable", asset.name)
+        )
+    );
+    if let Some(parent) = dest.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let partial = dest.with_extension("part");
+    std::fs::write(&partial, &bytes)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&partial, std::fs::Permissions::from_mode(0o755))?;
+    }
+    std::fs::rename(&partial, dest)?;
+    Ok(())
+}
+
+/// The sync entry point both the install command and the ensure() self-heal
+/// use. Returns the placed binary path.
+fn install_sidecar(dest: &Path, locale: crate::locale::Locale) -> Result<PathBuf> {
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?
+        .block_on(download_sidecar(dest, locale))?;
+    Ok(dest.to_path_buf())
+}
+
+/// One-shot on-demand provisioning for ensure(): when no binary is found,
+/// install the latest release unless the operator opted out with
+/// RUSTXNG_SKIP_INSTALL=1. Ok(None) keeps the historic not-found error.
+fn self_install() -> Result<Option<PathBuf>, Error> {
+    if std::env::var("RUSTXNG_SKIP_INSTALL")
+        .ok()
+        .is_some_and(|v| v == "1")
+    {
+        return Ok(None);
+    }
+    #[cfg(test)]
+    {
+        // Unit tests must never reach the network; the on-demand install is
+        // production-only behavior, so tests always take the not-found path.
+        let _ = &BIN_MODE;
+        return Ok(None);
+    }
+    let dest = match home_dir() {
+        Some(home) => install_path(&home),
+        None => return Ok(None),
+    };
+    eprintln!(
+        "rustxng sidecar is missing; installing the latest release into {}…",
+        dest.display()
+    );
+    match install_sidecar(&dest, crate::locale::Locale::English) {
+        Ok(path) => {
+            eprintln!("rustxng sidecar installed at {}", path.display());
+            Ok(Some(path))
+        }
+        Err(error) => Err(Error::Spawn(format!("auto-install failed: {error:#}"))),
+    }
+}
+
+/// `rdsh rustxng install`: place the latest release binary in ~/.local/bin.
+/// Idempotent: an already-resolvable binary wins and nothing is downloaded.
+pub fn cmd_install(locale: crate::locale::Locale) -> Result<()> {
+    if let Some(path) = binary() {
+        println!(
+            "{}",
+            match locale {
+                crate::locale::Locale::English =>
+                    format!("rustxng is already installed at {}", path.display()),
+                crate::locale::Locale::Chinese => format!("rustxng 已安装：{}", path.display()),
+                crate::locale::Locale::Japanese =>
+                    format!("rustxng は導入済みです: {}", path.display()),
+            }
+        );
+        return Ok(());
+    }
+    let Some(home) = home_dir() else {
+        return Err(install_failed(locale, "no home directory"));
+    };
+    let dest = install_path(&home);
+    let path = install_sidecar(&dest, locale)?;
+    println!(
+        "{}",
+        match locale {
+            crate::locale::Locale::English => format!(
+                "rustxng installed at {}; start it with: rdsh rustxng start",
+                path.display()
+            ),
+            crate::locale::Locale::Chinese => format!(
+                "rustxng 已安装到 {}；启动：rdsh rustxng start",
+                path.display()
+            ),
+            crate::locale::Locale::Japanese => format!(
+                "rustxng を {} へ導入しました。起動: rdsh rustxng start",
+                path.display()
+            ),
         }
     );
     Ok(())
@@ -1447,4 +1707,67 @@ fn main() {
     }
 }
 "#;
+}
+
+#[cfg(test)]
+mod install_tests {
+    use super::*;
+
+    #[test]
+    fn parses_latest_release_assets() {
+        let json = r#"{
+            "tag_name": "v0.2.0",
+            "assets": [
+                {"name": "SOURCE.tar.gz", "browser_download_url": "https://example/SOURCE.tar.gz"},
+                {"name": "rustxng-v0.2.0-x86_64-unknown-linux-gnu",
+                 "browser_download_url": "https://example/rustxng-linux"},
+                {"name": "rustxng-v0.2.0-x86_64-pc-windows-msvc.exe",
+                 "browser_download_url": "https://example/rustxng-win.exe"}
+            ]
+        }"#;
+        let assets = parse_latest_assets(json);
+        assert_eq!(assets.len(), 3);
+        match target_triple() {
+            "x86_64-unknown-linux-gnu" => {
+                let picked = choose_asset(&assets, target_triple()).unwrap();
+                assert_eq!(picked.name, "rustxng-v0.2.0-x86_64-unknown-linux-gnu");
+                assert_eq!(picked.url, "https://example/rustxng-linux");
+            }
+            "x86_64-pc-windows-msvc" => {
+                let picked = choose_asset(&assets, target_triple()).unwrap();
+                assert_eq!(picked.name, "rustxng-v0.2.0-x86_64-pc-windows-msvc.exe");
+            }
+            other => {
+                assert!(choose_asset(&assets, other).is_none());
+            }
+        }
+    }
+
+    #[test]
+    fn asset_contract_requires_tag_prefix() {
+        assert!(matches_triple(
+            "rustxng-v0.2.0-x86_64-unknown-linux-gnu",
+            "x86_64-unknown-linux-gnu"
+        ));
+        // A LOOKS-like name without the version tag is not ours.
+        assert!(!matches_triple(
+            "rustxng-x86_64-unknown-linux-gnu",
+            "x86_64-unknown-linux-gnu"
+        ));
+        // Different triple never matches.
+        assert!(!matches_triple(
+            "rustxng-v0.2.0-aarch64-apple-darwin",
+            "x86_64-unknown-linux-gnu"
+        ));
+        assert!(parse_latest_assets("not json").is_empty());
+    }
+
+    #[test]
+    fn windows_assets_use_exe_suffix() {
+        let name = "rustxng-v0.2.0-x86_64-pc-windows-msvc.exe";
+        assert!(matches_triple(name, "x86_64-pc-windows-msvc"));
+        assert!(!looks_like_executable(b"<html>rate limited</html>"));
+        assert!(looks_like_executable(b"ELFpayload"));
+        assert!(looks_like_executable(b"MZpayload"));
+    }
 }
