@@ -230,6 +230,7 @@ window.__ModuleLoader__.load({
       ".rdsh-settings{color:var(--dsw-alias-label-primary)}",
       ".rdsh-settings *{box-sizing:border-box}",
       ".rdsh-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;align-items:start}",
+      ".rdsh-grid-2>.rdsh-grid-field{flex:1 1 240px;min-width:0}",
       ".rdsh-card{min-width:0}",
       ".rdsh-group-toggle:hover{background:var(--dsw-alias-interactive-bg-hover)}",
       ".rdsh-group-toggle:hover .rdsh-caret{color:var(--dsw-alias-label-secondary)}",
@@ -253,11 +254,12 @@ window.__ModuleLoader__.load({
       ".rdsh-msg{font-size:12px;color:var(--dsw-alias-label-secondary)}",
       ".rdsh-settings [aria-invalid=true]{border-color:var(--dsw-alias-state-error)}",
     ].join("");
+    // 2列のフォーム。入力欄が0幅に潰れないよう、幅が足りないカードでは
+    // 1列へ折り返す (折り返し判定は .rdsh-grid-2 側のCSSで行う)。
     const grid2 = {
-      display: "grid",
-      gridTemplateColumns: "1fr 1fr",
+      display: "flex",
+      flexWrap: "wrap",
       gap: "10px 12px",
-      alignItems: "end",
     };
     // 読みやすさを優先する2列のフォーム (ラベル + 入力)。
     const gridField = {
@@ -265,6 +267,7 @@ window.__ModuleLoader__.load({
       gridTemplateColumns: "minmax(84px, 140px) minmax(0, 1fr)",
       alignItems: "center",
       gap: "4px 10px",
+      minWidth: 0,
       fontSize: "12px",
       fontWeight: 600,
       color: "var(--dsw-alias-label-secondary)",
