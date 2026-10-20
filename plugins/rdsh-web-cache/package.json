@@ -1,0 +1,19 @@
+{
+  "name": "rdsh-web-cache",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Cache headers for the DSH web shell assets (rdsh web performance)",
+  "exports": {
+    ".": "./index.js"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "meta": {
+    "title": "rdsh Web キャッシュヘッダ",
+    "description": "ハッシュ付きの Web シェル資産に Cache-Control: immutable を付与し、再訪問時の再転送をなくします。応答本文は変更しません。"
+  }
+}
