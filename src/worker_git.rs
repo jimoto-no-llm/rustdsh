@@ -1241,9 +1241,9 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn command_timeout_kills_the_child() {
-        let mut command = Command::new("sh");
+        let mut command = Command::new("/bin/sh");
         command
-            .args(["-c", "exec sleep 5"])
+            .args(["-c", "exec /bin/sleep 5"])
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
         let start = Instant::now();
@@ -1255,9 +1255,9 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn command_timeout_kills_descendants_that_hold_pipes_open() {
-        let mut command = Command::new("sh");
+        let mut command = Command::new("/bin/sh");
         command
-            .args(["-c", "sleep 3 & wait"])
+            .args(["-c", "/bin/sleep 3 & wait"])
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
         let start = Instant::now();
@@ -1269,9 +1269,9 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn command_exit_does_not_wait_for_descendants_that_hold_pipes_open() {
-        let mut command = Command::new("sh");
+        let mut command = Command::new("/bin/sh");
         command
-            .args(["-c", "sleep 3 & exit 0"])
+            .args(["-c", "/bin/sleep 3 & exit 0"])
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
         let start = Instant::now();

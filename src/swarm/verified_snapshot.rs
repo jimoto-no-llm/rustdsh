@@ -106,7 +106,8 @@ mod tests {
         let fixture = Fixture(root);
         std::fs::create_dir(&fixture.0).unwrap();
         let source_path = fixture.0.join("source");
-        std::fs::copy("/bin/sh", &source_path).unwrap();
+        std::fs::write(&source_path, b"#!/bin/sh\nexit 73\n").unwrap();
+        std::fs::set_permissions(&source_path, std::fs::Permissions::from_mode(0o700)).unwrap();
         let mut source = File::open(&source_path).unwrap();
         let digest = file_digest(&mut source).unwrap();
         let cache = fixture.0.join("cache");

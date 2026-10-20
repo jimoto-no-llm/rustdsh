@@ -884,23 +884,25 @@ fn self_install() -> Result<Option<PathBuf>, Error> {
     {
         // Unit tests must never reach the network; the on-demand install is
         // production-only behavior, so tests always take the not-found path.
-        let _ = &BIN_MODE;
-        return Ok(None);
+        Ok(None)
     }
-    let dest = match home_dir() {
-        Some(home) => install_path(&home),
-        None => return Ok(None),
-    };
-    eprintln!(
-        "rustxng sidecar is missing; installing the latest release into {}…",
-        dest.display()
-    );
-    match install_sidecar(&dest, crate::locale::Locale::English) {
-        Ok(path) => {
-            eprintln!("rustxng sidecar installed at {}", path.display());
-            Ok(Some(path))
+    #[cfg(not(test))]
+    {
+        let dest = match home_dir() {
+            Some(home) => install_path(&home),
+            None => return Ok(None),
+        };
+        eprintln!(
+            "rustxng sidecar is missing; installing the latest release into {}…",
+            dest.display()
+        );
+        match install_sidecar(&dest, crate::locale::Locale::English) {
+            Ok(path) => {
+                eprintln!("rustxng sidecar installed at {}", path.display());
+                Ok(Some(path))
+            }
+            Err(error) => Err(Error::Spawn(format!("auto-install failed: {error:#}"))),
         }
-        Err(error) => Err(Error::Spawn(format!("auto-install failed: {error:#}"))),
     }
 }
 
@@ -1096,15 +1098,7 @@ fn decode_chunked(body: &str) -> String {
 pub(crate) mod tests {
     use super::*;
     use std::sync::atomic::{AtomicU64, Ordering};
-    use std::sync::{Mutex, MutexGuard, OnceLock};
-
-    // Reentrancy depth of env_lock on this thread, plus the parked guard.
-    std::thread_local! {
-        static DEPTH: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
-        /// The Mutex guard, parked while this thread holds the lock.
-        static HELD: std::cell::RefCell<Option<MutexGuard<'static, ()>>> =
-            const { std::cell::RefCell::new(None) };
-    }
+    use std::sync::OnceLock;
 
     /// Serialises the tests that touch the process environment. Cargo runs test
     /// functions on parallel threads, so an unguarded set_var could redirect a
@@ -1112,21 +1106,8 @@ pub(crate) mod tests {
     ///
     /// Reentrant on purpose: some tests hold it and then call code ([ensure])
     /// that takes it again, and a plain Mutex would deadlock there.
-    pub(crate) fn env_lock() -> EnvLock {
-        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-        let depth = DEPTH.with(|d| {
-            let depth = d.get() + 1;
-            d.set(depth);
-            depth
-        });
-        if depth == 1 {
-            let guard = LOCK
-                .get_or_init(|| Mutex::new(()))
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner());
-            HELD.with(|held| *held.borrow_mut() = Some(guard));
-        }
-        EnvLock
+    pub(crate) fn env_lock() -> crate::test_support::EnvLock {
+        crate::test_support::env_lock()
     }
 
     /// Pins the binary lookup for one test: None means "not found anywhere",
@@ -1162,23 +1143,6 @@ pub(crate) mod tests {
                 None => std::env::remove_var("RUSTXNG_BIN"),
             }
             BIN_MODE.store(self.previous_mode, Ordering::Relaxed);
-        }
-    }
-
-    /// Releases one [env_lock] level; the outermost level drops the guard, so
-    /// the Mutex is only ever held by the thread that last acquired it.
-    pub(crate) struct EnvLock;
-
-    impl Drop for EnvLock {
-        fn drop(&mut self) {
-            let depth = DEPTH.with(|d| {
-                let depth = d.get().saturating_sub(1);
-                d.set(depth);
-                depth
-            });
-            if depth == 0 {
-                let _guard = HELD.with(|held| held.borrow_mut().take());
-            }
         }
     }
 
@@ -1619,6 +1583,7 @@ pub(crate) mod tests {
     // RUSTXNG_SETTINGS names a real file.
     #[test]
     fn spawn_arguments_follow_the_documented_cli() {
+        let _lock = env_lock();
         let dir = test_dir("config");
         let config = dir.join("settings.yml");
         std::fs::write(&config, "search: {}\n").unwrap();

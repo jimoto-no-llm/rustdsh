@@ -33,7 +33,8 @@ impl Fixture {
             .current_dir(&self.0)
             .env("HOME", &self.0)
             .env("USERPROFILE", &self.0)
-            .env("DSH_HOME", self.0.join("dsh"));
+            .env("DSH_HOME", self.0.join("dsh"))
+            .env("RUSTXNG_SKIP_INSTALL", "1");
         command
     }
 
@@ -55,6 +56,7 @@ impl Fixture {
             .env("HOME", &self.0)
             .env("USERPROFILE", &self.0)
             .env("DSH_HOME", self.0.join("dsh"))
+            .env("RUSTXNG_SKIP_INSTALL", "1")
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
@@ -400,7 +402,7 @@ fn native_command_errors_keep_unicode_values_in_chinese_and_japanese() {
             "错误",
             "无法读取文件",
             "无法访问搜索目录",
-            "仅支持 http:// SearXNG URL",
+            "无效的 SearXNG 主机",
             "RDSH_SECURITY：此平台无法使用安全原生搜索",
         ),
         (
@@ -408,7 +410,7 @@ fn native_command_errors_keep_unicode_values_in_chinese_and_japanese() {
             "エラー",
             "ファイルを読み込めません",
             "検索ディレクトリにアクセスできません",
-            "http:// の SearXNG URL のみ対応です",
+            "無効な SearXNG ホスト",
             "RDSH_SECURITY: このプラットフォームでは安全なネイティブ検索を利用できません",
         ),
     ] {
@@ -416,7 +418,10 @@ fn native_command_errors_keep_unicode_values_in_chinese_and_japanese() {
             (vec!["tokens", missing], file_error),
             (vec!["prune", "--max-tokens", "8", missing], file_error),
             (vec!["compact", missing, "--max-tokens", "8"], file_error),
-            (vec!["search-web", "値_日本語"], web_error),
+            (
+                vec!["search-web", "--engine", "searxng", "値_日本語"],
+                web_error,
+            ),
         ];
         if cfg!(unix) {
             cases.push((vec!["search", "needle", "--dir", missing], directory_error));
@@ -429,12 +434,14 @@ fn native_command_errors_keep_unicode_values_in_chinese_and_japanese() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             assert!(stderr.contains(error_label), "{args:?}: {stderr}");
             assert!(stderr.contains(localized_error), "{args:?}: {stderr}");
-            let expected = if command[0] == "search-web" {
-                "https://例.invalid/検索"
+            if command[0] == "search-web" {
+                assert!(
+                    !stderr.contains("https://例.invalid/検索"),
+                    "{args:?}: configured URL path leaked into diagnostic: {stderr}"
+                );
             } else {
-                missing
-            };
-            assert!(stderr.contains(expected), "{args:?}: {stderr}");
+                assert!(stderr.contains(missing), "{args:?}: {stderr}");
+            }
         }
         if !cfg!(unix) {
             let output =
