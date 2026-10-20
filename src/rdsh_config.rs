@@ -161,6 +161,16 @@ pub const FEATURES: &[FeatureDef] = &[
         summary: "Node compile cache for delegated runs (Node >= 22.1)",
     },
     FeatureDef {
+        id: "web_gzip_level",
+        default: true,
+        summary: "raise the DSH web server gzip level for a smaller first load",
+    },
+    FeatureDef {
+        id: "web_assets",
+        default: true,
+        summary: "precompress web shell assets in Rust and serve them with immutable caching",
+    },
+    FeatureDef {
         id: "slim_lazy_plugins",
         default: true,
         summary: "ask DSH to load plugins lazily in slim mode",

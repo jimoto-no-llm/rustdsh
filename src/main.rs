@@ -25,6 +25,8 @@ mod token_handoff;
 mod tokens;
 mod tool_security;
 mod websearch;
+mod webui_assets;
+mod webui_gzip;
 mod workflow_patch;
 
 #[derive(Parser, Debug)]

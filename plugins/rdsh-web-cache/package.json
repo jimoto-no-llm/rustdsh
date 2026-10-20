@@ -1,0 +1,22 @@
+{
+  "name": "rdsh-web-cache",
+  "version": "0.2.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Serve precompressed DSH web shell assets and immutable cache headers (rdsh web performance)",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "exports": {
+    ".": "./index.js"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "meta": {
+    "title": "rdsh Web 事前圧縮配信",
+    "description": "RDSH_WEB_ASSETS が指すキャッシュがあれば /assets を br/gzip/identity 交渉・ETag/304 付きで配信します。無い場合は従来どおりハッシュ付き資産に Cache-Control: immutable を付与します。"
+  }
+}
