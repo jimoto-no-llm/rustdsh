@@ -402,6 +402,10 @@ fn feature_switches_list_defaults_and_round_trip_through_the_cli() {
         "{keys}"
     );
     assert!(
+        keys.contains("features.feedback(bool, default OFF)"),
+        "{keys}"
+    );
+    assert!(
         keys.contains("features.gitview(bool, default ON)"),
         "{keys}"
     );

@@ -179,8 +179,9 @@ pub const FEATURES: &[FeatureDef] = &[
     },
     FeatureDef {
         id: "feedback",
-        default: true,
-        summary: "allow the DSH Like/Dislike and /feedback surface (off installs rdsh-no-feedback)",
+        default: false,
+        summary:
+            "DSH Like/Dislike and /feedback surface (default OFF; off installs rdsh-no-feedback)",
     },
     FeatureDef {
         id: "agent_tool_sandbox",

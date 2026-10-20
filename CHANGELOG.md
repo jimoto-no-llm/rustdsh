@@ -21,6 +21,12 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
   `rdsh features off search-web` で明示的に行います。ローカル状態画面
   （serve）の既定OFFと、`extras.enable` の従来形式は変わっていません。
 
+- DSH の Like/Dislike と /feedback 画面（feedback 機能）を既定OFFにしました。
+  rdsh 固有の不具合が DSH 本家へ送られないようにするもので、既定では
+  `rdsh-no-feedback` バンドルを導入して無効化します。本体の画面へ戻す
+  ときは `rdsh features on feedback` を保存してからプラグインを導入し、
+  DSH を再起動してください。
+
 ## [0.9.2] - 2026-10-19
 
 ### Changed

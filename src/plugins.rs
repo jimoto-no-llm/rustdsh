@@ -1024,7 +1024,7 @@ mod tests {
         let headless = catalog
             .selection("headless", None, &RdshSettings::default())
             .unwrap();
-        assert_eq!(headless.len(), 10);
+        assert_eq!(headless.len(), 11);
         assert!(headless.iter().all(|entry| entry.essential));
     }
 
@@ -1068,21 +1068,23 @@ mod tests {
             packages(&catalog.essential_for_settings(profile, cfg))
         };
 
-        // Default (switch absent) and explicit on: the stock DSH surface stays,
-        // so nothing is provisioned for it.
-        for cfg in [
-            RdshSettings::default(),
-            settings_with_feature("feedback", true),
-        ] {
-            assert!(
-                !tier("web", &cfg)
-                    .iter()
-                    .any(|name| name == "rdsh-no-feedback"),
-                "features.feedback is not off, so no bundle should be added"
-            );
-        }
+        // Default (switch absent = OFF): the rdsh-no-feedback bundle is
+        // provisioned so rdsh-specific issues never reach the DSH upstream.
+        assert!(tier("web", &RdshSettings::default())
+            .iter()
+            .any(|name| name == "rdsh-no-feedback"));
 
-        // Explicit off: the bundle joins the essential tier on every profile.
+        // Explicit on is the only way to keep the stock DSH surface.
+        let on = settings_with_feature("feedback", true);
+        assert!(
+            !tier("web", &on)
+                .iter()
+                .any(|name| name == "rdsh-no-feedback"),
+            "explicit features.feedback=true keeps the stock surface"
+        );
+
+        // Explicit off provisions the bundle on every profile, same as the
+        // default.
         let off = settings_with_feature("feedback", false);
         assert!(tier("web", &off)
             .iter()
@@ -1212,13 +1214,17 @@ mod tests {
             Locale::English,
         )
         .unwrap();
-        // Seven upstream specs plus the one bundled package the checkout carries.
+        // Seven upstream specs plus the one bundled package the checkout
+        // carries; the feedback bundle joins the skipped list by default now.
         assert_eq!(targets.len(), 8);
         let skipped_packages: Vec<&str> = skipped
             .iter()
             .map(|(package, _)| package.as_str())
             .collect();
-        assert_eq!(skipped_packages, ["rdsh-mobile-ui", "rdsh-answer-guard"]);
+        assert_eq!(
+            skipped_packages,
+            ["rdsh-mobile-ui", "rdsh-answer-guard", "rdsh-no-feedback"]
+        );
         assert!(skipped.iter().all(|(_, why)| why.contains("not in")));
         let _ = std::fs::remove_dir_all(&temp);
     }

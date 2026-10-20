@@ -927,8 +927,12 @@ mod tests {
         // default path); pin HOME to the temp dir so the lookup stays empty.
         let saved = [
             std::env::var("HOME").ok().map(|v| ("HOME", Some(v))),
-            std::env::var("USERPROFILE").ok().map(|v| ("USERPROFILE", Some(v))),
-            std::env::var("RUSTXNG_BIN").ok().map(|v| ("RUSTXNG_BIN", Some(v))),
+            std::env::var("USERPROFILE")
+                .ok()
+                .map(|v| ("USERPROFILE", Some(v))),
+            std::env::var("RUSTXNG_BIN")
+                .ok()
+                .map(|v| ("RUSTXNG_BIN", Some(v))),
         ];
         std::env::set_var("HOME", &dir);
         std::env::set_var("USERPROFILE", &dir);
