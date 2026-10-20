@@ -18,6 +18,10 @@ struct AuditedAdapter {
     id: &'static str,
     dsh_version: &'static str,
     tools_version: &'static str,
+    /// SHA256 of the release tarball's lib/bin.js. A tree whose entry file
+    /// was swapped keeps a valid manifest here, so the entry content is
+    /// verified before any boundary work happens.
+    bin_sha256: &'static str,
 }
 
 const AUDITED_ADAPTERS: [AuditedAdapter; 3] = [
@@ -25,16 +29,19 @@ const AUDITED_ADAPTERS: [AuditedAdapter; 3] = [
         id: "dsh-tools-0.2.0-rc.2",
         dsh_version: "0.2.0-rc.2",
         tools_version: "0.2.0-rc.2",
+        bin_sha256: "1a03dee18683483ff6a1b27b2a1e650230da6bcca9a0f55f7d81b3308c3f307f",
     },
     AuditedAdapter {
         id: "dsh-tools-0.2.1-alpha.1",
         dsh_version: "0.2.1-alpha.1",
         tools_version: "0.2.1-alpha.1",
+        bin_sha256: "1a03dee18683483ff6a1b27b2a1e650230da6bcca9a0f55f7d81b3308c3f307f",
     },
     AuditedAdapter {
         id: "dsh-tools-0.2.1-alpha.3",
         dsh_version: "0.2.1-alpha.3",
         tools_version: "0.2.1-alpha.3",
+        bin_sha256: "80112efe368efb1a39720c7ada0af00442e5131fb2744edaaff8a3e8bb499e6f",
     },
 ];
 
@@ -173,6 +180,50 @@ fn read_tools_manifest(
     serde_json::from_slice(&bytes).with_context(|| message)
 }
 
+/// Lowercase hex SHA256 of a byte slice.
+fn sha256_hex(bytes: &[u8]) -> String {
+    use sha2::Digest as _;
+    sha2::Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+/// The audited pair is matched by manifest alone unless the entry file that
+/// Node actually runs is pinned too. A swapped lib/bin.js inside a copied
+/// tree keeps every manifest field, so the digest is checked before the
+/// boundary files are staged.
+fn verify_entry_digest(
+    executable: &Path,
+    expected_sha256: &str,
+    locale: crate::locale::Locale,
+) -> anyhow::Result<()> {
+    let bytes = std::fs::read(executable).map_err(|error| {
+        anyhow::anyhow!(match locale {
+            crate::locale::Locale::English =>
+                format!("RDSH_SECURITY[AUDIT_DIGEST]: cannot read the DSH entry file: {error}"),
+            crate::locale::Locale::Chinese =>
+                format!("RDSH_SECURITY[AUDIT_DIGEST]：无法读取 DSH 入口文件：{error}"),
+            crate::locale::Locale::Japanese => format!(
+                "RDSH_SECURITY[AUDIT_DIGEST]: DSHのエントリファイルを読み込めません: {error}"
+            ),
+        })
+    })?;
+    let actual = sha256_hex(&bytes);
+    anyhow::ensure!(
+        actual == expected_sha256,
+        "{}",
+        match locale {
+            crate::locale::Locale::English =>
+                "RDSH_SECURITY[AUDIT_DIGEST]: the DSH entry file does not match the audited digest; refusing to delegate",
+            crate::locale::Locale::Chinese =>
+                "RDSH_SECURITY[AUDIT_DIGEST]：DSH 入口文件与审计摘要不符；拒绝委派",
+            crate::locale::Locale::Japanese =>
+                "RDSH_SECURITY[AUDIT_DIGEST]: DSHのエントリファイルが監査済みダイジェストと一致しません。委譲を拒否します",
+        }
+    );
+    Ok(())
+}
 pub fn command(
     orig: &str,
     node: &str,
@@ -245,6 +296,7 @@ pub fn command(
             crate::locale::Locale::Japanese => "RDSH_SECURITY: DSHとツールランタイムのバージョン組み合わせに対応していません。監査済みの実行アダプターが必要です",
         })
     })?;
+    verify_entry_digest(&executable, adapter.bin_sha256, locale)?;
     let runtime = canonical_package_file(&tools_package, Path::new("lib/index.js"))?
         .filter(|path| path.is_file())
         .ok_or_else(|| {
@@ -279,7 +331,12 @@ pub fn command(
         .arg("--import")
         .arg(directory.join("preload.mjs"))
         .arg(executable);
-    command.env_remove("NODE_OPTIONS").env_remove("NODE_PATH");
+    command
+        .env_remove("NODE_OPTIONS")
+        .env_remove("NODE_PATH")
+        // A writable compile cache could substitute the machine code that
+        // runs even when the load-hook source digest still matches.
+        .env_remove("NODE_COMPILE_CACHE");
     command.env("RDSH_TOOL_RUNTIME", runtime);
     command.env("RDSH_TOOL_ADAPTER", adapter.id);
     command.env("RDSH_SECURITY_LANG", language_code(locale));
@@ -336,6 +393,49 @@ mod tests {
         root
     }
 
+    #[test]
+    fn sha256_hex_matches_the_known_vectors() {
+        assert_eq!(
+            sha256_hex(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+        assert_eq!(
+            sha256_hex(b""),
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+    }
+
+    #[test]
+    fn entry_digest_check_accepts_the_pinned_content_only() {
+        let root = temporary_directory("digest");
+        let entry = root.join("bin.js");
+        std::fs::write(&entry, b"// audited\n").unwrap();
+        let good = sha256_hex(b"// audited\n");
+        verify_entry_digest(&entry, &good, crate::locale::Locale::English).unwrap();
+        let error = verify_entry_digest(
+            &entry,
+            "0".repeat(64).as_str(),
+            crate::locale::Locale::English,
+        )
+        .expect_err("swapped entry must fail");
+        assert!(error.to_string().contains("AUDIT_DIGEST"), "{error}");
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn every_audited_adapter_pins_a_full_digest() {
+        for adapter in AUDITED_ADAPTERS {
+            assert_eq!(adapter.bin_sha256.len(), 64, "{}", adapter.id);
+            assert!(
+                adapter
+                    .bin_sha256
+                    .bytes()
+                    .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()),
+                "{}",
+                adapter.id
+            );
+        }
+    }
     #[test]
     fn boundary_is_opt_in() {
         configure(false);
@@ -490,6 +590,12 @@ mod tests {
             assert_eq!(
                 environment.get(std::ffi::OsStr::new("RDSH_SECURITY_LANG")),
                 Some(&std::ffi::OsStr::new("ja"))
+            );
+            assert!(
+                environment
+                    .get(std::ffi::OsStr::new("NODE_COMPILE_CACHE"))
+                    .is_none(),
+                "the compile cache must not leak into the strict path"
             );
             let arguments = command.get_args().collect::<Vec<_>>();
             let preload = Path::new(arguments[1]);
