@@ -21,6 +21,7 @@ use serde_json::{json, Value};
 
 use crate::desktop::{self, OsEnv, ProfileState};
 use crate::locale::Locale;
+use crate::rdsh_config::RdshSettings;
 
 /// The catalog is embedded so a release install needs no checkout to read it.
 const CATALOG: &str = include_str!("plugin_catalog.json");
@@ -65,6 +66,10 @@ pub struct Entry {
     pub bundled: bool,
     /// Profiles the entry applies to; None means every profile.
     pub profiles: Option<Vec<String>>,
+    /// Feature switch whose *off* state selects this entry: it is provisioned
+    /// only while `features.<id>` is false. None means unconditional.
+    /// `rdsh-no-feedback` is the one case today.
+    pub feature: Option<String>,
     /// Member of the beginner starter set.
     pub starter: bool,
     /// Essential tier: installed on every provisioning run.
@@ -137,6 +142,20 @@ impl Catalog {
             .collect()
     }
 
+    /// The essential tier for one profile with the feature-gated entries
+    /// resolved: a row whose `feature` switch is off is provisioned, and one
+    /// whose switch is on (the default) is left to the stock DSH bundle.
+    /// Callers that only describe the tier keep using `essential_for`.
+    pub fn essential_for_settings(&self, profile: &str, cfg: &RdshSettings) -> Vec<Entry> {
+        self.essential_for(profile)
+            .into_iter()
+            .filter(|entry| match &entry.feature {
+                Some(id) => !crate::rdsh_config::feature_enabled(cfg, id),
+                None => true,
+            })
+            .collect()
+    }
+
     pub fn has_starter(&self, profile: &str) -> bool {
         self.starter_profiles.iter().any(|name| name == profile)
     }
@@ -193,8 +212,15 @@ impl Catalog {
     }
 
     /// Everything one provisioning run has to make sure of, essential first.
-    pub fn selection(&self, profile: &str, spec: Option<&str>) -> Result<Vec<Entry>> {
-        let mut all = self.essential_for(profile);
+    /// The feature-gated essentials are resolved against `cfg`, so a run
+    /// matches what `plugins/install.sh` would have attached.
+    pub fn selection(
+        &self,
+        profile: &str,
+        spec: Option<&str>,
+        cfg: &RdshSettings,
+    ) -> Result<Vec<Entry>> {
+        let mut all = self.essential_for_settings(profile, cfg);
         all.extend(self.recommended_for(profile, spec)?);
         Ok(all)
     }
@@ -241,6 +267,11 @@ fn entries(value: Option<&Value>, essential: bool) -> Result<Vec<Entry>> {
                     .map(str::to_string)
                     .collect::<Vec<_>>()
             }),
+            feature: item
+                .get("feature")
+                .and_then(Value::as_str)
+                .filter(|id| !id.is_empty())
+                .map(str::to_string),
             starter: item
                 .get("starter")
                 .and_then(Value::as_bool)
@@ -350,6 +381,7 @@ pub fn report(
     profile: &str,
     plugins_dir: Option<&str>,
     locale: Locale,
+    cfg: &RdshSettings,
 ) -> Report {
     let state = read(env, profile);
     let row = |entry: Entry| Row {
@@ -358,7 +390,7 @@ pub fn report(
         entry,
     };
     let essentials: Vec<Row> = catalog
-        .essential_for(profile)
+        .essential_for_settings(profile, cfg)
         .into_iter()
         .map(row)
         .collect();
@@ -426,7 +458,8 @@ pub fn cmd_status(
 ) -> Result<()> {
     let env = OsEnv::from_process();
     let catalog = Catalog::load()?;
-    let report = report(&env, &catalog, profile, plugins_dir, locale);
+    let cfg = crate::rdsh_config::load();
+    let report = report(&env, &catalog, profile, plugins_dir, locale, &cfg);
     if json_out {
         out!("{}", serde_json::to_string_pretty(&report_json(&report))?);
         return Ok(());
@@ -626,7 +659,8 @@ pub fn cmd_install(request: InstallRequest, locale: Locale) -> Result<()> {
         return install_desktop(&env, &catalog, &request, locale);
     }
     let state = read(&env, &request.profile);
-    let selection = catalog.selection(&request.profile, request.recommended.as_deref())?;
+    let cfg = crate::rdsh_config::load();
+    let selection = catalog.selection(&request.profile, request.recommended.as_deref(), &cfg)?;
     let (targets, skipped) = targets_for(&env, &state, selection, &request, locale)?;
     // --no-bundled is an explicit opt-out: reported, but not a failure.
     let (declined, unresolved): (Skipped, Skipped) = skipped
@@ -833,7 +867,8 @@ fn install_desktop(
     locale: Locale,
 ) -> Result<()> {
     let state = read(env, &request.profile);
-    let selection = catalog.selection(&request.profile, request.recommended.as_deref())?;
+    let cfg = crate::rdsh_config::load();
+    let selection = catalog.selection(&request.profile, request.recommended.as_deref(), &cfg)?;
     let (targets, skipped) = targets_for(env, &state, selection, request, locale)?;
     let unresolved: Vec<String> = skipped
         .iter()
@@ -883,7 +918,11 @@ fn tail(text: &str, lines: usize) -> String {
 
 /// Missing essential packages per initialized profile, for rdsh doctor.
 /// An uninitialized profile is skipped: it has no manifest to be missing from.
-pub fn essential_gaps(env: &OsEnv, catalog: &Catalog) -> Vec<(String, Vec<String>)> {
+pub fn essential_gaps(
+    env: &OsEnv,
+    catalog: &Catalog,
+    cfg: &RdshSettings,
+) -> Vec<(String, Vec<String>)> {
     let Ok(entries) = std::fs::read_dir(env.dsh_home.join("profiles")) else {
         return Vec::new();
     };
@@ -895,7 +934,7 @@ pub fn essential_gaps(env: &OsEnv, catalog: &Catalog) -> Vec<(String, Vec<String
             continue;
         }
         let missing: Vec<String> = catalog
-            .essential_for(&profile)
+            .essential_for_settings(&profile, cfg)
             .into_iter()
             .filter(|entry| !installed(&state, entry))
             .map(|entry| entry.package)
@@ -913,7 +952,8 @@ pub fn doctor_lines(env: &OsEnv, locale: Locale) -> Vec<String> {
     let Ok(catalog) = Catalog::load() else {
         return Vec::new();
     };
-    essential_gaps(env, &catalog)
+    let cfg = crate::rdsh_config::load();
+    essential_gaps(env, &catalog, &cfg)
         .into_iter()
         .map(|(profile, missing)| match locale {
             Locale::English => format!(
@@ -948,21 +988,27 @@ mod tests {
     fn catalog_carries_the_essential_tier_the_installer_ships() {
         let catalog = Catalog::load().unwrap();
         let web = packages(&catalog.essential_for("web"));
-        assert_eq!(web.len(), 11);
+        // The tier is the ten unconditional entries plus the Web banner plus
+        // the feature-gated feedback bundle; the gate itself is asserted in
+        // feedback_bundle_is_provisioned_only_when_the_switch_is_off.
+        assert_eq!(web.len(), 12);
         assert_eq!(web[0], "@deepseek-ai/dsh-tool-present");
         assert_eq!(web[6], "@deepseek-ai/dsh-mcp-client");
         assert_eq!(web[7], "rdsh-settings");
         assert_eq!(web[10], "rdsh-update-banner");
+        assert_eq!(web[11], "rdsh-no-feedback");
         // The Web release banner is essential for web only.
         let headless = packages(&catalog.essential_for("headless"));
-        assert_eq!(headless.len(), 10);
+        assert_eq!(headless.len(), 11);
         assert!(!headless.iter().any(|name| name == "rdsh-update-banner"));
     }
 
     #[test]
     fn starter_set_is_the_web_and_desktop_default() {
         let catalog = Catalog::load().unwrap();
-        let web = catalog.selection("web", None).unwrap();
+        let web = catalog
+            .selection("web", None, &RdshSettings::default())
+            .unwrap();
         let ids: Vec<String> = web.iter().map(|entry| entry.id.clone()).collect();
         for id in [
             "translation",
@@ -975,7 +1021,9 @@ mod tests {
         }
         assert!(!ids.contains(&"compute".to_string()));
         // headless keeps the essential tier only.
-        let headless = catalog.selection("headless", None).unwrap();
+        let headless = catalog
+            .selection("headless", None, &RdshSettings::default())
+            .unwrap();
         assert_eq!(headless.len(), 10);
         assert!(headless.iter().all(|entry| entry.essential));
     }
@@ -1010,6 +1058,52 @@ mod tests {
             .recommended_for("web", Some("none"))
             .unwrap()
             .is_empty());
+    }
+
+    #[test]
+    fn feedback_bundle_is_provisioned_only_when_the_switch_is_off() {
+        let catalog = Catalog::load().unwrap();
+        // The tier one profile gets under these settings, as package names.
+        let tier = |profile: &str, cfg: &RdshSettings| {
+            packages(&catalog.essential_for_settings(profile, cfg))
+        };
+
+        // Default (switch absent) and explicit on: the stock DSH surface stays,
+        // so nothing is provisioned for it.
+        for cfg in [
+            RdshSettings::default(),
+            settings_with_feature("feedback", true),
+        ] {
+            assert!(
+                !tier("web", &cfg)
+                    .iter()
+                    .any(|name| name == "rdsh-no-feedback"),
+                "features.feedback is not off, so no bundle should be added"
+            );
+        }
+
+        // Explicit off: the bundle joins the essential tier on every profile.
+        let off = settings_with_feature("feedback", false);
+        assert!(tier("web", &off)
+            .iter()
+            .any(|name| name == "rdsh-no-feedback"));
+        assert!(tier("headless", &off)
+            .iter()
+            .any(|name| name == "rdsh-no-feedback"));
+
+        // The selection a provisioning run uses sees the same entry.
+        let selection = catalog.selection("web", Some("none"), &off).unwrap();
+        assert!(selection
+            .iter()
+            .any(|entry| entry.package == "rdsh-no-feedback"));
+    }
+
+    /// Settings carrying one explicit feature value. `features` only holds
+    /// explicitly written ids, so inserting here mirrors a real rdsh.json.
+    fn settings_with_feature(id: &str, on: bool) -> RdshSettings {
+        let mut cfg = RdshSettings::default();
+        cfg.features.values.insert(id.to_string(), on);
+        cfg
     }
 
     #[test]
@@ -1053,7 +1147,9 @@ mod tests {
             ..Default::default()
         };
         let catalog = Catalog::load().unwrap();
-        let selection = catalog.selection("headless", Some("none")).unwrap();
+        let selection = catalog
+            .selection("headless", Some("none"), &RdshSettings::default())
+            .unwrap();
         let request = InstallRequest {
             profile: "headless".to_string(),
             plugins_dir: Some(checkout().display().to_string()),
@@ -1097,7 +1193,9 @@ mod tests {
             ..Default::default()
         };
         let catalog = Catalog::load().unwrap();
-        let selection = catalog.selection("headless", Some("none")).unwrap();
+        let selection = catalog
+            .selection("headless", Some("none"), &RdshSettings::default())
+            .unwrap();
         let request = InstallRequest {
             profile: "headless".to_string(),
             plugins_dir: Some(partial.display().to_string()),

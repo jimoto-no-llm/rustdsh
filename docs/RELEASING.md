@@ -290,6 +290,22 @@ and opens the `chore/pin-<tag>-digests` PR automatically: review both ledgers an
 merge it. Prereleases are skipped, and a release that is already pinned opens no
 PR.
 
+While the repository setting `can_approve_pull_request_reviews` is false, Actions
+cannot create the PR even though the workflow requests `pull-requests: write`;
+`gh pr create` then fails with *GitHub Actions is not permitted to create or
+approve pull requests*. The workflow treats that as a fallback rather than a
+failure: it leaves the digest commit on `chore/pin-<tag>-digests`, opens (or
+reuses) an issue titled `[release] vX.Y.Z のダイジェスト台帳を PR にしてください`
+with the exact next command, and finishes green. **A pinned release is only
+reachable once that branch is merged into `main`**, so watch for that issue after
+every publication.
+
+The workflow does not push to `main` directly. Branch protection requires one
+approving review and ten status checks, which the `GITHUB_TOKEN` push cannot
+satisfy. Enabling *Settings → Actions → General → Allow GitHub Actions to create
+and approve pull requests* restores the automatic PR, and a re-run then reuses the
+already-pushed branch and only retries the PR creation.
+
 候補版の公開後は、全5アーカイブのGitHub asset digestが揃ってから明示的に登録します。
 自動workflowは引き続きstableのみを扱います。
 

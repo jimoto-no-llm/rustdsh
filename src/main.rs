@@ -725,6 +725,10 @@ enum AutoAction {
         dry_run: bool,
         #[arg(long = "json")]
         json: bool,
+        /// Register the sync script even when it is not owned by you or is
+        /// group/world-writable
+        #[arg(long = "force")]
+        force: bool,
     },
     /// Stop and remove the auto-update timer
     Off {
@@ -1258,13 +1262,15 @@ fn main() {
         Some(Commands::Update { action }) => match action {
             UpdateAction::Auto { action } => match action {
                 AutoAction::Status { json } => {
-                    update_auto::cmd_update_auto("status", false, json, locale)
+                    update_auto::cmd_update_auto("status", false, json, false, locale)
                 }
-                AutoAction::On { dry_run, json } => {
-                    update_auto::cmd_update_auto("on", dry_run, json, locale)
-                }
+                AutoAction::On {
+                    dry_run,
+                    json,
+                    force,
+                } => update_auto::cmd_update_auto("on", dry_run, json, force, locale),
                 AutoAction::Off { dry_run, json } => {
-                    update_auto::cmd_update_auto("off", dry_run, json, locale)
+                    update_auto::cmd_update_auto("off", dry_run, json, false, locale)
                 }
             },
         },
@@ -2916,6 +2922,7 @@ fn feature_summary(locale: locale::Locale, def: &rdsh_config::FeatureDef) -> &'s
         "context_engine" => ("实验性的每轮上下文引擎（rdsh context）", "実験的なターン単位コンテキストエンジン（rdsh context）"),
         "compute" => ("允许常驻计算桥（RDSH_COMPUTE=1）", "常駐コンピュートブリッジを許可（RDSH_COMPUTE=1）"),
         "budget_guard" => ("DSH 插件中的预算保护 hook", "DSH プラグイン内の予算ガードフック"),
+        "feedback" => ("DSH 的 Like/Dislike 与 /feedback 反馈界面（关闭时安装 rdsh-no-feedback）", "DSH の Like/Dislike と /feedback のフィードバック画面（OFF で rdsh-no-feedback を導入）"),
         "agent_tool_sandbox" => ("将委派的代理工具限制为 --share-file 文件（无网络、无主机写入）", "委譲したエージェントツールを --share-file のファイルに制限（ネットワーク・ホスト書き込みなし）"),
         "release_probe" => ("在设置环境时运行发布资格检查", "環境設定時にリリース適格性プローブを実行"),
         "setup_web" => ("rdsh setup --web 本地设置页面", "rdsh setup --web ローカル設定ページ"),
