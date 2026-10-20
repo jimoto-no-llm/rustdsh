@@ -107,6 +107,7 @@ DSH 本体の Web 検索プロバイダは `search.dsh_search_provider` で固�
 | compute | off | 常駐 pure-compute worker 連携（RDSH_COMPUTE=1） |
 | budget_guard | on | 予算ガードフック |
 | answer_guard | on | 本文が空（reasoning のみ）でターンが終了する際、再出力を1回だけ促す |
+| feedback | on | DSH の Like/Dislike と /feedback（ダイアログとコマンド）。off にすると `rdsh-no-feedback` を導入して無効化する |
 | agent_tool_sandbox | off | 委譲したエージェントツールの権限を --share-file の範囲に限定（ネットワーク・ホストへの書き込みなし） |
 | release_probe | off | リリース検証プローブ（環境変数が設定されているときだけ実行） |
 | setup_web | on | rdsh setup --web |
@@ -124,6 +125,7 @@ DSH 本体の Web 検索プロバイダは `search.dsh_search_provider` で固�
 - `telemetry` は委譲して起動する DSH プロセスの環境変数 `DSH_TELEMETRY_DISABLED` に反映されます（off のとき `=1` を設定し、on または `RDSH_TELEMETRY=on` のときは設定しません）。ユーザーの環境にすでに `DSH_TELEMETRY_DISABLED` がある場合は上書きしません。
 - slim のヒント（`slim_lazy_plugins` / `slim_disable_voice` / `slim_disable_auto_review`）と `node_compile_cache` は、委譲して起動する DSH プロセスの環境変数に反映されます。
 - プラグイン側（`discord` / `sound` / `gitview` / `compute` / `budget_guard` / `answer_guard` / `release_probe` / `update_check` / `update_notifications`）は `rdsh.json` を読み込んで動作を停止します。DSH を再起動すると反映されます。
+- `feedback` は他と向きが逆です。DSH 本体の feedback は既定で ON なので、off は「プラグインを止める」のではなく「`rdsh-no-feedback` を導入してローダー上で無効化する」操作になります。したがって反映には導入（`PROFILE=web ./plugins/install.sh` または `rdsh plugins install`）と DSH の再起動が必要です。
 
 ## context engine（実験的、既定OFF）
 

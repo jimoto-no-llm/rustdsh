@@ -20,8 +20,19 @@ const upstream = installer.match(/PKGS="\n([\s\S]*?)"\n/)[1]
   .split('\n').map((line) => line.trim()).filter(Boolean);
 const bundled = installer.match(/ESSENTIAL_BUNDLED="([^"]*)"/)[1]
   .split(/\s+/).filter(Boolean);
-const webOnly = [...installer.matchAll(/ESSENTIAL_BUNDLED="\$ESSENTIAL_BUNDLED ([\w.-]+)"/g)]
+// An essential bundle is added either under a profile condition (Web-only) or
+// under a feature switch (installed whenever that switch is off). The catalog
+// records both, so the parser keeps them apart instead of calling every
+// appended name Web-only.
+const webOnly = [...installer.matchAll(
+  /if \[ "\$PROFILE" = "web" \]; then\n\s*ESSENTIAL_BUNDLED="\$ESSENTIAL_BUNDLED ([\w.-]+)"/g)]
   .map((match) => match[1]);
+// The shell helper name maps to the feature id by dropping its suffix:
+// `feedback_feature_off` gates the bundle on `features.feedback`.
+const featureGated = new Map(
+  [...installer.matchAll(
+    /if (\w+)_feature_off; then\n\s*ESSENTIAL_BUNDLED="\$ESSENTIAL_BUNDLED ([\w.-]+)"/g)]
+    .map((match) => [match[2], match[1]]));
 const recommendedBundled = new Map(
   [...installer.matchAll(/if \[ "\$rec_(\w+)" = "1" \]; then RECOMMENDED_BUNDLED="\$RECOMMENDED_BUNDLED ([\w.-]+)"; fi/g)]
     .map((match) => [match[1], match[2]]));
@@ -34,6 +45,13 @@ const starter = new Set(
 const starterProfiles = installer.match(/case "\$PROFILE" in ([\w|]+)\)/)[1].split('|');
 const recommendedIds = installer.match(/RECOMMENDED_IDS="([^"]*)"/)[1].split(' ');
 
+// Feature ids come from the compiled table, so a bundle gated on a switch that
+// `rdsh features` does not list fails here instead of at install time.
+const rustConfig = await readFile(join(repo, 'src', 'rdsh_config.rs'), 'utf8');
+const features = new Set(
+  [...rustConfig.match(/pub const FEATURES: &\[FeatureDef\] = &\[([\s\S]*?)\n\];/)[1]
+    .matchAll(/id: "([^"]+)"/g)].map((match) => match[1]));
+
 const normalize = (id) => id.replace(/-/g, '_');
 const catalogEssential = catalog.essential;
 const catalogRecommended = catalog.recommended;
@@ -41,7 +59,7 @@ const catalogRecommended = catalog.recommended;
 test('the essential tier matches plugins/install.sh', () => {
   assert.deepEqual(catalogEssential.filter((e) => !e.bundled).map((e) => e.package), upstream);
 
-  const expectedBundled = [...bundled, ...webOnly];
+  const expectedBundled = [...bundled, ...webOnly, ...featureGated.keys()];
   assert.deepEqual(catalogEssential.filter((e) => e.bundled).map((e) => e.package), expectedBundled);
 
   for (const name of webOnly) {
@@ -51,6 +69,19 @@ test('the essential tier matches plugins/install.sh', () => {
   for (const name of bundled) {
     const entry = catalogEssential.find((e) => e.package === name);
     assert.equal(entry.profiles, undefined, name + ' is installed on every profile');
+  }
+  // A feature-gated bundle is added on every profile, so it carries no
+  // `profiles` list; it records the switch it depends on instead, and that
+  // id must be one `rdsh features` actually knows.
+  for (const [name, feature] of featureGated) {
+    const entry = catalogEssential.find((e) => e.package === name);
+    assert.equal(entry.profiles, undefined, name + ' is installed on every profile');
+    assert.equal(entry.feature, feature, name + ' records the wrong feature switch');
+    assert.ok(features.has(feature), 'rdsh does not know feature ' + feature);
+  }
+  for (const entry of catalogEssential.filter((e) => e.bundled && e.feature)) {
+    assert.ok(featureGated.has(entry.package),
+      'install.sh does not gate ' + entry.package + ' on features.' + entry.feature);
   }
 });
 

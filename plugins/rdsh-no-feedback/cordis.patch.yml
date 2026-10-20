@@ -1,0 +1,9 @@
+- id: message-feedback
+  name: '@deepseek-ai/dsh-message-feedback'
+  disabled: true
+- id: ui-message-feedback
+  name: '@deepseek-ai/dsh-client-ui-message-feedback'
+  disabled: true
+- id: command-feedback
+  name: '@deepseek-ai/dsh-command-feedback'
+  disabled: true

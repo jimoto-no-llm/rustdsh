@@ -1,0 +1,20 @@
+{
+  "name": "rdsh-no-feedback",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "Disable the DSH message and session feedback surface",
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "meta": {
+    "title": "rdsh feedback off",
+    "description": "アシスタントメッセージの Like/Dislike と /feedback のダイアログ・コマンドを無効化します。"
+  }
+}
