@@ -555,8 +555,9 @@ SWB_PORT="$(cat "$SWB/port")"
 if ! curl -fsS --max-time 2 "http://127.0.0.1:$SWB_PORT/" >/dev/null 2>&1; then
   echo "FAIL: search-web fixture is not ready"; cat "$SWB/server.err"; kill "$HTTPSRV" 2>/dev/null; exit 1
 fi
-if "$BIN" search-web "hello world" 2>&1 | grep -q "disabled by default"; then ok "search-web refused while extra off"; else echo "FAIL(output): extras gate"; kill $HTTPSRV 2>/dev/null; exit 1; fi
-"$BIN" settings set extras.enable search-web >/dev/null 2>&1
+"$BIN" settings set features.search-web false >/dev/null 2>&1
+if "$BIN" search-web "hello world" 2>&1 | grep -q "disabled by default"; then ok "search-web refused while explicitly off"; else echo "FAIL(output): extras gate"; kill $HTTPSRV 2>/dev/null; exit 1; fi
+"$BIN" settings set features.search-web true >/dev/null 2>&1
 if SEARXNG_URL="http://127.0.0.1:$SWB_PORT" "$BIN" search-web "hello world" --limit 5 >"$SWB/search.out" 2>"$SWB/search.err" && grep -q "Alpha result" "$SWB/search.out"; then ok "search-web via fixture"; else echo "FAIL(output): search-web via fixture"; cat "$SWB/search.err" "$SWB/server.err"; kill $HTTPSRV 2>/dev/null; exit 1; fi
 kill $HTTPSRV 2>/dev/null
 wait $HTTPSRV 2>/dev/null || true

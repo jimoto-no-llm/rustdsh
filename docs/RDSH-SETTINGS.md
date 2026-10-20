@@ -74,6 +74,7 @@ rdsh context status   # 有効化後に記憶の状態を見る
 
 ローカル状態画面と Web 検索のオン／オフは、`setup --web` の Extras、または
 `rdsh settings set extras.enable serve,search-web` で変更します。
+Web 検索（search-web）は既定ON、ローカル状態画面（serve）は既定OFFです。
 ローカル状態画面の既定ポートは 38080 です。
 
 DSH 本体の Web 検索プロバイダは `search.dsh_search_provider` で固定できます

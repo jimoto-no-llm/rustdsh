@@ -16,11 +16,15 @@ rustdshの組み込み検索先はSearXNGとOllamaです。Tavilyはサービス
 
 ## 有効にする
 
-Web検索は既定で無効です。両方の検索先に同じスイッチが適用されます。
+Web検索は既定で有効です（search-web 機能、既定ON）。無効化は明示的に行います。
 
 ```sh
-rdsh features on search-web
+rdsh features off search-web
 ```
+
+既定の検索先 SearXNG に届かないときは、ローカルの rustxng サイドカーを
+自動で導入して使います（`rdsh rustxng install` で先に導入しておくこともできます）。
+導入を止めたいときは `RUSTXNG_SKIP_INSTALL=1` を付けます。
 
 `extras.enable` に `search-web` を含める従来の設定も使えます。
 `features.search-web=false` の明示指定があると、そちらが優先されます。

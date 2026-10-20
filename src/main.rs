@@ -602,6 +602,8 @@ enum RustxngAction {
     Start,
     /// Terminate the instance recorded in $DSH_HOME
     Stop,
+    /// Install the sidecar binary from the latest RustXNG release
+    Install,
 }
 
 #[derive(Subcommand, Debug)]
@@ -1234,6 +1236,7 @@ fn main() {
             RustxngAction::Status { json } => rustxng::cmd_status(json, locale),
             RustxngAction::Start => rustxng::cmd_start(locale),
             RustxngAction::Stop => rustxng::cmd_stop(locale),
+            RustxngAction::Install => rustxng::cmd_install(locale),
         },
         Some(Commands::Bench { n }) => bench(n.unwrap_or(cfg.bench.n), locale),
         Some(Commands::Compute { once }) => compute::cmd_compute(once, locale),

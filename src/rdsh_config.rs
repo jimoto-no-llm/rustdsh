@@ -143,8 +143,9 @@ pub const FEATURES: &[FeatureDef] = &[
     },
     FeatureDef {
         id: "search-web",
-        default: false,
-        summary: "SearXNG / Ollama web search (rdsh search-web)",
+        default: true,
+        summary:
+            "SearXNG / rustxng web search (rdsh search-web; the sidecar auto-installs on first use)",
     },
     FeatureDef {
         id: "context_engine",
@@ -272,7 +273,11 @@ pub fn feature_enabled(cfg: &RdshSettings, id: &str) -> bool {
         return *on;
     }
     match id {
-        "serve" | "search-web" => extra_enabled(cfg, id),
+        "serve" => extra_enabled(cfg, id),
+        // search-web ships on: the legacy extras list keeps an explicit opt-in,
+        // an absent entry now follows the FeatureDef default, and an explicit
+        // features.search-web=false still wins (checked first above).
+        "search-web" => extra_enabled(cfg, id) || feature_default(id),
         "context_engine" => cfg.beta.context_engine,
         "discord" => cfg.discord.enabled,
         _ => feature_default(id),
@@ -1425,7 +1430,7 @@ impl RdshSettings {
             "bench.n(1-20)",
             "setup.web_port(0-65535, 0=random)",
             "beta.context_engine(bool, default OFF)",
-            "extras.enable(list: serve,search-web; default OFF)",
+            "extras.enable(list: serve,search-web; serve default OFF, search-web default ON)",
             "context.token_budget(500-200000)",
             "context.enable_retriever(bool)",
             "context.enable_packer(bool)",
@@ -2291,25 +2296,31 @@ mod rdsh_config_tests {
     #[test]
     fn feature_enabled_precedence_and_defaults() {
         let mut c = RdshSettings::default();
-        // 既定値: discord/telemetry は off、sound/gitview は on、未知 id は false。
+        // 既定値: discord/telemetry は off、sound/gitview/search-web は on、
+        // 未知 id は false。
         assert!(!feature_enabled(&c, "discord"));
         assert!(!feature_enabled(&c, "telemetry"));
         assert!(feature_enabled(&c, "sound"));
         assert!(feature_enabled(&c, "gitview"));
+        assert!(feature_enabled(&c, "search-web"));
         assert!(!feature_enabled(&c, "no-such-feature"));
         assert!(!feature_is_explicit(&c, "discord"));
 
         // 導入の既定値にかかわらず、利用者の明示的な opt-out を維持する。
         c.features.values.insert("sound".to_string(), false);
         c.features.values.insert("gitview".to_string(), false);
+        c.features.values.insert("search-web".to_string(), false);
         assert!(!feature_enabled(&c, "sound"));
         assert!(!feature_enabled(&c, "gitview"));
+        assert!(!feature_enabled(&c, "search-web"));
         assert!(feature_is_explicit(&c, "sound"));
         assert!(feature_is_explicit(&c, "gitview"));
 
         // features.<id> が未記載なら旧キーを見る（旧 discord.enabled の明示 on は尊重）。
         c.discord.enabled = true;
         assert!(feature_enabled(&c, "discord"));
+        // 旧 extras.enable の opt-in も尊重される（明示 off はいったん外す）。
+        c.features.values.remove("search-web");
         c.extras.enable = vec!["search-web".to_string()];
         assert!(feature_enabled(&c, "search-web"));
         c.beta.context_engine = true;

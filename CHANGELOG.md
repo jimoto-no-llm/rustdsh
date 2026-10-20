@@ -5,6 +5,19 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Added
+
+- `rdsh rustxng install` が追加されました。RustXNG の最新リリースを
+  `~/.local/bin` へ導入します。サイドカーが見つからない状態で
+  `rdsh search-web` や `rdsh rustxng start` を使うと、この導入を自動で
+  行ってから起動します（`RUSTXNG_SKIP_INSTALL=1` で自動導入を止められます）。
+
+### Changed
+
+- Web検索（search-web）を既定ONにしました。無効化は
+  `rdsh features off search-web` で明示的に行います。ローカル状態画面
+  （serve）の既定OFFと、`extras.enable` の従来形式は変わっていません。
+
 ## [0.9.2] - 2026-10-19
 
 ### Changed
