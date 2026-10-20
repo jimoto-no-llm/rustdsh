@@ -3,6 +3,18 @@ name: pin-release-digests
 # A published stable release only reaches install.sh --from-release, the
 # automatic updater and install.ps1 -FromRelease once its archive digests are
 # pinned in the two ledgers on main; see docs/RELEASING.md.
+#
+# 注意: このワークフローは pull-requests: write を持っているが、それだけでは
+# PR を作れない。リポジトリ設定 can_approve_pull_request_reviews=false の間は
+# gh pr create が "GitHub Actions is not permitted to create or approve pull
+# requests (createPullRequest)" で失敗する。
+#
+# main へ直接 push する方式は採らない。main はブランチ保護で
+# required_pull_request_reviews(1名) と必須チェックを要求しており、GITHUB_TOKEN の
+# push はそれらを満たせないため、失敗の形が変わるだけで恒久対策にならない。
+# そこで release-cadence.yml と同じ作法にそろえる: ブランチは push したまま
+# 内容を失わず、PR 作成だけに失敗したときは次の一手を issue に記録して正常終了する。
+# 設定を有効にした次の回や次回リリースでは、既存ブランチを検出して PR 作成だけを試す。
 
 on:
   release:
@@ -17,7 +29,10 @@ on:
 
 permissions:
   contents: write
+  # gh pr create を試す。ただし下のステップのとおり、この権限だけでは PR は作れない。
   pull-requests: write
+  # gh pr create が失敗したときに次の一手を issue へ残すフォールバック用。
+  issues: write
 
 concurrency:
   group: pin-release-digests-${{ github.event.release.tag_name || github.event.workflow_run.head_branch }}
@@ -61,8 +76,12 @@ jobs:
           fi
 
           branch="chore/pin-${TAG}-digests"
+          title="chore(release): ${TAG} のダイジェストを台帳へ pin"
+
+          # 既に PR がある場合だけ何もしない。マージ済みでブランチが削除されていても
+          # gh pr view は state=MERGED を返すため、再実行のたびに PR を作り直さない。
           if gh pr view "${branch}" --json number >/dev/null 2>&1; then
-            echo "the pin pull request for ${TAG} is already open"
+            echo "the pin pull request for ${TAG} is already open or merged"
             exit 0
           fi
 
@@ -71,15 +90,40 @@ jobs:
           git switch -c "${branch}"
           git add release-digests.tsv release-digests-windows.tsv
           git commit -m "chore(release): pin ${TAG} digests"
-          git push origin "${branch}"
+          # ブランチ push は contents: write だけで成功する。ここで作った内容は
+          # PR の作成に失敗しても失われない。
+          git push --force-with-lease origin "${branch}"
+          sha=$(git rev-parse HEAD)
 
-          cat > "${RUNNER_TEMP}/pin-pr-body.md" <<EOF
+          body="${RUNNER_TEMP}/pin-pr-body.md"
+          cat > "${body}" <<EOF
           概要: ${TAG} の公開アセットのダイジェストを installer 台帳へ pin します。
           変更: release-digests.tsv と release-digests-windows.tsv に ${TAG} の行を追加し、latest 行を更新します。
           検証: ダイジェストは GitHub Releases API の値を使い、prerelease・欠損アセット・不正な値はスクリプトが拒否します。
           注意点: マージすると自動更新とインストーラがこの版を解決できるようになるため、両台帳の差分を確認してからマージしてください。
           EOF
 
-          gh pr create --base main --head "${branch}" \
-            --title "chore(release): ${TAG} のダイジェストを台帳へ pin" \
-            --body-file "${RUNNER_TEMP}/pin-pr-body.md"
+          pr_error=""
+          if ! pr_error=$(gh pr create --base main --head "${branch}" --title "${title}" --body-file "${body}" 2>&1); then
+            # フォールバック: can_approve_pull_request_reviews=false では Actions は
+            # PR を作れない。ブランチは push 済みなので、次の一手を issue に残して
+            # 正常終了する（release-cadence.yml と同じ作法）。
+            pr_error=$(printf '%s' "${pr_error}" | tr '\n' ' ')
+            echo "::warning::PR を作成できませんでした: ${pr_error}"
+            issue="${RUNNER_TEMP}/pin-issue.md"
+            cat > "${issue}" <<EOF
+          概要: pin-release-digests が ${branch} を push しましたが、Actions が PR を作成できませんでした（${pr_error}）。
+          変更: commit ${sha} で release-digests.tsv と release-digests-windows.tsv の ${TAG} 行と latest 行を更新しました。
+          検証: ダイジェストは GitHub Releases API の値で、scripts/pin-release-digests.py ${TAG} が生成した差分です。
+          次の一手: 手元で gh pr create --base main --head ${branch} --title "${title}" を実行するか、Settings → Actions → General の "Allow GitHub Actions to create and approve pull requests" を有効にしてこのワークフローを再実行してください。
+          注意点: ${TAG} が pin されるまで、自動更新とインストーラはこの版を解決できません。
+          EOF
+            issue_title="[release] ${TAG} のダイジェスト台帳を PR にしてください"
+            if gh issue list --state open --limit 200 --json number,title \
+                 --jq ".[] | select(.title == \"${issue_title}\") | .number" | grep -q .; then
+              echo "::notice::${issue_title} は既に開いています。"
+              exit 0
+            fi
+            gh issue create --title "${issue_title}" --body-file "${issue}"
+            exit 0
+          fi
