@@ -152,7 +152,7 @@ jobs:
         with:
           node-version: 22
       - uses: dtolnay/rust-toolchain@stable
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ~/.npm
           key: npm-${{ runner.os }}-headless-${{ hashFiles('scripts/headless-runtime/runtime/package-lock.json') }}
@@ -202,7 +202,7 @@ jobs:
         with:
           node-version: 22
       - uses: dtolnay/rust-toolchain@stable
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ~/.npm
           key: npm-${{ runner.os }}-headless-${{ hashFiles('scripts/headless-runtime/runtime/package-lock.json') }}
