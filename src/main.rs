@@ -103,9 +103,10 @@ mod tokens;
 mod tool_security;
 mod update_auto;
 mod websearch;
+mod webui_assets;
+mod webui_gzip;
 mod worker_git;
 mod worker_scopes;
-mod webui_gzip;
 
 #[derive(Parser, Debug)]
 #[command(
