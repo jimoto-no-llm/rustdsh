@@ -142,7 +142,8 @@ When invoked as `dsh`, the lookup order is: `RDSH_ORIG_BIN` (legacy
 Naming follows dsh convention (kebab-case commands/flags like `dump-config`);
 the `DSH_` env namespace stays owned by dsh itself, rdsh-private keys live
 under `RDSH_`. Slim also sets `NODE_COMPILE_CACHE` (Node >= 22.1 only, user
-value wins, `RDSH_NODE_COMPILE_CACHE=0` opts out).
+value wins, `RDSH_NODE_COMPILE_CACHE=0` opts out,
+`RDSH_NODE_COMPILE_CACHE=<dir>` relocates the cache).
 
 ## Performance notes
 

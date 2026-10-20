@@ -27,6 +27,10 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 - `rdsh cloud` のJSON入力を128 MiB以下の通常ファイルに制限し、読込中の
   サイズ増加も検出する。巨大なplan/request/leaseの無制限読込を防ぐ（#825）。
+- `RDSH_NODE_COMPILE_CACHE=<ディレクトリ>` でNodeコンパイルキャッシュの
+  出力先を指定できるようにしました。従来は `0` による無効化のみで、
+  `$HOME` が揮発する環境ではキャッシュが毎回作り直しになりました。
+  既存の `NODE_COMPILE_CACHE` が優先される挙動は変更なし（#864）。
 
 ### Added
 

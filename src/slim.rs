@@ -96,7 +96,7 @@ pub fn describe() -> String {
     let mut parts: Vec<String> = slim_env().iter().map(|(k, v)| format!("{k}={v}")).collect();
     if features().node_compile_cache {
         parts.push(
-            "NODE_COMPILE_CACHE=<cache-dir> (effective on Node >= 22.1), RDSH_NODE_COMPILE_CACHE=0 to disable"
+            "NODE_COMPILE_CACHE=<cache-dir> (effective on Node >= 22.1), RDSH_NODE_COMPILE_CACHE=0 to disable, RDSH_NODE_COMPILE_CACHE=<dir> to relocate"
                 .to_string(),
         );
     } else {
@@ -119,6 +119,8 @@ pub fn default_compile_cache_dir() -> Option<String> {
 // Pure decision for NODE_COMPILE_CACHE: returns the dir to set, or None
 // to leave the child env alone.
 // - rdsh_hint of Some(0) opts out entirely.
+// - rdsh_hint of Some(<path>) places the cache at that dir instead of the
+//   default (RDSH_NODE_COMPILE_CACHE=1 keeps the default).
 // - an existing non-empty user value wins (we never override it).
 pub fn resolve_node_compile_cache(
     rdsh_hint: Option<&str>,
@@ -130,6 +132,9 @@ pub fn resolve_node_compile_cache(
     }
     if existing.is_some_and(|v| !v.is_empty()) {
         return None;
+    }
+    if rdsh_hint.is_some_and(|v| !v.is_empty() && v != "1") {
+        return Some(rdsh_hint.unwrap().to_string());
     }
     if default_dir.is_empty() {
         return None;
@@ -175,6 +180,32 @@ mod tests {
         // Empty existing counts as unset.
         assert_eq!(
             resolve_node_compile_cache(None, Some(""), "/c"),
+            Some("/c".to_string())
+        );
+    }
+
+    #[test]
+    fn hint_directory_overrides_default() {
+        // RDSH_NODE_COMPILE_CACHE=<dir> places the cache at the given dir.
+        assert_eq!(
+            resolve_node_compile_cache(Some("/data/rdsh-ncc"), None, "/c"),
+            Some("/data/rdsh-ncc".to_string())
+        );
+        // Opt-out still wins over a directory check order (0 is handled first).
+        assert_eq!(resolve_node_compile_cache(Some("0"), None, "/c"), None);
+        // An explicit user NODE_COMPILE_CACHE still wins.
+        assert_eq!(
+            resolve_node_compile_cache(Some("/data/rdsh-ncc"), Some("/user/dir"), "/c"),
+            None
+        );
+        // RDSH_NODE_COMPILE_CACHE=1 keeps the default dir.
+        assert_eq!(
+            resolve_node_compile_cache(Some("1"), None, "/c"),
+            Some("/c".to_string())
+        );
+        // An empty hint counts as unset.
+        assert_eq!(
+            resolve_node_compile_cache(Some(""), None, "/c"),
             Some("/c".to_string())
         );
     }
