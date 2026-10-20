@@ -77,9 +77,9 @@ fn parse_json(body: &str, limit: usize) -> anyhow::Result<Vec<Hit>> {
 
 pub fn help(locale: crate::locale::Locale) -> &'static str {
     match locale {
-        crate::locale::Locale::English => "Enable: rdsh features on search-web\nOllama: set OLLAMA_API_KEY, then use --provider ollama (up to 10 results).\nEngines: --engine auto|searxng|rustxng. auto resolves SEARXNG_URL, then RUSTXNG_URL, then a local rustxng, then http://127.0.0.1:8888.\nLocal rustxng: set RUSTXNG_BIN (or install rustxng) and rdsh starts the sidecar itself; --engine searxng never spawns it.\nWeb Search API service guide: Tavily https://www.tavily.com/\nTavily quickstart: https://docs.tavily.com/documentation/quickstart\nBuilt-in providers: searxng, ollama. Tavily is a service reference.\nSearXNG down? --auto-start runs docker-compose.searxng.yml (loopback only).\nDocs: https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/WEB-SEARCH.md",
-        crate::locale::Locale::Chinese => "启用：rdsh features on search-web\nOllama：设置 OLLAMA_API_KEY 后使用 --provider ollama（最多10条结果）。\n搜索引擎：--engine auto|searxng|rustxng。auto 依次使用 SEARXNG_URL、RUSTXNG_URL、本地 rustxng，最后是 http://127.0.0.1:8888。\n本地 rustxng：设置 RUSTXNG_BIN（或安装 rustxng）后由 rdsh 启动该服务；--engine searxng 不会启动它。\nWeb Search API 服务指南：Tavily https://www.tavily.com/\nTavily 入门：https://docs.tavily.com/documentation/quickstart\n内置提供方：searxng、ollama。Tavily 为服务介绍。\nSearXNG 未启动时：--auto-start 会运行 docker-compose.searxng.yml（仅回环地址）。\n文档：https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/WEB-SEARCH.md",
-        crate::locale::Locale::Japanese => "有効化: rdsh features on search-web\nOllama: OLLAMA_API_KEY を設定し --provider ollama を指定（最大10件）。\nエンジン: --engine auto|searxng|rustxng。auto は SEARXNG_URL、RUSTXNG_URL、ローカル rustxng、http://127.0.0.1:8888 の順に解決します。\nローカル rustxng: RUSTXNG_BIN を設定（または rustxng を導入）すると rdsh がサイドカーを起動します。--engine searxng は起動しません。\nWeb Search API サービスの案内: Tavily https://www.tavily.com/\nTavily 入門: https://docs.tavily.com/documentation/quickstart\n組み込み検索先: searxng、ollama。Tavily はサービスの紹介です。\nSearXNG が停止中: --auto-start が docker-compose.searxng.yml を起動します（ループバック限定）。\n利用手順: https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/WEB-SEARCH.md",
+        crate::locale::Locale::English => "search-web is on by default; disable with: rdsh features off search-web\nOllama: set OLLAMA_API_KEY, then use --provider ollama (up to 10 results).\nEngines: --engine auto|searxng|rustxng. auto resolves SEARXNG_URL, then RUSTXNG_URL, then a local rustxng, then http://127.0.0.1:8888.\nLocal rustxng: rdsh rustxng install fetches the latest release into ~/.local/bin (or set RUSTXNG_BIN); rdsh starts the sidecar itself; --engine searxng never spawns it.\nWeb Search API service guide: Tavily https://www.tavily.com/\nTavily quickstart: https://docs.tavily.com/documentation/quickstart\nBuilt-in providers: searxng, ollama. Tavily is a service reference.\nSearXNG down? --auto-start runs docker-compose.searxng.yml (loopback only).\nDocs: https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/WEB-SEARCH.md",
+        crate::locale::Locale::Chinese => "search-web 默认开启；如需关闭：rdsh features off search-web\nOllama：设置 OLLAMA_API_KEY 后使用 --provider ollama（最多10条结果）。\n搜索引擎：--engine auto|searxng|rustxng。auto 依次使用 SEARXNG_URL、RUSTXNG_URL、本地 rustxng，最后是 http://127.0.0.1:8888。\n本地 rustxng：rdsh rustxng install 会把最新版安装到 ~/.local/bin（也可设置 RUSTXNG_BIN）；由 rdsh 启动该服务；--engine searxng 不会启动它。\nWeb Search API 服务指南：Tavily https://www.tavily.com/\nTavily 入门：https://docs.tavily.com/documentation/quickstart\n内置提供方：searxng、ollama。Tavily 为服务介绍。\nSearXNG 未启动时：--auto-start 会运行 docker-compose.searxng.yml（仅回环地址）。\n文档：https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/WEB-SEARCH.md",
+        crate::locale::Locale::Japanese => "search-web は既定で有効です。無効化: rdsh features off search-web\nOllama: OLLAMA_API_KEY を設定し --provider ollama を指定（最大10件）。\nエンジン: --engine auto|searxng|rustxng。auto は SEARXNG_URL、RUSTXNG_URL、ローカル rustxng、http://127.0.0.1:8888 の順に解決します。\nローカル rustxng: rdsh rustxng install が最新リリースを ~/.local/bin へ導入します（RUSTXNG_BIN でも可）。rdsh がサイドカーを起動します。--engine searxng は起動しません。\nWeb Search API サービスの案内: Tavily https://www.tavily.com/\nTavily 入門: https://docs.tavily.com/documentation/quickstart\n組み込み検索先: searxng、ollama。Tavily はサービスの紹介です。\nSearXNG が停止中: --auto-start が docker-compose.searxng.yml を起動します（ループバック限定）。\n利用手順: https://github.com/jimoto-no-llm/rustdsh/blob/main/docs/WEB-SEARCH.md",
     }
 }
 
@@ -923,9 +923,28 @@ mod tests {
         ));
         std::fs::create_dir_all(&dir).unwrap();
         std::env::set_var("DSH_HOME", &dir);
+        // The host may really have the sidecar installed (that is now the
+        // default path); pin HOME to the temp dir so the lookup stays empty.
+        let saved = [
+            std::env::var("HOME").ok().map(|v| ("HOME", Some(v))),
+            std::env::var("USERPROFILE")
+                .ok()
+                .map(|v| ("USERPROFILE", Some(v))),
+            std::env::var("RUSTXNG_BIN")
+                .ok()
+                .map(|v| ("RUSTXNG_BIN", Some(v))),
+        ];
+        std::env::set_var("HOME", &dir);
+        std::env::set_var("USERPROFILE", &dir);
         std::env::remove_var("RUSTXNG_PORT");
         let result = resolve_base_with(Engine::Rustxng, |_| false);
         std::env::remove_var("RUSTXNG_BIN");
+        for item in saved.into_iter().flatten() {
+            match item.1 {
+                Some(value) => std::env::set_var(item.0, value),
+                None => std::env::remove_var(item.0),
+            }
+        }
         assert!(result.is_err(), "rustxng must not fall back to searxng");
         let _ = std::fs::remove_dir_all(&dir);
     }

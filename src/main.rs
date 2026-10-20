@@ -602,6 +602,8 @@ enum RustxngAction {
     Start,
     /// Terminate the instance recorded in $DSH_HOME
     Stop,
+    /// Install the sidecar binary from the latest RustXNG release
+    Install,
 }
 
 #[derive(Subcommand, Debug)]
@@ -1234,6 +1236,7 @@ fn main() {
             RustxngAction::Status { json } => rustxng::cmd_status(json, locale),
             RustxngAction::Start => rustxng::cmd_start(locale),
             RustxngAction::Stop => rustxng::cmd_stop(locale),
+            RustxngAction::Install => rustxng::cmd_install(locale),
         },
         Some(Commands::Bench { n }) => bench(n.unwrap_or(cfg.bench.n), locale),
         Some(Commands::Compute { once }) => compute::cmd_compute(once, locale),
@@ -2922,7 +2925,7 @@ fn feature_summary(locale: locale::Locale, def: &rdsh_config::FeatureDef) -> &'s
         "context_engine" => ("实验性的每轮上下文引擎（rdsh context）", "実験的なターン単位コンテキストエンジン（rdsh context）"),
         "compute" => ("允许常驻计算桥（RDSH_COMPUTE=1）", "常駐コンピュートブリッジを許可（RDSH_COMPUTE=1）"),
         "budget_guard" => ("DSH 插件中的预算保护 hook", "DSH プラグイン内の予算ガードフック"),
-        "feedback" => ("DSH 的 Like/Dislike 与 /feedback 反馈界面（关闭时安装 rdsh-no-feedback）", "DSH の Like/Dislike と /feedback のフィードバック画面（OFF で rdsh-no-feedback を導入）"),
+        "feedback" => ("DSH 的 Like/Dislike 与 /feedback 反馈界面（默认 OFF；OFF 时安装 rdsh-no-feedback）", "DSH の Like/Dislike と /feedback のフィードバック画面（既定OFF。OFF で rdsh-no-feedback を導入）"),
         "agent_tool_sandbox" => ("将委派的代理工具限制为 --share-file 文件（无网络、无主机写入）", "委譲したエージェントツールを --share-file のファイルに制限（ネットワーク・ホスト書き込みなし）"),
         "release_probe" => ("在设置环境时运行发布资格检查", "環境設定時にリリース適格性プローブを実行"),
         "setup_web" => ("rdsh setup --web 本地设置页面", "rdsh setup --web ローカル設定ページ"),

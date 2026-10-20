@@ -398,6 +398,14 @@ fn feature_switches_list_defaults_and_round_trip_through_the_cli() {
     );
     assert!(keys.contains("features.sound(bool, default ON)"), "{keys}");
     assert!(
+        keys.contains("features.search-web(bool, default ON)"),
+        "{keys}"
+    );
+    assert!(
+        keys.contains("features.feedback(bool, default OFF)"),
+        "{keys}"
+    );
+    assert!(
         keys.contains("features.gitview(bool, default ON)"),
         "{keys}"
     );
@@ -453,7 +461,8 @@ fn unknown_feature_ids_are_rejected_without_touching_settings() {
 
 #[test]
 fn disabled_features_refuse_their_commands_and_point_at_the_switch() {
-    let fixture = Fixture::new("{}");
+    // search-web は既定ONになったため、拒否の確認には明示 opt-out が必要。
+    let fixture = Fixture::new(r#"{"features":{"search-web":false}}"#);
     for (args, feature) in [
         (vec!["serve"], "serve"),
         (vec!["search-web", "query"], "search-web"),

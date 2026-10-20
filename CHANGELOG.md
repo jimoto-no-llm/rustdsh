@@ -5,6 +5,28 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ## [Unreleased]
 
+### Added
+
+- `rdsh rustxng install` が追加されました。RustXNG の最新リリースを
+  `~/.local/bin` へ導入します。サイドカーが見つからない状態で
+  `rdsh search-web` や `rdsh rustxng start` を使うと、この導入を自動で
+  行ってから起動します（`RUSTXNG_SKIP_INSTALL=1` で自動導入を止められます）。
+  サイドカーは依存の無い単一バイナリです（バイナリ約14MB、常駐メモリー
+  約10MB、アイドル時CPU 0%）。低スペック機でも Docker 等の追加スタック
+  なしで動きます。
+
+### Changed
+
+- Web検索（search-web）を既定ONにしました。無効化は
+  `rdsh features off search-web` で明示的に行います。ローカル状態画面
+  （serve）の既定OFFと、`extras.enable` の従来形式は変わっていません。
+
+- DSH の Like/Dislike と /feedback 画面（feedback 機能）を既定OFFにしました。
+  rdsh 固有の不具合が DSH 本家へ送られないようにするもので、既定では
+  `rdsh-no-feedback` バンドルを導入して無効化します。本体の画面へ戻す
+  ときは `rdsh features on feedback` を保存してからプラグインを導入し、
+  DSH を再起動してください。
+
 ## [0.9.2] - 2026-10-19
 
 ### Changed
