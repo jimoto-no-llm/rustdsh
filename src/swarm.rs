@@ -203,12 +203,17 @@ mod tests {
         );
         std::fs::create_dir(&fixture.0).unwrap();
         let path = fixture.0.join("gc.exe");
-        #[cfg(unix)]
-        let source = PathBuf::from("/bin/sh");
         #[cfg(windows)]
         let source = PathBuf::from(
             std::env::var_os("COMSPEC").unwrap_or_else(|| "C:\\Windows\\System32\\cmd.exe".into()),
         );
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::copy("/usr/bin/true", &path).unwrap();
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
+        }
+        #[cfg(windows)]
         std::fs::copy(source, &path).unwrap();
         let digest: String = Sha256::digest(std::fs::read(&path).unwrap())
             .iter()
@@ -219,17 +224,9 @@ mod tests {
         {
             use std::os::unix::fs::PermissionsExt;
             std::fs::rename(&path, fixture.0.join("checked-binary")).unwrap();
-            std::fs::write(&path, b"#!/bin/sh\nexit 1\n").unwrap();
+            std::fs::copy("/usr/bin/false", &path).unwrap();
             std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
-            assert_eq!(
-                verified
-                    .command()
-                    .args(["-c", "exit 73"])
-                    .status()
-                    .unwrap()
-                    .code(),
-                Some(73)
-            );
+            assert_eq!(verified.command().status().unwrap().code(), Some(0));
         }
         #[cfg(windows)]
         {

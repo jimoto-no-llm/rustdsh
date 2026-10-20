@@ -482,7 +482,7 @@ mod tests {
         if cfg!(windows) {
             vec!["cmd".to_string(), "/c".to_string(), "exit".to_string()]
         } else {
-            vec!["sh".to_string(), "-c".to_string(), "true".to_string()]
+            vec!["/bin/sh".to_string(), "-c".to_string(), "true".to_string()]
         }
     }
 
@@ -490,7 +490,11 @@ mod tests {
         if cfg!(windows) {
             vec!["cmd".to_string(), "/c".to_string(), "exit 1".to_string()]
         } else {
-            vec!["sh".to_string(), "-c".to_string(), "exit 1".to_string()]
+            vec![
+                "/bin/sh".to_string(),
+                "-c".to_string(),
+                "exit 1".to_string(),
+            ]
         }
     }
 
@@ -500,7 +504,7 @@ mod tests {
     #[cfg(unix)]
     fn marker_command(marker: &Path) -> Vec<String> {
         vec![
-            "sh".to_string(),
+            "/bin/sh".to_string(),
             "-c".to_string(),
             "printf ok > \"$1\"".to_string(),
             "rdsh-searxng-test".to_string(),
@@ -553,6 +557,7 @@ mod tests {
 
     #[test]
     fn a_missing_override_file_is_reported_before_spawning() {
+        let _lock = crate::test_support::env_lock();
         let dir = test_dir("missing-override");
         let plan = Plan {
             compose: ComposeSource::Override(dir.join("absent.yml")),
@@ -567,6 +572,7 @@ mod tests {
 
     #[test]
     fn an_unknown_runtime_is_reported_instead_of_panicking() {
+        let _lock = crate::test_support::env_lock();
         let dir = test_dir("unknown-runtime");
         let plan = Plan {
             compose: ComposeSource::Override(compose_in(&dir)),
@@ -582,6 +588,7 @@ mod tests {
 
     #[test]
     fn a_runtime_that_starts_nothing_reports_a_timeout() {
+        let _lock = crate::test_support::env_lock();
         let dir = test_dir("noop-runtime");
         let plan = Plan {
             compose: ComposeSource::Override(compose_in(&dir)),
@@ -597,6 +604,7 @@ mod tests {
 
     #[test]
     fn an_unusable_runtime_falls_through_to_the_next_candidate() {
+        let _lock = crate::test_support::env_lock();
         let dir = test_dir("fallthrough");
         // The first runtime exits at once, as 'docker compose' does without the
         // Compose v2 plugin. Missing the second candidate only becomes visible
@@ -620,6 +628,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn the_candidate_after_a_failed_runtime_really_runs() {
+        let _lock = crate::test_support::env_lock();
         let dir = test_dir("fallthrough-runs");
         let marker = dir.join("second-ran");
         // The first runtime exits at once; the second one must still get its

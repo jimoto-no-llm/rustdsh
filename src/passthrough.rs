@@ -712,11 +712,8 @@ mod tests {
         assert!(parse_node_tree_version("other-v24.0.0-linux-x64").is_none());
     }
 
-    fn env_lock() -> std::sync::MutexGuard<'static, ()> {
-        static M: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
-        M.get_or_init(|| std::sync::Mutex::new(()))
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    fn env_lock() -> crate::test_support::EnvLock {
+        crate::test_support::env_lock()
     }
 
     struct EnvGuard {
@@ -929,6 +926,7 @@ mod tests {
     /// rather than only the embedded patch source.
     #[test]
     fn delegated_js_boots_receive_the_preload_as_a_file_url() {
+        let _lock = env_lock();
         if crate::tool_security::sandbox_enabled() {
             return; // the strict boundary path does not inject this preload
         }
@@ -1027,6 +1025,7 @@ mod tests {
     /// `.js` entry, and a shell wrapper must keep its direct exec.
     #[test]
     fn delegated_extensionless_node_backups_receive_the_preload() {
+        let _lock = env_lock();
         if crate::tool_security::sandbox_enabled() {
             return; // the strict boundary path does not inject this preload
         }

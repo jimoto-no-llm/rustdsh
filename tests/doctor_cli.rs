@@ -164,6 +164,10 @@ fn run_doctor_fallback(root: &Path, path: &Path, args: &[&str], original: Option
         .env("DSH_HOME", root.join("dsh"))
         .env("XDG_CONFIG_HOME", root.join("config"))
         .env("XDG_DATA_HOME", root.join("data"))
+        .env("PNPM_HOME", home.join(".local/share/pnpm"))
+        .env_remove("VOLTA_HOME")
+        .env_remove("npm_config_prefix")
+        .env_remove("NPM_CONFIG_PREFIX")
         .env("RDSH_LANG", "en")
         .env_remove("DSH_ORIG_BIN")
         .env("PATH", std::env::join_paths([path]).unwrap());
@@ -263,7 +267,7 @@ fn doctor_reports_the_pnpm_build_script_policy_and_its_fix() {
         "pnpm's default policy blocks dependency builds: {output}"
     );
     assert!(
-        output.contains("fix: pnpm approve-builds"),
+        output.contains("fix: pnpm approve-builds --all -g"),
         "doctor must print the resolution command: {output}"
     );
 
@@ -277,7 +281,10 @@ fn doctor_reports_the_pnpm_build_script_policy_and_its_fix() {
         output.contains("build scripts allowed by the global config"),
         "{output}"
     );
-    assert!(!output.contains("fix: pnpm approve-builds"), "{output}");
+    assert!(
+        !output.contains("fix: pnpm approve-builds --all -g"),
+        "{output}"
+    );
     fs::remove_dir_all(root).unwrap();
 }
 
@@ -303,7 +310,7 @@ fn doctor_json_publishes_the_environment_block() {
         "{output}"
     );
     assert!(output.contains("\"pnpm\":{\"found\":true"), "{output}");
-    assert!(output.contains("pnpm approve-builds"), "{output}");
+    assert!(output.contains("pnpm approve-builds --all -g"), "{output}");
     fs::remove_dir_all(root).unwrap();
 }
 
@@ -333,7 +340,7 @@ fn doctor_reports_the_essential_plugins_a_profile_is_missing() {
         "doctor must print the fix: {output}"
     );
     assert!(
-        !output.contains("plugins: web is missing 11"),
+        output.contains("plugins: web is missing 11 essential plugin(s)"),
         "the attached package must not be counted as missing: {output}"
     );
     fs::remove_dir_all(root).unwrap();

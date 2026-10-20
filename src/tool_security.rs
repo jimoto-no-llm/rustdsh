@@ -592,9 +592,7 @@ mod tests {
                 Some(&std::ffi::OsStr::new("ja"))
             );
             assert!(
-                environment
-                    .get(std::ffi::OsStr::new("NODE_COMPILE_CACHE"))
-                    .is_none(),
+                !environment.contains_key(std::ffi::OsStr::new("NODE_COMPILE_CACHE")),
                 "the compile cache must not leak into the strict path"
             );
             let arguments = command.get_args().collect::<Vec<_>>();

@@ -29,7 +29,7 @@ pub(crate) fn untrusted_reason(path: &Path) -> Option<&'static str> {
     let home = std::env::var_os("HOME").map(PathBuf::from);
     if let Some(home) = home {
         let in_home = path.canonicalize().ok().is_some_and(|resolved| {
-            resolved.starts_with(&home.canonicalize().unwrap_or(home.clone()))
+            resolved.starts_with(home.canonicalize().unwrap_or(home.clone()))
         });
         if in_home && metadata.uid() != unsafe { libc::geteuid() } {
             return Some("home file owned by another user");

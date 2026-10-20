@@ -1001,6 +1001,7 @@ mod tests {
         entries.iter().map(|entry| entry.package.clone()).collect()
     }
 
+    #[cfg(unix)]
     #[test]
     fn dsh_bin_from_enforces_the_trust_policy() {
         use std::os::unix::fs::PermissionsExt;
