@@ -1,6 +1,6 @@
 # Web UI プラグイン棚卸し (task-2)
 
-- 対象プロファイル: `~/.dsh/profiles/web` (dsh 0.2.1-rc.2 / GUI http://127.0.0.1:3080)
+- 対象プロファイル: `~/.dsh/profiles/web` (dsh 0.2.1-rc.2 / GUI <http://127.0.0.1:3080>)
 - 作業ブランチ: `test/webui-lighter` (worktree `/var/tmp/wt-uiperf`)
 - 調査は**読み取りのみ**。本番サービス `dsh-web.service` と `~/.dsh` の実設定は一切変更していない。
 - 分類は「**無効化しても安全**」「**条件付きで安全**」「**必要**」の3種。**推測は必ず「推測」と明記**した。
@@ -8,7 +8,7 @@
 ## 0. 結論サマリ
 
 | 分類 | プラグイン | 一言 |
-|---|---|---|
+| ---- | ---- | ---- |
 | **無効化しても安全** | `@local/rea-mcp` | 起動時点で解決失敗。すでに実効ゼロ。 |
 | **無効化しても安全** | `dsh-gitview` | バージョン非互換で起動スキップ済み。実効ゼロ。 |
 | **無効化しても安全** | `@local/dsh-sound` | client.js 49,670 B の最大級。音/通知のみで機能欠損なし。 |
@@ -28,7 +28,7 @@
 > **注意**: `dependencies` に載っていても `dsh.profile.bundles` に無いものは**読み込まれない**。
 > `@local/superlist-mcp` / `@local/opencode-live` / `@local/opencode-zen-usage` / `rdsh-update-banner` の4件が該当する。
 
----
+| ---- |
 
 ## 1. 起動失敗の実測 (一次証拠)
 
@@ -51,7 +51,7 @@ Discord MCP Server v2.2.0 running on stdio.
 `mcp-client(blender2)` / `mcp-client(unity2)` は `spawn ... ENOENT` で **attempt 1/10〜3/10 のリトライ**を繰り返している。
 Windows 側パス (`/mnt/c/...`) が WSL から見えないためで、**起動時間を確実に伸ばす**。
 
----
+| ---- |
 
 ## 2. プラグイン別の詳細
 
@@ -195,12 +195,12 @@ Windows 側パス (`/mnt/c/...`) が WSL から見えないためで、**起動�
 - **出現数**: 24 セッション。
 - **判断**: **無効化しても安全**。更新通知バナーが消えるだけ。**推測**: 18 KB の client.js を常時積む割に、効果は「更新があるときだけバナーを出す」ため、遅延ロードの良い候補。
 
----
+| ---- |
 
 ## 3. client.js サイズ一覧 (自作プラグインのみ)
 
 | プラグイン | client.js | index.js | 常時必要か |
-|---|---:|---:|---|
+| ---- | ---: | ---: | ---- |
 | `@local/dsh-sound` | 49,670 | 358 | いいえ (音のみ) |
 | `rdsh-settings` | 33,656 | 17,816 | **はい** (設定 UI) |
 | `rdsh-update-banner` | 18,041 | 22,040 | いいえ (未ロード) |
@@ -217,7 +217,7 @@ Windows 側パス (`/mnt/c/...`) が WSL から見えないためで、**起動�
 参考: DSH 標準の `dsh-client-ui-conversation/lib/client.js` だけで **774,080 B**。**自作プラグインの client.js 合計は標準 UI 1本より小さい**。
 → **転送量削減の主戦場は DSH 標準バンドル側**であり、自作プラグインの無効化で得られる削減は限定的 (最大でも 49,670 B の dsh-sound)。
 
----
+| ---- |
 
 ## 4. 推奨アクション (証拠に基づく優先順)
 
@@ -228,7 +228,7 @@ Windows 側パス (`/mnt/c/...`) が WSL から見えないためで、**起動�
 5. **触らない**: `dsh-base`, `dsh-web-app`, `dsh-experimental-agent-team-profile`, `rdsh-settings`, `rdsh-no-feedback`。
 6. **別途報告**: `@local/superlist-mcp` が bundles から脱落しており `~/.dsh/AGENTS.md` の「Superlist を正とする」指示と矛盾している。
 
----
+| ---- |
 
 ## 5. 未検証・限界
 

@@ -2,7 +2,7 @@
 
 計測日: 2026-10-20 (JST)
 ブランチ: `test/webui-lighter`
-再現スクリプト: [webui-docker-bench.sh](/var/tmp/wt-uiperf/scripts/webui-docker-bench.sh)
+再現スクリプト: [webui-docker-bench.sh](../../scripts/webui-docker-bench.sh)
 
 ## 0. 結論
 

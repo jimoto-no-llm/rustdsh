@@ -5,19 +5,19 @@
 作業ブランチ: `test/webui-lighter` (worktree `/var/tmp/wt-uiperf`)
 検証対象: DSH インストール先
 `/home/sahen/.local/opt/dsh-original/lib/node_modules/@deepseek-ai/dsh/node_modules/@deepseek-ai/`
-再現スクリプト: [webui-embedded-assets-repro.py](/var/tmp/wt-uiperf/docs/evidence/webui-embedded-assets-repro.py)
+再現スクリプト: [webui-embedded-assets-repro.py](webui-embedded-assets-repro.py)
 
 > **安全性**: 本検証は**読み取りのみ**。`dsh-web.service` は停止も再起動もしていない
 > (検証前後で `ActiveState=active`, `NRestarts=0`, `MainPID=400989` 不変)。
 > `~/.dsh` と元リポジトリ `/home/sahen/Projects/windows-migration/c1a2a17f4ca1-rustdsh` は未変更。
 > GUI への認証付きアクセスができないため、実ネットワーク転送量は**未検証** (後述)。
 
----
+| ---- |
 
 ## 0. 判定サマリ
 
 | # | 主張 | 判定 | 実測値 |
-|---|---|---|---|
+| ---- | ---- | ---- | ---- |
 | 1 | 全75プラグイン | **一致** | 75 (`*/lib/client.js` の個数) |
 | 2 | client.js 合計 11,619,693 chars | **一致** (char 単位。byte は 11,664,203) | 11,619,693 chars |
 | 3 | うち 3,645,684 chars が base64 画像 | **不一致** | 3,645,716 (接頭辞込み) / 3,645,224 (payload のみ) |
@@ -28,7 +28,7 @@
 | 8 | 同時に使われるのは 2 枚だけ、残り6枚は常に未使用 | **不一致 (誤り)** | 8枚すべてコード上到達可能。同時表示は 4 枚 (light 2 + dark 2) |
 | 9 | base64 の WebP が gzip でほとんど縮まない | **一致** (理由の記述は要補足) | 実 WebP の gzip 比 0.99875 |
 
----
+| ---- |
 
 ## 1. 計測手順
 
@@ -46,8 +46,8 @@ python3 docs/evidence/webui-embedded-assets-repro.py
 `<pkg>/lib/client.js` であり、これが **75 件**で主張と一致する。
 
 ```text
-$ find . -name client.js -type f | wc -l                      -> 87
-$ find . -maxdepth 3 -path '*/lib/client.js' -type f | wc -l  -> 75   <== 主張と一致
+find . -name client.js -type f | wc -l                      -> 87
+find . -maxdepth 3 -path '*/lib/client.js' -type f | wc -l  -> 75   <== 主張と一致
 ```
 
 ### 1.2 合計値: char と byte の区別
@@ -75,7 +75,7 @@ base64 chars (payload)    : 3645224   (31.371%)
 境界の定義を変えても主張値 3,645,684 は再現しなかった。試した定義:
 
 | 定義 | 値 |
-|---|---|
+| ---- | ---- |
 | payload のみ (`[A-Za-z0-9+/=]` を前進) | 3,645,224 |
 | 接頭辞 `data:...;base64,` 込み | 3,645,716 |
 | 二重引用符 `"` も含める | 3,645,733 |
@@ -111,7 +111,7 @@ data:image/png;base64,        1 件
 `onboarding_office_default` と `onboarding_code_default` の 2 **変数**を指している
 可能性が高いが、全体の件数としては誤り。
 
----
+| ---- |
 
 ## 2. 「8枚のうち2枚だけ使用」は誤り — コード上の反証
 
@@ -211,7 +211,7 @@ body[data-ds-dark-theme] .ywGceq_darkIllustration{display:block}
 「未使用の6枚」ではなく「テーマ/ロケールで選択されない 4〜6枚を
 遅延読み込みにできるか」という論点になる。
 
----
+| ---- |
 
 ## 3. gzip で縮まないことの確認
 
@@ -252,12 +252,12 @@ gzip(decoded webp) bytes: 414599
 
 全 8 枚の WebP で同様に 0.7718 (合計 3,200,352 → 2,470,115)。
 
----
+| ---- |
 
 ## 4. 未検証項目 (推測で埋めていない)
 
 | 項目 | 状態 | 理由 |
-|---|---|---|
+| ---- | ---- | ---- |
 | 実ネットワーク転送量 (gzip 後) | **未検証** | GUI `http://127.0.0.1:3080/` が 401。認証手段がなく、バンドル配信エンドポイントの応答を取得できない |
 | ブラウザでの実描画・`<img>` 取得数 | **未検証** | 同上。DevTools/Playwright での実測は認証が前提 |
 | 「初期ロード」の厳密な定義と対象範囲 | **未検証** | 全 75 バンドルが初期ロードで配られるのか、遅延ロードされるのかを実測できていない。本レポートは「インストール済み全 client.js の静的合計」を測ったもので、初期ロード転送量そのものではない |
@@ -267,7 +267,7 @@ gzip(decoded webp) bytes: 414599
 > 再現するが、初期ロードの実転送に対する比率としては本検証では確認できていない。
 > 用語を「インストール済み client.js 合計に対する比率」と限定するのが正確。
 
----
+| ---- |
 
 ## 5. 再現方法
 
@@ -280,7 +280,7 @@ python3 docs/evidence/webui-embedded-assets-repro.py --json     # 機械可読
 スクリプトは読み取り専用で、外部依存は Python 標準ライブラリのみ。
 `--install` で別のインストール先も計測可能。
 
----
+| ---- |
 
 ## 6. 結論
 

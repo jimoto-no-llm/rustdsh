@@ -100,6 +100,7 @@ RDSH_WEB_ASSETS=<キャッシュディレクトリの絶対パス>
 4. manifest にある場合、`Accept-Encoding` を見て優先順に選ぶ:
    `br` → `gzip` → `identity`（`q=0` は除外。`*` は考慮しない）
 5. レスポンスヘッダ:
+
    ```text
    content-type: <拡張子から決定>
    content-encoding: br | gzip | （identity では付けない）
@@ -108,6 +109,7 @@ RDSH_WEB_ASSETS=<キャッシュディレクトリの絶対パス>
    content-length: <実際に送るバイト数>
    vary: accept-encoding          （identity 以外を選びうる場合）
    ```
+
 6. `If-None-Match` が etag と一致 → **304** をヘッダ付きで返しボディなし。
 7. HEAD はボディを送らない。
 

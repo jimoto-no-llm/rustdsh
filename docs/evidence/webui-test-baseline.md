@@ -66,7 +66,7 @@ pristine な `main` でも同一に再現する既存不具合である (4 節)�
 
 ### 3.1 `plugins/workflow-board` `npm test` — 素の実行 (13 fail)
 
-```
+```text
 > node --test tests/source-patch.test.mjs
 
 ✖ checks without writing; applies to a checkout with spaces; repeats with nested new files (151.569871ms)
@@ -140,7 +140,7 @@ test at tests/source-patch.test.mjs:69:1
 
 残りの失敗も同一の `RDSH_FAILED` 起因で、期待コードとの差分は次のとおり。
 
-```
+```text
 +   code: 'RDSH_FAILED'
 -   code: 'PATCH_INTEGRITY'
 
@@ -156,7 +156,7 @@ test at tests/source-patch.test.mjs:69:1
 
 ### 3.2 CI の node スイート (plugin-security 系) — `RDSH_BIN` 未対策時
 
-```
+```text
 test at tests/plugin-security.test.mjs:102:11
 ✖ authenticated reads, saves and updater remain usable (4.138873ms)
   AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
@@ -179,7 +179,7 @@ test at tests/plugin-security.test.mjs:102:11
 
 ### 3.3 `tests/upstream-approval-integrity.test.mjs` — 前提パッケージ未導入時
 
-```
+```text
 node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
@@ -205,7 +205,7 @@ Node.js v24.21.0
 
 55 件が `ok:`、以下 1 件が失敗 (末尾の生ログ):
 
-```
+```text
 rdsh installer: Linux/x86_64
 error: could not find `Cargo.toml` in `/var/tmp/tmp.dPbkhYxHaY/valid/project` or any parent directory
 pinned rustup-init fixture did not install
@@ -219,7 +219,7 @@ FAIL(output): rustup-init pinned checksum
 `plugins/workflow-board/source-patch.mjs:12-20` の `nativeBin()` は
 `process.env.RDSH_BIN` を最優先で返す。この実行環境では:
 
-```
+```text
 RDSH_BIN=/home/sahen/.local/bin/rdsh
 /home/sahen/.local/bin/rdsh --version  →  rdsh 0.9.2
 /usr/bin/rdsh --version                →  rdsh 0.9.2
@@ -243,7 +243,7 @@ RDSH_BIN=/var/tmp/wt-uiperf/target/debug/rdsh npm test
 
 修正後の結果:
 
-```
+```text
 ✔ checks without writing; applies to a checkout with spaces; repeats with nested new files (102.605904ms)
 ﹣ Windows drive-letter casing still identifies the same source root (0.126228ms) # SKIP
 ✔ rejects modified source, untracked files, wrong roots and unsupported revisions (78.770966ms)
@@ -280,7 +280,7 @@ RDSH_BIN=/var/tmp/wt-uiperf/target/debug/rdsh npm test
 env -u RDSH_BIN node --test tests/plugin-security.test.mjs
 ```
 
-```
+```text
 ℹ tests 18
 ℹ pass 18
 ℹ fail 0
@@ -288,7 +288,7 @@ env -u RDSH_BIN node --test tests/plugin-security.test.mjs
 
 CI 相当の 8 ファイル構成でも:
 
-```
+```text
 ℹ tests 79
 ℹ pass 78
 ℹ fail 0
@@ -306,7 +306,7 @@ Cargo プロジェクトは用意しないためビルドが失敗する。
 この failure が本ブランチ固有でないことの証明として、**未変更の `main` を
 detached で一時 worktree に展開し、同じテストを実行**した (実行後に worktree は削除済み):
 
-```
+```text
 === main HEAD: c44a2a7e ===
 rdsh installer: Linux/x86_64
 error: could not find `Cargo.toml` in `/var/tmp/tmp.Sm1wKf69CO/valid/project` or any parent directory

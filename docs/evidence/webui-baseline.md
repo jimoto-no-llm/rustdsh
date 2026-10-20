@@ -91,7 +91,7 @@ kill -TERM $P; sleep 2; kill -9 $P 2>/dev/null
 
 ### 3.1 本番サービス (systemd, 読み取りのみ)
 
-```
+```bash
 $ systemctl --user show dsh-web.service -p ActiveState -p SubState -p MainPID \
     -p ExecMainStartTimestamp -p ActiveEnterTimestamp -p MemoryCurrent -p MemoryPeak -p NRestarts
 ActiveState=active
@@ -111,7 +111,7 @@ MemoryPeak=1694605312        # ≈ 1.58 GiB
 
 ### 3.2 別ポート起動での RSS (起動 12 秒後、MCP 子プロセス含む)
 
-```
+```text
 full_profile  main_rss_kb=2140   direct_children=1  children_rss_kb=430688
 minimal_home  main_rss_kb=2280   direct_children=1  children_rss_kb=299972
 ```
@@ -172,7 +172,7 @@ lead の値は brotli **品質 ~9** 相当 (q9: 264170 / 163082 / 13805) に近�
 
 zlib で各レベルを再現し、配信バイト数と比較:
 
-```
+```text
 file                       served | L1      L2      L3      L4      L5      L6      L7      L8      L9
 index-CN7NIWNw.js          316005 | 316005  308973  304985  295097  286365  285293  284997  284843  284725
 vendor-DcuzkuQH.js         206829 | 206829  201698  198135  188680  181344  179829  179212  178867  178481
@@ -189,7 +189,7 @@ vendor-DV2921Zo.css          8012 |   8012    7922    7849    7659    7551    75
 
 ### 4.4 配信ヘッダ (実測)
 
-```
+```text
 HTTP/1.1 200 OK
 content-type: text/javascript; charset=utf-8
 Vary: Accept-Encoding
@@ -297,7 +297,7 @@ client.js に含まれるかは別途確認が必要。
 
 実測ログ全文 (現状構成 `DSH_HOME=/home/sahen/.dsh`, `A_cold_1.log`, 3 行):
 
-```
+```text
 dsh: skipping profile bundle "@local/rea-mcp": Error: dsh: cannot resolve profile bundle "@local/rea-mcp" from the dsh installation or /home/sahen/.dsh/profiles/web; run 'dsh plugin --profile web install' if its dependency is not installed
 dsh: skipping profile bundle "dsh-gitview": Error: Plugin dsh-gitview@0.1.0 is incompatible with dsh 0.2.1-rc.2: requirements {"engines.dsh":"0.2.0-rc.2"}. Running it may cause crashes or data loss. Update the plugin or install a plugin version compatible with this dsh runtime. To accept this risk explicitly, grant the exact-version exemption for dsh-gitview@0.1.0 on dsh 0.2.1-rc.2 with `dsh plugin allow-version` or the plugin manager, then retry the installation or restart dsh. Exact-version exemption: not active.
 /usr/bin/python3: can't open file '/home/sahen/適当/gemini-mcp/server.py': [Errno 2] No such file or directory
@@ -315,12 +315,14 @@ lead の 3 件の主張は**すべて再現**。加えて **4 件目 (gemini-mcp
 ### 6.1 起動後に観測された MCP 側のエラー (n=3 中 1 回のみ)
 
 `B_warm_3.log` (21 行) と `B_warmup.log` には、起動後に:
-```
+
+```text
 [alpha-mcp] Server started (v0.1.7)
 [alpha-mcp] Uncaught exception: write EPIPE
 Discord MCP Server v2.2.0 running on stdio.
 Uncaught exception: Error: write EPIPE   (StdioServerTransport.send)
 ```
+
 これは**テストハーネスがプロセスを kill した際の EPIPE** であり、起動失敗ではない (推測)。
 ただし `B_warm_3` の起動時間が 3.641s と遅かったことと時間的に重なる。
 
@@ -333,7 +335,7 @@ Uncaught exception: Error: write EPIPE   (StdioServerTransport.send)
 
 プロファイル: `/tmp/dsh-prof/CPU.20261020.202909.585109.0.001.cpuprofile` (メインスレッド, 1798537 bytes)
 
-```
+```text
 total sampled us: 6538397 (6.54 s)
 samples: 5937
 ```

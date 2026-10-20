@@ -152,7 +152,7 @@ webserver (required)
 
 ### 4.2 キャッシュヘッダの非対称（重要）
 
-```
+```text
 GET /assets/index-CN7NIWNw.js
   → content-type のみ。cache-control / etag / last-modified なし
 
@@ -203,7 +203,7 @@ res.end(body);
 ### 4.3 埋め込み画像（最大の転送量要因、ただし upstream 側）
 
 プラグインの client.js には画像が base64 で埋め込まれている。独立検証
-([webui-embedded-assets.md](/var/tmp/wt-uiperf/docs/evidence/webui-embedded-assets.md))
+([webui-embedded-assets.md](evidence/webui-embedded-assets.md))
 で確認した実測値:
 
 | 項目 | 実測値 |
@@ -340,7 +340,7 @@ scripts/webui-bench.sh profile
 ホスト計測は実プロファイル（MCP サーバ 5 本・失敗プラグイン 3 本）の影響を受け、
 起動時間が環境状態に左右された。これを除くため、コンテナ内で
 **コアバンドル2つだけの新しい DSH_HOME** を使った A/B を別途行った。
-詳細は [webui-docker-bench.md](/var/tmp/wt-uiperf/docs/evidence/webui-docker-bench.md)。
+詳細は [webui-docker-bench.md](evidence/webui-docker-bench.md)。
 
 ```text
 image  : node:22-slim (sha256:c3de60bf...), node v22.23.3
