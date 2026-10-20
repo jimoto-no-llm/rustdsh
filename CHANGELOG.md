@@ -7,6 +7,10 @@ Format follows Keep a Changelog, versioning follows Semantic Versioning.
 
 ### Fixed
 
+- strict監査（RDSH_SECURITY=1）で dsh 本体 `lib/bin.js` の SHA256 を
+  ADAPTER監査表に追加し、境界設置前に内容照合するようにしました。偽ツリー
+  （manifest一致のみで bin.js 差し替え）を拒否します。strict 経路では
+  `NODE_COMPILE_CACHE` も除去します（#824）。
 - `rdsh search-web` の接続先を既定でループバックのみに制限しました。
   ループバック以外は `SEARXNG_ALLOW_REMOTE=1` で明示許可、リンクローカルと
   キャリア級NAT帯は常に拒否します。`https://` 接続に対応し、ログや `--json`
