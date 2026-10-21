@@ -809,8 +809,9 @@ DeepSeek Harness provides the upstream runtime; without it, rustdsh would not ex
 Thanks to the upstream developers and everyone contributing code, reviews, tests, and ideas:
 
 - Icon by [PENTACoXIAN](https://x.com/PENTACoXIAN)
-- Security reports & review: [GrEarl](https://github.com/GrEarl), [PENTACoXIAN](https://x.com/PENTACoXIAN)
-- Contributions & validation: [StudioYebisu](https://github.com/yebisu0529-ship-it), [RNA4219](https://github.com/RNA4219), [eightman999](https://github.com/eightman999)
+- Security audit (specialist), reports & review: [GrEarl](https://github.com/GrEarl) ([@Iamwonderingif](https://x.com/Iamwonderingif)), [PENTACoXIAN](https://x.com/PENTACoXIAN)
+- Contributions & validation: [StudioYebisu](https://github.com/yebisu0529-ship-it), [RNA4219](https://github.com/RNA4219), [eightman999](https://github.com/eightman999), [cyrne1-7208](https://github.com/cyrne1-7208)
+- AI provision: [StudioYebisu](https://github.com/yebisu0529-ship-it), Eureka ([@uReKA337307](https://x.com/uReKA337307) / [Eureka-COM](https://github.com/Eureka-COM))
 - Ideas & feedback: [@remydre8](https://x.com/remydre8)
 - Default Web UI plugins (used with upstream permission, MIT): [dsh-sound-notifications](https://github.com/cwd514/dsh-sound-notifications) by [cwd514](https://github.com/cwd514) ((c) 2026) — synthesized tones and desktop notifications; [dsh-gitview](https://github.com/yugapor/dsh-gitview) by [yugapor](https://github.com/yugapor) ((c) 2026) — Git panel with diffs, history, and CI status. Both are fetched from upstream GitHub at install time (see `plugins/recommended.md`).
 
